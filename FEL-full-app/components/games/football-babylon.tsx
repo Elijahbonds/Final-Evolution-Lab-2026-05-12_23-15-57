@@ -9,6 +9,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import type { GameProps, GameResult } from './game-shell';
 import { useBabylonPlaytestBridge } from './use-babylon-playtest-bridge';
 import { BootSplash } from './boot-splash';
+import { surfaceBootError } from './boot-error';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
@@ -68,7 +69,7 @@ export default function FootballBabylon({ onEnd }: GameProps) {
           if (disposed) { if (canvasOwner.get(canvas) === token) s(); return; }
           stop = s;
         })
-        .catch((e) => { if (!disposed) setLoadError(String(e?.message ?? e)); });
+        .catch((e) => surfaceBootError(e, { disposed, label: '[FEL-FOOTBALL] boot failed', setPhase, setLoadError }));
     }, 0);
 
     return () => {
@@ -77,7 +78,7 @@ export default function FootballBabylon({ onEnd }: GameProps) {
       if (canvasOwner.get(canvas) === token) stop?.();
       busRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- callbacks are read through refs; the Babylon stage is mount-owned.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- G7: the stage is owned by the mount; callbacks are read through refs.
   }, []);
 
   const emit = useCallback((e: Parameters<InputBus['emit']>[0]) => {

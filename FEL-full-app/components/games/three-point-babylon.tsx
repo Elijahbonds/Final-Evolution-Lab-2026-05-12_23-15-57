@@ -15,6 +15,7 @@ import type { LobbyPeer } from '@/lib/controller-link/types';
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import type { GameProps, GameResult } from './game-shell';
 import { BootSplash } from './boot-splash';
+import { surfaceBootError } from './boot-error';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { rackPips, SHOT_TARGET, PERFECT_BAND, GOOD_BAND } from '@/lib/babylon/core/shootoutHud';
@@ -45,6 +46,8 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const busRef = useRef<InputBus | null>(null);
   const endedRef = useRef(false);
+  const onEndRef = useRef(onEnd);
+  onEndRef.current = onEnd;
   const [phase, setPhase] = useState<ModePhase>('loading');
   // the running order lives in a ref AND state: the input callback reads it every frame (ref) while the
   // banner renders from it (state)
@@ -83,7 +86,7 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
       const pts = Number(r.stats?.points ?? r.score ?? 0);
       const rivalPts = Number(r.stats?.rivalScore ?? 0);
       const won = r.outcome === 'win';
-      onEnd({
+      onEndRef.current({
         score: pts,
         stats: r.stats, outcome: r.outcome,   // pass 5 phase 3: the proof line reads these
         opponentScore: rivalPts,
@@ -122,7 +125,7 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
       },
       resultSink,
     }).then((s) => { if (disposed) s(); else stop = s; })
-      .catch((e) => { if (!disposed) setLoadError(String(e?.message ?? e)); });
+      .catch((e) => surfaceBootError(e, { disposed, setPhase, setLoadError }));
     }, 0);
 
     return () => { disposed = true; clearTimeout(startTimer); stop?.(); };

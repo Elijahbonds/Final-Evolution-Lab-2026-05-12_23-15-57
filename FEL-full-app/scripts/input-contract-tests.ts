@@ -127,6 +127,17 @@ check('GameShell mounts the PhysicalGamepadPoller (physical controller)', () => 
 check('GameShell mounts the VirtualController (on-screen touch pad)', () => {
   assert.ok(/VirtualController/.test(shell), 'GameShell must render the touch controller');
 });
+check('Babylon-owned input suppresses the legacy touch deck', () => {
+  assert.ok(/const babylonOwnsInput = isBabylon\(mode\) \|\| !!ownControls/.test(shell), 'GameShell must compute one input owner for Babylon hosts');
+  assert.ok(/!babylonOwnsInput && !streamOn && <VirtualController/.test(shell), 'VirtualController must be gated on babylonOwnsInput, not only ownControls');
+});
+check('offline profile state is an error card, not error plus spinner', () => {
+  assert.ok(/!\s*unreachable \? \(/.test(shell), 'GameShell loading spinner must be suppressed when the server is unreachable');
+});
+check('signed-in challenge links are settled from the finished GameShell run', () => {
+  assert.ok(/searchParams\.get\('c'\)/.test(shell), 'GameShell must read /play/<mode>?c=<code>');
+  assert.ok(/\/api\/challenge\/\$\{encodeURIComponent\(challengeCode\)\}\/attempt/.test(shell), 'GameShell must post the finished score to the challenge attempt endpoint');
+});
 
 // ---- 3. touch + gamepad collapse onto the SAME keyboard events ----------
 const bridge = read(path.join(ROOT, 'lib', 'gamepad-bridge.ts'));

@@ -10,6 +10,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import type { GameProps, GameResult } from './game-shell';
 import { useBabylonPlaytestBridge } from './use-babylon-playtest-bridge';
 import { BootSplash } from './boot-splash';
+import { surfaceBootError } from './boot-error';
 import { BoostGauge } from './boost-hud';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
@@ -59,6 +60,8 @@ export function makeBoardHost(opts: BoardHostOpts) {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const busRef = useRef<InputBus | null>(null);
     const endedRef = useRef(false);
+    const onEndRef = useRef(onEnd);
+    onEndRef.current = onEnd;
     const [phase, setPhase] = useState<ModePhase>('loading');
     const [countdown, setCountdown] = useState<number | null>(null);
     const [loadError, setLoadError] = useState<string | null>(null);
@@ -79,7 +82,7 @@ export function makeBoardHost(opts: BoardHostOpts) {
         // boards pass phase 10: the card reads the MODE's line. It used to say `0 COINS · x1 CHAIN` for every board (snow has no
         // coins; `combo` was never a stat) and `won: false` for every run — the modes end 'win' / 'complete' now.
         const won = boardSportWon(r.outcome);
-        onEnd(boardGameResult(r, { modeKey, headline: boardHeadline(modeKey, r, won) }));
+        onEndRef.current(boardGameResult(r, { modeKey, headline: boardHeadline(modeKey, r, won) }));
       };
 
       const def = MODES[modeKey];
@@ -117,7 +120,7 @@ export function makeBoardHost(opts: BoardHostOpts) {
           if (disposed) { s(); return; }
           stop = s;
         })
-          .catch((e) => console.error(`[${tag}] boot failed`, e));
+          .catch((e) => surfaceBootError(e, { disposed, label: `[${tag}] boot failed`, setPhase, setLoadError }));
       }, 0);
 
       return () => {
@@ -126,7 +129,8 @@ export function makeBoardHost(opts: BoardHostOpts) {
         stop?.();
         busRef.current = null;
       };
-    }, [onEnd]);
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- G7: the stage is owned by the mount; callbacks are read through refs.
+    }, []);
 
     const emit = useCallback((e: Parameters<InputBus['emit']>[0]) => {
       busRef.current?.emit(e);

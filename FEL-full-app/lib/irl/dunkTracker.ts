@@ -115,7 +115,7 @@ export class DunkTracker {
   private result: DunkMetrics | null = null;
   private refusal: DunkRefusal | null = null;
 
-  /** Reset for the next attempt. */
+  /** Reset for the next attempt. Clears the floor line, so the next attempt calibrates again. */
   reset(): void {
     this.phase = 'idle';
     this.floorY = 0;
@@ -125,6 +125,32 @@ export class DunkTracker {
     this.preFrames = [];
     this.result = null;
     this.refusal = null;
+    this.takeoffAt = 0;
+    this.landedAt = 0;
+  }
+
+  /**
+   * Arm the next attempt without a new floor calibration.
+   *
+   * SESSION-SETUP-V1: the phone stays put between dunks, so the floor line from the first still stance stands.
+   * Call reset() instead when the camera moved (a flip, or framing that goes red). With no floor yet, this is reset().
+   */
+  rearm(): void {
+    const keepFloor = this.floorY > 0 && (this.phase === 'ready' || this.phase === 'settling');
+    this.hipTrail = [];
+    this.airFrames = [];
+    this.preFrames = [];
+    this.calibration = [];
+    this.result = null;
+    this.refusal = null;
+    this.takeoffAt = 0;
+    this.landedAt = 0;
+    if (keepFloor) {
+      this.phase = 'ready';
+      return;
+    }
+    this.phase = 'idle';
+    this.floorY = 0;
   }
 
   get state(): Phase { return this.phase; }

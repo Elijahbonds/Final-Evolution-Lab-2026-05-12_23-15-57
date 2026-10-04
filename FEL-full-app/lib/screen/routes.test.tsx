@@ -26,7 +26,8 @@ describe('(a) /play/mirror/assess renders for a guest', () => {
     expect(t).toContain('Hands-on-hips jump');
     expect(t).not.toMatch(/dorsiflexion|countermovement/i);
     expect(h).toMatch(/<a[^>]*href="\/screen\/privacy"/);
-    expect(h).toMatch(/<button[^>]*data-primary[^>]*>Start<\/button>/);
+    expect(h).toMatch(/data-primary[^>]*>Just test my jump \(about 1 min\)/);
+    expect(h).toContain('Full movement screen (about 5 min)');
     expect(t).not.toMatch(/sign in|log in|create an account/i);
     // the page module reads no session any more
     const { readFileSync } = await import('node:fs');
@@ -49,12 +50,17 @@ describe('(a) /play/mirror/assess renders for a guest', () => {
 });
 
 describe('(d) /screen: one stable QR address', () => {
-  const digest = (fn: () => unknown): string => { try { fn(); } catch (e) { return String((e as { digest?: string }).digest); } return 'no redirect'; };
-  it('sends to /play/mirror/assess with a temporary (307) redirect, keeping the query string, with no auth', async () => {
+  it('shows the jump first, then the full screen, and does not forward a query string', async () => {
     const { default: ScreenEntry } = await import('@/app/screen/page');
-    expect(digest(() => ScreenEntry({ searchParams: {} }))).toMatch(/^NEXT_REDIRECT;replace;\/play\/mirror\/assess;307;/);
-    expect(digest(() => ScreenEntry({ searchParams: { src: 'qr' } }))).toMatch(/^NEXT_REDIRECT;replace;\/play\/mirror\/assess\?src=qr;307;/);
-    expect(digest(() => ScreenEntry({ searchParams: { src: 'qr', a: ['1', '2'] } }))).toMatch(/\/play\/mirror\/assess\?src=qr&a=1&a=2;307;/);
+    const h = renderToStaticMarkup(createElement(ScreenEntry));
+    const t = text(h);
+    expect(t.indexOf('Just test my jump (about 1 min)')).toBeGreaterThan(-1);
+    expect(t.indexOf('Just test my jump (about 1 min)')).toBeLessThan(t.indexOf('Full movement screen (about 5 min)'));
+    expect(t.indexOf('Just test my jump (about 1 min)')).toBeLessThan(t.indexOf('This is a free movement check, not a medical exam.'));
+    expect(h).toMatch(/href="\/play\/mirror\/assess\?run=jump"/);
+    expect(h).toMatch(/href="\/play\/mirror\/assess\?run=full"/);
+    expect(h).not.toMatch(/[?&amp;]src=/);
+    expect(h).not.toMatch(/NEXT_REDIRECT|pose|wasm|mediapipe/i);
     const { readFileSync, existsSync } = await import('node:fs');
     const { join } = await import('node:path');
     expect(readFileSync(join(__dirname, '../../app/screen/page.tsx'), 'utf8')).not.toMatch(/getServerSession|authOptions/);

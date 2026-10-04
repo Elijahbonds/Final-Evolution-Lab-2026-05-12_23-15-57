@@ -23,6 +23,7 @@ export function DunkReelView(props: {
   onExport: (aspect: '9:16' | '16:9') => void;
   onShare: () => void;
   onSaveNumbers: () => void;
+  saveCard?: ReactNode;
 }) {
   const { reel } = props;
   return (
@@ -46,6 +47,7 @@ export function DunkReelView(props: {
           {clip.lines.map((line) => <p key={line} style={{ margin: '2px 0', fontSize: 14 }}>{line}</p>)}
         </article>
       ))}
+      {props.saveCard}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
         <button type="button" data-testid="dunk-export-916" style={btn} disabled={!props.canLeave} onClick={() => props.onExport('9:16')}>Export 9:16</button>
         <button type="button" data-testid="dunk-export-169" style={btn} disabled={!props.canLeave} onClick={() => props.onExport('16:9')}>Export 16:9</button>

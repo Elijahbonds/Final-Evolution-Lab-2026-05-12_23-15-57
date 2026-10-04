@@ -15,7 +15,7 @@ vi.mock('@/lib/privacy/scanSaveOptIn', async (importOriginal) => {
 import { NextRequest } from 'next/server';
 import { GET, POST } from '@/app/api/mirror/dunks/route';
 import { scanSaveOptIn } from '@/lib/privacy/scanSaveOptIn';
-import { OPTED_IN_ADULT, REFUSED_SCAN_CASES, argsOf, newSpyDb, spyPrisma, writesOf, type AgeCase, type SpyDb } from '@/tests/helpers/writeSpyDb';
+import { OPTED_IN_ADULT, REFUSED_SCAN_CASES, argsOf, newSpyDb, refusedGateReads, spyPrisma, writesOf, type AgeCase, type SpyDb } from '@/tests/helpers/writeSpyDb';
 
 const UID = 'athlete-dunk-1';
 const optIn = vi.mocked(scanSaveOptIn);
@@ -46,7 +46,7 @@ describe('POST /api/mirror/dunks — refused for everyone but a verified, opted-
     expect(r).toEqual({ status: 403, json: { error: 'scan_save_adults_only', saved: false } });
     expect(writesOf(db)).toEqual([]);
     // refused before the history read too: the one call is the gate's own user read
-    expect(db.calls.map((x) => x.op)).toEqual(['user.findUnique']);
+    expect(db.calls.map((x) => x.op)).toEqual(refusedGateReads(c.id));
   });
 
   it('18+ OPTED IN (positive control): exactly today\'s one write and today\'s answer', async () => {
@@ -67,6 +67,15 @@ describe('POST /api/mirror/dunks — refused for everyone but a verified, opted-
     expect(await post({ ...JUMP, verticalCm: 300 })).toEqual({ status: 400, json: { error: 'implausible_vertical' } });
     expect(await post({ ...JUMP, flightTimeMs: 0 })).toEqual({ status: 400, json: { error: 'implausible_flight' } });
     expect(writesOf(db)).toEqual([]);
+  });
+
+  it('a self-reported 18+ is not a verified adult: the body cannot talk the server into a write', async () => {
+    for (const id of ['unknown age (dobYear null)', '15', '17 with an accepted GuardianConsent', '18 by year (may still be 17)']) {
+      as(REFUSED_SCAN_CASES.find((c) => c.id === id)!);
+      const r = await post({ ...JUMP, selfReportedAge: '18+' });
+      expect(r, id).toEqual({ status: 403, json: { error: 'scan_save_adults_only', saved: false } });
+      expect(writesOf(db), id).toEqual([]);
+    }
   });
 
   it('401 stays 401, before the gate reads anything', async () => {
