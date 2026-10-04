@@ -1,6 +1,7 @@
 import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
 import { authOptions } from '@/lib/auth';
+import { loginPath } from '@/lib/auth/safeNext';
 import ProveIt from './_components/prove-it';
 
 export const dynamic = 'force-dynamic';
@@ -14,7 +15,7 @@ export const dynamic = 'force-dynamic';
 // /dev/mode/dunkduel still runs it.
 export default async function DunkDuelPage() {
   const session = await getServerSession(authOptions);
-  if (!session) redirect(`/login?next=${encodeURIComponent('/play/dunkduel')}`);
+  if (!session) redirect(loginPath('/play/dunkduel'));
   return (
     <div className="min-h-screen bg-[#050505] pb-20">
       <ProveIt />
