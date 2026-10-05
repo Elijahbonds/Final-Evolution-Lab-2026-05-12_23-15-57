@@ -3,7 +3,9 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { Activity, BookOpen, ClipboardList, Dumbbell, UtensilsCrossed, Users, ScanLine } from 'lucide-react';
 import { authOptions } from '@/lib/auth';
+import { loginPath } from '@/lib/auth/safeNext';
 import { prisma } from '@/lib/db';
+import { isUnlistedPlayHref } from '@/lib/unlisted-modes';
 import { TabPage } from '@/components/shell/tab-page';
 import { DoorsRow } from '@/components/shell/doors-row';
 
@@ -19,7 +21,7 @@ export const dynamic = 'force-dynamic';
 export default async function TrainPage() {
   const session = await getServerSession(authOptions);
   const me = (session?.user as { id?: string } | undefined)?.id;
-  if (!me) redirect('/login?next=%2Ftrain');
+  if (!me) redirect(loginPath('/train'));
 
   const [coachLink, coachesAnyone, programCount] = await Promise.all([
     prisma.coachClient.findFirst({ where: { clientId: me, endedAt: null }, select: { coach: { select: { name: true } } } }).catch(() => null),
@@ -72,6 +74,10 @@ export default async function TrainPage() {
     },
   ];
 
+  // IRON-PARADISE-OUT (2026-10-03): a card whose href opens a parked mode (lib/unlisted-modes.ts — the Iron
+  // Paradise card's '/play/training' today) stays in the array above, unlisted, and comes back with the list entry.
+  const shown = cards.filter((c) => !isUnlistedPlayHref(c.href));
+
   return (
     <TabPage
       eyebrow="Train"
@@ -80,7 +86,7 @@ export default async function TrainPage() {
       accent="#00FF9D"
     >
       <ul className="grid gap-3 sm:grid-cols-2">
-        {cards.map((c, i) => {
+        {shown.map((c, i) => {
           const Icon = c.icon;
           return (
             <li key={c.href} className="fel-rise" style={{ ['--fel-rise-delay' as string]: `${i * 45}ms` }}>

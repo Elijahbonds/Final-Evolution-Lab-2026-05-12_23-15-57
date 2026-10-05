@@ -40,8 +40,25 @@ import { gradeT1 } from './graders/t1-overhead-squat';
 import { gradeT2 } from './graders/t2-dorsiflexion';
 import { gradeT3 } from './graders/t3-single-leg-squat';
 import { detectFlights, gradeT5 } from './graders/t5-cmj';
+import { rejectionForPart, type Rejection } from './rejection';
+import { AUTO_ADVANCE_MS, type FlashKind } from '@/lib/screen/realtime-cues';
 import { PAIN_REFERRAL, reasonsFor, topFindings, type Reason } from './why';
 import { prqWritesFor, toRecord, type PrqWrite, type RecordDevice } from './prqWrite';
+
+const STILL_MS = 900;
+
+function moveOf(part: PartId | null, parts: readonly PartDef[]): { index: number; total: number; name: string; cue: string } | null {
+  if (!part) return null;
+  const test = parts.find((p) => p.id === part)?.test ?? null;
+  if (!test) return null;
+  const order: TestId[] = [];
+  for (const p of parts) if (!order.includes(p.test)) order.push(p.test);
+  const index = order.indexOf(test) + 1;
+  const def = testDef(test);
+  const cue = part === 'T1-side' ? 'Turn side-on, left to the camera' : part.includes('right') && part.startsWith('T2')
+    ? 'Right side to the camera' : part.includes('right') && part.startsWith('T3') ? 'Right leg' : def.setup.split('.')[0];
+  return { index, total: order.length, name: def.short, cue };
+}
 
 // ── the session result (the live flow and the replay grade the same way) ──
 
@@ -72,8 +89,12 @@ export interface SessionResult {
 
 const QUICK_ORDER: TestId[] = ['T1', 'T2', 'T3', 'T5'];
 
-/** Grade a whole Quick Screen from its captures. Deterministic: the same captures give an equal result. */
-export function gradeSession(cap: SessionCapture): SessionResult {
+/**
+ * Grade a whole Quick Screen from its captures. Deterministic: the same captures give an equal result.
+ * `prior` fills a test that has no capture (a jump already graded, carried into the rest of the screen).
+ * A capture always grades fresh. The prior object is kept as-is when it is used.
+ */
+export function gradeSession(cap: SessionCapture, prior?: Partial<Record<TestId, TestResult>>): SessionResult {
   const ctx = { calibration: cap.calibration, aspect: cap.calibration.aspect, ...(cap.poseHz ? { poseHz: cap.poseHz } : {}) };
   const tests: TestResult[] = [];
   let stopped = false;
@@ -84,6 +105,7 @@ export function gradeSession(cap: SessionCapture): SessionResult {
     else if (id === 'T2' && cap.T2) t = gradeT2(cap.T2, ctx);
     else if (id === 'T3' && cap.T3) t = gradeT3(cap.T3, ctx);
     else if (id === 'T5' && cap.T5) t = gradeT5(cap.T5, { ...ctx, poseHz: undefined, cameraFps: cap.cameraFps ?? null });
+    else if (prior?.[id]) t = prior[id]!;
     else t = skipped(id);
     if (cap.painAfter === id) { t = { ...t, status: 'painStop', score03: 0, frozen: [] }; stopped = true; }
     tests.push(t);
@@ -143,6 +165,11 @@ export const QUICK_PARTS: readonly PartDef[] = [
   { id: 'T5', test: 'T5', view: 'front', target: th('t5.reps'), maxAttempts: TRIES.T5, maxMs: LIMIT.T5, label: null, highFps: true, setup: `Jump. ${testDef('T5').setup}` },
 ];
 
+/** T5 only: the jump-only screen. */
+export const JUMP_PARTS: readonly PartDef[] = QUICK_PARTS.filter((p) => p.test === 'T5');
+/** T1–T3: the rest of the full screen after a jump that is already graded. */
+export const REST_PARTS: readonly PartDef[] = QUICK_PARTS.filter((p) => p.test !== 'T5');
+
 export type RunnerStep =
   | 'framing' | 'pain' | 'takeoff' | 'calibrate' | 'calibrateSide' | 'position' | 'countdown' | 'active' | 'paused'
   | 'partDone' | 'miniResult' | 'painCheck' | 'done' | 'stopped';
@@ -175,6 +202,20 @@ export interface RunnerView {
   result: SessionResult | null;
   /** Parts finished of all parts. */
   progress: { done: number; total: number };
+  /** Full-screen colour flash (SCREEN-REALTIME). */
+  flash: FlashKind | null;
+  /** Plain rejection line for the last rep that did not count. */
+  rejection: Rejection | null;
+  /** Move N of 4, readable from across the room. */
+  move: { index: number; total: number; name: string; cue: string } | null;
+  /** Framing held long enough to start the countdown. */
+  setupReady: boolean;
+  /** Dim light: a warning, not a hard stop. */
+  dimWarning: boolean;
+  /** Auto-retry message for this part (one retry per move). */
+  retryMessage: string | null;
+  /** Hands-free: no tap prompts in the runner. */
+  handsFree: boolean;
 }
 
 /**
@@ -227,8 +268,12 @@ export interface RunnerOptions {
   takeoffLeg?: Side | null;
   /** The page already asked "Does anything hurt right now?" before the camera (SCREEN-SHIP): skip the first prompt. */
   painAsked?: boolean;
+  /** No tap prompts: auto takeoff, auto-advance after each test (SCREEN-REALTIME). */
+  handsFree?: boolean;
   aspect: number;
   parts?: readonly PartDef[];
+  /** Tests already graded this run (the jump), used when this pass has no capture for them. */
+  priorTests?: Partial<Record<TestId, TestResult>>;
   cameraFps?: () => number | null;
 }
 
@@ -238,6 +283,16 @@ export class AssessRunner {
   private partIdx = 0;
   private part: PartState | null = null;
   private readonly gate = new FramingGate(1000);
+  private readonly stillGate = new FramingGate(STILL_MS, { counted: true });
+  private readonly handsFree: boolean;
+  private flash: FlashKind | null = null;
+  private flashAt = 0;
+  private rejection: Rejection | null = null;
+  private dimWarning = false;
+  private retryMessage: string | null = null;
+  private countdownReady = false;
+  private readonly retried = new Set<PartId>();
+  private readonly rejectLog: { part: PartId; text: string; at: number }[] = [];
   private calib: Calibration;
   private calFrames: PoseFrame[] = [];
   private calWhy: string | null = null;
@@ -265,9 +320,13 @@ export class AssessRunner {
 
   constructor(private readonly o: RunnerOptions) {
     this.parts = o.parts ?? QUICK_PARTS;
-    this.takeoff = o.takeoffLeg ?? null;
+    this.handsFree = !!o.handsFree;
+    this.takeoff = o.takeoffLeg ?? (o.handsFree ? 'left' : null);
     this.calib = { aspect: o.aspect, front: null, side: null };
   }
+
+  /** In-memory log of reps that did not count (never uploaded). */
+  get rejectionLog(): readonly { part: PartId; text: string; at: number }[] { return this.rejectLog; }
 
   get calibration(): Calibration { return this.calib; }
   get takeoffLeg(): Side | null { return this.takeoff; }
@@ -285,6 +344,14 @@ export class AssessRunner {
     if (pain) return this.stopForPain(now);
     if (this.step === 'pain') return this.go(this.takeoff ? 'calibrate' : 'takeoff', now);
     this.nextPart(now);
+  }
+
+  /** Hands-free: advance past a prompt the page would have tapped. */
+  autoAdvance(now: number): void {
+    this.now = now;
+    if (this.step === 'takeoff' && this.handsFree) { this.takeoff = this.takeoff ?? 'left'; this.go('calibrate', now); return; }
+    if (this.step === 'pain' && this.handsFree) { this.answerPain(false, now); return; }
+    if (this.step === 'painCheck' && this.handsFree) { this.answerPain(false, now); return; }
   }
 
   answerTakeoff(side: Side, now: number): void {
@@ -319,8 +386,15 @@ export class AssessRunner {
 
     switch (this.step) {
       case 'framing': {
-        if (this.gate.ready(framing, frame.t)) { this.gate.reset(); this.go(this.o.painAsked ? (this.takeoff ? 'calibrate' : 'takeoff') : 'pain', now); }
-        else this.say(framing.worst ? framing.instruction : 'Hold that.');
+        if (this.gate.ready(framing, frame.t)) {
+          this.gate.reset();
+          this.pulse('start');
+          const next = this.o.painAsked || this.handsFree
+            ? (this.takeoff ? 'calibrate' : 'takeoff')
+            : 'pain';
+          this.go(next, now);
+          if (next === 'takeoff' && this.handsFree) this.autoAdvance(now);
+        } else this.say(framing.worst ? framing.instruction : 'Hold that.');
         break;
       }
       case 'calibrate': {
@@ -347,23 +421,31 @@ export class AssessRunner {
       }
       case 'position': {
         const d = this.part!.def;
+        this.stillGate.reset();
         // a side-on part needs its own side toward the lens (the tested shin is the near one)
         const wrongSide = d.view === 'side' && !!d.near && framing.ok && frame.image.length >= 33 && nearSide(frame.image) !== d.near;
         if (wrongSide) { this.gate.reset(); this.say(facingCue('side', d.near)); break; }
         if (this.gate.ready(framing, frame.t)) {
           this.gate.reset();
           if (this.part!.def.calibrateSide && !this.calib.side) { this.calFrames = []; this.go('calibrateSide', now); this.say('Stand still for two seconds.', true); }
-          else this.go('countdown', now);
+          else { this.stillGate.reset(); this.countdownReady = false; this.go('countdown', now); }
         } else if (!framing.ok) {
           this.say(framing.worst === 'turned' ? facingCue(this.part!.def.view, this.part!.def.near) : framing.instruction);
         }
         break;
       }
       case 'countdown': {
-        if (!this.activeOk(framing)) { this.go('position', now); break; }
+        if (!this.positionOk(framing)) { this.stillGate.reset(); this.countdownReady = false; this.go('position', now); break; }
+        if (!this.countdownReady) {
+          if (this.stillGate.step(framing.ok && !trackingLost(frame), frame.t) < 1) break;
+          this.countdownReady = true;
+          this.stepAt = now;
+          this.pulse('countdown');
+        }
         const left = th('ui.timing').countdownMs - (now - this.stepAt);
-        if (left <= 0) { this.go('active', now); this.say('Go.', true); }
-        else this.say(String(Math.ceil(left / 1000)), true);
+        const n = Math.ceil(left / 1000);
+        if (left <= 0) { this.go('active', now); this.pulse('start'); this.say('Go.', true); }
+        else { this.pulse('countdown'); this.say(String(n), true); }
         break;
       }
       case 'active':
@@ -376,9 +458,18 @@ export class AssessRunner {
           this.lostFrames++;
           if (this.step === 'active' && this.lostFrames >= LOSS_FRAMES) { this.step = 'paused'; this.say(`${TRACKING_LOSS_PROMPT}.`); }
           if (now - this.badSince >= th('gate.absenceRestartMs')) {
-            this.resetPart();
-            this.go('position', now);
-            this.say(`Starting that one again. ${p.def.setup}`, true);
+            if (!this.retried.has(p.def.id)) {
+              this.retried.add(p.def.id);
+              this.retryMessage = 'Lost you for a moment — trying this move once more.';
+              this.resetPart();
+              this.go('position', now);
+              this.pulse('retry');
+              this.say(this.retryMessage, true);
+            } else {
+              this.resetPart();
+              this.go('position', now);
+              this.say(`Starting that one again. ${p.def.setup}`, true);
+            }
           }
           break;
         }
@@ -392,11 +483,14 @@ export class AssessRunner {
         break;
       }
       case 'partDone': {
-        if (now - this.stepAt >= DONE_BEAT_MS) { this.donePart = null; this.startPart(now); }
+        if (now - this.stepAt >= DONE_BEAT_MS) { this.donePart = null; this.retryMessage = null; this.startPart(now); }
         break;
       }
       case 'miniResult': {
-        if (now - this.stepAt >= th('ui.miniResultMs')) this.go('painCheck', now);
+        if (now - this.stepAt >= th('ui.miniResultMs')) {
+          if (this.handsFree) this.nextPart(now);
+          else this.go('painCheck', now);
+        }
         break;
       }
       default:
@@ -405,9 +499,21 @@ export class AssessRunner {
     return this.view(now);
   }
 
-  /** Mid-test, only what stops a reading pauses it: no body, feet out of shot, the wrong way round, too dark. */
+  /** Mid-test: dim is a warning only (SCREEN-REALTIME). */
   private activeOk(f: FramingCheck): boolean {
-    return !f.issues.some((i) => i === 'noBody' || i === 'cutOffBottom' || i === 'turned' || i === 'dim');
+    this.dimWarning = f.issues.includes('dim');
+    return !f.issues.some((i) => i === 'noBody' || i === 'cutOffBottom' || i === 'turned');
+  }
+
+  /** Before countdown: same as active, but dim still allowed. */
+  private positionOk(f: FramingCheck): boolean {
+    this.dimWarning = f.issues.includes('dim');
+    return f.ok || f.issues.every((i) => i === 'dim');
+  }
+
+  private pulse(kind: FlashKind): void {
+    this.flash = kind;
+    this.flashAt = this.now;
   }
 
   private go(step: RunnerStep, now: number): void {
@@ -478,8 +584,14 @@ export class AssessRunner {
     this.lastMark = mark;
     this.lastRepAt = now;
     if (mark === 'notRead') {
-      this.say(p.def.test === 'T2' ? 'That one did not count: keep the heel down.' : 'That one did not count.');
+      const rej = rejectionForPart(p.def.id, 'notRead', rep);
+      this.rejection = rej;
+      this.rejectLog.push({ part: p.def.id, text: rej.text, at: now });
+      this.pulse('retry');
+      this.say(rej.text);
     } else {
+      this.rejection = null;
+      this.pulse('captured');
       this.say(NUMBERS[p.valid - 1] ?? String(p.valid));
       // allowed coaching (spec §8): tempo and depth, never the pattern
       if (rep.tEnd - rep.tStart < th('cue.slowerRepMs')) this.say('Slower.');
@@ -550,7 +662,17 @@ export class AssessRunner {
       p.marks.push(mark);
       this.lastMark = mark;
       this.lastRepAt = now;
-      this.say(j.valid ? `${NUMBERS[p.valid - 1] ?? p.valid}. Stand still, then go again.` : `That one did not count: ${j.invalidWhy}.`);
+      if (!j.valid) {
+        const rej = rejectionForPart('T5', 'notRead', undefined, j.invalidWhy);
+        this.rejection = rej;
+        this.rejectLog.push({ part: 'T5', text: rej.text, at: now });
+        this.pulse('retry');
+        this.say(rej.text);
+      } else {
+        this.rejection = null;
+        this.pulse('captured');
+        this.say(`${NUMBERS[p.valid - 1] ?? p.valid}. Stand still, then go again.`);
+      }
     }
     p.lastFlightCount = jumps.length;
   }
@@ -568,7 +690,7 @@ export class AssessRunner {
     // the last count is said with the done line: "Three. Done." (a forced line would otherwise replace "Three")
     const lastCount = p.valid >= d.target && p.valid > 0 && d.test !== 'T5' ? `${NUMBERS[p.valid - 1] ?? p.valid}. ` : '';
     // the part is done: a "Done" beat (visual + voice), then the next part's setup
-    if (!testDone) { this.say(`${lastCount}Done.`, true); this.donePart = { test: d.test, part: d.id }; this.part = null; this.partIdx++; this.go('partDone', now); return; }
+    if (!testDone) { this.pulse('done'); this.say(`${lastCount}Done.`, true); this.donePart = { test: d.test, part: d.id }; this.part = null; this.partIdx++; this.go('partDone', now); return; }
     // the test is complete: grade it, show the mini-result, then ask about pain
     const ctx = { calibration: this.calib, aspect: this.o.aspect };
     const t = d.test === 'T1' ? gradeT1(this.captures.T1, ctx)
@@ -594,7 +716,7 @@ export class AssessRunner {
       T2: Object.keys(this.captures.T2).length ? this.captures.T2 : undefined,
       T3: Object.keys(this.captures.T3).length ? this.captures.T3 : undefined,
       T5: this.captures.T5 ?? undefined, painAfter: this.painAfter, takeoffLeg: this.takeoff, cameraFps: this.o.cameraFps?.() ?? null,
-    });
+    }, this.o.priorTests);
     this.step = this.result.pain ? 'stopped' : 'done';
     this.stepAt = now;
     this.say(this.result.pain ? PAIN_REFERRAL : 'That is the screen done. Your results are on the screen.', true);
@@ -628,7 +750,9 @@ export class AssessRunner {
     const def = p?.def ?? null;
     const say = this.cues.take(now);
     const { countdownMs, markMs } = th('ui.timing');
-    const countdown = this.step === 'countdown' ? Math.max(1, Math.ceil((countdownMs - (now - this.stepAt)) / 1000)) : null;
+    const flash = this.flash && now - this.flashAt < 420 ? this.flash : null;
+    const countdown = this.step === 'countdown' && this.countdownReady
+      ? Math.max(1, Math.ceil((countdownMs - (now - this.stepAt)) / 1000)) : null;
     const recent = now - this.lastRepAt < markMs && this.lastMark && this.lastMark !== 'notRead' ? this.lastMark : 'tracking';
     const calHold = (this.step === 'calibrate' || this.step === 'calibrateSide') && this.calFrames.length > 1
       ? Math.min(1, (this.calFrames[this.calFrames.length - 1].t - this.calFrames[0].t) / (this.step === 'calibrate' ? th('calib.frontMs') : th('calib.sideMs'))) : 0;
@@ -646,6 +770,13 @@ export class AssessRunner {
       done: this.step === 'partDone' ? this.donePart : null,
       result: this.result,
       progress: { done: this.partIdx, total: this.parts.length },
+      flash,
+      rejection: this.rejection,
+      move: moveOf(def?.id ?? this.donePart?.part ?? null, this.parts),
+      setupReady: (this.step === 'framing' || this.step === 'position') && !!this.lastFraming?.ok && !this.lastFraming?.issues.some((i) => i !== 'dim'),
+      dimWarning: this.dimWarning,
+      retryMessage: this.retryMessage,
+      handsFree: this.handsFree,
     };
   }
 

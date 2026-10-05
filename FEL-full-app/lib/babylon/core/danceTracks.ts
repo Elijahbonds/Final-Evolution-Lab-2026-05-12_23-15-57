@@ -1,36 +1,95 @@
-// danceTracks — the three charts of The Cypher (A+ mission #1, Phase 3).
+// danceTracks — the charts of The Cypher (A+ mission #1, Phase 3; MUSIC-SUITE P7, 2026-09-29).
 //
-// One routine at fixed constants was the Phase 0 gap: the spec wants three
-// tracks at different difficulties, a cue lane the couch can read, a body
-// that answers the judgement, and a graded results card. Everything here is
-// pure (no Babylon, no audio) so it is testable and so DanceMode stays the
-// only place that touches the scene.
+// One routine at fixed constants was the Phase 0 gap: the spec wants tracks at different difficulties, a cue lane
+// the couch can read, a body that answers the judgement, and a graded results card. Everything here is pure (no
+// Babylon, no audio) so it is testable and so DanceMode stays the only place that touches the scene.
 //
-// Seeds are fixed per track ON PURPOSE: DanceCore's generator is seeded so a
-// retry hands the player the same chart (its own rationale). Three tracks =
-// three charts, not three dice rolls.
+// MUSIC-SUITE P7 (2026-09-29): the three procedurally-random charts are now the SIX FEL house songs
+// (lib/babylon/dance/felSongs.ts): warmup and battle keep their ids and BPMs (88 / 112 — the songs were composed to
+// match), cypher too (96), and goldenhour / canals / evolution are new. Each track's steps are no longer a random
+// walk through DANCE_LIBRARY at a flat density (generateRoutine) — stepsForSong below reads the song's OWN section
+// map (energy, which stems play, the break bars) and authors press steps from it: denser in the hooks and builds,
+// sparser in the intros and breaks, and a freeze step (the one clip that earns HORNS) lands on every break bar whose
+// section actually plays horns. generateRoutine and DANCE_LIBRARY are UNCHANGED (DanceCore.ts is held by movement
+// play, and DanceCore.equivalence.test.ts pins generateRoutine's old/new-core equivalence byte for byte) — this is a
+// second, independent generator, not a replacement, and every field cueLane/HudCue read from a step (move, limb,
+// zone, windowScale, lateGrace, hold) is untouched: a song step is a plain press step, exactly like the old ones
+// (CONTRACT (b): "the new songs carry press steps only for now" — phase 9 authors real charts, with body targets,
+// from the same section data).
+//
+// Seeds are fixed per track ON PURPOSE, for the exported/legacy path (stepsForSong needs no seed argument — it is
+// deterministic from the song's OWN id via a local PRNG, so a retry or a share still hands back the same chart).
 
 import type { DanceClip, DanceStep, Judgement } from './DanceCore';
 import type { CueZone, Limb, MoveKind } from './bodyTargets';
 import { readExportedTrack } from '../music/DanceExport';
 import { DANCE_LIBRARY, isBodyStep, stepLimb } from './DanceCore';
+import { CATEGORY_STEM } from '../audio/StemBand';
+import { FEL_SONGS, sectionAtBar, type FelSong, type FelSongSection, type FelStem } from '../dance/felSongs';
 
 export interface DanceTrack {
   id: string;
   name: string;
   bpm: number;
   bars: number;
+  /**
+   * DanceTrack's OWN difficulty scale is, and stays, 1..3 — it is a frozen shape: a test fixture that pins
+   * old/new DanceCore equivalence (tests/fixtures/dance-pre-p9/danceTracks.base.ts, "never edit it") declares its
+   * own DanceTrack with `difficulty: 1 | 2 | 3` and takes a live DanceExport.readExportedTrack().track into an
+   * array of them, so widening this field would fail that frozen file's own type-check, not just this one's. A
+   * song's REAL 1..6 difficulty (unique per song, SONGS-REPORT.md's own scale) lives on `song.difficulty` instead —
+   * pickBanner reads it there when `song` is present, and legacyDifficultyBand (below) is only how a shipped track
+   * still answers this field for generateRoutine's legacy callers (now unreachable for a shipped track, since
+   * stepsFor answers every one of them from stepsForSong; scripts/music/baseline-sim.ts and DanceMode.ts still pass
+   * `track.difficulty` straight into generateRoutine's own 1..3 parameter, so this has to stay a real 1|2|3, not a
+   * clamped 1..6).
+   */
   difficulty: 1 | 2 | 3;
+  /** Only meaningful for the exported track today (routineFromGroove) — kept for every track because the
+   *  pre-P7 tests (DanceCore.equivalence.test.ts, danceTracks.test.ts, DanceCore.lateTap.test.ts,
+   *  danceRoomFlow.test.ts, scripts/music/baseline-sim.ts) all call generateRoutine({ bars, difficulty, seed }) off
+   *  a track's own fields directly. Shipped tracks carry the song's own render seed (SONGS-REPORT.md's provenance
+   *  table) for continuity, though stepsForSong never reads it. */
   seed: number;
   /** One line on the pick screen. */
   blurb: string;
+  /** MUSIC-SUITE P7: the FEL song this track plays. Absent only for the player's own exported track
+   *  (music/DanceExport.ts) — that track carries its own steps and has no map.json. */
+  song?: FelSong;
 }
 
-export const DANCE_TRACKS: readonly DanceTrack[] = [
-  { id: 'warmup', name: 'WARM UP', bpm: 88, bars: 12, difficulty: 1, seed: 0x5150, blurb: 'On the beat · easy moves' },
-  { id: 'cypher', name: 'THE CYPHER', bpm: 96, bars: 16, difficulty: 2, seed: 0xc1fe, blurb: 'Waves and six-steps join' },
-  { id: 'battle', name: 'BATTLE', bpm: 112, bars: 16, difficulty: 3, seed: 0xba77, blurb: 'Freezes · windmills · off-beat entries' },
-];
+/** A song's real 1..6 difficulty, banded down to DanceTrack's frozen 1..3 scale (1↔2→1, 3↔4→2, 5↔6→3). Only feeds
+ *  the legacy field above; every real difficulty display (pickBanner) reads `song.difficulty` directly instead. */
+function legacyDifficultyBand(songDifficulty: number): 1 | 2 | 3 {
+  return Math.min(3, Math.max(1, Math.ceil(songDifficulty / 2))) as 1 | 2 | 3;
+}
+
+const SONG_BLURB: Record<string, string> = {
+  warmup: 'Lo-fi and lazy · one easy freeze',
+  cypher: 'Slap bass leads the pocket',
+  goldenhour: 'Sunset groove · a whistle hook',
+  battle: 'Breakbeat battle · windmills welcome',
+  canals: 'Night house · four on the floor',
+  evolution: 'Fast electro-funk · four freezes',
+};
+
+/** The render seed SONGS-REPORT.md's provenance table lists for each song (build_song_provenance.py does not need
+ *  it — it hashes files, not seeds — this is only for generateRoutine's legacy callers, above). */
+const SONG_SEED: Record<string, number> = {
+  warmup: 0x5150, cypher: 0xc1fe, goldenhour: 0x5e75, battle: 0xba77, canals: 0xca7a, evolution: 0xef01,
+};
+
+/** MUSIC-SUITE P7: one track per shipped FEL song, easy to hard (FEL_SONGS' own order). */
+export const DANCE_TRACKS: readonly DanceTrack[] = FEL_SONGS.map((song) => ({
+  id: song.id,
+  name: song.title.toUpperCase(),
+  bpm: song.bpm,
+  bars: song.bars,
+  difficulty: legacyDifficultyBand(song.difficulty),
+  seed: SONG_SEED[song.id] ?? 1,
+  blurb: SONG_BLURB[song.id] ?? song.style,
+  song,
+}));
 
 export const DEFAULT_TRACK_ID = 'cypher';
 
@@ -62,13 +121,134 @@ export function cycleTrack(id: string, dir: 1 | -1): DanceTrack {
 /**
  * The steps for a track.
  *
- * A shipped track GENERATES its routine from its seed (a retry must hand back the same chart); the player's
- * exported track carries its own steps, because those steps are the point — they are the song's own drums,
- * and re-generating them from a seed would throw away the thing the export exists to preserve.
+ * The player's exported track carries its OWN steps, because those steps are the point — they are the song's own
+ * drums, and re-generating them from a seed would throw away the thing the export exists to preserve. Every shipped
+ * track is one of the six FEL songs (MUSIC-SUITE P7): its steps come from stepsForSong, generated from the song's
+ * own section map, not from a seed (stepsForSong is itself deterministic — same song in, same steps out — so this
+ * still answers a retry or a share with the same chart, just without needing an RNG seed argument to do it).
  */
 export function stepsFor(t: DanceTrack): DanceStep[] | null {
   const mine = readExportedTrack();
-  return mine && mine.track.id === t.id ? mine.steps : null;
+  if (mine && mine.track.id === t.id) return mine.steps;
+  return t.song ? stepsForSong(t.song) : null;
+}
+
+// ── MUSIC-SUITE P7: press steps authored from a song's own section map ──────────────────────────────────────────
+//
+// generateRoutine (DanceCore.ts) picks a flat mix of clips at a flat density for the whole chart; it has no idea a
+// song has an intro, a hook or a break. This generator reads the song's OWN arrangement (map.json → felSongs.ts:
+// each section's energy 1..5 and which of the seven earned stems it plays) and places ONE dance move per stem the
+// section actually plays, at a rate that rises and falls with that section's energy — so a hit during the sparse
+// intro earns the one or two instruments the intro actually has, and a hit during a hook earns all seven, exactly
+// as densely as the hook plays them. A freeze (the one clip that earns HORNS) is placed on every one of the song's
+// own breakBars whose section lists horns — the game's freeze beat IS the song's freeze beat, not a coincidence.
+//
+// Deliberately simple and documented, not "the real chart": phase 9 authors real charts (with body targets, off the
+// same section data) — this only has to be honest about the song's shape and never place two steps on top of each
+// other, which the beats-remaining check below guarantees the same way generateRoutine's own loop does.
+
+/** DANCE_LIBRARY's category (StemBand.CATEGORY_STEM, inverted and lower-cased) each earned FEL stem answers to. A
+ *  song step in `stem` turns on the instrument a hit on THIS family earns (DanceMode.ts onJudged → StemBand.judge). */
+const STEM_TO_FAMILY: Partial<Record<FelStem, DanceClip['category']>> = Object.fromEntries(
+  (Object.entries(CATEGORY_STEM) as [DanceClip['category'], string][]).map(([category, stem]) => [stem.toLowerCase(), category]),
+);
+
+/** Clips in DANCE_LIBRARY for one family, sorted by id (deterministic pick order). */
+function clipsFor(category: DanceClip['category']): DanceClip[] {
+  return DANCE_LIBRARY.filter((c) => c.category === category).sort((a, b) => a.id.localeCompare(b.id));
+}
+const FREEZE_CLIP = clipsFor('freeze')[0];
+/** The shortest clip in the library (2 beats — wave/freeze/transition): the while-loop below stops once less than
+ *  this remains in a section, so it never asks for a fraction of a step. */
+const MIN_CLIP_BEATS = Math.min(...DANCE_LIBRARY.map((c) => c.beats));
+
+/**
+ * The minimum beats between two step STARTS, by the section's own energy (1..5). This is a FLOOR, not a fixed rest:
+ * an 8-beat clip (footwork/power) always takes its own 8 beats whatever the floor says, so density in a section that
+ * leans on the big moves still comes from the CLIPS, not a number here — but a short clip (2–4 beats) in a sparse
+ * section (energy 1) is followed by real space, while the same short clip in a hook (energy 5) is followed by almost
+ * none. Tying density to "beats between step starts" rather than "rest after this clip's own length" keeps a run of
+ * short wave/transition steps in a quiet intro from ever reading as busy as a run of long moves in a hook.
+ */
+const STEP_GAP_BEATS_BY_ENERGY: Record<number, number> = { 1: 8, 2: 5, 3: 3, 4: 2, 5: 1.2 };
+
+/** A tiny deterministic PRNG — the same algorithm DanceCore.ts's (private) mulberry32 uses, kept as its own copy
+ *  here on purpose: this generator answers to the SONG's id, never to a chart seed, and DanceCore's own copy is
+ *  pinned byte-for-byte by DanceCore.equivalence.test.ts. */
+function songRng(id: string): () => number {
+  let a = 0;
+  for (let i = 0; i < id.length; i++) a = (Math.imul(a, 31) + id.charCodeAt(i)) >>> 0;
+  if (a === 0) a = 0x9e3779b9;
+  return () => {
+    a = (a + 0x6D2B79F5) >>> 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** The families a section actually earns (bed excluded — it has no move), in DANCE_LIBRARY's category order so two
+ *  songs with the same stem list place moves in the same relative order (readable, comparable difficulty curve). */
+function playableFamilies(section: FelSongSection): DanceClip['category'][] {
+  const order: DanceClip['category'][] = ['toprock', 'bounce', 'footwork', 'wave', 'power', 'transition'];
+  const have = new Set(section.stems.map((s) => STEM_TO_FAMILY[s]).filter((c): c is DanceClip['category'] => !!c));
+  return order.filter((c) => have.has(c));
+}
+
+/** One freeze step per breakBar inside `section`, at that bar's own downbeat — only when the section's own stem
+ *  list plays horns (a break the song wrote as bed-only earns nothing off a freeze that never sounds). */
+function freezeStepsIn(song: FelSong, section: FelSongSection, rnd: () => number): DanceStep[] {
+  if (!section.stems.includes('horns') || !FREEZE_CLIP) return [];
+  const startBeat = (section.startBar - 1) * 4;
+  const endBeat = startBeat + section.bars * 4;
+  const out: DanceStep[] = [];
+  for (const bar of song.breakBars) {
+    const at = (bar - 1) * 4;
+    if (at < startBeat || at + FREEZE_CLIP.beats > endBeat) continue;
+    out.push({ clipId: FREEZE_CLIP.id, beat: at, holdBeats: FREEZE_CLIP.beats, mirrored: rnd() < 0.35 });
+  }
+  return out;
+}
+
+/**
+ * Press steps for one FEL song, generated from its own section map. Deterministic: the same song always yields the
+ * same steps (no external seed — see songRng above). Never places two steps on beats that overlap.
+ */
+export function stepsForSong(song: FelSong): DanceStep[] {
+  const rnd = songRng(song.id);
+  const steps: DanceStep[] = [];
+  let familyTurn = 0;
+  for (const section of song.sections) {
+    const startBeat = (section.startBar - 1) * 4;
+    const endBeat = startBeat + section.bars * 4;
+    steps.push(...freezeStepsIn(song, section, rnd));
+
+    const families = playableFamilies(section);
+    if (families.length === 0) continue;   // a bed-only section (none shipped today, but never a crash)
+    const gap = STEP_GAP_BEATS_BY_ENERGY[section.energy] ?? 3;
+    // start each section on its own downbeat; freeze steps above may already occupy bar 0 of a break, so the
+    // cursor only ever moves forward from what freezeStepsIn placed in THIS section
+    let cursor = startBeat;
+    const alreadyHere = steps.filter((s) => s.beat >= startBeat && s.beat < endBeat);
+    for (const s of alreadyHere) cursor = Math.max(cursor, s.beat + Math.max(s.holdBeats, gap));
+
+    while (endBeat - cursor >= MIN_CLIP_BEATS) {
+      const family = families[familyTurn % families.length];
+      familyTurn++;
+      const options = clipsFor(family).filter((c) => c.beats <= endBeat - cursor);
+      if (options.length === 0) break;   // nothing in this family fits what's left — leave the tail as a rest
+      const clip = options[Math.floor(rnd() * options.length)];
+      steps.push({ clipId: clip.id, beat: cursor, holdBeats: clip.beats, mirrored: rnd() < 0.35 });
+      cursor += Math.max(clip.beats, gap);   // a long clip takes its own length; a short one leaves real space
+    }
+  }
+  return steps.sort((a, b) => a.beat - b.beat);
+}
+
+/** The stems currently earnable at `bar` (1-based) — a section's own stem list, minus bed. Exported for the pick
+ *  screen / tests; DanceMode reads the stem BAND state itself and never needs this at runtime. */
+export function earnableStemsAtBar(song: FelSong, bar: number): FelStem[] {
+  return sectionAtBar(song, bar).stems.filter((s) => s !== 'bed');
 }
 
 /** `?track=battle` deep link (probes, shares). null when absent or unknown —
@@ -80,9 +260,14 @@ export function trackFromQuery(search: string | null | undefined): DanceTrack | 
   return DANCE_TRACKS.find((t) => t.id === m[1].toLowerCase()) ?? null;
 }
 
-/** The pick-screen line: name · tempo · difficulty pips. */
+/** The pick-screen line: name · tempo · difficulty pips. A shipped FEL song shows ITS OWN 1..6 difficulty
+ *  (song.difficulty — unique per song, SONGS-REPORT.md's own scale), not DanceTrack.difficulty's banded 1..3
+ *  (legacyDifficultyBand exists only to keep generateRoutine's legacy callers type-checking, not to be shown). The
+ *  player's own exported track has no song, so it keeps the original three-pip display. */
 export function pickBanner(t: DanceTrack): string {
-  return `♪ ${t.name}  ·  ${t.bpm} BPM  ·  ${'●'.repeat(t.difficulty)}${'○'.repeat(3 - t.difficulty)}`;
+  const shown = t.song?.difficulty ?? t.difficulty;
+  const scale = t.song ? 6 : 3;
+  return `♪ ${t.name}  ·  ${t.bpm} BPM  ·  ${'●'.repeat(shown)}${'○'.repeat(Math.max(0, scale - shown))}`;
 }
 
 /** Seconds the pick screen waits for input before starting the default —

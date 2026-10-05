@@ -4,8 +4,8 @@
 // textured bodies — five karts, five cartoon planes — baked by scripts/meshy/batch-vehicles.sh to ~4 MB each. A body
 // mounts UNDER the vehicle's root as a dressed child: the physics, the seat anchors and the mode's own handling of the
 // root do not change; the primitive parts are hidden when the body arrives and stay if it never does (no placeholder
-// gap — the primitives ARE the fallback). The bake put the nose toward −x with the kart's floor at y 0 and the plane
-// centred; `yaw` turns the nose to the vehicle's +z.
+// gap — the primitives ARE the fallback). The kart's floor sits at y 0 and the plane is centred. `vehicleForwardYaw`
+// turns each body's nose onto the vehicle's +z; the flight and kart code never add a second correction.
 import { SceneLoader, TransformNode, type AbstractMesh, type AssetContainer, type Scene } from '@babylonjs/core';
 
 export type VehicleKind = 'kart' | 'plane';
@@ -17,9 +17,26 @@ export const VEHICLE_BODIES: Record<VehicleKind, Record<string, string>> = {
 };
 export const vehicleBodyUrl = (kind: VehicleKind, id: string): string => `/models/vehicles/${VEHICLE_BODIES[kind][id] ?? VEHICLE_BODIES[kind].rival}.${kind}.glb`;
 
-/** The bake's karts lie along x (nose −x) and the planes along z (the bake reported x 1.95 / z 1.4 for the karts, x 3.6 / z 4.5 for
- *  the planes); the modes drive +z. Per kind, verified on a frame. */
-export const VEHICLE_BODY_YAW: Record<VehicleKind, number> = { kart: Math.PI / 2, plane: Math.PI };   // frames: the kart's wheel sat in front of the driver at π/2; the plane flew backwards at 0
+/**
+ * Yaw applied to each baked body so its nose lies on the vehicle's +Z.
+ * The modes steer +Z (`forwardOf`, kart `heading`). This is the only place a mesh axis is corrected.
+ *
+ * Measured after Babylon's glTF import (the loader root is a 180° yaw plus a Z mirror, so these are not the file axes):
+ *  - Every kart's nose sits on −X. +π/2 puts it on +Z (the wheel-in-front frame check from when the bodies landed).
+ *  - Every plane's propeller sits on +X and the wings run along Z (trainer, darter, kestrel, bastion, rival — same bake).
+ *    π spun that propeller onto −X, so the nose stayed sideways to the velocity. −π/2 brings it to +Z.
+ */
+const KART_NOSE_YAW = Math.PI / 2;
+const PLANE_NOSE_YAW = -Math.PI / 2;
+export const VEHICLE_FORWARD_YAW: Record<VehicleKind, Readonly<Record<string, number>>> = {
+  kart: { runabout: KART_NOSE_YAW, slipstream: KART_NOSE_YAW, tailspin: KART_NOSE_YAW, anvil: KART_NOSE_YAW, rival: KART_NOSE_YAW },
+  plane: { trainer: PLANE_NOSE_YAW, darter: PLANE_NOSE_YAW, kestrel: PLANE_NOSE_YAW, bastion: PLANE_NOSE_YAW, rival: PLANE_NOSE_YAW },
+};
+
+/** The yaw for this garage id. An unknown id wears the rival body's axis — `dressVehicle` loads that mesh too. */
+export function vehicleForwardYaw(kind: VehicleKind, id: string): number {
+  return VEHICLE_FORWARD_YAW[kind][id] ?? VEHICLE_FORWARD_YAW[kind].rival;
+}
 
 const containers = new WeakMap<Scene, Map<string, Promise<AssetContainer | null>>>();
 function loadBody(scene: Scene, url: string): Promise<AssetContainer | null> {
@@ -48,7 +65,7 @@ export async function dressVehicle(scene: Scene, root: TransformNode, kind: Vehi
   const inst = c.instantiateModelsToScene((n) => `${root.name}_body_${n}`, false, { doNotInstantiate: true });
   const body = new TransformNode(`${root.name}_body`, scene);
   body.parent = root;
-  body.rotation.y = opts.yaw ?? VEHICLE_BODY_YAW[kind];
+  body.rotation.y = opts.yaw ?? vehicleForwardYaw(kind, id);
   body.position.y = opts.y ?? 0;
   for (const n of inst.rootNodes) n.parent = body;
   for (const m of body.getChildMeshes()) { m.isPickable = false; m.receiveShadows = true; }

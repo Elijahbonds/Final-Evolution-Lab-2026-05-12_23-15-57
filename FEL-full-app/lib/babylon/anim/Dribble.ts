@@ -90,3 +90,56 @@ export function fitDribbleToReach(p: DribbleParams, lowestHandY: number, headroo
   const needed = lowestHandY + Math.max(0, headroom) + p.followDepth;
   return needed > p.palmY ? { ...p, palmY: needed } : p;
 }
+
+// ── HOOPS MOTION phase 3 (2026-09-25): the PUSHED bounce, the stride lock, the crossing ────────────────────────────────────
+// dribbleAt's ball is a parabola in time with its vertex ON THE FLOOR: the ball slows to a stop at the floor and is fastest at
+// the palm — gravity pointing up. At the hoops pace (2.6 Hz) that put the fastest frame of the bounce in the hand, 4·H·hz ≈ 9 m/s
+// (0.15 m a frame before the body moved at all); the probe's ball path read 0.20–0.35 m a frame on the 1v1 handles (base2). A real
+// dribble is PUSHED out of the hand, falls faster to the floor, leaves it at the restitution's share of that speed and is caught
+// on the way up, slowing: the fastest frame is the floor contact and the hand meets a ball that is coming to it. The shape is
+// fixed in PHASE units (a bounce rate that changes mid-bounce never moves the ball), and its peak speed is 3.1·H·hz — so the
+// hoops rates stay at or under HOOPS_DRIBBLE.hzFast / the stride lock's ceiling, and one bounce a stride at a sprint keeps the ball
+// inside 0.15 m a frame with the body's own 6.4 m/s under it.
+
+/** Where in the bounce the ball meets the floor (the push leg is the shorter). */
+export const PUSHED_FLOOR_PHASE = 0.46;
+/** The push leg's linear share (the hand's push; the rest is gravity). */
+const PUSH_SHARE = 0.55;
+/** The rise leg's take-off coefficient: restitution 0.8 of the impact (see pushedBounce01). */
+const RISE_C1 = 0.8 * (PUSH_SHARE + 2 * (1 - PUSH_SHARE)) * (1 - PUSHED_FLOOR_PHASE) / PUSHED_FLOOR_PHASE;
+/** The hoops dribble: the default stroke, a slower fast rate (the stride lock sets the pace at a run; see above). */
+export const HOOPS_DRIBBLE: DribbleParams = { ...DEFAULT_DRIBBLE, hzIdle: 1.7, hzFast: 2.0 };
+/** The stride lock never bounces faster than this (per second): one bounce a stride, never two. */
+export const STRIDE_LOCK_HZ_MAX = 2.0;
+
+/** The pushed bounce's height as a fraction of the drop (1 = the palm, 0 = the floor), for a phase. */
+export function pushedBounce01(phase: number): number {
+  const ph = phase - Math.floor(phase);
+  if (ph <= PUSHED_FLOOR_PHASE) { const s = ph / PUSHED_FLOOR_PHASE; return 1 - (PUSH_SHARE * s + (1 - PUSH_SHARE) * s * s); }
+  const s = (ph - PUSHED_FLOOR_PHASE) / (1 - PUSHED_FLOOR_PHASE);
+  return RISE_C1 * s - (RISE_C1 - 1) * s * s;
+}
+/** The bounce's fastest rate of change (fraction of the drop per unit phase): the floor contact. */
+export const PUSHED_PEAK_RATE = (PUSH_SHARE + 2 * (1 - PUSH_SHARE)) / PUSHED_FLOOR_PHASE;
+
+/** dribbleAt with the pushed bounce (the hand rides it down `followDepth`, waits, and meets it on the way up at the palm).
+ *  `heightScale` lowers the stroke (a crossover goes low and hard) — 1 at the palm, so a smooth scale never moves the catch. */
+export function dribbleAtPushed(phase: number, p: DribbleParams = HOOPS_DRIBBLE, heightScale = 1): DribbleState {
+  const ph = phase - Math.floor(phase);
+  const top = p.ballR + (p.palmY - p.ballR) * heightScale;
+  const ballY = p.ballR + (top - p.ballR) * pushedBounce01(ph);
+  const handFloor = p.palmY - p.followDepth;
+  const onBall = ballY + p.ballR;
+  const handY = Math.max(onBall, handFloor);
+  const gap = handY - onBall;
+  const handWeight = gap <= 1e-6 ? 1 : Math.max(0.6, 1 - gap / (p.palmY - handFloor));
+  return { phase: ph, ballY, ball: { x: p.side, y: ballY, z: p.forward }, hand: { x: p.side, y: handY, z: p.forward }, handWeight };
+}
+
+/** The bounce the stride clock asks for: one a stride, the ball at `phiAtStrike` when the lock foot strikes. `sinceStrike` s since
+ *  that foot's last strike, `period` s a stride. Pulled onto the stride at `gain` (per second of phase error), capped. */
+export function strideLockHz(phase: number, sinceStrike: number, period: number, phiAtStrike: number, gain = 3, hzMax = STRIDE_LOCK_HZ_MAX): number {
+  const target = phiAtStrike + sinceStrike / period;
+  let err = target - phase; err -= Math.round(err);   // (−0.5, 0.5]: + = the ball behind the feet
+  return Math.min(hzMax, Math.min(2, Math.max(0.5, 1 + gain * period * err)) / period);
+}

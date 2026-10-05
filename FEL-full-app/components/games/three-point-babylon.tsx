@@ -15,9 +15,10 @@ import type { LobbyPeer } from '@/lib/controller-link/types';
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import type { GameProps, GameResult } from './game-shell';
 import { BootSplash } from './boot-splash';
+import { surfaceBootError } from './boot-error';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
-import { rackPips, SHOT_TARGET, PERFECT_BAND, GOOD_BAND } from '@/lib/babylon/core/shootoutHud';
+import { rackPips, SHOT_TARGET, GOOD_BAND } from '@/lib/babylon/core/shootoutHud';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { PadChips } from '@/lib/babylon/ui/PadChips';
 import { HostLobby } from '@/components/controller-link/host-lobby';
@@ -45,6 +46,8 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const busRef = useRef<InputBus | null>(null);
   const endedRef = useRef(false);
+  const onEndRef = useRef(onEnd);
+  onEndRef.current = onEnd;
   const [phase, setPhase] = useState<ModePhase>('loading');
   // the running order lives in a ref AND state: the input callback reads it every frame (ref) while the
   // banner renders from it (state)
@@ -80,13 +83,18 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
         if (!next.done) return;      // the next phone is up; the host remounts for their turn
       }
       endedRef.current = true;
-      onEnd({
-        score: Number(r.stats?.points ?? r.score ?? 0),
+      const pts = Number(r.stats?.points ?? r.score ?? 0);
+      const rivalPts = Number(r.stats?.rivalScore ?? 0);
+      const won = r.outcome === 'win';
+      onEndRef.current({
+        score: pts,
         stats: r.stats, outcome: r.outcome,   // pass 5 phase 3: the proof line reads these
-        opponentScore: 0,
-        won: r.outcome === 'win',
+        opponentScore: rivalPts,
+        won,
         duration: r.durationSec,
-        headline: r.outcome === 'win' ? 'RANGE UNLOCKED' : 'SHOOTOUT COMPLETE',
+        headline: won
+          ? `RANGE UNLOCKED · ${pts} PTS${rivalPts > 0 ? ` vs ${rivalPts}` : ''}`
+          : `SHOOTOUT COMPLETE · ${pts} PTS${rivalPts > 0 ? ` vs ${rivalPts}` : ''}`,
       } satisfies GameResult);
     };
 
@@ -117,7 +125,7 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
       },
       resultSink,
     }).then((s) => { if (disposed) s(); else stop = s; })
-      .catch((e) => { if (!disposed) setLoadError(String(e?.message ?? e)); });
+      .catch((e) => surfaceBootError(e, { disposed, setPhase, setLoadError }));
     }, 0);
 
     return () => { disposed = true; clearTimeout(startTimer); stop?.(); };
@@ -161,7 +169,7 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
   void MAX_SHOOTERS;
 
   return (
-    <div className="relative aspect-[16/10] w-full overflow-hidden rounded-xl border border-white/10 bg-black">
+    <div className="relative h-[calc(100dvh-3.25rem)] w-full overflow-hidden rounded-none border-0 bg-transparent">
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full touch-none" />
 
       {/* Whose turn it is, on the TV, whenever more than one phone is in the room. */}
@@ -191,6 +199,7 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
           onPeers={onPeers}
           onPadInput={onPhonePad}
           collapsed={phase === 'playing'}
+          lazy={process.env.NODE_ENV === 'production'}
           bus={busRef.current}
         />
       )}
@@ -244,7 +253,13 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
           {typeof hud.banner === 'string' && hud.banner && (
             <div className={`fel-heading fel-panel px-5 py-1.5 text-3xl font-black ${hud.banner.startsWith('MISS') ? 'text-white/70' : 'text-[#00E5FF]'}`}>{hud.banner}</div>
           )}
-          {typeof hud.meter === 'number' && <ReleaseBar t={hud.meter} />}
+          {typeof hud.meter === 'number' && (
+            <ReleaseBar
+              t={hud.meter}
+              green={typeof hud.meterGreen === 'number' ? hud.meterGreen : SHOT_TARGET}
+              half={typeof hud.meterHalf === 'number' ? hud.meterHalf : GOOD_BAND}
+            />
+          )}
         </div>
       )}
 
@@ -279,10 +294,13 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
   );
 }
 
-/** The timing bar the whole mode hangs on — the GOOD and PERFECT bands drawn from the mode's own constants. */
-function ReleaseBar({ t }: { t: number }) {
-  const good = { left: `${(SHOT_TARGET - GOOD_BAND) * 100}%`, width: `${GOOD_BAND * 200}%` };
-  const perfect = { left: `${(SHOT_TARGET - PERFECT_BAND) * 100}%`, width: `${PERFECT_BAND * 200}%` };
+/** The timing bar the whole mode hangs on — GOOD and PERFECT bands drawn from the shared ShotMeter's OWN window
+ *  (HOOPS-10PHASE-2 phase 2: the mode reports its live green centre/half-width over HUD now, so the host draws
+ *  the SAME window it is graded against, however distance or TV mode widened it). */
+function ReleaseBar({ t, green, half }: { t: number; green: number; half: number }) {
+  const perfectHalf = half * 0.35;   // BasketballCore.ShotMeter.release(): perfect is the inner 0.35 of the good window
+  const good = { left: `${(green - half) * 100}%`, width: `${half * 200}%` };
+  const perfect = { left: `${(green - perfectHalf) * 100}%`, width: `${perfectHalf * 200}%` };
   return (
     <div className="relative h-5 w-[min(520px,70vw)] overflow-hidden rounded-md border border-white/20 bg-black/55">
       <div className="absolute inset-y-0 bg-[#22d3ee]/35" style={good} />

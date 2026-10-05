@@ -136,6 +136,27 @@ export interface PrqAttributeValue {
   entryId: string;
 }
 
+/**
+ * MIRROR-COACH P9 fix (2026-09-30, code review): A GAME'S RECOVERY IS NOT A MEASUREMENT ANY MORE.
+ *
+ * Owner decision #12 moved PRQ recovery onto recovery work (cool-downs, off days, easy-cardio minutes — lib/prq-engine.ts
+ * "PRQ recovery"), settled on PlayerProfile.recovery. The only PrqEntry rows that ever carried recovery were game
+ * sessions' 'drillResult' copies of that profile value (app/api/sessions/route.ts), for the modes whose MODE_ATTRS row
+ * named recovery — trivia (Brain Brawl, Who Scene It) and the Iron Paradise gym game. P9 took recovery off all three
+ * rows, so no new such row is written; but this vector is latest-wins, so the last trivia-era row stood as "recovery"
+ * in the traceable PRQ (/api/prq/vector, the creator card's PRQ) for good — trivia's inflation, frozen, while the
+ * profile's number fell. Those rows are read as NOT A MEASUREMENT of recovery: recovery is then "not measured" here
+ * (absent, and so not averaged — the vector's own rule for an unmeasured axis) unless a manual or device entry says
+ * otherwise. Nothing is deleted (the rows stay, for export and history); every other attribute and source is read
+ * exactly as before.
+ */
+export const RECOVERY_RETIRED_SOURCES: readonly PrqSource[] = ['drillResult'];
+
+/** Whether a stored entry counts in the latest-value vector (false only for a retired recovery source, above). */
+export function countsInVector(entry: { attribute: string; source: string }): boolean {
+  return !(entry.attribute === 'recovery' && (RECOVERY_RETIRED_SOURCES as readonly string[]).includes(entry.source));
+}
+
 /** Returns the latest entry per attribute. Missing attrs → absent from the map. */
 export async function getLatestPrqVector(
   db: DbClient,
@@ -153,6 +174,7 @@ export async function getLatestPrqVector(
 
   for (const entry of allEntries) {
     const attr = entry.attribute as PrqAttr;
+    if (!countsInVector(entry)) continue;   // MIRROR-COACH P9 fix: a game's recovery copy (RECOVERY_RETIRED_SOURCES)
     if (!map.has(attr) && PRQ_ATTRS.includes(attr)) {
       map.set(attr, {
         attribute: attr,

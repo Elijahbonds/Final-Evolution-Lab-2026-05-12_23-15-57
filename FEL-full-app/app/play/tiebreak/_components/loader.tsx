@@ -14,5 +14,5 @@ const TiebreakGame = dynamicImport(() => import('@/components/games/tiebreak-gam
 });
 
 export function TiebreakLoader() {
-  return <GameShell mode="tiebreak" title="TIEBREAK BLITZ" venue="Venice Tennis Court" Game={TiebreakGame} />;
+  return <GameShell mode="tiebreak" title="TIEBREAK BLITZ" venue="Venice Tennis Court" Game={TiebreakGame} ownControls />;
 }

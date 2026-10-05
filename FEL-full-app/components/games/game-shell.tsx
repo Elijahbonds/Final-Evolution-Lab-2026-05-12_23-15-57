@@ -14,6 +14,7 @@ import { canFullscreen, isFullscreen, isLandscapePhone, toggleFullscreen } from 
 import { VirtualController } from './virtual-controller';
 import { ReplayInPlaceContext } from './replay-in-place';
 import { BodyControl } from './body-control';
+import { GameCaptureHud } from '@/components/capture/game-capture-hud';
 import type { SessionTallies } from '@/lib/game-systems';
 import { sessionStore, markRun, countedSince } from '@/lib/babylon/core/sessionStore';
 import { arenaRefusal, storyRefusal, ArenaRefusedLine, StoryRefusedPanel, type Refusal } from './end-card-refusal';
@@ -78,6 +79,7 @@ interface RecapData {
   grade?: { label: string; color: string };
   season?: SeasonRecap | null;
   mastery?: MasteryRecap | null;
+  capMessage?: string;
 }
 
 export function GameShell(props: {
@@ -119,6 +121,7 @@ function GameShellInner({
   const signatureFlag = searchParams.get('signature');
   const arenaMatchId = searchParams.get('arena');
   const mpCode = searchParams.get('mp');   // pass 5 phase 5: an async challenge code — accept it with this run's session
+  const challengeCode = searchParams.get('c'); // K-factor challenge link: /c/<code> -> /play/<mode>?c=<code>
   const carnivalFlag = searchParams.get('carnival');
   // ECONOMY-SESSIONS-HARDEN: an agent or playtest run is started as one, so the server records it and pays nothing
   const agentRun = searchParams.get('agent') === '1';
@@ -141,11 +144,14 @@ function GameShellInner({
   /** The Story route refused this run (end-card-refusal): the card says why instead of saying nothing. */
   const [storyRefused, setStoryRefused] = useState<Refusal | null>(null);
   const [mpResult, setMpResult] = useState<{ status: string; hostScore: number; guestScore: number; hostName?: string; iWon: boolean; tie: boolean } | null>(null);
+  const [challengeResult, setChallengeResult] = useState<{ beat: boolean; targetScore: number; margin: number; vs?: string; rematchPath?: string } | null>(null);
   const [arenaResult, setArenaResult] = useState<
     | { settled: boolean; status: string; result?: string; iWon?: boolean; payout?: number; feeLc?: number; myScore?: number; oppScore?: number; refused?: Refusal }
     | null
   >(null);
   const [gameKey, setGameKey] = useState(0);
+  /** Stream mode: a 16:9 stage with the chrome hidden, for OBS or a phone's own screen broadcast. */
+  const [streamOn, setStreamOn] = useState(false);
   // FEATURES-UX-SHOP (2026-09-08): browsing is not playing. A mode left idle ends on its own clock and used to post a
   // score-0 session that paid XP, a profile shard, streak credits and the 40-coin "Session completed" floor. The shell
   // now counts the presses it saw while the run was live (keys — the pad bridge and the touch deck both emit them —
@@ -170,8 +176,20 @@ function GameShellInner({
     const url = `/api/sessions/start${agentRun ? '?agent=1' : ''}`;
     return fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode, ...(playtestRun ? { playtest: true } : {}) }) })
       .then((r) => (r?.ok ? r.json() : null))
-      .then((j) => (typeof j?.runId === 'string' ? j.runId : null))
-      .catch(() => null);
+      .then((j) => {
+        if (j && typeof j.runId === 'string') {
+          import('@/lib/agentRunHooks').then(({ setAgentRunHooksAllowed }) => {
+            setAgentRunHooksAllowed(Boolean(j.agentRun));
+          });
+          return j.runId as string;
+        }
+        import('@/lib/agentRunHooks').then(({ setAgentRunHooksAllowed }) => setAgentRunHooksAllowed(false));
+        return null;
+      })
+      .catch(() => {
+        import('@/lib/agentRunHooks').then(({ setAgentRunHooksAllowed }) => setAgentRunHooksAllowed(false));
+        return null;
+      });
   }, [mode, agentRun, playtestRun]);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [shareState, setShareState] = useState<'idle' | 'minting' | 'copied'>('idle');
@@ -271,6 +289,8 @@ function GameShellInner({
         .then((r) => (r ? r.json().catch(() => null) : null))
         .then(async (j) => {
           if (j?.ok) {
+            // ECONOMY-CAPS (c): a replayed finish returns the stored body verbatim — no second reward card.
+            if (j?.replayed) return;
             if (mine()) setRecap({
               noPlay: Boolean(j?.noPlay),
               ...(j?.paid === false && !j?.noPlay ? { unpaid: String(j?.reason ?? 'UNPAID') } : {}),
@@ -282,6 +302,7 @@ function GameShellInner({
               grade: j?.grade,
               season: j?.season ?? null,
               mastery: j?.mastery ?? null,
+              capMessage: typeof j?.capMessage === 'string' ? j.capMessage : undefined,
             });
             // ECONOMY-SESSIONS-HARDEN (2026-09-28): the wallet coins this run paid come IN the session's answer — the server
             // wrote them in the run's own transaction (they were two earn reports from here, keyed by the new session's id,
@@ -381,6 +402,25 @@ function GameShellInner({
               } catch {}
             }
 
+            if (challengeCode) {
+              try {
+                const cj = await fetch(`/api/challenge/${encodeURIComponent(challengeCode)}/attempt`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ attemptScore: res?.score ?? 0, attemptTag: 'ATHLETE' }),
+                }).then((r2) => (r2.ok ? r2.json() : null));
+                if (cj && mine()) {
+                  setChallengeResult({
+                    beat: Boolean(cj.beat),
+                    targetScore: Number(cj.targetScore ?? 0),
+                    margin: Number(cj.margin ?? 0),
+                    vs: typeof cj.vs === 'string' ? cj.vs : undefined,
+                    rematchPath: typeof cj.rematch?.path === 'string' ? cj.rematch.path : undefined,
+                  });
+                }
+              } catch {}
+            }
+
             // Court Carnival relay: this stop's reward already posted above
             // through the normal pipeline — this only advances the run so
             // the recap can offer "next stop" instead of Replay/Hub.
@@ -414,7 +454,7 @@ function GameShellInner({
         })
         .catch(() => { if (mine()) setRecap({ xp: 0, shards: 0, credits: 0, prqDelta: 0, prqAfter: 0 }); });
     },
-    [mode, storyNodeId, signatureFlag, arenaMatchId, carnivalFlag, mpCode]
+    [mode, storyNodeId, signatureFlag, arenaMatchId, carnivalFlag, mpCode, challengeCode]
   );
 
   // REPLAY IN PLACE (BRAINBRAWL-RESIDUAL, 2026-09-24): a game that can start its next match on the stage it already has
@@ -432,6 +472,7 @@ function GameShellInner({
     setArenaResult(null);
     setStoryRefused(null);
     setMpResult(null);
+    setChallengeResult(null);
     setShareUrl(null);
     setShareState('idle');
     // the next run's evidence of play starts from zero, as a remount would start it — the game's record too: marked before
@@ -548,7 +589,7 @@ function GameShellInner({
     <div className={fullBleed ? 'flex h-[100dvh] flex-col overflow-hidden bg-[#050505]' : 'flex min-h-screen flex-col bg-[#050505]'}>
       {/* Sideways on a phone, the header is a fifth of the screen spent on a back link. It goes; the way out
           lives on the stage instead, where a thumb already is. */}
-      <header className={`sticky top-0 z-40 border-b border-white/10 bg-[#050505]/85 backdrop-blur-md ${fullBleed ? 'hidden' : ''}`}>
+      <header data-game-chrome className={`sticky top-0 z-40 border-b border-white/10 bg-[#050505]/85 backdrop-blur-md ${fullBleed || streamOn ? 'hidden' : ''}`}>
         <div className="mx-auto flex max-w-[1200px] items-center gap-3 px-4 py-2.5">
           <Link
             href="/"
@@ -588,14 +629,16 @@ function GameShellInner({
 
       <div
         ref={stageRef}
+        data-fel-stream={streamOn ? '1' : undefined}
         className={fullBleed
           ? 'relative w-full flex-1 overflow-hidden'
           : 'relative mx-auto w-full max-w-[1200px] flex-1 px-2 py-3 sm:px-4'}
       >
+        <GameCaptureHud mode={mode} stageRef={stageRef} streamOn={streamOn} onStreamMode={setStreamOn} />
         {/* The two controls the header was carrying, as thumb-sized glass over the corner of the stage. Only
             while full-bleed — with the header up they would be a second copy of it. */}
-        {fullBleed && (
-          <div className="pointer-events-none absolute right-2 top-2 z-30 flex items-center gap-1.5">
+        {fullBleed && !streamOn && (
+          <div data-game-chrome className="pointer-events-none absolute right-2 top-2 z-30 flex items-center gap-1.5">
             <Link
               href="/play"
               aria-label="Leave the game"
@@ -628,11 +671,11 @@ function GameShellInner({
           <ReplayInPlaceContext.Provider value={registerReplay}>
             <Game key={gameKey} grade={profile.grade} prq={profile.prq} onEnd={handleEnd} {...(gameProps ?? {})} />
           </ReplayInPlaceContext.Provider>
-        ) : (
+        ) : !unreachable ? (
           <div className="flex h-[60vh] items-center justify-center">
             <Loader2 className="h-8 w-8 animate-spin text-[#00E5FF]" />
           </div>
-        )}
+        ) : null}
 
         <AnimatePresence>
           {result && (
@@ -684,22 +727,35 @@ function GameShellInner({
                       <div className="mt-0.5 text-[11px] text-white/40">{unpaidLine(recap.unpaid)}</div>
                     </div>
                   )}
+                  {recap.capMessage && (
+                    <div data-recap="cap" className="fel-card mt-4 rounded-lg p-3 text-center">
+                      <div className="font-mono text-xs text-white/60">{recap.capMessage}</div>
+                    </div>
+                  )}
+                  {!recap.unpaid && (
                   <div className="mt-6 grid grid-cols-2 gap-3">
+                    {recap.xp > 0 && (
                     <div className="fel-card rounded-lg p-3">
                       <Sparkles className="mx-auto h-4 w-4 text-[#00FF9D]" />
                       <div className="mt-1 font-mono text-xl font-bold text-[#00FF9D]">+{recap.xp}</div>
                       <div className="text-[10px] uppercase tracking-wider text-white/40">XP</div>
                     </div>
+                    )}
+                    {recap.shards > 0 && (
                     <div className="fel-card rounded-lg p-3">
                       <Gem className="mx-auto h-4 w-4 text-[#A855F7]" />
                       <div className="mt-1 font-mono text-xl font-bold text-[#A855F7]">+{recap.shards}</div>
                       <div className="text-[10px] uppercase tracking-wider text-white/40">Shards</div>
                     </div>
+                    )}
+                    {recap.credits > 0 && (
                     <div className="fel-card rounded-lg p-3">
                       <Coins className="mx-auto h-4 w-4 text-[#FFD700]" />
                       <div className="mt-1 font-mono text-xl font-bold text-[#FFD700]">+{recap.credits}</div>
                       <div className="text-[10px] uppercase tracking-wider text-white/40">Credits</div>
                     </div>
+                    )}
+                    {recap.prqDelta !== 0 && (
                     <div className="fel-card rounded-lg p-3">
                       {recap.prqDelta >= 0 ? (
                         <TrendingUp className="mx-auto h-4 w-4 text-[#00E5FF]" />
@@ -712,16 +768,18 @@ function GameShellInner({
                       </div>
                       <div className="text-[10px] uppercase tracking-wider text-white/40">PRQ Δ</div>
                     </div>
-                    {recapCoins !== null && (
+                    )}
+                    {recapCoins !== null && recapCoins.coins > 0 && (
                       <div data-recap="coins" data-capped={recapCoins.capped ? '1' : undefined} className="fel-card col-span-2 flex items-center justify-center gap-2 rounded-lg p-3">
                         <Coins className="h-4 w-4 text-[#FFB020]" />
-                        {recapCoins.coins > 0 && <span className="font-mono text-xl font-bold text-[#FFB020]">+{recapCoins.coins}</span>}
+                        <span className="font-mono text-xl font-bold text-[#FFB020]">+{recapCoins.coins}</span>
                         <span className="text-[10px] uppercase tracking-wider text-white/40">
-                          {recapCoins.coins > 0 ? (recapCoins.capped ? 'Wallet coins · limit reached' : 'Wallet coins') : 'Wallet coin limit reached for now'}
+                          {recapCoins.capped ? 'Wallet coins · limit reached' : 'Wallet coins'}
                         </span>
                       </div>
                     )}
                   </div>
+                  )}
                   </>
                   )}
                   {storyRefused && <StoryRefusedPanel refusal={storyRefused} />}
@@ -740,6 +798,19 @@ function GameShellInner({
                     <div className={`mt-3 rounded-lg border p-3 text-center ${mpResult.tie ? 'border-white/25 bg-white/[0.05]' : mpResult.iWon ? 'border-[#00FF9D]/40 bg-[#00FF9D]/10' : 'border-[#FF3366]/40 bg-[#FF3366]/10'}`}>
                       <p className="text-xs font-bold tracking-wide text-white/80">FRIEND CHALLENGE</p>
                       <p className="mt-1 text-sm text-white/80">{mpResult.tie ? 'Dead heat' : mpResult.iWon ? 'You took it' : `${mpResult.hostName ?? 'They'} held it`} — your best {mpResult.guestScore.toLocaleString('en-US')} vs their {mpResult.hostScore.toLocaleString('en-US')}</p>
+                    </div>
+                  )}
+                  {challengeResult && (
+                    <div className={`mt-3 rounded-lg border p-3 text-center ${challengeResult.beat ? 'border-[#00FF9D]/40 bg-[#00FF9D]/10' : 'border-[#FF3366]/40 bg-[#FF3366]/10'}`}>
+                      <p className="text-xs font-bold tracking-wide text-white/80">FRIEND CHALLENGE</p>
+                      <p className="mt-1 text-sm text-white/80">
+                        {challengeResult.beat ? 'You beat' : 'Target held'} {challengeResult.vs ?? 'the rival'} — target {challengeResult.targetScore.toLocaleString('en-US')}, margin {challengeResult.margin >= 0 ? '+' : ''}{challengeResult.margin.toLocaleString('en-US')}
+                      </p>
+                      {challengeResult.rematchPath && (
+                        <Link href={challengeResult.rematchPath} className="mt-2 inline-block text-[11px] text-[#00E5FF] underline">
+                          Send the rematch
+                        </Link>
+                      )}
                     </div>
                   )}
                   {arenaResult && (
@@ -884,7 +955,7 @@ function GameShellInner({
         </AnimatePresence>
       </div>
 
-      {profile && scheme && !result && !ownControls && <VirtualController scheme={scheme} />}
+      {profile && scheme && !result && !babylonOwnsInput && !streamOn && <VirtualController scheme={scheme} />}
     </div>
   );
 }

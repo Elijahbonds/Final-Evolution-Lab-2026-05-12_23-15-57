@@ -1,6 +1,7 @@
 import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
 import { authOptions } from '@/lib/auth';
+import { loginPath } from '@/lib/auth/safeNext';
 import { SignatureView } from '@/components/signature-view';
 
 export const dynamic = 'force-dynamic';
@@ -11,7 +12,7 @@ export const dynamic = 'force-dynamic';
  */
 export default async function SignaturePage() {
   const session = await getServerSession(authOptions);
-  if (!session) redirect('/login');
+  if (!session) redirect(loginPath('/signature'));
   return (
     <div className="min-h-screen bg-[#050505] pb-20">
       <main className="mx-auto max-w-[900px] px-4 py-8">

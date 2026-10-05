@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { currentUserId, bad } from '@/lib/camp/server';
 import { saveClientLog } from '@/lib/coach/todayServer';
+import { settleRecoveryFor } from '@/lib/prq-recovery';
 
 /**
  * POST /api/coach/me/log — the client logs a session (lane 1 C2).
@@ -14,6 +15,10 @@ import { saveClientLog } from '@/lib/coach/todayServer';
  * effort 1–10 (lib/coach/setLog.ts). They are written to SetLog and the per-exercise columns are derived from them. A
  * set out of range is refused with its own error and the row it came from ({ error: 'rir_range', set: 2, … }) and
  * nothing is written. The save itself is lib/coach/todayServer.ts saveClientLog.
+ *
+ * MIRROR-COACH P9 (2026-09-30): a save that COMPLETES the session settles PRQ recovery right after (lib/prq-recovery.ts
+ * settleRecoveryFor): a completed cool-down, off day or easy-cardio minutes count at once, not at the player's next
+ * visit. Best-effort and after the save: it never changes this answer, and a settle that fails is picked up by the next.
  */
 export async function POST(req: NextRequest) {
   const userId = await currentUserId();
@@ -26,5 +31,6 @@ export async function POST(req: NextRequest) {
     const { ok: _ok, status, ...err } = r;
     return NextResponse.json(err, { status });
   }
+  if ((body as Record<string, unknown>).complete) await settleRecoveryFor(prisma, userId);
   return NextResponse.json({ clientSession: r.clientSession });
 }

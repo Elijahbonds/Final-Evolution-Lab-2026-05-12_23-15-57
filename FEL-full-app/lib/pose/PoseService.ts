@@ -29,7 +29,7 @@ import {
   MediaPipePoseAdapter, onVideoFrames,
   type DetectFrameInfo, type PoseFrame as AdapterFrame, type VideoFrameTick,
 } from '../babylon/nexus/neuro-mirror/pose/mediapipe-adapter';
-import { agentEnabled } from '../babylon/core/AgentBridge';
+import { agentRunHooksAllowed, registerProdHookSync } from '@/lib/agentRunHooks';
 import { LANDMARK_COUNT, emptyFrame, type PoseFrame } from './landmarks';
 import type { PoseModel } from './assets';
 import {
@@ -590,7 +590,20 @@ export function makeFeedHandle(get: () => PoseService): PoseFeed {
   };
 }
 
-// Installed when this module loads (any page with body control), so a probe finds it before anything opens the camera.
-if (typeof window !== 'undefined' && feedHookAllowed(process.env.NODE_ENV, agentEnabled(), window.location.hostname)) {
+function installPoseFeedHook(): void {
+  if (typeof window === 'undefined') return;
   window.__FEL_POSE_FEED__ = makeFeedHandle(poseService);
+}
+function removePoseFeedHook(): void {
+  if (typeof window === 'undefined') return;
+  delete window.__FEL_POSE_FEED__;
+}
+// Installed when this module loads (any page with body control), so a probe finds it before anything opens the camera.
+if (typeof window !== 'undefined') {
+  if (process.env.NODE_ENV === 'development') {
+    if (feedHookAllowed(process.env.NODE_ENV, true, window.location.hostname)) installPoseFeedHook();
+  } else {
+    registerProdHookSync(installPoseFeedHook, removePoseFeedHook);
+    if (agentRunHooksAllowed() && feedHookAllowed(process.env.NODE_ENV, true, window.location.hostname)) installPoseFeedHook();
+  }
 }

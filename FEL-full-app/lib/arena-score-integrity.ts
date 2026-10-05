@@ -73,14 +73,14 @@ export const MIRRORED = {
   /** lib/babylon/modes/ThreePointMode.ts — RACKS, BALLS_PER_RACK; the last ball of a rack is the money ball, worth 2. */
   threePointRacks: 5, threePointBallsPerRack: 5, threePointMoneyWorth: 2,
   /** lib/babylon/modes/precisionModes.ts GolfMode — TOTAL holes, GOLF_PAR, CLUTCH_MULT, a holed ball pays max(20, 120 − rel × 40). */
-  golfHoles: 3, golfPar: [3, 4, 3] as readonly number[], clutchMult: 1.5, holeBasePts: 120, holePerStroke: 40,
+  golfHoles: 5, golfPar: [3, 4, 4, 3, 5] as readonly number[], clutchMult: 1.5, holeBasePts: 120, holePerStroke: 40,
   /** precisionModes.ts DerbyMode — TOTAL pitches; a homer pays round(q × (80 + launch × 60) × clutch), q ≤ 1, launch ≤ 0.9. */
-  derbyPitches: 20, derbyHomerBase: 80, derbyLaunchPts: 60, derbyLaunchMax: 0.9,
+  derbyPitches: 30, derbyOutsCap: 15, derbyHomerBase: 80, derbyLaunchPts: 60, derbyLaunchMax: 0.9,
   /** precisionModes.ts PenaltyMode — SD_CAP sudden-death kicks, MAX_FEINTS × FEINT_STYLE_PTS, a goal is 20; the
    *  breakaway pays a shot kind up to 15 (+5 kinetic) and +5 a wall run. */
   penaltySdCap: 5, maxFeints: 2, feintStylePts: 8, goalPts: 20, shotStyleMax: 15, kineticStylePts: 5, wallRunStylePts: 5,
-  /** lib/babylon/modes/NetSportMode.ts — `new TennisScore(4)`: the match is the first to four games. */
-  tennisGames: 4,
+  /** lib/babylon/modes/NetSportMode.ts — `new TennisScore(6)`: the match is the first to six games. */
+  tennisGames: 6,
   /** components/games/tiebreak-game.tsx — TARGET 7; score = myPts × 120 + bestRally × 30; the AI misses with
    *  probability 0.16 + 0.05 × rally, which is certain from the rally where that reaches 1. */
   tiebreakTarget: 7, tiebreakPointPts: 120, tiebreakRallyPts: 30, tiebreakMissBase: 0.16, tiebreakMissPerRally: 0.05,
@@ -119,7 +119,7 @@ export const MIRRORED = {
   karateWaveMax: 20, karateKoPts: 100, karateWavePts: 50,
   /** FootballRushMode — DRIVES; the biggest single award (a truck in a breakaway, TRUCK_PTS 30 × 2); a TD pays
    *  (100 + evades × 10) × 1.5 in a breakaway; a style chain pays STYLE_CHAIN_PTS × (types − 1) for each of 7 evade types. */
-  footballDrives: 3, footballAwardMax: 60, footballTdBase: 100, footballTdPerEvade: 10, footballTdMult: 1.5,
+  footballDrives: 5, footballAwardMax: 60, footballTdBase: 100, footballTdPerEvade: 10, footballTdMult: 1.5,
   footballStylePts: 25, footballStyleTypes: 7,
   /** carnivalEvents — each event's clock, its points per unit, and what paces it. */
   slamRushSec: 20, slamRushPpu: 12, slamRushCooldownSec: 0.5,

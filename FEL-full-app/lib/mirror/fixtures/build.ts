@@ -288,12 +288,32 @@ const PUSH_TOP = 0.56, PUSH_BOTTOM = 0.31;   // shoulder-joint height (m): arms 
 const PUSH_HAND_X = -0.66;                   // the hands stay planted here (x along the body; the head is toward −X)
 const TORSO = 0.50, NECK = 0.07, HEADLEN = 0.17;
 
+export interface PushupOpts {
+  /**
+   * The hips' perpendicular offset from the shoulder–ankle (or, on a knee push-up, shoulder–knee) line, metres,
+   * constant through the rep (a bad plank is bad from the top, not just at the bottom): + = PIKE (hips ride above
+   * the line), − = SAG (hips drop below it). MIRROR-COACH P4, 2026-09-29 — added for the pushupAudit fixtures;
+   * pushupTruth() reads the real offset back off the joints, never off this input, like every other opt in this file.
+   */
+  hipOffM?: number;
+  /**
+   * A bent-knee push-up: the KNEE plants on the floor and the shin lies back off it, instead of the ankle planting
+   * and the shin running on up the straight body line. Built as its own geometry (the pivot moves from the ankle to
+   * the knee, and the body line the truth is read against shortens from ankle–shoulder to knee–shoulder) rather than
+   * as a flag pushupAudit.ts has to special-case twice — the audit's OWN variant switch is a plain read of which
+   * one (knee vs ankle) the joints put closer to the floor, the same thing a camera would see.
+   */
+  kneeVariant?: boolean;
+}
+
 /**
  * A push-up seen from the side, LEFT side to the camera, head toward the image's left. Built directly in the world:
- * the body is one straight line from the ankles (the pivot, on the balls of the feet) to the shoulders.
+ * the body is one straight line from the floor contact (the pivot — the balls of the feet on a straight-leg
+ * push-up, the knee on a bent-knee one) to the shoulders, with the hips (MIRROR-COACH P4) free to sit off that line.
  */
-export function pushupPose(d: number): Joints {
+export function pushupPose(d: number, o: PushupOpts = {}): Joints {
   const shY = PUSH_TOP + (PUSH_BOTTOM - PUSH_TOP) * d;
+  if (o.kneeVariant) return kneePushupPose(shY, o);
   const ankle: V3 = [0.67, 0.12, 0];
   const bodyLen = TORSO + THIGH + SHIN;
   const a = Math.asin((shY - ankle[1]) / bodyLen);          // body line's angle to the floor
@@ -304,8 +324,16 @@ export function pushupPose(d: number): Joints {
   j.LeftFoot = at(0, 0.10); j.RightFoot = at(0, -0.10);
   j.LeftToe = [ankle[0] - 0.05, 0.02, 0.10]; j.RightToe = [ankle[0] - 0.05, 0.02, -0.10];
   j.LeftLeg = at(SHIN, 0.10); j.RightLeg = at(SHIN, -0.10);
-  j.LeftUpLeg = at(H, 0.09); j.RightUpLeg = at(H, -0.09);
-  j.Hips = at(H + 0.03, 0);
+  // the hip JOINTS (LeftUpLeg/RightUpLeg — MediaPipe's left_hip/right_hip, lib/pose/synth.ts p[23]/p[24]; the "Hips"
+  // joint below is the Mixamo pelvis root and is not itself a landmark) sit on the line by default, offset
+  // perpendicular to it when a sag/pike opt is given — a rotation of the world-Y offset into the line's own frame,
+  // so `hipOffM` means the same thing whatever depth the rep is at. MIRROR-COACH P4 review: an earlier version of
+  // this offset moved only the Hips pelvis root, which pushupAudit.ts never reads — the fixture recorded a sag or a
+  // pike that no landmark carried, so every hip-offset reading came back the clean fixture's 0.
+  const perp: V3 = [Math.sin(a), Math.cos(a), 0];            // ⟂ to toHead, in the same sagittal plane
+  const hipOff = mul(perp, o.hipOffM ?? 0);
+  j.LeftUpLeg = add(at(H, 0.09), hipOff); j.RightUpLeg = add(at(H, -0.09), hipOff);
+  j.Hips = add(at(H + 0.03, 0), hipOff);
   j.Chest = at(H + 0.33, 0);
   j.LeftArm = at(S, 0.19); j.RightArm = at(S, -0.19);
   j.Neck = at(S + NECK, 0);
@@ -317,14 +345,156 @@ export function pushupPose(d: number): Joints {
   return j;
 }
 
-function pushupTruth(): FixtureTruth {
-  const b = pushupPose(1), t = pushupPose(0);
+/**
+ * The knee-push-up variant (MIRROR-COACH P4): the pivot is the KNEE, on the floor; the thigh (knee→hip) runs up the
+ * body line the way the shin did before, and the shin now folds back off the knee, roughly flat on the floor, so the
+ * ankle sits BEHIND and no higher than the knee — the opposite of a straight-leg push-up, where the ankle is the
+ * floor contact and the knee rides well clear of it. pushupAudit.ts's variant switch reads exactly that comparison.
+ */
+function kneePushupPose(shY: number, o: PushupOpts): Joints {
+  const knee: V3 = [0.42, 0.12, 0];              // the pivot: on the floor, nearer the shoulders than the ankle was
+  const bodyLen = TORSO + THIGH;                  // knee → hip → shoulder (the shin no longer on this line)
+  const a = Math.asin((shY - knee[1]) / bodyLen);
+  const toHead: V3 = [-Math.cos(a), Math.sin(a), 0];
+  const at = (s: number, z: number): V3 => [knee[0] + toHead[0] * s, knee[1] + toHead[1] * s, z];
+  const S = bodyLen, H = THIGH;
+  const j = {} as Joints;
+  j.LeftLeg = at(0, 0.10); j.RightLeg = at(0, -0.10);
+  // the shin folds UP and back off the knee (a kneeling fold, feet lifted clear of the floor) — the ankle ends up
+  // ABOVE the knee in the world, and so higher in the image (smaller y) than it: the opposite of a straight-leg
+  // push-up, where the ankle is the one planted and the knee rides clear of IT. MIRROR-COACH P4 review: an earlier
+  // version put a small, wrong-signed rise on the ankle (it landed BELOW the knee, same ordering as a straight-leg
+  // push-up), so pushupAudit.ts's variant switch never fired — checked by re-running this file's own probe script.
+  const behindX = toHead[0] > 0 ? -1 : 1;             // "behind" = away from the head, along the floor
+  j.LeftFoot = [knee[0] + behindX * SHIN * 0.35, knee[1] + SHIN * 0.75, 0.10];
+  j.RightFoot = [knee[0] + behindX * SHIN * 0.35, knee[1] + SHIN * 0.75, -0.10];
+  j.LeftToe = add(j.LeftFoot, [behindX * 0.05, -0.03, 0]); j.RightToe = add(j.RightFoot, [behindX * 0.05, -0.03, 0]);
+  const perp: V3 = [Math.sin(a), Math.cos(a), 0];
+  const hipOff = mul(perp, o.hipOffM ?? 0);
+  j.LeftUpLeg = add(at(H, 0.09), hipOff); j.RightUpLeg = add(at(H, -0.09), hipOff);
+  j.Hips = add(at(H + 0.03, 0), hipOff);
+  j.Chest = at(H + 0.33, 0);
+  j.LeftArm = at(S, 0.19); j.RightArm = at(S, -0.19);
+  j.Neck = at(S + NECK, 0);
+  j.Head = at(S + NECK + HEADLEN, 0);
+  // hands directly under the (now nearer) shoulders — a knee push-up's arms are shorter to the floor
+  j.LeftHand = [j.LeftArm[0] - 0.06, 0.05, 0.24]; j.RightHand = [j.RightArm[0] - 0.06, 0.05, -0.24];
+  j.LeftForeArm = solveMiddle(j.LeftArm, j.LeftHand, UPPER_ARM, FOREARM, [0.55, 0.65, 0.5]);
+  j.RightForeArm = solveMiddle(j.RightArm, j.RightHand, UPPER_ARM, FOREARM, [0.55, 0.65, -0.5]);
+  return j;
+}
+
+/** What the fixture really did, read off the joints (never off `o` directly) — exported for pushupAudit.test.ts. */
+export function pushupTruth(o: PushupOpts = {}): FixtureTruth {
+  const b = pushupPose(1, o), t = pushupPose(0, o);
+  // the hips' perpendicular offset from the shoulder–floor-contact line, read off the JOINTS (never off o.hipOffM
+  // directly, the same discipline as squatTruth/lungeTruth): + = piked (hips above the line), − = sagging (below it)
+  const floorContact = o.kneeVariant ? b.LeftLeg : b.LeftFoot;
+  const offsetCm = r1(hipOffLineCm(floorContact, b.LeftArm, b.LeftUpLeg) * 100);
   return {
     elbowDegTop: r1(angleAt(t.LeftArm, t.LeftForeArm, t.LeftHand)),
     elbowDegBottom: r1(angleAt(b.LeftArm, b.LeftForeArm, b.LeftHand)),
     shoulderHeightCmTop: r1(PUSH_TOP * 100), shoulderHeightCmBottom: r1(PUSH_BOTTOM * 100),
-    // the hips on the shoulder–ankle line (0 = a straight plank; + would be piked, − sagging)
-    hipOffLineCm: 0,
+    // the hips off the shoulder–floor-contact line (0 = a straight plank; + piked, − sagging) — MIRROR-COACH P4.
+    // No separate `kneeVariant` truth field: the registered pushup_side fixture (o={}) predates this option and its
+    // on-disk truth (lib/mirror/fixtures/pushup_side.json, fixtures.test.ts) has no such key — adding one here would
+    // only be to describe this function's OWN input back to itself, which pushupAudit.test.ts's own ad-hoc fixtures
+    // (built straight off pushupPose/PushupOpts, not through this truth function) don't need either.
+    hipOffLineCm: offsetCm,
+    reps: 1,
+  };
+}
+
+/**
+ * The hip's signed perpendicular distance (m) from the floor-contact→shoulder line, in the sagittal (X–Y) plane:
+ * + = the hip sits ABOVE the line (piked), − = below it (sagging). Built the same way as kneeInwardCm above — the
+ * ground truth read straight from the joints, in world space, so it agrees with pushupAudit.ts's image-space read
+ * (which uses the same "above/below the line, sign flips once for the image's y-down") up to that one, documented,
+ * axis flip.
+ */
+function hipOffLineCm(floor: V3, shoulder: V3, hip: V3): number {
+  const ab: V3 = [shoulder[0] - floor[0], shoulder[1] - floor[1], 0];
+  const l = Math.hypot(ab[0], ab[1]);
+  if (l < 1e-6) return 0;
+  const ap: V3 = [hip[0] - floor[0], hip[1] - floor[1], 0];
+  // 2-D cross (ab × ap), z component: + when ap is COUNTER-clockwise from ab. ab points toward −X (floor → shoulder,
+  // head is at −X), rising in +Y, so "above the line" (bigger Y at the same X) is the CLOCKWISE side — negative cross.
+  const cross2 = ab[0] * ap[1] - ab[1] * ap[0];
+  return -cross2 / l;
+}
+
+/** Rotate p about `pivot` around the Z axis: + turns +X toward +Y (a lateral raise, arm rising out to that side). */
+function rotZ(p: V3, pivot: V3, a: number): V3 {
+  const x = p[0] - pivot[0], y = p[1] - pivot[1], c = Math.cos(a), s = Math.sin(a);
+  return [pivot[0] + x * c - y * s, pivot[1] + x * s + y * c, p[2]];
+}
+
+// ── overhead reach (front) ───────────────────────────────────────────────────────────────────────────────────────
+// MIRROR-COACH P4, 2026-09-29 — built for overheadAudit.ts's fixtures. Standing, facing the camera (restPose's own
+// orientation — the same "front" stand every squat/lunge fixture starts from), both arms swinging from hanging at
+// the sides (d=0) to reaching overhead (d=1) THROUGH THE CORONAL PLANE — a lateral raise (rotation about Z), not a
+// front raise (rotation about X, toward/away from the lens). MIRROR-COACH P4 review: a first version used rotX, the
+// same helper squatPose's balance-reach arms use — correct for an arm swinging forward, but this camera watches the
+// reach from the FRONT, so a front-raise plane sends a short (asymmetric) reach mostly TOWARD the lens, where a 2-D
+// image foreshortens it almost away: overheadAudit.test.ts's own asymmetric fixture (one arm 50° short) measured an
+// image-plane elevation of ~6° on the short arm — closer to "overhead" than the FULL-reach arm's own 2.4° read out
+// of context, and nowhere near the ~50° the joints actually show. A lateral raise stays in the image's own plane at
+// every degree of the swing, so the 2-D read and the 3-D truth agree (overheadTruth reads the same joints either way).
+// FULL_OVERHEAD_DEG is the swing a straight arm makes from hanging straight down to pointing straight up; per side it
+// can fall short (an asymmetric reach) and the shoulder can ride up with it (a shrug) — both read from the fixture's
+// own JOINTS in overheadTruth, never from the opts directly.
+export const FULL_OVERHEAD_DEG = 180;
+
+export interface OverheadOpts {
+  /** Degrees the LEFT/RIGHT arm swings from hanging (0) toward overhead (FULL_OVERHEAD_DEG = straight up) at d=1. */
+  armDegL?: number;
+  armDegR?: number;
+  /** The shoulder's own rise (m) as that arm goes up, on top of the arm's swing — a trap doing the lift's job. */
+  shrugL?: number;
+  shrugR?: number;
+  /** The elbow's bend away from straight (degrees) at the top of the reach, per side. */
+  elbowBendL?: number;
+  elbowBendR?: number;
+}
+
+/** Both arms swinging up from the sides to overhead, at fraction `d` of the reach (0 = hanging, 1 = the top). */
+export function overheadPose(d: number, o: OverheadOpts = {}): Joints {
+  const j = restPose();
+  for (const s of ['Left', 'Right'] as const) {
+    const armDeg = (s === 'Left' ? o.armDegL : o.armDegR) ?? FULL_OVERHEAD_DEG;
+    const shrugM = (s === 'Left' ? o.shrugL : o.shrugR) ?? 0;
+    const elbowBendDeg = (s === 'Left' ? o.elbowBendL : o.elbowBendR) ?? 0;
+    const sh = j[`${s}Arm`];
+    // + for the LEFT arm swings it toward +X (the subject's own left, away from the midline) and up; the RIGHT arm
+    // takes the mirrored sign so it swings toward -X (its own away-from-midline direction) and up the same way.
+    const sign = s === 'Left' ? 1 : -1;
+    const angle = sign * rad(armDeg * d);
+    let fore = rotZ(j[`${s}ForeArm`], sh, angle);
+    let hand = rotZ(j[`${s}Hand`], sh, angle);
+    if (elbowBendDeg) hand = rotZ(hand, fore, -sign * rad(elbowBendDeg * d));   // the elbow softening as the arm tops out
+    const rise: V3 = [0, shrugM * d, 0];                                 // the shoulder hiking up with the reach
+    j[`${s}Arm`] = add(sh, rise);
+    j[`${s}ForeArm`] = add(fore, rise);
+    j[`${s}Hand`] = add(hand, rise);
+  }
+  return j;
+}
+
+/** What the fixture really did, read off the joints (never off `o` directly) — exported for overheadAudit.test.ts to
+ *  cross-check its own measurements against, the same way pushupAudit.test.ts can with pushupPose's truth. */
+export function overheadTruth(o: OverheadOpts = {}): FixtureTruth {
+  const top = overheadPose(1, o);
+  const elevationDeg = (s: 'Left' | 'Right') => {
+    const v = norm(sub(top[`${s}Hand`], top[`${s}Arm`]));
+    return r1(deg(Math.acos(Math.max(-1, Math.min(1, dot(v, [0, 1, 0]))))));   // 0° = straight overhead
+  };
+  const elbowDeg = (s: 'Left' | 'Right') => r1(angleAt(top[`${s}Arm`], top[`${s}ForeArm`], top[`${s}Hand`]));
+  const eL = elevationDeg('Left'), eR = elevationDeg('Right');
+  return {
+    elevationDegLeftTop: eL, elevationDegRightTop: eR,
+    asymmetryDegTop: r1(Math.abs(eL - eR)),
+    elbowDegLeftTop: elbowDeg('Left'), elbowDegRightTop: elbowDeg('Right'),
+    shrugRiseCmLeft: r1((o.shrugL ?? 0) * 100), shrugRiseCmRight: r1((o.shrugR ?? 0) * 100),
     reps: 1,
   };
 }

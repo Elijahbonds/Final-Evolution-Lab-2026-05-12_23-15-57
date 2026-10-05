@@ -1,13 +1,15 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { healthEraseToast, healthStoredLine } from '@/lib/health/healthDataCopy';
 import { MasteryBadge } from '@/components/mastery-badge';
 import { motion } from 'framer-motion';
 import { PRQ_ATTRS } from '@/lib/prq';
 import { ROSTER } from '@/lib/game-data';
 import { AvatarFigure } from '@/components/avatar-figure';
-import { Flame, Sparkles, Coins, Gem, Check, Plus, X, Loader2, Download, Trash2 } from 'lucide-react';
+import { Flame, Sparkles, Coins, Gem, Check, Plus, X, Loader2, Download, Trash2, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
+import { Switch } from '@/components/ui/switch';
 
 const ATTR_LABELS: Record<string, string> = {
   strength: 'Strength',
@@ -160,6 +162,7 @@ export function ProfileView({ userName, email }: { userName: string; email: stri
       <MasteryPanel />
       <PrqFoundation />
       <PrqDataRights />
+      <HealthDataSection />
     </main>
   );
 }
@@ -278,6 +281,167 @@ function PrqDataRights() {
             </button>
             <button
               onClick={() => setShowConfirm(false)}
+              className="rounded-md border border-white/20 px-3 py-1.5 text-xs text-white/50 hover:text-white"
+            >
+              Cancel
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// MIRROR-COACH P5 (2026-09-29) — Health data: view, withdraw (+ offer erase), and manage coach_view per coach.
+//
+// Deliberately its own panel, below YOUR DATA RIGHTS rather than folded into it: Privacy §5 promises this data
+// (a health intake, per-exercise pain check-ins) is handled "separately from the rest of your account" — withdrawing
+// consent here, or erasing what it collected, never touches a PRQ entry or a movement-history row, and the button
+// above never touches this. All state lives in app/api/health/consent (GET for the view, POST for every action);
+// lib/health/consent.ts is the pure module both the route and this page's own tests read the same rules from.
+// ---------------------------------------------------------------------------
+
+interface HealthConsentApiView {
+  healthData: { granted: boolean; grantedAt: string | null };
+  coaches: { coachId: string; name: string; viewGranted: boolean; grantedAt: string | null }[];
+  /** MIRROR-COACH P6 (2026-09-29): readinessCheckIns — the daily check-in, stored under this same consent. Optional
+   *  so a response from before P6 still renders (read as 0). MIRROR-COACH P7 FIX (2026-09-29): breathLogs — the Dial-Up
+   *  Breath's use log, which the export and both erases carry; optional for the same reason. */
+  counts: { healthIntakes: number; painCheckIns: number; readinessCheckIns?: number; breathLogs?: number };
+}
+
+
+function HealthDataSection() {
+  const [view, setView] = useState<HealthConsentApiView | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);       // which control is mid-request, so only it spins
+  const [showErase, setShowErase] = useState(false);
+  const [erasing, setErasing] = useState(false);
+
+  const load = () => {
+    fetch('/api/health/consent', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => { if (j) setView(j); })
+      .catch(() => {});
+  };
+  useEffect(load, []);
+
+  const post = async (body: Record<string, unknown>, busyKey: string) => {
+    if (busy) return;
+    setBusy(busyKey);
+    try {
+      const res = await fetch('/api/health/consent', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+      });
+      const j = await res.json().catch(() => null);
+      if (res.ok && j) setView(j);
+      else toast.error(j?.error === 'cannot_grant_coach_view' ? 'Turn on health data collection first.' : 'That didn\'t go through.');
+    } catch {
+      toast.error('That didn\'t go through.');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const toggleHealthData = (next: boolean) => post({ action: next ? 'grant' : 'revoke', scope: 'health_data' }, 'health_data');
+  const toggleCoach = (coachId: string, next: boolean) =>
+    post({ action: next ? 'grant' : 'revoke', scope: 'coach_view', coachId }, `coach:${coachId}`);
+
+  const handleErase = async () => {
+    if (erasing) return;
+    setErasing(true);
+    try {
+      const res = await fetch('/api/health/consent', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'erase' }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (res.ok) {
+        const e = j?.erased ?? {};
+        toast.success(healthEraseToast(e));
+        setShowErase(false);
+        setView(j);
+      } else {
+        toast.error('Delete failed');
+      }
+    } catch {
+      toast.error('Delete failed');
+    } finally {
+      setErasing(false);
+    }
+  };
+
+  const granted = view?.healthData.granted ?? false;
+
+  return (
+    <div className="mt-8 rounded-xl border border-white/10 bg-white/[0.02] p-5">
+      <h3 className="fel-heading flex items-center gap-2 text-lg font-bold text-white mb-1">
+        <ShieldCheck className="h-4 w-4 text-[#00E5FF]" /> HEALTH DATA
+      </h3>
+      <p className="text-xs text-white/40 mb-4">
+        Your health intake, pain check-ins, daily check-ins and Dial-Up Breath uses, kept separately from the rest of your account: opt-in only, stored on FEL
+        only, never sold, never used for ads, never in a share link, and never scored or paid. See Privacy §5.
+      </p>
+
+      <div className="flex items-center justify-between rounded-lg border border-white/10 p-3">
+        <div>
+          <div className="text-sm font-bold text-white">Health data collection</div>
+          <div className="text-xs text-white/40">
+            {granted
+              ? `On${view?.healthData.grantedAt ? ` since ${new Date(view.healthData.grantedAt).toLocaleDateString()}` : ''} — ${healthStoredLine(view?.counts)}`
+              : 'Off — nothing is being collected.'}
+          </div>
+        </div>
+        <Switch
+          checked={granted}
+          disabled={busy === 'health_data' || !view}
+          onCheckedChange={toggleHealthData}
+          aria-label="Health data collection"
+        />
+      </div>
+
+      {view && view.coaches.length > 0 && (
+        <div className="mt-3 space-y-2">
+          <div className="text-xs font-bold uppercase tracking-wider text-white/50">Coach access</div>
+          {view.coaches.map((c) => (
+            <div key={c.coachId} className="flex items-center justify-between rounded-lg border border-white/10 p-3">
+              <div>
+                <div className="text-sm text-white">{c.name}</div>
+                <div className="text-xs text-white/40">
+                  {c.viewGranted ? 'Can see your intake and pain check-ins.' : granted ? 'Not shared.' : 'Turn on health data collection to share.'}
+                </div>
+              </div>
+              <Switch
+                checked={c.viewGranted}
+                disabled={busy === `coach:${c.coachId}` || !granted}
+                onCheckedChange={(next) => toggleCoach(c.coachId, next)}
+                aria-label={`Share health data with ${c.name}`}
+              />
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="mt-4 flex flex-wrap items-center gap-3">
+        {!showErase ? (
+          <button
+            data-test-ignore="opens-confirm-dialog"
+            onClick={() => setShowErase(true)}
+            className="inline-flex items-center gap-2 rounded-md border border-[#FF3366]/30 bg-[#FF3366]/10 px-4 py-2 text-xs font-bold text-[#FF3366] transition-colors hover:bg-[#FF3366]/20"
+          >
+            <Trash2 className="h-3.5 w-3.5" /> ERASE HEALTH DATA
+          </button>
+        ) : (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-[#FF3366]">Deletes your intake, every pain check-in, every daily check-in and your Dial-Up Breath uses. Your consent records are kept as proof of agreement and withdrawal. Never touches a workout plan or your PRQ history. This is permanent.</span>
+            <button
+              onClick={handleErase}
+              disabled={erasing}
+              className="rounded-md bg-[#FF3366] px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50"
+            >
+              {erasing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'YES, DELETE'}
+            </button>
+            <button
+              onClick={() => setShowErase(false)}
               className="rounded-md border border-white/20 px-3 py-1.5 text-xs text-white/50 hover:text-white"
             >
               Cancel

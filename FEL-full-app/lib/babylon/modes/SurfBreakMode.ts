@@ -1,7 +1,7 @@
 // SurfBreakMode v5 — REPLACES the M44 file. The wave finally barrels
 // (rideWorlds v3 ships alongside):
-//   THE BARREL — the funnel shell over the pocket opens and closes on an
-//     18s cycle (8s open). Riding the pocket while it's open doubles flow
+//   THE BARREL — the funnel opens only inside a wave's barrel section
+//     (surfLineup), not on a fixed clock. Riding the pocket while it's open doubles flow
 //     gain and the score trickle ("IN THE BARREL"); hold it ≥1.5s and
 //     exiting banks a +250 "BARRELED!" bonus. The tube visibly breathes —
 //     you can SEE when the wave is hollow.
@@ -41,6 +41,7 @@ import { SurfSpray } from '../premium/SurfSpray';   // SURF OCEAN: crest mist, r
 // MOVEMENT PLAY P8 (2026-09-26): the body's grab in the air, a quarter-turn on the face (the CUTBACK) or in the air (a spin)
 import { RideIntents, rideOf, rideLines, type RideIntent } from '../core/rideBody';
 import { spinTrickFor } from '../core/rideTricks';
+import { HeatScore, scoreWave } from '../core/SurfHeat';
 
 const RUN_SEC = 90;
 /** phase 10: the score that wins a session without a barrel */
@@ -50,7 +51,7 @@ const CUTBACK_RATE = 6;
 /** The camera preset's resting fov, captured on the first frame after load and restored to by SpeedFov. */
 let baseFov: number | null = null;
 
-export const POCKET = { min: 2, max: 9 };
+export const POCKET = { min: 1, max: 9 };
 /** WALLS + SPEED (2026-09-15): +35% with the other boards (was 9) — the ceiling the surge and the lens normalise against.
  *  BOARD-SPEED (2026-09-21): it rides the shared pace now (9 × BOARD_PACE = 14.4), so the next pace change reaches surf too. */
 export const MAX_FORWARD_SPEED = 9 * BOARD_PACE;
@@ -63,7 +64,7 @@ export const FLAT_LEASH = 8;
 /** BOARD-SPEED (2026-09-21): what the RIDER does — trim up, drop in, drive off the rail — moves with the shared pace
  *  (+18.5% with skate and snow). What the WAVE does (flat / slide / trim) does not: the wave is the wave. */
 const RIDE_PACE = BOARD_PACE / 1.35;
-export const DRIFT = { flat: -1.7, slide: 0.9, trim: 0.6, climb: 2.4 * RIDE_PACE, drop: 2.2 * RIDE_PACE, rail: 2.6 * RIDE_PACE };
+export const DRIFT = { flat: -1.2, slide: 0.9, trim: 0.6, climb: 2.4 * RIDE_PACE, drop: 2.2 * RIDE_PACE, rail: 2.6 * RIDE_PACE };
 export const BARREL_HOLD_SEC = 1.5;
 export const BARREL_BONUS = 250;
 /** Carve depth at which the rider commits and starts SPENDING flow. */
@@ -76,9 +77,14 @@ export const SURGE_SPEED_BONUS = 4;
 /** Ceiling on the flow meter. */
 export const FLOW_MAX = 200;
 /** Flow gained per second riding the pocket (doubled inside the tube). */
-export const FLOW_FILL_PER_SEC = 22;
+export const FLOW_FILL_PER_SEC = 28;
 export const SurfBreakMode: ModeDefinition = (() => {
   let world: RideWorld, waveLipAt: (t: number) => Vector3, barrelActive: (t: number) => boolean;
+  let activeProfile: () => { worth: number } = () => ({ worth: 1 });
+  const heat = new HeatScore();
+  let waveMoves: { label: string; difficulty: number }[] = [];
+  let waveJudged = false;
+  let riddenTube = 0;
   let faceHeightAt: (x: number, z: number, t: number) => number;
   // deep runs light the building here too, not only on a skateboard (boardCore.TrickMachine)
   let trickMomentum = new MomentumBus();
@@ -109,7 +115,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
   const WAVE_MOVE_LOCK_SEC = 0.55;
   /** phase 7: lateral speed INTO the channel wall that is a wipe rather than a turn-back (a hard carve tops ~4 m/s). */
   const SURF_EDGE_SLAM_MS = 4.5;
-  const PUMP_WINDOW_SEC = 0.9, PUMP_DRIVE = 1.6, PUMP_DECAY = 1.1;
+  const PUMP_WINDOW_SEC = 1.15, PUMP_DRIVE = 1.8, PUMP_DECAY = 1.1;
   const SURF_LATERAL_MAX = 7;
   let ended = false, wipedOut = false;
   let lapsSeen = 0;
@@ -182,11 +188,28 @@ export const SurfBreakMode: ModeDefinition = (() => {
     });
   }
 
+  function judgeWave(ctx: ModeContext, wiped: boolean): void {
+    if (waveJudged) return;
+    waveJudged = true;
+    const worth = activeProfile().worth || 1;
+    const score = scoreWave({
+      selectionQuality01: Math.max(0, Math.min(1, worth / 1.8)),
+      maneuvers: waveMoves,
+      tubeSec: riddenTube,
+      wipedOut: wiped,
+    });
+    heat.addWave(score);
+    waveMoves = [];
+    riddenTube = 0;
+    ctx.setHud({ heat: heat.total, waves: heat.waveCount });
+  }
+
   function wipeout(ctx: ModeContext, why: string, lipZ: number): void {
     waveMoveRepeats.clear();   // a new wave, a fresh list
     spray?.splash(rig.char.root.position, 1.2);   // SURF OCEAN: the fall throws the water
     console.info(`[SURF-WIPE] call: ${why}${wipedOut ? ' (already down — ignored)' : ''} | u ${(rig.char.root.position.z - lipZ).toFixed(1)} x ${rig.char.root.position.x.toFixed(1)} rel ${rel.toFixed(1)} pump ${pumpBoost.toFixed(1)}`);   // A+ P0 probe: punches are checked against accepted calls
     if (wipedOut) return;
+    judgeWave(ctx, true);
     wipedOut = true;
     tricks.bail();
     // A+ P0 juice (PM brief BOARD-A-PLUS-P0, 2026-09-06): the wipe HITS — hit-stop + shake + ONE low thud (replaces the bare
@@ -215,6 +238,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
       ctx.camDirector.snapTo(rig.char.root.position, waveLipAt(t));
       rig.rider.vel.set(0, 0, 0);
       wipedOut = false;
+      waveJudged = false;
       ctx.setHud({ banner: '' });
     }, 1600);
   }
@@ -232,7 +256,9 @@ export const SurfBreakMode: ModeDefinition = (() => {
     }
     barrelWorked = 0;
     barrels++;
+    waveMoves.push({ label: 'BARREL', difficulty: 4 });
     tricks.score += BARREL_BONUS;
+    judgeWave(ctx, false);
     SoundKit.play('score', { pitch: 1.3 });
     SoundKit.play('crowdCheer', { volume: 0.5 });
     // The 'surf' preset's own note reads "barrel treatment = tightest (set via
@@ -263,6 +289,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
       yawTarget += Math.PI * 0.5 * turnSign;
       cutbackUntil = t + CUTBACK_LEAN_SEC;
     }
+    waveMoves.push({ label: wave.label, difficulty: wave.difficulty });
     const paid = Math.round((trickPts(wave) + Math.round(flow / 4)) * REPEAT_DECAY[Math.min(rep, REPEAT_DECAY.length - 1)]);
     tricks.score += paid;
     if (rep < 2) boostKit.earn(wave.difficulty >= 3 ? 'trickBig' : 'trickSmall');
@@ -305,6 +332,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
 
   return {
     modeId: 'surf', camPreset: 'surf',
+    hideRingInPlay: true,
     // MOVEMENT PLAY P8: the card — the floor's lines, then the grab, the cutback and the spin this mode reads itself
     body: { lines: rideLines('surf') },
     // Per-venue light and horizon, read at mount (see SkateRunMode). This is also what finally mounts the painted
@@ -324,6 +352,8 @@ export const SurfBreakMode: ModeDefinition = (() => {
       const built = buildSurfBreak(ctx.scene, POCKET, venue);
       ctx.setHud({ banner: `${venue.name} · ${venue.sub}` });
       world = built.world; waveLipAt = built.waveLipAt; barrelActive = built.barrelActive; faceHeightAt = built.faceHeightAt;
+      activeProfile = built.activeProfile;
+      waveMoves = []; waveJudged = false;
       updateSea = built.updateSea;
       spray?.dispose(); spray = new SurfSpray(ctx.scene);
       propsGone = false; void mountVenueProps(ctx.scene, 'surf-break').then((h) => { if (propsGone) h?.dispose(); else props = h; });
@@ -554,6 +584,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
           // drip is what scored 921 for a rider who never touched the pad, with no cue for any of it (19 unexplained scores).
           if (hollow) {
             barrelSec += dt;
+            riddenTube = Math.max(riddenTube, barrelSec);
             if (Math.hypot(stickX, stickY) > 0.3 || carve > 0.2) barrelWorked += dt;
             if (!inBarrel && barrelSec > 0.3) {
               inBarrel = true;

@@ -23,9 +23,14 @@ const factory = readFileSync(new URL('../lib/babylon/modes/AirSessionMode.ts', i
 const host = readFileSync(new URL('../components/games/air-session-babylon.tsx', import.meta.url), 'utf8');
 
 // ── A. the bezel renders the run ───────────────────────────────────────────
-for (const field of ['score', 'attempt', 'phase', 'speed', 'height', 'spin', 'banner', 'nextFoot', 'combo', 'best']) {
+for (const field of ['score', 'attempt', 'phase', 'banner', 'nextFoot', 'combo', 'best']) {
   ok(new RegExp(`hud\\.${field}\\b`).test(host), `host renders hud.${field}`);
   ok(factory.includes(field), `factory publishes ${field}`);
+}
+// RESULTS-TRUTH WA-6: speed/height/spin are mode telemetry — published for probes, not shown on the prod HUD.
+for (const field of ['speed', 'height', 'spin']) {
+  ok(factory.includes(field), `factory publishes ${field}`);
+  ok(!new RegExp(`hud\\.${field}\\b`).test(host), `host hides debug hud.${field}`);
 }
 
 // ── B/C. the gallery exists, is shared, and answers grades ────────────────

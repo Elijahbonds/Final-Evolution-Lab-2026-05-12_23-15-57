@@ -85,6 +85,9 @@ export async function POST(req: NextRequest) {
               create: b.sessions.map((s) => ({
                 order: s.order,
                 label: s.label,
+                // MIRROR-COACH P6 (2026-09-29): an off day stays an off day in the copy (Session.kind, lib/coach/offDay.ts).
+                // Without it a copied week's off day arrived as one more training session.
+                kind: s.kind,
                 // every prescription column, structure included (MIRROR-COACH P2, 2026-09-25): this listed seven
                 // columns by hand, so a copied program would have lost its sections, key set, supersets, timers,
                 // set-up cues and effort bands. lib/coach/structure.ts PRESCRIPTION_COLUMNS is checked against the

@@ -8,15 +8,27 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import type { GameProps, GameResult } from './game-shell';
+import { useBabylonPlaytestBridge } from './use-babylon-playtest-bridge';
 import { BootSplash } from './boot-splash';
+import { surfaceBootError } from './boot-error';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode } from './hud-format';
-import { timingWon } from './timing-won';
 import { timingMaxCombo } from './timing-combo';
+import { timingGameResult } from '@/lib/sessions/gameResultFromSession';
 import { CUE_LOOKAHEAD_SEC, CUE_LINGER_SEC, type HudCue } from '@/lib/babylon/core/danceTracks';
 import { ACCURACY_CENTER as GOLF_ACC_CENTER, ACCURACY_HALF as GOLF_ACC_HALF } from '@/lib/babylon/core/golfHud';
+// MUSIC-SUITE P7 (2026-09-29), room-mix-ux: the Cypher's instrument chips (replacing the MIX bar) and its paused-
+// screen MIX sliders. Dance-only — gated below on hud.instruments / modeKey==='dance', so every other timing sport
+// this host also drives (tennis, derby, penalty, golf, volleyball) renders exactly as before.
+import { decodeInstrumentChips } from '@/lib/babylon/dance/ui/InstrumentChips';
+import { VolumeMixer } from '@/lib/audio/ui/VolumeMixer';
+// MUSIC-SUITE P8 (2026-09-25): Stoop's caption — the same shared caption layer THE MIC's hoops modes already draw
+// with (mic-caption.tsx's <MicCaption>, reading hud.mic/hud.micWho); DanceMode.ts is the only mode this host also
+// drives that ever sets those two fields, so gating on modeKey === 'dance' is a formality (MicCaption already
+// renders nothing for an empty `text`), kept for the same reason every other dance-only block here is gated.
+import { MicCaption } from './mic-caption';
 /** GOLF UPGRADE: the meter's carry lines arrive as '0,6,12,…' (eleven tenths). */
 const ticksOf = (v: unknown): number[] => (typeof v === 'string' && v ? v.split(',').map(Number) : []);
 
@@ -51,10 +63,13 @@ export function makeTimingHost(opts: TimingHostOpts) {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const busRef = useRef<InputBus | null>(null);
     const endedRef = useRef(false);
+    const onEndRef = useRef(onEnd);
+    onEndRef.current = onEnd;
     const [phase, setPhase] = useState<ModePhase>('loading');
     const [countdown, setCountdown] = useState<number | null>(null);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [hud, setHud] = useState<Hud>({});
+    useBabylonPlaytestBridge(modeKey, () => ({ phase, countdown, loadError, hud }), busRef.current);
 
     useEffect(() => {
       const canvas = canvasRef.current;
@@ -71,24 +86,15 @@ export function makeTimingHost(opts: TimingHostOpts) {
         // `hits/rounds CLEAN` — an outcome and stats none of these five modes send — so no run here was ever a win.
         const st = r.stats ?? {};
         const n = (k: string, d = 0) => Number(st[k] ?? d);
-        // HOTFIX (2026-09-24): the verdict is a pure function now (./timing-won) — three Story bosses complete on it.
-        const won = timingWon(r.outcome, st);
+        const base = timingGameResult(r, { headline: '', modeKey });
+        const won = base.won;
         const headline = modeKey === 'tennis' ? `${won ? 'MATCH WON' : 'MATCH LOST'} · ${r.score} GAMES · ${n('style')} STYLE${st.rackets !== undefined ? ` · ${n('rackets')} RACKETS LEFT` : ''}`
           : modeKey === 'volleyball' ? `${won ? 'SET WON' : 'SET LOST'} · ${r.score} PTS · ${n('style')} STYLE`
           : modeKey === 'golf' ? `${won ? 'CARD IN — UNDER PAR' : 'CARD IN'} · ${n('overPar') > 0 ? '+' : ''}${n('overPar')} · ${n('holes')} HOLES · ${n('pickUps')} PICK-UPS`
           : modeKey === 'derby' ? `${won ? 'DERBY CHAMPION' : 'DERBY OVER'} · ${n('homers')} HOMERS · ${n('outs')} OUTS · ${Math.round(n('longestFt'))} FT`
           : modeKey === 'penalty' ? `${won ? 'SHOOTOUT WON' : 'SHOOTOUT LOST'} · ${n('goals')}–${n('themGoals')} · ${n('stylePts')} STYLE`
           : (n('rounds') ? `${n('hits')}/${n('rounds')} CLEAN · ${r.score} PTS` : `${r.score} PTS`);
-        const result: GameResult = {
-          score: r.score,
-          stats: r.stats, outcome: r.outcome,   // pass 5 phase 3: the proof line reads these
-          opponentScore: modeKey === 'penalty' ? n('themGoals') : 0,
-          won,
-          duration: r.durationSec,
-          headline,
-          maxCombo: timingMaxCombo(st),   // MUSIC-SUITE P6: the mode's own best streak (dance), else clean hits as before
-        };
-        onEnd(result);
+        onEndRef.current({ ...base, headline, maxCombo: timingMaxCombo(st) });
       };
 
       const def = MODES[modeKey];
@@ -118,7 +124,7 @@ export function makeTimingHost(opts: TimingHostOpts) {
             if (disposed) { s(); return; }
             stop = s;
           })
-          .catch((e) => console.error(`[${tag}] boot failed`, e));
+          .catch((e) => surfaceBootError(e, { disposed, label: `[${tag}] boot failed`, setPhase, setLoadError }));
       }, 0);
 
       return () => {
@@ -127,7 +133,8 @@ export function makeTimingHost(opts: TimingHostOpts) {
         stop?.();
         busRef.current = null;
       };
-    }, [onEnd]);
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- G7: the stage is owned by the mount; callbacks are read through refs.
+    }, []);
 
     const emit = useCallback((e: Parameters<InputBus['emit']>[0]) => {
       busRef.current?.emit(e);
@@ -195,6 +202,30 @@ export function makeTimingHost(opts: TimingHostOpts) {
                 )}
               </span>
             )}
+          </div>
+        )}
+
+        {/* MUSIC-SUITE P7 (2026-09-29), room-mix-ux: THE INSTRUMENT CHIPS — replaces the one MIX bar above for the
+            Cypher only (DanceMode.ts stopped publishing hud.energy/energyLabel; every other timing sport is
+            untouched by this block). One chip per instrument the CURRENT SONG calls for: gold + filled once earned,
+            dim while ducked, and marked FEL when the chart has no move in that category this run (contract (a)'s
+            "FEL's band filling missing parts" — the fill itself is a separate, bigger task; this only has to be able
+            to SHOW that state the day it lands). Sits where the MIX bar sat (left-4 top-14), well clear of the cue
+            lane below at bottom-[34%] — the HUD area movement play's P9 body cue lane needs stays free. */}
+        {typeof hud.instruments === 'string' && hud.instruments && (
+          <div className="pointer-events-none absolute left-4 top-14 flex max-w-[220px] flex-wrap gap-1.5">
+            {decodeInstrumentChips(hud.instruments).map((c) => (
+              <span
+                key={c.id}
+                className={`rounded-full px-2 py-0.5 font-mono text-[10px] font-bold tracking-wider transition-colors duration-200 ${
+                  c.state === 'earned' ? 'bg-[var(--fel-gold)] text-black'
+                    : c.state === 'fel' ? 'border border-white/20 text-white/35'
+                    : 'bg-black/50 text-white/50'
+                }`}
+              >
+                {c.label}{c.state === 'fel' ? ' · FEL' : ''}
+              </span>
+            ))}
           </div>
         )}
 
@@ -475,9 +506,24 @@ export function makeTimingHost(opts: TimingHostOpts) {
           onRetry={tapStart}
         />
 
+        {/* MUSIC-SUITE P7 (2026-09-29), room-mix-ux: "reachable from the dance room's pause menu" — boot-splash.tsx
+            is a held file (movement play owns it) and draws the PAUSED screen with no slot for extra content, so this
+            sits ON TOP of it instead: rendered after BootSplash, it paints over the paused backdrop rather than under
+            it, and its own controls (the sliders) capture the click before PausedLayer's full-screen "any click
+            resumes" button ever sees it. Dance only — every other timing sport pauses exactly as it did before. */}
+        {modeKey === 'dance' && phase === 'paused' && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-8 flex justify-center px-4">
+            <div className="fel-panel pointer-events-auto w-full max-w-xs rounded-xl p-3">
+              <VolumeMixer heading="MIX — this device" />
+            </div>
+          </div>
+        )}
+
         {busRef.current && (
           <TouchOverlay bus={busRef.current} modeId={modeKey} visible={phase === 'playing' || phase === 'countdown'} />
         )}
+
+        {modeKey === 'dance' && <MicCaption text={hud.mic} who={hud.micWho} className="bottom-[10%]" />}
       </div>
     );
   }

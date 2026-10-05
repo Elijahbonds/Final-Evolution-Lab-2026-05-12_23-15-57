@@ -23,7 +23,7 @@ import { trickSeconds } from '../core/TrickPose';
 import { SNOW_TRICKS, type BoardTrick } from '../core/BoardTricks';
 
 /** The poles stand this far either side of a gate's centre. The world draws them HERE and the verdict reads this. */
-export const GATE_HALF_WIDTH = 1.7;
+export const GATE_HALF_WIDTH = 1.9;
 /** A body whose centre crosses within this of a pole's line brushes it: the pole whips (the verdict is the centre's). */
 export const POLE_BRUSH_M = 0.35;
 /** The share of the gates that makes the run a GATE CRASHER — the win. */
@@ -309,7 +309,8 @@ export function timeBonus(elapsed: number): number {
 export const STALL_SPEED = 1.2;
 export const STALL_NUDGE_SEC = 3;
 export const STALL_END_SEC = 14;
-export const RUN_CAP_SEC = 240;
+/** Hard session ceiling — par × 2 (GC-F1 / RESULTS-TRUTH). A missed-gate run must still post. */
+export const RUN_CAP_SEC = TIME_PAR_SEC * 2;
 export type StallAction = 'ride' | 'nudge' | 'end';
 /** What `stillSec` seconds of stall (and `elapsed` of run) call for; the mode nudges once per STALL_NUDGE_SEC. */
 export function stallAction(stillSec: number, elapsed: number): StallAction {

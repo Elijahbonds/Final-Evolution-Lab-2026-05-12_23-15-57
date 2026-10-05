@@ -105,7 +105,8 @@ describe.skipIf(!RUN)('ECONOMY-SESSIONS-HARDEN against a real throwaway Postgres
     expect(ledger.find((g: Json) => g.grantType === 'wallet_coins').amount).toBe(r.body.coins);
     expect(ledger.find((g: Json) => g.grantType === 'season_xp').amount).toBe(r.body.season.gained);
     const walletRows = await walletRowsFor(run.runId);
-    expect(walletRows.map((w: Json) => w.idempotencyKey).sort()).toEqual([`run:${run.runId}:coins`, `run:${run.runId}:lc`, `run:${run.runId}:won`]);
+    expect(walletRows.map((w: Json) => w.idempotencyKey).sort()).toEqual([`run:${run.runId}:coins`, `run:${run.runId}:won`]);
+    expect(await prisma.walletLedgerEntry.findFirst({ where: { idempotencyKey: `session-lc:${run.runId}` } })).toBeTruthy();
 
     // the same Postgres transaction wrote every one of them: the ledger, the wallet rows, the balances, the session and the run
     const tx = await xmin('SessionRun', run.runId);
@@ -153,7 +154,7 @@ describe.skipIf(!RUN)('ECONOMY-SESSIONS-HARDEN against a real throwaway Postgres
     expect(after.xp - before.xp).toBe(paid.xp);
     expect(after.coins - before.coins).toBe(paid.coins);
     expect(await prisma.gameSession.count({ where: { userId: users.twin } })).toBe(1);
-    expect((await walletRowsFor(run.runId)).length).toBe(3);
+    expect((await walletRowsFor(run.runId)).length).toBe(2);
   });
 
   it('check 1 / QA "impossible score is rejected": SCORE_INVALID, the run closed, no ledger row, no balance change', async () => {
@@ -219,13 +220,26 @@ describe.skipIf(!RUN)('ECONOMY-SESSIONS-HARDEN against a real throwaway Postgres
     expect(await prisma.passProgress.count({ where: { userId: users.agent } })).toBe(0);
   });
 
-  it('check 6: a test-allowlist account (User.role, or FEL_TEST_ACCOUNTS) gets paid: false', async () => {
+  it('check 6: a test-allowlist account (User.role in prod, or FEL_TEST_ACCOUNTS) gets paid: false', async () => {
     as('tester');
-    const run = await start('brainBrawl');
-    expect(run).toMatchObject({ payoutEligible: false, reason: 'TEST_ACCOUNT' });
-    await playedFor(run.runId, 43);
-    expect((await finish({ ...BB, runId: run.runId })).body).toMatchObject({ paid: false, reason: 'TEST_ACCOUNT' });
-    expect(await ledgerFor(run.runId)).toEqual([]);
+    if (process.env.NODE_ENV === 'production') {
+      const run = await start('brainBrawl');
+      expect(run).toMatchObject({ payoutEligible: false, reason: 'TEST_ACCOUNT' });
+      await playedFor(run.runId, 43);
+      expect((await finish({ ...BB, runId: run.runId })).body).toMatchObject({ paid: false, reason: 'TEST_ACCOUNT' });
+      expect(await ledgerFor(run.runId)).toEqual([]);
+    } else {
+      process.env.FEL_TEST_ACCOUNTS = `${TAG}-tester@example.test`;
+      try {
+        const run = await start('brainBrawl');
+        expect(run).toMatchObject({ payoutEligible: false, reason: 'TEST_ACCOUNT' });
+        await playedFor(run.runId, 43);
+        expect((await finish({ ...BB, runId: run.runId })).body).toMatchObject({ paid: false, reason: 'TEST_ACCOUNT' });
+        expect(await ledgerFor(run.runId)).toEqual([]);
+      } finally {
+        delete process.env.FEL_TEST_ACCOUNTS;
+      }
+    }
     as('listed');
     process.env.FEL_TEST_ACCOUNTS = `${TAG}-listed@example.test`;
     try {
@@ -241,6 +255,30 @@ describe.skipIf(!RUN)('ECONOMY-SESSIONS-HARDEN against a real throwaway Postgres
     await prisma.sessionRun.update({ where: { id: run.runId }, data: { startedAt: new Date(Date.now() - 3_600_000), expiresAt: new Date(Date.now() - 1000) } });
     expect((await finish({ ...BB, runId: run.runId })).body).toMatchObject({ reason: 'RUN_EXPIRED' });
     expect(await ledgerFor(run.runId)).toEqual([]);
+  });
+
+  it('OWNER DECISION: a mode with no rules row (hoops3v3) is recorded unpaid — ok, NO_RULES, nothing filed', async () => {
+    as('player');
+    const before = await balances(users.player);
+    const run = await start('hoops3v3');
+    await playedFor(run.runId, 60);
+    const r = await finish({ mode: 'hoops3v3', score: 11, won: true, duration: 60, played: true, runId: run.runId });
+    expect(r.status).toBe(200);
+    expect(r.body).toMatchObject({ ok: true, paid: false, reason: 'NO_RULES', score: 11, sessionId: null });
+    expect(await ledgerFor(run.runId)).toEqual([]);
+    expect(await balances(users.player)).toEqual(before);
+    expect(await prisma.sessionRun.findUnique({ where: { id: run.runId } })).toMatchObject({ status: 'recorded', score: 11 });
+  });
+
+  it('OWNER DECISION: a derived row pays (acting, capped at 100 by its own scorer) and refuses above it', async () => {
+    as('player');
+    const run = await start('acting');
+    await playedFor(run.runId, 30);
+    const r = await finish({ mode: 'acting', score: 80, won: true, duration: 30, played: true, runId: run.runId });
+    expect(r.body).toMatchObject({ ok: true, paid: true, won: true });
+    const over = await start('acting');
+    await playedFor(over.runId, 30);
+    expect((await finish({ mode: 'acting', score: 101, won: true, duration: 30, played: true, runId: over.runId })).body).toMatchObject({ reason: 'SCORE_INVALID', detail: 'above_max_score', limit: 100 });
   });
 
   it('the wallet earn refuses the session events the run pays now (a run cannot be paid again from there)', async () => {
@@ -267,5 +305,43 @@ describe.skipIf(!RUN)('ECONOMY-SESSIONS-HARDEN against a real throwaway Postgres
     // DAILY-KEY-HOTFIX: the server files the claim under its own day key, never the client's, so the day's claim is
     // counted by its reason: one row for this player, whatever key was sent
     expect(await prisma.walletLedgerEntry.count({ where: { wallet: { playerId: users.daily }, reasonCode: 'DAILY_FIRST_SESSION' } })).toBe(1);
+  });
+
+  it('SECURITY (ECONOMY-CAPS review): two concurrent finishes on DIFFERENT runs of one user cannot both beat the daily cap', async () => {
+    // The TOCTOU the review named: without a per-user lock, two finishes of the same user each aggregate
+    // sumEarnedToday before either commits, both see the same stale total, and each is granted the full remaining
+    // headroom (≈ N × the daily cap in one burst). lockPlayerForDailyCap (SELECT … FOR UPDATE on the PlayerProfile
+    // row, before the sum) makes the second finish's sum wait on the first's commit.
+    as('daily');
+    const { DAILY_XP_CAP } = await import('@/lib/economy-caps');
+    // Seat the user near the cap, leaving less headroom than one run pays.
+    const before = await balances(users.daily);
+    const headroom = 1_000;
+    await prisma.playerProfile.update({
+      where: { userId: users.daily },
+      data: { xp: { increment: DAILY_XP_CAP - headroom - before.xp } },
+    });
+    // Backfill today's GameSession so sumEarnedToday reads the seeded total (the cap reads GameSession, not the counter).
+    await prisma.gameSession.create({
+      data: { userId: users.daily, mode: 'training', score: 0, xp: DAILY_XP_CAP - headroom - before.xp, shards: 0 },
+    });
+    const seated = await balances(users.daily);
+    expect(seated.xp).toBe(DAILY_XP_CAP - headroom);
+
+    // Two runs, played, finished in one concurrent burst.
+    const runA = await start('brainBrawl');
+    await playedFor(runA.runId, 43);
+    const runB = await start('brainBrawl');
+    await playedFor(runB.runId, 43);
+    const [ra, rb] = await Promise.all([finish({ ...BB, runId: runA.runId }), finish({ ...BB, runId: runB.runId })]);
+    expect([ra.status, rb.status]).toEqual([200, 200]);
+
+    // The cap binds across the burst: the day's total never exceeds the cap. Without the lock the second finish
+    // would have added another full headroom of XP on top of the cap.
+    const after = await balances(users.daily);
+    expect(after.xp).toBeLessThanOrEqual(DAILY_XP_CAP);
+    // …and it genuinely capped (not merely failed): the two runs together tried to earn more than the headroom.
+    const paidXp = Number(ra.body.xp ?? 0) + Number(rb.body.xp ?? 0);
+    expect(paidXp).toBeLessThanOrEqual(headroom);
   });
 });

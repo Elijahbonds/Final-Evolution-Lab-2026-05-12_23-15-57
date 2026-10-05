@@ -181,6 +181,32 @@ export interface FightAction {
   block: boolean;
 }
 
+/** RIVAL-PRESSURE-FLOOR (2026-10-04): once the rival is in range of a
+ *  stationary, never-blocking foe, it must land its first hit within this
+ *  many seconds of difficulty — otherwise a low roll on the jab share (32%,
+ *  1.6 m) against a rival parked at its circling radius (~1.70 m, outside
+ *  jab range) could whiff indefinitely. Sorted ascending by difficulty,
+ *  clamped at both ends, linearly interpolated between points. Easy rivals
+ *  keep the loose 6 s ceiling — they do not get faster, they just can't
+ *  stall forever. */
+export const PRESSURE_FLOOR_TABLE: Array<[number, number]> = [[0.4, 6.0], [0.7, 3.0]];
+
+export function pressureFloorSec(difficulty: number): number {
+  const table = PRESSURE_FLOOR_TABLE;
+  if (difficulty <= table[0][0]) return table[0][1];
+  const last = table[table.length - 1];
+  if (difficulty >= last[0]) return last[1];
+  for (let i = 0; i < table.length - 1; i++) {
+    const [d0, f0] = table[i];
+    const [d1, f1] = table[i + 1];
+    if (difficulty >= d0 && difficulty <= d1) {
+      const t = (difficulty - d0) / (d1 - d0);
+      return f0 + (f1 - f0) * t;
+    }
+  }
+  return last[1];
+}
+
 export class RivalFightBrain {
   private cooldown = 1.2;
   private circleDir = 1;
@@ -193,8 +219,24 @@ export class RivalFightBrain {
   private stepDir = 1;
   /** Have we already reacted to the wind-up currently on screen? */
   private reactedToStrike = false;
+  /** COMBAT-AI (2026-09-30): punishable strings — consecutive player swings. */
+  private foeStrikeStreak = 0;
+  private foeStrikeGap = 0;
+  private wasFoeStriking = false;
+  /** Seconds left to counter after a successful block read. */
+  private punishSec = 0;
+  /** Round ramp: each round the rival reads a little sooner and presses harder. */
+  private roundBonus = 0;
+  /** Vary the attack mix so rounds do not read as jab spam. */
+  private attackBias = 0;
+  /** RIVAL-PRESSURE-FLOOR: seconds spent continuously inside the swing gate
+   *  (dist <= attacks.heavy.range) since the last committed swing that could
+   *  connect. See pressureFloorSec() below for why this exists. */
+  private pressureClock = 0;
 
-  constructor(private difficulty = 0.6, private attacks: Record<'jab' | 'kick' | 'heavy', AttackDef> = KARATE_ATTACKS) {}
+  constructor(private difficulty = 0.6, private attacks: Record<'jab' | 'kick' | 'heavy', AttackDef> = KARATE_ATTACKS) {
+    this.attackBias = Math.random();
+  }
 
   /**
    * How hard it is pressing, and what that costs it. Both 1 = it is playing its normal game.
@@ -216,6 +258,11 @@ export class RivalFightBrain {
     if (Number.isFinite(mistake)) this.loose = Math.max(0.5, Math.min(2, mistake));
   }
 
+  /** COMBAT-AI: later rounds read mash strings and counter more reliably. */
+  setRound(round: number): void {
+    this.roundBonus = Math.max(0, Math.min(0.22, (round - 1) * 0.08));
+  }
+
   /** `foeStriking` = the player is mid-swing (readable startup — what the
    *  rival reacts to, exactly like a human watching the wind-up). */
   decide(dt: number, self: Vector3, foe: Vector3, selfState: FighterState, foeStriking: boolean): FightAction {
@@ -226,12 +273,57 @@ export class RivalFightBrain {
     this.circleTimer -= dt;
     this.blockHoldSec = Math.max(0, this.blockHoldSec - dt);
     this.stepHoldSec = Math.max(0, this.stepHoldSec - dt);
+    this.punishSec = Math.max(0, this.punishSec - dt);
     if (this.circleTimer <= 0) { this.circleTimer = 1.4 + Math.random() * 1.6; this.circleDir *= -1; }
 
     const to = foe.subtract(self); to.y = 0;
     const dist = to.length();
     const dir = to.normalize();
     const idealRange = this.attacks.jab.range * 0.9;
+    const effDiff = Math.min(0.92, this.difficulty + this.roundBonus);
+
+    // RIVAL-PRESSURE-FLOOR: the clock only runs inside the swing gate used
+    // below (dist <= attacks.heavy.range) and resets the moment it leaves
+    // range — the floor is measured from "in range", not total fight time.
+    const inSwingRange = dist <= this.attacks.heavy.range;
+    if (inSwingRange) this.pressureClock += dt; else this.pressureClock = 0;
+
+    // Track punishable strings: a mash is three swings inside ~1.1 s.
+    if (foeStriking && !this.wasFoeStriking) this.foeStrikeStreak += 1;
+    this.wasFoeStriking = foeStriking;
+    if (foeStriking) this.foeStrikeGap = 0;
+    else {
+      this.foeStrikeGap += dt;
+      if (this.foeStrikeGap > 0.55) this.foeStrikeStreak = 0;
+    }
+    const stringRead = this.foeStrikeStreak >= 2 ? 0.22 : 0;
+
+    // RIVAL-PRESSURE-FLOOR: once the clock gets within a swing's startup of
+    // the per-difficulty ceiling, force a committed swing that is guaranteed
+    // to connect (dist <= chosen attack's range — the same "hit" the tests
+    // use) instead of rolling/circling/guarding this frame. This fires
+    // rarely (only seeds that would otherwise breach the floor) and never
+    // calls Math.random(), so every frame that was never close to breaching
+    // plays out byte-identical to before. attackBias (already rolled once at
+    // construction) still decides which covering move fires, so
+    // personalities keep their mix instead of collapsing onto one move
+    // under pressure.
+    //
+    // Uses this.difficulty (not effDiff) for the floor lookup: effDiff is a
+    // separate per-round ramp; the floor table is keyed to the base dial
+    // the sweep tests set.
+    if (inSwingRange) {
+      const floorSec = pressureFloorSec(this.difficulty);
+      const margin = this.attacks.heavy.startupMs / 1000;
+      if (floorSec - this.pressureClock <= margin) {
+        const candidates = (['heavy', 'kick', 'jab'] as const).filter((k) => this.attacks[k].range >= dist);
+        const forcedAttack = selfState.chi >= CHI_MAX ? 'heavy'
+          : candidates[Math.floor(this.attackBias * candidates.length) % candidates.length];
+        this.cooldown = 1.0 / Math.max(0.3, effDiff * this.press);
+        this.pressureClock = 0;
+        return { moveX: 0, moveY: 0, attack: forcedAttack, block: false };
+      }
+    }
 
     // REACTIVE GUARD — once per wind-up, not once per frame.
     //
@@ -255,12 +347,27 @@ export class RivalFightBrain {
         // opens a punish) or guard it. Difficulty scales both.
         // NERVE: `loose` is the price of pressing. A rival chasing the fight reads the wind-up less often,
         // so the guard it does not put up is what pays for the pressure it is applying.
-        const read = this.difficulty / this.loose;
-        if (roll < read * 0.35) {
+        const read = Math.min(0.95, effDiff / this.loose + stringRead);
+        // STEP_SHARE of the roll sidesteps; READ_SHARE is the whole answer
+        // (step or guard). The 0.92 / 0.95 caps bound the in-match ramp so a
+        // later round cannot become a wall. They must not also clip a skill
+        // dial that already covers every roll: before the caps, difficulty 2
+        // made `read * 0.85` land past 1, and fight-balance C1 still requires
+        // that a maxed dial always answers the wind-up. In-match bases
+        // (0.68, 0.72) stay under this line, so their step and guard rates
+        // do not move. `loose` still opens a miss — a chasing rival pays for
+        // pressing by reading less, even on a high dial.
+        const STEP_SHARE = 0.30;
+        const READ_SHARE = 0.88;
+        const dialCovers = (this.difficulty / this.loose) * READ_SHARE >= 1;
+        const stepAt = dialCovers ? STEP_SHARE / READ_SHARE : read * STEP_SHARE;
+        const readAt = dialCovers ? 1 : read * READ_SHARE;
+        if (roll < stepAt) {
           this.stepHoldSec = 0.22;
           this.stepDir = Math.random() < 0.5 ? -1 : 1;
-        } else if (roll < read * 0.85) {
-          this.blockHoldSec = 0.45;
+        } else if (roll < readAt) {
+          this.blockHoldSec = this.foeStrikeStreak >= 2 ? 0.55 : 0.45;
+          this.punishSec = 0.42;
         }
       }
     }
@@ -270,17 +377,34 @@ export class RivalFightBrain {
     }
     if (this.blockHoldSec > 0) return { moveX: 0, moveY: 0, attack: null, block: true };
 
-    // attack when in range and off cooldown
-    if (dist <= this.attacks.heavy.range && this.cooldown <= 0) {
-      // NERVE: pressing comes forward sooner. The skill baseline stays `difficulty`; `press` is situation.
-      this.cooldown = (1.0 + Math.random() * 0.9) / Math.max(0.3, this.difficulty * this.press);
-      const roll = Math.random();
-      const attack = selfState.chi >= CHI_MAX ? 'heavy'          // full chi → the mode upgrades heavy to the special
-        : roll < 0.45 ? 'jab' : roll < 0.8 ? 'kick' : 'heavy';
+    // Counter window after a read — punish the string with a heavy or kick.
+    if (this.punishSec > 0 && dist <= this.attacks.heavy.range && this.cooldown <= 0) {
+      this.cooldown = (0.85 + Math.random() * 0.7) / Math.max(0.3, effDiff * this.press);
+      this.punishSec = 0;
+      const attack = selfState.chi >= CHI_MAX ? 'heavy'
+        : this.foeStrikeStreak >= 2 || Math.random() < 0.55 ? 'heavy' : 'kick';
+      // RIVAL-PRESSURE-FLOOR: a committed swing that already covers `dist`
+      // resets the clock, same as the forced branch above.
+      if (this.attacks[attack].range >= dist) this.pressureClock = 0;
       return { moveX: 0, moveY: 0, attack, block: false };
     }
 
-    // spacing: approach when out of range, circle when in range
+    // attack when in range and off cooldown
+    if (dist <= this.attacks.heavy.range && this.cooldown <= 0) {
+      // NERVE: pressing comes forward sooner. The skill baseline stays `difficulty`; `press` is situation.
+      this.cooldown = (1.0 + Math.random() * 0.9) / Math.max(0.3, effDiff * this.press);
+      const roll = (Math.random() + this.attackBias) % 1;
+      const attack = selfState.chi >= CHI_MAX ? 'heavy'          // full chi → the mode upgrades heavy to the special
+        : roll < 0.32 ? 'jab' : roll < 0.68 ? 'kick' : 'heavy';
+      // RIVAL-PRESSURE-FLOOR: same reset as above.
+      if (this.attacks[attack].range >= dist) this.pressureClock = 0;
+      return { moveX: 0, moveY: 0, attack, block: false };
+    }
+
+    // spacing: back off from a mashing foe; approach when out of range; circle at ideal range
+    if (this.foeStrikeStreak >= 2 && dist < idealRange + 0.15) {
+      return { moveX: -dir.x * 0.85, moveY: dir.z * 0.85, attack: null, block: false };
+    }
     if (dist > idealRange + 0.3) {
       return { moveX: dir.x, moveY: -dir.z, attack: null, block: false };
     }

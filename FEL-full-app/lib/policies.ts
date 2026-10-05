@@ -12,7 +12,31 @@
 // share it and re-label too, although their text did not change. policies.test.ts fails on a text change without one.
 // MOVEMENT PLAY P4 (2026-09-25): bumped again with §6's space-check paragraph (the check, the brightness sample, the
 // remembered choice, the self-view). 2026-09-24-draft is live and signups recorded it for the text without it.
-export const CURRENT_POLICY_VERSION = '2026-09-25-draft';
+// MIRROR-COACH P5 (2026-09-29): bumped again with §5's rewrite — Health-Adjacent Data used to be three sentences
+// (owner decision #4 was still just "YES, WITH INTAKE + CONSENT" on paper). It now says what a health intake and a
+// pain check-in collect, that both need a separate opt-in before anything is gathered, that none of it is sold, used
+// for ads, put in a share link, scored or paid, who can see it (the person; a coach only with a live coach_view
+// grant), how to export/erase/withdraw, that a minor needs a guardian's consent first, and addresses
+// consumer-health-data laws (e.g. Washington's My Health My Data Act) by extending the same rights to everyone
+// everywhere rather than only where a given law requires it. 2026-09-25-draft is live and signups recorded it for
+// the old three-sentence §5.
+// BODY-PLAY-WORKS (2026-10-01): bumped again, §6 only — the body-tracking files come from our own servers only.
+// The sentence that said a missing copy falls back to jsDelivr and Google was left over from before that fallback
+// was removed. Face scan's model is unchanged. 2026-09-30-draft is the text without this sentence.
+// MIRROR-COACH P6 (2026-09-29): bumped again, §5 only — it now names the optional daily check-in (sleep, soreness,
+// energy, mood; lib/health/readiness.ts) in what is collected, where it lives, who can see it and what an erase
+// deletes, because it is stored under the same health-data consent and §5 listed only the intake and pain
+// check-ins. 2026-09-29-draft never shipped (it is on the mirror lane's open PR only), but a new string is the rule
+// this file keeps, and it costs nothing: a bump re-prompts no one.
+// MIRROR-COACH P7 FIX (2026-09-29, review): bumped again, §5 only — it now names the Dial-Up Breath's use log (lib/breath/
+// rampGate.ts; schema.prisma BreathLog) in what is collected, where it lives and what an erase deletes, and says the
+// breath waits a week after an erase or a first opt-in. The export and both erases already carried the log while §5
+// still listed only the intake, pain and daily check-ins and the consent records (decisions #4, #17, #18; P6 bumped §5
+// the same way for the readiness check-in). 2026-09-29b-draft never shipped either; a new string is still the rule.
+// MIRROR-COACH-ERASE (2026-09-30, owner 07:53 PT, "No wait and fix"): bumped again, §5 only — an erase keeps the
+// consent records as proof of agreement and withdrawal, and it does not start the Dial-Up Breath's first-week wait
+// over. A first opt-in still waits that week. 2026-09-29c-draft never shipped either; a new string is still the rule.
+export const CURRENT_POLICY_VERSION = '2026-10-01-draft';
 
 export const TERMS_CONTENT = `
 # Terms of Service
@@ -95,9 +119,21 @@ settings. Account deletion removes all personal data.
 
 ## 5. Health-Adjacent Data
 
-PRQ attributes (e.g. vertical, balance, recovery) are fitness metrics.
-We do not collect medical data. These values are stored with their source
-and measurement date for full traceability.
+PRQ attributes (e.g. vertical, balance, recovery) are fitness metrics. We do not collect medical data through them, and these values are stored with their source and measurement date for full traceability. This section covers a different, separate kind of data: a short health intake, per-exercise pain check-ins and an optional daily check-in, for people who choose to use the Mirror or a coached program.
+
+**What this is.** Before the Mirror or a coached program asks your body to do anything, it can ask you a short intake about your training history and any red-flag symptoms. While you train, you can log a quick pain check-in — which exercise, where it hurt, how much, and an optional note — including a next-morning follow-up. Before a session you can also answer a quick daily check-in — how you slept, how sore you are, your energy and your mood, each on a 1-to-5 scale, every question optional and the whole thing skippable — which only sets how long that day's warm-up runs and whether to offer an easier day. If you are an adult and your answers allow it, a coached program can also offer an optional Dial-Up Breath before a session's key set; when you start one, we note that you used it, which session it was for and when, and nothing else, so we can hold it to its weekly limit. We also ask for your birth year here if we do not already have it, because the rules that apply to a minor are stricter than the rules that apply to an adult.
+
+**Consent first, always.** None of this is collected until you say yes to it, separately from creating an account or accepting this Policy. Saying yes to the Service does not turn this on. If you are under 18, or you have not told us your birth year, a parent or guardian has to give that consent before any of it is collected, and a pain check-in from an under-18 account always tells you to stop and tell an adult rather than offering anything else.
+
+**Where it lives, and where it never goes.** Your intake answers, pain check-ins, daily check-ins, your Dial-Up Breath uses and the birth year you gave us here are stored on FEL's own servers and nowhere else. We do not sell this data, license it, or use it to target advertising, to you or to anyone else. It never appears on a share link, a public page, or anything a coach can forward to someone else — a share carries training content, never a client's data (see §7). It is never used to compute your PRQ, never unlocks anything, and never earns Lab Credits, shards or any other reward: what you tell us about pain or how you feel changes what the app suggests next, not what it scores or pays.
+
+**Who can see it.** Only you, by default. Turning on coach access for one specific coach lets that coach read your intake, pain check-ins and daily check-ins; you can turn it off at any time, for one coach or all of them, from Health data in your account settings. Turning it off stops that coach from seeing anything logged after that; it does not erase what they already read.
+
+**Your rights.** You can view, export or erase this data at any time from Health data in your account settings, separately from the rest of your account (see §8). Erasing it deletes your intake answers, your pain check-ins, your daily check-ins and your Dial-Up Breath uses. Your consent records are kept, as proof of what you agreed to and when you withdrew. It never touches a workout plan or your PRQ history, because those never held this data to begin with. The first time you opt in, the Dial-Up Breath waits a week before it is offered. Erasing this data does not start that week over. Withdrawing consent stops new collection immediately and offers you the erase button in the same place.
+
+**Consumer health data laws.** Some places have a law specifically for data like this, beyond ordinary privacy law — for example Washington State's My Health My Data Act. Rather than work out where each law applies, we extend the same protections everywhere, to everyone: a specific opt-in kept separate from the rest of this Policy, no sale of this data under any circumstance, no use of it or of your location to target advertising, and the same view, export, deletion and consent-withdrawal rights described above, honored the same way regardless of where you are.
+
+None of the above is medical advice, and nothing in this section changes §3's AI-Generated Content notice or the Mirror's own on-screen wording: camera-based reads are labelled estimates, they do not diagnose or name a condition, and they describe what a movement builds capacity for, never what it prevents or reduces the risk of.
 
 ## 6. Camera and Body Tracking
 
@@ -107,7 +143,7 @@ When you play, only numbers worked out from the camera (for example jump height,
 
 Before body play, a space check makes sure the camera can see all of you and the floor. It also checks how bright the picture is. Both happen on your device, and nothing from them is sent or saved. Your choice to play a game with your body is remembered on this device only. The small self-view of you is shown only on your screen.
 
-The tracking model files are downloaded to your device when a camera feature first needs them, so the tracking can run there. The body-tracking files come from our own servers. Face scan's model file comes from Google's servers (storage.googleapis.com), and if our copy of the body-tracking files is ever missing they come from jsDelivr and Google instead. These downloads never include your picture.
+The tracking model files are downloaded to your device when a camera feature first needs them, so the tracking can run there. The body-tracking files come from our own servers only. Face scan's model file comes from Google's servers (storage.googleapis.com). These downloads never include your picture.
 
 ## 7. Third Parties
 

@@ -32,7 +32,7 @@ describe('derby counters', () => {
     expect(distanceLine(410, 410)).toBe('410 FT · LONGEST');
     expect(distanceLine(380, 410)).toBe('380 FT');
     const b = derbyBoard({ homers: 3, outs: 4, longestFt: 421, totalFt: 1200 }, 5, 'ticking');
-    expect(b[0]).toEqual({ name: 'YOU', score: 3, line: '4 / 10 OUTS · LONGEST 421 FT' });
+    expect(b[0]).toEqual({ name: 'YOU', score: 3, line: '4 / 15 OUTS · LONGEST 421 FT' });
     expect(b[1]).toEqual({ name: 'RIVAL', score: 5, line: 'ticking' });
   });
 });

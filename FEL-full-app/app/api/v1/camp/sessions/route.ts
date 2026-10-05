@@ -6,6 +6,7 @@ import { latestPerAttribute, prqDelta, numericDelta, toOutcomes } from '@/lib/ca
 import { computeResiliency } from '@/lib/camp/resiliency';
 import { analyzeMovement } from '@/lib/workout/movement-screen';
 import { currentUserId, bad, requirePaidFacilitator } from '@/lib/camp/server';
+import { canSaveScanNumbers } from '@/lib/privacy/scanSaveGate';
 
 /**
  * POST /api/v1/camp/sessions — record a facilitated session on an ACTIVE plan.
@@ -27,10 +28,15 @@ export async function POST(req: NextRequest) {
 
   const prev = await prisma.campSession.findFirst({ where: { goalPlanId: plan.id }, orderBy: { date: 'desc' } });
   const since = prev?.date ?? plan.lockedAt ?? plan.createdAt;
+  // TEEN-WRITE-BLOCK (2026-09-29; GAP 1 fix 2): the PRQ and movement deltas are the MENTEE's numbers, so they are kept
+  // only when the mentee (not the facilitator) is a verified 18+ account that has opted in (lib/privacy/scanSaveGate.ts;
+  // today nobody). Otherwise they are not read or written; the facilitator's record still saves, and the answer says so.
+  // assumption: (FE PM can reverse) strip the mentee's numbers rather than 403 the facilitator's whole record.
+  const deltasAllowed = await canSaveScanNumbers(prisma, plan.menteeId);
   const [games, entries, scans] = await Promise.all([
     prisma.gameSession.findMany({ where: { userId: plan.menteeId, createdAt: { gte: since } }, orderBy: { createdAt: 'asc' } }),
-    prisma.prqEntry.findMany({ where: { userId: plan.menteeId }, orderBy: { measuredAt: 'asc' } }),
-    prisma.workoutScan.findMany({ where: { userId: plan.menteeId, kind: 'movement_screen' }, orderBy: { createdAt: 'desc' }, take: 2 }),
+    deltasAllowed ? prisma.prqEntry.findMany({ where: { userId: plan.menteeId }, orderBy: { measuredAt: 'asc' } }) : [],
+    deltasAllowed ? prisma.workoutScan.findMany({ where: { userId: plan.menteeId, kind: 'movement_screen' }, orderBy: { createdAt: 'desc' }, take: 2 }) : [],
   ]);
   const safe = (m: unknown) => { try { return analyzeMovement(m as never); } catch { return null; } };
   const moduleKeys = (Array.isArray(body.moduleKeys) ? body.moduleKeys.map(String) : []).filter((r) => /^[a-z0-9-]+\/[a-z0-9]+(\/[a-z0-9]+)?$/.test(r)).slice(0, 12);
@@ -39,13 +45,13 @@ export async function POST(req: NextRequest) {
       goalPlanId: plan.id, facilitatorId: plan.facilitatorId, menteeId: plan.menteeId,
       clientSessionId: typeof body.clientSessionId === 'string' ? body.clientSessionId : null,
       moduleKeys, gameSessionIds: games.map((g) => g.id),
-      prqDelta: prqDelta(latestPerAttribute(entries, since), latestPerAttribute(entries, null)),
-      movementDelta: scans.length === 2 ? numericDelta(safe(scans[1].metrics), safe(scans[0].metrics)) : undefined,
+      prqDelta: deltasAllowed ? prqDelta(latestPerAttribute(entries, since), latestPerAttribute(entries, null)) : undefined,
+      movementDelta: deltasAllowed && scans.length === 2 ? numericDelta(safe(scans[1].metrics), safe(scans[0].metrics)) : undefined,
       resiliency: computeResiliency(toOutcomes(games)) as object,
       notes: typeof body.notes === 'string' ? body.notes.slice(0, 2000) : null,
     },
   });
-  return NextResponse.json({ session: record, gamesAttached: games.length });
+  return NextResponse.json({ session: record, gamesAttached: games.length, ...(deltasAllowed ? {} : { deltasSaved: false }) });
 }
 
 /** GET /api/v1/camp/sessions?goalPlanId=… — the plan's session records. */

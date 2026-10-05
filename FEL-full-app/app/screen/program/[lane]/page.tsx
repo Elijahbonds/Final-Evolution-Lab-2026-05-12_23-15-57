@@ -1,5 +1,7 @@
 import { notFound } from 'next/navigation';
+import { isCoachStoreEnabled } from '@/lib/flags';
 import { LANE_SLUGS, isLaneSlug } from '@/lib/screen/PROPOSED-program-lanes';
+import { AdultDunkLane } from './adult-dunk';
 import { ProgramLane } from './program-lane';
 
 /**
@@ -14,5 +16,6 @@ export function generateStaticParams() {
 
 export default function ProgramLanePage({ params }: { params: { lane: string } }) {
   if (!isLaneSlug(params.lane)) notFound();
+  if (params.lane === 'dunking' && isCoachStoreEnabled()) return <AdultDunkLane lane={params.lane} />;
   return <ProgramLane lane={params.lane} />;
 }

@@ -11,6 +11,7 @@ import { TRAITS } from './traits';
 import { TENDENCIES } from './tendencies';
 import { HOT_ZONES } from './hotZones';
 import { MECHANICS } from './mechanics';
+import { ANIMATIONS } from './animations';
 import { VITALS } from './vitals';
 import { APPEARANCE } from './appearance';
 import { BODY } from './body';
@@ -45,6 +46,7 @@ export const SIDEBAR: SidebarEntry[] = [
   { key: 'tendencies', label: 'Tendencies', table: TENDENCIES as SectionTable },
   { key: 'hotZones', label: 'Hot Zones', table: HOT_ZONES as SectionTable },
   { key: 'mechanics', label: 'Mechanics', table: MECHANICS },
+  { key: 'animations', label: 'Animations', table: ANIMATIONS as SectionTable },
   { key: 'traits', label: 'Traits', table: TRAITS as SectionTable },
   { key: 'import', label: 'Import Athlete Profile', table: null },
   { key: 'export', label: 'Export Athlete Profile', table: null },

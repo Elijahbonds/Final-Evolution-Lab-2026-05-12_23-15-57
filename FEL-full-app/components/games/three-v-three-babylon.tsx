@@ -9,6 +9,7 @@ import { readCourtLocation } from '@/lib/babylon/nexus/courtLocations';
 import { useEffect, useRef, useState, useCallback } from 'react';
 import type { GameProps, GameResult } from './game-shell';
 import { BootSplash } from './boot-splash';
+import { surfaceBootError } from './boot-error';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
@@ -21,6 +22,8 @@ export default function ThreeVThreeBabylon({ onEnd }: GameProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const busRef = useRef<InputBus | null>(null);
   const endedRef = useRef(false);
+  const onEndRef = useRef(onEnd);
+  onEndRef.current = onEnd;
   const [phase, setPhase] = useState<ModePhase>('loading');
   const [countdown, setCountdown] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -49,7 +52,7 @@ export default function ThreeVThreeBabylon({ onEnd }: GameProps) {
         duration: r.durationSec,
         headline: won ? 'GAME WON' : drew ? 'DEAD EVEN' : 'GAME OVER',
       };
-      onEnd(result);
+      onEndRef.current(result);
     };
 
     // StrictMode runs effect -> cleanup -> effect. Starting the harness
@@ -79,7 +82,7 @@ export default function ThreeVThreeBabylon({ onEnd }: GameProps) {
           if (disposed) { s(); return; }
           stop = s;
         })
-        .catch((e) => console.error('[FEL-HOOPS3] boot failed', e));
+        .catch((e) => surfaceBootError(e, { disposed, label: '[FEL-HOOPS3] boot failed', setPhase, setLoadError }));
     }, 0);
 
     return () => {
@@ -88,7 +91,8 @@ export default function ThreeVThreeBabylon({ onEnd }: GameProps) {
       stop?.();
       busRef.current = null;
     };
-  }, [onEnd]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- G7: the stage is owned by the mount; callbacks are read through refs.
+  }, []);
 
   const emit = useCallback((e: Parameters<InputBus['emit']>[0]) => {
     busRef.current?.emit(e);
@@ -101,7 +105,7 @@ export default function ThreeVThreeBabylon({ onEnd }: GameProps) {
   const meter = typeof hud.shotMeterT === 'number' ? Math.max(0, Math.min(1, hud.shotMeterT)) : null;
 
   return (
-    <div className="relative aspect-[16/10] w-full overflow-hidden rounded-xl border border-white/10 bg-black">
+    <div className="relative h-[calc(100dvh-3.25rem)] w-full overflow-hidden rounded-none border-0 bg-transparent">
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full touch-none" />
 
       {/* HUD bezel */}
@@ -172,7 +176,14 @@ export default function ThreeVThreeBabylon({ onEnd }: GameProps) {
       />
 
       {(phase === 'playing' || phase === 'countdown') && busRef.current && (
-        <TouchOverlay bus={busRef.current} modeId="threevthree" visible />
+        <TouchOverlay
+          bus={busRef.current}
+          modeId="threevthree"
+          visible
+          // CALL FOR THE BALL (Elijah item 2): the pad's PASS slot is BALL! whenever `onBall` reads false — shown
+          // only while off-ball, same press (button A), same wire LocalInputSource already reads as intent.pass.
+          overrides={hud.onBall === false ? { A: { label: 'BALL!', color: '#fbbf24' } } : undefined}
+        />
       )}
     </div>
   );

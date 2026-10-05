@@ -3,7 +3,7 @@
 //
 // THE SUMMARY IS ALL THAT LEAVES MEMORY. The results screen renders from it, and it is the only thing written to
 // sessionStorage (lib/screen/store.ts): band words, check ids, the lane and one jump height. No raw per-rep value, no
-// metric reading, no hidden metric, no frame: those are computed here, on the phone, and dropped (A2-3, gate 5).
+// metric reading, no hidden metric, no frame: those are computed here, on the device, and dropped (A2-3, gate 5).
 //
 // Pure.
 import type { SessionResult } from '@/lib/assess/runner';
@@ -54,7 +54,7 @@ const gap = (l: number | null, r: number | null): number | null => (l === null |
 
 /**
  * The value a check is graded on, per side for a sided check. Computed checks (the left–right gaps) are worked out here,
- * on the phone, from the per-side medians PR #20 already reads (A2-1): no new tracking, no new landmark metric.
+ * on the device, from the per-side medians PR #20 already reads (A2-1): no new tracking, no new landmark metric.
  */
 export function checkValues(c: ScreenCheck, tests: readonly TestResult[]): { left?: number | null; right?: number | null; value?: number | null } {
   const t = tests.find((x) => x.id === c.test && x.status === 'scored');

@@ -413,6 +413,35 @@ describe('StudioLibrary — the walk-out keeps a synchronous source (DunkMode.ts
     expect(dunkModeCue(storage, l)?.songId).toBe(small.rec.id);
   });
 
+  // MUSIC-SUITE P7 (2026-09-29): the SET AS MY WALK-OUT button renders a fresh, tail-wrapped N-bar loop (loopRender.ts)
+  // and hands it in as `opts.loopAudio` — this is what DunkMode ends up reading, not the 2-bar publish preview.
+  it('opts.loopAudio: a freshly rendered loop becomes the walk-out’s audio, in place of the published mixdown', async () => {
+    const storage = new FakeStorage(QUOTA_5MB);
+    const store = new FakeBlobStore();
+    const l = lib(storage, store);
+    const r = await l.publishWithAudio(draft(1), wav(WAV_BYTES_92, 1));
+    if (!r.ok) throw new Error('publish');
+    const loop = wav(2000, 9);   // a distinct blob — nothing like the published 92-BPM mixdown's own bytes
+    const set = await l.setWalkOut(r.rec.id, { bars: 8, loopAudio: loop });
+    expect(set).toMatchObject({ ok: true, line: '"Take 1" is your walk-out' });
+    const cue = dunkModeCue(storage, l);
+    expect(cue?.src).toBe(await blobToDataUrl(loop));
+    expect(cue?.src).not.toBe(await blobToDataUrl(wav(WAV_BYTES_92, 1)));
+    expect(set.ok && set.walkOut.bars).toBe(8);
+  });
+
+  it('opts.loopAudio still refuses cleanly when there is no room, and leaves the prior walk-out set', async () => {
+    const storage = new FakeStorage(QUOTA_5MB);
+    const l = lib(storage, new FakeBlobStore());
+    const small = await l.publishWithAudio(draft(1), wav(1000));
+    const big = await l.publishWithAudio(draft(2), wav(1000, 2));
+    if (!small.ok || !big.ok) throw new Error('publish');
+    expect((await l.setWalkOut(small.rec.id, { bars: 8, loopAudio: wav(1000, 3) })).ok).toBe(true);
+    storage.setItem('fel-other', 'z'.repeat(QUOTA_5MB - storage.usedChars - 1000));
+    expect(await l.setWalkOut(big.rec.id, { bars: 8, loopAudio: wav() })).toEqual({ ok: false, reason: 'device-full', line: WALKOUT_NO_ROOM_LINE });
+    expect(dunkModeCue(storage, l)?.songId).toBe(small.rec.id);
+  });
+
   it('a pointer written by another path (only fel-walkout) is repaired by ready(), so the Dunk Contest hears it next time', async () => {
     const storage = new FakeStorage();
     const store = new FakeBlobStore();

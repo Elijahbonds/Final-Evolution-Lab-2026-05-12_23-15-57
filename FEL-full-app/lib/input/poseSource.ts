@@ -27,7 +27,7 @@
 // (and the wasm and model download) only when a camera actually starts.
 
 import { publishBodyToLive, type BodyPacket } from '../babylon/core/InputBus';
-import { agentEnabled } from '../babylon/core/AgentBridge';
+import { agentRunHooksAllowed, registerProdHookSync } from '@/lib/agentRunHooks';
 import { BodyReader, type BodyRead } from '../pose/BodyReader';
 import type { Calibration } from '../pose/calibrate';
 import { ChannelReader, type BodyChannels } from '../pose/bodyChannels';
@@ -276,10 +276,23 @@ declare global {
   interface Window { __FEL_BODY__?: BodyHook }
 }
 
-if (typeof window !== 'undefined' && feedHookAllowed(process.env.NODE_ENV, agentEnabled(), window.location.hostname)) {
+function installBodyHook(): void {
+  if (typeof window === 'undefined') return;
   window.__FEL_BODY__ = {
     start: (opts?: PoseSourceStartOptions) => sharedPoseSource().start(opts),
     stop: () => sharedPoseSource().stop(),
     snapshot: () => sharedPoseSource().snapshot,
   };
+}
+function removeBodyHook(): void {
+  if (typeof window === 'undefined') return;
+  delete window.__FEL_BODY__;
+}
+if (typeof window !== 'undefined') {
+  if (process.env.NODE_ENV === 'development') {
+    if (feedHookAllowed(process.env.NODE_ENV, true, window.location.hostname)) installBodyHook();
+  } else {
+    registerProdHookSync(installBodyHook, removeBodyHook);
+    if (agentRunHooksAllowed() && feedHookAllowed(process.env.NODE_ENV, true, window.location.hostname)) installBodyHook();
+  }
 }

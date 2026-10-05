@@ -84,6 +84,12 @@ export interface FollowConfig {
 /** The air cam's full offset (setAir(1)): metres further back, up, and round to the side for a three-quarter view. */
 export const AIR_CAM = { back: 2.2, up: 1.3, side: 2.4 };
 
+/**
+ * The Hundred's gameplay camera, as a fraction farther than the shoulder (4.0 m) and crowd (6.4 m)
+ * distances it shipped with. Owner 2026-10-01: zoom out a little, about 15–20%. One constant, both shots.
+ */
+export const HUNDRED_CAM_PULL = 1.18;
+
 export const FOLLOW_PRESETS: Record<string, FollowConfig> = {
   // SCORECARD VISUALS (2026-09-15): golf played on 'court', which is a fitTwo preset — with the PIN as the second subject
   // (up to 90 m away) the separation pull-back put the camera 12.5 m off a 1.8 m golfer, and the frame review could
@@ -140,6 +146,14 @@ export const FOLLOW_PRESETS: Record<string, FollowConfig> = {
   // the horde brawler when SURROUNDED (karate endless H8): pull back and up so
   // the crowd around you is the shot, then drop back over the shoulder
   crowd: { distance: 5.6, height: 3.0, minHeight: 2.0, pitchFloorDeg: 12, pitchCapDeg: 26, targetHeight: 1.2, lag: 0.16, lookAhead: 0.6 },
+  // COMBAT-AI (2026-09-30): karate-only shoulder/crowd presets — pulled back so
+  // attackers stay in frame without touching the shared overShoulder/crowd used
+  // by Dance and other modes. fight-balance-tests: the 7.5 m disc plus this
+  // pullback still clears the shrine mat's 12 m half-extent.
+  // THE HUNDRED (owner 2026-10-01): one zoom-out on both shots. 1.18 is 18% farther
+  // than the 4.0 m shoulder and 6.4 m crowd distances those presets were signed off at.
+  fightShoulder: { distance: 4.0 * HUNDRED_CAM_PULL, height: 1.75, minHeight: 1.25, pitchFloorDeg: 2, pitchCapDeg: 11, targetHeight: 1.4, lag: 0.28, lookAhead: 2.4, shoulderOffset: 0.65 },
+  fightCrowd: { distance: 6.4 * HUNDRED_CAM_PULL, height: 3.2, minHeight: 2.1, pitchFloorDeg: 12, pitchCapDeg: 26, targetHeight: 1.2, lag: 0.16, lookAhead: 0.7 },
   // DUNK CONTEST cinematic — NOT the live-play camera: lower, closer,
   // slower lag so the flight glides like a highlight reel; tighter pitch
   // cap keeps the rim in frame at apex without a hard tilt.
@@ -403,25 +417,37 @@ export class CameraDirector {
    */
   public broadcast = 0;
 
-  /** The active preset, blended toward the broadcast framing by `broadcast`. */
+  /** The active preset, blended toward the broadcast framing by `broadcast`, with the mode's tuneFollow overlay on top. */
   private effCfg(): FollowConfig {
     const b = Math.max(0, Math.min(1, this.broadcast));
-    if (b <= 0) return this.cfg;
-    const c = this.cfg;
-    return {
-      ...c,
-      distance: c.distance + 4.0 * b,
-      height: c.height + 6.0 * b,
-      minHeight: c.minHeight + 4.0 * b,
-      lookAhead: c.lookAhead + 6.0 * b,
-      pitchCapDeg: c.pitchCapDeg + 10 * b,
+    const blended = b <= 0 ? this.cfg : {
+      ...this.cfg,
+      distance: this.cfg.distance + 4.0 * b,
+      height: this.cfg.height + 6.0 * b,
+      minHeight: this.cfg.minHeight + 4.0 * b,
+      lookAhead: this.cfg.lookAhead + 6.0 * b,
+      pitchCapDeg: this.cfg.pitchCapDeg + 10 * b,
     };
+    return this.tune ? { ...blended, ...this.tune } : blended;
   }
 
   setPreset(preset: keyof typeof FOLLOW_PRESETS): void {
     this.cfg = FOLLOW_PRESETS[preset] ?? this.cfg;
     this.mode = 'follow';
     this.invalidateBounds();          // a preset change usually means a new venue
+  }
+
+  /**
+   * PER-MODE FOLLOW TUNING (10-phase pass, 2026-10-02): an overlay on the active preset so a mode can own
+   * its chase camera in its own config (racing/kartTune, racing/aeroTune) instead of editing a preset
+   * shared with every other mode. Only the fields given are overlaid — the rest stay the preset's — and
+   * it composes with the broadcast blend (the blend applies to the preset, the overlay on top). Pass
+   * `null` to drop the overlay. Survives setPreset, so re-apply after a preset change if the new preset
+   * should NOT carry it.
+   */
+  private tune: Partial<Pick<FollowConfig, 'distance' | 'height' | 'lag' | 'lookAhead'>> | null = null;
+  tuneFollow(t: Partial<Pick<FollowConfig, 'distance' | 'height' | 'lag' | 'lookAhead'>> | null): void {
+    this.tune = t ? { ...t } : null;
   }
 
   /** Explicit venue bounds — overrides auto-derivation. */

@@ -72,8 +72,8 @@ export const HOOPS_STRIDE: StrideRef = { run: 3.6, slide: 2.0, walk: 0.72, jog: 
  * the reference leg):
  *
  *     state                               plays (capture)                         reference
- *     run                                 run_forward → bball_mc_drive (78_06)     4.57   (the ball-less runner plays the
- *                                                                                          dribbling capture until phase 3)
+ *     run                                 run → bball_mc_run (78_12)               4.69   (phase 3b: the ball-less runner's own run;
+ *                                                                                          it played the dribbling 78_06 at 4.57)
  *     drive, sprint_dribble               bball_mc_dribble_run (78_06)            4.57   sprint
  *     speed_dribble                       bball_mc_dribble_jog (78_10)            3.87   jog
  *     walk_dribble                        bball_mc_dribble_walk (06_01)           0.97   walk
@@ -82,7 +82,7 @@ export const HOOPS_STRIDE: StrideRef = { run: 3.6, slide: 2.0, walk: 0.72, jog: 
  *     defend_backpedal, carry_back        bball_mc_defend_backpedal (78_24)       3.31
  *     closeout; carry_slide(_right)       AUTHORED (bball_closeout; strafe_*)     3.6; 2.0 — HOOPS_STRIDE's, unchanged
  *
- * (bball_mc_run, 78_12, is 4.69 m/s at real time; no tree state plays it yet.) The previous table (run 3.6, slide 2.0,
+ * (Before phase 3b no tree state played bball_mc_run; `run` asked for run_forward, the dribbling drive.) The previous table (run 3.6, slide 2.0,
  * walk 0.72, jog 2.8, one number per kind) was calibrated by the foot-slide probe while the loops played 0.79–1.37× their
  * real speed through hand-set `duration`s, and read a 25–35% skate band that barely moved between 3.3 and 4.8. At the
  * tree's gears (walk 1.6 / jog 4.2 / sprint 6.4 m/s) the rates are now 1.65 / 1.09 / 1.40, all inside RATE_MAX — the
@@ -98,7 +98,7 @@ export const HOOPS_STRIDE: StrideRef = { run: 3.6, slide: 2.0, walk: 0.72, jog: 
  * standing "stepping defence" decision); every other defence state reaches 4.2 m/s inside RATE_MAX.
  */
 export const HOOPS_STRIDE_CAPTURE: StrideRef = {
-  run: 4.57, sprint: 4.57, jog: 3.87, walk: 0.97, slide: 2.4,
+  run: 4.69, sprint: 4.57, jog: 3.87, walk: 0.97, slide: 2.4,
   byState: {
     defend_slide_right: 1.7, defend_slide_hard: 2.69, defend_slide_hard_right: 2.69, defend_backpedal: 3.31, carry_back: 3.31,
     closeout: HOOPS_STRIDE.run, carry_slide: HOOPS_STRIDE.slide, carry_slide_right: HOOPS_STRIDE.slide,

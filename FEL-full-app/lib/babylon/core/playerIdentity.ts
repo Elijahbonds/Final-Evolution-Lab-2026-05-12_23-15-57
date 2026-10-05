@@ -29,8 +29,10 @@ export function cloneForTint(m: TintMat, name: string): TintMat | null {
   return clone;
 }
 import type { SpawnedCharacter } from './CharacterLibrary';
-import type { AvatarSpec } from '../../workout/avatar-builder';
+import type { AvatarSpec } from './avatarSpec';
 import { proportionsFromFrame, type HeroBodyKind } from './heroBody';
+import { playContextOf, playScales } from './playFrame';
+import { recordPlayScale } from './playFramePoint';
 import { boneNode } from '../anim/boneLookup';
 import {
   defaultFace, defaultJersey, sanitizeJersey, getWearable,
@@ -38,7 +40,7 @@ import {
 } from '../../closet/wearable-catalog';
 
 export interface PlayerIdentity {
-  proportions: AvatarSpec | null;                 // null until a body scan exists
+  proportions: AvatarSpec | null;                 // null until the creator frame sets one (REACH-FREEZE: never a workout scan)
   face: FaceConfig;
   /** jersey/shorts/shoes/accent hex derived from equipped wearables + card skin. */
   palette: { jersey: string; shorts: string; shoes: string; accent: string };
@@ -55,6 +57,10 @@ export interface PlayerIdentity {
   /** PLAYER RING (owner, 2026-09-17: "the icon correlates to the user's creator card"): the EQUIPPED creator card —
    *  the start screen's card slot / the Closet skin (AvatarLook.skinCardId) — with its accent and signature mode. null = BASE. */
   card?: EquippedCard | null;   // optional: the preview / dev literals do not carry one
+  /** TRUE for an under-18 or unknown-age player (the closet row holds only catalog defaults): the real look
+   *  is on the device and nowhere else (LOOK PRIVACY, PR #98; the race's local overlay, PR #138). Optional:
+   *  dev literals do not carry one. */
+  lookLocal?: boolean;
 }
 export interface EquippedCard { id: string; name: string; accent: string; mode: string }
 
@@ -67,9 +73,8 @@ export async function resolveIdentity(force = false): Promise<PlayerIdentity> {
   if (cached && !force) return cached;
   const dev = devBodyOverride();
   if (dev) { cached = dev; return dev; }
-  const [closet, scan, heroBody] = await Promise.all([
+  const [closet, heroBody] = await Promise.all([
     fetch('/api/v1/closet').then((r) => (r.ok ? r.json() : null)).catch(() => null),
-    fetch('/api/v1/workout/scan').then((r) => (r.ok ? r.json() : null)).catch(() => null),
     fetch('/api/v1/hero-body').then((r) => (r.ok ? r.json() : null)).catch(() => null) as Promise<{ body?: HeroBodyKind; frame?: Record<string, unknown> | null } | null>,
   ]);
 
@@ -90,11 +95,13 @@ export async function resolveIdentity(force = false): Promise<PlayerIdentity> {
     accent: cardAccent || accentOf('accessory', FALLBACK_PALETTE.accent),
   };
 
-  // A measured body scan wins; without one, the creator frame's height / build / reach (a kit-body player who never
-  // scanned still plays the proportions they built).
+  // The creator frame's height and build, and only those (REACH-FREEZE, 2026-09-29, spec Decision 4). This used to prefer the newest
+  // workout scan's stored avatarSpec — a height made from the jump and a reach from the running cadence — so jumping higher made the
+  // player taller in every mode. The scan route still stores a spec (the standard frame now) and old rows keep theirs; nothing reads
+  // them here, so the fetch is gone. The owner's scan body takes its frame the same way.
   const frame = heroBody?.frame ?? null;
   const frameScales = proportionsFromFrame(frame);
-  const proportions: AvatarSpec | null = scan?.scans?.[0]?.avatarSpec ?? (frameScales ? {
+  const proportions: AvatarSpec | null = (frameScales ? {
     ...frameScales,
     palette: { skin: face.skinTone, primary: palette.jersey, accent: palette.accent },
     stance: (frame?.stance === 'tall' || frame?.stance === 'compact' ? frame.stance : 'athletic') as AvatarSpec['stance'],
@@ -104,17 +111,17 @@ export async function resolveIdentity(force = false): Promise<PlayerIdentity> {
 
   const wardrobe: Wardrobe = { tops: equipped.tops ?? null, shorts: equipped.shorts ?? null, shoes: equipped.shoes ?? null };
   const body: HeroBodyKind = heroBody?.body === 'scan' || heroBody?.body === 'kit-female' ? heroBody.body : 'kit-male';
-  cached = { proportions, face, palette, jersey, wardrobe, custom: Boolean(closet?.look) || Boolean(frame), body, card };
+  cached = { proportions, face, palette, jersey, wardrobe, custom: Boolean(closet?.look) || Boolean(frame), body, card, lookLocal: closet?.lookLocal === true };
   return cached;
 }
 /** The identity resolved so far this session (null before the first spawn asked) — a synchronous read for the ring / icon. */
 export function cachedIdentity(): PlayerIdentity | null { return cached; }
 
 /**
- * DEV ONLY — the body matrix (EVERYONE-BODY-MOCAP-OPPONENTS, 2026-09-14). `/dev/mode/<key>?body=female&height=90&build=112&reach=100`
+ * DEV ONLY — the body matrix (EVERYONE-BODY-MOCAP-OPPONENTS, 2026-09-14). `/dev/mode/<key>?body=female&height=96&build=108`
  * plays a guest as that body without a login or a database row, so the owner's proof bar ("male/female × short/tall ×
- * slim/heavy, per mode family") can be walked by a probe. Percent scales like the creator's Vitals rows. Never in a
- * production build.
+ * slim/heavy, per mode family") can be walked by a probe. Percent scales like the creator's Vitals rows, clamped the same way
+ * where they are applied. `reach=` is gone with the Reach row (REACH-FREEZE). Never in a production build.
  */
 function devBodyOverride(): PlayerIdentity | null {
   if (process.env.NODE_ENV !== 'development' || typeof window === 'undefined') return null;
@@ -125,7 +132,7 @@ function devBodyOverride(): PlayerIdentity | null {
   const face = defaultFace();
   const palette = { ...FALLBACK_PALETTE };
   return {
-    proportions: { heightScale: pct('height'), buildScale: pct('build'), reachScale: pct('reach'), palette: { skin: face.skinTone, primary: palette.jersey, accent: palette.accent }, stance: 'athletic' },
+    proportions: { heightScale: pct('height'), buildScale: pct('build'), reachScale: 1, palette: { skin: face.skinTone, primary: palette.jersey, accent: palette.accent }, stance: 'athletic' },
     // CLOTHING-ALONE (2026-09-14): `&tops=top_lab&shorts=shorts_court&shoes=shoes_flight` dresses the guest like a Closet save
     face, palette, jersey: null, wardrobe: { tops: q.get('tops'), shorts: q.get('shorts'), shoes: q.get('shoes') },
     custom: true, body: b === 'scan' ? 'scan' : b === 'female' ? 'kit-female' : 'kit-male',
@@ -134,6 +141,13 @@ function devBodyOverride(): PlayerIdentity | null {
 
 /** Call on Closet save / new scan so the next spawn picks up changes. */
 export function invalidateIdentity(): void { cached = null; }
+
+/**
+ * Seat a resolved identity as the session's one (racing/raceLook: the local-look overlay for a minor,
+ * computed from what the device holds, so CharacterLibrary's own resolveIdentity picks it up). Nothing
+ * here fetches or uploads — it only sets what the next spawn will wear.
+ */
+export function primeIdentity(id: PlayerIdentity): void { cached = id; }
 
 // ── Application layers ──────────────────────────────────────────────────
 
@@ -149,19 +163,25 @@ export function invalidateIdentity(): void { cached = null; }
 //            rotations only (imported position tracks are stripped), so the offsets hold through every animation, and
 //            the two-bone solver already fits hands to the arm length it finds.
 // Absolute from the spawn's own base, so a live editor can re-apply per keypress without the old cumulative drift.
+//
+// REACH-FREEZE (2026-09-29, Gameplay Systems' spec, Decisions 1–3). Reach is gone: the longer arm was an edge, because the ball rides
+// the hand bone and the hoops modes read it for the rim touch and the release. The arm keeps its bind length now (a joint an older
+// build moved is put back), height and build are clamped to the cosmetic range (playFrame.COSMETIC_CLAMP), and the scale put on the
+// root is recorded so a mode can read its outcome points on the standard frame (playFramePoint).
 const REACH_JOINTS = ['LeftForeArm', 'LeftHand', 'RightForeArm', 'RightHand'];
 
+/** `reachScale` is read by nothing (REACH-FREEZE); it stays in the type because saved specs still carry it. */
 export interface ProportionScales { heightScale?: number; buildScale?: number; reachScale?: number }
 
 export function applyProportions(spawn: Pick<SpawnedCharacter, 'root' | 'skeleton'>, p: ProportionScales, base?: Vector3): void {
-  const h = p.heightScale || 1, b = p.buildScale || 1, r = p.reachScale || 1;
+  const { heightScale: h, buildScale: b } = playScales(p);   // the cosmetic clamp; reach is never read
   const s0 = base ?? spawn.root.scaling.clone();
   spawn.root.scaling.set(s0.x * h * b, s0.y * h, s0.z * h * b);
+  recordPlayScale(spawn.root, { heightScale: h, buildScale: b });
   for (const name of REACH_JOINTS) {
     const n = boneNode(spawn.skeleton, name); if (!n) continue;
-    const md = (n.metadata ??= {}) as { felBindPos?: Vector3 };
-    md.felBindPos ??= n.position.clone();
-    n.position.copyFrom(md.felBindPos).scaleInPlace(r);
+    const bind = (n.metadata as { felBindPos?: Vector3 } | null | undefined)?.felBindPos;
+    if (bind) n.position.copyFrom(bind);
   }
 }
 
@@ -173,9 +193,11 @@ export function applyIdentity(
    *  team colors but still wears the player's skin and build). */
   parts: 'full' | 'body' = 'full',
 ): void {
-  // 1) Proportions (scan AvatarSpec) — height on root, build on torso, reach on arms.
+  // 1) Proportions — height on the root, build as its girth, both cosmetic; the arms at their bind length (REACH-FREEZE). A ranked
+  //    session and every STANDARD_FRAME_MODES mode spawn every body at exactly 1.0: playScales reads the harness's stamps on the
+  //    spawn's scene (ModeHarness: `felModeId`; `felRanked`, which nothing sets yet — reach-freeze-routed.md R2).
   if (id.proportions) {
-    applyProportions(spawn, id.proportions);
+    applyProportions(spawn, playScales(id.proportions, playContextOf(spawn.root.getScene()?.metadata)));
   }
   // 2) Face — skin tone on skin materials (the model has no blendshapes today;
   //    the flat FaceConfig preset variety is handled by the Closet preview rig).

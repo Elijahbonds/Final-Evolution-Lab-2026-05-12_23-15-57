@@ -20,9 +20,37 @@
 // file that mentions the shoulder, when pulling is short of three for every two — a one-line suggestion says the
 // counts and what would balance them (lib/coach/coverage.ts pullPushCheck). It is a suggestion, never a block on
 // saving, and it counts tagged exercises only, saying so when untagged sets could change the answer.
-import { useState } from 'react';
+//
+// OFF DAYS (MIRROR-COACH P6, 2026-09-29). Under each training session, "Off day after this" adds FEL's off-day session
+// to the week right behind it (lib/coach/offDay.ts: an easy walk, three rock-and-hold stretches and the recovery
+// breath, 18 minutes; builderServer.ts add_off_day), stored as a session of kind 'recovery'. An off day reads as one
+// here — its own badge and line instead of one more "Session N" — and one the athlete has not started can be taken
+// back out. Its exercises are ordinary prescriptions from the coach's own catalogue, editable like any other.
+//
+// THE PROTOCOL GATE, FOR THIS CLIENT (MIRROR-COACH P8, 2026-09-29). Under every plyometric and depth drop, one line says
+// what the client's Today does with it right now (lib/coach/protocolGate.ts, decided server-side by GET
+// /api/coach/programs/:id/gates → lib/coach/protocolGateServer.ts loadProgramGates): shows it as written, shows the easier
+// step on its ladder instead, or holds it back — and why. Assigning an item is the coach's override of FEL's youth rule
+// for that item only; the intake, red-flag, pain and landing checks still apply, and the line says so. The client's
+// health reasons are named only with their coach_view consent. Fetched again whenever the tree's items change (an add,
+// a swap of catalogue row, a remove); a failed fetch just shows no lines — the builder never waits on it.
+//
+// FEL TEMPLATES (MIRROR-COACH P8, 2026-09-29). A BLANK program (nothing prescribed, no session done, no dated week —
+// lib/coach/templates/list.ts programIsBlank) opens with "Start from a FEL template": the seven templates (3 and 4 days ×
+// bodyweight and full gym for adults, two youth weeks, a camp session), each with its one-line summary, its shape, what
+// it needs, the wave line (weeks 1–3 build, week 4 easier: FEL's choice, said so), and for youth and camp templates the
+// 60-minute daily activity target. One press sends { action: 'clone_template' } (lib/coach/builderServer.ts); the tree
+// that comes back replaces the blank weeks on screen, and `onCatalogueChange` lets the page reload the catalogue the
+// clone just filled (so the add row and the pull-over-push line see the new rows and their pattern tags). The server
+// refuses an adult template for a client under youth rules, and a program that is not blank, and says why.
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { ArrowDown, ArrowUp, ChevronDown, ChevronUp, KeyRound, Plus, Scale, Timer, Trash2, TriangleAlert } from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronDown, ChevronUp, KeyRound, LayoutTemplate, Leaf, Plus, Scale, Timer, Trash2, TriangleAlert } from 'lucide-react';
+import { ADULT_TEMPLATE_LINE, CLONE_LINE, TEMPLATES, dailyTargetLine, programIsBlank, templateShapeLine } from '@/lib/coach/templates/list';
+import { WAVE_LINE } from '@/lib/coach/templates/waves';
+import { CoachGateLine } from '@/components/coach/protocol-gate-line';
+import type { CoachGateView } from '@/lib/coach/protocolGate';
+import { OFF_DAY_ADD_LINE, OFF_DAY_LINE, offDayWouldRewind } from '@/lib/coach/offDay';
 import type { MovementPattern, SessionSection } from '@/public/_prisma/client';
 import type { ProgramTree, TreeExercise } from '@/lib/coach/loop';
 import { mentionsShoulder, pullPushCheck } from '@/lib/coach/coverage';
@@ -52,12 +80,34 @@ export interface ProgramBuilderProps {
    * which tilts the pull-over-push suggestion. Never shown, never quoted.
    */
   notes?: readonly (string | null | undefined)[];
+  /**
+   * MIRROR-COACH P8: where the protocol gate's lines come from. Default: the real route for this program; null = none
+   * (a harness with no route). `initialGates` seeds them (a test, or a harness that has them already).
+   */
+  gatesEndpoint?: string | null;
+  initialGates?: Readonly<Record<string, CoachGateView>>;
+  /** MIRROR-COACH P8: called after a FEL template was cloned into this program (the clone added rows to the catalogue). */
+  onCatalogueChange?: () => void;
 }
+
+/** What the gates depend on in a tree: which catalogue row sits in which slot. A change re-asks the server. */
+export const gateSignature = (tree: ProgramTree): string =>
+  tree.blocks.flatMap((b) => b.sessions.flatMap((s) => s.exercises.map((e) => `${e.id}:${e.exerciseId}`))).join('|');
 
 const input = 'rounded-lg bg-white/5 border border-white/10 px-2 py-1 text-white text-xs';
 
-export function ProgramBuilder({ tree, completedSessionIds, catalogue, onTree, endpoint, notes }: ProgramBuilderProps) {
+export function ProgramBuilder({ tree, completedSessionIds, catalogue, onTree, endpoint, notes, gatesEndpoint, initialGates, onCatalogueChange }: ProgramBuilderProps) {
   const [open, setOpen] = useState<string | null>(null);
+  const [templateId, setTemplateId] = useState<string>(TEMPLATES[0].id);
+  const [gates, setGates] = useState<Readonly<Record<string, CoachGateView>>>(initialGates ?? {});
+  const gatesUrl = gatesEndpoint === undefined ? `/api/coach/programs/${tree.id}/gates` : gatesEndpoint;
+  const signature = gateSignature(tree);
+  useEffect(() => {
+    if (!gatesUrl) return;
+    let live = true;
+    fetch(gatesUrl).then((r) => (r.ok ? r.json() : null)).then((j) => { if (live && j?.gates && typeof j.gates === 'object') setGates(j.gates); }).catch(() => { /* no lines, never a block */ });
+    return () => { live = false; };
+  }, [gatesUrl, signature]);
   const [drafts, setDrafts] = useState<Record<string, ExerciseDraft>>({});
   const [adding, setAdding] = useState<Record<string, { exerciseId: string; section: SessionSection }>>({});
   const [busy, setBusy] = useState(false);
@@ -89,10 +139,43 @@ export function ProgramBuilder({ tree, completedSessionIds, catalogue, onTree, e
   // a shoulder note anywhere on this program — the coach's own notes on its exercises, or the client's log notes
   const shoulderNote = mentionsShoulder([...(notes ?? []), ...tree.blocks.flatMap((b) => b.sessions.flatMap((s) => s.exercises.map((e) => e.coachNote)))]);
 
-  if (tree.blocks.length === 0) return <div className="text-sm text-white/50">This program has no weeks yet.</div>;
+  // MIRROR-COACH P8: start from a FEL template, only while the program is blank (the server checks again)
+  const blank = programIsBlank(tree.blocks, completedSessionIds.length);
+  const picked = TEMPLATES.find((t) => t.id === templateId) ?? TEMPLATES[0];
+  const cloneTemplate = async () => {
+    if (await call({ action: 'clone_template', templateId: picked.id })) {
+      toast.success(`${picked.name} added. Its exercises are in My catalogue now.`);
+      onCatalogueChange?.();
+    }
+  };
+  const templatePicker = blank && (
+    <div className="space-y-1.5 rounded-lg border border-[#00E5FF]/20 bg-[#00E5FF]/[0.04] p-3" data-testid="template-picker">
+      <div className="flex items-center gap-1.5 text-xs font-medium text-white"><LayoutTemplate className="h-3.5 w-3.5 text-[#00E5FF]/80" aria-hidden="true" /> Start from a FEL template</div>
+      <select aria-label="FEL template" value={picked.id} onChange={(ev) => setTemplateId(ev.target.value)} className={`w-full ${input}`}>
+        <optgroup label="Adults">
+          {TEMPLATES.filter((t) => t.audience === 'adult').map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+        </optgroup>
+        <optgroup label="Youth and camp">
+          {TEMPLATES.filter((t) => t.audience === 'youth').map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+        </optgroup>
+      </select>
+      <div className="text-[11px] text-white/70" data-template-summary>{picked.summary}</div>
+      <div className="text-[11px] text-white/50" data-template-shape>{templateShapeLine(picked)} · Needs: {picked.equipmentLine}</div>
+      {picked.kind === 'program' && <div className="text-[11px] text-white/50" data-template-wave>{WAVE_LINE}</div>}
+      {picked.audience === 'adult' && <div className="text-[11px] text-white/50" data-template-adult>{ADULT_TEMPLATE_LINE}</div>}
+      {picked.dailyTargetMinutes != null && <div className="text-[11px] text-white/50" data-template-target>{dailyTargetLine(picked.dailyTargetMinutes)}</div>}
+      <div className="text-[11px] text-white/40">{CLONE_LINE}</div>
+      <button disabled={busy} onClick={() => void cloneTemplate()} className="rounded-lg border border-[#00E5FF]/40 px-2.5 py-1 text-xs text-[#00E5FF] disabled:opacity-30" data-clone-template>
+        Use this template
+      </button>
+    </div>
+  );
+
+  if (tree.blocks.length === 0) return <div className="space-y-3">{templatePicker}<div className="text-sm text-white/50">This program has no weeks yet.</div></div>;
 
   return (
     <div className="space-y-3" data-testid="program-builder">
+      {templatePicker}
       {tree.blocks.map((b) => {
         const balance = pullPushCheck(
           b.sessions.flatMap((s) => s.exercises.map((e) => ({ pattern: patternOf(e.exerciseId), section: e.section, sets: e.sets }))),
@@ -112,8 +195,19 @@ export function ProgramBuilder({ tree, completedSessionIds, catalogue, onTree, e
             const warnings = sessionWarnings(s.exercises);
             const add = adding[s.id] ?? { exerciseId: catalogue[0]?.id ?? '', section: 'key' as SessionSection };
             return (
-              <div key={s.id} className="rounded-lg bg-white/[0.03] border border-white/6 p-3 space-y-2" data-session={s.id}>
-                <div className="text-xs text-white">{s.label} {done && <span className="text-[#7BD389]">· done</span>}</div>
+              <div key={s.id} className={`rounded-lg bg-white/[0.03] border p-3 space-y-2 ${s.kind === 'recovery' ? 'border-dashed border-[#7BD389]/30' : 'border-white/6'}`} data-session={s.id} data-kind={s.kind ?? 'training'}>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 text-xs text-white">
+                    {s.kind === 'recovery' && <span className="mr-1.5 inline-flex items-center gap-0.5 rounded bg-[#7BD389]/15 px-1 text-[10px] font-semibold text-[#7BD389]" data-off-day-badge><Leaf className="h-2.5 w-2.5" aria-hidden="true" />OFF DAY</span>}
+                    {s.label} {done && <span className="text-[#7BD389]">· done</span>}
+                    {s.kind === 'recovery' && <div className="mt-0.5 text-[11px] text-white/45">{OFF_DAY_LINE}</div>}
+                  </div>
+                  {s.kind === 'recovery' && !done && (
+                    <button disabled={busy} onClick={() => void call({ action: 'remove_off_day', sessionId: s.id })} className="shrink-0 text-white/30 hover:text-[#FF3366] disabled:opacity-30" aria-label="Remove this off day" data-remove-off-day>
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
                 {warnings.map((w) => (
                   <div key={`${w.kind}-${'group' in w ? w.group : ''}`} className="flex items-center gap-1.5 text-[11px] text-[#FFD700]/85">
                     <TriangleAlert className="h-3 w-3 shrink-0" aria-hidden="true" /> {warningText(w)}
@@ -140,6 +234,8 @@ export function ProgramBuilder({ tree, completedSessionIds, catalogue, onTree, e
                             <button disabled={busy} onClick={() => void call({ action: 'remove', sessionExerciseId: e.id })} className="text-white/30 hover:text-[#FF3366]" aria-label={`Remove ${e.name}`}><Trash2 className="h-3.5 w-3.5" /></button>
                           </span>
                         </div>
+                        {/* MIRROR-COACH P8: what the protocol gate does with this item on the client's Today, and why */}
+                        {gates[e.id] && <CoachGateLine gate={gates[e.id]} />}
                         {open === e.id && drafts[e.id] && (
                           <ExerciseEditor
                             draft={drafts[e.id]}
@@ -169,6 +265,14 @@ export function ProgramBuilder({ tree, completedSessionIds, catalogue, onTree, e
                     aria-label="Add exercise"
                   ><Plus className="h-3.5 w-3.5" /></button>
                 </div>
+                {/* MIRROR-COACH P6 FIX (2026-09-29): not where the off day would land ahead of a session the athlete
+                   already did (Today would go back to it; the server refuses it too — offDayWouldRewind) */}
+                {s.kind !== 'recovery' && !offDayWouldRewind(tree.blocks, b.id, s.id, completedSessionIds) && (
+                  <button disabled={busy} onClick={() => void call({ action: 'add_off_day', blockId: b.id, afterSessionId: s.id })} title={OFF_DAY_ADD_LINE}
+                    className="inline-flex items-center gap-1 text-[11px] text-[#7BD389]/80 hover:text-[#7BD389] disabled:opacity-30" data-add-off-day>
+                    <Leaf className="h-3 w-3" aria-hidden="true" /> Off day after this
+                  </button>
+                )}
               </div>
             );
           })}

@@ -110,10 +110,34 @@ export type Share = ProgramShare | DrillShare | RecommendationShare | SelectionS
  * A denylist looks like the weaker choice and is the right one here: the payload types above are an
  * allowlist already, and this catches the case those cannot — somebody spreading a profile object into a
  * share and picking up fields the type does not name. It walks the actual object, not the type.
+ *
+ * MIRROR-COACH P5 (2026-09-29): the health intake / pain check-in / consent fields (schema.prisma's HealthIntake,
+ * PainCheckIn, HealthConsent) below. Privacy §5 promises this data "never appears on a share link", the same
+ * promise this file already keeps for a PRQ composite or a scan — a share carries training content, never a
+ * client's data, and that line does not carve out an exception for a client's health data being a different kind
+ * of client data. Left out on purpose: field names a legitimate share ALREADY carries, which this list must never
+ * catch — `note` (DrillShare/SelectionShare), `kind` (every ShareBase's own discriminator), `coachId` (SharedBy),
+ * `createdAt` (ShareBase) — a health row's own same-named field is still caught, just by `userid` riding along with
+ * it in practice, the same structural point `shareable.test.ts` already makes for a whole profile spread in.
  */
 const NEVER_SHARED = [
   'prq', 'composite', 'axes', 'scans', 'scan', 'snapshot', 'measuredat', 'sourcescanat',
   'clientid', 'userid', 'email', 'phone', 'history', 'signature', 'academy', 'dateofbirth', 'dob', 'age',
+  // HealthIntake
+  'healthintake', 'redflags', 'answers', 'consentedat', 'clearedat', 'birthyear', 'version',
+  // PainCheckIn
+  'paincheckin', 'programexerciseid', 'exercisename', 'bodyarea', 'acute', 'decision', 'score',
+  // HealthConsent
+  'healthconsent', 'scope', 'grantedat', 'revokedat',
+  // ReadinessCheckIn (MIRROR-COACH P6, 2026-09-29): the daily check-in's own table and export key, its four answers,
+  // and the read's "what was low" list. `date`, `level` and `suggestion` are left out for the reason `note` is above —
+  // generic names a legitimate share could carry — and a whole row is still caught by its `userid`.
+  'readiness', 'readinesscheckin', 'readinesscheckins', 'sleep', 'soreness', 'energy', 'mood', 'lowitems',
+  // BreathLog (MIRROR-COACH P7 FIX, 2026-09-29, review): the Dial-Up Breath's use log, which the export and both erases
+  // treat as health data and Privacy §5 now names. Its table and export key; `kind`, `sessionId`, `seconds` and
+  // `createdAt` are left out for the reason `note` is above (generic names a share could carry), and a whole row is
+  // still caught by its `userid` — but a projection such as { breathLogs: [{ kind, sessionId, createdAt }] } was not.
+  'breathlog', 'breathlogs',
 ];
 
 export class ShareLeak extends Error {}

@@ -17,6 +17,7 @@
 import { FLIP_NOTE_RANGE, FLIP_ROOT_MIDI, isNoteRow, isPitchedRow, noteName, pitchClass, rowRange, scaleNotes, stepDegrees, type SongKey } from '../scales';
 import { fallbackNote, type Step } from '../StudioProject';
 import type { TrackState } from '../AudioEngine';
+import { strokeEnter, type GridCell, type Stroke } from './gridMath';
 
 export interface NoteWindow {
   /** Lowest and highest MIDI note the window may show (inclusive). */
@@ -116,4 +117,62 @@ export function nudgeNote(track: Pick<TrackState, 'sampleId' | 'notes' | 'patter
   const to = stepDegrees(from, rowKey(track.sampleId, key), degrees);
   const note = to < range.lo || to > range.hi ? from : to;
   return { on: true, note };
+}
+
+// ── MUSIC-SUITE P10 (2026-09-29): PAINTING NOTES BY DRAGGING ─────────────────────────────────────────────────────────
+// P4's open item ("painting notes by dragging in the note row — a note is one tap, or ⌥↑/↓"): the step grid painted a
+// stroke, the note row made you tap a melody note by note, eight taps a page. A drag across the note row now paints the
+// way the grid does (gridMath's stroke: the first cell decides, skipped cells of a fast drag are filled in, a pointer
+// that leaves the cells breaks the line), with one note-row rule on top:
+//   * PAINT (the stroke began on a cell that was not lit): every step the pointer crosses lights ON the note under the
+//     pointer — a diagonal drag writes a run up or down the scale, a flat one repeats a note. A step holds one note, so
+//     a vertical move inside one column simply moves that step's note (the last cell wins).
+//   * ERASE (the stroke began on a lit cell — "this step plays this note"): a step it crosses goes off only where it
+//     plays the note under the pointer, so wiping along a line never deletes a different note the pointer merely passed.
+// The cells are gridMath GridCells whose `row` is the choice's index in the window (NoteRow draws high to low).
+
+/** What a painted cell does to its step: light it on `midi`, or (null) turn it off. */
+export interface NoteEdit { step: number; midi: number | null }
+
+/** The edits for `cells` of a stroke (`value` true = paint, false = erase) against the row as it is now. */
+export function noteStrokeEdits(
+  cells: readonly { row: number; step: number }[], value: boolean, choices: readonly Pick<NoteChoice, 'midi'>[],
+  track: Pick<TrackState, 'sampleId' | 'notes' | 'pattern'>, key: SongKey,
+): NoteEdit[] {
+  const out: NoteEdit[] = [];
+  for (const c of cells) {
+    const midi = choices[c.row]?.midi;
+    if (midi === undefined || !Number.isInteger(c.step) || c.step < 0) continue;
+    if (value) { out.push({ step: c.step, midi }); continue; }
+    if (track.pattern[c.step] === true && noteOfStep(track, c.step, key) === midi) out.push({ step: c.step, midi: null });
+  }
+  return out;
+}
+
+/**
+ * MUSIC-SUITE P10 FIX (2026-09-29): THE LAST CELL WINS, EVEN ON A CELL THE STROKE ALREADY VISITED. The header's rule (a
+ * vertical move inside one column moves that step's note) broke on a return: NoteRow reused gridMath's stroke, which
+ * never re-paints a cell already in `painted` (gridMath strokeEnter). Press unlit A1 at step 3 (A1 painted), drag down
+ * to G1 (step 3 → G1), drag back up to A1: strokeCells gave (G1,3) and (A1,3), both painted, so nothing was emitted —
+ * step 3 stayed G1 with the pointer resting on A1. A PAINT stroke now also re-paints the cell it ENTERS when that
+ * cell's step was last painted on a different note in this stroke (`rowOfStep`: the choice row each step was last
+ * painted on). An ERASE stroke is unchanged (it only turns off notes it is over). `rowOfStep` is the stroke's own
+ * memory, not the track's — the room applies edits asynchronously, and a stroke must not depend on when it re-renders.
+ */
+export function noteStrokeEnter(
+  stroke: Stroke, cell: GridCell, rowOfStep: ReadonlyMap<number, number>,
+): { stroke: Stroke; paint: GridCell[]; rowOfStep: Map<number, number> } {
+  const next = strokeEnter(stroke, cell);
+  const paint = next.paint.slice();
+  const entered = paint.some((c) => c.row === cell.row && c.step === cell.step);
+  const last = rowOfStep.get(cell.step);
+  if (stroke.value && !entered && last !== undefined && last !== cell.row) paint.push({ row: cell.row, step: cell.step });
+  const rows = new Map(rowOfStep);
+  if (stroke.value) for (const c of paint) rows.set(c.step, c.row);
+  return { stroke: next.stroke, paint, rowOfStep: rows };
+}
+
+/** The patch StudioProject.withStep takes for an edit (a lit step keeps its velocity; the key lock is withStep's). */
+export function noteEditPatch(e: NoteEdit): Partial<Step> {
+  return e.midi === null ? { on: false } : { on: true, note: e.midi };
 }

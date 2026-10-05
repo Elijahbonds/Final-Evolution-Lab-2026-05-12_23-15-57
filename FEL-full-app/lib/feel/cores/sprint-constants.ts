@@ -20,7 +20,7 @@ export const SPRINT_TUNING: SprintTuning = {
   setMs: 700, // TUNE(elijah) — SET hold before the gun (GO)
   perfectImpulse: 1.1, // TUNE(elijah) — m/s added on a perfect step
   goodImpulse: 0.7, // TUNE(elijah) — m/s added on a good/first step
-  offImpulse: 0.25, // TUNE(elijah) — m/s added on a sloppy step
+  offImpulse: 0, // TUNE(elijah) — m/s added on a sloppy step. FLAG 0.25 → 0 (MODES-SHARED-10). A frame-rate mash at 0.25 finishes the 100 m under WIN_TIME 13 s (scripts/sprint-core-tests.ts). Off-beat taps add nothing. A body-graded jog then finishes at about 19.5 s, past the old 18.4 s grace; that gate is flagged in rideBody.gate.test.ts.
   stumblePenalty: 0.6, // TUNE(elijah) — speed multiplier on a same-side stumble
   maxSpeed: 12.0, // TUNE(elijah) — top sprint speed (m/s)
   drag: 1.2, // TUNE(elijah) — passive m/s^2 decel between steps

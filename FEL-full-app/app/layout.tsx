@@ -1,4 +1,4 @@
-import { Barlow_Condensed, Chakra_Petch, IBM_Plex_Sans, JetBrains_Mono } from 'next/font/google'
+import localFont from 'next/font/local'
 import { TabBar } from '@/components/shell/tab-bar'
 import { StatusRail } from '@/components/shell/status-rail'
 import './globals.css'
@@ -13,20 +13,53 @@ import { ChunkLoadErrorHandler } from '@/components/chunk-load-error-handler'
 
 export const dynamic = 'force-dynamic'
 
-// THE APP'S FONTS, LOADED ONCE (FONT-SHARED, 2026-09-29). next/font self-hosts every face at build time (no font CDN
-// at run time) and names it by a hash, so a family name written in CSS ('Chakra Petch', 'JetBrains Mono') never
-// matches: the READY cards, TAP TO START and the JuiceKit banners asked for exactly that and got Courier.
-// app/theme.css builds --fel-font-display from the variables below instead, and the variables sit on <html> so its
-// :root tokens can see them.
+// THE APP'S FONTS, LOADED ONCE, FROM OUR OWN FILES. Two passes meet here:
+//  - FONT-SHARED (2026-09-29): next/font names every face by a hash, so a family written by name in CSS ('Chakra
+//    Petch', 'JetBrains Mono') never matches: the READY cards, TAP TO START and the JuiceKit banners asked for exactly
+//    that and got Courier. app/theme.css builds --fel-font-display from the variables below instead, and the variables
+//    sit on <html> so its :root tokens can see them. It added the display face, Chakra Petch.
+//  - FONT-LOCAL (2026-09-30): every face loads from files committed in app/fonts (next/font/local), never from
+//    next/font/google, which fetched from Google at build time and failed CI's builds whenever that fetch did. The
+//    files are the latin subsets next/font/google itself served (provenance, SHA-256s, licence: app/fonts/README.md).
 // preload: false (owner, 2026-09-29): a face downloads only where text is set in it, so a page that never uses one
 // (the Quick Screen draws in the system stack) loads none. The first visit to a page may swap from next/font's
 // metric-matched fallback once; the file is cached after that.
-const barlow = Barlow_Condensed({ subsets: ['latin'], weight: ['500', '600', '700', '800'], variable: '--font-display', preload: false })
-const plexSans = IBM_Plex_Sans({ subsets: ['latin'], weight: ['400', '500', '600', '700'], variable: '--font-sans', preload: false })
-const jetbrainsMono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-mono', preload: false })
+const barlow = localFont({
+  src: [
+    { path: './fonts/barlow-condensed-latin-500.woff2', weight: '500', style: 'normal' },
+    { path: './fonts/barlow-condensed-latin-600.woff2', weight: '600', style: 'normal' },
+    { path: './fonts/barlow-condensed-latin-700.woff2', weight: '700', style: 'normal' },
+    { path: './fonts/barlow-condensed-latin-800.woff2', weight: '800', style: 'normal' },
+  ],
+  variable: '--font-display',
+  display: 'swap',
+  preload: false,
+})
+const plexSans = localFont({
+  src: [{ path: './fonts/ibm-plex-sans-latin-variable.woff2', weight: '400 700', style: 'normal' }],
+  variable: '--font-sans',
+  display: 'swap',
+  preload: false,
+})
+const jetbrainsMono = localFont({
+  src: [{ path: './fonts/jetbrains-mono-latin-variable.woff2', weight: '100 800', style: 'normal' }],
+  variable: '--font-mono',
+  display: 'swap',
+  preload: false,
+})
 // The display face (owner, 2026-09-29: Chakra Petch, the face the token was written for). Its heaviest cut is 700; the
 // 800/900 the display rules ask for draw at 700.
-const chakraPetch = Chakra_Petch({ subsets: ['latin'], weight: ['400', '500', '600', '700'], variable: '--font-chakra', preload: false })
+const chakraPetch = localFont({
+  src: [
+    { path: './fonts/chakra-petch-latin-400.woff2', weight: '400', style: 'normal' },
+    { path: './fonts/chakra-petch-latin-500.woff2', weight: '500', style: 'normal' },
+    { path: './fonts/chakra-petch-latin-600.woff2', weight: '600', style: 'normal' },
+    { path: './fonts/chakra-petch-latin-700.woff2', weight: '700', style: 'normal' },
+  ],
+  variable: '--font-chakra',
+  display: 'swap',
+  preload: false,
+})
 
 // A shared link is the product's first impression, so the card carries the page's own
 // promise. It used to read "Premium athlete-development game — train, compete, evolve":

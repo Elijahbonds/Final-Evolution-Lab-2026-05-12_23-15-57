@@ -4,8 +4,9 @@
 // Modes MUST spawn the player via CharacterPipeline.spawnPlayer(); NPCs via spawnNpc().
 //
 // Adapted to the REAL FEL schema: FaceConfig is the flat string config from
-// lib/closet/wearable-catalog; body proportions come from the stored AvatarSpec
-// (lib/workout/avatar-builder). Everything fails soft to defaults so a spawn can
+// lib/closet/wearable-catalog; body proportions come from the creator frame as an
+// AvatarSpec (./avatarSpec — cosmetic, and never from a workout scan since
+// REACH-FREEZE). Everything fails soft to defaults so a spawn can
 // never throw just because a scan/look hasn't been created yet.
 
 import { Color3 } from '@babylonjs/core';
@@ -21,7 +22,7 @@ import { DEFAULT_HERO_URL, normalizeHeroUrl } from './athleteRoster';
 /** Rival colours that double as roster seeds: a different roster body per NPC in a scene, the same bodies every session. */
 const NPC_SEEDS = ['#F25F5C', '#2EC4B6', '#FFBF47', '#5B8DEF', '#B07CF5', '#7BD389'];
 let npcSeq = 0;
-import type { AvatarSpec } from '../../workout/avatar-builder';
+import type { AvatarSpec } from './avatarSpec';
 import { boneNode } from '../anim/boneLookup';
 import {
   defaultFace, getWearable, type FaceConfig, type WearableSlot,

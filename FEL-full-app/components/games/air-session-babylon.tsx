@@ -6,11 +6,14 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import type { GameProps, GameResult } from './game-shell';
+import { useBabylonPlaytestBridge } from './use-babylon-playtest-bridge';
 import { BootSplash } from './boot-splash';
+import { surfaceBootError } from './boot-error';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { BoostGauge } from './boost-hud';
+import { gameResultFromSession } from '@/lib/sessions/gameResultFromSession';
 
 // Which harness currently owns a given canvas. React mounts effects twice in
 // dev: effect A starts an async runMode(), its cleanup fires before A has even
@@ -43,6 +46,7 @@ export function makeAirHost(modeKey: string, title: string) {
     const [countdown, setCountdown] = useState<number | null>(null);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [hud, setHud] = useState<Hud>({});
+    useBabylonPlaytestBridge(modeKey, () => ({ phase, countdown, loadError, hud }), busRef.current);
 
     useEffect(() => {
       const canvas = canvasRef.current;
@@ -54,7 +58,9 @@ export function makeAirHost(modeKey: string, title: string) {
       let stop: (() => void) | null = null;
       let disposed = false;
 
-      runMode(MODES[modeKey], {
+      const startTimer = setTimeout(() => {
+        if (disposed) return;
+        runMode(MODES[modeKey], {
         canvas,
         input: bus,
         onPhase: (p, d) => {
@@ -67,17 +73,12 @@ export function makeAirHost(modeKey: string, title: string) {
         resultSink: async (r: SessionResult) => {
           if (endedRef.current) return;
           endedRef.current = true;
-          onEndRef.current({
-            score: r.score,
-            stats: r.stats, outcome: r.outcome,   // pass 5 phase 3: the proof line reads these
-            opponentScore: 0,
+          onEndRef.current(gameResultFromSession(r, {
             won: r.outcome === 'win',
-            duration: r.durationSec,
-            // boards pass phase 10: big air reads its judge; the vault keeps its line
             headline: r.stats?.judgeBest !== undefined
               ? `${r.outcome === 'win' ? 'STOMPED THE FINAL' : 'FINAL OVER'} · JUDGES BEST ${Number(r.stats.judgeBest).toFixed(1)}`
               : r.outcome === 'win' ? 'ROUTINE LANDED' : 'SESSION COMPLETE',
-          } satisfies GameResult);
+          }));
         },
       }).then((s) => {
         // If a newer mount already claimed this canvas, do NOT run our teardown —
@@ -85,10 +86,12 @@ export function makeAirHost(modeKey: string, title: string) {
         if (disposed) { if (canvasOwner.get(canvas) === token) s(); return; }
         stop = s;
       })
-        .catch((e) => { if (!disposed) setLoadError(String(e?.message ?? e)); });
+        .catch((e) => surfaceBootError(e, { disposed, setPhase, setLoadError }));
+      }, 0);
 
       return () => {
         disposed = true;
+        clearTimeout(startTimer);
         if (canvasOwner.get(canvas) === token) stop?.();
       };
     }, []);   // mount once — see onEndRef above
@@ -106,9 +109,6 @@ export function makeAirHost(modeKey: string, title: string) {
           <div className="pointer-events-none absolute left-4 top-4 z-20 font-mono text-xs text-white">
             <div className="text-2xl font-bold text-[#ffd75e]">{String(hud.score ?? 0)}</div>
             <div className="text-white/60">ATTEMPT {String(hud.attempt ?? '—')} · {String(hud.phase ?? '')}</div>
-            <div className="text-white/60">
-              speed {String(hud.speed ?? 0)} · height {String(hud.height ?? 0)} · spin {String(hud.spin ?? 0)}
-            </div>
             {/* nextFoot is the cadence mechanic's core readout — which stride
                 comes next — and the bezel dropped it (same trap as the 3PT
                 board and football's drive state: published is not rendered).

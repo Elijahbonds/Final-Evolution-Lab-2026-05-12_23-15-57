@@ -71,7 +71,8 @@ describe('the music session request: the fields the server reads (session-payout
     const route = read('app/api/sessions/route.ts');
     const tx = route.slice(route.indexOf('prisma.$transaction'));
     expect(tx).toMatch(/if \(won\) \{\s*const w = await sessionWalletGrant\(tx, \{ playerId: userId, reasonCode: REASON\.MODE_SESSION_WON/);
-    expect(route).toContain('const won = sessionWon(rulesMode, claimedWon, stats, duration, { score });');
+    // the server's verdict (sessionWon); a floor-only mode (Prove It, owner decision 2026-09-28) never wins
+    expect(route).toContain('const won = floorOnly ? false : sessionWon(rulesMode, claimedWon, stats, duration, { score });');
     // the route answers with its own verdict under that name
     expect(tx).toMatch(/const payload: Record<string, unknown> = \{\s*ok: true,\s*paid: true,\s*replayed: false,\s*runId: run\.id,\s*sessionId:[^\n]*\n\s*won,/);
   });
@@ -147,5 +148,15 @@ describe('an answer that lands after REPLAY writes nothing to the next run\'s ca
     // for whatever the card shows now (only the card is guarded)
     // ECONOMY-SESSIONS-HARDEN: the coins tile is the session answer's own figure (the run paid them), guarded like the rest
     expect(between(h, 'if (j?.ok) {', "fetch('/api/story/complete'")).toMatch(/if \(mine\(\) && j\?\.paid === true\) \{[\s\S]*setRecapCoins\(\{ coins, capped \}\)/);
+  });
+});
+
+describe('the profile failure state is a stop, not a spinner plus a stop', () => {
+  it('when /api/profile is unreachable, the retry panel replaces the loader instead of rendering underneath it', () => {
+    const profileBlock = between(shell, '{!profile && unreachable && (', '<AnimatePresence>');
+    expect(profileBlock).toContain("Can&apos;t reach the server. Check your connection, then try again.");
+    expect(profileBlock).toContain(') : !unreachable ? (');
+    expect(profileBlock).toContain('<Loader2 className="h-8 w-8 animate-spin text-[#00E5FF]" />');
+    expect(profileBlock).toContain(') : null}');
   });
 });
