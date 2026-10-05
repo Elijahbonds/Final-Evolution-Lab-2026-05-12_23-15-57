@@ -86,6 +86,14 @@ export function ModelViewer() {
           play: (name: string) => { body?.animator.play(name, { loop: true }); return body?.animator.clipNames.has(name) ?? false; },
           turn: (deg: number) => { if (body) body.root.rotation.y = (deg * Math.PI) / 180; },
           clips: () => Array.from(body?.animator.clipNames ?? []),
+          // Every mesh under the character, with where it actually sits in the world: the way to find a part that has
+          // come loose (the asset-polish pass's white foot blocks were invisible to every bone/clip check).
+          inspect: () => (body?.root.getChildMeshes(false) ?? []).map((m) => {
+            const b = m.getBoundingInfo().boundingBox;
+            const r = (v: Vector3) => [+v.x.toFixed(3), +v.y.toFixed(3), +v.z.toFixed(3)];
+            return { name: m.name, parent: m.parent?.name ?? null, visible: m.isVisible && m.isEnabled(), verts: m.getTotalVertices?.() ?? 0,
+              skinned: !!m.skeleton, mat: m.material?.name ?? null, min: r(b.minimumWorld), max: r(b.maximumWorld) };
+          }),
         };
         setMsg(`ready · ${report.joints} joints · ${report.height} m · ${report.clipCount} clips · ${report.verts} verts`);
       } catch (e) {
