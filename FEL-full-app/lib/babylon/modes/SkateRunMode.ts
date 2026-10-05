@@ -383,6 +383,12 @@ export const SkateRunMode: ModeDefinition = (() => {
       const near = canWallplant(p, { x: v.x, z: v.z }, walls, true) ?? wallAhead(p, { x: v.x, z: v.z }, walls, KICK_PLANT.aheadM, KICK_PLANT.intoMps);
       if (near) cue = near.rideable === false ? 'JUMP: KICK PLANT' : 'JUMP: KICK PLANT · GRIND: WALL RIDE';
     } else if (wallRide) cue = 'JUMP: WALLPLANT';
+    else if (lipStall) cue = 'JUMP: DROP IN';
+    // the lip stall has the same problem the walls had: X held at a crest at speed, which nobody finds on their own
+    if (!cue && !wallRide && !lipStall && !rig.rider.grinding) {
+      const pos = rig.char.root.position, v = rig.rider.vel;
+      if (canLipStall({ x: pos.x, y: pos.y, z: pos.z }, { x: v.x, z: v.z }, lips)) cue = 'GRIND: LIP STALL';
+    }
     if (cue !== wallCue) { wallCue = cue; ctx.setHud({ wallCue: cue }); }
     // the remembered ask: the wall (or the lip) catches the frame it comes into reach while the button is held or was just pressed
     if (!wallRide && !lipStall && !grindCh && !manualCh && (xHeld || performance.now() - wallAskedAt < WALL_ASK_MS)) {
@@ -880,7 +886,9 @@ export const SkateRunMode: ModeDefinition = (() => {
         // overlay has a right stick -- skate was unscoreable for every player
         // not holding a gamepad. Route them through the same air chain the
         // flick path uses, so the landing grades and banks them.
-        if (!rig.rider.grounded && !popped) {
+        // (asset-polish: never while the wall or a lip has the board — the rider counts as airborne there, and B/Y threw air
+        // tricks and X a grab while pinned to the wall)
+        if (!rig.rider.grounded && !popped && !wallRide && !lipStall) {
           // THE NAMED VOCABULARY. Three buttons used to mean three fixed tricks; now the HELD DIRECTION picks which
           // trick a button throws — the dunk's own grammar (DunkSystem.runwayTrickFor reads dir+btn the same way) — so
           // fifteen skate tricks are reachable from the same three buttons instead of three.
