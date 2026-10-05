@@ -16,7 +16,8 @@
 //     enough it pays +1 style ("HANG TIME!") before the judges reveal.
 // All additions are animation-independent on purpose (E25/M51-safe).
 
-import { rivalForNight, rivalIntro, type DunkRival } from '../core/DunkRivals';
+import { rivalForNight, rivalIntro, takeNextRival, type DunkRival } from '../core/DunkRivals';
+import { rosterBodyUrl } from '../core/athleteRoster';
 import {
   freshStakes, call as callTrick, spendAttempt, attemptsLeft, canRetry,
   stakesScale, callLanded, stakesLabel, callPreview, type Stakes,
@@ -1045,6 +1046,47 @@ export const DunkMode: ModeDefinition = (() => {
    * in one place, so the rival's turn can hand the SAME pipeline to the rival's body (swapBodies) and he dunks the way a player
    * does: the run on the stick, push 1-2, the take-off, his tricks, the slam on a timing of his own, the flush, the replay.
    */
+  /**
+   * The rival's body: the person this rival IS (DunkRivals `body`), set up exactly the way the one rival body always was.
+   * ASSET-POLISH (2026-10-05): every rival spawned on the shared hero URL with no tint, so the roster seeded all five on
+   * `opponent-0` from a two-body cast, and TY, PILOT, ZO and STACK all wore CASS's face. A missing body key falls back to
+   * the old path rather than failing the load.
+   */
+  async function spawnRivalBody(ctx: ModeContext, who: DunkRival): Promise<SpawnedCharacter> {
+    // spawnNpc is explicit: the rival must NEVER wear the player's identity, or you end up dunking against yourself.
+    const body = await CharacterPipeline.spawnNpc(ctx.scene, rosterBodyUrl(who.body) ?? CFG.heroUrl, {
+      position: new Vector3(3.2, 0, CFG.rimZ + 3), startClip: SPORT_CLIP.idle,
+      // A baked roster body: kit/skin/hair/shoes are in the GLB. No jersey tint wash; that used to clone the hero as a twin.
+    });
+    neverBindPose(body.animator, SPORT_CLIP.idle);
+    installSafePlay(body.animator, 'dunk-rival');
+    // DUNK MOTION phase 11: the rival is right-handed too (owner: "every dunk, every body") — and he dunks through the player's own
+    // pipeline on his turn, so he needs the same mirrored family
+    if (RIGHT_HANDED) {
+      const groups = (body.animator as unknown as { groups: Map<string, AnimationGroup> }).groups;
+      const done = mirrorGroupsInPlace([...groups.values()].filter((g) => g.name.startsWith('dunk_')), body.skeleton);
+      console.info(`[DUNK-HAND] the rival right-handed: ${done.length} dunk clips mirrored`);
+    }
+    ctx.groundLock?.track(body.root, body.skeleton);
+    console.info(`[DUNK-RIVAL] ${who.name} walks out as ${who.body}`);
+    return body;
+  }
+  /** GO AGAIN's new rival gets their own body. Loading is async and the night starts on the next frame, so the old body
+   *  stays until the new one is ready, and the swap only lands on the PLAYER's turn: swapBodies() trades `player` and
+   *  `rival` during the rival's dunks, and replacing `rival` then would dispose the player. */
+  let rivalSwapToken = 0;
+  async function swapRivalBody(ctx: ModeContext, who: DunkRival): Promise<void> {
+    const token = ++rivalSwapToken;
+    let next: SpawnedCharacter;
+    try { next = await spawnRivalBody(ctx, who); } catch (e) { console.error('[DUNK-RIVAL] body swap failed; keeping the current body', e); return; }
+    while (turn !== 'player' && token === rivalSwapToken && !ctx.scene.isDisposed) await new Promise((r) => setTimeout(r, 250));
+    if (token !== rivalSwapToken || ctx.scene.isDisposed) { ctx.groundLock?.untrack(next.root); next.dispose(); return; }
+    const old = rival;
+    next.root.position.copyFrom(old.root.position); next.root.rotation.y = old.root.rotation.y;
+    rival = next;
+    ctx.groundLock?.untrack(old.root); old.dispose();
+    rivalClipToken++; rivalClip(SPORT_CLIP.idle, { loop: true });
+  }
   function bindBody(ctx: ModeContext): void {
     // A+ P8 H1: the arm chains once (the eastbay's left hand carries the ball after the hand-off); the reach is applied
     // AFTER the clips evaluate, on top of the frame's pose — the slot the dribble's HandIK and foot planting use
@@ -1102,7 +1144,9 @@ export const DunkMode: ModeDefinition = (() => {
       momentum = ctx.momentum;
       // the walk-out is resolved ONCE at mount against the live library: a song deleted since it was
       // chosen resolves to null, and the card must not print a title nobody can hear.
-      foe = rivalForNight(night);
+      // ASSET-POLISH (2026-10-05): the next rival after the last one faced, remembered across visits. This was
+      // rivalForNight(night) with night always 1 on a load, so every visit opened on CASS.
+      foe = takeNextRival();
       walkOut = readWalkOut(); walkCounted = false;
       walkCue = resolveWalkOut(walkOut, walkOut ? StudioLibrary.get(walkOut.songId) : null);
       // M74: try Nexus venue first; fallback to VenueKit if no spec
@@ -1164,21 +1208,7 @@ export const DunkMode: ModeDefinition = (() => {
       ctx.groundLock?.track(player.root, player.skeleton);
       // spawnNpc is explicit: the rival must NEVER wear the player's identity,
       // or you end up dunking against yourself.
-      rival = await CharacterPipeline.spawnNpc(ctx.scene, CFG.heroUrl, {
-        position: new Vector3(3.2, 0, CFG.rimZ + 3), startClip: SPORT_CLIP.idle,
-        // Distinct baked body (elijah-rival.glb) — kit/skin/hair/shoes are in
-        // the GLB. No jersey tint wash; that used to clone the hero as a twin.
-      });
-      neverBindPose(rival.animator, SPORT_CLIP.idle);
-      installSafePlay(rival.animator, 'dunk-rival');
-      // DUNK MOTION phase 11: the rival is right-handed too (owner: "every dunk, every body") — and he dunks through the player's own
-      // pipeline on his turn, so he needs the same mirrored family
-      if (RIGHT_HANDED) {
-        const groups = (rival.animator as unknown as { groups: Map<string, AnimationGroup> }).groups;
-        const done = mirrorGroupsInPlace([...groups.values()].filter((g) => g.name.startsWith('dunk_')), rival.skeleton);
-        console.info(`[DUNK-HAND] the rival right-handed: ${done.length} dunk clips mirrored`);
-      }
-      ctx.groundLock?.track(rival.root, rival.skeleton);
+      rival = await spawnRivalBody(ctx, foe);
       dunkVenue?.hidePlaceholders();  // M74: drop stand-ins now that real chars are in
 
       ball = MeshBuilder.CreateSphere('ball', { diameter: 0.24 }, ctx.scene);
@@ -1214,7 +1244,8 @@ export const DunkMode: ModeDefinition = (() => {
       runUpPeak = 0; launchSpeed01 = 0; obstacleClipped = false; toppling = false; gatherHeld = false; gatherTold = '';
       dunkBody.reset(); bodySlamClip = null;
       vectorAt = -1e9; vectorWallRun = false; doubleLaunched = false; doubleLaunchLift = 0; boardSwung = false; hangBase = null; swingAng = 0; skyTapped = false; boardTopFlip = false; boardRan = false; l1DownAt = -1; busRun = null; busLaunch = null; busRan = false;
-        foe = rivalForNight(night);
+        // (ASSET-POLISH: no second pick here. This one ran after the rival had spawned and put `foe` back to night 1,
+        // CASS, so the name on the card never matched the body that walked out.)
     stakes = freshStakes();
       resetLob(); resetRunway(); win = 'run';
       setPhase('approach');
@@ -4308,6 +4339,10 @@ export const DunkMode: ModeDefinition = (() => {
     lastScores = []; revealed = [];
     // the run's own held state — a button or a stick still down when the card came up
     stickX = 0; stickY = 0; lookX = 0; lookY = 0; heldDpad = null; dpadPick = null; aHeld = false;
+    // ASSET-POLISH (2026-10-05): a new night is a new rival, and they walk out as themselves. GO AGAIN used to advance
+    // the night and keep the same rival, so a whole session was one opponent.
+    foe = takeNextRival();
+    void swapRivalBody(ctx, foe);
     // the rival goes back to the bench spot he spawned on, in the idle loop
     rival.root.position.set(3.2, 0, CFG.rimZ + 3);
     rival.root.rotation.y = 0;

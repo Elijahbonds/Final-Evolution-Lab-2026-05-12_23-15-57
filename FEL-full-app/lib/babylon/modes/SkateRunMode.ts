@@ -33,7 +33,7 @@ import { resolveLanding, BalanceSave, SKETCHY_SCORE_MULT } from '../core/Landing
 import { BalanceChannel, tryRevert, type BalanceChannelKind } from '../core/GrindManual';
 import { pickRail, nearestOnSegment } from '../core/RailMagnet';   // VENICE-SKATE-THPS: the catch window, testable on its own
 import { ComboChain } from '../core/ComboChain';
-import { WALL_RIDE, canWallRide, startWallRide, stepWallRide, wallSide, wallRideExitVel, wallplantVel, canLipStall, startLipStall, stepLipStall, dropInVel, lipStallPts, type Wall, type Lip, type WallRideState, type LipStallState } from '../core/WallRide';   // WALL RIDES + LIP TRICKS (2026-09-18)
+import { WALL_RIDE, KICK_PLANT, canWallRide, canWallplant, wallAhead, kickPlantVel, startWallRide, stepWallRide, wallSide, wallRideExitVel, wallplantVel, canLipStall, startLipStall, stepLipStall, dropInVel, lipStallPts, type Wall, type Lip, type WallRideState, type LipStallState } from '../core/WallRide';   // WALL RIDES + LIP TRICKS (2026-09-18)
 import { plazaWalls, plazaLips, SKATE_COIN_LOOK } from './skatePlaza';
 import { BoardAnimTree } from '../anim/boardTree';
 // BIOMECH-WAVE2 (2026-09-09) — the game-wide bar on the board family (SPEC-FEL-BIOMECH-GAMEWIDE G1–G6). Measured on
@@ -114,6 +114,10 @@ export const SkateRunMode: ModeDefinition = (() => {
    *  lands before it; THPS holds the button and the wall catches when reached). */
   let wallAskedAt = -1;
   const WALL_ASK_MS = 450;
+  /** KICK PLANT (asset-polish, 2026-10-05): JUMP asked for a plant (in the air with a face coming, or popped at one off the
+   *  ground); the plant lands the frame the face comes into reach, inside KICK_PLANT.askMs. */
+  let plantAskedAt = -1;
+  let wallCue = '';
   let props: VenuePropsHandle | null = null, propsGone = false;   // ship pass 4: CC0 prop dressing (visual/venuePropSets.ts)
   /** Seconds rolling clean on the ground before the pot banks (revert window). */
   let settleT = 0;
@@ -308,12 +312,29 @@ export const SkateRunMode: ModeDefinition = (() => {
     if (!wallRide) return;
     const v = wallplantVel(wallRide);
     endWallRide();
+    landPlant(ctx, v);
+  }
+  /** KICK PLANT: JUMP in the air at any face, no wall ride first (owner 2026-10-05: "a kick plant with the same button as the
+   *  jump button when you press it off a wall"). */
+  function tryKickPlant(ctx: ModeContext): boolean {
+    if (wallRide || lipStall || rig.rider.grinding) return false;
+    const pos = rig.char.root.position, v = rig.rider.vel;
+    const w = canWallplant({ x: pos.x, y: pos.y, z: pos.z }, { x: v.x, z: v.z }, walls, !rig.rider.grounded);
+    if (!w) return false;
+    letGoGrab(); trickLayer?.clear();
+    plantAskedAt = -1;
+    console.info(`[SKATE-WALL] kick plant off ${w.label} at y ${pos.y.toFixed(2)}`);
+    landPlant(ctx, kickPlantVel(w, { x: v.x, z: v.z }));
+    return true;
+  }
+  function landPlant(ctx: ModeContext, v: { x: number; y: number; z: number; yaw: number }): void {
     move.yaw = v.yaw; airEntryYaw = v.yaw;
     move.vel.set(v.x, 0, v.z); rig.rider.vel.set(v.x, v.y, v.z);
     rig.rider.grounded = false;
     combo.add('WALLPLANT', WALL_RIDE.plantPts, 'air');
     bannerFlash(ctx, 'WALLPLANT', 700);
     SoundKit.play('impact', { pitch: 1.3, volume: 0.45 }); ctx.feel?.impact?.(0.35); spectacle(ctx, 'wallplant');
+    rig.char.root.rotation.y = move.yaw + (move.stance === 'switch' ? Math.PI : 0);
     console.info('[SKATE-WALL] wallplant');
   }
   function endWallRide(): void {
@@ -351,6 +372,24 @@ export const SkateRunMode: ModeDefinition = (() => {
     console.info(`[SKATE-LIP] drop in after ${st.t.toFixed(2)} s +${pts}`);
   }
   function tickWalls(ctx: ModeContext, dt: number): void {
+    // KICK PLANT: a JUMP asked a moment ago lands the frame the face comes into reach
+    if (plantAskedAt >= 0 && performance.now() - plantAskedAt < KICK_PLANT.askMs && !rig.rider.grounded) tryKickPlant(ctx);
+    else if (plantAskedAt >= 0 && performance.now() - plantAskedAt >= KICK_PLANT.askMs) plantAskedAt = -1;
+    // THE CUE: what the wall in reach will take, said while it can (the moves existed and nobody found them)
+    let cue = '';
+    if (!wallRide && !lipStall && !rig.rider.grounded && !rig.rider.grinding) {
+      const pos = rig.char.root.position, v = rig.rider.vel;
+      const p = { x: pos.x, y: pos.y, z: pos.z };
+      const near = canWallplant(p, { x: v.x, z: v.z }, walls, true) ?? wallAhead(p, { x: v.x, z: v.z }, walls, KICK_PLANT.aheadM, KICK_PLANT.intoMps);
+      if (near) cue = near.rideable === false ? 'JUMP: KICK PLANT' : 'JUMP: KICK PLANT · GRIND: WALL RIDE';
+    } else if (wallRide) cue = 'JUMP: WALLPLANT';
+    else if (lipStall) cue = 'JUMP: DROP IN';
+    // the lip stall has the same problem the walls had: X held at a crest at speed, which nobody finds on their own
+    if (!cue && !wallRide && !lipStall && !rig.rider.grinding) {
+      const pos = rig.char.root.position, v = rig.rider.vel;
+      if (canLipStall({ x: pos.x, y: pos.y, z: pos.z }, { x: v.x, z: v.z }, lips)) cue = 'GRIND: LIP STALL';
+    }
+    if (cue !== wallCue) { wallCue = cue; ctx.setHud({ wallCue: cue }); }
     // the remembered ask: the wall (or the lip) catches the frame it comes into reach while the button is held or was just pressed
     if (!wallRide && !lipStall && !grindCh && !manualCh && (xHeld || performance.now() - wallAskedAt < WALL_ASK_MS)) {
       if (tryWallRide(ctx) || tryLipStall(ctx)) wallAskedAt = -1;
@@ -670,7 +709,7 @@ export const SkateRunMode: ModeDefinition = (() => {
       // the side for the first frames and, on a portrait phone (aspect 0.46),
       // lost the rider until the follow swung round (mobile capture, ~1 run in 2)
       ctx.camDirector.snapTo(rig.char.root.position, aheadOfRider());
-      timeLeft = RUN_SEC; ended = false; fenceHit = false; wallRide = null; lipStall = null; xHeld = false; stickX = 0; stickY = 0; pump = 0; pumpReleased = 0; pumpReleasedAt = -1; pushing = false; settleT = 0; airEntryYaw = 0; snappedForPlay = false;
+      timeLeft = RUN_SEC; ended = false; fenceHit = false; wallRide = null; lipStall = null; xHeld = false; plantAskedAt = -1; wallCue = ''; stickX = 0; stickY = 0; pump = 0; pumpReleased = 0; pumpReleasedAt = -1; pushing = false; settleT = 0; airEntryYaw = 0; snappedForPlay = false;
       landingBeatT = 0; bailBeatT = 0; bailLatch = false; lastLanding = 'none';
       slowT = 0; slowCool = 0; slowCount = 0; popBeatT = 0; crouchAt = -1; boardPitch = 0; lastGroundY = 0;
       grindAskedAt = -1; relockUntil = -1; lastGoodPos = null; lastGoodYaw = 0; nanReports = 0;
@@ -788,6 +827,13 @@ export const SkateRunMode: ModeDefinition = (() => {
         if (e.btn === 'X' && !wallRide && !lipStall && !grindCh && !manualCh && tryLipStall(ctx)) return;
         if (e.btn === 'X' && !wallRide && !lipStall && !grindCh) { if (tryWallRide(ctx)) return; wallAskedAt = performance.now(); }
         if (e.btn === 'A' && wallRide) { wallplant(ctx); return; }
+        // KICK PLANT: JUMP in the air at a face kicks off it; with a face just ahead, the press waits for it (askMs) instead
+        // of being spent on an air trick a frame before the wall
+        if (e.btn === 'A' && !lipStall && !rig.rider.grounded && !rig.rider.grinding && !(coyote.ok && !air.state.airborne)) {
+          if (tryKickPlant(ctx)) return;
+          const pos = rig.char.root.position, v = rig.rider.vel;
+          if (wallAhead({ x: pos.x, y: pos.y, z: pos.z }, { x: v.x, z: v.z }, walls, KICK_PLANT.aheadM, KICK_PLANT.intoMps)) { plantAskedAt = performance.now(); return; }
+        }
         if (e.btn === 'A' && lipStall) { dropIn(ctx); return; }
         if (e.btn === 'X' && rig.rider.grounded && !grindCh && !manualCh) {
           if (move.push()) SoundKit.play('whoosh', { pitch: 0.9, volume: 0.3 });   // the push beat is move.stroking (below)
@@ -821,6 +867,9 @@ export const SkateRunMode: ModeDefinition = (() => {
             apexDone = false; lastVy = rig.rider.vel.y;
             popped = true;
             SoundKit.play('whoosh', { pitch: 1.3, volume: 0.4 });
+            // KICK PLANT off the ground: the pop AT a face is the plant's (the jump button "off a wall")
+            { const pos = rig.char.root.position, v = rig.rider.vel;
+              if (wallAhead({ x: pos.x, y: Math.max(pos.y, KICK_PLANT.minY), z: pos.z }, { x: v.x, z: v.z }, walls, KICK_PLANT.groundAheadM, KICK_PLANT.groundIntoMps)) plantAskedAt = performance.now(); }
           }
           // VENICE-SKATE-THPS: the press only ASKS for the rail — it never catches one itself. A raw `tryGrind` here
           // skipped every qualification the magnet applies, so a press over a rail's last centimetre locked and
@@ -837,7 +886,9 @@ export const SkateRunMode: ModeDefinition = (() => {
         // overlay has a right stick -- skate was unscoreable for every player
         // not holding a gamepad. Route them through the same air chain the
         // flick path uses, so the landing grades and banks them.
-        if (!rig.rider.grounded && !popped) {
+        // (asset-polish: never while the wall or a lip has the board — the rider counts as airborne there, and B/Y threw air
+        // tricks and X a grab while pinned to the wall)
+        if (!rig.rider.grounded && !popped && !wallRide && !lipStall) {
           // THE NAMED VOCABULARY. Three buttons used to mean three fixed tricks; now the HELD DIRECTION picks which
           // trick a button throws — the dunk's own grammar (DunkSystem.runwayTrickFor reads dir+btn the same way) — so
           // fifteen skate tricks are reachable from the same three buttons instead of three.

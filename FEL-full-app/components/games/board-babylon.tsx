@@ -224,6 +224,13 @@ export function makeBoardHost(opts: BoardHostOpts) {
           </div>
         )}
 
+        {/* ASSET-POLISH (2026-10-05): what the wall in reach takes (skate's kick plant and wall ride), said while it can */}
+        {typeof hud.wallCue === 'string' && hud.wallCue && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-[22%] text-center">
+            <span className="fel-panel px-3 py-1 font-mono text-sm font-bold text-[var(--fel-cyan)]">{hud.wallCue}</span>
+          </div>
+        )}
+
         <BootSplash
           modeId={modeKey}
           title={opts.title ?? HOST_TITLE[modeKey] ?? modeKey.replace(/_/g, ' ').toUpperCase()}

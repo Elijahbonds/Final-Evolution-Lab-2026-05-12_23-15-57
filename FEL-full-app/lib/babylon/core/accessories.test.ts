@@ -5,7 +5,7 @@
 // available without the Blender pipeline, and the thing that makes them work is that they are DEALT, not randomised:
 // a rival keeps his signature every night, and an NPC re-spawned between rounds comes back wearing what it had on.
 import { describe, expect, it } from 'vitest';
-import { accessoriesFor, lookFor, seedOf, ACCESSORY_IDS, RIVAL_LOOKS } from './accessories';
+import { accessoriesFor, lookFor, seedOf, ACCESSORY_IDS, RIVAL_LOOKS, RETIRED_ACCESSORIES, NPC_LOOK_TABLE } from './accessories';
 
 describe('the deal is deterministic', () => {
   it('the same character is dressed the same way every time', () => {
@@ -72,5 +72,27 @@ describe('a rival is somebody', () => {
 
   it('anyone unnamed still gets a look they keep', () => {
     expect(lookFor('SOME NEW GUY').items).toEqual(lookFor('SOME NEW GUY').items);
+  });
+});
+
+// RETIRED: CREW SOCKS (asset-polish, 2026-10-05). They were dealt to about two bodies in three, and on every body measured
+// they hung as two rigid white tubes in the gap behind the ankles instead of on them (see NPC_LOOKS in accessories.ts).
+// Retiring them in the look table is only half a fix if the next look added puts them back, so every place a look comes
+// from is held to it: the NPC table itself, a wide sweep of dealt keys, and every named rival's signature.
+describe('nobody is dealt a retired accessory', () => {
+  it('the retired list is not empty, and names real accessories', () => {
+    expect(RETIRED_ACCESSORIES.length).toBeGreaterThan(0);
+    for (const id of RETIRED_ACCESSORIES) expect(ACCESSORY_IDS).toContain(id);
+  });
+  it('no look in the NPC table carries one', () => {
+    for (const look of NPC_LOOK_TABLE) for (const id of look) expect(RETIRED_ACCESSORIES, `look ${JSON.stringify(look)}`).not.toContain(id);
+  });
+  it('no dealt look carries one, across a wide sweep of keys', () => {
+    for (let i = 0; i < 2000; i++) {
+      for (const id of accessoriesFor(`npc_${i}`).items) expect(RETIRED_ACCESSORIES, `npc_${i}`).not.toContain(id);
+    }
+  });
+  it('no named rival signature carries one', () => {
+    for (const [name, sig] of Object.entries(RIVAL_LOOKS)) for (const id of sig.items) expect(RETIRED_ACCESSORIES, name).not.toContain(id);
   });
 });

@@ -360,18 +360,33 @@ export function seedOf(key: string | number): number {
   return (h >>> 0) / 4294967296;
 }
 
-/** The looks an NPC can be dealt, coarsest first. Nobody gets everything: a player wearing all six is a Christmas tree. */
+/** The looks an NPC can be dealt, coarsest first. Nobody gets everything: a player wearing all six is a Christmas tree.
+ *
+ *  NO CREW SOCKS (asset-polish, 2026-10-05). They were in six of these nine looks and three of the five rival
+ *  signatures, so roughly two bodies in three wore them — and on every body measured they were WRONG: two rigid white
+ *  tubes hanging in the gap behind and between the ankles, not on them (front view of fel-hero, and the same pair on
+ *  nearly every body in a 41-model contact sheet). The fit (accessoryFit) centres a ring on the skin weighted to the
+ *  segment's bone, and at the ankle almost all of the skin belongs to the FOOT bone, not the shin the sock hangs from,
+ *  so the ring is measured off a handful of calf vertices and lands behind the leg. Fitting it properly would still
+ *  put a rigid white tube over baked-in leggings and shoes on bodies that already wear their own. Each look keeps its
+ *  slot (the array is the same length and order) so every character keeps the rest of what it wore. The builder stays
+ *  in `buildAccessories` for the day a skinned sock exists. */
 const NPC_LOOKS: readonly (readonly AccessoryId[])[] = [
   [],
-  ['crewsocks'],
+  [],
   ['headband'],
-  ['wristbands', 'crewsocks'],
-  ['armsleeve', 'crewsocks'],
+  ['wristbands'],
+  ['armsleeve'],
   ['headband', 'wristbands'],
   ['armsleeve', 'legsleeve'],
-  ['chain', 'crewsocks'],
-  ['headband', 'armsleeve', 'crewsocks'],
+  ['chain'],
+  ['headband', 'armsleeve'],
 ];
+
+/** Accessories that are never dealt. Exported so a test can hold every look and every rival signature to it. */
+export const RETIRED_ACCESSORIES: readonly AccessoryId[] = ['crewsocks'];
+/** Every look NPCs can be dealt (read-only), for tests. */
+export const NPC_LOOK_TABLE: readonly (readonly AccessoryId[])[] = NPC_LOOKS;
 
 // ACCENTS ARE SATURATED ON PURPOSE. `#f4f1de` was in here, and a near-white band on a light body reads as a surgical
 // dressing rather than a choice — which is exactly what I saw in the rc46 frame and briefly mistook for a colour
@@ -401,9 +416,9 @@ export function accessoriesFor(key: string | number, opts: { accent?: string; ma
  */
 export const RIVAL_LOOKS: Readonly<Record<string, { items: readonly AccessoryId[]; accent: string; side: Side }>> = {
   SILK: { items: ['headband', 'armsleeve'], accent: '#8d5bd6', side: 'Right' },
-  DOC: { items: ['wristbands', 'crewsocks'], accent: '#f1a208', side: 'Right' },
-  MAC: { items: ['chain', 'crewsocks'], accent: '#e63946', side: 'Left' },
-  REIGN: { items: ['headband', 'wristbands', 'crewsocks'], accent: '#2a9d8f', side: 'Right' },
+  DOC: { items: ['wristbands'], accent: '#f1a208', side: 'Right' },
+  MAC: { items: ['chain'], accent: '#e63946', side: 'Left' },
+  REIGN: { items: ['headband', 'wristbands'], accent: '#2a9d8f', side: 'Right' },
   PRIME: { items: ['armsleeve', 'legsleeve', 'chain'], accent: '#1d3557', side: 'Left' },
 };
 

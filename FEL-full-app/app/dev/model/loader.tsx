@@ -86,6 +86,45 @@ export function ModelViewer() {
           play: (name: string) => { body?.animator.play(name, { loop: true }); return body?.animator.clipNames.has(name) ?? false; },
           turn: (deg: number) => { if (body) body.root.rotation.y = (deg * Math.PI) / 180; },
           clips: () => Array.from(body?.animator.clipNames ?? []),
+          // TORN SKIN (asset-polish, 2026-10-05): a vertex weighted to the wrong bone is dragged away from its neighbours
+          // when the body is posed, and every triangle it belongs to stretches. Compare each triangle edge in the posed,
+          // skinned mesh (CPU skinning: getPositionData(true, true)) against the same edge at rest. The ratios are
+          // normalised by their median, so a scaled import root cancels out. titan's shredded forearm, frost's hair spike
+          // and amir's plank arm were visible to the eye and invisible to every bone/clip check before this.
+          stretch: () => (body?.meshes ?? []).filter((m) => !!m.skeleton && (m.getTotalVertices?.() ?? 0) > 0).map((m) => {
+            const rest = m.getVerticesData('position'), posed = m.getPositionData(true, true), idx = m.getIndices();
+            if (!rest || !posed || !idx) return { name: m.name, edges: 0, maxGrowCm: 0, over8: 0, over20: 0, nanVerts: 0 };
+            const len = (a: ArrayLike<number>, i: number, j: number) => Math.hypot(a[i * 3] - a[j * 3], a[i * 3 + 1] - a[j * 3 + 1], a[i * 3 + 2] - a[j * 3 + 2]);
+            // Scale first (median posed/rest over long-enough edges), so a scaled import root cancels; then measure
+            // ABSOLUTE growth. A ratio alone blew up on sub-millimetre edges at the joints (a clean body scored 29x).
+            const rs: number[] = [];
+            for (let t = 0; t < idx.length; t += 9) { const r0 = len(rest, idx[t], idx[t + 1]); if (r0 > 1e-3) rs.push(len(posed, idx[t], idx[t + 1]) / r0); }
+            rs.sort((x, y) => x - y); const k = rs[Math.floor(rs.length / 2)] || 1;
+            // A vertex whose skinned position is not a number (weights summing to zero, or a bad bone index) renders as a
+            // spike to infinity or vanishes. Count them, and keep them out of the edge sums so one NaN cannot hide the rest.
+            let nanVerts = 0;
+            for (let v = 0; v < posed.length; v += 3) if (!Number.isFinite(posed[v]) || !Number.isFinite(posed[v + 1]) || !Number.isFinite(posed[v + 2])) nanVerts++;
+            let edges = 0, maxGrow = 0, over8 = 0, over20 = 0;
+            for (let t = 0; t < idx.length; t += 3) {
+              for (const [a, b] of [[idx[t], idx[t + 1]], [idx[t + 1], idx[t + 2]], [idx[t + 2], idx[t]]]) {
+                edges++;
+                const grow = len(posed, a, b) - k * len(rest, a, b);
+                if (!Number.isFinite(grow)) continue;
+                if (grow > maxGrow) maxGrow = grow;
+                if (grow > 0.08) over8++;
+                if (grow > 0.20) over20++;
+              }
+            }
+            return { name: m.name, edges, maxGrowCm: Math.round(maxGrow * 100), over8, over20, nanVerts };
+          }),
+          // Every mesh under the character, with where it actually sits in the world: the way to find a part that has
+          // come loose (the asset-polish pass's white foot blocks were invisible to every bone/clip check).
+          inspect: () => (body?.root.getChildMeshes(false) ?? []).map((m) => {
+            const b = m.getBoundingInfo().boundingBox;
+            const r = (v: Vector3) => [+v.x.toFixed(3), +v.y.toFixed(3), +v.z.toFixed(3)];
+            return { name: m.name, parent: m.parent?.name ?? null, visible: m.isVisible && m.isEnabled(), verts: m.getTotalVertices?.() ?? 0,
+              skinned: !!m.skeleton, mat: m.material?.name ?? null, min: r(b.minimumWorld), max: r(b.maximumWorld) };
+          }),
         };
         setMsg(`ready · ${report.joints} joints · ${report.height} m · ${report.clipCount} clips · ${report.verts} verts`);
       } catch (e) {

@@ -53,7 +53,11 @@ const dunk = codeOf(readFileSync('lib/babylon/modes/DunkMode.ts', 'utf8'));
 ok(/player\s*=\s*await CharacterPipeline\.spawnPlayer/.test(dunk),
   'dunk: the PLAYER is spawned with spawnPlayer, so the Closet reaches the mode ' +
   'that /try mounts');
-ok(/rival\s*=\s*await CharacterPipeline\.spawnNpc/.test(dunk),
+// ASSET-POLISH (2026-10-05): each named rival walks out in their own body, so the spawn moved into spawnRivalBody() (the
+// mount and GO AGAIN's body swap both call it). The rule is the same: whatever the rival is assigned from must be spawnNpc.
+const rivalFn = /async function spawnRivalBody\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/.exec(dunk)?.[1] ?? '';
+ok(/rival\s*=\s*await CharacterPipeline\.spawnNpc/.test(dunk)
+  || (/rival\s*=\s*await spawnRivalBody\(/.test(dunk) && /CharacterPipeline\.spawnNpc\(/.test(rivalFn) && !/spawnPlayer/.test(rivalFn)),
   'dunk: the RIVAL is spawnNpc — an opponent wearing your identity means dunking ' +
   'against yourself');
 ok(!/rival\s*=\s*await CharacterPipeline\.spawnPlayer/.test(dunk),
