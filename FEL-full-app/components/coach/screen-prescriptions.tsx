@@ -23,6 +23,9 @@
 //     blocks are off and pin rows are not offered, and the panel says so (draft.youthNote).
 //   · YOURS TO CHECK IN PERSON — the full screen's hands-on stations; the camera does not grade them.
 //   · THE DRAFT, and ONE TAP to add all of it to the session's Prep section through the builder's own add path.
+//   · MIRROR-COACH P9 (2026-09-30): under a flag's draft line, its matching WRITTEN corrective for an adult client — the
+//     band drill and the release to run first (lib/mirror/correctives.ts SCREEN_CORRECTIVE) — as text. It is the
+//     Mirror's own written work, not a catalogue row, so it is never added; youth rules show none.
 // Under it all, "This is what the camera saw, not a diagnosis."
 
 import { useEffect, useState } from 'react';
@@ -32,6 +35,7 @@ import {
   type CameraRow, type Prescription, type ScreenReview,
 } from '@/lib/coach/mirrorToProgram';
 import { CAMERA_NOT_DIAGNOSIS } from '@/lib/mirror/screenCorrectives';
+import { screenCorrectiveLine } from '@/lib/mirror/correctives';
 import { scoreLine } from '@/lib/mirror/screen';
 
 export type { Prescription };
@@ -276,6 +280,12 @@ export function DraftView({ clientId, draft, sessions, into, onInto, added, onAd
                     <span className="text-white/45"> — {p.sets}×{p.reps} · Prep</span>
                     <br />
                     <span className="text-white/45">for {p.title}</span>
+                    {/* MIRROR-COACH P9 (2026-09-30): the matching written corrective, adults only — text for the coach, never an add */}
+                    {p.corrective && (
+                      <span className="mt-0.5 block text-white/55" data-written-corrective={p.findingId}>
+                        Written corrective: {screenCorrectiveLine(p.corrective)}
+                      </span>
+                    )}
                     {p.matchedBy === 'name' && <span className="text-white/35"> · matched by its name — tag it to be sure</span>}
                     {!p.exercise && p.wanted.length > 0 && (
                       <span className="mt-0.5 flex items-center gap-1 text-white/35">

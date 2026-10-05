@@ -93,9 +93,9 @@ export const STORY_YARDSTICKS: Readonly<Record<string, StoryYardstick>> = {
     unit: POINTS, verb: 'Score', postsWin: true, winGoal: 'Card par or better',
     winEvidence: 'solo against the course\'s own par, no rival to out-balance — and NETPREC-10PHASE (2026-09-22): the '
       + 'intent driver held PAR and BIRDIE holes with 0 OB',
-    ceiling: null, reach: 420,
-    basis: 'GolfMode: par 3-4-3, a hole pays max(20, 120 − 40 × strokes over par), the last ×1.5 (CLUTCH_MULT) — a '
-      + 'par card posts 420 before rings and banks; the round is won at par or better',
+    ceiling: null, reach: 660,
+    basis: 'GolfMode: par 3-4-4-3-5, a hole pays max(20, 120 − 40 × strokes over par), the last ×1.5 (CLUTCH_MULT) — a '
+      + 'par card posts 660 before rings and banks; the round is won at par or better',
   },
   baseball: {
     unit: POINTS, verb: 'Score', postsWin: true, winGoal: 'Win the derby — 3 homers',
@@ -106,14 +106,11 @@ export const STORY_YARDSTICKS: Readonly<Record<string, StoryYardstick>> = {
       + 'wall out of every fielder\'s reach for 107 — three of them (the derby\'s own win) post 321',
   },
   football: {
-    unit: POINTS, verb: 'Score', postsWin: false, winGoal: '', winEvidence: null,
-    ceiling: null, reach: 300,
-    // HOTFIX (2026-09-24): a FLOOR, not a ceiling. Evades (+20, ×2 in a breakaway), pounces, trucks, coins (×5),
-    // ramps and rails all add, and a touchdown is 100 + 10 per evade so far — one long drive can post 300 alone.
-    basis: 'FootballRushMode: 3 drives, a touchdown pays 100 + 10 per evade so far (×1.5 in a breakaway) — 300 is the '
-      + 'least three touchdowns can post, a floor the rules guarantee, not a measured run (evades, trucks, coins, ramps '
-      + 'and rails all add). The host checks for a TOUCHDOWN outcome the mode never sends, so football never posts a '
-      + 'win (owner item)',
+    unit: POINTS, verb: 'Score', postsWin: true, winGoal: 'Score on all five drives',
+    winEvidence: 'RESULTS-TRUTH WA-8: five touchdown drives end DRIVES_DONE and the host posts won:true',
+    ceiling: null, reach: 500,
+    basis: 'FootballRushMode: 5 drives, a touchdown pays 100 + 10 per evade so far (×1.5 in a breakaway) — 500 is the '
+      + 'least five touchdowns can post. Finishing all five drives posts DRIVES_DONE and won:true (RESULTS-TRUTH WA-8).',
   },
   soccer: {
     unit: POINTS, verb: 'Score', postsWin: true, winGoal: 'Win the shootout',
@@ -124,10 +121,10 @@ export const STORY_YARDSTICKS: Readonly<Record<string, StoryYardstick>> = {
       + 'three kicks, so three converted kicks post 60',
   },
   tennis: {
-    unit: ['game', 'games'], verb: 'Take', postsWin: true, winGoal: 'Win the match — first to 4 games',
+    unit: ['game', 'games'], verb: 'Take', postsWin: true,     winGoal: 'Win the match — first to 6 games',
     winEvidence: 'NETPREC-10PHASE (2026-09-22), run to the end: the intent driver won the match, 4 games in 84 s',
-    ceiling: 4, reach: 4,
-    basis: 'RallyCore TennisScore(4): first to 4 games — the session posts the games you took',
+    ceiling: 6, reach: 6,
+    basis: 'RallyCore TennisScore(6): first to 6 games — the session posts the games you took',
   },
   training: {
     unit: POINTS, verb: 'Score', postsWin: true, winGoal: 'Win the session — 1,000',

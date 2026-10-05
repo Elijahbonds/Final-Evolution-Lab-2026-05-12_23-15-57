@@ -60,6 +60,19 @@ export const HERO_CAPTURE = (name: string): boolean => name.startsWith('bball_mc
  *  at 120), so the window is in real seconds; the clip plays it in 0.9 s, 1.31× real, until phase 7 re-cuts the jumper. */
 export const CAPTURE_RELEASE_01: Readonly<Record<string, number>> = { bball_mc_jumpshot: 0.75 };
 
+/** Where a shot clip's own LOAD ends and the RISE begins, as a fraction of the clip (HOOPS-10PHASE-2 phase 1, 2026-10-03).
+ *  The 3PT shooter is already HELD in the pull-up gather's loaded pose when the press lands (the set IS the load), so a
+ *  jumper played from frame 0 replays the dip under it — the second arm-raise that read as two shots from one press.
+ *  bball_mc_jumpshot's window dips 2.45–2.6 of 2.45–3.62 s (scripts/mocap/opponent-clips.json): the rise starts
+ *  0.15 / 1.17 ≈ 0.13 in. Clips not listed start at 0 (their load is their own). */
+export const CAPTURE_RISE_START_01: Readonly<Record<string, number>> = { bball_mc_jumpshot: 0.13 };
+
+/** The rise-start fraction of whatever clip a request for `name` really plays on this animator (0 = the first frame). */
+export function riseStartOf(animator: CharacterAnimator, name: string, fallback = 0): number {
+  const played = variantFor(name, animator.clipNames);
+  return CAPTURE_RISE_START_01[played] ?? fallback;
+}
+
 /** The release fraction of whatever clip a request for `name` really plays on this animator. */
 export function releaseFrameOf(animator: CharacterAnimator, name: string, fallback: number): number {
   const played = variantFor(name, animator.clipNames);

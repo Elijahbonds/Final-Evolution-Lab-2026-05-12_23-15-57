@@ -20,7 +20,8 @@
 // WHICH BLOCK, and why — FEL's judgement, read off each check's own FIX line against the block's own movements:
 //   shoulderLevel → rib_thoracic · release  "Open the ribcage": the FIX is "breathing work first, then easy rotation
 //                                            drills to both sides", and the block is a mid-back roll, the side-lying
-//                                            open book (rotation to both sides) and 360° breathing.
+//                                            open book (rotation to both sides) and long-exhale rib resets (named
+//                                            "360° breathing" until MIRROR-COACH P9 put it in the Playbook's words).
 //   headFloat     → rib_thoracic · activate "Ask the mid-back to hold": the FIX is thoracic extension; wall slides,
 //                                            the prone Y-raise and a half-kneeling overhead reach are extension work.
 //   hipLevel      → lumbo_pelvic · activate "Ask the pelvis to stay level": the FIX is single-leg hip work; the block is
@@ -48,6 +49,7 @@ import type { ZoneId } from '../babylon/nexus/neuro-mirror';
 import { playbookBlock, type BlockKind, type PlaybookBlock } from './program';
 import { cameraSlots, fixLine, sideWords, type CheckResult, type ScreenId } from './screen';
 import { RETEST_HINT, formatGradeValue, isGraderId, retestHintFor, type GraderId, type UnreadableReason } from './stationGraders';
+import { gapExceedsEighteenYears } from '@/lib/age/ageRules';
 
 /** Said wherever a screen's mapping is shown — to the athlete and to the coach. */
 export const CAMERA_NOT_DIAGNOSIS = 'This is what the camera saw, not a diagnosis.';
@@ -261,7 +263,9 @@ export type YouthGate = 'minor' | 'unknownAge' | null;
  *  lib/coach; screenCorrectives.test.ts holds the two together). */
 export function youthGateFor(dobYear: number | null | undefined, now: Date = new Date()): YouthGate {
   if (typeof dobYear !== 'number' || !Number.isFinite(dobYear) || dobYear < 1900) return 'unknownAge';
-  return now.getFullYear() - dobYear > 18 ? null : 'minor';
+  // AGE-HELPERS-CONSOLIDATE (2026-10-04, option (a)): threshold line shared via lib/age/ageRules.ts
+  // (STRICT, `> 18`, rule); this file's own unknown/invalid-year guard above is unchanged.
+  return gapExceedsEighteenYears(dobYear, now) ? null : 'minor';
 }
 
 export const YOUTH_BLOCKS_OFF: Record<Exclude<YouthGate, null>, string> = {

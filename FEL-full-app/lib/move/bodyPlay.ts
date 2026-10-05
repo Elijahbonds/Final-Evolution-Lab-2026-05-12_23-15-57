@@ -47,8 +47,9 @@ import { emitToLive } from '@/lib/babylon/core/InputBus';
 import { SoundKit } from '@/lib/babylon/audio/SoundKit';
 import { VoiceKit } from '@/lib/babylon/audio/mic/VoiceKit';
 import { feedHookAllowed } from '@/lib/pose/feed';
-import { agentEnabled } from '@/lib/babylon/core/AgentBridge';
+import { agentRunHooksAllowed, registerProdHookSync } from '@/lib/agentRunHooks';
 import type { Lm, PoseFrame } from '@/lib/pose/landmarks';
+import { bodyPlayNeedsGrownUp, readBodyPlayAge } from './bodyPlayGrownUp';
 
 /** The brightness is sampled at most this often (ms), only while the check runs. */
 export const LUMA_EVERY_MS = 250;
@@ -89,6 +90,11 @@ export interface BodyPlayView {
   /** For P5 / P10: the pose rate, and whether a jump height can be read at it — absence is never 0. */
   poseHz: number | null;
   jumpHeight: 'read' | 'unread' | null;
+  /**
+   * 'ask' when this player is under 18 or of unknown age and has not ticked the Mirror's grown-up step.
+   * The camera is not requested while this is 'ask'.
+   */
+  grownUp: 'ask' | 'clear';
 }
 
 export interface BodyPlayDeps {
@@ -105,6 +111,11 @@ export interface BodyPlayDeps {
   /** Calls `fn` whenever the page goes to the background (document.visibilityState 'hidden'). */
   onPageHidden(fn: () => void): void;
   now(): number;
+  /**
+   * The Mirror's age rule for this player (bodyPlayNeedsGrownUp). True: the camera waits for confirmGrownUp.
+   * An adult is false, and begin starts the camera as before.
+   */
+  needsGrownUp(): boolean;
 }
 
 export interface BodyPlay {
@@ -123,6 +134,11 @@ export interface BodyPlay {
   collapse(on: boolean): void;
   /** The header Body button: its action for the running game, done. */
   button(): Promise<BodyButtonAction>;
+  /**
+   * The Mirror's grown-up step was ticked. Only then may a waiting begin request the camera.
+   * The tick is this page's memory: it is not written to the screen's gate record.
+   */
+  confirmGrownUp(): Promise<boolean>;
 }
 
 const cameraOn = (s: PoseSourceState) => s !== 'idle' && s !== 'error';
@@ -153,6 +169,14 @@ export function createBodyPlay(deps: BodyPlayDeps): BodyPlay {
   let lastSource: PoseStatus['source'] = null;
   let phase = deps.session.view().phase;
   let view: BodyPlayView;
+  /** The grown-up step is on screen. The camera stays off until it is ticked. */
+  let ask = false;
+  /** Ticked on this page. Not stored: a reload asks again when the age still needs it. */
+  let ticked = false;
+  /** Which begin is waiting on the tick (the header's mid-play pause waits with it). */
+  let pending: 'begin' | 'begin-paused' | null = null;
+
+  const waitingForGrownUp = (): boolean => deps.needsGrownUp() && !ticked;
 
   const notify = (): void => { view = build(); for (const fn of [...listeners]) fn(); };
 
@@ -174,6 +198,7 @@ export function createBodyPlay(deps: BodyPlayDeps): BodyPlay {
       key, stage, collapsed, checking: feeding(),
       camera: { state: src.state, why: stage === 'error' ? why : null, aspect, portrait, source: lastSource },
       space, poseHz: last?.poseHz ?? null, jumpHeight: last?.jumpHeight ?? null,
+      grownUp: ask ? 'ask' : 'clear',
     };
   }
 
@@ -267,6 +292,14 @@ export function createBodyPlay(deps: BodyPlayDeps): BodyPlay {
     remembered: (k) => readBodyPlay(k, deps.storage),
 
     async begin(k) {
+      if (waitingForGrownUp()) {
+        key = k;
+        ask = true;
+        pending = pending ?? 'begin';
+        notify();
+        return false;
+      }
+      ask = false;
       deps.unlockAudio();
       writeBodyPlay(k, true, deps.storage);
       if (!voiceLoaded) { voiceLoaded = true; deps.voice.load(); }
@@ -314,6 +347,7 @@ export function createBodyPlay(deps: BodyPlayDeps): BodyPlay {
     end(k) {
       if (k) writeBodyPlay(k, false, deps.storage);
       stage = 'off'; handed = false; asked = false; last = null; lastImage = null;
+      ask = false; pending = null;
       deps.source.stop();
       notify();
     },
@@ -329,10 +363,28 @@ export function createBodyPlay(deps: BodyPlayDeps): BodyPlay {
       const action = bodyButtonAction(v, cameraOn(deps.source.snapshot.state));
       if (action === 'end') api.end(v.key ?? key);
       else if (action === 'begin' || action === 'begin-paused') {
+        if (waitingForGrownUp()) {
+          pending = action;
+          key = v.key;
+          ask = true;
+          notify();
+          return action;
+        }
         if (action === 'begin-paused') deps.pauseGame();
         await api.begin(v.key!);
       }
       return action;
+    },
+
+    async confirmGrownUp() {
+      ticked = true;
+      ask = false;
+      const k = key ?? deps.session.view().key;
+      const action = pending;
+      pending = null;
+      if (!k) { notify(); return false; }
+      if (action === 'begin-paused' && deps.session.view().phase === 'playing') deps.pauseGame();
+      return api.begin(k);
     },
   };
   return api;
@@ -393,6 +445,11 @@ function pageBodyPlay(): BodyPlay {
       document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') fn(); });
     },
     now: () => performance.now(),
+    needsGrownUp: () => {
+      let store: Storage | null = null;
+      try { store = typeof sessionStorage === 'undefined' ? null : sessionStorage; } catch { store = null; }
+      return bodyPlayNeedsGrownUp(readBodyPlayAge(store));
+    },
   }));
 }
 
@@ -407,13 +464,14 @@ export const bodyPlay: BodyPlay = {
   end: (k) => pageBodyPlay().end(k),
   collapse: (on) => pageBodyPlay().collapse(on),
   button: () => pageBodyPlay().button(),
+  confirmGrownUp: () => pageBodyPlay().confirmGrownUp(),
 };
 
 /** What body play looks like before the page is live (server render, hydration): off. */
 export const BODY_PLAY_OFF: BodyPlayView = Object.freeze({
   key: null, stage: 'off', collapsed: false, checking: false,
   camera: { state: 'idle', why: null, aspect: DEFAULT_ASPECT, portrait: false, source: null },
-  space: null, poseHz: null, jumpHeight: null,
+  space: null, poseHz: null, jumpHeight: null, grownUp: 'clear',
 }) as BodyPlayView;
 
 // ── the probe's hook ────────────────────────────────────────────────────────────────────────────────────────────
@@ -436,7 +494,8 @@ export interface SpaceHook {
 declare global {
   interface Window { __FEL_SPACE__?: SpaceHook }
 }
-if (typeof window !== 'undefined' && feedHookAllowed(process.env.NODE_ENV, agentEnabled(), window.location.hostname)) {
+function installSpaceHook(): void {
+  if (typeof window === 'undefined') return;
   window.__FEL_SPACE__ = {
     view: () => bodyPlay.view(),
     session: () => sessionStore.view(),
@@ -446,4 +505,16 @@ if (typeof window !== 'undefined' && feedHookAllowed(process.env.NODE_ENV, agent
     end: (k) => bodyPlay.end(k),
     shortcut: () => bodyPlay.button(),
   };
+}
+function removeSpaceHook(): void {
+  if (typeof window === 'undefined') return;
+  delete window.__FEL_SPACE__;
+}
+if (typeof window !== 'undefined') {
+  if (process.env.NODE_ENV === 'development') {
+    if (feedHookAllowed(process.env.NODE_ENV, true, window.location.hostname)) installSpaceHook();
+  } else {
+    registerProdHookSync(installSpaceHook, removeSpaceHook);
+    if (agentRunHooksAllowed() && feedHookAllowed(process.env.NODE_ENV, true, window.location.hostname)) installSpaceHook();
+  }
 }

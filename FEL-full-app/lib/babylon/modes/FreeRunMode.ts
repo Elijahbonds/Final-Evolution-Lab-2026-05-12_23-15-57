@@ -516,6 +516,7 @@ export const FreeRunMode: ModeDefinition = (() => {
 
   return {
     modeId: 'freerun', camPreset: 'runner',
+    hideRingInPlay: true,
     // PLACE LOOKS (2026-09-18): the light and the sky are the place's — getters, because the harness reads both at mount
     get mood() { return readPlaceLook('freerun')?.world?.mood ?? 'nightGame'; },
     get backdrop() { return readPlaceLook('freerun')?.world?.backdrop ?? MOOD_TO_FAMILY[readPlaceLook('freerun')?.world?.mood ?? 'nightGame']; },

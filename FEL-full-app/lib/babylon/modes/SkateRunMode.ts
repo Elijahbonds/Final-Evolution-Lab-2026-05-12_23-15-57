@@ -78,7 +78,7 @@ const RUN_SEC = 90;
 /** phase 10: the banked score that wins the run */
 const SKATE_WIN_SCORE = 1500;
 /** Skate 3 banks the moment you roll away clean; the delay is the revert window. */
-const BANK_SETTLE_SEC = 0.45;
+const BANK_SETTLE_SEC = 0.85;
 /** A bank at or above this is the run's big moment and is cued as one. */
 const BIG_BANK_PTS = 500;
 /**
@@ -547,6 +547,7 @@ export const SkateRunMode: ModeDefinition = (() => {
 
   return {
     modeId: 'skateboard', camPreset: 'board',
+    hideRingInPlay: true,
     // MOVEMENT PLAY P8: the step is the mode's — a kick-push with the back foot is the PUSH (the row binds no step); the card
     // says the floor's lines, then the grab, the spin and the push this mode reads itself
     body: { claims: ['step'], lines: rideLines('skateboard', ['step']) },
@@ -891,7 +892,7 @@ export const SkateRunMode: ModeDefinition = (() => {
         // less per line since the repeat decay, so the par sits at 1500) — it ended 'RUN_COMPLETE' with no win before
         const won = finalScore >= SKATE_WIN_SCORE;
         console.info(`[SKATE-END] ${won ? 'win' : 'complete'} banked ${combo.banked} coins ${coins.collected} best ${combo.bestCombo}x`);
-        return ctx.end(won ? 'win' : 'complete', finalScore, { runSec: RUN_SEC, coinsCollected: coins.collected, bestCombo: combo.bestCombo, tricksLanded: landed.total });   // SK-3: landed tricks only (the live pot's links were never landed)
+        return ctx.end(won ? 'win' : 'complete', finalScore, { runSec: RUN_SEC, coinsCollected: coins.collected, bestCombo: combo.bestCombo, tricksLanded: landed.total, goalsHit: goals.doneCount, goals: SKATE_GOALS.length });   // SK-3: landed tricks only; RESULTS-TRUTH: goals on the card
       }
       const gained = coins.update(dt, rig.char.root.position);
       if (gained > 0) {
@@ -1018,6 +1019,7 @@ export const SkateRunMode: ModeDefinition = (() => {
         console.info(`[SKATE-LAND] touchdown ${res.grade} (${res.chain.length} tricks)`);   // A+ P0 probe: the punch counts are checked against this
         if (res.grade === 'clean') {
           if (chainPts > 0) combo.add(res.chain.map((t) => t.label).join(' → '), chainPts, 'air');
+          if (combo.multiplier >= 2) ctx.juice.callout(`${combo.multiplier}x CHAIN`, '#fde047', 520);
           boost.earn('landingClean'); if (res.chain.length) boost.earn(res.chain.length >= 2 ? 'trickBig' : 'trickSmall');
           lastLanding = 'clean'; landingBeatT = 0.35;
           SoundKit.play('uiTick', { pitch: 1.4, volume: 0.4 });
@@ -1319,7 +1321,14 @@ export const SkateRunMode: ModeDefinition = (() => {
 
       // combo HUD
       const hud = combo.hud;
-      ctx.setHud({ combo: hud.combo, pot: hud.pot, score: hud.banked, momentum: Math.round(mbus.score01 * 100), ...boost.hud() });
+      ctx.setHud({
+        combo: hud.combo,
+        pot: hud.pot,
+        score: hud.banked,
+        chainLink: combo.active && combo.multiplier >= 2 ? `${combo.multiplier}x CHAIN` : combo.active ? 'LINK TRICKS BEFORE YOU SETTLE' : '',
+        momentum: Math.round(mbus.score01 * 100),
+        ...boost.hud(),
+      });
       // THE FENCE HAS TO TAKE YOUR SPEED. This clamped the POSITION and left the velocity alone, so a rider who rode
       // into the boundary was pinned there while the movement model still reported 6-8 m/s — measured: position frozen
       // at z 33 from t8s to the end of a 60 s run, speed never below 6.1. The board kept rolling, the push kept

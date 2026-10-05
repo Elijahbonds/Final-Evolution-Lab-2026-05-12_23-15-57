@@ -10,11 +10,12 @@ import type { CharacterAnimator } from '../CharacterAnimator';
 import { ledgerFor, scopeAllows, scopeForScene, suiteOfClip, type ClipScope } from '../clipScope';
 import { buildEastbay } from './eastbay';
 import { buildChargeGather, buildLaunch, buildScoreHang, buildLandCrouch } from './dunkSuite';
+import { buildDunkLandAbsorb } from './dunkLandAbsorb';
 import { buildMocapDunk } from './mocapDunk';
 import { buildCarryUpOne, buildCarryUpLeft, buildCarryUpTwo, buildFlushOne, buildFlushLeft, buildFlushTwo } from './dunkFlush';   // DUNK MOTION phase 4
 import { buildGatherOne, buildGatherTwo, buildTakeOffOne } from './dunkTakeoff';   // DUNK MOTION phase 7: push 1-2 and the one-foot take-off
 import { buildFinishWindmill, buildFinishTomahawk, buildFinishBlown, buildCelebrateBig, buildFinishReverse, buildFinishPower, buildFinishTwoHand } from './dunkFinishes';
-import { buildDefendBackpedal, buildCloseout, buildDefendSlideHard, buildContactReact } from './basketball';   // DEFENSE-LOOK (2026-09-17)
+import { buildDefendBackpedal, buildCloseout, buildDefendSlideHard, buildContactReact, buildCatchBall } from './basketball';   // DEFENSE-LOOK (2026-09-17) + HOOPS-10PHASE-2 phase 6 (the catch)
 import { buildScoopLayup, buildSpinLayup, buildHangLayup, buildShimmy, buildDropStep } from './basketball';   // ACROBATIC LAYUPS + THE POST GAME (2026-09-18)
 import { buildStackBase, buildStackRider, buildRowStand, buildRowCrouch, buildDubbleHold, buildDubbleKneel, buildBikeRider, buildSkateRider } from './stackProp';
 import { buildCelebSpidermanSplits, buildCelebItsOver, buildCelebRoar, buildCelebTooSmall } from './dunkCelebrations';
@@ -109,6 +110,7 @@ export function registerAuthoredClips(
     ['dunk_celeb_its_over', () => buildCelebItsOver(scene, skeleton)],
     ['dunk_celeb_roar', () => buildCelebRoar(scene, skeleton)],
     ['dunk_celeb_too_small', () => buildCelebTooSmall(scene, skeleton)],
+    ['dunk_land_absorb', () => buildDunkLandAbsorb(scene, skeleton)],
     ['football_juke_left', () => buildJuke(scene, skeleton, 'left')],
     ['football_juke_right', () => buildJuke(scene, skeleton, 'right')],
     ['football_spin_move', () => buildSpinMove(scene, skeleton)],
@@ -222,6 +224,7 @@ export function registerAuthoredClips(
     ['bball_defend_backpedal', () => buildDefendBackpedal(scene, skeleton)],                 // DEFENSE-LOOK (2026-09-17): the retreat
     ['bball_closeout', () => buildCloseout(scene, skeleton)],                                 // …the closeout
     ['bball_contact_react', () => buildContactReact(scene, skeleton)],                      // the bump (2026-09-17): hands in FRONT, never the fighter's flinch
+    ['bball_catch', () => buildCatchBall(scene, skeleton)],                                 // HOOPS-10PHASE-2 phase 6: hands out to meet the pass, then in to secure it
     ['bball_defend_slide_hard_left', () => buildDefendSlideHard(scene, skeleton, 'left')],   // …and the sat-down slide (intense D)
     ['bball_defend_slide_hard_right', () => buildDefendSlideHard(scene, skeleton, 'right')],
     ['bball_block_reach', () => buildBlockReach(scene, skeleton)],

@@ -186,6 +186,20 @@ export const MEASURED_RUNS: Readonly<Record<string, readonly MeasuredRun[]>> = {
   soccer: [{ score: null, sec: 60, secIs: 'upper', source: `${AP}:131 (kick 3/5, "6–2 you": the posted score is not in the capture)` }],
   whoSceneIt: [{ score: 479, sec: 60, secIs: 'upper', source: `${AP}:102` }],
   baseball: [{ score: 0, sec: 60, secIs: 'upper', source: `${AP}:105` }],
+  // ECONOMY-CAPS (a): measured TRUE :3000 runs from eye-a1a1c5f9/MEASURED_RUNS.md
+  tiebreak: [{ score: 1020, sec: 29.8, secIs: 'posted', source: 'eye-a1a1c5f9/MEASURED_RUNS.md tiebreak 1020/29.8 s' }],
+  training: [{ score: 4200, sec: 61.7, secIs: 'posted', source: 'eye-a1a1c5f9/MEASURED_RUNS.md training 4200/61.7 s' }],
+  tennis: [{ score: 4, sec: 90.6, secIs: 'posted', source: 'eye-a1a1c5f9/MEASURED_RUNS.md tennis 4/90.6 s' }],
+  golf: [{ score: 670, sec: 75.0, secIs: 'posted', source: 'eye-a1a1c5f9/MEASURED_RUNS.md golf 670/75.0 s' }],
+  karateVersus: [{ score: 200, sec: 29.2, secIs: 'posted', source: 'eye-a1a1c5f9/MEASURED_RUNS.md karateVersus 200/29.2 s' }],
+  karateEndless: [{ score: 20_520, sec: 127.3, secIs: 'posted', source: 'eye-a1a1c5f9/MEASURED_RUNS.md karateEndless 20520/127.3 s' }],
+  volleyball: [{ score: 25, sec: 287.9, secIs: 'posted', source: 'eye-a1a1c5f9/MEASURED_RUNS.md volleyball 25/287.9 s' }],
+  aeroAces: [{ score: 1100, sec: 155.1, secIs: 'posted', source: 'eye-a1a1c5f9/MEASURED_RUNS.md aeroAces 1100/155.1 s' }],
+  skateboarding: [{ score: 1649, sec: 93.9, secIs: 'posted', source: 'eye-a1a1c5f9/MEASURED_RUNS.md skateboarding 1649/93.9 s' }],
+  surfing: [{ score: 4451, sec: 94.4, secIs: 'posted', source: 'eye-a1a1c5f9/MEASURED_RUNS.md surfing 4451/94.4 s' }],
+  carnival: [{ score: 1216, sec: 98.7, secIs: 'posted', source: 'eye-a1a1c5f9/MEASURED_RUNS.md carnival 1216/98.7 s' }],
+  music: [{ score: 170_300, sec: 89.3, secIs: 'posted', source: 'eye-a1a1c5f9/MEASURED_RUNS.md music 170300/89.3 s (32 bars Arena set)' }],
+  velocityKart: [{ score: 1345, sec: 123.1, secIs: 'posted', source: 'eye-a1a1c5f9/MEASURED_RUNS.md velocityKart 1345/123.1 s' }],
 };
 
 /** The Postgres int4 ceiling of GameSession.score / SessionRun.score: no row can store more, so no rule allows more. */
@@ -241,8 +255,7 @@ function modelledBound(key: 'skateboarding' | 'surfing' | 'karateEndless', killS
 export function derivedBounds(o: { killSwitch?: boolean } = {}): Readonly<Record<string, DerivedBound>> {
   const ks = o.killSwitch ?? killSwitchOn();
   return {
-    skateboarding: { maxScore: modelledBound('skateboarding', ks), runSec: MIRRORED.skateRunSec, basis: 'arena-score-integrity skateBound(): the 90 s run chained at the fastest link rate with the largest award, × BOUND_MARGIN' },
-    surfing: { maxScore: modelledBound('surfing', ks), runSec: MIRRORED.surfRunSec, basis: 'arena-score-integrity surfBound(): the 90 s run at the fastest event rate with the largest awards, × BOUND_MARGIN' },
+    // skateboarding and surfing now have MEASURED_RUNS rows (ECONOMY-CAPS a); finite pay cap still limits payout
     karateEndless: { maxScore: modelledBound('karateEndless', ks), runSec: UNTIMED_RUN_SEC, basis: 'arena-score-integrity karateEndlessBound(): a 30-minute run swinging at the cooldown, × BOUND_MARGIN (payout also held by the endless ceiling)' },
     // music: the per-SET bound is the one that already exists — sessionScoreCap (lib/session-payout.ts): a set's score may
     // not exceed what its own hits allow (performSetMax), checked in the route as above_run_cap. This row adds only the

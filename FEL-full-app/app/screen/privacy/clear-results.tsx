@@ -13,7 +13,7 @@ export function ClearResults() {
   return (
     <div>
       <button type="button" onClick={clear} data-done-clear className={quietBtn}>{DONE_CLEAR}</button>
-      {done ? <p data-cleared role="status" className="mt-2 text-[13px] text-[#00FF9D]">{PRIVACY_CLEARED}</p> : null}
+      {done ? <p data-cleared role="status" className="mt-2 text-[16px] text-[#00FF9D]">{PRIVACY_CLEARED}</p> : null}
     </div>
   );
 }

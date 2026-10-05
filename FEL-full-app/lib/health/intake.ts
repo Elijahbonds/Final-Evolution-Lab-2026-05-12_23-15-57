@@ -33,7 +33,7 @@
 // year-old answer.
 
 import type { Prisma } from '@/public/_prisma/client';
-import { needsGuardian, guardianStatus, type GuardianConsentLike } from '../consent/guardianGate';
+import { verifiedAdult } from '../privacy/verifiedAdult';
 
 export const INTAKE_VERSION = '2026-09-29';
 export const INTAKE_REASK_DAYS = 365;
@@ -58,22 +58,43 @@ export interface IntakeQuestion {
 
 const yesIsRedFlag = (v: IntakeAnswerValue) => v === true;
 
+/**
+ * MIRROR-COACH P7 (2026-09-29): every question id, named ONCE, here. The adults-only Dial-Up Breath (lib/breath/
+ * rampGate.ts) gates on four specific answers — effort-brought dizziness or fainting, a heart or blood-pressure
+ * condition, heart-rate medicine, pregnancy — and the phase-7 brief's rule is "read them from lib/health/intake.ts, never
+ * re-type the strings": a second copy of 'heart_or_bp_condition' in another file is how a renamed question silently
+ * stops gating anything. INTAKE_QUESTIONS below reads its ids from this map, so the map and the question set cannot
+ * drift apart (lib/breath/rampGate.test.ts holds every id to a real question).
+ */
+export const INTAKE_IDS = {
+  currentPain: 'current_pain',
+  recentInjuryOrSurgery: 'recent_injury_or_surgery',
+  dizzinessFaintingChestPain: 'dizziness_fainting_chest_pain',
+  heartOrBpCondition: 'heart_or_bp_condition',
+  pregnancyOrPostpartum: 'pregnancy_or_postpartum',
+  heartRateOrBalanceMedicine: 'heart_rate_or_balance_medicine',
+  clinicianToldToAvoid: 'clinician_told_to_avoid',
+  birthYear: 'birth_year',
+} as const;
+
+export type IntakeQuestionId = (typeof INTAKE_IDS)[keyof typeof INTAKE_IDS];
+
 export const INTAKE_QUESTIONS: readonly IntakeQuestion[] = [
   {
-    id: 'current_pain',
+    id: INTAKE_IDS.currentPain,
     prompt: 'Do you have any pain right now, even mild, that started before today?',
     type: 'yes_no',
     skippable: true,
     // Not a red flag — see the file header. Handled per exercise by the pain check-in loop instead.
   },
   {
-    id: 'recent_injury_or_surgery',
+    id: INTAKE_IDS.recentInjuryOrSurgery,
     prompt: 'Any injury or surgery in the last 3 months?',
     type: 'yes_no',
     skippable: true,
   },
   {
-    id: 'dizziness_fainting_chest_pain',
+    id: INTAKE_IDS.dizzinessFaintingChestPain,
     prompt: 'Does physical effort ever bring on dizziness, fainting, or chest pain?',
     help: 'Meaning during or right after exercise, not any other time.',
     type: 'yes_no',
@@ -81,33 +102,33 @@ export const INTAKE_QUESTIONS: readonly IntakeQuestion[] = [
     isRedFlag: yesIsRedFlag,
   },
   {
-    id: 'heart_or_bp_condition',
+    id: INTAKE_IDS.heartOrBpCondition,
     prompt: 'Has a doctor ever told you about a heart or blood-pressure condition?',
     type: 'yes_no',
     skippable: true,
     isRedFlag: yesIsRedFlag,
   },
   {
-    id: 'pregnancy_or_postpartum',
+    id: INTAKE_IDS.pregnancyOrPostpartum,
     prompt: 'Are you currently pregnant, or within about 3 months postpartum?',
     type: 'yes_no',
     skippable: true,
   },
   {
-    id: 'heart_rate_or_balance_medicine',
+    id: INTAKE_IDS.heartRateOrBalanceMedicine,
     prompt: 'Do you take any medicine that affects your heart rate or your balance?',
     type: 'yes_no',
     skippable: true,
   },
   {
-    id: 'clinician_told_to_avoid',
+    id: INTAKE_IDS.clinicianToldToAvoid,
     prompt: 'Has a clinician told you to avoid any particular exercise or movement?',
     type: 'yes_no',
     skippable: true,
     isRedFlag: yesIsRedFlag,
   },
   {
-    id: 'birth_year',
+    id: INTAKE_IDS.birthYear,
     prompt: 'What year were you born?',
     help: "Prefer not to say is fine — we'll use the more careful youth rules until you tell us.",
     type: 'birth_year',
@@ -135,10 +156,14 @@ export const PUBLIC_INTAKE_QUESTIONS: readonly PublicIntakeQuestion[] = INTAKE_Q
 
 /** What the consent screen shown BEFORE any question says (owner decision #4/#18): what's stored, why, who sees it,
  *  how to erase it. FEL's own words, opt-in only — nothing here is implied consent or a pre-checked box. */
+// MIRROR-COACH P6 (2026-09-29): the first bullet names the daily check-in (sleep, soreness, energy, mood —
+// lib/health/readiness.ts) because it is stored under this same 'health_data' consent. A consent screen that listed
+// only the intake and pain check-ins would have had people agreeing to less than FEL then kept. Nothing was stored
+// under the old wording yet (P5 has not shipped), so no earlier grant was given for a narrower list.
 export const HEALTH_DATA_CONSENT_COPY = {
   title: 'Before we ask anything health-related',
   bullets: [
-    'What we store: your answers here, plus any pain check-ins you log during training.',
+    'What we store: your answers here, any pain check-ins you log during training, and your daily check-in (sleep, soreness, energy, mood) if you fill it in.',
     "Why: so training can be told to ease up or stop when it should, and never further than that.",
     'Who sees it: only you, unless you separately let a specific coach view it — that choice is always yours and can be turned off.',
     'It is never sold, never used for ads, never scored, never paid, and never shown in anything you share with a link.',
@@ -209,7 +234,7 @@ export function redFlagsFor(answers: IntakeAnswers): string[] {
 /** The birth year to write, from an already-validated answers object. Null when skipped/declined — which reads as
  *  a minor until answered (owner decision #20; enforced by lib/mirror/youth.ts isMinorForMirror, not here). */
 export function birthYearFrom(answers: IntakeAnswers): number | null {
-  const v = answers.birth_year;
+  const v = answers[INTAKE_IDS.birthYear];
   return typeof v === 'number' ? v : null;
 }
 
@@ -236,7 +261,7 @@ export function needsIntake(
 // collect app/; see lib/prq-data-rights.ts for the same pattern).
 // ---------------------------------------------------------------------------------------------------------------
 
-type IntakeDb = Pick<Prisma.TransactionClient, 'healthIntake' | 'healthConsent' | 'user' | 'guardianConsent'>;
+type IntakeDb = Pick<Prisma.TransactionClient, 'healthIntake' | 'healthConsent' | 'user'>;
 
 /** Grant (or return the already-active) 'health_data' consent for a user. Idempotent: granting twice while already
  *  active writes nothing new. A revoked grant is NOT reactivated by this — a fresh row is created instead, so the
@@ -286,6 +311,19 @@ export interface SubmitIntakeInput {
  *
  * A returning ADULT who skips the birth_year question (it is already on file) is unaffected: `effectiveDobYear`
  * falls back to the existing User.dobYear, so this never mistakes "already answered, not asked again" for "blank".
+ *
+ * TEEN-WRITE-BLOCK (FE PM 23:05 PT; Elijah 2026-09-29: health data saves ONLY for a verified adult, unknown age is not an
+ * adult, the parent path is gone). THE GUARDIAN ALLOWANCE ABOVE IS REMOVED: no GuardianConsent is read here any more,
+ * and an accepted one unlocks nothing. The whole submission is refused (IntakeValidationError 'health_data_adults_only',
+ * answered 403 by the route) unless the DATABASE's User.dobYear is verified 18+ (lib/privacy/verifiedAdult.ts, pure,
+ * because client components import this file).
+ *
+ * AGE-SCREEN MUST (1) (FE PM 04:19 PT): the answer can now only REFUSE, never unlock. The younger of the database
+ * year and this submission's birth_year decides: if the answer says under 18, the save is refused even when the
+ * stored year says adult. A skipped birth_year (null) leaves the database check alone. The answer never writes or
+ * overwrites dobYear. An under-13 answer here is a refusal, not a lock. REFUSE-ONLY; LOCK-ON-INTAKE IS DEFERRED to
+ * PRIVACY-CORE's `lockedUnder13At` column. So the dobYear write below, which only ran for a BLANK dobYear, stays
+ * unreachable.
  */
 export async function submitIntake(db: IntakeDb, input: SubmitIntakeInput) {
   if (input.consent !== true) throw new IntakeValidationError('consent_required');
@@ -295,17 +333,10 @@ export async function submitIntake(db: IntakeDb, input: SubmitIntakeInput) {
 
   const birthYear = birthYearFrom(answers);
   const user = await db.user.findUnique({ where: { id: input.userId }, select: { dobYear: true } });
-  const effectiveDobYear = birthYear ?? user?.dobYear ?? null;
-
-  if (needsGuardian(effectiveDobYear, now)) {
-    const guardianRows = await db.guardianConsent.findMany({
-      where: { menteeId: input.userId },
-      select: { requestedAt: true, acceptedAt: true, revokedAt: true },
-    });
-    if (guardianStatus(guardianRows as GuardianConsentLike[]) !== 'accepted') {
-      throw new IntakeValidationError('guardian_consent_required');
-    }
-  }
+  // TEEN-WRITE-BLOCK (FE PM 23:05 PT): the DB's User.dobYear only (never a guardian); else nothing is written.
+  if (!verifiedAdult(user?.dobYear ?? null, now)) throw new IntakeValidationError('health_data_adults_only');
+  // AGE-SCREEN MUST (1): the answer can only refuse. Nothing is written before this throw.
+  if (birthYear !== null && !verifiedAdult(birthYear, now)) throw new IntakeValidationError('health_data_adults_only');
 
   await grantHealthDataConsent(db, input.userId, now);
 

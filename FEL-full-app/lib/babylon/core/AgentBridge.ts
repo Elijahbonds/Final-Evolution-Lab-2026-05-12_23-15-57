@@ -30,6 +30,7 @@
 
 import type { Scene } from '@babylonjs/core';
 import type { AgentControlSource, AgentIntent } from './AgentControlSource';
+import { agentRunHooksAllowed } from '@/lib/agentRunHooks';
 
 export const AGENT_BRIDGE_VERSION = '1.0.0';
 
@@ -282,11 +283,11 @@ declare global {
   interface Window { __NEXUS_AGENT__?: Bridge }
 }
 
-/** Enabled ONLY on explicit opt-in. `?agent=1` turns it on for the session;
- *  `?agent=0` turns it off again. A control surface that is on by default in
- *  production is a control surface someone else can drive. */
+/** Enabled ONLY on explicit opt-in. Dev: `?agent=1` or a stored NEXUS_AGENT flag (unchanged).
+ *  Production: only when the server marked the current run (agentRunHooksAllowed); ?agent=1 alone never arms hooks. */
 export function agentEnabled(): boolean {
   if (typeof window === 'undefined') return false;
+  if (process.env.NODE_ENV === 'production') return agentRunHooksAllowed();
   try {
     const q = new URLSearchParams(window.location.search).get('agent');
     if (q === '1') { window.sessionStorage?.setItem('NEXUS_AGENT', '1'); return true; }

@@ -10,6 +10,7 @@ import { readCourtLocation } from '@/lib/babylon/nexus/courtLocations';
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import type { GameProps, GameResult } from './game-shell';
 import { BootSplash } from './boot-splash';
+import { surfaceBootError } from './boot-error';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue, type HudScoreCard } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
@@ -131,7 +132,7 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
           if (disposed) { s(); return; }
           stop = s;
         })
-        .catch((e) => console.error('[FEL-DUNK] boot failed', e));
+        .catch((e) => surfaceBootError(e, { disposed, label: '[FEL-DUNK] boot failed', setPhase, setLoadError }));
     }, 0);
 
     return () => {
@@ -172,6 +173,8 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
     // READY gate + pause both advance on any button press.
     emit({ t: 'button', btn: 'START', pressed: true });
   }, [emit]);
+
+  const judging = Array.isArray(hud.judgeReveal) && (hud.judgeReveal as HudScoreCard[]).length > 0;
 
   // ── Controller Link (CONTROLLER-UNIVERSAL-MULTI) ──────────────────────────
   // A phone joins by QR as this contest's pad while the host is on the TV. ONE adapter per bus: toInputBus keeps the
@@ -247,10 +250,9 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
           the verdict frame with "105 ms EARLY - EXECUTION 75%" showing through the gaps BETWEEN the judge chips,
           stray letters and all. Percent offsets cannot express "under" — a column can, so they share one now and the
           order is the order they are read in. */}
-      {(Array.isArray(hud.judgeReveal) && (hud.judgeReveal as HudScoreCard[]).length > 0) ||
-      (typeof hud.slamTiming === 'string' && hud.slamTiming && phase === 'playing') ? (
+      {(judging || (typeof hud.slamTiming === 'string' && hud.slamTiming && phase === 'playing' && !judging)) ? (
         <div className="pointer-events-none absolute inset-x-0 top-[20%] flex flex-col items-center gap-2">
-          {Array.isArray(hud.judgeReveal) && (hud.judgeReveal as HudScoreCard[]).length > 0 && (
+          {judging && (
             <>
               <div className="flex items-end justify-center gap-1.5">
                 {(hud.judgeReveal as HudScoreCard[]).map((j) => (
@@ -272,7 +274,7 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
               </span>
             </>
           )}
-          {typeof hud.slamTiming === 'string' && hud.slamTiming && phase === 'playing' && (
+          {!judging && typeof hud.slamTiming === 'string' && hud.slamTiming && phase === 'playing' && (
             <div className="flex flex-col items-center gap-1">
               <span className="fel-panel px-3 py-1 font-mono text-[12px] tracking-wide text-[var(--fel-cyan)]">
                 {hud.slamTiming}
@@ -280,17 +282,13 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
               {typeof hud.breakdown === 'string' && hud.breakdown ? (
                 <span className="fel-panel px-2.5 py-0.5 font-mono text-[10px] text-white/60">{hud.breakdown}</span>
               ) : null}
-              {/* JUDGE TRANSPARENCY (owner's pillars brief): the four reads behind the card, in words */}
-              {typeof hud.judgeWhy === 'string' && hud.judgeWhy ? (
-                <span className="fel-panel max-w-[92%] px-2.5 py-0.5 text-center font-mono text-[9px] leading-snug text-white/55">{hud.judgeWhy}</span>
-              ) : null}
             </div>
           )}
         </div>
       ) : null}  {/* banner — DUNK-CAR-CLIP R2: while the dunker is in the air (hud.bannerHigh) it rides at the top of the frame. At 38% it
           sat exactly where both flight cameras put the rim, so "OVER THE CAR!" / "WINDMILL!" covered the ball going through the
           ring on every flush the eye filmed. It comes back down for the replay and the judges. */}
-      {typeof hud.banner === 'string' && hud.banner && (
+      {!judging && typeof hud.banner === 'string' && hud.banner && (
         <div className={`pointer-events-none absolute inset-x-0 ${hud.bannerHigh === true ? 'top-[13%]' : 'top-[38%]'} text-center`}>
           <span className="fel-heading fel-panel px-4 py-2 text-2xl font-bold text-[var(--fel-cyan)]">{hud.banner}</span>
         </div>
@@ -305,9 +303,9 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
           </span>
         </div>
       )}
-      {phase === 'playing' && <MicCaption text={hud.mic} who={hud.micWho} />}
+      {phase === 'playing' && !judging && <MicCaption text={hud.mic} who={hud.micWho} />}
       {phase === 'playing' && <MicToggle />}
-      {typeof hud.call === 'string' && hud.call && phase === 'playing' && (
+      {!judging && typeof hud.call === 'string' && hud.call && phase === 'playing' && (
         <div className="pointer-events-none absolute inset-x-0 top-[58%] px-4 text-center">
           <span className="fel-heading inline-block rounded-md bg-black/55 px-3 py-1 text-base font-black uppercase italic tracking-wide text-[#ffd75e]">{hud.call}</span>
         </div>
@@ -396,7 +394,7 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
       {/* CONTROLLER-UNIVERSAL-MULTI: phones join as pads (lazy — no room until the badge is tapped), TV MODE lives in its
           panel, and every local controller gets a named chip (bottom-left: a connected pad hides the touch deck that lives there). */}
       {controllerConfig && bus && (
-        <HostLobby config={controllerConfig} onInput={onControllerInput} onPadInput={onPhonePad} collapsed={phase === 'playing'} lazy anchor="left-4 top-14" bus={bus} />
+        <HostLobby config={controllerConfig} onInput={onControllerInput} onPadInput={onPhonePad} collapsed={phase === 'playing'} lazy={process.env.NODE_ENV === 'production'} anchor="left-4 top-14" bus={bus} />
       )}
       {bus && <PadChips bus={bus} className="left-4 bottom-4" />}
 

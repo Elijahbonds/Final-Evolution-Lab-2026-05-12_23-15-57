@@ -31,7 +31,7 @@ export const DEFAULT_FREE_GAME_ROUTE = '/try';
 const GUARDIAN_PAGES = ['/con', 'sent/guardian'].join('');
 export const SIGNED_IN_ONLY_ROUTES: readonly string[] = [
   '/login', '/signup', '/account', '/api', '/dev',
-  '/admin', '/arena', '/camp', '/cards', '/closet', '/coach', GUARDIAN_PAGES, '/creator', '/education', '/guidance', '/kitchens',
+  '/admin', '/age', '/arena', '/camp', '/cards', '/closet', '/coach', GUARDIAN_PAGES, '/create', '/creator', '/education', '/guidance', '/kitchens',
   '/ladder', '/live', '/market', '/multiplayer', '/play', '/profile', '/sessions', '/shop', '/signature', '/store',
   '/story', '/studio', '/train', '/training', '/venues', '/wallet', '/workout',
 ];
@@ -82,6 +82,10 @@ export function screenNextTarget(age: AgeBand | null | undefined, env: string | 
  * only the PARENT's email is collected; under 13 never sees it (lib/screen/age.ts linksAllowed). With the flag off no
  * signup UI renders and no network call is made; with it on, the program page shows an inert placeholder only (no
  * form, no input, no request).
+ *
+ * SCREEN-FIX-2 (item 4, 2026-09-29): NO PAGE READS IT NOW. The program page's placeholder is gone for every value, until
+ * the email waitlist can save safely; the parse stays for the lane that builds it. screenNextTarget above is read by no
+ * page either (the results' free-game button is gone, retest 1 L5); it now answers /try for 18 or older only (age.ts).
  */
 export function programSignupEnabled(env: string | undefined): boolean {
   return env === 'true';

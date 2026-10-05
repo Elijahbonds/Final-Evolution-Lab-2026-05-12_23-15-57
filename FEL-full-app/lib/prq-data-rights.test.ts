@@ -42,9 +42,21 @@ function fakeDb() {
       { id: 'hc1', userId: 'u1', scope: 'health_data', coachId: null, grantedAt: t('20'), revokedAt: null },
       { id: 'hc9', userId: 'other', scope: 'health_data', coachId: null, grantedAt: t('20'), revokedAt: null },
     ] as Row[],
+    // MIRROR-COACH P6 (2026-09-29): the daily readiness check-in (schema.prisma ReadinessCheckIn).
+    readinessCheckIn: [
+      { id: 'rc1', userId: 'u1', date: '2026-09-21', sleep: 2, soreness: 4, energy: 2, mood: 3, createdAt: t('21'), updatedAt: t('21') },
+      { id: 'rc2', userId: 'u1', date: '2026-09-22', sleep: null, soreness: null, energy: 4, mood: null, createdAt: t('22'), updatedAt: t('22') },
+      { id: 'rc9', userId: 'other', date: '2026-09-22', sleep: 5, soreness: 1, energy: 5, mood: 5, createdAt: t('22'), updatedAt: t('22') },
+    ] as Row[],
+    // MIRROR-COACH P7 (2026-09-29): the breath toolbox's use log (schema.prisma BreathLog) — two Dial-Up uses.
+    breathLog: [
+      { id: 'bl1', userId: 'u1', kind: 'ramp', sessionId: 's-3', seconds: null, createdAt: t('21') },
+      { id: 'bl2', userId: 'u1', kind: 'ramp', sessionId: 's-5', seconds: null, createdAt: t('23') },
+      { id: 'bl9', userId: 'other', kind: 'ramp', sessionId: 's-7', seconds: null, createdAt: t('23') },
+    ] as Row[],
   };
   const calls: string[] = [];
-  const table = (name: 'prqEntry' | 'gameSession' | 'workoutScan' | 'healthIntake' | 'painCheckIn' | 'healthConsent') => ({
+  const table = (name: 'prqEntry' | 'gameSession' | 'workoutScan' | 'healthIntake' | 'painCheckIn' | 'healthConsent' | 'readinessCheckIn' | 'breathLog') => ({
     findMany: async ({ where, select }: { where: { userId: string }; select?: Record<string, true> }) => {
       calls.push(`${name}.findMany`);
       const rows = store[name].filter((r) => r.userId === where.userId);
@@ -60,6 +72,7 @@ function fakeDb() {
   const db = {
     prqEntry: table('prqEntry'), gameSession: table('gameSession'), workoutScan: table('workoutScan'),
     healthIntake: table('healthIntake'), painCheckIn: table('painCheckIn'), healthConsent: table('healthConsent'),
+    readinessCheckIn: table('readinessCheckIn'), breathLog: table('breathLog'),
   };
   return { db: db as never, store, calls };
 }
@@ -97,14 +110,43 @@ describe('the export hands over the health data too', () => {
   });
 });
 
+// MIRROR-COACH P6 (2026-09-29): the daily readiness check-in is health-adjacent data under the same consent, so it
+// rides the same export and both erases.
+describe('the export hands over the readiness check-ins too (P6)', () => {
+  it('every ReadinessCheckIn row of the user\'s, whole, nobody else\'s', async () => {
+    const f = fakeDb();
+    const out = await collectPrqExport(f.db, 'u1', new Date('2026-09-24T00:00:00.000Z'));
+    expect(out.readinessCheckIns.map((r: Row) => r.id).sort()).toEqual(['rc1', 'rc2']);
+    expect(out.readinessCheckIns.find((r: Row) => r.id === 'rc1')).toMatchObject({ date: '2026-09-21', sleep: 2, soreness: 4, energy: 2, mood: 3 });
+    expect(JSON.stringify(out)).not.toContain('rc9');
+    expect(f.calls).toContain('readinessCheckIn.findMany');
+  });
+});
+
+// MIRROR-COACH P7 (2026-09-29): the Dial-Up Breath's use log is written only behind the health gates, so it rides the
+// same export and both erases (lib/prq-data-rights.ts's header says why).
+describe('the export hands over the breath log too (P7)', () => {
+  it('every BreathLog row of the user\'s, whole, nobody else\'s', async () => {
+    const f = fakeDb();
+    const out = await collectPrqExport(f.db, 'u1', new Date('2026-09-24T00:00:00.000Z'));
+    expect(out.breathLogs.map((r: Row) => r.id).sort()).toEqual(['bl1', 'bl2']);
+    expect(out.breathLogs.find((r: Row) => r.id === 'bl2')).toMatchObject({ kind: 'ramp', sessionId: 's-5' });
+    expect(JSON.stringify(out)).not.toContain('bl9');
+    expect(f.calls).toContain('breathLog.findMany');
+  });
+});
+
 describe('eraseHealthData: the narrow health-only erase (Health data settings)', () => {
-  it('deletes only the three health tables, of this user only, and never a PRQ entry or a movement-history row', async () => {
+  it('deletes only the health tables (readiness check-ins included), of this user only, and never a PRQ entry or a movement-history row', async () => {
     const f = fakeDb();
     const erased = await eraseHealthData(f.db, 'u1');
-    expect(erased).toEqual({ healthIntakes: 1, painCheckIns: 2, healthConsents: 1 });
+    expect(erased).toEqual({ healthIntakes: 1, painCheckIns: 2, healthConsents: 0, readinessCheckIns: 2, breathLogs: 2 });
     expect(f.store.healthIntake.map((r) => r.id)).toEqual(['hi9']);
     expect(f.store.painCheckIn.map((r) => r.id)).toEqual(['pc9']);
-    expect(f.store.healthConsent.map((r) => r.id)).toEqual(['hc9']);
+    expect(f.store.healthConsent.map((r) => r.id).sort()).toEqual(['hc1', 'hc9']);
+    expect(f.store.readinessCheckIn.map((r) => r.id)).toEqual(['rc9']);
+    // MIRROR-COACH P7: the breath log goes with it, this user's only
+    expect(f.store.breathLog.map((r) => r.id)).toEqual(['bl9']);
     // untouched: this is the whole point of keeping it separate from erasePrqData
     expect(f.store.prqEntry).toHaveLength(3);
     expect(f.store.workoutScan).toHaveLength(KINDS.length + 1);
@@ -113,7 +155,7 @@ describe('eraseHealthData: the narrow health-only erase (Health data settings)',
   it('is idempotent', async () => {
     const f = fakeDb();
     await eraseHealthData(f.db, 'u1');
-    expect(await eraseHealthData(f.db, 'u1')).toEqual({ healthIntakes: 0, painCheckIns: 0, healthConsents: 0 });
+    expect(await eraseHealthData(f.db, 'u1')).toEqual({ healthIntakes: 0, painCheckIns: 0, healthConsents: 0, readinessCheckIns: 0, breathLogs: 0 });
   });
 });
 
@@ -121,16 +163,19 @@ describe('the delete erases the movement history too', () => {
   it('deletes the PRQ entries, every WorkoutScan row and the health data too; nobody else\'s, and not a bought plan', async () => {
     const f = fakeDb();
     const erased = await erasePrqData(f.db, 'u1');
-    expect(erased).toEqual({ prqEntries: 2, movementHistory: KINDS.length, healthIntakes: 1, painCheckIns: 2, healthConsents: 1 });
+    expect(erased).toEqual({ prqEntries: 2, movementHistory: KINDS.length, healthIntakes: 1, painCheckIns: 2, healthConsents: 0, readinessCheckIns: 2, breathLogs: 2 });
     expect(f.store.prqEntry.map((r) => r.id)).toEqual(['p9']);
     expect(f.store.workoutScan.map((r) => r.id)).toEqual(['w9']);
     expect(f.store.healthIntake.map((r) => r.id)).toEqual(['hi9']);
     expect(f.store.painCheckIn.map((r) => r.id)).toEqual(['pc9']);
-    expect(f.store.healthConsent.map((r) => r.id)).toEqual(['hc9']);
+    expect(f.store.healthConsent.map((r) => r.id).sort()).toEqual(['hc1', 'hc9']);
+    expect(f.store.readinessCheckIn.map((r) => r.id)).toEqual(['rc9']);
+    expect(f.store.breathLog.map((r) => r.id)).toEqual(['bl9']);
     expect(f.store.workoutPlan).toHaveLength(1);                      // WorkoutPlan.scanId is SetNull: plans stay
+    // MIRROR-COACH-ERASE: the consent ledger is not deleted. Health rows go; HealthConsent stays.
     expect(f.calls).toEqual([
       'prqEntry.deleteMany', 'workoutScan.deleteMany',
-      'healthIntake.deleteMany', 'painCheckIn.deleteMany', 'healthConsent.deleteMany',
+      'healthIntake.deleteMany', 'painCheckIn.deleteMany', 'readinessCheckIn.deleteMany', 'breathLog.deleteMany',
     ]);
   });
 
@@ -138,18 +183,24 @@ describe('the delete erases the movement history too', () => {
     const f = fakeDb();
     await erasePrqData(f.db, 'u1');
     expect(await erasePrqData(f.db, 'u1')).toEqual({
-      prqEntries: 0, movementHistory: 0, healthIntakes: 0, painCheckIns: 0, healthConsents: 0,
+      prqEntries: 0, movementHistory: 0, healthIntakes: 0, painCheckIns: 0, healthConsents: 0, readinessCheckIns: 0, breathLogs: 0,
     });
   });
 
   it('the ledger line names every count, PRQ and health together', () => {
-    expect(erasureReason({ prqEntries: 2, movementHistory: 7, healthIntakes: 1, painCheckIns: 3, healthConsents: 0 }))
+    expect(erasureReason({ prqEntries: 2, movementHistory: 7, healthIntakes: 1, painCheckIns: 3, healthConsents: 0, readinessCheckIns: 0, breathLogs: 0 }))
       .toBe('PRQ data erasure: 2 entries, 7 movement history rows and 4 health records deleted');
     // singular "record" at exactly one, and the zero case reads cleanly too
-    expect(erasureReason({ prqEntries: 0, movementHistory: 0, healthIntakes: 1, painCheckIns: 0, healthConsents: 0 }))
+    expect(erasureReason({ prqEntries: 0, movementHistory: 0, healthIntakes: 1, painCheckIns: 0, healthConsents: 0, readinessCheckIns: 0, breathLogs: 0 }))
       .toBe('PRQ data erasure: 0 entries, 0 movement history rows and 1 health record deleted');
-    expect(erasureReason({ prqEntries: 0, movementHistory: 0, healthIntakes: 0, painCheckIns: 0, healthConsents: 0 }))
+    expect(erasureReason({ prqEntries: 0, movementHistory: 0, healthIntakes: 0, painCheckIns: 0, healthConsents: 0, readinessCheckIns: 0, breathLogs: 0 }))
       .toBe('PRQ data erasure: 0 entries, 0 movement history rows and 0 health records deleted');
+    // MIRROR-COACH P6: readiness check-ins count as health records in the ledger line
+    expect(erasureReason({ prqEntries: 0, movementHistory: 0, healthIntakes: 0, painCheckIns: 0, healthConsents: 1, readinessCheckIns: 5, breathLogs: 0 }))
+      .toBe('PRQ data erasure: 0 entries, 0 movement history rows and 6 health records deleted');
+    // MIRROR-COACH P7: breath-toolbox uses count as health records in the ledger line
+    expect(erasureReason({ prqEntries: 0, movementHistory: 0, healthIntakes: 0, painCheckIns: 0, healthConsents: 0, readinessCheckIns: 0, breathLogs: 2 }))
+      .toBe('PRQ data erasure: 0 entries, 0 movement history rows and 2 health records deleted');
   });
 });
 

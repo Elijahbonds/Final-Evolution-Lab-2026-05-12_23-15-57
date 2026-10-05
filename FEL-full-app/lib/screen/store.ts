@@ -3,13 +3,16 @@
 //   · NOTHING IS SENT. No server save in this ship (A2-3): no fetch, no POST, no analytics; results stay on the device.
 //   · sessionStorage ONLY. Never localStorage, IndexedDB or a cookie. Every key starts SCREEN_PREFIX, so "Done, clear
 //     my results" can remove every one of them.
-//   · THE AGE ANSWER IS THE ONE KEY WRITTEN BEFORE A RESULT (SCREEN-FIX Cyber 2). lockAge() writes the band once, the
-//     moment it is answered, and it is then read back for the rest of the tab (lib/screen/age.ts): the question is not
-//     asked again, and a second answer cannot change it. Clearing keeps it; closing the tab ends it.
-//   · THE GROWN-UP STEP COMES FIRST for everything else. No result and no takeoff leg is written before the age
-//     answer; for under 18 or an age not given, none before "A grown-up is with me" is ticked (the gate record says
-//     which). write() refuses otherwise, and read() refuses a result whose gate record does not allow it, so a crafted
-//     key cannot skip the grown-up step either.
+//   · THE AGE ANSWER IS THE ONE KEY WRITTEN BEFORE A RESULT (SCREEN-FIX Cyber 2). lockAge() writes the band the moment
+//     it is answered and locks it FOR THE RUN: a second answer in the same run can only tighten it (strictestAge), never
+//     loosen it. A NEW RUN ASKS AGAIN (AGE-RESET, audit 2.2, 2026-10-03): on a shared phone the next person is not the
+//     last one, so every new Start and every new Film dunk session calls resetAge() first and the question comes back.
+//     "Done, clear my results" keeps the answer; closing the tab ends it.
+//   · UNDER 18 KEEP THE AGE ANSWER AND NOTHING ELSE (SCREEN-FIX-2; FE PM + Research, 2026-09-29 11:50 AM PT). Under
+//     13, 13–17 and "rather not say" (age.ts isKid) never have a result, takeoff leg or gate record written, grown-up
+//     ticked or not: their number lives in the page's memory only (assess-app.tsx). Only 18 or older keep a result in
+//     this tab. write() refuses otherwise, and read() refuses a result whose gate record is not an adult's, so a crafted
+//     key cannot keep a kid's result either.
 //   · A NEW SCREEN WIPES THE OLD ONE FIRST (shared event devices): clear() before anything new is shown or written.
 //
 // The gate record holds EXACTLY the age band, the grown-up checkbox, a timestamp and the step's text version (gate
@@ -17,7 +20,7 @@
 //
 // The storage is injected (a tab's window.sessionStorage in the page, a map in tests). Pure otherwise.
 import { GROWN_UP_TEXT_VERSION } from './copy';
-import { isAgeBand, type AgeBand } from './age';
+import { isAgeBand, isKid, strictestAge, type AgeBand } from './age';
 import { SUMMARY_VERSION, type ScreenSummary } from './checks';
 import { GRADED_CHECKS, THRESHOLDS_VERSION, type BandWord } from './PROPOSED-thresholds';
 import { isLaneSlug } from './PROPOSED-program-lanes';
@@ -44,11 +47,12 @@ export interface GateRecord {
 
 export type StorageLike = Pick<Storage, 'getItem' | 'setItem' | 'removeItem' | 'key' | 'length'>;
 
-/** An adult, or a younger athlete with a grown-up ticked: then (and only then) the screen may keep anything, in this tab. */
+/**
+ * 18 or older: then (and only then) the screen may keep a result, in this tab. CHANGED (SCREEN-FIX-2): an athlete under
+ * 18 with a grown-up ticked kept one too; now nothing but the age answer is kept for them.
+ */
 export function mayPersist(g: GateRecord | null | undefined): boolean {
-  if (!g) return false;
-  if (g.ageBand === '18+') return true;
-  return g.grownUp === true && g.textVersion === GROWN_UP_TEXT_VERSION;
+  return !!g && !isKid(g.ageBand);
 }
 
 export function gateRecord(ageBand: AgeBand, grownUp: boolean, now: Date = new Date()): GateRecord {
@@ -99,15 +103,29 @@ export function readAge(s: StorageLike | null): AgeBand | null {
 }
 
 /**
- * Lock this tab's age answer and return the band that holds: the first answer is written and kept; any later answer
- * is refused and the first one comes back. This is the one key written before a result.
+ * Lock this run's age answer and return the band that holds. The first answer is written and kept. A later answer in
+ * the same run can only TIGHTEN it (AGE-RESET, audit 2.2: stricter-only, never looser): the strictestAge of the held
+ * answer and the new one comes back, and a stricter outcome is written over the held one. This is the one key written
+ * before a result.
  */
 export function lockAge(s: StorageLike | null, band: AgeBand): AgeBand {
   const had = readAge(s);
-  if (had) return had;
-  ageMemory = band;
-  try { s?.setItem(KEYS.age, band); } catch { /* refused: the page's memory holds it */ }
-  return band;
+  const holds = strictestAge(had, band)!;
+  if (holds === had) return holds;
+  ageMemory = holds;
+  try { s?.setItem(KEYS.age, holds); } catch { /* refused: the page's memory holds it */ }
+  return holds;
+}
+
+/**
+ * A new run is maybe a new person (shared phones, audit 2.2): the age answer and with it the grown-up tick are asked
+ * again. Called on every new Start (assess-app.tsx) and every new Film dunk session (dunk-film.tsx). "Done, clear my
+ * results" is NOT this: clearing keeps the answer (clearScreen), so clearing is not a way to answer again. Only a key
+ * that is there is removed: a clean device sees no call at all.
+ */
+export function resetAge(s: StorageLike | null): void {
+  ageMemory = null;
+  try { if (s && s.getItem(KEYS.age) !== null) s.removeItem(KEYS.age); } catch { /* no storage: the page's memory was cleared above */ }
 }
 
 /** Tests only: a new tab (a fresh page's memory). */
@@ -115,7 +133,18 @@ export function forgetAgeForTests(): void { ageMemory = null; }
 
 // ── the result ──
 
-/** Keep the gate record and the result, after the grown-up step. Returns whether it wrote (false: refused, or no storage). */
+/**
+ * The end of a screen: an adult's result is kept (this page's memory and this tab's sessionStorage) and 'adult' comes
+ * back; anyone else keeps nothing and gets 'kid' (their number is the page's to show: assess-app.tsx).
+ */
+export function keepResult(s: StorageLike | null, gate: GateRecord | null, summary: ScreenSummary): 'adult' | 'kid' {
+  if (!mayPersist(gate)) return 'kid';
+  remember(gate, summary);
+  writeResult(s, gate, summary);
+  return 'adult';
+}
+
+/** Keep an adult's gate record and result (refused for anyone under 18). Returns whether it wrote (false: refused, or no storage). */
 export function writeResult(s: StorageLike | null, gate: GateRecord | null, summary: ScreenSummary): boolean {
   if (!s || !mayPersist(gate)) return false;
   try {
@@ -125,7 +154,7 @@ export function writeResult(s: StorageLike | null, gate: GateRecord | null, summ
   } catch { return false; }
 }
 
-/** The takeoff leg, asked once per screen: kept only after the grown-up step. */
+/** The takeoff leg, asked once per screen: kept for 18 or older only (a kid's lives in the runner, in memory). */
 export function writeTakeoff(s: StorageLike | null, gate: GateRecord | null, side: 'left' | 'right'): boolean {
   if (!s || !mayPersist(gate)) return false;
   try { s.setItem(KEYS.takeoff, side); return true; } catch { return false; }
@@ -157,7 +186,7 @@ export function recall(s: StorageLike | null): { gate: GateRecord; summary: Scre
  * Every screen key in this tab (and PR #20's old localStorage keys), gone, and the page's memory of them: all but the
  * age answer, which stays locked until the tab closes (clearing is not a way to answer again).
  */
-export function clearScreen(s: StorageLike | null, local?: Pick<Storage, 'removeItem'> | null): void {
+export function clearScreen(s: StorageLike | null, local?: Pick<Storage, 'getItem' | 'removeItem'> | null): void {
   memory = null;
   try {
     if (s) {
@@ -166,13 +195,14 @@ export function clearScreen(s: StorageLike | null, local?: Pick<Storage, 'remove
       for (const k of keys) s.removeItem(k);
     }
   } catch { /* no storage: nothing to clear */ }
-  try { for (const k of LEGACY_LOCAL_KEYS) local?.removeItem(k); } catch { /* none */ }
+  // only a key that is there is removed: a clean device sees no localStorage call at all (SCREEN-FIX-2)
+  try { for (const k of LEGACY_LOCAL_KEYS) if (local && local.getItem(k) !== null) local.removeItem(k); } catch { /* none */ }
 }
 
 /** The page's tab storage (null where the browser refuses it). */
 export function tabStorage(): StorageLike | null {
   try { return typeof window !== 'undefined' ? window.sessionStorage : null; } catch { return null; }
 }
-export function localForClear(): Pick<Storage, 'removeItem'> | null {
+export function localForClear(): Pick<Storage, 'getItem' | 'removeItem'> | null {
   try { return typeof window !== 'undefined' ? window.localStorage : null; } catch { return null; }
 }

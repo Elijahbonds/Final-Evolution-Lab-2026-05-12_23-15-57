@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { Swords } from 'lucide-react';
 import { authOptions } from '@/lib/auth';
+import { loginPath } from '@/lib/auth/safeNext';
 import { TabPage } from '@/components/shell/tab-page';
 import { DoorsRow } from '@/components/shell/doors-row';
 import { PlayShelf } from '@/components/shell/play-shelf';
@@ -16,7 +17,7 @@ export const dynamic = 'force-dynamic';
 /** PLAY — every game, on a shelf, grouped into families. */
 export default async function PlayPage() {
   const session = await getServerSession(authOptions);
-  if (!session) redirect('/login?next=%2Fplay');
+  if (!session) redirect(loginPath('/play'));
   return (
     <TabPage
       eyebrow="Play"

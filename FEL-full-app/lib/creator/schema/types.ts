@@ -11,7 +11,7 @@
 /** Which editor screen a row belongs to. One tab strip per section, driven off these. */
 export type CreatorSection =
   | 'vitals' | 'appearance' | 'body' | 'ink' | 'gear' | 'accessories'
-  | 'attributes' | 'tendencies' | 'hotZones' | 'mechanics' | 'traits';
+  | 'attributes' | 'tendencies' | 'hotZones' | 'mechanics' | 'animations' | 'traits';
 
 /** Every row the generic editor can render, whatever section it came from. */
 export interface SchemaRow {

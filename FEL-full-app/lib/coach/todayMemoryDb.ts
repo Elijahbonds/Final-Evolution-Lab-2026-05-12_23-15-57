@@ -20,14 +20,27 @@ export interface TodayStore {
   // red-flag hard stop": loadToday/saveClientLog now read the client's latest HealthIntake the same way
   // lib/health/intake.ts's own latestIntake() does. Empty by default, same as every athlete with no intake on file.
   healthIntake: Row[];
+  // MIRROR-COACH P8 (2026-09-29): the protocol gate's other reads (lib/coach/protocolGateServer.ts) — the health consent
+  // ledger, pain check-ins, stored Quick Screens (WorkoutScan) and facilitator profiles. Optional and empty by default:
+  // a store built before P8 (or a test that never seeds a gated item) reads as an athlete with none of them on file.
+  healthConsent?: Row[];
+  painCheckIn?: Row[];
+  workoutScan?: Row[];
+  fac?: Row[];
 }
 
-export const newTodayStore = (): TodayStore => ({ seq: 0, clock: Date.parse('2026-09-28T09:00:00Z'), program: [], block: [], session: [], se: [], pe: [], user: [], cs: [], log: [], setLog: [], healthIntake: [] });
+export const newTodayStore = (): TodayStore => ({
+  seq: 0, clock: Date.parse('2026-09-28T09:00:00Z'), program: [], block: [], session: [], se: [], pe: [], user: [], cs: [], log: [], setLog: [], healthIntake: [],
+  healthConsent: [], painCheckIn: [], workoutScan: [], fac: [],
+});
 
 /** ExerciseLog columns a write may name (prisma/schema.prisma model ExerciseLog, less id / timestamps / relations). */
-export const EXERCISE_LOG_WRITABLE = ['clientSessionId', 'sessionExerciseId', 'actualSets', 'actualReps', 'actualLoad', 'rpe', 'clientNote', 'videoUrl', 'coachComment', 'coachCommentAt', 'completedAt'] as const;
+// MIRROR-COACH P8 FIX (2026-09-30): + servedExerciseId (what the gate served on the slot; lib/coach/todayServer.ts).
+export const EXERCISE_LOG_WRITABLE = ['clientSessionId', 'sessionExerciseId', 'actualSets', 'actualReps', 'actualLoad', 'rpe', 'clientNote', 'videoUrl', 'coachComment', 'coachCommentAt', 'completedAt', 'servedExerciseId'] as const;
 /** SetLog columns a write may name. */
 export const SET_LOG_WRITABLE = ['exerciseLogId', 'setIndex', 'reps', 'weightKg', 'rir', 'effort', 'workSeconds', 'note'] as const;
+/** ClientSession columns a write may name (MIRROR-COACH P6: cooldownDoneAt joined them — lib/coach/cooldownServer.ts). */
+export const CLIENT_SESSION_WRITABLE = ['programId', 'sessionId', 'clientId', 'completedAt', 'cooldownDoneAt'] as const;
 /** SessionExercise's prescription defaults (prisma/schema.prisma), for seeding rows the way the database fills them. */
 export const SE_DEFAULTS: Row = {
   sets: 3, reps: '8-10', load: 'RPE7', tempo: '3-1-1-0', restSeconds: 90, coachNote: null,
@@ -82,7 +95,36 @@ export function todayMemoryDb(s: TodayStore) {
             .map((c) => csWith(c, a.include.clientSessions.include));
           return { ...clone(p), blocks: tree(p.id, exerciseSelect), clientSessions: cs };
         }),
-      findUnique: async (a: Row) => { const p = s.program.find((x) => x.id === a.where.id); return p ? pick(p, a.select) : null; },
+      // MIRROR-COACH P8 (2026-09-29): with `include` (TREE_INCLUDE — the coach's gates route, lib/coach/
+      // protocolGateServer.ts loadProgramGates reads the whole tree), the program with its blocks → sessions → exercises
+      findUnique: async (a: Row) => {
+        const p = s.program.find((x) => x.id === a.where.id);
+        if (!p) return null;
+        if (a.include?.blocks) return { ...clone(p), blocks: tree(p.id, a.include.blocks.include.sessions.include.exercises.include.exercise.select) };
+        return pick(p, a.select);
+      },
+    },
+    // MIRROR-COACH P8 (2026-09-29): the protocol gate's reads (lib/coach/protocolGateServer.ts), filtered the way it asks
+    healthConsent: {
+      findMany: async (a: Row) => (s.healthConsent ?? [])
+        .filter((c) => c.userId === a.where.userId && (!a.where.scope || c.scope === a.where.scope))
+        .map((c) => pick(c, a.select)),
+    },
+    painCheckIn: {
+      findMany: async (a: Row) => (s.painCheckIn ?? [])
+        .filter((p) => p.userId === a.where.userId && (!a.where.createdAt?.gte || time(p.createdAt) >= time(a.where.createdAt.gte)))
+        .sort((x, y) => time(y.createdAt) - time(x.createdAt))
+        .map((p) => pick(p, a.select)),
+    },
+    workoutScan: {
+      findMany: async (a: Row) => (s.workoutScan ?? [])
+        .filter((w) => w.userId === a.where.userId && (!a.where.kind || w.kind === a.where.kind))
+        .sort((x, y) => time(y.createdAt) - time(x.createdAt))
+        .slice(0, a.take ?? Infinity)
+        .map((w) => pick(w, a.select)),
+    },
+    facilitatorProfile: {
+      findUnique: async (a: Row) => { const f = (s.fac ?? []).find((x) => x.userId === a.where.userId); return f ? pick(f, a.select) : null; },
     },
     user: {
       findUnique: async (a: Row) => { const u = s.user.find((x) => x.id === a.where.id); return u ? pick(u, a.select) : null; },
@@ -96,6 +138,12 @@ export function todayMemoryDb(s: TodayStore) {
         if (!rows.length) return null;
         return clone([...rows].sort((x, y) => time(y.createdAt) - time(x.createdAt))[0]);
       },
+      // MIRROR-COACH P7 FIX (2026-09-29): the Dial-Up Breath reads every intake inside the year (lib/breath/rampServer.ts
+      // loadRampFacts), newest first — a re-take does not erase an earlier lasting "yes"
+      findMany: async (a: Row) => s.healthIntake
+        .filter((r) => r.userId === a.where.userId && (!a.where.createdAt?.gte || time(r.createdAt) >= time(a.where.createdAt.gte)))
+        .sort((x, y) => time(y.createdAt) - time(x.createdAt))
+        .map((r) => pick(r, a.select)),
     },
     programExercise: {
       findMany: async (a: Row) => s.pe.filter((p) => (a.where.id?.in ?? []).includes(p.id) && (a.where.coachId === undefined || p.coachId === a.where.coachId)).map((p) => pick(p, a.select)),
@@ -105,7 +153,9 @@ export function todayMemoryDb(s: TodayStore) {
         const x = s.session.find((y) => y.id === a.where.id);
         if (!x) return null;
         const block = s.block.find((b) => b.id === x.blockId)!;
-        return { ...clone(x), block: { programId: block.programId }, exercises: s.se.filter((e) => e.sessionId === x.id).map((e) => ({ id: e.id })) };
+        // the exercises as selected (MIRROR-COACH P6: the cool-down's done tap also reads each one's section)
+        const sel: Row = a.include?.exercises?.select ?? { id: true };
+        return { kind: 'training', ...clone(x), block: { programId: block.programId }, exercises: s.se.filter((e) => e.sessionId === x.id).map((e) => pick(e, sel)) };
       },
     },
     clientSession: {
@@ -116,8 +166,12 @@ export function todayMemoryDb(s: TodayStore) {
         return hit ? clone(hit) : null;
       },
       findUnique: async (a: Row) => { const c = s.cs.find((x) => x.id === a.where.id); return c ? csWith(c, a.include) : null; },
-      // the coach's inbox read (app/api/coach/inbox): completed sessions in the coach's programs, newest first
-      findMany: async (a: Row) => s.cs
+      // the coach's inbox read (app/api/coach/inbox): completed sessions in the coach's programs, newest first —
+      // or (MIRROR-COACH P6, the cool-down's done tap) one client's rows for one program + session, newest first
+      findMany: async (a: Row) => !a.where.program ? s.cs
+        .filter((c) => c.programId === a.where.programId && c.sessionId === a.where.sessionId && c.clientId === a.where.clientId)
+        .sort((x, y) => time(y.createdAt) - time(x.createdAt)).slice(0, a.take ?? Infinity)
+        .map((c) => pick({ cooldownDoneAt: null, ...c }, a.select)) : s.cs
         .filter((c) => c.completedAt !== null && s.program.find((p) => p.id === c.programId)?.coachId === a.where.program.coachId)
         .sort((x, y) => time(y.completedAt) - time(x.completedAt)).slice(0, a.take ?? Infinity)
         .map((c) => {
@@ -131,8 +185,12 @@ export function todayMemoryDb(s: TodayStore) {
             session: { label: session.label, block: { label: s.block.find((b) => b.id === session.blockId)!.label } }, exerciseLogs: logs,
           };
         }),
-      create: async (a: Row) => { const at = tick(); const c = { id: id('cs'), completedAt: null, ...clone(a.data), createdAt: at, updatedAt: at }; s.cs.push(c); return clone(c); },
+      create: async (a: Row) => {
+        checkColumns('clientSession.create', a.data, CLIENT_SESSION_WRITABLE);
+        const at = tick(); const c = { id: id('cs'), completedAt: null, cooldownDoneAt: null, ...clone(a.data), createdAt: at, updatedAt: at }; s.cs.push(c); return clone(c);
+      },
       update: async (a: Row) => {
+        checkColumns('clientSession.update', a.data, CLIENT_SESSION_WRITABLE);
         const i = s.cs.findIndex((c) => c.id === a.where.id);
         if (i < 0) throw err('Record to update not found.', 'P2025');
         s.cs[i] = { ...s.cs[i], ...clone(a.data), updatedAt: tick() };
@@ -159,7 +217,7 @@ export function todayMemoryDb(s: TodayStore) {
       create: async (a: Row) => {
         checkColumns('exerciseLog.create', a.data, EXERCISE_LOG_WRITABLE);
         const at = tick();
-        const l = { id: id('log'), actualSets: null, actualReps: null, actualLoad: null, rpe: null, clientNote: null, videoUrl: null, coachComment: null, coachCommentAt: null, completedAt: null, ...clone(a.data), createdAt: at, updatedAt: at };
+        const l = { id: id('log'), actualSets: null, actualReps: null, actualLoad: null, rpe: null, clientNote: null, videoUrl: null, coachComment: null, coachCommentAt: null, completedAt: null, servedExerciseId: null, ...clone(a.data), createdAt: at, updatedAt: at };
         s.log.push(l);
         return clone(l);
       },
@@ -211,7 +269,7 @@ export function todayMemoryDb(s: TodayStore) {
 // ── seeding ─────────────────────────────────────────────────────────────────────────────────────────────────────────
 
 export interface SeedExercise { id?: string; exerciseId: string; order?: number; [k: string]: unknown }
-export interface SeedSession { id?: string; order: number; label: string; exercises: SeedExercise[] }
+export interface SeedSession { id?: string; order: number; label: string; kind?: 'training' | 'recovery'; exercises: SeedExercise[] }
 
 /** A program for `clientId` from `coachId`, one block, with the given sessions. Returns the ids it made. */
 export function seedProgram(s: TodayStore, spec: { coachId: string; clientId: string; name: string; blockLabel: string; sessions: SeedSession[]; isActive?: boolean }): { programId: string; blockId: string; sessionIds: string[]; exerciseIds: string[][] } {
@@ -223,7 +281,7 @@ export function seedProgram(s: TodayStore, spec: { coachId: string; clientId: st
   const sessionIds: string[] = [], exerciseIds: string[][] = [];
   for (const x of spec.sessions) {
     const sid = x.id ?? id('s');
-    s.session.push({ id: sid, blockId, order: x.order, label: x.label });
+    s.session.push({ id: sid, blockId, order: x.order, label: x.label, kind: x.kind ?? 'training' });
     sessionIds.push(sid);
     exerciseIds.push(x.exercises.map((e, i) => {
       const eid = e.id ?? id('se');

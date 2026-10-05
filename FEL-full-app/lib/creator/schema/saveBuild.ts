@@ -26,7 +26,7 @@ import type { RowValue } from '../editor/rowState';
 import { defaultValueFor } from '../editor/rowState';
 import { APPEARANCE } from './appearance';
 import { GEAR, ACCESSORIES, wearableIdFor } from './gear';
-import { VITALS } from './vitals';
+import { VITALS, normalizeVitals } from './vitals';
 import { BODY } from './body';
 import { resolve, type CreatorBuild, type Issue, LOOK_SECTIONS } from './resolve';
 import { sanitizeJersey, getWearable, type FaceConfig } from '../../closet/wearable-catalog';
@@ -69,6 +69,8 @@ export interface BuildPayload {
   traits: Record<string, number>;
   hotZones: Record<string, string>;
   mechanics: Record<string, string | null>;
+  /** Animation package labels. Same JSON row as the rest of the build — no new column. */
+  animations: Record<string, string | null>;
   /** Frame scales as percent, the archetype and the stance. */
   frame: Record<string, RowValue>;
   /** The four palette overrides, by row id. */
@@ -77,9 +79,10 @@ export interface BuildPayload {
 
 export function toBuild(values: Values): BuildPayload {
   const frame: Record<string, RowValue> = {};
+  const vitals = normalizeVitals(values.vitals) as Record<string, RowValue>;   // REACH-FREEZE: saved clamped, no Reach
   for (const row of VITALS.rows) {
     if (row.id === 'jerseyNumber') continue;                  // that one lives in AvatarLook.jersey
-    const v = values.vitals?.[row.id];
+    const v = vitals[row.id];
     frame[row.id] = v === undefined ? defaultValueFor(row) : v;
   }
   for (const row of BODY.rows) {
@@ -97,6 +100,7 @@ export function toBuild(values: Values): BuildPayload {
     traits: numbers(values.traits),
     hotZones: strings(values.hotZones),
     mechanics: nullableStrings(values.mechanics),
+    animations: nullableStrings(values.animations),
     frame,
     palette,
   };
@@ -115,15 +119,18 @@ export function fromStorage(build: Partial<BuildPayload> | null | undefined, loo
     traits: { ...(build?.traits ?? {}) },
     hotZones: { ...(build?.hotZones ?? {}) },
     mechanics: { ...(build?.mechanics ?? {}) },
+    animations: { ...(build?.animations ?? {}) },
     vitals: {},
     body: {},
     appearance: {},
     gear: {},
     accessories: {},
   };
+  // REACH-FREEZE: an old save's Height and Build load clamped into the rows, and its Reach is read by nothing
+  const frameVitals = normalizeVitals(build?.frame) as Record<string, RowValue>;
   for (const row of VITALS.rows) {
     if (row.id === 'jerseyNumber') continue;
-    const v = build?.frame?.[row.id];
+    const v = frameVitals[row.id];
     if (v !== undefined) values.vitals![row.id] = v;
   }
   if (look?.jersey) values.vitals!.jerseyNumber = look.jersey.number;
@@ -170,6 +177,7 @@ export function validateForSave(values: Values, prq: CreatorBuild['prq']): { ok:
     traits: numbers(values.traits),
     hotZones: strings(values.hotZones),
     mechanics: nullableStrings(values.mechanics),
+    animations: nullableStrings(values.animations),
     look: Object.fromEntries(Object.keys(LOOK_SECTIONS).map((k) => [k, (values[k] ?? {}) as Record<string, string | number | null>])),
     prq,
   };

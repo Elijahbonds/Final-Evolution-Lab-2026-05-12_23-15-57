@@ -21,9 +21,23 @@ export function pickNight<T>(pool: readonly T[], seed: number, n = EVENTS_PER_NI
   return out.slice(0, Math.min(n, out.length));
 }
 
-/** The simulated rival's raw score for an event, drawn inside its plausible range. */
+/**
+ * A simulated rival run: a fixed number of attempts, each made or missed.
+ * The score is the range mapped by the make rate, so it stays inside the
+ * event's plausible band and is no longer a single dice roll.
+ */
+export function simulateRivalRun(range: readonly [number, number], rnd: () => number = Math.random, attempts = 8): number {
+  const [lo, hi] = range;
+  const span = hi - lo;
+  const n = Math.max(1, attempts);
+  let made = 0;
+  for (let i = 0; i < n; i++) if (rnd() < 0.55) made += 1;
+  return lo + span * (made / n);
+}
+
+/** The simulated rival's raw score for an event. Court Carnival calls this; the run lives here so the hoops mode file stays untouched. */
 export function rollRival(range: readonly [number, number], rnd: () => number = Math.random): number {
-  return range[0] + rnd() * (range[1] - range[0]);
+  return simulateRivalRun(range, rnd);
 }
 
 /** How much of the rival's final score is on the board at `t` (0..1 of the event). Slow start, a surge in the middle,

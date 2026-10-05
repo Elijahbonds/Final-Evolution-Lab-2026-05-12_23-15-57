@@ -19,7 +19,7 @@
 //   clang   — a chain net, or metal taking a hit
 //   squeak  — rubber on a hard floor: the sound a hard cut actually makes
 type SfxName = 'whoosh' | 'impact' | 'score' | 'miss' | 'whistle' | 'uiTick' | 'crowdCheer' | 'crowdGroan' | 'powerUp'
-  | 'thud' | 'rattle' | 'swish' | 'clang' | 'squeak';
+  | 'thud' | 'rattle' | 'swish' | 'clang' | 'squeak' | 'exhaust';
 
 // MUSIC-SUITE P7 (2026-09-29), room-mix-ux: the three player-set bus levels (lib/audio/volumes.ts owns the pure
 // arithmetic and the on-device persistence; this file is the only place that arithmetic reaches a real GainNode).
@@ -60,6 +60,8 @@ class SoundKitImpl {
   // sfxBus sits exactly where voiceBus and musicBus already did (its own gain node, between the sound and master),
   // so play()'s cases changed only their connect() target, never their own envelope math.
   private sfxBus: GainNode | null = null;
+  /** A copy of the mix for a local recording. Speakers stay connected. Nothing is uploaded. */
+  private recordDest: MediaStreamAudioDestinationNode | null = null;
   /** The three player-set levels (0..1 each), read once at construction (lib/audio/volumes.ts's own on-device
    *  persistence — the same guarded-localStorage shape readVoicePref/writeVoicePref below already use) and kept
    *  live from there on: setVolume() below is the only thing that ever changes it after this. */
@@ -262,6 +264,32 @@ class SoundKitImpl {
         src.start(); src.stop(ctx.currentTime + 0.3);
         break;
       }
+      // AN ENGINE SPOOLING UP (10-phase pass, phase 8 — the kart's boost exhaust note). A boost ignition was a
+      // `whoosh` of moving air and nothing from the machine; the machine is the kart. A low sawtooth RISES (the
+      // revs coming on, not a release falling off) with a brown-noise chug under it through a lowpass — the
+      // two-stroke bark read at phone volume, short enough to layer under the whoosh without smearing it.
+      case 'exhaust': {
+        const osc = ctx.createOscillator();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(68 * pitch, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(180 * pitch, ctx.currentTime + 0.22);
+        const lp = ctx.createBiquadFilter();
+        lp.type = 'lowpass'; lp.frequency.value = 900;
+        const g = ctx.createGain();
+        this.env(g, ctx, 0.008, 0.3, 0.5 * vol);
+        osc.connect(lp).connect(g).connect(this.sfxBus);
+        osc.start(); osc.stop(ctx.currentTime + 0.34);
+
+        const chug = ctx.createBufferSource();
+        chug.buffer = this.noiseBuffer(ctx, 0.16, 'brown');
+        const cl = ctx.createBiquadFilter();
+        cl.type = 'lowpass'; cl.frequency.value = 320;
+        const cg = ctx.createGain();
+        this.env(cg, ctx, 0.004, 0.18, 0.4 * vol);
+        chug.connect(cl).connect(cg).connect(this.sfxBus);
+        chug.start(); chug.stop(ctx.currentTime + 0.2);
+        break;
+      }
       case 'impact': {
         const osc = ctx.createOscillator();
         osc.type = 'square';
@@ -397,6 +425,20 @@ class SoundKitImpl {
     if (!this.crowdGain) return;
     const k = Math.max(0, Math.min(1, level01));
     this.crowdGain.gain.value = this.crowdBaseGain * (0.35 + k * 2.2);
+  }
+
+  /**
+   * The game mix, as a stream a local recording can add. The speakers are unchanged: this is a second
+   * wire off the limiter. Null when this browser has no audio context. Never sent anywhere.
+   */
+  captureMix(): MediaStream | null {
+    const ctx = this.ensure();
+    if (!ctx || !this.out || typeof ctx.createMediaStreamDestination !== 'function') return null;
+    if (!this.recordDest) {
+      this.recordDest = ctx.createMediaStreamDestination();
+      this.out.connect(this.recordDest);
+    }
+    return this.recordDest.stream;
   }
 
   stopAmbient(): void {

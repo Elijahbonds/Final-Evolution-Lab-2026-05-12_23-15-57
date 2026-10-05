@@ -7,18 +7,40 @@ import {
 } from './config';
 
 const APP = join(__dirname, '../../app');
+const redirectsSignedOutToLogin = (src: string) => /redirect\(\s*(?:['"`]\/login|loginPath\()/.test(src);
 
 describe('the free game is /try, the guest dunk contest', () => {
-  it('/try renders the guest shell for a signed-out visitor; Brain Brawl sends one to /login', () => {
+  it('/try renders the guest shell for a signed-out visitor; Brain Brawl sends one to login and back', () => {
     expect(DEFAULT_FREE_GAME_ROUTE).toBe('/try');
     const tryPage = readFileSync(join(APP, 'try/page.tsx'), 'utf8');
     expect(tryPage).toMatch(/return <GuestDunkShell/);
     expect(tryPage).not.toMatch(/redirect\(\s*['"`]\/login/);
-    expect(readFileSync(join(APP, 'play/brain-brawl/page.tsx'), 'utf8')).toMatch(/if \(!session\) redirect\('\/login'\)/);
+    expect(readFileSync(join(APP, 'play/brain-brawl/page.tsx'), 'utf8')).toContain(
+      "if (!session) redirect(loginPath('/play/brain-brawl'))",
+    );
   });
 
-  it('13 and older, signed out: /try, or the env route when it is valid and open to a guest', () => {
-    for (const age of ['13-17', '18+'] as const) {
+  it('every signed-in play route preserves its destination through login', () => {
+    const misses: string[] = [];
+    const walk = (dir: string) => {
+      for (const f of readdirSync(dir)) {
+        const p = join(dir, f);
+        if (statSync(p).isDirectory()) { walk(p); continue; }
+        if (f !== 'page.tsx') continue;
+        const src = readFileSync(p, 'utf8');
+        if (!redirectsSignedOutToLogin(src)) continue;
+        if (src.includes('loginPath(') || src.includes('?next=')) continue;
+        misses.push(`/${relative(APP, dir)}`);
+      }
+    };
+    walk(join(APP, 'play'));
+    expect(misses, 'play routes that drop the intended mode after login').toEqual([]);
+  });
+
+  // CHANGED (SCREEN-FIX-2, S-10): was 13 and older; 13–17 lose the /try link (no page reads this now: the results'
+  // free-game button is gone, retest 1 L5)
+  it('18 or older, signed out: /try, or the env route when it is valid and open to a guest', () => {
+    for (const age of ['18+'] as const) {
       expect(screenNextTarget(age, undefined), age).toBe('/try');
       expect(screenNextTarget(age, ''), age).toBe('/try');
       expect(screenNextTarget(age, '/try?c=abc'), age).toBe('/try?c=abc');
@@ -26,8 +48,8 @@ describe('the free game is /try, the guest dunk contest', () => {
     }
   });
 
-  it('under 13, "rather not say" and no answer: no target at all', () => {
-    for (const age of ['under-13', 'unknown', null, undefined] as const) {
+  it('under 18, "rather not say" and no answer: no target at all', () => {
+    for (const age of ['under-13', '13-17', 'unknown', null, undefined] as const) {
       expect(screenNextTarget(age, undefined), String(age)).toBeNull();
       expect(screenNextTarget(age, '/try'), String(age)).toBeNull();
     }
@@ -36,6 +58,7 @@ describe('the free game is /try, the guest dunk contest', () => {
   it('a signed-in-only env route is rejected → /try', () => {
     for (const bad of [
       '/play/brain-brawl', '/play/brain-brawl?src=screen', '/login', '/login?next=%2Fplay', '/signup', '/account', '/account/settings',
+      '/create', '/create?from=cell',
       '/play', '/play/dunk', '/profile', '/api/guest', '/dev/brainbrawl', '/PLAY/brain-brawl', '/try/../play/brain-brawl',
       '/pl%61y/brain-brawl', '/wallet/', '/studio/x',
     ]) {
@@ -60,7 +83,7 @@ describe('the free game is /try, the guest dunk contest', () => {
         if (statSync(p).isDirectory()) { if (f !== 'api') walk(p); continue; }
         if (!/^(page|layout)\.tsx?$/.test(f)) continue;
         const src = readFileSync(p, 'utf8');
-        if (!/redirect\(\s*['"`]\/login/.test(src)) continue;
+        if (!redirectsSignedOutToLogin(src)) continue;
         // the route: route groups dropped; a dynamic segment ends it (everything under the prefix is walled)
         const segs = relative(APP, dir).split('/').filter((x) => x && !/^\(.*\)$/.test(x));
         const cut = segs.findIndex((x) => x.startsWith('['));

@@ -14,6 +14,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Loader2, ScanLine, Volume2, VolumeX } from 'lucide-react';
+import { NOT_SAVED_ON_DEVICE, mirrorSave } from './mirror-save';   // R-HEALTH-CLIENT: no save request unless the server said so
 // CODE-SPLIT (2026-09-12). `NeuroMirror` reaches @babylonjs through render/overlay-compositor and
 // rig/zone-binding, so importing it here as a VALUE pulled the whole engine into this route's
 // first-load bundle: /play/mirror shipped 2.03 MB against ~160 kB for every other /play route,
@@ -40,13 +41,26 @@ import { attemptFrom, progressLine, readProgress, type DunkProgress } from '@/li
 import type { PoseFrame } from '@/lib/babylon/nexus/neuro-mirror/pose/mediapipe-adapter';
 import { RepCounter, type RepState } from '@/lib/babylon/nexus/neuro-mirror/rules/rep-counter';
 import type { SquatFault } from '@/lib/babylon/nexus/neuro-mirror/rules/squat-audit';
-import { CueEngine, VALGUS_CUE_VERIFIED, cueableFaults, type CueEvent } from '@/lib/babylon/nexus/neuro-mirror/rules/cue-engine';
+import { CueEngine, VALGUS_CUE_VERIFIED, cueableFaults, fadeReviewLines, type CueEvent, type FaultId } from '@/lib/babylon/nexus/neuro-mirror/rules/cue-engine';
+// MIRROR-COACH P9 (2026-09-30): the press/row's three faults reach the coach (lib/mirror/pressRowStage.ts), the coach
+// says less as a fault stays fixed (cue-engine.ts, the faded schedule), and the stage can drop the camera picture and
+// keep everything that reads (lib/mirror/skeletonView.ts, components/mirror/skeleton-view.tsx).
+import type { MovementPhase } from '@/lib/babylon/nexus/neuro-mirror/rules/kinematic-engine';
+import { PRESS_ROW_CUE_SHOWN_MS, PRESS_ROW_FAULT_LABEL, initialPressRowCues, stepPressRowCues, type PressRowFault } from '@/lib/mirror/pressRowStage';
+import { readSkeletonOnly, writeSkeletonOnly } from '@/lib/mirror/skeletonView';
+import { CameraImage, SkeletonToggle } from '@/components/mirror/skeleton-view';
 // MIRROR-COACH P1 (2026-09-25): the guided squat's stage clock is a pure step now (lib/mirror/squatStage.ts) — see
 // the onFrame squat branch for why it left the setSquatStage updater.
 import {
-  BREATH_CYCLES, DEEPER_LINE, EMPTY_KNEE_RECORD, SQUARE_UP_LINE, SQUAT_CHECK_REPS, SQUAT_FAULT_LABEL, SQUAT_WORK_REPS, initialSquatSession,
-  kneeReadLine, paintableFaults, squatReviewVerdict, stepKneeRecord, stepSquatSession, type KneeRecord, type SquatStage,
+  DEEPER_LINE, EMPTY_KNEE_RECORD, SQUARE_UP_LINE, SQUAT_BREATH_PACER, SQUAT_CHECK_REPS, SQUAT_FAULT_LABEL, SQUAT_WORK_REPS, squatBreathLine,
+  breathElapsedSec, initialSquatSession, kneeReadLine, paintableFaults, squatReviewVerdict, stepKneeRecord, stepSquatSession,
+  type KneeRecord, type SquatStage,
 } from '@/lib/mirror/squatStage';
+// MIRROR-COACH P7 (2026-09-29): the breathe-first stage draws the ONE pacer (lib/breath/pacer.ts, components/breath/
+// Pacer.tsx) — the same ring and count as the warm-up's Pressurize, the cool-down's breath and the settle between sets —
+// on the stage's own pose clock. It was a CSS loop (app/globals.css .fel-breath) timed from the moment the div mounted,
+// beside the pose clock that actually ends the stage, with no count on screen. The 4-2-6 × 3 count is unchanged.
+import { BreathPacer } from '@/components/breath/Pacer';
 // MIRROR-COACH P2 (2026-09-26): the knee arrows' geometry and the top-left chip are pure modules now, so their tests
 // hold what this file paints — the arrows point out from the hip midline, and the Movement Screen's chip names its
 // station (it read BREATHE through the whole screen).
@@ -84,6 +98,10 @@ import { ScreenSelfReport } from '@/components/mirror/screen-self-report';
 // coach's draft uses (lib/mirror/screenCorrectives.ts), in plain words, "what the camera saw, not a diagnosis".
 import { ScreenNextSteps } from '@/components/mirror/screen-next-steps';
 import type { YouthGate } from '@/lib/mirror/screenCorrectives';
+// MIRROR-COACH P9 (2026-09-30): the written correctives, mounted — beside the pattern picker, and under a press/row set's
+// summary (lib/mirror/correctives.ts; adults only, youth rules show none).
+import { CorrectivesPicker, SessionCorrectives } from '@/components/mirror/session-correctives';
+import { sessionLikeFromSummary } from '@/lib/mirror/correctives';
 
 /** What the screen panel says when a finished screen was not kept (offline, signed out, a server error). */
 const SCREEN_NOT_SAVED = 'Screen finished — it could not be saved, so nothing was paid for it.';
@@ -115,8 +133,10 @@ const BONES: [number, number][] = [
  * `youth` (MIRROR-COACH P3 review, 2026-09-26): the athlete's youth gate from their birth year (app/play/mirror/page.tsx
  * youthGateFor) — under 18 or no birth year on file, the screen's written corrective blocks are off (PLAN item 9).
  * Absent → youth rules, the conservative side (decision #20: blank = youth until answered).
+ * `canSaveScan` (R-HEALTH-CLIENT, 2026-09-30): page.tsx's canSaveScanNumbers for this user, asked once on the server. False
+ * (the default: a missing prop never saves) → no request to /api/mirror/* at all; results stay in this page's memory.
  */
-export function MirrorHarness({ youth = 'unknownAge' }: { youth?: YouthGate } = {}) {
+export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { youth?: YouthGate; canSaveScan?: boolean } = {}) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -143,8 +163,10 @@ export function MirrorHarness({ youth = 'unknownAge' }: { youth?: YouthGate } = 
   const [jumpState, setJumpState] = useState('idle');
   const skeletonRef = useRef<HTMLCanvasElement | null>(null);
   const jumpTrackerRef = useRef(new DunkTracker());
-  const cueEngineRef = useRef(new CueEngine());
+  const cueEngineRef = useRef(new CueEngine({ clearByRep: true }));   // P9 fix: a clean REP clears a fault (cue-engine.ts)
   const [squatStage, setSquatStage] = useState<SquatStage>('breathe');
+  // seconds into the breathe stage on the POSE clock (squatStage.ts breathElapsedSec) — what the pacer is drawn at
+  const [breathSec, setBreathSec] = useState(0);
   const [squatReps, setSquatReps] = useState(0);
   const [squatFaults, setSquatFaults] = useState<SquatFault[]>([]);
   // Whether the latest squat read saw a body. The four checks said "Estimated stable" with nobody in frame — and
@@ -156,6 +178,27 @@ export function MirrorHarness({ youth = 'unknownAge' }: { youth?: YouthGate } = 
   const [cue, setCue] = useState<CueEvent | null>(null);
   const [cueLog, setCueLog] = useState<CueEvent[]>([]);
   const [voiceOn, setVoiceOn] = useState(true);
+  // MIRROR-COACH P9: the press/row's own coach (one engine per pattern — a squat set says nothing about the elbow, so it
+  // must not step the elbow's faded schedule), its per-frame step, and what the last set's fade says in the review.
+  // Both engines live as long as this page: start() calls reset(), which keeps the faded schedule for the next set.
+  const pressRowCueRef = useRef(new CueEngine({ clearByRep: true }));
+  const pressRowRef = useRef(initialPressRowCues());
+  const [fadeLines, setFadeLines] = useState<string[]>([]);
+  // The skeleton-only view (no camera picture; everything that reads stays). A browser preference, read after mount so
+  // the server render and the first client render agree; never a server write.
+  const [skeletonOnly, setSkeletonOnly] = useState(false);
+  useEffect(() => { setSkeletonOnly(readSkeletonOnly()); }, []);
+  const toggleSkeletonOnly = useCallback(() => {
+    const next = !skeletonOnly;
+    setSkeletonOnly(next);
+    writeSkeletonOnly(next);
+  }, [skeletonOnly]);
+  // MIRROR-COACH P9 fix: the press/row set has no rep cap, so its cue bubble clears itself (pressRowStage.ts)
+  useEffect(() => {
+    if (!cue || pattern !== 'pressRow') return;
+    const id = window.setTimeout(() => setCue(null), PRESS_ROW_CUE_SHOWN_MS);
+    return () => window.clearTimeout(id);
+  }, [cue, pattern]);
   // The guided squat's session state, stepped once per frame by the pure stepSquatSession; the React state above
   // (squatStage, squatReps, squatFindings) is only its mirror for rendering.
   const squatSessionRef = useRef(initialSquatSession());
@@ -332,7 +375,11 @@ export function MirrorHarness({ youth = 'unknownAge' }: { youth?: YouthGate } = 
     setReps(null);
     jumpTrackerRef.current.reset();
     cueEngineRef.current.reset();
+    pressRowCueRef.current.reset();
+    pressRowRef.current = initialPressRowCues();
+    setFadeLines([]);
     setSquatStage('breathe');
+    setBreathSec(0);
     setSquatReps(0);
     setSquatFaults([]);
     setSquatSeen(false);
@@ -448,11 +495,13 @@ export function MirrorHarness({ youth = 'unknownAge' }: { youth?: YouthGate } = 
             // and only in the WORK set, where the voice cues too (MIRROR-COACH P2 review, 2026-09-26): painted during the
             // breath and the movement check, "KNEES OUT" corrected the athlete during the very measurement the review's
             // "did the correction hold" is judged against, while the voice stayed silent by design (squatStage.ts)
-            paintSkeleton(pose, p, paintableFaults(was, cueableFaults(squat.faults)), squat.valgusBySide);
+            paintSkeleton(pose, p, paintableFaults(was, cueableFaults(squat.faults), (f) => cueEngineRef.current.isVoiceable(f as FaultId)), squat.valgusBySide);
             const step = stepSquatSession(squatSessionRef.current, {
               nowMs: now, phase: squat.phase, present: squat.present, faults: squat.faults, square: squat.square, hipDrop: squat.hipDrop,
             });
             squatSessionRef.current = step.state;
+            // the pacer rides the same pose clock the step ends the breath on (MIRROR-COACH P7)
+            if (step.state.stage === 'breathe') setBreathSec(breathElapsedSec(step.state, now));
             // the knee read over the check and the work set, per POSE frame, square frames only (kept in memory for
             // this session's review — nothing is sent or saved)
             kneeRecordRef.current = stepKneeRecord(kneeRecordRef.current, was, squat, now);
@@ -483,6 +532,12 @@ export function MirrorHarness({ youth = 'unknownAge' }: { youth?: YouthGate } = 
                 setCueLog((l) => [...l, evt]);
                 speak(evt.text);
               }
+            }
+            // MIRROR-COACH P9: the faded schedule is told where a work-set rep ends (with the faults that rep showed —
+            // the same book the review reads) and where the set ends; the review says what the fade did
+            if (was === 'work' && step.repCounted) cueEngineRef.current.endRep(step.state.workReps[step.state.workReps.length - 1] ?? []);
+            if (step.stageChanged && step.state.stage === 'review') {
+              setFadeLines(fadeReviewLines(cueEngineRef.current.endSet(), (f: FaultId) => SQUAT_FAULT_LABEL[f as SquatFault] ?? f));
             }
           } else if (patternRef.current === 'lunge') {
             // THE LUNGE (MIRROR-COACH P4 lane 1, owner decision #9). No live cue voice or knee overlay here (not asked
@@ -517,6 +572,21 @@ export function MirrorHarness({ youth = 'unknownAge' }: { youth?: YouthGate } = 
             }
           } else {
             paintSkeleton(pose, p);
+            // THE PRESS/ROW'S COACH (MIRROR-COACH P9). Its three faults were read every frame and never reached the voice
+            // (lib/mirror/pressRowStage.ts). Same order as the squat: this frame's cue first, then the rep it closed.
+            if (patternRef.current === 'pressRow') {
+              const pr = stepPressRowCues(pressRowRef.current, { nowMs: pose.timestampMs, present: pose.present, phase: p as MovementPhase, zones, reps: r.reps });
+              pressRowRef.current = pr.state;
+              if (pr.cueFaults) {
+                const evt = pressRowCueRef.current.decide(pose.timestampMs, pr.cueFaults);
+                if (evt) {
+                  setCue(evt);
+                  setCueLog((l) => [...l, evt]);
+                  speak(evt.text);
+                }
+              }
+              if (pr.repFaults) pressRowCueRef.current.endRep(pr.repFaults);
+            }
           }
         },
       });
@@ -549,7 +619,8 @@ export function MirrorHarness({ youth = 'unknownAge' }: { youth?: YouthGate } = 
       // counts — was computed on every session and then discarded when the tab closed, so the
       // Mirror could never show whether anyone was improving. Saving is best-effort and silent:
       // a failed write must never interrupt the end of a workout.
-      void fetch('/api/mirror/sessions', {
+      // R-HEALTH-CLIENT: null (nothing sent) unless this account's sessions are saved; the summary already showed.
+      void mirrorSave(canSaveScan, fetch, '/api/mirror/sessions', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
@@ -557,16 +628,18 @@ export function MirrorHarness({ youth = 'unknownAge' }: { youth?: YouthGate } = 
           startedAtMs: s.startedAtMs,
           durationMs: s.durationMs,
           reps: s.reps,
-          avgTempoMs: s.avgTempo ?? null,
+          // MIRROR-COACH P9 fix (2026-09-30): ms per rep (pull + press), the one conversion the correctives use. It posted the
+          // { pullSec, pressSec } object, which the route's num() stores as 0 — every saved session's tempo read 0.
+          avgTempoMs: sessionLikeFromSummary(s).avgTempo,
           avgFrameMs: s.avgFrameMs,
           timeInStableMs: s.timeInStableMs,
           faultCounts: s.faultCounts,
         }),
-      }).catch(() => { /* offline or signed out: the session still showed on screen */ });
+      })?.catch(() => { /* offline or signed out: the session still showed on screen */ });
     });
     stop();
     setStatus('idle');
-  }, [stop]);
+  }, [stop, canSaveScan]);
 
   const secs = (ms: number) => (ms / 1000).toFixed(1);
 
@@ -581,11 +654,14 @@ export function MirrorHarness({ youth = 'unknownAge' }: { youth?: YouthGate } = 
   const recordDunk = useCallback(async (m: DunkMetrics) => {
     const attempt = attemptFrom(m);
     try {
-      const res = await fetch('/api/mirror/dunks', {
+      const pending = mirrorSave(canSaveScan, fetch, '/api/mirror/dunks', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(attempt),
       });
+      // R-HEALTH-CLIENT: not sent (this account's jumps aren't saved) → the same on-device line as offline, below
+      if (!pending) { setDunkSaid(progressLine(readProgress([attempt]), attempt)); return; }
+      const res = await pending;
       if (!res.ok) return;
       const j = await res.json().catch(() => null);
       if (!j?.progress) return;
@@ -598,18 +674,21 @@ export function MirrorHarness({ youth = 'unknownAge' }: { youth?: YouthGate } = 
       const local = readProgress([attempt]);
       setDunkSaid(progressLine(local, attempt));
     }
-  }, [speak]);
+  }, [speak, canSaveScan]);
 
   // The history, so the screen opens on what there is to beat rather than on nothing.
+  // R-HEALTH-CLIENT: only an account whose jumps are saved has a history to read; everyone else starts from this session.
   useEffect(() => {
     if (pattern !== 'jump') return;
+    const pending = mirrorSave(canSaveScan, fetch, '/api/mirror/dunks');
+    if (!pending) return;
     let live = true;
-    fetch('/api/mirror/dunks')
+    pending
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => { if (live && j?.progress) setDunkProgress(j.progress); })
       .catch(() => {});
     return () => { live = false; };
-  }, [pattern]);
+  }, [pattern, canSaveScan]);
 
   /**
    * A finished screen goes to the server, which recomputes the score and decides the payout. A screen the
@@ -634,7 +713,7 @@ export function MirrorHarness({ youth = 'unknownAge' }: { youth?: YouthGate } = 
     // so (NOT_READ_LINE), not "not graded yet" (P3 review)
     setScreenSummary(scoreScreen(ran, results, { attempted: grades.length > 0 }));
     try {
-      const res = await fetch('/api/mirror/screen', {
+      const pending = mirrorSave(canSaveScan, fetch, '/api/mirror/screen', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
@@ -649,6 +728,14 @@ export function MirrorHarness({ youth = 'unknownAge' }: { youth?: YouthGate } = 
           grades,
         }),
       });
+      // R-HEALTH-CLIENT: not sent (this account's screens aren't saved). The local score above stands; 'unsaved' keeps the
+      // answers card from PATCHing (components/mirror/screen-self-report.tsx), and the line says why, not "could not".
+      if (!pending) {
+        setScreenMessage(NOT_SAVED_ON_DEVICE);
+        setSavedScreenId('unsaved');
+        return;
+      }
+      const res = await pending;
       // A refused post (signed out, a server error) is not saved either, and says so like a network failure does
       // (MIRROR-COACH P1 review, 2026-09-25: it said nothing, and the ungraded panel hid even the network line).
       // MIRROR-COACH P3 (2026-09-25): a screen the server refused to check (422) says the server's own line.
@@ -667,7 +754,7 @@ export function MirrorHarness({ youth = 'unknownAge' }: { youth?: YouthGate } = 
       setScreenMessage(SCREEN_NOT_SAVED);
       setSavedScreenId('unsaved');
     }
-  }, [speak]);
+  }, [speak, canSaveScan]);
 
   // The screen ends itself. Nothing else in the Mirror does, which is the point of a protocol.
   //
@@ -698,6 +785,10 @@ export function MirrorHarness({ youth = 'unknownAge' }: { youth?: YouthGate } = 
         setEndedWith({ grades: soFar.grades, stations: soFar.stations });
         void submitScreen(soFar.results, soFar.screen, soFar.grades, { ended: true });
       }
+    }
+    // MIRROR-COACH P9: a press/row set ends at End — its fade is settled here and said in the summary
+    if (patternRef.current === 'pressRow' && runtimeRef.current) {
+      setFadeLines(fadeReviewLines(pressRowCueRef.current.endSet(), (f: FaultId) => PRESS_ROW_FAULT_LABEL[f as PressRowFault] ?? f));
     }
     endZoneSession();
   }, [endZoneSession, submitScreen]);
@@ -804,13 +895,16 @@ export function MirrorHarness({ youth = 'unknownAge' }: { youth?: YouthGate } = 
             );
           })}
         </div>
+        <CorrectivesPicker youth={youth} />
 
         {/* THE STAGE. The camera is the product here, so it gets the whole width and everything else floats over
             it. Before, it was a 4:3 box in a two-column grid beside a 260px column of bullet lists — the shape of
             a settings page, not of a thing you stand in front of. */}
         <div className="relative aspect-[3/4] w-full overflow-hidden rounded-3xl border border-white/10 bg-black
                         shadow-[0_40px_120px_-60px_rgba(0,229,255,0.5)] sm:aspect-[16/10]">
-          <video ref={videoRef} playsInline muted className="absolute inset-0 h-full w-full object-cover" />
+          {/* MIRROR-COACH P9: the camera element, hidden in the skeleton-only view (it stays mounted: the pose model reads
+              its frames from it — lib/mirror/skeletonView.ts) */}
+          <CameraImage ref={videoRef} skeletonOnly={skeletonOnly} />
           <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
           {/* the proof-of-tracking skeleton — drawn from the pose stream */}
           <canvas ref={skeletonRef} className="pointer-events-none absolute inset-0 h-full w-full" />
@@ -940,16 +1034,19 @@ export function MirrorHarness({ youth = 'unknownAge' }: { youth?: YouthGate } = 
                 )}
               </div>
 
-              {/* the breath pacer, centred on the stage where the eye already is */}
+              {/* the breath pacer, centred on the stage where the eye already is — the one pacer (MIRROR-COACH P7), drawn
+                  at the stage's pose-clock seconds, so its last breath out ends on the frame the check begins */}
               {pattern === 'squat' && squatStage === 'breathe' && (
                 <div className="pointer-events-none absolute inset-0 grid place-items-center">
-                  <div className="fel-breath" />
+                  <div className="rounded-3xl bg-black/40 px-5 py-4 backdrop-blur-sm">
+                    <BreathPacer id="mirror-breathe" spec={SQUAT_BREATH_PACER} elapsedSec={breathSec} size="lg" />
+                  </div>
                 </div>
               )}
 
               {/* THE COACH'S VOICE, one cue at a time, over the picture rather than in a panel below it — you are
                   looking at yourself when the correction lands, not at a sidebar. */}
-              {cue && pattern === 'squat' && squatStage === 'work' && (
+              {cue && ((pattern === 'squat' && squatStage === 'work') || pattern === 'pressRow') && (
                 <div className="pointer-events-none absolute inset-x-4 bottom-24 flex justify-center">
                   <p
                     className="max-w-lg rounded-2xl border px-5 py-3 text-center text-[15px] font-bold backdrop-blur-md"
@@ -970,14 +1067,17 @@ export function MirrorHarness({ youth = 'unknownAge' }: { youth?: YouthGate } = 
           <div className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-3 bg-gradient-to-t
                           from-black/80 to-transparent px-4 pb-5 pt-12">
             {!live ? (
-              <button
-                onClick={start}
-                disabled={status === 'requesting' || status === 'loading-model'}
-                className="rounded-2xl bg-[#00E5FF] px-7 py-3 text-[14px] font-black text-black shadow-[0_10px_40px_-12px_#00E5FF]
-                           transition-transform hover:scale-[1.02] active:scale-[0.99] disabled:opacity-50"
-              >
-                Start session
-              </button>
+              <>
+                <button
+                  onClick={start}
+                  disabled={status === 'requesting' || status === 'loading-model'}
+                  className="rounded-2xl bg-[#00E5FF] px-7 py-3 text-[14px] font-black text-black shadow-[0_10px_40px_-12px_#00E5FF]
+                             transition-transform hover:scale-[1.02] active:scale-[0.99] disabled:opacity-50"
+                >
+                  Start session
+                </button>
+                <SkeletonToggle skeletonOnly={skeletonOnly} onToggle={toggleSkeletonOnly} />
+              </>
             ) : (
               <>
                 <button
@@ -998,7 +1098,8 @@ export function MirrorHarness({ youth = 'unknownAge' }: { youth?: YouthGate } = 
                     Skip the retest
                   </button>
                 )}
-                {(pattern === 'squat' || pattern === 'lunge') && (
+                <SkeletonToggle skeletonOnly={skeletonOnly} onToggle={toggleSkeletonOnly} />
+                {(pattern === 'squat' || pattern === 'lunge' || pattern === 'pressRow') && (
                   <button
                     onClick={() => setVoiceOn((v) => !v)}
                     aria-pressed={voiceOn}
@@ -1018,7 +1119,7 @@ export function MirrorHarness({ youth = 'unknownAge' }: { youth?: YouthGate } = 
         {pattern === 'squat' && live && (
           <p className="mt-4 text-[13px] leading-relaxed text-white/55">
             {squatStage === 'breathe' && (
-              <><span className="font-bold text-white">Breathe first.</span> In through the nose 4s · hold 2s · out slow 6s, {BREATH_CYCLES} cycles. The breath is the bedrock — everything else builds on it.</>
+              <><span className="font-bold text-white">Breathe first.</span> {squatBreathLine()} The breath is the bedrock — everything else builds on it.</>
             )}
             {squatStage === 'check' && (
               <><span className="font-bold text-white">The movement check.</span> {SQUAT_CHECK_REPS} slow squats — heels, shoulders and shift{VALGUS_CUE_VERIFIED ? ', and knees (face the camera square-on)' : ' (knees measured, not judged)'}. Squat {Math.min(squatReps + 1, SQUAT_CHECK_REPS)} of {SQUAT_CHECK_REPS}.</>
@@ -1486,6 +1587,7 @@ export function MirrorHarness({ youth = 'unknownAge' }: { youth?: YouthGate } = 
                 kneeJudged: VALGUS_CUE_VERIFIED && kneeRecord.squareFrames > 0,
               }).line}
             </p>
+            <FadeLines lines={fadeLines} />
           </section>
         )}
 
@@ -1558,10 +1660,22 @@ export function MirrorHarness({ youth = 'unknownAge' }: { youth?: YouthGate } = 
                 </li>
               ))}
             </ul>
+            {pattern === 'pressRow' && <FadeLines lines={fadeLines} />}
+            {pattern === 'pressRow' && <SessionCorrectives summary={summary} youth={youth} />}
           </section>
         )}
       </div>
     </div>
+  );
+}
+
+/** What the faded schedule did this set (MIRROR-COACH P9, cue-engine.ts fadeReviewLines): nothing when it did nothing. */
+function FadeLines({ lines }: { lines: readonly string[] }) {
+  if (!lines.length) return null;
+  return (
+    <ul data-fade-lines className="mt-3 space-y-1 text-[12.5px] leading-relaxed text-white/55">
+      {lines.map((l) => <li key={l}>{l}</li>)}
+    </ul>
   );
 }
 

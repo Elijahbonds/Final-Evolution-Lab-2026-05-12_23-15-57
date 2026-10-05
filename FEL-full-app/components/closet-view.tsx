@@ -1,12 +1,15 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { Loader2, Shirt, Palette, Check, Coins, Sparkles } from 'lucide-react';
 import { newIdempotencyKey } from '@/lib/wallet/client';
 import { FaceScanCapture } from '@/components/facescan/face-scan-capture';
+import { LookConsent } from '@/components/creator/look-consent';
+import { readConsent, readLocalLook, writeConsent, writeLocalLook, type StoredConsent } from '@/lib/creator/localLook';
+import { closetSaveRequest, decideLookHold } from '@/lib/creator/lookPrivacy';
 import { invalidateIdentity } from '@/lib/babylon/core/characterPipeline';
 import { canEquip as canEquipItem } from '@/lib/closet/ownership';
 import {
@@ -90,7 +93,7 @@ const FACE_SLIDERS: [string, string][] = [
   ['faceHeart', 'Heart'], ['faceDiamond', 'Cheekbones'], ['jawOpen', 'Jaw open'], ['browRaise', 'Brow'],
 ];
 
-export function ClosetView() {
+export function ClosetView({ adult = false }: { adult?: boolean }) {
   const [face, setFace] = useState<FaceConfig>(defaultFace());
   const [equipped, setEquipped] = useState<Equipped>(defaultEquipped());
   const [jersey, setJersey] = useState<JerseyConfig>(defaultJersey());
@@ -102,24 +105,43 @@ export function ClosetView() {
   const [saving, setSaving] = useState(false);
   const [buying, setBuying] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
+  const [consent, setConsent] = useState<StoredConsent>({ saveLookNumbers: false, modelTraining: false });
+  const hydrated = useRef(false);
 
   useEffect(() => {
     (async () => {
       try {
         const res = await fetch('/api/v1/closet');
         const j = await res.json();
+        const savedConsent = readConsent();
+        const hold = decideLookHold(adult, savedConsent.saveLookNumbers, savedConsent.modelTraining);
+        const local = readLocalLook();
+        setConsent(savedConsent);
         if (res.ok) {
-          setFace({ ...defaultFace(), ...(j.look?.face ?? {}) });
-          setEquipped({ ...defaultEquipped(), ...(j.look?.equipped ?? {}) });
+          let nextFace: FaceConfig = { ...defaultFace(), ...(j.look?.face ?? {}) };
+          // The server copy is whatever the hold allowed. The device copy wins for the rest.
+          if (!hold.uploadLook && local?.face) nextFace = { ...local.face };
+          else if (local?.face?.sliders && !hold.uploadNumbers) nextFace = { ...nextFace, sliders: { ...local.face.sliders } };
+          setFace(nextFace);
+          const serverEquipped = { ...defaultEquipped(), ...(j.look?.equipped ?? {}) };
+          setEquipped(!hold.uploadLook && local?.equipped ? { ...defaultEquipped(), ...local.equipped } : serverEquipped);
           setOwned(new Set<string>(j.owned ?? []));
           setSkins(j.skins ?? []);
           setSkinCardId(j.look?.skinCardId ?? null);
-          setJersey(sanitizeJersey(j.look?.jersey ?? defaultJersey()));
+          setJersey(!hold.uploadLook && local?.jersey ? sanitizeJersey(local.jersey) : sanitizeJersey(j.look?.jersey ?? defaultJersey()));
+        } else if (local?.face && !hold.uploadLook) {
+          setFace({ ...local.face });
         }
       } catch { /* ignore */ }
-      finally { setLoading(false); }
+      finally { hydrated.current = true; setLoading(false); }
     })();
-  }, []);
+  }, [adult]);
+
+  // The look the server is not allowed to keep still has to survive a refresh.
+  useEffect(() => {
+    if (!hydrated.current || loading) return;
+    writeLocalLook({ ...(readLocalLook() ?? {}), face, equipped, jersey });
+  }, [face, equipped, jersey, loading]);
 
   const accent = useMemo(() => skins.find((s) => s.id === skinCardId)?.accent || '#00E5FF', [skins, skinCardId]);
   // Draft palette — the same mapping resolveIdentity() applies at spawn time,
@@ -158,12 +180,19 @@ export function ClosetView() {
     try {
       const res = await fetch('/api/v1/closet', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ face, equipped, skinCardId, jersey }),
+        body: JSON.stringify(closetSaveRequest({
+          adult, face, equipped, skinCardId, jersey,
+          saveLookNumbers: consent.saveLookNumbers, modelTraining: consent.modelTraining,
+        })),
       });
       const j = await res.json();
       if (!res.ok) throw new Error(j?.error || 'save failed');
+      writeConsent(consent);
+      writeLocalLook({ ...(readLocalLook() ?? {}), face, equipped, jersey });
       invalidateIdentity(); // next spawn picks up the new look everywhere
-      toast.success('Look saved — this is how you appear across the Lab.');
+      toast.success(adult
+        ? 'Look saved — this is how you appear across the Lab.'
+        : 'Saved on this device. Your look was not uploaded.');
     } catch (e: any) { toast.error(e?.message || 'Save failed'); }
     finally { setSaving(false); }
   };
@@ -177,6 +206,9 @@ export function ClosetView() {
       <div className="mb-5">
         <h1 className="flex items-center gap-2 text-2xl font-bold text-white"><Shirt className="h-6 w-6 text-cyan-400" /> Closet</h1>
         <p className="text-sm text-white/50">Design your avatar&apos;s face, gear, and card skin. Everyone belongs here — the options are built to represent you.</p>
+        <div className="mt-3 max-w-xl">
+          <LookConsent adult={adult} consent={consent} onChange={(next) => { setConsent(next); writeConsent(next); }} />
+        </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-[260px_1fr]">
@@ -218,7 +250,9 @@ export function ClosetView() {
               setFace((p) => ({ ...p, ...partial }));
               setScanning(false);
               setTab('face');
-              toast.success('Avatar built from your scan — review and Save Look.');
+              toast.success(adult
+                ? 'Avatar built from your scan — review and Save Look.'
+                : 'Built on this device. Your look is not uploaded.');
             }}
           />
         )}

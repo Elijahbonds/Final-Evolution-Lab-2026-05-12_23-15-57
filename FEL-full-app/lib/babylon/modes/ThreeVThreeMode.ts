@@ -94,7 +94,7 @@ import {
   resolveBodyCollision, checkAnkleBreak, classifyShot, ANKLE_BREAK_STUN_SEC,
   TurboMeter, ShotArc, checkDriveDunk, checkBlock, DUNK_PCT,
   SHOT_QUALITY_PCT, followThroughFor, type ShotQuality, type ShotContext, type PostShot, type ShotStyle, BODY_STANDOFF } from '../core/BasketballCore';
-import { lockTarget, choosePassType, PassFlight, type PassType } from '../core/BallHandling';
+import { lockTarget, choosePassType, PassFlight, type PassType, leadPoint, PASS_SPEED } from '../core/BallHandling';
 import { HARD_CONTACT_SPEED, FOUL_CLOSING_SPEED } from '../core/ContactSystem';
 import {   // HOOPS-MOVE-KIT-A
   canPostUp, postYaw, postWish, postFadeAway, POST_FADE_STICK_MIN, fadeDrift,   // HOOPS-MOVE-KIT-B (2026-09-08): M4 the fade
@@ -108,7 +108,7 @@ import {   // HOOPS-MOVE-KIT-A
   pickLayupSide, planFinish, finishHopY, finishStride, FINISH_LABEL, type FinishPlan, type FinishStyle,
   contestDrive, bumpShove, BUMP_SLOW, BUMP_SLOW_SEC, type DriveContest, resolveBodyContact, FINISH_CLIP } from '../core/HoopsMoves';
 import {   // HOOPS-MOVE-KIT-A amendment (D1–D3): the defense contest package (the 1v1's, on the team game)
-  groundContest, aiBlockChance, bumpExposure, aiBumpStrips, jumpSwats, contestedPct, alteredApex, aiHandsUp, facingCos,
+  groundContest, aiBlockChance, bumpExposure, aiBumpStrips, jumpSwats, contestedPct, fatiguePct, alteredApex, aiHandsUp, facingCos,
   AI_BLOCK_JUMP_CHANCE, AI_BLOCK_RANGE, BUMP_STRIP_WINDOW_SEC,
   contestTag, aiShotRead,   // HOOPS-DEPTH S5
 } from '../core/HoopsDefense';
@@ -131,12 +131,14 @@ import {
 } from '../core/TripleThreat';   // standing still with the ball is not idle — it is threatening
 import { inStance, stanceWish } from '../core/DefensiveStance';   // the slide was cosmetic until now
 import { MomentumBus } from '../core/MomentumBus';   // Phase 6: the shared Game-Breaker layer
+import { PlayerStateMachine } from '../core/PlayerStateMachine';   // HOOPS-10PHASE-2 phase 4: the explicit idle/dribble/gather/shoot/pass/dunk/land state, published read-only
 import { heroSwing } from '../core/HoopsSwing';   // finish-release: a play between the sides reports on MY meter by who did it to whom
 import {
   dunkKindFor, isContactDunk, posterPlant, posterFall, contactBanner, contactHitStopMs, POSTER_RELEASE_K,
   type ContactDunkKind,
 } from '../core/ContactDunk';   // dunked ON, not dunked beside
 import { ballVsBodies, resolvePickup, bobbleVelocity, boardOutcome, ballOutOfPlay, HOOPS_BALL_BOUNDS, type BodyRef } from '../core/LooseBall';   // and six bodies contest it
+import { isTipInEligible, tipInMakeChance } from '../core/TipIn';   // HOOPS-10PHASE-2 phase 8: the tip-in
 import { scramSwitch } from '../core/Matchups';
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit, applyTrail, type TrailLevel } from '../visual/EffectsKit';
@@ -272,6 +274,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
     standingOf(foeScore, myScore, TARGET_SCORE, Math.min(1, Math.max(myScore, foeScore) / TARGET_SCORE));
   let carrierId: 'me' | 'mate0' | 'mate1' | 'foeTeam' = 'me';
   let shooting = false, dunking = false, ended = false, lastPasserWasMe = false;
+  let buzzer = false;   // HOOPS-TO-75 WA-1: the horn fired — wait for live shots before posting the final score
   /** HOOPS MOTION phase 3b: a MATE's shot is up (the one-shot-at-a-time guard). teammateShoots used to raise the hero's own `shooting`,
    *  which nothing cleared when their ball followed his make (opponentPossession leaves it): the hero looped `bball_shoot_jumper` while
    *  sliding on defence and was slewed toward the rim until the next possession of ours (V:3v3 C6). */
@@ -294,9 +297,17 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   let lookX = 0, lookY = 0;   // R stick → camera look (MODE-STICK-FACE family, 2026-09-07)
   const rStick = new StickHandleReader(); let stickGestures: StickGesture[] = []; let pausedDribble = false;
   let lastStickMoveAt = -Infinity, sizeUpN = 0, stepbackWindow = 0;   // THE 2K PRO STICK (2026-09-18)
+  // HOOPS-10PHASE-2 phase 5: same fix as 1v1's — a flick thrown mid-gather/mid-finish/mid-spin used to vanish
+  // instead of landing a beat later. See the 1v1 note at its own declaration.
+  const STICK_MOVE_BUFFER_MS = 220;
+  let bufferedGesture: StickGesture | null = null, bufferedGestureAt = -Infinity;
   let postStick = { x: 0, y: 0 }; let stickShot: { side: 'left' | 'right'; shimmy: boolean; started: boolean; shimmied: boolean } | null = null; let shimmyLeft = 0;   // POST HOOK (2K20): in the post the R stick up-left / up-right IS the hook (R2: the shimmy first)   // STICK HANDLE
-  let passTargetId: 'mate0' | 'mate1' = 'mate0';
+  // CALL FOR THE BALL (Elijah item 2, Oct 3 2026): 'me' is a legal passTargetId now — the only new value this
+  // type takes on, when a mate throws the ball back to the hero instead of the hero throwing it to a mate.
+  let passTargetId: 'me' | 'mate0' | 'mate1' = 'mate0';
   let passType: PassType = 'chest';
+  /** Debounce for the "BALL!" callout so a held/spammed call doesn't restate it every frame. */
+  let ballCallCalloutAt = -Infinity;
   /** Each teammate's velocity this frame — the lob needs to know who is CUTTING (D7). */
   const mateVel: Vector3[] = [new Vector3(), new Vector3()];
   /** The defenders' brains and their current marks — the scram switch re-marks them (lock: defensive switching). */
@@ -385,6 +396,8 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
   // steals in this mode were invisible to the momentum system, so the tier never moved, the multiplier
   // never applied and the crowd never escalated — the highlight plays happened and the game did not notice.
   let mbus = new MomentumBus();
+  /** HOOPS-10PHASE-2 phase 4: see the 1v1 note at its own declaration — publish-only, additive. */
+  const myStateMachine = new PlayerStateMachine();
   let momentum = 0;
   let shotTrail: ParticleSystem | null = null; let shotTrailLevel: TrailLevel = 'off';   // suite pass: the hot hand's shot trail
   /** Report a highlight and mirror the bus into the HUD momentum meter (the 1v1's). Null = heroSwing says not mine. */
@@ -447,6 +460,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
   function unplant(b: Body): void { b.plant?.release(); b.wasPlanting = false; }
   const DRIVE_MPS = 5.4;            // the rival's sprint drive (suite pass): the clock is distance / this. Past HoopsDunks' WINDUP_SPEED (5.0) on a full-length drive, so the vocabulary opens; a short drive stays a power dunk
   const TEAM_JERSEY = { mine: '#22d3ee', theirs: '#ff2d78' } as const;   // the slot colours the HUD already speaks (cyan = us, pink = them)
+  const TEAM_SHORTS = { mine: '#0e7490', theirs: '#9d174d' } as const;   // HOOPS-TO-75 HP-5: shorts tint when the jersey mesh name misses
   const AI_REACH_COOLDOWN_SEC = 1.2, AI_STEAL_CHANCE = 0.22, AI_STEAL_ON_BUMP = 0.6, AI_REACH_GATE = 0.5;   // measured at 0.6 s: ten reaches and four reach-in fouls in nine possessions — a foul every other trip   // the AI defender's reach: its cadence and its odds (open / on the bump)
   const STANDING_GATHER_MS = 220;   // DEFENSE-LOOK: the two-foot squat before a standing dunk's flight
   const DUNK_SHARE = 0.55;          // of the OPEN lanes, the share the rival throws down (the rest are layups); nerve tilts it
@@ -549,6 +563,42 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     if (body) { const c = carries.get(body); c?.reset(); gatherBallToHand(ball, body.char.skeleton, c?.handBone ?? hoopsHand(body.char)); }
   }
 
+  // CALL FOR THE BALL (Elijah item 2, Oct 3 2026 9:35 PM PT). The PASS button already asks a question
+  // ("throw it to a mate") when I carry; off the ball it asks the opposite one ("mate, throw it to ME") —
+  // 2K's call-for-the-ball, hung on the same press instead of a new button, because that press already
+  // means "I want the ball to move" in both directions.
+  //
+  // The teammate who has it answers RIGHT AWAY unless he is busy — mid-shot (mateShooting, shared across
+  // both mates since only one shoots at a time), stunned/trapped (stunSec > 0, the same flag an ankle-
+  // breaker or a drift sets), or down (floored). Busy: the call is heard (a callout, so a press is never
+  // silent) and the ordinary flow decides what happens next — his own shot read (teammateShoots' contest-
+  // weighted roll) or another call once he is free — exactly as if nobody had asked. There is no separate
+  // "mid-dribble move" flag to read yet (3v3 mates don't run size-up moves — that's HOOPS-10PHASE-2 phase 5,
+  // not landed); when it lands, add it to `busy` here.
+  function callForBall(ctx: ModeContext): void {
+    if (!(carrierId === 'mate0' || carrierId === 'mate1') || passFlight.active) return;
+    const idx = carrierId === 'mate0' ? 0 : 1;
+    const body = mates[idx];
+    const busy = mateShooting || body.stunSec > 0 || body.floored;
+    const now = performance.now();
+    if (now - ballCallCalloutAt > 500) {
+      ballCallCalloutAt = now;
+      ctx.juice.callout('BALL!', busy ? '#94a3b8' : '#39ff88', busy ? 340 : 420);
+    }
+    if (busy) { console.info('[3V3-OFF] call for the ball — teammate busy, AI logic stands'); return; }
+    SoundKit.play('uiTick', { pitch: 1.2, volume: 0.4 });
+    releaseBall(ball);
+    passType = 'chest';
+    passTargetId = 'me';
+    lastPasserWasMe = false;   // the mate threw this one, not me — no assist to credit on whatever I do next
+    slingPass = false;
+    // HOOPS-10PHASE-2 phase 6: led the same way the live pass is — a call made mid-cut still arrives on me, not
+    // behind me.
+    const toMe = leadPoint(body.char.root.position, me.char.root.position, me.drib.vel, PASS_SPEED.chest).add(new Vector3(0, 1.2, 0));
+    passFlight.start(body.char.root.position.add(new Vector3(0, 1.2, 0)), toMe, 'chest', 1);
+    console.info('[3V3-OFF] call for the ball answered — mate passes it back');
+  }
+
   /**
    * LEAVE THE FLOOR TO CONTEST. Returns true if the jump happened. One body, two callers: the raw A press and the
    * slot's `jump` edge — see the note on `PlayerSlot.Intent.jump` for why the block needed a wire of its own.
@@ -596,13 +646,13 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     // is (DribbleController) — so with the hero spawned facing +z and the rim at −z, push-forward ran him BACKWARDS
     // to the rim for the whole drive (measured: facing·travel −1 for 4.4 m/s). 1v1 has always called setFacing(π).
     me.char.root.rotation.y = Math.PI; me.drib.setFacing(Math.PI);
-    mates[0].char.root.position.set(-3.5, 0, 4);
-    mates[1].char.root.position.set(3.5, 0, 4);
-    foes.forEach((f, i) => f.char.root.position.set((i - 1) * 3, 0, 2));
+    mates[0].char.root.position.set(-4.8, 0, 5.8);
+    mates[1].char.root.position.set(4.8, 0, 5.8);
+    foes.forEach((f, i) => f.char.root.position.set(-4.5 + i * 4.5, 0, -0.8 - i * 1.1));
     ctx0?.camDirector.snapTo(me.char.root.position, RIM);   // POLISH: the bodies moved metres — the camera cuts to them, it does not chase
     shooting = false; mateShooting = false; currentShot = null;
     if (gather || finish || spin || posting) me.tree.release();   // HOOPS-MOVE-KIT-A/B: a held gather / finish / seal / pivot is lifted with the possession
-    gather = null; finish = null; spin = null; posting = false; spinCooldown = 0; spinArmed = 0; stickGestures = []; rStick.reset(); stickShot = null; shimmyLeft = 0; if (pausedDribble) { pausedDribble = false; me.drib.pause(false); } pumpWindow = 0; banked = null; driveContest = null; finishFoul = false; passFakeCooldown = 0; threat = { ...THREAT_IDLE }; stickHeld = 0; stickPeak = 0; jabEligible = false; burstArmed = false; me.char.root.position.y = 0;
+    gather = null; finish = null; spin = null; posting = false; spinCooldown = 0; spinArmed = 0; stickGestures = []; bufferedGesture = null; rStick.reset(); stickShot = null; shimmyLeft = 0; if (pausedDribble) { pausedDribble = false; me.drib.pause(false); } pumpWindow = 0; banked = null; driveContest = null; finishFoul = false; passFakeCooldown = 0; threat = { ...THREAT_IDLE }; stickHeld = 0; stickPeak = 0; jabEligible = false; burstArmed = false; me.char.root.position.y = 0;
     clearDefense();
     // BIOMECH-HOOPS-WAVE1: the possession's clocks; a held shot is lifted, a floored body gets up
     driver = null; driveK = 0; dunkFlight = null; dunkFlush = null; mateArc.active = false; posterVictim = null; victimSlide = null; lastDunkKind = 'clean';
@@ -638,7 +688,11 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         // had no way to tell a teammate from a defender but the hero's purple. The AI bodies wear their team's jersey
         // (the tint used to be only a roster SEED; the roster's baked kit ignored it); the hero keeps the wardrobe he
         // chose, because he is the one you steer and that is how you find him.
-        if (ai) tintGarmentSlot(char, SLOT_KEYS.jersey, aiKind === 'teammate' ? TEAM_JERSEY.mine : TEAM_JERSEY.theirs);
+        if (ai) {
+          const side = aiKind === 'teammate' ? 'mine' : 'theirs';
+          tintGarmentSlot(char, SLOT_KEYS.jersey, TEAM_JERSEY[side]);
+          tintGarmentSlot(char, SLOT_KEYS.shorts, TEAM_SHORTS[side]);
+        }
         char.secondary?.setLookTarget(() => ball?.position ?? null);   // Phase 2: all six watch the ball
         neverBindPose(char.animator, SPORT_CLIP.idle);
         rightHandDunks(char.animator, char.skeleton);   // DUNK MOTION phase 11 (owner: right-handed "every dunk, every body"): all six
@@ -695,17 +749,17 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       me = await spawnBody(new Vector3(0, 0, 6), undefined, false, 'teammate');
       ring?.dispose(); ring = mountPlayerRing(ctx.scene, me.char.root, { color: TEAM_JERSEY.mine, icon: readPlayerIcon() });   // PLAYER RING: the one you steer, in your team's colour
       mates = [
-        await spawnBody(new Vector3(-3.5, 0, 4), '#22d3ee', true, 'teammate', Math.PI * 0.25),
-        await spawnBody(new Vector3(3.5, 0, 4), '#22d3ee', true, 'teammate', -Math.PI * 0.25),
+        await spawnBody(new Vector3(-4.8, 0, 5.8), '#22d3ee', true, 'teammate', Math.PI * 0.25),
+        await spawnBody(new Vector3(4.8, 0, 5.8), '#22d3ee', true, 'teammate', -Math.PI * 0.25),
       ];
       // Each defender MARKS A MAN: allyPositions() is [me, mate0, mate1], so
       // 0/1/2 is a real matchup. Three defenders with no assignment all solved
       // for the same point between the ball and the rim and arrived in a heap,
       // which is what the first 3v3 screenshot showed.
       foes = [
-        await spawnBody(new Vector3(-2, 0, 2), '#ff2d78', true, 'defender', 0, 0),
-        await spawnBody(new Vector3(0, 0, 1.5), '#ff2d78', true, 'defender', 0, 1),
-        await spawnBody(new Vector3(2, 0, 2), '#ff2d78', true, 'defender', 0, 2),
+        await spawnBody(new Vector3(-4.5, 0, -0.8), '#ff2d78', true, 'defender', 0, 0),
+        await spawnBody(new Vector3(0, 0, -1.9), '#ff2d78', true, 'defender', 0, 1),
+        await spawnBody(new Vector3(4.5, 0, -3.0), '#ff2d78', true, 'defender', 0, 2),
       ];
 
       ball = MeshBuilder.CreateSphere('ball', { diameter: 0.24 }, ctx.scene);
@@ -795,8 +849,11 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         // press is judged in, so a HELD pass read as a dead button on the capture (4 of 11). A passer's hands move the
         // instant the button goes down; the tick says so, and the pass or the fake still lands on its own beat.
         SoundKit.play('uiTick', { pitch: 1.15, volume: 0.3 });
+      } else if (e.t === 'button' && e.btn === 'A' && e.pressed && (carrierId === 'mate0' || carrierId === 'mate1') && !ended) {
+        // CALL FOR THE BALL (Elijah item 2): off the ball, the PASS button calls for it instead of throwing it.
+        callForBall(ctx);
       } else if (e.t === 'button' && e.btn === 'A' && e.pressed) {
-        refuse(ctx, carrierId === 'foeTeam' ? 'NO BALL TO PASS' : 'YOUR TEAMMATE HAS IT');   // SCORECARD CONTROLS (2026-09-15)
+        refuse(ctx, 'NO BALL TO PASS');   // only carrierId === 'foeTeam' reaches here now — the mate case calls for it above
       } else if (e.t === 'button' && e.btn === 'B' && e.pressed && carrierId === 'foeTeam') {
         refuse(ctx, 'NOBODY TO SCREEN FOR ON D');   // Circle is the screen call; on defence it is the charge, held
       } else if (e.t === 'button' && e.btn === 'B' && e.pressed && carrierId !== 'me') {
@@ -832,17 +889,19 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       }
       else if (!driver) { driverPrevFor = null; driverVelEst.setAll(0); }
       { const sv = Math.round(synergy.value), od = Math.ceil(synergy.overdriveLeft); if (sv !== synHud || od !== odHud) { synHud = sv; odHud = od; ctx.setHud({ synergy: sv, overdrive: od }); } }
-      timeLeft -= dt;
-      if (timeLeft <= 0) {
-        ended = true; SoundKit.play('whistle');
-        // A TIE IS NOT A WIN (2026-09-12 mechanic pass). This read `myScore >= foeScore`, so a
-        // game that ran out of clock level — 21-21 — reported WIN and the recap said GAME WON.
-        // It is a rule the game never states, and a player who ties and is told they won has
-        // been given a reason not to trust the scoreboard. Reaching TARGET_SCORE is still an
-        // outright win; only the buzzer can produce a level game, and it says so now.
-        const verdict = myScore > foeScore ? 'WIN' : myScore === foeScore ? 'DRAW' : 'LOSS';
-        micEnd(verdict);   // THE MIC: the buzzer's result, called before the harness stops ticking the mode
-        return ctx.end(verdict, myScore, { foeScore, assists });
+      if (timeLeft > 0) timeLeft -= dt;
+      else if (!buzzer) { buzzer = true; SoundKit.play('whistle'); }
+      const liveAtBuzzer = arc.active || mateArc.active || !!foeDunkFlight || dunking || shooting || mateShooting;
+      if (buzzer && !ended) {
+        if (!liveAtBuzzer) {
+          ended = true;
+          // A TIE IS NOT A WIN (2026-09-12 mechanic pass). Reaching TARGET_SCORE is still an outright win;
+          // only the buzzer can produce a level game, and it says so now.
+          const verdict = myScore > foeScore ? 'WIN' : myScore === foeScore ? 'DRAW' : 'LOSS';
+          ctx.setHud({ score: myScore, foeScore, time: 0 });
+          micEnd(verdict);   // THE MIC: the buzzer's result, called before the harness stops ticking the mode
+          return ctx.end(verdict, myScore, { foeScore, assists });
+        }
       }
       // THE MIC: ten seconds on the game clock, once (never inside my dunk's flight, where the booth is holding)
       if (!micClock && timeLeft <= 10 && !dunking) { micClock = true; mic?.say({ moment: 'game.clock', priority: 2, crowd: { moment: 'crowd.hype', n: 2 } }); }
@@ -1138,7 +1197,19 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       }
       const moving = Math.hypot(meIntent.moveX, meIntent.moveY) > 0.1;
       const sprintOk = turbo.gate(dt, meIntent.sprint, moving);
+      // CALL FOR THE BALL (Elijah item 2): the phone pad's PASS button relabels to BALL! whenever I don't have
+      // it, so the touch verb reads honestly in both directions — same slot, same owner rule as every other
+      // contextual verb on this diamond (Y: BLOCK/ALREADY UP, B: SCREEN/CHARGE).
+      ctx.setHud({ onBall: iAmCarrier });
       ctx.setHud({ turbo: Math.round(turbo.t01 * 100) }); ring?.set(turbo.t01);
+      // HOOPS-10PHASE-2 phase 4: the explicit state, once per frame — idle, dribble, gather, shoot, pass (THIS
+      // body's own pass out, not a catch), dunk, land. Publish-only, same reasoning as 1v1: the booleans below
+      // stay the single source of truth for behaviour, this only names what they already mean.
+      ctx.setHud({ playerState: myStateMachine.update({
+        hasBall: iAmCarrier, moving, gathering: !!gather, shooting, dunking,
+        passing: lastPasserWasMe && passFlight.active,   // a pass just thrown by me, still in flight
+        landing: me.landSec > 0,
+      }).state });
         // Stick-space is normalised in LocalInputSource — see PlayerSlot.
       // MODE-STICK-FACE (2026-09-07): CAMERA-relative — the team camera looks at the rim (−z) from behind me, and in a
       // left-handed world a raw +x intent is SCREEN-LEFT (measured: stick-right Δscreen −5.6 m). Up = the camera's flat
@@ -1209,6 +1280,10 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       // side flick at pace is the MOMENTUM CROSS (a wide cut that keeps the run; chained, the spam escalates), a down
       // flick the MOMENTUM BEHIND THE BACK (slow: the hesi), a hold is PAUSIN' (frozen, the ball out, the release explodes),
       // a half-circle sweep the STEEZO ROLL (the wrap rolled into the spin). In the air the same stick is the trick stick.
+      // HOOPS-10PHASE-2 phase 5: replay a buffered gesture the instant the lock clears — see the 1v1 note.
+      if (bufferedGesture && !shooting && !dunking && !finish && !gather && !spin && performance.now() - bufferedGestureAt <= STICK_MOVE_BUFFER_MS) {
+        stickGestures.unshift(bufferedGesture); bufferedGesture = null;
+      } else bufferedGesture = null;
       if (stickGestures.length && iAmCarrier && !shooting && !dunking && !finish && !gather && !spin) {
         const nfS = nearestLiveFoe(); const foeDistS = nfS ? distXZ(me.char.root.position, nfS.char.root.position) : Infinity; const foeLiveS = !!nfS;
         for (const g of stickGestures) {
@@ -1277,7 +1352,12 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           SoundKit.play('whoosh', { pitch: pick.move === 'momentum_cross' ? 1.45 : 1.3, volume: 0.4 }); ctx.feel?.impact?.(0.1);
         }
         stickGestures = [];
-      } else if (stickGestures.length) stickGestures = [];
+      } else if (stickGestures.length) {
+        // BUFFERED, NOT EATEN — see the 1v1 note at its own declaration.
+        const last = [...stickGestures].reverse().find((g) => g.kind === 'flick' || g.kind === 'sweep');
+        if (last) { bufferedGesture = last; bufferedGestureAt = performance.now(); }
+        stickGestures = [];
+      }
       if (drib.crossover && !shooting && !dunking && !finish && !gather && !posting && !spin) {
         carries.get(me)?.toSide(sideOfVector(me.char.root.rotation.y, wish));   // HOOPS MOTION phase 3: to the hand on the cut's side (a toggle before), crossing in front — a path, not a jump
         // A CROSSOVER IS A CHAIN LINK, not just a hand swap. In 3v3 it only ever switched hands, so the
@@ -1660,9 +1740,16 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           // any pass but the lob (the alley-oop is its own thing); the turbo HELD at the throw, not the gate — an unaimed pass lets the
           // stick go the frame it throws (that is how a bounce pass is asked for) and the gate has already dropped on that frame
           slingPass = type !== 'lob' && slingRead(sprintOk || !!meIntent.sprint, Math.hypot(me.drib.vel.x, me.drib.vel.z));
+          // HOOPS-10PHASE-2 phase 6: lead the catch — chest/bounce aim where he'll BE, not where he IS, so a mate
+          // cutting into the lane doesn't have to break stride for it. The lob keeps its own target: the alley-oop's
+          // cutting-speed/rim-radius read (choosePassType above) already times it to land above the iron, which a
+          // second, independent lead on top of would just fight.
+          const toTarget = type === 'lob'
+            ? locked.pos.add(new Vector3(0, 1.2, 0))
+            : leadPoint(ball.getAbsolutePosition(), locked.pos, mateVel[locked.id === 'mate0' ? 0 : 1], PASS_SPEED[type] * (slingPass ? SLING.ballMult : 1)).add(new Vector3(0, 1.2, 0));
           passFlight.start(
             ball.getAbsolutePosition(),
-            locked.pos.add(new Vector3(0, 1.2, 0)),
+            toTarget,
             type,
             slingPass ? SLING.ballMult : 1,
           );
@@ -1708,13 +1795,17 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         if (!passFlight.active) { /* picked */ }
         else if (passFlight.step(dt, ball.position)) {
           if (passType === 'lob') {
-            // caught above the rim: the cutter finishes it, no dribble in between
+            // caught above the rim: the cutter finishes it, no dribble in between — the catch beat is skipped on
+            // purpose, the alley-oop's own flight (mates[idx].tree) goes straight into the finish
             const idx = passTargetId === 'mate0' ? 0 : 1;
             giveBallTo(passTargetId);
             void teammateShoots(ctx, mates[idx], idx, 'alleyoop');
             return;
           }
           giveBallTo(passTargetId);
+          // HOOPS-10PHASE-2 phase 6: the catch — hands out to meet it, in to secure it. Plays on whichever body just
+          // received it (me or a mate), on top of their own stance, the same way bball_contact_react layers onto one.
+          (passTargetId === 'me' ? me : mates[passTargetId === 'mate0' ? 0 : 1]).tree.beat('bball_catch', { fadeSec: 0.05 });
           if (slingPass) { slingPass = false; mateBurst[passTargetId === 'mate0' ? 0 : 1] = SLING.burstSec; bannerFlash(ctx, 'SLING — BURST!', 500); console.info('[3V3-KIN] sling burst on the catch'); }
           if (passType === 'bounce') {
             ctx.setHud({ banner: 'BOUNCE PASS!' });
@@ -1933,7 +2024,10 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     // M12: CALLED GLASS — R1 held inside the band routes the ball through the square, and a bank from there is a real edge
     if (!banked && me.slot.intent.glass && inBankBand(me.char.root.position, RIM_FLOOR, BOARD_NORMAL)) banked = bankPoint(me.char.root.position, RIM, BOARD_NORMAL);
     if (banked) console.info(`[3V3-MOVE] called glass at ${banked.x.toFixed(2)}, ${banked.y.toFixed(2)}, ${banked.z.toFixed(2)}`);
-    const pct = contestedPct(SHOT_QUALITY_PCT[quality] * pctMod, shotContest) + (banked ? BANK_PCT_BONUS : 0);
+    // HOOPS-10PHASE-2 phase 3: fatigue reads the same "how gassed" signal the posture layer already does (the turbo tank
+    // run down) — not a new stat, just the make chance now listening to it too.
+    const meFatigue01 = Math.max(0, 1 - turbo.t01);
+    const pct = fatiguePct(contestedPct(SHOT_QUALITY_PCT[quality] * pctMod, shotContest), meFatigue01) + (banked ? BANK_PCT_BONUS : 0);
     const dist = Vector3.Distance(me.char.root.position, RIM);
     arcPoints = isThree(me.char.root.position, RIM) ? 3 : 2;
     arcLabel = currentShot?.label ?? 'SHOT';
@@ -1945,7 +2039,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     arcMade = v3.made;
     // D1: the AI's block at the release (a hand up or a jump inside range) — the ball knocked LOOSE from my hand
     const blockChance = near ? aiBlockChance(currentShot?.style ?? 'jumper', nearDist, nearUp, near.vel.length() < 1.0) : 0;
-    console.info(`[3V3-DEF] my release ${currentShot?.style} contest ${shotContest.toFixed(2)} handUp ${foeHandUp === near && !!near} jump ${!!near && near.jumpAge <= HAND_UP_SEC} block ${blockChance.toFixed(2)} rim ${distXZ(me.char.root.position, RIM_FLOOR).toFixed(2)} q ${quality} mod ${pctMod.toFixed(2)} pct ${pct.toFixed(2)} made ${arcMade}`);
+    console.info(`[3V3-DEF] my release ${currentShot?.style} contest ${shotContest.toFixed(2)} fatigue ${meFatigue01.toFixed(2)} handUp ${foeHandUp === near && !!near} jump ${!!near && near.jumpAge <= HAND_UP_SEC} block ${blockChance.toFixed(2)} rim ${distXZ(me.char.root.position, RIM_FLOOR).toFixed(2)} q ${quality} mod ${pctMod.toFixed(2)} pct ${pct.toFixed(2)} made ${arcMade}`);
     if (blockChance > 0 && roll() < blockChance) { blockedShot(ctx, near!); return; }
     releaseBall(ball);
     gather = null;   // HOOPS-MOVE-KIT-A M1: a release inside the gather is a rushed shot
@@ -2683,6 +2777,41 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     if (r.winner) {
       const team: 'me' | 'foe' = r.winner.id.startsWith('foe') ? 'foe' : 'me';
       const putback = boardOutcome(team, board.shooter) === 'putback';
+      // HOOPS-10PHASE-2 phase 8: THE TIP-IN. Caught right at/near the rim off your own miss, it goes straight
+      // back up in one motion — every other board still falls through to the ordinary dribble/gather/shoot loop
+      // below, unchanged. A missed tip attempt changes nothing: the ball is already secured the same way any
+      // other board is, this only adds a NEW instant-make outcome on the rare right-under-the-rim catch.
+      if (putback && isTipInEligible(ballSim.pos, RIM, true)) {
+        const winnerBody = r.winner.id === 'me' ? me : r.winner.id.startsWith('mate') ? mates[Number(r.winner.id.slice(4))] : foes[Number(r.winner.id.slice(3))];
+        const opponents = (team === 'me' ? foes : [me, ...mates]).map((b) => b.char.root.position);
+        const nearestOpp = opponents.reduce<Vector3 | null>((best, p) =>
+          !best || Vector3.Distance(p, winnerBody.char.root.position) < Vector3.Distance(best, winnerBody.char.root.position) ? p : best, null);
+        const contest = contestLevel(winnerBody.char.root.position, nearestOpp);
+        if (roll() < tipInMakeChance(contest)) {
+          board = null; endChase(); endBoxOut(); ballSim.stop();
+          winnerBody.tree.beat('bball_score_celebrate', { fadeSec: 0.2 });
+          const v = netExitVelocity('layup');
+          ballSim.launch(RIM.clone(), new Vector3(v.x, v.y, v.z));
+          SoundKit.play('score'); SoundKit.play('swish', { volume: 0.6 }); EffectsKit.burst(ctx.scene, RIM, 'net');
+          console.info(`[3V3-BOARD] TIP-IN by ${r.winner.id} contest ${contest.toFixed(2)}`);
+          if (team === 'me') {
+            myScore += 2;
+            ctx.setHud({ score: myScore, banner: 'TIP IN!' });
+            bannerClearLater(ctx, 700);
+            swing(heroSwing({ play: 'make', by: 'me' })); ctx.setHud({ momentum });
+            if (myScore >= TARGET_SCORE) { ended = true; SoundKit.play('whistle'); micEnd('WIN'); ctx.end('WIN', myScore, { foeScore, assists }); return; }
+            resetPossession(true);
+          } else {
+            foeScore += 2;
+            ctx.setHud({ foeScore, banner: 'THEIR TIP IN!' });
+            bannerClearLater(ctx, 700);
+            if (foeScore >= TARGET_SCORE) { ended = true; SoundKit.play('whistle'); micEnd('LOSS'); ctx.end('LOSS', myScore, { foeScore, assists }); return; }
+            void opponentPossession(ctx);
+          }
+          return;
+        }
+        // a missed tip attempt falls through to the ordinary board-secured flow below, unchanged
+      }
       board = null;
       endChase();
       endBoxOut();
@@ -3046,7 +3175,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         foeDunkFlight = null; driver = null;
         shooter.tree.beat(SPORT_CLIP.dunkLandCrouch, { fadeSec: 0.08 });
         if (made) {
-          foeScore += 2;
+          foeScore += 2; foeShotScored = true;
           SoundKit.play('score', { pitch: 0.9 }); SoundKit.play('crowdGroan', { volume: 0.5 });
           contactPunch(ctx);
           EffectsKit.burst(ctx.scene, RIM, 'net');

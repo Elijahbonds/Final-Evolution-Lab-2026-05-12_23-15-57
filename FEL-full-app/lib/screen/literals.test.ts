@@ -18,7 +18,7 @@ const ALLOWED: Record<string, [string[], string][]> = {
   'lib/assess/calibration.ts': [[LANDMARKS, 'MediaPipe landmark indices and the 33-landmark count']],
   'lib/assess/protocol.ts': [[['5', '3'], 'rep counts of T4, T6 and T7, listed as "Full screen: coming later" and never run']],
   'lib/assess/why.ts': [[['10', '100', '1000'], 'rounding, percent, ms → s'], [['2.54'], 'cm per inch'], [['3', '4', '5'], 'the §7.3 ranking order of finding categories and PR #20\'s top-three findings count (not shown by SCREEN-SHIP\'s results)']],
-  'lib/assess/runner.ts': [[['1000', '10000', '10', '100'], 'ms → s, Hz rounding, percent'], [['33'], 'the 33-landmark count'], [['3'], 'the 0–3 scale in PR #20\'s mini line'], [['2.54'], 'cm per inch']],
+  'lib/assess/runner.ts': [[['1000', '10000', '10', '100'], 'ms → s, Hz rounding, percent'], [['33'], 'the 33-landmark count'], [['3'], 'the 0–3 scale in PR #20\'s mini line'], [['2.54'], 'cm per inch'], [['900', '420'], 'still-hold and flash duration (SCREEN-REALTIME UI pacing)']],
   'lib/assess/geometry.ts': [
     [['180', '360'], 'degrees in a turn'], [['1e-12', '1e-9', '1e-6', '1e-3'], 'division guards'], [['0.5'], 'the image centre, midpoints'],
     [LANDMARKS, 'MediaPipe landmark indices and count'],
@@ -35,11 +35,14 @@ const ALLOWED: Record<string, [string[], string][]> = {
   'lib/assess/thresholds.ts': [],
   'lib/screen/checks.ts': [], 'lib/screen/store.ts': [], 'lib/screen/flow.ts': [], 'lib/screen/copy.ts': [], 'lib/screen/PROPOSED-program-lanes.ts': [],
   'lib/screen/age.ts': [], 'lib/screen/routes.ts': [],
+  'lib/screen/kid.ts': [[['10'], 'one decimal of rounding for the change line (as lib/assess/why.ts rounds the jump)']],
   'lib/screen/config.ts': [[['9'], 'a regex character class (a-z0-9)']],
   'lib/screen/ui.ts': [[['16', '3', '0.5', '6', '1200'], 'UI constants: the skeleton\'s One Euro (1, 16, 3), its visibility floor, the tracking-loss window and the Done beat — grade nothing (gate 2)'], [LANDMARKS, 'landmark indices and count']],
-  'app/play/mirror/assess/_components/assess-app.tsx': [[['33'], 'the landmark count'], [['500'], 'how often the camera check re-reads the pose rate (UI)'], [['4', '3'], 'the 4:3 default picture aspect'], [['60'], 'the camera frame-rate asked for on the jump (spec §3.1)']],
+  'app/play/mirror/assess/_components/assess-app.tsx': [[['33'], 'the landmark count'], [['500'], 'how often the camera check re-reads the pose rate (UI)'], [['4', '3'], 'the 4:3 default picture aspect'], [['60'], 'the camera frame-rate asked for on the jump (spec §3.1)'], [['12', '900'], 'device auto-continue pose-rate floor and hold (SCREEN-REALTIME)']],
+  'lib/screen/realtime-cues.ts': [[['420', '900', '1800', '12'], 'flash, still-hold, auto-advance and device-check UI pacing'], [['440', '660', '520', '784', '330', '280', '90', '140', '80', '160', '120', '100', '22', '28', '40', '35', '50'], 'Web Audio tone frequencies and buzz lengths (ms)'], [['0.22', '1000'], 'audio gain and ms → s']],
+  'lib/assess/rejection.ts': [[['700'], 'too-fast rep threshold (ms), not a grade']],
   'app/play/mirror/assess/_components/gate-steps.tsx': [],
-  'app/play/mirror/assess/_components/live-hud.tsx': [[['100', '1000'], 'percent, ms → s']],
+  'app/play/mirror/assess/_components/live-hud.tsx': [[['100', '1000'], 'percent, ms → s'], [['0.55', '3'], 'flash opacity and distance read in a comment (not a grade)']],
   'app/play/mirror/assess/_components/skeleton.ts': [[LANDMARKS, 'the bones and joints drawn'], [['0.35', '160', '0.9', '2.5', '110', '6', '1.5', '240', '200', '2.4', '0.2', '0.08', '1e-6'], 'drawing: visibility for the frozen view, line widths, alpha, radii, guide lengths, padding']],
   'app/play/mirror/assess/_components/use-voice.ts': [[['1.02'], 'speech rate']],
 };
@@ -47,7 +50,10 @@ const NONE = [
   'app/play/mirror/assess/_components/camera-help.tsx', 'app/play/mirror/assess/_components/not-saved.tsx', 'app/play/mirror/assess/_components/results-page.tsx',
   'app/play/mirror/assess/_components/results-view.tsx', 'app/play/mirror/assess/_components/screen-ui.tsx', 'app/play/mirror/assess/page.tsx',
   'app/play/mirror/assess/results/page.tsx', 'app/screen/page.tsx', 'app/screen/program/[lane]/page.tsx', 'app/screen/program/[lane]/program-lane.tsx',
-  'app/screen/privacy/page.tsx', 'app/screen/privacy/clear-results.tsx', 'app/play/mirror/assess/_components/use-leave-guard.ts',
+  'app/screen/privacy/page.tsx', 'app/screen/privacy/clear-results.tsx', 'app/screen/privacy/privacy-frame.tsx', 'app/play/mirror/assess/_components/use-leave-guard.ts',
+  // SCREEN-FIX-2
+  'app/play/mirror/assess/_components/kid-results.tsx', 'app/play/mirror/assess/_components/screen-pose.ts',
+  'app/play/mirror/assess/_components/screen-error-boundary.tsx', 'app/play/mirror/assess/layout.tsx', 'app/screen/layout.tsx',
 ];
 /** lib/assess/replay.ts is the synthetic athlete (QA data for tests and probes): it grades nothing. */
 const EXEMPT = ['lib/assess/replay.ts', 'lib/screen/PROPOSED-thresholds.ts', 'lib/screen/PROPOSED-program-lanes.ts'];

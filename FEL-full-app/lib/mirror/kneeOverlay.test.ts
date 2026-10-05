@@ -80,7 +80,8 @@ describe('the harness paints these arrows, only for a cueable knee fault, only o
     // against the same warn line the audit itself faults on, so only the caving knee gets an arrow.
     expect(h).toMatch(/valgusBySide\.left >= SQUAT_THRESHOLDS\.valgusWarn/);
     expect(h).toMatch(/valgusBySide\.right >= SQUAT_THRESHOLDS\.valgusWarn/);
-    expect(h).toContain('paintSkeleton(pose, p, paintableFaults(was, cueableFaults(squat.faults)), squat.valgusBySide)');
+    // (MIRROR-COACH P9 fix: the painter also takes the voice's fade — CueEngine.isVoiceable — so a faded fault is not painted)
+    expect(h).toContain('paintSkeleton(pose, p, paintableFaults(was, cueableFaults(squat.faults), (f) => cueEngineRef.current.isVoiceable(f as FaultId)), squat.valgusBySide)');
     expect(h).not.toMatch(/\bband\b/i);
   });
 });

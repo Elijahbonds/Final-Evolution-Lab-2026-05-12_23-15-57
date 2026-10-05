@@ -1,3 +1,5 @@
+import { isUnlistedMode } from './unlisted-modes';
+
 export const PRQ_ATTRS = [
   'strength',
   'speed',
@@ -80,7 +82,7 @@ export const MODE_ATTRS: Record<string, PrqAttr[]> = {
   karateEndless: ['strength', 'agility', 'endurance', 'mental'],
   dunkContest: ['power', 'speed', 'flexibility'],
   tennis: ['agility', 'speed', 'endurance'],
-  brainBrawl: ['mental', 'recovery'],
+  brainBrawl: ['mental'], // MIRROR-COACH P9 (2026-09-30): no longer 'recovery' — trivia is not recovery work (lib/prq-engine.ts, PRQ recovery)
   skateboarding: ['agility', 'flexibility', 'mental'],
   soccer: ['power', 'agility', 'mental'],
   baseball: ['strength', 'power', 'speed'],
@@ -88,12 +90,12 @@ export const MODE_ATTRS: Record<string, PrqAttr[]> = {
   surfing: ['flexibility', 'endurance', 'mental'],
   golf: ['mental', 'flexibility', 'power'],
   freerun: ['agility', 'power', 'flexibility'],
-  training: ['strength', 'endurance', 'recovery'],
+  training: ['strength', 'endurance'], // MIRROR-COACH P9 fix (2026-09-30): no longer 'recovery' — the Iron Paradise game is not recovery work (owner decision #12)
   hoops1v1: ['agility', 'power', 'mental'],
   hoops3v3: ['mental', 'agility', 'endurance'],
   threePoint: ['mental', 'flexibility', 'speed'],
   karateVersus: ['strength', 'agility', 'mental'],
-  whoSceneIt: ['mental', 'recovery'],
+  whoSceneIt: ['mental'], // MIRROR-COACH P9 (2026-09-30): no longer 'recovery' — trivia is not recovery work (lib/prq-engine.ts, PRQ recovery)
   bigAir: ['power', 'agility', 'flexibility'],
   tiebreak: ['speed', 'agility', 'mental'],
   sprint: ['speed', 'power', 'endurance'],
@@ -131,6 +133,10 @@ export function computePrqDelta(opts: {
   /** ACCURACY_PRQ_MODES with no accuracy: 'none' (no gain, the default) or 'score' (the pre-P2 score path: a legacy client). */
   whenNoAccuracy?: 'none' | 'score';
 }): number {
+  // IRON-PARADISE-OUT (2026-10-03): a parked mode's rows above STAY (history reads them; nothing is deleted),
+  // but they pay nothing new — a mode nobody can reach moves no PRQ, whatever posts. Remove the list entry and
+  // the row pays exactly as it did.
+  if (isUnlistedMode(opts?.mode)) return 0;
   const weight = MODE_WEIGHTS?.[opts?.mode] ?? 0.8;
   const completionBonus = opts?.won ? 1.2 : 1.0;
   const timeFactor = Math.min(Math.max((opts?.duration ?? 0) / 120, 0.25), 1);

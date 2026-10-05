@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { healthEraseToast, healthStoredLine } from '@/lib/health/healthDataCopy';
 import { MasteryBadge } from '@/components/mastery-badge';
 import { motion } from 'framer-motion';
 import { PRQ_ATTRS } from '@/lib/prq';
@@ -304,8 +305,12 @@ function PrqDataRights() {
 interface HealthConsentApiView {
   healthData: { granted: boolean; grantedAt: string | null };
   coaches: { coachId: string; name: string; viewGranted: boolean; grantedAt: string | null }[];
-  counts: { healthIntakes: number; painCheckIns: number };
+  /** MIRROR-COACH P6 (2026-09-29): readinessCheckIns — the daily check-in, stored under this same consent. Optional
+   *  so a response from before P6 still renders (read as 0). MIRROR-COACH P7 FIX (2026-09-29): breathLogs — the Dial-Up
+   *  Breath's use log, which the export and both erases carry; optional for the same reason. */
+  counts: { healthIntakes: number; painCheckIns: number; readinessCheckIns?: number; breathLogs?: number };
 }
+
 
 function HealthDataSection() {
   const [view, setView] = useState<HealthConsentApiView | null>(null);
@@ -352,7 +357,7 @@ function HealthDataSection() {
       const j = await res.json().catch(() => ({}));
       if (res.ok) {
         const e = j?.erased ?? {};
-        toast.success(`Deleted ${e.healthIntakes ?? 0} intake${e.healthIntakes === 1 ? '' : 's'}, ${e.painCheckIns ?? 0} pain check-in${e.painCheckIns === 1 ? '' : 's'} and ${e.healthConsents ?? 0} consent record${e.healthConsents === 1 ? '' : 's'}`);
+        toast.success(healthEraseToast(e));
         setShowErase(false);
         setView(j);
       } else {
@@ -373,7 +378,7 @@ function HealthDataSection() {
         <ShieldCheck className="h-4 w-4 text-[#00E5FF]" /> HEALTH DATA
       </h3>
       <p className="text-xs text-white/40 mb-4">
-        Your health intake and pain check-ins, kept separately from the rest of your account: opt-in only, stored on FEL
+        Your health intake, pain check-ins, daily check-ins and Dial-Up Breath uses, kept separately from the rest of your account: opt-in only, stored on FEL
         only, never sold, never used for ads, never in a share link, and never scored or paid. See Privacy §5.
       </p>
 
@@ -382,7 +387,7 @@ function HealthDataSection() {
           <div className="text-sm font-bold text-white">Health data collection</div>
           <div className="text-xs text-white/40">
             {granted
-              ? `On${view?.healthData.grantedAt ? ` since ${new Date(view.healthData.grantedAt).toLocaleDateString()}` : ''} — ${view?.counts.healthIntakes ?? 0} intake${(view?.counts.healthIntakes ?? 0) === 1 ? '' : 's'}, ${view?.counts.painCheckIns ?? 0} pain check-in${(view?.counts.painCheckIns ?? 0) === 1 ? '' : 's'} stored.`
+              ? `On${view?.healthData.grantedAt ? ` since ${new Date(view.healthData.grantedAt).toLocaleDateString()}` : ''} — ${healthStoredLine(view?.counts)}`
               : 'Off — nothing is being collected.'}
           </div>
         </div>
@@ -427,7 +432,7 @@ function HealthDataSection() {
           </button>
         ) : (
           <div className="flex items-center gap-2">
-            <span className="text-xs text-[#FF3366]">Deletes your intake, every pain check-in and your consent records. Never touches a workout plan or your PRQ history. This is permanent.</span>
+            <span className="text-xs text-[#FF3366]">Deletes your intake, every pain check-in, every daily check-in and your Dial-Up Breath uses. Your consent records are kept as proof of agreement and withdrawal. Never touches a workout plan or your PRQ history. This is permanent.</span>
             <button
               onClick={handleErase}
               disabled={erasing}

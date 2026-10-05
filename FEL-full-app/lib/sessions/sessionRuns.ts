@@ -33,6 +33,9 @@ export type GrantType = (typeof GRANT_TYPES)[number];
 /** The wallet idempotency key of one of a run's grants. */
 export const runWalletKey = (runId: string, grant: 'lc' | 'coins' | 'won'): string => `run:${runId}:${grant}`;
 
+/** ECONOMY-CAPS C5: LC idempotency keyed by the server run id. */
+export const sessionLcKey = (runId: string): string => `session-lc:${runId}`;
+
 /** A run id as a client may send it: a short opaque string. Anything else is no run id at all. */
 export function readRunId(v: unknown): string | null {
   return typeof v === 'string' && /^[A-Za-z0-9_-]{8,64}$/.test(v) ? v : null;
@@ -44,6 +47,7 @@ export interface StartedRun {
   startedAt: string;
   expiresAt: string;
   payoutEligible: boolean;
+  agentRun: boolean;
   reason: Eligibility['reason'];
 }
 
@@ -52,9 +56,10 @@ export function runLifetimeMs(mode: string): number {
   return (ruleFor(mode)?.maxDurationMs ?? MAX_DURATION_FLOOR_MS) + RUN_GRACE_MS;
 }
 
-export async function startRun(db: Db, a: { userId: string; mode: string; eligibility: Eligibility; now?: Date }): Promise<StartedRun> {
+export async function startRun(db: Db, a: { userId: string; mode: string; eligibility: Eligibility; agentRun?: boolean; now?: Date }): Promise<StartedRun> {
   const now = a.now ?? new Date();
   const modeSlug = canonicalModeKey(a.mode);
+  const agentRun = a.agentRun === true;
   // the player's own runs that ran out while nobody finished them close as expired (a lazy sweep: one indexed update)
   await (db as any).sessionRun.updateMany({
     where: { userId: a.userId, status: RUN_STATUS.open, expiresAt: { lt: now } },
@@ -64,18 +69,19 @@ export async function startRun(db: Db, a: { userId: string; mode: string; eligib
     data: {
       userId: a.userId, mode: modeSlug, status: RUN_STATUS.open,
       payoutEligible: a.eligibility.payoutEligible, ineligibleReason: a.eligibility.reason,
+      agentRun,
       startedAt: now, expiresAt: new Date(now.getTime() + runLifetimeMs(modeSlug)),
     },
   });
   return {
     runId: run.id, modeSlug, startedAt: run.startedAt.toISOString(), expiresAt: run.expiresAt.toISOString(),
-    payoutEligible: run.payoutEligible, reason: (run.ineligibleReason ?? null) as Eligibility['reason'],
+    payoutEligible: run.payoutEligible, agentRun: run.agentRun, reason: (run.ineligibleReason ?? null) as Eligibility['reason'],
   };
 }
 
 export interface RunRow {
   id: string; userId: string; mode: string; status: string; payoutEligible: boolean; ineligibleReason: string | null;
-  startedAt: Date; expiresAt: Date; result: unknown;
+  agentRun: boolean; startedAt: Date; expiresAt: Date; result: unknown;
 }
 
 /** What a closed run answered, to be returned verbatim to any later finish of it. */

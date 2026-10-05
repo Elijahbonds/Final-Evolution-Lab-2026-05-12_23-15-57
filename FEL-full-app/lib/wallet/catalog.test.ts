@@ -18,17 +18,21 @@ describe('SKUs held off sale', () => {
     for (const id of NOT_ON_SALE) expect(CATALOG[id], id).toBeDefined();
   });
 
-  // MIRROR-COACH P1 (2026-09-25), owner decision #3: /workout's plans are pulled from sale until the relaunch.
-  it('holds both /workout plans, and they are still registered at their price', () => {
+  // MIRROR-COACH P1 (2026-09-25), owner decision #3: /workout's plans were pulled from sale until the relaunch.
+  // MIRROR-COACH P8 (2026-09-29), owner decision #24: FLIPPED ON PURPOSE — the relaunch puts both back on sale at the SAME
+  // prices they carried while held (60 and 200 shards; neither CATALOG row changed). What they buy now is a FEL template
+  // plan behind the protocol gate, from the one route that sells them (lib/workout/relaunch-route.test.ts).
+  it('sells both /workout plans again, at the prices they always carried', () => {
+    expect(getSku('workout_plan_4w')).toMatchObject({ currency: 'shards', unitPrice: 60 });
+    expect(getSku('workout_program_12w')).toMatchObject({ currency: 'shards', unitPrice: 200 });
     for (const id of ['workout_plan_4w', 'workout_program_12w']) {
-      expect(NOT_ON_SALE.has(id), id).toBe(true);
-      expect(getSku(id), id).not.toBeNull();
-      expect(skuOnSale(id), id).toBe(false);
+      expect(NOT_ON_SALE.has(id), id).toBe(false);
+      expect(skuOnSale(id), id).toBe(true);
     }
   });
 
   it('holds nothing else (spend() still sells through the routes that deliver), and an unknown SKU is not on sale', () => {
-    expect([...NOT_ON_SALE].sort()).toEqual(['class_monthly', 'class_pass_single', 'workout_plan_4w', 'workout_program_12w']);
+    expect([...NOT_ON_SALE].sort()).toEqual(['class_monthly', 'class_pass_single']);
     expect(skuOnSale('private_1on1')).toBe(true); // sold by /api/v1/sessions/book, which writes the booking
     expect(skuOnSale('no_such_sku')).toBe(false);
   });

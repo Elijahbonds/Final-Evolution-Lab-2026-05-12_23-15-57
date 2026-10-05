@@ -37,13 +37,16 @@ import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
 import type { ModeContext, ModeDefinition, HudValue } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
-import { readCourse, startRace, stepRace, type RaceProgress } from '../core/RaceCourse';
+import { readCourse, startRace, stepRace, toNextGate, type RaceProgress } from '../core/RaceCourse';
 import { readProfile, profileFor, DEFAULT_TIER } from '../core/Difficulty';
 import {
-  makeField, stepRival, rivalPlacement, playerPosition, ordinal, fieldLeaderDone, stepFinishGrace, aroundCall, gapLine, lapProgress,
+  makeField, stepRival, rivalPace, rivalPlacement, playerPosition, ordinal, fieldLeaderDone, stepFinishGrace, aroundCall, gapLine, lapProgress,
   type RaceLine, type Rival,
 } from '../racing/RaceField';
 import { readPlane } from '../racing/garage';
+import { AERO_TUNE } from '../racing/aeroTune';   // 10-phase pass, phase 3: the mode's speed feel in one config
+import { spawnAeroDrive, stepAeroDrive, type AeroDrive } from '../racing/RivalDriver';   // 10-phase pass, phase 5: the field flies the same model
+import type { RacingLine } from '../racing/racingLine';
 import { dressVehicle } from '../racing/vehicleBody';   // models pass phase 5: the Meshy plane bodies over the toy primitives
 import { refuse } from '../core/Refusal';
 import { stepDraft, noDraft, DRAFT, type DraftState } from '../racing/Slipstream';   // racing pass phase 7
@@ -58,12 +61,16 @@ import {
 } from '../racing/AeroTricks';
 import {
   collectBalloon, balloonsHit, stepBalloons, useItem, stepMissiles, stepMines, bananasAfterHit, segDist,
-  BALLOON_RESPAWN_SEC, BANANA_RADIUS, BANANA_CAP, ITEM_LABEL, ITEM_KINDS,
+  BALLOON_RESPAWN_SEC, BANANA_RADIUS, BANANA_CAP, ITEM_LABEL, ITEM_KINDS, weightedItemKind,
   type Balloon, type Banana, type HeldItem, type Missile, type Mine, type Target, type ItemKind,
 } from '../racing/AeroItems';
 import { aeroCircuits, circuitById, locate, type AeroCircuit } from '../racing/aeroCircuits';
 import { buildAeroWorld, type AeroWorld } from '../racing/aeroWorlds';
-import { buildToyPlane, Scarf, brighter, type ToyPlane } from '../racing/toyPlane';
+import { buildToyPlane, blurProp, Scarf, brighter, type ToyPlane } from '../racing/toyPlane';
+import { aeroHudWords, RideHudSwitch, setRingGlyph } from './rideHud';   // GC-13 / 10-phase pass, phase 10: the HUD says the rider's words
+import { resolveRaceIdentity } from '../racing/raceLook';   // PR #138: a minor's look is the device's, and never uploaded
+import { fitVehicleLight, type VehicleLightHandle } from '../racing/vehicleLight';   // 10-phase pass, phase 7
+import { SpeedLines, WingtipTrails } from '../racing/speedFx';   // 10-phase pass, phase 8
 import { AeroPickups } from '../racing/aeroPickups';
 import { steerLane, resolveContact, nearMisses, personalityFor } from '../racing/RaceContact';   // RACE CONTACT (2026-09-18): rivals with intent, wing-to-wing bumps and punts
 
@@ -78,7 +85,7 @@ const BANANA_RESPAWN_SEC = 10;
 // 1.22 (racing pass phase 6, was 1.16): measured over five circuits, the best rival flew 3.5–6 % slower than a pilot
 // racing the line with the items and the boost, and a pilot with NO items, stunts or boost still won two of them (NEON
 // SKYLINE by 309 m). The field now holds a pilot who only flies the line.
-const RIVAL_PACE = 1.22;
+const RIVAL_PACE = 1.10;
 /** How much a bend slows an aero rival (0..1 of pace at a hairpin) — racing pass phase 6, see the rivals' step. */
 const RIVAL_CORNER_BITE = 0.1;
 /** Racer ids in the item system: 0 is the player, rivals are 1..FIELD. */
@@ -98,12 +105,20 @@ export function makeAeroAcesMode(): ModeDefinition {
   let scarf: Scarf | null = null;
   let pickups: AeroPickups | null = null;
   let boostFx: BoostFx | null = null;
+  let vehicleLight: VehicleLightHandle | null = null;   // 10-phase pass, phase 7: the vehicles' own light
+  let speedLines: SpeedLines | null = null;       // 10-phase pass, phase 8: streaks past ~80% of top speed
+  let wingtipFx: WingtipTrails | null = null;     // 10-phase pass, phase 8: the air coming off the wingtips
   let flight: ArcadeState | null = null;
   let race: RaceProgress = startRace();
   let line: RaceLine | null = null;
   let rivals: Rival[] = [];
   let rivalKits: RivalKit[] = [];
   let rivalPlanes: ToyPlane[] = [];
+  /** THE FIELD FLIES (10-phase pass, phase 5): each rival's own ArcadeState, stepped through the player's
+   *  model by a pure-pursuit pilot. `driveLine` is the circuit's line as a racingLine (same arrays — the
+   *  aero CircuitLine is always a loop, so the adapter is exact). */
+  let rivalDrive: AeroDrive[] = [];
+  let driveLine: RacingLine | null = null;
   let balloons: Balloon[] = [];
   let bananas: Banana[] = [];
   let missiles: Missile[] = [];
@@ -113,6 +128,8 @@ export function makeAeroAcesMode(): ModeDefinition {
   let tier = profileFor(DEFAULT_TIER);
   const prevPos = new Vector3();
 
+  /** GC-13 / phase 10: whose words the HUD says, and when the ring's puck needs re-asserting. */
+  const hudSwitch = new RideHudSwitch();
   const S = {
     input: { steer: 0, climb: 0, gas: 0, brake: 0, boostK: 0, bananas: 0 } as ArcadeInput,
     held: null as HeldItem | null,
@@ -162,11 +179,13 @@ export function makeAeroAcesMode(): ModeDefinition {
   function pushHud(ctx: ModeContext): void {
     if (!flight) return;
     const place = playerPosition(playerDist(), rivals);
+    const { dist } = toNextGate(race, circuit.course, flight.pos);
     const hud: Record<string, HudValue> = {
       lap: `${Math.min(race.lap, circuit.course.laps)}/${circuit.course.laps}`,
       pos: `${ordinal(place)} / ${rivals.length + 1}`,
       place,
       gap: gapLine(rivals.map((r) => ({ name: r.name, gap: r.dist - playerDist() })), flight.speed),   // phase 5: the gap under the place
+      toGate: Math.round(dist),
       item: S.held ? `${ITEM_LABEL[S.held.kind]}${S.held.level > 1 ? ` ×${S.held.level}` : ''}` : '',
       itemKind: S.held?.kind ?? '',
       itemLevel: S.held?.level ?? 0,
@@ -177,9 +196,9 @@ export function makeAeroAcesMode(): ModeDefinition {
       banner: S.banner,
       draft: Math.round(S.draft.charge * 100),   // SLIPSTREAM (phase 7): the wake's charge, 0–100
       start: S.start.go ? '' : beatLabel(S.start.beat),   // THE START: the beat on screen (QA drivers time the rocket off it)
-      hint: S.start.go ? 'RT gas · LT brake · A fire · B: roll, back=loop, fwd=split-s · Y: loop, +stick=knife edge · RB boost'
-        : 'GAS DOWN ON "2" AND HOLD IT FOR A ROCKET START — ON "3" THE ENGINE BOGS',
       ...boost.hud(),
+      // GC-13 / phase 10: the words are whoever is flying (rideHud) — a body's on the body, the pad's unchanged
+      ...aeroHudWords(hudSwitch.isBody, S.start.go),
     };
     ctx.setHud(hud);
   }
@@ -189,10 +208,13 @@ export function makeAeroAcesMode(): ModeDefinition {
     // planes are wide: spread the lanes, and put the grid behind the player in two staggered rows
     rivals.forEach((r, i) => { r.lane *= 3.2; r.dist = -10 - i * 7; });
     rivalKits = rivals.map((r) => ({ item: null, itemAt: 0, shieldT: 0, stunT: 0, zipT: 0, nextRow: 0, lastHeading: 0, roll: 0, lap: 0, home: r.lane, cool: 0, touch: false, alongside: false }));
+    // the field's own planes, on the grid it was dealt (10-phase pass, phase 5)
+    driveLine = { pts: circuit.line.pts, cum: circuit.line.cum, length: circuit.line.length, loop: true };
+    rivalDrive = rivals.map((r) => spawnAeroDrive(driveLine!, r, tune));
     S.events = { bumps: 0, punts: 0, punted: 0, nearMisses: 0, slingshots: 0 };
     S.draft = noDraft(); S.draftSaid = false;
-    rivalPlanes = rivals.map((r) => buildToyPlane(scene, r.name, r.tint, brighter(r.tint, 0.55), { toyPilot: true }));
-    for (const rp of rivalPlanes) void dressVehicle(scene, rp.root, 'plane', 'rival', { hide: rp.parts });   // phase 5: the field wears the fifth body
+    rivalPlanes = rivals.map((r) => buildToyPlane(scene, r.name, r.tint, brighter(r.tint, 0.55), { toyPilot: true, mood: readCourse('aero').mood }));
+    for (const rp of rivalPlanes) void dressVehicle(scene, rp.root, 'plane', 'rival', { hide: rp.parts }).then((h) => { if (h) vehicleLight?.include(h.root.getChildMeshes()); });   // phase 5: the field wears the fifth body
   }
 
   function resetPickups(): void {
@@ -314,9 +336,13 @@ export function makeAeroAcesMode(): ModeDefinition {
     modeId: 'aeroaces',
     get mood(): ModeDefinition['mood'] { return readCourse('aero').mood; },
     camPreset: 'flyer',
+    // GC-7. After mood/camPreset: pickerReach's modesById() only recognises a modeId whose next property
+    // is mood or camPreset (see VelocityKartMode).
+    hideRingInPlay: true,
 
     async load(ctx: ModeContext): Promise<void> {
       baseFov = null;
+      hudSwitch.reset();   // GC-13: a remount starts on the pad's words until a body plays
       Object.assign(S, {
         input: { steer: 0, climb: 0, gas: 0, brake: 0, boostK: 0, bananas: 0 }, held: null, bananas: 0, shieldT: 0, zipT: 0,
         boostHeld: false, banner: '', bannerT: 0, done: false, lastPlace: 0, wrongT: 0, scrapeCool: 0, graceLeft: null,
@@ -333,10 +359,13 @@ export function makeAeroAcesMode(): ModeDefinition {
       pickups = new AeroPickups(ctx.scene);
       resetPickups();
 
-      player = buildToyPlane(ctx.scene, 'player', '#e63946', '#ffd166');
-      { const pl = player; void dressVehicle(ctx.scene, pl.root, 'plane', readPlane().id, { hide: pl.parts }); }   // phase 5: the garage pick's body
+      player = buildToyPlane(ctx.scene, 'player', '#e63946', '#ffd166', { mood: circuit.course.mood });
+      { const pl = player; void dressVehicle(ctx.scene, pl.root, 'plane', readPlane().id, { hide: pl.parts }).then((h) => { if (h) vehicleLight?.include(h.root.getChildMeshes()); }); }   // phase 5: the garage pick's body
       // THE PILOT IN THE OPEN COCKPIT: the hero, seated, chest up out of the rim. Parented to the seat, so the plane
       // carries the body through every roll and loop with no second copy of the attitude maths.
+      // PR #138: a minor's (or unknown-age) pilot wears the look the PHONE holds — resolved and seated here,
+      // read-only over the wire, before the spawn asks for the session identity
+      await resolveRaceIdentity();
       pilot = await CharacterLibrary.spawn(ctx.scene, DEFAULT_HERO_URL, { position: new Vector3(0, 0, 0), yawRad: 0, startClip: 'idle_stand' });
       pilot.animator.park();
       pilot.root.parent = player.seat;
@@ -349,6 +378,13 @@ export function makeAeroAcesMode(): ModeDefinition {
 
       buildRivals(ctx.scene);
 
+      // phase 7: one vehicle light over every plane on the grid (receiveShadows on all, fill where the mood is flat)
+      vehicleLight?.dispose();
+      vehicleLight = fitVehicleLight(ctx.scene, circuit.course.mood, [player.root, ...rivalPlanes.map((p) => p.root)], 'plane');
+      // phase 8: speed you can see — streaks riding the camera, ribbons off the player's wingtips
+      speedLines?.dispose(); speedLines = new SpeedLines(ctx.scene, ctx.camera);
+      wingtipFx?.dispose(); wingtipFx = new WingtipTrails(ctx.scene, player.wingtips);
+
       flight = spawnArcade(circuit.course.start.at, circuit.course.start.heading, tune);
       prevPos.copyFrom(flight.pos);
       player.root.position.copyFrom(flight.pos);
@@ -359,6 +395,7 @@ export function makeAeroAcesMode(): ModeDefinition {
 
       ctx.heroRef.current = player.root;
       ctx.objectiveRef.current = null;
+      ctx.camDirector.tuneFollow(AERO_TUNE.cam);   // the mode's own chase numbers (10-phase pass, phase 3)
       ctx.camDirector.snapTo(flight.pos, null);
       say(`${circuit.course.name} — ${circuit.course.sub}`, 2.4);
 
@@ -419,6 +456,12 @@ export function makeAeroAcesMode(): ModeDefinition {
 
     update(ctx: ModeContext, dt: number): void {
       if (!flight || !player || !line || S.done) return;
+      // GC-13 / phase 10: the HUD's words and the ring's gamepad puck follow whoever is flying (the kart's
+      // wiring, the same pattern SkateRunMode set) — the puck is re-asserted once a second while a body
+      // plays, because the harness can mount the ring after the switch
+      const sw = hudSwitch.next(!!(ctx.body?.() ?? null));
+      if (sw !== null) { ctx.setHud({ ...aeroHudWords(!!(ctx.body?.() ?? null), S.start.go) }); setRingGlyph(ctx.scene.meshes, !sw); }
+      else if (hudSwitch.isBody && hudSwitch.glyphDue(dt)) setRingGlyph(ctx.scene.meshes, false);
 
       // ── THE START (racing pass phase 4, racing/RaceStart): the field holds on the grid until GO; the gas's timing
       // against the beats is worth a rocket (a zip) or a burnout (lost thrust). The planes hang on their grid spots.
@@ -429,7 +472,9 @@ export function makeAeroAcesMode(): ModeDefinition {
         if (!st.wentGo) {
           player.root.position.copyFrom(flight.pos);
           player.root.rotation.set(-flight.pitch, flight.heading, -flight.roll);
-          player.prop.rotation.z += (6 + 40 * S.input.gas) * dt;   // the engine revs on the grid
+          const gridRpm = AERO_TUNE.prop.gridIdle + AERO_TUNE.prop.gridGas * S.input.gas;   // the engine revs on the grid
+          player.prop.rotation.z += gridRpm * dt;
+          blurProp(player, gridRpm, AERO_TUNE.prop.blurFrom, AERO_TUNE.prop.blurTo);
           rivals.forEach((r, i) => {
             const rp = rivalPlanes[i]; if (!rp) return;
             const place = rivalPlacement(r, line!);
@@ -509,7 +554,7 @@ export function makeAeroAcesMode(): ModeDefinition {
         const side = Math.sign(at.lateral);
         const right = new Vector3(at.tangent.z, 0, -at.tangent.x);
         flight.pos.subtractInPlace(right.scale(at.lateral - side * circuit.corridor));
-        if (wallTurn(flight, -right.x * side, -right.z * side) && S.scrapeCool <= 0) {
+        if (wallTurn(flight, -right.x * side, -right.z * side, tune.wallScrub) && S.scrapeCool <= 0) {
           S.scrapeCool = 1.2;
           SoundKit.play('thud', { pitch: 0.9, volume: 0.35 });
           ctx.juice.shake(0.08, 120);
@@ -538,7 +583,10 @@ export function makeAeroAcesMode(): ModeDefinition {
       // ── the plane and the pilot ──
       player.root.position.copyFrom(flight.pos);
       player.root.rotation.set(-flight.pitch, flight.heading, -flight.roll);
-      player.prop.rotation.z += (18 + 30 * S.input.gas + 20 * S.input.boostK) * dt;
+      // phase 9: the prop rate lives in AERO_TUNE, and past the blur gate the blades smear into the disc
+      const propRpm = AERO_TUNE.prop.idle + AERO_TUNE.prop.gas * S.input.gas + AERO_TUNE.prop.boost * S.input.boostK;
+      player.prop.rotation.z += propRpm * dt;
+      blurProp(player, propRpm, AERO_TUNE.prop.blurFrom, AERO_TUNE.prop.blurTo);
       scarf?.update(dt, Math.min(1, flight.speed / tune.top));
       pickups?.shield(PLAYER_ID, player.root, S.shieldT > 0);
 
@@ -560,12 +608,14 @@ export function makeAeroAcesMode(): ModeDefinition {
       for (const b of balloonsHit(balloons, prevPos, flight.pos)) {
         b.respawn = BALLOON_RESPAWN_SEC;
         const before = S.held;
-        S.held = collectBalloon(S.held, b.kind);
+        // ITEM WEIGHTING BY PLACE (gap 12), same as the kart: drawn at collection, weighted by place.
+        const kind = weightedItemKind(playerPosition(playerDist(), rivals), rivals.length + 1, Math.random);
+        S.held = collectBalloon(S.held, kind);
         S.popped++;
         SoundKit.play('powerUp', { pitch: 1 + S.held.level * 0.12, volume: 0.55 });
         EffectsKit.burst(ctx.scene, b.pos.clone(), 'confetti');
         ctx.feel.impact(0.15);
-        say(before && before.kind === b.kind ? `${ITEM_LABEL[b.kind]} LEVEL ${S.held.level}` : ITEM_LABEL[b.kind], 0.8);
+        say(before && before.kind === kind ? `${ITEM_LABEL[kind]} LEVEL ${S.held.level}` : ITEM_LABEL[kind], 0.8);
       }
 
       // ── the field ──
@@ -581,8 +631,19 @@ export function makeAeroAcesMode(): ModeDefinition {
         // cornerBite 0.1 (racing pass phase 6, was 0.3): an arcade plane turns at close to full speed, so a field that
         // lifted 30 % for every bend lost the twisty circuits by itself — measured, a driver flying the line with NO items,
         // stunts or boost won NEON SKYLINE by 332 m while RED ROCK was a real race. The corners are the pilot's, not a tax.
-        stepRival(r, line!, dt, pDist, { topSpeed: tune.top * RIVAL_PACE * (k.zipT > 0 ? 1.35 : 1), cornerBite: RIVAL_CORNER_BITE }, race.time);
-        if (k.stunT > 0) { k.stunT = Math.max(0, k.stunT - dt); r.dist = before + (r.dist - before) * 0.25; r.speed *= 0.97; }
+        const drv = rivalDrive[i];
+        if (drv && driveLine) {
+          // THE FIELD FLIES (10-phase pass, phase 5): rivalPace (the same maths stepRival ran) sets the TARGET;
+          // the pursuit pilot flies the player's own stepArcade to it — the weave is a lane target now, so the
+          // bank into it is the model's own. A stunned rival LIMPS at a fifth of its pace.
+          const want = rivalPace(r, line!, pDist, { topSpeed: tune.top * RIVAL_PACE * (k.zipT > 0 ? 1.35 : 1), cornerBite: RIVAL_CORNER_BITE }, race.time);
+          if (k.stunT > 0) k.stunT = Math.max(0, k.stunT - dt);
+          const weave = Math.sin(race.time * 0.5 + r.phase) * 3;
+          stepAeroDrive(drv, r, driveLine, k.stunT > 0 ? want * 0.2 : want, dt, tune, circuit.corridor, circuit.floorAt, circuit.ceilingAt, weave);
+        } else {
+          stepRival(r, line!, dt, pDist, { topSpeed: tune.top * RIVAL_PACE * (k.zipT > 0 ? 1.35 : 1), cornerBite: RIVAL_CORNER_BITE }, race.time);
+          if (k.stunT > 0) { k.stunT = Math.max(0, k.stunT - dt); r.dist = before + (r.dist - before) * 0.25; r.speed *= 0.97; }
+        }
         // a rival flying a balloon row picks up an item
         const inLap = ((r.dist % lapLen) + lapLen) % lapLen;
         const lap = Math.floor(r.dist / lapLen);
@@ -612,17 +673,26 @@ export function makeAeroAcesMode(): ModeDefinition {
         }
         // place and pose the rival's plane: its lane weaves, it banks into the line's turns, it tumbles when hit
         if (rp) {
-          const place = rivalPlacement(r, line!);
-          const weave = Math.sin(race.time * 0.5 + r.phase) * 3;
-          const side = new Vector3(Math.cos(place.heading), 0, -Math.sin(place.heading));
-          rp.root.position.copyFrom(place.pos.add(side.scale(weave)));
-          rp.root.position.y = Math.max(rp.root.position.y, circuit.floorAt(rp.root.position.x, rp.root.position.z) + 3);
-          let turn = place.heading - k.lastHeading; turn = Math.atan2(Math.sin(turn), Math.cos(turn));
-          k.lastHeading = place.heading;
-          k.roll += ((dt > 0 ? Math.max(-0.8, Math.min(0.8, (turn / dt) * 0.5)) : 0) - k.roll) * Math.min(1, 5 * dt);
           const tumble = k.stunT > 0 ? race.time * 14 : 0;
-          rp.root.rotation.set(0, place.heading, -k.roll + tumble);
-          rp.prop.rotation.z += 40 * dt;
+          if (drv && driveLine) {
+            // the pose is the STATE's: the bank into a turn is the model's own roll, not a heading delta
+            const st = drv.state;
+            rp.root.position.copyFrom(st.pos);
+            rp.root.position.y = Math.max(rp.root.position.y, circuit.floorAt(st.pos.x, st.pos.z) + 3);
+            rp.root.rotation.set(-st.pitch, st.heading, -st.roll + tumble);
+          } else {
+            const place = rivalPlacement(r, line!);
+            const weave = Math.sin(race.time * 0.5 + r.phase) * 3;
+            const side = new Vector3(Math.cos(place.heading), 0, -Math.sin(place.heading));
+            rp.root.position.copyFrom(place.pos.add(side.scale(weave)));
+            rp.root.position.y = Math.max(rp.root.position.y, circuit.floorAt(rp.root.position.x, rp.root.position.z) + 3);
+            let turn = place.heading - k.lastHeading; turn = Math.atan2(Math.sin(turn), Math.cos(turn));
+            k.lastHeading = place.heading;
+            k.roll += ((dt > 0 ? Math.max(-0.8, Math.min(0.8, (turn / dt) * 0.5)) : 0) - k.roll) * Math.min(1, 5 * dt);
+            rp.root.rotation.set(0, place.heading, -k.roll + tumble);
+          }
+          rp.prop.rotation.z += AERO_TUNE.prop.rival * dt;
+          blurProp(rp, AERO_TUNE.prop.rival, AERO_TUNE.prop.blurFrom, AERO_TUNE.prop.blurTo);
           pickups?.shield(i + 1, rp.root, k.shieldT > 0);
         }
       });
@@ -635,10 +705,13 @@ export function makeAeroAcesMode(): ModeDefinition {
         const cools = rivalKits.map((k) => k.cool), touches = rivalKits.map((k) => k.touch);
         for (const ev of resolveContact(me, rposes, lapLen, cools, dt, touches)) {
           const r = rivals[ev.i];
+          const rdrv = rivalDrive[ev.i];
           flight.pos.addInPlace(right.scale(ev.playerShove * 2)); r.lane += ev.rivalShove * 2;
+          // the speed cost lands on the rival's MODEL (r.speed is measured off it next frame)
+          const cutRival = (keep: number) => { r.speed *= keep; if (rdrv) rdrv.state.speed *= keep; };
           if (ev.kind === 'punt') { flight.speed *= ev.playerKeep; hitRival(ctx, ev.i, true); S.events.punts++; say(`PUNTED ${r.name}`, 0.9); }
-          else if (ev.kind === 'punted') { r.speed *= ev.rivalKeep; if (S.shieldT > 0) say('SHIELD HELD', 0.5); else { hitPlayer(ctx, `${r.name} PUNT`); S.events.punted++; } }
-          else { flight.speed *= ev.playerKeep; r.speed *= ev.rivalKeep; S.events.bumps++; SoundKit.play('thud', { pitch: 1.1, volume: 0.45 }); ctx.juice.shake(0.08, 110); ctx.feel.impact(0.2); EffectsKit.burst(ctx.scene, flight.pos.clone(), 'sparks'); say(`BUMPED ${r.name}`, 0.5); console.info(`[RACE] bump ${r.name}`); }
+          else if (ev.kind === 'punted') { cutRival(ev.rivalKeep); if (S.shieldT > 0) say('SHIELD HELD', 0.5); else { hitPlayer(ctx, `${r.name} PUNT`); S.events.punted++; } }
+          else { flight.speed *= ev.playerKeep; cutRival(ev.rivalKeep); S.events.bumps++; SoundKit.play('thud', { pitch: 1.1, volume: 0.45 }); ctx.juice.shake(0.08, 110); ctx.feel.impact(0.2); EffectsKit.burst(ctx.scene, flight.pos.clone(), 'sparks'); say(`BUMPED ${r.name}`, 0.5); console.info(`[RACE] bump ${r.name}`); }
         }
         rivalKits.forEach((k, i) => { k.cool = cools[i]; k.touch = touches[i]; });
         const was = rivalKits.map((k) => k.alongside);
@@ -682,6 +755,9 @@ export function makeAeroAcesMode(): ModeDefinition {
       S.lastPlace = place;
 
       boostFx?.update(dt, boost, bev);
+      // phase 8: streaks past ~80% of top, and the wingtip ribbons in a hard bank or near the top
+      speedLines?.update(S.done ? 0 : flight.speed / Math.max(1, tune.top));
+      wingtipFx?.update(flight.roll, flight.speed / Math.max(1, tune.top));
       if (bev.started) { ctx.feel.impact(0.3); say('BOOST!', 0.6); }
       if (bev.full) say('BOOST READY', 0.8);
       // RACING PASS phase 3: an empty press says what fills the tank (it already ticked and lit the HUD pill)
@@ -710,24 +786,31 @@ export function makeAeroAcesMode(): ModeDefinition {
       }
       if (res.finished || S.graceLeft === 0) { finish(ctx); return; }
 
+      const { gate } = toNextGate(race, circuit.course, flight.pos);
+      ctx.objectiveRef.current = gate?.at.clone() ?? null;
+
       if (S.bannerT > 0) { S.bannerT -= dt; if (S.bannerT <= 0) S.banner = ''; }
 
       world?.update(dt, ctx.camera);
       ctx.camDirector.look(S.lookX, S.lookY, dt);
       ctx.camDirector.update(flight.pos, fwd.scale(flight.speed), null);
       baseFov ??= ctx.camera.fov;
-      ctx.camera.fov = stepSpeedFov(ctx.camera.fov, baseFov * (boostFx?.fovMult(boost) ?? 1), flight.speed, tune.top * 1.4, dt);
+      ctx.camera.fov = stepSpeedFov(ctx.camera.fov, baseFov * (boostFx?.fovMult(boost) ?? 1), flight.speed, tune.top * 1.4, dt, AERO_TUNE.fov);
+      // SPEED-VIGNETTE (racing HUD pass): same opt-in as the kart — report the fraction, the harness frames it.
+      ctx.feel.speedVignette01(flight.speed / (tune.top * 1.4));
       pushHud(ctx);
     },
 
     dispose(): void {
       boostFx?.dispose(); boostFx = null;
+      vehicleLight?.dispose(); vehicleLight = null;
+      speedLines?.dispose(); speedLines = null; wingtipFx?.dispose(); wingtipFx = null;
       scarf?.dispose(); scarf = null;
       seated?.dispose(); seated = null;
       pilot?.dispose(); pilot = null;
       player?.dispose(); player = null;
       for (const rp of rivalPlanes) rp.dispose();
-      rivalPlanes = []; rivals = []; rivalKits = []; line = null;
+      rivalPlanes = []; rivals = []; rivalKits = []; rivalDrive = []; driveLine = null; line = null;
       pickups?.dispose(); pickups = null;
       world?.dispose(); world = null;
       balloons = []; bananas = []; missiles = []; mines = [];

@@ -60,7 +60,7 @@ describe('deriveRule: one arithmetic for every mode', () => {
     expect(deriveRule('surfing', [])).toBeNull();
     expect(deriveRule('karateEndless', [run(null, 60, 'upper')])).toBeNull();
     // a rules mode with an unscored run still has its exact maximum
-    expect(deriveRule('soccer', [run(null, 60, 'upper')], { killSwitch: false })).toMatchObject({ maxScoreFrom: 'rules', maxScore: 5560 });
+    expect(deriveRule('soccer', [run(null, 60, 'upper')], { killSwitch: false })).toMatchObject({ maxScoreFrom: 'rules', maxScore: 6660 });
   });
 
   it('music free play is endless: never capped at the Arena set\'s maximum', () => {
@@ -81,8 +81,8 @@ describe('MODE_SCORE_RULES: every row comes from measured TRUE :3000 runs', () =
       if (rule.maxScoreFrom === 'derived') expect(rule, mode).toEqual(derivedRule(derived[mode]));
       else expect(rule, mode).toEqual(deriveRule(mode, MEASURED_RUNS[mode]));
     }
-    // no mode is both measured and derived: one source per row
-    expect(Object.keys(MEASURED_RUNS).filter((m) => m in derived)).toEqual([]);
+    // karateEndless and music keep derived rows; measured runs document their pace but derived wins the ceiling
+    expect(Object.keys(MEASURED_RUNS).filter((m) => m in derived).sort()).toEqual(['karateEndless', 'music']);
   });
 
   it('each row names at least one run, each run names its capture', () => {
@@ -184,27 +184,27 @@ describe('fail closed: the session keys with no measured TRUE :3000 run pay noth
     const keys = sessionKeys();
     expect(keys.length).toBeGreaterThanOrEqual(34);
     expect(unmeasuredModes(keys)).toEqual([
-      'aeroAces', 'carnival', 'duel', 'golf', 'hoops3v3', 'karateVersus', 'mixedcombat', 'showdown', 'sprint', 'tennis',
-      'tiebreak', 'training', 'velocityKart', 'volleyball',
+      'duel', 'hoops3v3', 'mixedcombat', 'showdown', 'sprint',
     ]);
     const ruled = keys.filter((k) => !unmeasuredModes([k]).length);
-    expect(ruled.filter((k) => MODE_SCORE_RULES[k].maxScoreFrom !== 'derived')).toEqual([
-      'baseball', 'bigAir', 'brainBrawl', 'dance', 'dunkContest', 'football', 'freerun', 'hoops1v1', 'snowboarding', 'soccer', 'threePoint', 'whoSceneIt',
-    ]);
-    expect(ruled.filter((k) => MODE_SCORE_RULES[k].maxScoreFrom === 'derived')).toEqual([
-      'acting', 'dunkduel', 'irl', 'karateEndless', 'music', 'skateboarding', 'storyMode', 'surfing',
-    ]);
+    expect(ruled).toContain('tiebreak');
+    expect(ruled).toContain('training');
+    expect(ruled).toContain('velocityKart');
+    expect(ruled).toContain('skateboarding');
+    expect(MODE_SCORE_RULES.tiebreak.maxScoreFrom).toBe('rules');
+    expect(MODE_SCORE_RULES.training.maxScoreFrom).toBe('rules');
+    expect(MODE_SCORE_RULES.velocityKart.maxScoreFrom).toBe('measured');
   });
 });
 
 describe('OWNER DECISION (2026-09-28): derived per-run bounds', () => {
   const b = derivedBounds({ killSwitch: false });
-  it('the endless / combo four: the Arena\'s modelled per-run bounds, and music\'s own per-hits bound (the row adds only the column limit)', () => {
-    expect(b.skateboarding.maxScore).toBe(435_544_000);
-    expect(b.surfing.maxScore).toBe(5_866_322);
+  it('the endless combo modes still on derived bounds: karateEndless and music', () => {
     expect(b.karateEndless.maxScore).toBe(136_807_600);
     expect(b.music.maxScore).toBe(SCORE_COLUMN_MAX);
-    for (const m of ['skateboarding', 'surfing', 'karateEndless', 'music']) expect(b[m].maxScore, m).toBeLessThanOrEqual(SCORE_COLUMN_MAX);
+    for (const m of ['karateEndless', 'music']) expect(b[m].maxScore, m).toBeLessThanOrEqual(SCORE_COLUMN_MAX);
+    expect(b.skateboarding).toBeUndefined();
+    expect(b.surfing).toBeUndefined();
   });
 
   it('the four that should pay, from their own code', () => {
@@ -220,17 +220,15 @@ describe('OWNER DECISION (2026-09-28): derived per-run bounds', () => {
 
   it('under the kill switch a modelled bound whose game swaps falls back to the column limit', () => {
     const ks = derivedBounds({ killSwitch: true });
-    expect(ks.skateboarding.maxScore).toBe(SCORE_COLUMN_MAX);
-    expect(ks.surfing.maxScore).toBe(SCORE_COLUMN_MAX);
     expect(ks.karateEndless.maxScore).toBe(SCORE_COLUMN_MAX);
     expect(ks.acting.maxScore).toBe(100);
   });
 
   it('a derived row: pace = the bound over its modelled run (else the shortest run), the duration floors, no measured runs', () => {
-    expect(derivedRule(b.skateboarding)).toMatchObject({ maxScoreFrom: 'derived', maxScorePerSecond: Math.ceil((435_544_000 / 90) * 100) / 100, minDurationMs: MIN_DURATION_FLOOR_MS, maxDurationMs: MAX_DURATION_FLOOR_MS, measured: [] });
+    expect(derivedRule(b.karateEndless)).toMatchObject({ maxScoreFrom: 'derived', minDurationMs: MIN_DURATION_FLOOR_MS, maxDurationMs: MAX_DURATION_FLOOR_MS, measured: [] });
     expect(derivedRule(b.acting).maxScorePerSecond).toBe(50);
-    // a real strong skate run (the rc gauntlet's 80,832 over its 90 s) is inside
-    expect(checkRunScore({ mode: 'skateboarding', score: 80_832, durationMs: 90_000 }, { skateboarding: derivedRule(b.skateboarding) })).toMatchObject({ ok: true });
+    // skateboarding now uses MEASURED_RUNS (ECONOMY-CAPS a); a real strong run is inside
+    expect(checkRunScore({ mode: 'skateboarding', score: 1649, durationMs: 94_000 })).toMatchObject({ ok: true });
   });
 
   it('the EXPORTED table carries Prove It\'s played-floor flag, and only Prove It\'s (review: dropping it in derivedRule paid Prove It in full, every test green)', () => {

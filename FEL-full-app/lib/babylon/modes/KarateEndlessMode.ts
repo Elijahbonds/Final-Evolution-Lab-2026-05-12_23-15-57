@@ -3,7 +3,7 @@
 // against escalating waves of identical, suited pursuers in a stylized
 // digital arena. Four concrete systems, all new:
 //   1. THIRD-PERSON OVER-THE-SHOULDER CAMERA — CameraDirector's new
-//      'overShoulder' preset (M50), locked behind your facing direction
+//      'fightShoulder' preset (COMBAT-AI), locked behind your facing direction
 //      rather than the nearest-enemy midpoint, the way action games frame
 //      combat instead of a fighting-game side-view.
 //   2. CO-OP-READY ALLY — a second fighter built on PlayerSlot (M48): today
@@ -64,7 +64,7 @@ import { FOCUS, FocusMeter, WALL_RUN, wallRunAvailableOn, startWallRunOn, wallRu
 import { readCombatArena, arenasFor, arenaClamp, knockTo, hazardAt, spawnRadius, describeArena, insideBy, ROPES, type CombatArena, type ArenaWall } from '../combat/arenas';   // COMBAT ARENAS (2026-09-18)
 import { buildArena, type ArenaHandle } from '../combat/arenaBuild';
 import { HORDE_WINDOW_SEC } from '../core/DodgeRead';
-import { Color3, Mesh, MeshBuilder, PBRMaterial, StandardMaterial, Vector3 } from '@babylonjs/core';
+import { Color3, Matrix, Mesh, MeshBuilder, PBRMaterial, StandardMaterial, Vector3 } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { Mob, MobPool, STEERING_PRESETS } from '../core/MobSteering';
 // BIOMECH-WAVE2 (2026-09-09) — the game-wide bar on the gauntlet (SPEC-FEL-BIOMECH-GAMEWIDE G1–G6). Two findings:
@@ -131,7 +131,8 @@ import { Freeflow, type FlowEvent, type FlowBroken } from '../core/Freeflow';   
  * The camera's bounds come from the ground mesh, so a play area the same size as
  * the mat leaves it nowhere to stand: at the old ±8 on a 16x16 mat the camera was
  * clamped to ±6.8 and ended up 1.2m behind a player at the edge, putting them out
- * of frame. 7.5 on a 24x24 mat keeps 3.3m clear behind the overShoulder rig.
+ * of frame. 7.5 on a 24x24 mat keeps 3.3m clear behind the fightShoulder rig at
+ * its 3.1m predecessor; at 4.0 m × HUNDRED_CAM_PULL the mat's 12 m half-extent still clears.
  */
 /**
  * The fighter is held inside a DISC of this radius, not a square of this half-
@@ -166,6 +167,8 @@ const STRIKES = {
 } as const;
 /** THE-HUNDRED: ground speed (m/s) — was 3 (2.83 measured under the stride filter). The horde is circled, not walked. */
 const MOVE_SPEED = 4.4;
+/** RESULTS-TRUTH / GC-F1: a horde run always posts — three minutes on the clock, then the card. */
+const HUNDRED_SESSION_CAP_SEC = 180;
 /** A held stick cuts a swing's recovery this long after its cancel point (the jab keeps its extension on screen). */
 const MOVE_CANCEL_EXTRA_SEC = 0.1;
 /** The ring the crowd stun throws (unlit, on the floor): peak radius is the move's stun radius. */
@@ -224,6 +227,7 @@ interface Enemy {
   /** THE-HUNDRED: staggered (helpless, steering held) until this GAME-clock time; 0 = standing */ stunUntil: number;
   /** game-clock time of the last hit this body took (a freshly hit body is grabbable) */ hitAt: number;
   /** in the hero's hands (or in flight): out of the brain, the steering, the arcs and the targeting */ carried: boolean;
+  /** Counter cue while a strike is about to land, and an arrow when the body is off screen. */ cue: Mesh | null; arrow: Mesh | null;
 }
 interface Pickup { kind: DropKind; mesh: Mesh; life: number; phase: number }
 /** A tween on the GAME clock (so slow-mo stretches the sink, the knockback, the slide — one clock, not two). */
@@ -478,25 +482,35 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     publishHp(ctx, true);
   }
 
-  async function spawnEnemy(ctx: ModeContext, angle: number, i: number): Promise<void> {
+  async function spawnEnemy(ctx: ModeContext, angle: number, i: number, lightFx = false): Promise<void> {
     const sr = spawnRadius(arena);
     const pos = new Vector3(Math.sin(angle) * sr, 0, Math.cos(angle) * sr); arenaClamp(pos, arena, 0.6);
+    const skinTints = ['#a67c5b', '#8d6e52', '#c49a6c', '#7a5c3e', '#b88968'];
+    const kitTint = CFG.enemyTints[(wave * 3 + i) % CFG.enemyTints.length];
+    const spawnName = `horde_w${wave}_e${i}`;
     const char = await CharacterLibrary.spawn(ctx.scene, CFG.heroUrl, {
       position: pos, yawRad: Math.atan2(-pos.x, -pos.z),
-      tint: i % 2 ? '#a67c5b' : '#8d6e52',   // EYE SORES (2026-09-17): the old near-black tint blackened the SKIN — brown heads and leopard tops floated over invisible bodies; a natural tint (a roster seed), the suit is the KIT (tintGarmentSlot below)
-      scale: 0.95 + ((wave * 7 + i * 13) % 12) / 100,
+      tint: skinTints[(wave + i) % skinTints.length],
+      name: spawnName,
+      accessories: true,
+      scale: 0.92 + ((wave * 7 + i * 13) % 17) / 100,
       startClip: STANCE,
+      modeId: 'karate',
+      role: 'opponent',
     });
-    tintGarmentSlot(char, SLOT_KEYS.jersey, i % 2 ? '#2b3550' : '#1f2735'); if ((SLOT_KEYS as Record<string, readonly string[]>).shorts) tintGarmentSlot(char, (SLOT_KEYS as Record<string, readonly string[]>).shorts, '#161b24');   // the agents' dark suit: navy / charcoal kit
+    tintGarmentSlot(char, SLOT_KEYS.jersey, kitTint);
+    if ((SLOT_KEYS as Record<string, readonly string[]>).shorts) tintGarmentSlot(char, (SLOT_KEYS as Record<string, readonly string[]>).shorts, '#161b24');
     neverBindPose(char.animator, STANCE);
     installSafePlay(char.animator, 'agent');
     ctx.groundLock?.track(char.root, char.skeleton);
-    // materialize, don't just appear
+    // materialize, don't just appear — skip heavy VFX on batched spawns (WA-11: the 2 s freeze was N concurrent GLB loads + bursts)
     const targetScale = char.root.scaling.clone();
     char.root.scaling.scaleInPlace(0.001);
-    EffectsKit.burst(ctx.scene, pos.add(new Vector3(0, 1, 0)), 'glitch');
-    SoundKit.play('powerUp', { pitch: 1.6, volume: 0.25 });
-    tween(0.32, (k) => { char.root.scaling = Vector3.Lerp(new Vector3(0.001, 0.001, 0.001), targetScale, k); });
+    if (!lightFx) {
+      EffectsKit.burst(ctx.scene, pos.add(new Vector3(0, 1, 0)), 'glitch');
+      SoundKit.play('powerUp', { pitch: 1.6, volume: 0.25 });
+    }
+    tween(lightFx ? 0.18 : 0.32, (k) => { char.root.scaling = Vector3.Lerp(new Vector3(0.001, 0.001, 0.001), targetScale, k); });
     const archetype = (['striker', 'rusher', 'flanker'] as const)[i % 3];
     const preset = STEERING_PRESETS[archetype];
     // ONE owner of this body's clips: the steering reports (idle / move / down), the owner shows it.
@@ -513,7 +527,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     // touch, so the health fields existed and meant nothing and there was no bar worth drawing. MookHealth
     // owns the curve; it is shallow and capped on purpose, because one swing still has to clear a crowd.
     const hpPool = mookMaxHp(wave);   // `pool` above is the MOB pool — different thing, same word
-    enemies.push({ mob, anim, brain: new EnemyBrain(wave), hp: hpPool, maxHp: hpPool, airUntil: 0, orbitUntil: 0, orbitDir: i % 2 ? 1 : -1, bar: null, stunUntil: 0, hitAt: -1e9, carried: false });
+    enemies.push({ mob, anim, brain: new EnemyBrain(wave), hp: hpPool, maxHp: hpPool, airUntil: 0, orbitUntil: 0, orbitDir: i % 2 ? 1 : -1, bar: null, stunUntil: 0, hitAt: -1e9, carried: false, cue: null, arrow: null });
   }
 
   async function spawnWave(ctx: ModeContext): Promise<void> {
@@ -524,9 +538,16 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     const spec = waveSpec(wave, ctx.scene.metadata?.felTier === 'mobile' ? 12 : 20);
     const count = spec.count;
     void spawnRing(wave, count);
-    const proms: Promise<void>[] = [];
-    for (let i = 0; i < count; i++) proms.push(spawnEnemy(ctx, (i / count) * Math.PI * 2 + wave, i));
-    await Promise.all(proms);
+    // WA-11: stagger spawns — N concurrent GLB instantiates + VFX in one frame caused a ~2 s hitch.
+    const BATCH = ctx.scene.metadata?.felTier === 'mobile' ? 3 : 4;
+    for (let b = 0; b < count; b += BATCH) {
+      const proms: Promise<void>[] = [];
+      for (let i = b; i < Math.min(b + BATCH, count); i++) {
+        proms.push(spawnEnemy(ctx, (i / count) * Math.PI * 2 + wave, i, i > 0));
+      }
+      await Promise.all(proms);
+      if (b + BATCH < count) await new Promise<void>((r) => setTimeout(r, 48));
+    }
     ctx.setHud({ wave, enemies: count, chi, banner: `WAVE ${wave}` });
     setTimeout(() => { if (!shopOpen) ctx.setHud({ banner: '' }); }, 900);
   }
@@ -1196,6 +1217,8 @@ export const KarateEndlessMode: ModeDefinition = (() => {
   function ko(ctx: ModeContext, e: Enemy): void {
     if (carry?.e === e) carry = null;
     e.bar?.dispose(); e.bar = null;
+    e.cue?.material?.dispose(); e.cue?.dispose(); e.cue = null;
+    e.arrow?.material?.dispose(); e.arrow?.dispose(); e.arrow = null;
     enemies = enemies.filter((x) => x !== e);
     kos++; totalKos++;
     e.mob.down();                                               // the owner: knockdown → the floor hold
@@ -1506,15 +1529,72 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     }
   }
 
+  const landLeft = (e: Enemy): number => {
+    const b = e.brain;
+    if (!b.attacking) return -1;
+    const left = b.phase === 'windup' ? windupSecFor(b.wave) - b.t + b.landAt : b.landAt - b.t;
+    return left >= 0 ? left : -1;
+  };
   const nextLandIn = (): number => {
     let best = -1;
     for (const e of enemies) {
-      const b = e.brain; if (!b.attacking) continue;
-      const left = b.phase === 'windup' ? windupSecFor(b.wave) - b.t + b.landAt : b.landAt - b.t;
+      const left = landLeft(e);
       if (left >= 0 && (best < 0 || left < best)) best = left;
     }
     return best;
   };
+  function publishFight(ctx: ModeContext): void {
+    const md = (ctx.scene.metadata ??= {}) as Record<string, unknown>;
+    md.fight = { landsIn: () => nextLandIn() };
+  }
+  function tickThreatCues(ctx: ModeContext): void {
+    const cam = ctx.scene.activeCamera;
+    const engine = ctx.scene.getEngine();
+    const w = engine.getRenderWidth();
+    const h = engine.getRenderHeight();
+    const vp = cam && w > 2 && h > 2 ? cam.viewport.toGlobal(w, h) : null;
+    const view = ctx.scene.getTransformMatrix();
+    for (const e of enemies) {
+      const left = landLeft(e);
+      const showCue = left > 0 && left < 0.6 && !e.carried;
+      if (showCue) {
+        if (!e.cue) {
+          const cue = MeshBuilder.CreatePlane(`threat_cue_${e.mob.char.root.uniqueId}`, { width: 0.28, height: 0.28 }, ctx.scene);
+          cue.billboardMode = Mesh.BILLBOARDMODE_ALL;
+          cue.isPickable = false;
+          cue.material = unlitMat(ctx, `${cue.name}_m`, '#ff3355');
+          e.cue = cue;
+        }
+        e.cue.isVisible = true;
+        e.cue.position.copyFrom(e.mob.char.root.position).addInPlace(new Vector3(0, BAR_Y + 0.38, 0));
+        const s = 0.65 + (0.6 - left);
+        e.cue.scaling.set(s, s, 1);
+      } else if (e.cue) e.cue.isVisible = false;
+
+      let off = false;
+      if (vp) {
+        const p = Vector3.Project(e.mob.char.root.position.add(new Vector3(0, 1.2, 0)), Matrix.Identity(), view, vp);
+        off = p.z < 0 || p.z > 1 || p.x < 12 || p.y < 12 || p.x > w - 12 || p.y > h - 12;
+      }
+      if (off && !e.carried) {
+        if (!e.arrow) {
+          const arrow = MeshBuilder.CreateCylinder(`threat_arrow_${e.mob.char.root.uniqueId}`, { diameterTop: 0, diameterBottom: 0.22, height: 0.42, tessellation: 6 }, ctx.scene);
+          arrow.isPickable = false;
+          arrow.material = unlitMat(ctx, `${arrow.name}_m`, '#ffcc33');
+          e.arrow = arrow;
+        }
+        const from = player.root.position;
+        const dir = e.mob.char.root.position.subtract(from);
+        dir.y = 0;
+        const len = dir.length() || 1;
+        dir.scaleInPlace(1 / len);
+        e.arrow.isVisible = true;
+        e.arrow.position.copyFrom(from).addInPlace(dir.scale(3.2)).addInPlace(new Vector3(0, 1.55, 0));
+        e.arrow.rotation.z = Math.PI / 2;
+        e.arrow.rotation.y = Math.atan2(dir.x, dir.z);
+      } else if (e.arrow) e.arrow.isVisible = false;
+    }
+  }
   function publishTelemetry(ctx: ModeContext): void {
     if (process.env.NODE_ENV !== 'development') return;
     const md = (ctx.scene.metadata ??= {}) as Record<string, unknown>;
@@ -1534,7 +1614,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
   }
 
   return {
-    modeId: 'karate', mood: 'dojoWarm', camPreset: 'overShoulder',
+    modeId: 'karate', mood: 'dojoWarm', camPreset: 'fightShoulder',
     // MOVEMENT PLAY P7: the body plays The Hundred only behind its flag (read at mount — the dev probe's ?bodyfight=karate)
     get body() { return bodyFightOn('karate') ? { claims: FIGHT_CLAIMS, lines: FIGHT_CARD_LINES } : undefined; },
     get onBody() { return bodyFightOn('karate') ? onBodyEvent : undefined; },
@@ -1694,6 +1774,11 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     update(ctx, dtReal) {
       if (spinApplied) { player.root.rotation.y -= spinApplied; spinApplied = 0; }   // the spin layer: back to the real facing first
       clockSec += dtReal;
+      if (!outFlag && !shopOpen && clockSec >= HUNDRED_SESSION_CAP_SEC) {
+        endSlowMo(ctx);
+        ctx.setHud({ banner: 'TIME!' });
+        return ctx.end('WAVE_CAP', totalKos * 100 + wave * 50 + Math.round(flow.points), { wave, kos: totalKos, bestFlow: flow.best, capped: 1 });
+      }
       ctxRef = ctx;
       { const bv = ctx.body?.(); if (bv) bodyLedgerFrame(bv, now()); deferred.flush(ledger, now()); }   // P7: the body's deferred hits
       ring?.set(Math.max(0, Math.min(1, vitals.hp / Math.max(1, vitals.maxHp))));   // PLAYER RING: hp as the gauge
@@ -1790,6 +1875,8 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       // a swing reads as sitting back
       // the bars ride their bodies: built on first damage, moved every frame after
       for (const e of enemies) if (e.bar) updateBar(ctx, e);
+      publishFight(ctx);
+      tickThreatCues(ctx);
       meAir.update(dtHero);
       player.root.position.y = meAir.height;
       tickMatrix(ctx, dtHero);   // MATRIX: the wall run and the kick own the root while they last
@@ -1871,7 +1958,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       // transition only — setPreset re-derives the venue bounds)
       const surroundedNow = surroundedCount(player.root.position,
         enemies.map((e) => ({ id: 'e', pos: e.mob.char.root.position, hp: e.hp, airborneSec: 0 }))) >= 3;
-      if (surroundedNow !== camCrowd) { camCrowd = surroundedNow; ctx.camDirector.setPreset(camCrowd ? 'crowd' : 'overShoulder'); }
+      if (surroundedNow !== camCrowd) { camCrowd = surroundedNow; ctx.camDirector.setPreset(camCrowd ? 'fightCrowd' : 'fightShoulder'); }
       ctx.camDirector.look(lookX, lookY, dtReal);
       ctx.camDirector.update(player.root.position, facingVec(), nearest(player.root.position)?.mob.char.root.position ?? null);
       animate(mySpeed01, Math.min(1, pVel.length() / 2.6));
@@ -1886,6 +1973,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       pickups = []; tweens = []; shockRings = []; carry = null; queue.clear();
       mePosture?.dispose(); mePosture = null; partnerPosture?.dispose(); partnerPosture = null;
       youRing?.material?.dispose(); youRing?.dispose(); youRing = null; ring?.dispose(); ring = null;
+      for (const e of enemies) { e.cue?.material?.dispose(); e.cue?.dispose(); e.arrow?.material?.dispose(); e.arrow?.dispose(); }
       crowd?.dispose(); crowd = null; arenaHandle?.dispose(); arenaHandle = null; karateVenue?.dispose(); karateVenue = null; player?.dispose(); partner?.dispose(); pool?.dispose(); playerSlot?.dispose(); partnerSlot?.dispose(); SoundKit.stopAmbient();
     },
   };

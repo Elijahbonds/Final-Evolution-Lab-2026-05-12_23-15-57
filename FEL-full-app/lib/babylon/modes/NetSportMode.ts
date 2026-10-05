@@ -168,6 +168,12 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
   let flightT = 0;                 // 0..1 across the current flight
   let contactArmed = false;        // the receiving side may swing
   let awaitingHuman = false;       // is the ball coming to us?
+  let rallyAge = 0;
+  const RALLY_CAP_SEC = 24;
+  let setter: SpawnedCharacter | null = null;
+  const setterHome = new Vector3();
+  const setterAt = new Vector3();
+  let netAlive = true;
   /** What KIND of shot is in the air. A block only answers an attack, and an
    *  attack is harder to return than a dig — both need this. */
   let incomingTouch: VolleyTouch | undefined;
@@ -318,6 +324,8 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
   /** Award a point to `side` (0 = hero) and set up the next serve. */
   function awardPoint(ctx: ModeContext, side: 0 | 1, why: string): void {
     rally.end();
+    rallyAge = 0;
+    setterAt.copyFrom(setterHome);
     if (o.cage) { if (side === 0) style += stylePts(mult); cageStats.rallies++; if (mult > 1 && side === 0) why = `${why} · x${mult}`; mult = 1; aerialNow = null; incomingMeteor = false; ctx.setHud({ mult: 1, style }); }   // PARKOUR TENNIS
     shot = null;
     contactArmed = false;
@@ -823,7 +831,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
 
     // WII READ: in tennis WHEN you swing is WHERE it goes — early pulls it across your body, late pushes it the other way
     const wallRun = o.cage && !isVolley && wallRunRead(foot.x, o.cfg.halfWidth);
-    const away = launch(ctx, swingPos, crosses ? -1 : 1, isVolley ? aimX : aimFor(aimX, dt), q,
+    const away = launch(ctx, swingPos, crosses ? -1 : 1, isVolley ? aimX : aimFor(0, dt), q,
       isVolley ? touchKind : undefined,
       isVolley ? undefined : pendingShot, zone);
     // PARKOUR TENNIS: the wall run and the aerials are faster balls and a higher multiplier
@@ -882,6 +890,19 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       ctx.groundLock?.track(foe.root, foe.skeleton);
       foeTree = new NetAnimTree(foe.animator, clips);
       foeTree.onSettle = (st) => { if (st === 'swing') foeSwing = false; };
+      if (o.cfg.touchesPerSide > 1) {
+        setterHome.set(2.6, 0, o.cfg.halfLength * 0.55);
+        setterAt.copyFrom(setterHome);
+        void CharacterLibrary.spawn(ctx.scene, o.heroUrl, {
+          position: setterHome.clone(), yawRad: Math.PI, tint: '#7CFFB2', startClip: clips.ready,
+        }).then((c) => {
+          if (!netAlive) { c.dispose(); return; }
+          setter = c;
+          neverBindPose(c.animator, clips.ready);
+          installSafePlay(c.animator, `${o.modeId}-setter`);
+          ctx.groundLock?.track(c.root, c.skeleton);
+        });
+      }
       meSwing = meServe = meBlock = foeSwing = false; serveIn = 0; serveFrom = null; foeFoot.x = 0; rallyFlow = 0;
       if (o.cfg.touchesPerSide > 1) ctx.setHud({ flow: 0 });
 
@@ -917,7 +938,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       }
 
       rally = new RallyState(o.cfg);
-      tennisScore = o.scoring === 'tennis' ? new TennisScore(4) : null;
+      tennisScore = o.scoring === 'tennis' ? new TennisScore(6) : null;   // FIELD-DEPTH W4: first to six games
       volleyScore = o.scoring === 'volley' ? new VolleyScore(25) : null;
       ended = false; restSec = 0.8; shot = null; aimX = 0; heroStreak = 0; gameLatch = false;
 
@@ -1011,7 +1032,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       if (landing) {
         const show = !!shot && awaitingHuman && !!ball;
         landing.show(show);
-        if (show && shot) { const l = landingFor(o.cfg, { x: shot.to.x, y: 1, z: shot.to.z }, -1, aimFor(aimX, 0), pendingShot); if (l) landing.set(l.x, l.z); }
+        if (show && shot) { const l = landingFor(o.cfg, { x: shot.to.x, y: 1, z: shot.to.z }, -1, aimFor(0, 0), pendingShot); if (l) landing.set(l.x, l.z); }
       }
 
       // Baseline shuffle (MODE-STICK-FACE, 2026-09-07): lateral only (depth is fixed so the player is always in a
@@ -1074,6 +1095,13 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
         return;
       }
       crowd?.update(dt); crowdEnds?.update(dt);
+      if (setter?.root) {
+        const p = setter.root.position;
+        const k = Math.min(1, dt * 3.5);
+        p.x += (setterAt.x - p.x) * k;
+        p.z += (setterAt.z - p.z) * k;
+        p.y = 0;
+      }
       if (blockCooldown > 0) blockCooldown = Math.max(0, blockCooldown - dt);
       if (serveFrom) {
         // the toss: the ball rises off the hand and the serve strikes it on the clip's contact beat
@@ -1086,8 +1114,25 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       if (!shot) return;
 
       flightT += dt / shot.duration;
+      if (o.cfg.touchesPerSide > 1) {
+        rallyAge += dt;
+        if (rallyAge >= RALLY_CAP_SEC) {
+          awardPoint(ctx, awaitingHuman ? 1 : 0, 'RALLY CAP');
+          return;
+        }
+      }
       const p = shotAt(shot, flightT);
       ball.position.set(p.x, p.y, p.z);
+      // The setter takes the second touch. After a bump the ball stays on our side;
+      // one player was bumping, setting, and spiking. The setter moves to the ball and sets.
+      if (o.cfg.touchesPerSide > 1 && setter && awaitingHuman && rally.touches === 1 && flightT >= 0.88 && flightT < 1) {
+        setterAt.set(ball.position.x, 0, ball.position.z);
+        const at = ball.getAbsolutePosition();
+        if (rally.touch() === 'fault') { awardPoint(ctx, 1, 'TOO MANY TOUCHES'); return; }
+        launch(ctx, at, 1, 0, 'good', 'set');
+        flash(ctx, 'SET', 600);
+        return;
+      }
       // PARKOUR TENNIS: the ball reaching a pane is mirrored off it (live); the aerial read on the incoming ball
       if (o.cage) {
         const hit = cageCross(ball.position, o.cfg, bouncedSide, bouncedBack);
@@ -1154,7 +1199,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       posture?.dispose(); posture = null;
       recoverMark?.dispose(); recoverMark = null;
       landing?.dispose(); landing = null; weatherFx?.dispose(); weatherFx = null;
-      me?.dispose(); foe?.dispose();
+      me?.dispose(); foe?.dispose(); setter?.dispose(); setter = null; netAlive = false;
       SoundKit.stopAmbient();
       shot = null; ended = true;
     },

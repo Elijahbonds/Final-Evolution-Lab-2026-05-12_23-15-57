@@ -61,6 +61,11 @@ export const PLACE_LOOKS: Record<string, PlaceLook[]> = {
     { id: 'clay', name: 'Red Clay', sub: 'THE SLOW COURT · LONG RALLIES', tint: '#C2542D', sky: DESERT, backdrop: 'stadium', ground: { color: '#B5502A', line: '#FFFFFF', kind: 'clay' } },
     { id: 'grass', name: 'The Lawn', sub: 'GRASS · A FAST, LOW BOUNCE', tint: '#3E8A47', sky: OVERCAST, backdrop: 'links', ground: { color: '#3E8A47', line: '#FFFFFF', kind: 'pitch' }, propSet: 'links' },
   ],
+  tiebreak: [
+    home('Tiebreak Center Court', 'HARDCOURT UNDER A DUSK SKY', '#2B6CB0'),
+    { id: 'clay', name: 'Red Clay Breaker', sub: 'THE SLOW COURT · LONG RALLIES', tint: '#C2542D', sky: DESERT, backdrop: 'stadium', ground: { color: '#B5502A', line: '#FFFFFF', kind: 'clay' } },
+    { id: 'grass', name: 'The Lawn Breaker', sub: 'GRASS · A FAST, LOW BOUNCE', tint: '#3E8A47', sky: OVERCAST, backdrop: 'links', ground: { color: '#3E8A47', line: '#FFFFFF', kind: 'pitch' }, propSet: 'links' },
+  ],
   volleyball: [
     home('Beach Pro', 'THE SAND AT GOLDEN HOUR', '#E0C08A'),
     { id: 'night-beach', name: 'Night Beach', sub: 'FLOODLIT SAND · THE SURF IN THE DARK', tint: '#9ad7ff', sky: NIGHT, backdrop: 'ocean', ground: { color: '#c8ac7a', line: '#bfe9ff' }, props: [lamp(-11, -16, '#9ad7ff'), lamp(11, -16, '#9ad7ff'), lamp(-11, 16, '#9ad7ff'), lamp(11, 16, '#9ad7ff')] },

@@ -13,7 +13,7 @@ import { ResultsView } from './results-view';
 import { NotSavedCard } from './not-saved';
 import { ScreenFrame, StepCard } from './screen-ui';
 
-export function ResultsPage() {
+export function ResultsPage({ trainWithElijahHref = null }: { trainWithElijahHref?: string | null }) {
   const router = useRouter();
   const [state, setState] = useState<{ summary: ScreenSummary; age: AgeBand | null } | 'none' | 'reading'>('reading');
   useEffect(() => {
@@ -29,7 +29,7 @@ export function ResultsPage() {
     <ScreenFrame back={SCREEN_HOME}>
       {state === 'reading' ? <StepCard testId="reading"><p className="text-white/60">Reading your results…</p></StepCard> : null}
       {state === 'none' ? <NotSavedCard /> : null}
-      {typeof state === 'object' ? <ResultsView summary={state.summary} age={state.age} onClear={clear} /> : null}
+      {typeof state === 'object' ? <ResultsView summary={state.summary} age={state.age} onClear={clear} onRunAgain={() => router.replace(ASSESS_PATH)} trainWithElijahHref={trainWithElijahHref} /> : null}
     </ScreenFrame>
   );
 }

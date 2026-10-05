@@ -15,7 +15,12 @@
 //
 // YOUTH (MIRROR-COACH P3 review, 2026-09-26; PLAN item 9, owner decisions #6 and #20): the written blocks are off for an
 // athlete under 18 or with no birth year on file, and the card says so (athletePlan's blocksNote). The FIX line stays.
+// MIRROR-COACH P9 (2026-09-30), PLAN item 9 rule (e): under a flag's block, its matching WRITTEN corrective for an adult —
+// the band drill and the release to run first (lib/mirror/correctives.ts SCREEN_CORRECTIVE, the same the coach's draft
+// shows) — with the way into the Mirror's correctives page, where each is written out in full. Youth rules: none.
+import Link from 'next/link';
 import type { ScreenId } from '@/lib/mirror/screen';
+import { CORRECTIVES_PATH, screenCorrectiveFor } from '@/lib/mirror/correctives';
 import { athletePlan, outcomesFromGrades, type GradeLike, type YouthGate } from '@/lib/mirror/screenCorrectives';
 // SCREEN-SHIP (2026-09-29), label only: the grades and cues here rest on unsigned thresholds (listed in
 // lib/screen/PROPOSED-thresholds.ts MOVEMENT_SCREEN_REGISTER), so the card says so. No grading logic or value changed.
@@ -31,7 +36,10 @@ export interface ScreenNextStepsProps {
 }
 
 export function ScreenNextSteps({ screen, grades, youth = 'unknownAge' }: ScreenNextStepsProps) {
-  const plan = athletePlan(outcomesFromGrades(screen, grades), { youth });
+  const outcomes = outcomesFromGrades(screen, grades);
+  const plan = athletePlan(outcomes, { youth });
+  // athletePlan's work items are the flagged outcomes, in order (screenCorrectives.ts athletePlan)
+  const flagged = outcomes.filter((o) => o.status === 'flag');
   return (
     <section aria-labelledby="screen-next-steps-heading" className="mt-4 rounded-2xl border border-white/8 bg-white/[0.02] p-5" data-next-steps>
       <h2 id="screen-next-steps-heading" className="fel-heading text-[15px] font-bold text-white/80">What to work on · estimated</h2>
@@ -59,6 +67,7 @@ export function ScreenNextSteps({ screen, grades, youth = 'unknownAge' }: Screen
                     </div>
                   )
               )}
+              <WrittenCorrective checkId={flagged[i]?.checkId} side={flagged[i]?.side} youth={youth} />
             </li>
           ))}
         </ol>
@@ -88,5 +97,21 @@ export function ScreenNextSteps({ screen, grades, youth = 'unknownAge' }: Screen
 
       <p className="mt-4 border-t border-white/8 pt-3 text-[12.5px] font-semibold text-white/60">{plan.note}</p>
     </section>
+  );
+}
+
+/** A flag's written corrective, one line, and the way to it in full. Nothing under youth rules or for a check with none. */
+function WrittenCorrective({ checkId, side, youth }: { checkId: string | undefined; side?: 'left' | 'right'; youth: YouthGate }) {
+  const c = checkId ? screenCorrectiveFor(checkId, youth, side) : null;
+  if (!c) return null;
+  // MIRROR-COACH P9 fix: "release first:" with no drill after it read as a cut-off line (the knee has a release only)
+  const parts = [c.release ? `${c.drill ? 'release first' : 'release'}: ${c.release.tissue.toLowerCase()}` : null, c.drill ? `band drill: ${c.drill.title}` : null].filter(Boolean);
+  return (
+    <p className="mt-1.5 text-[12.5px] leading-relaxed text-white/60" data-written-corrective={checkId}>
+      <span className="font-bold text-white/75">Written corrective: </span>
+      {parts.join(' · ')}.{' '}
+      {c.drill && <span data-screen-setup>{c.drill.setup}{' '}</span>}
+      <Link href={c.href} className="font-semibold text-[#00E5FF] hover:underline">In Correctives →</Link>
+    </p>
   );
 }

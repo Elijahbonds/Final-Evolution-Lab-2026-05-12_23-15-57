@@ -28,6 +28,14 @@ const NOT_IMPORTED: Record<string, string> = {
   // dead), but this one exists to be imported by them: six rule tests strip comments with it before scanning
   // source. Counting tests generally would blind the check; excusing this one file by name does not.
   'lib/testing/sourceScan.ts': 'test support — imported by the rule tests that scan source, and tests are not counted as consumers',
+  // R5 / HOOPS-10 round 5 (2026-10-01): training had no headless sim while dance, dunkduel and irl/acting all
+  // carry one. The sim is the mode's scoring rules extracted so the integrity ceiling and the win-rate read run
+  // headless; its only caller today is its test (same class as sourceScan above — tests are not consumers).
+  // A headed-rig probe or the integrity model importing it means deleting this line.
+  'lib/babylon/core/trainingSim.ts': 'the training scoring model — run by trainingSim.test.ts and the integrity suite\'s ceiling basis; tests are not counted as consumers',
+  // BODY-PLAY-WORKS (2026-10-01): the public-repo rule for a committed pose recording. The walk lives in
+  // recordingsGuard.test.ts; tests are not counted as consumers, same as sourceScan above.
+  'lib/pose/recordingsGuard.ts': 'repo guard — recordingsGuard.test.ts rejects a committed video, image, or child take; tests are not counted as consumers',
   // MIRROR-COACH P3 review (2026-09-26): a stored Mirror screen row reads as server-graded only with the server's evidence
   // beside results that match it, so the coach tests build their rows the way app/api/mirror/screen writes them — here.
   'lib/mirror/fixtures/storedRows.ts': 'test support — the stored screen rows the coach and attention tests read, built as the Mirror route writes them; tests are not counted as consumers',
@@ -35,6 +43,12 @@ const NOT_IMPORTED: Record<string, string> = {
   // staged until the live database is back). lib/sessions/sessionsHardening.scan.test.ts fails the day a route imports it
   // without that GO; wiring it is two lines per sessions route, then this line goes.
   'lib/sessions/runRateLimit.ts': 'STAGED, not wired to prod — the sessions rate limits wait for the FE PM\'s GO (live DB back)',
+  // STORE-PRICES (2026-10-04): Elijah's approved coach-store prices, typed and flag-gated (COACH_STORE_ENABLED,
+  // still off). No route, page or component reads from it yet — this tip writes no database rows and the
+  // sellable six still read their price from MarketplaceListing.priceUsd. It is the typed source of truth the
+  // eventual DB-seeding step (see ~/Claude/_observe/STORE-PRICES-LIVE-ROWS.txt) and a future listing/settings UI
+  // read from; wiring either one up means deleting this line.
+  'lib/coach-store/storePrices.ts': 'STAGED, not wired to prod — typed price data for the coach store\'s eventual DB seed; no route/page reads it yet',
   // MIRROR-COACH P5 FIX (2026-09-29, code review): the excuse this line used to carry ("that consuming route/UI is a
   // separate, not-yet-landed piece of this same phase") was already false the day it was committed — lib/health/pain.ts
   // (imported by app/api/health/pain/route.ts) and components/coach/pain-checkin.tsx both import decide() from this
@@ -86,7 +100,6 @@ const KNOWN_ORPHANS: readonly string[] = [
   'lib/cache/asset-cache.ts',
   'lib/competition/payoutMethods.ts',
   'lib/env.ts',
-  'lib/mode-menu.ts',
   'lib/offline-cache.ts',
   'lib/profile/dashboard.ts',
   'lib/story/progression-gates.ts',

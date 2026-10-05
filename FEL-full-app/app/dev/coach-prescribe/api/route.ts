@@ -70,7 +70,9 @@ export async function GET(req: NextRequest) {
   if (op === 'draft') {
     const catalogue: CatalogueExercise[] = w.store.pe.filter((e) => e.coachId === COACH)
       .map((e) => ({ id: e.id, name: e.name, category: e.category, pattern: e.pattern, skillLayer: e.skillLayer, defaultTempo: e.defaultTempo }));
-    return NextResponse.json(coachDraft(f.rows, catalogue));
+    // the fixture's client is an adult with a birth year on file — said explicitly now that coachDraft's written
+    // corrective fails closed for an unstated age (MIRROR-COACH P9 fix, 2026-09-30)
+    return NextResponse.json(coachDraft(f.rows, catalogue, { youth: null }));
   }
   const loaded = await loadProgram(builderMemoryDb(w.store) as unknown as BuilderDb, COACH, w.programId);
   if (!loaded.ok) return NextResponse.json({ error: loaded.error }, { status: loaded.status });

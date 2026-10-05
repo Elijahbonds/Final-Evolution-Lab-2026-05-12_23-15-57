@@ -6,6 +6,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { isProUser, paywall, PAYWALL_STATUS } from '@/lib/pro-guard';
 import { recordCheckValues } from '@/lib/mirror/baselines';
+import { canSaveScanNumbers, refuseScanSave } from '@/lib/privacy/scanSaveGate';
 
 /**
  * The Neuromechanic Mirror's training record.
@@ -37,6 +38,8 @@ export async function POST(req: NextRequest) {
   // a summary shorter than a single rep is a tab that was opened and closed; storing it would
   // pollute the trend with noise the player never intended to record
   if (durationMs < 3000) return NextResponse.json({ skipped: 'too_short' });
+  // TEEN-WRITE-BLOCK (FE PM 23:05 PT): a session summary is kept only for a verified 18+ account that opted in (today nobody).
+  if (!(await canSaveScanNumbers(prisma, session.user.id))) return refuseScanSave();
 
   // PERSONAL BASELINES (MIRROR-COACH P4, carry-and-baselines lane, 2026-09-29): an optional, additive
   // `checkValues` map — the pattern's own per-check numeric readings for THIS session (e.g. carryAudit's

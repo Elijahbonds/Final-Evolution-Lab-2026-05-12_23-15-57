@@ -28,7 +28,7 @@ import { plazaCrowd, plazaMarkers, plazaRails, plazaSolids } from './skatePlaza'
 import { SNOW_SLOPE, snowCrowd } from './snowSlope';
 import { GATE_HALF_WIDTH, FINISH_AFTER_M, treeline, edgePoles, rockSpots, type RideSolid } from './gateCrasher';
 import { snowParkMaterials, parkBoxUV, PARK_TILE_M } from '../visual/snowParkTextures';   // GATE-CRASHER-POLISH-2: the park, painted
-import { surfCrowd } from './surfLineup';
+import { barrelOpen, startLineup, stepLineup, surfCrowd, type LineupState, type WaveProfile } from './surfLineup';
 
 export interface RideObstacle { pos: Vector3; radius: number }
 
@@ -809,9 +809,9 @@ function buildSlalomGates(scene: Scene, all: AbstractMesh[], markers: Vector3[],
   strips.thinInstanceSetBuffer('matrix', stripBuf, 16, true); strips.thinInstanceSetBuffer('color', stripCol, 4, false);
 
   // the marker over the next gate: a lit chevron that bobs, the one bright thing on the run
-  const marker = MeshBuilder.CreateCylinder('gate_next', { diameterTop: 0.9, diameterBottom: 0, height: 0.8, tessellation: 4 }, scene);
+  const marker = MeshBuilder.CreateCylinder('gate_next', { diameterTop: 1.35, diameterBottom: 0, height: 1.2, tessellation: 4 }, scene);
   const markM = new PBRMaterial('gateNextM', scene);
-  markM.albedoColor = Color3.FromHexString(GATE_COLOR.stripNext); markM.emissiveColor = Color3.FromHexString(GATE_COLOR.stripNext).scale(0.9);
+  markM.albedoColor = Color3.FromHexString(GATE_COLOR.stripNext); markM.emissiveColor = Color3.FromHexString(GATE_COLOR.stripNext).scale(1.35);
   markM.metallic = 0; markM.roughness = 0.6;
   marker.material = markM; marker.isPickable = false; marker.setEnabled(false);
   all.push(marker);
@@ -1058,6 +1058,8 @@ export function buildSurfBreak(scene: Scene, pocket: { min: number; max: number 
   world: RideWorld;
   waveLipAt(tSec: number): Vector3;
   barrelActive(tSec: number): boolean;
+  /** The swell being ridden, for the judged heat. */
+  activeProfile(): WaveProfile;
   /** Face height at world (x, z) for the wave at `tSec` — the mode pitches the board with it. */
   faceHeightAt(x: number, z: number, tSec: number): number;
   /** SURF OCEAN: advance the sea and follow the camera, every frame. */
@@ -1306,8 +1308,45 @@ export function buildSurfBreak(scene: Scene, pocket: { min: number; max: number 
     const dLip = Math.hypot(camera.position.y - lip.position.y, camera.position.z - (waveRoot.position.z + lip.position.z));
     lipM.alpha = 0.62 * Math.max(0, Math.min(1, (dLip - 2) / 5));
     ocean.update(dt, camera); oceanT += Math.max(0, Math.min(0.1, dt)); faceShade.setTime(oceanT); foamShade.setTime(oceanT); tubeShade.setTime(oceanT); };
-  const BARREL_ON = 8, BARREL_CYCLE = 18;
-  const barrelActive = (tSec: number): boolean => (tSec % BARREL_CYCLE) < BARREL_ON;
+  // The tube opens on the swell's own barrel section (surfLineup), not an 18s clock.
+  let lineup: LineupState = startLineup();
+  let syncedAt = 0;
+  let ride: WaveProfile = lineup.swells[0].profile;
+  let along = 0;
+  let riding = false;
+  let pending: WaveProfile | null = null;
+  const syncSwell = (tSec: number): void => {
+    if (tSec + 1e-4 < syncedAt) {
+      lineup = startLineup();
+      syncedAt = 0;
+      ride = lineup.swells[0].profile;
+      along = 0;
+      riding = false;
+      pending = null;
+    }
+    const dt = Math.max(0, Math.min(0.1, tSec - syncedAt));
+    if (dt <= 0) return;
+    const stepped = stepLineup(lineup, dt);
+    lineup = stepped.state;
+    syncedAt = tSec;
+    if (stepped.broke.length > 0) {
+      const next = stepped.broke[stepped.broke.length - 1].profile;
+      if (!riding) { ride = next; along = 0; riding = true; pending = null; }
+      else pending = next;
+    }
+    if (riding) {
+      along += WAVE_SPEED * dt;
+      if (along >= ride.wall) {
+        if (pending) { ride = pending; pending = null; along = 0; }
+        else riding = false;
+      }
+    }
+  };
+  const barrelActive = (tSec: number): boolean => {
+    syncSwell(tSec);
+    return riding && barrelOpen(ride, along);
+  };
+  const activeProfile = (): WaveProfile => ride;
   const lipWorld = new Vector3(0, vH * 0.78, -50);
   let lastRebuild = -1;
   const waveLipAt = (tSec: number): Vector3 => {
@@ -1327,5 +1366,5 @@ export function buildSurfBreak(scene: Scene, pocket: { min: number; max: number 
     return lipWorld;
   };
   const faceHeightAt = (x: number, z: number, tSec: number): number => waveProfile(z - waveRoot.position.z, crestHeightAt(x, tSec));
-  return { world, waveLipAt, barrelActive, faceHeightAt, updateSea, seaHeightAt: ocean.heightAt };
+  return { world, waveLipAt, barrelActive, activeProfile, faceHeightAt, updateSea, seaHeightAt: ocean.heightAt };
 }

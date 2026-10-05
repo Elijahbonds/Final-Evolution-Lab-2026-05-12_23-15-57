@@ -57,3 +57,31 @@ export function seasonPassProPriceUsdCents(): number | null {
   if (!Number.isFinite(raw) || raw <= 0) return null;
   return Math.round(raw);
 }
+
+/** COACH-STORE-V1. Default OFF. Pages and routes 404 while this is unset. */
+export function isCoachStoreEnabled(): boolean {
+  return envOn('COACH_STORE_ENABLED');
+}
+
+/** Checkout. Still test mode only. Default OFF. */
+export function isCoachStorePaymentsEnabled(): boolean {
+  return envOn('COACH_STORE_PAYMENTS_ENABLED');
+}
+
+/** Signed upload URLs and selling async video review. Default OFF. */
+export function isCoachReviewUploadsEnabled(): boolean {
+  return envOn('COACH_REVIEW_UPLOADS_ENABLED');
+}
+
+/**
+ * Real Stripe transfers. Default OFF. The payout route answers 503 and writes nothing
+ * until this is on, and even then it does not mark a payout completed without a transfer.
+ */
+export function isPayoutsEnabled(): boolean {
+  return envOn('PAYOUTS_ENABLED');
+}
+
+/** LIVE-PAGE-FLAGOFF. Default OFF. /live/schedule 404s while unset. */
+export function isLiveStreamScheduleEnabled(): boolean {
+  return envOn('LIVE_STREAM_SCHEDULE_ENABLED');
+}

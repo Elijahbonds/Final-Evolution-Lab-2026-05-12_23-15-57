@@ -8,13 +8,15 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import type { GameProps, GameResult } from './game-shell';
+import { useBabylonPlaytestBridge } from './use-babylon-playtest-bridge';
 import { BootSplash } from './boot-splash';
+import { surfaceBootError } from './boot-error';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode } from './hud-format';
-import { timingWon } from './timing-won';
 import { timingMaxCombo } from './timing-combo';
+import { timingGameResult } from '@/lib/sessions/gameResultFromSession';
 import { CUE_LOOKAHEAD_SEC, CUE_LINGER_SEC, type HudCue } from '@/lib/babylon/core/danceTracks';
 import { ACCURACY_CENTER as GOLF_ACC_CENTER, ACCURACY_HALF as GOLF_ACC_HALF } from '@/lib/babylon/core/golfHud';
 // MUSIC-SUITE P7 (2026-09-29), room-mix-ux: the Cypher's instrument chips (replacing the MIX bar) and its paused-
@@ -61,10 +63,13 @@ export function makeTimingHost(opts: TimingHostOpts) {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const busRef = useRef<InputBus | null>(null);
     const endedRef = useRef(false);
+    const onEndRef = useRef(onEnd);
+    onEndRef.current = onEnd;
     const [phase, setPhase] = useState<ModePhase>('loading');
     const [countdown, setCountdown] = useState<number | null>(null);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [hud, setHud] = useState<Hud>({});
+    useBabylonPlaytestBridge(modeKey, () => ({ phase, countdown, loadError, hud }), busRef.current);
 
     useEffect(() => {
       const canvas = canvasRef.current;
@@ -81,24 +86,15 @@ export function makeTimingHost(opts: TimingHostOpts) {
         // `hits/rounds CLEAN` — an outcome and stats none of these five modes send — so no run here was ever a win.
         const st = r.stats ?? {};
         const n = (k: string, d = 0) => Number(st[k] ?? d);
-        // HOTFIX (2026-09-24): the verdict is a pure function now (./timing-won) — three Story bosses complete on it.
-        const won = timingWon(r.outcome, st);
+        const base = timingGameResult(r, { headline: '', modeKey });
+        const won = base.won;
         const headline = modeKey === 'tennis' ? `${won ? 'MATCH WON' : 'MATCH LOST'} · ${r.score} GAMES · ${n('style')} STYLE${st.rackets !== undefined ? ` · ${n('rackets')} RACKETS LEFT` : ''}`
           : modeKey === 'volleyball' ? `${won ? 'SET WON' : 'SET LOST'} · ${r.score} PTS · ${n('style')} STYLE`
           : modeKey === 'golf' ? `${won ? 'CARD IN — UNDER PAR' : 'CARD IN'} · ${n('overPar') > 0 ? '+' : ''}${n('overPar')} · ${n('holes')} HOLES · ${n('pickUps')} PICK-UPS`
           : modeKey === 'derby' ? `${won ? 'DERBY CHAMPION' : 'DERBY OVER'} · ${n('homers')} HOMERS · ${n('outs')} OUTS · ${Math.round(n('longestFt'))} FT`
           : modeKey === 'penalty' ? `${won ? 'SHOOTOUT WON' : 'SHOOTOUT LOST'} · ${n('goals')}–${n('themGoals')} · ${n('stylePts')} STYLE`
           : (n('rounds') ? `${n('hits')}/${n('rounds')} CLEAN · ${r.score} PTS` : `${r.score} PTS`);
-        const result: GameResult = {
-          score: r.score,
-          stats: r.stats, outcome: r.outcome,   // pass 5 phase 3: the proof line reads these
-          opponentScore: modeKey === 'penalty' ? n('themGoals') : 0,
-          won,
-          duration: r.durationSec,
-          headline,
-          maxCombo: timingMaxCombo(st),   // MUSIC-SUITE P6: the mode's own best streak (dance), else clean hits as before
-        };
-        onEnd(result);
+        onEndRef.current({ ...base, headline, maxCombo: timingMaxCombo(st) });
       };
 
       const def = MODES[modeKey];
@@ -128,7 +124,7 @@ export function makeTimingHost(opts: TimingHostOpts) {
             if (disposed) { s(); return; }
             stop = s;
           })
-          .catch((e) => console.error(`[${tag}] boot failed`, e));
+          .catch((e) => surfaceBootError(e, { disposed, label: `[${tag}] boot failed`, setPhase, setLoadError }));
       }, 0);
 
       return () => {
@@ -137,7 +133,8 @@ export function makeTimingHost(opts: TimingHostOpts) {
         stop?.();
         busRef.current = null;
       };
-    }, [onEnd]);
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- G7: the stage is owned by the mount; callbacks are read through refs.
+    }, []);
 
     const emit = useCallback((e: Parameters<InputBus['emit']>[0]) => {
       busRef.current?.emit(e);

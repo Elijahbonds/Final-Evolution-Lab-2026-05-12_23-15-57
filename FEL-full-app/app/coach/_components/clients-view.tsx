@@ -14,7 +14,7 @@ import type { ProgramTree } from '@/lib/coach/loop';
 
 interface Program { tree: ProgramTree; role: 'coach' | 'client' | null; clientName: string; clientId?: string; completedSessionIds: string[]; plan: { status: string; goalText: string } | null }
 type Catalogue = BuilderCatalogueItem;
-interface InboxLog { id: string; exercise: string; prescribed: string; actualSets: number | null; actualReps: string | null; actualLoad: string | null; rpe: number | null; setLines?: string[]; clientNote: string | null; videoUrl: string | null; coachComment: string | null }
+interface InboxLog { id: string; exercise: string; prescribed: string; /** MIRROR-COACH P8 FIX: the easier step the gate served on this slot, said. */ servedLine?: string | null; actualSets: number | null; actualReps: string | null; actualLoad: string | null; rpe: number | null; setLines?: string[]; clientNote: string | null; videoUrl: string | null; coachComment: string | null }
 interface InboxItem { id: string; completedAt: string; program: { id: string; name: string }; session: string; clientName: string; logs: InboxLog[] }
 interface Msg { id: string; body: string; mine: boolean; fromCoach: boolean }
 interface RosterRow { clientId: string; name: string; programs: { id: string; name: string; isActive: boolean }[]; card: { slug: string; published: boolean; rarity: string; prq: number; topScore: number; wins: number } | null; prq: Record<string, number> | null; prqDelta: Record<string, number> | null; sessions: number; wins: number; resiliency: { attempts: number; retryRate: number }; games?: number; gamesAtCap?: boolean; coachedSessions?: number; coverage?: CoverageStripData | null }
@@ -102,6 +102,8 @@ export function ClientsView() {
                     so, and the sets themselves — reps in reserve and effort per set, captured since P2 and returned by
                     the route as setLines — are listed under it instead of being dropped on the floor */}
                 <div><span className="text-white">{l.exercise}</span> <span className="text-white/40">({l.prescribed})</span> → {l.actualSets ?? '–'}×{l.actualReps ?? '–'} @ {l.actualLoad ?? '–'} · {l.setLines?.length ? 'top effort' : 'RPE'} {l.rpe ?? '–'}{l.clientNote ? ` · “${l.clientNote}”` : ''}{l.videoUrl && <a href={l.videoUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[#00E5FF] ml-2"><Video className="h-3 w-3" /> video</a>}</div>
+                {/* MIRROR-COACH P8 FIX (2026-09-30): a slot the protocol gate swapped says what was done instead */}
+                {l.servedLine && <div className="pl-3 text-[11px] text-[#FFD700]/85" data-served-line>{l.servedLine}</div>}
                 {!!l.setLines?.length && (
                   <ul className="pl-3 text-[11px] text-white/55 space-y-0.5" data-set-lines>
                     {l.setLines.map((line, k) => <li key={k}>{line}</li>)}
@@ -141,6 +143,9 @@ export function ClientsView() {
             // pull-over-push suggestion when one mentions the shoulder (MIRROR-COACH P2)
             notes={inbox.items.filter((it) => it.program.id === prog.tree.id).flatMap((it) => it.logs.map((l) => l.clientNote))}
             onTree={(tree) => setPrograms((ps) => ps?.map((p) => p.tree.id === tree.id ? { ...p, tree } : p) ?? null)}
+            // MIRROR-COACH P8 (2026-09-29): a FEL template clone seeds the catalogue — reload it so the add row lists the
+            // new rows and the pull-over-push line reads their pattern tags
+            onCatalogueChange={() => { void fetch('/api/coach/programs/exercises').then((r) => r.json()).then((c) => setCatalogue(Array.isArray(c) ? c : [])).catch(() => {}); }}
           />
         )}
       </div>

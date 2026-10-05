@@ -13,11 +13,14 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import type { GameProps, GameResult } from './game-shell';
+import { useBabylonPlaytestBridge } from './use-babylon-playtest-bridge';
 import { BootSplash } from './boot-splash';
+import { surfaceBootError } from './boot-error';
 import { BoostGauge } from './boost-hud';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
+import { gameResultFromSession } from '@/lib/sessions/gameResultFromSession';
 import { hnode } from './hud-format';
 
 type Hud = Record<string, HudValue>;
@@ -29,10 +32,13 @@ export default function AeroAcesBabylon({ onEnd }: GameProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const busRef = useRef<InputBus | null>(null);
   const endedRef = useRef(false);
+  const onEndRef = useRef(onEnd);
+  onEndRef.current = onEnd;
   const [phase, setPhase] = useState<ModePhase>('loading');
   const [countdown, setCountdown] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [hud, setHud] = useState<Hud>({});
+  useBabylonPlaytestBridge('aeroaces', () => ({ phase, countdown, loadError, hud }), busRef.current);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -47,11 +53,10 @@ export default function AeroAcesBabylon({ onEnd }: GameProps) {
       endedRef.current = true;
       const t = Number(r.stats?.seconds ?? r.stats?.timeSec ?? 0);
       const place = Number(r.stats?.place ?? 0);
-      onEnd({
-        score: r.score, stats: r.stats, outcome: r.outcome, opponentScore: 0,
-        won: r.outcome === 'WIN', duration: r.durationSec,
+      onEndRef.current(gameResultFromSession(r, {
+        won: r.outcome === 'WIN',
         headline: place > 0 ? `${place === 1 ? '1ST' : place === 2 ? '2ND' : place === 3 ? '3RD' : `${place}TH`} PLACE${t > 0 ? ` · ${t.toFixed(1)}s` : ''}` : 'FLIGHT COMPLETE',
-      } satisfies GameResult);
+      }));
     };
 
     const startTimer = setTimeout(() => {
@@ -66,11 +71,12 @@ export default function AeroAcesBabylon({ onEnd }: GameProps) {
         onHud: (u) => setHud((prev) => ({ ...prev, ...u })),
         resultSink,
       }).then((s) => { if (disposed) { s(); return; } stop = s; })
-        .catch((e) => console.error('[FEL-AERO] boot failed', e));
+        .catch((e) => surfaceBootError(e, { disposed, label: '[FEL-AERO] boot failed', setPhase, setLoadError }));
     }, 0);
 
     return () => { disposed = true; clearTimeout(startTimer); stop?.(); busRef.current = null; };
-  }, [onEnd]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- G7: the stage is owned by the mount; callbacks are read through refs.
+  }, []);
 
   const emit = useCallback((e: Parameters<InputBus['emit']>[0]) => { busRef.current?.emit(e); }, []);
   const tapStart = useCallback(() => emit({ t: 'button', btn: 'START', pressed: true }), [emit]);

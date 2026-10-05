@@ -51,28 +51,40 @@ export class SplitError extends Error {}
  * that list, so a program sale pays no commission and the whole platform take stays with the platform. That
  * boundary is the referral program's, not this file's, and it is honoured rather than widened here.
  */
-export function splitPayment(payment: Payment, upline: readonly string[] = []): Split {
+export function splitPayment(payment: Payment, upline: readonly string[] = [], rate: number = PLATFORM_TAKE): Split {
   if (!Number.isInteger(payment.amountCents) || payment.amountCents <= 0) {
     throw new SplitError('A payment is a positive whole number of cents.');
   }
-  // a rate change that makes the tree insolvent must fail loudly at the till, not quietly in a coach's payout
-  if (!ratesAreSolvent()) {
+  const customRate = rate !== PLATFORM_TAKE;
+  // a rate change that makes the tree insolvent must fail loudly at the till, not quietly in a coach's payout.
+  // A caller that passes its own rate (coach-store is 15%, and the tree's 27% does not fit under that) pays no
+  // commissions instead of throwing — the default call, with no rate, is unchanged.
+  if (!customRate && !ratesAreSolvent()) {
     throw new SplitError('Referral rates exceed the platform take — commissions cannot be paid without taking them out of the coach\'s share.');
   }
+  if (!(rate > 0 && rate < 1)) throw new SplitError('The platform rate has to sit between 0 and 1.');
 
   const gross = payment.amountCents;
   // floored: the odd cent goes to the platform, the direction that cannot invent money
-  const platformGross = Math.floor(gross * PLATFORM_TAKE);
+  const platformGross = Math.floor(gross * rate);
   const coachCents = gross - platformGross;
 
-  const tree = isQualifying(payment.kind)
+  let tree = isQualifying(payment.kind)
     ? commissionsFor(payment, upline)
-    : { commissions: [], totalCents: 0, rejected: `"${payment.kind}" is not a qualifying purchase — commissions are paid on product revenue only.` };
+    : { commissions: [] as Commission[], totalCents: 0, rejected: `"${payment.kind}" is not a qualifying purchase — commissions are paid on product revenue only.` as string | null };
 
-  const platformCents = platformGross - tree.totalCents;
+  let platformCents = platformGross - tree.totalCents;
   if (platformCents < 0) {
-    // unreachable while ratesAreSolvent() holds; asserted because the failure mode is silent underpayment
-    throw new SplitError('Commissions exceeded the platform take on this payment.');
+    if (!customRate) {
+      // unreachable while ratesAreSolvent() holds; asserted because the failure mode is silent underpayment
+      throw new SplitError('Commissions exceeded the platform take on this payment.');
+    }
+    tree = {
+      commissions: [],
+      totalCents: 0,
+      rejected: 'Commissions were not paid: this platform rate cannot cover them without taking them from the coach.',
+    };
+    platformCents = platformGross;
   }
 
   const split: Split = {

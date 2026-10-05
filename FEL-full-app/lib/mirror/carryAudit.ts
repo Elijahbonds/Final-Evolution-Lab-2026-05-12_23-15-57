@@ -239,14 +239,17 @@ function unitFor(id: CarryFaultId): string {
 /** FEL's own coaching lines (IP RULE: never the book's names or copy), three levels of insistence (cue-engine.ts's
  *  own CueCard shape, adopted by patterns.ts's CueRule so a phase-5 lane can hand these straight to that engine) —
  *  set-up language throughout, never diagnosis, nothing that reads as a max-effort brace (owner decision #6 below). */
+// MIRROR-COACH P9 (2026-09-30): reworded to FEL's external-focus policy (lib/coach/cueLint.ts, whose test lints this
+// table): a cue that names a body part leads with the floor, the wall, the ceiling, the camera or the load, and nothing
+// names a muscle to squeeze or feel. The fault each line answers, and its three levels, are unchanged.
 export const CARRY_CUES: readonly CueRule[] = [
-  { faultId: 'hipHike', cue: 'Keep both hips level as you step — no reaching up with the loaded side.',
-    escalate: 'Still hiking that hip. Shorten the step until both sides land even.',
+  { faultId: 'hipHike', cue: 'Keep the belt line level as you step — no hiking up on the loaded side.',
+    escalate: 'Still hiking. Shorten the step until the belt line stays level.',
     regress: 'Set the weight down. Just march the pattern, hips level, then pick it back up.' },
-  { faultId: 'shoulderShrug', cue: 'Let that shoulder relax down away from your ear.',
-    escalate: 'The shoulder is still riding up. Switch the load to the other hand for a set and come back to this one.',
-    regress: 'A lighter load, same reach — long arm, relaxed shoulder, then build back up.' },
-  { faultId: 'trunkSideLean', cue: 'Stack tall — shoulders back level over your hips.',
+  { faultId: 'shoulderShrug', cue: 'Let the load pull that arm long — the shoulder stays away from your ear.',
+    escalate: 'Still riding up. Switch the load to the other hand for a set and come back to this one.',
+    regress: 'A lighter load, the same long arm — let the load hang it, then build back up.' },
+  { faultId: 'trunkSideLean', cue: 'Grow tall toward the ceiling — shoulders level over your hips.',
     escalate: 'Still leaning off to one side. Slow the march and find the tall line before you speed back up.',
     regress: 'Hold the tall line standing still first, no march, then add the steps back in.' },
   { faultId: 'rhythm', cue: 'Find one even beat and keep it for every step.',

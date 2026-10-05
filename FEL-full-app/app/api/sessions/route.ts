@@ -14,6 +14,7 @@ import { recordServerEvent } from '@/lib/analytics-server';
 import { sessionHasPlay } from '@/lib/session-evidence';
 import { boundFormSummary, formHasReads, planFormWrite, gameRowAttrs, CAMERA_POWER_ATTR } from '@/lib/move/formSummary';
 import { writeFormPlan, type FormWriteResult } from '@/lib/move/formWrite';
+import { SCAN_SAVE_REFUSED, canSaveScanNumbers } from '@/lib/privacy/scanSaveGate';
 import {
   roomStats, sessionWon, sessionAccuracy, isEndlessSession, sessionPayout, readMusicSet, sessionScoreCap, isCatalogueMode,
   ENDLESS_SESSION_CEILING, ROOM_STATS_FORWARDED, isCreationSession, streakStep, creationNextDueAt, finitePayCapScore,
@@ -23,9 +24,11 @@ import { isExpired } from '@/lib/arena-reclaim';
 import { readMusicAttempt, musicAttemptScore, claimMusicSessionPay, MUSIC_SESSION_PAID } from '@/lib/arena-music';
 import { checkRunScore, checkUnruledScore } from '@/lib/sessions/modeScoreRules';
 import {
-  RUN_STATUS, RunClosedError, claimRun, closeRun, fileGrants, findRun, readRunId, replayOf, runWalletKey, settleGrant,
+  RUN_STATUS, RunClosedError, claimRun, closeRun, fileGrants, findRun, readRunId, replayOf, runWalletKey, sessionLcKey, settleGrant,
   storePaidResult, storedResult, type StoredResult,
 } from '@/lib/sessions/sessionRuns';
+import { applyEconomyCaps, dailyCapMessage } from '@/lib/economy-caps';
+import { sumEarnedToday, lockPlayerForDailyCap } from '@/lib/economy-caps-db';
 
 export const dynamic = 'force-dynamic';
 
@@ -239,6 +242,8 @@ export async function POST(req: Request) {
     // a height that agrees with its flight (g·t²/8), capped attempts — and a broken one is dropped, never the session.
     const { form, issues: formIssues } = boundFormSummary(body?.form, { mode });
     if (formIssues.length) console.warn('form read bounded:', formIssues.slice(0, 5).join('; '));
+    // TEEN-WRITE-BLOCK (FE PM 23:05 PT): the form write is movement data (verified 18+ AND opted in); asked once, outside the run's transaction.
+    const formAllowed = form ? await canSaveScanNumbers(prisma, userId) : false;
 
     const profile = await getOrCreateProfile(userId);
     const before = prqScore(profile as any);
@@ -295,8 +300,8 @@ export async function POST(req: Request) {
     // of a staked set never spends the player's one Arena pay for that duel.)
     // OWNER DECISION: a mode with no rules row yet (NO_RULES) is recorded the same way — and, returning here, it never
     // reaches the paying transaction either, so it never makes the pay-once claim (verifiedMusicDuel above only reads).
-    if (!run.payoutEligible || noRules) {
-      const reason = !run.payoutEligible ? run.ineligibleReason ?? 'UNPAID' : 'NO_RULES';
+    if (!run.payoutEligible || noRules || run.agentRun) {
+      const reason = run.agentRun ? 'AGENT' : !run.payoutEligible ? run.ineligibleReason ?? 'UNPAID' : 'NO_RULES';
       await recordServerEvent({ name: 'session_unpaid', userId, props: { mode, score, won, duration, reason } });
       return send(await closeRun(prisma, run.id, {
         status: RUN_STATUS.recorded, score, durationMs, now,
@@ -373,13 +378,33 @@ export async function POST(req: Request) {
         //    After the run's claim and before the ledger, so the ledger files what this run is actually paid, and inside
         //    the run's transaction, so a run that rolls back (a replay, a ledger conflict) releases the duel's claim with it.
         const plan: Plan = arena && arenaPlan && (await claimMusicSessionPay(tx as never, arena.matchId, userId)) ? arenaPlan : freePlan;
-        const { prqDelta, payout, xp, shards, credits, attrData } = plan;
+        let { payout, xp, shards, credits, attrData } = plan;
+        let economyCapNote: string | null = null;
+        try {
+          // SECURITY (ECONOMY-CAPS review, daily-cap TOCTOU): lock the user's PlayerProfile row before summing
+          // today's earnings, so two concurrent finishes of the same user on different runs cannot both read the
+          // same stale sum and each collect the full remaining headroom. The second finish's sum now waits on the
+          // first's commit. The lock is released with the transaction.
+          await lockPlayerForDailyCap(tx, userId);
+          const earnedToday = await sumEarnedToday(tx, userId, now);
+          const caps = applyEconomyCaps({ xp, shards }, earnedToday);
+          xp = caps.xp;
+          shards = caps.shards;
+          if (caps.dailyXpCapHit) economyCapNote = dailyCapMessage('xp', now);
+          else if (caps.dailyShardCapHit) economyCapNote = dailyCapMessage('shards', now);
+          if (caps.perRunCapped || caps.xpCapped || caps.shardsCapped) payout = { ...payout, capped: true };
+        } catch (capErr) {
+          console.warn('[sessions] CAP_CHECK_FAILED', 'user', userId, 'run', run.id, (capErr as Error)?.message ?? capErr);
+          xp = 0;
+          shards = 0;
+        }
         // 2. The ledger, before any balance moves (FIX 2): one row per payout, unique on (user, run, grant). The wallet
         //    and season amounts are decided further down (their caps, the first-of-day bonus) and settled into their rows.
+        // PRQ delta filed after profile attrs are known (below); placeholder 0 here.
         await fileGrants(tx, {
           userId, runId: run.id,
           amounts: {
-            xp, shards, prq: prqDelta,
+            xp, shards, prq: 0,
             ...(floorOnly ? {} : { season_xp: 0, mastery: 1 }),
             ...(credits > 0 ? { wallet_lc: credits } : {}),
             ...(walletCoins ? { wallet_coins: 0 } : {}),
@@ -406,13 +431,15 @@ export async function POST(req: Request) {
             lastActiveAt: stamp,
           },
         });
+        const prqDeltaRounded = Math.round((prqScore(updated as any) - before) * 100) / 100;
+        await settleGrant(tx, { userId, runId: run.id, grantType: 'prq', amount: prqDeltaRounded });
         const createdSession = await tx.gameSession.create({
-          data: { userId, mode, score: paidScore, opponentScore, won, xp, shards, prqDelta, credits, duration, hits, misses, dodges, combos, maxCombo },
+          data: { userId, mode, score: paidScore, opponentScore, won, xp, shards, prqDelta: prqDeltaRounded, credits, duration, hits, misses, dodges, combos, maxCombo, runId: run.id },
         });
         // LC lives in the wallet (2026-09-04): the session's credits move through the one mover, keyed by the RUN.
         let newBalance = Number(updated.labCredits ?? 0);
         if (credits > 0) {
-          const r = await applyLc(tx, { playerId: userId, delta: credits, reasonCode: 'SESSION_CREDITS', source: 'gameplay', idempotencyKey: runWalletKey(run.id, 'lc'), metadata: { mode, won, runId: run.id, streakDays, streakBonus: !!streakBonus, ...(streak.owed ? { streakOwed: true } : {}) } });
+          const r = await applyLc(tx, { playerId: userId, delta: credits, reasonCode: 'SESSION_CREDITS', source: 'gameplay', idempotencyKey: sessionLcKey(run.id), metadata: { mode, won, runId: run.id, streakDays, streakBonus: !!streakBonus, ...(streak.owed ? { streakOwed: true } : {}) } });
           newBalance = r.balanceAfter;
         }
         // the wallet's session earns, keyed by the run (see walletCoins above)
@@ -433,11 +460,12 @@ export async function POST(req: Request) {
         // row rather than sitting 1 ms after it, and once a camera reading is on file no game session writes drillResult
         // power again (formSummary.gameRowAttrs has the numbers).
         const sid = (createdSession as any)?.id;
-        const formPlan = form && sid ? planFormWrite(form, { userId, sessionId: sid, measuredAt: at }) : null;
+        // TEEN-WRITE-BLOCK (FE PM 23:05 PT): refused → no plan, so no form rows and no camera PRQ; the rest settles as a no-form session.
+        const formPlan = form && sid && formAllowed ? planFormWrite(form, { userId, sessionId: sid, measuredAt: at }) : null;
 
         // Task 3: emit drillResult PrqEntries for mode-relevant attributes.
         // prqDelta is the per-attribute gain; source = drillResult, linked to this session.
-        if (prqDelta > 0) {
+        if (prqDeltaRounded > 0) {
           const measuredNow = !!formPlan?.power;
           // asked only when it decides something: the mode trains power and this session measured no jump
           const onFile = !measuredNow && (attrs as readonly string[]).includes(CAMERA_POWER_ATTR)
@@ -485,6 +513,7 @@ export async function POST(req: Request) {
           // MUSIC-SUITE P2: the server's verdict (a music set's win is decided here), and whether the endless ceiling applied
           won,
           capped: payout.capped,
+          ...(economyCapNote ? { capMessage: economyCapNote } : {}),
           xp,
           shards,
           credits,
@@ -494,7 +523,7 @@ export async function POST(req: Request) {
           walletShards,
           streakDays,
           streakBonus,
-          prqDelta: Math.round((after - before) * 100) / 100,
+          prqDelta: prqDeltaRounded,
           prqBefore: before,
           prqAfter: after,
           grade: prqGrade(after),
@@ -514,7 +543,10 @@ export async function POST(req: Request) {
             ? { mode: mastery.mode, tier: mastery.tier, tierIndex: mastery.tierIndex, ups: mastery.events }
             : null,
           // null when no form was sent; `power` is the camera ESTIMATE (the end card says so), null when no jump was measured
-          form: form ? { attempts: form.attempts.length, stored: formWrite?.stored ?? 0, power: formWrite?.power ?? null, dropped: formIssues.length } : null,
+          // TEEN-WRITE-BLOCK (FE PM 23:05 PT): a refused form says so (saved: false, reason); nothing of it was written
+          form: !form ? null
+            : formAllowed ? { attempts: form.attempts.length, stored: formWrite?.stored ?? 0, power: formWrite?.power ?? null, dropped: formIssues.length }
+            : { attempts: form.attempts.length, stored: 0, power: null, dropped: formIssues.length, saved: false, reason: SCAN_SAVE_REFUSED.error },
         };
         // 3. The answer is stored with the payout it describes, so a retry after the commit always gets it back.
         await storePaidResult(tx, run.id, { result: { status: 200, body: payload }, sessionId: sid ?? null });

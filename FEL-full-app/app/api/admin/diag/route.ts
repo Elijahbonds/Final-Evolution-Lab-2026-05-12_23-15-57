@@ -6,15 +6,13 @@
  * most recent lines. Admin only, first-party data only.
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import { requireAdmin } from '@/lib/admin/requireAdmin';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if ((session?.user as { role?: string } | undefined)?.role !== 'admin') {
+  if (!(await requireAdmin())) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   const hours = Math.min(24 * 14, Math.max(1, Number(req.nextUrl.searchParams.get('hours') ?? 24)));
