@@ -3,6 +3,9 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Send, Loader2, Sparkles, RotateCcw } from 'lucide-react';
 import { AiDisclosure } from '@/components/ai-disclosure';
+import { AiComingSoon } from '@/components/ai-coming-soon';
+import { isComingSoonResponse } from '@/lib/abacus/aiStatus';
+import { useAiStatus } from '@/lib/abacus/useAiStatus';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -22,6 +25,8 @@ export function CoachChat() {
   const [streaming, setStreaming] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  // ABACUS-KILL: nothing goes to /api/coach/chat unless /api/ai/status says the Coach is available.
+  const [ai, markComingSoon] = useAiStatus('coach');
 
   const scrollToBottom = useCallback(() => {
     if (scrollRef.current) {
@@ -34,7 +39,7 @@ export function CoachChat() {
   }, [messages, scrollToBottom]);
 
   const sendMessage = async (text: string) => {
-    if (!text.trim() || streaming) return;
+    if (!text.trim() || streaming || ai !== 'available') return;
     const userMsg: Message = { role: 'user', content: text.trim() };
     const allMessages = [...messages, userMsg];
     setMessages(allMessages);
@@ -50,6 +55,11 @@ export function CoachChat() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: allMessages }),
       });
+
+      if (await isComingSoonResponse(res)) {
+        markComingSoon();
+        return;
+      }
 
       if (!res.ok) {
         setMessages((prev) => {
@@ -135,6 +145,14 @@ export function CoachChat() {
     setInput('');
   };
 
+  if (ai === 'coming_soon') {
+    return (
+      <div className="flex flex-col h-[calc(100vh-220px)] min-h-[400px]">
+        <AiComingSoon feature="coach" className="h-full" />
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-[calc(100vh-220px)] min-h-[400px]">
       {/* Chat messages */}
@@ -155,6 +173,7 @@ export function CoachChat() {
                   key={s}
                   data-test-ignore="sends-chat-message"
                   onClick={() => sendMessage(s)}
+                  disabled={ai !== 'available'}
                   className="text-left p-3 rounded-xl bg-[#16161a] border border-white/6 text-white/60 text-sm hover:border-[#00E5FF]/30 hover:text-white/80 transition-all"
                 >
                   {s}
@@ -216,11 +235,11 @@ export function CoachChat() {
             rows={1}
             className="flex-1 resize-none rounded-xl bg-[#16161a] border border-white/10 px-4 py-3 text-sm text-white placeholder-white/30 focus:outline-none focus:border-[#00E5FF]/40 transition-colors"
             style={{ maxHeight: '120px' }}
-            disabled={streaming}
+            disabled={streaming || ai !== 'available'}
           />
           <button
             onClick={() => sendMessage(input)}
-            disabled={!input.trim() || streaming}
+            disabled={!input.trim() || streaming || ai !== 'available'}
             className="rounded-xl bg-[#00E5FF] px-4 py-3 text-black font-medium text-sm hover:bg-[#00E5FF]/80 disabled:opacity-30 disabled:cursor-not-allowed transition-all flex-shrink-0"
           >
             {streaming ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
