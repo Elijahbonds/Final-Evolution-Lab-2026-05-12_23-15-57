@@ -116,6 +116,9 @@ export const SKATE_PLAZA: PlazaLayout = {
 
     // A WALLRIDE, leaned back so speed carries you along it rather than into it.
     S('wallride', 0.2, 0.82, 11, 0.5, 3.2, { pitch: 0.16 }),
+    // A STREET WALL in the open (asset-polish, 2026-10-05; owner: "add wall rides"): free-standing and upright, so both faces
+    // ride, low enough to reach off a plain ollie. The only other wall was the 3.2 m one against the north fence.
+    S('wallride', 0.28, -0.6, 9, 0.4, 2.2),
 
     // the things nobody designed for skating
     S('bin', -0.86, -0.5, 0.86, 0.86, 1.05),
@@ -198,22 +201,45 @@ export function plazaMarkers(bound: number): [number, number, number][] {
 }
 
 // ── WALLS AND LIPS (2026-09-18: wall rides, wallplants, lip tricks) ─────────────────────────────────────────────────
-// Derived from the table above, so a wall the layout moves takes its ride with it. The rideable faces are the wallride's
-// park-side face and the four fence lines; the lips are the spine's crest (from either side), the pyramid deck's four
-// edges (up any bank), and the wallride lip (reached off a wall ride).
+// Derived from the table above, so a wall the layout moves takes its ride with it. The lips are the spine's crest (from
+// either side), the pyramid deck's four edges (up any bank), and the wallride lip (reached off a wall ride).
+//
+// THE FACES (asset-polish, 2026-10-05). Only the big wallride's park face and the fences were walls, so a kick plant had
+// one place to happen in a 112 m park. Every solid upright box now gives its four vertical faces: long and tall enough
+// (RIDE_FACE_*) and it rides; shorter, a bench end or a planter, it takes a kick plant only. Banks are not walls (the
+// pyramid's sides are its banks), and a bin is round.
 import type { Wall, Lip } from '../core/WallRide';
 
 /** The fence is a rail you can ride up to this high. */
 export const FENCE_RIDE_HEIGHT = 1.85;   // the built fence is 1.9 m
+/** A face this long and this tall is a wall ride; anything lower than PLANT_FACE_MIN_H is an ollie onto, not a wall. */
+export const RIDE_FACE_MIN_LEN = 2.5, RIDE_FACE_MIN_H = 0.85, PLANT_FACE_MIN_H = 0.5;
+const NOT_WALLS = new Set(['pyramid', 'bin']);
 
 export function plazaWalls(bound: number): Wall[] {
   const walls: Wall[] = [];
   for (const s of SKATE_PLAZA.solids) {
-    if (s.kind !== 'wallride') continue;
-    const cx = atBound(s.fx, bound), cz = atBound(s.fz, bound);
-    // the face toward the park: the wall stands near the +z edge, so its rideable side looks −z (its yaw is 0 in the table)
-    const hw = s.width / 2, faceZ = cz - s.depth / 2;
-    walls.push({ a: { x: cx - hw, z: faceZ }, b: { x: cx + hw, z: faceZ }, nx: 0, nz: -1, height: s.height, lean: s.pitch ?? 0, label: 'the wallride' });
+    if (!s.solid || s.wedge || NOT_WALLS.has(s.kind) || s.height < PLANT_FACE_MIN_H) continue;
+    const cx = atBound(s.fx, bound), cz = atBound(s.fz, bound), hw = s.width / 2, hd = s.depth / 2;
+    const c = Math.cos(s.ry), sn = Math.sin(s.ry);
+    // the builder's yaw (Babylon, left-handed): local +x → (cos, −sin), local +z → (sin, cos)
+    const W = (lx: number, lz: number) => ({ x: cx + lx * c + lz * sn, z: cz - lx * sn + lz * c });
+    const faces: { a: [number, number]; b: [number, number]; n: [number, number]; len: number; side: string }[] = [
+      { a: [-hw, -hd], b: [hw, -hd], n: [0, -1], len: s.width, side: 'south' },
+      { a: [-hw, hd], b: [hw, hd], n: [0, 1], len: s.width, side: 'north' },
+      { a: [hw, -hd], b: [hw, hd], n: [1, 0], len: s.depth, side: 'east' },
+      { a: [-hw, -hd], b: [-hw, hd], n: [-1, 0], len: s.depth, side: 'west' },
+    ];
+    const leaned = !!s.pitch;
+    for (const f of faces) {
+      // the leaned wallride stands against the fence: its park face (local −z) is the ride, and its overhanging back is not a wall
+      if (leaned && f.side === 'north') continue;
+      const lean = leaned && f.side === 'south' ? s.pitch ?? 0 : 0;
+      const n = { x: f.n[0] * c + f.n[1] * sn, z: -f.n[0] * sn + f.n[1] * c };
+      const label = leaned && f.side === 'south' ? 'the wallride' : `the ${s.kind} (${f.side} face)`;
+      walls.push({ a: W(...f.a), b: W(...f.b), nx: n.x, nz: n.z, height: s.height, lean, label,
+        rideable: f.len >= RIDE_FACE_MIN_LEN && s.height >= RIDE_FACE_MIN_H && !(leaned && f.side !== 'south') });
+    }
   }
   const B = bound;
   walls.push({ a: { x: -B, z: B }, b: { x: B, z: B }, nx: 0, nz: -1, height: FENCE_RIDE_HEIGHT, lean: 0, label: 'the north fence' });
