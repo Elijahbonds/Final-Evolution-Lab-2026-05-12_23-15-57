@@ -54,3 +54,23 @@ export function loginPath(nextPath: string): string {
   const safe = safeLoginNext(nextPath);
   return safe ? `/login?next=${encodeURIComponent(safe)}` : '/login';
 }
+
+/** The bare pathname of a path-plus-query-plus-hash string: everything before the first `?` or `#`, with any
+ *  trailing slash trimmed (so `/login/` and `/login` compare equal). Used only to spot "is this the login page". */
+function barePath(p: string): string {
+  const cut = p.split(/[?#]/)[0];
+  return cut.length > 1 ? cut.replace(/\/+$/, '') : cut;
+}
+
+/**
+ * LOGIN-LOOP-FIX (2026-10-04): where to land once sign-in actually succeeds. Wraps loginDestination with one more
+ * guarantee a plain ?next= check does not give you — the result can never be the login page itself. Without this,
+ * `next=/login` (handed straight in, or nested as `next=/login?next=/login`) is a perfectly "safe" same-origin
+ * path by safeLoginNext's rules, and a caller that trusted it blind would send a just-authenticated athlete right
+ * back to the sign-in screen. `loginPathValue` defaults to this app's own /login but is a parameter (not a hardcoded
+ * literal) so the rule is testable on its own terms rather than by re-deriving this module's constant.
+ */
+export function safePostSignInDestination(nextRaw: unknown, fallback: string, loginPathValue = '/login'): string {
+  const dest = loginDestination(nextRaw, fallback);
+  return barePath(dest) === barePath(loginPathValue) ? fallback : dest;
+}

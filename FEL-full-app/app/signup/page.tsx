@@ -5,7 +5,7 @@ import { authOptions } from '@/lib/auth';
 import { AuthForm } from '@/components/auth-form';
 import { AgeTurnAway } from '@/components/age-step';
 import { AGE_BLOCK_COOKIE } from '@/lib/privacy/ageScreen';
-import { loginDestination } from '@/lib/auth/safeNext';
+import { safePostSignInDestination } from '@/lib/auth/safeNext';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,7 +13,9 @@ export default async function SignupPage({ searchParams }: { searchParams?: { ne
   const session = await getServerSession(authOptions);
   const next = searchParams?.next;
   const raw = Array.isArray(next) ? next[0] : next;
-  if (session) redirect(loginDestination(raw, '/'));
+  // LOGIN-LOOP-FIX: see app/login/page.tsx — a next=/login (bare or nested) must not send an already-signed-in
+  // visitor back to /login.
+  if (session) redirect(safePostSignInDestination(raw, '/'));
   if (cookies().get(AGE_BLOCK_COOKIE)) return <AgeTurnAway />;
   return <AuthForm mode="signup" />;
 }
