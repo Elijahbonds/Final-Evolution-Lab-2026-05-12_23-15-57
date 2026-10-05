@@ -123,15 +123,46 @@ export function normalizeHeroUrl(url: string | undefined | null): string {
   return url;
 }
 
-/** Deterministic pick from the tint string so the same rival color is always
- *  the same body within and across sessions. */
-export function rosterUrlFor(url: string, tint?: string, modeId?: string | null): string | null {
+/**
+ * Which roster body a tinted/opponent spawn gets.
+ *
+ * ROTATION (asset-polish, owner 2026-10-05: "make sure the rival that you play against alternates and it's not the same
+ * person each time"). This used to be a pure hash of the seed, documented as "the same rival color is always the same
+ * body within and across sessions", and the commonest seed is `opponent-0` (the first untinted opponent in every
+ * scene), so the first rival of every match in every mode was the same person, forever. `rotation` shifts the pick
+ * along the pool: CharacterLibrary takes one rotation per scene (one match) from `takeRivalRotation`, which advances it
+ * every match, so consecutive matches always land on a different body. Within a match the rotation is fixed, so a
+ * given seed still means one body, and seeds that were distinct stay distinct (a 3v3 still never repeats a look).
+ */
+export function rosterUrlFor(url: string, tint?: string, modeId?: string | null, rotation = 0): string | null {
   if (!tint || ATHLETE_ROSTER.length === 0) return null;
   if (!HERO_URLS.has(url)) return null;              // caller asked for a specific body
   let h = 0;
   for (let i = 0; i < tint.length; i++) h = (h * 31 + tint.charCodeAt(i)) >>> 0;
+  const shift = Number.isFinite(rotation) ? Math.max(0, Math.floor(rotation)) : 0;
   // phase 7: a mode with a CAST draws from it; the seed hashes over the cast so a 3v3 still never repeats a look
   const cast = modeId ? MODE_CAST[modeId] : undefined;
-  if (cast && cast.length) { const pick = ATHLETE_ROSTER.find((a) => a.key === cast[h % cast.length]); if (pick) return pick.url; }
-  return ATHLETE_ROSTER[h % ATHLETE_ROSTER.length].url;
+  if (cast && cast.length) { const pick = ATHLETE_ROSTER.find((a) => a.key === cast[(h + shift) % cast.length]); if (pick) return pick.url; }
+  return ATHLETE_ROSTER[(h + shift) % ATHLETE_ROSTER.length].url;
+}
+
+const ROTATION_KEY = 'fel.rivalRotation';
+let rotationFallback = 0;
+
+/**
+ * The rival rotation for a match that is starting, advanced so the NEXT match gets the next one. Kept in localStorage
+ * so it survives a reload or tomorrow's visit (that is the point: coming back must not mean the same person). Any
+ * storage failure (private mode, blocked site data, SSR) falls back to an in-memory counter, which still rotates
+ * within the visit and can never throw into a spawn.
+ */
+export function takeRivalRotation(): number {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const cur = Number.parseInt(window.localStorage.getItem(ROTATION_KEY) ?? '', 10);
+      const n = Number.isFinite(cur) && cur >= 0 ? cur : 0;
+      window.localStorage.setItem(ROTATION_KEY, String((n + 1) % 1_000_000));
+      return n;
+    }
+  } catch { /* fall through to the in-memory counter */ }
+  return rotationFallback++;
 }
