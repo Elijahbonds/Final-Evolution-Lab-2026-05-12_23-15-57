@@ -15,6 +15,11 @@ import {
   SESSION_HOLD_DAYS,
 } from './constants';
 
+/** `$29.00`-style formatting for a whole-cents price. The one place UI money strings come from — never hand-roll a "$" string. */
+export function formatCents(cents: number): string {
+  return `$${(cents / 100).toFixed(2)}`;
+}
+
 export interface CoachSplit {
   priceCents: number;
   platformFeeCents: number;
