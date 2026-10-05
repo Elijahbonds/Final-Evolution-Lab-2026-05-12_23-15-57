@@ -85,13 +85,18 @@ describe('account settings offers download and a confirm step before erase', () 
 });
 
 describe('login honors ?next for same-origin paths only', () => {
-  it('the form and the login page both go through loginDestination', () => {
+  // LOGIN-LOOP-FIX: this test used to assert both call sites went through `loginDestination` directly, which is
+  // exactly the buggy behavior the loop fix removes — `loginDestination` alone can resolve to the login page itself
+  // (e.g. a nested `?next=/login?next=/login`), which is how the sign-in bounce became possible. Both call sites now
+  // go through `safePostSignInDestination`, which wraps `loginDestination` and additionally refuses to ever return
+  // the login page as a destination. See lib/auth/safeNext.ts and lib/auth/safeNext.test.ts.
+  it('the form and the login page both go through safePostSignInDestination', () => {
     const form = read('components/auth-form.tsx');
-    expect(form).toContain('loginDestination(nextRaw, fallback)');
+    expect(form).toContain('safePostSignInDestination(nextRaw, fallback)');
     expect(form).toContain("searchParams.get('next')");
-    expect(form).toContain('const dest = loginDestination(nextRaw, fallback)');
+    expect(form).toContain('const dest = safePostSignInDestination(nextRaw, fallback)');
     const page = read('app/login/page.tsx');
-    expect(page).toContain('loginDestination(raw, \'/\')');
+    expect(page).toContain('safePostSignInDestination(raw, \'/\')');
   });
 
   it('the erase and export routes take the user id from the session and do not read a client id', () => {

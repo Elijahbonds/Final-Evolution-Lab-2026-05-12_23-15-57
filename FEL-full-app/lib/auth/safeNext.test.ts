@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
-import { loginDestination, loginPath, safeLoginNext } from './safeNext';
+import { loginDestination, loginPath, safeLoginNext, safePostSignInDestination } from './safeNext';
 
 const root = join(__dirname, '../..');
 
@@ -110,6 +110,55 @@ describe('the login walls that send ?next= (audit 2.10)', () => {
     for (const [file, p] of ROUTES) {
       const src = readFileSync(join(__dirname, '../../', file), 'utf8');
       expect(src, file).toContain(`redirect(loginPath('${p}'))`);
+    }
+  });
+});
+
+// LOGIN-LOOP-FIX (2026-10-04): a regression test for the sign-in redirect loop. The bug was never about
+// safeLoginNext refusing an unsafe path — it already did that — it was that a *safe*, same-origin ?next= could
+// still point straight back at /login (bare, or nested as next=/login?next=/login), and a caller trusting
+// loginDestination blind would send a just-signed-in athlete right back to logged-out. These pin the stronger
+// guarantee: whatever the input, the post-sign-in target is never /login and never a /login?next= URL.
+describe('safePostSignInDestination never returns the login page itself', () => {
+  it('next pointing straight at /login falls back', () => {
+    expect(safePostSignInDestination('/login', '/play/dunk')).toBe('/play/dunk');
+    expect(safePostSignInDestination('/login?foo=1', '/play/dunk')).toBe('/play/dunk');
+    expect(safePostSignInDestination('/login/', '/play/dunk')).toBe('/play/dunk');
+  });
+
+  it('next nesting another /login?next=... falls back (never returns a /login?next= URL)', () => {
+    expect(safePostSignInDestination('/login?next=%2Flogin', '/play/dunk')).toBe('/play/dunk');
+    expect(safePostSignInDestination('/login?next=%2Fplay%2Fdunk', '/play/dunk')).toBe('/play/dunk');
+  });
+
+  it('absolute/external next is ignored, same as loginDestination, and never equals the login page', () => {
+    expect(safePostSignInDestination('https://evil.example', '/play/dunk')).toBe('/play/dunk');
+    expect(safePostSignInDestination('//evil.example', '/play/dunk')).toBe('/play/dunk');
+  });
+
+  it('missing next falls back to the default destination', () => {
+    expect(safePostSignInDestination(undefined, '/play/dunk')).toBe('/play/dunk');
+    expect(safePostSignInDestination(null, '/coach/session')).toBe('/coach/session');
+  });
+
+  it('a safe next that is not /login wins, exactly like loginDestination', () => {
+    expect(safePostSignInDestination('/coach/session', '/play/dunk')).toBe('/coach/session');
+    expect(safePostSignInDestination('/play/mirror?step=1', '/play/dunk')).toBe('/play/mirror?step=1');
+  });
+
+  it('the loginPathValue parameter is honoured rather than a hardcoded literal', () => {
+    expect(safePostSignInDestination('/signin', '/play/dunk', '/signin')).toBe('/play/dunk');
+    expect(safePostSignInDestination('/login', '/play/dunk', '/signin')).toBe('/login');
+  });
+
+  it('never, for any input in this file\'s own fixtures, resolves to the login page', () => {
+    const fallback = '/play/dunk';
+    const inputs = [undefined, null, '', '/login', '/login/', '/login?x=1', '/login?next=%2Flogin', '/play/mirror',
+      'https://evil.example', '//evil.example', '/%252F%252Fevil.example'];
+    for (const raw of inputs) {
+      const dest = safePostSignInDestination(raw, fallback);
+      expect(dest, JSON.stringify(raw)).not.toBe('/login');
+      expect(dest, JSON.stringify(raw)).not.toMatch(/^\/login(?:[/?#]|$)/);
     }
   });
 });
