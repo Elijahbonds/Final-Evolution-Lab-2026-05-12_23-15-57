@@ -42,6 +42,7 @@ import {
 import { buildCourseVenue, buildWorldGround, worldHeightFn } from '../racing/venueForCourse';
 import { kartCircuitById, type KartCircuit, type KartRamp } from '../racing/kartCircuits';
 import { locate, pointAlong, cornerRadiusAt, holdableSpeed } from '../racing/racingLine';
+import { onGrid } from '../racing/itemGrid';
 import { edgeLimit, edgeReturn } from '../racing/courseEdge';   // the outside of the course: off-road is a cost, not a door out
 import { steerLane, resolveContact, nearMisses, personalityFor, CONTACT } from '../racing/RaceContact';   // RACE CONTACT (2026-09-18): rivals with intent, bumps and punts
 import { collectBalloon, balloonsHit, stepBalloons, useItem, stepMissiles, stepMines, ITEM_KINDS, ITEM_LABEL, weightedItemKind, type Balloon, type HeldItem, type Missile, type Mine, type ItemKind, type Target } from '../racing/AeroItems';   // the kart's items are the flyers' items on the road
@@ -1072,10 +1073,15 @@ return {
     if (circuit) {
       const pts = [course.start.at, ...course.gates.map((gt) => gt.at)];
       let id = 0;
+      // ASSET-POLISH (2026-10-05): no row on the grid. The last legs end at the start, so their rows fell on it: measured on the
+      // default circuit, one row 5–6 m behind the player's kart (2 m in front of the chase camera, a white blob over the
+      // start of every race) and one 7–8 m ahead (taken by the whole field at the gun).
+      const L = circuit.line.length, startDist = locate(circuit.line, course.start.at.x, course.start.at.z).dist;
       for (let i = 1; i <= pts.length; i++) {
         const a = pts[i - 1], b = pts[i % pts.length];
         const mid = a.add(b.subtract(a).scale(0.62));
         const at = locate(circuit.line, mid.x, mid.z);
+        if (onGrid(at.dist, startDist, L)) continue;
         const right = new Vector3(at.tangent.z, 0, -at.tangent.x);
         for (const [k, lat] of [-3.2, 0, 3.2].entries()) {
           const kind = ITEM_KINDS[(i + k) % ITEM_KINDS.length];
