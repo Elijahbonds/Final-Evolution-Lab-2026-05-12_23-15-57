@@ -1,7 +1,7 @@
 // models pass phase 7 (2026-09-22): a mode with a CAST draws its rivals and crowd from the cast; a mode without one draws
 // from the whole roster; the seed still spreads the picks so a field never repeats a look.
 import { describe, expect, it } from 'vitest';
-import { ATHLETE_ROSTER, DEFAULT_HERO_URL, MODE_CAST, rosterUrlFor, takeRivalRotation } from './athleteRoster';
+import { ATHLETE_ROSTER, DEFAULT_HERO_URL, MODE_CAST, RETIRED_ATHLETES, rosterUrlFor, rosterBodyUrl, takeRivalRotation } from './athleteRoster';
 
 describe('MODE_CAST (the Meshy 22)', () => {
   it('every cast key is a roster body and every cast body exists on disk by name', () => {
@@ -67,5 +67,31 @@ describe('the rival alternates from one match to the next', () => {
   });
   it('a bad rotation value never breaks a spawn', () => {
     for (const bad of [NaN, -5, Infinity]) expect(rosterUrlFor(DEFAULT_HERO_URL, 'opponent-0', 'dunk', bad)).toBeTruthy();
+  });
+});
+
+// RETIRED BODIES ARE NEVER DEALT (asset-polish, 2026-10-05). Eleven bodies tear or spike when they move (measured in
+// athleteRoster.ts). Taking them off the roster is the fix; this is what stops one coming back through a cast, a named
+// pick, or the uncast pool that six modes draw from.
+describe('a retired body is never dealt', () => {
+  const retired = Object.keys(RETIRED_ATHLETES);
+  it('the retired list carries its measured reasons, and none of them is on the roster', () => {
+    expect(retired.length).toBeGreaterThan(0);
+    for (const k of retired) { expect(RETIRED_ATHLETES[k]).toMatch(/torn|spike/); expect(ATHLETE_ROSTER.map((a) => a.key), k).not.toContain(k); }
+  });
+  it('no mode cast names one', () => {
+    for (const [mode, cast] of Object.entries(MODE_CAST)) for (const k of cast) expect(retired, `${mode} casts ${k}`).not.toContain(k);
+  });
+  it('no seed, rotation or mode ever spawns one, cast or uncast', () => {
+    const bad = new Set(retired.map((k) => `/models/athletes/${k}.glb`));
+    for (const mode of [null, 'aeroaces', 'derby', 'penalty', ...Object.keys(MODE_CAST)]) {
+      for (let r = 0; r < 40; r++) for (let i = 0; i < 6; i++) {
+        const u = rosterUrlFor(DEFAULT_HERO_URL, `opponent-${i}`, mode, r);
+        expect(bad.has(u!), `${mode} r${r} opponent-${i} -> ${u}`).toBe(false);
+      }
+    }
+  });
+  it('asking for a retired body by name falls back instead of loading it', () => {
+    for (const k of retired) expect(rosterBodyUrl(k)).toBeNull();
   });
 });

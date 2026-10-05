@@ -14,16 +14,35 @@ export interface RosterAthlete {
   url: string;
 }
 
+/**
+ * RETIRED BODIES (asset-polish, owner 2026-10-05: "some of the models are broken … make sure all the models actually work
+ * and aren't bugged out"). Every one of these passed every existing check (22 joints, 276 clips, conforms) and every one
+ * renders broken, because skin weights pull vertices to the wrong bones once the body moves. Measured by /dev/model's
+ * stretch(): each triangle edge in the posed, CPU-skinned mesh against the same edge at rest, after removing the import
+ * scale, over idle_stand, run, dunk_finish_tomahawk and jumpshot. Two faults:
+ *   TORN  >= 300 edges grow past 20 cm (a limb sheared into flaps);
+ *   SPIKE  any edge grows >= 55 cm (one vertex flung off the body: a hair wire, a finger to the floor).
+ * Calibrated on bodies seen with the eye: amir (torn), titan (torn), frost (spike), against m22-dab1e0f7 and fel-hero (clean).
+ * The 30 kept bodies top out at 177 torn edges and a 45 cm spike; the retired start at 410 and 55 cm. Nothing sits on
+ * the line. The files stay on disk (like wren and bramble); they come back when they are re-skinned and measure clean.
+ */
+export const RETIRED_ATHLETES: Readonly<Record<string, string>> = {
+  atlas: 'torn: 410 edges past 20 cm',
+  blitz: 'torn: 607 edges, a 93 cm spike',
+  nova: 'torn: 730 edges',
+  titan: 'torn: 854 edges (the shredded left forearm)',
+  ember: 'torn: 688 edges',
+  frost: 'spike: 66 cm (a hair strand wired off the ponytail)',
+  vex: 'torn: 932 edges',
+  ranger: 'spike: 85 cm in run',
+  juno: 'spike: 95 cm in the dunk',
+  lyra: 'spike: 120 cm in the dunk',
+  amir: 'torn: 1,112 edges (the arm smeared into a plank off the head)',
+};
+
 export const ATHLETE_ROSTER: RosterAthlete[] = [
-  { key: 'atlas', url: '/models/athletes/atlas.glb' },
-  { key: 'blitz', url: '/models/athletes/blitz.glb' },
-  { key: 'nova', url: '/models/athletes/nova.glb' },
-  { key: 'titan', url: '/models/athletes/titan.glb' },
   // Phase 3 (2026-09-02): four more bodies so a 3v3 never repeats a look.
-  { key: 'ember', url: '/models/athletes/ember.glb' },
-  { key: 'frost', url: '/models/athletes/frost.glb' },
   { key: 'sage', url: '/models/athletes/sage.glb' },
-  { key: 'vex', url: '/models/athletes/vex.glb' },
   // Phase 6 (owner, 2026-09-19: "rig the other models … same normal static posture as the ones that animate", then
   // "separate those models"). The Meshy people who were not basketball players carried no rig, so nothing could spawn
   // them — and they do not come one to a file: "Athletic Male NPC 1" is FIVE men standing shoulder to shoulder inside
@@ -31,19 +50,15 @@ export const ATHLETE_ROSTER: RosterAthlete[] = [
   // apart, which is exactly what it did the first time. They are cut into people first (scripts/meshy/split-row.py,
   // at the valleys in the vertex histogram — the one thing that separates figures standing in a line), then each one
   // goes through the same transfer onto the same 22-bone skeleton as the eight. One rig, one clip set, one idle.
-  { key: 'ranger', url: '/models/athletes/ranger.glb' },
   { key: 'flint', url: '/models/athletes/flint.glb' },
   { key: 'onyx', url: '/models/athletes/onyx.glb' },
   { key: 'dune', url: '/models/athletes/dune.glb' },
   { key: 'cobalt', url: '/models/athletes/cobalt.glb' },
   { key: 'vega', url: '/models/athletes/vega.glb' },
-  { key: 'juno', url: '/models/athletes/juno.glb' },
-  { key: 'lyra', url: '/models/athletes/lyra.glb' },
   { key: 'iris', url: '/models/athletes/iris.glb' },
   // wren and the crowd's bramble are BUILT but OUT: on those two the transfer bound the arms to the chest — not a
   // vertex reached an arm bone — so the anatomical repair below has no arm cluster to split and their arms would
   // swing from the sternum. The files stay on disk; they are not spawned until the transfer can find their arms.
-  { key: 'amir', url: '/models/athletes/amir.glb' },
   // MODELS PASS (owner drop 2026-09-22, cast by look — docs/CAST-MESHY-2026-09-22.md): 22 Meshy characters on the same 22-bone rig
   // via scripts/meshy/batch-meshy22.sh (skin-transfer.py onto the T-posed donor). The 0.6 / 1K pack: rivals and crowd never
   // carry the 2K. Keys are the source id until the owner names them.
@@ -144,6 +159,13 @@ export function rosterUrlFor(url: string, tint?: string, modeId?: string | null,
   const cast = modeId ? MODE_CAST[modeId] : undefined;
   if (cast && cast.length) { const pick = ATHLETE_ROSTER.find((a) => a.key === cast[(h + shift) % cast.length]); if (pick) return pick.url; }
   return ATHLETE_ROSTER[(h + shift) % ATHLETE_ROSTER.length].url;
+}
+
+/** A named body's URL, for a character who wears one specific person (the Dunk's named rivals). Null when the key is
+ *  not on the roster (retired or misspelled), so the caller falls back instead of loading a 404. */
+export function rosterBodyUrl(key: string | null | undefined): string | null {
+  if (!key) return null;
+  return ATHLETE_ROSTER.find((a) => a.key === key)?.url ?? null;
 }
 
 const ROTATION_KEY = 'fel.rivalRotation';
