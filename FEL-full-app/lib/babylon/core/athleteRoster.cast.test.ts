@@ -95,3 +95,14 @@ describe('a retired body is never dealt', () => {
     for (const k of retired) expect(rosterBodyUrl(k)).toBeNull();
   });
 });
+
+// ASSET-POLISH (2026-10-05): rotation is only worth something if there is someone to rotate to. A one-body cast (soccer,
+// who-scene-it) was the same face every match, and a two-body one (dunk, duel, showdown, football, snowboard) a flip-flop.
+describe('every rival cast has people to rotate through', () => {
+  it('no cast is smaller than three, and no cast lists a body twice', () => {
+    for (const [mode, cast] of Object.entries(MODE_CAST)) {
+      expect(cast.length, `${mode} cast`).toBeGreaterThanOrEqual(3);
+      expect(new Set(cast).size, `${mode} lists a body twice`).toBe(cast.length);
+    }
+  });
+});

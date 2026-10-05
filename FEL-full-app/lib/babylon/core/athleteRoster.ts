@@ -87,7 +87,14 @@ export const ATHLETE_ROSTER: RosterAthlete[] = [
 ];
 
 /** MODELS PASS phase 7: which roster bodies a mode's rivals and crowd draw from (the whole roster when a mode has none). The
- *  modeId is the registry's modeId (`baseball`, `soccer`, `snowboard_slalom`, …), read off `scene.metadata.felModeId`. */
+ *  modeId is the registry's modeId (`baseball`, `soccer`, `snowboard_slalom`, …), read off `scene.metadata.felModeId`.
+ *
+ * ASSET-POLISH (2026-10-05): the rival now rotates every match, so a one- or two-body cast meant the same face every
+ * time or a flip-flop between two. Every rival cast is at least four now (freerun and sprint keep their three runners).
+ * Additions follow docs/CAST-MESHY-2026-09-22.md's own fit column wherever it gives one (hoops, combat); football,
+ * soccer, snowboard and who-scene-it had too few tagged bodies, and their additions are a judgement by outfit
+ * (athletes for the field sports, hoodies for the snow, casual for the quiz). The doc records which is which.
+ */
 export const MODE_CAST: Record<string, readonly string[]> = {
   baseball: ['m22-6d8c65ad', 'm22-50acc34e', 'm22-2d171b36', 'm22-b5bcf955', 'm22-f760a342'],
   bigair: ['m22-feb2aabc', 'm22-242b6fd6', 'm22-bdb3bfb8', 'm22-350e6667'],
@@ -96,27 +103,27 @@ export const MODE_CAST: Record<string, readonly string[]> = {
   brainbrawl: ['m22-5cf665ee', 'm22-bdb3bfb8', 'm22-242b6fd6', 'm22-350e6667', 'm22-50acc34e', 'm22-f760a342', 'm22-df555984', 'm22-421d2cdb'],
   carnival: ['m22-4d4c6f8f', 'm22-242b6fd6', 'm22-5cf665ee', 'm22-c4822d61', 'm22-50acc34e', 'm22-b3a4e54f'],
   dance: ['m22-421d2cdb', 'm22-9e24fc5b', 'm22-5cf665ee', 'm22-f760a342'],
-  duel: ['m22-dab1e0f7', 'm22-c19ac82e'],
-  dunk: ['m22-6d8c65ad', 'm22-dab1e0f7'],
-  dunkduel: ['m22-6d8c65ad', 'm22-dab1e0f7'],
-  football: ['m22-dab1e0f7', 'm22-df555984'],
+  duel: ['m22-dab1e0f7', 'm22-c19ac82e', 'm22-2ef63bb6', 'm22-350e6667'],
+  dunk: ['m22-6d8c65ad', 'm22-dab1e0f7', 'm22-df555984', 'm22-2ef63bb6'],
+  dunkduel: ['m22-6d8c65ad', 'm22-dab1e0f7', 'm22-df555984', 'm22-2ef63bb6'],
+  football: ['m22-dab1e0f7', 'm22-df555984', 'm22-6d8c65ad', 'm22-c19ac82e'],
   freerun: ['m22-c19ac82e', 'm22-421d2cdb', 'm22-367df58a'],
   golf: ['m22-421d2cdb', 'm22-9e24fc5b', 'm22-c4822d61', 'm22-50acc34e', 'm22-2d171b36', 'm22-d81daaf0', 'm22-b5bcf955'],
-  karate: ['m22-dab1e0f7', 'm22-c19ac82e', 'm22-350e6667'],
-  karate_vs: ['m22-dab1e0f7', 'm22-c19ac82e', 'm22-2ef63bb6'],
+  karate: ['m22-dab1e0f7', 'm22-c19ac82e', 'm22-350e6667', 'm22-2ef63bb6'],
+  karate_vs: ['m22-dab1e0f7', 'm22-c19ac82e', 'm22-2ef63bb6', 'm22-350e6667'],
   mixedcombat: ['m22-dab1e0f7', 'm22-c19ac82e', 'm22-2ef63bb6', 'm22-350e6667'],
   onevone: ['m22-6d8c65ad', 'm22-dab1e0f7', 'm22-df555984', 'm22-2ef63bb6'],
-  showdown: ['m22-dab1e0f7', 'm22-c19ac82e'],
+  showdown: ['m22-dab1e0f7', 'm22-c19ac82e', 'm22-2ef63bb6', 'm22-350e6667'],
   skateboard: ['m22-bb13bdbe', 'm22-242b6fd6', 'm22-5cf665ee', 'm22-bdb3bfb8', 'm22-c4822d61', 'm22-b3a4e54f'],
-  snowboard_slalom: ['m22-242b6fd6', 'm22-350e6667'],
-  soccer: ['m22-df555984'],
+  snowboard_slalom: ['m22-242b6fd6', 'm22-350e6667', 'm22-bdb3bfb8', 'm22-5cf665ee'],
+  soccer: ['m22-df555984', 'm22-dab1e0f7', 'm22-c19ac82e', 'm22-2ef63bb6'],
   sprint: ['m22-c19ac82e', 'm22-2ef63bb6', 'm22-367df58a'],
   surf: ['m22-4d4c6f8f', 'm22-feb2aabc', 'm22-bb13bdbe', 'm22-bdb3bfb8', 'm22-d81daaf0', 'm22-b3a4e54f', 'm22-f760a342'],
   tennis: ['m22-df555984', 'm22-c19ac82e', 'm22-421d2cdb', 'm22-9e24fc5b', 'm22-2d171b36', 'm22-b5bcf955'],
   threepoint: ['m22-6d8c65ad', 'm22-dab1e0f7', 'm22-df555984', 'm22-bb13bdbe'],
   threevthree: ['m22-6d8c65ad', 'm22-dab1e0f7', 'm22-df555984', 'm22-2ef63bb6'],
   volleyball: ['m22-2ef63bb6', 'm22-9e24fc5b', 'm22-367df58a', 'm22-4d4c6f8f', 'm22-feb2aabc', 'm22-bb13bdbe', 'm22-2d171b36', 'm22-d81daaf0'],
-  who_scene_it: ['m22-50acc34e'],
+  who_scene_it: ['m22-50acc34e', 'm22-5cf665ee', 'm22-f760a342', 'm22-c4822d61'],
 };
 
 /** THE hero — the one body every mode spawns unless it asks for a specific file. Owner decision 2026-09-05 (Ship Pass 6):
