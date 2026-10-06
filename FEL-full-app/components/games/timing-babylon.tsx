@@ -29,6 +29,11 @@ import { VolumeMixer } from '@/lib/audio/ui/VolumeMixer';
 // drives that ever sets those two fields, so gating on modeKey === 'dance' is a formality (MicCaption already
 // renders nothing for an empty `text`), kept for the same reason every other dance-only block here is gated.
 import { MicCaption } from './mic-caption';
+// IMPROVE (2026-10-06, the Cypher's #8): GO AGAIN in place for dance — the room runs `continuous` (its finish reports a
+// card and the stage stays up) and the shell's REPLAY goes back to its pick screen (DanceMode.replayDance) instead of
+// rebooting the engine. Dance only: every other timing sport this host drives ends and remounts exactly as before.
+import { useReplayInPlace } from './replay-in-place';
+import { replayDance } from '@/lib/babylon/modes/DanceMode';
 /** GOLF UPGRADE: the meter's carry lines arrive as '0,6,12,…' (eleven tenths). */
 const ticksOf = (v: unknown): number[] => (typeof v === 'string' && v ? v.split(',').map(Number) : []);
 
@@ -93,6 +98,8 @@ export function makeTimingHost(opts: TimingHostOpts) {
           : modeKey === 'golf' ? `${won ? 'CARD IN — UNDER PAR' : 'CARD IN'} · ${n('overPar') > 0 ? '+' : ''}${n('overPar')} · ${n('holes')} HOLES · ${n('pickUps')} PICK-UPS`
           : modeKey === 'derby' ? `${won ? 'DERBY CHAMPION' : 'DERBY OVER'} · ${n('homers')} HOMERS · ${n('outs')} OUTS · ${Math.round(n('longestFt'))} FT`
           : modeKey === 'penalty' ? `${won ? 'SHOOTOUT WON' : 'SHOOTOUT LOST'} · ${n('goals')}–${n('themGoals')} · ${n('stylePts')} STYLE`
+          // IMPROVE (2026-10-06): the Cypher's card names a full combo (#6) and the run's STYLE (#10 / #13)
+          : modeKey === 'dance' && n('rounds') ? `${n('fullCombo') ? 'FULL COMBO · ' : ''}${n('hits')}/${n('rounds')} CLEAN · ${r.score} PTS${n('style') ? ` · ${n('style')} STYLE` : ''}`
           : (n('rounds') ? `${n('hits')}/${n('rounds')} CLEAN · ${r.score} PTS` : `${r.score} PTS`);
         onEndRef.current({ ...base, headline, maxCombo: timingMaxCombo(st) });
       };
@@ -119,6 +126,8 @@ export function makeTimingHost(opts: TimingHostOpts) {
           },
           onHud: (u) => setHud((prev) => ({ ...prev, ...u })),
           resultSink,
+          // IMPROVE (#8): dance reports through card() and keeps its stage for REPLAY; the same sink takes either
+          ...(modeKey === 'dance' ? { continuous: true, cardSink: resultSink } : {}),
         })
           .then((s) => {
             if (disposed) { s(); return; }
@@ -139,6 +148,15 @@ export function makeTimingHost(opts: TimingHostOpts) {
     const emit = useCallback((e: Parameters<InputBus['emit']>[0]) => {
       busRef.current?.emit(e);
     }, []);
+
+    // IMPROVE (#8): REPLAY on the shell's end card goes back to the Cypher's pick screen on this stage. Any other mode's
+    // restart answers false, which is the shell's "remount as before".
+    const restart = useCallback((): boolean => {
+      const ok = modeKey === 'dance' && replayDance();
+      if (ok) endedRef.current = false;
+      return ok;
+    }, []);
+    useReplayInPlace(restart);
 
     const tapStart = useCallback(() => {
       emit({ t: 'button', btn: 'START', pressed: true });
