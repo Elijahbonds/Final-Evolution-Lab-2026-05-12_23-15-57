@@ -7,7 +7,7 @@ import {
   readAdults, rosterReady, sealRoster, writeAdults, type Athlete, type KeyValueStore,
 } from './roster';
 import { REARM_MS, freshBoard, recordDunk, runRotationUntapped } from './rotation';
-import { goWhenReadyLine, nextUpLine, resultLine, speakCues, type Speaker } from './voice';
+import { NEXT_UP_SPOKEN, cuesAfterDunk, goWhenReadyLine, nextUpLine, resultLine, speakCues, spokenResultLine, type Speaker } from './voice';
 import { KIDS_IN_SHOT, mayRecord, recordingOnHandoff } from './record';
 import { endSession, readSession, rememberSession } from './memory';
 import { adultCsv } from './summary';
@@ -121,6 +121,28 @@ describe('voice and recording', () => {
     expect(nextUpLine('Jalen')).toBe('Next up: Jalen');
     expect(goWhenReadyLine()).toBe('Go when ready');
     expect(resultLine('Jalen', 86.36, 8.5)).toBe('Jalen, 34 inches, judges 8.5');
+  });
+
+  // IMPROVE (2026-10-06), the owner's decision: a recorded "Next up!" and the name shown big on screen, never the name read aloud.
+  it('never speaks a name: the result and "Next up!" are said, the name only shown', () => {
+    expect(NEXT_UP_SPOKEN).toBe('Next up!');
+    expect(spokenResultLine(86.36, 8.5)).toBe('34 inches, judges 8.5');
+    expect(cuesAfterDunk(86.36, 8.5, true)).toEqual(['34 inches, judges 8.5', 'Next up!']);
+    expect(cuesAfterDunk(86.36, 8.47, false)).toEqual(['34 inches, judges 8.5']);
+    for (const name of ['Jalen', kid, 'Nix']) {
+      for (const line of [...cuesAfterDunk(90, 7, true), goWhenReadyLine()]) expect(line).not.toContain(name);
+    }
+    // on screen the result and the next name stay as they were
+    expect(resultLine('Jalen', 86.36, 8.5)).toBe('Jalen, 34 inches, judges 8.5');
+    expect(nextUpLine('Jalen')).toBe('Next up: Jalen');
+  });
+
+  it('Prove It speaks the name-free cues and shows the next name big', () => {
+    const src = readFileSync(join(ROOT, 'app/play/dunkduel/_components/prove-it.tsx'), 'utf8');
+    expect(src).toContain('cuesAfterDunk(got.verticalCm');
+    expect(src).not.toMatch(/speakCues\([^;]*(nextUpLine|resultLine)\(/);
+    expect(src).toContain('data-testid="next-up-name"');
+    expect(src).toMatch(/text-5xl font-black[^"]*"[^>]*>\s*\{boardRef\.current\.players\[boardRef\.current\.index\]\.name\}/);
   });
 
   it('mute cancels speech and blocks the next line', () => {
