@@ -493,3 +493,47 @@ export function scriptedSoloClaims(
   const claimed = claimedBy(claims, 0).length;
   return { claimed, rounds, done: claimed >= CATEGORIES.length };
 }
+
+// ── the REVIEW round (KNOWLEDGE-FEED v2, owner decision 2026-10-06) ──────────────────────────────────────────────────
+// "Brain Brawl 'Review' round: YES, as a separate round type; normal Brain Brawl stays generic and unchanged." Everything
+// above is the standard match and is untouched: generated, seeded, never trivia. A REVIEW round is entered only with
+// ?round=review (the Learn feed's "Test yourself"), asks the player's OWN learned quiz cards (lib/knowledge/review.ts
+// picks them, from the device or the account), and is graded like any challenge — speed AND accuracy, challengeScore —
+// with no wheel and no claims. The questions come from outside here; nothing else in the mode does.
+
+export type RoundKind = 'standard' | 'review';
+/** TUNED (new, not owner-felt): a learned question is read, not decoded — a sentence and up to four answers. */
+export const REVIEW_TIME_LIMIT_S = 20;
+/** Scored at tier 1: 50–100 a question, so a five-question round (≤ 500) sits far under the mode's arena ceiling. */
+export const REVIEW_TIER: Tier = 1;
+/** The review round's own personal best; the standard solo best (SOLO_BEST_KEY) is never touched by it. */
+export const REVIEW_BEST_KEY = 'fel.brainbrawl.review.best';
+
+/** One learned quiz card, as the review round needs it. */
+export interface ReviewQuestion { cardId: string; topic: string; question: string; options: readonly string[]; answer: number; why: string }
+
+/** A review question on the stage: a Challenge's shape, marked REVIEW so no wheel or claim code can mistake it. */
+export interface ReviewChallenge extends Omit<Challenge, 'category' | 'kind'> {
+  category: 'REVIEW';
+  kind: 'review';
+  cardId: string;
+  topic: string;
+  why: string;
+}
+
+/** Which round the page asked for: `?round=review` is the review round; anything else is the standard match. */
+export function roundKindFrom(search: string): RoundKind {
+  try { return new URLSearchParams(search).get('round') === 'review' ? 'review' : 'standard'; } catch { return 'standard'; }
+}
+
+/** A learned card as a stage challenge: its options shuffled by the round's seed (two or four of them, as authored),
+ *  the key following its option, nothing shown before the answers. */
+export function reviewChallenge(q: ReviewQuestion, rnd: () => number): ReviewChallenge {
+  const order = shuffle(rnd, q.options.map((_, i) => i));
+  return {
+    id: `REVIEW-${q.cardId}`, category: 'REVIEW', kind: 'review', tier: REVIEW_TIER,
+    prompt: q.question, display: [], exposureSec: 0,
+    options: order.map((i) => q.options[i]), answer: order.indexOf(q.answer),
+    timeLimitSec: REVIEW_TIME_LIMIT_S, cardId: q.cardId, topic: q.topic, why: q.why,
+  };
+}

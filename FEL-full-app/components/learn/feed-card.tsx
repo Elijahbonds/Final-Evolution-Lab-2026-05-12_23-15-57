@@ -192,9 +192,11 @@ function QuizBody({ card, picked, focus, onPick, accent }: {
   );
 }
 
+/** "Test yourself": the Brain Brawl REVIEW round, asking your own learned quiz cards (KNOWLEDGE-FEED v2, owner decision
+ *  2026-10-06). With too few learned cards, the mode says so and plays a standard brawl. */
 export function TestYourself({ accent }: { accent: string }) {
   return (
-    <Link href="/play/brain-brawl"
+    <Link href="/play/brain-brawl?round=review"
       className="inline-flex items-center gap-2 self-start rounded-full border px-4 py-2 text-[13px] font-bold text-white md:text-base"
       style={{ borderColor: `${accent}77`, background: `${accent}14` }}>
       <Brain className="h-4 w-4" style={{ color: accent }} /> Test yourself in Brain Brawl
