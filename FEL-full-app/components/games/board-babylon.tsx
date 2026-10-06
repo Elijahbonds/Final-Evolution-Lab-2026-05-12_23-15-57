@@ -25,7 +25,7 @@ type Hud = Record<string, HudValue>;
 export interface BoardHostOpts {
   /** Registry key: 'skateboard' | 'snowboard_slalom' | 'surf'. */
   modeKey: string;
-  /** One-line control hint shown on the TAP TO START overlay. */
+  /** One-line control hint shown on the CONTROLS panel (READY and pause) when the mode writes none of its own. */
   hint: string;
   /** Trick button labels for B / X / Y (air-only). */
   tricks: [string, string, string];
@@ -358,6 +358,7 @@ export function makeBoardHost(opts: BoardHostOpts) {
 
         <BootSplash
           modeId={modeKey}
+          controls={opts.hint}   // CONTROLS SCREEN (2026-10-06): the host's control line, on the READY card and the pause
           title={opts.title ?? HOST_TITLE[modeKey] ?? modeKey.replace(/_/g, ' ').toUpperCase()}
           goal={typeof hud.goal === 'string' && hud.goal ? hud.goal : undefined}
           phase={phase}

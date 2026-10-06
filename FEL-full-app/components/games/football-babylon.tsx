@@ -132,7 +132,8 @@ export default function FootballBabylon({ onEnd }: GameProps) {
         {typeof hud.lane === 'string' && hud.lane && <span className="rounded bg-[#ffd75e]/20 px-2 py-0.5 text-[#ffd75e]">{hud.lane}</span>}
         {typeof hud.slingshot === 'number' && (
           <div className="mt-0.5 flex flex-col gap-0.5">
-            <span className={`text-[9px] ${Number(hud.slingshot) >= 100 ? 'text-[#9ad7ff]' : 'text-white/50'}`}>{Number(hud.slingshot) >= 100 ? 'SLINGSHOT READY — L1' : 'DRAFT → SLINGSHOT (L1)'}</span>
+            <span className={`text-[9px] ${Number(hud.slingshot) >= 100 ? 'text-[#9ad7ff]' : 'text-white/50'}`}>{/* controls-screen-2 (2026-10-06): the meter's name while it fills, not how to fill it (the CONTROLS panel says
+                that); the full meter's call to press is a live prompt and stays */}{Number(hud.slingshot) >= 100 ? 'SLINGSHOT READY — L1' : 'SLINGSHOT'}</span>
             <div className="relative h-2.5 w-32 overflow-hidden rounded-sm border border-white/25 bg-black/50">
               <div className={`absolute inset-y-0 left-0 ${Number(hud.slingshot) >= 100 ? 'bg-[#9ad7ff]' : 'bg-[#9ad7ff]/60'}`} style={{ width: `${Math.max(0, Math.min(100, Number(hud.slingshot)))}%` }} />
             </div>

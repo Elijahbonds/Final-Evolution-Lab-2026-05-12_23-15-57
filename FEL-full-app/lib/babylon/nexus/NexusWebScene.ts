@@ -250,7 +250,7 @@ function paintMarkings(
     // as a place rather than a hard stop.
     case 'ring': {
       const cx = S / 2, cy = S / 2;
-      arc(cx, cy, S * 0.3125);              // the clamp itself: 7.5 of a 24m mat
+      arc(cx, cy, S * 0.3125);              // the clamp itself: 7.5 of a 24m mat (9.375 of 30 since ARENA_SCALE 1.25 grew both — combat/arenas.test holds the ratio)
       ctx.globalAlpha = 0.45; arc(cx, cy, S * 0.3125 - 26); ctx.globalAlpha = 1;
       ctx.globalAlpha = 0.25; arc(cx, cy, S * 0.3125 + 34); ctx.globalAlpha = 1;
       arc(cx, cy, 60);                      // centre mark, for spawn orientation
@@ -1087,6 +1087,29 @@ function paintBackdrop(ctx: CanvasRenderingContext2D, W: number, H: number, kind
   }
 }
 
+/**
+ * The venue's grade, written onto the scene's image-processing configuration — ONLY when nothing else owns it.
+ *
+ * ONE OWNER FOR THE GRADE (visual-foundation A9.3, 2026-10-06). The harness light rig's DefaultRenderingPipeline reads
+ * `scene.imageProcessingConfiguration` (Babylon passes it to the pipeline's ImageProcessingPostProcess), so this used to
+ * overwrite the MOOD's exposure, contrast and vignette the moment a spec venue loaded. ModeHarness had already captured
+ * its resting grade from the mood, so every spec-venue mode showed this grade until the first `feel.impact`, then snapped
+ * exposure and vignette back to the mood's while contrast stayed this one (measured on a NullEngine scene in
+ * scene/gradeOwner.test.ts). The rig marks the scene (`metadata.felGradeOwner = 'rig'`) and the venue stands down; a
+ * standalone venue page with no rig (mountNexus, the render check) still gets its grade from here.
+ */
+export function applyVenueGrade(scene: Scene, grade: { exposure: number; contrast: number; vignette: number }, fog: Color3): boolean {
+  if ((scene.metadata as { felGradeOwner?: string } | null)?.felGradeOwner === 'rig') return false;
+  const ip = scene.imageProcessingConfiguration;
+  ip.toneMappingEnabled = true;
+  ip.exposure = grade.exposure;
+  ip.contrast = grade.contrast;
+  ip.vignetteEnabled = grade.vignette > 0;
+  ip.vignetteWeight = grade.vignette * 4;
+  ip.vignetteColor = Color4.FromColor3(fog, 1);
+  return true;
+}
+
 export function buildNexusScene(scene: Scene, spec: NexusWebSpec, canvas?: HTMLCanvasElement): BuiltScene {
   const env = spec.environment;
   const root = new TransformNode(`nexus_${spec.modeId}`, scene);
@@ -1232,14 +1255,8 @@ export function buildNexusScene(scene: Scene, spec: NexusWebSpec, canvas?: HTMLC
     }
   }
 
-  // grade — the single biggest quality lever, and it is nearly free
-  const ip = scene.imageProcessingConfiguration;
-  ip.toneMappingEnabled = true;
-  ip.exposure = env.grade.exposure;
-  ip.contrast = env.grade.contrast;
-  ip.vignetteEnabled = env.grade.vignette > 0;
-  ip.vignetteWeight = env.grade.vignette * 4;
-  ip.vignetteColor = Color4.FromColor3(c3(env.fogColor), 1);
+  // grade — the single biggest quality lever, and it is nearly free (unless the harness rig owns it: applyVenueGrade)
+  applyVenueGrade(scene, env.grade, c3(env.fogColor));
 
   return {
     root, camera: cam, ground, actors, shadows,

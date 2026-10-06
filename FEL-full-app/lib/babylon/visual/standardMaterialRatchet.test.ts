@@ -37,7 +37,7 @@ const KNOWN: Record<string, number> = {
   'boardCore.ts': 1,
   'ShowdownMode.ts': 1,
   'KarateEndlessMode.ts': 1,
-  'DuelMode.ts': 1,
+  // 'DuelMode.ts' — 0 since IMPROVE (2026-10-06): its one was the hidden duel_disc's material, and the disc is gone
   // 'AirSessionMode.ts': 1 — fixed 2026-10-06 (IMPROVE, Big Air item 1): the launch box's material is VenueKit.paint now
   // IMPROVE (2026-10-06, Tiebreak #19): ONE unlit-marker helper (disableLighting) for the ball, the hit-window ring and the
   // ball's blob. They are markers that only ever showed an emissive colour, never a PBR palette — the case this table allows.

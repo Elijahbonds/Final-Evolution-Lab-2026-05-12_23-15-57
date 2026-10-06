@@ -312,6 +312,139 @@ export interface CreatorEyes {
   glow?: number;
 }
 
+// ── CODE-BUILT CLOTHES (phase 4e, 2026-10-06; owner: "You should be able to change their clothing too.") ─────────────
+//
+// A piece of clothing is GENERATED FROM THE BODY ITSELF (lib/babylon/creator/clothes): the kit body's own triangles in the
+// regions the piece covers (found from the skin weights and the body's measured heights, like paint's regions), offset
+// outward by the fit, skinned with the body's own weights — so it moves with the body in every animation and needs no
+// art. These lists are the allow-list (APPEND ONLY, like every list above). Every piece, colour and paint is FREE; the
+// coin store keeps selling its special items (the kit tops / shorts / shoes and future modelled outfits). A built top,
+// bottom or footwear replaces the kit garment in that slot; a slot left empty keeps the Closet pick, else the sport's
+// default uniform (kit.applyKit). Cosmetic only: never pickable, never a collider, never a hitbox.
+//
+// LAYERS ARE THE ARRAY ORDER: the first piece is innermost, each later one sits a little further out wherever they
+// overlap (a tee under an open jacket; pants listed after a tee tuck it in, before it leave it out).
+
+export const CLOTH_KINDS = ['top', 'bottom', 'gloves', 'feet'] as const;
+export type ClothKind = typeof CLOTH_KINDS[number];
+/** Styles per kind. A style is a set of defaults (CLOTH_STYLE_DEFAULTS), not a model: every option below can be changed
+ *  on any style of its kind (a tank with long sleeves is a long-sleeve tee). */
+export const CLOTH_STYLES = {
+  top: ['tank', 'tee', 'longsleeve', 'hoodie', 'jacket', 'highneck'],
+  bottom: ['shorts', 'capris', 'pants', 'leggings', 'skirt'],
+  gloves: ['gloves', 'fingerless'],
+  feet: ['shoes', 'boots'],
+} as const satisfies Record<ClothKind, readonly string[]>;
+export type ClothStyle = typeof CLOTH_STYLES[ClothKind][number];
+/** Sleeve length, shoulder to hand: none (a sleeveless armhole), a cap, short, to the elbow, three-quarter, long (to the
+ *  wrist) and to the knuckles. */
+export const CLOTH_SLEEVES = ['none', 'cap', 'short', 'elbow', 'threeQuarter', 'long', 'knuckles'] as const;
+/** A top's hem: cropped, at the waist, at the hip, and the long coat to mid-thigh or the knee (below the hip it hangs
+ *  as one tube round both legs, and may flare). */
+export const CLOTH_HEMS = ['crop', 'waist', 'hip', 'thigh', 'knee'] as const;
+/** A top's neckline: crew, scoop, V, high (a turtle / mock neck) and a stand collar. */
+export const CLOTH_NECKS = ['crew', 'scoop', 'v', 'high', 'collar'] as const;
+/** A hood, on any top: none, down on the back, up over the head (it hides the hair). */
+export const CLOTH_HOODS = ['none', 'down', 'up'] as const;
+/** A bottom's leg length (a skirt's too), from the crotch to the ankle. */
+export const CLOTH_LEGS = ['brief', 'short', 'knee', 'capri', 'ankle'] as const;
+/** Where a bottom's waist sits. */
+export const CLOTH_RISES = ['low', 'mid', 'high'] as const;
+/** A glove's cuff: at the wrist, or a gauntlet up the forearm. */
+export const CLOTH_CUFFS = ['wrist', 'gauntlet'] as const;
+/** Footwear height: a low shoe, to the ankle, mid-calf, to the knee. */
+export const CLOTH_SHAFTS = ['low', 'ankle', 'mid', 'knee'] as const;
+/** Where a piece's second colour goes: its edges (hem, cuffs, neckline, waistband), its sleeves, its left half, its
+ *  shoulders (a yoke), a side stripe (down each leg and the side seams), a shoe's sole. Cut into the geometry, crisp. */
+export const CLOTH_TONES = ['trim', 'sleeves', 'split', 'yoke', 'stripe', 'sole'] as const;
+export type ClothSleeve = typeof CLOTH_SLEEVES[number];
+export type ClothHem = typeof CLOTH_HEMS[number];
+export type ClothNeck = typeof CLOTH_NECKS[number];
+export type ClothHood = typeof CLOTH_HOODS[number];
+export type ClothLeg = typeof CLOTH_LEGS[number];
+export type ClothRise = typeof CLOTH_RISES[number];
+export type ClothCuff = typeof CLOTH_CUFFS[number];
+export type ClothShaft = typeof CLOTH_SHAFTS[number];
+export type ClothTone = typeof CLOTH_TONES[number];
+
+/** Most pieces on one body, and per kind (at least two tops: a tee under an open jacket; two bottoms: leggings under a
+ *  skirt). Past these the sanitiser keeps the first. */
+export const MAX_CLOTHES = 6;
+export const MAX_CLOTHES_PER_KIND: Record<ClothKind, number> = { top: 3, bottom: 2, gloves: 1, feet: 1 };
+
+/**
+ * One piece. Every option but `id`, `kind`, `style` and `colour` is OPTIONAL and stored only when it differs from the
+ * style's default (CLOTH_STYLE_DEFAULTS), so a saved look and a share code stay short; `fit` is 0 (skin-tight) to 1
+ * (loose). Options that do not belong to the kind (a sleeve on a shoe) are dropped by the sanitiser.
+ */
+export interface CreatorCloth {
+  /** short id, unique in the doc ([a-z0-9], 1–8) */
+  id: string;
+  kind: ClothKind;
+  style: ClothStyle;
+  colour: string;
+  fit?: number;
+  // tops
+  sleeve?: ClothSleeve;
+  hem?: ClothHem;
+  neck?: ClothNeck;
+  hood?: ClothHood;
+  /** a jacket's open front, 0 (zipped) to 1 (wide open) */
+  open?: number;
+  // bottoms
+  leg?: ClothLeg;
+  rise?: ClothRise;
+  /** a band at the waist, a little proud of the rest (on by default but on leggings) */
+  waistband?: boolean;
+  /** how far a skirt or a long coat flares below the hips, 0..1 */
+  flare?: number;
+  // hands and feet
+  cuff?: ClothCuff;
+  shaft?: ClothShaft;
+  /** the second colour and where it goes */
+  colour2?: string;
+  tone?: ClothTone;
+}
+
+export interface ClothDefaults {
+  fit: number;
+  sleeve?: ClothSleeve; hem?: ClothHem; neck?: ClothNeck; hood?: ClothHood; open?: number;
+  leg?: ClothLeg; rise?: ClothRise; waistband?: boolean; flare?: number;
+  cuff?: ClothCuff; shaft?: ClothShaft;
+  tone: ClothTone;
+}
+/** Each style's defaults (what the sanitiser leaves out). TUNED (2026-10-06, phase 4e — first guesses, never seen on a
+ *  screen): the fits, the jacket half open, the skirt's 0.5 flare. */
+export const CLOTH_STYLE_DEFAULTS: Record<ClothStyle, ClothDefaults> = {
+  tank: { fit: 0.3, sleeve: 'none', hem: 'hip', neck: 'scoop', hood: 'none', open: 0, flare: 0, tone: 'trim' },
+  tee: { fit: 0.35, sleeve: 'short', hem: 'hip', neck: 'crew', hood: 'none', open: 0, flare: 0, tone: 'trim' },
+  longsleeve: { fit: 0.3, sleeve: 'long', hem: 'hip', neck: 'crew', hood: 'none', open: 0, flare: 0, tone: 'trim' },
+  hoodie: { fit: 0.55, sleeve: 'long', hem: 'hip', neck: 'crew', hood: 'down', open: 0, flare: 0, tone: 'trim' },
+  jacket: { fit: 0.6, sleeve: 'long', hem: 'hip', neck: 'collar', hood: 'none', open: 0.5, flare: 0.3, tone: 'trim' },
+  highneck: { fit: 0.25, sleeve: 'long', hem: 'hip', neck: 'high', hood: 'none', open: 0, flare: 0, tone: 'trim' },
+  shorts: { fit: 0.45, leg: 'short', rise: 'mid', waistband: true, flare: 0, tone: 'stripe' },
+  capris: { fit: 0.35, leg: 'capri', rise: 'mid', waistband: true, flare: 0, tone: 'stripe' },
+  pants: { fit: 0.45, leg: 'ankle', rise: 'mid', waistband: true, flare: 0, tone: 'stripe' },
+  leggings: { fit: 0, leg: 'ankle', rise: 'high', waistband: false, flare: 0, tone: 'stripe' },
+  skirt: { fit: 0.4, leg: 'knee', rise: 'mid', waistband: true, flare: 0.5, tone: 'trim' },
+  gloves: { fit: 0.1, cuff: 'wrist', tone: 'trim' },
+  fingerless: { fit: 0.1, cuff: 'wrist', tone: 'trim' },
+  shoes: { fit: 0.3, shaft: 'low', tone: 'sole' },
+  boots: { fit: 0.35, shaft: 'mid', tone: 'sole' },
+};
+/** The options each kind takes (the sanitiser drops the rest). `flare` on a top only matters for a long coat (thigh or
+ *  knee hem); on a bottom, for a skirt (and flared trousers). */
+export const CLOTH_OPTIONS: Record<ClothKind, readonly (keyof ClothDefaults)[]> = {
+  top: ['sleeve', 'hem', 'neck', 'hood', 'open', 'flare'],
+  bottom: ['leg', 'rise', 'waistband', 'flare'],
+  gloves: ['cuff'],
+  feet: ['shaft'],
+};
+/** The kit slot a kind replaces (gloves have none: the kit has no gloves). */
+export const CLOTH_KIT_SLOT: Record<ClothKind, 'tops' | 'shorts' | 'shoes' | null> = { top: 'tops', bottom: 'shorts', gloves: null, feet: 'shoes' };
+export const kindOfStyle = (style: string): ClothKind | null =>
+  (CLOTH_KINDS.find((k) => (CLOTH_STYLES[k] as readonly string[]).includes(style)) ?? null);
+
 export interface CreatorDoc {
   v: typeof CREATOR_DOC_VERSION;
   parts: CreatorPart[];
@@ -323,6 +456,8 @@ export interface CreatorDoc {
   eyes?: CreatorEyes;
   /** Phase 4c: player-drawn stamps (marks.ts), at most MAX_MARKS, each used by a `mark` layer; stored only when one is. */
   marks?: CreatorMark[];
+  /** Phase 4e: code-built clothes, innermost first (at most MAX_CLOTHES); stored only when there is one. */
+  clothes?: CreatorCloth[];
 }
 
 /** One saved character, v1 (phase 1): `label` through the jersey name rule, `doc` a full CreatorDoc. Still accepted by
@@ -377,7 +512,7 @@ export function isEmptyCreatorDoc(d: CreatorDoc): boolean {
   return !d.parts.length && !d.paint.length && !Object.keys(d.colours).length
     && !Object.keys(d.shape.face).length && !Object.keys(d.shape.body).length && !Object.keys(d.shape.girth ?? {}).length
     && !d.flags.suit
-    && !Object.keys(d.flags.hide ?? {}).length && !Object.keys(d.eyes ?? {}).length;
+    && !Object.keys(d.flags.hide ?? {}).length && !Object.keys(d.eyes ?? {}).length && !d.clothes?.length;
 }
 
 /** What the doc hides, resolved: `head` takes the ears, the eyes and the hair with it. */

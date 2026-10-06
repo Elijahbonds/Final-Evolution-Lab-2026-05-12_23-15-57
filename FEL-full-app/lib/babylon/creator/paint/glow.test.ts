@@ -53,8 +53,10 @@ const apx = (B: PaintBuffers, x: number, y: number) => Array.from(B.out.slice((y
 describe('the glow blend in the compositor', () => {
   it('paints over like normal AND lights its region; everywhere else stays dark', () => {
     const { B, emit } = render([L({ id: 'g', blend: 'glow', colours: ['#00FF80'] })]);
-    expect(apx(B, 5, 5)).toEqual([0, 255, 128, 255]);
-    expect(epx(emit, 5, 5)).toEqual([0, 255, 128, 255]);
+    // #00FF80: the 0x80 channel goes in as 255 × (128/255)^(1/2.2) = 186 (PAINT_ENCODE; test changed 2026-10-06, owner
+    // "Match everywhere" — it was 128)
+    expect(apx(B, 5, 5)).toEqual([0, 255, 186, 255]);
+    expect(epx(emit, 5, 5)).toEqual([0, 255, 186, 255]);
     expect(epx(emit, 40, 5)).toEqual([0, 0, 0, 0]);
     expect(epx(emit, 5, 40)).toEqual([0, 0, 0, 0]);
   });

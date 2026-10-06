@@ -17,7 +17,10 @@
 import type { FelInput } from '@/lib/babylon/core/InputBus';
 import type { PartyStyle } from './catalog';
 
-const FACE_TO_DPAD = { A: 'up', B: 'right', X: 'down', Y: 'left' } as const;
+/** A phone P2's face buttons in a buzz game, as the d-pad answer each one means: A B X Y are cards A B C D, and the
+ *  modes read cards A B C D off ▲ ▶ ◀ ▼ (WhoSceneItMode / BrainBrawlMode `DPAD`, since their IMPROVE #14 2×2 grid).
+ *  It said X → ▼, Y → ◀ (the old ▲ ▶ ▼ ◀ order), so a phone pressing C answered D (integration-2, 2026-10-06). */
+export const FACE_TO_DPAD = { A: 'up', B: 'right', X: 'left', Y: 'down' } as const;
 
 export interface RouteCtx {
   style: PartyStyle;

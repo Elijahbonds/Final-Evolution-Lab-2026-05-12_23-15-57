@@ -196,8 +196,12 @@ export const VENUE_PROP_SETS: Record<string, PropPlacement[]> = {
     // camera). The kit's own record calls these "sail billboards"; the two left stand wide of the hoop.
   ],
   'dojo': [
-    ...ring('mini-arena', 'column', 9.5, 8, 0, 1.5, Math.PI / 8),   // Pass 7: lantern-post height — at 2.6 they read as Greek temple pillars in a shrine courtyard
-    { kit: 'mini-arena', model: 'statue', at: [0, 0, 11], yaw: Math.PI, scale: 2.4 }, { kit: 'mini-arena', model: 'banner', at: [-4, 0, 11], scale: 2.4 }, { kit: 'mini-arena', model: 'banner', at: [4, 0, 11], scale: 2.4 },
+    // IMPROVE (2026-10-06): the column ring 9.5 → 11 and the statue + banners z 11 → 12.5. The combat arenas grew
+    // (combat/arenas.ts ARENA_SCALE 1.25) and the Shadow Gauntlet's stone ring now stands at r 9.375 — a column at 9.5
+    // was 0.13 m outside it, i.e. inside the wall. At 11 it clears the ring by 1.6 m; the statue and banners step back
+    // with it so a column does not stand 0.9 m off a banner. combat/arenas.test holds every prop clear of every arena.
+    ...ring('mini-arena', 'column', 11, 8, 0, 1.5, Math.PI / 8),   // Pass 7: lantern-post height — at 2.6 they read as Greek temple pillars in a shrine courtyard
+    { kit: 'mini-arena', model: 'statue', at: [0, 0, 12.5], yaw: Math.PI, scale: 2.4 }, { kit: 'mini-arena', model: 'banner', at: [-4, 0, 12.5], scale: 2.4 }, { kit: 'mini-arena', model: 'banner', at: [4, 0, 12.5], scale: 2.4 },
     { kit: 'mini-arena', model: 'tree', at: [-11, 0, -8], scale: 2.6 }, { kit: 'nature', model: 'tree_pineRoundA', at: [11, 0, -9], scale: 4.8 },
     // props+depth pass 2026-09-05 — NEAR: stones at the mat's apron corners (the Kenney blocks read as black cubes under the dusk — gone, Pass 7)
     { kit: 'nature', model: 'rock_smallFlatA', at: [-8.5, 0, 8.5], scale: 2.0 }, { kit: 'nature', model: 'rock_smallG', at: [8.5, 0, -8.5], scale: 1.8 },

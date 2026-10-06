@@ -5,7 +5,8 @@
 // PER TEXEL: start from the albedo the material showed (its texture × its colour, so an unpainted texel looks exactly as
 // it did), then for each layer whose region holds the texel's label, work out the layer's colour and coverage at the
 // texel's chart position (bodyChart.ts, in metres) and blend it: NORMAL lays it over, MULTIPLY darkens through it.
-// Colours are blended in the texture's own (gamma) bytes, the way a paint program does.
+// Colours are blended in the texture's own (gamma) bytes, the way a paint program does; a picked hex goes in encoded the
+// way every other colour on the body is (PAINT_ENCODE), so it looks the same painted as worn.
 //
 // ONLY WHAT CHANGED. The map is cut into tiles (rasterise.ts). A layer touches the tiles holding its region's labels,
 // and a stamp only the tiles its chart box reaches, so an edit redraws the tiles under the old and the new version of
@@ -83,6 +84,18 @@ export interface CompiledLayer {
 
 const hexRgb = (h: string): [number, number, number] => [parseInt(h.slice(1, 3), 16) / 255, parseInt(h.slice(3, 5), 16) / 255, parseInt(h.slice(5, 7), 16) / 255];
 
+/** The power a picked colour is written into the paint bytes with. TUNED: paint colour space linear → sRGB (owner
+ *  2026-10-06, "Match everywhere"). Everywhere else in the identity pipe a hex is the material's colour as is (a
+ *  garment's tint, a built garment's vertex colour, a part, the skin, the hair: Color3.FromHexString → the albedo), which
+ *  the shader takes as LINEAR; these bytes are a texture, which the shader decodes as sRGB (^2.2). Written as the hex's
+ *  own bytes (before), a picked colour came out darker painted than worn: #808080 at 0.22 linear against 0.50. Written
+ *  as hex^(1/2.2) — the same encoding renderPaint gives a material's tint and clothes/baseRaster a garment's colour — it
+ *  decodes to the same linear value, so one hex looks the same in paint, clothing, parts, skin and hair. Existing painted
+ *  looks come out a little brighter (black and white do not move). */
+export const PAINT_ENCODE = 1 / 2.2;
+/** A picked hex → the compositor's colour (0..1, in the texture's gamma bytes / 255). */
+export const paintColour = (h: string): [number, number, number] => hexRgb(h).map((c) => Math.pow(c, PAINT_ENCODE)) as [number, number, number];
+
 /** The extent of a region's atoms inside one group: s half-width (front or back) and t range. */
 function regionExtent(chart: ChartInfo, atoms: readonly number[], group: number, back: boolean): { sHalf: number; tMin: number; tMax: number } | null {
   let sHalf = 0, tMin = Infinity, tMax = -Infinity, any = false;
@@ -140,7 +153,7 @@ export function compileLayer(l: PaintLayer, chart: ChartInfo, aa: number, glow =
   let labelBits = 0;
   for (let k = 1; k <= ATOM_COUNT; k++) if (labels[k]) labelBits |= 1 << k;
   const col = new Float32Array(9);
-  l.colours.slice(0, 3).forEach((c, i) => col.set(hexRgb(c), i * 3));
+  l.colours.slice(0, 3).forEach((c, i) => col.set(paintColour(c), i * 3));
   const rot = (l.at.rot * Math.PI) / 180;
   // phase 4c: a drawn stamp ('mark') is placed, sized and outlined exactly like a library stamp
   const kind: CompiledLayer['kind'] = l.type === 'pattern' ? (l.pattern === 'gradient' ? 'gradient' : 'pattern') : l.type === 'mark' ? 'stamp' : l.type;
