@@ -611,7 +611,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
       ambientStarted = true;
       // mood -> ambient bed: dojo hush, alpine wind-quiet, everything else a stadium crowd.
       const bed = mood === 'dojoWarm' ? 'dojo' : mood === 'alpine' || mood === 'overcast' ? 'none' : 'stadium';
-      SoundKit.startAmbient(bed);
+      SoundKit.startVenueAmbient(bed);   // AMBIENT FIX (2026-10-06): only over a mode that chose no bed in load()
     }
   }
   /** MOVEMENT PLAY P3: whatever the body holds on this mode, let go — sent while the phase is still 'playing', so the
@@ -829,7 +829,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
       for (let i = 1; i < qaSteps && phase === 'playing'; i++) def.update(ctx, dt * timeScale());
       // the meter cools on REAL time, so a hit-stop cannot be used to bank momentum
       momentum.update(dt);
-      if (!def.ownsCrowd) SoundKit.setAmbientLevel(crowdLevel(momentum.score01));
+      if (!def.ownsCrowd && SoundKit.bedFollowsMomentum()) SoundKit.setAmbientLevel(crowdLevel(momentum.score01));   // AMBIENT FIX: a crowd swells, wind/ocean/dojo stay at base
     }
     // The impact pulse runs on REAL dt and in every phase, so a mode that ends mid-pulse still hands the
     // frame back at its resting grade instead of leaving the end card dimmed. `framePainted` means the
