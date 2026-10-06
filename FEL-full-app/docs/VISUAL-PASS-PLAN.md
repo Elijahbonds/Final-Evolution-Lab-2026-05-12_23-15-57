@@ -615,3 +615,31 @@ Upgrades:
   - themed FreeRun course modules;
   - sport-specific set pieces: rack, judge table, umpire chair, scaffold, starting blocks;
   - more crowd body variety.
+
+## Foundation status after phase 2 (visual-foundation, 2026-10-06)
+
+What the per-mode passes can now build on, beyond A9.1–A9.7:
+
+- **A9.10 static shadow cache** (`scene/ShadowCache.ts`, phones' single 512 map). Static casters are drawn into the
+  shadow map once; only moving casters are drawn per frame. Measured on the phone tier: velocitykart 234 → 24 shadow
+  draws a render, dunk 73 → 27, karate 104 → 51. `?shadowcache=0` is the A/B. `scene.metadata.felShadowCache` has
+  `stats()` and `movingByName()` — the list of casters still drawn every frame, which is a mode's own shopping list.
+  Desktop/high are unchanged (4096 map; the cascades follow the camera — caching the far cascades is the fuller version).
+- **Phone post chain** (`QualityTier.tierRigSettings('mobile')`): 6 → 5 passes, post fill 4.43 → 2.88 Mpx a frame at
+  780×1688 (bloom target ×0.5 with its kernel in step; FXAA only below DPR 1.5). `?mobilepost=0` is the A/B.
+- **A9.8 particles** (`visual/ParticleBudget.ts`, `EffectsKit.BURST_LOOK`): one live-particle budget per tier for every
+  burst, a governor lever (`setParticleBudgetScale`), additive stretched sparks, puffing dust, tumbling confetti strips.
+- **A9.9 crowd at distance** (`visual/CrowdLod.ts`): onlookers past 14 m drop their ink hull and cast shadow; phones'
+  crowds never cast into the map.
+- HUD-in-the-world meshes and light sprites no longer cast shadows (phone flashes, shot meter, player ring and tag, gulls).
+
+Notes for the per-mode passes, from the shadow cache's per-frame lists:
+- **karate**: `threat_arrow`, `threat_cue`, `ke_pick_health`, `mook_bar_*` are HUD meshes still casting shadows every frame —
+  name them into LightRig's never-cast pattern (or set them as non-casters in the mode) when the karate pass runs.
+- **dunk / velocitykart**: after settling, what is drawn per frame is the bodies, their kit and the ball — nothing left to
+  take at the foundation level.
+- **Every mode with bursts**: look at a grind (sparks), a planted cut (dust) and a win (confetti) on screen — the new looks
+  were tested headless, not judged by eye.
+- Still not built: broadcast kit (A9.12), TV HUD styling (A9.13), procedural sky (A9.11), material detail (A9.14),
+  clustered lights (A9.5 part 2), SSR/mirror floors (A9.7 part 2), FSR for 4K.
+
