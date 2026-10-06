@@ -22,6 +22,7 @@ import { readyWeathers, readWeather, writeWeather, WEATHER_FAMILY_OF, type Weath
 import { readyMusicStages, readMusicStage, writeMusicStage, type MusicStageId } from '@/lib/babylon/music/musicStage';
 import { skinsFor, readBoardSkin, writeBoardSkin } from '@/lib/babylon/nexus/boardSkins';
 import { readyCourses, readCourse, writeCourse } from '@/lib/babylon/core/RaceCourse';
+import { readKartVariant, writeKartVariant, KART_GP_LAPS, type KartVariant } from '@/lib/babylon/racing/kartCircuits';
 import { readyVehicles, readVehicle, writeVehicle, type RaceKind } from '@/lib/babylon/racing/garage';
 import { readyWeapons, readWeapon, writeWeapon } from '@/lib/babylon/combat/arsenal';
 import { arenasFor, readCombatArena, writeCombatArena, COMBAT_MODE_IDS, type CombatModeId } from '@/lib/babylon/combat/arenas';
@@ -203,6 +204,16 @@ export function SplashCard(props: BootSplashProps) {
   const pickRide = (id: string) => {
     if (!race || id === ride) return;
     writeVehicle(race, id); setRide(id);
+  };
+  // IMPROVE (2026-10-06), velocitykart #12: the kart's RACE — the standard two laps, a three-lap GRAND PRIX, and the
+  // course MIRRORED. The geometry is built at mount, so a change reloads with it in the query, exactly like the map.
+  const [kartRace, setKartRace] = useState<KartVariant | null>(null);
+  useEffect(() => { if (race === 'kart') setKartRace(readKartVariant()); }, [race]);
+  const pickKartRace = (v: KartVariant) => {
+    if (!kartRace || (v.laps === kartRace.laps && v.mirror === kartRace.mirror)) return;
+    writeKartVariant(v); setKartRace(v);
+    const u = new URL(window.location.href); u.searchParams.set('laps', String(v.laps)); u.searchParams.set('mirror', v.mirror ? '1' : '0');
+    window.location.assign(u.toString());
   };
 
   // THE FIGHT PICKS (2026-09-13). A weapon for the weapon modes, a fighting style — and a blend of two — for
@@ -512,6 +523,24 @@ export function SplashCard(props: BootSplashProps) {
             <p className="max-w-[24rem] text-[9px] leading-tight tracking-wide text-white/40">
               {readyCourses(race).find((c) => c.id === map)?.sub ?? ''}
             </p>
+          </div>
+        )}
+
+        {race === 'kart' && kartRace && (props.phase === 'ready' || props.phase === 'loading') && (
+          <div className="mt-2 flex flex-col items-center gap-1.5">
+            <p className="text-[9px] font-black tracking-[0.3em] text-white/45">RACE</p>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {([['2 LAPS', 2], ['GRAND PRIX · 3 LAPS', KART_GP_LAPS]] as const).map(([label, laps]) => (
+                <button key={laps} type="button" onClick={() => pickKartRace({ ...kartRace, laps })} aria-pressed={kartRace.laps === laps}
+                  className={`rounded-full border border-white/40 px-3 py-1 text-[10px] font-black tracking-wider transition ${kartRace.laps === laps ? 'bg-white text-black' : 'text-white/80 hover:bg-white/10'}`}>
+                  {label}
+                </button>
+              ))}
+              <button type="button" onClick={() => pickKartRace({ ...kartRace, mirror: !kartRace.mirror })} aria-pressed={kartRace.mirror}
+                className={`rounded-full border border-white/40 px-3 py-1 text-[10px] font-black tracking-wider transition ${kartRace.mirror ? 'bg-white text-black' : 'text-white/80 hover:bg-white/10'}`}>
+                MIRROR
+              </button>
+            </div>
           </div>
         )}
 

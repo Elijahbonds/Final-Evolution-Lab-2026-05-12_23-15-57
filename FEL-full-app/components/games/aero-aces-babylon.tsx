@@ -22,44 +22,16 @@ import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { gameResultFromSession } from '@/lib/sessions/gameResultFromSession';
 import { hnode, hnum } from './hud-format';
+import { RaceCourseMap, THREAT_POS, THREAT_ARROW } from './race-course-map';
 
 type Hud = Record<string, HudValue>;
 
 /** The balloon colours (AeroItems.BALLOON_COLOR), for the item box. */
 const ITEM_COLOR: Record<string, string> = { missile: '#ff4b4b', boost: '#3aa0ff', shield: '#ffd75e', mine: '#4fdc6a' };
 
-/** IMPROVE (2026-10-06) #3: where the missile warning sits — on the edge the missile is coming from. */
-const THREAT_POS: Record<string, string> = {
-  BEHIND: 'inset-x-0 bottom-40 justify-center', AHEAD: 'inset-x-0 top-24 justify-center',
-  LEFT: 'left-3 top-[60%] justify-start', RIGHT: 'right-3 top-[60%] justify-end',
-};
-const THREAT_ARROW: Record<string, string> = { BEHIND: '▼', AHEAD: '▲', LEFT: '◀', RIGHT: '▶' };
-
-/** "x,y;x,y" → points (the mode sends the course strip's dots as one string — aeroAcesRules.mapDots). */
-function dots(v: HudValue | undefined): [number, number][] {
-  if (typeof v !== 'string' || !v) return [];
-  return v.split(';').map((p) => p.split(',').map(Number) as [number, number]).filter(([x, y]) => Number.isFinite(x) && Number.isFinite(y));
-}
-
-/** IMPROVE (2026-10-06) #6: THE COURSE STRIP — the circuit's outline, the field, the next ring and you (pointing your
- *  way). Three-lap 3D circuits lost players on where the next ring and the pack were; this is the map in the corner. */
-function CourseMap({ hud }: { hud: Hud }) {
-  if (typeof hud.mapPath !== 'string' || !hud.mapPath) return null;
-  const me = typeof hud.mapMe === 'string' ? hud.mapMe.split(',').map(Number) : null;
-  const ring = dots(hud.mapRing)[0];
-  return (
-    <div className="pointer-events-none absolute left-3 top-[5.5rem] fel-panel rounded-lg p-1" aria-hidden>
-      <svg viewBox="0 0 100 100" className="h-20 w-20 sm:h-28 sm:w-28">
-        <path d={hud.mapPath} fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth={3.2} strokeLinejoin="round" />
-        {dots(hud.mapField).map(([x, y], i) => <circle key={i} cx={x} cy={y} r={2.2} fill="#94a3b8" />)}
-        {ring ? <circle cx={ring[0]} cy={ring[1]} r={3.2} fill="none" stroke="#7dd3fc" strokeWidth={1.4} /> : null}
-        {me && me.length === 3 && me.every(Number.isFinite)
-          ? <path d="M0,-5 L3.6,4 L0,2.2 L-3.6,4 Z" fill="#ffd166" stroke="#1f2937" strokeWidth={0.8} transform={`translate(${me[0]} ${me[1]}) rotate(${me[2]})`} />
-          : null}
-      </svg>
-    </div>
-  );
-}
+/** IMPROVE (2026-10-06) #3 #6: the missile warning's placement and the course strip are shared with the kart's host
+ *  (race-course-map.tsx) — one drawing of each for both racing modes. */
+const CourseMap = RaceCourseMap;
 
 export default function AeroAcesBabylon({ onEnd }: GameProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
