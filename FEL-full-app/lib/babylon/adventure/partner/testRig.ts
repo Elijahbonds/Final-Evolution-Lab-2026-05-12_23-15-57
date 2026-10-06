@@ -109,7 +109,7 @@ export function fakeMovement(): AdventureSystem {
 }
 
 /** A2's stand-in (see the header). `monsterHit` is a monster's damage per swing (0 = harmless). */
-export function fakeCombat(o: { monsterHit?: number; reach?: number } = {}): AdventureSystem {
+export function fakeCombat(o: { monsterHit?: number; reach?: number; monsterTargets?: ActorId[] } = {}): AdventureSystem {
   const reach = o.reach ?? 2.2;
   const swingCd = new Map<ActorId, number>();
   const kod = new Set<ActorId>();
@@ -130,6 +130,7 @@ export function fakeCombat(o: { monsterHit?: number; reach?: number } = {}): Adv
       const nearestFoe = (a: AdventureActor) => {
         let best: AdventureActor | null = null, bd = Infinity;
         for (const b of all) {
+          if (a.kind === 'monster' && o.monsterTargets && !o.monsterTargets.includes(b.id)) continue;
           if (b.team === a.team || b.stats.hp.cur <= 0 || (b.kind === 'partner' && b.fusion.active)) continue;
           const d = Math.hypot(b.pos.x - a.pos.x, b.pos.z - a.pos.z);
           if (d < bd) { bd = d; best = b; }
