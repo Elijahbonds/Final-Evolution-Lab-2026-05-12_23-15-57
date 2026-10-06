@@ -260,6 +260,10 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
    * this scene's geometry buffer skips transparent meshes (an alpha-blended surface occludes nothing). Idempotent.
    */
   let decorQuiet = false;
+  // IMPROVE (2026-10-06): the wind bed starts on the first PLAYED frame, not in load(). The harness starts the mood's bed on
+  // the first input (ModeHarness firstInput: alpine / overcast → 'none', night → 'stadium'), which stopped the wind load()
+  // had started before a single frame was played. Big Air's pattern (AirSessionMode, item 14).
+  let ambientOn = false;
   function quietDecor(ctx: ModeContext): void {
     for (const l of ctx.scene.lights) {
       const sg = l.getShadowGenerator?.() as ShadowGenerator | null | undefined;
@@ -665,7 +669,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
       // off-screen the whole way. That is where this mode's [FEL-FRAME] lines
       // came from — a fast board sport outruns a camera that begins behind.
       ctx.camDirector.snapTo(rig.char.root.position, world.markers[nextGate] ?? null);
-      SoundKit.startAmbient('wind');           // Phase 18: descent wind bed
+      ambientOn = false;                       // Phase 18: descent wind bed — started on the first played frame (update)
       EffectsKit.ambient(ctx.scene, 'slope');  // snowfall
       // BOOST: a pad on the fall line halfway to every other gate, pointing down the hill
       boostKit = new BoostKit(0.2); boostHeld = false;
@@ -762,6 +766,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
 
     update(ctx: ModeContext, dt: number) {
       if (ended) return;
+      if (!ambientOn) { ambientOn = true; SoundKit.startAmbient('wind'); }   // IMPROVE (2026-10-06): after the harness's bed
       trickLayer?.begin();   // TRICK POSE: take back last frame's trick offsets before this frame's writes
       if (!decorQuiet) { quietDecor(ctx); decorQuiet = true; }   // POLISH-2 (GC-6): once, on the first played frame (the rig and the SSAO exist)
       // GATE-CRASHER-MAJOR: the run clock counts PLAY. The harness hands over raw frame time, and the first frames after the
@@ -1160,7 +1165,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
       for (const s of sinking.splice(0)) s.char.dispose();                  // IMPROVE (item 15): nothing sinks past the mode
       crowd?.dispose();
       propsGone = true; props?.dispose(); props = null;
-      rig?.dispose(); world?.dispose(); SoundKit.stopAmbient();
+      rig?.dispose(); world?.dispose(); SoundKit.stopAmbient(); ambientOn = false;
     },
   };
 })();
