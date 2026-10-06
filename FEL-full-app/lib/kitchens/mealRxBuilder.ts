@@ -1,6 +1,7 @@
 // FEL Kitchens — the pure builder from the soft prep. No I/O, no store writes; Build is read-only upstream.
 
 import type { BuildSnapshot } from './buildSnapshot';
+import { filterRecipesForAllergies, type Allergen } from './allergens';
 import { NON_CLINICAL_DISCLAIMER, type FulfillmentPath, type GroceryItem, type LeakId, type LoadBand, type MealRx, type MealSlot, type MealSlotKind, type MealTheme, type Recipe } from './types';
 
 /** DRAFT (pending Elijah): leak → primary themes. */
@@ -80,7 +81,7 @@ export function pickDayPlan(recipes: Recipe[], themes: MealTheme[], loadBand: Lo
       .sort((a, b) => b.score - a.score || a.r.prepMinutes - b.r.prepMinutes || a.r.id.localeCompare(b.r.id))[0];
     if (!best) break;
     used.add(best.r.id);
-    plan.push({ slot, recipeId: best.r.id, title: best.r.title, minutes: best.r.prepMinutes, macros: best.r.macros, themes: best.r.themes });
+    plan.push({ slot, recipeId: best.r.id, title: best.r.title, minutes: best.r.prepMinutes, macros: best.r.macros, themes: best.r.themes, allergens: [...(best.r.allergens ?? [])] });
   }
   return plan;
 }
@@ -94,10 +95,14 @@ function newId(): string {
  * Pure. 1) leak from the snapshot; 2) load band from the PRQ; 3) themes = leak map ∪ load extras (hard adds carb-timing
  * and a recovery snack bias); 4) the band's slot plan (LOAD_SLOTS — train and hard cover pre and post) filled by greedy
  * tag overlap + slot fit, no recipe twice; 5) the grocery list merged by name + unit; 6) the fulfilment hint is the
- * preference (only 'list' is unlocked in v0); 7) the disclaimer always rides.
+ * preference (only 'list' is unlocked in v0); 7) the disclaimer always rides. `avoid` (the player's allergy pick) first
+ * drops every recipe carrying one of those allergens, so neither the plan nor the list can hold one.
  */
-export function buildMealRx(input: { signature: BuildSnapshot; recipes: Recipe[]; preferredFulfillment?: FulfillmentPath; now?: Date }): MealRx {
-  const { signature, recipes } = input;
+export function buildMealRx(input: { signature: BuildSnapshot; recipes: Recipe[]; preferredFulfillment?: FulfillmentPath; now?: Date; avoid?: readonly Allergen[] }): MealRx {
+  const { signature } = input;
+  // owner-approved 2026-10-06: the player's allergy pick (this device only) leaves every flagged recipe out of the plan
+  // and the grocery list — a recipe with an avoided allergen is never picked (lib/kitchens/allergens.ts)
+  const recipes = filterRecipesForAllergies(input.recipes, input.avoid ?? []).safe;
   const loadBand = loadBandFor(signature.prqScore);
   const themes: MealTheme[] = [...LEAK_THEMES[signature.leak]];
   if (loadBand === 'hard') for (const t of ['carb-timing', 'recovery'] as MealTheme[]) if (!themes.includes(t)) themes.push(t);

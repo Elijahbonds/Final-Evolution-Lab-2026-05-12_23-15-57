@@ -226,8 +226,8 @@ export function GuardianConsentGate({ children }: { children: ReactNode }) {
       <h2 className="text-[20px] font-black leading-tight text-white">Ask a parent or guardian</h2>
       <p className="mt-2 text-[13.5px] leading-snug text-white/70">
         {status?.status === 'revoked'
-          ? 'A guardian consent on your account was withdrawn. Ask again to keep using the Mirror, pain check-ins and the daily check-in.'
-          : "Because you're under 18 (or haven't told us your birth year yet), a parent or guardian needs to say it's OK before you can use the Mirror, log a pain check-in or answer the daily check-in. This is safety, not a paywall — it's free either way."}
+          ? 'A guardian consent on your account was withdrawn. Ask again so a camp plan your coach builds with you can go live.'
+          : "Because you're under 18 (or haven't told us your birth year yet), a parent or guardian needs to say it's OK before a camp plan your coach builds with you can go live. This is safety, not a paywall — it's free either way."}
       </p>
       <div className="mt-4 space-y-2.5">
         <input
