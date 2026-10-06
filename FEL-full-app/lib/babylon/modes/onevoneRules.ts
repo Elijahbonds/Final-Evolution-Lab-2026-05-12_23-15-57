@@ -53,19 +53,37 @@ export function gameWinner(me: number, foe: number, r: WinRule): 'me' | 'foe' | 
 export function onePointAway(mine: number, theirs: number, r: WinRule): boolean {
   return gameWinner(mine + 2, theirs, r) === 'me';
 }
-/** The most a WON game can post: one short of where it ends, plus the biggest bucket. 13 for first to 11 — the server's own
- *  ceiling for hoops1v1 (lib/arena-score-integrity firstToCeiling); a win-by-2 game can go to cap − 1 + 3 = 17. */
+/** The most a WON game can post: one short of where it ends, plus the biggest bucket. 13 for first to 11 — the Arena stake
+ *  ceiling for hoops1v1 (lib/arena-score-integrity firstToCeiling); a win-by-2 game can go to cap − 1 + 3 = 17, the session
+ *  ceiling (arena-score-integrity SESSION_RULES_CEILINGS, owner 2026-10-06). */
 export function postedMax(r: WinRule): number { return (r.winBy2 ? r.cap : r.target) - 1 + BUCKET_MAX; }
-/**
- * Is win-by-2 on for this run? NOT YET A PLAYER PICK (owner call waiting): every 1v1 session the server sees is held to the
- * first-to-11 ceiling (13; app/api/sessions refuses a score above it as SCORE_INVALID, an Arena stake as SCORE_ABOVE_CEILING), so
- * a deuce game won 14–12 would lose the whole session. Until that ceiling knows the rule it is a development seam only
- * (`?winby2=1`), and never in a staked duel (`?arena=`), where both players must play the same game.
- */
-export function winBy2Requested(search: string, dev: boolean): boolean {
-  if (!dev) return false;
+/** Where the READY screen's win-by-2 pick is remembered (this device only; off unless the player turned it on). */
+export const WIN_BY_2_KEY = 'fel-1v1-winby2';
+/** The query keys of a head-to-head run: an Arena stake, an async mp challenge, a challenge link. Both players must play the
+ *  same game there, and the stake is held to the first-to-11 ceiling (13). */
+export const HEAD_TO_HEAD_PARAMS: readonly string[] = ['arena', 'mp', 'c'];
+/** Is the win-by-2 pick offered on this run? Never on a staked or head-to-head run. */
+export function winBy2Offered(search: string): boolean {
   const q = new URLSearchParams(search);
-  return q.get('winby2') === '1' && !q.get('arena');
+  return !HEAD_TO_HEAD_PARAMS.some((k) => q.get(k));
+}
+/** The remembered pick: on only when the player turned it on (owner 2026-10-06: off by default). */
+export function readWinBy2Pick(): boolean {
+  try { return typeof window !== 'undefined' && window.localStorage.getItem(WIN_BY_2_KEY) === '1'; } catch { return false; }
+}
+export function writeWinBy2Pick(on: boolean): void {
+  try { if (on) window.localStorage.setItem(WIN_BY_2_KEY, '1'); else window.localStorage.removeItem(WIN_BY_2_KEY); } catch { /* convenience only */ }
+}
+/**
+ * Is win-by-2 on for this run? OWNER DECISION 2026-10-06 (moderate): a PLAYER OPTION, off by default — the toggle on the 1v1
+ * READY screen (components/games/onevone-win-by-2.tsx) remembers it (`picked`, readWinBy2Pick); `?winby2=1` stays as the
+ * development seam. Never on a staked or head-to-head run (winBy2Offered), so the Arena stake ceiling stays first to 11 (13);
+ * a session may post the win-by-2 game's 17 (lib/arena-score-integrity SESSION_RULES_CEILINGS).
+ */
+export function winBy2Requested(search: string, o: { picked: boolean; dev: boolean }): boolean {
+  if (!winBy2Offered(search)) return false;
+  if (o.picked) return true;
+  return o.dev && new URLSearchParams(search).get('winby2') === '1';
 }
 
 // ── #1 THE CONTEXTUAL HINT, AND THE FULL LIST FOR THE PAUSE SCREEN ───────────────────────────────────────────────────

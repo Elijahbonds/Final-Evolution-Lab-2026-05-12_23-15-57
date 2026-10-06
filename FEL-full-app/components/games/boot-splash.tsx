@@ -28,6 +28,7 @@ import { arenasFor, readCombatArena, writeCombatArena, COMBAT_MODE_IDS, type Com
 import { COURT_LAYOUTS, COURT_LAYOUT_MODES, readCourtLayout, writeCourtLayout, type CourtLayoutId } from '@/lib/babylon/nexus/courtLayout';   // COURT LAYOUT (2026-09-18): the 3v3's chokepoint
 import { looksFor, readPlaceLook, writePlaceLook } from '@/lib/babylon/nexus/placeLooks';
 import { tierList, readTier, writeTier, profileFor, type Tier } from '@/lib/babylon/core/Difficulty';
+import { OneVOneWinBy2 } from './onevone-win-by-2';   // owner 2026-10-06: the 1v1's win-by-2 pick
 import {
   readySchools, readBlend, writeBlend, blendName, schoolById, blendTraits, STYLE_TRAIT_KEYS,
   type StyleBlend,
@@ -637,6 +638,9 @@ export function SplashCard(props: BootSplashProps) {
             </p>
           </div>
         )}
+
+        {/* 1v1 WIN BY 2 (owner 2026-10-06): a player option, off by default; it draws nothing on a staked / head-to-head run */}
+        {props.modeId === 'onevone' && (props.phase === 'ready' || props.phase === 'loading') && <OneVOneWinBy2 />}
 
         {/* CARD SLOT (FINISH-RELEASE, 2026-09-15): the creator card beside the setting and the items, on every mode —
             and the button map it carries, so a player can read what every press does before the first one. */}

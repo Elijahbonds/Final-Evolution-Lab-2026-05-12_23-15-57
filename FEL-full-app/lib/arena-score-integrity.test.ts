@@ -15,7 +15,7 @@ import {
   KARATE_SWING_SEC, FOOTBALL_EVENT_SEC, DUNK_ATTEMPT_MAX, DUNK_CONTEST_ATTEMPTS, DUNK_MAX_SCALE, BIG_AIR_MAX_TURNS,
   checkStakeScore, checkDunkCard, scoreCeilingFor, canonicalStakeMode, killSwitchOn, dunkAttemptCeiling, aboveCeilingDetail,
   whoSceneItCeiling, danceCeiling, brainBrawlCeiling, bigAirCeiling, skateLinkMax, chainRunBound, frameRoundedRate,
-  carnivalEventBounds, STAKE_MODE_ALIASES, REJUDGED_STAKE_MODES, type ScoreCeiling,
+  carnivalEventBounds, STAKE_MODE_ALIASES, REJUDGED_STAKE_MODES, SESSION_RULES_CEILINGS, sessionRulesMax, firstToCeiling, type ScoreCeiling,
 } from './arena-score-integrity';
 import { ARENA_MODES } from './arena';
 import { ARENA_SCORE_BASELINES } from './arena-rivals';
@@ -829,6 +829,13 @@ describe('drift guards — the numbers mirrored out of mode files still match th
     const one = src('lib/babylon/modes/OneVOneMode.ts'), three = src('lib/babylon/modes/ThreeVThreeMode.ts');
     expect(num(one, /const TARGET_SCORE = (\d+);/, '1v1 TARGET_SCORE')).toBe(MIRRORED.onevoneTarget);
     expect(num(three, /const TARGET_SCORE = (\d+);/, '3v3 TARGET_SCORE')).toBe(MIRRORED.threevthreeTarget);
+    // owner 2026-10-06: the 1v1's win-by-2 option — its cap is mirrored for the SESSION ceiling only (the stake row stays 13)
+    expect(num(src('lib/babylon/modes/onevoneRules.ts'), /export const WIN_BY_2_CAP = (\d+);/, 'WIN_BY_2_CAP')).toBe(MIRRORED.onevoneWinBy2Cap);
+    expect(SESSION_RULES_CEILINGS.hoops1v1.max).toBe(firstToCeiling(MIRRORED.onevoneWinBy2Cap, MIRRORED.bucketMax));
+    expect(SCORE_CEILINGS.hoops1v1.max).toBe(firstToCeiling(MIRRORED.onevoneTarget, MIRRORED.bucketMax));
+    expect(sessionRulesMax('onevone', SCORE_CEILINGS.hoops1v1)).toBe(17);
+    expect(sessionRulesMax('hoops3v3', SCORE_CEILINGS.hoops3v3)).toBe(SCORE_CEILINGS.hoops3v3.max);   // no option: the stake row
+    expect(Object.keys(SESSION_RULES_CEILINGS)).toEqual(['hoops1v1']);
     for (const t of [one, three]) {
       for (const m of t.matchAll(/myScore \+= (\w+);/g)) expect(['arcPoints', 'points', '2']).toContain(m[1]);
       expect(t).not.toMatch(/arcPoints = [^;]*\? 4/);

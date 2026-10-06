@@ -44,7 +44,7 @@ import { TRIPLE_CUT, tripleCutSec } from '../core/DunkCuts';
 import { DunkFlight, DUNK_TRICKS, cueOf, cueVerdict, cueFireAt, CUE_BEAT_LABEL, type DunkTrick } from '../core/DunkSystem';   // IMPROVE (2026-10-06) #8: air tricks
 import { trickInput } from '../core/DunkAssist';
 import type { AmbientHandle } from '../visual/EffectsKit';
-import { duelNext, duelNeed, needLine, nextMatchLength, reportedScore, styleTierFor, type DuelState } from './dunkDuelRules';   // IMPROVE (2026-10-06) #3 #4 #5 #9
+import { duelNext, duelNeed, needLine, nextMatchLength, styleTierFor, type DuelState } from './dunkDuelRules';   // IMPROVE (2026-10-06) #3 #4 #5 #9
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { FirstPress, PRESS_GRACE } from '../core/timingPress';
 import { TakeoffEcho, type LaunchCause } from '../core/slamPress';   // HOTFIX (2026-09-24): the take-off's A is not the slam
@@ -753,10 +753,9 @@ export const DunkDuelMode: ModeDefinition = (() => {
       mic?.say(tie
         ? { moment: 'duel.tie', priority: 3, crowd: { moment: 'crowd.ooh', n: 2 } }
         : { moment: 'duel.win', tags: [winner === 'P1' ? 'p:1' : 'p:2'], priority: 3, crowd: { moment: 'crowd.erupt', n: 3 } });
-      // IMPROVE (2026-10-06) #9: the server bounds a duel at DUNKS_EACH dunks (lib/sessions/modeScoreRules) — a longer match reports
-      // its totals at that scale (dunkDuelRules.reportedScore); the default length reports them unchanged
-      const s1 = reportedScore(totals[0], dunksEach, DUNKS_EACH), s2 = reportedScore(totals[1], dunksEach, DUNKS_EACH);
-      ctx.end(tie ? 'DUEL_TIED' : `${winner}_WINS`, Math.max(s1, s2), { p1: s1, p2: s2, p1Total: totals[0], p2Total: totals[1], dunksEach, dunkOffRounds: offScores[1].length });
+      // owner 2026-10-06 (moderate): the server bound covers the longest match and its dunk-off (lib/sessions/modeScoreRules
+      // dunkDuelBound), so every length reports its real totals — no scaling (p1Total / p2Total kept for saved results)
+      ctx.end(tie ? 'DUEL_TIED' : `${winner}_WINS`, Math.max(totals[0], totals[1]), { p1: totals[0], p2: totals[1], p1Total: totals[0], p2Total: totals[1], dunksEach, dunkOffRounds: offScores[1].length });
       return;
     }
     // alternate: whoever has fewer attempts goes next (dunkDuelRules.duelNext)

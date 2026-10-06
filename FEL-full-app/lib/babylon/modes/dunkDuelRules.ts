@@ -1,8 +1,10 @@
-// dunkDuelRules — the duel's turn order, its deciding number, the dunk-off and the score it reports, as pure logic
+// dunkDuelRules — the duel's turn order, its deciding number and the dunk-off, as pure logic
 // (IMPROVE 2026-10-06, owner-picked items #3 #4 #5 #9 from the dunkduel section of docs/IMPROVEMENTS-2026-10-05.md).
 // Nothing here touches the scene: DunkDuelMode reads these and decides what to show.
 
-/** #9: the match lengths offered on the first hand-off card (dunks EACH). The first is the duel's own length (DUNKS_EACH). */
+/** #9: the match lengths offered on the first hand-off card (dunks EACH). The first is the duel's own length (DUNKS_EACH). The
+ *  server's bound covers the longest of them plus every dunk-off round (lib/sessions/modeScoreRules STORY_MIRRORED, owner
+ *  2026-10-06), so a duel reports its real totals at every length. */
 export const MATCH_LENGTHS: readonly number[] = [2, 3, 5];
 /** The next length round the card's ring. An unknown length starts the ring again. */
 export function nextMatchLength(cur: number): number {
@@ -66,15 +68,6 @@ export function needLine(need: number, minMake: number, maxMake: number): string
   if (need <= minMake) return 'ANY MAKE WINS IT';
   if (need > maxMake) return `NEEDS ${need} — OUT OF REACH, DUNK FOR PRIDE`;
   return need >= maxMake ? `NEEDS A PERFECT ${maxMake}` : `NEEDS ${need} TO WIN`;
-}
-
-/** #9: the score a duel REPORTS. The server bounds a dunkduel run at DUNKS_EACH dunks of the most one can score
- *  (lib/sessions/modeScoreRules, STORY_MIRRORED.dunkDuelDunksEach) and refuses a score above it, so a longer match reports its
- *  total at the regulation length's scale (the per-dunk average × the regulation count). The default length reports the total
- *  unchanged, byte for byte. */
-export function reportedScore(total: number, dunksEach: number, regulation: number): number {
-  if (dunksEach === regulation || dunksEach <= 0) return total;
-  return Math.round((total * regulation) / dunksEach);
 }
 
 /** #3 (TUNED): FLASHY is a dunk with flash in it. It launched on the same take-off as POWER and was judged as tier 5.5 against

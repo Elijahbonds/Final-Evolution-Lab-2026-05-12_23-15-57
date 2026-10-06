@@ -12,6 +12,7 @@ const fn = (name: string): string => { const i = SRC.indexOf(`function ${name}(`
 const CARRY = readFileSync(path.join(__dirname, '../anim/ballCarry.ts'), 'utf8');
 const HOST = readFileSync(path.join(__dirname, '../../../components/games/basketball-babylon.tsx'), 'utf8');
 const SPLASH = readFileSync(path.join(__dirname, '../../../components/games/boot-splash.tsx'), 'utf8');
+const TOGGLE = readFileSync(path.join(__dirname, '../../../components/games/onevone-win-by-2.tsx'), 'utf8');
 
 describe('the beats and the flights run on the mode clock and die with the mode (#5 #6 #13)', () => {
   it('no raw setTimeout, and no flight on onBeforeRender, is left in the mode', () => {
@@ -62,10 +63,15 @@ describe('the rules reach the game (#1 #2 #3 #4 #10)', () => {
     expect(SRC).toMatch(/attacker\.patience = attackerPatience\(nerve\(rivalStanding\(\)\)\.aggression, knobs\)/);
     expect(SPLASH).toMatch(/const TIER_MODES = new Set\(\[[^\]]*'onevone'/);
   });
-  it('#3 win-by-2 asks the rule, and only through the dev seam; first to 11 is untouched', () => {
+  it('#3 win-by-2 asks the rule, from the READY screen\'s pick (or the dev seam); first to 11 is untouched', () => {
     const g = fn('checkGameOver');
     expect(g).toMatch(/if \(winCond\.winBy2\) \{\n\s*const w = gameWinner\(myScore, foeScore, winCond\);/);
-    expect(SRC).toMatch(/winBy2Requested\(window\.location\.search, process\.env\.NODE_ENV === 'development'\)/);
+    expect(SRC).toMatch(/winBy2Requested\(window\.location\.search, \{ picked: readWinBy2Pick\(\), dev: process\.env\.NODE_ENV === 'development' \}\)/);
+    // owner 2026-10-06: the pick is on the 1v1 READY screen, and the toggle draws nothing on a staked / head-to-head run
+    expect(SPLASH).toMatch(/props\.modeId === 'onevone' && \(props\.phase === 'ready' \|\| props\.phase === 'loading'\) && <OneVOneWinBy2 \/>/);
+    expect(TOGGLE).toMatch(/winBy2Offered\(window\.location\.search\)/);
+    expect(TOGGLE).toMatch(/if \(!offered\) return null;/);
+    expect(TOGGLE).toMatch(/writeWinBy2Pick\(next\)/);
   });
   it('#4 the box score rides both endings', () => {
     const g = fn('checkGameOver');
