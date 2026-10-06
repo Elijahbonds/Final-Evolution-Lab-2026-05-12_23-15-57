@@ -196,6 +196,20 @@
   transform: translateX(-50%);
   opacity: 0.8;
 }
+/* A phone's frame leaves no band: its top-centre is a fighting game's round
+ * timer (measured: karate-vs "ROUND 1" under the buttons), so on a short
+ * screen they sit bottom-centre, between the two thumb clusters and under the
+ * modes' bottom hints (which start 40 px up from the frame). */
+@media (orientation: landscape) and (max-height: 520px) {
+  [data-fel-console] > [data-fel-corner] {
+    top: auto !important;
+    bottom: max(4px, env(safe-area-inset-bottom, 0px)) !important;
+  }
+  /* and a hint keeps to the gap between the thumb clusters (the compact deck reaches ~30 % in from each side) */
+  [data-fel-console] > div:has(> canvas) > div.inset-x-0.text-center > span.fel-panel.font-mono {
+    max-width: 44%;
+  }
+}
 
 /* 3b. A mode's control hint (a bottom-centred `fel-panel` line in the mono
  *    face): two lines at most, sideways. The 3v3 hint is a whole controller
@@ -210,6 +224,11 @@
   width: fit-content;
   max-width: min(92%, 980px);
   margin-inline: auto;
+  /* overflow clips at the PADDING edge, so a clamped third line showed through the bottom padding: the vertical
+   * room is a transparent border instead (the panel's background still paints under it) */
+  padding-block: 0 !important;
+  border-top: 0.375rem solid transparent !important;
+  border-bottom: 0.375rem solid transparent !important;
 }
 
 /* 4. The READY card, sideways: two columns — the title and START on the left,
