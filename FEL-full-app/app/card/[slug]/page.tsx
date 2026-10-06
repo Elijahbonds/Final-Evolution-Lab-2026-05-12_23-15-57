@@ -14,6 +14,7 @@ import { signupPathFor } from '@/lib/creator/share-link';
 import { DEFAULT_REWARD_RULES, REASON } from '@/lib/wallet/reward-rules';
 import { Sparkles } from 'lucide-react';
 import { CreatorTracks } from '@/components/soundtrack/creator-tracks';
+import { SignatureMoves } from '@/components/create/signature-moves';
 
 export const dynamic = 'force-dynamic';
 
@@ -74,6 +75,8 @@ export default async function CardPage({ params }: { params: { slug: string } })
         {progression && <CardProgressionPanel progression={progression} accent={card.accent} />}
         {/* CREATOR SOUNDTRACK (2026-10-06): the creator's approved tracks and their plays; nothing for a minor */}
         <CreatorTracks ownerId={card.ownerId} accent={card.accent} />
+        {/* CREATE HUB (2026-10-06): the creator's approved sport cards; nothing for a minor */}
+        <SignatureMoves ownerId={card.ownerId} accent={card.accent} />
 
         {/* the share surface: bio link + QR (stickers/flyers) */}
         <CardShare slug={card.slug} accent={card.accent} refCode={refCode} refShards={refShards} />
