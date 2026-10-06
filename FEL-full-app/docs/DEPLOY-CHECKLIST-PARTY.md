@@ -29,7 +29,7 @@ Two variables, both server-only (no `NEXT_PUBLIC_` prefix, so they never reach t
 
 | Variable | Value |
 |---|---|
-| `CONTROLLER_LINK_KV_URL` | The REST URL of an Upstash Redis database (or any endpoint that speaks the Upstash / Vercel-KV REST dialect), e.g. `https://<name>.upstash.io`. **No trailing slash**: the code builds `${url}/get/<key>`. |
+| `CONTROLLER_LINK_KV_URL` | The REST URL of an Upstash Redis database (or any endpoint that speaks the Upstash / Vercel-KV REST dialect), e.g. `https://<name>.upstash.io`. The code POSTs each command to `${url}` (or `${url}/pipeline`) with the command in the body; a trailing slash is stripped. |
 | `CONTROLLER_LINK_KV_TOKEN` | That database's REST token. Use the **read-write** token, not the read-only one: rooms, peers and mailboxes are all writes. |
 
 - Both must be set, or the app quietly keeps the memory store (`kvSignalStoreFromEnv` returns null when either is
@@ -38,7 +38,8 @@ Two variables, both server-only (no `NEXT_PUBLIC_` prefix, so they never reach t
   (`docs/LANES.md` section 4: `.env.production` in `wt-webapp-deploy`, or `.env.local` in `deploy-wt`). Set them there
   before the deploy. Never commit them. `.env.example` lists them, empty.
 - **No package, no schema, no Prisma.** The KV client is plain `fetch` (`restKvTransport`). Keys are
-  `felcl:<CODE>:meta | :peers | :seq | :mbox:<peer>`, each written with a 2-hour TTL, so the store empties itself.
+  `felcl:<CODE>:meta | :peers | :seq | :mlist:<peer>` (the last is a Redis list, one entry per message), each written
+  with a 2-hour TTL, so the store empties itself.
 - **Plan size.** An open party room's TV polls the signal route about 4 times a second for as long as the room is
   open (drop-in), and each poll is 3 KV reads (room meta, peers, the TV's mailbox). That is up to about 43,000 KV
   commands an hour per open room, plus a few dozen writes per phone join. Check the KV plan's command limit against
@@ -105,9 +106,9 @@ round-trip in ms). The README's numbers are loopback only.
 | What you see | What it means | What to do |
 |---|---|---|
 | Phones sometimes join and sometimes hang on **Finding host…** / **Connecting…**. Or "Can't find that game" for a code that is on the TV. Worse when busy, or right after a deploy. No KV line in the logs. | The memory store, with requests landing on different instances. | Set both variables (section 2) and redeploy. |
-| The TV shows **Phone link offline — The game server refused the room (500)** after its 3 retries. The logs show an error like `KV set/felcl%3A<CODE>%3Ameta/... failed: 401` (or 403). The key is URL-encoded in the message (`:` is `%3A`), and the value follows it. | Wrong or read-only token. (Failed reads are swallowed and read as "no room"; the first failed write is what surfaces.) | Fix the token and redeploy. |
-| The same, with `failed: 404`, or a `fetch failed` / DNS error. | Wrong URL, or a trailing slash. | Fix the URL and redeploy. |
-| Rooms open, then a join fails: the signal POST returns 500, and the logs show `KV set/felcl%3A<CODE>%3Ambox%3A... failed: 414` (or 400). | **Known risk, unverified.** The REST transport puts each value in the URL path, and the TV's mailbox is rewritten whole on every message. A busy room (four phones, several rejoins) can outgrow the endpoint's URL limit. | Short term: reopen the party room (a fresh code is a fresh mailbox). The fix is a code change, not a setting: send the value as the request body, or use a Redis list (`kvSignalStore.ts` names the seam). |
+| The TV shows **Phone link offline — The game server refused the room (500)** after its 3 retries. The logs show an error like `KV set felcl:<CODE>:meta failed: 401` (or 403). The message names the command and key, never the value. | Wrong or read-only token. (Failed reads are swallowed and read as "no room"; the first failed write is what surfaces.) | Fix the token and redeploy. |
+| The same, with `failed: 404`, or a `fetch failed` / DNS error. | Wrong URL (a trailing slash is stripped, so it is not that). | Fix the URL and redeploy. |
+| Rooms open, then a join fails: the signal POST returns 500, and the logs show `KV rpush felcl:<CODE>:mlist:<peer> + ltrim ... failed: 413` (or 400). | **Fixed in code 2026-10-06 (was: values in the URL); proven against a fake endpoint, not yet against the real one: the five-minute device test (section 4) on the deploy is the check.** The REST transport used to put each value in the URL path and rewrite the TV's whole mailbox per message, so a busy room could outgrow the URL limit (414). Now every command goes in the request body (`POST <url>` / `<url>/pipeline`), and each message is one `RPUSH` to a list capped at the newest 200, so a request carries one message, not the mailbox. Tested with a 64 KB message against a fake endpoint that answers 414 to any URL over 2 KB (`lib/controller-link/kvSignalStore.test.ts`). What is left is the plan's request-size limit (Upstash documents a per-request maximum, around 1 MB on its smallest plans; check yours), which one SDP message, a few KB, is far below. | If it ever shows: a 413 means one message outgrew the plan's request size; check the KV plan. Reopening the party room still gives a fresh mailbox. |
 | The TV lists a phone's name, but the phone never reaches **Connected**. | Signalling worked; the direct WebRTC path did not. The usual cause is a guest or office WiFi that isolates clients, or a phone on mobile data. Production has public STUN only, no TURN relay. | Put every device on the same home WiFi. A TURN server is a separate decision; nothing is configured for it. |
 | After about 2 hours, new phones cannot join a room that is still open; seated phones keep playing. | The room's KV keys expired (2-hour TTL; the memory store sweeps at 2 hours too). | Close and reopen the party room. |
 | Motion controls do nothing on an iPhone. | No secure context, or the permission was denied. Production is HTTPS, so this is the permission. | The party games are button-driven. Every motion schema ships a button fallback. |
