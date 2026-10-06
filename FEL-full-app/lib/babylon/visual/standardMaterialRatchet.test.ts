@@ -27,6 +27,7 @@ const MODES_DIR = join(process.cwd(), 'lib/babylon/modes');
  */
 const KNOWN: Record<string, number> = {
   'MixedCombatMode.ts': 6,
+  'ThreeVThreeMode.ts': 1,  // IMPROVE (2026-10-06, 3v3 #5 #6): the pass/ball-handler floor ring is a deliberately unlit marker (disableLighting) so it reads under every mood
   'ThreePointMode.ts': 2,   // IMPROVE (2026-10-06, 3PT #12): the five rack materials are one
   'BrainBrawlMode.ts': 3,
   'precisionModes.ts': 2,
