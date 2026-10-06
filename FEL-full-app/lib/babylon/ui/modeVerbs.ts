@@ -271,7 +271,11 @@ const VERBS: Record<string, Omit<ModeVerbConfig, 'rStick' | 'boost'>> = {
     B: { label: 'BLOCK', emit: A('B') },
   }),
 
-  dance: verbs({ A: { label: 'TAP', emit: A('A') } }),
+  // IMPROVE (2026-10-06, dance #12): MATCH mode puts the move families on the four face buttons (A grooves, B floor,
+  // X arms/spins, Y freeze) and Y toggles it on the pick screen, so touch needs all four. Each slot is labelled with
+  // its letter — the lane shows the same letter on every cue in MATCH mode. Outside MATCH, B taps like A (the mode
+  // reads A or B) and X / Y do nothing during a song.
+  dance: verbs({ A: { label: 'TAP', emit: A('A') }, B: { label: 'B', emit: A('B') }, X: { label: 'X', emit: A('X') }, Y: { label: 'Y', emit: A('Y') } }),
   // lane 3 W1 — the four answers ride the four face buttons
   who_scene_it: verbs({ A: { label: 'A', emit: A('A') }, B: { label: 'B', emit: A('B') }, X: { label: 'C', emit: A('X') }, Y: { label: 'D', emit: A('Y') } }),
   // VERB-KEY (2026-09-07): Brain Brawl reads the same answer diamond (FACE index 0..3 → option A/B/C/D, the HUD's
