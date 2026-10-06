@@ -6,6 +6,7 @@
 // lib/babylon/* cores (BasketballCore + PlayerSlot + TeammateBrain).
 
 import { readCourtLocation } from '@/lib/babylon/nexus/courtLocations';
+import { courtArtSkin } from '@/lib/modes/art/apply-art-card';
 import { useEffect, useRef, useState, useCallback } from 'react';
 import type { GameProps, GameResult } from './game-shell';
 import { BootSplash } from './boot-splash';
@@ -69,6 +70,7 @@ export default function ThreeVThreeBabylon({ onEnd }: GameProps) {
       runMode(MODES.threevthree, {
         canvas,
         location: readCourtLocation(),   // court location pick (docs/SPEC-COURT-LOCATIONS.md)
+        applySkin: courtArtSkin,   // PIPELINES (2026-10-06): the player's court art card, a centre-court decal
         input: bus,
         onPhase: (p, cd) => {
           setPhase(p);

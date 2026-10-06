@@ -38,9 +38,11 @@ const GUIDE: Record<Discipline, Omit<DisciplineGuide, 'id' | 'label' | 'blurb' |
   art: {
     make: 'Paint a skin in the painter',
     showsUp: [
-      // apply-art-card.ts maps 'board' to a mesh named board_deck; the deck is deck_slab (routed: lane/pipelines).
-      { where: 'Board decks in board runs (Apply from My Creations)', live: false },
-      { where: 'Courts and kits', live: false },
+      // PIPELINES (2026-10-06): apply-art-card.ts now paints the real deck (deck_grip + deck_slab) and lays a court card
+      // as a centre-court decal on the hoops courts. Kits wait on lane/creator's paint system (routed).
+      { where: 'Board decks in board runs (Apply from My Creations)', live: true },
+      { where: 'Centre court on the hoops courts', live: true },
+      { where: 'Kits', live: false },
     ],
   },
   dance: {
