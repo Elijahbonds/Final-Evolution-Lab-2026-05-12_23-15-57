@@ -278,7 +278,10 @@ export function SplashCard(props: BootSplashProps) {
   if (props.phase === 'playing' || props.phase === 'ended') return null;
 
   return (
-    <div className="absolute inset-0 z-40 overflow-hidden"
+    // data-fel-fullbleed: in console view the HUD keeps to the title-safe frame, but this card's art is the whole screen
+    // (app/game-surface.css). data-splash-column / data-splash-pickers: a sideways screen lays the card out in two
+    // columns — title and START on the left, the pickers on the right — instead of one column taller than the screen.
+    <div data-fel-fullbleed className="absolute inset-0 z-40 overflow-hidden"
       // SHARED-START-UNSTICK: on READY the whole card is the start button. A press that misses the pill (a thumb on
       // the art, a click in the corner) used to do nothing, and a player reads a card that ignores them as a hang.
       // The pickers are buttons and keep their own clicks; everything else starts on pointer DOWN, so a hold starts too.
@@ -300,7 +303,7 @@ export function SplashCard(props: BootSplashProps) {
           setting; this is the override, reachable before the first flash (a guest never sees the Profile tab). In the
           corner, out of the picker column. */}
       {(props.phase === 'ready' || props.phase === 'loading') && <MotionSetting compact className="absolute left-3 top-3 z-10" />}
-      <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 px-6 text-center">
+      <div data-splash-column className="absolute inset-0 flex flex-col items-center justify-center gap-4 px-6 text-center">
         <p className="text-[11px] font-black tracking-[0.4em]" style={{ color: v.tint }}>{v.sub}</p>
         <h1 className="text-4xl font-black tracking-wide text-white drop-shadow-lg">{props.title}</h1>
         {props.goal && (props.phase === 'ready' || props.phase === 'loading') && (
@@ -339,6 +342,8 @@ export function SplashCard(props: BootSplashProps) {
             chosen, the space check over this card. */}
         {props.phase === 'ready' && <BodyPlayReady tint={v.tint} onStart={props.onStart} />}
 
+        {/* display: contents everywhere but a sideways screen, so the column above is unchanged in portrait */}
+        <div data-splash-pickers className="contents">
         {isCourt && (props.phase === 'ready' || props.phase === 'loading') && readyCourtLocations().length > 1 && (
           <div className="mt-3 flex flex-col items-center gap-1.5">
             <p className="text-[9px] font-black tracking-[0.3em] text-white/45">LOCATION</p>
@@ -641,6 +646,7 @@ export function SplashCard(props: BootSplashProps) {
         {/* CARD SLOT (FINISH-RELEASE, 2026-09-15): the creator card beside the setting and the items, on every mode —
             and the button map it carries, so a player can read what every press does before the first one. */}
         {(props.phase === 'ready' || props.phase === 'loading') && <CardSlot modeId={props.modeId} />}
+        </div>
 
         {props.phase === 'countdown' && (
           <div key={String(props.detail)} className="fel-count text-8xl font-black text-white">
