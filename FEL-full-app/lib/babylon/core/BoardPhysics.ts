@@ -23,8 +23,8 @@
 // responsive, provable terrain response — raycast + this model.
 
 import { Vector3, Ray } from '@babylonjs/core';
-import type { AbstractMesh, Scene, TransformNode } from '@babylonjs/core';
-import { rideFilter } from './rideFilter';
+import type { AbstractMesh, PickingInfo, Scene, TransformNode } from '@babylonjs/core';
+import { rideFilter, groundYUnder } from './rideFilter';
 
 // ── Slope response ─────────────────────────────────────────────────────────
 export interface SlopeInfo {
@@ -43,14 +43,22 @@ export interface SlopeInfo {
 /** Sample the ground under the rider: normal + slope response for the
  *  current facing direction. Falls back to flat when no hit. */
 export function sampleSlope(
-  scene: Scene, pos: Vector3, facingYaw: number, ground: AbstractMesh[],
+  scene: Scene, pos: Vector3, facingYaw: number, ground: AbstractMesh[], reuse?: PickingInfo | null,
 ): SlopeInfo {
-  const up = pos.add(new Vector3(0, 1.2, 0));
-  const ray = new Ray(up, new Vector3(0, -1, 0), 12);
-  const hit = scene.pickWithRay(ray, rideFilter(ground));   // IMPROVE (2026-10-06): a Set, not an O(n) includes per scene mesh
-  // face-normal selection: the top face of a ramp, not a side face
-  let normal = hit?.getNormal(true, true) ?? null;
-  if (normal && normal.y < 0) normal = normal.negate();
+  // IMPROVE (2026-10-06, snow item 16): a ground hit the caller already has (the Rider's own ray, this frame or the last) answers
+  // for this ray when it is the surface this ray would find (rideFilter.groundYUnder); otherwise the ray is cast, as before.
+  const same = reuse ? groundYUnder(reuse, pos.x, pos.y, pos.z, 1.2, 12) : null;
+  let hit: PickingInfo | null = null;
+  let normal: Vector3 | null;
+  if (same) normal = new Vector3(same.normal.x, same.normal.y, same.normal.z);
+  else {
+    const up = pos.add(new Vector3(0, 1.2, 0));
+    const ray = new Ray(up, new Vector3(0, -1, 0), 12);
+    hit = scene.pickWithRay(ray, rideFilter(ground));   // IMPROVE (2026-10-06): a Set, not an O(n) includes per scene mesh
+    // face-normal selection: the top face of a ramp, not a side face
+    normal = hit?.getNormal(true, true) ?? null;
+    if (normal && normal.y < 0) normal = normal.negate();
+  }
   if (!normal) normal = Vector3.Up();
   const n = normal.normalize();
   const steep = 1 - Math.max(-1, Math.min(1, Vector3.Dot(n, Vector3.Up())));
@@ -61,7 +69,7 @@ export function sampleSlope(
   return {
     normal: n, gravityAlongSlope: Vector3.Dot(alongPlane, fwd), steepness01: steep,
     fallYaw: Math.atan2(alongPlane.x, alongPlane.z), fallAccel: Math.hypot(alongPlane.x, alongPlane.z),
-    groundGap: hit?.hit ? Math.max(0, hit.distance - 1.2) : Infinity,
+    groundGap: same ? Math.max(0, pos.y - same.y) : hit?.hit ? Math.max(0, hit.distance - 1.2) : Infinity,
   };
 }
 

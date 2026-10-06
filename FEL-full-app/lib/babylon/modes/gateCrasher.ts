@@ -22,6 +22,9 @@
 import { trickSeconds } from '../core/TrickPose';
 import { SNOW_TRICKS, type BoardTrick } from '../core/BoardTricks';
 
+/** The height of the piste plane at `z` (every piste surface is built through the origin at the run's pitch: y = −tan(pitch)·z). */
+export function pisteY(z: number, pitch: number): number { return -Math.tan(pitch) * z; }
+
 /** The poles stand this far either side of a gate's centre. The world draws them HERE and the verdict reads this. */
 export const GATE_HALF_WIDTH = 1.9;
 /** A body whose centre crosses within this of a pole's line brushes it: the pole whips (the verdict is the centre's). */

@@ -30,7 +30,8 @@ import { angulate } from '../core/DynamicPosture';   // a rider ANGULATES: the b
 import { buildSlopeRun, SLOPE_PITCH, SLALOM_START, SLALOM_GATES, SLALOM_SPACING, type RideWorld } from './rideWorlds';
 import { readBoardVenue, tuneForVenue, rideOf as mountainRideOf } from '../nexus/boardVenues';   // three mountains, not three tints of one
 import { Mob, MobPool, STEERING_PRESETS } from '../core/MobSteering';
-import { CharacterLibrary } from '../core/CharacterLibrary';
+import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
+import { groundYUnder, rideFilter } from '../core/rideFilter';   // IMPROVE (2026-10-06, item 16): the Rider's ground hit, reused
 import { neverBindPose } from '../anim/importSanitizer';
 import { installSafePlay, SPORT_CLIP } from '../anim/clipRegistry';
 import { BoardAnimTree } from '../anim/boardTree';
@@ -53,7 +54,7 @@ import {
   type RideSolid,
 } from './gateCrasher';   // GATE-CRASHER-MAJOR: the slalom's rules and the mountain's solids, pure and tested
 import {
-  snowBank, rockOutcome, ROCK_STUMBLE_KEEP, airLeftSec, shortenToAir, timeBonus, TIME_PAR_SEC, stallAction, STALL_SPEED, STALL_NUDGE_SEC, STALL_END_SEC,
+  snowBank, rockOutcome, ROCK_STUMBLE_KEEP, pisteY, airLeftSec, shortenToAir, timeBonus, TIME_PAR_SEC, stallAction, STALL_SPEED, STALL_NUDGE_SEC, STALL_END_SEC,
 } from './gateCrasher';   // GATE-CRASHER-POLISH-2: the carve, the rocks, the air left, the time curve, the stall
 // MOVEMENT PLAY P8 (2026-09-26): the body's grab and spin in the air, the body coyote off a kicker, and the rail inferred for
 // a body rider (a second hop in the air is not a natural body move, so the magnet catches the line skate's way)
@@ -146,6 +147,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
   let posture: { layer: PostureLayer; dispose(): void } | null = null;
   let trickLayer: BoardTrickLayer | null = null;
   const bio: BoardPostureInput = { ...BOARD_INPUT_IDLE };
+  const aimAt = new Vector3();
   let bailBeatT = 0, landBeatT = 0, airT = 0;
   let lastLanding: 'clean' | 'sketchy' = 'clean';   // phase 6: which landing beat the tree plays
   // GATE-CRASHER-MAJOR (2026-09-28): the wipeout (a fall the body shows), the snow's answer to the board, the crossing the gate
@@ -170,14 +172,22 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
   let ringHidden = false;                              // GC-7 / GC-13: the harness ring and its pad glyph
   let xRefused = false;                                // GC-2: an X the air could not hold — its release ends nothing
   let lastTrickNote = '';                              // GC-2: the last press the air shortened or refused (the probe reads it)
-  const DOWN = new Vector3(0, -1, 0);
   /** GC-2: seconds of air the rider has left — the snow under him by a ray against the ground he rides, the pitched piste
-   *  falling away under a board moving down it. 0 on the snow. */
+   *  falling away under a board moving down it. 0 on the snow. IMPROVE (2026-10-06, item 16): the Rider's own ground hit
+   *  answers when it is the snow this ray would find (it is read every airborne frame now, for the meter — item 9); the ray
+   *  is cast otherwise, and it is one reused Ray. */
+  const airRay = new Ray(new Vector3(), new Vector3(0, -1, 0), 90);
   function airLeftNow(ctx: ModeContext): number {
     if (rig.rider.grounded) return 0;
     const p = rig.char.root.position;
-    const hit = ctx.scene.pickWithRay(new Ray(new Vector3(p.x, p.y + 0.3, p.z), DOWN, 90), (m) => world.ground.includes(m));
-    const h = hit?.hit && hit.pickedPoint ? p.y - hit.pickedPoint.y : 0;
+    const same = groundYUnder(rig.rider.lastHit, p.x, p.y, p.z, 0.3, 90);
+    let h = 0;
+    if (same) h = p.y - same.y;
+    else {
+      airRay.origin.set(p.x, p.y + 0.3, p.z);
+      const hit = ctx.scene.pickWithRay(airRay, rideFilter(world.ground));
+      h = hit?.hit && hit.pickedPoint ? p.y - hit.pickedPoint.y : 0;
+    }
     return airLeftSec(h, rig.rider.vel.y, Math.tan(pitch) * Math.max(0, rig.rider.vel.z));
   }
   /** GC-2: the trick a press may throw with the air that is left — the one asked for, the biggest shorter spin, or none
@@ -253,18 +263,45 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
   let boostPads: BoostPads | null = null;
   let boostHeld = false;
 
+  // IMPROVE (2026-10-06, item 14): THE YETI IS LOADED WITH THE MOUNTAIN. It was `await CharacterLibrary.spawn(...)` the moment
+  // gate 5 cleared — a model instance, a tinted material clone and its shader compile at the run's peak speed. It is spawned
+  // at load now (not awaited: the hero's asset is already in the library), its materials compiled, parked high over the
+  // mountain and disabled; the chase enables it. `yetiGen` drops a spawn that resolves after its mount is gone.
+  let yetiChar: SpawnedCharacter | null = null;
+  let yetiLoading: Promise<SpawnedCharacter | null> | null = null;
+  let yetiGen = 0;
+  /** The spawn's own ground snap, kept: root height over the feet (CharacterLibrary lifts the root so the feet touch `position.y`). */
+  let yetiFootOffset = 0;
+  /** Where the hidden yeti waits: above the mountain (its contact disc follows a floor DOWN at once, and up only slowly). */
+  const YETI_PARK = new Vector3(0, 300, -200);
+  function preloadYeti(ctx: ModeContext): void {
+    yetiChar?.dispose(); yetiChar = null;
+    const gen = ++yetiGen;
+    yetiLoading = CharacterLibrary.spawn(ctx.scene, CFG.heroUrl, {
+      position: YETI_PARK.clone(), scale: 1.4, tint: '#dfe9f2', startClip: SPORT_CLIP.idle,
+    }).then((char) => {
+      if (gen !== yetiGen) { char.dispose(); return null; }
+      neverBindPose(char.animator, SPORT_CLIP.idle);
+      installSafePlay(char.animator, 'snowboard-yeti');
+      for (const m of char.meshes) void m.material?.forceCompilationAsync(m).catch(() => undefined);   // the compile, now
+      yetiFootOffset = char.root.position.y - YETI_PARK.y;
+      char.root.setEnabled(false);
+      yetiChar = char;
+      return char;
+    }).catch((e) => { console.warn('[SNOW-YETI] preload failed', e); return null; });
+  }
+
   async function spawnYeti(ctx: ModeContext): Promise<void> {
     if (yetiDone || yeti) return;
     yetiDone = true;                       // one appearance per run, no matter what
     console.info('[SNOW-YETI] spawn');
+    const gen = yetiGen;
+    const char = yetiChar ?? await yetiLoading;
+    if (!char || gen !== yetiGen || ended) return;
+    yetiChar = null;
     const p = rig.char.root.position;
-    const char = await CharacterLibrary.spawn(ctx.scene, CFG.heroUrl, {
-      position: new Vector3(p.x + 12, p.y, p.z + 6),
-      scale: 1.4, tint: '#dfe9f2', startClip: SPORT_CLIP.idle,
-    });
-    neverBindPose(char.animator, SPORT_CLIP.idle);
-    installSafePlay(char.animator, 'snowboard-yeti');
-    ctx.groundLock?.track(char.root, char.skeleton);
+    char.root.position.set(p.x + 12, pisteY(p.z + 6, pitch) + yetiFootOffset, p.z + 6);   // ON the snow 6 m down (item 7)
+    char.root.setEnabled(true);
     yeti = new Mob(char, STEERING_PRESETS.rusher);
     yeti.startPursuit();
     yetiPool = new MobPool();
@@ -276,23 +313,25 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
     setTimeout(() => ctx.setHud({ banner: '' }), 1100);
   }
 
-  function despawnYeti(ctx: ModeContext): void {
+  /** IMPROVE (2026-10-06, item 15): a yeti going down into the snow — sunk on the mode's own clock (update) and disposed there or
+   *  on dispose. It was a render-loop observer plus a 2.5 s setTimeout, either of which could outlive the mode. */
+  const sinking: { char: SpawnedCharacter; startY: number; t: number }[] = [];
+  const YETI_SINK_MPS = 1.8, YETI_SINK_M = 3, YETI_SINK_MAX_SEC = 2.5;
+  function despawnYeti(_ctx: ModeContext): void {
     if (!yeti) return;
     const gone = yeti;
     yeti = null; yetiPool = null;
     gone.down();
-    ctx.groundLock?.release(gone.char.root);
     spray?.burst(gone.char.root.position.add(new Vector3(0, 0.6, 0)), 0.8);   // powder, not dirt (GATE-CRASHER-MAJOR)
-    const root = gone.char.root;
-    const startY = root.position.y;
-    const sink = ctx.scene.onBeforeRenderObservable.add(() => {
-      root.position.y -= 0.03;
-      if (root.position.y < startY - 3) {
-        ctx.scene.onBeforeRenderObservable.remove(sink);
-        gone.char.dispose();
-      }
-    });
-    setTimeout(() => { try { gone.char.dispose(); } catch { /* already gone */ } }, 2500);
+    sinking.push({ char: gone.char, startY: gone.char.root.position.y, t: 0 });
+  }
+  function stepSinking(dt: number): void {
+    for (let i = sinking.length - 1; i >= 0; i--) {
+      const s = sinking[i];
+      s.t += dt;
+      s.char.root.position.y -= YETI_SINK_MPS * dt;
+      if (s.char.root.position.y < s.startY - YETI_SINK_M || s.t >= YETI_SINK_MAX_SEC) { s.char.dispose(); sinking.splice(i, 1); }
+    }
   }
 
   /** MOVEMENT PLAY P8: the credit a caught rail pays — the button path's, shared with the body magnet. */
@@ -447,6 +486,8 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
         // ("descends at 12–16 m/s straight"). The momentum model owns the ceiling; the Rider's cap only has to clear it.
         maxSpeed: snowTune.maxSpeed * 1.4,
       });
+      move.groundHit = () => rig.rider.lastHit;   // IMPROVE (2026-10-06, item 16): the slope sample reuses the Rider's ray
+      preloadYeti(ctx);                            // IMPROVE (item 14): the yeti is loaded now, hidden — not mid-run at full speed
       tricks = new TrickMachine(rig, (h) => ctx.setHud(h), {
         momentum: trickMomentum, anim: 'external',
         // HOTFIX (2026-09-24): X in the air is a grab now, and X's release ends it — so a keyboard tap under 0.1 s graded
@@ -475,7 +516,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
         const angled = angulate(pose, rig.char.root.rotation.z, window);
         // the objective on a board sport is where the board is TAKING you — 7 m down the heading at head height
         const la = lookAhead(rig.char.root.position, rig.char.root.rotation.y, 7, 1.5);
-        const at = new Vector3(la.x, la.y, la.z);
+        const at = aimAt.set(la.x, la.y, la.z);   // IMPROVE (2026-10-06, item 20): one aim vector, written each frame
         return { pose: angled, legs, aim: at, eyes: at, window };
       }, 'SNOW-PP');
       trickLayer?.dispose();
@@ -767,11 +808,17 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
 
       // ROCKS are solids now (the contact above): a rock you do not jump is a stumble and a body that goes round it.
 
+      stepSinking(dt);   // IMPROVE (item 15)
       // THE YETI — spawn after gate N, chase for a bounded window
       if (!yetiDone && gatesHit >= YETI_SPAWN_GATE) void spawnYeti(ctx);
       if (yeti && yetiPool) {
         yetiSec += dt;
         const contacts = yetiPool.update(dt, rig.char.root.position, rig.rider.vel);
+        // IMPROVE (2026-10-06, item 7): THE YETI RUNS ON THE SNOW. GroundLock held it at y ≥ 0 — the flat-park floor — and at gate
+        // 5 the piste is ~26 m below that, so it was lifted into the sky the frame it spawned; and the steering moves it in x / z
+        // only, so a chase down a pitched run left it ever higher over the snow. It is not tracked now, and it stands on the
+        // piste plane (y = −tan(pitch)·z, the plane every piste surface is built on) at its own x / z each frame.
+        if (yeti) yeti.char.root.position.y = pisteY(yeti.char.root.position.z, pitch) + yetiFootOffset;
         for (const mob of contacts) {
           if (!rig.rider.grounded || rig.rider.grinding) {
             tricks.score += YETI_CLEAR_PTS;
@@ -921,7 +968,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
         grounded: rig.rider.grounded && !rig.rider.grinding,
       }, dt);
       world.gates?.update(dt);
-      shadow?.update(rig.char.root.position);   // POLISH-2 (GC-6): on the snow under him, soft and faint with height
+      shadow?.update(rig.char.root.position, true, rig.rider.lastHit);   // POLISH-2 (GC-6): on the snow under him, soft and faint with height (item 16: the Rider's ray)
       // POLISH-2 (GC-13): the HUD's words follow who is playing — a body the camera sees, or a pad / keys / touch
       {
         const bodyNow = !!(ctx.body?.() ?? null);
@@ -980,6 +1027,8 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
       boostFx?.dispose(); boostFx = null; boostPads?.dispose(); boostPads = null;
       posture?.dispose(); posture = null;
       yeti?.char.dispose(); yeti = null; yetiPool = null;
+      yetiGen++; yetiChar?.dispose(); yetiChar = null; yetiLoading = null;   // IMPROVE (item 14): the hidden yeti, or one still loading
+      for (const s of sinking.splice(0)) s.char.dispose();                  // IMPROVE (item 15): nothing sinks past the mode
       crowd?.dispose();
       propsGone = true; props?.dispose(); props = null;
       rig?.dispose(); world?.dispose(); SoundKit.stopAmbient();

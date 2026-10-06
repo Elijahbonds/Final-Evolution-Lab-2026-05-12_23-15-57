@@ -3,7 +3,7 @@
 // cable). Kinematic and cheap.
 
 import { Ray, Vector3 } from '@babylonjs/core';
-import type { AbstractMesh, Scene, TransformNode } from '@babylonjs/core';
+import type { AbstractMesh, PickingInfo, Scene, TransformNode } from '@babylonjs/core';
 import { rideFilter } from './rideFilter';
 
 export interface GrindLine {
@@ -72,6 +72,9 @@ export class Rider {
   private missedRaycasts = 0;
   /** SKATE-MAJOR: the solid the wheels met this frame (see RiderCfgOverrides.stepUp), cleared every update. */
   public solidHit: SolidHit | null = null;
+  /** IMPROVE (2026-10-06, snow item 16): what this frame's ground ray found (null on a miss and on a rail). The snow mode's
+   *  slope sample, air-left read and shadow reuse it (rideFilter.groundYUnder) instead of casting three rays of their own. */
+  public lastHit: PickingInfo | null = null;
 
   /** The last ground height the ray found (null until the first hit): the ray's second origin and the clamp's target. */
   private lastGroundY: number | null = null;
@@ -109,7 +112,7 @@ export class Rider {
   /** steer: -1..1 · pump: 0..1 (R2) · dt seconds */
   update(dt: number, steer: number, pump: number): void {
     this.solidHit = null;
-    if (this.grinding) { this.updateGrind(dt); return; }
+    if (this.grinding) { this.lastHit = null; this.updateGrind(dt); return; }
     const wasGrounded = this.grounded;
     const prevX = this.root.position.x, prevY = this.root.position.y, prevZ = this.root.position.z;
 
@@ -147,6 +150,7 @@ export class Rider {
     ray.direction.copyFrom(this.down);
     ray.length = this.cfg.rayLength + Math.max(0, rayFromY - this.root.position.y - 1.5);
     const hit = this.scene.pickWithRay(ray, rideFilter(this.groundMeshes));
+    this.lastHit = hit?.hit && hit.pickedPoint ? hit : null;
     if (hit?.hit && hit.pickedPoint) {
       this.missedRaycasts = 0;
       const groundY = hit.pickedPoint.y;
