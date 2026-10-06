@@ -106,7 +106,8 @@ import {
 } from '../core/JudgePanel';
 import { MomentumBus } from '../core/MomentumBus';
 import { rivalNerve, rivalExecution } from '../core/RivalNerve';   // the rival feels the contest too
-import { rivalTricksFor, rivalSlamOffset } from '../core/RivalPlay';
+import { rivalTricksFor, rivalSlamOffset, rivalPressAt, rivalHitsBeats } from '../core/RivalPlay';
+import { beatsCrossed, gradeTrickPress, flightFlow, encodeBeatStrip, BEAT_ORDER, BEAT_TOL_SEC, BEAT_TICK_PITCH, BEAT_TICK_VOLUME, type BeatGrade, type BeatMark, type SlamZone } from '../core/DunkBeats';   // dunk-next phase 1: the flight is a four-beat bar
 import { TRIPLE_CUT, POSTER_SEC, tripleCutSec, announcerCall, CELEBRATIONS, CELEB_BY_DPAD, seedOf, type CelebId } from '../core/DunkCuts';   // DUNK MOTION phase 12: the made dunk's show
 import {
   DUNK_LAND_ABSORB_CLIP, CELEB_BLEND_SEC, pickLiveCelebration, holdEndMs, celebStartMs, clipFor, type RotCelebId,
@@ -796,6 +797,20 @@ export const DunkMode: ModeDefinition = (() => {
   // queue: every trick has a named beat now, not just "the rise"); the 360's turn is a yaw LAYER on the hips the mode drives
   // from the cue (DunkSpin) — never authored into a clip, so no crossfade can leave it half-turned at the slam
   let armedAir: DunkTrick | null = null;
+  // dunk-next phase 1 — THE FOUR-BEAT BAR (core/DunkBeats): RISE · HANG · PRE · SLAM, heard as a rising tick and drawn as the beat strip.
+  // This flight's last beat crossed, its tricks as the strip shows them (the beat each went off on and how it was thrown), the grade an
+  // ARMED trick was pressed with (it fires on its beat later), how the slam landed, and the strip last sent (the HUD hears changes only).
+  let beatAt = -1, beatMarks: BeatMark[] = [], armedGrade: BeatGrade | null = null, beatSlam: SlamZone | null = null, beatStripSent = '';
+  /** On the beat is BEAT_TOL_SEC either side, widened by the TV factor exactly as the slam window is (a mirrored picture is late). */
+  const beatTol = (): number => BEAT_TOL_SEC * tvFactor;
+  function pushBeats(ctx: ModeContext): void {
+    const s = encodeBeatStrip({ at: beatAt, marks: beatMarks, slam: beatSlam, perfect: flightFlow(beatMarks, beatSlam).perfect });
+    if (s !== beatStripSent) { beatStripSent = s; ctx.setHud({ beats: s }); }
+  }
+  function clearBeats(ctx: ModeContext): void {
+    beatAt = -1; beatMarks = []; armedGrade = null; beatSlam = null;
+    if (beatStripSent !== '') { beatStripSent = ''; ctx.setHud({ beats: '' }); }
+  }
   const spin = new DunkSpin();
   let spinPeak = 0, spinStepMax = 0;
   let hipsNode: TransformNode | null = null, hipsBf: BindFrame | null = null;
@@ -1830,6 +1845,12 @@ export const DunkMode: ModeDefinition = (() => {
           bodySlamClip = null;
           def.onInput(ctx, { t: 'button', btn: 'A', pressed: true, src: 'body' });
         }
+        // dunk-next phase 1: THE BAR COUNTS IN — a soft rising tick on each beat (the slam's own NOW! below is the fourth), the strip's pip lit
+        for (const b of beatsCrossed(prevClip, clipTime)) {
+          beatAt = BEAT_ORDER.indexOf(b);
+          if (b !== 'slam') SoundKit.play('uiTick', { pitch: BEAT_TICK_PITCH[b], volume: BEAT_TICK_VOLUME });
+          pushBeats(ctx);
+        }
         if (!hangSlowMoLatch && prevClip < EASTBAY_TIMING.rise && clipTime >= EASTBAY_TIMING.rise) {
           hangSlowMoLatch = true;
           ctx.juice.slowMo(0.4, 400, { gameplay: true });   // HOTFIX (2026-09-24): the flight clock above rides this — reduced motion keeps it whole, so the slam window never moves
@@ -2536,6 +2557,7 @@ export const DunkMode: ModeDefinition = (() => {
     // AND NOW THE PLAYER IS TOLD. This exact information went to console.info and nowhere else, which is the
     // single loudest complaint in the review: three attempts out of six scored nothing and explained nothing.
     slamTiming = slamReadout(at, center, qteAccuracy, half);
+    beatSlam = slamTiming.zone; pushBeats(ctx);   // dunk-next: the fourth beat, on the strip
     if (early > 0) console.info(`[DUNK-SLAM] buffered press @${at.toFixed(2)} fired at the window (${(early * 1000).toFixed(0)} ms early, execution ${qteAccuracy.toFixed(2)})`);
     // every accepted press, on the record (CLOTHING-SOFT-RESIDUAL R2): the probe names its frames by THIS, not by hope
     console.info(`[DUNK-SLAM] press @${at.toFixed(2)} · window ${openAt.toFixed(2)}–${(center + half).toFixed(2)} centre ${center.toFixed(2)} · ${slamTiming.zone} ${Math.round((at - center) * 1000)} ms · execution ${qteAccuracy.toFixed(2)} · ${qteHit ? 'CLEAN' : 'IRON'}`);
@@ -2587,12 +2609,12 @@ export const DunkMode: ModeDefinition = (() => {
     // DUNK MOTION phase 10b — THE 720: the 360 thrown AGAIN — twice before the rise, or once more while the first turn is still going
     if (trick.id === 'spin360' && !isA) {
       if (armedAir?.id === 'spin360') {
-        armedAir = SPIN_720; console.info(`[DUNK-CUE] armed 720 @${clipTime.toFixed(2)} → fires @${cueFireAt(SPIN_720).toFixed(2)}`);
+        armedAir = SPIN_720; armedGrade = gradeTrickPress(SPIN_720, clipTime, beatTol()); console.info(`[DUNK-CUE] armed 720 @${clipTime.toFixed(2)} → fires @${cueFireAt(SPIN_720).toFixed(2)}`);
         flash(ctx, `720 ARMED · ${CUE_BEAT_LABEL[cueOf(SPIN_720).fire]}`, 600); SoundKit.play('uiTick', { pitch: 1.6, volume: 0.3 });
         return;
       }
       if (airTrick?.trick.id === 'spin360' && spin.active) {
-        if (spinProgress(spin.record, clipTime) <= SPIN_720_UPGRADE_BY && clipTime <= cueLastAt(SPIN_720)) { upgradeTo720(ctx); return; }
+        if (spinProgress(spin.record, clipTime) <= SPIN_720_UPGRADE_BY && clipTime <= cueLastAt(SPIN_720)) { upgradeTo720(ctx, gradeTrickPress(SPIN_720, clipTime, beatTol())); return; }
         refuse(ctx, 'TOO LATE FOR THE 720 — THROW THE 360 AGAIN EARLIER IN THE TURN');
         return;
       }
@@ -2605,7 +2627,8 @@ export const DunkMode: ModeDefinition = (() => {
       if (armedAir) return;   // one cue armed at a time — the first press is the one that fires
       if (takeoffEcho || e.t !== 'button' || !e.pressed) return;   // HOOPS-TO-75: only a deliberate press arms a trick — not the take-off echo or a held stick
       armedAir = trick;
-      console.info(`[DUNK-CUE] armed ${trick.id} @${clipTime.toFixed(2)} → fires @${cueFireAt(trick).toFixed(2)} (${cue.fire})`);
+      armedGrade = gradeTrickPress(trick, clipTime, beatTol());   // dunk-next: a press just in front of its beat is ON it (it fires there)
+      console.info(`[DUNK-CUE] armed ${trick.id} @${clipTime.toFixed(2)} → fires @${cueFireAt(trick).toFixed(2)} (${cue.fire}) · ${armedGrade.grade}`);
       flash(ctx, `${trick.label} ARMED · ${CUE_BEAT_LABEL[cue.fire]}`, 600);
       SoundKit.play('uiTick', { pitch: 1.4, volume: 0.3 });
       return;
@@ -2616,11 +2639,12 @@ export const DunkMode: ModeDefinition = (() => {
       refuse(ctx, `TOO LATE FOR THE ${trick.label} — ARM IT BY ${CUE_BEAT_LABEL[cue.last]}`);
       return;
     }
-    fireTrick(ctx, trick, 'window');
+    fireTrick(ctx, trick, 'window', gradeTrickPress(trick, clipTime, beatTol()));
   }
   /** The named trick fires: the air budget pays for it (or says why not), its body plays, a spinThrough trick starts the
    *  turn that resolves rim-facing by SPIN_RESOLVE_T whatever flight is left (momentum-led: later = quicker). */
-  function fireTrick(ctx: ModeContext, trick: DunkTrick, how: 'window' | 'armed'): void {
+  function fireTrick(ctx: ModeContext, trick: DunkTrick, how: 'window' | 'armed', grade: BeatGrade | null = null): void {
+    const g = how === 'armed' ? armedGrade : grade; if (how === 'armed') armedGrade = null;   // dunk-next: how it was thrown (none = held for a grab: neutral)
     const got = flight.take(trick);
     if (!got) {
       // the run-up didn't buy the air that trick needs (or two are already in the air) — SAY so, or it reads as a dropped input
@@ -2632,11 +2656,15 @@ export const DunkMode: ModeDefinition = (() => {
       return;
     }
     trickLabels.push(trick.label);
+    // dunk-next phase 1: the trick goes on the strip under the beat it went off on, graded — ON THE BEAT pays execution at the card
+    const onBeat = g?.grade === 'onbeat';
+    beatMarks = [...beatMarks, { beat: g?.beat ?? cueOf(trick).fire, label: trick.label, grade: g?.grade ?? 'early' }]; pushBeats(ctx);
+    if (onBeat) { SoundKit.play('uiTick', { pitch: 2.1, volume: 0.3 }); hype = Math.min(100, hype + 2); }
     flight.recognizer.spend();            // DUNK-BODY-MID: one direction, one trick — the next A under this same hold is the SLAM
     const rate = trickRate(trick);
     airTrick = { trick, t0: clipTime, rate };   // the trick's own clock (its hand-offs are keyed to it)
     liveTricks.push({ clip: trick.clip, t0: clipTime, speed: rate });
-    console.info(`[DUNK-TRICK] air ${trick.id} @${clipTime.toFixed(2)} (${how}, cue ${cueOf(trick).fire}→${cueOf(trick).last})`);
+    console.info(`[DUNK-TRICK] air ${trick.id} @${clipTime.toFixed(2)} (${how}, cue ${cueOf(trick).fire}→${cueOf(trick).last}) · ${g?.grade ?? 'held'}${g ? ` ${Math.round(g.offsetSec * 1000)} ms off the ${g.beat}` : ''}`);
     const cue = cueOf(trick);
     if (cue.facing === 'spinThrough' && cue.turns) {
       spin.start(cue.turns * HX, clipTime, SPIN_RESOLVE_T); liveSpin = spin.record;   // phase 8: the mirror image turns the other way
@@ -2648,14 +2676,17 @@ export const DunkMode: ModeDefinition = (() => {
     SoundKit.play('crowdCheer', { volume: 0.3 + trick.difficulty * 0.05 });
     mic?.crowd('crowd.ooh', trickLabels.length > 1 ? 2 : 1);   // the stands gasp at the trick (the booth holds)
     EffectsKit.burst(ctx.scene, player.root.position.add(new Vector3(0, 1.8, 0)), 'sparks');
-    flash(ctx, trickLabels.length > 1 ? `COMBO: ${trickLabels.join(' → ')}!` : `${trick.label}!`, 700);
+    flash(ctx, (trickLabels.length > 1 ? `COMBO: ${trickLabels.join(' → ')}!` : `${trick.label}!`) + (onBeat ? ' · ON THE BEAT' : ''), 700);
     ctx.camDirector.pulse(trickLabels.length > 1 ? 0.7 : 0.45, 0.5);
   }
   /** DUNK MOTION phase 10b: the 360 carries on into a second turn — the same slot in the flight, the turn extended from where the body
    *  is and as fast as it is going (DunkSpin.extend), the body tucked tighter for the second revolution. */
-  function upgradeTo720(ctx: ModeContext): void {
+  function upgradeTo720(ctx: ModeContext, g: BeatGrade | null = null): void {
     if (!flight.upgrade('spin360', SPIN_720)) return;
     const i = trickLabels.lastIndexOf('360'); if (i >= 0) trickLabels[i] = SPIN_720.label;
+    // dunk-next: the strip's 360 becomes the 720, graded by the press that threw it again (the second turn is the one that counts)
+    const m = beatMarks.map((x) => x.label).lastIndexOf('360');
+    if (m >= 0) { beatMarks = beatMarks.map((x, k) => (k === m ? { beat: g?.beat ?? x.beat, label: SPIN_720.label, grade: g?.grade ?? x.grade } : x)); pushBeats(ctx); }
     spin.extend(HX, clipTime, SPIN_RESOLVE_T); liveSpin = spin.record;
     const rate = trickRate(SPIN_720);
     airTrick = { trick: SPIN_720, t0: clipTime, rate };
@@ -2762,6 +2793,7 @@ export const DunkMode: ModeDefinition = (() => {
     launchTag = prof.label; launchCarry = prof.carryMult; launchFoot = approach.takeoff;
     flight.launch(Math.min(1, charge * 0.5 + launchSpeed01 * 0.5), STYLE_TIER[style], approach.difficulty + prof.difficulty);
     armedAir = null; spin.reset(); liveTricks = []; liveSpin = { turns: 0, from: 0, until: 0 };
+    beatAt = -1; beatMarks = []; armedGrade = null; beatSlam = null; pushBeats(ctx);   // dunk-next: a fresh bar, the strip up before the rise
     if (heldDpad) flight.recognizer.feed({ t: 'dpad', dir: heldDpad, pressed: true });   // a direction held through the takeoff is still held
     if (launchSpeed01 < 0.3 && charge > 0.4) flash(ctx, 'WALK-UP — short air', 900);
     else if (approach.difficulty > 0 || vectorLive()) flash(ctx, `${vectorLive() ? (vectorWallRun ? `OFF THE ${ride.short} RUN · ` : 'OFF THE REBOUND · ') : ''}${approach.label}${approach.angleDeg >= 10 ? ` · ${approach.angleDeg}°` : ''}`, 900);
@@ -2812,6 +2844,7 @@ export const DunkMode: ModeDefinition = (() => {
     if (phase === 'resolve') return;
     setPhase('resolve');
     sinceRelease = 0;
+    if (!beatSlam) { beatSlam = 'miss'; pushBeats(ctx); }   // dunk-next: the flight ended without a slam on the strip
     qteWindowOpen = false;
     // DUNK-CAR-CLIP R2: the flush is filmed from the flight's cut. This used to snapTo the behind-the-back follow on the resolve —
     // one frame before the CONTACT — while the director stayed in 'fixed' and eased straight back to the cut over ~0.5 s: a whip
@@ -2831,7 +2864,7 @@ export const DunkMode: ModeDefinition = (() => {
     if (lob.live) { setTrail('off'); armSettle(); }   // the lost lob is already bouncing — no clank, the miss is the ball on the floor
     else if (!qteHit) { releaseBall(ball); ballSim.launch(releasePos, clankOffRim(ball, rim)); looseBall = true; missClank(ctx); setTrail('off'); armSettle(); }   // juice soft #2, #5; A+ P4
     else if (finishRelease < 0) { jamSec = 0; jamContact = false; jamPrevLive = false; punchPending = false; }   // DUNK-HANDS-RIM: a make keeps the ball IN THE PALM — the jam carries it to the iron and lets go there (the windmill's sweep starts its jam at the top)
-    armedAir = null;
+    armedAir = null; armedGrade = null;
     if (spin.active) console.info(`[DUNK-CUE] contact latch: turn still ${spin.yaw.toFixed(2)} rad at the resolve — settling`);
     if (!qteHit) dropToFloor = true;   // A+ P8 H5: a miss falls from the release height — feet-down is where the stumble lands
     // DUNK-SOFTS-NAMED: the miss reads the frame it happens — the lost lob, the prop, or the iron, under the dunk's name — and
@@ -4043,6 +4076,11 @@ export const DunkMode: ModeDefinition = (() => {
     // a nod on top of its parts for doing the whole thing.
     const signature = signatureFor(runwayIds, flight.attempt.tricks.map((t) => t.id));
     const trickDifficulty = flight.attempt.difficulty - STYLE_TIER[style];
+    // dunk-next phase 1: THE BEATS — tricks thrown on the beat lift execution; every trick on its beat and the slam on time is a PERFECT
+    // FLIGHT (style, and the building). A flight that only armed its tricks is the card it always was.
+    const flow = flightFlow(beatMarks, beatSlam);
+    if (flow.tricks) console.info(`[DUNK-BEATS] ${flow.label} · exec +${flow.beatExec.toFixed(1)} · style +${flow.flowStyle.toFixed(1)} (${beatMarks.map((m) => `${m.label}@${m.beat}:${m.grade}`).join(' ')} · slam ${beatSlam ?? '—'})`);
+    if (flow.perfect) verdictParts.push('PERFECT FLIGHT');
     // DUNK-CONTROL-JUICE: the runway tricks (a toss, a kick, a cartwheel, the hop) and a caught lob are judged on top; an
     // obstacle pays only CLEARED (a clip never reaches this path)
     // P3 (2026-09-16): the three numbers are computed in one pure place (core/DunkCard) and they mean what their names
@@ -4054,6 +4092,7 @@ export const DunkMode: ModeDefinition = (() => {
       charge, launchSpeed01, styleTier: STYLE_TIER[style], styleTaps,
       hype, hang: hangBonus > 0, repeat: isRepeat, execution01: qteAccuracy,
       chainTricks: Math.max(0, flight.attempt.tricks.length - 1),
+      beatExec: flow.beatExec, flowStyle: flow.flowStyle,
     });
 
     // THE BUILDING IS PART OF THE PANEL. Momentum reached the score only as hype into the NEXT attempt's
@@ -4067,7 +4106,7 @@ export const DunkMode: ModeDefinition = (() => {
     // takeoff, the runway beats, the caught toss), the AIR (the tricks, the taps, the hang), the PRECISION (the slam's timing)
     // and the room (HYPE, and whether the panel has seen this one) — so a card is a lesson, not a number
     const approachBits = [launchSpeed01 >= 0.8 ? 'FULL RUN' : launchSpeed01 >= 0.45 ? 'JOG' : 'WALK-UP', launchTag, ...runwayLabels, lob.caught ? lob.label : '', doubleLaunched && !boardTopFlip ? 'DOUBLE-LAUNCH' : ''].filter(Boolean);   // the sky tap, the board top and the board run are runway labels
-    const airBits = [...flight.attempt.tricks.map((t) => t.id.toUpperCase()), styleTaps > 0 ? `${styleTaps} STYLE TAP${styleTaps > 1 ? 'S' : ''}` : '', hangBonus > 0 ? 'HANG' : ''].filter(Boolean);
+    const airBits = [...flight.attempt.tricks.map((t) => t.id.toUpperCase()), flow.label, styleTaps > 0 ? `${styleTaps} STYLE TAP${styleTaps > 1 ? 'S' : ''}` : '', hangBonus > 0 ? 'HANG' : ''].filter(Boolean);
     const judgeWhy = `APPROACH ${approachBits.join(' · ')} │ AIR ${airBits.join(' · ') || 'straight up'} │ PRECISION ${Math.round(qteAccuracy * 100)}% │ HYPE ${Math.round(momentum.score01 * 100)}%${isRepeat ? ' · SEEN IT' : ''}`;
     lastJudgeWhy = judgeWhy; lastDifficulty = difficulty; lastExecution = execution; lastStyleScore = styleScore;
     // HOOPS-TO-75 HP-1: the timing line waits until the judge cards finish — one overlay at a time
@@ -4130,6 +4169,10 @@ export const DunkMode: ModeDefinition = (() => {
     // almost instantly, quietly wrecking the momentum curve. Per-judge average
     // is scale-free: this yields the same 36..60 it always did.
     if (!rivalsDunk) hype = Math.min(100, hype + perJudgeAvg(dunkTotal) * 6);
+    if (flow.perfect) {   // dunk-next: a perfect flight is the building's — whoever threw it
+      SoundKit.play('crowdCheer', { volume: 0.8, pitch: 1.1 }); mic?.crowd('crowd.erupt', 2);
+      if (!rivalsDunk) hype = Math.min(100, hype + 6);
+    }
 
     ctx.feel?.impact?.(0.2 + execution / 15);
     SoundKit.play('score', { pitch: 1 + Math.min(1, hype / 100) });
@@ -4204,7 +4247,8 @@ export const DunkMode: ModeDefinition = (() => {
    */
   function finishPractice(ctx: ModeContext, made: boolean): void {
     const read = slamTiming?.label ?? '';
-    flash(ctx, `PRACTICE · ${made ? 'MADE IT' : missWhy()}${read ? ` · ${read}` : ''}`, MISS_BEAT_MS);
+    const beats = flightFlow(beatMarks, beatSlam).label;   // dunk-next: the practice runway says how the beats went too
+    flash(ctx, `PRACTICE · ${made ? 'MADE IT' : missWhy()}${beats ? ` · ${beats}` : ''}${read ? ` · ${read}` : ''}`, MISS_BEAT_MS);
     ctx.setHud({ judgeReveal: null, hint: '', slamTiming: read });
     if (!made) { landingClip = DUNK_LAND_ABSORB_CLIP; landNow(); }
     console.info(`[DUNK-PRACTICE] ${made ? 'made' : 'missed'}${read ? ` · ${read}` : ''}`);
@@ -4262,7 +4306,7 @@ export const DunkMode: ModeDefinition = (() => {
     player.root.rotation.z = 0; airLean = 0; holdRunSpeed = 0; approachMove.stop();
     airHeld = false; dropToFloor = false; dropVy = 0; liveLandAt = -1; cancelLiveCeleb(); replaying = false; replayAir = false; player.root.rotationQuaternion = null;   // A+ P8
     cutting = false; celebPick = null; soundGapUntil = 0; celebFace = null; ctx.setHud({ cut: '', call: '', poster: null });   // DUNK MOTION phase 12
-    armedAir = null; spin.reset(); replaySpinYaw = 0;
+    armedAir = null; spin.reset(); replaySpinYaw = 0; clearBeats(ctx);   // dunk-next: the strip goes with the attempt
     playClip(SPORT_CLIP.idle, { loop: true });
     charge = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; rimCamCut = false; hangSlowMoLatch = false; contactLatch = false;
     dunkBody.reset(); bodySlamClip = null;
@@ -4325,7 +4369,7 @@ export const DunkMode: ModeDefinition = (() => {
   // (his signature dunk leads), how clean the slam is, and whether he blows it (he never finds the window).
   let turn: 'player' | 'rival' = 'player';
   let aiFeeding = false, rivalDunkNum = 0, playerProp: Prop = 'none';
-  interface RivalAttempt { tricks: DunkTrick[]; acc: number; early: boolean; blew: boolean }
+  interface RivalAttempt { tricks: DunkTrick[]; acc: number; early: boolean; blew: boolean; /** dunk-next: a clean attempt throws each trick on its beat */ onBeat: boolean }
   let rivalPlan: RivalAttempt | null = null;
   let rivalFed = { run: false, released: false, trickIdx: 0, slammed: false, slamUpAt: -1 };
   const playerCombos = new Set<string>(), rivalCombos = new Set<string>();   // the judges remember each dunker's own
@@ -4355,7 +4399,7 @@ export const DunkMode: ModeDefinition = (() => {
     const tricks = rivalTricksFor(reach, foe.signature);
     // (a clean one can land either side of the beat; one that leaks is LATE — the side the execution reads linearly, so the slam
     //  scores the execution he rolled, whatever tax his tricks put on the window)
-    rivalPlan = { tricks, acc, early: acc >= SLAM_EDGE_EXEC && Math.random() < 0.4, blew };
+    rivalPlan = { tricks, acc, early: acc >= SLAM_EDGE_EXEC && Math.random() < 0.4, blew, onBeat: rivalHitsBeats(acc, blew) };
     rivalFed = { run: false, released: false, trickIdx: 0, slammed: false, slamUpAt: -1 };
     if (nerve.label) console.info(`[DUNK-RIVAL] ${nerve.label} (deficit ${rivalTotal - playerTotal})`);
     console.info(`[DUNK-RIVAL] ${foe.name} goes for ${tricks.map((t) => t.label).join(' → ') || 'a plain one'}${blew ? ' — and never finds the window' : ` · slam at execution ${acc.toFixed(2)}`} (reach ${reach.toFixed(1)})`);
@@ -4381,7 +4425,10 @@ export const DunkMode: ModeDefinition = (() => {
     // the first trick is thrown straight off the floor (it waits for its cue); each next one once the last has fired
     const next = P.tricks[F.trickIdx];
     const prevFired = F.trickIdx === 0 || (airTrick?.trick.id === P.tricks[F.trickIdx - 1].id && clipTime >= airTrick.t0 + 0.12);
-    if (next && clipTime >= 0.06 && prevFired && !qteWindowOpen) {
+    // dunk-next phase 1: off the beat he presses the moment he can (0.06 off the floor, 0.12 after the last fired: the old pad); on a clean
+    // attempt he waits for the trick's next beat (RivalPlay.rivalPressAt)
+    const after = F.trickIdx === 0 ? 0.06 : (airTrick ? airTrick.t0 + 0.12 : Infinity);
+    if (next && prevFired && clipTime >= rivalPressAt(next, after, P.onBeat) && !qteWindowOpen) {
       F.trickIdx++;
       aiFeed(ctx, { t: 'dpad', dir: next.dir, pressed: true });
       aiFeed(ctx, { t: 'button', btn: next.btn, pressed: true }); aiFeed(ctx, { t: 'button', btn: next.btn, pressed: false });
@@ -4542,3 +4589,5 @@ export const DunkMode: ModeDefinition = (() => {
 // hype, charge, slamPulse, hint, banner, judgeReveal, chain) plus NEW:
 //   need: number — 0 normally; on final-round attempts, the judge total this
 //     dunk should hit to hold off the rival's pace (bezel: "NEED N" chip)
+//   beats: string — dunk-next phase 1: the flight's beat strip (RISE · HANG · PRE · SLAM, the tricks under the beats they went off on,
+//     how the slam landed, PERFECT FLIGHT), encoded by core/DunkBeats.encodeBeatStrip; '' clears it

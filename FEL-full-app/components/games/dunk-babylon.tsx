@@ -20,6 +20,7 @@ import { controllerConfigFor } from '@/lib/controller-link/schemas/registry';
 import { toInputBus } from '@/lib/controller-link/modeBridge';
 import { hnode, hnum } from './hud-format';
 import { DunkPoster } from './dunk-poster';
+import { DunkBeatStrip } from './dunk-beat-strip';
 import { MicCaption, MicToggle } from './mic-caption';
 import type { HudPoster } from '@/lib/babylon/core/ModeHarness';
 
@@ -324,6 +325,14 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
           <span className="fel-panel px-2.5 py-1 font-mono text-[10px] uppercase tracking-wide text-[var(--fel-cyan)]/80">
             {hud.walkOutNow}
           </span>
+        </div>
+      )}
+
+      {/* dunk-next phase 1 — THE BEAT STRIP: RISE · HANG · PRE · SLAM, the tricks under their beats, PERFECT FLIGHT. Above the hint, out of
+          the way of the rim; it stands aside for the triple cut and the judges. */}
+      {typeof hud.beats === 'string' && hud.beats && phase === 'playing' && !judging && !(typeof hud.cut === 'string' && hud.cut) && (
+        <div className="pointer-events-none absolute inset-x-0 flex justify-center px-3" style={{ bottom: 'calc(clamp(2.5rem, calc((640px - 100vw) * 999), 17.5rem) + 2.6rem)' }}>
+          <DunkBeatStrip value={hud.beats} />
         </div>
       )}
 
