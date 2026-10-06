@@ -6,6 +6,10 @@
 // TWO-TONE (phase 4c, 2026-10-06): a part with a second colour is its shape cut crisply along a split or a band
 // (twoTone.ts), the second colour riding in the same vertex colours: still one mesh per (bone, finish), no new material.
 //
+// BENDABLE (phase 4c): a cape strip, hair strand or tail segment with `swing` above 0 is skinned to a short bone chain of
+// its own that follows the body with a cheap fixed-step spring (swing.ts): one skeleton per body, one skinned mesh per
+// finish for all of them (the same part materials), rebuilt only when a bendable part changes.
+//
 // DRAW CALLS. Parts are merged: every part on the same bone with the same material is baked into ONE mesh parented to
 // that bone's node, so it rides the animation with no per-frame work and costs one draw. A part's COLOUR rides in the
 // mesh's vertex colours, so the material is the FINISH alone (matte, gloss, metal, glow): ten spikes in five colours on
@@ -24,13 +28,14 @@
 import { Color3, Mesh, PBRMaterial, VertexData } from '@babylonjs/core';
 import type { Scene, Skeleton, TransformNode } from '@babylonjs/core';
 import { boneNode } from '../../anim/boneLookup';
-import type { CreatorPart, Finish, PartBone } from '../../../creator/look/doc';
+import { isSwingShape, type CreatorPart, type Finish, type PartBone } from '../../../creator/look/doc';
 import { PART_BUDGET, renderList } from '../../../creator/look/parts';
-import { append, bake, emptyGeo, pack } from './geometry';
+import { append, bake, emptyGeo, pack, type Geo } from './geometry';
 import { nodeMatrix } from './placement';
 import { rigFrames } from './rigFrames';
-import { shapeGeo } from './shapes';
-import { tonedGeo, type ToneSpec } from './twoTone';
+import { shapeGeo, swingGeo } from './shapes';
+import { cutToned, tonedGeo, type ToneSpec } from './twoTone';
+import { buildSwingRig, disposeSwingRig, type SwingRig } from './swing';
 
 export interface PartsSummary {
   /** parts the doc asked for (entries) */
@@ -46,7 +51,7 @@ export interface PartsSummary {
 }
 
 interface Group { mesh: Mesh; sig: string; mat: Finish }
-interface BodyParts { groups: Map<string, Group>; mats: Map<Finish, PBRMaterial>; hooked: boolean }
+interface BodyParts { groups: Map<string, Group>; mats: Map<Finish, PBRMaterial>; hooked: boolean; swing: { sig: string; rig: SwingRig } | null }
 
 const bodies = new WeakMap<TransformNode, BodyParts>();
 const HEX = /^#[0-9A-F]{6}$/i;
@@ -77,9 +82,12 @@ export function toneSpec(p: Pick<CreatorPart, 'tone' | 'toneAxis' | 'toneAt' | '
   return { kind: p.tone ?? 'split', axis: p.toneAxis ?? 'y', at: p.toneAt ?? 0.5, width: p.toneWidth ?? 0.2 };
 }
 /** What of a part's two-tone changes its bake (empty for a one-colour part, so a phase 2 group's signature is unchanged). */
+/** A bendable part's own geometry cut for its two-tone (the cape strip's denser swing version is not the cached shape). */
+const tonedGeoOf = (g: Geo, p: CreatorPart) => (g === shapeGeo(p.shape) ? tonedGeo(p.shape, toneSpec(p)) : cutToned(g, toneSpec(p), p.shape));
 const toneSig = (p: CreatorPart): unknown[] => (p.colour2 ? [p.colour2, p.tone, p.toneAxis, p.toneAt, p.toneWidth] : []);
 
 function release(root: TransformNode, s: BodyParts): void {
+  if (s.swing) { disposeSwingRig(s.swing.rig); s.swing = null; }
   for (const g of s.groups.values()) g.mesh.dispose(false, false);
   for (const m of s.mats.values()) m.dispose(false, true);
   s.groups.clear(); s.mats.clear();
@@ -105,17 +113,20 @@ export function syncParts(spawn: { root: TransformNode; skeleton: Skeleton }, pa
   const list = [...renderList(worn, worn.length * 2), ...renderList(parts, PART_BUDGET)];
   let s = bodies.get(root);
   if (!list.length && !s) { stamp(root, summary); return summary; }
-  if (!s) { s = { groups: new Map(), mats: new Map(), hooked: false }; bodies.set(root, s); }
+  if (!s) { s = { groups: new Map(), mats: new Map(), hooked: false, swing: null }; bodies.set(root, s); }
   if (!s.hooked) { s.hooked = true; root.onDisposeObservable.addOnce(() => { const b = bodies.get(root); if (b) release(root, b); }); }
 
   const frames = list.length ? rigFrames(skeleton, root) : null;
   // group by (bone, material): the bake inputs are the group's signature
   const want = new Map<string, { bone: PartBone; mat: Finish; items: { part: CreatorPart; mirrored: boolean }[] }>();
+  // phase 4c: bendable parts (a swing shape with swing > 0) go to the body's swing rig instead (parts/swing.ts)
+  const swingList: { part: CreatorPart; mirrored: boolean }[] = [];
   for (const it of list) {
     const bone = it.mirrored ? null : it.part.bone;
     const placed = frames ? nodeMatrix(it.part, frames, it.mirrored) : null;
     const b = placed?.bone ?? bone;
     if (!placed || !b || !boneNode(skeleton, b)) { summary.skipped++; continue; }
+    if (isSwingShape(it.part.shape) && (it.part.swing ?? 0) > 0) { swingList.push(it); summary.drawn++; continue; }
     const mat = it.part.finish;
     const key = `${b}|${mat}`;
     let g = want.get(key);
@@ -125,8 +136,9 @@ export function syncParts(spawn: { root: TransformNode; skeleton: Skeleton }, pa
   }
 
   for (const [key, g] of s.groups) {
-    if (!want.has(key)) { g.mesh.dispose(false, false); s.groups.delete(key); }
+    if (!want.has(key) && !key.startsWith('swing|')) { g.mesh.dispose(false, false); s.groups.delete(key); }
   }
+  syncSwingParts(s, root, skeleton, frames, swingList, scene);
   for (const [key, w] of want) {
     const sig = JSON.stringify(w.items.map(({ part, mirrored }) => [part.shape, part.bone, part.pos, part.rot, part.scale, part.colour, mirrored, ...toneSig(part)]));
     const have = s.groups.get(key);
@@ -174,6 +186,35 @@ export function syncParts(spawn: { root: TransformNode; skeleton: Skeleton }, pa
   summary.materials = s.mats.size;
   stamp(root, summary);
   return summary;
+}
+
+/** Phase 4c: the body's bendable parts — rebuilt (skeleton and meshes, one per finish) only when one of them changed. */
+function syncSwingParts(s: BodyParts, root: TransformNode, skeleton: Skeleton, frames: ReturnType<typeof rigFrames>, list: { part: CreatorPart; mirrored: boolean }[], scene: Scene): void {
+  const sig = list.length ? JSON.stringify(list.map(({ part, mirrored }) => [part, mirrored])) : '';
+  if (s.swing?.sig === sig || (!s.swing && !sig)) return;
+  if (s.swing) { disposeSwingRig(s.swing.rig); s.swing = null; root.metadata = { ...(root.metadata ?? {}), felSwingRig: null }; }
+  for (const [key, g] of s.groups) if (key.startsWith('swing|')) { g.mesh.dispose(false, false); s.groups.delete(key); }
+  if (!list.length || !frames) return;
+  const items = list.map(({ part, mirrored }) => {
+    const placed = nodeMatrix(part, frames, mirrored)!;
+    const toned = part.colour2 ? tonedGeoOf(swingGeo(part.shape), part) : null;
+    const geo = toned ? toned.geo : swingGeo(part.shape);
+    const [r, g, b] = rgb(part.colour), [r2, g2, b2] = part.colour2 ? rgb(part.colour2) : [r, g, b];
+    const colours: number[] = [];
+    for (let i = 0; i < geo.positions.length / 3; i++) { if (toned?.second[i]) colours.push(r2, g2, b2, 1); else colours.push(r, g, b, 1); }
+    // the chain's frame is the placement at scale 1 (the swing's angles are true angles); its scale goes in the vertices
+    const unit = nodeMatrix({ ...part, scale: [1, 1, 1] }, frames, mirrored)!;
+    return { part, mirrored, m: unit.m, node: boneNode(skeleton, placed.bone)!, restNode: frames.restInv.get(placed.bone)!.clone().invert(), geo, colours };
+  });
+  const mat = (f: Finish) => {
+    let m = s.mats.get(f);
+    if (!m) { m = partMaterial(scene, `cpartmat_${root.uniqueId}_${f}`, f); s.mats.set(f, m); }
+    return m;
+  };
+  const { rig, meshes } = buildSwingRig(root, items, mat, `cswing_${root.uniqueId}`);
+  for (const [f, mesh] of meshes) s.groups.set(`swing|${f}`, { mesh, sig, mat: f });
+  s.swing = { sig, rig };
+  root.metadata = { ...(root.metadata ?? {}), felSwingRig: rig };   // probes and tests
 }
 
 /** What the parts made on this body (probes and tests). */

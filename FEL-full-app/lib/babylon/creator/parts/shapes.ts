@@ -74,25 +74,7 @@ const BUILDERS: Record<PartShape, () => Geo> = {
     [0.05, 0.06], [0.015, 0.035], [0, 0.02],
   ], 0.006),
   strap: () => extrude([[-0.0125, -0.05], [0.0125, -0.05], [0.0125, 0.05], [-0.0125, 0.05]], 0.004),
-  capeStrip: () => {
-    const at = (u: number, v: number): [number, number, number] => {
-      const w = 0.1 + 0.02 * v;
-      return [(u - 0.5) * w, -0.1 * v, 0.006 * Math.sin(Math.PI * u) + 0.004 * Math.sin(Math.PI * v)];
-    };
-    const nrm = (u: number, v: number): [number, number, number] => {
-      // central differences clamped into [0, 1] (phase 4c fix: a one-sided step from the far edge, u = 1 or v = 1, was
-      // zero, which left that edge's normals at zero length)
-      const e = 1e-3, u0 = Math.max(0, u - e), u1 = Math.min(1, u + e), v0 = Math.max(0, v - e), v1 = Math.min(1, v + e);
-      const a0 = at(u0, v), b = at(u1, v), c0 = at(u, v0), c = at(u, v1);
-      const du = [b[0] - a0[0], b[1] - a0[1], b[2] - a0[2]], dv = [c[0] - c0[0], c[1] - c0[1], c[2] - c0[2]];
-      let n: [number, number, number] = [du[1] * dv[2] - du[2] * dv[1], du[2] * dv[0] - du[0] * dv[2], du[0] * dv[1] - du[1] * dv[0]];
-      if (n[2] < 0) n = [-n[0], -n[1], -n[2]];
-      const l = Math.hypot(...n) || 1;
-      return [n[0] / l, n[1] / l, n[2] / l];
-    };
-    const front = surface(4, 4, at, nrm);
-    return concat(front, bake(backFace(front), move(0, 0, -0.003)));
-  },
+  capeStrip: () => capeStripGeo(4),
   shoulderPad: () => {
     const Ro = 0.06, Ri = 0.054, rim = 70 * DEG, yoff = Ro * Math.cos(rim);
     const outer: P2[] = [], inner: P2[] = [];
@@ -171,6 +153,27 @@ const BUILDERS: Record<PartShape, () => Geo> = {
   },
 };
 
+/** The cape strip, `rows` quads long (phase 2 used 4; a bendable one uses 8 so it curves smoothly: swingGeo). */
+function capeStripGeo(rows: number): Geo {
+  const at = (u: number, v: number): [number, number, number] => {
+    const w = 0.1 + 0.02 * v;
+    return [(u - 0.5) * w, -0.1 * v, 0.006 * Math.sin(Math.PI * u) + 0.004 * Math.sin(Math.PI * v)];
+  };
+  const nrm = (u: number, v: number): [number, number, number] => {
+    // central differences clamped into [0, 1] (phase 4c fix: a one-sided step from the far edge, u = 1 or v = 1, was
+    // zero, which left that edge's normals at zero length)
+    const e = 1e-3, u0 = Math.max(0, u - e), u1 = Math.min(1, u + e), v0 = Math.max(0, v - e), v1 = Math.min(1, v + e);
+    const a0 = at(u0, v), b = at(u1, v), c0 = at(u, v0), c = at(u, v1);
+    const du = [b[0] - a0[0], b[1] - a0[1], b[2] - a0[2]], dv = [c[0] - c0[0], c[1] - c0[1], c[2] - c0[2]];
+    let n: [number, number, number] = [du[1] * dv[2] - du[2] * dv[1], du[2] * dv[0] - du[0] * dv[2], du[0] * dv[1] - du[1] * dv[0]];
+    if (n[2] < 0) n = [-n[0], -n[1], -n[2]];
+    const l = Math.hypot(...n) || 1;
+    return [n[0] / l, n[1] / l, n[2] / l];
+  };
+  const front = surface(4, rows, at, nrm);
+  return concat(front, bake(backFace(front), move(0, 0, -0.003)));
+}
+
 /** The closed crown of a shell (helmet, hood): from `rim` elevation up over the top, `t` thick, centred on the origin. */
 function shellCap(R: number, t: number, rim: number, n: number): Geo {
   const outer = arcPts(0, 0, R, rim, Math.PI / 2, n), inner = arcPts(0, 0, R - t, Math.PI / 2, rim, n);
@@ -201,6 +204,15 @@ export function shapeGeo(shape: PartShape): Geo {
   if (!g) { g = BUILDERS[shape](); cache.set(shape, g); }
   return g;
 }
+
+/** The geometry a BENDABLE part is built from (phase 4c, parts/swing.ts): the cape strip with twice the rows along its
+ *  length so it bends smoothly; the strand and the tail segment already have rings along theirs. */
+export function swingGeo(shape: PartShape): Geo {
+  if (shape !== 'capeStrip') return shapeGeo(shape);
+  swingCape ??= capeStripGeo(8);
+  return swingCape;
+}
+let swingCape: Geo | null = null;
 
 /** Every shape has a builder (a test pins this; PART_SHAPES is the allow-list). */
 export const BUILT_SHAPES: readonly PartShape[] = PART_SHAPES.filter((s) => s in BUILDERS);

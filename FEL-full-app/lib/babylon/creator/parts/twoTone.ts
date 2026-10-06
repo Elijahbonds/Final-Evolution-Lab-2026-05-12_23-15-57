@@ -137,5 +137,18 @@ export function tonedGeo(shape: PartShape, s: ToneSpec): TonedGeo {
   return made;
 }
 
+/** Cut any geometry of `shape` (the denser swing version of a cape strip) for a spec, measured on that geometry (not
+ *  cached: a bendable part's rig is rebuilt only when it changes). */
+export function cutToned(g: Geo, s: ToneSpec, _shape: PartShape): TonedGeo {
+  const ax = AXIS[s.axis];
+  let lo = Infinity, hi = -Infinity;
+  for (let i = ax; i < g.positions.length; i += 3) { lo = Math.min(lo, g.positions[i]); hi = Math.max(hi, g.positions[i]); }
+  const span = hi - lo;
+  if (s.kind === 'split') { const c = cutGeo(g, ax, lo + s.at * span); return { geo: c.geo, second: c.above }; }
+  const first = cutGeo(g, ax, lo + (s.at - s.width / 2) * span);
+  const second = cutGeo(first.geo, ax, lo + (s.at + s.width / 2) * span, first.above);
+  return { geo: second.geo, second: second.tag.map((t, i) => (t && !second.above[i] ? 1 : 0)) };
+}
+
 /** The cache's size (tests). */
 export const toneCacheSize = (): number => cache.size;
