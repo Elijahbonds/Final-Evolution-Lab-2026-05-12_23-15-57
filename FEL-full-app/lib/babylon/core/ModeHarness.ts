@@ -58,6 +58,7 @@ import type { ModeBodySpec } from '@/lib/input/bodyProfiles';
 import type { SessionStep } from './BodySession';
 import { bodySeamFor, type BodySeam } from './bodySeam';
 import { sessionStore, stanceOnMount, type SessionWriter } from './sessionStore';   // (stanceOnMount: MOVEMENT PLAY P8)
+import { stripStaticControls } from '../ui/staticControls';   // controls-screen (2026-10-06): button maps leave the play screen
 // declared beside the profiles they subtract from (step 2); the harness is where a mode meets them
 export type { BodyClaim, BodyChannelName, ModeBodySpec } from '@/lib/input/bodyProfiles';
 
@@ -481,7 +482,10 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
       // juice.banner(), so this — not the juice channel — is where a caption has to come from. See hudCaptions.
       for (const c of captionsFromHud(update, saidHud)) captions.cue(c.text, 'feedback');
       rememberHud(update, saidHud);
-      opts.onHud?.(update);
+      // CONTROLS SCREEN (console-view lane, 2026-10-06; owner: "take off that wall of text when the game starts"): a
+      // static button map a mode writes as its `hint` reaches the host blank — it is on the READY card and the pause
+      // instead (ControlsPanel). Live prompts ("NOW!", "DEFEND — …") are not on the list and pass untouched.
+      opts.onHud?.(stripStaticControls(update));
     },
     stamina(v01) { ring?.set(v01); },
     body() { const p = input.body(); return p ? viewOf(p) : null; },

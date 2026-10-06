@@ -14,6 +14,7 @@ import { venueThumb } from '@/lib/babylon/ui/venueThumbs';
 import { CardSlot } from './card-slot';
 import { MotionSetting } from '@/components/settings/motion-setting';
 import { PausedLayer } from './paused-layer';
+import { ControlsPanel } from './controls-panel';
 import { BodyPlayReady, BodyPlayReadyLine, BodyPlayLayer } from './body-play';
 import { BASKETBALL_MODE_IDS, COURT_LOCATIONS, readCourtLocation, readyCourtLocations, writeCourtLocation, type CourtLocationId } from '@/lib/babylon/nexus/courtLocations';
 import { BALL_SKINS, readBallSkin, readyBallSkins, writeBallSkin, type BallSkinId } from '@/lib/babylon/nexus/ballSkins';
@@ -108,6 +109,9 @@ export interface BootSplashProps {
   detail?: number | string;         // countdown number or error message
   onStart: () => void;              // READY tap
   onRetry: () => void;              // error retry
+  /** CONTROLS SCREEN (2026-10-06): the one-line controls a host was built with (the board and timing hosts' `hint`),
+   *  shown on the CONTROLS panel for a mode that writes no static hint of its own. */
+  controls?: string;
 }
 
 /** The splash: the card, and body play beside it (the check over a pause, the corner self-view in play). */
@@ -274,7 +278,7 @@ export function SplashCard(props: BootSplashProps) {
   // copy straight after this splash (BACKLOG B16). PausedLayer keeps that copy's classes, so it stacks where they did.
   // Step 5 (2026-09-26): Brain Brawl's own copy is gone, and with it the check that drew nothing here for it (the two
   // stacked were 84% black with the headline doubled — the step-4a review); pausedLayer.scan.test holds the two together.
-  if (props.phase === 'paused') return <PausedLayer onResume={props.onStart} />;
+  if (props.phase === 'paused') return <PausedLayer onResume={props.onStart} modeId={props.modeId} hint={props.controls} />;
   if (props.phase === 'playing' || props.phase === 'ended') return null;
 
   return (
@@ -304,6 +308,9 @@ export function SplashCard(props: BootSplashProps) {
           corner, out of the picker column. */}
       {(props.phase === 'ready' || props.phase === 'loading') && <MotionSetting compact className="absolute left-3 top-3 z-10" />}
       <div data-splash-column className="absolute inset-0 flex flex-col items-center justify-center gap-4 px-6 text-center">
+        {/* data-splash-main: display: contents everywhere but a sideways screen, where it is the left column — title,
+            START and the CONTROLS panel, which gives up its height (its lines scroll) before START leaves the screen */}
+        <div data-splash-main className="contents">
         <p className="text-[11px] font-black tracking-[0.4em]" style={{ color: v.tint }}>{v.sub}</p>
         <h1 className="text-4xl font-black tracking-wide text-white drop-shadow-lg">{props.title}</h1>
         {props.goal && (props.phase === 'ready' || props.phase === 'loading') && (
@@ -341,6 +348,14 @@ export function SplashCard(props: BootSplashProps) {
         {/* MOVEMENT PLAY P4 (2026-09-25): "Play with your body" (the games the body drives), "coming", or nothing; once
             chosen, the space check over this card. */}
         {props.phase === 'ready' && <BodyPlayReady tint={v.tint} onStart={props.onStart} />}
+        {/* CONTROLS SCREEN (console-view lane, 2026-10-06). Owner: "take off that wall of text when the game starts, maybe
+            have that show as a beginning screen for the controls." The mode's button map for the device in use, and its
+            own words — which the harness now keeps off the play screen (lib/babylon/ui/staticControls.ts). The pause
+            shows the same panel (PausedLayer). It replaces the card slot's collapsed BUTTONS line. */}
+        {(props.phase === 'ready' || props.phase === 'loading') && (
+          <ControlsPanel modeId={props.modeId} hint={props.controls} className="max-h-[34vh] sm:max-h-[38vh]" />
+        )}
+        </div>
 
         {/* display: contents everywhere but a sideways screen, so the column above is unchanged in portrait */}
         <div data-splash-pickers className="contents">

@@ -47,7 +47,7 @@ type Hud = Record<string, HudValue>;
 export interface TimingHostOpts {
   /** Registry key: 'tennis' | 'derby' | 'penalty' | 'golf'. */
   modeKey: string;
-  /** One-line control hint shown on the TAP TO START overlay. */
+  /** One-line control hint shown on the CONTROLS panel (READY and pause) when the mode writes none of its own. */
   hint: string;
   /** Label on the big swing button (e.g. SWING / STRIKE / KICK). */
   swingLabel: string;
@@ -499,6 +499,7 @@ export function makeTimingHost(opts: TimingHostOpts) {
 
         <BootSplash
           modeId={modeKey}
+          controls={opts.hint}   // CONTROLS SCREEN (2026-10-06): the host's control line, on the READY card and the pause
           title={modeKey.replace(/_/g, ' ').toUpperCase()}
           phase={phase}
           detail={phase === 'error' ? (loadError ?? undefined) : (countdown ?? undefined)}
