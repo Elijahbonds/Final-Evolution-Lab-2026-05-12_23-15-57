@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { firstNight, nextNight, cardWon, isLastAttempt, type NightState } from './ContinuousNight';
+import { firstNight, nextNight, cardWon, isLastAttempt, cardVerdict, dunkOffVerdict, DUNK_OFF_MAX, type NightState } from './ContinuousNight';
 import { emptyCard, addAttempt, nightReport, type DunkCard } from '@/lib/mp/dunkCard';
 
 // A night that has actually been played: scores on the board, a rival ahead, a
@@ -101,5 +101,30 @@ describe('ContinuousNight — the card closes with the night', () => {
     // night 1's best dunk and night 1's miss, on night 2's card
     expect(nightReport(n.card).headline).toBe('YOUR NIGHT: 377 · BEST 58');
     expect(nightReport(n.card).lines).toContain('7 down, 1 off the iron');
+  });
+});
+
+// dunk-next phase 3 — the dunk-off: a tied card is settled by dunks, not by a rule nobody saw.
+
+describe('the dunk-off (dunk-next phase 3)', () => {
+  it('the card after the final is a win, a loss, or a TIE — and only an exact tie is a tie', () => {
+    expect(cardVerdict({ playerTotal: 170, rivalTotal: 169 })).toBe('won');
+    expect(cardVerdict({ playerTotal: 169, rivalTotal: 170 })).toBe('lost');
+    expect(cardVerdict({ playerTotal: 170, rivalTotal: 170 })).toBe('tied');
+  });
+  it('a dunk-off is decided by its two cards', () => {
+    expect(dunkOffVerdict(44, 41, 1)).toBe('won');
+    expect(dunkOffVerdict(38, 41, 1)).toBe('lost');
+  });
+  it('tied again, they go again — until the last one', () => {
+    for (let n = 1; n < DUNK_OFF_MAX; n++) expect(dunkOffVerdict(40, 40, n)).toBe('again');
+  });
+  it('a tie after the last dunk-off falls back to the old rule, so the night always ends', () => {
+    expect(dunkOffVerdict(40, 40, DUNK_OFF_MAX)).toBe(cardWon({ playerTotal: 40, rivalTotal: 40 }) ? 'won' : 'lost');
+    expect(dunkOffVerdict(40, 40, DUNK_OFF_MAX + 5)).not.toBe('again');
+  });
+  it('the dunk-off is short: a handful at most', () => {
+    expect(DUNK_OFF_MAX).toBeGreaterThanOrEqual(1);
+    expect(DUNK_OFF_MAX).toBeLessThanOrEqual(3);
   });
 });
