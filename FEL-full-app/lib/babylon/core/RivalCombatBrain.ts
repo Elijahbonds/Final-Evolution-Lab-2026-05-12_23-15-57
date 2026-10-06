@@ -113,6 +113,10 @@ export class RivalCombatBrain {
   private readonly out: RivalDecision = { moveX: 0, moveY: 0, attack: null, attackId: null, block: false, guard: null, spend: null };
   /** The rival's REACH: its longest move. Spacing (dash, substitution) reads this. */
   readonly reach: number;
+  /** IMPROVE (2026-10-06), Duel #20: each kind's reach and each move's range, worked out once — decide() rebuilt an array
+   *  (`pool.map`) for the ultimate's reach and ran a `find` closure on every swing it threw. */
+  private readonly reachByKind: Record<RivalAttackKind, number>;
+  private readonly rangeById = new Map<string, number>();
   /** The range of the last committed swing (informational; spacing no longer reads it). */
   lastRange: number;
 
@@ -129,6 +133,9 @@ export class RivalCombatBrain {
     };
     this.reach = Math.max(...this.moves.map((m) => m.range));
     this.lastRange = this.reach;
+    const reachOf = (kind: RivalAttackKind): number => { const pool = this.byKind[kind]; return pool.length ? Math.max(...pool.map((m) => m.range)) : this.reach; };
+    this.reachByKind = { jab: reachOf('jab'), kick: reachOf('kick'), heavy: reachOf('heavy') };
+    for (const m of this.moves) if (!this.rangeById.has(m.id)) this.rangeById.set(m.id, m.range);
   }
 
   setNerve(aggression: number, mistake: number): void {
@@ -192,14 +199,14 @@ export class RivalCombatBrain {
       this.spendLock = 1.2;
     } else if (attack) {
       // the ultimate is a heavy: it is spent when the HEAVY reaches, whatever the last swing was
-      if (resource && resource.value >= resource.max && dist <= this.reachOf('heavy') + 0.15) {
+      if (resource && resource.value >= resource.max && dist <= this.reachByKind.heavy + 0.15) {
         spend = 'ultimate';
         attack = 'heavy';
         this.spendLock = 1.4;
       }
       attackId = this.pickId(attack);
-      const spec = this.moves.find((m) => m.id === attackId);
-      if (spec) this.lastRange = spec.range;
+      const range = this.rangeById.get(attackId);
+      if (range !== undefined) this.lastRange = range;
     }
 
     // the guard: the inner brain's read, with a skilled rival turning some of its parries into guard impacts
@@ -214,11 +221,6 @@ export class RivalCombatBrain {
     o.moveX = action.moveX; o.moveY = action.moveY; o.attack = attack; o.attackId = attackId;
     o.block = action.block; o.guard = action.block ? this.guardNow : null; o.spend = spend;
     return o;
-  }
-
-  private reachOf(kind: RivalAttackKind): number {
-    const pool = this.byKind[kind];
-    return pool.length ? Math.max(...pool.map((m) => m.range)) : this.reach;
   }
 
   /** Weighted pick inside the kind, never the move that kind threw last when the kind has another. */

@@ -265,6 +265,9 @@ export function rivalDifficulty(base: number, tier: Tier | null | undefined): nu
   return Math.max(0.3, Math.min(0.95, base + off));
 }
 
+/** The covering moves a forced swing picks from, in order (IMPROVE 2026-10-06: a constant, not an array per swing). */
+const FORCED_ORDER = ['heavy', 'kick', 'jab'] as const;
+
 export class RivalFightBrain {
   private cooldown = 1.2;
   private circleDir = 1;
@@ -433,9 +436,15 @@ export class RivalFightBrain {
       const floorSec = pressureFloorSec(this.difficulty);
       const margin = this.attacks.heavy.startupMs / 1000;
       if (floorSec - this.pressureClock <= margin) {
-        const candidates = (['heavy', 'kick', 'jab'] as const).filter((k) => this.attacks[k].range >= dist);
-        const forcedAttack = this.canSpecial && selfState.chi >= CHI_MAX ? 'heavy'
-          : candidates[Math.floor(this.attackBias * candidates.length) % candidates.length];
+        // IMPROVE (2026-10-06), Duel #20: the same pick without a filtered array per forced swing — the covering moves,
+        // heavy → kick → jab, counted, then the attackBias-th of them
+        let n = 0;
+        for (const k of FORCED_ORDER) if (this.attacks[k].range >= dist) n++;
+        let forcedAttack: 'jab' | 'kick' | 'heavy' = 'heavy';   // (inside the swing gate the heavy always covers: n ≥ 1)
+        if (!(this.canSpecial && selfState.chi >= CHI_MAX) && n > 0) {
+          let i = Math.floor(this.attackBias * n) % n;
+          for (const k of FORCED_ORDER) if (this.attacks[k].range >= dist && i-- === 0) { forcedAttack = k; break; }
+        }
         this.cooldown = 1.0 / Math.max(0.3, effDiff * this.press);
         this.pressureClock = 0;
         this.wasFoeOpen = foeOpen;
