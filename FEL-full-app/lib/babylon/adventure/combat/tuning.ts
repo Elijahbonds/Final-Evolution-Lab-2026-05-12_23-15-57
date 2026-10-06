@@ -146,4 +146,7 @@ export const DAMAGE = {
   maxMultiplier: 3,
   /** Level scaling of outgoing damage: +1.5 % a level (level 50 = ×1.735). */
   perLevel: 0.015,
+  /** Spells scale with the PRQ mental attribute instead of style and force: ×(0.85 + 0.3 × mental / 100). */
+  mentalBase: 0.85,
+  mentalSpan: 0.3,
 } as const;

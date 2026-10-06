@@ -68,11 +68,18 @@ export function resetHitSpec(s: HitSpec): HitSpec {
   return s;
 }
 
-/** What the attacker brings to every hit: level, style (school power), PRQ force. A guest (no attrs) is a 50. */
-export function outgoingMult(attacker: AdventureActor | null): number {
+/**
+ * What the attacker brings to every hit: its level, then for a strike its style (school power) and PRQ force, for a
+ * spell its PRQ mental (the owner's "levelling with stats"). A guest (no attrs) is a 50 on both.
+ */
+export function outgoingMult(attacker: AdventureActor | null, source: DamageSource = 'strike'): number {
   if (!attacker) return 1;
   const st = attacker.stats;
   const level = 1 + DAMAGE.perLevel * Math.max(0, (st.level || 1) - 1);
+  if (source === 'spell') {
+    const mental = Math.max(0, Math.min(100, st.attrs?.mental ?? 50));
+    return level * (DAMAGE.mentalBase + (DAMAGE.mentalSpan * mental) / 100);
+  }
   const style = styleDamageMult(blendTraits(st.school));
   const force = damageScale(ratingsFrom(st.attrs ?? {}));
   return level * style * force;
@@ -95,7 +102,7 @@ export function hitCap(target: AdventureActor): number {
 export function damageAmount(attacker: AdventureActor | null, target: AdventureActor, spec: HitSpec, comboN = 1): number {
   if (!(spec.base > 0)) return 0;
   const tfs = fightStateOf(target);
-  let m = spec.mult * spec.partMult * outgoingMult(attacker) * elementMultiplier(spec.element, elementOf(target));
+  let m = spec.mult * spec.partMult * outgoingMult(attacker, spec.source) * elementMultiplier(spec.element, elementOf(target));
   if (spec.source === 'strike') m *= comboScale(comboN);
   if (tfs.airSec > 0) m *= AIR.juggleMult;
   if (tfs.subVulnerableSec > 0) m *= SUB_PUNISH_MULT;

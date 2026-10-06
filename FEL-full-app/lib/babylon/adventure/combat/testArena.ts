@@ -150,7 +150,8 @@ export function createArena(opts: ArenaOptions = {}): Arena {
             const sp = a.kind === 'monster' || a.kind === 'boss' ? 9 : runSpeed;
             a.vel.x = w.x * sp; a.vel.z = w.z * sp;
             if (input.ascendHeld && a.pos.y < 6) a.vel.y = Math.max(a.vel.y, 3);
-          } else if (!locked) {
+          } else if (!locked && a.pos.y <= 0.001) {
+            // Ground friction; a body in the air keeps its momentum (a throw, a launch).
             const f = Math.exp(-10 * adt);
             a.vel.x *= f; a.vel.z *= f;
           }
