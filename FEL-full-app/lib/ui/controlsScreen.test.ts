@@ -80,7 +80,8 @@ describe('controlRows — the list for the device in use', () => {
     // is one line per button below the rows (moveLines), not a row per trick — still in each device's words
     expect(controlRows('snowboard', 'pad').some((r) => /^. \+ [ABXY]$/.test(r.input))).toBe(false);
     expect(row(controlRows('snowboard', 'pad'), 'BOARDSLIDE')).toBeUndefined();
-    expect(moveLines('snowboard', 'pad')).toEqual(['B: ↑INDY ←METHOD →STALEFISH ↓TAIL GRAB', 'Y: →720 ←CORK 720 ↓RODEO 540', 'X: BOARDSLIDE']);
+    expect(moveLines('snowboard', 'pad')).toEqual(['B: ↑INDY ←METHOD →STALEFISH ↓TAIL GRAB', 'Y: →720 ←CORK 720 ↓RODEO 540 · X: BOARDSLIDE']);
+    for (const d of ['pad', 'keys', 'touch'] as const) for (const l of moveLines('snowboard', d)) expect(l.length, l).toBeLessThanOrEqual(52);
     expect(moveLines('surf', 'pad')[0]).toBe('B: BOTTOM TURN · ←CUTBACK ↑SNAP →FLOATER ↓TUBE RIDE');
     expect(moveLines('snowboard', 'keys')[0]).toBe(moveLines('snowboard', 'pad')[0].replace(/^B:/, 'K:'));
     expect(moveLines('snowboard', 'touch')[0]).toMatch(/^SPIN: ↑INDY/);

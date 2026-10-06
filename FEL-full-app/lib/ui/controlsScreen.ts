@@ -23,7 +23,7 @@
 import { MODE_VERBS } from '../babylon/ui/modeVerbs';
 import { buttonMap, slotModeKey } from '../creator/cardSlot';
 import { staticControlsFor } from '../babylon/ui/staticControls';
-import { panelLinesFor, BODY_BOOST_LINE } from '../babylon/ui/panelLines';
+import { panelLinesFor, BODY_BOOST_LINE, PANEL_MAX_CHARS } from '../babylon/ui/panelLines';
 
 export type ControlsDevice = 'pad' | 'keys' | 'touch';
 export const CONTROLS_DEVICES: readonly ControlsDevice[] = ['pad', 'keys', 'touch'];
@@ -122,7 +122,15 @@ export function moveLines(modeId: string, device: ControlsDevice): string[] {
   }
   const name = (b: string): string => device === 'pad' ? b : device === 'keys' ? KEY_OF[b] ?? b : labels[b] ?? b;
   // the arrow is each directed move's own bullet: one row of a sideways phone holds the surf's five B moves
-  return [...byBtn].map(([b, g]) => `${name(b)}: ${[...g.plain, g.dir.join(' ')].filter(Boolean).join(' · ')}`);
+  const lines = [...byBtn].map(([b, g]) => `${name(b)}: ${[...g.plain, g.dir.join(' ')].filter(Boolean).join(' · ')}`);
+  // and two short buttons share a row ('Y: →720 … · X: BOARDSLIDE'): Gate Crasher's sideways-phone card has no row spare
+  const packed: string[] = [];
+  for (const l of lines) {
+    const last = packed.length ? packed[packed.length - 1] : null;
+    if (last !== null && last.length + 3 + l.length <= PANEL_MAX_CHARS) packed[packed.length - 1] = `${last} · ${l}`;
+    else packed.push(l);
+  }
+  return packed;
 }
 
 /**
