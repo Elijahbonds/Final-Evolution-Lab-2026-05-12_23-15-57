@@ -46,7 +46,7 @@ player builds with the tools is theirs.
    (`playFrame.ts`).
 
 Around them: undo/redo, randomise with locks, a real preview stage (face/bust/full cameras, lighting rigs, poses,
-turntable), up to 5 saved characters, and **share codes** (a short versioned code anyone can paste to load a look,
+turntable), up to 5 saved characters (**5 slots max, owner, 2026-10-06**), and **share codes** (a short versioned code anyone can paste to load a look,
 sanitised on import).
 
 ## The Studio: the builder itself has to be dope (owner, 2026-10-06: "make the builder dope")
@@ -85,8 +85,21 @@ phase builds toward this, not toward a settings page with sliders.
 | 1. Foundation | The six known bugs fixed. `CreatorDoc` v1: a versioned, sanitised, size-capped document (parts, paint layers, colours, shape) stored in `AvatarLook.face.creator`, read by `resolveIdentity` and applied in `applyIdentity`. A tinted-material cache. Undo/redo and randomise. Share-code encode/decode. |
 | 2. Parts | The procedural part library, bone placement with transforms and mirroring, rendered in every mode via the identity layer, merged per material for draw calls, with a budget (64 parts). The editor's Parts tab. |
 | 3. Paint | Region masks from skin weights, the pattern generators, stamps and text, the layer stack composited into a canvas texture over skin and garments, suit mode. The editor's Paint tab. Tier-aware texture size. |
-| 4. Shape and the Studio | Counter-scaled proportion sliders and the data-driven face morph list. **The Studio** (section above) as the one appearance editor, with Body, Face, Hair, Parts, Paint, Colours and Share tabs. It includes:<br>• the stage, camera moves and turntable;<br>• on-model selection and drag placement;<br>• mode poses;<br>• photo mode with the share card;<br>• 5 slots and import;<br>• pad and touch input;<br>• the first-run walkthrough. |
+| 4a. Slots and the make-anyone tools | **Done (2026-10-06).** A slot is a whole character (`CreatorSlotV2`: body, face, sliders, height/build, worn items, doc); `face.activeSlot` picks the one every mode spawns (`lib/creator/look/slots.ts` `activeLook`, read by `resolveIdentity`). The Closet's slot bar (select, Play as, new, duplicate, rename, delete with a confirm, paste a code as a new slot, copy a code) and a "Play as …" switcher on the game start screen. Share code v2 carries the whole slot, deflated. Procedural eyes (iris colour/size, pupil round/slit/none, sclera, glow, hide). Hide and cut-out (eyes, ears, head, hair; an `ears` paint region). Any colour for skin, hair and eyes, with a clean far-from-human skin. Ten archetype fixtures (test-only) with a render check and the cosmetic-only invariant. |
+| 4b. Shape v2 and presentation scale | Cosmetic-safe proportions (head, neck, hands, feet as counter-scaled bones; legs, torso and shoulders inside a clamp and 1.0 in ranked / standard-frame modes), per-segment girth as procedural inflate morphs, the data-driven face morph list. Presentation scale beyond the play clamp (giants, tiny mascots) **in the Studio and photo mode only** (owner decision, below). |
+| 4c. More part and paint tools | Skinned (bendable) parts for capes, tails and long hair; two-tone parts; a player-drawn custom stamp; an emissive (glow) paint blend; more generic part shapes (bolt, skirt, helmet, hood, ear, tail segment, …). |
+| 4d. The Studio | The Studio (section above) as the one appearance editor: the stage, camera moves and turntable, on-model selection and drag placement, mode poses, photo mode with the share card, pad and touch input, the environment map, the first-run walkthrough. |
 | 5. New art (owner's Mac) | The asset spec and Blender/MPFB bake scripts for 40–60 face morphs, body-shape morphs and modular layered garments. Not runnable in the cloud (no Blender); the code from phases 1–4 picks them up by name. |
+
+## Owner decisions (2026-10-06)
+
+- **5 slots max.** "5 max slots." (`MAX_SLOTS = 5`; the research suggested 10.)
+- **Teens: every mode, device only.** An under-18 (or unknown-age) player's look stays on the device and is never
+  uploaded; it now applies in every mode through `resolveIdentity` (`TEEN_DEVICE_LOOK_EVERYWHERE = true` in
+  `lib/creator/look/slots.ts`), not just racing.
+- **Giant and tiny builds: Studio and photo only.** Presentation scale beyond the play clamp (`playFrame.COSMETIC_CLAMP`)
+  shows only in the Studio and photo mode (phase 4b). Every mode keeps the play clamp, and ranked / standard-frame modes
+  keep 1.0.
 
 ## Rules for every phase
 
