@@ -13,6 +13,7 @@ import { SoundtrackPlayer, type PlayerEnv } from './player';
 import { musicFocus, claimMusicFocus } from './focus';
 import { stageForPhase } from './policy';
 import { cachedSrc } from './cache';
+import { readRunTrack } from './runTrack';
 import type { SoundtrackStage } from './types';
 
 export { claimMusicFocus };
@@ -63,6 +64,7 @@ function browserEnv(): PlayerEnv {
         }).catch(() => {});
       } catch { /* a play that is not counted is not an error */ }
     },
+    runTrack: () => readRunTrack(),   // PIPELINES: the dock's "play this under my games" pick
     loadPrefs: () => { try { return JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}'); } catch { return {}; } },
     savePrefs: (p) => { try { localStorage.setItem(PREFS_KEY, JSON.stringify(p)); } catch { /* lasts the session */ } },
   };

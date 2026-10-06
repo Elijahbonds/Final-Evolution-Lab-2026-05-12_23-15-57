@@ -19,6 +19,7 @@ import { getSoundtrackPlayer, preloadSoundKit, saveDataOn, unlockSoundtrackFromG
 import { isGamePath } from '@/lib/soundtrack/policy';
 import type { SoundtrackCatalogue } from '@/lib/soundtrack/types';
 import { NowPlayingCard, useSoundtrack } from './now-playing-card';
+import { RunTrackPick } from '@/components/pipelines/run-track-pick';
 
 function ageLocked(): boolean {
   try {
@@ -85,6 +86,7 @@ function DockChip() {
       {open && snap.enabled && (
         <div className="w-[300px] max-w-full rounded-2xl border border-white/10 bg-[#0b0d12]/95 p-3 shadow-xl backdrop-blur">
           <NowPlayingCard />
+          {snap.track && <RunTrackPick trackId={snap.track.id} title={snap.track.title} />}
           <label className="mt-3 flex items-center gap-2 text-xs text-white/60">
             Level
             <input type="range" min={0} max={1} step={0.05} value={snap.level} aria-label="Soundtrack level"
