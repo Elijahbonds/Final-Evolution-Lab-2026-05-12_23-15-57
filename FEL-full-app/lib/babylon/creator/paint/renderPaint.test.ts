@@ -11,9 +11,9 @@ import type { SpawnedCharacter } from '../../core/CharacterLibrary';
 import { defaultFace } from '../../../closet/wearable-catalog';
 import { sanitizeCreatorDoc } from '../../../creator/look/sanitize';
 import { MAX_PAINT_LAYERS, type CreatorDoc, type PaintLayer } from '../../../creator/look/doc';
-import { PAINT_SIZES, flushPaint, paintBufferOf, paintStats, setPaintBaseReader, syncPaint } from './renderPaint';
+import { PAINT_SIZES, flushPaint, paintBufferOf, paintStats, prewarmPaint, resetPaintCaches, setPaintBaseReader, syncPaint } from './renderPaint';
 import { atomIndex } from './bodyChart';
-import { chartForBody, geometryKey, isPaintBody, surfaceMapFor } from './surfaceMap';
+import { cachedSurfaceMap, chartForBody, geometryKey, isPaintBody, surfaceMapFor, surfaceMapKey } from './surfaceMap';
 import type { Mesh } from '@babylonjs/core';
 
 let scene: Scene, desktop: Scene;
@@ -125,6 +125,11 @@ describe('paint through the identity pipe', () => {
   }, 120_000);
 
   it('a hidden layer draws nothing (and a doc of only hidden layers paints nothing at all)', () => {
+    const s0 = body();
+    applyIdentity(s0, ID(doc([{ surface: 'skin', region: 'torsoBack', colours: ['#0000FF'] }, { surface: 'skin', hidden: true }]))); flushPaint(s0.root);
+    expect(texelOf(s0, skinMesh(s0), 'torsoBack', 1024)).toEqual([0, 0, 255, 255]);
+    expect(texelOf(s0, skinMesh(s0), 'torsoFront', 1024)).not.toEqual([255, 0, 0, 255]);
+    s0.root.dispose();
     const s = body();
     applyIdentity(s, ID(doc([{ hidden: true }])));
     expect(paintStats(s.root)).toBeNull();
@@ -149,6 +154,18 @@ describe('paint through the identity pipe', () => {
     const top = s.meshes.find((m) => m.name.startsWith('Kit_tops_top_lab'))! as Mesh;
     expect(albedoTex(top)).toBeInstanceOf(RawTexture);
     expect(texelOf(s, top, 'torsoFront', 512)).toEqual([0, 255, 0, 255]);
+    s.root.dispose();
+  }, 120_000);
+
+  it('a garment that stops being painted gets its own texture back (its tint never resets the texture by itself)', () => {
+    const s = body();
+    applyIdentity(s, ID(null));
+    const top = s.meshes.find((m) => m.name.startsWith('Kit_tops_top_lab'))! as Mesh;
+    const own = albedoTex(top);
+    applyIdentity(s, ID(doc([{ surface: 'garments' }, { surface: 'skin' }]))); flushPaint(s.root);
+    expect(albedoTex(top)).toBeInstanceOf(RawTexture);
+    applyIdentity(s, ID(doc([{ surface: 'skin' }]))); flushPaint(s.root);
+    expect(albedoTex(top)).toBe(own);
     s.root.dispose();
   }, 120_000);
 
@@ -214,6 +231,24 @@ describe('paint through the identity pipe', () => {
     expect(st.gpuBytes).toBe(Math.round(2048 * 2048 * 4 * (4 / 3)));
     console.info(`[paint memory] 10 layers, desktop: buffer ${(st.cpuBytes / 2 ** 20).toFixed(1)} MiB, GPU ${(st.gpuBytes / 2 ** 20).toFixed(1)} MiB`);
     s.root.dispose();
+  }, 180_000);
+
+  it('prewarm builds the body\'s map in the frame budget without painting anything; the first paint then uses it', () => {
+    const fresh = new Scene(new NullEngine()); new FreeCamera('c', new Vector3(0, 1, -3), fresh);
+    fresh.metadata = { felTier: 'mobile' };
+    return SceneLoader.LoadAssetContainerAsync('', GLB(), fresh, undefined, '.glb').then((c) => {
+      const s = body(c);
+      // a different kit instance shares the cached map, so start from a cache that lacks it
+      resetPaintCaches();
+      prewarmPaint(s);
+      const key = surfaceMapKey(skinMesh(s), geometryKey(skinMesh(s)), PAINT_SIZES.mobile.skin);
+      expect(cachedSurfaceMap(key)).toBeUndefined();
+      for (let i = 0; i < 2000 && cachedSurfaceMap(key) === undefined; i++) fresh.render();
+      expect(cachedSurfaceMap(key)).toBeTruthy();
+      expect(paintStats(s.root)).toBeNull();
+      expect(albedoTex(skinMesh(s))).not.toBeInstanceOf(RawTexture);
+      s.root.dispose(); fresh.dispose();
+    });
   }, 180_000);
 
   it('syncPaint on a body with no paint and no doc does nothing at all', () => {

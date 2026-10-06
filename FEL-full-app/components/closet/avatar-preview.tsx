@@ -96,6 +96,9 @@ export default function AvatarPreview({ face, palette, jersey, wardrobe, accesso
         });
       };
       applyRef.current({ face, palette, jersey, wardrobe, accessories, creator, wornParts });
+      // CREATOR-PLAN phase 3: build the body's paint map in the background now, so the first paint shows at once
+      const { prewarmPaint } = await import('@/lib/babylon/creator/paint/renderPaint');
+      if (!disposed) prewarmPaint(spawned);
 
       playRef.current = (clip: string | null) => {
         if (!clip) return;

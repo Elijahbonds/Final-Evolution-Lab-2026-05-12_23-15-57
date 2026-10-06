@@ -152,7 +152,8 @@ export function syncPaint(
     P = { root, scene, tier: tierOf(scene), targets: new Map(), layers: [], suit: false, chart: null, chartKey: '' };
     bodies.set(root, P);
     let set = live.get(scene);
-    if (!set) { set = new Set(); live.set(scene, set); installScheduler(scene); }
+    if (!set) { set = new Set(); live.set(scene, set); }
+    installScheduler(scene);
     set.add(P);
     if (!hooked.has(root)) { hooked.add(root); root.onDisposeObservable.addOnce(() => releasePaint(root, true)); }
   }
@@ -429,23 +430,59 @@ export function flushPaint(root: TransformNode): void {
   }
 }
 
-/** One frame's work for every painted body in a scene, within the tier's budget. */
+/** One frame's work for every painted body in a scene, then any prewarm, within the tier's budget. */
 function installScheduler(scene: Scene): void {
+  if (scheduled.has(scene)) return;
+  scheduled.add(scene);
+  const tier = tierOf(scene);
   const obs = scene.onBeforeRenderObservable.add(() => {
-    const set = live.get(scene);
-    if (!set?.size) return;
     const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
     const start = now();
-    for (const P of set) {
-      const budget = PAINT_BUDGET_MS[P.tier];
+    const budget = PAINT_BUDGET_MS[tier];
+    for (const P of live.get(scene) ?? []) {
       for (const t of P.targets.values()) {
         const left = budget - (now() - start);
         if (left <= 0) return;
         work(P, t, left, now);
       }
     }
+    const warm = prewarming.get(scene);
+    if (!warm?.size) return;
+    for (const key of warm) {
+      const job = mapJobs.get(key);
+      if (!job) { warm.delete(key); continue; }
+      for (;;) {
+        if (now() - start > budget) return;
+        const r = job.next();
+        if (r.done) { storeSurfaceMap(key, r.value); mapJobs.delete(key); warm.delete(key); break; }
+      }
+    }
   });
-  scene.onDisposeObservable.addOnce(() => { scene.onBeforeRenderObservable.remove(obs); live.delete(scene); });
+  scene.onDisposeObservable.addOnce(() => { scene.onBeforeRenderObservable.remove(obs); live.delete(scene); prewarming.delete(scene); scheduled.delete(scene); });
+}
+const scheduled = new WeakSet<Scene>();
+const prewarming = new Map<Scene, Set<string>>();
+
+/**
+ * Start building a body's skin surface map now, in the background (the per-frame budget), so the first paint in an
+ * editor shows at once instead of after the build (~0.4 s of work at 1024, ~1.6 s at 2048). Nothing is painted or bound.
+ * The Closet's preview calls it when its body spawns; modes do not (a body with no paint never pays for a map).
+ */
+export function prewarmPaint(spawn: { root: TransformNode; meshes?: readonly AbstractMesh[] }): void {
+  const body = (spawn.meshes ?? spawn.root.getChildMeshes()).find((m) => isPaintBody(m.name)) as Mesh | undefined;
+  if (!body) return;
+  const scene = spawn.root.getScene();
+  const chart = chartForBody(body);
+  if (!chart) return;
+  const key = surfaceMapKey(body, geometryKey(body), PAINT_SIZES[tierOf(scene)].skin);
+  if (cachedSurfaceMap(key) !== undefined || mapJobs.has(key)) return;
+  const it = surfaceMapSteps(body, chart, PAINT_SIZES[tierOf(scene)].skin);
+  if (!it) return;
+  mapJobs.set(key, it);
+  let warm = prewarming.get(scene);
+  if (!warm) { warm = new Set(); prewarming.set(scene, warm); }
+  warm.add(key);
+  installScheduler(scene);
 }
 
 /** Take the paint off a body: materials back to what the identity layer gave them, textures and buffers released. */

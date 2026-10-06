@@ -69,6 +69,16 @@ describe('fills, blending and the albedo underneath', () => {
     expect(px(render([L({ id: 'a', blend: 'multiply', colours: ['#808080'] })]).out, 5, 5)).toEqual([100, 100, 100, 255]);
     expect(px(render([], { base: null }).out, 40, 40)).toEqual([102, 51, 26, 255]);
   });
+  it('a tile holding several regions paints only its region\'s texels (columns alternate chest and back here)', () => {
+    const label = new Uint8Array(SIZE * SIZE), ang = new Int16Array(SIZE * SIZE), tt = new Int16Array(SIZE * SIZE);
+    for (let i = 0; i < SIZE * SIZE; i++) label[i] = atomIndex(i % 2 ? 'torsoBack' : 'torsoFront') + 1;
+    const striped: SurfaceMap = { ...map, label, ang, tt, tiles: buildTiles(label, ang, tt, SIZE) };
+    const out = new Uint8Array(SIZE * SIZE * 4);
+    const B: PaintBuffers = { map: striped, base: new Uint8Array(SIZE * SIZE * 4).fill(200), flat: [0, 0, 0], tint: [1, 1, 1], out, aa: 0.0015, radius: chart.radius };
+    compositeDirty(B, compileLayers([L({ id: 'a' })], chart, { target: 'skin', suit: false, aa: 0.0015 }), new Uint8Array(NT).fill(1));
+    expect(px(out, 10, 10)).toEqual([255, 0, 0, 255]);
+    expect(px(out, 11, 10)).toEqual([200, 200, 200, 255]);
+  });
   it('layers stack in doc order: the last one is on top', () => {
     const { out } = render([L({ id: 'a' }), L({ id: 'b', colours: ['#0000FF'] })]);
     expect(px(out, 5, 5)).toEqual([0, 0, 255, 255]);
