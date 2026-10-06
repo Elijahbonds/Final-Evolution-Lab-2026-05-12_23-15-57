@@ -23,6 +23,10 @@ describe('proofLineFor', () => {
     // IMPROVE (2026-10-06, 1v1 #4): the box score rides the line when the run sent one
     expect(proofLineFor('hoops1v1', { score: 11, won: true, stats: { foeScore: 7, fgm: 5, fga: 9, threes: 1, steals: 2, blocks: 0, ankles: 1 } }))
       .toBe('11–7 · WON · FG 5/9 · 3PT 1 · STL 2 · ANKLES 1');
+    // IMPROVE (2026-10-06, 3v3 #9): the 3v3's box score (assists and overdrives its own); without one, the line is as it was
+    expect(proofLineFor('hoops3v3', { score: 21, opponentScore: 17, won: true, stats: { foeScore: 17, assists: 3, fgm: 8, fga: 15, threes: 2, steals: 1, blocks: 0, overdrives: 1 } }))
+      .toBe('21–17 · WON · FG 8/15 · 3PT 2 · AST 3 · STL 1 · OVERDRIVE 1');
+    expect(proofLineFor('hoops3v3', { score: 14, opponentScore: 21, won: false, stats: { foeScore: 21, assists: 0 } })).toBe('14–21 · LOST');
     expect(proofLineFor('tennis', { score: 6, opponentScore: 4, won: true })).toBe('6–4 · WON');
   });
   it('returns null for a mode it does not know or stats it cannot read', () => {

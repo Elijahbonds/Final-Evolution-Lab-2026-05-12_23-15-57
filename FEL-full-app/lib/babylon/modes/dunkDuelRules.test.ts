@@ -1,16 +1,17 @@
 // IMPROVE (2026-10-06): the duel's pure rules — the turn order with a match length, the dunk-off, the deciding number, the
-// reported score inside the server's bound, and FLASHY's trick requirement (dunkDuelRules.ts).
+// server's bound covering every length, and FLASHY's trick requirement (dunkDuelRules.ts).
 import { describe, it, expect } from 'vitest';
-import { DUNKOFF_MAX_ROUNDS, MATCH_LENGTHS, duelNeed, duelNext, needLine, nextMatchLength, reportedScore, styleTierFor, type DuelState } from './dunkDuelRules';
-import { STORY_MIRRORED } from '@/lib/sessions/modeScoreRules';
+import { DUNKOFF_MAX_ROUNDS, MATCH_LENGTHS, duelNeed, duelNext, needLine, nextMatchLength, styleTierFor, type DuelState } from './dunkDuelRules';
+import { STORY_MIRRORED, dunkDuelBound, checkRunScore } from '@/lib/sessions/modeScoreRules';
 import { DUNK_ATTEMPT_MAX } from '@/lib/arena-score-integrity';
 import { MIN_TOTAL, PERFECT_TOTAL } from '../core/JudgePanel';
 
 const st = (o: Partial<DuelState> = {}): DuelState => ({ dunksEach: 2, attempts: [0, 0], totals: [0, 0], off: [[], []], ...o });
 
 describe('the match length (#9)', () => {
-  it('rings 2 → 3 → 5 → 2, and the first is the duel’s own length (the server bound mirrors it)', () => {
-    expect(MATCH_LENGTHS[0]).toBe(STORY_MIRRORED.dunkDuelDunksEach);
+  it('rings 2 → 3 → 5 → 2, and the longest is the length the server bound mirrors', () => {
+    expect(MATCH_LENGTHS[0]).toBe(2);
+    expect(Math.max(...MATCH_LENGTHS)).toBe(STORY_MIRRORED.dunkDuelMaxDunksEach);
     expect(nextMatchLength(2)).toBe(3);
     expect(nextMatchLength(3)).toBe(5);
     expect(nextMatchLength(5)).toBe(2);
@@ -28,12 +29,14 @@ describe('the match length (#9)', () => {
     expect(order).toEqual([0, 1, 0, 1, 0, 1]);
   });
 
-  it('the reported score stays inside the server bound at every length — and is the total, unchanged, at the default', () => {
-    const bound = STORY_MIRRORED.dunkDuelDunksEach * DUNK_ATTEMPT_MAX;
-    for (const n of MATCH_LENGTHS) expect(reportedScore(n * PERFECT_TOTAL, n, STORY_MIRRORED.dunkDuelDunksEach)).toBeLessThanOrEqual(bound);
-    expect(reportedScore(87, 2, 2)).toBe(87);
-    expect(reportedScore(200, 5, 2)).toBe(80);
-    expect(reportedScore(130, 3, 2)).toBe(87);
+  it('the real total of a perfect match at every length, dunk-off included, is inside the server bound (owner 2026-10-06: no scaling)', () => {
+    expect(STORY_MIRRORED.dunkDuelDunkOffRounds).toBe(DUNKOFF_MAX_ROUNDS);
+    expect(dunkDuelBound()).toBe((Math.max(...MATCH_LENGTHS) + DUNKOFF_MAX_ROUNDS) * DUNK_ATTEMPT_MAX);
+    for (const n of MATCH_LENGTHS) {
+      const perfect = (n + DUNKOFF_MAX_ROUNDS) * PERFECT_TOTAL;
+      expect(perfect, `${n} each`).toBeLessThanOrEqual(dunkDuelBound());
+      expect(checkRunScore({ mode: 'dunkduel', score: n * PERFECT_TOTAL, durationMs: 5 * 60_000 }).ok, `${n} each`).toBe(true);
+    }
   });
 });
 

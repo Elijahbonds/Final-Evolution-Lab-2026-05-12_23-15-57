@@ -182,3 +182,30 @@ describe('mountMotionLayers — the layers\' rules on a hoops body', () => {
     expect(deg(spine.rotationQuaternion!, bind.get(spine)!)).toBeLessThan(1e-3);   // dispose takes it off too
   });
 });
+
+// IMPROVE (2026-10-06, 3v3 #14): the level-of-detail gate — gated off, the drag and the lean skip their pass (the clip exactly, upright);
+// back on, they run again; no gate (the default) is every existing caller, unchanged.
+describe('mountMotionLayers.setGate — the 3v3\'s level of detail', () => {
+  it('gated off: the arm is its clip exactly and the chest stays upright through a cut; back on, the drag trails again', () => {
+    restBind();
+    const arm = boneNode(sk, 'LeftForeArm')!;
+    const r0 = bind.get(arm)!.clone(), r1 = r0.multiply(Quaternion.RotationAxis(new Vector3(0, 0, 1), 0.9));
+    let t = 0; const c = clip(() => new Map([[arm, t % 2 ? r1 : r0]]));
+    const m = mountMotionLayers({ scene, skeleton: sk, root, hinge: false });
+    let on = false; m.setGate(() => on);
+    for (let i = 0; i < 6; i++) scene.render();
+    t = 1; scene.render();
+    expect(deg(arm.rotationQuaternion!, r1)).toBeLessThan(0.05);      // no drag: the clip (0.022° here with no layer mounted at all — the rig's own rounding)
+    const fwd = root.getDirection(Vector3.Forward()); fwd.y = 0; fwd.normalize();
+    const side = Vector3.Cross(Vector3.Up(), fwd).normalize();
+    let v = 0; for (let i = 0; i < 20; i++) { v = Math.min(4, v + 8 / 60); root.position.addInPlace(side.scale(v / 60)); scene.render(); }
+    expect(m.leanDeg).toBe(0);                                        // no lean through a hard cut
+    on = true; t = 0;
+    for (let i = 0; i < 6; i++) scene.render();
+    t = 1; scene.render();
+    expect(deg(arm.rotationQuaternion!, r1)).toBeGreaterThan(5);      // gated on: the forearm trails its step again
+    m.setGate(null); t = 0; scene.render(); t = 1; scene.render();
+    expect(deg(arm.rotationQuaternion!, r1)).toBeGreaterThan(5);      // no gate: as ever
+    m.dispose(); scene.onBeforeAnimationsObservable.remove(c); restBind();
+  });
+});

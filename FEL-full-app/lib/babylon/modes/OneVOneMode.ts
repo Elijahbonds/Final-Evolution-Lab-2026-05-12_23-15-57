@@ -205,7 +205,7 @@ import { DUNK_CONFIG as SHARED_CFG } from './modeConfigs';
 import { readTier } from '../core/Difficulty';   // IMPROVE (2026-10-06) #2: the shared OPPONENT pick
 import type { AmbientHandle } from '../visual/EffectsKit';
 import {   // IMPROVE (2026-10-06) #1 #2 #3 #4 #10: the pure rules (onevoneRules.test)
-  ONEVONE_TIER, attackerPatience, winRule, gameWinner, onePointAway, winBy2Requested, type WinRule,
+  ONEVONE_TIER, attackerPatience, winRule, gameWinner, onePointAway, winBy2Requested, readWinBy2Pick, type WinRule,
   hintFor, hintSwap, pushPip, emptyBox,
 } from './onevoneRules';
 
@@ -385,7 +385,7 @@ export const OneVOneMode: ModeDefinition = (() => {
   let hintShown = '', hintAt = 0, hintPossession: Possession | null = null;
   /** #2: the OPPONENT pick's knobs for this run (PRO until load reads it). */
   let knobs = ONEVONE_TIER.pro;
-  /** #3: the win condition (first to 11 unless the dev seam asks for win-by-2 — onevoneRules.winBy2Requested). */
+  /** #3: the win condition (first to 11 unless the player picked win-by-2 on the READY screen — onevoneRules.winBy2Requested). */
   let winCond: WinRule = winRule(TARGET_SCORE, false);
   /** #10: the last five graded releases (onevoneRules.pushPip), and #4: my box score for the end card. */
   let pips = '';
@@ -950,7 +950,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       modeClock = 0; bannerUntil = 0; timers.length = 0; lastUpdateMs = -1; meFlightTick = null; foeFlightTick = null;
       hudMemo.clear(); hintShown = ''; hintAt = 0; hintPossession = null; pips = ''; box = emptyBox();
       knobs = ONEVONE_TIER[readTier()] ?? ONEVONE_TIER.pro;
-      winCond = winRule(TARGET_SCORE, typeof window !== 'undefined' && winBy2Requested(window.location.search, process.env.NODE_ENV === 'development'));
+      winCond = winRule(TARGET_SCORE, typeof window !== 'undefined' && winBy2Requested(window.location.search, { picked: readWinBy2Pick(), dev: process.env.NODE_ENV === 'development' }));
       console.info(`[1V1-RULES] opponent ${readTier()} (poke ${knobs.defenderAggression}, drive ×${knobs.attackerAggression}) · ${winCond.winBy2 ? `win by 2, cap ${winCond.cap}` : `first to ${winCond.target}`}`);
       if (typeof window !== 'undefined') {
         const q = Number(new URLSearchParams(window.location.search).get('handle'));

@@ -82,8 +82,9 @@ describe('the match (#4 #5 #9)', () => {
     expect(fn('finishAttempt')).toMatch(/if \(!inDunkOff\) totals\[activeIdx\] \+= dunkTotal;/);
     expect(fn('advance')).toMatch(/const next = duelNext\(duelState\(\)\);/);
   });
-  it('the reported score stays inside the server bound', () => {
-    expect(fn('advance')).toMatch(/reportedScore\(totals\[0\], dunksEach, DUNKS_EACH\)/);
+  it('the result reports the real totals at every length (owner 2026-10-06: the server bound covers the longest match)', () => {
+    expect(fn('advance')).not.toMatch(/reportedScore\(/);
+    expect(fn('advance')).toMatch(/ctx\.end\([^\n]*Math\.max\(totals\[0\], totals\[1\]\), \{ p1: totals\[0\], p2: totals\[1\], p1Total: totals\[0\], p2Total: totals\[1\]/);
   });
   it('the first card’s B steps the length; the deciding dunk carries its number on the card', () => {
     expect(DUEL).toMatch(/firstCard\(\) && e\.t === 'button' && e\.btn === 'B' && e\.pressed\) \{\n\s*dunksEach = nextMatchLength\(dunksEach\);/);

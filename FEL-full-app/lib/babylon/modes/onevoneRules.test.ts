@@ -1,13 +1,14 @@
 // IMPROVE (2026-10-06) — the 1v1's pure rules (onevoneRules): the tier knobs, the win condition and what it can post, the
 // contextual hint, the release pips and the box score line.
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
-  ONEVONE_TIER, attackerPatience, winRule, gameWinner, onePointAway, postedMax, winBy2Requested, WIN_BY_2_CAP,
+  ONEVONE_TIER, attackerPatience, winRule, gameWinner, onePointAway, postedMax, winBy2Requested, winBy2Offered, readWinBy2Pick, writeWinBy2Pick, WIN_BY_2_KEY, WIN_BY_2_CAP,
   hintFor, hintSwap, HINT_DWELL_SEC, HINT_PAINT, CONTROLS_OFFENCE, CONTROLS_DEFENCE, type HintState,
   pushPip, pipBias, PIP_COUNT, boxLine, emptyBox,
 } from './onevoneRules';
 import { TIERS } from '../core/Difficulty';
-import { SCORE_CEILINGS } from '@/lib/arena-score-integrity';
+import { SCORE_CEILINGS, SESSION_RULES_CEILINGS, checkStakeScore } from '@/lib/arena-score-integrity';
+import { rulesMaxFor, checkRunScore } from '@/lib/sessions/modeScoreRules';
 
 describe('#2 the OPPONENT pick reaches the rival', () => {
   it('every shared tier has knobs; PRO is the game as tuned (0.7, ×1) and the ladder climbs both ways', () => {
@@ -48,16 +49,40 @@ describe('#3 the win condition', () => {
     expect(onePointAway(11, 11, by2)).toBe(true);   // 13–11: two up
     expect(onePointAway(9, 10, by2)).toBe(false);   // 11–10 plays on
   });
-  it('what a won game can post — first to 11 fits the server ceiling; win-by-2 does not (why it is a dev seam)', () => {
-    const ceiling = SCORE_CEILINGS.hoops1v1.max;
-    expect(postedMax(to11)).toBe(ceiling);
-    expect(postedMax(by2)).toBeGreaterThan(ceiling);
+  it('what a won game can post — first to 11 fits the stake ceiling; win-by-2 fits only the session ceiling (owner 2026-10-06)', () => {
+    const stake = SCORE_CEILINGS.hoops1v1.max;
+    expect(postedMax(to11)).toBe(stake);
+    expect(postedMax(by2)).toBeGreaterThan(stake);                      // why it is never offered on a staked run
+    expect(postedMax(by2)).toBe(SESSION_RULES_CEILINGS.hoops1v1.max);   // 17: a session takes it
+    expect(rulesMaxFor('hoops1v1', { killSwitch: false })).toBe(postedMax(by2));
+    expect(checkRunScore({ mode: 'hoops1v1', score: postedMax(by2), durationMs: 5 * 60_000 }).ok).toBe(true);
+    expect(checkRunScore({ mode: 'hoops1v1', score: postedMax(by2) + 1, durationMs: 5 * 60_000 }).ok).toBe(false);
+    expect(checkStakeScore({ mode: 'hoops1v1', score: postedMax(to11) }).ok).toBe(true);
+    expect(checkStakeScore({ mode: 'hoops1v1', score: postedMax(to11) + 1 }).ok).toBe(false);   // a stake still reads 13
   });
-  it('win-by-2 is requested only in development, and never in a staked duel', () => {
-    expect(winBy2Requested('?winby2=1', true)).toBe(true);
-    expect(winBy2Requested('?winby2=1', false)).toBe(false);
-    expect(winBy2Requested('?winby2=1&arena=abc', true)).toBe(false);
-    expect(winBy2Requested('', true)).toBe(false);
+  it('win-by-2 is a player pick, off by default; the dev seam stays; never on a staked or head-to-head run', () => {
+    expect(winBy2Requested('', { picked: false, dev: false })).toBe(false);          // the default: first to 11
+    expect(winBy2Requested('', { picked: false, dev: true })).toBe(false);
+    expect(winBy2Requested('', { picked: true, dev: false })).toBe(true);            // the READY screen's pick, in production
+    expect(winBy2Requested('?winby2=1', { picked: false, dev: true })).toBe(true);   // the dev seam
+    expect(winBy2Requested('?winby2=1', { picked: false, dev: false })).toBe(false);
+    for (const q of ['?arena=abc', '?mp=XYZ', '?c=code', '?winby2=1&arena=abc']) {
+      expect(winBy2Offered(q), q).toBe(false);
+      expect(winBy2Requested(q, { picked: true, dev: true }), q).toBe(false);
+    }
+    expect(winBy2Offered('?tier=elite')).toBe(true);
+  });
+  it('the pick is remembered on this device, and reads off when storage is empty or throws', () => {
+    const store = new Map<string, string>();
+    const ls = { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => { store.set(k, v); }, removeItem: (k: string) => { store.delete(k); } };
+    vi.stubGlobal('window', { localStorage: ls });
+    try {
+      expect(readWinBy2Pick()).toBe(false);
+      writeWinBy2Pick(true); expect(store.get(WIN_BY_2_KEY)).toBe('1'); expect(readWinBy2Pick()).toBe(true);
+      writeWinBy2Pick(false); expect(store.has(WIN_BY_2_KEY)).toBe(false); expect(readWinBy2Pick()).toBe(false);
+      vi.stubGlobal('window', { localStorage: { getItem: () => { throw new Error('blocked'); } } });
+      expect(readWinBy2Pick()).toBe(false);
+    } finally { vi.unstubAllGlobals(); }
   });
 });
 
