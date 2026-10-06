@@ -375,6 +375,41 @@ describe('through the identity pipe (the Creator hook)', () => {
   });
 });
 
+describe('the female kit body', () => {
+  it('reads its own frame and wears the visor over its own eyes; a mirrored pad pair lands on both shoulders', async () => {
+    const c = await SceneLoader.LoadAssetContainerAsync('', `data:model/gltf-binary;base64,${readFileSync('public/models/candidates/fel-kit-female.glb').toString('base64')}`, scene, undefined, '.glb');
+    const inst = c.instantiateModelsToScene((x) => `${x}_f${++n}`, false, { doNotInstantiate: true });
+    for (const g of inst.animationGroups) g.stop();
+    const root = inst.rootNodes[0] as TransformNode;
+    const s = { id: 'f', root, meshes: root.getChildMeshes(), skeleton: inst.skeletons[0] } as unknown as SpawnedCharacter;
+    settle(root);
+    const f = rigFrames(s.skeleton, root)!;
+    near(Vector3.TransformNormal(f.axes.right, root.getWorldMatrix()).normalize(), new Vector3(1, 0, 0), 0.03);
+    near(Vector3.TransformNormal(f.axes.fwd, root.getWorldMatrix()).normalize(), new Vector3(0, 0, 1), 0.05);
+    syncParts(s, [P({ id: 'a', shape: 'shoulderPad', bone: 'LeftShoulder', pos: [0.04, 0.11, 0], rot: [0, 0, -90], mirror: true })], wornPartsForEquipped({ headwear: 'cap_nexus' }));
+    settle(root);
+    const ms = partsOn(root).meshes;
+    const visor = ms.find((m) => m.parent!.name.startsWith('Head'))!;
+    const eyes = root.getChildMeshes().find((m) => m.name.startsWith('eyes'))!;
+    visor.refreshBoundingInfo(); eyes.refreshBoundingInfo(true);
+    const v = visor.getBoundingInfo().boundingBox, e = eyes.getBoundingInfo().boundingBox;
+    expect(v.minimumWorld.x).toBeLessThan(e.minimumWorld.x);
+    expect(v.maximumWorld.x).toBeGreaterThan(e.maximumWorld.x);
+    expect(v.maximumWorld.z).toBeGreaterThan(e.maximumWorld.z);
+    expect(v.minimumWorld.y).toBeLessThan(e.centerWorld.y);
+    expect(v.maximumWorld.y).toBeGreaterThan(e.centerWorld.y);
+    const pads = ms.filter((m) => /Shoulder/.test(m.parent!.name)).map((m) => { m.refreshBoundingInfo(); return m.getBoundingInfo().boundingBox.centerWorld; });
+    expect(pads).toHaveLength(2);
+    for (const side of ['Left', 'Right'] as const) {
+      const arm = boneNode(s.skeleton, `${side}Arm`)!.getAbsolutePosition();
+      const pad = pads.find((p) => Math.sign(p.x) === Math.sign(arm.x))!;
+      expect(pad.y).toBeGreaterThan(arm.y);                // on top of the shoulder
+      expect(Math.abs(pad.x - arm.x)).toBeLessThan(0.08);  // over the joint
+    }
+    root.dispose();
+  }, 60_000);
+});
+
 describe('draw calls and materials (measured: 0 vs 20 vs 64 parts)', () => {
   // a clean scene: one kit body in its default identity, a camera framing it, nothing left over from the cases above
   let clean: Scene; let s: SpawnedCharacter;
