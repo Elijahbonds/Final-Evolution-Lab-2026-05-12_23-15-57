@@ -23,7 +23,7 @@ import {
 import { RivalCombatBrain, threatLandsIn, type RivalResource } from '../core/RivalCombatBrain';
 import { StrikeController, karateMoveset, staffMoveset, bladeMoveset, bookMoveset, stringRule, MIN_STARTUP_SEC, type CombatMove } from '../core/StrikeSystem';
 import { DefenseController, applyDefenseOutcome, SUBSTITUTION_CHI_COST } from '../core/DefenseSystem';
-import { ResourceMeter, CHAKRA } from '../core/ResourceMeter';
+import { ResourceMeter, CHAKRA, CHI } from '../core/ResourceMeter';
 import { CombatMovement } from '../core/CombatMovement';
 import { EvadeMoves } from '../core/EvadeMoves';
 import { StringBook, attackFromMove, STRIKE_TIMING, DASH_ATTACK_SEC, type HordeMove, type StrikeBtn, type StickDir } from '../core/HordeDynamics';
@@ -31,6 +31,7 @@ import { DASH, stormDashReady } from '../core/StormCombat';
 import { dodgeReward, dashSecToImpact, tickCounter, counterMult } from '../core/DodgeRead';
 import { FocusMeter, FOCUS } from '../core/MatrixFocus';
 import { KnockSlides } from '../core/FightKit';
+import { ComboBreaker, COMBO_BREAK } from '../core/ComboBreaker';
 import { BASELINE_RATINGS, hasFightMove, routeFor, cancelWindowSec, damageScale, type RouteStrike } from '../core/FighterStyle';
 import { COMBAT_ARENAS, arenasFor, arenaClamp, knockTo, offEdge, insideBy, type CombatArena, type CombatModeId } from './arenas';
 import { styleMoveset, styleAttacks } from './loadout';
@@ -177,6 +178,8 @@ export interface Obs {
   subReady: boolean;
   dashKind: 'storm' | 'combat';
   canRoll: boolean;
+  /** my velocity (S modes: CombatMovement's; K modes: 0 — they move at the stick at once) */
+  myVx?: number; myVz?: number;
 }
 
 export class Agent {
@@ -319,8 +322,17 @@ export class Agent {
         wx += cx * k; wz += cz * k;
       }
     }
-    const wl = Math.hypot(wx, wz);
-    if (wl > 1) { wx /= wl; wz /= wl; }
+    let wl = Math.hypot(wx, wz);
+    if (wl > 1) { wx /= wl; wz /= wl; wl = 1; }
+    // edge awareness, predictive: if this step would leave less than 1.2 m of floor in 0.35 s, steer for the middle
+    // a decent player near a drop LETS GO of the stick when he is carried at it (the movement's decel stops him); pulling
+    // straight back at a jog does not reverse in time (CourtMovement turns a near-180° wish very slowly — measured on the
+    // Pit: the bot walked off in 78 of 100 rounds pulling back, 3 letting go)
+    if (p.edgeAware && o.arena.edge === 'drop' && insideBy({ x: o.me.x + (o.myVx ?? 0) * 0.35, z: o.me.z + (o.myVz ?? 0) * 0.35 }, o.arena.shape) < 1.2) { wx = 0; wz = 0; }
+    else if (p.edgeAware && o.arena.edge === 'drop' && wl > 0.05 && insideBy({ x: o.me.x + wx * 4.4 * 0.35, z: o.me.z + wz * 4.4 * 0.35 }, o.arena.shape) < 1.2) {
+      const cl = Math.hypot(o.me.x, o.me.z) || 1;
+      wx = -o.me.x / cl; wz = -o.me.z / cl;
+    }
     pad.wx = wx; pad.wz = wz;
     return pad;
   }
@@ -769,6 +781,8 @@ class SMatch {
   private book = new StringBook();
   private chakra = new ResourceMeter(CHAKRA); private foeChakra = new ResourceMeter(CHAKRA);
   private foeUlt = new UltimateArm();
+  /** Showdown / Duel: the rival escapes a long mashed chain (core/ComboBreaker), as the modes do */
+  private breaker = new ComboBreaker();
   private myMoves!: Record<string, CombatMove>; private myIds: string[] = [];
   private myWeapon: SimWeapon; private foeWeapon: SimWeapon | null = null;
   private foeGuardUntil = 0; private guardUp = false; private xDownAt = -1; private lastTapAt = -1e9;
@@ -827,6 +841,7 @@ class SMatch {
     this.meDef.releaseBlock(); this.foeDef.releaseBlock(); this.guardUp = false; this.xDownAt = -1;
     this.book.reset(); this.focus.stop(); this.foeUlt.clear(); this.foeSubstituted = 0; this.meSubstituted = 0;
     this.ult = null; this.foeLaunched = 0; this.roundOver = null; this.knock.clear(); this.agent.reset(); this.assistHitAt = -1;
+    this.breaker.reset();
     this.meStrike.swapMoveset(this.myMoves); this.foeStrike.swapMoveset(this.foeSet(this.mode === 'duel' ? this.foeWeapon! : 'fists'));
     this.pw = this.mirror ? UNIT : powerFor(this.mode, this.cfg.tier, this.cfg.powerBase, this.myWeapon);
     this.foeSt.maxHp = Math.round(100 * this.pw.hp); this.foeSt.guardTaken = this.pw.guardTaken; this.foeSt.hp = this.foeSt.maxHp;
@@ -868,10 +883,12 @@ class SMatch {
     if (mine) { this.myOutSeq = this.mySwingSeq; this.myOut = out; }
     if (this.mode === 'showdown') {
       const g = attackerChakraGain(out); if (g) (mine ? this.chakra : this.foeChakra).gain(g);
+      if (out === 'hit') (mine ? this.foeChakra : this.chakra).gain('hitTaken');   // ShowdownMode: a blow taken builds chakra
       if (out === 'parried') { (mine ? this.foeChakra : this.chakra).gain('parry'); if (!mine) this.focus.gain(FOCUS.dodgeGain); }
       if (out === 'guardImpacted') { (mine ? this.foeChakra : this.chakra).gain('guardImpact'); if (!mine) this.focus.gain(FOCUS.dodgeGain); }
     } else {
       const g = chiForOutcome(out, move.atk.chiGain); if (g) aSt.chi = Math.min(CHI_MAX, aSt.chi + g);
+      if (out === 'hit') dSt.chi = Math.min(CHI_MAX, dSt.chi + (CHI.gains.hitTaken ?? 0));   // DuelMode: a blow taken builds chi
       if ((out === 'parried' || out === 'guardImpacted') && !mine) this.focus.gain(FOCUS.dodgeGain);
     }
     if (out !== 'hit') return;
@@ -888,6 +905,24 @@ class SMatch {
     if (mine && move.launch) this.foeLaunched = 0.9; else if (mine && move.air && !move.slam) this.foeLaunched = Math.max(this.foeLaunched, 0.5); else if (mine && move.slam) this.foeLaunched = 0;
     if (this.ringOut()) return;
     if (dSt.hp <= 0) this.end(mine, 'ko');
+    else if (mine && !this.mirror) this.maybeBreak();
+  }
+
+  /** the rival's combo break (ShowdownMode / DuelMode comboBreak) */
+  private maybeBreak(): void {
+    const fs = this.foeSt, sd = this.mode === 'showdown';
+    const spot = sd
+      ? (this.foeChakra.value >= SUBSTITUTION_CHI_COST ? DefenseController.substitutionSpot(this.me, yawTo(this.me, this.foe)) : null)
+      : (fs.chi >= SUBSTITUTION_CHI_COST ? safeSubstitutionSpot(this.me.x, this.me.z, yawTo(this.me, this.foe), this.edgeIn) : null);
+    if (!this.breaker.hit(this.now / 1000, this.cfg.tier, !!spot) || !spot) return;
+    if (sd) this.foeChakra.spend(SUBSTITUTION_CHI_COST); else fs.chi -= SUBSTITUTION_CHI_COST;
+    this.foeDef.spendSubstitution(this.now);
+    fs.stunSec = 0; fs.staggerSec = 0;
+    this.knock.cancel(this.foe);
+    this.foe.x = spot.x; this.foe.z = spot.z;
+    if (sd) arenaClamp(this.foe, this.arena);
+    this.foeSubstituted = this.now + (sd ? SHOWDOWN.subWhiffMs : DUEL.subWhiffMs);
+    this.brain.openCounter(COMBO_BREAK.counterSec);
   }
 
   private resolveUlt(): void {
@@ -984,6 +1019,7 @@ class SMatch {
 
     // ── strikes ──
     if (this.meStrike.current !== this.lastMyCur) { this.lastMyCur = this.meStrike.current; if (this.meStrike.current) this.mySwingSeq++; }
+    this.breaker.track(DT, this.meStrike.current);
     if (this.meStrike.update(DT, this.now).startedActive) {
       if (this.now < this.foeSubstituted) this.meStrike.current?.consumeHit();
       else this.resolve(true);
@@ -1102,7 +1138,7 @@ class SMatch {
     o.specialReady = this.mode === 'showdown' && this.chakra.full; o.specialReach = SHOWDOWN.ultReachM - 0.2;
     o.assistReady = this.mode === 'showdown' && this.assistCd <= 0;
     o.subReady = this.mode === 'showdown' && this.meDef.canSubstitute(this.chakra.value, this.now);
-    o.dashKind = 'combat'; o.canRoll = false;
+    o.dashKind = 'combat'; o.canRoll = false; o.myVx = this.meMove.vel.x; o.myVz = this.meMove.vel.z;
     return o;
   }
 }

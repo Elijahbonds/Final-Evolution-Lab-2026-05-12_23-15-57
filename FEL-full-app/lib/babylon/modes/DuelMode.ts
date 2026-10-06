@@ -39,6 +39,8 @@ import { RivalCombatBrain, threatLandsIn, type RivalResource } from '../core/Riv
 import {
   StrikeController, karateMoveset, staffMoveset, bladeMoveset, MIN_STARTUP_SEC, type CombatMove, bookMoveset, stringRule } from '../core/StrikeSystem';
 import { DefenseController, applyDefenseOutcome, SUBSTITUTION_CHI_COST } from '../core/DefenseSystem';
+import { ComboBreaker, COMBO_BREAK } from '../core/ComboBreaker';
+import { CHI } from '../core/ResourceMeter';
 import { CombatMovement } from '../core/CombatMovement';
 import { XButtonReader, LAUNCH_AIR_SEC, launchHeight } from '../core/StormCombat';
 import { FOCUS, FocusMeter } from '../core/MatrixFocus';   // phase 8: bullet time on R2, a clock per rig
@@ -258,7 +260,10 @@ export const DuelMode: ModeDefinition = (() => {
   }
   /** IMPROVE (2026-10-06): the rival at a round's start — the standing (NERVE, once per round now, not per frame), the
    *  OPPONENT pick (PRO = the tuned 0.72), the disc's edge (it circles away from the drop), no slide left running. */
+  /** COMBAT DIFFICULTY (2026-10-06): the rival escapes a long mashed string (core/ComboBreaker). */
+  const breaker = new ComboBreaker();
   function roundStartRival(): void {
+    breaker.reset();
     rivalBrain.setStanding(foeWins, myWins, ROUNDS_TO_WIN);
     rivalBrain.setDifficulty(rivalDifficulty(0.72, readTier()));
     // COMBAT DIFFICULTY (2026-10-06): nothing here reads the line, so a read is a guard, never a sidestep; and the rival's
@@ -429,6 +434,9 @@ export const DuelMode: ModeDefinition = (() => {
     // breaks). Duel never paid chi, so the rival could never afford a dash, a substitution or its CRITICAL EDGE.
     const gain = chiForOutcome(outcome, move.atk.chiGain);
     if (gain) atkState.chi = Math.min(CHI_MAX, atkState.chi + gain);
+    // COMBAT DIFFICULTY (2026-10-06), TUNED: a blow TAKEN builds the defender's chi too (ResourceMeter CHI.gains.hitTaken,
+    // which nothing paid) — the stun-locked rival's way to afford the substitution out of a mashed string (ComboBreaker)
+    if (outcome === 'hit') defState.chi = Math.min(CHI_MAX, defState.chi + (CHI.gains.hitTaken ?? 0));
     if (ult && outcome !== 'hit') { banner(ctx, outcome === 'whiff' ? 'CRITICAL EDGE MISSED!' : 'CRITICAL EDGE STOPPED!', 800); console.info(`[DL-STORM] rival critical edge answered (${outcome})`); }
 
     switch (outcome) {
@@ -489,9 +497,32 @@ export const DuelMode: ModeDefinition = (() => {
         // (the HP reaches the HUD at the end of the frame — pushHud — IMPROVE 2026-10-06)
         if (checkRingOut(ctx)) return;
         if (defState.hp <= 0) endRound(ctx, mine, mine ? 'K.O.' : 'K.O. — YOU', 'ko');
+        else if (mine) {
+          // COMBAT DIFFICULTY (2026-10-06): a rival stun-locked by a long mashed chain substitutes out of it (ComboBreaker) —
+          // when it has the chi and a spot with footing (never off the drop)
+          const spot = foeState.chi >= SUBSTITUTION_CHI_COST ? safeSubstitutionSpot(player.root.position.x, player.root.position.z, player.root.rotation.y, edgeIn) : null;
+          if (breaker.hit(now() / 1000, readTier(), !!spot) && spot) comboBreak(ctx, spot);
+        }
         break;
       }
     }
+  }
+
+  /** COMBAT DIFFICULTY (2026-10-06): THE BREAK — the rival's substitution out of a combo (see ShowdownMode.comboBreak). */
+  function comboBreak(ctx: ModeContext, spot: { x: number; z: number }): void {
+    foeState.chi -= SUBSTITUTION_CHI_COST;
+    foeDef.spendSubstitution(now());
+    foeState.stunSec = 0; foeState.staggerSec = 0;
+    knock.cancel(rival.root.position);
+    rival.root.position.set(spot.x, rival.root.position.y, spot.z);
+    foeSubstituted = now() + DUEL.subWhiffMs;
+    SoundKit.play('whoosh', { pitch: 1.8, volume: 0.6 });
+    EffectsKit.burst(ctx.scene, new Vector3(spot.x, rival.root.position.y + 1.2, spot.z), 'glitch');
+    ctx.juice.flash('#ff3344', 110);
+    ctx.camDirector.pulse(0.45, 0.35);
+    banner(ctx, 'BREAK! — THE RIVAL ESCAPED YOUR STRING', 900);
+    rivalBrain.openCounter(COMBO_BREAK.counterSec);   // it escapes AND strikes back
+    console.info('[DL-STORM] rival combo break');
   }
 
   /** IMPROVE (2026-10-06): the defender's one-beat guard states, per fighter (re-armed so a second parry plays again). */
@@ -956,6 +987,7 @@ export const DuelMode: ModeDefinition = (() => {
       if (arena.edge === 'drop' && holdFromEdge(rival.root.position, foeInBefore, arena.shape)) foeMove.vel.setAll(0);
 
       // strike resolution at active-frame open
+      breaker.track(dt, meStrike.current);   // COMBAT DIFFICULTY (2026-10-06): the links of my string (ComboBreaker)
       if (meStrike.update(dt, now()).startedActive) {
         // IMPROVE (2026-10-06): the rival's substitution beat — my swing in flight finds nobody (Showdown's rule)
         if (now() < foeSubstituted) { meStrike.current?.consumeHit(); banner(ctx, 'THEY SUBSTITUTED!', 500); }

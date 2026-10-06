@@ -50,6 +50,7 @@ import { StringBook, type StickDir, type StrikeBtn } from '../core/HordeDynamics
 import { readBlend, blendTraits } from '../combat/schools';
 import { styleMoveset } from '../combat/loadout';
 import { DefenseController, applyDefenseOutcome, SUBSTITUTION_CHI_COST } from '../core/DefenseSystem';
+import { ComboBreaker, COMBO_BREAK } from '../core/ComboBreaker';
 import { CombatMovement } from '../core/CombatMovement';
 import { XButtonReader, LAUNCH_AIR_SEC, launchHeight } from '../core/StormCombat';
 import { FOCUS, FocusMeter } from '../core/MatrixFocus';   // phase 8: bullet time on R2, a clock per rig   // combat pass phase 3: X = tap dash / double = chakra dash / hold = guard, the same reader the Storm modes use
@@ -187,7 +188,10 @@ export const ShowdownMode: ModeDefinition = (() => {
   }
   /** IMPROVE (2026-10-06): the rival at a round's start — the standing (NERVE, once per round now, not per frame), the
    *  OPPONENT pick (PRO = the tuned 0.72), and no slide left running from the last round. */
+  /** COMBAT DIFFICULTY (2026-10-06): the rival escapes a long mashed string (core/ComboBreaker). */
+  const breaker = new ComboBreaker();
   function roundStartRival(): void {
+    breaker.reset();
     rivalBrain.setStanding(foeRounds, myRounds, 2);
     rivalBrain.setDifficulty(rivalDifficulty(0.72, readTier()));
     // COMBAT DIFFICULTY (2026-10-06): nothing here reads the line, so a read is a guard, never a sidestep; and the rival's
@@ -278,6 +282,10 @@ export const ShowdownMode: ModeDefinition = (() => {
     // IMPROVE (2026-10-06), TUNED: the attacker's chakra pays only for a blow that lands (a hit, a guard it breaks) — the
     // gain ran before the outcome was known, so a whiff, a block and a parried swing each paid as a clean hit
     const gain = attackerChakraGain(outcome); if (gain) meter.gain(gain);
+    // COMBAT DIFFICULTY (2026-10-06), TUNED: a blow TAKEN builds the defender's chakra too — the CHAKRA table always had
+    // hitTaken (4) and nothing paid it. Storm's rule, both fighters; it is what lets a stun-locked rival afford the
+    // substitution out of a mashed string (ComboBreaker — measured: without it, 0.4 of ~4 chances a round were affordable)
+    if (outcome === 'hit') (mine ? foeChakra : chakra).gain('hitTaken');
     if (ult && outcome !== 'hit') { banner(ctx, outcome === 'whiff' ? 'RIVAL ULTIMATE MISSED!' : 'RIVAL ULTIMATE STOPPED!', 800); console.info(`[SD-STORM] rival ultimate answered (${outcome})`); }
 
     switch (outcome) {
@@ -333,9 +341,32 @@ export const ShowdownMode: ModeDefinition = (() => {
           ? { foeHp: defState.hp, combo: atkState.combo >= 2 ? atkState.combo : 0 }
           : { hp: defState.hp, foeCombo: atkState.combo >= 2 ? atkState.combo : 0 });
         if (defState.hp <= 0) endRound(ctx, mine);
+        // COMBAT DIFFICULTY (2026-10-06): a rival stun-locked by a long mashed chain substitutes out of it (ComboBreaker)
+        else if (mine && breaker.hit(now() / 1000, readTier(), foeChakra.value >= SUBSTITUTION_CHI_COST)) comboBreak(ctx);
         break;
       }
     }
+  }
+
+  /** COMBAT DIFFICULTY (2026-10-06): THE BREAK — the rival's substitution out of a combo (Storm's combo breaker). Its meter
+   *  pays the substitution's cost, the stun is gone, it is behind you, and your swing in flight finds nobody for the
+   *  substitution's whiff beat. Called loudly ("BREAK!", the rival's flash) so a masher learns why. */
+  function comboBreak(ctx: ModeContext): void {
+    foeChakra.spend(SUBSTITUTION_CHI_COST);
+    foeDef.spendSubstitution(now());
+    foeState.stunSec = 0; foeState.staggerSec = 0;
+    knock.cancel(rival.root.position);
+    const spot = DefenseController.substitutionSpot(player.root.position, player.root.rotation.y);
+    rival.root.position.copyFrom(spot);
+    arenaClamp(rival.root.position, arena);
+    foeSubstituted = now() + SHOWDOWN.subWhiffMs;
+    SoundKit.play('whoosh', { pitch: 1.8, volume: 0.6 });
+    EffectsKit.burst(ctx.scene, rival.root.position.add(new Vector3(0, 1.2, 0)), 'glitch');
+    ctx.juice.flash('#ff3344', 110);
+    ctx.camDirector.pulse(0.45, 0.35);
+    banner(ctx, 'BREAK! — THE RIVAL ESCAPED YOUR STRING', 900);
+    rivalBrain.openCounter(COMBO_BREAK.counterSec);   // it escapes AND strikes back
+    console.info('[SD-STORM] rival combo break');
   }
 
   /** P7: what the rival's hit meets on a BODY player at `impactAt` (page ms): the ledger's guard, raise, push and slip,
@@ -931,6 +962,7 @@ export const ShowdownMode: ModeDefinition = (() => {
       arenaClamp(player.root.position, arena); if (!modeVenue?.constrain(player.root.position)) { player.root.position.x = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, player.root.position.x)); player.root.position.z = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, player.root.position.z)); }
 
       // ── strikes: advance, resolve at active-frame open ──
+      breaker.track(dt, meStrike.current);   // COMBAT DIFFICULTY (2026-10-06): the links of my string (ComboBreaker)
       const opened = meStrike.update(dt, now());
       if (opened.startedActive) {
         // IMPROVE (2026-10-06): the rival's substitution beat — my swing in flight finds nobody (the player's own rule)

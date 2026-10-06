@@ -290,7 +290,10 @@ export const RIVAL_TIER_POWER: Readonly<Record<Tier, number>> = { rookie: 0.65, 
 /** The PRO rival's power per duel mode, for the default pick (fists). It differs per mode because the player's kit does:
  *  Showdown adds an unconditional ultimate and an assist. The other picks carry a matchup factor on top
  *  (duelRules DUEL.rivalPowerByWeapon, mixedRules RIVAL_POWER_BY_LOADOUT). 1 = the body every mode shipped with. */
-export const RIVAL_POWER_BASE = { karateVs: 1.35, showdown: 2.85, duel: 2.25, mixedcombat: 2.2 } as const;
+// COMBAT DIFFICULTY (2026-10-06, the combo breaker): Showdown 2.85 → 2.4 and Duel 2.25 → 2.15 once the rival breaks out
+// of mashed strings (core/ComboBreaker) — the break took the masher's edge, and the lighter body keeps a decent player's
+// ELITE in band.
+export const RIVAL_POWER_BASE = { karateVs: 1.35, showdown: 2.4, duel: 2.15, mixedcombat: 2.2 } as const;
 export interface RivalPower { p: number; hp: number; dmg: number; guardTaken: number }
 export function rivalPower(base: number, tier: Tier | null | undefined): RivalPower {
   const k = tier ? RIVAL_TIER_POWER[tier] ?? 1 : 1;
@@ -376,6 +379,14 @@ export class RivalFightBrain {
 
   /** COMBAT DIFFICULTY (2026-10-06): see `stepping`. Default true keeps the old behaviour for a mode that never says. */
   setStepping(ok: boolean): void { this.stepping = ok; }
+
+  /** COMBAT DIFFICULTY (2026-10-06): the rival has just broken out of a combo (core/ComboBreaker) — the counter window opens
+   *  now and the cooldown is cleared, as an opening read does: it escapes AND strikes back (Storm's substitution). */
+  openCounter(sec: number): void {
+    if (!(sec > 0)) return;
+    this.punishSec = Math.max(this.punishSec, sec);
+    this.cooldown = Math.min(this.cooldown, 0);
+  }
 
   /** COMBAT DIFFICULTY (2026-10-06): see `foeReach` — the mode says what the foe holds (Duel: the player's weapon). */
   setFoeReach(m: number): void { this.foeReach = Number.isFinite(m) && m > 0 ? m : 0; }

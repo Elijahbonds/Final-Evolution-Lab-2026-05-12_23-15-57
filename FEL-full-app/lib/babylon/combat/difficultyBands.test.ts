@@ -11,6 +11,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { runCell, runMatch, type SimMode } from './difficultySim';
 import { rivalPower, applyRivalPower, poweredAttack, RIVAL_POWER_BASE, RIVAL_TIER_POWER, FighterState, KARATE_ATTACKS, resolveStrike } from '../core/FightCore';
+import { ComboBreaker, COMBO_BREAK } from '../core/ComboBreaker';
 
 const MODES: SimMode[] = ['kvs', 'showdown', 'duel', 'mixed'];
 
@@ -129,13 +130,69 @@ describe('the reference players', () => {
   it('a NEW player (slow, few reads) still wins at ROOKIE', () => {
     for (const mode of MODES) expect(runCell({ mode, tier: 'rookie', profile: 'new' }, N_TIER, SEED).winRate, mode).toBeGreaterThan(0.5);
   });
-  it('a masher does clearly worse than a decent player at PRO in Karate VS and Mixed', () => {
-    // (Showdown and Duel: the masher's stun-lock and Showdown's unconditional ultimate keep it level — reported to the
-    // owner as a structural finding, not pinned here.)
-    for (const mode of ['kvs', 'mixed'] as SimMode[]) {
-      const d = runCell({ mode, tier: 'pro', profile: 'decent' }, N_PRO, SEED).winRate;
-      const m = runCell({ mode, tier: 'pro', profile: 'masher' }, N_PRO, SEED).winRate;
-      expect(m, mode).toBeLessThan(d - 0.15);
-    }
+  // COMBAT DIFFICULTY (2026-10-06, the combo breaker): Showdown and Duel are pinned too now — the rival breaks out of a
+  // mashed string there (core/ComboBreaker). Their masher sits nearer the line, so they are measured on 200 matches.
+  for (const [mode, n] of [['kvs', N_PRO], ['mixed', N_PRO], ['showdown', 200], ['duel', 200]] as const) {
+    it(`${mode}: a masher does clearly worse than a decent player — 15+ points under at PRO, under at ELITE`, () => {
+      const d = runCell({ mode, tier: 'pro', profile: 'decent' }, n, SEED).winRate;
+      const m = runCell({ mode, tier: 'pro', profile: 'masher' }, n, SEED).winRate;
+      expect(m).toBeLessThanOrEqual(d - 0.15);
+      const de = runCell({ mode, tier: 'elite', profile: 'decent' }, 60, SEED).winRate;
+      const me = runCell({ mode, tier: 'elite', profile: 'masher' }, 60, SEED).winRate;
+      expect(me).toBeLessThan(de);
+    });
+  }
+});
+
+describe('the combo breaker (core/ComboBreaker)', () => {
+  const string = (b: ComboBreaker, links: number, gapSec = 0.05): void => {
+    for (let i = 0; i < links; i++) { const swing = { i }; b.track(gapSec, swing); b.track(0.1, swing); }   // one swing, two frames
+  };
+  it('counts the links of ONE unbroken string; an idle gap starts a new one', () => {
+    const b = new ComboBreaker();
+    string(b, 3);
+    expect(b.string).toBe(3);
+    b.track(COMBO_BREAK.idleGapSec + 0.01, null);   // he stopped pressing long enough
+    string(b, 1);
+    expect(b.string).toBe(1);
+  });
+  it('never breaks a book-length string (a decent player\'s), only one past minLinks', () => {
+    const b = new ComboBreaker(), yes = () => 0;   // a roll that always succeeds
+    string(b, COMBO_BREAK.minLinks - 1);
+    expect(b.hit(10, 'elite', true, yes)).toBe(false);
+    string(b, 1);
+    expect(b.hit(10, 'elite', true, yes)).toBe(true);
+  });
+  it('needs the meter (affordable), then waits out its cooldown', () => {
+    const b = new ComboBreaker(), yes = () => 0;
+    string(b, COMBO_BREAK.minLinks);
+    expect(b.hit(10, 'pro', false, yes)).toBe(false);   // no chi / nowhere to go
+    expect(b.hit(10, 'pro', true, yes)).toBe(true);
+    string(b, COMBO_BREAK.minLinks);
+    expect(b.hit(10 + COMBO_BREAK.cooldownSec - 0.1, 'pro', true, yes)).toBe(false);
+    expect(b.hit(10 + COMBO_BREAK.cooldownSec + 0.1, 'pro', true, yes)).toBe(true);
+  });
+  it('ROOKIE rarely breaks, ELITE reliably', () => {
+    expect(COMBO_BREAK.chance.rookie).toBeLessThan(COMBO_BREAK.chance.pro);
+    expect(COMBO_BREAK.chance.pro).toBeLessThan(COMBO_BREAK.chance.elite);
+    const roll = (r: number, tier: 'rookie' | 'elite') => { const b = new ComboBreaker(); string(b, COMBO_BREAK.minLinks); return b.hit(10, tier, true, () => r); };
+    expect(roll(0.5, 'rookie')).toBe(false);
+    expect(roll(0.5, 'elite')).toBe(true);
+  });
+  for (const [file, tag] of [['ShowdownMode.ts', 'SD'], ['DuelMode.ts', 'DL']] as const) {
+    it(`${file}: tracks my string, breaks on a landed blow, pays and plays it (BREAK!, the flash, the whiff beat, the counter)`, () => {
+      const s = modeSrc(file);
+      expect(s).toContain('breaker.track(dt, meStrike.current);');
+      expect(s).toMatch(/breaker\.hit\(now\(\) \/ 1000, readTier\(\), /);
+      expect(s).toContain("banner(ctx, 'BREAK! — THE RIVAL ESCAPED YOUR STRING', 900);");
+      expect(s).toContain("ctx.juice.flash('#ff3344', 110);");
+      expect(s).toContain('rivalBrain.openCounter(COMBO_BREAK.counterSec);');
+      expect(s).toContain(`console.info('[${tag}-STORM] rival combo break');`);
+      expect(s).toContain('breaker.reset();');
+      expect(s).toMatch(/if \(outcome === 'hit'\) .*hitTaken/);   // a blow taken builds the meter that pays for it
+    });
+  }
+  it('Karate VS and Mixed have no such chain (1–2 hit chains for every player measured) and do not use it', () => {
+    for (const f of ['KarateVSMode.ts', 'MixedCombatMode.ts']) expect(modeSrc(f)).not.toContain('ComboBreaker');
   });
 });

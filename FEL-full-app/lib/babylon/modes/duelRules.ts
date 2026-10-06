@@ -39,7 +39,8 @@ export const DUEL = {
    *  counter-picks (fists → its blade, blade → its staff, staff → its fists), so one power is three different fights:
    *  measured at the fists' power, a decent player won 3 % with the blade (the staff out-reaches it) and 3 % with the staff
    *  (on its authored chain). Each pick is calibrated to the same PRO target. */
-  rivalPowerByWeapon: { fists: 1, blade: 0.6, staff: 0.67 },
+  // (the combo breaker pass: blade 0.6 → 0.58, staff 0.67 → 0.64 — the rival's hit-taken chi and break moved them)
+  rivalPowerByWeapon: { fists: 1, blade: 0.58, staff: 0.64 },
 } as const;
 
 /** What a strike's outcome pays the ATTACKER's chi: the move's own chiGain for a blow that lands (a hit, a guard it

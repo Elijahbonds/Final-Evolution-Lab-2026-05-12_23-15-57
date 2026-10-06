@@ -154,6 +154,8 @@ export class RivalCombatBrain {
   setStepping(ok: boolean): void { this.inner.setStepping(ok); }
   /** COMBAT DIFFICULTY (2026-10-06): see RivalFightBrain.setFoeReach — the read covers the foe's weapon, not only its own. */
   setFoeReach(m: number): void { this.inner.setFoeReach(m); }
+  /** COMBAT DIFFICULTY (2026-10-06): see RivalFightBrain.openCounter — after a combo break. */
+  openCounter(sec: number): void { this.inner.openCounter(sec); }
   setEdge(edgeIn: ((x: number, z: number) => number) | null): void { this.inner.setEdge(edgeIn); }
   /** IMPROVE (2026-10-06): NERVE at round start, memoised — see RivalFightBrain.setStanding. */
   setStanding(rivalWins: number, playerWins: number, toWin: number): NerveShift {
