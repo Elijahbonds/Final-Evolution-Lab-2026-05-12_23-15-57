@@ -859,6 +859,10 @@ describe('drift guards — the numbers mirrored out of mode files still match th
   it('Big Air: the line bonus is scored the way bigAirLineBonusMax models it', () => {
     const t = src('lib/babylon/modes/AirSessionMode.ts');
     expect(t).toMatch(/chain: new ComboChain\(undefined, 'air'\)/);
+    // …and a fresh one each session: the mode is one module-level definition, and reset() runs on every load()
+    const reset = t.slice(t.indexOf('const reset = (): void => {'), t.indexOf('\n  };', t.indexOf('const reset = (): void => {')));
+    expect(reset).toMatch(/S\.chain = new ComboChain\(undefined, 'air'\); S\.bonus = 0;/);
+    expect(t).toMatch(/async load\(ctx: ModeContext\): Promise<void> \{\n\s+loadCount \+= 1;\n\s+reset\(\);/);
     expect(t.match(/S\.chain\.bank\(\)/g)?.length, 'the chain banks only when the session ends').toBe(1);
     expect(t.match(/S\.chain\.add\(/g)?.length, 'one link a landing').toBe(1);
     expect(t).not.toMatch(/S\.chain\.accrue\(/);

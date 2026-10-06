@@ -185,6 +185,9 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
     hudOut.reset(); camPhase = null; galleryCullT = 0;   // IMPROVE (2026-10-06): a remount publishes and frames afresh
     S.note = ''; S.noteT = 0; stickLeft = null; landedAtMs = -1; lastStomp = null; prevVy = 0; hangFired = false; slowT = 0; ambientOn = false; ringState = null;
     stride.reset(); rideIntents.reset(); plantAt = null; bodyPhase = null; bodySynced = false;   // MOVEMENT PLAY P8
+    // IMPROVE (2026-10-06): the line is the SESSION's. BigAirMode is one module-level definition, so S outlives a mount: the
+    // banked chain, its bonus, the judges' best and an air's unscored names carried into the next session's posted total.
+    S.chain = new ComboChain(undefined, 'air'); S.bonus = 0; S.judgeBest = 0; S.named = [];
     Object.assign(bodyStats, { strides: 0, perfect: 0, good: 0, off: 0, fault: 0, ignoredInAir: 0, spins: 0, plants: 0, grabs: 0, last: '' });
   };
   /** The stride's feedback: the d-pad's and a body's step share it. */
