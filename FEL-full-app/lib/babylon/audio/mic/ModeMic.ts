@@ -10,7 +10,8 @@
 
 import type { ModeContext } from '@/lib/babylon/core/ModeHarness';
 import { MicDirector, type CastScript, type MicCue, type MicEvent, type MicLine } from './MicDirector';
-import { VoiceKit, type BankIndex } from './VoiceKit';
+import { VoiceKit, captionWithoutAudio, type BankIndex, type VoicePlayResult } from './VoiceKit';
+import { deviceLineMemory, saveLineMemory } from '../voice/lineMemory';
 import { CROWD, SIDEKICK, castById, mcFor } from './cast';
 import type { MicGroup } from './moments';
 
@@ -27,15 +28,19 @@ export interface ModeMicOpts {
 }
 
 /** The last cues, for probes (`window.__FEL_MIC__`). */
-const LOG: { t: number; cast: string; clips: string[]; caption: string; played: boolean }[] = [];
-function logCue(c: MicCue, played: boolean): void {
-  LOG.push({ t: Math.round(performance.now()), cast: c.cast, clips: c.clips, caption: c.caption, played });
+const LOG: { t: number; cast: string; clips: string[]; caption: string; played: boolean; result: VoicePlayResult }[] = [];
+function logCue(c: MicCue, result: VoicePlayResult): void {
+  const played = result === 'played';
+  LOG.push({ t: Math.round(performance.now()), cast: c.cast, clips: c.clips, caption: c.caption, played, result });
   if (LOG.length > 80) LOG.shift();
-  console.info(`[MIC] ${c.cast}${played ? '' : ' (caption only)'}: ${c.caption}`);
+  console.info(`[MIC] ${c.cast}${played ? '' : result === 'dropped' ? ' (dropped: the lane was busy or the moment passed)' : ' (caption only)'}: ${c.caption}`);
   if (typeof window !== 'undefined') (window as unknown as { __FEL_MIC__?: typeof LOG }).__FEL_MIC__ = LOG;
 }
 
 const now = (): number => performance.now() / 1000;
+/** TUNED (VOICEOVER 2026-10-06): a follow-up line (`then`) is stale after 4 s, was 8 s: a rival's jab or an intro 8 s after the
+ *  moment it answered is one of the "late" lines the owner hears. */
+const THEN_STALE_SEC = 4;
 
 export class ModeMic {
   private director: MicDirector | null = null;
@@ -65,7 +70,7 @@ export class ModeMic {
     }
     this.run(this.director.hear(ev, now()));
   }
-  /** Say this once the booth is free (an intro after the welcome, a rival's jab after the MC's call). Stale after 8 s. */
+  /** Say this once the booth is free (an intro after the welcome, a rival's jab after the MC's call). Stale after THEN_STALE_SEC. */
   then(ev: MicEvent): void { if (!this.disposed) this.seq.push({ ev, at: now() }); }
   /** The stands alone (they react to a trick in the air while the booth holds). */
   crowd(moment: string, n: number): void { if (this.director && !this.disposed) this.run(this.director.crowd(moment, n, now())); }
@@ -80,7 +85,7 @@ export class ModeMic {
       else this.pending = null;
       if (t >= this.holdUntil) {
         this.run(this.director.tick(t));
-        this.seq = this.seq.filter((s) => t - s.at < 8);
+        this.seq = this.seq.filter((s) => t - s.at < THEN_STALE_SEC);
         if (this.seq.length && t >= this.director.boothBusyUntil + 0.25) { const s = this.seq.shift()!; this.say(s.ev); }
       }
     }
@@ -97,6 +102,7 @@ export class ModeMic {
   hush(): void { this.seq = []; this.director?.hush(now()); VoiceKit.stop('booth', 0.08); this.clearCaption(); }
   dispose(): void {
     this.disposed = true;
+    saveLineMemory();   // VOICEOVER: the next run picks up the rounds where this one left off
     VoiceKit.stopAll(0.12);
     this.clearCaption();
   }
@@ -122,6 +128,7 @@ export class ModeMic {
       crowd: crowd.filter((c) => idx.some((i) => i.cast === c)),
       players: this.o.coach ? { ...this.o.players, coach: 'coach' } : this.o.players,
       seed: this.o.seed ?? Math.floor(Math.random() * 2 ** 31),   // a fixed seed opened every session with the same two shouts
+      memory: deviceLineMemory(),   // VOICEOVER: the shuffle bags outlive the run (lineMemory.ts)
     });
     if (this.filler) this.director.setFiller(this.filler, now());
     if (this.crowdIdle) this.director.setCrowdIdle(this.crowdIdle, now());
@@ -129,9 +136,12 @@ export class ModeMic {
   private run(cues: MicCue[]): void {
     for (const c of cues) {
       const caption = c.channel !== 'crowd';
-      void VoiceKit.play(c, this.court, () => { if (caption) this.showCaption(c); }).then((played) => {
-        logCue(c, played);
-        if (!played && caption) this.showCaption(c);   // no audio (muted, no bank, no Web Audio): the words still land
+      // VOICEOVER: the caption goes up when the audio actually starts (onStart: a line that waited its turn shows then, not
+      // when it was asked for), or at once when there is no audio (muted, no bank, no Web Audio: the words still land). A line
+      // the lane dropped (stale, cooling down, a bigger moment had the mic) shows nothing: nothing was said.
+      void VoiceKit.playEx(c, this.court, () => { if (caption) this.showCaption(c); }).then((r) => {
+        logCue(c, r);
+        if (captionWithoutAudio(r) && caption) this.showCaption(c);
       });
     }
   }

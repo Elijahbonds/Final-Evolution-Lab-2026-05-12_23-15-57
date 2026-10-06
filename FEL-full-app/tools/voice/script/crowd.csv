@@ -1,0 +1,13 @@
+id,voice,persona,mode,moment,tier,tags,priority,text,match,delivery,max_sec,target,source
+crowd_a.crowd.defense.02,crowd_a,THE CROWD,all six hoops modes,crowd.defense,,,P2,Lock it down!,,"a shout from the stands; raw, not polished",1.8,public/audio/voice/v1/crowd_a/crowd.json#crowd.defense.02,
+crowd_a.crowd.defense.03,crowd_a,THE CROWD,all six hoops modes,crowd.defense,,,P2,Hands high!,,"a shout from the stands; raw, not polished",1.4,public/audio/voice/v1/crowd_a/crowd.json#crowd.defense.03,
+crowd_b.crowd.defense.02,crowd_b,THE CROWD,all six hoops modes,crowd.defense,,,P2,Big stop now!,,"a shout from the stands; raw, not polished",1.8,public/audio/voice/v1/crowd_b/crowd.json#crowd.defense.02,
+crowd_b.crowd.defense.03,crowd_b,THE CROWD,all six hoops modes,crowd.defense,,,P2,"Defense, let's go!",,"a shout from the stands; raw, not polished",1.8,public/audio/voice/v1/crowd_b/crowd.json#crowd.defense.03,
+crowd_c.crowd.defense.02,crowd_c,THE CROWD,all six hoops modes,crowd.defense,,,P2,No layups!,,"a shout from the stands; raw, not polished",1.4,public/audio/voice/v1/crowd_c/crowd.json#crowd.defense.02,
+crowd_c.crowd.defense.03,crowd_c,THE CROWD,all six hoops modes,crowd.defense,,,P2,No easy buckets!,,"a shout from the stands; raw, not polished",1.8,public/audio/voice/v1/crowd_c/crowd.json#crowd.defense.03,
+crowd_d.crowd.defense.02,crowd_d,THE CROWD,all six hoops modes,crowd.defense,,,P2,"Hands up, folks!",,"a shout from the stands; raw, not polished",1.8,public/audio/voice/v1/crowd_d/crowd.json#crowd.defense.02,
+crowd_d.crowd.defense.03,crowd_d,THE CROWD,all six hoops modes,crowd.defense,,,P2,"Get low, defense!",,"a shout from the stands; raw, not polished",1.8,public/audio/voice/v1/crowd_d/crowd.json#crowd.defense.03,
+crowd_e.crowd.defense.02,crowd_e,THE CROWD,all six hoops modes,crowd.defense,,,P2,Box out!,,"a shout from the stands; raw, not polished",1.4,public/audio/voice/v1/crowd_e/crowd.json#crowd.defense.02,
+crowd_e.crowd.defense.03,crowd_e,THE CROWD,all six hoops modes,crowd.defense,,,P2,Talk on defense!,,"a shout from the stands; raw, not polished",1.8,public/audio/voice/v1/crowd_e/crowd.json#crowd.defense.03,
+crowd_f.crowd.defense.02,crowd_f,THE CROWD,all six hoops modes,crowd.defense,,,P2,"Defense, defense!",,"a shout from the stands; raw, not polished",1.4,public/audio/voice/v1/crowd_f/crowd.json#crowd.defense.02,
+crowd_f.crowd.defense.03,crowd_f,THE CROWD,all six hoops modes,crowd.defense,,,P2,"Stop them, please!",,"a shout from the stands; raw, not polished",1.8,public/audio/voice/v1/crowd_f/crowd.json#crowd.defense.03,

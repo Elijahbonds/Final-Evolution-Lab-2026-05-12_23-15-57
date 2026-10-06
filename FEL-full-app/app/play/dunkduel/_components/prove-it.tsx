@@ -24,7 +24,7 @@ import {
 } from '@/lib/session-setup/roster';
 import { REARM_MS, freshBoard, phaseAfterCountdown, phaseAfterDunk, recordDunk, type Board } from '@/lib/session-setup/rotation';
 import {
-  MUTE_KEY, goWhenReadyLine, judgeAverage, nextUpLine, readMuted, resultLine, speakCues, writeMuted,
+  MUTE_KEY, cuesAfterDunk, goWhenReadyLine, judgeAverage, nextUpLine, readMuted, resultLine, speakCues, writeMuted,
   type Speaker,
 } from '@/lib/session-setup/voice';
 import { KIDS_IN_SHOT, mayRecord, recordingOnHandoff, saveClipOnDevice } from '@/lib/session-setup/record';
@@ -32,6 +32,7 @@ import { PLACEMENT_LINES, dunkFraming, firstAttemptAllowed, shotLight, type Fram
 import { endSession, readSession } from '@/lib/session-setup/memory';
 import { adultCsv, adultShareText, type SummaryRow } from '@/lib/session-setup/summary';
 import { ScanSaveCard } from '@/components/privacy/scan-save-card';
+import { naturalSpeaker } from '@/lib/babylon/audio/voice/speakNatural';
 
 const CYAN = '#00E5FF';
 const GOLD = '#FFD700';
@@ -51,22 +52,10 @@ const CLAIMS: { id: ClaimedAge; label: string }[] = [
   { id: 'unknown', label: 'Rather not say' },
 ];
 
+// VOICEOVER (2026-10-06): the device's least robotic voice (was the engine's default), a rendered take where one exists, and every
+// spoken line logged as a content gap until it is recorded (lib/babylon/audio/voice/speakNatural.ts).
 function browserSpeaker(): Speaker {
-  return {
-    cancel() {
-      try { if (typeof speechSynthesis !== 'undefined') speechSynthesis.cancel(); } catch { /* nothing speaking */ }
-    },
-    speak(line, onend) {
-      try {
-        if (typeof speechSynthesis === 'undefined') { onend?.(); return; }
-        const u = new SpeechSynthesisUtterance(line);
-        u.rate = 0.96;
-        u.onend = () => onend?.();
-        u.onerror = () => onend?.();
-        speechSynthesis.speak(u);
-      } catch { onend?.(); }
-    },
-  };
+  return naturalSpeaker('prove-it', 0.96);
 }
 
 export default function ProveIt({
@@ -317,9 +306,9 @@ export default function ProveIt({
     const adv = recordDunk(board);
     boardRef.current = adv.board;
     setIndex(adv.board.index);
-    const lines = [resultLine(athlete.name, got.verticalCm, judgeAverage(scores.map((j) => j.score)))];
-    if (adv.next) lines.push(nextUpLine(adv.next.name));
-    speakCues(speakerRef.current, lines, mutedRef.current);
+    // IMPROVE (2026-10-06), the owner's decision: no name is spoken. The result and a recorded "Next up!" are said; the next
+    // athlete's name is shown big on the countdown card below (lib/session-setup/voice.ts cuesAfterDunk).
+    speakCues(speakerRef.current, cuesAfterDunk(got.verticalCm, judgeAverage(scores.map((j) => j.score)), !!adv.next), mutedRef.current);
     const phase = phaseAfterDunk(pausedRef.current, adv.done);
     setStage(phase === 'paused' ? 'paused' : phase === 'final' ? 'final' : 'countdown');
   }, [dobYear, stopRecorder]);
@@ -705,7 +694,13 @@ export default function ProveIt({
             </p>
             <p className="text-2xl font-black">{stage === 'paused' ? 'Paused' : `Next up in ${secondsLeft}`}</p>
             {boardRef.current.players[boardRef.current.index] && (
-              <p className="text-base">{nextUpLine(boardRef.current.players[boardRef.current.index].name)}</p>
+              // IMPROVE (2026-10-06): the name is shown big, not read aloud (the voice says only "Next up!").
+              <div role="status" aria-label={nextUpLine(boardRef.current.players[boardRef.current.index].name)} className="flex max-w-full flex-col items-center gap-1" data-testid="next-up-name">
+                <span className="text-base font-bold uppercase tracking-widest text-white/80">Next up</span>
+                <span className="max-w-full break-words text-5xl font-black leading-tight sm:text-6xl" style={{ color: CYAN }}>
+                  {boardRef.current.players[boardRef.current.index].name}
+                </span>
+              </div>
             )}
             <button type="button" onClick={pauseToggle} className="inline-flex min-h-12 items-center gap-2 rounded-lg px-4 text-base font-bold text-black" style={{ background: GOLD }}>
               {stage === 'paused' ? <Play className="h-5 w-5" /> : <Pause className="h-5 w-5" />}

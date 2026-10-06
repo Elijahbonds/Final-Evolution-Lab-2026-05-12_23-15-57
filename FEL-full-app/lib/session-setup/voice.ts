@@ -1,6 +1,6 @@
 // Prove It voice (SESSION-SETUP-V1). The same speechSynthesis idea as the Mirror: no package, no download.
 // Voice is on until this tab mutes it. Mute cancels whatever is speaking and blocks the next line.
-// A nickname is spoken from page memory. This module never writes it.
+// IMPROVE (2026-10-06): a nickname is SHOWN from page memory, never spoken (NEXT_UP_SPOKEN). This module never writes it.
 
 export const MUTE_KEY = 'fel.prove-it.mute';
 
@@ -14,8 +14,28 @@ export function inchesFromCm(cm: number): number {
   return Math.round(cm / 2.54);
 }
 
+/** On screen: who is up next (the name is shown, not spoken: NEXT_UP_SPOKEN). */
 export function nextUpLine(name: string): string {
   return `Next up: ${name}`;
+}
+
+/**
+ * IMPROVE (2026-10-06), the owner's decision: Prove It never reads an athlete's name aloud. A nickname typed on the day came out
+ * of the browser's voice mangled and robotic; now a recorded "Next up!" plays (the Coach's take, tools/voice/script/coach.csv;
+ * the browser's best voice says it until it is recorded) and the name is shown big on screen.
+ */
+export const NEXT_UP_SPOKEN = 'Next up!';
+
+const judgesText = (judgeAverage: number): string => (Math.round(judgeAverage * 10) / 10).toFixed(1);
+
+/** The spoken result: "34 inches, judges 8.5" — the on-screen resultLine without the name. */
+export function spokenResultLine(verticalCm: number, judgeAverage: number): string {
+  return `${inchesFromCm(verticalCm)} inches, judges ${judgesText(judgeAverage)}`;
+}
+
+/** What is said after a measured dunk: the result, then "Next up!" when somebody is next. No line carries a name. */
+export function cuesAfterDunk(verticalCm: number, judgeAverage: number, hasNext: boolean): string[] {
+  return hasNext ? [spokenResultLine(verticalCm, judgeAverage), NEXT_UP_SPOKEN] : [spokenResultLine(verticalCm, judgeAverage)];
 }
 
 export function goWhenReadyLine(): string {
@@ -24,8 +44,7 @@ export function goWhenReadyLine(): string {
 
 /** "<name>, 34 inches, judges 8.5" — inches from the measured centimetres, judges as the card average. */
 export function resultLine(name: string, verticalCm: number, judgeAverage: number): string {
-  const judges = (Math.round(judgeAverage * 10) / 10).toFixed(1);
-  return `${name}, ${inchesFromCm(verticalCm)} inches, judges ${judges}`;
+  return `${name}, ${inchesFromCm(verticalCm)} inches, judges ${judgesText(judgeAverage)}`;
 }
 
 export function judgeAverage(scores: readonly number[]): number {

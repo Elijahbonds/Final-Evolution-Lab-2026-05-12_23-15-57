@@ -847,14 +847,18 @@ export default function StudioMode({
     const clip = clipId(OKTA, line);
     const sec = VoiceKit.line(clip)?.sec ?? estimateSec(line.text);
     const cap = hostCaption(OKTA, line, sec);
-    setOktaSay({ text: cap.mic, name: cap.micWho });
-    if (oktaCaptionTimer.current) clearTimeout(oktaCaptionTimer.current);
-    oktaCaptionTimer.current = setTimeout(() => setOktaSay({ text: '', name: '' }), cap.holdSec * 1000);
     oktaSpeakingUntilRef.current = performance.now() / 1000 + sec;
-    void VoiceKit.play(
+    // IMPROVE (2026-10-06): the caption goes up when Okta is actually heard (a line the voice lane holds shows then; one it drops
+    // shows nothing), or at once when there is no audio to wait for (muted, no bank): VoiceKit.playCaptioned.
+    void VoiceKit.playCaptioned(
       { cast: OKTA.id, role: 'coach', channel: 'player', clips: [clip], caption: line.text, speaker: OKTA.name, sec, priority: 1, interrupt: false, pan: 0, gain: 1 },
       'academy',
-    ).catch(() => false);
+      () => {
+        setOktaSay({ text: cap.mic, name: cap.micWho });
+        if (oktaCaptionTimer.current) clearTimeout(oktaCaptionTimer.current);
+        oktaCaptionTimer.current = setTimeout(() => setOktaSay({ text: '', name: '' }), cap.holdSec * 1000);
+      },
+    );
   }, []);
 
   /**
