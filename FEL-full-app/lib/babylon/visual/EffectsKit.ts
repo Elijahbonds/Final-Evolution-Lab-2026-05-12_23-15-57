@@ -97,6 +97,45 @@ export function applyTrail(ps: ParticleSystem, level: TrailLevel, hex = '#ffb36b
 /** How far out the ambient gulls circle, and how high — far enough to be sky, not traffic over the rim. */
 export const GULL_RADIUS = 17, GULL_Y = 10.5;
 
+export type BurstKind = 'dust' | 'sparks' | 'net' | 'confetti' | 'glitch';
+const BURST_CFG: Record<BurstKind, { colors: string[]; count: number; speed: number; size: number; life: number; gy: number }> = {
+  dust: { colors: ['#c9c2b6', '#a89f90'], count: 26, speed: 1.4, size: 0.16, life: 0.7, gy: -1.5 },
+  sparks: { colors: ['#ffd75e', '#ff8f3d'], count: 20, speed: 3.2, size: 0.06, life: 0.35, gy: -3 },
+  net: { colors: ['#ffffff', '#dfe8f2'], count: 18, speed: 1.2, size: 0.08, life: 0.4, gy: -2 },
+  confetti: { colors: ['#ff006e', '#3a86ff', '#ffbe0b', '#34e89e'], count: 60, speed: 3.5, size: 0.1, life: 1.4, gy: -2.2 },
+  // M50 — tight, fast, cyan/white fragment pop for the enemy spawn-in flourish
+  glitch: { colors: ['#22d3ee', '#e6fbff'], count: 34, speed: 4.2, size: 0.05, life: 0.28, gy: 0 },
+};
+/** The most a `scale` can ask for (burst clamps it here), so a pooled system's capacity always fits the count. */
+const BURST_SCALE_MAX = 2;
+/**
+ * IMPROVE (2026-10-06): BURSTS ARE POOLED. `burst` built a new ParticleSystem every call (a new vertex buffer, a new
+ * effect lookup, then a dispose) and a 50 in the dunk fires three glitch + three confetti in one frame. Each scene keeps
+ * up to BURST_POOL_PER_KIND idle systems per kind, sized for the largest count a kind can ask for; a burst takes an idle
+ * one (its particles all dead: Babylon flips `isStarted()` back to false then) and only falls back to the old one-off,
+ * self-disposing system when every pooled one is still in the air. Same signature, same look.
+ */
+export const BURST_POOL_PER_KIND = 4;
+const burstPools = new WeakMap<Scene, Map<BurstKind, ParticleSystem[]>>();
+function pooledBurst(scene: Scene, kind: BurstKind): ParticleSystem | null {
+  let byKind = burstPools.get(scene);
+  if (!byKind) { byKind = new Map(); burstPools.set(scene, byKind); }
+  let pool = byKind.get(kind);
+  if (!pool) { pool = []; byKind.set(kind, pool); }
+  const idle = pool.find((ps) => !ps.isStarted());
+  if (idle) return idle;
+  if (pool.length >= BURST_POOL_PER_KIND) return null;
+  const ps = baseSystem(scene, `fx_${kind}_pool_${pool.length}`, Math.ceil(BURST_CFG[kind].count * BURST_SCALE_MAX));
+  ps.emitter = new Vector3();
+  ps.disposeOnStop = false;
+  const list = pool;
+  ps.onDisposeObservable.addOnce(() => { const i = list.indexOf(ps); if (i >= 0) list.splice(i, 1); });   // a scene teardown (or anyone) disposing it takes it out of the pool
+  pool.push(ps);
+  return ps;
+}
+/** Test hook: how many pooled burst systems a scene holds for a kind. */
+export function burstPoolSize(scene: Scene, kind: BurstKind): number { return burstPools.get(scene)?.get(kind)?.length ?? 0; }
+
 export const EffectsKit = {
   /** Ambient motion per venue — mount once in load(). */
   ambient(scene: Scene, family: VenueFamily): void {
@@ -172,21 +211,16 @@ export const EffectsKit = {
    * caused this was — a shoe-scuff on a light cut and one on a planted stop are the same effect at two
    * sizes, and firing the identical puff for both is what makes particle work read as canned.
    */
-  burst(scene: Scene, at: Vector3, kind: 'dust' | 'sparks' | 'net' | 'confetti' | 'glitch', scale = 1, tint?: string): void {
-    const cfg = {
-      dust: { colors: ['#c9c2b6', '#a89f90'], count: 26, speed: 1.4, size: 0.16, life: 0.7, gy: -1.5 },
-      sparks: { colors: ['#ffd75e', '#ff8f3d'], count: 20, speed: 3.2, size: 0.06, life: 0.35, gy: -3 },
-      net: { colors: ['#ffffff', '#dfe8f2'], count: 18, speed: 1.2, size: 0.08, life: 0.4, gy: -2 },
-      confetti: { colors: ['#ff006e', '#3a86ff', '#ffbe0b', '#34e89e'], count: 60, speed: 3.5, size: 0.1, life: 1.4, gy: -2.2 },
-      // M50 — tight, fast, cyan/white fragment pop for the enemy spawn-in flourish
-      glitch: { colors: ['#22d3ee', '#e6fbff'], count: 34, speed: 4.2, size: 0.05, life: 0.28, gy: 0 },
-    }[kind];
+  burst(scene: Scene, at: Vector3, kind: BurstKind, scale = 1, tint?: string): void {
+    const cfg = BURST_CFG[kind];
     // clamped: a caller passing 0 would allocate a system that emits nothing, and one passing 50 would
     // budget thousands of particles for a footstep.
-    const k = Math.max(0.25, Math.min(2, scale));
+    const k = Math.max(0.25, Math.min(BURST_SCALE_MAX, scale));
     const count = Math.max(4, Math.round(cfg.count * k));
-    const ps = baseSystem(scene, `fx_${kind}_${Date.now()}`, count);
-    ps.emitter = at.clone();
+    // IMPROVE (2026-10-06): a pooled system when one is idle; the old one-off (self-disposing) only when all are busy
+    const pooled = pooledBurst(scene, kind);
+    const ps = pooled ?? baseSystem(scene, `fx_${kind}_${Date.now()}`, count);
+    if (pooled) (ps.emitter as Vector3).copyFrom(at); else ps.emitter = at.clone();
     // `tint` (racing pass phase 8): one colour for the whole burst — the kart's mini-turbo tiers are the SAME sparks in
     // blue, orange and purple, and the colour is the read
     const c1 = Color3.FromHexString(tint ?? cfg.colors[0]), c2 = tint ? Color3.FromHexString(tint).scale(1.25) : Color3.FromHexString(cfg.colors[1 % cfg.colors.length]);
@@ -198,7 +232,7 @@ export const EffectsKit = {
     ps.direction1 = new Vector3(-1, 1, -1); ps.direction2 = new Vector3(1, 1.6, 1);
     ps.gravity = new Vector3(0, cfg.gy, 0);
     ps.manualEmitCount = count;
-    ps.disposeOnStop = true;
+    ps.disposeOnStop = !pooled;
     ps.start();
     setTimeout(() => ps.stop(), 120);
   },
