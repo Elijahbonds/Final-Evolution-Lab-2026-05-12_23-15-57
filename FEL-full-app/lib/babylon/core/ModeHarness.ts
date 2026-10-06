@@ -413,10 +413,9 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
   //
   // The resting grade is captured once, from whatever mood the venue chose, so a night court and a bright
   // gym each pulse around their OWN look instead of being graded to shared constants.
-  const restGrade: Grade = {
-    vignette: lights.pipeline.imageProcessing.vignetteWeight,
-    exposure: lights.pipeline.imageProcessing.exposure,
-  };
+  // A9.3 (visual-foundation): the rig OWNS the resting grade and this is a live reference to it — re-taken once load() is
+  // done (lights.adoptRest below), so a venue no longer overwrites it and a load-time grade (WeatherFx) is kept.
+  const restGrade: Grade = lights.rest;
   let frame: ImpactFrameState = IMPACT_FRAME_IDLE;
   let framePainted = false;
   // SPEED-VIGNETTE: the level the mode reports this frame (0 = off). The harness, not the mode, owns the
@@ -550,6 +549,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
       clearTimeout(watchdog);
       if (timedOut) return false;                  // late resolve after watchdog: stay on error
       liftBlackMaterials(scene);                   // rescue anything venue-load added
+      lights.adoptRest();                          // A9.3: the grade load() settled on is the rest every pulse returns to
       try { opts.applySkin?.(scene); } catch (e) { console.error('[FEL-ART] applySkin failed', e); }
       // M37: loud spawn assertion — empty world or missing hero never reaches play.
       assertSpawned(scene, { hero: heroRef.current, minWorldMeshes: 8, modeId: def.modeId });

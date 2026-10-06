@@ -2,11 +2,11 @@
 // Fixes: black skatepark, dark football field, mid-dunk sky collapse.
 
 import {
-  CascadedShadowGenerator, Color3, Color4, DefaultRenderingPipeline, DirectionalLight,
+  CascadedShadowGenerator, Color3, Color4, ColorCurves, DefaultRenderingPipeline, DirectionalLight,
   HemisphericLight, ImageProcessingConfiguration, Scene, ShadowGenerator, Vector3,
 } from '@babylonjs/core';
 import type { AbstractMesh, PBRMaterial, StandardMaterial } from '@babylonjs/core';
-import { MOODS, type VenueMood } from './moods';
+import { MOODS, type VenueMood, type MoodCurves } from './moods';
 import { tierRigSettings, legacyAa, type QualityTier } from './QualityTier';
 import { isLegacyLook } from './graphicsSetting';
 import { mountEnvironmentIBL } from './EnvironmentIBL';
@@ -21,7 +21,24 @@ export interface LightRigHandle {
   /** M44: brief exposure pulse for a highlight beat (dunk flush, TD, KO,
    *  goal) — reads as a camera-flash without a hard cut. Self-reverts. */
   flashBeat(): void;
+  /**
+   * ONE OWNER FOR THE GRADE (A9.3). The resting exposure and vignette every pulse returns to — the impact frame and the
+   * speed vignette (ModeHarness composes over this object, by reference) and the flash beat. Starts at the mood's.
+   */
+  rest: { exposure: number; vignette: number };
+  /** Take the pipeline's current exposure/vignette as the new rest — the harness calls it once load() is done, so a
+   *  deliberate load-time grade (WeatherFx's time of day) is kept instead of being undone by the first impact. */
+  adoptRest(): void;
   dispose(): void;
+}
+
+/** The mood's split-tone grade as Babylon ColorCurves (moods.ts MoodDef.curves). */
+export function moodColorCurves(c: MoodCurves): ColorCurves {
+  const cc = new ColorCurves();
+  cc.globalSaturation = c.globalSat;
+  cc.highlightsHue = c.highlightsHue; cc.highlightsDensity = c.highlightsDensity; cc.highlightsSaturation = c.highlightsSat;
+  cc.shadowsHue = c.shadowsHue; cc.shadowsDensity = c.shadowsDensity; cc.shadowsSaturation = c.shadowsSat;
+  return cc;
 }
 
 /**
@@ -43,6 +60,10 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
   // shadow map size, cascades on outdoor moods, sharpen and bloom weight.
   const legacy = isLegacyLook();   // ?look=legacy: the shared look as it shipped before 2026-10-06 (before/after shots)
   const T = legacy ? legacyAa(tierRigSettings(tier, mood)) : tierRigSettings(tier, mood);
+
+  // A9.3: the rig owns the scene's grade. A spec venue built after this (NexusWebScene.applyVenueGrade) stands down
+  // instead of overwriting the mood — the pipeline reads the SAME scene.imageProcessingConfiguration it would write.
+  if (!legacy) (scene.metadata ??= {}).felGradeOwner = 'rig';
 
   scene.clearColor = Color4.FromHexString(M.clearColor + 'ff');
   scene.fogMode = Scene.FOGMODE_NONE;          // fog was blacking out high cameras
@@ -150,17 +171,28 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
   pipeline.imageProcessing.vignetteEnabled = true;
   pipeline.imageProcessing.vignetteColor.set(...M.vignetteColor);
   pipeline.imageProcessing.vignetteWeight = M.vignetteWeight;
+  // A9.3: the mood's colour grade, mounted with the pipeline (one define on a pass that already runs; never toggled).
+  if (!legacy) {
+    pipeline.imageProcessing.colorCurvesEnabled = true;
+    pipeline.imageProcessing.colorCurves = moodColorCurves(M.curves);
+  }
+  const rest = { exposure: M.exposure, vignette: M.vignetteWeight };
 
   liftBlackMaterials(scene);
 
   let flashObs: ReturnType<Scene['onBeforeRenderObservable']['add']> | null = null;
   return {
-    hemi, sun, shadows, pipeline, tier,
+    hemi, sun, shadows, pipeline, tier, rest,
+    adoptRest() {
+      if (legacy) return;   // the pre-pass harness kept the mood's grade as its rest, whatever load() wrote
+      rest.exposure = pipeline.imageProcessing.exposure;
+      rest.vignette = pipeline.imageProcessing.vignetteWeight;
+    },
     flashBeat() {
       // HOTFIX (2026-09-24): reduced motion — no exposure flash (a made three, a momentum tier, the storm's lightning:
       // the thunder still rolls, the sky just does not strobe)
       if (!motionPolicy().flash) return;
-      const base = M.exposure;
+      const base = rest.exposure;   // A9.3: the owned rest, not the raw mood (a night's dimmed exposure stays dimmed)
       pipeline.imageProcessing.exposure = base * 1.35;            //TUNE(elijah)
       if (flashObs) return;
       flashObs = scene.onBeforeRenderObservable.add(() => {
@@ -175,6 +207,7 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
     dispose() {
       if (autoObserver) scene.onNewMeshAddedObservable.remove(autoObserver);
       if (flashObs) scene.onBeforeRenderObservable.remove(flashObs);
+      if ((scene.metadata as { felGradeOwner?: string } | null)?.felGradeOwner === 'rig') delete scene.metadata.felGradeOwner;
       hemi.dispose(); sun.dispose(); shadows.dispose(); pipeline.dispose();
       disposeEnv();
     },
