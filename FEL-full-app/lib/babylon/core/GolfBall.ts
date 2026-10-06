@@ -36,7 +36,10 @@ export const WIND_GAIN = 2.5;
 const MAX_STEP = 1 / 240;
 /** The cup: a ball this close, this slow, drops. (The mode keeps its own generous gimme on top.) */
 export const CUP_RADIUS_M = 0.3;
-export const CUP_DROP_SPEED = 2.2;
+/** IMPROVE (2026-10-06, owner-approved, the moderate option): 2.2 → 1.8 m/s. At 2.2 a putt on line dropped for most of
+ *  the meter from any range (2 / 4 / 6 / 8 m: 82 / 69 / 65 / 51 % of powers); at 1.8 pace matters more from 6–8 m.
+ *  The putt preview (GolfAim.simulatePutt → flyAhead → tryHole) reads this same constant, so it stays the putt. */
+export const CUP_DROP_SPEED = 1.8;
 
 export class GolfBallSim {
   readonly ball: SoccerBall;

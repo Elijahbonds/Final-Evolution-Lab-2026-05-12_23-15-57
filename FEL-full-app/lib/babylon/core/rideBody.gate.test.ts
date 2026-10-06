@@ -467,7 +467,12 @@ describe('G10 PAD UNCHANGED', () => {
     expect(s).toMatch(/rig\.rider\.vel\.y <= 0\.6 && performance\.now\(\) >= relockUntil\) \{/);
     expect(s).toMatch(/if \(!bodySynced\) \{ rideIntents\.sync\(ctx\.body\?\.\(\) \?\? null\); bodySynced = true; \}\n\s*bodyVerbs\(ctx\);/);
     expect(s).toMatch(/if \(rig\.rider\.grinding && Math\.abs\(stickX\) > 0\.7 && !stickFromBody\) rig\.rider\.dismount\(\);/);
-    expect(s).toMatch(/if \(rideOf\(view\)\?\.stance && !rig\.rider\.grounded/);
+    // IMPROVE (2026-10-06, snow item 2): the magnet is every rider's now (the owner gave the pad skate's magnet + ask window);
+    // a pad's A in the air asks for a rail (it never locks one raw), and the body's rail count stays the body's
+    expect(s).toMatch(/if \(!rig\.rider\.grounded && !rig\.rider\.grinding && rig\.rider\.vel\.y <= 0\.6 && performance\.now\(\) >= relockUntil\) \{/);
+    expect(s).toMatch(/\} else if \(!rig\.rider\.grinding\) \{[\s\S]{0,400}?railAskedAt = performance\.now\(\);/);
+    expect(s).not.toMatch(/rig\.rider\.tryGrind\(world\.grindLines\)/);
+    expect(s).toMatch(/if \(byBody\) \{ bodyStats\.rails\+\+;/);
     expect(s).toMatch(/const view = ctx\.body\?\.\(\) \?\? null;/);
   });
   it('the harness writes the stance off every body packet, before the body line, and at mount (R-F1: READY asks for it from its first frame; the store writes only for a carve row)', () => {
@@ -478,7 +483,9 @@ describe('G10 PAD UNCHANGED', () => {
   it('surf, big air, sprint: the body verbs come from ctx.body() or the claimed step only; the d-pad strides call the core without options', () => {
     expect(src('SurfBreakMode.ts')).toMatch(/const view = ctx\.body\?\.\(\) \?\? null;/);
     // surf's pad B: the same refusals, then the wave move the body's cutback shares (one scoring line, the arena guard's)
-    expect(src('SurfBreakMode.ts')).toMatch(/if \(t < waveMoveUntil\) \{ refuse\(ctx, 'MID-TURN'\); return; \}\n\s*waveMove\(ctx, wave, stickX >= 0 \? 1 : -1\);/);
+    // (IMPROVE 2026-10-06, surf item 16 — test changed: the turn's side is the stick's when it is held across, else back toward
+    // the curl; it was `stickX >= 0 ? 1 : -1`, which cut right whenever the stick was centred or held up)
+    expect(src('SurfBreakMode.ts')).toMatch(/if \(t < waveMoveUntil\) \{ refuse\(ctx, 'MID-TURN'\); return; \}\n\s*waveMove\(ctx, wave, Math\.abs\(stickX\) > 0\.3 \? Math\.sign\(stickX\) : neutralCutSign\(/);
     const sp = src('SprintMode.ts');
     expect(sp).toMatch(/takeStride\(ctx, e\.dir === 'left' \? 'L' : 'R'\);/);
     expect(sp).toMatch(/core\.step\(side, opts\);/);

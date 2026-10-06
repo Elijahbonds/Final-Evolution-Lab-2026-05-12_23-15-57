@@ -15,6 +15,7 @@ import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode } from './hud-format';
 import { MicCaption, MicToggle } from './mic-caption';   // THE MIC (2026-09-24): what the court's MC just said, and the voice switch
+import { CONTROLS_OFFENCE, CONTROLS_DEFENCE } from '@/lib/babylon/modes/threevthreeRules';   // IMPROVE (2026-10-06) #7: the full lists, on the pause
 
 type Hud = Record<string, HudValue>;
 
@@ -160,8 +161,15 @@ export default function ThreeVThreeBabylon({ onEnd }: GameProps) {
       {phase === 'playing' && <MicCaption text={hud.mic} who={hud.micWho} />}
       {phase === 'playing' && <MicToggle />}
 
+      {/* IMPROVE (2026-10-06) #5: what the PASS button would throw right now — the ring under the mate is its colour */}
+      {typeof hud.passPreview === 'string' && hud.passPreview && phase === 'playing' && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-[4.25rem] text-center">
+          <span className={`fel-panel px-2 py-0.5 font-mono text-[10px] tracking-wider ${hud.passPreview === 'NO LANE' ? 'text-white/50' : 'text-[var(--fel-cyan)]'}`}>J · {hud.passPreview}</span>
+        </div>
+      )}
+      {/* IMPROVE (2026-10-06) #7: ONE line for the state you are in (it used to be every control at once) */}
       {typeof hud.hint === 'string' && hud.hint && phase === 'playing' && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-10 text-center">
+        <div className="pointer-events-none absolute inset-x-0 bottom-10 px-3 text-center">
           <span className="fel-panel px-3 py-1.5 font-mono text-[11px] text-white/80">{hud.hint}</span>
         </div>
       )}
@@ -174,6 +182,15 @@ export default function ThreeVThreeBabylon({ onEnd }: GameProps) {
         onStart={tapStart}
         onRetry={tapStart}
       />
+
+      {/* IMPROVE (2026-10-06) #7: the full control list lives on the pause screen — over the splash's pause layer, never catching a tap
+          (the layer's tap is the resume) */}
+      {phase === 'paused' && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-4 mx-auto max-w-3xl space-y-2 px-4 text-[10px] leading-snug text-white/75">
+          <p><span className="font-black tracking-widest text-[var(--fel-cyan)]">OFFENSE</span> · {CONTROLS_OFFENCE}</p>
+          <p><span className="font-black tracking-widest text-[var(--fel-gold)]">DEFENSE</span> · {CONTROLS_DEFENCE}</p>
+        </div>
+      )}
 
       {(phase === 'playing' || phase === 'countdown') && busRef.current && (
         <TouchOverlay

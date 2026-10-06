@@ -46,6 +46,13 @@ export interface BallCarryOpts {
   hoops?: boolean;
   /** Hold the reach through a held move until the ball leaves the hand (the 3c review's alternative; default `?heldReach=1`, dev). */
   heldReach?: boolean;
+  /**
+   * IMPROVE (2026-10-06, 1v1 #16): false = an inactive carry whose let-go fade is done (and with no chest hold) skips the stride clock
+   * — its root and both feet's world matrices recomputed every frame for a body that is not dribbling (the 1v1 rival's carry, on
+   * every one of my possessions). The clock picks up again on the next activation, from where the body is then (no speed read off
+   * the gap). Default true: every existing caller runs exactly as before.
+   */
+  idleStride?: boolean;
 }
 /** Where a crossing's ball meets the floor, in the root's frame (x across, z forward; m). Default: the centre line, in front. */
 export interface CrossPoint { x?: number; z?: number }
@@ -429,6 +436,8 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
   };
   /** The stride clock off this body's own feet: the foot opposite the ball hand striking, its period, and the bounce locked to it. */
   const strideTick = (dt: number, sx: number): void => {
+    // IMPROVE (2026-10-06) #16: an opted-out carry that is not dribbling, letting go or holding skips the clock (see idleStride)
+    if (opts.idleStride === false && !active && releaseLeft <= 0 && holdK <= 1e-3 && holdTarget <= 0) { rootSeen = false; lockHz = 0; return; }
     opts.root.computeWorldMatrix(true);
     const rp = opts.root.getAbsolutePosition();
     if (rootSeen && dt > 0) { const d = Math.hypot(rp.x - lastRoot.x, rp.z - lastRoot.z); if (d < 0.5) rootSpeed += (d / dt - rootSpeed) * Math.min(1, dt / 0.12); }

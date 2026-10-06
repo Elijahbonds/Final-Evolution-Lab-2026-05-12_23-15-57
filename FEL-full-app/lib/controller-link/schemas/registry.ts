@@ -289,6 +289,9 @@ export const MODE_CONTROLLERS: Record<string, ModeControllerConfig> = {
       { kind: 'button', buttons: [
         { action: 'A', label: 'HIT' },
         { action: 'B', label: 'BLOCK' },
+        // IMPROVE (2026-10-06): the set call — NetSportMode reads X as a quick set and Y as a high one
+        { action: 'X', label: 'QUICK' },
+        { action: 'Y', label: 'HIGH' },
       ] },
     ],
   },

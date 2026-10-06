@@ -174,9 +174,11 @@ export const INTENT_DRIVERS: Record<string, string> = {
   // TENNIS (net/precision pass, 2026-09-22): play the point — steer to the incoming landing off the mode's QA seam
   // (scene.metadata.tennis), swing at the contact aimed inside the lines (alternating sides), R1 on an aerial read.
   tennis: loop(`
-    let side = 1, swungAt = -1;
+    let side = 1, swungAt = -1, servedAt = 0;
     setInterval(() => {
       const s = Q.scene && Q.scene(); const st = s && s.metadata && s.metadata.tennis ? s.metadata.tennis.state() : null; if (!st) return;
+      // IMPROVE (2026-10-06): tennis serves on the toss now (contact 1.1 s in), and the serve changes ends each game
+      if (st.serving === 'me') { stick(0, 0); if (st.tossT >= 1.06 && st.tossT < 1.2 && performance.now() - servedAt > 500) { servedAt = performance.now(); btn(A, 60); } return; }
       if (!st.awaitingHuman || !st.shot) { stick(0, 0); return; }
       const dx = st.shot.toX - st.footX;
       if (st.flightT < 0.9) { stick(clamp(dx * 1.2) * st.steerSign, 0); return; }
@@ -212,9 +214,11 @@ export const INTENT_DRIVERS: Record<string, string> = {
   // VOLLEYBALL (net/precision phase 6): the net seam (scene.metadata.net) — steer under the incoming landing, A at the
   // contact for each of the three touches (aimed across on the spike), B to BLOCK when their spike comes.
   volleyball: loop(`
-    let swungAt = '', side = 1, blockedAt = '';
+    let swungAt = '', side = 1, blockedAt = '', servedAt = 0;
     setInterval(() => {
       const s = Q.scene && Q.scene(); const st = s && s.metadata && s.metadata.net ? s.metadata.net.state() : null; if (!st) return;
+      // IMPROVE (2026-10-06): the player's serve is a toss and a strike now (contact 1.1 s into the toss) — A on the drop
+      if (st.serving === 'me') { stick(0, 0); if (st.tossT >= 1.06 && st.tossT < 1.2 && performance.now() - servedAt > 500) { servedAt = performance.now(); btn(A, 60); } return; }
       if (!st.awaitingHuman || !st.shot) { stick(0, 0); return; }
       const key = st.shot.toX.toFixed(2) + ':' + st.shot.toZ.toFixed(2);
       const dx = st.shot.toX - st.footX;

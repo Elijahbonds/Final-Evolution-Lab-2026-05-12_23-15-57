@@ -15,6 +15,12 @@ import type { FelInput } from '../core/InputBus';
 
 const rider = { grounded: true, vel: new Vector3(0, 0, 0), update: () => undefined, jump: () => undefined };
 const coinGain = { next: 0 };
+/** IMPROVE (2026-10-06): where the mocked flight puts the ball on its next step, and whether it is still flying (Hot Shot) */
+const shot = { to: new Vector3(3, 1, 11), flying: true };
+/** every CoinField built, and every coin line laid on it (Coin Storm) */
+const coinFields: Array<{ lines: Array<[Vector3, Vector3, number]>; clears: number; disposed: boolean }> = [];
+/** where each spawned body stood at spawn (Coin Storm's whistle spot) */
+const spawns: Vector3[] = [];
 /** Every BeatOwner the events build, and what each was asked to play (Slam Rush's gather, HOTFIX 2026-09-24). */
 type BeatCall = { fn: 'loop' | 'beat' | 'settle'; clip: string; holdEnd?: boolean };
 type MockOwner = { busy: boolean; current: string | null; calls: BeatCall[]; autoEnd: boolean; end(): void };
@@ -24,13 +30,17 @@ const ballRig = { dressed: [] as Array<{ name: string; kind: unknown }>, hands: 
 
 vi.mock('../core/CharacterLibrary', () => ({
   CharacterLibrary: {
-    spawn: async (_scene: unknown, _url: string, o: { position?: Vector3 } = {}) => ({
-      root: { position: (o.position ?? new Vector3()).clone(), rotation: { x: 0, y: 0, z: 0 } },
-      animator: {}, skeleton: {}, dispose: () => undefined,
-    }),
+    spawn: async (_scene: unknown, _url: string, o: { position?: Vector3 } = {}) => {
+      spawns.push((o.position ?? new Vector3()).clone());
+      return {
+        root: { position: (o.position ?? new Vector3()).clone(), rotation: { x: 0, y: 0, z: 0 } },
+        animator: {}, skeleton: {}, dispose: () => undefined,
+      };
+    },
   },
 }));
 vi.mock('../anim/importSanitizer', () => ({ neverBindPose: () => undefined }));
+vi.mock('../anim/mirrored-clips', () => ({ registerMirroredClips: () => undefined }));   // Hot Shot's keeper dives both ways
 vi.mock('../anim/clipRegistry', () => ({ installSafePlay: () => undefined, SPORT_CLIP: new Proxy({}, { get: (_t, k) => String(k) }) }));
 vi.mock('../anim/beatOwner', () => ({
   // The real BeatOwner's contract: a beat is `busy` until its clip runs out; a holdEnd beat stays busy (held) after it runs
@@ -74,28 +84,36 @@ vi.mock('./boardCore', async (orig) => ({
     dispose: () => undefined,
   }),
 }));
+/** the `alive` each buildGoal was handed (Hot Shot's late Meshy goal, IMPROVE 2026-10-06) */
+const goalAlive: Array<() => boolean> = [];
 vi.mock('./aimSwingCore', () => ({
-  buildGoal: () => [],
+  buildGoal: (_scene: unknown, alive?: () => boolean) => { if (alive) goalAlive.push(alive); return []; },
   Reticle: class { pos = new Vector3(0, 1.2, 11); update(): void {} dispose(): void {} },
   PowerMeter: class { start(): void {} stop(): number { return 0.5; } update(): void {} },
-  // the shot arrives at the goal line on the next step, in the frame
+  // the shot reaches `shot.to` on the next step (by default a corner of the goal, in the frame)
   Flight: class {
     active = false;
     constructor(public ball: { position: Vector3 }) {}
     launch(): void { this.active = true; }
-    step(): boolean { this.ball.position.set(0, 1, 11); return true; }
+    step(): boolean { this.ball.position.copyFrom(shot.to); this.active = shot.flying; return shot.flying; }
   },
 }));
 vi.mock('../core/Pickups', () => ({
   CoinField: class {
     collected = 0;
-    line(): void {}
+    rec = { lines: [] as Array<[Vector3, Vector3, number]>, clears: 0, disposed: false };
+    constructor() { coinFields.push(this.rec); }
+    line(a: Vector3, b: Vector3, n: number): void { this.rec.lines.push([a.clone(), b.clone(), n]); }
     update(): number { const g = coinGain.next; coinGain.next = 0; this.collected += g; return g; }
-    dispose(): void {}
+    clear(): void { this.rec.clears++; this.rec.lines = []; this.collected = 0; }
+    dispose(): void { this.rec.disposed = true; }
   },
 }));
 
-import { slamRush, strikeStorm, trickGauntlet, hotShot, coinStorm, counterStrike, type CarnivalEvent } from './carnivalEvents';
+import {
+  slamRush, strikeStorm, trickGauntlet, hotShot, coinStorm, counterStrike, type CarnivalEvent,
+  slamMade, SLAM_SWEET, SLAM_TOL, strikeTrio, hotShotKeeper, bannerChannel,
+} from './carnivalEvents';
 import { TRICKS } from './boardCore';
 
 type Hud = Record<string, unknown>;
@@ -120,7 +138,11 @@ function fakeCtx() {
 }
 const press = (btn: string): FelInput => ({ t: 'button', btn, pressed: true } as unknown as FelInput);
 
-beforeEach(() => { rider.grounded = true; rider.vel.set(0, 0, 0); coinGain.next = 0; owners.length = 0; ballRig.dressed.length = 0; ballRig.hands.length = 0; vi.useFakeTimers(); });
+beforeEach(() => {
+  rider.grounded = true; rider.vel.set(0, 0, 0); coinGain.next = 0; owners.length = 0; ballRig.dressed.length = 0; ballRig.hands.length = 0;
+  shot.to.set(3, 1, 11); shot.flying = true; coinFields.length = 0; spawns.length = 0; goalAlive.length = 0;
+  vi.useFakeTimers();
+});
 afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
 
 describe('TRICK GAUNTLET: the call is the banner (1), the machine keeps off the night total (2), a landing is heard (3)', () => {
@@ -196,7 +218,7 @@ describe('TRICK GAUNTLET: the call is the banner (1), the machine keeps off the 
 describe('every carnival event reports its successes to the momentum bus (3)', () => {
   it('SLAM RUSH: a make', async () => {
     const f = fakeCtx(); const ev = slamRush(); await ev.build(f.ctx);
-    vi.spyOn(Math, 'random').mockReturnValue(0);                    // the charge at the sweet spot, and it drops
+    // the charge at the sweet spot: it drops (IMPROVE 2026-10-06: the release decides, no dice)
     ev.onInput(f.ctx, { t: 'trigger', side: 'R', value: 0.85 } as unknown as FelInput);
     ev.onInput(f.ctx, { t: 'trigger', side: 'R', value: 0 } as unknown as FelInput);
     expect(f.report).toHaveBeenCalledWith(expect.objectContaining({ kind: 'big_make' }));
@@ -205,8 +227,9 @@ describe('every carnival event reports its successes to the momentum bus (3)', (
 
   it('SLAM RUSH: a miss is not a success', async () => {
     const f = fakeCtx(); const ev = slamRush(); await ev.build(f.ctx);
-    vi.spyOn(Math, 'random').mockReturnValue(0.999);
-    ev.onInput(f.ctx, { t: 'trigger', side: 'R', value: 0.85 } as unknown as FelInput);
+    // test changed (IMPROVE 2026-10-06): the miss used to be a 0.85 release with the dice mocked high; the make is the
+    // release's own now (SLAM_TOL), so the miss is a release short of the band
+    ev.onInput(f.ctx, { t: 'trigger', side: 'R', value: 0.5 } as unknown as FelInput);
     ev.onInput(f.ctx, { t: 'trigger', side: 'R', value: 0 } as unknown as FelInput);
     expect(f.report).not.toHaveBeenCalled();
     f.dispose();
@@ -221,6 +244,8 @@ describe('every carnival event reports its successes to the momentum bus (3)', (
 
   it('HOT SHOT: a goal', async () => {
     const f = fakeCtx(); const ev = hotShot(); await ev.build(f.ctx);
+    // test changed (IMPROVE 2026-10-06): the mocked shot went in dead centre, which the new keeper always saves (he stays
+    // up or dives through it); it is a corner now (shot.to, x 3), past any dive he can make
     ev.onInput(f.ctx, press('A')); ev.onInput(f.ctx, press('A'));   // power, then shoot
     ev.tick(f.ctx, 1 / 60);
     expect(f.report).toHaveBeenCalledWith(expect.objectContaining({ kind: 'big_make' }));
@@ -363,5 +388,228 @@ describe('SLAM RUSH: the gather is held, not looped, and the ball is the hoops b
     // HOOPS MOTION phase 3: the hand DRAWN on his right — rig LeftHand on the runtime rig (athleteSide's fallback for a stub rig)
     expect(ballRig.hands).toEqual(['LeftHand']);
     f.dispose();
+  });
+});
+
+// ── IMPROVE (2026-10-06): the owner-picked Carnival list ─────────────────────────────────────────────────────────────
+const trig = (value: number): FelInput => ({ t: 'trigger', side: 'R', value } as unknown as FelInput);
+/** a fixed sequence for a `rnd` argument */
+const seq = (...v: number[]) => { let i = 0; return () => v[i++ % v.length]; };
+
+describe('SLAM RUSH: the release decides the make (#4), and the charge is on the HUD (#3)', () => {
+  it('a make is a release inside the gold band and nothing else — no dice', () => {
+    expect([SLAM_SWEET, SLAM_TOL]).toEqual([0.85, 0.12]);
+    for (const c of [0.73, 0.8, 0.85, 0.9, 0.97]) expect(slamMade(c), String(c)).toBe(true);
+    for (const c of [0, 0.25, 0.5, 0.72, 0.98, 1]) expect(slamMade(c), String(c)).toBe(false);   // 1 = held past the top
+  });
+
+  it('the same release scores the same whatever Math.random says', async () => {
+    for (const r of [0, 0.5, 0.999]) {
+      const f = fakeCtx(); const ev = slamRush(); await ev.build(f.ctx);
+      vi.spyOn(Math, 'random').mockReturnValue(r);
+      ev.onInput(f.ctx, trig(0.85)); ev.onInput(f.ctx, trig(0)); f.run(ev, 0.6);
+      ev.onInput(f.ctx, trig(1)); ev.onInput(f.ctx, trig(0));      // held past the top: too long
+      expect(ev.tick(f.ctx, 0), `random ${r}`).toBe(1);
+      vi.restoreAllMocks(); f.dispose();
+    }
+  });
+
+  it('the meter follows the held charge, shows the band, and goes when the charge does (and with the event)', async () => {
+    const f = fakeCtx(); const ev = slamRush(); await ev.build(f.ctx);
+    expect(f.hud).toContainEqual(expect.objectContaining({ chargeLo: SLAM_SWEET - SLAM_TOL, chargeHi: SLAM_SWEET + SLAM_TOL }));
+    const charges = () => f.hud.filter((h) => 'charge' in h).map((h) => h.charge);
+    const before = charges().length;
+    ev.onInput(f.ctx, trig(0.3)); ev.onInput(f.ctx, trig(0.305)); ev.onInput(f.ctx, trig(0.6));
+    expect(charges().slice(before)).toEqual([0.3, 0.6]);           // 2 % steps: a streaming trigger is not a HUD push a frame
+    ev.onInput(f.ctx, trig(0));
+    expect(charges().at(-1)).toBeNull();
+    expect(f.banners().at(-1)).toBe('MISS — TOO SHORT');
+    f.run(ev, 0.6);
+    ev.onInput(f.ctx, trig(0.9));
+    ev.teardown();
+    expect(charges().at(-1)).toBeNull();                            // a charge held at the whistle leaves no meter behind
+    f.dispose();
+  });
+});
+
+describe('STRIKE STORM: the mix pays (#11)', () => {
+  it('three different buttons in a row close a trio (+1); a repeat starts the trio again', () => {
+    expect(strikeTrio([], 'A')).toEqual({ trio: ['A'], bonus: 0 });
+    expect(strikeTrio(['A'], 'B')).toEqual({ trio: ['A', 'B'], bonus: 0 });
+    expect(strikeTrio(['A', 'B'], 'Y')).toEqual({ trio: [], bonus: 1 });
+    expect(strikeTrio(['A', 'B'], 'A')).toEqual({ trio: ['A'], bonus: 0 });
+    expect(strikeTrio(['B', 'Y'], 'B')).toEqual({ trio: ['B'], bonus: 0 });
+  });
+
+  it('a one-button masher scores what it always did; the same presses mixed score a third more', async () => {
+    const masher = fakeCtx(); const a = strikeStorm(); await a.build(masher.ctx);
+    for (let i = 0; i < 9; i++) a.onInput(masher.ctx, press('A'));
+    expect(a.tick(masher.ctx, 0)).toBe(9);
+    const mixer = fakeCtx(); const b = strikeStorm(); await b.build(mixer.ctx);
+    for (let i = 0; i < 9; i++) b.onInput(mixer.ctx, press(['A', 'B', 'Y'][i % 3]));
+    expect(b.tick(mixer.ctx, 0)).toBe(12);
+    expect(mixer.banners().at(-1)).toBe('12 · MIX +1');
+    masher.dispose(); mixer.dispose();
+  });
+});
+
+describe('COUNTER STRIKE: one press per wind-up (#2)', () => {
+  async function windUp() {
+    const f = fakeCtx(); const ev = counterStrike(); await ev.build(f.ctx);
+    vi.spyOn(Math, 'random').mockReturnValue(0);                    // every wind-up comes 0.4 s into the idle
+    f.run(ev, 0.45);                                                // the wind-up has begun
+    return { ...f, ev };
+  }
+
+  it('mashing GO through the wind-up never counters: the first (early) press is the answer', async () => {
+    const { ctx, ev, run, banners, dispose } = await windUp();
+    for (let i = 0; i < 12; i++) { ev.onInput(ctx, press('A')); run(ev, 0.05); }   // 0.05–0.6 s: right through the window
+    expect(ev.tick(ctx, 0)).toBe(0);
+    expect(banners()).toContain('TOO EARLY');
+    expect(banners().filter((b) => typeof b === 'string' && b.startsWith('COUNTER'))).toEqual([]);
+    dispose();
+  });
+
+  it('one press in the window still counters, and the next wind-up takes a fresh answer', async () => {
+    const { ctx, ev, run, dispose } = await windUp();
+    run(ev, 0.45); ev.onInput(ctx, press('A'));                      // ~0.45 s in
+    expect(ev.tick(ctx, 0)).toBe(1);
+    ev.onInput(ctx, press('A'));                                    // a second press on the same wind-up does nothing
+    expect(ev.tick(ctx, 0)).toBe(1);
+    run(ev, 0.2 + 0.6 + 0.4 + 0.47);                                // the wind-up's end, the cooldown, the idle, 0.47 s into the next
+    ev.onInput(ctx, press('A'));
+    expect(ev.tick(ctx, 0)).toBe(2);
+    dispose();
+  });
+});
+
+describe('one banner channel per event (#7)', () => {
+  it('a second banner is not wiped by the first one\'s clear', () => {
+    const f = fakeCtx(); const ch = bannerChannel();
+    ch.flash(f.ctx, 'MAKE 1', 400);
+    vi.advanceTimersByTime(300);
+    ch.flash(f.ctx, 'MISS', 400);
+    vi.advanceTimersByTime(150);                                    // the first clear would have fired here
+    expect(f.banners()).toEqual(['MAKE 1', 'MISS']);
+    vi.advanceTimersByTime(300);
+    expect(f.banners()).toEqual(['MAKE 1', 'MISS', '']);
+    f.dispose();
+  });
+
+  it('a clear still pending at the whistle never wipes the result card', async () => {
+    const f = fakeCtx(); const ev = counterStrike(); await ev.build(f.ctx);
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    f.run(ev, 0.45); f.run(ev, 0.45); ev.onInput(f.ctx, press('A'));   // COUNTER 1!, its clear armed
+    ev.tick(f.ctx, 0); ev.teardown();                               // the whistle
+    f.ctx.setHud({ banner: 'COUNTER STRIKE: YOU 14 · RIVAL 70' });
+    vi.runAllTimers();
+    expect(f.banners().at(-1)).toBe('COUNTER STRIKE: YOU 14 · RIVAL 70');
+    f.dispose();
+  });
+});
+
+describe('HOT SHOT: a keeper (#14), a shot that dies short (#1), a late goal model (#6)', () => {
+  it('the keeper: good / late / stays by the odds, reading the aim side 60 % of the time', () => {
+    expect(hotShotKeeper(2, seq(0.1, 0.1))).toEqual({ dive: 1, timing: 'good' });    // read right
+    expect(hotShotKeeper(2, seq(0.1, 0.9))).toEqual({ dive: -1, timing: 'good' });   // guessed wrong
+    expect(hotShotKeeper(-2, seq(0.5, 0.1))).toEqual({ dive: -1, timing: 'late' });
+    expect(hotShotKeeper(-2, seq(0.95))).toEqual({ dive: 0, timing: 'none' });
+  });
+
+  async function shootAt(x: number, y = 1, rnd = 0.1) {
+    const f = fakeCtx(); const ev = hotShot(); await ev.build(f.ctx);
+    vi.spyOn(Math, 'random').mockReturnValue(rnd);                  // 0.1: a GOOD dive to the right side
+    shot.to.set(x, y, 11);
+    ev.onInput(f.ctx, press('A')); ev.onInput(f.ctx, press('A'));
+    const goals = ev.tick(f.ctx, 1 / 60);
+    vi.restoreAllMocks();
+    return { ...f, ev, goals };
+  }
+
+  it('a shot down the middle is saved; a corner beats even a good dive the right way', async () => {
+    const mid = await shootAt(0.4);
+    expect(mid.goals).toBe(0);
+    expect(mid.banners()).toContain('SAVED!');
+    expect(mid.report).not.toHaveBeenCalled();
+    mid.dispose();
+    const corner = await shootAt(3);
+    expect(corner.goals).toBe(1);
+    corner.dispose();
+    const reached = await shootAt(2);                                // inside a good dive's 2.4 m reach, the way he went
+    expect(reached.goals).toBe(0);
+    reached.dispose();
+  });
+
+  it('a ball that stops short of the line is a miss, and the next shot can be taken', async () => {
+    const f = fakeCtx(); const ev = hotShot(); await ev.build(f.ctx);
+    shot.to.set(0, 0.05, 4); shot.flying = false;                   // a dribbler: it dies on the grass 4 m out
+    ev.onInput(f.ctx, press('A')); ev.onInput(f.ctx, press('A'));
+    ev.tick(f.ctx, 1 / 60);
+    expect(f.banners()).toContain('SHORT — MORE POWER');
+    shot.to.set(3, 1, 11); shot.flying = true;                      // the shot after it is live (it used to be locked out)
+    ev.onInput(f.ctx, press('A')); ev.onInput(f.ctx, press('A'));
+    expect(ev.tick(f.ctx, 1 / 60)).toBe(1);
+    f.dispose();
+  });
+
+  it('the goal is built with an alive check that turns false at teardown', async () => {
+    const f = fakeCtx(); const ev = hotShot(); await ev.build(f.ctx);
+    expect(goalAlive).toHaveLength(1);
+    expect(goalAlive[0]()).toBe(true);
+    ev.teardown();
+    expect(goalAlive[0]()).toBe(false);
+    f.dispose();
+  });
+});
+
+describe('COIN STORM: nothing handed out at the whistle (#12), one coin field all event (#19)', () => {
+  /** every coin a line lays (CoinField.line's own spacing) */
+  const coinsOf = (lines: Array<[Vector3, Vector3, number]>): Vector3[] =>
+    lines.flatMap(([a, b, n]) => Array.from({ length: n }, (_, i) => Vector3.Lerp(a, b, n === 1 ? 0 : i / (n - 1))));
+
+  it('the runner starts out of the magnet\'s reach (1.1 m) of every coin of the first pattern', async () => {
+    const f = fakeCtx(); const ev = coinStorm(); await ev.build(f.ctx);
+    const at = spawns.at(-1)!;
+    const nearest = Math.min(...coinsOf(coinFields[0].lines).map((c) => Math.hypot(c.x - at.x, c.z - at.z)));
+    expect(nearest).toBeGreaterThan(1.1 * 2);
+    f.dispose();
+  });
+
+  it('a cleared pattern is laid on the same field, emptied — not a new one', async () => {
+    const f = fakeCtx(); const ev = coinStorm(); await ev.build(f.ctx);
+    coinGain.next = 14; ev.tick(f.ctx, 1 / 60);                     // the cross cleared: the ring
+    coinGain.next = 10; ev.tick(f.ctx, 1 / 60);                     // the ring cleared: the cross again
+    expect(coinFields).toHaveLength(1);
+    expect(coinFields[0].clears).toBe(2);
+    expect(coinFields[0].disposed).toBe(false);
+    expect(ev.tick(f.ctx, 0)).toBe(24);
+    ev.teardown();
+    expect(coinFields[0].disposed).toBe(true);
+    f.dispose();
+  });
+});
+
+describe('2P: an event resets for P2 on its own stage (#16)', () => {
+  it('every event but the trick gauntlet resets: the score is back to zero and the next attempt scores again', async () => {
+    const all: Array<[CarnivalEvent, (f: ReturnType<typeof fakeCtx>, ev: CarnivalEvent) => void]> = [
+      [slamRush(), (f, ev) => { ev.onInput(f.ctx, trig(0.85)); ev.onInput(f.ctx, trig(0)); f.run(ev, 0.6); }],
+      [strikeStorm(), (f, ev) => { ev.onInput(f.ctx, press('A')); }],
+      [hotShot(), (f, ev) => { ev.onInput(f.ctx, press('A')); ev.onInput(f.ctx, press('A')); ev.tick(f.ctx, 1 / 60); }],
+      [coinStorm(), (f, ev) => { coinGain.next = 2; ev.tick(f.ctx, 1 / 60); }],
+      [counterStrike(), (f, ev) => { vi.spyOn(Math, 'random').mockReturnValue(0); f.run(ev, 0.45); f.run(ev, 0.45); ev.onInput(f.ctx, press('A')); vi.restoreAllMocks(); }],
+    ];
+    for (const [ev, score] of all) {
+      const f = fakeCtx(); await ev.build(f.ctx);
+      const spawned = spawns.length;
+      score(f, ev);
+      expect(ev.tick(f.ctx, 0), ev.id).toBeGreaterThan(0);
+      ev.reset!(f.ctx);
+      expect(ev.tick(f.ctx, 0), `${ev.id} after reset`).toBe(0);
+      expect(spawns.length, `${ev.id} spawns nothing for P2`).toBe(spawned);
+      score(f, ev);
+      expect(ev.tick(f.ctx, 0), `${ev.id} P2 scores`).toBeGreaterThan(0);
+      ev.teardown(); f.dispose();
+    }
+    expect(trickGauntlet().reset).toBeUndefined();                 // its rider physics has no reset: it is rebuilt
   });
 });
