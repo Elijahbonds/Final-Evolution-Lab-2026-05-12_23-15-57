@@ -14,7 +14,7 @@
 
 import {
   CREATOR_DOC_VERSION, MAX_PARTS, MAX_PAINT_LAYERS, MAX_SLOTS, MAX_DOC_CHARS,
-  PART_SHAPES, PART_BONES, FINISHES, PAINT_TYPES, PAINT_REGIONS, PAINT_SURFACES, PAINT_PATTERNS, PAINT_STAMPS,
+  PART_SHAPES, PART_BONES, FINISHES, PAINT_TYPES, PAINT_REGIONS, PAINT_SURFACES, PAINT_PATTERNS, PAINT_STAMPS, PAINT_BLENDS,
   COLOUR_SLOTS, SHAPE_FACE_KEYS, PROPORTION_RANGES, PROPORTION_KEYS, RANGES,
   type CreatorDoc, type CreatorPart, type PaintLayer, type CreatorSlot, type Vec3, type ColourSlot,
 } from './doc';
@@ -102,6 +102,11 @@ export function sanitizePaintLayer(raw: unknown): PaintLayer | null {
     opacity: clampNum(raw.opacity, RANGES.opacity[0], RANGES.opacity[1], 1),
     mirror: raw.mirror === true,
   };
+  // phase 3's optional fields, stored only when not the default (a phase 1–2 doc sanitises to exactly what it was)
+  if (pick(raw.blend, PAINT_BLENDS) === 'multiply') layer.blend = 'multiply';
+  if (raw.hidden === true) layer.hidden = true;
+  const weight = clampNum(raw.weight, RANGES.paintWeight[0], RANGES.paintWeight[1], 0.5);
+  if (weight !== 0.5) layer.weight = weight;
   // each type carries exactly the one id it needs; a type missing it is not a layer
   if (type === 'pattern') { const p = pick(raw.pattern, PAINT_PATTERNS); if (!p) return null; layer.pattern = p; }
   if (type === 'stamp') { const s = pick(raw.stamp, PAINT_STAMPS); if (!s) return null; layer.stamp = s; }

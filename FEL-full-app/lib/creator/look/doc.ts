@@ -54,10 +54,15 @@ export type Finish = typeof FINISHES[number];
 export const PAINT_TYPES = ['fill', 'pattern', 'stamp', 'text'] as const;
 export type PaintType = typeof PAINT_TYPES[number];
 
-/** Body regions (phase 3 derives each mask from the skin weights, not a hand-drawn map). */
+/** Body regions (phase 3 derives each mask from the skin weights, not a hand-drawn map:
+ *  lib/babylon/creator/paint/bodyChart.ts). APPEND ONLY. Phase 3 (2026-10-06) appended the second row: the neck, each
+ *  limb's two segments, and `body` (everything below the head, the neck included: the suit's region). `armLeft` is the upper arm and the
+ *  forearm, `legLeft` the thigh and the shin; the hands and feet are their own regions. */
 export const PAINT_REGIONS = [
   'all', 'head', 'face', 'torsoFront', 'torsoBack', 'armLeft', 'armRight', 'handLeft', 'handRight',
   'legLeft', 'legRight', 'footLeft', 'footRight',
+  'neck', 'upperArmLeft', 'upperArmRight', 'forearmLeft', 'forearmRight', 'thighLeft', 'thighRight', 'shinLeft',
+  'shinRight', 'body',
 ] as const;
 export type PaintRegion = typeof PAINT_REGIONS[number];
 
@@ -65,17 +70,26 @@ export type PaintRegion = typeof PAINT_REGIONS[number];
 export const PAINT_SURFACES = ['skin', 'garments', 'both'] as const;
 export type PaintSurface = typeof PAINT_SURFACES[number];
 
+/** Procedural patterns (lib/babylon/creator/paint/patterns.ts). `radial` is radial lines, `lines` pinstripes.
+ *  APPEND ONLY; phase 3 appended `waves` and `hexes`. */
 export const PAINT_PATTERNS = [
   'web', 'radial', 'stripes', 'chevrons', 'gradient', 'camo', 'dots', 'scales', 'checks', 'carbon', 'lines',
+  'waves', 'hexes',
 ] as const;
 export type PaintPattern = typeof PAINT_PATTERNS[number];
 
-/** Generic stamp shapes. Text is its own layer type, through the jersey plate's sanitiser. */
+/** Generic stamp shapes (lib/babylon/creator/paint/stamps.ts). Text is its own layer type, through the jersey plate's
+ *  sanitiser. APPEND ONLY; phase 3 appended the second row (`cross` is the diagonal one, `plus` the upright one). */
 export const PAINT_STAMPS = [
   'circle', 'ring', 'star', 'bolt', 'triangle', 'diamond', 'heart', 'cross', 'eye', 'eyeSharp', 'flame', 'wing',
   'tribalCurve', 'tribalSpike', 'chevron', 'drop',
+  'plus', 'square', 'hexagon', 'crescent', 'arrow', 'slash',
 ] as const;
 export type PaintStamp = typeof PAINT_STAMPS[number];
+
+/** How a layer meets what is under it. Kept simple on purpose (CREATOR-PLAN phase 3): paint over, or darken through. */
+export const PAINT_BLENDS = ['normal', 'multiply'] as const;
+export type PaintBlend = typeof PAINT_BLENDS[number];
 
 /** Colour slots the doc can override. Skin, hair and eyes stay in FaceConfig. */
 export const COLOUR_SLOTS = ['jersey', 'shorts', 'shoes', 'accent'] as const;
@@ -109,6 +123,7 @@ export const RANGES = {
   paintScale: [0.02, 4],
   paintStretch: [0.2, 5],    // width / height
   opacity: [0, 1],
+  paintWeight: [0.05, 0.95], // a pattern's line / stripe / dot weight, a stamp's outline width (phase 3)
 } as const;
 
 export type Vec3 = [number, number, number];
@@ -130,6 +145,11 @@ export interface CreatorPart {
   mirror: boolean;
 }
 
+/** Where a layer sits (phase 3, lib/babylon/creator/paint/bodyChart.ts). The body is unrolled into a chart in METRES,
+ *  seen from outside: `x` runs across the region left to right as you look at it (0..1, 0.5 = its middle, the body's
+ *  midline on a centre region), `y` runs up it (0 = its bottom). `rot` is degrees, `scale` multiplies the base size (a
+ *  stamp 12 cm across, text 6 cm tall, a pattern's period 6 cm), `stretch` is width / height. On a pattern, x and y
+ *  shift it (or set a radial pattern's centre). */
 export interface PaintTransform { x: number; y: number; rot: number; scale: number; stretch: number }
 
 export interface PaintLayer {
@@ -148,6 +168,12 @@ export interface PaintLayer {
   colours: string[];
   opacity: number;
   mirror: boolean;
+  /** Phase 3, all optional and stored only when not the default (so phase 1–2 docs and codes are unchanged):
+   *  `blend` 'normal' when absent; `hidden` true keeps the layer in the stack but draws nothing; `weight` (0.05–0.95,
+   *  0.5 when absent) is a pattern's line/stripe/dot weight or a stamp's / text's outline width. */
+  blend?: PaintBlend;
+  hidden?: boolean;
+  weight?: number;
 }
 
 export interface CreatorShape {
