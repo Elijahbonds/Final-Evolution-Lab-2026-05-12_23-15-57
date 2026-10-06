@@ -10,7 +10,7 @@
 
 import type { ModeContext } from '@/lib/babylon/core/ModeHarness';
 import { MicDirector, type CastScript, type MicCue, type MicEvent, type MicLine } from './MicDirector';
-import { VoiceKit, type BankIndex, type VoicePlayResult } from './VoiceKit';
+import { VoiceKit, captionWithoutAudio, type BankIndex, type VoicePlayResult } from './VoiceKit';
 import { deviceLineMemory, saveLineMemory } from '../voice/lineMemory';
 import { CROWD, SIDEKICK, castById, mcFor } from './cast';
 import type { MicGroup } from './moments';
@@ -141,7 +141,7 @@ export class ModeMic {
       // the lane dropped (stale, cooling down, a bigger moment had the mic) shows nothing: nothing was said.
       void VoiceKit.playEx(c, this.court, () => { if (caption) this.showCaption(c); }).then((r) => {
         logCue(c, r);
-        if ((r === 'off' || r === 'missing') && caption) this.showCaption(c);
+        if (captionWithoutAudio(r) && caption) this.showCaption(c);
       });
     }
   }

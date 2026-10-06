@@ -41,17 +41,30 @@ export const ROUTE_TRIM_DB: Readonly<Record<MicRole, number>> = Object.freeze({ 
 /** Per-voice trims from a real decode (dB). Empty until measured: see the header, point 1. */
 export const CAST_TRIM_DB: Readonly<Record<string, number>> = Object.freeze({});
 
+/**
+ * IMPROVE (2026-10-06): each imported voice's median measured loudness (LUFS), written by tools/voice/import-voices.mts after it
+ * levels and measures a provider's takes. A line that carries its own `lufs` in the bank index is trimmed by that; a line without
+ * one (render-mic.py rewrites the indexes without `lufs`, so a Kokoro re-render drops every measurement) is trimmed by its
+ * voice's median here, which survives a re-render. Between the markers the importer owns the text: edit the voices, not the shape.
+ */
+// <measured-cast-lufs>
+export const MEASURED_CAST_LUFS: Readonly<Record<string, number>> = Object.freeze({
+});
+// </measured-cast-lufs>
+
 export const dbToGain = (db: number): number => Math.pow(10, db / 20);
 export const gainToDb = (g: number): number => 20 * Math.log10(Math.max(g, 1e-9));
 const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v));
 
-/** A clip's own trim (dB): back to TARGET_LUFS when its loudness was measured, else 0 (the renderer already levelled it). */
-export function clipTrimDb(line?: { lufs?: number } | null): number {
-  const l = line?.lufs;
+/** A clip's own trim (dB): back to TARGET_LUFS when its loudness was measured, else by its voice's measured median
+ *  (MEASURED_CAST_LUFS), else 0 (the renderer already levelled it). */
+export function clipTrimDb(line?: { lufs?: number } | null, cast?: string, measured: Readonly<Record<string, number>> = MEASURED_CAST_LUFS): number {
+  const own = line?.lufs;
+  const l = typeof own === 'number' && Number.isFinite(own) ? own : cast !== undefined ? measured[cast] : undefined;
   return typeof l === 'number' && Number.isFinite(l) ? clamp(TARGET_LUFS - l, -MAX_CLIP_TRIM_DB, MAX_CLIP_TRIM_DB) : 0;
 }
 
 /** The linear gain one clip plays at: its route's trim, its voice's trim and its own, on top of the cue's relative gain. */
 export function lineGain(role: MicRole, cast: string, line: { lufs?: number } | null | undefined, cueGain = 1): number {
-  return cueGain * dbToGain((ROUTE_TRIM_DB[role] ?? 0) + (CAST_TRIM_DB[cast] ?? 0) + clipTrimDb(line));
+  return cueGain * dbToGain((ROUTE_TRIM_DB[role] ?? 0) + (CAST_TRIM_DB[cast] ?? 0) + clipTrimDb(line, cast));
 }

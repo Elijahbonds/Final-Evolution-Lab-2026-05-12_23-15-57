@@ -8,13 +8,15 @@
 //   2. otherwise speaks it with the device's least robotic voice (ttsVoice.pickTtsVoice) at its natural pitch, and logs the line
 //      as a content gap (voiceGaps: `window.__FEL_VOICE_GAPS__`), so docs/VOICE-LINES-NEEDED.md can be kept honest.
 // Today no Mirror / Quick Screen / Prove It line has a rendered take (their text is built at run time), so (2) is what plays until
-// the owner records them: rendering a line into the coach bank with the same text is all it takes for (1) to pick it up.
+// the owner records them: rendering a line into the coach bank with the same text is all it takes for (1) to pick it up. The
+// production script for every one of them is tools/voice/script/coach.csv; tools/voice/import-voices.mts puts the takes in the bank.
 // Browser-only (it touches speechSynthesis and VoiceKit); every decision it makes is in the pure modules it calls.
 
 import { SoundKit } from '../SoundKit';
 import { VoiceKit } from '../mic/VoiceKit';
 import { TTS_PITCH, pickTtsVoice } from './ttsVoice';
 import { noteTtsLine } from './voiceGaps';
+import { bakedClipsFor } from './bakedLine';
 
 /** The voices whose rendered takes may stand in for a run-time line. */
 const BAKED_CASTS: readonly string[] = ['coach'];
@@ -54,11 +56,13 @@ export function cancelNatural(): void {
 export function speakNatural(text: string, o: SpeakOpts): void {
   warmBakedVoice();
   cancelNatural();
-  const clip = VoiceKit.findText(text, BAKED_CASTS);
-  if (clip && SoundKit.voiceOn && SoundKit.audioRunning) {
-    const sec = VoiceKit.line(clip)?.sec ?? 2;
+  // IMPROVE (2026-10-06): the whole line's take, or one take per sentence when the page built the line from recorded parts
+  // (bakedLine.ts); a take's `match` covers a page string whose spoken words differ ("130 cm").
+  const clips = bakedClipsFor(text, (t) => VoiceKit.findText(t, BAKED_CASTS));
+  if (clips && SoundKit.voiceOn && SoundKit.audioRunning) {
+    const sec = clips.reduce((a, c) => a + (VoiceKit.line(c)?.sec ?? 2), 0) + 0.05 * (clips.length - 1);
     void VoiceKit.playEx({
-      cast: clip.split('/')[0], role: 'coach', channel: 'player', clips: [clip], caption: text, speaker: 'Coach',
+      cast: clips[0].split('/')[0], role: 'coach', channel: 'player', clips, caption: text, speaker: 'Coach',
       sec, priority: o.protect ? 2 : 1, interrupt: true, pan: 0, gain: 1,
     }, 'venice').then((r) => {
       if (r === 'played') { endTimer = setTimeout(() => { endTimer = null; o.onend?.(); }, sec * 1000); return; }

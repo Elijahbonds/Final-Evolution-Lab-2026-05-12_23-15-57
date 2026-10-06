@@ -26,13 +26,18 @@ import { VoiceQueue } from '../voice/voiceQueue';
 import { lineGain } from '../voice/loudness';
 
 export const VOICE_BASE = '/audio/voice/v1';
-/** One rendered line in a bank: where its bytes are and how long it plays (`lufs`: its measured loudness, once measured). */
-export interface BankLine extends MicLine { off: number; len: number; sec: number; lufs?: number }
+/** One rendered line in a bank: where its bytes are and how long it plays (`lufs`: its measured loudness, once measured;
+ *  `match`: the page's own string when the spoken words differ from it, VOICEOVER 2026-10-06, see findText). */
+export interface BankLine extends MicLine { off: number; len: number; sec: number; lufs?: number; peak?: number; match?: string }
 export interface BankIndex { cast: string; group: string; bank: string; lines: BankLine[] }
 
 /** What became of a line: it played, the voice is off (or there is no Web Audio), a clip is missing, or the lane dropped it
  *  (stale, cooling down, or a busier moment had the mic). A dropped line shows no caption: nothing was said. */
 export type VoicePlayResult = 'played' | 'off' | 'missing' | 'dropped';
+
+/** IMPROVE (2026-10-06): a line that could not be heard (the voice is off, no audio, no bank) still shows its words; a line the
+ *  lane dropped shows nothing; a played line showed its caption when it started. */
+export const captionWithoutAudio = (r: VoicePlayResult): boolean => r === 'off' || r === 'missing';
 
 const RATE = 24000;
 const CACHE = 64;
@@ -140,6 +145,21 @@ class VoiceKitImpl {
     });
   }
 
+  /**
+   * IMPROVE (2026-10-06): play a host line and put its caption up WHEN THE AUDIO STARTS. A room that set its caption before
+   * asking the lane showed a line a beat early when the lane held it, and showed one that was never said when the lane dropped
+   * it. `show` runs once: on start; or at once when there is no audio to wait for (the voice is off, no Web Audio, the bank is
+   * not in: the words still land, the rooms' "captions for every voiced line" rule); never for a dropped line (nothing was said).
+   */
+  async playCaptioned(cue: MicCue, court: string, show: () => void): Promise<VoicePlayResult> {
+    let shown = false;
+    const once = (): void => { if (!shown) { shown = true; show(); } };
+    let r: VoicePlayResult;
+    try { r = await this.playEx(cue, court, once); } catch { r = 'off'; }
+    if (captionWithoutAudio(r)) once();
+    return r;
+  }
+
   /** Stop a channel (or everything) with a short fade. What was waiting on it is dropped. */
   stop(channel: MicCue['channel'] | 'all', fadeSec = 0.08): void {
     const g = SoundKit.graph(); if (!g) return;
@@ -231,6 +251,9 @@ class VoiceKitImpl {
             const clipId = `${cast}/${line.id}`;
             this.where.set(clipId, { bank: key, line });
             const k = textKey(line.text); if (k && !this.byText.has(k)) this.byText.set(k, clipId);
+            // IMPROVE (2026-10-06): a take whose words differ from the page's string ("one hundred thirty centimetres" for
+            // "130 cm") carries the page's string as `match`, so the page still finds it.
+            const m = line.match ? textKey(line.match) : ''; if (m && !this.byText.has(m)) this.byText.set(m, clipId);
           }
           return index;
         } catch { return null; }
