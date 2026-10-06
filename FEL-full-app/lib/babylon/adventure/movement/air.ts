@@ -14,6 +14,9 @@ import type { Wish } from './input';
 import { yawOf } from './math';
 import { enterState } from './state';
 
+/** Above this planar speed the body faces where it is going; below it keeps its facing. [TUNE] */
+export const FACE_RUN_SPEED = 3;
+
 /** The apex height of a jump at take-off speed v under gravity g: v² / 2g (spin-jump apex test). */
 export const jumpApex = (v: number, g: number): number => (v * v) / (2 * g);
 
@@ -58,9 +61,12 @@ export function integrateAir(a: AdventureActor, b: BodyState, inp: MoveInput, w:
       else { a.vel.x += (dx / dl) * step; a.vel.z += (dz / dl) * step; }
     }
   }
+  // Velocity Verlet on y (the mean of the old and new vertical speed), so the apex is v²/2g at any step size.
+  const vy0 = a.vel.y;
   a.vel.y = Math.max(-air.maxFall, a.vel.y - air.gravity * gScale * dt);
-  a.pos.x += a.vel.x * dt; a.pos.y += a.vel.y * dt; a.pos.z += a.vel.z * dt;
-  if (Math.hypot(a.vel.x, a.vel.z) > 0.5) a.facingYaw = yawOf(a.vel.x, a.vel.z);
+  a.pos.x += a.vel.x * dt; a.pos.y += (vy0 + a.vel.y) * 0.5 * dt; a.pos.z += a.vel.z * dt;
+  // The facing follows a real run, not a homing bounce's small kick back (the next target stays ahead).
+  if (Math.hypot(a.vel.x, a.vel.z) > FACE_RUN_SPEED) a.facingYaw = yawOf(a.vel.x, a.vel.z);
 }
 
 /** Touch down when the feet reach the ground while falling. Keeps the planar speed: landing never brakes a run. */
@@ -76,7 +82,7 @@ export function tryLand(a: AdventureActor, b: BodyState, env: StepEnv): boolean 
   b.coyote = 0;
   b.airDashes = 1; b.airDashT = 0;
   b.rising = false; b.spinning = false;
-  b.homingChain = 0;
+  b.homingChain = 0; b.lastHomedId = null;
   b.landedAt = env.tSec;
   enterState(a, 'ground', env.bus);
   return true;

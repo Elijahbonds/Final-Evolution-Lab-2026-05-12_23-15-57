@@ -17,6 +17,7 @@ import { FLOW } from '@/lib/babylon/core/FreeRunFlow';
 import type { BodyState, StepEnv } from './body';
 import type { HomingParams } from './params';
 import { yawOf } from './math';
+import { FACE_RUN_SPEED } from './air';
 
 const aEye: Vec3 = { x: 0, y: 0, z: 0 }, bEye: Vec3 = { x: 0, y: 0, z: 0 };
 
@@ -51,23 +52,31 @@ export function homingReason(
 
 /** The cone's axis: where the body is going, or where it faces when it is not going anywhere. */
 export function homingAxis(a: AdventureActor): number {
-  return Math.hypot(a.vel.x, a.vel.z) > 1 ? yawOf(a.vel.x, a.vel.z) : a.facingYaw;
+  return Math.hypot(a.vel.x, a.vel.z) > FACE_RUN_SPEED ? yawOf(a.vel.x, a.vel.z) : a.facingYaw;
 }
 
-/** The target a homing press would snap to, or null. Pure: same world, same answer. */
-export function pickHomingTarget(a: AdventureActor, world: AdventureWorld, h: HomingParams): AdventureActor | null {
+/**
+ * The target a homing press would snap to, or null. Pure: same world, same answer. `avoidId` is the body just hit: a
+ * chain moves ON to the next target when there is one (a lone boss can still be hit again and again).
+ */
+export function pickHomingTarget(a: AdventureActor, world: AdventureWorld, h: HomingParams, avoidId: ActorId | null = null): AdventureActor | null {
   const axis = homingAxis(a);
-  if (a.lock) {
+  if (a.lock && a.lock.actorId !== avoidId) {
     const locked = world.actors.get(a.lock.actorId);
     if (locked && homingReason(a, locked, axis, world, h, true) === 'ok') return locked;
   }
-  let best: AdventureActor | null = null, bestD = Infinity;
+  let best: AdventureActor | null = null, bestD = Infinity, again: AdventureActor | null = null;
   for (const t of world.near(a.pos, h.range + 2)) {
     if (homingReason(a, t, axis, world, h) !== 'ok') continue;
+    if (t.id === avoidId) { again = t; continue; }
     const d = Math.hypot(t.pos.x - a.pos.x, t.pos.y - a.pos.y, t.pos.z - a.pos.z);
     if (d < bestD) { best = t; bestD = d; }
   }
-  return best;
+  if (!best && a.lock && a.lock.actorId === avoidId) {
+    const locked = world.actors.get(avoidId);
+    if (locked && homingReason(a, locked, axis, world, h, true) === 'ok') return locked;
+  }
+  return best ?? again;
 }
 
 export function startHoming(a: AdventureActor, b: BodyState, target: AdventureActor): void {
@@ -106,6 +115,7 @@ export function stepHoming(a: AdventureActor, b: BodyState, env: StepEnv, dt: nu
     a.vel.x = -(ux / flat) * h.bounceBack; a.vel.z = -(uz / flat) * h.bounceBack; a.vel.y = h.bounceUp;
     b.airDashes = 1;
     b.homingChain++;
+    b.lastHomedId = id;
     b.flow.add(FLOW.rebound);
     b.spinning = true;
     endHoming(a, b, id, true, env);

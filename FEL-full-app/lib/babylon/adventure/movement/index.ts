@@ -123,6 +123,8 @@ export function createMovementSystem(opts: MovementSystemOptions = {}): Movement
   const telemetry = new Map<ActorId, MovementTelemetry>();
   const feelBand = new Map<ActorId, string>();
   const riderOf = new Map<ActorId, AdventureActor>();
+  /** Riders at the start of the step: one who mounts this tick is already seated and is not stepped again. */
+  const seated = new Set<ActorId>();
   const w: Wish = wish();
   const caught = railCatch();
   /** The ground's catch: the air's window, tighter (a rail at the feet, not one beside the runner). [TUNE] 0.6 m */
@@ -216,7 +218,7 @@ export function createMovementSystem(opts: MovementSystemOptions = {}): Movement
   function airPress(a: AdventureActor, b: BodyState, source: FlightSource | null, isMount: boolean, rider: AdventureActor | null): void {
     if (b.coyote <= params.air.coyoteSec) { groundJump(a, b, env); return; }
     if (!isMount) {
-      const t = pickHomingTarget(a, env.world, params.homing);
+      const t = pickHomingTarget(a, env.world, params.homing, b.lastHomedId);
       if (t) { startHoming(a, b, t); return; }
       if (tryWallRun(a, b, env)) return;
     }
@@ -386,10 +388,10 @@ export function createMovementSystem(opts: MovementSystemOptions = {}): Movement
       if (!rails || rails.net !== world.rails) rails = buildRailIndex(world.rails);
       env.tSec = ctx.tSec; env.world = world; env.bus = ctx.bus; env.rails = rails;
       let localId = opts.localId ?? null;
-      riderOf.clear();
+      riderOf.clear(); seated.clear();
       for (const a of world.actors.values()) {
         if (!localId && opts.localId === undefined && a.kind === 'player') localId = a.id;
-        if (a.ridingId) riderOf.set(a.ridingId, a);
+        if (a.ridingId) { riderOf.set(a.ridingId, a); seated.add(a.id); }
       }
       for (const a of world.actors.values()) {
         if (a.ridingId || opts.skip?.(a)) continue;
@@ -397,7 +399,7 @@ export function createMovementSystem(opts: MovementSystemOptions = {}): Movement
         stepBody(a, ctx, dt * ctx.timeScaleOf(a.id));
       }
       for (const a of world.actors.values()) {
-        if (!a.ridingId || opts.skip?.(a)) continue;
+        if (!a.ridingId || !seated.has(a.id) || opts.skip?.(a)) continue;
         env.hint = a.id === localId ? ctx.hint : null;
         stepRider(a, ctx, dt * ctx.timeScaleOf(a.id));
       }
@@ -410,6 +412,6 @@ export function createMovementSystem(opts: MovementSystemOptions = {}): Movement
       if (id === undefined) { bodies.clear(); telemetry.clear(); feelBand.clear(); return; }
       bodies.delete(id); telemetry.delete(id); feelBand.delete(id);
     },
-    dispose(): void { bodies.clear(); telemetry.clear(); feelBand.clear(); riderOf.clear(); rails = null; },
+    dispose(): void { bodies.clear(); telemetry.clear(); feelBand.clear(); riderOf.clear(); seated.clear(); rails = null; },
   };
 }

@@ -54,7 +54,7 @@ export function landFromFlight(a: AdventureActor, b: BodyState, gy: number, env:
   b.fl.mode = 'free'; b.fl.dashT = 0; b.fl.bank = 0; b.fl.pitch = 0; b.fl.glide = false;
   b.speed = Math.hypot(a.vel.x, a.vel.z);
   if (b.speed > 0.1) b.heading = yawOf(a.vel.x, a.vel.z);
-  b.coyote = 0; b.airDashes = 1; b.homingChain = 0;
+  b.coyote = 0; b.airDashes = 1; b.homingChain = 0; b.lastHomedId = null;
   b.landedAt = env.tSec;
   enterState(a, 'ground', env.bus);
 }

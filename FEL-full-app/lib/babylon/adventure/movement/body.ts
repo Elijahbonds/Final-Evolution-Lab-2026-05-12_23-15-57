@@ -72,6 +72,8 @@ export interface BodyState {
   homingId: ActorId | null;
   homingT: number;
   homingChain: number;
+  /** The body the last homing hit landed on (the next press moves on to another target when there is one). */
+  lastHomedId: ActorId | null;
   /** Wall run. */
   wall: WallRunOn<WallSegment> | null;
   wallT: number;
@@ -106,7 +108,7 @@ export function newBody(id: ActorId, seed: number): BodyState {
     flow: new FlowMeter(),
     speed: 0, heading: 0, skidding: false,
     coyote: Infinity, jumpBuffer: 0, rising: false, spinning: false, airDashes: 1, airDashT: 0,
-    homingId: null, homingT: 0, homingChain: 0,
+    homingId: null, homingT: 0, homingChain: 0, lastHomedId: null,
     wall: null, wallT: 0, wallSpeed: 0, wallBaseY: 0,
     balance: new RailBalance(rnd),
     lean: 0, turn: 0, trickT: 0, trickChain: 0, hopT: 0, hopFrom: { x: 0, y: 0, z: 0 }, recatchId: null, recatchT: 0,
