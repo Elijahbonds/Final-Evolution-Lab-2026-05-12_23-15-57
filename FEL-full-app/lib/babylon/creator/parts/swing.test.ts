@@ -187,6 +187,19 @@ describe('a bendable part on the body', () => {
     expect(stiff, 'a stiff one leans with the body').toBeGreaterThan(25);
   });
 
+  it('a tail placed pointing back and up stays where it was placed at rest (the swing is measured from how it was placed)', () => {
+    const s = body(); settle(s.root);
+    syncParts(s, [P({ id: 't', shape: 'tailSeg', bone: 'Hips', pos: [0, -0.02, -0.12], rot: [-120, 0, 0], scale: [1.2, 5, 1.2], swing: 1 })]);
+    const mesh = partsOn(s.root).meshes.find((m) => m.metadata?.felSwing)!;
+    const rig = findRig(s.root);
+    const far = () => { const p = mesh.getVerticesData('position')!; let best = 0, d = -1; for (let v = 0; v < p.length / 3; v++) { const q = skinned(mesh, v); const l = Vector3.Distance(q, s.root.position); if (l > d) { d = l; best = v; } } return best; };
+    const tip = far();
+    const placed = skinned(mesh, tip);
+    for (let i = 0; i < 300; i++) { settle(s.root); stepSwing(rig, 1 / 60); }
+    expect(Vector3.Distance(skinned(mesh, tip), placed), 'it does not droop to hang').toBeLessThan(0.003);
+    s.root.dispose();
+  });
+
   it('a phone swings at 30 Hz, one step a frame, and only the first chains', () => {
     const s = body(kitM); settle(s.root);
     const many = Array.from({ length: 8 }, (_, i) => P({ id: `s${i}`, pos: [(i - 4) * 0.03, 0.1, -0.13], swing: 0.6 }));

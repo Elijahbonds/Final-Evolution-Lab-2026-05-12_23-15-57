@@ -82,7 +82,7 @@ describe('what is refused', () => {
     for (const bad of [
       '', 'r', 'x' + ok.slice(1), ok + 'A', ok.slice(0, -3), ok.replace(/./g, (ch, i) => (i === 5 ? '+' : ch)), 'r' + 'A'.repeat(MAX_MARK_CHARS),
       raw([0, 100, 100]),                            // runs that stop short of 128²
-      raw([0, 0, 1]),                                // an empty run after the first
+      raw([0, 0, 0x80, 0x80, 0x01]),                 // an empty run after the first (the runs still add up to 128²)
       raw([0x80, 0x80, 0x80, 0x01]),                 // a varint longer than any run needs
       raw([0x80, 0x80, 0x01, 0x01]),                 // a run past 128² (16 384 + 1)
       7, null, { data: ok },
