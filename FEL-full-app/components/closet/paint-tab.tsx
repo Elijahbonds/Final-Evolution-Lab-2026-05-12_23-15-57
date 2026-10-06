@@ -32,6 +32,10 @@ export interface PaintTabProps {
   marks?: readonly CreatorMark[];
   onMarks?: (paint: PaintLayer[], marks: CreatorMark[], group?: string) => void;
   canUndo: boolean; canRedo: boolean; onUndo: () => void; onRedo: () => void;
+  /** CREATOR-PLAN phase 4d: the selection, held by the Studio when it passes these (a tap on the body places the selected
+   *  layer, a drag moves a stamp over the surface); the tab keeps its own otherwise. */
+  selectedId?: string | null;
+  onSelect?: (id: string | null) => void;
 }
 
 const HEX6 = /^#[0-9a-fA-F]{6}$/;
@@ -46,8 +50,10 @@ const COLOUR_ROLES: Record<PaintType, readonly string[]> = {
 };
 const SECOND = '#111111', THIRD = '#FFFFFF';
 
-export function PaintTab({ layers, suit, onChange, onSuit, accent, marks, onMarks, canUndo, canRedo, onUndo, onRedo }: PaintTabProps) {
-  const [selectedId, setSelectedId] = useState<string | null>(layers[layers.length - 1]?.id ?? null);
+export function PaintTab({ layers, suit, onChange, onSuit, accent, marks, onMarks, canUndo, canRedo, onUndo, onRedo, selectedId: heldId, onSelect }: PaintTabProps) {
+  const [ownId, setOwnId] = useState<string | null>(layers[layers.length - 1]?.id ?? null);
+  const selectedId = heldId !== undefined ? heldId : ownId;
+  const setSelectedId = (id: string | null) => { setOwnId(id); onSelect?.(id); };
   const selected = useMemo(() => layers.find((l) => l.id === selectedId) ?? null, [layers, selectedId]);
   const colour = HEX6.test(accent) ? accent.toUpperCase() : '#00E5FF';
   const full = !fitsPaintBudget(layers);

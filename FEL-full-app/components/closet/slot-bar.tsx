@@ -8,7 +8,7 @@
 // each action back. Selecting a slot is not an undo step (the Closet keeps one history per slot); deleting asks in the
 // page first. Rename goes through the jersey plate's name rule (sanitizeStampText), as the slot is stored.
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Check, Copy, Play, Plus, Trash2, ClipboardPaste, Pencil, X } from 'lucide-react';
 import { MAX_SLOTS, type CreatorSlotV2 } from '@/lib/creator/look/doc';
 import { summaryOf } from '@/lib/creator/look/slots';
@@ -28,6 +28,8 @@ export interface SlotBarProps {
   onDelete: (id: string) => void;
   /** paste a share code: resolves to an error message, or null when a slot was made */
   onPaste: (code: string) => Promise<string | null>;
+  /** CREATOR-PLAN phase 4d: the Studio's own "Paste a code" button opens the paste box here (a counter: each bump opens it). */
+  openPaste?: number;
   /** the selected slot's share code (numbers = include the face sculpt sliders) */
   onShare: (numbers: boolean) => Promise<string>;
   accent?: string;
@@ -58,6 +60,7 @@ export function SlotBar(p: SlotBarProps) {
   const [shareNumbers, setShareNumbers] = useState(false);
   const full = p.slots.length >= MAX_SLOTS;
   const sel = p.slots.find((s) => s.id === p.selected);
+  useEffect(() => { if (p.openPaste) { setPasting(true); setPasteError(null); } }, [p.openPaste]);
 
   const btn = 'flex items-center gap-1 rounded-lg bg-white/5 px-2 py-1 text-[11px] text-white/80 transition hover:bg-white/10 disabled:opacity-30';
   return (

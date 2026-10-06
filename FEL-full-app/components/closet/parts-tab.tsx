@@ -21,6 +21,10 @@ export interface PartsTabProps {
   /** The colour a new part starts in. */
   accent: string;
   canUndo: boolean; canRedo: boolean; onUndo: () => void; onRedo: () => void;
+  /** CREATOR-PLAN phase 4d: the selection, held by the Studio when it passes these (a tap on the body selects a part,
+   *  and its knobs follow the selection); the tab keeps its own otherwise. */
+  selectedId?: string | null;
+  onSelect?: (id: string | null) => void;
 }
 
 const HEX6 = /^#[0-9a-fA-F]{6}$/;
@@ -30,8 +34,10 @@ const POS_LABELS = ['Side', 'Along', 'Front'] as const;
 const ROT_LABELS = ['Tilt', 'Turn', 'Roll'] as const;
 const SQUASH_LABELS = ['Width', 'Length', 'Depth'] as const;
 
-export function PartsTab({ parts, onChange, accent, canUndo, canRedo, onUndo, onRedo }: PartsTabProps) {
-  const [selectedId, setSelectedId] = useState<string | null>(parts[0]?.id ?? null);
+export function PartsTab({ parts, onChange, accent, canUndo, canRedo, onUndo, onRedo, selectedId: heldId, onSelect }: PartsTabProps) {
+  const [ownId, setOwnId] = useState<string | null>(parts[0]?.id ?? null);
+  const selectedId = heldId !== undefined ? heldId : ownId;
+  const setSelectedId = (id: string | null) => { setOwnId(id); onSelect?.(id); };
   const [cluster, setCluster] = useState(9);
   const used = partsCost(parts);
   const selected = useMemo(() => parts.find((p) => p.id === selectedId) ?? null, [parts, selectedId]);

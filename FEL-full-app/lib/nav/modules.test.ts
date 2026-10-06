@@ -38,6 +38,9 @@ const NOT_IMPORTED: Record<string, string> = {
   'lib/pose/recordingsGuard.ts': 'repo guard — recordingsGuard.test.ts rejects a committed video, image, or child take; tests are not counted as consumers',
   // MIRROR-COACH P3 review (2026-09-26): a stored Mirror screen row reads as server-graded only with the server's evidence
   // beside results that match it, so the coach tests build their rows the way app/api/mirror/screen writes them — here.
+  // CREATOR-PLAN phase 4d (2026-10-06): the creator lane's archetype recipes are TEST-ONLY by design (the game ships tools,
+  // never characters, so no shipped module may import them); 4a added the file without its line here.
+  'lib/creator/look/__fixtures__/archetypes.ts': 'test support — the ten generic archetype recipes the creator tests build and render (never shipped: tools, not characters); tests are not counted as consumers',
   'lib/mirror/fixtures/storedRows.ts': 'test support — the stored screen rows the coach and attention tests read, built as the Mirror route writes them; tests are not counted as consumers',
   // ECONOMY-SESSIONS-HARDEN (2026-09-28), FIX 2 step 7: written, tested and deliberately NOT imported by any route (FE PM:
   // staged until the live database is back). lib/sessions/sessionsHardening.scan.test.ts fails the day a route imports it
