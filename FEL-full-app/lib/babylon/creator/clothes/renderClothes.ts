@@ -215,7 +215,7 @@ export function syncClothes(
   setBodyHide(body, meshes, geo.bodyHide);
   let hidden = 0;
   for (let v = 0; v < geo.bodyHide.length; v++) hidden += geo.bodyHide[v];
-  const summary: ClothSummary = { mesh: st.mesh, pieces: geo.pieces.length, verts: geo.P.length / 3, tris: geo.ind.length / 3, hidden, covered: [...covered], rebuilt };
+  const summary: ClothSummary = { mesh: st.mesh, pieces: clothes.length, verts: geo.P.length / 3, tris: geo.ind.length / 3, hidden, covered: [...covered], rebuilt };
   root.metadata = { ...(root.metadata ?? {}), felClothes: { pieces: summary.pieces, verts: summary.verts, tris: summary.tris, hidden, covered: summary.covered } };
   return summary;
 }

@@ -258,6 +258,31 @@ describe('where the cuts are, and what stays drawn', () => {
       }
       s.root.dispose();
     });
+    it(`${sex}: a loose fit is smoothed but never pulled towards the skin (each original vertex keeps ≥ 85 % of its offset)`, async () => {
+      const { bodyCMesh, clipKeep } = await import('./clip');
+      const s = spawn(sex);
+      const F = clothFieldOf(bodyOf(s))!;
+      for (const raw of [{ kind: 'top', style: 'hoodie', fit: 1 }, { kind: 'bottom', style: 'pants', fit: 1 }]) {
+        const clothes = sanitizeClothes([{ id: 'c1', colour: '#111111', ...raw }]);
+        const geo = buildClothes(F, clothes, 'desktop');
+        // the cloth vertices that ARE a body vertex (not a cut point): the piece's own clip says which body vertices are kept whole
+        const kept = clipKeep(bodyCMesh(F.n, F.ind), keepField(F, resolveCloth(clothes[0]))).mesh;
+        const whole = new Set<number>();
+        for (let v = 0; v < kept.n; v++) if (kept.vw[v * 4] === 1) whole.add(kept.vi[v * 4]);
+        let worst = Infinity, n = 0;
+        for (let v = 0; v < geo.from.length; v++) {
+          const b = geo.from[v];
+          if (b < 0 || !whole.has(b) || !(geo.off[v] > 0)) continue;
+          const d = (geo.P[v * 3] - F.P[b * 3]) * F.N[b * 3] + (geo.P[v * 3 + 1] - F.P[b * 3 + 1]) * F.N[b * 3 + 1] + (geo.P[v * 3 + 2] - F.P[b * 3 + 2]) * F.N[b * 3 + 2];
+          // a vertex can only be one of its body vertex's positions if it sits on it; the two-tone duplicates share it
+          if (Math.hypot(geo.P[v * 3] - F.P[b * 3], geo.P[v * 3 + 1] - F.P[b * 3 + 1], geo.P[v * 3 + 2] - F.P[b * 3 + 2]) > geo.off[v] * 3 + 0.03) continue;
+          n++; worst = Math.min(worst, d / geo.off[v]);
+        }
+        expect(n, `${sex} ${raw.style}`).toBeGreaterThan(500);
+        expect(worst, `${sex} ${raw.style}: the smallest share of its offset a smoothed vertex kept`).toBeGreaterThanOrEqual(0.85 - 1e-3);   // float32 positions
+      }
+      s.root.dispose();
+    });
     it(`${sex}: footwear never sinks more than 2 mm below the skin it covers; a tube never tucks in going down`, async () => {
       const { tubeRadii } = await import('./build');
       const s = spawn(sex);
@@ -270,6 +295,37 @@ describe('where the cuts are, and what stays drawn', () => {
       const { r, hull } = tubeRadii(F, rows, 24, { clearance: 0.01, flare: 0.3, flareFrom: F.L.crotch + 0.05 });
       for (let i = 1; i < rows.length; i++) for (let k = 0; k < 24; k++) expect(r[i * 24 + k]).toBeGreaterThanOrEqual(r[(i - 1) * 24 + k] - 1e-6);
       for (let i = 0; i < r.length; i++) expect(r[i]).toBeGreaterThanOrEqual(hull[i] + 0.01 - 1e-6);
+      s.root.dispose();
+    });
+  }
+});
+
+describe('the second colour lands where it says', () => {
+  for (const sex of ['male', 'female'] as const) {
+    it(`${sex}: a skirt's trim at its hem and waistband; a side stripe down the outside of each leg, never the inside`, () => {
+      const s = spawn(sex);
+      const F = clothFieldOf(bodyOf(s))!;
+      const skirt = buildClothes(F, sanitizeClothes([{ id: 'k', kind: 'bottom', style: 'skirt', colour: '#552266', colour2: '#FFFFFF' }]), 'desktop');
+      const ys: number[] = [];
+      for (let v = 0; v < skirt.colour.length; v++) if (skirt.colour[v] === 1) ys.push(skirt.P[v * 3] * F.L.up[0] + skirt.P[v * 3 + 1] * F.L.up[1] + skirt.P[v * 3 + 2] * F.L.up[2]);
+      const r = resolveCloth(sanitizeClothes([{ id: 'k', kind: 'bottom', style: 'skirt', colour: '#552266' }])[0]);
+      expect(ys.length).toBeGreaterThan(40);
+      expect(Math.min(...ys)).toBeCloseTo(legCutHeight(r.leg, F.L), 3);
+      expect(Math.max(...ys)).toBeCloseTo(riseHeight(r.rise, F.L), 3);
+      const pants = buildClothes(F, sanitizeClothes([{ id: 'p', kind: 'bottom', style: 'pants', colour: '#111111', colour2: '#FFFFFF' }]), 'desktop');
+      let outer = 0, inner = 0;
+      for (let v = 0; v < pants.colour.length; v++) {
+        if (pants.colour[v] !== 1 || pants.from[v] < 0) continue;
+        const b = pants.from[v];
+        if (F.legW[b] < 0.9 || F.h[b] > F.L.knee) continue;   // the shin, well below the hips
+        // the leg's own axis at this height (hip joint → ankle joint), sideways from the midline
+        const leg = F.x[b] >= 0 ? F.L.leg.L : F.L.leg.R;
+        const t = (F.P[b * 3 + 1] - leg.o[1]) / leg.d[1];
+        const axisX = Math.abs(leg.o[0] + leg.d[0] * t - F.L.mid[0]);
+        if (Math.abs(F.x[b]) > axisX + 0.015) outer++; else if (Math.abs(F.x[b]) < axisX - 0.015) inner++;
+      }
+      expect(outer).toBeGreaterThan(20);
+      expect(inner).toBe(0);
       s.root.dispose();
     });
   }

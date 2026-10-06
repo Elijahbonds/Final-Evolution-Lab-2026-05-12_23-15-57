@@ -30,6 +30,8 @@ export interface ClothLandmarks extends BodyHeights {
   /** each arm: the shoulder joint, the unit direction down the arm, the arm's length (shoulder → wrist joint) and the hand's
    *  (wrist joint → fingertip, measured on the mesh) */
   arm: { L: { o: V3; d: V3; len: number; hand: number }; R: { o: V3; d: V3; len: number; hand: number } };
+  /** each leg's axis: the hip joint and the unit direction down to the ankle joint (a side stripe runs round it) */
+  leg: { L: { o: V3; d: V3 }; R: { o: V3; d: V3 } };
 }
 
 export interface ClothBodyField {
@@ -75,7 +77,7 @@ export function measureClothField(input: {
 }): ClothBodyField | null {
   const { P, chart, atomW, joints } = input;
   const n = P.length / 3;
-  const need = ['LeftArm', 'LeftHand', 'RightArm', 'RightHand'];
+  const need = ['LeftArm', 'LeftHand', 'RightArm', 'RightHand', 'LeftUpLeg', 'LeftFoot', 'RightUpLeg', 'RightFoot'];
   if (need.some((b) => !joints[b])) return null;
   const N = weldedNormals(P, input.ind);
   const { up, left, fwd } = chart;
@@ -93,6 +95,12 @@ export function measureClothField(input: {
     return { o, d: [d[0] / len, d[1] / len, d[2] / len] as V3, len, hand: 0 };
   };
   const arms = { L: arm('L'), R: arm('R') };
+  const legOf = (side: 'L' | 'R') => {
+    const o = joints[side === 'L' ? 'LeftUpLeg' : 'RightUpLeg'], f = joints[side === 'L' ? 'LeftFoot' : 'RightFoot'];
+    const d: V3 = [f[0] - o[0], f[1] - o[1], f[2] - o[2]];
+    const len = Math.hypot(d[0], d[1], d[2]) || 1;
+    return { o, d: [d[0] / len, d[1] / len, d[2] / len] as V3 };
+  };
   let crotch = Infinity, torsoTop = -Infinity, neckBase = Infinity, neckTop = -Infinity, headTop = -Infinity, sole = Infinity, footTop = -Infinity;
   let thighLo = Infinity, shinHi = -Infinity;
   let nx0 = Infinity, nx1 = -Infinity, nz0 = Infinity, nz1 = -Infinity, headR = 0;
@@ -131,7 +139,7 @@ export function measureClothField(input: {
     up, left, fwd, mid,
     crotch, torsoTop, knee: (thighLo + shinHi) / 2, ankle: footTop, neckBase, neckTop, headTop, sole,
     neckX: (nx0 + nx1) / 2, neckZ: (nz0 + nz1) / 2, neckR: Math.max(0.03, (nx1 - nx0) / 2), headR: Math.max(0.06, headR),
-    arm: arms,
+    arm: arms, leg: { L: legOf('L'), R: legOf('R') },
   };
   return {
     key: input.key, n, P, N, UV: input.UV, ind: Uint32Array.from(input.ind), J: Float32Array.from(input.J), W: Float32Array.from(input.W), bones: input.bones,

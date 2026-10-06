@@ -183,21 +183,42 @@ export function toneField(F: ClothBodyField, c: ResolvedCloth, m: CMesh, edge: F
   const tone = effectiveTone(c);
   const h = sampleField(m, F.h), x = sampleField(m, F.x), sArm = sampleField(m, F.sArm);
   const L = F.L;
+  const stripe = tone === 'stripe' ? sideStripe(F, m) : null;
   for (let v = 0; v < m.n; v++) {
     switch (tone) {
       case 'trim': g[v] = edge[v] - TRIM_WIDTH; break;
       case 'sleeves': g[v] = 0.02 - sArm[v]; break;
       case 'split': g[v] = -x[v]; break;
       case 'yoke': g[v] = Math.max(L.torsoTop - 0.11 - h[v], sArm[v] - 0.03); break;
-      case 'stripe': {
-        const s = x[v] >= 0 ? 1 : -1;
-        g[v] = 0.93 - s * (N0[v * 3] * L.left[0] + N0[v * 3 + 1] * L.left[1] + N0[v * 3 + 2] * L.left[2]);
-        break;
-      }
+      case 'stripe': g[v] = stripe![v]; break;
       default: g[v] = h[v] - (L.sole + 0.024); break;   // sole
     }
   }
   return g;
+}
+
+/** The side stripe's field over a piece's vertices: the angle (rad) away from the OUTSIDE of the leg (round the leg's
+ *  own axis) or from the side seam of the torso (round its front / back centre line), less half the stripe's width —
+ *  measured from positions, which are smooth (a field read off the normals was ragged along the kit's leg mesh). The two
+ *  are blended by the leg weight, so the stripe runs on from the thigh to the hip without a kink. Arms have none. */
+export const STRIPE_HALF = 0.3;
+function sideStripe(F: ClothBodyField, m: CMesh): Float32Array {
+  const P = blend3(m, F.P), legW = sampleField(m, F.legW), armW = sampleField(m, F.armW), handW = sampleField(m, F.handW), front = sampleField(m, F.front), x = sampleField(m, F.x);
+  const L = F.L, out = new Float32Array(m.n);
+  for (let v = 0; v < m.n; v++) {
+    if (armW[v] + handW[v] > 0.5) { out[v] = 1; continue; }
+    const side = x[v] >= 0 ? 1 : -1;
+    const leg = side > 0 ? L.leg.L : L.leg.R;
+    const dx = P[v * 3] - leg.o[0], dy = P[v * 3 + 1] - leg.o[1], dz = P[v * 3 + 2] - leg.o[2];
+    const along = dx * leg.d[0] + dy * leg.d[1] + dz * leg.d[2];
+    const px = dx - along * leg.d[0], py = dy - along * leg.d[1], pz = dz - along * leg.d[2];
+    const lat = side * (px * L.left[0] + py * L.left[1] + pz * L.left[2]), fw = px * L.fwd[0] + py * L.fwd[1] + pz * L.fwd[2];
+    const gLeg = Math.abs(Math.atan2(fw, lat)) - STRIPE_HALF;
+    const gTorso = Math.abs(Math.acos(Math.max(-1, Math.min(1, front[v]))) - Math.PI / 2) - STRIPE_HALF;
+    const w = Math.min(1, Math.max(0, legW[v]));
+    out[v] = w * gLeg + (1 - w) * gTorso;
+  }
+  return out;
 }
 
 /** A piece's own distance off the skin at each of its vertices (before layering): the fit, plus what the style adds. */
@@ -468,11 +489,12 @@ function normalise(N: Float32Array): Float32Array {
   return N;
 }
 
-/** Smoothing passes: a loose fit hides the body's detail; a phone does fewer. */
+/** Smoothing passes: a loose fit hides the body's detail; a phone does fewer. Footwear is smoothed most (seen on screen
+ *  2026-10-06: at 3 passes a boot followed each toe like a toe sock; the gaps between the toes fill and a toe box shows). */
 export function smoothingFor(c: ResolvedCloth, tier: ClothTier): number {
-  let n = c.kind === 'feet' ? 3 : c.kind === 'gloves' ? 1 : Math.round(1 + c.fit * 5);
+  let n = c.kind === 'feet' ? 8 : c.kind === 'gloves' ? 1 : Math.round(1 + c.fit * 5);
   if (c.kind === 'top' && c.hood === 'up') n = Math.max(n, 4);
-  return tier === 'mobile' ? Math.min(n, 2) : n;
+  return tier === 'mobile' ? Math.min(n, c.kind === 'feet' ? 4 : 2) : n;
 }
 
 // ── a tube (a skirt, a long coat's skirt) ────────────────────────────────────────────────────────────────────────────
@@ -576,12 +598,16 @@ function buildTube(F: ClothBodyField, spec: TubeSpec): Built | null {
   const K = det.segments;
   if (!(spec.top > spec.bottom + 0.02)) return null;
   // ring heights, with exact rings where a colour or the waistband changes
-  const cuts = new Set<number>();
+  const cuts: number[] = [];
   const R0 = Math.max(3, Math.ceil((spec.top - spec.bottom) / det.step));
-  for (let r = 0; r <= R0; r++) cuts.add(+(spec.top - (r * (spec.top - spec.bottom)) / R0).toFixed(4));
-  if (spec.tone === 'trim') { cuts.add(+(spec.bottom + TRIM_WIDTH).toFixed(4)); if (spec.waistband) cuts.add(+(spec.top - TRIM_WIDTH).toFixed(4)); }
-  if (spec.waistband) cuts.add(+(spec.top - 0.034).toFixed(4));
-  const rows = [...cuts].filter((h) => h <= spec.top + 1e-6 && h >= spec.bottom - 1e-6).sort((a, b) => b - a);
+  for (let r = 0; r <= R0; r++) cuts.push(spec.top - (r * (spec.top - spec.bottom)) / R0);
+  if (spec.tone === 'trim') { cuts.push(spec.bottom + TRIM_WIDTH); if (spec.waistband) cuts.push(spec.top - TRIM_WIDTH); }
+  if (spec.waistband) cuts.push(spec.top - 0.034);
+  // top to bottom, the exact ends kept (a rounded end once fell outside the range and took the hem's trim band with it),
+  // rings closer than 2 mm merged
+  const rows: number[] = [];
+  for (const h of cuts.map((x) => Math.min(spec.top, Math.max(spec.bottom, x))).sort((a, b) => b - a)) if (!rows.length || rows[rows.length - 1] - h > 0.002) rows.push(h);
+  rows[rows.length - 1] = spec.bottom;
   const R = rows.length;
   const { r: rad, cx, cz } = tubeRadii(F, rows, K, spec);
   if (spec.waistband) for (let r = 0; r < R; r++) if (rows[r] >= spec.top - 0.034 - 1e-6) for (let k = 0; k < K; k++) rad[r * K + k] += 0.003;
