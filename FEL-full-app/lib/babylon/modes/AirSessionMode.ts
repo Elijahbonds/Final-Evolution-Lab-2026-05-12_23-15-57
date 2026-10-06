@@ -13,7 +13,7 @@
 // The core even reports a genuine 3D position (pos.x/y/z). The old surfaces
 // flattened that to 2D; here it drives the athlete directly.
 
-import { Color3, MeshBuilder, StandardMaterial, Vector3 } from '@babylonjs/core';
+import { Axis, Color3, MeshBuilder, StandardMaterial, Vector3 } from '@babylonjs/core';
 import type { Mesh, Scene } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { mountPostureLayer } from '../anim/PostureLayer';
@@ -49,6 +49,7 @@ import { grabTrickFor } from '../core/rideTricks';
 import { gravityAccelForVy } from '../../feel';
 import type { BodyView } from '../core/ModeHarness';
 import type { BodyEvent } from '@/lib/pose/BodyReader';
+import { HudDelta } from './rideHud';   // IMPROVE (2026-10-06, big air item 16): publish only what changed
 
 export interface AirSessionModeOpts {
   modeId: string;
@@ -105,6 +106,16 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
   let bodyPhase: string | null = null;   // the core's phase last frame: a new run-up starts the body's stride clean
   let bodySynced = false;   // the body's quarters count from the first frame of play (rideIntents.sync)
   const bodyStats = { strides: 0, perfect: 0, good: 0, off: 0, fault: 0, ignoredInAir: 0, spins: 0, plants: 0, grabs: 0, last: '' };
+  // IMPROVE (2026-10-06, big air items 15–18): the per-frame costs. The camera preset is set when the phase CHANGES (each
+  // setPreset clears the director's bounds, so calling it every frame re-walked every scene mesh every frame); the HUD
+  // publishes only the fields that moved; the camera's velocity and the posture's eye target are scratch vectors; and the
+  // gallery behind the lens is put away (Onlookers.cullBehind) on a quarter-second clock.
+  const hudOut = new HudDelta();
+  let camPhase: string | null = null;
+  const camVel = new Vector3();
+  const eyeAt = new Vector3();
+  const camFwd = new Vector3();
+  let galleryCullT = 0;
 
   /** A clean / stuck landing: a soft shake on top of the scorePop + light feel hit that stay. */
   const landBeat = (ctx: ModeContext, grade: TrickGrade): void => { ctx.juice.shake(0.06, 120); console.info(`[AIR-JUICE] clean land (${grade})`); };
@@ -143,6 +154,7 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
     S.attempt = 0; S.score = 0; S.combo = 0; S.best = null;
     S.nextFoot = 'L'; S.banner = ''; S.bannerT = 0; S.done = false;
     crashAt = 0; finishLatch = false;
+    hudOut.reset(); camPhase = null; galleryCullT = 0;   // IMPROVE (2026-10-06): a remount publishes and frames afresh
     stride.reset(); rideIntents.reset(); plantAt = null; bodyPhase = null; bodySynced = false;   // MOVEMENT PLAY P8
     Object.assign(bodyStats, { strides: 0, perfect: 0, good: 0, off: 0, fault: 0, ignoredInAir: 0, spins: 0, plants: 0, grabs: 0, last: '' });
   };
@@ -192,13 +204,13 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
 
   const pushHud = (ctx: ModeContext): void => {
     const st = core?.state;
-    ctx.setHud({
+    const patch = hudOut.diff({
       judge: S.judgeBest > 0 ? S.judgeBest.toFixed(1) : null,   // phase 9: the session's best judge read
       score: (st?.score ?? 0) + S.bonus,   // phase 3: the core's rotation points + the named line
       attempt: `${Math.min((st?.attempt ?? 0) + 1, opts.attempts)}/${opts.attempts}`,
       phase: st?.phase ?? 'Run',
       speed: st ? Number(st.speed.toFixed(1)) : 0,
-      height: st ? Number((st.height ?? 0).toFixed(2)) : 0,
+      height: st ? Number((st.height ?? 0).toFixed(1)) : 0,   // (a decimetre: a centimetre re-rendered the HUD every frame of an air)
       spin: st ? Number((st.spinTurns ?? 0).toFixed(2)) : 0,
       combo: S.combo,
       best: S.best ? GRADE_LABEL[S.best] : null,
@@ -207,6 +219,7 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
       ...boost.hud(),
       hint: 'D-PAD ←/→ alternate strides · HOLD RB/SHIFT boost the run-in (bigger pop) · in the air ←/→ picks backside/frontside · A starts the spin, A again plants it — land on a half turn · B stick the landing',
     });
+    if (patch) ctx.setHud(patch);
   };
 
   const say = (text: string, sec = 1.2): void => { S.banner = text; S.bannerT = sec; };
@@ -300,7 +313,7 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
         // rider who does not know where the snow is
         // the pad is built before the athlete spawns, but the feed runs on its own observable and must not
         // assume the world still exists mid-teardown
-        const at = launchPad ? launchPad.position.add(new Vector3(0, 0, 14)) : new Vector3(0, 1.5, 14);
+        const at = launchPad ? eyeAt.copyFrom(launchPad.position).addInPlaceFromFloats(0, 0, 14) : eyeAt.set(0, 1.5, 14);
         return { pose, legs, aim: at, eyes: at, window: w };
       }, 'AIR-PP');
 
@@ -357,10 +370,10 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
       boostPads = new BoostPads(ctx.scene, [   // on the run-in, before the slope has you at terminal speed
         { pos: new Vector3(0, 0, -18) }, { pos: new Vector3(0, 0, -36) },
       ].map((p) => ({ ...p, yaw: Math.PI, radius: 2.8 })));
-      // L4 — a judged performance is watched. The gallery flanks the runway
-      // (the athlete runs -z into the launch at z=-12): two banks at |x|=4,
-      // outside the run line, in the runner cam's frame edges. Instanced,
-      // 2 draws, shared by both skins — one factory, never forked.
+      // L4 — a judged performance is watched. The gallery flanks the start of the run-in: two banks at |x|=4, outside the
+      // run line, in the runner cam's frame edges. IMPROVE (2026-10-06, big air item 18): the "instanced, 2 draws" note was
+      // the capsule crowd's — these 12 spots are up to Onlookers.MAX_BODIES (8) skinned roster bodies, and the run-in
+      // leaves them behind the camera within seconds, so update() puts away the ones behind the lens (cullBehind).
       gallery = new Onlookers(ctx.scene, [
         ...[0, 1, 2, 3, 4, 5].map((i) => new Vector3(-4, 0, -3 - i * 2.2)),
         ...[0, 1, 2, 3, 4, 5].map((i) => new Vector3(4, 0, -4.5 - i * 2.2)),
@@ -475,22 +488,25 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
       if (S.bannerT > 0) { S.bannerT -= dt; if (S.bannerT <= 0) S.banner = ''; }
 
       gallery?.update(dt);
+      if (gallery && (galleryCullT -= dt) <= 0) { galleryCullT = 0.25; ctx.camera.getDirectionToRef(Axis.Z, camFwd); gallery.cullBehind(ctx.camera.position, camFwd); }
       boostPads?.update(dt, athlete.root.position, boost);
       boostFx?.update(dt, boost, bev);
       if (bev.started) say('BOOST!', 0.5);
       ctx.camDirector.look(S.lookX, S.lookY, dt);
       // WA-7: runner preset looked straight down in the air; board + setAir gives a three-quarter read.
+      const wantPreset = st.phase === 'Air' || st.phase === 'Land' ? 'board' : 'runner';
+      if (wantPreset !== camPhase) {   // IMPROVE (item 15): on a change only
+        camPhase = wantPreset;
+        if (wantPreset === 'board') ctx.camDirector.setPreset('board'); else ctx.camDirector.setPreset('runner');
+      }
       if (st.phase === 'Air') {
-        ctx.camDirector.setPreset('board');
         ctx.camDirector.setAir(Math.min(1, Math.max(0.35, st.pos.y / 7)));
       } else if (st.phase === 'Land') {
-        ctx.camDirector.setPreset('board');
         ctx.camDirector.setAir(0.25);
       } else {
-        ctx.camDirector.setPreset('runner');
         ctx.camDirector.setAir(0);
       }
-      ctx.camDirector.update(athlete.root.position, new Vector3(0, 0, -st.speed), launchPad.position);
+      ctx.camDirector.update(athlete.root.position, camVel.set(0, 0, -st.speed), launchPad.position);
       baseFov ??= ctx.camera.fov;
       ctx.camera.fov = stepSpeedFov(ctx.camera.fov, baseFov * (boostFx?.fovMult(boost) ?? 1), st.phase === 'Run' ? st.speed : 0, BIG_AIR_TUNING.maxRunSpeed, dt);
       pushHud(ctx);
