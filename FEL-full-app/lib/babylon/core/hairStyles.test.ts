@@ -30,3 +30,39 @@ describe('applyHairStyle', () => {
     expect(meshes[1].isVisible).toBe(true);
   });
 });
+
+// IMPROVE (2026-10-06), research item 3 / BACKLOG B19: Hijab showed bald because no body carries Hair_hijab.
+import { readFileSync } from 'node:fs';
+import { HAIR_NODE_FALLBACK } from './hairStyles';
+
+describe('a style whose node the body lacks falls back to a covering node', () => {
+  const kitNodes = ['Hair_afro', 'Hair_braids', 'Hair_bun', 'Hair_buzz', 'Hair_cap', 'Hair_ponytail'];
+  it('the kit bodies really have no Hair_hijab (the bug this covers)', () => {
+    for (const f of ['public/models/candidates/fel-kit-male.glb', 'public/models/candidates/fel-kit-female.glb', 'public/models/fel-hero.glb']) {
+      const b = readFileSync(f);
+      const j = JSON.parse(b.subarray(20, 20 + b.readUInt32LE(12)).toString('utf8')) as { nodes: { name?: string }[] };
+      const names = j.nodes.map((n) => n.name ?? '');
+      expect(names.filter((n) => n.startsWith('Hair_')).sort(), f).toEqual(kitNodes);
+    }
+  });
+  it('Hijab shows the cap instead of nothing on a body without a hijab node', () => {
+    const s = new Scene(new NullEngine());
+    const meshes = kitNodes.map((n) => MeshBuilder.CreateBox(`${n}_c9`, {}, s));
+    applyHairStyle(meshes, 'Hijab');
+    expect(meshes.filter((m) => m.isVisible).map((m) => m.name)).toEqual(['Hair_cap_c9']);
+    expect(HAIR_NODE_FALLBACK.hijab).toEqual(['cap']);
+  });
+  it('a body that HAS the hijab node shows it (the fallback steps aside)', () => {
+    const s = new Scene(new NullEngine());
+    const meshes = [...kitNodes, 'Hair_hijab'].map((n) => MeshBuilder.CreateBox(`${n}_c9`, {}, s));
+    applyHairStyle(meshes, 'Hijab');
+    expect(meshes.filter((m) => m.isVisible).map((m) => m.name)).toEqual(['Hair_hijab_c9']);
+  });
+  it('Bald still shows nothing; a body with no hair nodes is untouched', () => {
+    const s = new Scene(new NullEngine());
+    const meshes = kitNodes.map((n) => MeshBuilder.CreateBox(`${n}_c9`, {}, s));
+    applyHairStyle(meshes, 'Bald');
+    expect(meshes.some((m) => m.isVisible)).toBe(false);
+    expect(applyHairStyle([MeshBuilder.CreateBox('Body', {}, s)], 'Hijab')).toBe(0);
+  });
+});

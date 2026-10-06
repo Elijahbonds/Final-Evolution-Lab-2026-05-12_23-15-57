@@ -15,6 +15,7 @@ import { CardSlot } from './card-slot';
 import { MotionSetting } from '@/components/settings/motion-setting';
 import { PausedLayer } from './paused-layer';
 import { BodyPlayReady, BodyPlayReadyLine, BodyPlayLayer } from './body-play';
+import { PlayAsSwitcher } from '@/components/closet/play-as-switcher';   // CREATOR-PLAN phase 4a: "Play as …" a saved character
 import { BASKETBALL_MODE_IDS, COURT_LOCATIONS, readCourtLocation, readyCourtLocations, writeCourtLocation, type CourtLocationId } from '@/lib/babylon/nexus/courtLocations';
 import { BALL_SKINS, readBallSkin, readyBallSkins, writeBallSkin, type BallSkinId } from '@/lib/babylon/nexus/ballSkins';
 import { readyVenues, readBoardVenue, writeBoardVenue, type BoardDiscipline } from '@/lib/babylon/nexus/boardVenues';
@@ -355,6 +356,8 @@ export function SplashCard(props: BootSplashProps) {
         {/* MOVEMENT PLAY P4 (2026-09-25): "Play with your body" (the games the body drives), "coming", or nothing; once
             chosen, the space check over this card. */}
         {props.phase === 'ready' && <BodyPlayReady tint={v.tint} onStart={props.onStart} />}
+        {/* CREATOR-PLAN phase 4a (2026-10-06): switch to another saved character (renders nothing for a guest or one character) */}
+        {props.phase === 'ready' && <PlayAsSwitcher tint={v.tint} />}
 
         {isCourt && (props.phase === 'ready' || props.phase === 'loading') && readyCourtLocations().length > 1 && (
           <div className="mt-3 flex flex-col items-center gap-1.5">

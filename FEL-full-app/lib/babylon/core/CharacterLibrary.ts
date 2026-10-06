@@ -31,6 +31,7 @@ import { pickedVocab } from '../combat/styleVocab';
 const STYLE_FIGHT_MODES: ReadonlySet<string> = new Set(['karate', 'karate_vs', 'mixedcombat', 'duel', 'showdown']);
 import { applySkinShading } from './skinShading';
 import { attachAccessories, lookFor, type AccessorySet } from './accessories';
+import { optOutAccessories, playerWearsOwnAccessories } from './playerAccessories';
 import { fitForName, wearFit } from './fits';
 import { applyKit } from './kit';
 import { attachContactShadow } from '../visual/contactShadow';
@@ -352,7 +353,13 @@ export const CharacterLibrary = {
     if (fit) wearFit({ meshes }, fit);
 
     const wantsAccessories = opts.accessories !== false;
-    const accDispose = wantsAccessories
+    if (!wantsAccessories) optOutAccessories(root);
+    // IMPROVE (2026-10-06), research item 2: the PLAYER is not dealt a seeded look. A player spawn with no explicit look,
+    // name or tint wears what they EQUIPPED, hung by the identity pipe (applyIdentity → playerAccessories) — here, in
+    // CharacterPipeline.spawnPlayer, and in both editor previews alike. NPCs, rivals and named spawns keep the deal, and
+    // so does a spawn with its own skin tone (it never takes the identity below, so it would otherwise stand bare).
+    const playerDressesSelf = playerWearsOwnAccessories(role, rosterPicked, opts);
+    const accDispose = wantsAccessories && !playerDressesSelf
       ? attachAccessories(scene, skeleton, root, opts.look ?? {
           ...lookFor(opts.name ?? opts.tint ?? `char_${spawnCounter}`),
           ...(fit ? { accent: Color3.FromHexString(fit.accent) } : {}),   // the accessories wear the fit's accent
