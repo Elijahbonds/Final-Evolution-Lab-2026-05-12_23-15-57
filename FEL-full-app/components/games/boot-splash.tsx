@@ -307,7 +307,9 @@ export function SplashCard(props: BootSplashProps) {
           setting; this is the override, reachable before the first flash (a guest never sees the Profile tab). In the
           corner, out of the picker column. */}
       {(props.phase === 'ready' || props.phase === 'loading') && <MotionSetting compact className="absolute left-3 top-3 z-10" />}
-      <div data-splash-column className="absolute inset-0 flex flex-col items-center justify-center gap-4 px-6 text-center">
+      {/* CONTROLS SCREEN (2026-10-06): the column scrolls (safe-centred) rather than clip when a portrait card holds the
+          controls and three pickers: START stays at the top of what shows, and no picker is cut off out of reach */}
+      <div data-splash-column className="absolute inset-0 flex flex-col items-center justify-center gap-4 overflow-y-auto px-6 py-4 text-center [justify-content:safe_center] [scrollbar-width:none]">
         {/* data-splash-main: display: contents everywhere but a sideways screen, where it is the left column — title,
             START and the CONTROLS panel, which gives up its height (its lines scroll) before START leaves the screen */}
         <div data-splash-main className="contents">
@@ -353,7 +355,7 @@ export function SplashCard(props: BootSplashProps) {
             own words — which the harness now keeps off the play screen (lib/babylon/ui/staticControls.ts). The pause
             shows the same panel (PausedLayer). It replaces the card slot's collapsed BUTTONS line. */}
         {(props.phase === 'ready' || props.phase === 'loading') && (
-          <ControlsPanel modeId={props.modeId} hint={props.controls} className="max-h-[34vh] sm:max-h-[38vh]" />
+          <ControlsPanel modeId={props.modeId} hint={props.controls} className="max-h-[26vh] shrink-0 sm:max-h-[38vh]" />
         )}
         </div>
 

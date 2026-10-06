@@ -291,6 +291,14 @@
   max-width: 100%;
 }
 [data-fel-console] [data-splash-main] > h1 { line-height: 1.1; }
+[data-fel-console] [data-controls-lines] > span { line-height: 1.3; }
+/* A sideways PHONE has 390 px of height for the whole column: the brand line
+ * above the title goes (the title says the mode), and the column starts
+ * below the MOTION chip in the corner instead of under it. */
+@media (orientation: landscape) and (max-height: 520px) {
+  [data-fel-console] [data-splash-main] { padding-top: 1.6rem; }
+  [data-fel-console] [data-splash-main] > p:first-child { display: none; }
+}
 /* the pause's copy: inside the zoomed HUD, so a viewport cap is divided by the zoom it is about to be multiplied by */
 [data-fel-console] button.inset-0 [data-controls-panel] {
   max-height: calc(62vh / var(--fel-hud-zoom, 1)) !important;

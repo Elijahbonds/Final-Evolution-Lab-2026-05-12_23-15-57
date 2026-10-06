@@ -63,7 +63,7 @@ export function ControlsPanel({ modeId, hint, chooser = true, className = '' }: 
         )}
       </span>
       {sheet.rows.length > 0 && (
-        <span data-controls-rows className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 sm:grid-cols-[auto_1fr_auto_1fr]">
+        <span data-controls-rows className="grid grid-cols-[auto_1fr_auto_1fr] gap-x-3 gap-y-0.5">
           {sheet.rows.map((r) => (
             <span key={`${r.input}-${r.action}`} className="contents">
               <span className="whitespace-nowrap font-mono text-[11px] font-black text-[#22d3ee]">{r.input}</span>
