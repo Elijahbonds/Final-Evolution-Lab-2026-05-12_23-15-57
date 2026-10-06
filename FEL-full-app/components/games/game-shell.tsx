@@ -10,7 +10,8 @@ import type { PrqGrade } from '@/lib/prq';
 import { PhysicalGamepadPoller } from '@/lib/gamepad-bridge';
 import { getScheme } from '@/lib/input-schemes';
 import { isBabylon } from '@/components/three/flags';
-import { canFullscreen, isFullscreen, isLandscapePhone, toggleFullscreen } from '@/lib/ui/fullscreen';
+import { canFullscreen, isFullscreen, toggleFullscreen } from '@/lib/ui/fullscreen';
+import { consoleLayout, consoleStageVars, type ConsoleLayout } from '@/lib/ui/consoleView';
 import { VirtualController } from './virtual-controller';
 import { ReplayInPlaceContext } from './replay-in-place';
 import { BodyControl } from './body-control';
@@ -570,11 +571,20 @@ function GameShellInner({
   // plenty of laptops, so a width test gets it exactly backwards.
   const stageRef = useRef<HTMLDivElement | null>(null);
   const [immersive, setImmersive] = useState(false);
+  // CONSOLE VIEW (console-view lane, 2026-10-06; lib/ui/consoleView.ts). Owner: "it looks bad when you screen mirror …
+  // it needs to feel like a console game." The rule above was a landscape PHONE only, so a laptop or console browser on
+  // a TV (1920x1080, 1280x720) kept the page: the header, a 1200 px column, a 16:10 window and a scrolling page. Every
+  // sideways screen is now the console view, and the stage carries the HUD's height-scaled zoom and title-safe frame.
+  const [layout, setLayout] = useState<ConsoleLayout>(() => consoleLayout(0, 0));
   const [fsAvailable, setFsAvailable] = useState(false);
   const [fsOn, setFsOn] = useState(false);
 
   useEffect(() => {
-    const measure = () => setImmersive(isLandscapePhone(window.innerWidth, window.innerHeight));
+    const measure = () => {
+      const l = consoleLayout(window.innerWidth, window.innerHeight);
+      setLayout((prev) => (prev.console === l.console && prev.hudZoom === l.hudZoom && prev.safeX === l.safeX && prev.safeY === l.safeY ? prev : l));
+      setImmersive(l.console);
+    };
     measure();
     setFsAvailable(canFullscreen(stageRef.current));
     const onFs = () => setFsOn(isFullscreen());
@@ -598,6 +608,19 @@ function GameShellInner({
     document.body.style.overflow = 'hidden';
     return () => { document.body.style.overflow = prev; };
   }, [immersive, fsOn]);
+
+  // viewport-fit=cover while a game is mounted (console-view, 2026-10-06). A phone held sideways — the screen that gets
+  // mirrored to the TV — otherwise gives its notch side and home-indicator side to Safari, which paints them as page-colour
+  // bars down both edges of the game. With cover the canvas runs edge to edge and the HUD keeps clear of the notch on its
+  // own (env(safe-area-inset-*): the console frame in app/game-surface.css, TouchOverlay). Set here, not in a layout,
+  // so only the game pages change; restored on the way out.
+  useEffect(() => {
+    const meta = document.querySelector<HTMLMetaElement>('meta[name="viewport"]');
+    if (!meta || /viewport-fit\s*=\s*cover/.test(meta.content)) return;
+    const prev = meta.content;
+    meta.content = `${prev}, viewport-fit=cover`;
+    return () => { meta.content = prev; };
+  }, []);
 
   const onFullscreen = useCallback(() => { void toggleFullscreen(stageRef.current); }, []);
 
@@ -649,6 +672,8 @@ function GameShellInner({
       <div
         ref={stageRef}
         data-fel-stream={streamOn ? '1' : undefined}
+        data-fel-console={fullBleed ? '1' : undefined}
+        style={fullBleed ? consoleStageVars(layout) as React.CSSProperties : undefined}
         className={fullBleed
           ? 'relative w-full flex-1 overflow-hidden'
           : 'relative mx-auto w-full max-w-[1200px] flex-1 px-2 py-3 sm:px-4'}
@@ -657,7 +682,7 @@ function GameShellInner({
         {/* The two controls the header was carrying, as thumb-sized glass over the corner of the stage. Only
             while full-bleed — with the header up they would be a second copy of it. */}
         {fullBleed && !streamOn && (
-          <div data-game-chrome className="pointer-events-none absolute right-2 top-2 z-30 flex items-center gap-1.5">
+          <div data-game-chrome data-fel-corner className="pointer-events-none absolute right-2 top-2 z-30 flex items-center gap-1.5">
             <Link
               href="/play"
               aria-label="Leave the game"

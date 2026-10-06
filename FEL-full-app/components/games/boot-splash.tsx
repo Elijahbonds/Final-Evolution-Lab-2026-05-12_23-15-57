@@ -16,6 +16,7 @@ import { MotionSetting } from '@/components/settings/motion-setting';
 import { PausedLayer } from './paused-layer';
 import { LearnWhileYouWait } from '@/components/learn/learn-while-you-wait';   // KNOWLEDGE-FEED v1: one card while the arena loads
 import { useSoundtrackStage } from '@/components/soundtrack/soundtrack-stage';
+import { ControlsPanel } from './controls-panel';
 import { BodyPlayReady, BodyPlayReadyLine, BodyPlayLayer } from './body-play';
 import { PlayAsSwitcher } from '@/components/closet/play-as-switcher';   // CREATOR-PLAN phase 4a: "Play as …" a saved character
 import { BASKETBALL_MODE_IDS, COURT_LOCATIONS, readCourtLocation, readyCourtLocations, writeCourtLocation, type CourtLocationId } from '@/lib/babylon/nexus/courtLocations';
@@ -116,6 +117,9 @@ export interface BootSplashProps {
   detail?: number | string;         // countdown number or error message
   onStart: () => void;              // READY tap
   onRetry: () => void;              // error retry
+  /** CONTROLS SCREEN (2026-10-06): the one-line controls a host was built with (the board and timing hosts' `hint`),
+   *  shown on the CONTROLS panel for a mode that writes no static hint of its own. */
+  controls?: string;
 }
 
 /** The splash: the card, and body play beside it (the check over a pause, the corner self-view in play). */
@@ -307,11 +311,14 @@ export function SplashCard(props: BootSplashProps) {
   // copy straight after this splash (BACKLOG B16). PausedLayer keeps that copy's classes, so it stacks where they did.
   // Step 5 (2026-09-26): Brain Brawl's own copy is gone, and with it the check that drew nothing here for it (the two
   // stacked were 84% black with the headline doubled — the step-4a review); pausedLayer.scan.test holds the two together.
-  if (props.phase === 'paused') return <PausedLayer onResume={props.onStart} />;
+  if (props.phase === 'paused') return <PausedLayer onResume={props.onStart} modeId={props.modeId} hint={props.controls} />;
   if (props.phase === 'playing' || props.phase === 'ended') return null;
 
   return (
-    <div className="absolute inset-0 z-40 overflow-hidden"
+    // data-fel-fullbleed: in console view the HUD keeps to the title-safe frame, but this card's art is the whole screen
+    // (app/game-surface.css). data-splash-column / data-splash-pickers: a sideways screen lays the card out in two
+    // columns — title and START on the left, the pickers on the right — instead of one column taller than the screen.
+    <div data-fel-fullbleed className="absolute inset-0 z-40 overflow-hidden"
       // SHARED-START-UNSTICK: on READY the whole card is the start button. A press that misses the pill (a thumb on
       // the art, a click in the corner) used to do nothing, and a player reads a card that ignores them as a hang.
       // The pickers are buttons and keep their own clicks; everything else starts on pointer DOWN, so a hold starts too.
@@ -333,7 +340,12 @@ export function SplashCard(props: BootSplashProps) {
           setting; this is the override, reachable before the first flash (a guest never sees the Profile tab). In the
           corner, out of the picker column. */}
       {(props.phase === 'ready' || props.phase === 'loading') && <MotionSetting compact className="absolute left-3 top-3 z-10" />}
-      <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 px-6 text-center">
+      {/* CONTROLS SCREEN (2026-10-06): the column scrolls (safe-centred) rather than clip when a portrait card holds the
+          controls and three pickers: START stays at the top of what shows, and no picker is cut off out of reach */}
+      <div data-splash-column className="absolute inset-0 flex flex-col items-center justify-center gap-4 overflow-y-auto px-6 py-4 text-center [justify-content:safe_center] [scrollbar-width:none]">
+        {/* data-splash-main: display: contents everywhere but a sideways screen, where it is the left column — title,
+            START and the CONTROLS panel, which gives up its height (its lines scroll) before START leaves the screen */}
+        <div data-splash-main className="contents">
         <p className="text-[11px] font-black tracking-[0.4em]" style={{ color: v.tint }}>{v.sub}</p>
         <h1 className="text-4xl font-black tracking-wide text-white drop-shadow-lg">{props.title}</h1>
         {props.goal && (props.phase === 'ready' || props.phase === 'loading') && (
@@ -376,7 +388,17 @@ export function SplashCard(props: BootSplashProps) {
         {props.phase === 'ready' && <PlayAsSwitcher tint={v.tint} />}
         {/* MULTIPLAYER (2026-10-06): a game friends can play together says so, and opens the party room with it picked */}
         {props.phase === 'ready' && <PartyInvite modeId={props.modeId} />}
+        {/* CONTROLS SCREEN (console-view lane, 2026-10-06). Owner: "take off that wall of text when the game starts, maybe
+            have that show as a beginning screen for the controls." The mode's button map for the device in use, and its
+            own words — which the harness now keeps off the play screen (lib/babylon/ui/staticControls.ts). The pause
+            shows the same panel (PausedLayer). It replaces the card slot's collapsed BUTTONS line. */}
+        {(props.phase === 'ready' || props.phase === 'loading') && (
+          <ControlsPanel modeId={props.modeId} hint={props.controls} className="max-h-[26vh] shrink-0 sm:max-h-[38vh]" />
+        )}
+        </div>
 
+        {/* display: contents everywhere but a sideways screen, so the column above is unchanged in portrait */}
+        <div data-splash-pickers className="contents">
         {isCourt && (props.phase === 'ready' || props.phase === 'loading') && readyCourtLocations().length > 1 && (
           <div className="mt-3 flex flex-col items-center gap-1.5">
             <p className="text-[9px] font-black tracking-[0.3em] text-white/45">LOCATION</p>
@@ -719,6 +741,7 @@ export function SplashCard(props: BootSplashProps) {
         {/* CARD SLOT (FINISH-RELEASE, 2026-09-15): the creator card beside the setting and the items, on every mode —
             and the button map it carries, so a player can read what every press does before the first one. */}
         {(props.phase === 'ready' || props.phase === 'loading') && <CardSlot modeId={props.modeId} />}
+        </div>
 
         {props.phase === 'countdown' && (
           <div key={String(props.detail)} className="fel-count text-8xl font-black text-white">

@@ -14,7 +14,9 @@ export function MicCaption({ text, who, className = 'bottom-[14%]' }: { text: un
   const name = typeof who === 'string' ? who : '';
   return (
     <div className={`pointer-events-none absolute inset-x-0 ${className} z-10 flex justify-center px-4`} aria-hidden>
-      <div className="max-w-[min(92vw,560px)] rounded-lg bg-black/60 px-3 py-1.5 text-center shadow-lg">
+      {/* data-mic-line: on a sideways screen the line may run wider (app/game-surface.css, console view) — at 560 px it
+          wrapped to two lines and, zoomed for a TV, the box sat across the dunker's legs */}
+      <div data-mic-line className="max-w-[min(92vw,560px)] rounded-lg bg-black/60 px-3 py-1.5 text-center shadow-lg">
         {name && <span className="mr-2 align-middle font-mono text-[10px] font-bold tracking-[0.18em] text-[var(--fel-cyan)]">{name}</span>}
         <span className="fel-heading align-middle text-[13px] font-black uppercase italic leading-tight text-[#ffd75e] md:text-[15px]">{line}</span>
       </div>
