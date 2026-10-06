@@ -37,6 +37,10 @@ export interface ToyPlane {
   body: PBRMaterial;
   /** the primitive parts (models pass phase 5: a dressed Meshy body hides them) */
   parts: Mesh[];
+  /** IMPROVE (2026-10-06), aeroaces #16: the dressed body has arrived — dispose the primitives and their materials
+   *  instead of keeping ~25 hidden meshes (and their shadow-caster slots) per plane for the whole race. The prop,
+   *  wingtip, seat and scarf anchors are TransformNodes and stay. Idempotent. */
+  dropPrimitives(): void;
   dispose(): void;
 }
 
@@ -51,6 +55,33 @@ const paint = (scene: Scene, name: string, hex: string, e = 0.08, r = 0.45, env 
   return m;
 };
 
+// IMPROVE (2026-10-06), aeroaces #18: SHARED PAINT. Every toy plane made its own dark, cream, prop-blur, skin and cap
+// materials — the same five colours eight times over (40 materials, of which 10 differ). Only the body and the trim
+// carry a plane's tint, so those stay per plane and the rest are shared per scene, keyed by colour and light, and
+// counted: the last plane to let go of one disposes it.
+const sharedPaints = new WeakMap<Scene, Map<string, { mat: PBRMaterial; users: number }>>();
+function sharedPaint(scene: Scene, key: string, hex: string, e: number, r: number, env: number): { mat: PBRMaterial; release(): void } {
+  let byKey = sharedPaints.get(scene);
+  if (!byKey) { byKey = new Map(); sharedPaints.set(scene, byKey); }
+  const k = `${key}|${hex}|${e}|${r}|${env.toFixed(3)}`;
+  let entry = byKey.get(k);
+  if (!entry) { entry = { mat: paint(scene, `toy_shared_${key}`, hex, e, r, env), users: 0 }; byKey.set(k, entry); }
+  entry.users++;
+  let released = false;
+  const held = entry;
+  return {
+    mat: held.mat,
+    release() {
+      if (released) return; released = true;
+      if (--held.users > 0) return;
+      held.mat.dispose();
+      if (byKey!.get(k) === held) byKey!.delete(k);
+    },
+  };
+}
+/** How many shared toy-plane materials a scene holds (the share's pin). */
+export function sharedToyPaints(scene: Scene): number { return sharedPaints.get(scene)?.size ?? 0; }
+
 export function buildToyPlane(scene: Scene, name: string, bodyHex: string, trimHex: string, opts: { toyPilot?: boolean; mood?: VenueMood } = {}): ToyPlane {
   // phase 7: the flat 0.55 was tuned under goldenHour; the mood scales it (a flat-light mood leans on the IBL)
   const env = vehicleEnvFor(PLANE_ENV_BASE, opts.mood ?? 'goldenHour');
@@ -62,8 +93,10 @@ export function buildToyPlane(scene: Scene, name: string, bodyHex: string, trimH
   model.parent = root; model.scaling.setAll(TOY_SCALE);
   const body = paint(scene, `toy_body_${name}`, bodyHex, 0.1, 0.38, env);
   const trim = paint(scene, `toy_trim_${name}`, trimHex, 0.12, 0.4, env);
-  const dark = paint(scene, `toy_dark_${name}`, '#20232b', 0.03, 0.6, env);
-  const cream = paint(scene, `toy_cream_${name}`, '#f6efdc', 0.12, 0.5, env);
+  const held: { release(): void }[] = [];
+  const share = (key: string, hex: string, e: number, r: number): PBRMaterial => { const h = sharedPaint(scene, key, hex, e, r, env); held.push(h); return h.mat; };
+  const dark = share('dark', '#20232b', 0.03, 0.6);
+  const cream = share('cream', '#f6efdc', 0.12, 0.5);
   const parts: Mesh[] = [];
   const add = <T extends Mesh>(m: T, mat: PBRMaterial, parent: TransformNode = model): T => { m.material = mat; m.parent = parent; m.isPickable = false; parts.push(m); return m; };
 
@@ -90,7 +123,7 @@ export function buildToyPlane(scene: Scene, name: string, bodyHex: string, trimH
   // the blur disc (phase 9): past the tune's blur gate the blades smear into this — a translucent disc
   // fading in as the blades fade out, the way a fast prop actually photographs. Its own material (the
   // blades share `dark` with the struts, and the chase camera watches the disc's back).
-  const blurM = paint(scene, `toy_blurmat_${name}`, '#4a505c', 0.02, 0.7, env);
+  const blurM = share('blur', '#4a505c', 0.02, 0.7);
   blurM.backFaceCulling = false;
   const propDisc = add(MeshBuilder.CreateDisc(`toy_blur_${name}`, { radius: 1.32, tessellation: 28 }, scene), blurM, prop);
   propDisc.visibility = 0;
@@ -145,28 +178,38 @@ export function buildToyPlane(scene: Scene, name: string, bodyHex: string, trimH
 
   if (opts.toyPilot) {
     // a simple toy pilot for the rivals: head, leather cap, goggles, shoulders
-    const skin = paint(scene, `toy_skin_${name}`, '#d9a27a', 0.08, 0.7, env);
+    const skin = share('skin', '#d9a27a', 0.08, 0.7);
     const shoulders = add(MeshBuilder.CreateSphere(`toy_pshoulders_${name}`, { diameterX: 1.1, diameterY: 0.7, diameterZ: 0.7, segments: 10 }, scene), trim);
     shoulders.position.set(0, 1.25, TOY_SEAT.z);
     const head = add(MeshBuilder.CreateSphere(`toy_phead_${name}`, { diameter: 0.72, segments: 12 }, scene), skin);
     head.position.set(0, 1.85, TOY_SEAT.z);
-    const capM = paint(scene, `toy_cap_${name}`, '#6b4a2f', 0.04, 0.8, env);
+    const capM = share('cap', '#6b4a2f', 0.04, 0.8);
     const cap = add(MeshBuilder.CreateSphere(`toy_pcap_${name}`, { diameter: 0.78, segments: 12, slice: 0.55 }, scene), capM);
     cap.position.set(0, 1.9, TOY_SEAT.z);
     const goggles = add(MeshBuilder.CreateTorus(`toy_pgog_${name}`, { diameter: 0.72, thickness: 0.12, tessellation: 16 }, scene), dark);
     goggles.position.set(0, 1.93, TOY_SEAT.z); goggles.rotation.x = 0.1;
   }
 
+  let dropped = false;
+  const dropPrimitives = (): void => {
+    if (dropped) return; dropped = true;
+    for (const p of parts) p.dispose();
+    parts.length = 0; propBlades.length = 0;
+    body.dispose(); trim.dispose();
+    for (const h of held) h.release();
+  };
   return {
     root, prop, propDisc, propBlades, wingtips, seat, scarfAnchor, body,
     parts,
-    dispose() { for (const p of parts) p.dispose(); model.dispose(); root.dispose(); },
+    dropPrimitives,
+    dispose() { dropPrimitives(); model.dispose(); root.dispose(); },
   };
 }
 
 /** Phase 9: the prop's blur for an rpm — the disc fades in as the blades fade out (per-mesh visibility:
  *  the blades share their material with the struts, so a material alpha would fade half the plane). */
 export function blurProp(plane: ToyPlane, rpm: number, from: number, to: number): void {
+  if (plane.propDisc.isDisposed()) return;   // IMPROVE (2026-10-06): the dressed body's own prop is the one on show
   const k = propBlurK(rpm, from, to);
   plane.propDisc.visibility = k * PROP_BLUR.discAlpha;
   for (const b of plane.propBlades) b.visibility = 1 - k * PROP_BLUR.bladeFade;

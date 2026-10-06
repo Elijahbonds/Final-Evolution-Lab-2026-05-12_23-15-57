@@ -20,7 +20,7 @@
 
 import { Color3, Mesh, MeshBuilder, PBRMaterial, TransformNode, type Scene, Vector3, Matrix, Quaternion } from '@babylonjs/core';
 import { VenueKit } from '../visual/VenueKit';
-import type { KartCircuit, KartObstacle } from './kartCircuits';
+import { clearOfShortcuts, type KartCircuit, type KartObstacle } from './kartCircuits';
 import { locate, pointAlong } from './racingLine';
 import type { PropPlacement } from '../visual/venuePropSets';
 
@@ -122,20 +122,35 @@ export function buildKerbs(scene: Scene, circuit: KartCircuit): TransformNode {
   const red = VenueKit.paint(scene, 'kart_kerb_red', '#c8412f', 0.04, 0.7) as PBRMaterial;
   const white = VenueKit.paint(scene, 'kart_kerb_white', '#e9edf2', 0.04, 0.7) as PBRMaterial;
 
+  // IMPROVE (2026-10-06), velocitykart (phone pass): the kerb was ~100 separate 14 cm slabs per course — measured headlessly
+  // on BOARDWALK LOOP, 96 of the scene's 239 draws and 96 shadow-caster entries. Built as before, then merged into ONE mesh
+  // per colour, and named '__' so LightRig never lists them as casters (a 14 cm slab's shadow is a hairline under the
+  // kerb itself). They still RECEIVE shadows. A block on a shortcut's mouth is left out (the sand path runs through it).
+  const byColour: [Mesh[], Mesh[]] = [[], []];
   for (const kerb of circuit.kerbs) {
     const len = kerb.to - kerb.from;
     const blocks = Math.max(2, Math.round(len / 3));
     for (let i = 0; i < blocks; i++) {
       const at = pointAlong(circuit.line, kerb.from + (i / blocks) * len);
-      const slab = MeshBuilder.CreateBox(`kerb_${kerb.from}_${i}`, { width: 1.4, height: 0.14, depth: 3 }, scene);
-      slab.position.copyFrom(at.pos.add(at.right.scale(kerb.side * (circuit.halfWidth + 0.7))));
+      const pos = at.pos.add(at.right.scale(kerb.side * (circuit.halfWidth + 0.7)));
+      if (!clearOfShortcuts(circuit, pos.x, pos.z, 0.5)) continue;
+      const slab = MeshBuilder.CreateBox(`__kerb_${kerb.from}_${i}`, { width: 1.4, height: 0.14, depth: 3 }, scene);
+      slab.position.copyFrom(pos);
       slab.position.y = at.pos.y + 0.07;
       slab.rotation.y = Math.atan2(at.tangent.x, at.tangent.z);
-      slab.material = i % 2 ? white : red;
-      slab.isPickable = false;
-      slab.parent = root;
+      byColour[i % 2].push(slab);
     }
   }
+  byColour.forEach((list, c) => {
+    if (!list.length) return;
+    const m = list.length > 1 ? Mesh.MergeMeshes(list, true, true, undefined, false, false) : list[0];
+    if (!m) return;
+    m.name = c ? '__kart_kerbs_white' : '__kart_kerbs_red';
+    m.material = c ? white : red;
+    m.isPickable = false; m.receiveShadows = true;
+    m.parent = root;
+    m.freezeWorldMatrix();
+  });
   return root;
 }
 
@@ -243,11 +258,20 @@ export function buildGantry(scene: Scene, circuit: KartCircuit): TransformNode {
   beam.position.copyFrom(at.pos); beam.position.y = at.pos.y + 7.2; beam.rotation.y = yaw; beam.material = steel; beam.isPickable = false; beam.parent = root;
   const black = VenueKit.paint(scene, 'kart_check_b', '#15171c', 0.02, 0.8), white = VenueKit.paint(scene, 'kart_check_w', '#f7f7f2', 0.12, 0.8);
   const n = 14, w = (half * 2) / n;
+  // IMPROVE (2026-10-06), velocitykart (phone pass): the 28 checker tiles were 28 draws and 28 casters; built '__' (never
+  // listed) and merged into one mesh per colour, which IS listed — the banner still throws its shadow across the grid.
+  const tiles: [Mesh[], Mesh[]] = [[], []];
   for (let r = 0; r < 2; r++) for (let i = 0; i < n; i++) {
-    const tile = MeshBuilder.CreateBox('kart_check', { width: w, height: 0.9, depth: 0.16 }, scene);
+    const tile = MeshBuilder.CreateBox('__kart_check', { width: w, height: 0.9, depth: 0.16 }, scene);
     tile.position.copyFrom(at.pos.add(at.right.scale(-half + w * (i + 0.5)))); tile.position.y = at.pos.y + 6.4 - r * 0.9;
-    tile.rotation.y = yaw; tile.material = (i + r) % 2 ? black : white; tile.isPickable = false; tile.parent = root;
+    tile.rotation.y = yaw; tiles[(i + r) % 2].push(tile);
   }
+  tiles.forEach((list, c) => {
+    // merged INTO a mesh made under a listed name, so the merged banner is the caster and the tiles never were
+    const m = Mesh.MergeMeshes(list, true, true, new Mesh(c ? 'kart_check_black' : 'kart_check_white', scene), false, false);
+    if (!m) return;
+    m.material = c ? black : white; m.isPickable = false; m.parent = root;
+  });
   // the finish line painted across the road
   const line = MeshBuilder.CreateBox('kart_finish_line', { width: circuit.halfWidth * 2, height: 0.03, depth: 1.2 }, scene);
   line.position.copyFrom(at.pos); line.position.y = at.pos.y + 0.085; line.rotation.y = yaw; line.material = white; line.isPickable = false; line.parent = root;
@@ -259,12 +283,40 @@ export function buildGantry(scene: Scene, circuit: KartCircuit): TransformNode {
  * the start, banner towers on the gantry, flags on the outside of every corner, barrier walls along the tight ones,
  * light posts down the straights on the courses run at night. Pure; the kit is mounted by the mode.
  */
+/** IMPROVE (2026-10-06), velocitykart #8: how far scenery keeps from the edge of a shortcut's sand path, metres. */
+export const SHORTCUT_CLEAR = 2.5;
+
+/**
+ * THE SHORTCUT'S PATH (velocitykart #8): a raised sand causeway per shortcut, from the road's edge at one end to the
+ * other, its top the path's own height (the kart rides `shortcutAt(..).y`), its sides down into the ground so it reads
+ * as a built path and never as a plank floating over the grass. Thin-sided and flat, so it receives and never casts.
+ */
+export function buildShortcuts(scene: Scene, circuit: KartCircuit): TransformNode | null {
+  if (!circuit.shortcuts.length) return null;
+  const root = new TransformNode(`kart_shortcuts_${circuit.course.id}`, scene);
+  const sand = VenueKit.paint(scene, 'kart_shortcut_sand', '#c9a66b', 0.04, 0.95) as PBRMaterial;
+  sand.environmentIntensity = 0.4;
+  circuit.shortcuts.forEach((sc, i) => {
+    const dx = sc.b.x - sc.a.x, dz = sc.b.z - sc.a.z, dy = sc.b.y - sc.a.y;
+    const flat = Math.hypot(dx, dz);
+    const top = Math.max(sc.a.y, sc.b.y);
+    const h = top + 0.6;                         // from 0.6 m under the ground to the path's top
+    const m = MeshBuilder.CreateBox(`__kart_shortcut_${i}`, { width: sc.halfWidth * 2, height: h, depth: Math.hypot(flat, dy) }, scene);
+    m.position.set((sc.a.x + sc.b.x) / 2, (sc.a.y + sc.b.y) / 2 + 0.07 - h / 2, (sc.a.z + sc.b.z) / 2);   // a centimetre under the road top where they overlap
+    m.rotation.set(-Math.atan2(dy, flat), Math.atan2(dx, dz), 0);
+    m.material = sand; m.isPickable = false; m.receiveShadows = true; m.parent = root;
+    m.freezeWorldMatrix();
+  });
+  return root;
+}
+
 export function kartSceneryFor(circuit: KartCircuit): PropPlacement[] {
   const out: PropPlacement[] = [];
   const L = circuit.line.length, hw = circuit.halfWidth;
   const start = pointAlong(circuit.line, 0);
   const put = (model: string, at: { pos: Vector3; right: Vector3; tangent: Vector3 }, side: number, off: number, scale: number, yawExtra = 0, tint?: string) => {
     const p = at.pos.add(at.right.scale(side * (hw + off)));
+    if (!clearOfShortcuts(circuit, p.x, p.z, SHORTCUT_CLEAR)) return;   // IMPROVE (2026-10-06) #8: the sand path stays open
     out.push({ kit: 'racing', model, at: [p.x, 0, p.z], yaw: Math.atan2(at.tangent.x, at.tangent.z) + yawExtra, scale, ...(tint ? { tint } : {}) });
   };
   // the start: a grandstand each side a little before the line, tents behind them, banner towers at the gantry
@@ -331,6 +383,7 @@ export function forestFor(circuit: KartCircuit, count = 520, seed = 7, reach = 3
   for (let i = 0; i < count * 6 && out.length < count; i++) {
     const x = -reach + rnd() * reach * 2, z = -reach + rnd() * reach * 2;
     if (Math.abs(locate(circuit.line, x, z).lateral) < keep) continue;
+    if (!clearOfShortcuts(circuit, x, z, SHORTCUT_CLEAR + 2)) continue;   // IMPROVE (2026-10-06) #8: no pine on a path
     out.push([x, z, 0.75 + rnd() * 1.0, rnd() * Math.PI * 2]);
   }
   return out;
@@ -425,6 +478,7 @@ export function kartSettingFor(circuit: KartCircuit): PropPlacement[] {
     const off = fam.near + rnd() * (fam.far - fam.near);
     const p = at.pos.add(at.right.scale(side * (circuit.halfWidth + off)));
     if (Math.abs(locate(circuit.line, p.x, p.z).lateral) < circuit.halfWidth + 5) continue;
+    if (!clearOfShortcuts(circuit, p.x, p.z, SHORTCUT_CLEAR)) continue;   // IMPROVE (2026-10-06) #8
     const pick = fam.picks[Math.floor(rnd() * fam.picks.length)]!;
     out.push({
       kit: pick.kit, model: pick.model, at: [p.x, 0, p.z],

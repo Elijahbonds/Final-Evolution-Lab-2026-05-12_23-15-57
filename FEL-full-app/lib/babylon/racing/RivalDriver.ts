@@ -21,6 +21,7 @@ import { locate, pointAlong, type RacingLine } from './racingLine';
 import { spawnKart, stepKart, type KartInput, type KartSpec, type KartState } from '../core/KartModel';
 import { spawnArcade, stepArcade, type ArcadeInput, type ArcadeState, type ArcadeTune } from './ArcadeFlight';
 import type { Rival } from './RaceField';
+import { locateNear, newLineFix, type LineFix } from './lineWindow';   // IMPROVE (2026-10-06): aeroaces #13
 
 const clamp01 = (v: number): number => Math.max(0, Math.min(1, v));
 const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v));
@@ -60,6 +61,10 @@ export interface KartDrive {
   lastAlong: number;
   /** Seconds beached or thrown wide — the recovery net's clock. */
   stuckT: number;
+  /** IMPROVE (2026-10-06), velocitykart #13: the last fix on the line, as the plane's (AeroDrive.fix). Both locates a frame
+   *  search round it (lineWindow) instead of scanning the whole lap, and the mode reads the kart's road height off it.
+   *  Absent = a fresh fix (full scan); a point-to-point line keeps the full scan. */
+  fix?: LineFix;
 }
 
 /** Put a rival's kart on the line at its grid distance, in its lane, at its grid speed. */
@@ -68,7 +73,8 @@ export function spawnKartDrive(line: RacingLine, r: Rival): KartDrive {
   const pos = at.pos.add(at.right.scale(r.lane));
   const state = spawnKart(pos, Math.atan2(at.tangent.x, at.tangent.z));
   state.speed = r.speed;
-  return { state, lastAlong: locate(line, pos.x, pos.z).dist, stuckT: 0 };
+  const fix = newLineFix();
+  return { state, lastAlong: line.loop ? locateNear(line, pos.x, pos.z, fix).dist : locate(line, pos.x, pos.z).dist, stuckT: 0, fix };
 }
 
 /** The inputs a kart rival asks for this frame — what its thumbs would do. */
@@ -91,11 +97,17 @@ export function kartDriveInput(s: KartState, line: RacingLine, atDist: number, l
  * thrown-wide rival back at the distance it had earned — never forward, never back.
  */
 export function stepKartDrive(d: KartDrive, r: Rival, line: RacingLine, wantSpeed: number, dt: number, spec: KartSpec, halfWidth: number): void {
-  const at = locate(line, d.state.pos.x, d.state.pos.z);
-  const input = kartDriveInput(d.state, line, at.dist, r.lane, wantSpeed, spec);
-  stepKart(d.state, input, dt, Math.abs(at.lateral) <= halfWidth + 1, spec);
+  // IMPROVE (2026-10-06), velocitykart #13: both fixes windowed round the last one (lineWindow), written into `d.fix` —
+  // the first is read (dist, lateral) before the second overwrites it. Two full ~400-segment scans per rival per frame
+  // were the field's whole locate bill.
+  const fix = d.fix;
+  const near = (x: number, z: number) => (fix && line.loop ? locateNear(line, x, z, fix) : locate(line, x, z));
+  const at = near(d.state.pos.x, d.state.pos.z);
+  const atDist = at.dist, onRoad = Math.abs(at.lateral) <= halfWidth + 1;
+  const input = kartDriveInput(d.state, line, atDist, r.lane, wantSpeed, spec);
+  stepKart(d.state, input, dt, onRoad, spec);
 
-  const now = locate(line, d.state.pos.x, d.state.pos.z);
+  const now = near(d.state.pos.x, d.state.pos.z);
   r.dist += measureAdvance(d.lastAlong, now.dist, line.length);
   d.lastAlong = now.dist;
   r.speed = d.state.speed;
@@ -112,7 +124,8 @@ export function stepKartDrive(d: KartDrive, r: Rival, line: RacingLine, wantSpee
     d.state.speed = Math.min(wantSpeed, spec.vMax) * 0.5;
     d.state.slip = 0;
     d.state.steerAt = 0;
-    d.lastAlong = locate(line, d.state.pos.x, d.state.pos.z).dist;
+    if (fix) fix.i = -1;   // a teleport: the next fix is a full scan
+    d.lastAlong = near(d.state.pos.x, d.state.pos.z).dist;
   }
 }
 
@@ -123,6 +136,9 @@ export interface AeroDrive {
   state: ArcadeState;
   lastAlong: number;
   stuckT: number;
+  /** IMPROVE (2026-10-06), aeroaces #13: the last fix on the line. Both locates a frame search round it (lineWindow)
+   *  instead of scanning the whole lap, and write into it instead of allocating. Absent = a fresh fix (full scan). */
+  fix?: LineFix;
 }
 
 /** Put a rival's plane on the line at its grid distance, in its lane, at its grid speed. */
@@ -131,7 +147,8 @@ export function spawnAeroDrive(line: RacingLine, r: Rival, tune: ArcadeTune): Ae
   const pos = at.pos.add(at.right.scale(r.lane));
   const state = spawnArcade(pos, Math.atan2(at.tangent.x, at.tangent.z));
   state.speed = Math.max(tune.coast, r.speed);
-  return { state, lastAlong: locate(line, pos.x, pos.z).dist, stuckT: 0 };
+  const fix = newLineFix();
+  return { state, lastAlong: line.loop ? locateNear(line, pos.x, pos.z, fix).dist : locate(line, pos.x, pos.z).dist, stuckT: 0, fix };
 }
 
 /** The inputs an aero rival asks for: pursue the line, hold its height, fly the pace. */
@@ -160,11 +177,15 @@ export function stepAeroDrive(
   corridor: number, floorAt: (x: number, z: number) => number, ceilingAt: (x: number, z: number) => number,
   laneWeave = 0,
 ): void {
-  const at = locate(line, d.state.pos.x, d.state.pos.z);
-  const input = aeroDriveInput(d.state, line, at.dist, r.lane + laneWeave, wantSpeed, tune);
+  // IMPROVE (2026-10-06), aeroaces #13: both fixes are windowed round the last one and written into `d.fix` — the
+  // first is read (its dist) before the second overwrites it. A loop line only: a point-to-point keeps the full scan.
+  const fix = d.fix ??= newLineFix();
+  const near = (x: number, z: number) => (line.loop ? locateNear(line, x, z, fix) : locate(line, x, z));
+  const atDist = near(d.state.pos.x, d.state.pos.z).dist;
+  const input = aeroDriveInput(d.state, line, atDist, r.lane + laneWeave, wantSpeed, tune);
   stepArcade(d.state, input, dt, tune, floorAt, ceilingAt(d.state.pos.x, d.state.pos.z));
 
-  const now = locate(line, d.state.pos.x, d.state.pos.z);
+  const now = near(d.state.pos.x, d.state.pos.z);
   r.dist += measureAdvance(d.lastAlong, now.dist, line.length);
   d.lastAlong = now.dist;
   r.speed = d.state.speed;
@@ -181,6 +202,7 @@ export function stepAeroDrive(
     d.state.roll = 0;
     d.state.yawAt = 0;
     d.state.speed = Math.min(wantSpeed, tune.top);
-    d.lastAlong = locate(line, d.state.pos.x, d.state.pos.z).dist;
+    fix.i = -1;   // a teleport: the next fix is a full scan
+    d.lastAlong = near(d.state.pos.x, d.state.pos.z).dist;
   }
 }

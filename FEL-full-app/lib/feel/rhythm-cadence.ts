@@ -47,6 +47,13 @@ export class RhythmCadence {
   private _lastSide: CadenceSide | null = null;
   private _lastAt = 0;
   stats: CadenceStats = { perfect: 0, good: 0, off: 0, fault: 0 };
+  /**
+   * IMPROVE (2026-10-06): the last graded tap's timing error WITH its sign — interval minus target, ms. Positive = the
+   * tap came late (too slow: go FASTER), negative = early (too fast: go SLOWER). `tap()` grades on the absolute error,
+   * so an 'off' tap said nothing about which way to correct. Null after a first tap, a fault or a reset. Read-only
+   * extra: the grade and the stats are unchanged.
+   */
+  lastErrorMs: number | null = null;
 
   constructor({ targetIntervalMs = 220, perfectMs = 40, goodMs = 90, now }: RhythmCadenceOpts = {}) {
     this.targetIntervalMs = targetIntervalMs; // TUNE(elijah)
@@ -58,6 +65,7 @@ export class RhythmCadence {
   reset(): void {
     this._lastSide = null;
     this._lastAt = 0;
+    this.lastErrorMs = null;
     this.stats.perfect = 0;
     this.stats.good = 0;
     this.stats.off = 0;
@@ -71,14 +79,16 @@ export class RhythmCadence {
       this.stats.fault++;
       this._lastSide = side;
       this._lastAt = t;
+      this.lastErrorMs = null;
       return 'fault';
     }
     const first = this._lastSide === null;
     const interval = t - this._lastAt;
     this._lastSide = side;
     this._lastAt = t;
-    if (first) return 'first';
-    const err = Math.abs(interval - this.targetIntervalMs);
+    if (first) { this.lastErrorMs = null; return 'first'; }
+    this.lastErrorMs = interval - this.targetIntervalMs;
+    const err = Math.abs(this.lastErrorMs);
     if (err <= this.perfectMs) {
       this.stats.perfect++;
       return 'perfect';

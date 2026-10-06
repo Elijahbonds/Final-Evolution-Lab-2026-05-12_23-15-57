@@ -89,6 +89,10 @@ export default function FreeRunBabylon({ onEnd }: GameProps) {
         <div className="flex flex-col items-center gap-1">
           <span className="fel-panel px-4 py-1.5 fel-stat text-2xl text-white">{Number(hud.time ?? 0).toFixed(1)}s</span>
           <span className="fel-panel px-2 py-0.5 text-[10px] tracking-wider text-white/70">CHECKPOINT {hnode(hud.checkpoint, '0/2')}</span>
+          {/* IMPROVE (2026-10-06): the last checkpoint's split against the personal best (− is ahead) */}
+          {typeof hud.pbSplit === 'string' && hud.pbSplit && phase === 'playing' ? (
+            <span className={`fel-panel px-2 py-0.5 text-[10px] font-bold tracking-wider ${hud.pbSplit.includes('−') ? 'text-[#86efac]' : 'text-[#fca5a5]'}`}>{hud.pbSplit}</span>
+          ) : null}
         </div>
         <div className="fel-panel px-3 py-1.5 text-right">
           <div className="text-[10px] tracking-wider text-white/60">{hnode(hud.tier, 'ROOKIE')}{hud.track ? ` · ${String(hud.track).toUpperCase()}` : ''}</div>
@@ -117,6 +121,18 @@ export default function FreeRunBabylon({ onEnd }: GameProps) {
               <span className="h-2 w-28 overflow-hidden rounded-full bg-black/50"><span className={`block h-full rounded-full transition-[width] duration-150 ${Number(hud.kinetic) >= 100 ? 'bg-[#fbbf24]' : Number(hud.kinetic) >= 50 ? 'bg-[#fde68a]/80' : 'bg-white/40'}`} style={{ width: `${Math.max(0, Math.min(100, Number(hud.kinetic)))}%` }} /></span>
               {Number(hud.kinetic) >= 100 ? <span className="text-[10px] font-bold text-[#fbbf24]">SLAM READY</span> : Number(hud.kinetic) >= 50 ? <span className="text-[10px] font-bold text-[#fde68a]">BURST</span> : null}
             </div>
+          )}
+          {/* IMPROVE (2026-10-06): the trick's rotation — green once it is round far enough to land */}
+          {Number(hud.trickPct) > 0 && (
+            <div className="mt-0.5 flex items-center gap-1.5">
+              <span className="text-[10px] tracking-wider text-white/60">TRICK</span>
+              <span className="h-2 w-28 overflow-hidden rounded-full bg-black/50"><span className={`block h-full rounded-full ${Number(hud.trickAround) ? 'bg-[#86efac]' : 'bg-[#f472b6]'}`} style={{ width: `${Math.max(0, Math.min(100, Number(hud.trickPct)))}%` }} /></span>
+              {Number(hud.trickAround) ? <span className="text-[10px] font-bold text-[#86efac]">LAND IT</span> : null}
+            </div>
+          )}
+          {/* IMPROVE (2026-10-06): a speed gate ahead — what it needs against your speed, from 15 m out */}
+          {typeof hud.gateReq === 'string' && hud.gateReq && (
+            <div className={`rounded px-2 py-0.5 text-[10px] font-bold tracking-wider ${Number(hud.gateReady) ? 'bg-[#34d399]/25 text-[#34d399]' : 'bg-[#f87171]/25 text-[#f87171]'}`}>{hud.gateReq}</div>
           )}
           {typeof hud.verbs === 'string' && hud.verbs && (
             <div className="flex flex-wrap gap-1">

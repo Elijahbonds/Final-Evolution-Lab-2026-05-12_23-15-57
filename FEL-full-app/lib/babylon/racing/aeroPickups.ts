@@ -105,7 +105,7 @@ export class AeroPickups {
   setBananas(bananas: Banana[]): void {
     for (const n of this.bananaNodes) n.dispose();
     this.bananaNodes = bananas.map((b, i) => {
-      const inst = this.bananaMaster.createInstance(`banana_${i}`);
+      const inst = this.bananaMaster.createInstance(`__banana_${i}`);   // IMPROVE (2026-10-06): '__' keeps each banana off LightRig's caster list — 35–40 entries per circuit, each a shadow draw per cascade, for a 2 m curl floating 10 m up
       inst.position.copyFrom(b.pos); inst.parent = this.root; inst.isPickable = false; inst.scaling.setAll(this.scale);
       return inst;
     });

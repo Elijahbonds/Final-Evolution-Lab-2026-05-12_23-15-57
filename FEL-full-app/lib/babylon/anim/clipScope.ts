@@ -84,7 +84,7 @@ export const MODE_CLIP_SCOPES: Record<string, { suites: readonly ClipSuite[]; bo
   skateboard: BOARD, surf: BOARD, bigair: BOARD,
   snowboard: { suites: ['board'], borrow: ['karate_knockdown'] },
   freerun: { suites: ['freerun'], borrow: ['karate_floor_hold', 'karate_get_up', 'football_tackled_fall', 'dunk_celebrate_big'] },
-  sprint: { suites: [], borrow: [] },
+  sprint: { suites: [], borrow: ['dunk_celebrate_big'] },   // IMPROVE (2026-10-06, Sprint #7): the run-out's winner celebration (SPORT_CLIP.scoreCelebrate), arms overhead like freerun's
   dance: { suites: [], borrow: ['karate_hit_react'] },
   tennis: NET, tiebreak: { suites: ['tennis'], borrow: [] }, volleyball: NET,
   golf: { suites: ['golf'], borrow: [] },
