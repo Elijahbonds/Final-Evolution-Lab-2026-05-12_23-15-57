@@ -37,6 +37,7 @@ describe('the ten archetypes', () => {
         expect(r.base).toEqual(a.slot.base);
         expect(r.slot?.body).toBe(a.slot.body === 'female' ? 'female' : 'male');
         expect(r.slot?.frame).toEqual(a.slot.frame);
+        expect(r.slot?.presentation).toEqual(a.slot.presentation);
         expect(code.length).toBeLessThan(encodeShareCode(a.slot.doc, a.slot.base).length);
       });
     });
@@ -54,6 +55,14 @@ describe('the ten archetypes', () => {
     expect(r.creatorSlots).toHaveLength(5);
     expect(JSON.stringify(r).length).toBeLessThan(MAX_FACE_CHARS);
     expect(sanitizeCreatorSlots(five)).toEqual(five);
+  });
+  it('phase 4b unlocked what it promised: no recipe still waits for a shape v2 tool, and they use it', () => {
+    for (const a of ARCHETYPES) expect(a.later.join(' '), a.name).not.toMatch(/4b|shape v2|presentation|girth|thin limbs|big head/);
+    const uses = (f: (a: (typeof ARCHETYPES)[number]) => unknown) => ARCHETYPES.filter((a) => f(a)).length;
+    expect(uses((a) => a.slot.doc.shape.body.head)).toBeGreaterThanOrEqual(2);          // head scale
+    expect(uses((a) => a.slot.doc.shape.girth?.thighs)).toBeGreaterThanOrEqual(3);      // limb girth
+    expect(uses((a) => a.slot.doc.shape.girth?.chest || a.slot.doc.shape.girth?.belly)).toBeGreaterThanOrEqual(3);   // bulk
+    expect(uses((a) => a.slot.presentation)).toBeGreaterThanOrEqual(4);                 // the Studio size: giants and the mascot
   });
   it('the mascot\'s verdict is pinned: a costume on the human rig, not a creature', () => {
     expect(MASCOT_VERDICT).toBe('costume read, not a creature');

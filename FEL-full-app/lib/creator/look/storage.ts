@@ -12,7 +12,8 @@
 //   - the request leaves it out (the Athlete Creator's Finalize knows nothing about docs): the stored one is kept, so
 //     saving in one editor never wipes what the other built.
 //   - shape values are body-shape NUMBERS: without the adult's numbers opt-in (hold.uploadNumbers) they are stripped,
-//     the same rule holdFace applies to the face sliders. Phase 4a: every slot's sliders, frame and doc.shape too.
+//     the same rule holdFace applies to the face sliders. Phase 4a: every slot's sliders, frame and doc.shape too;
+//     phase 4b: doc.shape.girth (it is inside doc.shape) and the slot's presentation (Studio) size.
 //   - phase 4a: every slot's worn items go through the shop's ownership filter (ctx.owned); with no inventory to check
 //     against they are dropped, never trusted. A slot cannot wear what the account does not own.
 //   - phase 4a: `activeSlot` must name a slot; the active slot is MATERIALISED onto the face's top level (its base, its
@@ -85,7 +86,7 @@ export function holdCreator(
   }
   slots = slots.map((s) => {
     const next: CreatorSlotV2 = { ...s };
-    if (!hold.uploadNumbers) { next.doc = withoutShape(s.doc); delete next.sliders; delete next.frame; }
+    if (!hold.uploadNumbers) { next.doc = withoutShape(s.doc); delete next.sliders; delete next.frame; delete next.presentation; }
     if (s.equipped) {
       if (ctx.owned) next.equipped = filterEquipped(s.equipped, ctx.owned) as CreatorSlotV2['equipped'];
       else delete next.equipped;

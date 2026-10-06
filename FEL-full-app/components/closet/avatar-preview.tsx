@@ -32,9 +32,12 @@ export interface AvatarPreviewProps {
    *  account plays, as before) and its height / build (cosmetic, clamped like every mode outside ranked). */
   body?: HeroBodyKind;
   frame?: SlotFrame | null;
+  /** CREATOR-PLAN phase 4b: the slot's Studio size (owner decision 2026-10-06: giant and tiny builds show here and in
+   *  photos only). Stamped on THIS scene's metadata and read back from it (shape/presentation.ts); never in a mode. */
+  presentation?: number | null;
 }
 
-export default function AvatarPreview({ face, palette, jersey, wardrobe, accessories, creator, wornParts, body, frame }: AvatarPreviewProps) {
+export default function AvatarPreview({ face, palette, jersey, wardrobe, accessories, creator, wornParts, body, frame, presentation }: AvatarPreviewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const applyRef = useRef<((p: AvatarPreviewProps) => void) | null>(null);
   const playRef = useRef<(clip: string | null) => void>(() => {});
@@ -53,6 +56,7 @@ export default function AvatarPreview({ face, palette, jersey, wardrobe, accesso
       const { detectQualityTier } = await import('@/lib/babylon/scene/QualityTier');
       const { CharacterLibrary } = await import('@/lib/babylon/core/CharacterLibrary');
       const { applyIdentity } = await import('@/lib/babylon/core/playerIdentity');
+      const { applyPresentation, stampPresentation } = await import('@/lib/babylon/creator/shape/presentation');
       if (disposed || !canvasRef.current) return;
 
       const box = canvasRef.current;
@@ -107,8 +111,14 @@ export default function AvatarPreview({ face, palette, jersey, wardrobe, accesso
         });
         // the slot's height and build, absolutely from the spawn's own scale (never compounding across edits)
         applyProportions(spawned, p.frame ? { heightScale: p.frame.heightScale, buildScale: p.frame.buildScale } : { heightScale: 1, buildScale: 1 }, baseScale);
+        // CREATOR-PLAN phase 4b: this is the Studio, so its scene carries the slot's presentation size, applied on top of
+        // the absolute scale just set (so it never compounds); the camera keeps a giant's head and a mascot in frame
+        stampPresentation(scene, 'studio', p.presentation ?? null);
+        const size = applyPresentation(spawned.root);
+        if (Math.abs(cam.target.y - 0.95 * size) > 1e-6) cam.target = new Vector3(cam.target.x, 0.95 * size, cam.target.z);
+        cam.radius = Math.max(cam.radius, 3.1 * Math.max(1, size));
       };
-      let lastProps: AvatarPreviewProps = { face, palette, jersey, wardrobe, accessories, creator, wornParts, frame };
+      let lastProps: AvatarPreviewProps = { face, palette, jersey, wardrobe, accessories, creator, wornParts, frame, presentation };
       applyRef.current(lastProps);
       // a slot with another body: the old one goes, the new one is spawned and dressed with the same draft
       let respawning: Promise<void> | null = null;
@@ -156,8 +166,8 @@ export default function AvatarPreview({ face, palette, jersey, wardrobe, accesso
 
   // re-apply the draft on every edit — same pipe, new values
   useEffect(() => {
-    applyRef.current?.({ face, palette, jersey, wardrobe, accessories, creator, wornParts, frame });
-  }, [face, palette, jersey, wardrobe, accessories, creator, wornParts, frame]);
+    applyRef.current?.({ face, palette, jersey, wardrobe, accessories, creator, wornParts, frame, presentation });
+  }, [face, palette, jersey, wardrobe, accessories, creator, wornParts, frame, presentation]);
   // CREATOR-PLAN phase 4a: another slot's body
   useEffect(() => { if (body) respawnRef.current?.(body); }, [body]);
 

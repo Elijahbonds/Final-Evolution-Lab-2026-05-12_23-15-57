@@ -9,8 +9,11 @@
 //   phase 3 (paint): DONE (2026-10-06) — lib/babylon/creator/paint/renderPaint.syncPaint: the layer stack composited
 //                    into one texture per body over the skin's own albedo (and one per painted garment), suit mode
 //                    hiding the garments. Synced on EVERY apply (see applyCreatorLayers), released with the body.
-//   phase 4 (shape): doc.shape.body through counter-scaled bones, never the arms (REACH-FREEZE), 1.0 in
-//                    STANDARD_FRAME_MODES and ranked (playFrame.playScales).
+//   phase 4b (shape): DONE (2026-10-06) — lib/babylon/creator/shape/renderShape.syncShape: head / neck / hands / feet
+//                    (reach-safe, every mode), legs / torso / shoulders (the play clamp; 1.0 in STANDARD_FRAME_MODES and
+//                    ranked), never the arms (REACH-FREEZE), and per-segment bulk as one summed morph per mesh. Synced on
+//                    EVERY apply, after the parts (a part on a hand is scaled with the hand). The Studio-only presentation
+//                    size is NOT here: avatar-preview applies it from its own scene (shape/presentation.ts).
 //
 // Contract every phase keeps: idempotent per body (a re-apply with the same doc is cheap; a changed doc replaces, never
 // stacks), everything made is disposed when the body's root disposes, and nothing here changes a hitbox, a reach or a
@@ -20,6 +23,7 @@ import type { AbstractMesh, Skeleton, TransformNode } from '@babylonjs/core';
 import type { CreatorDoc, CreatorPart } from '../../creator/look/doc';
 import { syncParts } from '../creator/parts/renderParts';
 import { syncPaint } from '../creator/paint/renderPaint';
+import { syncShape } from '../creator/shape/renderShape';
 
 export interface CreatorLayers {
   /** JSON of the doc last applied (cheap change test for a live editor) */
@@ -61,15 +65,24 @@ export function applyCreatorLayers(
   const prev = applied.get(root);
   const summary = { parts: doc?.parts.length ?? 0, paint: doc?.paint.length ?? 0 };
   syncPaint(spawn, doc);
-  if (prev && prev.sig === sig) return summary;
+  if (!(prev && prev.sig === sig)) layersChanged(spawn, root, doc, worn, sig, summary);
+  // SHAPE (phase 4b, 2026-10-06) on every call too, after the parts: the place decides the values (a standard-frame mode
+  // plays the frame keys at 1.0), applyIdentity may have just re-set the root, and a part on a hand is scaled with it
+  syncShape(spawn, doc);
+  return summary;
+}
+
+function layersChanged(
+  spawn: { root: TransformNode; skeleton?: Skeleton | null }, root: TransformNode, doc: CreatorDoc | null,
+  worn: readonly CreatorPart[], sig: string, summary: { parts: number; paint: number },
+): void {
   if (spawn.skeleton) syncParts({ root, skeleton: spawn.skeleton }, doc?.parts ?? [], worn);
   release(root);
-  if (!doc && !worn.length) { stamp(root, null); return summary; }
+  if (!doc && !worn.length) { stamp(root, null); return; }
   const layers: CreatorLayers = { sig, dispose: [] };
   applied.set(root, layers);
   if (!hooked.has(root)) { hooked.add(root); root.onDisposeObservable.addOnce(() => release(root)); }
   stamp(root, doc ? { v: doc.v, ...summary, suit: doc.flags.suit } : null);
-  return summary;
 }
 
 function stamp(root: TransformNode, v: { v: number; parts: number; paint: number; suit: boolean } | null): void {

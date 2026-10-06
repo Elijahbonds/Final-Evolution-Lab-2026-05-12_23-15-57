@@ -12,7 +12,9 @@
 import {
   SKIN_TONES, FACE_SHAPES, HAIR_STYLES, HAIR_COLORS, EYE_SHAPES, EYE_COLORS, BROWS, MOUTHS, NOSES, type FaceConfig,
 } from '../../closet/wearable-catalog';
-import { emptyCreatorDoc, type CreatorDoc } from './doc';
+import {
+  FRAME_KEYS, GIRTH_KEYS, GIRTH_RANGE, PROPORTION_RANGES, REACH_SAFE_KEYS, emptyCreatorDoc, type CreatorDoc, type CreatorShape,
+} from './doc';
 
 export const RANDOM_SECTIONS = ['skin', 'face', 'hair', 'eyes', 'colours'] as const;
 export type RandomSection = typeof RANDOM_SECTIONS[number];
@@ -86,4 +88,36 @@ export function randomiseLook(cur: RandomLook, locks: readonly RandomSection[] =
   let doc = cur.doc;
   if (!locked.has('colours')) doc = { ...(doc ?? emptyCreatorDoc()), colours: rollKitColours(rnd) };
   return { face, doc };
+}
+
+// ── shape (CREATOR-PLAN phase 4b) ────────────────────────────────────────────────────────────────────────────────────
+// The Shape tab's own roll, with its own locks, so the face tab's Randomise never changes a body (and its tests hold).
+// TUNED (2026-10-06, phase 4b): a roll stays well inside the ranges — head, neck, hands and feet 0.9–1.2; legs, torso and
+// shoulders anywhere in the play clamp; bulk one build for the whole body (0.82–1.3) with a ±8 % jitter per segment — so
+// a dice gives a believable body, and the extremes stay a deliberate slider move.
+
+export const SHAPE_RANDOM_SECTIONS = ['proportions', 'bulk'] as const;
+export type ShapeRandomSection = typeof SHAPE_RANDOM_SECTIONS[number];
+export const SHAPE_RANDOM_FIELDS: Record<ShapeRandomSection, string> = {
+  proportions: 'head, neck, hands, feet, legs, torso, shoulders',
+  bulk: 'bulk per body part',
+};
+
+const r2 = (v: number) => Math.round(v * 100) / 100;
+
+export function randomiseShape(cur: CreatorShape, locks: readonly ShapeRandomSection[] = [], rnd: () => number = Math.random): CreatorShape {
+  const locked = new Set(locks);
+  const out: CreatorShape = { ...cur, body: { ...cur.body } };
+  if (cur.girth) out.girth = { ...cur.girth };
+  if (!locked.has('proportions')) {
+    for (const k of REACH_SAFE_KEYS) out.body[k] = r2(0.9 + rnd() * 0.3);
+    for (const k of FRAME_KEYS) { const [lo, hi] = PROPORTION_RANGES[k]; out.body[k] = r2(lo + rnd() * (hi - lo)); }
+  }
+  if (!locked.has('bulk')) {
+    const build = 0.82 + rnd() * 0.48;
+    const girth: NonNullable<CreatorShape['girth']> = {};
+    for (const k of GIRTH_KEYS) girth[k] = r2(Math.min(GIRTH_RANGE[1], Math.max(GIRTH_RANGE[0], build * (0.92 + rnd() * 0.16))));
+    out.girth = girth;
+  }
+  return out;
 }

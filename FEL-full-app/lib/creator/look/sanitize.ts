@@ -16,9 +16,9 @@ import {
   CREATOR_DOC_VERSION, MAX_PARTS, MAX_PAINT_LAYERS, MAX_SLOTS, MAX_DOC_CHARS, MAX_SLOT_CHARS,
   PART_SHAPES, PART_BONES, FINISHES, PAINT_TYPES, PAINT_REGIONS, PAINT_SURFACES, PAINT_PATTERNS, PAINT_STAMPS, PAINT_BLENDS,
   COLOUR_SLOTS, SHAPE_FACE_KEYS, PROPORTION_RANGES, PROPORTION_KEYS, RANGES, HIDE_KEYS, PUPIL_SHAPES, EYE_RANGES, EYE_DEFAULTS,
-  SLOT_BODIES,
+  SLOT_BODIES, GIRTH_KEYS, GIRTH_RANGE, PRESENTATION_RANGE,
   type CreatorDoc, type CreatorPart, type PaintLayer, type Vec3, type ColourSlot, type CreatorEyes, type CreatorFlags,
-  type CreatorSlotV2, type SlotBody, type SlotFrame,
+  type CreatorSlotV2, type SlotBody, type SlotFrame, type SlotPresentation,
 } from './doc';
 import {
   sanitizeJersey, sanitizeFaceSliders, getWearable, SLOTS as WEARABLE_SLOTS,
@@ -154,6 +154,12 @@ export function sanitizeCreatorDoc(raw: unknown, maxChars: number = MAX_DOC_CHAR
     const [lo, hi] = PROPORTION_RANGES[k];
     if (typeof v === 'number' && Number.isFinite(v)) body[k] = clampNum(v, lo, hi, 1);
   }
+  // phase 4b: bulk per segment (stored only when something is set, so a phase 1–4a doc sanitises to what it was)
+  const girth: NonNullable<CreatorDoc['shape']['girth']> = {};
+  if (isObj(shapeRaw.girth)) for (const k of GIRTH_KEYS) {
+    const v = shapeRaw.girth[k];
+    if (typeof v === 'number' && Number.isFinite(v)) girth[k] = clampNum(v, GIRTH_RANGE[0], GIRTH_RANGE[1], 1);
+  }
   const flags: CreatorFlags = { suit: isObj(raw.flags) && raw.flags.suit === true };
   // phase 4a: what the doc hides (only `true` counts; stored only when something is hidden)
   const hideRaw = isObj(raw.flags) && isObj(raw.flags.hide) ? raw.flags.hide : null;
@@ -167,7 +173,7 @@ export function sanitizeCreatorDoc(raw: unknown, maxChars: number = MAX_DOC_CHAR
     parts: budgeted(raw.parts, MAX_PARTS, sanitizePart),
     paint: budgeted(raw.paint, MAX_PAINT_LAYERS, sanitizePaintLayer),
     colours,
-    shape: { face, body },
+    shape: Object.keys(girth).length ? { face, body, girth } : { face, body },
     flags,
   };
   const eyes = sanitizeEyes(raw.eyes);
@@ -224,6 +230,14 @@ export function sanitizeSlotFrame(raw: unknown): SlotFrame | undefined {
   return { heightScale: r3(clampCosmetic(raw.heightScale, 'height')), buildScale: r3(clampCosmetic(raw.buildScale, 'build')) };
 }
 
+/** Phase 4b: the Studio / photo size, clamped to PRESENTATION_RANGE; undefined when not a number or exactly 1 (the
+ *  default is not stored). Never read by a mode (lib/babylon/creator/shape/presentation.ts). */
+export function sanitizeSlotPresentation(raw: unknown): SlotPresentation | undefined {
+  if (!isObj(raw) || typeof raw.scale !== 'number' || !Number.isFinite(raw.scale) || raw.scale <= 0) return undefined;
+  const scale = clampNum(raw.scale, PRESENTATION_RANGE[0], PRESENTATION_RANGE[1], 1);
+  return scale === 1 ? undefined : { scale };
+}
+
 /** One slot, v2 or v1. Null when its doc does not sanitise, or it is over MAX_SLOT_CHARS. A v1 slot (no `base`) takes
  *  its base and sliders from the fallback face; a slot without an id gets none here (sanitizeCreatorSlots assigns one). */
 export function sanitizeCreatorSlot(raw: unknown, fallback: SlotFallback = {}): (Omit<CreatorSlotV2, 'id'> & { id: string | null }) | null {
@@ -243,6 +257,8 @@ export function sanitizeCreatorSlot(raw: unknown, fallback: SlotFallback = {}): 
   if (sliders) slot.sliders = sliders;
   const frame = sanitizeSlotFrame(raw.frame);
   if (frame) slot.frame = frame;
+  const presentation = sanitizeSlotPresentation(raw.presentation);
+  if (presentation) slot.presentation = presentation;
   const equipped = sanitizeSlotEquipped(raw.equipped);
   if (equipped) slot.equipped = equipped;
   return JSON.stringify(slot).length > MAX_SLOT_CHARS ? null : slot;

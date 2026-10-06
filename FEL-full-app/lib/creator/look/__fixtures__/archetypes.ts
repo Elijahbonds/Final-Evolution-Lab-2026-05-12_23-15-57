@@ -7,10 +7,11 @@
 // else's character).
 //
 // Each is a whole slot (doc.ts CreatorSlotV2) in the sanitiser's own canonical form, so `sanitizeCreatorSlot(f)` must
-// give `f` back exactly (no silent drops). Fields from tools that land in later phases (shape v2, presentation scale,
-// skinned parts) are not here; `later` says what each still waits for.
+// give `f` back exactly (no silent drops). Fields from tools that land in later phases (skinned parts, two-tone parts, a
+// custom stamp, new art) are not here; `later` says what each still waits for. Phase 4b (2026-10-06) filled in what shape
+// v2 unlocked: head and hand / foot scale, the frame keys, bulk per segment, and the Studio-only presentation size.
 
-import { emptyCreatorDoc, type CreatorPart, type CreatorSlotV2, type Finish, type PaintLayer, type PartBone, type PartShape, type SlotBody } from '../doc';
+import { emptyCreatorDoc, type CreatorPart, type CreatorShape, type CreatorSlotV2, type Finish, type PaintLayer, type PartBone, type PartShape, type SlotBody } from '../doc';
 import { spikeCluster } from '../parts';
 
 type V = [number, number, number];
@@ -43,6 +44,9 @@ function slot(id: string, label: string, body: SlotBody, base: CreatorSlotV2['ba
 /** Re-number a part list's ids (a1…) after a helper such as spikeCluster made some. */
 const ids = (parts: CreatorPart[]): CreatorPart[] => parts.map((p, i) => ({ ...p, id: `a${i + 1}`, pos: z(p.pos), rot: z(p.rot), scale: z(p.scale) }));
 const spikes = (count: number, colour: string, length: number, spread = 1) => spikeCluster([], { count, colour, length, spread });
+/** Phase 4b: a doc shape — proportions and bulk (no face values: the fixtures sculpt no face). */
+const shape = (body: CreatorShape['body'], girth?: CreatorShape['girth']): CreatorShape => (girth ? { face: {}, body, girth } : { face: {}, body });
+const LIMBS = (g: number) => ({ upperArms: g, forearms: g, thighs: g, calves: g });
 
 export interface Archetype {
   /** generic description only */
@@ -64,8 +68,9 @@ export const ARCHETYPES: Archetype[] = [
         P('tube', 'Neck', '#141826', { pos: [0, 0.02, 0], scale: [3.2, 0.9, 3] }),
       ]),
       eyes: { glow: 0.8 },
-    }, { frame: { heightScale: 1.04, buildScale: 0.94 } }),
-    later: ['shape v2: thin limbs (4b)', 'presentation height beyond the play clamp (4b, Studio + photo only)'],
+      shape: shape({ legs: 1.04, neck: 1.1 }, LIMBS(0.85)),
+    }, { frame: { heightScale: 1.04, buildScale: 0.94 }, presentation: { scale: 1.1 } }),
+    later: [],
   },
   {
     name: 'quilled black-and-red speedster',
@@ -83,8 +88,9 @@ export const ARCHETYPES: Archetype[] = [
         P('capsule', 'LeftFoot', '#C8102E', { pos: [0, 0.06, 0.04], scale: [1.4, 1.8, 1.4], finish: 'gloss', mirror: true }),
         P('strap', 'LeftFoot', '#FFFFFF', { pos: [0, 0.05, 0.05], mirror: true }),
       ],
+      shape: shape({ head: 1.4, hands: 1.15, feet: 1.3 }, LIMBS(0.8)),
     }),
-    later: ['shape v2: big head, thin limbs (4b)', 'two-tone parts for striped quills (4c)'],
+    later: ['two-tone parts for striped quills (4c)'],
   },
   {
     name: 'skull-masked giant warlord',
@@ -104,8 +110,9 @@ export const ARCHETYPES: Archetype[] = [
         P('cylinder', 'RightHand', '#5A3A1A', { scale: [1, 6, 1] }),
         P('box', 'RightHand', '#6B6B6B', { pos: [0, 0.6, 0], scale: [2.5, 1.5, 1.5], finish: 'metal' }),
       ],
-    }, { frame: { heightScale: 1.04, buildScale: 1.08 } }),
-    later: ['muscle body morphs (phase 5 art)', 'presentation height 1.2 (4b, Studio + photo only)', 'skinned loincloth (4c)'],
+      shape: shape({ legs: 1.04, torso: 1.04, shoulders: 1.08, neck: 0.85, hands: 1.25, feet: 1.15 }, { chest: 1.3, upperArms: 1.3, forearms: 1.3, neck: 1.3, thighs: 1.15 }),
+    }, { frame: { heightScale: 1.04, buildScale: 1.08 }, presentation: { scale: 1.2 } }),
+    later: ['muscle body morphs (phase 5 art)', 'skinned loincloth (4c)'],
   },
   {
     name: 'web-lined masked acrobat',
@@ -148,8 +155,9 @@ export const ARCHETYPES: Archetype[] = [
         P('wedge', 'LeftFoot', '#3A3F38', { pos: [0, 0.04, 0.06], mirror: true }),
         P('belt', 'Hips', '#3A3F38'),
       ],
+      shape: shape({ shoulders: 1.06 }, { chest: 1.15, upperArms: 1.1, thighs: 1.1, calves: 1.1 }),
     }),
-    later: ['an environment map so metal reads (4d)', 'girth (4b)'],
+    later: ['an environment map so metal reads (4d)'],
   },
   {
     name: 'black-caped dark lord with a glowing blade',
@@ -170,8 +178,8 @@ export const ARCHETYPES: Archetype[] = [
         P('cylinder', 'RightHand', '#C0C0C0', { finish: 'metal' }),
         P('cylinder', 'RightHand', '#FF2020', { pos: [0, 0.1, 0], scale: [0.8, 8, 0.8], finish: 'glow' }),
       ],
-    }, { frame: { heightScale: 1.04, buildScale: 1.06 } }),
-    later: ['a skinned cape (4c)', 'presentation height 1.12 (4b)'],
+    }, { frame: { heightScale: 1.04, buildScale: 1.06 }, presentation: { scale: 1.12 } }),
+    later: ['a skinned cape (4c)'],
   },
   {
     name: 'ash-skinned bearded warrior with a red stripe',
@@ -219,8 +227,9 @@ export const ARCHETYPES: Archetype[] = [
         P('sphere', 'Spine1', '#FFD800', { scale: [4.5, 5, 4] }),
         ...[0, 1, 2].map((i) => P('plate', 'Hips', '#FFD800', { pos: [0, 0.05 + i * 0.08, -0.15 - i * 0.05], rot: [0, 0, i % 2 ? 40 : -40] })),
       ],
-    }),
-    later: ['a bolt part (4c)', 'presentation scale 0.6 (4b)', 'a non-human rig is out of scope'],
+      shape: shape({ head: 1.6, hands: 1.5, feet: 1.5, legs: 0.96 }, { belly: 1.6, thighs: 1.3, calves: 1.2 }),
+    }, { presentation: { scale: 0.6 } }),
+    later: ['a bolt part (4c)', 'a non-human rig is out of scope'],
   },
 ];
 

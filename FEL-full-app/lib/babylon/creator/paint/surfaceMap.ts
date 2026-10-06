@@ -18,7 +18,8 @@ import type { Bone, Mesh, Skeleton } from '@babylonjs/core';
 import { ATOM_COUNT, CHART_JOINTS, bareBone, buildBodyChart, classify, type BodyChart, type ChartJoint, type SkinInput, type V3 } from './bodyChart';
 import { rasteriseSteps, type SurfaceMap } from './rasterise';
 
-function absRest(b: Bone): Matrix {
+/** A bone's absolute REST matrix in the skeleton's space (its rest matrix times its parents'). Phase 4b's shape reads it too. */
+export function absRest(b: Bone): Matrix {
   let m = b.getRestMatrix().clone();
   for (let p = b.getParent(); p; p = p.getParent()) m = m.multiply(p.getRestMatrix());
   return m;

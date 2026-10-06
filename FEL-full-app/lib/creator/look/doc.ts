@@ -110,16 +110,52 @@ export const SHAPE_FACE_KEYS = ['faceLong', 'faceRound', 'faceSquare', 'faceHear
 export type ShapeFaceKey = typeof SHAPE_FACE_KEYS[number];
 
 /**
- * Cosmetic body proportions, as multipliers on the bind length (phase 4: counter-scaled bones, nothing compounds).
- * NO ARMS: arm length is frozen for gameplay (REACH-FREEZE, playFrame.ts), and ranked / STANDARD_FRAME_MODES spawn 1.0.
- * assumption: these ranges are a first guess for phase 4 to tune by eye; nothing reads them in phase 1.
+ * Cosmetic body proportions, as multipliers (CREATOR-PLAN phase 4b, shape v2). NO ARMS: arm length is frozen for gameplay
+ * (REACH-FREEZE, playFrame.ts). Two kinds, by what they move (lib/babylon/creator/shape/renderShape.ts does the moving):
+ *
+ *   REACH-SAFE (head, neck, hands, feet) — wide ranges, the same in every mode, ranked included. None of them moves a
+ *     shoulder, an elbow or a hand-bone origin: the head is the Head bone's own scale (a leaf: nothing below it to
+ *     compound into), the neck moves only the Head joint, and hands and feet are a MESH scale about the wrist / the sole
+ *     under the ankle (a morph, so the hand and foot BONES — which carry the ball, a staff, a bat — are never scaled).
+ *   FRAME KEYS (legs, torso, shoulders) — these DO move where the hands sit, so they live inside the play clamp
+ *     (playFrame.COSMETIC_CLAMP: legs and torso the height range, shoulders the build range) and are exactly 1.0 in a
+ *     ranked session and every STANDARD_FRAME_MODES mode (shape.effectiveShape).
+ *
+ * TUNED (2026-10-06, phase 4b): head 0.9–1.12 → 0.8–1.6, neck 0.85–1.2 → 0.8–1.5, hands and feet 0.9–1.15 → 0.8–1.5 (the
+ * make-anyone research's wide ranges: a big-headed mascot, huge gloves); legs and torso 0.9–1.1 → 0.96–1.04 and shoulders
+ * 0.9–1.12 → 0.94–1.08 (the play clamp itself, so what the editor shows is what a casual mode plays). shape.test.ts pins
+ * the frame keys to COSMETIC_CLAMP, so the two cannot drift apart.
  */
 export const PROPORTION_RANGES = {
-  legs: [0.9, 1.1], torso: [0.9, 1.1], shoulders: [0.9, 1.12], neck: [0.85, 1.2], head: [0.9, 1.12],
-  hands: [0.9, 1.15], feet: [0.9, 1.15],
+  legs: [0.96, 1.04], torso: [0.96, 1.04], shoulders: [0.94, 1.08], neck: [0.8, 1.5], head: [0.8, 1.6],
+  hands: [0.8, 1.5], feet: [0.8, 1.5],
 } as const satisfies Record<string, readonly [number, number]>;
 export type ProportionKey = keyof typeof PROPORTION_RANGES;
 export const PROPORTION_KEYS = Object.keys(PROPORTION_RANGES) as ProportionKey[];
+/** The proportions that move where the hands sit: inside the play clamp, 1.0 in ranked / standard-frame modes. */
+export const FRAME_KEYS = ['legs', 'torso', 'shoulders'] as const satisfies readonly ProportionKey[];
+/** The proportions that never move a shoulder or a hand-bone origin: the same in every mode. */
+export const REACH_SAFE_KEYS = ['head', 'neck', 'hands', 'feet'] as const satisfies readonly ProportionKey[];
+
+/**
+ * BULK (phase 4b): per-segment girth, as a multiplier on the segment's own radius (1 = as modelled). Rendered as a
+ * procedural inflate generated at load — every vertex moves along its normal by its skin weight on the segment's bones ×
+ * (girth − 1) × the segment's measured radius — on the body AND every worn garment, so clothes follow. No bone moves, so
+ * no hitbox and no reach: the same in every mode, ranked included.
+ * TUNED (2026-10-06, phase 4b): 0.7–1.6 (thin limbs to heavy muscle; by eye in the Studio).
+ */
+export const GIRTH_KEYS = ['head', 'neck', 'chest', 'belly', 'upperArms', 'forearms', 'thighs', 'calves'] as const;
+export type GirthKey = typeof GIRTH_KEYS[number];
+export const GIRTH_RANGE = [0.7, 1.6] as const;
+
+/**
+ * PRESENTATION SCALE (phase 4b; owner decision 2026-10-06: "giant and tiny builds: Studio and photo only"). A whole-body
+ * size beyond the play clamp, for the giant warlord or the tiny mascot. It is a SLOT field (CreatorSlotV2.presentation),
+ * never part of the doc, so identityFrom — which every mode spawns through — never sees it; only a Studio or photo scene
+ * reads it, from its own scene metadata (lib/babylon/creator/shape/presentation.ts). Every mode keeps the play clamp.
+ */
+export const PRESENTATION_RANGE = [0.6, 1.35] as const;
+export interface SlotPresentation { scale: number }
 
 /** Numeric ranges the sanitiser clamps to. Part positions are metres from the bone's joint along the bone's own REST
  *  frame (lib/creator/look/parts.ts says which way each axis runs; phase 2 measures it off the rig, rigFrames.ts). */
@@ -188,6 +224,9 @@ export interface PaintLayer {
 export interface CreatorShape {
   face: Partial<Record<ShapeFaceKey, number>>;
   body: Partial<Record<ProportionKey, number>>;
+  /** Phase 4b: bulk per segment (GIRTH_KEYS). Optional and stored only when something is set (a phase 1–4a doc is
+   *  unchanged). */
+  girth?: Partial<Record<GirthKey, number>>;
 }
 
 /** What `flags.hide` can take off the body (phase 4a, tool #4). Visual only: the eyeballs and hair are hidden meshes, the
@@ -271,6 +310,9 @@ export interface CreatorSlotV2 {
   /** face morph weights (the face scan writes these): numbers, so the numbers opt-in only */
   sliders?: Partial<Record<ShapeFaceKey, number>>;
   frame?: SlotFrame;
+  /** Phase 4b: the Studio / photo size (PRESENTATION_RANGE). Read ONLY by a Studio or photo scene; never by identityFrom
+   *  or any mode. A number, so stored only with the numbers opt-in, like the frame. */
+  presentation?: SlotPresentation;
   /** worn items per wearable slot; ownership-filtered on save (lib/closet/ownership.filterEquipped) */
   equipped?: Partial<Record<'headwear' | 'tops' | 'shorts' | 'shoes' | 'accessory', string | null>>;
   doc: CreatorDoc;
@@ -283,7 +325,8 @@ export function emptyCreatorDoc(): CreatorDoc {
 /** True when the doc changes nothing (so a save can omit it). */
 export function isEmptyCreatorDoc(d: CreatorDoc): boolean {
   return !d.parts.length && !d.paint.length && !Object.keys(d.colours).length
-    && !Object.keys(d.shape.face).length && !Object.keys(d.shape.body).length && !d.flags.suit
+    && !Object.keys(d.shape.face).length && !Object.keys(d.shape.body).length && !Object.keys(d.shape.girth ?? {}).length
+    && !d.flags.suit
     && !Object.keys(d.flags.hide ?? {}).length && !Object.keys(d.eyes ?? {}).length;
 }
 

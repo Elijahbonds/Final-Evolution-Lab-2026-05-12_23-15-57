@@ -11,7 +11,8 @@ import { defaultFace } from '../../closet/wearable-catalog';
 const ADULT = decideLookHold(true, false, false);
 const ADULT_NUMBERS = decideLookHold(true, true, false);
 const MINOR = decideLookHold(false, true, true);
-const DOC = { v: 1, colours: { jersey: '#ff0000' }, shape: { face: { faceLong: 0.5 }, body: { legs: 1.05 } } };
+// phase 4b (test changed): legs 1.05 → 1.03, inside the new legs range (the play clamp, 0.96–1.04)
+const DOC = { v: 1, colours: { jersey: '#ff0000' }, shape: { face: { faceLong: 0.5 }, body: { legs: 1.03 } } };
 const OLD = { v: 1, colours: { shoes: '#00ff00' } };
 
 describe('holdCreator', () => {
@@ -20,7 +21,7 @@ describe('holdCreator', () => {
   });
   it('an adult stores the sanitised doc; shape numbers only with the numbers opt-in', () => {
     expect(holdCreator({ creator: DOC }, null, ADULT)).toEqual({ creator: { v: 1, parts: [], paint: [], colours: { jersey: '#FF0000' }, shape: { face: {}, body: {} }, flags: { suit: false } } });
-    expect(holdCreator({ creator: DOC }, null, ADULT_NUMBERS).creator!.shape).toEqual({ face: { faceLong: 0.5 }, body: { legs: 1.05 } });
+    expect(holdCreator({ creator: DOC }, null, ADULT_NUMBERS).creator!.shape).toEqual({ face: { faceLong: 0.5 }, body: { legs: 1.03 } });
   });
   it('a request that leaves the doc out keeps the stored one (the Athlete Creator never wipes it)', () => {
     expect(holdCreator({ hairStyle: 'Afro' }, { creator: OLD, creatorSlots: [{ label: 'one', doc: OLD }] }, ADULT)).toEqual({

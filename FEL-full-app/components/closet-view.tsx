@@ -19,20 +19,20 @@ import {
 } from '@/lib/closet/wearable-catalog';
 import { faceFieldRenders, faceOptionRenders, type FaceField } from '@/lib/babylon/core/faceMorphs';
 import { accessoriesForEquipped, wornPartsForEquipped } from '@/lib/closet/wearableAccessories';
-import { MAX_SLOTS, emptyCreatorDoc, type ColourSlot, type CreatorEyes, type CreatorPart, type CreatorSlotV2, type HideKey, type PaintLayer, type SlotBody, type SlotFrame } from '@/lib/creator/look/doc';
+import { MAX_SLOTS, emptyCreatorDoc, type ColourSlot, type CreatorEyes, type CreatorPart, type CreatorShape, type CreatorSlotV2, type HideKey, type PaintLayer, type SlotBody, type SlotFrame } from '@/lib/creator/look/doc';
 import { readCreatorDoc, faceOnly, type StoredFace } from '@/lib/creator/look/storage';
 import {
   addSlot, blankSlot, canAddSlot, duplicateSlot, ensureSlots, heroBodyForSlot, mergeDeviceNumbers, newSlotId, newSlotLabel,
   removeSlot, renameSlot, replaceSlot, slotBodyOf, slotFace, withFace,
 } from '@/lib/creator/look/slots';
 import { decodeSlotCode, encodeSlotCode, type DecodeError } from '@/lib/creator/look/shareCode';
-import { sanitizeStampText } from '@/lib/creator/look/sanitize';
 import type { HeroBodyKind } from '@/lib/babylon/core/heroBody';
 import { SlotBar } from '@/components/closet/slot-bar';
 import { BodyControls, ColourRow, EyeControls, HideControls } from '@/components/closet/character-controls';
 import { effectivePalette } from '@/lib/creator/look/palette';
 import { canRedo, canUndo, createHistory, pushHistory, redo, undo, type History } from '@/lib/creator/look/history';
-import { RANDOM_SECTIONS, RANDOM_SECTION_FIELDS, randomiseLook, type RandomSection } from '@/lib/creator/look/randomise';
+import { RANDOM_SECTIONS, RANDOM_SECTION_FIELDS, randomiseLook, randomiseShape, type RandomSection, type ShapeRandomSection } from '@/lib/creator/look/randomise';
+import { sanitizeSlotPresentation, sanitizeStampText } from '@/lib/creator/look/sanitize';
 
 // The 3D preview is client-only (Babylon engine on a canvas) — never SSR it.
 const AvatarPreview = dynamic(() => import('@/components/closet/avatar-preview'), { ssr: false });
@@ -40,6 +40,8 @@ const AvatarPreview = dynamic(() => import('@/components/closet/avatar-preview')
 const PartsTab = dynamic(() => import('@/components/closet/parts-tab').then((m) => m.PartsTab), { ssr: false });
 // CREATOR-PLAN phase 3: the Paint tab (fills, patterns, stamps, text, suit mode).
 const PaintTab = dynamic(() => import('@/components/closet/paint-tab').then((m) => m.PaintTab), { ssr: false });
+// CREATOR-PLAN phase 4b: the Shape tab (proportions, bulk, the Studio size).
+const ShapeTab = dynamic(() => import('@/components/closet/shape-tab').then((m) => m.ShapeTab), { ssr: false });
 
 type Equipped = Record<WearableSlot, string | null>;
 type CardSkin = { id: string; displayName: string; accent: string; rarity: string };
@@ -137,6 +139,7 @@ export function ClosetView({ adult = false }: { adult?: boolean }) {
   /** every slot, with the working copy in it */
   const allSlots = useMemo(() => replaceSlot(slots, slot), [slots, slot]);
   const [locks, setLocks] = useState<RandomSection[]>([]);
+  const [shapeLocks, setShapeLocks] = useState<ShapeRandomSection[]>([]);
   // the selected character's worn items (each slot wears its own; the save filters them through what you own)
   const equipped = useMemo(() => ({ ...defaultEquipped(), ...(slot.equipped ?? {}) }) as Equipped, [slot]);
   const setEquipped = (fn: (p: Equipped) => Equipped) => setSlot((s) => ({ ...s, equipped: fn({ ...defaultEquipped(), ...(s.equipped ?? {}) } as Equipped) }));
@@ -144,7 +147,7 @@ export function ClosetView({ adult = false }: { adult?: boolean }) {
   const [owned, setOwned] = useState<Set<string>>(new Set());
   const [skins, setSkins] = useState<CardSkin[]>([]);
   const [skinCardId, setSkinCardId] = useState<string | null>(null);
-  const [tab, setTab] = useState<'face' | 'parts' | 'paint' | 'wear' | 'skins'>('face');
+  const [tab, setTab] = useState<'face' | 'shape' | 'parts' | 'paint' | 'wear' | 'skins'>('face');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [buying, setBuying] = useState<string | null>(null);
@@ -253,6 +256,7 @@ export function ClosetView({ adult = false }: { adult?: boolean }) {
     };
     if (r.slot?.sliders) s.sliders = r.slot.sliders;
     if (r.slot?.frame) s.frame = r.slot.frame;
+    if (r.slot?.presentation) s.presentation = r.slot.presentation;
     goTo(addSlot(allSlots, s), s.id);
     toast.success('Added as a new character — Save to keep it.');
     return null;
@@ -307,6 +311,22 @@ export function ClosetView({ adult = false }: { adult?: boolean }) {
   const setHide = (h: Partial<Record<HideKey, true>>) => setFace((p) => {
     const d = readCreatorDoc(p) ?? emptyCreatorDoc();
     return { ...p, creator: { ...d, flags: { ...d.flags, hide: h } } };
+  });
+  /** The Creator doc's shape (CREATOR-PLAN phase 4b): proportions and bulk. A drag passes a group so it is one undo step. */
+  const setShape = (next: CreatorShape, group?: string) => setFace((p) => {
+    const d = readCreatorDoc(p) ?? emptyCreatorDoc();
+    return { ...p, creator: { ...d, shape: { ...next, face: d.shape.face } } };
+  }, group);
+  /** The slot's Studio size (phase 4b): a slot field, never the doc, so no mode can read it. */
+  const setPresentation = (scale: number | null, group?: string) => setSlot((s) => {
+    const n = { ...s };
+    const p = scale == null ? undefined : sanitizeSlotPresentation({ scale });
+    if (p) n.presentation = p; else delete n.presentation;
+    return n;
+  }, group);
+  const rollShape = () => setFace((p) => {
+    const d = readCreatorDoc(p) ?? emptyCreatorDoc();
+    return { ...p, creator: { ...d, shape: randomiseShape(d.shape, shapeLocks) } };
   });
   const roll = () => setFace((p) => {
     const r = randomiseLook({ face: faceOnly(p) as FaceConfig, doc: readCreatorDoc(p) }, locks);
@@ -401,7 +421,7 @@ export function ClosetView({ adult = false }: { adult?: boolean }) {
           {/* The actual game model (forged fel-hero) wearing the draft look —
               what you design here is what spawns in every mode. */}
           <AvatarPreview face={previewFace} palette={previewPalette} jersey={jersey} wardrobe={{ tops: equipped.tops ?? null, shorts: equipped.shorts ?? null, shoes: equipped.shoes ?? null }} accessories={previewAccessories} creator={doc} wornParts={previewWornParts}
-            body={heroBodyForSlot(slot.body, { scanOwned, fallback: serverBody })} frame={slot.frame ?? null} />
+            body={heroBodyForSlot(slot.body, { scanOwned, fallback: serverBody })} frame={slot.frame ?? null} presentation={slot.presentation?.scale ?? null} />
           <div className="mt-3">
             <FacePreview face={face} accent={accent} />
           </div>
@@ -443,8 +463,9 @@ export function ClosetView({ adult = false }: { adult?: boolean }) {
         )}
         {/* editor column */}
         <div>
-          <div className="mb-4 flex gap-2">
+          <div className="mb-4 flex flex-wrap gap-2">
             <Chip label="Face" active={tab === 'face'} onClick={() => setTab('face')} />
+            <Chip label="Shape" active={tab === 'shape'} onClick={() => setTab('shape')} />
             <Chip label="Parts" active={tab === 'parts'} onClick={() => setTab('parts')} />
             <Chip label="Paint" active={tab === 'paint'} onClick={() => setTab('paint')} />
             <Chip label="Wearables" active={tab === 'wear'} onClick={() => setTab('wear')} />
@@ -515,6 +536,15 @@ export function ClosetView({ adult = false }: { adult?: boolean }) {
                   <button type="button" onClick={() => setFace((p) => ({ ...p, sliders: {} }))} className="text-[11px] text-cyan-300/80 hover:text-cyan-200">Reset sculpt</button>
                 </div>
               </Group>
+            </motion.div>
+          )}
+
+          {tab === 'shape' && (
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+              <ShapeTab shape={doc?.shape ?? emptyCreatorDoc().shape} presentation={slot.presentation?.scale ?? null}
+                onShape={setShape} onPresentation={setPresentation} locks={shapeLocks} onLocks={setShapeLocks} onRoll={rollShape}
+                canUndo={canUndo(hist)} canRedo={canRedo(hist)} onUndo={() => setHist(undo)} onRedo={() => setHist(redo)}
+                numbersSaved={consent.saveLookNumbers && adult} />
             </motion.div>
           )}
 

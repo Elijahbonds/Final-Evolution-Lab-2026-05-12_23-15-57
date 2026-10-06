@@ -6,6 +6,8 @@
 //     join spawn.meshes; the paint texture is the tier's size;
 //   - COSMETIC ONLY: both hand bones' world positions and the root's scale are IDENTICAL with and without the recipe
 //     (its eyes, hide flags, paint, parts and its own height / build included) — no reach, no hitbox drift.
+//   - phase 4b (shape v2): still identical with each recipe's head / neck / hand / foot scale, its bulk, its legs /
+//     torso / shoulders (exactly 1.0 here, a standard-frame mode) and its Studio-only presentation size (never in a mode).
 import { readFileSync } from 'node:fs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ArcRotateCamera, NullEngine, Scene, SceneLoader, Vector3 } from '@babylonjs/core';
@@ -19,6 +21,8 @@ import { partsOn } from './parts/renderParts';
 import { PAINT_SIZES, flushPaint, paintStats, setPaintBaseReader } from './paint/renderPaint';
 import { defaultFace } from '../../closet/wearable-catalog';
 import { isEyeMesh } from './eyes/renderEyes';
+import { bodyMeshOf, shapeTargetOf } from './shape/renderShape';
+import { FRAME_KEYS, REACH_SAFE_KEYS } from '../../creator/look/doc';
 
 const kits: Record<'male' | 'female', AssetContainer> = {} as never;
 let scene: Scene;
@@ -85,6 +89,18 @@ describe('the ten archetypes on the real kit (a dunk scene)', () => {
         for (const t of st!.targets) expect(t.size).toBe(PAINT_SIZES.mobile[t.kind as 'skin' | 'garment']);
       }
       // the eyes follow the hide flag
+      // phase 4b: the frame keys play at 1.0 in this standard-frame mode; the reach-safe keys and the bulk are the recipe's
+      const sh = a.slot.doc.shape;
+      const shaped = Object.keys(sh.body).length || Object.keys(sh.girth ?? {}).length;
+      if (shaped) {
+        const applied = s.root.metadata.felShape;
+        for (const k of FRAME_KEYS) expect(applied.body[k]).toBe(1);
+        for (const k of REACH_SAFE_KEYS) expect(applied.body[k]).toBe(sh.body[k] ?? 1);
+        const morphs = Object.keys(sh.girth ?? {}).length || (sh.body.hands ?? 1) !== 1 || (sh.body.feet ?? 1) !== 1;
+        if (morphs) expect(shapeTargetOf(bodyMeshOf(s.meshes)!)!.influence).toBe(1);
+      }
+      // the Studio size is never applied in a mode: the root scale check above already includes it
+      expect(s.root.metadata.felPresentationScale).toBeUndefined();
       const eyes = s.meshes.find(isEyeMesh)!;
       const hid = !!(a.slot.doc.flags.hide?.eyes || a.slot.doc.flags.hide?.head);
       expect(eyes.isVisible).toBe(!hid);

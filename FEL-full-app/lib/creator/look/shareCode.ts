@@ -14,7 +14,8 @@
 // uses. The checksum is for typos, not security (anyone can recompute it). Pure; works in the browser and in node.
 //
 // V2 (IMPROVE (2026-10-06), CREATOR-PLAN phase 4a): a code can carry a WHOLE SLOT — the doc and the base as before, plus
-// `k: { body, sliders?, frame? }` — so a character made in one account loads as a new slot in another.
+// `k: { body, sliders?, frame?, presentation? }` — so a character made in one account loads as a new slot in another
+// (phase 4b added the Studio size; an older decoder ignores it).
 //
 //   FEL2.<payload>.<check>   payload = base64url of the JSON DEFLATED (CompressionStream 'deflate-raw'): a worst-case
 //                            slot is ~4× shorter than v1's plain base64, which is what lets it ride on a photo card.
@@ -26,8 +27,8 @@
 // (which a face scan writes) ride only when the player asks (`numbers: true`); the height and build always do.
 // Decoding re-sanitises everything, and a deflated payload is inflated at most MAX_INFLATED_CHARS (no zip bombs).
 
-import { CREATOR_DOC_VERSION, type CreatorDoc, type CreatorPart, type PaintLayer, type CreatorSlotV2, type SlotFrame } from './doc';
-import { sanitizeCreatorDoc, sanitizeLookBase, sanitizeSlotFrame, type LookBase } from './sanitize';
+import { CREATOR_DOC_VERSION, type CreatorDoc, type CreatorPart, type PaintLayer, type CreatorSlotV2, type SlotFrame, type SlotPresentation } from './doc';
+import { sanitizeCreatorDoc, sanitizeLookBase, sanitizeSlotFrame, sanitizeSlotPresentation, type LookBase } from './sanitize';
 import { sanitizeFaceSliders } from '../../closet/wearable-catalog';
 
 export const SHARE_CODE_VERSION = 1;
@@ -40,7 +41,7 @@ export const MAX_SHARE_CODE_CHARS = 40_000;
 
 export type DecodeError = 'empty' | 'too_long' | 'not_a_code' | 'unsupported_version' | 'corrupt' | 'invalid';
 /** What a slot code adds to a look (phase 4a). Absent on a phase-1 code. */
-export interface SlotExtras { body: 'male' | 'female'; sliders?: CreatorSlotV2['sliders']; frame?: SlotFrame }
+export interface SlotExtras { body: 'male' | 'female'; sliders?: CreatorSlotV2['sliders']; frame?: SlotFrame; presentation?: SlotPresentation }
 export type DecodeResult = { ok: true; doc: CreatorDoc; base: LookBase; slot?: SlotExtras } | { ok: false; error: DecodeError };
 
 // ── base64url over UTF-8 ─────────────────────────────────────────────────────────────────────────────────────────────
@@ -105,7 +106,7 @@ function compactDoc(d: CreatorDoc): Record<string, unknown> {
   if (d.parts.length) o.parts = d.parts.map(compactPart);
   if (d.paint.length) o.paint = d.paint.map(compactLayer);
   if (Object.keys(d.colours).length) o.colours = d.colours;
-  if (Object.keys(d.shape.face).length || Object.keys(d.shape.body).length) o.shape = d.shape;
+  if (Object.keys(d.shape.face).length || Object.keys(d.shape.body).length || Object.keys(d.shape.girth ?? {}).length) o.shape = d.shape;
   if (d.flags.suit || d.flags.hide) o.flags = { ...(d.flags.suit ? { suit: true } : {}), ...(d.flags.hide ? { hide: d.flags.hide } : {}) };
   if (d.eyes) o.eyes = d.eyes;
   return o;
@@ -155,6 +156,8 @@ function sanitizeExtras(raw: unknown): SlotExtras | undefined {
   if (sliders) out.sliders = sliders;
   const frame = sanitizeSlotFrame(k.frame);
   if (frame) out.frame = frame;
+  const presentation = sanitizeSlotPresentation(k.presentation);
+  if (presentation) out.presentation = presentation;
   return out;
 }
 
@@ -196,7 +199,7 @@ async function inflateRaw(bytes: Uint8Array, limit: number): Promise<Uint8Array 
 }
 
 /** The JSON a slot code carries: never the label, the worn items, or a scan. */
-function slotPayload(slot: Pick<CreatorSlotV2, 'body' | 'base' | 'sliders' | 'frame' | 'doc'>, numbers: boolean): Record<string, unknown> {
+function slotPayload(slot: Pick<CreatorSlotV2, 'body' | 'base' | 'sliders' | 'frame' | 'doc' | 'presentation'>, numbers: boolean): Record<string, unknown> {
   const clean = sanitizeCreatorDoc(slot.doc) ?? sanitizeCreatorDoc({ v: CREATOR_DOC_VERSION })!;
   const b = sanitizeLookBase(slot.base);
   const k: Record<string, unknown> = { body: slot.body === 'female' ? 'female' : 'male' };
@@ -204,6 +207,9 @@ function slotPayload(slot: Pick<CreatorSlotV2, 'body' | 'base' | 'sliders' | 'fr
   if (sliders) k.sliders = sliders;
   const frame = sanitizeSlotFrame(slot.frame);
   if (frame) k.frame = frame;
+  // phase 4b: the Studio size rides like the height and build (a giant should arrive a giant in the importer's Studio)
+  const presentation = sanitizeSlotPresentation(slot.presentation);
+  if (presentation) k.presentation = presentation;
   return Object.keys(b).length ? { d: compactDoc(clean), b, k } : { d: compactDoc(clean), k };
 }
 
@@ -211,7 +217,7 @@ function slotPayload(slot: Pick<CreatorSlotV2, 'body' | 'base' | 'sliders' | 'fr
  * Encode a whole slot. Deflated (FEL2) where CompressionStream exists, else the v1-style FEL1 with the slot fields riding
  * in `k`. `numbers` puts the face sliders in (off by default: a face scan writes them).
  */
-export async function encodeSlotCode(slot: Pick<CreatorSlotV2, 'body' | 'base' | 'sliders' | 'frame' | 'doc'>, o: { numbers?: boolean } = {}): Promise<string> {
+export async function encodeSlotCode(slot: Pick<CreatorSlotV2, 'body' | 'base' | 'sliders' | 'frame' | 'doc' | 'presentation'>, o: { numbers?: boolean } = {}): Promise<string> {
   const json = JSON.stringify(slotPayload(slot, o.numbers === true));
   const z = await deflateRaw(new TextEncoder().encode(json));
   if (!z) {

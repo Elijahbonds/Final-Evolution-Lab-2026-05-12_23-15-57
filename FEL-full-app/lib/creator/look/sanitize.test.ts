@@ -101,19 +101,20 @@ describe('the doc', () => {
     const d = sanitizeCreatorDoc(doc({
       name: 'Real Person', email: 'a@b.c', scan: { landmarks: [1, 2] },
       colours: { jersey: '#123456', skin: '#ffffff', email: '#000000' },
-      shape: { face: { faceLong: 0.5, noseWidth: 1 }, body: { legs: 1.05, arms: 1.2 }, sliders: {} },
+      shape: { face: { faceLong: 0.5, noseWidth: 1 }, body: { legs: 1.03, arms: 1.2 }, sliders: {} },
       flags: { suit: true, godMode: true },
     }))!;
     expect(Object.keys(d).sort()).toEqual(['colours', 'flags', 'paint', 'parts', 'shape', 'v']);
     expect(d.colours).toEqual({ jersey: '#123456' });
-    expect(d.shape).toEqual({ face: { faceLong: 0.5 }, body: { legs: 1.05 } });
+    expect(d.shape).toEqual({ face: { faceLong: 0.5 }, body: { legs: 1.03 } });
     expect(d.flags).toEqual({ suit: true });
     expect(JSON.stringify(d)).not.toMatch(/Real Person|a@b\.c|landmarks|arms|godMode/);
   });
   it('clamps shape values to their ranges (and has no arm proportion: REACH-FREEZE)', () => {
     const d = sanitizeCreatorDoc(doc({ shape: { face: { jawOpen: 4, browRaise: -1 }, body: { legs: 3, neck: 0.1, head: NaN } } }))!;
     expect(d.shape.face).toEqual({ jawOpen: 1, browRaise: 0 });
-    expect(d.shape.body).toEqual({ legs: 1.1, neck: 0.85 });
+    // phase 4b (test changed: the ranges are what 4b retuned): legs to the play clamp's top, the neck to its new floor
+    expect(d.shape.body).toEqual({ legs: 1.04, neck: 0.8 });
   });
   it('holds the budgets: first 64 parts, first 24 layers, duplicate ids dropped', () => {
     const parts = Array.from({ length: 100 }, (_, i) => part({ id: `p${i}` }));

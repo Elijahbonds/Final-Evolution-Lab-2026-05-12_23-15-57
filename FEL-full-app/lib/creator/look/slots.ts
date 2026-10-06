@@ -91,6 +91,8 @@ export function activeLook(face: unknown): ActiveLook {
   const id = activeSlotId(face, slots);
   const slot = id ? slots.find((s) => s.id === id)! : null;
   if (slot) {
+    // Phase 4b: NOT the slot's `presentation` (the Studio / photo size). Every mode spawns through this reader (via
+    // identityFrom), and the owner's rule is that giant and tiny builds show only in the Studio and photo mode.
     return {
       slot, face: faceOfSlot(slot), doc: isEmptyCreatorDoc(slot.doc) ? null : slot.doc, body: slot.body,
       frame: slot.frame ?? null, equipped: slot.equipped ?? null,
@@ -250,6 +252,7 @@ export function mergeDeviceNumbers(server: unknown, device: unknown): Obj {
       const next: CreatorSlotV2 = { ...s, doc: { ...s.doc, shape: d.doc.shape } };
       if (d.sliders) next.sliders = d.sliders;
       if (d.frame) next.frame = d.frame;
+      if (d.presentation) next.presentation = d.presentation;   // phase 4b: the Studio size is a number too
       return next;
     });
   }
