@@ -118,9 +118,9 @@ class VoiceKitImpl {
       src.connect(gain).connect(dest);
       const t0 = g.ctx.currentTime + 0.05;
       src.start(t0);
-      this.duck(g.crowdDuck, t0, t0 + buf.duration);
-      const rec = { src, gain, channel: 'booth' as const };
-      this.live.add(rec); src.onended = () => this.live.delete(rec);
+      SoundKit.duckForVoice(t0, t0 + buf.duration, court);   // the voiceover lane's one duck for every foreground voice
+      const rec: LiveRec = { id: ++this.seq, src, gain, channel: 'booth' };
+      this.live.add(rec); src.onended = () => { this.live.delete(rec); };
       onStart?.();
       return true;
     } catch { return false; }
