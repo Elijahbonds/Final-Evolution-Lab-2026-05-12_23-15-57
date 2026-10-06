@@ -27,6 +27,15 @@ export const SPRINT_TUNING: SprintTuning = {
   raceDistanceM: 100, // TUNE(elijah) — dash length
 };
 
+/**
+ * IMPROVE (2026-10-06): the SET hold's random spread, ms. READY 900 ms and SET 700 ms were fixed, so the gun could be
+ * timed from memory and a "reaction" was a rehearsed count. The Babylon sprint draws each SET hold uniformly from
+ * [setMs, setMs + SPRINT_SET_JITTER_MS] — never SHORTER than the signed-off 700 ms, at most 1.3 s. Opt-in through
+ * makeSprintSkin({ setHoldMs }): SPRINT_TUNING itself is unchanged, so the 2D surface and every fixed-clock test are too.
+ * // TUNE(elijah)
+ */
+export const SPRINT_SET_JITTER_MS = 600;
+
 /** Sprint sensory presets. // TUNE(elijah) */
 export const SPRINT_SENSORY: SprintSensory = {
   gun: { sfx: 'impact', volume: 0.6 }, // TUNE(elijah) — the starting gun
