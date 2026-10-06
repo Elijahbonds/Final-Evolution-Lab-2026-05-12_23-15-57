@@ -13,7 +13,7 @@ const VENUES = [
 const SWEEPS = [['sweep', 'Slow sweep'], ['rim', 'From the rim'], ['high', 'High and wide'], ['low', 'Low along the floor']] as const;
 const blank = (): SceneQuestion => ({ prompt: '', options: ['', '', '', ''], answer: 0 });
 
-export default function SceneMode({ onPublish }: { onPublish: (p: ScenePublishPayload) => void }) {
+export default function SceneMode({ onPublish, submitLabel = 'Submit pack for review' }: { onPublish: (p: ScenePublishPayload) => void; submitLabel?: string }) {
   const [venueId, setVenueId] = useState<string>(VENUES[0][0]);
   const [cameraPath, setCameraPath] = useState<string>(SWEEPS[0][0]);
   const [title, setTitle] = useState('');
@@ -46,7 +46,7 @@ export default function SceneMode({ onPublish }: { onPublish: (p: ScenePublishPa
         ))}
         {qs.length < 8 && <button onClick={() => setQs((a) => [...a, blank()])} className="rounded-lg bg-neutral-800 px-3 py-2 text-sm">+ question</button>}
       </div>
-      <button disabled={!ready} onClick={() => onPublish({ venueId, cameraPath, questions: qs, title })} className="mt-6 rounded-xl bg-violet-500 px-6 py-3 font-bold text-black disabled:opacity-40">Submit pack for review</button>
+      <button disabled={!ready} onClick={() => onPublish({ venueId, cameraPath, questions: qs, title })} className="mt-6 rounded-xl bg-violet-500 px-6 py-3 font-bold text-black disabled:opacity-40">{submitLabel}</button>
     </div>
   );
 }
