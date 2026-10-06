@@ -52,6 +52,9 @@ export interface CardInput {
   backdrop?: keyof typeof CARD_BACKDROPS | string;
   frame?: CardFrame;
   accent?: string;
+  /** the page's real font families (next/font names them by a hash, so the canvas needs the resolved names; the
+   *  photo mode reads them off the CSS variables) — a generic monospace when absent */
+  fonts?: { display?: string; mono?: string };
 }
 
 export interface CardLayout { w: number; h: number; ops: CardOp[]; codeLines: string[]; codeSize: number }
@@ -104,11 +107,13 @@ export function cardLayout(i: CardInput): CardLayout {
     }
   }
   const nameY = SHOT.y + SHOT.h + 78;
-  ops.push({ op: 'text', text: (i.label || 'MY LOOK').toUpperCase(), x: PAD, y: nameY, font: '700 64px "Chakra Petch", ui-monospace, monospace', colour: '#F2F5F9', align: 'left' });
-  ops.push({ op: 'text', text: 'FINAL EVOLUTION LAB · STUDIO', x: CARD_W - PAD, y: nameY - 6, font: '600 24px "Chakra Petch", ui-monospace, monospace', colour: accent, align: 'right' });
-  ops.push({ op: 'text', text: 'SHARE CODE — paste it in the Studio to load this look', x: PAD, y: CODE_TOP - 22, font: '500 22px "Chakra Petch", ui-monospace, monospace', colour: '#8B97A5', align: 'left' });
+  const display = `${i.fonts?.display ? `${i.fonts.display}, ` : ''}"Chakra Petch", ui-monospace, monospace`;
+  const mono = `${i.fonts?.mono ? `${i.fonts.mono}, ` : ''}"JetBrains Mono", ui-monospace, monospace`;
+  ops.push({ op: 'text', text: (i.label || 'MY LOOK').toUpperCase(), x: PAD, y: nameY, font: `700 64px ${display}`, colour: '#F2F5F9', align: 'left' });
+  ops.push({ op: 'text', text: 'FINAL EVOLUTION LAB · STUDIO', x: CARD_W - PAD, y: nameY - 6, font: `600 24px ${display}`, colour: accent, align: 'right' });
+  ops.push({ op: 'text', text: 'SHARE CODE — paste it in the Studio to load this look', x: PAD, y: CODE_TOP - 22, font: `500 22px ${display}`, colour: '#8B97A5', align: 'left' });
   fit.lines.forEach((line, k) => {
-    ops.push({ op: 'text', text: line, x: PAD, y: CODE_TOP + (k + 1) * fit.size * LINE - fit.size * 0.3, font: `500 ${fit.size}px "JetBrains Mono", ui-monospace, monospace`, colour: '#F2F5F9', align: 'left' });
+    ops.push({ op: 'text', text: line, x: PAD, y: CODE_TOP + (k + 1) * fit.size * LINE - fit.size * 0.3, font: `500 ${fit.size}px ${mono}`, colour: '#F2F5F9', align: 'left' });
   });
   return { w: CARD_W, h, ops, codeLines: fit.lines, codeSize: fit.size };
 }

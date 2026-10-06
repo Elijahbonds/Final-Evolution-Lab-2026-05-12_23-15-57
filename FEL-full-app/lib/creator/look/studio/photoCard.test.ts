@@ -98,3 +98,13 @@ describe('teens: nothing is uploaded', () => {
     }
   });
 });
+
+describe('the card uses the page\'s real fonts', () => {
+  it('the resolved families lead every text op (next/font hashes their names)', () => {
+    const L = cardLayout({ label: 'x', code: 'FEL2.abc', fonts: { display: "'__chakra_abc'", mono: "'__mono_def'" } });
+    const fonts = L.ops.filter((o) => o.op === 'text').map((o) => (o as { font: string }).font);
+    expect(fonts.filter((f) => f.includes("'__chakra_abc', \"Chakra Petch\"")).length).toBe(3);
+    expect(fonts.filter((f) => f.includes("'__mono_def', \"JetBrains Mono\"")).length).toBe(L.codeLines.length);
+    expect(cardLayout({ label: 'x', code: 'y' }).ops.find((o) => o.op === 'text')).toMatchObject({ font: '700 64px "Chakra Petch", ui-monospace, monospace' });
+  });
+});

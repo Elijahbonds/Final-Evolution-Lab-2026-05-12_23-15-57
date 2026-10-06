@@ -243,7 +243,11 @@ export default function AvatarPreview(props: AvatarPreviewProps) {
       // ── framing: the tab or the selection decides the shot ──────────────────────────────────────────────────────
       reframeRef.current = () => {
         const st = studioRef.current;
-        if (st) stage.frame(framingFor(st.tab, st.focus));
+        if (!st) return;
+        const f = framingFor(st.tab, st.focus);
+        // a selection turns the body to show it, which stops the turntable: say so, so the Spin button agrees
+        if (f.facing != null && stage.autoSpin) st.events.onSpin?.(false);
+        stage.frame(f);
       };
       reframeRef.current();
 
@@ -571,7 +575,7 @@ export default function AvatarPreview(props: AvatarPreviewProps) {
         {knob('rotate', 'Turn the part: drag round the ring', { left: 'var(--ring)', top: 0 }, '⟳')}
         {knob('scale', 'Resize the part: drag out or in', { left: 'calc(var(--ring) * 0.7071)', top: 'calc(var(--ring) * 0.7071)' }, '⤡')}
       </div>
-      {perfOn && <pre ref={perfRef} className="pointer-events-none absolute bottom-2 left-2 z-20 rounded bg-black/70 px-2 py-1 font-mono text-[10px] leading-tight text-emerald-300" />}
+      {perfOn && <pre ref={perfRef} className="pointer-events-none absolute left-2 top-24 z-20 rounded bg-black/70 px-2 py-1 font-mono text-[10px] leading-tight text-emerald-300" />}
     </div>
   );
 }

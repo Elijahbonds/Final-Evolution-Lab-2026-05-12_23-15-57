@@ -8,18 +8,19 @@ import { PAINT_REGIONS, PART_BONES } from '../doc';
 
 describe('which shot the editor wants', () => {
   it('each tab without a selection', () => {
-    expect(framingFor('face', null)).toEqual({ shot: 'face', facing: null });
+    expect(framingFor('face', null)).toEqual({ shot: 'bust', facing: null });
     for (const t of ['shape', 'parts', 'paint', 'wear', 'skins'] as const) expect(framingFor(t, null).shot).toBe('full');
   });
   it('a selected part frames its bone: head and chest in the bust, legs in the full body', () => {
-    expect(framingFor('parts', { kind: 'part', bone: 'Head' }).shot).toBe('bust');
+    expect(framingFor('parts', { kind: 'part', bone: 'Head' })).toEqual({ shot: 'bust', facing: 0 });   // the front, whatever the turntable did
     expect(framingFor('parts', { kind: 'part', bone: 'Spine2' }).shot).toBe('bust');
     expect(framingFor('parts', { kind: 'part', bone: 'LeftFoot' }).shot).toBe('full');
     expect(framingFor('parts', { kind: 'part', bone: 'LeftForeArm' })).toEqual({ shot: 'full', facing: -Math.PI / 4 });
     expect(framingFor('parts', { kind: 'part', bone: 'RightArm' })).toEqual({ shot: 'bust', facing: Math.PI / 4 });
   });
   it('a selected layer frames its region and turns the back to the camera', () => {
-    expect(framingFor('paint', { kind: 'layer', region: 'face' }).shot).toBe('face');
+    expect(framingFor('paint', { kind: 'layer', region: 'face' })).toEqual({ shot: 'face', facing: 0 });
+    expect(framingFor('paint', { kind: 'layer', region: 'body' }).facing).toBeNull();
     expect(framingFor('paint', { kind: 'layer', region: 'torsoBack' })).toEqual({ shot: 'bust', facing: Math.PI });
     expect(framingFor('paint', { kind: 'layer', region: 'legLeft' })).toEqual({ shot: 'full', facing: -Math.PI / 4 });
     expect(framingFor('paint', { kind: 'layer', region: 'all' })).toEqual({ shot: 'full', facing: null });

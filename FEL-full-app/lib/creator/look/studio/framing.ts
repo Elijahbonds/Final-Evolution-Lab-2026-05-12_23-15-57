@@ -24,11 +24,13 @@ export interface ShotDef {
 }
 
 /** TUNED (2026-10-06, phase 4d — never seen on screen; the owner's eye is the judge): full 3.15 m at a 1.8 m body (the
- *  Closet preview's 3.1), bust frames head to mid-chest, face frames the head and a little hair above it. */
+ *  Closet preview's 3.1), bust frames head to mid-chest, face frames the head and a little hair above it. The Face tab opens
+ *  on the BUST (seen on screen 2026-10-06: a face close-up as the Studio's first frame was all hair on the turntable); the
+ *  face shot is for a face / ears layer, the camera buttons, the pad and the 3 key. */
 export const SHOTS: Record<StudioShot, ShotDef> = {
   full: { look: 0.52, distance: 1.75, beta: 1.33 },
-  bust: { look: 0.8, distance: 0.72, beta: 1.4 },
-  face: { look: 0.925, distance: 0.38, beta: 1.47 },
+  bust: { look: 0.83, distance: 0.9, beta: 1.4 },
+  face: { look: 0.9, distance: 0.42, beta: 1.47 },
 };
 
 /** The kit body's standing height (m) — the fallback when the stage has not measured one. */
@@ -64,25 +66,28 @@ export function shotForRegion(region: PaintRegion): StudioShot {
   }
 }
 
-/** The body yaw that shows a region or a bone's side to the camera: the back half-turned, a side a quarter-turn, the
- *  front (or a region that wraps the body) null. The camera looks down the body's −forward at yaw 0. */
+/** The body yaw that shows a region or a bone to the camera: the back half-turned, a side a quarter-turn, the front for
+ *  anything else on the body's front or midline (seen on screen 2026-10-06: a part selected while the turntable had
+ *  stopped on the back of the head was edited blind), null for a region that wraps the whole body. The camera looks at
+ *  the body's front at yaw 0. */
 export function facingFor(focus: StudioFocus): number | null {
   if (!focus) return null;
   if (focus.kind === 'layer') {
     if (focus.region === 'torsoBack') return Math.PI;
+    if (focus.region === 'all' || focus.region === 'body') return null;
     const side = /Left$/.test(focus.region) ? 'L' : /Right$/.test(focus.region) ? 'R' : null;
-    return side === 'L' ? -Math.PI / 4 : side === 'R' ? Math.PI / 4 : null;
+    return side === 'L' ? -Math.PI / 4 : side === 'R' ? Math.PI / 4 : 0;
   }
   if (focus.bone.startsWith('Left')) return -Math.PI / 4;
   if (focus.bone.startsWith('Right')) return Math.PI / 4;
-  return null;
+  return 0;
 }
 
 /** The framing the editor wants: the selection decides when there is one, else the tab. */
 export function framingFor(tab: StudioTab, focus: StudioFocus): Framing {
   if (tab === 'parts' && focus?.kind === 'part') return { shot: shotForBone(focus.bone), facing: facingFor(focus) };
   if (tab === 'paint' && focus?.kind === 'layer') return { shot: shotForRegion(focus.region), facing: facingFor(focus) };
-  return { shot: tab === 'face' ? 'face' : 'full', facing: null };
+  return { shot: tab === 'face' ? 'bust' : 'full', facing: null };
 }
 
 export interface CameraPose { targetY: number; radius: number; beta: number }

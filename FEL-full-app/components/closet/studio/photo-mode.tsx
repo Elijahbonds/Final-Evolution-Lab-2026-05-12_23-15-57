@@ -46,12 +46,15 @@ export function PhotoMode({ label, accent, makeCode, adult, capture, onClose, on
       const [shot, code] = await Promise.all([capture({ pose, venue: backdrop }), makeCode(adult && numbers)]);
       if (!shot) throw new Error('The stage is not ready yet.');
       const img = await loadImage(shot.url);
-      const L = cardLayout({ label, code, backdrop, frame, accent });
+      const css = getComputedStyle(document.documentElement);
+      const fonts = { display: css.getPropertyValue('--font-chakra').trim() || undefined, mono: css.getPropertyValue('--font-mono').trim() || undefined };
+      const L = cardLayout({ label, code, backdrop, frame, accent, fonts });
       const canvas = document.createElement('canvas');
       canvas.width = L.w; canvas.height = L.h;
       const ctx = canvas.getContext('2d');
       if (!ctx) throw new Error('This browser cannot draw the card.');
-      await document.fonts?.ready?.catch(() => undefined);
+      // the display face is preload:false and a canvas never asks for it: load the two faces the card draws in first
+      await Promise.all([fonts.display && document.fonts?.load(`700 64px ${fonts.display}`), fonts.mono && document.fonts?.load(`500 16px ${fonts.mono}`)].map((p) => Promise.resolve(p).catch(() => undefined)));
       drawCard(ctx as unknown as Parameters<typeof drawCard>[0], L, img, { w: shot.width, h: shot.height });
       const blob: Blob | null = await new Promise((res) => canvas.toBlob(res, 'image/png'));
       if (!blob) throw new Error('This browser cannot save the card.');

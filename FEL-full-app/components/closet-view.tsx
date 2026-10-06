@@ -581,7 +581,7 @@ export function ClosetView({ adult = false, fullBleed = false }: { adult?: boole
 
   const dirty = !!savedSig && sigNow !== savedSig;
   const stageH = fullBleed ? 'h-[100dvh]' : 'h-[calc(100dvh-3.5rem)] max-md:h-[calc(100dvh-3.5rem-4.5rem)]';
-  const hudBtn = 'pointer-events-auto flex items-center gap-1 rounded-lg border border-white/10 bg-black/55 px-2.5 py-1.5 font-display text-[10px] font-semibold uppercase tracking-wider text-white/80 backdrop-blur transition hover:border-cyan-400/50';
+  const hudBtn = 'pointer-events-auto flex items-center gap-1 rounded-lg border border-white/10 bg-black/55 px-2.5 py-1.5 max-md:px-2 max-md:py-1 font-display text-[10px] font-semibold uppercase tracking-wider text-white/80 backdrop-blur transition hover:border-cyan-400/50';
   const on = (v: boolean) => (v ? { borderColor: 'var(--fel-cyan)', color: 'var(--fel-cyan)', background: 'rgba(0,229,255,0.12)' } : undefined);
   const selLabel = tab === 'parts' && selectedPart ? `Part · ${selectedPart.shape}` : tab === 'paint' && selectedLayer ? `Layer · ${REGION_LABELS[selectedLayer.region]}` : null;
   const selMirror = tab === 'parts' ? selectedPart?.mirror : tab === 'paint' ? selectedLayer?.mirror : undefined;
@@ -601,8 +601,8 @@ export function ClosetView({ adult = false, fullBleed = false }: { adult?: boole
 
         {/* top: the title and the character, the shots and the tools */}
         <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-2 p-3">
-          <div className="min-w-0">
-            <h1 className="flex items-center gap-2 font-display text-lg font-bold uppercase tracking-[0.22em] text-white"><Shirt className="h-5 w-5 text-cyan-400" /> Studio</h1>
+          <div className="min-w-[7rem]">
+            <h1 className="flex items-center gap-2 font-display text-lg font-bold uppercase tracking-[0.22em] text-white max-md:text-base max-md:tracking-[0.15em]"><Shirt className="h-5 w-5 text-cyan-400" /> Studio</h1>
             <p className="truncate font-display text-[11px] uppercase tracking-[0.18em] text-white/55">{slot.label || 'This character'}{dirty ? ' · unsaved' : ''}</p>
             {selLabel && (
               <div className="pointer-events-auto mt-2 flex items-center gap-1.5">
@@ -621,18 +621,18 @@ export function ClosetView({ adult = false, fullBleed = false }: { adult?: boole
             )}
           </div>
           <div className="flex shrink-0 flex-col items-end gap-1.5">
-            <button onClick={() => save()} disabled={saving} className="pointer-events-auto flex items-center gap-2 rounded-xl bg-cyan-400 px-4 py-2 font-display text-xs font-bold uppercase tracking-wider text-black shadow-[0_0_18px_rgba(0,229,255,0.35)] transition hover:bg-cyan-300 disabled:opacity-60">
+            <button onClick={() => save()} disabled={saving} className="pointer-events-auto flex items-center gap-2 rounded-xl bg-cyan-400 px-4 py-2 max-md:px-3 max-md:py-1.5 font-display text-xs font-bold uppercase tracking-wider text-black shadow-[0_0_18px_rgba(0,229,255,0.35)] transition hover:bg-cyan-300 disabled:opacity-60">
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Save Look
             </button>
             <div className="flex gap-1" role="group" aria-label="Camera">
               {STUDIO_SHOTS.map((sh, i) => <button key={sh} type="button" className={hudBtn} onClick={() => act({ shot: sh })} title={`${sh} (${i + 1})`}>{sh}</button>)}
             </div>
             <div className="flex flex-wrap justify-end gap-1">
-              <button type="button" className={hudBtn} style={on(autoSpin)} onClick={() => setAutoSpin(!autoSpin)} aria-pressed={autoSpin} title="Turntable (T, pad L3) — or drag the stage to spin"><RotateCw className="h-3.5 w-3.5" /> Spin</button>
-              <button type="button" className={hudBtn} style={on(compare)} onClick={() => setCompare((c) => !c)} aria-pressed={compare} title="Before / after (B, pad Select)"><SplitSquareHorizontal className="h-3.5 w-3.5" /> Before</button>
-              <button type="button" className={hudBtn} style={on(showPose)} onClick={() => setShowPose((v) => !v)} aria-pressed={showPose} title="Poses and venue light"><Sun className="h-3.5 w-3.5" /> Pose</button>
-              <button type="button" className={hudBtn} onClick={() => setPhotoOpen(true)} title="Photo mode (P, pad Start)"><Camera className="h-3.5 w-3.5" /> Photo</button>
-              <button type="button" className={hudBtn} onClick={() => setOpenPaste((n) => n + 1)} title="Paste a share code as a new character"><ClipboardPaste className="h-3.5 w-3.5" /> Code</button>
+              <button type="button" className={hudBtn} style={on(autoSpin)} onClick={() => setAutoSpin(!autoSpin)} aria-pressed={autoSpin} title="Turntable (T, pad L3) — or drag the stage to spin"><RotateCw className="h-3.5 w-3.5" /> <span className="max-md:hidden">Spin</span></button>
+              <button type="button" className={hudBtn} style={on(compare)} onClick={() => setCompare((c) => !c)} aria-pressed={compare} title="Before / after (B, pad Select)"><SplitSquareHorizontal className="h-3.5 w-3.5" /> <span className="max-md:hidden">Before</span></button>
+              <button type="button" className={hudBtn} style={on(showPose)} onClick={() => setShowPose((v) => !v)} aria-pressed={showPose} title="Poses and venue light"><Sun className="h-3.5 w-3.5" /> <span className="max-md:hidden">Pose</span></button>
+              <button type="button" className={hudBtn} onClick={() => setPhotoOpen(true)} title="Photo mode (P, pad Start)"><Camera className="h-3.5 w-3.5" /> <span className="max-md:hidden">Photo</span></button>
+              <button type="button" className={hudBtn} onClick={() => setOpenPaste((n) => n + 1)} title="Paste a share code as a new character"><ClipboardPaste className="h-3.5 w-3.5" /> <span className="max-md:hidden">Code</span></button>
             </div>
           </div>
         </div>
@@ -657,7 +657,7 @@ export function ClosetView({ adult = false, fullBleed = false }: { adult?: boole
           </div>
         )}
 
-        <div className="pointer-events-none absolute bottom-14 left-3 z-10">
+        <div className="pointer-events-none absolute bottom-14 left-3 z-10 max-md:hidden">
           <WalkthroughCard state={walk} onNext={() => walkDo('next')} onSkip={() => walkDo('skip')} />
         </div>
 
@@ -674,6 +674,8 @@ export function ClosetView({ adult = false, fullBleed = false }: { adult?: boole
       </section>
 
       <aside aria-label="Editor" className="min-h-0 flex-1 overflow-y-auto border-t border-white/10 bg-[#0a0a0f] px-4 py-4 md:border-l md:border-t-0">
+        {/* a phone's stage is small: the walkthrough sits at the top of the editor there */}
+        <div className="mb-3 md:hidden"><WalkthroughCard state={walk} onNext={() => walkDo('next')} onSkip={() => walkDo('skip')} /></div>
         <div className="mb-4 space-y-3">
           <p className="text-[11px] text-white/45">Design your avatar&apos;s face, gear, and card skin. Everyone belongs here — the options are built to represent you. Tap the body to choose a region, drag the stage to spin, pinch or scroll to zoom.</p>
           <LookConsent adult={adult} consent={consent} onChange={(next) => { setConsent(next); writeConsent(next); }} />

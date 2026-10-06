@@ -74,7 +74,7 @@ export function SlotBar(p: SlotBarProps) {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-5" role="listbox" aria-label="Characters">
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(9.5rem,1fr))] gap-2" role="listbox" aria-label="Characters">
         {p.slots.map((s) => {
           const on = s.id === p.selected;
           const playing = s.id === p.active;
