@@ -9,6 +9,7 @@ import type { AbstractMesh, PBRMaterial, StandardMaterial } from '@babylonjs/cor
 import { MOODS, type VenueMood, type MoodCurves } from './moods';
 import { tierRigSettings, legacyAa, type QualityTier } from './QualityTier';
 import { isLegacyLook } from './graphicsSetting';
+import { mountKickerLight, type KickerHandle } from './KickerLight';
 import { mountEnvironmentIBL } from './EnvironmentIBL';
 import { motionPolicy } from '../../a11y/reducedMotion';
 
@@ -20,6 +21,8 @@ export interface LightRigHandle {
   tier: QualityTier;
   /** The mood this rig lit — after the place resolver (A9.4), so a mode can read the light it actually got. */
   mood: VenueMood;
+  /** A9.6: the players-only rim light (KickerLight.ts); null under ?look=legacy. */
+  kicker: KickerHandle | null;
   /** M44: brief exposure pulse for a highlight beat (dunk flush, TD, KO,
    *  goal) — reads as a camera-flash without a hard cut. Self-reverts. */
   flashBeat(): void;
@@ -179,12 +182,14 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
     pipeline.imageProcessing.colorCurves = moodColorCurves(M.curves);
   }
   const rest = { exposure: M.exposure, vignette: M.vignetteWeight };
+  // A9.6: a rim light on the players only — every tier (one shadowless light on a handful of bodies costs no draws)
+  const kicker = legacy ? null : mountKickerLight(scene, mood);
 
   liftBlackMaterials(scene);
 
   let flashObs: ReturnType<Scene['onBeforeRenderObservable']['add']> | null = null;
   return {
-    hemi, sun, shadows, pipeline, tier, mood, rest,
+    hemi, sun, shadows, pipeline, tier, mood, kicker, rest,
     adoptRest() {
       if (legacy) return;   // the pre-pass harness kept the mood's grade as its rest, whatever load() wrote
       rest.exposure = pipeline.imageProcessing.exposure;
@@ -210,6 +215,7 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
       if (autoObserver) scene.onNewMeshAddedObservable.remove(autoObserver);
       if (flashObs) scene.onBeforeRenderObservable.remove(flashObs);
       if ((scene.metadata as { felGradeOwner?: string } | null)?.felGradeOwner === 'rig') delete scene.metadata.felGradeOwner;
+      kicker?.dispose();
       hemi.dispose(); sun.dispose(); shadows.dispose(); pipeline.dispose();
       disposeEnv();
     },
