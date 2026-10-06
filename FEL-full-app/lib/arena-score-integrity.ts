@@ -110,6 +110,8 @@ export const MIRRORED = {
   surfRunSec: 90, surfWaveMoveLockSec: 0.55, surfFlowMax: 200, surfBarrelHoldSec: 1.5, surfBarrelBonus: 250,
   /** SnowboardSlalomMode — rideWorlds SLALOM_GATES at 100 a gate, YETI_CLEAR_PTS once a run, the time bonus (60 − t) × 10. */
   slalomGates: 30, slalomGatePts: 100, yetiClearPts: 150, snowTimeBonusMax: 600,
+  /** IMPROVE (2026-10-06, snow item 5): gateCrasher GATE_STREAK_MAX — the most a gate's streak bonus pays on top of its 100. */
+  slalomStreakMax: 50,
   /** FreeRunMode RUN_CAP_PAR × FreeRunCore's longest par (ROOKIE 55 s); FREERUN_TRICKS' best (SIDE FLIP 200) × the best
    *  LAUNCH_MULT (1.5); the biggest verb link (PARRY-VAULT 110); the move keys a combo can hold (17 verbs + 5 tricks);
    *  timeBonus 25 a second under par; the biggest routeBonus (TRACEUR 650). */
@@ -346,7 +348,7 @@ export function snowBound(): number {
     sec: UNTIMED_RUN_SEC, eventSec: BOARD_EVENT_SEC,
     perEvent: Math.max(maxOf(airPts(SNOW_TRICKS)), maxOf(m.boardCoreTrickPts), m.boardRailMax),
     multCap: trickMachineMultCap(SNOW_TRICKS.length + m.boardCoreTrickPts.length + 1),   // + the GRIND link
-    flat: m.slalomGates * m.slalomGatePts + m.yetiClearPts + m.snowTimeBonusMax,
+    flat: m.slalomGates * (m.slalomGatePts + m.slalomStreakMax) + m.yetiClearPts + m.snowTimeBonusMax,
   });
 }
 
@@ -540,7 +542,7 @@ export const SCORE_CEILINGS: Readonly<Record<string, ScoreCeiling>> = {
   snowboarding: {
     max: bound(snowBound()), kind: 'bound', swapsUnderKillSwitch: true,
     why: `${BOUND_MARGIN}× a flawless ${untimedMin}-minute run: a landing or a rail every ${BOARD_EVENT_SEC} s, every gate`,
-    basis: 'no clock (the run ends at the last gate, and a rider can stall on the slope): chainRunBound(UNTIMED_RUN_SEC, BOARD_EVENT_SEC, the biggest trick or rail, TrickMachine\'s multiplier cap) + gates + yeti + the time bonus, × BOUND_MARGIN',
+    basis: 'no clock (the run ends at the last gate, and a rider can stall on the slope): chainRunBound(UNTIMED_RUN_SEC, BOARD_EVENT_SEC, the biggest trick or rail, TrickMachine\'s multiplier cap) + gates at their streak\'s most + yeti + the time bonus, × BOUND_MARGIN',
   },
   freerun: {
     max: bound(freerunBound()), kind: 'bound', swapsUnderKillSwitch: false,

@@ -49,7 +49,7 @@ import { FREERUN_TRICKS, LAUNCH_MULT, TIERS } from './babylon/core/FreeRunCore';
 import { EVENTS_PER_NIGHT } from './babylon/core/CarnivalNight';
 import type { GrindLine } from './babylon/core/GroundRide';
 import { SNOW_SLOPE } from './babylon/modes/snowSlope';
-import { timeBonus, TIME_BONUS_MAX } from './babylon/modes/gateCrasher';   // GATE-CRASHER-POLISH-2 (GC-9): the time curve
+import { timeBonus, TIME_BONUS_MAX, gateStreakBonus, GATE_STREAK_MAX, GRAB_HOLD_MAX } from './babylon/modes/gateCrasher';   // GATE-CRASHER-POLISH-2 (GC-9): the time curve
 
 const src = (p: string) => readFileSync(join(process.cwd(), p), 'utf8');
 const num = (text: string, re: RegExp, what: string): number => {
@@ -378,7 +378,9 @@ const PERFECT_RUNS: Record<string, () => number> = {
   snowboarding: () => {
     const m = MIRRORED;
     const run = trickMachineRun([...SNOW_TRICKS.filter((t) => t.kind === 'air').map(asTrickDef), ...Object.values(TRICKS)], UNTIMED_RUN_SEC, m.boardRailMax);
-    return run + m.slalomGates * m.slalomGatePts + m.yetiClearPts + m.snowTimeBonusMax;
+    // (IMPROVE 2026-10-06, snow item 5: every gate in one streak, each paying its streak bonus on top)
+    const streak = Array.from({ length: m.slalomGates }, (_, i) => gateStreakBonus(i + 1)).reduce((a, b) => a + b, 0);
+    return run + m.slalomGates * m.slalomGatePts + streak + m.yetiClearPts + m.snowTimeBonusMax;
   },
   freerun: freerunRun,
   karateEndless: karateRun,
@@ -993,14 +995,24 @@ describe('drift guards — the numbers mirrored out of mode files still match th
     // GATE-CRASHER-POLISH-2 (GC-9): the time bonus is gateCrasher.timeBonus — a new CURVE (10 a second under 90 s, so one fall no
     // longer zeroes it), the SAME ceiling. This guard pinned the old formula's text; it now reads the function's own maximum
     // against the mirror, and that the mode pays the time through it and nothing hand-rolled beside it.
-    expect(snow).toContain('timeBonus(elapsed)');
+    // IMPROVE (2026-10-06, snow item 8): paid on the RUN time (the ride + the missed gates' penalty) — still through timeBonus
+    expect(snow).toContain('timeBonus(runT)');
+    expect(snow).toContain('const runT = runTimeSec(elapsed, misses);');
     expect(snow).not.toMatch(/Math\.round\(\(\d+ - elapsed\)/);
     expect(timeBonus(0)).toBe(MIRRORED.snowTimeBonusMax);
     expect(TIME_BONUS_MAX).toBe(MIRRORED.snowTimeBonusMax);
     expect(Math.max(...Array.from({ length: 481 }, (_, i) => timeBonus(i * 0.5)))).toBe(MIRRORED.snowTimeBonusMax);
     expect(MIRRORED.snowTimeBonusMax).toBe(60 * 10);
-    expect(snow.match(/tricks\.score \+= /g)).toHaveLength(2);                   // the yeti and a gate
-    expect(snow).toContain('rig.rider.jump(0.5 + tuck * 0.5)');
+    expect(snow.match(/tricks\.score \+= /g)).toHaveLength(3);                   // the yeti, a gate, and its streak (snow item 5)
+    expect(snow).toContain('tricks.score += streakPts;');
+    expect(snow).toContain('const streakPts = gateStreakBonus(gateStreak);');
+    expect(GATE_STREAK_MAX).toBe(MIRRORED.slalomStreakMax);
+    // (snow item 13: a clean grab held long pays up to GRAB_HOLD_MAX more — still under the bound's biggest single event)
+    expect(snow).toContain('grabHold: { fromSec: GRAB_HOLD_FROM_SEC, perSec: GRAB_HOLD_PER_SEC, max: GRAB_HOLD_MAX }');
+    const grabs = [...SNOW_TRICKS.filter((t) => t.kind === 'air').map(asTrickDef), ...Object.values(TRICKS)].filter((d) => d.turns === 0 && d.clip === 'board_grab');
+    expect(grabs.length).toBeGreaterThan(0);
+    expect(Math.max(...grabs.map((d) => d.pts)) * (1 + GRAB_HOLD_MAX)).toBeLessThanOrEqual(Math.max(...SNOW_TRICKS.filter((t) => t.kind === 'air').map(basePts), MIRRORED.boardRailMax));
+    expect(snow).toContain('rig.rider.jump(0.5 + tuck * 0.5, late)');            // (snow item 3: the coyote's late press, same power)
     expect(src('lib/babylon/modes/boardCore.ts')).toContain('this.comboPts += line.bonus * this.combo;');
   });
 

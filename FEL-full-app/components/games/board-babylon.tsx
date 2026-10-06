@@ -217,6 +217,13 @@ export function makeBoardHost(opts: BoardHostOpts) {
             {hud.goals != null && (
               <span className="fel-panel px-3 py-1 text-white/80">GOALS {hnode(hud.goals)}</span>
             )}
+            {/* IMPROVE (2026-10-06, snow item 12): the pace — the speed, and the split at the last gate against par (and the best run) */}
+            {typeof hud.speed === 'number' && (
+              <span className="fel-panel px-3 py-1 text-white/80">{hud.speed} KM/H</span>
+            )}
+            {typeof hud.split === 'string' && hud.split && (
+              <span className={`fel-panel px-3 py-1 font-bold ${hud.split.includes('+') ? 'text-[var(--fel-gold)]' : 'text-[var(--fel-emerald)]'}`}>{hud.split}</span>
+            )}
           </div>
           <span className="rounded-md bg-black/50 px-3 py-1 text-lg font-bold text-white">{hnode(hud.score, 0)}</span>
         </div>
@@ -252,6 +259,10 @@ export function makeBoardHost(opts: BoardHostOpts) {
         <div className="pointer-events-none absolute right-4 top-24 flex flex-col items-end gap-1.5">
           {hud.flow != null && <Meter label="FLOW" value={Number(hud.flow)} max={200} color="var(--fel-cyan)" />}
           {hud.momentum != null && <Meter label="MOMENTUM" value={Number(hud.momentum)} max={100} color="var(--fel-red)" />}
+          {/* IMPROVE (2026-10-06, snow item 9): the air left, while the rider is in it */}
+          {typeof hud.airLeft === 'number' && (
+            <Meter label={`AIR ${hud.airLeft.toFixed(1)}s`} value={hud.airLeft} max={Number(hud.airMax ?? 1.2) || 1.2} color="var(--fel-cyan)" />
+          )}
         </div>
 
         {/* The objectives, NAMED. The bezel showed "GOALS 0/4" and nothing else,
