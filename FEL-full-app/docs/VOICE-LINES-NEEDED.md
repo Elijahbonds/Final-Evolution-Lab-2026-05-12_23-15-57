@@ -5,11 +5,17 @@ and they are hard to hear on a TV or phone. Code fixed the timing, the repetitio
 **What code cannot fix is the voices themselves.** This file lists every line that is missing or robotic, so the owner can
 choose how to voice them.
 
-> **Owner decision needed: the voice provider.** No external voice service was called for this work. Options: record real
-> takes (the renderer already swaps a take in per line id, `tools/voice/render-mic.py`, "A REAL VOICE"), license a
-> voice-generation service, or keep the offline Kokoro renders and only fill the gaps below. Every line here is written for an
-> original, generic persona (the court MCs, the courtside sidekick, the crowd, the rivals, the Coach, the quiz host); none
-> imitates a real person or uses anyone's catchphrase.
+> **Decided (owner, 2026-10-06): a licensed AI voice service, provider-neutral.** The production script is now
+> **`tools/voice/script/*.csv`** (282 lines, one row per line, with persona, delivery, max seconds and the bank target), the
+> voice briefs are `tools/voice/PERSONAS.md`, and `tools/voice/import-voices.mts` brings the rendered takes into the bank; the
+> five-step workflow is in `tools/voice/README.md`. The lists below are the audit that the script was built from; the script is
+> what to render. Every line is written for an original, generic persona; none imitates a real person or uses anyone's
+> catchphrase.
+>
+> **The count grew from ~180 to 282.** The audit below counted a moment's lines without its tags. The game asks a tagged moment
+> WITH its tag (a carnival event, a celebration, one side's game point, one player's duel win), and each of those pools held one
+> line per MC: the script adds 60 more lines for them (priority P3), and 98 page lines (P1, the Mirror's movement-screen station
+> lines and the Quick Screen's move setups included) where this file estimated ~51.
 
 ## How a new line gets used
 
@@ -131,8 +137,8 @@ announcer (warm, quick).
 | # | Text | Note |
 |---|---|---|
 | 1 | Go when ready | fixed (`goWhenReadyLine`) |
-| 2 | Next up: | fixed part of `nextUpLine(name)`; the name is the athlete's nickname, typed on the day. **Owner decision:** keep the name on the browser voice, or say "Next up!" and show the name on screen only. |
-| 3 | `<name>, <N> inches, judges <x.y>` | built at run time (`resultLine`). Suggested: render "inches" and "judges" and compose the numbers from the Coach's number clips. |
+| 2 | Next up! | **Decided 2026-10-06:** a recorded "Next up!" and the name shown big on screen; no name is spoken (`cuesAfterDunk`, `NEXT_UP_SPOKEN` in `lib/session-setup/voice.ts`). |
+| 3 | `<N> inches, judges <x.y>` | built at run time (`spokenResultLine`; the name is no longer in it). Still the browser voice: composing the numbers from the Coach's number clips is a follow-up. |
 
 ## 4. Thin moments: fewer than 3 variants (the "too repetitive" half code cannot fix)
 
