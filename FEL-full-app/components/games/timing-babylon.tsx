@@ -91,7 +91,9 @@ export function makeTimingHost(opts: TimingHostOpts) {
         const headline = modeKey === 'tennis' ? `${won ? 'MATCH WON' : 'MATCH LOST'} · ${r.score} GAMES · ${n('style')} STYLE${st.rackets !== undefined ? ` · ${n('rackets')} RACKETS LEFT` : ''}`
           : modeKey === 'volleyball' ? `${won ? 'SET WON' : 'SET LOST'} · ${r.score} PTS · ${n('style')} STYLE`
           : modeKey === 'golf' ? `${won ? 'CARD IN — UNDER PAR' : 'CARD IN'} · ${n('overPar') > 0 ? '+' : ''}${n('overPar')} · ${n('holes')} HOLES · ${n('pickUps')} PICK-UPS`
-          : modeKey === 'derby' ? `${won ? 'DERBY CHAMPION' : 'DERBY OVER'} · ${n('homers')} HOMERS · ${n('outs')} OUTS · ${Math.round(n('longestFt'))} FT`
+          // IMPROVE (2026-10-06, Derby #2): the derby ends WIN / LOSS against the rival's round (the mode's `beatRival`); the
+          // posted `won` (timingWon: three homers, the Story's Diamond goal) is unchanged
+          : modeKey === 'derby' ? `${st.beatRival !== undefined ? (n('beatRival') ? 'BEAT THE RIVAL' : 'RIVAL TAKES IT') : won ? 'DERBY CHAMPION' : 'DERBY OVER'} · ${n('homers')}–${n('rivalHomers')} HR · ${n('outs')} OUTS · ${Math.round(n('longestFt'))} FT`
           : modeKey === 'penalty' ? `${won ? 'SHOOTOUT WON' : 'SHOOTOUT LOST'} · ${n('goals')}–${n('themGoals')} · ${n('stylePts')} STYLE`
           : (n('rounds') ? `${n('hits')}/${n('rounds')} CLEAN · ${r.score} PTS` : `${r.score} PTS`);
         onEndRef.current({ ...base, headline, maxCombo: timingMaxCombo(st) });

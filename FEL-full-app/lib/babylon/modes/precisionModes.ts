@@ -23,13 +23,16 @@
 
 import { kickPips, type KickResult } from '../core/penaltyHud';
 import { freshDerby, bankSwing, distanceLine, OUTS_CAP, type DerbyTally } from '../core/derbyHud';
+// IMPROVE (2026-10-06, docs/IMPROVEMENTS-2026-10-05.md § Derby): the derby's pure reads (seeded pitches, the rival's line
+// and verdict, the timing window's cue and miss, the homer's real feet, the stick's aim, the bat-flip's window).
+import { pitchShape, derbySeed, derbyProgress, rivalVerdict, rivalLine, timingMiss, timingMissLine, contactCue, homerFeet, hitLateral, batFlipRead } from '../core/DerbyLoop';
 import { rivalProgress } from '../core/CarnivalNight';
 import { holeName, cardString, windBearingDeg, windWord, holeBoard, ACCURACY_CENTER as GH_ACC_CENTER, ACCURACY_HALF as GH_ACC_HALF, type HoleResult } from '../core/golfHud';
-import { Color3, Matrix, MeshBuilder, Quaternion, StandardMaterial, Vector3 } from '@babylonjs/core';
+import { Color3, DynamicTexture, Matrix, Mesh, MeshBuilder, PBRMaterial, Quaternion, StandardMaterial, Vector3 } from '@babylonjs/core';
 import { dressBall } from '../visual/meshyProps';
 import { boneNode } from '../anim/boneLookup';
 import { planRivalKick, gradeDive, resolveSave, type DiveSign, type RivalKickPlan } from '../core/KeeperCore';
-import type { AbstractMesh, Material, Observer, ParticleSystem, PBRMaterial, Scene } from '@babylonjs/core';
+import type { AbstractMesh, Material, Observer, ParticleSystem, Scene } from '@babylonjs/core';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import type { SpawnedCharacter } from '../core/CharacterLibrary';
@@ -886,8 +889,8 @@ export const GolfMode: ModeDefinition = (() => {
 //              the PCI has to track it, which is the whole point of the pitch;
 //   changeup — same look, ~0.78x speed: the timing read. No banner tells you;
 //              the ball flight is the tell, as it is at the plate.
-// Deterministic by round (the whole mode's pitch formula already is), and
-// EXPORTED so the PCI driver and the headless suite read the mode's own
+// Deterministic by round and the session's seed (IMPROVE 2026-10-06, Derby #5: by round alone the sequence repeated every
+// derby), and EXPORTED so the PCI driver and the headless suite read the mode's own
 // numbers instead of mirroring them — the driver's header demands exactly
 // that ("reads the pitch location from the mode's OWN formula … so the two
 // cannot drift"), and it was mirroring anyway.
@@ -903,17 +906,16 @@ export interface PitchSpec {
   breakShift: number;      // slider: lateral arrival shift (m), 0 otherwise
 }
 
-/** The pitch mix: fastballs to learn on, then a real mix. Deterministic. */
-const PITCH_MIX: PitchType[] = ['fastball', 'fastball', 'slider', 'fastball', 'changeup', 'slider', 'fastball', 'changeup', 'slider', 'fastball'];
-
-export function pitchSpec(round: number): PitchSpec {
-  const type = PITCH_MIX[(round - 1) % PITCH_MIX.length];
-  const ax = (Math.sin(round * 2.7) * 0.8) * ZONE_HALF.x;
-  const ay = 1.05 + Math.cos(round * 1.9) * ZONE_HALF.y;
+/** IMPROVE (2026-10-06, Derby #5): the mix and the location walk are DerbyLoop.pitchShape's — `seed` omitted is the old
+ *  fixed sequence (the depth suite reads it); the mode passes its session seed, so a derby can no longer be memorised. */
+export function pitchSpec(round: number, seed?: number): PitchSpec {
+  const { type, ux, uy, breakSign } = pitchShape(round, seed);
+  const ax = (ux * 0.8) * ZONE_HALF.x;
+  const ay = 1.05 + uy * ZONE_HALF.y;
   const speed = (14 + round * 0.5) * (type === 'changeup' ? 0.78 : 1);
   // sliders break to alternating sides; hard enough that covering the aim
   // point means the edge of the bat, not the barrel
-  const breakShift = type === 'slider' ? (round % 2 === 0 ? 0.45 : -0.45) : 0;
+  const breakShift = type === 'slider' ? breakSign * 0.45 : 0;
   const aim = new Vector3(ax, ay, 0);
   return {
     type,
@@ -975,63 +977,167 @@ export const DerbyMode: ModeDefinition = (() => {
   // A fielder gets a BeatOwner like every other body in this file: the derby's first cut drove their run/idle loops
   // with two raw `animator.play` calls, which is the exact discipline net-anim-tests guards (one owner per body, so a
   // beat can never be cut by a locomotion frame). `loop()` is per-frame safe and dedupes, so it is a drop-in.
-  let fielders: { char: SpawnedCharacter; own: BeatOwner; bearing: number; home: Vector3; run: { bearing: number; t: number; total: number; mode: Rob; boost: number; h: number } | null; y: number; moving: boolean }[] = [];
+  let fielders: { char: SpawnedCharacter; own: BeatOwner; bearing: number; home: Vector3; run: { bearing: number; t: number; total: number; mode: Rob; boost: number; h: number; to: Vector3 } | null; y: number; moving: boolean }[] = [];
   let token: { mesh: AbstractMesh; t: number; bearing: number; who: 'yours' | 'theirs' } | null = null;
   const park = { batFlips: 0, targetsHit: 0, robbed: 0, tokensYours: 0, tokensTheirs: 0 };
   let lastVerdict: Verdict | '' = '', lastDetail = '', settledRound = 0;
+  // IMPROVE (2026-10-06, Derby #9 / #10): every delayed call goes through one bag dispose() clears, and every banner
+  // through one channel — the token's, the settle's, the bat-flip's and the whiff's clears used to wipe each other.
+  const timers = new TimerBag();
+  let bannerCh: BannerChannel | null = null;
+  /** #5: this derby's pitch sequence. */
+  let seed = 0;
+  /** #3: the last swing's miss, for the whiff's banner ('' when the pitch was taken or the swing connected). */
+  let missLine = '';
+  /** #17: the token's one material per load (dropToken made a PBR material per drop and mesh.dispose() left it). */
+  let tokenMat: Material | null = null;
+  /** #1: the target paint (two textures, two materials), disposed with the mode. */
+  let targetMats: Material[] = [];
+  /** #8: the approach ring that closes on the PCI as the ball comes into the window. */
+  let cueRing: Mesh | null = null, cueMat: PBRMaterial | null = null, cueWasIn: boolean | null = null;
+  /** #11: the hit's tracer. */
+  let trail: ParticleSystem | null = null;
+  // #13 / #14 / #16: scratch for the per-frame bat, fielder, posture and camera feeds (nothing allocated a frame).
+  const ZERO_V = Vector3.Zero(), UP_V = Vector3.Up();
+  const pitchAimAt = new Vector3();
   const bearingOf = (x: number, z: number) => (Math.atan2(x, z) * 180) / Math.PI;
-  const onWall = (deg: number, r: number, y = 0) => { const rad = (deg * Math.PI) / 180; return new Vector3(Math.sin(rad) * r, y, Math.cos(rad) * r); };
+  const onWall = (deg: number, r: number, y = 0, out = new Vector3()) => { const rad = (deg * Math.PI) / 180; return out.set(Math.sin(rad) * r, y, Math.cos(rad) * r); };
   /** The upper tier, the rail-bar, the pillars and the targets on the outfield wall. */
   function buildPark(ctx: ModeContext): void {
     const tierMat = VenueKit.paint(ctx.scene, 'park_tier_mat', '#2d5b45', 0.05, 0.85), railMat = VenueKit.paint(ctx.scene, 'park_rail_mat', '#d9d2c2', 0.08, 0.5), pillarMat = VenueKit.paint(ctx.scene, 'park_pillar_mat', '#4b5563', 0.05, 0.8);
+    const tiers: Mesh[] = [], rails: Mesh[] = [], pillars: Mesh[] = [];
     for (const deg of [-40, -20, 0, 20, 40]) {
       const rad = (deg * Math.PI) / 180;
       const tier = MeshBuilder.CreateBox(`park_tier_${deg}`, { width: 13.4, height: PARK.wallTop - 3, depth: 0.5 }, ctx.scene);
-      tier.position.copyFrom(onWall(deg, PARK.wallR, 3 + (PARK.wallTop - 3) / 2)); tier.rotation.y = rad; tier.material = tierMat; tier.isPickable = false; furniture.push(tier);
+      onWall(deg, PARK.wallR, 3 + (PARK.wallTop - 3) / 2, tier.position); tier.rotation.y = rad; tier.material = tierMat; tier.isPickable = false; tiers.push(tier);
       const rail = MeshBuilder.CreateCylinder(`park_rail_${deg}`, { diameter: 0.12, height: 13.2 }, ctx.scene);
-      rail.position.copyFrom(onWall(deg, PARK.wallR - 0.45, PARK.railY)); rail.rotation.z = Math.PI / 2; rail.rotation.y = rad; rail.material = railMat; rail.isPickable = false; furniture.push(rail);
+      onWall(deg, PARK.wallR - 0.45, PARK.railY, rail.position); rail.rotation.z = Math.PI / 2; rail.rotation.y = rad; rail.material = railMat; rail.isPickable = false; rails.push(rail);
     }
     for (const deg of PARK.pillarBearings) {
       const pil = MeshBuilder.CreateCylinder(`park_pillar_${deg}`, { diameter: 0.6, height: PARK.wallTop }, ctx.scene);
-      pil.position.copyFrom(onWall(deg, PARK.wallR - 0.7, PARK.wallTop / 2)); pil.material = pillarMat; pil.isPickable = false; furniture.push(pil);
+      onWall(deg, PARK.wallR - 0.7, PARK.wallTop / 2, pil.position); pil.material = pillarMat; pil.isPickable = false; pillars.push(pil);
     }
-    // WA-17: target zones score on the wall arc only — no floating pink/glass discs in the outfield.
+    // IMPROVE (2026-10-06, Derby #18): the stadium is static — the outfield wall's five segments and the five tiers are one
+    // mesh (two materials), the rails, the pillars and the foul poles another (three); both frozen. ~19 meshes → 2, the
+    // same five material draws, no per-frame world matrices. The distance band keeps its own texture and stays apart.
+    const isMesh = (m: AbstractMesh): m is Mesh => m instanceof Mesh;
+    const wallSegs = furniture.filter((m): m is Mesh => isMesh(m) && m.name.startsWith('ofwall_') && m.name !== 'ofwall_band');
+    const poles = furniture.filter((m): m is Mesh => isMesh(m) && m.name.startsWith('foulpole_'));
+    const merge = (name: string, parts: Mesh[]): Mesh | null => {
+      if (parts.length === 0) return null;
+      const one = parts.length > 1 ? Mesh.MergeMeshes(parts, true, true, undefined, false, true) : parts[0];
+      if (!one) { furniture.push(...parts); return null; }
+      one.name = name; one.isPickable = false; one.freezeWorldMatrix();
+      return one;
+    };
+    furniture = furniture.filter((m) => !wallSegs.includes(m as Mesh) && !poles.includes(m as Mesh));
+    const wall = merge('park_wall', [...wallSegs, ...tiers]);
+    const trim = merge('park_trim', [...rails, ...pillars, ...poles]);
+    for (const m of [wall, trim]) if (m) furniture.push(m);
+    // IMPROVE (2026-10-06, Derby #1): the targets are PAINTED on the wall — a decal projected onto the wall's own face, so
+    // it sits flush and stops at the wall's top (WA-17 took out discs that floated in front of it and over the top, and
+    // with them the only way to see a 100-point zone). One per target; a taken zone's paint goes (settleHit).
+    targetMeshes.clear(); targetMats = [];
+    if (wall) {
+      const paintFor = (kind: WallTarget['kind']): PBRMaterial => {
+        const tex = new DynamicTexture(`park_target_tex_${kind}`, { width: 256, height: 256 }, ctx.scene, true);
+        const g = tex.getContext() as unknown as CanvasRenderingContext2D;
+        g.clearRect(0, 0, 256, 256);
+        const ring = (r: number, fill: string) => { g.beginPath(); g.arc(128, 128, r, 0, Math.PI * 2); g.fillStyle = fill; g.fill(); };
+        if (kind === 'bullseye') { ring(126, '#ff2d78'); ring(96, '#fff7ed'); ring(66, '#ff2d78'); ring(36, '#fff7ed'); ring(14, '#ff2d78'); }
+        else {
+          // the multiplier glass: a gold rim (the token's gold), a pale-blue pane, a few cracks off the middle — no lettering,
+          // which a projected decal can mirror
+          ring(126, '#ffd75e'); ring(112, 'rgba(154,215,255,0.75)');
+          g.strokeStyle = 'rgba(255,255,255,0.9)'; g.lineWidth = 4;
+          for (const a of [0.3, 1.5, 2.6, 3.9, 5.1]) { g.beginPath(); g.moveTo(128, 128); g.lineTo(128 + Math.cos(a) * 108, 128 + Math.sin(a) * 108); g.stroke(); }
+        }
+        tex.hasAlpha = true; tex.update();
+        // unlit PBR: paint reads as its own colour under the 2.6 directional (a StandardMaterial clips it — the ratchet's rule)
+        const m = new PBRMaterial(`park_target_mat_${kind}`, ctx.scene);
+        m.unlit = true; m.albedoTexture = tex; m.useAlphaFromAlbedoTexture = true; m.zOffset = -2; m.backFaceCulling = false;
+        targetMats.push(m);
+        return m;
+      };
+      const mats = { bullseye: paintFor('bullseye'), glass: paintFor('glass') };
+      for (const tg of TARGETS) {
+        const rad = (tg.bearingDeg * Math.PI) / 180;
+        const decal = MeshBuilder.CreateDecal(`park_target_${tg.id}`, wall, {
+          position: onWall(tg.bearingDeg, PARK.wallR - 0.25, tg.y),
+          normal: new Vector3(-Math.sin(rad), 0, -Math.cos(rad)),   // the face looks back at the plate
+          size: new Vector3(tg.r * 2, tg.r * 2, 1.2), cullBackFaces: true,
+        });
+        decal.material = mats[tg.kind]; decal.isPickable = false; decal.freezeWorldMatrix();
+        furniture.push(decal); targetMeshes.set(tg.id, decal);
+      }
+    }
   }
   function tickFielders(dt: number): void {
     for (const f of fielders) {
       const root = f.char.root; let target = f.home; let speed: number = PARK.fielderSpeed;
       if (f.run) {
-        f.run.t += dt; target = onWall(f.run.bearing, PARK.wallR - 1.4); speed *= f.run.boost;
-        const d0 = Vector3.Distance(new Vector3(root.position.x, 0, root.position.z), target);
+        // IMPROVE (2026-10-06, Derby #14): the run's wall spot is worked out once, when the run is set (runTo), and every
+        // distance below is scalars — this ran onWall + four Vector3s per fielder per frame.
+        f.run.t += dt; target = f.run.to; speed *= f.run.boost;
+        const d0 = Math.hypot(root.position.x - target.x, root.position.z - target.z);
         if (d0 < 1.6 && f.run.mode) { const want = f.run.mode === 'hang' ? PARK.railY - 0.6 : Math.min(4.6, Math.max(0.6, f.run.h - 0.4)); f.y += (want - f.y) * Math.min(1, dt * 7); }
         if (f.run.t > f.run.total + 1.3) f.run = null;
       } else f.y += (0 - f.y) * Math.min(1, dt * 4);
-      const d = target.subtract(root.position); d.y = 0; const dist = d.length();
-      if (dist > 0.3) { const step = Math.min(dist, speed * dt); root.position.addInPlace(d.scale(step / dist)); root.rotation.y = Math.atan2(d.x, d.z); if (!f.moving) { f.moving = true; f.own.loop(SPORT_CLIP.moveLoop, { fadeSec: 0.15 }); } }
+      const dx = target.x - root.position.x, dz = target.z - root.position.z; const dist = Math.hypot(dx, dz);
+      if (dist > 0.3) { const k = Math.min(dist, speed * dt) / dist; root.position.x += dx * k; root.position.z += dz * k; root.rotation.y = Math.atan2(dx, dz); if (!f.moving) { f.moving = true; f.own.loop(SPORT_CLIP.moveLoop, { fadeSec: 0.15 }); } }
       else if (f.moving) { f.moving = false; f.own.loop(SPORT_CLIP.idle, { fadeSec: 0.2 }); root.rotation.y = Math.PI + (f.bearing * Math.PI) / 180; }
       root.position.y = f.y;
     }
   }
+  /** A fielder's run to the wall at `bearing` (#14: the spot is computed here, once). */
+  const runTo = (bearing: number, total: number, mode: Rob, boost: number, h: number): NonNullable<typeof fielders[number]['run']> =>
+    ({ bearing, t: 0, total, mode, boost, h, to: onWall(bearing, PARK.wallR - 1.4) });
   /** The multiplier glass shattered: the token drops at the wall's base and the nearest fielder goes for it. */
   function dropToken(ctx: ModeContext, tg: WallTarget): void {
     if (token) token.mesh.dispose();
-    const mesh = MeshBuilder.CreateBox(`park_token_${tg.id}`, { size: 0.5 }, ctx.scene); mesh.position.copyFrom(onWall(tg.bearingDeg, PARK.wallR - 1.6, 0.35)); mesh.rotation.y = Math.PI / 4;
-    mesh.material = VenueKit.paint(ctx.scene, 'park_token_mat', '#ffd75e', 0.6, 0.3); mesh.isPickable = false;
+    const mesh = MeshBuilder.CreateBox(`park_token_${tg.id}`, { size: 0.5 }, ctx.scene); onWall(tg.bearingDeg, PARK.wallR - 1.6, 0.35, mesh.position); mesh.rotation.y = Math.PI / 4;
+    mesh.material = tokenMat ??= VenueKit.paint(ctx.scene, 'park_token_mat', '#ffd75e', 0.6, 0.3); mesh.isPickable = false;
     const who = multiplierScramble(tg.bearingDeg, fielders.map((f) => f.bearing));
     token = { mesh, t: 0, bearing: tg.bearingDeg, who };
     const nearest = fielders.reduce<typeof fielders[number] | null>((b, f) => !b || Math.abs(f.bearing - tg.bearingDeg) < Math.abs(b.bearing - tg.bearingDeg) ? f : b, null);
-    if (nearest) nearest.run = { bearing: tg.bearingDeg, t: 0, total: TOKEN.graceSec, mode: null, boost: 1, h: 0 };
-    ctx.setHud({ banner: 'GLASS SHATTERED — the x2 is on the ground!' });
+    if (nearest) nearest.run = runTo(tg.bearingDeg, TOKEN.graceSec, null, 1, 0);
+    bannerCh?.flash('GLASS SHATTERED — the x2 is on the ground!', 900);
     console.info(`[PARK] token dropped at ${tg.bearingDeg}° → ${who}`);
   }
   function tickToken(ctx: ModeContext, dt: number): void {
     if (!token) return;
     token.t += dt; token.mesh.rotation.y += dt * 3;
     if (token.t < TOKEN.graceSec) return;
-    if (token.who === 'theirs') { park.tokensTheirs++; ctx.setHud({ banner: 'THEY GOT THE x2 — hit the far glass' }); }
-    else { park.tokensYours++; multiplier = TOKEN.mult; ctx.setHud({ banner: 'x2 IS YOURS — the next hit pays double', mult: `x${multiplier} NEXT` }); SoundKit.play('powerUp', { pitch: 1.2 }); }
-    setTimeout(() => ctx.setHud({ banner: '' }), 900);
+    if (token.who === 'theirs') { park.tokensTheirs++; bannerCh?.flash('THEY GOT THE x2 — hit the far glass', 900); }
+    else { park.tokensYours++; multiplier = TOKEN.mult; ctx.setHud({ mult: `x${multiplier} NEXT` }); bannerCh?.flash('x2 IS YOURS — the next hit pays double', 900); SoundKit.play('powerUp', { pitch: 1.2 }); }
     token.mesh.dispose(); token = null;
+  }
+  /** #2: the rival's homers so far — by pitches OR outs, whichever is further through the round. */
+  const rivalSoFar = (): number => Math.round(rivalTarget * rivalProgress(derbyProgress(round, tally.outs, TOTAL, OUTS_CAP)));
+  /** #2: the round is over — the rival's full round goes up, the verdict against it is called (after the last play's own
+   *  banner has had `verdictAfterMs` to read), then the end card. The outcome stays DERBY_END (the Story's and the
+   *  results' reads of it are unchanged); `beatRival` carries the verdict to the card. */
+  function endDerby(ctx: ModeContext, pitchCount: number, verdictAfterMs: number): void {
+    ended = true; SoundKit.play('whistle');
+    const verdict = rivalVerdict(tally.homers, rivalTarget);
+    ctx.setHud({ rivalHomers: rivalTarget });
+    const call = () => bannerCh?.flash(rivalLine(tally.homers, rivalTarget), 2000);
+    if (verdictAfterMs > 0) timers.later(call, verdictAfterMs); else call();
+    console.info(`[DERBY-END] homers ${tally.homers} outs ${tally.outs} pts ${pts} rival ${rivalTarget} ${verdict}`);
+    timers.later(() => ctx.end('DERBY_END', pts, { pitches: pitchCount, homers: tally.homers, outs: tally.outs, longestFt: tally.longestFt, rivalHomers: rivalTarget, beatRival: verdict === 'WIN' ? 1 : 0 }), verdictAfterMs + 1200);
+  }
+  /** #8: the cue's colours (waiting, in the window), its lead before the window opens, and how wide it starts. */
+  const CUE_WAIT = '#ffb020', CUE_LEAD_SEC = 0.6, CUE_GROW = 1.4;
+  const cueWaitC = Color3.FromHexString(CUE_WAIT), cueInC = Color3.FromHexString('#34e89e');
+  /** #8: the approach ring rides the PCI while a released pitch comes in unswung; nothing allocated a frame. */
+  function tickCue(): void {
+    if (!cueRing || !cueMat) return;
+    const c = incoming && !swung && throwIn <= 0 && flight.active ? contactCue(ball.position.z, 0.3, pitchSpeed, 0.15, CUE_LEAD_SEC) : null;
+    if (!c || !c.show) { if (cueRing.isEnabled()) cueRing.setEnabled(false); return; }
+    if (!cueRing.isEnabled()) cueRing.setEnabled(true);
+    cueRing.position.copyFrom(pci.pos);
+    cueRing.scaling.setAll(1 + CUE_GROW * (1 - c.fill));
+    if (cueWasIn !== c.inWindow) { cueWasIn = c.inWindow; cueMat.albedoColor.copyFrom(c.inWindow ? cueInC : cueWaitC); }
   }
   /** The wall decided: the zone, the glove, the top of the wall, or the track (was the swing's own verdict at contact). */
   function settleHit(ctx: ModeContext, verdict: Verdict): void {
@@ -1045,11 +1151,14 @@ export const DerbyMode: ModeDefinition = (() => {
     ctx.feel?.impact?.(homer ? 0.3 + q * 0.5 : tg ? 0.5 : 0.4);
     if (homer && !homerLatch) { homerLatch = true; ctx.juice.hitStop(60); ctx.juice.shake(0.14, 160); ctx.juice.flash('#FFD700', 130); console.info('[DERBY-JUICE] homer punch'); }
     else if (!homer) console.info(`[DERBY-JUICE] ${verdict} (clank weight)`);
-    const distFt = homer ? Math.round(300 + q * (80 + launch * 60) * 1.6) : 0;
+    // IMPROVE (2026-10-06, Derby #4): the feet are the flight's — where this ball, at the wall, comes down (the arc Flight
+    // is flying it on, projected to the grass). `300 + q × (80 + launch × 60) × 1.6` was not tied to it, and read 300+ FT
+    // over a wall that says 124 FT on it. Points are untouched (distPts): this is the distance line and longestFt only.
+    const distFt = homer ? homerFeet(ball.position, flight.vel, PARK.g) : 0;
     let gained = 0; let roundOver = false;
     if (tg) {
       gained = tg.pts * mult; pts += gained; park.targetsHit++; targetsHit.add(tg.id);
-      const m = targetMeshes.get(tg.id); if (m) m.setEnabled(false);
+      const m = targetMeshes.get(tg.id); if (m) m.setEnabled(false);   // #1: the zone's paint goes with it
       EffectsKit.burst(ctx.scene, ball.position.clone(), tg.kind === 'glass' ? 'sparks' : 'confetti');
       SoundKit.play('score', { pitch: 1.3 }); if (tg.kind === 'glass') SoundKit.play('clang', { pitch: 1.5, volume: 0.6 });
       if (tg.kind === 'glass') dropToken(ctx, tg);
@@ -1065,10 +1174,11 @@ export const DerbyMode: ModeDefinition = (() => {
       : homer ? (clutch ? `CLUTCH DINGER! +${gained}` : q > 0.85 ? `DINGER! +${gained}` : `HOMER +${gained}`) + x
       : verdict === 'robbed' ? (h.rob === 'hang' ? 'ROBBED — HANGING OFF THE RAIL!' : 'ROBBED AT THE WALL!')
       : verdict === 'wall' ? 'OFF THE WALL — caught' : `OUT — ${cover >= 0.5 ? 'caught on the track' : 'weak contact'}`;
-    ctx.setHud({ score: pts, banner, homers: tally.homers, outs: tally.outs, longest: tally.longestFt, distance: homer ? distanceLine(distFt, tally.longestFt) : '', targets: `${park.targetsHit}/${TARGETS.length}`, mult: multiplier > 1 ? `x${multiplier} NEXT` : '' });
-    setTimeout(() => ctx.setHud({ banner: '' }), 900);
-    console.info(`[PARK] ${verdict} ${lastDetail} +${gained}`);
-    if (roundOver) { ended = true; SoundKit.play('whistle'); console.info(`[DERBY-END] homers ${tally.homers} outs ${tally.outs} pts ${pts}`); setTimeout(() => ctx.end('DERBY_END', pts, { pitches: round, homers: tally.homers, outs: tally.outs, longestFt: tally.longestFt, rivalHomers: rivalTarget }), 1000); }
+    // #2: the rival's line moves on an out as well as a pitch
+    ctx.setHud({ score: pts, homers: tally.homers, outs: tally.outs, longest: tally.longestFt, rivalHomers: rivalSoFar(), distance: homer ? distanceLine(distFt, tally.longestFt) : '', targets: `${park.targetsHit}/${TARGETS.length}`, mult: multiplier > 1 ? `x${multiplier} NEXT` : '' });
+    bannerCh?.flash(banner, 900);
+    console.info(`[PARK] ${verdict} ${lastDetail} +${gained}${homer ? ` ${distFt} ft` : ''}`);
+    if (roundOver) endDerby(ctx, round, 700);
   }
 
   // THE BATTING CAMERA LOOKS OUT TO THE OUTFIELD (owner, 2026-09-15: "face outfield so we can see the pitcher and our
@@ -1080,17 +1190,23 @@ export const DerbyMode: ModeDefinition = (() => {
   // pitcher and the whole flight of the ball sit in the middle. The aim point is steady (PITCHER_VIEW) rather than the
   // moving ball — the 0.4 lerp onto a 17 m/s pitch is what used to drag the batter out of frame.
   const BATTING_CAM = new Vector3(-1.75, 1.85, -3.4);
+  /** IMPROVE (2026-10-06, Derby #15): the PCI readout is a driver's seam — two toFixed and a HUD push every frame of every
+   *  pitch, for nobody in production. */
+  const DEV_PCI = process.env.NODE_ENV === 'development';
   const PITCHER_VIEW = new Vector3(0, 1.45, 18);
   function battingCam(ctx: ModeContext, snap: boolean): void {
     ctx.camDirector.setFixed(BATTING_CAM, 1.25, snap);
-    if (snap) ctx.camera.setTarget(Vector3.Lerp(me.root.position.add(new Vector3(0, 1.25, 0)), PITCHER_VIEW, 0.4));
+    if (snap) ctx.camera.setTarget(Vector3.Lerp(me.root.position.add(new Vector3(0, 1.25, 0)), PITCHER_VIEW, 0.4));   // once a pitch: a fresh vector, which a camera may keep
   }
 
   function pitch(ctx: ModeContext): void {
     round++;
     swung = false; incoming = true;
     homerLatch = false;                // A+ P0: one homer punch per pitch
-    trickDone = false; hit = null;     // PARKOUR DERBY: the warm-up is per pitch; the wall has nothing pending
+    hit = null;                        // PARKOUR DERBY: the wall has nothing pending
+    // (#12: the warm-up's one-a-pitch latch resets when the last pitch is over — the set — not here, so a flip in the set
+    // carries into this pitch's wind-up as its one trick)
+    missLine = ''; trail?.stop();      // #3 / #11: the last swing's miss and tracer are over
     ctx.setHud({ flow, targets: `${park.targetsHit}/${TARGETS.length}`, mult: multiplier > 1 ? `x${multiplier} NEXT` : '' });
     ctx.heroRef.current = me.root;   // back to the batter (see contact branch)
     // CUT, don't ease — the follow cam ends a dinger forty metres downfield,
@@ -1105,7 +1221,7 @@ export const DerbyMode: ModeDefinition = (() => {
     // (D2, this pass: pitchSpec adds the movement read — sliders break late,
     // changeups take speed off. The pitch aims at the PRE-break spot; the
     // break lands it at `arrive`, which is where the PCI must actually be.)
-    const spec = pitchSpec(round);
+    const spec = pitchSpec(round, seed);   // #5: this session's sequence
     // The slider comes from a three-quarter slot; the changeup deliberately
     // shares the fastball's look (the ball flight is the tell, not the arm).
     pitcherAnim.beat(spec.type === 'slider' ? SPORT_CLIP.derbyPitchSide : SPORT_CLIP.derbyPitch, { fadeSec: 0.1 });
@@ -1124,18 +1240,19 @@ export const DerbyMode: ModeDefinition = (() => {
     throwIn = PITCH_RELEASE_SEC;   // the ball waits in the hand through the leg lift; update() releases it
     pendingThrow = () => flight.launch(ball.position, vel);
     const clutch = round === TOTAL || lastOut();
-    const rivalLive = Math.round(rivalTarget * rivalProgress(round / TOTAL));
     ctx.setHud({
       round: `PITCH ${round}`,
-      pitch: spec.label,
-      homers: tally.homers, outs: tally.outs, outsCap: OUTS_CAP, longest: tally.longestFt, rivalHomers: rivalLive, distance: '',
+      // IMPROVE (2026-10-06, Derby #7): the pitch's name is NOT on the board while it is coming — the design says no banner
+      // tells you a change-up, and this chip did. It goes up when the pitch resolves (the swing's contact line, the whiff).
+      pitch: '',
+      homers: tally.homers, outs: tally.outs, outsCap: OUTS_CAP, longest: tally.longestFt, rivalHomers: rivalSoFar(), distance: '',
       contact: '',                              // last pitch's grade is over
       hint: clutch ? `FINAL PITCH — STRIKE as it crosses the plate` : 'STRIKE as it crosses the plate · read the break',
     });
     // the dev HUD dump carries the real PCI position so drivers can CLOSE
     // THE LOOP instead of integrating their own (the open-loop model
     // drifted enough that the covering bot once lost to the blind control)
-    ctx.setHud({ pci: `${pci.pos.x.toFixed(2)},${pci.pos.y.toFixed(2)}` });
+    if (DEV_PCI) ctx.setHud({ pci: `${pci.pos.x.toFixed(2)},${pci.pos.y.toFixed(2)}` });
   }
 
   return {
@@ -1157,7 +1274,9 @@ export const DerbyMode: ModeDefinition = (() => {
         // line — flanking the infield view, outside the widest pitch (|x|<1)
         ...[0, 1, 2, 3, 4, 5].map((i) => new Vector3(6.5 + i * 0.9, 0, 3 + i * 1.4)),
         ...[0, 1, 2, 3, 4, 5].map((i) => new Vector3(-6.5 - i * 0.9, 0, 3 + i * 1.4)),
-      ]);
+        // IMPROVE (2026-10-06, Derby #19): six bodies (twelve spots, every other one), parked while off-screen — the follow
+        // cam on a hit and the outfield leave them all out of frame (Tennis's opt-in, Onlookers.pauseOffscreen).
+      ], undefined, undefined, { pauseOffscreen: true });
       me = await spawnAthlete(ctx, CFG.heroUrl, new Vector3(-0.7, 0, 0), Math.PI / 2, SPORT_CLIP.derbyStance);
       meAnim = new BeatOwner(me.animator); meAnim.loop(SPORT_CLIP.derbyStance);
       // The bat (Phase 6, 2026-09-03): the stance and swing are real now; the
@@ -1182,21 +1301,24 @@ export const DerbyMode: ModeDefinition = (() => {
           bat.material = bm;
           bat.rotationQuaternion = new Quaternion();
           const batRef = bat, meRef = me;
+          // IMPROVE (2026-10-06, Derby #13): the placement runs every frame, so it writes into these — it allocated ~8
+          // Vector3s a frame (clone, subtract, add, new Vector3, toEulerAngles, Vector3.Up()).
+          const sL = new Vector3(), sR = new Vector3(), sAlong = new Vector3(), sGrip = new Vector3(), sDir = new Vector3(), sSpan = new Vector3(), sEuler = new Vector3();
           /** The fist, not the wrist: a hand bone's origin is the wrist, the handle sits a palm further along the forearm line. */
-          const fist = (hand: typeof lh, fore: typeof lf): Vector3 => {
+          const fist = (hand: typeof lh, fore: typeof lf, out: Vector3): Vector3 => {
             hand.computeWorldMatrix(true);
-            const h = hand.getAbsolutePosition().clone();
-            if (!fore) return h;
+            out.copyFrom(hand.getAbsolutePosition());
+            if (!fore) return out;
             fore.computeWorldMatrix(true);
-            const along = h.subtract(fore.getAbsolutePosition());
-            return along.lengthSquared() > 1e-8 ? h.addInPlace(along.normalize().scaleInPlace(BAT_PALM_M)) : h;
+            const along = out.subtractToRef(fore.getAbsolutePosition(), sAlong);
+            return along.lengthSquared() > 1e-8 ? out.addInPlace(along.normalize().scaleInPlace(BAT_PALM_M)) : out;
           };
           batObs = ctx.scene.onBeforeRenderObservable.add(() => {
             if (batRef.isDisposed()) return;
-            const fL = fist(lh, lf), fR = fist(rh, rf);
-            const grip = fL.add(fR).scaleInPlace(0.5);
+            const fL = fist(lh, lf, sL), fR = fist(rh, rf, sR);
+            const grip = fL.addToRef(fR, sGrip).scaleInPlace(0.5);
             const d = batLineAt(batSwingSec);
-            const yaw = meRef.root.rotationQuaternion ? meRef.root.rotationQuaternion.toEulerAngles().y : meRef.root.rotation.y;
+            const yaw = meRef.root.rotationQuaternion ? meRef.root.rotationQuaternion.toEulerAnglesToRef(sEuler).y : meRef.root.rotation.y;
             // root → world: +x = (cos, 0, -sin), +z forward = (sin, 0, cos) — the axes the hand targets are authored in.
             // ANIM-RESIDUAL: +x is NOT the batter's right on the runtime rig. Measured on dev :3061 (/dev/mode/derby, kit body):
             // RightArm at −0.20 and LeftArm at +0.13 along this +x, both fists at −0.23 by the right shoulder (the clip's
@@ -1209,19 +1331,19 @@ export const DerbyMode: ModeDefinition = (() => {
               if (rightSign !== 0) console.info(`[DERBY-BAT] batter's right is ${rightSign > 0 ? '+' : '−'}x on this rig`);
             }
             const dx = d[0] * (rightSign || 1);
-            const dir = new Vector3(dx * Math.cos(yaw) + d[2] * Math.sin(yaw), d[1], -dx * Math.sin(yaw) + d[2] * Math.cos(yaw));
+            const dir = sDir.set(dx * Math.cos(yaw) + d[2] * Math.sin(yaw), d[1], -dx * Math.sin(yaw) + d[2] * Math.cos(yaw));
             // Hands that come apart through the swing lie ON the handle, so the line between the fists pulls the handle
             // onto it (signed along the authored line). Measured on the first cut: fists 6 cm off the axis at the swing
             // median, 29 of 66 swing frames past 8 cm. A full pull fixed the grip but let a stacked pair of fists tip the
             // barrel into the dirt (14 swing frames below −0.3); at 0.7 the fists stay on the handle (2.9 cm median, none past
             // 8 cm) and the barrel only dips ≤ 27° at the launch and through the zone, the way a real swing's does.
-            const span = fR.subtract(fL); const sep = span.length();
+            const span = fR.subtractToRef(fL, sSpan); const sep = span.length();
             if (sep > BAT_SPLIT_M) {
               span.scaleInPlace((Vector3.Dot(span, dir) < 0 ? -1 : 1) / sep);
               const k = BAT_HANDS_PULL * Math.min(1, (sep - BAT_SPLIT_M) / 0.08);
               dir.scaleInPlace(1 - k).addInPlace(span.scaleInPlace(k)).normalize();
             }
-            Quaternion.FromUnitVectorsToRef(Vector3.Up(), dir, batRef.rotationQuaternion!);
+            Quaternion.FromUnitVectorsToRef(UP_V, dir, batRef.rotationQuaternion!);
             // the cylinder is centred on its origin: the knob just past the fists, the barrel out along the line
             batRef.position.copyFrom(grip.addInPlace(dir.scaleInPlace(BAT_LEN / 2 - BAT_KNOB_M)));
           });
@@ -1236,9 +1358,10 @@ export const DerbyMode: ModeDefinition = (() => {
         const char = await spawnFoe(ctx, CFG.heroUrl, home.clone(), Math.PI + (bearing * Math.PI) / 180, SPORT_CLIP.idle);
         fielders.push({ char, own: new BeatOwner(char.animator), bearing, home, run: null, y: 0, moving: false });
       }
+      seed = derbySeed();   // #5: a new pitch sequence each derby (one value: the dev state carries it, pitchSpec(r, seed) re-reads it)
       if (process.env.NODE_ENV === 'development') {
         (ctx.scene.metadata ??= {}).baseball = {
-          state: () => ({ round, incoming, throwIn, swung, ended, ballZ: ball.position.z, ballY: ball.position.y, pciX: pci.pos.x, pciY: pci.pos.y, pitchAtX: pitchAt.x, pitchAtY: pitchAt.y, flow, flowAtSwing, multiplier, ...park, homers: tally.homers, outs: tally.outs, pts, lastVerdict, lastDetail, settledRound, hitPending: !!hit && !hit.settled, fielders: fielders.map((f) => ({ x: f.char.root.position.x, z: f.char.root.position.z, y: f.y, run: f.run ? f.run.mode : null })) }),
+          state: () => ({ round, seed, incoming, throwIn, swung, ended, ballZ: ball.position.z, ballY: ball.position.y, pciX: pci.pos.x, pciY: pci.pos.y, pitchAtX: pitchAt.x, pitchAtY: pitchAt.y, flow, flowAtSwing, multiplier, ...park, homers: tally.homers, outs: tally.outs, pts, lastVerdict, lastDetail, settledRound, hitPending: !!hit && !hit.settled, fielders: fielders.map((f) => ({ x: f.char.root.position.x, z: f.char.root.position.z, y: f.y, run: f.run ? f.run.mode : null })) }),
         };
       }
       throwIn = 0; pendingThrow = null;
@@ -1247,6 +1370,18 @@ export const DerbyMode: ModeDefinition = (() => {
       // bat-detach frames, ANIM-SURGICAL). The shared Reticle stands its ring up itself now (aimSwingCore); a second bake here would lay it flat again.
       ctx.heroRef.current = me.root;
       ball = MeshBuilder.CreateSphere('bball', { diameter: 0.12 }, ctx.scene);
+      // IMPROVE (2026-10-06, Derby #11): a 12 cm default-grey sphere was hard to pick up off the bat and lost down the line.
+      // A lit white that holds its white on the grass (golf's ball paint), and a tracer from the bat to where it lands.
+      ball.material = VenueKit.paint(ctx.scene, 'derby_ball_m', '#f7f7f2', 0.45, 0.35); ball.isPickable = false;
+      trail = EffectsKit.ballTrail(ctx.scene, ball, '#fff4cf'); trail.stop();
+      // #8: the contact cue — a ring around the PCI that closes onto it as the ball comes into the ±0.15 s window and
+      // turns green while a swing would connect (the window was invisible; tennis and volleyball draw their bands).
+      cueRing = MeshBuilder.CreateTorus('derby_cue', { diameter: 0.62, thickness: 0.035, tessellation: 32 }, ctx.scene);
+      cueRing.bakeTransformIntoVertices(Matrix.RotationX(Math.PI / 2));   // stood up once, like the Reticle's own ring
+      cueRing.billboardMode = 7; cueRing.isPickable = false; cueRing.setEnabled(false);
+      cueMat = new PBRMaterial('derby_cue_m', ctx.scene);
+      cueMat.unlit = true; cueMat.albedoColor = Color3.FromHexString(CUE_WAIT); cueMat.alpha = 0.9;
+      cueRing.material = cueMat; cueWasIn = null;
       flight = new Flight(ball, -6);
       ctx.objectiveRef.current = ball.position;
       battingCam(ctx, true);
@@ -1271,11 +1406,13 @@ export const DerbyMode: ModeDefinition = (() => {
       pitchPosture = mountPostureLayer(ctx.scene, pitcher.skeleton, pitcher.root, () => {
         const w = throwIn > 0 ? 'pitch_set' : 'pitch_throw';
         const { pose, legs } = fieldPose(w);
-        const at = me ? me.root.position.add(new Vector3(0, 1.1, 0)) : new Vector3(0, 1.1, 0);
+        // #16: the batter's chest, in a scratch vector (this allocated two Vector3s every frame)
+        const at = me ? pitchAimAt.copyFrom(me.root.position) : pitchAimAt.setAll(0); at.y += 1.1;
         return { pose, legs, aim: at, eyes: at, window: w };
       }, 'PITCH-PP');
 
-      round = 0; pts = 0; ended = false;
+      round = 0; pts = 0; ended = false; pending = false; trickDone = false; missLine = '';
+      timers.clear(); bannerCh = new BannerChannel(timers, (text) => ctx.setHud({ banner: text }));
       SoundKit.startAmbient('stadium');
       tally = freshDerby(); rivalTarget = 3 + Math.floor(Math.random() * 6);   // a rival round of 3–8 homers
       ctx.setHud({ score: 0 });
@@ -1285,14 +1422,17 @@ export const DerbyMode: ModeDefinition = (() => {
     onInput(ctx: ModeContext, e: FelInput) {
       SoundKit.unlock();
       if (e.t === 'stick' && e.side === 'L') { stickX = e.x; stickY = e.y; }
-      // PARKOUR DERBY: B in the wind-up is the BAT-FLIP VAULT — the warm-up trick that fills the flow for a KINETIC swing
+      // PARKOUR DERBY: B before the pitch is the BAT-FLIP VAULT — the warm-up trick that fills the flow for a KINETIC swing.
+      // IMPROVE (2026-10-06, Derby #12): it opens in the SET (the gap between pitches) as well as the 0.52 s wind-up; the
+      // wind-up alone was easy to miss and answered "WARM UP IN THE WIND-UP". Still one a pitch (DerbyLoop.batFlipRead).
       if (e.t === 'button' && e.btn === 'B' && e.pressed) {
-        if (incoming && throwIn > 0 && !trickDone) {
+        const flip = batFlipRead({ incoming, throwIn, pending, trickDone, ended });
+        if (flip === 'ok') {
           trickDone = true; flow = flowTrick(flow, 'batflip'); park.batFlips++; hopT = 0;
           meAnim.beat(SPORT_CLIP.derbySwing, { fadeSec: 0.05, speedRatio: 1.7 });
-          SoundKit.play('whoosh', { pitch: 1.4, volume: 0.4 }); ctx.setHud({ flow, banner: `BAT-FLIP VAULT — flow ${flow}` }); setTimeout(() => ctx.setHud({ banner: '' }), 500);
+          SoundKit.play('whoosh', { pitch: 1.4, volume: 0.4 }); ctx.setHud({ flow }); bannerCh?.flash(`BAT-FLIP VAULT — flow ${flow}`, 500);
           console.info(`[PARK] bat-flip vault → flow ${flow}`);
-        } else refuse(ctx, trickDone ? 'ONE TRICK A PITCH' : 'WARM UP IN THE WIND-UP');
+        } else refuse(ctx, flip === 'spent' ? 'ONE TRICK A PITCH' : 'WARM UP BEFORE THE PITCH');
         return;
       }
       // SCORECARD CONTROLS (2026-09-15): a swing between pitches was 28 % of the derby's presses and got nothing back
@@ -1305,8 +1445,15 @@ export const DerbyMode: ModeDefinition = (() => {
         // time against THIS pitch's speed — the window conversion divides by
         // speed, and a hardcoded 14 mistimed every fastball and change-up
         const timing = swingQuality(ball.position.z, 0.3, pitchSpeed, 0.3);
-        if (timing <= 0) return;
+        if (timing <= 0) {
+          // IMPROVE (2026-10-06, Derby #3): the swing is spent — say how it missed, now, and again on the whiff.
+          missLine = timingMissLine(timingMiss(ball.position.z, 0.3, pitchSpeed, 0.15), throwIn <= 0);
+          bannerCh?.flash(missLine, 900);
+          console.info(`[DERBY] mistimed: ${missLine}`);
+          return;
+        }
         incoming = false;
+        cueRing?.setEnabled(false);
         // CONTACT = TIMING x COVERAGE. Timing alone was the whole game; now
         // where you put the PCI matters as much as when you swing, which is the
         // mechanic the benchmark is named for.
@@ -1320,21 +1467,26 @@ export const DerbyMode: ModeDefinition = (() => {
         // stick used to do by fiat.
         const meet = pci.pos.y - ball.position.y;
         const launch = Math.max(0.1, Math.min(0.9, 0.45 - meet * 1.1));
-        // PARKOUR DERBY: the KINETIC swing — the flow the warm-up filled grows the exit speed; the stick at the swing AIMS the
-        // ball's bearing (a wall target's); the WALL decides the hit (settleHit), not the contact
+        // PARKOUR DERBY: the KINETIC swing — the flow the warm-up filled grows the exit speed; the WALL decides the hit
+        // (settleHit), not the contact.
+        // IMPROVE (2026-10-06, Derby #6): the bearing is timing (early pulls, late goes the other way) plus the STICK at the
+        // swing, which nudges it toward a wall target (DerbyLoop.hitLateral, ±3 m/s ≈ ±5°). The comment always said the
+        // stick aimed; the code rolled ±1 m/s of Math.random() instead, so the same swing went to different places.
         const ks = kineticSwing(flow / PARK_FLOW.full); flowAtSwing = flow; flow = 0;
-        const side = swingSide(ball.position.z, 0.3, pitchSpeed, 0.3);   // FLAG: early pulls, late goes the other way. The stick still places the PCI.
-        const vx = side * 17 + (Math.random() - 0.5) * 2;
+        const side = swingSide(ball.position.z, 0.3, pitchSpeed, 0.3);
+        const vx = hitLateral(side, stickX);
         flight.launch(ball.position, new Vector3(vx, (18 * launch * q + 4) * ks.exitMult, (16 + q * 18) * ks.exitMult));
         const distPts = Math.round(q * (80 + launch * 60) * (clutch ? CLUTCH_MULT : 1));
         const cross = predictWallCross({ x: flight.vel.x, y: flight.vel.y, z: flight.vel.z }, { x: ball.position.x, y: ball.position.y, z: ball.position.z });
         let rob: Rob = null;
-        if (cross && !targetHit(cross, TARGETS, targetsHit)) for (const f of fielders) { const r = robRead(f.bearing, cross); const lo = Math.min(f.bearing, cross.bearingDeg), hi = Math.max(f.bearing, cross.bearingDeg); const boost = PARK.pillarBearings.some((b2) => b2 > lo && b2 < hi) ? PARK.pillarBoost : 1; f.run = { bearing: cross.bearingDeg, t: 0, total: cross.t, mode: r, boost, h: cross.h }; if (r && !rob) rob = r; }
+        if (cross && !targetHit(cross, TARGETS, targetsHit)) for (const f of fielders) { const r = robRead(f.bearing, cross); const lo = Math.min(f.bearing, cross.bearingDeg), hi = Math.max(f.bearing, cross.bearingDeg); const boost = PARK.pillarBearings.some((b2) => b2 > lo && b2 < hi) ? PARK.pillarBoost : 1; f.run = runTo(cross.bearingDeg, cross.t, r, boost, cross.h); if (r && !rob) rob = r; }
         hit = { q, launch, cover, clutch, distPts, cross, rob, settled: false };
         console.info(`[PARK] swing q ${q.toFixed(2)} ${ks.label || 'plain'} x${ks.exitMult.toFixed(2)} → ${cross ? `wall in ${cross.t.toFixed(2)} s at ${cross.bearingDeg.toFixed(0)}° h ${cross.h.toFixed(1)}` : 'short'}${rob ? ' · ' + rob + ' coming' : ''}`);
         ctx.heroRef.current = ball;
         ctx.camDirector.mode = 'follow';
-        ctx.setHud({ contact: `${cover >= 0.9 ? 'PURE' : cover >= 0.5 ? 'OFF-CENTRE' : 'EDGE OF THE BAT'} · ${pitchLabel}${ks.label ? ' · ' + ks.label : ''}`, flow: 0 });
+        trail?.start();   // #11: the tracer from the bat
+        // #7: the pitch's name goes up now that it has resolved
+        ctx.setHud({ contact: `${cover >= 0.9 ? 'PURE' : cover >= 0.5 ? 'OFF-CENTRE' : 'EDGE OF THE BAT'} · ${pitchLabel}${ks.label ? ' · ' + ks.label : ''}`, flow: 0, pitch: pitchLabel });
       }
     },
 
@@ -1350,9 +1502,10 @@ export const DerbyMode: ModeDefinition = (() => {
       if (incoming) {
         pci.update(dt, stickX, stickY);
         // stream the real reticle position (see the pitch() note: drivers
-        // close the loop on this instead of integrating their own model)
-        ctx.setHud({ pci: `${pci.pos.x.toFixed(2)},${pci.pos.y.toFixed(2)}` });
+        // close the loop on this instead of integrating their own model) — #15: in development only
+        if (DEV_PCI) ctx.setHud({ pci: `${pci.pos.x.toFixed(2)},${pci.pos.y.toFixed(2)}` });
       }
+      tickCue();
       // the slider's LATE break — armed in the last 45% of the flight,
       // integrated as velocity so it bends rather than teleports
       if (incoming && flight.active && pitchBreakA !== 0) {
@@ -1390,15 +1543,17 @@ export const DerbyMode: ModeDefinition = (() => {
         ctx.feel?.impact?.(0.35);   // A+ P0: a whiff is an out — clank-weight feel, no make punch
         console.info('[DERBY-JUICE] whiff (clank weight)');
         const whiffOut = bankSwing(tally, false);        // a whiff is an out
-        // the whiff names the pitch — The Show tells you what beat you
-        ctx.setHud({ banner: `WHIFF — ${pitchLabel === 'SLD' ? 'the slider broke late' : pitchLabel === 'CHG' ? 'the change-up pulled the string' : 'beat you with heat'}`, outs: tally.outs });
-        setTimeout(() => ctx.setHud({ banner: '' }), 900);
-        if (whiffOut) { ended = true; SoundKit.play('whistle'); console.info(`[DERBY-END] homers ${tally.homers} outs ${tally.outs} pts ${pts}`); setTimeout(() => ctx.end('DERBY_END', pts, { pitches: round, homers: tally.homers, outs: tally.outs, longestFt: tally.longestFt, rivalHomers: rivalTarget }), 1000); return; }
+        // the whiff names the pitch — The Show tells you what beat you; #3: a swing that missed the window says by how much
+        // first (it was the pitch type alone); #7: the pitch's name goes up on the board now; #2: the rival moves on the out
+        const what = pitchLabel === 'SLD' ? 'the slider broke late' : pitchLabel === 'CHG' ? 'the change-up pulled the string' : 'beat you with heat';
+        ctx.setHud({ outs: tally.outs, pitch: pitchLabel, rivalHomers: rivalSoFar() });
+        bannerCh?.flash(`WHIFF — ${missLine ? `${missLine} · ` : ''}${what}`, 900);
+        if (whiffOut) { endDerby(ctx, round, 700); return; }
       }
       if (!flying && !incoming && !pending) {
-        if (round >= TOTAL) { ended = true; SoundKit.play('whistle'); console.info(`[DERBY-END] homers ${tally.homers} outs ${tally.outs} pts ${pts}`); return ctx.end('DERBY_END', pts, { pitches: TOTAL, homers: tally.homers, outs: tally.outs, longestFt: tally.longestFt, rivalHomers: rivalTarget }); }
-        pending = true;
-        setTimeout(() => { pending = false; if (!ended) pitch(ctx); }, 800);
+        if (round >= TOTAL) { endDerby(ctx, TOTAL, 0); return; }
+        pending = true; trickDone = false;   // #12: the set — the next pitch's warm-up is open from here
+        timers.later(() => { pending = false; if (!ended) pitch(ctx); }, 800);
       }
       // During the PITCH the fixed swing camera aims at where the pitch is
       // GOING (the strike zone), never at the moving ball: a 0.4 lerp onto a
@@ -1408,10 +1563,12 @@ export const DerbyMode: ModeDefinition = (() => {
       // the zone; the ball comes to it. After contact the follow cam owns
       // the ball (see the contact branch) and this objective is moot.
       gallery?.update(dt);
-      ctx.camDirector.update(me.root.position, Vector3.Zero(), flying && !incoming ? ball.position : PITCHER_VIEW);   // a hit ball is followed; a pitch is watched from the plate
+      ctx.camDirector.update(me.root.position, ZERO_V, flying && !incoming ? ball.position : PITCHER_VIEW);   // a hit ball is followed; a pitch is watched from the plate (#16: a shared zero, not Vector3.Zero() a frame)
     },
 
-    dispose() { for (const f of fielders) f.char.dispose(); fielders = []; token?.mesh.dispose(); token = null; targetMeshes.clear(); batPosture?.dispose(); batPosture = null; pitchPosture?.dispose(); pitchPosture = null; derbyVenue?.dispose?.(); derbyVenue = null; gallery?.dispose(); gallery = null; if (batObs) { bat?.getScene().onBeforeRenderObservable.remove(batObs); batObs = null; } batSwingSec = null; bat?.dispose(); bat = null; me?.dispose(); pitcher?.dispose(); furniture.forEach((f) => f.dispose()); ball?.dispose(); SoundKit.stopAmbient(); },
+    // IMPROVE (2026-10-06, Derby #9): ended = true and every pending timer cleared — the next pitch's setTimeout checked
+    // only `!ended`, which dispose never set, so a pitch could be thrown into a torn-down scene.
+    dispose() { ended = true; pending = false; timers.clear(); bannerCh = null; trail?.dispose(); trail = null; cueRing?.dispose(); cueRing = null; cueMat?.dispose(); cueMat = null; tokenMat?.dispose(); tokenMat = null; for (const m of targetMats) m.dispose(true, true); targetMats = []; pci?.dispose(); for (const f of fielders) f.char.dispose(); fielders = []; token?.mesh.dispose(); token = null; targetMeshes.clear(); batPosture?.dispose(); batPosture = null; pitchPosture?.dispose(); pitchPosture = null; derbyVenue?.dispose?.(); derbyVenue = null; gallery?.dispose(); gallery = null; if (batObs) { bat?.getScene().onBeforeRenderObservable.remove(batObs); batObs = null; } batSwingSec = null; bat?.dispose(); bat = null; me?.dispose(); pitcher?.dispose(); furniture.forEach((f) => f.dispose()); ball?.dispose(); SoundKit.stopAmbient(); },
   };
 })();
 
