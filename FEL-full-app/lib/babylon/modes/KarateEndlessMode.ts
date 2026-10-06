@@ -1329,7 +1329,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
           landHit(ctx, e, false, 'medium');
           flowStats.counters++;
           onFlow(ctx, flow.counter(gameSec), 'COUNTER');
-        } else flowBanner(ctx, 'BULLET TIME', 800);
+        } else flowBanner(ctx, 'FOCUS', 800);
       } else gainChi(ctx, 5);
       return;
     }
