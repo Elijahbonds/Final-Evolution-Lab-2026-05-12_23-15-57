@@ -165,6 +165,7 @@ import {
 import { flipSoundMap, songBarSounds, songChops } from './studioEdit';
 import { danceSongAtTier, danceFloorOpenFor, DANCE_FLOOR_UPLOAD_LINE, exportSongToDance, saveExportedTrack, type ExportedTake } from './DanceExport';
 import { renderWalkOutLoopBlob, WALKOUT_LOOP_BARS } from './loopRender';   // MUSIC-SUITE P7: SET AS MY WALK-OUT's gap-free loop
+import { PublishAsCardLink } from '@/components/create/publish-as-card';   // CREATE HUB: every Academy song can become a Creator Card
 import { bakedBuffer, monoOf, sourceKey, type DecodedSource, type StepClock } from './FlipPad';
 // MUSIC-SUITE P5 (2026-09-25), phone-mpc: the phone's room lives at ROOM level, its pads play the room's bank on any tab
 // (the pad_N parse moved from Flip.padFromAction to phonePad.phoneCommand, which also reads PLAY / STOP / REC / BANK A–D)
@@ -3099,6 +3100,11 @@ export default function StudioMode({
                 </button>
               );
             })()}
+            {/* CREATE HUB (owner 2026-10-06): the song you just published, as a Creator Card — the same guided setup as /create */}
+            {lastPublishedId && StudioLibrary.get(lastPublishedId) && (
+              <PublishAsCardLink discipline="music" qa="publish-card-current" style={S.btnAlt}
+                entry={{ from: 'academy', song: lastPublishedId, title: StudioLibrary.get(lastPublishedId)?.title }}>PUBLISH AS CARD</PublishAsCardLink>
+            )}
           </div>
           {/* MUSIC-SUITE P5 (decision #15): a song with an upload stays on this device — the room says why, in one line */}
           {privacy.private && <div data-qa="upload-private" role="note" style={{ fontSize: 12, color: '#ffd75e', marginTop: 6 }}>{privacy.line}</div>}
@@ -3114,6 +3120,12 @@ export default function StudioMode({
                 onClick={sendToDance}>
                 {dancedSig === danceSig ? '✓ ON THE DANCE FLOOR' : '♪ SEND TO THE DANCE FLOOR'}
               </button>
+              {/* CREATE HUB: once the chart is on the dance floor, publish it with the song (the flow attaches the chart
+                  to the Academy song of the same tempo) */}
+              {dancedSig === danceSig && (
+                <PublishAsCardLink discipline="music" qa="publish-card-dance" style={S.btnAlt}
+                  entry={{ from: 'dance-export', chart: true, ...(lastPublishedId ? { song: lastPublishedId } : {}) }}>…AND PUBLISH IT WITH THE CHART</PublishAsCardLink>
+              )}
               <span style={{ fontSize: 12, opacity: 0.75 }}>{danceSong.from === 'chain' ? 'your song, as chained' : 'your grid, looped'}</span>
             </div>
           )}
@@ -3193,6 +3205,9 @@ export default function StudioMode({
                   uses just above — a walk-out chosen on another author's song is not a thing this room's own UI offers,
                   and a device-private (uploaded) song is refused with a line by StudioLibrary.setWalkOut itself rather than
                   hidden here, the same way a full library refuses PUBLISH with a line instead of disabling the button. */}
+              {(t.authorId === me || t.authorId === 'me') && (
+                <PublishAsCardLink discipline="music" qa="publish-card-library" style={S.btnAlt} entry={{ from: 'library', song: t.id, title: t.title }}>PUBLISH AS CARD</PublishAsCardLink>
+              )}
               {(t.authorId === me || t.authorId === 'me') && (
                 <button data-qa="set-walkout" style={{ ...S.btnAlt, ...(t.isWalkOut ? { background: '#4FD1E8', color: '#101018', border: '1px solid #4FD1E8' } : {}) }}
                   disabled={walkOutBusy} onClick={() => void setAsWalkOut(t)}>

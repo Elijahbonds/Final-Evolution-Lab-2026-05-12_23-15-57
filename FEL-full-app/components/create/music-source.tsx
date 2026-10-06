@@ -37,7 +37,7 @@ export function musicPayloadOf(t: Prepared, chart: DanceStep[] | null): ArtPaylo
 export default function MusicSource({ entry, userId, publicCreator, onMade }: {
   entry: PublishEntry; userId: string; publicCreator: boolean; onMade: (m: MadeThing) => void;
 }) {
-  const [tab, setTab] = useState<Tab>(entry.from === 'flipshelf' ? 'upload' : entry.from === 'maker' ? 'maker' : 'academy');
+  const [tab, setTab] = useState<Tab>(entry.from === 'flipshelf' || entry.from === 'song-render' ? 'upload' : entry.from === 'maker' ? 'maker' : 'academy');
   const [rows, setRows] = useState<LibraryRow[] | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -84,6 +84,28 @@ export default function MusicSource({ entry, userId, publicCreator, onMade }: {
     if (auto.current || !entry.song || !rows || !publicCreator) return;
     if (rows.some((r) => r.id === entry.song)) { auto.current = true; void fromLibrary(entry.song); }
   }, [entry.song, rows, fromLibrary, publicCreator]);
+
+  // A rendered song (SongPanel) or a file (FlipShelf) handed over on this device (lib/create/handoff.ts). Without one
+  // (another browser, older than 30 minutes) the upload tab asks for the file.
+  const [handoffMissing, setHandoffMissing] = useState(false);
+  useEffect(() => {
+    if (!publicCreator || (entry.from !== 'song-render' && entry.from !== 'flipshelf')) return;
+    let live = true;
+    void (async () => {
+      const { takeHandoff } = await import('@/lib/create/handoff');
+      const got = await takeHandoff(entry.from!);
+      if (!live) return;
+      if (!got) { setHandoffMissing(true); setTab('upload'); return; }
+      setBusy('Reading your song…');
+      try {
+        const { prepareUpload } = await import('@/lib/create/media-browser');
+        const t = await prepareUpload(new File([got.blob], got.meta.fileName, { type: got.meta.mime }));
+        take(entry.from === 'song-render' ? { ...t, origin: 'academy', ...(got.meta.bpm ? { bpm: got.meta.bpm } : {}) } : t, got.meta.title ?? got.meta.fileName.replace(/\.[^.]+$/, ''));
+      } catch (e) { setErr(e instanceof Error ? e.message : 'Could not read that song.'); setTab('upload'); }
+      finally { if (live) setBusy(null); }
+    })();
+    return () => { live = false; };
+  }, [entry.from, publicCreator, take]);
 
   const fromFile = async (file: File | undefined) => {
     if (!file) return;
@@ -150,6 +172,7 @@ export default function MusicSource({ entry, userId, publicCreator, onMade }: {
 
       {tab === 'upload' && !track && (
         <label className="block rounded-2xl border border-dashed border-neutral-700 bg-neutral-900 p-6 text-center text-sm text-neutral-300">
+          {handoffMissing && <span className="mb-2 block text-xs text-amber-300">{entry.from === 'song-render' ? 'Your render is not on this page any more: choose the mix you downloaded (⬇ MIX).' : 'Choose the file again.'}</span>}
           <span className="block font-bold text-neutral-100">Choose an audio file</span>
           <span className="mt-1 block text-xs text-neutral-500">mp3, m4a, wav or webm · up to 4 minutes and 8 MB · only music you made or own every right to</span>
           <input type="file" accept="audio/*,.mp3,.m4a,.wav,.webm" className="mt-3 block w-full text-xs" onChange={(e) => void fromFile(e.target.files?.[0])} />
