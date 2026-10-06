@@ -79,8 +79,11 @@ export function shapeKey(mesh: Mesh): string {
 /** A skinned mesh's rest field, cached per kit mesh; null when it has no skin, no indices or no positions. */
 export function prepFor(mesh: Mesh): MeshPrep | null {
   if (prepOfMesh.has(mesh)) return prepOfMesh.get(mesh) ?? null;
+  // phase 4e: a code-built garment is a new geometry at every edit (a sleeve slider) — kept per mesh object only, never in
+  // the shared per-kit map, which would otherwise grow with every step of a drag
+  const own = !!(mesh.metadata as { felNoShapeCache?: boolean } | null | undefined)?.felNoShapeCache;
   const key = shapeKey(mesh);
-  if (preps.has(key)) { const hit = preps.get(key) ?? null; prepOfMesh.set(mesh, hit); return hit; }
+  if (!own && preps.has(key)) { const hit = preps.get(key) ?? null; prepOfMesh.set(mesh, hit); return hit; }
   const skin = mesh.skeleton ? restSkin(mesh) : null;
   const ind = fullIndices(mesh);
   const pos = mesh.getVerticesData('position');
@@ -98,7 +101,7 @@ export function prepFor(mesh: Mesh): MeshPrep | null {
       linv, base: Float32Array.from(pos), bones: skin.bones.map(bareBone),
     };
   }
-  preps.set(key, prep);
+  if (!own) preps.set(key, prep);
   prepOfMesh.set(mesh, prep);
   return prep;
 }
@@ -353,6 +356,8 @@ export function syncShape(
   const m = body ? measureBody(body) : null;
   if (!m || !body) return null;
   if (!st) { st = { meshes: new Map(), hooked: false }; bodies.set(root, st); }
+  // phase 4e: a garment rebuilt since (a code-built piece edited) left its old mesh behind: forget it
+  for (const [m, ms] of [...st.meshes]) if (m.isDisposed()) { if (ms.own) { try { ms.mgr.dispose(); } catch { /* gone */ } } st.meshes.delete(m); }
   if (!st.hooked) { st.hooked = true; root.onDisposeObservable.addOnce(() => { const b = bodies.get(root); if (b) { release(b); bodies.delete(root); } }); }
   const sk = spawn.skeleton;
   applyBones({ root, skeleton: sk }, s, m);

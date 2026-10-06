@@ -17,6 +17,9 @@ import {
   PART_SHAPES, PART_BONES, FINISHES, PAINT_TYPES, PAINT_REGIONS, PAINT_SURFACES, PAINT_PATTERNS, PAINT_STAMPS, PAINT_BLENDS,
   COLOUR_SLOTS, PROPORTION_RANGES, PROPORTION_KEYS, RANGES, HIDE_KEYS, PUPIL_SHAPES, EYE_RANGES, EYE_DEFAULTS,
   SLOT_BODIES, GIRTH_KEYS, GIRTH_RANGE, PRESENTATION_RANGE, PART_TONES, TONE_AXES, isSwingShape,
+  CLOTH_KINDS, CLOTH_STYLES, CLOTH_STYLE_DEFAULTS, CLOTH_OPTIONS, CLOTH_SLEEVES, CLOTH_HEMS, CLOTH_NECKS, CLOTH_HOODS, CLOTH_LEGS,
+  CLOTH_RISES, CLOTH_CUFFS, CLOTH_SHAFTS, CLOTH_TONES, MAX_CLOTHES, MAX_CLOTHES_PER_KIND,
+  type CreatorCloth, type ClothKind, type ClothDefaults,
   type CreatorDoc, type CreatorPart, type PaintLayer, type Vec3, type ColourSlot, type CreatorEyes, type CreatorFlags,
   type CreatorSlotV2, type SlotBody, type SlotFrame, type SlotPresentation,
 } from './doc';
@@ -209,7 +212,73 @@ export function sanitizeCreatorDoc(raw: unknown, maxChars: number = MAX_DOC_CHAR
   const eyes = sanitizeEyes(raw.eyes);
   if (eyes) doc.eyes = eyes;
   if (marks.length) doc.marks = marks;
+  // phase 4e: code-built clothes (stored only when there is one, so a phase 1–4d doc sanitises to exactly what it was)
+  const clothes = sanitizeClothes(raw.clothes);
+  if (clothes.length) doc.clothes = clothes;
   return JSON.stringify(doc).length > maxChars ? null : doc;
+}
+
+// ── code-built clothes (phase 4e) ───────────────────────────────────────────────────────────────────────────────────
+
+/** The option lists, by option name (what a piece may say for each). */
+const CLOTH_ENUMS: Partial<Record<keyof ClothDefaults, readonly string[]>> = {
+  sleeve: CLOTH_SLEEVES, hem: CLOTH_HEMS, neck: CLOTH_NECKS, hood: CLOTH_HOODS, leg: CLOTH_LEGS, rise: CLOTH_RISES, cuff: CLOTH_CUFFS, shaft: CLOTH_SHAFTS,
+};
+
+/**
+ * One piece of clothing (doc.ts CreatorCloth) in its canonical form: the kind is the style's (a style that names another
+ * kind's list is refused), the colour is required, every option is from its allow-list and belongs to the kind, numbers
+ * are clamped to 0..1 (2 decimals), and an option equal to the style's default is left out — so a piece sanitises to
+ * the same thing however it was written, and a share code carries only what the player changed. Null for anything that
+ * is not a piece.
+ */
+export function sanitizeCloth(raw: unknown): CreatorCloth | null {
+  if (!isObj(raw)) return null;
+  const id = sanitizeId(raw.id);
+  const kind = pick(raw.kind, CLOTH_KINDS);
+  const colour = sanitizeHex(raw.colour);
+  if (!id || !kind || !colour) return null;
+  const style = pick(raw.style, CLOTH_STYLES[kind] as readonly string[]) as CreatorCloth['style'] | null;
+  if (!style) return null;
+  const def = CLOTH_STYLE_DEFAULTS[style];
+  const out: CreatorCloth = { id, kind, style, colour };
+  const fit = clampNum(raw.fit, 0, 1, def.fit, 2);
+  if (fit !== def.fit) out.fit = fit;
+  for (const k of CLOTH_OPTIONS[kind]) {
+    const v = raw[k];
+    if (k === 'open' || k === 'flare') {
+      const n = clampNum(v, 0, 1, def[k] ?? 0, 2);
+      if (n !== (def[k] ?? 0)) out[k] = n;
+    } else if (k === 'waistband') {
+      if (typeof v === 'boolean' && v !== def.waistband) out.waistband = v;
+    } else {
+      const e = pick(v, CLOTH_ENUMS[k] ?? []);
+      if (e && e !== def[k]) (out as unknown as Record<string, unknown>)[k] = e;
+    }
+  }
+  const colour2 = sanitizeHex(raw.colour2);
+  if (colour2) {
+    out.colour2 = colour2;
+    const tone = pick(raw.tone, CLOTH_TONES);
+    if (tone && tone !== def.tone) out.tone = tone;
+  }
+  return out;
+}
+
+/** The doc's clothes: the first valid pieces with unique ids, at most MAX_CLOTHES and MAX_CLOTHES_PER_KIND of each kind,
+ *  in the order given (the order is the layering, innermost first). Only the first MAX_CLOTHES × 4 entries are looked at. */
+export function sanitizeClothes(raw: unknown): CreatorCloth[] {
+  if (!Array.isArray(raw)) return [];
+  const out: CreatorCloth[] = [];
+  const seen = new Set<string>();
+  const per: Record<ClothKind, number> = { top: 0, bottom: 0, gloves: 0, feet: 0 };
+  for (const r of raw.slice(0, MAX_CLOTHES * 4)) {
+    if (out.length >= MAX_CLOTHES) break;
+    const c = sanitizeCloth(r);
+    if (!c || seen.has(c.id) || per[c.kind] >= MAX_CLOTHES_PER_KIND[c.kind]) continue;
+    seen.add(c.id); per[c.kind]++; out.push(c);
+  }
+  return out;
 }
 
 /** Phase 4a: the procedural eyes block. Every field is optional and kept only when it differs from EYE_DEFAULTS, so an
