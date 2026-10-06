@@ -49,6 +49,30 @@ function Meter({ label, value, max, color }: { label: string; value: number; max
   );
 }
 
+/**
+ * IMPROVE (2026-10-06, skate item 9): the balance needle a grind or a manual rides, −100..100 (the side it is tipping to;
+ * the stick held that way brings it back). A meter the player cannot see is a guess. Drawn while a mode publishes a number.
+ */
+function BalanceNeedle({ value, label }: { value: number; label: string }) {
+  const v = Math.max(-100, Math.min(100, value));
+  const danger = Math.abs(v) > 70;
+  return (
+    <div className="flex flex-col items-center gap-0.5">
+      <span className={`font-mono text-[10px] tracking-wider ${danger ? 'text-[var(--fel-red)]' : 'text-white/70'}`}>{label || 'BALANCE'}</span>
+      <div className="relative h-2 w-40 rounded-full bg-white/15">
+        <div className="absolute inset-y-0 left-1/2 w-px bg-white/50" />
+        <div
+          className="absolute top-1/2 h-3.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-sm"
+          style={{ left: `${50 + v / 2}%`, background: danger ? 'var(--fel-red)' : 'var(--fel-gold)' }}
+        />
+      </div>
+    </div>
+  );
+}
+
+/** IMPROVE (2026-10-06, item 18): how long the mode's control hint stays up once play starts (or the hint changes), ms. */
+const HINT_SHOW_MS = 8000;
+
 /** A mode's NAME on the splash when the route does not pass one (GATE-CRASHER-MAJOR: every host of the slalom says what it is). */
 const HOST_TITLE: Record<string, string> = { snowboard_slalom: 'GATE CRASHER' };
 
@@ -66,6 +90,17 @@ export function makeBoardHost(opts: BoardHostOpts) {
     const [countdown, setCountdown] = useState<number | null>(null);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [hud, setHud] = useState<Hud>({});
+    // IMPROVE (2026-10-06, item 18): skate, snow and surf all publish `hint` and this host never drew it. It is shown at
+    // the start of play (and again when it changes — a body's words replace a pad's), then gets out of the way.
+    const [hintUp, setHintUp] = useState(false);
+    const hintText = typeof hud.hint === 'string' ? hud.hint : '';
+    const live = phase === 'playing' || phase === 'countdown';
+    useEffect(() => {
+      if (!live || !hintText) { setHintUp(false); return; }
+      setHintUp(true);
+      const t = setTimeout(() => setHintUp(false), HINT_SHOW_MS);
+      return () => clearTimeout(t);
+    }, [live, hintText]);
     useBabylonPlaytestBridge(modeKey, () => ({ phase, countdown, loadError, hud }), busRef.current);
 
     useEffect(() => {
@@ -113,7 +148,9 @@ export function makeBoardHost(opts: BoardHostOpts) {
           setCountdown(p === 'countdown' && typeof cd === 'number' ? cd : null);
           setLoadError(p === 'error' ? (typeof cd === 'string' ? cd : 'Failed to load this mode.') : null);
         },
-        onHud: (u) => setHud((prev) => ({ ...prev, ...u })),
+        // IMPROVE (2026-10-06): an update that changes nothing keeps the same state object, so React skips the re-render
+        // (a mode repeating its values every frame cost a render a call — skate pushed about three a frame)
+        onHud: (u) => setHud((prev) => (Object.keys(u).some((k) => prev[k] !== u[k]) ? { ...prev, ...u } : prev)),
         resultSink,
       })
         .then((s) => {
@@ -191,6 +228,20 @@ export function makeBoardHost(opts: BoardHostOpts) {
               {hnode(hud.pot, 0)}
             </span>
             <span className="font-mono text-sm font-bold text-[var(--fel-gold)]">{hnode(hud.combo)}</span>
+            {/* IMPROVE (2026-10-06, item 10): the THPS line — the links by name, and what the pot is waiting on */}
+            {typeof hud.comboLine === 'string' && hud.comboLine && (
+              <span className="max-w-[80%] truncate font-mono text-xs font-bold text-white/90 drop-shadow">{hud.comboLine}</span>
+            )}
+            {typeof hud.chainLink === 'string' && hud.chainLink && (
+              <span className="font-mono text-[10px] tracking-wider text-white/60">{hud.chainLink}</span>
+            )}
+          </div>
+        )}
+
+        {/* IMPROVE (2026-10-06, item 9): the balance needle while a grind or a manual rides one */}
+        {typeof hud.balance === 'number' && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-[32%] flex justify-center">
+            <BalanceNeedle value={hud.balance} label={typeof hud.balanceKind === 'string' ? hud.balanceKind : ''} />
           </div>
         )}
 
@@ -228,6 +279,13 @@ export function makeBoardHost(opts: BoardHostOpts) {
         {typeof hud.wallCue === 'string' && hud.wallCue && (
           <div className="pointer-events-none absolute inset-x-0 bottom-[22%] text-center">
             <span className="fel-panel px-3 py-1 font-mono text-sm font-bold text-[var(--fel-cyan)]">{hud.wallCue}</span>
+          </div>
+        )}
+
+        {/* IMPROVE (2026-10-06, item 18): the mode's control hint, for the first seconds of play */}
+        {hintUp && hintText && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-14 flex justify-center px-4">
+            <span className="fel-panel max-w-[70%] px-3 py-1 text-center font-mono text-[11px] text-white/80">{hintText}</span>
           </div>
         )}
 
