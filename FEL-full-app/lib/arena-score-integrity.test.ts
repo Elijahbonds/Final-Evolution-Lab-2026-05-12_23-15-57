@@ -49,7 +49,9 @@ import { FREERUN_TRICKS, LAUNCH_MULT, TIERS } from './babylon/core/FreeRunCore';
 import { EVENTS_PER_NIGHT } from './babylon/core/CarnivalNight';
 import type { GrindLine } from './babylon/core/GroundRide';
 import { SNOW_SLOPE } from './babylon/modes/snowSlope';
-import { timeBonus, TIME_BONUS_MAX, gateStreakBonus, GATE_STREAK_MAX, GRAB_HOLD_MAX } from './babylon/modes/gateCrasher';   // GATE-CRASHER-POLISH-2 (GC-9): the time curve
+import { timeBonus, TIME_BONUS_MAX, gateStreakBonus, GATE_STREAK_MAX, GRAB_HOLD_MAX } from './babylon/modes/gateCrasher';
+import { SURF_GRABS, NEAR_MISS_PTS, NEAR_MISS_COOLDOWN_SEC, SWELL_WORTH_MAX } from './babylon/modes/surfBreak';   // IMPROVE (2026-10-06, surf)
+import { WAVE_PROFILES } from './babylon/modes/surfLineup';   // GATE-CRASHER-POLISH-2 (GC-9): the time curve
 
 const src = (p: string) => readFileSync(join(process.cwd(), p), 'utf8');
 const num = (text: string, re: RegExp, what: string): number => {
@@ -370,8 +372,9 @@ const PERFECT_RUNS: Record<string, () => number> = {
   skateboarding: () => Math.max(...[60, 120, 144, 180, 240].map(skateRun)),
   surfing: () => {
     const m = MIRRORED;
-    const airs = trickMachineRun([...SURF_TRICKS.filter((t) => t.kind === 'air').map(asTrickDef), TRICKS.grab], m.surfRunSec);
-    const waveMoves = (Math.floor(m.surfRunSec / m.surfWaveMoveLockSec) + 1) * (Math.max(...SURF_TRICKS.filter((t) => t.kind !== 'air').map(basePts)) + m.surfFlowMax / 4);
+    // (IMPROVE 2026-10-06, surf: the named X grabs are airs too, and a wave move pays × its swell's worth — the CAVE's at most)
+    const airs = trickMachineRun([...SURF_TRICKS.filter((t) => t.kind === 'air').map(asTrickDef), ...SURF_GRABS.map(asTrickDef), TRICKS.grab], m.surfRunSec);
+    const waveMoves = (Math.floor(m.surfRunSec / m.surfWaveMoveLockSec) + 1) * (Math.max(...SURF_TRICKS.filter((t) => t.kind !== 'air').map(basePts)) + m.surfFlowMax / 4) * m.surfWorthMax;
     const barrels = Math.floor(m.surfRunSec / m.surfBarrelHoldSec) * m.surfBarrelBonus;
     return airs + waveMoves + barrels;
   },
@@ -985,7 +988,19 @@ describe('drift guards — the numbers mirrored out of mode files still match th
     expect(num(surf, /export const BARREL_BONUS = (\d+);/, 'BARREL_BONUS')).toBe(MIRRORED.surfBarrelBonus);
     expect(surf).toContain('(trickPts(wave) + Math.round(flow / 4))');
     expect(surf.match(/tricks\.score \+= /g)).toHaveLength(2);                   // a wave move and a barrel; the rest is the machine's
-    expect(surf).toContain('rig.rider.jump(0.5 + flow / 200)');                  // a pop: v ≥ 7.75 m/s → ≥ 1.1 s of hang
+    // IMPROVE (2026-10-06, surf): test changed — the pop takes the coyote's late press (item 11), same power; a wave move pays
+    // × the swell's worth (item 20) and joins the chain with its own points paid outside the pot (item 15); a near miss is the
+    // only other link (item 14); the named grabs (item 18) are mirrored
+    expect(surf).toContain('rig.rider.jump(0.5 + flow / 200, late)');            // a pop: v ≥ 7.75 m/s → ≥ 1.1 s of hang
+    expect(surf).toContain('* REPEAT_DECAY[Math.min(rep, REPEAT_DECAY.length - 1)] * worth);');
+    expect(surf).toContain('tricks.link(wave.label, paid, true)');
+    expect(surf).toContain("tricks.link('NEAR MISS', NEAR_MISS_PTS)");
+    expect(surf.match(/tricks\.link\(/g)).toHaveLength(2);
+    expect(SURF_GRABS.map(basePts)).toEqual([...MIRRORED.surfGrabPts]);
+    expect(NEAR_MISS_PTS).toBe(MIRRORED.surfNearMissPts);
+    expect(NEAR_MISS_COOLDOWN_SEC).toBe(MIRRORED.surfNearMissCooldownSec);
+    expect(SWELL_WORTH_MAX).toBe(MIRRORED.surfWorthMax);
+    expect(Math.max(...WAVE_PROFILES.map((p) => p.worth))).toBe(MIRRORED.surfWorthMax);
     expect((2 * (5 + 0.5 * 5.5)) / 14).toBeGreaterThan(3 * BOARD_EVENT_SEC);
     const snow = src('lib/babylon/modes/SnowboardSlalomMode.ts');
     expect(num(src('lib/babylon/modes/rideWorlds.ts'), /export const SLALOM_GATES = (\d+);/, 'SLALOM_GATES')).toBe(MIRRORED.slalomGates);

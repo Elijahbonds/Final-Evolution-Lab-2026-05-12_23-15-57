@@ -108,6 +108,10 @@ export const MIRRORED = {
   boardCoreTrickPts: [50, 120, 120, 140, 90] as readonly number[],
   /** SurfBreakMode — RUN_SEC, WAVE_MOVE_LOCK_SEC, FLOW_MAX (a wave move pays + flow / 4), BARREL_HOLD_SEC, BARREL_BONUS. */
   surfRunSec: 90, surfWaveMoveLockSec: 0.55, surfFlowMax: 200, surfBarrelHoldSec: 1.5, surfBarrelBonus: 250,
+  /** IMPROVE (2026-10-06, surf items 14 / 18 / 20) — modes/surfBreak: the named X grabs' points (SURF_GRABS, basePts), the near
+   *  miss (NEAR_MISS_PTS, one per NEAR_MISS_COOLDOWN_SEC at most), and the biggest swell's worth (SWELL_WORTH_MAX), which a wave
+   *  move is multiplied by. */
+  surfGrabPts: [104, 120] as readonly number[], surfNearMissPts: 50, surfNearMissCooldownSec: 2, surfWorthMax: 1.8,
   /** SnowboardSlalomMode — rideWorlds SLALOM_GATES at 100 a gate, YETI_CLEAR_PTS once a run, the time bonus (60 − t) × 10. */
   slalomGates: 30, slalomGatePts: 100, yetiClearPts: 150, snowTimeBonusMax: 600,
   /** IMPROVE (2026-10-06, snow item 5): gateCrasher GATE_STREAK_MAX — the most a gate's streak bonus pays on top of its 100. */
@@ -325,19 +329,24 @@ export function skateBound(): number {
  *  never pass REPEAT_NO_MULT × the distinct moves the machine can be handed. */
 const trickMachineMultCap = (moves: number): number => REPEAT_NO_MULT * moves;
 
-/** The Break: a landing every BOARD_EVENT_SEC for the session (surf's airs or boardCore's grab, whichever pays most), a
- *  wave move every WAVE_MOVE_LOCK_SEC at full flow, and a barrel every BARREL_HOLD_SEC. */
+/** The Break: a landing every BOARD_EVENT_SEC for the session (surf's airs, its named grabs or boardCore's grab, whichever
+ *  pays most), a wave move every WAVE_MOVE_LOCK_SEC at full flow on the biggest swell, a near miss every cooldown, and a
+ *  barrel every BARREL_HOLD_SEC. IMPROVE (2026-10-06, surf item 15): a wave move and a near miss are LINKS in the TrickMachine's
+ *  chain now (TrickMachine.link) — the multiplier cap counts them, and each can pay at most its points × that cap in all
+ *  (a wave move's own points at once, the chain's share on top). */
 export function surfBound(): number {
   const m = MIRRORED;
+  const multCap = trickMachineMultCap(SURF_TRICKS.length + m.boardCoreTrickPts.length + m.surfGrabPts.length + 1);   // + NEAR MISS
   const airs = chainRunBound({
     sec: m.surfRunSec, eventSec: BOARD_EVENT_SEC,
-    perEvent: Math.max(maxOf(airPts(SURF_TRICKS)), maxOf(m.boardCoreTrickPts)),
-    multCap: trickMachineMultCap(SURF_TRICKS.length + m.boardCoreTrickPts.length),
+    perEvent: Math.max(maxOf(airPts(SURF_TRICKS)), maxOf(m.boardCoreTrickPts), maxOf(m.surfGrabPts)),
+    multCap,
   });
   const waveMoves = (Math.floor(m.surfRunSec / m.surfWaveMoveLockSec) + 1)
-    * (maxOf(SURF_TRICKS.filter((t) => t.kind !== 'air').map(basePts)) + Math.round(m.surfFlowMax / 4));
+    * Math.ceil((maxOf(SURF_TRICKS.filter((t) => t.kind !== 'air').map(basePts)) + Math.round(m.surfFlowMax / 4)) * m.surfWorthMax) * multCap;
+  const nearMisses = (Math.floor(m.surfRunSec / m.surfNearMissCooldownSec) + 1) * m.surfNearMissPts * multCap;
   const barrels = Math.floor(m.surfRunSec / m.surfBarrelHoldSec) * m.surfBarrelBonus;
-  return airs + waveMoves + barrels;
+  return airs + waveMoves + nearMisses + barrels;
 }
 
 /** Gate Crasher: no clock (a rider can stall on the slope), so UNTIMED_RUN_SEC of a landing or a rail every
@@ -536,8 +545,8 @@ export const SCORE_CEILINGS: Readonly<Record<string, ScoreCeiling>> = {
   },
   surfing: {
     max: bound(surfBound()), kind: 'bound', swapsUnderKillSwitch: true,
-    why: `${BOUND_MARGIN}× a flawless ${m.surfRunSec}-second session: a landing every ${BOARD_EVENT_SEC} s, every wave move and every barrel`,
-    basis: 'chainRunBound(RUN_SEC 90, BOARD_EVENT_SEC, the best air, TrickMachine\'s multiplier cap) + a wave move each WAVE_MOVE_LOCK_SEC at FLOW_MAX + a barrel each BARREL_HOLD_SEC, × BOUND_MARGIN',
+    why: `${BOUND_MARGIN}× a flawless ${m.surfRunSec}-second session: a landing every ${BOARD_EVENT_SEC} s, every wave move, near miss and barrel`,
+    basis: 'chainRunBound(RUN_SEC 90, BOARD_EVENT_SEC, the best air or grab, TrickMachine\'s multiplier cap) + a wave move each WAVE_MOVE_LOCK_SEC at FLOW_MAX on the biggest swell + a near miss each cooldown (both chain links: × the cap) + a barrel each BARREL_HOLD_SEC, × BOUND_MARGIN',
   },
   snowboarding: {
     max: bound(snowBound()), kind: 'bound', swapsUnderKillSwitch: true,

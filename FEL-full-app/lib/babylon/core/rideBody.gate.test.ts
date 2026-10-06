@@ -483,7 +483,9 @@ describe('G10 PAD UNCHANGED', () => {
   it('surf, big air, sprint: the body verbs come from ctx.body() or the claimed step only; the d-pad strides call the core without options', () => {
     expect(src('SurfBreakMode.ts')).toMatch(/const view = ctx\.body\?\.\(\) \?\? null;/);
     // surf's pad B: the same refusals, then the wave move the body's cutback shares (one scoring line, the arena guard's)
-    expect(src('SurfBreakMode.ts')).toMatch(/if \(t < waveMoveUntil\) \{ refuse\(ctx, 'MID-TURN'\); return; \}\n\s*waveMove\(ctx, wave, stickX >= 0 \? 1 : -1\);/);
+    // (IMPROVE 2026-10-06, surf item 16 — test changed: the turn's side is the stick's when it is held across, else back toward
+    // the curl; it was `stickX >= 0 ? 1 : -1`, which cut right whenever the stick was centred or held up)
+    expect(src('SurfBreakMode.ts')).toMatch(/if \(t < waveMoveUntil\) \{ refuse\(ctx, 'MID-TURN'\); return; \}\n\s*waveMove\(ctx, wave, Math\.abs\(stickX\) > 0\.3 \? Math\.sign\(stickX\) : neutralCutSign\(/);
     const sp = src('SprintMode.ts');
     expect(sp).toMatch(/takeStride\(ctx, e\.dir === 'left' \? 'L' : 'R'\);/);
     expect(sp).toMatch(/core\.step\(side, opts\);/);

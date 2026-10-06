@@ -70,6 +70,43 @@ function BalanceNeedle({ value, label }: { value: number; label: string }) {
   );
 }
 
+/**
+ * IMPROVE (2026-10-06, surf item 12): where the rider sits between the lip (left) and the bottom of the face (right), the scored
+ * pocket band drawn on the track. `pos`, `lo`, `hi` are 0..100 along the face. Drawn while a mode publishes `pocket`.
+ */
+function PocketBar({ pos, lo, hi }: { pos: number; lo: number; hi: number }) {
+  const at = Math.max(0, Math.min(100, pos));
+  const inside = at >= lo && at <= hi;
+  return (
+    <div className="flex flex-col items-end gap-0.5">
+      <span className={`font-mono text-[10px] tracking-wider ${inside ? 'text-[var(--fel-cyan)]' : 'text-white/60'}`}>LIP · POCKET · FLAT</span>
+      <div className="relative h-1.5 w-24 rounded-full bg-white/15">
+        <div className="absolute inset-y-0 rounded-full bg-[var(--fel-cyan)]/35" style={{ left: `${lo}%`, width: `${Math.max(0, hi - lo)}%` }} />
+        <div className={`absolute top-1/2 h-3 w-1 -translate-x-1/2 -translate-y-1/2 rounded-sm ${inside ? 'bg-[var(--fel-cyan)]' : 'bg-white'}`} style={{ left: `${at}%` }} />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * IMPROVE (2026-10-06, surf item 13): the tube timer — seconds inside against the hold `mark` (the barrel banks past it), gold
+ * while the rider is working the tube enough to bank, grey (with the ask) while he is not. Drawn while a mode publishes `tube`.
+ */
+function TubeMeter({ sec, mark, ok }: { sec: number; mark: number; ok: boolean }) {
+  const max = mark * 2;
+  const pct = Math.max(0, Math.min(100, (sec / max) * 100));
+  const color = ok ? 'var(--fel-gold)' : 'rgba(255,255,255,0.55)';
+  return (
+    <div className="flex flex-col items-end gap-0.5">
+      <span className="font-mono text-[10px] tracking-wider" style={{ color }}>{ok ? `TUBE ${sec.toFixed(1)}s` : `TUBE ${sec.toFixed(1)}s · TRIM OR DRIVE`}</span>
+      <div className="relative h-1.5 w-24 rounded-full bg-white/15">
+        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: color }} />
+        <div className="absolute -top-0.5 h-2.5 w-px bg-white" style={{ left: '50%' }} />
+      </div>
+    </div>
+  );
+}
+
 /** IMPROVE (2026-10-06, item 18): how long the mode's control hint stays up once play starts (or the hint changes), ms. */
 const HINT_SHOW_MS = 8000;
 
@@ -224,6 +261,13 @@ export function makeBoardHost(opts: BoardHostOpts) {
             {typeof hud.split === 'string' && hud.split && (
               <span className={`fel-panel px-3 py-1 font-bold ${hud.split.includes('+') ? 'text-[var(--fel-gold)]' : 'text-[var(--fel-emerald)]'}`}>{hud.split}</span>
             )}
+            {/* IMPROVE (2026-10-06, surf items 9 / 20): the judged heat (best three waves) and the swell being ridden */}
+            {typeof hud.heat === 'number' && (
+              <span className="fel-panel px-3 py-1 text-white/80">HEAT {hud.heat.toFixed(1)} · {hnode(hud.waves, 0)} WAVES</span>
+            )}
+            {typeof hud.swell === 'string' && hud.swell && (
+              <span className="fel-panel px-3 py-1 font-bold text-[var(--fel-cyan)]">{hud.swell}</span>
+            )}
           </div>
           <span className="rounded-md bg-black/50 px-3 py-1 text-lg font-bold text-white">{hnode(hud.score, 0)}</span>
         </div>
@@ -263,6 +307,11 @@ export function makeBoardHost(opts: BoardHostOpts) {
           {typeof hud.airLeft === 'number' && (
             <Meter label={`AIR ${hud.airLeft.toFixed(1)}s`} value={hud.airLeft} max={Number(hud.airMax ?? 1.2) || 1.2} color="var(--fel-cyan)" />
           )}
+          {/* IMPROVE (2026-10-06, surf items 12 / 13): where the rider is on the face, and the tube while one is ridden */}
+          {typeof hud.pocket === 'number' && (
+            <PocketBar pos={hud.pocket} lo={Number(hud.pocketLo ?? 0)} hi={Number(hud.pocketHi ?? 0)} />
+          )}
+          {typeof hud.tube === 'number' && <TubeMeter sec={hud.tube} mark={Number(hud.tubeMark ?? 1.5) || 1.5} ok={hud.tubeOk === true} />}
         </div>
 
         {/* The objectives, NAMED. The bezel showed "GOALS 0/4" and nothing else,
@@ -290,6 +339,13 @@ export function makeBoardHost(opts: BoardHostOpts) {
         {typeof hud.wallCue === 'string' && hud.wallCue && (
           <div className="pointer-events-none absolute inset-x-0 bottom-[22%] text-center">
             <span className="fel-panel px-3 py-1 font-mono text-sm font-bold text-[var(--fel-cyan)]">{hud.wallCue}</span>
+          </div>
+        )}
+
+        {/* IMPROVE (2026-10-06, surf item 19): a lesson the mode is giving right now (surf's first wave: climb, drop, pump) */}
+        {phase === 'playing' && typeof hud.coach === 'string' && hud.coach && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-[30%] text-center">
+            <span className="fel-panel px-3 py-1 font-mono text-sm font-bold text-[var(--fel-cyan)]">{hud.coach}</span>
           </div>
         )}
 
