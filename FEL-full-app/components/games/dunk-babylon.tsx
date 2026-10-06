@@ -21,6 +21,7 @@ import { toInputBus } from '@/lib/controller-link/modeBridge';
 import { hnode, hnum } from './hud-format';
 import { DunkPoster } from './dunk-poster';
 import { DunkBeatStrip } from './dunk-beat-strip';
+import { DunkFieldBoard } from './dunk-field-board';
 import { MicCaption, MicToggle } from './mic-caption';
 import type { HudPoster } from '@/lib/babylon/core/ModeHarness';
 
@@ -205,7 +206,7 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
             {hnode(hud.score, 0)} <span className="text-white/50">vs</span> {hnode(hud.rivalScore, 0)}
           </span>
           {hud.round != null && (
-            <span className="fel-panel px-2 py-1 text-[var(--fel-cyan)]">{String(hud.round).startsWith('DUNK-OFF') ? '' : 'RD '}{hnode(hud.round)}</span>
+            <span className="fel-panel px-2 py-1 text-[var(--fel-cyan)]">{/^\d/.test(String(hud.round)) ? 'RD ' : ''}{hnode(hud.round)}</span>
           )}
           {/* dunk-next phase 3: the dunk-off's own two cards — never added to the night's totals beside them */}
           {typeof hud.dunkOff === 'string' && hud.dunkOff && (
@@ -305,6 +306,13 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
         </div>
       )}
 
+      {/* dunk-next phase 5: THE FIELD — four dunkers, the cut line, the final (core/DunkField); the night card shows the full board */}
+      {typeof hud.field === 'string' && hud.field && phase === 'playing' && !card && !judging && (
+        <div className="pointer-events-none absolute left-3 top-[15%]">
+          <DunkFieldBoard value={hud.field} compact />
+        </div>
+      )}
+
       {/* dunk-next phase 4: SKIP the rival's dunk straight to his card (B on a pad, K on a keyboard, this chip on a phone) */}
       {hud.rivalSkip === true && phase === 'playing' && !card && (
         <button type="button" onClick={tapSkip} data-fel-dunk-skip
@@ -371,14 +379,19 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
               Night {hnum(hud.nightNum) || 1} · Flight Night
             </p>
             <h2 className={`fel-heading mt-1 text-3xl font-black ${card === 'WON' ? 'text-[var(--fel-gold)]' : 'text-white'}`}>
-              {card === 'WON' ? 'YOU TOOK THE CARD' : 'RIVAL TOOK THE CARD'}
+              {card === 'WON' ? 'YOU TOOK THE CARD' : typeof hud.nightField === 'string' && hud.nightField.startsWith('CUT') ? 'CUT AT THE LINE' : 'RIVAL TOOK THE CARD'}
             </h2>
+            {/* dunk-next phase 5: how the field went — the champion, the final, or where the cut fell */}
+            {typeof hud.nightField === 'string' && hud.nightField ? (
+              <p className="mt-1 font-mono text-[11px] font-bold uppercase text-[var(--fel-gold)]">{hud.nightField}</p>
+            ) : null}
             <p className="mt-2 font-mono text-sm text-white/70">
               YOU {hnode(hud.score, 0)} <span className="text-white/35">·</span> RIVAL {hnode(hud.rivalScore, 0)}
             </p>
             {typeof hud.nightDunkOff === 'string' && hud.nightDunkOff ? (
               <p className="mt-1 font-mono text-[11px] font-bold uppercase text-[var(--fel-gold)]">{hud.nightDunkOff}</p>
             ) : null}
+            {typeof hud.field === 'string' && hud.field ? <div className="mt-2 text-left"><DunkFieldBoard value={hud.field} /></div> : null}
             <p className="mt-1 font-mono text-[11px] text-white/45">
               {hnum(hud.nightMakes)} dunked · {hnum(hud.nightMisses)} missed
               {hnum(hud.nightBest) > 1 ? ` · best run ${hnum(hud.nightBest)}` : ''}

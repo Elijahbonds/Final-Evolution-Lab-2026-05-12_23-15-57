@@ -16,7 +16,7 @@
 //     enough it pays +1 style ("HANG TIME!") before the judges reveal.
 // All additions are animation-independent on purpose (E25/M51-safe).
 
-import { rivalForNight, rivalIntro, takeNextRival, type DunkRival } from '../core/DunkRivals';
+import { rivalForNight, rivalIntro, takeNextRival, rivalById, type DunkRival } from '../core/DunkRivals';
 import { rosterBodyUrl } from '../core/athleteRoster';
 import {
   freshStakes, call as callTrick, spendAttempt, attemptsLeft, canRetry,
@@ -98,7 +98,7 @@ import { spawnDunkObstacle, type DunkObstacle } from './dunkObstacleProps';
 import { LOST_FOUND_HANDOFF, BETWEEN_LEGS_HANDOFF, BEHIND_BACK_SWAP, DOUBLE_EASTBAY_FIRST, DOUBLE_EASTBAY_SECOND, FRONT_SWAP_AT, FRONT_SWAP_BLEND } from '../anim/authored/dunkTricks';
 import { boneNode } from '../anim/boneLookup';
 import { approachAngle, approachBonus, takeoffFor, takeoffTell, rangeLabel } from '../core/DunkApproach';
-import { NightMemory, dunkElements, originalityLine, freshTip, type Dunker } from '../core/DunkOriginality';   // dunk-next phase 2: the night remembers who showed what first
+import { NightMemory, dunkElements, originalityLine, freshTip, SHOWPIECE, type Dunker, type OriginalityRead } from '../core/DunkOriginality';   // dunk-next phase 2: the night remembers who showed what first
 import { spinBody, spinProgress } from '../core/DunkSpinBody';
 import { emptyCard, addAttempt, forWire, nightReport } from '@/lib/mp/dunkCard';
 import {
@@ -108,6 +108,7 @@ import {
 import { MomentumBus } from '../core/MomentumBus';
 import type { RivalSituation } from '../core/RivalNerve';   // the rival feels the contest too (his nerve is read in core/DunkRivalSim.rollRivalAttempt)
 import { rivalSlamOffset, rivalPressAt } from '../core/RivalPlay';
+import { newField, bookCard, cutField, cutTiebreak, placeOf, highlightSituation, simFinal, encodeField, fieldTotal, PLAYER_ID, FIELD_SIZE, FINALISTS, type FieldDunker } from '../core/DunkField';   // dunk-next phase 5: the four-dunker night
 import { rollRivalAttempt, simRivalDunk, DEFAULT_RIVAL_RUNUP, type RivalAttempt, type RivalRunUp, type RivalDunkResult, type RivalJudgeContext } from '../core/DunkRivalSim';   // dunk-next phase 4: a rival's dunk, judged without flying it
 import { beatsCrossed, gradeTrickPress, flightFlow, encodeBeatStrip, BEAT_ORDER, BEAT_TOL_SEC, BEAT_TICK_PITCH, BEAT_TICK_VOLUME, type BeatGrade, type BeatMark, type SlamZone } from '../core/DunkBeats';   // dunk-next phase 1: the flight is a four-beat bar
 import { TRIPLE_CUT, POSTER_SEC, tripleCutSec, announcerCall, CELEBRATIONS, CELEB_BY_DPAD, seedOf, type CelebId } from '../core/DunkCuts';   // DUNK MOTION phase 12: the made dunk's show
@@ -119,7 +120,7 @@ import { ModeMic } from '../audio/mic/ModeMic';   // THE MIC (2026-09-24): the c
 import { dunkStingers } from '../audio/mic/names';
 import { DUNK_RIVAL_VOICES } from '../audio/mic/cast';   // DUNK MOTION phase 11: the rival's pad decides like a player
 
-type Phase = 'approach' | 'charge' | 'cinematic' | 'resolve' | 'judging' | 'rivalTurn' | 'contestOver';
+type Phase = 'approach' | 'charge' | 'cinematic' | 'resolve' | 'judging' | 'rivalTurn' | 'fieldCut' | 'contestOver';   // fieldCut: dunk-next phase 5 (the highlights, the cut)
 /** Venice DualShock pad (2026-09-05): a miss is one beat, not the full judged reveal — the next run-up follows at once. */
 const MISS_BEAT_MS = 1400;
 /** HOLD = RUN: the hold ramps the athlete toward the rim at up to the max run (7 m/s) and launches at the gather line. */
@@ -368,7 +369,7 @@ const BUDGET_SEC: Record<Phase, number> = {
   // 40 ms before ctx.end tore the mode down; on a continuous night the guest sits on it
   // for as long as they like, and a tripped watchdog with no case for this phase logs a
   // warning every frame from minute seventeen on.
-  approach: 30, charge: 5, cinematic: 4, resolve: 3, judging: 6, rivalTurn: 8, contestOver: Infinity,
+  approach: 30, charge: 5, cinematic: 4, resolve: 3, judging: 6, rivalTurn: 8, fieldCut: 14, contestOver: Infinity,
 };
 
 export const DunkMode: ModeDefinition = (() => {
@@ -1364,11 +1365,14 @@ export const DunkMode: ModeDefinition = (() => {
         rivalName: foe.name,
         dunkOff: '', nightDunkOff: '', beats: '', rivalSkip: false,   // dunk-next: a reload starts with no dunk-off, no beat strip, no skip chip
       });
+      startField(ctx);   // dunk-next phase 5: tonight's four dunkers
     },
 
     onInput(ctx: ModeContext, e: FelInput) {
       SoundKit.unlock();
       slamEcho.see();   // HOTFIX (2026-09-24): a new input — first, before anything in here can launch
+      // dunk-next phase 5: the highlights reel and the cut are the broadcast's — A or B goes straight to the cut, nothing else is read
+      if (phase === 'fieldCut') { if (e.t === 'button' && e.pressed && (e.btn === 'A' || e.btn === 'B')) finishCut(ctx); return; }
       // IMPROVE (2026-10-06): THE PAD SKIPS THE CUT, AND HURRIES THE JUDGES. The triple cut listened only for a tap or Space, so a pad or a
       // phone controller sat through every replay and was told "THE JUDGES ARE SCORING"; A or B ends it now. A held through the reveal
       // (or held on from the skip) runs the judges' beats REVEAL_HOLD_SPEED× — the next run-up follows the reveal's own end.
@@ -2443,6 +2447,7 @@ export const DunkMode: ModeDefinition = (() => {
       case 'resolve': void finishAttempt(ctx, qteHit); break;
       case 'judging': void advanceAfterJudging(ctx); break;
       case 'rivalTurn': rival.root.position.set(3.2, 0, CFG.rimZ + 3); rival.root.rotation.y = 0; void advanceAfterRivalTurn(ctx); break;   // soft-OPEN #3: the rival is parked + idled by the advance
+      case 'fieldCut': finishCut(ctx); break;   // dunk-next phase 5: the highlights never hold the night
     }
   }
 
@@ -4053,6 +4058,7 @@ export const DunkMode: ModeDefinition = (() => {
       if (turn === 'rival') rivalScored = true;   // dunk-next phase 4: his card is the panel's now — a skip only hurries it
       if (dunkOff > 0) dunkOffCards[turn === 'rival' ? 'rival' : 'player'] = { total: missTotal, execution: 0, difficulty: missDiff, style: missStyle };   // endless dunk-offs: the numbers the tiebreak reads
       noteBest(turn === 'rival' ? 'rival' : 'player', missTotal);
+      if (dunkOff === 0) bookField(ctx, turn === 'rival' ? foe.id : PLAYER_ID, missTotal);   // dunk-next phase 5: the standings
       lastScores = missScores;
       crowd.onScore(missTotal);
       revealed = [];
@@ -4108,7 +4114,7 @@ export const DunkMode: ModeDefinition = (() => {
     if (flow.perfect) verdictParts.push('PERFECT FLIGHT');
     // dunk-next phase 2: ORIGINALITY — the dunk as the night remembers it, read against who showed what first. Fresh pays style; the
     // other dunker's idea pays nothing, and a dunk that is nothing but his is SEEN IT (the panel's own repeat rule, applied to a copy).
-    const dunker: Dunker = turn === 'rival' ? 'rival' : 'player';
+    const dunker: Dunker = turn === 'rival' ? foe.id : 'player';   // dunk-next phase 5: each dunker of the field by his own id
     const elements = dunkElements({
       tricks: flight.attempt.tricks.map((t) => ({ id: t.id, label: t.label })),
       runway: [...runwayLabels, ...(doubleLaunched && !boardTopFlip ? ['DOUBLE-LAUNCH'] : [])],
@@ -4119,7 +4125,7 @@ export const DunkMode: ModeDefinition = (() => {
     const fresh = nightMemory.read(elements, dunker);
     nightMemory.show(elements, dunker); refreshTips();
     const seenIt = isRepeat || fresh.copiedWhole;
-    { const line = originalityLine(fresh, dunker === 'player' ? foe.name : 'YOU'); if (line && !isRepeat) verdictParts.push(line); }
+    { const line = originalityLine(fresh, copierName(fresh, dunker)); if (line && !isRepeat) verdictParts.push(line); }   // (phase 5: named after whoever showed it first)
     console.info(`[DUNK-FRESH] ${dunker} ${Math.round(fresh.freshness01 * 100)}% fresh · style +${fresh.style.toFixed(2)} · new ${fresh.fresh.map((e) => e.label).join(', ') || '—'} · copied ${fresh.copied.map((e) => e.label).join(', ') || '—'}${fresh.copiedWhole ? ' · SEEN (a copy)' : ''}`);
     // DUNK-CONTROL-JUICE: the runway tricks (a toss, a kick, a cartwheel, the hop) and a caught lob are judged on top; an
     // obstacle pays only CLEARED (a clip never reaches this path)
@@ -4218,6 +4224,7 @@ export const DunkMode: ModeDefinition = (() => {
     if (rivalsDunk) rivalScored = true;   // dunk-next phase 4: his card is the panel's now — a skip only hurries the cut and the reveal
     if (dunkOff > 0) dunkOffCards[rivalsDunk ? 'rival' : 'player'] = { total: dunkTotal, execution, difficulty, style: styleScore };   // endless dunk-offs: the numbers the tiebreak reads
     noteBest(rivalsDunk ? 'rival' : 'player', dunkTotal);
+    if (dunkOff === 0) bookField(ctx, rivalsDunk ? foe.id : PLAYER_ID, dunkTotal);   // dunk-next phase 5: the standings
     if (flow.perfect) {   // dunk-next: a perfect flight is the building's — whoever threw it
       SoundKit.play('crowdCheer', { volume: 0.8, pitch: 1.1 }); mic?.crowd('crowd.erupt', 2);
       if (!rivalsDunk) hype = Math.min(100, hype + 6);
@@ -4553,7 +4560,7 @@ export const DunkMode: ModeDefinition = (() => {
   function rivalJudgeCtx(): RivalJudgeContext {
     return {
       styleId: style, styleTier: STYLE_TIER[style], hype, crowd01: momentum.score01, slamHalf: slamWindowBase() / 2,
-      runUp: rivalRunUp, memory: nightMemory, dunker: 'rival', usedCombos,
+      runUp: rivalRunUp, memory: nightMemory, dunker: foe.id, usedCombos,
     };
   }
   function skipRivalDunk(ctx: ModeContext): void {
@@ -4582,6 +4589,7 @@ export const DunkMode: ModeDefinition = (() => {
     if (dunkOff > 0) { dunkOffRival = r.total; dunkOffCards.rival = { total: r.total, execution: r.execution, difficulty: r.difficulty, style: r.style }; }
     else rivalTotal += r.total;
     noteBest('rival', r.total);
+    if (dunkOff === 0) bookField(ctx, foe.id, r.total);   // dunk-next phase 5: the standings
     lastScores = r.scores; lastDifficulty = r.difficulty; lastExecution = r.execution; lastStyleScore = r.style;
     qteAccuracy = r.execution01; slamTiming = null;
     const freshPct = r.fresh ? Math.round(r.fresh.freshness01 * 100) : 0;
@@ -4590,7 +4598,7 @@ export const DunkMode: ModeDefinition = (() => {
     crowd.onScore(r.total);
     revealed = [];
     if (r.made) {
-      const parts = [r.perfect ? 'PERFECT FLIGHT' : '', r.fresh && !r.seenIt ? originalityLine(r.fresh, 'YOU') : '', r.seenIt ? 'THE JUDGES HAVE SEEN THAT ONE…' : ''].filter(Boolean);
+      const parts = [r.perfect ? 'PERFECT FLIGHT' : '', r.fresh && !r.seenIt ? originalityLine(r.fresh, copierName(r.fresh, foe.id)) : '', r.seenIt ? 'THE JUDGES HAVE SEEN THAT ONE…' : ''].filter(Boolean);
       flash(ctx, `HIGHLIGHT · ${foe.name}: ${r.name ? (r.signature ? r.name : `${r.name} DUNK!`) : 'DUNK!'}${r.attempts > 1 ? ` (TRY ${r.attempts})` : ''}${parts.length ? ` · ${parts.join(' · ')}` : ''}`);
       SoundKit.play('crowdCheer', { volume: r.perfect ? 0.8 : 0.5 });
       if (r.perfect) mic?.crowd('crowd.erupt', 2);
@@ -4609,6 +4617,117 @@ export const DunkMode: ModeDefinition = (() => {
     if (dunkOff > 0) ctx.setHud({ dunkOff: dunkOffChip() });
   }
 
+  // ── dunk-next phase 5: THE FOUR-DUNKER FIELD (core/DunkField) ─────────────────────────────────────────────────────────────
+  // Owner, 2026-10-06: "a contest night with four dunkers (you + three of the five rival bodies), a first round, a cut to two, a final".
+  // FIRST ROUND: you, the rival on the floor (live, skippable), then the other two as broadcast HIGHLIGHTS (core/DunkRivalSim, the same
+  // panel). THE CUT: the top two. THE FINAL: the finalists on their night totals — the number on the board is the number on your card —
+  // and a level final goes to the (endless) dunk-off. Cut → the final is shown as highlights and the night card says who won it.
+  // playerTotal / rivalTotal stay the books (rivalTotal is whoever you are dunking against); the field mirrors them for the standings.
+  // The staked card is still the player's own judged dunks — four in a final, TWO on a night that ends at the cut (owner decision:
+  // docs/DUNK-NEXT.md phase 5); the integrity cap (2 rounds × 2 dunks) is untouched.
+  const FIELD_ON = true;
+  /** TUNED (dunk-next phase 5): how long each highlight dunker's two cards hold the banner, and the cut's own beat. */
+  const HIGHLIGHT_MS = 1900, CUT_BEAT_MS = 2400;
+  let field: FieldDunker[] = [];
+  let fieldStage: 'round1' | 'cut' | 'final' | 'done' = 'round1', fieldChamp = '', fieldNote = '', cutSeq = 0;
+  /** each field dunker's own exact-repeat memory (the live rival's is `rivalCombos` while he is on the floor) */
+  const fieldCombos = new Map<string, Set<string>>();
+  function startField(ctx: ModeContext): void {
+    field = FIELD_ON ? newField(foe) : [];
+    fieldStage = 'round1'; fieldChamp = ''; fieldNote = ''; cutSeq++; fieldCombos.clear();
+    ctx.setHud({ field: field.length ? encodeField(field, 'round1') : '', nightField: '' });
+  }
+  function bookField(ctx: ModeContext, id: string, total: number): void {
+    if (!field.length) return;
+    field = bookCard(field, id, total);
+    ctx.setHud({ field: encodeField(field, fieldStage === 'done' ? 'done' : fieldStage === 'round1' ? 'round1' : 'final', fieldChamp) });
+  }
+  function dunkerName(id: string): string {
+    return id === PLAYER_ID ? 'YOU' : field.find((d) => d.id === id)?.name ?? (id === foe.id ? foe.name : rivalById(id).name);
+  }
+  /** Whose idea a copied dunk was — the first copied showpiece's owner (with four dunkers it is not always the man beside you). */
+  function copierName(fresh: OriginalityRead, dunker: Dunker): string {
+    const key = fresh.copied.find((e) => SHOWPIECE.has(e.kind))?.key;
+    const by = key ? nightMemory.firstBy(key) : null;
+    return by ? dunkerName(by) : dunker === 'player' ? foe.name : 'YOU';
+  }
+  const ordinal = (n: number): string => `${n}${n === 1 ? 'ST' : n === 2 ? 'ND' : n === 3 ? 'RD' : 'TH'}`;
+  /** A field dunker's judged dunk, off the screen: the phase-4 sim under his own temperament, his own id and his own repeat memory. */
+  function fieldDunk(id: string, sit: RivalSituation): RivalDunkResult {
+    const temper = rivalById(id);
+    let combos = fieldCombos.get(id);
+    if (!combos) { combos = new Set(); fieldCombos.set(id, combos); }
+    return simRivalDunk(null, freshStakes(), () => rollRivalAttempt(sit, temper), { ...rivalJudgeCtx(), dunker: id, usedCombos: combos });
+  }
+  /** After the first round's live dunks: the two highlight dunkers' first rounds, as a reel, then THE CUT. Any A / B goes to the cut. */
+  function runFieldHighlights(ctx: ModeContext): void {
+    setPhase('fieldCut');
+    ctx.setHud({ rivalSkip: false, hint: 'HIGHLIGHTS — A / B GOES TO THE CUT', need: 0 });
+    const seq = ++cutSeq;
+    const reel: { line: string; standings: string }[] = [];
+    for (const h of field.filter((d) => d.kind === 'highlight')) {
+      const bits: string[] = [];
+      for (let k = 0; k < DUNKS_PER_ROUND; k++) {
+        const r = fieldDunk(h.id, highlightSituation(field, h.id, DUNKS_PER_ROUND - k, playerPace()));
+        field = bookCard(field, h.id, r.total);
+        bits.push(r.made ? `${r.name || 'DUNK'}${r.perfect ? ' (PERFECT FLIGHT)' : ''} ${r.total}` : `MISSED ${r.total}`);
+        console.info(`[DUNK-FIELD] ${h.name} dunk ${k + 1}: ${r.made ? 'made' : 'missed'} ${r.name || 'a plain one'} → ${r.total}`);
+      }
+      reel.push({ line: `HIGHLIGHTS · ${h.name}: ${bits.join(' · ')} — ${fieldTotal(field.find((d) => d.id === h.id)!)}`, standings: encodeField(field, 'round1') });
+    }
+    let at = 0;
+    for (const r of reel) {
+      later(() => {
+        if (seq !== cutSeq || phase !== 'fieldCut') return;
+        flash(ctx, r.line, HIGHLIGHT_MS); ctx.setHud({ field: r.standings });
+        SoundKit.play('crowdCheer', { volume: 0.3 });
+      }, at);
+      at += HIGHLIGHT_MS;
+    }
+    later(() => { if (seq === cutSeq) finishCut(ctx); }, at);
+  }
+  /** THE CUT: the top two go to the final. You through → the final against the other finalist (his body walks out if he was a
+   *  highlight). You out → the final is played as highlights and the night ends on its result. */
+  function finishCut(ctx: ModeContext): void {
+    if (phase !== 'fieldCut' || ended) return;
+    cutSeq++;   // the reel's pending beats are void
+    fieldStage = 'cut';
+    const { through } = cutField(field);
+    const place = placeOf(field, PLAYER_ID);
+    const tb = cutTiebreak(field);
+    ctx.setHud({ field: encodeField(field, 'cut'), hint: '' });
+    console.info(`[DUNK-FIELD] the cut: ${field.map((d) => `${d.name} ${fieldTotal(d)}`).join(' · ')} → ${through.map((d) => d.name).join(' + ')}${tb ? ` (${tb})` : ''}`);
+    if (!through.some((d) => d.id === PLAYER_ID)) {
+      const [a, b] = [through[0].id, through[1].id] as [string, string];
+      const fin = simFinal(field, [a, b], (id, sit) => fieldDunk(id, sit).total);
+      field = fin.field; fieldStage = 'done'; fieldChamp = fin.winner;
+      const champ = field.find((d) => d.id === fin.winner)!, other = field.find((d) => d.id === (fin.winner === a ? b : a))!;
+      fieldNote = `CUT AFTER THE FIRST ROUND — ${ordinal(place)} OF ${FIELD_SIZE}${place === FINALISTS + 1 && tb ? ` (${tb})` : ''} · ${champ.name} WON THE FINAL ${fieldTotal(champ)}–${fieldTotal(other)}${fin.offs ? ` AFTER ${fin.offs} DUNK-OFF${fin.offs > 1 ? 'S' : ''}` : ''}`;
+      console.info(`[DUNK-FIELD] ${fieldNote}`);
+      endNight(ctx, false);
+      later(() => { if (phase === 'contestOver') flash(ctx, `THE CUT — YOU FINISH ${ordinal(place)} · ${through.map((d) => d.name).join(' & ')} GO TO THE FINAL`, 1300); }, 50);
+      return;
+    }
+    const opp = through.find((d) => d.id !== PLAYER_ID)!;
+    if (opp.id !== foe.id) {
+      // the other finalist walks out: his body, his name, his repeat memory, his night total
+      fieldCombos.set(foe.id, new Set(rivalCombos));
+      rivalCombos.clear(); for (const c of fieldCombos.get(opp.id) ?? []) rivalCombos.add(c);
+      field = field.map((d) => (d.kind === 'live' ? { ...d, kind: 'highlight' } : d.id === opp.id ? { ...d, kind: 'live' } : d));
+      foe = rivalById(opp.id);
+      void swapRivalBody(ctx, foe);
+      ctx.setHud({ rivalName: foe.name });
+    }
+    rivalTotal = fieldTotal(opp);
+    fieldStage = 'final';
+    round++;
+    ctx.setHud({ round: 'FINAL', score: playerTotal, rivalScore: rivalTotal, field: encodeField(field, 'final') });
+    SoundKit.play('whistle'); SoundKit.play('crowdCheer', { volume: 0.6 });
+    flash(ctx, `THE CUT — YOU ARE THROUGH${tb && place === FINALISTS ? ` (${tb})` : ''} · THE FINAL: YOU v ${foe.name}`, CUT_BEAT_MS);
+    mic?.then({ moment: 'dunk.round', priority: 2 });
+    resetForNextAttempt(ctx);
+  }
+
   /** Round hand-off / contest end. Soft-OPEN #3: reached by rivalRound's own end AND by the rivalTurn watchdog (8 s) — the
    *  phase gate makes it run once, so round++ never double-fires and ctx.end (the guest claim modal, the resultSink) fires
    *  once per contest. The rival is left in the idle loop with any pending chain dead, whichever path got here. */
@@ -4624,6 +4743,7 @@ export const DunkMode: ModeDefinition = (() => {
     ctx.camDirector.snapTo(player.root.position, rim);
     rivalClip(SPORT_CLIP.idle, { loop: true });
     if (round < TOTAL_ROUNDS) {
+      if (field.length && fieldStage === 'round1') { runFieldHighlights(ctx); return; }   // dunk-next phase 5: the rest of the field, then the cut
       round++;
       ctx.setHud({ round: `${round}/${TOTAL_ROUNDS}` }); flash(ctx, `ROUND ${round}`, 1400);
       mic?.then({ moment: 'dunk.round', priority: 2 });
@@ -4643,6 +4763,17 @@ export const DunkMode: ModeDefinition = (() => {
       dunkOffBy = dunkOffByLine(d.by);   // how a level one was taken — on the night card, beside the two cards
     } else if (cardVerdict({ playerTotal, rivalTotal }) === 'tied') { startDunkOff(ctx, 1); return; }
     else won = cardWon({ playerTotal, rivalTotal });
+    endNight(ctx, won);
+  }
+
+  /** The night is over: the result, the mic, the card out (ctx.card / ctx.end) and the night card. One place, reached by the final's
+   *  verdict and (dunk-next phase 5) by the cut. */
+  function endNight(ctx: ModeContext, won: boolean): void {
+    if (field.length) {   // dunk-next phase 5: the field's last word for the night card
+      const champ = won ? PLAYER_ID : fieldStage === 'done' ? fieldChamp : foe.id;
+      fieldStage = 'done'; fieldChamp = champ;
+      ctx.setHud({ field: encodeField(field, 'done', champ), nightField: fieldNote || (won ? `CHAMPION — YOU WON THE FINAL OVER ${foe.name}` : `RUNNER-UP — ${foe.name} WON THE FINAL`) });
+    }
     setPhase('contestOver');
     SoundKit.play('whistle');
     if (won) { SoundKit.play('crowdCheer'); EffectsKit.burst(ctx.scene, player.root.position.add(new Vector3(0, 2, 0)), 'confetti'); }
@@ -4721,6 +4852,7 @@ export const DunkMode: ModeDefinition = (() => {
     // the night and keep the same rival, so a whole session was one opponent.
     foe = takeNextRival();
     void swapRivalBody(ctx, foe);
+    startField(ctx);   // dunk-next phase 5: a new night, a new field (the live rival and the next two in the roster)
     // the rival goes back to the bench spot he spawned on, in the idle loop
     rival.root.position.set(3.2, 0, CFG.rimZ + 3);
     rival.root.rotation.y = 0;

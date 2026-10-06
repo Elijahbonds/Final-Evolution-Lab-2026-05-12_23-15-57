@@ -57,7 +57,7 @@ real slam window with an honest rim (`core/DunkCard.ts:84`), 32 props, the tripl
 
 ## 3. Ranked phases (fun gained per effort)
 
-**Status (2026-10-06):** phases 1–4 are built on `lane/dunk-next` (commits name them); the dunk-off is endless (owner decision). Phases 5–8 are next.
+**Status (2026-10-06):** phases 1–5 are built on `lane/dunk-next` (commits name them); the dunk-off is endless (owner decision). Phases 6–8 are next.
 
 | # | Phase | Effort | Acceptance |
 |---|---|---|---|
@@ -65,13 +65,22 @@ real slam window with an honest rim (`core/DunkCard.ts:84`), 32 props, the tripl
 | **2 ✓** | **ORIGINALITY.** The night's shared element memory, freshness into style, a first-time-tonight banner and crowd *ooh* in the air, copied elements called out, the runway tip naming what is still fresh, and freshness on the judges' why-line | M | Pure `core/DunkOriginality.ts` with vitest: elements, freshness weights, who-showed-first, copy detection, the reset per night. Wired into `finishAttempt` for both dunkers. **TUNED: freshness up to +1.5 style; a copied dunk gets 0.** |
 | **3 ✓** | **DUNK-OFF.** A tie after the final plays one dunk each (three attempts, as ever), not added to the staked total. Repeat while tied. **Owner decision 2026-10-06: endless dunk-offs** — from the third, level totals go to the judges' declared tiebreak (EXECUTION, then DIFFICULTY, then STYLE, one criterion more each dunk-off, named before the dunk); a hard safety cap at 12 settles a dead-level one on each dunker's best dunk of the night, then the house rule. | M | Pure `dunkOffDecide` / `dunkOffVerdict` in `ContinuousNight` with tests (cap, criteria, NaN-safe). The card still holds 4 attempts and the score still equals the card's total, so `arena-score-integrity` is unchanged. Wiring scan. |
 | **4 ✓** | **Rival highlights.** A rival dunk can be skipped from his runway to his card (B, the K key, or the host's SKIP chip). `core/DunkRivalSim` judges the plan he is ON (not re-rolled: the live rival rolls the same `rollRivalAttempt`) through the real flight, slam curve, beats, originality, card, panel and stakes, off his last measured take-off; his card comes up as a highlight (named, cheered, the five cards at the hurried rate). Already judged → the cut ends and the reveal hurries. Cuts ~10 s per rival dunk. | M | The sim's card equals what `dunkCard` + `judgeDunk` give for his plan (vitest); the roll equals the old inline plan for the same random stream; B on his runway skips (scan). |
-| 5 | **Four-dunker field + cut + final** | L | Round one with 4 dunkers (2 live, 2 highlights), the cut line on the HUD, a final of 2. The card still holds ≤ 4 attempts. |
+| **5 ✓** | **Four-dunker field + cut + final.** You + the rival on the floor (live, skippable) + two more as broadcast highlights (`core/DunkRivalSim`), two dunks each; the standings board with the cut line; the top two go to a final on their night totals; a level final goes to the endless dunk-off. Cut → the final plays as highlights and the night card says who won it. | L | Pure `core/DunkField` with vitest (field, strict cut order, highlight nerve, the final-as-highlights loop and its cap, the board's wire format); wiring scan. The card still holds ≤ 4 attempts — **owner decision below**. |
 | 6 | **Challenges + unlocks** on the practice runway (fan #19, #11) | M | A pure challenge table and checker; a won challenge unlocks a prop or celebration (local storage). |
 | 7 | **Take-off read**: the take-off spot marked on the floor as you run, the range and foot chip live | S | The chip changes as you cross the paint, the elbow and the stripe. |
 | 8 | **Hang pump** (spend window for a beat), **blooper retry** | M | Needs the owner's eye: it is feel. |
 
 Not here: a judges' table in 3D, the night lighting, a replay theatre (presentation lanes); the shared shell / TV layout
 (`lane/console-view`); phone voting and lobbies (`lane/multiplayer`).
+
+**Owner decision (phase 5): what a CUT night stakes.** The field changes what a night's card can hold. A player who reaches the
+final dunks four times (the card is unchanged); a player cut after the first round dunks twice, so the staked card holds **two**
+judged dunks and the score is their total (~70–95 instead of ~150–190). Every integrity check still holds as written — the card has
+≤ 4 attempts, each under its ceiling, and the score is the card's total — so `lib/arena-score-integrity.ts` and the server cap are
+**unchanged**. But a ladder or a staked duel now compares a cut night's two-dunk card with a finalist's four-dunk card. Built
+default: the card holds what you dunked. Alternatives, each a small change: (a) keep this; (b) a staked / ladder run plays the
+old one-rival night (the mode would need to be told it is staked; `FIELD_ON` in `DunkMode.ts` is today's global switch); (c) the cut player keeps dunking a two-dunk
+"consolation" round that counts on the card but cannot win the night. The owner chooses.
 
 **Arena integrity.** The staked score stays the sum of at most four judged dunks: 5 judges × 10 × the stakes scale. Beats and
 freshness move cards inside 6–10, never past them, and the dunk-off is never added to the total. `lib/arena-score-integrity.ts`

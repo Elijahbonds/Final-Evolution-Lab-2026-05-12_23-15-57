@@ -67,7 +67,8 @@ describe('phase 1 — the flight is a four-beat bar', () => {
 describe('phase 2 — originality, judged and cheered', () => {
   it('a made dunk is read against the night BEFORE the night remembers it, by whoever threw it', () => {
     const fin = fn('finishAttempt');
-    expect(fin).toMatch(/const dunker: Dunker = turn === 'rival' \? 'rival' : 'player';/);
+    // test changed (dunk-next phase 5): with four dunkers each is remembered by his own id (was 'rival' for whoever the rival was)
+    expect(fin).toMatch(/const dunker: Dunker = turn === 'rival' \? foe\.id : 'player';/);
     const read = fin.indexOf('const fresh = nightMemory.read(elements, dunker);');
     const show = fin.indexOf('nightMemory.show(elements, dunker);');
     expect(read).toBeGreaterThan(0);
@@ -84,7 +85,9 @@ describe('phase 2 — originality, judged and cheered', () => {
     expect(fin).toMatch(/FRESH \$\{Math\.round\(fresh\.freshness01 \* 100\)\}%\$\{seenIt \? ' · SEEN IT' : ''\}/);
     expect(fin).toMatch(/seen: seenIt, dunker:/);
     expect(fin).toMatch(/micMake\(theName, [^;]*, seenIt\)/);
-    expect(fin).toMatch(/originalityLine\(fresh, dunker === 'player' \? foe\.name : 'YOU'\)/);
+    // test changed (dunk-next phase 5): a copy is named after whoever showed it first (with four dunkers, not always the man beside you)
+    expect(fin).toMatch(/originalityLine\(fresh, copierName\(fresh, dunker\)\)/);
+    expect(fn('copierName')).toMatch(/const by = key \? nightMemory\.firstBy\(key\) : null;/);
   });
   it('the dunk\'s elements: its tricks, the runway, the prop, a parkour launch, the foot, the range, the side, the hang', () => {
     const fin = fn('finishAttempt');
@@ -115,7 +118,9 @@ describe('phase 3 — the dunk-off', () => {
     const adv = fn('advanceAfterRivalTurn');
     const tie = adv.indexOf("cardVerdict({ playerTotal, rivalTotal }) === 'tied') { startDunkOff(ctx, 1); return; }");
     expect(tie).toBeGreaterThan(0);
-    expect(tie).toBeLessThan(adv.indexOf("setPhase('contestOver');"));
+    // test changed (dunk-next phase 5): the night's end moved into endNight() (the cut ends a night too) — the tie still comes first
+    expect(tie).toBeLessThan(adv.indexOf('endNight(ctx, won);'));
+    expect(fn('endNight')).toMatch(/setPhase\('contestOver'\);/);
     // test changed (owner decision 2026-10-06, "Endless dunk-offs"): was `dunkOffVerdict(dunkOffPlayer, dunkOffRival, dunkOff)` with the
     // up-to-3-then-the-player rule; the verdict now reads both dunk-off CARDS (the judges' declared tiebreak) and the night's best (the cap)
     expect(adv).toMatch(/const d = dunkOffDecide\(dunkOffCards\.player \?\? dunkOffPlayer, dunkOffCards\.rival \?\? dunkOffRival, dunkOff, nightBest\);/);
@@ -222,5 +227,60 @@ describe('phase 4 — skip a rival\'s dunk straight to his card', () => {
     expect(HOST).toMatch(/const tapSkip = useCallback\(\(\) => \{\n\s*emit\(\{ t: 'button', btn: 'B', pressed: true \}\);\n\s*emit\(\{ t: 'button', btn: 'B', pressed: false \}\);/);
     expect(fn('rivalRound')).toMatch(/ctx\.setHud\(\{ rivalSkip: true \}\);/);
     expect(fn('endRivalTurn')).toMatch(/ctx\.setHud\(\{ rivalSkip: false \}\);/);
+  });
+});
+
+describe('phase 5 — the four-dunker field, the cut, the final', () => {
+  it('every judged dunk of the night is booked to the standings — and never a dunk-off', () => {
+    const fin = fn('finishAttempt');
+    expect(fin).toMatch(/if \(dunkOff === 0\) bookField\(ctx, turn === 'rival' \? foe\.id : PLAYER_ID, missTotal\);/);
+    expect(fin).toMatch(/if \(dunkOff === 0\) bookField\(ctx, rivalsDunk \? foe\.id : PLAYER_ID, dunkTotal\);/);
+    expect(fn('commitRivalHighlight')).toMatch(/if \(dunkOff === 0\) bookField\(ctx, foe\.id, r\.total\);/);
+  });
+  it('after the first round: the highlights, then the cut — once a night, before round 2', () => {
+    const adv = fn('advanceAfterRivalTurn');
+    const hl = adv.indexOf("if (field.length && fieldStage === 'round1') { runFieldHighlights(ctx); return; }");
+    expect(hl).toBeGreaterThan(adv.indexOf('if (round < TOTAL_ROUNDS) {'));
+    expect(hl).toBeLessThan(adv.indexOf('round++;'));
+    const run = fn('runFieldHighlights');
+    expect(run).toMatch(/setPhase\('fieldCut'\);/);
+    expect(run).toMatch(/field = bookCard\(field, h\.id, r\.total\);/);
+    expect(run).toMatch(/later\(\(\) => \{ if \(seq === cutSeq\) finishCut\(ctx\); \}, at\);/);
+    expect(fn('finishCut')).toMatch(/fieldStage = 'cut';/);
+  });
+  it('a highlight dunker is judged by the phase-4 sim under his own temperament, id and repeat memory', () => {
+    const fd = fn('fieldDunk');
+    expect(fd).toMatch(/const temper = rivalById\(id\);/);
+    expect(fd).toMatch(/simRivalDunk\(null, freshStakes\(\), \(\) => rollRivalAttempt\(sit, temper\), \{ \.\.\.rivalJudgeCtx\(\), dunker: id, usedCombos: combos \}\)/);
+  });
+  it('cut: the final is played as highlights and the night ends LOST; through: the other finalist walks out on his own total', () => {
+    const fc = fn('finishCut');
+    const out = fc.indexOf("if (!through.some((d) => d.id === PLAYER_ID)) {");
+    expect(out).toBeGreaterThan(0);
+    const outBlock = fc.slice(out, fc.indexOf('return;', out));
+    expect(outBlock).toMatch(/simFinal\(field, \[a, b\], \(id, sit\) => fieldDunk\(id, sit\)\.total\)/);
+    expect(outBlock).toMatch(/endNight\(ctx, false\);/);
+    const thr = fc.slice(fc.indexOf('const opp = through.find'));
+    expect(thr).toMatch(/if \(opp\.id !== foe\.id\) \{[\s\S]*foe = rivalById\(opp\.id\);[\s\S]*void swapRivalBody\(ctx, foe\);/);
+    expect(thr).toMatch(/rivalTotal = fieldTotal\(opp\);/);
+    expect(thr).toMatch(/round\+\+;/);
+    expect(thr).toMatch(/resetForNextAttempt\(ctx\);/);
+  });
+  it('the staked card is untouched by the field: only the player\'s own dunks go on it, and the night sends playerTotal with it', () => {
+    expect(fn('runFieldHighlights')).not.toMatch(/addAttempt|playerTotal|card =/);
+    expect(fn('finishCut')).not.toMatch(/addAttempt|playerTotal \+?=|card =/);
+    expect(fn('endNight')).toMatch(/ctx\.card\(won \? 'CONTEST_WON' : 'CONTEST_LOST', playerTotal, stats, detail\);/);
+    expect(fn('endNight')).toMatch(/const detail = \{ card: forWire\(card\) \};/);
+  });
+  it('a new night (and a reload) draws a new field; the cut answers A / B and its watchdog', () => {
+    expect(DUNK.match(/startField\(ctx\);/g)).toHaveLength(2);
+    expect(fn('goAgain')).toMatch(/startField\(ctx\);/);
+    expect(DUNK).toMatch(/if \(phase === 'fieldCut'\) \{ if \(e\.t === 'button' && e\.pressed && \(e\.btn === 'A' \|\| e\.btn === 'B'\)\) finishCut\(ctx\); return; \}/);
+    expect(DUNK).toMatch(/case 'fieldCut': finishCut\(ctx\); break;/);
+  });
+  it('the host draws the field board in play and on the night card, and names a cut night', () => {
+    expect(HOST).toMatch(/<DunkFieldBoard value=\{hud\.field\} compact \/>/);
+    expect(HOST).toMatch(/<DunkFieldBoard value=\{hud\.field\} \/>/);
+    expect(HOST).toMatch(/hud\.nightField\.startsWith\('CUT'\) \? 'CUT AT THE LINE'/);
   });
 });
