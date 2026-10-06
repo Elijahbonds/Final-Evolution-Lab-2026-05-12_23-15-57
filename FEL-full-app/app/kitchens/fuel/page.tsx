@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { authOptions } from '@/lib/auth';
 import { loginPath } from '@/lib/auth/safeNext';
 import { FuelView } from '@/components/kitchens/fuel-view';
+import { CommunityRecipes } from '@/components/pipelines/community-recipes';   // PIPELINES (2026-10-06)
 
 export const dynamic = 'force-dynamic';
 
@@ -13,6 +14,7 @@ export default async function KitchensFuelPage() {
   return (
     <div className="min-h-screen bg-[#050505] pb-24 text-white">
       <FuelView />
+      <CommunityRecipes />
     </div>
   );
 }

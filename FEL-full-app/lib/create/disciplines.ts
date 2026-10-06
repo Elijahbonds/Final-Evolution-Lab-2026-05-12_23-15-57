@@ -63,7 +63,7 @@ const GUIDE: Record<Discipline, Omit<DisciplineGuide, 'id' | 'label' | 'blurb' |
   },
   cooking: {
     make: 'Write a recipe: ingredients, steps, fuel tags',
-    showsUp: [{ where: 'Community recipes on the Fuel floor', live: false }],
+    showsUp: [{ where: 'Community recipes on the Fuel floor', live: true }],
   },
   fashion: {
     make: 'Build a look from pieces you own',
