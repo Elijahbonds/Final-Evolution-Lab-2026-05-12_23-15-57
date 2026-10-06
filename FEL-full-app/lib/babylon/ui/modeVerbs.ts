@@ -285,6 +285,9 @@ const VERBS: Record<string, Omit<ModeVerbConfig, 'rStick' | 'boost'>> = {
   // VERB-KEY (2026-09-07): Brain Brawl reads the same answer diamond (FACE index 0..3 → option A/B/C/D, the HUD's
   // optA/optB/optX/optY); before this it fell through to `default` and touch lost three of the four answers.
   brainbrawl: verbs({ A: { label: 'A', emit: A('A') }, B: { label: 'B', emit: A('B') }, X: { label: 'C', emit: A('X') }, Y: { label: 'D', emit: A('Y') } }),
+  // ADVENTURE A4 (2026-10-06, the plan's "Default controls"): the face diamond is the run and the fight; lock, cast,
+  // guard, slow-time, partner and fuse ride the d-pad and the Adventure's own touch radial (adventure/host/touchRadial)
+  adventure: verbs({ A: { label: 'JUMP', emit: A('A') }, B: { label: 'DASH', emit: A('B') }, X: { label: 'LIGHT', emit: A('X') }, Y: { label: 'HEAVY', emit: A('Y') } }),
 
   default: verbs({ A: { label: 'ACTION', emit: A('A') } }),
 };

@@ -93,6 +93,8 @@ export class AdventureHost {
   readonly save: AdventureSave;
   /** Errors the bus isolated (a lane's handler threw). */
   readonly errors: unknown[] = [];
+  /** The player's spell book as the magic system reads it (the save's, or the one the host was lent). */
+  readonly loadout: SpellLoadout;
 
   private readonly ctx: AdventureStepContext;
   private readonly sources = new Map<ActorId, (out: MoveInput) => void>();
@@ -148,6 +150,7 @@ export class AdventureHost {
     });
     this.combat = createCombatSystem({ localPlayerId: this.playerId, seed: seed ^ 0xa2 });
     const loadout: SpellLoadout = o.loadout ?? o.save.player.spells;
+    this.loadout = loadout;
     this.magic = createMagicSystem({
       spells: o.spells,
       loadoutOf: (a) => (a.id === this.playerId ? loadout : null),

@@ -27,13 +27,15 @@ describe('AdventureHost: the fixed step and its order', () => {
   it('a 30 fps frame runs two steps, a 60 fps frame one; a press lands on exactly one of them', () => {
     const { host } = createSandbox({ seed: 1 });
     let jumps = 0, fills = 0, pending = true;
-    host.setInputSource(host.playerId, (out) => { fills++; if (pending) { out.jump = true; pending = false; } });
+    const stale: boolean[] = [];   // an edge still set when the next step's input stage begins
+    host.setInputSource(host.playerId, (out) => { fills++; stale.push(out.jump); if (pending) { out.jump = true; pending = false; } });
     host.bus.on('state', (e) => { if (e.actorId === host.playerId && e.to === 'air') jumps++; });
     expect(host.frame(1 / 30)).toBe(2);
     expect(fills).toBe(2);
     expect(host.frame(1 / 60)).toBe(1);
     expect(jumps).toBe(1);
     expect(host.player.state).toBe('air');
+    expect(stale).toEqual([false, false, false]);   // the host cleared the press after its step
   });
 
   it('systems get the UNSCALED fixed dt and the unscaled clock; slow-time reaches them only through timeScaleOf', () => {
