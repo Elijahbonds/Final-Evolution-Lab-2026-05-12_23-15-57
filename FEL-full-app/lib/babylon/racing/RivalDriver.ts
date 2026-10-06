@@ -21,6 +21,7 @@ import { locate, pointAlong, type RacingLine } from './racingLine';
 import { spawnKart, stepKart, type KartInput, type KartSpec, type KartState } from '../core/KartModel';
 import { spawnArcade, stepArcade, type ArcadeInput, type ArcadeState, type ArcadeTune } from './ArcadeFlight';
 import type { Rival } from './RaceField';
+import { locateNear, newLineFix, type LineFix } from './lineWindow';   // IMPROVE (2026-10-06): aeroaces #13
 
 const clamp01 = (v: number): number => Math.max(0, Math.min(1, v));
 const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v));
@@ -123,6 +124,9 @@ export interface AeroDrive {
   state: ArcadeState;
   lastAlong: number;
   stuckT: number;
+  /** IMPROVE (2026-10-06), aeroaces #13: the last fix on the line. Both locates a frame search round it (lineWindow)
+   *  instead of scanning the whole lap, and write into it instead of allocating. Absent = a fresh fix (full scan). */
+  fix?: LineFix;
 }
 
 /** Put a rival's plane on the line at its grid distance, in its lane, at its grid speed. */
@@ -131,7 +135,8 @@ export function spawnAeroDrive(line: RacingLine, r: Rival, tune: ArcadeTune): Ae
   const pos = at.pos.add(at.right.scale(r.lane));
   const state = spawnArcade(pos, Math.atan2(at.tangent.x, at.tangent.z));
   state.speed = Math.max(tune.coast, r.speed);
-  return { state, lastAlong: locate(line, pos.x, pos.z).dist, stuckT: 0 };
+  const fix = newLineFix();
+  return { state, lastAlong: line.loop ? locateNear(line, pos.x, pos.z, fix).dist : locate(line, pos.x, pos.z).dist, stuckT: 0, fix };
 }
 
 /** The inputs an aero rival asks for: pursue the line, hold its height, fly the pace. */
@@ -160,11 +165,15 @@ export function stepAeroDrive(
   corridor: number, floorAt: (x: number, z: number) => number, ceilingAt: (x: number, z: number) => number,
   laneWeave = 0,
 ): void {
-  const at = locate(line, d.state.pos.x, d.state.pos.z);
-  const input = aeroDriveInput(d.state, line, at.dist, r.lane + laneWeave, wantSpeed, tune);
+  // IMPROVE (2026-10-06), aeroaces #13: both fixes are windowed round the last one and written into `d.fix` — the
+  // first is read (its dist) before the second overwrites it. A loop line only: a point-to-point keeps the full scan.
+  const fix = d.fix ??= newLineFix();
+  const near = (x: number, z: number) => (line.loop ? locateNear(line, x, z, fix) : locate(line, x, z));
+  const atDist = near(d.state.pos.x, d.state.pos.z).dist;
+  const input = aeroDriveInput(d.state, line, atDist, r.lane + laneWeave, wantSpeed, tune);
   stepArcade(d.state, input, dt, tune, floorAt, ceilingAt(d.state.pos.x, d.state.pos.z));
 
-  const now = locate(line, d.state.pos.x, d.state.pos.z);
+  const now = near(d.state.pos.x, d.state.pos.z);
   r.dist += measureAdvance(d.lastAlong, now.dist, line.length);
   d.lastAlong = now.dist;
   r.speed = d.state.speed;
@@ -181,6 +190,7 @@ export function stepAeroDrive(
     d.state.roll = 0;
     d.state.yawAt = 0;
     d.state.speed = Math.min(wantSpeed, tune.top);
-    d.lastAlong = locate(line, d.state.pos.x, d.state.pos.z).dist;
+    fix.i = -1;   // a teleport: the next fix is a full scan
+    d.lastAlong = near(d.state.pos.x, d.state.pos.z).dist;
   }
 }

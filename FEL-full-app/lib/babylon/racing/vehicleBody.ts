@@ -18,6 +18,21 @@ export const VEHICLE_BODIES: Record<VehicleKind, Record<string, string>> = {
 export const vehicleBodyUrl = (kind: VehicleKind, id: string): string => `/models/vehicles/${VEHICLE_BODIES[kind][id] ?? VEHICLE_BODIES[kind].rival}.${kind}.glb`;
 
 /**
+ * IMPROVE (2026-10-06), aeroaces #20: A LIGHTER RIVAL. Every baked body carries three 2048² JPEG maps (base colour,
+ * metal-rough, normal): ~2.5 MB of the ~3 MB file and ~64 MB of GPU memory with mips, per body. The field's plane is
+ * seen from a chase camera, tens of metres off, so its LOD carries the same mesh with the maps at 1024²
+ * (scripts/meshy/vehicle-lod.mts makes it): ~1.1 MB on the wire, ~16 MB on the GPU. Opt-in per call (`lod`), and a
+ * missing LOD file falls back to the full body.
+ */
+export const VEHICLE_LOD: Partial<Record<VehicleKind, Record<string, string>>> = {
+  plane: { rival: 'v-d5a0bbed-lod1' },
+};
+export const vehicleLodUrl = (kind: VehicleKind, id: string): string | null => {
+  const f = VEHICLE_LOD[kind]?.[id];
+  return f ? `/models/vehicles/${f}.${kind}.glb` : null;
+};
+
+/**
  * Yaw applied to each baked body so its nose lies on the vehicle's +Z.
  * The modes steer +Z (`forwardOf`, kart `heading`). This is the only place a mesh axis is corrected.
  *
@@ -57,19 +72,56 @@ function loadBody(scene: Scene, url: string): Promise<AssetContainer | null> {
 
 export interface VehicleBodyHandle { root: TransformNode; dispose(): void }
 
-/** Mount the baked body under `root`; hide `hide` when it arrives. Resolves null (nothing hidden) if the file is missing. */
-export async function dressVehicle(scene: Scene, root: TransformNode, kind: VehicleKind, id: string, opts: { hide?: AbstractMesh[]; yaw?: number; y?: number } = {}): Promise<VehicleBodyHandle | null> {
-  const url = vehicleBodyUrl(kind, id);
-  const c = await loadBody(scene, url);
+/**
+ * IMPROVE (2026-10-06), aeroaces #17: INSTANCED BODIES. A field of seven planes wearing the same body cloned the GLB
+ * seven times (`doNotInstantiate: true`): seven meshes, seven draws, seven shadow draws per cascade. With `instance`,
+ * the first body dressed from a file is cloned as before and becomes the TEMPLATE; every later one is a hardware
+ * instance of it (`instantiateHierarchy`), which Babylon draws in one call. Safe for these bodies because they share
+ * one material and nothing tints a body per racer (cloneMaterials was already false — the clones shared it anyway).
+ * A template whose meshes are gone (its racer disposed) is replaced by the next clone.
+ */
+const templates = new WeakMap<Scene, Map<string, TransformNode>>();
+function liveTemplate(scene: Scene, url: string): TransformNode | null {
+  const t = templates.get(scene)?.get(url) ?? null;
+  if (!t || t.isDisposed()) return null;
+  const meshes = t.getChildMeshes();
+  return meshes.length && meshes.every((m) => !m.isDisposed()) ? t : null;
+}
+
+/** Mount the baked body under `root`; hide `hide` when it arrives. Resolves null (nothing hidden) if the file is missing.
+ *  `lod`: wear the kind's lighter body where there is one (#20). `instance`: share one drawn body across every racer
+ *  dressed from the same file (#17). Both opt-in; the default is exactly the old clone. */
+export async function dressVehicle(scene: Scene, root: TransformNode, kind: VehicleKind, id: string, opts: { hide?: AbstractMesh[]; yaw?: number; y?: number; lod?: boolean; instance?: boolean } = {}): Promise<VehicleBodyHandle | null> {
+  const full = vehicleBodyUrl(kind, id);
+  const lodUrl = opts.lod ? vehicleLodUrl(kind, id) : null;
+  let url = lodUrl ?? full;
+  let c = await loadBody(scene, url);
+  if (!c && lodUrl) { url = full; c = await loadBody(scene, full); }   // no LOD on disk: the full body, as before
   if (!c || scene.isDisposed || root.isDisposed()) return null;
-  const inst = c.instantiateModelsToScene((n) => `${root.name}_body_${n}`, false, { doNotInstantiate: true });
-  const body = new TransformNode(`${root.name}_body`, scene);
-  body.parent = root;
-  body.rotation.y = opts.yaw ?? vehicleForwardYaw(kind, id);
+  const yaw = opts.yaw ?? vehicleForwardYaw(kind, id);
+  const template = opts.instance ? liveTemplate(scene, url) : null;
+  let body: TransformNode;
+  let groups: { dispose(): void }[] = [];
+  if (template) {
+    body = template.instantiateHierarchy(root, { doNotInstantiate: false }) as TransformNode;
+    body.name = `${root.name}_body`;
+  } else {
+    const inst = c.instantiateModelsToScene((n) => `${root.name}_body_${n}`, false, { doNotInstantiate: true });
+    groups = inst.animationGroups;
+    body = new TransformNode(`${root.name}_body`, scene);
+    body.parent = root;
+    for (const n of inst.rootNodes) n.parent = body;
+    if (opts.instance) {
+      let byUrl = templates.get(scene);
+      if (!byUrl) { byUrl = new Map(); templates.set(scene, byUrl); }
+      byUrl.set(url, body);
+    }
+  }
+  body.rotation.y = yaw;
   body.position.y = opts.y ?? 0;
-  for (const n of inst.rootNodes) n.parent = body;
   for (const m of body.getChildMeshes()) { m.isPickable = false; m.receiveShadows = true; }
   for (const m of opts.hide ?? []) m.setEnabled(false);
-  console.info(`[FEL-VEHICLE] ${kind} ${id} wears ${url.split('/').pop()} (${body.getChildMeshes().length} meshes, ${opts.hide?.length ?? 0} primitives hidden)`);
-  return { root: body, dispose: () => { for (const g of inst.animationGroups) g.dispose(); body.dispose(false, true); } };
+  console.info(`[FEL-VEHICLE] ${kind} ${id} wears ${url.split('/').pop()} (${body.getChildMeshes().length} meshes${template ? ', instanced' : ''}, ${opts.hide?.length ?? 0} primitives hidden)`);
+  // an instance must never take the shared material with it; a clone keeps the old dispose
+  return { root: body, dispose: () => { for (const g of groups) g.dispose(); body.dispose(false, !template && !opts.instance); } };
 }
