@@ -35,6 +35,7 @@ import { looksFor, readPlaceLook, writePlaceLook } from '@/lib/babylon/nexus/pla
 import { tierList, readTier, writeTier, profileFor, type Tier } from '@/lib/babylon/core/Difficulty';
 import { OneVOneWinBy2 } from './onevone-win-by-2';   // owner 2026-10-06: the 1v1's win-by-2 pick
 import { ThreePointOptions } from './three-point-options';   // IMPROVE (2026-10-06): 3PT #5 #6 #8
+import { PartyInvite } from '@/components/party/party-invite';   // MULTIPLAYER: the start screen's door to the party room
 import {
   readySchools, readBlend, writeBlend, blendName, schoolById, blendTraits, STYLE_TRAIT_KEYS,
   type StyleBlend,
@@ -373,6 +374,8 @@ export function SplashCard(props: BootSplashProps) {
         {props.phase === 'ready' && <BodyPlayReady tint={v.tint} onStart={props.onStart} />}
         {/* CREATOR-PLAN phase 4a (2026-10-06): switch to another saved character (renders nothing for a guest or one character) */}
         {props.phase === 'ready' && <PlayAsSwitcher tint={v.tint} />}
+        {/* MULTIPLAYER (2026-10-06): a game friends can play together says so, and opens the party room with it picked */}
+        {props.phase === 'ready' && <PartyInvite modeId={props.modeId} />}
 
         {isCourt && (props.phase === 'ready' || props.phase === 'loading') && readyCourtLocations().length > 1 && (
           <div className="mt-3 flex flex-col items-center gap-1.5">

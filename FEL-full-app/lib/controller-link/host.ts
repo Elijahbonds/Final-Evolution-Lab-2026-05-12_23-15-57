@@ -8,10 +8,20 @@
 import { PeerLink } from './transport/webrtc';
 import { createRoom, pollSignals, postSignal } from './transport/signaling';
 import { getOrCreatePeerId, joinUrl } from './codes';
-import type { ControlEvent, LinkState, LobbyPeer, ModeControllerConfig, PeerId, RoomState } from './types';
+import type { ControlEvent, LinkMessage, LinkState, LobbyPeer, ModeControllerConfig, PeerId, RoomState } from './types';
 import type { FelInput } from '@/lib/babylon/core/InputBus';
 import { HostInput, type LinkStats } from './hostInput';
 import { parseRoomState, roomStateOptIn, sameRoomState } from './roomState';
+import { cleanPlayerName } from '@/lib/party/playerName';
+
+/**
+ * MULTIPLAYER (2026-10-06): a phone's name as the TV will show it. The phone is not trusted — a modified page can say
+ * anything — so the host cleans every name it is told (lib/party/playerName.ts: the jersey plate rule) and falls back
+ * to PLAYER when nothing survives.
+ */
+export function hostPlayerName(raw: unknown): string {
+  return cleanPlayerName(raw) || 'PLAYER';
+}
 
 export interface HostSessionOpts {
   config: ModeControllerConfig;
@@ -29,6 +39,16 @@ export interface HostSessionOpts {
    * remote PAD relay" four paths into one game rather than four games.
    */
   onPadInput?: (e: FelInput, slot: number, peerId: PeerId) => void;
+  /**
+   * MULTIPLAYER (2026-10-06): a party command from a phone (lib/party/protocol.ts — ready, pick, start, leave). Raw: the
+   * party room parses and checks it. A host that passes nothing never hears one, and no other message reaches here.
+   */
+  onPartyCmd?: (cmd: string, peerId: PeerId) => void;
+  /**
+   * MULTIPLAYER: a phone's link came up (each channel that opens, and every reconnect). The party room re-sends that
+   * phone its view here: a sender that only watched the lobby could miss a drop-and-return folded into one render.
+   */
+  onPeerUp?: (peerId: PeerId) => void;
 }
 
 interface HostPeer {
@@ -95,6 +115,60 @@ export class HostSession {
 
   get joinUrl(): string { return joinUrl(this.code); }
 
+  /** The config the room is running now (setConfig may have swapped it). */
+  get config(): ModeControllerConfig { return this.opts.config; }
+
+  /**
+   * MULTIPLAYER (2026-10-06): ONE ROOM ACROSS GAMES. Swap the layout every phone shows — the party room picks a new game
+   * and nobody scans again. Each connected phone is sent the new lobby (its page re-renders the schema it carries); a
+   * phone that connects later gets it too, because the lobby always carries the current config. Seats are untouched.
+   */
+  setConfig(config: ModeControllerConfig): void {
+    if (this.disposed) return;
+    this.opts.config = config;
+    for (const p of this.peers.values()) if (p.connected) p.link.sendSafe(this.lobbyMessage());
+    this.emitLobby();
+  }
+
+  /**
+   * MULTIPLAYER: one control message to one phone (the party room's per-phone view). False when it did not go — the
+   * phone is not connected, or its reliable channel is not open yet (PeerLink.sendSafe) — so the caller sends it again.
+   */
+  sendTo(peerId: PeerId, msg: LinkMessage): boolean {
+    const p = this.peers.get(peerId);
+    if (this.disposed || !p || !p.connected) return false;
+    return p.link.sendSafe(msg) !== false;
+  }
+
+  /** MULTIPLAYER: a phone's ready light (the party lobby). Unknown peer: nothing. */
+  setReady(peerId: PeerId, ready: boolean): void {
+    const p = this.peers.get(peerId);
+    if (!p || p.ready === ready) return;
+    p.ready = ready;
+    this.emitLobby();
+  }
+
+  /**
+   * MULTIPLAYER: a phone LEFT (it said so, or the TV removed a player who never came back). Its link closes, its slot
+   * lets go of anything it held and is free for the next phone. If it scans again it is simply a new arrival.
+   */
+  drop(peerId: PeerId): void {
+    const p = this.peers.get(peerId);
+    if (!p) return;
+    this.releaseSlot(p.slot);
+    p.link.close();
+    this.peers.delete(peerId);
+    this.emitLobby();
+  }
+
+  /**
+   * The lobby as a PHONE is sent it. MULTIPLAYER: without the peer ids — a phone needs names and seats, and another
+   * phone's id is the handle a stranger in the room could use to take that phone's seat on a reconnect.
+   */
+  private lobbyMessage(): LinkMessage {
+    return { type: 'lobby', peers: this.lobby().map((p) => ({ ...p, peerId: '' })), config: this.opts.config };
+  }
+
   async start(): Promise<string> {
     this.code = await createRoom(this.opts.config.modeId, this.hostId);
     // MUSIC-SUITE P10 (2026-09-29): DISPOSED WHILE THE ROOM WAS BEING MADE. dispose() stops the poll and the ping — but a
@@ -131,7 +205,7 @@ export class HostSession {
     if (data.hello) {
       if (this.peers.size >= this.opts.config.maxPlayers && !existing) return;
       existing?.link.close();
-      await this.offerTo(m.from, String((data.hello as { name?: string }).name ?? 'Player'));
+      await this.offerTo(m.from, hostPlayerName((data.hello as { name?: unknown }).name));
       return;
     }
 
@@ -152,12 +226,13 @@ export class HostSession {
         if (s === 'failed' || s === 'reconnecting') this.releaseSlot(p.slot);
         if (s === 'connected') {
           // Re-send the lobby so a reconnected phone re-renders the right UI.
-          p.link.sendSafe({ type: 'lobby', peers: this.lobby(), config: this.opts.config });
+          p.link.sendSafe(this.lobbyMessage());
           if (p.slot !== null) p.link.sendSafe({ type: 'assign', slot: p.slot });
           // MUSIC-SUITE P6 phone-replay: …and the room as it is now (only an opted-in config ever has one — sendState)
           if (this.roomState) p.link.sendSafe({ type: 'state', state: this.roomState });
         }
         this.emitLobby();
+        if (s === 'connected') this.opts.onPeerUp?.(peerId);
       },
       // BINARY INPUT FRAMES (Phase B). Decoded, gated for order, and turned into the same FelInput a local
       // controller produces — so a mode cannot tell a remote pad from one plugged into the machine.
@@ -177,8 +252,10 @@ export class HostSession {
           p.rttMs = Date.now() - msg.t;
           this.emitLobby();
         } else if (msg.type === 'hello') {
-          p.name = msg.name;
+          p.name = hostPlayerName(msg.name);
           this.emitLobby();
+        } else if (msg.type === 'party-cmd') {
+          this.opts.onPartyCmd?.(String(msg.cmd), peerId);
         }
       },
     });

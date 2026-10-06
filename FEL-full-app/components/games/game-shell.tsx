@@ -22,6 +22,7 @@ import { arenaRefusal, storyRefusal, type Refusal } from './end-card-refusal';
 import { EndScreen } from './end-screen/end-screen';
 import type { EndGoals } from './end-screen/types';
 import { unpaidReason } from '@/lib/sessions/unpaidCopy';
+import { PartyInvite } from '@/components/party/party-invite';   // MULTIPLAYER: the results card's door to the party room
 import {
   type CarnivalStop, type CarnivalRunState,
   recordCarnivalResult, clearCarnivalRun,
@@ -722,7 +723,8 @@ function GameShellInner({
               share={{ state: shareState, url: shareUrl, onChallenge: () => void shareChallenge(), onProof: shareProof }}
               onReplay={replay}
               onNavigate={(href) => router.push(href)}
-              sideCards={<LearnWhileYouWait compact />}   /* KNOWLEDGE-FEED v1: one card for the idle moment, in the end card's side slot */
+              /* MULTIPLAYER: a game friends can play together offers the couch (not on a staked run); KNOWLEDGE-FEED v1: one card for the idle moment */
+              sideCards={<>{!arenaMatchId && <PartyInvite modeId={mode} variant="card" />}<LearnWhileYouWait compact /></>}
             />
           )}
         </AnimatePresence>

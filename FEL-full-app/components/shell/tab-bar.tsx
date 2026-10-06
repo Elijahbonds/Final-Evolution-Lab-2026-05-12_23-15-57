@@ -31,7 +31,7 @@ export interface TabDef {
 export const TABS: TabDef[] = [
   {
     id: 'play', label: 'Play', href: '/play', icon: Gamepad2, accent: '#00E5FF',
-    owns: ['/play', '/modes', '/arena', '/multiplayer', '/ladder', '/story', '/try', '/venues', '/host'],
+    owns: ['/play', '/modes', '/arena', '/multiplayer', '/ladder', '/story', '/try', '/venues', '/host', '/join'],
   },
   {
     id: 'train', label: 'Train', href: '/train', icon: Dumbbell, accent: '#00FF9D',

@@ -3,6 +3,7 @@ import { DoorsRow } from '@/components/shell/doors-row';
 import { TabPage } from '@/components/shell/tab-page';
 import { FAMILIES, OFF_SHELF, SHELF_MODE_COUNT, shelvedModes, type Family } from '@/lib/nav/families';
 import { modeMenuMetaFor, visibleModeEntries } from '@/lib/mode-menu';
+import { PartyBadge } from '@/components/party/party-badge';   // MULTIPLAYER: the games friends can play together
 
 type ModeTile = {
   key: string;
@@ -42,7 +43,7 @@ function ModeCard({ tile }: { tile: ModeTile }) {
         <Icon className="h-5 w-5" />
       </span>
       <span className="min-w-0">
-        <span className="fel-heading block truncate text-[15px] font-bold text-white">{tile.name}</span>
+        <span className="fel-heading block truncate text-[15px] font-bold text-white">{tile.name} <PartyBadge modeKey={tile.key} className="ml-1" /></span>
         <span className="mt-0.5 block truncate font-mono text-[10.5px] uppercase tracking-[0.12em] text-white/35">
           {tile.venue}
         </span>
