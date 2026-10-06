@@ -215,6 +215,66 @@ describe('every style of every kind builds on both kits', () => {
   }
 });
 
+describe('where the cuts are, and what stays drawn', () => {
+  for (const sex of ['male', 'female'] as const) {
+    it(`${sex}: a sleeve is whole from the shoulder to its cuff (no cut along an arm held above the base of the neck)`, async () => {
+      const { openEdges } = await import('./build');
+      const { blend3, bodyCMesh, clipKeep } = await import('./clip');
+      const s = spawn(sex);
+      const F = clothFieldOf(bodyOf(s))!;
+      for (const raw of [{ style: 'longsleeve' }, { style: 'jacket' }, { style: 'hoodie', hood: 'up' }, { style: 'highneck' }, { style: 'tee', sleeve: 'elbow', neck: 'v' }]) {
+        const c = resolveCloth(sanitizeClothes([{ id: 'c1', kind: 'top', colour: '#111111', ...raw }])[0]);
+        const pm = clipKeep(bodyCMesh(F.n, F.ind), keepField(F, c)).mesh;
+        const e = openEdges(blend3(pm, F.P), pm.tris);
+        const reach = sleeveReach(c.sleeve, F.L.arm.L.len, Math.min(F.L.arm.L.hand, F.L.arm.R.hand));
+        let onArm = 0;
+        for (let i = 0; i < e.points.length; i += 3) {
+          const x = e.points[i] - F.L.mid[0];
+          const a = x >= 0 ? F.L.arm.L : F.L.arm.R;
+          const sArm = (e.points[i] - a.o[0]) * a.d[0] + (e.points[i + 1] - a.o[1]) * a.d[1] + (e.points[i + 2] - a.o[2]) * a.d[2];
+          if (sArm > 0.06 && sArm < reach - 0.03) onArm++;
+        }
+        expect(onArm, `${sex} ${raw.style}`).toBe(0);
+      }
+      s.root.dispose();
+    });
+    it(`${sex}: the skin within the margin of a hem stays drawn; the skin deep inside is hidden`, () => {
+      const s = spawn(sex);
+      const F = clothFieldOf(bodyOf(s))!;
+      const clothes = sanitizeClothes([{ id: 't', kind: 'top', style: 'tee', colour: '#111111' }, { id: 'p', kind: 'bottom', style: 'shorts', colour: '#222222' }, { id: 'f', kind: 'feet', style: 'boots', colour: '#222222' }]);
+      for (const c of clothes) {
+        const geo = buildClothes(F, [c], 'desktop');   // each alone: another piece may hide what this one keeps
+        const r = resolveCloth(c);
+        const f = keepField(F, r);
+        let deepInside = 0, nearEdgeHidden = 0;
+        for (let v = 0; v < F.n; v++) {
+          if (f[v] > 0) continue;
+          // a body vertex 1 cm or less inside the hem / cuff / neckline (the field is metric there) is near an edge
+          if (f[v] > -0.01 && geo.bodyHide[v]) nearEdgeHidden++;
+          if (f[v] < -0.08 && geo.bodyHide[v]) deepInside++;
+        }
+        expect(nearEdgeHidden, `${sex} ${c.style} near its edges`).toBe(0);
+        expect(deepInside, `${sex} ${c.style} deep`).toBeGreaterThan(100);
+      }
+      s.root.dispose();
+    });
+    it(`${sex}: footwear never sinks more than 2 mm below the skin it covers; a tube never tucks in going down`, async () => {
+      const { tubeRadii } = await import('./build');
+      const s = spawn(sex);
+      const F = clothFieldOf(bodyOf(s))!;
+      const geo = buildClothes(F, sanitizeClothes([{ id: 'f', kind: 'feet', style: 'boots', colour: '#111111', fit: 1 }]), 'desktop');
+      let lowest = Infinity;
+      for (let v = 0; v < geo.P.length / 3; v++) lowest = Math.min(lowest, geo.P[v * 3] * F.L.up[0] + geo.P[v * 3 + 1] * F.L.up[1] + geo.P[v * 3 + 2] * F.L.up[2]);
+      expect(lowest).toBeGreaterThanOrEqual(F.L.sole - 0.0025);
+      const rows = Array.from({ length: 10 }, (_, i) => F.L.crotch + 0.1 - i * 0.04);
+      const { r, hull } = tubeRadii(F, rows, 24, { clearance: 0.01, flare: 0.3, flareFrom: F.L.crotch + 0.05 });
+      for (let i = 1; i < rows.length; i++) for (let k = 0; k < 24; k++) expect(r[i * 24 + k]).toBeGreaterThanOrEqual(r[(i - 1) * 24 + k] - 1e-6);
+      for (let i = 0; i < r.length; i++) expect(r[i]).toBeGreaterThanOrEqual(hull[i] + 0.01 - 1e-6);
+      s.root.dispose();
+    });
+  }
+});
+
 describe('skinned to the right bones, painted in the right place', () => {
   for (const sex of ['male', 'female'] as const) {
     it(`${sex}: each cloth vertex rides the bone that carries the skin it was cut from`, () => {
@@ -449,7 +509,7 @@ describe('paint reaches the clothes', () => {
 });
 
 describe('cached by inputs, one draw', () => {
-  it('the same doc rebuilds nothing; a colour change rewrites colours only; any other change a new mesh; the LRU is bounded', () => {
+  it('the same doc rebuilds nothing; a colour change rewrites colours only; any other change a new mesh; the LRU is bounded', async () => {
     resetClothCaches();
     const s = spawn('male');
     const a = dressed([{ id: 't', kind: 'top', style: 'tee', colour: '#111111' }]);
@@ -467,6 +527,15 @@ describe('cached by inputs, one draw', () => {
     expect(m1.isDisposed()).toBe(true);
     for (const sleeve of ['none', 'cap', 'elbow', 'threeQuarter', 'knuckles', 'short', 'long']) syncClothes(s, dressed([{ id: 't', kind: 'top', style: 'tee', colour: '#EE2222', sleeve }]));
     expect(clothCacheStats().entries).toBeLessThanOrEqual(CLOTH_CACHE_MAX);
+    // the shape morph's per-kit cache does not grow with every rebuilt garment (a sleeve drag)
+    const { shapeCacheStats } = await import('../shape/renderShape');
+    const shaped = (sleeve: string) => dressed([{ id: 't', kind: 'top', style: 'tee', colour: '#EE2222', sleeve }], { shape: { face: {}, body: {}, girth: { chest: 1.2 } } });
+    syncClothes(s, shaped('long'));
+    const { syncShape } = await import('../shape/renderShape');
+    syncShape({ ...s, meshes: [...s.meshes, clothMeshOf(s.root)!] }, shaped('long'));
+    const preps0 = shapeCacheStats().preps;
+    for (const sleeve of ['none', 'cap', 'elbow', 'threeQuarter']) { syncClothes(s, shaped(sleeve)); syncShape({ ...s, meshes: [...s.meshes, clothMeshOf(s.root)!] }, shaped(sleeve)); }
+    expect(shapeCacheStats().preps).toBe(preps0);
     // one mesh, one material, however many pieces
     syncClothes(s, dressed(OUTFIT));
     const cloths = s.root.getChildMeshes(false).filter((m) => (m.metadata as { felCloth?: boolean } | null)?.felCloth);
