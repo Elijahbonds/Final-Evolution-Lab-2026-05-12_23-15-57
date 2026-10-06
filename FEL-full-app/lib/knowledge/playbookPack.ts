@@ -5,8 +5,9 @@
 // chapter's "What to Remember" items, and two chapter theses), only broken into lines that fit a phone card. A
 // revision of the book is re-imported and this pack follows it.
 //
-// No quiz cards: a question about the owner's book would be our paraphrase of it. Writing those is an owner decision
-// (docs/KNOWLEDGE-FEED.md).
+// No quiz cards: a question about the owner's book would be our paraphrase of it. Owner decision 6 (2026-10-06): draft
+// them, the owner approves before they ship — the drafts are docs/PLAYBOOK-QUIZ-DRAFTS.md, and
+// lib/knowledge/playbookQuizDrafts.test.ts keeps every one of them out of this pack until then.
 
 import { CHAPTERS, PLAYBOOK, type Chapter } from '@/lib/education/course';
 import { LIMITS } from './validate';
