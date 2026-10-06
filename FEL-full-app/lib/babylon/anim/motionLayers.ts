@@ -133,6 +133,12 @@ export interface MotionMount {
   setBall(ball: AbstractMesh | null): void;
   /** A teleport / a reset: the followers start again from the clips, the lean from upright. */
   reset(): void;
+  /**
+   * IMPROVE (2026-10-06, 3v3 #14): the level-of-detail gate — while `gate()` is false the drag and the side lean skip their pass
+   * (the followers restart from the clips, the lean from upright, as `?nomotion=1` does), and the hinge runs as ever (the arms'
+   * last writer). Null (the default) = always on: every existing caller runs exactly as before.
+   */
+  setGate(gate: (() => boolean) | null): void;
   dispose(): void;
   /** Readouts (probes, tests): airborne now, the legs' drag weight, the lean (deg, signed about the body's front), the skipped arm. */
   readonly airborne: boolean; readonly legW: number; readonly leanDeg: number; readonly skipping: 'Left' | 'Right' | null;
@@ -149,6 +155,7 @@ export function mountMotionLayers(o: MotionMountOpts): MotionMount {
   const dtNow = () => animDt(scene.getEngine().getDeltaTime() / 1000, scene.animationTimeScale);
   let stamp = 0, airborne = false, legW = 0, footFloor = Number.POSITIVE_INFINITY;
   let heldBy: 'Left' | 'Right' | null = null, sinceRelease = Number.POSITIVE_INFINITY, skipping: 'Left' | 'Right' | null = null;
+  let gate: (() => boolean) | null = null;   // IMPROVE (2026-10-06, 3v3 #14): see MotionMount.setGate
   const skipSets: Record<'Left' | 'Right', Set<TransformNode>> = {
     Left: new Set(layers.arms.Left ? [layers.arms.Left.shoulder, layers.arms.Left.elbow] : []),
     Right: new Set(layers.arms.Right ? [layers.arms.Right.shoulder, layers.arms.Right.elbow] : []),
@@ -176,7 +183,7 @@ export function mountMotionLayers(o: MotionMountOpts): MotionMount {
   // ── the drag: INSERT-FIRST, on the clips' own values ──
   const dragObs: Observer<Scene> | null = o.drag === false ? null : scene.onAfterAnimationsObservable.add(() => {
     stamp++;
-    if (MOTION_OFF) { layers.drag.reset(); layers.legDrag?.reset(); legW = 0; return; }
+    if (MOTION_OFF || (gate && !gate())) { layers.drag.reset(); layers.legDrag?.reset(); legW = 0; return; }
     const dt = dtNow();
     readAirborne(dt); readSkip(dt);
     layers.drag.apply(dt, 1, skipping ? skipSets[skipping] : undefined);
@@ -189,6 +196,7 @@ export function mountMotionLayers(o: MotionMountOpts): MotionMount {
   const _axis = new Vector3(), _fwd = new Vector3(), _d = new Vector3();
   const undoLean = (): void => { if (leanOn && spine?.rotationQuaternion) spine.rotationQuaternion.copyFrom(leanSaved); leanOn = false; };
   const leanObs: Observer<Scene> | null = o.lean === false || !spine ? null : scene.onAfterAnimationsObservable.add(() => {
+    if (gate && !gate()) { seen = false; leanDeg = 0; vel.setAll(0); acc.setAll(0); return; }   // IMPROVE (2026-10-06, 3v3 #14): gated off — no root read, no spine walk
     const dt = Math.min(0.05, Math.max(0, scene.getEngine().getDeltaTime() / 1000));
     root.computeWorldMatrix(true);
     const p = root.getAbsolutePosition();
@@ -231,6 +239,7 @@ export function mountMotionLayers(o: MotionMountOpts): MotionMount {
   return {
     layers, mountHinge,
     setBall(b) { ballRef = b; heldBy = null; skipping = null; },
+    setGate(g) { gate = g; },
     reset() { layers.reset(); legW = 0; airborne = false; footFloor = Number.POSITIVE_INFINITY; heldBy = null; skipping = null; sinceRelease = Number.POSITIVE_INFINITY; seen = false; vel.setAll(0); acc.setAll(0); leanDeg = 0; for (const H of layers.hinges) H.stamp = -10; },
     dispose() {
       if (dragObs) scene.onAfterAnimationsObservable.remove(dragObs);

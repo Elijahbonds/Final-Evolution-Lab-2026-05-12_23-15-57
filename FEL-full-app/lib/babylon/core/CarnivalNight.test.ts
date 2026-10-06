@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { pickNight, rollRival, simulateRivalRun, rivalProgress, eventWinner, freshTally, bankEvent, nightChampion, nightBoard, EVENTS_PER_NIGHT } from './CarnivalNight';
+import { pickNight, rollRival, simulateRivalRun, rivalProgress, eventWinner, freshTally, bankEvent, nightChampion, nightBoard, EVENTS_PER_NIGHT, rivalMakeRate, RIVAL_BASE_RATE, RIVAL_RATE_MAX } from './CarnivalNight';
 
 describe('carnival night rules', () => {
   it('draws a seeded four from the pool with no repeats', () => {
@@ -43,5 +43,27 @@ describe('carnival night rules', () => {
     const board = nightBoard(t, ['YOU', 'RIVAL']);
     expect(board[0]).toEqual({ name: 'YOU', score: 140, line: 'SLAM RUSH' });
     expect(nightBoard(flat, ['P1', 'P2'])[1].line).toBe('—');
+  });
+});
+
+// IMPROVE (2026-10-06): the rival was eight coin flips at a flat 55 % all night, so event 4 played like event 1.
+describe('the rival warms up through the night', () => {
+  it('the first event is the old rival; each later event and each event the player took add to the make rate, capped', () => {
+    expect(rivalMakeRate(0)).toBe(RIVAL_BASE_RATE);
+    expect(RIVAL_BASE_RATE).toBe(0.55);
+    expect(rivalMakeRate(1)).toBeCloseTo(0.58, 10);
+    expect(rivalMakeRate(3)).toBeCloseTo(0.64, 10);
+    expect(rivalMakeRate(3, 2)).toBeCloseTo(0.68, 10);
+    expect(rivalMakeRate(3, 3)).toBe(RIVAL_RATE_MAX);
+    expect(rivalMakeRate(20, 20)).toBe(RIVAL_RATE_MAX);
+    for (let i = 0; i < 3; i++) expect(rivalMakeRate(i + 1, i)).toBeGreaterThan(rivalMakeRate(i, i));
+  });
+
+  it('the rate is what each attempt is rolled against; the band is still the event\'s own', () => {
+    expect(simulateRivalRun([4, 9], () => 0.6)).toBe(4);                  // 0.6 misses at the base 0.55
+    expect(simulateRivalRun([4, 9], () => 0.6, 8, rivalMakeRate(3))).toBe(9);   // and makes at event 4's 0.64
+    expect(rollRival([4, 9], () => 0.6, rivalMakeRate(3))).toBe(9);
+    expect(rollRival([4, 9], () => 0.6)).toBe(4);                        // the old two-argument call is the old rival
+    for (let i = 0; i < 50; i++) { const v = rollRival([4, 9], Math.random, RIVAL_RATE_MAX); expect(v).toBeGreaterThanOrEqual(4); expect(v).toBeLessThanOrEqual(9); }
   });
 });

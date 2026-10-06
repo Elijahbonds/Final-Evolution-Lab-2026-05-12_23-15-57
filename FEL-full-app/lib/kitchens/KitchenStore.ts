@@ -3,6 +3,7 @@
 
 import type { BuildSnapshot } from './buildSnapshot';
 import { buildMealRx } from './mealRxBuilder';
+import type { Allergen } from './allergens';
 import { KITCHEN_RECIPES } from './recipes.seed';
 import { KITCHEN_STORAGE_KEY, type FulfillmentPath, type KitchenSnapshot, type MealRx } from './types';
 
@@ -43,9 +44,10 @@ export const KitchenStore = {
    * fresh MealRx is built. Same scanDate: rebuild in place (idempotent for the day) — and when the rebuilt plan is the
    * same plan (leak, band, slots), the id and createdAt are kept so the grocery checklist's ticks survive a re-render.
    */
-  ingest(build: BuildSnapshot): MealRx {
+  ingest(build: BuildSnapshot, opts: { avoid?: readonly Allergen[] } = {}): MealRx {
     const s = read();
-    const fresh = buildMealRx({ signature: build, recipes: s.recipes, preferredFulfillment: s.preferredFulfillment });
+    // owner-approved 2026-10-06: the player's allergy pick (this device) keeps flagged recipes out of the plan
+    const fresh = buildMealRx({ signature: build, recipes: s.recipes, preferredFulfillment: s.preferredFulfillment, avoid: opts.avoid });
     const planKey = (m: MealRx) => `${m.sourceScanDate}|${m.leak}|${m.loadBand}|${m.dayPlan.map((p) => `${p.slot}:${p.recipeId}`).join(',')}`;
     const rx = s.current && planKey(s.current) === planKey(fresh) ? { ...fresh, id: s.current.id, createdAt: s.current.createdAt } : fresh;
     const history = s.current && s.current.sourceScanDate !== rx.sourceScanDate

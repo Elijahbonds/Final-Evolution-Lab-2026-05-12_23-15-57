@@ -40,5 +40,5 @@ export const AGENT_MODES: AgentModeDescriptor[] = [
   { id: 'tiebreak',          route: '/play/tiebreak',      label: 'Tiebreak Blitz', actions: ['move', 'shoot', 'idle'] },
   { id: 'velocitykart',      route: '/play/velocity-kart', label: 'Velocity Kart',  actions: ['move', 'sprint', 'turbo', 'idle'] },
   { id: 'volleyball',        route: '/play/volleyball',    label: 'Beach Rally',    actions: ['move', 'shoot', 'block', 'idle'] },
-  { id: 'who_scene_it',      route: '/play/who-scene-it',  label: 'Who Scene It',   actions: ['move', 'shoot', 'idle'] },
+  { id: 'who_scene_it',      route: '/play/who-scene-it',  label: 'Spot the Scene', actions: ['move', 'shoot', 'idle'] },
 ];

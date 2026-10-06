@@ -64,16 +64,24 @@ import { readPlaceLook } from '../nexus/placeLooks';
 import { SoundKit } from '../audio/SoundKit';
 import { VoiceKit } from '../audio/mic/VoiceKit';
 import { Contestants, type PodiumSpot } from '../party/Contestants';
-import { buildStage, SEATS, HOST_AT, HOST_CENTRE, WHEEL, GALLERY, type StageHandle } from '../party/BrainBrawlStage';
+import { buildStage, SEATS, HOST_AT, HOST_CENTRE, WHEEL, type StageHandle } from '../party/BrainBrawlStage';
 import { BB_HOST, SEAT_LINES, hostLines, pickFrom, spinLines, type HostMoment, type SeatBeat } from '../party/brainBrawlLines';
 import { plantFeet, type PodiumFeet } from '../party/podiumFeet';
 import { EffectsKit } from '../visual/EffectsKit';
+import { HAPTIC, padRumble } from '../premium/Haptics';
+// IMPROVE (2026-10-06): the owner-picked pass — its pure rules (brainBrawlPlay) and the two core helpers it added
+import { soloTier, scoreParts, type ChallengeKind } from '../core/BrainBrawlCore';
+import {
+  SPIN_WAIT_S, CHARGE_FULL_S, spinTurns, WHEEL_CRAWL, wheelRoll, cpuAllowed, armCpu, cpuChoice, SOLO_STRIKES, strikeRow,
+  stepHandicap, extraFor, handicapLabel, FASTEST_KEY, parseFastest, recordFastest, HOWTO_KEY, HOWTO_S, HOWTO_SKIP_S, HOW_TO, KIND_NAME,
+  parseSeenKinds, EXPOSE_SKIP_MIN_S, exposeDone, tickSecond, type Fastest,
+} from './brainBrawlPlay';
 import {
   CATEGORIES, CATEGORY_COLOR, mulberry32, makeChallenge, challengeScore, freshClaims, spinWheel, resolveClaim, claimedBy,
   matchWinner, boardRows, wheelLanding, wheelPool, verdicts, claimLine, SOLO_BEST_KEY, type Category, type Challenge, type Tier, type Verdict,
 } from '../core/BrainBrawlCore';
 
-type Phase = 'pick' | 'spin' | 'expose' | 'answer' | 'result' | 'done';
+type Phase = 'pick' | 'spin' | 'howto' | 'expose' | 'answer' | 'result' | 'done';
 const MAX_ROUNDS = 15;
 /** The spin, then the LANDING beat: the wheel stopped, the category named — before the card goes up. */
 // Feel: the wheel and the verdict used to hold 2.2 + 0.7 and 3.2 s (skip at 0.9). A night of five claims
@@ -95,7 +103,9 @@ const RISER_TOP = SEATS.riser + 0.002, DECK_TOP = 0.012;
  */
 const CAM_ANCHOR = new Vector3(0, 1.1, 0.1), CAM_OBJECTIVE = new Vector3(0, 2.29, -2.8);
 const FACE: Array<'A' | 'B' | 'X' | 'Y'> = ['A', 'B', 'X', 'Y'];
-const DPAD: Array<'up' | 'right' | 'down' | 'left'> = ['up', 'right', 'down', 'left'];
+/** IMPROVE (2026-10-06, #13): P2's arrows point at the option on THEIR corner of the 2×2 card — ▲ A (top left), ▶ B (top
+ *  right), ◀ C (bottom left), ▼ D (bottom right). ▲▶▼◀ in clockwise order put ◀ on D, the card's bottom RIGHT. */
+const DPAD: Array<'up' | 'right' | 'down' | 'left'> = ['up', 'right', 'left', 'down'];
 /** P1 / P2 — the same cyan and gold the host's scoreboard and option dots use. */
 const SEAT_COLOR = ['#22d3ee', '#facc15'];
 const LIGHT: Record<'armed' | 'locked' | Verdict | 'winner' | 'dim', string> = {
@@ -146,6 +156,42 @@ function hostSpot(scene: Scene): PodiumSpot {
   return { at: at.clone(), yaw: Math.atan2(0 - at.x, FACE_Z - at.z), tint: '#243b6b' };
 }
 
+/** IMPROVE (2026-10-06): the pass's own state, kept in one object so it sits apart from the match's. */
+interface Extra {
+  /** #3: may this night seat the CPU (brainBrawlPlay.cpuAllowed — not an Arena, async or challenge-link run, not a review). */
+  cpuOk: boolean; cpuAt: number; cpuRight: boolean;
+  /** #4: a solo night's misses. */
+  strikes: number;
+  /** #10: the duel handicap in seconds (− P1 gets them, + P2), and the pick chip last sent. */
+  handicap: number; chip: string;
+  /** #10: an extra-time seat's overtime has been announced. */
+  overtime: boolean;
+  /** #2: who spins this round, how long the wheel has waited, the hold (−1 = not held). */
+  spinner: number; waitT: number; charge: number;
+  /** #9: the how-to card's clock and age, the phase it hands over to, the kinds this device has seen. */
+  howToT: number; howToAge: number; howToNext: Phase; seenKinds: string[];
+  /** #11: how long the display has been up, and which seats have said they are ready. */
+  exposeAge: number; ready: boolean[];
+  /** #8: the fastest right answers on this device. */
+  fastest: Fastest;
+  /** #15: the camera and canvas the anchors were last computed for (view, projection, width, height). */
+  camAt: Float64Array;
+  /** #19: the set's materials frozen yet, and the clock to it. */
+  frozen: boolean; freezeT: number;
+}
+
+function readStore(key: string): string | null { try { return localStorage.getItem(key); } catch { return null; } }
+function writeStore(key: string, v: string): void { try { localStorage.setItem(key, v); } catch { /* private mode: device bests are a convenience */ } }
+
+function freshExtra(): Extra {
+  return {
+    cpuOk: typeof window !== 'undefined' && cpuAllowed(window.location.search), cpuAt: 0, cpuRight: false,
+    strikes: 0, handicap: 0, chip: '\u0000', overtime: false, spinner: 0, waitT: 0, charge: -1,
+    howToT: 0, howToAge: 0, howToNext: 'answer', seenKinds: parseSeenKinds(readStore(HOWTO_KEY)),
+    exposeAge: 0, ready: [false, false], fastest: parseFastest(readStore(FASTEST_KEY)), camAt: new Float64Array(34), frozen: false, freezeT: 0,
+  };
+}
+
 interface St {
   scene: Scene; ctx: ModeContext; phase: Phase; autoBegin: boolean; players: number; pickShown: boolean; firstTick: boolean;
   rnd: () => number; seen: Set<string>; claims: Record<Category, number | null>; played: Set<Category>;
@@ -167,6 +213,8 @@ interface St {
   spots: PodiumSpot[];
   /** Where the host stands now (hostSpot). */
   hostAt: PodiumSpot;
+  /** IMPROVE (2026-10-06). */
+  x: Extra;
   /** Feet on the riser / the deck, one per body (party/podiumFeet): seats 0 and 1, then the host. */
   feet: (PodiumFeet | null)[];
   timers: ReturnType<typeof setTimeout>[];
@@ -195,7 +243,13 @@ let restartMatch: (S: St) => void = () => {};
 
 export const BrainBrawlMode: ModeDefinition = (() => {
   const st = (ctx: ModeContext): St | undefined => states.get(ctx.scene);
-  const names = (S: St): string[] => (S.players > 1 ? ['P1', 'P2'] : ['YOU']);
+  const names = (S: St): string[] => (S.players > 1 ? ['P1', 'P2'] : cpuOn(S) ? ['YOU', 'CPU'] : ['YOU']);
+  /** IMPROVE #3: a solo night seats the CPU on P2's podium (cpuAllowed). `S.players` stays the HUMANS: input, the spinner and
+   *  every solo rule read it; the podiums, the verdicts and the scores read seatsIn. */
+  const cpuOn = (S: St): boolean => S.players === 1 && S.x.cpuOk;
+  const seatsIn = (S: St): number => S.players + (cpuOn(S) ? 1 : 0);
+  /** IMPROVE #10: seat `i`'s extra seconds (a duel's handicap). */
+  const extraOf = (S: St, i: number): number => (S.players > 1 ? extraFor(S.x.handicap, i) : 0);
   /** A timeout that dies with the scene — the end-of-match hand-off must not fire into a disposed harness. */
   const later = (S: St, ms: number, fn: () => void): void => { S.timers.push(setTimeout(() => { if (!S.scene.isDisposed) fn(); }, ms)); };
 
@@ -218,7 +272,7 @@ export const BrainBrawlMode: ModeDefinition = (() => {
   /** A contestant says something: a bubble over their podium, and — when the line is theirs alone — the talk gesture. `pool`
    *  replaces the beat's own lines when they depend on the game (the spin's: spinLines). */
   function speak(S: St, seat: number, beat: SeatBeat, gesture = false, pool: readonly string[] = SEAT_LINES[beat]): void {
-    if (seat >= S.players) return;
+    if (seat >= seatsIn(S)) return;
     const key = `${seat}:${beat}`;
     const text = pickFrom(pool, S.rnd, S.lastSaid.get(key));
     S.lastSaid.set(key, text);
@@ -233,9 +287,10 @@ export const BrainBrawlMode: ModeDefinition = (() => {
    * in front, beside the podium on its outboard side (anchorPop: the card's side put P2's pop over the host's head), and gone
    * after POP_S.
    */
-  function pop(S: St, seat: number, text: string, tone: Verdict): void {
+  function pop(S: St, seat: number, text: string, tone: Verdict, sub = ''): void {
     const p = S.pops[seat]; p.t = POP_S; p.n++;
-    S.ctx.setHud({ [`pop${seat + 1}`]: text, [`popTone${seat + 1}`]: tone, [`popN${seat + 1}`]: p.n });
+    // IMPROVE #7: `sub` is the pop's small second line — "100 + 50 speed"
+    S.ctx.setHud({ [`pop${seat + 1}`]: text, [`popTone${seat + 1}`]: tone, [`popN${seat + 1}`]: p.n, [`popSub${seat + 1}`]: sub });
   }
 
   /** Where the bubbles hang: above each seat's head and beside the host's, projected through the live camera (% of the
@@ -245,6 +300,15 @@ export const BrainBrawlMode: ModeDefinition = (() => {
     const cam = S.scene.activeCamera; if (!cam) return;
     const eng = S.scene.getEngine(), w = eng.getRenderWidth(), h = eng.getRenderHeight();
     if (!w || !h) return;
+    // IMPROVE (2026-10-06, #15): the camera holds a fixed subject, so most polls found nothing to move — and each one still
+    // projected eight new Vector3s and stringified the lot. The view, the projection and the canvas size are compared first
+    // (34 numbers, no allocation); only a change (a restage, a resize, the follow settling) recomputes.
+    const vm = cam.getViewMatrix().m, pm = cam.getProjectionMatrix().m, k = S.x.camAt;
+    let same = S.anchorKey !== '' && k[32] === w && k[33] === h;
+    for (let i = 0; i < 16 && same; i++) same = k[i] === vm[i] && k[16 + i] === pm[i];
+    if (same) return;
+    for (let i = 0; i < 16; i++) { k[i] = vm[i]; k[16 + i] = pm[i]; }
+    k[32] = w; k[33] = h;
     const vp = cam.viewport.toGlobal(w, h);
     const at = (p: Vector3): string => { const q = Vector3.Project(p, Matrix.Identity(), S.scene.getTransformMatrix(), vp); return `${(q.x / w * 100).toFixed(1)},${(q.y / h * 100).toFixed(1)}`; };
     const out: Record<string, HudValue> = {};
@@ -267,14 +331,19 @@ export const BrainBrawlMode: ModeDefinition = (() => {
   /**
    * The audience does not cast shadows. Measured on the new set: 276 draws a frame before it, 672 with it — twelve gallery
    * bodies and the host, each drawn again into every shadow cascade. The galleries stand 5–8 m back on dark risers where a
-   * shadow reads as nothing; the podiums and the host keep theirs. Run while the bodies are still arriving (async spawns).
+   * shadow reads as nothing; the podiums and the host keep theirs.
+   *
+   * IMPROVE (2026-10-06, #16): each body leaves the cascades the moment it LANDS (Onlookers' onSpawn). The light rig adds a
+   * mesh as a caster when it is created, which is before the spawn resolves, so the body's meshes are on the list by then. The
+   * four polls this replaces (1.5–12 s) left any body that landed after 12 s casting for the rest of the night.
    */
-  function trimCrowdShadows(S: St): void {
-    const inGallery = (x: number, z: number) => Math.abs(x) > GALLERY.x0 - 0.3 && z < GALLERY.rows[0].z + 0.6;
+  function dropCrowdShadows(S: St, root: TransformNode): void {
+    const mine = new Set<unknown>(root.getChildMeshes(false));
+    if (!mine.size) return;
     for (const l of S.scene.lights) {
-      const map = (l.getShadowGenerator?.() as { getShadowMap?: () => { renderList: { getAbsolutePosition(): Vector3 }[] | null } | null } | null)?.getShadowMap?.();
+      const map = (l.getShadowGenerator?.() as { getShadowMap?: () => { renderList: unknown[] | null } | null } | null)?.getShadowMap?.();
       if (!map?.renderList) continue;
-      map.renderList = map.renderList.filter((m) => { const p = m.getAbsolutePosition(); return !inGallery(p.x, p.z); });
+      map.renderList = map.renderList.filter((m) => !mine.has(m));
     }
   }
 
@@ -307,16 +376,20 @@ export const BrainBrawlMode: ModeDefinition = (() => {
     if (S.crowd.length || !S.stage) return;
     const cam = S.scene.activeCamera; if (!cam) return;
     if (S.scene.getEngine().getAspectRatio(cam) < 1.2) return;
-    S.crowd = S.stage.crowd.map((spots, i) => new Onlookers(S.scene, spots, i ? '#f472b6' : '#7c3aed', new Vector3(0, 1.6, -1.5)));
-    for (const ms of [1500, 3500, 7000, 12000]) later(S, ms, () => trimCrowdShadows(S));   // the onlookers land over a few seconds
+    // IMPROVE (2026-10-06): #16 out of the shadow cascades as each body lands; #17 each body's clip rests between cheers (the
+    // Cypher's opt-in — up to sixteen skinned bodies 5–8 m back stop re-evaluating an idle nobody can read); #18 the idle
+    // breathe-bob is written ten times a second, not every frame (a 2 cm bob at that distance; a cheer moves every frame)
+    S.crowd = S.stage.crowd.map((spots, i) => new Onlookers(S.scene, spots, i ? '#f472b6' : '#7c3aed', new Vector3(0, 1.6, -1.5),
+      { restBetweenCheers: true, idleBobStepSec: 0.1, onSpawn: (root) => { if (!S.scene.isDisposed) dropCrowdShadows(S, root); } }));
   }
 
   /** Only the seats in play are on the stage: pressing ▶ on the pick screen brings P2's podium up beside the wheel. */
   function seats(S: St): void {
-    S.stage?.lecterns.forEach((p, i) => p.seatRoot.setEnabled(i < S.players));
+    const n = seatsIn(S);   // IMPROVE #3: the CPU's podium is up on a solo night
+    S.stage?.lecterns.forEach((p, i) => p.seatRoot.setEnabled(i < n));
     for (let i = 0; i < 2; i++) {
-      if (i < S.players) spawnSeat(S, i);
-      S.cast[i]?.at(0)?.root.setEnabled(i < S.players);
+      if (i < n) spawnSeat(S, i);
+      S.cast[i]?.at(0)?.root.setEnabled(i < n);
     }
     screens(S);
   }
@@ -343,7 +416,7 @@ export const BrainBrawlMode: ModeDefinition = (() => {
 
   /** The lectern screens: the seat's tag and score. */
   function screens(S: St): void {
-    S.stage?.lecterns.forEach((l, i) => l.screen(S.players > 1 ? `P${i + 1}` : 'YOU', S.scores[i] ?? 0));
+    S.stage?.lecterns.forEach((l, i) => l.screen(names(S)[i] ?? `P${i + 1}`, S.scores[i] ?? 0));
   }
 
   function hud(ctx: ModeContext, S: St, extra: Record<string, HudValue> = {}): void {
@@ -362,9 +435,11 @@ export const BrainBrawlMode: ModeDefinition = (() => {
       clock: S.phase === 'answer' ? Math.max(0, Math.ceil(S.clock)) : null,
       clockFrac: S.phase === 'answer' && c ? Math.max(0, Math.min(1, S.clock / c.timeLimitSec)) : null,
       score: S.scores[0], p2score: S.scores[1] ?? 0, streak: S.streak,
-      answeredP1: S.answers[0] !== null && S.phase === 'answer', answeredP2: S.answers[1] !== null && S.players > 1 && S.phase === 'answer',
+      // IMPROVE: #3 the CPU's seat (the host names it CPU, and shows the solo player's own pick at once as before); #4 the strikes
+      cpu: cpuOn(S), strikes: S.players === 1 ? strikeRow(S.x.strikes) : '',
+      answeredP1: S.answers[0] !== null && S.phase === 'answer', answeredP2: S.answers[1] !== null && seatsIn(S) > 1 && S.phase === 'answer',
       // what each seat picked: shown on the card for the player's OWN lock-in (solo) and at the reveal (both)
-      pickP1: S.answers[0] ?? -1, pickP2: S.players > 1 ? (S.answers[1] ?? -1) : -1,
+      pickP1: S.answers[0] ?? -1, pickP2: seatsIn(S) > 1 ? (S.answers[1] ?? -1) : -1,
       best: S.best,
       ...extra,
     });
@@ -394,7 +469,7 @@ export const BrainBrawlMode: ModeDefinition = (() => {
   /** The podium's standing pose for the phase — so a body that arrives late (async spawn) or a seat that has finished its
    *  one-shot is never left in the wrong state. */
   function pose(S: St): void {
-    for (let i = 0; i < S.players; i++) {
+    for (let i = 0; i < seatsIn(S); i++) {
       if (S.phase === 'expose' || (S.phase === 'answer' && S.answers[i] === null)) act(S, i, 'party_think', { loop: true, fadeSec: 0.3 });
       else if (S.phase === 'answer') act(S, i, 'party_locked', { loop: true });
       else if (S.phase === 'spin' || S.phase === 'pick') act(S, i, 'idle_stand', { loop: true, fadeSec: 0.3 });
@@ -403,25 +478,31 @@ export const BrainBrawlMode: ModeDefinition = (() => {
 
   function spin(ctx: ModeContext, S: St): void {
     S.round++;
-    S.tier = (S.round <= 2 ? 1 : S.round <= 4 ? 2 : 3) as Tier;
+    // IMPROVE (2026-10-06, #1, TUNED): a solo night climbs the tiers by its CLAIMS (BrainBrawlCore.soloTier) — by the round, a
+    // miss climbed it too and paid the next card more. A duel still climbs by the round: both seats see the same cards.
+    S.tier = (S.players === 1 ? soloTier(claimedBy(S.claims, 0).length) : S.round <= 2 ? 1 : S.round <= 4 ? 2 : 3) as Tier;
     // A miss stays open. The wheel skips only categories already claimed, so a solo night can reach all five.
     const spinner = S.players > 1 ? (S.round - 1) % 2 : 0;
-    const unclaimed = CATEGORIES.filter((c) => S.claims[c] === null).length;
+    S.x.spinner = spinner;
     // N5: what the wheel can land on, read BEFORE the spin — the spinner's wish names only one of these
     const wish = spinLines(wheelPool(S.claims, spinner), S.rnd);
     const { category, fullTurns } = spinWheel(S.rnd, S.claims, spinner);
-    S.category = category; S.landed = false; S.spinT = 0;
+    // IMPROVE (2026-10-06, #2): from round two the wheel WAITS for its spinner (spinT < 0): a press winds it, the release lets
+    // it go — a tap is three turns, a full hold five (spinTurns) — and after SPIN_WAIT_S it spins itself. Round one's spin is
+    // the press that started the night (one press to play stays).
+    S.category = category; S.landed = false; S.spinT = S.round === 1 ? 0 : -1; S.x.waitT = 0; S.x.charge = -1;
     S.spinFrom = S.wheel ? S.wheel.rotation.z : 0;
     S.spinTo = wheelLanding(S.spinFrom, category, fullTurns);   // an ABSOLUTE stop: the named wedge under the pin
     S.phase = 'spin'; S.challenge = null; S.answers = names(S).map(() => null);
     for (let i = 0; i < S.players; i++) light(S, i, 'dim');
     pose(S);
-    SoundKit.play('whoosh', { pitch: 0.9 });
+    if (S.spinT === 0) SoundKit.play('whoosh', { pitch: 0.9 });   // a waiting wheel whooshes when it is let go (letGo)
     S.pops.forEach((p) => { p.t = 0; });   // the last verdict's pops do not ride into the spin
-    hud(ctx, S, { banner: S.players > 1 ? `${names(S)[spinner]} SPINS` : 'SPIN', hint: '', board: null, boardTitle: '', reveal: -1, verdictP1: '', verdictP2: '', pop1: '', pop2: '' });
+    const spinHint = S.spinT < 0 ? `${S.players > 1 ? `${names(S)[spinner]}: ` : ''}${spinner ? '▲' : 'A'} spins · hold for a bigger spin` : '';
+    hud(ctx, S, { banner: S.players > 1 ? `${names(S)[spinner]} SPINS` : 'SPIN', hint: spinHint, board: null, boardTitle: '', reveal: -1, verdictP1: '', verdictP2: '', pop1: '', pop2: '' });
     // the host opens the match, then calls every spin; the spinner wishes it on
     if (S.round === 1) host(S, S.matches > 1 ? 'again' : S.players > 1 ? 'intro.duel' : 'intro.solo', 'present');
-    else host(S, S.players === 1 && unclaimed === 1 ? 'spin.last' : 'spin', 'present');
+    else host(S, S.players === 1 && claimedBy(S.claims, 0).length === CATEGORIES.length - 1 ? 'spin.last' : 'spin', 'present');
     later(S, 350, () => { if (S.phase === 'spin') speak(S, spinner, 'spin', true, wish); });
   }
 
@@ -433,7 +514,7 @@ export const BrainBrawlMode: ModeDefinition = (() => {
     SoundKit.play('uiTick', { pitch: 1.35, volume: 0.7 });
     ctx.juice.flash(CATEGORY_COLOR[cat], 110, 0.45);
     S.stage?.flash(CATEGORY_COLOR[cat], 1);
-    hud(ctx, S, { banner: cat, hint: S.claims[cat] !== null && S.players > 1 ? `held by ${names(S)[S.claims[cat]!]} — take it` : '' });
+    hud(ctx, S, { banner: cat, hint: S.claims[cat] !== null && seatsIn(S) > 1 ? `held by ${names(S)[S.claims[cat]!]} — take it` : '' });
     host(S, `land.${cat}` as HostMoment);
   }
 
@@ -458,7 +539,7 @@ export const BrainBrawlMode: ModeDefinition = (() => {
     hud(ctx, S, { banner: '', hint: S.exposeT > 0 ? 'memorise…' : answerHint(S), reveal: -1 });
   }
 
-  const answerHint = (S: St): string => (S.players > 1 ? 'P1: A B X Y · P2: ▲ ▶ ▼ ◀' : 'A B X Y answer');
+  const answerHint = (S: St): string => (S.players > 1 ? 'P1: A B X Y · P2: ▲ ▶ ◀ ▼' : 'A B X Y answer');
 
   function answer(ctx: ModeContext, S: St, player: number, choice: number): void {
     if (S.phase !== 'answer' || !S.challenge || player >= S.players || S.answers[player] !== null) return;
@@ -477,23 +558,30 @@ export const BrainBrawlMode: ModeDefinition = (() => {
   function resolve(ctx: ModeContext, S: St): void {
     const c = S.challenge!;
     const vs = verdicts(S.answers, c.answer);
-    const roundScores = names(S).map((_, i) => challengeScore(vs[i] === 'correct', S.answerTimes[i], c.timeLimitSec, c.tier));
+    const roundScores = names(S).map((_, i) => challengeScore(vs[i] === 'correct', S.answerTimes[i] + extraOf(S, i), c.timeLimitSec + extraOf(S, i), c.tier));   // IMPROVE #10: each seat on its own clock
     roundScores.forEach((v, i) => { S.scores[i] += v; });
     const before = S.claims[c.category];   // who held it going in — the banner says HOLDS / TAKES / STAYS WITH from this
     const claimant = resolveClaim(S.claims, c.category, roundScores);
     S.played.add(c.category);
     // Assumption: a streak changes the banner, the chip and the cheer pitch. It does not multiply roundScores.
     if (S.players === 1) S.streak = vs[0] === 'correct' ? S.streak + 1 : 0;
+    // IMPROVE (2026-10-06, #4, TUNED): a solo miss — wrong, or the clock ran out — is a strike; SOLO_STRIKES end the night
+    const struck = S.players === 1 && vs[0] !== 'correct';
+    if (struck) S.x.strikes++;
+    // IMPROVE #7: what each right answer was made of — the base every right answer earns, and the speed on top
+    const parts = names(S).map((_, i) => scoreParts(vs[i] === 'correct', S.answerTimes[i] + extraOf(S, i), c.timeLimitSec + extraOf(S, i), c.tier));
     const fast = (i: number) => vs[i] === 'correct' && S.answerTimes[i] / c.timeLimitSec >= 0.7;
     // the verdicts land together, on the bodies, the lecterns, the bubbles and the card
     vs.forEach((v, i) => {
       act(S, i, v === 'correct' ? 'party_yes' : v === 'wrong' ? 'party_facepalm' : 'party_shrug', { fadeSec: 0.1 });
       light(S, i, v);
-      pop(S, i, v === 'correct' ? `+${roundScores[i]}` : v === 'wrong' ? 'WRONG' : 'TIME', v);
+      pop(S, i, v === 'correct' ? `+${roundScores[i]}` : v === 'wrong' ? 'WRONG' : 'TIME', v, v === 'correct' ? speedLine(parts[i]) : '');
       const stole = i === claimant && before !== null && before !== claimant;
       speak(S, i, v === 'correct' ? (stole ? 'steal' : fast(i) ? 'rightFast' : 'right') : v === 'wrong' ? 'wrong' : 'timeout');
     });
     screens(S);
+    verdictFeel(S, vs);                    // IMPROVE #6
+    const bestNote = fastNote(S, c, vs);   // IMPROVE #8
     const anyRight = vs.includes('correct');
     if (anyRight) SoundKit.play('score', { volume: 0.6, pitch: 1 + Math.min(0.4, Math.max(0, S.streak - 1) * 0.08) });
     else if (vs.every((v) => v === 'timeout')) SoundKit.play('clang', { volume: 0.5, pitch: 0.6 });
@@ -515,7 +603,8 @@ export const BrainBrawlMode: ModeDefinition = (() => {
     else host(S, 'claim');
     S.phase = 'result'; S.resultT = RESULT_S; S.resultAge = 0;
     hud(ctx, S, {
-      banner: `${claimLine(before, c.category, claimant, names(S))}${S.players === 1 && S.streak > 1 ? ` · STREAK ×${S.streak}` : ''}`,
+      banner: `${claimLine(before, c.category, claimant, names(S))}${S.players === 1 && S.streak > 1 ? ` · STREAK ×${S.streak}` : ''}${struck ? ` · STRIKE ${S.x.strikes}/${SOLO_STRIKES}` : ''}`,
+      fastBest: bestNote,
       hint: `${roundScores.map((v, i) => `${names(S)[i]} ${vs[i] === 'correct' ? `+${v}` : vs[i] === 'wrong' ? 'wrong' : 'out of time'}`).join(' · ')} · A next`,
       reveal: c.answer, verdictP1: vs[0], verdictP2: vs[1] ?? '', gainP1: roundScores[0], gainP2: roundScores[1] ?? 0,
       board: boardRows(S.claims, S.scores, names(S)), boardTitle: S.players > 1 ? 'FIRST TO FIVE' : `${claimedBy(S.claims, 0).length}/5 CLAIMED${S.streak > 1 ? ` · STREAK ×${S.streak}` : ''}`,
@@ -526,7 +615,8 @@ export const BrainBrawlMode: ModeDefinition = (() => {
     if (S.phase !== 'result') return;
     const winner = matchWinner(S.claims, S.players);
     const soloDone = S.players === 1 && claimedBy(S.claims, 0).length >= CATEGORIES.length;
-    if (winner >= 0 || soloDone || S.round >= MAX_ROUNDS) { finish(ctx, S, winner); return; }
+    const struckOut = S.players === 1 && S.x.strikes >= SOLO_STRIKES;   // IMPROVE #4
+    if (winner >= 0 || soloDone || struckOut || S.round >= MAX_ROUNDS) { finish(ctx, S, winner); return; }
     spin(ctx, S);
   }
 
@@ -558,11 +648,15 @@ export const BrainBrawlMode: ModeDefinition = (() => {
       if (outcome === 'win' || newBest) { act(S, 0, 'party_win_in', { then: 'party_win' }); light(S, 0, 'winner'); speak(S, 0, 'win'); }
       else if (claimed <= 1) { act(S, 0, 'party_lose', { loop: true, fadeSec: 0.25 }); speak(S, 0, 'lose'); }
       else act(S, 0, 'idle_stand', { loop: true, fadeSec: 0.25 });
+      // IMPROVE #3: the CPU takes the night the way it went for the player — a hung head under a win or a best, otherwise it
+      // stands; its lectern dims either way
+      if (cpuOn(S)) { act(S, 1, outcome === 'win' || newBest ? 'party_lose' : 'idle_stand', { loop: true, fadeSec: 0.25 }); light(S, 1, 'dim'); }
       host(S, newBest ? 'best' : 'solo.done', 'present');
-      hud(ctx, S, { ...clear, banner: newBest ? `NEW BEST · ${p1}` : `COMPOSITE · ${p1}`, board: boardRows(S.claims, S.scores, names(S)), boardTitle: `${claimed} / 5 CLAIMED · best ${S.best}`, hint: '' });
+      const out = S.x.strikes >= SOLO_STRIKES ? `OUT · ${SOLO_STRIKES} STRIKES · ${p1}` : `COMPOSITE · ${p1}`;   // IMPROVE #4
+      hud(ctx, S, { ...clear, banner: newBest ? `NEW BEST · ${p1}` : out, board: boardRows(S.claims, S.scores, names(S)), boardTitle: `${claimed} / 5 CLAIMED · best ${S.best}`, hint: '' });
     }
     SoundKit.play('whistle'); if (outcome === 'win') { SoundKit.play('crowdCheer'); for (const cr of S.crowd) cr.cheer(1); }
-    const stats = { players: S.players, p2score: p2, claims: claimedBy(S.claims, 0).length, p2claims: claimedBy(S.claims, 1).length, rounds: S.round, best: S.best };
+    const stats = { players: S.players, p2score: p2, claims: claimedBy(S.claims, 0).length, p2claims: claimedBy(S.claims, 1).length, rounds: S.round, best: S.best, cpu: cpuOn(S) ? 1 : 0, strikes: S.players === 1 ? S.x.strikes : 0 };
     // a CONTINUOUS host (the game shell, GO AGAIN in place) gets the card and keeps the stage; anything else ends the session
     later(S, 1800, () => (ctx.continuous ? ctx.card(outcome, p1, stats) : ctx.end(outcome, p1, stats)));
   }
@@ -579,6 +673,7 @@ export const BrainBrawlMode: ModeDefinition = (() => {
     // first spin line likewise differs from its last one
     S.say.forEach((b) => { b.t = 0; b.text = ''; });
     S.pops.forEach((p) => { p.t = 0; });
+    S.x.strikes = 0;   // IMPROVE #4: a fresh night
     S.phase = 'pick';   // begin() starts from the pick; the pick itself is never shown
     S.ctx.setHud({ board: null, boardTitle: '', banner: '', hint: '', say1: '', say2: '', pop1: '', pop2: '', hostSay: '', round: 0 });
     begin(S.ctx, S);
@@ -592,6 +687,125 @@ export const BrainBrawlMode: ModeDefinition = (() => {
     if (w.__FEL_MIC__.length > 80) w.__FEL_MIC__.shift();
   }
 
+  // ── IMPROVE (2026-10-06) ──────────────────────────────────────────────────────────────────────────────────────────
+  /** #7: "100 + 50 speed" — the pop's second line (nothing when the answer earned no speed). */
+  const speedLine = (p: { base: number; speed: number }): string => (p.speed > 0 ? `${p.base} + ${p.speed} speed` : `${p.base} base`);
+
+  /** #6: the verdict on the hands — the 'perfect' pattern and a short rumble when a player was right, the 'fail' buzz and a
+   *  longer one when no player was (a CPU's verdict buzzes nobody). The slap's own impact is slapFeel. */
+  function verdictFeel(S: St, vs: readonly Verdict[]): void {
+    const humans = vs.slice(0, S.players);
+    if (humans.includes('correct')) { HAPTIC.perfect(); padRumble(0.3, 90); }
+    else if (humans.length) { HAPTIC.fail(); padRumble(0.55, 160); }
+  }
+  /** #6 — TUNED (new): the buzzer slap's impact (hit-stop, a little shake, a tap on the pad). */
+  const slapFeel = (ctx: ModeContext): void => ctx.feel.impact(0.15);
+
+  /** #8: each player's right answer against this device's fastest for the category and the kind; the line to show for a
+   *  new best (a duel names the seat). Stored on the device only. */
+  function fastNote(S: St, c: Challenge, vs: readonly Verdict[]): string {
+    let note = '';
+    for (let i = 0; i < S.players; i++) {
+      if (vs[i] !== 'correct') continue;
+      const r = recordFastest(S.x.fastest, c.category, c.kind, c.timeLimitSec - S.answerTimes[i]);
+      S.x.fastest = r.table;
+      if (r.note) note = S.players > 1 ? `${names(S)[i]} ${r.note}` : r.note;
+    }
+    if (vs.slice(0, S.players).includes('correct')) writeStore(FASTEST_KEY, JSON.stringify(S.x.fastest));
+    return note;
+  }
+
+  /** #3: the CPU locks in — the slap, the light and the bubble a player's press gets (answer() is the players'). */
+  function cpuLock(ctx: ModeContext, S: St, choice: number): void {
+    if (S.phase !== 'answer' || !S.challenge || S.answers[1] !== null) return;
+    S.answers[1] = choice; S.answerTimes[1] = S.clock;
+    act(S, 1, 'party_buzz', { then: 'party_locked', fadeSec: 0.06 });
+    later(S, 230, () => S.stage?.lecterns[1]?.buzz());
+    light(S, 1, 'locked');
+    SoundKit.play('thud', { volume: 0.4, pitch: 1.1 });
+    speak(S, 1, 'lock');
+    hud(ctx, S);
+    if (S.answers.every((a) => a !== null)) S.lockT = LOCK_BEAT_S;
+  }
+
+  /** Right after launch(): #11 the memorise starts its own clock, #3 the CPU commits to its answer, #9 a kind this device has
+   *  never seen gets its how-to card first. */
+  function afterLaunch(ctx: ModeContext, S: St): void {
+    const c = S.challenge; if (!c) return;
+    S.x.exposeAge = 0; S.x.ready = [false, false]; S.x.overtime = false;
+    if (cpuOn(S)) {
+      const plan = armCpu(c.timeLimitSec, S.rnd);
+      S.x.cpuAt = plan.at; S.x.cpuRight = plan.right;
+      light(S, 1, S.phase === 'answer' ? 'armed' : 'dim');
+    }
+    const kind = (c as { kind: string }).kind;
+    if (kind in HOW_TO && !S.x.seenKinds.includes(kind)) startHowTo(ctx, S, kind as ChallengeKind);
+  }
+
+  /** #9: the first time a kind appears on this device, a short card says what it asks (and shows one, where it fits) before
+   *  the clock starts. HOWTO_S on its own; a press moves on after HOWTO_SKIP_S. Never again on this device. */
+  function startHowTo(ctx: ModeContext, S: St, kind: ChallengeKind): void {
+    S.x.howToNext = S.phase; S.phase = 'howto'; S.x.howToT = HOWTO_S; S.x.howToAge = 0;
+    S.x.seenKinds = [...S.x.seenKinds, kind];
+    writeStore(HOWTO_KEY, JSON.stringify(S.x.seenKinds));
+    for (let i = 0; i < seatsIn(S); i++) light(S, i, 'dim');
+    hud(ctx, S, { howToTitle: `NEW · ${KIND_NAME[kind]}`, howTo: HOW_TO[kind], hint: '' });
+  }
+
+  function endHowTo(ctx: ModeContext, S: St): void {
+    if (S.phase !== 'howto') return;
+    S.phase = S.x.howToNext;
+    for (let i = 0; i < seatsIn(S); i++) light(S, i, S.phase === 'answer' ? 'armed' : 'dim');
+    pose(S);
+    SoundKit.play('uiTick', { pitch: 1.2 });
+    hud(ctx, S, { howTo: '', howToTitle: '', hint: S.exposeT > 0 ? 'memorise…' : answerHint(S) });
+  }
+
+  /** #2: the waiting wheel — winds back while it is held, spins itself after SPIN_WAIT_S, and a hold spins at its cap. */
+  function waitSpin(ctx: ModeContext, S: St, dt: number): void {
+    S.x.waitT += dt;
+    if (S.x.charge >= 0) {
+      S.x.charge = Math.min(1, S.x.charge + dt / CHARGE_FULL_S);
+      if (S.wheel) S.wheel.rotation.z = S.spinFrom - S.x.charge * 0.22;   // the wind-up: the wheel eases back against the hand
+      if (S.x.charge >= 1) letGo(ctx, S);
+    } else if (S.x.waitT >= SPIN_WAIT_S) { S.x.charge = 0.5; letGo(ctx, S); }
+  }
+
+  /** #2: the spinner lets go — the wheel spins from where the wind-up left it, its turns set by the hold. */
+  function letGo(ctx: ModeContext, S: St): void {
+    if (S.phase !== 'spin' || S.spinT >= 0 || !S.category) return;
+    const turns = spinTurns(Math.max(0, S.x.charge));
+    S.x.charge = -1;
+    S.spinFrom = S.wheel ? S.wheel.rotation.z : S.spinFrom;
+    S.spinTo = wheelLanding(S.spinFrom, S.category, turns);
+    S.spinT = 0;
+    SoundKit.play('whoosh', { pitch: 0.85 + turns * 0.03 });
+    hud(ctx, S, { hint: '' });
+  }
+
+  /** #10: the pick screen's handicap chip (a duel only), sent when it changes. */
+  function pickChip(ctx: ModeContext, S: St): void {
+    const label = S.players > 1 ? `${handicapLabel(S.x.handicap)} · ▲ ▼` : '';
+    const key = `${label}|${cpuOn(S)}`;
+    if (key === S.x.chip) return;
+    S.x.chip = key;
+    ctx.setHud({ handicap: label, cpu: cpuOn(S) });
+  }
+
+  /** #10: the seats still answering in a duel's overtime, and how far past zero the clock runs for them. */
+  function overtime(S: St): number {
+    let over = 0;
+    for (let i = 0; i < S.players; i++) if (S.answers[i] === null) over = Math.max(over, extraOf(S, i));
+    return over;
+  }
+
+  /** A release (pad or keyboard): whose it is, as answerOwner reads a press. */
+  function releaseFrom(e: FelInput): LocalPress | null {
+    if (e.t === 'button' && !e.pressed) return 'face';
+    if (e.t === 'dpad' && !e.pressed) return e.src === 'key' ? 'key-dpad' : 'dpad';
+    return null;
+  }
+
   function pressFrom(e: FelInput): LocalPress | null {
     if (e.t === 'button' && e.pressed) return 'face';
     if (e.t === 'dpad' && e.pressed) return e.src === 'key' ? 'key-dpad' : 'dpad';
@@ -600,6 +814,11 @@ export const BrainBrawlMode: ModeDefinition = (() => {
 
   function seatAnswer(ctx: ModeContext, e: FelInput, slot: number): void {
     const S = st(ctx); if (!S) return;
+    // IMPROVE #2: the spinner's release lets the wheel go (a touch tap sends no release: its hold spins at the cap)
+    if (S.phase === 'spin' && S.spinT < 0 && S.x.charge >= 0) {
+      const off = releaseFrom(e);
+      if (off && answerOwner({ pads: ctx.input.pads().length, slot, playerCount: S.players, from: off }) === S.x.spinner) { letGo(ctx, S); return; }
+    }
     const from = pressFrom(e);
     if (!from) return;
     const pads = ctx.input.pads().length;
@@ -608,19 +827,37 @@ export const BrainBrawlMode: ModeDefinition = (() => {
       if (who !== null && S.resultAge >= RESULT_SKIP_S) { SoundKit.play('uiTick', { volume: 0.3, pitch: 0.9 }); afterResult(ctx, S); }
       return;
     }
+    // IMPROVE #2: the waiting wheel is the spinner's — their press winds it; anyone else is told whose spin it is
+    if (S.phase === 'spin' && S.spinT < 0) {
+      if (who === S.x.spinner && S.x.charge < 0) { S.x.charge = 0; SoundKit.play('uiTick', { volume: 0.4, pitch: 0.8 }); }
+      else if (who !== null && who !== S.x.spinner) refuse(ctx, `${names(S)[S.x.spinner]} SPINS`);
+      return;
+    }
+    // IMPROVE #9: a press moves the how-to card on once it has had its beat
+    if (S.phase === 'howto') { if (who !== null && S.x.howToAge >= HOWTO_SKIP_S) endHowTo(ctx, S); return; }
+    // IMPROVE (2026-10-06, #11, TUNED): a press ends the memorise — once the display has been up EXPOSE_SKIP_MIN_S, and in a
+    // duel only when BOTH have pressed (one player must not cut the other's look short). Earlier presses are refused as before.
+    if (S.phase === 'expose' && who !== null && S.x.exposeAge >= EXPOSE_SKIP_MIN_S) {
+      if (!S.x.ready[who]) { S.x.ready[who] = true; SoundKit.play('uiTick', { volume: 0.3, pitch: 1.1 }); }
+      if (exposeDone(S.x.ready, S.players)) S.exposeT = 0;
+      else hud(ctx, S, { hint: `${names(S)[who]} ready · memorise…` });
+      return;
+    }
     if (S.phase !== 'answer') {
       if (who === 0 && from === 'face' && S.phase !== 'done') refuse(ctx, S.phase === 'expose' ? 'MEMORISE…' : S.phase === 'spin' ? (S.landed ? `${S.category}…` : 'SPINNING…') : 'NEXT QUESTION…');
       return;
     }
     if (who === null) return;
+    // IMPROVE #10: a seat with no extra time is out at zero while the other plays its overtime
+    if (S.answers[who] === null && S.clock + extraOf(S, who) <= 0) { refuse(ctx, `${names(S)[who]} OUT OF TIME`); return; }
     if (who === 0 && from === 'face' && e.t === 'button') {
       const i = FACE.indexOf(e.btn as 'A' | 'B' | 'X' | 'Y');
       if (i >= 0 && S.answers[0] !== null) refuse(ctx, 'LOCKED IN');
-      else if (i >= 0) answer(ctx, S, 0, i);
+      else if (i >= 0) { answer(ctx, S, 0, i); if (S.answers[0] !== null) slapFeel(ctx); }   // IMPROVE #6
     } else if (who === 1 && (from === 'dpad' || from === 'key-dpad') && e.t === 'dpad') {
       const i = DPAD.indexOf(e.dir);
       if (i >= 0 && S.answers[1] !== null) refuse(ctx, 'P2 LOCKED IN');
-      else if (i >= 0) answer(ctx, S, 1, i);
+      else if (i >= 0) { answer(ctx, S, 1, i); if (S.answers[1] !== null) slapFeel(ctx); }
     }
   }
 
@@ -634,6 +871,7 @@ export const BrainBrawlMode: ModeDefinition = (() => {
         rnd: mulberry32(Date.now() % 1000003), seen: new Set(), claims: freshClaims(), played: new Set(), scores: [0], round: 0, tier: 1, matches: 1,
         venue: null, stage: null, crowd: [], anchor: null, wheel: null, cast: [null, null], spawning: [false, false], host: null,
         spinT: 0, spinFrom: 0, spinTo: 0, landed: false, category: null, lastRoll: 0, tickAt: 0,
+        x: freshExtra(),
         challenge: null, clock: 0, exposeT: 0, answers: [null], answerTimes: [0], lockT: -1, resultT: 0, resultAge: 0, hurried: false, thought: [false, false],
         best: loadBest(), streak: 0, spots: [], hostAt: { at: HOST_AT.clone(), yaw: 0 }, feet: [null, null, null], timers: [],
         say: [{ text: '', t: 0, n: 0 }, { text: '', t: 0, n: 0 }], hostN: 0, lastSaid: new Map(), pops: [{ t: 0, n: 0 }, { t: 0, n: 0 }], anchorsAt: 0, anchorKey: '',
@@ -643,6 +881,11 @@ export const BrainBrawlMode: ModeDefinition = (() => {
       // the venue spec's two stand-in podiums (x ±3, z 2) sat below the old shot; the camera that holds the whole podium (N7)
       // saw them as big pink and violet discs in the bottom corners. The set has its own risers and lecterns.
       for (const n of S.venue?.built.root.getChildTransformNodes(true) ?? []) if (n.name.startsWith('prop_podium_')) n.setEnabled(false);
+      // IMPROVE (2026-10-06, #20): the spec's back wall (z −10, 6 m tall) and its banner (z −9.6) stand wholly behind the set's
+      // LED wall (z −9.4, 11 m tall, its wings swung forward), so nothing of them can reach the frame — they go too. Its two
+      // lamps (x ±8, z −4) stand IN FRONT of the wall's wings, beside the galleries, and stay. (No CC0 prop set mounts here:
+      // propSetFor('brain_brawl') is null.)
+      for (const n of S.venue?.built.root.getChildTransformNodes(true) ?? []) if (/^prop_(wall|banner)_/.test(n.name)) n.setEnabled(false);
       // the set, built to the camera's shot (BrainBrawlStage): the LED wall, the deck, the wheel, the podiums, the galleries
       S.stage = buildStage(ctx.scene, SEAT_COLOR);
       S.wheel = S.stage.wheel;
@@ -679,6 +922,8 @@ export const BrainBrawlMode: ModeDefinition = (() => {
 
     onInput(ctx: ModeContext, e: FelInput) {
       const S = st(ctx); if (!S) return;
+      // IMPROVE (2026-10-06, #10, TUNED): on the duel's pick, ▲ ▼ move the handicap — the extra seconds one seat gets each card
+      if (S.phase === 'pick' && S.players > 1 && e.t === 'dpad' && e.pressed && (e.dir === 'up' || e.dir === 'down')) { S.x.handicap = stepHandicap(S.x.handicap, e.dir === 'down' ? 1 : -1); SoundKit.play('uiTick', { volume: 0.3, pitch: 1.1 }); pickChip(ctx, S); return; }
       if (S.phase === 'pick') {
         if (e.t === 'dpad' && e.pressed && (e.dir === 'left' || e.dir === 'right')) { S.players = e.dir === 'right' ? Math.min(2, S.players + 1) : Math.max(1, S.players - 1); SoundKit.play('uiTick', { volume: 0.3 }); seats(S); showPick(ctx, S); }
         else if (e.t === 'button' && e.pressed && FACE.includes(e.btn as 'A')) begin(ctx, S);
@@ -701,8 +946,12 @@ export const BrainBrawlMode: ModeDefinition = (() => {
       S.say.forEach((b, i) => { if (b.t > 0) { b.t -= dt; if (b.t <= 0) ctx.setHud({ [`say${i + 1}`]: '' }); } });
       S.pops.forEach((p, i) => { if (p.t > 0) { p.t -= dt; if (p.t <= 0) ctx.setHud({ [`pop${i + 1}`]: '' }); } });
       S.anchorsAt -= dt; if (S.anchorsAt <= 0) { S.anchorsAt = 0.5; anchors(S); }
+      // IMPROVE #19: the set's static materials freeze two seconds into play — after the harness's post-load pass over the
+      // scene's materials (liftBlackMaterials lifts the near-black header's albedo, which a material frozen first would keep)
+      if (!S.x.frozen) { S.x.freezeT += dt; if (S.x.freezeT >= 2) { S.x.frozen = true; S.stage?.freezeStatic(); } }
       if (S.phase === 'done') return;
       if (S.phase === 'pick') {
+        pickChip(ctx, S);   // IMPROVE #10
         if (S.autoBegin) { begin(ctx, S); return; }
         // ONE PRESS TO PLAY (the eye: "start takes two confirmations" — TAP TO START, then the pick, then 6 s on its timer).
         // The first playing frame is the frame after the splash's press. One pad: that press was the player saying go —
@@ -715,26 +964,41 @@ export const BrainBrawlMode: ModeDefinition = (() => {
         return;
       }
       if (S.phase === 'spin') {
+        if (S.spinT < 0) { waitSpin(ctx, S, dt); return; }   // IMPROVE #2: the wheel waits for its spinner
         S.spinT += dt;
-        const k = Math.min(1, S.spinT / SPIN_S), ease = 1 - Math.pow(1 - k, 3);
-        if (S.wheel && !S.landed) S.wheel.rotation.z = S.spinFrom + ease * (S.spinTo - S.spinFrom);
-        if (!S.landed && S.spinT >= SPIN_S) land(ctx, S);
-        if (S.spinT >= SPIN_S + LAND_S) launch(ctx, S);
+        // IMPROVE (2026-10-06, #12, TUNED): the fast part keeps SPIN_S; the pin then crawls the last peg (brainBrawlPlay.wheelRoll)
+        if (S.wheel && !S.landed) S.wheel.rotation.z = wheelRoll(S.spinT, S.spinFrom, S.spinTo, SPIN_S);
+        if (!S.landed && S.spinT >= SPIN_S + WHEEL_CRAWL.sec) land(ctx, S);
+        if (S.spinT >= SPIN_S + WHEEL_CRAWL.sec + LAND_S) { launch(ctx, S); afterLaunch(ctx, S); }
         return;
       }
+      if (S.phase === 'howto') { S.x.howToAge += dt; S.x.howToT -= dt; if (S.x.howToT <= 0) endHowTo(ctx, S); return; }   // IMPROVE #9
       if (S.phase === 'expose') {
-        S.exposeT -= dt;
-        if (S.exposeT <= 0) { S.phase = 'answer'; for (let i = 0; i < S.players; i++) light(S, i, 'armed'); hud(ctx, S, { hint: answerHint(S) }); }
+        S.exposeT -= dt; S.x.exposeAge += dt;
+        if (S.exposeT <= 0) { S.phase = 'answer'; for (let i = 0; i < seatsIn(S); i++) light(S, i, 'armed'); hud(ctx, S, { hint: answerHint(S) }); }
         return;
       }
       if (S.phase === 'answer') {
         if (S.lockT >= 0) { S.lockT -= dt; if (S.lockT <= 0) resolve(ctx, S); return; }   // the clock stops when everyone is in
         S.clock -= dt;
-        if (S.clock <= 0) { S.clock = 0; resolve(ctx, S); return; }
+        // IMPROVE #10: a handicapped seat still answering plays on past zero for its extra seconds (overtime)
+        const over = overtime(S);
+        if (S.clock <= -over) { S.clock = -over; resolve(ctx, S); return; }
         const c = S.challenge!;
+        if (S.clock <= 0 && !S.x.overtime) {
+          S.x.overtime = true;
+          const seat = S.answers[0] === null && extraOf(S, 0) > 0 ? 0 : 1;
+          hud(ctx, S, { hint: `${names(S)[seat]} OVERTIME · +${extraOf(S, seat)} s` });
+        }
+        const waiting = S.answers.slice(0, S.players).some((a) => a === null);
+        // IMPROVE (2026-10-06, #5): a rising tick on each of the last three seconds while a player is still answering
+        const sec = tickSecond(S.clock + dt, S.clock);
+        if (sec !== null && waiting) SoundKit.play('uiTick', { volume: 0.45, pitch: 1.2 + (3 - sec) * 0.15 });
+        // IMPROVE #3: the CPU presses at the moment it committed to (armCpu)
+        if (cpuOn(S) && S.answers[1] === null && c.timeLimitSec - S.clock >= S.x.cpuAt) cpuLock(ctx, S, cpuChoice(c.answer, c.options.length, S.x.cpuRight, S.rnd));
         // the room keeps talking while the clock runs: a thinker mutters once, the host calls the last three seconds
-        for (let i = 0; i < S.players; i++) if (!S.thought[i] && S.answers[i] === null && S.clock < c.timeLimitSec * 0.6) { S.thought[i] = true; if (S.rnd() < 0.6) speak(S, i, 'think'); }
-        if (!S.hurried && S.clock <= 3 && c.timeLimitSec > 5 && S.answers.some((a) => a === null)) { S.hurried = true; host(S, 'hurry'); }
+        for (let i = 0; i < seatsIn(S); i++) if (!S.thought[i] && S.answers[i] === null && S.clock < c.timeLimitSec * 0.6) { S.thought[i] = true; if (S.rnd() < 0.6) speak(S, i, 'think'); }
+        if (!S.hurried && S.clock <= 3 && c.timeLimitSec > 5 && waiting) { S.hurried = true; host(S, 'hurry'); }
         if (Math.floor((S.clock + dt) * 4) !== Math.floor(S.clock * 4)) hud(ctx, S);
         return;
       }

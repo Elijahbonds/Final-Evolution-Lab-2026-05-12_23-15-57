@@ -35,7 +35,8 @@ const ok = (c: boolean, label: string): void => { checks++; if (!c) fail.push(la
     'the ball actually flies mate → hero (PassFlight, same system a human throw uses — now led toward "me" via leadPoint, HOOPS-10PHASE-2 phase 6)');
   ok(/if \(!\(carrierId === 'mate0' \|\| carrierId === 'mate1'\) \|\| passFlight\.active\) return;/.test(src),
     'a call with no mate carrying, or a pass already in flight, is a no-op (one pass at a time)');
-  ok(/ctx\.setHud\(\{ onBall: iAmCarrier \}\);/.test(src), 'the HUD publishes onBall every frame for the touch pad to read');
+  // IMPROVE (2026-10-06, 3v3 #11): every frame through the on-change memo (putHud) — the host keeps the last value, so the pad reads it
+  ok(/putHud\(ctx, \{ onBall: iAmCarrier \}\);/.test(src), 'the HUD publishes onBall every frame (on change) for the touch pad to read');
 }
 
 // ── B. phone pad: PASS retitles to BALL! only off the ball ─────────────────

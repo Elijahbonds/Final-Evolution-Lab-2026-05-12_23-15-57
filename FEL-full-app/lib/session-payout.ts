@@ -70,7 +70,7 @@
  */
 
 import { canonicalModeKey, MODE_INFO } from '@/lib/game-data';
-import { scoreCeilingFor, killSwitchOn, SCORE_CEILINGS } from '@/lib/arena-score-integrity';
+import { scoreCeilingFor, killSwitchOn, SCORE_CEILINGS, sessionRulesMax } from '@/lib/arena-score-integrity';
 import { performSetMax } from '@/lib/babylon/music/performSet';
 
 /**
@@ -119,7 +119,9 @@ export function sessionShards(score: number, won: boolean): number {
  * 60 s, each perfect on a streak, 9,400 points → 14,150 XP, 473 shards). The two music rooms are left out: their rows
  * bound the longest chart an exported song can hold (dance, 79,680) and a quadratic combo over 512 notes (music, 2,647,100)
  * rather than a game's own clock or target — counting them would set the ceiling at 119,570 or 3,970,700 XP, which is no
- * ceiling. So an endless run pays, at most, what a flawless training minute pays; a strong real run of The Hundred (the
+ * ceiling. IMPROVE (2026-10-06): Big Air is left out too — its row now counts the banked line bonus (33,260: every snow air
+ * trick named in every air, a bound of the trick table, not of a clock or target), and counting it would set this at 49,940
+ * XP / 1,666 shards. So an endless run pays, at most, what a flawless training minute pays; a strong real run of The Hundred (the
  * 4,000 "strong run" of lib/babylon/core/scoreScale.ts:64-66 → 6,010 XP) is under it and pays exactly what it did.
  * assumption: the finite modes outside the Arena table (sprint, volleyball, the racers, showdown...) have no derived
  * maximum; none of them counts in thousands the way training does.
@@ -149,7 +151,7 @@ export function endlessCeilingFor(durationSec: number, won: boolean): { xp: numb
 /** Where ENDLESS_SESSION_CEILING comes from, in a phrase (for logs and the phase report). */
 export const ENDLESS_CEILING_BASIS =
   'a flawless Iron Paradise win (training 9,400 → 14,150 XP, 473 shards): the best-paying finite rules-mode maximum in '
-  + 'lib/arena-score-integrity.ts SCORE_CEILINGS, the music rooms left out';
+  + 'lib/arena-score-integrity.ts SCORE_CEILINGS, the music rooms and big air left out';
 
 /**
  * The modes whose runs have no end of their own, with the code that says so. Everything not listed here is a scored game
@@ -397,7 +399,7 @@ export function sessionScoreCap(mode: string, stats: RoomStats | null, durationS
   const c = scoreCeilingFor(m);
   if (!c || c.kind !== 'rules') return null;
   if ((opts.killSwitch ?? killSwitchOn()) && c.swapsUnderKillSwitch) return null;
-  return c.max;
+  return sessionRulesMax(m, c);   // owner 2026-10-06: the 1v1's win-by-2 option posts up to 17; the stake row stays 13
 }
 
 export interface SessionPayout {

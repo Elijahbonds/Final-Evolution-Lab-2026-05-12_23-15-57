@@ -289,6 +289,9 @@ export const MODE_CONTROLLERS: Record<string, ModeControllerConfig> = {
       { kind: 'button', buttons: [
         { action: 'A', label: 'HIT' },
         { action: 'B', label: 'BLOCK' },
+        // IMPROVE (2026-10-06): the set call — NetSportMode reads X as a quick set and Y as a high one
+        { action: 'X', label: 'QUICK' },
+        { action: 'Y', label: 'HIGH' },
       ] },
     ],
   },
@@ -459,7 +462,7 @@ export const MODE_CONTROLLERS: Record<string, ModeControllerConfig> = {
   // second local player can buzz with directions and the picker can change count.
   who_scene_it: {
     modeId: 'who_scene_it',
-    title: 'Who Scene It',
+    title: 'Spot the Scene',
     maxPlayers: 2,
     askName: true,
     schemas: [

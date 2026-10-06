@@ -356,6 +356,28 @@ export function challengeScore(correct: boolean, secondsLeft: number, timeLimit:
   return Math.round(100 * tier * (0.5 + 0.5 * speed));
 }
 
+/**
+ * IMPROVE (2026-10-06, #7): the two parts of a right answer's points, so the pop can say "100 + 50 speed" and a player learns
+ * that answering fast pays. `base` is the half every right answer earns; `speed` is the rest — taken as the difference, so the
+ * parts always add up to challengeScore exactly (its rounding included). Zero and zero for a miss.
+ */
+export function scoreParts(correct: boolean, secondsLeft: number, timeLimit: number, tier: Tier): { base: number; speed: number } {
+  const total = challengeScore(correct, secondsLeft, timeLimit, tier);
+  if (!correct) return { base: 0, speed: 0 };
+  const base = 50 * tier;
+  return { base, speed: total - base };
+}
+
+/**
+ * IMPROVE (2026-10-06, #1) — TUNED: a SOLO night's tier follows the categories claimed, not the round number. The round count
+ * rose with every miss, so a player who missed reached the tier-3 cards (300 a claim) sooner than one who did not. On a clean
+ * night it is the same ladder as before (claims 0–1 → tier 1, 2–3 → 2, the last → 3: rounds 1–2, 3–4, 5); a miss no longer
+ * climbs it. The ceiling is unchanged — the tier is still at most 3.
+ */
+export function soloTier(claimed: number): Tier {
+  return (claimed <= 1 ? 1 : claimed <= 3 ? 2 : 3) as Tier;
+}
+
 // ── the wheel and the claims ──────────────────────────────────────────
 export interface Claims { [cat: string]: number | null }
 
@@ -475,20 +497,23 @@ export function scriptedSoloClaims(
   seed: number,
   answer: (challenge: Challenge) => number | null,
   maxRounds = 15,
+  /** IMPROVE (2026-10-06, #4): misses that end the night (the mode's SOLO_STRIKES); none by default. */
+  strikes = Infinity,
 ): ScriptedClaimRun {
   const rnd = mulberry32(seed);
   const claims = freshClaims();
   const seen = new Set<string>();
-  let rounds = 0;
-  while (rounds < maxRounds && claimedBy(claims, 0).length < CATEGORIES.length) {
+  let rounds = 0, missed = 0;
+  while (rounds < maxRounds && missed < strikes && claimedBy(claims, 0).length < CATEGORIES.length) {
     rounds += 1;
-    const tier = (rounds <= 2 ? 1 : rounds <= 4 ? 2 : 3) as Tier;
+    const tier = soloTier(claimedBy(claims, 0).length);   // IMPROVE #1: the mode's solo ladder
     const { category } = spinWheel(rnd, claims, 0);
     const challenge = makeChallenge(category, tier, rnd, seen);
     const pick = answer(challenge);
     const correct = pick !== null && pick === challenge.answer;
     const score = challengeScore(correct, challenge.timeLimitSec * 0.5, challenge.timeLimitSec, tier);
     resolveClaim(claims, category, [score]);
+    if (!correct) missed += 1;
   }
   const claimed = claimedBy(claims, 0).length;
   return { claimed, rounds, done: claimed >= CATEGORIES.length };

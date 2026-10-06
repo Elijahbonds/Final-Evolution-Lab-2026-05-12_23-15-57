@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { Vector3 } from '@babylonjs/core';
-import { WII_CLUBS, WII_PUTTER, turnAim, launchVelocity, simulateShot, meterTicks, carryAt, AIM_LIMIT_RAD } from './GolfAim';
-import { GolfBallSim } from './GolfBall';
+import { WII_CLUBS, WII_PUTTER, turnAim, launchVelocity, simulateShot, meterTicks, carryAt, AIM_LIMIT_RAD, MeterTickJob, simulatePutt, puttTicks, puttLaunch, flyAhead } from './GolfAim';
+import { GolfBallSim, resolvePutt, greenBreakSlope } from './GolfBall';
 
 const TEE = { x: 0, y: 0.05, z: 0 };
 const [DRIVER, IRON, WEDGE] = WII_CLUBS;
@@ -60,3 +60,43 @@ describe('GolfAim — the Wii Sports read', () => {
     expect(roll(9)).toBe(false);
   });
 });
+
+// IMPROVE (2026-10-06, Golf #3 / #5 / #14): the putt rolls its pace, the preview is that putt, the meter lines are built a
+// flight at a time.
+describe('GolfAim — the putt and the meter lines', () => {
+  const GREEN = () => 'green' as const;
+  it('a putt ROLLS the pace resolvePutt sets, dry or soaked (it was pace / 1.15: a 2 m putt rolled 0.8 m at full power)', () => {
+    for (const wet01 of [0, 1]) for (const d of [1.5, 3, 6, 9]) for (const p of [0, 0.42, 1]) {
+      const s = simulatePutt(p, 0, TEE, { x: 0, z: d }, { wind: { x: 0, z: 0 }, wet01, density: 1 }, GREEN, 14, false);
+      const pace = resolvePutt({ power01: p, face01: 1 }, d, 0).paceM;
+      expect(Math.abs(s.totalM - pace), `wet ${wet01} d ${d} p ${p}`).toBeLessThan(0.05 * pace + 0.05);
+    }
+  });
+  it('a short putt reaches the cup and drops; a putt off the line does not', () => {
+    expect(simulatePutt(1, 0, TEE, { x: 0, z: 2 }, undefined, GREEN).rest).toEqual({ x: 0, z: 2 });   // tryHole sinks it AT the cup
+    const wide = simulatePutt(0.5, 0.3, TEE, { x: 0, z: 4 }, undefined, GREEN);
+    expect(Math.hypot(wide.rest.x, wide.rest.z - 4)).toBeGreaterThan(0.5);
+  });
+  it('the preview is the putt: the same launch the mode strikes, flown on the same sim, breaks the same way', () => {
+    const from = { x: 3, y: 0.05, z: 0 }, cup = { x: 0, z: 5 };
+    const dist = Math.hypot(from.x - cup.x, from.z - cup.z);
+    const { vel } = puttLaunch(0.42, 1, 0, dist, greenBreakSlope(from.x, cup.x));
+    const struck = flyAhead(vel, new Vector3(), from, undefined, GREEN, 14, cup);
+    expect(simulatePutt(0.42, 0, from, cup, undefined, GREEN)).toEqual(struck);
+    expect(struck.rest.x).toBeGreaterThan(from.x);   // the ball sits right of the hole: the break pushes the line right
+  });
+  it('the meter lines build one flight a step and equal the eleven-in-a-frame result', () => {
+    const job = new MeterTickJob((p) => simulateShot(IRON, p, 0.2, TEE).carryM);
+    let steps = 0; while (!job.step(1)) steps++;
+    expect(steps + 1).toBe(11); expect(job.done).toBe(true);
+    expect(job.ticks).toEqual(meterTicks(IRON, 0.2, TEE));
+    expect(job.step(1)).toBe(true); expect(job.ticks).toHaveLength(11);   // done is done
+  });
+  it('a putt\'s lines read the roll, rising with power, cup or no cup', () => {
+    const t = puttTicks(0, TEE, { x: 0, z: 4 }, undefined, GREEN);
+    expect(t).toHaveLength(11);
+    for (let i = 1; i < t.length; i++) expect(t[i]).toBeGreaterThanOrEqual(t[i - 1]);
+    expect(t[10]).toBeGreaterThan(4);   // full power runs past the cup it is not told about
+  });
+});
+

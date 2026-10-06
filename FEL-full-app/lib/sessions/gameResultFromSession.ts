@@ -98,7 +98,9 @@ export function boardHeadline(modeKey: string, r: SessionResult, won: boolean): 
   if (modeKey === 'surf') {
     const epic = won && (n('bestFlow') > 0 || n('barrels') > 0);
     const title = epic ? 'EPIC SESSION' : won ? 'SOLID SESSION' : 'SESSION OVER';
-    return `${title} · ${n('barrels')} BARRELS · ${n('tricksLanded')} TRICKS · ${n('pumps')} PUMPS`;
+    // IMPROVE (2026-10-06, surf item 9): the judged heat on the card when the session published one (best three waves)
+    const heat = n('heat') > 0 ? ` · HEAT ${n('heat').toFixed(1)}` : '';
+    return `${title}${heat} · ${n('barrels')} BARRELS · ${n('tricksLanded')} TRICKS · ${n('pumps')} PUMPS`;
   }
   const goalsHit = n('goalsHit', n('goalsDone'));
   const legendary = won && (combo >= 3 || goalsHit > 0);

@@ -15,7 +15,7 @@ export const DISCIPLINE_META: Record<Discipline, { label: string; blurb: string;
   art:     { label: 'Art',     blurb: 'Paint courts, boards, kits, UI',                        color: 'bg-sky-500' },
   dance:   { label: 'Dance',   blurb: 'Choreograph routines and celebrations',                 color: 'bg-fuchsia-500' },
   acting:  { label: 'Acting',  blurb: 'Record commentary and callouts',                        color: 'bg-amber-500' },
-  scene:   { label: 'Scene',   blurb: 'Author a Who Scene It pack from FEL\'s own venues',      color: 'bg-violet-500' },
+  scene:   { label: 'Scene',   blurb: 'Author a Spot the Scene pack from FEL\'s own venues',    color: 'bg-violet-500' },
   cooking: { label: 'Cooking', blurb: 'A recipe the Fuel floor can serve and a coach can assign', color: 'bg-rose-500' },
   fashion: { label: 'Fashion', blurb: 'A look from your closet, equippable and sellable',      color: 'bg-pink-500' },
   writing: { label: 'Writing', blurb: 'A story beat, a caption, a verse — reads in Story',     color: 'bg-lime-500' },
