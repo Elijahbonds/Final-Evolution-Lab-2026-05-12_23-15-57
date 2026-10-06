@@ -56,6 +56,14 @@ const NOT_IMPORTED: Record<string, string> = {
   // eventual DB-seeding step (see ~/Claude/_observe/STORE-PRICES-LIVE-ROWS.txt) and a future listing/settings UI
   // read from; wiring either one up means deleting this line.
   'lib/coach-store/storePrices.ts': 'STAGED, not wired to prod — typed price data for the coach store\'s eventual DB seed; no route/page reads it yet',
+  // INTEGRATION (2026-10-06): voiceover v2's production-script parser is run by tools/voice/import-voices.mts (it imports
+  // '../../lib/babylon/audio/voice/voiceScript.ts' at lines 35 and 39). tools/ is outside the tree this check scans, so
+  // its one real consumer is invisible here; the import runs on the owner's machine when a voice is recorded.
+  'lib/babylon/audio/voice/voiceScript.ts': 'run by tools/voice/import-voices.mts (outside the scanned lib/app/components/scripts tree): the voice-take import, an owner step',
+  // INTEGRATION (2026-10-06): two pure PIPELINES adapters, built and tested, whose mounts the pipelines lane ROUTED to the
+  // lanes that own the hosts (its report, "Routed (not done here)"). Wiring either one means deleting its line.
+  'lib/pipelines/celebration.ts': 'ROUTED, not wired — the equipped-routine dunk celebration; DunkMode\'s startLiveCeleb needs the dance clips on the dunk rig and `dance` in clipScope SCOPES.dunk (rig work for the dunk lane)',
+  'lib/pipelines/feedCommunity.ts': 'ROUTED, not wired — approved community writing as Knowledge Feed fact cards; lib/knowledge needs a `community` topic in TOPIC_IDS fed by feedCardsOf(fetchCommunity(\'reads\')) (knowledge-feed lane)',
   // MIRROR-COACH P5 FIX (2026-09-29, code review): the excuse this line used to carry ("that consuming route/UI is a
   // separate, not-yet-landed piece of this same phase") was already false the day it was committed — lib/health/pain.ts
   // (imported by app/api/health/pain/route.ts) and components/coach/pain-checkin.tsx both import decide() from this
