@@ -36,6 +36,7 @@ import { axesFor } from '@/lib/creator/athleteAxes-server';
 import { SCAN_SAVE_REFUSED, canSaveScanNumbers, readDobYear } from '@/lib/privacy/scanSaveGate';
 import { verifiedAdult } from '@/lib/privacy/verifiedAdult';
 import { decideLookHold, holdAnimations, holdEquipped, holdFace, holdFrame, holdJersey, payloadHasImage, privacyRecord } from '@/lib/creator/lookPrivacy';
+import { holdCreator } from '@/lib/creator/look/storage';
 
 /**
  * `AthleteBuild` is new and the migration is the owner's to run, so the one error a fresh checkout will
@@ -129,7 +130,12 @@ export async function POST(req: NextRequest) {
   }
 
   const look = toLook(values, plate);
-  look.face = holdFace(look.face, hold);
+  // IMPROVE (2026-10-06): this editor knows nothing about the Creator doc, so the stored one is carried over (an adult's;
+  // a minor's face is the catalog default and carries none) instead of Finalize wiping what the Closet built.
+  const prevFace = hold.uploadFace
+    ? (await prisma.avatarLook.findUnique({ where: { userId }, select: { face: true } }))?.face ?? null
+    : null;
+  look.face = { ...holdFace(look.face, hold), ...holdCreator(undefined, prevFace, hold) };
   const built = toBuild(values);
   built.frame = holdFrame(built.frame, hold);
   built.animations = holdAnimations(built.animations, hold);

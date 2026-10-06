@@ -9,6 +9,7 @@ import { filterEquipped } from '@/lib/closet/ownership';
 import { readDobYear } from '@/lib/privacy/scanSaveGate';
 import { verifiedAdult } from '@/lib/privacy/verifiedAdult';
 import { decideLookHold, holdEquipped, holdFace, holdJersey, payloadHasImage, privacyRecord } from '@/lib/creator/lookPrivacy';
+import { holdCreator, needsPreviousFace } from '@/lib/creator/look/storage';
 
 /** GET /api/v1/closet — current look + owned wearables + applied card skin. */
 export async function GET() {
@@ -44,7 +45,12 @@ export async function POST(req: NextRequest) {
   const sliders = sanitizeFaceSliders(body?.face?.sliders);
   if (sliders) posted.sliders = sliders; else delete posted.sliders;
   // Under 18 the written face is the catalog default. Adults without the numbers opt-in keep presets, not sliders.
-  const face = holdFace(posted, hold);
+  // IMPROVE (2026-10-06): the Creator doc rides inside `face` (face.creator / face.creatorSlots), sanitised and held by
+  // the same rules (lib/creator/look/storage.ts). A save that leaves it out keeps the stored one.
+  const prevFace = hold.uploadFace && needsPreviousFace(body?.face)
+    ? (await prisma.avatarLook.findUnique({ where: { userId }, select: { face: true } }))?.face ?? null
+    : null;
+  const face = { ...holdFace(posted, hold), ...holdCreator(body?.face, prevFace, hold) };
   const equipped = body?.equipped ?? defaultEquipped();
 
   // Only equip owned wearables (server-side ownership check). The rule — owned OR one of the free
