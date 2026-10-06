@@ -319,9 +319,12 @@ export const ACTOR_FIELD_OWNERS: Readonly<Record<string, readonly FieldOwner[]>>
   id: ['spawn'], kind: ['spawn'], team: ['spawn'], radius: ['spawn'], height: ['spawn'], canFly: ['spawn'],
 });
 
-/** The owners of a leaf path, from ACTOR_FIELD_OWNERS (exact key first, then the nearest `.*` parent). Empty = nobody. */
+/**
+ * The owners of a path, from ACTOR_FIELD_OWNERS: the exact key, else the key for its leaves (`stats.school` replaced
+ * whole is `stats.school.*`'s), else the nearest `.*` parent. Empty = nobody.
+ */
 export function ownersOfField(path: string): readonly FieldOwner[] {
-  const exact = ACTOR_FIELD_OWNERS[path];
+  const exact = ACTOR_FIELD_OWNERS[path] ?? ACTOR_FIELD_OWNERS[`${path}.*`];   // a whole object replaced: its leaves' owner
   if (exact) return exact;
   for (let i = path.lastIndexOf('.'); i > 0; i = path.lastIndexOf('.', i - 1)) {
     const wild = ACTOR_FIELD_OWNERS[`${path.slice(0, i)}.*`];
