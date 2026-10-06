@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { deliverClip, extForMime, planShare, shareFileName } from './shareClip';
+import { clipWasSaved, deliverClip, extForMime, planShare, shareFileName } from './shareClip';
 
 describe('share fallback', () => {
   it('uses the system sheet when the browser can share a file', () => {
@@ -36,6 +36,57 @@ describe('share fallback', () => {
     });
     expect(fallback).toMatchObject({ kind: 'download', reason: 'no-share' });
     expect(downloaded).toEqual(['fel-game-16x9.webm']);
+  });
+
+  it('falls back to download when the sheet throws NotAllowedError (not a fresh user gesture)', async () => {
+    const blob = new Blob(['x'], { type: 'video/webm' });
+    const downloaded: string[] = [];
+    const plan = await deliverClip(blob, 'fel-dunk-9x16.webm', 'FEL', {
+      share: async () => { throw new DOMException('not a gesture', 'NotAllowedError'); },
+      canShare: () => true,
+      download: (_b, name) => { downloaded.push(name); },
+    });
+    expect(plan).toMatchObject({ kind: 'download', reason: 'share-refused' });
+    expect(downloaded).toEqual(['fel-dunk-9x16.webm']);
+  });
+
+  it('falls back to download when the sheet throws a TypeError', async () => {
+    const blob = new Blob(['x'], { type: 'video/webm' });
+    const downloaded: string[] = [];
+    const plan = await deliverClip(blob, 'fel-dunk-9x16.webm', 'FEL', {
+      share: async () => { throw new TypeError('bad share call'); },
+      canShare: () => true,
+      download: (_b, name) => { downloaded.push(name); },
+    });
+    expect(plan).toMatchObject({ kind: 'download', reason: 'share-refused' });
+    expect(downloaded).toEqual(['fel-dunk-9x16.webm']);
+  });
+
+  it('does not download when the user cancels the sheet (AbortError)', async () => {
+    const blob = new Blob(['x'], { type: 'video/webm' });
+    let downloadCalls = 0;
+    const plan = await deliverClip(blob, 'fel-dunk-9x16.webm', 'FEL', {
+      share: async () => { throw new DOMException('cancelled', 'AbortError'); },
+      canShare: () => true,
+      download: () => { downloadCalls++; },
+    });
+    expect(plan).toEqual({ kind: 'cancelled', fileName: 'fel-dunk-9x16.webm' });
+    expect(downloadCalls).toBe(0);
+  });
+
+  it('deliverClip never throws out of these cases', async () => {
+    const blob = new Blob(['x'], { type: 'video/webm' });
+    await expect(deliverClip(blob, 'a.webm', 'FEL', {
+      share: async () => { throw new Error('anything else'); },
+      canShare: () => true,
+      download: () => {},
+    })).resolves.toMatchObject({ kind: 'download', reason: 'share-refused' });
+  });
+
+  it('clipWasSaved is true for a sheet or a download, false for a cancel', () => {
+    expect(clipWasSaved({ kind: 'sheet', fileName: 'a.webm' })).toBe(true);
+    expect(clipWasSaved({ kind: 'download', fileName: 'a.webm', reason: 'no-share' })).toBe(true);
+    expect(clipWasSaved({ kind: 'cancelled', fileName: 'a.webm' })).toBe(false);
   });
 
   it('names the file for the shape and the container', () => {

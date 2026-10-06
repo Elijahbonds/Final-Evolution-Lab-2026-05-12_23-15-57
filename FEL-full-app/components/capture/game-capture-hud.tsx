@@ -113,9 +113,11 @@ export function GameCaptureHud(props: {
         download: downloadBlob,
       });
       const framedNote = framed ? '' : ' The reframed file could not be built, so this keeps the original recording pieces.';
-      setNote(plan.kind === 'sheet'
-        ? `Share sheet opened. Nothing is posted until you send it.${framedNote}`
-        : `Downloaded ${name}. This browser could not open a share sheet for a video file.${framedNote}`);
+      setNote(plan.kind === 'cancelled'
+        ? 'Share cancelled. Nothing was saved — try again when ready.'
+        : plan.kind === 'sheet'
+          ? `Share sheet opened. Nothing is posted until you send it.${framedNote}`
+          : `Downloaded ${name}. This browser could not open a share sheet for a video file.${framedNote}`);
     } catch (e) {
       setNote(e instanceof Error ? e.message : 'Share did not finish.');
     } finally {
