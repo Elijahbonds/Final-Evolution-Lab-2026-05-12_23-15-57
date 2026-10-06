@@ -32,35 +32,38 @@ const GUIDE: Record<Discipline, Omit<DisciplineGuide, 'id' | 'label' | 'blurb' |
       // lane/soundtrack's player plays approved tracks in rotation; false until it merges (flip both at that merge).
       { where: 'The FEL soundtrack: menus and loading screens', live: false },
       { where: 'Under your games, the end screen and replays', live: false },
-      { where: 'The Dance floor, with its chart', live: false },
+      // PIPELINES (2026-10-06): an approved track with a chart is a Dance song (lib/babylon/dance/communityDance.ts).
+      { where: 'The Dance floor, with its chart', live: true },
     ],
   },
   art: {
     make: 'Paint a skin in the painter',
     showsUp: [
-      // apply-art-card.ts maps 'board' to a mesh named board_deck; the deck is deck_slab (routed: lane/pipelines).
-      { where: 'Board decks in board runs (Apply from My Creations)', live: false },
-      { where: 'Courts and kits', live: false },
+      // PIPELINES (2026-10-06): apply-art-card.ts now paints the real deck (deck_grip + deck_slab) and lays a court card
+      // as a centre-court decal on the hoops courts. Kits wait on lane/creator's paint system (routed).
+      { where: 'Board decks in board runs (Apply from My Creations)', live: true },
+      { where: 'Centre court on the hoops courts', live: true },
+      { where: 'Kits', live: false },
     ],
   },
   dance: {
     make: 'Choreograph a routine from the clip library',
     showsUp: [
-      { where: 'The Dance floor routine pick', live: false },
+      { where: 'The Dance floor routine pick', live: true },   // PIPELINES: community routines + MY ROUTINE
       { where: 'Dunk celebrations', live: false },
     ],
   },
   scene: {
     make: 'Write a Spot the Scene pack about a FEL venue',
-    showsUp: [{ where: 'A Spot the Scene pack you can share as a link', live: true }, { where: 'The pack picker in Spot the Scene, credited', live: false }],
+    showsUp: [{ where: 'A Spot the Scene pack you can share as a link', live: true }, { where: 'The pack picker in Spot the Scene, credited', live: true }],
   },
   acting: {
     make: 'Record a voice line for a game moment',
-    showsUp: [{ where: 'MC callouts at the moment you picked', live: false }],
+    showsUp: [{ where: 'MC callouts at the moment you picked', live: true }],   // PIPELINES: the crowd mic (ModeMic)
   },
   cooking: {
     make: 'Write a recipe: ingredients, steps, fuel tags',
-    showsUp: [{ where: 'Community recipes on the Fuel floor', live: false }],
+    showsUp: [{ where: 'Community recipes on the Fuel floor', live: true }],
   },
   fashion: {
     make: 'Build a look from pieces you own',

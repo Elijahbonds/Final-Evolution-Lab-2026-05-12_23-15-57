@@ -186,6 +186,7 @@ import { replayAcademyInPlace } from './academyReplay';
 import { useReplayInPlace, type RegisterReplay } from '@/components/games/replay-in-place';
 import { BootSplash } from '@/components/games/boot-splash';
 import { readMusicStage } from './musicStage';
+import { claimMusicFocus } from '@/lib/soundtrack/focus';
 import {
   advance as advanceProgress, heardTracks, hiddenHits, patternCounts, readProgress, shownRowIds, tierChips, tierDef, tierFor,
   visibleRows, writeProgress, type MusicProgress,
@@ -395,6 +396,7 @@ export default function StudioMode({
    *  it is inside the shell — useStudioProject's streak post — so the dev host must not provide that context). */
   registerReplay?: RegisterReplay;
 }) {
+  useEffect(() => claimMusicFocus('academy'), []);   // PIPELINES (2026-10-06): the Academy owns the music bus; the soundtrack waits
   const engineRef = useRef<AudioEngine | null>(null);
   /** MUSIC-SUITE P3 FIX PASS: who is making music here — the signed-in player (GameShell passes no `profile`). */
   const me = playerId ?? profile.id;

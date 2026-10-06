@@ -7,6 +7,7 @@ import { prisma } from '@/lib/db';
 import { reviewCard, getCard, CardError } from '@/lib/creator/creative-card-service';
 import { canApprove, canFlag, cleanMoods, cleanNote, roleOf, FLAGS_MAX, type FlagRecord, type SoundtrackRecord } from '@/lib/creator/creative-card-review';
 import { promoteCardMedia, UploadsComingSoon } from '@/lib/soundtrack/storage';
+import { cardHasPrivateMedia } from '@/lib/soundtrack/privateUploads';
 
 /**
  * POST /api/v1/creative-card/[id]/review
@@ -52,6 +53,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       const next: FlagRecord[] = [...flags, { by: userId, at: now.toISOString(), ...(note ? { note } : {}) }].slice(-FLAGS_MAX);
       await prisma.creativeCard.update({ where: { id: card.id }, data: { stats: { ...stats, flags: next } as never } });
       return NextResponse.json({ ok: true, flags: next.length });
+    }
+
+    // PIPELINES (owner, 2026-10-06, teen private uploads "never approvable for public"): an owner-only card is not
+    // review work. It never entered the queue; approving it by id is refused outright (reviewCard would keep it private
+    // anyway, and promoteCardMedia never copies private/ — this is the third lock).
+    if (decision === 'approved' && cardHasPrivateMedia(card.art)) {
+      return NextResponse.json({ error: 'an owner-only private card is never approved for public' }, { status: 422 });
     }
 
     if (decision === 'approved') {

@@ -98,6 +98,34 @@ class VoiceKitImpl {
     const got = await Promise.all(needs.map((n) => this.index(n.cast, n.group)));
     return got.filter((g): g is BankIndex => !!g);
   }
+  /**
+   * PIPELINES (owner, 2026-10-06): a community voice line (an approved acting card's public copy, adults only) handed
+   * the court's mic: fetched, decoded, played once through the PA with the crowd ducked under it, like the booth. Never
+   * cached. False (and silent) on any failure: no Web Audio, no CORS on the bucket, a decode error.
+   */
+  async playUrl(url: string, court: string, onStart?: () => void): Promise<boolean> {
+    if (!/^https:\/\//.test(url) || typeof window === 'undefined') return false;
+    try {
+      const g = SoundKit.graph();
+      if (!g) return false;
+      const res = await fetch(url, { mode: 'cors', credentials: 'omit' });
+      if (!res.ok) return false;
+      const buf = await g.ctx.decodeAudioData(await res.arrayBuffer());
+      const dest = this.routeFor({ role: 'mc', channel: 'booth', pan: 0 } as MicCue, court);
+      if (!dest) return false;
+      const src = g.ctx.createBufferSource(); src.buffer = buf;
+      const gain = g.ctx.createGain(); gain.gain.value = 0.9;
+      src.connect(gain).connect(dest);
+      const t0 = g.ctx.currentTime + 0.05;
+      src.start(t0);
+      this.duck(g.crowdDuck, t0, t0 + buf.duration);
+      const rec = { src, gain, channel: 'booth' as const };
+      this.live.add(rec); src.onended = () => this.live.delete(rec);
+      onStart?.();
+      return true;
+    } catch { return false; }
+  }
+
   /** The rendered line behind a clip id ('<cast>/<line id>'), once its bank is in. */
   line(clipId: string): BankLine | undefined { return this.where.get(clipId)?.line; }
   /** VOICEOVER: the clip whose script text is `text` (case, punctuation and spacing aside) in a loaded index, optionally only

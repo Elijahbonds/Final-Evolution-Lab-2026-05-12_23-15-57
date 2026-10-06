@@ -15,6 +15,10 @@ import { deviceLineMemory, saveLineMemory } from '../voice/lineMemory';
 import { CROWD, SIDEKICK, castById, mcFor } from './cast';
 import type { MicGroup } from './moments';
 
+// PIPELINES (2026-10-06): approved adult acting lines as an occasional, credited crowd mic (lib/pipelines/crowdMic.ts).
+import { CrowdMicPicker } from '@/lib/pipelines/crowdMic';
+import { fetchCommunity } from '@/lib/pipelines/client';
+
 export interface ModeMicOpts {
   /** The event groups this mode's MC needs ('shared' always rides along; 'names' for the dunk and game-dunk stingers). */
   groups: (MicGroup | 'names')[];
@@ -53,11 +57,14 @@ export class ModeMic {
   private seq: { ev: MicEvent; at: number }[] = [];
   private crowdIdle: string | null = null;
   private disposed = false;
+  private readonly crowdMic = new CrowdMicPicker();
+  private crowdPending: { pick: NonNullable<ReturnType<CrowdMicPicker['hear']>>; at: number } | null = null;
 
   constructor(private readonly ctx: ModeContext, private readonly o: ModeMicOpts) {
     this.court = o.court ?? ctx.location ?? 'venice';
     this.mc = mcFor(this.court);
     void this.load();
+    void fetchCommunity('mc-lines').then((l) => this.crowdMic.setLines(l)).catch(() => { /* no community lines */ });
   }
 
   /** Something happened. Before the banks are in, a big moment waits (up to 1.5 s); anything smaller is let go. */
@@ -69,6 +76,24 @@ export class ModeMic {
       return;
     }
     this.run(this.director.hear(ev, now()));
+    this.communityLine(ev.moment);
+  }
+  /** PIPELINES: now and then, a fan's approved line for this moment, handed the mic once the booth is done talking. */
+  private communityLine(moment: string): void {
+    const pick = this.crowdMic.hear(moment, now());
+    if (pick) this.crowdPending = { pick, at: now() };
+  }
+  private crowdTurn(t: number): void {
+    const p = this.crowdPending;
+    if (!p || !this.director) return;
+    if (t - p.at > 8) { this.crowdPending = null; return; }   // the moment has passed
+    if (t < this.director.boothBusyUntil + 0.4 || t < this.holdUntil) return;
+    this.crowdPending = null;
+    void VoiceKit.playUrl(p.pick.line.url, this.court, () => {
+      if (this.disposed) return;
+      this.ctx.setHud({ mic: p.pick.caption, micWho: p.pick.who });
+      this.captionUntil = now() + 4;
+    });
   }
   /** Say this once the booth is free (an intro after the welcome, a rival's jab after the MC's call). Stale after THEN_STALE_SEC. */
   then(ev: MicEvent): void { if (!this.disposed) this.seq.push({ ev, at: now() }); }
@@ -87,6 +112,7 @@ export class ModeMic {
         this.run(this.director.tick(t));
         this.seq = this.seq.filter((s) => t - s.at < THEN_STALE_SEC);
         if (this.seq.length && t >= this.director.boothBusyUntil + 0.25) { const s = this.seq.shift()!; this.say(s.ev); }
+        this.crowdTurn(t);   // PIPELINES
       }
     }
     if (this.captionUntil && t >= this.captionUntil) { this.captionUntil = 0; this.ctx.setHud({ mic: '', micWho: '' }); }

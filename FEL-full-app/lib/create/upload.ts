@@ -22,6 +22,11 @@ export interface UploadInput {
   contentType: string;
   /** Required for audio by the route (the 4-minute cap). */
   durationSec?: number;
+  /**
+   * PIPELINES (owner, 2026-10-06, teen private uploads): the card's discipline. A creator who is not a verified 18+ gets
+   * an upload into their owner-only private area only when it names a discipline that allows it (never acting).
+   */
+  discipline?: string;
 }
 
 type FetchLike = (input: string, init?: RequestInit) => Promise<Pick<Response, 'ok' | 'status' | 'json'>>;
@@ -36,6 +41,7 @@ export async function uploadMedia(input: UploadInput, fetchImpl: FetchLike = (u,
       body: JSON.stringify({
         fileName: safeName(input.fileName), contentType: input.contentType, bytes: input.body.size,
         ...(input.durationSec !== undefined ? { durationSec: Math.round(input.durationSec * 100) / 100 } : {}),
+        ...(input.discipline ? { discipline: input.discipline } : {}),
       }),
     });
   } catch { throw new UploadError('network', 'Could not reach FEL. Check your connection and try again.'); }

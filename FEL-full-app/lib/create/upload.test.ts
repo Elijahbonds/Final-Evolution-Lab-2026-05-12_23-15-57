@@ -23,6 +23,11 @@ describe('uploadMedia', () => {
     expect(calls[1]).toMatchObject({ url: 'https://storage.googleapis.com/b/pending/x?sig', init: { method: 'PUT', headers: { 'x-goog-content-length-range': '1234,1234' } } });
     expect(calls[1].init!.body).toBe(blob);
   });
+  it('PIPELINES: sends the discipline, so a teen gets their private area (never acting)', async () => {
+    const { f, calls } = fakeFetch({ status: 200, body: { uploadUrl: 'https://u', publicUrl: 'https://storage.googleapis.com/b/private/kid/x.wav', private: true } });
+    expect(await uploadMedia({ body: blob, fileName: 'a.wav', contentType: 'audio/wav', durationSec: 3, discipline: 'music' }, f)).toContain('/private/');
+    expect(JSON.parse(String(calls[0].init!.body)).discipline).toBe('music');
+  });
   it.each([
     [403, { error: 'device_only', message: 'Uploads are for creators 18 and over. Your work stays on this device.' }, 'device_only', /18 and over/],
     [503, { error: 'uploads_coming_soon' }, 'coming_soon', /coming soon/],

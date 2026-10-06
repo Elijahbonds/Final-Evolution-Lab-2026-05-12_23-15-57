@@ -16,11 +16,20 @@ describe('the Create tiles', () => {
       expect(g.label).toBe(guideFor(g.id).label);
     }
   });
-  it('the live lines are the ones this branch wires: Story reads, signature moves, shared scene packs', () => {
+  // test changed (lane/pipelines, 2026-10-06): each consumer lane/pipelines wires flips its line to live here, because
+  // "nothing claims a consumer that is not wired" is exactly what this pins.
+  it('the live lines are the ones this branch wires', () => {
     const live = ALL_GUIDES.flatMap((g) => g.showsUp.filter((s) => s.live).map((s) => `${g.id}: ${s.where}`));
     expect(live).toEqual([
+      'music: The Dance floor, with its chart',
       'sport: Signature moves on your athlete card',
+      'art: Board decks in board runs (Apply from My Creations)',
+      'art: Centre court on the hoops courts',
+      'dance: The Dance floor routine pick',
+      'acting: MC callouts at the moment you picked',
       'scene: A Spot the Scene pack you can share as a link',
+      'scene: The pack picker in Spot the Scene, credited',
+      'cooking: Community recipes on the Fuel floor',
       'writing: Community reads on the Story page',
     ]);
   });

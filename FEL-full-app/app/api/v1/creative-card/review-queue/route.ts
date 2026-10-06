@@ -7,6 +7,7 @@ import { prisma } from '@/lib/db';
 import { isDiscipline } from '@/lib/creator/creative-card-types';
 import { canApprove, canFlag, roleOf } from '@/lib/creator/creative-card-review';
 import { queueWhere, toQueueItem, QUEUE_VIEWS, type QueueView } from '@/lib/soundtrack/reviewQueue';
+import { cardHasPrivateMedia } from '@/lib/soundtrack/privateUploads';
 
 /**
  * GET /api/v1/creative-card/review-queue?view=pending|flagged|rotation|approved|rejected&discipline=music&take=25
@@ -36,7 +37,8 @@ export async function GET(req: NextRequest) {
     include: { owner: { select: { name: true, dobYear: true } } },
   });
   const now = new Date();
-  let items = rows.map((r) => toQueueItem(r as never, now));
+  // PIPELINES (owner, 2026-10-06): an owner-only private card (a teen's upload) is nobody's review work: never listed.
+  let items = rows.filter((r) => !cardHasPrivateMedia(r.art)).map((r) => toQueueItem(r as never, now));
   if (view === 'flagged') items = items.filter((i) => i.flags > 0).slice(0, take);
   if (view === 'rotation') items = items.filter((i) => i.rotation === 'on' || i.rotation === 'featured');
   return NextResponse.json({ view, items, canApprove: canApprove(role) });

@@ -16,6 +16,7 @@ import { CROSSFADE_SEC, FADE_SEC, clampLevel, crossfadeGains, dbToGain, stageGai
 import { decideStage, type PlayConditions, type Silence } from './policy';
 import { moodPool, Shuffler } from './shuffle';
 import { PlayTracker } from './playCount';
+import { bedPool } from './runTrack';
 import type { SoundtrackStage, SoundtrackTrack } from './types';
 import type { Mood } from '@/lib/creator/creative-card-review';
 
@@ -42,6 +43,8 @@ export interface PlayerEnv {
   loadPrefs?(): { enabled?: boolean; level?: number };
   savePrefs?(p: { enabled: boolean; level: number }): void;
   rng?: () => number;
+  /** PIPELINES (2026-10-06): the track the player pinned for the in-game bed in the dock (runTrack.ts), or null. */
+  runTrack?(): string | null;
 }
 
 interface Deck { el: AudioLike; node: GainNode | null; track: SoundtrackTrack | null; loops: number; fadingOut: boolean }
@@ -152,7 +155,13 @@ export class SoundtrackPlayer {
   }
 
   private inPool(t: SoundtrackTrack): boolean {
-    return moodPool(this.tracks, this.stage ? STAGE_MOOD[this.stage] ?? null : null).some((x) => x.id === t.id);
+    return this.pool().some((x) => x.id === t.id);
+  }
+
+  /** The stage's mood pool; under a game, the player's pinned run track alone while it is in the catalogue (PIPELINES). */
+  private pool(): SoundtrackTrack[] {
+    const moods = moodPool(this.tracks, this.stage ? STAGE_MOOD[this.stage] ?? null : null);
+    return this.stage === 'bed' ? bedPool(this.tracks, this.env.runTrack?.() ?? null, moods) : moods;
   }
 
   /** One wiring for the page's life; every caller waits for the same one, so no deck ever starts half-wired. */
@@ -198,7 +207,7 @@ export class SoundtrackPlayer {
     this.starting = true;
     let failed: Deck | null = null;
     try {
-      const pool = moodPool(this.tracks, STAGE_MOOD[this.stage] ?? null);
+      const pool = this.pool();
       const id = this.shuffler.next(pool);
       const track = pool.find((t) => t.id === id) ?? null;
       if (!track) return;

@@ -25,6 +25,8 @@ import {
 import { nextPropCategory, stepPropInCategory, guestSlamFactor, idleTip, trickInput, PROP_CATEGORY_LABEL, RUNWAY_TIPS, type PropCategory, type PropRing } from '../core/DunkAssist';   // IMPROVE (2026-10-06)
 import { readWalkOut, saveWalkOut, countPlay, musicCredential, type WalkOut } from '../music/WalkOut';
 import { resolveWalkOut, walkOutLine, type WalkOutCue } from '../music/WalkOutCue';
+// PIPELINES (2026-10-06): the walk-out plays on the MUSIC bus, from your song or a soundtrack hype track, credited.
+import { WalkOutPlayer, walkOutSourceLine } from '../music/WalkOutSource';
 import { StudioLibrary } from '../music/StudioLibrary';
 import { Color3, Color4, MeshBuilder, Space, StandardMaterial, Tools, Vector3, type Mesh } from '@babylonjs/core';
 import { TransformNode } from '@babylonjs/core';
@@ -903,26 +905,22 @@ export const DunkMode: ModeDefinition = (() => {
   // (the song can have been deleted after it was chosen); this end only owns the element.
   let walkOut: WalkOut | null = null;
   let walkCue: WalkOutCue | null = null;
-  let walkAudio: HTMLAudioElement | null = null;
+  // PIPELINES (2026-10-06): `new Audio()` at 0.45 played past SoundKit's buses (no music slider, no MC duck, the menu
+  // soundtrack on top). WalkOutPlayer plays the same song through playOnMusicBus (−7 dB, music focus claimed), and with
+  // no song of your own, an approved soundtrack hype track, credited on the HUD.
+  const walkPlayer = new WalkOutPlayer();
   let walkCounted = false;                       // one play per night, counted when audio actually starts
   function startWalkOut(): void {
-    if (!walkCue || typeof Audio === 'undefined') return;
-    try {
-      if (!walkAudio) { walkAudio = new Audio(walkCue.src); walkAudio.loop = true; walkAudio.volume = 0.45; }
-      void walkAudio.play().then(() => {
-        // COUNTED WHERE IT HAPPENS, and only if it actually started. An autoplay block is not a play, and
-        // an engagement number that counts intentions is not an engagement number.
-        if (walkCounted || !walkOut) return;
-        walkCounted = true;
-        walkOut = countPlay(walkOut); saveWalkOut(walkOut);
-        StudioLibrary.countPlay(walkCue!.songId);
-      }).catch(() => { /* autoplay refused until a gesture — the contest is not worse for it */ });
-    } catch { /* no audio on this device */ }
+    walkPlayer.start(walkCue, () => {
+      // COUNTED WHERE IT HAPPENS, and only if it actually started. An autoplay block is not a play, and
+      // an engagement number that counts intentions is not an engagement number.
+      if (walkCounted || !walkOut || !walkCue) return;
+      walkCounted = true;
+      walkOut = countPlay(walkOut); saveWalkOut(walkOut);
+      StudioLibrary.countPlay(walkCue.songId);
+    });
   }
-  function stopWalkOut(): void {
-    if (!walkAudio) return;
-    try { walkAudio.pause(); walkAudio.currentTime = 0; } catch { /* already gone */ }
-  }
+  function stopWalkOut(): void { walkPlayer.stop(); }
   // WHAT THIS DUNK COST YOU TO GET. Three attempts, a growing penalty, and an optional called shot
   // (owner decisions, 2026-09-14). The rules live in core/DunkStakes.ts, including the invariant that
   // calling must never be strictly better than not calling; this end only holds the ledger and the input.
@@ -1281,6 +1279,7 @@ export const DunkMode: ModeDefinition = (() => {
       foe = takeNextRival();
       walkOut = readWalkOut(); walkCounted = false;
       walkCue = resolveWalkOut(walkOut, walkOut ? StudioLibrary.get(walkOut.songId) : null);
+      void walkPlayer.prepare(walkCue, (line) => ctx.setHud({ walkOutNow: line }));   // PIPELINES: no song → a soundtrack track
       // M74: try Nexus venue first; fallback to VenueKit if no spec
       dunkVenue = mountVenue(ctx, 'basketball_dunk', { keepGameplayCamera: true, location: ctx.location });
       if (!dunkVenue) { VenueKit.buildCourt(ctx.scene); applyOceanCourt(ctx.scene, 'venice'); }
@@ -1393,7 +1392,7 @@ export const DunkMode: ModeDefinition = (() => {
         // F4 (review): this was a 130-character run-on naming six controls. The first run needs two.
         hint: (runwayHint = 'HOLD to run · tap JUMP at the line — then SLAM on NOW!'),
         // one line, phrased by the module: a mode must not invent its own wording for somebody's track
-        walkOutNow: walkOutLine(walkCue),
+        walkOutNow: walkOutLine(walkCue) || walkOutSourceLine(walkPlayer.catalogueSource),
         attempt: stakesLabel(stakes, calledLabel()),
         rivalName: foe.name,
         dunkOff: '', nightDunkOff: '', beats: '', rivalSkip: false, takeoff: '', runBack: false,   // dunk-next: a reload starts with no dunk-off, no beat strip, no skip chip, no take-off read, no RUN IT BACK
@@ -2475,7 +2474,7 @@ export const DunkMode: ModeDefinition = (() => {
       ring?.dispose(); ring = null;
       takeoffMark?.dispose(); takeoffMark = null; takeoffMat?.dispose(); takeoffMat = null; takeoffSent = ''; takeoffZone = null;   // dunk-next phase 7
       player?.dispose(); rival?.dispose(); replay?.dispose(); ball?.dispose();
-      stopWalkOut(); walkAudio = null; walkCue = null; walkOut = null;
+      stopWalkOut(); walkCue = null; walkOut = null;
       clearProps(); SoundKit.stopAmbient(); feet = { L: null, R: null };
       sparePasser?.dispose(); sparePasser = null;   // IMPROVE (2026-10-06): the kept passer goes with the mode
       dunkVenue?.dispose(); dunkVenue = null;  // M74

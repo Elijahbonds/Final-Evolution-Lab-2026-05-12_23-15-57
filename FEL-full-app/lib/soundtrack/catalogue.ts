@@ -11,6 +11,7 @@
 
 import { cardSharePath } from '@/lib/creator/share-link';
 import { isPublicCreator, publicMediaUrl, readPlays, readRotation } from '@/lib/creator/creative-card-review';
+import { cardHasPrivateMedia, isPrivateMediaUrl } from './privateUploads';
 import { readMusicV2 } from './musicPayload';
 import { normaliseGainDb } from './gain';
 import { trackKey, type SoundtrackCatalogue, type SoundtrackTrack } from './types';
@@ -31,6 +32,7 @@ export function cardTrack(row: CardTrackRow, now: Date = new Date()): Soundtrack
   if (!m || !m.rights) return null;
   const url = publicMediaUrl(m.mixUrl, row.stats);
   if (!url || /\/pending\//.test(url)) return null;   // never the private upload: only an approval's public copy
+  if (cardHasPrivateMedia(row.art) || isPrivateMediaUrl(url)) return null;   // PIPELINES: a teen's owner-only upload never plays
   const pub = row.owner?.creatorCards?.[0];
   const slug = pub?.slug;
   // The credit uses the creator's public card name when they have one (a handle they chose to show), else their account name.

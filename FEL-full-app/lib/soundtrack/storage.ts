@@ -23,6 +23,13 @@ export class UploadsComingSoon extends Error {
 const HOST = 'storage.googleapis.com';
 export const PENDING_PREFIX = 'pending/';
 export const PUBLIC_PREFIX = 'tracks/';
+/**
+ * PIPELINES (owner, 2026-10-06, "teen private uploads YES: owner-only private area, never public"). A creator who is not
+ * a verified 18+ uploads under private/<userId>/ in the PRIVATE bucket. Nothing ever copies that prefix to the public
+ * bucket: publicObjectName and pendingObjectOf accept pending/ only, so promoteCardMedia skips it, and the rules in
+ * lib/soundtrack/privateUploads.ts keep a card carrying it private, out of review and out of rotation.
+ */
+export const PRIVATE_PREFIX = 'private/';
 export const PUT_TTL_SEC = 15 * 60;
 export const GET_TTL_SEC = 60 * 60;
 export const PUBLIC_CACHE_CONTROL = 'public, max-age=31536000, immutable';
@@ -51,7 +58,7 @@ export function creatorMediaBuckets(env: NodeJS.ProcessEnv = process.env): { pen
 }
 
 const SEG = /^[A-Za-z0-9_-]{1,80}$/;
-const OBJECT_RE = /^(pending|tracks)\/[A-Za-z0-9_-]{1,80}\/[A-Za-z0-9_-]{1,80}\.[a-z0-9]{2,5}$/;
+const OBJECT_RE = /^(pending|tracks|private)\/[A-Za-z0-9_-]{1,80}\/[A-Za-z0-9_-]{1,80}\.[a-z0-9]{2,5}$/;
 
 /** Reject anything that could climb out of the two prefixes (the regex admits no dot-segments, slashes or escapes). */
 export function assertMediaObject(name: string, prefix: string): void {
@@ -62,6 +69,14 @@ export function pendingObjectName(userId: string, fileId: string, ext: string): 
   if (!SEG.test(userId) || !SEG.test(fileId) || !/^[a-z0-9]{2,5}$/.test(ext)) throw new Error('bad_object');
   const name = `${PENDING_PREFIX}${userId}/${fileId}.${ext}`;
   assertMediaObject(name, PENDING_PREFIX);
+  return name;
+}
+
+/** PIPELINES: an owner-only private upload's object name (teens and unknown-age creators). Never promotable. */
+export function privateObjectName(userId: string, fileId: string, ext: string): string {
+  if (!SEG.test(userId) || !SEG.test(fileId) || !/^[a-z0-9]{2,5}$/.test(ext)) throw new Error('bad_object');
+  const name = `${PRIVATE_PREFIX}${userId}/${fileId}.${ext}`;
+  assertMediaObject(name, PRIVATE_PREFIX);
   return name;
 }
 
@@ -194,7 +209,8 @@ export async function signCreatorPut(input: { objectName: string; contentType: s
   Promise<{ url: string; headers: Record<string, string>; pendingUrl: string }> {
   const chk = checkUpload({ contentType: input.contentType, bytes: input.bytes, durationSec: 1 });
   if (!chk.ok) throw new Error(chk.error);
-  assertMediaObject(input.objectName, PENDING_PREFIX);
+  // PIPELINES: a private/ upload signs the same way, into the same private bucket (never the public one).
+  assertMediaObject(input.objectName, input.objectName.startsWith(PRIVATE_PREFIX) ? PRIVATE_PREFIX : PENDING_PREFIX);
   const { pending } = creatorMediaBuckets(deps.env);
   const now = (deps.now ?? (() => new Date()))();
   const email = await serviceEmail(deps);
@@ -209,6 +225,20 @@ export async function signCreatorPut(input: { objectName: string; contentType: s
 /** A short-lived GET for review staff to hear a pending upload. */
 export async function signPendingGet(objectName: string, deps: SignDeps = {}): Promise<string> {
   assertMediaObject(objectName, PENDING_PREFIX);
+  const { pending } = creatorMediaBuckets(deps.env);
+  const now = (deps.now ?? (() => new Date()))();
+  const email = await serviceEmail(deps);
+  const built = buildSignedRequest({ method: 'GET', bucket: pending, objectName, expiresSec: GET_TTL_SEC, now, email });
+  return `${built.urlBase}&X-Goog-Signature=${await signBlob(built.stringToSign, deps)}`;
+}
+
+/**
+ * PIPELINES: a short-lived GET for the OWNER to hear or see one of their own private uploads. `ownerSeg` is the owner's
+ * id as the upload route wrote it into the name; an object under anyone else's private/ folder is refused.
+ */
+export async function signPrivateGet(objectName: string, ownerSeg: string, deps: SignDeps = {}): Promise<string> {
+  assertMediaObject(objectName, PRIVATE_PREFIX);
+  if (!objectName.startsWith(`${PRIVATE_PREFIX}${ownerSeg}/`)) throw new Error('bad_object');
   const { pending } = creatorMediaBuckets(deps.env);
   const now = (deps.now ?? (() => new Date()))();
   const email = await serviceEmail(deps);

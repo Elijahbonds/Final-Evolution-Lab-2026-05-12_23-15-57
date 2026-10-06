@@ -33,7 +33,7 @@ export default function MyCreations({ cards, loading, publicCreator }: { cards: 
   const equipDance = (c: CreativeCard) => {
     if (c.art.kind !== 'dance') return;
     setEquippedRoutine({ steps: c.art.sequence, bpm: c.art.bpm ?? 100 });
-    toast.success('Routine equipped on this device.');
+    toast.success('Routine equipped on this device: dance it as MY ROUTINE on the Dance floor.');   // PIPELINES (2026-10-06)
   };
 
   return (

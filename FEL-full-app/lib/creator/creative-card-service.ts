@@ -18,6 +18,8 @@ import {
 import {
   publicCardWhere, slimCard, stripServerStats, ownerIsPublicCreator, wantsPublic, cleanNote, type ReviewRecord,
 } from './creative-card-review';
+// PIPELINES (owner, 2026-10-06, "teen private uploads, never public"): a card carrying an owner-only upload is private for good.
+import { cardHasPrivateMedia, TEEN_ACTING_LINE } from '@/lib/soundtrack/privateUploads';
 
 const EXTRA_SLOT_SHARDS = 200; // mirrors catalog SKU creative_card_slot // TUNE(elijah)
 const PUBLISH_FAUCET_COINS = 50; // mirrors reward rule CREATIVE_CARD_PUBLISH
@@ -118,8 +120,14 @@ export async function createCard(
   // CREATOR SOUNDTRACK (owner, 2026-10-06, "everything public needs approval"): a card asked to be public waits for an
   // approver whatever its discipline; a private card of a discipline that needs no screen is ready for its owner at once.
   // No card is public at creation. The creator's wish is kept in stats.wantsPublic, so approval can honour it.
-  const askedPublic = input.isPublic === true;
-  const reviewState: ReviewState = NEEDS_REVIEW.includes(input.primary) || askedPublic ? 'pending_review' : 'approved';
+  // PIPELINES (owner, 2026-10-06): a card that carries an owner-only private upload (a teen's song or picture) is the
+  // owner's alone: it is never asked public, never queued for review (no approver ever hears a minor's private work), and
+  // it is ready for its owner at once. A voice line may never ride in one (acting stays adults-only).
+  const privateMedia = cardHasPrivateMedia(input.art);
+  if (privateMedia && (input.primary === 'acting' || input.secondary.includes('acting'))) throw new CardError(403, TEEN_ACTING_LINE);
+  const askedPublic = input.isPublic === true && !privateMedia;
+  const reviewState: ReviewState = privateMedia ? 'approved'
+    : NEEDS_REVIEW.includes(input.primary) || askedPublic ? 'pending_review' : 'approved';
   const isPublic = false;
   const id = `ccard_${userId}_${Date.now()}`;
 
@@ -246,7 +254,9 @@ export async function reviewCard(
   if (!card) throw new CardError(404, 'no card');
   const now = opts.now ?? new Date();
   const stats = ((card.stats ?? {}) as Record<string, unknown>);
-  const isPublic = decision === 'approved' && wantsPublic(stats) && await ownerIsPublicCreator(prisma, card.ownerId, now);
+  // PIPELINES: an owner-only private upload never goes public, whoever approves it and whatever the owner's age now.
+  const isPublic = decision === 'approved' && !cardHasPrivateMedia(card.art) && wantsPublic(stats)
+    && await ownerIsPublicCreator(prisma, card.ownerId, now);
   const review: ReviewRecord = { decision, by: opts.by ?? 'unknown', at: now.toISOString(), ...(cleanNote(opts.note) ? { note: cleanNote(opts.note) } : {}) };
   await prisma.creativeCard.update({
     where: { id: cardId },

@@ -29,6 +29,7 @@ import {
   type ImpactFrameState, type Grade,
 } from './ImpactFrame';
 import { SoundKit } from '../audio/SoundKit';
+import { enterBed, exitBed } from '@/lib/soundtrack/client';   // PIPELINES (2026-10-06): the in-game soundtrack bed
 import { VoiceKit } from '../audio/mic/VoiceKit';
 import { QaTrace } from './QaTrace';
 import { captions } from './captions';
@@ -612,6 +613,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
       // mood -> ambient bed: dojo hush, alpine wind-quiet, everything else a stadium crowd.
       const bed = mood === 'dojoWarm' ? 'dojo' : mood === 'alpine' || mood === 'overcast' ? 'none' : 'stadium';
       SoundKit.startVenueAmbient(bed);   // AMBIENT FIX (2026-10-06): only over a mode that chose no bed in load()
+      enterBed();   // PIPELINES (2026-10-06): the creator soundtrack plays 14 dB under the game (a room with its own music claims focus)
     }
   }
   /** MOVEMENT PLAY P3: whatever the body holds on this mode, let go — sent while the phase is still 'playing', so the
@@ -867,6 +869,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     unsub?.();
     input.stop();
     SoundKit.stopAmbient();   // M43: silence the ambient bed on teardown
+    exitBed();                // PIPELINES: the page gets its soundtrack stage back
     VoiceKit.stopAll(0.1);    // THE MIC: whatever a mode left on the mic goes with it
     juice.dispose();
     qaRestore?.();

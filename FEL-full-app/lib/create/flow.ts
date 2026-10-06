@@ -160,12 +160,14 @@ export const rightsFamily = rightsFamilyFor;
 
 // ── "Publish as card" entry points ───────────────────────────────────────────────────────────────────────────────────
 /** Every tool that can open the flow, so the flow can say where you came from and pre-fill what it can. */
-export const PUBLISH_SOURCES = ['academy', 'library', 'song-render', 'dance-export', 'flipshelf', 'maker', 'kitchens', 'hub'] as const;
+// PIPELINES (2026-10-06): + the Closet's "publish this look" and the end screen's "make a card".
+export const PUBLISH_SOURCES = ['academy', 'library', 'song-render', 'dance-export', 'flipshelf', 'maker', 'kitchens', 'hub', 'closet', 'end-screen'] as const;
 export type PublishSource = typeof PUBLISH_SOURCES[number];
 
 export const SOURCE_LABEL: Record<PublishSource, string> = {
   academy: 'the Groove Academy', library: 'your Academy library', 'song-render': 'your song render',
   'dance-export': 'your Dance export', flipshelf: 'your uploaded file', maker: 'the beat maker', kitchens: 'FEL Kitchens', hub: 'Create',
+  closet: 'your Closet', 'end-screen': 'the run you just played',
 };
 
 export interface PublishEntry {
