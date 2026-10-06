@@ -85,7 +85,7 @@ async function json(res: Response): Promise<Record<string, unknown> | null> {
  * Link this device to the signed-in account, if the server says it may. Resolves to the state the device should hold
  * now (unchanged when not synced), and whether it is synced.
  */
-export async function startSync(userId: string, device: LearnState): Promise<{ synced: boolean; state: LearnState }> {
+export async function startSync(userId: string, device: LearnState): Promise<{ synced: boolean; state: LearnState; plan?: LinkPlan }> {
   const unchanged = { synced: false, state: device };
   try {
     const status = await json(await fetch('/api/learn/sync', { cache: 'no-store' }));
@@ -93,7 +93,7 @@ export async function startSync(userId: string, device: LearnState): Promise<{ s
     const plan = linkPlan(readMark(), userId);
     if (plan === 'other-account') {
       writeMark({ userId });
-      return { synced: true, state: adopt(device, status.state, plan) };
+      return { synced: true, state: adopt(device, status.state, plan), plan };
     }
     const res = await json(await fetch('/api/learn/sync', {
       method: 'POST', headers: { 'content-type': 'application/json' },
@@ -101,7 +101,7 @@ export async function startSync(userId: string, device: LearnState): Promise<{ s
     }));
     if (!res || !res.state) return unchanged;
     writeMark({ userId });
-    return { synced: true, state: adopt(device, res.state, plan) };
+    return { synced: true, state: adopt(device, res.state, plan), plan };
   } catch {
     return unchanged;
   }

@@ -141,8 +141,9 @@ export function LearnFeed() {
       syncedRef.current = true;
       setSynced(true);
       const cur = stateRef.current ?? s;
-      // anything done on this device while the request was out joins the merge (XP: the larger, never added twice)
-      const next = cur === s ? r.state : { ...mergeStates(r.state, cur, 'first-link'), xp: Math.max(r.state.xp, cur.xp) };
+      // anything done on this device while the request was out joins the merge (XP: the larger, never added twice) —
+      // unless the device was another account's mirror, which never joins this one
+      const next = cur === s || r.plan === 'other-account' ? r.state : { ...mergeStates(r.state, cur, 'first-link'), xp: Math.max(r.state.xp, cur.xp) };
       stateRef.current = next;
       saveState(next);
       setState(next);

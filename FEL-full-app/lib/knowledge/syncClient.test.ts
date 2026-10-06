@@ -67,6 +67,26 @@ describe('startSync leaves the device alone unless the server says "eligible"', 
     });
   }
 
+  it('an eligible account: the device is sent as a first link (without its near-repeat window) and the merge adopted', async () => {
+    const d = device();
+    const merged = { ...d, recent: [], xp: d.xp + 12 };
+    const calls: { method: string; body?: Record<string, unknown> }[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (_url: string, init?: RequestInit) => {
+      calls.push({ method: init?.method ?? 'GET', body: init?.body ? JSON.parse(String(init.body)) : undefined });
+      return init?.method === 'POST'
+        ? new Response(JSON.stringify({ ok: true, mode: 'first-link', state: merged }), { status: 200 })
+        : new Response(JSON.stringify({ eligible: true, state: null }), { status: 200 });
+    }));
+    const r = await startSync('u1', d);
+    expect(r.synced).toBe(true);
+    expect(r.plan).toBe('first-link');
+    expect(r.state.xp).toBe(d.xp + 12);
+    expect(r.state.recent).toEqual(d.recent);
+    expect(calls.map((c) => c.method)).toEqual(['GET', 'POST']);
+    expect(calls[1].body?.mode).toBe('first-link');
+    expect((calls[1].body?.state as { recent: string[] }).recent).toEqual([]);
+  });
+
   it('offline: unchanged, no throw', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('Failed to fetch'); }));
     const d = device();
