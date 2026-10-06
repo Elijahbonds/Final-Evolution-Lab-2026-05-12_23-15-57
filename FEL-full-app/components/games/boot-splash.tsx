@@ -29,6 +29,7 @@ import { COURT_LAYOUTS, COURT_LAYOUT_MODES, readCourtLayout, writeCourtLayout, t
 import { looksFor, readPlaceLook, writePlaceLook } from '@/lib/babylon/nexus/placeLooks';
 import { tierList, readTier, writeTier, profileFor, type Tier } from '@/lib/babylon/core/Difficulty';
 import { OneVOneWinBy2 } from './onevone-win-by-2';   // owner 2026-10-06: the 1v1's win-by-2 pick
+import { ThreePointOptions } from './three-point-options';   // IMPROVE (2026-10-06): 3PT #5 #6 #8
 import {
   readySchools, readBlend, writeBlend, blendName, schoolById, blendTraits, STYLE_TRAIT_KEYS,
   type StyleBlend,
@@ -641,6 +642,9 @@ export function SplashCard(props: BootSplashProps) {
 
         {/* 1v1 WIN BY 2 (owner 2026-10-06): a player option, off by default; it draws nothing on a staked / head-to-head run */}
         {props.modeId === 'onevone' && (props.phase === 'ready' || props.phase === 'loading') && <OneVOneWinBy2 />}
+        {/* 3PT OPTIONS (IMPROVE 2026-10-06 #5 #6 #8): the shot input, and — never on a staked / head-to-head run — the practice rack
+            and the money rack */}
+        {props.modeId === 'threepoint' && (props.phase === 'ready' || props.phase === 'loading') && <ThreePointOptions />}
 
         {/* CARD SLOT (FINISH-RELEASE, 2026-09-15): the creator card beside the setting and the items, on every mode —
             and the button map it carries, so a player can read what every press does before the first one. */}

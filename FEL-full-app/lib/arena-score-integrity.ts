@@ -75,6 +75,10 @@ export const MIRRORED = {
   bucketMax: 3,
   /** lib/babylon/modes/ThreePointMode.ts — RACKS, BALLS_PER_RACK; the last ball of a rack is the money ball, worth 2. */
   threePointRacks: 5, threePointBallsPerRack: 5, threePointMoneyWorth: 2,
+  /** lib/babylon/modes/threePointRules.ts moneyBall — the MONEY RACK option (IMPROVE 2026-10-06, 3PT #5: a player pick on the
+   *  READY screen, never on a staked or head-to-head run): this many racks have every ball a money ball. Only the SESSION
+   *  ceiling reads it (SESSION_RULES_CEILINGS); the stake row stays the 2009 format's 30. */
+  threePointMoneyRacks: 1,
   /** lib/babylon/modes/precisionModes.ts GolfMode — TOTAL holes, GOLF_PAR, CLUTCH_MULT, a holed ball pays max(20, 120 − rel × 40). */
   golfHoles: 5, golfPar: [3, 4, 4, 3, 5] as readonly number[], clutchMult: 1.5, holeBasePts: 120, holePerStroke: 40,
   /** precisionModes.ts DerbyMode — TOTAL pitches; a homer pays round(q × (80 + launch × 60) × clutch), q ≤ 1, launch ≤ 0.9. */
@@ -582,6 +586,7 @@ const own = (o: object, k: string): boolean => Object.prototype.hasOwnProperty.c
 
 /**
  * OWNER DECISION 2026-10-06 (the moderate option): a mode whose PLAYER OPTIONS can run a longer game than the staked one.
+ * (IMPROVE 2026-10-06: the 3-Point Contest's money rack is the second such option — same rule, same split.)
  * The 1v1's win-by-2 is a pick on its READY screen, off by default, and never offered on a staked or head-to-head run
  * (onevoneRules.winBy2Offered: no `?arena=`, `?mp=` or `?c=`), so an Arena stake is still held to the first-to-11 row
  * above (13) while a session — practice, story, the paid run — may post what a won win-by-2 game can: one short of the
@@ -592,6 +597,12 @@ export const SESSION_RULES_CEILINGS: Readonly<Record<string, { max: number; basi
   hoops1v1: {
     max: firstToCeiling(m.onevoneWinBy2Cap, m.bucketMax),
     basis: `onevoneRules WIN_BY_2_CAP ${m.onevoneWinBy2Cap} (the win-by-2 option): ${m.onevoneWinBy2Cap - 1} + a ${m.bucketMax}`,
+  },
+  // IMPROVE (2026-10-06, 3PT #5): the money-rack option — a player pick, off by default, never offered on `?arena=` / `?mp=` /
+  // `?c=` (threePointRules.optionsOffered), so the stake row above stays 30 while a session may post a perfect money-rack run
+  threePoint: {
+    max: m.threePointRacks * ((m.threePointBallsPerRack - 1) + m.threePointMoneyWorth) + m.threePointMoneyRacks * (m.threePointBallsPerRack - 1) * (m.threePointMoneyWorth - 1),
+    basis: `ThreePointMode with the money rack (threePointRules.perfectRun): ${m.threePointRacks} racks × (4 + a ${m.threePointMoneyWorth}) + ${m.threePointMoneyRacks} rack's other 4 balls worth ${m.threePointMoneyWorth}`,
   },
 };
 

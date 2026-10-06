@@ -27,7 +27,7 @@ const MODES_DIR = join(process.cwd(), 'lib/babylon/modes');
  */
 const KNOWN: Record<string, number> = {
   'MixedCombatMode.ts': 6,
-  'ThreePointMode.ts': 3,
+  'ThreePointMode.ts': 2,   // IMPROVE (2026-10-06, 3PT #12): the five rack materials are one
   'BrainBrawlMode.ts': 3,
   'precisionModes.ts': 2,
   'aimSwingCore.ts': 2,

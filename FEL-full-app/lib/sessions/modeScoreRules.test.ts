@@ -35,9 +35,11 @@ function sessionKeys(): string[] {
 
 describe('deriveRule: one arithmetic for every mode', () => {
   it('a mode with an exact rules maximum is capped at exactly that, whatever was measured', () => {
-    expect(rulesMaxFor('threePoint', { killSwitch: false })).toBe(30);
+    // IMPROVE (2026-10-06, 3PT #5): a session may play the money-rack option (one all-money rack: 34); the Arena stake row
+    // stays the 2009 format's 30 (arena-score-integrity SESSION_RULES_CEILINGS — the 1v1 win-by-2's split)
+    expect(rulesMaxFor('threePoint', { killSwitch: false })).toBe(34);
     const r = deriveRule('threePoint', [run(6, 150, 'upper')], { killSwitch: false })!;
-    expect(r).toMatchObject({ maxScore: 30, maxScoreFrom: 'rules' });
+    expect(r).toMatchObject({ maxScore: 34, maxScoreFrom: 'rules' });
   });
 
   it('any other mode: the best measured score × SCORE_HEADROOM; its pace × RATE_HEADROOM, never below a max run at the shortest length', () => {

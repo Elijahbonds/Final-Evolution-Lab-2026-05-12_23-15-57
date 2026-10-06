@@ -7,6 +7,7 @@
 //   3. DRIFT GUARDS for the numbers mirrored out of mode files a server route must not import.
 //   4. SERVER SAFETY: nothing the module pulls in, however deep, touches Babylon or a window.
 // The routes are exercised with auth and the database mocked in lib/arenaSubmitRoute.test.ts.
+import { perfectRun, moneyBall as tpMoneyBall, optionsOffered as tpOptionsOffered } from './babylon/modes/threePointRules';
 import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -835,7 +836,7 @@ describe('drift guards — the numbers mirrored out of mode files still match th
     expect(SCORE_CEILINGS.hoops1v1.max).toBe(firstToCeiling(MIRRORED.onevoneTarget, MIRRORED.bucketMax));
     expect(sessionRulesMax('onevone', SCORE_CEILINGS.hoops1v1)).toBe(17);
     expect(sessionRulesMax('hoops3v3', SCORE_CEILINGS.hoops3v3)).toBe(SCORE_CEILINGS.hoops3v3.max);   // no option: the stake row
-    expect(Object.keys(SESSION_RULES_CEILINGS)).toEqual(['hoops1v1']);
+    expect(Object.keys(SESSION_RULES_CEILINGS)).toEqual(['hoops1v1', 'threePoint']);   // IMPROVE (2026-10-06, 3PT #5): the money rack is the second option
     for (const t of [one, three]) {
       for (const m of t.matchAll(/myScore \+= (\w+);/g)) expect(['arcPoints', 'points', '2']).toContain(m[1]);
       expect(t).not.toMatch(/arcPoints = [^;]*\? 4/);
@@ -847,6 +848,20 @@ describe('drift guards — the numbers mirrored out of mode files still match th
     expect(num(t, /const RACKS = (\d+);/, 'RACKS')).toBe(MIRRORED.threePointRacks);
     expect(num(t, /const BALLS_PER_RACK = (\d+);/, 'BALLS_PER_RACK')).toBe(MIRRORED.threePointBallsPerRack);
     expect(num(t, /const worth = isMoneyBall\(S\.ballIdx\) \? (\d+) : 1;/, 'money ball worth')).toBe(MIRRORED.threePointMoneyWorth);
+    // IMPROVE (2026-10-06, 3PT #5): the money-rack option — one all-money rack (threePointRules) — reaches the SESSION ceiling
+    // only: the stake row stays the 2009 format's 30, and the option is never offered on a staked or head-to-head run
+    expect(perfectRun()).toBe(SCORE_CEILINGS.threePoint.max);
+    expect(SCORE_CEILINGS.threePoint.max).toBe(30);
+    expect(perfectRun(0)).toBe(SESSION_RULES_CEILINGS.threePoint.max);
+    for (let r = 0; r < MIRRORED.threePointRacks; r++) expect(perfectRun(r)).toBe(34);
+    let allMoney = 0;
+    for (let r = 0; r < MIRRORED.threePointRacks; r++) if ([0, 1, 2, 3, 4].every((b) => tpMoneyBall(r, b, 2))) allMoney++;
+    expect(allMoney).toBe(MIRRORED.threePointMoneyRacks);
+    expect(sessionRulesMax('threepoint', SCORE_CEILINGS.threePoint)).toBe(34);
+    for (const q of ['?arena=x', '?mp=1', '?c=abc']) expect(tpOptionsOffered(q)).toBe(false);
+    expect(tpOptionsOffered('')).toBe(true);
+    expect(src('components/games/three-point-options.tsx')).toMatch(/optionsOffered\(window\.location\.search\)/);
+    expect(t).toMatch(/runOptions\(search, \{ practice: readPracticePick\(\), moneyRack: readMoneyRackPick\(\) \}\)/);
   });
 
   it('golf, derby and penalties', () => {
