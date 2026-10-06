@@ -34,6 +34,7 @@ function setLiteral(src: string, name: string): string[] {
 /** Every mode file, by the `modeId` it declares. */
 function modesById(): Map<string, string> {
   const out = new Map<string, string>();
+  const netSport = new Set<string>();
   for (const f of fs.readdirSync(MODES_DIR)) {
     if (!f.endsWith('.ts') || f.includes('.test.')) continue;
     const src = stripComments(fs.readFileSync(path.join(MODES_DIR, f), 'utf8'));
@@ -51,8 +52,13 @@ function modesById(): Map<string, string> {
     }
     // a net sport is a CONFIG (TennisMode.ts: createNetSportMode({ modeId: 'tennis', … })) — the mode that reads the
     // picks is NetSportMode.ts, so that is the file a pick is looked for in
-    if (/createNetSportMode\(/.test(src)) for (const m of src.matchAll(/modeId:\s*'([^']+)'/g)) out.set(m[1], 'NetSportMode.ts');
+    if (/createNetSportMode\(/.test(src)) for (const m of src.matchAll(/modeId:\s*'([^']+)'/g)) netSport.add(m[1]);
   }
+  // …and that wins over any other file that still names the id. modeConfigs.ts keeps a `modeId: 'tennis', mood:`
+  // config and sorts after TennisMode.ts, so last-write-wins pointed tennis at a file that reads no pick. It passed
+  // only because the dead precision tennis in precisionModes.ts sorted later still and read golf's weather
+  // (2026-10-06: the court lane deleted that dead copy, and this guard went red on the lookup, not on the mode).
+  for (const id of netSport) out.set(id, 'NetSportMode.ts');
   return out;
 }
 

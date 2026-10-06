@@ -33,6 +33,7 @@ import { MAX_SONG_BARS, MAX_CHAIN_ENTRIES } from './babylon/music/Song';
 import { PerformSet, performSetMax, PERFORM_SET_NOTES, PERFORM_SET_BARS, PERFORM_STEPS_PER_BAR } from './babylon/music/performSet';
 import { houseBeatFor, judgeHouseSet, houseTap, HOUSE_SET_MAX, HOUSE_SET_NOTES, HOUSE_BPMS, HOUSE_SWINGS } from './babylon/music/houseBeat';
 import { TennisScore } from './babylon/core/RallyCore';
+import { readSetLength, setLengthOf } from './babylon/nexus/setLength';
 import { buildResult } from './babylon/core/sessionResult';
 import { RINGS, BANK } from './babylon/core/ParkourGolf';
 import { TOKEN, TARGETS } from './babylon/core/ParkourDerby';
@@ -218,7 +219,8 @@ function carnivalEventRuns(): Record<string, number> {
   const gauntletRaw = trickMachineRun([TRICKS.flipA, TRICKS.flipB, TRICKS.spin], m.trickGauntletSec);
   return {
     slam_rush: makes * m.slamRushPpu,
-    strike_storm: m.strikeStormSec * MAX_FRAME_HZ * m.strikeStormPpu,                         // the bag hit every frame
+    // the bag hit every frame, rotating GO / TRICK / POWER so every third closes a trio (carnivalEvents.strikeTrio)
+    strike_storm: (m.strikeStormSec * MAX_FRAME_HZ + Math.floor((m.strikeStormSec * MAX_FRAME_HZ) / 3) * m.strikeStormTrioBonus) * m.strikeStormPpu,
     trick_gauntlet: Math.round(gauntletRaw * m.trickGauntletPpu),
     hot_shot: Math.floor(m.hotShotSec / (m.hotShotGoalZ / m.hotShotMaxSpeed)) * m.hotShotPpu,  // full-power goals back to back
     coin_storm: (14 + 10 + 14) * m.coinStormPpu,                                               // three patterns cleared at the stick's top speed
@@ -865,7 +867,12 @@ describe('drift guards — the numbers mirrored out of mode files still match th
   });
 
   it('tennis, tiebreak, Brain Brawl, Who Scene It and the fight modes', () => {
-    expect(num(src('lib/babylon/modes/NetSportMode.ts'), /new TennisScore\((\d+)\)/, 'TennisScore')).toBe(MIRRORED.tennisGames);
+    // IMPROVE (2026-10-06) Tennis #5: the match length is the set-length pick's (a quick match to 3 exists), so the number
+    // lives in nexus/setLength — and a staked run (arena, challenge, story) always reads the FULL match
+    expect(src('lib/babylon/modes/NetSportMode.ts')).toContain("new TennisScore(setLen.target)");
+    expect(src('lib/babylon/modes/NetSportMode.ts')).toContain('setLengthOf(readSetLength(o.modeId), o.modeId)');
+    expect(setLengthOf('full', 'tennis').target).toBe(MIRRORED.tennisGames);
+    for (const p of ['arena=m1', 'mp=ABC', 'c=xyz', 'story=x']) expect(readSetLength('tennis', `?${p}&set=3`)).toBe('full');
     const tb = src('components/games/tiebreak-game.tsx');
     expect(num(tb, /const TARGET = (\d+);/, 'tiebreak TARGET')).toBe(MIRRORED.tiebreakTarget);
     expect(tb).toContain('score: myPts');
@@ -1058,6 +1065,7 @@ describe('drift guards — the numbers mirrored out of mode files still match th
     expect([Number(ev('counter_strike')[1]), Number(ev('counter_strike')[2])]).toEqual([m.counterStrikeSec, m.counterStrikePpu]);
     expect(c).toContain('charge = 0; cooldown = 0.5;');
     expect(c).toContain("if (e.t === 'button' && e.pressed && !striking && (e.btn === 'A' || e.btn === 'B' || e.btn === 'Y')) {");
+    expect(num(c, /const TRIO_BONUS = (\d+);/, 'TRIO_BONUS')).toBe(m.strikeStormTrioBonus);
     expect(c).toContain('to.scale(13 + p * 7)');
     expect(c).toContain('if (ball.position.z >= 10.9) {');
     expect(c).toContain('.scaleInPlace(6);');

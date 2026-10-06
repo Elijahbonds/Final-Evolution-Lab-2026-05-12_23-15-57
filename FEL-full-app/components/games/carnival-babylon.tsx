@@ -137,6 +137,21 @@ export default function CarnivalBabylon({ onEnd }: GameProps) {
         </div>
       )}
 
+      {/* IMPROVE (2026-10-06): Slam Rush's CHARGE meter — the fill is the held charge, the gold band is where a release goes
+          down (chargeLo..chargeHi). The make used to hang on a value nobody could see. */}
+      {typeof hud.charge === 'number' && phase === 'playing' && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-36 flex justify-center">
+          <div className="fel-panel relative h-4 w-[220px] overflow-hidden rounded-full p-0">
+            {typeof hud.chargeLo === 'number' && typeof hud.chargeHi === 'number' && (
+              <div className="absolute inset-y-0 bg-[var(--fel-gold)]/45"
+                style={{ left: `${Math.max(0, hud.chargeLo) * 100}%`, width: `${Math.max(0, Math.min(1, hud.chargeHi) - hud.chargeLo) * 100}%` }} />
+            )}
+            <div className="absolute inset-y-0 left-0 bg-[var(--fel-cyan)]/80"
+              style={{ width: `${Math.max(0, Math.min(1, hud.charge)) * 100}%` }} />
+          </div>
+        </div>
+      )}
+
       {/* reveal / result / finale card — A+ mission #3: title, the verb line, and the scoreboard between events */}
       {typeof hud.banner === 'string' && hud.banner && (
         <div className="pointer-events-none absolute inset-x-0 top-[22%] flex flex-col items-center gap-2 px-4 text-center">
