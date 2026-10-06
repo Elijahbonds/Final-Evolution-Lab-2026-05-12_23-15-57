@@ -55,7 +55,7 @@ const GUIDE: Record<Discipline, Omit<DisciplineGuide, 'id' | 'label' | 'blurb' |
   },
   scene: {
     make: 'Write a Spot the Scene pack about a FEL venue',
-    showsUp: [{ where: 'A Spot the Scene pack you can share as a link', live: true }, { where: 'The pack picker in Spot the Scene, credited', live: false }],
+    showsUp: [{ where: 'A Spot the Scene pack you can share as a link', live: true }, { where: 'The pack picker in Spot the Scene, credited', live: true }],
   },
   acting: {
     make: 'Record a voice line for a game moment',

@@ -27,6 +27,7 @@ describe('the Create tiles', () => {
       'art: Centre court on the hoops courts',
       'dance: The Dance floor routine pick',
       'scene: A Spot the Scene pack you can share as a link',
+      'scene: The pack picker in Spot the Scene, credited',
       'writing: Community reads on the Story page',
     ]);
   });
