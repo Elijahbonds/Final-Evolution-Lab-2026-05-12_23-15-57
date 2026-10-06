@@ -168,6 +168,10 @@ export function Certify({ state, onDone }: { state: AssessState | null; onDone: 
 }
 
 // ── Plans (intake) ─────────────────────────────────────────────────────────
+/** SAFETY FIX (owner decision 2026-10-06, "Same answer"): GET /api/v1/camp/mentees finds only YOUR mentees (joined through
+ *  your coach invite, or already on a plan of yours), and answers no account and someone else's account alike — so the
+ *  copy can no longer say "no player with that email", and says how a new mentee gets in instead. */
+const NOT_YOUR_MENTEE = 'Not one of your mentees yet — a new mentee joins through your invite link first (Coach → Clients), then you can find them here';
 function Plans({ plans, me, certified, onChange }: { plans: Plan[]; me: string | null; certified: boolean; onChange: () => Promise<void> }) {
   const [email, setEmail] = useState(''); const [mentee, setMentee] = useState<{ id: string; name: string; consentAccepted: boolean } | null>(null);
   const [goal, setGoal] = useState(''); const [followups, setFollowups] = useState<string[]>([]); const [saidBack, setSaidBack] = useState('');
@@ -177,7 +181,7 @@ function Plans({ plans, me, certified, onChange }: { plans: Plan[]; me: string |
 
   const lookup = async () => {
     const r = await api<{ mentee: { id: string; name: string; consentAccepted: boolean } }>(`/api/v1/camp/mentees?email=${encodeURIComponent(email)}`);
-    if (r.error) { toast.error(r.error === 'not_found' ? 'No player with that email' : r.error); setMentee(null); return; }
+    if (r.error) { toast.error(r.error === 'not_found' ? NOT_YOUR_MENTEE : r.error); setMentee(null); return; }
     setMentee(r.mentee);
   };
   const askFollowups = async () => {
@@ -354,7 +358,7 @@ function Templates({ templates, plans, certified, onChange }: { templates: Templ
     if (!importFor) return;
     setBusy('import');
     const m = await api<{ mentee: { id: string } }>(`/api/v1/camp/mentees?email=${encodeURIComponent(importFor.email)}`);
-    if (m.error) { setBusy(null); toast.error('No player with that email'); return; }
+    if (m.error) { setBusy(null); toast.error(m.error === 'not_found' ? NOT_YOUR_MENTEE : m.error); return; }
     await post({ action: 'import', templateId: importFor.templateId, menteeId: m.mentee.id, goalText: importFor.goal }, 'Imported as a new draft plan');
     setBusy(null); setImportFor(null);
   };
