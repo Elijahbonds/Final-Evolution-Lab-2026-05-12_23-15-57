@@ -77,7 +77,10 @@ describe('adventure bosses: phases', () => {
     boss.stats.hp.cur = Math.floor(boss.stats.hp.max * 0.2);
     ar.step([c], 1, run(c));
     expect(ar.log['boss:phase'].map((e) => e.phase)).toEqual([2]);
+    const t2 = ar.tSec;
     ar.runUntil([c], () => ar.log['boss:phase'].length === 2, 3, run(c));
+    // The second change waits for the first one's invulnerable beat to end.
+    expect(ar.tSec - t2).toBeGreaterThanOrEqual(PLACEHOLDER_BOSS.phaseChangeSec - 1 / 60);
     expect(ar.log['boss:phase'].map((e) => e.phase)).toEqual([2, 3]);
     expect(boss.iframeSec).toBeGreaterThan(0);
   });

@@ -47,6 +47,22 @@ describe('adventure damage: elements', () => {
   });
 });
 
+describe('adventure damage: a downed body', () => {
+  it('takes no more hits and emits nothing, so ko fires once per life', () => {
+    const bus = createAdventureBus();
+    const seen: string[] = [];
+    bus.on('damage', (e) => seen.push(e.outcome));
+    bus.on('ko', () => seen.push('ko'));
+    const t = makeActor('t', { x: 0, z: 0 }, { hp: 10 });
+    let n = 0;
+    while (t.stats.hp.cur > 0 && n < 10) { expect(applyHit(bus, 0, null, t, spec(50))).not.toBeNull(); n++; }
+    expect(t.stats.hp.cur).toBe(0);
+    expect(applyHit(bus, 0, null, t, spec(50))).toBeNull();
+    expect(applyHit(bus, 0, null, t, spec(50))).toBeNull();
+    expect(seen).toEqual([...Array(n).fill('hit'), 'ko']);
+  });
+});
+
 describe('adventure damage: the combo scaling is FightCore\'s', () => {
   it('matches FightCore.applyHit link for link', () => {
     const a = new FighterState(), d = new FighterState(1e6);
