@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest';
 import { MOVEMENT_STATES, type AdventureEvents } from '../contracts';
 import { SCRIPT_BEATS, runSandboxScript, type ScriptResult } from './sandboxScript';
-import { HOST_TICK_BUDGET_MS } from './budget';
+import { HOST_TICK_BUDGET_MS } from './clock';
 
 const snapshot = (r: ScriptResult) => [...r.sandbox.host.world.actors.values()]
   .map((a) => [a.id, a.state, a.pos.x.toFixed(6), a.pos.y.toFixed(6), a.pos.z.toFixed(6), a.stats.hp.cur.toFixed(6), a.stats.energy.cur.toFixed(6), a.fusion.meter.toFixed(6)].join(' '))
@@ -68,7 +68,7 @@ describe('the 60 s sandbox run, headless', () => {
     expect(again.reached).toEqual(run.reached);
   });
 
-  it('stays inside the per-tick budget (host/budget.ts: the mean and the 95th percentile of a 60 Hz tick)', () => {
+  it('stays inside the per-tick budget (host/clock.ts HOST_TICK_BUDGET_MS: the mean and the 95th percentile of a 60 Hz tick)', () => {
     const ms = [...run.tickMs].slice(60).sort((a, b) => a - b);   // the first second warms the JIT
     const mean = ms.reduce((a, b) => a + b, 0) / ms.length;
     const p95 = ms[Math.floor(ms.length * 0.95)];

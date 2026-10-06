@@ -61,16 +61,24 @@ function landAtOf(attackId: string): number {
   return 0.15;
 }
 
-export function runSandboxScript(o: ScriptOptions = {}): ScriptResult {
-  const sb = createSandbox({ ...o, fuseReady: false });
+/**
+ * The script as a per-step DRIVER: call `step()` once before each host step (it sends that step's FelInput to `mapper`).
+ * The headless run below loops it; AdventureMode's `?demo=1` runs it live in the page, so the owner can watch every verb
+ * played in the real scene. It assumes the mapper is filled with camYaw 0 (the stick is the world direction).
+ */
+export interface ScriptDriver {
+  step(): void;
+  readonly reached: Partial<Record<ScriptBeat, number>>;
+  readonly counts: Partial<Record<AdventureEventName, number>>;
+  /** The beat playing now (the brawl, once the list is done). */
+  beat(): ScriptBeat | null;
+}
+
+export function createScriptDriver(sb: Sandbox, mapper: InputMapper): ScriptDriver {
   const { host } = sb;
-  const mapper = createInputMapper();
-  host.setInputSource(host.playerId, (out) => mapper.fill(out, { camYaw: 0, state: host.player.state }));
   const P = (): AdventureActor => host.player;
   const reached: ScriptResult['reached'] = {};
   const counts: ScriptResult['counts'] = {};
-  const tickMs: number[] = [];
-  const nonFinite: string[] = [];
   const seen: { name: AdventureEventName; p: unknown }[] = [];
   for (const n of NAMES) host.bus.on(n, (p: unknown) => { counts[n] = (counts[n] ?? 0) + 1; seen.push({ name: n, p }); });
   const since = (n: number) => seen.slice(n);
@@ -244,26 +252,44 @@ export function runSandboxScript(o: ScriptOptions = {}): ScriptResult {
     } },
   ];
 
-  const seconds = o.seconds ?? 60;
-  const total = Math.round(seconds * SIM_HZ);
   let bi = 0;
   let beatStart = 0;
+  let started = false;
   const startBeat = (i: number) => {
     bi = i; mark = seen.length; beatStart = host.tSec; beatT = 0;
     beats[i]?.enter?.();
   };
+  return {
+    reached, counts,
+    beat: () => beats[bi]?.id ?? null,
+    step(): void {
+      if (!started) { started = true; startBeat(0); }
+      for (let i = later.length - 1; i >= 0; i--) if (later[i][0] <= tick) { const fn = later[i][1]; later.splice(i, 1); fn(); }
+      const beat = beats[bi];
+      if (beat) {
+        beatT = host.tSec - beatStart;
+        let done = false;
+        try { done = beat.step(beatT); } catch { done = false; }
+        if (done) { reached[beat.id] = host.tSec; startBeat(bi + 1); }
+        else if (beatT > beat.maxSec) startBeat(bi + 1);
+      } else stick(0, 0);
+      tick++;
+    },
+  };
+}
+
+export function runSandboxScript(o: ScriptOptions = {}): ScriptResult {
+  const sb = createSandbox({ ...o, fuseReady: false });
+  const { host } = sb;
+  const mapper = createInputMapper();
+  host.setInputSource(host.playerId, (out) => mapper.fill(out, { camYaw: 0, state: host.player.state }));
+  const driver = createScriptDriver(sb, mapper);
+  const tickMs: number[] = [];
+  const nonFinite: string[] = [];
+  const total = Math.round((o.seconds ?? 60) * SIM_HZ);
   o.beforeRun?.(sb);
-  startBeat(0);
-  for (tick = 0; tick < total; tick++) {
-    for (let i = later.length - 1; i >= 0; i--) if (later[i][0] <= tick) { const fn = later[i][1]; later.splice(i, 1); fn(); }
-    const beat = beats[bi];
-    if (beat) {
-      beatT = host.tSec - beatStart;
-      let done = false;
-      try { done = beat.step(beatT); } catch { done = false; }
-      if (done) { reached[beat.id] = host.tSec; startBeat(bi + 1); }
-      else if (beatT > beat.maxSec) startBeat(bi + 1);
-    } else stick(0, 0);
+  for (let tick = 0; tick < total; tick++) {
+    driver.step();
     const t0 = o.now?.();
     host.tick();
     if (t0 !== undefined) tickMs.push(o.now!() - t0);
@@ -272,5 +298,5 @@ export function runSandboxScript(o: ScriptOptions = {}): ScriptResult {
     }
     o.afterTick?.(sb, tick);
   }
-  return { sandbox: sb, mapper, reached, counts, tickMs, nonFinite, ticks: total };
+  return { sandbox: sb, mapper, reached: driver.reached, counts: driver.counts, tickMs, nonFinite, ticks: total };
 }

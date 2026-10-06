@@ -14,7 +14,6 @@ import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { buttonMap } from '@/lib/creator/cardSlot';
 import { CONTROLS_SHEET } from '@/lib/babylon/adventure/host/inputMap';
-import { PausedLayer } from '@/components/games/paused-layer';
 import { AdventureRadial } from './radial';
 
 const MODE_KEY = 'adventure';
@@ -75,10 +74,12 @@ export function AdventureStage() {
         </div>
       )}
       {phase === 'paused' && (
-        <>
-          <PausedLayer onResume={start} />
-          <div className="pointer-events-none absolute inset-x-0 top-4 z-10 flex justify-center"><Controls /></div>
-        </>
+        // a dev runner prints its phase (the game hosts' pause is BootSplash's PausedLayer: one layer, one headline)
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 bg-black/70 p-4">
+          <p className="text-[10px] tracking-[0.3em] text-white/50">DEV · PAUSED</p>
+          <Controls />
+          <button type="button" onClick={(e) => { e.currentTarget.blur(); start(); }} className="rounded bg-[#00E5FF] px-6 py-2 font-bold text-black">RESUME</button>
+        </div>
       )}
       {phase === 'error' && <p className="absolute left-3 top-3 z-20 text-red-400">{err}</p>}
       {touch && busRef.current && playing && (

@@ -39,6 +39,7 @@ import { bindMagicView, type MagicView } from '../adventure/magic/view';
 import { partnerBodyVisible } from '../adventure/partner/view';
 import { loadAdventureSave, storeAdventureSave, adventureSavePolicy, type SaveStorage } from '../adventure/save';
 import { mirrorOnBody, MIRROR_CLAIMS } from '../adventure/stats/mirror';
+import { createScriptDriver } from '../adventure/host/sandboxScript';
 
 /** The yard keeps its own progress under this prefix, so a try-out never writes the player's real save. */
 export const YARD_SAVE_PREFIX = 'yard:';
@@ -212,7 +213,13 @@ export const AdventureMode: ModeDefinition = {
       },
     };
     states.set(scene, S);
-    host.setInputSource(host.playerId, (out) => mapper.fill(out, { camYaw: camYawOf(ctx, S), state: host.player.state, invertFlightY: sb.save.settings.invertFlightY }));
+    // ?demo=1 (dev): the headless integration script plays the yard live — every verb, in the real scene, hands off
+    // (the script steers in world directions, so its camera yaw is held at 0)
+    const demo = param('demo') === '1' ? createScriptDriver(sb, mapper) : null;
+    host.setInputSource(host.playerId, (out) => {
+      if (demo) { demo.step(); mapper.fill(out, { camYaw: 0, state: host.player.state }); return; }
+      mapper.fill(out, { camYaw: camYawOf(ctx, S), state: host.player.state, invertFlightY: sb.save.settings.invertFlightY });
+    });
     // the keyboard's d-pad: 1 partner · 2 fuse / mount · 3 / 4 spell slot (no other mode binds the digit keys)
     if (typeof window !== 'undefined') {
       const onKey = (ev: KeyboardEvent) => {
@@ -240,6 +247,7 @@ export const AdventureMode: ModeDefinition = {
         return { t: +host.tSec.toFixed(2), state: p.state, pos: { x: +p.pos.x.toFixed(2), y: +p.pos.y.toFixed(2), z: +p.pos.z.toFixed(2) }, hp: p.stats.hp.cur, bodies: host.world.actors.size, phase: sb.runtime.phase, errors: host.errors.length };
       },
       host,
+      demo: () => (demo ? { beat: demo.beat(), reached: { ...demo.reached } } : null),
       poseOf: (id: string) => { const b = bodies.get(id); return b ? { x: b.pose.rotation.x, z: b.pose.rotation.z } : null; },
     };
     if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined') {
