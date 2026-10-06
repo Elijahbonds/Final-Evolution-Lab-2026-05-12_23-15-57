@@ -13,6 +13,7 @@ import { surfaceBootError } from './boot-error';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { mergeHud } from '@/lib/babylon/core/hudMerge';   // IMPROVE (2026-10-06): an unchanged HUD patch is not a render
+import { clockText } from '@/lib/babylon/core/HundredPacing';   // IMPROVE (2026-10-06, #17): the run's clock to the 180 s cap
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode } from './hud-format';
 import { gameResultFromSession } from '@/lib/sessions/gameResultFromSession';
@@ -137,6 +138,8 @@ export default function KarateBabylon({ onEnd }: GameProps) {
         <span className="fel-panel px-3 py-1 font-mono text-xs text-[var(--fel-gold)]">
           WAVE {hnode(hud.wave, 1)} · {hnode(hud.kos, 0)} KO
           {hud.coins != null && <> · <span className="text-white">{hnode(hud.coins, 0)}c</span></>}
+          {/* IMPROVE (2026-10-06, #17): the time left on the run's 180 s cap — red in the last 30 s, which the mode also calls */}
+          {hud.timeLeft != null && <> · <span className={Number(hud.timeLeft) <= 30 ? 'text-[#FF3366]' : 'text-white'} data-testid="hundred-clock">{clockText(Number(hud.timeLeft))}</span></>}
         </span>
       </div>
 
