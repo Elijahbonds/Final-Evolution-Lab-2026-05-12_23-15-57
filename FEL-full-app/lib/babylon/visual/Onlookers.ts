@@ -11,7 +11,17 @@ import type { Scene, TransformNode } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { DEFAULT_HERO_URL } from '../core/athleteRoster';
 
-interface Figure { char: SpawnedCharacter; root: TransformNode; baseY: number; phase: number }
+interface Figure { char: SpawnedCharacter; root: TransformNode; baseY: number; phase: number; resting: boolean; age: number }
+
+/** IMPROVE (2026-10-06, the Cypher's #20): opt-in, so every other crowd (the dojo, the courts) is unchanged. */
+export interface OnlookersOpts {
+  /** Hold each body's clip still between cheers: the idle's keyframes stop being evaluated for a body that is only
+   *  standing there (the root's own breathe-bob in update() keeps it alive), and a cheer starts it again. */
+  restBetweenCheers?: boolean;
+}
+/** A body rests this long after it lands and after a cheer ends (s): its clip has posed it (a clip held before its
+ *  first evaluated frame would leave the bind pose) and the fade-in has finished. */
+const REST_AFTER_SEC = 0.6;
 
 const BOB_HEIGHT = 0.02;
 const CHEER_SEC = 1.6;
@@ -26,10 +36,14 @@ export class Onlookers {
   private cheerT = 0;
   private disposed = false;
   private requested = 0;
+  private rest: boolean;
+  /** Seconds since the last cheer ended (or the crowd was built): bodies rest once this passes REST_AFTER_SEC. */
+  private calmT = 0;
   /** Bodies this crowd asked for (the headless checks count the crowd before the spawns land). */
   get count(): number { return Math.max(this.requested, this.figures.length); }
 
-  constructor(scene: Scene, spots: Vector3[], tint = '#2b3550', lookAt: Vector3 = Vector3.Zero()) {
+  constructor(scene: Scene, spots: Vector3[], tint = '#2b3550', lookAt: Vector3 = Vector3.Zero(), opts: OnlookersOpts = {}) {
+    this.rest = opts.restBetweenCheers === true;
     if (spots.length === 0) return;
     // spread the cap over the spots so a long rail still reads populated end to end
     const step = Math.max(1, Math.ceil(spots.length / MAX_BODIES));
@@ -42,7 +56,7 @@ export class Onlookers {
         .then((char) => {
           if (this.disposed) { char.dispose(); return; }
           for (const m of char.root.getChildMeshes()) m.isPickable = false;
-          this.figures.push({ char, root: char.root, baseY: p.y, phase: (i * 2.399) % (Math.PI * 2) });
+          this.figures.push({ char, root: char.root, baseY: p.y, phase: (i * 2.399) % (Math.PI * 2), resting: false, age: 0 });
         })
         .catch((e) => console.warn('[FEL-ONLOOKERS] body did not spawn', (e as Error)?.message ?? e));
     });
@@ -54,6 +68,17 @@ export class Onlookers {
     this.t += dt;
     if (this.cheerT > 0) this.cheerT = Math.max(0, this.cheerT - dt);
     const excite = this.cheerT / CHEER_SEC;
+    if (this.rest) {
+      for (const f of this.figures) f.age += dt;
+      this.calmT = this.cheerT > 0 ? 0 : this.calmT + dt;
+      if (this.calmT >= REST_AFTER_SEC) {
+        for (const f of this.figures) {
+          if (f.resting || f.age < REST_AFTER_SEC) continue;
+          f.resting = true;
+          try { f.char.animator?.currentGroup?.pause(); } catch { /* nothing playing: nothing to hold */ }
+        }
+      }
+    }
     for (const f of this.figures) {
       const sway = Math.sin(this.t * (1.4 + excite * 6) + f.phase);
       const lift = BOB_HEIGHT * sway + (excite > 0 ? Math.abs(Math.sin(this.t * 9 + f.phase)) * CHEER_HOP * excite : 0);
@@ -64,7 +89,11 @@ export class Onlookers {
   /** The big moment happened. 0..1 — a bigger moment cheers longer. */
   cheer(strength = 1): void {
     this.cheerT = Math.max(this.cheerT, CHEER_SEC * Math.max(0.2, Math.min(1, strength)));
-    for (const f of this.figures) { try { f.char.animator?.play?.('cheer', { loop: false }); } catch { /* no cheer clip on this body — the hop carries it */ } }
+    for (const f of this.figures) {
+      // a resting body (restBetweenCheers) picks its held clip back up first, so a body with no cheer clip still moves
+      if (f.resting) { f.resting = false; try { f.char.animator?.currentGroup?.restart(); } catch { /* nothing held */ } }
+      try { f.char.animator?.play?.('cheer', { loop: false }); } catch { /* no cheer clip on this body — the hop carries it */ }
+    }
   }
 
   dispose(): void {
