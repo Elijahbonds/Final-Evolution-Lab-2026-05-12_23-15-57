@@ -51,7 +51,7 @@ export const PATHWAYS: Pathway[] = [
   { id: 'dancer', discipline: 'dance', title: 'Dancer', looksLike: 'Moving on the beat until the body stops thinking about it.', firstStep: 'Learn eight counts properly rather than a whole routine badly.', neighbours: ['choreographer', 'performer'] },
   { id: 'choreographer', discipline: 'dance', title: 'Choreographer', looksLike: 'Making the moves and teaching them to other bodies.', firstStep: 'Choreograph eight counts and teach them to one person.', neighbours: ['dancer', 'director'] },
   { id: 'actor', discipline: 'acting', title: 'Actor', looksLike: 'Being believable as someone who is not you.', firstStep: 'Perform the same line three ways and keep the one that scares you.', neighbours: ['director', 'scene_maker'] },
-  { id: 'director', discipline: 'scene', title: 'Director', looksLike: 'Deciding what the audience sees and when they see it.', firstStep: 'Build one scene in Who Scene It and cut it twice.', neighbours: ['actor', 'scene_maker', 'choreographer'] },
+  { id: 'director', discipline: 'scene', title: 'Director', looksLike: 'Deciding what the audience sees and when they see it.', firstStep: 'Build one scene in Spot the Scene and cut it twice.', neighbours: ['actor', 'scene_maker', 'choreographer'] },
   { id: 'scene_maker', discipline: 'scene', title: 'World builder', looksLike: 'Making the place the story happens in.', firstStep: 'Build one venue and put a person in it doing something ordinary.', neighbours: ['director', 'designer'] },
   // cooking
   { id: 'chef', discipline: 'cooking', title: 'Chef', looksLike: 'Feeding people well, repeatedly, under time pressure.', firstStep: 'Cook the same dish three times and change one variable each time.', neighbours: ['nutrition'] },

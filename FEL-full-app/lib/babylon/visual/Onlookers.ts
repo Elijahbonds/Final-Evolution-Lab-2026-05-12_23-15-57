@@ -11,15 +11,26 @@ import type { Scene, TransformNode } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { DEFAULT_HERO_URL } from '../core/athleteRoster';
 
-interface Figure { char: SpawnedCharacter; root: TransformNode; baseY: number; phase: number; bounds: BoundingInfo; parked: boolean; hidden?: boolean }
+interface Figure { char: SpawnedCharacter; root: TransformNode; baseY: number; phase: number; bounds: BoundingInfo; parked: boolean; hidden?: boolean; resting: boolean; age: number }
 
-/** IMPROVE (2026-10-06, Tennis #20): opt-in. */
+/** IMPROVE (2026-10-06, the Cypher's #20): opt-in, so every other crowd (the dojo, the courts) is unchanged. */
 export interface OnlookersOpts {
-  /** Pause the bodies the active camera cannot see — their clips parked, their bob skipped — and resume each on its idle
-   *  the moment it comes back into view (polled every CULL_SEC). A crowd of full roster bodies animated every frame on
-   *  top of their bob whether anyone could see them or not. Off by default: every existing crowd behaves as it did. */
+  /** IMPROVE (2026-10-06, Tennis #20): pause the bodies the active camera cannot see — their clips parked, their bob
+   *  skipped — and resume each on its idle the moment it comes back into view (polled every CULL_SEC). Off by default. */
   pauseOffscreen?: boolean;
+  /** Hold each body's clip still between cheers: the idle's keyframes stop being evaluated for a body that is only
+   *  standing there (the root's own breathe-bob in update() keeps it alive), and a cheer starts it again. */
+  restBetweenCheers?: boolean;
+  /** IMPROVE (2026-10-06, Brain Brawl #16): called with each body's root the moment it lands — a mode that wants its crowd
+   *  out of the shadow cascades takes it out here, however late the body arrives (the polls it replaces stopped at 12 s). */
+  onSpawn?: (root: TransformNode) => void;
+  /** IMPROVE (2026-10-06, Brain Brawl #18): while nobody is cheering, write the idle breathe-bob at most this often (s)
+   *  instead of every frame — each write recomputes the body's world matrix. A cheer still moves every frame. */
+  idleBobStepSec?: number;
 }
+/** A body rests this long after it lands and after a cheer ends (s): its clip has posed it (a clip held before its
+ *  first evaluated frame would leave the bind pose) and the fade-in has finished. */
+const REST_AFTER_SEC = 0.6;
 const CULL_SEC = 0.25;
 
 const BOB_HEIGHT = 0.02;
@@ -35,6 +46,13 @@ export class Onlookers {
   private cheerT = 0;
   private disposed = false;
   private requested = 0;
+  private rest: boolean;
+  /** Seconds since the last cheer ended (or the crowd was built): bodies rest once this passes REST_AFTER_SEC. */
+  private calmT = 0;
+  private onSpawn: ((root: TransformNode) => void) | null;
+  private bobStep: number;
+  /** Seconds since the idle bob was last written (idleBobStepSec). */
+  private bobAcc = 0;
   private readonly scene: Scene;
   private readonly pauseOffscreen: boolean;
   private sinceCull = 0;
@@ -42,6 +60,9 @@ export class Onlookers {
   get count(): number { return Math.max(this.requested, this.figures.length); }
 
   constructor(scene: Scene, spots: Vector3[], tint = '#2b3550', lookAt: Vector3 = Vector3.Zero(), opts: OnlookersOpts = {}) {
+    this.rest = opts.restBetweenCheers === true;
+    this.onSpawn = opts.onSpawn ?? null;
+    this.bobStep = Math.max(0, opts.idleBobStepSec ?? 0);
     this.scene = scene;
     this.pauseOffscreen = !!opts.pauseOffscreen;
     if (spots.length === 0) return;
@@ -58,7 +79,8 @@ export class Onlookers {
           for (const m of char.root.getChildMeshes()) m.isPickable = false;
           // the body's cull volume: a 1.2 m wide, 2.1 m tall box over the spot (it never leaves it)
           const bounds = new BoundingInfo(new Vector3(p.x - 0.6, p.y, p.z - 0.6), new Vector3(p.x + 0.6, p.y + 2.1, p.z + 0.6));
-          this.figures.push({ char, root: char.root, baseY: p.y, phase: (i * 2.399) % (Math.PI * 2), bounds, parked: false });
+          this.figures.push({ char, root: char.root, baseY: p.y, phase: (i * 2.399) % (Math.PI * 2), bounds, parked: false, resting: false, age: 0 });
+          try { this.onSpawn?.(char.root); } catch (e) { console.warn('[FEL-ONLOOKERS] onSpawn failed', (e as Error)?.message ?? e); }
         })
         .catch((e) => console.warn('[FEL-ONLOOKERS] body did not spawn', (e as Error)?.message ?? e));
     });
@@ -71,6 +93,22 @@ export class Onlookers {
     if (this.cheerT > 0) this.cheerT = Math.max(0, this.cheerT - dt);
     const excite = this.cheerT / CHEER_SEC;
     if (this.pauseOffscreen) { this.sinceCull += dt; if (this.sinceCull >= CULL_SEC) { this.sinceCull = 0; this.cull(); } }
+    if (this.rest) {
+      for (const f of this.figures) f.age += dt;
+      this.calmT = this.cheerT > 0 ? 0 : this.calmT + dt;
+      if (this.calmT >= REST_AFTER_SEC) {
+        for (const f of this.figures) {
+          if (f.resting || f.age < REST_AFTER_SEC) continue;
+          f.resting = true;
+          try { f.char.animator?.currentGroup?.pause(); } catch { /* nothing playing: nothing to hold */ }
+        }
+      }
+    }
+    if (this.bobStep > 0 && excite === 0) {
+      this.bobAcc += dt;
+      if (this.bobAcc < this.bobStep) return;
+    }
+    this.bobAcc = 0;
     for (const f of this.figures) {
       if (f.parked || f.hidden) continue;   // nobody can see it (pauseOffscreen), or put away behind the lens (cullBehind): no bob either
       const sway = Math.sin(this.t * (1.4 + excite * 6) + f.phase);
@@ -116,7 +154,12 @@ export class Onlookers {
   /** The big moment happened. 0..1 — a bigger moment cheers longer. */
   cheer(strength = 1): void {
     this.cheerT = Math.max(this.cheerT, CHEER_SEC * Math.max(0.2, Math.min(1, strength)));
-    for (const f of this.figures) { if (f.parked || f.hidden) continue; try { f.char.animator?.play?.('cheer', { loop: false }); } catch { /* no cheer clip on this body — the hop carries it */ } }
+    for (const f of this.figures) {
+      if (f.parked || f.hidden) continue;   // nobody can see it (pauseOffscreen / cullBehind): no cheer
+      // a resting body (restBetweenCheers) picks its held clip back up first, so a body with no cheer clip still moves
+      if (f.resting) { f.resting = false; try { f.char.animator?.currentGroup?.restart(); } catch { /* nothing held */ } }
+      try { f.char.animator?.play?.('cheer', { loop: false }); } catch { /* no cheer clip on this body — the hop carries it */ }
+    }
   }
 
   dispose(): void {

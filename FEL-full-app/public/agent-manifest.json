@@ -51,7 +51,7 @@
     { "id": "tiebreak",         "route": "/play/tiebreak",      "label": "Tiebreak Blitz", "venue": "Venice Tennis Court",  "actions": ["move", "shoot", "idle"] },
     { "id": "velocitykart",     "route": "/play/velocity-kart", "label": "Velocity Kart",  "venue": "Sovereign Circuit",    "actions": ["move", "sprint", "turbo", "idle"] },
     { "id": "volleyball",       "route": "/play/volleyball",    "label": "Beach Rally",    "venue": "Nexus Volleyball Court", "actions": ["move", "shoot", "block", "idle"] },
-    { "id": "who_scene_it",     "route": "/play/who-scene-it",  "label": "Who Scene It",   "venue": "NeuroArena",           "actions": ["move", "shoot", "idle"] }
+    { "id": "who_scene_it",     "route": "/play/who-scene-it",  "label": "Spot the Scene", "venue": "NeuroArena",           "actions": ["move", "shoot", "idle"] }
   ],
   "actions": [
     { "name": "move",   "args": { "x": "-1..1", "y": "-1..1", "ms": "number" }, "description": "Walk or run. Magnitude above 0.85 sprints." },

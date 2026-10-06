@@ -192,7 +192,7 @@ export const MODE_INFO: Record<string, { name: string; venue: string; href: stri
   carnival: { name: 'Game Night', venue: 'Venice Beach Court', href: '/play/carnival' },
   threePoint: { name: 'Downtown', venue: 'Venice Beach Court', href: '/play/threepoint' },
   karateVersus: { name: 'Storm Duel', venue: 'Shimogamo Dojo', href: '/play/karate-vs' },
-  whoSceneIt: { name: 'Who Scene It', venue: 'NeuroArena', href: '/play/who-scene-it' },
+  whoSceneIt: { name: 'Spot the Scene', venue: 'NeuroArena', href: '/play/who-scene-it' },
   bigAir: { name: 'Stomp', venue: 'Mountain Slope', href: '/play/big-air' },
   tiebreak: { name: 'Tiebreak Blitz', venue: 'Venice Tennis Court', href: '/play/tiebreak' },
   // sprint / duel / showdown were retired from the v1 roster on 2026-09-01, then revived when the owner asked

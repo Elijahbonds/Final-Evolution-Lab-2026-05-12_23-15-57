@@ -39,6 +39,9 @@ const KNOWN: Record<string, number> = {
   'KarateEndlessMode.ts': 1,
   'DuelMode.ts': 1,
   // 'AirSessionMode.ts': 1 — fixed 2026-10-06 (IMPROVE, Big Air item 1): the launch box's material is VenueKit.paint now
+  // IMPROVE (2026-10-06, Tiebreak #19): ONE unlit-marker helper (disableLighting) for the ball, the hit-window ring and the
+  // ball's blob. They are markers that only ever showed an emissive colour, never a PBR palette — the case this table allows.
+  'TiebreakMode.ts': 1,
 };
 
 function counts(): Record<string, number> {

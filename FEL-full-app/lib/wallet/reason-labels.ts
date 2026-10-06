@@ -28,7 +28,7 @@ export const REASON_LABELS: Record<string, ReasonLabel> = {
   DUNK_FIRST_CLEAR: { label: 'First dunk clear', kind: 'earn' },
   MODE_SESSION_COMPLETED: { label: 'Session completed', kind: 'earn' },
   MODE_SESSION_WON: { label: 'Session won', kind: 'earn' },
-  SCENEIT_FREEUSE_IDENTIFIED: { label: 'Scene It — Free-Use Legend', kind: 'earn' },
+  SCENEIT_FREEUSE_IDENTIFIED: { label: 'Spot the Scene — Free-Use Legend', kind: 'earn' },
   MP_MATCH_WON: { label: 'Multiplayer match won', kind: 'earn' },
   MP_MATCH_PLAYED: { label: 'Multiplayer match played', kind: 'earn' },
   REFERRAL_BONUS: { label: 'Referral bonus', kind: 'earn' },

@@ -56,7 +56,7 @@ export const MODE_MENU_META: Record<string, ModeMenuMeta> = {
   karateVersus: { icon: Shield, color: '#FF3366', desc: 'Best of 3 vs the Rival Sensei. Strike, block the telegraph, unleash your chi special.' },
   whoSceneIt: { icon: Eye, color: '#A855F7', desc: 'Rapid-fire recall. 15 questions, 8 seconds each - speed and streaks multiply your score.' },
   bigAir: { icon: Mountain, color: '#00E5FF', desc: 'Five kickers, huge amplitude. Charge the jump, spin the trick prompts, stomp the landing.' },
-  tiebreak: { icon: Timer, color: '#00FF9D', desc: 'Sudden-death tennis. Read the serve side and swing in the green window. First to 7.' },
+  tiebreak: { icon: Timer, color: '#00FF9D', desc: 'A tennis tiebreak. Read the serve side and swing in the green window. First to 7, win by 2.' },
   storyMode: { icon: BookOpen, color: '#A855F7', desc: 'The Nexus Initiative. Train in the Sanctum, grind the rails, face the Glitch Boss.' },
   football: { icon: Footprints, color: '#FFD700', desc: 'Breakaway football. Read the lane, chain cuts and trucks, then finish through contact.' },
   mixedcombat: { icon: Swords, color: '#FF3366', desc: "Ring's Edge combat. Manage guard, spacing, stamina and finishers in a scored fight." },
