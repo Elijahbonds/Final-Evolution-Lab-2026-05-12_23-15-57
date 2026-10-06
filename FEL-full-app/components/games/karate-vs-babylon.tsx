@@ -11,6 +11,7 @@ import { BootSplash } from './boot-splash';
 import { surfaceBootError } from './boot-error';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
+import { mergeHud } from '@/lib/babylon/core/hudMerge';   // IMPROVE (2026-10-06): an unchanged HUD patch is not a render
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode, hnum } from './hud-format';
 
@@ -72,7 +73,7 @@ export default function KarateVSBabylon({ onEnd }: GameProps) {
         setCountdown(p === 'countdown' && typeof cd === 'number' ? cd : null);
         setLoadError(p === 'error' ? (typeof cd === 'string' ? cd : 'Failed to load this mode.') : null);
       },
-      onHud: (u) => setHud((prev) => ({ ...prev, ...u })),
+      onHud: (u) => setHud((prev) => mergeHud(prev, u)),
       resultSink,
     })
       .then((s) => {

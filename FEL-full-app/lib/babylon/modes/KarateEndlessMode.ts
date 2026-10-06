@@ -89,7 +89,7 @@ import { attachNetplay, type NetplayHandle } from '../../net/attach';   // opt-i
 import { SoundKit } from '../audio/SoundKit';
 import { refuse } from '../core/Refusal';   // SCORECARD CONTROLS: a press a rule forbids is answered, not swallowed
 import {
-  BASELINE_RATINGS, ratingsFrom, routeFor, routeHitStopMs, routeShake, cancelWindowSec, hasFightMove,
+  BASELINE_RATINGS, ratingsFrom, ratingsForBand, routeFor, routeHitStopMs, routeShake, cancelWindowSec, hasFightMove,
   type FightRatings, type RouteStrike,
 } from '../core/FighterStyle';   // the same named routes the duel modes use, read for a CROWD
 import { EffectsKit } from '../visual/EffectsKit';
@@ -1706,7 +1706,9 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       landed = []; lastLandAt = -Infinity;
       // `?fight=` sets the ratings so the earned routes and the chi burst can be driven and measured; without a
       // PRQ scan plumbed into the modes a fighter is a baseline body. Same seam as Karate VS and Mixed Combat.
-      myRatings = { ...BASELINE_RATINGS };
+      // IMPROVE (2026-10-06): the PRQ band the harness carries earns the vocabulary now (a guest / RECOVERING = the baseline);
+      // `?fight=` still overrides it for a probe
+      myRatings = ratingsForBand(ctx.prqBand);
       if (typeof window !== 'undefined') {
         const v = Number(new URLSearchParams(window.location.search).get('fight'));
         if (Number.isFinite(v) && v > 0) {

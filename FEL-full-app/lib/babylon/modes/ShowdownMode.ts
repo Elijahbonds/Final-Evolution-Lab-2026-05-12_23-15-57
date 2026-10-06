@@ -24,7 +24,6 @@ type PostureHandle = ReturnType<typeof mountPostureLayer>;
 import { combatPose, combatApproach, COMBAT_INPUT_IDLE, type CombatPostureInput } from '../core/CombatPosture';
 import { BodyMotion, dynamicPose, COMBAT_DYNAMIC } from '../core/DynamicPosture';
 import { strafeAxis } from '../core/Biomech';
-import { nerve, standingOf } from '../core/Nerve';
 import { MeshBuilder, StandardMaterial, Color3, Vector3 } from '@babylonjs/core';
 import type { AbstractMesh } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
@@ -35,7 +34,9 @@ import { mountVenue, type VenueHandle } from '../core/NexusVenue';
 import { readCombatArena, arenasFor, arenaClamp, knockTo, hazardAt, describeArena, showdownGateDist, SHOWDOWN_GATE, type CombatArena } from '../combat/arenas';   // phase 7: the arena decides
 import { buildArena, type ArenaHandle } from '../combat/arenaBuild';
 import { readPlaceLook } from '../nexus/placeLooks';
-import { FighterState, KARATE_ATTACKS, CHI_MAX, PARRY_WINDOW_MS } from '../core/FightCore';
+import { FighterState, KARATE_ATTACKS, CHI_MAX, PARRY_WINDOW_MS, guardPressMs, rivalDifficulty } from '../core/FightCore';
+import { KnockSlides, makeChestOf } from '../core/FightKit';   // IMPROVE (2026-10-06): the shared knock slide + scratch chest points
+import { readTier } from '../core/Difficulty';   // IMPROVE (2026-10-06): the OPPONENT pick
 import { RivalCombatBrain, threatLandsIn } from '../core/RivalCombatBrain';
 import { StrikeController, karateMoveset, bookMoveset, MIN_STARTUP_SEC, type CombatMove } from '../core/StrikeSystem';
 import { StringBook, type StickDir, type StrikeBtn } from '../core/HordeDynamics';   // phase 4: the Storm strings on showdown
@@ -92,7 +93,7 @@ export const ShowdownMode: ModeDefinition = (() => {
   let mePosture: PostureHandle | null = null, foePosture: PostureHandle | null = null;
   const meBio: CombatPostureInput = { ...COMBAT_INPUT_IDLE }, foeBio: CombatPostureInput = { ...COMBAT_INPUT_IDLE };
   const meMotion = new BodyMotion(), foeMotion = new BodyMotion();
-  const chestOf = (c: SpawnedCharacter): Vector3 => c.root.position.add(new Vector3(0, 1.32, 0));
+  const chestOf = makeChestOf();   // IMPROVE (2026-10-06): one scratch point per target, no per-frame Vector3s
   const feedFor = (bio: CombatPostureInput, foeC: () => SpawnedCharacter, motion: BodyMotion, exertion: number) => {
     const { window, pose, legs } = combatPose(bio);
     const at = chestOf(foeC());
@@ -145,22 +146,22 @@ export const ShowdownMode: ModeDefinition = (() => {
    *  distance setting the duration, so a big hit reads bigger. It used to be a velocity impulse added to the movement's
    *  velocity, which the movement model then damped on its own terms — the distance a hit carried was whatever the damping
    *  left, not the attack's knockback. */
-  const KNOCK_SPEED = 9;   // m/s
-  function knockSlide(ctx: ModeContext, char: SpawnedCharacter, fromPos: Vector3, meters: number, clamp?: (q: Vector3) => void): void {
+  // IMPROVE (2026-10-06): the slide itself is the shared KnockSlides (core/FightKit) — ticked on the ROOM clock in update(),
+  // one per body, cleared at a round reset — instead of a real-clock render observer per hit.
+  const knock = new KnockSlides();
+  function knockSlide(_ctx: ModeContext, char: SpawnedCharacter, fromPos: Vector3, meters: number, clamp?: (q: Vector3) => void): void {
     const dir = char.root.position.subtract(fromPos); dir.y = 0;
     if (dir.lengthSquared() < 1e-4 || meters <= 0) return;
     dir.normalize();
-    const from = char.root.position.clone();
-    const to = from.add(dir.scale(meters)); if (clamp) clamp(to);
-    const ms = Math.max(80, (Vector3.Distance(from, to) / KNOCK_SPEED) * 1000);
-    const t0 = now();
-    const obs = ctx.scene.onBeforeRenderObservable.add(() => {
-      const u = Math.min(1, (now() - t0) / ms);
-      const k = 1 - (1 - u) * (1 - u);
-      char.root.position.x = from.x + (to.x - from.x) * k;
-      char.root.position.z = from.z + (to.z - from.z) * k;
-      if (u >= 1) ctx.scene.onBeforeRenderObservable.remove(obs);
-    });
+    const to = char.root.position.add(dir.scale(meters)); if (clamp) clamp(to);
+    knock.start(char.root.position, to.x, to.z);
+  }
+  /** IMPROVE (2026-10-06): the rival at a round's start — the standing (NERVE, once per round now, not per frame), the
+   *  OPPONENT pick (PRO = the tuned 0.72), and no slide left running from the last round. */
+  function roundStartRival(): void {
+    rivalBrain.setStanding(foeRounds, myRounds, 2);
+    rivalBrain.setDifficulty(rivalDifficulty(0.72, readTier()));
+    knock.clear();
   }
   /** Phase 5 — SOUL CALIBUR WEIGHT (the horde's rule): the connect holds for a beat that grows with the weight. */
   const HIT_STOP_MS = { light: 28, medium: 45, heavy: 70, finisher: 70 } as const;
@@ -258,7 +259,7 @@ export const ShowdownMode: ModeDefinition = (() => {
       case 'hit': {
         const w = move.weight;
         const scale = Math.max(0.4, 1 - 0.12 * atkState.combo);
-        const dealt = Math.round(move.atk.dmg * scale * (mine && focus.active ? FOCUS.damageMult : 1));   // phase 8: a Focus strike lands harder
+        const dealt = Math.round(move.atk.dmg * scale * (mine && focus.active ? FOCUS.damageMult : 1) * defCtrl.counterMult(now()));   // phase 8: a Focus strike lands harder; IMPROVE (2026-10-06): a read substitution eats COUNTER damage
         if (mine) focus.gain(FOCUS.hitGain);
         defState.hp = Math.max(0, defState.hp - dealt);
         defState.stunSec = Math.max(defState.stunSec, move.atk.stunSec);
@@ -286,7 +287,7 @@ export const ShowdownMode: ModeDefinition = (() => {
    *  on the body's widened windows (bodyDefenseAt: parry 200, guard impact 160 ms); a slip or a raise needs the fighter
    *  free, as a press would. */
   function bodyAction(atk: AttackDef, dist: number, impactAt: number): DefenseAction | 'evaded' {
-    if (dist > atk.range) return 'none';
+    if (dist > atk.range) return 'outOfRange';   // IMPROVE (2026-10-06): out of reach is a whiff; 'none' (undefended) is a hit now
     const bd = bodyDefenseAt(ledger, impactAt);
     // (the pad's guard counts too, as it stood AT the impact: held then, or its press — a flick's guard impact, a parry —
     // inside the pad's own windows before it; the stronger answer wins — the review, 2026-09-26)
@@ -461,7 +462,7 @@ export const ShowdownMode: ModeDefinition = (() => {
     setTimeout(() => {
       meState.resetRound(); foeState.resetRound(); xBtn.reset(); padGuard.reset(); guardUp = false; book.reset(); stringLabels = []; deferred.clear(); ledger.reset(); bodyShift = null; foeLaunchedSec = 0; rival.root.position.y = 0; focus.stop(); focusHeld = false; rival.animator.setTimeScale(1); player.animator.setTimeScale(1); ctx.juice.tint(null);
       player.root.position.set(0, 0, 4); rival.root.position.set(0, 0, -4);
-      faceEachOther();
+      faceEachOther(); roundStartRival();
       setPhase('fighting');
     }, 1800);
   }
@@ -511,7 +512,7 @@ export const ShowdownMode: ModeDefinition = (() => {
       meStrike = new StrikeController(myMoves);   // phase 4: the book, styled (P7: kept for a body strike's range)
       foeStrike = new StrikeController(karateMoveset(KARATE_ATTACKS));
       rivalBrain = new RivalCombatBrain({
-        difficulty: 0.72,
+        difficulty: 0.72, canSpecial: false,   // IMPROVE (2026-10-06): the rival's ultimate is the CHAKRA meter's, never a FighterState-chi heavy
         moves: Object.entries(karateMoveset(KARATE_ATTACKS)).map(([id, m]) => ({
           id,
           kind: m.weight === 'light' ? 'jab' as const : m.weight === 'medium' ? 'kick' as const : 'heavy' as const,
@@ -551,7 +552,7 @@ export const ShowdownMode: ModeDefinition = (() => {
         banner: 'SHOWDOWN — BEST OF 3', hp: 100, foeHp: 100, chi: 0, wins: 0, foeWins: 0,
         hint: 'L1 dash-cancel (chi) · R1 substitute their strike · SELECT assist · full chi + Y = ULTIMATE',
       });
-      setTimeout(() => { ctx.setHud({ banner: '' }); setPhase('fighting'); }, 1800);
+      setTimeout(() => { ctx.setHud({ banner: '' }); roundStartRival(); setPhase('fighting'); }, 1800);
     },
 
     onInput(ctx: ModeContext, e: FelInput) {
@@ -629,6 +630,7 @@ export const ShowdownMode: ModeDefinition = (() => {
       if (wasFocus !== focus.active) { rival.animator.setTimeScale(focus.worldScale); player.animator.setTimeScale(focus.heroScale); }
       { const fv = Math.round(focus.value); if (fv !== focusHud || focus.active !== focusHudOn) { focusHud = fv; focusHudOn = focus.active; ctx.setHud({ focus: fv, focusOn: focus.active }); } }
       const sdtRoom = dt * focus.worldScale, sdtHero = dt * focus.heroScale;
+      knock.tick(sdtRoom);   // IMPROVE (2026-10-06): knockback on the room clock, every phase (a KO's slide finishes)
       arenaHandle?.tick(dt);
       if (arena.hazards.length) { hazardTick += dt; if (hazardTick >= 0.2) { hazardTick = 0; for (const [st, c] of [[meState, player], [foeState, rival]] as const) { const h = hazardAt(c.root.position, arena); if (h) { st.hp = Math.max(0, st.hp - h.dps * 0.2); console.info(`[ARENA] showdown ${c === player ? 'you' : 'rival'} in the fire`); } } } }   // phase 7
       if (foeLaunchedSec > 0) { foeLaunchedSec = Math.max(0, foeLaunchedSec - dt); rival.root.position.y = launchHeight(1 - foeLaunchedSec / LAUNCH_AIR_SEC); if (foeLaunchedSec === 0) rival.root.position.y = 0; }   // phase 5
@@ -706,16 +708,17 @@ export const ShowdownMode: ModeDefinition = (() => {
 
       // ── rival AI: the shared brain approaches, uses the moveset, and spends chakra ──
       if (foeState.controllable && phase === 'fighting') {
-        const nrv = nerve(standingOf(foeRounds, myRounds, 2, Math.min(1, Math.max(myRounds, foeRounds) / 2)));
-        rivalBrain.setNerve(nrv.aggression, nrv.mistake);
+        // (NERVE: set once per round in roundStartRival — IMPROVE 2026-10-06)
         const meWinding = !!meStrike.current && meStrike.current.phase === 'startup';
         const incoming = meWinding && meStrike.current ? meStrike.current.secToActive : -1;
         const dist = Vector3.Distance(rival.root.position, player.root.position);
         const reach = meStrike.current?.move.atk.range ?? 1.8;
+        // IMPROVE (2026-10-06): the rival reads my openings (a whiff's recovery, a dash, a roll) and its own sub cooldown
+        const meOpen = meStrike.current?.phase === 'recovery' || meMove.dashing || meMove.rolling;
         const decision = rivalBrain.decide(
           sdtRoom, rival.root.position, player.root.position, foeState, meWinding,
-          { value: foeChakra.value, max: CHAKRA.max, dashCost: DASH_CHI_COST, subCost: SUBSTITUTION_CHI_COST },
-          threatLandsIn(dist, reach, incoming < 0 ? null : incoming),
+          { value: foeChakra.value, max: CHAKRA.max, dashCost: DASH_CHI_COST, subCost: SUBSTITUTION_CHI_COST, subReady: foeDef.canSubstitute(foeChakra.value, now()) },
+          threatLandsIn(dist, reach, incoming < 0 ? null : incoming), meOpen,
         );
         if (!foeStrike.busy) {
           const sprint = dist > 6 && decision.spend !== 'dash';
@@ -730,10 +733,13 @@ export const ShowdownMode: ModeDefinition = (() => {
         }
         if (decision.spend === 'ultimate') foeChakra.spendUltimate();
         if (decision.spend === 'substitution' && foeChakra.spend(SUBSTITUTION_CHI_COST)) {
+          foeDef.spendSubstitution(now());   // IMPROVE (2026-10-06): the rival's substitution has the player's cooldown and punish window
           rival.root.position.copyFrom(DefenseController.substitutionSpot(player.root.position, player.root.rotation.y));
         }
         if (decision.block && !foeState.blockHeld) {
-          foeDef.pressBlock(now() - 200, false); foeState.pressBlock(now() - 200); foeGuardUntil = now() + 600;
+          // IMPROVE (2026-10-06): the brain says block / parry / guard impact; the press is stamped for it (was always now − 200)
+          const at = guardPressMs(now(), decision.guard, incoming >= 0 ? incoming * 1000 : null);
+          foeDef.pressBlock(at, decision.guard === 'impact'); foeState.pressBlock(at); foeGuardUntil = now() + 600;
         }
         if (!decision.block && foeState.blockHeld && now() > foeGuardUntil) { foeDef.releaseBlock(); foeState.releaseBlock(); }
         rival.root.position.addInPlace(foeMove.vel.scale(sdtRoom));
