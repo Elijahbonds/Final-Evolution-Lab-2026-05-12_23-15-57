@@ -49,6 +49,35 @@ Around them: undo/redo, randomise with locks, a real preview stage (face/bust/fu
 turntable), up to 5 saved characters, and **share codes** (a short versioned code anyone can paste to load a look,
 sanitised on import).
 
+## The Studio: the builder itself has to be dope (owner, 2026-10-06: "make the builder dope")
+
+The tools above are what makes "anyone" possible. The Studio is what makes people *want* to spend an hour in it. Every
+phase builds toward this, not toward a settings page with sliders.
+
+- **Full-screen stage.** The body stands centre stage under studio light (key, rim, a coloured back light), on a
+  turntable you can spin with a drag, a stick or a swipe. Smooth camera moves between full body, bust and a close face
+  view whenever a tab or a part needs them. A dark, clean frame with the game's own type (Chakra Petch) and colours.
+- **Direct manipulation.**
+  - Tap the body to select a region.
+  - Drag a part or sticker straight onto the body: stickers ride the surface under the pointer, parts snap to the
+    nearest bone.
+  - On-model handles move, rotate and scale.
+  - One switch mirrors left and right, both for parts and for symmetric painting.
+  - Sliders stay as the precise fallback, with typed values.
+- **Instant.** Every edit shows on the next frame (only what changed is rebuilt; paint redraws only its layer). No
+  apply button, no loading spinner between choices.
+- **Fearless.** Unlimited undo/redo (Ctrl/Cmd+Z, a pad button, a swipe), a history you can scroll back through, a
+  before/after toggle, randomise with locks per section, and duplicate-to-slot before a big change.
+- **Pose it.** Preview the look in poses from the modes (a dunk hang, a fight stance, a board grab, a sprint start,
+  a victory) and under each venue's light, so it reads right in the game it will be played in.
+- **Photo mode and sharing.**
+  - A posed shot with a backdrop and frame, saved as an image card that carries the look's share code.
+  - Paste a code to load someone's look as a new slot, and start your own build from it.
+- **Every input.** Mouse and keyboard, touch (pinch to zoom, two-finger orbit), and a gamepad, so the couch player can
+  build on the TV.
+- **Feel.** Soft UI sounds and haptics on snaps and selections, 60 fps on a phone in the editor (budgets below),
+  and a 30-second first-run walkthrough (place a part, paint a layer, save) that the player can skip.
+
 ## Phases (lane `lane/creator`, one PR, owner merges)
 
 | Phase | Delivers |
@@ -56,7 +85,7 @@ sanitised on import).
 | 1. Foundation | The six known bugs fixed. `CreatorDoc` v1: a versioned, sanitised, size-capped document (parts, paint layers, colours, shape) stored in `AvatarLook.face.creator`, read by `resolveIdentity` and applied in `applyIdentity`. A tinted-material cache. Undo/redo and randomise. Share-code encode/decode. |
 | 2. Parts | The procedural part library, bone placement with transforms and mirroring, rendered in every mode via the identity layer, merged per material for draw calls, with a budget (64 parts). The editor's Parts tab. |
 | 3. Paint | Region masks from skin weights, the pattern generators, stamps and text, the layer stack composited into a canvas texture over skin and garments, suit mode. The editor's Paint tab. Tier-aware texture size. |
-| 4. Shape, stage, slots | Counter-scaled proportion sliders, the data-driven face morph list, the preview stage, 5 character slots, the share-code UI. One editor: the Closet's appearance tabs become the Creator (Body, Face, Hair, Parts, Paint, Colours, Share). |
+| 4. Shape and the Studio | Counter-scaled proportion sliders and the data-driven face morph list. **The Studio** (section above) as the one appearance editor, with Body, Face, Hair, Parts, Paint, Colours and Share tabs. It includes:<br>• the stage, camera moves and turntable;<br>• on-model selection and drag placement;<br>• mode poses;<br>• photo mode with the share card;<br>• 5 slots and import;<br>• pad and touch input;<br>• the first-run walkthrough. |
 | 5. New art (owner's Mac) | The asset spec and Blender/MPFB bake scripts for 40–60 face morphs, body-shape morphs and modular layered garments. Not runnable in the cloud (no Blender); the code from phases 1–4 picks them up by name. |
 
 ## Rules for every phase
