@@ -58,6 +58,7 @@ import { GUNSLING, SLINGSHOT, STIFF, BLOCK, LANES } from '@/lib/babylon/core/Kic
 import { parseCard, type DunkCard } from '@/lib/mp/dunkCard';
 import { canonicalModeKey } from '@/lib/game-data';
 import { versusScoreMax } from '@/lib/babylon/core/VersusScore';
+import { mixedScoreMax } from '@/lib/babylon/core/MixedScore';
 
 // ---------------------------------------------------------------------------
 // Constants mirrored from Babylon mode files (the test holds each one to its source).
@@ -90,7 +91,7 @@ export const MIRRORED = {
   /** lib/babylon/modes/WhoSceneItMode.ts QUESTIONS_PER_CATEGORY. */
   whoSceneItPerCategory: 2,
   /** KarateVSMode.ts / MixedCombatMode.ts — ROUNDS_TO_WIN; the result is myWins × 100 − foeWins × 40 (Karate VS adds its
-   *  capped bonuses on top: core/VersusScore, imported). */
+   *  capped bonuses on top: core/VersusScore, imported; Mixed Combat a ring-out bonus per round won: core/MixedScore). */
   versusRoundsToWin: 2, versusWinPts: 100,
   /** lib/babylon/core/DanceCore.ts hit(): a caught step pays its window's points + combo × 5. */
   danceComboPts: 5,
@@ -500,10 +501,12 @@ export const SCORE_CEILINGS: Readonly<Record<string, ScoreCeiling>> = {
     why: `the match ends at ${m.versusRoundsToWin} round wins; a sweep at full HP with every bonus capped`,
     basis: 'VersusScore: myWins × 100 − foeWins × 40 + Σ 25 × HP share per round won + min(dodges, 10) × 2 + min(routes, 6) × 5',
   },
+  // IMPROVE (2026-10-06): a round WON by a ring-out pays 25 on top (lib/babylon/core/MixedScore.ts, a pure module imported
+  // here) — 200 → 250. A ceiling only goes up.
   mixedcombat: {
-    max: m.versusRoundsToWin * m.versusWinPts, kind: 'rules', swapsUnderKillSwitch: false,
-    why: `the match ends at ${m.versusRoundsToWin} round wins`,
-    basis: 'MixedCombatMode myWins × 100 − foeWins × 40, myWins ≤ ROUNDS_TO_WIN',
+    max: mixedScoreMax(m.versusRoundsToWin), kind: 'rules', swapsUnderKillSwitch: false,
+    why: `the match ends at ${m.versusRoundsToWin} round wins; a sweep, every round a ring-out`,
+    basis: 'mixedScore: myWins × 100 − foeWins × 40 + 25 × min(ring-out wins, myWins), myWins ≤ ROUNDS_TO_WIN',
   },
   dance: {
     max: danceCeiling(), kind: 'rules', swapsUnderKillSwitch: false,
