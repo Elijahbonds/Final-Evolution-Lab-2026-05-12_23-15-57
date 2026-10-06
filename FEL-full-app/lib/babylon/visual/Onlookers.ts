@@ -6,6 +6,7 @@
 // so the same spots get the same people every session), idling on the spot, capped so a crowd never competes with the
 // athletes for frame budget (MAX_BODIES × ~6 draws). The constructor keeps its shape — modes construct it synchronously
 // and call update(dt) and cheer(strength); the bodies land a moment later.
+import { registerCrowdBody } from './CrowdLod';
 import { Vector3 } from '@babylonjs/core';
 import type { Scene, TransformNode } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
@@ -41,6 +42,7 @@ export class Onlookers {
       void CharacterLibrary.spawn(scene, DEFAULT_HERO_URL, { position: p.clone(), yawRad: yaw, tint: seed, startClip: 'idle', identity: false })
         .then((char) => {
           if (this.disposed) { char.dispose(); return; }
+          registerCrowdBody(scene, char.root);   // A9.9: past ~14 m from the camera, no ink hull and no cast shadow
           for (const m of char.root.getChildMeshes()) m.isPickable = false;
           this.figures.push({ char, root: char.root, baseY: p.y, phase: (i * 2.399) % (Math.PI * 2) });
         })
