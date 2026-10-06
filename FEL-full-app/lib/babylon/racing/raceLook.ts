@@ -80,6 +80,9 @@ export function raceIdentityFromLocal(base: PlayerIdentity, local: StoredLook): 
 export async function resolveRaceIdentity(): Promise<PlayerIdentity> {
   const base = await resolveIdentity();
   if (base.lookLocal !== true) return base;
+  // CREATOR-PLAN phase 4a (owner decision 2026-10-06, "Every mode, device only"): resolveIdentity already dressed the
+  // body from the device copy (its active slot), so there is nothing left to overlay
+  if (base.lookFromDevice) return base;
   const local = readLocalLook();
   if (!local) return base;   // nothing on the device: the catalog defaults the server holds stand
   const merged = raceIdentityFromLocal(base, local);

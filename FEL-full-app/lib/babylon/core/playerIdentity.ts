@@ -15,9 +15,14 @@ import type { AccessoryId } from './accessories';
 import { wearPlayerAccessories } from './playerAccessories';
 import { applyCreatorLayers } from './creatorLook';
 import type { CreatorDoc, CreatorPart } from '../../creator/look/doc';
-import { readCreatorDoc, faceOnly } from '../../creator/look/storage';
 import { effectivePalette, type PaletteOverrides } from '../../creator/look/palette';
 import { accessoriesForEquipped, wornPartsForEquipped } from '../../closet/wearableAccessories';
+import { hiddenParts } from '../../creator/look/doc';
+import { TEEN_DEVICE_LOOK_EVERYWHERE, activeLook, heroBodyForSlot } from '../../creator/look/slots';
+import { readLocalLook, type StoredLook } from '../../creator/localLook';
+import { applyEyes } from '../creator/eyes/renderEyes';
+import { eyeParams } from '../creator/eyes/eyeTexture';
+import { RawTexture } from '@babylonjs/core';
 
 type TintMat = Material & { albedoColor?: Color3; diffuseColor?: Color3; bumpTexture?: { dispose(): void } | null };
 
@@ -78,6 +83,9 @@ export interface PlayerIdentity {
   /** IMPROVE (2026-10-06), CREATOR-PLAN phase 2: equipped items that render as Creator parts (the Nexus Visor,
    *  wearableAccessories.wornPartsForEquipped). Optional: a literal without it wears none. */
   wornParts?: readonly CreatorPart[];
+  /** IMPROVE (2026-10-06), CREATOR-PLAN phase 4a: true when the look came from the DEVICE copy (a lookLocal player, under
+   *  TEEN_DEVICE_LOOK_EVERYWHERE), so the race's own overlay (raceLook.ts) knows it is already applied. */
+  lookFromDevice?: boolean;
 }
 export interface EquippedCard { id: string; name: string; accent: string; mode: string }
 
@@ -90,16 +98,37 @@ export async function resolveIdentity(force = false): Promise<PlayerIdentity> {
   if (cached && !force) return cached;
   const dev = devBodyOverride();
   if (dev) { cached = dev; return dev; }
+  // CREATOR-PLAN phase 4a: `?for=spawn` — the closet answers the ACTIVE slot only (a spawn dresses one body).
   const [closet, heroBody] = await Promise.all([
-    fetch('/api/v1/closet').then((r) => (r.ok ? r.json() : null)).catch(() => null),
-    fetch('/api/v1/hero-body').then((r) => (r.ok ? r.json() : null)).catch(() => null) as Promise<{ body?: HeroBodyKind; frame?: Record<string, unknown> | null; palette?: PaletteOverrides | null } | null>,
+    fetch('/api/v1/closet?for=spawn').then((r) => (r.ok ? r.json() : null)).catch(() => null),
+    fetch('/api/v1/hero-body').then((r) => (r.ok ? r.json() : null)).catch(() => null) as Promise<HeroBodyAnswer | null>,
   ]);
+  // TEENS (owner decision 2026-10-06, "Every mode, device only"): a lookLocal player's row holds only the catalog
+  // defaults, so their look comes from the device copy — read here, never sent anywhere (lib/creator/look/slots.ts).
+  const local = closet?.lookLocal === true && TEEN_DEVICE_LOOK_EVERYWHERE ? readLocalLook() : null;
+  cached = identityFrom(closet, heroBody, local);
+  return cached;
+}
 
-  // IMPROVE (2026-10-06): the stored face carries the Creator's doc (face.creator / face.creatorSlots); the face pipes
-  // get the FaceConfig alone, and the doc is read (and sanitised again) on its own.
-  const creator = readCreatorDoc(closet?.look?.face);
-  const face: FaceConfig = { ...defaultFace(), ...faceOnly(closet?.look?.face ?? {}) };
-  const equipped: Partial<Record<WearableSlot, string | null>> = closet?.look?.equipped ?? {};
+/** What /api/v1/hero-body answers. */
+export interface HeroBodyAnswer { body?: HeroBodyKind; frame?: Record<string, unknown> | null; palette?: PaletteOverrides | null; scanOwned?: boolean }
+
+/**
+ * The identity from the two answers (pure: resolveIdentity's fetches feed it; tests drive it directly).
+ * IMPROVE (2026-10-06), CREATOR-PLAN phase 4a: the look is the ACTIVE SLOT's (slots.activeLook): its face, its doc, its
+ * worn items, its height and build. The body is the server's decision (hero-body read the active slot's body, honouring
+ * `'scan'` only for an account that owns one). `local` is the device copy of a lookLocal player (TEEN_DEVICE_LOOK_
+ * EVERYWHERE): when it carries a face, it is the look instead, and its slot's body is mapped here within what the server
+ * allows (heroBodyForSlot: `'scan'` only with scanOwned).
+ */
+export function identityFrom(closet: any, heroBody: HeroBodyAnswer | null, local: StoredLook | null): PlayerIdentity {
+  const device = !!local?.face && closet?.lookLocal === true;
+  const look = activeLook(device ? local!.face : closet?.look?.face);
+  const creator = look.doc;
+  const face: FaceConfig = look.face;
+  const equipped: Partial<Record<WearableSlot, string | null>> = device
+    ? (look.equipped ?? local!.equipped ?? {})
+    : (look.equipped ?? closet?.look?.equipped ?? {});
   const cardRow = closet?.skins?.find((s: { id: string }) => s.id === closet?.look?.skinCardId) as { id: string; displayName?: string; accent?: string; mode?: string } | undefined;
   const cardAccent: string | undefined = cardRow?.accent;
   const card: EquippedCard | null = cardRow ? { id: cardRow.id, name: cardRow.displayName ?? '', accent: cardRow.accent || FALLBACK_PALETTE.accent, mode: cardRow.mode || 'dunk' } : null;
@@ -122,22 +151,31 @@ export async function resolveIdentity(force = false): Promise<PlayerIdentity> {
   // workout scan's stored avatarSpec — a height made from the jump and a reach from the running cadence — so jumping higher made the
   // player taller in every mode. The scan route still stores a spec (the standard frame now) and old rows keep theirs; nothing reads
   // them here, so the fetch is gone. The owner's scan body takes its frame the same way.
-  const frame = heroBody?.frame ?? null;
+  // phase 4a: a slot's own height and build (multipliers) win over the Athlete Creator's frame (percent); the device copy's
+  // frame numbers (percent) for a lookLocal player without a slot frame, as the race always did
+  const pct = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : undefined);
+  const frame: Record<string, unknown> | null = look.frame
+    ? { ...(heroBody?.frame ?? {}), heightScale: look.frame.heightScale * 100, buildScale: look.frame.buildScale * 100 }
+    : device && (pct(local!.heightScale) || pct(local!.buildScale))
+      ? { ...(heroBody?.frame ?? {}), ...(pct(local!.heightScale) ? { heightScale: local!.heightScale } : {}), ...(pct(local!.buildScale) ? { buildScale: local!.buildScale } : {}) }
+      : heroBody?.frame ?? null;
   const frameScales = proportionsFromFrame(frame);
   const proportions: AvatarSpec | null = (frameScales ? {
     ...frameScales,
     palette: { skin: face.skinTone, primary: palette.jersey, accent: palette.accent },
     stance: (frame?.stance === 'tall' || frame?.stance === 'compact' ? frame.stance : 'athletic') as AvatarSpec['stance'],
   } : null);
-  const jerseyRaw = closet?.look?.jersey;
+  const jerseyRaw = device && local!.jersey ? local!.jersey : closet?.look?.jersey;
   const jersey = jerseyRaw ? sanitizeJersey(jerseyRaw) : null;
 
   const wardrobe: Wardrobe = { tops: equipped.tops ?? null, shorts: equipped.shorts ?? null, shoes: equipped.shoes ?? null };
-  const body: HeroBodyKind = heroBody?.body === 'scan' || heroBody?.body === 'kit-female' ? heroBody.body : 'kit-male';
+  const serverBody: HeroBodyKind = heroBody?.body === 'scan' || heroBody?.body === 'kit-female' ? heroBody.body : 'kit-male';
+  const body: HeroBodyKind = device ? heroBodyForSlot(look.body, { scanOwned: heroBody?.scanOwned === true, fallback: serverBody }) : serverBody;
   const accessories = accessoriesForEquipped(equipped);
   const wornParts = wornPartsForEquipped(equipped);
-  cached = { proportions, face, palette, jersey, wardrobe, custom: Boolean(closet?.look) || Boolean(frame), body, card, lookLocal: closet?.lookLocal === true, creator, accessories, wornParts };
-  return cached;
+  const id: PlayerIdentity = { proportions, face, palette, jersey, wardrobe, custom: Boolean(closet?.look) || Boolean(frame), body, card, lookLocal: closet?.lookLocal === true, creator, accessories, wornParts };
+  if (device) id.lookFromDevice = true;
+  return id;
 }
 /** The identity resolved so far this session (null before the first spawn asked) — a synchronous read for the ring / icon. */
 export function cachedIdentity(): PlayerIdentity | null { return cached; }
@@ -229,7 +267,9 @@ export function applyIdentity(
   // IMPROVE (2026-10-06), research item 4: the body's sex picks the skin map family (the female body wore male maps).
   applySkinTone(spawn, id.face.skinTone, id.body === 'kit-female' ? 'female' : 'male');
   applyHair(spawn, id.face.hairColor, id.face.hairStyle === 'Bald');
-  applyHairStyle(spawn.meshes, id.face.hairStyle);   // Phase 3: real hair geometry per style
+  // CREATOR-PLAN phase 4a (hide, tool #4): a doc that hides the hair (or the whole head) shows no hair node at all
+  const hidden = hiddenParts(id.creator);
+  applyHairStyle(spawn.meshes, hidden.hair ? 'Bald' : id.face.hairStyle);   // Phase 3: real hair geometry per style
   applyKit(spawn.meshes, id.wardrobe);              // ship pass 3: fitted garments per equipped wearable (no-op without a kit)
   // Phase 3 (2026-09-02): the forge now has a face. Shape presets and the
   // fine-tune sliders resolve through one table; eye color lands on the
@@ -240,7 +280,10 @@ export function applyIdentity(
     faceShape: id.face.faceShape, brows: id.face.brows, eyeShape: id.face.eyeShape, mouth: id.face.mouth, nose: id.face.nose,
     sliders: { ...(id.face.sliders ?? {}), ...(doc?.shape.face ?? {}) } as never,
   }));
-  tintSlot(spawn, ['iris'], id.face.eyeColor);
+  // CREATOR-PLAN phase 4a (tool #3): eye colour is honest now — the eyeballs wear a code-drawn texture (the base's eye
+  // colour, the doc's sclera / iris size / pupil / glow), or are hidden. (This line used to tint an `iris` material the
+  // kit never had.)
+  applyEyes(spawn, eyeParams(id.face.eyeColor, doc?.eyes), hidden.eyes);
   watchReadiness(spawn);
   if (parts === 'body') return;
   // 3) Wardrobe palette — jersey/shorts/shoes tints by mesh/material slot name. The doc's colours win (a no-op when
@@ -463,15 +506,106 @@ function applySkinMap(mat: PBRMaterial, tone: Color3, scene: ReturnType<PBRMater
   // the tier the harness stored on the scene (ModeHarness.ts); a scene without one (Closet preview, tests) is desktop
   const tier: QualityTier = (scene.metadata as { felTier?: QualityTier } | undefined)?.felTier ?? 'desktop';
   const tex = (rawUrl: string) => { const url = skinMapUrl(rawUrl, tier); let t = cache!.get(url); if (!t) { t = new Texture(url, scene, false, invertY, Texture.TRILINEAR_SAMPLINGMODE); cache!.set(url, t); } return t; };
-  mat.albedoTexture = tex(entry.albedo);
-  const [mr, mg, mb] = entry.meanRGB.map((v) => Math.max(8, v) / 255);
-  const clamp = (v: number) => Math.min(1.25, Math.max(0.35, v));   // past 1.25 the map washes out; the light family already sits near the swatch
-  mat.albedoColor = new Color3(clamp(tone.r / mr), clamp(tone.g / mg), clamp(tone.b / mb));
+  // CREATOR-PLAN phase 4a (free colour, tool #5): a tone far from any human one (green, blue, white, …) wears a
+  // DESATURATED version of the map times the tone, so it reads clean; the per-channel ratio below would clamp it to mud.
+  if (isFantasyTone(tone, entry.meanRGB)) {
+    mat.albedoTexture = fantasySkinTexture(skinMapUrl(entry.albedo, tier), scene, tier, invertY);
+    mat.albedoColor = fantasySkinColour(tone);
+  } else {
+    mat.albedoTexture = tex(entry.albedo);
+    const [mr, mg, mb] = entry.meanRGB.map((v) => Math.max(8, v) / 255);
+    const clamp = (v: number) => Math.min(1.25, Math.max(0.35, v));   // past 1.25 the map washes out; the light family already sits near the swatch
+    mat.albedoColor = new Color3(clamp(tone.r / mr), clamp(tone.g / mg), clamp(tone.b / mb));
+  }
   // photographed detail normal in place of the procedural pores (same UV layout on every MakeHuman skin)
   const n = tex(SKIN_DETAIL_NORMAL);
   mat.bumpTexture = n; n.level = 0.45;
   mat.metadata = { ...(mat.metadata ?? {}), felSkin: entry.key };
 }
+// ── FANTASY SKIN (IMPROVE (2026-10-06), CREATOR-PLAN phase 4a, tool #5) ─────────────────────────────────────────────
+// The photographed skin maps are tinted by a per-channel RATIO (tone / the map's mean colour), clamped to 0.35–1.25 so
+// the map never washes out. Inside the human range that lands the mean on the swatch. Outside it the clamp bites, or the
+// map's own warm hue shows through, and a green, blue or white skin came out muddy. Such a tone now wears a GREY version
+// of the same map (its luminance, its pores and shading, no hue) times the tone itself: the colour is exactly the one
+// picked and the detail is still skin.
+
+/** The grey map's mean, as a gamma byte level (0..1): bright enough for white skin, room left for the detail above it. */
+export const FANTASY_GREY_MEAN = 0.8;
+/** The per-channel ratios past which a tone is not a skin tone at all (every catalog tone sits inside, tested). */
+export const FANTASY_RATIO: readonly [number, number] = [0.15, 2.2];
+/** A tone is "far from human" when the ratio tint would be far past its clamp, or its hue is not a skin hue (skin runs red ≥ green ≥
+ *  blue, give or take). Pure; `meanRGB` is the chosen map's mean (0..255). */
+export function isFantasyTone(tone: { r: number; g: number; b: number }, meanRGB: readonly number[]): boolean {
+  const [mr, mg, mb] = meanRGB.map((v) => Math.max(8, v) / 255);
+  const ratios = [tone.r / mr, tone.g / mg, tone.b / mb];
+  // far past the ratio clamp (0.35–1.25; the catalog's palest and darkest tones already lean on it a little, and keep
+  // the photographed map exactly as before)
+  if (ratios.some((k) => k < FANTASY_RATIO[0] || k > FANTASY_RATIO[1])) return true;
+  // skin hue: red leads, green does not trail blue by much; a grey or a green-led / blue-led tone is not skin
+  if (tone.g > tone.r * 1.02 || tone.b > tone.g * 1.15 || tone.b > tone.r) return true;
+  const max = Math.max(tone.r, tone.g, tone.b), min = Math.min(tone.r, tone.g, tone.b);
+  return max > 0.2 && (max - min) / max < 0.08;   // a neutral grey / white
+}
+/** The albedo colour over the grey map: the tone in linear light over the map's mean, scaled down (never shifted in hue)
+ *  where a channel would pass 1.25. */
+export function fantasySkinColour(tone: Color3): Color3 {
+  const lin = (v: number) => Math.pow(v, 2.2);
+  const mean = lin(FANTASY_GREY_MEAN);
+  let c = [lin(tone.r) / mean, lin(tone.g) / mean, lin(tone.b) / mean];
+  // the shader multiplies the map's LINEAR value; albedoColor is linear too
+  const peak = Math.max(...c);
+  if (peak > 1.25) c = c.map((v) => (v * 1.25) / peak);
+  // Color3 here is read as linear by the PBR shader (albedoColor), so store the linear ratio as is
+  return new Color3(c[0], c[1], c[2]);
+}
+
+/** The grey version of a skin map, made once per (scene, url): a RawTexture at the tier's map size, flat at the grey mean
+ *  until the image is read (or for good where there is no canvas — tests, workers), then its luminance, re-centred on
+ *  FANTASY_GREY_MEAN. Shared by every body wearing it; it goes with the scene. */
+const greyCache = new WeakMap<object, Map<string, RawTexture>>();
+export function fantasySkinTexture(url: string, scene: ReturnType<PBRMaterial['getScene']>, tier: QualityTier, invertY: boolean): RawTexture {
+  let cache = greyCache.get(scene); if (!cache) { cache = new Map(); greyCache.set(scene, cache); }
+  const hit = cache.get(url);
+  if (hit) return hit;
+  const size = tier === 'mobile' ? 1024 : 2048;
+  const flat = Math.round(FANTASY_GREY_MEAN * 255);
+  const data = new Uint8Array(size * size * 4);
+  for (let i = 0; i < data.length; i += 4) { data[i] = flat; data[i + 1] = flat; data[i + 2] = flat; data[i + 3] = 255; }
+  const t = new RawTexture(data, size, size, 5 /* RGBA */, scene, true, invertY, Texture.TRILINEAR_SAMPLINGMODE);
+  t.name = `fel_skin_grey_${url}`;
+  cache.set(url, t);
+  if (typeof document !== 'undefined' && typeof Image !== 'undefined') {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      try {
+        const cv = document.createElement('canvas'); cv.width = size; cv.height = size;
+        const ctx = cv.getContext('2d', { willReadFrequently: true });
+        if (!ctx || !t.getScene()) return;
+        ctx.drawImage(img, 0, 0, size, size);
+        t.update(greyFromRGBA(ctx.getImageData(0, 0, size, size).data));
+      } catch { /* a tainted or lost canvas: the flat grey stands */ }
+    };
+    img.src = url;
+  }
+  return t;
+}
+/** RGBA bytes → their luminance, re-centred so the mean sits at FANTASY_GREY_MEAN (pure; tested). */
+export function greyFromRGBA(src: ArrayLike<number>): Uint8Array {
+  const n = src.length / 4;
+  const out = new Uint8Array(src.length);
+  let sum = 0;
+  for (let i = 0; i < n; i++) sum += 0.2126 * src[i * 4] + 0.7152 * src[i * 4 + 1] + 0.0722 * src[i * 4 + 2];
+  const mean = Math.max(1, sum / Math.max(1, n));
+  const k = (FANTASY_GREY_MEAN * 255) / mean;
+  for (let i = 0; i < n; i++) {
+    const l = (0.2126 * src[i * 4] + 0.7152 * src[i * 4 + 1] + 0.0722 * src[i * 4 + 2]) * k;
+    const v = l >= 255 ? 255 : l <= 0 ? 0 : Math.round(l);
+    out[i * 4] = v; out[i * 4 + 1] = v; out[i * 4 + 2] = v; out[i * 4 + 3] = 255;
+  }
+  return out;
+}
+
 /** Hair color + bald toggle, matched on the forged rig's `hair` material name
  *  (scripts/avatar/forge.mts). Rigs without one skip cleanly. */
 function applyHair(spawn: SpawnedCharacter, hex: string, bald: boolean): void {

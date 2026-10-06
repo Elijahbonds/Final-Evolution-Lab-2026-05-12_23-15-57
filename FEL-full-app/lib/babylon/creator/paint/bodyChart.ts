@@ -26,12 +26,14 @@ import type { PaintRegion } from '../../../creator/look/doc';
 
 export type V3 = [number, number, number];
 
-/** The 17 atoms (texel label = index + 1; 0 = not on the body). APPEND ONLY is not needed (never stored), but the
+/** The 18 atoms (texel label = index + 1; 0 = not on the body). Phase 4a (2026-10-06) appended `ears` (both ears, one
+ *  atom; split off the head by position like face and scalp, see EAR_*). APPEND ONLY is not needed (never stored), but the
  *  order is the label value, so the tests and the compositor's tables index by it. */
 export const ATOMS = [
   'face', 'scalp', 'neck', 'torsoFront', 'torsoBack',
   'upperArmL', 'upperArmR', 'forearmL', 'forearmR', 'handL', 'handR',
   'thighL', 'thighR', 'shinL', 'shinR', 'footL', 'footR',
+  'ears',
 ] as const;
 export type Atom = typeof ATOMS[number];
 export const ATOM_COUNT = ATOMS.length;
@@ -44,7 +46,7 @@ export const GROUP_COUNT = GROUPS.length;
 const GROUP_OF: Record<Atom, Group> = {
   face: 'head', scalp: 'head', neck: 'head', torsoFront: 'torso', torsoBack: 'torso',
   upperArmL: 'armL', forearmL: 'armL', handL: 'armL', upperArmR: 'armR', forearmR: 'armR', handR: 'armR',
-  thighL: 'legL', shinL: 'legL', thighR: 'legR', shinR: 'legR', footL: 'footL', footR: 'footR',
+  thighL: 'legL', shinL: 'legL', thighR: 'legR', shinR: 'legR', footL: 'footL', footR: 'footR', ears: 'head',
 };
 /** Group index per atom index. */
 export const ATOM_GROUP: readonly number[] = ATOMS.map((a) => GROUPS.indexOf(GROUP_OF[a]));
@@ -56,8 +58,9 @@ export const GROUP_MIRROR: readonly number[] = GROUPS.map((g) => GROUPS.indexOf(
 /** The doc's regions as unions of atoms. `armLeft` is the upper arm and forearm; hands and feet are their own. */
 export const REGION_ATOMS: Record<PaintRegion, readonly Atom[]> = {
   all: ATOMS,
-  head: ['face', 'scalp'],
+  head: ['face', 'scalp', 'ears'],
   face: ['face'],
+  ears: ['ears'],
   neck: ['neck'],
   torsoFront: ['torsoFront'],
   torsoBack: ['torsoBack'],
@@ -70,7 +73,7 @@ export const REGION_ATOMS: Record<PaintRegion, readonly Atom[]> = {
   thighLeft: ['thighL'], thighRight: ['thighR'],
   shinLeft: ['shinL'], shinRight: ['shinR'],
   footLeft: ['footL'], footRight: ['footR'],
-  body: ATOMS.filter((a) => a !== 'face' && a !== 'scalp'),   // the suit's region: everything below the head, neck in
+  body: ATOMS.filter((a) => a !== 'face' && a !== 'scalp' && a !== 'ears'),   // the suit's region: everything below the head, neck in
 };
 
 /** A label → in-region table for a doc region (index by texel label; label 0 is never in a region). */
@@ -146,6 +149,9 @@ export interface BodyChart {
   /** the face: in front of the ear plane (`front` m forward of the head's centre) and below the hairline (`top` m up
    *  from the head's centre), each soft over `soft` m */
   face: { front: number; top: number; soft: number };
+  /** Phase 4a: the ears — head vertices farther to the side than `lateral` m (the skull's half-width above the ears ×
+   *  EAR_LATERAL), inside a band of height and depth around the ear (m from the head's centre), each soft over `soft` m */
+  ears: { lateral: number; hLo: number; hHi: number; fLo: number; fHi: number; soft: number };
 }
 
 const sub = (a: V3, b: V3): V3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
@@ -265,13 +271,21 @@ export function buildBodyChart(joints: Partial<Record<ChartJoint, V3>>, body: Sk
 
   // the head: the hairline sits this far up the head's height above its centre (measured on both kit bodies: the
   // brow ridge is a few cm above the head's centre; above it the forehead runs into the hair)
-  let headTop = -Infinity;
-  for (let v = 0; v < n; v++) if (cls[v * width + ATOM_COUNT] > 0.5) headTop = Math.max(headTop, dot(sub(pt(v), headC), up));
+  let headTop = -Infinity, skull = 0;
+  for (let v = 0; v < n; v++) {
+    if (cls[v * width + ATOM_COUNT] <= 0.5) continue;
+    const d = sub(pt(v), headC);
+    const h = dot(d, up);
+    headTop = Math.max(headTop, h);
+    // the skull's half-width just above the ears (where nothing sticks out of it)
+    if (h >= EAR_SKULL_BAND[0] && h <= EAR_SKULL_BAND[1]) skull = Math.max(skull, Math.abs(dot(d, left)));
+  }
   const chart: BodyChart = {
     up, left, fwd, groups,
     torsoMid: { h0: Number.isFinite(hLo) ? hLo : 0, step, mid },
     extent: new Float32Array(ATOM_COUNT * 4),
     face: { front: FACE_FRONT, top: Number.isFinite(headTop) ? headTop * FACE_TOP : 0.05, soft: 0.008 },
+    ears: { lateral: (skull || 0.07) * EAR_LATERAL, hLo: EAR_BAND.h[0], hHi: EAR_BAND.h[1], fLo: EAR_BAND.f[0], fHi: EAR_BAND.f[1], soft: EAR_SOFT },
   };
   // each group's mean radius, from the vertices mostly in it
   const sum = new Float64Array(GROUP_COUNT), cnt = new Float64Array(GROUP_COUNT);
@@ -315,6 +329,17 @@ export const FACE_FRONT = 0.015;
 /** The face's top, as a fraction of the head's height above its centre (the hairline). */
 export const FACE_TOP = 0.42;
 
+/** THE EARS (phase 4a, measured 2026-10-06 on both kit heads, m from the head's centre in the body's axes): the ears
+ *  stick out sideways to 0.085 (male) / 0.082 (female) between 4.5 cm below and 2.5 cm above the head's centre, 4.4 cm
+ *  behind to 2 cm in front of it; at that height the skull itself, in front of and behind the ear, is at most 0.067 wide,
+ *  and just above the ears (EAR_SKULL_BAND) it is 0.071 / 0.069. An ear is what lies farther out than 0.97 × that skull
+ *  width inside the band — the flap, leaving a short root so a cut-out leaves no hole in the head.
+ *  assumption: 0.97 is judged from the measurements, not from a rendered view. */
+export const EAR_SKULL_BAND: readonly [number, number] = [0.035, 0.065];
+export const EAR_LATERAL = 0.97;
+export const EAR_BAND = { h: [-0.055, 0.03], f: [-0.055, 0.025] } as const;
+export const EAR_SOFT = 0.003;
+
 /** The axis point a position is measured from: the group's origin, except the torso, whose centre moves front and
  *  back with height (the chest is forward of the belly, the seat behind it). */
 function axisPoint(c: BodyChart, g: number, p: V3): V3 {
@@ -356,7 +381,7 @@ export function classify(c: BodyChart, m: SkinInput): Classified {
   const ang = new Float32Array(n * GROUP_COUNT);
   const t = new Float32Array(n * GROUP_COUNT);
   const headG = GROUPS.indexOf('head'), torsoG = GROUPS.indexOf('torso');
-  const iFace = atomIndex('face'), iScalp = atomIndex('scalp'), iFront = atomIndex('torsoFront'), iBack = atomIndex('torsoBack');
+  const iFace = atomIndex('face'), iScalp = atomIndex('scalp'), iEars = atomIndex('ears'), iFront = atomIndex('torsoFront'), iBack = atomIndex('torsoBack');
   for (let v = 0; v < n; v++) {
     const p: V3 = [m.P[v * 3], m.P[v * 3 + 1], m.P[v * 3 + 2]];
     for (let g = 0; g < GROUP_COUNT; g++) { const k = chartCoords(c, g, p); ang[v * GROUP_COUNT + g] = k.ang; t[v * GROUP_COUNT + g] = k.t; }
@@ -368,8 +393,15 @@ export function classify(c: BodyChart, m: SkinInput): Classified {
       const f = dot(d, c.fwd);
       const h = t[v * GROUP_COUNT + headG];
       const face = smooth(c.face.front - c.face.soft, c.face.front + c.face.soft, f) * (1 - smooth(c.face.top - c.face.soft, c.face.top + c.face.soft, h));
-      atomW[v * ATOM_COUNT + iFace] += wh * face;
-      atomW[v * ATOM_COUNT + iScalp] += wh * (1 - face);
+      // phase 4a: the ears come off the head first (far out to the side, inside the ear's band)
+      const E = c.ears;
+      const lat = Math.abs(dot(d, c.left));
+      const ear = smooth(E.lateral - E.soft, E.lateral + E.soft, lat)
+        * smooth(E.hLo - 2 * E.soft, E.hLo + 2 * E.soft, h) * (1 - smooth(E.hHi - 2 * E.soft, E.hHi + 2 * E.soft, h))
+        * smooth(E.fLo - 2 * E.soft, E.fLo + 2 * E.soft, f) * (1 - smooth(E.fHi - 2 * E.soft, E.fHi + 2 * E.soft, f));
+      atomW[v * ATOM_COUNT + iEars] += wh * ear;
+      atomW[v * ATOM_COUNT + iFace] += wh * (1 - ear) * face;
+      atomW[v * ATOM_COUNT + iScalp] += wh * (1 - ear) * (1 - face);
     }
     const wt = cls[v * width + ATOM_COUNT + 1];
     if (wt > 0) {

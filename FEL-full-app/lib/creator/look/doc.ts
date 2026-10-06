@@ -29,6 +29,13 @@ export const MAX_SLOTS = 5;
 /** Serialised size cap of one sanitised doc, in characters of JSON. A doc at every budget, every field at its longest,
  *  is under this (look.test.ts measures it), so the cap only bites if the budgets and the cap drift apart. */
 export const MAX_DOC_CHARS = 24_000;
+/** Phase 4a (2026-10-06): one saved character (a slot: its doc plus its base, numbers and worn items) is at most this
+ *  much JSON — the doc's cap plus room for the rest, which is bounded by allow-lists (sanitize.sanitizeCreatorSlot). */
+export const MAX_SLOT_CHARS = MAX_DOC_CHARS + 2_000;
+/** The whole creator part of `AvatarLook.face` (the active doc, every slot, the pointer): five slots at their cap plus
+ *  the active doc is ~154k, so this only bites if the budgets drift (storage.holdCreator drops trailing slots, never
+ *  the active one, to fit). */
+export const MAX_FACE_CHARS = 160_000;
 
 /** Procedural part shapes (phase 2 builds each in code, lib/babylon/creator/parts/shapes.ts; no art needed).
  *  APPEND ONLY: saved docs and share codes name these. Phase 2 (2026-10-06) appended the second row, generic building
@@ -57,12 +64,14 @@ export type PaintType = typeof PAINT_TYPES[number];
 /** Body regions (phase 3 derives each mask from the skin weights, not a hand-drawn map:
  *  lib/babylon/creator/paint/bodyChart.ts). APPEND ONLY. Phase 3 (2026-10-06) appended the second row: the neck, each
  *  limb's two segments, and `body` (everything below the head, the neck included: the suit's region). `armLeft` is the upper arm and the
- *  forearm, `legLeft` the thigh and the shin; the hands and feet are their own regions. */
+ *  forearm, `legLeft` the thigh and the shin; the hands and feet are their own regions. Phase 4a appended `ears` (both
+ *  ears, split off the head geometrically like face and scalp; bodyChart.ts), so they can be painted or cut out. */
 export const PAINT_REGIONS = [
   'all', 'head', 'face', 'torsoFront', 'torsoBack', 'armLeft', 'armRight', 'handLeft', 'handRight',
   'legLeft', 'legRight', 'footLeft', 'footRight',
   'neck', 'upperArmLeft', 'upperArmRight', 'forearmLeft', 'forearmRight', 'thighLeft', 'thighRight', 'shinLeft',
   'shinRight', 'body',
+  'ears',
 ] as const;
 export type PaintRegion = typeof PAINT_REGIONS[number];
 
@@ -181,9 +190,39 @@ export interface CreatorShape {
   body: Partial<Record<ProportionKey, number>>;
 }
 
+/** What `flags.hide` can take off the body (phase 4a, tool #4). Visual only: the eyeballs and hair are hidden meshes, the
+ *  ears and head are cut out of the skin through the paint texture's alpha (alpha test). Never a pick, a collider or a
+ *  hitbox — the body mesh is the same mesh. `head` takes the ears, eyes and hair with it (a mascot head or a helmet). */
+export const HIDE_KEYS = ['eyes', 'ears', 'head', 'hair'] as const;
+export type HideKey = typeof HIDE_KEYS[number];
+
 export interface CreatorFlags {
   /** Suit mode: hide the garments and paint the whole body (phase 3). */
   suit: boolean;
+  /** Phase 4a: what to take off the body. Optional and stored only when something is hidden (a phase 1–3 doc is
+   *  unchanged). */
+  hide?: Partial<Record<HideKey, true>>;
+}
+
+/** Procedural eyes (phase 4a, tool #3): the kit's eyeballs get a code-drawn texture (lib/babylon/creator/eyes). The
+ *  iris colour is the base's `eyeColor` (FaceConfig), so there is one source for it; this block is the rest. */
+export const PUPIL_SHAPES = ['round', 'slit', 'none'] as const;
+export type PupilShape = typeof PUPIL_SHAPES[number];
+export const EYE_RANGES = {
+  /** iris radius, as a multiple of the natural iris (1) */
+  size: [0.5, 1.6],
+  /** pupil radius, as a fraction of the iris */
+  pupilSize: [0.1, 0.8],
+  /** how strongly the iris glows (emissive), 0 = not at all */
+  glow: [0, 1],
+} as const;
+export const EYE_DEFAULTS = { sclera: '#F2EEE8', size: 1, pupil: 'round' as PupilShape, pupilSize: 0.33, glow: 0 };
+export interface CreatorEyes {
+  sclera?: string;
+  size?: number;
+  pupil?: PupilShape;
+  pupilSize?: number;
+  glow?: number;
 }
 
 export interface CreatorDoc {
@@ -193,10 +232,49 @@ export interface CreatorDoc {
   colours: Partial<Record<ColourSlot, string>>;
   shape: CreatorShape;
   flags: CreatorFlags;
+  /** Phase 4a: optional, stored only when something differs from EYE_DEFAULTS. */
+  eyes?: CreatorEyes;
 }
 
-/** One saved character. `label` runs through the jersey name rule; `doc` is a full CreatorDoc. */
+/** One saved character, v1 (phase 1): `label` through the jersey name rule, `doc` a full CreatorDoc. Still accepted by
+ *  the sanitiser, which upgrades it to a CreatorSlotV2 (the missing fields default from the top-level face). */
 export interface CreatorSlot { label: string; doc: CreatorDoc }
+
+/** The body a slot plays in. `'scan'` is honoured only when the server says this account owns a scan
+ *  (/api/v1/hero-body → heroBody.decideHeroBody); anywhere else it is the kit body (a share code exports it as `male`). */
+export const SLOT_BODIES = ['male', 'female', 'scan'] as const;
+export type SlotBody = typeof SLOT_BODIES[number];
+
+/** A slot's height and build, as multipliers inside playFrame.COSMETIC_CLAMP (ranked and standard-frame modes still
+ *  spawn 1.0). Body-shape NUMBERS: stored only with the adult's numbers opt-in, like the sliders. */
+export interface SlotFrame { heightScale: number; buildScale: number }
+
+/** The categorical face a slot wears: FaceConfig without the sliders (sanitize.sanitizeLookBase: hexes and catalog
+ *  names only). Skin, hair and eye colours are any hex (tool #5). */
+export interface SlotBase {
+  skinTone?: string; faceShape?: string; hairStyle?: string; hairColor?: string;
+  eyeShape?: string; eyeColor?: string; brows?: string; mouth?: string; nose?: string;
+}
+
+/**
+ * Phase 4a (owner, 2026-10-06: "1 slot that looks like me, then switch to another character I made"; "5 max slots"):
+ * a slot is a WHOLE character — body, face, numbers, worn items and the Creator doc — and `face.activeSlot` names the
+ * one every mode spawns. Stored in `AvatarLook.face.creatorSlots` (no schema change).
+ */
+export interface CreatorSlotV2 {
+  /** stable id ([a-z0-9], 1–8): `face.activeSlot` points at it */
+  id: string;
+  /** the jersey name rule (A–Z, 0–9, space, hyphen; 12 characters) */
+  label: string;
+  body: SlotBody;
+  base: SlotBase;
+  /** face morph weights (the face scan writes these): numbers, so the numbers opt-in only */
+  sliders?: Partial<Record<ShapeFaceKey, number>>;
+  frame?: SlotFrame;
+  /** worn items per wearable slot; ownership-filtered on save (lib/closet/ownership.filterEquipped) */
+  equipped?: Partial<Record<'headwear' | 'tops' | 'shorts' | 'shoes' | 'accessory', string | null>>;
+  doc: CreatorDoc;
+}
 
 export function emptyCreatorDoc(): CreatorDoc {
   return { v: CREATOR_DOC_VERSION, parts: [], paint: [], colours: {}, shape: { face: {}, body: {} }, flags: { suit: false } };
@@ -205,7 +283,15 @@ export function emptyCreatorDoc(): CreatorDoc {
 /** True when the doc changes nothing (so a save can omit it). */
 export function isEmptyCreatorDoc(d: CreatorDoc): boolean {
   return !d.parts.length && !d.paint.length && !Object.keys(d.colours).length
-    && !Object.keys(d.shape.face).length && !Object.keys(d.shape.body).length && !d.flags.suit;
+    && !Object.keys(d.shape.face).length && !Object.keys(d.shape.body).length && !d.flags.suit
+    && !Object.keys(d.flags.hide ?? {}).length && !Object.keys(d.eyes ?? {}).length;
+}
+
+/** What the doc hides, resolved: `head` takes the ears, the eyes and the hair with it. */
+export function hiddenParts(d: CreatorDoc | null | undefined): Record<HideKey, boolean> {
+  const h = d?.flags.hide ?? {};
+  const head = h.head === true;
+  return { head, ears: head || h.ears === true, eyes: head || h.eyes === true, hair: head || h.hair === true };
 }
 
 /** The bone on the other side ('LeftArm' ↔ 'RightArm'); a centre bone mirrors onto itself. For phase 2's mirror. */

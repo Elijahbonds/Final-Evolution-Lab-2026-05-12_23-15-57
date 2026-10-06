@@ -34,20 +34,24 @@ export const BROW_WEIGHTS: Record<string, FaceWeights> = {
 // `eyes` material, so the iris tint below matches nothing). So eye shape, mouth, nose, eye colour and every brow but
 // Arched changed only the Closet's CSS sketch, never the body a mode spawns. The editors ask this table and label those
 // options "coming soon" instead of pretending. When phase 5's baked morphs land, give an option weights in
-// FEATURE_WEIGHTS (or BROW_WEIGHTS) and it turns honest by itself; eye colour needs an iris mask first.
+// FEATURE_WEIGHTS (or BROW_WEIGHTS) and it turns honest by itself. Eye colour is honest since phase 4a (procedural eyes).
 
 /** Per-feature preset → morph weights. Empty until the face-sculpt morphs are baked (CREATOR-PLAN phase 5). */
 export const FEATURE_WEIGHTS: Record<'eyeShape' | 'mouth' | 'nose', Record<string, FaceWeights>> = { eyeShape: {}, mouth: {}, nose: {} };
 /** The option each field starts on: it is the untouched face, so it is honest whether or not anything else renders. */
 const BASELINE: Record<string, string> = { faceShape: 'Oval', brows: 'Natural' };
-/** Fields with no 3D path at all yet (not morph-driven). */
-const NO_3D_FIELDS = new Set(['eyeColor']);
+/** Fields with no 3D path at all yet (not morph-driven). CREATOR-PLAN phase 4a (2026-10-06): none — eye colour renders
+ *  through the procedural eye texture (lib/babylon/creator/eyes), which needs no iris material. */
+const NO_3D_FIELDS = new Set<string>();
+/** Fields where EVERY option renders (not morph-driven): eye colour is drawn into the eyeballs' texture. */
+const ALWAYS_3D_FIELDS = new Set<string>(['eyeColor']);
 
 export type FaceField = 'faceShape' | 'brows' | 'eyeShape' | 'mouth' | 'nose' | 'eyeColor';
 
 /** True when picking `option` for `field` changes the 3D body (or is the field's untouched baseline). */
 export function faceOptionRenders(field: FaceField, option: string): boolean {
   if (NO_3D_FIELDS.has(field)) return false;
+  if (ALWAYS_3D_FIELDS.has(field)) return true;
   if (BASELINE[field] === option) return true;
   const own = (o: object) => Object.prototype.hasOwnProperty.call(o, option);
   if (field === 'faceShape') return own(FACE_SHAPE_WEIGHTS);

@@ -36,11 +36,13 @@ describe('faceOptionRenders (the honest face menu)', () => {
     expect(faceFieldRenders('brows', BROWS)).toBe(true);
     expect(faceFieldRenders('faceShape', FACE_SHAPES)).toBe(true);
   });
-  it('eye shape, mouth, nose and eye colour have no 3D effect yet, so the whole field says "coming soon"', () => {
+  it('eye shape, mouth and nose have no 3D effect yet, so the whole field says "coming soon"; eye colour renders now', () => {
     expect(faceFieldRenders('eyeShape', EYE_SHAPES)).toBe(false);
     expect(faceFieldRenders('mouth', MOUTHS)).toBe(false);
     expect(faceFieldRenders('nose', NOSES)).toBe(false);
-    expect(faceFieldRenders('eyeColor', EYE_COLORS)).toBe(false);
+    // CREATOR-PLAN phase 4a: the procedural eye texture draws any iris colour (eyeTexture.test.ts proves the pixels)
+    expect(faceFieldRenders('eyeColor', EYE_COLORS)).toBe(true);
+    for (const c of [...EYE_COLORS, '#7FD8FF']) expect(faceOptionRenders('eyeColor', c)).toBe(true);
     expect(faceOptionRenders('brows', 'toString')).toBe(false);   // prototype keys are not options
   });
   it('the claim is true: every option it calls "renders" changes the weights, every other one does not', () => {
@@ -60,7 +62,7 @@ describe('faceOptionRenders (the honest face menu)', () => {
       expect(resolveFaceWeights({ nose: 'Wide' })[FACE_MORPH_NAMES.indexOf('faceSquare')]).toBeCloseTo(0.2);
     } finally { delete FEATURE_WEIGHTS.nose.Wide; }
   });
-  it('the kit bodies really carry no iris material (why eye colour is "coming soon")', () => {
+  it('the kit bodies really carry no iris material (why eye colour needed the procedural eye texture)', () => {
     for (const f of ['public/models/candidates/fel-kit-male.glb', 'public/models/candidates/fel-kit-female.glb']) {
       const b = readFileSync(f);
       const j = JSON.parse(b.subarray(20, 20 + b.readUInt32LE(12)).toString('utf8')) as { materials: { name: string }[]; extras?: unknown };

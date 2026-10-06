@@ -130,7 +130,7 @@ export function nextPartId(parts: readonly Pick<CreatorPart, 'id'>[]): string {
 }
 
 const clamp = (v: number, [lo, hi]: readonly [number, number]) => Math.min(hi, Math.max(lo, v));
-const round = (v: number, dp: number) => { const k = 10 ** dp; return Math.round(v * k) / k; };
+const round = (v: number, dp: number) => { const k = 10 ** dp; const r = Math.round(v * k) / k; return r === 0 ? 0 : r; };   // never -0 (the sanitiser and JSON have none; phase 4a)
 
 /** A new part of `shape` at its start placement, or null when it would not fit the budget. */
 export function newPart(parts: readonly CreatorPart[], shape: PartShape, colour: string): CreatorPart | null {

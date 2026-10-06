@@ -68,7 +68,8 @@ export const APPEARANCE: SectionTable<AnyRow> = {
     // IMPROVE (2026-10-06), research item 3: these glossaries promised 3D geometry the body does not have (seven morphs, no
     // iris material — faceMorphs.faceOptionRenders). They say what is true now; the Closet labels the same options.
     face('eyeShape', 'Eye Shape', EYE_SHAPES, `Lid and corner shape. ${SOON_3D}`),
-    face('eyeColor', 'Eye Colour', EYE_COLORS, `Iris colour. The cyan one is a Nexus look rather than a natural one. ${SOON_3D}`),
+    // CREATOR-PLAN phase 4a: eye colour renders now (the procedural eye texture), any colour in the Closet
+    face('eyeColor', 'Eye Colour', EYE_COLORS, 'Iris colour, drawn into the 3D eyes. The cyan one is a Nexus look rather than a natural one.'),
     face('brows', 'Brows', BROWS, 'Brow weight and arch. Arched lifts the brow on the 3D body; the other weights are coming soon in 3D.'),
     face('mouth', 'Mouth', MOUTHS, `Lip shape and fullness. ${SOON_3D}`),
     face('nose', 'Nose', NOSES, `Bridge and tip shape. ${SOON_3D}`),

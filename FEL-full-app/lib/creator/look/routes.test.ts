@@ -71,7 +71,8 @@ describe('POST /api/v1/closet stores the Creator doc inside face', () => {
     await post(closetPOST, '/api/v1/closet', { face: { ...defaultFace(), hairStyle: 'Afro' }, equipped: {} });
     expect(storedFace().hairStyle).toBe('Afro');
     expect(storedFace().creator.colours).toEqual({ jersey: '#123456' });
-    expect(storedFace().creatorSlots).toEqual([{ label: 'ALT', doc: expect.objectContaining({ flags: { suit: true } }) }]);
+    // phase 4a: the stored v1 slot is upgraded to v2 on the next save (its base from the face it was stored beside)
+    expect(storedFace().creatorSlots).toEqual([expect.objectContaining({ id: 's1', label: 'ALT', body: 'male', doc: expect.objectContaining({ flags: { suit: true } }) })]);
     await post(closetPOST, '/api/v1/closet', { face: { ...defaultFace(), creator: null, creatorSlots: null }, equipped: {} });
     expect('creator' in storedFace()).toBe(false);
     expect('creatorSlots' in storedFace()).toBe(false);

@@ -27,11 +27,16 @@
 // so turning suit mode off needs nothing undone here; the body mask is rescheduled so the skin under the hidden garments
 // is drawn again (bodyMask.ts hides skin only under VISIBLE garments).
 //
+// HIDE / CUT-OUT (IMPROVE (2026-10-06), CREATOR-PLAN phase 4a, tool #4): `doc.flags.hide.ears` / `.head` cut those regions out
+// of the SKIN through this same texture's alpha (composite.ts `cut`), and the skin material switches to an alpha test
+// while anything is cut (one shader variant). The mesh, its picks and its colliders are untouched: the body is the same
+// mesh with transparent texels. Garments are never cut. With no layer, no suit and no cut, the body has no paint at all.
+//
 // Cosmetic only: nothing here touches a mesh's geometry, a bone, a hitbox or a pick.
 
 import { Color3, RawTexture, Texture } from '@babylonjs/core';
 import type { AbstractMesh, BaseTexture, Material, Mesh, Scene, TransformNode } from '@babylonjs/core';
-import type { CreatorDoc, PaintLayer } from '../../../creator/look/doc';
+import { hiddenParts, type CreatorDoc, type PaintLayer, type PaintRegion } from '../../../creator/look/doc';
 import { kitOf } from '../../core/kit';
 import { scheduleBodyMask } from '../../core/bodyMask';
 import { syncGarmentVisibility } from '../../core/garmentFixes';
@@ -41,7 +46,7 @@ import {
 } from './surfaceMap';
 import { ATOM_MIRROR, regionLabelMask, type BodyChart } from './bodyChart';
 import type { SurfaceMap } from './rasterise';
-import { compileLayers, compositeDirty, dirtyTiles, layerApplies, type BelowCache, type ChartInfo, type CompiledLayer, type PaintBuffers } from './composite';
+import { compileLayers, compositeDirty, cutLabels, dirtyTiles, layerApplies, type BelowCache, type ChartInfo, type CompiledLayer, type PaintBuffers } from './composite';
 
 export type PaintTier = 'desktop' | 'mobile';
 export const PAINT_SIZES: Record<PaintTier, { skin: number; garment: number }> = {
@@ -76,6 +81,9 @@ interface Target {
   /** pending upload rectangle */
   up: { x0: number; y0: number; x1: number; y1: number } | null;
   below: (BelowCache & { sigs: string }) | null;
+  /** phase 4a: the cut this target's buffer was drawn with, and the material's alpha settings before we cut */
+  cutSig: string;
+  alphaSaved: { mode: number | null; useAlpha: boolean; cutoff: number } | null;
 }
 
 interface BodyPaint {
@@ -87,6 +95,16 @@ interface BodyPaint {
   suit: boolean;
   chart: BodyChart | null;
   chartKey: string;
+  /** phase 4a: the regions cut out of the skin (hide.ears / hide.head), their label table and signature */
+  cut: PaintRegion[];
+  cutTable: Uint8Array | null;
+  cutSig: string;
+}
+
+/** The regions a doc cuts out of the skin. */
+export function cutRegions(doc: CreatorDoc | null | undefined): PaintRegion[] {
+  const h = hiddenParts(doc);
+  return h.head ? ['head'] : h.ears ? ['ears'] : [];
 }
 
 const bodies = new WeakMap<TransformNode, BodyPaint>();
@@ -145,11 +163,12 @@ export function syncPaint(
   const layers = doc?.paint ?? [];
   const suit = !!doc?.flags.suit;
   const visible = layers.some((l) => !l.hidden);
+  const cut = cutRegions(doc);
   let P = bodies.get(root);
-  if (!visible && !suit) { if (P) releasePaint(root); return { targets: 0, layers: 0 }; }
+  if (!visible && !suit && !cut.length) { if (P) releasePaint(root); return { targets: 0, layers: 0 }; }
   const scene = root.getScene();
   if (!P) {
-    P = { root, scene, tier: tierOf(scene), targets: new Map(), layers: [], suit: false, chart: null, chartKey: '' };
+    P = { root, scene, tier: tierOf(scene), targets: new Map(), layers: [], suit: false, chart: null, chartKey: '', cut: [], cutTable: null, cutSig: '' };
     bodies.set(root, P);
     let set = live.get(scene);
     if (!set) { set = new Set(); live.set(scene, set); }
@@ -159,13 +178,16 @@ export function syncPaint(
   }
   P.layers = layers;
   P.suit = suit;
+  P.cut = cut;
+  P.cutSig = cut.join(',');
+  P.cutTable = cutLabels(cut);
   if (suit) hideGarments(meshes);
 
   // what gets painted: the skin when a layer paints it; each shown garment a layer paints (never in suit mode)
   const body = meshes.find((m) => isPaintBody(m.name)) as Mesh | undefined;
   if (body && !P.chart) { P.chart = chartForBody(body); P.chartKey = geometryKey(body); }
   const want = new Map<Mesh, 'skin' | 'garment'>();
-  if (body && layers.some((l) => layerApplies(l, { target: 'skin', suit }))) want.set(body, 'skin');
+  if (body && (cut.length || layers.some((l) => layerApplies(l, { target: 'skin', suit })))) want.set(body, 'skin');
   const garmentLayers = suit ? [] : layers.filter((l) => layerApplies(l, { target: 'garment', suit }));
   if (garmentLayers.length && P.chart) {
     // only a shown garment some layer's region reaches (a chest layer leaves the shoes alone)
@@ -192,7 +214,7 @@ function newTarget(P: BodyPaint, mesh: Mesh, kind: 'skin' | 'garment'): Target {
   return {
     mesh, kind, size, mapKey: surfaceMapKey(mesh, P.chartKey, size), map: null, mat: null, src: null, tex: null, out: null,
     base: null, baseKey: '', baseState: 'none', flat: [0.5, 0.5, 0.5], tint: [1, 1, 1], compiled: [], dirty: null, complete: false,
-    up: null, below: null,
+    up: null, below: null, cutSig: '', alphaSaved: null,
   };
 }
 
@@ -230,6 +252,10 @@ function updateTarget(P: BodyPaint, t: Target): void {
   const baseKey = src.tex ? `${src.tex.uniqueId}` : 'flat';
   const tintChanged = tint.some((v, i) => Math.abs(v - t.tint[i]) > 1e-4);
   t.tint = tint;
+  // phase 4a: a cut that changed redraws the whole skin (a toggle, rare: not worth a tile diff)
+  const cutSig = t.kind === 'skin' ? P.cutSig : '';
+  const cutChanged = cutSig !== t.cutSig;
+  t.cutSig = cutSig;
   if (baseKey !== t.baseKey) {
     t.baseKey = baseKey;
     t.base = null; t.baseState = 'none'; t.complete = false; t.below = null;
@@ -243,7 +269,7 @@ function updateTarget(P: BodyPaint, t: Target): void {
   if (map) {
     const nTiles = map.tiles.n * map.tiles.n;
     if (!t.dirty) { t.dirty = new Uint8Array(nTiles).fill(1); t.complete = false; }
-    if (tintChanged || !t.complete) { t.dirty.fill(1); t.below = null; }
+    if (tintChanged || cutChanged || !t.complete) { t.dirty.fill(1); t.below = null; }
     else {
       // one layer changing again and again (a drag): keep the layers under it cached
       const changed = changedIndices(t.compiled, next);
@@ -259,7 +285,7 @@ function updateTarget(P: BodyPaint, t: Target): void {
   }
   t.compiled = next;
   // bind now if the texture already holds a composite of this base (a tint-only change shows the old tint for a frame)
-  if (t.tex && t.complete) bind(t);
+  if (t.tex && t.complete) bind(t, P);
 }
 
 function changedIndices(a: readonly CompiledLayer[], b: readonly CompiledLayer[]): number[] {
@@ -366,11 +392,11 @@ function work(P: BodyPaint, t: Target, budget: number, now: () => number): boole
   if (!map) return true;
   if (!t.out) t.out = new Uint8Array(map.size * map.size * 4);
   if (!t.dirty) return true;
-  const B: PaintBuffers = { map, base: t.base, flat: t.flat, tint: t.tint, out: t.out, aa: map.metresPerTexel, radius: P.chart!.groups.map((g) => g.radius) };
+  const B: PaintBuffers = { map, base: t.base, flat: t.flat, tint: t.tint, out: t.out, aa: map.metresPerTexel, radius: P.chart!.groups.map((g) => g.radius), cut: t.kind === 'skin' ? P.cutTable : null };
   const r = compositeDirty(B, t.compiled, t.dirty, budget, now, t.below);
   if (r && r.x1 > r.x0) t.up = t.up ? { x0: Math.min(t.up.x0, r.x0), y0: Math.min(t.up.y0, r.y0), x1: Math.max(t.up.x1, r.x1), y1: Math.max(t.up.y1, r.y1) } : { x0: r.x0, y0: r.y0, x1: r.x1, y1: r.y1 };
   const finished = !r || r.left === 0;
-  if (finished && !t.complete) { upload(P, t, true); t.complete = true; bind(t); }
+  if (finished && !t.complete) { upload(P, t, true); t.complete = true; bind(t, P); }
   else if (t.complete && t.up) upload(P, t, false);
   return finished;
 }
@@ -404,15 +430,44 @@ function upload(P: BodyPaint, t: Target, whole: boolean): void {
 const BOUND = new Color3(1, 1, 0.9999);
 const isBound = (c: Color3 | null): boolean => !!c && c.r === BOUND.r && c.g === BOUND.g && c.b === BOUND.b;
 
-function bind(t: Target): void {
+function bind(t: Target, P?: BodyPaint): void {
   if (!t.mat || !t.tex) return;
+  syncAlphaCut(t, t.kind === 'skin' && !!P?.cutTable);
   const cur = albedoOf(t.mat);
   if (cur.tex === t.tex && isBound(cur.color)) return;
   setAlbedo(t.mat, t.tex, BOUND);
 }
 
+type AlphaMat = Material & { transparencyMode: number | null; useAlphaFromAlbedoTexture?: boolean; useAlphaFromDiffuseTexture?: boolean; alphaCutOff: number };
+/** Phase 4a: the alpha test that turns cut texels into holes (on while anything is cut, restored after). */
+export const ALPHA_TEST_MODE = 1;   // Material.MATERIAL_ALPHATEST
+function syncAlphaCut(t: Target, on: boolean): void {
+  const m = t.mat as AlphaMat | null;
+  if (!m || !t.tex) return;
+  if (on) {
+    if (!t.alphaSaved) t.alphaSaved = { mode: m.transparencyMode, useAlpha: !!(m.useAlphaFromAlbedoTexture ?? m.useAlphaFromDiffuseTexture), cutoff: m.alphaCutOff };
+    t.tex.hasAlpha = true;
+    m.transparencyMode = ALPHA_TEST_MODE;
+    if ('useAlphaFromAlbedoTexture' in m) m.useAlphaFromAlbedoTexture = true; else m.useAlphaFromDiffuseTexture = true;
+    m.alphaCutOff = 0.5;
+  } else if (t.alphaSaved) {
+    restoreAlpha(t);
+  }
+}
+function restoreAlpha(t: Target): void {
+  const m = t.mat as AlphaMat | null;
+  const a = t.alphaSaved;
+  if (!m || !a) return;
+  m.transparencyMode = a.mode;
+  if ('useAlphaFromAlbedoTexture' in m) m.useAlphaFromAlbedoTexture = a.useAlpha; else m.useAlphaFromDiffuseTexture = a.useAlpha;
+  m.alphaCutOff = a.cutoff;
+  if (t.tex) t.tex.hasAlpha = false;
+  t.alphaSaved = null;
+}
+
 function restoreTarget(t: Target): void {
   if (!t.mat || !t.src) return;
+  restoreAlpha(t);
   if (albedoOf(t.mat).tex === t.tex) setAlbedo(t.mat, t.src.tex, t.src.color);
 }
 

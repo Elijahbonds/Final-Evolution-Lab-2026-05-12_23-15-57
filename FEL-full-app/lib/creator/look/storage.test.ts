@@ -25,7 +25,8 @@ describe('holdCreator', () => {
   it('a request that leaves the doc out keeps the stored one (the Athlete Creator never wipes it)', () => {
     expect(holdCreator({ hairStyle: 'Afro' }, { creator: OLD, creatorSlots: [{ label: 'one', doc: OLD }] }, ADULT)).toEqual({
       creator: expect.objectContaining({ colours: { shoes: '#00FF00' } }),
-      creatorSlots: [{ label: 'ONE', doc: expect.objectContaining({ colours: { shoes: '#00FF00' } }) }],
+      // phase 4a: a v1 slot is upgraded to a whole character (id, body, base from the face it was stored beside)
+      creatorSlots: [{ id: 's1', label: 'ONE', body: 'male', base: {}, doc: expect.objectContaining({ colours: { shoes: '#00FF00' } }) }],
     });
     expect(holdCreator(undefined, { creator: OLD }, ADULT).creator!.colours).toEqual({ shoes: '#00FF00' });
   });
@@ -40,7 +41,9 @@ describe('holdCreator', () => {
     expect(r.creatorSlots![0].doc.shape).toEqual({ face: {}, body: {} });
   });
   it('needsPreviousFace only when a creator field is missing from the request', () => {
-    expect(needsPreviousFace({ creator: null, creatorSlots: null })).toBe(false);
+    // phase 4a: the active-slot pointer is a creator field too
+    expect(needsPreviousFace({ creator: null, creatorSlots: null, activeSlot: null })).toBe(false);
+    expect(needsPreviousFace({ creator: null, creatorSlots: null })).toBe(true);
     expect(needsPreviousFace({ creator: DOC })).toBe(true);
     expect(needsPreviousFace(undefined)).toBe(true);
   });

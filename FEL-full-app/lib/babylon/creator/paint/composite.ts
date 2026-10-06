@@ -235,6 +235,17 @@ export interface PaintBuffers {
   /** one texel on the body (m) */
   aa: number;
   radius: ArrayLike<number>;
+  /** Phase 4a (hide / cut-out, tool #4): labels to CUT (index by texel label, 1 = cut): those texels get alpha 0, which
+   *  the skin's alpha test (renderPaint) turns into a hole. Null or absent: everything opaque, as before. */
+  cut?: Uint8Array | null;
+}
+
+/** The cut table for a set of regions (null when nothing is cut). */
+export function cutLabels(regions: readonly PaintLayer['region'][]): Uint8Array | null {
+  if (!regions.length) return null;
+  const m = new Uint8Array(ATOM_COUNT + 1);
+  for (const r of regions) { const rm = regionLabelMask(r); for (let k = 1; k < rm.length; k++) if (rm[k]) m[k] = 1; }
+  return m;
 }
 
 const scratch = new Float32Array(2);
@@ -273,6 +284,7 @@ function tilePass(B: PaintBuffers, layers: readonly CompiledLayer[], from: numbe
   for (let li = from; li < to; li++) if (layerTouchesTile(layers[li], map, k)) active.push(layers[li]);
   const na = active.length;
   const [tr, tg, tb] = src ? [1, 1, 1] : B.tint;
+  const cut = B.cut ?? null;
   const fr = B.flat[0] * tr, fg = B.flat[1] * tg, fb = B.flat[2] * tb;
   const rgba = RGBA;
   for (let y = y0; y < y1; y++) {
@@ -305,7 +317,7 @@ function tilePass(B: PaintBuffers, layers: readonly CompiledLayer[], from: numbe
       out[o] = r >= 1 ? 255 : r <= 0 ? 0 : (r * 255 + 0.5) | 0;
       out[o + 1] = g >= 1 ? 255 : g <= 0 ? 0 : (g * 255 + 0.5) | 0;
       out[o + 2] = b >= 1 ? 255 : b <= 0 ? 0 : (b * 255 + 0.5) | 0;
-      out[o + 3] = 255;
+      out[o + 3] = cut && cut[lab] ? 0 : 255;
     }
   }
 }

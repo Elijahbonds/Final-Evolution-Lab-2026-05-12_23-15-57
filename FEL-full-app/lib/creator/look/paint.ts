@@ -28,13 +28,13 @@ export const REGION_LABELS: Record<PaintRegion, string> = {
   armLeft: 'L arm', armRight: 'R arm', upperArmLeft: 'L upper arm', upperArmRight: 'R upper arm',
   forearmLeft: 'L forearm', forearmRight: 'R forearm', handLeft: 'L hand', handRight: 'R hand',
   legLeft: 'L leg', legRight: 'R leg', thighLeft: 'L thigh', thighRight: 'R thigh', shinLeft: 'L shin', shinRight: 'R shin',
-  footLeft: 'L foot', footRight: 'R foot',
+  footLeft: 'L foot', footRight: 'R foot', ears: 'Ears',
 };
 
 /** The region picker, grouped the way a body reads. */
 export const REGION_GROUPS: readonly { label: string; regions: readonly PaintRegion[] }[] = [
   { label: 'Whole', regions: ['all', 'body'] },
-  { label: 'Head', regions: ['head', 'face', 'neck'] },
+  { label: 'Head', regions: ['head', 'face', 'ears', 'neck'] },
   { label: 'Torso', regions: ['torsoFront', 'torsoBack'] },
   { label: 'Left arm', regions: ['armLeft', 'upperArmLeft', 'forearmLeft', 'handLeft'] },
   { label: 'Right arm', regions: ['armRight', 'upperArmRight', 'forearmRight', 'handRight'] },

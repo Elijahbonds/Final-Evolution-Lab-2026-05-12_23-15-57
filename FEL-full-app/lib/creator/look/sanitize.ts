@@ -13,14 +13,18 @@
 // Never throws: anything that is not a plain object comes back as null (or the empty doc where a doc is required).
 
 import {
-  CREATOR_DOC_VERSION, MAX_PARTS, MAX_PAINT_LAYERS, MAX_SLOTS, MAX_DOC_CHARS,
+  CREATOR_DOC_VERSION, MAX_PARTS, MAX_PAINT_LAYERS, MAX_SLOTS, MAX_DOC_CHARS, MAX_SLOT_CHARS,
   PART_SHAPES, PART_BONES, FINISHES, PAINT_TYPES, PAINT_REGIONS, PAINT_SURFACES, PAINT_PATTERNS, PAINT_STAMPS, PAINT_BLENDS,
-  COLOUR_SLOTS, SHAPE_FACE_KEYS, PROPORTION_RANGES, PROPORTION_KEYS, RANGES,
-  type CreatorDoc, type CreatorPart, type PaintLayer, type CreatorSlot, type Vec3, type ColourSlot,
+  COLOUR_SLOTS, SHAPE_FACE_KEYS, PROPORTION_RANGES, PROPORTION_KEYS, RANGES, HIDE_KEYS, PUPIL_SHAPES, EYE_RANGES, EYE_DEFAULTS,
+  SLOT_BODIES,
+  type CreatorDoc, type CreatorPart, type PaintLayer, type Vec3, type ColourSlot, type CreatorEyes, type CreatorFlags,
+  type CreatorSlotV2, type SlotBody, type SlotFrame,
 } from './doc';
 import {
-  sanitizeJersey, FACE_SHAPES, HAIR_STYLES, EYE_SHAPES, BROWS, MOUTHS, NOSES, type FaceConfig,
+  sanitizeJersey, sanitizeFaceSliders, getWearable, SLOTS as WEARABLE_SLOTS,
+  FACE_SHAPES, HAIR_STYLES, EYE_SHAPES, BROWS, MOUTHS, NOSES, type FaceConfig,
 } from '../../closet/wearable-catalog';
+import { clampCosmetic } from '../../babylon/core/playFrame';
 
 type Obj = Record<string, unknown>;
 const isObj = (v: unknown): v is Obj => !!v && typeof v === 'object' && !Array.isArray(v);
@@ -39,7 +43,8 @@ export function clampNum(v: unknown, lo: number, hi: number, fallback: number, d
   if (typeof v !== 'number' || !Number.isFinite(v)) return fallback;
   const c = Math.min(hi, Math.max(lo, v));
   const k = 10 ** dp;
-  return Math.round(c * k) / k;
+  const r = Math.round(c * k) / k;
+  return r === 0 ? 0 : r;   // never -0: JSON (a save, a share code) has no -0, so a doc would not round-trip it (phase 4a)
 }
 
 function pick<T extends string>(v: unknown, list: readonly T[]): T | null {
@@ -149,27 +154,117 @@ export function sanitizeCreatorDoc(raw: unknown, maxChars: number = MAX_DOC_CHAR
     const [lo, hi] = PROPORTION_RANGES[k];
     if (typeof v === 'number' && Number.isFinite(v)) body[k] = clampNum(v, lo, hi, 1);
   }
+  const flags: CreatorFlags = { suit: isObj(raw.flags) && raw.flags.suit === true };
+  // phase 4a: what the doc hides (only `true` counts; stored only when something is hidden)
+  const hideRaw = isObj(raw.flags) && isObj(raw.flags.hide) ? raw.flags.hide : null;
+  if (hideRaw) {
+    const hide: NonNullable<CreatorFlags['hide']> = {};
+    for (const k of HIDE_KEYS) if (hideRaw[k] === true) hide[k] = true;
+    if (Object.keys(hide).length) flags.hide = hide;
+  }
   const doc: CreatorDoc = {
     v: CREATOR_DOC_VERSION,
     parts: budgeted(raw.parts, MAX_PARTS, sanitizePart),
     paint: budgeted(raw.paint, MAX_PAINT_LAYERS, sanitizePaintLayer),
     colours,
     shape: { face, body },
-    flags: { suit: isObj(raw.flags) && raw.flags.suit === true },
+    flags,
   };
+  const eyes = sanitizeEyes(raw.eyes);
+  if (eyes) doc.eyes = eyes;
   return JSON.stringify(doc).length > maxChars ? null : doc;
 }
 
-/** Up to MAX_SLOTS saved characters; a slot whose doc does not sanitise is dropped. */
-export function sanitizeCreatorSlots(raw: unknown): CreatorSlot[] {
+/** Phase 4a: the procedural eyes block. Every field is optional and kept only when it differs from EYE_DEFAULTS, so an
+ *  untouched look carries nothing (and a phase 1–3 doc sanitises to exactly what it was). */
+export function sanitizeEyes(raw: unknown): CreatorEyes | undefined {
+  if (!isObj(raw)) return undefined;
+  const out: CreatorEyes = {};
+  const sclera = sanitizeHex(raw.sclera);
+  if (sclera && sclera !== EYE_DEFAULTS.sclera) out.sclera = sclera;
+  const size = clampNum(raw.size, EYE_RANGES.size[0], EYE_RANGES.size[1], EYE_DEFAULTS.size, 2);
+  if (size !== EYE_DEFAULTS.size) out.size = size;
+  const pupil = pick(raw.pupil, PUPIL_SHAPES);
+  if (pupil && pupil !== EYE_DEFAULTS.pupil) out.pupil = pupil;
+  const pupilSize = clampNum(raw.pupilSize, EYE_RANGES.pupilSize[0], EYE_RANGES.pupilSize[1], EYE_DEFAULTS.pupilSize, 2);
+  if (pupilSize !== EYE_DEFAULTS.pupilSize) out.pupilSize = pupilSize;
+  const glow = clampNum(raw.glow, EYE_RANGES.glow[0], EYE_RANGES.glow[1], 0, 2);
+  if (glow > 0) out.glow = glow;
+  return Object.keys(out).length ? out : undefined;
+}
+
+// ── slots (phase 4a: a slot is a whole character) ───────────────────────────────────────────────────────────────────
+
+/** What a v1 slot ({ label, doc }, phase 1) is missing comes from here: the top-level face it was saved beside, and the
+ *  body the account plays (the server's kit default when nobody says). */
+export interface SlotFallback { face?: unknown; body?: SlotBody }
+
+/** Worn items per wearable slot: a known item for that slot, or null. Ownership is NOT decided here (the route filters
+ *  with lib/closet/ownership.filterEquipped, the server's own inventory); this only drops what is not an item at all. */
+export function sanitizeSlotEquipped(raw: unknown): CreatorSlotV2['equipped'] | undefined {
+  if (!isObj(raw)) return undefined;
+  const out: NonNullable<CreatorSlotV2['equipped']> = {};
+  for (const k of WEARABLE_SLOTS) {
+    if (!(k in raw)) continue;
+    const v = raw[k];
+    if (v === null) { out[k] = null; continue; }
+    if (typeof v !== 'string' || v.length > 64) continue;
+    const w = getWearable(v);
+    if (w && w.slot === k) out[k] = v;
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
+/** Height and build multipliers, clamped to the cosmetic range (playFrame.COSMETIC_CLAMP); null when not numbers. */
+export function sanitizeSlotFrame(raw: unknown): SlotFrame | undefined {
+  if (!isObj(raw)) return undefined;
+  const ok = (v: unknown) => typeof v === 'number' && Number.isFinite(v) && v > 0;
+  if (!ok(raw.heightScale) && !ok(raw.buildScale)) return undefined;
+  const r3 = (v: number) => Math.round(v * 1000) / 1000;
+  return { heightScale: r3(clampCosmetic(raw.heightScale, 'height')), buildScale: r3(clampCosmetic(raw.buildScale, 'build')) };
+}
+
+/** One slot, v2 or v1. Null when its doc does not sanitise, or it is over MAX_SLOT_CHARS. A v1 slot (no `base`) takes
+ *  its base and sliders from the fallback face; a slot without an id gets none here (sanitizeCreatorSlots assigns one). */
+export function sanitizeCreatorSlot(raw: unknown, fallback: SlotFallback = {}): (Omit<CreatorSlotV2, 'id'> & { id: string | null }) | null {
+  if (!isObj(raw)) return null;
+  const doc = sanitizeCreatorDoc(raw.doc);
+  if (!doc) return null;
+  const v1 = !isObj(raw.base);
+  const fb = isObj(fallback.face) ? fallback.face : {};
+  const slot: Omit<CreatorSlotV2, 'id'> & { id: string | null } = {
+    id: sanitizeId(raw.id),
+    label: sanitizeStampText(raw.label),
+    body: pick(raw.body, SLOT_BODIES) ?? fallback.body ?? 'male',
+    base: sanitizeLookBase(v1 ? fb : raw.base),
+    doc,
+  };
+  const sliders = sanitizeFaceSliders(v1 && raw.sliders === undefined ? fb.sliders : raw.sliders);
+  if (sliders) slot.sliders = sliders;
+  const frame = sanitizeSlotFrame(raw.frame);
+  if (frame) slot.frame = frame;
+  const equipped = sanitizeSlotEquipped(raw.equipped);
+  if (equipped) slot.equipped = equipped;
+  return JSON.stringify(slot).length > MAX_SLOT_CHARS ? null : slot;
+}
+
+/** Up to MAX_SLOTS saved characters, every one a v2 slot with a unique id (a v1 slot or a duplicate id is given the
+ *  first free `s1`…`s9`); a slot whose doc does not sanitise is dropped. */
+export function sanitizeCreatorSlots(raw: unknown, fallback: SlotFallback = {}): CreatorSlotV2[] {
   if (!Array.isArray(raw)) return [];
-  const out: CreatorSlot[] = [];
+  const kept: (Omit<CreatorSlotV2, 'id'> & { id: string | null })[] = [];
   for (const r of raw.slice(0, MAX_SLOTS * 2)) {
-    if (out.length >= MAX_SLOTS) break;
-    if (!isObj(r)) continue;
-    const doc = sanitizeCreatorDoc(r.doc);
-    if (!doc) continue;
-    out.push({ label: sanitizeStampText(r.label), doc });
+    if (kept.length >= MAX_SLOTS) break;
+    const s = sanitizeCreatorSlot(r, fallback);
+    if (s) kept.push(s);
+  }
+  const used = new Set<string>();
+  const out: CreatorSlotV2[] = [];
+  for (const s of kept) {
+    let id = s.id && !used.has(s.id) ? s.id : null;
+    for (let n = 1; !id; n++) if (!used.has(`s${n}`) && !kept.some((k) => k.id === `s${n}`)) id = `s${n}`;
+    used.add(id);
+    out.push({ ...s, id });
   }
   return out;
 }

@@ -135,7 +135,11 @@ export async function POST(req: NextRequest) {
   const prevFace = hold.uploadFace
     ? (await prisma.avatarLook.findUnique({ where: { userId }, select: { face: true } }))?.face ?? null
     : null;
-  look.face = { ...holdFace(look.face, hold), ...holdCreator(undefined, prevFace, hold) };
+  // CREATOR-PLAN phase 4a: with a slot active, this editor's face and worn items land on THAT character (holdCreator's fold);
+  // its worn items are ownership-filtered there like the Closet's.
+  const heldFace = holdFace(look.face, hold);
+  const ownedForSlots = new Set((await prisma.ownedWearable.findMany({ where: { userId } })).map((o) => o.itemId));
+  look.face = { ...heldFace, ...holdCreator(undefined, prevFace, hold, { owned: ownedForSlots, fold: { face: heldFace, equipped: look.equipped as Record<string, string | null> } }) };
   const built = toBuild(values);
   built.frame = holdFrame(built.frame, hold);
   built.animations = holdAnimations(built.animations, hold);

@@ -189,7 +189,9 @@ describe('slots', () => {
     const good = { label: 'my <b>guy</b>', doc: { v: 1, colours: { jersey: '#fff' } } };
     const slots = sanitizeCreatorSlots([good, { label: 'x', doc: { v: 9 } }, 'junk', ...Array(10).fill(good)]);
     expect(slots).toHaveLength(MAX_SLOTS);
-    expect(slots[0]).toEqual({ label: 'MY BGUYB', doc: { ...emptyCreatorDoc(), colours: { jersey: '#FFFFFF' } } as CreatorDoc });
+    // phase 4a: a v1 slot comes back as a v2 slot (an id, the default body, a base from the fallback face: none here)
+    expect(slots[0]).toEqual({ id: 's1', label: 'MY BGUYB', body: 'male', base: {}, doc: { ...emptyCreatorDoc(), colours: { jersey: '#FFFFFF' } } as CreatorDoc });
+    expect(new Set(slots.map((s) => s.id)).size).toBe(MAX_SLOTS);
     expect(sanitizeCreatorSlots('nope')).toEqual([]);
   });
 });

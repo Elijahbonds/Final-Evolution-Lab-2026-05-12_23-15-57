@@ -103,7 +103,8 @@ describe('resolveRaceIdentity: what the race reads, and what it never sends', ()
     for (const c of calls) {
       expect(c.method).toBe('GET');
       expect(c.hasBody).toBe(false);
-      expect(['/api/v1/closet', '/api/v1/hero-body']).toContain(c.url);
+      // CREATOR-PLAN phase 4a: the closet GET asks for the active slot only (`?for=spawn`); still a GET with no body
+      expect(['/api/v1/closet?for=spawn', '/api/v1/hero-body']).toContain(c.url);
     }
     expect(calls.length).toBe(2);
   });
@@ -139,7 +140,8 @@ describe('resolveRaceIdentity: what the race reads, and what it never sends', ()
     for (const c of calls) {
       expect(c.method).toBe('GET');
       expect(c.hasBody).toBe(false);
-      expect(['/api/v1/closet', '/api/v1/hero-body']).toContain(c.url);
+      // CREATOR-PLAN phase 4a: the closet GET asks for the active slot only (`?for=spawn`); still a GET with no body
+      expect(['/api/v1/closet?for=spawn', '/api/v1/hero-body']).toContain(c.url);
     }
     expect(id.custom).toBe(false);
   });
