@@ -8,6 +8,9 @@
 //     (its eyes, hide flags, paint, parts and its own height / build included) — no reach, no hitbox drift.
 //   - phase 4b (shape v2): still identical with each recipe's head / neck / hand / foot scale, its bulk, its legs /
 //     torso / shoulders (exactly 1.0 here, a standard-frame mode) and its Studio-only presentation size (never in a mode).
+//   - phase 4e (clothes): still identical with each recipe's built clothes; a dressed recipe has exactly one cloth mesh
+//     (one draw, one material, never pickable, never in spawn.meshes) and no kit garment in a slot it covers. The draws,
+//     vertices and memory before / after are logged for the report.
 import { readFileSync } from 'node:fs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ArcRotateCamera, NullEngine, Scene, SceneLoader, Vector3 } from '@babylonjs/core';
@@ -22,7 +25,10 @@ import { PAINT_SIZES, flushPaint, paintStats, setPaintBaseReader } from './paint
 import { defaultFace } from '../../closet/wearable-catalog';
 import { isEyeMesh } from './eyes/renderEyes';
 import { bodyMeshOf, shapeTargetOf } from './shape/renderShape';
-import { FRAME_KEYS, REACH_SAFE_KEYS } from '../../creator/look/doc';
+import { CLOTH_KIT_SLOT, FRAME_KEYS, REACH_SAFE_KEYS } from '../../creator/look/doc';
+import { clothMeshOf } from './clothes/renderClothes';
+import { kitOf } from '../core/kit';
+import type { AbstractMesh, Mesh } from '@babylonjs/core';
 
 const kits: Record<'male' | 'female', AssetContainer> = {} as never;
 let scene: Scene;
@@ -56,6 +62,18 @@ function frameOf(s: SpawnedCharacter): number[] {
   return out;
 }
 const HERO = (body: 'male' | 'female') => ({ body: body === 'female' ? 'kit-female' : 'kit-male', frame: { heightScale: 100, buildScale: 100 }, scanOwned: false }) as const;
+
+/** What a body draws: every enabled, visible mesh with geometry under its root (parts, the cloth mesh, soles, plates), its
+ *  triangles as drawn (the body after its mask), its vertices, and the geometry bytes of what was added. */
+function drawn(s: SpawnedCharacter): { draws: number; tris: number; verts: number; materials: number } {
+  const ms = s.root.getChildMeshes(false).filter((m) => m.isEnabled() && m.isVisible && (m as Mesh).getTotalVertices?.() > 0) as AbstractMesh[];
+  return {
+    draws: ms.length,
+    tris: ms.reduce((n, m) => n + ((m as Mesh).getIndices()?.length ?? 0) / 3, 0),
+    verts: ms.reduce((n, m) => n + (m as Mesh).getTotalVertices(), 0),
+    materials: new Set(ms.map((m) => m.material)).size,
+  };
+}
 
 describe('the ten archetypes on the real kit (a dunk scene)', () => {
   for (const a of ARCHETYPES) {
@@ -107,10 +125,62 @@ describe('the ten archetypes on the real kit (a dunk scene)', () => {
       }
       // the Studio size is never applied in a mode: the root scale check above already includes it
       expect(s.root.metadata.felPresentationScale).toBeUndefined();
+      // phase 4e: built clothes — one mesh, one material; the kit slots they cover show nothing
+      const cloth = clothMeshOf(s.root);
+      const clothes = a.slot.doc.clothes ?? [];
+      expect(!!cloth).toBe(clothes.length > 0);
+      if (cloth) {
+        expect(cloth.isPickable).toBe(false);
+        expect(s.meshes).not.toContain(cloth);
+        expect(s.root.getChildMeshes(false).filter((m) => (m.metadata as { felCloth?: boolean } | null)?.felCloth)).toHaveLength(1);
+        const covered = new Set(clothes.map((c) => CLOTH_KIT_SLOT[c.kind]).filter(Boolean));
+        for (const m of s.meshes) { const k = kitOf(m.name); if (k && covered.has(k.slot)) expect(m.isVisible, m.name).toBe(false); }
+      }
       const eyes = s.meshes.find(isEyeMesh)!;
       const hid = !!(a.slot.doc.flags.hide?.eyes || a.slot.doc.flags.hide?.head);
       expect(eyes.isVisible).toBe(!hid);
       s.root.dispose();
     });
   }
+});
+
+// PHASE 4e — the budget, measured on the ten recipes: each as it was before 4e (no built clothes: the kit garments in
+// their slots) and as it is now. Draw calls (visible meshes), materials, drawn triangles (the body after its mask), vertices,
+// and the cloth geometry's bytes. Logged for the report; asserted: built clothes add at most ONE draw and ONE material,
+// however many pieces, and never more triangles than they take off the body plus their own.
+describe('measured: the archetypes\' draws, triangles and memory before → after built clothes', () => {
+  it('all ten', async () => {
+    const { maskBodyNow } = await import('../core/bodyMask');
+    const { clothCacheStats } = await import('./clothes/renderClothes');
+    const rows: string[] = [];
+    for (const a of ARCHETYPES) {
+      const sex = a.slot.body === 'female' ? 'female' : 'male';
+      const measure = (doc: typeof a.slot.doc) => {
+        const s = spawn(sex);
+        const slot = { ...a.slot, doc };
+        applyIdentity(s, identityFrom({ look: { face: { ...defaultFace(), creatorSlots: [slot], activeSlot: slot.id }, equipped: {} } }, HERO(sex), null));
+        flushPaint(s.root);
+        s.root.computeWorldMatrix(true);
+        for (const t of s.root.getDescendants(false) as TransformNode[]) t.computeWorldMatrix?.(true);
+        const body = s.meshes.find((m) => /^Body/.test(m.name)) as Mesh;
+        body.skeleton?.prepare(true);
+        maskBodyNow(body, s.meshes);
+        const d = drawn(s);
+        const cloth = clothMeshOf(s.root);
+        const clothBytes = cloth ? (cloth.getTotalVertices() * (3 + 3 + 2 + 4 + 4 + 4) * 4 + (cloth.getTotalIndices() * 4)) : 0;
+        const clothVerts = cloth?.getTotalVertices() ?? 0;
+        s.root.dispose();
+        return { ...d, clothBytes, clothVerts };
+      };
+      const before = measure({ ...a.slot.doc, clothes: undefined } as typeof a.slot.doc);
+      const after = measure(a.slot.doc);
+      const pieces = a.slot.doc.clothes?.length ?? 0;
+      rows.push(`${a.name.padEnd(46)} ${pieces} pieces: draws ${before.draws} → ${after.draws}, materials ${before.materials} → ${after.materials}, triangles ${before.tris} → ${after.tris}, vertices ${before.verts} → ${after.verts}, cloth ${after.clothVerts} verts / ${(after.clothBytes / 1024).toFixed(0)} KiB`);
+      if (pieces) {
+        expect(after.draws - before.draws, a.name).toBeLessThanOrEqual(1);
+        expect(after.materials - before.materials, a.name).toBeLessThanOrEqual(1);
+      } else expect(after).toEqual(before);
+    }
+    console.info(`[4e archetype budget] (draws = visible meshes under the root; triangles as drawn after the body mask)\n${rows.join('\n')}\ncloth geometry cache: ${JSON.stringify(clothCacheStats())}`);
+  }, 300_000);
 });

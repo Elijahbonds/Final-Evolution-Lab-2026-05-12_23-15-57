@@ -113,6 +113,7 @@ function compactDoc(d: CreatorDoc): Record<string, unknown> {
   if (d.flags.suit || d.flags.hide) o.flags = { ...(d.flags.suit ? { suit: true } : {}), ...(d.flags.hide ? { hide: d.flags.hide } : {}) };
   if (d.eyes) o.eyes = d.eyes;
   if (d.marks?.length) o.marks = d.marks;   // phase 4c: drawn stamps ride along (each ≤ MAX_MARK_CHARS, at most MAX_MARKS)
+  if (d.clothes?.length) o.clothes = d.clothes;   // phase 4e: code-built clothes (the sanitiser already left their defaults out)
   return o;
 }
 

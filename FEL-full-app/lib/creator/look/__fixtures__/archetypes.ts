@@ -11,9 +11,12 @@
 // says what each still waits for. Phase 4b (2026-10-06) filled in what shape v2 unlocked: head and hand / foot scale, the
 // frame keys, bulk per segment, and the Studio-only presentation size. Phase 4c (2026-10-06) filled in its tools: two-tone
 // quills, bendable capes / loincloths / long hair (`swing`), a player-drawn chest emblem (a mark), the bolt tail, the
-// beard shell, ears, a helmet, glow paint, and parts that ride out on the bulk (`follow`).
+// beard shell, ears, a helmet, glow paint, and parts that ride out on the bulk (`follow`). Phase 4e (2026-10-06) dressed
+// them in CODE-BUILT CLOTHES where a recipe wanted clothes (the brawler's loose gi was waiting on "layered garments"):
+// a high-neck long sleeve and trousers, a gi jacket open over an undershirt, baggy trousers, gloves, knee boots, a long
+// coat — generic garments only, in the doc's canonical form (style defaults left out).
 
-import { emptyCreatorDoc, type CreatorPart, type CreatorShape, type CreatorSlotV2, type Finish, type PaintLayer, type PartBone, type PartShape, type SlotBody } from '../doc';
+import { emptyCreatorDoc, type CreatorCloth, type CreatorPart, type CreatorShape, type CreatorSlotV2, type Finish, type PaintLayer, type PartBone, type PartShape, type SlotBody } from '../doc';
 import { spikeCluster } from '../parts';
 import { MARK_SIZE, emptyMark, encodeMark, strokeMark } from '../marks';
 
@@ -55,6 +58,8 @@ const fill = (region: PaintLayer['region'], c: string, surface: PaintLayer['surf
 function slot(id: string, label: string, body: SlotBody, base: CreatorSlotV2['base'], doc: Partial<CreatorSlotV2['doc']>, extra: Partial<CreatorSlotV2> = {}): CreatorSlotV2 {
   return { id, label, body, base, doc: { ...emptyCreatorDoc(), ...doc }, ...extra };
 }
+/** Phase 4e: a built piece, written in its canonical form (the test proves the sanitiser gives it back unchanged). */
+const cl = (c: CreatorCloth): CreatorCloth => c;
 /** Re-number a part list's ids (a1…) after a helper such as spikeCluster made some. */
 const ids = (parts: CreatorPart[]): CreatorPart[] => parts.map((p, i) => ({ ...p, id: `a${i + 1}`, pos: z(p.pos), rot: z(p.rot), scale: z(p.scale) }));
 const spikes = (count: number, colour: string, length: number, spread = 1) => spikeCluster([], { count, colour, length, spread });
@@ -74,12 +79,15 @@ export const ARCHETYPES: Archetype[] = [
   {
     name: 'white-haired blindfolded sorcerer',
     slot: slot('f1', 'SORCERER', 'male', { skinTone: '#F3D2B3', hairStyle: 'Bald', faceShape: 'Long', eyeColor: '#7FD8FF' }, {
-      flags: { suit: true },
-      paint: [fill('body', '#141826'), fill('handLeft', '#F3D2B3'), fill('handRight', '#F3D2B3')],
+      // phase 4e: a dark high-neck long sleeve and loose trousers instead of a painted suit (the old neck tube is the collar)
+      clothes: [
+        cl({ id: 'c1', kind: 'bottom', style: 'pants', colour: '#141826', fit: 0.6 }),
+        cl({ id: 'c2', kind: 'top', style: 'highneck', colour: '#141826', fit: 0.5, hem: 'thigh', flare: 0.2 }),
+        cl({ id: 'c3', kind: 'feet', style: 'shoes', colour: '#0B0B0B', colour2: '#141826' }),
+      ],
       parts: ids([
         ...spikes(14, '#F4F6FA', 1.6),
         P('visor', 'Head', '#0B0B0B', { pos: [0, 0.09, 0.035], scale: [0.97, 1.1, 1.18] }),
-        P('tube', 'Neck', '#141826', { pos: [0, 0.02, 0], scale: [3.2, 0.9, 3] }),
       ]),
       eyes: { glow: 0.8 },
       shape: shape({ legs: 1.04, neck: 1.1 }, LIMBS(0.85)),
@@ -110,6 +118,11 @@ export const ARCHETYPES: Archetype[] = [
     name: 'skull-masked giant warlord',
     slot: slot('f3', 'WARLORD', 'male', { skinTone: '#C68642', hairStyle: 'Bald' }, {
       colours: { shorts: '#1A0A0A' },
+      // phase 4e: baggy dark trousers into knee boots (the chest stays bare under the kit's own top, the sport's default)
+      clothes: [
+        cl({ id: 'c1', kind: 'bottom', style: 'pants', colour: '#1A0A0A', fit: 0.95, colour2: '#7A0F0F' }),
+        cl({ id: 'c2', kind: 'feet', style: 'boots', colour: '#3A2A1A', shaft: 'knee' }),
+      ],
       parts: [
         P('maskShell', 'Head', '#E8E2D0', { pos: [0, 0.08, 0.06] }),
         P('dome', 'Head', '#E8E2D0', { pos: [0, 0.14, 0], scale: [2, 1.6, 2.2] }),
@@ -146,15 +159,21 @@ export const ARCHETYPES: Archetype[] = [
   {
     name: 'spike-haired orange-gi brawler',
     slot: slot('f5', 'BRAWLER', 'male', { hairStyle: 'Bald' }, {
-      flags: { suit: true },
-      paint: [fill('body', '#F77F00'), fill('torsoFront', '#1B3A8A'), fill('shinLeft', '#1B3A8A'), fill('shinRight', '#1B3A8A'), fill('footLeft', '#1B3A8A'), fill('footRight', '#1B3A8A')],
+      // phase 4e: the loose gi it waited for — a blue undershirt under an orange gi jacket open in a V, loose orange
+      // trousers, blue mid boots (layers: the undershirt shows only where the gi is open)
+      clothes: [
+        cl({ id: 'c1', kind: 'bottom', style: 'pants', colour: '#F77F00', fit: 0.85 }),
+        cl({ id: 'c2', kind: 'top', style: 'tee', colour: '#1B3A8A', fit: 0.2 }),
+        cl({ id: 'c3', kind: 'top', style: 'jacket', colour: '#F77F00', fit: 0.85, sleeve: 'threeQuarter', neck: 'v', open: 0.3 }),
+        cl({ id: 'c4', kind: 'feet', style: 'boots', colour: '#1B3A8A' }),
+      ],
       parts: ids([
         ...spikes(20, '#0B0B0B', 1.8, 1.2),
         P('belt', 'Hips', '#1B3A8A'),
         P('tube', 'LeftForeArm', '#1B3A8A', { pos: [0, 0.2, 0], mirror: true }),
       ]),
     }),
-    later: ['a loose gi (layered garments, phase 5 art)'],
+    later: [],
   },
   {
     name: 'olive armoured visor soldier',
@@ -173,6 +192,11 @@ export const ARCHETYPES: Archetype[] = [
         P('plate', 'LeftLeg', '#556B2F', { pos: [0, -0.2, 0.06], mirror: true }),
         P('wedge', 'LeftFoot', '#3A3F38', { pos: [0, 0.04, 0.06], mirror: true }),
         P('belt', 'Hips', '#3A3F38'),
+      ],
+      // phase 4e: gloves and knee boots over the painted undersuit (built clothes stay on in suit mode)
+      clothes: [
+        cl({ id: 'c1', kind: 'gloves', style: 'gloves', colour: '#3A3F38', cuff: 'gauntlet' }),
+        cl({ id: 'c2', kind: 'feet', style: 'boots', colour: '#2B2F2A', shaft: 'knee', colour2: '#1A1A1A' }),
       ],
       shape: shape({ shoulders: 1.06 }, { chest: 1.15, upperArms: 1.1, thighs: 1.1, calves: 1.1 }),
     }),
@@ -196,6 +220,12 @@ export const ARCHETYPES: Archetype[] = [
         ...[-1, 0, 1].map((i) => P('capeStrip', 'Spine2', '#0A0A0A', { pos: [i * 0.08, 0, -0.15], rot: [0, 180, 0], scale: [1.2, 6, 1], swing: 0.8 })),
         P('cylinder', 'RightHand', '#C0C0C0', { finish: 'metal' }),
         P('cylinder', 'RightHand', '#FF2020', { pos: [0, 0.1, 0], scale: [0.8, 8, 0.8], finish: 'glow' }),
+      ],
+      // phase 4e: a black knee coat with a high neck, gloves and knee boots over the painted suit
+      clothes: [
+        cl({ id: 'c1', kind: 'gloves', style: 'gloves', colour: '#0A0A0A', fit: 0.3 }),
+        cl({ id: 'c2', kind: 'top', style: 'jacket', colour: '#0A0A0A', fit: 0.5, hem: 'knee', neck: 'high', open: 0.12, flare: 0.5 }),
+        cl({ id: 'c3', kind: 'feet', style: 'boots', colour: '#0A0A0A', shaft: 'knee' }),
       ],
     }, { frame: { heightScale: 1.04, buildScale: 1.06 }, presentation: { scale: 1.12 } }),
     later: [],
@@ -232,6 +262,11 @@ export const ARCHETYPES: Archetype[] = [
         P('wing', 'Spine2', '#0B0B0B', { pos: [0.1, 0.05, -0.1], mirror: true }),
       ],
       eyes: { sclera: '#FFFFFF', pupil: 'none', glow: 1 },
+      // phase 4e: a skirt over the painted suit, and knee boots
+      clothes: [
+        cl({ id: 'c1', kind: 'bottom', style: 'skirt', colour: '#0B0B0B', leg: 'capri', flare: 0.7, colour2: '#C0C0C0' }),
+        cl({ id: 'c2', kind: 'feet', style: 'boots', colour: '#0B0B0B', shaft: 'knee' }),
+      ],
     }),
     later: [],
   },

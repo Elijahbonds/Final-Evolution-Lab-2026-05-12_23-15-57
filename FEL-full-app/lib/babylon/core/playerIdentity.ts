@@ -18,6 +18,7 @@ import type { CreatorDoc, CreatorPart } from '../../creator/look/doc';
 import { effectivePalette, type PaletteOverrides } from '../../creator/look/palette';
 import { accessoriesForEquipped, wornPartsForEquipped } from '../../closet/wearableAccessories';
 import { hiddenParts } from '../../creator/look/doc';
+import { clothKitSlots } from '../../creator/look/clothes';
 import { TEEN_DEVICE_LOOK_EVERYWHERE, activeLook, heroBodyForSlot } from '../../creator/look/slots';
 import { readLocalLook, type StoredLook } from '../../creator/localLook';
 import { applyEyes } from '../creator/eyes/renderEyes';
@@ -270,7 +271,9 @@ export function applyIdentity(
   // CREATOR-PLAN phase 4a (hide, tool #4): a doc that hides the hair (or the whole head) shows no hair node at all
   const hidden = hiddenParts(id.creator);
   applyHairStyle(spawn.meshes, hidden.hair ? 'Bald' : id.face.hairStyle);   // Phase 3: real hair geometry per style
-  applyKit(spawn.meshes, id.wardrobe);              // ship pass 3: fitted garments per equipped wearable (no-op without a kit)
+  // ship pass 3: fitted garments per equipped wearable (no-op without a kit). CREATOR-PLAN phase 4e: a slot the player's
+  // code-built clothes cover shows no kit garment (only on a full apply: a team-kit 'body' apply builds no clothes)
+  applyKit(spawn.meshes, id.wardrobe, null, { covered: parts === 'full' ? clothKitSlots(id.creator?.clothes) : undefined });
   // Phase 3 (2026-09-02): the forge now has a face. Shape presets and the
   // fine-tune sliders resolve through one table; eye color lands on the
   // iris material. No-ops on a body without morphs or an iris.

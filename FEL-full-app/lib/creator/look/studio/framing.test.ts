@@ -25,6 +25,14 @@ describe('which shot the editor wants', () => {
     expect(framingFor('paint', { kind: 'layer', region: 'legLeft' })).toEqual({ shot: 'full', facing: -Math.PI / 4 });
     expect(framingFor('paint', { kind: 'layer', region: 'all' })).toEqual({ shot: 'full', facing: null });
   });
+  it('phase 4e: a selected piece of clothing is framed from the front — a top in the bust, a long coat, bottoms, gloves and footwear in the full body', () => {
+    expect(framingFor('clothes', null).shot).toBe('full');
+    expect(framingFor('clothes', { kind: 'cloth', cloth: 'top' })).toEqual({ shot: 'bust', facing: 0 });
+    expect(framingFor('clothes', { kind: 'cloth', cloth: 'top', long: true })).toEqual({ shot: 'full', facing: 0 });
+    expect(framingFor('clothes', { kind: 'cloth', cloth: 'top', long: true, hood: true }).shot).toBe('bust');
+    for (const k of ['bottom', 'gloves', 'feet'] as const) expect(framingFor('clothes', { kind: 'cloth', cloth: k })).toEqual({ shot: 'full', facing: 0 });
+    expect(framingFor('paint', { kind: 'cloth', cloth: 'top' }).shot).toBe('full');   // only on its own tab
+  });
   it('a selection only counts on its own tab', () => {
     expect(framingFor('shape', { kind: 'part', bone: 'Head' }).shot).toBe('full');
     expect(framingFor('parts', { kind: 'layer', region: 'face' }).shot).toBe('full');
