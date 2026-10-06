@@ -101,6 +101,7 @@ import { SongStemBand } from '../audio/SongStemBand';
 // PIPELINES (2026-10-06): an approved community song (a music card with a chart) plays its own mix, muffled by misses.
 import { CardSongBand } from '../dance/cardSongBand';
 import { communityDanceSong, noteCommunityLockIn } from '../dance/communityDance';
+import { claimMusicFocus } from '@/lib/soundtrack/focus';
 import { songPreviewUrl, outroRange } from '../dance/felSongs';
 import { KitPulse, kitPattern } from '../audio/KitPulse';
 import { SongClock, danceTap, tapLatencySec, type TriggerLatch } from '../audio/SongClock';
@@ -310,6 +311,7 @@ export const DanceMode: ModeDefinition = (() => {
   let countBackShown = false;
   /** MUSIC-SUITE P2 FIX PASS: gives back the 'playback' audio session this room claimed at load (lib/audio/session.ts). */
   let releaseSession: (() => void) | null = null;
+  let releaseFocus: (() => void) | null = null;   // PIPELINES (2026-10-06): the soundtrack's music focus
   /** The Class of 3000 layer: the band your dancing builds. MUSIC-SUITE P7: a YourSongBand for YOUR exported song
    *  (its own rendered audio), a SongStemBand for a SHIPPED FEL song (track.song — six-songs), else the synth
    *  StemBand (a pre-P7 export with no real-audio payload). */
@@ -1062,6 +1064,7 @@ export const DanceMode: ModeDefinition = (() => {
       // It was set inside SoundKit for every mode, where (assumed) it also stopped the player's own music app.
       releaseSession?.();
       releaseSession = claimPlaybackSession();
+      releaseFocus?.(); releaseFocus = claimMusicFocus('dance');   // PIPELINES: the Cypher's band owns the music bus
       // MUSIC-SUITE P8 (2026-09-25): `keepGameplayCamera: true` still keeps the venue's own static orbit camera OUT
       // of `scene.activeCamera` — CameraDirector's follow-cam stays the one the player sees; the M104 comment this
       // line used to carry ("keep the over-shoulder follow camera") is the gap decision #8 closes: applyStageCamera
@@ -1384,7 +1387,8 @@ export const DanceMode: ModeDefinition = (() => {
     dispose() {
       stopPreview();   // MUSIC-SUITE P7 (six-songs): leaving the room is a blur too
       stoopQueue.clear(); VoiceKit.stop('booth', 0.12);   // MUSIC-SUITE P8: Stoop never bleeds into the next room
-      releaseSession?.(); releaseSession = null;   // MUSIC-SUITE P2 FIX PASS: the audio session goes back
+      releaseSession?.(); releaseSession = null;
+      releaseFocus?.(); releaseFocus = null;   // PIPELINES: the soundtrack may come back   // MUSIC-SUITE P2 FIX PASS: the audio session goes back
       perf?.stop();
       crowd?.dispose(); crowd = null;
       posture?.dispose(); posture = null;

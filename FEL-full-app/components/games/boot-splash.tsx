@@ -14,6 +14,7 @@ import { venueThumb } from '@/lib/babylon/ui/venueThumbs';
 import { CardSlot } from './card-slot';
 import { MotionSetting } from '@/components/settings/motion-setting';
 import { PausedLayer } from './paused-layer';
+import { useSoundtrackStage } from '@/components/soundtrack/soundtrack-stage';
 import { BodyPlayReady, BodyPlayReadyLine, BodyPlayLayer } from './body-play';
 import { BASKETBALL_MODE_IDS, COURT_LOCATIONS, readCourtLocation, readyCourtLocations, writeCourtLocation, type CourtLocationId } from '@/lib/babylon/nexus/courtLocations';
 import { BALL_SKINS, readBallSkin, readyBallSkins, writeBallSkin, type BallSkinId } from '@/lib/babylon/nexus/ballSkins';
@@ -112,6 +113,7 @@ export interface BootSplashProps {
 
 /** The splash: the card, and body play beside it (the check over a pause, the corner self-view in play). */
 export function BootSplash(props: BootSplashProps) {
+  useSoundtrackStage(props.phase);   // PIPELINES (2026-10-06): the soundtrack follows every host's phase (loading → bed → end)
   return (
     <>
       <SplashCard {...props} />
