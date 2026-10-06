@@ -35,7 +35,7 @@ export const TABS: TabDef[] = [
   },
   {
     id: 'train', label: 'Train', href: '/train', icon: Dumbbell, accent: '#00FF9D',
-    owns: ['/train', '/training', '/coach', '/kitchens', '/workout', '/education', '/camp', '/live'],
+    owns: ['/train', '/training', '/coach', '/kitchens', '/workout', '/education', '/camp', '/live', '/learn'],
   },
   {
     id: 'profile', label: 'Profile', href: '/profile', icon: UserRound, accent: '#FFD700',

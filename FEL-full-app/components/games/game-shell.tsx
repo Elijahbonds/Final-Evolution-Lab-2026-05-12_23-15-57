@@ -15,6 +15,7 @@ import { VirtualController } from './virtual-controller';
 import { ReplayInPlaceContext } from './replay-in-place';
 import { BodyControl } from './body-control';
 import { GameCaptureHud } from '@/components/capture/game-capture-hud';
+import { LearnWhileYouWait } from '@/components/learn/learn-while-you-wait';
 import type { SessionTallies } from '@/lib/game-systems';
 import { sessionStore, markRun, countedSince } from '@/lib/babylon/core/sessionStore';
 import { arenaRefusal, storyRefusal, type Refusal } from './end-card-refusal';
@@ -721,6 +722,7 @@ function GameShellInner({
               share={{ state: shareState, url: shareUrl, onChallenge: () => void shareChallenge(), onProof: shareProof }}
               onReplay={replay}
               onNavigate={(href) => router.push(href)}
+              sideCards={<LearnWhileYouWait compact />}   /* KNOWLEDGE-FEED v1: one card for the idle moment, in the end card's side slot */
             />
           )}
         </AnimatePresence>

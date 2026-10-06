@@ -130,6 +130,10 @@ model User {
   // MIRROR-COACH P7 (2026-09-29): the breath toolbox's use log (lib/breath/rampGate.ts). Additive only — see the
   // BreathLog model below.
   breathLogs         BreathLog[]
+  // KNOWLEDGE-FEED v2 (2026-10-06, owner decision 2): /learn progress synced to the account, verified adults only.
+  // Additive only — see the LearnProfile/LearnCard models at the end of this file.
+  learnProfile       LearnProfile?
+  learnCards         LearnCard[]
 
   // M4 compliance stubs
   dobYear         Int?        // Year of birth for 18+ attestation
@@ -2466,4 +2470,62 @@ model CoachStoreReferral {
   @@index([referrerUserId, status])
   @@index([buyerUserId])
   @@index([holdUntil])
+}
+
+/// KNOWLEDGE-FEED v2 (2026-10-06, owner decision 2: "Account sync: YES"). The /learn feed's progress for a signed-in,
+/// VERIFIED-ADULT account (User.dobYear, lib/privacy/verifiedAdult). Under-18 and unknown age stay on the device and
+/// never get a row. One row per account: the profile half of lib/knowledge/state.ts LearnState (topics, likes, saves,
+/// streak, today's tally); the per-card half is LearnCard. Day numbers are the client's LOCAL calendar day as an integer
+/// (lib/knowledge/day.ts), checked by the server to be within one day of its own UTC day.
+///
+/// `xp` is the learning-XP tally the feed shows. Account XP itself is PlayerProfile.xp, credited by
+/// lib/knowledge/accountXp.ts under its own daily cap: `accountXpDay`/`accountXpToday` are that cap's ledger, and
+/// `goalBonusDay` makes the daily-goal bonus once per day. `devices` lists the device ids already merged into this
+/// account, so a retried first-sign-in merge never adds a device's XP twice.
+/// Additive only: prisma/pending/2026-10-06-knowledge-feed.sql. The routes fail soft (503) until it is applied.
+model LearnProfile {
+  userId         String   @id
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  onboarded      Boolean  @default(false)
+  topics         String[] @default([])
+  likes          Json     @default("{}")
+  less           Json     @default("{}")
+  dwell          Json     @default("{}")
+  liked          String[] @default([])
+  saved          String[] @default([])
+  hidden         String[] @default([])
+  xp             Int      @default(0)
+  streakCount    Int      @default(0)
+  streakBest     Int      @default(0)
+  streakLastDay  Int?
+  todayDay       Int      @default(-1)
+  todayDone      String[] @default([])
+  accountXpDay   Int      @default(-1)
+  accountXpToday Int      @default(0)
+  goalBonusDay   Int      @default(-1)
+  devices        String[] @default([])
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+/// KNOWLEDGE-FEED v2: one row per (account, card) the account has seen — lib/knowledge/state.ts CardRecord. `box`,
+/// `dueDay`, `right`, `wrong` and `lastAnsweredDay` are the quiz card's Leitner record (lib/knowledge/leitner.ts);
+/// null `box` means a card that is not a quiz, or a quiz not answered yet. `cardId` is a pack id (`topic.slug`), never
+/// renamed once shipped.
+model LearnCard {
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cardId          String
+  views           Int      @default(0)
+  firstDay        Int
+  lastSeenAt      DateTime
+  box             Int?
+  dueDay          Int?
+  right           Int      @default(0)
+  wrong           Int      @default(0)
+  lastAnsweredDay Int?
+  updatedAt       DateTime @updatedAt
+
+  @@id([userId, cardId])
+  @@index([userId, dueDay])
 }

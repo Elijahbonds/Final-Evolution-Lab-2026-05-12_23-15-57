@@ -257,6 +257,13 @@ export default function BrainBrawlBabylon({ onEnd }: GameProps) {
           {twoP && <><span className="mx-2 text-white/40">·</span><span className="text-[10px] tracking-wider text-[#facc15]">{seatName(1)}</span> <span className="fel-stat text-base sm:text-xl">{hnode(hud.p2score, 0)}</span></>}
           {/* IMPROVE #4: a solo night's strikes */}{typeof hud.strikes === 'string' && hud.strikes && hud.roundKind !== 'review' && <span data-bb="strikes" className="ml-2 text-xs font-bold tracking-widest text-[#ff5c5c] sm:text-sm">{hud.strikes}</span>}
         </div>
+        {/* KNOWLEDGE-FEED v2: the REVIEW round (?round=review) has no claims — its strip is the question count */}
+        {hud.roundKind === 'review' && (
+          <div data-bb="review-strip" className="fel-panel px-3 py-1 font-mono text-[11px] font-bold tracking-widest text-[#C58BFF] sm:text-xs">
+            REVIEW · {hnode(hud.reviewOf, '')} · {hnode(hud.reviewRight, 0)} RIGHT
+          </div>
+        )}
+        {hud.roundKind !== 'review' && (
         <div data-bb="claims" className="flex max-w-[58%] flex-col items-center gap-1">
           <span className="font-mono text-[11px] font-bold tracking-widest text-white sm:text-xs">
             {CATEGORIES.filter((c) => claims[c] === '0' || claims[c] === '1').length}/5 CLAIMED
@@ -275,6 +282,7 @@ export default function BrainBrawlBabylon({ onEnd }: GameProps) {
             })}
           </div>
         </div>
+        )}
         {typeof hud.clock === 'number' && <span className={`fel-panel px-2 py-0.5 fel-stat text-lg sm:px-3 sm:py-1 sm:text-2xl ${hud.clock <= 3 ? 'text-[#ff2d78]' : 'text-white'}`}>{hud.clock}s</span>}
       </div>
 
@@ -297,7 +305,7 @@ export default function BrainBrawlBabylon({ onEnd }: GameProps) {
           <div className="flex w-full max-w-[620px] flex-col items-center gap-1 rounded-2xl bg-[#07051a]/75 p-1 sm:w-[40%] sm:min-w-[400px] sm:gap-1.5 sm:p-1.5">
             {revealed && banner && <div data-bb="banner" className="fel-heading fel-panel px-4 py-1 text-center text-base font-black text-white sm:text-xl">{banner}</div>}
             <div className="fel-panel flex w-full items-center gap-2 px-3 py-1 sm:px-4">
-              <span className="shrink-0 text-[10px] font-bold tracking-widest sm:text-[11px]" style={{ color: catColor }}>{hnode(hud.category, '')} · TIER {hnode(hud.tier, 1)}</span>
+              <span className="shrink-0 text-[10px] font-bold tracking-widest sm:text-[11px]" style={{ color: catColor }}>{hud.roundKind === 'review' ? <>REVIEW · {hnode(hud.reviewOf, '')}</> : <>{hnode(hud.category, '')} · TIER {hnode(hud.tier, 1)}</>}</span>
               {/* the host's call while the card is up — the WHOLE line, wrapped when it is long (POLISH-2 N3: it was cut to "That is a
                   no, I am afrai…") */}
               <span data-bb="host-line" className="min-w-0 flex-1 whitespace-normal break-words text-center text-[10px] leading-tight sm:text-[11px]" style={{ color: HOST_COLOR }}>{hostSay ? `🎙 ${hostSay}` : ''}</span>
@@ -315,6 +323,7 @@ export default function BrainBrawlBabylon({ onEnd }: GameProps) {
             {typeof hud.optA === 'string' && hud.optA && (
               <div className="grid w-full grid-cols-2 gap-1.5">
                 {OPTS.map((o, idx) => {
+                  if (typeof hud[o.key] !== 'string' || !hud[o.key]) return null;   // a review card may have three answers
                   const isAnswer = revealed && idx === answer;
                   const seats = [0, 1].filter((s) => showPick(s) && picks[s] === idx);
                   const wrongPick = revealed && !isAnswer && seats.length > 0;
@@ -336,6 +345,9 @@ export default function BrainBrawlBabylon({ onEnd }: GameProps) {
                   );
                 })}
               </div>
+            )}
+            {revealed && typeof hud.why === 'string' && hud.why && (
+              <div data-bb="why" className="fel-panel w-full px-3 py-1 text-center text-[11px] leading-snug text-white/85 sm:text-xs">{hud.why}</div>
             )}
             <div className="flex min-h-[18px] items-center gap-2">
               {!revealed && hud.answeredP1 === true && <span className="fel-panel px-2 py-0.5 text-[11px] text-[#22d3ee]">{duel ? 'P1 LOCKED' : 'LOCKED'}</span>}
