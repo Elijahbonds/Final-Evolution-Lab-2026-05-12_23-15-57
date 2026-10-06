@@ -19,10 +19,19 @@ import {
 } from '@/lib/closet/wearable-catalog';
 import { faceFieldRenders, faceOptionRenders, type FaceField } from '@/lib/babylon/core/faceMorphs';
 import { accessoriesForEquipped, wornPartsForEquipped } from '@/lib/closet/wearableAccessories';
-import { emptyCreatorDoc, type ColourSlot, type CreatorPart, type PaintLayer } from '@/lib/creator/look/doc';
+import { MAX_SLOTS, emptyCreatorDoc, type ColourSlot, type CreatorEyes, type CreatorPart, type CreatorSlotV2, type HideKey, type PaintLayer, type SlotBody, type SlotFrame } from '@/lib/creator/look/doc';
 import { readCreatorDoc, faceOnly, type StoredFace } from '@/lib/creator/look/storage';
+import {
+  addSlot, blankSlot, canAddSlot, duplicateSlot, ensureSlots, heroBodyForSlot, mergeDeviceNumbers, newSlotId, newSlotLabel,
+  removeSlot, renameSlot, replaceSlot, slotBodyOf, slotFace, withFace,
+} from '@/lib/creator/look/slots';
+import { decodeSlotCode, encodeSlotCode, type DecodeError } from '@/lib/creator/look/shareCode';
+import { sanitizeStampText } from '@/lib/creator/look/sanitize';
+import type { HeroBodyKind } from '@/lib/babylon/core/heroBody';
+import { SlotBar } from '@/components/closet/slot-bar';
+import { BodyControls, ColourRow, EyeControls, HideControls } from '@/components/closet/character-controls';
 import { effectivePalette } from '@/lib/creator/look/palette';
-import { canRedo, canUndo, createHistory, pushHistory, redo, resetHistory, undo, type History } from '@/lib/creator/look/history';
+import { canRedo, canUndo, createHistory, pushHistory, redo, undo, type History } from '@/lib/creator/look/history';
 import { RANDOM_SECTIONS, RANDOM_SECTION_FIELDS, randomiseLook, type RandomSection } from '@/lib/creator/look/randomise';
 
 // The 3D preview is client-only (Babylon engine on a canvas) — never SSR it.
@@ -37,17 +46,6 @@ type CardSkin = { id: string; displayName: string; accent: string; rarity: strin
 
 // The free starters come from lib/closet/ownership.ts — the server decides entitlement and this screen
 // must not hold a second opinion about it.
-
-function Swatch({ color, active, onClick }: { color: string; active: boolean; onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      className="h-9 w-9 rounded-full border-2 transition"
-      style={{ backgroundColor: color, borderColor: active ? '#00E5FF' : 'rgba(255,255,255,0.15)', boxShadow: active ? '0 0 12px #00E5FF' : 'none' }}
-      aria-label={color}
-    />
-  );
-}
 
 function Chip({ label, active, onClick, accent = '#00E5FF' }: { label: string; active: boolean; onClick: () => void; accent?: string }) {
   return (
@@ -107,16 +105,41 @@ const FACE_SLIDERS: [string, string][] = [
 /** IMPROVE (2026-10-06): options with no 3D effect yet say so (faceMorphs.faceOptionRenders), instead of pretending. */
 const SOON = '3D coming soon — shows in the sketch only';
 
+const PASTE_ERRORS: Record<DecodeError, string> = {
+  empty: 'Paste a share code first.',
+  too_long: 'That code is too long to be a character.',
+  not_a_code: 'That is not a share code (they start with FEL).',
+  unsupported_version: 'That code is from a newer version, or this browser cannot unpack it.',
+  corrupt: 'That code is damaged — check it was copied whole.',
+  invalid: 'That code holds no character.',
+};
+
 export function ClosetView({ adult = false }: { adult?: boolean }) {
-  // IMPROVE (2026-10-06), CREATOR-PLAN phase 1: the face (and the Creator doc inside it, face.creator) is an undo
-  // history. `setFace` records a step; a slider or colour drag passes a group so the whole drag is one step.
-  const [hist, setHist] = useState<History<StoredFace>>(() => createHistory<StoredFace>(defaultFace()));
-  const face = hist.present;
+  // CREATOR-PLAN phase 4a (owner, 2026-10-06: "5 max slots"): the Closet edits ONE CHARACTER at a time, the selected
+  // slot. Its working copy is an undo history of that slot alone (phase 1's history held the whole face, slots and all,
+  // in every step): switching slots is not a step, and each slot keeps its own history while you switch between them.
+  // `face` / `setFace` are that slot seen as the StoredFace the editors already speak (slots.slotFace / withFace), so
+  // every editor below is unchanged; a slider or colour drag still passes a group so the whole drag is one step.
+  const initial = useMemo(() => ensureSlots(defaultFace(), 'male'), []);
+  const [slots, setSlots] = useState<CreatorSlotV2[]>(initial.slots);
+  const [activeId, setActiveId] = useState(initial.active);
+  const [selectedId, setSelectedId] = useState(initial.active);
+  const [hist, setHist] = useState<History<CreatorSlotV2>>(() => createHistory<CreatorSlotV2>(initial.slots[0]));
+  const stash = useRef(new Map<string, History<CreatorSlotV2>>());
+  const [savedSig, setSavedSig] = useState('');
+  const [scanOwned, setScanOwned] = useState(false);
+  const [serverBody, setServerBody] = useState<HeroBodyKind>('kit-male');
+  const slot = hist.present;
+  const face = useMemo(() => slotFace(slot) as StoredFace, [slot]);
   const setFace = (next: StoredFace | ((p: StoredFace) => StoredFace), group?: string) =>
-    setHist((h) => pushHistory(h, typeof next === 'function' ? next(h.present) : next, group));
-  const loadFace = (next: StoredFace) => setHist((h) => resetHistory(h, next));
+    setHist((h) => pushHistory(h, withFace(h.present, typeof next === 'function' ? next(slotFace(h.present) as StoredFace) : next), group));
+  const setSlot = (fn: (s: CreatorSlotV2) => CreatorSlotV2, group?: string) => setHist((h) => pushHistory(h, fn(h.present), group));
+  /** every slot, with the working copy in it */
+  const allSlots = useMemo(() => replaceSlot(slots, slot), [slots, slot]);
   const [locks, setLocks] = useState<RandomSection[]>([]);
-  const [equipped, setEquipped] = useState<Equipped>(defaultEquipped());
+  // the selected character's worn items (each slot wears its own; the save filters them through what you own)
+  const equipped = useMemo(() => ({ ...defaultEquipped(), ...(slot.equipped ?? {}) }) as Equipped, [slot]);
+  const setEquipped = (fn: (p: Equipped) => Equipped) => setSlot((s) => ({ ...s, equipped: fn({ ...defaultEquipped(), ...(s.equipped ?? {}) } as Equipped) }));
   const [jersey, setJersey] = useState<JerseyConfig>(defaultJersey());
   const [owned, setOwned] = useState<Set<string>>(new Set());
   const [skins, setSkins] = useState<CardSkin[]>([]);
@@ -132,37 +155,109 @@ export function ClosetView({ adult = false }: { adult?: boolean }) {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch('/api/v1/closet');
+        // CREATOR-PLAN phase 4a: hero-body says which body this account plays and whether it owns a scan (a slot may pick it)
+        const [res, hb] = await Promise.all([
+          fetch('/api/v1/closet'),
+          fetch('/api/v1/hero-body').then((r) => (r.ok ? r.json() : null)).catch(() => null) as Promise<{ body?: HeroBodyKind; scanOwned?: boolean } | null>,
+        ]);
         const j = await res.json();
         const savedConsent = readConsent();
         const hold = decideLookHold(adult, savedConsent.saveLookNumbers, savedConsent.modelTraining);
         const local = readLocalLook();
         setConsent(savedConsent);
+        const kind: HeroBodyKind = hb?.body === 'scan' || hb?.body === 'kit-female' ? hb.body : 'kit-male';
+        setServerBody(kind);
+        setScanOwned(hb?.scanOwned === true);
         if (res.ok) {
-          let nextFace: FaceConfig = { ...defaultFace(), ...(j.look?.face ?? {}) };
-          // The server copy is whatever the hold allowed. The device copy wins for the rest.
+          let nextFace: StoredFace = { ...defaultFace(), ...(j.look?.face ?? {}) };
+          // The server copy is whatever the hold allowed. The device copy wins for the rest (phase 4a: per slot).
           if (!hold.uploadLook && local?.face) nextFace = { ...local.face };
-          else if (local?.face?.sliders && !hold.uploadNumbers) nextFace = { ...nextFace, sliders: { ...local.face.sliders } };
-          loadFace(nextFace);
+          else if (local?.face && !hold.uploadNumbers) nextFace = mergeDeviceNumbers(nextFace, local.face) as unknown as StoredFace;
           const serverEquipped = { ...defaultEquipped(), ...(j.look?.equipped ?? {}) };
-          setEquipped(!hold.uploadLook && local?.equipped ? { ...defaultEquipped(), ...local.equipped } : serverEquipped);
+          loadSlots(nextFace, slotBodyOf(kind), !hold.uploadLook && local?.equipped ? { ...defaultEquipped(), ...local.equipped } : serverEquipped);
           setOwned(new Set<string>(j.owned ?? []));
           setSkins(j.skins ?? []);
           setSkinCardId(j.look?.skinCardId ?? null);
           setJersey(!hold.uploadLook && local?.jersey ? sanitizeJersey(local.jersey) : sanitizeJersey(j.look?.jersey ?? defaultJersey()));
         } else if (local?.face && !hold.uploadLook) {
-          loadFace({ ...local.face });
+          loadSlots({ ...local.face }, slotBodyOf(kind), { ...defaultEquipped(), ...(local.equipped ?? {}) });
         }
       } catch { /* ignore */ }
       finally { hydrated.current = true; setLoading(false); }
     })();
   }, [adult]);
 
-  // The look the server is not allowed to keep still has to survive a refresh.
+  // The look the server is not allowed to keep still has to survive a refresh. Phase 4a: every slot, and the face's top
+  // level is the playing character (what raceLook and an older reader see).
+  const storedFace = useMemo(() => buildStoredFace(allSlots, activeId), [allSlots, activeId]);
+  const activeEquippedNow = useMemo(() => ({ ...defaultEquipped(), ...(allSlots.find((s) => s.id === activeId)?.equipped ?? {}) }), [allSlots, activeId]);
   useEffect(() => {
     if (!hydrated.current || loading) return;
-    writeLocalLook({ ...(readLocalLook() ?? {}), face, equipped, jersey });
-  }, [face, equipped, jersey, loading]);
+    writeLocalLook({ ...(readLocalLook() ?? {}), face: storedFace as FaceConfig, equipped: activeEquippedNow, jersey });
+  }, [storedFace, activeEquippedNow, jersey, loading]);
+  const sigNow = useMemo(() => JSON.stringify([allSlots, activeId]), [allSlots, activeId]);
+
+  /** Open a face's characters (a look saved before slots becomes one slot), each wearing `eq` unless it has its own. */
+  function loadSlots(f: StoredFace, body: SlotBody, eq: Record<string, string | null>) {
+    const r = ensureSlots(f, body, eq as CreatorSlotV2['equipped']);
+    const list = r.slots.map((s) => (s.equipped ? s : { ...s, equipped: { ...eq } as CreatorSlotV2['equipped'] }));
+    stash.current.clear();
+    setSlots(list);
+    setActiveId(r.active);
+    setSelectedId(r.active);
+    setHist(createHistory(list.find((s) => s.id === r.active) ?? list[0]));
+    setSavedSig(JSON.stringify([list, r.active]));
+  }
+  /** Go to a slot of `next` (the slot list after an operation), keeping each slot's own undo history. */
+  const goTo = (next: CreatorSlotV2[], id: string) => {
+    stash.current.set(selectedId, hist);
+    for (const k of [...stash.current.keys()]) if (!next.some((s) => s.id === k)) stash.current.delete(k);
+    const target = next.find((s) => s.id === id);
+    if (!target) return;
+    setSlots(next);
+    setSelectedId(id);
+    const kept = stash.current.get(id);
+    setHist(kept && kept.present === target ? kept : createHistory(target));
+  };
+  const selectSlot = (id: string) => { if (id !== selectedId) goTo(allSlots, id); };
+  const newCharacter = () => {
+    if (!canAddSlot(allSlots)) return;
+    const s = { ...blankSlot({ id: newSlotId(allSlots), label: newSlotLabel(allSlots), body: slot.body === 'scan' ? 'male' : slot.body }), equipped: { ...defaultEquipped() } };
+    goTo(addSlot(allSlots, s), s.id);
+  };
+  const duplicateCharacter = (id: string) => {
+    const next = duplicateSlot(allSlots, id);
+    const added = next.find((s) => !allSlots.some((a) => a.id === s.id));
+    if (added) goTo(next, added.id);
+  };
+  const renameCharacter = (id: string, label: string) => {
+    const clean = sanitizeStampText(label);
+    if (!clean) return;
+    if (id === selectedId) setSlot((s) => ({ ...s, label: clean }));
+    else setSlots((list) => renameSlot(list, id, clean));
+  };
+  const deleteCharacter = (id: string) => {
+    const r = removeSlot(allSlots, id, activeId);
+    if (r.slots === allSlots) return;
+    setActiveId(r.active ?? r.slots[0].id);
+    if (id === selectedId) { stash.current.delete(id); goTo(r.slots, r.active ?? r.slots[0].id); }
+    else { stash.current.delete(id); setSlots(r.slots); }
+  };
+  const pasteCharacter = async (code: string): Promise<string | null> => {
+    const r = await decodeSlotCode(code);
+    if (!r.ok) return PASTE_ERRORS[r.error];
+    if (!canAddSlot(allSlots)) return `${MAX_SLOTS} characters is the most — delete one first.`;
+    const s: CreatorSlotV2 = {
+      id: newSlotId(allSlots), label: newSlotLabel(allSlots, 'IMPORT'),
+      body: r.slot?.body ?? (slot.body === 'female' ? 'female' : 'male'), base: r.base, doc: r.doc, equipped: { ...defaultEquipped() },
+    };
+    if (r.slot?.sliders) s.sliders = r.slot.sliders;
+    if (r.slot?.frame) s.frame = r.slot.frame;
+    goTo(addSlot(allSlots, s), s.id);
+    toast.success('Added as a new character — Save to keep it.');
+    return null;
+  };
+  const shareCode = (numbers: boolean) => encodeSlotCode(slot, { numbers });
 
   const accent = useMemo(() => skins.find((s) => s.id === skinCardId)?.accent || '#00E5FF', [skins, skinCardId]);
   // Draft palette — the same mapping resolveIdentity() applies at spawn time,
@@ -203,6 +298,16 @@ export function ClosetView({ adult = false }: { adult?: boolean }) {
     const d = readCreatorDoc(p) ?? emptyCreatorDoc();
     return { ...p, creator: { ...d, paint, flags: { ...d.flags, suit: on } } };
   });
+  /** The procedural eyes block (phase 4a). Defaults are dropped by the sanitiser, so an untouched look carries nothing. */
+  const setEyes = (e: CreatorEyes, group?: string) => setFace((p) => {
+    const d = readCreatorDoc(p) ?? emptyCreatorDoc();
+    return { ...p, creator: { ...d, eyes: e } };
+  }, group);
+  /** What the doc hides (phase 4a), as one undo step. */
+  const setHide = (h: Partial<Record<HideKey, true>>) => setFace((p) => {
+    const d = readCreatorDoc(p) ?? emptyCreatorDoc();
+    return { ...p, creator: { ...d, flags: { ...d.flags, hide: h } } };
+  });
   const roll = () => setFace((p) => {
     const r = randomiseLook({ face: faceOnly(p) as FaceConfig, doc: readCreatorDoc(p) }, locks);
     return { ...p, ...r.face, ...(r.doc ? { creator: r.doc } : {}) };
@@ -241,20 +346,26 @@ export function ClosetView({ adult = false }: { adult?: boolean }) {
     finally { setBuying(null); }
   };
 
-  const save = async () => {
+  // Phase 4a: a save stores every character and which one is played; "Play as" is a save with another one playing.
+  const save = async (playAs?: string) => {
     setSaving(true);
     try {
+      const active = playAs ?? activeId;
+      const out = buildStoredFace(allSlots, active);
+      const eqOut = { ...defaultEquipped(), ...(allSlots.find((s) => s.id === active)?.equipped ?? {}) };
       const res = await fetch('/api/v1/closet', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(closetSaveRequest({
-          adult, face, equipped, skinCardId, jersey,
+          adult, face: out as FaceConfig, equipped: eqOut, skinCardId, jersey,
           saveLookNumbers: consent.saveLookNumbers, modelTraining: consent.modelTraining,
         })),
       });
       const j = await res.json();
       if (!res.ok) throw new Error(j?.error || 'save failed');
+      if (playAs) setActiveId(playAs);
+      setSavedSig(JSON.stringify([allSlots, active]));
       writeConsent(consent);
-      writeLocalLook({ ...(readLocalLook() ?? {}), face, equipped, jersey });
+      writeLocalLook({ ...(readLocalLook() ?? {}), face: out as FaceConfig, equipped: eqOut, jersey });
       invalidateIdentity(); // next spawn picks up the new look everywhere
       toast.success(adult
         ? 'Look saved — this is how you appear across the Lab.'
@@ -277,12 +388,20 @@ export function ClosetView({ adult = false }: { adult?: boolean }) {
         </div>
       </div>
 
+      {/* CREATOR-PLAN phase 4a: the characters (up to 5) — select one to edit it, "Play as" to wear it in every mode */}
+      <div className="mb-5">
+        <SlotBar slots={allSlots} selected={selectedId} active={activeId} dirty={!!savedSig && sigNow !== savedSig}
+          onSelect={selectSlot} onPlayAs={(id) => { void save(id); }} onNew={newCharacter} onDuplicate={duplicateCharacter}
+          onRename={renameCharacter} onDelete={deleteCharacter} onPaste={pasteCharacter} onShare={shareCode} accent={accent} />
+      </div>
+
       <div className="grid gap-6 md:grid-cols-[260px_1fr]">
         {/* preview column */}
         <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
           {/* The actual game model (forged fel-hero) wearing the draft look —
               what you design here is what spawns in every mode. */}
-          <AvatarPreview face={previewFace} palette={previewPalette} jersey={jersey} wardrobe={{ tops: equipped.tops ?? null, shorts: equipped.shorts ?? null, shoes: equipped.shoes ?? null }} accessories={previewAccessories} creator={doc} wornParts={previewWornParts} />
+          <AvatarPreview face={previewFace} palette={previewPalette} jersey={jersey} wardrobe={{ tops: equipped.tops ?? null, shorts: equipped.shorts ?? null, shoes: equipped.shoes ?? null }} accessories={previewAccessories} creator={doc} wornParts={previewWornParts}
+            body={heroBodyForSlot(slot.body, { scanOwned, fallback: serverBody })} frame={slot.frame ?? null} />
           <div className="mt-3">
             <FacePreview face={face} accent={accent} />
           </div>
@@ -304,7 +423,7 @@ export function ClosetView({ adult = false }: { adult?: boolean }) {
               <div className="mt-0.5 text-[9px] uppercase tracking-wider text-white/30">jersey back</div>
             </div>
           )}
-          <button onClick={save} disabled={saving} className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-cyan-400 py-2.5 text-sm font-bold text-black transition hover:bg-cyan-300 disabled:opacity-60">
+          <button onClick={() => save()} disabled={saving} className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-cyan-400 py-2.5 text-sm font-bold text-black transition hover:bg-cyan-300 disabled:opacity-60">
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Save Look
           </button>
         </div>
@@ -360,12 +479,22 @@ export function ClosetView({ adult = false }: { adult?: boolean }) {
                   })}
                 </div>
               </div>
-              <Group title="Skin Tone"><div className="flex flex-wrap gap-2">{SKIN_TONES.map((c) => <Swatch key={c} color={c} active={face.skinTone === c} onClick={() => setF('skinTone', c)} />)}</div></Group>
+              <Group title={`Body — ${slot.label || 'this character'}`}>
+                <BodyControls body={slot.body} frame={slot.frame ?? null} scanOwned={scanOwned} numbersSaved={consent.saveLookNumbers && adult}
+                  onBody={(b) => setSlot((s) => ({ ...s, body: b }))}
+                  onFrame={(f: SlotFrame | null, g?: string) => setSlot((s) => { const n = { ...s }; if (f) n.frame = f; else delete n.frame; return n; }, g)} />
+              </Group>
+              {/* CREATOR-PLAN phase 4a (tool #5): any colour for skin, hair and eyes */}
+              <Group title="Skin Tone"><ColourRow label="Skin tone" swatches={SKIN_TONES} value={face.skinTone} group="colour:skin" onPick={(h, g) => setFace((p) => ({ ...p, skinTone: h }), g)} /></Group>
               <Group title="Face Shape"><div className="flex flex-wrap gap-2">{FACE_SHAPES.map((s) => <Chip key={s} label={s} active={face.faceShape === s} onClick={() => setF('faceShape', s)} />)}</div></Group>
               <Group title="Hair Style"><div className="flex flex-wrap gap-2">{HAIR_STYLES.map((s) => <Chip key={s} label={s} active={face.hairStyle === s} onClick={() => setF('hairStyle', s)} />)}</div></Group>
-              <Group title="Hair Color"><div className="flex flex-wrap gap-2">{HAIR_COLORS.map((c) => <Swatch key={c} color={c} active={face.hairColor === c} onClick={() => setF('hairColor', c)} />)}</div></Group>
+              <Group title="Hair Color"><ColourRow label="Hair colour" swatches={HAIR_COLORS} value={face.hairColor} group="colour:hair" onPick={(h, g) => setFace((p) => ({ ...p, hairColor: h }), g)} /></Group>
               <Group title="Eye Shape" soon={soonField('eyeShape', EYE_SHAPES)}><div className="flex flex-wrap gap-2">{EYE_SHAPES.map((s) => <Chip key={s} label={s} active={face.eyeShape === s} onClick={() => setF('eyeShape', s)} />)}</div></Group>
-              <Group title="Eye Color" soon={soonField('eyeColor', EYE_COLORS)}><div className="flex flex-wrap gap-2">{EYE_COLORS.map((c) => <Swatch key={c} color={c} active={face.eyeColor === c} onClick={() => setF('eyeColor', c)} />)}</div></Group>
+              <Group title="Eye Color"><ColourRow label="Eye colour" swatches={EYE_COLORS} value={face.eyeColor} group="colour:eye" onPick={(h, g) => setFace((p) => ({ ...p, eyeColor: h }), g)} /></Group>
+              {/* CREATOR-PLAN phase 4a (tool #3): the procedural eyes */}
+              <Group title="Eyes"><EyeControls eyes={doc?.eyes} onChange={setEyes} /></Group>
+              {/* CREATOR-PLAN phase 4a (tool #4): hide the eyeballs, ears, head or hair (masks, helmets, mascot heads) */}
+              <Group title="Hide"><HideControls hide={doc?.flags.hide} onChange={setHide} /></Group>
               <Group title="Brows" soon={soonField('brows', BROWS)}>
                 <div className="flex flex-wrap gap-2">{BROWS.map((s) => <Chip key={s} label={faceOptionRenders('brows', s) ? s : `${s} · soon`} active={face.brows === s} onClick={() => setF('brows', s)} />)}</div>
                 {faceFieldRenders('brows', BROWS) && <p className="mt-1.5 text-[10px] text-white/35">Options marked “soon” show in the sketch only until their 3D shapes land.</p>}
@@ -506,6 +635,13 @@ export function ClosetView({ adult = false }: { adult?: boolean }) {
 }
 
 const KIT_COLOUR_SLOTS: [ColourSlot, string][] = [['jersey', 'Jersey'], ['shorts', 'Shorts'], ['shoes', 'Shoes'], ['accent', 'Accent']];
+
+/** The face a save stores (phase 4a): every character, which one is played, and the played one materialised on the top
+ *  level (the server re-derives that top level itself; this keeps the device copy the same shape). */
+function buildStoredFace(all: CreatorSlotV2[], active: string): StoredFace {
+  const a = all.find((s) => s.id === active) ?? all[0];
+  return { ...(slotFace(a) as StoredFace), creatorSlots: all, activeSlot: a.id };
+}
 
 /** The whole field has no 3D effect yet → the group says so. */
 function soonField(field: FaceField, options: readonly string[]): boolean {

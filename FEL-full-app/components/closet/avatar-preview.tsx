@@ -1,7 +1,8 @@
 'use client';
 import type { Wardrobe } from '@/lib/babylon/core/kit';
 import type { AccessoryId } from '@/lib/babylon/core/accessories';
-import type { CreatorDoc, CreatorPart } from '@/lib/creator/look/doc';
+import type { CreatorDoc, CreatorPart, SlotFrame } from '@/lib/creator/look/doc';
+import type { HeroBodyKind } from '@/lib/babylon/core/heroBody';
 
 // AvatarPreview — the Closet's live 3D preview: the FORGED hero
 // (public/models/fel-hero.glb, scripts/avatar/forge.mts) wearing the draft
@@ -27,12 +28,19 @@ export interface AvatarPreviewProps {
   creator?: CreatorDoc | null;
   /** CREATOR-PLAN phase 2: equipped items that render as parts (the Nexus Visor) — resolveIdentity's `wornParts`. */
   wornParts?: readonly CreatorPart[];
+  /** CREATOR-PLAN phase 4a: the selected slot's body (the preview respawns when it changes; absent: the body this
+   *  account plays, as before) and its height / build (cosmetic, clamped like every mode outside ranked). */
+  body?: HeroBodyKind;
+  frame?: SlotFrame | null;
 }
 
-export default function AvatarPreview({ face, palette, jersey, wardrobe, accessories, creator, wornParts }: AvatarPreviewProps) {
+export default function AvatarPreview({ face, palette, jersey, wardrobe, accessories, creator, wornParts, body, frame }: AvatarPreviewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const applyRef = useRef<((p: AvatarPreviewProps) => void) | null>(null);
   const playRef = useRef<(clip: string | null) => void>(() => {});
+  const respawnRef = useRef<((kind: HeroBodyKind) => void) | null>(null);
+  const bodyRef = useRef<HeroBodyKind | undefined>(body);
+  bodyRef.current = body;
   const spinRef = useRef(true);
   const [spinning, setSpinning] = useState(true);
 
@@ -70,11 +78,13 @@ export default function AvatarPreview({ face, palette, jersey, wardrobe, accesso
       if (heroParam) (scene.metadata ??= {}).felHeroOverride = heroParam;
       // EVERYONE-BODY-MOCAP-OPPONENTS (2026-09-14): the Closet dresses the body this player actually plays — the scan
       // for the owner's account, otherwise their kit body (heroBody.ts). A dev ?hero= override still wins.
-      const { resolveIdentity } = await import('@/lib/babylon/core/playerIdentity');
+      const { resolveIdentity, applyProportions } = await import('@/lib/babylon/core/playerIdentity');
       const { urlForHeroBody } = await import('@/lib/babylon/core/heroBody');
-      const bodyKind = (await resolveIdentity().catch(() => null))?.body ?? 'kit-male';
-      const spawned = await CharacterLibrary.spawn(scene, heroParam ? '/models/fel-hero.glb' : urlForHeroBody(bodyKind), { identity: false, role: 'player' });
+      // CREATOR-PLAN phase 4a: the SELECTED SLOT's body when the Closet names one (a scan owner's Gojo slot is a kit body)
+      let bodyKind: HeroBodyKind = bodyRef.current ?? (await resolveIdentity().catch(() => null))?.body ?? 'kit-male';
+      let spawned = await CharacterLibrary.spawn(scene, heroParam ? '/models/fel-hero.glb' : urlForHeroBody(bodyKind), { identity: false, role: 'player' });
       if (disposed) { spawned.dispose(); engine.dispose(); return; }
+      let baseScale = spawned.root.scaling.clone();
       // dev-only probe hook (scripts/_closet-scene-probe.mts): the preview is the
       // one place the identity pipe and the spawn layers meet without a login
       if (process.env.NODE_ENV === 'development') (window as unknown as { __FEL_PREVIEW__?: unknown }).__FEL_PREVIEW__ = { scene, spawned };
@@ -82,6 +92,7 @@ export default function AvatarPreview({ face, palette, jersey, wardrobe, accesso
       // dev only: ?tone=8d5524 previews a skin tone without touching the draft (per-tone captures, ship pass 3 rung 2)
       const toneParam = process.env.NODE_ENV === 'development' ? new URLSearchParams(window.location.search).get('tone') : null;
       applyRef.current = (p: AvatarPreviewProps) => {
+        lastProps = p;
         applyIdentity(spawned, {
           proportions: null,
           face: toneParam ? { ...p.face, skinTone: `#${toneParam.replace(/^#/, '')}` } : p.face,
@@ -94,8 +105,29 @@ export default function AvatarPreview({ face, palette, jersey, wardrobe, accesso
           creator: p.creator ?? null,
           wornParts: p.wornParts ?? [],
         });
+        // the slot's height and build, absolutely from the spawn's own scale (never compounding across edits)
+        applyProportions(spawned, p.frame ? { heightScale: p.frame.heightScale, buildScale: p.frame.buildScale } : { heightScale: 1, buildScale: 1 }, baseScale);
       };
-      applyRef.current({ face, palette, jersey, wardrobe, accessories, creator, wornParts });
+      let lastProps: AvatarPreviewProps = { face, palette, jersey, wardrobe, accessories, creator, wornParts, frame };
+      applyRef.current(lastProps);
+      // a slot with another body: the old one goes, the new one is spawned and dressed with the same draft
+      let respawning: Promise<void> | null = null;
+      respawnRef.current = (kind: HeroBodyKind) => {
+        if (heroParam || kind === bodyKind) return;
+        const run = async () => {
+          bodyKind = kind;
+          const next = await CharacterLibrary.spawn(scene, urlForHeroBody(kind), { identity: false, role: 'player' });
+          if (disposed) { next.dispose(); return; }
+          next.root.rotation.y = spawned.root.rotation.y;
+          spawned.dispose();
+          spawned = next;
+          baseScale = spawned.root.scaling.clone();
+          applyRef.current?.(lastProps);
+          const { prewarmPaint: warm } = await import('@/lib/babylon/creator/paint/renderPaint');
+          if (!disposed) warm(spawned);
+        };
+        respawning = (respawning ?? Promise.resolve()).then(run).catch((e) => console.error('[closet] preview respawn failed', e));
+      };
       // CREATOR-PLAN phase 3: build the body's paint map in the background now, so the first paint shows at once
       const { prewarmPaint } = await import('@/lib/babylon/creator/paint/renderPaint');
       if (!disposed) prewarmPaint(spawned);
@@ -124,8 +156,10 @@ export default function AvatarPreview({ face, palette, jersey, wardrobe, accesso
 
   // re-apply the draft on every edit — same pipe, new values
   useEffect(() => {
-    applyRef.current?.({ face, palette, jersey, wardrobe, accessories, creator, wornParts });
-  }, [face, palette, jersey, wardrobe, accessories, creator, wornParts]);
+    applyRef.current?.({ face, palette, jersey, wardrobe, accessories, creator, wornParts, frame });
+  }, [face, palette, jersey, wardrobe, accessories, creator, wornParts, frame]);
+  // CREATOR-PLAN phase 4a: another slot's body
+  useEffect(() => { if (body) respawnRef.current?.(body); }, [body]);
 
   return (
     <div>
