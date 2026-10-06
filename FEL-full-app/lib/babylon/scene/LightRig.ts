@@ -7,9 +7,10 @@ import {
 } from '@babylonjs/core';
 import type { AbstractMesh, PBRMaterial, StandardMaterial } from '@babylonjs/core';
 import { MOODS, type VenueMood, type MoodCurves } from './moods';
-import { tierRigSettings, legacyAa, type QualityTier } from './QualityTier';
+import { tierRigSettings, legacyRig, type QualityTier } from './QualityTier';
 import { isLegacyLook } from './graphicsSetting';
 import { mountKickerLight, type KickerHandle } from './KickerLight';
+import { mountEmissiveGlow, type GlowHandle } from './EmissiveGlow';
 import { mountEnvironmentIBL } from './EnvironmentIBL';
 import { motionPolicy } from '../../a11y/reducedMotion';
 
@@ -23,6 +24,8 @@ export interface LightRigHandle {
   mood: VenueMood;
   /** A9.6: the players-only rim light (KickerLight.ts); null under ?look=legacy. */
   kicker: KickerHandle | null;
+  /** A9.5: the include-list glow on light fixtures (EmissiveGlow.ts); null on mobile and under ?look=legacy. */
+  glow: GlowHandle | null;
   /** M44: brief exposure pulse for a highlight beat (dunk flush, TD, KO,
    *  goal) — reads as a camera-flash without a hard cut. Self-reverts. */
   flashBeat(): void;
@@ -64,7 +67,7 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
   // Ship pass (2026-09-02): desktop 60 fps / mobile 30 fps. The tier decides
   // shadow map size, cascades on outdoor moods, sharpen and bloom weight.
   const legacy = isLegacyLook();   // ?look=legacy: the shared look as it shipped before 2026-10-06 (before/after shots)
-  const T = legacy ? legacyAa(tierRigSettings(tier, mood)) : tierRigSettings(tier, mood);
+  const T = legacy ? legacyRig(tierRigSettings(tier, mood)) : tierRigSettings(tier, mood);
 
   // A9.3: the rig owns the scene's grade. A spec venue built after this (NexusWebScene.applyVenueGrade) stands down
   // instead of overwriting the mood — the pipeline reads the SAME scene.imageProcessingConfiguration it would write.
@@ -184,12 +187,15 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
   const rest = { exposure: M.exposure, vignette: M.vignetteWeight };
   // A9.6: a rim light on the players only — every tier (one shadowless light on a handful of bodies costs no draws)
   const kicker = legacy ? null : mountKickerLight(scene, mood);
+  // A9.5: lamp heads, floods, LED strips and neon glow on the tiers that can pay for it; mounted now, before load()
+  // builds the venue, so every fixture's glow shader compiles during the load and never mid-play
+  const glow = T.glow ? mountEmissiveGlow(scene, tier, mood) : null;
 
   liftBlackMaterials(scene);
 
   let flashObs: ReturnType<Scene['onBeforeRenderObservable']['add']> | null = null;
   return {
-    hemi, sun, shadows, pipeline, tier, mood, kicker, rest,
+    hemi, sun, shadows, pipeline, tier, mood, kicker, glow, rest,
     adoptRest() {
       if (legacy) return;   // the pre-pass harness kept the mood's grade as its rest, whatever load() wrote
       rest.exposure = pipeline.imageProcessing.exposure;
@@ -216,6 +222,7 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
       if (flashObs) scene.onBeforeRenderObservable.remove(flashObs);
       if ((scene.metadata as { felGradeOwner?: string } | null)?.felGradeOwner === 'rig') delete scene.metadata.felGradeOwner;
       kicker?.dispose();
+      glow?.dispose();
       hemi.dispose(); sun.dispose(); shadows.dispose(); pipeline.dispose();
       disposeEnv();
     },

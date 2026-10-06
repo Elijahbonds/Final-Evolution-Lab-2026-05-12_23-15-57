@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { OUTDOOR_MOODS, resolveQualityTier, explainQualityTier, classifyGpu, tierFromName, tierRigSettings, legacyAa, type TierInput } from './QualityTier';
+import { OUTDOOR_MOODS, resolveQualityTier, explainQualityTier, classifyGpu, tierFromName, tierRigSettings, legacyRig, type TierInput } from './QualityTier';
 import { fitCanvas } from '../core/canvasFit';
 import { MOODS } from './moods';
 
@@ -139,7 +139,12 @@ describe('tierRigSettings', () => {
   it('MSAA replaces FXAA on desktop and high; the phones keep FXAA as their only AA (A9.2)', () => {
     for (const t of ['desktop', 'high'] as const) expect(tierRigSettings(t, 'nightGame')).toMatchObject({ msaaSamples: 4, fxaa: false });
     expect(tierRigSettings('mobile', 'nightGame')).toMatchObject({ msaaSamples: 1, fxaa: true });
-    expect(legacyAa(tierRigSettings('high', 'nightGame'))).toMatchObject({ msaaSamples: 1, fxaa: true });
+    expect(legacyRig(tierRigSettings('high', 'nightGame'))).toMatchObject({ msaaSamples: 1, fxaa: true, glow: false });
+  });
+  it('the fixture glow runs on desktop and high only (A9.5)', () => {
+    expect(tierRigSettings('desktop', 'nightGame').glow).toBe(true);
+    expect(tierRigSettings('high', 'nightGame').glow).toBe(true);
+    expect(tierRigSettings('mobile', 'nightGame').glow).toBe(false);
   });
   it('high runs at least everything desktop runs', () => {
     const d = tierRigSettings('desktop', 'goldenHour'), h = tierRigSettings('high', 'goldenHour');
@@ -148,7 +153,7 @@ describe('tierRigSettings', () => {
   });
   it('mobile drops SSAO, sharpen and cascades and shrinks the shadow map', () => {
     const s = tierRigSettings('mobile', 'goldenHour');
-    expect(s).toEqual({ shadowMapSize: 512, cascaded: false, sharpen: false, bloomScaleMul: 0.7, ssao: false, msaaSamples: 1, fxaa: true });
+    expect(s).toEqual({ shadowMapSize: 512, cascaded: false, sharpen: false, bloomScaleMul: 0.7, ssao: false, msaaSamples: 1, fxaa: true, glow: false });
   });
   it('desktop cascades only outdoors', () => {
     expect(tierRigSettings('desktop', 'goldenHour').cascaded).toBe(true);

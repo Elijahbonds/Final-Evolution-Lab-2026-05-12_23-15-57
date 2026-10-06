@@ -187,14 +187,16 @@ export interface TierRigSettings {
   msaaSamples: number;
   /** The FXAA pass: the phones keep it (it is their only AA); MSAA replaces it where MSAA runs. */
   fxaa: boolean;
+  /** A9.5: the include-list GlowLayer on light fixtures (EmissiveGlow.ts). The phones keep bloom only. */
+  glow: boolean;
 }
 
-/** The pre-pass settings ?look=legacy restores on any tier: FXAA only, no MSAA. */
-export function legacyAa(t: TierRigSettings): TierRigSettings { return { ...t, msaaSamples: 1, fxaa: true }; }
+/** The pre-pass settings ?look=legacy restores on any tier: FXAA only, no MSAA, no glow. */
+export function legacyRig(t: TierRigSettings): TierRigSettings { return { ...t, msaaSamples: 1, fxaa: true, glow: false }; }
 
 export function tierRigSettings(tier: QualityTier, mood: VenueMood): TierRigSettings {
   if (tier === 'mobile') {
-    return { shadowMapSize: 512, cascaded: false, sharpen: false, bloomScaleMul: 0.7, ssao: false, msaaSamples: 1, fxaa: true };
+    return { shadowMapSize: 512, cascaded: false, sharpen: false, bloomScaleMul: 0.7, ssao: false, msaaSamples: 1, fxaa: true, glow: false };
   }
   // high: the desktop rig. The high-only extras arrive with the passes that use them (MSAA, glow, the venue probe).
   // DESKTOP SHADOWS AT 4096 (owner, 2026-09-19: the graphics pass, "whatever it takes"). 2048 over a 90 m cascade
@@ -202,7 +204,7 @@ export function tierRigSettings(tier: QualityTier, mood: VenueMood): TierRigSett
   // stepped while everything else in the frame is sharp. Measured on the dunk arena before and after: the frame is
   // vsync-locked at 16.7 ms either way, zero frames over 33 ms. The map is the one thing in this rig that was
   // visibly under-resolved and the budget had room for it.
-  return { shadowMapSize: 4096, cascaded: OUTDOOR_MOODS.has(mood), sharpen: true, bloomScaleMul: 1, ssao: true, msaaSamples: 4, fxaa: false };
+  return { shadowMapSize: 4096, cascaded: OUTDOOR_MOODS.has(mood), sharpen: true, bloomScaleMul: 1, ssao: true, msaaSamples: 4, fxaa: false, glow: true };
 }
 
 export interface SsaoHandle { dispose(): void }
