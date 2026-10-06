@@ -13,6 +13,7 @@ import { mountLightRig, liftBlackMaterials, type LightRigHandle } from '../scene
 import { mountIblShadows, type IblShadowsHandle } from '../scene/IblShadows';
 import { detectRenderTier, mountSsao, tierRigSettings, type SsaoHandle } from '../scene/QualityTier';
 import type { VenueMood } from '../scene/moods';
+import { resolveModeMood } from '../scene/moodResolver';   // A9.4: mood follows the place
 import { InputBus, type FelInput, type BodyPacket } from './InputBus';
 import { CameraDirector, type FOLLOW_PRESETS } from './CameraDirector';
 import { buildResult, type ResultSink, type SessionResult } from './sessionResult';
@@ -279,7 +280,11 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
   // re-registers the same mode list and re-binds window.__NEXUS_AGENT__ each mount.
   installAgentBridge(AGENT_MODES);
   const camera = new TargetCamera('cam', new Vector3(0, 3, -8), scene);
-  const mood = def.mood;   // read once — it may be a per-venue getter
+  const declaredMood = def.mood;   // read once — it may be a per-venue getter
+  // A9.4 (visual-foundation): MOOD FOLLOWS THE PLACE — the picked arena / place look decides the light for the modes the
+  // resolver knows (combat, net, football, golf, derby, penalty, carnival, dance, brainbrawl); every other mode keeps its own.
+  const { mood, why: moodWhy } = resolveModeMood(def.modeId, declaredMood);
+  if (mood !== declaredMood) console.info(`[FEL-MOOD] ${def.modeId}: ${declaredMood} → ${mood} (${moodWhy})`);
   const lights = mountLightRig(scene, mood, tier);
   // Desktop tier only: SSAO grounds feet and darkens the crease between close
   // bodies. Attached to the one gameplay camera; disposed with the mode.
@@ -609,7 +614,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     if (!ambientStarted) {
       ambientStarted = true;
       // mood -> ambient bed: dojo hush, alpine wind-quiet, everything else a stadium crowd.
-      const bed = mood === 'dojoWarm' ? 'dojo' : mood === 'alpine' || mood === 'overcast' ? 'none' : 'stadium';
+      const bed = declaredMood === 'dojoWarm' ? 'dojo' : declaredMood === 'alpine' || declaredMood === 'overcast' ? 'none' : 'stadium';   // the mode's own bed: the light pass leaves the sound alone
       SoundKit.startAmbient(bed);
     }
   }

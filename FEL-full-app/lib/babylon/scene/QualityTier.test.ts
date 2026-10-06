@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { OUTDOOR_MOODS, resolveQualityTier, explainQualityTier, classifyGpu, tierFromName, tierRigSettings, legacyAa, type TierInput } from './QualityTier';
 import { fitCanvas } from '../core/canvasFit';
+import { MOODS } from './moods';
 
 const desktop = { touch: false, coarsePointer: false, cssWidth: 1440, cssHeight: 900, limitedBy: null as null };
 
@@ -154,7 +155,11 @@ describe('tierRigSettings', () => {
     expect(tierRigSettings('desktop', 'dojoWarm').cascaded).toBe(false);
     expect(tierRigSettings('desktop', 'dojoWarm').ssao).toBe(true);
   });
+  // CHANGED 2026-10-06 (A9.4): the list this checked against was a copy of OUTDOOR_MOODS itself; it now checks the real
+  // MOODS table, and pins the two additions and the two indoor moods that must stay single-map.
   it('every outdoor mood is a real mood key', () => {
-    for (const m of OUTDOOR_MOODS) expect(['goldenHour', 'daylight', 'alpine', 'nightGame']).toContain(m);
+    for (const m of OUTDOOR_MOODS) expect(Object.keys(MOODS)).toContain(m);
+    expect(OUTDOOR_MOODS.has('overcast') && OUTDOOR_MOODS.has('dusk')).toBe(true);
+    expect(OUTDOOR_MOODS.has('dojoWarm') || OUTDOOR_MOODS.has('indoorArena')).toBe(false);
   });
 });

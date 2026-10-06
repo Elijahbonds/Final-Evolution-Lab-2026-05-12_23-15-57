@@ -18,6 +18,8 @@ export interface LightRigHandle {
   /** The mounted post pipeline (ACES, bloom, FXAA, sharpen, vignette). */
   pipeline: DefaultRenderingPipeline;
   tier: QualityTier;
+  /** The mood this rig lit — after the place resolver (A9.4), so a mode can read the light it actually got. */
+  mood: VenueMood;
   /** M44: brief exposure pulse for a highlight beat (dunk flush, TD, KO,
    *  goal) — reads as a camera-flash without a hard cut. Self-reverts. */
   flashBeat(): void;
@@ -97,7 +99,7 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
     csm.cascadeBlendPercentage = 0.1;
     csm.usePercentageCloserFiltering = true;
     csm.filteringQuality = ShadowGenerator.QUALITY_MEDIUM;
-    csm.darkness = 0.35;
+    csm.darkness = M.shadowDarkness ?? 0.35;   // overcast joined the cascades 2026-10-06 (A9.4) with its own weak shadow
     // SHADOW ACNE AT A GRAZING SUN (dunk visuals pass, 2026-09-16). Caught under the dunker's feet on the Venice court:
     // not a body shadow but four hard black WEDGES radiating out of her shoes, the shape a shadow map makes when a
     // surface shadows itself. Every outdoor mood here puts the sun low (it is a sunset look), and a low sun is the worst
@@ -182,7 +184,7 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
 
   let flashObs: ReturnType<Scene['onBeforeRenderObservable']['add']> | null = null;
   return {
-    hemi, sun, shadows, pipeline, tier, rest,
+    hemi, sun, shadows, pipeline, tier, mood, rest,
     adoptRest() {
       if (legacy) return;   // the pre-pass harness kept the mood's grade as its rest, whatever load() wrote
       rest.exposure = pipeline.imageProcessing.exposure;

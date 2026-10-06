@@ -1,6 +1,6 @@
 // Venue mood presets for LightRig. One place to tune every scene's look.
 
-export type VenueMood = 'goldenHour' | 'daylight' | 'dojoWarm' | 'nightGame' | 'alpine' | 'overcast';
+export type VenueMood = 'goldenHour' | 'daylight' | 'dojoWarm' | 'nightGame' | 'alpine' | 'overcast' | 'dusk' | 'indoorArena';
 
 export interface MoodDef {
   sky: string; ground: string; hemiIntensity: number;
@@ -28,6 +28,8 @@ export interface MoodDef {
    * Babylon's -100..100 where 0 is "no change". Kept gentle: this is the grade a broadcast camera bakes in, not a filter.
    */
   curves: MoodCurves;
+  /** Shadow darkness override (0 = black, 1 = none); the rig's 0.35 when absent. Overcast light casts weak shadows. */
+  shadowDarkness?: number;
 }
 
 export interface MoodCurves {
@@ -54,8 +56,15 @@ export const MOODS: Record<VenueMood, MoodDef> = {
   // and the colour goes out of the place without the whole frame going dark. Bloom is effectively off (0.95
   // threshold) because there is no highlight to bloom, and contrast stays near 1 so it reads grey rather than
   // moody — a flat day, not a night.
-  overcast:   { sky: '#d8dee6', ground: '#6e747c', hemiIntensity: 0.95, sun: '#e9edf2', sunIntensity: 0.9, sunDir: [-0.25, -1, -0.15], exposure: 1.0, clearColor: '#bcc6d1', bloomThreshold: 0.95, bloomWeight: 0.18, bloomScale: 0.4, contrast: 1.02, vignetteColor: [0.08, 0.1, 0.12, 0], vignetteWeight: 1.3, skyWash: 0.6, curves: curves(-6, 205, 6, 205, 10) },
+  overcast:   { sky: '#d8dee6', ground: '#6e747c', hemiIntensity: 0.95, sun: '#e9edf2', sunIntensity: 0.9, sunDir: [-0.25, -1, -0.15], exposure: 1.0, clearColor: '#bcc6d1', bloomThreshold: 0.95, bloomWeight: 0.18, bloomScale: 0.4, contrast: 1.02, vignetteColor: [0.08, 0.1, 0.12, 0], vignetteWeight: 1.3, skyWash: 0.6, curves: curves(-6, 205, 6, 205, 10), shadowDarkness: 0.55 },
   alpine:     { sky: '#cfe0f4', ground: '#7d90a8', hemiIntensity: 0.55, sun: '#fff1dc', sunIntensity: 1.6, sunDir: [-0.45, -1, -0.25], exposure: 0.92, clearColor: '#a9c7e8', bloomThreshold: 0.92, bloomWeight: 0.22, bloomScale: 0.5, contrast: 1.14, vignetteColor: [0.05, 0.08, 0.12, 0], vignetteWeight: 1.1, skyWash: 0, curves: curves(4, 42, 10, 215, 24) },
+  // A9.4 (visual-foundation, 2026-10-06): two places no mood could be. DUSK is the blue hour after the sun has gone: a
+  // low deep-orange key under a violet sky, long shadows, the warmest highlights against the coolest shadows in the
+  // game (the Pit's dusk sky, the Foundry's and Rooftop Dusk's ember). INDOOR ARENA is a lit hall: the key is the
+  // ceiling rig straight overhead (shadows pool under the feet, not across the floor), the bounce off a bright ceiling
+  // carries the fill, and nothing out there needs a sky (the volleyball gym, the daytime TV studio).
+  dusk:        { sky: '#c49ad0', ground: '#3a2b36', hemiIntensity: 0.6, sun: '#ff8f4a', sunIntensity: 2.0, sunDir: [-0.7, -0.62, -0.3], exposure: 1.08, clearColor: '#2b1c3d', bloomThreshold: 0.6, bloomWeight: 0.42, bloomScale: 0.55, contrast: 1.16, vignetteColor: [0.14, 0.05, 0.14, 0], vignetteWeight: 1.7, skyWash: 0.35, curves: curves(10, 28, 26, 265, 28, 6, 6) },
+  indoorArena: { sky: '#e8ebf0', ground: '#5a4f46', hemiIntensity: 0.8, sun: '#fff4e2', sunIntensity: 2.1, sunDir: [-0.12, -1, -0.1], exposure: 1.06, clearColor: '#15171c', bloomThreshold: 0.82, bloomWeight: 0.26, bloomScale: 0.45, contrast: 1.12, vignetteColor: [0.03, 0.03, 0.05, 0], vignetteWeight: 1.6, skyWash: 0, curves: curves(6, 45, 10, 220, 12) },
 };
 
 /** Mode → mood mapping (README wiring step 4). */

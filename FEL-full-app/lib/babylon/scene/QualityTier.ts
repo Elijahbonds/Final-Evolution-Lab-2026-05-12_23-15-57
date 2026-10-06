@@ -166,8 +166,10 @@ export function detectQualityTier(canvas: { clientWidth: number; clientHeight: n
 }
 
 /** Moods with a real sun over a large ground plane — where cascades pay off.
- *  The dojo is a lit interior with a tatami; one cascade frames it fine. */
-export const OUTDOOR_MOODS: ReadonlySet<VenueMood> = new Set<VenueMood>(['goldenHour', 'daylight', 'alpine', 'nightGame']);
+ *  The dojo is a lit interior with a tatami; one cascade frames it fine. So is the indoor arena.
+ *  overcast joined 2026-10-06 (A9.4): the glacier and the reef are outdoor fields too, and the audit found them on the
+ *  single blurred map; dusk is outdoor by definition. */
+export const OUTDOOR_MOODS: ReadonlySet<VenueMood> = new Set<VenueMood>(['goldenHour', 'daylight', 'alpine', 'nightGame', 'overcast', 'dusk']);
 
 /** Per-tier rig settings, read by mountLightRig. */
 export interface TierRigSettings {
