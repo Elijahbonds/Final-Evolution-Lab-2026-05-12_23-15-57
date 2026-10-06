@@ -51,6 +51,12 @@ describe('Community recipes shelf', () => {
   it('the Fuel page mounts it for every signed-in player (teens included: no age gate on the mount)', () => {
     const page = readFileSync(join(process.cwd(), 'app/kitchens/fuel/page.tsx'), 'utf8');
     expect(page).toContain('<CommunityRecipes />');
-    expect(page).not.toMatch(/dobYear|isPublicCreator|verifiedAdult/);
+    // INTEGRATION (2026-10-06): the Fuel page now reads dobYear itself (finish-release's recipes-only floor under 18
+    // picks FuelView or FuelYouthView). The shelf's mount must stay outside that choice: on its own line, unconditional,
+    // after the audience ternary has closed, and no creator/adult gate anywhere on the page.
+    const mount = page.split('\n').find((l) => l.includes('<CommunityRecipes />'))!;
+    expect(mount.trim()).toBe('<CommunityRecipes />');
+    expect(page).toMatch(/\{audience === 'adult' \? <FuelView \/> : <FuelYouthView \/>\}\s*\n\s*<CommunityRecipes \/>/);
+    expect(page).not.toMatch(/isPublicCreator|verifiedAdult|if \(audience|audience === 'adult' &&/);
   });
 });
