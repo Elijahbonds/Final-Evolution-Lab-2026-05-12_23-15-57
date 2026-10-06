@@ -122,6 +122,43 @@ describe('the ambient gulls', () => {
   });
 });
 
+// IMPROVE (2026-10-06): the flock shares ONE material (it built four around one texture), and the call hands back what it
+// mounted — a mode's dispose took none of it (4 planes, 4 materials, 4 per-frame observers outlived every mode).
+describe('the ambient handle', () => {
+  const fresh = () => { const s = new Scene(new NullEngine()); new FreeCamera('ca', new Vector3(0, 1, -3), s); return s; };
+
+  it('the four gulls share one material', () => {
+    const s = fresh();
+    EffectsKit.ambient(s, 'venice');
+    const gulls = s.meshes.filter((m) => m.name.startsWith('gull_'));
+    expect(gulls.length).toBe(4);
+    expect(new Set(gulls.map((g) => g.material)).size).toBe(1);
+    expect(s.materials.filter((m) => m.name.startsWith('gull_m')).length).toBe(1);
+  });
+
+  it('dispose takes the planes, the material and the per-frame observers', () => {
+    const s = fresh();
+    // (Babylon defers an observer's removal to the next tick and flags it meanwhile: the live ones are the unflagged)
+    const live = () => s.onBeforeRenderObservable.observers.filter((o) => !(o as unknown as { _willBeUnregistered?: boolean })._willBeUnregistered).length;
+    const before = live();
+    const h = EffectsKit.ambient(s, 'venice');
+    expect(live()).toBe(before + 4);
+    h.dispose();
+    expect(s.meshes.filter((m) => m.name.startsWith('gull_')).length).toBe(0);
+    expect(s.materials.filter((m) => m.name.startsWith('gull_m')).length).toBe(0);
+    expect(live()).toBe(before);
+    expect(() => { h.dispose(); s.render(); }).not.toThrow();   // twice is harmless, and the scene still draws
+  });
+
+  it('a particle ambient is taken down too', () => {
+    const s = fresh();
+    const h = EffectsKit.ambient(s, 'dojo');
+    expect(s.particleSystems.some((p) => p.name === 'amb_petals')).toBe(true);
+    h.dispose();
+    expect(s.particleSystems.some((p) => p.name === 'amb_petals')).toBe(false);
+  });
+});
+
 // IMPROVE (2026-10-06): a burst used to build (and then dispose) a whole ParticleSystem per call; a 50 in the dunk fires six
 // in one frame. They come out of a small per-scene, per-kind pool now, and the caller cannot tell.
 describe('the burst pool', () => {

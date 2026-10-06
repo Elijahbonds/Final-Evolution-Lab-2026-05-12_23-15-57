@@ -5,7 +5,11 @@ import {
   Color4, DynamicTexture, Mesh, MeshBuilder, ParticleSystem, StandardMaterial,
   Texture, Vector3, Color3,
 } from '@babylonjs/core';
-import type { AbstractMesh, Scene } from '@babylonjs/core';
+import type { AbstractMesh, Observer, Scene } from '@babylonjs/core';
+
+/** IMPROVE (2026-10-06): what `EffectsKit.ambient` mounted — a mode that disposes it takes the gulls' planes, their material and
+ *  their per-frame observers with it (they outlived every mode before: 4 planes, 4 materials, 4 observers never removed). */
+export interface AmbientHandle { dispose(): void }
 
 /** 16×16 soft dot texture, generated once per scene. */
 function dotTexture(scene: Scene): Texture {
@@ -138,7 +142,9 @@ export function burstPoolSize(scene: Scene, kind: BurstKind): number { return bu
 
 export const EffectsKit = {
   /** Ambient motion per venue — mount once in load(). */
-  ambient(scene: Scene, family: VenueFamily): void {
+  ambient(scene: Scene, family: VenueFamily): AmbientHandle {
+    // IMPROVE (2026-10-06): everything mounted here is kept, so the handle can take it down (callers that ignore it are unchanged)
+    const owned: { dispose(): void }[] = [], observers: Observer<Scene>[] = [];
     if (family === 'dojo') {                               // drifting petals
       const ps = baseSystem(scene, 'amb_petals', 60);
       ps.emitter = new Vector3(0, 5, 0);
@@ -148,7 +154,7 @@ export const EffectsKit = {
       ps.minLifeTime = 6; ps.maxLifeTime = 10;
       ps.emitRate = 5;
       ps.gravity = new Vector3(0.15, -0.35, 0.1);
-      ps.start();
+      ps.start(); owned.push(ps);
     }
     if (family === 'slope') {                              // snowfall
       const ps = baseSystem(scene, 'amb_snow', 400);
@@ -159,27 +165,31 @@ export const EffectsKit = {
       ps.minLifeTime = 5; ps.maxLifeTime = 8;
       ps.emitRate = 60;
       ps.gravity = new Vector3(0.3, -1.4, 0);
-      ps.start();
+      ps.start(); owned.push(ps);
     }
     if (family === 'venice' || family === 'park') {        // gulls
       const tex = gullTexture(scene);
+      // IMPROVE (2026-10-06): ONE material for the flock. Each gull built its own StandardMaterial around the same texture with the
+      // same settings — four materials (four effects to keep, four binds a frame) for one look.
+      const m = new StandardMaterial('gull_m', scene);
+      m.diffuseTexture = tex; m.opacityTexture = tex; m.useAlphaFromDiffuseTexture = true;
+      m.emissiveColor = new Color3(0.93, 0.93, 0.96); m.disableLighting = true;
+      m.diffuseColor = Color3.Black(); m.backFaceCulling = false;
+      owned.push(m);   // (the texture is the scene's cached one, shared by name: the scene's teardown takes it)
       for (let i = 0; i < 4; i++) {
         const gull = MeshBuilder.CreatePlane(`gull_${i}`, { width: 0.9, height: 0.45 }, scene);
         gull.billboardMode = Mesh.BILLBOARDMODE_ALL;
         gull.isPickable = false;
-        const m = new StandardMaterial(`gull_m_${i}`, scene);
-        m.diffuseTexture = tex; m.opacityTexture = tex; m.useAlphaFromDiffuseTexture = true;
-        m.emissiveColor = new Color3(0.93, 0.93, 0.96); m.disableLighting = true;
-        m.diffuseColor = Color3.Black(); m.backFaceCulling = false;
         gull.material = m;
+        owned.push(gull);
         // GULLS BELONG IN THE BACKGROUND. At r 8–17 and y 6.5 they flew through the play — over the rim, across the
         // dunker — which is where the eye is. Pushed out and up, they are weather instead of traffic.
         const phase = i * 1.7, r = GULL_RADIUS + i * 4;
-        scene.onBeforeRenderObservable.add(() => {
+        observers.push(scene.onBeforeRenderObservable.add(() => {
           const t = performance.now() / 1000 + phase;
           gull.position.set(Math.sin(t * 0.18) * r, GULL_Y + i * 0.8 + Math.sin(t * 0.9) * 0.4, Math.cos(t * 0.18) * r - 6);
           gull.scaling.y = 0.7 + Math.abs(Math.sin(t * 6)) * 0.5;   // wing flap
-        });
+        }));
       }
     }
     if (family === 'gridiron') {                           // floodlight moths
@@ -190,8 +200,16 @@ export const EffectsKit = {
       ps.minSize = 0.03; ps.maxSize = 0.06;
       ps.minLifeTime = 2; ps.maxLifeTime = 4;
       ps.emitRate = 10;
-      ps.start();
+      ps.start(); owned.push(ps);
     }
+    let gone = false;
+    return {
+      dispose() {
+        if (gone) return; gone = true;
+        for (const o of observers) scene.onBeforeRenderObservable.remove(o);
+        for (let i = owned.length - 1; i >= 0; i--) owned[i].dispose();   // the planes before the material they wear
+      },
+    };
   },
 
   /** Comet trail parented to the ball. Call once; runs while ball moves. */
