@@ -30,10 +30,13 @@ export const MAX_SLOTS = 5;
  *  is under this (look.test.ts measures it), so the cap only bites if the budgets and the cap drift apart. */
 export const MAX_DOC_CHARS = 24_000;
 
-/** Procedural part shapes (phase 2 builds each in code; no art needed). */
+/** Procedural part shapes (phase 2 builds each in code, lib/babylon/creator/parts/shapes.ts; no art needed).
+ *  APPEND ONLY: saved docs and share codes name these. Phase 2 (2026-10-06) appended the second row, generic building
+ *  blocks only. Keep every name at most 11 characters (the size-cap test budgets the longest). */
 export const PART_SHAPES = [
   'spike', 'cone', 'horn', 'blade', 'plate', 'disc', 'ring', 'sphere', 'capsule', 'box', 'visor', 'lens', 'fin', 'wing',
   'strap', 'capeStrip', 'shoulderPad', 'belt', 'maskShell', 'torus', 'tube',
+  'cylinder', 'wedge', 'dome', 'pyramid', 'gem', 'crescent', 'leaf', 'claw', 'arc',
 ] as const;
 export type PartShape = typeof PART_SHAPES[number];
 
@@ -95,7 +98,8 @@ export const PROPORTION_RANGES = {
 export type ProportionKey = keyof typeof PROPORTION_RANGES;
 export const PROPORTION_KEYS = Object.keys(PROPORTION_RANGES) as ProportionKey[];
 
-/** Numeric ranges the sanitiser clamps to. Positions are bone-local metres (before the rig scale). */
+/** Numeric ranges the sanitiser clamps to. Part positions are metres from the bone's joint along the bone's own REST
+ *  frame (lib/creator/look/parts.ts says which way each axis runs; phase 2 measures it off the rig, rigFrames.ts). */
 export const RANGES = {
   partPos: [-0.6, 0.6],
   partRot: [-180, 180],      // degrees
@@ -114,13 +118,15 @@ export interface CreatorPart {
   id: string;
   shape: PartShape;
   bone: PartBone;
+  /** metres from the joint, in the bone's rest frame (x side, y along the bone, z front; parts.ts) */
   pos: Vec3;
+  /** degrees in that frame, Babylon's x/y/z order */
   rot: Vec3;
   /** Non-uniform scale is the "squash". */
   scale: Vec3;
   colour: string;
   finish: Finish;
-  /** Also place the mirror image on the opposite side's bone. */
+  /** Also place the mirror image on the opposite side's bone (a centre bone: reflected across the body). Costs 2 of the 64. */
   mirror: boolean;
 }
 
