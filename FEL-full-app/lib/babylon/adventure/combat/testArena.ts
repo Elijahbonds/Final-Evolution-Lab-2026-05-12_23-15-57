@@ -147,7 +147,8 @@ export function createArena(opts: ArenaOptions = {}): Arena {
             a.impulse = null;
           } else if (a.stats.hp.cur > 0 && a.stunSec <= 0 && !locked && input) {
             const w = wishDir(input);
-            const sp = a.kind === 'monster' || a.kind === 'boss' ? 9 : runSpeed;
+            // contracts v2: a body with maxSpeed runs a full stick at exactly it (A1's rule); else the v1 stand-in
+            const sp = a.maxSpeed !== undefined && a.maxSpeed > 0 ? a.maxSpeed : a.kind === 'monster' || a.kind === 'boss' ? 9 : runSpeed;
             a.vel.x = w.x * sp; a.vel.z = w.z * sp;
             if (input.ascendHeld && a.pos.y < 6) a.vel.y = Math.max(a.vel.y, 3);
           } else if (!locked && a.pos.y <= 0.001) {

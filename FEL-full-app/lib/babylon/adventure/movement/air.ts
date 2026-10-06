@@ -9,6 +9,7 @@
  */
 
 import type { AdventureActor, MoveInput } from '../contracts';
+import { LAUNCH_GRAVITY } from '../contracts';
 import type { BodyState, StepEnv } from './body';
 import type { Wish } from './input';
 import { yawOf } from './math';
@@ -47,7 +48,8 @@ export function integrateAir(a: AdventureActor, b: BodyState, inp: MoveInput, w:
   if (b.rising && !inp.jumpHeld && a.vel.y > 0 && a.stateSec >= air.minJumpSec) { a.vel.y *= air.jumpCutMult; b.rising = false; }
   if (a.vel.y <= 0) b.rising = false;
 
-  let gScale = 1;
+  // A body A2 launched falls at the shared launch gravity (contracts v2), so the air string's window is A2's.
+  let gScale = b.launched ? LAUNCH_GRAVITY / air.gravity : 1;
   if (b.airDashT > 0) { b.airDashT = Math.max(0, b.airDashT - dt); gScale = air.airDashGravity; }
   else {
     // Steering: toward the stick at the run's own speed (never below airMinSpeed × tilt), so steering keeps momentum.
@@ -81,7 +83,7 @@ export function tryLand(a: AdventureActor, b: BodyState, env: StepEnv): boolean 
   if (b.speed > 0.1) b.heading = yawOf(a.vel.x, a.vel.z);
   b.coyote = 0;
   b.airDashes = 1; b.airDashT = 0;
-  b.rising = false; b.spinning = false;
+  b.rising = false; b.spinning = false; b.launched = false;
   b.homingChain = 0; b.lastHomedId = null;
   b.landedAt = env.tSec;
   enterState(a, 'ground', env.bus);

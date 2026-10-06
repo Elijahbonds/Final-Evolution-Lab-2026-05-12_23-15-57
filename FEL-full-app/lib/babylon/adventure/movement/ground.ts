@@ -77,6 +77,7 @@ export function groundJump(a: AdventureActor, b: BodyState, env: StepEnv): void 
   b.jumpBuffer = 0;
   b.rising = true;
   b.spinning = true;
+  b.launched = false;
   b.skidding = false;
   b.jumpedAt = env.tSec;
   enterState(a, 'air', env.bus);

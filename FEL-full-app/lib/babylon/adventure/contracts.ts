@@ -12,6 +12,10 @@
  *   it trades in cannot depend on a scene.
  * - Frozen during Phase A. A lane that needs a change writes `contract request:` in its PR body; A4 applies it. New
  *   fields are added as OPTIONAL so nothing already coded against the contract breaks.
+ * - Version 2 (A4, 2026-10-06): the Phase A lanes' contract requests, all optional — `AdventureWorld.bounds`,
+ *   `AdventureActor.{spinning, moveLockSec, warp, canFly, maxSpeed}`, `MoveInput.interactHeld`,
+ *   `CreaturePartner.xp`, the events `telegraph` and `revive`, `rail:trick`'s `energy`, `LAUNCH_GRAVITY`, the
+ *   time:scale semantics written down, and the ownership table `ACTOR_FIELD_OWNERS` the ownership test reads.
  * - IP line: every name in here is generic. No character, place, move or spell name from a feel reference ships.
  */
 
@@ -19,7 +23,7 @@ import type { PrqAttr, PrqGrade } from '@/lib/prq';
 import type { StyleBlend } from '@/lib/babylon/combat/schools';
 
 /** Bumped only when a contract changes shape in a way a lane must react to (pinned by contracts.test.ts). */
-export const ADVENTURE_CONTRACTS_VERSION = 1;
+export const ADVENTURE_CONTRACTS_VERSION = 2;
 
 // ── Space ─────────────────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -114,13 +118,18 @@ export interface MoveInput {
   /** Flight only. */
   ascendHeld: boolean;
   descendHeld: boolean;
+  /**
+   * Held interact (v2, A3's request): a human's revive of a downed BR duo partner. Optional so every MoveInput built
+   * before v2 stays valid; absent reads as false. Story revives still work by standing still beside the body.
+   */
+  interactHeld?: boolean;
 }
 
 export const NEUTRAL_MOVE_INPUT: Readonly<MoveInput> = Object.freeze({
   move: Object.freeze({ x: 0, y: 0 }), camYaw: 0, look: Object.freeze({ x: 0, y: 0 }),
   jump: false, jumpHeld: false, dash: false, dashHeld: false, attackLight: false, attackHeavy: false, lock: false,
   guardHeld: false, magic: false, magicHeld: false, magicSlot: null, focusHeld: false, partner: false, fuse: false,
-  lean: 0, ascendHeld: false, descendHeld: false,
+  lean: 0, ascendHeld: false, descendHeld: false, interactHeld: false,
 }) as Readonly<MoveInput>;
 
 /** A fresh, mutable neutral input (systems may consume edges by clearing them). */
@@ -219,13 +228,19 @@ export const NO_FUSION: Readonly<FusionState> = Object.freeze({
 /**
  * One body in the Adventure: the player, their partner, a BR bot, a monster or a boss.
  *
- * WHO WRITES WHAT (the rule that lets three lanes share one object):
- *   A1 movement: pos, vel, facingYaw, grounded, state, stateSec, rail, ridingId (mount/dismount), wantsFlight.
- *   A2 combat:   stats.hp.cur, stats.poise.cur, stats.stamina.cur (spend and regen), energy SPEND, lock, stunSec,
- *                iframeSec, impulse.
- *   A3 partner:  every pool's max, energy regen, special, level, element, school, attrs, fusion, partnerId.
+ * WHO WRITES WHAT (the rule that lets three lanes share one object; ACTOR_FIELD_OWNERS below is the same table as
+ * data, and host/ownership.test.ts steps every system and fails on a write outside it):
+ *   A1 movement: pos, vel, facingYaw, grounded, state, stateSec, rail, ridingId (mount/dismount), wantsFlight,
+ *                spinning; it CLEARS impulse (after adding it) and warp (after applying it); energy SPEND (fused flight).
+ *                It never moves a partner whose fusion is active (that body belongs to A3 while fused, below).
+ *   A2 combat:   stats.hp.cur (incl. the revive's restore), stats.poise.cur, stats.stamina.cur (spend and regen),
+ *                energy SPEND, lock, stunSec, iframeSec, impulse, moveLockSec, warp (sets), maxSpeed.
+ *   A3 partner:  every pool's max, energy regen and gain (a rail trick's energy), special, level, prqBand, element,
+ *                school, attrs, fusion, partnerId; and a FUSED partner's pos / vel (the hidden body travels inside the
+ *                player and reappears beside it at the unfuse).
+ *   The spawner (A4's host, at spawn only): id, kind, team, radius, height, canFly, and every field's first value.
  * A reader may read anything. A field is written only by its owner; a request to another owner goes through the
- * owner's input field (impulse, stunSec) or an event.
+ * owner's input field (impulse, stunSec, warp) or an event (revive).
  */
 export interface AdventureActor {
   id: ActorId;
@@ -259,6 +274,60 @@ export interface AdventureActor {
   fusion: FusionState;
   /** This actor's partner (player ↔ partner both point at each other). */
   partnerId: ActorId | null;
+  // ── v2 (A4 applied the Phase A contract requests; every one optional, absent = the v1 behaviour) ──
+  /** In the spin ball (a spin jump, a homing dash): a damaging body. A1 writes it so A2 can score a spin contact. */
+  spinning?: boolean;
+  /**
+   * Seconds a combat verb holds the body (a roll, the homing dash to the lock, a lunge, a telekinesis hold, the Storm
+   * dash). A2 writes it; while > 0 A1 skips its own steering and carries the body on its velocity (A2 drives that
+   * velocity through `impulse`).
+   */
+  moveLockSec?: number;
+  /** A teleport (a substitution's landing spot). A2 sets it; A1 applies it on its next step and clears it to null. */
+  warp?: Vec3 | null;
+  /**
+   * Flies by nature (a flyer monster, a boss): takes off like a fused body at no energy cost, and starts in the air
+   * when spawned with `wantsFlight`. Set by the spawner; a player never has it (their flight is fusion or a mount).
+   */
+  canFly?: boolean;
+  /** This body's run top speed, m/s, exact (a monster's steering preset). A2 writes it; A1 caps the ground run at it. */
+  maxSpeed?: number;
+}
+
+
+/** The lanes that may write an actor field (contracts v2). 'spawn' = the host when it builds or respawns the actor. */
+export type FieldOwner = 'movement' | 'combat' | 'partner' | 'spawn';
+
+/**
+ * Who may CHANGE each actor field during a step: the WHO WRITES WHAT table above as data. Keys are leaf paths
+ * (`stats.hp.cur`); a key ending in `.*` covers every leaf under it. Rules a table cannot say, the ownership test
+ * (host/ownership.test.ts) checks beside it: energy `cur` may go DOWN by anyone (spendPool) and UP only by 'partner';
+ * a pool's `cur` lowered to a max 'partner' just lowered is 'partner's; a fused partner's pos / vel are 'partner's;
+ * movement's clearing of `impulse` and `warp` to null is movement's.
+ */
+export const ACTOR_FIELD_OWNERS: Readonly<Record<string, readonly FieldOwner[]>> = Object.freeze({
+  'pos.*': ['movement'], 'vel.*': ['movement'], facingYaw: ['movement'], grounded: ['movement'], state: ['movement'],
+  stateSec: ['movement'], 'rail.*': ['movement'], rail: ['movement'], ridingId: ['movement'], wantsFlight: ['movement'],
+  spinning: ['movement'],
+  'stats.hp.cur': ['combat'], 'stats.poise.cur': ['combat'], 'stats.stamina.cur': ['combat'],
+  'lock.*': ['combat'], lock: ['combat'], stunSec: ['combat'], iframeSec: ['combat'], 'impulse.*': ['combat'],
+  impulse: ['combat'], moveLockSec: ['combat'], 'warp.*': ['combat'], warp: ['combat'], maxSpeed: ['combat'],
+  'stats.hp.max': ['partner'], 'stats.stamina.max': ['partner'], 'stats.energy.max': ['partner'],
+  'stats.poise.max': ['partner'], 'stats.special': ['partner'], 'stats.level': ['partner'],
+  'stats.prqBand': ['partner'], 'stats.school.*': ['partner'], 'stats.element': ['partner'], 'stats.attrs.*': ['partner'],
+  'fusion.*': ['partner'], partnerId: ['partner'],
+  id: ['spawn'], kind: ['spawn'], team: ['spawn'], radius: ['spawn'], height: ['spawn'], canFly: ['spawn'],
+});
+
+/** The owners of a leaf path, from ACTOR_FIELD_OWNERS (exact key first, then the nearest `.*` parent). Empty = nobody. */
+export function ownersOfField(path: string): readonly FieldOwner[] {
+  const exact = ACTOR_FIELD_OWNERS[path];
+  if (exact) return exact;
+  for (let i = path.lastIndexOf('.'); i > 0; i = path.lastIndexOf('.', i - 1)) {
+    const wild = ACTOR_FIELD_OWNERS[`${path.slice(0, i)}.*`];
+    if (wild) return wild;
+  }
+  return [];
 }
 
 // ── Rails ─────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -374,6 +443,14 @@ export function flightSourceOf(actor: Pick<AdventureActor, 'fusion' | 'ridingId'
   return null;
 }
 
+/**
+ * The gravity on a body A2 LAUNCHED (its impulse lifted it off the ground), m/s² (v2, A2's request). A2 sizes a launch
+ * by it (v = g·T/2 keeps the body up for T) and A1 applies it to that body until it lands, so the air string's window
+ * is the one A2 tuned. A1's own jump runs on its own snappier gravity (movement/params `air.gravity`). [TUNE] — the
+ * value is EvadeMoves' combat gravity (19.5), the number A2 tuned its launches against.
+ */
+export const LAUNCH_GRAVITY = 19.5;
+
 // ── Magic ─────────────────────────────────────────────────────────────────────────────────────────────────────────
 
 export interface SpellDef {
@@ -428,6 +505,8 @@ export interface CreaturePartner {
   /** Stage from which the creature can carry the player on the ground / in the air; null = never. */
   rideableAtStage: number | null;
   flyableAtStage: number | null;
+  /** v2 (A3's request): the creature's training XP toward its next stage (partner/evolution.ts). */
+  xp?: number;
 }
 
 export interface CharacterPartner {
@@ -520,12 +599,21 @@ export interface AdventureEvents {
   'state': { actorId: ActorId; from: MovementState; to: MovementState };
   'rail:enter': { actorId: ActorId; segmentId: string; speed: number };
   'rail:switch': { actorId: ActorId; from: string; to: string };
-  'rail:trick': { actorId: ActorId; trick: string; points: number };
+  /** `energy` (v2): what the trick pays (A1 fills it with RAIL_TRICK_ENERGY); A3's stats system grants it. */
+  'rail:trick': { actorId: ActorId; trick: string; points: number; energy?: number };
   'rail:exit': { actorId: ActorId; segmentId: string; reason: 'end' | 'jump' | 'fall' | 'hit' };
   'homing': { actorId: ActorId; targetId: ActorId; hit: boolean };
   'lock': { actorId: ActorId; target: LockTarget | null };
   'spell:cast': { actorId: ActorId; spellId: string; element: Element | null };
-  /** Slow-time and hit-stop: the host owns the clock; systems ask. */
+  /**
+   * Slow-time and hit-stop: the host owns the clock; systems ask (v2 writes the semantics down).
+   *   - A request from `byId` runs for `sec` seconds of the host's UNSCALED sim time: every actor runs at `world`, and
+   *     `byId` itself at `self`. One request per `byId`: a new one replaces that actor's last.
+   *   - CANCEL: `sec: 0`, `world: 1`, `self: 1` from the same `byId` ends that actor's request at once.
+   *   - Several actors' requests at once: each actor runs at the SLOWEST scale any live request gives it.
+   *   - `world: 0, self: 0` is a HIT-STOP: the host freezes the whole sim for `sec` of real time (views keep drawing).
+   * Systems receive the UNSCALED fixed dt in `step(ctx, dt)` and apply `ctx.timeScaleOf(id)` per actor themselves.
+   */
   'time:scale': { byId: ActorId; world: number; self: number; sec: number };
   'fusion': { actorId: ActorId; partnerId: ActorId; active: boolean; tier: FusionState['tier'] };
   'mount': { riderId: ActorId; mountId: ActorId; on: boolean };
@@ -536,6 +624,13 @@ export interface AdventureEvents {
   'story:flag': { flag: string; value: boolean | number | string };
   'loot': { actorId: ActorId; lootId: string };
   'zone': { phase: number; radiusM: number; center: Vec3 };
+  /** v2 (A2's request): a monster's or boss's wind-up began — for audio and views (the tell, heard). */
+  'telegraph': { actorId: ActorId; attackId: string; tellSec: number };
+  /**
+   * v2 (A3's request): a downed actor's revive completed. A3 emits it (the partner's channel); A2 applies it (hp is
+   * A2's field) on its next step: hp back to `hpRatio` of max.
+   */
+  'revive': { actorId: ActorId; byId: ActorId; hpRatio: number };
 }
 
 export type AdventureEventName = keyof AdventureEvents;
@@ -589,11 +684,16 @@ export interface AdventureWorld {
   near(p: Vec3, r: number): AdventureActor[];
   /** Line of sight for lock-on and homing. */
   clear(a: Vec3, b: Vec3): boolean;
+  /** v2 (A1's request): the world's sides on the ground plane, for flight's edge steering. Absent = unbounded. */
+  bounds?: { minX: number; maxX: number; minZ: number; maxZ: number } | null;
 }
 
 /** What a system gets each fixed step. */
 export interface AdventureStepContext {
-  /** Sim time, seconds (the host's fixed clock, already slowed by time:scale). */
+  /**
+   * Sim time, seconds: the host's fixed clock, UNSCALED (it advances one fixed dt per step whatever time:scale says; a
+   * hit-stop is the only thing that holds it). An actor's own slowed clock is the system's to keep (dt × timeScaleOf).
+   */
   tSec: number;
   world: AdventureWorld;
   inputs: ReadonlyMap<ActorId, MoveInput>;
@@ -607,6 +707,7 @@ export interface AdventureStepContext {
 /**
  * The unit A4 composes. Step order per fixed tick (60 Hz): input → partner brain (A3) → movement (A1) → combat and
  * magic (A2) → stats (A3) → view sync. A system mutates only the actor fields it owns (see AdventureActor).
+ * `dt` is the UNSCALED fixed step (1 / SIM_HZ); scale it per actor with `ctx.timeScaleOf(id)`.
  */
 export interface AdventureSystem {
   readonly id: string;

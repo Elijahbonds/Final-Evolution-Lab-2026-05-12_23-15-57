@@ -12,7 +12,8 @@
  * (derive.applyDerived: the pool invariant).
  *
  * XP it awards itself [TUNE]: a monster KO by the party 12, a boss KO 150, a rail trick points / 10. A partner's XP is
- * the player's: a partner's level follows its player's (`levelFrom`).
+ * the player's: a partner's level follows its player's (`levelFrom`). A rail trick also pays its `energy` (contracts
+ * v2; A1's RAIL_TRICK_ENERGY, 4), granted on this system's next step.
  *
  * Pure (no Babylon). Steps on the host's fixed clock.
  */
@@ -148,6 +149,8 @@ export function createStatsSystem(opts: StatsSystemOptions = {}): StatsSystem {
   let unsubs: (() => void)[] = [];
   let lastT = 0;
   let actors: ReadonlyMap<ActorId, AdventureActor> | null = null;
+  /** Energy owed from rail tricks since the last step (granted at the top of the next). */
+  const pendingEnergy = new Map<ActorId, number>();
 
   function register(setup: StatsActorSetup): void {
     const p = setup.progress;
@@ -215,6 +218,10 @@ export function createStatsSystem(opts: StatsSystemOptions = {}): StatsSystem {
   }
 
   function onTrick(e: AdventureEvents['rail:trick']): void {
+    // contracts v2: a trick pays energy (A1 names it, RAIL_TRICK_ENERGY); A3 owns energy gain, granted at this
+    // system's own step so the write is the stats system's.
+    const energy = e.energy ?? 0;
+    if (energy > 0 && tracked.has(e.actorId)) pendingEnergy.set(e.actorId, (pendingEnergy.get(e.actorId) ?? 0) + energy);
     const owner = progressOwner(e.actorId);
     const amount = Math.floor(Math.max(0, e.points) / XP_TRICK_DIV);
     if (owner && amount > 0) bus?.emit('xp', { actorId: owner.setup.id, amount, source: 'trick' });
@@ -270,6 +277,12 @@ export function createStatsSystem(opts: StatsSystemOptions = {}): StatsSystem {
           t.spawned = true;
           t.key = key;
           t.dirty = false;
+        }
+        const owed = pendingEnergy.get(t.setup.id);
+        if (owed) {
+          const en = a.stats.energy;
+          en.cur = Math.min(en.max, en.cur + owed);
+          pendingEnergy.delete(t.setup.id);
         }
         const blocked = a.state === 'flight' || a.state === 'ko' || a.stats.hp.cur <= 0;
         t.regen.step(a.stats.energy, t.derived.energyRegenPerSec, dt, blocked);

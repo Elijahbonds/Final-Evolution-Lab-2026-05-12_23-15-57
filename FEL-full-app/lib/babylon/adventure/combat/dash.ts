@@ -38,6 +38,17 @@ export function startDodge(actor: AdventureActor, fs: FightState, kind: DodgeKin
   fs.iframeCause = 'dodge';
   fs.move = null;            // a dodge cancels the swing (the dash is a cancel: StormCombat)
   fs.homingSec = 0;
+  fs.dashSec = 0;
+  if (kind === 'dash' && actor.grounded && actor.state === 'ground') {
+    // The Storm dash moves the body (A4: A1 has no ground dash of its own, so the burst is driven here through the
+    // impulse while moveLockSec holds A1's steering — the same path as the roll). It never brakes a run.
+    const l = Math.hypot(dirX, dirZ);
+    if (l > 0.2) { fs.dashDirX = dirX / l; fs.dashDirZ = dirZ / l; }
+    else { fs.dashDirX = Math.sin(actor.facingYaw); fs.dashDirZ = Math.cos(actor.facingYaw); }
+    fs.dashSpeed = Math.max(DODGE.dashSpeed, Math.hypot(actor.vel.x, actor.vel.z));
+    fs.dashSec = DODGE.dashSec;
+    fs.moveLockSec = Math.max(fs.moveLockSec, DODGE.dashSec);
+  }
   if (kind === 'roll') {
     const l = Math.hypot(dirX, dirZ);
     if (l > 0.2) { fs.rollDirX = dirX / l; fs.rollDirZ = dirZ / l; }
@@ -62,6 +73,7 @@ export function startHoming(actor: AdventureActor, fs: FightState, targetId: Act
   if (!targetId || actor.stunSec > 0 || actor.stats.hp.cur <= 0) return false;
   // The double tap's first tap already paid for a dash; the homing burst is the same press continued.
   fs.rollSec = 0;
+  fs.dashSec = 0;
   fs.homingSec = DODGE.homingMaxSec;
   fs.homingTarget = targetId;
   fs.moveLockSec = Math.max(fs.moveLockSec, DODGE.homingMaxSec);
@@ -73,6 +85,12 @@ export function startHoming(actor: AdventureActor, fs: FightState, targetId: Act
  * homing dash reaches its stop distance, 'expired' when it ran out first, else null.
  */
 export function stepDodgeMotion(actor: AdventureActor, fs: FightState, world: AdventureWorld, dt: number): 'arrived' | 'expired' | null {
+  if (fs.dashSec > 0) {
+    fs.dashSec = Math.max(0, fs.dashSec - dt);
+    // the burst holds its speed to the end; A1 then runs on from it (the run keeps what the dash gave)
+    requestPlanarVel(actor, fs.dashDirX * fs.dashSpeed, fs.dashDirZ * fs.dashSpeed);
+    return null;
+  }
   if (fs.rollSec > 0) {
     fs.rollSec = Math.max(0, fs.rollSec - dt);
     const v = fs.rollSec > 0 ? DODGE.rollSpeed : 0;

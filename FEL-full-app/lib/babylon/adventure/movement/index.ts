@@ -6,8 +6,15 @@
  *   movement.step(ctx, 1 / SIM_HZ);
  *
  * WHAT IT WRITES (contracts.ts field ownership): pos, vel, facingYaw, grounded, state, stateSec, rail, ridingId,
- * wantsFlight — and it SPENDS energy for fused flight (spendPool). It reads hp and stunSec (A2), fusion (A3) and impulse
- * (A2: applied once, then zeroed — the one A2 field the contract hands A1 to clear).
+ * wantsFlight, spinning — and it SPENDS energy for fused flight (spendPool). It reads hp and stunSec (A2), fusion (A3)
+ * and impulse (A2: applied once, then zeroed — the one A2 field the contract hands A1 to clear).
+ *
+ * CONTRACTS v2 (A4, 2026-10-06): `warp` (A2's substitution spot) is applied and cleared here; while `moveLockSec` > 0
+ * the body is CARRIED on the velocity A2 drives (no steering of A1's own: a roll, the homing dash to the lock, a lunge,
+ * the Storm dash); `canFly` makes an innate flyer; `maxSpeed` caps the ground run exactly (a monster's preset); a
+ * FUSED partner is never stepped (its hidden body is A3's while fused); the sprint stops at an empty stamina bar (A2's
+ * handoff: the sprint reads stamina, never writes it); a body A2 launched falls at contracts.LAUNCH_GRAVITY until it
+ * lands; and a hard lock on the ground faces its target while the stick circles it (the locked eight-way).
  *
  * ORDER INSIDE A STEP. Bodies that carry nobody step first (mounts included, driven by their rider's stick), then
  * riders sit on their mounts. So a rider is always exactly where its mount ended the tick.
@@ -52,7 +59,7 @@ export interface MovementSystemOptions {
   params?: { [K in keyof MovementParams]?: Partial<MovementParams[K]> };
   flight?: Partial<FlightParams>;
   flightExtra?: Partial<FlightExtra>;
-  /** The world's sides for flight (contract request: AdventureWorld.bounds). */
+  /** The world's sides for flight. Default: the world's own `bounds` (contracts v2), else none. */
   bounds?: WorldBounds | null;
   /** Whose camera hints to push. Default: the first actor of kind 'player'. */
   localId?: ActorId | null;
@@ -65,7 +72,15 @@ export interface MovementSystemOptions {
    * and one spawned with `wantsFlight` starts in the air. Players never: their flight is fusion or a flying mount.
    */
   innateFlyer?: (a: AdventureActor) => boolean;
+  /**
+   * The top ground speed while hard-locked on a target (the locked circle, CombatMovement's eight-way). [TUNE] default
+   * the jog (6 m/s): circling is a fight's footwork, not a run.
+   */
+  lockedTopSpeed?: number;
 }
+
+/** A fused partner's body is inside its player (contracts v2: A3's while fused). */
+export const isFusedPartner = (a: AdventureActor): boolean => a.kind === 'partner' && a.fusion.active;
 
 /** What a view (or a test, or A2's spin-attack check) can read about a body's traversal. Refreshed by inspect(). */
 export interface MovementTelemetry {
@@ -137,6 +152,15 @@ export function createMovementSystem(opts: MovementSystemOptions = {}): Movement
   const groundRail = { ...params.rail, catchReach: Math.min(0.6, params.rail.catchReach) };
   const lastGood = { x: 0, y: 0, z: 0 };
   let rails: RailIndex | null = null;
+  /** [TUNE] 6 m/s: the plan's jog. */
+  const lockedTop = opts.lockedTopSpeed ?? params.ground.jogSpeed;
+  /** The input with the sprint let go (one object, refilled: no allocation). */
+  const sprintless: MoveInput = { ...NEUTRAL, move: { x: 0, y: 0 }, look: { x: 0, y: 0 } };
+  const noSprint = (inp: MoveInput): MoveInput => {
+    Object.assign(sprintless, inp);
+    sprintless.dashHeld = false;
+    return sprintless;
+  };
 
   const canFly = (id: ActorId): boolean =>
     typeof opts.mountCanFly === 'function' ? opts.mountCanFly(id) : !!opts.mountCanFly;
@@ -184,6 +208,54 @@ export function createMovementSystem(opts: MovementSystemOptions = {}): Movement
       if (b.speed > 0.1) b.heading = Math.atan2(a.vel.x, a.vel.z);
       if (im.y > 0.5) { leaveGround(a, b, env); b.coyote = Infinity; }
     }
+    if (im.y > 0.5 && !a.grounded) b.launched = true;
+  }
+
+  /** A2's warp (a substitution's landing spot): put the body there on the ground, once (contracts v2). */
+  function applyWarp(a: AdventureActor, b: BodyState): void {
+    const wp = a.warp!;
+    a.warp = null;
+    if (!isFiniteVec(wp)) return;
+    if (a.state === 'grind') exitGrind(a, b, 'hit', env);
+    if (b.wall) b.wall = null;
+    const gy = env.world.groundY(wp.x, wp.z);
+    a.pos.x = wp.x; a.pos.z = wp.z;
+    a.pos.y = gy ?? wp.y;
+    a.vel.x = 0; a.vel.z = 0; a.vel.y = 0; b.speed = 0;
+    if (gy !== null && a.state !== 'flight') { a.grounded = true; if (a.state === 'air' || a.state === 'wallrun') enterState(a, 'ground', env.bus); }
+  }
+
+  /**
+   * A combat verb holds the body (moveLockSec > 0): no steering of A1's own. The body rides the velocity A2 set through
+   * its impulse — along the ground (steps, ledges and walls still apply), through the air under gravity, or in flight.
+   */
+  function carried(a: AdventureActor, b: BodyState, dt: number): void {
+    if (a.state === 'flight') { a.pos.x += a.vel.x * dt; a.pos.y += a.vel.y * dt; a.pos.z += a.vel.z * dt; return; }
+    if (!a.grounded || a.state === 'air') {
+      integrateAir(a, b, NEUTRAL, ZERO_WISH, env, dt);
+      tryLand(a, b, env);
+      return;
+    }
+    const g = params.ground;
+    const sp = Math.hypot(a.vel.x, a.vel.z);
+    b.speed = sp;
+    if (sp > 0.1) b.heading = Math.atan2(a.vel.x, a.vel.z);
+    const nx = a.pos.x + a.vel.x * dt, nz = a.pos.z + a.vel.z * dt;
+    const gy = env.world.groundY(nx, nz);
+    a.vel.y = 0;
+    if (gy !== null && gy - a.pos.y > g.stepUp) { a.vel.x = 0; a.vel.z = 0; b.speed = 0; }
+    else if (gy === null || a.pos.y - gy > g.stepDown) { a.pos.x = nx; a.pos.z = nz; leaveGround(a, b, env); }
+    else { a.pos.x = nx; a.pos.z = nz; a.pos.y = gy; }
+  }
+
+  /** The yaw from a hard-locked body to its live target, or null (no hard lock, the target gone or down). */
+  function lockYaw(a: AdventureActor): number | null {
+    const lk = a.lock;
+    if (!lk || !lk.hard) return null;
+    const t = env.world.actors.get(lk.actorId);
+    if (!t || !(t.stats.hp.cur > 0)) return null;
+    const dx = t.pos.x - a.pos.x, dz = t.pos.z - a.pos.z;
+    return dx * dx + dz * dz > 1e-6 ? Math.atan2(dx, dz) : null;
   }
 
   /** No control (stunned, down): the body keeps moving, slows, falls and lands. */
@@ -198,7 +270,7 @@ export function createMovementSystem(opts: MovementSystemOptions = {}): Movement
     integrateAir(a, b, NEUTRAL, ZERO_WISH, env, dt);
     const gy = env.world.groundY(a.pos.x, a.pos.z);
     if (gy !== null && a.pos.y <= gy && a.vel.y <= 0) {
-      a.pos.y = gy; a.vel.y = 0; a.grounded = true;
+      a.pos.y = gy; a.vel.y = 0; a.grounded = true; b.launched = false;
       b.speed = Math.hypot(a.vel.x, a.vel.z);
       if (b.speed > 0.1) b.heading = Math.atan2(a.vel.x, a.vel.z);
     }
@@ -251,6 +323,7 @@ export function createMovementSystem(opts: MovementSystemOptions = {}): Movement
     wishInto(inp, params.ground.deadzone, w);
     lastGood.x = a.pos.x; lastGood.y = a.pos.y; lastGood.z = a.pos.z;
 
+    if (a.warp) applyWarp(a, b);
     if (a.impulse) applyImpulse(a, b);
 
     // Another lane's field forces the state: down or stunned.
@@ -258,9 +331,21 @@ export function createMovementSystem(opts: MovementSystemOptions = {}): Movement
     if (forced === 'ko' || forced === 'stunned') {
       if (a.state !== forced) { leaveForced(a, b); enterState(a, forced, env.bus); }
       passive(a, b, dt);
+      a.spinning = false;
       return;
     }
     if (a.state === 'ko' || a.state === 'stunned' || a.state === 'riding') enterState(a, settleState(a.grounded), env.bus);
+
+    // A combat verb holds the body (contracts v2 moveLockSec): carried, not steered. A rail or a wall lets go first.
+    if ((a.moveLockSec ?? 0) > 0 && !isMount && a.state !== 'grind' && a.state !== 'wallrun') {
+      if (b.homingId) { const id = b.homingId; b.homingId = null; env.bus.emit('homing', { actorId: a.id, targetId: id, hit: false }); }
+      carried(a, b, dt);
+      const ly = lockYaw(a);
+      if (ly !== null) a.facingYaw = ly;
+      else if (Math.hypot(a.vel.x, a.vel.z) > 0.5) a.facingYaw = Math.atan2(a.vel.x, a.vel.z);
+      a.spinning = b.spinning;
+      return;
+    }
 
     // The mount verb (a body that carries nobody, beside its partner).
     if (!isMount && inp.fuse && a.partnerId && (a.state === 'ground' || a.state === 'air')) {
@@ -277,16 +362,21 @@ export function createMovementSystem(opts: MovementSystemOptions = {}): Movement
 
     // Flight's source: the fusion for a body on its own, the mount's wings for a body carrying a rider.
     if (isMount && spec && spec.canFly && b.mountStaminaMax === 0) { b.mountStaminaMax = spec.staminaMax; b.mountStamina = spec.staminaMax; }
-    const innate = !isMount && a.kind !== 'player' && !!opts.innateFlyer?.(a);
+    const innate = !isMount && a.kind !== 'player' && (a.canFly === true || !!opts.innateFlyer?.(a));
     const source: FlightSource | null = isMount
       ? (spec?.canFly && a.stats.hp.cur > 0 ? 'mount' : null)
       : innate ? 'fusion' : canTakeOff(a, false);
     env.freeFlight = innate;
-    const groundTop = isMount && spec ? spec.groundSpeed * b.feel.run : undefined;
+    const locked = lockYaw(a);
+    const groundTop = isMount && spec ? spec.groundSpeed * b.feel.run
+      : a.kind !== 'player' && a.maxSpeed !== undefined && a.maxSpeed > 0 ? a.maxSpeed
+      : locked !== null ? lockedTop * b.feel.run
+      : undefined;
 
     // A body that already wants flight and has a source flies (contracts: fusion.active && wantsFlight → 'flight'):
     // a restored save, a net handover, a monster spawned on the wing.
-    if (source && a.wantsFlight && (a.state === 'ground' || a.state === 'air')) takeOff(a, b, env);
+    // A4: an innate flyer that landed (a dive, a knock-down) takes off again when its brain asks to climb.
+    if (source && (a.wantsFlight || (innate && inp.ascendHeld)) && (a.state === 'ground' || a.state === 'air')) takeOff(a, b, env);
 
     switch (a.state) {
       case 'flight': {
@@ -303,7 +393,9 @@ export function createMovementSystem(opts: MovementSystemOptions = {}): Movement
       case 'ground': {
         b.coyote = 0;
         if (inp.jump || b.jumpBuffer > 0) { groundJump(a, b, env); integrateAir(a, b, inp, w, env, dt); break; }
-        stepGround(a, b, inp, w, env, dt, groundTop);
+        // The sprint (held dash) runs on stamina: an empty bar stops it (A2's handoff; read, never written).
+        stepGround(a, b, inp.dashHeld && !(a.stats.stamina.cur > 0) ? noSprint(inp) : inp, w, env, dt, groundTop);
+        if (locked !== null && a.state === 'ground') a.facingYaw = lockYaw(a) ?? locked;
         // A low rail run onto from the ground (a tighter window than the air's catch).
         if (!isMount && a.state === 'ground' && b.speed > 2 && b.recatchT <= 0) {
           if (findRailCatch(env.rails, a.pos, a.vel, a.facingYaw, groundRail, b.recatchId, caught)) enterGrind(a, b, caught, env);
@@ -336,6 +428,8 @@ export function createMovementSystem(opts: MovementSystemOptions = {}): Movement
       a.pos.x = lastGood.x; a.pos.y = lastGood.y; a.pos.z = lastGood.z;
       a.vel.x = 0; a.vel.y = 0; a.vel.z = 0; b.speed = 0;
     }
+    if (a.grounded || a.state !== 'air') b.launched = false;
+    a.spinning = b.spinning;
   }
 
   function stepRider(r: AdventureActor, ctx: AdventureStepContext, dt: number): void {
@@ -353,6 +447,8 @@ export function createMovementSystem(opts: MovementSystemOptions = {}): Movement
       return;
     }
     r.impulse = null;   // a small knock is absorbed by the mount
+    r.warp = r.warp ? null : r.warp;   // a seated rider is never teleported off its mount (the mount carries it)
+    r.spinning = false;
     if (r.state !== 'riding') enterState(r, 'riding', env.bus);
     const spec = specOf(m!.id) ?? defaultMountSpec(false);
     glueRider(r, m!, spec.seatHeight);
@@ -402,6 +498,7 @@ export function createMovementSystem(opts: MovementSystemOptions = {}): Movement
       const world = ctx.world;
       if (!rails || rails.net !== world.rails) rails = buildRailIndex(world.rails);
       env.tSec = ctx.tSec; env.world = world; env.bus = ctx.bus; env.rails = rails;
+      env.bounds = opts.bounds !== undefined ? opts.bounds : world.bounds ?? null;
       let localId = opts.localId ?? null;
       riderOf.clear(); seated.clear();
       for (const a of world.actors.values()) {
@@ -409,7 +506,7 @@ export function createMovementSystem(opts: MovementSystemOptions = {}): Movement
         if (a.ridingId) { riderOf.set(a.ridingId, a); seated.add(a.id); }
       }
       for (const a of world.actors.values()) {
-        if (a.ridingId || opts.skip?.(a)) continue;
+        if (a.ridingId || isFusedPartner(a) || opts.skip?.(a)) continue;
         env.hint = a.id === localId ? ctx.hint : null;
         stepBody(a, ctx, dt * ctx.timeScaleOf(a.id));
       }

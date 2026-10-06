@@ -66,6 +66,8 @@ export interface BodyState {
   jumpBuffer: number;
   rising: boolean;
   spinning: boolean;
+  /** Airborne from an A2 launch (its impulse lifted the body): falls at contracts.LAUNCH_GRAVITY until it lands. */
+  launched: boolean;
   airDashes: number;
   airDashT: number;
   /** Homing: the target, time in the dash, and how many hits in a row (reset on landing). */
@@ -107,7 +109,7 @@ export function newBody(id: ActorId, seed: number): BodyState {
     feel: { ...NEUTRAL_FEEL },
     flow: new FlowMeter(),
     speed: 0, heading: 0, skidding: false,
-    coyote: Infinity, jumpBuffer: 0, rising: false, spinning: false, airDashes: 1, airDashT: 0,
+    coyote: Infinity, jumpBuffer: 0, rising: false, spinning: false, launched: false, airDashes: 1, airDashT: 0,
     homingId: null, homingT: 0, homingChain: 0, lastHomedId: null,
     wall: null, wallT: 0, wallSpeed: 0, wallBaseY: 0,
     balance: new RailBalance(rnd),

@@ -13,7 +13,12 @@
  *   5. projectiles; lock upkeep; boss phase checks; camera hints for the local player.
  *
  * Writes only A2's fields: hp, poise, stamina, lock, stunSec, iframeSec, impulse (and spends energy for a
- * substitution). Pure: no Babylon, no clock, no Math.random (the monsters' picks use a seeded generator).
+ * substitution); contracts v2 adds moveLockSec (mirrored from the fight record), warp (a substitution's spot), maxSpeed
+ * (a monster's preset), the hp a `revive` restores, and the `telegraph` event when a wind-up begins.
+ * Pure: no Babylon, no clock, no Math.random (the monsters' picks use a seeded generator).
+ *
+ * A4 (2026-10-06): on a rail the light / heavy buttons are A1's tricks and the dash does nothing (the plan's control
+ * table), so this system neither swings nor dodges for a body in the 'grind' state.
  */
 
 import { MOVES, pickTarget, stickDirTo, lungeFor, DASH_ATTACK_SEC, type Body2, type StickDir } from '@/lib/babylon/core/HordeDynamics';
@@ -21,7 +26,7 @@ import { DASH } from '@/lib/babylon/core/StormCombat';
 import { ratingsFrom, routeFor } from '@/lib/babylon/core/FighterStyle';
 import { threatLandsIn } from '@/lib/babylon/core/RivalCombatBrain';
 import {
-  neutralInput, spendPool, wishDir, type ActorId, type AdventureActor, type AdventureStepContext, type AdventureSystem,
+  neutralInput, spendPool, wishDir, type ActorId, type AdventureBus, type AdventureEvents, type AdventureActor, type AdventureStepContext, type AdventureSystem,
   type CameraHint, type LockTarget, type MoveInput, type Vec3,
 } from '../contracts';
 import { applyHit, makeHitSpec, requestPlanarVel, resetHitSpec, type HitSpec } from './damage';
@@ -86,7 +91,7 @@ export interface CombatSystem extends AdventureSystem {
   readonly projectiles: ProjectilePool;
 }
 
-interface MonsterRuntime { def: MonsterDef; brain: MonsterBrain; input: MoveInput; lungeStop: boolean }
+interface MonsterRuntime { def: MonsterDef; brain: MonsterBrain; input: MoveInput; lungeStop: boolean; windup: boolean }
 
 /** mulberry32: a tiny seeded generator, so a fight replays the same from the same seed. */
 export function seededRng(seed: number): () => number {
@@ -110,7 +115,7 @@ const wrap = (a: number): number => {
 export function createCombatSystem(opts: CombatSystemOptions = {}): CombatSystem {
   const rng = seededRng(opts.seed ?? 1);
   const monsters = new Map<ActorId, MonsterRuntime>();
-  const bosses = new Map<ActorId, BossRuntime & { input: MoveInput; lungeStop: boolean }>();
+  const bosses = new Map<ActorId, BossRuntime & { input: MoveInput; lungeStop: boolean; windup: boolean }>();
   // The fight records of actors this system has stepped, by id (takeWarp / moveLockOf get only an id).
   const warpOf = new Map<ActorId, FightState>();
   const aiInputs = new Map<ActorId, MoveInput>();
@@ -126,6 +131,12 @@ export function createCombatSystem(opts: CombatSystemOptions = {}): CombatSystem
   const hintLock: CameraHint = { preset: 'lock', priority: 50 };
   const hintBoss: CameraHint = { preset: 'boss', priority: 60 };
   const hintBeat: CameraHint = { preset: 'boss', priority: 90 };
+  // contracts v2: revives arrive on the bus (A3's channel) and are applied at the top of this system's next step, so
+  // the hp write is this system's own; the telegraph payload is one reused object (read it inside the handler).
+  const revives: AdventureEvents['revive'][] = [];
+  let bus: AdventureBus | null = null;
+  let offRevive: (() => void) | null = null;
+  const telegraphEv: AdventureEvents['telegraph'] = { actorId: '', attackId: '', tellSec: 0 };
 
   const partsOf: PartsOf = (a) => bosses.get(a.id)?.parts ?? null;
 
@@ -190,6 +201,7 @@ export function createCombatSystem(opts: CombatSystemOptions = {}): CombatSystem
     const fs = fightStateOf(a);
     if (a.stats.hp.cur <= 0) return;
     const now = fs.localSec;
+    const onRail = a.state === 'grind';
 
     // Guard: the press time is the parry's clock.
     if (input.guardHeld && !fs.guardWasHeld) fs.guardPressSec = now;
@@ -206,7 +218,8 @@ export function createCombatSystem(opts: CombatSystemOptions = {}): CombatSystem
 
     // The dash button: XButtonReader turns press / release into a tap, a double tap, or a hold (the sprint).
     let gesture: 'tap' | 'double' | 'held' | null = null;
-    if (input.dash) {
+    if (onRail) { fs.dashWasHeld = false; }
+    else if (input.dash) {
       fs.xButton.press(now);
       fs.dashWasHeld = true;
       if (!input.dashHeld) { gesture = fs.xButton.release(now); fs.dashWasHeld = false; }
@@ -235,6 +248,7 @@ export function createCombatSystem(opts: CombatSystemOptions = {}): CombatSystem
       drainStamina(a, fs, STAMINA.sprintPerSec * ctx.timeScaleOf(a.id) * dt);
     }
 
+    if (onRail) return;   // X / Y on a rail are A1's tricks
     if (input.attackLight) press(ctx, a, fs, 'light', wish);
     if (input.attackHeavy) press(ctx, a, fs, 'heavy', wish);
   }
@@ -371,11 +385,20 @@ export function createCombatSystem(opts: CombatSystemOptions = {}): CombatSystem
 
   // ── 3. monsters and bosses ────────────────────────────────────────────────────────────────────────────────────
   function stepBrain(ctx: AdventureStepContext, a: AdventureActor, brain: MonsterBrain, input: MoveInput, dt: number,
-    rt: { lungeStop: boolean }): void {
+    rt: { lungeStop: boolean; windup: boolean }): void {
     const scale = ctx.timeScaleOf(a.id);
     const adt = dt * scale;
     const was = brain.targetId;
+    // contracts v2: the preset's speed, exact (A1 caps the run at it; the brain then sends a full stick)
+    const top = brain.presetSpeed();
+    if (a.maxSpeed !== top) a.maxSpeed = top;
     const ev = brain.step(a, ctx.world, adt, input, tokens);
+    const winding = brain.attacking && brain.phase === 'windup' && !!brain.attack;
+    if (winding && !rt.windup) {
+      telegraphEv.actorId = a.id; telegraphEv.attackId = brain.attack!.id; telegraphEv.tellSec = brain.attack!.tellSec;
+      ctx.bus.emit('telegraph', telegraphEv);
+    }
+    rt.windup = winding;
     if (brain.targetId !== was) a.lock = brain.targetId ? { actorId: brain.targetId, sinceSec: ctx.tSec, hard: false } : null;
     const target = brain.targetId ? ctx.world.actors.get(brain.targetId) : undefined;
     const atk = brain.attack;
@@ -452,7 +475,7 @@ export function createCombatSystem(opts: CombatSystemOptions = {}): CombatSystem
       fs.hyperArmor = def.hyperArmor;
       const input = neutralInput();
       const side = monsters.size % 2 === 0 ? 1 : -1;
-      monsters.set(actor.id, { def, brain: new MonsterBrain(def, def.attacks, rng, side), input, lungeStop: false });
+      monsters.set(actor.id, { def, brain: new MonsterBrain(def, def.attacks, rng, side), input, lungeStop: false, windup: false });
       aiInputs.set(actor.id, input);
     },
 
@@ -460,7 +483,7 @@ export function createCombatSystem(opts: CombatSystemOptions = {}): CombatSystem
       const fs = fightStateOf(actor);
       fs.weight = 'heavy';
       fs.hyperArmor = true;
-      const rt = Object.assign(new BossRuntime(def, rng), { input: neutralInput(), lungeStop: false });
+      const rt = Object.assign(new BossRuntime(def, rng), { input: neutralInput(), lungeStop: false, windup: false });
       const p0 = def.phases[0];
       if (p0.element !== undefined) fs.element = p0.element;
       bosses.set(actor.id, rt);
@@ -493,10 +516,26 @@ export function createCombatSystem(opts: CombatSystemOptions = {}): CombatSystem
       return { ...pending.subSpot };
     },
 
+    /** The same number as the actor's `moveLockSec` (contracts v2; A1 reads the field). Kept for the test arena. */
     moveLockOf(id) { return warpOf.get(id)?.moveLockSec ?? 0; },
 
     step(ctx, dt) {
       const world = ctx.world;
+      if (bus !== ctx.bus) {
+        offRevive?.();
+        bus = ctx.bus;
+        offRevive = bus.on('revive', (e) => { revives.push({ actorId: e.actorId, byId: e.byId, hpRatio: e.hpRatio }); });
+      }
+      // A revive A3 completed since the last step: hp back (this system's field), the get-up is A1's state machine.
+      for (const r of revives) {
+        const a = world.actors.get(r.actorId);
+        if (!a || a.stats.hp.cur > 0) continue;
+        const ratio = Math.max(0.05, Math.min(1, Number.isFinite(r.hpRatio) ? r.hpRatio : 0.3));
+        a.stats.hp.cur = Math.max(1, Math.round(a.stats.hp.max * ratio));
+        a.stunSec = 0;
+        fightStateOf(a).poiseIdleSec = 0;
+      }
+      revives.length = 0;
       for (const a of world.actors.values()) {
         const fs = fightStateOf(a);
         warpOf.set(a.id, fs);
@@ -527,6 +566,11 @@ export function createCombatSystem(opts: CombatSystemOptions = {}): CombatSystem
         upkeepLock(ctx, a, fs, adt);
       }
       projectiles.step(ctx, dt);
+      // contracts v2: the hold on A1's steering, as a field (written only when it changes)
+      for (const a of world.actors.values()) {
+        const ml = fightStateOf(a).moveLockSec;
+        if (a.moveLockSec !== ml) a.moveLockSec = ml;
+      }
       for (const [id, rt] of bosses) {
         const a = world.actors.get(id);
         if (a) rt.checkPhase(a, ctx.bus, tokens);
@@ -543,6 +587,7 @@ export function createCombatSystem(opts: CombatSystemOptions = {}): CombatSystem
     },
 
     dispose() {
+      offRevive?.(); offRevive = null; bus = null; revives.length = 0;
       monsters.clear(); bosses.clear(); aiInputs.clear(); projectiles.clear(); warpOf.clear();
     },
   };

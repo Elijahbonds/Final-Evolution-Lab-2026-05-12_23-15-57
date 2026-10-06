@@ -4,7 +4,7 @@
 // in the PR body ("contract change: …") and tell the other lanes.
 import { describe, expect, it } from 'vitest';
 import {
-  ACTOR_KINDS, ADVENTURE_CONTRACTS_VERSION, ADVENTURE_SAVE_MAX_BYTES, ADVENTURE_SAVE_VERSION, DAMAGE_OUTCOMES, ELEMENTS,
+  ACTOR_FIELD_OWNERS, ACTOR_KINDS, ADVENTURE_CONTRACTS_VERSION, LAUNCH_GRAVITY, ownersOfField, ADVENTURE_SAVE_MAX_BYTES, ADVENTURE_SAVE_VERSION, DAMAGE_OUTCOMES, ELEMENTS,
   ELEMENT_STRONG, ELEMENT_WEAK, FLIGHT_MODES, MIND_POWERS, MOVEMENT_STATES, NEUTRAL_MOVE_INPUT, NO_FUSION, PARTNER_KINDS,
   PRQ_BANDS, SPELL_KINDS, SPELL_SHAPES, SPELL_SLOTS, createAdventureBus, elementMultiplier, emptyAdventureSave,
   flightSourceOf, fusionTierFor, isAdventureSave, neutralInput, partnerCanCarry, polylineLength, pool, spendPool,
@@ -13,7 +13,8 @@ import {
 
 describe('adventure contracts: the pinned unions', () => {
   it('pins the contract and save versions', () => {
-    expect(ADVENTURE_CONTRACTS_VERSION).toBe(1);
+    // test changed (A4, 2026-10-06): 1 → 2, the Phase A contract requests (all optional; see the file header).
+    expect(ADVENTURE_CONTRACTS_VERSION).toBe(2);
     expect(ADVENTURE_SAVE_VERSION).toBe(1);
     expect(ADVENTURE_SAVE_MAX_BYTES).toBe(48 * 1024);
     expect(SPELL_SLOTS).toBe(4);
@@ -182,5 +183,34 @@ describe('adventure contracts: the save', () => {
     expect(isAdventureSave(null)).toBe(false);
     expect(isAdventureSave([])).toBe(false);
     expect(isAdventureSave(JSON.parse(JSON.stringify(s)))).toBe(true);
+  });
+});
+
+describe('adventure contracts v2: the requests A4 applied', () => {
+  it('the neutral input carries interactHeld false (an optional field, present in the neutral)', () => {
+    expect(NEUTRAL_MOVE_INPUT.interactHeld).toBe(false);
+    expect(neutralInput().interactHeld).toBe(false);
+  });
+
+  it('pins the launch gravity A1 and A2 share', () => {
+    expect(LAUNCH_GRAVITY).toBe(19.5);
+  });
+
+  it('every owned field has exactly the owner the WHO WRITES WHAT comment names', () => {
+    expect(ownersOfField('pos.x')).toEqual(['movement']);
+    expect(ownersOfField('rail.speed')).toEqual(['movement']);
+    expect(ownersOfField('stats.hp.cur')).toEqual(['combat']);
+    expect(ownersOfField('stats.hp.max')).toEqual(['partner']);
+    expect(ownersOfField('stats.school.mix')).toEqual(['partner']);
+    expect(ownersOfField('fusion.remainingSec')).toEqual(['partner']);
+    expect(ownersOfField('moveLockSec')).toEqual(['combat']);
+    expect(ownersOfField('warp.x')).toEqual(['combat']);
+    expect(ownersOfField('spinning')).toEqual(['movement']);
+    expect(ownersOfField('canFly')).toEqual(['spawn']);
+    // energy cur is the rule the table cannot say (anyone spends, only A3 gains): no single owner
+    expect(ownersOfField('stats.energy.cur')).toEqual([]);
+    expect(ownersOfField('nonsense.field')).toEqual([]);
+    // no two lanes share a key
+    for (const [k, v] of Object.entries(ACTOR_FIELD_OWNERS)) expect(v.length, k).toBe(1);
   });
 });

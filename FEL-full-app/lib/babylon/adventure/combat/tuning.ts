@@ -12,7 +12,8 @@
 
 import { GUARD_BREAK_STAGGER_SEC, PARRY_STAGGER_SEC, PARRY_WINDOW_MS, COMBO_WINDOW_SEC } from '@/lib/babylon/core/FightCore';
 import { DASH, LAUNCH_AIR_SEC } from '@/lib/babylon/core/StormCombat';
-import { ROLL_IFRAMES_SEC, ROLL_SEC, ROLL_SPEED, ROLL_COOLDOWN_SEC, JUMP_G } from '@/lib/babylon/core/EvadeMoves';
+import { ROLL_IFRAMES_SEC, ROLL_SEC, ROLL_SPEED, ROLL_COOLDOWN_SEC } from '@/lib/babylon/core/EvadeMoves';
+import { LAUNCH_GRAVITY } from '../contracts';
 import { COUNTER_SEC, COUNTER_DAMAGE_MULT } from '@/lib/babylon/core/DodgeRead';
 import { JUGGLE_DAMAGE_MULT } from '@/lib/babylon/core/OnslaughtCore';
 import {
@@ -85,6 +86,12 @@ export const DODGE = {
   homingMaxSec: DASH.homingMaxSec,    // 0.6
   homingStopM: DASH.homingStopM,      // 1.5
   doubleTapSec: DASH.doubleSec,       // 0.32
+  /**
+   * The unlocked Storm dash on the ground (A4, contracts v2 moveLockSec): StormCombat's burst, driven here through the
+   * impulse while A1 holds its steering. It never brakes a run: a runner already faster keeps their speed. [TUNE]
+   */
+  dashSpeed: DASH.speed,              // 9.5 m/s
+  dashSec: DASH.sec,                  // 0.22
 } as const;
 
 /** Substitution: DefenseSystem's numbers, spent from energy (the Adventure's chi). Guard held + dash. */
@@ -102,10 +109,11 @@ export const AIR = {
   /** How long a launched body stays up (StormCombat). */
   launchSec: LAUNCH_AIR_SEC,          // 0.9
   /**
-   * assumption: A1's gravity on a launched body is EvadeMoves' combat gravity (19.5 m/s²). The launch impulse is sized
-   * so the body is in the air for `launchSec` under it: v = g·T/2.
+   * The gravity on a launched body: contracts.LAUNCH_GRAVITY (v2), which A1 now applies to a body A2 launched until it
+   * lands — it was A2's assumption until A4 made it one shared number (EvadeMoves' combat gravity, 19.5 m/s², pinned
+   * equal below). The launch impulse is sized so the body is in the air for `launchSec` under it: v = g·T/2.
    */
-  gravity: -JUMP_G,                   // 19.5
+  gravity: LAUNCH_GRAVITY,            // 19.5 (= −EvadeMoves.JUMP_G)
   /** An air link holds the body up: its vertical speed is set to this and its air time extended. NEW [TUNE]. */
   holdVy: 3.2,
   linkExtendSec: 0.45,

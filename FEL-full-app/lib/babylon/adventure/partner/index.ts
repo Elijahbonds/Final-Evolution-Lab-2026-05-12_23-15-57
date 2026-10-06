@@ -17,9 +17,10 @@
  * On the bus: damage the party lands together fills the fusion meter; enemies the party fells together grow the bond;
  * a creature trains from the party's play and evolves at the Garden's thresholds (partner/evolution.ts).
  *
- * FIELDS IT WRITES (A3's): `fusion` and `partnerId` on both actors. Plus, as a CONTRACT REQUEST for A4, the partner's
- * `pos`/`vel` while its fusion is active and at the moment it unfuses (its body is inside the player, and reappears
- * beside them) — A1's fields otherwise. A1 should skip a partner whose fusion is active.
+ * FIELDS IT WRITES (A3's): `fusion` and `partnerId` on both actors, and (contracts v2) the partner's `pos`/`vel` while
+ * its fusion is active and at the moment it unfuses (its body is inside the player, and reappears beside them) — A1's
+ * fields otherwise; A1 skips a partner whose fusion is active. A revive goes out as the `revive` event (A2 applies it).
+ * A player HOLDING interact (`MoveInput.interactHeld`, v2) beside a downed partner revives it while moving too.
  */
 import { DownRevive, REVIVE_CHANNEL_SEC, REVIVE_RANGE } from '@/lib/babylon/core/OnslaughtCore';
 import type { Companion } from '@/lib/babylon/core/EvolutionGarden';
@@ -58,7 +59,10 @@ export interface PartnerSystemOptions {
   seed?: number;
   /** The stats system, so an evolved creature's maxes re-derive. */
   stats?: { refresh(id: ActorId, patch?: { attrs?: PartnerDef['attrs']; gear?: { hp?: number } }): void } | null;
-  /** A downed actor's revive completed: restore `hpRatio` of its HP (A2's field) and its get-up. */
+  /**
+   * A downed actor's revive completed. Contracts v2: the system also emits `revive` on the bus, which A2's combat
+   * system applies (hp is A2's field) — so a host running combat needs no callback; this stays for a rig without A2.
+   */
   onRevive?: (r: ReviveRequest) => void;
   /** A downed actor bled out (DownRevive.BLEED_OUT_SEC) without a revive. */
   onBleedOut?: (actorId: ActorId) => void;
@@ -169,7 +173,9 @@ export function createPartnerSystem(opts: PartnerSystemOptions): PartnerSystem {
       if (!playerDown.downed) { playerDown.down(ctx.tSec); playerBledOut = false; }
       const reviver = !isDown(partner) && !partner.fusion.active && near();
       if (playerDown.channel(dt, reviver)) {
-        opts.onRevive?.({ actorId: playerId, byId: partnerId, hpRatio: playerDown.revive() });
+        const r = { actorId: playerId, byId: partnerId, hpRatio: playerDown.revive() };
+        ctx.bus.emit('revive', r);   // contracts v2: A2 restores the hp on its next step
+        opts.onRevive?.(r);
       } else if (!playerBledOut && playerDown.bledOut(ctx.tSec)) {
         playerBledOut = true;
         opts.onBleedOut?.(playerId);
@@ -180,8 +186,10 @@ export function createPartnerSystem(opts: PartnerSystemOptions): PartnerSystem {
       if (!partnerDown.downed) { partnerDown.down(ctx.tSec); partnerBledOut = false; }
       const inp = ctx.inputs.get(playerId);
       const still = !inp || Math.hypot(inp.move.x, inp.move.y) < REVIVE_STILL_STICK;
-      if (partnerDown.channel(dt, !isDown(player) && still && near())) {
-        opts.onRevive?.({ actorId: partnerId, byId: playerId, hpRatio: partnerDown.revive() });
+      if (partnerDown.channel(dt, !isDown(player) && (still || !!inp?.interactHeld) && near())) {
+        const r = { actorId: partnerId, byId: playerId, hpRatio: partnerDown.revive() };
+        ctx.bus.emit('revive', r);
+        opts.onRevive?.(r);
       } else if (!partnerBledOut && partnerDown.bledOut(ctx.tSec)) {
         partnerBledOut = true;
         opts.onBleedOut?.(partnerId);

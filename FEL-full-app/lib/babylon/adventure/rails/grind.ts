@@ -24,7 +24,7 @@ import {
   nearBox, nearestOnPath, railNearest, sampleRail, turnPerMetre, type RailIndex, type RailNearest, type RailPath,
 } from './railMath';
 
-/** Energy a rail trick pays (plan: "a trick for points and 4 energy"). A3 owns energy gain, so A4 wires it from 'rail:trick'. */
+/** Energy a rail trick pays (plan: "a trick for points and 4 energy"), carried on 'rail:trick' (contracts v2 `energy`); A3's stats system grants it. */
 export const RAIL_TRICK_ENERGY = 4;
 /** Generic trick ids (the IP line: no move names from a feel reference). [PLACEHOLDER] display names are the owner's. */
 export const RAIL_TRICKS = { light: 'rail-spin', heavy: 'rail-flip' } as const;
@@ -257,7 +257,7 @@ export function stepGrind(a: AdventureActor, b: BodyState, inp: MoveInput, w: Wi
     b.trickChain++;
     const points = Math.round(rp.trickPoints * (1 + speed / top) * (1 + 0.25 * (b.trickChain - 1)));
     b.flow.add(FLOW.trick);
-    env.bus.emit('rail:trick', { actorId: a.id, trick: inp.attackHeavy ? RAIL_TRICKS.heavy : RAIL_TRICKS.light, points });
+    env.bus.emit('rail:trick', { actorId: a.id, trick: inp.attackHeavy ? RAIL_TRICKS.heavy : RAIL_TRICKS.light, points, energy: RAIL_TRICK_ENERGY });
   }
 
   if (inp.jump) {

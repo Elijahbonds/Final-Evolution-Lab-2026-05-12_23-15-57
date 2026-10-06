@@ -188,7 +188,7 @@ export class MonsterBrain {
         return null;
       }
       case 'retreat': {
-        out.move.x = -ux * stickFor(this.def, this.speedMult); out.move.y = -uz * stickFor(this.def, this.speedMult);
+        out.move.x = -ux * this.stickOf(self); out.move.y = -uz * this.stickOf(self);
         if (this.t >= this.def.retreatSec) { this.phase = 'pursue'; this.t = 0; }
         return null;
       }
@@ -196,9 +196,20 @@ export class MonsterBrain {
   }
 
   /** MobSteering's pursuit: lead the target, flank by the preset's bias, hold a caster's distance. */
+  /**
+   * The stick for the preset's speed. Contracts v2: with `maxSpeed` on the body (written by the combat system from the
+   * preset) A1 runs a full stick at exactly that speed, so the stick is full; without it, the v1 estimate (stickFor).
+   */
+  private stickOf(self: AdventureActor): number {
+    return self.maxSpeed !== undefined && self.maxSpeed > 0 ? 1 : stickFor(this.def, this.speedMult);
+  }
+
+  /** The preset's top speed for this body, m/s (the combat system writes it to `maxSpeed`). */
+  presetSpeed(): number { return STEERING_PRESETS[this.def.steering].maxSpeed * this.speedMult; }
+
   private steer(self: AdventureActor, target: AdventureActor, dist: number, ux: number, uz: number, out: MoveInput): void {
     const cfg = STEERING_PRESETS[this.def.steering];
-    const mag = stickFor(this.def, this.speedMult);
+    const mag = this.stickOf(self);
     if (this.def.keepAwayM > 0) {
       const k = this.def.keepAwayM;
       const away = dist < k * 0.75 ? -1 : dist > k * 1.1 ? 1 : 0;

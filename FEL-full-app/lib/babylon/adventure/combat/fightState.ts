@@ -41,6 +41,11 @@ export class FightState {
   iframeCause: IframeCause = 'other';
   rollSec = 0;
   rollCooldownSec = 0;
+  /** The unlocked Storm dash on the ground (A4): seconds left, its direction and speed. */
+  dashSec = 0;
+  dashDirX = 0;
+  dashDirZ = 1;
+  dashSpeed = 0;
   rollDirX = 0;
   rollDirZ = 1;
   /** Seconds left of the homing dash to the lock, and its target. */
@@ -82,7 +87,8 @@ export class FightState {
   comboSec = 0;
   /** Seconds since a dash or homing dash ended inside which a strike is the dash attack (HordeDynamics). */
   afterDashSec = 0;
-  /** Seconds a movement-owning verb (roll, homing dash, lunge) holds the body. Contract request: A1 reads it. */
+  /** Seconds a movement-owning verb (roll, homing dash, lunge, Storm dash) holds the body; mirrored to the actor's
+   *  `moveLockSec` (contracts v2), which A1 reads. */
   moveLockSec = 0;
 
   // ── being juggled ──

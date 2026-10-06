@@ -166,6 +166,15 @@ writes position, velocity, facing and the movement state; A2 writes HP, poise, s
 impulses; A3 writes every max, energy regen, special, level, element, fusion. A4 adds a test that steps all three
 systems and fails if any wrote a field it does not own.
 
+**Contracts v2 (A4, 2026-10-06)** applied the Phase A lanes' requests, all optional: A1 also writes `spinning`, clears
+`impulse` and `warp` after applying them, and never moves a fused partner; A2 also writes `moveLockSec` (A1 carries the
+body without steering while it is > 0), `warp` (a substitution's spot), `maxSpeed` (a monster's exact preset) and the hp
+a `revive` restores; A3 also owns a fused partner's `pos`/`vel` and the energy a rail trick pays; the spawner sets
+`canFly`. New events: `telegraph`, `revive`; `rail:trick` carries `energy`. `LAUNCH_GRAVITY` is the one gravity a launched
+body falls at. `time:scale` semantics are written down (one request per `byId`, the slowest wins, a cancel is
+`sec: 0, world: 1, self: 1`, `world: 0, self: 0` is a hit-stop) and systems receive the unscaled dt. The table is
+`ACTOR_FIELD_OWNERS` in `contracts.ts`; `host/ownership.test.ts` holds every system to it.
+
 ### Default controls (A4's mapper; every one rebindable)
 
 | Pad | Keyboard | Ground | Air | Rail | Flight | Locked |

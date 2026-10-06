@@ -130,7 +130,7 @@ export function requestPlanarVel(a: AdventureActor, vx: number, vz: number): voi
   addImpulse(a, vx - (a.vel.x + px), 0, vz - (a.vel.z + pz));
 }
 
-/** The launch speed that keeps a body up for `sec` under A1's (assumed) gravity. */
+/** The launch speed that keeps a body up for `sec` under the shared launch gravity (contracts v2 LAUNCH_GRAVITY). */
 export const launchVy = (sec: number): number => (AIR.gravity * sec) / 2;
 
 function emit(bus: AdventureBus, tSec: number, attacker: AdventureActor | null, target: AdventureActor, spec: HitSpec,
@@ -166,6 +166,8 @@ export function applyHit(bus: AdventureBus, tSec: number, attacker: AdventureAct
     tfs.subVulnerableSec = SUBSTITUTION.vulnerableSec;
     substitutionSpot(attacker, tfs.subSpot);
     tfs.subPending = true;
+    // contracts v2: the warp is a field A1 applies (and clears); takeWarp stays for the A2 test arena.
+    target.warp = { x: tfs.subSpot.x, y: tfs.subSpot.y, z: tfs.subSpot.z };
     return emit(bus, tSec, attacker, target, { ...spec, via: 'substitution' }, 'dodged', 0, 0, 0, 0, false, null);
   }
 
