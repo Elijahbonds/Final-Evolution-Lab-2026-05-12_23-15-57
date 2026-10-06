@@ -207,7 +207,7 @@
   }
   /* and a hint keeps to the gap between the thumb clusters (the compact deck reaches ~30 % in from each side) */
   [data-fel-console] > div:has(> canvas) > div.inset-x-0.text-center > span.fel-panel.font-mono {
-    max-width: 44%;
+    max-width: 44% !important;   /* !important: the base clamp rule below comes later in the file */
   }
 }
 
@@ -273,3 +273,11 @@
   max-width: min(78%, 900px) !important;
 }
 
+/* ...but not on a phone, where a wider line runs over the thumb clusters
+ * (measured at 844x390: the dunk MC line covered the right stick); there it
+ * keeps MicCaption's own 560 px. */
+@media (orientation: landscape) and (max-height: 520px) {
+  [data-fel-console] [data-mic-line] {
+    max-width: min(92vw, 560px) !important;
+  }
+}
