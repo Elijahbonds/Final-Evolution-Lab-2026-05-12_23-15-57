@@ -61,7 +61,7 @@ import { prqGrade } from '../../prq';
 import { mookMaxHp, damageMook, mookHp01, mookBarHex } from '../core/MookHealth';
 import { EvadeMoves } from '../core/EvadeMoves';
 import { FOCUS, FocusMeter, WALL_RUN, wallRunAvailableOn, startWallRunOn, wallRunOnAt, wallRunOnSide, startWallKick, wallKickAt, kickHits, type WallRunOn, type WallKickState } from '../core/MatrixFocus';   // MATRIX FOCUS (2026-09-18)
-import { readCombatArena, arenasFor, arenaClamp, knockTo, hazardAt, spawnRadius, describeArena, insideBy, ROPES, type CombatArena, type ArenaWall } from '../combat/arenas';   // COMBAT ARENAS (2026-09-18)
+import { readCombatArena, arenasFor, arenaClamp, knockTo, hazardAt, spawnRadius, describeArena, insideBy, crowdRing, CROWD_GAP, CROWD_PHASE, ROPES, type CombatArena, type ArenaWall } from '../combat/arenas';   // COMBAT ARENAS (2026-09-18)
 import { buildArena, type ArenaHandle } from '../combat/arenaBuild';
 import { HORDE_WINDOW_SEC } from '../core/DodgeRead';
 import { Color3, Matrix, Mesh, MeshBuilder, PBRMaterial, StandardMaterial, Vector3 } from '@babylonjs/core';
@@ -126,23 +126,23 @@ import { styleVariant, styleLabel, hasRootTrack, styleMotionOf } from '../anim/s
 import { Freeflow, type FlowEvent, type FlowBroken } from '../core/Freeflow';   // THE HUNDRED: Arkham freeflow — the count means something
 
 /**
- * Half-extent of the playable floor, INSET from the 24x24 mat.
+ * THE PLAY AREA — the history behind the arena's size (the size itself is data now: the picked arena's shape in
+ * combat/arenas.ts, grown by ARENA_SCALE; this file kept a `const ARENA_RADIUS = 7.5` nothing read until 2026-10-06).
  *
- * The camera's bounds come from the ground mesh, so a play area the same size as
+ * It is INSET from the mat. The camera's bounds come from the ground mesh, so a play area the same size as
  * the mat leaves it nowhere to stand: at the old ±8 on a 16x16 mat the camera was
  * clamped to ±6.8 and ended up 1.2m behind a player at the edge, putting them out
- * of frame. 7.5 on a 24x24 mat keeps 3.3m clear behind the fightShoulder rig at
- * its 3.1m predecessor; at 4.0 m × HUNDRED_CAM_PULL the mat's 12 m half-extent still clears.
- */
-/**
- * The fighter is held inside a DISC of this radius, not a square of this half-
- * width. A square clamp has corners, and a corner is the one place a
+ * of frame. 7.5 on a 24x24 mat kept 3.3m clear behind the fightShoulder rig at
+ * its 3.1m predecessor; at 4.0 m × HUNDRED_CAM_PULL the mat's 12 m half-extent still cleared. IMPROVE (2026-10-06):
+ * ARENA_SCALE 1.25 makes that a 9.375 disc on a 30x30 mat (floorHalf grows with it), 5.6 m clear, and
+ * scripts/fight-balance-tests D holds every arena's furthest point plus the camera's pullback inside its floor.
+ *
+ * The fighter is held inside a DISC, not a square. A square clamp has corners, and a corner is the one place a
  * facing-derived camera at a 3.1m radius cannot swing behind its subject:
  * every [FEL-FRAME] this mode had left was a fighter pinned at (+-7.5, +-7.5).
  * Karate VS is fought on a disc for the same reason, and the venue now paints
  * this ring on the mat so the edge is seen rather than only felt.
  */
-const ARENA_RADIUS = 7.5;
 const STANCE = SPORT_CLIP.karateStance;
 // ANIM-READABILITY (combat, 2026-09-07): the player and the partner are driven by the CombatAnimTree, the ONE owner of
 // their clips — the same jumble Karate VS had (a per-frame stance / step play racing the strike's onEnd chain, the
@@ -1639,15 +1639,15 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       karateVenue = mountVenue(ctx, 'karate_endless', { keepGameplayCamera: true, arena });
       arenaHandle?.dispose(); arenaHandle = buildArena(ctx.scene, arena);
       // L4 — the Shadow Gauntlet is a gauntlet, and a gauntlet has an audience.
-      // Ringed OUTSIDE the fighting disc (radius 7.5) and inside the mat (12),
-      // so nobody stands anywhere the fight can reach. Instanced silhouettes,
-      // never rigs: this mode already carries up to twelve pursuers plus an
-      // ally, and L4's own rule is that a crowd must not compete with
-      // characters for frame budget.
-      crowd = new Onlookers(ctx.scene, Array.from({ length: 14 }, (_, i) => {
-        const a = (i / 14) * Math.PI * 2 + 0.22;
-        return new Vector3(Math.sin(a) * 10.2, 0, Math.cos(a) * 10.2);
-      }), '#3B2A52');
+      // Ringed OUTSIDE the fighting area and inside the mat, so nobody stands
+      // anywhere the fight can reach. Instanced silhouettes, never rigs: this
+      // mode already carries up to twelve pursuers plus an ally, and L4's own
+      // rule is that a crowd must not compete with characters for frame budget.
+      // IMPROVE (2026-10-06): the ring was a fixed 10.2 m (the 7.5 disc + 2.7);
+      // it is read off the PICKED arena now, which ARENA_SCALE grew — a fixed
+      // ring would have stood inside the Foundry's corners and 0.8 m off the
+      // gauntlet's stone wall. arenas.test holds it outside the edge, on the mat.
+      crowd = new Onlookers(ctx.scene, crowdRing(arena, CROWD_GAP.karate, 14, CROWD_PHASE.karate).map((p) => new Vector3(p.x, 0, p.z)), '#3B2A52');
       if (!karateVenue) VenueKit.buildDojo(ctx.scene);
       EffectsKit.ambient(ctx.scene, 'dojo');
       player = await CharacterLibrary.spawn(ctx.scene, CFG.heroUrl, { position: new Vector3(0, 0, 1.5), startClip: IDLE_CLIP });
@@ -1897,7 +1897,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
         const before = player.root.position.clone();
         player.root.position.addInPlace(vel.scale(dtHero));
         // Inset from the mat so the camera always has somewhere to stand behind
-        // the player — see ARENA_RADIUS.
+        // the player — see THE PLAY AREA note at the top.
         clampDisc(player.root.position);
         // G1/G3: the body TURNS onto its travel. This was `rotation.y = atan2(vel)` — a stick reversal moved the whole
         // body (and the over-shoulder camera behind it) in ONE frame; measured 172° between two rendered frames.

@@ -26,7 +26,7 @@
 
 import { EvadeMoves } from '../core/EvadeMoves';
 import { FOCUS, FocusMeter, WALL_RUN, wallRunAvailableOn, startWallRunOn, wallRunOnAt, wallRunOnSide, startWallKick, wallKickAt, kickHits, type WallRunOn, type WallKickState } from '../core/MatrixFocus';   // MATRIX FOCUS (2026-09-18): bullet time held on the right trigger
-import { readCombatArena, arenasFor, arenaClamp, knockTo, hazardAt, describeArena, ROPES, type CombatArena, type ArenaWall } from '../combat/arenas';   // COMBAT ARENAS (2026-09-18)
+import { readCombatArena, arenasFor, arenaClamp, knockTo, hazardAt, describeArena, crowdRing, CROWD_GAP, CROWD_PHASE, ROPES, type CombatArena, type ArenaWall } from '../combat/arenas';   // COMBAT ARENAS (2026-09-18)
 import { buildArena, type ArenaHandle } from '../combat/arenaBuild';
 import { dodgeReward, tickCounter, counterMult } from '../core/DodgeRead';
 import { nerve, standingOf } from '../core/Nerve';
@@ -728,11 +728,9 @@ export const KarateVSMode: ModeDefinition = (() => {
       modeVenue = mountVenue(ctx, 'karate_h2h', { keepGameplayCamera: true, arena });
       if (!modeVenue) VenueKit.buildDojo(ctx.scene);
       arenaHandle?.dispose(); arenaHandle = buildArena(ctx.scene, arena);
-      const crowdR = (arena.shape.kind === 'disc' ? arena.shape.radius : Math.max(arena.shape.halfX, arena.shape.halfZ)) + 2.6;
-      crowd = new Onlookers(ctx.scene, Array.from({ length: 14 }, (_, i) => {
-        const a = (i / 14) * Math.PI * 2 + 0.22;
-        return new Vector3(Math.sin(a) * crowdR, 0, Math.cos(a) * crowdR);   // outside the arena's walls
-      }), '#3B2A52');
+      // outside the arena's walls. IMPROVE (2026-10-06): the ring was max(halfX, halfZ) + 2.6 — at ARENA_SCALE the Foundry's
+      // corner reached past it; combat/arenas crowdRing keeps it clear of a box's corner too, and arenas.test holds it
+      crowd = new Onlookers(ctx.scene, crowdRing(arena, CROWD_GAP.karate_vs, 14, CROWD_PHASE.karate_vs).map((p) => new Vector3(p.x, 0, p.z)), '#3B2A52');
       player = await CharacterLibrary.spawn(ctx.scene, CFG.heroUrl, {
         position: new Vector3(0, 0, 2.2), yawRad: Math.PI, startClip: IDLE_CLIP,   // BIOMECH-WAVE2 G1/G3: they SPAWN facing each other — the round start used to be a 180° yaw snap on both bodies
       });

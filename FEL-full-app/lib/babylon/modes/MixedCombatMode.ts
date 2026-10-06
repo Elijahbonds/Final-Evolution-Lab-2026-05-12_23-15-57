@@ -22,7 +22,7 @@
 
 import { EvadeMoves } from '../core/EvadeMoves';
 import { FOCUS, FocusMeter, WALL_RUN, wallRunAvailableOn, startWallRunOn, wallRunOnAt, wallRunOnSide, startWallKick, wallKickAt, kickHits, type WallRunOn, type WallKickState } from '../core/MatrixFocus';   // MATRIX FOCUS (2026-09-18): bullet time held on the right trigger
-import { readCombatArena, arenasFor, arenaClamp, knockTo, offEdge, insideBy, hazardAt, describeArena, ROPES, type CombatArena, type ArenaWall } from '../combat/arenas';   // COMBAT ARENAS (2026-09-18)
+import { readCombatArena, arenasFor, arenaClamp, knockTo, offEdge, insideBy, hazardAt, describeArena, crowdRing, CROWD_GAP, CROWD_PHASE, ROPES, type CombatArena, type ArenaWall } from '../combat/arenas';   // COMBAT ARENAS (2026-09-18)
 import { buildArena, type ArenaHandle } from '../combat/arenaBuild';
 import { mountVenue } from '../core/NexusVenue';
 import { dodgeReward, tickCounter, counterMult } from '../core/DodgeRead';
@@ -815,12 +815,9 @@ export const MixedCombatMode: ModeDefinition = (() => {
       EffectsKit.ambient(ctx.scene, 'park');
       // L4 — a pit fight is WATCHED. A ring of onlookers on the apron,
       // outside the braziers, answering the big moments.
-      gallery = new Onlookers(ctx.scene,
-        Array.from({ length: 14 }, (_, i) => {
-          const a = (i / 14) * Math.PI * 2;
-          const gr = (arena.shape.kind === 'disc' ? arena.shape.radius : Math.max(arena.shape.halfX, arena.shape.halfZ)) + 4.2;
-          return new Vector3(Math.cos(a) * gr, 0, Math.sin(a) * gr);
-        }));
+      // IMPROVE (2026-10-06): the ring is combat/arenas crowdRing — the same radius + 4.2 (max half-extent on a box), never
+      // nearer a box's corner than CROWD_CORNER_CLEAR, and the same fourteen spots (phase π/2 is the old cos/sin ring)
+      gallery = new Onlookers(ctx.scene, crowdRing(arena, CROWD_GAP.mixedcombat, 14, CROWD_PHASE.mixedcombat).map((p) => new Vector3(p.x, 0, p.z)));
       ctx.heroRef.current = player.root;
       ctx.objectiveRef.current = rival.root.position;
       ctx.camDirector.snapTo(player.root.position, rival.root.position);

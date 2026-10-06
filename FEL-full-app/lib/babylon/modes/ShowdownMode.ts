@@ -32,7 +32,7 @@ import { neverBindPose } from '../anim/importSanitizer';
 import { installSafePlay } from '../anim/clipRegistry';
 import { VenueKit } from '../visual/VenueKit';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';
-import { readCombatArena, arenasFor, arenaClamp, knockTo, hazardAt, describeArena, type CombatArena } from '../combat/arenas';   // phase 7: the arena decides
+import { readCombatArena, arenasFor, arenaClamp, knockTo, hazardAt, describeArena, showdownGateDist, SHOWDOWN_GATE, type CombatArena } from '../combat/arenas';   // phase 7: the arena decides
 import { buildArena, type ArenaHandle } from '../combat/arenaBuild';
 import { readPlaceLook } from '../nexus/placeLooks';
 import { FighterState, KARATE_ATTACKS, CHI_MAX, PARRY_WINDOW_MS } from '../core/FightCore';
@@ -69,7 +69,7 @@ import type { BodyView } from '../core/ModeHarness';
 
 let modeVenue: VenueHandle | null = null;   // ship pass 4: the mounted venue spec, disposed with the mode
 
-const ARENA_HALF = 12;
+const ARENA_HALF = 12;   // the floor fallback clamp when the venue has no navmesh (always, under an arena) — wider than every Showdown arena at ARENA_SCALE (arenas.test holds it); the gate no longer stands on it
 const DASH_CHI_COST = 12;
 const ULT_DMG = 38;
 const ULT_RANGE = 2.6;
@@ -101,6 +101,7 @@ export const ShowdownMode: ModeDefinition = (() => {
   let chakra: ResourceMeter, foeChakra: ResourceMeter;
   let mbus = new MomentumBus();
   let wallMesh: AbstractMesh | null = null;
+  let gateZ = -12;   // where the gate stands; set from the picked arena at load
   let phase: Phase = 'intro';
   let phaseSec = 0;
   let stickX = 0, stickY = 0;
@@ -493,8 +494,10 @@ export const ShowdownMode: ModeDefinition = (() => {
       installSafePlay(rival.animator, 'showdown-rival');
 
       // the destructible north gate (wall-break beat)
+      // IMPROVE (2026-10-06): on the picked arena's −z edge (combat/arenas.ts showdownGateDist), not at z −12 behind it
+      gateZ = -showdownGateDist(arena);
       wallMesh = MeshBuilder.CreateBox('shatter_gate', { width: 3, height: 2.6, depth: 0.3 }, ctx.scene);
-      wallMesh.position.set(0, 1.3, -ARENA_HALF);
+      wallMesh.position.set(0, 1.3, gateZ);
       const wm = new StandardMaterial('gateMat', ctx.scene);
       wm.diffuseColor = new Color3(0.55, 0.4, 0.25);
       wallMesh.material = wm;
@@ -658,14 +661,14 @@ export const ShowdownMode: ModeDefinition = (() => {
       if (phase !== 'fighting') return;
 
       // ── wall shatter check (destructible beat) ──
-      if (wallMesh && rival.root.position.z <= -ARENA_HALF + 0.8) {
+      if (wallMesh && rival.root.position.z <= gateZ + SHOWDOWN_GATE.breakM) {
         const w = wallMesh; wallMesh = null;
         w.dispose();
         SoundKit.play('impact', { pitch: 0.4, volume: 0.9 });
         SoundKit.play('crowdCheer', { volume: 0.8 });
         ctx.feel?.impact?.(1);
         for (let i = 0; i < 3; i++) {
-          EffectsKit.burst(ctx.scene, new Vector3(0, 1 + i * 0.5, -ARENA_HALF), 'glitch');
+          EffectsKit.burst(ctx.scene, new Vector3(0, 1 + i * 0.5, gateZ), 'glitch');
         }
         ctx.camDirector.pulse(1, 0.7);
         banner(ctx, 'THE GATE SHATTERS!', 1200);
