@@ -19,6 +19,7 @@ import { timingMaxCombo } from './timing-combo';
 import { timingGameResult } from '@/lib/sessions/gameResultFromSession';
 import { CUE_LOOKAHEAD_SEC, CUE_LINGER_SEC, type HudCue } from '@/lib/babylon/core/danceTracks';
 import { ACCURACY_CENTER as GOLF_ACC_CENTER, ACCURACY_HALF as GOLF_ACC_HALF } from '@/lib/babylon/core/golfHud';
+import { breakawayLine } from '@/lib/babylon/core/penaltyHud';   // IMPROVE (2026-10-06, Penalty #12)
 // MUSIC-SUITE P7 (2026-09-29), room-mix-ux: the Cypher's instrument chips (replacing the MIX bar) and its paused-
 // screen MIX sliders. Dance-only — gated below on hud.instruments / modeKey==='dance', so every other timing sport
 // this host also drives (tennis, derby, penalty, golf, volleyball) renders exactly as before.
@@ -94,7 +95,8 @@ export function makeTimingHost(opts: TimingHostOpts) {
           // IMPROVE (2026-10-06, Derby #2): the derby ends WIN / LOSS against the rival's round (the mode's `beatRival`); the
           // posted `won` (timingWon: three homers, the Story's Diamond goal) is unchanged
           : modeKey === 'derby' ? `${st.beatRival !== undefined ? (n('beatRival') ? 'BEAT THE RIVAL' : 'RIVAL TAKES IT') : won ? 'DERBY CHAMPION' : 'DERBY OVER'} · ${n('homers')}–${n('rivalHomers')} HR · ${n('outs')} OUTS · ${Math.round(n('longestFt'))} FT`
-          : modeKey === 'penalty' ? `${won ? 'SHOOTOUT WON' : 'SHOOTOUT LOST'} · ${n('goals')}–${n('themGoals')} · ${n('stylePts')} STYLE`
+          // IMPROVE (2026-10-06, Penalty #12): and the breakaway's tricks, when there were any (penaltyHud.breakawayLine)
+          : modeKey === 'penalty' ? `${won ? 'SHOOTOUT WON' : 'SHOOTOUT LOST'} · ${n('goals')}–${n('themGoals')} · ${n('stylePts')} STYLE${breakawayLine(st) ? ` · ${breakawayLine(st)}` : ''}`
           : (n('rounds') ? `${n('hits')}/${n('rounds')} CLEAN · ${r.score} PTS` : `${r.score} PTS`);
         onEndRef.current({ ...base, headline, maxCombo: timingMaxCombo(st) });
       };

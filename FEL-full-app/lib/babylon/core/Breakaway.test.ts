@@ -46,3 +46,16 @@ describe('the keeper', () => {
     expect(crossesKeeper(5.9, 6.1, 6)).toBe(true); expect(crossesKeeper(6.1, 6.3, 6)).toBe(false);
   });
 });
+
+// IMPROVE (2026-10-06, Penalty #8): the parry is placement, not a roll
+import { parryRead } from './Breakaway';
+describe('the parry-kick', () => {
+  it('a shot at his body comes back; one at his stretch is held; none late on the clock or off an overdrive', () => {
+    expect(parryRead(0.3, 0, 5, 'strike')).toBe(true);
+    expect(parryRead(-KEEPER.parryBodyM, 0, 5, 'curler')).toBe(true);
+    expect(parryRead(KEEPER.parryBodyM + 0.05, 0, 5, 'strike')).toBe(false);
+    expect(parryRead(0.1, 0, KEEPER.parryMinClock, 'strike')).toBe(false);
+    expect(parryRead(0.1, 0, 5, 'overdrive')).toBe(false);
+    expect(parryRead(2.1, 2.0, 5, 'bank')).toBe(true);   // measured from where HE is, not the middle
+  });
+});

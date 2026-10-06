@@ -72,8 +72,11 @@ export const KEEPER = {
   slideDist: 2.8, slideSec: 0.45, slideSpeed: 7.5, slideHitM: 0.8, slideCool: 2.2,
   /** Near a post a high shot is met with the crossbar vault. */
   vaultNearPost: 2.0, vaultReachMult: 1.4,
-  /** A save inside reach comes back as a PARRY-KICK this often; the counter's speed. */
-  parryChance: 0.45, counterSpeed: 9,
+  /** A save inside reach comes back as a PARRY-KICK when the shot was at his body (inside `parryBodyM` of his centre —
+   *  IMPROVE 2026-10-06, Penalty #8; TUNED: was a 45% roll on every save, so it could be neither read nor played around);
+   *  a save at full stretch is held. Not in the last `parryMinClock` s (no time to hit it again), never off an overdrive.
+   *  The counter's speed. */
+  parryBodyM: 0.55, parryMinClock: 1.5, counterSpeed: 9,
   /** What the tricks do to his reach. */
   overdriveReachMult: 0.6, rainbowReachMult: 0.5,
 } as const;
@@ -92,3 +95,8 @@ export function reachFor(base: number, shot: { high: boolean; kind: ShotKind }, 
 }
 /** The ball crossed the keeper's depth this step. */
 export function crossesKeeper(prevZ: number, z: number, keeperZ: number): boolean { return prevZ < keeperZ && z >= keeperZ; }
+/** IMPROVE (2026-10-06, Penalty #8): a save he makes inside reach — a shot at his body comes back at you (the parry-kick),
+ *  one he stretches for is held. */
+export function parryRead(ballX: number, keeperX: number, clock: number, kind: ShotKind): boolean {
+  return Math.abs(ballX - keeperX) <= KEEPER.parryBodyM && clock > KEEPER.parryMinClock && kind !== 'overdrive';
+}
