@@ -270,3 +270,34 @@ describe('penalty: the result card gets the breakaway (#12)', () => {
     expect(stats.goals).toBe(stats.shots);           // Math.random 0.99: every kick reads wrong and goes in
   });
 });
+
+// ── owner decision 2026-10-06, "Stick aims" ──────────────────────────────────────────────────────────────────────────
+describe('penalty: the stick held at the strike aims the breakaway shot', () => {
+  /** Strike on the first frame (the ball on the dribble's 0.9 m) with the stick held, and read where it was judged. */
+  async function strikeWithStick(x: number, y: number): Promise<{ aimX: number; ballX: number }> {
+    const info = vi.spyOn(console, 'info');
+    const ctx = fakeCtx();
+    await PenaltyMode.load(ctx);
+    PenaltyMode.onInput!(ctx, { t: 'stick', side: 'L', x, y });
+    PenaltyMode.onInput!(ctx, press('A'));
+    for (let i = 0; i < 300 && last('clock') !== 0; i++) frames(ctx, 1 / 60);
+    const lines = info.mock.calls.map((c) => String(c[0]));
+    const read = lines.find((l) => l.startsWith('[BREAK] keeper read'))!;
+    const judged = lines.find((l) => l.startsWith('[BREAK] judge'))!;
+    return { aimX: Number(/aim (-?[\d.]+)/.exec(read)![1]), ballX: Number(/ball x (-?[\d.]+)/.exec(judged)![1]) };
+  }
+  it('◀ the left corner, ▶ the right, neither the middle — off the same 0.9 m dribble', async () => {
+    const left = await strikeWithStick(-0.9, 0);
+    PenaltyMode.dispose?.();
+    const mid = await strikeWithStick(0, 0);
+    PenaltyMode.dispose?.();
+    const right = await strikeWithStick(0.9, 0);
+    expect(left.aimX).toBe(-3);
+    expect(mid.aimX).toBe(0);
+    expect(right.aimX).toBe(3);
+    expect(left.ballX).toBeLessThan(-2);               // it went there, not to x ≈ −0.1 every time
+    expect(Math.abs(mid.ballX)).toBeLessThan(0.5);
+    expect(right.ballX).toBeGreaterThan(2);
+    expect(last('goals')).toBe(1);                     // Math.random 0.99: he misread it
+  });
+});

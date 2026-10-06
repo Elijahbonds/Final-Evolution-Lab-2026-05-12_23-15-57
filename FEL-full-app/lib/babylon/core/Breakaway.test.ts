@@ -1,6 +1,6 @@
 // Does the flow set the power, does the glass take a run, does the mirror aim bank, is the keeper an answer?
 import { describe, it, expect } from 'vitest';
-import { BREAK, FLOW, flowAdd, shotProfile, glassRead, bankTarget, rainbowRead, slideCancelRead, rainbowArc, KEEPER, keeperTargetZ, keeperSlideRead, reachFor, crossesKeeper } from './Breakaway';
+import { BREAK, FLOW, flowAdd, shotProfile, glassRead, bankTarget, rainbowRead, slideCancelRead, rainbowArc, KEEPER, keeperTargetZ, keeperSlideRead, reachFor, crossesKeeper, AIM, stickAimSide, strikeStretch01, strikeAim, keeperDiveX } from './Breakaway';
 
 describe('kinetic shot stacking', () => {
   it('the flow sets the power, the kinetic stack and the overdrive multiply the ball, the gauge caps', () => {
@@ -57,5 +57,44 @@ describe('the parry-kick', () => {
     expect(parryRead(0.1, 0, KEEPER.parryMinClock, 'strike')).toBe(false);
     expect(parryRead(0.1, 0, 5, 'overdrive')).toBe(false);
     expect(parryRead(2.1, 2.0, 5, 'bank')).toBe(true);   // measured from where HE is, not the middle
+  });
+});
+
+// ── owner decision 2026-10-06, "Stick aims" ──────────────────────────────────────────────────────────────────────────
+describe('the stick aims the breakaway shot', () => {
+  it('the stick held at the strike picks left, the middle or right; up lifts it', () => {
+    expect(stickAimSide(-0.9)).toBe(-1);
+    expect(stickAimSide(0.9)).toBe(1);
+    expect(stickAimSide(0)).toBe(0);
+    expect(stickAimSide(AIM.sideDeadZone - 0.01)).toBe(0);
+    expect(stickAimSide(-AIM.sideDeadZone)).toBe(-1);
+    expect(strikeAim({ x: -1, y: 0 }, BREAK.dribbleAhead).target).toEqual({ x: -AIM.cornerX, y: AIM.lowY });
+    expect(strikeAim({ x: 1, y: 0 }, BREAK.dribbleAhead).target).toEqual({ x: AIM.cornerX, y: AIM.lowY });
+    expect(strikeAim({ x: 0, y: 0 }, BREAK.dribbleAhead).target).toEqual({ x: 0, y: AIM.lowY });
+    const upLeft = strikeAim({ x: -0.7, y: -0.7 }, BREAK.dribbleAhead);
+    expect(upLeft.high).toBe(true);
+    expect(upLeft.target).toEqual({ x: -AIM.cornerX, y: AIM.highY });
+    expect(strikeAim({ x: 0, y: 0.9 }, BREAK.dribbleAhead).high).toBe(false);   // stick back is not high
+  });
+  it('off the dribble every corner is reachable — the ball\'s distance no longer picks it', () => {
+    // the bug: the ball always rides dribbleAhead ahead, so the distance read put every plain strike at x ≈ −0.1
+    const xs = [-1, 0, 1].map((sx) => strikeAim({ x: sx, y: 0 }, BREAK.dribbleAhead).target.x);
+    expect(xs).toEqual([-AIM.cornerX, 0, AIM.cornerX]);
+    for (const d of [0.2, BREAK.dribbleAhead, BREAK.strikeReach]) expect(strikeAim({ x: 1, y: 0 }, d).side).toBe(1);
+  });
+  it('the distance is the accuracy: clean on the dribble\'s sweet spot, wobbling off it', () => {
+    expect(strikeStretch01(BREAK.dribbleAhead)).toBe(0);
+    expect(strikeAim({ x: 1, y: 0 }, BREAK.dribbleAhead).wobble).toBe(0);
+    expect(strikeStretch01(BREAK.strikeReach)).toBe(1);
+    expect(strikeAim({ x: 1, y: 0 }, BREAK.strikeReach).wobble).toBeCloseTo(AIM.stretchWobble, 9);
+    expect(strikeStretch01(BREAK.dribbleAhead - 0.4)).toBeCloseTo(0.5, 9);   // jammed tight wobbles too
+  });
+  it('the keeper: read right he goes to the line, read wrong he goes away — a misread middle shot is still a dive', () => {
+    expect(keeperDiveX(true, 1, 3.0, 0, 0.5)).toBe(2.9);
+    expect(keeperDiveX(true, 0, 0, 0.3, 0.5)).toBe(0);
+    expect(keeperDiveX(false, 1, 3.0, 0, 0.5)).toBe(-2);
+    expect(keeperDiveX(false, -1, -3.0, 0, 0.5)).toBe(2);
+    expect(Math.abs(keeperDiveX(false, 0, 0, 0, 0.1))).toBe(2);   // before: −0 × 2 left him standing in the ball's path
+    expect(keeperDiveX(false, 0, 0, 0, 0.1)).toBe(-keeperDiveX(false, 0, 0, 0, 0.9));
   });
 });

@@ -34,7 +34,7 @@ import { boneNode } from '../anim/boneLookup';
 import { planRivalKick, gradeDive, resolveSaveRead, type DiveSign, type KeeperCall, type RivalKickPlan } from '../core/KeeperCore';
 // IMPROVE (2026-10-06, docs/IMPROVEMENTS-2026-10-05.md § Penalty): the shootout loop's pure reads — the classic-pens pick,
 // the habit read said in the breakaway, the honest hint, the skippable result beat.
-import { readPensStyle, writePensStyle, PENS_SWITCH_SEC, habitRead, breakawayHint, CLASSIC_HINT, ResultBeat, type PensStyle } from '../core/PenaltyLoop';
+import { readPensStyle, writePensStyle, PENS_SWITCH_SEC, habitRead, breakawayReadProb, breakawayHint, CLASSIC_HINT, ResultBeat, type PensStyle } from '../core/PenaltyLoop';
 import type { AbstractMesh, Material, Observer, ParticleSystem, Scene } from '@babylonjs/core';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
@@ -78,7 +78,7 @@ import { mountWeatherFx, type WeatherFxHandle } from '../premium/WeatherFx';
 import { SoccerBall, GRASS } from '../core/SoccerBall';
 import { launchKick, frameHit, judgeKick, kickZone, METER_ZONES, GOAL as PEN_GOAL } from '../core/PenaltyKick';
 import { WIND_GAIN } from '../core/GolfBall';
-import { BREAK, FLOW, flowAdd, shotProfile, glassRead, bankTarget, rainbowRead, slideCancelRead, rainbowArc, KEEPER, keeperTargetZ, keeperSlideRead, reachFor, crossesKeeper, parryRead, type ShotKind } from '../core/Breakaway';   // BREAKAWAY (owner brief, 2026-09-18: "Soccer Shootout")
+import { BREAK, FLOW, flowAdd, shotProfile, glassRead, bankTarget, rainbowRead, slideCancelRead, rainbowArc, KEEPER, keeperTargetZ, keeperSlideRead, reachFor, crossesKeeper, parryRead, strikeAim, keeperDiveX, type ShotKind } from '../core/Breakaway';   // BREAKAWAY (owner brief, 2026-09-18: "Soccer Shootout")
 import { stepRun } from '../core/RushRun';
 import { PAD, padMult, type PadKind, FLICK, flickRead, flickVel, type Ring, RINGS, ringsFor, ringPass, turbineFor, gustAt, BANK, bankReflect } from '../core/ParkourGolf';   // PARKOUR GOLF (owner brief, 2026-09-18)
 import { PARK, TARGETS, predictWallCross, targetHit, robRead, verdictFor, flowTrick, kineticSwing, FLOW as PARK_FLOW, TOKEN, multiplierScramble, type Rob, type Verdict, type WallTarget, type WallCross } from '../core/ParkourDerby';   // PARKOUR DERBY (owner brief, 2026-09-18)
@@ -1698,7 +1698,7 @@ export const PenaltyMode: ModeDefinition = (() => {
     pball.stop(); ball.position.set(0, 0.11, BREAK.startZ + BREAK.dribbleAhead); frameKind = null; flightSec = 0;
     ctx.camDirector.setPreset('court'); ctx.camDirector.snapTo(me.root.position, new Vector3(0, 1, PEN_GOAL.z));
     // IMPROVE (2026-10-06, Penalty #2 / #4): the hint names the real clock (BREAK.clockSec; it said 9 s of 11) and what
-    // really picks the corner (your distance to the ball at the strike; it said the stick), carries the pressure line
+    // really picks the corner (the stick held at the strike — owner decision 2026-10-06), carries the pressure line
     // nextKick used to write and this overwrote, and says when the keeper is reading your habit — keeperReadProb drives
     // his dive here, and the warning lived only in the unreachable place-kick aim.
     ctx.setHud({ hint: breakawayHint({ clockSec: BREAK.clockSec, pressure, readSide: round > 1 ? habitRead(shotHistory) : 0 }), clock: BREAK.clockSec, flow: 0, kinetic: '', kickPower: null });
@@ -1733,29 +1733,37 @@ export const PenaltyMode: ModeDefinition = (() => {
     if (phase !== 'break' || brk.struck) return;
     const kinetic = gameT - brk.kineticAt <= FLOW.kineticSec;   // IMPROVE (2026-10-06, Penalty #20): game time
     const prof = shotProfile(brk.flow / FLOW.full, kinetic, kind);
-    const high = stickY < -0.5 || kind === 'rainbow';
-    // FLAG: shot shape is when you strike, not where the run stick sits. Still far of the reach is a pull; in close is the other way.
-    const reach = Math.max(0.4, BREAK.strikeReach);
-    const signed = Math.max(-1, Math.min(1, (Vector3.Distance(ball.position, me.root.position) - reach * 0.55) / (reach * 0.55)));
-    let curl = 0; let target = { x: signed * 3.0, y: high || signed > 0.8 ? 1.9 : 0.85 };
-    if (kind === 'curler') { const sgn = signed >= 0 ? 1 : -1; curl = 1.6 * sgn; target = { x: sgn * 2.6, y: 0.9 }; }
-    if (kind === 'rainbow') target = { x: signed * 2.2, y: 2.05 };
+    // IMPROVE (2026-10-06, owner decision "Stick aims"): the stick held at the strike picks the corner (◀ / ▶ / neither =
+    // the middle; up = the chip, as before). The corner was read off the ball's distance ahead of you, and off the
+    // dribble that is always 0.9 m — every plain strike went low, just left of centre. The distance is now the strike's
+    // accuracy: struck off the dribble's sweet spot (jammed, or stretched for) it wobbles off its line (Breakaway.strikeAim).
+    const aim = strikeAim({ x: stickX, y: stickY }, Vector3.Distance(ball.position, me.root.position));
+    const high = aim.high || kind === 'rainbow';
+    let curl = 0; let target = aim.target; let side = aim.side;
+    // the curler always bends into a corner: the middle stick takes the side the slide went (its clip, below, reads the same)
+    if (kind === 'curler') { const sgn = side !== 0 ? side : stickX >= 0 ? 1 : -1; side = sgn; curl = 1.6 * sgn; target = { x: sgn * 2.6, y: 0.9 }; }
+    if (kind === 'rainbow') target = { x: side * 2.2, y: 2.05 };
+    // the keeper reads where the ball ARRIVES — for the bank that is the stick's corner, not its mirror image off the glass
+    // (Math.sign of the mirrored x always read the wall's side, whatever the aim)
+    const aimX = target.x;
     if (kind === 'bank') target = bankTarget(brk.wall === 0 ? 1 : brk.wall, target);
     const from = { x: ball.position.x, y: ball.position.y, z: ball.position.z };
-    const { vel, spin } = launchKick(from, target, prof.power01, { curl, chip: kind === 'rainbow' || (high && kind !== 'bank'), wobble: 0, rand: Math.random() });
+    const { vel, spin } = launchKick(from, target, prof.power01, { curl, chip: kind === 'rainbow' || (high && kind !== 'bank'), wobble: kind === 'strike' || kind === 'overdrive' ? aim.wobble : 0, rand: Math.random() });
     vel.scaleInPlace(prof.speedMult);
-    brk.struck = true; brk.shotKind = kind; brk.lastHigh = high; brk.lastAimSign = Math.sign(target.x || 0.01); brk.lastAimX = target.x; brk.counterLive = false; brk.slideSec = -1;
+    brk.struck = true; brk.shotKind = kind; brk.lastHigh = high; brk.lastAimSign = side; brk.lastAimX = aimX; brk.counterLive = false; brk.slideSec = -1;
     if (brk.wall !== 0) { brk.wall = 0; me.root.position.y = 0; }
     brk.stylePts += kind === 'strike' ? 0 : kind === 'rainbow' ? 15 : kind === 'overdrive' ? 15 : 10; if (kinetic) brk.stylePts += 5;
     brkStats.shots++; if (kind === 'bank') brkStats.banks++; if (kind === 'rainbow') brkStats.rainbows++; if (kind === 'curler') brkStats.curlers++; if (kind === 'overdrive') brkStats.overdrives++; if (kinetic) brkStats.kinetic++;
     goalLatch = false; frameKind = null; flightSec = 0;
     meAnim.beat(SPORT_CLIP.penaltyStrike, { fadeSec: 0.08 });
     if (kind === 'rainbow') { const dir = keeper.root.position.subtract(me.root.position); dir.y = 0; dir.normalize(); brk.vault = { from: me.root.position.clone(), dir }; brk.vaultT = 0; }
-    const aimSign = brk.lastAimSign; const correct = Math.random() < keeperReadProb(aimSign, shotHistory, 0);
+    // IMPROVE (2026-10-06, "Stick aims"): the read is breakawayReadProb — keeperReadProb on a corner, its own streak on
+    // the middle the stick can now pick — and a misread middle shot sends him to a side (keeperDiveX), not nowhere.
+    const correct = Math.random() < breakawayReadProb(side, shotHistory);
     // net/precision phase 6 — A READ THAT IS RIGHT REACHES THE BALL. The dive went 2.0 m toward the read side from wherever he
     // stood; a corner sits at 3.0, past his reach even when he read it, so a random corner beat him as surely as a read one
     // (the masher's shootout: 5 of 5). Right = he goes to the shot's line (inside the post); wrong = the other way.
-    keeperTargetX = correct ? Math.max(-2.9, Math.min(2.9, brk.lastAimX)) : keeper.root.position.x - aimSign * 2.0;
+    keeperTargetX = keeperDiveX(correct, side, brk.lastAimX, keeper.root.position.x, Math.random());
     console.info(`[BREAK] keeper read ${correct ? 'RIGHT' : 'WRONG'} aim ${brk.lastAimX.toFixed(1)} dive to ${keeperTargetX.toFixed(1)}`);
     kickIn = kind === 'rainbow' ? 0.2 : KICK_CONTACT_SEC * 0.6;
     pendingKick = () => {
