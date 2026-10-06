@@ -10,7 +10,7 @@
 // This file owns meshes, input, animation and HUD, and nothing else.
 
 import { nerve, standingOf, SKILL_FLOOR, SKILL_CEIL, type Standing } from '../core/Nerve';
-import { Color3, DynamicTexture, MeshBuilder, PBRMaterial, Vector3 } from '@babylonjs/core';
+import { Color3, DynamicTexture, Mesh, MeshBuilder, PBRMaterial, Vector3 } from '@babylonjs/core';
 import { answerFor, tellFor, rallyPace, SHOT_FACE } from '../core/tennisHud';
 // TENNIS UPGRADE (owner, 2026-09-18: "football, tennis and soccer upgrades next"): the Wii read — WHEN you swing bends
 // WHERE it goes, a landing ring on the far court shows the shot you are holding, the timing meter draws its bands, and
@@ -23,7 +23,7 @@ import { WeatherKit } from '../core/WeatherKit';
 import { readWeather } from '../nexus/weather';
 import { mountWeatherFx, type WeatherFxHandle } from '../premium/WeatherFx';
 import { ballKindFor, dressBall } from '../visual/meshyProps';
-import type { AbstractMesh, Mesh, Scene } from '@babylonjs/core';
+import type { AbstractMesh, Scene } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { neverBindPose } from '../anim/importSanitizer';
 import { installSafePlay } from '../anim/clipRegistry';
@@ -47,6 +47,12 @@ import {
   shapeSet, spikeDigSteps, quantiseMeter, blockChip, type SetCall,
 } from '../core/VolleyPlay';
 import { readSetLength, setLengthOf } from '../nexus/setLength';
+// IMPROVE (2026-10-06), Tennis: tennis's own rules — who serves a game, what the shown answer buys, the too-early lock,
+// the Zone Shot hold, the opponent's shot pick, the landing ring's plot — pure and tested in core/TennisPlay. The serve's
+// toss is VolleyPlay's: one toss for both sports.
+import {
+  serverAfter, ANSWER_READ_SEC, answeredWith, earlyPress, zoneHold, aiShotWeights, pickShot, ringDt, ringKey,
+} from '../core/TennisPlay';
 import type { ParticleSystem } from '@babylonjs/core';
 
 /** Seconds before the blocker can commit to the net again. */
@@ -213,8 +219,12 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
    *  same time pressure as the timing itself. */
   let pendingShot: TennisShot = 'drive';
   /** A+ mission #6 (Mario Tennis): the opponent PICKS a shot — mostly drives, a slice, the odd lob or drop — so the
-   *  tell on the incoming ball is a real read, not a label. */
-  function pickAiShot(): TennisShot { const r = Math.random(); return r < 0.5 ? 'drive' : r < 0.75 ? 'slice' : r < 0.9 ? 'lob' : 'drop'; }
+   *  tell on the incoming ball is a real read, not a label.
+   *  IMPROVE (2026-10-06) Tennis #11: weighted by where the player stands and whether the opponent was stretched (the
+   *  fixed 50/25/15/10 mix was easy to predict) — TennisPlay.aiShotWeights. */
+  function pickAiShot(stretched: boolean): TennisShot {
+    return pickShot(aiShotWeights({ playerX: foot.x, playerZ: me ? me.root.position.z : o.cfg.halfLength, halfWidth: o.cfg.halfWidth, halfLength: o.cfg.halfLength, stretched }), Math.random());
+  }
   /**
    * Seconds until the player can commit to the net again.
    *
@@ -248,6 +258,10 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
   let trail: ParticleSystem | null = null;
   /** IMPROVE #18 / #7: what the HUD last got, so it is pushed on a change and not every frame. */
   let meterQ = -1, meterIncoming = '', blockShown = '';
+  /** IMPROVE (2026-10-06) Tennis #6: the incoming ball the player locked themselves out of with a too-early press. */
+  let lockedShot: Shot | null = null;
+  /** Tennis #4 / #13: what the landing ring last plotted — re-planned only when its key or the incoming ball changes. */
+  let ringFor: Shot | null = null, ringLast = -1;
   /** WII READ: the landing ring, the weather. */
   let landing: RingHandle | null = null;
   let weather: WeatherKit = new WeatherKit(); let weatherFx: WeatherFxHandle | null = null;
@@ -259,8 +273,8 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
   const clips: NetClipSet = { ...(o.cfg.touchesPerSide > 1 ? VOLLEYBALL_CLIPS : TENNIS_CLIPS), swing: o.swingClip };
   let meTree: NetAnimTree, foeTree: NetAnimTree;
   let meSwing = false, meServe = false, meBlock = false, foeSwing = false;
-  /** The serve: the ball leaves on the clip's contact beat (the trophy → overhead), not at the toss. */
-  let serveIn = 0, serveTotal = 0, serveAim = 0; let serveFrom: Vector3 | null = null;
+  /** The serve's toss: where the ball left the hand (null when no toss is up). */
+  let serveFrom: Vector3 | null = null;
   /** phase 6: where the foe's feet are (x across the court); it runs to the landing at a skill-scaled speed */
   const foeFoot = { x: 0 };
   /** phase 8: volleyball's RALLY FLOW — clean touches build it, a fault empties it, 70+ makes the spike KINETIC */
@@ -287,11 +301,31 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
   let bouncedSide = false, bouncedBack = false, mult = 1, style = 0, aerialNow: AerialKind = null, incomingMeteor = false, lastLive = false, incomingKind: TennisShot | undefined;
   const cageStats = { bounces: 0, wallRuns: 0, smashes: 0, meteors: 0, rallies: 0, liveSaves: 0 };
   let glassMeshes: AbstractMesh[] = [];
+  /** IMPROVE (2026-10-06) Tennis #12: the cage's match — wall runs, smashes, meteors, live saves — goes to the results
+   *  (and the proof line) with the score. It was counted all match and thrown away. */
+  function cageEnd(): Record<string, number> {
+    if (!o.cage) return {};
+    return { wallRuns: cageStats.wallRuns, smashes: cageStats.smashes, meteors: cageStats.meteors, liveSaves: cageStats.liveSaves, glassBounces: cageStats.bounces };
+  }
+  let glassMat: PBRMaterial | null = null;
   function buildCage(ctx: ModeContext): void {
     const mat = VenueKit.paint(ctx.scene, 'cage_glass_mat', '#9ad7ff', 0.12, 0.2); mat.alpha = 0.26;
+    glassMat = mat;
     const gx = glassX(o.cfg), bz = backZ(o.cfg);
-    for (const sx of [1, -1] as const) { const g = MeshBuilder.CreateBox(`cage_side_${sx}`, { width: 0.12, height: CAGE.height, depth: bz * 2 }, ctx.scene); g.position.set(sx * (gx + 0.06), CAGE.height / 2, 0); g.material = mat; g.isPickable = false; glassMeshes.push(g); }
-    for (const sz of [1, -1] as const) { const g = MeshBuilder.CreateBox(`cage_back_${sz}`, { width: gx * 2 + 0.24, height: CAGE.height, depth: 0.12 }, ctx.scene); g.position.set(0, CAGE.height / 2, sz * (bz + 0.06)); g.material = mat; g.isPickable = false; glassMeshes.push(g); }
+    // IMPROVE (2026-10-06) Tennis #17: ONE glass mesh. Four large alpha-blended boxes were four draws and four world
+    // matrices recomputed every frame for a cage that never moves. Merged, frozen, and the material frozen once the scene
+    // is ready (after the weather's fog is in, as the beach's are). Built far pane first, near pane last: the panes now
+    // draw in index order inside one mesh instead of being sorted, and the play camera always sits behind the +Z end.
+    const panes: Mesh[] = [];
+    const back = (sz: 1 | -1) => { const g = MeshBuilder.CreateBox(`cage_back_${sz}`, { width: gx * 2 + 0.24, height: CAGE.height, depth: 0.12 }, ctx.scene); g.position.set(0, CAGE.height / 2, sz * (bz + 0.06)); panes.push(g); };
+    back(-1);
+    for (const sx of [1, -1] as const) { const g = MeshBuilder.CreateBox(`cage_side_${sx}`, { width: 0.12, height: CAGE.height, depth: bz * 2 }, ctx.scene); g.position.set(sx * (gx + 0.06), CAGE.height / 2, 0); panes.push(g); }
+    back(1);
+    const glass = Mesh.MergeMeshes(panes, true, true);
+    const made: AbstractMesh[] = glass ? [glass] : panes;
+    for (const g of made) { g.material = mat; g.isPickable = false; g.freezeWorldMatrix(); glassMeshes.push(g); }
+    if (glass) glass.name = 'cage_glass';
+    ctx.scene.executeWhenReady(() => { if (glassMat === mat) mat.freeze(); });
   }
   /** R1: the aerial on the incoming ball — the back-wall smash or the net-vault meteor. */
   function humanAerial(ctx: ModeContext): void {
@@ -336,6 +370,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
 
   function pushHud(ctx: ModeContext): void {
     if (volleyScore) ctx.setHud({ round: `SET TO ${volleyScore.target}` });   // IMPROVE #10: which set this is
+    if (tennisScore) ctx.setHud({ round: `FIRST TO ${tennisScore.gamesToWin}` });   // Tennis #5: which match this is (quick or full)
     if (o.energy) {
       ctx.setHud({
         energy: Math.round(energy[0]),
@@ -364,6 +399,15 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     ctx.setHud({ banner: text });
     bannerTimer = setTimeout(() => { bannerTimer = null; ctx.setHud({ banner: '' }); }, ms);
   }
+  /** IMPROVE (2026-10-06) Tennis #8: the shot chip is ONE channel too, the same as the banner. Five separate clear timers
+   *  wiped each other's text — a STRETCHED timer (450 ms) cleared the DRIVE · PERFECT pushed after it, a SPLIT's clear
+   *  could wipe the swing's label. A new chip replaces the old one and owns the clear. `extra` rides the same push. */
+  let shotTimer: ReturnType<typeof setTimeout> | null = null;
+  function showShot(ctx: ModeContext, text: string, ms: number, extra?: Parameters<ModeContext['setHud']>[0]): void {
+    if (shotTimer) clearTimeout(shotTimer);
+    ctx.setHud({ ...extra, shotType: text });
+    shotTimer = setTimeout(() => { shotTimer = null; ctx.setHud({ shotType: '' }); }, ms);
+  }
 
   /** The rally is over (a point, or a replay): the ball is dead, the helpers go home, the trail and the meter stop. */
   function resetRally(ctx: ModeContext): void {
@@ -375,6 +419,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     contactArmed = false;
     serveFrom = null;
     quickSet = false; quickSpike = false;
+    lockedShot = null; ringFor = null;               // Tennis #6 / #13: a dead ball holds no lock and no ring plan
     trail?.stop();                                 // IMPROVE #19: no trail behind a dead ball
     // IMPROVE (2026-10-06): a rally that ended mid-window (a stuff, a net touch, their miss) left the meter on screen
     // until the next landing; it clears with the rally now
@@ -399,13 +444,17 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       energy[side] = Math.min(ENERGY_MAX, energy[side] + ENERGY_RALLY_WON);
     }
     const result = tennisScore ? tennisScore.award(side) : volleyScore!.award(side);
+    if (tennisScore) server = serverAfter(server, result as 'point' | 'game' | 'match');   // Tennis #2: the serve changes ends with the game
     pushHud(ctx);
     SoundKit.play(side === 0 ? 'score' : 'miss');
     // L4: they react to the point, or they are set dressing. Louder for the
     // home side, which is what a crowd at a beach court actually does.
     // IMPROVE #14: the beach court's crowd is ONE bank now (it was the sideline bank plus the end banks, 16 skinned
     // bodies); it is the home crowd the end banks were, so it is loudest on the player's point.
-    crowd?.cheer(o.beach ? (side === 0 ? 1 : 0.35) : (side === 1 ? 1 : 0.35));
+    // IMPROVE (2026-10-06) Tennis #7 finding: tennis's crowd cheered LOUDER on the opponent's point (`side === 1 ? 1`). Side
+    // 1 is the opponent here; HERO_SIDE = 1 is the hero's END (+Z), and the two read alike — the comment above says the
+    // home side is the loud one. Both courts now cheer the player's point at full strength.
+    crowd?.cheer(side === 0 ? 1 : 0.35);
 
     // M107 point feedback → ARENA-10PHASE P6: the point's TEXT lives in the banner alone (see flash); the feel hit, the
     // shake and the loss flash stay. The streak still builds tension across a game.
@@ -437,7 +486,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       ctx.end(
         side === 0 ? 'WIN' : 'LOSS',
         mine,
-        { streak: heroStreak, style, theirs },
+        { streak: heroStreak, style, theirs, ...cageEnd() },
       );
       return;
     }
@@ -547,26 +596,17 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     return Math.max(-1, Math.min(1, stick * Math.sign(ctx.camDirector.rightFlat().x || 1)));
   }
 
-  function serve(ctx: ModeContext): void {
-    if (VOLLEY) { volleyServe(ctx); return; }
-    rally.serve(0);
-    const from = new Vector3(me.root.position.x, 1.5, o.cfg.halfLength * 0.92);
-    ball.position.copyFrom(from);
-    meTree.clearBeat('serve'); meServe = true;
-    SoundKit.play('uiTick', { pitch: 1.2, volume: 0.4 });
-    // the ball is tossed now and struck on the serve's contact beat (update() launches it); the aim is drawn now
-    serveFrom = from; serveAim = (Math.random() - 0.5) * 0.5; serveIn = serveTotal = NET_CONTACT_SEC[clips.serve] ?? 0;
-    if (serveIn <= 0) { launch(ctx, from, -1, serveAim, 'good'); serveFrom = null; }
-    flash(ctx, 'SERVE', 600);
-  }
-
   /**
-   * IMPROVE (2026-10-06) #3 + #4: the volleyball serve. Whoever won the last rally serves (the opponent too, so there is
+   * IMPROVE (2026-10-06) #3 + #4: the serve. Whoever won the last rally serves (the opponent too, so there is
    * a serve to RECEIVE), and the player's serve is a toss and a strike: the ball goes up off the hand and A (or the
    * trigger) hits it, graded on the swing bands around the toss's contact point. A toss let fall is tossed again once,
    * then goes over as a weak serve — a serve that waits forever would stall the match.
+   * Tennis #2 / #3 (IMPROVE 2026-10-06): TENNIS SERVES THE SAME WAY. It was the player's every point, a random aim at a
+   * fixed 'good' struck by the clip, with no skill in it. Now the serve changes ends with each game (TennisPlay.
+   * serverAfter), the opponent serves theirs, and the player's is this toss — any shot button strikes it, graded on the
+   * same bands, aimed by the stick and bent by the timing (aimFor), the Wii read the rally plays on.
    */
-  function volleyServe(ctx: ModeContext): void {
+  function serve(ctx: ModeContext): void {
     serveBy = server;
     rally.serve(serveBy);
     const body = serveBy === 0 ? me : foe;
@@ -574,7 +614,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     ball.position.copyFrom(from);
     serveFrom = from; tossT = 0; tossMisses = 0; foeServeCued = false;
     SoundKit.play('uiTick', { pitch: serveBy === 0 ? 1.2 : 0.9, volume: 0.4 });
-    if (serveBy === 0) { publishBands(ctx, TOSS_SEC / 0.45); flash(ctx, 'SERVE — A AS THE TOSS FALLS', 1100); }
+    if (serveBy === 0) { publishBands(ctx, TOSS_SEC / 0.45); flash(ctx, VOLLEY ? 'SERVE — A AS THE TOSS FALLS' : 'SERVE — SWING AS THE TOSS FALLS', 1100); }
     else flash(ctx, 'THEIR SERVE', 700);
   }
 
@@ -590,12 +630,12 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     const from = new Vector3(at.x, at.y, at.z);
     serveFrom = null;
     meTree.clearBeat('serve'); meServe = true;
-    ctx.setHud({ shotType: auto ? 'LATE SERVE' : `SERVE · ${q.toUpperCase()}`, shotMeterT: 0, shotMeterBands: '' });
-    setTimeout(() => ctx.setHud({ shotType: '' }), 500);
+    showShot(ctx, auto ? 'LATE SERVE' : `SERVE · ${q.toUpperCase()}`, 500, { shotMeterT: 0, shotMeterBands: '' });
     SoundKit.play('uiTick', { pitch: q === 'perfect' ? 1.6 : 1.1, volume: 0.5 });
     if (q === 'perfect') { ctx.juice.scorePop(from, 'PERFECT!', '#00E5FF'); ctx.feel.impact(0.3); }
     console.info(`[NET-SERVE] ${q}${auto ? ' (auto)' : ''} toss ${tossT.toFixed(3)}`);
-    launch(ctx, from, -1, attackAim(ctx), q);
+    // Tennis #3: the stick aims the serve and the timing bends it (a dropped toss's weak serve is not bent)
+    launch(ctx, from, -1, VOLLEY ? attackAim(ctx) : aimFor(attackAim(ctx), auto ? 0 : tossT - TOSS_SEC), q);
   }
 
   /** The opponent's serve, struck at the toss's contact point. Mostly a good ball; now and then a perfect or a weak one. */
@@ -610,7 +650,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     launch(ctx, from, 1, aiTargetX(foot.x, o.cfg.halfWidth, 0.6) / o.cfg.halfWidth, q);
   }
 
-  /** One frame of the volleyball toss: the ball rides the server's hand up and down; the opponent strikes on the beat. */
+  /** One frame of the toss (both sports): the ball rides the server's hand up and down; the opponent strikes on the beat. */
   function stepToss(ctx: ModeContext, dt: number): void {
     if (!serveFrom) return;
     tossT += dt;
@@ -626,7 +666,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     const mq = quantiseMeter(tossT / TOSS_SEC);
     if (mq !== meterQ) { meterQ = mq; ctx.setHud({ shotMeterT: mq }); }
     if (tossDropped(tossT)) {
-      if (tossMisses < TOSS_RETRIES) { tossMisses++; tossT = 0; meterQ = -1; flash(ctx, 'TOSS AGAIN — A AS IT FALLS', 900); }
+      if (tossMisses < TOSS_RETRIES) { tossMisses++; tossT = 0; meterQ = -1; flash(ctx, VOLLEY ? 'TOSS AGAIN — A AS IT FALLS' : 'TOSS AGAIN — SWING AS IT FALLS', 900); }
       else humanServeStrike(ctx, 'late', true);
     }
   }
@@ -669,8 +709,10 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     // (see the frame step) and its return is graded through the SAME reach model the human plays under.
     // IMPROVE #9: the opponent's SECOND touch is their setter's, so the setter's feet are the ones graded for it
     const setterTakes = VOLLEY && !!foeSetter && volleyTouchFor(rally.touches + 1, o.cfg.touchesPerSide) === 'set';
+    let foeStretched = false;   // Tennis #11: a stretched opponent plays the defensive ball
     if (ball) {
       const foeReach = reachOf(setterTakes ? foeSetter!.root.position.x : foeFoot.x, ball.position.x);
+      foeStretched = foeReach > NET_REACH_M;
       const before = q;
       const stretched = gradeAfterStretch(q === 'miss' ? 'miss' : q, foeReach);
       q = stretched === 'early' ? 'late' : stretched;
@@ -691,7 +733,9 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     // answer it costs a RACKET rather than only a point. That is the stake the
     // gauge buys, and it is what makes banking energy meaningful.
     if (o.energy && incomingZone) {
-      if (q !== 'perfect') {
+      // IMPROVE (2026-10-06) Tennis #10: the same economy as the player's hold — a good one costs them the point only
+      if (zoneHold(q) === 'point') { awardPoint(ctx, 0, 'ZONE SHOT — THEY SAVED THE RACKET'); return; }
+      if (zoneHold(q) === 'racket') {
         rackets[1] = Math.max(0, rackets[1] - 1);
         pushHud(ctx);
         ctx.juice.flash('#FFD700', 220);
@@ -699,7 +743,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
         if (rackets[1] === 0) {
           ended = true;
           flash(ctx, 'RACKET BROKEN — YOU WIN', 2500);
-          ctx.end('WIN', tennisScore ? tennisScore.games[0] : 0, { rackets: rackets[0] });
+          ctx.end('WIN', tennisScore ? tennisScore.games[0] : 0, { rackets: rackets[0], ...cageEnd() });
           return;
         }
         awardPoint(ctx, 0, 'RACKET DAMAGE');
@@ -760,7 +804,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     // A self-pass on their side must NOT hand the human a swing window, which
     // is what toSide decides (awaitingHuman = toSide > 0).
     // A+ mission #6: the opponent picks a shot (tennis) and the HUD tells it, with the answer that beats it
-    const aiShot: TennisShot | undefined = aiIsVolley ? undefined : pickAiShot();
+    const aiShot: TennisShot | undefined = aiIsVolley ? undefined : pickAiShot(foeStretched);
     if (aiShot) ctx.setHud({ incomingShot: aiShot.toUpperCase(), incomingTell: tellFor(aiShot), answer: `${SHOT_FACE[answerFor(aiShot)]} · ${answerFor(aiShot).toUpperCase()}` });
     // AIM INTO THE SPACE THE PLAYER LEFT. This was `(Math.random() - 0.5) * 1.6` — a coin flip, which is the
     // only aim that makes sense when the player has no position to be out of. It now plays the open court,
@@ -822,8 +866,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       // block (reads the spike, wins the point outright, loses it if you are
       // wrong).
       awaitingHuman = false;
-      ctx.setHud({ shotType: 'BLOCK MISSED' });
-      setTimeout(() => ctx.setHud({ shotType: '' }), 500);
+      showShot(ctx, 'BLOCK MISSED', 500);
       SoundKit.play('uiTick', { pitch: 0.7, volume: 0.3 });
       return;
     }
@@ -834,7 +877,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       // branch, so jumping too soon was rewarded with the point.
       awaitingHuman = false;
       shot = null;
-      ctx.setHud({ shotType: 'NET TOUCH' });
+      showShot(ctx, 'NET TOUCH', 900);
       SoundKit.play('uiTick', { pitch: 0.6, volume: 0.35 });
       awardPoint(ctx, 1, 'NET TOUCH');
       return;
@@ -852,8 +895,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     if (!stuffed && (q === 'good' || q === 'perfect')) {
       meTree.clearBeat('block'); meBlock = true;
       EffectsKit.burst(ctx.scene, at, 'sparks');
-      ctx.setHud({ shotType: 'BLOCK · TOUCH' });
-      setTimeout(() => ctx.setHud({ shotType: '' }), 500);
+      showShot(ctx, 'BLOCK · TOUCH', 500);
       SoundKit.play('uiTick', { pitch: 1.2, volume: 0.45 });
       rally.cross();
       // A FREE BALL, not an attack. This launched a 'spike', which is the
@@ -886,8 +928,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
    */
   function callSet(ctx: ModeContext, call: SetCall): void {
     setCall = call;
-    ctx.setHud({ shotType: call === 'quick' ? 'QUICK SET CALLED' : 'HIGH SET CALLED' });
-    setTimeout(() => ctx.setHud({ shotType: '' }), 600);
+    showShot(ctx, call === 'quick' ? 'QUICK SET CALLED' : 'HIGH SET CALLED', 600);
     SoundKit.play('uiTick', { pitch: call === 'quick' ? 1.5 : 1.0, volume: 0.3 });
   }
   /** Reshape the set just launched to the player's call, re-draw the meter for its new length, and spend the call. */
@@ -904,11 +945,20 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
   function humanSwing(ctx: ModeContext, aerial: AerialKind = null): void {
     // MECHANICS PASS (2026-09-15): tennis X was silent 5 of 7 and volleyball 29 % of hits — a swing with no ball coming, or
     // one too early / out of reach, returned without a word. The rally game's whole read is timing, so timing is SAID.
-    if (VOLLEY && serveFrom && serveBy === 0) { humanServePress(ctx); return; }   // IMPROVE #4: A strikes the toss
+    if (serveFrom && serveBy === 0) { humanServePress(ctx); return; }   // IMPROVE #4 (Tennis #3 too): the press strikes the toss
     if (!shot || !awaitingHuman) { refuse(ctx, 'WAIT FOR THE BALL'); return; }
+    if (lockedShot === shot) { refuse(ctx, 'LOCKED OUT — TOO EARLY ON THIS BALL'); return; }   // Tennis #6
     // dt vs the ideal contact moment, which is the end of the flight
     const dt = (flightT - 1) * shot.duration;
     const timing = gradeSwing(dt);
+    // IMPROVE (2026-10-06) Tennis #6, TUNED: A TOO-EARLY SWING COSTS THE BALL. A press outside the band was refused and
+    // free, so mashing from early always landed an 'early' return. Inside EARLY_LOCK_SEC of contact it now locks the
+    // player out of this ball; further out it is refused as before (TennisPlay.earlyPress). Tennis only.
+    if (!VOLLEY && timing === 'miss' && earlyPress(dt) === 'lock') {
+      lockedShot = shot;
+      refuse(ctx, 'TOO EARLY — LOCKED OUT OF THIS BALL');
+      return;
+    }
 
     // THE STRETCH. Timing was the whole game here; now WHERE YOU ARE multiplies it. A perfect swing at full
     // stretch is not a perfect shot — you got your racket on it, which is not the same as hitting it — and a
@@ -932,10 +982,8 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       }
       heavy = dug !== q; q = dug;
     }
-    if (timing !== q && !heavy) {
-      ctx.setHud({ shotType: lastReach > NET_REACH_M ? 'STRETCHED' : 'REACHING' });
-      setTimeout(() => ctx.setHud({ shotType: '' }), 450);
-    }
+    // Tennis #8: the stretch rides the swing's own chip — it was a chip of its own whose 450 ms clear wiped the label below
+    const stretchTag = timing !== q && !heavy ? (lastReach > NET_REACH_M ? ' · STRETCHED' : ' · REACHING') : '';
     swingingNow = true;
     setTimeout(() => { swingingNow = false; }, 320);
     // phase 4: the ledger — every swing's timing, its stretch and the touch it was (the windows are measured off this)
@@ -947,6 +995,10 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       console.info(`[NET-FLOW] ${rallyFlow}`);
     }
     foeReactSec = q === 'perfect' ? 0.65 : q === 'good' ? 0.45 : 0.3;   // phase 6: the foe reads a better ball later
+    // IMPROVE (2026-10-06) Tennis #1, TUNED: THE ANSWER IS WORTH PLAYING. The HUD showed the shot that beats the incoming
+    // one and playing it did nothing; it now costs the opponent ANSWER_READ_SEC of their read (they start for it later).
+    const answered = !VOLLEY && !aerial && answeredWith(incomingKind, pendingShot);
+    if (answered) foeReactSec += ANSWER_READ_SEC;
 
     // WHICH touch this is decides what the swing DOES. Previously every human
     // swing called rally.cross(), and cross() zeroes the touch counter, so the
@@ -984,17 +1036,24 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     // they are about to play, and the difference between a set and a spike is
     // the difference between building the point and winning it.
     const label = o.cfg.touchesPerSide > 1
-      ? `${touchKind.toUpperCase()} · ${q.toUpperCase()}${heavy ? ' · HEAVY BALL' : ''}`
-      : `${pendingShot.toUpperCase()} · ${q.toUpperCase()}`;
-    ctx.setHud({ shotType: label, touch: o.cfg.touchesPerSide > 1 ? `${touchNo}/${o.cfg.touchesPerSide}` : '' });
-    setTimeout(() => ctx.setHud({ shotType: '' }), 500);
+      ? `${touchKind.toUpperCase()} · ${q.toUpperCase()}${heavy ? ' · HEAVY BALL' : ''}${stretchTag}`
+      : `${pendingShot.toUpperCase()} · ${q.toUpperCase()}${answered ? ' · ANSWER' : ''}${stretchTag}`;
+    showShot(ctx, label, 500, { touch: o.cfg.touchesPerSide > 1 ? `${touchNo}/${o.cfg.touchesPerSide}` : '' });
     if (touchKind === 'spike' && q === 'perfect') {
       ctx.juice.shake(0.14, 130);   // A+ P0: the spike's extra impact SFX stacked a second thud on the PERFECT feel hit — shake only now
     }
     // Holding THEIR Zone Shot is the same test in reverse: anything short of a
     // perfect read costs you a racket, and the third one ends the match on the
     // spot rather than on the scoreboard.
-    if (o.energy && incomingZone && q !== 'perfect') {
+    // IMPROVE (2026-10-06) Tennis #10, TUNED: …short of a GOOD read. A good hold costs the point and keeps the racket
+    // (TennisPlay.zoneHold); only an early / late one breaks it.
+    if (o.energy && incomingZone && zoneHold(q) === 'point') {
+      ctx.juice.flash('#FF3366', 160);
+      SoundKit.play('impact', { pitch: 0.9, volume: 0.5 });
+      awardPoint(ctx, 1, 'ZONE SHOT — RACKET SAVED');
+      return;
+    }
+    if (o.energy && incomingZone && zoneHold(q) === 'racket') {
       rackets[0] = Math.max(0, rackets[0] - 1);
       pushHud(ctx);
       ctx.juice.flash('#FF3366', 240);
@@ -1002,7 +1061,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       if (rackets[0] === 0) {
         ended = true;
         flash(ctx, 'YOUR RACKET IS GONE', 2500);
-        ctx.end('LOSS', tennisScore ? tennisScore.games[0] : 0, { rackets: 0 });
+        ctx.end('LOSS', tennisScore ? tennisScore.games[0] : 0, { rackets: 0, ...cageEnd() });
         return;
       }
       awardPoint(ctx, 1, 'RACKET DAMAGE');
@@ -1073,11 +1132,13 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
           serving: serveFrom ? (serveBy === 0 ? 'me' : 'them') : '', tossT, setCall, blockCooldown }),
       };
       if (o.cage) {   // PARKOUR TENNIS: the glass, and the dev seam
-        for (const g of glassMeshes) g.dispose(); glassMeshes = []; buildCage(ctx);
+        for (const g of glassMeshes) g.dispose(); glassMeshes = []; glassMat?.dispose(); glassMat = null; buildCage(ctx);
         mult = 1; style = 0; aerialNow = null; incomingMeteor = false; Object.assign(cageStats, { bounces: 0, wallRuns: 0, smashes: 0, meteors: 0, rallies: 0, liveSaves: 0 });
         if (process.env.NODE_ENV === 'development') {
           (ctx.scene.metadata ??= {}).tennis = {
-            state: () => ({ awaitingHuman, flightT, contactArmed, shot: shot ? { toX: shot.to.x, toZ: shot.to.z, duration: shot.duration, kind: incomingKind ?? '' } : null, ballX: ball ? ball.position.x : 0, ballZ: ball ? ball.position.z : 0, footX: foot.x, aerial: aerialNow, mult, style, energy: energy[0], lastLive, ...cageStats, ended, resting: restSec > 0, steerSign: Math.sign(ctx.camDirector.rightFlat().x || 1), games: tennisScore ? [tennisScore.games[0], tennisScore.games[1]] : null }),
+            state: () => ({ awaitingHuman, flightT, contactArmed, shot: shot ? { toX: shot.to.x, toZ: shot.to.z, duration: shot.duration, kind: incomingKind ?? '' } : null, ballX: ball ? ball.position.x : 0, ballZ: ball ? ball.position.z : 0, footX: foot.x, aerial: aerialNow, mult, style, energy: energy[0], lastLive, ...cageStats, ended, resting: restSec > 0, steerSign: Math.sign(ctx.camDirector.rightFlat().x || 1), games: tennisScore ? [tennisScore.games[0], tennisScore.games[1]] : null,
+              // IMPROVE (2026-10-06) Tennis #2/#3: the serve is an input now, and it changes ends — a driver has to see whose toss it is
+              serving: serveFrom ? (serveBy === 0 ? 'me' : 'them') : '', tossT, locked: !!shot && lockedShot === shot }),
           };
         }
       }
@@ -1124,7 +1185,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
           ctx.groundLock?.track(c.root, c.skeleton);
         });
       }
-      meSwing = meServe = meBlock = foeSwing = foeServe = false; serveIn = 0; serveFrom = null; foeFoot.x = 0; rallyFlow = 0;
+      meSwing = meServe = meBlock = foeSwing = foeServe = false; serveFrom = null; foeFoot.x = 0; rallyFlow = 0;
       server = 0; serveBy = 0; tossT = 0; tossMisses = 0; foeServeCued = false; aimRX = 0;
       setCall = 'high'; quickSet = false; quickSpike = false; blockCooldown = 0; meterQ = -1; meterIncoming = ''; blockShown = '';
       if (o.cfg.touchesPerSide > 1) ctx.setHud({ flow: 0 });
@@ -1161,13 +1222,17 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
         // IMPROVE (2026-10-06) #14: ONE bank. The ends were a second Onlookers, so the beach court stood 16 skinned bodies
         // (two MAX_BODIES banks, ~6 draws each) on top of the four players. Onlookers spreads its cap over every spot it
         // is given, so the 22 spots now share 8 bodies: two down each sideline, two behind each baseline.
-        crowd = new Onlookers(ctx.scene, spots, '#3E5A70');
+        // IMPROVE (2026-10-06) Tennis #20: the tennis crowd pauses the bodies the camera cannot see (Onlookers' opt-in);
+        // the beach court's bank is left exactly as the volleyball pass tuned it
+        crowd = new Onlookers(ctx.scene, spots, '#3E5A70', undefined, { pauseOffscreen: !VOLLEY });
       }
 
       rally = new RallyState(o.cfg);
-      tennisScore = o.scoring === 'tennis' ? new TennisScore(6) : null;   // FIELD-DEPTH W4: first to six games
       // IMPROVE #10: the set is to 25 or, picked on the splash (`?set=15`), a short set to 15
-      const setLen = setLengthOf(readSetLength(o.modeId));
+      // IMPROVE (2026-10-06) Tennis #5: and tennis's match is first to 6 games (FIELD-DEPTH W4) or, picked the same way
+      // (`?set=3`), a quick match first to 3 — nexus/setLength's TENNIS_MATCH_LENGTHS
+      const setLen = setLengthOf(readSetLength(o.modeId), o.modeId);
+      tennisScore = o.scoring === 'tennis' ? new TennisScore(setLen.target) : null;
       volleyScore = o.scoring === 'volley' ? new VolleyScore(setLen.target, setLen.cap) : null;
       ended = false; restSec = 0.8; shot = null; aimX = 0; heroStreak = 0; gameLatch = false;
 
@@ -1198,7 +1263,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       posture = mountPostureLayer(ctx.scene, me.skeleton, me.root, () => {
         const w = netWindow({
           incoming: awaitingHuman && !!shot,
-          serving: !!serveFrom && (!VOLLEY || serveBy === 0),   // IMPROVE #3: their toss is not our serve
+          serving: !!serveFrom && serveBy === 0,   // IMPROVE #3 (and Tennis #2): their toss is not our serve
           swinging: swingingNow,
           reachM: shot && awaitingHuman ? reachOf(foot.x, ball.position.x) : lastReach,
           speed: Math.abs(foot.vx),
@@ -1238,8 +1303,15 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
         const timed = splitTimed(sinceOppStrike === Infinity ? Infinity : -sinceOppStrike);
         foot.sinceSplit = timed ? 0 : Infinity;   // IMPROVE #17: in place, like the frame step
         splittingNow = 0.22;
-        _ctx.setHud({ shotType: timed ? 'SPLIT' : '' });
-        if (timed) { SoundKit.play('uiTick', { pitch: 1.8, volume: 0.3 }); setTimeout(() => _ctx.setHud({ shotType: '' }), 360); }
+        // IMPROVE (2026-10-06) Tennis #9: a missed split is SAID. It cleared the chip and made no sound, so the hardest
+        // skill in the mode gave no feedback when it went wrong. Pressed while the ball is still going to them, the hop
+        // was early (their strike is still to come); otherwise it came after their strike — late.
+        if (timed) { SoundKit.play('uiTick', { pitch: 1.8, volume: 0.3 }); showShot(_ctx, 'SPLIT', 360); }
+        else if (VOLLEY) _ctx.setHud({ shotType: '' });   // the beach court keeps its silent miss (tennis's item, not volleyball's)
+        else {
+          SoundKit.play('uiTick', { pitch: 0.7, volume: 0.25 });
+          showShot(_ctx, shot && !awaitingHuman ? 'EARLY SPLIT — HOP AS THEY HIT' : 'LATE SPLIT — HOP AS THEY HIT', 600);
+        }
       }
       // In a ONE-touch sport the four face buttons are the four SHOTS: which
       // button you swing with is the shot you play, decided under the same time
@@ -1268,7 +1340,17 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
         landing.show(show);
         // IMPROVE #1: in volleyball the ring is where the ball coming to you comes down — the spot to get your feet to
         if (show && shot && VOLLEY) landing.set(shot.to.x, shot.to.z);
-        else if (show && shot) { const l = landingFor(o.cfg, { x: shot.to.x, y: 1, z: shot.to.z }, -1, aimFor(0, 0), pendingShot); if (l) landing.set(l.x, l.z); }
+        else if (show && shot) {
+          // IMPROVE (2026-10-06) Tennis #4: the ring plots the swing the player would make NOW — the current timing's
+          // grade and its bend (TennisPlay.ringDt), not a perfect swing at any moment. #13: and it is re-planned only when
+          // the incoming ball or what it plots changes (planShot ran and allocated every frame of every flight).
+          const rdt = ringDt((flightT - 1) * shot.duration), rq = gradeSwing(rdt), aim = aimFor(0, rdt), key = ringKey(pendingShot, rq, aim);
+          if (ringFor !== shot || key !== ringLast) {
+            ringFor = shot; ringLast = key;
+            const l = landingFor(o.cfg, { x: shot.to.x, y: 1, z: shot.to.z }, -1, aim, pendingShot, rq);
+            if (l) landing.set(l.x, l.z);
+          }
+        }
       }
 
       // Baseline shuffle (MODE-STICK-FACE, 2026-09-07): lateral only (depth is fixed so the player is always in a
@@ -1357,15 +1439,8 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       // IMPROVE #7: the block's cooldown on the HUD as a ready chip (it only showed as a refusal AFTER the press);
       // pushed when the whole second changes, not every frame
       if (VOLLEY) { const chip = blockChip(blockCooldown); if (chip !== blockShown) { blockShown = chip; ctx.setHud({ blockReady: chip }); } }
-      if (VOLLEY && serveFrom) { stepToss(ctx, dt); return; }   // IMPROVE #3/#4: the volleyball toss
-      if (serveFrom) {
-        // the toss: the ball rises off the hand and the serve strikes it on the clip's contact beat
-        serveIn -= dt;
-        const u = serveTotal > 0 ? 1 - Math.max(0, serveIn) / serveTotal : 1;
-        ball.position.set(serveFrom.x, serveFrom.y + 0.5 * Math.sin(Math.PI * u), serveFrom.z);
-        if (serveIn <= 0) { const from = serveFrom; serveFrom = null; launch(ctx, from, -1, serveAim, 'good'); }
-        return;
-      }
+      // IMPROVE #3/#4: the toss — and Tennis #2/#3, the same toss for tennis (its serve was struck by the clip's beat)
+      if (serveFrom) { stepToss(ctx, dt); return; }
       if (!shot) return;
 
       flightT += dt / shot.duration;
@@ -1451,7 +1526,8 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     },
 
     dispose() {
-      for (const g of glassMeshes) g.dispose(); glassMeshes = [];   // PARKOUR TENNIS
+      for (const g of glassMeshes) g.dispose(); glassMeshes = []; glassMat?.dispose(); glassMat = null;   // PARKOUR TENNIS
+      if (shotTimer) { clearTimeout(shotTimer); shotTimer = null; }   // Tennis #8: the chip's clear does not outlive the match
       crowd?.dispose(); crowd = null;
       beach?.dispose(); beach = null; readableNet?.dispose(); readableNet = null;   // P5
       trail = null;   // the scene owns the system; the handle must not outlive the match

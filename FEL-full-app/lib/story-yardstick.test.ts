@@ -56,7 +56,7 @@ describe('each yardstick is what its mode actually posts', () => {
     // IMPROVE (2026-10-06): the set is built from the splash's set-length pick (a short set to 15 exists now) — and a
     // Story run always gets the FULL set, which is the set these yardsticks are measured on
     has('lib/babylon/modes/NetSportMode.ts', "volleyScore = o.scoring === 'volley' ? new VolleyScore(setLen.target, setLen.cap) : null;");
-    has('lib/babylon/modes/NetSportMode.ts', 'const setLen = setLengthOf(readSetLength(o.modeId));');
+    has('lib/babylon/modes/NetSportMode.ts', 'const setLen = setLengthOf(readSetLength(o.modeId), o.modeId);');
     expect(readSetLength('volleyball', '?story=sandPit.boss&set=15')).toBe('full');
     expect(setLengthOf('full')).toMatchObject({ target: 25, cap: 30 });
     const won = new VolleyScore(25);
@@ -76,15 +76,19 @@ describe('each yardstick is what its mode actually posts', () => {
   });
 
   it('Match Point: first to 6 games posts the games you took — run on RallyCore', () => {
-    has('lib/babylon/modes/NetSportMode.ts', "tennisScore = o.scoring === 'tennis' ? new TennisScore(6) : null;");
-    const t = new TennisScore(6);
+    // IMPROVE (2026-10-06) Tennis #5: the match length is the splash's pick now (a quick match to 3 exists) — and a Story
+    // run always gets the FULL match, first to 6, which is the match this yardstick is measured on
+    has('lib/babylon/modes/NetSportMode.ts', "tennisScore = o.scoring === 'tennis' ? new TennisScore(setLen.target) : null;");
+    expect(readSetLength('tennis', '?story=tennis.boss&set=3')).toBe('full');
+    expect(setLengthOf('full', 'tennis').target).toBe(6);
+    const t = new TennisScore(setLengthOf('full', 'tennis').target);
     let r: string = 'point';
     while (r !== 'match') r = t.award(0);
     expect(t.games[0]).toBe(STORY_YARDSTICKS.tennis.reach);
     expect(STORY_YARDSTICKS.tennis.ceiling).toBe(t.gamesToWin);
     expect(STORY_YARDSTICKS.tennis.unit).toEqual(['game', 'games']);
     // the match's end and the racket break both post WIN — which the timing host reads as a win
-    has('lib/babylon/modes/NetSportMode.ts', "ctx.end('WIN', tennisScore ? tennisScore.games[0] : 0, { rackets: rackets[0] });");
+    has('lib/babylon/modes/NetSportMode.ts', "ctx.end('WIN', tennisScore ? tennisScore.games[0] : 0, { rackets: rackets[0], ...cageEnd() });");
     expect(timingWon('WIN', { rackets: 1 })).toBe(true);
     expect(STORY_YARDSTICKS.tennis.postsWin).toBe(true);
   });
