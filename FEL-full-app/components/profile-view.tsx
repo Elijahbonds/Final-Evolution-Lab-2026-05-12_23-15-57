@@ -10,6 +10,7 @@ import { AvatarFigure } from '@/components/avatar-figure';
 import { Flame, Sparkles, Coins, Gem, Check, Plus, X, Loader2, Download, Trash2, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { Switch } from '@/components/ui/switch';
+import { levelFor } from '@/lib/player-level';
 
 const ATTR_LABELS: Record<string, string> = {
   strength: 'Strength',
@@ -57,6 +58,8 @@ export function ProfileView({ userName, email }: { userName: string; email: stri
   const grade = data?.grade;
   const p = data?.profile;
   const currentAvatar = ROSTER.find((r) => r.key === p?.avatarKey) ?? null;
+  // IMPROVE (2026-10-06, owner decision): the player level, read off the account XP shown below (lib/player-level.ts)
+  const lv = typeof p?.xp === 'number' ? levelFor(p.xp) : null;
 
   return (
     <main className="py-2">
@@ -86,6 +89,15 @@ export function ProfileView({ userName, email }: { userName: string; email: stri
               >
                 {grade?.label} · PRQ {Math.round(data?.prq ?? 0)}
               </span>
+            )}
+            {lv && (
+              <div data-player-level={lv.level} className="mt-2 flex items-center gap-2">
+                <span className="fel-heading text-sm font-bold text-[#00FF9D]">LEVEL {lv.level}</span>
+                <span className="h-1.5 w-28 overflow-hidden rounded-full bg-white/10" role="progressbar" aria-label="Player level progress" aria-valuemin={0} aria-valuemax={lv.need} aria-valuenow={lv.into}>
+                  <span className="block h-full rounded-full bg-[#00FF9D]" style={{ width: `${Math.min(100, (lv.into / lv.need) * 100)}%` }} />
+                </span>
+                <span className="font-mono text-[11px] text-white/50">{lv.into.toLocaleString('en-US')}/{lv.need.toLocaleString('en-US')} XP</span>
+              </div>
             )}
           </div>
           <div className="ml-auto grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-4">

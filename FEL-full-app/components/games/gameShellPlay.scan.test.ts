@@ -21,6 +21,9 @@ import { stripComments } from '@/lib/testing/sourceScan';
 const ROOT = path.resolve(__dirname, '../..');
 const read = (rel: string): string => stripComments(fs.readFileSync(path.join(ROOT, rel), 'utf8'));
 const shell = read('components/games/game-shell.tsx');
+// END SCREEN (2026-10-06): the results card the shell mounts, and its outcome panels
+const card = read('components/games/end-screen/end-screen.tsx');
+const cards = read('components/games/end-screen/outcome-cards.tsx');
 const between = (src: string, from: string, to: string): string => {
   const a = src.indexOf(from);
   expect(a, from).toBeGreaterThan(-1);
@@ -84,7 +87,10 @@ describe('refusals on the end card (the arena integrity pass, re-applied)', () =
     expect(submit).toContain('const refused = arenaRefusal(r2.status, await r2.json().catch(() => null));');
     expect(submit).toContain("if (refused && mine()) setArenaResult({ settled: false, status: 'REFUSED', myScore: arenaScore, refused });");
     expect(shell).toContain('const arenaVerdict: ProofVerdict | null = arenaMatchId && arenaResult && !arenaResult.refused');
-    expect(shell).toMatch(/\{arenaResult\.refused \? \(\s*<ArenaRefusedLine refusal=\{arenaResult\.refused\} \/>\s*\) : !arenaResult\.settled \? \(/);
+    // END SCREEN (2026-10-06): the panel moved into components/games/end-screen (outcome-cards.tsx); the shell hands it the
+    // result as it holds it, and the panel still says the refusal before any verdict
+    expect(shell).toContain('arenaResult={arenaResult}');
+    expect(cards).toMatch(/\{r\.refused \? \(\s*<ArenaRefusedLine refusal=\{r\.refused\} \/>\s*\) : !r\.settled \? \(/);
   });
 
   it('a refused Arena score claims no win: no trophy, no win headline, no proof line, nothing to share (review)', () => {
@@ -94,19 +100,28 @@ describe('refusals on the end card (the arena integrity pass, re-applied)', () =
     expect(shell).toContain("const cardWon = arenaRefused ? false : arenaVerdict ? arenaVerdict === 'WON' : Boolean(result?.won);");
     expect(shell).toMatch(/const cardHeadline = !result \? '' : arenaRefused \? 'SCORE NOT ACCEPTED' : /);
     // the trophy and the headline read only cardWon / cardHeadline, SHARE PROOF only shows with a proof line, and the
-    // challenge mint is gone for the run
-    expect(shell).toContain("<Trophy className={`mx-auto h-12 w-12 ${cardWon ? 'text-[#FFD700]' : 'text-white/30'}`} />");
-    expect(shell).toMatch(/<h2 className="fel-heading mt-3 text-4xl font-bold text-white">\s*\{cardHeadline\}\s*<\/h2>/);
-    expect(shell).toMatch(/\{proofLine && \(\s*<button\s*onClick=\{shareProof\}/);
-    expect(shell).toMatch(/\{!arenaRefused && <button\s*onClick=\{\(\) => void shareChallenge\(\)\}/);
-    expect(shell.match(/shareChallenge\(/g)).toHaveLength(2);   // those two buttons are the only mints
+    // challenge mint is gone for the run. END SCREEN (2026-10-06): the card is components/games/end-screen; the shell passes
+    // exactly these values, and the card renders them under the same rules (end-screen.test.tsx renders the refused case:
+    // dim trophy, no challenge, no proof)
+    expect(shell).toContain('headline={cardHeadline}');
+    expect(shell).toContain('won={cardWon}');
+    expect(shell).toContain('proofLine={proofLine}');
+    expect(shell).toContain('arenaRefused={arenaRefused}');
+    expect(card).toContain("data-end-trophy={won ? 'gold' : 'dim'}");
+    expect(card).toMatch(/\{headline\}\s*<\/motion\.h2>/);
+    expect(card).toMatch(/\{proofLine && \(\s*<button[^>]*onClick=\{guard\(share\.onProof\)\}/);
+    expect(card).toMatch(/\{!arenaRefused && \(\s*<button[^>]*onClick=\{guard\(share\.onChallenge\)\}/);
+    expect(card.match(/share\.on(Proof|Challenge)\b/g)).toHaveLength(2);   // those two buttons are the only mints
+    expect(shell).toContain('share={{ state: shareState, url: shareUrl, onChallenge: () => void shareChallenge(), onProof: shareProof }}');
+    expect(shell.match(/shareChallenge\(/g)).toHaveLength(2);   // shareProof's mint and the card's challenge button
   });
 
   it('a refused Story node (422 verdict / 409) is said where STORY NODE COMPLETE would be, and REPLAY clears it', () => {
     const story = between(shell, "fetch('/api/story/complete'", 'if (sr?.ok && !sr?.alreadyCompleted)');
     expect(story).toContain('const refused = storyRefusal(r2.status, await r2.json().catch(() => null));');
     expect(story).toContain('if (refused && mine()) setStoryRefused(refused);');
-    expect(shell).toContain('{storyRefused && <StoryRefusedPanel refusal={storyRefused} />}');
+    expect(shell).toContain('storyRefused={storyRefused}');
+    expect(card).toMatch(/\{storyRefused && <Beat show=\{shown\('storyRefused'\)\}[^>]*><StoryRefusedPanel refusal=\{storyRefused\} \/><\/Beat>\}/);
     expect(between(shell, 'const replay = () => {', 'setGameKey((k) => k + 1);')).toContain('setStoryRefused(null);');
   });
 
