@@ -167,7 +167,7 @@ export default function WhoSceneItBabylon({ onEnd }: GameProps) {
       {/* ready / countdown / error gates */}
       {phase === 'ready' && (
         <button onClick={tapStart} className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 text-center">
-          <span className="fel-heading text-3xl font-black text-white">WHO SCENE IT</span>
+          <span className="fel-heading text-3xl font-black text-white">SPOT THE SCENE</span>
           <span className="mt-2 font-mono text-xs text-white/70">name the place · A B C D answer · faster pays more · ◀ ▶ on the first screen adds a second player (arrows)</span>
           <span className="mt-6 rounded-xl bg-[var(--fel-cyan)] px-6 py-3 font-bold text-black">TAP TO START</span>
           {/* MOVEMENT PLAY P3 (2026-09-24, the step-4a review): the hands-up START works here too — say so, as BootSplash does */}

@@ -459,7 +459,7 @@ export const MODE_CONTROLLERS: Record<string, ModeControllerConfig> = {
   // second local player can buzz with directions and the picker can change count.
   who_scene_it: {
     modeId: 'who_scene_it',
-    title: 'Who Scene It',
+    title: 'Spot the Scene',
     maxPlayers: 2,
     askName: true,
     schemas: [

@@ -403,7 +403,7 @@ export const VENUE_SPECS: Record<string, NexusWebSpec> = {
   },
 
   who_scene_it: {
-    modeId: 'who_scene_it', name: 'Who Scene It', venue: 'Scene Vault',
+    modeId: 'who_scene_it', name: 'Spot the Scene', venue: 'Scene Vault',
     environment: dusk('#FFB35C', '#140A05', '#2E1A0E', '#FFD9A0', 0.5),
     ground: { kind: 'stage', size: [20, 20], color: '#241408', lineColor: '#FFB35C', markings: 'none' },
     props: [
