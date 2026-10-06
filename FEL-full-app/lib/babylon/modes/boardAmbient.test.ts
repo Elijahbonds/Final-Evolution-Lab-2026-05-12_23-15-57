@@ -30,7 +30,10 @@ describe('the snow wind bed is started after the harness starts the mood bed', (
     // INTEGRATION (2026-10-06): since lane/ambient-fix the harness asks startVenueAmbient(bed), which keeps a bed the
     // mode already chose; the first-frame wind below still owns the bed either way (a later startAmbient replaces it).
     expect(first).toMatch(/SoundKit\.(?:startAmbient|startVenueAmbient)\(bed\)/);
-    expect(first).toMatch(/mood === 'alpine' \|\| mood === 'overcast' \? 'none'/);
+    // INTEGRATION (2026-10-06, integration-2): the bed is picked from the mode's DECLARED mood (lane/visual-foundation: `mood` is
+    // now the resolved LIGHT mood, which a place pick can change — grass tennis lights overcast, and must not go silent). The snow
+    // modes resolve to what they declare, so alpine / overcast still ask for no bed and the wind below still owns it.
+    expect(first).toMatch(/declaredMood === 'alpine' \|\| declaredMood === 'overcast' \? 'none'/);
   });
 
   for (const { file, update } of MODES) {

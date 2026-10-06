@@ -32,7 +32,9 @@ describe('panel lines — a curated list per long mode', () => {
     }
     expect(PANEL_LINES.threevthree.lines.join(' ')).toMatch(/FAKE/);
     expect(PANEL_LINES.threevthree.lines.join(' ')).toMatch(/SCREEN/);
-    expect(staticControlsFor('onevone').length).toBe(2);   // offence and defence, 22 lines once split
+    // integration-2: the 1v1 writes no static map any more (one live line per state, owner pick 1v1 #1), so the curated list is
+    // the panel's only copy of its controls
+    expect(staticControlsFor('onevone')).toEqual([]);
     expect(controlLines('onevone')).toEqual(PANEL_LINES.onevone.lines);
     expect(controlLines('threevthree')).toEqual(PANEL_LINES.threevthree.lines);
   });

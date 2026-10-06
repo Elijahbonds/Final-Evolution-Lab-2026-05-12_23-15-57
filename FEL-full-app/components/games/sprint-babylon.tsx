@@ -102,7 +102,7 @@ export function makeSprintHost(modeKey: string, title: string) {
           setCountdown(typeof d === 'number' ? d : null);
           if (p === 'error') setLoadError(typeof d === 'string' ? d : 'load failed');
         },
-        onHud: (h) => { if (!disposed) setHud((prev) => ({ ...prev, ...h })); },
+        onHud: (u) => { if (!disposed) setHud((prev) => ({ ...prev, ...u })); },
         resultSink: async (r: SessionResult) => {
           if (endedRef.current) return;
           endedRef.current = true;

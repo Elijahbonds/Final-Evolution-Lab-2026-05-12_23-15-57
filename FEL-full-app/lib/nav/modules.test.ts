@@ -45,6 +45,10 @@ const NOT_IMPORTED: Record<string, string> = {
   // CREATOR-PLAN phase 4d (2026-10-06): the creator lane's archetype recipes are TEST-ONLY by design (the game ships tools,
   // never characters, so no shipped module may import them); 4a added the file without its line here.
   'lib/creator/look/__fixtures__/archetypes.ts': 'test support — the ten generic archetype recipes the creator tests build and render (never shipped: tools, not characters); tests are not counted as consumers',
+  // INTEGRATION (2026-10-06, integration-2): two test-only modules whose lanes did not add their line (each lane ran its own
+  // tests, not this one). Neither was ever imported by shipped code, so no wiring was lost in a merge.
+  'lib/ui/hintLiterals.ts': 'test support — the hint-literal reader controlsScreen.scan.test.ts sorts every mode\'s `hint` with (console-view lane); tests are not counted as consumers',
+  'lib/babylon/combat/difficultySim.ts': 'test support — the combat difficulty harness "trimmed for the regression test" (its header); difficultyBands.test.ts pins each duel mode\'s bands with it (improve-combat lane); tests are not counted as consumers',
   'lib/mirror/fixtures/storedRows.ts': 'test support — the stored screen rows the coach and attention tests read, built as the Mirror route writes them; tests are not counted as consumers',
   // ECONOMY-SESSIONS-HARDEN (2026-09-28), FIX 2 step 7: written, tested and deliberately NOT imported by any route (FE PM:
   // staged until the live database is back). lib/sessions/sessionsHardening.scan.test.ts fails the day a route imports it

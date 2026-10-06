@@ -4,12 +4,14 @@ import { describe, expect, it } from 'vitest';
 import { FIT_MIN, controlLines, controlRows, controlsSheet, fitScale, moveLines, pickDevice, splitHint } from './controlsScreen';
 import { STATIC_CONTROLS, isStaticControlsHint, staticControlsFor, stripStaticControls } from '../babylon/ui/staticControls';
 import { KART_PAD_HINT, KART_PAD_START_HINT } from '../babylon/modes/rideHud';
+import { CONTROLS_OFFENCE as THREES_CONTROLS } from '../babylon/modes/threevthreeRules';
 
 const row = (rows: { input: string; action: string }[], action: string) => rows.find((r) => r.action === action)?.input;
 
 describe('stripStaticControls — what the harness hands the host', () => {
   it('a static map reaches the host blank (so it also clears a live prompt the host is still showing)', () => {
-    const big = STATIC_CONTROLS.find((s) => s.mode === 'threevthree')!.text;
+    // (integration-2: the 3v3 writes no static map any more — one live line per state — so the long map here is karate's)
+    const big = STATIC_CONTROLS.find((s) => s.mode === 'karate')!.text;
     expect(stripStaticControls({ hint: big, score: 3 })).toEqual({ hint: '', score: 3 });
     expect(stripStaticControls({ hint: KART_PAD_HINT })).toEqual({ hint: '' });
   });
@@ -26,7 +28,11 @@ describe('stripStaticControls — what the harness hands the host', () => {
     expect(staticControlsFor('velocitykart')).toEqual([KART_PAD_HINT]);
     expect(staticControlsFor('velocitykart', true)[0]).toMatch(/^Grip the wheel/);
     expect(staticControlsFor('dunk', true)).toEqual(['HOLD to run · tap JUMP at the line — then SLAM on NOW!']);   // no body words: the pad's
-    expect(staticControlsFor('threevthree')).toHaveLength(1);    // "Work the court" is a repeat of the map
+    // integration-2: the hoops modes write no static map (one live line per state, owner picks 1v1 #1 / 3v3 #7; their panel is
+    // the curated list), and no mode writes a repeat any more (the 3v3's "Work the court" and the duel's short runway line are gone)
+    expect(staticControlsFor('threevthree')).toEqual([]);
+    expect(STATIC_CONTROLS.filter((l) => l.repeat)).toEqual([]);
+    expect(staticControlsFor('dunkduel')).toHaveLength(1);
     expect(staticControlsFor('nope')).toEqual([]);
   });
 });
@@ -40,10 +46,11 @@ describe('splitHint — a hint string as lines', () => {
   });
 
   it('never inside brackets: the 3v3 post-up list is one line', () => {
-    const lines = splitHint(STATIC_CONTROLS.find((s) => s.mode === 'threevthree')!.text);
+    // integration-2: the 3v3's full list moved to threevthreeRules CONTROLS_OFFENCE (the hoops lane's pause list), reworded
+    const lines = splitHint(THREES_CONTROLS);
     const post = lines.find((l) => l.startsWith('L2 (F): POST UP'))!;
-    expect(post).toMatch(/\(L2\/L1 · shoot = HOOK · .* UP AND UNDER\)$/);
-    expect(lines).toHaveLength(7);
+    expect(post).toMatch(/\(shoot = HOOK · .* UP AND UNDER\)$/);
+    expect(lines).toHaveLength(8);
     expect(lines.at(-1)).toBe('snap the stick to break ankles');
   });
 });
@@ -120,7 +127,7 @@ describe('controlLines / controlsSheet — the mode\'s own words', () => {
     const s = controlsSheet('karate-vs', 'keys');
     expect(s.device).toBe('keys');
     expect(s.rows.length).toBeGreaterThan(3);
-    expect(s.lines).toContain('tap BLOCK at the last instant to parry');
+    expect(s.lines).toContain('hold X guard, press it at the last instant to parry');   // integration-2: the combat lane's words
   });
 });
 

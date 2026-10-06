@@ -76,22 +76,35 @@ export const PANEL_LINES: Readonly<Record<string, PanelLines>> = {
       'Knock them past the glowing edge for a RING OUT',
       'side-step verticals (A/Y) · sweep (B) a stepper',
       'tap GUARD at the last instant to parry',
+      'full CHI + Y = the DRAGON',
+    ],
+  },
+  // INTEGRATION (2026-10-06, integration-2): the combat lane gave Karate VS every control in one line (9 lines split, three of
+  // them its JAB / KICK / HEAVY rows again), and changed Showdown's L1 (a chakra charge, not a dash-cancel) and Duel's X (tap
+  // steps, hold blocks). These lists are those new words, merged the same way; the old ones taught buttons that changed.
+  // rows: JAB · KICK · DASH · HEAVY
+  karate_vs: {
+    lines: [
+      'hold X guard, press it at the last instant to parry',
+      'tap X dash, double-tap chakra dash',
+      'L1 roll · R1 jump',
+      'hold R2 Focus (L1 into a wall: wall run)',
+      'full chi + an ELITE body: HEAVY becomes the DRAGON',
     ],
   },
   // rows: ORBIT (the stick) · FISTS · BLADE · BLOCK · STAFF
-  duel: { lines: ['X block: tap+flick TOWARD them at impact', 'for GUARD IMPACT · knock them OFF the disc'] },
-  showdown: { lines: ['L1 dash-cancel (chi) · R1 substitute their strike', 'SELECT assist · full chi + Y = ULTIMATE'] },
+  duel: { lines: ['tap X step, double-tap X close in', 'hold X block — flick TOWARD them at impact', 'for GUARD IMPACT · hold R2 focus', 'knock them OFF the edge'] },
+  showdown: { lines: ['X tap dash · hold X guard · hold L1 charge chakra', 'R1 substitute their strike · SELECT assist', 'R2 focus · full chakra + Y = ULTIMATE'] },
   // rows: MOVE · SLAM · STYLE · PROP · RUN · LOOK (its "LOOK stick orbits the camera" was the LOOK row again)
   dunkduel: { lines: ['STYLE to cycle · HOLD to run — then tap jump', 'X / D-PAD down picks the CAR, BARRIER or CRATE'] },
   // rows: MOVE · JUMP · SLIDE · FLIP / KICK · OVERDRIVE: 8 lines → 3
   freerun: { lines: ['RT SPRINT · LB GRAPPLE · R-stick TRICKS', 'A JUMP / VAULT / REBOUND / WALL RUN', 'LT or B SLIDE'] },
-  // rows: SPIN · STOMP · STRIDES · BOOST
+  // rows: SPIN · STOMP · STRIDES · BOOST. INTEGRATION (2026-10-06, integration-2): the board lane's one-line card (bigAirPlay
+  // AIR_HINT) added X GRAB and Y BIG SPIN; its stride and boost words are the rows above.
   bigair: {
     lines: [
-      'HOLD RB/SHIFT boost the run-in (bigger pop)',
-      'in the air ←/→ picks backside/frontside',
-      'A starts the spin, A again plants it',
-      'land on a half turn · B stick the landing',
+      'AIR: ◀ ▶ SIDE · A SPIN, A PLANT',
+      'X GRAB · Y BIG SPIN (stick picks) · B STOMP',
     ],
   },
   // the rides: the gas, brake, fire and boost were each a row above as well (body: its own words, staticControls)
@@ -109,14 +122,15 @@ export const PANEL_LINES: Readonly<Record<string, PanelLines>> = {
       'L-STICK turns the ARROW (the ring is a full swing)',
       'A starts the swing · A at the top for POWER',
       'A in the band · B cycles CLUB',
-      'or pull the stick back and drive through',
+      'or pull the stick back, drive it STRAIGHT through',
+      'drift off line hooks / slices',
     ],
   },
   // rows: ANSWER A–D. Split at its dots the quiz line came apart into 'A', 'B', 'X', 'Y pick the answer …'
   who_scene_it: {
     lines: [
       'pick the answer — faster is worth more',
-      'P1: A B X Y · P2: ▲ ▶ ▼ ◀ (arrows)',
+      'P1: A B X Y · P2: ▲ ▶ ◀ ▼ (arrows)',
       'first right answer takes it',
       'a wrong one hands the steal over',
     ],

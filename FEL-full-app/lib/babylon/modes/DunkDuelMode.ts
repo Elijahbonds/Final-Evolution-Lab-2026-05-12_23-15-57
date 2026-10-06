@@ -369,10 +369,15 @@ export const DunkDuelMode: ModeDefinition = (() => {
     // IMPROVE (2026-10-06) #11: the card hands over to the runway from update() (handoffTick), on the mode's clock
   }
   const matchLengthHint = (): string => `B — MATCH LENGTH: ${dunksEach} DUNKS EACH (2 / 3 / 5) · any other button starts`;
-  /** The runway's opening line (with the number on a deciding dunk). */
+  /** The runway's button map: static, so it leaves the play screen for the CONTROLS panel (staticControls.ts). */
+  const RUNWAY_HINT = 'STYLE to cycle · X / D-PAD down picks the CAR, BARRIER or CRATE · LOOK stick orbits the camera · HOLD to run — then tap jump';
+  /** The runway's opening line: the number on a deciding dunk (a live call), else the button map.
+   *  INTEGRATION (2026-10-06, integration-2): the number used to ride in front of the map in one string, which the controls
+   *  screen's exact-match strip could not take apart — so a deciding dunk put the whole map back on the play screen. The
+   *  two are separate lines now; the map is still on the READY card and the pause, and the number on dunkNum as well. */
   function runwayHint(): string {
     const need = duelNeed(duelState(), activeIdx);
-    return `${need !== null ? `${needLine(need, MIN_TOTAL, PERFECT_TOTAL)} · ` : ''}STYLE to cycle · X / D-PAD down picks the CAR, BARRIER or CRATE · LOOK stick orbits the camera · HOLD to run — then tap jump`;
+    return need !== null ? needLine(need, MIN_TOTAL, PERFECT_TOTAL) : RUNWAY_HINT;
   }
   /** IMPROVE (2026-10-06) #11: the hand-off card's own beat — 2.2 s (4 s on the first card, which offers the match length), counted on
    *  phaseSec in update(), so a game paused on "PASS TO P2" stays on the card. */

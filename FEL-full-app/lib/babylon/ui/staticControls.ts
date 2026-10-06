@@ -40,24 +40,25 @@ export interface StaticControlsLine {
 
 export const STATIC_CONTROLS: readonly StaticControlsLine[] = [
   // ── hoops ──
-  { mode: 'threevthree', file: 'ThreeVThreeMode.ts', text: 'HOLD R2 (SHIFT) + a direction to SPRINT · R2 + SQUARE (SHIFT + L) at the rim = DUNK, SQUARE (L) alone = LAY IT IN · SQUARE (L): hold, release in the green · BOTTOM BUTTON (J): PASS (hold to FAKE) · CIRCLE (K): call a SCREEN · L2 (F): POST UP (L2/L1 · shoot = HOOK · stick off the rim = FADE, with R2 = SHIMMY FADE · stick at the rim = DROP STEP · stick across = SPIN · let go early = PUMP, then shoot = UP AND UNDER) · snap the stick to break ankles' },
-  { mode: 'threevthree', file: 'ThreeVThreeMode.ts', repeat: true, text: 'Work the court · BOTTOM BUTTON (J) passes · CIRCLE (K) calls a screen · HOLD SQUARE (L), release in the green' },
-  { mode: 'onevone', file: 'OneVOneMode.ts', text: 'HOLD R2 (SHIFT) + a direction to SPRINT · R2 + SQUARE (SHIFT + L) at the rim = DUNK, SQUARE (L) alone = LAY IT IN · SQUARE (L): hold, release in the green · L2 (F): POST UP · RIGHT STICK (2K, relative to the ball hand): flick TOWARD the ball = hesi · AWAY = between the legs · UP-AWAY = crossover · UP = in and out · DOWN-AWAY = behind the back · DOWN = STEP-BACK (shoot inside it = the step-back jumper) · UP-TOWARD = size-ups · ROTATE = SPIN · hold R2 with any of them = the ESCAPE (crossover → momentum cross · down → the SNATCHBACK · rotate → the STEEZO ROLL) · hold the stick = PAUSIN · hold L2 (F) or L1 (Q) near the block to POST UP (back to the rim: SQUARE = HOOK · stick OFF the rim + SQUARE = FADE, with R2 = SHIMMY FADE · stick AT the rim + SQUARE = DROP STEP · swing the stick across = SPIN · let go early = PUMP FAKE, then SQUARE again = UP AND UNDER) · drive into a body to SPIN off him' },
-  { mode: 'onevone', file: 'OneVOneMode.ts', text: 'STAY IN FRONT — they sidestep, you slide · HOLD L2 (F): SIT DOWN and slide faster · SQUARE (L): STEAL as the ball crosses over (hold it for a HAND UP) · TRIANGLE (I): jump on the gather to BLOCK · HOLD CIRCLE (K): plant and TAKE THE CHARGE · L1: BOX OUT' },
+  // INTEGRATION (2026-10-06, integration-2): the 3v3 and 1v1 maps that sat here are gone from the modes. The owner's picks for
+  // the hoops lane (1v1 #1, 3v3 #7: "show one line keyed to the current state … and put the full list in pause") replaced
+  // them with ONE line for the state you are in (onevoneRules / threevthreeRules hintFor): live prompts by this file's own
+  // rule, listed on the scan's LIVE side. The panel shows the curated hoops lists (panelLines.ts), which never read these.
   { mode: 'dunk', file: 'DunkMode.ts', text: 'HOLD to run · tap JUMP at the line — then SLAM on NOW!' },
   { mode: 'dunkduel', file: 'DunkDuelMode.ts', text: 'STYLE to cycle · X / D-PAD down picks the CAR, BARRIER or CRATE · LOOK stick orbits the camera · HOLD to run — then tap jump' },
-  { mode: 'dunkduel', file: 'DunkDuelMode.ts', repeat: true, text: 'STYLE to cycle · LOOK stick orbits the camera · HOLD to run — then tap jump' },
   // ── combat ──
   { mode: 'karate', file: 'KarateEndlessMode.ts', text: 'Strings: A A A · A A B WHIRLWIND · A B Y HAMMER · B B Y TYPHOON · stick AT a body + Y = RUSH · pull back + B = SPIN BACK KICK · L1 on a staggered body = GRAB (A swing · Y throw) · tap BLOCK late on a wind-up = COUNTER · land 8 = TAKEDOWN (L1) · a miss or a hit taken breaks the flow · R1 = CHI BURST' },
-  { mode: 'karate_vs', file: 'KarateVSMode.ts', text: 'Chain hits for combos · tap BLOCK at the last instant to parry · full chi turns HEAVY into the DRAGON' },
-  { mode: 'showdown', file: 'ShowdownMode.ts', text: 'L1 dash-cancel (chi) · R1 substitute their strike · SELECT assist · full chi + Y = ULTIMATE' },
-  { mode: 'mixedcombat', file: 'MixedCombatMode.ts', text: 'Knock them past the glowing edge for a RING OUT · side-step verticals (A/Y), punish steppers with the sweep (B) · tap GUARD at the last instant to parry' },
-  { mode: 'duel', file: 'DuelMode.ts', text: 'Stick orbits your foe · X block — tap+flick TOWARD them at impact for GUARD IMPACT · knock them OFF the disc' },
+  { mode: 'karate_vs', file: 'KarateVSMode.ts', text: 'A jab · B kick · Y heavy · hold X guard, press it at the last instant to parry · tap X dash, double-tap chakra dash · L1 roll · R1 jump · hold R2 Focus (L1 into a wall: wall run) · full chi + an ELITE body: HEAVY becomes the DRAGON' },
+  { mode: 'showdown', file: 'ShowdownMode.ts', text: 'X tap dash · hold X guard · hold L1 charge chakra · R1 substitute their strike · SELECT assist · R2 focus · full chakra + Y = ULTIMATE' },
+  { mode: 'mixedcombat', file: 'MixedCombatMode.ts', text: 'Knock them past the glowing edge for a RING OUT · side-step verticals (A/Y), punish steppers with the sweep (B) · tap GUARD at the last instant to parry · full CHI + Y = the DRAGON' },
+  { mode: 'duel', file: 'duelRules.ts', text: 'Stick orbits your foe · A / B / Y strike · tap X step, double-tap X close in · hold X block — flick TOWARD them at impact for GUARD IMPACT · hold R2 focus · knock them OFF the edge' },
   // ── race / ride ──
   { mode: 'freerun', file: 'FreeRunMode.ts', text: 'stick RUNS · RT SPRINT · A JUMP / VAULT / REBOUND / WALL RUN · LT or B SLIDE · X FLIP / KICK · Y OVERDRIVE · LB GRAPPLE · R-stick TRICKS' },
   { mode: 'football', file: 'FootballRushMode.ts', text: 'Juke, spin, hurdle — or HOLD TRUCK and run THROUGH them' },
-  { mode: 'sprint', file: 'SprintMode.ts', text: 'Alternate D-PAD ←/→ in rhythm. Do NOT tap before GO.' },
-  { mode: 'bigair', file: 'AirSessionMode.ts', text: 'D-PAD ←/→ alternate strides · HOLD RB/SHIFT boost the run-in (bigger pop) · in the air ←/→ picks backside/frontside · A starts the spin, A again plants it — land on a half turn · B stick the landing' },
+  // the sprint's line follows the race (SprintMode hintFor): the run's map is static; before GO ("Do NOT tap before GO …")
+  // and the last 20 m's dip call are live prompts, and stay.
+  { mode: 'sprint', file: 'SprintMode.ts', text: 'Alternate D-PAD ←/→ — tap as the ring closes.' },
+  { mode: 'bigair', file: 'bigAirPlay.ts', text: '◀ ▶ STRIDE · HOLD RB BOOST · AIR: ◀ ▶ SIDE · A SPIN, A PLANT · X GRAB · Y BIG SPIN (stick picks) · B STOMP' },
   { mode: 'surf', file: 'SurfBreakMode.ts', text: 'Ride the pocket under the lip · pull BACK to climb, push to drop in · R2 drives · hold RB / Shift to BOOST · miss the buoys' },
   { mode: 'snowboard_slalom', file: 'SnowboardSlalomMode.ts', text: 'Between the poles for 100 · JUMP rocks · grind the rails · hold RB / Shift to BOOST' },
   { mode: 'snowboard_slalom', file: 'SnowboardSlalomMode.ts', body: true, text: 'Lean to carve between the poles · crouch to tuck · hop to jump · a hand to the board grabs · turn your shoulders to spin' },
@@ -69,11 +70,11 @@ export const STATIC_CONTROLS: readonly StaticControlsLine[] = [
   { mode: 'aeroaces', file: 'rideHud.ts', text: AERO_PAD_HINT },
   { mode: 'aeroaces', file: 'rideHud.ts', body: true, text: AERO_BODY_HINT },
   // ── precision ──
-  { mode: 'golf', file: 'precisionModes.ts', text: 'L-STICK turns the ARROW (the ring is a full swing) · A starts the swing · A at the top for POWER · A in the band · B cycles CLUB · or pull the stick back and drive through' },
+  { mode: 'golf', file: 'precisionModes.ts', text: 'L-STICK turns the ARROW (the ring is a full swing) · A starts the swing · A at the top for POWER · A in the band · B cycles CLUB · or pull the stick back and drive it STRAIGHT through (drift off line hooks / slices)' },
   { mode: 'derby', file: 'precisionModes.ts', text: 'STRIKE as it crosses the plate · read the break' },
   // ── party ──
   { mode: 'who_scene_it', file: 'WhoSceneItMode.ts', text: 'A · B · X · Y pick the answer — faster is worth more' },
-  { mode: 'who_scene_it', file: 'WhoSceneItMode.ts', text: 'P1: A · B · X · Y   ·   P2: ▲ ▶ ▼ ◀ (arrows)   ·   first right answer takes it, a wrong one hands the steal over' },
+  { mode: 'who_scene_it', file: 'WhoSceneItMode.ts', text: 'P1: A · B · X · Y   ·   P2: ▲ ▶ ◀ ▼ (arrows)   ·   first right answer takes it, a wrong one hands the steal over' },
 ];
 
 const STATIC_SET: ReadonlySet<string> = new Set(STATIC_CONTROLS.map((l) => l.text));
