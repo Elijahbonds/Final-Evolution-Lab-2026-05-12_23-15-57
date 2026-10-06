@@ -2,7 +2,10 @@ import { describe, it, expect } from 'vitest';
 import {
   fieldFor, newField, standings, cutField, placeOf, bookCard, highlightSituation, simFinal, encodeField, decodeField, cutTiebreak,
   fieldTotal, FIELD_SIZE, FINALISTS, PLAYER_ID, type FieldDunker,
+  STAKED_PARAMS, isStakedRun, nightFormat, cardDunks, type NightFormat,
 } from './DunkField';
+import { HEAD_TO_HEAD_PARAMS } from '../modes/onevoneRules';
+import { DUNK_CONTEST_ATTEMPTS } from '../../arena-score-integrity';
 import { DUNK_RIVALS, rivalById } from './DunkRivals';
 import { DUNK_OFF_CAP } from './ContinuousNight';
 
@@ -136,5 +139,67 @@ describe('the standings on the wire', () => {
   });
   it('garbage decodes to null, never a throw', () => {
     for (const v of [null, undefined, 3, '', 'round1', {}]) expect(decodeField(v)).toBeNull();
+  });
+});
+
+// OWNER DECISION (2026-10-06): staked and ladder nights play the classic format — one rival, four dunks — so every staked card is equal.
+describe('the night format: the field is for casual nights only', () => {
+  it('a staked, ladder or head-to-head run is CLASSIC: ?arena= / ?mp= / ?c= / ?signature=', () => {
+    for (const q of ['?arena=m1', '?mp=AB12', '?c=xyz', '?signature=1', '?court=venice&arena=m9', '?agent=1&mp=Q']) {
+      expect(isStakedRun(q), q).toBe(true);
+      expect(nightFormat(q), q).toBe('classic');
+    }
+  });
+  it('a casual run is the FIELD: no query, dev and probe keys, an empty stake key', () => {
+    for (const q of ['', '?', '?court=venice', '?agent=1', '?unlocks=all&prop=car', '?story=n3', '?carnival=1', '?arena=']) {
+      expect(isStakedRun(q), q).toBe(false);
+      expect(nightFormat(q), q).toBe('field');
+    }
+  });
+  it('reads every head-to-head key the other hoops modes read (onevoneRules.HEAD_TO_HEAD_PARAMS), plus the ladder', () => {
+    for (const k of HEAD_TO_HEAD_PARAMS) expect(STAKED_PARAMS).toContain(k);
+    expect(STAKED_PARAMS).toContain('signature');
+  });
+  it('a broken query is casual, never a throw', () => {
+    expect(() => nightFormat('%E0%A4%A')).not.toThrow();
+  });
+
+  // The mode's own walk (DunkMode.startField / advanceAfterRivalTurn): the field is built only on a 'field' night, and the first round
+  // goes to the cut only when there is a field. Walked here with a player who would be CUT on a field night.
+  const walkNight = (search: string): { format: NightFormat; ranField: boolean; playerDunks: number } => {
+    const format = nightFormat(search);
+    let field: FieldDunker[] = format === 'field' ? newField(DUNK_RIVALS[0]) : [];
+    let playerDunks = 0;
+    // round 1: two dunks each; the player has the worst card in the building
+    for (let k = 0; k < 2; k++) {
+      playerDunks++;
+      if (field.length) field = book(field, { [PLAYER_ID]: [31], [DUNK_RIVALS[0].id]: [45] });
+    }
+    if (field.length) {   // the highlights and the cut
+      for (const d of field.filter((x) => x.kind === 'highlight')) field = book(field, { [d.id]: [44, 44] });
+      const { through } = cutField(field);
+      if (!through.some((d) => d.id === PLAYER_ID)) return { format, ranField: true, playerDunks };
+      playerDunks += 2;
+      return { format, ranField: true, playerDunks };
+    }
+    playerDunks += 2;   // round 2
+    return { format, ranField: false, playerDunks };
+  };
+  it('a staked night NEVER runs the field — and its card always holds four dunks, however badly the night goes', () => {
+    for (const q of ['?arena=m1', '?mp=x', '?c=y', '?signature=1']) {
+      const w = walkNight(q);
+      expect(w.ranField, q).toBe(false);
+      expect(w.playerDunks, q).toBe(4);
+      expect(w.playerDunks).toBe(DUNK_CONTEST_ATTEMPTS);
+      expect(cardDunks(w.format, false)).toBe(DUNK_CONTEST_ATTEMPTS);
+      expect(cardDunks(w.format, true)).toBe(DUNK_CONTEST_ATTEMPTS);
+    }
+  });
+  it('a casual night DOES run the field (and a dunker cut there has a two-dunk card)', () => {
+    const w = walkNight('?court=venice');
+    expect(w.ranField).toBe(true);
+    expect(w.playerDunks).toBe(2);
+    expect(cardDunks('field', false)).toBe(2);
+    expect(cardDunks('field', true)).toBe(4);
   });
 });

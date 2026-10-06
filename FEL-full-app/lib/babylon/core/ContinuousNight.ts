@@ -64,6 +64,7 @@ export function isLastAttempt(s: NightState, totalRounds: number, dunksPerRound:
 // No loop in code can be endless, so there is a hard SAFETY CAP: dunk-off DUNK_OFF_CAP that is still dead level is settled by the
 // night's best single dunk (each dunker's best card of the night, dunk-offs included), and only if that is level too by the house
 // rule `cardWon` always had (the player). Reaching the cap needs eleven straight dead-level dunk-offs — it is a guard, not a rule.
+// OWNER-APPROVED (2026-10-06): "after 12 tied dunk-offs, best single dunk of the night, then the player. Keep it."
 
 /** One dunk-off card: the panel's total and the three numbers it used (DunkCard). A miss has execution 0. */
 export interface DunkOffCard { total: number; execution: number; difficulty: number; style: number }

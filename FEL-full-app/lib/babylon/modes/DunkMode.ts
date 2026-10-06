@@ -110,7 +110,7 @@ import type { RivalSituation } from '../core/RivalNerve';   // the rival feels t
 import { rivalSlamOffset, rivalPressAt } from '../core/RivalPlay';
 import { DUNK_CHALLENGES, nextChallenge, checkChallenge, challengeLine, challengeChip, challengeCard, type DunkChallenge } from '../core/DunkChallenges';   // dunk-next phase 6: set pieces on the practice runway
 import { emptyUnlocks, loadUnlocks, saveUnlocks, refOpen, needLine, nextUnlockLine, recordNightWon, recordChallenge, devUnlockOverride, allOpen, type UnlockState, type DunkUnlock } from '../core/DunkUnlocks';   // dunk-next phase 6: what winning opens, on the device
-import { newField, bookCard, cutField, cutTiebreak, placeOf, highlightSituation, simFinal, encodeField, fieldTotal, PLAYER_ID, FIELD_SIZE, FINALISTS, type FieldDunker } from '../core/DunkField';   // dunk-next phase 5: the four-dunker night
+import { newField, bookCard, cutField, cutTiebreak, placeOf, highlightSituation, simFinal, encodeField, fieldTotal, nightFormat, cardDunks, PLAYER_ID, FIELD_SIZE, FINALISTS, type FieldDunker, type NightFormat } from '../core/DunkField';   // dunk-next phase 5: the four-dunker night (casual nights only: owner 2026-10-06)
 import { rollRivalAttempt, simRivalDunk, DEFAULT_RIVAL_RUNUP, type RivalAttempt, type RivalRunUp, type RivalDunkResult, type RivalJudgeContext } from '../core/DunkRivalSim';   // dunk-next phase 4: a rival's dunk, judged without flying it
 import { beatsCrossed, gradeTrickPress, flightFlow, encodeBeatStrip, BEAT_ORDER, BEAT_TOL_SEC, BEAT_TICK_PITCH, BEAT_TICK_VOLUME, type BeatGrade, type BeatMark, type SlamZone } from '../core/DunkBeats';   // dunk-next phase 1: the flight is a four-beat bar
 import { TRIPLE_CUT, POSTER_SEC, tripleCutSec, announcerCall, CELEBRATIONS, CELEB_BY_DPAD, seedOf, type CelebId } from '../core/DunkCuts';   // DUNK MOTION phase 12: the made dunk's show
@@ -4696,9 +4696,11 @@ export const DunkMode: ModeDefinition = (() => {
   // panel). THE CUT: the top two. THE FINAL: the finalists on their night totals — the number on the board is the number on your card —
   // and a level final goes to the (endless) dunk-off. Cut → the final is shown as highlights and the night card says who won it.
   // playerTotal / rivalTotal stay the books (rivalTotal is whoever you are dunking against); the field mirrors them for the standings.
-  // The staked card is still the player's own judged dunks — four in a final, TWO on a night that ends at the cut (owner decision:
-  // docs/DUNK-NEXT.md phase 5); the integrity cap (2 rounds × 2 dunks) is untouched.
-  const FIELD_ON = true;
+  // The staked card is still the player's own judged dunks; the integrity cap (2 rounds × 2 dunks) is untouched.
+  // OWNER DECISION (2026-10-06): a STAKED or LADDER night (?arena= / ?mp= / ?c= / ?signature= — core/DunkField.nightFormat) plays the
+  // CLASSIC night — one rival, four dunks for the player, no cut — so every staked card is equal. The field is for casual nights only.
+  // Read per night, not at import: the mode is one object across runs, and the next run's URL is not the last one's.
+  let nightFmt: NightFormat = 'field';
   /** TUNED (dunk-next phase 5): how long each highlight dunker's two cards hold the banner, and the cut's own beat. */
   const HIGHLIGHT_MS = 1900, CUT_BEAT_MS = 2400;
   let field: FieldDunker[] = [];
@@ -4706,7 +4708,9 @@ export const DunkMode: ModeDefinition = (() => {
   /** each field dunker's own exact-repeat memory (the live rival's is `rivalCombos` while he is on the floor) */
   const fieldCombos = new Map<string, Set<string>>();
   function startField(ctx: ModeContext): void {
-    field = FIELD_ON ? newField(foe) : [];
+    nightFmt = nightFormat(typeof location !== 'undefined' ? location.search : '');
+    field = nightFmt === 'field' ? newField(foe) : [];
+    console.info(`[DUNK-FIELD] night format: ${nightFmt}${nightFmt === 'classic' ? ' (a staked / ladder run — one rival, four dunks)' : ''}`);
     fieldStage = 'round1'; fieldChamp = ''; fieldNote = ''; cutSeq++; fieldCombos.clear();
     ctx.setHud({ field: field.length ? encodeField(field, 'round1') : '', nightField: '' });
   }
@@ -4847,6 +4851,11 @@ export const DunkMode: ModeDefinition = (() => {
       fieldStage = 'done'; fieldChamp = champ;
       ctx.setHud({ field: encodeField(field, 'done', champ), nightField: fieldNote || (won ? `CHAMPION — YOU WON THE FINAL OVER ${foe.name}` : `RUNNER-UP — ${foe.name} WON THE FINAL`) });
     }
+    // OWNER DECISION (2026-10-06): what the card should hold — four on a classic (staked) night and a finalist's, two for a dunker cut.
+    // Said, never enforced here: the card holds what was dunked, and the integrity check reads the card.
+    { const want = cardDunks(nightFmt, round >= TOTAL_ROUNDS, TOTAL_ROUNDS, DUNKS_PER_ROUND);
+      const line = `[DUNK-NIGHT] ${nightFmt} night · the card holds ${card.attempts.length} of ${want} dunks`;
+      if (card.attempts.length === want) console.info(line); else console.warn(`${line} — check the night's flow`); }
     // dunk-next phase 6: a won night moves the device's ladder; the card names what it opened, or what is next
     let unlockLine = '';
     if (won) { const r = recordNightWon(unlocks); unlocks = r.state; keepUnlocks(); unlockLine = openedLine(r.opened); }

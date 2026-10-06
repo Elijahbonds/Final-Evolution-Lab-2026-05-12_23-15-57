@@ -15,8 +15,9 @@
 //
 // ARENA INTEGRITY. The staked score is still the player's own card total, and the card still holds at most four judged dunks
 // (2 rounds × 2: arena-score-integrity's MIRRORED.dunkRounds × dunksPerRound — the cap is untouched). A cut night's card holds TWO.
-// That is within every integrity check, but it changes what a night's card can hold, so it is written up as an OWNER DECISION
-// (docs/DUNK-NEXT.md, phase 5) rather than decided here.
+// That is within every integrity check, but it changed what a night's card can hold, so it went to the owner — and the OWNER DECIDED
+// (2026-10-06): a STAKED or LADDER night plays the classic format — one rival, four dunks for the player, exactly as the staked card
+// has always been — so every staked card is equal. The field is for CASUAL nights only (nightFormat, below).
 //
 // Pure: no Babylon, no randomness (the mode's sims are injected).
 import { DUNK_RIVALS, type DunkRival } from './DunkRivals';
@@ -56,6 +57,35 @@ export function newField(foe: DunkRival, roster: readonly DunkRival[] = DUNK_RIV
     { id: foe.id, name: foe.name, kind: 'live', cards: [], order: 1 },
     ...fieldFor(foe, roster).map((r, k): FieldDunker => ({ id: r.id, name: r.name, kind: 'highlight', cards: [], order: 2 + k })),
   ];
+}
+
+// ── OWNER DECISION (2026-10-06): STAKED AND LADDER NIGHTS PLAY THE CLASSIC FORMAT ──────────────────────────────────────────
+// "Staked and ladder nights use the classic format: one rival, 4 dunks for the player, exactly as the staked card has always been, so
+// every staked card is equal. The four-dunker field (cut + final) is for casual nights only." A cut night's card holds two dunks; a
+// finalist's four. Compared in an Arena duel or on a ladder that is two different games, so a run that is compared never cuts.
+
+/** The query keys of a run whose score is compared with somebody else's — read the way the other hoops modes read a staked run
+ *  (modes/onevoneRules HEAD_TO_HEAD_PARAMS: an Arena stake `?arena=`, an async mp challenge `?mp=`, a challenge link `?c=`) — plus the
+ *  weekly Signature LADDER (`?signature=`: GameShell posts the run's score to /api/signature). The test pins the first three to
+ *  HEAD_TO_HEAD_PARAMS, so a key added there is a key here (this file is core and does not import a mode's rules). */
+export const STAKED_PARAMS: readonly string[] = ['arena', 'mp', 'c', 'signature'];
+/** Is this run staked, ranked or head-to-head? Any of STAKED_PARAMS with a value. An empty `?arena=` stakes nothing (GameShell reads
+ *  the same `searchParams.get(..)` and submits nothing for an empty one). */
+export function isStakedRun(search: string): boolean {
+  let q: URLSearchParams;
+  try { q = new URLSearchParams(search); } catch { return false; }
+  return STAKED_PARAMS.some((k) => !!q.get(k));
+}
+/** The night's shape: the four-dunker FIELD (casual) or the CLASSIC one-rival night (staked / ladder / head-to-head). */
+export type NightFormat = 'field' | 'classic';
+export function nightFormat(search: string): NightFormat {
+  return isStakedRun(search) ? 'classic' : 'field';
+}
+/** How many judged dunks the player's card holds at the end of a night (a retried miss is not a dunk; a dunk-off is never on the card).
+ *  The classic night is `rounds × perRound` whatever happens — the number arena-score-integrity mirrors (DUNK_CONTEST_ATTEMPTS). The
+ *  field's is the same for a finalist and the first round alone for a dunker cut. */
+export function cardDunks(format: NightFormat, reachedFinal: boolean, rounds = 2, perRound = 2): number {
+  return format === 'classic' || reachedFinal ? rounds * perRound : perRound;
 }
 
 export const fieldTotal = (d: Pick<FieldDunker, 'cards'>): number => d.cards.reduce((a, c) => a + c, 0);

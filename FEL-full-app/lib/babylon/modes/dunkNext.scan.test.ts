@@ -285,6 +285,25 @@ describe('phase 5 — the four-dunker field, the cut, the final', () => {
   });
 });
 
+describe('owner decision 2026-10-06 — staked and ladder nights play the classic format', () => {
+  it('the field is built per night from the run\'s URL (core/DunkField.nightFormat) — no global switch left', () => {
+    const sf = fn('startField');
+    expect(sf).toMatch(/nightFmt = nightFormat\(typeof location !== 'undefined' \? location\.search : ''\);/);
+    expect(sf).toMatch(/field = nightFmt === 'field' \? newField\(foe\) : \[\];/);
+    expect(DUNK).not.toMatch(/FIELD_ON/);
+  });
+  it('a classic night has no field, so it never reaches the highlights or the cut: round 2 follows round 1', () => {
+    // every path into the cut is behind a field (the highlights are the only caller of finishCut's reel)
+    expect(DUNK.match(/runFieldHighlights\(ctx\)/g)).toHaveLength(1);
+    expect(fn('advanceAfterRivalTurn')).toMatch(/if \(field\.length && fieldStage === 'round1'\) \{ runFieldHighlights\(ctx\); return; \}/);
+    expect(fn('bookField')).toMatch(/if \(!field\.length\) return;/);
+    // the classic card is the integrity's own 2 × 2 (arena-score-integrity MIRRORED.dunkRounds × dunksPerRound)
+    expect(DUNK).toMatch(/^const DUNKS_PER_ROUND = 2;$/m);
+    expect(DUNK).toMatch(/^const TOTAL_ROUNDS = 2;$/m);
+    expect(fn('endNight')).toMatch(/cardDunks\(nightFmt, round >= TOTAL_ROUNDS, TOTAL_ROUNDS, DUNKS_PER_ROUND\)/);
+  });
+});
+
 describe('phase 6 — challenges and unlocks', () => {
   it('practice without a challenge is never judged; with one, the card is computed off the night (no totals, card, stakes or memory)', () => {
     const fp = fn('finishPractice');
