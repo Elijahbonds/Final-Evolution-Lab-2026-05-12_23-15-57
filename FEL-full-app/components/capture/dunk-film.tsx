@@ -225,9 +225,11 @@ export function DunkFilm(props: { onClose: () => void }) {
         canShare: navigator.canShare ? (data) => navigator.canShare!(data) : undefined,
         download: downloadBlob,
       });
-      setNote(plan.kind === 'sheet'
-        ? 'Share sheet opened. Nothing is posted until you send it.'
-        : `Downloaded ${name}. This browser could not open a share sheet for a video file.`);
+      setNote(plan.kind === 'cancelled'
+        ? 'Share cancelled. Nothing was saved — try again when ready.'
+        : plan.kind === 'sheet'
+          ? 'Share sheet opened. Nothing is posted until you send it.'
+          : `Downloaded ${name}. This browser could not open a share sheet for a video file.`);
     } catch (e) {
       setNote(e instanceof Error ? e.message : 'Share did not finish.');
     } finally {

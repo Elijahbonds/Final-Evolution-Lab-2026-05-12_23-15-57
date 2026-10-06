@@ -15,7 +15,7 @@ import { Camera, CameraOff, Pause, Play, RotateCcw, SwitchCamera, Trophy, Volume
 import { MediaPipePoseAdapter } from '@/lib/babylon/nexus/neuro-mirror/pose/mediapipe-adapter';
 import { DunkTracker, scoreIrlDunk, refusalLine, type DunkMetrics, type DunkRefusal } from '@/lib/irl/dunkTracker';
 import { judgeDunk, type JudgeScore } from '@/lib/babylon/core/JudgePanel';
-import { downloadBlob } from '@/lib/capture/shareClip';
+import { clipWasSaved, downloadBlob } from '@/lib/capture/shareClip';
 import { verifiedAdult } from '@/lib/privacy/verifiedAdult';
 import {
   DEFAULT_DUNKS, MAX_DUNKS, MAX_PLAYERS, MIN_DUNKS, MIN_PLAYERS,
@@ -124,6 +124,8 @@ export default function ProveIt({
   const [remind, setRemind] = useState(false);
   const [saveLine, setSaveLine] = useState('');
   const [savedAdults, setSavedAdults] = useState(0);
+  const [pendingClip, setPendingClip] = useState<Blob | null>(null);
+  const [clipNote, setClipNote] = useState('');
   const trackerSeen = useRef('');
 
   prqRef.current = prq;
@@ -180,9 +182,10 @@ export default function ProveIt({
       chunksRef.current = [];
       if (discard || parts.length === 0) return;
       const blob = new Blob(parts, { type: parts[0].type || 'video/webm' });
-      const share = typeof navigator !== 'undefined' && navigator.share ? (data: ShareData) => navigator.share(data) : undefined;
-      const canShare = typeof navigator !== 'undefined' && navigator.canShare ? (data: ShareData) => navigator.canShare!(data) : undefined;
-      void saveClipOnDevice(blob, { share, canShare, download: downloadBlob });
+      // Stashed, not auto-saved: navigator.share must run inside a fresh tap, and this fires from
+      // the recorder's own async onstop event, not a click. The "Save clip" button below is the tap.
+      setPendingClip(blob);
+      setClipNote('');
     };
     try { rec.stop(); } catch { chunksRef.current = []; }
   }, []);
@@ -449,6 +452,22 @@ export default function ProveIt({
     setRecording(true);
   }
 
+  /** Called from the "Save clip" tap, so navigator.share runs inside a real user gesture. */
+  async function saveClip() {
+    const blob = pendingClip;
+    if (!blob) return;
+    const share = typeof navigator !== 'undefined' && navigator.share ? (data: ShareData) => navigator.share(data) : undefined;
+    const canShare = typeof navigator !== 'undefined' && navigator.canShare ? (data: ShareData) => navigator.canShare!(data) : undefined;
+    const plan = await saveClipOnDevice(blob, { share, canShare, download: downloadBlob });
+    if (!clipWasSaved(plan)) {
+      // Cancelled sheet: not a save. Keep the clip pending so the button stays available.
+      setClipNote('Save cancelled. Tap Save clip to try again.');
+      return;
+    }
+    setClipNote('Stays on this phone.');
+    setPendingClip(null);
+  }
+
   const ready = rosterReady(rows, dunksEach) && !blockedUnder13;
   const up = roster[index];
   const showRecord = !!up && mayRecord(up.band, dobYear) && stage !== 'consent' && stage !== 'loading-model' && stage !== 'camera-off';
@@ -465,6 +484,8 @@ export default function ProveIt({
     saveOnceRef.current = false;
     proveSavesRef.current = [];
     setSaveLine('');
+    setPendingClip(null);
+    setClipNote('');
     boardRef.current = freshBoard(rosterRef.current, boardRef.current.dunksEach || dunksEach);
     setAttempts(rosterRef.current.map(() => []));
     setIndex(0);
@@ -761,6 +782,22 @@ export default function ProveIt({
             </button>
           )}
         </div>
+      )}
+      {pendingClip && (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void saveClip()}
+            className="inline-flex min-h-12 items-center gap-2 rounded-lg px-4 text-base font-bold text-black"
+            style={{ background: GOLD }}
+          >
+            Save clip
+          </button>
+          {clipNote && <p className="text-base text-white/80">{clipNote}</p>}
+        </div>
+      )}
+      {!pendingClip && clipNote && (
+        <p className="mt-3 text-base text-white/80">{clipNote}</p>
       )}
       {remind && showRecord && (
         <div className="mt-3 rounded-xl border border-white/15 p-4">

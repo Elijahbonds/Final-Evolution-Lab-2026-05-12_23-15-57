@@ -5,7 +5,13 @@
 
 export type SharePlan =
   | { kind: 'sheet'; fileName: string }
-  | { kind: 'download'; fileName: string; reason: 'no-share' | 'cannot-share-file' };
+  | { kind: 'download'; fileName: string; reason: 'no-share' | 'cannot-share-file' | 'share-refused' }
+  | { kind: 'cancelled'; fileName: string };
+
+/** True once a clip has actually left this device's memory for a sheet or a download. */
+export function clipWasSaved(plan: SharePlan): boolean {
+  return plan.kind === 'sheet' || plan.kind === 'download';
+}
 
 export function planShare(env: { hasShare: boolean; canShareFile: boolean }, fileName: string): SharePlan {
   if (env.hasShare && env.canShareFile) return { kind: 'sheet', fileName };
@@ -41,7 +47,16 @@ export function downloadBlob(blob: Blob, fileName: string): void {
   URL.revokeObjectURL(url);
 }
 
-/** Hand the file to the sheet, or download it. Returns which one happened. */
+/**
+ * Hand the file to the sheet, or download it. Returns which one happened.
+ *
+ * The sheet can refuse: missing in this browser, `canShare` says no, or the call throws —
+ * `NotAllowedError` when it was not made inside a fresh user gesture, or any other error a
+ * browser invents for "could not share this". All of those fall back to the download, same as
+ * never having a sheet at all. The one exception is `AbortError`: the user saw the sheet and
+ * cancelled it. That is not a refusal to work around, it is "no" — nothing is downloaded, and the
+ * caller gets a distinct result so it never reports a save that did not happen.
+ */
 export async function deliverClip(
   blob: Blob,
   fileName: string,
@@ -54,8 +69,16 @@ export async function deliverClip(
     fileName,
   );
   if (plan.kind === 'sheet' && env.share) {
-    await env.share({ files: [file], title, text: `${title} — ${fileName}` });
-    return plan;
+    try {
+      await env.share({ files: [file], title, text: `${title} — ${fileName}` });
+      return plan;
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        return { kind: 'cancelled', fileName };
+      }
+      env.download(blob, fileName);
+      return { kind: 'download', fileName, reason: 'share-refused' };
+    }
   }
   env.download(blob, fileName);
   return plan.kind === 'sheet' ? { kind: 'download', fileName, reason: 'no-share' } : plan;
