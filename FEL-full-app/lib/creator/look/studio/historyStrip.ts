@@ -13,6 +13,7 @@ import { redo, undo, type History } from '../history';
 import type { CreatorDoc, CreatorPart, CreatorSlotV2, PaintLayer } from '../doc';
 import { SHAPE_LABELS } from '../parts';
 import { layerName } from '../paint';
+import { CLOTH_STYLE_LABELS } from '../clothes';
 import { addSlot, canAddSlot, newSlotId, newSlotLabel } from '../slots';
 
 export interface StripEntry {
@@ -59,8 +60,26 @@ function paintChange(a: readonly PaintLayer[], b: readonly PaintLayer[]): string
   return 'Paint';
 }
 
+/** Phase 4e: what changed in the code-built clothes. */
+function clothesChange(a: CreatorDoc['clothes'], b: CreatorDoc['clothes']): string | null {
+  const x = a ?? [], y = b ?? [];
+  if (sameJson(x, y)) return null;
+  const A = byId(x), B = byId(y);
+  const added = y.filter((c) => !A.has(c.id)), removed = x.filter((c) => !B.has(c.id));
+  if (added.length === 1 && !removed.length) return `Put on ${CLOTH_STYLE_LABELS[added[0].style].toLowerCase()}`;
+  if (removed.length === 1 && !added.length) return `Took off ${CLOTH_STYLE_LABELS[removed[0].style].toLowerCase()}`;
+  const changed = y.filter((c) => A.has(c.id) && !sameJson(A.get(c.id), c));
+  if (changed.length === 1) {
+    const o = A.get(changed[0].id)!, n = changed[0];
+    return `${o.colour !== n.colour || o.colour2 !== n.colour2 ? 'Recoloured' : 'Changed'} ${CLOTH_STYLE_LABELS[n.style].toLowerCase()}`;
+  }
+  if (!added.length && !removed.length && x.length === y.length && x.some((c, i) => c.id !== y[i].id)) return 'Clothing: layers';
+  return 'Clothing';
+}
+
 function docChange(a: CreatorDoc, b: CreatorDoc): string | null {
   return partsChange(a.parts, b.parts)
+    ?? clothesChange(a.clothes, b.clothes)
     ?? (a.flags.suit !== b.flags.suit ? (b.flags.suit ? 'Suit on' : 'Suit off') : null)
     ?? paintChange(a.paint, b.paint)
     ?? (!sameJson(a.marks, b.marks) ? 'Drawing' : null)
@@ -133,7 +152,7 @@ export function changeSize(a: CreatorSlotV2, b: CreatorSlotV2): number {
     for (const v of x) if (!Y.has(v.id)) d++;
     return d;
   };
-  n += diff(a.doc.parts, b.doc.parts) + diff(a.doc.paint, b.doc.paint);
+  n += diff(a.doc.parts, b.doc.parts) + diff(a.doc.paint, b.doc.paint) + diff(a.doc.clothes ?? [], b.doc.clothes ?? []);
   if (a.doc.flags.suit !== b.doc.flags.suit) n += 3;
   if (!sameJson(a.doc.shape, b.doc.shape)) n++;
   if (!sameJson(a.doc.colours, b.doc.colours)) n++;
