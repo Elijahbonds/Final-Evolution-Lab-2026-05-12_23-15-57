@@ -59,7 +59,13 @@ export function proofLineFor(mode: string, r: ProofInput): string | null {
     }
     case 'soccer': return `${r.score} PTS · ${r.verdict ?? r.outcome?.replace(/_/g, ' ') ?? wl(r)}`;
     case 'football': { const yards = n(s, 'yards'), ev = n(s, 'evades') ?? n(s, 'evaded'), tr = n(s, 'trucks'); return `${yards ?? 0} YDS${ev !== null ? ` · ${ev} EVADES` : ''}${tr !== null ? ` · ${tr} TRUCKS` : ''}`; }
-    case 'tennis': case 'tiebreak': case 'volleyball': return `${r.score}–${r.opponentScore ?? 0} · ${wl(r)}`;
+    case 'tennis': {
+      // IMPROVE (2026-10-06) Tennis #12: the cage's match rides the line when it happened (NetSportMode's cageEnd)
+      const tail = ([['wallRuns', 'WALL RUN'], ['smashes', 'SMASH'], ['meteors', 'METEOR'], ['liveSaves', 'LIVE SAVE']] as const)
+        .map(([k, w]) => { const v = n(s, k); return v ? ` · ${v} ${w}${v === 1 ? '' : w.endsWith('H') ? 'ES' : 'S'}` : ''; }).join('');
+      return `${r.score}–${r.opponentScore ?? 0} · ${wl(r)}${tail}`;
+    }
+    case 'tiebreak': case 'volleyball': return `${r.score}–${r.opponentScore ?? 0} · ${wl(r)}`;
     case 'carnival': { const ev = n(s, 'events'), rp = n(s, 'rivalPoints'); return `${r.score}–${rp ?? r.opponentScore ?? 0} OVER ${ev ?? '?'} EVENTS · ${r.verdict ?? (r.won ? 'CHAMPION' : 'RUNNER-UP')}`; }
     case 'dance': {
       const stars = n(s, 'stars'), acc = n(s, 'accuracy'), combo = n(s, 'maxCombo');

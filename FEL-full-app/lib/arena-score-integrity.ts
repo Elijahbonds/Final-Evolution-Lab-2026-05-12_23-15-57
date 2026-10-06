@@ -115,8 +115,14 @@ export const MIRRORED = {
   boardCoreTrickPts: [50, 120, 120, 140, 90] as readonly number[],
   /** SurfBreakMode — RUN_SEC, WAVE_MOVE_LOCK_SEC, FLOW_MAX (a wave move pays + flow / 4), BARREL_HOLD_SEC, BARREL_BONUS. */
   surfRunSec: 90, surfWaveMoveLockSec: 0.55, surfFlowMax: 200, surfBarrelHoldSec: 1.5, surfBarrelBonus: 250,
+  /** IMPROVE (2026-10-06, surf items 14 / 18 / 20) — modes/surfBreak: the named X grabs' points (SURF_GRABS, basePts), the near
+   *  miss (NEAR_MISS_PTS, one per NEAR_MISS_COOLDOWN_SEC at most), and the biggest swell's worth (SWELL_WORTH_MAX), which a wave
+   *  move is multiplied by. */
+  surfGrabPts: [104, 120] as readonly number[], surfNearMissPts: 50, surfNearMissCooldownSec: 2, surfWorthMax: 1.8,
   /** SnowboardSlalomMode — rideWorlds SLALOM_GATES at 100 a gate, YETI_CLEAR_PTS once a run, the time bonus (60 − t) × 10. */
   slalomGates: 30, slalomGatePts: 100, yetiClearPts: 150, snowTimeBonusMax: 600,
+  /** IMPROVE (2026-10-06, snow item 5): gateCrasher GATE_STREAK_MAX — the most a gate's streak bonus pays on top of its 100. */
+  slalomStreakMax: 50,
   /** FreeRunMode RUN_CAP_PAR × FreeRunCore's longest par (ROOKIE 55 s); FREERUN_TRICKS' best (SIDE FLIP 200) × the best
    *  LAUNCH_MULT (1.5); the biggest verb link (PARRY-VAULT 110); the move keys a combo can hold (17 verbs + 5 tricks);
    *  timeBonus 25 a second under par; the biggest routeBonus (TRACEUR 650). */
@@ -130,7 +136,7 @@ export const MIRRORED = {
   footballStylePts: 25, footballStyleTypes: 7,
   /** carnivalEvents — each event's clock, its points per unit, and what paces it. */
   slamRushSec: 20, slamRushPpu: 12, slamRushCooldownSec: 0.5,
-  strikeStormSec: 15, strikeStormPpu: 8,
+  strikeStormSec: 15, strikeStormPpu: 8, strikeStormTrioBonus: 1,   // IMPROVE (2026-10-06): +1 hit per GO / TRICK / POWER trio
   trickGauntletSec: 20, trickGauntletPpu: 0.4,
   hotShotSec: 15, hotShotPpu: 15, hotShotGoalZ: 10.9, hotShotMaxSpeed: 20,
   coinStormSec: 15, coinStormPpu: 6, coinStormSpeed: 6, coinStormMagnet: 1.1, coinStormSpacing: 3.77,
@@ -193,12 +199,32 @@ export function firstToCeiling(target: number, maxPerScore: number): number {
 }
 
 /** Big Air: most turns a boosted launch can spin before touchdown. The test RUNS the real big-air core at full boost with
- *  the spin started at take-off and holds this above what it measures (≈ 4.7 turns). */
+ *  the spin started at take-off and holds this above what it measures (≈ 4.75 turns). IMPROVE (2026-10-06, Big Air items
+ *  2 / 8 / 10): the core now lands on a hill (a 2 m lip; a full boost overshoots the landing onto the flat, capped at
+ *  sketchy) and pays a repeated rotation less — both only LOWER what an attempt can pay, so the rotation part stands unchanged. */
 export const BIG_AIR_MAX_TURNS = 5;
+/** IMPROVE (2026-10-06, owner-approved "Big Air ceiling counts the line bonus"): the most one landing's named line can pay.
+ *  AirSessionMode names a trick from the snow table at most once an air (S.named is de-duplicated by id) and scores each at
+ *  scoreTrick(t, landed01) — basePts × landed01², so a stuck/clean landing pays every named trick's basePts in full. The
+ *  largest line is every snow air trick named in one air. */
+export function bigAirLineMax(): number {
+  return airPts(SNOW_TRICKS).reduce((a, b) => a + b, 0);
+}
+/** The whole banked line bonus a session can post. AirSessionMode runs ONE ComboChain (scope 'air') for the session and
+ *  banks it only when the session ends; the Nth link pays N× (ComboChain's multiplier is its link count), a landing is at
+ *  most one link, and a repeated line only pays less. So attemptsPerRound landings, each the largest line and each a fresh
+ *  one: lineMax × (1 + 2 + … + attemptsPerRound). */
+export function bigAirLineBonusMax(): number {
+  const n = BIG_AIR_TUNING.attemptsPerRound;
+  return bigAirLineMax() * (n * (n + 1)) / 2;
+}
+/** Rotation points (the core's score) + the banked line bonus — the one total AirSessionMode posts (RESULTS-TRUTH WA-5).
+ *  IMPROVE (2026-10-06): it counted the rotation points alone (8,000), so a legitimate top session (~14,000 measured with the
+ *  line) was refused as a stake. */
 export function bigAirCeiling(): number {
   const t = BIG_AIR_TUNING;
   const perAttempt = Math.round((t.basePoints + BIG_AIR_MAX_TURNS * t.pointsPerRotation) * Math.max(...Object.values(t.gradePoints)));
-  return t.attemptsPerRound * perAttempt;
+  return t.attemptsPerRound * perAttempt + bigAirLineBonusMax();
 }
 
 /** Golf: a hole in one on every hole (the last one clutch), both rings, and the bank ride. */
@@ -330,19 +356,24 @@ export function skateBound(): number {
  *  never pass REPEAT_NO_MULT × the distinct moves the machine can be handed. */
 const trickMachineMultCap = (moves: number): number => REPEAT_NO_MULT * moves;
 
-/** The Break: a landing every BOARD_EVENT_SEC for the session (surf's airs or boardCore's grab, whichever pays most), a
- *  wave move every WAVE_MOVE_LOCK_SEC at full flow, and a barrel every BARREL_HOLD_SEC. */
+/** The Break: a landing every BOARD_EVENT_SEC for the session (surf's airs, its named grabs or boardCore's grab, whichever
+ *  pays most), a wave move every WAVE_MOVE_LOCK_SEC at full flow on the biggest swell, a near miss every cooldown, and a
+ *  barrel every BARREL_HOLD_SEC. IMPROVE (2026-10-06, surf item 15): a wave move and a near miss are LINKS in the TrickMachine's
+ *  chain now (TrickMachine.link) — the multiplier cap counts them, and each can pay at most its points × that cap in all
+ *  (a wave move's own points at once, the chain's share on top). */
 export function surfBound(): number {
   const m = MIRRORED;
+  const multCap = trickMachineMultCap(SURF_TRICKS.length + m.boardCoreTrickPts.length + m.surfGrabPts.length + 1);   // + NEAR MISS
   const airs = chainRunBound({
     sec: m.surfRunSec, eventSec: BOARD_EVENT_SEC,
-    perEvent: Math.max(maxOf(airPts(SURF_TRICKS)), maxOf(m.boardCoreTrickPts)),
-    multCap: trickMachineMultCap(SURF_TRICKS.length + m.boardCoreTrickPts.length),
+    perEvent: Math.max(maxOf(airPts(SURF_TRICKS)), maxOf(m.boardCoreTrickPts), maxOf(m.surfGrabPts)),
+    multCap,
   });
   const waveMoves = (Math.floor(m.surfRunSec / m.surfWaveMoveLockSec) + 1)
-    * (maxOf(SURF_TRICKS.filter((t) => t.kind !== 'air').map(basePts)) + Math.round(m.surfFlowMax / 4));
+    * Math.ceil((maxOf(SURF_TRICKS.filter((t) => t.kind !== 'air').map(basePts)) + Math.round(m.surfFlowMax / 4)) * m.surfWorthMax) * multCap;
+  const nearMisses = (Math.floor(m.surfRunSec / m.surfNearMissCooldownSec) + 1) * m.surfNearMissPts * multCap;
   const barrels = Math.floor(m.surfRunSec / m.surfBarrelHoldSec) * m.surfBarrelBonus;
-  return airs + waveMoves + barrels;
+  return airs + waveMoves + nearMisses + barrels;
 }
 
 /** Gate Crasher: no clock (a rider can stall on the slope), so UNTIMED_RUN_SEC of a landing or a rail every
@@ -353,7 +384,7 @@ export function snowBound(): number {
     sec: UNTIMED_RUN_SEC, eventSec: BOARD_EVENT_SEC,
     perEvent: Math.max(maxOf(airPts(SNOW_TRICKS)), maxOf(m.boardCoreTrickPts), m.boardRailMax),
     multCap: trickMachineMultCap(SNOW_TRICKS.length + m.boardCoreTrickPts.length + 1),   // + the GRIND link
-    flat: m.slalomGates * m.slalomGatePts + m.yetiClearPts + m.snowTimeBonusMax,
+    flat: m.slalomGates * (m.slalomGatePts + m.slalomStreakMax) + m.yetiClearPts + m.snowTimeBonusMax,
   });
 }
 
@@ -403,7 +434,8 @@ export function carnivalEventBounds(): Record<string, number> {
   const coins = 2 * (Math.floor((m.coinStormSec * m.coinStormSpeed * Math.SQRT2) / coinReach) + 1);
   return {
     slam_rush: (Math.floor(m.slamRushSec / m.slamRushCooldownSec) + 1) * m.slamRushPpu,
-    strike_storm: (m.strikeStormSec * MAX_FRAME_HZ + 1) * m.strikeStormPpu,
+    // a hit every frame, and every third of them closes a three-button trio (its bonus on top)
+    strike_storm: (() => { const hits = m.strikeStormSec * MAX_FRAME_HZ + 1; return (hits + Math.floor(hits / 3) * m.strikeStormTrioBonus) * m.strikeStormPpu; })(),
     trick_gauntlet: Math.round(gauntletRaw * m.trickGauntletPpu),
     hot_shot: (Math.floor(m.hotShotSec / (m.hotShotGoalZ / m.hotShotMaxSpeed)) + 1) * m.hotShotPpu,
     coin_storm: coins * m.coinStormPpu,
@@ -460,8 +492,8 @@ export const SCORE_CEILINGS: Readonly<Record<string, ScoreCeiling>> = {
   },
   bigAir: {
     max: bigAirCeiling(), kind: 'rules', swapsUnderKillSwitch: true,
-    why: `${BIG_AIR_TUNING.attemptsPerRound} hits, each at most ${BIG_AIR_MAX_TURNS} turns stuck`,
-    basis: `BIG_AIR_TUNING attemptsPerRound × round((basePoints + ${BIG_AIR_MAX_TURNS} turns × pointsPerRotation) × gradePoints.stuck); ${BIG_AIR_MAX_TURNS} turns is above the full-boost air the core allows (measured by the test)`,
+    why: `${BIG_AIR_TUNING.attemptsPerRound} hits, each at most ${BIG_AIR_MAX_TURNS} turns stuck, each naming every snow air trick in a fresh line`,
+    basis: `BIG_AIR_TUNING attemptsPerRound × round((basePoints + ${BIG_AIR_MAX_TURNS} turns × pointsPerRotation) × gradePoints.stuck); ${BIG_AIR_MAX_TURNS} turns is above the full-boost air the core allows (measured by the test) + the banked line: Σ SNOW_TRICKS airs' basePts × (1 + … + attemptsPerRound), ComboChain's Nth link paying N×`,
   },
   golf: {
     max: golfCeiling(), kind: 'rules', swapsUnderKillSwitch: true,
@@ -541,13 +573,13 @@ export const SCORE_CEILINGS: Readonly<Record<string, ScoreCeiling>> = {
   },
   surfing: {
     max: bound(surfBound()), kind: 'bound', swapsUnderKillSwitch: true,
-    why: `${BOUND_MARGIN}× a flawless ${m.surfRunSec}-second session: a landing every ${BOARD_EVENT_SEC} s, every wave move and every barrel`,
-    basis: 'chainRunBound(RUN_SEC 90, BOARD_EVENT_SEC, the best air, TrickMachine\'s multiplier cap) + a wave move each WAVE_MOVE_LOCK_SEC at FLOW_MAX + a barrel each BARREL_HOLD_SEC, × BOUND_MARGIN',
+    why: `${BOUND_MARGIN}× a flawless ${m.surfRunSec}-second session: a landing every ${BOARD_EVENT_SEC} s, every wave move, near miss and barrel`,
+    basis: 'chainRunBound(RUN_SEC 90, BOARD_EVENT_SEC, the best air or grab, TrickMachine\'s multiplier cap) + a wave move each WAVE_MOVE_LOCK_SEC at FLOW_MAX on the biggest swell + a near miss each cooldown (both chain links: × the cap) + a barrel each BARREL_HOLD_SEC, × BOUND_MARGIN',
   },
   snowboarding: {
     max: bound(snowBound()), kind: 'bound', swapsUnderKillSwitch: true,
     why: `${BOUND_MARGIN}× a flawless ${untimedMin}-minute run: a landing or a rail every ${BOARD_EVENT_SEC} s, every gate`,
-    basis: 'no clock (the run ends at the last gate, and a rider can stall on the slope): chainRunBound(UNTIMED_RUN_SEC, BOARD_EVENT_SEC, the biggest trick or rail, TrickMachine\'s multiplier cap) + gates + yeti + the time bonus, × BOUND_MARGIN',
+    basis: 'no clock (the run ends at the last gate, and a rider can stall on the slope): chainRunBound(UNTIMED_RUN_SEC, BOARD_EVENT_SEC, the biggest trick or rail, TrickMachine\'s multiplier cap) + gates at their streak\'s most + yeti + the time bonus, × BOUND_MARGIN',
   },
   freerun: {
     max: bound(freerunBound()), kind: 'bound', swapsUnderKillSwitch: false,

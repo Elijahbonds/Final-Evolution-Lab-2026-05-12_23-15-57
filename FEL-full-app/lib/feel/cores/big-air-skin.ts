@@ -15,7 +15,7 @@
 
 import { AirSessionCore, type AirSessionSkin } from './air-session-core';
 import { SensoryBus } from '../index';
-import { BIG_AIR_TUNING, BIG_AIR_TRICK, BIG_AIR_SENSORY } from './big-air-constants';
+import { BIG_AIR_TUNING, BIG_AIR_TRICK, BIG_AIR_SENSORY, BIG_AIR_HILL } from './big-air-constants';
 
 export interface BigAirSkinOpts {
   onSensory?: AirSessionSkin['onSensory'];
@@ -29,6 +29,7 @@ export function makeBigAirSkin(opts: BigAirSkinOpts = {}): AirSessionSkin {
     tuning: BIG_AIR_TUNING,
     trick: BIG_AIR_TRICK,
     sensory: BIG_AIR_SENSORY,
+    hill: BIG_AIR_HILL,   // IMPROVE (2026-10-06, items 1 / 2): the kicker, the table and the landing the core lands on
     onSensory: opts.onSensory,
     onPhase: opts.onPhase,
     onLanding: opts.onLanding,
@@ -40,4 +41,4 @@ export function makeBigAirSession(bus?: SensoryBus, opts: BigAirSkinOpts = {}): 
   return new AirSessionCore(makeBigAirSkin(opts), bus);
 }
 
-export { BIG_AIR_TUNING, BIG_AIR_TRICK, BIG_AIR_SENSORY } from './big-air-constants';
+export { BIG_AIR_TUNING, BIG_AIR_TRICK, BIG_AIR_SENSORY, BIG_AIR_HILL } from './big-air-constants';

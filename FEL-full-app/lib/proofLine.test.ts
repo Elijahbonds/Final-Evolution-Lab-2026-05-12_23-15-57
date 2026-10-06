@@ -28,6 +28,11 @@ describe('proofLineFor', () => {
       .toBe('21–17 · WON · FG 8/15 · 3PT 2 · AST 3 · STL 1 · OVERDRIVE 1');
     expect(proofLineFor('hoops3v3', { score: 14, opponentScore: 21, won: false, stats: { foeScore: 21, assists: 0 } })).toBe('14–21 · LOST');
     expect(proofLineFor('tennis', { score: 6, opponentScore: 4, won: true })).toBe('6–4 · WON');
+    // IMPROVE (2026-10-06) Tennis #12: the cage's match rides the line, only what happened, singular / plural
+    expect(proofLineFor('tennis', { score: 3, opponentScore: 1, won: true, stats: { wallRuns: 2, smashes: 1, meteors: 0, liveSaves: 3 } }))
+      .toBe('3–1 · WON · 2 WALL RUNS · 1 SMASH · 3 LIVE SAVES');
+    expect(proofLineFor('tennis', { score: 2, opponentScore: 6, won: false, stats: { smashes: 2, meteors: 1 } })).toBe('2–6 · LOST · 2 SMASHES · 1 METEOR');
+    expect(proofLineFor('volleyball', { score: 25, opponentScore: 20, won: true, stats: { wallRuns: 2 } })).toBe('25–20 · WON');
   });
   it('returns null for a mode it does not know or stats it cannot read', () => {
     expect(proofLineFor('nope_mode', { score: 1, won: true })).toBeNull();

@@ -34,8 +34,13 @@ function musicSet(o: Record<string, unknown> = {}) {
 }
 
 describe('the endless ceiling is derived, not guessed', () => {
-  it('equals what the best-paying finite rules game pays for a flawless win (the music rooms left out)', () => {
-    const finite = Object.entries(SCORE_CEILINGS).filter(([mode, c]) => c.kind === 'rules' && mode !== 'music' && mode !== 'dance');
+  // IMPROVE (2026-10-06) test changed: Big Air is left out with the music rooms. Its row now counts the banked line bonus
+  // (owner-approved: 8,000 → 33,260), which bounds every snow air trick named in every air — a bound of the trick table,
+  // like the music rows' longest chart, not a game's own clock or target. Counted, it would move this ceiling from 14,150 XP
+  // / 473 shards to 49,940 / 1,666 for EVERY endless mode (and 3.5× the per-second proration), an economy change nobody
+  // asked for. OWNER CALL if that is wanted instead.
+  it('equals what the best-paying finite rules game pays for a flawless win (the music rooms and big air left out)', () => {
+    const finite = Object.entries(SCORE_CEILINGS).filter(([mode, c]) => c.kind === 'rules' && mode !== 'music' && mode !== 'dance' && mode !== 'bigAir');
     expect(finite.length).toBeGreaterThan(10);
     const xp = Math.max(...finite.map(([, c]) => sessionXp(c.max, true)));
     const shards = Math.max(...finite.map(([, c]) => sessionShards(c.max, true)));

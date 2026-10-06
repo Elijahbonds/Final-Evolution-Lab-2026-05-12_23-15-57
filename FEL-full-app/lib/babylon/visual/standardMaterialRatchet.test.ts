@@ -38,7 +38,7 @@ const KNOWN: Record<string, number> = {
   'ShowdownMode.ts': 1,
   'KarateEndlessMode.ts': 1,
   'DuelMode.ts': 1,
-  'AirSessionMode.ts': 1,
+  // 'AirSessionMode.ts': 1 — fixed 2026-10-06 (IMPROVE, Big Air item 1): the launch box's material is VenueKit.paint now
 };
 
 function counts(): Record<string, number> {

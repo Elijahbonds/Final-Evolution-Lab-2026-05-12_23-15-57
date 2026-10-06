@@ -31,10 +31,13 @@ function paintedGround(
   scene: Scene, w: number, l: number, base: string,
   paint: (ctx: CanvasRenderingContext2D, W: number, H: number) => void,
   texSize: [number, number] = [1024, 1024],
+  /** IMPROVE (2026-10-06): opt-in repeats of the painted texture across the ground (a tile, not one stretched canvas). */
+  tile?: { u: number; v: number },
 ): Mesh {
   const ground = MeshBuilder.CreateGround('venue_ground', { width: w, height: l }, scene);
   const [TW, TH] = texSize;
   const tex = new DynamicTexture('venue_ground_tex', { width: TW, height: TH }, scene, texSize[0] !== 1024 || texSize[1] !== 1024);
+  if (tile) { tex.wrapU = Texture.WRAP_ADDRESSMODE; tex.wrapV = Texture.WRAP_ADDRESSMODE; tex.uScale = tile.u; tex.vScale = tile.v; }
   const ctx = tex.getContext() as unknown as CanvasRenderingContext2D;
   ctx.fillStyle = base; ctx.fillRect(0, 0, TW, TH);
   paint(ctx, TW, TH);
@@ -210,6 +213,16 @@ const paintTrees = (snow: boolean) => (ctx: CanvasRenderingContext2D, W: number,
 const CROWD = ['#e07a5f', '#3d5a80', '#81b29a', '#f2cc8f', '#f4f1de', '#9d4edd'];
 
 // ── VENUES ──────────────────────────────────────────────────────────────────
+/** buildSlope's options. Every field is opt-in: a caller that passes none gets the piste it always got. */
+export interface SlopeOpts {
+  /** false = no tree-painted venue box around the piste. */
+  walls?: boolean;
+  /** IMPROVE (2026-10-06, big air item 20): paint one tile of this many metres and repeat it (0 / unset = one stretched canvas). */
+  tileM?: number;
+  /** IMPROVE (2026-10-06, big air item 20): freeze the world matrices of the piste and its flags (they never move). */
+  freeze?: boolean;
+}
+
 export const VenueKit = {
   /**
    * The house paint for a coloured prop: PBR, matte, with the emissive floor so nothing goes black.
@@ -396,29 +409,53 @@ export const VenueKit = {
     }
   },
 
-  buildSlope(scene: Scene, liftCable?: GrindLine, opts?: { walls?: boolean }): void {
+  buildSlope(scene: Scene, liftCable?: GrindLine, opts?: SlopeOpts): void {
     // Pass 5 phase 7: big air's piste was near-white (#eef4fa) with faint groom lines under the alpine sky and read as a
     // flat white sheet. Cooler snow, denser darker groom lines and shadowed drifts give the run edges to read speed against.
     // The piste's own extent, so nothing placed on it can drift past its edge (see the gate flags below).
     const SLOPE_W = 60, SLOPE_L = 400;
-    paintedGround(scene, SLOPE_W, SLOPE_L, '#cbd9e7', (ctx, W, H) => {
-      ctx.fillStyle = 'rgba(96,130,176,0.55)';
-      for (let i = 0; i < 420; i++) ctx.fillRect(Math.random() * W, Math.random() * H, 3, 14);  // groom lines
-      ctx.fillStyle = 'rgba(70,100,150,0.30)';
-      for (let i = 0; i < 60; i++) {                                                          // drifts
-        ctx.beginPath(); ctx.ellipse(Math.random() * W, Math.random() * H, 10 + Math.random() * 24, 3 + Math.random() * 5, 0, 0, Math.PI * 2); ctx.fill();
-      }
-    });
+    const tileM = opts?.tileM ?? 0;
+    const ground = tileM > 0
+      // IMPROVE (2026-10-06, big air item 20): opt-in TILED snow. The one 1024² canvas below is stretched over 60 × 400 m
+      // (2.5 px a metre down the run: every groom line a smeared 5 m streak) and painted with 480 random shapes at load. A
+      // 512² tile of `tileM` metres repeats instead — ~17 px a metre at 30 m, mip-mapped, the same groom lines and drifts at the
+      // same density per square metre (≈ 20 shapes a 30 m tile, not 480).
+      ? paintedGround(scene, SLOPE_W, SLOPE_L, '#cbd9e7', (ctx, W, H) => {
+        const area = tileM * tileM, px = W / tileM;
+        ctx.fillStyle = 'rgba(96,130,176,0.55)';
+        for (let i = 0; i < Math.round(area * (420 / (SLOPE_W * SLOPE_L))); i++) ctx.fillRect(Math.random() * W, Math.random() * H, 0.18 * px, 5.5 * px);
+        ctx.fillStyle = 'rgba(70,100,150,0.30)';
+        for (let i = 0; i < Math.max(2, Math.round(area * (60 / (SLOPE_W * SLOPE_L)))); i++) {
+          ctx.beginPath(); ctx.ellipse(Math.random() * W, Math.random() * H, (0.6 + Math.random() * 1.4) * px, (1.2 + Math.random() * 2) * px, 0, 0, Math.PI * 2); ctx.fill();
+        }
+      }, [512, 512], { u: SLOPE_W / tileM, v: SLOPE_L / tileM })
+      : paintedGround(scene, SLOPE_W, SLOPE_L, '#cbd9e7', (ctx, W, H) => {
+        ctx.fillStyle = 'rgba(96,130,176,0.55)';
+        for (let i = 0; i < 420; i++) ctx.fillRect(Math.random() * W, Math.random() * H, 3, 14);  // groom lines
+        ctx.fillStyle = 'rgba(70,100,150,0.30)';
+        for (let i = 0; i < 60; i++) {                                                          // drifts
+          ctx.beginPath(); ctx.ellipse(Math.random() * W, Math.random() * H, 10 + Math.random() * 24, 3 + Math.random() * 5, 0, 0, Math.PI * 2); ctx.fill();
+        }
+      });
+    const statics: Mesh[] = [ground];
     if (opts?.walls !== false) venueBox(scene, 64, 404, 12, [paintTrees(true)]);
     // GATE FLAGS, ON THE SNOW. This ran to z −360 on a piste that ends at −200, so the last three pairs hung
     // in the air 160 m past the ground (found by scripts/probes/_ground-audit.mts: six gates over nothing).
     // Bound to the piste's own length now, with a margin, so the two cannot drift apart again.
     const lastGateZ = -(SLOPE_L / 2) + 24;
+    // IMPROVE (2026-10-06, big air item 19): ONE material per flag colour. Each of the six planes built its own PBR material
+    // (six materials, six effect bindings) for two colours.
+    const gateMat: Record<string, PBRMaterial> = {};
+    const gateMatFor = (hex: string): PBRMaterial => (gateMat[hex] ??= mat(scene, 'gate', hex, 0.3));
     for (let z = -40; z > lastGateZ; z -= 60) for (const x of [-24, 24]) {   // gate flags
       const flag = MeshBuilder.CreatePlane(`gate_${x}_${z}`, { width: 0.7, height: 0.5 }, scene);
       flag.position.set(x * 0.6, 1.2, z);
-      flag.material = mat(scene, 'gate', z % 120 === -40 ? '#ff3d5e' : '#3a86ff', 0.3);
+      flag.material = gateMatFor(z % 120 === -40 ? '#ff3d5e' : '#3a86ff');
+      statics.push(flag);
     }
+    // IMPROVE (2026-10-06, big air item 20): opt-in — the piste and its flags never move, so their world matrices are frozen
+    // (no per-frame recompute). Materials are left live: the lighting lane's tiers and moods still reach them.
+    if (opts?.freeze) for (const m of statics) m.freezeWorldMatrix();
     if (liftCable) {                                                     // visible lift line
       const len = Vector3.Distance(liftCable.a, liftCable.b);
       const cable = MeshBuilder.CreateCylinder('lift_cable', { height: len, diameter: 0.06 }, scene);
@@ -530,6 +567,6 @@ export const VenueKit = {
 
   /** Big-air slope: same groomed piste as buildSlope but no venueBox tree walls (WA-7 stretched prisms). */
   buildBigAirSlope(scene: Scene): void {
-    VenueKit.buildSlope(scene, undefined, { walls: false });
+    VenueKit.buildSlope(scene, undefined, { walls: false, tileM: 30, freeze: true });   // IMPROVE (2026-10-06, big air item 20)
   },
 };

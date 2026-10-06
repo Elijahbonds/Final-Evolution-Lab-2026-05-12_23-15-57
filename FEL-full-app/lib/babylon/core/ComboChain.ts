@@ -12,7 +12,11 @@
 
 import { MomentumBus } from './MomentumBus';
 
-export interface ComboLink { label: string; pts: number; kind: 'air' | 'grind' | 'manual' | 'revert'; /** how many times this move already appeared in the combo */ repeat?: number }
+export interface ComboLink {
+  label: string; pts: number; kind: 'air' | 'grind' | 'manual' | 'revert';
+  /** how many times this move already appeared in the combo */ repeat?: number;
+  /** IMPROVE (2026-10-06): the link's repeat identity when the caller names one (a rail, a wall) — see add(`key`) */ key?: string;
+}
 
 // REPEAT DECAY (MECHANICS PASS, 2026-09-15). THPS's own answer to the button masher: the same trick again in the same combo
 // pays less — 100 %, 75 %, 50 %, 25 %, then 10 % — and from its fourth appearance it stops raising the multiplier. The
@@ -27,6 +31,9 @@ export type RepeatDecayScope = 'all' | 'air' | 'none';
 /** A move's identity for repeats: the trick, not where it was thrown from or how it landed. */
 export const moveKey = (label: string): string => label.replace(/^SKETCHY\s+/, '').split(' OFF ')[0].split(' · ')[0].trim();
 
+/** A link's repeat identity: the key it was given, else its move. */
+const linkId = (l: ComboLink): string => l.key ?? moveKey(l.label);
+
 export class ComboChain {
   links: ComboLink[] = [];
   pot = 0;
@@ -40,17 +47,24 @@ export class ComboChain {
   /** Links that still count toward the multiplier (a move repeated to death stops counting). */
   get multiplier(): number { return this.links.filter((l) => (l.repeat ?? 0) < REPEAT_NO_MULT).length; }
 
-  /** A trick landed clean — add it and keep the chain alive. Returns what it actually paid (after any repeat decay). */
-  add(label: string, pts: number, kind: ComboLink['kind']): number {
-    const decays = this.decay === 'all' || (this.decay === 'air' && kind === 'air');
-    const key = moveKey(label);
-    const repeat = decays ? this.links.filter((l) => moveKey(l.label) === key).length : 0;
+  /**
+   * A trick landed clean — add it and keep the chain alive. Returns what it actually paid (after any repeat decay).
+   *
+   * `key` (IMPROVE 2026-10-06, skate's lock farming): a link the caller gives an identity to ALWAYS decays by that identity,
+   * whatever the chain's scope — skate's chain decays airs only (its grinds tick over time), so re-locking the same rail or
+   * wall paid full and raised the multiplier every time. The rail's key is the rail, not the trick's name, so a different
+   * rail is fresh and the same rail is a repeat. Callers that pass no key behave exactly as before.
+   */
+  add(label: string, pts: number, kind: ComboLink['kind'], key?: string): number {
+    const decays = key !== undefined || this.decay === 'all' || (this.decay === 'air' && kind === 'air');
+    const id = key ?? moveKey(label);
+    const repeat = decays ? this.links.filter((l) => linkId(l) === id).length : 0;
     const paid = Math.round(pts * REPEAT_DECAY[Math.min(repeat, REPEAT_DECAY.length - 1)]);
     // ANTI-MASH (2026-09-15): the table bottomed out at 10 %, so the SAME move over and over still paid and still kept the
     // chain alive — free run's masher held a slide loop for a 4 717-point run against an intent line's 806. A move
     // repeated past the table pays NOTHING and is not a link at all: the chain has to be fed something new.
     if (decays && paid <= 0 && pts > 0) return 0;
-    this.links.push({ label, pts: paid, kind, repeat });
+    this.links.push(key !== undefined ? { label, pts: paid, kind, repeat, key } : { label, pts: paid, kind, repeat });
     this.active = true;
     const before = this.pot;
     this.pot += paid * Math.max(1, this.multiplier);      // Nth trick pays Nx
@@ -68,10 +82,12 @@ export class ComboChain {
    * multiplier was a frame counter — a masher that fell into a revert-manual rode it to 81x and 7 000 points in a second
    * and a half (measured). A held move is one link.
    */
-  accrue(label: string, pts: number, kind: ComboLink['kind']): number {
+  accrue(label: string, pts: number, kind: ComboLink['kind'], key?: string): number {
     const last = this.links[this.links.length - 1];
-    if (!last || moveKey(last.label) !== moveKey(label)) return this.add(label, pts, kind);
-    const paid = Math.round(pts);
+    if (!last || linkId(last) !== (key ?? moveKey(label))) return this.add(label, pts, kind, key);
+    // a keyed link held again pays its hold at the same repeat rate its lock paid (IMPROVE 2026-10-06)
+    const rate = last.key !== undefined ? REPEAT_DECAY[Math.min(last.repeat ?? 0, REPEAT_DECAY.length - 1)] : 1;
+    const paid = Math.round(pts * rate);
     if (paid <= 0) return 0;
     last.pts += paid;
     this.pot += paid * Math.max(1, this.multiplier);
@@ -79,7 +95,7 @@ export class ComboChain {
   }
 
   /** The move's repeat count in this combo so far (0 = fresh) — for a HUD that says REPEAT. */
-  repeatsOf(label: string): number { const k = moveKey(label); return this.links.filter((l) => moveKey(l.label) === k).length; }
+  repeatsOf(label: string): number { const k = moveKey(label); return this.links.filter((l) => linkId(l) === k).length; }
 
   /** Rider stopped clean on the ground — bank the pot. */
   bank(): number {
