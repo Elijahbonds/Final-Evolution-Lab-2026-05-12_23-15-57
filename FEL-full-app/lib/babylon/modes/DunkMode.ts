@@ -108,6 +108,8 @@ import {
 import { MomentumBus } from '../core/MomentumBus';
 import type { RivalSituation } from '../core/RivalNerve';   // the rival feels the contest too (his nerve is read in core/DunkRivalSim.rollRivalAttempt)
 import { rivalSlamOffset, rivalPressAt } from '../core/RivalPlay';
+import { DUNK_CHALLENGES, nextChallenge, checkChallenge, challengeLine, challengeChip, challengeCard, type DunkChallenge } from '../core/DunkChallenges';   // dunk-next phase 6: set pieces on the practice runway
+import { emptyUnlocks, loadUnlocks, saveUnlocks, refOpen, needLine, nextUnlockLine, recordNightWon, recordChallenge, devUnlockOverride, allOpen, type UnlockState, type DunkUnlock } from '../core/DunkUnlocks';   // dunk-next phase 6: what winning opens, on the device
 import { newField, bookCard, cutField, cutTiebreak, placeOf, highlightSituation, simFinal, encodeField, fieldTotal, PLAYER_ID, FIELD_SIZE, FINALISTS, type FieldDunker } from '../core/DunkField';   // dunk-next phase 5: the four-dunker night
 import { rollRivalAttempt, simRivalDunk, DEFAULT_RIVAL_RUNUP, type RivalAttempt, type RivalRunUp, type RivalDunkResult, type RivalJudgeContext } from '../core/DunkRivalSim';   // dunk-next phase 4: a rival's dunk, judged without flying it
 import { beatsCrossed, gradeTrickPress, flightFlow, encodeBeatStrip, BEAT_ORDER, BEAT_TOL_SEC, BEAT_TICK_PITCH, BEAT_TICK_VOLUME, type BeatGrade, type BeatMark, type SlamZone } from '../core/DunkBeats';   // dunk-next phase 1: the flight is a four-beat bar
@@ -923,11 +925,12 @@ export const DunkMode: ModeDefinition = (() => {
   const HANG_PROMPT = 'HOLD SLAM — HANG ON THE RIM';
   /** The attempt chip: the stakes on a judged dunk, PRACTICE on the practice runway. */
   function attemptChip(): string { return practice ? PRACTICE_CHIP : stakesLabel(stakes, calledLabel()); }
-  const propAllowed = (p: Prop): boolean => !(p === 'oopalien' && skyTier?.kind !== 'saucer') && !(SPECIAL_PROPS.has(p) && !specialsOpen());
-  const propLockLine = (p: Prop): string => p === 'oopalien' ? 'NO ALIENS OVER THIS COURT' : specialLockLine(p as 'kangaroo');
+  const propAllowed = (p: Prop): boolean => !(p === 'oopalien' && skyTier?.kind !== 'saucer') && !(SPECIAL_PROPS.has(p) && !specialsOpen()) && refOpen('prop', p, unlocks);   // (dunk-next phase 6: + the won-nights ladder)
+  const propLockLine = (p: Prop): string => !refOpen('prop', p, unlocks) ? needLine('prop', p, unlocks) : p === 'oopalien' ? 'NO ALIENS OVER THIS COURT' : specialLockLine(p as 'kangaroo');
   function togglePractice(ctx: ModeContext): void {
     practice = !practice;
-    ctx.setHud({ attempt: attemptChip() });
+    if (!practice) challenge = null;   // dunk-next phase 6: a challenge lives on the practice runway
+    ctx.setHud({ attempt: attemptChip(), challenge: challengeHud() });
     flash(ctx, practice ? 'PRACTICE RUNWAY — free dunks: no judges, no rival · R1 to go back' : 'BACK TO THE CONTEST', 1400);
     SoundKit.play('uiTick', { pitch: practice ? 1.5 : 0.9 });
     console.info(`[DUNK-PRACTICE] ${practice ? 'on' : 'off'}`);
@@ -1366,6 +1369,7 @@ export const DunkMode: ModeDefinition = (() => {
         dunkOff: '', nightDunkOff: '', beats: '', rivalSkip: false,   // dunk-next: a reload starts with no dunk-off, no beat strip, no skip chip
       });
       startField(ctx);   // dunk-next phase 5: tonight's four dunkers
+      readUnlocks(); challenge = null; ctx.setHud({ challenge: '', nightUnlock: '' });   // dunk-next phase 6: the device's ladder
     },
 
     onInput(ctx: ModeContext, e: FelInput) {
@@ -1415,6 +1419,7 @@ export const DunkMode: ModeDefinition = (() => {
         liveLandAt = -1; cancelLiveCeleb(); void finishAttempt(ctx, true); return;
       }
       if (e.t === 'dpad' && e.pressed && turn === 'player' && (phase === 'resolve' || phase === 'judging') && qteHit && !celebPick) {
+        if (!refOpen('celebration', CELEB_BY_DPAD[e.dir], unlocks)) { refuse(ctx, needLine('celebration', CELEB_BY_DPAD[e.dir], unlocks)); return; }   // dunk-next phase 6: yours to call once it is open
         celebPick = CELEB_BY_DPAD[e.dir]; flash(ctx, `${CELEBRATIONS[celebPick].label}!`, 700); SoundKit.play('uiTick', { pitch: 1.5, volume: 0.35 });
         console.info(`[DUNK-CELEB] thrown on the d-pad: ${celebPick}`);
         return;
@@ -1451,7 +1456,9 @@ export const DunkMode: ModeDefinition = (() => {
       // The cycle passes through NOT CALLED on its way round, so backing out is one more press rather than
       // a trap: a player who scrolls past the one they wanted can reach "no call" again without taking a
       // run they did not want to take.
-      if (e.t === 'button' && e.btn === 'L1' && e.pressed && phase === 'approach') {
+      // dunk-next phase 6: on the PRACTICE runway L1 picks a CHALLENGE (a call has no judges to pay it there); in the contest it is the call
+      if (e.t === 'button' && e.btn === 'L1' && e.pressed && e.src !== 'key' && phase === 'approach' && practice && turn === 'player') cycleChallenge(ctx);
+      else if (e.t === 'button' && e.btn === 'L1' && e.pressed && phase === 'approach') {
         const i = stakes.called ? DUNK_TRICKS.findIndex((t) => t.id === stakes.called) : -1;
         const next = i + 1 >= DUNK_TRICKS.length ? null : DUNK_TRICKS[i + 1].id;
         stakes = callTrick(stakes, next);
@@ -1492,9 +1499,13 @@ export const DunkMode: ModeDefinition = (() => {
           // X picks the family) instead of walking all 23 of them; from any other family it opens the obstacles where it always did
           const fam = propCategory(prop);
           prop = e.dir === 'up' ? 'none' : e.dir === 'right' ? nextOop(prop) : e.dir === 'left' ? nextLobProp(prop)
-            : fam === 'obstacle' || fam === 'dubble' || fam === 'special' ? stepPropInCategory(prop, PROP_RING, propAllowed) : nextObstacle(null);   // left cycles SELF-LOB → OFF THE GLASS → BOUNCE LOB
+            : fam === 'obstacle' || fam === 'dubble' || fam === 'special' ? stepPropInCategory(prop, PROP_RING, (p) => propAllowed(p) || !refOpen('prop', p, unlocks)) : nextObstacle(null);   // left cycles SELF-LOB → OFF THE GLASS → BOUNCE LOB (phase 6: a laddered prop is stepped ONTO, so it can be named below)
           while (prop === 'oopalien' && skyTier?.kind !== 'saucer') { refuse(ctx, 'NO ALIENS OVER THIS COURT'); prop = nextOop(prop); }   // the alien lob is the saucer's (Orbit)
           while (SPECIAL_PROPS.has(prop) && !specialsOpen()) { refuse(ctx, specialLockLine(prop as 'kangaroo')); prop = nextObstacle(obstacleKindOf(prop)); }   // SEASON SPECIALS: the animals skip past a free lane, named
+          // dunk-next phase 6: a prop still on the won-nights ladder is passed over and NAMED with what opens it (bounded: the plain oop and
+          // the first of every family are always open, so the walk ends on one; a walk that somehow does not lands on no prop)
+          for (let guard = 0; !propAllowed(prop) && guard < PROPS.length; guard++) { refuse(ctx, propLockLine(prop)); prop = isOop(prop) ? nextOop(prop) : stepPropInCategory(prop, PROP_RING, propAllowed); }
+          if (!propAllowed(prop)) prop = 'none';
           propMemory[propCategory(prop)] = prop;
           ctx.setHud({ prop: propLabel(prop) });
           SoundKit.play('uiTick', { pitch: 1.3 });
@@ -4304,13 +4315,75 @@ export const DunkMode: ModeDefinition = (() => {
   function finishPractice(ctx: ModeContext, made: boolean): void {
     const read = slamTiming?.label ?? '';
     const beats = flightFlow(beatMarks, beatSlam).label;   // dunk-next: the practice runway says how the beats went too
-    flash(ctx, `PRACTICE · ${made ? 'MADE IT' : missWhy()}${beats ? ` · ${beats}` : ''}${read ? ` · ${read}` : ''}`, MISS_BEAT_MS);
+    const ch = challenge ? challengeRun(ctx, made) : '';   // dunk-next phase 6: a picked set piece is checked and carded (core/DunkChallenges)
+    flash(ctx, ch || `PRACTICE · ${made ? 'MADE IT' : missWhy()}${beats ? ` · ${beats}` : ''}${read ? ` · ${read}` : ''}`, ch ? CHALLENGE_BEAT_MS : MISS_BEAT_MS);
     ctx.setHud({ judgeReveal: null, hint: '', slamTiming: read });
     if (!made) { landingClip = DUNK_LAND_ABSORB_CLIP; landNow(); }
     console.info(`[DUNK-PRACTICE] ${made ? 'made' : 'missed'}${read ? ` · ${read}` : ''}`);
     setPhase('judging');
-    later(() => { if (phase !== 'judging') return; cancelLiveCeleb(); celebFace = null; clearBanner(ctx); resetForNextAttempt(ctx); }, MISS_BEAT_MS);
+    later(() => { if (phase !== 'judging') return; cancelLiveCeleb(); celebFace = null; clearBanner(ctx); resetForNextAttempt(ctx); }, ch ? CHALLENGE_BEAT_MS : MISS_BEAT_MS);
     finishing = false;
+  }
+
+  // ── dunk-next phase 6: CHALLENGES (core/DunkChallenges) and UNLOCKS (core/DunkUnlocks) ─────────────────────────────────────
+  // Owner, 2026-10-06: "set-piece challenges … each with a target card; and unlocks earned by winning nights (props, courts,
+  // celebrations) stored on the device (no DB). Presentation of unlocks only; no new currency or payout." L1 on the practice runway picks
+  // a set piece (and sets up its prop); the next practice dunk is checked against it and, when it was the set piece, carded against the
+  // target — the contest's own card for that dunk in a neutral room, never the night's (no totals, no staked card, no night memory).
+  // A won night and a cleared challenge move the device's ladder; what it opens is named on the night card and the banner. Courts are
+  // not gated: the court is picked in the lobby (another lane's). A dev / agent run opens the ladder (DunkUnlocks.devUnlockOverride).
+  /** TUNED (dunk-next phase 6): how long a challenge's verdict holds the runway (it is a longer line than a practice read). */
+  const CHALLENGE_BEAT_MS = 2400;
+  let unlocks: UnlockState = emptyUnlocks(), unlocksDev = false, challenge: DunkChallenge | null = null;
+  function deviceStore(): Storage | null { try { return typeof window !== 'undefined' ? window.localStorage : null; } catch { return null; } }
+  function readUnlocks(): void {
+    const o = process.env.NODE_ENV === 'development' && typeof location !== 'undefined' ? devUnlockOverride(location.search) : null;
+    unlocksDev = o === 'all';
+    unlocks = unlocksDev ? allOpen() : loadUnlocks(deviceStore());
+    console.info(`[DUNK-UNLOCKS] ${unlocksDev ? 'dev: all open' : `${unlocks.nightsWon} nights won · ${unlocks.beaten.length} challenges beaten`}`);
+  }
+  /** Keep the ladder on the device (never the dev override's all-open state). */
+  function keepUnlocks(): void { if (!unlocksDev) saveUnlocks(deviceStore(), unlocks); }
+  const openedLine = (opened: readonly DunkUnlock[]): string => (opened.length ? `UNLOCKED: ${opened.map((u) => u.label.split(' — ')[0]).join(' · ')}` : '');
+  function challengeHud(): string {
+    if (!practice) return '';
+    return challenge ? challengeChip(challenge, unlocks.best[challenge.id] ?? 0, unlocks.beaten.includes(challenge.id)) : `CHALLENGES · L1 (${unlocks.beaten.length}/${DUNK_CHALLENGES.length} BEATEN)`;
+  }
+  function cycleChallenge(ctx: ModeContext): void {
+    challenge = nextChallenge(challenge?.id);
+    if (challenge?.prop && (PROPS as readonly string[]).includes(challenge.prop) && challenge.prop !== prop) {
+      prop = challenge.prop as Prop; propMemory[propCategory(prop)] = prop;
+      ctx.setHud({ prop: propLabel(prop) });
+      queuePropSetup(ctx);
+    }
+    ctx.setHud({ challenge: challengeHud() });
+    flash(ctx, challenge ? `CHALLENGE: ${challenge.name} — ${challenge.brief.toUpperCase()} · TARGET ${challenge.target}` : 'NO CHALLENGE — FREE PRACTICE', challenge ? 2200 : 1100);
+    SoundKit.play('uiTick', { pitch: challenge ? 1.35 : 0.9 });
+  }
+  /** The practice dunk against the picked set piece: the facts, the card, the verdict, the device's ladder; the banner's words back. */
+  function challengeRun(ctx: ModeContext, made: boolean): string {
+    const c = challenge!;
+    const flow = flightFlow(beatMarks, beatSlam);
+    const tricks = flight.attempt.tricks;
+    const signature = signatureFor(runwayIds, tricks.map((t) => t.id));
+    const cardNow = challengeCard({
+      trickDifficulty: flight.attempt.difficulty - STYLE_TIER[style], runwayDifficulty: runwayDifficulty + (signature?.nod ?? 0) + (doubleLaunched ? DOUBLE_LAUNCH.difficulty : 0),
+      propBonus: PROP_BONUS[prop], charge, launchSpeed01, styleTier: STYLE_TIER[style], styleTaps, hang: hangSec >= 0.5, execution01: qteAccuracy,
+      chainTricks: Math.max(0, tricks.length - 1), beatExec: flow.beatExec, flowStyle: flow.flowStyle,
+    });
+    const res = checkChallenge(c, {
+      made, tricks: tricks.map((t) => t.id), prop, range: rangeLabel(launchRange), foot: launchFoot, side: launchSide, perfect: flow.perfect, onBeat: flow.onBeat, total: cardNow.total,
+    });
+    const before = unlocks.best[c.id] ?? 0;
+    let opened: DunkUnlock[] = [];
+    if (res.verdict === 'cleared' || res.verdict === 'short') {
+      const r = recordChallenge(unlocks, c.id, res.total, res.verdict === 'cleared');
+      unlocks = r.state; opened = r.opened; keepUnlocks();
+    }
+    if (res.verdict === 'cleared') { SoundKit.play('crowdCheer', { volume: 0.7 }); EffectsKit.burst(ctx.scene, player.root.position.add(new Vector3(0, 2, 0)), 'confetti'); }
+    ctx.setHud({ challenge: challengeHud() });
+    console.info(`[DUNK-CHALLENGE] ${c.id}: ${res.verdict}${res.missing ? ` (${res.missing})` : ''} · card ${cardNow.total} / ${c.target}${opened.length ? ` · ${openedLine(opened)}` : ''}`);
+    return [challengeLine(c, res, before), openedLine(opened)].filter(Boolean).join(' · ');
   }
 
   /** The label of the trick the player called, or '' — one place, so the banner and the bezel agree. */
@@ -4774,6 +4847,10 @@ export const DunkMode: ModeDefinition = (() => {
       fieldStage = 'done'; fieldChamp = champ;
       ctx.setHud({ field: encodeField(field, 'done', champ), nightField: fieldNote || (won ? `CHAMPION — YOU WON THE FINAL OVER ${foe.name}` : `RUNNER-UP — ${foe.name} WON THE FINAL`) });
     }
+    // dunk-next phase 6: a won night moves the device's ladder; the card names what it opened, or what is next
+    let unlockLine = '';
+    if (won) { const r = recordNightWon(unlocks); unlocks = r.state; keepUnlocks(); unlockLine = openedLine(r.opened); }
+    ctx.setHud({ nightUnlock: unlockLine || nextUnlockLine(unlocks) });
     setPhase('contestOver');
     SoundKit.play('whistle');
     if (won) { SoundKit.play('crowdCheer'); EffectsKit.burst(ctx.scene, player.root.position.add(new Vector3(0, 2, 0)), 'confetti'); }
@@ -4860,7 +4937,7 @@ export const DunkMode: ModeDefinition = (() => {
     ctx.heroRef.current = player.root;
     ctx.camDirector.suspended = false;
     ctx.setHud({
-      nightCard: null, nightNum: night, nightMakes: null, nightMisses: null, nightBest: null, nightDunkOff: '', dunkOff: '', rivalSkip: false,
+      nightCard: null, nightNum: night, nightMakes: null, nightMisses: null, nightBest: null, nightDunkOff: '', dunkOff: '', rivalSkip: false, nightUnlock: '',
       round: `1/${TOTAL_ROUNDS}`, score: 0, rivalScore: 0, hype: 0, chain: 0,
     });
     crowd.onScore(0);

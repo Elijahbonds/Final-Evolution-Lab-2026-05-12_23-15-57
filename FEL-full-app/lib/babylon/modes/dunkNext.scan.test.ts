@@ -284,3 +284,43 @@ describe('phase 5 — the four-dunker field, the cut, the final', () => {
     expect(HOST).toMatch(/hud\.nightField\.startsWith\('CUT'\) \? 'CUT AT THE LINE'/);
   });
 });
+
+describe('phase 6 — challenges and unlocks', () => {
+  it('practice without a challenge is never judged; with one, the card is computed off the night (no totals, card, stakes or memory)', () => {
+    const fp = fn('finishPractice');
+    expect(fp).toMatch(/const ch = challenge \? challengeRun\(ctx, made\) : '';/);
+    const run = fn('challengeRun');
+    for (const never of ['playerTotal', 'rivalTotal', 'addAttempt', 'card = ', 'spendAttempt', 'stakes', 'nightMemory', 'bookField', 'makes++', 'misses++']) expect(run, never).not.toContain(never);
+  });
+  it('the challenge card reads the same dunk facts the contest card reads', () => {
+    const run = fn('challengeRun'), fin = fn('finishAttempt');
+    for (const piece of [
+      'runwayDifficulty + (signature?.nod ?? 0) + (doubleLaunched ? DOUBLE_LAUNCH.difficulty : 0)', 'propBonus: PROP_BONUS[prop]',
+      'charge, launchSpeed01, styleTier: STYLE_TIER[style], styleTaps', 'execution01: qteAccuracy', 'beatExec: flow.beatExec',
+    ]) { expect(run, piece).toContain(piece); expect(fin, piece).toContain(piece); }
+    expect(fin).toMatch(/const trickDifficulty = flight\.attempt\.difficulty - STYLE_TIER\[style\];/);
+    expect(run).toContain('trickDifficulty: flight.attempt.difficulty - STYLE_TIER[style]');
+    expect(run).toMatch(/const flow = flightFlow\(beatMarks, beatSlam\);/);
+  });
+  it('L1 picks a challenge on the practice runway only; in the contest it is still the call', () => {
+    const at = DUNK.indexOf("if (e.t === 'button' && e.btn === 'L1' && e.pressed && e.src !== 'key' && phase === 'approach' && practice && turn === 'player') cycleChallenge(ctx);");
+    expect(at).toBeGreaterThan(0);
+    expect(DUNK.slice(at, at + 400)).toMatch(/else if \(e\.t === 'button' && e\.btn === 'L1' && e\.pressed && phase === 'approach'\) \{\n\s*const i = stakes\.called/);
+    expect(fn('togglePractice')).toMatch(/if \(!practice\) challenge = null;/);
+  });
+  it('the ladder gates the prop ring (named, never silent) and the d-pad celebrations', () => {
+    expect(DUNK).toMatch(/const propAllowed = \(p: Prop\): boolean => [^\n]*&& refOpen\('prop', p, unlocks\);/);
+    expect(DUNK).toMatch(/for \(let guard = 0; !propAllowed\(prop\) && guard < PROPS\.length; guard\+\+\) \{ refuse\(ctx, propLockLine\(prop\)\);/);
+    expect(DUNK).toMatch(/if \(!refOpen\('celebration', CELEB_BY_DPAD\[e\.dir\], unlocks\)\) \{ refuse\(ctx, needLine\('celebration', CELEB_BY_DPAD\[e\.dir\], unlocks\)\); return; \}/);
+  });
+  it('only a WON night moves the ladder; the device is written, never with the dev override\'s all-open state', () => {
+    expect(fn('endNight')).toMatch(/if \(won\) \{ const r = recordNightWon\(unlocks\); unlocks = r\.state; keepUnlocks\(\);/);
+    expect(fn('keepUnlocks')).toMatch(/if \(!unlocksDev\) saveUnlocks\(deviceStore\(\), unlocks\);/);
+    expect(fn('readUnlocks')).toMatch(/process\.env\.NODE_ENV === 'development'/);
+    expect(DUNK).toMatch(/readUnlocks\(\); challenge = null;/);
+  });
+  it('the host: the challenge chip is a finger on L1, and the night card names what a win opened', () => {
+    expect(HOST).toMatch(/const tapChallenge = useCallback\(\(\) => \{\n\s*emit\(\{ t: 'button', btn: 'L1', pressed: true \}\);/);
+    expect(HOST).toMatch(/hud\.nightUnlock\.startsWith\('UNLOCKED'\)/);
+  });
+});

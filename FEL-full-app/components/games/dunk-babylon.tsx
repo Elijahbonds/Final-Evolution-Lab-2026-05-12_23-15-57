@@ -177,6 +177,12 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
     emit({ t: 'button', btn: 'B', pressed: false });
   }, [emit]);
 
+  // dunk-next phase 6: the CHALLENGE chip on the practice runway is a finger on L1 — the mode picks the next set piece (cycleChallenge)
+  const tapChallenge = useCallback(() => {
+    emit({ t: 'button', btn: 'L1', pressed: true });
+    emit({ t: 'button', btn: 'L1', pressed: false });
+  }, [emit]);
+
   const tapStart = useCallback(() => {
     // READY gate + pause both advance on any button press.
     emit({ t: 'button', btn: 'START', pressed: true });
@@ -321,6 +327,14 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
         </button>
       )}
 
+      {/* dunk-next phase 6: the practice runway's CHALLENGE — the set piece, its target and your best (L1 on a pad, Q on a keyboard, a tap here) */}
+      {typeof hud.challenge === 'string' && hud.challenge && phase === 'playing' && !card && (
+        <button type="button" onClick={tapChallenge} data-fel-dunk-challenge
+          className="fel-panel pointer-events-auto absolute right-3 top-[9%] inline-flex items-center gap-2 px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--fel-gold)]">
+          {hud.challenge} <span className="text-white/45">L1 ▸</span>
+        </button>
+      )}
+
       {/* DUNK MOTION phase 12 — THE SHOW: the broadcast bug while the triple cut plays (a tap skips it), the announcer's lower third,
           and the poster of a big make, kept until the next attempt. */}
       {typeof hud.cut === 'string' && hud.cut && (
@@ -392,6 +406,10 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
               <p className="mt-1 font-mono text-[11px] font-bold uppercase text-[var(--fel-gold)]">{hud.nightDunkOff}</p>
             ) : null}
             {typeof hud.field === 'string' && hud.field ? <div className="mt-2 text-left"><DunkFieldBoard value={hud.field} /></div> : null}
+            {/* dunk-next phase 6: what a won night just opened on this device, or the next thing to chase */}
+            {typeof hud.nightUnlock === 'string' && hud.nightUnlock ? (
+              <p className={`mt-2 font-mono text-[10px] font-bold uppercase tracking-wide ${hud.nightUnlock.startsWith('UNLOCKED') ? 'text-[var(--fel-gold)]' : 'text-white/45'}`}>{hud.nightUnlock}</p>
+            ) : null}
             <p className="mt-1 font-mono text-[11px] text-white/45">
               {hnum(hud.nightMakes)} dunked · {hnum(hud.nightMisses)} missed
               {hnum(hud.nightBest) > 1 ? ` · best run ${hnum(hud.nightBest)}` : ''}
