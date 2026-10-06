@@ -23,6 +23,85 @@ import type { CoinLook } from '../core/Pickups';
  */
 export const SKATE_COIN_LOOK: Readonly<CoinLook> = { diameter: 0.42, glow: 0.35, metallic: 0.65 };
 
+// ── THE PARK'S OTHER FEATURES, AS NUMBERS (IMPROVE 2026-10-06) ─────────────────────────────────────────────────────
+// The downhill lane, the bowl and the centre funbox are still built inline by rideWorlds.buildSkatepark, but their
+// numbers live here so the coin lines that run over them can be laid out — and tested — without a canvas. rideWorlds
+// reads these exact values, so the geometry is what it was.
+/** The downhill straight: a slab `thick` deep at `y`, tilted `tilt` rad about x (its −z end high), `len(bound)` long. */
+export const SKATE_LANE = { fx: 0.6, fz: -0.18, y: 1.6, width: 8, thick: 0.5, tilt: 0.14, len: (bound: number): number => Math.max(30, bound * 0.9) } as const;
+/** The bowl: an octagon of banks at radius `r` round its centre. */
+export const SKATE_BOWL = { fx: -0.48, fz: 0.42, r: 6.5 } as const;
+/** The funbox in the middle of the park (the first of rideWorlds' four). */
+export const SKATE_CENTRE_BOX = { fx: 0, fz: -0.06, width: 6, depth: 4, height: 1.1 } as const;
+
+/** The lane's riding surface over its centre line, `dz` metres along it from its middle (+ is down the hill, toward +z).
+ *  Babylon's rotation about x carries the slab's local (0, thick/2, dz) to y·cos − dz·sin up and y·sin + dz·cos along. */
+export function laneTop(bound: number, dz: number): { x: number; y: number; z: number } {
+  const L = SKATE_LANE, h = L.thick / 2, c = Math.cos(L.tilt), s = Math.sin(L.tilt);
+  return { x: atBound(L.fx, bound), y: L.y + h * c - dz * s, z: atBound(L.fz, bound) + h * s + dz * c };
+}
+
+type Tri = [number, number, number];
+/** Where the coins go: single coins, and the arcs (CoinField.arc's from / to / apex above them / count). */
+export interface CoinLayout { points: Tri[]; arcs: { from: Tri; to: Tri; apex: number; n: number }[] }
+/** Coins float this far over what they mark, metres. */
+export const COIN_LIFT_M = 0.4;
+/** Lane coins start where its surface is this high: the top of a long lane is a 5 m cliff nobody rides up to. */
+export const LANE_COIN_TOP_Y = 3;
+
+/**
+ * THE COIN LINES, FROM THE VENUE (IMPROVE 2026-10-06, skate item 8). They were fixed metres from the 33 m park — "down
+ * the downhill straight" at x 20 — while the park now scales with its bound (48–62): at Venice the lane is at x 33.6, so
+ * the line ran down open concrete 14 m from it and the bowl arc missed the rim. Every run is laid on the feature it names:
+ *   · the two DIAGONALS the boost pads sit on, out to just short of the 45° bank on the south-west diagonal, skipping
+ *     the centre funbox (the arc covers it) and anything solid in the plaza;
+ *   · an arc over the CENTRE FUNBOX;
+ *   · down the LANE's own surface, from where it stands LANE_COIN_TOP_Y high to where it meets the floor;
+ *   · an arc across the BOWL, rim to rim through its centre.
+ */
+export function skateCoinLayout(bound: number): CoinLayout {
+  const points: Tri[] = [];
+  const box = SKATE_CENTRE_BOX, bz = atBound(box.fz, bound);
+  const solids = plazaSolids(bound).filter((s) => s.solid && s.height > COIN_LIFT_M);
+  const blocked = (x: number, z: number): boolean => {
+    if (Math.abs(x - atBound(box.fx, bound)) < box.width / 2 + 0.5 && Math.abs(z - bz) < box.depth / 2 + 0.5) return true;
+    return solids.some((s) => {
+      // into the solid's own frame (the builder's yaw: local +x → (cos, −sin), local +z → (sin, cos)); a wedge's table point
+      // is its crest and its body runs half a depth back from there (rideWorlds places it so)
+      const c = Math.cos(s.ry), sn = Math.sin(s.ry);
+      const cx = s.wedge ? s.x - sn * s.depth / 2 : s.x, cz = s.wedge ? s.z - c * s.depth / 2 : s.z;
+      const dx = x - cx, dz = z - cz;
+      const lx = dx * c - dz * sn, lz = dx * sn + dz * c;
+      return Math.abs(lx) < s.width / 2 + 0.5 && Math.abs(lz) < s.depth / 2 + 0.5;
+    });
+  };
+  // the diagonals: the south-west one runs at the 45° bank at (−0.34, −0.34)·bound, whose near edge is 3 m (half its
+  // depth) short of its centre along the diagonal — stop a metre before it, the same distance on all four arms
+  const e = 0.34 * bound - 4 / Math.SQRT2;
+  for (const [sx, sz] of [[1, 1], [1, -1]] as const) {
+    for (let i = 0; i < 10; i++) {
+      const t = -1 + (2 * i) / 9, x = sx * e * t, z = sz * e * t;
+      if (!blocked(x, z)) points.push([x, COIN_LIFT_M, z]);
+    }
+  }
+  // down the lane: from LANE_COIN_TOP_Y high to a metre before its foot meets the floor
+  const L = SKATE_LANE, s = Math.sin(L.tilt), c = Math.cos(L.tilt), half = L.len(bound) / 2;
+  const dzTop = Math.max(-(half - 2), (L.y + (L.thick / 2) * c - LANE_COIN_TOP_Y) / s);
+  const dzFoot = Math.min(half - 2, (L.y + (L.thick / 2) * c) / s - 1);
+  for (let i = 0; i < 8; i++) {
+    const p = laneTop(bound, dzTop + ((dzFoot - dzTop) * i) / 7);
+    points.push([p.x, Math.max(0, p.y) + COIN_LIFT_M + 0.2, p.z]);
+  }
+  const bowlX = atBound(SKATE_BOWL.fx, bound), bowlZ = atBound(SKATE_BOWL.fz, bound);
+  return {
+    points,
+    arcs: [
+      { from: [-3, 1.2, bz], to: [3, 1.2, bz], apex: 2.4, n: 6 },
+      { from: [bowlX - 6, 1.6, bowlZ], to: [bowlX + 6, 1.6, bowlZ], apex: 2.6, n: 6 },
+    ],
+  };
+}
+
 export type PlazaSolidKind =
   | 'spine' | 'pyramid' | 'pyramidBank' | 'gapLedge' | 'manualPad' | 'table' | 'bench' | 'wallride'
   | 'bin' | 'planter';

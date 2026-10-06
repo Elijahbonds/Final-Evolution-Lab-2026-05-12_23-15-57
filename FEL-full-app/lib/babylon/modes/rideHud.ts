@@ -88,3 +88,25 @@ export class RideHudSwitch {
   get isBody(): boolean { return this.body === true; }
   reset(): void { this.body = null; this.since = 0; }
 }
+
+/**
+ * IMPROVE (2026-10-06, skate item 2): the HUD fields that CHANGED since the last publish. Every `setHud` is a React
+ * setState in the board host, and skate pushed its goals, its combo block and its clock every frame — about three
+ * re-renders a frame to repeat the same values. `diff(patch)` answers only the keys whose value moved (or null), so the
+ * mode publishes nothing on a frame where nothing it shows changed. Values compare with `===` (the HUD's are primitives).
+ */
+export class HudDelta {
+  private sent = new Map<string, unknown>();
+  diff<V>(patch: Record<string, V>): Record<string, V> | null {
+    let out: Record<string, V> | null = null;
+    for (const k of Object.keys(patch)) {
+      const v = patch[k];
+      if (this.sent.has(k) && this.sent.get(k) === v) continue;
+      this.sent.set(k, v);
+      (out ??= {})[k] = v;
+    }
+    return out;
+  }
+  /** Forget what was sent (a remount publishes everything again). */
+  reset(): void { this.sent.clear(); }
+}

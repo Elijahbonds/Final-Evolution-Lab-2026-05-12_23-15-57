@@ -83,6 +83,8 @@ export interface FollowConfig {
 
 /** The air cam's full offset (setAir(1)): metres further back, up, and round to the side for a three-quarter view. */
 export const AIR_CAM = { back: 2.2, up: 1.3, side: 2.4 };
+/** How fast the air cam's side swings over when a mode asks for the other side (per second; see setAir). */
+export const AIR_SIDE_EASE = 3;
 
 /**
  * The Hundred's gameplay camera, as a fraction farther than the shoulder (4.0 m) and crowd (6.4 m)
@@ -315,7 +317,11 @@ export class CameraDirector {
   // three-quarter view the moment the wheels leave the ground. `setAir(1)` asks for that framing, `setAir(0)` releases it;
   // the director eases both ways so a small kerb hop never whips the view.
   private airWant = 0; private airK = 0;
-  setAir(k01: number): void { this.airWant = Math.max(0, Math.min(1, k01)); }
+  /** IMPROVE (2026-10-06, skate item 20): which side the three-quarter swing goes — +1 the camera's right (every caller
+   *  before this), −1 its left. Skate's wall ride asks for the wall's OPEN side: on the street wall the right-hand swing
+   *  could put the camera on the wall side, looking through it. Eased, so a change of side swings round, never cuts. */
+  private airSideWant = 1; private airSide = 1;
+  setAir(k01: number, side = 1): void { this.airWant = Math.max(0, Math.min(1, k01)); this.airSideWant = side < 0 ? -1 : 1; }
   get air01(): number { return this.airK; }
 
   /** Current beat scale on the follow distance (1 = no beat). */
@@ -600,7 +606,8 @@ export class CameraDirector {
     let desired = subject.add(back.scale(dist)).add(new Vector3(0, cfg.height + AIR_CAM.up * this.airK, 0));
     desired.y = Math.max(desired.y, subject.y + cfg.minHeight);
     if (cfg.shoulderOffset) desired = desired.add(this.rightOf(back).scale(cfg.shoulderOffset));
-    if (this.airK > 0.001) desired = desired.add(this.rightOf(back).scale(AIR_CAM.side * this.airK));
+    this.airSide += (this.airSideWant - this.airSide) * Math.min(1, AIR_SIDE_EASE * stepAir);
+    if (this.airK > 0.001) desired = desired.add(this.rightOf(back).scale(AIR_CAM.side * this.airK * this.airSide));
 
     // M69: enforceStandoff is the FINAL link in the chain — nothing can undo the
     // safe distance after it (fixes the karate dojo camera collapsing onto the hero).

@@ -11,7 +11,7 @@ import type { Scene, TransformNode } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { DEFAULT_HERO_URL } from '../core/athleteRoster';
 
-interface Figure { char: SpawnedCharacter; root: TransformNode; baseY: number; phase: number; bounds: BoundingInfo; parked: boolean }
+interface Figure { char: SpawnedCharacter; root: TransformNode; baseY: number; phase: number; bounds: BoundingInfo; parked: boolean; hidden?: boolean }
 
 /** IMPROVE (2026-10-06, Tennis #20): opt-in. */
 export interface OnlookersOpts {
@@ -72,11 +72,33 @@ export class Onlookers {
     const excite = this.cheerT / CHEER_SEC;
     if (this.pauseOffscreen) { this.sinceCull += dt; if (this.sinceCull >= CULL_SEC) { this.sinceCull = 0; this.cull(); } }
     for (const f of this.figures) {
-      if (f.parked) continue;   // nobody can see it: no bob either
+      if (f.parked || f.hidden) continue;   // nobody can see it (pauseOffscreen), or put away behind the lens (cullBehind): no bob either
       const sway = Math.sin(this.t * (1.4 + excite * 6) + f.phase);
       const lift = BOB_HEIGHT * sway + (excite > 0 ? Math.abs(Math.sin(this.t * 9 + f.phase)) * CHEER_HOP * excite : 0);
       f.root.position.y = f.baseY + lift;
     }
+  }
+
+  /**
+   * IMPROVE (2026-10-06, surf item 6): opt-in — the bodies BEHIND the lens are put away. Surf's crowd stands on the sand while
+   * its camera faces out to sea (forward.z ≈ −0.98), and up to six skinned bodies were skinned, animated and drawn for nothing.
+   * A body more than `margin` m behind the camera's plane (`eye`, unit `forward`) is disabled and its clip paused; it comes
+   * back, clip resumed, the moment it is in front again. Returns how many are shown. Modes that never call it are unchanged.
+   */
+  cullBehind(eye: { x: number; y: number; z: number }, forward: { x: number; y: number; z: number }, margin = 3): number {
+    let shown = 0;
+    for (const f of this.figures) {
+      const p = f.root.position;
+      const ahead = (p.x - eye.x) * forward.x + (p.y + 1 - eye.y) * forward.y + (p.z - eye.z) * forward.z;
+      const hide = ahead < -margin;
+      if (!hide) shown++;
+      if (hide === !!f.hidden) continue;
+      f.hidden = hide;
+      f.root.setEnabled(!hide);
+      const g = f.char.animator?.currentGroup;
+      try { if (hide) g?.pause(); else g?.restart(); } catch { /* a body with no clip playing has nothing to pause */ }
+    }
+    return shown;
   }
 
   /** pauseOffscreen: park the bodies outside the camera's view, wake the ones back in it. */
@@ -84,6 +106,7 @@ export class Onlookers {
     const cam = this.scene.activeCamera;
     if (!cam) return;
     for (const f of this.figures) {
+      if (f.hidden) continue;   // cullBehind owns this body while it is put away
       const seen = cam.isInFrustum(f.bounds);
       if (!seen && !f.parked) { f.parked = true; try { f.char.animator?.park?.(); } catch { /* a body with no animator just stops bobbing */ } }
       else if (seen && f.parked) { f.parked = false; try { f.char.animator?.play?.('idle', { loop: true }); } catch { /* as above */ } }
@@ -93,7 +116,7 @@ export class Onlookers {
   /** The big moment happened. 0..1 — a bigger moment cheers longer. */
   cheer(strength = 1): void {
     this.cheerT = Math.max(this.cheerT, CHEER_SEC * Math.max(0.2, Math.min(1, strength)));
-    for (const f of this.figures) { if (f.parked) continue; try { f.char.animator?.play?.('cheer', { loop: false }); } catch { /* no cheer clip on this body — the hop carries it */ } }
+    for (const f of this.figures) { if (f.parked || f.hidden) continue; try { f.char.animator?.play?.('cheer', { loop: false }); } catch { /* no cheer clip on this body — the hop carries it */ } }
   }
 
   dispose(): void {

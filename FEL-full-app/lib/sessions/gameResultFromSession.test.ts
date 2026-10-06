@@ -44,6 +44,13 @@ describe('gameResultFromSession', () => {
     expect(boardHeadline('surf', barrel, true)).toContain('EPIC SESSION');
   });
 
+  it('IMPROVE (2026-10-06, surf item 9): the judged heat is on the surf card when the session has one', () => {
+    const heat = sess({ outcome: 'complete', stats: { bestFlow: 40, barrels: 0, tricksLanded: 3, pumps: 2, heat: 14.25, waves: 4 } });
+    expect(boardHeadline('surf', heat, false)).toBe('SESSION OVER · HEAT 14.3 · 0 BARRELS · 3 TRICKS · 2 PUMPS');
+    const none = sess({ outcome: 'complete', stats: { bestFlow: 40, barrels: 0, tricksLanded: 3, pumps: 2 } });
+    expect(boardHeadline('surf', none, false)).not.toContain('HEAT');
+  });
+
   it('board host posts the same score and won as the mode sent', () => {
     const r = sess({ outcome: 'win', score: 2067, stats: { bestCombo: 1, tricksLanded: 24, coinsCollected: 3 } });
     const g = boardGameResult(r, { headline: boardHeadline('skateboard', r, boardSportWon(r.outcome)), modeKey: 'skateboard' });

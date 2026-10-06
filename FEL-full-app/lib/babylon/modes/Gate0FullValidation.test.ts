@@ -52,13 +52,19 @@ describe("PHASE 3 — Gate 0 Full Runtime Validation (All 18 Modes)", () => {
   } {
     try {
       const fullPath = resolve(process.cwd(), filePath);
-      const source = readFileSync(fullPath, "utf-8");
+      // IMPROVE (2026-10-06): read the CODE, not the comments. A mode that dropped its own spawn passed this check because a
+      // comment mentioning CharacterLibrary.spawn was still in the file.
+      const source = readFileSync(fullPath, "utf-8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
 
       const hasCharacterLibrary = source.includes("CharacterLibrary");
       const hasSkeletonMarker = source.includes("skeleton") || source.includes("Skeleton");
       const hasMixamoPrefix = source.includes("mixamorig:");
       // 2026-09-17: the hoops modes spawn through CharacterPipeline (the kit body + identity layer OVER CharacterLibrary) — the same skeletal pipeline, one call up
-      const hasCharLibSpawn = source.includes("CharacterLibrary.spawn") || source.includes("CharacterPipeline.spawn");
+      // IMPROVE (2026-10-06): the board family spawns its rider through boardCore.buildRig, which counts only while buildRig
+      // itself still calls CharacterLibrary.spawn (checked in boardCore's code, comments stripped).
+      const boardRigSpawns = /\bbuildRig\(/.test(source)
+        && /CharacterLibrary\.spawn\(/.test(readFileSync(resolve(process.cwd(), "lib/babylon/modes/boardCore.ts"), "utf-8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1"));
+      const hasCharLibSpawn = source.includes("CharacterLibrary.spawn") || source.includes("CharacterPipeline.spawn") || boardRigSpawns;
 
       const issues: string[] = [];
       const indicators: string[] = [];
