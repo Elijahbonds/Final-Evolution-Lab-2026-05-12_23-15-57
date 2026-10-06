@@ -6,8 +6,9 @@
 //
 //   phase 2 (parts): DONE (2026-10-06) — lib/babylon/creator/parts/renderParts.syncParts, merged per (bone, material),
 //                    never pickable, never colliding, synced in place rather than released (see applyCreatorLayers).
-//   phase 3 (paint): composite doc.paint into one canvas texture per body over the skin (and garments), honour
-//                    doc.flags.suit (hide the garments); push its disposer the same way.
+//   phase 3 (paint): DONE (2026-10-06) — lib/babylon/creator/paint/renderPaint.syncPaint: the layer stack composited
+//                    into one texture per body over the skin's own albedo (and one per painted garment), suit mode
+//                    hiding the garments. Synced on EVERY apply (see applyCreatorLayers), released with the body.
 //   phase 4 (shape): doc.shape.body through counter-scaled bones, never the arms (REACH-FREEZE), 1.0 in
 //                    STANDARD_FRAME_MODES and ranked (playFrame.playScales).
 //
@@ -15,9 +16,10 @@
 // stacks), everything made is disposed when the body's root disposes, and nothing here changes a hitbox, a reach or a
 // gameplay number. `root.metadata.felCreator` records what was applied, for probes.
 
-import type { Skeleton, TransformNode } from '@babylonjs/core';
+import type { AbstractMesh, Skeleton, TransformNode } from '@babylonjs/core';
 import type { CreatorDoc, CreatorPart } from '../../creator/look/doc';
 import { syncParts } from '../creator/parts/renderParts';
+import { syncPaint } from '../creator/paint/renderPaint';
 
 export interface CreatorLayers {
   /** JSON of the doc last applied (cheap change test for a live editor) */
@@ -43,9 +45,14 @@ function release(root: TransformNode): void {
  * edit rebuilds only the (bone, material) groups it touched instead of the whole set — an editor slider drag stays
  * instant. They own their disposal (with the body's root, or synced to none when the doc clears). `worn` are store items
  * that render as parts (wearableAccessories.wornPartsForEquipped: the Nexus Visor), outside the player's 64.
+ *
+ * PAINT (phase 3, 2026-10-06) is synced on EVERY call, before the unchanged-doc early return: applyIdentity has just
+ * re-set the skin's and the garments' albedo (applySkinTone, the garment tints, applyKit's visibility), so the painted
+ * texture is re-bound and suit mode re-applied each time. That costs a signature compare when nothing changed; only the
+ * tiles an edit touches are redrawn (renderPaint.ts). It owns its disposal like parts.
  */
 export function applyCreatorLayers(
-  spawn: { root: TransformNode; skeleton?: Skeleton | null },
+  spawn: { root: TransformNode; skeleton?: Skeleton | null; meshes?: readonly AbstractMesh[] },
   doc: CreatorDoc | null,
   worn: readonly CreatorPart[] = [],
 ): { parts: number; paint: number } {
@@ -53,12 +60,12 @@ export function applyCreatorLayers(
   const sig = doc || worn.length ? JSON.stringify([doc, worn]) : '';
   const prev = applied.get(root);
   const summary = { parts: doc?.parts.length ?? 0, paint: doc?.paint.length ?? 0 };
+  syncPaint(spawn, doc);
   if (prev && prev.sig === sig) return summary;
   if (spawn.skeleton) syncParts({ root, skeleton: spawn.skeleton }, doc?.parts ?? [], worn);
   release(root);
   if (!doc && !worn.length) { stamp(root, null); return summary; }
   const layers: CreatorLayers = { sig, dispose: [] };
-  // phase 3: if (doc) layers.dispose.push(renderPaint(spawn, doc.paint, doc.flags));
   applied.set(root, layers);
   if (!hooked.has(root)) { hooked.add(root); root.onDisposeObservable.addOnce(() => release(root)); }
   stamp(root, doc ? { v: doc.v, ...summary, suit: doc.flags.suit } : null);
