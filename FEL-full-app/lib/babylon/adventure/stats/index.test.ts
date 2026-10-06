@@ -2,11 +2,12 @@
 // the Mirror (faster, capped, needs the setting), XP → level → re-derived maxes, a partner's level following its
 // player's, and fusion's merged maxes coming off cleanly.
 import { describe, expect, it } from 'vitest';
+import type { BodyEvent } from '@/lib/pose/BodyReader';
 import { emptyAdventureSave, spendPool, type DamageEvent } from '../contracts';
 import { makeActor, makeRig } from '../partner/testRig';
 import {
   ENERGY_REGEN_DELAY_SEC, MIRROR_SPECIAL_BURST, MIRROR_XP_SESSION_CAP, SPECIAL_PLAY_REF_PER_SEC, XP_MONSTER_KO, createStatsSystem,
-  deriveActorStats, statsSetupForParty,
+  deriveActorStats, mirrorOnBody, statsSetupForParty,
 } from './index';
 
 const hitEv = (src: string, tgt: string, amount: number, t = 0): DamageEvent => ({
@@ -150,5 +151,39 @@ describe('stats system', () => {
     expect(afterHit).toBeGreaterThan(0);
     rig.bus.emit('damage', { ...hitEv('m1', 'p1', 0), outcome: 'parried' });
     expect(p.stats.special).toBeGreaterThan(afterHit);
+  });
+
+  it('end to end: a session of real pose events through mirrorOnBody charges the special and trains, capped; camera off does nothing', () => {
+    // one shadow-boxing round: jab, cross, a round kick, a guard raise, a slip, a squat, on a 0.4 s rhythm, for 10 minutes
+    const round = (t: number): BodyEvent[] => [
+      { kind: 'blow', t, seen: t + 100, hand: 'L', lead: true, form: 'straight', name: 'jab', peakT: t + 60, speed: 4.5 },
+      { kind: 'blow', t: t + 400, seen: t + 500, hand: 'R', lead: false, form: 'straight', name: 'cross', peakT: t + 460, speed: 5.5 },
+      { kind: 'legKick', t: t + 800, seen: t + 950, foot: 'R', lead: false, form: 'round', peakT: t + 900, speed: 6, heightM: 1.2, spin: false, airborne: false },
+      { kind: 'guard', t: t + 1200, seen: t + 1300, up: true, raise: true, push: false },
+      { kind: 'evade', t: t + 1600, seen: t + 1700, form: 'slip', side: 'L', sizeM: 0.12 },
+      { kind: 'dip', t: t + 2000, seen: t + 2100, depthM: 0.3 },
+      { kind: 'fightStep', t: t + 2400, seen: t + 2500, dir: 'in', foot: 'L', distM: 0.3 },   // not a move
+    ];
+    const session = (cameraOn: boolean) => {
+      const { rig, p, stats } = party({ mirror: true });
+      rig.step([stats]);
+      const hook = { bus: rig.bus, actorId: 'p1', enabled: () => cameraOn };
+      let taken = 0, frames = 0;
+      const queue: BodyEvent[] = [];
+      rig.run([stats], 600, (t) => {
+        const ms = t * 1000;
+        if (frames++ % 168 === 0) queue.push(...round(ms));   // a new round every 2.8 s
+        while (queue.length && queue[0].t <= ms) if (mirrorOnBody(queue.shift()!, hook)) taken++;
+      });
+      return { taken, special: p.stats.special, xp: stats.progress('p1')!.xp, training: stats.progress('p1')!.training, session: stats.mirrorSession('p1')! };
+    };
+    const on = session(true);
+    expect(on.taken).toBeGreaterThan(1000);              // six of the seven are moves, every round
+    expect(on.special).toBeGreaterThan(0);
+    expect(on.xp).toBe(MIRROR_XP_SESSION_CAP);           // capped for the session
+    expect(on.session.xp).toBe(MIRROR_XP_SESSION_CAP);
+    for (const k of ['strength', 'power', 'flexibility', 'mental', 'endurance', 'agility'] as const) expect(on.training[k]).toBeGreaterThan(0);
+    const off = session(false);
+    expect(off).toMatchObject({ taken: 0, special: 0, xp: 0, training: {} });
   });
 });
