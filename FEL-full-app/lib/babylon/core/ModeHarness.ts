@@ -40,6 +40,7 @@ import type { BackdropFamily } from '../visual/Backdrops';
 import { FrameGuard, assertSpawned } from './FrameGuard';
 import { applyCanvasFit, watchCanvasFit } from './canvasFit';       // M95 (Pass 2): cap DPR + backing-pixel budget
 import { PerfMonitor, budgetForTier } from './PerfMonitor';          // M67: dev frame-budget monitor
+import { mountPerfGuard } from './perfGuard';                       // PERF-GUARD (2026-10-06): paced frames, adaptive quality, idle
 import { setReady, clearReady } from './readyMarker';  // M67: smoke-test readiness gate
 import { installAgentBridge, agentBridge, agentEnabled } from './AgentBridge';  // M69: agent control plane
 import { AGENT_MODES } from './agentModes';
@@ -276,6 +277,14 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
   const scene = new Scene(engine);
   (scene.metadata ??= {}).felTier = tier;   // read by CharacterLibrary for per-spawn quality
   scene.metadata.felModeId = def.modeId;   // read by kit.applyKit for the sport's default kit (owner decision 2026-09-05)
+  // PERF-GUARD (owner, 2026-10-06: "cool + smooth"): phones render at a steady 60 or 30 instead of every vsync, the
+  // resolution and the cheap effects step down when frames run slow or the phone heats up, and nothing renders behind a
+  // pause, an end card or a hidden tab. A hidden page pauses a playing game first (the START pause, so the resume is the
+  // one every mode already handles). See perfGuard.ts; the policy is PerfGovernor.ts.
+  const guard = mountPerfGuard({
+    engine, scene, tier, fit, publish: devOrAgentHooks(),
+    onHidden: () => { if (phase === 'playing') { releaseBody(); setPhase('paused'); store.setPause('input'); } },
+  });
   if (opts.heroOverride) scene.metadata.felHeroOverride = opts.heroOverride;   // dev rollout flag (?hero=)
   // M69: publish the agent control bridge (no-op unless ?agent=1). Idempotent —
   // re-registers the same mode list and re-binds window.__NEXUS_AGENT__ each mount.
@@ -326,6 +335,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     else if (p === 'ended') setReady(def.modeId, 'ended');
     else if (p === 'error') setReady(def.modeId, 'failed', typeof detail === 'string' ? detail : undefined);
     store.setPhase(p);   // MOVEMENT PLAY P4: the body-play store and the shell's Body button read the phase here
+    guard.setPhase(p);   // PERF-GUARD: a pause, an end card or an error refreshes at 2 fps instead of the cap
     opts.onPhase?.(p, detail);
   };
 
@@ -857,7 +867,8 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
   // M95 re-cap on every fold/rotate signal (FOLDABLE-SCREEN): resize, orientationchange, and the
   // visualViewport resize a cover↔main swap fires first. The mode never sees these — the engine re-fits
   // in place, nothing unmounts, no state is lost.
-  const unwatchFit = watchCanvasFit(engine, opts.canvas);
+  // PERF-GUARD: through the guard, so a re-fit moves the governor's BASE and its resolution step stays on top of it
+  const unwatchFit = watchCanvasFit(guard.scalable, opts.canvas);
 
   return () => {
     unwatchFit();
@@ -878,6 +889,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     ring?.dispose(); ring = null; ringRoot = null;   // PLAYER RING
     def.dispose?.();
     perf.dispose();       // M67
+    guard.dispose();      // PERF-GUARD
     clearReady();         // M67
     unink();              // M59
     backdrop.dispose();   // M61
