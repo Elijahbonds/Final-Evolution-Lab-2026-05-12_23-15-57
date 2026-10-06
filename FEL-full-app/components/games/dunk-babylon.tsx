@@ -199,7 +199,11 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
             {hnode(hud.score, 0)} <span className="text-white/50">vs</span> {hnode(hud.rivalScore, 0)}
           </span>
           {hud.round != null && (
-            <span className="fel-panel px-2 py-1 text-[var(--fel-cyan)]">RD {hnode(hud.round)}</span>
+            <span className="fel-panel px-2 py-1 text-[var(--fel-cyan)]">{String(hud.round).startsWith('DUNK-OFF') ? '' : 'RD '}{hnode(hud.round)}</span>
+          )}
+          {/* dunk-next phase 3: the dunk-off's own two cards — never added to the night's totals beside them */}
+          {typeof hud.dunkOff === 'string' && hud.dunkOff && (
+            <span className="fel-panel px-2 py-1 font-bold text-[var(--fel-gold)]">{hud.dunkOff}</span>
           )}
           {hud.dunkNum != null && (
             <span className="fel-panel px-2 py-1 text-white/70">DUNK {hnode(hud.dunkNum)}</span>
@@ -358,6 +362,9 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
             <p className="mt-2 font-mono text-sm text-white/70">
               YOU {hnode(hud.score, 0)} <span className="text-white/35">·</span> RIVAL {hnode(hud.rivalScore, 0)}
             </p>
+            {typeof hud.nightDunkOff === 'string' && hud.nightDunkOff ? (
+              <p className="mt-1 font-mono text-[11px] font-bold uppercase text-[var(--fel-gold)]">{hud.nightDunkOff}</p>
+            ) : null}
             <p className="mt-1 font-mono text-[11px] text-white/45">
               {hnum(hud.nightMakes)} dunked · {hnum(hud.nightMisses)} missed
               {hnum(hud.nightBest) > 1 ? ` · best run ${hnum(hud.nightBest)}` : ''}

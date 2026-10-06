@@ -22,7 +22,7 @@ import {
   freshStakes, call as callTrick, spendAttempt, attemptsLeft, canRetry,
   stakesScale, callLanded, stakesLabel, callPreview, type Stakes,
 } from '../core/DunkStakes';
-import { nextPropCategory, stepPropInCategory, guestSlamFactor, idleTip, trickInput, PROP_CATEGORY_LABEL, type PropCategory, type PropRing } from '../core/DunkAssist';   // IMPROVE (2026-10-06)
+import { nextPropCategory, stepPropInCategory, guestSlamFactor, idleTip, trickInput, PROP_CATEGORY_LABEL, RUNWAY_TIPS, type PropCategory, type PropRing } from '../core/DunkAssist';   // IMPROVE (2026-10-06)
 import { readWalkOut, saveWalkOut, countPlay, musicCredential, type WalkOut } from '../music/WalkOut';
 import { resolveWalkOut, walkOutLine, type WalkOutCue } from '../music/WalkOutCue';
 import { StudioLibrary } from '../music/StudioLibrary';
@@ -39,7 +39,7 @@ import type { FelInput } from '../core/InputBus';
 import type { BodyEvent } from '@/lib/pose/BodyReader';
 import { DUNK_BODY, DunkBodyBinder } from '@/lib/move/dunkBody';
 import { BallSim } from '../core/BallPhysics';
-import { firstNight, nextNight, cardWon, type NightState } from '../core/ContinuousNight';   // TRY-ONBOARD G1: the GO AGAIN ledger
+import { firstNight, nextNight, cardWon, cardVerdict, dunkOffVerdict, type NightState } from '../core/ContinuousNight';   // TRY-ONBOARD G1: the GO AGAIN ledger
 import { neverBindPose } from '../anim/importSanitizer';
 import { installSafePlay, SPORT_CLIP } from '../anim/clipRegistry';
 import { MOCAP_DUNK, DUNK_FINISH_VARIETY } from '../nexus/dressingFlags';
@@ -97,7 +97,8 @@ import { missBeat } from '../core/MissFlavour';
 import { spawnDunkObstacle, type DunkObstacle } from './dunkObstacleProps';
 import { LOST_FOUND_HANDOFF, BETWEEN_LEGS_HANDOFF, BEHIND_BACK_SWAP, DOUBLE_EASTBAY_FIRST, DOUBLE_EASTBAY_SECOND, FRONT_SWAP_AT, FRONT_SWAP_BLEND } from '../anim/authored/dunkTricks';
 import { boneNode } from '../anim/boneLookup';
-import { approachAngle, approachBonus, takeoffFor, takeoffTell } from '../core/DunkApproach';
+import { approachAngle, approachBonus, takeoffFor, takeoffTell, rangeLabel } from '../core/DunkApproach';
+import { NightMemory, dunkElements, originalityLine, freshTip, type Dunker } from '../core/DunkOriginality';   // dunk-next phase 2: the night remembers who showed what first
 import { spinBody, spinProgress } from '../core/DunkSpinBody';
 import { emptyCard, addAttempt, forWire, nightReport } from '@/lib/mp/dunkCard';
 import {
@@ -807,6 +808,13 @@ export const DunkMode: ModeDefinition = (() => {
     const s = encodeBeatStrip({ at: beatAt, marks: beatMarks, slam: beatSlam, perfect: flightFlow(beatMarks, beatSlam).perfect });
     if (s !== beatStripSent) { beatStripSent = s; ctx.setHud({ beats: s }); }
   }
+  // dunk-next phase 2 — ORIGINALITY (core/DunkOriginality): what the night has been shown and by whom (made dunks only, both dunkers),
+  // where this flight left the floor (the range and the side are part of the idea), and the standing tips with the fresh-tonight line
+  const nightMemory = new NightMemory();
+  let launchRange = 0, launchSide = 'HEAD-ON';
+  let standingTips: readonly string[] = RUNWAY_TIPS;
+  /** The standing tips, rebuilt only when the night's memory changes (never per frame). */
+  function refreshTips(): void { standingTips = [...RUNWAY_TIPS, freshTip(nightMemory, DUNK_TRICKS)]; }
   function clearBeats(ctx: ModeContext): void {
     beatAt = -1; beatMarks = []; armedGrade = null; beatSlam = null;
     if (beatStripSent !== '') { beatStripSent = ''; ctx.setHud({ beats: '' }); }
@@ -1328,6 +1336,8 @@ export const DunkMode: ModeDefinition = (() => {
       if (!ctx.location || ctx.location === 'venice') await applyVeniceDunkLookPass(ctx.scene);
 
       ({ night, round, dunkInRound, playerTotal, rivalTotal, makes, misses, bestChain } = firstNight());
+      nightMemory.reset(); refreshTips();   // dunk-next phase 2: a new night has seen nothing
+      dunkOff = 0; dunkOffPlayer = 0; dunkOffRival = 0;   // dunk-next phase 3
       hype = 0; chain = 0; finishing = false; ended = false; rivalClipToken = 0; card = emptyCard();
       style = 'power'; prop = DEV_PROP && (PROPS as readonly string[]).includes(DEV_PROP) ? (DEV_PROP as Prop) : 'none'; rimCamCut = false;   // (dev ?prop=: the probe's Dubble Up runs) hangSlowMoLatch = false; contactLatch = false;
       styleTaps = 0; hangSec = 0; aHeld = false; usedCombos.clear(); momentum.reset(); flight.reset();
@@ -1351,6 +1361,7 @@ export const DunkMode: ModeDefinition = (() => {
         walkOutNow: walkOutLine(walkCue),
         attempt: stakesLabel(stakes, calledLabel()),
         rivalName: foe.name,
+        dunkOff: '', nightDunkOff: '', beats: '',   // dunk-next: a reload starts with no dunk-off and no beat strip
       });
     },
 
@@ -1440,7 +1451,9 @@ export const DunkMode: ModeDefinition = (() => {
         ctx.setHud({ attempt: attemptChip() });
         // the bet is PRICED now, not dared -- see DunkStakes.callPreview. IMPROVE (2026-10-06): and it says how to throw it
         const calledT = stakes.called ? DUNK_TRICKS.find((t) => t.id === stakes.called) : undefined;
-        flash(ctx, stakes.called ? callPreview(calledLabel(), calledT ? trickInput(calledT) : undefined) : 'NO CALL', stakes.called ? 1800 : 1100);
+        // dunk-next phase 2: …and whether the night has seen it (a call is a plan, and the panel pays the dunk nobody has shown)
+        const seenTonight = calledT ? nightMemory.shown(`trick:${calledT.id}`) : false;
+        flash(ctx, stakes.called ? `${callPreview(calledLabel(), calledT ? trickInput(calledT) : undefined)} · ${seenTonight ? 'SEEN TONIGHT' : 'FRESH TONIGHT'}` : 'NO CALL', stakes.called ? 1800 : 1100);
         SoundKit.play('uiTick', { pitch: stakes.called ? 1.3 : 0.9 });
       }
       // d-pad cycles PROP during approach (up=none, right=alley-oop,
@@ -1706,7 +1719,7 @@ export const DunkMode: ModeDefinition = (() => {
         const standing = turn === 'player' && !moving && !runwayBeat && runHeld <= 0.02 && player.root.position.z > gatherLine() + 0.2;
         if (standing) {
           idleSec += dt;
-          const tip = idleTip(idleSec);
+          const tip = idleTip(idleSec, standingTips);   // dunk-next: the fifth line counts what the night has not seen
           if (tip && tip !== idleTipShown) { idleTipShown = tip; ctx.setHud({ hint: tip }); }
         } else {
           idleSec = 0;
@@ -2263,6 +2276,7 @@ export const DunkMode: ModeDefinition = (() => {
             SoundKit.play('uiTick', { pitch: 0.9, volume: 0.4 });
             SoundKit.play('uiTick', { pitch: 0.95, volume: 0.35 });
           } else if (beat.kind === 'total') {
+            if (dunkOff > 0) ctx.setHud({ dunkOff: dunkOffChip() });   // dunk-next: the dunk-off's card lands with the panel's number
             ctx.setHud({
               slamTiming: slamTiming?.label ?? '',
               breakdown: `DIFF ${lastDifficulty.toFixed(1)} · EXEC ${lastExecution.toFixed(1)} · STYLE ${lastStyleScore.toFixed(1)}`,
@@ -2660,6 +2674,7 @@ export const DunkMode: ModeDefinition = (() => {
     const onBeat = g?.grade === 'onbeat';
     beatMarks = [...beatMarks, { beat: g?.beat ?? cueOf(trick).fire, label: trick.label, grade: g?.grade ?? 'early' }]; pushBeats(ctx);
     if (onBeat) { SoundKit.play('uiTick', { pitch: 2.1, volume: 0.3 }); hype = Math.min(100, hype + 2); }
+    const firstTonight = !nightMemory.shown(`trick:${trick.id}`);   // dunk-next phase 2: the stands have not seen this one tonight
     flight.recognizer.spend();            // DUNK-BODY-MID: one direction, one trick — the next A under this same hold is the SLAM
     const rate = trickRate(trick);
     airTrick = { trick, t0: clipTime, rate };   // the trick's own clock (its hand-offs are keyed to it)
@@ -2674,9 +2689,9 @@ export const DunkMode: ModeDefinition = (() => {
     hype = Math.min(100, hype + 6);
     SoundKit.play('whoosh', { pitch: 1.1 + trick.difficulty * 0.08, volume: 0.45 });
     SoundKit.play('crowdCheer', { volume: 0.3 + trick.difficulty * 0.05 });
-    mic?.crowd('crowd.ooh', trickLabels.length > 1 ? 2 : 1);   // the stands gasp at the trick (the booth holds)
+    mic?.crowd('crowd.ooh', (trickLabels.length > 1 ? 2 : 1) + (firstTonight ? 1 : 0));   // the stands gasp at the trick (the booth holds) — louder for a new one
     EffectsKit.burst(ctx.scene, player.root.position.add(new Vector3(0, 1.8, 0)), 'sparks');
-    flash(ctx, (trickLabels.length > 1 ? `COMBO: ${trickLabels.join(' → ')}!` : `${trick.label}!`) + (onBeat ? ' · ON THE BEAT' : ''), 700);
+    flash(ctx, (trickLabels.length > 1 ? `COMBO: ${trickLabels.join(' → ')}!` : `${trick.label}!`) + (onBeat ? ' · ON THE BEAT' : '') + (firstTonight ? ' · NEW' : ''), 700);
     ctx.camDirector.pulse(trickLabels.length > 1 ? 0.7 : 0.45, 0.5);
   }
   /** DUNK MOTION phase 10b: the 360 carries on into a second turn — the same slot in the flight, the turn extended from where the body
@@ -2791,6 +2806,7 @@ export const DunkMode: ModeDefinition = (() => {
     const prof = launchProfile(approach.takeoff, vectorLive(), vectorWallRun);   // DUNK PARKOUR: the foot's launch, and the corner prop if it was just used
     console.info(`[DUNK-PARKOUR] ${prof.label} apex x${prof.apexMult.toFixed(2)} +${prof.difficulty.toFixed(1)} diff`);
     launchTag = prof.label; launchCarry = prof.carryMult; launchFoot = approach.takeoff;
+    launchRange = takeoffRange; launchSide = approach.label.split(' · ')[0];   // dunk-next phase 2: where it left the floor is part of the idea
     flight.launch(Math.min(1, charge * 0.5 + launchSpeed01 * 0.5), STYLE_TIER[style], approach.difficulty + prof.difficulty);
     armedAir = null; spin.reset(); liveTricks = []; liveSpin = { turns: 0, from: 0, until: 0 };
     beatAt = -1; beatMarks = []; armedGrade = null; beatSlam = null; pushBeats(ctx);   // dunk-next: a fresh bar, the strip up before the rise
@@ -4018,7 +4034,8 @@ export const DunkMode: ModeDefinition = (() => {
       }
       const missTotal = Math.round(missScores.reduce((a, j) => a + j.score, 0)
         * stakesScale(stakes, flight.attempt.tricks.map((t) => t.id), false));
-      if (turn === 'rival') rivalTotal += missTotal;   // phase 11: the rival's miss is his
+      if (dunkOff > 0) { if (turn === 'rival') dunkOffRival = missTotal; else dunkOffPlayer = missTotal; ctx.setHud({ dunkOff: dunkOffChip() }); }   // dunk-next: the dunk-off's own card, never the night's
+      else if (turn === 'rival') rivalTotal += missTotal;   // phase 11: the rival's miss is his
       else {
         playerTotal += missTotal; misses++; playerCards.push(missTotal);   // a miss is part of the standard too
         card = addAttempt(card, {
@@ -4081,6 +4098,21 @@ export const DunkMode: ModeDefinition = (() => {
     const flow = flightFlow(beatMarks, beatSlam);
     if (flow.tricks) console.info(`[DUNK-BEATS] ${flow.label} · exec +${flow.beatExec.toFixed(1)} · style +${flow.flowStyle.toFixed(1)} (${beatMarks.map((m) => `${m.label}@${m.beat}:${m.grade}`).join(' ')} · slam ${beatSlam ?? '—'})`);
     if (flow.perfect) verdictParts.push('PERFECT FLIGHT');
+    // dunk-next phase 2: ORIGINALITY — the dunk as the night remembers it, read against who showed what first. Fresh pays style; the
+    // other dunker's idea pays nothing, and a dunk that is nothing but his is SEEN IT (the panel's own repeat rule, applied to a copy).
+    const dunker: Dunker = turn === 'rival' ? 'rival' : 'player';
+    const elements = dunkElements({
+      tricks: flight.attempt.tricks.map((t) => ({ id: t.id, label: t.label })),
+      runway: [...runwayLabels, ...(doubleLaunched && !boardTopFlip ? ['DOUBLE-LAUNCH'] : [])],
+      prop: prop !== 'none' ? { id: prop, label: propLabel(prop) } : null,
+      launch: launchTag.includes('→') ? launchTag : '',
+      foot: launchFoot, range: rangeLabel(launchRange), side: launchSide, hang: hangBonus > 0,
+    });
+    const fresh = nightMemory.read(elements, dunker);
+    nightMemory.show(elements, dunker); refreshTips();
+    const seenIt = isRepeat || fresh.copiedWhole;
+    { const line = originalityLine(fresh, dunker === 'player' ? foe.name : 'YOU'); if (line && !isRepeat) verdictParts.push(line); }
+    console.info(`[DUNK-FRESH] ${dunker} ${Math.round(fresh.freshness01 * 100)}% fresh · style +${fresh.style.toFixed(2)} · new ${fresh.fresh.map((e) => e.label).join(', ') || '—'} · copied ${fresh.copied.map((e) => e.label).join(', ') || '—'}${fresh.copiedWhole ? ' · SEEN (a copy)' : ''}`);
     // DUNK-CONTROL-JUICE: the runway tricks (a toss, a kick, a cartwheel, the hop) and a caught lob are judged on top; an
     // obstacle pays only CLEARED (a clip never reaches this path)
     // P3 (2026-09-16): the three numbers are computed in one pure place (core/DunkCard) and they mean what their names
@@ -4090,9 +4122,9 @@ export const DunkMode: ModeDefinition = (() => {
     const { difficulty, execution, style: styleScore } = dunkCard({
       trickDifficulty, runwayDifficulty: runwayDifficulty + (signature?.nod ?? 0) + (doubleLaunched ? DOUBLE_LAUNCH.difficulty : 0), propBonus: PROP_BONUS[prop],
       charge, launchSpeed01, styleTier: STYLE_TIER[style], styleTaps,
-      hype, hang: hangBonus > 0, repeat: isRepeat, execution01: qteAccuracy,
+      hype, hang: hangBonus > 0, repeat: seenIt, execution01: qteAccuracy,
       chainTricks: Math.max(0, flight.attempt.tricks.length - 1),
-      beatExec: flow.beatExec, flowStyle: flow.flowStyle,
+      beatExec: flow.beatExec, flowStyle: flow.flowStyle + fresh.style,
     });
 
     // THE BUILDING IS PART OF THE PANEL. Momentum reached the score only as hype into the NEXT attempt's
@@ -4107,12 +4139,15 @@ export const DunkMode: ModeDefinition = (() => {
     // and the room (HYPE, and whether the panel has seen this one) — so a card is a lesson, not a number
     const approachBits = [launchSpeed01 >= 0.8 ? 'FULL RUN' : launchSpeed01 >= 0.45 ? 'JOG' : 'WALK-UP', launchTag, ...runwayLabels, lob.caught ? lob.label : '', doubleLaunched && !boardTopFlip ? 'DOUBLE-LAUNCH' : ''].filter(Boolean);   // the sky tap, the board top and the board run are runway labels
     const airBits = [...flight.attempt.tricks.map((t) => t.id.toUpperCase()), flow.label, styleTaps > 0 ? `${styleTaps} STYLE TAP${styleTaps > 1 ? 'S' : ''}` : '', hangBonus > 0 ? 'HANG' : ''].filter(Boolean);
-    const judgeWhy = `APPROACH ${approachBits.join(' · ')} │ AIR ${airBits.join(' · ') || 'straight up'} │ PRECISION ${Math.round(qteAccuracy * 100)}% │ HYPE ${Math.round(momentum.score01 * 100)}%${isRepeat ? ' · SEEN IT' : ''}`;
+    const judgeWhy = `APPROACH ${approachBits.join(' · ')} │ AIR ${airBits.join(' · ') || 'straight up'} │ PRECISION ${Math.round(qteAccuracy * 100)}% │ HYPE ${Math.round(momentum.score01 * 100)}% · FRESH ${Math.round(fresh.freshness01 * 100)}%${seenIt ? ' · SEEN IT' : ''}`;
     lastJudgeWhy = judgeWhy; lastDifficulty = difficulty; lastExecution = execution; lastStyleScore = styleScore;
     // HOOPS-TO-75 HP-1: the timing line waits until the judge cards finish — one overlay at a time
     ctx.setHud({ slamTiming: '', breakdown: '', judgeWhy: '' });
     console.info(`[JUDGE-WHY] ${judgeWhy}`);
-    const scores = judgeDunk(difficulty, execution, styleScore, momentum.score01);
+    // dunk-next phase 2: the judges SAY it — Silk (the style judge) on a dunk the night has not seen, Reign on a copy. The cards are the panel's.
+    const scores = judgeDunk(difficulty, execution, styleScore, momentum.score01).map((j) =>
+      fresh.copiedWhole && j.name === 'Reign' ? { ...j, line: 'Reign: I saw that an hour ago. From the other guy.' }
+      : !seenIt && fresh.style >= 1 && j.name === 'Silk' ? { ...j, line: 'Silk: never seen that tonight. THAT is why I came.' } : j);
     lastScores = scores;
     // THE STAKES SCALE THE PANEL, they do not replace it: the judges still judge the dunk, and then what
     // it cost to get there is applied on top. A called trick that fired pays a bonus; one that did not
@@ -4154,16 +4189,19 @@ export const DunkMode: ModeDefinition = (() => {
       chain = 0;
     }
 
-    if (rivalsDunk) rivalTotal += dunkTotal;
-    else { playerTotal += dunkTotal; makes++; bestChain = Math.max(bestChain, chain); playerCards.push(dunkTotal); }
-    // the FINISH CLIP goes in, not only a label: the body's finish is picked deterministically from these
-    // same values, so the card is enough to re-perform the attempt if a replay is ever built
-    if (!rivalsDunk) card = addAttempt(card, {
-      round, style: STYLE_LABEL[style], prop: propLabel(prop),
-      finish: aerialClip, label: finishBanner(true, qteAccuracy, inOffHand(), calledAirTrick()).replace('!', '') || STYLE_LABEL[style],
-      judges: scores.map((j) => j.score), total: dunkTotal, made: true,
-      diff: difficulty, exec: execution, look: styleScore,   // P9: the night's report reads these back
-    });
+    if (dunkOff > 0) { if (rivalsDunk) dunkOffRival = dunkTotal; else dunkOffPlayer = dunkTotal; }   // dunk-next: the dunk-off's own card — never the night's totals, never the staked card
+    else {
+      if (rivalsDunk) rivalTotal += dunkTotal;
+      else { playerTotal += dunkTotal; makes++; bestChain = Math.max(bestChain, chain); playerCards.push(dunkTotal); }
+      // the FINISH CLIP goes in, not only a label: the body's finish is picked deterministically from these
+      // same values, so the card is enough to re-perform the attempt if a replay is ever built
+      if (!rivalsDunk) card = addAttempt(card, {
+        round, style: STYLE_LABEL[style], prop: propLabel(prop),
+        finish: aerialClip, label: finishBanner(true, qteAccuracy, inOffHand(), calledAirTrick()).replace('!', '') || STYLE_LABEL[style],
+        judges: scores.map((j) => j.score), total: dunkTotal, made: true,
+        diff: difficulty, exec: execution, look: styleScore,   // P9: the night's report reads these back
+      });
+    }
     // Hype is fed by the QUALITY of the dunk, not the raw total — the total's
     // range moved with the ceiling and `dunkTotal * 2` would now fill the meter
     // almost instantly, quietly wrecking the momentum curve. Per-judge average
@@ -4201,8 +4239,8 @@ export const DunkMode: ModeDefinition = (() => {
     // under the rim, on the iron, from the stands — out of the RECORDED POSE, and a big one freezes on the contact frame as a poster.
     const big = dunkTotal >= BAND_TOTAL.eruption || !!signature;
     const theName = signature ? signature.name : named.length ? `${named.join(' → ')}` : finishBanner(qteHit, qteAccuracy, inOffHand(), calledAirTrick()).replace('!', '') || 'THE DUNK';
-    const call = announcerCall({ total: dunkTotal, name: theName, bands: BAND_TOTAL, seen: isRepeat, dunker: turn === 'rival' ? foe.name : undefined, seed: seedOf(`${theName}:${dunkTotal}:${round}:${dunkInRound}`) });
-    if (!micMake(theName, scores.reduce((a, j) => a + j.score, 0), isRepeat)) announce(ctx, call);   // the lower third only when the voices never arrived
+    const call = announcerCall({ total: dunkTotal, name: theName, bands: BAND_TOTAL, seen: seenIt, dunker: turn === 'rival' ? foe.name : undefined, seed: seedOf(`${theName}:${dunkTotal}:${round}:${dunkInRound}`) });
+    if (!micMake(theName, scores.reduce((a, j) => a + j.score, 0), seenIt)) announce(ctx, call);   // the lower third only when the voices never arrived
     phoneFlashes?.burst(big ? 22 : 10, big ? 2.4 : 1.6);
     if (big) pyro(ctx);
     const contactSec = flushRealSec || resolveRealMs / 1000;
@@ -4284,14 +4322,14 @@ export const DunkMode: ModeDefinition = (() => {
     if (turn === 'rival') {   // phase 11: the rival's own count, then the runway back
       stakes = freshStakes();
       rivalDunkNum++;
-      if (rivalDunkNum < DUNKS_PER_ROUND) { resetForNextAttempt(ctx); return; }
+      if (rivalDunkNum < dunksThisRound()) { resetForNextAttempt(ctx); return; }
       endRivalTurn(ctx);
       return;
     }
     // the dunk is over however it ended: fresh attempts, and the call cleared. A call belongs to one dunk.
     stakes = freshStakes();
     dunkInRound++;
-    if (dunkInRound < DUNKS_PER_ROUND) {
+    if (dunkInRound < dunksThisRound()) {
       resetForNextAttempt(ctx);
       return;
     }
@@ -4332,13 +4370,14 @@ export const DunkMode: ModeDefinition = (() => {
     // to stay ahead of the rival's pace (they dunk after you)
     const isFinalRound = round === TOTAL_ROUNDS;
     const deficit = rivalTotal - playerTotal;
-    const need = isFinalRound ? Math.max(0, deficit + RIVAL_PACE) : 0;
+    const need = isFinalRound && dunkOff === 0 ? Math.max(0, deficit + RIVAL_PACE) : 0;   // (dunk-next: the dunk-off has no pace to chase — he answers you)
     revealTail = -1; revealHold = false; hangPrompt = false; lineHint = '';   // IMPROVE (2026-10-06)
     runwayHint = practice ? 'PRACTICE — HOLD to run · JUMP at the line · SLAM on NOW! · R1 back to the contest'
+      : dunkOff > 0 ? `DUNK-OFF — one dunk, ${foe.name} answers it. Make it one he cannot.`
       : need > 0 ? `FINAL ROUND — you need big numbers (${deficit > 0 ? `down ${deficit}` : `up ${-deficit}`})` : 'HOLD to run · tap JUMP at the line — then SLAM on NOW!';
     idleSec = 0; idleTipShown = null;
     ctx.setHud({
-      dunkNum: `${dunkInRound + 1}/${DUNKS_PER_ROUND}`,
+      dunkNum: `${dunkInRound + 1}/${dunksThisRound()}`,
       attempt: attemptChip(),
       // the LAST attempt's verdict must not hang over this one: measured on the probe, the readout from
       // attempt 1 was still on screen through attempt 2 because only a resolve ever wrote the field.
@@ -4350,12 +4389,12 @@ export const DunkMode: ModeDefinition = (() => {
     mic?.release();
     if (turn === 'player') {   // THE MIC: who is up — the attempt, and the pressure in the final round
       const moment = stakes.attemptsUsed >= 2 ? 'dunk.lastchance' : stakes.attemptsUsed === 1 ? 'dunk.retry'
-        : isFinalRound && dunkInRound === 0 ? (deficit > 0 ? 'dunk.need' : 'dunk.need.ahead') : 'dunk.up';
+        : isFinalRound && dunkInRound === 0 && dunkOff === 0 ? (deficit > 0 ? 'dunk.need' : 'dunk.need.ahead') : 'dunk.up';   // (dunk-next: a dunk-off is level — nobody is ahead)
       mic?.then({ moment, priority: 1, side: moment === 'dunk.up' ? 0.15 : 0 });
     }
     if (turn === 'rival') {   // phase 11: his attempt, his plan, his line on the HUD
       planRivalAttempt();
-      ctx.setHud({ dunkNum: `${rivalDunkNum + 1}/${DUNKS_PER_ROUND}`, attempt: '', need: 0, hint: `${foe.name} — THE RIVAL'S DUNK` });
+      ctx.setHud({ dunkNum: `${rivalDunkNum + 1}/${dunksThisRound()}`, attempt: '', need: 0, hint: dunkOff > 0 ? `${foe.name} — HE NEEDS ${dunkOffPlayer ? dunkOffPlayer + 1 : 'A MAKE'} TO TAKE IT` : `${foe.name} — THE RIVAL'S DUNK` });
     }
   }
 
@@ -4369,6 +4408,20 @@ export const DunkMode: ModeDefinition = (() => {
   // (his signature dunk leads), how clean the slam is, and whether he blows it (he never finds the window).
   let turn: 'player' | 'rival' = 'player';
   let aiFeeding = false, rivalDunkNum = 0, playerProp: Prop = 'none';
+  // dunk-next phase 3 — THE DUNK-OFF (core/ContinuousNight): which dunk-off this is (0 = none), and its two cards. NEVER the night's
+  // totals and never the staked card: the night is still its four dunks.
+  let dunkOff = 0, dunkOffPlayer = 0, dunkOffRival = 0;
+  /** Dunks each dunker takes this round: two, or one in a dunk-off. */
+  const dunksThisRound = (): number => (dunkOff > 0 ? 1 : DUNKS_PER_ROUND);
+  const dunkOffChip = (): string => `YOU ${dunkOffPlayer || '—'} · ${foe.name} ${dunkOffRival || '—'}`;
+  function startDunkOff(ctx: ModeContext, n: number): void {
+    dunkOff = n; dunkOffPlayer = 0; dunkOffRival = 0; dunkInRound = 0; stakes = freshStakes();
+    ctx.setHud({ round: n > 1 ? `DUNK-OFF ${n}` : 'DUNK-OFF', dunkOff: dunkOffChip() });
+    SoundKit.play('whistle'); SoundKit.play('crowdCheer', { volume: 0.7 }); mic?.crowd('crowd.erupt', 2);
+    flash(ctx, n > 1 ? `STILL TIED — DUNK-OFF ${n} · ONE DUNK EACH` : `TIED AT ${playerTotal} — DUNK-OFF! · ONE DUNK EACH`, 2200);
+    console.info(`[DUNK-OFF] ${n} · tied at ${playerTotal}`);
+    resetForNextAttempt(ctx);
+  }
   interface RivalAttempt { tricks: DunkTrick[]; acc: number; early: boolean; blew: boolean; /** dunk-next: a clean attempt throws each trick on its beat */ onBeat: boolean }
   let rivalPlan: RivalAttempt | null = null;
   let rivalFed = { run: false, released: false, trickIdx: 0, slammed: false, slamUpAt: -1 };
@@ -4387,10 +4440,13 @@ export const DunkMode: ModeDefinition = (() => {
   /** What the rival goes for this time, and how clean: the nerve's reach picks the dunk (his signature leads), its execution band
    *  places the slam against the beat, its blown chance means he never finds the window. */
   function planRivalAttempt(): void {
-    const nerve = rivalNerve({
-      deficit: rivalTotal - playerTotal, isFinalRound: round === TOTAL_ROUNDS,
-      attemptsLeft: DUNKS_PER_ROUND - rivalDunkNum + (TOTAL_ROUNDS - round) * DUNKS_PER_ROUND, playerPace: playerPace(),
-    });
+    // dunk-next phase 3: in a dunk-off he is answering ONE card with ONE dunk — the deficit is the dunk-off's, and it is his last
+    const nerve = rivalNerve(dunkOff > 0
+      ? { deficit: dunkOffRival - dunkOffPlayer, isFinalRound: true, attemptsLeft: 1, playerPace: playerPace() }
+      : {
+        deficit: rivalTotal - playerTotal, isFinalRound: round === TOTAL_ROUNDS,
+        attemptsLeft: DUNKS_PER_ROUND - rivalDunkNum + (TOTAL_ROUNDS - round) * DUNKS_PER_ROUND, playerPace: playerPace(),
+      });
     const band = rivalExecution(nerve);
     const blew = Math.random() < Math.min(0.85, nerve.blownChance * foe.risk);
     const reach = (nerve.diffMin + Math.random() * (nerve.diffMax - nerve.diffMin)) * foe.reach;
@@ -4486,9 +4542,18 @@ export const DunkMode: ModeDefinition = (() => {
       resetForNextAttempt(ctx);
       return;
     }
+    // dunk-next phase 3: A TIED CARD IS SETTLED BY DUNKS (core/ContinuousNight). The final ties → a dunk-off; a dunk-off still tied → another,
+    // up to DUNK_OFF_MAX; then the old rule. The night's totals and its staked card never see a dunk-off.
+    let won: boolean;
+    if (dunkOff > 0) {
+      const v = dunkOffVerdict(dunkOffPlayer, dunkOffRival, dunkOff);
+      console.info(`[DUNK-OFF] ${dunkOff}: you ${dunkOffPlayer} · ${foe.name} ${dunkOffRival} → ${v}`);
+      if (v === 'again') { startDunkOff(ctx, dunkOff + 1); return; }
+      won = v === 'won';   // (the night card says the dunk-off's two cards: nightDunkOff)
+    } else if (cardVerdict({ playerTotal, rivalTotal }) === 'tied') { startDunkOff(ctx, 1); return; }
+    else won = cardWon({ playerTotal, rivalTotal });
     setPhase('contestOver');
     SoundKit.play('whistle');
-    const won = cardWon({ playerTotal, rivalTotal });
     if (won) { SoundKit.play('crowdCheer'); EffectsKit.burst(ctx.scene, player.root.position.add(new Vector3(0, 2, 0)), 'confetti'); }
     // THE MIC: the result, the sidekick, the building; then the rival has a word and the MC sends everyone home
     mic?.hush();
@@ -4496,7 +4561,7 @@ export const DunkMode: ModeDefinition = (() => {
     mic?.then({ who: foe.id, moment: won ? 'player.dunk.respect' : 'player.dunk.brag' });
     mic?.then({ moment: won ? 'outro.win' : 'outro.loss', priority: 1 });
     // the card rides out with the result, which is what the arena submit forwards
-    const stats = { rivalTotal, rounds: TOTAL_ROUNDS, makes, misses, bestChain, night };
+    const stats = { rivalTotal, rounds: TOTAL_ROUNDS, makes, misses, bestChain, night, dunkOffs: dunkOff };   // dunk-next: how many dunk-offs it took (0 = none)
     // the card goes out on `detail`, not `stats` — stats is numbers-only because the reward layer reads it
     const detail = { card: forWire(card) };
     // TRY-ONBOARD G1 (BUG-001). The card is finite by design — 2 rounds x 2 dunks
@@ -4523,6 +4588,7 @@ export const DunkMode: ModeDefinition = (() => {
     clearBanner(ctx);
     ctx.setHud({
       nightCard: won ? 'WON' : 'OVER', nightNum: night,
+      nightDunkOff: dunkOff > 0 ? `DUNK-OFF${dunkOff > 1 ? ` ×${dunkOff}` : ''}: YOU ${dunkOffPlayer} · ${foe.name} ${dunkOffRival}` : '',   // dunk-next phase 3
       rivalName: foe.name,
       nightMakes: makes, nightMisses: misses, nightBest: bestChain,
       // the Passion Pipeline credential -- engagement, stated as engagement, never a rating and never a gate
@@ -4547,6 +4613,8 @@ export const DunkMode: ModeDefinition = (() => {
     // the night number, and nothing else a contest scored
     const led: NightState = nextNight({ night, round, dunkInRound, playerTotal, rivalTotal, makes, misses, bestChain });
     ({ night, round, dunkInRound, playerTotal, rivalTotal, makes, misses, bestChain } = led);
+    nightMemory.reset(); refreshTips();   // dunk-next phase 2: night N+1 is a new building — every idea is fresh again
+    dunkOff = 0; dunkOffPlayer = 0; dunkOffRival = 0;   // dunk-next phase 3
     // HOTFIX (2026-09-24): the card is the night too. The ledger put playerTotal back to 0 but the card kept last
     // night's attempts (addAttempt holds the last twelve), so night 2's report read "YOUR NIGHT: <both nights>" with
     // night 1's dunks on it, and the card no longer added up to the score ctx.card sends out beside it. A card that
@@ -4569,7 +4637,7 @@ export const DunkMode: ModeDefinition = (() => {
     ctx.heroRef.current = player.root;
     ctx.camDirector.suspended = false;
     ctx.setHud({
-      nightCard: null, nightNum: night, nightMakes: null, nightMisses: null, nightBest: null,
+      nightCard: null, nightNum: night, nightMakes: null, nightMisses: null, nightBest: null, nightDunkOff: '', dunkOff: '',
       round: `1/${TOTAL_ROUNDS}`, score: 0, rivalScore: 0, hype: 0, chain: 0,
     });
     crowd.onScore(0);
