@@ -98,6 +98,7 @@ import { spawnDunkObstacle, type DunkObstacle } from './dunkObstacleProps';
 import { LOST_FOUND_HANDOFF, BETWEEN_LEGS_HANDOFF, BEHIND_BACK_SWAP, DOUBLE_EASTBAY_FIRST, DOUBLE_EASTBAY_SECOND, FRONT_SWAP_AT, FRONT_SWAP_BLEND } from '../anim/authored/dunkTricks';
 import { boneNode } from '../anim/boneLookup';
 import { takeoffFor, takeoffTell, rangeLabel } from '../core/DunkApproach';
+import { runBackOffered, runBackReady, runBackHint, bloopLine, type MissKind } from '../core/DunkRunItBack';   // dunk-next phase 8: the blooper and RUN IT BACK
 import { gradePump, pumpOpen, pumpMsAt, pumpEndsAt, pumpRefusalLine, PUMP_MIN_MS } from '../core/DunkHangPump';   // dunk-next phase 8: the hang pump
 import { takeoffRead, encodeTakeoff, ZONE_HEX, MARK_W, MARK_D, MARK_Y, MARK_ALPHA, type TakeoffInputs, type TakeoffRead, type TakeoffZone } from '../core/DunkTakeoffRead';   // dunk-next phase 7: the live take-off read
 import { NightMemory, dunkElements, originalityLine, freshTip, SHOWPIECE, type Dunker, type OriginalityRead } from '../core/DunkOriginality';   // dunk-next phase 2: the night remembers who showed what first
@@ -1395,7 +1396,7 @@ export const DunkMode: ModeDefinition = (() => {
         walkOutNow: walkOutLine(walkCue),
         attempt: stakesLabel(stakes, calledLabel()),
         rivalName: foe.name,
-        dunkOff: '', nightDunkOff: '', beats: '', rivalSkip: false, takeoff: '',   // dunk-next: a reload starts with no dunk-off, no beat strip, no skip chip, no take-off read
+        dunkOff: '', nightDunkOff: '', beats: '', rivalSkip: false, takeoff: '', runBack: false,   // dunk-next: a reload starts with no dunk-off, no beat strip, no skip chip, no take-off read, no RUN IT BACK
       });
       startField(ctx);   // dunk-next phase 5: tonight's four dunkers
       readUnlocks(); challenge = null; ctx.setHud({ challenge: '', nightUnlock: '' });   // dunk-next phase 6: the device's ladder
@@ -1453,6 +1454,8 @@ export const DunkMode: ModeDefinition = (() => {
         console.info(`[DUNK-CELEB] thrown on the d-pad: ${celebPick}`);
         return;
       }
+      // dunk-next phase 8: RUN IT BACK — A on a retryable miss (a press before RUN_BACK_MIN_MS is the slam still being thrown: swallowed)
+      if (e.t === 'button' && e.pressed && e.btn === 'A' && phase === 'judging' && runBackAt >= 0) { runItBack(ctx); return; }
       if ((e.t === 'button' || e.t === 'dpad') && e.pressed && (phase === 'rivalTurn' || phase === 'judging' || phase === 'resolve')) {
         refuse(ctx, phase === 'rivalTurn' ? "RIVAL'S TURN" : practice ? 'PRACTICE — THE NEXT RUN IS COMING' : 'THE JUDGES ARE SCORING');
         return;
@@ -1679,11 +1682,12 @@ export const DunkMode: ModeDefinition = (() => {
       if (e.t === 'trigger' && e.side === 'R') {
         // MECHANICS PASS (2026-09-15): RUN (RT) was silent 6 of 6 when held outside the runway — through the judges, the
         // replay, the rival's turn. The first press of a hold is answered with what the contest is doing.
-        if (e.value > 0.5 && !runPressWas && phase !== 'approach' && phase !== 'charge' && phase !== 'cinematic') {
+        if (e.value > 0.5 && !runPressWas && phase !== 'approach' && phase !== 'charge' && phase !== 'cinematic' && !(phase === 'judging' && runBackAt >= 0)) {
           refuse(ctx, phase === 'rivalTurn' ? "RIVAL'S TURN" : phase === 'judging' || phase === 'resolve' ? 'THE JUDGES ARE SCORING' : 'WAIT');
         }
         runPressWas = e.value > 0.5;
-        { const down = e.value > 0; if (down && !runDownWas && phase === 'cinematic') hangPump(ctx); runDownWas = down; }   // dunk-next phase 8: RUN again in the air
+        { const down = e.value > 0, edge = down && !runDownWas; runDownWas = down;   // dunk-next phase 8: RUN again in the air is the pump; on a miss, RUN IT BACK
+          if (edge && phase === 'cinematic') hangPump(ctx); else if (edge && phase === 'judging' && runBackAt >= 0) runItBack(ctx); }
         runHeld = e.value;
         if (phase === 'approach' && e.value > 0.02) beginRun(ctx);
         if (phase === 'charge') {
@@ -2945,6 +2949,12 @@ export const DunkMode: ModeDefinition = (() => {
    *  had landed perfectly read as "WINDMILL — MISSED" — the one line the eye saw on the flight where the trick fired and
    *  the SLAM press was eaten (99109f7). The trick is what you did; the slam is what you missed. The name still leads,
    *  because the judges scored it and the card names it, but it no longer wears the failure. */
+  /** dunk-next phase 8: what went wrong, as the booth's blooper hears it — missWhy's own reading, in four words. */
+  function missKind(): MissKind {
+    if (obstacleClipped) return 'prop';
+    if (lob.live || lob.lost) return 'lob';
+    return slamSeen ? 'early' : 'noSlam';
+  }
   function missWhy(): string {
     if (obstacleClipped) return `CAUGHT THE ${obstacle?.spec.label ?? 'PROP'}`;   // the prop ended it, whatever the toss was doing
     if (lob.live || lob.lost) return lob.clanked ? `${lob.label} OFF THE IRON` : lob.over ? `${lob.label} OVER THE GLASS` : `LOST THE ${lob.label}`;
@@ -4122,11 +4132,16 @@ export const DunkMode: ModeDefinition = (() => {
       if (canRetry(stakes, false)) {
         micMiss(false);
         SoundKit.play('crowdGroan', { volume: 0.35 });
-        flash(ctx, `${missWhy()} — MISSED · ${attemptsLeft(stakes)} LEFT`);
-        ctx.setHud({ judgeReveal: null, hint: '', attempt: stakesLabel(stakes, calledLabel()) });
+        // dunk-next phase 8: THE BLOOPER, AND RUN IT BACK — the booth calls the clank, and from RUN_BACK_MIN_MS a press (A, RUN, the chip)
+        // goes straight to the runway; the attempt is already spent, so nothing is re-done for free (core/DunkRunItBack)
+        const runBack = runBackOffered(stakes, false, turn === 'player');
+        flash(ctx, `${runBack ? `${bloopLine(missKind(), bloopN++)} · ` : ''}${missWhy()} — MISSED · ${attemptsLeft(stakes)} LEFT`);
+        ctx.setHud({ judgeReveal: null, hint: runBack ? runBackHint(stakes) : '', attempt: stakesLabel(stakes, calledLabel()), runBack });
         landingClip = DUNK_LAND_ABSORB_CLIP; landNow();
         setPhase('judging');
-        later(() => { clearBanner(ctx); void retryThisDunk(ctx); }, MISS_BEAT_MS);
+        runBackAt = runBack ? performance.now() : -1; runBackHud = runBack;
+        const seq = ++runBackSeq;
+        later(() => { if (seq !== runBackSeq) return; clearBanner(ctx); void retryThisDunk(ctx); }, MISS_BEAT_MS);   // nobody pressed: the beat ends as it always did
         finishing = false;
         return;
       }
@@ -4476,6 +4491,19 @@ export const DunkMode: ModeDefinition = (() => {
    * exactly as it does between dunks, so a retry starts from the same standing position as a first
    * attempt and the only difference is what it is worth.
    */
+  /** dunk-next phase 8: the retryable miss on the table (performance.now() of the call; -1 = none), the beat's own token, the bloopers. */
+  let runBackAt = -1, runBackSeq = 0, bloopN = 0, runBackHud = false;
+  /** RUN IT BACK: the miss beat ends now and the runway is back. Only on the player's retryable miss, only from RUN_BACK_MIN_MS. */
+  function runItBack(ctx: ModeContext): boolean {
+    if (runBackAt < 0 || phase !== 'judging' || turn !== 'player') return false;
+    if (!runBackReady(performance.now() - runBackAt)) return false;
+    runBackSeq++;   // the beat's own timer is void
+    console.info(`[DUNK-RETRY] RUN IT BACK ${Math.round(performance.now() - runBackAt)} ms after the miss (the beat is ${MISS_BEAT_MS})`);
+    runBackAt = -1;
+    SoundKit.play('uiTick', { pitch: 1.3, volume: 0.35 });
+    clearBanner(ctx); retryThisDunk(ctx);
+    return true;
+  }
   function retryThisDunk(ctx: ModeContext): void {
     if (phase !== 'judging') return;
     cancelLiveCeleb(); celebFace = null;
@@ -4542,6 +4570,7 @@ export const DunkMode: ModeDefinition = (() => {
     revealTail = -1; revealHold = false; hangPrompt = false; lineHint = '';   // IMPROVE (2026-10-06)
     clearTakeoff(ctx);   // dunk-next phase 7: the mark and the read go with the attempt
     pumpUsed = false; pumpStyle = 0; pumpCueUp = false;   // dunk-next phase 8
+    runBackAt = -1; if (runBackHud) { runBackHud = false; ctx.setHud({ runBack: false }); }   // dunk-next phase 8: the miss's chip goes with it
     runwayHint = practice ? 'PRACTICE — HOLD to run · JUMP at the line · SLAM on NOW! · R1 back to the contest'
       : dunkOff > 0 ? `DUNK-OFF — one dunk, ${foe.name} answers it. Make it one he cannot.`
       : need > 0 ? `FINAL ROUND — you need big numbers (${deficit > 0 ? `down ${deficit}` : `up ${-deficit}`})` : 'HOLD to run · tap JUMP at the line — then SLAM on NOW!';

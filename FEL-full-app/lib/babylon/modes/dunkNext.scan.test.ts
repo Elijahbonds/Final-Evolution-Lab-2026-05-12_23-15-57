@@ -334,7 +334,7 @@ describe('phase 7 — the live take-off read', () => {
 
 describe('phase 8 — the hang pump', () => {
   it('RUN pressed again in the air is the pump — the player\'s own, never before the rise, once a flight', () => {
-    expect(DUNK).toMatch(/\{ const down = e\.value > 0; if \(down && !runDownWas && phase === 'cinematic'\) hangPump\(ctx\); runDownWas = down; \}/);
+    expect(DUNK).toMatch(/\{ const down = e\.value > 0, edge = down && !runDownWas; runDownWas = down;[^\n]*\n\s*if \(edge && phase === 'cinematic'\) hangPump\(ctx\);/);
     const hp = fn('hangPump');
     expect(hp).toMatch(/if \(phase !== 'cinematic' \|\| turn !== 'player'\) return;/);
     expect(hp).toMatch(/if \(clipTime < EASTBAY_TIMING\.rise\) return;/);
@@ -365,6 +365,35 @@ describe('phase 8 — the hang pump', () => {
     expect(fn('finishAttempt')).toMatch(/flowStyle: flow\.flowStyle \+ fresh\.style \+ pumpStyle,/);
     expect(fn('challengeRun')).toMatch(/flowStyle: flow\.flowStyle \+ pumpStyle,/);
     expect(fn('finishAttempt')).toMatch(/pumpStyle > 0 \? 'HANG PUMP' : ''/);
+  });
+});
+
+describe('phase 8 — the blooper and RUN IT BACK', () => {
+  it('a retryable miss calls the blooper and offers the retry only where the stakes already allow it — the attempt is already spent', () => {
+    const fin = fn('finishAttempt');
+    const spend = fin.indexOf('stakes = spendAttempt(stakes);');
+    const offer = fin.indexOf("const runBack = runBackOffered(stakes, false, turn === 'player');");
+    expect(spend).toBeGreaterThan(0);
+    expect(offer).toBeGreaterThan(fin.indexOf('if (canRetry(stakes, false)) {', spend));
+    expect(fin).toMatch(/flash\(ctx, `\$\{runBack \? `\$\{bloopLine\(missKind\(\), bloopN\+\+\)\} · ` : ''\}\$\{missWhy\(\)\} — MISSED · \$\{attemptsLeft\(stakes\)\} LEFT`\);/);
+    // nobody pressing: the beat ends on its own, as before; a run-back voids it
+    expect(fin).toMatch(/const seq = \+\+runBackSeq;\n\s*later\(\(\) => \{ if \(seq !== runBackSeq\) return; clearBanner\(ctx\); void retryThisDunk\(ctx\); \}, MISS_BEAT_MS\);/);
+    expect(DUNK).toMatch(/^const MISS_BEAT_MS = 1400;$/m);
+  });
+  it('A or a RUN press runs it back — only on the player\'s retryable miss, only once the clank has read — and touches no stakes', () => {
+    expect(DUNK).toMatch(/if \(e\.t === 'button' && e\.pressed && e\.btn === 'A' && phase === 'judging' && runBackAt >= 0\) \{ runItBack\(ctx\); return; \}/);
+    expect(DUNK).toMatch(/else if \(edge && phase === 'judging' && runBackAt >= 0\) runItBack\(ctx\);/);
+    const rb = fn('runItBack');
+    expect(rb).toMatch(/if \(runBackAt < 0 \|\| phase !== 'judging' \|\| turn !== 'player'\) return false;/);
+    expect(rb).toMatch(/if \(!runBackReady\(performance\.now\(\) - runBackAt\)\) return false;/);
+    expect(rb).toMatch(/runBackSeq\+\+;/);
+    expect(rb).toMatch(/clearBanner\(ctx\); retryThisDunk\(ctx\);/);
+    expect(rb).not.toMatch(/stakes|spendAttempt|freshStakes|playerTotal|addAttempt/);
+  });
+  it('the next attempt clears the offer and the chip; the host draws the chip as a finger on A', () => {
+    expect(fn('resetForNextAttempt')).toMatch(/runBackAt = -1; if \(runBackHud\) \{ runBackHud = false; ctx\.setHud\(\{ runBack: false \}\); \}/);
+    expect(HOST).toMatch(/hud\.runBack === true && phase === 'playing' && !card && \(\n\s*<button type="button" onClick=\{tapRunBack\}/);
+    expect(HOST).toMatch(/const tapRunBack = useCallback\(\(\) => \{\n\s*emit\(\{ t: 'button', btn: 'A', pressed: true \}\);/);
   });
 });
 

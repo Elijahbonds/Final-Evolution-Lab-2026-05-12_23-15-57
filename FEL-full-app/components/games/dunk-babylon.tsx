@@ -184,6 +184,12 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
     emit({ t: 'button', btn: 'L1', pressed: false });
   }, [emit]);
 
+  // dunk-next phase 8: the RUN IT BACK chip on a retryable miss is a finger on A — the mode owns the retry and its rules (DunkMode.runItBack)
+  const tapRunBack = useCallback(() => {
+    emit({ t: 'button', btn: 'A', pressed: true });
+    emit({ t: 'button', btn: 'A', pressed: false });
+  }, [emit]);
+
   const tapStart = useCallback(() => {
     // READY gate + pause both advance on any button press.
     emit({ t: 'button', btn: 'START', pressed: true });
@@ -325,6 +331,14 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
         <button type="button" onClick={tapSkip} data-fel-dunk-skip
           className="fel-panel pointer-events-auto absolute right-3 top-[9%] inline-flex items-center gap-2 px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-white">
           SKIP TO HIS CARD <span className="text-white/45">B ▸▸</span>
+        </button>
+      )}
+
+      {/* dunk-next phase 8: RUN IT BACK on a retryable miss (A or RUN on a pad / keyboard, this chip on a phone) — the attempt is already spent */}
+      {hud.runBack === true && phase === 'playing' && !card && (
+        <button type="button" onClick={tapRunBack} data-fel-dunk-runback
+          className="fel-panel pointer-events-auto absolute right-3 top-[9%] inline-flex items-center gap-2 px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--fel-cyan)]">
+          RUN IT BACK <span className="text-white/45">A ▸</span>
         </button>
       )}
 
