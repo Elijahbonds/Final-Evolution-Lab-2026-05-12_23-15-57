@@ -20,7 +20,7 @@ vi.mock('@/lib/wallet/wallet-service', () => ({
 }));
 
 import { createCard, reviewCard, browse, type CreateCardInput } from './creative-card-service';
-import { defaultRarity, defaultStats } from './creative-card-types';
+import { defaultRarity, defaultStats, rightsRecordFor } from './creative-card-types';
 import { REASON } from '@/lib/wallet/reward-rules';
 
 const matches = (row: any, where: any): boolean => Object.entries(where ?? {}).every(([k, v]: [string, any]) => {
@@ -43,7 +43,8 @@ const prisma: any = {
 };
 
 const music = (n: number) => ({ kind: 'music', trackId: `t${n}`, stemUrls: [], coverArtUrl: '', bpm: 100, keySignature: 'C' }) as any;
-const art = () => ({ kind: 'art', canvasDataUrl: 'data:image/png;base64,AAAA', palette: [], brushSetId: 'b', appliedSurface: 'board' }) as any;
+// test changed (lane/create-hub, payload v2): a card carrying media carries its rights record, so the art fixture ticks it.
+const art = () => ({ kind: 'art', canvasDataUrl: 'data:image/png;base64,AAAA', palette: [], brushSetId: 'b', appliedSurface: 'board', rights: rightsRecordFor('art') }) as any;
 const input = (over: Partial<CreateCardInput> = {}): CreateCardInput => ({
   title: 'T', primary: 'music', secondary: [], art: music(1), stats: defaultStats(), rarity: defaultRarity(),
   isPublic: true, licenseAccepted: true, ...over,
