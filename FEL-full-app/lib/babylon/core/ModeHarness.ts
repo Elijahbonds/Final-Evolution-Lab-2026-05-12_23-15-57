@@ -11,7 +11,7 @@ import { readPlayerIcon } from '../visual/playerIcon';
 import { cachedIdentity } from './playerIdentity';
 import { mountLightRig, liftBlackMaterials, type LightRigHandle } from '../scene/LightRig';
 import { mountIblShadows, type IblShadowsHandle } from '../scene/IblShadows';
-import { detectQualityTier, mountSsao, tierRigSettings, type SsaoHandle } from '../scene/QualityTier';
+import { detectRenderTier, mountSsao, tierRigSettings, type SsaoHandle } from '../scene/QualityTier';
 import type { VenueMood } from '../scene/moods';
 import { InputBus, type FelInput, type BodyPacket } from './InputBus';
 import { CameraDirector, type FOLLOW_PRESETS } from './CameraDirector';
@@ -270,7 +270,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
   const fit = applyCanvasFit(engine, opts.canvas);
   // Ship pass (2026-09-02): desktop 60 fps / mobile 30 fps. Decided once, here,
   // from the same fill-rate signal the canvas fit used.
-  const tier = detectQualityTier(opts.canvas, fit);
+  const tier = detectRenderTier(opts.canvas, fit, engine);   // visual-foundation: + the GPU, the high tier and the Graphics menu
   const scene = new Scene(engine);
   (scene.metadata ??= {}).felTier = tier;   // read by CharacterLibrary for per-spawn quality
   scene.metadata.felModeId = def.modeId;   // read by kit.applyKit for the sport's default kit (owner decision 2026-09-05)
