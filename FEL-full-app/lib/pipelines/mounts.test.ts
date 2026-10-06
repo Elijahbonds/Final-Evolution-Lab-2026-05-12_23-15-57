@@ -15,7 +15,10 @@ describe('soundtrack hook mounts', () => {
   });
   it('ModeHarness: enterBed() where the ambient bed starts (first input), exitBed() on teardown', () => {
     const s = src('lib/babylon/core/ModeHarness.ts');
-    expect(body(s, 'function firstInput(): void {', 600)).toMatch(/SoundKit\.startAmbient\(bed\);\s*\n\s*enterBed\(\);/);
+    // INTEGRATION (2026-10-06): lane/ambient-fix renamed the harness's call to startVenueAmbient (the mood bed only over
+    // a mode that chose none); enterBed() still follows it on the next line.
+    expect(body(s, 'function firstInput(): void {', 600))
+      .toMatch(/SoundKit\.(?:startAmbient|startVenueAmbient)\(bed\);[^\n]*\n\s*enterBed\(\);/);
     expect(s).toMatch(/SoundKit\.stopAmbient\(\);[^\n]*\n\s*exitBed\(\);/);
   });
   it('Dance claims music focus with the room and releases it on dispose; the Academy claims it while mounted', () => {

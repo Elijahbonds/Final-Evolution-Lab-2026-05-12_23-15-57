@@ -24,10 +24,12 @@ const MODES: { file: string; update: RegExp }[] = [
 ];
 
 describe('the snow wind bed is started after the harness starts the mood bed', () => {
-  it('the harness still replaces the bed on the first input (the reason a load()-time wind went silent)', () => {
+  it('the harness starts the mood bed on the first input (it replaced a load()-time wind before lane/ambient-fix)', () => {
     const h = src('lib/babylon/core/ModeHarness.ts');
     const first = body(h, /function firstInput\(\): void \{/, /\n {2}\}/);
-    expect(first).toMatch(/SoundKit\.startAmbient\(bed\)/);
+    // INTEGRATION (2026-10-06): since lane/ambient-fix the harness asks startVenueAmbient(bed), which keeps a bed the
+    // mode already chose; the first-frame wind below still owns the bed either way (a later startAmbient replaces it).
+    expect(first).toMatch(/SoundKit\.(?:startAmbient|startVenueAmbient)\(bed\)/);
     expect(first).toMatch(/mood === 'alpine' \|\| mood === 'overcast' \? 'none'/);
   });
 
