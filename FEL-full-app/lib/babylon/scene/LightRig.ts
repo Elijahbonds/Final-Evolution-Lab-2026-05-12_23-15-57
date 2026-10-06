@@ -7,8 +7,8 @@ import {
 } from '@babylonjs/core';
 import type { AbstractMesh, PBRMaterial, StandardMaterial } from '@babylonjs/core';
 import { MOODS, type VenueMood, type MoodCurves } from './moods';
-import { tierRigSettings, legacyRig, type QualityTier } from './QualityTier';
-import { isLegacyLook, readShadowCacheParam } from './graphicsSetting';
+import { tierRigSettings, legacyRig, legacyMobilePost, type QualityTier } from './QualityTier';
+import { isLegacyLook, readShadowCacheParam, readMobilePostParam } from './graphicsSetting';
 import { mountShadowCache, shadowCacheWanted, gpuCanCopyShadowMap, type ShadowCacheHandle } from './ShadowCache';
 import { mountKickerLight, type KickerHandle } from './KickerLight';
 import { mountEmissiveGlow, type GlowHandle } from './EmissiveGlow';
@@ -77,7 +77,8 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
   // Ship pass (2026-09-02): desktop 60 fps / mobile 30 fps. The tier decides
   // shadow map size, cascades on outdoor moods, sharpen and bloom weight.
   const legacy = isLegacyLook();   // ?look=legacy: the shared look as it shipped before 2026-10-06 (before/after shots)
-  const T = legacy ? legacyRig(tierRigSettings(tier, mood)) : tierRigSettings(tier, mood);
+  const T0 = legacy ? legacyRig(tierRigSettings(tier, mood), tier) : tierRigSettings(tier, mood);
+  const T = tier === 'mobile' && readMobilePostParam() === '0' ? legacyMobilePost(T0) : T0;   // the phase-2 A/B
 
   // A9.3: the rig owns the scene's grade. A spec venue built after this (NexusWebScene.applyVenueGrade) stands down
   // instead of overwriting the mood — the pipeline reads the SAME scene.imageProcessingConfiguration it would write.
@@ -189,10 +190,13 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
   pipeline.bloomThreshold = M.bloomThreshold;
   pipeline.bloomWeight = M.bloomWeight;
   pipeline.bloomScale = M.bloomScale * T.bloomScaleMul;
+  pipeline.bloomKernel = T.bloomKernel;
   // A9.2 (2026-10-06): real anti-aliasing. MSAA on the pipeline's first target where the tier can pay for it; FXAA stays
   // as the phones' only AA (M44). Set once here, at mount — never toggled at runtime (a rebuild compiles shaders).
   pipeline.samples = T.msaaSamples;
-  pipeline.fxaaEnabled = T.fxaa;
+  // the backing density the canvas fit chose (the harness fits the canvas before it mounts the rig)
+  const backingDpr = 1 / Math.max(1e-3, scene.getEngine().getHardwareScalingLevel());
+  pipeline.fxaaEnabled = T.fxaa && backingDpr < T.fxaaMaxDpr;
   pipeline.sharpenEnabled = T.sharpen;               // mobile skips the full-screen pass
   pipeline.sharpen.edgeAmount = 0.25;                             //TUNE(elijah)
   // M44: mood-tinted vignette so the grade reads on the whole frame

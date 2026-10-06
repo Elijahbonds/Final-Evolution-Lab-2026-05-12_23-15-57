@@ -108,6 +108,16 @@ async function measure(key: string, variant: string): Promise<void> {
   await ctx.close();
 }
 
-for (const key of MODES) for (const v of VARIANTS) await measure(key, v);
+// one crashed renderer (this box runs out of memory under several lanes' browsers) must not lose the rest of the run:
+// a failed measure is recorded and retried once
+for (const key of MODES) for (const v of VARIANTS) {
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try { await measure(key, v); break; } catch (e) {
+      const line = `${key.padEnd(13)} ${(v || 'current').padEnd(28)} FAILED (attempt ${attempt}): ${String(e).split('\n')[0].slice(0, 160)}`;
+      rows.push(line); console.log(line);
+      for (const c of b.contexts()) await c.close().catch(() => {});
+    }
+  }
+}
 fs.writeFileSync(`${OUT}/perf-probe.txt`, rows.join('\n') + '\n');
 await b.close();

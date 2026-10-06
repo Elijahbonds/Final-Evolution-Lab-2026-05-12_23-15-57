@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { OUTDOOR_MOODS, resolveQualityTier, explainQualityTier, classifyGpu, tierFromName, tierRigSettings, legacyRig, type TierInput } from './QualityTier';
+import { OUTDOOR_MOODS, resolveQualityTier, explainQualityTier, classifyGpu, tierFromName, tierRigSettings, legacyRig, legacyMobilePost, type TierInput } from './QualityTier';
 import { fitCanvas } from '../core/canvasFit';
 import { MOODS } from './moods';
 
@@ -153,7 +153,25 @@ describe('tierRigSettings', () => {
   });
   it('mobile drops SSAO, sharpen and cascades and shrinks the shadow map', () => {
     const s = tierRigSettings('mobile', 'goldenHour');
-    expect(s).toEqual({ shadowMapSize: 512, cascaded: false, sharpen: false, bloomScaleMul: 0.7, ssao: false, msaaSamples: 1, fxaa: true, glow: false, venueProbe: false, shadowCache: true });
+    expect(s).toEqual({ shadowMapSize: 512, cascaded: false, sharpen: false, bloomScaleMul: 0.5, bloomKernel: 46, fxaaMaxDpr: 1.5, ssao: false, msaaSamples: 1, fxaa: true, glow: false, venueProbe: false, shadowCache: true });
+  });
+  it('A9 phase 2: the phone bloom is smaller with its kernel cut in step — the glow reaches as far on screen', () => {
+    const now = tierRigSettings('mobile', 'goldenHour'), was = legacyMobilePost(now);
+    expect(now.bloomScaleMul).toBeLessThan(was.bloomScaleMul);
+    // reach on screen ∝ kernel / scale: within 1% of what it was
+    expect(Math.abs(now.bloomKernel / now.bloomScaleMul - was.bloomKernel / was.bloomScaleMul) / (was.bloomKernel / was.bloomScaleMul)).toBeLessThan(0.01);
+    // never so small the highlight pass skips glints: a bloom texel per 5 screen pixels at most, on the smallest mood
+    expect(0.4 * now.bloomScaleMul).toBeGreaterThanOrEqual(0.2 - 1e-9);
+  });
+  it('A9 phase 2: FXAA stays below DPR 1.5 only, and only on the phones; desktop and high are unchanged', () => {
+    expect(tierRigSettings('mobile', 'goldenHour').fxaaMaxDpr).toBe(1.5);
+    for (const t of ['desktop', 'high'] as const) {
+      const s = tierRigSettings(t, 'goldenHour');
+      expect([s.bloomScaleMul, s.bloomKernel, s.fxaaMaxDpr]).toEqual([1, 64, Infinity]);
+    }
+    // ?look=legacy and ?mobilepost=0 restore the shipped phone chain
+    expect(legacyRig(tierRigSettings('mobile', 'goldenHour'), 'mobile')).toMatchObject({ bloomScaleMul: 0.7, bloomKernel: 64, fxaaMaxDpr: Infinity });
+    expect(legacyRig(tierRigSettings('desktop', 'goldenHour'), 'desktop').bloomScaleMul).toBe(1);
   });
   it('desktop cascades only outdoors', () => {
     expect(tierRigSettings('desktop', 'goldenHour').cascaded).toBe(true);

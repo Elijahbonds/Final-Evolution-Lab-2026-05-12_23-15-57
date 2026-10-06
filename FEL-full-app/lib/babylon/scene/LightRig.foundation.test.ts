@@ -29,3 +29,25 @@ describe('A9.2 real anti-aliasing', () => {
     expect(rig.pipeline.fxaaEnabled).toBe(true);
   });
 });
+
+describe('A9 phase 2: the phones\' post chain', () => {
+  it('FXAA goes at a DPR-2 backing and stays at DPR 1; the bloom kernel follows the tier', () => {
+    const hi = new NullEngine(); hi.getHardwareScalingLevel = () => 0.5;   // what canvasFit sets for a DPR-2 phone (NullEngine ignores the setter)
+    const m2 = mountLightRig(new Scene(hi), 'goldenHour', 'mobile');
+    expect(m2.pipeline.fxaaEnabled).toBe(false);
+    expect(m2.pipeline.bloomKernel).toBe(46);
+    expect(m2.pipeline.bloomScale).toBeCloseTo(0.5 * 0.5);
+    const m1 = mountLightRig(scene(), 'goldenHour', 'mobile');
+    expect(m1.pipeline.fxaaEnabled).toBe(true);
+    const d = mountLightRig(scene(), 'dojoWarm', 'desktop');
+    expect(d.pipeline.bloomKernel).toBe(64);
+  });
+  it('?mobilepost=0 puts the shipped phone chain back for one load', () => {
+    vi.stubGlobal('window', { location: { search: '?mobilepost=0' } });
+    const hi = new NullEngine(); hi.getHardwareScalingLevel = () => 0.5;
+    const m = mountLightRig(new Scene(hi), 'goldenHour', 'mobile');
+    expect(m.pipeline.fxaaEnabled).toBe(true);
+    expect(m.pipeline.bloomKernel).toBe(64);
+    expect(m.pipeline.bloomScale).toBeCloseTo(0.5 * 0.7);
+  });
+});
