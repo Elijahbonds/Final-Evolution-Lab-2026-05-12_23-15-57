@@ -499,7 +499,8 @@ export async function POST(req: Request) {
         // ledger above, so a retried run adds neither twice (they ran after the commit, unkeyed). Tier rewards and the
         // announcements go out after the commit (bookSeasonTierUps / emitMasteryUps). ---
         // (a floor-only run adds neither — the owner's played floor is XP, a shard and the streak day)
-        const season = floorOnly ? null : await addSeasonXp({ userId, mode, score: paidScore, won }, { db: tx, deferTierRewards: true });
+        // (IMPROVE 2026-10-06: with this run's row, so the daily goals it completes feed the pass's questsDone)
+        const season = floorOnly ? null : await addSeasonXp({ userId, mode, score: paidScore, won, sessionId: sid ?? null }, { db: tx, deferTierRewards: true });
         if (!floorOnly) await settleGrant(tx, { userId, runId: run.id, grantType: 'season_xp', amount: season?.gained ?? 0, ...(season ? {} : { metadata: { noActiveSeason: true } }) });
         const mastery = floorOnly ? null : await recordMastery(userId, { mode, score: paidScore, won, hits, misses, maxCombo }, { db: tx, emit: false });
 
@@ -528,6 +529,8 @@ export async function POST(req: Request) {
           prqAfter: after,
           grade: prqGrade(after),
           labCredits: (updated as any).labCredits,
+          // IMPROVE (2026-10-06): the account XP after this run (the card reads the player level off it, lib/player-level.ts)
+          ...(Number.isFinite((updated as any)?.xp) ? { profileXp: Number((updated as any).xp) } : {}),
           season: season
             ? {
                 name: season.season.name,
@@ -539,6 +542,9 @@ export async function POST(req: Request) {
                 tierUps: season.events.map((e) => ({ tier: e.tier, rewards: e.rewards })),
               }
             : null,
+          // IMPROVE (2026-10-06): today's daily goals after this run, and the ones it completed (their season XP is in
+          // season.gained)
+          goals: season?.goals ? { day: season.goals.day, resetsAt: season.goals.resetsAt, items: season.goals.goals, completedNow: season.goals.completedNow } : null,
           mastery: mastery
             ? { mode: mastery.mode, tier: mastery.tier, tierIndex: mastery.tierIndex, ups: mastery.events }
             : null,
