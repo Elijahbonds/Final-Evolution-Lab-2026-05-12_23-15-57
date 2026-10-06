@@ -492,17 +492,18 @@ export function ClosetView({ adult = false, fullBleed = false }: { adult?: boole
   // THE WALKTHROUGH: once per device (place a part, paint a layer, save)
   useEffect(() => { if (!walkSeen()) setWalk(WALK_START); }, []);
   const walkDo = (e: WalkEvent) => setWalk((w) => { const n = walkReduce(w, e); if (n.over && !w.over) rememberWalk(n); return n; });
-  const counts = useRef({ parts: doc?.parts.length ?? 0, paint: doc?.paint.length ?? 0, slot: slot.id });
+  const counts = useRef({ parts: doc?.parts.length ?? 0, paint: doc?.paint.length ?? 0, slot: slot.id, ready: false });
   useEffect(() => {
     const c = counts.current;
     const parts = doc?.parts.length ?? 0, paint = doc?.paint.length ?? 0;
-    if (c.slot === slot.id) {
+    // only what the player adds counts: not the saved look arriving on load, not switching to another character
+    if (c.ready && !loading && c.slot === slot.id) {
       if (parts > c.parts) walkDo('partAdded');
       if (paint > c.paint) walkDo('layerAdded');
     }
-    counts.current = { parts, paint, slot: slot.id };
+    counts.current = { parts, paint, slot: slot.id, ready: !loading };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [doc, slot.id]);
+  }, [doc, slot.id, loading]);
   const walkStep = walkCurrent(walk);
   useEffect(() => { const t = walkStep ? WALK_COPY[walkStep].tab : null; if (t) setTab(t); }, [walkStep]);
   /** What Before shows: the selected character as it was opened or last saved. */

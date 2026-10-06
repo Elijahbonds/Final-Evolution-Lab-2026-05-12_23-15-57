@@ -16,6 +16,7 @@ describe('screen maths', () => {
     expect(sweptAngle(c, { x: 10, y: 0 }, { x: 0, y: 10 })).toBeCloseTo(90, 6);
     expect(sweptAngle(c, { x: 10, y: 0 }, { x: 0, y: -10 })).toBeCloseTo(-90, 6);
     expect(sweptAngle(c, { x: -10, y: 1 }, { x: -10, y: -1 })).toBeCloseTo(11.42, 1);   // across the ±180 seam: the short way
+    expect(sweptAngle(c, { x: -10, y: -1 }, { x: -10, y: 1 })).toBeCloseTo(-11.42, 1);  // …both ways round
   });
   it('the drag ratio, and a jitter near the centre is ignored', () => {
     expect(dragRatio({ x: 0, y: 0 }, { x: 20, y: 0 }, { x: 40, y: 0 })).toBeCloseTo(2, 6);
