@@ -27,8 +27,12 @@ export interface Topic {
   motif: MotifId;
   /** Health and money topics carry a standing "educational, not advice" line under every card. */
   notAdvice?: 'medical' | 'financial';
-  /** Shown only to a signed-in player (the Playbook is behind sign-in at /education, so it is here too). */
+  /** Shown only to a signed-in player. (v1 set this on the Playbook; owner decision 5, 2026-10-06, replaced it with
+   *  `guestPreview`. Kept for a future topic that is account-only.) */
   signedInOnly?: boolean;
+  /** A guest sees only this many of the topic's cards, in pack order, and is asked to sign in for the rest
+   *  (lib/knowledge/access.ts). Signed in, every card. */
+  guestPreview?: number;
 }
 
 export type Visual =

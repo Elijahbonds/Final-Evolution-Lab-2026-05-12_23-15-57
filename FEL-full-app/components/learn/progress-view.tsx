@@ -7,7 +7,7 @@ import { Flame, Trophy, Sparkles, Bookmark, Trash2, X } from 'lucide-react';
 import { DAILY_GOAL, doneToday, liveStreak } from '@/lib/knowledge/day';
 import { masteredCount, topicProgress, type LearnState } from '@/lib/knowledge/state';
 import { topicById } from '@/lib/knowledge/topics';
-import type { Card } from '@/lib/knowledge/types';
+import type { Card, TopicId } from '@/lib/knowledge/types';
 import { TestYourself } from './feed-card';
 
 export function GoalRing({ done, goal = DAILY_GOAL, size = 40, accent = '#00FF9D' }: { done: number; goal?: number; size?: number; accent?: string }) {
@@ -24,11 +24,15 @@ export function GoalRing({ done, goal = DAILY_GOAL, size = 40, accent = '#00FF9D
 }
 
 export function ProgressView({
-  state, today, catalog, onClose, onChangeTopics, onUnsave, onClear,
+  state, today, catalog, locked = {}, synced = false, onClose, onChangeTopics, onUnsave, onClear,
 }: {
   state: LearnState;
   today: number;
   catalog: Card[];
+  /** Cards of a topic a guest can't see yet (the Playbook preview, lib/knowledge/access). */
+  locked?: Partial<Record<TopicId, number>>;
+  /** Synced to the account (KNOWLEDGE-FEED v2: a verified adult). The privacy note says where the data lives. */
+  synced?: boolean;
   onClose: () => void;
   onChangeTopics: () => void;
   onUnsave: (id: string) => void;
@@ -67,6 +71,7 @@ export function ProgressView({
                 <span className="font-bold text-white md:text-lg">{t.label}</span>
                 <span className="font-mono text-[12px] text-white/55 md:text-sm">{p.seen}/{p.total} seen · {p.mastered}/{p.quizzes} mastered</span>
               </div>
+              {(locked[id] ?? 0) > 0 && <p className="mt-1 text-[12px] md:text-sm" style={{ color: t.accent }}>+{locked[id]} more when you sign in</p>}
               <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10">
                 <div className="h-full rounded-full" style={{ width: `${p.total ? (p.seen / p.total) * 100 : 0}%`, background: t.accent }} />
               </div>
@@ -103,10 +108,14 @@ export function ProgressView({
       )}
 
       <div className="mt-10 rounded-2xl border border-white/8 bg-white/[0.02] p-4 text-sm text-white/55">
-        <p>Your progress is stored only on this device. Nothing here is shared or uploaded, and there are no followers or comments.</p>
+        {synced ? (
+          <p data-learn-synced>Your progress is saved to your account, so it follows you to other devices. Learning XP also counts toward your account XP, up to a daily limit. Nothing is shared, and there are no followers or comments.</p>
+        ) : (
+          <p>Your progress is stored only on this device. Nothing here is shared or uploaded, and there are no followers or comments.</p>
+        )}
         <button type="button" data-pad-focus onClick={onClear}
           className="mt-3 inline-flex items-center gap-2 rounded-full border border-rose-400/30 px-3.5 py-1.5 text-[13px] font-bold text-rose-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-200">
-          <Trash2 className="h-3.5 w-3.5" /> Clear my learning data on this device
+          <Trash2 className="h-3.5 w-3.5" /> {synced ? 'Clear my learning data here and on my account' : 'Clear my learning data on this device'}
         </button>
       </div>
     </div>

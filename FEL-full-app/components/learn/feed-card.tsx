@@ -27,7 +27,7 @@ const H1 = 'font-black leading-[1.08] tracking-tight text-white text-[clamp(1.65
 const BODY = 'text-white/80 leading-snug text-[clamp(1.02rem,2.1vw,1.65rem)]';
 
 export function FeedCard({
-  slide, picked, focus, onPick, active, reduced,
+  slide, picked, focus, onPick, active, reduced, note,
 }: {
   slide: FeedSlide;
   /** The authored index the viewer picked on this screen, if any. */
@@ -37,6 +37,8 @@ export function FeedCard({
   onPick: (authoredIndex: number) => void;
   active: boolean;
   reduced: boolean;
+  /** A line for this viewer under the card — a guest's Playbook preview count (lib/knowledge/access.guestNote). */
+  note?: string | null;
 }) {
   const { card } = slide;
   const topic = topicById(card.topic);
@@ -130,6 +132,7 @@ export function FeedCard({
 
       <footer className="space-y-1 pt-1">
         {topic.notAdvice && <p className="text-[11px] font-semibold text-amber-200/70 md:text-sm">{NOT_ADVICE_LINE[topic.notAdvice]}</p>}
+        {note && <p className="text-[11px] font-semibold md:text-sm" style={{ color: accent }} data-card-note>{note}</p>}
         <p className="line-clamp-2 text-[10.5px] leading-snug md:text-[13px]" style={{ color: 'rgba(255,255,255,0.42)' }}>Source: {card.source}</p>
       </footer>
     </article>

@@ -9,18 +9,22 @@
 // Safety, by construction: no user-generated content, no comments, no followers, nothing uploaded. Progress lives on
 // this device (lib/knowledge/storage). Rewards are learning XP and a streak — never coins or shards for scrolling.
 
-import { useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { SessionContext } from 'next-auth/react';
 import { toast } from 'sonner';
 import { BarChart3, Bookmark, ChevronUp, EyeOff, Flame, Heart, Share2, SlidersHorizontal, X } from 'lucide-react';
 import { CARDS } from '@/lib/knowledge/catalog';
-import { availableTopics } from '@/lib/knowledge/topics';
+import { availableTopics, topicBlurb } from '@/lib/knowledge/topics';
+import { guestNote, lockedCount, visibleCards } from '@/lib/knowledge/access';
+import { loginPath } from '@/lib/auth/safeNext';
 import { planFeed, seeded, type PlanItem } from '@/lib/knowledge/scheduler';
 import {
   lessOfThis, recordAnswer, recordView, setTopics, toggleLike, toggleSave, freshState, type LearnState,
 } from '@/lib/knowledge/state';
 import { clearState, loadState, saveState } from '@/lib/knowledge/storage';
+import { deleteAccountCopy, postEvent, schedulePush, startSync, type EventResult } from '@/lib/knowledge/syncClient';
+import { mergeStates } from '@/lib/knowledge/sync';
 import { DAILY_GOAL, doneToday, liveStreak, localDay } from '@/lib/knowledge/day';
 import { keyAction, moveFocus, padActions, padStateFrom, freshTracker, stepIndex, type NavAction } from '@/lib/knowledge/feedNav';
 import { optionOrder, shareText } from '@/lib/knowledge/quiz';
@@ -38,8 +42,17 @@ const REFILL_WHEN_LEFT = 4;
 
 export function LearnFeed() {
   // the context, not useSession(): this renders outside a SessionProvider in tests (and must not throw there)
-  const status = useContext(SessionContext)?.status ?? 'unauthenticated';
+  const session = useContext(SessionContext);
+  const status = session?.status ?? 'unauthenticated';
   const signedIn = status === 'authenticated';
+  const userId = (session?.data?.user as { id?: string } | undefined)?.id ?? null;
+  // KNOWLEDGE-FEED v2 (owner decision 2): true once the server has said this account syncs (a verified adult) and the
+  // device is linked. Under 18, unknown age, signed out or offline: false, and the feed is exactly v1's device feed.
+  const syncedRef = useRef(false);
+  const [synced, setSynced] = useState(false);
+  const capToldRef = useRef(false);
+  // IMPROVE (2026-10-06), owner decision 5: a guest's catalogue holds the first 5 Playbook cards (lib/knowledge/access)
+  const catalog = useMemo(() => visibleCards(CARDS, signedIn), [signedIn]);
   const [state, setState] = useState<LearnState | null>(null);
   const [view, setView] = useState<View>('feed');
   const [slides, setSlides] = useState<FeedSlide[]>([]);
@@ -66,6 +79,7 @@ export function LearnFeed() {
     stateRef.current = next;
     saveState(next);
     setState(next);
+    if (syncedRef.current) schedulePush(next);
     const day = localDay();
     if (doneToday(prev.today, day) < DAILY_GOAL && doneToday(next.today, day) >= DAILY_GOAL) {
       toast.success(`Daily goal done — ${DAILY_GOAL} cards. ${liveStreak(next.streak, day)}-day streak.`);
@@ -83,7 +97,7 @@ export function LearnFeed() {
     const tail: PlanItem[] = [];
     for (const x of existing.slice(-6)) if (tail[tail.length - 1]?.card.id !== x.card.id) tail.push({ card: x.card, reason: x.reason });
     return planFeed({
-      catalog: CARDS,
+      catalog,
       state: { ...s, topics: s.topics.filter((t) => allowed.has(t)) },
       today: localDay(),
       nowMs: Date.now(),
@@ -92,7 +106,7 @@ export function LearnFeed() {
       exclude: new Set(existing.map((x) => x.card.id)),
       tail,
     });
-  }, [signedIn]);
+  }, [signedIn, catalog]);
 
   const goTo = useCallback((i: number) => {
     const el = scroller.current;
@@ -120,7 +134,31 @@ export function LearnFeed() {
     stateRef.current = s;
     setState(s);
     if (s.onboarded) restart(s); else setView('picker');
-  }, [status, restart]);
+    // account sync (KNOWLEDGE-FEED v2): the server decides eligibility; the device feed is already running meanwhile
+    if (!signedIn || !userId) return;
+    void startSync(userId, s).then((r) => {
+      if (!r.synced) return;
+      syncedRef.current = true;
+      setSynced(true);
+      const cur = stateRef.current ?? s;
+      // anything done on this device while the request was out joins the merge (XP: the larger, never added twice)
+      const next = cur === s ? r.state : { ...mergeStates(r.state, cur, 'first-link'), xp: Math.max(r.state.xp, cur.xp) };
+      stateRef.current = next;
+      saveState(next);
+      setState(next);
+      if (next !== r.state) schedulePush(next);
+      if (!cur.onboarded && next.onboarded) { setView('feed'); restart(next); }
+    });
+  }, [status, restart, signedIn, userId]);
+
+  const afterEvent = useCallback((r: EventResult | null) => {
+    if (!r) return;
+    if (r.goalBonus > 0) toast(`+${r.goalBonus} XP to your account for today's goal`);
+    if (r.capHit && !capToldRef.current) {
+      capToldRef.current = true;
+      toast("That's today's learning XP for your account — your streak and progress still count.");
+    }
+  }, []);
 
   useEffect(() => {
     setReduced(motionPolicy().reduced);
@@ -130,8 +168,10 @@ export function LearnFeed() {
   // ── dwell: record the card you leave, with how long you stayed ──
   const recordLeave = useCallback((index: number, dwellMs: number) => {
     const slide = slidesRef.current[index];
-    if (slide) update((s) => recordView(s, slide.card, localDay(), Date.now(), dwellMs));
-  }, [update]);
+    if (!slide) return;
+    update((s) => recordView(s, slide.card, localDay(), Date.now(), dwellMs));
+    if (syncedRef.current) void postEvent(localDay(), { kind: 'view', cardId: slide.card.id, dwellMs }).then(afterEvent);
+  }, [update, afterEvent]);
 
   useEffect(() => {
     const prev = entered.current;
@@ -180,7 +220,9 @@ export function LearnFeed() {
     if (slide.card.type !== 'quiz' || picks[slide.key] !== undefined) return;
     setPicks((p) => ({ ...p, [slide.key]: authored }));
     update((s) => recordAnswer(s, slide.card, authored === (slide.card as { answer: number }).answer, localDay(), Date.now()));
-  }, [picks, update]);
+    // the server grades it again from the option picked (lib/knowledge/accountXp.ts) — the device never says "right"
+    if (syncedRef.current) void postEvent(localDay(), { kind: 'answer', cardId: slide.card.id, choice: authored }).then(afterEvent);
+  }, [picks, update, afterEvent]);
 
   const share = useCallback(async (slide: FeedSlide) => {
     const text = shareText(slide.card);
@@ -272,7 +314,8 @@ export function LearnFeed() {
   const today = localDay();
   const done = doneToday(state.today, today);
   const streak = liveStreak(state.streak, today);
-  const topicsOffered = availableTopics(signedIn);
+  const topicsOffered = availableTopics(signedIn).map((t) => ({ ...t, blurb: topicBlurb(t, signedIn) }));
+  const playbookLocked = state.topics.includes('playbook') ? lockedCount(CARDS, signedIn, 'playbook') : 0;
   const closeHref = signedIn ? '/train' : '/';
 
   const onTopicsDone = (picked: TopicId[]) => {
@@ -321,7 +364,7 @@ export function LearnFeed() {
         {slides.map((s, i) => (
           <section key={s.key} className="h-full snap-start snap-always pb-[max(6.5rem,calc(env(safe-area-inset-bottom)+5.5rem))] pl-5 pr-[4.6rem] pt-20 md:px-24 md:pb-24 md:pt-24" data-slide-index={i}>
             {Math.abs(i - active) <= 2 ? (
-              <FeedCard slide={s} picked={picks[s.key]} focus={i === active ? focus : null} onPick={(a) => pick(s, a)} active={i === active} reduced={reduced} />
+              <FeedCard slide={s} picked={picks[s.key]} focus={i === active ? focus : null} onPick={(a) => pick(s, a)} active={i === active} reduced={reduced} note={guestNote(CARDS, signedIn, s.card)} />
             ) : <div className="h-full" />}
           </section>
         ))}
@@ -329,6 +372,11 @@ export function LearnFeed() {
           <section className="flex h-full snap-start snap-always flex-col items-center justify-center gap-4 px-6 text-center" data-learn-end>
             <h2 className="text-[clamp(1.6rem,4vw,3rem)] font-black">You're all caught up</h2>
             <p className="max-w-md text-white/65 md:text-xl">Missed questions come back for review, and new reviews are due over the next few days. Add a topic for more.</p>
+            {playbookLocked > 0 && (
+              <Link href={loginPath('/learn')} className="rounded-full border border-[#00FF9D]/50 px-5 py-2.5 font-bold text-[#00FF9D]" data-learn-signin>
+                Sign in for {playbookLocked} more Playbook cards
+              </Link>
+            )}
             <div className="flex flex-wrap justify-center gap-3">
               <button type="button" onClick={() => setView('topics')} className="rounded-full bg-white px-5 py-2.5 font-bold text-black">Add topics</button>
               <TestYourself accent="#C58BFF" />
@@ -365,12 +413,15 @@ export function LearnFeed() {
             <ProgressView
               state={state}
               today={today}
-              catalog={CARDS}
+              catalog={catalog}
+              locked={{ playbook: playbookLocked }}
+              synced={synced}
               onClose={() => setView('feed')}
               onChangeTopics={() => setView('topics')}
               onUnsave={(id) => update((s) => ({ ...s, saved: s.saved.filter((x) => x !== id) }))}
               onClear={() => {
-                if (!window.confirm('Clear your topics, streak and progress on this device?')) return;
+                if (!window.confirm(synced ? 'Clear your topics, streak and progress on this device and on your account?' : 'Clear your topics, streak and progress on this device?')) return;
+                if (syncedRef.current) { syncedRef.current = false; setSynced(false); void deleteAccountCopy(); }
                 clearState();
                 const s = freshState();
                 stateRef.current = s;

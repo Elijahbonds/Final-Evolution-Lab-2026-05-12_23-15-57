@@ -24,6 +24,8 @@ type Mods = {
   day: typeof import('@/lib/knowledge/day');
   topics: typeof import('@/lib/knowledge/topics');
   quiz: typeof import('@/lib/knowledge/quiz');
+  access: typeof import('@/lib/knowledge/access');
+  sync: typeof import('@/lib/knowledge/syncClient');
 };
 
 let modsPromise: Promise<Mods> | null = null;
@@ -31,14 +33,18 @@ function loadMods(): Promise<Mods> {
   modsPromise ??= Promise.all([
     import('@/lib/knowledge/catalog'), import('@/lib/knowledge/scheduler'), import('@/lib/knowledge/state'),
     import('@/lib/knowledge/storage'), import('@/lib/knowledge/day'), import('@/lib/knowledge/topics'), import('@/lib/knowledge/quiz'),
-  ]).then(([catalog, scheduler, state, storage, day, topics, quiz]) => ({ catalog, scheduler, state, storage, day, topics, quiz }));
+    import('@/lib/knowledge/access'), import('@/lib/knowledge/syncClient'),
+  ]).then(([catalog, scheduler, state, storage, day, topics, quiz, access, sync]) => ({ catalog, scheduler, state, storage, day, topics, quiz, access, sync }));
   return modsPromise;
 }
 
 export function LearnWhileYouWait({ compact = false, className = '' }: { compact?: boolean; className?: string }) {
   // the context, not useSession(): this renders outside a SessionProvider in tests (and must not throw there)
-  const status = useContext(SessionContext)?.status ?? 'unauthenticated';
+  const session = useContext(SessionContext);
+  const status = session?.status ?? 'unauthenticated';
   const signedIn = status === 'authenticated';
+  // KNOWLEDGE-FEED v2: a device /learn has linked to this account also sends the idle card's views and answers up
+  const userId = (session?.data?.user as { id?: string } | undefined)?.id ?? null;
   const [mods, setMods] = useState<Mods | null>(null);
   const [item, setItem] = useState<PlanItem | null>(null);
   const [picked, setPicked] = useState<number | null>(null);
@@ -53,7 +59,7 @@ export function LearnWhileYouWait({ compact = false, className = '' }: { compact
     const all = m.topics.availableTopics(signedIn).map((t) => t.id);
     const allowed = new Set(all);
     const scoped = { ...st, topics: st.topics.filter((t) => allowed.has(t)) };
-    setItem(m.scheduler.pickIdle(m.catalog.CARDS, scoped, m.day.localDay(now), now, rng.current, all) ?? null);
+    setItem(m.scheduler.pickIdle(m.access.visibleCards(m.catalog.CARDS, signedIn), scoped, m.day.localDay(now), now, rng.current, all) ?? null);
     setPicked(null);
     shownAt.current = now;
   }, [signedIn]);
@@ -73,7 +79,9 @@ export function LearnWhileYouWait({ compact = false, className = '' }: { compact
   const next = () => {
     const s = mods.storage.loadState();
     const today = mods.day.localDay();
-    mods.storage.saveState(mods.state.recordView(s, card, today, Date.now(), Date.now() - shownAt.current));
+    const dwellMs = Date.now() - shownAt.current;
+    mods.storage.saveState(mods.state.recordView(s, card, today, Date.now(), dwellMs));
+    if (mods.sync.isLinked(userId)) void mods.sync.postEvent(today, { kind: 'view', cardId: card.id, dwellMs });
     draw(mods, card.id);
   };
 
@@ -82,6 +90,7 @@ export function LearnWhileYouWait({ compact = false, className = '' }: { compact
     setPicked(authored);
     const s = mods.storage.loadState();
     mods.storage.saveState(mods.state.recordAnswer(s, card, authored === card.answer, mods.day.localDay(), Date.now()));
+    if (mods.sync.isLinked(userId)) void mods.sync.postEvent(mods.day.localDay(), { kind: 'answer', cardId: card.id, choice: authored });
   };
 
   const text = card.type === 'lesson' ? card.lines.slice(0, compact ? 1 : 2).join(' ')

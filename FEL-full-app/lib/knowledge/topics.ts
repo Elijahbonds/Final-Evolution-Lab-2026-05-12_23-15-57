@@ -17,10 +17,16 @@ export const TOPICS: Topic[] = [
   { id: 'art', label: 'Art & music', blurb: 'Colour, perspective, rhythm and harmony', accent: '#FF9F43', motif: 'note' },
   { id: 'nature', label: 'Nature', blurb: 'Ecosystems, animals and the living planet', accent: '#3DDC97', motif: 'leaf' },
   { id: 'space', label: 'Space', blurb: 'Planets, stars and the scale of it all', accent: '#8EA8FF', motif: 'planet' },
-  { id: 'playbook', label: 'Training — The Playbook', blurb: "The Neuro-Mechanic Playbook's chapter takeaways", accent: '#00FF9D', motif: 'book', signedInOnly: true },
+  // IMPROVE (2026-10-06), owner decision 5: guests see the first PLAYBOOK_GUEST_CARDS Playbook cards, sign in for all
+  { id: 'playbook', label: 'Training — The Playbook', blurb: "The Neuro-Mechanic Playbook's chapter takeaways", accent: '#00FF9D', motif: 'book', guestPreview: 5 },
 ];
 
 const BY_ID = new Map(TOPICS.map((t) => [t.id, t]));
+
+/** The picker's blurb for this viewer: a guest is told how much of a preview topic they get. */
+export function topicBlurb(t: Topic, signedIn: boolean): string {
+  return !signedIn && t.guestPreview !== undefined ? `First ${t.guestPreview} cards free — sign in for the whole book` : t.blurb;
+}
 
 export function topicById(id: TopicId): Topic {
   const t = BY_ID.get(id);
@@ -28,7 +34,7 @@ export function topicById(id: TopicId): Topic {
   return t;
 }
 
-/** The topics a viewer may pick: the Playbook only when signed in (it is behind sign-in at /education). */
+/** The topics a viewer may pick. Every topic today: the Playbook is open to guests as a 5-card preview (access.ts). */
 export function availableTopics(signedIn: boolean): Topic[] {
   return TOPICS.filter((t) => signedIn || !t.signedInOnly);
 }
