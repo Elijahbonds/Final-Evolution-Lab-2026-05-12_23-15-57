@@ -32,7 +32,8 @@ const GUIDE: Record<Discipline, Omit<DisciplineGuide, 'id' | 'label' | 'blurb' |
       // lane/soundtrack's player plays approved tracks in rotation; false until it merges (flip both at that merge).
       { where: 'The FEL soundtrack: menus and loading screens', live: false },
       { where: 'Under your games, the end screen and replays', live: false },
-      { where: 'The Dance floor, with its chart', live: false },
+      // PIPELINES (2026-10-06): an approved track with a chart is a Dance song (lib/babylon/dance/communityDance.ts).
+      { where: 'The Dance floor, with its chart', live: true },
     ],
   },
   art: {
@@ -48,7 +49,7 @@ const GUIDE: Record<Discipline, Omit<DisciplineGuide, 'id' | 'label' | 'blurb' |
   dance: {
     make: 'Choreograph a routine from the clip library',
     showsUp: [
-      { where: 'The Dance floor routine pick', live: false },
+      { where: 'The Dance floor routine pick', live: true },   // PIPELINES: community routines + MY ROUTINE
       { where: 'Dunk celebrations', live: false },
     ],
   },

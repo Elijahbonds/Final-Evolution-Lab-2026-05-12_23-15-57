@@ -98,6 +98,9 @@ import { readDeviceAudio } from '../music/StudioLibrary';
 // exactly, which it does. songPreviewUrl feeds the pick screen's preview-on-focus; outroRange picks the results
 // screen's clip (its own song's last section).
 import { SongStemBand } from '../audio/SongStemBand';
+// PIPELINES (2026-10-06): an approved community song (a music card with a chart) plays its own mix, muffled by misses.
+import { CardSongBand } from '../dance/cardSongBand';
+import { communityDanceSong, noteCommunityLockIn } from '../dance/communityDance';
 import { songPreviewUrl, outroRange } from '../dance/felSongs';
 import { KitPulse, kitPattern } from '../audio/KitPulse';
 import { SongClock, danceTap, tapLatencySec, type TriggerLatch } from '../audio/SongClock';
@@ -310,7 +313,7 @@ export const DanceMode: ModeDefinition = (() => {
   /** The Class of 3000 layer: the band your dancing builds. MUSIC-SUITE P7: a YourSongBand for YOUR exported song
    *  (its own rendered audio), a SongStemBand for a SHIPPED FEL song (track.song — six-songs), else the synth
    *  StemBand (a pre-P7 export with no real-audio payload). */
-  let band: StemBand | YourSongBand | SongStemBand | null = null;
+  let band: StemBand | YourSongBand | SongStemBand | CardSongBand | null = null;
   let bandJoined = new Set<string>();
   /** MUSIC-SUITE P7 (six-songs): true while the locked-in track is one of the six FEL songs — CONTRACT.md §7: "the
    *  rendered bed replaces KitPulse's 808 floor for these songs; with both, the kick doubles." Only gates the 808's
@@ -989,15 +992,21 @@ export const DanceMode: ModeDefinition = (() => {
 
     SoundKit.unlock();   // the shared context: a no-op once running (the harness unlocks it on the first gesture)
     band?.dispose();
-    isSongTrack = !!track.song;
+    const cardSong = communityDanceSong(track.id);   // PIPELINES: a community song is a song (no 808 under its own drums)
+    noteCommunityLockIn(track.id);
+    isSongTrack = !!track.song || !!cardSong;
     // MUSIC-SUITE P7 ("your beat"): a track that IS your exported song, with a real-audio payload attached
     // (DanceExport.YourSongExport — absent on an export saved before P7), dances to ITS OWN rendered stems
     // (dance/yourSong.ts). MUSIC-SUITE P7 FIX (six-songs, 2026-09-29): gated on `!track.song`, not on `mine` —
     // stepsFor(track) now ALSO answers every SHIPPED track (danceTracks.stepsForSong), so `mine` alone can no
     // longer tell "an export" from "a shipped song" apart; a shipped track still never pays for the extra
     // localStorage read, it just asks its own `song` field instead of asking `mine`.
-    const myExport = !track.song ? readExportedTrack() : null;
-    if (myExport?.song && audioCtx && bus) {
+    const myExport = !track.song && !cardSong ? readExportedTrack() : null;
+    if (cardSong && audioCtx && bus) {
+      const cardBand = new CardSongBand(audioCtx, bus, cardSong);
+      void cardBand.load().catch(() => 0);   // a mix still decoding when start() fires joins in update()
+      band = cardBand;
+    } else if (myExport?.song && audioCtx && bus) {
       const ac = audioCtx;
       const deps: YourSongRenderDeps = {
         readTake: readDeviceAudio,

@@ -26,6 +26,8 @@ import { readExportedTrack } from '../music/DanceExport';
 import { DANCE_LIBRARY, isBodyStep, stepLimb } from './DanceCore';
 import { CATEGORY_STEM } from '../audio/StemBand';
 import { FEL_SONGS, sectionAtBar, type FelSong, type FelSongSection, type FelStem } from '../dance/felSongs';
+// PIPELINES (2026-10-06): approved community songs and routines, and the player's equipped routine (dance/communityDance.ts).
+import { communityCreditLine, communityDanceTracks, communityStepsFor } from '../dance/communityDance';
 
 export interface DanceTrack {
   id: string;
@@ -102,7 +104,8 @@ export const DEFAULT_TRACK_ID = 'cypher';
  */
 export function allTracks(): readonly DanceTrack[] {
   const mine = readExportedTrack();
-  return mine ? [...DANCE_TRACKS, mine.track] : DANCE_TRACKS;
+  const community = communityDanceTracks();   // PIPELINES: after the shipped songs, before your export
+  return mine ? [...DANCE_TRACKS, ...community, mine.track] : community.length ? [...DANCE_TRACKS, ...community] : DANCE_TRACKS;
 }
 
 export function trackById(id: string | null | undefined): DanceTrack {
@@ -130,6 +133,8 @@ export function cycleTrack(id: string, dir: 1 | -1): DanceTrack {
 export function stepsFor(t: DanceTrack): DanceStep[] | null {
   const mine = readExportedTrack();
   if (mine && mine.track.id === t.id) return mine.steps;
+  const community = communityStepsFor(t);   // PIPELINES: a community song's own chart, a routine looped over its song
+  if (community) return community;
   return t.song ? stepsForSong(t.song) : null;
 }
 
@@ -267,7 +272,7 @@ export function trackFromQuery(search: string | null | undefined): DanceTrack | 
 export function pickBanner(t: DanceTrack): string {
   const shown = t.song?.difficulty ?? t.difficulty;
   const scale = t.song ? 6 : 3;
-  return `♪ ${t.name}  ·  ${t.bpm} BPM  ·  ${'●'.repeat(shown)}${'○'.repeat(Math.max(0, scale - shown))}`;
+  return `♪ ${t.name}  ·  ${t.bpm} BPM  ·  ${'●'.repeat(shown)}${'○'.repeat(Math.max(0, scale - shown))}${communityCreditLine(t.id)}`;
 }
 
 /** Seconds the pick screen waits for input before starting the default —

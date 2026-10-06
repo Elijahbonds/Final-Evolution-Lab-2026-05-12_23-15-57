@@ -21,9 +21,11 @@ describe('the Create tiles', () => {
   it('the live lines are the ones this branch wires', () => {
     const live = ALL_GUIDES.flatMap((g) => g.showsUp.filter((s) => s.live).map((s) => `${g.id}: ${s.where}`));
     expect(live).toEqual([
+      'music: The Dance floor, with its chart',
       'sport: Signature moves on your athlete card',
       'art: Board decks in board runs (Apply from My Creations)',
       'art: Centre court on the hoops courts',
+      'dance: The Dance floor routine pick',
       'scene: A Spot the Scene pack you can share as a link',
       'writing: Community reads on the Story page',
     ]);
