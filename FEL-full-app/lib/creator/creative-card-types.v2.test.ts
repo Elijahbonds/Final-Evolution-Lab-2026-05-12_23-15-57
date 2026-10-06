@@ -6,6 +6,7 @@ import {
   rightsFamilyFor, rightsRecordFor, stampRights, validateArtPayload, type ArtPayload,
 } from './creative-card-types';
 import { MOODS } from './creative-card-review';
+import { RIGHTS_VERSIONS as SOUND_RIGHTS_VERSIONS, isValidRights as soundIsValidRights, rightsRecord as soundRightsRecord } from '@/lib/soundtrack/rights';
 
 const OWNER_WORDS = "I made this, or I own all rights to every sound in it. No samples, beats, vocals or AI imitations of artists I don't have rights to. FEL may play it in menus, loading screens, games, replays and the end screen, credited to me.";
 const sound = rightsRecordFor('music', new Date('2026-10-06T12:00:00Z'));
@@ -22,6 +23,13 @@ describe('rights record', () => {
     expect(RIGHTS_VERSIONS['music-2026-10-06'].text).toBe(OWNER_WORDS);
     expect(sound).toEqual({ text: OWNER_WORDS, version: 'music-2026-10-06', at: '2026-10-06T12:00:00.000Z' });
     expect(CURRENT_RIGHTS.sound).toBe('music-2026-10-06');
+  });
+  it("music's record is exactly lane/soundtrack's rightsRecord(), and the soundtrack accepts every hub record for sound", () => {
+    const at = new Date('2026-10-06T12:00:00Z');
+    expect(rightsRecordFor('music', at)).toEqual(soundRightsRecord(at));
+    expect(rightsRecordFor('acting', at)).toEqual(soundRightsRecord(at));
+    expect(soundIsValidRights(rightsRecordFor('music'))).toBe(true);
+    for (const v of Object.keys(SOUND_RIGHTS_VERSIONS)) expect(RIGHTS_VERSIONS[v]).toEqual({ family: 'sound', text: SOUND_RIGHTS_VERSIONS[v] });
   });
   it('music and voice are sound; every other discipline is media', () => {
     expect(rightsFamilyFor('music')).toBe('sound'); expect(rightsFamilyFor('acting')).toBe('sound');

@@ -72,7 +72,7 @@ export default function GuidedFlow({ discipline, entry, ...props }: FlowProps & 
   const ctx = useMemo(() => ({ publicCreator: props.publicCreator }), [props.publicCreator]);
   const guide = guideFor(discipline);
   const [step, setStep] = useState<StepId>('make');
-  const [draft, setDraft] = useState<FlowDraft>(() => newDraft(discipline, { title: entry.title ?? '', wantsPublic: props.publicCreator }));
+  const [draft, setDraft] = useState<FlowDraft>(() => newDraft(discipline, { title: entry.title ?? '', wantsPublic: props.publicCreator, ...(entry.remix ? { remixOf: entry.remix } : {}) }));
   const [media, setMedia] = useState<Record<string, PendingMedia>>({});
   const [previewUrl, setPreviewUrl] = useState<string | undefined>();
   const [phase, setPhase] = useState<'idle' | 'uploading' | 'saving'>('idle');
@@ -150,6 +150,7 @@ export default function GuidedFlow({ discipline, entry, ...props }: FlowProps & 
           <div className="min-w-0">
             <div className="truncate text-lg font-black">{guide.label}</div>
             {entry.from && entry.from !== 'hub' && <div className="truncate text-[11px] text-neutral-400">from {SOURCE_LABEL[entry.from]}</div>}
+            {draft.remixOf && <div className="truncate text-[11px] text-violet-300">a remix: the original&apos;s creator is credited</div>}
           </div>
         </div>
         <ol className="mt-3 grid grid-cols-3 gap-2" aria-label="Steps">

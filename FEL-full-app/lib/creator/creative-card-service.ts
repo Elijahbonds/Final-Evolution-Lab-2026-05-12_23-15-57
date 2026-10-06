@@ -24,6 +24,8 @@ const PUBLISH_FAUCET_COINS = 50; // mirrors reward rule CREATIVE_CARD_PUBLISH
 // CREATOR SOUNDTRACK (owner, 2026-10-06, "coins=cap"): that rule now pays ONCE per creator per discipline, on the
 // first card an approver passes, never on publish and never twice. The amount is still the reward rule's (50, TUNE(elijah)).
 const firstApprovalKey = (ownerId: string, discipline: string) => `first_${ownerId}_${discipline}`;
+// CREATE HUB (owner, 2026-10-06, "remix pay is capped"): the remix royalty pays once per parent card, on its first remix.
+const firstRemixKey = (parentId: string) => `remix_first_${parentId}`;
 
 export class CardError extends Error {
   status: number;
@@ -143,10 +145,16 @@ export async function createCard(
   // (The +50 publish faucet that stood here is gone: owner 2026-10-06, "no pay-per-publish". See reviewCard.)
 
   // Remix royalty: the social/retention loop — parent creator earns on remix.
+  // CREATE HUB (owner 2026-10-06, "remix pay is capped"): the parent's creator is paid for the FIRST remix of each card
+  // only (by someone else), then never again for that card. Two locks: no earlier remix by another player exists, and the
+  // ledger key is per parent card, so a race or a retry cannot pay twice. A creator remixing their own card is never
+  // paid and does not use up the first-remix pay. Credit is unchanged and unpaid: the new card keeps remixOf, the
+  // original counts its remixes (remixCredits).
   if (input.remixOf) {
     const parent = await prisma.creativeCard.findUnique({ where: { id: input.remixOf } });
     if (parent && parent.ownerId !== userId) {
-      await creditCoins(prisma, parent.ownerId, REASON.CREATIVE_CARD_REMIX_ROYALTY, id);
+      const earlier = await prisma.creativeCard.count({ where: { remixOf: parent.id, ownerId: { not: parent.ownerId }, id: { not: id } } });
+      if (earlier === 0) await creditCoins(prisma, parent.ownerId, REASON.CREATIVE_CARD_REMIX_ROYALTY, firstRemixKey(parent.id));
     }
   }
   return toCreativeCard(row);
@@ -185,7 +193,34 @@ export async function myCards(
   const rows = await prisma.creativeCard.findMany({
     where: { ownerId: userId }, orderBy: { createdAt: 'desc' },
   });
-  return rows.map(toCreativeCard);
+  // CREATE HUB: remix credit on both cards (owner 2026-10-06).
+  return withRemixCredits(prisma, userId, rows.map(toCreativeCard));
+}
+
+/**
+ * Remix credit (owner 2026-10-06: "credit shows on both cards"). On the original: how many cards remixed it
+ * (`remixedBy`, counted from the remixes themselves, so nothing a client sends can inflate it). On the remix: the card
+ * it came from (`remixedFrom` {id, title}), named only when the viewer may see that card (theirs, or approved and
+ * public); otherwise just the id stays, as before.
+ */
+export async function withRemixCredits(prisma: PrismaClient, viewerId: string, cards: CreativeCard[]): Promise<CreativeCard[]> {
+  if (!cards.length) return cards;
+  const ids = cards.map((c) => c.id);
+  const parentIds = [...new Set(cards.map((c) => c.remixOf).filter((x): x is string => !!x))];
+  const [children, parents] = await Promise.all([
+    prisma.creativeCard.findMany({ where: { remixOf: { in: ids } }, select: { remixOf: true } }),
+    parentIds.length
+      ? prisma.creativeCard.findMany({ where: { id: { in: parentIds } }, select: { id: true, title: true, ownerId: true, reviewState: true, isPublic: true } })
+      : Promise.resolve([] as { id: string; title: string; ownerId: string; reviewState: string; isPublic: boolean }[]),
+  ]);
+  const counts = new Map<string, number>();
+  for (const ch of children) if (ch.remixOf) counts.set(ch.remixOf, (counts.get(ch.remixOf) ?? 0) + 1);
+  const visible = new Map(parents.filter((p) => p.ownerId === viewerId || (p.reviewState === 'approved' && p.isPublic)).map((p) => [p.id, p.title]));
+  return cards.map((c) => ({
+    ...c,
+    ...(counts.get(c.id) ? { remixedBy: counts.get(c.id) } : {}),
+    ...(c.remixOf && visible.has(c.remixOf) ? { remixedFrom: { id: c.remixOf, title: visible.get(c.remixOf)! } } : {}),
+  }));
 }
 
 export async function getCard(

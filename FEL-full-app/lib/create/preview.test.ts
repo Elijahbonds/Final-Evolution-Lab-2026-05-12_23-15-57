@@ -1,6 +1,6 @@
 // CREATE HUB step 3's numbers: the bed level, the Dance banner's difficulty, the routine playhead.
 import { describe, expect, it } from 'vitest';
-import { BED_DB, activeStep, chartDifficulty, dbToGain, routineBeat } from './preview';
+import { BED_DB, activeStep, chartDifficulty, dbToGain, previewGainDb, routineBeat } from './preview';
 
 const step = (beat: number, holdBeats = 4) => ({ clipId: 'c', beat, holdBeats, mirrored: false });
 
@@ -9,6 +9,12 @@ describe('step 3 numbers', () => {
     expect(BED_DB).toBe(-14);
     expect(dbToGain(BED_DB)).toBeCloseTo(0.1995, 3);
     expect(dbToGain(0)).toBe(1);
+  });
+  it("the preview plays at the soundtrack's own trim plus stage: a -10 LUFS track is turned down 6 dB, more under a game", () => {
+    expect(previewGainDb('menu', -16)).toBe(0);
+    expect(previewGainDb('menu', -10)).toBe(-6);
+    expect(previewGainDb('bed', -16)).toBe(-14);
+    expect(previewGainDb('menu', -40)).toBe(6);   // clamped boost
   });
   it('chart difficulty by steps per minute', () => {
     expect(chartDifficulty([], 120)).toBe(1);

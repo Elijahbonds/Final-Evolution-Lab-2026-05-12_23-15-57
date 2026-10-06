@@ -75,6 +75,10 @@ describe('the card body', () => {
     const music: ArtPayloadBody = { kind: 'music', trackId: 't', stemUrls: [], coverArtUrl: '', bpm: 96, keySignature: 'Am', mixUrl: 'https://s/x.wav', mime: 'audio/wav', durationSec: 30 };
     expect(buildCreateBody(ready({ discipline: 'music', art: music }), ADULT)!.art.rights!.version).toBe('music-2026-10-06');
   });
+  it('a remix carries remixOf', () => {
+    expect(buildCreateBody(ready({ remixOf: 'ccard_p' }), ADULT)!.remixOf).toBe('ccard_p');
+    expect('remixOf' in buildCreateBody(ready(), ADULT)!).toBe(false);
+  });
   it('null until details are done; the sport rides along only when sport is in', () => {
     expect(buildCreateBody(ready({ rightsTicked: false }), ADULT)).toBeNull();
     expect(buildCreateBody(ready({ secondary: ['sport'], sport: 'golf' }), ADULT)!.sportDesignation).toBe('golf');
@@ -107,6 +111,9 @@ describe('publish-as-card links', () => {
     expect(publishHref('music', { from: 'dance-export', song: 'trk_1', chart: true })).toBe('/create/music?from=dance-export&song=trk_1&chart=1');
     expect(publishHref('cooking', { from: 'kitchens', title: '  Game-day oats  ' })).toBe('/create/cooking?from=kitchens&title=Game-day+oats');
     expect(publishHref('music', { from: 'academy', song: '../../etc' })).toBe('/create/music?from=academy');
+    expect(publishHref('art', { from: 'hub', remix: 'ccard_u1_1700000000000' })).toBe('/create/art?from=hub&remix=ccard_u1_1700000000000');
+    expect(readEntry({ remix: 'ccard_u1_1' })).toEqual({ from: null, remix: 'ccard_u1_1' });
+    expect(readEntry({ remix: 'x y' })).toEqual({ from: null });
   });
   it('reads them back defensively', () => {
     expect(readEntry(new URLSearchParams('from=academy&song=trk_123'))).toEqual({ from: 'academy', song: 'trk_123' });

@@ -175,6 +175,8 @@ export interface PublishEntry {
   title?: string;
   /** Carry the Dance chart with the song (the Dance export's "…and publish the chart"). */
   chart?: boolean;
+  /** The card this one remixes (its creator is credited; the first remix pays them once). */
+  remix?: string;
 }
 
 const ID_RE = /^[A-Za-z0-9_-]{1,80}$/;
@@ -186,6 +188,7 @@ export function publishHref(d: Discipline, entry: PublishEntry = { from: null })
   if (entry.song && ID_RE.test(entry.song)) q.set('song', entry.song);
   if (entry.title) q.set('title', entry.title.trim().slice(0, TITLE_MAX));
   if (entry.chart) q.set('chart', '1');
+  if (entry.remix && ID_RE.test(entry.remix)) q.set('remix', entry.remix);
   const qs = q.toString();
   return `/create/${d}${qs ? `?${qs}` : ''}`;
 }
@@ -200,10 +203,12 @@ export function readEntry(params: URLSearchParams | Record<string, string | stri
   const from = get('from');
   const song = get('song');
   const title = get('title');
+  const remix = get('remix');
   return {
     from: (PUBLISH_SOURCES as readonly string[]).includes(from ?? '') ? from as PublishSource : null,
     ...(song && ID_RE.test(song) ? { song } : {}),
     ...(title && title.trim() ? { title: title.trim().slice(0, TITLE_MAX) } : {}),
     ...(get('chart') === '1' ? { chart: true } : {}),
+    ...(remix && ID_RE.test(remix) ? { remix } : {}),
   };
 }

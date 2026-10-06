@@ -3,15 +3,30 @@
 // cooking allergens survive the round trip, and a teen's card never goes public. In-memory Prisma stand-in.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const h = vi.hoisted(() => ({ rows: new Map<string, any>(), users: new Map<string, { dobYear: number | null }>() }));
-vi.mock('@/lib/wallet/wallet-service', () => ({ grantServerReward: async () => ({}), spend: async () => ({}), WalletError: class extends Error {} }));
+const h = vi.hoisted(() => ({ rows: new Map<string, any>(), users: new Map<string, { dobYear: number | null }>(), grants: [] as { playerId: string; reasonCode: string; idempotencyKey: string }[], ledgerIdempotent: true }));
+vi.mock('@/lib/wallet/wallet-service', () => ({
+  grantServerReward: async (_p: unknown, a: { playerId: string; reasonCode: string; idempotencyKey: string }) => {
+    if (h.ledgerIdempotent && h.grants.some((g) => g.idempotencyKey === a.idempotencyKey)) return {};
+    h.grants.push(a); return {};
+  },
+  spend: async () => ({}), WalletError: class extends Error {},
+}));
 
-import { createCard, reviewCard, CardError, type CreateCardInput } from './creative-card-service';
+import { createCard, reviewCard, myCards, CardError, type CreateCardInput } from './creative-card-service';
+import { REASON } from '@/lib/wallet/reward-rules';
 import { DISCIPLINES, defaultRarity, defaultStats, rightsRecordFor, type ArtPayload, type Discipline } from './creative-card-types';
 
+/** A Prisma `where` on plain fields, `{not}` and `{in}`; unknown relation filters (owner) match everything. */
+const matches = (r: any, where: any) => Object.entries(where ?? {}).every(([k, v]: [string, any]) => {
+  if (k === 'owner') return true;
+  if (v && typeof v === 'object' && 'not' in v) return r[k] !== v.not;
+  if (v && typeof v === 'object' && 'in' in v) return v.in.includes(r[k]);
+  return r[k] === v;
+});
 const prisma: any = {
   creativeCard: {
-    count: async ({ where }: any) => [...h.rows.values()].filter((r) => Object.entries(where).every(([k, v]) => typeof v !== 'object' && r[k] === v)).length,
+    count: async ({ where }: any) => [...h.rows.values()].filter((r) => matches(r, where)).length,
+    findMany: async ({ where }: any) => [...h.rows.values()].filter((r) => matches(r, where)),
     create: async ({ data }: any) => { const row = { ...data, createdAt: new Date() }; h.rows.set(data.id, row); return row; },
     findUnique: async ({ where }: any) => h.rows.get(where.id) ?? null,
     update: async ({ where, data }: any) => { const row = { ...h.rows.get(where.id), ...data }; h.rows.set(where.id, row); return row; },
@@ -46,7 +61,7 @@ const ADULT = 'u_adult', TEEN = 'u_teen';
 let clock = 1_900_000_000_000;
 beforeEach(() => {
   vi.spyOn(Date, 'now').mockImplementation(() => ++clock);
-  h.rows.clear(); h.users.clear();
+  h.rows.clear(); h.users.clear(); h.grants = []; h.ledgerIdempotent = true;
   h.users.set(ADULT, { dobYear: 1990 });
   h.users.set(TEEN, { dobYear: new Date().getFullYear() - 15 });
 });
@@ -95,5 +110,54 @@ describe('teen privacy', () => {
   it("an adult's approved card does go public (the control)", async () => {
     const c = await createCard(prisma, ADULT, input('writing'));
     expect((await reviewCard(prisma, c.id, 'approved', { by: 'founder' })).isPublic).toBe(true);
+  });
+});
+
+describe('remix pay is capped (owner 2026-10-06): +25 on the first remix of each card only', () => {
+  const OTHER = 'u_other', THIRD = 'u_third';
+  const royalties = () => h.grants.filter((g) => g.reasonCode === REASON.CREATIVE_CARD_REMIX_ROYALTY);
+  beforeEach(() => { h.users.set(OTHER, { dobYear: 1985 }); h.users.set(THIRD, { dobYear: 1980 }); });
+
+  it('the first remix by someone else pays the original creator once; the second and third pay nothing', async () => {
+    const orig = await createCard(prisma, ADULT, input('writing'));
+    await createCard(prisma, OTHER, input('writing', { remixOf: orig.id }));
+    await createCard(prisma, THIRD, input('writing', { remixOf: orig.id }));
+    await createCard(prisma, OTHER, input('writing', { remixOf: orig.id }));
+    expect(royalties()).toEqual([{ playerId: ADULT, reasonCode: REASON.CREATIVE_CARD_REMIX_ROYALTY, idempotencyKey: `${REASON.CREATIVE_CARD_REMIX_ROYALTY}:remix_first_${orig.id}` }]);
+  });
+  it('the cap holds even if the ledger did not dedupe (the earlier-remix count is its own lock)', async () => {
+    h.ledgerIdempotent = false;
+    const orig = await createCard(prisma, ADULT, input('writing'));
+    await createCard(prisma, OTHER, input('writing', { remixOf: orig.id }));
+    await createCard(prisma, THIRD, input('writing', { remixOf: orig.id }));
+    expect(royalties()).toHaveLength(1);
+  });
+  it('remixing your own card pays nothing and does not use up the first-remix pay', async () => {
+    const orig = await createCard(prisma, ADULT, input('writing'));
+    await createCard(prisma, ADULT, input('writing', { remixOf: orig.id }));
+    expect(royalties()).toHaveLength(0);
+    await createCard(prisma, OTHER, input('writing', { remixOf: orig.id }));
+    expect(royalties()).toHaveLength(1);
+  });
+  it('each original card has its own first remix', async () => {
+    const a = await createCard(prisma, ADULT, input('writing'));
+    const b = await createCard(prisma, ADULT, input('dance'));
+    await createCard(prisma, OTHER, input('writing', { remixOf: a.id }));
+    await createCard(prisma, OTHER, input('dance', { remixOf: b.id }));
+    expect(royalties()).toHaveLength(2);
+  });
+  it('credit on both cards: "remixed by N" on the original, the parent named on the remix only when visible', async () => {
+    const orig = await createCard(prisma, ADULT, input('writing', { title: 'Dawn' }));
+    await createCard(prisma, OTHER, input('writing', { remixOf: orig.id }));
+    await createCard(prisma, THIRD, input('writing', { remixOf: orig.id }));
+    const [mine] = await myCards(prisma, ADULT);
+    expect(mine.remixedBy).toBe(2);
+    // the original is still pending (not public): another player's remix keeps only the id
+    let [theirs] = await myCards(prisma, OTHER);
+    expect(theirs.remixOf).toBe(orig.id);
+    expect(theirs.remixedFrom).toBeUndefined();
+    await reviewCard(prisma, orig.id, 'approved', { by: 'founder' });
+    [theirs] = await myCards(prisma, OTHER);
+    expect(theirs.remixedFrom).toEqual({ id: orig.id, title: 'Dawn' });
   });
 });

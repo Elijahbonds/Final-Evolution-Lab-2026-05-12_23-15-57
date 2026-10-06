@@ -3,6 +3,7 @@
 // existing athlete-identity CreatorCard model/type in this project.
 
 import { MOODS, type Mood } from './creative-card-review';
+import { RIGHTS_VERSIONS as SOUND_RIGHTS_VERSIONS, RIGHTS_VERSION as SOUND_RIGHTS_VERSION, type RightsRecord } from '@/lib/soundtrack/rights';
 
 // Lane 4 (SPEC-PASSION-PIPELINES, owner decision 2026-09-06): scene, cooking, fashion and writing are first-class disciplines
 // with their own payloads, review rules and the same remix royalty.
@@ -98,15 +99,14 @@ export type CardAllergen = typeof CARD_ALLERGENS[number];
  * NEW version; never edit one in place, so a card that agreed to an older one is still known to have agreed to exactly
  * that. `sound` covers music and voice; `media` covers images and video.
  */
-export interface RightsRecord { text: string; version: string; at: string }
+/** The record a card keeps: lane/soundtrack's shape (lib/soundtrack/rights.ts). */
+export type { RightsRecord };
 export type RightsFamily = 'sound' | 'media';
 export const RIGHTS_VERSIONS: Readonly<Record<string, { family: RightsFamily; text: string }>> = {
-  // The owner's wording, verbatim (2026-10-06, "rights text = use proposed wording (versioned + timestamped)").
-  'music-2026-10-06': {
-    family: 'sound',
-    text: "I made this, or I own all rights to every sound in it. No samples, beats, vocals or AI imitations of artists I don't " +
-      'have rights to. FEL may play it in menus, loading screens, games, replays and the end screen, credited to me.',
-  },
+  // Sound: the owner's wording, verbatim (2026-10-06, "rights text = use proposed wording (versioned + timestamped)").
+  // ONE home for it: lane/soundtrack's lib/soundtrack/rights.ts, whose catalogue plays only cards carrying a version it
+  // lists. Every version there is a sound version here, so a new wording added there is accepted here too.
+  ...Object.fromEntries(Object.entries(SOUND_RIGHTS_VERSIONS).map(([v, text]) => [v, { family: 'sound' as const, text }])),
   // assumption: the owner gave wording for sound only. Images and video get the same promise in their own terms until
   // the owner words it; a new version replaces this, it is never edited.
   'media-2026-10-06': {
@@ -115,7 +115,7 @@ export const RIGHTS_VERSIONS: Readonly<Record<string, { family: RightsFamily; te
       'rights to. FEL may show it in the game, on my card and in the Create hub, credited to me.',
   },
 };
-export const CURRENT_RIGHTS: Readonly<Record<RightsFamily, string>> = { sound: 'music-2026-10-06', media: 'media-2026-10-06' };
+export const CURRENT_RIGHTS: Readonly<Record<RightsFamily, string>> = { sound: SOUND_RIGHTS_VERSION, media: 'media-2026-10-06' };
 
 /** Which promise a discipline's media needs: sound for music and voice, media for the rest. */
 export const rightsFamilyFor = (kind: Discipline): RightsFamily => (kind === 'music' || kind === 'acting' ? 'sound' : 'media');
@@ -180,6 +180,9 @@ export interface CreativeCard {
   licenseAccepted: true;
   /** UGC audio (music stems, acting) enters pending_review before public listing. */
   reviewState: ReviewState;
+  /** CREATE HUB (owner 2026-10-06): remix credit, derived on read (creative-card-service withRemixCredits), never stored. */
+  remixedBy?: number;
+  remixedFrom?: { id: string; title: string };
 }
 
 /** Disciplines whose payloads contain UGC audio needing moderation first. */

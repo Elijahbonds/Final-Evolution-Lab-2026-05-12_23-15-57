@@ -10,7 +10,9 @@
 //   cooking  the Fuel floor tile with its allergens.
 //   fashion  the palette and pieces (the Closet avatar preview is lane/creator's: routed).
 //   sport    the Signature moves block on the athlete card.
-// NOTE: lane/soundtrack's NowPlayingCard reads the live player, not a draft, so this draws its own (DraftNowPlaying).
+// NOTE: lane/soundtrack's NowPlayingCard renders the LIVE player's current catalogue track (snapshot().track) and null
+// otherwise; a draft is not in the catalogue (unreviewed, not yet uploaded), so mounting it here would show nothing or
+// the wrong song. DraftNowPlaying draws the same card for the draft. routed: NowPlayingCard to take an optional `track`.
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
@@ -19,7 +21,7 @@ import { DANCE_LIBRARY } from '@/lib/modes/dance/choreography-engine';
 import { SCENE_PROMPTS } from '@/lib/modes/acting/voice-capture';
 import { FEL_SONGS, songPreviewUrl } from '@/lib/babylon/dance/felSongs';
 import { PENDING_MEDIA } from '@/lib/create/flow';
-import { BED_DB, activeStep, chartDifficulty, dbToGain, routineBeat } from '@/lib/create/preview';
+import { BED_DB, activeStep, chartDifficulty, dbToGain, previewGainDb, routineBeat } from '@/lib/create/preview';
 
 const ArtPreview3D = dynamic(() => import('./art-preview-3d'), { ssr: false, loading: () => <div className="h-72 w-full animate-pulse rounded-xl bg-neutral-900" /> });
 
@@ -48,35 +50,47 @@ function DraftNowPlaying({ title, creator, cover, playing, onToggle }: { title: 
 }
 
 function MusicPreview({ art, url, title, creator }: { art: Extract<ArtPayloadBody, { kind: 'music' }>; url?: string; title: string; creator: string }) {
-  const audio = useRef<HTMLAudioElement | null>(null);
+  // Through lane/soundtrack's music-bus clip player: the player's music volume applies, the menu soundtrack yields to
+  // it (music focus), and the level is the soundtrack's own loudness trim plus the stage. A plain <audio> where there
+  // is no Web Audio. Changing the stage restarts the clip at the new level from where it was.
+  const clip = useRef<{ stop(): void; element: HTMLAudioElement } | null>(null);
   const [playing, setPlaying] = useState(false);
-  const [stage, setStage] = useState<'menu' | 'game'>('menu');
-  useEffect(() => {
+  const [stage, setStage] = useState<'menu' | 'bed'>('menu');
+  const stop = () => { clip.current?.stop(); clip.current = null; setPlaying(false); };
+  const start = async (at = 0) => {
     if (!url) return;
-    const a = new Audio(url);
-    a.loop = true;
-    audio.current = a;
-    a.onplay = () => setPlaying(true); a.onpause = () => setPlaying(false);
-    return () => { a.pause(); audio.current = null; };
-  }, [url]);
+    stop();
+    const { SoundKit } = await import('@/lib/babylon/audio/SoundKit');
+    SoundKit.unlock();
+    const { playOnMusicBus } = await import('@/lib/soundtrack/musicBusPlayer');
+    const gainDb = previewGainDb(stage, art.loudnessLufs);
+    let c = await playOnMusicBus(url, { gainDb, loop: true, who: 'create-preview' }).catch(() => null);
+    if (!c) {   // no Web Audio: an element at the same level
+      const el = new Audio(url); el.loop = true; el.volume = Math.min(1, dbToGain(gainDb));
+      await el.play().catch(() => {});
+      c = { stop: () => el.pause(), element: el };
+    }
+    try { c.element.currentTime = at; } catch { /* not seekable yet */ }
+    clip.current = c; setPlaying(true);
+  };
+  useEffect(() => () => stop(), [url]);   // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    const a = audio.current;
-    if (a) a.volume = stage === 'menu' ? 1 : dbToGain(BED_DB);
-    if (stage !== 'game') return;
-    let stop = () => {};
+    if (clip.current) void start(clip.current.element.currentTime);
+    if (stage !== 'bed') return;
+    let off = () => {};
     void import('@/lib/babylon/audio/SoundKit').then(({ SoundKit }) => {
       SoundKit.unlock(); SoundKit.startAmbient('stadium');
       const id = window.setInterval(() => SoundKit.play('impact'), 2400);
-      stop = () => { window.clearInterval(id); SoundKit.stopAmbient(); };
+      off = () => { window.clearInterval(id); SoundKit.stopAmbient(); };
     }).catch(() => {});
-    return () => stop();
-  }, [stage]);
-  const toggle = () => { const a = audio.current; if (!a) return; if (a.paused) void a.play().catch(() => {}); else a.pause(); };
+    return () => off();
+  }, [stage]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const toggle = () => { if (clip.current) stop(); else void start(); };
   const diff = art.chart ? chartDifficulty(art.chart, art.bpm) : null;
   return (
     <div className="space-y-4">
       <div className="flex gap-2">
-        {([['menu', 'Menus and loading'], ['game', 'Under a game']] as const).map(([id, l]) => (
+        {([['menu', 'Menus and loading'], ['bed', 'Under a game']] as const).map(([id, l]) => (
           <button key={id} onClick={() => setStage(id)} className={`rounded-lg px-3 py-1.5 text-xs font-bold ${stage === id ? 'bg-emerald-400 text-black' : 'bg-neutral-800 text-neutral-300'}`}>{l}</button>
         ))}
       </div>

@@ -1,9 +1,15 @@
 // lib/create/preview.ts — CREATE HUB step 3's numbers. Pure.
 import type { DanceStep } from '@/lib/creator/creative-card-types';
+import { STAGE_GAIN_DB, dbToGain, normaliseGainDb } from '@/lib/soundtrack/gain';
 
-/** The in-game bed level the soundtrack plan names (§2 piece G: bed about -14 dB under the menu's 0 dB). */
-export const BED_DB = -14;
-export const dbToGain = (db: number): number => Math.pow(10, db / 20);
+/** The in-game bed level: lane/soundtrack's own stage table, so the preview is what the player will do. */
+export const BED_DB = STAGE_GAIN_DB.bed;
+export { dbToGain };
+
+/** The gain a draft track plays at in step 3: the soundtrack's loudness trim plus the stage level. */
+export function previewGainDb(stage: 'menu' | 'bed', loudnessLufs: number | undefined): number {
+  return normaliseGainDb(loudnessLufs) + STAGE_GAIN_DB[stage];
+}
 
 /** A chart's density as the Dance pick banner's 1–3 difficulty (steps per minute: under 40 easy, under 80 medium). */
 export function chartDifficulty(chart: readonly DanceStep[], bpm: number): 1 | 2 | 3 {

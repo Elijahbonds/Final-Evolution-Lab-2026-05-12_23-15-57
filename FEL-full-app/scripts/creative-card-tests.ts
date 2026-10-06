@@ -7,7 +7,7 @@
  * Proves acceptance #4 (the server-verifiable contract):
  *   1. Unlicensed card  -> 422 (license gate is SERVER-enforced).
  *   2. Music/acting card -> pending_review + NOT public (moderation queue).
- *   3. Remix pays the PARENT creator a royalty (a real LEDGER ENTRY).
+ *   3. Remix pays the PARENT creator a royalty (a real LEDGER ENTRY), on the card's FIRST remix only (owner 2026-10-06).
  *   4. Approver approve -> card becomes public (creator asked, creator is 18+) + the one-time coin fires.
  *   5. CREATOR SOUNDTRACK (owner, 2026-10-06): the coin is once per creator per discipline; a teen's card stays private;
  *      a card asked to be public waits for review whatever its discipline.
@@ -200,6 +200,9 @@ async function main() {
       await createCard(prisma, bob, baseInput({ title: 'Bob Remix', remixOf: parent.id }));
       const after = await ledgerCount(alice, REASON.CREATIVE_CARD_REMIX_ROYALTY);
       assert.equal(after, before + 1, 'parent creator should get exactly one royalty entry');
+      // CREATE HUB (owner 2026-10-06, "remix pay is capped"): the first remix of a card pays; the next one does not.
+      await createCard(prisma, bob, baseInput({ title: 'Bob Remix 2', remixOf: parent.id }));
+      assert.equal(await ledgerCount(alice, REASON.CREATIVE_CARD_REMIX_ROYALTY), after, 'a second remix of the same card pays nothing');
     });
 
     await check('self-remix does NOT pay a royalty', async () => {

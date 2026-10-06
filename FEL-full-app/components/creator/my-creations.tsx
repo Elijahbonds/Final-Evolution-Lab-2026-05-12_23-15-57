@@ -68,6 +68,12 @@ export default function MyCreations({ cards, loading, publicCreator }: { cards: 
                   <span data-qa="status-chip" className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${CHIP[v.status]}`}>{v.label}</span>
                   {c.primary === 'music' && v.plays > 0 && <span className="text-[10px] text-neutral-400">{v.plays} play{v.plays === 1 ? '' : 's'}</span>}
                 </div>
+                {(c.remixedFrom || c.remixedBy) && (
+                  <p data-qa="remix-credit" className="mt-1 text-[11px] text-violet-300">
+                    {c.remixedFrom && <>Remix of “{c.remixedFrom.title}”</>}{c.remixedFrom && c.remixedBy ? ' · ' : ''}
+                    {c.remixedBy ? <>Remixed by {c.remixedBy} {c.remixedBy === 1 ? 'card' : 'cards'}</> : null}
+                  </p>
+                )}
                 {v.detail && <p className="mt-1 text-[11px] text-neutral-400">{v.detail}</p>}
                 {v.note && <p data-qa="review-note" className="mt-1 rounded bg-neutral-800 px-2 py-1 text-[11px] text-neutral-200"><span className="font-bold">From FEL:</span> {v.note}</p>}
               </div>
