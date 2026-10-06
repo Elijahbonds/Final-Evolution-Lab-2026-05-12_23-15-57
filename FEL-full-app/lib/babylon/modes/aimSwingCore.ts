@@ -89,15 +89,20 @@ export class Reticle {
 }
 
 // ── Power meter (PLACE) ────────────────────────────────────────────────────
+/** The meter wave's angular speed (rad/s): 0→1→0 in ~1.85 s. */
+export const POWER_METER_RATE = 3.4;
 export class PowerMeter {
   active = false;
   private t = 0;
   value = 0;                                              // 0..1, oscillates
+  /** IMPROVE (2026-10-06, Golf #7): the wave's angular speed (rad/s), opt-in per swing. Default is the one every meter
+   *  ran at, so no caller changes; golf slows it on the green, where pace is the whole putt. */
+  rate = POWER_METER_RATE;
   start(): void { this.active = true; this.t = 0; }
   update(dt: number): void {
     if (!this.active) return;
     this.t += dt;
-    this.value = (Math.sin(this.t * 3.4 - Math.PI / 2) + 1) / 2;   // 0→1→0 wave
+    this.value = (Math.sin(this.t * this.rate - Math.PI / 2) + 1) / 2;   // 0→1→0 wave
   }
   stop(): number { this.active = false; return this.value; }
 }

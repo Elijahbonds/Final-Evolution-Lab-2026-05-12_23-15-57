@@ -20,7 +20,7 @@ vi.mock('../visual/meshyProps', () => ({ spawnMeshyProp: async () => { await mes
 vi.mock('../core/characterPipeline', () => ({ CharacterPipeline: {} }));
 vi.mock('../anim/importSanitizer', () => ({ neverBindPose: () => undefined }));
 
-import { Reticle, Flight, buildGoal } from './aimSwingCore';
+import { Reticle, Flight, buildGoal, PowerMeter, POWER_METER_RATE } from './aimSwingCore';
 import { MeshBuilder, TransformNode } from '@babylonjs/core';
 
 let engine: NullEngine | null = null;
@@ -158,3 +158,20 @@ describe('buildGoal: a Meshy goal that lands after its owner is gone is dropped'
     }
   });
 });
+
+// IMPROVE (2026-10-06, Golf #7): the meter's wave speed is an opt-in field; every caller that does not set it runs the
+// wave it always ran (golf slows it on the green).
+describe('PowerMeter.rate (shared by golf, penalty, carnival)', () => {
+  const sample = (m: PowerMeter, secs: number) => { m.start(); const out: number[] = []; for (let i = 0; i < secs * 60; i++) { m.update(1 / 60); out.push(m.value); } return out; };
+  it('by default it is the old 3.4 rad/s wave, value for value', () => {
+    const vals = sample(new PowerMeter(), 2);
+    vals.forEach((v, i) => expect(v).toBeCloseTo((Math.sin(((i + 1) / 60) * 3.4 - Math.PI / 2) + 1) / 2, 12));
+    expect(POWER_METER_RATE).toBe(3.4);
+  });
+  it('a slower rate reaches the top later', () => {
+    const slow = new PowerMeter(); slow.rate = 2.6;
+    const peak = (v: number[]) => v.indexOf(Math.max(...v));
+    expect(peak(sample(slow, 2))).toBeGreaterThan(peak(sample(new PowerMeter(), 2)));
+  });
+});
+
