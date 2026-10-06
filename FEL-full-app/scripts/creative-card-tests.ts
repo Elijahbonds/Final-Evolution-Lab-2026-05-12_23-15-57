@@ -21,7 +21,7 @@ import {
   createCard, reviewCard, CardError, type CreateCardInput,
 } from '../lib/creator/creative-card-service';
 import { REASON } from '../lib/wallet/reward-rules';
-import { defaultStats, defaultRarity } from '../lib/creator/creative-card-types';
+import { defaultStats, defaultRarity, rightsRecordFor } from '../lib/creator/creative-card-types';
 
 const prisma = new PrismaClient();
 
@@ -45,14 +45,17 @@ function baseInput(over: Partial<CreateCardInput> = {}): CreateCardInput {
     primary: 'art',
     secondary: [],
     sportDesignation: undefined,
-    art: artPayload(),
     stats: defaultStats(),
     rarity: defaultRarity(),
     isPublic: true,
     licenseAccepted: true,
     ...over,
+    // test changed (CREATE HUB phase 1, owner 2026-10-06): a card that carries media now carries the creator's rights
+    // record {text, version, at}; the fixtures tick it the way the Create hub does. A card without one is a 422 (below).
+    art: withRights((over.art ?? artPayload()) as CreateCardInput['art']),
   } as CreateCardInput;
 }
+const withRights = (art: CreateCardInput['art']) => ({ ...art, rights: rightsRecordFor(art.kind) });
 
 async function mkUser(tag: string, dobYear?: number): Promise<string> {
   const u = await prisma.user.create({
@@ -108,6 +111,12 @@ async function main() {
       await assert.rejects(
         () => createCard(prisma, alice, baseInput({ primary: 'sport', art: { kind: 'sport' } as any })),
         (e: unknown) => e instanceof CardError && e.status === 422,
+      );
+    });
+    await check('a media card without a rights record -> 422', async () => {
+      await assert.rejects(
+        () => createCard(prisma, alice, { ...baseInput(), art: artPayload() } as CreateCardInput),
+        (e: unknown) => e instanceof CardError && e.status === 422 && /rights/.test(e.message),
       );
     });
     await check('art kind must match primary -> 422', async () => {

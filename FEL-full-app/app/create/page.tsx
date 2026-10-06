@@ -124,7 +124,7 @@ export default function CreatePage() {
   };
 
   const onDance = (p: DancePublishPayload) => submit(
-    { kind: 'dance', choreographyId: p.choreographyId, sequence: p.sequence },
+    { kind: 'dance', choreographyId: p.choreographyId, sequence: p.sequence, bpm: p.bpm },   // CREATE HUB: keep the editor's tempo
     `${p.sequence.length}-step routine`,
   );
 

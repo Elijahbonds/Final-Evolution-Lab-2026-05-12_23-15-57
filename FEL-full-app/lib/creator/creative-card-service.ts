@@ -11,7 +11,7 @@ import { REASON } from '@/lib/wallet/reward-rules';
 import {
   NEEDS_REVIEW, FREE_CARD_SLOTS,
   defaultStats, defaultRarity,
-  type CreativeCard, type Discipline, type ArtPayload, isDiscipline, validateArtPayload,
+  type CreativeCard, type Discipline, type ArtPayload, isDiscipline, validateArtPayload, stampRights,
   type CardStats, type CardRarity, type ReviewState, type SportDesignation,
 } from './creative-card-types';
 // CREATOR SOUNDTRACK phase 0 (owner, 2026-10-06): approval, privacy and the slim list live in one additive module.
@@ -97,6 +97,8 @@ export async function createCard(
   if (!isDiscipline(input.primary) || !input.secondary.every(isDiscipline)) throw new CardError(422, 'unknown discipline');
   const shape = validateArtPayload(input.art);   // lane 4: every payload's fields, urls and list bounds
   if (!shape.ok) throw new CardError(422, shape.error);
+  // CREATE HUB phase 1 (owner 2026-10-06): the rights record keeps the server's time of agreement, not the device's.
+  input = { ...input, art: stampRights(input.art) };
   if (input.art.kind === 'fashion') {   // a look may only carry wearables the owner actually holds
     const owned = new Set((await prisma.ownedWearable.findMany({ where: { userId }, select: { itemId: true } })).map((o) => o.itemId));
     const missing = input.art.wearableIds.filter((id) => !owned.has(id));
