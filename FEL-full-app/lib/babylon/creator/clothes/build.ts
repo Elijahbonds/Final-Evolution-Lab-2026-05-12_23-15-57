@@ -20,6 +20,9 @@
 // are a TUBE (`buildTube`): rings shrink-wrapped round the body's own cross-section (the convex hull of the hips and both
 // legs at each height), never tucking in going down, flaring below the hips, skinned to the hips and, lower down, partly
 // to each thigh by side so it follows the legs.
+// FOOTWEAR is the body's surface behind the ball, shaped on the foot's last with a flat, wider sole and a lipped collar,
+// and a TOE CAP in front (a loft round the toes, not their surface: cut from the foot, every toe showed through) —
+// shoe.ts.
 //
 // WHAT THE CLOTHES HIDE (`bodyHide`): a body vertex deep inside a piece (at least HIDE_MARGIN from any of its open edges)
 // is hidden — the skin cannot poke through what it is not drawn under — and the skin near an edge stays, so no hole opens
@@ -34,6 +37,7 @@ import type { CreatorCloth } from '../../../creator/look/doc';
 import { weldedNormals } from '../shape/inflate';
 import type { ClothBodyField } from './bodyField';
 import { blend2, blend3, blendSkin, bodyCMesh, clipKeep, concatCMesh, filterTris, sampleField, splitBy, type CMesh } from './clip';
+import { CAP_STAND, COLLAR_LIP, COLLAR_LIP_H, SOLE_H, buildToeCaps, capKeep, shapeShoe } from './shoe';
 
 /** Skin within this of a piece's open edge stays drawn (metres, at rest). TUNED (phase 4e): 3 cm — a hem that rides up in
  *  a reach never opens onto a hole, and the skin there sits under the cloth by its offset. */
@@ -227,6 +231,7 @@ export function ownOffset(F: ClothBodyField, c: ResolvedCloth, m: CMesh): Float3
   const h = sampleField(m, F.h), x = sampleField(m, F.x), z = sampleField(m, F.z), front = sampleField(m, F.front);
   const rise = c.kind === 'bottom' ? riseHeight(c.rise, L) : 0;
   const cut = c.kind === 'bottom' ? legCutHeight(c.leg, L) : 0;
+  const top = c.kind === 'feet' ? shaftHeight(c.shaft, L) : 0;
   for (let v = 0; v < m.n; v++) {
     let o = base;
     if (c.kind === 'top') {
@@ -242,6 +247,8 @@ export function ownOffset(F: ClothBodyField, c: ResolvedCloth, m: CMesh): Float3
       if (c.flare > 0) o += c.flare * 0.06 * smooth(L.knee + 0.04, cut, h[v]);
     } else if (c.kind === 'feet') {
       o += 0.002 * (1 - smooth(L.sole + 0.015, L.sole + 0.03, h[v]));
+      // the collar: a rolled lip at the top edge (shoe.ts)
+      o += COLLAR_LIP * smooth(top - COLLAR_LIP_H, top - 0.002, h[v]);
     }
     out[v] = o;
   }
@@ -388,10 +395,23 @@ function buildSurfacePiece(F: ClothBodyField, c: ResolvedCloth, outer: Float32Ar
   // the second colour, cut into the geometry
   let mesh = pm;
   let tone = new Uint8Array(pm.n);
-  if (c.colour2) {
+  // footwear always has a sole (the second colour, or the first darkened: renderClothes.clothPalette), cut where the
+  // shaped shoe's bottom band will be — the toe box moves the toes' own surface by up to a centimetre, so the band is cut
+  // on the predicted shape, not on the bare foot (cut on the foot, it ran round every toe)
+  const feet = c.kind === 'feet';
+  if (c.colour2 || feet) {
     const N0pre = normalise(blend3(pm, F.N));
-    const g = toneField(F, c, pm, edgeDist, N0pre);
-    const parts = splitBy(pm, g);
+    let g = c.colour2 && !(feet && effectiveTone(c) === 'sole') ? toneField(F, c, pm, edgeDist, N0pre) : null;
+    if (feet) {
+      const Pp = blend3(pm, F.P), own = ownOffset(F, c, pm), S = new Float32Array(pm.n * 3);
+      for (let v = 0; v < pm.n; v++) for (let k = 0; k < 3; k++) S[v * 3 + k] = Pp[v * 3 + k] + N0pre[v * 3 + k] * own[v];
+      shapeShoe(F, pm.tris, Pp, N0pre, own, S, shoeRounds(tier));
+      const up = F.L.up, sole = new Float32Array(pm.n);
+      for (let v = 0; v < pm.n; v++) sole[v] = S[v * 3] * up[0] + S[v * 3 + 1] * up[1] + S[v * 3 + 2] * up[2] - (F.L.sole + SOLE_H);
+      if (g) for (let v = 0; v < pm.n; v++) g[v] = Math.min(g[v], sole[v]);
+      else g = sole;
+    }
+    const parts = splitBy(pm, g!);
     mesh = concatCMesh([parts.b, parts.a]);
     tone = new Uint8Array(mesh.n);
     tone.fill(1, parts.b.n);
@@ -410,8 +430,9 @@ function buildSurfacePiece(F: ClothBodyField, c: ResolvedCloth, outer: Float32Ar
   for (let v = 0; v < mesh.n; v++) for (let k = 0; k < 3; k++) P[v * 3 + k] = Pr[v * 3 + k] + N0[v * 3 + k] * off[v];
   const iters = smoothingFor(c, tier);
   const fin = openEdges(Pr, mesh.tris);
-  if (iters > 0) {
-    smoothPinned(P, fin.weld, fin.onEdge.length, mesh.tris, fin.onEdge, iters);
+  if (feet) shapeShoe(F, mesh.tris, Pr, N0, off, P, shoeRounds(tier));
+  else if (iters > 0) smoothPinned(P, fin.weld, fin.onEdge.length, mesh.tris, fin.onEdge, iters);
+  if (iters > 0 || feet) {
     for (let v = 0; v < mesh.n; v++) {
       const i = v * 3;
       const d = (P[i] - Pr[i]) * N0[i] + (P[i + 1] - Pr[i + 1]) * N0[i + 1] + (P[i + 2] - Pr[i + 2]) * N0[i + 2];
@@ -419,13 +440,23 @@ function buildSurfacePiece(F: ClothBodyField, c: ResolvedCloth, outer: Float32Ar
       if (d < min) for (let k = 0; k < 3; k++) P[i + k] += N0[i + k] * (min - d);
     }
   }
-  if (c.kind === 'feet') {
-    // the sole does not sink into the floor: no more than 2 mm below the skin it covers
-    const up = F.L.up;
+  if (feet) {
+    // the sole does not sink into the floor: no more than 2 mm below the lowest skin (under a toe it fills the gap down
+    // to that floor: a flat sole)
+    const up = F.L.up, floor = F.L.sole - 0.002;
     for (let v = 0; v < mesh.n; v++) {
       const i = v * 3;
-      const dv = (P[i] - Pr[i]) * up[0] + (P[i + 1] - Pr[i + 1]) * up[1] + (P[i + 2] - Pr[i + 2]) * up[2];
-      if (dv < -0.002) for (let k = 0; k < 3; k++) P[i + k] += up[k] * (-0.002 - dv);
+      const dv = P[i] * up[0] + P[i + 1] * up[1] + P[i + 2] * up[2] - floor;
+      if (dv < 0) for (let k = 0; k < 3; k++) P[i + k] -= up[k] * dv;
+    }
+    // the sole's edge, level: it was cut where the shaped shoe was predicted to cross the sole line, which lands within a
+    // few mm of it; each vertex on that edge (both its copies, one per colour) is set on the line exactly
+    const line = F.L.sole + SOLE_H, both = new Uint8Array(fin.onEdge.length);
+    for (let v = 0; v < mesh.n; v++) both[fin.weld[v]] |= tone[v] ? 2 : 1;
+    for (let v = 0; v < mesh.n; v++) {
+      if (both[fin.weld[v]] !== 3) continue;
+      const i = v * 3, dh = line - (P[i] * up[0] + P[i + 1] * up[1] + P[i + 2] * up[2]);
+      if (Math.abs(dh) < 0.006) for (let k = 0; k < 3; k++) P[i + k] += up[k] * dh;
     }
   }
   // the layer over this one starts from here (an original vertex carries its own offset)
@@ -437,7 +468,15 @@ function buildSurfacePiece(F: ClothBodyField, c: ResolvedCloth, outer: Float32Ar
   const skin = blendSkin(mesh, F.J, F.W);
   const from = new Int32Array(mesh.n);
   for (let v = 0; v < mesh.n; v++) from[v] = mesh.vi[v * 4];
-  return { P, N0, UV: blend2(mesh, F.UV), J: skin.J, W: skin.W, tone, tris: mesh.tris, src: mesh.src, from, off, deep };
+  let tris = mesh.tris, src = mesh.src;
+  if (feet) {
+    // the front of the foot is the toe cap's (shoe.ts): the back's own triangles under it go
+    const keep = capKeep(F, Pr, tris);
+    const t2: number[] = [], s2: number[] = [];
+    for (let t = 0; t < keep.length; t++) if (keep[t]) { t2.push(tris[t * 3], tris[t * 3 + 1], tris[t * 3 + 2]); s2.push(src[t]); }
+    tris = Int32Array.from(t2); src = Int32Array.from(s2);
+  }
+  return { P, N0, UV: blend2(mesh, F.UV), J: skin.J, W: skin.W, tone, tris, src, from, off, deep };
 }
 
 /** The body's vertex neighbours (CSR), built once per field. */
@@ -489,13 +528,16 @@ function normalise(N: Float32Array): Float32Array {
   return N;
 }
 
-/** Smoothing passes: a loose fit hides the body's detail; a phone does fewer. Footwear is smoothed most (seen on screen
- *  2026-10-06: at 3 passes a boot followed each toe like a toe sock; the gaps between the toes fill and a toe box shows). */
+/** Smoothing passes: a loose fit hides the body's detail; a phone does fewer. Footwear is shaped on its last instead
+ *  (shoe.ts; seen on screen 2026-10-06: smoothing alone, even at 8 passes, left every toe showing through a shoe). */
 export function smoothingFor(c: ResolvedCloth, tier: ClothTier): number {
-  let n = c.kind === 'feet' ? 8 : c.kind === 'gloves' ? 1 : Math.round(1 + c.fit * 5);
+  if (c.kind === 'feet') return 2 * shoeRounds(tier);
+  let n = c.kind === 'gloves' ? 1 : Math.round(1 + c.fit * 5);
   if (c.kind === 'top' && c.hood === 'up') n = Math.max(n, 4);
-  return tier === 'mobile' ? Math.min(n, c.kind === 'feet' ? 4 : 2) : n;
+  return tier === 'mobile' ? Math.min(n, 2) : n;
 }
+/** Footwear: rounds of push-to-the-last then two smoothing passes (shoe.shapeShoe); a phone does fewer. */
+export const shoeRounds = (tier: ClothTier): number => (tier === 'mobile' ? 2 : 3);
 
 // ── a tube (a skirt, a long coat's skirt) ────────────────────────────────────────────────────────────────────────────
 
@@ -724,6 +766,19 @@ export function buildClothes(F: ClothBodyField, clothes: readonly CreatorCloth[]
     if (!skirt) {
       const b = buildSurfacePiece(F, c, outer, tier);
       if (b) built.push({ b, piece: i, tube: false });
+    }
+    if (c.kind === 'feet') {
+      // the toe cap (shoe.ts): not the body's surface, so it takes the swatch UVs a tube does
+      const offC = fitOffset(c) + 0.002 + CAP_STAND;
+      const cap = buildToeCaps(F, offC, tier);
+      if (cap) {
+        const n = cap.tone.length, UV = new Float32Array(n * 2);
+        for (let v = 0; v < n; v++) { const [u, w] = swatchUV(i, cap.tone[v] as 0 | 1); UV[v * 2] = u; UV[v * 2 + 1] = w; }
+        built.push({
+          b: { P: cap.P, N0: new Float32Array(n * 3), UV, J: cap.J, W: cap.W, tone: cap.tone, tris: cap.tris, src: new Int32Array(cap.tris.length / 3).fill(-1), from: new Int32Array(n).fill(-1), off: new Float32Array(n).fill(offC), deep: new Uint8Array(F.n) },
+          piece: i, tube: true,
+        });
+      }
     }
     const hem = c.kind === 'top' ? hemHeights(c.hem, L) : null;
     if (skirt || hem?.tube != null) {

@@ -32,7 +32,8 @@ import { LAYER_GAP, legCutHeight, resolveCloth, riseHeight, shaftHeight, sleeveR
 import { flushPaint, paintStats, setPaintBaseReader } from '../paint/renderPaint';
 import { shapeTargetOf } from '../shape/renderShape';
 import { clothFieldOf } from './bodyField';
-import { HIDE_MARGIN, buildClothes, keepField } from './build';
+import { HIDE_MARGIN, buildClothes, convexHull, keepField } from './build';
+import { SOLE_H } from './shoe';
 import { CLOTH_CACHE_MAX, clothCacheStats, clothMeshOf, resetClothCaches, syncClothes } from './renderClothes';
 import { buildChargeGather, buildScoreHang } from '../../anim/authored/dunkSuite';
 import { buildCelebSpidermanSplits, CELEB_SPIDERMAN_SEC } from '../../anim/authored/dunkCelebrations';
@@ -180,6 +181,9 @@ describe('every style of every kind builds on both kits', () => {
         const body = bodyOf(s);
         expect(cloth).toBeTruthy();
         expect(cloth.skeleton).toBe(body.skeleton);
+        // wound like the body (the glTF loader marks it counter-clockwise; a fresh Mesh is clockwise): else two-sided
+        // lighting lights the outside as the inside
+        expect(cloth.sideOrientation).toBe(body.sideOrientation);
         expect(cloth.isPickable).toBe(false);
         expect(cloth.checkCollisions).toBe(false);
         expect(s.meshes.length).toBe(count0);
@@ -213,6 +217,160 @@ describe('every style of every kind builds on both kits', () => {
       });
     }
   }
+});
+
+// ── footwear reads as footwear (phase 4e polish, 2026-10-06: the screenshots showed bare toes through a shoe) ─────────
+
+/** A shoe's forefoot, measured independently of shoe.ts: cloth vertices over the front 35 % of each foot (the toes; by position,
+ *  against the body's own foot), over the welt and 3 cm under the ankle. Per vertex, how far it sits BELOW the mean
+ *  of its ring of neighbours along its own normal (m): a toe gap is a crease, so positive (measured on the phase 4e
+ *  shoe, cut from the bare foot and smoothed 8 times: 3.9 mm male, 2.7 mm female; with the toe cap 1.0 and 0.5 mm). */
+function toeCreases(F: ReturnType<typeof clothFieldOf> & object, geo: ReturnType<typeof buildClothes>): { n: number; worst: number; p99: number } {
+  const up = F.L.up, n = geo.P.length / 3;
+  const zr: Record<number, [number, number]> = { 1: [Infinity, -Infinity], [-1]: [Infinity, -Infinity] };
+  for (let v = 0; v < F.n; v++) if (F.footW[v] > 0.5) { const r = zr[F.x[v] >= 0 ? 1 : -1]; r[0] = Math.min(r[0], F.z[v]); r[1] = Math.max(r[1], F.z[v]); }
+  // weld by position (a tone cut doubles its vertices)
+  const id = new Int32Array(n), keyOf = new Map<string, number>();
+  for (let v = 0; v < n; v++) { const k = `${Math.round(geo.P[v * 3] * 2000)},${Math.round(geo.P[v * 3 + 1] * 2000)},${Math.round(geo.P[v * 3 + 2] * 2000)}`; if (!keyOf.has(k)) keyOf.set(k, v); id[v] = keyOf.get(k)!; }
+  const nb = new Map<number, Set<number>>();
+  for (let t = 0; t < geo.ind.length; t += 3) for (let k = 0; k < 3; k++) {
+    const a = id[geo.ind[t + k]], b = id[geo.ind[t + (k + 1) % 3]];
+    if (a === b) continue;
+    (nb.get(a) ?? nb.set(a, new Set()).get(a)!).add(b); (nb.get(b) ?? nb.set(b, new Set()).get(b)!).add(a);
+  }
+  const vals: number[] = [];
+  for (const [v, ring] of nb) {
+    const px = geo.P[v * 3] - F.L.mid[0], py = geo.P[v * 3 + 1] - F.L.mid[1], pz = geo.P[v * 3 + 2] - F.L.mid[2];
+    const x = px * F.L.left[0] + py * F.L.left[1] + pz * F.L.left[2], z = px * F.L.fwd[0] + py * F.L.fwd[1] + pz * F.L.fwd[2];
+    const r = zr[x >= 0 ? 1 : -1];
+    if (z < r[0] + 0.65 * (r[1] - r[0])) continue;
+    const h = geo.P[v * 3] * up[0] + geo.P[v * 3 + 1] * up[1] + geo.P[v * 3 + 2] * up[2];
+    if (h < F.L.sole + SOLE_H + 0.008 || h > F.L.ankle - 0.03) continue;   // over the welt (its join is a crease by design)
+    let mx = 0, my = 0, mz = 0;
+    for (const u of ring) { mx += geo.P[u * 3]; my += geo.P[u * 3 + 1]; mz += geo.P[u * 3 + 2]; }
+    mx /= ring.size; my /= ring.size; mz /= ring.size;
+    vals.push((mx - geo.P[v * 3]) * geo.N[v * 3] + (my - geo.P[v * 3 + 1]) * geo.N[v * 3 + 1] + (mz - geo.P[v * 3 + 2]) * geo.N[v * 3 + 2]);
+  }
+  vals.sort((a, b) => a - b);
+  return { n: vals.length, worst: vals[vals.length - 1] ?? 0, p99: vals[Math.floor(vals.length * 0.99)] ?? 0 };
+}
+
+describe('footwear reads as footwear: a closed toe box, a sole, a clean collar, the foot hidden', () => {
+  for (const sex of ['male', 'female'] as const) {
+    it(`${sex}: shoes and boots — no toe creases, a flat sole wider than the upper, a level collar with a lip, the foot hidden`, async () => {
+      const { SOLE_WIDE, COLLAR_LIP } = await import('./shoe');
+      const s = spawn(sex);
+      const F = clothFieldOf(bodyOf(s))!;
+      const up = F.L.up;
+      const rows: string[] = [];
+      for (const raw of [
+        { id: 'f', kind: 'feet', style: 'shoes', colour: '#F2EEE6', colour2: '#5A3A22' },
+        { id: 'f', kind: 'feet', style: 'boots', colour: '#3A2A1E', shaft: 'ankle' },
+        { id: 'f', kind: 'feet', style: 'boots', colour: '#3A2A1E' },
+      ]) {
+        const clothes = sanitizeClothes([raw]);
+        const r = resolveCloth(clothes[0]);
+        for (const tier of ['desktop', 'mobile'] as const) {
+          const geo = buildClothes(F, clothes, tier);
+          const n = geo.P.length / 3;
+          const hOf = (v: number) => geo.P[v * 3] * up[0] + geo.P[v * 3 + 1] * up[1] + geo.P[v * 3 + 2] * up[2];
+          // 1. the toe box: no crease deeper than 1.5 mm anywhere on the forefoot
+          const cr = toeCreases(F, geo);
+          expect(cr.n, `${raw.style} ${tier}: forefoot vertices`).toBeGreaterThan(100);
+          expect(cr.worst, `${raw.style} ${tier}: the deepest crease on the forefoot (m)`).toBeLessThanOrEqual(0.0015);
+          // 2. the sole: the bottom on the floor (2 mm under the lowest skin, flat to 3 mm: no toe or arch underneath); the sole band
+          //    takes the second colour; seen from above it is wider than the upper just over it
+          let flat = 0, bottom = 0, soleV = 0, backBottom = 0, backHigh = 0;
+          // the left foot seen from above: the outline (convex hull) of the sole band, and of the upper just over the welt
+          const solePts: number[] = [], upperPts: number[] = [], capSole: number[] = [], capUpper: number[] = [];
+          for (let v = 0; v < n; v++) {
+            const h = hOf(v);
+            const nu = geo.N[v * 3] * up[0] + geo.N[v * 3 + 1] * up[1] + geo.N[v * 3 + 2] * up[2];
+            if (nu < -0.8 && h < F.L.sole + 0.02) { bottom++; if (Math.abs(h - (F.L.sole - 0.002)) <= 0.003) flat++; }
+            // the back of the shoe's own bottom (the arch underneath too): on the floor to 1 mm
+            if (geo.from[v] >= 0 && nu < -0.8 && h < F.L.sole + 0.03) { backBottom++; if (h - (F.L.sole - 0.002) > 0.001) backHigh++; }
+            // the sole colour on the back of the shoe (the body's own surface), not just on the cap
+            if (geo.from[v] >= 0 && geo.colour[v] % 2 === 1 && h < F.L.sole + SOLE_H + 0.004) soleV++;
+            const px = geo.P[v * 3] - F.L.mid[0], py = geo.P[v * 3 + 1] - F.L.mid[1], pz = geo.P[v * 3 + 2] - F.L.mid[2];
+            const x = px * F.L.left[0] + py * F.L.left[1] + pz * F.L.left[2], z = px * F.L.fwd[0] + py * F.L.fwd[1] + pz * F.L.fwd[2];
+            if (x < 0) continue;
+            if (h < F.L.sole + SOLE_H - 0.003) { solePts.push(x, z); if (geo.from[v] < 0) capSole.push(x, z); }
+            else if (h > F.L.sole + SOLE_H + 0.004 && h < F.L.sole + SOLE_H + 0.01) { upperPts.push(x, z); if (geo.from[v] < 0) capUpper.push(x, z); }
+          }
+          expect(bottom, `${raw.style} ${tier}: bottom-facing vertices`).toBeGreaterThan(30);
+          expect(flat / bottom, `${raw.style} ${tier}: the share of the bottom that is flat on the floor (the rest: the nose's toe spring, the rounded edge)`).toBeGreaterThanOrEqual(0.9);
+          expect(soleV, `${raw.style} ${tier}: vertices in the sole colour on the back of the shoe`).toBeGreaterThan(50);
+          expect(backBottom, `${raw.style} ${tier}: the back's bottom-facing vertices`).toBeGreaterThan(20);
+          expect(backHigh / backBottom, `${raw.style} ${tier}: the share of the back's bottom off the floor (the arch)`).toBeLessThanOrEqual(0.02);
+          const perimeter = (pts: number[]) => { const hl = convexHull(pts); let p = 0; for (let i = 0; i < hl.length; i += 2) { const j = (i + 2) % hl.length; p += Math.hypot(hl[j] - hl[i], hl[j + 1] - hl[i + 1]); } return p; };
+          // a band SOLE_WIDE out all round is 2π·SOLE_WIDE longer; at least half of that
+          const welt = (perimeter(solePts) - perimeter(upperPts)) / (2 * Math.PI);
+          expect(welt, `${raw.style} ${tier}: how far the sole's outline stands out past the upper's (m)`).toBeGreaterThanOrEqual(SOLE_WIDE / 2);
+          // and on the toe cap alone (its own welt, not the back's)
+          const capWelt = (perimeter(capSole) - perimeter(capUpper)) / (2 * Math.PI);
+          expect(capWelt, `${raw.style} ${tier}: the toe cap's sole stands out past its upper (m)`).toBeGreaterThanOrEqual(SOLE_WIDE / 2);
+          // 3. the collar: the top edge is level (within 3 mm of the shaft height, at rest) and stands off by the lip
+          const top = shaftHeight(r.shaft, F.L);
+          const { openEdges } = await import('./build');
+          const oe = openEdges(geo.P, geo.ind);
+          let edgeN = 0;
+          const edgeOff: number[] = [], belowOff: number[] = [];
+          // (the back of the shoe's own open edges behind the ball: in front, its edge and the cap's rim lie under the cap)
+          const zr = [Infinity, -Infinity];
+          for (let v = 0; v < F.n; v++) if (F.footW[v] > 0.5) { zr[0] = Math.min(zr[0], F.z[v]); zr[1] = Math.max(zr[1], F.z[v]); }
+          for (let v = 0; v < n; v++) {
+            const b = geo.from[v];
+            // (and over the welt: flattened on the floor and pushed out round the heel, two vertices can land within the
+            // weld tolerance of each other)
+            if (b < 0 || !oe.onEdge[oe.weld[v]] || F.z[b] > zr[0] + 0.5 * (zr[1] - zr[0]) || hOf(v) < F.L.sole + SOLE_H + 0.008) continue;
+            edgeN++;
+            expect(Math.abs(F.h[b] - top), `${raw.style}: a collar vertex's height`).toBeLessThanOrEqual(0.03);
+            edgeOff.push(geo.off[v]);
+          }
+          expect(edgeN, `${raw.style} ${tier}: the collar's vertices`).toBeGreaterThan(20);
+          // the lip: the collar stands further off than the shoe 2.5–7 cm under it (over the sole band, which stands off a little more)
+          for (let v = 0; v < n; v++) { const b = geo.from[v]; if (b >= 0 && F.h[b] > Math.max(top - 0.07, F.L.sole + 0.03) && F.h[b] < top - 0.025) belowOff.push(geo.off[v]); }
+          const med = (xs: number[]) => xs.sort((p, q) => p - q)[Math.floor(xs.length / 2)];
+          expect(belowOff.length, `${raw.style} ${tier}: the shoe under its collar`).toBeGreaterThan(8);
+          expect(med(edgeOff) - med(belowOff), `${raw.style} ${tier}: the collar's lip (m)`).toBeGreaterThanOrEqual(COLLAR_LIP * 0.9);
+          // 4. the foot is hidden: every foot vertex lower than 4 cm over the sole, and every one deeper than the margin
+          let foot = 0, hid = 0;
+          for (let v = 0; v < F.n; v++) if (F.footW[v] > 0.5 && F.h[v] < F.L.sole + 0.04) { foot++; if (geo.bodyHide[v]) hid++; }
+          expect(hid, `${raw.style} ${tier}: foot skin hidden under the shoe`).toBe(foot);
+          rows.push(`${raw.style}${raw.shaft ? `/${raw.shaft}` : ''} ${tier}: deepest forefoot crease ${(cr.worst * 1000).toFixed(2)} mm (p99 ${(cr.p99 * 1000).toFixed(2)}), the sole ${(welt * 1000).toFixed(1)} mm wider than the upper, ${flat}/${bottom} bottom on the floor, ${hid}/${foot} low foot vertices hidden`);
+        }
+      }
+      console.info(`[4e shoes] ${sex}\n  ${rows.join('\n  ')}`);
+      s.root.dispose();
+    });
+    it(`${sex}: no poke-through under shoes or boots, at rest and in the four extreme poses`, () => {
+      const rows: string[] = [];
+      for (const raw of [{ id: 'f', kind: 'feet', style: 'shoes', colour: '#F2EEE6' }, { id: 'f', kind: 'feet', style: 'boots', colour: '#3A2A1E' }]) {
+        const s = spawn(sex);
+        const doc = dressed([raw]);
+        wear(s, doc, { sex });
+        for (const p of POSES) {
+          resetPose(s);
+          p.set(s);
+          settle(s);
+          const r = pokes(s, doc);
+          rows.push(`${raw.style} ${p.name}: ${r.checked} covered skin vertices drawn, ${r.out} through (worst ${(r.worst * 1000).toFixed(1)} mm)`);
+          expect(r.out, `${raw.style} ${p.name}`).toBe(0);
+        }
+        resetPose(s);
+        s.root.dispose();
+      }
+      console.info(`[4e shoe poke] ${sex}\n  ${rows.join('\n  ')}`);
+    });
+  }
+  it('a shoe without a second colour has a darker sole: its main colour times SOLE_SHADE', async () => {
+    const { clothPalette } = await import('./renderClothes');
+    const { SOLE_SHADE } = await import('./shoe');
+    const [main, sole] = clothPalette(sanitizeClothes([{ id: 'f', kind: 'feet', style: 'shoes', colour: '#C08040' }]));
+    for (let k = 0; k < 3; k++) expect(sole[k]).toBeCloseTo(main[k] * SOLE_SHADE, 6);
+    const [, tee2] = clothPalette(sanitizeClothes([{ id: 't', kind: 'top', style: 'tee', colour: '#C08040' }]));
+    expect(tee2).toEqual(main);
+  });
 });
 
 describe('where the cuts are, and what stays drawn', () => {

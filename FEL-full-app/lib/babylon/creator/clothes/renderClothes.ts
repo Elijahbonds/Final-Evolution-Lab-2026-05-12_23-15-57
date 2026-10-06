@@ -36,6 +36,7 @@ import { bodyMeshOf } from '../shape/renderShape';
 import { clothFieldOf, type ClothBodyField } from './bodyField';
 import { buildClothes, clothGeometryKey, type ClothGeo, type ClothTier } from './build';
 import { rasterClothBase, type RGB } from './baseRaster';
+import { SOLE_SHADE } from './shoe';
 
 /** Built geometries kept (each a whole outfit, ~0.5–1.5 MB). */
 export const CLOTH_CACHE_MAX = 6;
@@ -79,12 +80,17 @@ export const clothCacheStats = (): { entries: number; bytes: number } => {
 };
 export function resetClothCaches(): void { cache.clear(); }
 
-/** The palette: per piece, its colour and its second colour (the first again when it has none). '#RRGGBB' → 0..1, the
+/** The palette: per piece, its colour and its second colour (the first again when it has none; a shoe's sole, darker). '#RRGGBB' → 0..1, the
  *  same reading a material's albedo colour gives a hex everywhere else in the identity pipe. */
 export function clothPalette(clothes: readonly CreatorCloth[]): RGB[] {
   const out: RGB[] = [];
   const rgb = (hex: string): RGB => { const c = Color3.FromHexString(/^#[0-9A-F]{6}$/i.test(hex) ? hex : '#FFFFFF'); return [c.r, c.g, c.b]; };
-  for (const c of clothes) { out.push(rgb(c.colour)); out.push(rgb(c.colour2 ?? c.colour)); }
+  for (const c of clothes) {
+    const main = rgb(c.colour);
+    out.push(main);
+    // footwear always has a sole (shoe.ts): without a second colour, the first darkened
+    out.push(c.colour2 ? rgb(c.colour2) : c.kind === 'feet' ? [main[0] * SOLE_SHADE, main[1] * SOLE_SHADE, main[2] * SOLE_SHADE] : main);
+  }
   return out;
 }
 
@@ -185,6 +191,10 @@ export function syncClothes(
     mesh.setVerticesData(VertexBuffer.ColorKind, colourBuffer(geo, palette), true, 4);
     mesh.useVertexColors = true; mesh.hasVertexAlpha = false;
     mesh.skeleton = body.skeleton; mesh.numBoneInfluencers = 4;
+    // the body's winding: the glTF loader marks its meshes counter-clockwise and a fresh Mesh is clockwise, so with two-sided
+    // lighting every garment was lit as if its outside faced in (seen 2026-10-06: a toe cap facing the camera came out
+    // dark; flipping the normals lit it). premium/snowOutfit.ts met the same trap.
+    mesh.sideOrientation = body.sideOrientation;
     mesh.parent = body.parent;
     mesh.position.copyFrom(body.position);
     mesh.rotationQuaternion = body.rotationQuaternion?.clone() ?? null;
