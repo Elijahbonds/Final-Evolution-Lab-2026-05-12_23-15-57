@@ -132,7 +132,7 @@ describe('the harness reads the body (plan §4.4)', () => {
     expect(apply).toMatch(/if \(it === 'wake' && phase === 'ready'\) \{ firstInput\(\); wake\('body'\); \}/);
     expect(apply).toMatch(/if \(it === 'resume' && phase === 'paused'\) resume\(null\);/);
     // M43's unlock + ambient bed is one function, and every input still runs it first
-    expect(fnBody(harness, 'firstInput')).toMatch(/SoundKit\.unlock\(\);[\s\S]*SoundKit\.startAmbient\(bed\);/);
+    expect(fnBody(harness, 'firstInput')).toMatch(/SoundKit\.unlock\(\);[\s\S]*SoundKit\.startVenueAmbient\(bed\);/);   // AMBIENT FIX (2026-10-06): the bed defers to a mode-owned one
     expect(harness).toMatch(/unsub = input\.on\(\(e\) => \{\s*firstInput\(\);/);
     // the play evidence is counted from every source, after the wake latch, before the mode sees the event
     expect(harness).toMatch(/if \(!wakeLatch\.pass\(e, now\)\) return;\s*const c = evidence\.count\(e, now\);\s*if \(c\) \{ store\.count\(c\); session\.noteInput\(c, now\); \}/);

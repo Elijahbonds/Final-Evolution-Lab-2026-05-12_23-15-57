@@ -610,7 +610,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
       ambientStarted = true;
       // mood -> ambient bed: dojo hush, alpine wind-quiet, everything else a stadium crowd.
       const bed = mood === 'dojoWarm' ? 'dojo' : mood === 'alpine' || mood === 'overcast' ? 'none' : 'stadium';
-      SoundKit.startAmbient(bed);
+      SoundKit.startVenueAmbient(bed);   // AMBIENT FIX (2026-10-06): only over a mode that chose no bed in load()
     }
   }
   /** MOVEMENT PLAY P3: whatever the body holds on this mode, let go — sent while the phase is still 'playing', so the

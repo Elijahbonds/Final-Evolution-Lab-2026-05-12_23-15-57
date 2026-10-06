@@ -7,6 +7,13 @@
 // "procedural, zero external assets" philosophy VenueKit used for visuals.
 // One singleton, lazily created on first user gesture (autoplay policy safe).
 
+/** The looping beds startAmbient() can play ('none' = deliberately silent). */
+export type AmbientKind = 'stadium' | 'dojo' | 'ocean' | 'wind' | 'none';
+
+/** AMBIENT FIX (2026-10-06): the harness's first-input decision, pure so it can be tested. It starts the mood's venue
+ *  bed only over a mode that has not chosen one; a mode that chose any bed in load(), 'none' included, keeps it. */
+export function shouldStartMoodBed(current: AmbientKind | null): boolean { return current === null; }
+
 // THE IMPACT VOCABULARY (2026-09-14). The kit shipped with nine cues and every physical contact in the
 // game — a body hitting the floor, a ball off the iron, a shoe stopping hard, a ball through the net —
 // played the SAME `impact` with a different pitch. Nine sounds cannot carry a sports game: a rim rattle and
@@ -389,8 +396,9 @@ class SoundKitImpl {
 
   /** Looping ambient crowd bed for outdoor/stadium venues. Call once per
    *  mode load; returns nothing — call stopAmbient() on mode dispose. */
-  startAmbient(kind: 'stadium' | 'dojo' | 'ocean' | 'wind' | 'none'): void {
+  startAmbient(kind: AmbientKind): void {
     this.stopAmbient();
+    this.ambientAsked = kind;   // AMBIENT FIX (2026-10-06): recorded before the early returns — see ambientKind()
     if (kind === 'none' || !this.musicEnabled) return;
     const ctx = this.ensure();
     if (!ctx || !this.master) return;
@@ -445,6 +453,22 @@ class SoundKitImpl {
     this.crowdBed?.stop();
     this.crowdBed = null;
     this.crowdGain = null;
+    this.ambientAsked = null;   // AMBIENT FIX: teardown resets it, so a remount on the same page starts like the first
+  }
+
+  // AMBIENT FIX (2026-10-06), owner decision "one shared fix for all": the harness started its mood bed on the first
+  // input, and startAmbient stops whatever is playing — so every mode that chose its own bed in load() (wind, ocean,
+  // dojo…) lost it to a stadium crowd (or to silence) on the first press. The harness now asks this first.
+  private ambientAsked: AmbientKind | null = null;
+  /** The bed the last startAmbient() asked for, until stopAmbient(); null when none has been asked for. It is the
+   *  REQUEST, not the audio: 'none' (a mode that wants silence) counts, and so does a bed that cannot sound yet (music
+   *  off, no AudioContext) — the mode chose it either way, and the venue bed must not overrule it. */
+  ambientKind(): AmbientKind | null { return this.ambientAsked; }
+  /** The harness's venue bed for the mood, started on the first input: only when no bed has been asked for since the
+   *  last stopAmbient() (shouldStartMoodBed). A mode that starts its bed later (on its first played frame) still
+   *  replaces this one through startAmbient(), as before. */
+  startVenueAmbient(kind: AmbientKind): void {
+    if (shouldStartMoodBed(this.ambientAsked)) this.startAmbient(kind);
   }
 }
 
