@@ -57,6 +57,7 @@ import { FREEFLOW } from '@/lib/babylon/core/Freeflow';
 import { GUNSLING, SLINGSHOT, STIFF, BLOCK, LANES } from '@/lib/babylon/core/KickoffReturn';
 import { parseCard, type DunkCard } from '@/lib/mp/dunkCard';
 import { canonicalModeKey } from '@/lib/game-data';
+import { versusScoreMax } from '@/lib/babylon/core/VersusScore';
 
 // ---------------------------------------------------------------------------
 // Constants mirrored from Babylon mode files (the test holds each one to its source).
@@ -88,7 +89,8 @@ export const MIRRORED = {
   brainBrawlMaxRounds: 15,
   /** lib/babylon/modes/WhoSceneItMode.ts QUESTIONS_PER_CATEGORY. */
   whoSceneItPerCategory: 2,
-  /** KarateVSMode.ts / MixedCombatMode.ts — ROUNDS_TO_WIN; the result is myWins × 100 − foeWins × 40. */
+  /** KarateVSMode.ts / MixedCombatMode.ts — ROUNDS_TO_WIN; the result is myWins × 100 − foeWins × 40 (Karate VS adds its
+   *  capped bonuses on top: core/VersusScore, imported). */
   versusRoundsToWin: 2, versusWinPts: 100,
   /** lib/babylon/core/DanceCore.ts hit(): a caught step pays its window's points + combo × 5. */
   danceComboPts: 5,
@@ -491,10 +493,12 @@ export const SCORE_CEILINGS: Readonly<Record<string, ScoreCeiling>> = {
     why: `${SCENE_CATEGORIES.length * m.whoSceneItPerCategory} questions, all instant, the streak maxed`,
     basis: 'SCENE_CATEGORIES × QUESTIONS_PER_CATEGORY questions, each scoreAnswer(WHO_SCENE_IT, correct, full clock, streak)',
   },
+  // IMPROVE (2026-10-06): the Storm Duel's result adds the HP kept in each round won, the perfect dodges and the routes, each
+  // capped (lib/babylon/core/VersusScore.ts, a pure module imported here) — 200 → 300. A ceiling only goes up.
   karateVersus: {
-    max: m.versusRoundsToWin * m.versusWinPts, kind: 'rules', swapsUnderKillSwitch: true,
-    why: `the match ends at ${m.versusRoundsToWin} round wins`,
-    basis: 'KarateVSMode myWins × 100 − foeWins × 40, myWins ≤ ROUNDS_TO_WIN',
+    max: versusScoreMax(m.versusRoundsToWin), kind: 'rules', swapsUnderKillSwitch: true,
+    why: `the match ends at ${m.versusRoundsToWin} round wins; a sweep at full HP with every bonus capped`,
+    basis: 'VersusScore: myWins × 100 − foeWins × 40 + Σ 25 × HP share per round won + min(dodges, 10) × 2 + min(routes, 6) × 5',
   },
   mixedcombat: {
     max: m.versusRoundsToWin * m.versusWinPts, kind: 'rules', swapsUnderKillSwitch: false,

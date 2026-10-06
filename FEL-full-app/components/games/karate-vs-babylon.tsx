@@ -117,6 +117,12 @@ export default function KarateVSBabylon({ onEnd }: GameProps) {
           <div className="text-center">
             <span className="fel-heading text-xl font-black">ROUND {hnode(hud.round, 1)}</span>
             <div className="text-xs mt-1">{hnode(hud.wins, 0)} – {hnode(hud.foeWins, 0)}</div>
+            {/* IMPROVE (2026-10-06): the round clock — a round that runs out is decided on HP at the bell (TIME) */}
+            {typeof hud.timeLeft === 'number' && (
+              <div className={`text-xs mt-0.5 tabular-nums ${hud.timeLeft <= 10 ? 'text-red-400' : 'text-white/70'}`} title="Round clock">
+                {Math.floor(hud.timeLeft / 60)}:{String(hud.timeLeft % 60).padStart(2, '0')}
+              </div>
+            )}
           </div>
           <div className="flex flex-col gap-1 items-end">
             <span className="fel-panel px-2 py-0.5 text-red-400">FOE HP {hnum(hud.foeHp, 100)}</span>
