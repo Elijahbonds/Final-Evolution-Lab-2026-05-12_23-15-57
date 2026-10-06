@@ -49,8 +49,11 @@ export function progressLines(recap: EndRecap | null, rec: RunCallouts | null, w
     if (rec.shortBy !== null && rec.shortBy > 0) out.push({ id: 'best', text: `${fmt(rec.shortBy)} short of your best (${fmt(rec.best)})` });
     if (won && rec.winRun >= 1) out.push({ id: 'winRun', text: rec.winRun === 1 ? 'Win the next one for 2 in a row' : `${rec.winRun} wins in a row · go for ${rec.winRun + 1}` });
   }
-  return out;
+  // three lines at most: the card has to fit a TV without scrolling, and the first three are the nearest goals
+  return out.slice(0, MAX_PROGRESS_LINES);
 }
+
+export const MAX_PROGRESS_LINES = 3;
 
 export interface CalloutChip {
   id: 'best' | 'first' | 'winRun' | 'streak';

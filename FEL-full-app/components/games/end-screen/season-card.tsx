@@ -49,17 +49,16 @@ export function SeasonCard({ season, active, instant, ms, onTierUp }: {
   const lastUp = season.tierUps.length > 0 ? season.tierUps[season.tierUps.length - 1] : null;
   const words = lastUp ? tierRewardWords(lastUp) : [];
   const showUp = lastUp && (instant || flash !== null);
-  const remaining = Math.max(0, season.need - season.into);
 
   return (
-    <div data-recap="season" data-tier-ups={season.tierUps.length} className="relative overflow-hidden rounded-2xl border border-[#FFD700]/30 bg-[#FFD700]/[0.07] p-[0.8em] text-left">
+    <div data-recap="season" data-tier-ups={season.tierUps.length} className="relative overflow-hidden rounded-2xl border border-[#FFD700]/30 bg-[#FFD700]/[0.07] px-[0.8em] py-[0.55em] text-left">
       <div className="flex items-center justify-between gap-3">
         <span className="flex items-center gap-2 font-bold text-[#FFD700]">
           <Crown className="h-[1em] w-[1em]" /> {season.name}
         </span>
         <span className="font-mono text-white/75">+{Math.round(season.gained).toLocaleString('en-US')} season XP</span>
       </div>
-      <div className="mt-[0.5em] flex items-center gap-3">
+      <div className="mt-[0.35em] flex items-center gap-3">
         <span className="font-mono text-white/60">T{cur.tier}</span>
         <div className="relative h-[0.6em] flex-1 overflow-hidden rounded-full bg-white/10" role="progressbar" aria-label="Season tier progress" aria-valuemin={0} aria-valuemax={season.need} aria-valuenow={season.into}>
           <div
@@ -70,12 +69,10 @@ export function SeasonCard({ season, active, instant, ms, onTierUp }: {
         </div>
         <span className="font-mono text-white/60">T{cur.tier + 1}</span>
       </div>
-      {showUp ? (
-        <p data-season-tierup className="mt-[0.5em] text-center font-bold text-[#FFD700]" style={instant ? undefined : { animation: 'fel-rise 320ms cubic-bezier(0.2,1.4,0.4,1) both' }}>
+      {showUp && (
+        <p data-season-tierup className="mt-[0.3em] text-center font-bold text-[#FFD700]" style={instant ? undefined : { animation: 'fel-rise 320ms cubic-bezier(0.2,1.4,0.4,1) both' }}>
           TIER UP! Tier {lastUp!.tier}{words.length ? ` · ${words.join(' · ')}` : ''}
         </p>
-      ) : (
-        <p className="mt-[0.4em] text-right font-mono text-[0.85em] text-white/55">{remaining.toLocaleString('en-US')} to Tier {season.tier + 1}</p>
       )}
     </div>
   );

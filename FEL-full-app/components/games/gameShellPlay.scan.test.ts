@@ -121,7 +121,7 @@ describe('refusals on the end card (the arena integrity pass, re-applied)', () =
     expect(story).toContain('const refused = storyRefusal(r2.status, await r2.json().catch(() => null));');
     expect(story).toContain('if (refused && mine()) setStoryRefused(refused);');
     expect(shell).toContain('storyRefused={storyRefused}');
-    expect(card).toContain('{storyRefused && <Beat show={shown(\'storyRefused\')} instant={fast}><StoryRefusedPanel refusal={storyRefused} /></Beat>}');
+    expect(card).toMatch(/\{storyRefused && <Beat show=\{shown\('storyRefused'\)\}[^>]*><StoryRefusedPanel refusal=\{storyRefused\} \/><\/Beat>\}/);
     expect(between(shell, 'const replay = () => {', 'setGameKey((k) => k + 1);')).toContain('setStoryRefused(null);');
   });
 

@@ -18,8 +18,8 @@ const gap = (a0: number, a1: number, b0: number, b1: number): number => (b0 > a1
 
 /**
  * PURE: the index to move to from `from` in `dir`, or `from` when nothing lies that way. A candidate must lie wholly past
- * our edge in the pressed direction; the nearest wins, by the gap along the press plus twice the gap across it (0 when the
- * two share a row / column) — so "down" from Play again goes to the button under it, not the one diagonally across.
+ * our edge in the pressed direction; one that shares our row / column wins over one that does not, then the nearest — so
+ * "down" from Play again goes to the button under it, not the one diagonally across.
  */
 export function spatialNext(rects: readonly Rect[], from: number, dir: Dir): number {
   const a = rects[from];
@@ -36,7 +36,9 @@ export function spatialNext(rects: readonly Rect[], from: number, dir: Dir): num
     else if (dir === 'left') { if (rR > a.left + 1) return; along = a.left - rR; across = gap(a.top, aB, r.top, rB); }
     else if (dir === 'down') { if (r.top < aB - 1) return; along = r.top - aB; across = gap(a.left, aR, r.left, rR); }
     else { if (rB > a.top + 1) return; along = a.top - rB; across = gap(a.left, aR, r.left, rR); }
-    const score = Math.max(0, along) + across * 2;
+    // a control sharing our row (or column) always beats one that does not: Left from the Next teaser is Play again,
+    // never the button tucked under the teaser's left edge on the row below
+    const score = (across > 0 ? 1e6 : 0) + Math.max(0, along) + across * 2;
     if (score < bestScore) { bestScore = score; best = i; }
   });
   return best;

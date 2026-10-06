@@ -87,6 +87,7 @@ const CASES: Record<string, Case> = {
 export function EndScreenFixture({ name }: { name: string }) {
   const c = CASES[name] ?? CASES.win;
   const [open, setOpen] = useState(true);
+  const [runN, setRunN] = useState(0);   // keyed by run, as GameShell keys the card (runSeq)
   const [landed, setLanded] = useState(false);
   const [log, setLog] = useState<string>('');
   const store = useMemo(() => memoryStore(c.seedBest !== undefined
@@ -107,6 +108,7 @@ export function EndScreenFixture({ name }: { name: string }) {
       <AnimatePresence>
         {open && (
           <EndScreen
+            key={runN}
             {...c}
             title={c.title ?? 'Fixture'}
             recap={landed ? c.recap : null}
@@ -115,7 +117,7 @@ export function EndScreenFixture({ name }: { name: string }) {
             arenaResult={landed ? c.arenaResult : null}
             store={store}
             share={{ state: 'idle', url: null, onChallenge: () => setLog('challenge minted'), onProof: () => setLog('proof shared') }}
-            onReplay={() => { setLog('PLAY AGAIN'); setOpen(false); setLanded(false); setTimeout(() => setOpen(true), 600); }}
+            onReplay={() => { setLog('PLAY AGAIN'); setOpen(false); setLanded(false); setRunN((n) => n + 1); setTimeout(() => setOpen(true), 1200); }}
             onNavigate={(href) => setLog(`navigate → ${href}`)}
           />
         )}

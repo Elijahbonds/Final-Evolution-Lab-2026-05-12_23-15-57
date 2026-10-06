@@ -52,7 +52,7 @@ export function ArenaCard({ r, onNavigate }: { r: EndArenaResult; onNavigate: (h
   return (
     <div
       data-recap="arena"
-      className={`rounded-2xl border p-[0.7em] text-center ${
+      className={`rounded-2xl border p-[0.7em] text-center [&_[data-arena=refused]]:!text-[0.85em] ${
         !r.settled ? 'border-white/20 bg-white/[0.04]'
           : r.result === 'tie' ? 'border-white/25 bg-white/[0.05]'
           : r.iWon ? 'border-[#00FF9D]/40 bg-[#00FF9D]/10'
@@ -92,7 +92,7 @@ export function CarnivalCard({ run }: { run: CarnivalRunState }) {
 
 export function StoryRewardCard({ r, lc }: { r: EndStoryReward; lc: number }) {
   return (
-    <div data-recap="story" className="rounded-2xl border border-[#A855F7]/35 bg-[#A855F7]/10 p-[0.7em] text-center">
+    <div data-recap="story" className="rounded-2xl border border-[#A855F7]/35 bg-[#A855F7]/10 px-[0.7em] py-[0.45em] text-center">
       <p className="flex items-center justify-center gap-2 text-[0.85em] font-bold text-[#A855F7]"><BookOpen className="h-[1em] w-[1em]" /> STORY NODE COMPLETE</p>
       <p className="mt-[0.2em] font-mono text-[1.2em] font-bold text-[#FFD700]">+{Math.round(lc).toLocaleString('en-US')} LC</p>
       {r.badge && <p className="mt-[0.2em] font-bold text-amber-400">BADGE EARNED · {r.badge.name}</p>}

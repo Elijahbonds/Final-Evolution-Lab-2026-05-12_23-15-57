@@ -32,6 +32,7 @@ import {
 import { applyRun, browserStore, localDay, playedOn } from './records';
 import { recommendNext, type NextPick } from './recommend';
 import { gradeBadge } from './grade';
+import { highlights } from './highlights';
 import { progressLines, calloutChips } from './progress';
 import { keyIntent, padFrame, padIntents, spatialNext, type Intent, type PadFrame } from './nav';
 import { browserFx, type EndFx } from './fx';
@@ -70,18 +71,18 @@ function Beat({ show, instant, children, className = '' }: { show: boolean; inst
   );
 }
 
-function RewardTile({ show, instant, ms, value, prefix = '+', label, sub, color, Icon, data, wide, capped }: {
+function RewardTile({ show, instant, ms, value, prefix = '+', label, sub, color, Icon, data, capped }: {
   show: boolean; instant: boolean; ms: number; value: number; prefix?: string; label: string; sub?: string; color: string;
-  Icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>; data: string; wide?: boolean; capped?: boolean;
+  Icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>; data: string; capped?: boolean;
 }) {
   const v = useCountUp(value, { active: show, instant, ms: Math.max(200, ms - 60) });
   const decimals = Math.abs(value) < 10 && !Number.isInteger(value) ? 1 : 0;
   return (
-    <Beat show={show} instant={instant} className={wide ? 'col-span-2' : ''}>
-      <div data-recap={data} data-capped={capped ? '1' : undefined} className="flex h-full items-center gap-[0.6em] rounded-2xl border border-white/10 bg-white/[0.04] p-[0.6em]" style={{ boxShadow: show ? `inset 0 0 0 1px ${color}22, 0 0 24px ${color}14` : undefined }}>
+    <Beat show={show} instant={instant}>
+      <div data-recap={data} data-capped={capped ? '1' : undefined} className="flex h-full items-center gap-[0.5em] rounded-2xl border border-white/10 bg-white/[0.04] px-[0.6em] py-[0.4em]" style={{ boxShadow: show ? `inset 0 0 0 1px ${color}22, 0 0 24px ${color}14` : undefined }}>
         <Icon className="h-[1.4em] w-[1.4em] shrink-0" style={{ color }} />
         <div className="min-w-0">
-          <div className="font-mono text-[1.45em] font-bold leading-none" style={{ color }}>{prefix}{v.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}</div>
+          <div className="font-mono text-[1.35em] font-bold leading-none" style={{ color }}>{prefix}{v.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}</div>
           <div className="mt-[0.2em] text-[0.72em] uppercase tracking-[0.12em] text-white/60">{label}</div>
           {sub && <div className="text-[0.72em] text-white/50">{sub}</div>}
         </div>
@@ -123,7 +124,7 @@ function NextTeaser({ pick, focused, onPress }: { pick: NextPick; focused: boole
       <span className="min-w-0 flex-1">
         <span className="block text-[0.68em] font-bold uppercase tracking-[0.14em]" style={{ color }}>Next · {pick.reason}</span>
         <span className="fel-heading block truncate text-[1.1em] font-bold text-white">{pick.title}</span>
-        {pick.detail && <span className="block truncate text-[0.75em] text-white/55">{pick.detail}</span>}
+        {pick.detail && <span className="block truncate text-[0.75em] text-white/55 [@media(max-height:500px)]:hidden">{pick.detail}</span>}
       </span>
       <ArrowRight className="h-[1.2em] w-[1.2em] shrink-0 text-white/70" />
     </button>
@@ -170,6 +171,7 @@ export function EndScreen(props: EndScreenProps) {
 
   // ── THE BEATS ──
   const grade = useMemo(() => gradeBadge(mode, run), [mode, run]);
+  const lights = useMemo(() => highlights(run), [run]);
   const chips = useMemo(() => calloutChips(callouts, recap, won), [callouts, recap, won]);
   const progress = useMemo(() => progressLines(recap, callouts, won), [recap, callouts, won]);
   const tierUps = recap?.season?.tierUps?.length ?? 0;
@@ -311,8 +313,12 @@ export function EndScreen(props: EndScreenProps) {
       transition={{ duration: 0.25 }}
       className="fixed inset-0 z-50 overflow-hidden"
       style={{
-        background: 'radial-gradient(120% 90% at 50% 30%, rgba(0,0,0,0.30) 0%, rgba(3,4,8,0.78) 70%, rgba(3,4,8,0.9) 100%)',
-        backdropFilter: 'blur(3px) saturate(1.1)',
+        // NO backdrop-filter, here or on the panel (measured 2026-10-06, /dev/end-screen, headless Chromium, swiftshader):
+        // the panel with a 10 px backdrop blur held 0.7 fps while the reveal animated, 60 fps without it, 52 fps with it under
+        // reduced motion (nothing moving). Under the card the live 3D scene changes every frame, so a backdrop blur would be
+        // recomputed every frame for as long as the card is up — on a TV browser the most expensive thing on screen. The
+        // glass is a near-opaque dark gradient instead; the scene shows faintly through it.
+        background: 'radial-gradient(120% 90% at 50% 30%, rgba(0,0,0,0.35) 0%, rgba(3,4,8,0.8) 70%, rgba(3,4,8,0.9) 100%)',
         padding: 'max(5vh, env(safe-area-inset-top)) max(5vw, env(safe-area-inset-right)) max(5vh, env(safe-area-inset-bottom)) max(5vw, env(safe-area-inset-left))',
       }}
       onClick={onPanelTap}
@@ -329,30 +335,32 @@ export function EndScreen(props: EndScreenProps) {
           animate={{ y: 0, opacity: 1, scale: 1 }}
           transition={{ type: 'spring', damping: 24, stiffness: 260 }}
           onFocusCapture={(e) => { const id = (e.target as HTMLElement).dataset?.endFocus; if (id && id !== focusRef.current) setFocusId(id); }}
-          className="relative flex max-h-full w-full max-w-[1500px] flex-col overflow-hidden rounded-[1.6em] border border-white/10 text-white shadow-[0_30px_90px_rgba(0,0,0,0.6)]"
-          style={{ fontSize: 'clamp(15px, calc(1vw + 0.5vh), 28px)', background: 'linear-gradient(160deg, rgba(16,20,30,0.82), rgba(8,10,16,0.86))', backdropFilter: 'blur(18px)' }}
+          className="relative flex max-h-full w-full max-w-[1500px] flex-col overflow-hidden rounded-[1.6em] border border-white/10 text-white shadow-[0_24px_60px_rgba(0,0,0,0.55)]"
+          style={{ fontSize: 'clamp(15px, calc(1vw + 0.5vh), 28px)', background: 'linear-gradient(160deg, rgba(18,23,34,0.9), rgba(8,10,16,0.93))' }}
         >
           {/* the win glow along the top edge */}
           <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[0.25em]" style={{ background: won ? 'linear-gradient(90deg, transparent, #FFD700, transparent)' : 'linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent)' }} />
 
-          <div className="grid min-h-0 flex-1 gap-[1.1em] overflow-y-auto p-[1.1em] md:grid-cols-[1.05fr_1fr] md:p-[1.4em]">
+          <div className="grid min-h-0 flex-1 gap-[1em] overflow-y-auto p-[1em] md:grid-cols-[0.95fr_1.1fr] md:px-[1.3em] md:py-[1em]">
             {/* ── 1. THE MOMENT ── */}
-            <div className="flex min-w-0 flex-col items-center justify-center gap-[0.7em] text-center">
+            <div className="flex min-w-0 flex-col">
+            <div className="my-auto flex flex-col items-center gap-[0.6em] text-center [@media(max-height:560px)]:!my-0">
               <motion.div
                 initial={instant ? false : { scale: 0.3, rotate: -18, opacity: 0 }}
                 animate={{ scale: 1, rotate: 0, opacity: 1 }}
                 transition={{ type: 'spring', damping: 11, stiffness: 220, delay: instant ? 0 : 0.08 }}
               >
-                <Trophy data-end-trophy={won ? 'gold' : 'dim'} className={`h-[2.6em] w-[2.6em] ${won ? 'text-[#FFD700] drop-shadow-[0_0_24px_rgba(255,215,0,0.7)]' : 'text-white/30'}`} />
+                <Trophy data-end-trophy={won ? 'gold' : 'dim'} className={`h-[min(2.6em,9vh)] w-[min(2.6em,9vh)] ${won ? 'text-[#FFD700] drop-shadow-[0_0_24px_rgba(255,215,0,0.7)]' : 'text-white/30'}`} />
               </motion.div>
               <motion.h2
                 data-end-headline
-                initial={instant ? false : { scale: 1.9, opacity: 0, letterSpacing: '0.35em' }}
-                animate={{ scale: 1, opacity: 1, letterSpacing: '0.04em' }}
+                initial={instant ? false : { scale: 1.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
                 transition={{ type: 'spring', damping: 14, stiffness: 260 }}
                 className="fel-heading max-w-full break-words font-bold leading-[0.95]"
                 style={{
-                  fontSize: longHead ? 'clamp(28px, calc(2.4vw + 1vh), 68px)' : 'clamp(40px, calc(4vw + 1vh), 112px)',
+                  willChange: instant ? undefined : 'transform, opacity',
+                  fontSize: longHead ? 'clamp(24px, min(calc(2.4vw + 1vh), 8vh), 68px)' : 'clamp(28px, min(calc(4vw + 1vh), 11vh), 112px)',
                   color: won ? '#FFFFFF' : 'rgba(255,255,255,0.88)',
                   textShadow: won ? '0 0 30px rgba(0,229,255,0.45), 0 0 70px rgba(0,229,255,0.2)' : 'none',
                 }}
@@ -366,7 +374,7 @@ export function EndScreen(props: EndScreenProps) {
                     <div
                       data-end-score={fig.mine}
                       className="font-mono font-bold leading-none tabular-nums"
-                      style={{ fontSize: 'clamp(36px, calc(3vw + 1vh), 96px)', color: newBest && shown('callouts') ? '#FFD700' : '#FFFFFF', textShadow: newBest && shown('callouts') ? '0 0 28px rgba(255,215,0,0.6)' : undefined }}
+                      style={{ fontSize: 'clamp(28px, min(calc(3vw + 1vh), 8vh), 96px)', color: newBest && shown('callouts') ? '#FFD700' : '#FFFFFF', textShadow: newBest && shown('callouts') ? '0 0 28px rgba(255,215,0,0.6)' : undefined }}
                     >
                       {fmt(score)}
                     </div>
@@ -386,6 +394,15 @@ export function EndScreen(props: EndScreenProps) {
                     </Beat>
                   )}
                 </div>
+                {lights.length > 0 && (
+                  <div data-end-highlights className="mt-[0.6em] flex flex-wrap justify-center gap-[0.4em]">
+                    {lights.map((l) => (
+                      <span key={l.key} data-highlight={l.key} className="rounded-lg border border-white/12 bg-white/[0.05] px-[0.6em] py-[0.2em] text-[0.8em] text-white/70">
+                        {l.label} <b className="font-mono text-white">{l.value}</b>
+                      </span>
+                    ))}
+                  </div>
+                )}
               </Beat>
 
               {chips.length > 0 && (
@@ -413,9 +430,10 @@ export function EndScreen(props: EndScreenProps) {
                 {arenaResult && <Beat show={shown('arena')} instant={fast}><ArenaCard r={arenaResult} onNavigate={onNavigate} /></Beat>}
               </div>
             </div>
+            </div>
 
             {/* ── 2. THE REWARDS · 3. NEXT TO EARN ── */}
-            <div className="flex min-w-0 flex-col gap-[0.6em]">
+            <div className="flex min-w-0 flex-col gap-[0.5em]">
               <div className="flex items-center gap-[0.5em] text-[0.75em] font-bold uppercase tracking-[0.2em] text-white/55">
                 <Sparkles className="h-[1.1em] w-[1.1em] text-[#FFD700]" /> Rewards
               </div>
@@ -447,7 +465,7 @@ export function EndScreen(props: EndScreenProps) {
                   )}
                   {!recap.unpaid && (
                     anyTile ? (
-                      <div className="grid grid-cols-2 gap-[0.5em]">
+                      <div className="grid grid-cols-2 gap-[0.5em] lg:grid-cols-3">
                         {recap.xp > 0 && <RewardTile show={shown('xp')} instant={fast} ms={msOf('xp')} value={recap.xp} label="XP" color="#00FF9D" Icon={Sparkles} data="xp" />}
                         {coins && coins.coins > 0 && <RewardTile show={shown('coins')} instant={fast} ms={msOf('coins')} value={coins.coins} label={coins.capped ? 'Wallet coins · limit reached' : 'Wallet coins'} color="#FFB020" Icon={Coins} data="coins" capped={coins.capped} />}
                         {recap.shards > 0 && <RewardTile show={shown('shards')} instant={fast} ms={msOf('shards')} value={recap.shards} label="Shards" color="#A855F7" Icon={Gem} data="shards" />}
@@ -467,7 +485,7 @@ export function EndScreen(props: EndScreenProps) {
                 </>
               )}
 
-              {storyRefused && <Beat show={shown('storyRefused')} instant={fast}><StoryRefusedPanel refusal={storyRefused} /></Beat>}
+              {storyRefused && <Beat show={shown('storyRefused')} instant={fast} className="[&_p]:!text-[0.85em]"><StoryRefusedPanel refusal={storyRefused} /></Beat>}
               {storyReward && <Beat show={shown('story')} instant={fast}><StoryRewardCardCounted r={storyReward} show={shown('story')} instant={fast} ms={msOf('story')} /></Beat>}
 
               {recap?.season && (
@@ -477,7 +495,7 @@ export function EndScreen(props: EndScreenProps) {
               )}
               {recap?.mastery && recap.mastery.ups.length > 0 && (
                 <Beat show={shown('mastery')} instant={fast}>
-                  <div data-recap="mastery" className="rounded-2xl border border-[#00E5FF]/35 bg-[#00E5FF]/10 p-[0.6em] text-center">
+                  <div data-recap="mastery" className="rounded-2xl border border-[#00E5FF]/35 bg-[#00E5FF]/10 px-[0.6em] py-[0.4em] text-center">
                     <p className="flex items-center justify-center gap-[0.4em] font-bold text-[#00E5FF]">
                       <Award className="h-[1.1em] w-[1.1em]" /> MASTERY UP — {recap.mastery.ups[recap.mastery.ups.length - 1].tier}
                     </p>
@@ -487,9 +505,9 @@ export function EndScreen(props: EndScreenProps) {
 
               {progress.length > 0 && (
                 <Beat show={shown('progress')} instant={fast}>
-                  <div data-end-progress className="rounded-2xl border border-white/10 bg-white/[0.03] p-[0.7em]">
+                  <div data-end-progress className="rounded-2xl border border-white/10 bg-white/[0.03] px-[0.7em] py-[0.5em]">
                     <div className="mb-[0.35em] text-[0.72em] font-bold uppercase tracking-[0.2em] text-white/50">Next to earn</div>
-                    <ul className="flex flex-col gap-[0.35em]">
+                    <ul className="flex flex-col gap-[0.25em]">
                       {progress.map((l) => (
                         <li key={l.id} data-progress={l.id} className="flex items-center gap-[0.5em] text-[0.92em] text-white/85">
                           <span className="h-[0.4em] w-[0.4em] shrink-0 rounded-full bg-[#00E5FF]" />
@@ -509,14 +527,14 @@ export function EndScreen(props: EndScreenProps) {
           </div>
 
           {/* ── 4. WHAT'S NEXT — always on screen, Play again focused ── */}
-          <footer data-end-actions className="border-t border-white/10 bg-black/45 p-[0.8em] md:px-[1.4em]" onClick={(e) => e.stopPropagation()}>
+          <footer data-end-actions className="border-t border-white/10 bg-black/45 p-[0.7em] md:px-[1.4em]" onClick={(e) => e.stopPropagation()}>
             <div className="flex flex-col gap-[0.6em] md:flex-row md:items-stretch">
               <button
                 type="button"
                 data-end-focus="primary"
                 data-focused={focusId === 'primary'}
                 onClick={guard(primary.act)}
-                className={`${btnBase} min-h-[2.6em] shrink-0 px-[1.4em] text-[1.15em] md:min-w-[11em] ${primary.gold ? 'bg-[#FFD700] text-black data-[focused=true]:ring-white' : 'bg-[#00E5FF] text-black shadow-[0_0_30px_rgba(0,229,255,0.45)] data-[focused=true]:ring-white'}`}
+                className={`${btnBase} min-h-[2.6em] shrink-0 px-[1.4em] text-[1.15em] md:min-w-[11em] [@media(max-height:500px)]:min-h-[2.1em] ${primary.gold ? 'bg-[#FFD700] text-black data-[focused=true]:ring-white' : 'bg-[#00E5FF] text-black shadow-[0_0_30px_rgba(0,229,255,0.45)] data-[focused=true]:ring-white'}`}
               >
                 <span aria-hidden className="grid h-[1.4em] w-[1.4em] place-items-center rounded-full bg-black/80 text-[0.7em] font-bold text-[#00FF9D]">A</span>
                 <primary.Icon className="h-[1em] w-[1em]" /> {primary.label}

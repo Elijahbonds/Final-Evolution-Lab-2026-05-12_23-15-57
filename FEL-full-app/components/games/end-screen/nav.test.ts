@@ -20,6 +20,13 @@ describe('spatial focus', () => {
     expect(spatialNext(grid, 5, 'up')).toBe(1);
     expect(spatialNext(grid, 3, 'up')).toBe(0);
   });
+  it('a control on the same row beats a nearer one on the next row (Left from Next is Play again)', () => {
+    // the secondary row's second button ends right under the teaser's left edge, nearer than Play again's right edge
+    const g: Rect[] = [R(30, 600, 180, 60), R(260, 600, 900, 60), R(30, 670, 120, 40), R(160, 670, 96, 40)];
+    expect(spatialNext(g, 1, 'left')).toBe(0);
+    expect(spatialNext(g, 3, 'up')).toBe(0);   // up from the button under Play again's right half
+  });
+
   it('stays put at an edge (no wrap off the card)', () => {
     expect(spatialNext(grid, 0, 'up')).toBe(0);
     expect(spatialNext(grid, 0, 'left')).toBe(0);

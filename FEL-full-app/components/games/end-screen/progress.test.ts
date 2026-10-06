@@ -78,3 +78,26 @@ describe('the grade badge: only what the mode reported', () => {
     expect(gradeBadge('x', {})).toBeNull();
   });
 });
+
+describe('highlights: the mode\'s own stats, never computed', () => {
+  it('reads the keys the modes send, in order, up to three', async () => {
+    const { highlights } = await import('./highlights');
+    expect(highlights({ stats: { points: 21, bestStreak: 7, place: 1, field: 8, rivalScore: 17 } })).toEqual([
+      { key: 'place', label: 'Place', value: '1st of 8' }, { key: 'bestStreak', label: 'Best streak', value: '7' },
+    ]);
+    expect(highlights({ stats: { homers: 9, outs: 3, longestFt: 452, rivalHomers: 7 } }).map((h) => h.value)).toEqual(['9', '452 ft']);
+    expect(highlights({ stats: { wave: 6, kos: 41, bestFlow: 3 } }).map((h) => h.key)).toEqual(['wave', 'kos']);
+    expect(highlights({ stats: {}, maxCombo: 14 })).toEqual([{ key: 'maxCombo', label: 'Max combo', value: '×14' }]);
+    expect(highlights({ stats: { foeScore: 9, momentum: 3 } })).toEqual([]);
+    expect(highlights({ stats: { a: 1, gatesHit: 12, gates: 14, tricksLanded: 5, bestCombo: 4, place: 2 } })).toHaveLength(3);
+  });
+});
+
+describe('next to earn fits the screen', () => {
+  it('three lines at most, nearest goals first', async () => {
+    const { MAX_PROGRESS_LINES } = await import('./progress');
+    const l = progressLines(recap({ season, mastery: { mode: 'x', tier: 'Gold', tierIndex: 3, ups: [] }, streakDays: 4 }), rec({ shortBy: 3, winRun: 2 }), true);
+    expect(l).toHaveLength(MAX_PROGRESS_LINES);
+    expect(l.map((x) => x.id)).toEqual(['season', 'mastery', 'streak']);
+  });
+});
