@@ -107,7 +107,7 @@ import { waveSpec, spawnRing, DownRevive, REVIVE_RANGE, inArc, CROWDCLEAR_RADIUS
 import {
   PlayerVitals, VITALS, enemyHitDamage, SlowMoLatch, SLOWMO, type SlowMoKind,
   EnemyBrain, ENEMY_ATTACK, windupSecFor, maxAttackers,
-  DropDirector, DROPS, type DropKind, PerkShop,
+  DropDirector, DROPS, type DropKind, PerkShop, NEO_PERKS, NEO_PERKS_TIER2,
 } from '../core/NeoCombatCore';
 // THE-HUNDRED-COMBAT-DYNAMICS (2026-09-14) — the feel layer: cancel + queue, the string book, crowd stun, redirect, the
 // body throw. Pure and tested in core/HordeDynamics(.test); this file only renders it. See that header for the base
@@ -343,7 +343,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
   /** The Endless button -> the shared route vocabulary. */
   const ROUTE_KIND: Record<'A' | 'B' | 'Y', RouteStrike> = { A: 'jab', B: 'kick', Y: 'heavy' };
   const drops = new DropDirector();
-  const shop = new PerkShop();
+  const shop = new PerkShop([...NEO_PERKS, ...NEO_PERKS_TIER2]);   // IMPROVE (2026-10-06, #20): a second tier in each slot
   let perks = shop.state();
   /** The school picked on the start-up screen, translated into this mode's grammar. Read in load(). */
   let style: HordeStyle = hordeStyle(SCHOOLS[0].traits);
@@ -499,7 +499,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
   /** The shop's perk state, applied to the run. */
   function applyPerks(ctx: ModeContext, bought: string): void {
     perks = shop.state();
-    vitals.setMax(perks.maxHp, bought === 'iron');    // IRON BODY heals to full
+    vitals.setMax(perks.maxHp, bought === 'iron' || bought === 'iron2');    // IRON BODY (I and II) heals to full
     publishHp(ctx, true);
   }
 
@@ -683,7 +683,8 @@ export const KarateEndlessMode: ModeDefinition = (() => {
   }
   function openShop(ctx: ModeContext): void {
     if (shop.allOwned) { void spawnWave(ctx); return; }   // nothing left to buy: straight on
-    shopOpen = true; shop.sel = 0; shopUntil = now() + SHOP_SEC * 1000;
+    shopOpen = true; shopUntil = now() + SHOP_SEC * 1000;
+    shop.sel = Math.max(0, shop.offers.findIndex((p) => !shop.owned.has(p.id)));   // #20: the cursor opens on something to buy
     publishShop(ctx);
   }
   function closeShop(ctx: ModeContext): void {
