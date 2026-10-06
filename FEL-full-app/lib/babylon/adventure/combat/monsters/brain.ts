@@ -145,7 +145,8 @@ export class MonsterBrain {
       case 'pursue': {
         if (this.reactionLeft > 0) { this.reactionLeft -= dt; return null; }
         const a = this.forced ?? this.pickAttack(dist);
-        const tokenOk = !this.usesTokens || this.hasToken || tokens.take(target.id);
+        // Ask for a token only with a swing in hand: a token taken on a miss would never be given back.
+        const tokenOk = !!a && (!this.usesTokens || this.hasToken || tokens.take(target.id));
         if (a && tokenOk) {
           this.hasToken = this.usesTokens;
           this.forced = null;
