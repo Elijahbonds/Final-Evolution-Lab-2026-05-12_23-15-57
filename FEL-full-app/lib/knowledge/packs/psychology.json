@@ -63,7 +63,7 @@
         "Actions repeated in a stable setting become automatic — the cue triggers them, not a decision.",
         "That's why changing the cue (where, when, what's in sight) often works better than willpower."
       ],
-      "visual": { "kind": "cycle", "steps": ["Cue", "Routine", "Reward"] },
+      "visual": { "kind": "cycle", "steps": ["Cue", "Action", "Repeat"] },
       "source": "Wood & Neal (2007), 'A New Look at Habits and the Habit–Goal Interface', Psychological Review."
     },
     {

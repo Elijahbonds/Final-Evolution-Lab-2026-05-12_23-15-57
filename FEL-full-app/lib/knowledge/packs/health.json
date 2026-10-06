@@ -13,7 +13,7 @@
         "In one study of young athletes, those sleeping under 8 hours were injured more often."
       ],
       "visual": { "kind": "stat", "value": "8–10 h", "caption": "recommended for 13–18-year-olds" },
-      "source": "Paruthi et al. (2016), AASM consensus, J Clin Sleep Med; Milewski et al. (2014), J Pediatr Orthop."
+      "source": "Paruthi et al. (2016), AASM consensus, J Clin Sleep Med; Watson et al. (2015), AASM/SRS adult consensus, J Clin Sleep Med; Milewski et al. (2014), J Pediatr Orthop."
     },
     {
       "id": "health.fibre-types",
@@ -49,7 +49,7 @@
       "lines": [
         "Losing around 2% of body weight in sweat can noticeably reduce endurance performance.",
         "In long, hot sessions, the salts lost in sweat matter too.",
-        "Weighing before and after training shows how much fluid a session costs."
+        "Sport scientists sometimes weigh athletes before and after training to estimate fluid lost — drinking to thirst works for most young people."
       ],
       "visual": { "kind": "stat", "value": "≈ 2%", "caption": "body-weight loss where endurance can dip" },
       "source": "Sawka et al. (2007), ACSM Position Stand: Exercise and Fluid Replacement."
@@ -61,7 +61,7 @@
       "headline": "Progressive overload",
       "lines": [
         "Muscles, bones and tendons adapt to the demands placed on them.",
-        "Raise load, reps or difficulty gradually — then let the body recover.",
+        "Athletes and coaches raise load, reps or difficulty gradually, then allow recovery — young athletes should do this with a coach.",
         "Big, sudden jumps in training load are a well-known injury risk."
       ],
       "visual": { "kind": "bars", "items": [{ "label": "Week 1", "value": 10 }, { "label": "Week 2", "value": 11 }, { "label": "Week 3", "value": 12 }, { "label": "Week 4", "value": 9 }], "caption": "Build gradually, then ease off" },
@@ -157,9 +157,9 @@
       "headline": "The body's three energy systems",
       "steps": [
         { "headline": "1 · Phosphocreatine", "lines": ["The fastest system powers all-out efforts of a few seconds: a sprint start, a jump.", "It refills within a few minutes of rest."], "visual": { "kind": "motif", "motif": "heart" } },
-        { "headline": "2 · Glycolytic", "lines": ["For hard efforts of roughly 10 seconds to 2 minutes, carbohydrate is broken down fast without needing oxygen.", "Powerful, but it can't last."] },
+        { "headline": "2 · Glycolytic", "lines": ["For hard efforts of roughly 10 seconds to about a minute, carbohydrate is broken down fast without needing oxygen.", "Powerful, but it can't last."] },
         { "headline": "3 · Aerobic", "lines": ["For anything longer, the aerobic system uses oxygen to burn carbohydrate and fat.", "Slower, but it can run for hours."] },
-        { "headline": "4 · All at once", "lines": ["The systems overlap — none is ever fully on or off.", "A basketball game uses all three: sprints, repeated bursts, and the long game in between."], "visual": { "kind": "timeline", "points": [{ "at": "0–10 s", "label": "Phosphocreatine leads" }, { "at": "10 s–2 min", "label": "Glycolytic leads" }, { "at": "2 min +", "label": "Aerobic leads" }] } }
+        { "headline": "4 · All at once", "lines": ["The systems overlap — none is ever fully on or off.", "A basketball game uses all three: sprints, repeated bursts, and the long game in between."], "visual": { "kind": "timeline", "points": [{ "at": "0–10 s", "label": "Phosphocreatine leads" }, { "at": "10–~60 s", "label": "Glycolytic leads" }, { "at": "~1 min +", "label": "Aerobic leads" }] } }
       ],
       "source": "Gastin (2001), 'Energy System Interaction', Sports Medicine; McArdle, Katch & Katch, 'Exercise Physiology'."
     },

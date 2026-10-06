@@ -121,8 +121,8 @@
       "id": "space.f-venus-day",
       "topic": "space",
       "type": "fact",
-      "headline": "A day on Venus is longer than its year",
-      "text": "Venus takes about 243 Earth days to spin once, but only about 225 days to orbit the Sun — and it spins backwards.",
+      "headline": "Venus spins slower than it orbits",
+      "text": "Venus takes about 243 Earth days to spin once but about 225 days to orbit — and it spins backwards. (Sunrise to sunrise takes about 117 days.)",
       "visual": { "kind": "bars", "items": [{ "label": "One spin", "value": 243 }, { "label": "One orbit", "value": 225 }], "unit": " days" },
       "source": "NASA Venus Fact Sheet."
     },
@@ -158,7 +158,7 @@
       "headline": "What is a black hole?",
       "steps": [
         { "headline": "1 · Too much in too little", "lines": ["When a very massive star collapses, its core can shrink without limit.", "Gravity becomes so strong that nothing — not even light — can escape."], "visual": { "kind": "motif", "motif": "planet" } },
-        { "headline": "2 · The event horizon", "lines": ["The boundary of no return is called the event horizon.", "Outside it, things can still orbit safely, as planets orbit the Sun."] },
+        { "headline": "2 · The event horizon", "lines": ["The boundary of no return is called the event horizon.", "Well outside it, things can orbit safely, as planets orbit the Sun."] },
         { "headline": "3 · Giants at the centre", "lines": ["Most large galaxies have a supermassive black hole at their core.", "Ours, Sagittarius A*, is about 4 million times the Sun's mass."], "visual": { "kind": "stat", "value": "≈ 4 million Suns", "caption": "mass of Sagittarius A*" } },
         { "headline": "4 · Seeing the unseeable", "lines": ["In 2019 the Event Horizon Telescope imaged the shadow of the black hole in galaxy M87.", "In 2022 it released an image of Sagittarius A*."] }
       ],

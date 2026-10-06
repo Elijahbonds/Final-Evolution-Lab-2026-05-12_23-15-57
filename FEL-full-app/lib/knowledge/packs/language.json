@@ -34,10 +34,10 @@
       "type": "lesson",
       "headline": "Why 'cow' in the field but 'beef' on the plate?",
       "lines": [
-        "After the Norman Conquest, English-speaking farmers raised the animals; French-speaking nobles ate the meat.",
-        "So the animal kept an English name and the meat took a French one."
+        "After the Norman Conquest, French words like 'beef' and 'pork' entered English and, over time, came to mean the meat.",
+        "The English words kept the animal — a split likely helped by French-speaking elites' tables."
       ],
-      "visual": { "kind": "compare", "left": { "label": "In the field (English)", "text": "cow · pig · sheep" }, "right": { "label": "On the plate (French)", "text": "beef · pork · mutton" } },
+      "visual": { "kind": "compare", "left": { "label": "In the field (English)", "text": "cow · pig · sheep" }, "right": { "label": "On the plate (from French)", "text": "beef · pork · mutton" } },
       "source": "Baugh & Cable, 'A History of the English Language'; Crystal, 'The Stories of English'."
     },
     {
@@ -152,10 +152,10 @@
       "id": "language.d-writing-systems",
       "topic": "language",
       "type": "deeper",
-      "headline": "Four ways to write a language",
+      "headline": "Four main ways to write a language",
       "steps": [
         { "headline": "1 · Alphabets", "lines": ["Letters stand for individual sounds — consonants and vowels.", "Greek, Latin and Cyrillic are alphabets."], "visual": { "kind": "motif", "motif": "quote" } },
-        { "headline": "2 · Abjads", "lines": ["Letters mostly stand for consonants; readers supply many of the vowels.", "Arabic and Hebrew are usually written this way."] },
+        { "headline": "2 · Abjads", "lines": ["Letters mostly stand for consonants; readers supply many of the vowels.", "Arabic and Hebrew are usually written this way.", "Abugidas, like Hindi's Devanagari, write consonants with vowel marks attached."] },
         { "headline": "3 · Syllabaries", "lines": ["Each symbol stands for a whole syllable.", "Japanese kana and the Cherokee syllabary are examples."] },
         { "headline": "4 · Logographic", "lines": ["Characters stand for words or meaningful parts of words.", "Chinese characters work this way, often combining clues to meaning and sound."] }
       ],

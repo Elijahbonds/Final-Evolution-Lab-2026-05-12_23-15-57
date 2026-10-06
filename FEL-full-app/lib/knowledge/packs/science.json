@@ -138,8 +138,8 @@
       "id": "science.f-carbon",
       "topic": "science",
       "type": "fact",
-      "headline": "Diamond and pencil 'lead' are both pure carbon",
-      "text": "In diamond, carbon atoms lock into a rigid 3D lattice. In graphite they form flat sheets that slide — so one scratches glass and the other smudges paper.",
+      "headline": "Diamond and graphite are both pure carbon",
+      "text": "In diamond, carbon atoms lock into a rigid 3D lattice. In graphite (mixed with clay to make pencil 'lead') they form flat sheets that slide — so one scratches glass and the other smudges paper.",
       "source": "Atkins & Jones, 'Chemical Principles', allotropes of carbon."
     },
     {
@@ -159,7 +159,7 @@
       "steps": [
         { "headline": "1 · Variation", "lines": ["Individuals differ — in size, colour, speed and more.", "Some of those differences are inherited."], "visual": { "kind": "motif", "motif": "leaf" } },
         { "headline": "2 · Too many offspring", "lines": ["Most species produce more young than can survive.", "So individuals compete for food, space and mates."] },
-        { "headline": "3 · Selection", "lines": ["Traits that help an individual survive and reproduce get passed on more often.", "Darwin and Wallace proposed this together in 1858."] },
+        { "headline": "3 · Selection", "lines": ["Traits that help an individual survive and reproduce get passed on more often.", "Darwin and Wallace reached the idea independently; their papers were presented together in 1858."] },
         { "headline": "4 · Change over time", "lines": ["Over many generations, helpful traits become more common.", "Example: bacteria evolving resistance to antibiotics."], "visual": { "kind": "cycle", "steps": ["Vary", "Compete", "Survive", "Inherit"] } }
       ],
       "source": "Darwin, 'On the Origin of Species' (1859); Futuyma, 'Evolution'."

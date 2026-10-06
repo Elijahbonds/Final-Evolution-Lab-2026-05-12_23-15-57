@@ -113,3 +113,48 @@ describe('the Playbook pack is the book, not a paraphrase', () => {
     expect(lines.join(' ').replace(/\s+/g, ' ')).toBe(s);
   });
 });
+
+// IMPROVE (2026-10-06): the owner's fact check (15 fixes, applied in v2). Each line pins the corrected claim so a later
+// edit can't quietly bring the old wording back.
+describe('the 2026-10-06 fact check stays applied', () => {
+  const card = (id: string) => {
+    const c = CARDS.find((x) => x.id === id);
+    if (!c) throw new Error(`no card ${id}`);
+    return JSON.stringify(c);
+  };
+
+  it('fixes the one WRONG card: pencil lead is graphite mixed with clay', () => {
+    expect(card('science.f-carbon')).not.toMatch(/pencil 'lead' are both pure carbon/);
+    expect(card('science.f-carbon')).toMatch(/mixed with clay/);
+  });
+
+  it('fixes the SHAKY cards', () => {
+    expect(card('psychology.habit-loop')).not.toMatch(/"Reward"/);
+    expect(card('history.writing')).toMatch(/Egyptian hieroglyphs/);
+    expect(card('science.d-evolution')).toMatch(/independently/);
+    expect(card('health.d-energy-systems')).not.toMatch(/2 min/);
+    expect(card('health.sleep')).toMatch(/Watson et al\. \(2015\)/);
+    expect(card('productivity.f-pareto')).not.toMatch(/Italy's land/);
+    expect(card('language.cow-beef')).not.toMatch(/nobles ate the meat/);
+    expect(card('language.d-writing-systems')).toMatch(/Four main ways/);
+    expect(card('language.d-writing-systems')).toMatch(/Abugidas/);
+    expect(card('tech.f-qwerty')).not.toMatch(/mechanical reasons/);
+    expect(card('nature.phytoplankton')).not.toMatch(/ocean plants/);
+    expect(card('space.f-venus-day')).not.toMatch(/longer than its year/);
+    expect(card('space.f-venus-day')).toMatch(/117 days/);
+    expect(card('space.d-black-holes')).toMatch(/Well outside it/);
+  });
+
+  it('fixes the TONE cards: health describes what athletes do, it does not instruct a young reader', () => {
+    expect(card('health.hydration')).not.toMatch(/^.*"Weighing before/);
+    expect(card('health.hydration')).toMatch(/drinking to thirst/);
+    expect(card('health.progressive-overload')).toMatch(/with a coach/);
+  });
+
+  it('labels self-help methods as methods, and credits James Clear for the habit steps', () => {
+    for (const id of ['productivity.pomodoro', 'productivity.urgent-important', 'productivity.two-minute']) {
+      expect(card(id), id).toMatch(/A popular method suggests/);
+    }
+    expect(card('productivity.d-habit')).toMatch(/Clear, 'Atomic Habits'/);
+  });
+});

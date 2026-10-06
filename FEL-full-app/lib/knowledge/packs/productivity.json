@@ -8,7 +8,7 @@
       "type": "lesson",
       "headline": "The Pomodoro Technique",
       "lines": [
-        "Work for 25 focused minutes, then take a 5-minute break.",
+        "A popular method suggests 25 focused minutes of work, then a 5-minute break.",
         "After four rounds, take a longer break.",
         "Francesco Cirillo devised it in the late 1980s, named after a tomato-shaped kitchen timer."
       ],
@@ -23,7 +23,7 @@
       "lines": [
         "Sort tasks with two questions: is it urgent? Is it important?",
         "Important-but-not-urgent work — planning, learning, health — is the easiest to neglect.",
-        "It's often the work that matters most, so give it a slot in your day."
+        "A popular method suggests it's often the work that matters most, so it deserves a slot in the day."
       ],
       "visual": { "kind": "compare", "left": { "label": "Urgent", "text": "Demands attention now" }, "right": { "label": "Important", "text": "Moves your goals forward" } },
       "source": "Covey, 'The 7 Habits of Highly Effective People' (1989), the Time Management Matrix."
@@ -60,8 +60,8 @@
       "type": "lesson",
       "headline": "The two-minute rule",
       "lines": [
-        "If a task takes less than two minutes, do it now.",
-        "Writing it down and coming back to it later costs more than just doing it."
+        "A popular method suggests: if a task takes less than two minutes, do it now.",
+        "Its author, David Allen, argues that noting it down to come back to later costs more than just doing it."
       ],
       "visual": { "kind": "stat", "value": "< 2 min", "caption": "do it now" },
       "source": "Allen, 'Getting Things Done' (2001)."
@@ -73,7 +73,7 @@
       "question": "A standard Pomodoro is…",
       "options": ["5 minutes of work", "25 minutes of focused work", "2 hours of deep work", "As long as you like"],
       "answer": 1,
-      "why": "25 minutes of focus, then a short break. The timer makes starting easier.",
+      "why": "25 minutes of focus, then a short break. The method's author says the timer makes starting easier.",
       "source": "Cirillo, 'The Pomodoro Technique'."
     },
     {
@@ -110,10 +110,10 @@
       "id": "productivity.q-matrix",
       "topic": "productivity",
       "type": "quiz",
-      "question": "In the urgent/important matrix, which kind of task is easiest to neglect but often most valuable?",
+      "question": "In Covey's urgent/important matrix, which kind of task does he say is easiest to neglect but often most valuable?",
       "options": ["Urgent and important", "Important but not urgent", "Urgent but not important", "Neither"],
       "answer": 1,
-      "why": "Planning, learning and health rarely shout for attention, so they get crowded out unless you schedule them.",
+      "why": "A popular method suggests that planning, learning and health rarely shout for attention, so they get crowded out unless scheduled.",
       "source": "Covey, 'The 7 Habits of Highly Effective People' (1989)."
     },
     {
@@ -121,9 +121,8 @@
       "topic": "productivity",
       "type": "fact",
       "headline": "The 80/20 rule is named after an economist",
-      "text": "Vilfredo Pareto observed that about 80% of Italy's land was owned by about 20% of its people. Many things are similarly lopsided, though rarely exactly 80/20.",
-      "visual": { "kind": "bars", "items": [{ "label": "20% of people", "value": 80 }, { "label": "80% of people", "value": 20 }], "unit": "%", "caption": "Share of land in Pareto's observation" },
-      "source": "Pareto, 'Cours d'économie politique' (1896); popularised as a principle by Joseph Juran."
+      "text": "Vilfredo Pareto showed in the 1890s that income and wealth were very unevenly spread; Joseph Juran later named the '80/20' principle after him. Real splits are rarely exactly 80/20.",
+      "source": "Pareto, 'Cours d'économie politique' (1896–97), on the distribution of income; Juran, 'Quality Control Handbook' (1951), who named the principle."
     },
     {
       "id": "productivity.f-plan-it",
@@ -155,12 +154,12 @@
       "type": "deeper",
       "headline": "Building a habit that sticks",
       "steps": [
-        { "headline": "1 · Make it obvious", "lines": ["Put the cue where you'll see it: shoes by the door, the book on your pillow.", "Habits start with a reliable trigger."], "visual": { "kind": "motif", "motif": "clock" } },
+        { "headline": "1 · Make it obvious", "lines": ["A popular method, James Clear's 'Atomic Habits', suggests putting the cue in sight: shoes by the door, a book on the pillow.", "Habits start with a reliable trigger."], "visual": { "kind": "motif", "motif": "clock" } },
         { "headline": "2 · Make it small", "lines": ["Start so small you can't say no: one push-up, one page.", "Showing up matters more than size at first."] },
         { "headline": "3 · Stack it", "lines": ["Attach the new habit to an old one: 'After I brush my teeth, I'll stretch.'", "The old habit becomes the cue."] },
         { "headline": "4 · Give it time", "lines": ["In one study, a new habit took a median of 66 days to become automatic, with wide variation.", "Missing a single day didn't derail it."], "visual": { "kind": "stat", "value": "66 days", "caption": "median time to automatic (Lally, 2010)" } }
       ],
-      "source": "Lally et al. (2010), European Journal of Social Psychology; Fogg, 'Tiny Habits' (2019)."
+      "source": "Step names after Clear, 'Atomic Habits' (2018); Lally et al. (2010), European Journal of Social Psychology; Fogg, 'Tiny Habits' (2019)."
     },
     {
       "id": "productivity.recap",
@@ -169,10 +168,10 @@
       "headline": "Productivity: the takeaways",
       "points": [
         "25 minutes on, 5 off: the Pomodoro.",
-        "Schedule the important-but-not-urgent.",
+        "Covey's matrix: schedule the important-but-not-urgent.",
         "If–then plans boost follow-through.",
         "Switching tasks has a cost.",
-        "Under two minutes? Do it now."
+        "Under two minutes? A popular rule says do it now."
       ],
       "source": "Summary of this topic's cards."
     }
