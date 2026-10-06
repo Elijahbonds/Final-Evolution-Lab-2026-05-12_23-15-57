@@ -14,10 +14,10 @@ import type { QualityTier } from '../scene/QualityTier';
 import type { AccessoryId } from './accessories';
 import { wearPlayerAccessories } from './playerAccessories';
 import { applyCreatorLayers } from './creatorLook';
-import type { CreatorDoc } from '../../creator/look/doc';
+import type { CreatorDoc, CreatorPart } from '../../creator/look/doc';
 import { readCreatorDoc, faceOnly } from '../../creator/look/storage';
 import { effectivePalette, type PaletteOverrides } from '../../creator/look/palette';
-import { accessoriesForEquipped } from '../../closet/wearableAccessories';
+import { accessoriesForEquipped, wornPartsForEquipped } from '../../closet/wearableAccessories';
 
 type TintMat = Material & { albedoColor?: Color3; diffuseColor?: Color3; bumpTexture?: { dispose(): void } | null };
 
@@ -75,6 +75,9 @@ export interface PlayerIdentity {
   /** IMPROVE (2026-10-06): the accessories the equipped headwear / accessory render as (wearableAccessories). Optional:
    *  a literal without one wears none. The player never gets the NPCs' seeded deal. */
   accessories?: readonly AccessoryId[];
+  /** IMPROVE (2026-10-06), CREATOR-PLAN phase 2: equipped items that render as Creator parts (the Nexus Visor,
+   *  wearableAccessories.wornPartsForEquipped). Optional: a literal without it wears none. */
+  wornParts?: readonly CreatorPart[];
 }
 export interface EquippedCard { id: string; name: string; accent: string; mode: string }
 
@@ -132,7 +135,8 @@ export async function resolveIdentity(force = false): Promise<PlayerIdentity> {
   const wardrobe: Wardrobe = { tops: equipped.tops ?? null, shorts: equipped.shorts ?? null, shoes: equipped.shoes ?? null };
   const body: HeroBodyKind = heroBody?.body === 'scan' || heroBody?.body === 'kit-female' ? heroBody.body : 'kit-male';
   const accessories = accessoriesForEquipped(equipped);
-  cached = { proportions, face, palette, jersey, wardrobe, custom: Boolean(closet?.look) || Boolean(frame), body, card, lookLocal: closet?.lookLocal === true, creator, accessories };
+  const wornParts = wornPartsForEquipped(equipped);
+  cached = { proportions, face, palette, jersey, wardrobe, custom: Boolean(closet?.look) || Boolean(frame), body, card, lookLocal: closet?.lookLocal === true, creator, accessories, wornParts };
   return cached;
 }
 /** The identity resolved so far this session (null before the first spawn asked) — a synchronous read for the ring / icon. */
@@ -250,8 +254,8 @@ export function applyIdentity(
   if (id.jersey && (id.jersey.name || id.jersey.number > 0)) attachJerseyPlate(spawn, id.jersey, palette.accent);
   // 5) IMPROVE (2026-10-06), research item 2: what the player equipped, in the palette's accent (never the NPCs' deal).
   wearPlayerAccessories(spawn, id.accessories ?? [], palette.accent);
-  // 6) THE CREATOR HOOK — parts (phase 2) and paint (phase 3) render from the doc here, and only here.
-  applyCreatorLayers(spawn, doc);
+  // 6) THE CREATOR HOOK — parts (phase 2) and paint (phase 3) render from the doc here, and only here; worn parts too.
+  applyCreatorLayers(spawn, doc, id.wornParts ?? []);
 }
 
 /** Ship watchdog. A material that never compiles renders NOTHING and throws

@@ -1,7 +1,7 @@
 'use client';
 import type { Wardrobe } from '@/lib/babylon/core/kit';
 import type { AccessoryId } from '@/lib/babylon/core/accessories';
-import type { CreatorDoc } from '@/lib/creator/look/doc';
+import type { CreatorDoc, CreatorPart } from '@/lib/creator/look/doc';
 
 // AvatarPreview — the Closet's live 3D preview: the FORGED hero
 // (public/models/fel-hero.glb, scripts/avatar/forge.mts) wearing the draft
@@ -25,9 +25,11 @@ export interface AvatarPreviewProps {
    *  fields resolveIdentity fills at spawn, so the preview shows what the game will. */
   accessories?: readonly AccessoryId[];
   creator?: CreatorDoc | null;
+  /** CREATOR-PLAN phase 2: equipped items that render as parts (the Nexus Visor) — resolveIdentity's `wornParts`. */
+  wornParts?: readonly CreatorPart[];
 }
 
-export default function AvatarPreview({ face, palette, jersey, wardrobe, accessories, creator }: AvatarPreviewProps) {
+export default function AvatarPreview({ face, palette, jersey, wardrobe, accessories, creator, wornParts }: AvatarPreviewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const applyRef = useRef<((p: AvatarPreviewProps) => void) | null>(null);
   const playRef = useRef<(clip: string | null) => void>(() => {});
@@ -90,9 +92,10 @@ export default function AvatarPreview({ face, palette, jersey, wardrobe, accesso
           body: bodyKind,
           accessories: p.accessories ?? [],
           creator: p.creator ?? null,
+          wornParts: p.wornParts ?? [],
         });
       };
-      applyRef.current({ face, palette, jersey, wardrobe, accessories, creator });
+      applyRef.current({ face, palette, jersey, wardrobe, accessories, creator, wornParts });
 
       playRef.current = (clip: string | null) => {
         if (!clip) return;
@@ -118,8 +121,8 @@ export default function AvatarPreview({ face, palette, jersey, wardrobe, accesso
 
   // re-apply the draft on every edit — same pipe, new values
   useEffect(() => {
-    applyRef.current?.({ face, palette, jersey, wardrobe, accessories, creator });
-  }, [face, palette, jersey, wardrobe, accessories, creator]);
+    applyRef.current?.({ face, palette, jersey, wardrobe, accessories, creator, wornParts });
+  }, [face, palette, jersey, wardrobe, accessories, creator, wornParts]);
 
   return (
     <div>

@@ -47,7 +47,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { PreviewBinding } from '@/lib/creator/editor/previewBinding';
 import { poseLoops } from '@/lib/creator/editor/previewPose';
 import { PreviewControls } from '@/components/creator/editor/preview-controls';
-import { accessoriesForEquipped } from '@/lib/closet/wearableAccessories';
+import { accessoriesForEquipped, wornPartsForEquipped } from '@/lib/closet/wearableAccessories';
 
 export interface CreatorPreviewProps {
   binding: PreviewBinding;
@@ -114,6 +114,7 @@ export default function CreatorPreview({ binding, poseClip = null, height = 420 
           // IMPROVE (2026-10-06), research item 2: the draft's headwear and accessory, as the game hangs them (the
           // library no longer deals this player body a seeded set).
           accessories: accessoriesForEquipped(b.wardrobe),
+          wornParts: wornPartsForEquipped(b.wardrobe),   // CREATOR-PLAN phase 2: the Nexus Visor, as a part
         });
         applyProportions(s, b.proportions, baseScale);   // the SAME absolute pipe every mode spawns with
       };

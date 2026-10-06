@@ -20,7 +20,7 @@ import { mergeLocalLook, readLocalLook, type StoredLook } from '../../creator/lo
 import { getWearable, sanitizeJersey } from '../../closet/wearable-catalog';
 import { faceOnly, readCreatorDoc } from '../../creator/look/storage';
 import { effectivePalette } from '../../creator/look/palette';
-import { accessoriesForEquipped } from '../../closet/wearableAccessories';
+import { accessoriesForEquipped, wornPartsForEquipped } from '../../closet/wearableAccessories';
 
 /**
  * The identity the race dresses the hero in when the look is device-only. `base` is the resolved identity
@@ -61,6 +61,7 @@ export function raceIdentityFromLocal(base: PlayerIdentity, local: StoredLook): 
     }, creator?.colours),
     creator,
     accessories: local.equipped ? accessoriesForEquipped(local.equipped) : base.accessories,
+    wornParts: local.equipped ? wornPartsForEquipped(local.equipped) : base.wornParts,
     wardrobe: {
       tops: eq.tops ?? base.wardrobe.tops,
       shorts: eq.shorts ?? base.wardrobe.shorts,
