@@ -1,5 +1,6 @@
 'use client';
 import type { Wardrobe } from '@/lib/babylon/core/kit';
+import type { AbstractMesh } from '@babylonjs/core';
 import type { AccessoryId } from '@/lib/babylon/core/accessories';
 import type { CreatorDoc, CreatorPart, PaintLayer, PaintRegion, PartBone, SlotFrame, Vec3 } from '@/lib/creator/look/doc';
 import type { HeroBodyKind } from '@/lib/babylon/core/heroBody';
@@ -178,7 +179,11 @@ export default function AvatarPreview(props: AvatarPreviewProps) {
       if (disposed) { spawned.dispose(); stage.dispose(); engine.dispose(); return; }
       let baseScale = spawned.root.scaling.clone();
       let picker: InstanceType<typeof BodyPicker> | null = null;
-      const pickerOf = () => (picker ??= new BodyPicker(spawned));
+      // CREATOR-PLAN phase 4e: the code-built clothes are what a tap lands on (the skin under them is not drawn), so the
+      // picker takes the cloth mesh with the body's own; a rebuilt cloth mesh makes a new picker
+      const { clothMeshOf } = await import('@/lib/babylon/creator/clothes/renderClothes');
+      let pickCloth: AbstractMesh | null = null;
+      const pickerOf = () => (picker ??= new BodyPicker(pickCloth ? { root: spawned.root, skeleton: spawned.skeleton, meshes: [...spawned.meshes, pickCloth] } : spawned));
       let padIndex = -1;
       stage.setBody(spawned);
       // dev-only probe hook (scripts/_closet-scene-probe.mts): the preview is the
@@ -210,6 +215,8 @@ export default function AvatarPreview(props: AvatarPreviewProps) {
         applyPresentation(spawned.root);
         // the shots are in body heights: the frame's height and the Studio size both scale the root
         stage.setHeight(BODY_HEIGHT * (spawned.root.scaling.y / (baseScale.y || 1)));
+        const cloth = clothMeshOf(spawned.root);
+        if (cloth !== pickCloth) { pickCloth = cloth; picker = null; }
         picker?.invalidate();
         stage.gate.kick();
       };
@@ -227,7 +234,7 @@ export default function AvatarPreview(props: AvatarPreviewProps) {
           next.root.rotation.y = spawned.root.rotation.y;
           spawned.dispose();
           spawned = next;
-          picker = null;
+          picker = null; pickCloth = null;
           baseScale = spawned.root.scaling.clone();
           stage.setBody(spawned);
           applyRef.current?.(lastProps);
@@ -551,7 +558,7 @@ export default function AvatarPreview(props: AvatarPreviewProps) {
   // CREATOR-PLAN phase 4a: another slot's body
   useEffect(() => { if (body) respawnRef.current?.(body); }, [body]);
   // phase 4d: the tab or the selection moved — reframe
-  const focusKey = studio ? `${studio.tab}|${studio.focus ? (studio.focus.kind === 'part' ? studio.focus.bone : studio.focus.region) : ''}` : '';
+  const focusKey = studio ? `${studio.tab}|${studio.focus ? (studio.focus.kind === 'part' ? studio.focus.bone : studio.focus.kind === 'cloth' ? `${studio.focus.cloth}${studio.focus.long ? 'L' : ''}${studio.focus.hood ? 'H' : ''}` : studio.focus.region) : ''}` : '';
   useEffect(() => { reframeRef.current?.(); }, [focusKey]);
 
   const knob = (kind: 'move' | 'rotate' | 'scale', label: string, style: React.CSSProperties, glyph: string) => (

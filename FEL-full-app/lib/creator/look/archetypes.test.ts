@@ -75,6 +75,17 @@ describe('the ten archetypes', () => {
     expect(parts.filter((p) => p.follow).length, 'follow the bulk').toBeGreaterThanOrEqual(2);
     for (const shape of ['bolt', 'beard', 'ear', 'strand'] as const) expect(parts.some((p) => p.shape === shape), shape).toBe(true);
   });
+  it('phase 4e dressed what was waiting for clothes: no recipe waits for a garment, and they wear the tools', () => {
+    for (const a of ARCHETYPES) expect(a.later.join(' '), a.name).not.toMatch(/garment|gi\b|cloth|layered|trouser|jacket/);
+    const worn = ARCHETYPES.flatMap((a) => a.slot.doc.clothes ?? []);
+    expect(ARCHETYPES.filter((a) => a.slot.doc.clothes?.length).length, 'dressed').toBeGreaterThanOrEqual(5);
+    for (const style of ['jacket', 'pants', 'gloves', 'boots', 'skirt', 'highneck', 'tee'] as const) expect(worn.some((c) => c.style === style), style).toBe(true);
+    // layers: a top under a jacket; a long coat (a tube); built clothes over a painted suit
+    expect(ARCHETYPES.some((a) => (a.slot.doc.clothes ?? []).filter((c) => c.kind === 'top').length >= 2), 'two tops').toBe(true);
+    expect(worn.some((c) => c.hem === 'knee' || c.hem === 'thigh'), 'a long coat').toBe(true);
+    expect(ARCHETYPES.some((a) => a.slot.doc.flags.suit && a.slot.doc.clothes?.length), 'clothes over a suit').toBe(true);
+    expect(worn.filter((c) => c.colour2).length, 'two-tone').toBeGreaterThanOrEqual(3);
+  });
   it('the mascot\'s verdict is pinned: a costume on the human rig, not a creature', () => {
     expect(MASCOT_VERDICT).toBe('costume read, not a creature');
     expect(ARCHETYPES.find((a) => a.name.includes('mascot'))!.later).toContain('a non-human rig is out of scope');

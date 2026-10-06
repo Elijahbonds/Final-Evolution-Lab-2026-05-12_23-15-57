@@ -6,6 +6,7 @@ import {
   Texture, Vector3, Color3,
 } from '@babylonjs/core';
 import type { AbstractMesh, Observer, Scene } from '@babylonjs/core';
+import { fitBurst, liveParticles, particleBudget, particleBudgetScale } from './ParticleBudget';
 
 /** IMPROVE (2026-10-06): what `EffectsKit.ambient` mounted — a mode that disposes it takes the gulls' planes, their material and
  *  their per-frame observers with it (they outlived every mode before: 4 planes, 4 materials, 4 observers never removed). */
@@ -50,6 +51,62 @@ function gullTexture(scene: Scene): Texture {
   tex.update();
   tex.hasAlpha = true;
   return tex;
+}
+
+/**
+ * A small soft-edged RECTANGLE for confetti (visual-foundation A9.8, 2026-10-06). Confetti was the round dot — and a
+ * spinning dot looks exactly like a still one, so the paper never tumbled. A strip with a short and a long side shows
+ * every turn.
+ */
+function quadTexture(scene: Scene): Texture {
+  const existing = scene.getTextureByName('fx_quad');
+  if (existing) return existing as Texture;
+  const tex = new DynamicTexture('fx_quad', { width: 16, height: 16 }, scene, false);
+  const ctx = tex.getContext() as unknown as CanvasRenderingContext2D;
+  ctx.clearRect(0, 0, 16, 16);
+  ctx.fillStyle = 'rgba(255,255,255,1)';
+  ctx.fillRect(2, 5, 12, 6);
+  tex.update();
+  tex.hasAlpha = true;
+  return tex;
+}
+
+/**
+ * How each burst kind LOOKS (visual-foundation A9.8, 2026-10-06), as one table a test can argue with. Every burst used
+ * to be the same soft dot, alpha-blended, the same size from birth to death — so sparks read as orange snow, dust as
+ * beige dots and confetti as coloured dots. The read each one needs:
+ *   sparks, glitch  ADDITIVE and STRETCHED along their flight: a spark is a streak of light, it brightens what is behind
+ *                   it and never darkens it
+ *   dust            a PUFF: born small, grows to ~2.4× while it fades out — a cloud spreading, not dots falling
+ *   confetti        paper strips that TUMBLE (angular speed) and fade at the end of their life
+ *   net             unchanged: the white flick through the mesh was already right
+ */
+export const BURST_LOOK = {
+  sparks:   { additive: true,  stretched: true,  grow: 1,   spin: 0, quad: false },
+  glitch:   { additive: true,  stretched: true,  grow: 1,   spin: 0, quad: false },
+  dust:     { additive: false, stretched: false, grow: 2.4, spin: 0, quad: false },
+  confetti: { additive: false, stretched: false, grow: 1,   spin: 9, quad: true },
+  net:      { additive: false, stretched: false, grow: 1,   spin: 0, quad: false },
+} as const;
+
+/**
+ * Compile the streak variant at LOAD, not on the first spark (A9.8). The stretched billboard is its own particle shader;
+ * left alone it would compile on the frame the first grind spark or glitch pop fires — a hitch at exactly the moment the
+ * game is answering the player. ambient() and ballTrail() run in load(), so they warm it: a one-particle system that is
+ * never started, kept so its compiled effect stays in the engine's cache.
+ */
+export function prewarmBurstShaders(scene: Scene): void {
+  const md = (scene.metadata ??= {}) as { felFxPrewarmed?: boolean };
+  if (md.felFxPrewarmed) return;
+  md.felFxPrewarmed = true;
+  try {
+    const ps = baseSystem(scene, '__fx_prewarm_streak', 1);
+    ps.emitter = Vector3.Zero();
+    ps.blendMode = ParticleSystem.BLENDMODE_ADD;
+    ps.billboardMode = ParticleSystem.BILLBOARDMODE_STRETCHED;
+    ps.emitRate = 0;
+    ps.isReady();   // creates (and starts compiling) the effect; the system is never started
+  } catch { /* a headless scene: nothing to warm */ }
 }
 
 function baseSystem(scene: Scene, name: string, capacity: number): ParticleSystem {
@@ -160,6 +217,7 @@ export function burstPoolSize(scene: Scene, kind: BurstKind): number { return bu
 export const EffectsKit = {
   /** Ambient motion per venue — mount once in load(). */
   ambient(scene: Scene, family: VenueFamily): AmbientHandle {
+    prewarmBurstShaders(scene);
     // IMPROVE (2026-10-06): everything mounted here is kept, so the handle can take it down (callers that ignore it are unchanged)
     const owned: { dispose(): void }[] = [], observers: Observer<Scene>[] = [];
     if (family === 'dojo') {                               // drifting petals
@@ -231,6 +289,7 @@ export const EffectsKit = {
 
   /** Comet trail parented to the ball. Call once; runs while ball moves. */
   ballTrail(scene: Scene, ball: AbstractMesh, hex = '#ffb36b'): ParticleSystem {
+    prewarmBurstShaders(scene);
     const ps = baseSystem(scene, 'fx_ball_trail', 120);
     ps.emitter = ball;
     ps.minEmitPower = 0; ps.maxEmitPower = 0;    // a trail is the PATH the ball took: the particles stay where they were laid
@@ -251,7 +310,9 @@ export const EffectsKit = {
     // clamped: a caller passing 0 would allocate a system that emits nothing, and one passing 50 would
     // budget thousands of particles for a footstep.
     const k = Math.max(0.25, Math.min(BURST_SCALE_MAX, scale));
-    const count = Math.max(4, Math.round(cfg.count * k));
+    // A9.8: the scene's particle budget — a burst that fits fires whole, one that does not is trimmed to the room left
+    // (never below a readable few). ParticleBudget.ts.
+    const count = fitBurst(Math.max(4, Math.round(cfg.count * k)), liveParticles(scene), particleBudget(scene), particleBudgetScale(scene));
     // IMPROVE (2026-10-06): a pooled system when one is idle; the old one-off (self-disposing) only when all are busy
     const pooled = pooledBurst(scene, kind);
     const ps = pooled ?? baseSystem(scene, `fx_${kind}_${Date.now()}`, count);
@@ -266,6 +327,25 @@ export const EffectsKit = {
     ps.minEmitPower = cfg.speed * 0.5 * k; ps.maxEmitPower = cfg.speed * k;
     ps.direction1 = new Vector3(-1, 1, -1); ps.direction2 = new Vector3(1, 1.6, 1);
     ps.gravity = new Vector3(0, cfg.gy, 0);
+    const look = BURST_LOOK[kind];
+    if (look.additive) ps.blendMode = ParticleSystem.BLENDMODE_ADD;
+    if (look.stretched) {
+      ps.billboardMode = ParticleSystem.BILLBOARDMODE_STRETCHED;
+      ps.minScaleX = 0.35; ps.maxScaleX = 0.45;   // thin across the flight,
+      ps.minScaleY = 1.8; ps.maxScaleY = 2.6;     // long along it
+    }
+    if (look.grow !== 1) {
+      ps.addSizeGradient(0, ps.minSize, ps.maxSize);
+      ps.addSizeGradient(1, ps.minSize * look.grow, ps.maxSize * look.grow);
+      ps.addColorGradient(0, new Color4(c1.r, c1.g, c1.b, 0.55), new Color4(c2.r, c2.g, c2.b, 0.5));
+      ps.addColorGradient(1, new Color4(c1.r, c1.g, c1.b, 0), new Color4(c2.r, c2.g, c2.b, 0));
+    }
+    if (look.spin) {
+      ps.minAngularSpeed = -look.spin; ps.maxAngularSpeed = look.spin;
+      ps.minInitialRotation = 0; ps.maxInitialRotation = Math.PI * 2;
+      ps.colorDead = new Color4(c2.r, c2.g, c2.b, 0);
+    }
+    if (look.quad) ps.particleTexture = quadTexture(scene);
     ps.manualEmitCount = count;
     ps.disposeOnStop = !pooled;
     ps.start();

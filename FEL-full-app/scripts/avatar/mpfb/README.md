@@ -14,3 +14,8 @@ Blender authors, the forge finishes.
    eyes / hair), and writes the hero.
 3. `/dev/rig?avatar=/models/candidates/<file>.glb&anim=/models/clips/npc_ericnash_run.glb`
    runs the Phase 0 rig audit on the result.
+
+Modelled outfits (CREATOR-PLAN phase 4e, 2026-10-06): `fit-outfit.py` fits a modelled garment (an MPFB `.mhclo` asset
+or any `.glb/.fbx/.obj/.blend`) to the kit body, weights it from the body, and exports it as a kit pack
+(`public/models/kits/<itemId>.glb`, the game's own 22-bone armature + one `Kit_<slot>_<itemId>` mesh). UNTESTED (no
+Blender in the cloud); the owner's checklist is in `docs/BRIEF-WARDROBE.md` ("Modelled outfits").

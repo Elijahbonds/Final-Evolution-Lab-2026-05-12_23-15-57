@@ -127,11 +127,11 @@ describe('route: a phone press, as its seat should be heard', () => {
     expect(buzz(0, btn('Y', false))).toEqual([btn('Y', false)]);
     expect(buzz(0, dpad('up'))).toEqual([]);
   });
-  it('BUZZ seat 1: A B X Y become ▲ ▶ ▼ ◀ — the card order — press and release both', () => {
+  it('BUZZ seat 1: A B X Y become ▲ ▶ ◀ ▼ — the card order (#14\'s 2×2 grid) — press and release both', () => {
     expect(buzz(1, btn('A'))).toEqual([dpad('up')]);
     expect(buzz(1, btn('B'))).toEqual([dpad('right')]);
-    expect(buzz(1, btn('X'))).toEqual([dpad('down')]);
-    expect(buzz(1, btn('Y', false))).toEqual([dpad('left', false)]);
+    expect(buzz(1, btn('X'))).toEqual([dpad('left')]);
+    expect(buzz(1, btn('Y', false))).toEqual([dpad('down', false)]);
     expect(buzz(1, dpad('left'))).toEqual([dpad('left')]);
     expect(buzz(1, { t: 'stick', side: 'L', x: 1, y: 0 })).toEqual([]);
   });

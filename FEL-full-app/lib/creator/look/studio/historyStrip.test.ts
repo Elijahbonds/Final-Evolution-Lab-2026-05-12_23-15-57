@@ -27,6 +27,19 @@ describe('what each step is called', () => {
     expect(describeStep(a, move({ colour: '#00FF00' }))).toBe('Recoloured horn');
     expect(describeStep(a, S0)).toBe('Removed a horn');
   });
+  it('phase 4e: clothes put on, recoloured, changed, layered, taken off — and each counts towards a big change', () => {
+    const on = (clothes: NonNullable<CreatorSlotV2['doc']['clothes']>) => withDoc(S0, (d) => ({ ...d, clothes }));
+    const hoodie = { id: 'c1', kind: 'top' as const, style: 'hoodie' as const, colour: '#111111' };
+    const pants = { id: 'c2', kind: 'bottom' as const, style: 'pants' as const, colour: '#222222' };
+    const a = on([hoodie]);
+    expect(describeStep(S0, a)).toBe('Put on hoodie');
+    expect(describeStep(a, on([{ ...hoodie, colour: '#FF0000' }]))).toBe('Recoloured hoodie');
+    expect(describeStep(a, on([{ ...hoodie, sleeve: 'short' }]))).toBe('Changed hoodie');
+    const b = on([hoodie, pants]);
+    expect(describeStep(b, on([pants, hoodie]))).toBe('Clothing: layers');
+    expect(describeStep(a, S0)).toBe('Took off hoodie');
+    expect(changeSize(S0, on([hoodie, pants]))).toBe(2);
+  });
   it('paint, the base look, the body, suit mode', () => {
     const l = newLayer([], 'stamp', ['#FF0000'])!;
     const b = withDoc(S0, (d) => ({ ...d, paint: [l] }));

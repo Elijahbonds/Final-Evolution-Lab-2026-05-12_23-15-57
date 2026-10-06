@@ -21,7 +21,7 @@ import {
 import { FACE_MORPH_NAMES, faceFieldRenders, faceOptionRenders, type FaceField } from '@/lib/babylon/core/faceMorphs';
 import { faceMorphList } from '@/lib/creator/look/faceMorphList';
 import { accessoriesForEquipped, wornPartsForEquipped } from '@/lib/closet/wearableAccessories';
-import { MAX_SLOTS, emptyCreatorDoc, type CreatorMark, type ColourSlot, type CreatorEyes, type CreatorPart, type CreatorShape, type CreatorSlotV2, type HideKey, type PaintLayer, type PaintRegion, type SlotBody, type SlotFrame } from '@/lib/creator/look/doc';
+import { CLOTH_KIT_SLOT, MAX_SLOTS, emptyCreatorDoc, type ClothKind, type CreatorCloth, type CreatorMark, type ColourSlot, type CreatorEyes, type CreatorPart, type CreatorShape, type CreatorSlotV2, type HideKey, type PaintLayer, type PaintRegion, type SlotBody, type SlotFrame } from '@/lib/creator/look/doc';
 import { readCreatorDoc, faceOnly, type StoredFace } from '@/lib/creator/look/storage';
 import {
   addSlot, blankSlot, canAddSlot, duplicateSlot, ensureSlots, heroBodyForSlot, mergeDeviceNumbers, newSlotId, newSlotLabel,
@@ -46,6 +46,7 @@ import { STUDIO_POSES, STUDIO_VENUES, backdropFor, type StudioVenue } from '@/li
 import { WALK_COPY, WALK_DONE, WALK_START, rememberWalk, walkCurrent, walkReduce, walkSeen, type WalkEvent, type WalkState } from '@/lib/creator/look/studio/walkthrough';
 import { fitsBudget, updatePart } from '@/lib/creator/look/parts';
 import { REGION_LABELS, newLayer, updateLayer } from '@/lib/creator/look/paint';
+import { clothLabel, randomiseClothes, resolveCloth } from '@/lib/creator/look/clothes';
 import type { FeelCue } from '@/lib/babylon/creator/studio/feel';
 
 // The 3D preview is client-only (Babylon engine on a canvas) — never SSR it.
@@ -56,11 +57,13 @@ const PartsTab = dynamic(() => import('@/components/closet/parts-tab').then((m) 
 const PaintTab = dynamic(() => import('@/components/closet/paint-tab').then((m) => m.PaintTab), { ssr: false });
 // CREATOR-PLAN phase 4b: the Shape tab (proportions, bulk, the Studio size).
 const ShapeTab = dynamic(() => import('@/components/closet/shape-tab').then((m) => m.ShapeTab), { ssr: false });
+// CREATOR-PLAN phase 4e: the Clothing tab (code-built clothes from the body itself; free).
+const ClothesTab = dynamic(() => import('@/components/closet/clothes-tab').then((m) => m.ClothesTab), { ssr: false });
 // CREATOR-PLAN phase 4d: photo mode (loaded when opened).
 const PhotoMode = dynamic(() => import('@/components/closet/studio/photo-mode').then((m) => m.PhotoMode), { ssr: false });
 
 /** The editor's tabs, in order (the pad's shoulder buttons and the [ ] keys cycle them). */
-const STUDIO_TABS: readonly StudioTab[] = ['face', 'shape', 'parts', 'paint', 'wear', 'skins'];
+const STUDIO_TABS: readonly StudioTab[] = ['face', 'shape', 'parts', 'paint', 'clothes', 'wear', 'skins'];
 /** Soft UI sounds and haptics, loaded on first use (SoundKit stays out of the page's first bundle). */
 const cue = (c: FeelCue) => { void import('@/lib/babylon/creator/studio/feel').then((m) => m.feel(c)).catch(() => undefined); };
 
@@ -162,7 +165,7 @@ export function ClosetView({ adult = false, fullBleed = false }: { adult?: boole
   const [owned, setOwned] = useState<Set<string>>(new Set());
   const [skins, setSkins] = useState<CardSkin[]>([]);
   const [skinCardId, setSkinCardId] = useState<string | null>(null);
-  const [tab, setTab] = useState<'face' | 'shape' | 'parts' | 'paint' | 'wear' | 'skins'>('face');
+  const [tab, setTab] = useState<StudioTab>('face');
   // CREATOR-PLAN phase 4c: the face sliders come from the morph targets the LOADED body carries (the preview reports them
   // on every spawn), so a morph baked into the GLB in phase 5 appears here without code; the forge's seven until it reports
   const [morphNames, setMorphNames] = useState<string[]>(() => [...FACE_MORPH_NAMES]);
@@ -177,6 +180,9 @@ export function ClosetView({ adult = false, fullBleed = false }: { adult?: boole
   const studioApi = useRef<StudioApi | null>(null);
   const [partSel, setPartSel] = useState<string | null>(null);
   const [layerSel, setLayerSel] = useState<string | null>(null);
+  // CREATOR-PLAN phase 4e: the Clothing tab's selection and its randomise locks
+  const [clothSel, setClothSel] = useState<string | null>(null);
+  const [clothLocks, setClothLocks] = useState<ClothKind[]>([]);
   const [autoSpin, setAutoSpinState] = useState(true);
   const [pose, setPose] = useState('idle');
   const [venue, setVenueState] = useState<StudioVenue['id']>('studio');
@@ -258,7 +264,7 @@ export function ClosetView({ adult = false, fullBleed = false }: { adult?: boole
     const kept = stash.current.get(id);
     setHist(kept && kept.present === target ? kept : createHistory(target));
     if (!baseline.current.has(id)) baseline.current.set(id, target);
-    setPartSel(null); setLayerSel(null); setTapped(null); setCompare(false);
+    setPartSel(null); setLayerSel(null); setClothSel(null); setTapped(null); setCompare(false);
   };
   const selectSlot = (id: string) => { if (id !== selectedId) goTo(allSlots, id); };
   const newCharacter = () => {
@@ -347,6 +353,20 @@ export function ClosetView({ adult = false, fullBleed = false }: { adult?: boole
     const d = readCreatorDoc(p) ?? emptyCreatorDoc();
     return { ...p, creator: { ...d, paint, flags: { ...d.flags, suit: on } } };
   });
+  /** Phase 4e: the doc's code-built clothes (innermost first). A drag passes a group so it is one undo step. */
+  const setClothes = (next: CreatorCloth[], group?: string) => setFace((p) => {
+    const d = readCreatorDoc(p) ?? emptyCreatorDoc();
+    const out = { ...d };
+    if (next.length) out.clothes = next; else delete out.clothes;
+    return { ...p, creator: out };
+  }, group);
+  const rollClothes = () => setFace((p) => {
+    const d = readCreatorDoc(p) ?? emptyCreatorDoc();
+    const next = randomiseClothes(d.clothes ?? [], clothLocks, Math.random);
+    const out = { ...d };
+    if (next.length) out.clothes = next; else delete out.clothes;
+    return { ...p, creator: out };
+  });
   /** The procedural eyes block (phase 4a). Defaults are dropped by the sanitiser, so an untouched look carries nothing. */
   const setEyes = (e: CreatorEyes, group?: string) => setFace((p) => {
     const d = readCreatorDoc(p) ?? emptyCreatorDoc();
@@ -390,9 +410,12 @@ export function ClosetView({ adult = false, fullBleed = false }: { adult?: boole
   }, group);
   const selectedPart = useMemo(() => (tab === 'parts' ? doc?.parts.find((p) => p.id === partSel) ?? null : null), [tab, doc, partSel]);
   const selectedLayer = useMemo(() => doc?.paint.find((l) => l.id === layerSel) ?? null, [doc, layerSel]);
+  const selectedCloth = useMemo(() => (tab === 'clothes' ? doc?.clothes?.find((c) => c.id === clothSel) ?? null : null), [tab, doc, clothSel]);
   const sticker = tab === 'paint' && selectedLayer && (selectedLayer.type === 'stamp' || selectedLayer.type === 'text' || selectedLayer.type === 'mark') ? selectedLayer : null;
+  const clothFocus = selectedCloth ? resolveCloth(selectedCloth) : null;
   const focus: StudioFocus = tab === 'parts' && selectedPart ? { kind: 'part', bone: selectedPart.bone }
-    : tab === 'paint' && selectedLayer ? { kind: 'layer', region: selectedLayer.region } : null;
+    : tab === 'paint' && selectedLayer ? { kind: 'layer', region: selectedLayer.region }
+      : clothFocus ? { kind: 'cloth', cloth: clothFocus.kind, long: clothFocus.hem === 'thigh' || clothFocus.hem === 'knee', hood: clothFocus.hood === 'up' } : null;
   const setAutoSpin = (on: boolean) => { setAutoSpinState(on); studioApi.current?.setAutoSpin(on); };
   const setVenue = (v: StudioVenue['id']) => { setVenueState(v); studioApi.current?.setVenue(v); };
   const playPose = (id: string) => { setPose(id); studioApi.current?.playPose(id); };
@@ -443,6 +466,7 @@ export function ClosetView({ adult = false, fullBleed = false }: { adult?: boole
         const dir = a === 'nextItem' ? 1 : -1;
         if (tab === 'parts' && doc?.parts.length) setPartSel((id) => cycle(doc.parts.map((p) => p.id), id ?? doc.parts[0].id, dir));
         else if (tab === 'paint' && doc?.paint.length) setLayerSel((id) => cycle(doc.paint.map((l) => l.id), id ?? doc.paint[0].id, dir));
+        else if (tab === 'clothes' && doc?.clothes?.length) setClothSel((id) => cycle(doc.clothes!.map((c) => c.id), id ?? doc.clothes![0].id, dir));
         break;
       }
       case 'photo': setPhotoOpen(true); break;
@@ -451,7 +475,7 @@ export function ClosetView({ adult = false, fullBleed = false }: { adult?: boole
       case 'mirror': toggleMirror(); break;
       case 'shotIn': studioApi.current?.setShot('in'); break;
       case 'shotOut': studioApi.current?.setShot('out'); break;
-      case 'back': if (photoOpen) setPhotoOpen(false); else if (compare) setCompare(false); else if (tapped) setTapped(null); else { setPartSel(null); setLayerSel(null); } break;
+      case 'back': if (photoOpen) setPhotoOpen(false); else if (compare) setCompare(false); else if (tapped) setTapped(null); else { setPartSel(null); setLayerSel(null); setClothSel(null); } break;
       default: break;
     }
   };
@@ -526,6 +550,11 @@ export function ClosetView({ adult = false, fullBleed = false }: { adult?: boole
   const back = backdropFor(venue);
 
   const canEquip = (itemId: string) => canEquipItem(itemId, owned);
+  /** Phase 4e: the built piece worn over a store slot (it replaces the item there while worn), or null. */
+  const builtOver = (slot: WearableSlot): string | null => {
+    const c = doc?.clothes?.find((x) => CLOTH_KIT_SLOT[x.kind] === slot);
+    return c ? clothLabel(c).toLowerCase() : null;
+  };
 
   const buy = async (itemId: string) => {
     const w = getWearable(itemId);
@@ -584,7 +613,8 @@ export function ClosetView({ adult = false, fullBleed = false }: { adult?: boole
   const stageH = fullBleed ? 'h-[100dvh]' : 'h-[calc(100dvh-3.5rem)] max-md:h-[calc(100dvh-3.5rem-4.5rem)]';
   const hudBtn = 'pointer-events-auto flex items-center gap-1 rounded-lg border border-white/10 bg-black/55 px-2.5 py-1.5 max-md:px-2 max-md:py-1 font-display text-[10px] font-semibold uppercase tracking-wider text-white/80 backdrop-blur transition hover:border-cyan-400/50';
   const on = (v: boolean) => (v ? { borderColor: 'var(--fel-cyan)', color: 'var(--fel-cyan)', background: 'rgba(0,229,255,0.12)' } : undefined);
-  const selLabel = tab === 'parts' && selectedPart ? `Part · ${selectedPart.shape}` : tab === 'paint' && selectedLayer ? `Layer · ${REGION_LABELS[selectedLayer.region]}` : null;
+  const selLabel = tab === 'parts' && selectedPart ? `Part · ${selectedPart.shape}` : tab === 'paint' && selectedLayer ? `Layer · ${REGION_LABELS[selectedLayer.region]}`
+    : selectedCloth ? `Wearing · ${clothLabel(selectedCloth)}` : null;
   const selMirror = tab === 'parts' ? selectedPart?.mirror : tab === 'paint' ? selectedLayer?.mirror : undefined;
 
   // CREATOR-PLAN phase 4d: THE STUDIO — a full-screen stage (the preview, its HUD, the history strip) and the editor
@@ -674,7 +704,8 @@ export function ClosetView({ adult = false, fullBleed = false }: { adult?: boole
         </div>
       </section>
 
-      <aside aria-label="Editor" className="min-h-0 flex-1 overflow-y-auto border-t border-white/10 bg-[#0a0a0f] px-4 py-4 md:border-l md:border-t-0">
+      {/* scroll-padding: whatever the editor scrolls into view (a picked row, a focused field) lands below the sticky tabs */}
+      <aside aria-label="Editor" className="min-h-0 flex-1 scroll-pt-16 overflow-y-auto border-t border-white/10 bg-[#0a0a0f] px-4 py-4 md:scroll-pt-28 md:border-l md:border-t-0">
         {/* a phone's stage is small: the walkthrough sits at the top of the editor there */}
         <div className="mb-3 md:hidden"><WalkthroughCard state={walk} onNext={() => walkDo('next')} onSkip={() => walkDo('skip')} /></div>
         <div className="mb-4 space-y-3">
@@ -701,11 +732,15 @@ export function ClosetView({ adult = false, fullBleed = false }: { adult?: boole
           />
         )}
         <div>
-          <div className="sticky top-0 z-10 -mx-4 mb-4 flex flex-wrap gap-2 bg-[#0a0a0f]/95 px-4 py-2 backdrop-blur">
+          {/* the tabs stick flush to the top of the editor (-top-4 takes back its padding: nothing shows above them), and
+              on a phone they are ONE row that scrolls sideways — two rows of chips hid a third of the 390 × 844 editor
+              (seen 2026-10-06: the Clothing list's rows cut behind them) */}
+          <div className="sticky -top-4 z-20 -mx-4 mb-4 flex gap-2 bg-[#0a0a0f] px-4 py-2 shadow-[0_6px_10px_-6px_rgba(0,0,0,0.8)] max-md:flex-nowrap max-md:overflow-x-auto max-md:[scrollbar-width:none] md:flex-wrap [&>*]:shrink-0">
             <Chip label="Face" active={tab === 'face'} onClick={() => setTab('face')} />
             <Chip label="Shape" active={tab === 'shape'} onClick={() => setTab('shape')} />
             <Chip label="Parts" active={tab === 'parts'} onClick={() => setTab('parts')} />
             <Chip label="Paint" active={tab === 'paint'} onClick={() => setTab('paint')} />
+            <Chip label="Clothing" active={tab === 'clothes'} onClick={() => setTab('clothes')} />
             <Chip label="Wearables" active={tab === 'wear'} onClick={() => setTab('wear')} />
             <Chip label="Card Skins" active={tab === 'skins'} onClick={() => setTab('skins')} accent="#A855F7" />
           </div>
@@ -805,6 +840,17 @@ export function ClosetView({ adult = false, fullBleed = false }: { adult?: boole
             </motion.div>
           )}
 
+          {tab === 'clothes' && (
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+              <ClothesTab clothes={doc?.clothes ?? []} onChange={setClothes} accent={previewPalette.accent}
+                locks={clothLocks} onLocks={setClothLocks} onRoll={rollClothes}
+                canUndo={canUndo(hist)} canRedo={canRedo(hist)} onUndo={() => setHist(undo)} onRedo={() => setHist(redo)}
+                selectedId={clothSel} onSelect={setClothSel}
+                storeItems={{ tops: equipped.tops ? getWearable(equipped.tops)?.name ?? null : null, shorts: equipped.shorts ? getWearable(equipped.shorts)?.name ?? null : null, shoes: equipped.shoes ? getWearable(equipped.shoes)?.name ?? null : null }}
+                onStore={() => setTab('wear')} />
+            </motion.div>
+          )}
+
           {tab === 'wear' && (
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
               <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
@@ -853,6 +899,9 @@ export function ClosetView({ adult = false, fullBleed = false }: { adult?: boole
               {SLOTS.map((slot) => (
                 <div key={slot}>
                   <h3 className="mb-2 text-sm font-semibold capitalize text-white/80">{slot}</h3>
+                  {builtOver(slot) && (
+                    <p className="mb-2 text-[11px] text-[#FFD700]/80" role="note">Your built {builtOver(slot)} is worn over this slot (Clothing tab) — the item here shows again when you take it off.</p>
+                  )}
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                     <button onClick={() => setEquipped((p) => ({ ...p, [slot]: null }))} className="rounded-xl border border-white/10 bg-white/[0.02] p-3 text-left text-xs text-white/50 transition hover:border-white/25">None</button>
                     {wearablesForSlot(slot).map((w) => {

@@ -40,6 +40,12 @@
 // first 3 glow layers glow (the rest paint as normal), so the phone pays at most ~0.3 MiB more for it. Nothing runs per
 // frame: the glow is drawn in the same budgeted tile pass as the paint, and only when an edit dirties tiles.
 //
+// CODE-BUILT CLOTHES (IMPROVE (2026-10-06), CREATOR-PLAN phase 4e): a layer on the garments paints the player's built
+// clothes too (lib/babylon/creator/clothes — one merged mesh, `metadata.felCloth`). Their UVs ARE the body's, so they use the
+// BODY's surface map (at the garment size; one per kit, not one per garment shape), and their albedo is the garments' own
+// colours rasterised into that UV space (`metadata.felClothBase`, clothes/baseRaster.ts) — the vertex colours they show
+// unpainted are switched off while the painted texture is bound, and back on when it is not.
+//
 // Cosmetic only: nothing here touches a mesh's geometry, a bone, a hitbox or a pick.
 
 import { Color3, RawTexture, Texture } from '@babylonjs/core';
@@ -68,11 +74,19 @@ export const GLOW_SHIFT: Record<PaintTier, number> = { desktop: 1, mobile: 2 };
 /** Phase 4c: how many glow layers glow on one painted mesh; past it a glow layer paints as normal. */
 export const GLOW_LAYER_CAP: Record<PaintTier, number> = { desktop: 8, mobile: 3 };
 
+/** Phase 4e: what a code-built garment hands paint for its albedo (renderClothes puts it on the mesh's metadata). */
+interface ClothBase { key: string; read: (size: number) => Uint8Array }
+const clothBaseOf = (m: AbstractMesh): ClothBase | null => ((m.metadata as { felCloth?: boolean; felClothBase?: ClothBase } | null | undefined)?.felCloth ? (m.metadata as { felClothBase?: ClothBase }).felClothBase ?? null : null);
+
 type AlbedoMat = Material & { albedoTexture?: BaseTexture | null; albedoColor?: Color3; diffuseTexture?: BaseTexture | null; diffuseColor?: Color3; emissiveTexture?: BaseTexture | null; emissiveColor?: Color3 };
 
 interface Target {
   mesh: Mesh;
   kind: 'skin' | 'garment';
+  /** phase 4e: the mesh whose surface map this target paints with (the body, for a code-built garment) */
+  mapMesh: Mesh;
+  /** phase 4e: a code-built garment (its own colour raster for an albedo; its vertex colours off while bound) */
+  cloth: ClothBase | null;
   size: number;
   mapKey: string;
   map: SurfaceMap | null;
@@ -215,7 +229,7 @@ export function syncPaint(
     let reach = 0;
     for (const l of garmentLayers) reach |= layerLabelBits(l);
     for (const m of meshes) {
-      if (!kitOf(m.name) || !m.isVisible || !m.isEnabled()) continue;
+      if ((!kitOf(m.name) && !clothBaseOf(m)) || !m.isVisible || !m.isEnabled()) continue;
       if (atomBitsOf(m as Mesh, P.chart, P.chartKey) & reach) want.set(m as Mesh, 'garment');
     }
   }
@@ -223,17 +237,17 @@ export function syncPaint(
   if (!P.chart) return { targets: 0, layers: layers.length };
   for (const [mesh, kind] of want) {
     let t = P.targets.get(mesh);
-    if (!t) { t = newTarget(P, mesh, kind); P.targets.set(mesh, t); }
+    if (!t) { t = newTarget(P, mesh, kind, clothBaseOf(mesh) && body ? body : mesh); P.targets.set(mesh, t); }
     updateTarget(P, t);
   }
   if (opts.sync) flushPaint(root);
   return { targets: P.targets.size, layers: layers.length };
 }
 
-function newTarget(P: BodyPaint, mesh: Mesh, kind: 'skin' | 'garment'): Target {
+function newTarget(P: BodyPaint, mesh: Mesh, kind: 'skin' | 'garment', mapMesh: Mesh = mesh): Target {
   const size = PAINT_SIZES[P.tier][kind];
   return {
-    mesh, kind, size, mapKey: surfaceMapKey(mesh, P.chartKey, size), map: null, mat: null, src: null, tex: null, out: null,
+    mesh, kind, mapMesh, cloth: clothBaseOf(mesh), size, mapKey: surfaceMapKey(mapMesh, P.chartKey, size), map: null, mat: null, src: null, tex: null, out: null,
     base: null, baseKey: '', baseState: 'none', flat: [0.5, 0.5, 0.5], tint: [1, 1, 1], compiled: [], dirty: null, complete: false,
     up: null, below: null, cutSig: '', alphaSaved: null, emit: null, emitTex: null, emitUp: null, emitSaved: null,
   };
@@ -245,7 +259,7 @@ function mapFor(P: BodyPaint, t: Target): SurfaceMap | null {
   const hit = cachedSurfaceMap(t.mapKey);
   if (hit) { t.map = hit; return hit; }
   if (hit === undefined && !mapJobs.has(t.mapKey) && P.chart) {
-    const it = surfaceMapSteps(t.mesh, P.chart, t.size);
+    const it = surfaceMapSteps(t.mapMesh, P.chart, t.size);
     if (it) mapJobs.set(t.mapKey, it); else storeSurfaceMap(t.mapKey, null);
   }
   return null;
@@ -270,7 +284,9 @@ function updateTarget(P: BodyPaint, t: Target): void {
   const src = t.src!;
   const gamma = (v: number) => Math.pow(Math.max(0, v), 1 / 2.2);
   const tint: [number, number, number] = [gamma(src.color.r), gamma(src.color.g), gamma(src.color.b)];
-  const baseKey = src.tex ? `${src.tex.uniqueId}` : 'flat';
+  // phase 4e: a code-built garment's albedo is its own colour raster (renderClothes), keyed by its geometry and colours
+  t.cloth = clothBaseOf(t.mesh);
+  const baseKey = t.cloth ? `cloth:${t.cloth.key}` : src.tex ? `${src.tex.uniqueId}` : 'flat';
   const tintChanged = tint.some((v, i) => Math.abs(v - t.tint[i]) > 1e-4);
   t.tint = tint;
   // phase 4a: a cut that changed redraws the whole skin (a toggle, rare: not worth a tile diff)
@@ -330,6 +346,7 @@ function flatFor(mat: AlbedoMat, tex: BaseTexture | null): [number, number, numb
 
 /** Read the source texture's pixels back at the target's size (once per texture and size, shared). */
 function requestBase(t: Target): void {
+  if (t.cloth) { t.base = t.cloth.read(t.size); t.baseState = 'ready'; return; }
   const tex = t.src?.tex;
   if (!tex) { t.baseState = 'ready'; t.base = null; return; }
   let per = bases.get(tex);
@@ -511,6 +528,7 @@ const isBound = (c: Color3 | null): boolean => !!c && c.r === BOUND.r && c.g ===
 function bind(t: Target, P?: BodyPaint): void {
   if (!t.mat || !t.tex) return;
   syncAlphaCut(t, t.kind === 'skin' && !!P?.cutTable);
+  if (t.cloth) t.mesh.useVertexColors = false;   // phase 4e: the texture carries the garment's colours now
   const cur = albedoOf(t.mat);
   if (cur.tex === t.tex && isBound(cur.color)) return;
   setAlbedo(t.mat, t.tex, BOUND);
@@ -545,6 +563,7 @@ function restoreAlpha(t: Target): void {
 
 function restoreTarget(t: Target): void {
   restoreGlow(t);
+  if (t.cloth && !t.mesh.isDisposed()) t.mesh.useVertexColors = true;
   if (!t.mat || !t.src) return;
   restoreAlpha(t);
   if (albedoOf(t.mat).tex === t.tex) setAlbedo(t.mat, t.src.tex, t.src.color);

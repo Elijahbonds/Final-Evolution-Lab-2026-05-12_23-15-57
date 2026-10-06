@@ -14,6 +14,10 @@
 //                    ranked), never the arms (REACH-FREEZE), and per-segment bulk as one summed morph per mesh. Synced on
 //                    EVERY apply, after the parts (a part on a hand is scaled with the hand). The Studio-only presentation
 //                    size is NOT here: avatar-preview applies it from its own scene (shape/presentation.ts).
+//   phase 4e (clothes): DONE (2026-10-06) — lib/babylon/creator/clothes/renderClothes.syncClothes: code-built clothes from
+//                    the body's own triangles, ONE merged skinned mesh per body (never in spawn.meshes, like parts), the
+//                    skin under it not drawn. Synced FIRST on every apply (paint paints it, the shape morph shapes it: both
+//                    are handed the cloth mesh with the body's own meshes). applyKit already hid the kit slots it covers.
 //
 // Contract every phase keeps: idempotent per body (a re-apply with the same doc is cheap; a changed doc replaces, never
 // stacks), everything made is disposed when the body's root disposes, and nothing here changes a hitbox, a reach or a
@@ -24,6 +28,7 @@ import type { CreatorDoc, CreatorPart } from '../../creator/look/doc';
 import { syncParts } from '../creator/parts/renderParts';
 import { syncPaint } from '../creator/paint/renderPaint';
 import { bulkPushFor, syncShape } from '../creator/shape/renderShape';
+import { syncClothes } from '../creator/clothes/renderClothes';
 
 export interface CreatorLayers {
   /** JSON of the doc last applied (cheap change test for a live editor) */
@@ -64,11 +69,15 @@ export function applyCreatorLayers(
   const sig = doc || worn.length ? JSON.stringify([doc, worn]) : '';
   const prev = applied.get(root);
   const summary = { parts: doc?.parts.length ?? 0, paint: doc?.paint.length ?? 0 };
-  syncPaint(spawn, doc);
+  // CLOTHES (phase 4e, 2026-10-06) first: paint reaches the cloth mesh and the shape morph shapes it, so both are handed
+  // it alongside the body's own meshes (it is never pushed into spawn.meshes)
+  const cloth = syncClothes(spawn, doc)?.mesh ?? null;
+  const dressed = cloth ? { ...spawn, meshes: [...(spawn.meshes ?? spawn.root.getChildMeshes()), cloth] } : spawn;
+  syncPaint(dressed, doc);
   if (!(prev && prev.sig === sig)) layersChanged(spawn, root, doc, worn, sig, summary);
   // SHAPE (phase 4b, 2026-10-06) on every call too, after the parts: the place decides the values (a standard-frame mode
   // plays the frame keys at 1.0), applyIdentity may have just re-set the root, and a part on a hand is scaled with it
-  syncShape(spawn, doc);
+  syncShape(dressed, doc);
   return summary;
 }
 

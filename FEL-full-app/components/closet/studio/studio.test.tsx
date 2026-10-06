@@ -63,6 +63,19 @@ describe('the wiring (source)', () => {
     for (const t of ['Face', 'Shape', 'Parts', 'Paint', 'Wearables', 'Card Skins']) expect(closet).toContain(`<Chip label="${t}"`);
     expect(existsNoSecondEditor()).toBe(true);
   });
+  it('the tabs never hide the editor (4e polish, 2026-10-06): flush to the top, one sideways row on a phone, and what is scrolled into view lands below them', () => {
+    const bar = closet.match(/<div className="(sticky [^"]*)">\s*<Chip label="Face"/);
+    expect(bar, 'the sticky tab bar').toBeTruthy();
+    const cls = bar![1].split(/\s+/);
+    // flush: the editor's own padding (py-4) taken back, so no list row shows above the bar
+    expect(closet).toMatch(/<aside aria-label="Editor" className="[^"]*\bpy-4\b/);
+    expect(cls).toContain('-top-4');
+    // a phone: one row that scrolls sideways (two rows of chips hid the Clothing list's rows at 390 × 844), opaque
+    for (const c of ['max-md:flex-nowrap', 'max-md:overflow-x-auto', '[&>*]:shrink-0', 'bg-[#0a0a0f]']) expect(cls).toContain(c);
+    expect(cls).not.toContain('flex-wrap');
+    // a picked row or a focused field is scrolled to below the bar, not behind it
+    expect(closet).toMatch(/<aside aria-label="Editor" className="[^"]*\bscroll-pt-16\b[^"]*\bmd:scroll-pt-28\b/);
+  });
   it('every key goes through input.keyAction, never inside a text box', () => {
     expect(closet).toMatch(/const f = isFieldTarget\(e\.target as HTMLInputElement \| null\);\s*const a = keyAction\(e, f\.field, f\.text\);/);
   });

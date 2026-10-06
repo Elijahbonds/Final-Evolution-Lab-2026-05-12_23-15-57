@@ -10,6 +10,7 @@ import { BootSplash } from './boot-splash';
 import { surfaceBootError } from './boot-error';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
+import { mergeHud } from '@/lib/babylon/core/hudMerge';   // IMPROVE (2026-10-06): an unchanged HUD patch is not a render
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode, hnum } from './hud-format';
 
@@ -76,7 +77,7 @@ export default function MixedCombatBabylon({ onEnd }: GameProps) {
           setCountdown(p === 'countdown' && typeof cd === 'number' ? cd : null);
           setLoadError(p === 'error' ? (typeof cd === 'string' ? cd : 'Failed to load this mode.') : null);
         },
-        onHud: (u) => { if (!disposed) setHud((prev) => ({ ...prev, ...u })); },
+        onHud: (u) => { if (!disposed) setHud((prev) => mergeHud(prev, u)); },
         resultSink,
       })
         .then((s) => {
@@ -116,7 +117,8 @@ export default function MixedCombatBabylon({ onEnd }: GameProps) {
           <div className="flex flex-col gap-1">
             <span className="fel-panel px-2 py-0.5 text-cyan-300">HP {hnum(hud.hp, 100)}</span>
             <span className="fel-panel px-2 py-0.5 text-yellow-400">GUARD {hnum(hud.guard, 100)}</span>
-            <span className="fel-panel px-2 py-0.5 text-purple-400">CHI {hnum(hud.chi, 0)}</span>
+            {/* IMPROVE (2026-10-06): a full bar is the DRAGON in this mode (mixedRules.dragonLicensed) — the line says so */}
+            <span className={`fel-panel px-2 py-0.5 ${hud.dragonReady ? 'text-[#FFD700] shadow-[0_0_8px_#FFD700]' : 'text-purple-400'}`}>CHI {hnum(hud.chi, 0)}{hud.dragonReady ? ' · DRAGON' : ''}</span>
             {hud.focus != null && <span className={`fel-panel px-2 py-0.5 ${hud.focusOn ? 'text-[#39FF6A] shadow-[0_0_8px_#39FF6A]' : 'text-emerald-500'}`} title="FOCUS — hold R2">FOCUS {hnum(hud.focus, 0)}</span>}
           </div>
           <div className="text-center">

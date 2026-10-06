@@ -9,7 +9,7 @@
 // FACING. A selection on the back (a cape, a back emblem) or on one side (a left-arm stamp) also turns the turntable so
 // that side faces the camera: `facing` is the body yaw (radians) that shows it, null to leave the turntable alone.
 
-import type { PaintRegion, PartBone } from '../doc';
+import type { ClothKind, PaintRegion, PartBone } from '../doc';
 
 export const STUDIO_SHOTS = ['full', 'bust', 'face'] as const;
 export type StudioShot = typeof STUDIO_SHOTS[number];
@@ -37,12 +37,14 @@ export const SHOTS: Record<StudioShot, ShotDef> = {
 export const BODY_HEIGHT = 1.8;
 
 /** The Closet's editor tabs (components/closet-view.tsx). */
-export type StudioTab = 'face' | 'shape' | 'parts' | 'paint' | 'wear' | 'skins';
+export type StudioTab = 'face' | 'shape' | 'parts' | 'paint' | 'clothes' | 'wear' | 'skins';
 
 /** What is selected on the body, as far as the camera cares. */
 export type StudioFocus =
   | { kind: 'part'; bone: PartBone }
   | { kind: 'layer'; region: PaintRegion }
+  /** phase 4e: a code-built piece (a top in the bust, unless it is a long coat or its hood is up) */
+  | { kind: 'cloth'; cloth: ClothKind; long?: boolean; hood?: boolean }
   | null;
 
 export interface Framing { shot: StudioShot; facing: number | null }
@@ -72,6 +74,7 @@ export function shotForRegion(region: PaintRegion): StudioShot {
  *  the body's front at yaw 0. */
 export function facingFor(focus: StudioFocus): number | null {
   if (!focus) return null;
+  if (focus.kind === 'cloth') return 0;
   if (focus.kind === 'layer') {
     if (focus.region === 'torsoBack') return Math.PI;
     if (focus.region === 'all' || focus.region === 'body') return null;
@@ -84,7 +87,15 @@ export function facingFor(focus: StudioFocus): number | null {
 }
 
 /** The framing the editor wants: the selection decides when there is one, else the tab. */
+/** Phase 4e: the shot for a code-built piece — a top in the bust (a hood up too), a long coat and everything below the
+ *  waist in the full body; always from the front. */
+export function shotForCloth(f: { cloth: ClothKind; long?: boolean; hood?: boolean }): StudioShot {
+  if (f.cloth === 'top') return f.long && !f.hood ? 'full' : 'bust';
+  return 'full';
+}
+
 export function framingFor(tab: StudioTab, focus: StudioFocus): Framing {
+  if (tab === 'clothes' && focus?.kind === 'cloth') return { shot: shotForCloth(focus), facing: 0 };
   if (tab === 'parts' && focus?.kind === 'part') return { shot: shotForBone(focus.bone), facing: facingFor(focus) };
   if (tab === 'paint' && focus?.kind === 'layer') return { shot: shotForRegion(focus.region), facing: facingFor(focus) };
   return { shot: tab === 'face' ? 'bust' : 'full', facing: null };
