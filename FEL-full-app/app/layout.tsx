@@ -10,6 +10,7 @@ import './game-surface.css'
 import { Providers } from '@/components/providers'
 import { Toaster } from '@/components/ui/sonner'
 import { ChunkLoadErrorHandler } from '@/components/chunk-load-error-handler'
+import { SoundtrackDock } from '@/components/soundtrack/soundtrack-dock'
 
 export const dynamic = 'force-dynamic'
 
@@ -102,6 +103,8 @@ export default function RootLayout({
               bars stacked at the bottom. The rail carries PRQ, the wallet and the way out; on a desktop it carries
               the tabs too. */}
           <StatusRail />
+          {/* CREATOR SOUNDTRACK (owner, 2026-10-06): the menu music and its Now Playing chip; silent on the Quick Screen */}
+          <SoundtrackDock />
           {children}
           {/* The same three tabs, at the bottom of a phone where a thumb is. On a desktop this renders nothing and
               the rail above carries them instead. */}

@@ -1,0 +1,181 @@
+{
+  "topic": "philosophy",
+  "version": 1,
+  "cards": [
+    {
+      "id": "philosophy.socratic",
+      "topic": "philosophy",
+      "type": "lesson",
+      "headline": "The Socratic method",
+      "lines": [
+        "Socrates taught by asking questions rather than giving answers.",
+        "Each question tests a belief for hidden contradictions.",
+        "The goal is clearer thinking — and admitting what you don't know."
+      ],
+      "visual": { "kind": "cycle", "steps": ["Claim", "Question", "Contradiction", "Refine"] },
+      "source": "Plato's dialogues, e.g. 'Euthyphro' and 'Apology'; Vlastos, 'Socrates: Ironist and Moral Philosopher'."
+    },
+    {
+      "id": "philosophy.stoicism",
+      "topic": "philosophy",
+      "type": "lesson",
+      "headline": "Stoicism: work on what's up to you",
+      "lines": [
+        "The Stoics split the world into what is up to us — our judgements and actions — and what isn't.",
+        "Epictetus taught that we are disturbed not by events, but by our views of them.",
+        "Marcus Aurelius, a Roman emperor, wrote his Meditations as notes to himself."
+      ],
+      "visual": { "kind": "compare", "left": { "label": "Up to you", "text": "Effort, attitude, choices" }, "right": { "label": "Not up to you", "text": "Weather, others, results" } },
+      "source": "Epictetus, 'Enchiridion' §1 and §5; Marcus Aurelius, 'Meditations'."
+    },
+    {
+      "id": "philosophy.trolley",
+      "topic": "philosophy",
+      "type": "lesson",
+      "headline": "The trolley problem",
+      "lines": [
+        "A runaway trolley will kill five people unless you pull a lever, diverting it to kill one.",
+        "Most people say they'd pull it — far fewer would push someone off a bridge to stop it.",
+        "The gap suggests we care how harm happens, not only how much."
+      ],
+      "visual": { "kind": "compare", "left": { "label": "Pull the lever", "text": "Most say yes" }, "right": { "label": "Push a person", "text": "Most say no" } },
+      "source": "Foot (1967), Oxford Review; Thomson (1985), Yale Law Journal; Greene et al. (2001), Science."
+    },
+    {
+      "id": "philosophy.occam",
+      "topic": "philosophy",
+      "type": "lesson",
+      "headline": "Occam's razor",
+      "lines": [
+        "Don't add assumptions you don't need.",
+        "When two explanations fit the evidence equally well, start with the simpler one — then test it.",
+        "It's a rule of thumb, not a proof: sometimes the truth is complicated."
+      ],
+      "visual": { "kind": "motif", "motif": "scale" },
+      "source": "Attributed to William of Ockham (14th century); Baker, 'Simplicity', Stanford Encyclopedia of Philosophy."
+    },
+    {
+      "id": "philosophy.cave",
+      "topic": "philosophy",
+      "type": "lesson",
+      "headline": "Plato's cave",
+      "lines": [
+        "Prisoners see only shadows on a wall and take them for reality.",
+        "One escapes, sees the sun, and returns — but the others don't believe him.",
+        "Plato's point: education turns us toward what's real, and that can be uncomfortable."
+      ],
+      "visual": { "kind": "compare", "left": { "label": "In the cave", "text": "Shadows on a wall" }, "right": { "label": "Outside", "text": "The things themselves" } },
+      "source": "Plato, 'Republic', Book VII (514a–520a)."
+    },
+    {
+      "id": "philosophy.q-cogito",
+      "topic": "philosophy",
+      "type": "quiz",
+      "question": "Who wrote 'I think, therefore I am'?",
+      "options": ["Aristotle", "René Descartes", "Immanuel Kant", "Confucius"],
+      "answer": 1,
+      "why": "Descartes, in 1637. Doubting everything, he found one thing he couldn't doubt: that he was thinking.",
+      "source": "Descartes, 'Discourse on the Method' (1637), Part IV."
+    },
+    {
+      "id": "philosophy.q-utilitarianism",
+      "topic": "philosophy",
+      "type": "quiz",
+      "question": "Which view judges actions by whether they produce the greatest good for the greatest number?",
+      "options": ["Utilitarianism", "Stoicism", "Existentialism", "Nihilism"],
+      "answer": 0,
+      "why": "Associated with Jeremy Bentham and John Stuart Mill: consequences make an action right or wrong.",
+      "source": "Mill, 'Utilitarianism' (1863); Bentham, 'An Introduction to the Principles of Morals and Legislation' (1789)."
+    },
+    {
+      "id": "philosophy.q-stoic-control",
+      "topic": "philosophy",
+      "type": "quiz",
+      "question": "According to the Stoics, what is fully within your control?",
+      "options": ["Your reputation", "The weather", "Your judgements and choices", "Other people's opinions"],
+      "answer": 2,
+      "why": "Epictetus: our opinions, intentions and desires are up to us; body, property and reputation are not.",
+      "source": "Epictetus, 'Enchiridion' §1."
+    },
+    {
+      "id": "philosophy.q-golden-mean",
+      "topic": "philosophy",
+      "type": "quiz",
+      "question": "Aristotle saw courage as the middle point between…",
+      "options": ["Fear and anger", "Cowardice and recklessness", "Pride and shame", "Wealth and poverty"],
+      "answer": 1,
+      "why": "His 'golden mean': a virtue sits between a deficiency and an excess.",
+      "source": "Aristotle, 'Nicomachean Ethics', Book II."
+    },
+    {
+      "id": "philosophy.q-occam",
+      "topic": "philosophy",
+      "type": "quiz",
+      "question": "Occam's razor recommends…",
+      "options": ["Choosing the most detailed explanation", "Preferring explanations with fewer assumptions", "Rejecting every explanation", "Trusting the oldest explanation"],
+      "answer": 1,
+      "why": "When rival explanations fit equally well, the one with fewer assumptions is the better starting point.",
+      "source": "Baker, 'Simplicity', Stanford Encyclopedia of Philosophy."
+    },
+    {
+      "id": "philosophy.f-socrates",
+      "topic": "philosophy",
+      "type": "fact",
+      "headline": "Socrates never wrote anything down",
+      "text": "We know his ideas mainly through his students — above all Plato — and through the historian Xenophon.",
+      "source": "Kraut, 'Socrates', Encyclopaedia Britannica; Plato's and Xenophon's Socratic writings."
+    },
+    {
+      "id": "philosophy.f-confucius",
+      "topic": "philosophy",
+      "type": "fact",
+      "headline": "Confucius taught a version of the Golden Rule",
+      "text": "In the Analects, around 500 BCE: 'What you do not wish for yourself, do not do to others.'",
+      "visual": { "kind": "motif", "motif": "quote" },
+      "source": "Confucius, 'Analects' 15.24."
+    },
+    {
+      "id": "philosophy.f-academy",
+      "topic": "philosophy",
+      "type": "fact",
+      "headline": "Plato founded a school that lasted centuries",
+      "text": "Plato's Academy in Athens, founded around 387 BCE, is often called the first institution of higher learning in the Western world.",
+      "source": "Dillon, 'The Heirs of Plato' (2003)."
+    },
+    {
+      "id": "philosophy.f-theseus",
+      "topic": "philosophy",
+      "type": "fact",
+      "headline": "The Ship of Theseus",
+      "text": "If every plank of a ship is replaced over time, is it still the same ship? Plutarch recorded the puzzle; philosophers still argue about identity.",
+      "source": "Plutarch, 'Life of Theseus' 23."
+    },
+    {
+      "id": "philosophy.d-arguments",
+      "topic": "philosophy",
+      "type": "deeper",
+      "headline": "How to judge an argument",
+      "steps": [
+        { "headline": "1 · Premises and conclusion", "lines": ["An argument gives reasons (premises) for a claim (the conclusion).", "First, find what's being claimed — and why."], "visual": { "kind": "motif", "motif": "scale" } },
+        { "headline": "2 · Valid", "lines": ["Valid means: if the premises are true, the conclusion must be true.", "'All birds have feathers. A robin is a bird. So a robin has feathers.'"] },
+        { "headline": "3 · Sound", "lines": ["A sound argument is valid AND its premises really are true.", "Valid logic built on a false premise can still reach a false conclusion."] },
+        { "headline": "4 · Watch for fallacies", "lines": ["Attacking the person instead of the point is an ad hominem.", "Offering only two options when there are more is a false dilemma."] }
+      ],
+      "source": "Copi, Cohen & McMahon, 'Introduction to Logic'."
+    },
+    {
+      "id": "philosophy.recap",
+      "topic": "philosophy",
+      "type": "recap",
+      "headline": "Philosophy: the takeaways",
+      "points": [
+        "Socrates taught by questioning.",
+        "Stoics: focus on what's up to you.",
+        "Start with the simpler explanation — then test it.",
+        "Plato's cave: learning means turning toward the real.",
+        "Sound = valid logic + true premises."
+      ],
+      "source": "Summary of this topic's cards."
+    }
+  ]
+}

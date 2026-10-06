@@ -104,7 +104,7 @@ def main() -> None:
             blob, lines = bytearray(), []
             for line, m4a, sec in items:
                 b = open(m4a, 'rb').read()
-                entry = {k2: line[k2] for k2 in ('id', 'moment', 'text', 'tier', 'tags') if k2 in line}
+                entry = {k2: line[k2] for k2 in ('id', 'moment', 'text', 'tier', 'tags', 'match') if k2 in line}   # match: IMPROVE 2026-10-06
                 entry.update({'off': len(blob), 'len': len(b), 'sec': sec})
                 lines.append(entry)
                 blob += b

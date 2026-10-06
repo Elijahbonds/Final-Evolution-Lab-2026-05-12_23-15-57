@@ -11,8 +11,19 @@ export const ONE_FOOT_MIN_SPEED = 4.5;
 /** Angle (radians from head-on) at which the approach reads as "baseline". */
 export const BASELINE_ANGLE = 0.5;   // ~29°
 
+/**
+ * The approach's angle off head-on, radians (+ one side, − the other): 0 straight down the floor at the rim, BASELINE_ANGLE and
+ * wider from the baseline.
+ *
+ * FIX (dunk-next phase 7, 2026-10-06): the court's depth is a DISTANCE — `|rimZ − playerZ|`. It was the signed `rimZ − playerZ`,
+ * which is right only for a court whose dunker stands at −z of the rim (this file's tests). DunkMode's runway is the other way
+ * round (rim z −10.28, the take-off line −7.5, the start −1.2: modeConfigs DUNK_CONFIG), so the depth was always negative,
+ * atan2 put every take-off near ±180°, and EVERY dunk read "BASELINE" with the angle's full +0.8 difficulty — a straight hold-run
+ * that the launch comment says "still reads head-on" never did. The live take-off read (core/DunkTakeoffRead) showed it on the
+ * first frame of the run. Both courts read the same now; a straight run is HEAD-ON.
+ */
 export function approachAngle(playerX: number, playerZ: number, rimX: number, rimZ: number): number {
-  return Math.atan2(playerX - rimX, rimZ - playerZ);
+  return Math.atan2(playerX - rimX, Math.abs(rimZ - playerZ));
 }
 
 // THE FOOT IS THE PLAYER'S CALL NOW (owner, 2026-09-19: "have 1 foot and 2 foot jumps", chosen "with a button").

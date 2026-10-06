@@ -10,6 +10,7 @@
 // mode cheap.
 
 import { readCourtLocation } from '@/lib/babylon/nexus/courtLocations';
+import { courtArtSkin } from '@/lib/modes/art/apply-art-card';
 import { freshOrder, syncLobby, slotDrives, recordTurn, turnBanner, MAX_SHOOTERS, type ShootoutOrder } from '@/lib/controller-link/shootoutTurns';
 import type { LobbyPeer } from '@/lib/controller-link/types';
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
@@ -109,6 +110,7 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
     runMode(MODES.threepoint, {
       canvas,
       location: readCourtLocation(),   // court location pick (docs/SPEC-COURT-LOCATIONS.md)
+      applySkin: courtArtSkin,   // PIPELINES (2026-10-06): the player's court art card, a centre-court decal
       input: bus,
       onPhase: (p, detail) => {
         if (disposed) return;

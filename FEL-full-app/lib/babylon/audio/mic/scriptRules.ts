@@ -5,9 +5,11 @@
 // anyone, so nobody but the speaker gets a gendered pronoun; and a text-to-speech voice reads every line, so no digits, no
 // all-caps words and no stage directions.
 
-import { ACADEMY_MOMENTS, COACH_MOMENTS, CROWD_MOMENTS, DANCE_MOMENTS, MOMENTS, PLAYER_MOMENTS, TIER_COUNTS, momentSpec } from './moments';
+import { ACADEMY_MOMENTS, COACH_MOMENTS, CROWD_MOMENTS, DANCE_MOMENTS, MOMENTS, PAGE_MOMENTS, PLAYER_MOMENTS, TIER_COUNTS, momentSpec } from './moments';
 
-export interface ScriptLine { id?: string; moment: string; text: string; tier?: 0 | 1 | 2; tags?: string[] }
+// VOICEOVER (2026-10-06): `match` is the page's own string when the spoken words differ from it (a digit spelled out: the page
+// says "130 cm", the take says "one hundred thirty centimetres"); speakNatural finds the take by either.
+export interface ScriptLine { id?: string; moment: string; text: string; tier?: 0 | 1 | 2; tags?: string[]; match?: string }
 export interface ScriptFile { cast: string; lines: ScriptLine[] }
 
 // minced oaths a kids' camp says out loud (dang, heck, gosh) pass; "oh my god" does not
@@ -30,6 +32,8 @@ export function maxWordsFor(moment: string): number | null {
   // MUSIC-SUITE P8: Stoop (the Cypher) and Professor Okta (the Academy) — flat moments, same shape as COACH_MOMENTS.
   const d = DANCE_MOMENTS.find((x) => x.id === moment); if (d) return d.maxWords;
   const ac = ACADEMY_MOMENTS.find((x) => x.id === moment); if (ac) return ac.maxWords;
+  // VOICEOVER (2026-10-06): the pages' lines in the Coach's voice (Mirror, Quick Screen, Prove It).
+  const pg = PAGE_MOMENTS.find((x) => x.id === moment); if (pg) return pg.maxWords;
   return null;
 }
 

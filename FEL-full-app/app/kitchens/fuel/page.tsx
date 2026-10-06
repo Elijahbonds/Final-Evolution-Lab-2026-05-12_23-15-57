@@ -6,6 +6,7 @@ import { prisma } from '@/lib/db';
 import { fuelAudience } from '@/lib/kitchens/audience';
 import { FuelView } from '@/components/kitchens/fuel-view';
 import { FuelYouthView } from '@/components/kitchens/fuel-youth-view';
+import { CommunityRecipes } from '@/components/pipelines/community-recipes';   // PIPELINES (2026-10-06)
 
 export const dynamic = 'force-dynamic';
 
@@ -22,6 +23,7 @@ export default async function KitchensFuelPage() {
   return (
     <div className="min-h-screen bg-[#050505] pb-24 text-white">
       {audience === 'adult' ? <FuelView /> : <FuelYouthView />}
+      <CommunityRecipes />
     </div>
   );
 }

@@ -24,7 +24,7 @@ const PALETTES: Record<string, string[]> = {
 };
 const SIZE = 1024;
 
-export default function ArtMode({ onPublish }: { onPublish: (p: ArtPublishPayload) => void }) {
+export default function ArtMode({ onPublish, submitLabel = 'Publish as Creator Card' }: { onPublish: (p: ArtPublishPayload) => void; submitLabel?: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
   const drawing = useRef(false);
@@ -206,7 +206,7 @@ export default function ArtMode({ onPublish }: { onPublish: (p: ArtPublishPayloa
         ))}
       </div>
       <button onClick={publish} className="mt-4 w-full rounded-lg bg-amber-400 py-3 font-bold text-black">
-        Publish as Creator Card
+        {submitLabel}
       </button>
     </div>
   );

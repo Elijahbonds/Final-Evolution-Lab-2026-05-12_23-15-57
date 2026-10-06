@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { loginPath } from '@/lib/auth/safeNext';
 import StoryMap from '@/components/story-map';
 import { CellOrb } from '@/components/cell-orb';
+import { CommunityReads } from '@/components/create/community-reads';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,6 +14,8 @@ export default async function StoryPage() {
   return (
     <div className="min-h-screen bg-[#050505]">
       <StoryMap className="min-h-screen" />
+      {/* CREATE HUB (owner 2026-10-06): approved community writing, under the map */}
+      <CommunityReads />
       <CellOrb />
     </div>
   );

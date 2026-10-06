@@ -12,17 +12,42 @@
 //   - a cue's clips are scheduled back to back on the audio clock (the line, then the dunk's name), never on timers, so slow-mo,
 //     hit-stop and a busy frame cannot pull them apart.
 
+//
+// VOICEOVER (2026-10-06): ONE LANE PER SCENE. Every foreground line (the booth, a player, the coach, a room's host) now asks
+// voiceQueue.ts before it plays: lines never overlap, a bigger moment cuts in with a fade, an equal one waits its turn inside a
+// window or is dropped, a line that decoded too late is dropped (never played late), and the same moment has a cooldown. Each clip
+// plays at its loudness trim (loudness.ts), the music, the effects and the crowd duck under every foreground voice (SoundKit,
+// ducking.ts), and `onStart` fires when the audio actually starts, so the caption is in step with what is heard. The crowd's own
+// shouts stay a background layer under all of it, as before.
+
 import { SoundKit } from '../SoundKit';
 import type { MicCue, MicLine } from './MicDirector';
+import { VoiceQueue } from '../voice/voiceQueue';
+import { lineGain } from '../voice/loudness';
 
 export const VOICE_BASE = '/audio/voice/v1';
-/** One rendered line in a bank: where its bytes are and how long it plays. */
-export interface BankLine extends MicLine { off: number; len: number; sec: number }
+/** One rendered line in a bank: where its bytes are and how long it plays (`lufs`: its measured loudness, once measured;
+ *  `match`: the page's own string when the spoken words differ from it, VOICEOVER 2026-10-06, see findText). */
+export interface BankLine extends MicLine { off: number; len: number; sec: number; lufs?: number; peak?: number; match?: string }
 export interface BankIndex { cast: string; group: string; bank: string; lines: BankLine[] }
 
-type Loaded = { index: BankIndex; bytes: ArrayBuffer };
+/** What became of a line: it played, the voice is off (or there is no Web Audio), a clip is missing, or the lane dropped it
+ *  (stale, cooling down, or a busier moment had the mic). A dropped line shows no caption: nothing was said. */
+export type VoicePlayResult = 'played' | 'off' | 'missing' | 'dropped';
+
+/** IMPROVE (2026-10-06): a line that could not be heard (the voice is off, no audio, no bank) still shows its words; a line the
+ *  lane dropped shows nothing; a played line showed its caption when it started. */
+export const captionWithoutAudio = (r: VoicePlayResult): boolean => r === 'off' || r === 'missing';
+
 const RATE = 24000;
 const CACHE = 64;
+/** The breath between two clips of one cue (the line, then the dunk's name). */
+const CLIP_GAP = 0.05;
+/** The scheduling lead from "now" to the first sample (the audio thread needs a few ms). */
+const LEAD = 0.03;
+const clock = (): number => (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
+/** Text as a lookup key: case, curly quotes, punctuation and spacing do not matter. */
+export const textKey = (t: string): string => t.toLowerCase().replace(/[\u2018\u2019]/g, "'").replace(/[^a-z0-9' ]+/g, ' ').replace(/\s+/g, ' ').trim();
 
 /** The PA per court: the wall that answers (slap-back delay, seconds; 0 = none), the room's length, and how hard the horn is pushed. */
 export const PA_PRESETS: Record<string, { slap: number[]; room: number; drive: number; roomWet: number }> = {
@@ -38,86 +63,245 @@ export const PA_PRESETS: Record<string, { slap: number[]; room: number; drive: n
   cypher: { slap: [0.05], room: 0.5, drive: 1.7, roomWet: 0.12 },
 };
 
+interface LiveRec { id: number; src: AudioBufferSourceNode; gain: GainNode; channel: MicCue['channel'] }
+interface Waiting { cue: MicCue; court: string; bufs: AudioBuffer[]; onStart?: () => void; resolve: (r: VoicePlayResult) => void }
+
 class VoiceKitImpl {
-  private readonly banks = new Map<string, Promise<Loaded | null>>();
+  private readonly indexes = new Map<string, Promise<BankIndex | null>>();
+  private readonly bins = new Map<string, Promise<ArrayBuffer | null>>();
+  private readonly binName = new Map<string, string>();
   private readonly where = new Map<string, { bank: string; line: BankLine }>();
+  private readonly byText = new Map<string, string>();
   private readonly decoded = new Map<string, AudioBuffer>();
   private readonly decoding = new Map<string, Promise<AudioBuffer | null>>();
-  private readonly live = new Set<{ src: AudioBufferSourceNode; gain: GainNode; channel: MicCue['channel'] }>();
+  private readonly live = new Set<LiveRec>();
   private pa: { court: string; input: GainNode; side: GainNode; nodes: AudioNode[] } | null = null;
   private decoder: BaseAudioContext | null = null;
+  // VOICEOVER: the scene's one foreground lane
+  private readonly lane = new VoiceQueue();
+  private readonly waiting = new Map<number, Waiting>();
+  private seq = 0;
+  private wake: ReturnType<typeof setTimeout> | null = null;
 
   /** Fetch the banks a mode needs (e.g. the court's MC in 'shared' + 'dunk'). Resolves to the indexes that arrived. */
   async load(needs: { cast: string; group: string }[]): Promise<BankIndex[]> {
-    const got = await Promise.all(needs.map((n) => this.bank(n.cast, n.group)));
-    return got.filter((g): g is Loaded => !!g).map((g) => g.index);
+    const got = await Promise.all(needs.map(async (n) => {
+      const index = await this.index(n.cast, n.group);
+      if (index?.bank) await this.bin(`${n.cast}/${n.group}`);   // the audio too: a mode wants its first call on time
+      return index;
+    }));
+    return got.filter((g): g is BankIndex => !!g);
   }
+  /** VOICEOVER: fetch only the banks' indexes (the text of every line): the audio is fetched the first time a line is played.
+   *  For a page that speaks mostly with the browser's voice and wants a rendered take only where one exists (findText). */
+  async loadIndex(needs: { cast: string; group: string }[]): Promise<BankIndex[]> {
+    const got = await Promise.all(needs.map((n) => this.index(n.cast, n.group)));
+    return got.filter((g): g is BankIndex => !!g);
+  }
+  /**
+   * PIPELINES (owner, 2026-10-06): a community voice line (an approved acting card's public copy, adults only) handed
+   * the court's mic: fetched, decoded, played once through the PA with the crowd ducked under it, like the booth. Never
+   * cached. False (and silent) on any failure: no Web Audio, no CORS on the bucket, a decode error.
+   */
+  async playUrl(url: string, court: string, onStart?: () => void): Promise<boolean> {
+    if (!/^https:\/\//.test(url) || typeof window === 'undefined') return false;
+    try {
+      const g = SoundKit.graph();
+      if (!g) return false;
+      const res = await fetch(url, { mode: 'cors', credentials: 'omit' });
+      if (!res.ok) return false;
+      const buf = await g.ctx.decodeAudioData(await res.arrayBuffer());
+      const dest = this.routeFor({ role: 'mc', channel: 'booth', pan: 0 } as MicCue, court);
+      if (!dest) return false;
+      const src = g.ctx.createBufferSource(); src.buffer = buf;
+      const gain = g.ctx.createGain(); gain.gain.value = 0.9;
+      src.connect(gain).connect(dest);
+      const t0 = g.ctx.currentTime + 0.05;
+      src.start(t0);
+      SoundKit.duckForVoice(t0, t0 + buf.duration, court);   // the voiceover lane's one duck for every foreground voice
+      const rec: LiveRec = { id: ++this.seq, src, gain, channel: 'booth' };
+      this.live.add(rec); src.onended = () => { this.live.delete(rec); };
+      onStart?.();
+      return true;
+    } catch { return false; }
+  }
+
   /** The rendered line behind a clip id ('<cast>/<line id>'), once its bank is in. */
   line(clipId: string): BankLine | undefined { return this.where.get(clipId)?.line; }
+  /** VOICEOVER: the clip whose script text is `text` (case, punctuation and spacing aside) in a loaded index, optionally only
+   *  from these voices. */
+  findText(text: string, casts?: readonly string[]): string | undefined {
+    const id = this.byText.get(textKey(text));
+    return id && (!casts || casts.includes(id.split('/')[0])) ? id : undefined;
+  }
 
   /** Decode clips ahead of their moment (the director pre-picks the likely next call). */
   prefetch(clipIds: readonly string[]): void { for (const id of clipIds) void this.buffer(id); }
 
   /**
-   * Play a cue. Resolves true when it started (false: no audio here, the voice is off, or a clip never decoded). `onStart` fires
-   * when the first clip starts, for the caption.
+   * Play a cue. Resolves true when it started (false: no audio here, the voice is off, a clip never decoded, or the lane dropped
+   * it). `onStart` fires when the first clip starts, for the caption.
    */
   async play(cue: MicCue, court: string, onStart?: () => void): Promise<boolean> {
-    if (!SoundKit.voiceOn) return false;
-    const g = SoundKit.graph(); if (!g) return false;
-    const bufs = await Promise.all(cue.clips.map((c) => this.buffer(c)));
-    if (bufs.some((b) => !b)) return false;
-    const { ctx } = g;
-    if (cue.interrupt || cue.channel === 'booth') this.stop('booth', 0.06);
-    const out = this.routeFor(cue, court); if (!out) return false;
-    let t = ctx.currentTime + 0.03;
-    const t0 = t;
-    for (const b of bufs as AudioBuffer[]) {
-      const src = ctx.createBufferSource(); src.buffer = b;
-      const gain = ctx.createGain(); gain.gain.value = cue.gain;
-      src.connect(gain).connect(out);
-      src.start(t);
-      const rec = { src, gain, channel: cue.channel };
-      this.live.add(rec); src.onended = () => this.live.delete(rec);
-      t += b.duration + 0.05;
-    }
-    if (cue.channel === 'booth') this.duck(g.crowdDuck, t0, t);
-    onStart?.();
-    return true;
+    return (await this.playEx(cue, court, onStart)) === 'played';
   }
 
-  /** Stop a channel (or everything) with a short fade. */
+  /**
+   * VOICEOVER: play a cue through the scene's lane and say what became of it. A crowd shout plays at once (it is the bed); every
+   * other line asks the lane: it starts now, waits its turn (the promise resolves when it starts) or is dropped. Its window runs
+   * from THIS call, so a slow decode cannot make it late.
+   */
+  async playEx(cue: MicCue, court: string, onStart?: () => void): Promise<VoicePlayResult> {
+    const askedAt = clock();
+    if (!SoundKit.voiceOn) return 'off';
+    if (!SoundKit.graph()) return 'off';
+    const bufs = await Promise.all(cue.clips.map((c) => this.buffer(c)));
+    if (bufs.some((b) => !b)) return 'missing';
+    if (cue.channel === 'crowd') return this.startClips(0, cue, court, bufs as AudioBuffer[], 0, onStart) ? 'played' : 'off';
+    const sec = (bufs as AudioBuffer[]).reduce((a, b) => a + b.duration, 0) + CLIP_GAP * (bufs.length - 1);
+    return new Promise<VoicePlayResult>((resolve) => {
+      const id = ++this.seq;
+      const d = this.lane.request({ id, priority: cue.priority, sec, at: askedAt, moment: cue.moment, interrupt: cue.interrupt }, clock());
+      for (const e of this.lane.takeEvicted()) this.settle(e.id, 'dropped');
+      if (d.kind === 'drop') { resolve('dropped'); return; }
+      this.waiting.set(id, { cue, court, bufs: bufs as AudioBuffer[], onStart, resolve });
+      if (d.kind === 'start') {
+        if (d.cut) this.cut(d.cut.id, d.cut.fadeSec);
+        this.begin(id, Math.max(0, d.at - clock()));
+      }
+      this.schedule();
+    });
+  }
+
+  /**
+   * IMPROVE (2026-10-06): play a host line and put its caption up WHEN THE AUDIO STARTS. A room that set its caption before
+   * asking the lane showed a line a beat early when the lane held it, and showed one that was never said when the lane dropped
+   * it. `show` runs once: on start; or at once when there is no audio to wait for (the voice is off, no Web Audio, the bank is
+   * not in: the words still land, the rooms' "captions for every voiced line" rule); never for a dropped line (nothing was said).
+   */
+  async playCaptioned(cue: MicCue, court: string, show: () => void): Promise<VoicePlayResult> {
+    let shown = false;
+    const once = (): void => { if (!shown) { shown = true; show(); } };
+    let r: VoicePlayResult;
+    try { r = await this.playEx(cue, court, once); } catch { r = 'off'; }
+    if (captionWithoutAudio(r)) once();
+    return r;
+  }
+
+  /** Stop a channel (or everything) with a short fade. What was waiting on it is dropped. */
   stop(channel: MicCue['channel'] | 'all', fadeSec = 0.08): void {
     const g = SoundKit.graph(); if (!g) return;
-    const now = g.ctx.currentTime;
+    const now = g.ctx.currentTime, t = clock();
+    const ids = new Set<number>();
     for (const rec of [...this.live]) {
       if (channel !== 'all' && rec.channel !== channel) continue;
-      try { rec.gain.gain.cancelScheduledValues(now); rec.gain.gain.setTargetAtTime(0, now, fadeSec / 3); rec.src.stop(now + fadeSec); } catch { /* already done */ }
-      this.live.delete(rec);
+      this.fadeOut(rec, now, fadeSec);
+      ids.add(rec.id);
     }
-    if (channel === 'all' || channel === 'booth') { g.crowdDuck.gain.cancelScheduledValues(now); g.crowdDuck.gain.setTargetAtTime(1, now, 0.2); }
+    for (const id of ids) this.lane.stopped(id, t);
+    if (channel === 'all') { for (const r of this.lane.clear(t)) this.settle(r.id, 'dropped'); }
+    else for (const [id, w] of [...this.waiting]) if (w.cue.channel === channel) { this.lane.stopped(id, t); this.settle(id, 'dropped'); }
+    if (ids.size || channel === 'all') SoundKit.releaseDuck(now + fadeSec);
+    this.schedule();
   }
   stopAll(fadeSec = 0.15): void { this.stop('all', fadeSec); }
 
+  // ── the lane (VOICEOVER) ──────────────────────────────────────────────────────────────────────────────────────────────
+  /** Start a waiting line `delay` seconds from now. */
+  private begin(id: number, delay: number): void {
+    const w = this.waiting.get(id); if (!w) return;
+    this.waiting.delete(id);
+    if (!SoundKit.voiceOn || !this.startClips(id, w.cue, w.court, w.bufs, delay, w.onStart)) {
+      this.lane.stopped(id, clock()); w.resolve('off'); return;
+    }
+    if (delay > 0.02) setTimeout(() => w.resolve('played'), delay * 1000); else w.resolve('played');
+  }
+  /** A line that will not play now resolves as dropped. */
+  private settle(id: number, r: VoicePlayResult): void { const w = this.waiting.get(id); if (w) { this.waiting.delete(id); w.resolve(r); } }
+  private cut(id: number, fadeSec: number): void {
+    const g = SoundKit.graph(); if (!g) return;
+    const now = g.ctx.currentTime;
+    for (const rec of [...this.live]) if (rec.id === id) this.fadeOut(rec, now, fadeSec);
+  }
+  private fadeOut(rec: LiveRec, now: number, fadeSec: number): void {
+    try { rec.gain.gain.cancelScheduledValues(now); rec.gain.gain.setTargetAtTime(0, now, fadeSec / 3); rec.src.stop(now + fadeSec); } catch { /* already done */ }
+    this.live.delete(rec);
+  }
+  /** Wake when the lane next changes on its own (a line ends, a waiting line goes stale). */
+  private schedule(): void {
+    if (this.wake) { clearTimeout(this.wake); this.wake = null; }
+    const t = this.lane.nextWake(clock()); if (t === null) return;
+    this.wake = setTimeout(() => this.pump(), Math.max(10, (t - clock()) * 1000 + 5));
+  }
+  private pump(): void {
+    this.wake = null;
+    const { start, dropped } = this.lane.next(clock());
+    for (const d of dropped) this.settle(d.id, 'dropped');
+    if (start) this.begin(start.id, 0);
+    this.schedule();
+  }
+
+  /** Schedule a cue's clips back to back on the audio clock, `delay` seconds out. False: no graph. */
+  private startClips(id: number, cue: MicCue, court: string, bufs: AudioBuffer[], delay: number, onStart?: () => void): boolean {
+    const g = SoundKit.graph(); if (!g) return false;
+    const out = this.routeFor(cue, court); if (!out) return false;
+    const { ctx } = g;
+    let t = ctx.currentTime + LEAD + delay;
+    const t0 = t;
+    cue.clips.forEach((clip, i) => {
+      const b = bufs[i];
+      const src = ctx.createBufferSource(); src.buffer = b;
+      const gain = ctx.createGain(); gain.gain.value = lineGain(cue.role, cue.cast, this.line(clip), cue.gain);
+      src.connect(gain).connect(out);
+      src.start(t);
+      const rec: LiveRec = { id, src, gain, channel: cue.channel };
+      this.live.add(rec); src.onended = () => { this.live.delete(rec); };
+      t += b.duration + CLIP_GAP;
+    });
+    if (cue.channel !== 'crowd') SoundKit.duckForVoice(t0, t - CLIP_GAP, court);
+    if (onStart) { if (delay > 0.02) setTimeout(onStart, delay * 1000); else onStart(); }
+    return true;
+  }
+
   // ── internals ─────────────────────────────────────────────────────────────────────────────────────────────────────
-  private bank(cast: string, group: string): Promise<Loaded | null> {
+  private index(cast: string, group: string): Promise<BankIndex | null> {
     const key = `${cast}/${group}`;
-    let p = this.banks.get(key);
+    let p = this.indexes.get(key);
     if (!p) {
       p = (async () => {
         try {
-          const idx = await fetch(`${VOICE_BASE}/${cast}/${group}.json`);
-          if (!idx.ok) return null;
-          const index = (await idx.json()) as BankIndex;
-          if (!index.lines.length || !index.bank) return { index, bytes: new ArrayBuffer(0) };   // nothing to say in this group
-          const bin = await fetch(`${VOICE_BASE}/${cast}/${index.bank}`);
-          if (!bin.ok) return null;
-          const bytes = await bin.arrayBuffer();
-          for (const line of index.lines) this.where.set(`${cast}/${line.id}`, { bank: key, line });
-          return { index, bytes };
+          const res = await fetch(`${VOICE_BASE}/${cast}/${group}.json`);
+          if (!res.ok) return null;
+          const index = (await res.json()) as BankIndex;
+          if (!index.lines.length || !index.bank) return index;   // nothing to say in this group
+          this.binName.set(key, index.bank);
+          for (const line of index.lines) {
+            const clipId = `${cast}/${line.id}`;
+            this.where.set(clipId, { bank: key, line });
+            const k = textKey(line.text); if (k && !this.byText.has(k)) this.byText.set(k, clipId);
+            // IMPROVE (2026-10-06): a take whose words differ from the page's string ("one hundred thirty centimetres" for
+            // "130 cm") carries the page's string as `match`, so the page still finds it.
+            const m = line.match ? textKey(line.match) : ''; if (m && !this.byText.has(m)) this.byText.set(m, clipId);
+          }
+          return index;
         } catch { return null; }
       })();
-      this.banks.set(key, p);
+      this.indexes.set(key, p);
+    }
+    return p;
+  }
+  private bin(key: string): Promise<ArrayBuffer | null> {
+    let p = this.bins.get(key);
+    if (!p) {
+      const name = this.binName.get(key);
+      if (!name) return Promise.resolve(null);
+      p = (async () => {
+        try {
+          const res = await fetch(`${VOICE_BASE}/${key.split('/')[0]}/${name}`);
+          return res.ok ? await res.arrayBuffer() : null;
+        } catch { return null; }
+      })();
+      this.bins.set(key, p);
     }
     return p;
   }
@@ -129,11 +313,11 @@ class VoiceKitImpl {
     if (p) return p;
     p = (async () => {
       const w = this.where.get(clipId); if (!w) return null;
-      const loaded = await this.banks.get(w.bank); if (!loaded) return null;
+      const bytes = await this.bin(w.bank); if (!bytes) return null;
       const dec = this.decodeCtx(); if (!dec) return null;
       try {
         // decodeAudioData detaches what it is given: hand it a copy of the clip's bytes
-        const buf = await dec.decodeAudioData(loaded.bytes.slice(w.line.off, w.line.off + w.line.len));
+        const buf = await dec.decodeAudioData(bytes.slice(w.line.off, w.line.off + w.line.len));
         this.decoded.set(clipId, buf);
         while (this.decoded.size > CACHE) this.decoded.delete(this.decoded.keys().next().value as string);
         return buf;
@@ -169,8 +353,8 @@ class VoiceKitImpl {
       pan.connect(lp).connect(lvl).connect(g.crowdDuck);
       return pan;
     }
-    const lvl = ctx.createGain(); lvl.gain.value = 0.8;   // a player: on the court, dry
-    pan.connect(lvl).connect(g.voice);
+    const lvl = ctx.createGain(); lvl.gain.value = 0.8;   // a player: on the court, dry (loudness.ROUTE_TRIM_DB lifts him on his clip's gain)
+    pan.connect(lvl).connect(g.voiceIn);
     return pan;
   }
 
@@ -207,17 +391,10 @@ class VoiceKitImpl {
     const conv = ctx.createConvolver(); conv.buffer = roomIR(ctx, P.room);
     const roomWet = ctx.createGain(); roomWet.gain.value = P.roomWet;
     comp.connect(conv).connect(roomWet).connect(outBus);
-    outBus.connect(g.voice);
+    outBus.connect(g.voiceIn);   // VOICEOVER: through the preset's voice chain to the voice bus
     nodes.push(conv, roomWet);
     this.pa = { court, input, side, nodes };
     return this.pa;
-  }
-
-  /** The crowd drops ~8 dB while the booth talks, and comes back up after. */
-  private duck(node: GainNode, t0: number, t1: number): void {
-    node.gain.cancelScheduledValues(t0);
-    node.gain.setTargetAtTime(0.4, Math.max(0, t0 - 0.03), 0.05);
-    node.gain.setTargetAtTime(1, t1, 0.25);
   }
 }
 

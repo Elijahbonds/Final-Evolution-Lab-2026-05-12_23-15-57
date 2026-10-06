@@ -17,6 +17,7 @@ import { FAMILIES, type Family } from '@/lib/nav/families';
 import { MODE_INFO } from '@/lib/game-data';
 import { modeMenuMetaFor } from '@/lib/mode-menu';
 import { isUnlistedMode } from '@/lib/unlisted-modes';
+import { PartyBadge } from '@/components/party/party-badge';   // MULTIPLAYER: "2 PLAYERS" on the games friends can play together
 
 type ModeRow = { key: string; name: string; venue: string; href: string; desc: string; color: string; Icon: LucideIcon };
 
@@ -127,7 +128,7 @@ export function PlayShelf({ initialFamily }: { initialFamily?: string }) {
                             <Icon className="h-4 w-4" />
                           </span>
                           <span className="min-w-0">
-                            <span className="block truncate text-[14px] font-semibold leading-tight text-white">{m.name}</span>
+                            <span className="block truncate text-[14px] font-semibold leading-tight text-white">{m.name} <PartyBadge modeKey={m.key} className="ml-1" /></span>
                             <span className="mt-1 block line-clamp-2 text-[11.5px] leading-snug text-white/50">{m.desc}</span>
                             {m.venue && venueDistinguishes && (
                               <span className="mt-1.5 block truncate font-mono text-[10.5px] uppercase tracking-wider text-white/35">

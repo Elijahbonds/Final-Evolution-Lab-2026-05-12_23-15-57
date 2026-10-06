@@ -120,7 +120,11 @@ export type LinkMessage =
   | { type: 'lobby'; peers: LobbyPeer[]; config: ModeControllerConfig }
   | { type: 'assign'; slot: number }
   /** host → phone, reliable channel, only for a config with `roomState: true` (MUSIC-SUITE P6 phone-replay) */
-  | { type: 'state'; state: RoomState };
+  | { type: 'state'; state: RoomState }
+  /** host → phone, reliable: the party room as this phone sees it (lib/party/protocol.ts PartyView; bounded on arrival) */
+  | { type: 'party'; party: unknown }
+  /** phone → host, reliable: ready / pick / start / leave in a party room (lib/party/protocol.ts PartyCmd; the host decides) */
+  | { type: 'party-cmd'; cmd: string };
 
 export interface LobbyPeer {
   peerId: PeerId;
