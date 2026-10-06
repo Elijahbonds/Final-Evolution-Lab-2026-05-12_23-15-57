@@ -1,3 +1,5 @@
+import type { Allergen } from './allergens';
+
 // FEL Kitchens — the LOCKED shapes from the PM's soft prep (docs/_soft-prep-kitchens/SPEC-MEAL-RX-v0.md), adapted to
 // this tree (docs/SPEC-FEL-KITCHENS.md). Kitchens owns these. Build / Mirror types are never mutated from here.
 
@@ -52,6 +54,9 @@ export interface Recipe {
   macros: Macros;
   themes: MealTheme[];
   ingredients: GroceryItem[];
+  /** The major US allergens it contains, chef-declared from `ingredients` (lib/kitchens/allergens.ts). [] = none declared.
+   *  Required, so no recipe can join the catalogue unlabelled (owner-approved 2026-10-06). */
+  allergens: Allergen[];
   athleteNote?: string; // Elijah's voice, optional
   source: 'seed' | 'elijah' | 'blueprint';
 }
@@ -65,6 +70,8 @@ export interface MealSlot {
   minutes: number;
   macros: Macros;
   themes: MealTheme[];
+  /** The recipe's declared allergens (absent on a plan stored before 2026-10-06: the UI reads the catalogue then). */
+  allergens?: Allergen[];
 }
 
 export interface MealRx {
