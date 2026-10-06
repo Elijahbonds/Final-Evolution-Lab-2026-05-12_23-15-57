@@ -26,6 +26,7 @@ describe('the Create tiles', () => {
       'art: Board decks in board runs (Apply from My Creations)',
       'art: Centre court on the hoops courts',
       'dance: The Dance floor routine pick',
+      'acting: MC callouts at the moment you picked',
       'scene: A Spot the Scene pack you can share as a link',
       'scene: The pack picker in Spot the Scene, credited',
       'cooking: Community recipes on the Fuel floor',

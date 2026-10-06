@@ -59,7 +59,7 @@ const GUIDE: Record<Discipline, Omit<DisciplineGuide, 'id' | 'label' | 'blurb' |
   },
   acting: {
     make: 'Record a voice line for a game moment',
-    showsUp: [{ where: 'MC callouts at the moment you picked', live: false }],
+    showsUp: [{ where: 'MC callouts at the moment you picked', live: true }],   // PIPELINES: the crowd mic (ModeMic)
   },
   cooking: {
     make: 'Write a recipe: ingredients, steps, fuel tags',
