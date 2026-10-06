@@ -33,3 +33,15 @@ describe('BoostGauge — the meter, and no instruction text', () => {
     expect(gauge({})).toBe('');   // no tank in the HUD, no gauge
   });
 });
+
+// the sweep: the football's slingshot meter carried the same kind of caption ("DRAFT → SLINGSHOT (L1)") while filling
+describe('the other meters in play — the football slingshot', () => {
+  it('names the meter while it fills; the full meter\'s call to press stays (a live prompt); the how-to is on the panel', async () => {
+    const { readFileSync } = await import('node:fs');
+    const src = readFileSync(require.resolve('./football-babylon.tsx'), 'utf8');
+    expect(src).not.toContain('DRAFT → SLINGSHOT (L1)');
+    expect(src).toContain(`'SLINGSHOT READY — L1' : 'SLINGSHOT'`);
+    const { controlLines } = await import('@/lib/ui/controlsScreen');
+    expect(controlLines('football').join(' ')).toMatch(/DRAFT .*SLINGSHOT \(L1\)/);
+  });
+});

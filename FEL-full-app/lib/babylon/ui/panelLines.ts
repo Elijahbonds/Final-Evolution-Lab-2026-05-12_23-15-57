@@ -101,6 +101,8 @@ export const PANEL_LINES: Readonly<Record<string, PanelLines>> = {
   // (the surf's "R2 drives" is the CARVE row; its pocket line the one left out: the wave shows you the pocket)
   surf: { lines: ['pull BACK to climb, push to drop in · miss the buoys'] },
   snowboard_slalom: { lines: ['Between the poles for 100 · JUMP rocks · grind rails'] },
+  // rows: MOVE · TRUCK …; the slingshot meter's "DRAFT → SLINGSHOT (L1)" caption came off the play screen to here
+  football: { lines: ['Juke, spin, hurdle — or HOLD TRUCK and run THROUGH', 'DRAFT behind a blocker to fill the SLINGSHOT (L1)'] },
   // rows: AIM · SWING · CLUB · PAD
   golf: {
     lines: [

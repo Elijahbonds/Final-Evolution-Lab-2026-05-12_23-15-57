@@ -92,6 +92,7 @@ const PANEL = `(() => {
       rows: p.querySelectorAll('[data-controls-rows] > span').length, lines: lines ? lines.children.length : 0,
       hiddenPx: lines ? Math.max(0, lines.scrollHeight - lines.clientHeight) : 0,
       items: items.length, clipped: items.filter(clip).length, overflowPx: Math.max(0, p.scrollHeight - p.clientHeight),
+      fit: p.dataset.controlsFit ?? null,
       fontPx: lines && lines.firstElementChild ? +(parseFloat(getComputedStyle(lines.firstElementChild).fontSize) * (lines.firstElementChild.currentCSSZoom || 1)).toFixed(1) : null } : null,
     panels: panels.length, titleOverlap, pills: pills.length,
     boostCaption: [...document.querySelectorAll('[data-testid="boost-gauge"]')].map((e) => e.textContent).join(' | ') || null,
@@ -131,7 +132,20 @@ for (const mode of modes) {
       for (const s of group) {
         await p.setViewportSize({ width: SIZES[s].w, height: SIZES[s].h }); await p.waitForTimeout(1500);
         await shot(p, path.join(OUT, `${mode}-${s}-ready.png`));
-        log({ mode, size: s, screen: 'ready', ready, ...(await p.evaluate(PANEL) as object) });
+        const first = await p.evaluate(PANEL) as { panel?: { device?: string } };
+        log({ mode, size: s, screen: 'ready', ready, ...first });
+        // the pad's list too (a pad cannot scroll; its list carries the look and pause rows): the panel's own chooser
+        const label: Record<string, string> = { pad: 'CONTROLLER', keys: 'KEYBOARD', touch: 'TOUCH' };
+        const dev = first.panel?.device;
+        if (dev && dev !== 'pad') {
+          const pick = (d: string) => p.locator(`[data-controls-panel] button:has-text("${label[d]}") >> visible=true`).first();
+          if (await within(5000, pick('pad').count())) {
+            await pick('pad').click({ timeout: 5000 }).catch(() => {}); await p.waitForTimeout(600);
+            if (process.env.PAD_SHOTS) await shot(p, path.join(OUT, `${mode}-${s}-ready-pad.png`));
+            log({ mode, size: s, screen: 'ready-pad', ...(await p.evaluate(PANEL) as object) });
+            await pick(dev).click({ timeout: 5000 }).catch(() => {}); await p.waitForTimeout(300);
+          }
+        }
       }
       if (READY_ONLY) { await ctx.close(); continue; }
       await p.setViewportSize({ width: SIZES[group[0]].w, height: SIZES[group[0]].h });
