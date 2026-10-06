@@ -19,7 +19,7 @@ import {
 } from '@/lib/closet/wearable-catalog';
 import { faceFieldRenders, faceOptionRenders, type FaceField } from '@/lib/babylon/core/faceMorphs';
 import { accessoriesForEquipped, wornPartsForEquipped } from '@/lib/closet/wearableAccessories';
-import { emptyCreatorDoc, type ColourSlot, type CreatorPart } from '@/lib/creator/look/doc';
+import { emptyCreatorDoc, type ColourSlot, type CreatorPart, type PaintLayer } from '@/lib/creator/look/doc';
 import { readCreatorDoc, faceOnly, type StoredFace } from '@/lib/creator/look/storage';
 import { effectivePalette } from '@/lib/creator/look/palette';
 import { canRedo, canUndo, createHistory, pushHistory, redo, resetHistory, undo, type History } from '@/lib/creator/look/history';
@@ -29,6 +29,8 @@ import { RANDOM_SECTIONS, RANDOM_SECTION_FIELDS, randomiseLook, type RandomSecti
 const AvatarPreview = dynamic(() => import('@/components/closet/avatar-preview'), { ssr: false });
 // CREATOR-PLAN phase 2: the Parts tab (place generic shapes on any bone).
 const PartsTab = dynamic(() => import('@/components/closet/parts-tab').then((m) => m.PartsTab), { ssr: false });
+// CREATOR-PLAN phase 3: the Paint tab (fills, patterns, stamps, text, suit mode).
+const PaintTab = dynamic(() => import('@/components/closet/paint-tab').then((m) => m.PaintTab), { ssr: false });
 
 type Equipped = Record<WearableSlot, string | null>;
 type CardSkin = { id: string; displayName: string; accent: string; rarity: string };
@@ -119,7 +121,7 @@ export function ClosetView({ adult = false }: { adult?: boolean }) {
   const [owned, setOwned] = useState<Set<string>>(new Set());
   const [skins, setSkins] = useState<CardSkin[]>([]);
   const [skinCardId, setSkinCardId] = useState<string | null>(null);
-  const [tab, setTab] = useState<'face' | 'parts' | 'wear' | 'skins'>('face');
+  const [tab, setTab] = useState<'face' | 'parts' | 'paint' | 'wear' | 'skins'>('face');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [buying, setBuying] = useState<string | null>(null);
@@ -191,6 +193,16 @@ export function ClosetView({ adult = false }: { adult?: boolean }) {
     const d = readCreatorDoc(p) ?? emptyCreatorDoc();
     return { ...p, creator: { ...d, parts: next } };
   }, group);
+  /** The Creator doc's paint layers (CREATOR-PLAN phase 3). A drag passes a group so it is one undo step. */
+  const setPaint = (next: PaintLayer[], group?: string) => setFace((p) => {
+    const d = readCreatorDoc(p) ?? emptyCreatorDoc();
+    return { ...p, creator: { ...d, paint: next } };
+  }, group);
+  /** Suit mode and the layers it comes with, as one undo step. */
+  const setSuit = (on: boolean, paint: PaintLayer[]) => setFace((p) => {
+    const d = readCreatorDoc(p) ?? emptyCreatorDoc();
+    return { ...p, creator: { ...d, paint, flags: { ...d.flags, suit: on } } };
+  });
   const roll = () => setFace((p) => {
     const r = randomiseLook({ face: faceOnly(p) as FaceConfig, doc: readCreatorDoc(p) }, locks);
     return { ...p, ...r.face, ...(r.doc ? { creator: r.doc } : {}) };
@@ -315,6 +327,7 @@ export function ClosetView({ adult = false }: { adult?: boolean }) {
           <div className="mb-4 flex gap-2">
             <Chip label="Face" active={tab === 'face'} onClick={() => setTab('face')} />
             <Chip label="Parts" active={tab === 'parts'} onClick={() => setTab('parts')} />
+            <Chip label="Paint" active={tab === 'paint'} onClick={() => setTab('paint')} />
             <Chip label="Wearables" active={tab === 'wear'} onClick={() => setTab('wear')} />
             <Chip label="Card Skins" active={tab === 'skins'} onClick={() => setTab('skins')} accent="#A855F7" />
           </div>
@@ -379,6 +392,13 @@ export function ClosetView({ adult = false }: { adult?: boolean }) {
           {tab === 'parts' && (
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
               <PartsTab parts={doc?.parts ?? []} onChange={setParts} accent={previewPalette.accent}
+                canUndo={canUndo(hist)} canRedo={canRedo(hist)} onUndo={() => setHist(undo)} onRedo={() => setHist(redo)} />
+            </motion.div>
+          )}
+
+          {tab === 'paint' && (
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+              <PaintTab layers={doc?.paint ?? []} suit={doc?.flags.suit ?? false} onChange={setPaint} onSuit={setSuit} accent={previewPalette.accent}
                 canUndo={canUndo(hist)} canRedo={canRedo(hist)} onUndo={() => setHist(undo)} onRedo={() => setHist(redo)} />
             </motion.div>
           )}

@@ -214,7 +214,7 @@ export function PartsTab({ parts, onChange, accent, canUndo, canRedo, onUndo, on
   );
 }
 
-function SliderGroup({ title, children }: { title: string; children: React.ReactNode }) {
+export function SliderGroup({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
       <h4 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-white/45">{title}</h4>
@@ -223,8 +223,9 @@ function SliderGroup({ title, children }: { title: string; children: React.React
   );
 }
 
-/** A slider with a typed value beside it. `log` makes the slider logarithmic (sizes from 0.05× to 8×). */
-function NumSlider({ label, value, min, max, step, log = false, onChange }: { label: string; value: number; min: number; max: number; step: number; log?: boolean; onChange: (v: number) => void }) {
+/** A slider with a typed value beside it. `log` makes the slider logarithmic (sizes from 0.05× to 8×). Shared with the
+ *  Paint tab. */
+export function NumSlider({ label, value, min, max, step, log = false, onChange }: { label: string; value: number; min: number; max: number; step: number; log?: boolean; onChange: (v: number) => void }) {
   const toSlider = (v: number) => (log ? Math.log(Math.max(min, v)) : v);
   const fromSlider = (s: number) => (log ? Math.exp(s) : s);
   const dp = step < 0.1 ? 2 : step < 1 ? 1 : 0;
@@ -242,12 +243,12 @@ function NumSlider({ label, value, min, max, step, log = false, onChange }: { la
 }
 
 /** A hex box that commits only a whole #RRGGBB (so typing half a colour does not spray undo steps or bad colours). */
-function HexField({ value, onCommit }: { value: string; onCommit: (hex: string) => void }) {
+export function HexField({ value, onCommit, label = 'Part colour hex' }: { value: string; onCommit: (hex: string) => void; label?: string }) {
   const [draft, setDraft] = useState<string | null>(null);
   const shown = draft ?? value;
   const commit = () => { if (draft && HEX6.test(draft)) onCommit(draft.toUpperCase()); setDraft(null); };
   return (
-    <input type="text" value={shown} maxLength={7} aria-label="Part colour hex" spellCheck={false}
+    <input type="text" value={shown} maxLength={7} aria-label={label} spellCheck={false}
       onChange={(e) => setDraft(e.target.value.startsWith('#') ? e.target.value : `#${e.target.value}`)}
       onBlur={commit} onKeyDown={(e) => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setDraft(null); }}
       className="w-20 rounded border border-white/10 bg-white/5 px-1.5 py-1 font-mono text-[11px] uppercase text-white/80" />
