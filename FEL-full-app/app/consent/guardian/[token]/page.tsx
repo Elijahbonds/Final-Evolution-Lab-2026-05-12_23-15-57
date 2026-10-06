@@ -30,6 +30,8 @@ export const dynamic = 'force-dynamic';
  * MIRROR-COACH P6 FIX (2026-09-29, code review): the ask names everything the yes covers, the optional daily check-in
  * included (lib/consent/guardianGate.ts GUARDIAN_CONSENT_COVERS) — it said "the Mirror or a pain check-in … That's all
  * this does" while P6's readiness check-in rode on the same consent.
+ * OWNER DECISION 2026-10-06 ("Match today"): the list now names only what the yes unlocks today — a camp plan going
+ * live — since a guardian's OK no longer opens the Mirror or any check-in (see GUARDIAN_CONSENT_COVERS). Copy only.
  */
 export default async function GuardianAcceptPage({ params }: { params: { token: string } }) {
   const token = String(params?.token ?? '');

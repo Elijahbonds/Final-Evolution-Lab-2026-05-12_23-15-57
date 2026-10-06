@@ -113,21 +113,28 @@ export function canUse(feature: GuardianGatedFeature, input: GuardianGateInput, 
 /**
  * WHAT A GUARDIAN'S YES COVERS, in the words both guardian screens say it (app/consent/guardian/[token]/page.tsx for a
  * coach's or camp's link, player-request.tsx for the athlete's own). MIRROR-COACH P6 FIX (2026-09-29, code review —
- * "the guardian's yes now unlocks the daily readiness check-in, but the guardian is never told"): P6's readiness
- * check-in is gated as 'pain_checkin' (lib/health/readiness.ts READINESS_GUARDIAN_FEATURE), so an accepted consent
- * now also lets a minor answer a daily sleep / soreness / energy / mood check-in — while both screens still said the
- * yes covered the Mirror and pain check-ins, the camp one adding "That's all this does". The screens now read this
- * list, and tests/camp/guardian-accept-page.test.ts holds every gated feature with a consumer to a line in it.
- * `body_play` has no consumer yet (movement play's); when it gets one, it gets a line here before it ships.
- * Copy only: neither accept call changes.
+ * "the guardian's yes now unlocks the daily readiness check-in, but the guardian is never told"): the screens read this
+ * list, so what a guardian is asked to OK is exactly what the yes unlocks.
+ *
+ * OWNER DECISION 2026-10-06 ("Match today"): the list named the Mirror, pain check-ins and the daily check-in, which a
+ * guardian's yes no longer unlocks — TEEN-WRITE-BLOCK (2026-09-29) saves pain and daily check-ins only for a verified
+ * 18+ (canWriteHealthData, guardian or not), and the Mirror runs on the device for everyone with no guardian gate,
+ * saving nothing under 18 (app/play/mirror/page.tsx). What an accepted consent unlocks today is one thing: a camp plan
+ * going live (app/api/v1/camp/plans 'activate' refuses a minor's plan with guardian_consent_required without one) —
+ * what /consent/guardian already tells the player (0c4ddb47). So the guardian is now asked for exactly that.
+ * Copy only: no stored consent is touched or re-asked. A GuardianConsent row records no wording (prisma/schema.prisma),
+ * and every reader (the plans route, guardianStatus, canUse) reads acceptedAt / revokedAt alone, so a consent given
+ * under the old, wider wording still reads accepted — it covered more than this, never less.
+ * `canUse` and its GuardianGatedFeature list are unchanged (readiness GET still reads them); when a new thing starts
+ * to need a guardian's yes, it gets a line here before it ships.
  */
-export const GUARDIAN_CONSENT_COVERS: readonly { feature: GuardianGatedFeature; words: string }[] = [
-  { feature: 'mirror', words: 'use its movement-coaching camera tool (the Mirror)' },
-  { feature: 'pain_checkin', words: 'log how an exercise feels (a pain check-in)' },
-  { feature: 'pain_checkin', words: 'answer an optional daily check-in on sleep, soreness, energy and mood' },
+export type GuardianConsentUnlock = 'camp_plan';
+export const GUARDIAN_CONSENT_COVERS: readonly { unlocks: GuardianConsentUnlock; words: string }[] = [
+  { unlocks: 'camp_plan', words: 'start a camp plan their coach builds with them' },
 ];
 
-/** "Before Sam can use …, log … or answer …, we ask a parent or guardian to confirm that's OK." */
+/** "Before Sam can start a camp plan their coach builds with them, we ask a parent or guardian to confirm that's OK."
+ *  (A longer list joins as "a, b or c".) */
 export function guardianConsentAsk(menteeName: string): string {
   const w = GUARDIAN_CONSENT_COVERS.map((c) => c.words);
   const list = w.length > 1 ? `${w.slice(0, -1).join(', ')} or ${w[w.length - 1]}` : w[0];
