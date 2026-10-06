@@ -10,7 +10,7 @@ import { useMemo, useState } from 'react';
 import { ArrowDown, ArrowUp, Copy, Eye, EyeOff, FlipHorizontal, Paintbrush, Plus, Redo2, Shirt, Trash2, Undo2 } from 'lucide-react';
 import { PAINT_BLENDS, PAINT_SURFACES, RANGES, type PaintLayer, type PaintPattern, type PaintRegion, type PaintStamp, type PaintSurface, type PaintType } from '@/lib/creator/look/doc';
 import {
-  PAINT_BUDGET, PATTERN_LABELS, PATTERN_ORDER, REGION_GROUPS, REGION_LABELS, STAMP_LABELS, STAMP_ORDER, SURFACE_LABELS, TYPE_LABELS,
+  BLEND_LABELS, PAINT_BUDGET, PATTERN_LABELS, PATTERN_ORDER, REGION_GROUPS, REGION_LABELS, STAMP_LABELS, STAMP_ORDER, SURFACE_LABELS, TYPE_LABELS,
   duplicateLayer, fitsPaintBudget, layerName, moveLayer, newLayer, removeLayer, suitBase, toggleHidden, updateLayer, weightLabel,
 } from '@/lib/creator/look/paint';
 import { sanitizeStampText } from '@/lib/creator/look/sanitize';
@@ -196,7 +196,7 @@ export function PaintTab({ layers, suit, onChange, onSuit, accent, canUndo, canR
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex gap-1" role="group" aria-label="Blend">
               {PAINT_BLENDS.map((b) => (
-                <Pill key={b} on={(selected.blend ?? 'normal') === b} onClick={() => edit({ blend: b === 'normal' ? undefined : b })}>{b === 'normal' ? 'Paint over' : 'Multiply'}</Pill>
+                <Pill key={b} on={(selected.blend ?? 'normal') === b} onClick={() => edit({ blend: b === 'normal' ? undefined : b })}>{BLEND_LABELS[b]}</Pill>
               ))}
             </div>
             <label className="flex items-center gap-2 text-[11px] text-white/70" title={placed ? 'Also on the other side, mirrored' : 'Mirror left and right'}>

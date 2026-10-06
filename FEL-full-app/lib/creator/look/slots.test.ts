@@ -29,7 +29,7 @@ describe('sanitising slots: v1 → v2', () => {
   it('a v2 slot keeps its own fields, each through its allow-list (no names, no unknown fields)', () => {
     const s = sanitizeCreatorSlot({
       id: 'ab12', label: 'gojo!!', body: 'scan', base: { skinTone: '#abc', hairStyle: 'Mohawk', eyeColor: '#7fd8ff', name: 'Real Name' },
-      sliders: { faceLong: 2, nope: 1 }, frame: { heightScale: 3, buildScale: 0.5 },
+      sliders: { faceLong: 2, 'no-pe': 1 }, frame: { heightScale: 3, buildScale: 0.5 },
       equipped: { tops: 'top_lab', shoes: 'not_an_item', shorts: null, wallet: 'x' }, doc: DOC, email: 'a@b.c',
     })!;
     expect(s).toEqual({

@@ -17,7 +17,8 @@ import {
   BROWS, MOUTHS, NOSES, defaultFace, defaultEquipped, defaultJersey, sanitizeJersey, SLOTS,
   wearablesForSlot, getWearable, type FaceConfig, type WearableSlot, type JerseyConfig,
 } from '@/lib/closet/wearable-catalog';
-import { faceFieldRenders, faceOptionRenders, type FaceField } from '@/lib/babylon/core/faceMorphs';
+import { FACE_MORPH_NAMES, faceFieldRenders, faceOptionRenders, type FaceField } from '@/lib/babylon/core/faceMorphs';
+import { faceMorphList } from '@/lib/creator/look/faceMorphList';
 import { accessoriesForEquipped, wornPartsForEquipped } from '@/lib/closet/wearableAccessories';
 import { MAX_SLOTS, emptyCreatorDoc, type ColourSlot, type CreatorEyes, type CreatorPart, type CreatorShape, type CreatorSlotV2, type HideKey, type PaintLayer, type SlotBody, type SlotFrame } from '@/lib/creator/look/doc';
 import { readCreatorDoc, faceOnly, type StoredFace } from '@/lib/creator/look/storage';
@@ -98,12 +99,6 @@ function FacePreview({ face, accent }: { face: FaceConfig; accent: string }) {
   );
 }
 
-/** Phase 3 fine-tune sliders — names are the forge's morph targets. */
-const FACE_SLIDERS: [string, string][] = [
-  ['faceLong', 'Length'], ['faceRound', 'Roundness'], ['faceSquare', 'Jaw'],
-  ['faceHeart', 'Heart'], ['faceDiamond', 'Cheekbones'], ['jawOpen', 'Jaw open'], ['browRaise', 'Brow'],
-];
-
 /** IMPROVE (2026-10-06): options with no 3D effect yet say so (faceMorphs.faceOptionRenders), instead of pretending. */
 const SOON = '3D coming soon — shows in the sketch only';
 
@@ -148,6 +143,10 @@ export function ClosetView({ adult = false }: { adult?: boolean }) {
   const [skins, setSkins] = useState<CardSkin[]>([]);
   const [skinCardId, setSkinCardId] = useState<string | null>(null);
   const [tab, setTab] = useState<'face' | 'shape' | 'parts' | 'paint' | 'wear' | 'skins'>('face');
+  // CREATOR-PLAN phase 4c: the face sliders come from the morph targets the LOADED body carries (the preview reports them
+  // on every spawn), so a morph baked into the GLB in phase 5 appears here without code; the forge's seven until it reports
+  const [morphNames, setMorphNames] = useState<string[]>(() => [...FACE_MORPH_NAMES]);
+  const faceSliders = useMemo(() => faceMorphList(morphNames), [morphNames]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [buying, setBuying] = useState<string | null>(null);
@@ -420,7 +419,7 @@ export function ClosetView({ adult = false }: { adult?: boolean }) {
         <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
           {/* The actual game model (forged fel-hero) wearing the draft look —
               what you design here is what spawns in every mode. */}
-          <AvatarPreview face={previewFace} palette={previewPalette} jersey={jersey} wardrobe={{ tops: equipped.tops ?? null, shorts: equipped.shorts ?? null, shoes: equipped.shoes ?? null }} accessories={previewAccessories} creator={doc} wornParts={previewWornParts}
+          <AvatarPreview face={previewFace} palette={previewPalette} jersey={jersey} wardrobe={{ tops: equipped.tops ?? null, shorts: equipped.shorts ?? null, shoes: equipped.shoes ?? null }} accessories={previewAccessories} creator={doc} wornParts={previewWornParts} onMorphs={setMorphNames}
             body={heroBodyForSlot(slot.body, { scanOwned, fallback: serverBody })} frame={slot.frame ?? null} presentation={slot.presentation?.scale ?? null} />
           <div className="mt-3">
             <FacePreview face={face} accent={accent} />
@@ -525,7 +524,8 @@ export function ClosetView({ adult = false }: { adult?: boolean }) {
               <Group title="Fine-tune">
                 <p className="mb-2 text-[11px] text-white/40">Sculpt on top of the shape preset. These are the same morphs the game renders.</p>
                 <div className="space-y-2">
-                  {FACE_SLIDERS.map(([key, label]) => (
+                  {!faceSliders.length && <p className="text-[11px] text-white/40">This body has no face shapes to sculpt. Saved values are kept for a body that has them.</p>}
+                  {faceSliders.map(({ key, label }) => (
                     <label key={key} className="flex items-center gap-3 text-xs text-white/70">
                       <span className="w-24 shrink-0">{label}</span>
                       <input type="range" min={0} max={100} value={Math.round(((face.sliders?.[key] ?? 0) as number) * 100)}

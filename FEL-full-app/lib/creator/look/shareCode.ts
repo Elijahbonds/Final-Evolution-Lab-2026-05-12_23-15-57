@@ -84,6 +84,8 @@ function compactPart(p: CreatorPart): Record<string, unknown> {
   if (!one(p.scale)) o.scale = p.scale;
   if (p.finish !== 'matte') o.finish = p.finish;
   if (p.mirror) o.mirror = true;
+  // phase 4c: the sanitiser already left the defaults out of these
+  for (const k of ['colour2', 'tone', 'toneAxis', 'toneAt', 'toneWidth', 'swing', 'follow'] as const) if (p[k] !== undefined) o[k] = p[k];
   return o;
 }
 function compactLayer(l: PaintLayer): Record<string, unknown> {

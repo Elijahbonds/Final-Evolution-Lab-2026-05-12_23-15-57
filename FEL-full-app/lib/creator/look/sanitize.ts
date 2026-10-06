@@ -15,8 +15,8 @@
 import {
   CREATOR_DOC_VERSION, MAX_PARTS, MAX_PAINT_LAYERS, MAX_SLOTS, MAX_DOC_CHARS, MAX_SLOT_CHARS,
   PART_SHAPES, PART_BONES, FINISHES, PAINT_TYPES, PAINT_REGIONS, PAINT_SURFACES, PAINT_PATTERNS, PAINT_STAMPS, PAINT_BLENDS,
-  COLOUR_SLOTS, SHAPE_FACE_KEYS, PROPORTION_RANGES, PROPORTION_KEYS, RANGES, HIDE_KEYS, PUPIL_SHAPES, EYE_RANGES, EYE_DEFAULTS,
-  SLOT_BODIES, GIRTH_KEYS, GIRTH_RANGE, PRESENTATION_RANGE,
+  COLOUR_SLOTS, PROPORTION_RANGES, PROPORTION_KEYS, RANGES, HIDE_KEYS, PUPIL_SHAPES, EYE_RANGES, EYE_DEFAULTS,
+  SLOT_BODIES, GIRTH_KEYS, GIRTH_RANGE, PRESENTATION_RANGE, PART_TONES, TONE_AXES, isSwingShape,
   type CreatorDoc, type CreatorPart, type PaintLayer, type Vec3, type ColourSlot, type CreatorEyes, type CreatorFlags,
   type CreatorSlotV2, type SlotBody, type SlotFrame, type SlotPresentation,
 } from './doc';
@@ -25,6 +25,7 @@ import {
   FACE_SHAPES, HAIR_STYLES, EYE_SHAPES, BROWS, MOUTHS, NOSES, type FaceConfig,
 } from '../../closet/wearable-catalog';
 import { clampCosmetic } from '../../babylon/core/playFrame';
+import { sanitizeMorphWeights } from './faceMorphList';
 
 type Obj = Record<string, unknown>;
 const isObj = (v: unknown): v is Obj => !!v && typeof v === 'object' && !Array.isArray(v);
@@ -68,7 +69,7 @@ export function sanitizePart(raw: unknown): CreatorPart | null {
   const bone = pick(raw.bone, PART_BONES);
   const colour = sanitizeHex(raw.colour);
   if (!id || !shape || !bone || !colour) return null;
-  return {
+  const part: CreatorPart = {
     id, shape, bone,
     pos: vec3(raw.pos, RANGES.partPos, 0),
     rot: vec3(raw.rot, RANGES.partRot, 0, 1),
@@ -77,6 +78,21 @@ export function sanitizePart(raw: unknown): CreatorPart | null {
     finish: pick(raw.finish, FINISHES) ?? 'matte',
     mirror: raw.mirror === true,
   };
+  // phase 4c's optional fields, stored only when not the default (a phase 1–4b doc sanitises to exactly what it was)
+  const colour2 = sanitizeHex(raw.colour2);
+  if (colour2) {
+    part.colour2 = colour2;
+    const tone = pick(raw.tone, PART_TONES) ?? 'split';
+    if (tone !== 'split') part.tone = tone;
+    const axis = pick(raw.toneAxis, TONE_AXES) ?? 'y';
+    if (axis !== 'y') part.toneAxis = axis;
+    const at = clampNum(raw.toneAt, RANGES.toneAt[0], RANGES.toneAt[1], 0.5);
+    if (at !== 0.5) part.toneAt = at;
+    if (tone === 'band') { const w = clampNum(raw.toneWidth, RANGES.toneWidth[0], RANGES.toneWidth[1], 0.2); if (w !== 0.2) part.toneWidth = w; }
+  }
+  if (isSwingShape(shape)) { const sw = clampNum(raw.swing, RANGES.swing[0], RANGES.swing[1], 0, 2); if (sw > 0) part.swing = sw; }
+  if (raw.follow === true) part.follow = true;
+  return part;
 }
 
 /** Text for a text stamp: the jersey plate's own rule (A–Z, 0–9, space, hyphen; 12 characters, upper-cased). */
@@ -108,7 +124,8 @@ export function sanitizePaintLayer(raw: unknown): PaintLayer | null {
     mirror: raw.mirror === true,
   };
   // phase 3's optional fields, stored only when not the default (a phase 1–2 doc sanitises to exactly what it was)
-  if (pick(raw.blend, PAINT_BLENDS) === 'multiply') layer.blend = 'multiply';
+  const blend = pick(raw.blend, PAINT_BLENDS);
+  if (blend && blend !== 'normal') layer.blend = blend;   // 'multiply' (phase 3), 'glow' (phase 4c)
   if (raw.hidden === true) layer.hidden = true;
   const weight = clampNum(raw.weight, RANGES.paintWeight[0], RANGES.paintWeight[1], 0.5);
   if (weight !== 0.5) layer.weight = weight;
@@ -143,11 +160,9 @@ export function sanitizeCreatorDoc(raw: unknown, maxChars: number = MAX_DOC_CHAR
   const colours: Partial<Record<ColourSlot, string>> = {};
   if (isObj(raw.colours)) for (const k of COLOUR_SLOTS) { const c = sanitizeHex(raw.colours[k]); if (c) colours[k] = c; }
   const shapeRaw = isObj(raw.shape) ? raw.shape : {};
-  const face: CreatorDoc['shape']['face'] = {};
-  if (isObj(shapeRaw.face)) for (const k of SHAPE_FACE_KEYS) {
-    const v = shapeRaw.face[k];
-    if (typeof v === 'number' && Number.isFinite(v)) face[k] = clampNum(v, 0, 1, 0);
-  }
+  // phase 4c: data-driven — any face morph name the rule lets through (faceMorphList), the known seven first; an explicit
+  // 0 is kept (a doc value pins a morph over a preset)
+  const face: CreatorDoc['shape']['face'] = sanitizeMorphWeights(shapeRaw.face, true);
   const body: CreatorDoc['shape']['body'] = {};
   if (isObj(shapeRaw.body)) for (const k of PROPORTION_KEYS) {
     const v = shapeRaw.body[k];

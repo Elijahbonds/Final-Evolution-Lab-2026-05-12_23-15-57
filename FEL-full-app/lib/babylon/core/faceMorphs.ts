@@ -8,10 +8,13 @@
 // disagree. Pure, so it is unit-tested without a GPU.
 
 import type { AbstractMesh } from '@babylonjs/core';
+import { isFaceMorphName, orderMorphNames } from '../../creator/look/faceMorphList';
 
 export const FACE_MORPH_NAMES = ['faceLong', 'faceRound', 'faceSquare', 'faceHeart', 'faceDiamond', 'jawOpen', 'browRaise'] as const;
 export type FaceMorphName = typeof FACE_MORPH_NAMES[number];
-export type FaceWeights = Partial<Record<FaceMorphName, number>>;
+/** Weights by morph name. CREATOR-PLAN phase 4c (2026-10-06): any name (faceMorphList.isFaceMorphName), so a preset or a
+ *  slider can drive a morph phase 5 bakes without a type change. */
+export type FaceWeights = Partial<Record<FaceMorphName, number>> & Partial<Record<string, number>>;
 
 /** Named face-shape presets (lib/closet/wearable-catalog.ts FACE_SHAPES). */
 export const FACE_SHAPE_WEIGHTS: Record<string, FaceWeights> = {
@@ -87,20 +90,63 @@ export function resolveFaceWeights(i: FaceMorphInput): number[] {
 }
 
 /**
+ * CREATOR-PLAN phase 4c (2026-10-06), the data-driven face: the weight for EVERY morph by name — the seven known ones
+ * (0 when nothing sets them, as resolveFaceWeights gives) plus any other name a preset or a slider sets that passes
+ * faceMorphList's rule. applyFaceMorphs pushes it onto each target by the target's own name, so a morph baked in phase 5
+ * is driven the moment it is in the GLB.
+ */
+export function resolveFaceWeightMap(i: FaceMorphInput): Record<string, number> {
+  const w: FaceWeights = {
+    ...(FACE_SHAPE_WEIGHTS[i.faceShape ?? ''] ?? {}), ...(BROW_WEIGHTS[i.brows ?? ''] ?? {}),
+    ...(FEATURE_WEIGHTS.eyeShape[i.eyeShape ?? ''] ?? {}), ...(FEATURE_WEIGHTS.mouth[i.mouth ?? ''] ?? {}),
+    ...(FEATURE_WEIGHTS.nose[i.nose ?? ''] ?? {}),
+  };
+  if (i.sliders) for (const [k, v] of Object.entries(i.sliders)) if (v != null) w[k] = v;
+  const out: Record<string, number> = {};
+  for (const k of FACE_MORPH_NAMES) out[k] = 0;
+  for (const k of orderMorphNames(Object.keys(w))) out[k] = clamp01(w[k] ?? 0);
+  return out;
+}
+
+type MorphMgr = { numTargets: number; getTarget(i: number): { name: string; influence: number } };
+const mgrOf = (m: AbstractMesh): MorphMgr | null | undefined => (m as AbstractMesh & { morphTargetManager?: MorphMgr | null }).morphTargetManager;
+
+/**
  * Push weights onto every mesh that carries the forge's morph manager.
  * Returns how many meshes took them (0 on the procedural body or an old GLB).
+ *
+ * `weights` is either the legacy vector in FACE_MORPH_NAMES order (resolveFaceWeights: only those seven are touched) or,
+ * since phase 4c, a map by name (resolveFaceWeightMap): every target whose name is a face morph (faceMorphList's rule) is
+ * set, 0 when the map does not name it. Targets the rule refuses — the Creator's own `felShape` bulk — are never touched.
  */
-export function applyFaceMorphs(meshes: AbstractMesh[], weights: number[]): number {
+export function applyFaceMorphs(meshes: AbstractMesh[], weights: number[] | Record<string, number>): number {
   let applied = 0;
+  const byName = !Array.isArray(weights);
   for (const m of meshes) {
-    const mgr = (m as AbstractMesh & { morphTargetManager?: { numTargets: number; getTarget(i: number): { name: string; influence: number } } }).morphTargetManager;
+    const mgr = mgrOf(m);
     if (!mgr || mgr.numTargets === 0) continue;
     for (let t = 0; t < mgr.numTargets; t++) {
       const target = mgr.getTarget(t);
+      if (byName) {
+        if (isFaceMorphName(target.name)) target.influence = clamp01((weights as Record<string, number>)[target.name] ?? 0);
+        continue;
+      }
       const idx = (FACE_MORPH_NAMES as readonly string[]).indexOf(target.name);
-      if (idx >= 0) target.influence = weights[idx] ?? 0;
+      if (idx >= 0) target.influence = (weights as number[])[idx] ?? 0;
     }
     applied++;
   }
   return applied;
+}
+
+/** The face morph names the loaded body carries (every mesh's targets that pass faceMorphList's rule), the known seven
+ *  first: what the Closet builds its sliders from (phase 4c). */
+export function morphNamesOf(meshes: readonly AbstractMesh[]): string[] {
+  const names: string[] = [];
+  for (const m of meshes) {
+    const mgr = mgrOf(m);
+    if (!mgr) continue;
+    for (let t = 0; t < mgr.numTargets; t++) names.push(mgr.getTarget(t).name);
+  }
+  return orderMorphNames(names);
 }

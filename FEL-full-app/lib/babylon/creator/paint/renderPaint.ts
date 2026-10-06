@@ -32,6 +32,14 @@
 // while anything is cut (one shader variant). The mesh, its picks and its colliders are untouched: the body is the same
 // mesh with transparent texels. Garments are never cut. With no layer, no suit and no cut, the body has no paint at all.
 //
+// GLOW (IMPROVE (2026-10-06), CREATOR-PLAN phase 4c): a `glow` layer also lights up the material's EMISSIVE channel. The
+// compositor writes emission into a second, smaller buffer (composite.ts `emit`) that is uploaded as its own texture and
+// bound as the material's emissive texture, only while some layer glows — a body with no glow has no extra buffer, no
+// extra texture and no extra shader sampler. TIER-AWARE (GLOW_SHIFT, GLOW_LAYER_CAP): on desktop the glow texture is half
+// the paint's size (1024² on the skin) and up to 8 layers glow; on a phone it is a quarter (256² on the skin) and only the
+// first 3 glow layers glow (the rest paint as normal), so the phone pays at most ~0.3 MiB more for it. Nothing runs per
+// frame: the glow is drawn in the same budgeted tile pass as the paint, and only when an edit dirties tiles.
+//
 // Cosmetic only: nothing here touches a mesh's geometry, a bone, a hitbox or a pick.
 
 import { Color3, RawTexture, Texture } from '@babylonjs/core';
@@ -46,7 +54,7 @@ import {
 } from './surfaceMap';
 import { ATOM_MIRROR, regionLabelMask, type BodyChart } from './bodyChart';
 import type { SurfaceMap } from './rasterise';
-import { compileLayers, compositeDirty, cutLabels, dirtyTiles, layerApplies, type BelowCache, type ChartInfo, type CompiledLayer, type PaintBuffers } from './composite';
+import { compileLayers, compositeDirty, cutLabels, dirtyTiles, layerApplies, type BelowCache, type ChartInfo, type CompiledLayer, type EmitBuffer, type PaintBuffers } from './composite';
 
 export type PaintTier = 'desktop' | 'mobile';
 export const PAINT_SIZES: Record<PaintTier, { skin: number; garment: number }> = {
@@ -55,8 +63,12 @@ export const PAINT_SIZES: Record<PaintTier, { skin: number; garment: number }> =
 };
 /** Per-frame drawing budget (ms). */
 export const PAINT_BUDGET_MS: Record<PaintTier, number> = { desktop: 8, mobile: 5 };
+/** Phase 4c: the glow texture is the paint's size >> this (desktop 2048 → 1024, mobile 1024 → 256). */
+export const GLOW_SHIFT: Record<PaintTier, number> = { desktop: 1, mobile: 2 };
+/** Phase 4c: how many glow layers glow on one painted mesh; past it a glow layer paints as normal. */
+export const GLOW_LAYER_CAP: Record<PaintTier, number> = { desktop: 8, mobile: 3 };
 
-type AlbedoMat = Material & { albedoTexture?: BaseTexture | null; albedoColor?: Color3; diffuseTexture?: BaseTexture | null; diffuseColor?: Color3 };
+type AlbedoMat = Material & { albedoTexture?: BaseTexture | null; albedoColor?: Color3; diffuseTexture?: BaseTexture | null; diffuseColor?: Color3; emissiveTexture?: BaseTexture | null; emissiveColor?: Color3 };
 
 interface Target {
   mesh: Mesh;
@@ -84,6 +96,12 @@ interface Target {
   /** phase 4a: the cut this target's buffer was drawn with, and the material's alpha settings before we cut */
   cutSig: string;
   alphaSaved: { mode: number | null; useAlpha: boolean; cutoff: number } | null;
+  /** phase 4c: the emission buffer and its texture (only while a layer glows), its pending upload, what the material's
+   *  emissive channel showed before we bound ours */
+  emit: EmitBuffer | null;
+  emitTex: RawTexture | null;
+  emitUp: { x0: number; y0: number; x1: number; y1: number } | null;
+  emitSaved: { tex: BaseTexture | null; color: Color3 | null } | null;
 }
 
 interface BodyPaint {
@@ -214,7 +232,7 @@ function newTarget(P: BodyPaint, mesh: Mesh, kind: 'skin' | 'garment'): Target {
   return {
     mesh, kind, size, mapKey: surfaceMapKey(mesh, P.chartKey, size), map: null, mat: null, src: null, tex: null, out: null,
     base: null, baseKey: '', baseState: 'none', flat: [0.5, 0.5, 0.5], tint: [1, 1, 1], compiled: [], dirty: null, complete: false,
-    up: null, below: null, cutSig: '', alphaSaved: null,
+    up: null, below: null, cutSig: '', alphaSaved: null, emit: null, emitTex: null, emitUp: null, emitSaved: null,
   };
 }
 
@@ -265,7 +283,12 @@ function updateTarget(P: BodyPaint, t: Target): void {
   const map = mapFor(P, t);
   const chart = P.chart!;
   const info: ChartInfo = { radius: chart.groups.map((g) => g.radius), extent: chart.extent };
-  const next = compileLayers(P.layers, info, { target: t.kind, suit: P.suit, aa: map?.metresPerTexel ?? 0.002 });
+  const next = compileLayers(P.layers, info, { target: t.kind, suit: P.suit, aa: map?.metresPerTexel ?? 0.002, glowCap: GLOW_LAYER_CAP[P.tier] });
+  // phase 4c: the emission buffer exists only while a layer glows. A new one starts dark, which is right everywhere no glow
+  // layer reaches; the tiles a glow layer reaches are dirty anyway (its signature is new), so they fill it.
+  const glows = next.some((l) => l.glow);
+  if (map && glows && !t.emit) { const shift = GLOW_SHIFT[P.tier], size = map.size >> shift; t.emit = { buf: new Uint8Array(size * size * 4), size, shift }; t.below = null; }
+  if (!glows && t.emit) dropGlow(t);
   if (map) {
     const nTiles = map.tiles.n * map.tiles.n;
     if (!t.dirty) { t.dirty = new Uint8Array(nTiles).fill(1); t.complete = false; }
@@ -285,7 +308,7 @@ function updateTarget(P: BodyPaint, t: Target): void {
   }
   t.compiled = next;
   // bind now if the texture already holds a composite of this base (a tint-only change shows the old tint for a frame)
-  if (t.tex && t.complete) bind(t, P);
+  if (t.tex && t.complete) { bind(t, P); if (t.emitTex) bindGlow(t); }
 }
 
 function changedIndices(a: readonly CompiledLayer[], b: readonly CompiledLayer[]): number[] {
@@ -392,12 +415,19 @@ function work(P: BodyPaint, t: Target, budget: number, now: () => number): boole
   if (!map) return true;
   if (!t.out) t.out = new Uint8Array(map.size * map.size * 4);
   if (!t.dirty) return true;
-  const B: PaintBuffers = { map, base: t.base, flat: t.flat, tint: t.tint, out: t.out, aa: map.metresPerTexel, radius: P.chart!.groups.map((g) => g.radius), cut: t.kind === 'skin' ? P.cutTable : null };
-  const r = compositeDirty(B, t.compiled, t.dirty, budget, now, t.below);
-  if (r && r.x1 > r.x0) t.up = t.up ? { x0: Math.min(t.up.x0, r.x0), y0: Math.min(t.up.y0, r.y0), x1: Math.max(t.up.x1, r.x1), y1: Math.max(t.up.y1, r.y1) } : { x0: r.x0, y0: r.y0, x1: r.x1, y1: r.y1 };
+  const B: PaintBuffers = { map, base: t.base, flat: t.flat, tint: t.tint, out: t.out, aa: map.metresPerTexel, radius: P.chart!.groups.map((g) => g.radius), cut: t.kind === 'skin' ? P.cutTable : null, emit: t.emit };
+  const r = compositeDirty(B, t.compiled, t.dirty, budget, now, t.emit ? null : t.below);
+  if (r && r.x1 > r.x0) {
+    t.up = t.up ? { x0: Math.min(t.up.x0, r.x0), y0: Math.min(t.up.y0, r.y0), x1: Math.max(t.up.x1, r.x1), y1: Math.max(t.up.y1, r.y1) } : { x0: r.x0, y0: r.y0, x1: r.x1, y1: r.y1 };
+    if (t.emit) {
+      const k = t.emit.shift, e = { x0: r.x0 >> k, y0: r.y0 >> k, x1: ((r.x1 - 1) >> k) + 1, y1: ((r.y1 - 1) >> k) + 1 };
+      t.emitUp = t.emitUp ? { x0: Math.min(t.emitUp.x0, e.x0), y0: Math.min(t.emitUp.y0, e.y0), x1: Math.max(t.emitUp.x1, e.x1), y1: Math.max(t.emitUp.y1, e.y1) } : e;
+    }
+  }
   const finished = !r || r.left === 0;
   if (finished && !t.complete) { upload(P, t, true); t.complete = true; bind(t, P); }
   else if (t.complete && t.up) upload(P, t, false);
+  if (t.complete && t.emit && (t.emitUp || !t.emitTex)) uploadGlow(P, t);
   return finished;
 }
 
@@ -423,6 +453,51 @@ function upload(P: BodyPaint, t: Target, whole: boolean): void {
     try { engine.updateTextureData(internal, sub, r.x0, r.y0, w, h, 0, 0, true); return; } catch { /* fall through to a whole upload */ }
   }
   t.tex.update(out);
+}
+
+/** Phase 4c: push the emission buffer (a sub-rectangle when little changed) and bind it as the material's emissive. */
+function uploadGlow(P: BodyPaint, t: Target): void {
+  const E = t.emit!;
+  if (!t.emitTex) {
+    t.emitTex = new RawTexture(E.buf, E.size, E.size, 5 /* RGBA */, P.scene, true, false, Texture.TRILINEAR_SAMPLINGMODE);
+    t.emitTex.name = `fel_paint_glow_${t.kind}_${t.mesh.name}`;
+    t.emitTex.wrapU = Texture.CLAMP_ADDRESSMODE; t.emitTex.wrapV = Texture.CLAMP_ADDRESSMODE;
+    t.emitUp = null;
+  } else if (t.emitUp) {
+    const r = t.emitUp; t.emitUp = null;
+    const engine = P.scene.getEngine() as unknown as { updateTextureData?: (tex: unknown, data: ArrayBufferView, x: number, y: number, w: number, h: number, face?: number, lod?: number, mips?: boolean) => void };
+    const internal = t.emitTex.getInternalTexture();
+    const w = r.x1 - r.x0, h = r.y1 - r.y0;
+    let done = false;
+    if (internal && typeof engine.updateTextureData === 'function' && w * h < E.size * E.size * 0.5) {
+      const sub = new Uint8Array(w * h * 4);
+      for (let y = 0; y < h; y++) sub.set(E.buf.subarray(((r.y0 + y) * E.size + r.x0) * 4, ((r.y0 + y) * E.size + r.x1) * 4), y * w * 4);
+      try { engine.updateTextureData(internal, sub, r.x0, r.y0, w, h, 0, 0, true); done = true; } catch { /* a whole upload */ }
+    }
+    if (!done) t.emitTex.update(E.buf);
+  }
+  bindGlow(t);
+}
+
+function bindGlow(t: Target): void {
+  const m = t.mat;
+  if (!m || !t.emitTex || !('emissiveColor' in m) || !m.emissiveColor) return;
+  if (m.emissiveTexture === t.emitTex) return;
+  if (!t.emitSaved) t.emitSaved = { tex: m.emissiveTexture ?? null, color: m.emissiveColor.clone() };
+  m.emissiveTexture = t.emitTex;
+  m.emissiveColor = Color3.White();
+}
+
+/** Take the glow off: the material's emissive back to what it was, the buffer and texture released. */
+function dropGlow(t: Target): void {
+  restoreGlow(t);
+  try { t.emitTex?.dispose(); } catch { /* gone with the scene */ }
+  t.emitTex = null; t.emit = null; t.emitUp = null;
+}
+function restoreGlow(t: Target): void {
+  const m = t.mat, saved = t.emitSaved;
+  if (m && saved && m.emissiveTexture === t.emitTex) { m.emissiveTexture = saved.tex; if (saved.color) m.emissiveColor = saved.color.clone(); }
+  t.emitSaved = null;
 }
 
 /** The colour a painted material carries: white, but for a blue a hex colour can never make (254.97/255), so a garment
@@ -466,6 +541,7 @@ function restoreAlpha(t: Target): void {
 }
 
 function restoreTarget(t: Target): void {
+  restoreGlow(t);
   if (!t.mat || !t.src) return;
   restoreAlpha(t);
   if (albedoOf(t.mat).tex === t.tex) setAlbedo(t.mat, t.src.tex, t.src.color);
@@ -473,7 +549,8 @@ function restoreTarget(t: Target): void {
 
 function disposeTarget(t: Target): void {
   try { t.tex?.dispose(); } catch { /* gone with the scene */ }
-  t.tex = null; t.out = null; t.base = null; t.below = null; t.dirty = null;
+  try { t.emitTex?.dispose(); } catch { /* gone with the scene */ }
+  t.tex = null; t.out = null; t.base = null; t.below = null; t.dirty = null; t.emit = null; t.emitTex = null; t.emitUp = null;
 }
 
 /** Draw everything a body still owes, now (tests, probes, a photo). Map builds included. */
@@ -564,15 +641,19 @@ function hideGarments(meshes: readonly AbstractMesh[]): void {
 }
 
 /** What a body carries (for tests and probes): painted meshes, texture sizes and the bytes held. */
-export function paintStats(root: TransformNode): { targets: { mesh: string; kind: string; size: number; complete: boolean; bound: boolean; pendingTiles: number; tiles: number }[]; cpuBytes: number; gpuBytes: number } | null {
+export function paintStats(root: TransformNode): { targets: { mesh: string; kind: string; size: number; complete: boolean; bound: boolean; pendingTiles: number; tiles: number; glowSize: number; glowBound: boolean }[]; cpuBytes: number; gpuBytes: number } | null {
   const P = bodies.get(root);
   if (!P) return null;
   let cpu = 0, gpu = 0;
   const targets = [...P.targets.values()].map((t) => {
-    cpu += (t.out?.byteLength ?? 0) + (t.below?.buf.byteLength ?? 0);
+    cpu += (t.out?.byteLength ?? 0) + (t.below?.buf.byteLength ?? 0) + (t.emit?.buf.byteLength ?? 0);
     if (t.tex) gpu += Math.round(t.size * t.size * 4 * (4 / 3));   // RGBA8 plus its mip chain
+    if (t.emitTex && t.emit) gpu += Math.round(t.emit.size * t.emit.size * 4 * (4 / 3));
     const pendingTiles = t.dirty ? t.dirty.reduce((a, b) => a + b, 0) : 0;
-    return { mesh: t.mesh.name, kind: t.kind, size: t.size, complete: t.complete, bound: !!t.tex && !!t.mat && albedoOf(t.mat).tex === t.tex, pendingTiles, tiles: t.dirty?.length ?? 0 };
+    return {
+      mesh: t.mesh.name, kind: t.kind, size: t.size, complete: t.complete, bound: !!t.tex && !!t.mat && albedoOf(t.mat).tex === t.tex, pendingTiles, tiles: t.dirty?.length ?? 0,
+      glowSize: t.emit?.size ?? 0, glowBound: !!t.emitTex && !!t.mat && t.mat.emissiveTexture === t.emitTex,
+    };
   });
   return { targets, cpuBytes: cpu, gpuBytes: gpu };
 }
@@ -580,6 +661,11 @@ export function paintStats(root: TransformNode): { targets: { mesh: string; kind
 /** The painted texture on a body's mesh (probes). */
 export function paintTextureOf(root: TransformNode, mesh: AbstractMesh): RawTexture | null {
   return bodies.get(root)?.targets.get(mesh as Mesh)?.tex ?? null;
+}
+
+/** Phase 4c: the emission buffer behind a mesh's glow texture (probes and tests), or null when nothing glows. */
+export function glowBufferOf(root: TransformNode, mesh: AbstractMesh): EmitBuffer | null {
+  return bodies.get(root)?.targets.get(mesh as Mesh)?.emit ?? null;
 }
 
 /** The composited RGBA buffer behind a mesh's paint texture (probes and tests read pixels from it). */

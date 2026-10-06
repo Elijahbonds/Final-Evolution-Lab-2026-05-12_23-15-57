@@ -47,6 +47,8 @@ describe('every part shape', () => {
       expect(Math.max(...e), 'about 10 cm at scale 1').toBeGreaterThanOrEqual(0.06);
       expect(Math.max(...e)).toBeLessThanOrEqual(0.21);
       expect(backwards(g), 'triangles wound against their normals').toBe(0);
+      // phase 4c: every normal is unit length (the cape strip's far edge once had zero-length ones)
+      for (let i = 0; i < g.normals.length; i += 3) expect(Math.hypot(g.normals[i], g.normals[i + 1], g.normals[i + 2]), `normal ${i / 3}`).toBeCloseTo(1, 5);
     });
   }
 

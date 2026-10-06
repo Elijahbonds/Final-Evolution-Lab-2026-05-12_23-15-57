@@ -3,6 +3,9 @@
 // Called by the Creator hook (core/creatorLook.applyCreatorLayers), so parts show in every mode that applies the
 // player's identity, in the Closet preview and in the Athlete Creator's.
 //
+// TWO-TONE (phase 4c, 2026-10-06): a part with a second colour is its shape cut crisply along a split or a band
+// (twoTone.ts), the second colour riding in the same vertex colours: still one mesh per (bone, finish), no new material.
+//
 // DRAW CALLS. Parts are merged: every part on the same bone with the same material is baked into ONE mesh parented to
 // that bone's node, so it rides the animation with no per-frame work and costs one draw. A part's COLOUR rides in the
 // mesh's vertex colours, so the material is the FINISH alone (matte, gloss, metal, glow): ten spikes in five colours on
@@ -27,6 +30,7 @@ import { append, bake, emptyGeo, pack } from './geometry';
 import { nodeMatrix } from './placement';
 import { rigFrames } from './rigFrames';
 import { shapeGeo } from './shapes';
+import { tonedGeo, type ToneSpec } from './twoTone';
 
 export interface PartsSummary {
   /** parts the doc asked for (entries) */
@@ -67,6 +71,13 @@ function rgb(hex: string): [number, number, number] {
   const c = Color3.FromHexString(HEX.test(hex) ? hex.toUpperCase() : '#FFFFFF');
   return [c.r, c.g, c.b];
 }
+
+/** A part's two-tone spec, defaults filled in (doc.ts: split along y at the middle; a band 0.2 wide). */
+export function toneSpec(p: Pick<CreatorPart, 'tone' | 'toneAxis' | 'toneAt' | 'toneWidth'>): ToneSpec {
+  return { kind: p.tone ?? 'split', axis: p.toneAxis ?? 'y', at: p.toneAt ?? 0.5, width: p.toneWidth ?? 0.2 };
+}
+/** What of a part's two-tone changes its bake (empty for a one-colour part, so a phase 2 group's signature is unchanged). */
+const toneSig = (p: CreatorPart): unknown[] => (p.colour2 ? [p.colour2, p.tone, p.toneAxis, p.toneAt, p.toneWidth] : []);
 
 function release(root: TransformNode, s: BodyParts): void {
   for (const g of s.groups.values()) g.mesh.dispose(false, false);
@@ -117,7 +128,7 @@ export function syncParts(spawn: { root: TransformNode; skeleton: Skeleton }, pa
     if (!want.has(key)) { g.mesh.dispose(false, false); s.groups.delete(key); }
   }
   for (const [key, w] of want) {
-    const sig = JSON.stringify(w.items.map(({ part, mirrored }) => [part.shape, part.bone, part.pos, part.rot, part.scale, part.colour, mirrored]));
+    const sig = JSON.stringify(w.items.map(({ part, mirrored }) => [part.shape, part.bone, part.pos, part.rot, part.scale, part.colour, mirrored, ...toneSig(part)]));
     const have = s.groups.get(key);
     if (have && have.sig === sig) continue;
     let mat = s.mats.get(w.mat);
@@ -126,10 +137,16 @@ export function syncParts(spawn: { root: TransformNode; skeleton: Skeleton }, pa
     const colours: number[] = [];
     for (const { part, mirrored } of w.items) {
       const placed = nodeMatrix(part, frames!, mirrored)!;
-      const g = bake(shapeGeo(part.shape), placed.m);
+      // phase 4c: a two-tone part is its shape cut along the split / band (twoTone.ts, cached by its inputs), each
+      // vertex carrying the colour of its side
+      const toned = part.colour2 ? tonedGeo(part.shape, toneSpec(part)) : null;
+      const g = bake(toned ? toned.geo : shapeGeo(part.shape), placed.m);
       append(geo, g);
       const [r, gr, b] = rgb(part.colour);
-      for (let i = 0; i < g.positions.length / 3; i++) colours.push(r, gr, b, 1);
+      const [r2, g2, b2] = part.colour2 ? rgb(part.colour2) : [r, gr, b];
+      for (let i = 0; i < g.positions.length / 3; i++) {
+        if (toned?.second[i]) colours.push(r2, g2, b2, 1); else colours.push(r, gr, b, 1);
+      }
     }
     const packed = pack(geo);
     const vd = new VertexData();

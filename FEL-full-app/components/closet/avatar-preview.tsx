@@ -35,9 +35,14 @@ export interface AvatarPreviewProps {
   /** CREATOR-PLAN phase 4b: the slot's Studio size (owner decision 2026-10-06: giant and tiny builds show here and in
    *  photos only). Stamped on THIS scene's metadata and read back from it (shape/presentation.ts); never in a mode. */
   presentation?: number | null;
+  /** CREATOR-PLAN phase 4c: told the face morph names the loaded body carries (faceMorphs.morphNamesOf) after every spawn
+   *  and respawn, so the Closet's face sliders are built from the body, not a fixed table. */
+  onMorphs?: (names: string[]) => void;
 }
 
-export default function AvatarPreview({ face, palette, jersey, wardrobe, accessories, creator, wornParts, body, frame, presentation }: AvatarPreviewProps) {
+export default function AvatarPreview({ face, palette, jersey, wardrobe, accessories, creator, wornParts, body, frame, presentation, onMorphs }: AvatarPreviewProps) {
+  const onMorphsRef = useRef(onMorphs);
+  onMorphsRef.current = onMorphs;
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const applyRef = useRef<((p: AvatarPreviewProps) => void) | null>(null);
   const playRef = useRef<(clip: string | null) => void>(() => {});
@@ -57,6 +62,7 @@ export default function AvatarPreview({ face, palette, jersey, wardrobe, accesso
       const { CharacterLibrary } = await import('@/lib/babylon/core/CharacterLibrary');
       const { applyIdentity } = await import('@/lib/babylon/core/playerIdentity');
       const { applyPresentation, stampPresentation } = await import('@/lib/babylon/creator/shape/presentation');
+      const { morphNamesOf } = await import('@/lib/babylon/core/faceMorphs');
       if (disposed || !canvasRef.current) return;
 
       const box = canvasRef.current;
@@ -120,6 +126,7 @@ export default function AvatarPreview({ face, palette, jersey, wardrobe, accesso
       };
       let lastProps: AvatarPreviewProps = { face, palette, jersey, wardrobe, accessories, creator, wornParts, frame, presentation };
       applyRef.current(lastProps);
+      onMorphsRef.current?.(morphNamesOf(spawned.meshes));
       // a slot with another body: the old one goes, the new one is spawned and dressed with the same draft
       let respawning: Promise<void> | null = null;
       respawnRef.current = (kind: HeroBodyKind) => {
@@ -133,6 +140,7 @@ export default function AvatarPreview({ face, palette, jersey, wardrobe, accesso
           spawned = next;
           baseScale = spawned.root.scaling.clone();
           applyRef.current?.(lastProps);
+          onMorphsRef.current?.(morphNamesOf(spawned.meshes));
           const { prewarmPaint: warm } = await import('@/lib/babylon/creator/paint/renderPaint');
           if (!disposed) warm(spawned);
         };

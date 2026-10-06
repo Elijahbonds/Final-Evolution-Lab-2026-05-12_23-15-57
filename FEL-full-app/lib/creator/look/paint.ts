@@ -11,7 +11,7 @@
 
 import {
   MAX_PAINT_LAYERS, PAINT_PATTERNS, PAINT_REGIONS, PAINT_STAMPS,
-  type PaintLayer, type PaintPattern, type PaintRegion, type PaintStamp, type PaintSurface, type PaintType,
+  type PaintBlend, type PaintLayer, type PaintPattern, type PaintRegion, type PaintStamp, type PaintSurface, type PaintType,
 } from './doc';
 import { sanitizePaintLayer } from './sanitize';
 
@@ -55,6 +55,9 @@ export const STAMP_LABELS: Record<PaintStamp, string> = {
 };
 
 export const SURFACE_LABELS: Record<PaintSurface, string> = { skin: 'Skin', garments: 'Clothes', both: 'Skin & clothes' };
+
+/** How each blend reads in the tab (phase 4c appended Glow: lit from within, the emissive channel). */
+export const BLEND_LABELS: Record<PaintBlend, string> = { normal: 'Paint over', multiply: 'Multiply', glow: 'Glow' };
 
 /** What each layer's one shape knob (`weight`) does, per type and pattern. */
 export function weightLabel(l: Pick<PaintLayer, 'type' | 'pattern'>): string | null {

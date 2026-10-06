@@ -6,7 +6,7 @@
 import { applyHairStyle } from './hairStyles';
 import { applyKit, type Wardrobe } from './kit';
 import { reportDiag } from './diag';
-import { applyFaceMorphs, resolveFaceWeights } from './faceMorphs';
+import { applyFaceMorphs, resolveFaceWeightMap } from './faceMorphs';
 import { Color3, DynamicTexture, MeshBuilder, PBRMaterial, StandardMaterial, Texture, Vector3 } from '@babylonjs/core';
 import { SKIN_DETAIL_NORMAL, SKIN_LIBRARY, type SkinEntry } from './skinLibrary';
 import type { Material } from '@babylonjs/core';
@@ -274,9 +274,10 @@ export function applyIdentity(
   // Phase 3 (2026-09-02): the forge now has a face. Shape presets and the
   // fine-tune sliders resolve through one table; eye color lands on the
   // iris material. No-ops on a body without morphs or an iris.
-  // IMPROVE (2026-10-06): the Creator doc's face values win over the Closet sliders, per morph.
+  // IMPROVE (2026-10-06): the Creator doc's face values win over the Closet sliders, per morph. CREATOR-PLAN phase 4c: by
+  // NAME (resolveFaceWeightMap), so a morph phase 5 bakes into the body is driven without a code change.
   const doc = id.creator ?? null;
-  applyFaceMorphs(spawn.meshes, resolveFaceWeights({
+  applyFaceMorphs(spawn.meshes, resolveFaceWeightMap({
     faceShape: id.face.faceShape, brows: id.face.brows, eyeShape: id.face.eyeShape, mouth: id.face.mouth, nose: id.face.nose,
     sliders: { ...(id.face.sliders ?? {}), ...(doc?.shape.face ?? {}) } as never,
   }));

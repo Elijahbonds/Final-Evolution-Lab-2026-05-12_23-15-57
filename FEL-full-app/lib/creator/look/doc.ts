@@ -39,11 +39,15 @@ export const MAX_FACE_CHARS = 160_000;
 
 /** Procedural part shapes (phase 2 builds each in code, lib/babylon/creator/parts/shapes.ts; no art needed).
  *  APPEND ONLY: saved docs and share codes name these. Phase 2 (2026-10-06) appended the second row, generic building
- *  blocks only. Keep every name at most 11 characters (the size-cap test budgets the longest). */
+ *  blocks only; phase 4c (2026-10-06) the third: a lightning bolt, a skirt, a helmet and a hood (shells with a face
+ *  opening), an ear, a tail segment, and — for what the archetype fixtures were waiting on — a beard shell, boot and glove
+ *  shells and a hair strand. Generic shapes only. Keep every name at most 11 characters (the size-cap test budgets the
+ *  longest). */
 export const PART_SHAPES = [
   'spike', 'cone', 'horn', 'blade', 'plate', 'disc', 'ring', 'sphere', 'capsule', 'box', 'visor', 'lens', 'fin', 'wing',
   'strap', 'capeStrip', 'shoulderPad', 'belt', 'maskShell', 'torus', 'tube',
   'cylinder', 'wedge', 'dome', 'pyramid', 'gem', 'crescent', 'leaf', 'claw', 'arc',
+  'bolt', 'skirt', 'helmet', 'hood', 'ear', 'tailSeg', 'beard', 'bootShell', 'gloveShell', 'strand',
 ] as const;
 export type PartShape = typeof PART_SHAPES[number];
 
@@ -57,6 +61,19 @@ export type PartBone = typeof PART_BONES[number];
 
 export const FINISHES = ['matte', 'gloss', 'metal', 'glow'] as const;
 export type Finish = typeof FINISHES[number];
+
+/** TWO-TONE PARTS (phase 4c, 2026-10-06): a part's second colour covers one side of a SPLIT across the shape, or a BAND
+ *  (a stripe) round it, along one of the shape's own axes (x side, y its length, z its front; parts/shapes.ts says which
+ *  way each shape runs). Cut in the geometry, so the edge is crisp (parts/twoTone.ts). */
+export const PART_TONES = ['split', 'band'] as const;
+export type PartTone = typeof PART_TONES[number];
+export const TONE_AXES = ['x', 'y', 'z'] as const;
+export type ToneAxis = typeof TONE_AXES[number];
+
+/** BENDABLE PARTS (phase 4c): these shapes may `swing` — skinned to a short bone chain that follows the body with a
+ *  cheap spring (parts/swing.ts). They are the ones that hang or trail: a cape strip, a hair strand, a tail segment. */
+export const SWING_SHAPES = ['capeStrip', 'strand', 'tailSeg'] as const;
+export const isSwingShape = (s: string): boolean => (SWING_SHAPES as readonly string[]).includes(s);
 
 export const PAINT_TYPES = ['fill', 'pattern', 'stamp', 'text'] as const;
 export type PaintType = typeof PAINT_TYPES[number];
@@ -96,18 +113,23 @@ export const PAINT_STAMPS = [
 ] as const;
 export type PaintStamp = typeof PAINT_STAMPS[number];
 
-/** How a layer meets what is under it. Kept simple on purpose (CREATOR-PLAN phase 3): paint over, or darken through. */
-export const PAINT_BLENDS = ['normal', 'multiply'] as const;
+/** How a layer meets what is under it. Kept simple on purpose (CREATOR-PLAN phase 3): paint over, or darken through.
+ *  APPEND ONLY. Phase 4c (2026-10-06) appended `glow`: painted over like `normal`, and ALSO lit from within (the body's
+ *  emissive channel, renderPaint.ts) — panel lines, an arc reactor, glowing tattoos. Tier-aware: a smaller glow texture on
+ *  a phone, and only the first few glow layers glow there (the rest paint as normal). */
+export const PAINT_BLENDS = ['normal', 'multiply', 'glow'] as const;
 export type PaintBlend = typeof PAINT_BLENDS[number];
 
 /** Colour slots the doc can override. Skin, hair and eyes stay in FaceConfig. */
 export const COLOUR_SLOTS = ['jersey', 'shorts', 'shoes', 'accent'] as const;
 export type ColourSlot = typeof COLOUR_SLOTS[number];
 
-/** Face morph values the doc may carry: the forge's seven today (faceMorphs.FACE_MORPH_NAMES). Phase 4 makes this
- *  list data-driven so phase 5's baked morphs are picked up by name. */
+/** Face morph values the doc may carry: the forge's seven today (faceMorphs.FACE_MORPH_NAMES). Phase 4c (2026-10-06)
+ *  made the list DATA-DRIVEN: any name that passes faceMorphList.isFaceMorphName is kept (these seven first, at most
+ *  MAX_FACE_MORPHS), so a morph phase 5 bakes into the body is carried by name without a code change. */
 export const SHAPE_FACE_KEYS = ['faceLong', 'faceRound', 'faceSquare', 'faceHeart', 'faceDiamond', 'jawOpen', 'browRaise'] as const;
-export type ShapeFaceKey = typeof SHAPE_FACE_KEYS[number];
+/** A face morph's name: one of the known seven, or any other name the face morph rule lets through (phase 4c). */
+export type ShapeFaceKey = typeof SHAPE_FACE_KEYS[number] | (string & {});
 
 /**
  * Cosmetic body proportions, as multipliers (CREATOR-PLAN phase 4b, shape v2). NO ARMS: arm length is frozen for gameplay
@@ -169,6 +191,9 @@ export const RANGES = {
   paintStretch: [0.2, 5],    // width / height
   opacity: [0, 1],
   paintWeight: [0.05, 0.95], // a pattern's line / stripe / dot weight, a stamp's outline width (phase 3)
+  toneAt: [0, 1],            // phase 4c: where a two-tone split / band sits along the shape's axis (0 one end, 1 the other)
+  toneWidth: [0.02, 1],      // phase 4c: a band's width, as a fraction of the shape's length on that axis
+  swing: [0, 1],             // phase 4c: how freely a bendable part swings (0 rigid, 1 hangs and sways fully)
 } as const;
 
 export type Vec3 = [number, number, number];
@@ -188,6 +213,18 @@ export interface CreatorPart {
   finish: Finish;
   /** Also place the mirror image on the opposite side's bone (a centre bone: reflected across the body). Costs 2 of the 64. */
   mirror: boolean;
+  /** Phase 4c, all optional and stored only when not the default (so a phase 1–4b doc and code are unchanged):
+   *  `colour2` turns the part two-tone — the second colour on one side of a split (`tone` 'split', the default) or in a
+   *  band (`tone` 'band'), along `toneAxis` ('y' when absent) at `toneAt` (0..1 along the shape, 0.5 when absent), a band
+   *  `toneWidth` wide (0.2 when absent). `swing` (0..1, SWING_SHAPES only) makes it bend and sway with the body. `follow`
+   *  pushes it out with the bulk of the segment it sits on (shape v2), so a chest plate is not buried by a big chest. */
+  colour2?: string;
+  tone?: PartTone;
+  toneAxis?: ToneAxis;
+  toneAt?: number;
+  toneWidth?: number;
+  swing?: number;
+  follow?: true;
 }
 
 /** Where a layer sits (phase 3, lib/babylon/creator/paint/bodyChart.ts). The body is unrolled into a chart in METRES,

@@ -101,7 +101,7 @@ describe('the doc', () => {
     const d = sanitizeCreatorDoc(doc({
       name: 'Real Person', email: 'a@b.c', scan: { landmarks: [1, 2] },
       colours: { jersey: '#123456', skin: '#ffffff', email: '#000000' },
-      shape: { face: { faceLong: 0.5, noseWidth: 1 }, body: { legs: 1.03, arms: 1.2 }, sliders: {} },
+      shape: { face: { faceLong: 0.5, 'nose width': 1, felShape: 1 }, body: { legs: 1.03, arms: 1.2 }, sliders: {} },
       flags: { suit: true, godMode: true },
     }))!;
     expect(Object.keys(d).sort()).toEqual(['colours', 'flags', 'paint', 'parts', 'shape', 'v']);

@@ -15,8 +15,9 @@
 
 import {
   MAX_PARTS, PART_BONES, PART_SHAPES, RANGES, mirrorBone,
-  type CreatorPart, type Finish, type PartBone, type PartShape, type Vec3,
+  type CreatorPart, type Finish, type PartBone, type PartShape, type PartTone, type ToneAxis, type Vec3,
 } from './doc';
+import { sanitizePart } from './sanitize';
 
 /** Most rendered parts on one body (mirrored copies count). */
 export const PART_BUDGET = MAX_PARTS;
@@ -49,14 +50,16 @@ export const SHAPE_LABELS: Record<PartShape, string> = {
   capeStrip: 'Cape strip', shoulderPad: 'Shoulder pad', belt: 'Belt', maskShell: 'Mask shell', torus: 'Torus', tube: 'Tube',
   cylinder: 'Cylinder', wedge: 'Wedge', dome: 'Dome', pyramid: 'Pyramid', gem: 'Gem', crescent: 'Crescent', leaf: 'Leaf',
   claw: 'Claw', arc: 'Arc',
+  bolt: 'Bolt', skirt: 'Skirt', helmet: 'Helmet', hood: 'Hood', ear: 'Ear', tailSeg: 'Tail segment', beard: 'Beard',
+  bootShell: 'Boot shell', gloveShell: 'Glove shell', strand: 'Hair strand',
 };
 
 /** Shapes in the order the picker shows them: points, flats, rounds, wraps. */
 export const SHAPE_ORDER: readonly PartShape[] = [
-  'spike', 'cone', 'horn', 'claw', 'blade', 'leaf', 'fin', 'wing',
+  'spike', 'cone', 'horn', 'claw', 'blade', 'leaf', 'fin', 'wing', 'bolt', 'ear', 'tailSeg', 'strand',
   'plate', 'shoulderPad', 'disc', 'lens', 'ring', 'crescent', 'strap', 'capeStrip',
   'sphere', 'capsule', 'box', 'cylinder', 'tube', 'wedge', 'dome', 'pyramid', 'gem',
-  'visor', 'maskShell', 'belt', 'torus', 'arc',
+  'visor', 'maskShell', 'helmet', 'hood', 'beard', 'belt', 'skirt', 'torus', 'arc', 'bootShell', 'gloveShell',
 ];
 
 export const BONE_LABELS: Record<PartBone, string> = {
@@ -77,6 +80,10 @@ export const BONE_GROUPS: readonly { label: string; bones: readonly PartBone[] }
 ];
 
 export const FINISH_LABELS: Record<Finish, string> = { matte: 'Matte', gloss: 'Gloss', metal: 'Metal', glow: 'Glow' };
+
+/** Phase 4c: the two-tone axes as a player reads them (the shape's own frame: x across, y along its length, z its front). */
+export const TONE_AXIS_LABELS: Record<ToneAxis, string> = { x: 'Across', y: 'Along', z: 'Front–back' };
+export const TONE_LABELS: Record<PartTone, string> = { split: 'Split', band: 'Stripe' };
 
 // ── where a new part starts ──────────────────────────────────────────────────────────────────────────────────────────
 // A first placement that already reads as the thing, measured on the kit body (rigFrames.test.ts checks a few land where
@@ -116,6 +123,17 @@ export const PART_START: Record<PartShape, Start> = {
   belt: S('Hips', [0, 0.02, 0.015], [0, 0, 0], [3.4, 1.6, 2.6]),
   torus: S('Head', [0, 0.27, 0.03], [0, 0, 0], [1.4, 1, 1.4], false, 'glow'),
   arc: S('Head', [0, 0.09, 0.03], [-90, 0, 0], [1.9, 1.5, 3]),
+  // phase 4c (2026-10-06): first guesses on the male kit, like the rest (assumption: for the owner's eye)
+  bolt: S('Hips', [0, 0.02, -0.14], [-120, 0, 0], [1.5, 1.5, 1.5]),
+  skirt: S('Hips', [0, 0.02, 0.015], [0, 0, 0], [3.4, 2.5, 2.6]),
+  helmet: S('Head', [0, 0.09, 0.02], [0, 0, 0], [1, 1.05, 1.15]),
+  hood: S('Head', [0, 0.08, 0], [0, 0, 0], [1.1, 1.15, 1.25]),
+  ear: S('Head', [0.085, 0.07, 0], [0, 90, -15], [0.9, 1, 1], true),
+  tailSeg: S('Hips', [0, -0.02, -0.12], [-120, 0, 0]),
+  beard: S('Head', [0, 0.05, 0.02], [0, 0, 0], [0.95, 0.9, 1.15]),
+  bootShell: S('LeftFoot', [0, -0.01, 0.015], [0, 0, 0], [1.25, 2.1, 1.1], true),
+  gloveShell: S('LeftHand', [0, 0, 0], [0, 0, 0], [1.2, 1.1, 0.8], true),
+  strand: S('Head', [0.06, 0.08, -0.06], [0, 0, 10], [1, 3, 1], true),
 };
 
 const ID_CHARS = 'abcdefghijklmnopqrstuvwxyz0123456789';
@@ -169,7 +187,9 @@ export function updatePart(parts: readonly CreatorPart[], id: string, patch: Par
     next.pos = next.pos.map((v) => round(clamp(v, RANGES.partPos), 3)) as Vec3;
     next.rot = next.rot.map((v) => round(clamp(v, RANGES.partRot), 1)) as Vec3;
     next.scale = next.scale.map((v) => round(clamp(v, RANGES.partScale), 3)) as Vec3;
-    return next;
+    // phase 4c: the optional fields (two-tone, swing, follow) in the sanitiser's own canonical form — clamped, defaults
+    // left out, a tone without a second colour dropped, swing only on a bendable shape
+    return sanitizePart(next) ?? p;
   });
 }
 

@@ -8,10 +8,10 @@
 
 import { useMemo, useState } from 'react';
 import { Copy, FlipHorizontal, Layers, Plus, Redo2, RotateCcw, Trash2, Undo2 } from 'lucide-react';
-import { FINISHES, RANGES, type CreatorPart, type Finish, type PartBone, type PartShape, type Vec3 } from '@/lib/creator/look/doc';
+import { FINISHES, PART_TONES, RANGES, TONE_AXES, isSwingShape, type CreatorPart, type Finish, type PartBone, type PartShape, type Vec3 } from '@/lib/creator/look/doc';
 import {
-  BONE_GROUPS, BONE_LABELS, FINISH_LABELS, PART_BUDGET, PART_START, SHAPE_LABELS, SHAPE_ORDER, duplicatePart, fitsBudget,
-  newPart, partCost, partsCost, removePart, spikeCluster, updatePart,
+  BONE_GROUPS, BONE_LABELS, FINISH_LABELS, PART_BUDGET, PART_START, SHAPE_LABELS, SHAPE_ORDER, TONE_AXIS_LABELS, TONE_LABELS,
+  duplicatePart, fitsBudget, newPart, partCost, partsCost, removePart, spikeCluster, updatePart,
 } from '@/lib/creator/look/parts';
 
 export interface PartsTabProps {
@@ -187,6 +187,40 @@ export function PartsTab({ parts, onChange, accent, canUndo, canRedo, onUndo, on
             </label>
           </div>
 
+          {/* CREATOR-PLAN phase 4c: a second colour (a split or a stripe), bend and sway, sit on the bulk */}
+          <SliderGroup title="Second colour">
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="flex items-center gap-2 text-[11px] text-white/70">
+                <input type="checkbox" checked={!!selected.colour2} aria-label="Two-tone"
+                  onChange={(e) => edit(e.target.checked ? { colour2: selected.colour === '#FFFFFF' ? '#111111' : '#FFFFFF' } : { colour2: undefined, tone: undefined, toneAxis: undefined, toneAt: undefined, toneWidth: undefined })} className="accent-cyan-400" />
+                Two-tone
+              </label>
+              {selected.colour2 && (<>
+                <input type="color" value={selected.colour2.toLowerCase()} aria-label="Second colour"
+                  onChange={(e) => edit({ colour2: e.target.value.toUpperCase() }, 'colour2')} className="h-8 w-10 cursor-pointer rounded border border-white/15 bg-transparent" />
+                <HexField value={selected.colour2} label="Second colour hex" onCommit={(hex) => edit({ colour2: hex })} />
+                <div className="flex gap-1" role="group" aria-label="Two-tone kind">
+                  {PART_TONES.map((t) => <Pill key={t} on={(selected.tone ?? 'split') === t} onClick={() => edit({ tone: t })}>{TONE_LABELS[t]}</Pill>)}
+                </div>
+                <div className="flex gap-1" role="group" aria-label="Two-tone direction">
+                  {TONE_AXES.map((a) => <Pill key={a} on={(selected.toneAxis ?? 'y') === a} onClick={() => edit({ toneAxis: a })}>{TONE_AXIS_LABELS[a]}</Pill>)}
+                </div>
+              </>)}
+            </div>
+            {selected.colour2 && <NumSlider label="Where" value={selected.toneAt ?? 0.5} min={RANGES.toneAt[0]} max={RANGES.toneAt[1]} step={0.01} onChange={(v) => edit({ toneAt: v }, 'toneAt')} />}
+            {selected.colour2 && selected.tone === 'band' && <NumSlider label="Width" value={selected.toneWidth ?? 0.2} min={RANGES.toneWidth[0]} max={RANGES.toneWidth[1]} step={0.01} onChange={(v) => edit({ toneWidth: v }, 'toneWidth')} />}
+          </SliderGroup>
+          {isSwingShape(selected.shape) && (
+            <SliderGroup title="Bend and sway">
+              <NumSlider label="Sway" value={selected.swing ?? 0} min={RANGES.swing[0]} max={RANGES.swing[1]} step={0.01} onChange={(v) => edit({ swing: v }, 'swing')} />
+              <p className="text-[10px] text-white/35">0 keeps it rigid. Above 0 it bends along its length and swings as you move (a lighter version on phones).</p>
+            </SliderGroup>
+          )}
+          <label className="flex items-center gap-2 text-[11px] text-white/70" title="When this body segment is bulked up (Shape tab), the part moves out with it instead of sinking in">
+            <input type="checkbox" checked={!!selected.follow} onChange={(e) => edit({ follow: e.target.checked ? true : undefined })} className="accent-cyan-400" />
+            Sit on top of the bulk
+          </label>
+
           <SliderGroup title="Position (cm from the joint)">
             {AXES.map((k) => (
               <NumSlider key={k} label={POS_LABELS[k]} value={selected.pos[k] * 100} min={RANGES.partPos[0] * 100} max={RANGES.partPos[1] * 100} step={0.5}
@@ -211,6 +245,15 @@ export function PartsTab({ parts, onChange, accent, canUndo, canRedo, onUndo, on
         </section>
       )}
     </div>
+  );
+}
+
+function Pill({ on, onClick, children }: { on: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button type="button" aria-pressed={on} onClick={onClick} className="rounded-full px-2.5 py-1 text-[11px] transition"
+      style={{ backgroundColor: on ? '#00E5FF' : 'rgba(255,255,255,0.05)', color: on ? '#050505' : 'rgba(255,255,255,0.75)', border: `1px solid ${on ? '#00E5FF' : 'rgba(255,255,255,0.12)'}` }}>
+      {children}
+    </button>
   );
 }
 
