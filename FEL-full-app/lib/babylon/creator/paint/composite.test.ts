@@ -4,7 +4,9 @@
 import { describe, expect, it } from 'vitest';
 import { ATOM_COUNT, GROUP_COUNT, atomIndex, type Atom } from './bodyChart';
 import { ANG_Q, T_Q, TILE, buildTiles, type SurfaceMap } from './rasterise';
-import { compileLayers, compositeDirty, dirtyTiles, layerApplies, markLayerTiles, type BelowCache, type ChartInfo, type PaintBuffers } from './composite';
+import { PAINT_ENCODE, compileLayers, compositeDirty, dirtyTiles, layerApplies, markLayerTiles, type BelowCache, type ChartInfo, type PaintBuffers } from './composite';
+import { Color3 } from '@babylonjs/core';
+import { clothPalette } from '../clothes/renderClothes';
 import { sanitizePaintLayer } from '../../../creator/look/sanitize';
 import { MAX_PAINT_LAYERS, type PaintLayer } from '../../../creator/look/doc';
 
@@ -52,6 +54,23 @@ function render(layers: PaintLayer[], o: { base?: Uint8Array | null; tint?: [num
 }
 const px = (out: Uint8Array, x: number, y: number) => Array.from(out.slice((y * SIZE + x) * 4, (y * SIZE + x) * 4 + 4));
 
+describe('one hex, one colour: painted and worn come out the same (owner 2026-10-06, "Match everywhere")', () => {
+  it('a fill\'s bytes, decoded the way the shader decodes a texture (^2.2), are the linear value a garment colour gives the same hex', () => {
+    for (const hex of ['#808080', '#3A6EA5', '#C8102E', '#F2EEE6', '#1A1A1A', '#6A3FA0', '#FFD700']) {
+      const [garment] = clothPalette([{ id: 'g', kind: 'top', style: 'tee', colour: hex }]);
+      const material = Color3.FromHexString(hex);   // a kit garment's tint, a part, the skin, the hair
+      expect([material.r, material.g, material.b]).toEqual(garment);
+      const painted = px(render([L({ id: 'a', colours: [hex] })]).out, 5, 5);
+      for (let k = 0; k < 3; k++) {
+        const linear = Math.pow(painted[k] / 255, 2.2);
+        // within half a byte of rounding
+        expect(Math.abs(linear - garment[k]), `${hex} channel ${k}: painted ${linear.toFixed(4)} vs worn ${garment[k].toFixed(4)}`).toBeLessThanOrEqual(0.005);
+      }
+    }
+    expect(PAINT_ENCODE).toBeCloseTo(1 / 2.2, 9);
+  });
+});
+
 describe('fills, blending and the albedo underneath', () => {
   it('a fill paints exactly its region, and every other texel is the albedo × tint, untouched', () => {
     const { out } = render([L({ id: 'a' })], { tint: [0.5, 1, 1] });
@@ -66,7 +85,9 @@ describe('fills, blending and the albedo underneath', () => {
     expect(half.slice(1)).toEqual([100, 100, 255]);
     expect(px(render([L({ id: 'a', blend: 'multiply', colours: ['#FFFFFF'] })]).out, 5, 5)).toEqual([200, 200, 200, 255]);
     expect(px(render([L({ id: 'a', blend: 'multiply', colours: ['#000000'] })]).out, 5, 5)).toEqual([0, 0, 0, 255]);
-    expect(px(render([L({ id: 'a', blend: 'multiply', colours: ['#808080'] })]).out, 5, 5)).toEqual([100, 100, 100, 255]);
+    // #808080 is half the light (linear 0.502, as on a garment), so in these gamma bytes it multiplies by 0.502^(1/2.2):
+    // 200 × 0.731 = 146 (test changed 2026-10-06 with PAINT_ENCODE, owner "Match everywhere"; it was 200 × 128/255 = 100)
+    expect(px(render([L({ id: 'a', blend: 'multiply', colours: ['#808080'] })]).out, 5, 5)).toEqual([146, 146, 146, 255]);
     expect(px(render([], { base: null }).out, 40, 40)).toEqual([102, 51, 26, 255]);
   });
   it('a tile holding several regions paints only its region\'s texels (columns alternate chest and back here)', () => {
