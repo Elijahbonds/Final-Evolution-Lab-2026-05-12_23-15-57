@@ -12,6 +12,7 @@ import { readConsent, readLocalLook, writeConsent, writeLocalLook, type StoredCo
 import { closetSaveRequest, decideLookHold } from '@/lib/creator/lookPrivacy';
 import { invalidateIdentity } from '@/lib/babylon/core/characterPipeline';
 import { canEquip as canEquipItem } from '@/lib/closet/ownership';
+import { PublishLookAsCard } from '@/components/pipelines/publish-look';   // PIPELINES (2026-10-06)
 import {
   SKIN_TONES, FACE_SHAPES, HAIR_STYLES, HAIR_COLORS, EYE_SHAPES, EYE_COLORS,
   BROWS, MOUTHS, NOSES, defaultFace, defaultEquipped, defaultJersey, sanitizeJersey, SLOTS,
@@ -683,6 +684,7 @@ export function ClosetView({ adult = false, fullBleed = false }: { adult?: boole
           <SlotBar slots={allSlots} selected={selectedId} active={activeId} dirty={dirty}
             onSelect={selectSlot} onPlayAs={(id) => { void save(id); }} onNew={newCharacter} onDuplicate={duplicateCharacter}
             onRename={renameCharacter} onDelete={deleteCharacter} onPaste={pasteCharacter} onShare={shareCode} accent={accent} openPaste={openPaste} />
+          <PublishLookAsCard />{/* PIPELINES (2026-10-06): publish the look as a fashion card — under the characters, beside the Studio's Save Look */}
         </div>
 
         {scanning && (

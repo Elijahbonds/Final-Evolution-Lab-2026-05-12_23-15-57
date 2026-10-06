@@ -39,6 +39,9 @@ const SHELL_EXEMPT_ROUTES: Record<string, string> = {
   calibrate: 'timing calibration utility; it does not record a play session',
   'map-preview': 'auth-gated map preview, not a playable mode',
   mirror: 'Train-owned pose screen; mirror-coach owns its camera/session contract',
+  // MULTIPLAYER (2026-10-06): the party room hosts several games on one screen as FREE PLAY — it mounts each game's own
+  // component for a couch session and records no play session, pays nothing, stakes nothing (components/party).
+  party: 'party room: free-play couch host for several games; records no session, so no GameShell',
 };
 
 const LOADER_BYPASS_ROUTES: Record<string, string> = {

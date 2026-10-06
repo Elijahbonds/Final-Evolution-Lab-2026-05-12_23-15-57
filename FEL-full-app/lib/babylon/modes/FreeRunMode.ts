@@ -23,6 +23,7 @@ import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrar
 import { DEFAULT_HERO_URL } from '../core/athleteRoster';
 import { installSafePlay } from '../anim/clipRegistry';
 import { FreeRunAnimTree } from '../anim/freeRunTree';
+import { mountLandingAbsorb } from '../anim/LandingAbsorb';
 // BIOMECH-WAVE2 (2026-09-09) — the game-wide bar on the traceur (SPEC-FEL-BIOMECH-GAMEWIDE G1–G6). Measured on
 // 2942860, per rendered frame:
 //   G1/G3  on the ground the stick's direction was COPIED into the heading (`S.heading.copyFrom(w)`) and written
@@ -451,7 +452,7 @@ export const FreeRunMode: ModeDefinition = (() => {
         const far = Math.abs(r.z - p.z);
         if (!rig.parked && far > RIG_PARK_M) { rig.parked = true; rig.tree.reset(); rig.char.animator.park(); }   // reset first: stop() raises a one-shot's end, and a tree still in it would replay
         else if (rig.parked && far < RIG_WAKE_M) { rig.parked = false; rig.tree.reset(); }
-        if (!rig.parked) rig.tree.update({ speed01: Math.min(1, r.speed / RUN_MAX), airborne: r.air, jumpBeat: false, tricking: false, wallrun: false, sliding: false, landing: 'none', down: r.stumble > 0.45, celebrating: r.finished });
+        if (!rig.parked) rig.tree.update({ speed01: Math.min(1, r.speed / RUN_MAX), speedMps: r.speed, airborne: r.air, jumpBeat: false, tricking: false, wallrun: false, sliding: false, landing: 'none', down: r.stumble > 0.45, celebrating: r.finished });
       }
     }
     if (S.lunge && S.clock > S.lunge.at + RIVALS.parryWindowSec) S.lunge = null;
@@ -478,6 +479,7 @@ export const FreeRunMode: ModeDefinition = (() => {
     S.bio.celebrating = S.finished;
     S.tree.update({
       speed01: S.finished ? 0 : Math.min(1, S.speed / RUN_MAX),   // the finish: the celebrate settles into the idle, not a run on the spot under the results banner
+      speedMps: S.finished ? 0 : S.speed,   // MOVEMENT POLISH (2026-10-06): the walk and the run pace their stride to the ground (freeRunTree)
       airborne,
       jumpBeat: airborne && S.clock - S.jumpAt < JUMP_BEAT_SEC,
       tricking: airborne && !!S.trick,
@@ -724,6 +726,7 @@ export const FreeRunMode: ModeDefinition = (() => {
       }
       installSafePlay(S.hero.animator, 'freerun');
       S.tree = new FreeRunAnimTree(S.hero.animator);
+      mountLandingAbsorb(ctx.scene, S.hero.skeleton, S.hero.root);   // MOVEMENT POLISH (2026-10-06): a hard landing sinks deeper than a hop (anim/LandingAbsorb)
       // G1/G5: the body under the clips. There is no objective on a course, so the aim IS the line — 8 m down the
       // heading at head height; a vault / a wall run puts the eyes on the surface through the window's own stance.
       S.posture?.dispose();

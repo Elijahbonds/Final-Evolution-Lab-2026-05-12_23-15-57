@@ -4,8 +4,8 @@ import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { proofLineFor, type ProofVerdict } from '@/lib/proofLine';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Maximize2, Minimize2, ArrowLeft, RotateCcw, Home, Loader2, Trophy, Sparkles, Gem, Coins, TrendingUp, TrendingDown, Crown, Award, Share2, Check, PartyPopper, ArrowRight } from 'lucide-react';
+import { AnimatePresence } from 'framer-motion';
+import { Maximize2, Minimize2, ArrowLeft, Loader2 } from 'lucide-react';
 import type { PrqGrade } from '@/lib/prq';
 import { PhysicalGamepadPoller } from '@/lib/gamepad-bridge';
 import { getScheme } from '@/lib/input-schemes';
@@ -15,13 +15,17 @@ import { VirtualController } from './virtual-controller';
 import { ReplayInPlaceContext } from './replay-in-place';
 import { BodyControl } from './body-control';
 import { GameCaptureHud } from '@/components/capture/game-capture-hud';
+import { LearnWhileYouWait } from '@/components/learn/learn-while-you-wait';
 import type { SessionTallies } from '@/lib/game-systems';
 import { sessionStore, markRun, countedSince } from '@/lib/babylon/core/sessionStore';
-import { arenaRefusal, storyRefusal, ArenaRefusedLine, StoryRefusedPanel, type Refusal } from './end-card-refusal';
-import { unpaidLine, unpaidReason, unpaidTitle } from '@/lib/sessions/unpaidCopy';
+import { arenaRefusal, storyRefusal, type Refusal } from './end-card-refusal';
+import { EndScreen } from './end-screen/end-screen';
+import type { EndGoals } from './end-screen/types';
+import { unpaidReason } from '@/lib/sessions/unpaidCopy';
+import { PartyInvite } from '@/components/party/party-invite';   // MULTIPLAYER: the results card's door to the party room
 import {
   type CarnivalStop, type CarnivalRunState,
-  recordCarnivalResult, carnivalStopLabel, carnivalStopHref, carnivalRunTotalScore, clearCarnivalRun,
+  recordCarnivalResult, clearCarnivalRun,
 } from '@/lib/carnival-run';
 
 export interface GameResult {
@@ -80,6 +84,14 @@ interface RecapData {
   season?: SeasonRecap | null;
   mastery?: MasteryRecap | null;
   capMessage?: string;
+  /** END SCREEN: the server's streak after this run, and the streak Lab Credits inside `credits` (read for the card only). */
+  streakDays?: number;
+  streakBonus?: number;
+  /** END SCREEN (2026-10-06): the account XP after the run (the level bar), today's goals, the run's session id (the
+   *  account-best read leaves it out). Read for the card only. */
+  profileXp?: number;
+  goals?: EndGoals | null;
+  sessionId?: string | null;
 }
 
 export function GameShell(props: {
@@ -303,6 +315,11 @@ function GameShellInner({
               season: j?.season ?? null,
               mastery: j?.mastery ?? null,
               capMessage: typeof j?.capMessage === 'string' ? j.capMessage : undefined,
+              ...(Number.isFinite(j?.streakDays) ? { streakDays: Number(j.streakDays) } : {}),
+              ...(Number.isFinite(j?.streakBonus) ? { streakBonus: Number(j.streakBonus) } : {}),
+              ...(Number.isFinite(j?.profileXp) ? { profileXp: Number(j.profileXp) } : {}),
+              ...(j?.goals && typeof j.goals === 'object' ? { goals: j.goals as EndGoals } : {}),
+              ...(typeof j?.sessionId === 'string' ? { sessionId: j.sessionId } : {}),
             });
             // ECONOMY-SESSIONS-HARDEN (2026-09-28): the wallet coins this run paid come IN the session's answer — the server
             // wrote them in the run's own transaction (they were two earn reports from here, keyed by the new session's id,
@@ -677,280 +694,38 @@ function GameShellInner({
           </div>
         ) : null}
 
+        {/* END SCREEN (owner, 2026-10-06): the sequenced, console-style finish — components/games/end-screen. The card reads
+            exactly what this shell holds; what counts as a win stays decided above (cardWon / cardHeadline). Slots for the
+            lanes building on it: extraActions (multiplayer) and sideCards (knowledge-feed). */}
         <AnimatePresence>
           {result && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 px-4 backdrop-blur-sm"
-            >
-              <motion.div
-                initial={{ y: 60, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                transition={{ type: 'spring', damping: 22 }}
-                className="fel-panel w-full max-w-md rounded-2xl p-7 text-center"
-              >
-                <Trophy className={`mx-auto h-12 w-12 ${cardWon ? 'text-[#FFD700]' : 'text-white/30'}`} />
-                <h2 className="fel-heading mt-3 text-4xl font-bold text-white">
-                  {cardHeadline}
-                </h2>
-                <p className="mt-1 font-mono text-sm text-white/50">
-                  {arenaVerdict && arenaVerdict !== 'PENDING' && typeof arenaOpp === 'number'
-                    ? `Score ${arenaResult?.myScore ?? result.score} — ${arenaOpp} house rival`
-                    : <>Score {result.score}{typeof result.opponentScore === 'number' && result.opponentScore > 0 ? ` — ${result.opponentScore}` : ''}</>}
-                </p>
-
-                {carnivalFlag && carnivalRun && (
-                  <div className="mt-3 rounded-lg border border-[#FFD700]/30 bg-[#FFD700]/10 p-3 text-center">
-                    <p className="flex items-center justify-center gap-1.5 text-xs font-bold text-[#FFD700]">
-                      <PartyPopper className="h-3.5 w-3.5" /> CARNIVAL NIGHT — STOP {carnivalRun.index} OF {carnivalRun.lineup.length}
-                    </p>
-                    <p className="mt-1 font-mono text-sm text-white/70">
-                      Running total: {carnivalRunTotalScore(carnivalRun)}
-                    </p>
-                  </div>
-                )}
-
-                {recap ? (
-                  <>
-                  {recap.noPlay ? (
-                    <div className="fel-card mt-6 rounded-lg p-4 text-center">
-                      <div className="font-mono text-sm font-bold text-white/70">NO PLAY RECORDED</div>
-                      <div className="mt-1 text-xs text-white/40">The run ended before you got going — nothing earned, nothing counted. Play again to score.</div>
-                    </div>
-                  ) : (
-                  <>
-                  {recap.unpaid && (
-                    <div data-recap="unpaid" className="fel-card mt-6 rounded-lg p-3 text-center">
-                      <div className="font-mono text-xs font-bold text-white/70">{unpaidTitle(recap.unpaid)}</div>
-                      <div className="mt-0.5 text-[11px] text-white/40">{unpaidLine(recap.unpaid)}</div>
-                    </div>
-                  )}
-                  {recap.capMessage && (
-                    <div data-recap="cap" className="fel-card mt-4 rounded-lg p-3 text-center">
-                      <div className="font-mono text-xs text-white/60">{recap.capMessage}</div>
-                    </div>
-                  )}
-                  {!recap.unpaid && (
-                  <div className="mt-6 grid grid-cols-2 gap-3">
-                    {recap.xp > 0 && (
-                    <div className="fel-card rounded-lg p-3">
-                      <Sparkles className="mx-auto h-4 w-4 text-[#00FF9D]" />
-                      <div className="mt-1 font-mono text-xl font-bold text-[#00FF9D]">+{recap.xp}</div>
-                      <div className="text-[10px] uppercase tracking-wider text-white/40">XP</div>
-                    </div>
-                    )}
-                    {recap.shards > 0 && (
-                    <div className="fel-card rounded-lg p-3">
-                      <Gem className="mx-auto h-4 w-4 text-[#A855F7]" />
-                      <div className="mt-1 font-mono text-xl font-bold text-[#A855F7]">+{recap.shards}</div>
-                      <div className="text-[10px] uppercase tracking-wider text-white/40">Shards</div>
-                    </div>
-                    )}
-                    {recap.credits > 0 && (
-                    <div className="fel-card rounded-lg p-3">
-                      <Coins className="mx-auto h-4 w-4 text-[#FFD700]" />
-                      <div className="mt-1 font-mono text-xl font-bold text-[#FFD700]">+{recap.credits}</div>
-                      <div className="text-[10px] uppercase tracking-wider text-white/40">Credits</div>
-                    </div>
-                    )}
-                    {recap.prqDelta !== 0 && (
-                    <div className="fel-card rounded-lg p-3">
-                      {recap.prqDelta >= 0 ? (
-                        <TrendingUp className="mx-auto h-4 w-4 text-[#00E5FF]" />
-                      ) : (
-                        <TrendingDown className="mx-auto h-4 w-4 text-[#FF3366]" />
-                      )}
-                      <div className={`mt-1 font-mono text-xl font-bold ${recap.prqDelta >= 0 ? 'text-[#00E5FF]' : 'text-[#FF3366]'}`}>
-                        {recap.prqDelta >= 0 ? '+' : ''}
-                        {recap.prqDelta}
-                      </div>
-                      <div className="text-[10px] uppercase tracking-wider text-white/40">PRQ Δ</div>
-                    </div>
-                    )}
-                    {recapCoins !== null && recapCoins.coins > 0 && (
-                      <div data-recap="coins" data-capped={recapCoins.capped ? '1' : undefined} className="fel-card col-span-2 flex items-center justify-center gap-2 rounded-lg p-3">
-                        <Coins className="h-4 w-4 text-[#FFB020]" />
-                        <span className="font-mono text-xl font-bold text-[#FFB020]">+{recapCoins.coins}</span>
-                        <span className="text-[10px] uppercase tracking-wider text-white/40">
-                          {recapCoins.capped ? 'Wallet coins · limit reached' : 'Wallet coins'}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                  )}
-                  </>
-                  )}
-                  {storyRefused && <StoryRefusedPanel refusal={storyRefused} />}
-                  {storyReward && (
-                    <div className="mt-3 rounded-lg border border-[#A855F7]/30 bg-[#A855F7]/10 p-3 text-center">
-                      <p className="text-xs font-bold text-[#A855F7]">STORY NODE COMPLETE</p>
-                      <p className="mt-1 font-mono text-sm text-[#FFD700]">+{storyReward.rewardLC} LC</p>
-                      {storyReward.badge && (
-                        <p className="mt-1 text-xs text-amber-400">{'🏆'} {storyReward.badge.name}</p>
-                      )}
-                    </div>
-                  )}
-
-                  {/* M14 Triumph Arena — duel result */}
-                  {mpResult && (
-                    <div className={`mt-3 rounded-lg border p-3 text-center ${mpResult.tie ? 'border-white/25 bg-white/[0.05]' : mpResult.iWon ? 'border-[#00FF9D]/40 bg-[#00FF9D]/10' : 'border-[#FF3366]/40 bg-[#FF3366]/10'}`}>
-                      <p className="text-xs font-bold tracking-wide text-white/80">FRIEND CHALLENGE</p>
-                      <p className="mt-1 text-sm text-white/80">{mpResult.tie ? 'Dead heat' : mpResult.iWon ? 'You took it' : `${mpResult.hostName ?? 'They'} held it`} — your best {mpResult.guestScore.toLocaleString('en-US')} vs their {mpResult.hostScore.toLocaleString('en-US')}</p>
-                    </div>
-                  )}
-                  {challengeResult && (
-                    <div className={`mt-3 rounded-lg border p-3 text-center ${challengeResult.beat ? 'border-[#00FF9D]/40 bg-[#00FF9D]/10' : 'border-[#FF3366]/40 bg-[#FF3366]/10'}`}>
-                      <p className="text-xs font-bold tracking-wide text-white/80">FRIEND CHALLENGE</p>
-                      <p className="mt-1 text-sm text-white/80">
-                        {challengeResult.beat ? 'You beat' : 'Target held'} {challengeResult.vs ?? 'the rival'} — target {challengeResult.targetScore.toLocaleString('en-US')}, margin {challengeResult.margin >= 0 ? '+' : ''}{challengeResult.margin.toLocaleString('en-US')}
-                      </p>
-                      {challengeResult.rematchPath && (
-                        <Link href={challengeResult.rematchPath} className="mt-2 inline-block text-[11px] text-[#00E5FF] underline">
-                          Send the rematch
-                        </Link>
-                      )}
-                    </div>
-                  )}
-                  {arenaResult && (
-                    <div
-                      className={`mt-3 rounded-lg border p-3 text-center ${
-                        !arenaResult.settled
-                          ? 'border-white/20 bg-white/[0.04]'
-                          : arenaResult.result === 'tie'
-                          ? 'border-white/25 bg-white/[0.05]'
-                          : arenaResult.iWon
-                          ? 'border-[#00FF9D]/40 bg-[#00FF9D]/10'
-                          : 'border-[#FF3366]/40 bg-[#FF3366]/10'
-                      }`}
-                    >
-                      <p className="text-xs font-bold tracking-wide text-white/80">TRIUMPH ARENA</p>
-                      {arenaResult.refused ? (
-                        <ArenaRefusedLine refusal={arenaResult.refused} />
-                      ) : !arenaResult.settled ? (
-                        <p className="mt-1 text-sm text-white/70">Score locked in — waiting for your opponent to finish.</p>
-                      ) : arenaResult.result === 'tie' ? (
-                        <p className="mt-1 text-sm text-white/80">Tie — both entries refunded ({arenaResult.feeLc} LC each).</p>
-                      ) : arenaResult.iWon ? (
-                        <p className="mt-1 font-mono text-sm font-bold text-[#00FF9D]">You won the duel — +{arenaResult.payout} LC</p>
-                      ) : (
-                        <p className="mt-1 text-sm text-[#FF3366]">You lost this duel. Better luck next time.</p>
-                      )}
-                      {arenaResult.settled && typeof arenaResult.myScore === 'number' && typeof arenaResult.oppScore === 'number' && (
-                        <p className="mt-1 font-mono text-[11px] text-white/60">Your {arenaResult.myScore.toLocaleString('en-US')} vs the house rival&apos;s {arenaResult.oppScore.toLocaleString('en-US')}</p>
-                      )}
-                      <a href="/arena" className="mt-2 inline-block text-[11px] text-[#00E5FF] underline">
-                        Back to the Arena
-                      </a>
-                    </div>
-                  )}
-
-                  {/* M13.2 season pass progress + tier-up feedback */}
-                  {recap.season && (
-                    <div className="mt-3 rounded-lg border border-[#FFD700]/25 bg-[#FFD700]/[0.06] p-3 text-left">
-                      <div className="flex items-center justify-between">
-                        <span className="flex items-center gap-1.5 text-xs font-bold text-[#FFD700]">
-                          <Crown className="h-3.5 w-3.5" /> {recap.season.name}
-                        </span>
-                        <span className="font-mono text-[11px] text-white/60">+{recap.season.gained} season XP</span>
-                      </div>
-                      <div className="mt-2 flex items-center gap-2">
-                        <span className="font-mono text-[11px] text-white/50">T{recap.season.tier}</span>
-                        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/10">
-                          <div
-                            className="h-full rounded-full bg-[#FFD700]"
-                            style={{ width: `${Math.min(100, Math.round((recap.season.into / Math.max(1, recap.season.need)) * 100))}%` }}
-                          />
-                        </div>
-                        <span className="font-mono text-[11px] text-white/50">T{recap.season.tier + 1}</span>
-                      </div>
-                      {recap.season.tierUps.length > 0 && (
-                        <p className="mt-2 text-center text-xs font-bold text-[#FFD700]">
-                          {'🎖'} TIER UP! Reached Tier {recap.season.tierUps[recap.season.tierUps.length - 1].tier}
-                        </p>
-                      )}
-                    </div>
-                  )}
-
-                  {/* M13.3 mastery-up feedback */}
-                  {recap.mastery && recap.mastery.ups.length > 0 && (
-                    <div className="mt-3 rounded-lg border border-[#00E5FF]/30 bg-[#00E5FF]/10 p-3 text-center">
-                      <p className="flex items-center justify-center gap-1.5 text-xs font-bold text-[#00E5FF]">
-                        <Award className="h-3.5 w-3.5" /> MASTERY UP — {recap.mastery.ups[recap.mastery.ups.length - 1].tier}
-                      </p>
-                    </div>
-                  )}
-
-                  {/* M13.4 share challenge (K-factor loop) — not for a score the Arena refused */}
-                  {!arenaRefused && <button
-                    onClick={() => void shareChallenge()}
-                    disabled={shareState === 'minting'}
-                    className="fel-heading mt-3 flex w-full items-center justify-center gap-2 rounded-md border border-[#A855F7]/50 bg-[#A855F7]/10 py-2.5 text-sm font-bold text-[#A855F7] transition-colors hover:bg-[#A855F7]/20 disabled:opacity-60"
-                  >
-                    {shareState === 'copied' ? (
-                      <><Check className="h-4 w-4" /> CHALLENGE LINK COPIED</>
-                    ) : shareState === 'minting' ? (
-                      <><Loader2 className="h-4 w-4 animate-spin" /> MINTING…</>
-                    ) : (
-                      <><Share2 className="h-4 w-4" /> CHALLENGE A FRIEND</>
-                    )}
-                  </button>}
-                  {proofLine && (
-                    <button
-                      onClick={shareProof}
-                      disabled={shareState === 'minting'}
-                      className="fel-heading mt-2 flex w-full items-center justify-center gap-2 rounded-md border border-[#00E5FF]/50 bg-[#00E5FF]/10 py-2.5 text-sm font-bold text-[#00E5FF] transition-colors hover:bg-[#00E5FF]/20 disabled:opacity-60"
-                    >
-                      <Share2 className="h-4 w-4" /> Share proof · {proofLine}
-                    </button>
-                  )}
-                  {shareUrl && (
-                    <p className="mt-1 break-all font-mono text-[10px] text-white/40">{shareUrl}</p>
-                  )}
-                  </>
-                ) : (
-                  <div className="mt-6 flex justify-center">
-                    <Loader2 className="h-6 w-6 animate-spin text-[#00E5FF]" />
-                  </div>
-                )}
-
-                {carnivalFlag && carnivalRun ? (
-                  <div className="mt-6">
-                    {carnivalRun.index < carnivalRun.lineup.length ? (
-                      <button
-                        onClick={() => router.push(carnivalStopHref(carnivalRun.lineup[carnivalRun.index]))}
-                        className="fel-heading flex w-full items-center justify-center gap-2 rounded-md bg-[#FFD700] py-3 text-base font-bold text-black transition-all hover:bg-[#FFD700]/85"
-                      >
-                        <ArrowRight className="h-4 w-4" /> NEXT: {carnivalStopLabel(carnivalRun.lineup[carnivalRun.index]).toUpperCase()}
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => router.push('/play/carnival/recap')}
-                        className="fel-heading flex w-full items-center justify-center gap-2 rounded-md bg-[#FFD700] py-3 text-base font-bold text-black transition-all hover:bg-[#FFD700]/85"
-                      >
-                        <PartyPopper className="h-4 w-4" /> SEE CARNIVAL RESULTS
-                      </button>
-                    )}
-                  </div>
-                ) : (
-                  <div className="mt-6 flex gap-3">
-                    <button
-                      onClick={replay}
-                      className="fel-heading flex flex-1 items-center justify-center gap-2 rounded-md bg-[#00E5FF] py-3 text-base font-bold text-black transition-all hover:bg-[#00E5FF]/85"
-                    >
-                      <RotateCcw className="h-4 w-4" /> REPLAY
-                    </button>
-                    <Link
-                      href={storyNodeId ? '/story' : '/'}
-                      className="fel-heading flex flex-1 items-center justify-center gap-2 rounded-md border border-white/15 py-3 text-base font-bold text-white/80 transition-colors hover:border-[#00E5FF]/60 hover:text-[#00E5FF]"
-                    >
-                      <Home className="h-4 w-4" /> {storyNodeId ? 'Map' : 'Home'}
-                    </Link>
-                  </div>
-                )}
-              </motion.div>
-            </motion.div>
+            <EndScreen
+              key={runSeq.current}
+              mode={mode}
+              title={title}
+              run={result}
+              headline={cardHeadline}
+              won={cardWon}
+              proofLine={proofLine}
+              arenaRefused={arenaRefused}
+              arenaVerdict={arenaVerdict}
+              staked={Boolean(arenaMatchId)}
+              recap={recap}
+              coins={recapCoins}
+              storyNodeId={storyNodeId}
+              storyReward={storyReward}
+              storyRefused={storyRefused}
+              mpResult={mpResult}
+              challengeResult={challengeResult}
+              arenaResult={arenaResult}
+              carnivalRun={carnivalFlag ? carnivalRun : null}
+              signatureRun={Boolean(signatureFlag)}
+              share={{ state: shareState, url: shareUrl, onChallenge: () => void shareChallenge(), onProof: shareProof }}
+              onReplay={replay}
+              onNavigate={(href) => router.push(href)}
+              /* MULTIPLAYER: a game friends can play together offers the couch (not on a staked run); KNOWLEDGE-FEED v1: one card for the idle moment */
+              sideCards={<>{!arenaMatchId && <PartyInvite modeId={mode} variant="card" />}<LearnWhileYouWait compact /></>}
+            />
           )}
         </AnimatePresence>
       </div>

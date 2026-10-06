@@ -2,7 +2,7 @@
 // "replaying recorded captures gives the same scores deterministically"). And the import boundary the route keeps.
 import { describe, expect, it } from 'vitest';
 import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { readFixture } from '@/lib/mirror/fixtures/load';
 import { toPoseFrames } from '@/lib/mirror/fixtures';
 import type { PoseFrame } from '@/lib/pose/landmarks';
@@ -81,8 +81,37 @@ describe('the route imports nothing from Babylon', () => {
     expect(all.filter((f) => f.startsWith('lib/assess')).length).toBeGreaterThan(8);
   });
 
-  it('no source under lib/assess, the page or the API route imports @babylonjs/* or lib/babylon/**', () => {
-    const bad = all.flatMap((f) => imports(readFileSync(f, 'utf8')).filter((m) => /@babylonjs\/|(^|\/)babylon\//.test(m)).map((m) => `${f} → ${m}`));
+  // INTEGRATION (2026-10-06): lane/voiceover gave the Quick Screen's spoken lines the device's least robotic voice through
+  // speakNatural, which lives under lib/babylon/audio/voice but is Web Audio + speechSynthesis only. It is excused BY NAME,
+  // and the next test measures what the rule is for: nothing the route loads, at any depth, reaches @babylonjs/*.
+  const BABYLON_FREE_ENTRIES = new Set(['@/lib/babylon/audio/voice/speakNatural']);
+  it('no source under lib/assess, the page or the API route imports @babylonjs/* or lib/babylon/** (one named, Babylon-free voice entry aside)', () => {
+    const bad = all.flatMap((f) => imports(readFileSync(f, 'utf8'))
+      .filter((m) => /@babylonjs\/|(^|\/)babylon\//.test(m) && !BABYLON_FREE_ENTRIES.has(m)).map((m) => `${f} → ${m}`));
+    expect(bad).toEqual([]);
+  });
+
+  it('nothing the route imports, followed through every local module, reaches @babylonjs/*', () => {
+    const resolve = (from: string, spec: string): string | null => {
+      const base = spec.startsWith('@/') ? spec.slice(2) : spec.startsWith('.') ? join(dirname(from), spec) : null;
+      if (base === null) return null;
+      for (const ext of ['.ts', '.tsx', '/index.ts', '/index.tsx']) if (existsSync(base + ext)) return base + ext;
+      return null;
+    };
+    const valueImports = (src: string) => [...src.matchAll(/(?:import|export)\s+(type\s)?[^'"`;]*?from\s*['"]([^'"]+)['"]|import\(\s*['"]([^'"]+)['"]\s*\)/g)]
+      .filter((m) => !m[1]).map((m) => m[2] ?? m[3]);
+    const seen = new Set<string>(), bad: string[] = [];
+    const walk = (f: string): void => {
+      if (seen.has(f)) return;
+      seen.add(f);
+      for (const m of valueImports(readFileSync(f, 'utf8'))) {
+        if (m.startsWith('@babylonjs/')) bad.push(`${f} → ${m}`);
+        const next = resolve(f, m);
+        if (next) walk(next);
+      }
+    };
+    all.forEach(walk);
+    expect(seen.has('lib/babylon/audio/voice/speakNatural.ts'), 'the walk follows the excused entry').toBe(true);
     expect(bad).toEqual([]);
   });
 

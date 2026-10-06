@@ -6,7 +6,7 @@ import { KEY_INDEX, createStudioLibrary, type LibraryBlobStore, type PublishDraf
 import { newProject, withFlipRow, type ProjectFlipRow, type ProjectFlipSource } from './StudioProject';
 import { publishTracks, publishedHasUpload } from './studioEdit';
 import {
-  LIBRARY_UPLOAD_LINE, OWN_RIGHTS_TICK, UPLOAD_DOORS, WALKOUT_UPLOAD_LINE, isUpload, projectUploadPrivacy, projectUploads, tickedUploadNote, tracksHaveUpload,
+  LIBRARY_UPLOAD_LINE, OWN_RIGHTS_TICK, UPLOAD_DOORS, UPLOAD_DOORS_BEFORE_REVIEW, WALKOUT_UPLOAD_LINE, isUpload, projectUploadPrivacy, projectUploads, tickedUploadNote, tracksHaveUpload,
   uploadDoorOpen, uploadNeedsTick, uploadPrivateLine, type UploadDoor, type UploadDoors,
 } from './uploadPrivacy';
 import { WALKOUT_KEY } from './WalkOut';
@@ -46,11 +46,19 @@ describe('the device-private rule (decision #15)', () => {
     expect(projectUploads(idle)).toEqual(['my loop.wav']);                // …though the project holds it
   });
 
-  it('THE SWITCH: on-device doors open, off-device shut (default); the stricter reading shuts all four', () => {
-    expect(UPLOAD_DOORS).toEqual({ library: true, danceFloor: true, walkOut: true, offDevice: false });
-    const u = projectUploadPrivacy(withFlipRow(newProject({ now: 1 }), row(0, upload)));
+  // test changed (CREATE HUB, owner 2026-10-06): the default is now all four doors open — the owner's review queue is the
+  // "online review" decision #15 waited for, so offDevice (a Creator Card submitted for review) opened. The earlier
+  // default (off-device shut) is still pinned, as UPLOAD_DOORS_BEFORE_REVIEW, with its own words.
+  it('THE SWITCH: every door open now the review queue exists; before it, off-device shut; the stricter reading shuts all four', () => {
+    expect(UPLOAD_DOORS).toEqual({ library: true, danceFloor: true, walkOut: true, offDevice: true });
+    const now = projectUploadPrivacy(withFlipRow(newProject({ now: 1 }), row(0, upload)));
+    expect(now.private).toBe(true);                     // the room still says the song plays an upload…
+    expect(now.closed).toEqual([]);                     // …and every door is open
+    expect(now.line).toBe('This song uses your upload "my loop.wav" — it works on this device, and sharing it as a Creator Card goes through FEL\'s review first.');
+    expect(UPLOAD_DOORS_BEFORE_REVIEW).toEqual({ library: true, danceFloor: true, walkOut: true, offDevice: false });
+    const u = projectUploadPrivacy(withFlipRow(newProject({ now: 1 }), row(0, upload)), UPLOAD_DOORS_BEFORE_REVIEW);
     expect(u.closed).toEqual(['offDevice']);
-    expect(['library', 'danceFloor', 'walkOut', 'offDevice'].map((d) => uploadDoorOpen(d as UploadDoor, u))).toEqual([true, true, true, false]);
+    expect(['library', 'danceFloor', 'walkOut', 'offDevice'].map((d) => uploadDoorOpen(d as UploadDoor, u, UPLOAD_DOORS_BEFORE_REVIEW))).toEqual([true, true, true, false]);
     const strict = projectUploadPrivacy(withFlipRow(newProject({ now: 1 }), row(0, upload)), STRICT);
     expect(strict.closed).toEqual(['library', 'danceFloor', 'walkOut', 'offDevice']);
     expect(['library', 'danceFloor', 'walkOut'].map((d) => uploadDoorOpen(d as UploadDoor, strict, STRICT))).toEqual([false, false, false]);
@@ -58,11 +66,13 @@ describe('the device-private rule (decision #15)', () => {
 
   it('the room says why in one line, naming the file (once, however many rows use it) — in the words of the doors shut', () => {
     const base = newProject({ now: 1 });
-    const u = projectUploadPrivacy(withFlipRow(withFlipRow({ ...base, flip: { ...base.flip, source: upload } }, row(0, upload)), row(1, upload)));
+    // test changed (CREATE HUB): the pre-review words are pinned under UPLOAD_DOORS_BEFORE_REVIEW (the default changed)
+    const u = projectUploadPrivacy(withFlipRow(withFlipRow({ ...base, flip: { ...base.flip, source: upload } }, row(0, upload)), row(1, upload)), UPLOAD_DOORS_BEFORE_REVIEW);
     expect(u.uploads).toEqual(['my loop.wav']);
     expect(u.line).toBe('Device-only: this song uses your upload "my loop.wav" — your library, the dance floor and your walk-out work on this device; sharing it online opens once FEL can review uploads.');
     expect(u.line!.includes('\n')).toBe(false);
-    expect(uploadPrivateLine(['a.wav', 'b.wav'])).toMatch(/^Device-only: this song uses 2 of your uploads/);
+    expect(uploadPrivateLine(['a.wav', 'b.wav'], UPLOAD_DOORS_BEFORE_REVIEW)).toMatch(/^Device-only: this song uses 2 of your uploads/);
+    expect(uploadPrivateLine(['a.wav', 'b.wav'])).toMatch(/^This song uses 2 of your uploads — .*FEL's review first\.$/);
     expect(uploadPrivateLine(['a.wav'], STRICT)).toBe('Device-only: this song uses your upload "a.wav" — publishing, the dance floor, walk-outs open once FEL can review uploads online.');
   });
 

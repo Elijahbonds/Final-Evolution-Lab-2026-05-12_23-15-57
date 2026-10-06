@@ -34,6 +34,8 @@ import { WHO_SCENE_IT_PACK } from '../content/quizPacks';
 import { SoundKit } from '../audio/SoundKit';
 import { Contestants, podiums } from '../party/Contestants';
 import { refuse } from '../core/Refusal';
+// PIPELINES (2026-10-06): the pick screen lists approved community packs, credited, with play counts.
+import { cycleChoice, fetchScenePacks, noteScenePackStart, packLabel, packPickLine, sceneChoices, type SceneChoice } from '@/lib/pipelines/scenePicker';
 
 const REVEAL_S = 1.5;            // how long the answer card stays up before the next venue mounts
 const BOARD_S = 3.2;             // the between-rounds scoreboard
@@ -157,6 +159,8 @@ export function makeWhoSceneItMode(): ModeDefinition {
   let sweepT = 0;
   let bestStreak: number[] = [0, 0];
   let packTitle = WHO_SCENE_IT_PACK.title;
+  let choices: SceneChoice[] = [];   // PIPELINES: FEL's pack first, then the community's
+  let choiceIdx = 0;
 
   async function pickPack(): Promise<QuizPack> {
     try {
@@ -224,6 +228,7 @@ export function makeWhoSceneItMode(): ModeDefinition {
     ctx.setHud({
       pack: packTitle, prompt: '', board: null, boardTitle: '', clock: null,
       banner: `PLAYERS   ◀  ${players}  ▶`,
+      ...(choices.length > 1 ? { prompt: packPickLine(choices[choiceIdx], choiceIdx, choices.length) } : {}),
       hint: players > 1 ? 'two on one screen · P1 faces, P2 arrows · any face button starts' : 'solo · ◀ ▶ adds a player · any face button starts',
       players,
     });
@@ -305,6 +310,7 @@ export function makeWhoSceneItMode(): ModeDefinition {
 
   function begin(ctx: ModeContext): void {
     if (phase !== 'pick') return;
+    noteScenePackStart(choices[choiceIdx]);   // PIPELINES: a community pack counts one play
     match = new BuzzMatch(buildRounds(pack, Date.now() % 100000, QUESTIONS_PER_CATEGORY), WHO_SCENE_IT, players);
     bestStreak = [0, 0];
     // IMPROVE (#7): solo is no longer "60 % right = win" — the CPU takes P2's podium and buzzes in under the same rules
@@ -456,6 +462,7 @@ export function makeWhoSceneItMode(): ModeDefinition {
     async load(ctx: ModeContext): Promise<void> {
       phase = 'pick'; pickT = 0; match = null; revealT = 0; boardT = 0;
       pack = await pickPack(); packTitle = pack.title;
+      choices = sceneChoices(pack, await fetchScenePacks()); choiceIdx = 0; packTitle = packLabel(choices[0]);   // PIPELINES
       shelf = makeVenueShelf((id) => {
         const handle = mountVenue(ctx, id, { keepGameplayCamera: true });
         if (!handle) return null;
@@ -489,6 +496,12 @@ export function makeWhoSceneItMode(): ModeDefinition {
         if (e.t === 'dpad' && e.pressed && (e.dir === 'left' || e.dir === 'right')) {
           players = e.dir === 'right' ? Math.min(MAX_PLAYERS, players + 1) : Math.max(1, players - 1);
           SoundKit.play('uiTick', { pitch: e.dir === 'right' ? 1.2 : 0.9, volume: 0.3 });
+          showPick(ctx);
+        } else if (e.t === 'dpad' && e.pressed && (e.dir === 'up' || e.dir === 'down') && choices.length > 1) {   // PIPELINES: ▲ ▼ the pack
+          choiceIdx = cycleChoice(choiceIdx, e.dir === 'down' ? 1 : -1, choices.length);
+          pack = choices[choiceIdx].pack; packTitle = packLabel(choices[choiceIdx]); pickT = 0;
+          shelf.preload([...new Set(pack.questions.map((q) => q.sceneVenueId).filter((v): v is string => !!v))]);
+          SoundKit.play('uiTick', { pitch: 1.05, volume: 0.3 });
           showPick(ctx);
         } else if (e.t === 'button' && e.pressed && FACE.includes(e.btn as 'A')) begin(ctx);
         return;

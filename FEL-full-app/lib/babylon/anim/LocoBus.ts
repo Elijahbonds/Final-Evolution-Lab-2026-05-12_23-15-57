@@ -18,7 +18,7 @@
 // probe / production readout grade a live rig with the same `armsVerdict`. The loop's playback rate is StrideMatch's
 // (the calibrated run reference and rate limits) — this module picks the loop, it does not re-derive the stride.
 
-import { HOOPS_STRIDE, strideRate } from '../core/StrideMatch';
+import { strideRate } from '../core/StrideMatch';
 
 export type LocoWindow = 'idle' | 'walk' | 'run' | 'sprint' | 'strafe_left' | 'strafe_right' | 'backpedal';
 
@@ -29,9 +29,12 @@ export interface LocoTune {
   walkRef: number; runRef: number; strafeRef: number;
 }
 
-// runRef is StrideMatch's calibrated run (foot-slide probe, live 1v1). walkRef / strafeRef — assumption: a 1.4 m/s walk
-// and a 1.0 m/s side step, not yet calibrated against a foot-slide probe.
-export const LOCO_TUNE: LocoTune = { walkAt: 0.6, runAt: 2.8, sprintAt: 6.5, walkRef: 1.4, runRef: HOOPS_STRIDE.run, strafeRef: 1.0 };
+// MOVEMENT POLISH (2026-10-06), TUNED: walkRef 1.4 → 1.75, runRef 3.6 (HOOPS_STRIDE.run) → 4.8. LOCO_CLIP plays the AUTHORED `walk`
+// and `run` (baseClips) — never the hoops captures HOOPS_STRIDE was calibrated on — and with their knees on the forward swing
+// (anim/gait.ts; they moonwalked before) each was swept against its own raw foot slide (scripts/probes/_movement-probe.ts `calib`):
+// walk 6% of the root's travel at 1.7–1.8, run 1.2% at 4.8. strafeRef 1.0 is still an assumption: the authored strafe clips step
+// in place (no lateral sweep at all, `clips`), so no reference can match them.
+export const LOCO_TUNE: LocoTune = { walkAt: 0.6, runAt: 2.8, sprintAt: 6.5, walkRef: 1.75, runRef: 4.8, strafeRef: 1.0 };
 
 /** The clip each window plays — core names, so every scope owns them (clipScope.ts). A sprint is the run at a faster
  *  rate: the alias `sprint_forward` is the same loop at a fixed 1.4×, which would double-count the stride rate. */
@@ -81,6 +84,31 @@ export function stepYaw(cur: number, target: number, dt: number, ratePerSec: num
   const d = wrapYaw(target - cur);
   const max = Math.max(0, ratePerSec) * Math.max(0, dt);
   return wrapYaw(cur + Math.sign(d) * Math.min(Math.abs(d), max));
+}
+
+/**
+ * MOVEMENT POLISH (2026-10-06): A TURN THAT WINDS UP AND SETTLES. stepYaw (and Biomech.slewYaw, the same rule) turns at its full rate from
+ * the first frame of a stick reversal to the last — the yaw rate jumps 0 → 9.5°/frame in one frame and back (1v1's FACE_RATE 10 rad/s,
+ * _movement-probe `hoops`): a body that snaps into a turn and stops dead out of it. TurnSlew keeps a yaw RATE: it accelerates toward
+ * `ratePerSec` at `accelPerSec2` and brakes so it arrives on the target with no overshoot (v² = 2·a·d). Frame-rate independent.
+ * Opt-in: a mode that wants it holds one per body in place of its slewYaw call (routed — the modes own their turn rates).
+ */
+export class TurnSlew {
+  private rate = 0;
+  /** The yaw rate now (rad/s, signed). */
+  get yawRate(): number { return this.rate; }
+  step(cur: number, target: number, dt: number, ratePerSec: number, accelPerSec2: number): number {
+    const d = wrapYaw(target - cur), h = Math.max(0, dt), a = Math.max(1e-6, accelPerSec2);
+    // the fastest rate that can still brake to a stop on the target after this frame's own travel (v·h + v²/2a ≤ |d|), capped
+    const want = Math.sign(d) * Math.min(Math.max(0, ratePerSec), a * (Math.sqrt(h * h + (2 * Math.abs(d)) / a) - h));
+    const dv = want - this.rate, maxDv = a * h;
+    this.rate += Math.sign(dv) * Math.min(Math.abs(dv), maxDv);
+    let step = this.rate * h;
+    if (Math.sign(step) === Math.sign(d) && Math.abs(step) > Math.abs(d)) { step = d; this.rate = 0; }   // never past the target
+    return wrapYaw(cur + step);
+  }
+  /** A cut (a teleport, a reset facing): forget the rate. */
+  reset(): void { this.rate = 0; }
 }
 
 // ── ARMS ─────────────────────────────────────────────────────────────────────────────────────────────────────────────

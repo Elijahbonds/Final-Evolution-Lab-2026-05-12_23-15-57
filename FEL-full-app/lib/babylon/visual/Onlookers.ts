@@ -7,9 +7,11 @@
 // athletes for frame budget (MAX_BODIES × ~6 draws). The constructor keeps its shape — modes construct it synchronously
 // and call update(dt) and cheer(strength); the bodies land a moment later.
 import { BoundingInfo, Vector3 } from '@babylonjs/core';
-import type { Scene, TransformNode } from '@babylonjs/core';
+import type { AnimationGroup, Scene, TransformNode } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { DEFAULT_HERO_URL } from '../core/athleteRoster';
+import { registerPerfTarget } from '../core/perfGuard';
+import type { PerfLevel } from '../core/PerfGovernor';
 
 interface Figure { char: SpawnedCharacter; root: TransformNode; baseY: number; phase: number; bounds: BoundingInfo; parked: boolean; hidden?: boolean; resting: boolean; age: number }
 
@@ -56,6 +58,11 @@ export class Onlookers {
   private readonly scene: Scene;
   private readonly pauseOffscreen: boolean;
   private sinceCull = 0;
+  /** PERF-GUARD (2026-10-06): a phone under load holds the crowd in its idle pose — the clips stop evaluating, the
+   *  breathing layer and the bob stay — and lets it move again when the load goes. */
+  private still = false;
+  private held: AnimationGroup[] = [];
+  private unperf: (() => void) | null = null;
   /** Bodies this crowd asked for (the headless checks count the crowd before the spawns land). */
   get count(): number { return Math.max(this.requested, this.figures.length); }
 
@@ -70,6 +77,7 @@ export class Onlookers {
     const step = Math.max(1, Math.ceil(spots.length / MAX_BODIES));
     const chosen = spots.filter((_, i) => i % step === 0).slice(0, MAX_BODIES);
     this.requested = chosen.length;
+    this.unperf = registerPerfTarget(scene, this);
     chosen.forEach((p, i) => {
       const seed = SEEDS[(i + tint.length) % SEEDS.length];
       const yaw = Math.atan2(lookAt.x - p.x, lookAt.z - p.z);   // face the action
@@ -81,6 +89,7 @@ export class Onlookers {
           const bounds = new BoundingInfo(new Vector3(p.x - 0.6, p.y, p.z - 0.6), new Vector3(p.x + 0.6, p.y + 2.1, p.z + 0.6));
           this.figures.push({ char, root: char.root, baseY: p.y, phase: (i * 2.399) % (Math.PI * 2), bounds, parked: false, resting: false, age: 0 });
           try { this.onSpawn?.(char.root); } catch (e) { console.warn('[FEL-ONLOOKERS] onSpawn failed', (e as Error)?.message ?? e); }
+          if (this.still) this.hold(char);
         })
         .catch((e) => console.warn('[FEL-ONLOOKERS] body did not spawn', (e as Error)?.message ?? e));
     });
@@ -154,6 +163,7 @@ export class Onlookers {
   /** The big moment happened. 0..1 — a bigger moment cheers longer. */
   cheer(strength = 1): void {
     this.cheerT = Math.max(this.cheerT, CHEER_SEC * Math.max(0.2, Math.min(1, strength)));
+    if (this.still) return;   // PERF-GUARD: a held crowd cheers with the hop alone
     for (const f of this.figures) {
       if (f.parked || f.hidden) continue;   // nobody can see it (pauseOffscreen / cullBehind): no cheer
       // a resting body (restBetweenCheers) picks its held clip back up first, so a body with no cheer clip still moves
@@ -162,7 +172,25 @@ export class Onlookers {
     }
   }
 
+  /** PERF-GUARD (2026-10-06): the governor's lever (perfGuard.registerPerfTarget). */
+  setPerfLevel(level: Readonly<PerfLevel>): void {
+    const still = level.crowd === 'still';
+    if (still === this.still) return;
+    this.still = still;
+    if (still) { for (const f of this.figures) this.hold(f.char); return; }
+    // only a group still started and paused is resumed: one the animator has since stopped stays its business
+    for (const g of this.held) { try { if (g.isStarted) g.restart(); } catch { /* disposed with its body */ } }
+    this.held = [];
+  }
+
+  private hold(char: SpawnedCharacter): void {
+    const g = char.animator?.currentGroup;
+    if (g?.isPlaying) { g.pause(); this.held.push(g); }
+  }
+
   dispose(): void {
+    this.unperf?.(); this.unperf = null;
+    this.held = [];
     this.disposed = true;
     for (const f of this.figures) f.char.dispose();
     this.figures = [];

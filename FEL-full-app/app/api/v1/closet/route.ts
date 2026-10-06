@@ -16,7 +16,7 @@ import { activeSlotId, slotSummaries, spawnFace } from '@/lib/creator/look/slots
  *  IMPROVE (2026-10-06), CREATOR-PLAN phase 4a: `?for=spawn` trims the face to the active slot (what a mode needs to dress
  *  one body); `?for=slots` answers only the slot bar's summaries (id, label, body, colour chips) and the active id. */
 export async function GET(req: NextRequest) {
-  const forWhat = req.nextUrl.searchParams.get('for') ?? null;
+  const forWhat = req.nextUrl?.searchParams.get('for') ?? null;   // required: Next's build rejects an optional route-handler argument
   const session = await getServerSession(authOptions);
   const userId = (session?.user as any)?.id as string | undefined;
   if (!userId) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });

@@ -59,6 +59,14 @@ export function GuestLandingHero() {
           </Link>
         </div>
 
+        {/* MULTIPLAYER (2026-10-06): a friend's TV shows a code — the guest's one-step way into their game */}
+        <div className="mt-3 flex items-center justify-center gap-2 text-sm text-white/50">
+          <span>Friend hosting a game?</span>
+          <Link href="/join" data-testid="landing-join" className="inline-flex items-center gap-1 font-semibold text-[#00E5FF] hover:underline">
+            Join with a code <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+        </div>
+
         {/* JOIN-LAB-HIDE: the Join the Lab email form stays hidden until the switch is on (lib/marketing/joinLab.ts). */}
         {joinLabEnabled() && (
           <div className="mx-auto mt-10 max-w-md">

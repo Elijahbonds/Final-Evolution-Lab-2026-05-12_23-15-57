@@ -6,7 +6,8 @@
 // (VoiceKit already plays it), the script rules (scriptRules.lintLine, against the DANCE_MOMENTS / ACADEMY_MOMENTS
 // word limits in moments.ts) and the voice bus (SoundKit's voiceBus — VoiceKit routes into it either way).
 //
-// This file touches no window / AudioContext / fetch — every export here runs the same in a vitest node environment
+// (VOICEOVER 2026-10-06: pickHostLine's shuffle bag reads lineMemory's device copy, a typeof-guarded localStorage read that
+// is an in-memory bag in node.) This file touches no window / AudioContext / fetch — every export here runs the same in a vitest node environment
 // as in the browser, so the room-mode files (which DO touch VoiceKit / the DOM) can be exercised through these pure
 // functions without mocking Web Audio. The task's four owner rules, each a pure decision here:
 //   · NEVER REPEATS THE SAME LINE TWICE IN A ROW — pickHostLine (same rotation as brainBrawlLines.pickFrom).
@@ -18,6 +19,8 @@
 //   · CAPTIONS FOR EVERY VOICED LINE — hostCaption turns a line into the {mic, micWho} pair the shared caption layer
 //     (components/games/mic-caption.tsx's <MicCaption>) already knows how to draw; the room sets it whether or not
 //     the clip actually plays (muted, no bank yet, no Web Audio at all), same as ModeMic.showCaption.
+
+import { deviceLineMemory } from '../voice/lineMemory';
 
 /** One rendered (or about-to-be-rendered) line. Shape matches MicLine (id/moment/text) minus the hoops-only tier/tags,
  *  so a HostLine can be linted with scriptRules.lintLine unchanged. */
@@ -40,13 +43,21 @@ export interface HostCast {
 
 /** One of `pool`, never the one said last time — same rotation as brainBrawlLines.pickFrom, generalised to anything
  *  with an `id` (a HostLine) instead of a plain string, and to `lastId` (a moment can remember "the last line's id"
- *  without keeping the line object itself, which is how DanceMode's/StudioMode's own lastSaid map works). */
+ *  without keeping the line object itself, which is how DanceMode's/StudioMode's own lastSaid map works).
+ *
+ *  VOICEOVER (2026-10-06): and now a SHUFFLE BAG (lineMemory.ts): every line of the pool once before any line again, the round
+ *  remembered on this device across runs. "Never twice in a row" alone let a four-line pool play the same two all night (the
+ *  owner's "too repetitive"). The bag is keyed by the pool (its first id's family and its size), so the call sites in the rooms
+ *  are unchanged. The device memory is a guarded localStorage read, absent in node: there it is an in-memory bag. */
 export function pickHostLine<T extends { id: string }>(pool: readonly T[], rnd: () => number, lastId?: string): T {
   if (pool.length === 0) throw new Error('pickHostLine: empty pool');
   if (pool.length === 1) return pool[0];
-  let i = Math.floor(rnd() * pool.length);
-  if (pool[i].id === lastId) i = (i + 1) % pool.length;
-  return pool[i];
+  const mem = deviceLineMemory();
+  const key = `host|${pool[0].id.replace(/\.\d+$/, '')}|${pool.length}`;
+  let chosen = mem.pick(key, pool, rnd, (l) => (l.id === lastId ? 0 : 1));
+  if (chosen.id === lastId) { const rest = pool.filter((l) => l.id !== lastId); chosen = rest[Math.floor(rnd() * rest.length) % rest.length]; }
+  mem.mark(key, chosen.id);
+  return chosen;
 }
 
 /** A tiny seeded PRNG (mulberry32 — the same algorithm BrainBrawlCore.mulberry32 and lib/pose/synth.ts's own copy
