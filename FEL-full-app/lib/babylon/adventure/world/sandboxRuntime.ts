@@ -95,7 +95,9 @@ export class SandboxRuntime {
     // the gate shuts again once the camp is back and the player is out of the arena
     if (this.phase === 'camp' && this.spec.gate.off && host.player.pos.z < this.spec.gate.minZ - 4) this.spec.gate.off = false;
     // a bled-out party member stands up at the spawn (a spawn's writes)
-    for (const a of [host.player, host.partnerActor]) if (a) this.standUpIfLost(a);
+    this.standUpIfLost(host.player);
+    const q = host.partnerActor;
+    if (q) this.standUpIfLost(q);
   }
 
   private standUpIfLost(a: AdventureActor): void {

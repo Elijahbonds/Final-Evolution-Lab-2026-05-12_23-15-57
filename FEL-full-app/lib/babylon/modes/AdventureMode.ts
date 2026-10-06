@@ -79,6 +79,9 @@ interface St {
   lastHud: string;
   mirror: boolean;
   preset: string;
+  /** The follow overlay last handed to the director (re-tuned only when the rig changes). */
+  rigKey: string;
+  budgetIn: { tier: 'mobile' | 'desktop'; eye: { x: number; y: number; z: number }; pinned: (a: AdventureActor) => boolean };
 }
 
 const states = new WeakMap<Scene, St>();
@@ -201,6 +204,12 @@ export const AdventureMode: ModeDefinition = {
       sb, mapper, yard, bodies, budget: new BodyBudget(), combatView, magicView, sparks, speed,
       stickL: { x: 0, y: 0 }, stickR: { x: 0, y: 0 }, latchedYaw: null, baseFov: ctx.camera.fov, fovBoost: 0,
       hudSec: 0, saveSec: 0, frame: 0, offKeys: null, storage, lastHud: '', mirror: save.settings.mirror === true, preset: 'runner',
+      rigKey: '',
+      budgetIn: {
+        tier: (scene.metadata as { felTier?: 'mobile' | 'desktop' } | undefined)?.felTier ?? 'desktop',
+        eye: host.player.pos,
+        pinned: (a) => a.id === host.playerId || a.id === host.partnerId || a.id === host.player.lock?.actorId || a.kind === 'boss',
+      },
     };
     states.set(scene, S);
     host.setInputSource(host.playerId, (out) => mapper.fill(out, { camYaw: camYawOf(ctx, S), state: host.player.state, invertFlightY: sb.save.settings.invertFlightY }));
@@ -326,7 +335,7 @@ function syncFrame(ctx: ModeContext, S: St, dt: number): void {
   // the camera: the host's held hint as a director rig
   const rig = h.camera.rig();
   if (rig.preset !== S.preset) { S.preset = rig.preset; ctx.camDirector.setPreset(rig.preset); }
-  ctx.camDirector.tuneFollow({ distance: rig.distance, height: rig.height, lag: rig.lag, lookAhead: rig.lookAhead });
+  if (rig.hint !== S.rigKey) { S.rigKey = rig.hint; ctx.camDirector.tuneFollow({ distance: rig.distance, height: rig.height, lag: rig.lag, lookAhead: rig.lookAhead }); }
   ctx.camDirector.look(S.stickR.x, S.stickR.y, dt);
   const target = rig.objectiveId ? h.world.actors.get(rig.objectiveId) : undefined;
   TMP_SUBJECT.set(me.pos.x, me.pos.y, me.pos.z);
@@ -346,12 +355,8 @@ function syncFrame(ctx: ModeContext, S: St, dt: number): void {
   }
 
   // the body budget, every half-second (the player, the partner, the lock and a boss are always full)
-  const tier = (scene.metadata as { felTier?: 'mobile' | 'desktop' } | undefined)?.felTier ?? 'desktop';
-  const lockId = me.lock?.actorId ?? null;
-  S.budget.update(h.world.actors.values(), dt, {
-    tier, eye: me.pos,
-    pinned: (a) => a.id === h.playerId || a.id === h.partnerId || a.id === lockId || a.kind === 'boss',
-  });
+  S.budgetIn.eye = me.pos;
+  S.budget.update(h.world.actors.values(), dt, S.budgetIn);
 
   S.saveSec += dt;
   if (S.saveSec >= SAVE_EVERY_SEC) { S.saveSec = 0; try { storeYard(S); } catch { /* best-effort */ } }

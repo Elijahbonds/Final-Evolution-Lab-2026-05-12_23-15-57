@@ -97,8 +97,9 @@ export class AdventureHost {
   readonly loadout: SpellLoadout;
 
   private readonly ctx: AdventureStepContext;
-  private readonly sources = new Map<ActorId, (out: MoveInput) => void>();
-  private readonly ownedInputs = new Set<ActorId>();
+  /** The input stage's sources and the inputs whose presses the host clears: arrays, walked by index (no iterator). */
+  private readonly sources: { id: ActorId; fill: (out: MoveInput) => void; inp: MoveInput }[] = [];
+  private readonly owned: MoveInput[] = [];
   private readonly listeners: TickListener[] = [];
   private readonly onError: (e: unknown) => void;
   private partnerDef: PartnerDef | null;
@@ -160,8 +161,9 @@ export class AdventureHost {
       : [this.movement, this.combat, this.magic, this.stats];
 
     // ── inputs: the player's (filled by its source each step), the partner's (its brain writes it) ──
-    this.inputs.set(this.playerId, neutralInput());
-    this.ownedInputs.add(this.playerId);
+    const pin = neutralInput();
+    this.inputs.set(this.playerId, pin);
+    this.owned.push(pin);
     if (partner && partnerId) this.inputs.set(partnerId, neutralInput());
 
     // ── the clock listens for time:scale ──
@@ -227,11 +229,13 @@ export class AdventureHost {
 
   /** Who fills `id`'s MoveInput at the input stage of each step (the player's mapper). The host owns that input. */
   setInputSource(id: ActorId, fill: ((out: MoveInput) => void) | null): void {
-    if (fill) {
-      this.sources.set(id, fill);
-      if (!this.inputs.has(id)) this.inputs.set(id, neutralInput());
-      this.ownedInputs.add(id);
-    } else this.sources.delete(id);
+    const i = this.sources.findIndex((x) => x.id === id);
+    if (i >= 0) this.sources.splice(i, 1);
+    if (!fill) return;
+    let inp = this.inputs.get(id);
+    if (!inp) { inp = neutralInput(); this.inputs.set(id, inp); }
+    if (!this.owned.includes(inp)) this.owned.push(inp);
+    this.sources.push({ id, fill, inp });
   }
 
   /** Listen to the host's events stage (after every step's systems). Returns the unsubscribe. */
@@ -261,7 +265,7 @@ export class AdventureHost {
     const ctx = this.ctx;
     ctx.tSec = this.clock.tSec;
     // input
-    for (const [id, fill] of this.sources) { const inp = this.inputs.get(id); if (inp) fill(inp); }
+    for (let i = 0; i < this.sources.length; i++) { const src = this.sources[i]; src.fill(src.inp); }
     this.world.reindex();
     const dt = this.clock.stepSec;
     const sys = this.systems;
@@ -273,12 +277,11 @@ export class AdventureHost {
     }
     // events: the camera's hint for the step, then the listeners
     this.camera.endStep(ctx.tSec);
-    for (const fn of this.listeners) fn(this);
+    for (let i = 0; i < this.listeners.length; i++) this.listeners[i](this);
     // a press lands on exactly one step
-    for (const id of this.ownedInputs) {
-      const inp = this.inputs.get(id);
-      if (!inp) continue;
-      for (const e of EDGES) inp[e] = false;
+    for (let i = 0; i < this.owned.length; i++) {
+      const inp = this.owned[i];
+      for (let k = 0; k < EDGES.length; k++) inp[EDGES[k]] = false;
       inp.magicSlot = null;
     }
     this.clock.advance();
@@ -294,6 +297,6 @@ export class AdventureHost {
     this.disposed = true;
     for (const s of this.systems) s.dispose?.();
     this.listeners.length = 0;
-    this.sources.clear();
+    this.sources.length = 0;
   }
 }
