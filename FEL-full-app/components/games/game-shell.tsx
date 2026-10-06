@@ -14,6 +14,7 @@ import { canFullscreen, isFullscreen, isLandscapePhone, toggleFullscreen } from 
 import { VirtualController } from './virtual-controller';
 import { ReplayInPlaceContext } from './replay-in-place';
 import { BodyControl } from './body-control';
+import { GraphicsToggle } from './graphics-toggle';
 import { GameCaptureHud } from '@/components/capture/game-capture-hud';
 import { LearnWhileYouWait } from '@/components/learn/learn-while-you-wait';
 import type { SessionTallies } from '@/lib/game-systems';
@@ -630,6 +631,7 @@ function GameShellInner({
               a body to the same FelInput a gamepad produces and emitToLive posts it to whichever bus is running,
               so no mode file knows this exists. */}
           <BodyControl />
+          <GraphicsToggle />   {/* visual-foundation: Auto / Performance / Quality, applied on the next load */}
           {fsAvailable && (
             <button
               type="button"

@@ -36,6 +36,8 @@ export const VEHICLE_ENV_SCALE: Record<VenueMood, number> = {
   nightGame: 1.1,   // stadium sky is dim; a notch keeps the paint from going matte-black between the lamps
   alpine: 1.15,
   overcast: 1.3,    // sun 0.9 by design: the environment IS the key light here
+  dusk: 1.05,       // visual-foundation A9.4: a 2.0 low sun still models the bodywork; a notch for the violet sky
+  indoorArena: 1.0, // an overhead key over a bright hall: the base values hold
 };
 
 /**
@@ -51,6 +53,8 @@ export const SUN_FILL: Record<VenueMood, number> = {
   nightGame: 0.3,   // a white night key at 2.2 still leaves the off-camera flank black under the lights
   alpine: 0.35,
   overcast: 0.55,   // the flattest light in the game; the fill is what separates bodywork from sky
+  dusk: 0.2,        // visual-foundation A9.4: a low sun leaves the far flank dark; a weak fill, as nightGame
+  indoorArena: 0,   // the overhead key and the bright hemi light a vehicle from every side
 };
 
 /** The environment intensity one vehicle material should carry under a mood. */

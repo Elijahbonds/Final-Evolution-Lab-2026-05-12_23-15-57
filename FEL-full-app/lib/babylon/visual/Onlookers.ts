@@ -6,6 +6,7 @@
 // so the same spots get the same people every session), idling on the spot, capped so a crowd never competes with the
 // athletes for frame budget (MAX_BODIES × ~6 draws). The constructor keeps its shape — modes construct it synchronously
 // and call update(dt) and cheer(strength); the bodies land a moment later.
+import { registerCrowdBody } from './CrowdLod';
 import { BoundingInfo, Vector3 } from '@babylonjs/core';
 import type { AnimationGroup, Scene, TransformNode } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
@@ -84,6 +85,9 @@ export class Onlookers {
       void CharacterLibrary.spawn(scene, DEFAULT_HERO_URL, { position: p.clone(), yawRad: yaw, tint: seed, startClip: 'idle', identity: false })
         .then((char) => {
           if (this.disposed) { char.dispose(); return; }
+          // A9.9: past ~14 m from the camera, no ink hull and no cast shadow. Best-effort: a scene the LOD cannot watch must not
+          // lose the body (integration-2: the crowd's headless suites build on a bare scene and lost every body here)
+          try { registerCrowdBody(scene, char.root); } catch (e) { console.warn('[FEL-ONLOOKERS] crowd LOD skipped', (e as Error)?.message ?? e); }
           for (const m of char.root.getChildMeshes()) m.isPickable = false;
           // the body's cull volume: a 1.2 m wide, 2.1 m tall box over the spot (it never leaves it)
           const bounds = new BoundingInfo(new Vector3(p.x - 0.6, p.y, p.z - 0.6), new Vector3(p.x + 0.6, p.y + 2.1, p.z + 0.6));

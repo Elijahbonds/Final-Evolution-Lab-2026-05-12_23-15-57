@@ -11,8 +11,9 @@ import { readPlayerIcon } from '../visual/playerIcon';
 import { cachedIdentity } from './playerIdentity';
 import { mountLightRig, liftBlackMaterials, type LightRigHandle } from '../scene/LightRig';
 import { mountIblShadows, type IblShadowsHandle } from '../scene/IblShadows';
-import { detectQualityTier, mountSsao, tierRigSettings, type SsaoHandle } from '../scene/QualityTier';
+import { detectRenderTier, mountSsao, tierRigSettings, type SsaoHandle } from '../scene/QualityTier';
 import type { VenueMood } from '../scene/moods';
+import { resolveModeMood } from '../scene/moodResolver';   // A9.4: mood follows the place
 import { InputBus, type FelInput, type BodyPacket } from './InputBus';
 import { CameraDirector, type FOLLOW_PRESETS } from './CameraDirector';
 import { buildResult, type ResultSink, type SessionResult } from './sessionResult';
@@ -34,7 +35,7 @@ import { VoiceKit } from '../audio/mic/VoiceKit';
 import { QaTrace } from './QaTrace';
 import { captions } from './captions';
 import { captionsFromHud, rememberHud } from './hudCaptions';   // MECHANICS PASS: press → perceivable answer, agent-only   // M43: unlock audio on first user gesture
-import { autoInk } from '../visual/AnimeInk';    // M59: anime ink outlines
+import { autoInk, inkStyleFor } from '../visual/AnimeInk';    // M59: anime ink outlines
 import { mountBackdrop, MOOD_TO_FAMILY } from '../visual/Backdrops'; // M61: painted backdrops
 import type { BackdropFamily } from '../visual/Backdrops';
 import { FrameGuard, assertSpawned } from './FrameGuard';
@@ -273,7 +274,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
   const fit = applyCanvasFit(engine, opts.canvas);
   // Ship pass (2026-09-02): desktop 60 fps / mobile 30 fps. Decided once, here,
   // from the same fill-rate signal the canvas fit used.
-  const tier = detectQualityTier(opts.canvas, fit);
+  const tier = detectRenderTier(opts.canvas, fit, engine);   // visual-foundation: + the GPU, the high tier and the Graphics menu
   const scene = new Scene(engine);
   (scene.metadata ??= {}).felTier = tier;   // read by CharacterLibrary for per-spawn quality
   scene.metadata.felModeId = def.modeId;   // read by kit.applyKit for the sport's default kit (owner decision 2026-09-05)
@@ -290,7 +291,11 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
   // re-registers the same mode list and re-binds window.__NEXUS_AGENT__ each mount.
   installAgentBridge(AGENT_MODES);
   const camera = new TargetCamera('cam', new Vector3(0, 3, -8), scene);
-  const mood = def.mood;   // read once — it may be a per-venue getter
+  const declaredMood = def.mood;   // read once — it may be a per-venue getter
+  // A9.4 (visual-foundation): MOOD FOLLOWS THE PLACE — the picked arena / place look decides the light for the modes the
+  // resolver knows (combat, net, football, golf, derby, penalty, carnival, dance, brainbrawl); every other mode keeps its own.
+  const { mood, why: moodWhy } = resolveModeMood(def.modeId, declaredMood);
+  if (mood !== declaredMood) console.info(`[FEL-MOOD] ${def.modeId}: ${declaredMood} → ${mood} (${moodWhy})`);
   const lights = mountLightRig(scene, mood, tier);
   // Desktop tier only: SSAO grounds feet and darkens the crease between close
   // bodies. Attached to the one gameplay camera; disposed with the mode.
@@ -300,7 +305,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
   // post pipeline, the backdrop and the ambient bed all agree on one mood for the life of the mount.
   const backdrop = mountBackdrop(scene, def.backdrop ?? MOOD_TO_FAMILY[mood] ?? 'park', mood);
   // M59: anime ink outlines on every skinned character (auto-hooks spawns)
-  const unink = autoInk(scene);
+  const unink = autoInk(scene, inkStyleFor(def.modeId));   // A9.6: the anime line for the party modes, a distance-true contour for the sports
   const input = opts.input ?? new InputBus();
   const camDirector = new CameraDirector(scene, camera, def.camPreset);
 
@@ -425,10 +430,9 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
   //
   // The resting grade is captured once, from whatever mood the venue chose, so a night court and a bright
   // gym each pulse around their OWN look instead of being graded to shared constants.
-  const restGrade: Grade = {
-    vignette: lights.pipeline.imageProcessing.vignetteWeight,
-    exposure: lights.pipeline.imageProcessing.exposure,
-  };
+  // A9.3 (visual-foundation): the rig OWNS the resting grade and this is a live reference to it — re-taken once load() is
+  // done (lights.adoptRest below), so a venue no longer overwrites it and a load-time grade (WeatherFx) is kept.
+  const restGrade: Grade = lights.rest;
   let frame: ImpactFrameState = IMPACT_FRAME_IDLE;
   let framePainted = false;
   // SPEED-VIGNETTE: the level the mode reports this frame (0 = off). The harness, not the mode, owns the
@@ -562,6 +566,8 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
       clearTimeout(watchdog);
       if (timedOut) return false;                  // late resolve after watchdog: stay on error
       liftBlackMaterials(scene);                   // rescue anything venue-load added
+      lights.adoptRest();                          // A9.3: the grade load() settled on is the rest every pulse returns to
+      lights.captureVenue(heroRef.current?.getAbsolutePosition() ?? null);   // A9.7: high tier — the glossy surfaces reflect the real venue
       try { opts.applySkin?.(scene); } catch (e) { console.error('[FEL-ART] applySkin failed', e); }
       // M37: loud spawn assertion — empty world or missing hero never reaches play.
       assertSpawned(scene, { hero: heroRef.current, minWorldMeshes: 8, modeId: def.modeId });
@@ -621,7 +627,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     if (!ambientStarted) {
       ambientStarted = true;
       // mood -> ambient bed: dojo hush, alpine wind-quiet, everything else a stadium crowd.
-      const bed = mood === 'dojoWarm' ? 'dojo' : mood === 'alpine' || mood === 'overcast' ? 'none' : 'stadium';
+      const bed = declaredMood === 'dojoWarm' ? 'dojo' : declaredMood === 'alpine' || declaredMood === 'overcast' ? 'none' : 'stadium';   // the mode's own bed: the light pass leaves the sound alone
       SoundKit.startVenueAmbient(bed);   // AMBIENT FIX (2026-10-06): only over a mode that chose no bed in load()
       enterBed();   // PIPELINES (2026-10-06): the creator soundtrack plays 14 dB under the game (a room with its own music claims focus)
     }
