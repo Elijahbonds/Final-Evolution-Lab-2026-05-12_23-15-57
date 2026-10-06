@@ -41,7 +41,7 @@ describe('phase 1 — the flight is a four-beat bar', () => {
   it('the card reads the beats: execution for each on the beat, style for a perfect flight, and the judges are told', () => {
     const fin = fn('finishAttempt');
     expect(fin).toMatch(/const flow = flightFlow\(beatMarks, beatSlam\);/);
-    expect(fin).toMatch(/beatExec: flow\.beatExec, flowStyle: flow\.flowStyle[ +a-z.]*,/);   // (phase 2 adds the freshness on top)
+    expect(fin).toMatch(/beatExec: flow\.beatExec, flowStyle: flow\.flowStyle[ +a-zA-Z.]*,/);   // (phase 2 adds the freshness on top, phase 8 the pump)
     expect(fin.indexOf('const flow = flightFlow(')).toBeLessThan(fin.indexOf('} = dunkCard({'));
     expect(fin).toMatch(/if \(flow\.perfect\) verdictParts\.push\('PERFECT FLIGHT'\);/);
     expect(fin).toMatch(/const airBits = \[[^\]]*flow\.label/);
@@ -81,7 +81,7 @@ describe('phase 2 — originality, judged and cheered', () => {
     const fin = fn('finishAttempt');
     expect(fin).toMatch(/const seenIt = isRepeat \|\| fresh\.copiedWhole;/);
     expect(fin).toMatch(/repeat: seenIt, execution01: qteAccuracy,/);
-    expect(fin).toMatch(/flowStyle: flow\.flowStyle \+ fresh\.style,/);
+    expect(fin).toMatch(/flowStyle: flow\.flowStyle \+ fresh\.style \+ pumpStyle,/);   // (phase 8: + the hang pump, 0 without one)
     expect(fin).toMatch(/FRESH \$\{Math\.round\(fresh\.freshness01 \* 100\)\}%\$\{seenIt \? ' · SEEN IT' : ''\}/);
     expect(fin).toMatch(/seen: seenIt, dunker:/);
     expect(fin).toMatch(/micMake\(theName, [^;]*, seenIt\)/);
@@ -329,6 +329,42 @@ describe('phase 7 — the live take-off read', () => {
     expect(HOST).toMatch(/const t = decodeTakeoff\(hud\.takeoff\);/);
     expect(HOST).toMatch(/\(typeof hud\.beats === 'string' && hud\.beats\)\) return null;/);
     expect(HOST).toMatch(/style=\{\{ color: ZONE_HEX\[t\.zone\] \}\} data-fel-takeoff=\{t\.zone\}/);
+  });
+});
+
+describe('phase 8 — the hang pump', () => {
+  it('RUN pressed again in the air is the pump — the player\'s own, never before the rise, once a flight', () => {
+    expect(DUNK).toMatch(/\{ const down = e\.value > 0; if \(down && !runDownWas && phase === 'cinematic'\) hangPump\(ctx\); runDownWas = down; \}/);
+    const hp = fn('hangPump');
+    expect(hp).toMatch(/if \(phase !== 'cinematic' \|\| turn !== 'player'\) return;/);
+    expect(hp).toMatch(/if \(clipTime < EASTBAY_TIMING\.rise\) return;/);
+    expect(hp).toMatch(/const v = gradePump\(clipTime, \{ tol: beatTol\(\), used: pumpUsed, slamReadAt: read \}\);/);
+    expect(fn('launchDunk')).toMatch(/pumpUsed = false; pumpStyle = 0; pumpCueUp = false;/);
+    expect(fn('resetForNextAttempt')).toMatch(/pumpUsed = false; pumpStyle = 0; pumpCueUp = false;/);
+  });
+  it('the slow is the gameplay slow-mo the flight clock already rides, for the length the pump module allowed', () => {
+    expect(fn('hangPump')).toMatch(/ctx\.juice\.slowMo\(v\.slow, v\.ms, \{ gameplay: true \}\);/);
+    expect(DUNK).toMatch(/clipTime \+= dt \* \(Number\.isFinite\(animScale\) && animScale > 0 \? animScale : 1\);/);
+  });
+  it('the slam read it is cut short of is the update\'s own: the same window, the same buffer, the same top of the arc', () => {
+    expect(fn('slamReadAtNow')).toMatch(/const openAt = EASTBAY_TIMING\.extend - slamWindowNow\(\) \/ 2;\n\s*return openAt - slamBufferSec\(openAt, SLAM_APEX_T, SLAM_BUFFER_SEC\);/);
+    expect(DUNK).toMatch(/function slamWindowNow\(\): number \{ return slamWindowBase\(\) \* \(1 - styleTaps \* 0\.25\) \* flight\.slamWindowScale; \}/);
+    expect(DUNK).toMatch(/const window = slamWindowBase\(\) \* \(1 - styleTaps \* 0\.25\) \* flight\.slamWindowScale;/);
+    expect(DUNK).toMatch(/const holdSec = slamBufferSec\(openAt, SLAM_APEX_T, SLAM_BUFFER_SEC\);/);
+    // the constants DunkHangPump.test mirrors
+    expect(DUNK).toMatch(/const SLAM_BUFFER_SEC = 0\.22;/);
+    expect(DUNK).toMatch(/const SLAM_APEX_T = arcTopT\(EASTBAY_TIMING\.extend, ARC_TOP_FRAC\);/);
+    expect(DUNK).toMatch(/function slamWindowBase\(\): number \{ return CFG\.qteWindowSec \* tvFactor \* guestFactor; \}/);
+  });
+  it('the cue is up while a pump would pay and has room, and comes down before the slam read lifts', () => {
+    const at = DUNK.indexOf("const want = turn === 'player' && !pumpUsed && pumpOpen(clipTime) && pumpMsAt(clipTime, slamReadAtNow()) >= PUMP_MIN_MS;");
+    expect(at).toBeGreaterThan(0);
+    expect(at).toBeLessThan(DUNK.indexOf('slamCueOn = !lob.live && clipTime >= openAt - holdSec', at));
+  });
+  it('the judges see it: style on the contest card and the challenge card, and the why-line names it', () => {
+    expect(fn('finishAttempt')).toMatch(/flowStyle: flow\.flowStyle \+ fresh\.style \+ pumpStyle,/);
+    expect(fn('challengeRun')).toMatch(/flowStyle: flow\.flowStyle \+ pumpStyle,/);
+    expect(fn('finishAttempt')).toMatch(/pumpStyle > 0 \? 'HANG PUMP' : ''/);
   });
 });
 

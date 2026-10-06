@@ -98,6 +98,7 @@ import { spawnDunkObstacle, type DunkObstacle } from './dunkObstacleProps';
 import { LOST_FOUND_HANDOFF, BETWEEN_LEGS_HANDOFF, BEHIND_BACK_SWAP, DOUBLE_EASTBAY_FIRST, DOUBLE_EASTBAY_SECOND, FRONT_SWAP_AT, FRONT_SWAP_BLEND } from '../anim/authored/dunkTricks';
 import { boneNode } from '../anim/boneLookup';
 import { takeoffFor, takeoffTell, rangeLabel } from '../core/DunkApproach';
+import { gradePump, pumpOpen, pumpMsAt, pumpEndsAt, pumpRefusalLine, PUMP_MIN_MS } from '../core/DunkHangPump';   // dunk-next phase 8: the hang pump
 import { takeoffRead, encodeTakeoff, ZONE_HEX, MARK_W, MARK_D, MARK_Y, MARK_ALPHA, type TakeoffInputs, type TakeoffRead, type TakeoffZone } from '../core/DunkTakeoffRead';   // dunk-next phase 7: the live take-off read
 import { NightMemory, dunkElements, originalityLine, freshTip, SHOWPIECE, type Dunker, type OriginalityRead } from '../core/DunkOriginality';   // dunk-next phase 2: the night remembers who showed what first
 import { spinBody, spinProgress } from '../core/DunkSpinBody';
@@ -809,6 +810,33 @@ export const DunkMode: ModeDefinition = (() => {
   let beatAt = -1, beatMarks: BeatMark[] = [], armedGrade: BeatGrade | null = null, beatSlam: SlamZone | null = null, beatStripSent = '';
   /** On the beat is BEAT_TOL_SEC either side, widened by the TV factor exactly as the slam window is (a mirrored picture is late). */
   const beatTol = (): number => BEAT_TOL_SEC * tvFactor;
+  // ── dunk-next phase 8: THE HANG PUMP (core/DunkHangPump) ──────────────────────────────────────────────────────────────────────
+  // RUN pressed again in the hang (RT · Space · the phone's RUN): the flight clock slows a little (the hang is longer in real time) and
+  // the judges see it. Its slow is cut to end before THIS flight's slam read opens, so no part of the slam window is ever slowed.
+  let pumpUsed = false, pumpStyle = 0, pumpCueUp = false, runDownWas = false;
+  const PUMP_CUE = 'HANG PUMP — HIT RUN ON THE HANG';
+  /** The clip second this flight's SLAM read opens: the window's edge less the buffer's reach (the update's own sums). Tricks and
+   *  style taps only narrow the window later in the flight, so this is the earliest it can be. */
+  function slamReadAtNow(): number {
+    const openAt = EASTBAY_TIMING.extend - slamWindowNow() / 2;
+    return openAt - slamBufferSec(openAt, SLAM_APEX_T, SLAM_BUFFER_SEC);
+  }
+  function hangPump(ctx: ModeContext): void {
+    if (phase !== 'cinematic' || turn !== 'player') return;
+    if (clipTime < EASTBAY_TIMING.rise) return;   // the take-off's own RUN coming back up is not a pump (and says nothing)
+    const read = slamReadAtNow();
+    const v = gradePump(clipTime, { tol: beatTol(), used: pumpUsed, slamReadAt: read });
+    if (!v.ok) { refuse(ctx, pumpRefusalLine(v.why)); console.info(`[DUNK-PUMP] refused @${clipTime.toFixed(2)}: ${v.why} (slam read @${read.toFixed(2)})`); return; }
+    pumpUsed = true; pumpStyle = v.style;
+    ctx.juice.slowMo(v.slow, v.ms, { gameplay: true });   // the rise's own mechanism: the flight clock rides it, reduced motion keeps it whole
+    SoundKit.play('whoosh', { pitch: 0.75, volume: 0.4 });
+    if (v.grade === 'clean') SoundKit.play('uiTick', { pitch: 2.1, volume: 0.3 });
+    ctx.camDirector.pulse(0.35, 0.4); ctx.feel?.impact?.(0.15);
+    hype = Math.min(100, hype + (v.grade === 'clean' ? 3 : 1));
+    flash(ctx, v.grade === 'clean' ? 'HANG PUMP · ON THE BEAT' : 'HANG PUMP', 650);
+    if (pumpCueUp) { pumpCueUp = false; ctx.setHud({ hint: '' }); }
+    console.info(`[DUNK-PUMP] ${v.grade} @${clipTime.toFixed(2)} (${Math.round(v.offsetSec * 1000)} ms off the hang) · ${v.slow}× for ${v.ms} ms → over @${pumpEndsAt(clipTime, v.ms).toFixed(2)}, the slam read @${read.toFixed(2)} · style +${v.style}`);
+  }
   function pushBeats(ctx: ModeContext): void {
     const s = encodeBeatStrip({ at: beatAt, marks: beatMarks, slam: beatSlam, perfect: flightFlow(beatMarks, beatSlam).perfect });
     if (s !== beatStripSent) { beatStripSent = s; ctx.setHud({ beats: s }); }
@@ -1655,6 +1683,7 @@ export const DunkMode: ModeDefinition = (() => {
           refuse(ctx, phase === 'rivalTurn' ? "RIVAL'S TURN" : phase === 'judging' || phase === 'resolve' ? 'THE JUDGES ARE SCORING' : 'WAIT');
         }
         runPressWas = e.value > 0.5;
+        { const down = e.value > 0; if (down && !runDownWas && phase === 'cinematic') hangPump(ctx); runDownWas = down; }   // dunk-next phase 8: RUN again in the air
         runHeld = e.value;
         if (phase === 'approach' && e.value > 0.02) beginRun(ctx);
         if (phase === 'charge') {
@@ -2062,6 +2091,9 @@ export const DunkMode: ModeDefinition = (() => {
         // the call used to appear on its opening frame, so the honest reaction — press when you see it — arrived after the
         // press that would have worked. The cue lifts a buffer's width early and every press from there is taken.
         // CLOTHING-SOFT-RESIDUAL R2: the buffer (and the SLAM! read with it) reaches back to the top of the arc — "SLAM at the top"
+        // dunk-next phase 8: THE PUMP CUE — up while a pump would pay and still has room before the slam read; down before the read lifts
+        { const want = turn === 'player' && !pumpUsed && pumpOpen(clipTime) && pumpMsAt(clipTime, slamReadAtNow()) >= PUMP_MIN_MS;
+          if (want !== pumpCueUp) { pumpCueUp = want; ctx.setHud({ hint: want ? PUMP_CUE : '' }); } }
         const holdSec = slamBufferSec(openAt, SLAM_APEX_T, SLAM_BUFFER_SEC);
         slamCueOn = !lob.live && clipTime >= openAt - holdSec && clipTime <= closeAt;
         // THE BEAT IS MACHINE-READABLE (CLOTHING-SOFT-RESIDUAL R2, 2026-09-21). `slamBeat` names where the flight is against
@@ -2875,6 +2907,7 @@ export const DunkMode: ModeDefinition = (() => {
     if (turn === 'rival') rivalRunUp = { charge, launchSpeed01, approachDifficulty: approach.difficulty + prof.difficulty, foot: approach.takeoff, rangeM: takeoffRange, side: launchSide, launchTag };
     armedAir = null; spin.reset(); liveTricks = []; liveSpin = { turns: 0, from: 0, until: 0 };
     beatAt = -1; beatMarks = []; armedGrade = null; beatSlam = null; pushBeats(ctx);   // dunk-next: a fresh bar, the strip up before the rise
+    pumpUsed = false; pumpStyle = 0; pumpCueUp = false;   // dunk-next phase 8: one pump a flight
     if (heldDpad) flight.recognizer.feed({ t: 'dpad', dir: heldDpad, pressed: true });   // a direction held through the takeoff is still held
     if (launchSpeed01 < 0.3 && charge > 0.4) flash(ctx, 'WALK-UP — short air', 900);
     else if (approach.difficulty > 0 || vectorLive()) flash(ctx, `${vectorLive() ? (vectorWallRun ? `OFF THE ${ride.short} RUN · ` : 'OFF THE REBOUND · ') : ''}${approach.label}${approach.angleDeg >= 10 ? ` · ${approach.angleDeg}°` : ''}`, 900);
@@ -4193,7 +4226,7 @@ export const DunkMode: ModeDefinition = (() => {
       charge, launchSpeed01, styleTier: STYLE_TIER[style], styleTaps,
       hype, hang: hangBonus > 0, repeat: seenIt, execution01: qteAccuracy,
       chainTricks: Math.max(0, flight.attempt.tricks.length - 1),
-      beatExec: flow.beatExec, flowStyle: flow.flowStyle + fresh.style,
+      beatExec: flow.beatExec, flowStyle: flow.flowStyle + fresh.style + pumpStyle,   // dunk-next phase 8: + the hang pump (0 without one)
     });
 
     // THE BUILDING IS PART OF THE PANEL. Momentum reached the score only as hype into the NEXT attempt's
@@ -4207,7 +4240,7 @@ export const DunkMode: ModeDefinition = (() => {
     // takeoff, the runway beats, the caught toss), the AIR (the tricks, the taps, the hang), the PRECISION (the slam's timing)
     // and the room (HYPE, and whether the panel has seen this one) — so a card is a lesson, not a number
     const approachBits = [launchSpeed01 >= 0.8 ? 'FULL RUN' : launchSpeed01 >= 0.45 ? 'JOG' : 'WALK-UP', launchTag, ...runwayLabels, lob.caught ? lob.label : '', doubleLaunched && !boardTopFlip ? 'DOUBLE-LAUNCH' : ''].filter(Boolean);   // the sky tap, the board top and the board run are runway labels
-    const airBits = [...flight.attempt.tricks.map((t) => t.id.toUpperCase()), flow.label, styleTaps > 0 ? `${styleTaps} STYLE TAP${styleTaps > 1 ? 'S' : ''}` : '', hangBonus > 0 ? 'HANG' : ''].filter(Boolean);
+    const airBits = [...flight.attempt.tricks.map((t) => t.id.toUpperCase()), flow.label, styleTaps > 0 ? `${styleTaps} STYLE TAP${styleTaps > 1 ? 'S' : ''}` : '', pumpStyle > 0 ? 'HANG PUMP' : '', hangBonus > 0 ? 'HANG' : ''].filter(Boolean);
     const judgeWhy = `APPROACH ${approachBits.join(' · ')} │ AIR ${airBits.join(' · ') || 'straight up'} │ PRECISION ${Math.round(qteAccuracy * 100)}% │ HYPE ${Math.round(momentum.score01 * 100)}% · FRESH ${Math.round(fresh.freshness01 * 100)}%${seenIt ? ' · SEEN IT' : ''}`;
     lastJudgeWhy = judgeWhy; lastDifficulty = difficulty; lastExecution = execution; lastStyleScore = styleScore;
     // HOOPS-TO-75 HP-1: the timing line waits until the judge cards finish — one overlay at a time
@@ -4413,7 +4446,7 @@ export const DunkMode: ModeDefinition = (() => {
     const cardNow = challengeCard({
       trickDifficulty: flight.attempt.difficulty - STYLE_TIER[style], runwayDifficulty: runwayDifficulty + (signature?.nod ?? 0) + (doubleLaunched ? DOUBLE_LAUNCH.difficulty : 0),
       propBonus: PROP_BONUS[prop], charge, launchSpeed01, styleTier: STYLE_TIER[style], styleTaps, hang: hangSec >= 0.5, execution01: qteAccuracy,
-      chainTricks: Math.max(0, tricks.length - 1), beatExec: flow.beatExec, flowStyle: flow.flowStyle,
+      chainTricks: Math.max(0, tricks.length - 1), beatExec: flow.beatExec, flowStyle: flow.flowStyle + pumpStyle,
     });
     const res = checkChallenge(c, {
       made, tricks: tricks.map((t) => t.id), prop, range: rangeLabel(launchRange), foot: launchFoot, side: launchSide, perfect: flow.perfect, onBeat: flow.onBeat, total: cardNow.total,
@@ -4508,6 +4541,7 @@ export const DunkMode: ModeDefinition = (() => {
     const need = isFinalRound && dunkOff === 0 ? Math.max(0, deficit + RIVAL_PACE) : 0;   // (dunk-next: the dunk-off has no pace to chase — he answers you)
     revealTail = -1; revealHold = false; hangPrompt = false; lineHint = '';   // IMPROVE (2026-10-06)
     clearTakeoff(ctx);   // dunk-next phase 7: the mark and the read go with the attempt
+    pumpUsed = false; pumpStyle = 0; pumpCueUp = false;   // dunk-next phase 8
     runwayHint = practice ? 'PRACTICE — HOLD to run · JUMP at the line · SLAM on NOW! · R1 back to the contest'
       : dunkOff > 0 ? `DUNK-OFF — one dunk, ${foe.name} answers it. Make it one he cannot.`
       : need > 0 ? `FINAL ROUND — you need big numbers (${deficit > 0 ? `down ${deficit}` : `up ${-deficit}`})` : 'HOLD to run · tap JUMP at the line — then SLAM on NOW!';
