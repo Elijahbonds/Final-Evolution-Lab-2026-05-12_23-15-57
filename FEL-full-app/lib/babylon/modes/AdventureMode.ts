@@ -149,6 +149,7 @@ export const AdventureMode: ModeDefinition = {
       save,
       partner: param('partner') === 'character' ? 'character' : 'creature',
       fuseReady: param('fuse') === 'ready',
+      start: param('at') === 'camp' ? 'camp' : 'spawn',
       band: ctx.prqBand ?? null,
     });
     const host = sb.host;

@@ -12,6 +12,22 @@
     "particles": 1500
   },
   "modes": {
+    "adventure": {
+      "measured": {
+        "drawCalls": 69,
+        "activeMeshes": 28,
+        "skinnedBodies": 6,
+        "textureMb": 101,
+        "particles": 20
+      },
+      "budget": {
+        "drawCalls": 83,
+        "activeMeshes": 34,
+        "skinnedBodies": 8,
+        "textureMb": 122,
+        "particles": 24
+      }
+    },
     "aeroaces": {
       "measured": {
         "drawCalls": 134,

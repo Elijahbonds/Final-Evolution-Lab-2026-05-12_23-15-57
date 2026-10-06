@@ -30,6 +30,8 @@ export interface SandboxOptions {
   /** The partner the yard lends when the save has none. Default 'creature'. */
   partner?: SandboxPartnerKind;
   fuseReady?: boolean;
+  /** Where the party starts: the spawn (default), or just short of the camp (a fight at once; the perf probe's view). */
+  start?: 'spawn' | 'camp';
   band?: PrqBand | null;
   prqAttrs?: Partial<Record<PrqAttr, number>> | null;
   instrument?: (a: AdventureActor) => AdventureActor;
@@ -79,6 +81,11 @@ export function createSandbox(o: SandboxOptions = {}): Sandbox {
   const partnerLent = !base.partner;
   const save: AdventureSave = partnerLent ? { ...base, partner: sandboxPartner(o.partner ?? 'creature') } : base;
   let runtime: SandboxRuntime | null = null;
+  if (o.start === 'camp') {
+    // [TUNE] 12 m short of the camp's nearest monster: inside their notice range, the whole camp in view
+    spec.player = { pos: { x: 0, y: 0, z: 142 }, yaw: 0 };
+    spec.partner = { pos: { x: 1.6, y: 0, z: 140.8 }, yaw: 0 };
+  }
   const host = new AdventureHost({
     world: sandboxWorldSource(spec),
     save,
