@@ -5,9 +5,10 @@
 // RECTANGLES over Venice beach. Particle and billboard work is exactly the kind of thing that never gets a test
 // because "it's just visual" — which is why it shipped wrong.
 import { describe, expect, it, beforeAll } from 'vitest';
-import { FreeCamera, MeshBuilder, NullEngine, Scene, StandardMaterial, Vector3 } from '@babylonjs/core';
+import { FreeCamera, MeshBuilder, NullEngine, ParticleSystem, Scene, StandardMaterial, Vector3 } from '@babylonjs/core';
 import type { AbstractMesh } from '@babylonjs/core';
-import { EffectsKit, applyTrail, TRAIL_LOOK, GULL_RADIUS, GULL_Y, type TrailLevel } from './EffectsKit';
+import { EffectsKit, applyTrail, TRAIL_LOOK, GULL_RADIUS, GULL_Y, BURST_LOOK, type TrailLevel } from './EffectsKit';
+import { setParticleBudgetScale } from './ParticleBudget';
 
 // Babylon's DynamicTexture reaches for OffscreenCanvas, which node has not got, so both procedural textures in this
 // kit (the particle dot and the gull) are unconstructible headlessly. The shim only lets the 2-D calls land — nothing
@@ -118,5 +119,62 @@ describe('the ambient gulls', () => {
 
   it('still flap', () => {
     for (const g of gulls) { expect(g.scaling.y).toBeGreaterThan(0.6); expect(g.scaling.y).toBeLessThan(1.3); }
+  });
+});
+
+// A9.8 (visual-foundation, 2026-10-06): each burst kind reads as what it is, and every burst answers to the budget.
+describe('burst looks and the particle budget', () => {
+  const last = (kind: string) => {
+    const list = scene.particleSystems.filter((p) => p.name.startsWith(`fx_${kind}_`));
+    return list[list.length - 1] as ParticleSystem;
+  };
+  it('sparks and glitch are additive streaks stretched along their flight', () => {
+    for (const kind of ['sparks', 'glitch'] as const) {
+      EffectsKit.burst(scene, Vector3.Zero(), kind);
+      const ps = last(kind);
+      expect(ps.blendMode, kind).toBe(ParticleSystem.BLENDMODE_ADD);
+      expect(ps.billboardMode, kind).toBe(ParticleSystem.BILLBOARDMODE_STRETCHED);
+      expect(ps.maxScaleY / ps.maxScaleX, kind).toBeGreaterThan(3);
+    }
+  });
+  it('dust is a puff: it grows while it fades out', () => {
+    EffectsKit.burst(scene, Vector3.Zero(), 'dust');
+    const ps = last('dust');
+    const g = ps.getSizeGradients() ?? [];
+    expect(g[g.length - 1].factor1).toBeGreaterThan(g[0].factor1 * 2);
+    const c = ps.getColorGradients() ?? [];
+    expect(c[c.length - 1].color1.a).toBe(0);
+    expect(ps.blendMode).toBe(ParticleSystem.BLENDMODE_STANDARD);
+  });
+  it('confetti is paper that tumbles: a strip texture and a spin', () => {
+    EffectsKit.burst(scene, Vector3.Zero(), 'confetti');
+    const ps = last('confetti');
+    expect(ps.maxAngularSpeed).toBeGreaterThan(0);
+    expect(ps.minAngularSpeed).toBeLessThan(0);
+    expect(ps.particleTexture?.name).toBe('fx_quad');
+  });
+  it('the net flick is unchanged', () => {
+    EffectsKit.burst(scene, Vector3.Zero(), 'net');
+    const ps = last('net');
+    expect(ps.blendMode).toBe(ParticleSystem.BLENDMODE_STANDARD);
+    expect(ps.billboardMode).toBe(ParticleSystem.BILLBOARDMODE_ALL);
+    expect(BURST_LOOK.net).toEqual({ additive: false, stretched: false, grow: 1, spin: 0, quad: false });
+  });
+  it('the streak shader is warmed at load (ambient / ball trail), once per scene, and never emits', () => {
+    const s2 = new Scene(new NullEngine());
+    EffectsKit.ambient(s2, 'dojo');
+    EffectsKit.ballTrail(s2, MeshBuilder.CreateSphere('bb', {}, s2));
+    const warm = s2.particleSystems.filter((p) => p.name === '__fx_prewarm_streak');
+    expect(warm.length).toBe(1);
+    expect((warm[0] as ParticleSystem).billboardMode).toBe(ParticleSystem.BILLBOARDMODE_STRETCHED);
+    expect(warm[0].isStarted()).toBe(false);
+  });
+  it('the governor lever trims every burst; at 1 nothing changes', () => {
+    EffectsKit.burst(scene, Vector3.Zero(), 'confetti');
+    expect(last('confetti').manualEmitCount).toBe(60);
+    setParticleBudgetScale(scene, 0.5);
+    EffectsKit.burst(scene, Vector3.Zero(), 'confetti');
+    expect(last('confetti').manualEmitCount).toBe(30);
+    setParticleBudgetScale(scene, 1);
   });
 });
