@@ -1,0 +1,181 @@
+{
+  "topic": "history",
+  "version": 1,
+  "cards": [
+    {
+      "id": "history.printing",
+      "topic": "history",
+      "type": "lesson",
+      "headline": "The printing press made ideas cheap",
+      "lines": [
+        "Around 1450 in Mainz, Johannes Gutenberg combined movable metal type with a press.",
+        "Books became far cheaper; millions of copies were printed in Europe by 1500.",
+        "Cheap print helped spread the Reformation and the Scientific Revolution."
+      ],
+      "visual": { "kind": "timeline", "points": [{ "at": "c.1450", "label": "Gutenberg's press" }, { "at": "c.1455", "label": "Gutenberg Bible" }, { "at": "1517", "label": "Luther's theses spread" }] },
+      "source": "Eisenstein, 'The Printing Revolution in Early Modern Europe' (1983)."
+    },
+    {
+      "id": "history.farming",
+      "topic": "history",
+      "type": "lesson",
+      "headline": "Farming changed everything",
+      "lines": [
+        "Around 10,000 years ago, people in the Fertile Crescent began farming wheat and barley.",
+        "Food surpluses allowed permanent villages, then towns, specialists and writing.",
+        "Farming arose independently in several places, including China, Mesoamerica and the Andes."
+      ],
+      "visual": { "kind": "stat", "value": "≈ 10,000 years", "caption": "since farming began" },
+      "source": "Bellwood, 'First Farmers' (2005); Diamond, 'Guns, Germs, and Steel' (1997)."
+    },
+    {
+      "id": "history.writing",
+      "topic": "history",
+      "type": "lesson",
+      "headline": "Writing began as bookkeeping",
+      "lines": [
+        "The earliest known writing, Sumerian cuneiform in Mesopotamia, appeared around 3200 BCE.",
+        "Many early tablets are records of grain, livestock and labour.",
+        "Writing was also invented separately in China and in Mesoamerica."
+      ],
+      "visual": { "kind": "motif", "motif": "column" },
+      "source": "Schmandt-Besserat, 'How Writing Came About' (1996); Robinson, 'The Story of Writing'."
+    },
+    {
+      "id": "history.black-death",
+      "topic": "history",
+      "type": "lesson",
+      "headline": "The Black Death reshaped Europe",
+      "lines": [
+        "Between 1347 and 1351, plague killed roughly a third to a half of Europe's population.",
+        "With fewer workers, surviving labourers could demand higher wages.",
+        "Historians link it to the decline of serfdom in Western Europe."
+      ],
+      "visual": { "kind": "stat", "value": "⅓ – ½", "caption": "of Europe's people lost, 1347–1351" },
+      "source": "Benedictow, 'The Black Death 1346–1353' (2004); Herlihy, 'The Black Death and the Transformation of the West'."
+    },
+    {
+      "id": "history.industrial",
+      "topic": "history",
+      "type": "lesson",
+      "headline": "The Industrial Revolution began in Britain",
+      "lines": [
+        "From about 1760, machines, steam power and factories transformed how goods were made.",
+        "Coal, iron and cotton textiles led the way.",
+        "Over time it raised living standards — after decades of harsh working conditions."
+      ],
+      "visual": { "kind": "timeline", "points": [{ "at": "1769", "label": "Watt's steam engine patent" }, { "at": "1825", "label": "First public steam railway" }, { "at": "1830", "label": "Liverpool–Manchester line" }] },
+      "source": "Allen, 'The British Industrial Revolution in Global Perspective' (2009)."
+    },
+    {
+      "id": "history.q-rome",
+      "topic": "history",
+      "type": "quiz",
+      "question": "In which year is the Western Roman Empire traditionally said to have fallen?",
+      "options": ["44 BCE", "476 CE", "1066 CE", "1453 CE"],
+      "answer": 1,
+      "why": "In 476 the last western emperor, Romulus Augustulus, was deposed. The Eastern (Byzantine) Empire lasted until 1453.",
+      "source": "Gibbon, 'The Decline and Fall of the Roman Empire'; Heather, 'The Fall of the Roman Empire' (2005)."
+    },
+    {
+      "id": "history.q-magna-carta",
+      "topic": "history",
+      "type": "quiz",
+      "question": "What principle is Magna Carta (1215) famous for?",
+      "options": ["The king is subject to the law", "Everyone gets a vote", "Monarchy is abolished", "Free schooling for all"],
+      "answer": 0,
+      "why": "It limited the king's power and became a symbol of the rule of law — though at the time it mainly protected the barons.",
+      "source": "Holt, 'Magna Carta' (3rd ed., 2015)."
+    },
+    {
+      "id": "history.q-gutenberg",
+      "topic": "history",
+      "type": "quiz",
+      "question": "Who brought movable-type printing to Europe around 1450?",
+      "options": ["Leonardo da Vinci", "Johannes Gutenberg", "Galileo Galilei", "Martin Luther"],
+      "answer": 1,
+      "why": "Gutenberg, in Mainz. Movable type existed earlier in China and Korea, but his press transformed Europe.",
+      "source": "Eisenstein, 'The Printing Revolution in Early Modern Europe' (1983)."
+    },
+    {
+      "id": "history.q-berlin-wall",
+      "topic": "history",
+      "type": "quiz",
+      "question": "In which year did the Berlin Wall fall?",
+      "options": ["1961", "1975", "1989", "1991"],
+      "answer": 2,
+      "why": "The border opened on 9 November 1989. Germany reunified in 1990; the Soviet Union dissolved in 1991.",
+      "source": "Sarotte, 'The Collapse: The Accidental Opening of the Berlin Wall' (2014)."
+    },
+    {
+      "id": "history.q-pyramid",
+      "topic": "history",
+      "type": "quiz",
+      "question": "The Great Pyramid of Giza was built for which pharaoh?",
+      "options": ["Tutankhamun", "Khufu", "Ramesses II", "Cleopatra"],
+      "answer": 1,
+      "why": "Khufu, around 2560 BCE. It was the tallest human-made structure for nearly 4,000 years.",
+      "source": "Lehner, 'The Complete Pyramids' (1997)."
+    },
+    {
+      "id": "history.f-cleopatra",
+      "topic": "history",
+      "type": "fact",
+      "headline": "Cleopatra lived closer to the Moon landing than to the Great Pyramid",
+      "text": "The Great Pyramid dates to about 2560 BCE. Cleopatra died in 30 BCE — about 2,500 years later, and about 2,000 years before 1969.",
+      "visual": { "kind": "timeline", "points": [{ "at": "2560 BCE", "label": "Great Pyramid" }, { "at": "30 BCE", "label": "Cleopatra dies" }, { "at": "1969", "label": "Moon landing" }] },
+      "source": "Lehner, 'The Complete Pyramids'; standard chronologies of Ptolemaic Egypt."
+    },
+    {
+      "id": "history.f-oxford",
+      "topic": "history",
+      "type": "fact",
+      "headline": "Oxford University is older than the Aztec capital",
+      "text": "Teaching was under way at Oxford by 1096. Tenochtitlan, the Aztec capital, was founded in 1325.",
+      "source": "University of Oxford, history of the university; Smith, 'The Aztecs' (3rd ed.)."
+    },
+    {
+      "id": "history.f-jikji",
+      "topic": "history",
+      "type": "fact",
+      "headline": "Korea printed with metal type before Gutenberg",
+      "text": "The Jikji, printed in Korea in 1377, is the oldest surviving book printed with movable metal type.",
+      "source": "UNESCO Memory of the World Register, 'Baegun hwasang chorok buljo jikji simche yojeol' (vol. II)."
+    },
+    {
+      "id": "history.f-short-war",
+      "topic": "history",
+      "type": "fact",
+      "headline": "The shortest recorded war lasted under an hour",
+      "text": "The Anglo-Zanzibar War of 27 August 1896 ended after roughly 38 to 45 minutes.",
+      "source": "Hernon, 'Britain's Forgotten Wars' (2003)."
+    },
+    {
+      "id": "history.d-silk-roads",
+      "topic": "history",
+      "type": "deeper",
+      "headline": "The Silk Roads",
+      "steps": [
+        { "headline": "1 · A network, not a road", "lines": ["Land and sea routes linked China, Central Asia, India, the Middle East and Europe.", "They flourished from about the 2nd century BCE."], "visual": { "kind": "motif", "motif": "column" } },
+        { "headline": "2 · More than silk", "lines": ["Traders carried silk, spices, glass, horses and paper.", "Few merchants travelled the whole way; goods passed from hand to hand."] },
+        { "headline": "3 · Ideas travelled too", "lines": ["Buddhism spread from India into China along these routes.", "Papermaking moved west from China to the Islamic world, and on to Europe."] },
+        { "headline": "4 · And so did disease", "lines": ["Trade links also carried plague.", "The Black Death most likely spread west along these routes in the 1340s."] }
+      ],
+      "source": "Frankopan, 'The Silk Roads' (2015); Hansen, 'The Silk Road: A New History' (2012)."
+    },
+    {
+      "id": "history.recap",
+      "topic": "history",
+      "type": "recap",
+      "headline": "History: the takeaways",
+      "points": [
+        "Farming began about 10,000 years ago.",
+        "Writing began as record-keeping in Sumer.",
+        "Printing made ideas cheap and fast.",
+        "The Black Death reshaped work in Europe.",
+        "Steam and factories began in 1700s Britain."
+      ],
+      "source": "Summary of this topic's cards."
+    }
+  ]
+}

@@ -1,0 +1,180 @@
+{
+  "topic": "psychology",
+  "version": 1,
+  "cards": [
+    {
+      "id": "psychology.anchoring",
+      "topic": "psychology",
+      "type": "lesson",
+      "headline": "Anchoring: the first number sticks",
+      "lines": [
+        "When we estimate, we start from the first number we saw and adjust too little.",
+        "In a classic study, a wheel rigged to stop on 10 or 65 pulled people's guesses toward that number.",
+        "Spot it: ask what you'd guess if you had never seen the first number."
+      ],
+      "visual": { "kind": "bars", "items": [{ "label": "Wheel showed 10", "value": 25 }, { "label": "Wheel showed 65", "value": 45 }], "unit": "%", "caption": "Median guess, % of African UN members" },
+      "source": "Tversky & Kahneman (1974), 'Judgment under Uncertainty: Heuristics and Biases', Science."
+    },
+    {
+      "id": "psychology.spacing",
+      "topic": "psychology",
+      "type": "lesson",
+      "headline": "Spread practice out and you remember more",
+      "lines": [
+        "Several short sessions beat one long cram for long-term memory.",
+        "Ebbinghaus measured this in the 1880s, and it has replicated in hundreds of studies since.",
+        "This feed uses it: questions you answer come back after growing gaps."
+      ],
+      "visual": { "kind": "timeline", "points": [{ "at": "Day 1", "label": "Learn" }, { "at": "Day 2", "label": "Review" }, { "at": "Day 5", "label": "Review" }, { "at": "Day 12", "label": "Review" }] },
+      "source": "Ebbinghaus, 'Memory' (1885); Cepeda et al. (2006), distributed-practice review, Psychological Bulletin."
+    },
+    {
+      "id": "psychology.retrieval",
+      "topic": "psychology",
+      "type": "lesson",
+      "headline": "Testing yourself is a way of learning",
+      "lines": [
+        "Pulling an answer out of memory strengthens it more than re-reading it.",
+        "Students who practised recall remembered more a week later than students who re-studied.",
+        "So the quizzes here aren't exams — they're the workout."
+      ],
+      "visual": { "kind": "compare", "left": { "label": "Re-read", "text": "Feels easy, fades" }, "right": { "label": "Recall", "text": "Feels hard, sticks" } },
+      "source": "Roediger & Karpicke (2006), 'Test-Enhanced Learning', Psychological Science."
+    },
+    {
+      "id": "psychology.confirmation-bias",
+      "topic": "psychology",
+      "type": "lesson",
+      "headline": "Confirmation bias",
+      "lines": [
+        "We notice and remember evidence that fits what we already believe.",
+        "We also tend to ask questions that can only confirm an idea, not disprove it.",
+        "A useful habit: ask yourself, 'What would change my mind?'"
+      ],
+      "visual": { "kind": "motif", "motif": "brain" },
+      "source": "Nickerson (1998), 'Confirmation Bias: A Ubiquitous Phenomenon in Many Guises', Review of General Psychology."
+    },
+    {
+      "id": "psychology.habit-loop",
+      "topic": "psychology",
+      "type": "lesson",
+      "headline": "Habits run on cues",
+      "lines": [
+        "Actions repeated in a stable setting become automatic — the cue triggers them, not a decision.",
+        "That's why changing the cue (where, when, what's in sight) often works better than willpower."
+      ],
+      "visual": { "kind": "cycle", "steps": ["Cue", "Routine", "Reward"] },
+      "source": "Wood & Neal (2007), 'A New Look at Habits and the Habit–Goal Interface', Psychological Review."
+    },
+    {
+      "id": "psychology.q-anchoring",
+      "topic": "psychology",
+      "type": "quiz",
+      "question": "A wheel showed a random number before people guessed an unrelated quantity. What happened?",
+      "options": ["Guesses ignored the wheel", "Higher wheel numbers led to higher guesses", "Everyone guessed the wheel's number", "Guesses became more accurate"],
+      "answer": 1,
+      "why": "That's anchoring: an irrelevant starting number still pulled people's estimates toward it.",
+      "source": "Tversky & Kahneman (1974), Science."
+    },
+    {
+      "id": "psychology.q-spacing",
+      "topic": "psychology",
+      "type": "quiz",
+      "question": "You have three hours to study for a test in two weeks. What usually works best for long-term memory?",
+      "options": ["One 3-hour session the night before", "Three 1-hour sessions spread over two weeks", "Re-reading the notes three times in a row"],
+      "answer": 1,
+      "why": "The spacing effect: the same time, spread out, produces more durable memory than cramming.",
+      "source": "Cepeda et al. (2006), Psychological Bulletin."
+    },
+    {
+      "id": "psychology.q-retrieval",
+      "topic": "psychology",
+      "type": "quiz",
+      "question": "Which study method has the strongest evidence for long-term retention?",
+      "options": ["Highlighting", "Re-reading", "Practising recall with self-quizzes", "Studying with music on"],
+      "answer": 2,
+      "why": "Practice testing rates among the best-supported techniques; highlighting and re-reading feel productive but help less.",
+      "source": "Dunlosky et al. (2013), 'Improving Students' Learning', Psychological Science in the Public Interest."
+    },
+    {
+      "id": "psychology.q-bystander",
+      "topic": "psychology",
+      "type": "quiz",
+      "question": "The bystander effect says that in an emergency, a person is…",
+      "options": ["More likely to help when alone than in a crowd", "More likely to help in a big crowd", "Equally likely to help either way"],
+      "answer": 0,
+      "why": "With others present, responsibility feels shared, so each person is less likely to act.",
+      "source": "Darley & Latané (1968), Journal of Personality and Social Psychology."
+    },
+    {
+      "id": "psychology.q-mere-exposure",
+      "topic": "psychology",
+      "type": "quiz",
+      "question": "People tend to like things more simply after seeing them repeatedly. This is called…",
+      "options": ["The mere-exposure effect", "The placebo effect", "Learned helplessness", "The halo effect"],
+      "answer": 0,
+      "why": "Zajonc showed that familiarity alone can increase liking — one reason repetition works in advertising.",
+      "source": "Zajonc (1968), 'Attitudinal Effects of Mere Exposure', Journal of Personality and Social Psychology."
+    },
+    {
+      "id": "psychology.f-working-memory",
+      "topic": "psychology",
+      "type": "fact",
+      "headline": "Working memory holds only a handful of things",
+      "text": "Miller's classic estimate was about seven items; later work suggests closer to four chunks. Grouping helps — that's why phone numbers are split into parts.",
+      "visual": { "kind": "stat", "value": "≈ 4", "caption": "chunks held in mind at once" },
+      "source": "Miller (1956), Psychological Review; Cowan (2001), Behavioral and Brain Sciences."
+    },
+    {
+      "id": "psychology.f-peak-end",
+      "topic": "psychology",
+      "type": "fact",
+      "headline": "We remember the peak and the ending",
+      "text": "We judge an experience largely by its most intense moment and how it ended. In one study, people preferred a longer unpleasant experience that ended more gently.",
+      "source": "Kahneman et al. (1993), 'When More Pain Is Preferred to Less', Psychological Science."
+    },
+    {
+      "id": "psychology.f-sleep-memory",
+      "topic": "psychology",
+      "type": "fact",
+      "headline": "Sleep helps lock in what you learned",
+      "text": "During sleep the brain replays and consolidates new memories. Studying and then sleeping tends to beat studying and staying up.",
+      "source": "Diekelmann & Born (2010), 'The Memory Function of Sleep', Nature Reviews Neuroscience."
+    },
+    {
+      "id": "psychology.f-halo",
+      "topic": "psychology",
+      "type": "fact",
+      "headline": "The halo effect",
+      "text": "One good trait colours how we judge the rest. Thorndike found officers who rated a soldier highly on one quality tended to rate him highly on unrelated ones too.",
+      "source": "Thorndike (1920), 'A Constant Error in Psychological Ratings', Journal of Applied Psychology."
+    },
+    {
+      "id": "psychology.d-memory",
+      "topic": "psychology",
+      "type": "deeper",
+      "headline": "How a memory is made",
+      "steps": [
+        { "headline": "1 · Encoding", "lines": ["Attention decides what gets in — what you don't notice, you can't remember.", "Linking new facts to things you already know makes them easier to encode."], "visual": { "kind": "motif", "motif": "brain" } },
+        { "headline": "2 · Consolidation", "lines": ["New memories are fragile at first.", "Over hours, and during sleep, they are stabilised and tied to older knowledge."] },
+        { "headline": "3 · Retrieval", "lines": ["Each time you recall something, you strengthen the path back to it.", "Recall also changes memories slightly: they're rebuilt, not replayed like a video."] },
+        { "headline": "4 · Forgetting", "lines": ["Forgetting is fast at first, then slows — Ebbinghaus's forgetting curve.", "Spaced reviews flatten the curve. That's what review cards here are for."], "visual": { "kind": "bars", "items": [{ "label": "20 min", "value": 58 }, { "label": "1 hour", "value": 44 }, { "label": "1 day", "value": 34 }, { "label": "6 days", "value": 25 }], "unit": "%", "caption": "Ebbinghaus: share of relearning effort saved" } }
+      ],
+      "source": "Baddeley, Eysenck & Anderson, 'Memory' (textbook); Ebbinghaus, 'Memory' (1885)."
+    },
+    {
+      "id": "psychology.recap",
+      "topic": "psychology",
+      "type": "recap",
+      "headline": "Psychology: the takeaways",
+      "points": [
+        "The first number you see anchors your estimate.",
+        "Spaced practice beats cramming.",
+        "Recalling beats re-reading.",
+        "We favour evidence that agrees with us.",
+        "Habits are triggered by cues — change the cue."
+      ],
+      "source": "Summary of this topic's cards."
+    }
+  ]
+}

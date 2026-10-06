@@ -14,6 +14,7 @@ import { venueThumb } from '@/lib/babylon/ui/venueThumbs';
 import { CardSlot } from './card-slot';
 import { MotionSetting } from '@/components/settings/motion-setting';
 import { PausedLayer } from './paused-layer';
+import { LearnWhileYouWait } from '@/components/learn/learn-while-you-wait';   // KNOWLEDGE-FEED v1: one card while the arena loads
 import { BodyPlayReady, BodyPlayReadyLine, BodyPlayLayer } from './body-play';
 import { BASKETBALL_MODE_IDS, COURT_LOCATIONS, readCourtLocation, readyCourtLocations, writeCourtLocation, type CourtLocationId } from '@/lib/babylon/nexus/courtLocations';
 import { BALL_SKINS, readBallSkin, readyBallSkins, writeBallSkin, type BallSkinId } from '@/lib/babylon/nexus/ballSkins';
@@ -315,6 +316,7 @@ export function SplashCard(props: BootSplashProps) {
             <p className="mt-2 text-[11px] tracking-widest text-white/60">LOADING ARENA…</p>
           </div>
         )}
+        {props.phase === 'loading' && <LearnWhileYouWait compact className="mt-1" />}
 
         {props.phase === 'ready' && (
           <button

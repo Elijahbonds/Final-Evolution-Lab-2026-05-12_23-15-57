@@ -23,6 +23,7 @@ export const DOORS: Door[] = [
   { href: '/workout', label: 'Workouts', tab: 'train' },
   { href: '/camp', label: 'Camp', tab: 'train' },
   { href: '/education', label: 'Education', tab: 'train' },
+  { href: '/learn', label: 'Learn feed', tab: 'train' },
   { href: '/live', label: 'Live classes', tab: 'train' },
   { href: '/coach', label: 'Coaching', tab: 'train' },
 

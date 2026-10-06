@@ -1,0 +1,181 @@
+{
+  "topic": "tech",
+  "version": 1,
+  "cards": [
+    {
+      "id": "tech.binary",
+      "topic": "tech",
+      "type": "lesson",
+      "headline": "Computers count in binary",
+      "lines": [
+        "Digital computers store everything as bits: 0 or 1.",
+        "Eight bits make a byte — enough for 256 different values.",
+        "Text, photos and music are all patterns of bits."
+      ],
+      "visual": { "kind": "stat", "value": "2⁸ = 256", "caption": "different values in one byte" },
+      "source": "Patterson & Hennessy, 'Computer Organization and Design'."
+    },
+    {
+      "id": "tech.algorithm",
+      "topic": "tech",
+      "type": "lesson",
+      "headline": "An algorithm is a precise recipe",
+      "lines": [
+        "An algorithm is a step-by-step procedure for solving a problem.",
+        "The word comes from al-Khwarizmi, a 9th-century Persian mathematician in Baghdad.",
+        "A better algorithm can make the same job millions of times faster."
+      ],
+      "visual": { "kind": "cycle", "steps": ["Input", "Steps", "Output"] },
+      "source": "Cormen et al., 'Introduction to Algorithms'; Knuth, 'The Art of Computer Programming', vol. 1."
+    },
+    {
+      "id": "tech.machine-learning",
+      "topic": "tech",
+      "type": "lesson",
+      "headline": "How machine learning learns",
+      "lines": [
+        "Instead of hand-written rules, a model learns patterns from many examples.",
+        "It guesses, measures its error, and nudges its settings to shrink it — over and over.",
+        "It's only as good as its data: biased examples give biased results."
+      ],
+      "visual": { "kind": "cycle", "steps": ["Guess", "Measure error", "Adjust", "Repeat"] },
+      "source": "Goodfellow, Bengio & Courville, 'Deep Learning' (2016)."
+    },
+    {
+      "id": "tech.language-models",
+      "topic": "tech",
+      "type": "lesson",
+      "headline": "What a language model does",
+      "lines": [
+        "Large language models are trained to predict the next piece of text from what came before.",
+        "Trained on huge amounts of text, they become fluent — but fluent isn't the same as correct.",
+        "They can state false things confidently, so check anything important."
+      ],
+      "visual": { "kind": "motif", "motif": "chip" },
+      "source": "Vaswani et al. (2017), 'Attention Is All You Need'; Brown et al. (2020), 'Language Models are Few-Shot Learners'."
+    },
+    {
+      "id": "tech.packets",
+      "topic": "tech",
+      "type": "lesson",
+      "headline": "The internet runs on packets",
+      "lines": [
+        "Data is split into small packets that travel separately and are reassembled on arrival.",
+        "Packets can take different routes, so the network can route around failures.",
+        "ARPANET switched to the TCP/IP rules that make this work on 1 January 1983."
+      ],
+      "visual": { "kind": "timeline", "points": [{ "at": "1969", "label": "First ARPANET link" }, { "at": "1983", "label": "Switch to TCP/IP" }, { "at": "1991", "label": "The Web opens to all" }] },
+      "source": "Leiner et al., 'A Brief History of the Internet' (Internet Society); Berners-Lee, 'Weaving the Web' (1999)."
+    },
+    {
+      "id": "tech.q-byte",
+      "topic": "tech",
+      "type": "quiz",
+      "question": "How many bits are in a byte?",
+      "options": ["2", "4", "8", "16"],
+      "answer": 2,
+      "why": "Eight bits, giving 256 possible values (0 to 255).",
+      "source": "Patterson & Hennessy, 'Computer Organization and Design'."
+    },
+    {
+      "id": "tech.q-turing",
+      "topic": "tech",
+      "type": "quiz",
+      "question": "Who proposed the 'imitation game' — now called the Turing test — in 1950?",
+      "options": ["Ada Lovelace", "Alan Turing", "Charles Babbage", "Grace Hopper"],
+      "answer": 1,
+      "why": "Alan Turing, in 'Computing Machinery and Intelligence', asked whether a machine's conversation could pass for a human's.",
+      "source": "Turing (1950), 'Computing Machinery and Intelligence', Mind."
+    },
+    {
+      "id": "tech.q-moore",
+      "topic": "tech",
+      "type": "quiz",
+      "question": "Moore's law predicted that the number of transistors on a chip would…",
+      "options": ["Double about every two years", "Halve every year", "Stay the same", "Grow 10% a decade"],
+      "answer": 0,
+      "why": "Gordon Moore's 1965 observation, revised in 1975 to about every two years, held for decades.",
+      "source": "Moore (1965), Electronics; Moore (1975), IEEE International Electron Devices Meeting."
+    },
+    {
+      "id": "tech.q-lovelace",
+      "topic": "tech",
+      "type": "quiz",
+      "question": "Ada Lovelace is often called the first computer programmer because she…",
+      "options": ["Built the first transistor", "Published an algorithm for Babbage's engine", "Invented the internet", "Wrote the first video game"],
+      "answer": 1,
+      "why": "Her 1843 notes on the Analytical Engine included a method for it to calculate Bernoulli numbers.",
+      "source": "Lovelace (1843), notes to Menabrea's 'Sketch of the Analytical Engine'."
+    },
+    {
+      "id": "tech.q-check-ai",
+      "topic": "tech",
+      "type": "quiz",
+      "question": "A chatbot gives a confident answer with a citation you can't find. What's the best move?",
+      "options": ["Trust it — it sounded sure", "Check the claim against a reliable source", "Ask it to sound more confident"],
+      "answer": 1,
+      "why": "Language models can produce plausible but false details, including made-up citations. Confidence isn't evidence.",
+      "source": "Ji et al. (2023), 'Survey of Hallucination in Natural Language Generation', ACM Computing Surveys."
+    },
+    {
+      "id": "tech.f-bug",
+      "topic": "tech",
+      "type": "fact",
+      "headline": "The first computer 'bug' was a real moth",
+      "text": "In 1947, operators of the Harvard Mark II taped a moth found in a relay into their logbook. 'Bug' was already engineers' slang for a fault.",
+      "source": "Smithsonian National Museum of American History, the Harvard Mark II logbook."
+    },
+    {
+      "id": "tech.f-apollo",
+      "topic": "tech",
+      "type": "fact",
+      "headline": "Apollo flew to the Moon on tiny memory",
+      "text": "The Apollo Guidance Computer had about 4 KB of working memory and 72 KB of fixed program storage. A phone today has millions of times more.",
+      "visual": { "kind": "stat", "value": "≈ 4 KB", "caption": "Apollo's working memory" },
+      "source": "Mindell, 'Digital Apollo' (2008); MIT Instrumentation Laboratory AGC documentation."
+    },
+    {
+      "id": "tech.f-qwerty",
+      "topic": "tech",
+      "type": "fact",
+      "headline": "QWERTY was designed for typewriters",
+      "text": "Christopher Latham Sholes's 1870s layout spread with the Remington typewriter — and stuck long after the mechanical reasons faded.",
+      "source": "Yasuoka & Yasuoka (2011), 'On the Prehistory of QWERTY', ZINBUN."
+    },
+    {
+      "id": "tech.f-passwords",
+      "topic": "tech",
+      "type": "fact",
+      "headline": "For passwords, length beats complexity",
+      "text": "US NIST guidance favours long passphrases and checks against known-breached passwords over forced symbol rules and routine resets.",
+      "source": "NIST Special Publication 800-63B, 'Digital Identity Guidelines'."
+    },
+    {
+      "id": "tech.d-neural-network",
+      "topic": "tech",
+      "type": "deeper",
+      "headline": "Inside a neural network",
+      "steps": [
+        { "headline": "1 · Neurons", "lines": ["An artificial neuron multiplies its inputs by weights, adds them up, and passes the total through a simple function.", "On its own, it's just arithmetic."], "visual": { "kind": "motif", "motif": "chip" } },
+        { "headline": "2 · Layers", "lines": ["Neurons are stacked in layers; each layer's outputs feed the next.", "Early layers find simple patterns; later layers combine them."] },
+        { "headline": "3 · Training", "lines": ["The network compares its output with the right answer and measures the error.", "Backpropagation works out how each weight should change to shrink that error."], "visual": { "kind": "cycle", "steps": ["Predict", "Compare", "Backpropagate", "Update"] } },
+        { "headline": "4 · Generalising", "lines": ["The goal is to do well on new examples, not to memorise the training set.", "Testing on held-out data shows whether it really learned."] }
+      ],
+      "source": "Goodfellow, Bengio & Courville, 'Deep Learning' (2016); Rumelhart, Hinton & Williams (1986), Nature."
+    },
+    {
+      "id": "tech.recap",
+      "topic": "tech",
+      "type": "recap",
+      "headline": "Tech & AI: the takeaways",
+      "points": [
+        "Everything digital is bits.",
+        "Algorithms are precise recipes.",
+        "Models learn by shrinking their error.",
+        "Fluent AI isn't always correct — check it.",
+        "The internet moves data in packets."
+      ],
+      "source": "Summary of this topic's cards."
+    }
+  ]
+}

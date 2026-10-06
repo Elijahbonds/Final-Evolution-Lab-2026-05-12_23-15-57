@@ -1,0 +1,182 @@
+{
+  "topic": "space",
+  "version": 1,
+  "cards": [
+    {
+      "id": "space.scale",
+      "topic": "space",
+      "type": "lesson",
+      "headline": "The Solar System is mostly empty",
+      "lines": [
+        "Shrink the Sun to a 1-metre ball, and Earth is a 9 mm marble about 107 m away.",
+        "Neptune would be over 3 km away.",
+        "The nearest other star would be about 29,000 km away."
+      ],
+      "visual": { "kind": "bars", "items": [{ "label": "Earth", "value": 0.107 }, { "label": "Jupiter", "value": 0.56 }, { "label": "Neptune", "value": 3.2 }], "unit": " km", "caption": "Distance from a 1 m Sun, to scale" },
+      "source": "NASA Planetary Fact Sheets; scale computed from mean distances and the Sun's diameter."
+    },
+    {
+      "id": "space.seasons",
+      "topic": "space",
+      "type": "lesson",
+      "headline": "Seasons come from Earth's tilt",
+      "lines": [
+        "Earth's axis is tilted about 23.4°.",
+        "When your hemisphere leans toward the Sun, longer days and more direct sunlight bring summer.",
+        "It isn't distance: Earth is closest to the Sun in early January."
+      ],
+      "visual": { "kind": "motif", "motif": "planet" },
+      "source": "NASA Space Place, 'What Causes the Seasons?'; Chaisson & McMillan, 'Astronomy Today'."
+    },
+    {
+      "id": "space.moon-phases",
+      "topic": "space",
+      "type": "lesson",
+      "headline": "Why the Moon has phases",
+      "lines": [
+        "The Sun always lights half of the Moon.",
+        "As the Moon orbits Earth, we see different amounts of that lit half.",
+        "One full cycle of phases takes about 29.5 days."
+      ],
+      "visual": { "kind": "cycle", "steps": ["New", "First quarter", "Full", "Last quarter"] },
+      "source": "NASA Science, 'Moon Phases'; Chaisson & McMillan, 'Astronomy Today'."
+    },
+    {
+      "id": "space.light-year",
+      "topic": "space",
+      "type": "lesson",
+      "headline": "A light-year is a distance, not a time",
+      "lines": [
+        "It's how far light travels in a year: about 9.46 trillion km.",
+        "The nearest star beyond the Sun, Proxima Centauri, is about 4.2 light-years away.",
+        "So looking far into space means looking back in time."
+      ],
+      "visual": { "kind": "stat", "value": "9.46 trillion km", "caption": "one light-year" },
+      "source": "International Astronomical Union definitions; NASA."
+    },
+    {
+      "id": "space.stardust",
+      "topic": "space",
+      "type": "lesson",
+      "headline": "Stars forge the elements",
+      "lines": [
+        "Stars shine by fusing hydrogen into helium in their cores.",
+        "Massive stars build heavier elements, and their explosions scatter them through space.",
+        "The calcium in your bones and the iron in your blood were made in earlier stars."
+      ],
+      "visual": { "kind": "cycle", "steps": ["Gas cloud", "Star", "Fusion", "Explosion", "New stars"] },
+      "source": "Burbidge, Burbidge, Fowler & Hoyle (1957), Reviews of Modern Physics; NASA."
+    },
+    {
+      "id": "space.q-largest-planet",
+      "topic": "space",
+      "type": "quiz",
+      "question": "Which is the largest planet in our Solar System?",
+      "options": ["Saturn", "Jupiter", "Neptune", "Earth"],
+      "answer": 1,
+      "why": "Jupiter — more than twice the mass of all the other planets combined.",
+      "source": "NASA Jupiter Fact Sheet."
+    },
+    {
+      "id": "space.q-moon-landing",
+      "topic": "space",
+      "type": "quiz",
+      "question": "In which year did humans first walk on the Moon?",
+      "options": ["1957", "1961", "1969", "1975"],
+      "answer": 2,
+      "why": "Apollo 11, 20 July 1969. 1957 was Sputnik; 1961 was Yuri Gagarin's first human spaceflight.",
+      "source": "NASA History Office, Apollo 11 mission overview."
+    },
+    {
+      "id": "space.q-hottest-planet",
+      "topic": "space",
+      "type": "quiz",
+      "question": "Which planet is the hottest?",
+      "options": ["Mercury", "Venus", "Mars", "Jupiter"],
+      "answer": 1,
+      "why": "Venus, at about 465 °C: its thick carbon-dioxide atmosphere traps heat, even though Mercury is closer to the Sun.",
+      "source": "NASA Venus Fact Sheet."
+    },
+    {
+      "id": "space.q-seasons",
+      "topic": "space",
+      "type": "quiz",
+      "question": "What mainly causes Earth's seasons?",
+      "options": ["Changing distance from the Sun", "The tilt of Earth's axis", "The Moon's orbit", "Sunspots"],
+      "answer": 1,
+      "why": "The roughly 23.4° tilt changes how directly sunlight hits each hemisphere through the year.",
+      "source": "NASA Space Place, 'What Causes the Seasons?'."
+    },
+    {
+      "id": "space.q-sunlight",
+      "topic": "space",
+      "type": "quiz",
+      "question": "Roughly how long does sunlight take to reach Earth?",
+      "options": ["8 seconds", "8 minutes", "8 hours", "8 days"],
+      "answer": 1,
+      "why": "About 8 minutes 20 seconds to cross roughly 150 million km.",
+      "source": "NASA Sun Fact Sheet."
+    },
+    {
+      "id": "space.f-venus-day",
+      "topic": "space",
+      "type": "fact",
+      "headline": "A day on Venus is longer than its year",
+      "text": "Venus takes about 243 Earth days to spin once, but only about 225 days to orbit the Sun — and it spins backwards.",
+      "visual": { "kind": "bars", "items": [{ "label": "One spin", "value": 243 }, { "label": "One orbit", "value": 225 }], "unit": " days" },
+      "source": "NASA Venus Fact Sheet."
+    },
+    {
+      "id": "space.f-footprints",
+      "topic": "space",
+      "type": "fact",
+      "headline": "Moon footprints could last millions of years",
+      "text": "With no wind or rain, almost nothing erodes them. Only tiny meteorite impacts slowly churn the surface.",
+      "source": "NASA, Apollo lunar surface science summaries."
+    },
+    {
+      "id": "space.f-iss",
+      "topic": "space",
+      "type": "fact",
+      "headline": "The ISS circles Earth about every 90 minutes",
+      "text": "Travelling at about 28,000 km/h, its crew sees roughly 16 sunrises and 16 sunsets every day.",
+      "visual": { "kind": "stat", "value": "≈ 16", "caption": "sunrises a day aboard the ISS" },
+      "source": "NASA, International Space Station facts and figures."
+    },
+    {
+      "id": "space.f-neutron-star",
+      "topic": "space",
+      "type": "fact",
+      "headline": "A teaspoon of neutron star would weigh about a billion tonnes",
+      "text": "Neutron stars pack more mass than the Sun into a ball about 20 km across.",
+      "source": "NASA Goddard, 'Neutron Stars'; Chaisson & McMillan, 'Astronomy Today'."
+    },
+    {
+      "id": "space.d-black-holes",
+      "topic": "space",
+      "type": "deeper",
+      "headline": "What is a black hole?",
+      "steps": [
+        { "headline": "1 · Too much in too little", "lines": ["When a very massive star collapses, its core can shrink without limit.", "Gravity becomes so strong that nothing — not even light — can escape."], "visual": { "kind": "motif", "motif": "planet" } },
+        { "headline": "2 · The event horizon", "lines": ["The boundary of no return is called the event horizon.", "Outside it, things can still orbit safely, as planets orbit the Sun."] },
+        { "headline": "3 · Giants at the centre", "lines": ["Most large galaxies have a supermassive black hole at their core.", "Ours, Sagittarius A*, is about 4 million times the Sun's mass."], "visual": { "kind": "stat", "value": "≈ 4 million Suns", "caption": "mass of Sagittarius A*" } },
+        { "headline": "4 · Seeing the unseeable", "lines": ["In 2019 the Event Horizon Telescope imaged the shadow of the black hole in galaxy M87.", "In 2022 it released an image of Sagittarius A*."] }
+      ],
+      "source": "Event Horizon Telescope Collaboration (2019, 2022), Astrophysical Journal Letters; Nobel Prize in Physics 2020."
+    },
+    {
+      "id": "space.recap",
+      "topic": "space",
+      "type": "recap",
+      "headline": "Space: the takeaways",
+      "points": [
+        "The Solar System is mostly empty space.",
+        "Tilt, not distance, makes the seasons.",
+        "Phases: how much of the lit half we see.",
+        "A light-year is a distance.",
+        "Your atoms were forged in stars."
+      ],
+      "source": "Summary of this topic's cards."
+    }
+  ]
+}

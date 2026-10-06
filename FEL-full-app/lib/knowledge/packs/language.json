@@ -1,0 +1,179 @@
+{
+  "topic": "language",
+  "version": 1,
+  "cards": [
+    {
+      "id": "language.eponyms",
+      "topic": "language",
+      "type": "lesson",
+      "headline": "Words named after people",
+      "lines": [
+        "'Sandwich' is named after John Montagu, the 4th Earl of Sandwich, in the 1700s.",
+        "'Boycott' comes from Captain Charles Boycott, shunned by his community in Ireland in 1880.",
+        "'Diesel' honours the engineer Rudolf Diesel."
+      ],
+      "visual": { "kind": "motif", "motif": "quote" },
+      "source": "Oxford English Dictionary, etymologies of 'sandwich', 'boycott' and 'diesel'."
+    },
+    {
+      "id": "language.english-borrows",
+      "topic": "language",
+      "type": "lesson",
+      "headline": "English is a great borrower",
+      "lines": [
+        "English grew from the Germanic speech of the Anglo-Saxons.",
+        "After 1066, thousands of French words arrived — beef, court, justice.",
+        "Latin and Greek later supplied much of the vocabulary of science."
+      ],
+      "visual": { "kind": "timeline", "points": [{ "at": "c.450", "label": "Anglo-Saxons arrive" }, { "at": "1066", "label": "Norman Conquest" }, { "at": "1500s", "label": "Latin and Greek borrowings" }] },
+      "source": "Crystal, 'The Cambridge Encyclopedia of the English Language'; Baugh & Cable, 'A History of the English Language'."
+    },
+    {
+      "id": "language.cow-beef",
+      "topic": "language",
+      "type": "lesson",
+      "headline": "Why 'cow' in the field but 'beef' on the plate?",
+      "lines": [
+        "After the Norman Conquest, English-speaking farmers raised the animals; French-speaking nobles ate the meat.",
+        "So the animal kept an English name and the meat took a French one."
+      ],
+      "visual": { "kind": "compare", "left": { "label": "In the field (English)", "text": "cow · pig · sheep" }, "right": { "label": "On the plate (French)", "text": "beef · pork · mutton" } },
+      "source": "Baugh & Cable, 'A History of the English Language'; Crystal, 'The Stories of English'."
+    },
+    {
+      "id": "language.zipf",
+      "topic": "language",
+      "type": "lesson",
+      "headline": "A few words do most of the work",
+      "lines": [
+        "In English text, 'the' is the most common word.",
+        "Zipf noticed a pattern: the 2nd most common word appears about half as often as the 1st, the 3rd about a third as often.",
+        "Learning a language? The most frequent words pay off first."
+      ],
+      "visual": { "kind": "bars", "items": [{ "label": "1st", "value": 100 }, { "label": "2nd", "value": 50 }, { "label": "3rd", "value": 33 }, { "label": "4th", "value": 25 }, { "label": "5th", "value": 20 }], "caption": "Zipf's law: word rank vs. how often it appears" },
+      "source": "Zipf, 'Human Behavior and the Principle of Least Effort' (1949)."
+    },
+    {
+      "id": "language.how-many",
+      "topic": "language",
+      "type": "lesson",
+      "headline": "About 7,000 languages are spoken today",
+      "lines": [
+        "Ethnologue lists roughly 7,000 living languages.",
+        "Around 40% of them are endangered, many with fewer than 1,000 speakers.",
+        "When a language disappears, so does a unique way of describing the world."
+      ],
+      "visual": { "kind": "stat", "value": "≈ 7,000", "caption": "living languages" },
+      "source": "Ethnologue: Languages of the World (SIL International), recent editions."
+    },
+    {
+      "id": "language.q-palindrome",
+      "topic": "language",
+      "type": "quiz",
+      "question": "Which word is a palindrome?",
+      "options": ["Level", "Letter", "Lever", "Label"],
+      "answer": 0,
+      "why": "A palindrome reads the same backwards: L-E-V-E-L.",
+      "source": "Standard definition (Oxford English Dictionary)."
+    },
+    {
+      "id": "language.q-onomatopoeia",
+      "topic": "language",
+      "type": "quiz",
+      "question": "'Buzz', 'sizzle' and 'thud' are examples of…",
+      "options": ["Onomatopoeia", "Alliteration", "Metaphor", "Oxymoron"],
+      "answer": 0,
+      "why": "Onomatopoeia: words that imitate the sound they describe.",
+      "source": "Baldick, 'The Oxford Dictionary of Literary Terms'."
+    },
+    {
+      "id": "language.q-oxymoron",
+      "topic": "language",
+      "type": "quiz",
+      "question": "Which phrase is an oxymoron?",
+      "options": ["Deafening silence", "Bright sun", "Fast car", "Cold ice"],
+      "answer": 0,
+      "why": "An oxymoron pairs contradictory words for effect: silence can't literally be deafening.",
+      "source": "Baldick, 'The Oxford Dictionary of Literary Terms'."
+    },
+    {
+      "id": "language.q-native-speakers",
+      "topic": "language",
+      "type": "quiz",
+      "question": "Which language has the most native speakers?",
+      "options": ["English", "Spanish", "Mandarin Chinese", "Hindi"],
+      "answer": 2,
+      "why": "Mandarin has the most native speakers. Count second-language speakers too, and English has the most overall.",
+      "source": "Ethnologue (SIL International), most-spoken languages."
+    },
+    {
+      "id": "language.q-alphabet",
+      "topic": "language",
+      "type": "quiz",
+      "question": "Where does the word 'alphabet' come from?",
+      "options": ["The first two Greek letters", "A Latin word for 'writing'", "The name of a Phoenician king"],
+      "answer": 0,
+      "why": "Alpha and beta — letters that themselves descend from Phoenician aleph and beth.",
+      "source": "Oxford English Dictionary, 'alphabet'; Daniels & Bright, 'The World's Writing Systems'."
+    },
+    {
+      "id": "language.f-tittle",
+      "topic": "language",
+      "type": "fact",
+      "headline": "The dot over an 'i' is called a tittle",
+      "text": "The word comes from Latin 'titulus'. The old phrase 'every jot and tittle' means every tiny detail.",
+      "source": "Oxford English Dictionary, 'tittle'."
+    },
+    {
+      "id": "language.f-pangram",
+      "topic": "language",
+      "type": "fact",
+      "headline": "'The quick brown fox jumps over the lazy dog'",
+      "text": "It uses every letter of the alphabet — a pangram — and has long been used to test typewriters and fonts.",
+      "source": "Oxford English Dictionary, 'pangram'; typographic tradition."
+    },
+    {
+      "id": "language.f-shakespeare",
+      "topic": "language",
+      "type": "fact",
+      "headline": "Shakespeare is the first recorded user of many words",
+      "text": "The Oxford English Dictionary's earliest citations for words like 'lonely' and 'eyeball' come from his plays — though some were likely spoken earlier.",
+      "source": "Oxford English Dictionary, first citations; Crystal, 'Think on My Words' (2008)."
+    },
+    {
+      "id": "language.f-babies",
+      "topic": "language",
+      "type": "fact",
+      "headline": "Babies can hear sounds from any language",
+      "text": "Young infants can tell apart speech sounds from many languages. By about their first birthday, they tune in to the sounds of the languages around them.",
+      "source": "Werker & Tees (1984), Infant Behavior and Development; Kuhl (2004), Nature Reviews Neuroscience."
+    },
+    {
+      "id": "language.d-writing-systems",
+      "topic": "language",
+      "type": "deeper",
+      "headline": "Four ways to write a language",
+      "steps": [
+        { "headline": "1 · Alphabets", "lines": ["Letters stand for individual sounds — consonants and vowels.", "Greek, Latin and Cyrillic are alphabets."], "visual": { "kind": "motif", "motif": "quote" } },
+        { "headline": "2 · Abjads", "lines": ["Letters mostly stand for consonants; readers supply many of the vowels.", "Arabic and Hebrew are usually written this way."] },
+        { "headline": "3 · Syllabaries", "lines": ["Each symbol stands for a whole syllable.", "Japanese kana and the Cherokee syllabary are examples."] },
+        { "headline": "4 · Logographic", "lines": ["Characters stand for words or meaningful parts of words.", "Chinese characters work this way, often combining clues to meaning and sound."] }
+      ],
+      "source": "Daniels & Bright, 'The World's Writing Systems' (1996)."
+    },
+    {
+      "id": "language.recap",
+      "topic": "language",
+      "type": "recap",
+      "headline": "Language & words: the takeaways",
+      "points": [
+        "Many words are named after people.",
+        "English borrowed heavily from French and Latin.",
+        "Cow in the field, beef on the plate.",
+        "A few common words do most of the work.",
+        "About 7,000 languages are alive today."
+      ],
+      "source": "Summary of this topic's cards."
+    }
+  ]
+}
