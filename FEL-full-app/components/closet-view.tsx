@@ -703,7 +703,8 @@ export function ClosetView({ adult = false, fullBleed = false }: { adult?: boole
         </div>
       </section>
 
-      <aside aria-label="Editor" className="min-h-0 flex-1 overflow-y-auto border-t border-white/10 bg-[#0a0a0f] px-4 py-4 md:border-l md:border-t-0">
+      {/* scroll-padding: whatever the editor scrolls into view (a picked row, a focused field) lands below the sticky tabs */}
+      <aside aria-label="Editor" className="min-h-0 flex-1 scroll-pt-16 overflow-y-auto border-t border-white/10 bg-[#0a0a0f] px-4 py-4 md:scroll-pt-28 md:border-l md:border-t-0">
         {/* a phone's stage is small: the walkthrough sits at the top of the editor there */}
         <div className="mb-3 md:hidden"><WalkthroughCard state={walk} onNext={() => walkDo('next')} onSkip={() => walkDo('skip')} /></div>
         <div className="mb-4 space-y-3">
@@ -729,7 +730,10 @@ export function ClosetView({ adult = false, fullBleed = false }: { adult?: boole
           />
         )}
         <div>
-          <div className="sticky top-0 z-10 -mx-4 mb-4 flex flex-wrap gap-2 bg-[#0a0a0f]/95 px-4 py-2 backdrop-blur">
+          {/* the tabs stick flush to the top of the editor (-top-4 takes back its padding: nothing shows above them), and
+              on a phone they are ONE row that scrolls sideways — two rows of chips hid a third of the 390 × 844 editor
+              (seen 2026-10-06: the Clothing list's rows cut behind them) */}
+          <div className="sticky -top-4 z-20 -mx-4 mb-4 flex gap-2 bg-[#0a0a0f] px-4 py-2 shadow-[0_6px_10px_-6px_rgba(0,0,0,0.8)] max-md:flex-nowrap max-md:overflow-x-auto max-md:[scrollbar-width:none] md:flex-wrap [&>*]:shrink-0">
             <Chip label="Face" active={tab === 'face'} onClick={() => setTab('face')} />
             <Chip label="Shape" active={tab === 'shape'} onClick={() => setTab('shape')} />
             <Chip label="Parts" active={tab === 'parts'} onClick={() => setTab('parts')} />
