@@ -24,7 +24,7 @@ import { SKATE_VENUES, SNOW_VENUES, SURF_VENUES, rideOf, type BoardVenue } from 
 import { applyFloorDetailToMesh } from '../visual/groundTextures';
 import { VertexData, Texture } from '@babylonjs/core';
 import { readableFloorHex, separatedHex, paintGraffitiWall, buildGraffitiStage } from '../visual/PlacePack';
-import { plazaCrowd, plazaMarkers, plazaRails, plazaSolids } from './skatePlaza';
+import { plazaCrowd, plazaMarkers, plazaRails, plazaSolids, SKATE_LANE, SKATE_BOWL, SKATE_CENTRE_BOX } from './skatePlaza';
 import { SNOW_SLOPE, snowCrowd } from './snowSlope';
 import { GATE_HALF_WIDTH, FINISH_AFTER_M, treeline, edgePoles, rockSpots, type RideSolid } from './gateCrasher';
 import { snowParkMaterials, parkBoxUV, PARK_TILE_M } from '../visual/snowParkTextures';   // GATE-CRASHER-POLISH-2: the park, painted
@@ -93,13 +93,15 @@ function paintGround(scene: Scene, w: number, h: number, painter: (g: CanvasRend
   return m;
 }
 
-function makeRail(scene: Scene, all: AbstractMesh[], lines: GrindLine[], a: Vector3, b: Vector3, bonus: number, gapId?: string): void {
+/** `material` (IMPROVE 2026-10-06): one shared rail material — the skatepark made a new PBR material for each of its 14
+ *  rails. Omitted, a rail makes its own as it always did (the slope's rails). */
+function makeRail(scene: Scene, all: AbstractMesh[], lines: GrindLine[], a: Vector3, b: Vector3, bonus: number, gapId?: string, material?: Material): void {
   const rail = MeshBuilder.CreateCylinder('rail', { diameter: 0.09, height: Vector3.Distance(a, b) }, scene);
   rail.position = Vector3.Center(a, b);
   const d = b.subtract(a);
   rail.rotation.x = Math.PI / 2 - Math.atan2(d.y, Math.hypot(d.x, d.z));
   rail.rotation.y = Math.atan2(d.x, d.z);
-  rail.material = mat(scene, 'railM', '#d8dce2');
+  rail.material = material ?? mat(scene, 'railM', '#d8dce2');
   all.push(rail);
   lines.push({ a, b, bonus, gapId });
 }
@@ -149,6 +151,17 @@ function rampWedge(scene: Scene, name: string, width: number, depth: number, hei
   vd.applyToMesh(m);
   m.isPickable = true;
   return m;
+}
+
+/** The shadow generators that already cast `mesh` (IMPROVE 2026-10-06: a merged group keeps the shadow its parts had). */
+function shadowGeneratorsCasting(scene: Scene, mesh: AbstractMesh): { addShadowCaster(m: AbstractMesh, includeDescendants?: boolean): unknown }[] {
+  const out: { addShadowCaster(m: AbstractMesh, includeDescendants?: boolean): unknown }[] = [];
+  for (const light of scene.lights) {
+    const g = (light as { getShadowGenerator?: () => unknown }).getShadowGenerator?.() as
+      { getShadowMap?: () => { renderList?: AbstractMesh[] | null } | null; addShadowCaster(m: AbstractMesh, d?: boolean): unknown } | null | undefined;
+    if (g?.getShadowMap?.()?.renderList?.includes(mesh)) out.push(g);
+  }
+  return out;
 }
 
 /** Half-width of the skatepark's playable area. The rider clamps here AND the
@@ -224,12 +237,21 @@ export function buildSkatepark(scene: Scene, venue: BoardVenue = SKATE_VENUES[0]
     c.parent = parent; c.rotation.z = Math.PI / 2; c.position.set(0, y, z); c.material = copeM; c.isPickable = false;
     dressing.push(c);
   };
-  // funboxes and ledges are TAGGED — a park is somewhere people paint
+  // funboxes and ledges are TAGGED — a park is somewhere people paint.
+  // IMPROVE (2026-10-06): THREE tags, painted once and reused — it was seven 512×128 DynamicTextures (four funboxes, the
+  // pyramid, two wallrides), each painted on the canvas at load and each its own material. Seeds 3, 4, 5 are the first
+  // three the park always painted, so the funboxes that carried them look exactly as they did.
+  const TAG_SEEDS = [3, 4, 5] as const;
+  const tagPool = new Map<number, PBRMaterial>();
   const tagM = (seed: number): PBRMaterial => {
-    const tex = new DynamicTexture(`funTag_${seed}`, { width: 512, height: 128 }, scene, true);
-    paintGraffitiWall(tex.getContext() as unknown as CanvasRenderingContext2D, 512, 128, seed, structHex);
+    const use = TAG_SEEDS[((seed - TAG_SEEDS[0]) % TAG_SEEDS.length + TAG_SEEDS.length) % TAG_SEEDS.length];
+    const have = tagPool.get(use);
+    if (have) return have;
+    const tex = new DynamicTexture(`funTag_${use}`, { width: 512, height: 128 }, scene, true);
+    paintGraffitiWall(tex.getContext() as unknown as CanvasRenderingContext2D, 512, 128, use, structHex);
     tex.update(true);
-    const m = new PBRMaterial(`funTagM_${seed}`, scene); m.albedoTexture = tex; m.metallic = 0; m.roughness = 0.9;
+    const m = new PBRMaterial(`funTagM_${use}`, scene); m.albedoTexture = tex; m.metallic = 0; m.roughness = 0.9;
+    tagPool.set(use, m);
     return m;
   };
   const accentM = mat(scene, `accentM_${venue.id}`, P.accent);
@@ -251,8 +273,8 @@ export function buildSkatepark(scene: Scene, venue: BoardVenue = SKATE_VENUES[0]
     w.position.set(f(fx), 0, f(fz)); w.rotation.y = ry; w.material = wedgeM; dressing.push(w);
   }
 
-  // THE BOWL — an octagon of inward-tilted banks around a sunken centre
-  const bowlC = new Vector3(f(-0.48), 0, f(0.42)), bowlR = 6.5;
+  // THE BOWL — an octagon of inward-tilted banks around a sunken centre (skatePlaza.SKATE_BOWL: the coins read it too)
+  const bowlC = new Vector3(f(SKATE_BOWL.fx), 0, f(SKATE_BOWL.fz)), bowlR = SKATE_BOWL.r;
   for (let i = 0; i < 8; i++) {
     const a = (i / 8) * Math.PI * 2;
     const bank = MeshBuilder.CreateBox(`bowl_${i}`, { width: 5.4, height: 0.5, depth: 3.6 }, scene);
@@ -268,19 +290,20 @@ export function buildSkatepark(scene: Scene, venue: BoardVenue = SKATE_VENUES[0]
   }
 
   // THE DOWNHILL STRAIGHT — longer in a longer park, which is the point of a longer park
-  const laneLen = Math.max(30, B * 0.9);
-  const lane = MeshBuilder.CreateBox('dh_lane', { width: 8, height: 0.5, depth: laneLen }, scene);
-  lane.position.set(f(0.6), 1.6, f(-0.18));
-  lane.rotation.set(0.14, 0, 0);
+  // (skatePlaza.SKATE_LANE: the same numbers the coin line down it is laid on)
+  const laneLen = SKATE_LANE.len(B);
+  const lane = MeshBuilder.CreateBox('dh_lane', { width: SKATE_LANE.width, height: SKATE_LANE.thick, depth: laneLen }, scene);
+  lane.position.set(f(SKATE_LANE.fx), SKATE_LANE.y, f(SKATE_LANE.fz));
+  lane.rotation.set(SKATE_LANE.tilt, 0, 0);
   lane.material = laneM;
   lane.checkCollisions = true;
   all.push(lane); rideable.push(lane);
 
   // FUNBOXES and a STAIR SET — something to ollie down rather than only things to ride up
   let tagSeed = 3;
-  for (const [fx, fz] of [[0, -0.06], [-0.24, -0.36], [0.3, 0.68], [-0.6, -0.6]] as const) {
-    const box = MeshBuilder.CreateBox('funbox', { width: 6, height: 1.1, depth: 4 }, scene);
-    box.position.set(f(fx), 0.55, f(fz));
+  for (const [fx, fz] of [[SKATE_CENTRE_BOX.fx, SKATE_CENTRE_BOX.fz], [-0.24, -0.36], [0.3, 0.68], [-0.6, -0.6]] as const) {
+    const box = MeshBuilder.CreateBox('funbox', { width: SKATE_CENTRE_BOX.width, height: SKATE_CENTRE_BOX.height, depth: SKATE_CENTRE_BOX.depth }, scene);
+    box.position.set(f(fx), SKATE_CENTRE_BOX.height / 2, f(fz));
     box.material = tagM(tagSeed++);
     // steel edges along the two long top edges: the line you grind and the line you read
     cope(box, 6, 0.55, 2); cope(box, 6, 0.55, -2);
@@ -316,13 +339,14 @@ export function buildSkatepark(scene: Scene, venue: BoardVenue = SKATE_VENUES[0]
   }
 
   const grindLines: GrindLine[] = [];
-  makeRail(scene, all, grindLines, new Vector3(f(-0.18), 0.8, f(0.12)), new Vector3(f(-0.18), 0.8, f(0.36)), 180);
-  makeRail(scene, all, grindLines, new Vector3(f(0.18), 0.8, f(-0.12)), new Vector3(f(0.18), 0.8, f(-0.36)), 180);
-  makeRail(scene, all, grindLines, new Vector3(f(0.48), 2.9, f(-0.54)), new Vector3(f(0.48), 0.9, f(0.18)), 220);
-  makeRail(scene, all, grindLines, new Vector3(f(-0.06), 0.8, f(0.6)), new Vector3(f(0.18), 0.8, f(0.72)), 260);
-  makeRail(scene, all, grindLines, new Vector3(f(0.18), 0.8, f(0.72)), new Vector3(f(0.42), 0.8, f(0.6)), 300);
+  const railM = mat(scene, `railM_${venue.id}`, '#d8dce2');   // IMPROVE (2026-10-06): one rail material for the park's 14 rails
+  makeRail(scene, all, grindLines, new Vector3(f(-0.18), 0.8, f(0.12)), new Vector3(f(-0.18), 0.8, f(0.36)), 180, undefined, railM);
+  makeRail(scene, all, grindLines, new Vector3(f(0.18), 0.8, f(-0.12)), new Vector3(f(0.18), 0.8, f(-0.36)), 180, undefined, railM);
+  makeRail(scene, all, grindLines, new Vector3(f(0.48), 2.9, f(-0.54)), new Vector3(f(0.48), 0.9, f(0.18)), 220, undefined, railM);
+  makeRail(scene, all, grindLines, new Vector3(f(-0.06), 0.8, f(0.6)), new Vector3(f(0.18), 0.8, f(0.72)), 260, undefined, railM);
+  makeRail(scene, all, grindLines, new Vector3(f(0.18), 0.8, f(0.72)), new Vector3(f(0.42), 0.8, f(0.6)), 300, undefined, railM);
   // the HANDRAIL down the stair set — the one every skater looks for
-  makeRail(scene, all, grindLines, new Vector3(f(0.12) + 5, 1.5, f(-0.62)), new Vector3(f(0.12) + 5, 0.5, f(-0.62) + 4.4), 340);
+  makeRail(scene, all, grindLines, new Vector3(f(0.12) + 5, 1.5, f(-0.62)), new Vector3(f(0.12) + 5, 0.5, f(-0.62) + 4.4), 340, undefined, railM);
 
   // GRAFFITI STAGES (SHARED-PLACE-FLOOR, eye HARD #10: "no park geometry/graffiti"). Venice's art walls, as the MID
   // layer: six painted walls standing just OUTSIDE the fence, tall enough to read over it, two per long side and one
@@ -346,14 +370,6 @@ export function buildSkatepark(scene: Scene, venue: BoardVenue = SKATE_VENUES[0]
   apron.material = apronM;
   applyFloorDetailToMesh(scene, apron, { kind: 'asphalt', blend: 0.6 }, [B * 2 + 150, B * 2 + 150]);
   all.push(apron);
-  // merge the dressing per material: 30-odd copings and prisms become two draws
-  const merged: Mesh[] = [];
-  for (const m of [copeM, wedgeM]) {
-    const parts = dressing.filter((d) => d.material === m);
-    for (const p of parts) p.computeWorldMatrix(true);
-    const one = parts.length ? Mesh.MergeMeshes(parts, true, true) : null;
-    if (one) { one.name = m === copeM ? 'park_coping' : 'park_rampbody'; one.isPickable = false; one.material = m; merged.push(one); }
-  }
 
   // one accent object so the eye has somewhere to land — the thing a place is known by
   const totem = MeshBuilder.CreateCylinder('park_totem', { diameter: 0.9, height: 5.2, tessellation: 8 }, scene);
@@ -376,6 +392,12 @@ export function buildSkatepark(scene: Scene, venue: BoardVenue = SKATE_VENUES[0]
   const markers: Vector3[] = plazaMarkers(B).map(([x, y, z]) => new Vector3(x, y, z));
 
   const binM = mat(scene, `binM_${venue.id}`, mixHex(P.edge, '#2b2f36', 0.45));
+  // IMPROVE (2026-10-06): the dressing's materials, made ONCE — `mat()` ran inside the shrub, cone, deck and banner loops
+  const shrubM = mat(scene, `shrubM_${venue.id}`, '#3f7a44');
+  const coneM = mat(scene, `coneM_${venue.id}`, '#ff7a3d');
+  const deckM = mat(scene, `deckM_${venue.id}`, P.accent);
+  const boomM = mat(scene, `boomM_${venue.id}`, '#22262d');
+  const bannerM = mat(scene, `bannerM_${venue.id}`, P.accent);
   for (const sol of plazaSolids(B)) {
     if (sol.wedge) {
       const w = rampWedge(scene, `plaza_${sol.kind}`, sol.width, sol.depth, sol.height, true);
@@ -404,7 +426,7 @@ export function buildSkatepark(scene: Scene, venue: BoardVenue = SKATE_VENUES[0]
     if (sol.kind === 'planter') {
       const shrub = MeshBuilder.CreateSphere('plaza_shrub', { diameter: 1.7, segments: 6 }, scene);
       shrub.position.set(sol.x, sol.height + 0.4, sol.z);
-      shrub.material = mat(scene, `shrubM_${venue.id}`, '#3f7a44');
+      shrub.material = shrubM;
       dressing.push(shrub);
     }
     if (sol.kind === 'table') {
@@ -424,7 +446,7 @@ export function buildSkatepark(scene: Scene, venue: BoardVenue = SKATE_VENUES[0]
     // P8: the three signature features carry a gapId, which is what makes them goal-capable — ParkGoals already
     // has a 'gap' kind keyed by exactly this, and GrindLine already had the field. Nothing new was needed but
     // handing it a name.
-    makeRail(scene, all, grindLines, new Vector3(...r.a), new Vector3(...r.b), r.bonus, r.gapId);
+    makeRail(scene, all, grindLines, new Vector3(...r.a), new Vector3(...r.b), r.bonus, r.gapId, railM);
   }
 
   // ── AND THE THINGS NOBODY DESIGNED FOR SKATING ────────────────────────────────────────────────────────────
@@ -435,28 +457,58 @@ export function buildSkatepark(scene: Scene, venue: BoardVenue = SKATE_VENUES[0]
     const a = (i / 9) * Math.PI * 2;
     const cone = MeshBuilder.CreateCylinder(`plaza_cone_${i}`, { diameterTop: 0.05, diameterBottom: 0.42, height: 0.62, tessellation: 8 }, scene);
     cone.position.set(f(Math.sin(a) * 0.78), 0.31, f(Math.cos(a) * 0.78));
-    cone.material = mat(scene, `coneM_${venue.id}`, '#ff7a3d');
+    cone.material = coneM;
     dressing.push(cone);
   }
   for (const [bx, bz, ry] of [[f(-0.7), f(0.48), 0.5], [f(-0.74), f(0.62), -0.3]] as const) {
     const deck = MeshBuilder.CreateBox('plaza_parkedboard', { width: 0.24, height: 0.82, depth: 0.05 }, scene);
     deck.position.set(bx, 0.42, bz); deck.rotation.set(0.28, ry, 0);
-    deck.material = mat(scene, `deckM_${venue.id}`, P.accent);
+    deck.material = deckM;
     dressing.push(deck);
   }
   {
     const boom = MeshBuilder.CreateBox('plaza_boombox', { width: 0.7, height: 0.34, depth: 0.26 }, scene);
     boom.position.set(f(0.72), 0.7, f(0.16));
-    boom.material = mat(scene, `boomM_${venue.id}`, '#22262d');
+    boom.material = boomM;
     dressing.push(boom);
   }
   for (const [sx, sz] of [[-0.55, 1], [0.15, 1], [1, -0.4], [-1, 0.2]] as const) {
     const onX = Math.abs(sx) === 1;
     const flag = MeshBuilder.CreateBox('plaza_banner', { width: onX ? 0.08 : 3.4, height: 1.1, depth: onX ? 3.4 : 0.08 }, scene);
     flag.position.set(onX ? sx * (B - 0.5) : f(sx), 2.6, onX ? f(sz) : sz * (B - 0.5));
-    flag.material = mat(scene, `bannerM_${venue.id}`, P.accent);
+    flag.material = bannerM;
     dressing.push(flag);
   }
+
+  // ── MERGE, THEN FREEZE (IMPROVE 2026-10-06, skate items 4 + 5) ───────────────────────────────────────────────────
+  // The dressing merged per material — and ALL of it now. The merge used to run before the plaza was built, so every
+  // plaza piece pushed after it (shrubs, table benches, bench backs, the pyramid's and the ledges' coping, cones, parked
+  // decks, the boombox, banners) stayed its own draw and never entered `all`, so world.dispose() left them in the scene.
+  // The copings and ramp bodies keep exactly the treatment they had (merged, no shadow — their merged bounds are park
+  // sized, which LightRig never casts); a group that DID cast before the merge keeps casting, and keeps receiving.
+  const merged: Mesh[] = [];
+  const HISTORIC = new Set<Material>([copeM, wedgeM]);
+  const groups: [Material, string][] = [
+    [copeM, 'park_coping'], [wedgeM, 'park_rampbody'], [boxM, 'plaza_dressing_box'], [shrubM, 'plaza_dressing_shrub'],
+    [coneM, 'plaza_dressing_cone'], [deckM, 'plaza_dressing_deck'], [boomM, 'plaza_dressing_boom'], [bannerM, 'plaza_dressing_banner'],
+  ];
+  for (const [m, name] of groups) {
+    const parts = dressing.filter((d) => d.material === m && !d.isDisposed());
+    if (!parts.length) continue;
+    const casters = HISTORIC.has(m) ? [] : shadowGeneratorsCasting(scene, parts[0]);
+    const receives = parts[0].receiveShadows;
+    for (const p of parts) p.computeWorldMatrix(true);
+    const one = Mesh.MergeMeshes(parts, true, true);
+    if (!one) continue;
+    one.name = name; one.isPickable = false; one.material = m;
+    if (!HISTORIC.has(m)) { one.receiveShadows = receives; for (const g of casters) g.addShadowCaster(one, false); }
+    merged.push(one);
+  }
+  // The park never moves: its world matrices are computed once, and its materials compiled once. No ride world froze
+  // anything (NetSportMode and Pickups do), so every static mesh recomputed its world matrix every frame. The floor and the
+  // apron keep live materials (the art card and the floor detail own those); every structure and dressing material freezes.
+  for (const m of [...all, ...merged]) m.freezeWorldMatrix();
+  for (const m of [rampM, bankM, laneM, boxM, wedgeM, copeM, fenceM, accentM, binM, railM, shrubM, coneM, deckM, boomM, bannerM, ...tagPool.values()]) m.freeze();
 
   // Where people watch from: the ledges and the bowl rim, clear of every line the player rides, scaled to the venue
   // P9: onlookers stand where there is something to watch. These were ten points chosen before the plaza

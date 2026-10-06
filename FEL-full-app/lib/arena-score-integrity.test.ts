@@ -939,7 +939,8 @@ describe('drift guards — the numbers mirrored out of mode files still match th
     expect(num(src('lib/babylon/core/AirControl.ts'), /GRAB_PTS_PER_SEC = (\d+);/, 'GRAB')).toBe(MIRRORED.grabPtsPerSec);
     expect(num(src('lib/babylon/core/Pickups.ts'), /COIN_RUN_CAP = (\d+);/, 'COIN_RUN_CAP')).toBe(MIRRORED.coinRunCap);
     // every combo.add / accrue in the run pays a table award, a rail's bonus, or a per-second rate — nothing bigger
-    const calls = [...skate.matchAll(/combo\.(add|accrue)\(([^;]*?), ([^,;]+), '(air|grind|manual|revert)'\)/g)];
+    // (IMPROVE 2026-10-06: a lock link may carry a trailing repeat key — `combo.add(label, pts, 'grind', railKey(...))`)
+    const calls = [...skate.matchAll(/combo\.(add|accrue)\(([^;]*?), ([^,;]+), '(air|grind|manual|revert)'(?:, [^;]*?)?\)/g)];
     expect(calls.length).toBe(skate.match(/combo\.(add|accrue)\(/g)!.length);
     for (const m of calls) {
       expect(['pts', 'WALL_RIDE.pts', 'WALL_RIDE.plantPts', 'Math.round(WALL_RIDE.ptsPerSec * ridden)', 'gp', 'chainPts', 'Math.round(chainPts * SKETCHY_SCORE_MULT)', 'line.bonus', 'Math.round(r.pts)'], m[0]).toContain(m[3].trim());
@@ -957,7 +958,8 @@ describe('drift guards — the numbers mirrored out of mode files still match th
     for (const f of files) {
       const t = src(f);
       for (const m of t.matchAll(/bonus: (\d+)/g)) { seen++; expect(Number(m[1]), `${f}: ${m[0]}`).toBeLessThanOrEqual(MIRRORED.boardRailMax); }
-      for (const m of t.matchAll(/makeRail\([^;]*?, (\d+)\);/g)) { seen++; expect(Number(m[1]), `${f}: ${m[0]}`).toBeLessThanOrEqual(MIRRORED.boardRailMax); }
+      // (IMPROVE 2026-10-06: the skatepark's rails pass a gap id and a shared material after the bonus)
+      for (const m of t.matchAll(/makeRail\([^;]*?, (\d+)(?:, [^;]*?)?\);/g)) { seen++; expect(Number(m[1]), `${f}: ${m[0]}`).toBeLessThanOrEqual(MIRRORED.boardRailMax); }
     }
     // the slope's rails are modes/snowSlope.ts data; the legacy slope-v2 ledges ([x, from, to, bonus] tuples) are gone
     // (GATE-CRASHER-MAJOR: bare bars floating 0.7 m over the snow, one ending on gate 2's pole line) — and stay gone

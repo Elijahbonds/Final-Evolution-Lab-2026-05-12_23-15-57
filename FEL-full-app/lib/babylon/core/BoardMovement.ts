@@ -287,7 +287,9 @@ export class BoardMovement {
       slopeAccel = Math.max(slopeAccel, fall.accel * Math.max(0.25, Math.cos(d)));
     }
 
-    const fwd = new Vector3(Math.sin(this.yaw), 0, Math.cos(this.yaw));
+    // IMPROVE (2026-10-06): the facing is two numbers, not a new Vector3 plus scaled copies every frame — `vel` is written
+    // in place (same values; the object a caller holds is the one `update` returns, as before)
+    const fx = Math.sin(this.yaw), fz = Math.cos(this.yaw);
     // Steering re-aligns velocity toward facing (committed carves hold
     // speed through the turn; lazy steers scrub). SPEED IS SCALAR-FIRST:
     // pushing/pumping/drag act on magnitude, never re-deriving direction
@@ -299,17 +301,18 @@ export class BoardMovement {
       const turnCost = carveCommit > 0.05
         ? (t.scrubPerSec ? 1 - (1 - carveCommit) * t.scrubRate * 0.6 * dt : 1 - (1 - carveCommit) * t.scrubRate * 0.25)
         : 1;
-      const held = speed * turnCost + (slopeAccel - brake - resist) * dt;
-      this.vel = fwd.scale(Math.max(0, held));
+      const held = Math.max(0, speed * turnCost + (slopeAccel - brake - resist) * dt);
+      this.vel.set(fx * held, 0, fz * held);
     } else if (slopeAccel > 0) {
-      this.vel = fwd.scale(slopeAccel * dt);
+      const v = slopeAccel * dt;
+      this.vel.set(fx * v, 0, fz * v);
     } else if (speed > 0) {
       this.vel.setAll(0);
     }
 
     // BOOST: drive forward along the facing and lift the ceiling, both scaled by the ramp
     const bk = Math.max(0, Math.min(1, this.boostK));
-    if (bk > 0) this.vel.addInPlace(new Vector3(Math.sin(this.yaw), 0, Math.cos(this.yaw)).scale(t.maxSpeed * 1.6 * bk * dt));
+    if (bk > 0) { const b = t.maxSpeed * 1.6 * bk * dt; this.vel.addInPlaceFromFloats(fx * b, 0, fz * b); }
     // drag + clamp
     this.vel.scaleInPlace(Math.max(0, 1 - t.drag * dt));
     const cap = t.maxSpeed * (1 + 0.4 * bk);

@@ -4,6 +4,7 @@
 
 import { Ray, Vector3 } from '@babylonjs/core';
 import type { AbstractMesh, Scene, TransformNode } from '@babylonjs/core';
+import { rideFilter } from './rideFilter';
 
 export interface GrindLine {
   a: Vector3; b: Vector3;
@@ -65,6 +66,8 @@ export class Rider {
   public grinding: GrindLine | null = null;
   private grindT = 0;
   private down = new Vector3(0, -1, 0);
+  /** IMPROVE (2026-10-06): the ground ray, reused — a new Ray and origin every frame was steady GC churn. */
+  private readonly ray = new Ray(Vector3.Zero(), new Vector3(0, -1, 0), 1);
   /** M42: frames since the raycast last found ground — drives the hard clamp */
   private missedRaycasts = 0;
   /** SKATE-MAJOR: the solid the wheels met this frame (see RiderCfgOverrides.stepUp), cleared every update. */
@@ -112,8 +115,8 @@ export class Rider {
 
     // forward accel with pump, lateral carve with steer
     const yaw = this.root.rotation.y;
-    const fwd = new Vector3(Math.sin(yaw), 0, Math.cos(yaw));
-    this.vel.addInPlace(fwd.scale((this.cfg.carveAccel * (0.55 + 0.45 * pump)) * dt));
+    const accel = (this.cfg.carveAccel * (0.55 + 0.45 * pump)) * dt;   // IMPROVE (2026-10-06): no fwd / scaled copies per frame
+    this.vel.x += Math.sin(yaw) * accel; this.vel.z += Math.cos(yaw) * accel;
     this.root.rotation.y += steer * 1.9 * dt * (this.grounded ? 1 : 0.5);
     // carve lean reads the turn — eased (~0.1 s), not set: written straight from the stick it rolled the whole rider 16° in
     // one frame on every stick edge (measured 0.3–0.45 m hand jumps at each press / release; ANIM-READABILITY 2026-09-07)
@@ -137,10 +140,13 @@ export class Rider {
     // finds it again; and the clamp goes to that last ground when there is one, not the world's floor.
     const gdt = Math.min(dt, Rider.MAX_GRAVITY_STEP_SEC);
     this.vel.y += this.cfg.gravity * gdt;
-    this.root.position.addInPlace(this.vel.scale(dt));
+    this.root.position.addInPlaceFromFloats(this.vel.x * dt, this.vel.y * dt, this.vel.z * dt);
     const rayFromY = Math.max(this.root.position.y, this.lastGroundY ?? -Infinity) + 1.5;
-    const ray = new Ray(new Vector3(this.root.position.x, rayFromY, this.root.position.z), this.down, this.cfg.rayLength + Math.max(0, rayFromY - this.root.position.y - 1.5));
-    const hit = this.scene.pickWithRay(ray, (m) => this.groundMeshes.includes(m as AbstractMesh));
+    const ray = this.ray;
+    ray.origin.set(this.root.position.x, rayFromY, this.root.position.z);
+    ray.direction.copyFrom(this.down);
+    ray.length = this.cfg.rayLength + Math.max(0, rayFromY - this.root.position.y - 1.5);
+    const hit = this.scene.pickWithRay(ray, rideFilter(this.groundMeshes));
     if (hit?.hit && hit.pickedPoint) {
       this.missedRaycasts = 0;
       const groundY = hit.pickedPoint.y;

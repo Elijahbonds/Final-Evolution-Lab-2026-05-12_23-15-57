@@ -24,6 +24,7 @@
 
 import { Vector3, Ray } from '@babylonjs/core';
 import type { AbstractMesh, Scene, TransformNode } from '@babylonjs/core';
+import { rideFilter } from './rideFilter';
 
 // ── Slope response ─────────────────────────────────────────────────────────
 export interface SlopeInfo {
@@ -46,7 +47,7 @@ export function sampleSlope(
 ): SlopeInfo {
   const up = pos.add(new Vector3(0, 1.2, 0));
   const ray = new Ray(up, new Vector3(0, -1, 0), 12);
-  const hit = scene.pickWithRay(ray, (m) => ground.includes(m as AbstractMesh));
+  const hit = scene.pickWithRay(ray, rideFilter(ground));   // IMPROVE (2026-10-06): a Set, not an O(n) includes per scene mesh
   // face-normal selection: the top face of a ramp, not a side face
   let normal = hit?.getNormal(true, true) ?? null;
   if (normal && normal.y < 0) normal = normal.negate();
