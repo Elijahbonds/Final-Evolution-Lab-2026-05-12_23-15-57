@@ -44,12 +44,12 @@ import {
   FighterState, RivalFightBrain, resolveStrike, applyHit,
   KARATE_ATTACKS, STAFF_ATTACKS, SPECIAL_ATTACK, CHI_MAX, GUARD_MAX, PARRY_STAGGER_SEC,
   STEP_CHI_GAIN, STEP_EVADE_M, PARRY_WINDOW_MS, type AttackDef,
-  guardPressMs, rivalDifficulty,
+  guardPressMs, rivalDifficulty, rivalPower, applyRivalPower, poweredAttack, RIVAL_POWER_BASE, type RivalPower,
 } from '../core/FightCore';
 import { KnockSlides, makeChestOf } from '../core/FightKit';   // IMPROVE (2026-10-06): the shared knock slide + scratch chest points
 import { readTier } from '../core/Difficulty';   // IMPROVE (2026-10-06): the OPPONENT pick
 import { GameTimers, BannerSlot } from '../core/ModeClock';   // IMPROVE (2026-10-06): hit beats, the round-over beat and banners on the game clock
-import { dragonLicensed, fallStep, neutralRollDir, onlookerSpots } from './mixedRules';   // IMPROVE (2026-10-06)
+import { dragonLicensed, fallStep, neutralRollDir, onlookerSpots, RIVAL_POWER_BY_LOADOUT } from './mixedRules';   // IMPROVE (2026-10-06)
 import { mixedScore } from '../core/MixedScore';   // IMPROVE (2026-10-06): the result, with its ring-out bonus
 import type { VenueHandle } from '../core/NexusVenue';
 import { threatLandsIn } from '../core/RivalCombatBrain';
@@ -126,6 +126,8 @@ export const MixedCombatMode: ModeDefinition = (() => {
   let player: SpawnedCharacter, rival: SpawnedCharacter;
   let meState: FighterState, foeState: FighterState;
   let brain: RivalFightBrain;
+  /** COMBAT DIFFICULTY (2026-10-06): the rival's power for this round (rivalPower; set in startRound). */
+  let foePower: RivalPower = rivalPower(1, null);
   let phase: Phase = 'loadout';
   let phaseSec = 0;
   let round = 1, myWins = 0, foeWins = 0;
@@ -537,7 +539,8 @@ export const MixedCombatMode: ModeDefinition = (() => {
     // STORM COMBOS: MY presses read the book — the sequence, the stick and the situation (a launched body: air links; a dash just thrown: the rush) pick the link
     const move = mine && body ? book.pressMove(body.move, BTN_OF[key], body.onsetPage / 1000)   // P7: the body's own move, timed onset to onset
       : mine && !special ? book.press(BTN_OF[key], stickDirToFoe(), now() / 1000, { air: foeLaunchedSec > 0, afterDash: now() / 1000 - lastDashSec < DASH_ATTACK_SEC, airborne: meEvade.airborne, close: Vector3.Distance(player.root.position, rival.root.position) < 1.35 }) : null;
-    const atk: AttackDef = special ? SPECIAL_ATTACK : move ? attackFromMove(move, baseAtk) : baseAtk;
+    const atk0: AttackDef = special ? SPECIAL_ATTACK : move ? attackFromMove(move, baseAtk) : baseAtk;
+    const atk = mine ? atk0 : poweredAttack(atk0, foePower);   // COMBAT DIFFICULTY (2026-10-06): the rival's blow carries its power
     if (mine) striking = true; else foeStriking = true;
     // Commit to the line at swing start — the impact check measures the
     // defender's offset from THIS facing, not from wherever the mesh has
@@ -825,6 +828,10 @@ export const MixedCombatMode: ModeDefinition = (() => {
   }
 
   function startRound(ctx: ModeContext): void {
+    // COMBAT DIFFICULTY (2026-10-06): the rival's POWER for the pick (hp, damage, guard — FightCore.rivalPower), on before
+    // resetRound fills the HP. Mixed keeps the brain's sidestep: this is the one mode whose line grammar it answers.
+    foePower = rivalPower(RIVAL_POWER_BASE.mixedcombat * RIVAL_POWER_BY_LOADOUT[myLoadout], readTier());   // the pick's matchup (mixedRules)
+    applyRivalPower(foeState, foePower);
     meState.resetRound(); foeState.resetRound(); book.reset(); xBtn.reset(); padBlock.reset(); queuedKey = null; meDash = null; meDashIframeSec = 0; meDashUntil = 0; foeLaunchedSec = 0; rival.root.position.y = 0;   // STORM
     deferred.clear(); ledger.reset(); bodyShift = null;   // P7
     meTimers.clear(); foeTimers.clear(); meCounter = 0;   // IMPROVE (2026-10-06): no beat or counter window from the last round

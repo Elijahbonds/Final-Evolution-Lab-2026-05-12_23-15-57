@@ -91,6 +91,10 @@ export class FighterState {
   lastBlockPressMs = -1e9;   // for the parry window
   combo = 0;                 // hits landed BY this fighter in the window
   comboTimer = 0;
+  /** COMBAT DIFFICULTY (2026-10-06): what a blocked blow takes out of THIS fighter's guard gauge, × the blow's guardDmg.
+   *  1 for everyone but a powered rival (rivalPower): a tougher body has a sturdier guard, on the same 100-point gauge
+   *  the HUD draws. */
+  guardTaken = 1;
 
   constructor(public maxHp = 100) { this.hp = maxHp; }
 
@@ -147,7 +151,7 @@ export function resolveStrike(atk: AttackDef, dist: number, defender: FighterSta
   // every pad defender keeps the default
   if (nowMs - defender.lastBlockPressMs <= parryWindowMs) return 'parried';
   if (defender.blockHeld) {
-    defender.guard -= atk.guardDmg;
+    defender.guard -= atk.guardDmg * defender.guardTaken;
     if (defender.guard <= 0) {
       defender.guard = 0;
       defender.blockHeld = false;
@@ -248,6 +252,8 @@ export const PARRY_READ_CAP = 0.4;
 /** IMPROVE (2026-10-06), TUNED: the chance to read an opening — the foe in a whiff's recovery, a dash or a roll — and
  *  punish it, once per opening: `PUNISH_READ_PER_SKILL × difficulty`, capped. 0.72 → 50 %. */
 export const PUNISH_READ_PER_SKILL = 0.7;
+/** The counter window after a guard read's hold ends (it was 0.42 s from the READ — see decide()). */
+export const BLOCK_COUNTER_SEC = 0.42;
 export const PUNISH_READ_CAP = 0.85;
 /** IMPROVE (2026-10-06): edge awareness — how far ahead the brain probes a step, and how much floor it keeps. */
 export const EDGE_PROBE_M = 1.0;
@@ -263,6 +269,42 @@ export const RIVAL_TIER_OFFSET: Readonly<Record<Tier, number>> = { rookie: -0.22
 export function rivalDifficulty(base: number, tier: Tier | null | undefined): number {
   const off = tier ? RIVAL_TIER_OFFSET[tier] ?? 0 : 0;
   return Math.max(0.3, Math.min(0.95, base + off));
+}
+
+/**
+ * COMBAT DIFFICULTY (2026-10-06), TUNED: THE RIVAL'S POWER. The owner's targets for a decent player — ROOKIE 85 % /
+ * PRO 55 % / ELITE 30 % of matches — were measured (scratchpad combat-difficulty harness: a pad bot against each mode's
+ * real brain, strike and defense code, 300 matches a cell) at 100 % in all four duel modes and all three tiers. The dial
+ * above cannot close that: even a rival on difficulty 2.0, which reads every wind-up, lost ~100 % — the player's book
+ * strings out-damage and out-stun its plain set, so how WELL it plays is not the gap; how MUCH it can take and deal is.
+ *
+ * Power `p` is one number per mode (RIVAL_POWER_BASE, the PRO rival) times a tier multiplier, and it means:
+ *   hp          × p      — FighterState.maxHp (the HUD prints it: "FOE HP 240")
+ *   damage      × √p     — every blow the rival lands (a tougher body, not a one-shot one)
+ *   guardTaken  × 1 / p  — its guard gauge lasts as long as its HP does, so a mashed string chips instead of breaking it
+ * The behaviour stays the dial's: ELITE is nearly PRO's body (×1.08), reading, parrying and punishing more
+ * (RIVAL_TIER_OFFSET). ROOKIE is a weaker body as well (×0.65), so a NEW player (slow reactions, few reads) still wins
+ * there — which leaves a decent player near 100 % at ROOKIE, above the 85 % target: the two cannot both hold (measured).
+ */
+export const RIVAL_TIER_POWER: Readonly<Record<Tier, number>> = { rookie: 0.65, pro: 1, elite: 1.08 };
+/** The PRO rival's power per duel mode, for the default pick (fists). It differs per mode because the player's kit does:
+ *  Showdown adds an unconditional ultimate and an assist. The other picks carry a matchup factor on top
+ *  (duelRules DUEL.rivalPowerByWeapon, mixedRules RIVAL_POWER_BY_LOADOUT). 1 = the body every mode shipped with. */
+export const RIVAL_POWER_BASE = { karateVs: 1.35, showdown: 2.85, duel: 2.25, mixedcombat: 2.2 } as const;
+export interface RivalPower { p: number; hp: number; dmg: number; guardTaken: number }
+export function rivalPower(base: number, tier: Tier | null | undefined): RivalPower {
+  const k = tier ? RIVAL_TIER_POWER[tier] ?? 1 : 1;
+  const p = Math.max(0.5, Math.min(6, (Number.isFinite(base) ? base : 1) * k));
+  return { p, hp: p, dmg: Math.sqrt(p), guardTaken: 1 / p };
+}
+/** Put a power on the rival's FighterState at a round start (before resetRound, which fills hp to maxHp). */
+export function applyRivalPower(st: FighterState, pw: RivalPower, baseHp = 100): void {
+  st.maxHp = Math.round(baseHp * pw.hp);
+  st.guardTaken = pw.guardTaken;
+}
+/** The rival's blow with its power's damage (a copy — the shared tables are never touched). */
+export function poweredAttack(atk: AttackDef, pw: RivalPower): AttackDef {
+  return pw.dmg === 1 ? atk : { ...atk, dmg: atk.dmg * pw.dmg };
 }
 
 /** The covering moves a forced swing picks from, in order (IMPROVE 2026-10-06: a constant, not an array per swing). */
@@ -299,6 +341,15 @@ export class RivalFightBrain {
   /** IMPROVE (2026-10-06): may a full chi bar become the special? A mode whose rival cannot throw the DRAGON (the force
    *  gate, FighterStyle) said nothing, so a full bar locked the brain onto heavies it could never upgrade. */
   private canSpecial = true;
+  /** COMBAT DIFFICULTY (2026-10-06): may a read be a SIDESTEP? The step is the line grammar's answer — a vertical whiffs
+   *  past a defender off its line — and only Mixed Combat passes the lateral offset that makes it one. In Karate VS,
+   *  Showdown and Duel nothing reads the line, so 30 % of this brain's reads walked it sideways for 0.22 s and answered
+   *  nothing (measured: a fifth of every wind-up it read, wasted). Those modes say false: the read is a guard. */
+  private stepping = true;
+  /** COMBAT DIFFICULTY (2026-10-06): the foe's longest reach (m), 0 = unknown. The read below only looked at wind-ups inside
+   *  the rival's OWN reach (+0.4 m) — so a fists rival never read a staff poke thrown from 2.6 m, and never guarded one
+   *  (measured in Duel: 0 blocks a round against a staff, which won 100 % of matches mashed). It reads what can reach it. */
+  private foeReach = 0;
   /** IMPROVE (2026-10-06): metres inside the arena's edge at (x, z), negative outside; null = no edge to respect. */
   private edgeIn: ((x: number, z: number) => number) | null = null;
   /** IMPROVE (2026-10-06): the whiff/recovery read — have we already looked at the opening on screen? */
@@ -322,6 +373,12 @@ export class RivalFightBrain {
 
   /** IMPROVE (2026-10-06): see `canSpecial`. Default true keeps the old behaviour for a mode that never says. */
   setCanSpecial(ok: boolean): void { this.canSpecial = ok; }
+
+  /** COMBAT DIFFICULTY (2026-10-06): see `stepping`. Default true keeps the old behaviour for a mode that never says. */
+  setStepping(ok: boolean): void { this.stepping = ok; }
+
+  /** COMBAT DIFFICULTY (2026-10-06): see `foeReach` — the mode says what the foe holds (Duel: the player's weapon). */
+  setFoeReach(m: number): void { this.foeReach = Number.isFinite(m) && m > 0 ? m : 0; }
 
   /** IMPROVE (2026-10-06): give the brain the arena — `insideBy` for the picked arena. Circling, backing off and the
    *  sidestep then turn away from an edge instead of walking the rival off a drop arena. null = no edge (the default). */
@@ -476,7 +533,7 @@ export class RivalFightBrain {
     if (!foeStriking) this.reactedToStrike = false;
     if (foeStriking && !this.reactedToStrike) {
       this.reactedToStrike = true;
-      if (dist < this.attacks.heavy.range + 0.4 && this.blockHoldSec === 0 && this.stepHoldSec === 0) {
+      if (dist < Math.max(this.attacks.heavy.range + 0.4, this.foeReach + 0.2) && this.blockHoldSec === 0 && this.stepHoldSec === 0) {
         const roll = Math.random();
         // One read per wind-up, split between the two honest answers to a
         // vertical: step off the line (the sidestep grammar pays chi and
@@ -496,7 +553,7 @@ export class RivalFightBrain {
         const STEP_SHARE = 0.30;
         const READ_SHARE = 0.88;
         const dialCovers = (this.difficulty / this.loose) * READ_SHARE >= 1;
-        const stepAt = dialCovers ? STEP_SHARE / READ_SHARE : read * STEP_SHARE;
+        const stepAt = !this.stepping ? 0 : dialCovers ? STEP_SHARE / READ_SHARE : read * STEP_SHARE;
         const readAt = dialCovers ? 1 : read * READ_SHARE;
         if (roll < stepAt) {
           this.stepHoldSec = 0.22;
@@ -508,7 +565,11 @@ export class RivalFightBrain {
           }
         } else if (roll < readAt) {
           this.blockHoldSec = this.foeStrikeStreak >= 2 ? 0.55 : 0.45;
-          this.punishSec = 0.42;
+          // COMBAT DIFFICULTY (2026-10-06): the counter window opens when the guard COMES DOWN. It was set to 0.42 s at
+          // the read while the hold ran 0.45 / 0.55 s, and both count down together — so it had always closed before the
+          // counter below could look at it (measured: 0 of 178 block reads ever countered). An expert punishes a string
+          // it blocked; this one never did.
+          this.punishSec = this.blockHoldSec + BLOCK_COUNTER_SEC;
           // IMPROVE (2026-10-06): THE PARRY ON PURPOSE. Where in the guard share the same roll fell decides whether the
           // guard is a timed tap or a held block — no second roll, so every seeded sequence draws the same numbers.
           const u = readAt > stepAt ? (roll - stepAt) / (readAt - stepAt) : 1;

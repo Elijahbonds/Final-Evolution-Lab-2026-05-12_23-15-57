@@ -119,7 +119,7 @@ export function applyDefenseOutcome(
     case 'outOfRange': return 'whiff';
     case 'none': return 'hit';             // IMPROVE (2026-10-06): in range and undefended — the blow lands
     case 'blocked': {
-      defender.guard -= atk.guardDmg;
+      defender.guard -= atk.guardDmg * defender.guardTaken;   // COMBAT DIFFICULTY (2026-10-06): a powered rival's sturdier guard
       if (defender.guard <= 0) {
         defender.guard = 0;
         defender.blockHeld = false;

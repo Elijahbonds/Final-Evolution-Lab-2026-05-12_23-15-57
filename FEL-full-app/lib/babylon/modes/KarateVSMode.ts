@@ -52,7 +52,7 @@ import { Onlookers } from '../visual/Onlookers';
 import {
   FighterState, resolveStrike, applyHit,
   KARATE_ATTACKS, SPECIAL_ATTACK, CHI_MAX, GUARD_MAX, PARRY_STAGGER_SEC, PARRY_WINDOW_MS, type AttackDef,
-  guardPressMs, rivalDifficulty,
+  guardPressMs, rivalDifficulty, rivalPower, applyRivalPower, poweredAttack, RIVAL_POWER_BASE, type RivalPower,
 } from '../core/FightCore';
 import { KnockSlides, makeChestOf } from '../core/FightKit';   // IMPROVE (2026-10-06): the shared knock slide + scratch chest points
 import { readTier } from '../core/Difficulty';   // IMPROVE (2026-10-06): the OPPONENT pick
@@ -151,6 +151,8 @@ export const KarateVSMode: ModeDefinition = (() => {
   let player: SpawnedCharacter, rival: SpawnedCharacter;
   let meState: FighterState, foeState: FighterState;
   let brain: RivalCombatBrain;
+  /** COMBAT DIFFICULTY (2026-10-06): the rival's power for this round (rivalPower; set in startRound). */
+  let foePower: RivalPower = rivalPower(1, null);
   /** IMPROVE (2026-10-06): the rival's dash (its RivalCombatBrain spends chi on one when it is far out), on the room clock. */
   let foeDash: { dx: number; dz: number; left: number } | null = null;
   /** IMPROVE (2026-10-06): what the brain is told it can spend. The ultimate is a heavy at a full bar; a rival that cannot
@@ -487,7 +489,8 @@ export const KarateVSMode: ModeDefinition = (() => {
     // STORM COMBOS: MY presses read the book — the sequence, the stick and the situation (a launched body: air links; a dash just thrown: the rush) pick the link
     const move = mine && body ? book.pressMove(body.move, BTN_OF[key], body.onsetPage / 1000)   // P7: the body's own move, timed onset to onset
       : mine && !special ? book.press(BTN_OF[key], stickDirToFoe(), now() / 1000, { air: foeLaunchedSec > 0, afterDash: now() / 1000 - lastDashSec < DASH_ATTACK_SEC, airborne: meEvade.airborne, close: Vector3.Distance(player.root.position, rival.root.position) < 1.35 }) : null;
-    const atk: AttackDef = special ? SPECIAL_ATTACK : move ? attackFromMove(move, baseAtk) : baseAtk;
+    const atk0: AttackDef = special ? SPECIAL_ATTACK : move ? attackFromMove(move, baseAtk) : baseAtk;
+    const atk = mine ? atk0 : poweredAttack(atk0, foePower);   // COMBAT DIFFICULTY (2026-10-06): the rival's blow carries its power
     if (mine) striking = true; else foeStriking = true;
     if (special) {
       atkState.chi = 0;
@@ -773,6 +776,11 @@ export const KarateVSMode: ModeDefinition = (() => {
       if (shift.label) console.info(`[KAR-NERVE] ${shift.label} (rounds ${foeWins}-${myWins})`);
       brain.setDifficulty(rivalDifficulty(BASE_RIVAL_DIFFICULTY, readTier()));
       brain.setCanSpecial(hasFightMove('dragon', foeRatings));
+      // COMBAT DIFFICULTY (2026-10-06): nothing here reads the line, so a read is a guard, never a sidestep; and the rival's
+      // POWER for the pick (hp, damage, guard — FightCore.rivalPower), on before resetRound fills the HP
+      brain.setStepping(false);
+      foePower = rivalPower(RIVAL_POWER_BASE.karateVs, readTier());
+      applyRivalPower(foeState, foePower);
       knock.clear();
       // the rival's dash, and the beats still waiting from the last round (IMPROVE 2026-10-06: never cleared before)
       foeDash = null; foeTimers.clear(); meTimers.clear();

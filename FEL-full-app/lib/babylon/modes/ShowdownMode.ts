@@ -41,7 +41,7 @@ import { mountVenue, type VenueHandle } from '../core/NexusVenue';
 import { readCombatArena, arenasFor, arenaClamp, knockTo, hazardAt, describeArena, showdownGateDist, SHOWDOWN_GATE, type CombatArena } from '../combat/arenas';   // phase 7: the arena decides
 import { buildArena, type ArenaHandle } from '../combat/arenaBuild';
 import { readPlaceLook } from '../nexus/placeLooks';
-import { FighterState, KARATE_ATTACKS, CHI_MAX, PARRY_WINDOW_MS, guardPressMs, rivalDifficulty } from '../core/FightCore';
+import { FighterState, KARATE_ATTACKS, CHI_MAX, PARRY_WINDOW_MS, guardPressMs, rivalDifficulty, rivalPower, applyRivalPower, RIVAL_POWER_BASE, type RivalPower } from '../core/FightCore';
 import { KnockSlides, makeChestOf } from '../core/FightKit';   // IMPROVE (2026-10-06): the shared knock slide + scratch chest points
 import { readTier } from '../core/Difficulty';   // IMPROVE (2026-10-06): the OPPONENT pick
 import { RivalCombatBrain, threatLandsIn } from '../core/RivalCombatBrain';
@@ -190,6 +190,11 @@ export const ShowdownMode: ModeDefinition = (() => {
   function roundStartRival(): void {
     rivalBrain.setStanding(foeRounds, myRounds, 2);
     rivalBrain.setDifficulty(rivalDifficulty(0.72, readTier()));
+    // COMBAT DIFFICULTY (2026-10-06): nothing here reads the line, so a read is a guard, never a sidestep; and the rival's
+    // POWER for the pick (hp, damage, guard — FightCore.rivalPower). resetRound has run: the HP is filled here.
+    rivalBrain.setStepping(false);
+    foePower = rivalPower(RIVAL_POWER_BASE.showdown, readTier());
+    applyRivalPower(foeState, foePower); foeState.hp = foeState.maxHp;
     knock.clear();
   }
   /** Phase 5 — SOUL CALIBUR WEIGHT (the horde's rule): the connect holds for a beat that grows with the weight. */
@@ -199,6 +204,8 @@ export const ShowdownMode: ModeDefinition = (() => {
   const focus = new FocusMeter(); let focusHeld = false, focusHud = -1, focusHudOn = false;   // phase 8
   let foeGuardUntil = 0;
   let rivalBrain = new RivalCombatBrain({ difficulty: 0.72 });
+  /** COMBAT DIFFICULTY (2026-10-06): the rival's power for this round (rivalPower; set in roundStartRival). */
+  let foePower: RivalPower = rivalPower(1, null);
   let arena: CombatArena = arenasFor('showdown')[0]; let arenaHandle: ArenaHandle | null = null;   // phase 7
   // MOVEMENT PLAY P7: the body's fight read (see KarateVSMode: the same seam) — the strikes through the book and the
   // StrikeController's elapsed start, the rival's hits on a body player resolved at impact against the ledger
@@ -308,7 +315,7 @@ export const ShowdownMode: ModeDefinition = (() => {
         if (ult) { startUltimate(ctx, 'foe'); break; }   // IMPROVE (2026-10-06): the opener landed — the rival's cut plays
         const w = move.weight;
         const scale = Math.max(0.4, 1 - 0.12 * atkState.combo);
-        const dealt = Math.round(move.atk.dmg * scale * (mine && focus.active ? FOCUS.damageMult : 1) * defCtrl.counterMult(now()));   // phase 8: a Focus strike lands harder; IMPROVE (2026-10-06): a read substitution eats COUNTER damage
+        const dealt = Math.round(move.atk.dmg * scale * (mine ? 1 : foePower.dmg) * (mine && focus.active ? FOCUS.damageMult : 1) * defCtrl.counterMult(now()));   // COMBAT DIFFICULTY (2026-10-06): the rival's power   // phase 8: a Focus strike lands harder; IMPROVE (2026-10-06): a read substitution eats COUNTER damage
         if (mine) focus.gain(FOCUS.hitGain);
         defState.hp = Math.max(0, defState.hp - dealt);
         defState.stunSec = Math.max(defState.stunSec, move.atk.stunSec);
@@ -493,7 +500,7 @@ export const ShowdownMode: ModeDefinition = (() => {
     ctx.camDirector.setPreset('fight');
     setPhase('fighting');   // (before endRound, which may close the round or the match — it used to be set after, over matchOver)
     if (ultimateReaches(dist)) {
-      defState.hp = Math.max(0, defState.hp - ULT_DMG);
+      defState.hp = Math.max(0, defState.hp - Math.round(ULT_DMG * (mine ? 1 : foePower.dmg)));   // COMBAT DIFFICULTY (2026-10-06): the rival's ultimate carries its power
       defState.staggerSec = 1.6;
       hitReact(!mine, 'finisher', SHOWDOWN.ultReactSec);
       ctx.feel?.impact?.(0.9);   // ONE thud — the ultimate's own; the impact SFX that doubled it is gone

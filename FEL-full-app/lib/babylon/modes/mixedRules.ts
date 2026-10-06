@@ -19,6 +19,15 @@ export function dragonLicensed(r: FightRatings): boolean {
   return PIT_LICENSES_DRAGON || hasFightMove('dragon', r);
 }
 
+/**
+ * COMBAT DIFFICULTY (2026-10-06), TUNED: the rival's power (FightCore.rivalPower) × this, by YOUR loadout. The rival
+ * takes the other one, and your staff swings the book's moves with the staff's damage on them — measured at the fists'
+ * power, a decent player won ~25 points more often with the staff (PRO 86 % / ELITE 59 % against 61 / 33). Each pick is
+ * calibrated to the same PRO target. (The source of the gap — your staff has the book's reach, not the staff's — is the
+ * owner's call; this evens the picks without touching how either swings.)
+ */
+export const RIVAL_POWER_BY_LOADOUT: Readonly<Record<'fists' | 'staff', number>> = { fists: 1, staff: 1.3 };
+
 /** A ring-out victim's fall: 0.14 m a RENDER before (8.4 m/s at 60 Hz, twice that at 120 Hz). The same 8.4 m/s, per
  *  second of the clock it is handed, down to where the pit swallows it. */
 export const FALL = { mps: 8.4, floorY: -5.5 } as const;

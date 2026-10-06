@@ -31,7 +31,7 @@ import { Vector3 } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { neverBindPose } from '../anim/importSanitizer';
 import { installSafePlay } from '../anim/clipRegistry';
-import { FighterState, KARATE_ATTACKS, STAFF_ATTACKS, PARRY_WINDOW_MS, CHI_MAX, guardPressMs, rivalDifficulty } from '../core/FightCore';
+import { FighterState, KARATE_ATTACKS, STAFF_ATTACKS, PARRY_WINDOW_MS, CHI_MAX, guardPressMs, rivalDifficulty, rivalPower, applyRivalPower, RIVAL_POWER_BASE, type RivalPower } from '../core/FightCore';
 import { KnockSlides, makeChestOf } from '../core/FightKit';   // IMPROVE (2026-10-06): the shared knock slide + scratch chest points
 import { readTier } from '../core/Difficulty';   // IMPROVE (2026-10-06): the OPPONENT pick
 import { BannerSlot } from '../core/ModeClock';   // IMPROVE (2026-10-06): one banner, expiring on the game clock
@@ -81,7 +81,12 @@ import type { BodyView } from '../core/ModeHarness';
 export type { DuelWeapon } from './duelRules';
 const WEAPON_MOVESET: Record<DuelWeapon, () => Record<string, CombatMove>> = {
   fists: () => bookMoveset(KARATE_ATTACKS),        // phase 4: empty hands read the Storm book
-  staff: () => stringRule(staffMoveset(STAFF_ATTACKS)),   // phase 4: a weapon keeps its own moves under the string rule
+  // COMBAT DIFFICULTY (2026-10-06): the staff swings its OWN authored chain (poke → sweep → overhead inside each move's
+  // cancel window), not the string rule. Under the string rule a poke cancelled at half its active frames, so a mashed
+  // staff chained 2.6 m pokes faster than their stun wore off: measured, a masher won 100 % of matches at every tier
+  // with the rival unable to touch it, while a player who spaced and read won fewer than with fists. "Long and slow —
+  // win by keeping distance and punishing approaches" (FightCore's STAFF table) is the weapon again.
+  staff: () => staffMoveset(STAFF_ATTACKS),
   blade: () => stringRule(bladeMoveset()),
 };
 /** Phase 4: the RIVAL keeps the plain movesets. Measured with the string rule on him: his brain requests a random id
@@ -238,6 +243,8 @@ export const DuelMode: ModeDefinition = (() => {
     knock.start(char.root.position, to.x, to.z);
   }
   let rivalBrain = new RivalCombatBrain({ difficulty: 0.72 });
+  /** COMBAT DIFFICULTY (2026-10-06): the rival's power for this round (rivalPower; set in roundStartRival). */
+  let foePower: RivalPower = rivalPower(1, null);
   /** IMPROVE (2026-10-06): the rival's brain for a weapon (its moves are the brain's moves). Built when its weapon changes. */
   function brainFor(w: DuelWeapon): RivalCombatBrain {
     return new RivalCombatBrain({
@@ -254,6 +261,12 @@ export const DuelMode: ModeDefinition = (() => {
   function roundStartRival(): void {
     rivalBrain.setStanding(foeWins, myWins, ROUNDS_TO_WIN);
     rivalBrain.setDifficulty(rivalDifficulty(0.72, readTier()));
+    // COMBAT DIFFICULTY (2026-10-06): nothing here reads the line, so a read is a guard, never a sidestep; and the rival's
+    // POWER for the pick (hp, damage, guard — FightCore.rivalPower). resetRound has run: the HP is filled here.
+    rivalBrain.setStepping(false);
+    rivalBrain.setFoeReach(WEAPON_RANGE[myWeapon]);   // the read covers what I hold — a staff poke lands from 2.6 m
+    foePower = rivalPower(RIVAL_POWER_BASE.duel * DUEL.rivalPowerByWeapon[myWeapon], readTier());   // the pick's matchup (duelRules)
+    applyRivalPower(foeState, foePower); foeState.hp = foeState.maxHp;
     rivalBrain.setEdge(edgeIn);
     knock.clear();
   }
@@ -457,7 +470,7 @@ export const DuelMode: ModeDefinition = (() => {
         const scale = Math.max(0.4, 1 - 0.12 * atkState.combo);
         // IMPROVE (2026-10-06), TUNED: the rival's CRITICAL EDGE lands DUEL.critMult harder and carries the body that much further
         const crit = ult ? DUEL.critMult : 1;
-        const dealt = Math.round(move.atk.dmg * scale * crit * (mine && focus.active ? FOCUS.damageMult : 1) * defCtrl.counterMult(now()));   // phase 8: a Focus strike lands harder; IMPROVE (2026-10-06): a read substitution eats COUNTER damage
+        const dealt = Math.round(move.atk.dmg * scale * crit * (mine ? 1 : foePower.dmg) * (mine && focus.active ? FOCUS.damageMult : 1) * defCtrl.counterMult(now()));   // COMBAT DIFFICULTY (2026-10-06): the rival's power   // phase 8: a Focus strike lands harder; IMPROVE (2026-10-06): a read substitution eats COUNTER damage
         if (mine) focus.gain(FOCUS.hitGain);
         defState.hp = Math.max(0, defState.hp - dealt);
         defState.stunSec = Math.max(defState.stunSec, move.atk.stunSec);

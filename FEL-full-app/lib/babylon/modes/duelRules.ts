@@ -35,6 +35,11 @@ export const DUEL = {
   subSafeM: 0.8,
   /** The rival's CRITICAL EDGE: a full chi bar rides one heavy; clean, it lands this much harder and further. */
   critMult: 1.5,
+  /** COMBAT DIFFICULTY (2026-10-06), TUNED: the rival's power (FightCore.rivalPower) × this, by YOUR weapon. The rival
+   *  counter-picks (fists → its blade, blade → its staff, staff → its fists), so one power is three different fights:
+   *  measured at the fists' power, a decent player won 3 % with the blade (the staff out-reaches it) and 3 % with the staff
+   *  (on its authored chain). Each pick is calibrated to the same PRO target. */
+  rivalPowerByWeapon: { fists: 1, blade: 0.6, staff: 0.67 },
 } as const;
 
 /** What a strike's outcome pays the ATTACKER's chi: the move's own chiGain for a blow that lands (a hit, a guard it
