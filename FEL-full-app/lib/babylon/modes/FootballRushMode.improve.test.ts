@@ -40,7 +40,7 @@ describe('FootballRushMode wiring (IMPROVE 2026-10-06)', () => {
   });
   it('#6 #19 one CoinField for the session, re-laid on the lanes each drive', () => {
     expect(body('layCoins')).toContain('if (!coins) coins = new CoinField(ctx.scene);');
-    expect(body('layCoins')).toContain('coins.clear();');
+    expect(body('layCoins')).toContain('coins.clear({ keepCollected: true });');
     expect(body('layCoins')).toContain('coinLayout(drive)');
     expect(body('layCoins')).not.toContain('coins?.dispose()');
   });

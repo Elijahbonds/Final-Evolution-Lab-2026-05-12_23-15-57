@@ -97,6 +97,14 @@ export default function TiebreakGame({ grade, prq, onEnd }: GameProps) {
   const myPts = Number(hud.myPts ?? 0);
   const aiPts = Number(hud.aiPts ?? 0);
   const banner = typeof hud.banner === 'string' ? hud.banner : '';
+  // IMPROVE (2026-10-06) #10 #11 #12 #17: the match call, the live rally, where the last swing landed in the window, the
+  // warm-up count. All sent by TiebreakMode; the host only draws them.
+  const call = typeof hud.call === 'string' ? hud.call : '';
+  const rally = Number(hud.rally ?? 0);
+  const bestRally = Number(hud.bestRally ?? 0);
+  const hitAt = Number(hud.hitAt ?? -1);
+  const warmup = Number(hud.warmup ?? 0);
+  const warmTotal = Number(hud.warmTotal ?? 0);
 
   return (
     <div className="relative w-full">
@@ -105,13 +113,29 @@ export default function TiebreakGame({ grade, prq, onEnd }: GameProps) {
         {started && phase === 'playing' && (
           <div className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-between px-4 py-3 font-mono">
             <span className="fel-panel px-3 py-1 text-lg text-white">YOU {myPts}</span>
-            <span className="fel-panel px-3 py-1 text-sm text-white/80">TO {TARGET}</span>
+            <span className="fel-panel px-3 py-1 text-sm text-white/80">
+              {warmup > 0 ? `WARM-UP ${warmTotal - warmup + 1}/${warmTotal}` : call || `TO ${TARGET} · WIN BY 2`}
+            </span>
             <span className="fel-panel px-3 py-1 text-lg text-white">AI {aiPts}</span>
           </div>
         )}
         {started && banner && (
-          <div className="pointer-events-none absolute inset-x-0 top-[18%] flex justify-center px-4">
+          <div className="pointer-events-none absolute inset-x-0 top-[18%] flex flex-col items-center gap-1 px-4">
             <span className="fel-panel px-4 py-2 text-center text-xl font-black text-[#00FF9D]">{banner}</span>
+            {hitAt >= 0 && (
+              // #12: where the swing landed in the window — the left edge is the ring closing, the right edge the ball on you
+              <span className="fel-panel relative h-2 w-40 overflow-hidden rounded-full bg-white/10" aria-label="swing timing">
+                <span className="absolute inset-y-0 w-1 rounded-full bg-[#00FF9D]" style={{ left: `calc(${Math.round(hitAt * 100)}% - 2px)` }} />
+              </span>
+            )}
+          </div>
+        )}
+        {started && phase === 'playing' && (rally > 0 || bestRally > 0) && (
+          // #11: the live rally, so a long one is felt building, and the match's best
+          <div className="pointer-events-none absolute left-3 top-14 font-mono">
+            <span className="fel-panel px-3 py-1 text-sm text-white">
+              RALLY <span className="text-[#00FF9D]">{rally}</span>{bestRally > 0 && <span className="text-white/50"> · BEST {bestRally}</span>}
+            </span>
           </div>
         )}
         {started && phase === 'playing' && (
@@ -131,7 +155,7 @@ export default function TiebreakGame({ grade, prq, onEnd }: GameProps) {
           <div onPointerDown={wake.onPointerDown} className="absolute inset-0 z-10 flex cursor-pointer flex-col items-center justify-center gap-4 bg-black/80 p-6 text-center">
             <h2 className="fel-heading text-4xl text-white">TIEBREAK BLITZ</h2>
             <p className="max-w-md text-sm text-gray-300">
-              First to {TARGET}. The ball comes in on one side — swing <span className="text-[#00FF9D]">← / →</span> when the green ring closes on it. The window tightens as the rally and the lead grow.
+              First to {TARGET}, win by 2. The ball comes in on one side — swing <span className="text-[#00FF9D]">← / →</span> when the green ring closes on it. The window tightens as the rally and the lead grow.
             </p>
             <button onClick={() => setStarted(true)} className="rounded-lg bg-[#00FF9D] px-8 py-3 font-bold text-black transition hover:bg-[#00d986]">FIRST SERVE</button>
             <p className="font-mono text-[11px] tracking-widest text-white/50">ANY KEY · ANY BUTTON · TAP</p>

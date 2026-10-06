@@ -18,6 +18,9 @@ import { primeIdentity, resolveIdentity, type PlayerIdentity } from '../core/pla
 import { clampCosmetic } from '../core/playFrame';
 import { mergeLocalLook, readLocalLook, type StoredLook } from '../../creator/localLook';
 import { getWearable, sanitizeJersey } from '../../closet/wearable-catalog';
+import { faceOnly, readCreatorDoc } from '../../creator/look/storage';
+import { effectivePalette } from '../../creator/look/palette';
+import { accessoriesForEquipped, wornPartsForEquipped } from '../../closet/wearableAccessories';
 
 /**
  * The identity the race dresses the hero in when the look is device-only. `base` is the resolved identity
@@ -28,7 +31,10 @@ import { getWearable, sanitizeJersey } from '../../closet/wearable-catalog';
 export function raceIdentityFromLocal(base: PlayerIdentity, local: StoredLook): PlayerIdentity {
   // The hold a minor is under: nothing of the face or the frame numbers was uploaded.
   const merged = mergeLocalLook(base.face, {}, local, { uploadFace: false, uploadNumbers: false });
-  const face = merged.face;
+  // IMPROVE (2026-10-06): the device face may carry the Creator doc (the Closet keeps it in `face`); it rides on its own
+  // field, like resolveIdentity's, and its colours and the device's equipped accessories dress the race body too.
+  const creator = readCreatorDoc(merged.face) ?? base.creator ?? null;
+  const face = faceOnly(merged.face) as typeof merged.face;
   const pct = (v: number | undefined): number | null =>
     typeof v === 'number' && Number.isFinite(v) && v > 0 ? v / 100 : null;
   const height = pct(merged.heightScale), build = pct(merged.buildScale);
@@ -47,12 +53,15 @@ export function raceIdentityFromLocal(base: PlayerIdentity, local: StoredLook): 
     ...base,
     face,
     proportions,
-    palette: {
+    palette: effectivePalette({
       jersey: accentOf(eq.tops, base.palette.jersey),
       shorts: accentOf(eq.shorts, base.palette.shorts),
       shoes: accentOf(eq.shoes, base.palette.shoes),
       accent: base.palette.accent,   // the card accent is the server's non-look answer — it stays
-    },
+    }, creator?.colours),
+    creator,
+    accessories: local.equipped ? accessoriesForEquipped(local.equipped) : base.accessories,
+    wornParts: local.equipped ? wornPartsForEquipped(local.equipped) : base.wornParts,
     wardrobe: {
       tops: eq.tops ?? base.wardrobe.tops,
       shorts: eq.shorts ?? base.wardrobe.shorts,
@@ -71,6 +80,9 @@ export function raceIdentityFromLocal(base: PlayerIdentity, local: StoredLook): 
 export async function resolveRaceIdentity(): Promise<PlayerIdentity> {
   const base = await resolveIdentity();
   if (base.lookLocal !== true) return base;
+  // CREATOR-PLAN phase 4a (owner decision 2026-10-06, "Every mode, device only"): resolveIdentity already dressed the
+  // body from the device copy (its active slot), so there is nothing left to overlay
+  if (base.lookFromDevice) return base;
   const local = readLocalLook();
   if (!local) return base;   // nothing on the device: the catalog defaults the server holds stand
   const merged = raceIdentityFromLocal(base, local);

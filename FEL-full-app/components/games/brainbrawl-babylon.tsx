@@ -41,9 +41,10 @@ import { useReplayInPlace } from './replay-in-place';
 import { CATEGORIES, CATEGORY_COLOR, type Category } from '@/lib/babylon/core/BrainBrawlCore';
 
 type Hud = Record<string, HudValue>;
+// IMPROVE (2026-10-06, #13): P2's arrow is the option's corner of the 2×2 grid — ◀ is C (bottom left), ▼ is D (bottom right)
 const OPTS = [
   { key: 'optA', face: 'A', btn: 'A', dpad: '▲', color: '#22d3ee' }, { key: 'optB', face: 'B', btn: 'B', dpad: '▶', color: '#f43f5e' },
-  { key: 'optX', face: 'C', btn: 'X', dpad: '▼', color: '#a855f7' }, { key: 'optY', face: 'D', btn: 'Y', dpad: '◀', color: '#facc15' },
+  { key: 'optX', face: 'C', btn: 'X', dpad: '◀', color: '#a855f7' }, { key: 'optY', face: 'D', btn: 'Y', dpad: '▼', color: '#facc15' },
 ] as const;
 const SEAT = ['#22d3ee', '#facc15'];
 const HOST_COLOR = '#b9b2ff';
@@ -119,7 +120,7 @@ const POP_TONE: Record<string, string> = { correct: '#4ade80', wrong: '#ff5c5c',
  * was dark green / dark red on the dark set and drew BEHIND the gallery bodies; this one is the card layer's — always in front,
  * bright text on a dark plate with the verdict's colour round it.
  */
-function ScorePop({ id, text, tone, anchor }: { id: string; text: string; tone: string; anchor: [number, number] | null }) {
+function ScorePop({ id, text, tone, anchor, sub = '' }: { id: string; text: string; tone: string; anchor: [number, number] | null; sub?: string }) {
   const color = POP_TONE[tone] ?? '#ffffff';
   return (
     <AnimatePresence>
@@ -129,7 +130,11 @@ function ScorePop({ id, text, tone, anchor }: { id: string; text: string; tone: 
           className="pointer-events-none absolute z-20 font-mono"
           style={{ left: `${Math.max(7, Math.min(93, anchor[0]))}%`, top: `${Math.max(14, Math.min(90, anchor[1]))}%` }}>
           <div className="-translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-xl border-2 bg-[#0a0618]/90 px-2.5 py-0.5 text-2xl font-black leading-none tracking-tight shadow-lg sm:px-3 sm:py-1 sm:text-4xl"
-            style={{ color, borderColor: color, textShadow: `0 0 14px ${color}99, 0 2px 0 #000` }}>{text}</div>
+            style={{ color, borderColor: color, textShadow: `0 0 14px ${color}99, 0 2px 0 #000` }}>
+            {text}
+            {/* IMPROVE (2026-10-06, #7): what the points were made of — "100 + 50 speed" — so answering fast is seen to pay */}
+            {sub && <div data-bb-pop-sub className="mt-0.5 text-center text-[10px] font-bold tracking-wide text-white/85 sm:text-xs" style={{ textShadow: 'none' }}>{sub}</div>}
+          </div>
         </motion.div>
       )}
     </AnimatePresence>
@@ -222,13 +227,17 @@ export default function BrainBrawlBabylon({ onEnd }: GameProps) {
   const emit = useCallback((e: Parameters<InputBus['emit']>[0]) => { busRef.current?.emit(e); }, []);
   const tapStart = useCallback(() => emit({ t: 'button', btn: 'START', pressed: true }), [emit]);
   const claims = typeof hud.claims === 'string' ? Object.fromEntries(hud.claims.split(',').map((kv) => { const [k, v] = kv.split(':'); return [k, v]; })) : {};
-  const twoP = Number(hud.players) === 2;
+  // IMPROVE (2026-10-06, #3): a solo night's CPU takes P2's podium — two seats on the stage, one player at the pad
+  const cpu = hud.cpu === true;
+  const duel = Number(hud.players) === 2;
+  const twoP = duel || cpu;
+  const seatName = (s: number): string => (cpu ? (s ? 'CPU' : 'YOU') : duel ? `P${s + 1}` : 'YOU');
   const display = typeof hud.display === 'string' && hud.display ? hud.display.split('\n') : [];
   const revealed = hud.phase === 'result' && typeof hud.reveal === 'number' && hud.reveal >= 0;
   const answer = revealed ? hnum(hud.reveal, -1) : -1;
   // a solo lock-in shows the pick at once; a duel only at the reveal (one screen, two players)
   const picks = [hnum(hud.pickP1, -1), hnum(hud.pickP2, -1)];
-  const showPick = (seat: number) => picks[seat] >= 0 && (revealed || (!twoP && seat === 0));
+  const showPick = (seat: number) => picks[seat] >= 0 && (revealed || (!duel && seat === 0));
   const clockFrac = typeof hud.clockFrac === 'number' ? hud.clockFrac : null;
   const catColor = typeof hud.categoryColor === 'string' && hud.categoryColor ? hud.categoryColor : '#ffffff';
   const sequence = display.length === 1 && display[0].trim().endsWith('?');
@@ -244,8 +253,9 @@ export default function BrainBrawlBabylon({ onEnd }: GameProps) {
       {/* top bar: scores + claims strip + clock */}
       <div data-bb="topbar" className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-2 px-2 py-2 font-mono sm:px-4 sm:py-3">
         <div className="fel-panel px-2 py-1 text-sm sm:px-3 sm:py-1.5">
-          <span className="text-[10px] tracking-wider text-[#22d3ee]">{twoP ? 'P1' : 'YOU'}</span> <span className="fel-stat text-base sm:text-xl">{hnode(hud.score, 0)}</span>
-          {twoP && <><span className="mx-2 text-white/40">·</span><span className="text-[10px] tracking-wider text-[#facc15]">P2</span> <span className="fel-stat text-base sm:text-xl">{hnode(hud.p2score, 0)}</span></>}
+          <span className="text-[10px] tracking-wider text-[#22d3ee]">{seatName(0)}</span> <span className="fel-stat text-base sm:text-xl">{hnode(hud.score, 0)}</span>
+          {twoP && <><span className="mx-2 text-white/40">·</span><span className="text-[10px] tracking-wider text-[#facc15]">{seatName(1)}</span> <span className="fel-stat text-base sm:text-xl">{hnode(hud.p2score, 0)}</span></>}
+          {/* IMPROVE #4: a solo night's strikes */}{typeof hud.strikes === 'string' && hud.strikes && hud.roundKind !== 'review' && <span data-bb="strikes" className="ml-2 text-xs font-bold tracking-widest text-[#ff5c5c] sm:text-sm">{hud.strikes}</span>}
         </div>
         <div data-bb="claims" className="flex max-w-[58%] flex-col items-center gap-1">
           <span className="font-mono text-[11px] font-bold tracking-widest text-white sm:text-xs">
@@ -259,7 +269,7 @@ export default function BrainBrawlBabylon({ onEnd }: GameProps) {
               const held = mine || theirs;
               return (
                 <span key={c} className="rounded-md px-2 py-1 text-[11px] font-bold tracking-wide sm:px-2.5 sm:py-1.5 sm:text-xs" style={{ background: held ? CATEGORY_COLOR[c] : 'rgba(0,0,0,0.55)', color: held ? '#111' : CATEGORY_COLOR[c], outline: hud.category === c ? '2px solid #fff' : '1px solid rgba(255,255,255,0.18)' }}>
-                  {held ? '✓ ' : ''}{c}{twoP && held ? ` ${mine ? 'P1' : 'P2'}` : ''}
+                  {held ? '✓ ' : ''}{c}{twoP && held ? ` ${seatName(mine ? 0 : 1)}` : ''}
                 </span>
               );
             })}
@@ -271,12 +281,12 @@ export default function BrainBrawlBabylon({ onEnd }: GameProps) {
       {/* the room talking: the contestants over their podiums, the host over his head while the card is not in front of him */}
       {phase === 'playing' && (
         <>
-          <Bubble id={`s1-${hnum(hud.sayN1, 0)}`} text={typeof hud.say1 === 'string' ? hud.say1 : ''} anchor={anchorOf(hud.anchor1)} color={SEAT[0]} who={twoP ? 'P1' : 'YOU'} />
-          {twoP && <Bubble id={`s2-${hnum(hud.sayN2, 0)}`} text={typeof hud.say2 === 'string' ? hud.say2 : ''} anchor={anchorOf(hud.anchor2)} color={SEAT[1]} who="P2" />}
+          <Bubble id={`s1-${hnum(hud.sayN1, 0)}`} text={typeof hud.say1 === 'string' ? hud.say1 : ''} anchor={anchorOf(hud.anchor1)} color={SEAT[0]} who={seatName(0)} />
+          {twoP && <Bubble id={`s2-${hnum(hud.sayN2, 0)}`} text={typeof hud.say2 === 'string' ? hud.say2 : ''} anchor={anchorOf(hud.anchor2)} color={SEAT[1]} who={seatName(1)} />}
           {!cardUp && !(hud.phase === 'done' && isBoard(hud.board)) && <Bubble id={`h-${hostN}`} text={hostSay} anchor={anchorOf(hud.anchorHost)} color={HOST_COLOR} who={String(hnode(hud.hostName, 'HOST'))} place={hud.hostBubble === 'left' ? 'left' : 'above'} />}
           {/* the verdict beside each podium (R1) */}
-          <ScorePop id={`p1-${hnum(hud.popN1, 0)}`} text={typeof hud.pop1 === 'string' ? hud.pop1 : ''} tone={String(hnode(hud.popTone1, ''))} anchor={anchorOf(hud.anchorPop1)} />
-          {twoP && <ScorePop id={`p2-${hnum(hud.popN2, 0)}`} text={typeof hud.pop2 === 'string' ? hud.pop2 : ''} tone={String(hnode(hud.popTone2, ''))} anchor={anchorOf(hud.anchorPop2)} />}
+          <ScorePop id={`p1-${hnum(hud.popN1, 0)}`} text={typeof hud.pop1 === 'string' ? hud.pop1 : ''} tone={String(hnode(hud.popTone1, ''))} anchor={anchorOf(hud.anchorPop1)} sub={typeof hud.popSub1 === 'string' ? hud.popSub1 : ''} />
+          {twoP && <ScorePop id={`p2-${hnum(hud.popN2, 0)}`} text={typeof hud.pop2 === 'string' ? hud.pop2 : ''} tone={String(hnode(hud.popTone2, ''))} anchor={anchorOf(hud.anchorPop2)} sub={typeof hud.popSub2 === 'string' ? hud.popSub2 : ''} />}
         </>
       )}
 
@@ -317,10 +327,10 @@ export default function BrainBrawlBabylon({ onEnd }: GameProps) {
                       <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full font-mono text-[11px] font-bold text-black sm:h-7 sm:w-7 sm:text-[12px]" style={{ background: o.color }}>{o.face}</span>
                       <OptionText text={String(hnode(hud[o.key], ''))} />
                       <span className="ml-auto flex shrink-0 items-center gap-1">
-                        {seats.map((s) => <span key={s} className="rounded px-1 text-[10px] font-bold text-black" style={{ background: SEAT[s] }}>{twoP ? `P${s + 1}` : 'YOU'}</span>)}
+                        {seats.map((s) => <span key={s} className="rounded px-1 text-[10px] font-bold text-black" style={{ background: SEAT[s] }}>{seatName(s)}</span>)}
                         {isAnswer && <span className="text-base font-black text-[#4ade80] sm:text-xl">✓</span>}
                         {wrongPick && <span className="text-base font-black text-[#f87171] sm:text-xl">✗</span>}
-                        {twoP && !revealed && <span className="text-sm text-white/55">{o.dpad}</span>}
+                        {duel && !revealed && <span className="text-sm text-white/55">{o.dpad}</span>}
                       </span>
                     </button>
                   );
@@ -328,14 +338,16 @@ export default function BrainBrawlBabylon({ onEnd }: GameProps) {
               </div>
             )}
             <div className="flex min-h-[18px] items-center gap-2">
-              {!revealed && hud.answeredP1 === true && <span className="fel-panel px-2 py-0.5 text-[11px] text-[#22d3ee]">{twoP ? 'P1 LOCKED' : 'LOCKED'}</span>}
-              {!revealed && hud.answeredP2 === true && <span className="fel-panel px-2 py-0.5 text-[11px] text-[#facc15]">P2 LOCKED</span>}
+              {!revealed && hud.answeredP1 === true && <span className="fel-panel px-2 py-0.5 text-[11px] text-[#22d3ee]">{duel ? 'P1 LOCKED' : 'LOCKED'}</span>}
+              {!revealed && hud.answeredP2 === true && <span className="fel-panel px-2 py-0.5 text-[11px] text-[#facc15]">{seatName(1)} LOCKED</span>}
               {revealed && ['verdictP1', 'verdictP2'].map((k, s) => {
                 const v = typeof hud[k] === 'string' ? (hud[k] as string) : '';
                 const pill = VERDICT_PILL[v]; if (!pill) return null;
-                return <span key={k} data-bb-verdict={v} className="fel-panel px-2 py-0.5 text-[11px] font-bold" style={{ color: pill.color }}>{twoP ? `P${s + 1} ` : ''}{pill.label(hnum(hud[s ? 'gainP2' : 'gainP1'], 0))}</span>;
+                return <span key={k} data-bb-verdict={v} className="fel-panel px-2 py-0.5 text-[11px] font-bold" style={{ color: pill.color }}>{twoP ? `${seatName(s)} ` : ''}{pill.label(hnum(hud[s ? 'gainP2' : 'gainP1'], 0))}</span>;
               })}
               {typeof hud.hint === 'string' && hud.hint && !revealed && <span className="fel-panel px-3 py-0.5 text-[11px] text-white/70">{hud.hint}</span>}
+              {/* IMPROVE #8: a new fastest right answer on this device, for the category or the kind */}
+              {revealed && typeof hud.fastBest === 'string' && hud.fastBest && <span data-bb="fast-best" className="fel-panel px-2 py-0.5 text-[11px] font-bold text-[var(--fel-gold)]">{hud.fastBest}</span>}
               {revealed && <span className="fel-panel px-3 py-0.5 text-[11px] text-white/60">A · next</span>}
             </div>
           </div>
@@ -347,6 +359,17 @@ export default function BrainBrawlBabylon({ onEnd }: GameProps) {
         <div data-bb="banner" className="pointer-events-none absolute inset-x-0 top-[45%] flex flex-col items-center gap-2 px-4 text-center font-mono">
           <span className="fel-heading fel-panel whitespace-pre px-5 py-1.5 text-xl font-black text-white sm:px-6 sm:py-2 sm:text-3xl" style={{ color: hud.phase === 'spin' && typeof hud.categoryColor === 'string' && hud.categoryColor ? hud.categoryColor : undefined }}>{banner}</span>
           {!cardUp && typeof hud.hint === 'string' && hud.hint && <span className="fel-panel px-3 py-1 text-xs text-white/70">{hud.hint}</span>}
+          {/* IMPROVE (2026-10-06, #10): the duel's handicap, on the pick */}
+          {hud.phase === 'pick' && duel && typeof hud.handicap === 'string' && hud.handicap && <span data-bb="handicap" className="fel-panel px-3 py-1 text-xs font-bold tracking-wider text-[var(--fel-gold)]">{hud.handicap}</span>}
+        </div>
+      )}
+      {/* IMPROVE (2026-10-06, #9): the first time a kind of card comes up on this device, what it asks — before its clock starts */}
+      {phase === 'playing' && hud.phase === 'howto' && typeof hud.howTo === 'string' && hud.howTo && (
+        <div data-bb="howto" className="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center px-3 font-mono">
+          <div className="fel-panel w-full max-w-[520px] px-4 py-3 text-center">
+            <div className="text-[11px] font-black tracking-widest sm:text-xs" style={{ color: catColor }}>{hnode(hud.howToTitle, 'NEW')}</div>
+            <div className="mt-1 whitespace-pre-wrap text-sm font-bold leading-snug text-white sm:text-base">{hud.howTo}</div>
+          </div>
         </div>
       )}
       {phase === 'playing' && hud.phase === 'done' && isBoard(hud.board) && typeof hud.boardTitle === 'string' && hud.boardTitle && (

@@ -18,23 +18,31 @@
 //     wrong more often and pays a style bonus on a goal, but each also adds
 //     a little shot wobble. Commitment tradeoff, not a free win.
 // Derby is unchanged from M43 apart from riding the same file.
+// (IMPROVE 2026-10-06: the TENNIS described above was never the live one — the registry serves TennisMode.ts — and is
+// deleted from this file; golf, derby and penalty are what it holds.)
 
 import { kickPips, type KickResult } from '../core/penaltyHud';
 import { freshDerby, bankSwing, distanceLine, OUTS_CAP, type DerbyTally } from '../core/derbyHud';
+// IMPROVE (2026-10-06, docs/IMPROVEMENTS-2026-10-05.md § Derby): the derby's pure reads (seeded pitches, the rival's line
+// and verdict, the timing window's cue and miss, the homer's real feet, the stick's aim, the bat-flip's window).
+import { pitchShape, derbySeed, derbyProgress, rivalVerdict, rivalLine, timingMiss, timingMissLine, contactCue, homerFeet, hitLateral, batFlipRead } from '../core/DerbyLoop';
 import { rivalProgress } from '../core/CarnivalNight';
 import { holeName, cardString, windBearingDeg, windWord, holeBoard, ACCURACY_CENTER as GH_ACC_CENTER, ACCURACY_HALF as GH_ACC_HALF, type HoleResult } from '../core/golfHud';
-import { Color3, MeshBuilder, Quaternion, StandardMaterial, Vector3 } from '@babylonjs/core';
+import { Color3, DynamicTexture, Matrix, Mesh, MeshBuilder, PBRMaterial, Quaternion, StandardMaterial, Vector3 } from '@babylonjs/core';
 import { dressBall } from '../visual/meshyProps';
 import { boneNode } from '../anim/boneLookup';
-import { planRivalKick, gradeDive, resolveSave, type DiveSign, type RivalKickPlan } from '../core/KeeperCore';
-import type { AbstractMesh, Observer, Scene } from '@babylonjs/core';
+import { planRivalKick, gradeDive, resolveSaveRead, type DiveSign, type KeeperCall, type RivalKickPlan } from '../core/KeeperCore';
+// IMPROVE (2026-10-06, docs/IMPROVEMENTS-2026-10-05.md § Penalty): the shootout loop's pure reads — the classic-pens pick,
+// the habit read said in the breakaway, the honest hint, the skippable result beat.
+import { readPensStyle, writePensStyle, PENS_SWITCH_SEC, habitRead, breakawayReadProb, breakawayHint, CLASSIC_HINT, ResultBeat, type PensStyle } from '../core/PenaltyLoop';
+import type { AbstractMesh, Material, Observer, ParticleSystem, Scene } from '@babylonjs/core';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import type { SpawnedCharacter } from '../core/CharacterLibrary';
 import { assertSpawned } from '../core/FrameGuard';
 import {
-  spawnAthlete, Reticle, PowerMeter, Flight, swingQuality, swingSide,
-  buildTennisNet, buildGolfGreen, buildPlateAndMound, buildGoal, buildBallparkOutfield, spawnFoe } from './aimSwingCore';
+  spawnAthlete, Reticle, PowerMeter, POWER_METER_RATE, Flight, swingQuality, swingSide,
+  buildGolfGreen, buildPlateAndMound, buildGoal, buildBallparkOutfield, spawnFoe } from './aimSwingCore';
 import { SPORT_CLIP } from '../anim/clipRegistry';
 import { BeatOwner } from '../anim/beatOwner';
 import { registerMirroredClips } from '../anim/mirrored-clips';
@@ -55,8 +63,11 @@ import { PRECISION_CONFIG as CFG } from './modeConfigs';
 // lines to gauge power. upgrade physics, weather") — the arrow + landing ring (AimArrow), the meter's carry lines and the
 // shot's launch (GolfAim), the flight itself (GolfBallSim: drag, Magnus, bounce, roll, wind through the air, wet turf),
 // and the weather (WeatherKit read from the start screen's chip, WeatherFx for what it looks like).
-import { GolfBallSim, greenBreakSlope, resolvePutt, type Surface as GolfSurface } from '../core/GolfBall';
-import { WII_CLUBS, WII_PUTTER, turnAim, launchVelocity, simulateShot, meterTicks, carryAt, type WiiClub, type AirLike } from '../core/GolfAim';
+import { GolfBallSim, greenBreakSlope, type Surface as GolfSurface } from '../core/GolfBall';
+import { WII_CLUBS, WII_PUTTER, turnAim, launchVelocity, simulateShot, simulatePutt, puttLaunch, MeterTickJob, carryAt, type WiiClub, type AirLike } from '../core/GolfAim';
+// IMPROVE (2026-10-06, docs/IMPROVEMENTS-2026-10-05.md § Golf): the loop's pure reads — the seeded course, the stick path,
+// the rhythm decay, the OB drop, the timers / banner channel the mode clears on dispose, the meter HUD's change gate.
+import { loopHole, loopSeed, loopWindAngle, LOOP_TEE, stickPathErr, rhythmAfter, obDrop, inBounds, rotateAbout, TimerBag, BannerChannel, MeterHudGate } from '../core/GolfLoop';
 import { mountAimArrow, type AimArrowHandle } from '../visual/AimArrow';
 import { WeatherKit } from '../core/WeatherKit';
 import { readWeather } from '../nexus/weather';
@@ -67,7 +78,7 @@ import { mountWeatherFx, type WeatherFxHandle } from '../premium/WeatherFx';
 import { SoccerBall, GRASS } from '../core/SoccerBall';
 import { launchKick, frameHit, judgeKick, kickZone, METER_ZONES, GOAL as PEN_GOAL } from '../core/PenaltyKick';
 import { WIND_GAIN } from '../core/GolfBall';
-import { BREAK, FLOW, flowAdd, shotProfile, glassRead, bankTarget, rainbowRead, slideCancelRead, rainbowArc, KEEPER, keeperTargetZ, keeperSlideRead, reachFor, crossesKeeper, type ShotKind } from '../core/Breakaway';   // BREAKAWAY (owner brief, 2026-09-18: "Soccer Shootout")
+import { BREAK, FLOW, flowAdd, shotProfile, glassRead, bankTarget, rainbowRead, slideCancelRead, rainbowArc, KEEPER, keeperTargetZ, keeperSlideRead, reachFor, crossesKeeper, parryRead, strikeAim, keeperDiveX, type ShotKind } from '../core/Breakaway';   // BREAKAWAY (owner brief, 2026-09-18: "Soccer Shootout")
 import { stepRun } from '../core/RushRun';
 import { PAD, padMult, type PadKind, FLICK, flickRead, flickVel, type Ring, RINGS, ringsFor, ringPass, turbineFor, gustAt, BANK, bankReflect } from '../core/ParkourGolf';   // PARKOUR GOLF (owner brief, 2026-09-18)
 import { PARK, TARGETS, predictWallCross, targetHit, robRead, verdictFor, flowTrick, kineticSwing, FLOW as PARK_FLOW, TOKEN, multiplierScramble, type Rob, type Verdict, type WallTarget, type WallCross } from '../core/ParkourDerby';   // PARKOUR DERBY (owner brief, 2026-09-18)
@@ -117,155 +128,21 @@ export const PUTTER: WiiClub = WII_PUTTER;
 
 /** Strokes each hole is expected to take. Golf is scored against this. */
 export const GOLF_PAR = [3, 4, 4, 3, 5] as const;   // FIELD-DEPTH W4: five-hole loop
-/** Within this many metres the ball is holed. */
-export const HOLED_M = 1.6;
+/** Within this many metres the ball is holed — a tap-in gimme; the cup itself is GolfBallSim.tryHole (CUP_RADIUS_M).
+ *  IMPROVE (2026-10-06, Golf #3): was 1.6 m, so most putting was trivial — and it hid that a short putt could not reach
+ *  the cup at all (a 2 m putt at full power rolled 0.8 m; see GolfAim.puttSpeedFor). With the putt rolling its pace,
+ *  the cup does the holing and this is only the gimme. */
+export const HOLED_M = 0.75;
+/** IMPROVE (2026-10-06, Golf #7): the swing meter's wave on the green (rad/s; every other swing runs POWER_METER_RATE
+ *  3.4). Pace is the whole putt, and the full-swing wave made it a coarse grab. */
+export const GOLF_PUTT_METER_RATE = 2.6;
 /** Stick pulled past this is a backswing; pushed past it is the strike. */
 export const SWING_STICK = 0.6;
 
 // ════════════════════════════════════════════════════════════════ TENNIS ══
-// ⚠️ DEAD CODE — NOT THE TENNIS THE GAME RUNS.
-//
-// The registry imports Tennis from `./TennisMode` (the M74 net-sport core) and
-// takes only Golf, Derby and Penalty from this file; its own import line says
-// "M74 net-sport replaces precision tennis". This implementation is unreachable.
-//
-// Unlike the dead `GolfMode.ts`, it is NOT excluded in tsconfig, so it
-// type-checks and reads as live code. Editing it changes nothing in the game.
-// Kept rather than deleted because it is a working reference for the rally feel
-// described at the top of this file; git has it either way if it should go.
-export const TennisMode: ModeDefinition = (() => {
-  let me: SpawnedCharacter, opponent: SpawnedCharacter;
-  let furniture: AbstractMesh[] = [];
-  let ball: AbstractMesh, flight: Flight;
-  let round = 0, pts = 0, stickX = 0, stickY = 0;
-  let incoming = false, swung = false, ended = false;
-  let rally = 0;                                 // exchanges in the current point
-  let awaitingOpponent = false;                  // ball is on its way to them
-  const TOTAL = 7;
-
-  function serve(ctx: ModeContext): void {
-    round++;
-    swung = false; incoming = true; awaitingOpponent = false; rally = 0;
-    const clutch = round === TOTAL;
-    const targetX = ((round * 37) % 7) - 3;
-    ball.position.set(targetX * 0.4, 1.2, 11);
-    flight.launch(ball.position, new Vector3((targetX - ball.position.x) * 0.12, 2.2, -10.5 - round * 0.4));
-    opponent.root.position.set(targetX * 0.4, 0, 11);
-    ctx.setHud({ round: `${round}/${TOTAL}`, rally: 0, hint: clutch ? 'MATCH POINT — build the rally, then put it away' : 'SWING as the ball reaches you · stick UP = topspin · stick DOWN = lob' });
-  }
-
-  /** The opponent tries to return what you just hit. Better swings from you
-   *  (and deeper rallies) make their get harder — that's how points END. */
-  function opponentReturn(ctx: ModeContext, myQuality: number, topspin: boolean): void {
-    awaitingOpponent = true;
-    const reach = Math.max(0.1, 0.85 - myQuality * 0.35 - rally * 0.06 - (topspin ? 0.12 : 0));
-    setTimeout(() => {
-      if (ended) return;
-      awaitingOpponent = false;
-      if (Math.random() < reach) {
-        // they got it back — the rally continues
-        rally++;
-        SoundKit.play('impact', { pitch: 1.4, volume: 0.25 });
-        opponent.animator.play(SPORT_CLIP.tennisForehand, { onEnd: () => opponent.animator.play(SPORT_CLIP.tennisIdle, { loop: true }) });
-        const targetX = (Math.random() * 8) - 4;
-        ball.position.set(opponent.root.position.x, 1.2, 11);
-        flight.launch(ball.position, new Vector3((targetX - ball.position.x) * 0.14, 2.1 + rally * 0.05, -10.5 - rally * 0.6));
-        incoming = true; swung = false;
-        ctx.setHud({ rally, banner: rally >= 3 ? `RALLY x${rally}` : '' });
-        if (rally >= 3) setTimeout(() => ctx.setHud({ banner: '' }), 500);
-      } else {
-        // winner! bank the point at the rally multiplier
-        const clutch = round === TOTAL;
-        const mult = Math.max(1, rally) * (clutch ? CLUTCH_MULT : 1);
-        const gained = Math.round((10 + myQuality * 15) * mult);
-        pts += gained;
-        SoundKit.play('score', { pitch: 1.1 });
-        SoundKit.play('crowdCheer', { volume: Math.min(0.7, 0.25 + rally * 0.1) });
-        ctx.setHud({ score: pts, banner: rally >= 2 ? `WINNER — RALLY x${rally}! +${gained}` : `WINNER! +${gained}` });
-        setTimeout(() => {
-          ctx.setHud({ banner: '' });
-          if (round >= TOTAL) { ended = true; SoundKit.play('whistle'); ctx.end('MATCH_END', pts, { rounds: TOTAL }); return; }
-          serve(ctx);
-        }, 1100);
-      }
-    }, 650 + Math.random() * 300);
-  }
-
-  return {
-    modeId: 'tennis', mood: 'goldenHour', camPreset: 'court',
-
-    async load(ctx: ModeContext) {
-      VenueKit.buildField(ctx.scene, 'tennis');
-      EffectsKit.ambient(ctx.scene, 'park');
-      furniture = buildTennisNet(ctx.scene);
-      me = await spawnAthlete(ctx, CFG.heroUrl, new Vector3(0, 0, -10.5), 0, SPORT_CLIP.tennisIdle);
-      opponent = await spawnFoe(ctx, CFG.heroUrl, new Vector3(0, 0, 11), Math.PI, SPORT_CLIP.tennisIdle);
-      ctx.heroRef.current = me.root;                 // spawnAthlete sets heroRef on each call — reassert the player
-      ball = MeshBuilder.CreateSphere('tball', { diameter: 0.14 }, ctx.scene);
-      void dressBall(ball, 'tennis');   // Meshy ball skin rides the sphere (visual only)
-      flight = new Flight(ball, -8.5);
-      ctx.objectiveRef.current = ball.position;
-      ctx.camDirector.setFixedBehind(me.root.position, 0, 'swing');
-      assertSpawned(ctx.scene, { hero: me.root, minWorldMeshes: 5, modeId: 'tennis' });
-      round = 0; pts = 0; ended = false;
-      SoundKit.startAmbient('stadium');
-      ctx.setHud({ score: 0 });
-      serve(ctx);
-    },
-
-    onInput(ctx: ModeContext, e: FelInput) {
-      SoundKit.unlock();
-      if (e.t === 'stick' && e.side === 'L') { stickX = e.x; stickY = e.y; }
-      if (e.t === 'button' && e.btn === 'A' && e.pressed && incoming && !swung) {
-        swung = true;
-        SoundKit.play('whoosh');
-        me.animator.play(SPORT_CLIP.tennisForehand, {});
-        const q = swingQuality(ball.position.z, me.root.position.z + 0.8, 10.5, 0.34);
-        if (q <= 0) return;                        // early whiff — ball still incoming
-        incoming = false;
-        ctx.feel?.impact?.(0.2 + q * 0.3);
-        // Wii-style: the stick AT CONTACT is the swing — X steers the shot,
-        // Y picks the shot shape (up = topspin, down = lob)
-        const topspin = stickY < -0.35;
-        const lob = stickY > 0.35;
-        SoundKit.play('impact', { pitch: topspin ? 1.5 : lob ? 0.9 : 1.2, volume: 0.3 });
-        flight.launch(ball.position, new Vector3(
-          stickX * 4.5,
-          lob ? 6.5 : topspin ? 3 : 4 + q * 2,
-          (topspin ? 16 : lob ? 10 : 13) + q * 4,
-        ));
-        ctx.setHud({ shotShape: topspin ? 'TOPSPIN' : lob ? 'LOB' : 'DRIVE' });
-        opponentReturn(ctx, q * (lob ? 0.75 : 1), topspin);
-      }
-    },
-
-    update(ctx: ModeContext, dt: number) {
-      if (ended) return;
-      flight.step(dt);
-      // opponent shuffles toward the ball's x while it's coming to them
-      if (awaitingOpponent) {
-        opponent.root.position.x += (ball.position.x - opponent.root.position.x) * 2.5 * dt;
-        opponent.root.position.x = Math.max(-5, Math.min(5, opponent.root.position.x));
-      }
-      me.root.position.x += (ball.position.x - me.root.position.x) * (incoming ? 2.2 : 0) * dt + stickX * 3 * dt;
-      me.root.position.x = Math.max(-5, Math.min(5, me.root.position.x));
-      if (incoming && ball.position.z <= me.root.position.z - 0.6) {
-        // the ball got past you — the point is over, no bank
-        incoming = false;
-        SoundKit.play('miss');
-        ctx.setHud({ banner: rally >= 2 ? `RALLY LOST — x${rally} gone` : 'MISS', rally: 0 });
-        setTimeout(() => {
-          ctx.setHud({ banner: '' });
-          if (round >= TOTAL) { ended = true; SoundKit.play('whistle'); ctx.end('MATCH_END', pts, { rounds: TOTAL }); return; }
-          serve(ctx);
-        }, 900);
-      }
-      ctx.camDirector.update(me.root.position, Vector3.Zero(), ball.position);
-    },
-
-    dispose() { me?.dispose(); opponent?.dispose(); furniture.forEach((f) => f.dispose()); ball?.dispose(); SoundKit.stopAmbient(); },
-  };
-})();
+// IMPROVE (2026-10-06, Golf #20): the dead precision TennisMode that sat here is deleted (owner-picked). The registry
+// has taken tennis from `./TennisMode` (the M74 net-sport core) since M74; this one was unreachable, type-checked and
+// read as live code. `git log -S "precision TennisMode"` finds it if its rally feel is ever wanted as a reference.
 
 // ══════════════════════════════════════════════════════════════════ GOLF ══
 export const GolfMode: ModeDefinition = (() => {
@@ -275,7 +152,11 @@ export const GolfMode: ModeDefinition = (() => {
   let strikeIn = 0; let pendingStrike: (() => void) | null = null; let pendingVel: Vector3 | null = null;
   let furniture: AbstractMesh[] = [];
   let ball: AbstractMesh, sim: GolfBallSim, meter: PowerMeter;
-  let holePos = new Vector3(0, 0, 55);
+  /** IMPROVE (2026-10-06, Golf #2 / #18): ONE vector, moved in place per hole. It was reassigned per hole, so the
+   *  objectiveRef the load handed FrameGuard kept the first value (0, 0, 55) — off the field — for the whole round. */
+  const holePos = new Vector3(0, 0, 55);
+  /** IMPROVE (2026-10-06, Golf #2): the round's course seed — the holes and the wind's heading are new each play. */
+  let seed = 0;
   /** WII AIM: the arrow's yaw (the stick turns it inside ±60° of the pin line), what it draws, the meter's carry lines. */
   let aimYaw = 0; let arrow: AimArrowHandle | null = null; let ticks: number[] = []; let flightSec = 0;
   let weather: WeatherKit = new WeatherKit(); let weatherFx: WeatherFxHandle | null = null;
@@ -283,7 +164,7 @@ export const GolfMode: ModeDefinition = (() => {
   let phase: 'preview' | 'aim' | 'power' | 'accuracy' | 'flight' = 'aim';
   let previewSec = 0, power = 0;
   let club = 0;                       // which club is in hand
-  let wind = new Vector3();           // per-hole wind, applied in flight
+  const wind = new Vector3();         // per-hole wind, applied in flight (written in place)
   let strokes = 0, overPar = 0;       // golf is scored in strokes against par
   let holeLatch = false;              // A+ P0 juice: one holed punch per hole
   let pickUps = 0;   // triple-par pick-ups this round (owner decision 2026-09-05)
@@ -291,6 +172,10 @@ export const GolfMode: ModeDefinition = (() => {
    *  a stick swing does not express on a touch overlay and 3-click is the
    *  better mobile input, so the mode offers both. */
   let backswing = 0, pulling = false;
+  /** IMPROVE (2026-10-06, Golf #1): the stick's peak sideways deflection from the pull-back to the push-through — the path. */
+  let pathPeakX = 0;
+  /** IMPROVE (2026-10-06, Golf #4): where this shot was struck from (the OB drop goes on the line from here). */
+  const lie = new Vector3();
   /**
    * The beat between a ball coming to rest and the player walking to it.
    *
@@ -308,10 +193,28 @@ export const GolfMode: ModeDefinition = (() => {
   let gallery: Onlookers | null = null;
   let flag: AbstractMesh | null = null;
   let ended = false;
+  /** IMPROVE (2026-10-06, Golf #10 / #11): every timeout goes through `timers` (cleared on dispose; each callback also
+   *  checks `ended`), and every flash banner through one channel, so a FLICK's clear can no longer wipe a RING mid-flight. */
+  const timers = new TimerBag();
+  let banners: BannerChannel | null = null;
+  const later = (fn: () => void, ms: number) => timers.later(() => { if (!ended) fn(); }, ms);
+  /** IMPROVE (2026-10-06, Golf #8): the ball's tracer (a shot's flight and roll-out, stopped at rest) and its own white. */
+  let trail: ParticleSystem | null = null;
+  /** IMPROVE (2026-10-06, Golf #6 / #8 / #15): the mode's own materials, made once per load and disposed with the mode —
+   *  the park's four and the wind flag's were made again every hole and never disposed. */
+  let mats: { pad: PBRMaterial; ring: PBRMaterial; fan: PBRMaterial; bank: PBRMaterial; flag: PBRMaterial; ball: PBRMaterial } | null = null;
+  /** IMPROVE (2026-10-06, Golf #13 / #14 / #17 / #18): the aim's last exact prediction (turned with the arrow between
+   *  refreshes), the meter lines being built a flight per frame, the meter HUD's change gate, the frame's scratch. */
+  let aimDirty = false, aimRefreshT = 0, predYaw = 0, predLen = 0;
+  const predCarry = { x: 0, z: 0 }, predRest = { x: 0, z: 0 }, drawCarry = { x: 0, z: 0 }, drawRest = { x: 0, z: 0 };
+  const AIM_REFRESH_SEC = 0.1;
+  let tickJob: MeterTickJob | null = null;
+  const meterHud = new MeterHudGate();
+  const aimDir = new Vector3(); const STILL = Vector3.Zero();   // STILL is read, never written
   const TOTAL = 5;   // FIELD-DEPTH W4: matches GOLF_PAR length
   /** phase 8: the golfer's RHYTHM gauge (the shared FLOW chip): clean strikes build it, at 70+ the strike is steadier (path error halved) */
   let golfFlow = 0;
-  const GOLF_FLOW_CLEAN = 35, GOLF_FLOW_RHYTHM = 70, GOLF_FLOW_FORGIVE = 0.5;
+  const GOLF_FLOW_RHYTHM = 70, GOLF_FLOW_FORGIVE = 0.5;   // the gain and the miss decay: GolfLoop.rhythmAfter
   const PREVIEW_SEC = 1.8;
   const ACCURACY_CENTER = GH_ACC_CENTER;         // wave value to hit on the way down (one source with the drawn band: core/golfHud)
   const ACCURACY_HALF = GH_ACC_HALF;
@@ -330,7 +233,7 @@ export const GolfMode: ModeDefinition = (() => {
   function buildHolePark(ctx: ModeContext): void {
     teePos.copyFrom(ball.position); ringsTaken.clear(); ringMeshes.clear(); ringChain = 0; pad = null; slidePutt = false; bankRode = false; gusting = false;
     const tee = { x: teePos.x, z: teePos.z }, hole = { x: holePos.x, z: holePos.z };
-    const padMat = VenueKit.paint(ctx.scene, 'gp_pad_mat', '#22d3ee', 0.3, 0.5), ringMat = VenueKit.paint(ctx.scene, 'gp_ring_mat', '#9ad7ff', 0.45, 0.4), fanMat = VenueKit.paint(ctx.scene, 'gp_fan_mat', '#d9d2c2', 0.08, 0.6), bankMat = VenueKit.paint(ctx.scene, 'gp_bank_mat', '#2f7a42', 0.06, 0.9);
+    const { pad: padMat, ring: ringMat, fan: fanMat, bank: bankMat } = golfMats(ctx);   // IMPROVE #15: made once, not per hole
     const yaw = Math.atan2(hole.x - tee.x, hole.z - tee.z);
     const board = MeshBuilder.CreateBox('gp_springboard', { width: 1.2, height: 0.12, depth: 0.9 }, ctx.scene);
     board.position.set(tee.x - Math.sin(yaw) * 1.1, 0.06, tee.z - Math.cos(yaw) * 1.1); board.rotation.y = yaw; board.material = padMat; board.isPickable = false; furniture.push(board);
@@ -349,6 +252,34 @@ export const GolfMode: ModeDefinition = (() => {
     bank.position.set(hole.x, -0.25, hole.z); bank.scaling.y = 0.75; bank.material = bankMat; bank.isPickable = false; furniture.push(bank);
   }
 
+  /** IMPROVE (2026-10-06, Golf #6 / #8 / #15): the mode's materials, once per load. */
+  function golfMats(ctx: ModeContext): NonNullable<typeof mats> {
+    if (mats) return mats;
+    const flagMat = VenueKit.paint(ctx.scene, 'golf_wind_flag_m', '#ffcf3a', 0.18, 0.7);
+    flagMat.albedoColor = flagMat.albedoColor.scale(0.42);   // the green's LIT divisor (aimSwingCore): under this rig an unscaled pick clips pale
+    mats = {
+      pad: VenueKit.paint(ctx.scene, 'gp_pad_mat', '#22d3ee', 0.3, 0.5), ring: VenueKit.paint(ctx.scene, 'gp_ring_mat', '#9ad7ff', 0.45, 0.4),
+      fan: VenueKit.paint(ctx.scene, 'gp_fan_mat', '#d9d2c2', 0.08, 0.6), bank: VenueKit.paint(ctx.scene, 'gp_bank_mat', '#2f7a42', 0.06, 0.9),
+      flag: flagMat,
+      ball: VenueKit.paint(ctx.scene, 'golf_ball_m', '#f7f7f2', 0.35, 0.35),   // a white ball that holds its white on the grass
+    };
+    return mats;
+  }
+  /**
+   * IMPROVE (2026-10-06, Golf #15): the hole's furniture goes WITH its per-hole materials. `f.dispose()` leaves a mesh's
+   * material behind, and buildGolfGreen paints four new ones each hole; the mode's own (golfMats) are kept for the next.
+   */
+  function clearFurniture(): void {
+    const keep = new Set<Material>(mats ? Object.values(mats) : []);
+    const drop = new Set<Material>();
+    for (const f of furniture) { const m = f.material; if (m && !keep.has(m)) drop.add(m); f.dispose(); }
+    for (const m of drop) m.dispose();
+    furniture = [];
+  }
+  const parOf = (r: number): number => GOLF_PAR[Math.min(r, GOLF_PAR.length) - 1] ?? 3;
+  /** Flat distance from the ball to the pin (no Vector3 made: onGreen() runs every frame). */
+  function distToPin(): number { return Math.hypot(ball.position.x - holePos.x, ball.position.z - holePos.z); }
+
   function nextShot(ctx: ModeContext): void {
     round++;
     // ON THE COURSE. VenueKit.buildField(scene, 'golf') builds 60 x 90, so the
@@ -356,18 +287,30 @@ export const GolfMode: ModeDefinition = (() => {
     // up to z 69. Holes 2 and 3 sat off the end of the world, the preview camera
     // flew out over the void behind them, and the watchdog reported a black
     // frame. Kept well inside the field now.
-    holePos = new Vector3(((round * 53) % 21) - 10, 0, 26 + ((round * 31) % 13));
-    furniture.forEach((f) => f.dispose());
+    // IMPROVE (2026-10-06, Golf #2): the pin was `((round * 53) % 21) - 10, 26 + ((round * 31) % 13)` — the same five holes
+    // every session, at lengths that ignored the card (hole 1, a par 3, was 30 m; hole 4, a par 3, 33 m). The hole's
+    // LENGTH now comes from its par (GolfLoop.PAR_BANDS: par 3 22–26 m, par 4 28–32 m, par 5 34–37.4 m) and its line from
+    // the round's seed, inside the same x ±10, z ≤ 38 box. GOLF_PAR itself is unchanged (the score ceiling reads it).
+    const h = loopHole(parOf(round), seed, round);
+    holePos.set(h.x, 0, h.z);
+    clearFurniture();
     furniture = buildGolfGreen(ctx.scene, holePos);
     // L2 — THE WIND, READABLE FROM THE COURSE. It was a number in the HUD only,
     // and "course reading" is one of the three pillars the benchmark names: a
     // player should be able to look at the hole and see which way it blows.
     // The flag leans with it, harder in a stronger wind.
+    // IMPROVE (2026-10-06, Golf #6): it wore `furniture[0].material` — the GREEN's paint — so the wind flag vanished
+    // against the green it stood on, while the kit's static red flag (which reads no wind) stood over it at the same
+    // spot. One flag now, the wind's, in a yellow of its own; and it hangs from the POLE and streams DOWNWIND (it turned
+    // about its own middle and lay across the wind, so even when seen it pointed the wrong way).
+    for (const f of furniture) if (f.name === 'flag') f.setEnabled(false);
     flag?.dispose();
-    flag = MeshBuilder.CreateBox('pinFlag', { width: 0.7, height: 0.34, depth: 0.03 }, ctx.scene);
-    flag.position = holePos.add(new Vector3(0.35, 1.85, 0));
-    flag.material = furniture[0]?.material ?? null;
-    ball.position.set(0, 0.05, 0.6);
+    const flagBox = MeshBuilder.CreateBox('pinFlag', { width: 0.7, height: 0.34, depth: 0.03 }, ctx.scene);
+    flagBox.bakeTransformIntoVertices(Matrix.Translation(0.35, 0, 0));   // the box's origin at its pole edge: it turns on the pole
+    flag = flagBox;
+    flag.position.set(holePos.x, 1.85, holePos.z);
+    flag.material = golfMats(ctx).flag; flag.isPickable = false;
+    ball.position.set(LOOP_TEE.x, 0.05, LOOP_TEE.z);
     meAnim.loop(SPORT_CLIP.golfAddress, { fadeSec: 0.3 });
     strikeIn = 0; pendingStrike = null;
     // HOLE PREVIEW — fly the camera to the green, look back at the tee.
@@ -375,19 +318,22 @@ export const GolfMode: ModeDefinition = (() => {
     strokes = 0;
     holeLatch = false;                // A+ P0: a new hole gets its own punch
     settling = false;
+    trail?.stop();
     // COURSE READING — the third pillar, and none of its inputs existed. Wind
     // is the cheapest honest one: it is visible in the HUD before you commit,
     // it pushes the ball for the whole flight, and it makes the reticle a
     // starting point rather than an answer.
-    const wa = (round * 2.399) % (Math.PI * 2);
-    wind = new Vector3(Math.sin(wa) * (1.2 + (round % 3) * 0.9), 0, Math.cos(wa) * 0.6);
+    const wa = loopWindAngle(round, seed);   // IMPROVE #2: the old golden-angle walk from a seeded heading
+    wind.set(Math.sin(wa) * (1.2 + (round % 3) * 0.9), 0, Math.cos(wa) * 0.6);
     // WEATHER: a pick that carries wind (a windy day, a storm, rain) sets the hole's wind — one value, not a second one
-    { const w = weather.flightWind(); if (Math.hypot(w.x, w.z) >= 0.5) wind = new Vector3(w.x, 0, w.z); }
+    { const w = weather.flightWind(); if (Math.hypot(w.x, w.z) >= 0.5) wind.set(w.x, 0, w.z); }
     if (flag) {
       // Point the flag downwind and lean it by strength — the reading a golfer
       // actually takes before choosing a club.
-      flag.rotation.y = Math.atan2(wind.x, wind.z);
-      flag.rotation.z = -Math.min(0.9, wind.length() * 0.35);
+      // IMPROVE #6: the box's long side is its local +x, so DOWNWIND is the wind's bearing less a quarter turn; a still
+      // flag hangs (1.2 rad below level) and a 3 m/s wind flies it out flat — more wind, less droop.
+      flag.rotation.y = Math.atan2(wind.x, wind.z) - Math.PI / 2;
+      flag.rotation.z = -Math.max(0.1, 1.2 - wind.length() * 0.35);
     }
     phase = 'preview'; previewSec = 0;
     // The hole preview is an AUTHORED SHOT: the camera flies to the green and
@@ -402,7 +348,7 @@ export const GolfMode: ModeDefinition = (() => {
     const clutch = round === TOTAL;
     ctx.setHud({
       round: `${round}/${TOTAL}`, power: 0, accuracy: '',
-      hint: clutch ? 'FINAL SHOT — study the green' : `HOLE ${round} — ${Math.round(Vector3.Distance(ball.position, holePos))}m out`,
+      hint: clutch ? 'FINAL SHOT — study the green' : `HOLE ${round} · PAR ${parOf(round)} — ${Math.round(distToPin())}m out`,
     });
     buildHolePark(ctx);   // PARKOUR GOLF
   }
@@ -415,7 +361,7 @@ export const GolfMode: ModeDefinition = (() => {
    *  instead of two implementations that drift apart. */
   /** On the green the club is taken out of your hands — you putt. */
   function onGreen(): boolean {
-    return Vector3.Distance(new Vector3(ball.position.x, 0, ball.position.z), holePos) <= PUTT_RANGE_M;
+    return distToPin() <= PUTT_RANGE_M;   // IMPROVE #18: it built a Vector3 on every call, and it is called every frame
   }
 
   /** The course under the ball: the green is the hole's disc, the fairway the mown strip, the rest is rough. */
@@ -429,15 +375,48 @@ export const GolfMode: ModeDefinition = (() => {
   function pinYaw(): number { const v = holePos.subtract(ball.position); return Math.atan2(v.x, v.z); }
   /** Redraw the arrow (this club, full power, this wind) and, when asked, the meter's carry lines. */
   function refreshAim(ctx: ModeContext, withTicks: boolean): void {
-    const c = onGreen() ? PUTTER : GOLF_CLUBS[club];
+    // IMPROVE (2026-10-06, Golf #5): on the green the ring is the PUTT — resolvePutt's pace and the green's break, rolled
+    // ahead and dropping if it would (GolfAim.simulatePutt) — and the arrow runs to where it STOPS. It was the putter flown
+    // as a club (another speed, no break), so the preview said one thing and the putt did another.
+    const green = onGreen();
     const from = { x: ball.position.x, y: ball.position.y, z: ball.position.z };
-    const pred = simulateShot(c, 1, aimYaw, from, air(), surfaceAt);
-    arrow?.set(ball.position, aimYaw, pred.carryM, pred.carry, pred.rest); lastCarryM = pred.carryM;
-    me.root.rotation.y = aimYaw;   // the golfer faces the arrow
+    const pred = green ? simulatePutt(1, aimYaw, from, holePos, air(), surfaceAt) : simulateShot(GOLF_CLUBS[club], 1, aimYaw, from, air(), surfaceAt);
+    predYaw = aimYaw; predLen = green ? pred.totalM : pred.carryM; lastCarryM = predLen;
+    const land = green ? pred.rest : pred.carry; predCarry.x = land.x; predCarry.z = land.z; predRest.x = pred.rest.x; predRest.z = pred.rest.z;
+    aimDirty = false; aimRefreshT = 0;
+    drawAim();
     const aimDeg = Math.round(((aimYaw - pinYaw() + Math.PI * 3) % (Math.PI * 2) - Math.PI) * 180 / Math.PI);   // the arrow's offset from the pin line, for the HUD
-    if (withTicks) { ticks = meterTicks(c, aimYaw, from, air(), surfaceAt); ctx.setHud({ meterTicks: ticks.join(','), aimCarry: Math.round(pred.carryM), aimDeg }); }
-    else ctx.setHud({ aimCarry: Math.round(pred.carryM), aimDeg });
+    if (withTicks) startTicks(green, from);
+    ctx.setHud({ aimCarry: Math.round(predLen), aimDeg });
   }
+  /**
+   * IMPROVE (2026-10-06, Golf #13): the arrow at THIS yaw from the last exact prediction, turned about the ball. Turning the
+   * aim ran a full flight (up to 1680 sim steps) every frame; the flight is re-run at most every AIM_REFRESH_SEC now, and
+   * between runs the ring turns with the arrow (exact in still air; within a frame or two of exact in a wind).
+   */
+  function drawAim(): void {
+    const d = aimYaw - predYaw;
+    rotateAbout(predCarry, ball.position.x, ball.position.z, d, drawCarry); rotateAbout(predRest, ball.position.x, ball.position.z, d, drawRest);
+    arrow?.set(ball.position, aimYaw, predLen, drawCarry, drawRest);
+    me.root.rotation.y = aimYaw;   // the golfer faces the arrow
+  }
+  /** IMPROVE (2026-10-06, Golf #14): the meter's eleven lines are built a flight per frame (update) instead of eleven in the
+   *  press's frame — the hitch on every B. A swing started before they are in finishes them then (stepTicks(ctx, true)). */
+  function startTicks(green: boolean, from: { x: number; y: number; z: number }): void {
+    const yaw = aimYaw, a = air(), c = GOLF_CLUBS[club], cup = { x: holePos.x, z: holePos.z };
+    // a putt's lines read how far each power ROLLS (no cup); a shot's, where it lands
+    tickJob = new MeterTickJob(green ? (p) => simulatePutt(p, yaw, from, cup, a, surfaceAt, 14, false).totalM : (p) => simulateShot(c, p, yaw, from, a, surfaceAt).carryM);
+    ticks = [];
+  }
+  function stepTicks(ctx: ModeContext, finish: boolean): void {
+    if (!tickJob) return;
+    if (finish) tickJob.finish(); else tickJob.step(1);
+    if (!tickJob.done) return;
+    ticks = tickJob.ticks; tickJob = null;
+    ctx.setHud({ meterTicks: ticks.join(',') });
+  }
+  /** A refresh the stick asked for and the throttle has not run yet: run it now (the swing starts on the true ring). */
+  function flushAim(ctx: ModeContext): void { if (aimDirty) refreshAim(ctx, false); }
 
   function strike(ctx: ModeContext, pwr: number, sideErr: number): void {
     // PUTTING. Half of golf, and the mode had none of it: every shot was a full
@@ -446,12 +425,16 @@ export const GolfMode: ModeDefinition = (() => {
     // green — and it rolls the ball along the ground rather than flying it,
     // which is why its launch is near zero and its forgiveness is the lowest in
     // the bag: on the green the LINE is the whole shot.
-    const c = onGreen() ? PUTTER : GOLF_CLUBS[club];
+    const green = onGreen();
+    const c = green ? PUTTER : GOLF_CLUBS[club];
     phase = 'flight';
-    console.info(`[GOLF-STRIKE] ${c.id} power ${pwr.toFixed(2)} side ${sideErr.toFixed(2)} ${onGreen() ? 'putt' : pad ? 'pad' : 'swing'}`);   // phase 4: the ledger
-    // phase 8: RHYTHM — a clean strike (the path inside 0.2) builds the gauge, a hook / slice empties it; at 70+ the strike is IN RHYTHM
+    lie.copyFrom(ball.position);   // IMPROVE #4: the OB drop goes on the line from here
+    console.info(`[GOLF-STRIKE] ${c.id} power ${pwr.toFixed(2)} side ${sideErr.toFixed(2)} ${green ? 'putt' : pad ? 'pad' : 'swing'}`);   // phase 4: the ledger
+    // phase 8: RHYTHM — a clean strike (the path inside 0.2) builds the gauge, a hook / slice drains it; at 70+ the strike is IN RHYTHM
+    // IMPROVE (2026-10-06, Golf #12): a hook / slice HALVES the gauge (GolfLoop.rhythmAfter) — it emptied it, so one drift
+    // took a 70+ gauge to 0 and the rhythm a round had built was gone on a single swing.
     const inRhythm = golfFlow >= GOLF_FLOW_RHYTHM;
-    golfFlow = Math.abs(sideErr) <= 0.2 ? Math.min(100, golfFlow + GOLF_FLOW_CLEAN) : 0;
+    golfFlow = rhythmAfter(golfFlow, sideErr);
     ctx.setHud({ flow: golfFlow, kinetic: golfFlow >= GOLF_FLOW_RHYTHM ? 'IN RHYTHM' : '' });
     // measured on the first cut: rhythm as EXTRA CARRY (x1.08) sent a club chosen for the distance out of bounds four times on
     // the par 4 — a steadier golfer is not a longer one. In rhythm = a steadier strike: the path error is halved (forgiveness).
@@ -486,16 +469,11 @@ export const GolfMode: ModeDefinition = (() => {
     const sideSign: -1 | 1 = sideErr >= 0 ? 1 : -1; const errMag = Math.min(1, Math.abs(sideErr));
     let vel: Vector3;
     let spin: Vector3;
-    if (onGreen()) {
-      const distM = Math.hypot(ball.position.x - holePos.x, ball.position.z - holePos.z);
-      const putt = resolvePutt(
-        { power01: pwr, face01: Math.max(0, 1 - errMag) },
-        distM,
-        greenBreakSlope(ball.position.x, holePos.x),
-      );
-      const yaw = aimYaw + putt.offlineRad;
-      const spd = putt.paceM / 1.15;
-      vel = new Vector3(Math.sin(yaw) * spd, 0.15, Math.cos(yaw) * spd);
+    if (green) {
+      // IMPROVE (2026-10-06, Golf #3 / #5): one putt launch for the putt and its preview (GolfAim.puttLaunch) — resolvePutt's
+      // pace and break as before, but the speed is now the one that ROLLS that pace (it was pace / 1.15, which left a 2 m
+      // putt 1.2 m short at full power).
+      vel = puttLaunch(pwr, Math.max(0, 1 - errMag), aimYaw, distToPin(), greenBreakSlope(ball.position.x, holePos.x), weather.wet01()).vel;
       spin = Vector3.Zero();
     } else {
       const launched = launchVelocity(c, pwr, aimYaw, errMag, sideSign);
@@ -514,6 +492,7 @@ export const GolfMode: ModeDefinition = (() => {
       ctx.feel?.impact?.(0.25 + pwr * 0.35);   // the contact feel, ON the contact (A+ P0 weight unchanged)
       sim.wind.copyFrom(wind); sim.wet01 = weather.wet01(); sim.airDensity = weather.airDensityMult();
       prevBallPos.copyFrom(ball.position); apexY = 0; sim.launch(ball.position.clone(), vel, spin); flightSec = 0;
+      if (c !== PUTTER) trail?.start();   // IMPROVE #8: the tracer runs from the strike to the rest (a putt rolls at your feet)
     };
     if (strikeIn <= 0) { pendingStrike(); pendingStrike = null; }
     ctx.setHud({
@@ -526,7 +505,8 @@ export const GolfMode: ModeDefinition = (() => {
     phase = 'aim';
     settling = false;
     ctx.camDirector.suspended = false;      // the cinematic is over
-    pulling = false; backswing = 0;
+    pulling = false; backswing = 0; pathPeakX = 0;
+    trail?.stop();
     meAnim.loop(SPORT_CLIP.golfAddress, { fadeSec: 0.3 });   // at the lie: the held finish gives way to the address
     strikeIn = 0; pendingStrike = null;
     ctx.heroRef.current = me.root;      // addressing the ball: frame the player
@@ -564,18 +544,18 @@ export const GolfMode: ModeDefinition = (() => {
     arrow?.show(true); refreshAim(ctx, true);
     ctx.camDirector.mode = 'follow';
     ctx.camDirector.snapTo(me.root.position, holePos);
-    const toPin = Vector3.Distance(new Vector3(ball.position.x, 0, ball.position.z), holePos);
+    const toPin = distToPin();
     const windDeg = windBearingDeg(wind, pinVec);
     ctx.setHud({
       club: onGreen() ? PUTTER.id : GOLF_CLUBS[club].id,
       wind: `${wind.length().toFixed(0)} m/s`,
       // A+ mission #5 (Everybody's Golf read): bearing + word for the lie panel, the hole for the chip; the meter keys
       // below are published while the three-press swing runs
-      windDeg, windWord: windWord(windDeg, wind.length()), hole: round, holes: TOTAL, par: GOLF_PAR[Math.min(round, GOLF_PAR.length) - 1] ?? 3,
+      windDeg, windWord: windWord(windDeg, wind.length()), hole: round, holes: TOTAL, par: parOf(round),
       meterT: null, swingPhase: null, powerLock: null, board: null, boardTitle: '',
       pin: `${toPin.toFixed(0)}m`, weather: weather.describe(),
       strokes, card: card(), pad: '', flicks: onGreen() ? 0 : FLICK.perShot, rings: ringsTaken.size,
-      hint: 'L-STICK turns the ARROW (the ring is a full swing) · A starts the swing · A at the top for POWER · A in the band · B cycles CLUB · or pull the stick back and drive through',
+      hint: 'L-STICK turns the ARROW (the ring is a full swing) · A starts the swing · A at the top for POWER · A in the band · B cycles CLUB · or pull the stick back and drive it STRAIGHT through (drift off line hooks / slices)',
     });
   }
 
@@ -592,6 +572,14 @@ export const GolfMode: ModeDefinition = (() => {
       me = await spawnAthlete(ctx, CFG.heroUrl, new Vector3(-0.5, 0, 0), 0, SPORT_CLIP.golfAddress);
       meAnim = new BeatOwner(me.animator); meAnim.loop(SPORT_CLIP.golfAddress);
       ball = MeshBuilder.CreateSphere('gball', { diameter: 0.1 }, ctx.scene);
+      // IMPROVE (2026-10-06, Golf #8): the ball was an untextured default sphere with no tracer — a 10 cm grey dot against
+      // the sky. It is a lit white now, and a shot draws its line (EffectsKit.ballTrail, as the court sports do; started on
+      // the strike, stopped at rest, so it is not 120 particles on a ball lying still)
+      timers.clear(); mats = null; ended = false;
+      ball.material = golfMats(ctx).ball; ball.isPickable = false;
+      trail = EffectsKit.ballTrail(ctx.scene, ball, '#fff4cf'); trail.stop();
+      banners = new BannerChannel(timers, (text) => ctx.setHud({ banner: text }));
+      seed = loopSeed();   // IMPROVE #2: a new course each play (the weather's seed is the same clock)
       sim = new GolfBallSim(ball);
       // WEATHER: the start screen's pick (natural / random / a condition / a time of day) — read here, after the page exists
       weather = WeatherKit.fromPick(readWeather('golf'), 'links', Math.floor(Date.now() / 1000) % 100000);
@@ -606,19 +594,19 @@ export const GolfMode: ModeDefinition = (() => {
       // 'wind', not 'dojo' — a martial-arts room tone on an alpine golf course.
       // Same class of mistake as the skatepark's stadium crowd bed.
       SoundKit.startAmbient('wind');
-      // L4 — a gallery behind the tee. A links hole is watched; and they are
-      // instanced silhouettes, so the whole gallery costs two draws.
+      // L4 — a gallery behind the tee. A links hole is watched.
       // two rows flanking the tee box (x ±8.5, z −1…+5): the old rows behind the tee at z −4 / −6 sat on the swing camera's
       // plane (offset z −4.2) and two bodies stood beside the lens, over the phone pad (measured 2026-09-06)
-      gallery = new Onlookers(ctx.scene, Array.from({ length: 10 }, (_, i) => new Vector3(
-        (i < 5 ? -8.5 : 8.5) + (i % 2) * (i < 5 ? -0.8 : 0.8),
-        0,
-        -1 + (i % 5) * 1.5,
-      )), '#3d4a3a');
+      // IMPROVE (2026-10-06, Golf #16): these are full skinned roster bodies now (Onlookers, Ship Pass 6), not the instanced
+      // silhouettes "two draws" described: ten spots under MAX_BODIES spawned five, three on one side and two on the other.
+      // Four, two each side of the tee box, and paused while the camera is off them (Onlookers' pauseOffscreen) — which
+      // is every shot after the drive, the whole hole preview and every flight down the fairway.
+      gallery = new Onlookers(ctx.scene, [new Vector3(-8.5, 0, 0.5), new Vector3(-8.5, 0, 3.5), new Vector3(8.5, 0, 0.5), new Vector3(8.5, 0, 3.5)],
+        '#3d4a3a', Vector3.Zero(), { pauseOffscreen: true });
       ctx.setHud({ score: 0, weather: weather.describe() });
       if (process.env.NODE_ENV === 'development') {
         (ctx.scene.metadata ??= {}).golf = {   // PARKOUR GOLF probes
-          state: () => ({ phase, hole: round, strokes, ended, onGreen: onGreen(), ballX: ball.position.x, ballY: ball.position.y, ballZ: ball.position.z, holeX: holePos.x, holeZ: holePos.z, pad, flicksLeft, rings: ringsTaken.size, ringChain, slidePutt, pts, ...golfPark, flying: sim.ball.active, rolling: sim.ball.rolling, carryM: lastCarryM, apexY, distToPin: Vector3.Distance(new Vector3(ball.position.x, 0, ball.position.z), holePos) }),
+          state: () => ({ phase, hole: round, strokes, ended, onGreen: onGreen(), ballX: ball.position.x, ballY: ball.position.y, ballZ: ball.position.z, holeX: holePos.x, holeZ: holePos.z, par: parOf(round), seed, pad, flicksLeft, rings: ringsTaken.size, ringChain, slidePutt, pts, ...golfPark, flying: sim.ball.active, rolling: sim.ball.rolling, carryM: lastCarryM, apexY, distToPin: distToPin() }),
         };
       }
       nextShot(ctx);
@@ -634,7 +622,7 @@ export const GolfMode: ModeDefinition = (() => {
           if (f !== 0) {
             const d = flickVel({ x: sim.ball.vel.x, z: sim.ball.vel.z }, f); sim.ball.vel.x += d.x; sim.ball.vel.z += d.z;
             flicksLeft--; golfPark.flicks++; SoundKit.play('whoosh', { pitch: 1.5, volume: 0.35 }); ctx.feel?.impact?.(0.12);
-            ctx.setHud({ flicks: flicksLeft, banner: `FLICK ${f > 0 ? '▶' : '◀'}` }); setTimeout(() => ctx.setHud({ banner: '' }), 400); console.info(`[GOLF-PARK] flick ${f > 0 ? 'right' : 'left'} (${flicksLeft} left)`);
+            ctx.setHud({ flicks: flicksLeft }); banners?.flash(`FLICK ${f > 0 ? '▶' : '◀'}`, 400); console.info(`[GOLF-PARK] flick ${f > 0 ? 'right' : 'left'} (${flicksLeft} left)`);
           }
         }
         prevFlickX = e.x;
@@ -643,20 +631,33 @@ export const GolfMode: ModeDefinition = (() => {
         // strike: how far you pulled is the power, and where the stick sits
         // laterally as you come through is the path, so a swing that drifts off
         // line hooks or slices exactly as a real one does.
+        // IMPROVE (2026-10-06, Golf #1): it struck with a side error of 0 — "the stick turns the aim; it no longer also hooks
+        // the swing" — so a full pull-and-push was full power AND pure, every time, and the three-press swing was the worse
+        // choice. The aim still never turns during a swing (update() turns it only while not pulling); what the stick does
+        // sideways BETWEEN the pull-back and the push-through is the path now: its peak past a dead zone is the side error
+        // (GolfLoop.stickPathErr), right slices and left hooks, as the three-press swing's late / early do.
         if (phase === 'aim') {
           if (e.y <= -SWING_STICK) {
+            if (!pulling) pathPeakX = 0;
             pulling = true;
             backswing = Math.max(backswing, Math.min(1, -e.y));
-          } else if (pulling && e.y >= SWING_STICK) {
+          }
+          if (pulling && Math.abs(e.x) > Math.abs(pathPeakX)) pathPeakX = e.x;
+          if (pulling && e.y >= SWING_STICK) {
             pulling = false;
-            strike(ctx, backswing, 0);   // FLAG: the stick turns the aim; it no longer also hooks the swing. Direction is the arrow.
-            backswing = 0;
+            flushAim(ctx);
+            strike(ctx, backswing, stickPathErr(pathPeakX));   // the arrow is the direction; the path is the curve
+            backswing = 0; pathPeakX = 0;
           }
         }
       }
       if (e.t === 'button' && e.btn === 'A' && e.pressed) {
         if (phase === 'preview') { backToTee(ctx); return; }   // skip the flyover
-        if (phase === 'aim') { phase = 'power'; meter.start(); ctx.setHud({ hint: 'SWING at the top for POWER' }); }
+        if (phase === 'aim') {
+          flushAim(ctx); stepTicks(ctx, true);   // IMPROVE #13 / #14: the swing starts on the true ring and the full meter lines
+          meter.rate = onGreen() ? GOLF_PUTT_METER_RATE : POWER_METER_RATE;   // IMPROVE #7: a slower wave on the green
+          phase = 'power'; meter.start(); meterHud.reset(); ctx.setHud({ hint: 'SWING at the top for POWER' });
+        }
         else if (phase === 'power') {
           power = meter.value;                    // keep the wave running — accuracy rides it down
           phase = 'accuracy';
@@ -670,7 +671,7 @@ export const GolfMode: ModeDefinition = (() => {
       }
       // PARKOUR GOLF: Y before the swing is the SPRINGBOARD hop (power off the launch position); LT on the green is the SLIDE PUTT
       if (e.t === 'button' && e.btn === 'Y' && e.pressed) {
-        if (phase === 'aim' && !onGreen() && !pad) { pad = 'springboard'; hopT = 0; SoundKit.play('whoosh', { pitch: 1.2, volume: 0.4 }); ctx.setHud({ pad: PAD.springboard.label, banner: `SPRINGBOARD — +${Math.round((PAD.springboard.mult - 1) * 100)}% off the pad` }); setTimeout(() => ctx.setHud({ banner: '' }), 600); console.info('[GOLF-PARK] springboard'); }
+        if (phase === 'aim' && !onGreen() && !pad) { pad = 'springboard'; hopT = 0; SoundKit.play('whoosh', { pitch: 1.2, volume: 0.4 }); ctx.setHud({ pad: PAD.springboard.label }); banners?.flash(`SPRINGBOARD — +${Math.round((PAD.springboard.mult - 1) * 100)}% off the pad`, 600); console.info('[GOLF-PARK] springboard'); }
         else refuse(ctx, onGreen() ? 'NO PAD ON THE GREEN' : pad ? 'ON THE PAD ALREADY' : 'HOP BEFORE THE SWING');
         return;
       }
@@ -679,7 +680,7 @@ export const GolfMode: ModeDefinition = (() => {
       if (e.t === 'button' && e.btn === 'B' && e.pressed && phase === 'aim' && !onGreen()) {
         club = (club + 1) % GOLF_CLUBS.length;
         SoundKit.play('uiTick', { pitch: 1.1 });
-        const toPin = Vector3.Distance(new Vector3(ball.position.x, 0, ball.position.z), holePos);
+        const toPin = distToPin();
         ctx.setHud({ club: GOLF_CLUBS[club].id, pin: `${toPin.toFixed(0)}m` });
         refreshAim(ctx, true);   // a new club is a new arrow and new meter lines
         ctx.juice.callout(`${GOLF_CLUBS[club].id.toUpperCase()} · PIN ${toPin.toFixed(0)} m`, '#8fe0a0');   // the change is SAID, not only a HUD field
@@ -698,11 +699,25 @@ export const GolfMode: ModeDefinition = (() => {
         if (previewSec >= PREVIEW_SEC) backToTee(ctx);
         return;                                   // camera holds the green view
       }
-      if (phase === 'power' || phase === 'accuracy') ctx.setHud({ power: Math.round(meter.value * 100), meterT: Number(meter.value.toFixed(3)), swingPhase: phase, powerLock: phase === 'accuracy' ? Math.round(power * 100) : null, meterCarry: ticks.length ? Math.round(carryAt(ticks, phase === 'accuracy' ? power : meter.value)) : null });
+      // IMPROVE (2026-10-06, Golf #17): the meter's five keys went out as a new object every frame (with a toFixed string),
+      // the unchanged ones included; only the keys whose published (rounded) value moved are pushed now (GolfLoop.MeterHudGate)
+      if (phase === 'power' || phase === 'accuracy') {
+        const v = meter.value, acc = phase === 'accuracy';
+        const patch = meterHud.next(Math.round(v * 100), Math.round(v * 1000) / 1000, phase, acc ? Math.round(power * 100) : null, ticks.length ? Math.round(carryAt(ticks, acc ? power : v)) : null);
+        if (patch) ctx.setHud(patch);
+      }
       // PARKOUR GOLF: the springboard hop, the fan turning
       if (hopT >= 0) { hopT += dt; const u = Math.min(1, hopT / 0.45); me.root.position.y = Math.sin(u * Math.PI) * 0.6; if (u >= 1) { hopT = -1; me.root.position.y = 0; } }
       if (fanBlades) fanBlades.rotation.z += dt * 6;
-      if (phase === 'aim' && !pulling) { const y0 = aimYaw; aimYaw = turnAim(aimYaw, pinYaw(), stickX, dt); if (aimYaw !== y0) refreshAim(ctx, false); }
+      if (phase === 'aim' && !pulling) {
+        // IMPROVE (2026-10-06, Golf #13): the arrow turns every frame from the last prediction; the flight is re-run at most
+        // every AIM_REFRESH_SEC while the stick turns it, and once more when it stops (the ring settles on the exact read)
+        const y0 = aimYaw; aimYaw = turnAim(aimYaw, pinYaw(), stickX, dt);
+        if (aimYaw !== y0) { aimDirty = true; drawAim(); }
+        aimRefreshT += dt;
+        if (aimDirty && aimRefreshT >= AIM_REFRESH_SEC) refreshAim(ctx, false);
+      }
+      if (phase === 'aim') stepTicks(ctx, false);   // IMPROVE #14: one meter line a frame
       // Phase 3 wants update() EVERY frame; this mode drove its camera only
       // during flight, so between shots the camera never converged on its fixed
       // framing — it sat wherever the last snap left it, which after a long
@@ -713,7 +728,10 @@ export const GolfMode: ModeDefinition = (() => {
         // A unit vector toward the pin stands in for velocity, which is how the
         // director is told which way "behind" is for a stationary subject.
         // WII AIM: the camera looks down the ARROW, so turning the aim turns the view
-        const aimDir = new Vector3(Math.sin(aimYaw), 0, Math.cos(aimYaw));
+        // IMPROVE (2026-10-06, Golf #9 / #18): the ONE camera update of an aiming frame, from a scratch vector. A second
+        // update(…, Vector3.Zero(), …) used to follow at the end of update() — zero velocity tells the director "keep
+        // whatever side you are on", so it undid "behind the arrow" and stepped the follow lerp twice a frame.
+        aimDir.set(Math.sin(aimYaw), 0, Math.cos(aimYaw));
         ctx.camDirector.update(me.root.position, aimDir, holePos);
       }
       if (phase === 'flight') {
@@ -721,7 +739,7 @@ export const GolfMode: ModeDefinition = (() => {
           // the club is still coming down: the ball waits on the contact key
           strikeIn -= dt;
           if (strikeIn <= 0 && pendingStrike) { pendingStrike(); pendingStrike = null; }
-          ctx.camDirector.update(ball.position, pendingVel ?? Vector3.Zero(), holePos);
+          ctx.camDirector.update(ball.position, pendingVel ?? STILL, holePos);
           return;
         }
         // THE FLIGHT IS PHYSICS: drag, backspin lift, the wind through the air, a bounce that takes a pitch mark, the
@@ -734,17 +752,17 @@ export const GolfMode: ModeDefinition = (() => {
           const line = { x: holePos.x - teePos.x, z: holePos.z - teePos.z };
           for (const rg of rings) if (!ringsTaken.has(rg.id) && ringPass(prevBallPos, ball.position, rg, line)) {
             ringsTaken.add(rg.id); ringChain++; golfPark.ringsTotal++; const gained = RINGS.pts * (ringChain >= 2 ? RINGS.chainMult : 1); pts += gained;
-            ringMeshes.get(rg.id)?.setEnabled(false); SoundKit.play('score', { pitch: 1.4 }); EffectsKit.burst(ctx.scene, ball.position.clone(), 'sparks');
-            ctx.setHud({ score: pts, rings: ringsTaken.size, banner: ringChain >= 2 ? `RING CHAIN! +${gained}` : `RING! +${gained}` }); setTimeout(() => ctx.setHud({ banner: '' }), 700); console.info(`[GOLF-PARK] ring ${rg.id} +${gained}`);
+            ringMeshes.get(rg.id)?.setEnabled(false); SoundKit.play('score', { pitch: 1.4 }); EffectsKit.burst(ctx.scene, ball.position, 'sparks');   // burst clones its emitter point
+            ctx.setHud({ score: pts, rings: ringsTaken.size }); banners?.flash(ringChain >= 2 ? `RING CHAIN! +${gained}` : `RING! +${gained}`, 700); console.info(`[GOLF-PARK] ring ${rg.id} +${gained}`);
           }
           if (fan && !sim.ball.rolling) {
             const g = gustAt(ball.position, fan);
-            if (g) { sim.ball.vel.x += g.x * dt; sim.ball.vel.z += g.z * dt; if (!gusting) { gusting = true; golfPark.gusts++; ctx.setHud({ banner: 'TURBINE — flick against it' }); setTimeout(() => ctx.setHud({ banner: '' }), 500); console.info('[GOLF-PARK] gust'); } }
+            if (g) { sim.ball.vel.x += g.x * dt; sim.ball.vel.z += g.z * dt; if (!gusting) { gusting = true; golfPark.gusts++; banners?.flash('TURBINE — flick against it', 500); console.info('[GOLF-PARK] gust'); } }
             else gusting = false;
           }
           if (sim.ball.rolling && onGreen()) {
             bankCool = Math.max(0, bankCool - dt);
-            if (bankCool === 0) { const r = bankReflect(ball.position, sim.ball.vel, holePos, slidePutt); if (r) { sim.ball.vel.x = r.x; sim.ball.vel.z = r.z; bankCool = 0.4; if (!bankRode) { bankRode = true; golfPark.bankRides++; ctx.setHud({ banner: slidePutt ? 'SLIDE PUTT — riding the bank' : 'OFF THE BANK' }); setTimeout(() => ctx.setHud({ banner: '' }), 600); } SoundKit.play('clang', { pitch: 1.6, volume: 0.35 }); console.info('[GOLF-PARK] bank ride'); } }
+            if (bankCool === 0) { const r = bankReflect(ball.position, sim.ball.vel, holePos, slidePutt); if (r) { sim.ball.vel.x = r.x; sim.ball.vel.z = r.z; bankCool = 0.4; if (!bankRode) { bankRode = true; golfPark.bankRides++; banners?.flash(slidePutt ? 'SLIDE PUTT — riding the bank' : 'OFF THE BANK', 600); } SoundKit.play('clang', { pitch: 1.6, volume: 0.35 }); console.info('[GOLF-PARK] bank ride'); } }
           }
         }
         prevBallPos.copyFrom(ball.position); apexY = Math.max(apexY, ball.position.y);
@@ -753,11 +771,12 @@ export const GolfMode: ModeDefinition = (() => {
         const flying = sim.ball.active;
         ctx.camDirector.update(ball.position, sim.ball.vel, holePos);
         if (!flying && !settling) {
-          const flat = new Vector3(ball.position.x, 0, ball.position.z);
+          trail?.stop();   // IMPROVE #8: the ball is at rest
+          banners?.cancel();   // IMPROVE #10: the rest's own banner is next; no flash clear may wipe it
           // Owner decision (2026-09-05): TRIPLE-PAR PICK-UP. At three times par the hole is scored as triple par and the
           // round moves on — a hole that is never holed used to never end (traced: the ball wandered and re-dropped for
           // 330 s on hole 1). A real player rarely reaches it; a stuck one always finishes the card.
-          const parNow = GOLF_PAR[Math.min(round, GOLF_PAR.length) - 1] ?? 3;
+          const parNow = parOf(round);
           const pickUp = (why: string) => {
             const rel = strokes - parNow;
             overPar += rel; pickUps++;
@@ -768,7 +787,7 @@ export const GolfMode: ModeDefinition = (() => {
             holeResults.push({ hole: round, par: parNow, strokes, pickedUp: true });
             ctx.setHud({ score: pts, strokes, card: card(), meterT: null, swingPhase: null, powerLock: null, banner: `PICKED UP — ${why} · ${strokes} on a par ${parNow}`, board: holeBoard(holeResults, TOTAL), boardTitle: round >= TOTAL ? 'CARD IN' : `NEXT — HOLE ${round + 1}` });
             settling = true;
-            setTimeout(() => {
+            later(() => {
               ctx.setHud({ banner: '', board: null, boardTitle: '' });
               if (round >= TOTAL) { ended = true; SoundKit.play('whistle'); console.info(`[GOLF-END] card in ${overPar > 0 ? '+' : ''}${overPar} pickUps ${pickUps} pts ${pts}`); ctx.end('CARD_IN', pts, { holes: TOTAL, overPar, pickUps }); }
               else nextShot(ctx);
@@ -778,20 +797,23 @@ export const GolfMode: ModeDefinition = (() => {
           // rule and also stops a shanked drive leaving the course entirely.
           // Out of bounds is the EDGE OF THE FIELD (60 x 90 → ±30, ±45), not an
           // arbitrary number larger than it.
-          if (Math.abs(ball.position.x) > 28 || ball.position.z > 43 || ball.position.z < -6) {
+          if (!inBounds(ball.position)) {   // GolfLoop.LOOP_BOUNDS: |x| > 28, z > 43 or z < −6, as it was
             strokes++;
             if (strokes >= parNow * 3) { pickUp('triple par, out of bounds'); return; }
-            const back = holePos.subtract(new Vector3(0, 0, 14));
-            ball.position.set(back.x, 0.05, Math.max(1, back.z));
+            // IMPROVE (2026-10-06, Golf #4): the drop was always 14 m straight in front of the pin — often a better lie than
+            // a decent drive, so going out of bounds could pay. It is on the shot's own line now, 2 m inside where that line
+            // left the field (GolfLoop.obDrop): the penalty stroke and no lie the shot did not earn.
+            const drop = obDrop(lie, ball.position);
+            ball.position.set(drop.x, 0.05, drop.z);
             SoundKit.play('miss');
             ctx.feel?.impact?.(0.15);   // A+ P0: OB is a light feel only
             console.info('[GOLF-JUICE] out of bounds (light feel)');
             ctx.setHud({ banner: `OUT OF BOUNDS — penalty stroke (${strokes})`, strokes });
             settling = true;
-            setTimeout(() => { ctx.setHud({ banner: '' }); backToTee(ctx); }, 1300);
+            later(() => { ctx.setHud({ banner: '' }); backToTee(ctx); }, 1300);
             return;
           }
-          const dist = Vector3.Distance(flat, holePos);
+          const dist = distToPin();
 
           // NOT HOLED — play it from where it lies. A hole used to be exactly
           // one shot, scored by proximity, which is why there were no strokes
@@ -805,12 +827,12 @@ export const GolfMode: ModeDefinition = (() => {
                 : `${dist.toFixed(1)}m from the pin · stroke ${strokes}`,
             });
             settling = true;
-            setTimeout(() => { ctx.setHud({ banner: '' }); backToTee(ctx); }, 1100);
+            later(() => { ctx.setHud({ banner: '' }); backToTee(ctx); }, 1100);
             return;
           }
 
           // HOLED. Golf is scored in strokes against par.
-          const par = GOLF_PAR[Math.min(round, GOLF_PAR.length) - 1] ?? 3;
+          const par = parOf(round);
           const rel = strokes - par;
           overPar += rel;
           const clutch = round === TOTAL;
@@ -832,10 +854,10 @@ export const GolfMode: ModeDefinition = (() => {
           ctx.setHud({
             score: pts, strokes, card: card(), meterT: null, swingPhase: null, powerLock: null,
             banner: `${bankRode ? 'BANKED IN! ' : ''}${name} — ${strokes} on a par ${par}${clutch ? ' · CLUTCH' : ''}`,
-            board: holeBoard(holeResults, TOTAL), boardTitle: round >= TOTAL ? 'CARD IN' : `NEXT — HOLE ${round + 1} · PAR ${GOLF_PAR[Math.min(round + 1, GOLF_PAR.length) - 1] ?? 3}`,
+            board: holeBoard(holeResults, TOTAL), boardTitle: round >= TOTAL ? 'CARD IN' : `NEXT — HOLE ${round + 1} · PAR ${parOf(round + 1)}`,
           });
           settling = true;
-          setTimeout(() => {
+          later(() => {
             ctx.setHud({ banner: '', board: null, boardTitle: '' });
             if (round >= TOTAL) {
               ended = true; SoundKit.play('whistle');
@@ -845,10 +867,18 @@ export const GolfMode: ModeDefinition = (() => {
         }
         return;
       }
-      ctx.camDirector.update(me.root.position, Vector3.Zero(), holePos);
     },
 
-    dispose() { golfVenue?.dispose?.(); golfVenue = null; gallery?.dispose(); gallery = null; flag?.dispose(); flag = null; me?.dispose(); furniture.forEach((f) => f.dispose()); ball?.dispose(); arrow?.dispose(); arrow = null; weatherFx?.dispose(); weatherFx = null; SoundKit.stopAmbient(); },
+    dispose() {
+      // IMPROVE (2026-10-06, Golf #11): the hole's timers (next hole, back to the lie, the card) could fire on a disposed
+      // scene; the mode is ended and every pending one cleared first (each also checks `ended` when it runs)
+      ended = true; timers.clear(); banners = null; tickJob = null;
+      golfVenue?.dispose?.(); golfVenue = null; gallery?.dispose(); gallery = null; flag?.dispose(); flag = null; me?.dispose();
+      clearFurniture(); trail?.dispose(); trail = null; ball?.dispose(); arrow?.dispose(); arrow = null; weatherFx?.dispose(); weatherFx = null;
+      if (mats) for (const m of Object.values(mats)) m.dispose();   // IMPROVE #15: the mode's own materials go with it
+      mats = null;
+      SoundKit.stopAmbient();
+    },
   };
 })();
 
@@ -862,8 +892,8 @@ export const GolfMode: ModeDefinition = (() => {
 //              the PCI has to track it, which is the whole point of the pitch;
 //   changeup — same look, ~0.78x speed: the timing read. No banner tells you;
 //              the ball flight is the tell, as it is at the plate.
-// Deterministic by round (the whole mode's pitch formula already is), and
-// EXPORTED so the PCI driver and the headless suite read the mode's own
+// Deterministic by round and the session's seed (IMPROVE 2026-10-06, Derby #5: by round alone the sequence repeated every
+// derby), and EXPORTED so the PCI driver and the headless suite read the mode's own
 // numbers instead of mirroring them — the driver's header demands exactly
 // that ("reads the pitch location from the mode's OWN formula … so the two
 // cannot drift"), and it was mirroring anyway.
@@ -879,17 +909,16 @@ export interface PitchSpec {
   breakShift: number;      // slider: lateral arrival shift (m), 0 otherwise
 }
 
-/** The pitch mix: fastballs to learn on, then a real mix. Deterministic. */
-const PITCH_MIX: PitchType[] = ['fastball', 'fastball', 'slider', 'fastball', 'changeup', 'slider', 'fastball', 'changeup', 'slider', 'fastball'];
-
-export function pitchSpec(round: number): PitchSpec {
-  const type = PITCH_MIX[(round - 1) % PITCH_MIX.length];
-  const ax = (Math.sin(round * 2.7) * 0.8) * ZONE_HALF.x;
-  const ay = 1.05 + Math.cos(round * 1.9) * ZONE_HALF.y;
+/** IMPROVE (2026-10-06, Derby #5): the mix and the location walk are DerbyLoop.pitchShape's — `seed` omitted is the old
+ *  fixed sequence (the depth suite reads it); the mode passes its session seed, so a derby can no longer be memorised. */
+export function pitchSpec(round: number, seed?: number): PitchSpec {
+  const { type, ux, uy, breakSign } = pitchShape(round, seed);
+  const ax = (ux * 0.8) * ZONE_HALF.x;
+  const ay = 1.05 + uy * ZONE_HALF.y;
   const speed = (14 + round * 0.5) * (type === 'changeup' ? 0.78 : 1);
   // sliders break to alternating sides; hard enough that covering the aim
   // point means the edge of the bat, not the barrel
-  const breakShift = type === 'slider' ? (round % 2 === 0 ? 0.45 : -0.45) : 0;
+  const breakShift = type === 'slider' ? breakSign * 0.45 : 0;
   const aim = new Vector3(ax, ay, 0);
   return {
     type,
@@ -951,63 +980,167 @@ export const DerbyMode: ModeDefinition = (() => {
   // A fielder gets a BeatOwner like every other body in this file: the derby's first cut drove their run/idle loops
   // with two raw `animator.play` calls, which is the exact discipline net-anim-tests guards (one owner per body, so a
   // beat can never be cut by a locomotion frame). `loop()` is per-frame safe and dedupes, so it is a drop-in.
-  let fielders: { char: SpawnedCharacter; own: BeatOwner; bearing: number; home: Vector3; run: { bearing: number; t: number; total: number; mode: Rob; boost: number; h: number } | null; y: number; moving: boolean }[] = [];
+  let fielders: { char: SpawnedCharacter; own: BeatOwner; bearing: number; home: Vector3; run: { bearing: number; t: number; total: number; mode: Rob; boost: number; h: number; to: Vector3 } | null; y: number; moving: boolean }[] = [];
   let token: { mesh: AbstractMesh; t: number; bearing: number; who: 'yours' | 'theirs' } | null = null;
   const park = { batFlips: 0, targetsHit: 0, robbed: 0, tokensYours: 0, tokensTheirs: 0 };
   let lastVerdict: Verdict | '' = '', lastDetail = '', settledRound = 0;
+  // IMPROVE (2026-10-06, Derby #9 / #10): every delayed call goes through one bag dispose() clears, and every banner
+  // through one channel — the token's, the settle's, the bat-flip's and the whiff's clears used to wipe each other.
+  const timers = new TimerBag();
+  let bannerCh: BannerChannel | null = null;
+  /** #5: this derby's pitch sequence. */
+  let seed = 0;
+  /** #3: the last swing's miss, for the whiff's banner ('' when the pitch was taken or the swing connected). */
+  let missLine = '';
+  /** #17: the token's one material per load (dropToken made a PBR material per drop and mesh.dispose() left it). */
+  let tokenMat: Material | null = null;
+  /** #1: the target paint (two textures, two materials), disposed with the mode. */
+  let targetMats: Material[] = [];
+  /** #8: the approach ring that closes on the PCI as the ball comes into the window. */
+  let cueRing: Mesh | null = null, cueMat: PBRMaterial | null = null, cueWasIn: boolean | null = null;
+  /** #11: the hit's tracer. */
+  let trail: ParticleSystem | null = null;
+  // #13 / #14 / #16: scratch for the per-frame bat, fielder, posture and camera feeds (nothing allocated a frame).
+  const ZERO_V = Vector3.Zero(), UP_V = Vector3.Up();
+  const pitchAimAt = new Vector3();
   const bearingOf = (x: number, z: number) => (Math.atan2(x, z) * 180) / Math.PI;
-  const onWall = (deg: number, r: number, y = 0) => { const rad = (deg * Math.PI) / 180; return new Vector3(Math.sin(rad) * r, y, Math.cos(rad) * r); };
+  const onWall = (deg: number, r: number, y = 0, out = new Vector3()) => { const rad = (deg * Math.PI) / 180; return out.set(Math.sin(rad) * r, y, Math.cos(rad) * r); };
   /** The upper tier, the rail-bar, the pillars and the targets on the outfield wall. */
   function buildPark(ctx: ModeContext): void {
     const tierMat = VenueKit.paint(ctx.scene, 'park_tier_mat', '#2d5b45', 0.05, 0.85), railMat = VenueKit.paint(ctx.scene, 'park_rail_mat', '#d9d2c2', 0.08, 0.5), pillarMat = VenueKit.paint(ctx.scene, 'park_pillar_mat', '#4b5563', 0.05, 0.8);
+    const tiers: Mesh[] = [], rails: Mesh[] = [], pillars: Mesh[] = [];
     for (const deg of [-40, -20, 0, 20, 40]) {
       const rad = (deg * Math.PI) / 180;
       const tier = MeshBuilder.CreateBox(`park_tier_${deg}`, { width: 13.4, height: PARK.wallTop - 3, depth: 0.5 }, ctx.scene);
-      tier.position.copyFrom(onWall(deg, PARK.wallR, 3 + (PARK.wallTop - 3) / 2)); tier.rotation.y = rad; tier.material = tierMat; tier.isPickable = false; furniture.push(tier);
+      onWall(deg, PARK.wallR, 3 + (PARK.wallTop - 3) / 2, tier.position); tier.rotation.y = rad; tier.material = tierMat; tier.isPickable = false; tiers.push(tier);
       const rail = MeshBuilder.CreateCylinder(`park_rail_${deg}`, { diameter: 0.12, height: 13.2 }, ctx.scene);
-      rail.position.copyFrom(onWall(deg, PARK.wallR - 0.45, PARK.railY)); rail.rotation.z = Math.PI / 2; rail.rotation.y = rad; rail.material = railMat; rail.isPickable = false; furniture.push(rail);
+      onWall(deg, PARK.wallR - 0.45, PARK.railY, rail.position); rail.rotation.z = Math.PI / 2; rail.rotation.y = rad; rail.material = railMat; rail.isPickable = false; rails.push(rail);
     }
     for (const deg of PARK.pillarBearings) {
       const pil = MeshBuilder.CreateCylinder(`park_pillar_${deg}`, { diameter: 0.6, height: PARK.wallTop }, ctx.scene);
-      pil.position.copyFrom(onWall(deg, PARK.wallR - 0.7, PARK.wallTop / 2)); pil.material = pillarMat; pil.isPickable = false; furniture.push(pil);
+      onWall(deg, PARK.wallR - 0.7, PARK.wallTop / 2, pil.position); pil.material = pillarMat; pil.isPickable = false; pillars.push(pil);
     }
-    // WA-17: target zones score on the wall arc only — no floating pink/glass discs in the outfield.
+    // IMPROVE (2026-10-06, Derby #18): the stadium is static — the outfield wall's five segments and the five tiers are one
+    // mesh (two materials), the rails, the pillars and the foul poles another (three); both frozen. ~19 meshes → 2, the
+    // same five material draws, no per-frame world matrices. The distance band keeps its own texture and stays apart.
+    const isMesh = (m: AbstractMesh): m is Mesh => m instanceof Mesh;
+    const wallSegs = furniture.filter((m): m is Mesh => isMesh(m) && m.name.startsWith('ofwall_') && m.name !== 'ofwall_band');
+    const poles = furniture.filter((m): m is Mesh => isMesh(m) && m.name.startsWith('foulpole_'));
+    const merge = (name: string, parts: Mesh[]): Mesh | null => {
+      if (parts.length === 0) return null;
+      const one = parts.length > 1 ? Mesh.MergeMeshes(parts, true, true, undefined, false, true) : parts[0];
+      if (!one) { furniture.push(...parts); return null; }
+      one.name = name; one.isPickable = false; one.freezeWorldMatrix();
+      return one;
+    };
+    furniture = furniture.filter((m) => !wallSegs.includes(m as Mesh) && !poles.includes(m as Mesh));
+    const wall = merge('park_wall', [...wallSegs, ...tiers]);
+    const trim = merge('park_trim', [...rails, ...pillars, ...poles]);
+    for (const m of [wall, trim]) if (m) furniture.push(m);
+    // IMPROVE (2026-10-06, Derby #1): the targets are PAINTED on the wall — a decal projected onto the wall's own face, so
+    // it sits flush and stops at the wall's top (WA-17 took out discs that floated in front of it and over the top, and
+    // with them the only way to see a 100-point zone). One per target; a taken zone's paint goes (settleHit).
+    targetMeshes.clear(); targetMats = [];
+    if (wall) {
+      const paintFor = (kind: WallTarget['kind']): PBRMaterial => {
+        const tex = new DynamicTexture(`park_target_tex_${kind}`, { width: 256, height: 256 }, ctx.scene, true);
+        const g = tex.getContext() as unknown as CanvasRenderingContext2D;
+        g.clearRect(0, 0, 256, 256);
+        const ring = (r: number, fill: string) => { g.beginPath(); g.arc(128, 128, r, 0, Math.PI * 2); g.fillStyle = fill; g.fill(); };
+        if (kind === 'bullseye') { ring(126, '#ff2d78'); ring(96, '#fff7ed'); ring(66, '#ff2d78'); ring(36, '#fff7ed'); ring(14, '#ff2d78'); }
+        else {
+          // the multiplier glass: a gold rim (the token's gold), a pale-blue pane, a few cracks off the middle — no lettering,
+          // which a projected decal can mirror
+          ring(126, '#ffd75e'); ring(112, 'rgba(154,215,255,0.75)');
+          g.strokeStyle = 'rgba(255,255,255,0.9)'; g.lineWidth = 4;
+          for (const a of [0.3, 1.5, 2.6, 3.9, 5.1]) { g.beginPath(); g.moveTo(128, 128); g.lineTo(128 + Math.cos(a) * 108, 128 + Math.sin(a) * 108); g.stroke(); }
+        }
+        tex.hasAlpha = true; tex.update();
+        // unlit PBR: paint reads as its own colour under the 2.6 directional (a StandardMaterial clips it — the ratchet's rule)
+        const m = new PBRMaterial(`park_target_mat_${kind}`, ctx.scene);
+        m.unlit = true; m.albedoTexture = tex; m.useAlphaFromAlbedoTexture = true; m.zOffset = -2; m.backFaceCulling = false;
+        targetMats.push(m);
+        return m;
+      };
+      const mats = { bullseye: paintFor('bullseye'), glass: paintFor('glass') };
+      for (const tg of TARGETS) {
+        const rad = (tg.bearingDeg * Math.PI) / 180;
+        const decal = MeshBuilder.CreateDecal(`park_target_${tg.id}`, wall, {
+          position: onWall(tg.bearingDeg, PARK.wallR - 0.25, tg.y),
+          normal: new Vector3(-Math.sin(rad), 0, -Math.cos(rad)),   // the face looks back at the plate
+          size: new Vector3(tg.r * 2, tg.r * 2, 1.2), cullBackFaces: true,
+        });
+        decal.material = mats[tg.kind]; decal.isPickable = false; decal.freezeWorldMatrix();
+        furniture.push(decal); targetMeshes.set(tg.id, decal);
+      }
+    }
   }
   function tickFielders(dt: number): void {
     for (const f of fielders) {
       const root = f.char.root; let target = f.home; let speed: number = PARK.fielderSpeed;
       if (f.run) {
-        f.run.t += dt; target = onWall(f.run.bearing, PARK.wallR - 1.4); speed *= f.run.boost;
-        const d0 = Vector3.Distance(new Vector3(root.position.x, 0, root.position.z), target);
+        // IMPROVE (2026-10-06, Derby #14): the run's wall spot is worked out once, when the run is set (runTo), and every
+        // distance below is scalars — this ran onWall + four Vector3s per fielder per frame.
+        f.run.t += dt; target = f.run.to; speed *= f.run.boost;
+        const d0 = Math.hypot(root.position.x - target.x, root.position.z - target.z);
         if (d0 < 1.6 && f.run.mode) { const want = f.run.mode === 'hang' ? PARK.railY - 0.6 : Math.min(4.6, Math.max(0.6, f.run.h - 0.4)); f.y += (want - f.y) * Math.min(1, dt * 7); }
         if (f.run.t > f.run.total + 1.3) f.run = null;
       } else f.y += (0 - f.y) * Math.min(1, dt * 4);
-      const d = target.subtract(root.position); d.y = 0; const dist = d.length();
-      if (dist > 0.3) { const step = Math.min(dist, speed * dt); root.position.addInPlace(d.scale(step / dist)); root.rotation.y = Math.atan2(d.x, d.z); if (!f.moving) { f.moving = true; f.own.loop(SPORT_CLIP.moveLoop, { fadeSec: 0.15 }); } }
+      const dx = target.x - root.position.x, dz = target.z - root.position.z; const dist = Math.hypot(dx, dz);
+      if (dist > 0.3) { const k = Math.min(dist, speed * dt) / dist; root.position.x += dx * k; root.position.z += dz * k; root.rotation.y = Math.atan2(dx, dz); if (!f.moving) { f.moving = true; f.own.loop(SPORT_CLIP.moveLoop, { fadeSec: 0.15 }); } }
       else if (f.moving) { f.moving = false; f.own.loop(SPORT_CLIP.idle, { fadeSec: 0.2 }); root.rotation.y = Math.PI + (f.bearing * Math.PI) / 180; }
       root.position.y = f.y;
     }
   }
+  /** A fielder's run to the wall at `bearing` (#14: the spot is computed here, once). */
+  const runTo = (bearing: number, total: number, mode: Rob, boost: number, h: number): NonNullable<typeof fielders[number]['run']> =>
+    ({ bearing, t: 0, total, mode, boost, h, to: onWall(bearing, PARK.wallR - 1.4) });
   /** The multiplier glass shattered: the token drops at the wall's base and the nearest fielder goes for it. */
   function dropToken(ctx: ModeContext, tg: WallTarget): void {
     if (token) token.mesh.dispose();
-    const mesh = MeshBuilder.CreateBox(`park_token_${tg.id}`, { size: 0.5 }, ctx.scene); mesh.position.copyFrom(onWall(tg.bearingDeg, PARK.wallR - 1.6, 0.35)); mesh.rotation.y = Math.PI / 4;
-    mesh.material = VenueKit.paint(ctx.scene, 'park_token_mat', '#ffd75e', 0.6, 0.3); mesh.isPickable = false;
+    const mesh = MeshBuilder.CreateBox(`park_token_${tg.id}`, { size: 0.5 }, ctx.scene); onWall(tg.bearingDeg, PARK.wallR - 1.6, 0.35, mesh.position); mesh.rotation.y = Math.PI / 4;
+    mesh.material = tokenMat ??= VenueKit.paint(ctx.scene, 'park_token_mat', '#ffd75e', 0.6, 0.3); mesh.isPickable = false;
     const who = multiplierScramble(tg.bearingDeg, fielders.map((f) => f.bearing));
     token = { mesh, t: 0, bearing: tg.bearingDeg, who };
     const nearest = fielders.reduce<typeof fielders[number] | null>((b, f) => !b || Math.abs(f.bearing - tg.bearingDeg) < Math.abs(b.bearing - tg.bearingDeg) ? f : b, null);
-    if (nearest) nearest.run = { bearing: tg.bearingDeg, t: 0, total: TOKEN.graceSec, mode: null, boost: 1, h: 0 };
-    ctx.setHud({ banner: 'GLASS SHATTERED — the x2 is on the ground!' });
+    if (nearest) nearest.run = runTo(tg.bearingDeg, TOKEN.graceSec, null, 1, 0);
+    bannerCh?.flash('GLASS SHATTERED — the x2 is on the ground!', 900);
     console.info(`[PARK] token dropped at ${tg.bearingDeg}° → ${who}`);
   }
   function tickToken(ctx: ModeContext, dt: number): void {
     if (!token) return;
     token.t += dt; token.mesh.rotation.y += dt * 3;
     if (token.t < TOKEN.graceSec) return;
-    if (token.who === 'theirs') { park.tokensTheirs++; ctx.setHud({ banner: 'THEY GOT THE x2 — hit the far glass' }); }
-    else { park.tokensYours++; multiplier = TOKEN.mult; ctx.setHud({ banner: 'x2 IS YOURS — the next hit pays double', mult: `x${multiplier} NEXT` }); SoundKit.play('powerUp', { pitch: 1.2 }); }
-    setTimeout(() => ctx.setHud({ banner: '' }), 900);
+    if (token.who === 'theirs') { park.tokensTheirs++; bannerCh?.flash('THEY GOT THE x2 — hit the far glass', 900); }
+    else { park.tokensYours++; multiplier = TOKEN.mult; ctx.setHud({ mult: `x${multiplier} NEXT` }); bannerCh?.flash('x2 IS YOURS — the next hit pays double', 900); SoundKit.play('powerUp', { pitch: 1.2 }); }
     token.mesh.dispose(); token = null;
+  }
+  /** #2: the rival's homers so far — by pitches OR outs, whichever is further through the round. */
+  const rivalSoFar = (): number => Math.round(rivalTarget * rivalProgress(derbyProgress(round, tally.outs, TOTAL, OUTS_CAP)));
+  /** #2: the round is over — the rival's full round goes up, the verdict against it is called (after the last play's own
+   *  banner has had `verdictAfterMs` to read), then the end card. The outcome stays DERBY_END (the Story's and the
+   *  results' reads of it are unchanged); `beatRival` carries the verdict to the card. */
+  function endDerby(ctx: ModeContext, pitchCount: number, verdictAfterMs: number): void {
+    ended = true; SoundKit.play('whistle');
+    const verdict = rivalVerdict(tally.homers, rivalTarget);
+    ctx.setHud({ rivalHomers: rivalTarget });
+    const call = () => bannerCh?.flash(rivalLine(tally.homers, rivalTarget), 2000);
+    if (verdictAfterMs > 0) timers.later(call, verdictAfterMs); else call();
+    console.info(`[DERBY-END] homers ${tally.homers} outs ${tally.outs} pts ${pts} rival ${rivalTarget} ${verdict}`);
+    timers.later(() => ctx.end('DERBY_END', pts, { pitches: pitchCount, homers: tally.homers, outs: tally.outs, longestFt: tally.longestFt, rivalHomers: rivalTarget, beatRival: verdict === 'WIN' ? 1 : 0 }), verdictAfterMs + 1200);
+  }
+  /** #8: the cue's colours (waiting, in the window), its lead before the window opens, and how wide it starts. */
+  const CUE_WAIT = '#ffb020', CUE_LEAD_SEC = 0.6, CUE_GROW = 1.4;
+  const cueWaitC = Color3.FromHexString(CUE_WAIT), cueInC = Color3.FromHexString('#34e89e');
+  /** #8: the approach ring rides the PCI while a released pitch comes in unswung; nothing allocated a frame. */
+  function tickCue(): void {
+    if (!cueRing || !cueMat) return;
+    const c = incoming && !swung && throwIn <= 0 && flight.active ? contactCue(ball.position.z, 0.3, pitchSpeed, 0.15, CUE_LEAD_SEC) : null;
+    if (!c || !c.show) { if (cueRing.isEnabled()) cueRing.setEnabled(false); return; }
+    if (!cueRing.isEnabled()) cueRing.setEnabled(true);
+    cueRing.position.copyFrom(pci.pos);
+    cueRing.scaling.setAll(1 + CUE_GROW * (1 - c.fill));
+    if (cueWasIn !== c.inWindow) { cueWasIn = c.inWindow; cueMat.albedoColor.copyFrom(c.inWindow ? cueInC : cueWaitC); }
   }
   /** The wall decided: the zone, the glove, the top of the wall, or the track (was the swing's own verdict at contact). */
   function settleHit(ctx: ModeContext, verdict: Verdict): void {
@@ -1021,11 +1154,14 @@ export const DerbyMode: ModeDefinition = (() => {
     ctx.feel?.impact?.(homer ? 0.3 + q * 0.5 : tg ? 0.5 : 0.4);
     if (homer && !homerLatch) { homerLatch = true; ctx.juice.hitStop(60); ctx.juice.shake(0.14, 160); ctx.juice.flash('#FFD700', 130); console.info('[DERBY-JUICE] homer punch'); }
     else if (!homer) console.info(`[DERBY-JUICE] ${verdict} (clank weight)`);
-    const distFt = homer ? Math.round(300 + q * (80 + launch * 60) * 1.6) : 0;
+    // IMPROVE (2026-10-06, Derby #4): the feet are the flight's — where this ball, at the wall, comes down (the arc Flight
+    // is flying it on, projected to the grass). `300 + q × (80 + launch × 60) × 1.6` was not tied to it, and read 300+ FT
+    // over a wall that says 124 FT on it. Points are untouched (distPts): this is the distance line and longestFt only.
+    const distFt = homer ? homerFeet(ball.position, flight.vel, PARK.g) : 0;
     let gained = 0; let roundOver = false;
     if (tg) {
       gained = tg.pts * mult; pts += gained; park.targetsHit++; targetsHit.add(tg.id);
-      const m = targetMeshes.get(tg.id); if (m) m.setEnabled(false);
+      const m = targetMeshes.get(tg.id); if (m) m.setEnabled(false);   // #1: the zone's paint goes with it
       EffectsKit.burst(ctx.scene, ball.position.clone(), tg.kind === 'glass' ? 'sparks' : 'confetti');
       SoundKit.play('score', { pitch: 1.3 }); if (tg.kind === 'glass') SoundKit.play('clang', { pitch: 1.5, volume: 0.6 });
       if (tg.kind === 'glass') dropToken(ctx, tg);
@@ -1041,10 +1177,11 @@ export const DerbyMode: ModeDefinition = (() => {
       : homer ? (clutch ? `CLUTCH DINGER! +${gained}` : q > 0.85 ? `DINGER! +${gained}` : `HOMER +${gained}`) + x
       : verdict === 'robbed' ? (h.rob === 'hang' ? 'ROBBED — HANGING OFF THE RAIL!' : 'ROBBED AT THE WALL!')
       : verdict === 'wall' ? 'OFF THE WALL — caught' : `OUT — ${cover >= 0.5 ? 'caught on the track' : 'weak contact'}`;
-    ctx.setHud({ score: pts, banner, homers: tally.homers, outs: tally.outs, longest: tally.longestFt, distance: homer ? distanceLine(distFt, tally.longestFt) : '', targets: `${park.targetsHit}/${TARGETS.length}`, mult: multiplier > 1 ? `x${multiplier} NEXT` : '' });
-    setTimeout(() => ctx.setHud({ banner: '' }), 900);
-    console.info(`[PARK] ${verdict} ${lastDetail} +${gained}`);
-    if (roundOver) { ended = true; SoundKit.play('whistle'); console.info(`[DERBY-END] homers ${tally.homers} outs ${tally.outs} pts ${pts}`); setTimeout(() => ctx.end('DERBY_END', pts, { pitches: round, homers: tally.homers, outs: tally.outs, longestFt: tally.longestFt, rivalHomers: rivalTarget }), 1000); }
+    // #2: the rival's line moves on an out as well as a pitch
+    ctx.setHud({ score: pts, homers: tally.homers, outs: tally.outs, longest: tally.longestFt, rivalHomers: rivalSoFar(), distance: homer ? distanceLine(distFt, tally.longestFt) : '', targets: `${park.targetsHit}/${TARGETS.length}`, mult: multiplier > 1 ? `x${multiplier} NEXT` : '' });
+    bannerCh?.flash(banner, 900);
+    console.info(`[PARK] ${verdict} ${lastDetail} +${gained}${homer ? ` ${distFt} ft` : ''}`);
+    if (roundOver) endDerby(ctx, round, 700);
   }
 
   // THE BATTING CAMERA LOOKS OUT TO THE OUTFIELD (owner, 2026-09-15: "face outfield so we can see the pitcher and our
@@ -1056,17 +1193,23 @@ export const DerbyMode: ModeDefinition = (() => {
   // pitcher and the whole flight of the ball sit in the middle. The aim point is steady (PITCHER_VIEW) rather than the
   // moving ball — the 0.4 lerp onto a 17 m/s pitch is what used to drag the batter out of frame.
   const BATTING_CAM = new Vector3(-1.75, 1.85, -3.4);
+  /** IMPROVE (2026-10-06, Derby #15): the PCI readout is a driver's seam — two toFixed and a HUD push every frame of every
+   *  pitch, for nobody in production. */
+  const DEV_PCI = process.env.NODE_ENV === 'development';
   const PITCHER_VIEW = new Vector3(0, 1.45, 18);
   function battingCam(ctx: ModeContext, snap: boolean): void {
     ctx.camDirector.setFixed(BATTING_CAM, 1.25, snap);
-    if (snap) ctx.camera.setTarget(Vector3.Lerp(me.root.position.add(new Vector3(0, 1.25, 0)), PITCHER_VIEW, 0.4));
+    if (snap) ctx.camera.setTarget(Vector3.Lerp(me.root.position.add(new Vector3(0, 1.25, 0)), PITCHER_VIEW, 0.4));   // once a pitch: a fresh vector, which a camera may keep
   }
 
   function pitch(ctx: ModeContext): void {
     round++;
     swung = false; incoming = true;
     homerLatch = false;                // A+ P0: one homer punch per pitch
-    trickDone = false; hit = null;     // PARKOUR DERBY: the warm-up is per pitch; the wall has nothing pending
+    hit = null;                        // PARKOUR DERBY: the wall has nothing pending
+    // (#12: the warm-up's one-a-pitch latch resets when the last pitch is over — the set — not here, so a flip in the set
+    // carries into this pitch's wind-up as its one trick)
+    missLine = ''; trail?.stop();      // #3 / #11: the last swing's miss and tracer are over
     ctx.setHud({ flow, targets: `${park.targetsHit}/${TARGETS.length}`, mult: multiplier > 1 ? `x${multiplier} NEXT` : '' });
     ctx.heroRef.current = me.root;   // back to the batter (see contact branch)
     // CUT, don't ease — the follow cam ends a dinger forty metres downfield,
@@ -1081,7 +1224,7 @@ export const DerbyMode: ModeDefinition = (() => {
     // (D2, this pass: pitchSpec adds the movement read — sliders break late,
     // changeups take speed off. The pitch aims at the PRE-break spot; the
     // break lands it at `arrive`, which is where the PCI must actually be.)
-    const spec = pitchSpec(round);
+    const spec = pitchSpec(round, seed);   // #5: this session's sequence
     // The slider comes from a three-quarter slot; the changeup deliberately
     // shares the fastball's look (the ball flight is the tell, not the arm).
     pitcherAnim.beat(spec.type === 'slider' ? SPORT_CLIP.derbyPitchSide : SPORT_CLIP.derbyPitch, { fadeSec: 0.1 });
@@ -1100,18 +1243,19 @@ export const DerbyMode: ModeDefinition = (() => {
     throwIn = PITCH_RELEASE_SEC;   // the ball waits in the hand through the leg lift; update() releases it
     pendingThrow = () => flight.launch(ball.position, vel);
     const clutch = round === TOTAL || lastOut();
-    const rivalLive = Math.round(rivalTarget * rivalProgress(round / TOTAL));
     ctx.setHud({
       round: `PITCH ${round}`,
-      pitch: spec.label,
-      homers: tally.homers, outs: tally.outs, outsCap: OUTS_CAP, longest: tally.longestFt, rivalHomers: rivalLive, distance: '',
+      // IMPROVE (2026-10-06, Derby #7): the pitch's name is NOT on the board while it is coming — the design says no banner
+      // tells you a change-up, and this chip did. It goes up when the pitch resolves (the swing's contact line, the whiff).
+      pitch: '',
+      homers: tally.homers, outs: tally.outs, outsCap: OUTS_CAP, longest: tally.longestFt, rivalHomers: rivalSoFar(), distance: '',
       contact: '',                              // last pitch's grade is over
       hint: clutch ? `FINAL PITCH — STRIKE as it crosses the plate` : 'STRIKE as it crosses the plate · read the break',
     });
     // the dev HUD dump carries the real PCI position so drivers can CLOSE
     // THE LOOP instead of integrating their own (the open-loop model
     // drifted enough that the covering bot once lost to the blind control)
-    ctx.setHud({ pci: `${pci.pos.x.toFixed(2)},${pci.pos.y.toFixed(2)}` });
+    if (DEV_PCI) ctx.setHud({ pci: `${pci.pos.x.toFixed(2)},${pci.pos.y.toFixed(2)}` });
   }
 
   return {
@@ -1133,7 +1277,9 @@ export const DerbyMode: ModeDefinition = (() => {
         // line — flanking the infield view, outside the widest pitch (|x|<1)
         ...[0, 1, 2, 3, 4, 5].map((i) => new Vector3(6.5 + i * 0.9, 0, 3 + i * 1.4)),
         ...[0, 1, 2, 3, 4, 5].map((i) => new Vector3(-6.5 - i * 0.9, 0, 3 + i * 1.4)),
-      ]);
+        // IMPROVE (2026-10-06, Derby #19): six bodies (twelve spots, every other one), parked while off-screen — the follow
+        // cam on a hit and the outfield leave them all out of frame (Tennis's opt-in, Onlookers.pauseOffscreen).
+      ], undefined, undefined, { pauseOffscreen: true });
       me = await spawnAthlete(ctx, CFG.heroUrl, new Vector3(-0.7, 0, 0), Math.PI / 2, SPORT_CLIP.derbyStance);
       meAnim = new BeatOwner(me.animator); meAnim.loop(SPORT_CLIP.derbyStance);
       // The bat (Phase 6, 2026-09-03): the stance and swing are real now; the
@@ -1158,21 +1304,24 @@ export const DerbyMode: ModeDefinition = (() => {
           bat.material = bm;
           bat.rotationQuaternion = new Quaternion();
           const batRef = bat, meRef = me;
+          // IMPROVE (2026-10-06, Derby #13): the placement runs every frame, so it writes into these — it allocated ~8
+          // Vector3s a frame (clone, subtract, add, new Vector3, toEulerAngles, Vector3.Up()).
+          const sL = new Vector3(), sR = new Vector3(), sAlong = new Vector3(), sGrip = new Vector3(), sDir = new Vector3(), sSpan = new Vector3(), sEuler = new Vector3();
           /** The fist, not the wrist: a hand bone's origin is the wrist, the handle sits a palm further along the forearm line. */
-          const fist = (hand: typeof lh, fore: typeof lf): Vector3 => {
+          const fist = (hand: typeof lh, fore: typeof lf, out: Vector3): Vector3 => {
             hand.computeWorldMatrix(true);
-            const h = hand.getAbsolutePosition().clone();
-            if (!fore) return h;
+            out.copyFrom(hand.getAbsolutePosition());
+            if (!fore) return out;
             fore.computeWorldMatrix(true);
-            const along = h.subtract(fore.getAbsolutePosition());
-            return along.lengthSquared() > 1e-8 ? h.addInPlace(along.normalize().scaleInPlace(BAT_PALM_M)) : h;
+            const along = out.subtractToRef(fore.getAbsolutePosition(), sAlong);
+            return along.lengthSquared() > 1e-8 ? out.addInPlace(along.normalize().scaleInPlace(BAT_PALM_M)) : out;
           };
           batObs = ctx.scene.onBeforeRenderObservable.add(() => {
             if (batRef.isDisposed()) return;
-            const fL = fist(lh, lf), fR = fist(rh, rf);
-            const grip = fL.add(fR).scaleInPlace(0.5);
+            const fL = fist(lh, lf, sL), fR = fist(rh, rf, sR);
+            const grip = fL.addToRef(fR, sGrip).scaleInPlace(0.5);
             const d = batLineAt(batSwingSec);
-            const yaw = meRef.root.rotationQuaternion ? meRef.root.rotationQuaternion.toEulerAngles().y : meRef.root.rotation.y;
+            const yaw = meRef.root.rotationQuaternion ? meRef.root.rotationQuaternion.toEulerAnglesToRef(sEuler).y : meRef.root.rotation.y;
             // root → world: +x = (cos, 0, -sin), +z forward = (sin, 0, cos) — the axes the hand targets are authored in.
             // ANIM-RESIDUAL: +x is NOT the batter's right on the runtime rig. Measured on dev :3061 (/dev/mode/derby, kit body):
             // RightArm at −0.20 and LeftArm at +0.13 along this +x, both fists at −0.23 by the right shoulder (the clip's
@@ -1185,19 +1334,19 @@ export const DerbyMode: ModeDefinition = (() => {
               if (rightSign !== 0) console.info(`[DERBY-BAT] batter's right is ${rightSign > 0 ? '+' : '−'}x on this rig`);
             }
             const dx = d[0] * (rightSign || 1);
-            const dir = new Vector3(dx * Math.cos(yaw) + d[2] * Math.sin(yaw), d[1], -dx * Math.sin(yaw) + d[2] * Math.cos(yaw));
+            const dir = sDir.set(dx * Math.cos(yaw) + d[2] * Math.sin(yaw), d[1], -dx * Math.sin(yaw) + d[2] * Math.cos(yaw));
             // Hands that come apart through the swing lie ON the handle, so the line between the fists pulls the handle
             // onto it (signed along the authored line). Measured on the first cut: fists 6 cm off the axis at the swing
             // median, 29 of 66 swing frames past 8 cm. A full pull fixed the grip but let a stacked pair of fists tip the
             // barrel into the dirt (14 swing frames below −0.3); at 0.7 the fists stay on the handle (2.9 cm median, none past
             // 8 cm) and the barrel only dips ≤ 27° at the launch and through the zone, the way a real swing's does.
-            const span = fR.subtract(fL); const sep = span.length();
+            const span = fR.subtractToRef(fL, sSpan); const sep = span.length();
             if (sep > BAT_SPLIT_M) {
               span.scaleInPlace((Vector3.Dot(span, dir) < 0 ? -1 : 1) / sep);
               const k = BAT_HANDS_PULL * Math.min(1, (sep - BAT_SPLIT_M) / 0.08);
               dir.scaleInPlace(1 - k).addInPlace(span.scaleInPlace(k)).normalize();
             }
-            Quaternion.FromUnitVectorsToRef(Vector3.Up(), dir, batRef.rotationQuaternion!);
+            Quaternion.FromUnitVectorsToRef(UP_V, dir, batRef.rotationQuaternion!);
             // the cylinder is centred on its origin: the knob just past the fists, the barrel out along the line
             batRef.position.copyFrom(grip.addInPlace(dir.scaleInPlace(BAT_LEN / 2 - BAT_KNOB_M)));
           });
@@ -1212,9 +1361,10 @@ export const DerbyMode: ModeDefinition = (() => {
         const char = await spawnFoe(ctx, CFG.heroUrl, home.clone(), Math.PI + (bearing * Math.PI) / 180, SPORT_CLIP.idle);
         fielders.push({ char, own: new BeatOwner(char.animator), bearing, home, run: null, y: 0, moving: false });
       }
+      seed = derbySeed();   // #5: a new pitch sequence each derby (one value: the dev state carries it, pitchSpec(r, seed) re-reads it)
       if (process.env.NODE_ENV === 'development') {
         (ctx.scene.metadata ??= {}).baseball = {
-          state: () => ({ round, incoming, throwIn, swung, ended, ballZ: ball.position.z, ballY: ball.position.y, pciX: pci.pos.x, pciY: pci.pos.y, pitchAtX: pitchAt.x, pitchAtY: pitchAt.y, flow, flowAtSwing, multiplier, ...park, homers: tally.homers, outs: tally.outs, pts, lastVerdict, lastDetail, settledRound, hitPending: !!hit && !hit.settled, fielders: fielders.map((f) => ({ x: f.char.root.position.x, z: f.char.root.position.z, y: f.y, run: f.run ? f.run.mode : null })) }),
+          state: () => ({ round, seed, incoming, throwIn, swung, ended, ballZ: ball.position.z, ballY: ball.position.y, pciX: pci.pos.x, pciY: pci.pos.y, pitchAtX: pitchAt.x, pitchAtY: pitchAt.y, flow, flowAtSwing, multiplier, ...park, homers: tally.homers, outs: tally.outs, pts, lastVerdict, lastDetail, settledRound, hitPending: !!hit && !hit.settled, fielders: fielders.map((f) => ({ x: f.char.root.position.x, z: f.char.root.position.z, y: f.y, run: f.run ? f.run.mode : null })) }),
         };
       }
       throwIn = 0; pendingThrow = null;
@@ -1223,6 +1373,18 @@ export const DerbyMode: ModeDefinition = (() => {
       // bat-detach frames, ANIM-SURGICAL). The shared Reticle stands its ring up itself now (aimSwingCore); a second bake here would lay it flat again.
       ctx.heroRef.current = me.root;
       ball = MeshBuilder.CreateSphere('bball', { diameter: 0.12 }, ctx.scene);
+      // IMPROVE (2026-10-06, Derby #11): a 12 cm default-grey sphere was hard to pick up off the bat and lost down the line.
+      // A lit white that holds its white on the grass (golf's ball paint), and a tracer from the bat to where it lands.
+      ball.material = VenueKit.paint(ctx.scene, 'derby_ball_m', '#f7f7f2', 0.45, 0.35); ball.isPickable = false;
+      trail = EffectsKit.ballTrail(ctx.scene, ball, '#fff4cf'); trail.stop();
+      // #8: the contact cue — a ring around the PCI that closes onto it as the ball comes into the ±0.15 s window and
+      // turns green while a swing would connect (the window was invisible; tennis and volleyball draw their bands).
+      cueRing = MeshBuilder.CreateTorus('derby_cue', { diameter: 0.62, thickness: 0.035, tessellation: 32 }, ctx.scene);
+      cueRing.bakeTransformIntoVertices(Matrix.RotationX(Math.PI / 2));   // stood up once, like the Reticle's own ring
+      cueRing.billboardMode = 7; cueRing.isPickable = false; cueRing.setEnabled(false);
+      cueMat = new PBRMaterial('derby_cue_m', ctx.scene);
+      cueMat.unlit = true; cueMat.albedoColor = Color3.FromHexString(CUE_WAIT); cueMat.alpha = 0.9;
+      cueRing.material = cueMat; cueWasIn = null;
       flight = new Flight(ball, -6);
       ctx.objectiveRef.current = ball.position;
       battingCam(ctx, true);
@@ -1247,11 +1409,13 @@ export const DerbyMode: ModeDefinition = (() => {
       pitchPosture = mountPostureLayer(ctx.scene, pitcher.skeleton, pitcher.root, () => {
         const w = throwIn > 0 ? 'pitch_set' : 'pitch_throw';
         const { pose, legs } = fieldPose(w);
-        const at = me ? me.root.position.add(new Vector3(0, 1.1, 0)) : new Vector3(0, 1.1, 0);
+        // #16: the batter's chest, in a scratch vector (this allocated two Vector3s every frame)
+        const at = me ? pitchAimAt.copyFrom(me.root.position) : pitchAimAt.setAll(0); at.y += 1.1;
         return { pose, legs, aim: at, eyes: at, window: w };
       }, 'PITCH-PP');
 
-      round = 0; pts = 0; ended = false;
+      round = 0; pts = 0; ended = false; pending = false; trickDone = false; missLine = '';
+      timers.clear(); bannerCh = new BannerChannel(timers, (text) => ctx.setHud({ banner: text }));
       SoundKit.startAmbient('stadium');
       tally = freshDerby(); rivalTarget = 3 + Math.floor(Math.random() * 6);   // a rival round of 3–8 homers
       ctx.setHud({ score: 0 });
@@ -1261,14 +1425,17 @@ export const DerbyMode: ModeDefinition = (() => {
     onInput(ctx: ModeContext, e: FelInput) {
       SoundKit.unlock();
       if (e.t === 'stick' && e.side === 'L') { stickX = e.x; stickY = e.y; }
-      // PARKOUR DERBY: B in the wind-up is the BAT-FLIP VAULT — the warm-up trick that fills the flow for a KINETIC swing
+      // PARKOUR DERBY: B before the pitch is the BAT-FLIP VAULT — the warm-up trick that fills the flow for a KINETIC swing.
+      // IMPROVE (2026-10-06, Derby #12): it opens in the SET (the gap between pitches) as well as the 0.52 s wind-up; the
+      // wind-up alone was easy to miss and answered "WARM UP IN THE WIND-UP". Still one a pitch (DerbyLoop.batFlipRead).
       if (e.t === 'button' && e.btn === 'B' && e.pressed) {
-        if (incoming && throwIn > 0 && !trickDone) {
+        const flip = batFlipRead({ incoming, throwIn, pending, trickDone, ended });
+        if (flip === 'ok') {
           trickDone = true; flow = flowTrick(flow, 'batflip'); park.batFlips++; hopT = 0;
           meAnim.beat(SPORT_CLIP.derbySwing, { fadeSec: 0.05, speedRatio: 1.7 });
-          SoundKit.play('whoosh', { pitch: 1.4, volume: 0.4 }); ctx.setHud({ flow, banner: `BAT-FLIP VAULT — flow ${flow}` }); setTimeout(() => ctx.setHud({ banner: '' }), 500);
+          SoundKit.play('whoosh', { pitch: 1.4, volume: 0.4 }); ctx.setHud({ flow }); bannerCh?.flash(`BAT-FLIP VAULT — flow ${flow}`, 500);
           console.info(`[PARK] bat-flip vault → flow ${flow}`);
-        } else refuse(ctx, trickDone ? 'ONE TRICK A PITCH' : 'WARM UP IN THE WIND-UP');
+        } else refuse(ctx, flip === 'spent' ? 'ONE TRICK A PITCH' : 'WARM UP BEFORE THE PITCH');
         return;
       }
       // SCORECARD CONTROLS (2026-09-15): a swing between pitches was 28 % of the derby's presses and got nothing back
@@ -1281,8 +1448,15 @@ export const DerbyMode: ModeDefinition = (() => {
         // time against THIS pitch's speed — the window conversion divides by
         // speed, and a hardcoded 14 mistimed every fastball and change-up
         const timing = swingQuality(ball.position.z, 0.3, pitchSpeed, 0.3);
-        if (timing <= 0) return;
+        if (timing <= 0) {
+          // IMPROVE (2026-10-06, Derby #3): the swing is spent — say how it missed, now, and again on the whiff.
+          missLine = timingMissLine(timingMiss(ball.position.z, 0.3, pitchSpeed, 0.15), throwIn <= 0);
+          bannerCh?.flash(missLine, 900);
+          console.info(`[DERBY] mistimed: ${missLine}`);
+          return;
+        }
         incoming = false;
+        cueRing?.setEnabled(false);
         // CONTACT = TIMING x COVERAGE. Timing alone was the whole game; now
         // where you put the PCI matters as much as when you swing, which is the
         // mechanic the benchmark is named for.
@@ -1296,21 +1470,26 @@ export const DerbyMode: ModeDefinition = (() => {
         // stick used to do by fiat.
         const meet = pci.pos.y - ball.position.y;
         const launch = Math.max(0.1, Math.min(0.9, 0.45 - meet * 1.1));
-        // PARKOUR DERBY: the KINETIC swing — the flow the warm-up filled grows the exit speed; the stick at the swing AIMS the
-        // ball's bearing (a wall target's); the WALL decides the hit (settleHit), not the contact
+        // PARKOUR DERBY: the KINETIC swing — the flow the warm-up filled grows the exit speed; the WALL decides the hit
+        // (settleHit), not the contact.
+        // IMPROVE (2026-10-06, Derby #6): the bearing is timing (early pulls, late goes the other way) plus the STICK at the
+        // swing, which nudges it toward a wall target (DerbyLoop.hitLateral, ±3 m/s ≈ ±5°). The comment always said the
+        // stick aimed; the code rolled ±1 m/s of Math.random() instead, so the same swing went to different places.
         const ks = kineticSwing(flow / PARK_FLOW.full); flowAtSwing = flow; flow = 0;
-        const side = swingSide(ball.position.z, 0.3, pitchSpeed, 0.3);   // FLAG: early pulls, late goes the other way. The stick still places the PCI.
-        const vx = side * 17 + (Math.random() - 0.5) * 2;
+        const side = swingSide(ball.position.z, 0.3, pitchSpeed, 0.3);
+        const vx = hitLateral(side, stickX);
         flight.launch(ball.position, new Vector3(vx, (18 * launch * q + 4) * ks.exitMult, (16 + q * 18) * ks.exitMult));
         const distPts = Math.round(q * (80 + launch * 60) * (clutch ? CLUTCH_MULT : 1));
         const cross = predictWallCross({ x: flight.vel.x, y: flight.vel.y, z: flight.vel.z }, { x: ball.position.x, y: ball.position.y, z: ball.position.z });
         let rob: Rob = null;
-        if (cross && !targetHit(cross, TARGETS, targetsHit)) for (const f of fielders) { const r = robRead(f.bearing, cross); const lo = Math.min(f.bearing, cross.bearingDeg), hi = Math.max(f.bearing, cross.bearingDeg); const boost = PARK.pillarBearings.some((b2) => b2 > lo && b2 < hi) ? PARK.pillarBoost : 1; f.run = { bearing: cross.bearingDeg, t: 0, total: cross.t, mode: r, boost, h: cross.h }; if (r && !rob) rob = r; }
+        if (cross && !targetHit(cross, TARGETS, targetsHit)) for (const f of fielders) { const r = robRead(f.bearing, cross); const lo = Math.min(f.bearing, cross.bearingDeg), hi = Math.max(f.bearing, cross.bearingDeg); const boost = PARK.pillarBearings.some((b2) => b2 > lo && b2 < hi) ? PARK.pillarBoost : 1; f.run = runTo(cross.bearingDeg, cross.t, r, boost, cross.h); if (r && !rob) rob = r; }
         hit = { q, launch, cover, clutch, distPts, cross, rob, settled: false };
         console.info(`[PARK] swing q ${q.toFixed(2)} ${ks.label || 'plain'} x${ks.exitMult.toFixed(2)} → ${cross ? `wall in ${cross.t.toFixed(2)} s at ${cross.bearingDeg.toFixed(0)}° h ${cross.h.toFixed(1)}` : 'short'}${rob ? ' · ' + rob + ' coming' : ''}`);
         ctx.heroRef.current = ball;
         ctx.camDirector.mode = 'follow';
-        ctx.setHud({ contact: `${cover >= 0.9 ? 'PURE' : cover >= 0.5 ? 'OFF-CENTRE' : 'EDGE OF THE BAT'} · ${pitchLabel}${ks.label ? ' · ' + ks.label : ''}`, flow: 0 });
+        trail?.start();   // #11: the tracer from the bat
+        // #7: the pitch's name goes up now that it has resolved
+        ctx.setHud({ contact: `${cover >= 0.9 ? 'PURE' : cover >= 0.5 ? 'OFF-CENTRE' : 'EDGE OF THE BAT'} · ${pitchLabel}${ks.label ? ' · ' + ks.label : ''}`, flow: 0, pitch: pitchLabel });
       }
     },
 
@@ -1326,9 +1505,10 @@ export const DerbyMode: ModeDefinition = (() => {
       if (incoming) {
         pci.update(dt, stickX, stickY);
         // stream the real reticle position (see the pitch() note: drivers
-        // close the loop on this instead of integrating their own model)
-        ctx.setHud({ pci: `${pci.pos.x.toFixed(2)},${pci.pos.y.toFixed(2)}` });
+        // close the loop on this instead of integrating their own model) — #15: in development only
+        if (DEV_PCI) ctx.setHud({ pci: `${pci.pos.x.toFixed(2)},${pci.pos.y.toFixed(2)}` });
       }
+      tickCue();
       // the slider's LATE break — armed in the last 45% of the flight,
       // integrated as velocity so it bends rather than teleports
       if (incoming && flight.active && pitchBreakA !== 0) {
@@ -1366,15 +1546,17 @@ export const DerbyMode: ModeDefinition = (() => {
         ctx.feel?.impact?.(0.35);   // A+ P0: a whiff is an out — clank-weight feel, no make punch
         console.info('[DERBY-JUICE] whiff (clank weight)');
         const whiffOut = bankSwing(tally, false);        // a whiff is an out
-        // the whiff names the pitch — The Show tells you what beat you
-        ctx.setHud({ banner: `WHIFF — ${pitchLabel === 'SLD' ? 'the slider broke late' : pitchLabel === 'CHG' ? 'the change-up pulled the string' : 'beat you with heat'}`, outs: tally.outs });
-        setTimeout(() => ctx.setHud({ banner: '' }), 900);
-        if (whiffOut) { ended = true; SoundKit.play('whistle'); console.info(`[DERBY-END] homers ${tally.homers} outs ${tally.outs} pts ${pts}`); setTimeout(() => ctx.end('DERBY_END', pts, { pitches: round, homers: tally.homers, outs: tally.outs, longestFt: tally.longestFt, rivalHomers: rivalTarget }), 1000); return; }
+        // the whiff names the pitch — The Show tells you what beat you; #3: a swing that missed the window says by how much
+        // first (it was the pitch type alone); #7: the pitch's name goes up on the board now; #2: the rival moves on the out
+        const what = pitchLabel === 'SLD' ? 'the slider broke late' : pitchLabel === 'CHG' ? 'the change-up pulled the string' : 'beat you with heat';
+        ctx.setHud({ outs: tally.outs, pitch: pitchLabel, rivalHomers: rivalSoFar() });
+        bannerCh?.flash(`WHIFF — ${missLine ? `${missLine} · ` : ''}${what}`, 900);
+        if (whiffOut) { endDerby(ctx, round, 700); return; }
       }
       if (!flying && !incoming && !pending) {
-        if (round >= TOTAL) { ended = true; SoundKit.play('whistle'); console.info(`[DERBY-END] homers ${tally.homers} outs ${tally.outs} pts ${pts}`); return ctx.end('DERBY_END', pts, { pitches: TOTAL, homers: tally.homers, outs: tally.outs, longestFt: tally.longestFt, rivalHomers: rivalTarget }); }
-        pending = true;
-        setTimeout(() => { pending = false; if (!ended) pitch(ctx); }, 800);
+        if (round >= TOTAL) { endDerby(ctx, TOTAL, 0); return; }
+        pending = true; trickDone = false;   // #12: the set — the next pitch's warm-up is open from here
+        timers.later(() => { pending = false; if (!ended) pitch(ctx); }, 800);
       }
       // During the PITCH the fixed swing camera aims at where the pitch is
       // GOING (the strike zone), never at the moving ball: a 0.4 lerp onto a
@@ -1384,10 +1566,12 @@ export const DerbyMode: ModeDefinition = (() => {
       // the zone; the ball comes to it. After contact the follow cam owns
       // the ball (see the contact branch) and this objective is moot.
       gallery?.update(dt);
-      ctx.camDirector.update(me.root.position, Vector3.Zero(), flying && !incoming ? ball.position : PITCHER_VIEW);   // a hit ball is followed; a pitch is watched from the plate
+      ctx.camDirector.update(me.root.position, ZERO_V, flying && !incoming ? ball.position : PITCHER_VIEW);   // a hit ball is followed; a pitch is watched from the plate (#16: a shared zero, not Vector3.Zero() a frame)
     },
 
-    dispose() { for (const f of fielders) f.char.dispose(); fielders = []; token?.mesh.dispose(); token = null; targetMeshes.clear(); batPosture?.dispose(); batPosture = null; pitchPosture?.dispose(); pitchPosture = null; derbyVenue?.dispose?.(); derbyVenue = null; gallery?.dispose(); gallery = null; if (batObs) { bat?.getScene().onBeforeRenderObservable.remove(batObs); batObs = null; } batSwingSec = null; bat?.dispose(); bat = null; me?.dispose(); pitcher?.dispose(); furniture.forEach((f) => f.dispose()); ball?.dispose(); SoundKit.stopAmbient(); },
+    // IMPROVE (2026-10-06, Derby #9): ended = true and every pending timer cleared — the next pitch's setTimeout checked
+    // only `!ended`, which dispose never set, so a pitch could be thrown into a torn-down scene.
+    dispose() { ended = true; pending = false; timers.clear(); bannerCh = null; trail?.dispose(); trail = null; cueRing?.dispose(); cueRing = null; cueMat?.dispose(); cueMat = null; tokenMat?.dispose(); tokenMat = null; for (const m of targetMats) m.dispose(true, true); targetMats = []; pci?.dispose(); for (const f of fielders) f.char.dispose(); fielders = []; token?.mesh.dispose(); token = null; targetMeshes.clear(); batPosture?.dispose(); batPosture = null; pitchPosture?.dispose(); pitchPosture = null; derbyVenue?.dispose?.(); derbyVenue = null; gallery?.dispose(); gallery = null; if (batObs) { bat?.getScene().onBeforeRenderObservable.remove(batObs); batObs = null; } batSwingSec = null; bat?.dispose(); bat = null; me?.dispose(); pitcher?.dispose(); furniture.forEach((f) => f.dispose()); ball?.dispose(); SoundKit.stopAmbient(); },
   };
 })();
 
@@ -1419,6 +1603,21 @@ export const PenaltyMode: ModeDefinition = (() => {
   const prevBall = new Vector3();
   let weather: WeatherKit = new WeatherKit(); let weatherFx: WeatherFxHandle | null = null;
   const KEEPER_REACH = 0.9;
+  // IMPROVE (2026-10-06, Penalty #10 / #11 / #9): every timeout in one bag dispose() clears; one banner channel, so the
+  // strike label's clear no longer wipes the result banner that lands 0.4 s later (nor a wall run's, a slide's, a feint's);
+  // the result beats after each kick held where A can skip them.
+  const timers = new TimerBag();
+  let bannerCh: BannerChannel | null = null;
+  const resultBeat = new ResultBeat(timers);
+  /** IMPROVE (2026-10-06, Penalty #20): game time (s), the sum of update()'s dt — the dive, the strike and the kinetic
+   *  window are graded on it, so a hit-stop or a hitch between them cannot mis-grade a dive (performance.now() could). */
+  let gameT = 0;
+  /** IMPROVE (2026-10-06, Penalty #3): the kick's style — the breakaway, or the classic place kick from the spot. */
+  let pensStyle: PensStyle = 'breakaway';
+  /** This kick's pressure line (sudden death, score-or-out), kept so a Y switch keeps saying it. */
+  let kickPressure: string | null = null;
+  /** IMPROVE (2026-10-06, Penalty #14 / #15 / #17): scratch, so the ball's substeps and the run allocate nothing a frame. */
+  const ZERO_V = Vector3.Zero(), RUN_V = new Vector3(), GLASS_N = new Vector3();
   // ── BREAKAWAY (owner brief, 2026-09-18): your kick is a RUN at the keeper from midfield on a shot clock — kinetic shot
   // stacking off a flow gauge, the bank off the glass, the rainbow flick, the slide-cancel curler; the keeper comes off
   // his line, slide-tackles, vaults for the top corners and parry-kicks a save back at you (an overdrive if you hit it
@@ -1430,14 +1629,19 @@ export const PenaltyMode: ModeDefinition = (() => {
   /** The physics step every kick shares: wind through the air (the golf gain), the frame, the mesh. */
   function stepBall(dt: number): void {
     if (!pball.active) return;
-    const w = weather.flightWind(); const wv = new Vector3(w.x, 0, w.z);
+    // IMPROVE (2026-10-06, Penalty #14): the same wind pull in components — it was a new Vector3 a frame plus a scale and a
+    // subtract on every 240 Hz substep
+    const w = weather.flightWind(); const windy = w.x * w.x + w.z * w.z > 0;
     const n = Math.max(1, Math.ceil(dt / (1 / 240))); const h = dt / n;
     for (let i = 0; i < n && pball.active; i++) {
       prevBall.copyFrom(pball.pos);
-      if (!pball.rolling && wv.lengthSquared() > 0) pball.vel.addInPlace(wv.scale(WIND_GAIN * GRASS.dragK * pball.vel.subtract(wv).length() * h));
+      if (!pball.rolling && windy) {
+        const v = pball.vel; const k = WIND_GAIN * GRASS.dragK * Math.hypot(v.x - w.x, v.y, v.z - w.z) * h;
+        v.x += w.x * k; v.z += w.z * k;
+      }
       pball.step(h);
       if (brk.on && Math.abs(pball.pos.x) >= BREAK.glassX - 0.05) {   // BREAKAWAY: the side glass keeps the ball live (the bank rides this)
-        const sx = Math.sign(pball.pos.x) || 1; pball.deflect(new Vector3(-sx, 0, 0), 0.85); pball.pos.x = sx * (BREAK.glassX - 0.08); ball.position.x = pball.pos.x;
+        const sx = Math.sign(pball.pos.x) || 1; pball.deflect(GLASS_N.set(-sx, 0, 0), 0.85); pball.pos.x = sx * (BREAK.glassX - 0.08); ball.position.x = pball.pos.x;
         brk.flow = flowAdd(brk.flow, FLOW.bank); SoundKit.play('clang', { pitch: 1.4, volume: 0.45 });
       }
       const hit = frameHit(prevBall, pball.pos);
@@ -1453,11 +1657,11 @@ export const PenaltyMode: ModeDefinition = (() => {
   // keeper. The rival's body runs up with a tell, you dive, KeeperCore judges.
   let keepPlan: RivalKickPlan | null = null;
   let keepT = 0;                               // seconds into the rival's run-up
-  let keepStruck = false, keepStrikeAt = 0, keepDive: DiveSign = 0, keepDiveAt: number | null = null;
+  /** IMPROVE (2026-10-06, Penalty #7 / #20): the call is ◀ / ▶ or ▼ stay / ▲ spring (KeeperCall); the instants are game time. */
+  let keepStruck = false, keepStrikeAt = 0, keepCall: KeeperCall = 0, keepDiveAt: number | null = null;
   /** HOTFIX (2026-09-24): your kick is decided and their kick has not started (resolveKick → startKeeperRound, 1.2 s).
    *  resolveKick leaves phase 'aim' for that beat, and the old PLACE kick below read 'aim' as a fresh kick. */
   let betweenKicks = false;
-  const KEEP_RUNUP_SEC = 1.15;
   const SPOT = new Vector3(0, 0, 0), GOAL_LINE = new Vector3(0, 0, 10.4);
   let feints = 0, lastFlickSign = 0, lastFlickMs = 0;
   /** A+ mission #8 (FIFA read): every kick as a pip, both sides. */
@@ -1486,43 +1690,80 @@ export const PenaltyMode: ModeDefinition = (() => {
    *  sudden death until a round splits. */
 
   // ── BREAKAWAY helpers ────────────────────────────────────────────────────────────────────────────────────────────
-  function startBreakaway(ctx: ModeContext): void {
+  function startBreakaway(ctx: ModeContext, pressure: string | null = null): void {
     phase = 'break'; Object.assign(brk, { on: true, clock: BREAK.clockSec, flow: 0, kineticAt: -1e9, run: { vx: 0, vz: 0 }, wall: 0, wallSec: 0, slideSec: -1, slideCool: 0, vaultT: -1, vault: null, counterLive: false, struck: false, shotKind: 'strike', lastHigh: false, lastAimSign: 1, stylePts: 0, keeperSlide: null, keeperCool: 1.0, hudClock: -1, hudFlow: -1, hudKin: '' });
     me.root.position.set(0, 0, BREAK.startZ); me.root.rotation.set(0, 0, 0);
     keeper.root.position.set(0, 0, BREAK.keeperZ); keeper.root.rotation.set(0, Math.PI, 0);
     keeperAnim.loop(SPORT_CLIP.keeperIdle, { fadeSec: 0.25 }); meAnim.loop(SPORT_CLIP.moveLoop, { fadeSec: 0.2 });
     pball.stop(); ball.position.set(0, 0.11, BREAK.startZ + BREAK.dribbleAhead); frameKind = null; flightSec = 0;
     ctx.camDirector.setPreset('court'); ctx.camDirector.snapTo(me.root.position, new Vector3(0, 1, PEN_GOAL.z));
-    ctx.setHud({ hint: 'BREAKAWAY — 9 s · run at him · A shoots (stick = the corner, up = the chip) · LT slide · R1 banks it off the glass', clock: BREAK.clockSec, flow: 0, kinetic: '', kickPower: null });
+    // IMPROVE (2026-10-06, Penalty #2 / #4): the hint names the real clock (BREAK.clockSec; it said 9 s of 11) and what
+    // really picks the corner (the stick held at the strike — owner decision 2026-10-06), carries the pressure line
+    // nextKick used to write and this overwrote, and says when the keeper is reading your habit — keeperReadProb drives
+    // his dive here, and the warning lived only in the unreachable place-kick aim.
+    ctx.setHud({ hint: breakawayHint({ clockSec: BREAK.clockSec, pressure, readSide: round > 1 ? habitRead(shotHistory) : 0 }), clock: BREAK.clockSec, flow: 0, kinetic: '', kickPower: null });
+  }
+  /** IMPROVE (2026-10-06, Penalty #3): CLASSIC PENS — the place kick from the spot: the feints, the aim ring, the power wave
+   *  and the keeper's read of your aim (the PLACE path in onInput / update, which every kick used to skip for the run). */
+  function startClassic(ctx: ModeContext, pressure: string | null = null): void {
+    phase = 'aim'; brk.on = false; brk.counterLive = false; brk.struck = false; brk.keeperSlide = null; brk.wall = 0; brk.vaultT = -1; stickX = 0; stickY = 0;
+    me.root.position.set(-0.4, 0, -1.6); me.root.rotation.set(0, 0, 0);
+    keeper.root.position.set(0, 0, 10.4); keeper.root.rotation.set(0, Math.PI, 0);
+    keeperAnim.loop(SPORT_CLIP.keeperIdle, { fadeSec: 0.25 }); meAnim.loop(SPORT_CLIP.penaltyIdle, { fadeSec: 0.25 });
+    pball.stop(); ball.position.set(0, 0.11, 0); frameKind = null; flightSec = 0;
+    reticle.pos.set(0, 1.2, 11);
+    ctx.camDirector.setFixedBehind(me.root.position, 0, 'flight', true);
+    ctx.setHud({ hint: pressure ? `${pressure} · ${CLASSIC_HINT}` : CLASSIC_HINT, clock: 0, flow: -1, kinetic: '', kickPower: null });
+  }
+  /** IMPROVE (2026-10-06, Penalty #3): Y at the top of a kick switches its style (and remembers the pick). The same kick,
+   *  started fresh — the breakaway only inside its first PENS_SWITCH_SEC, before the run has gone anywhere. */
+  function switchPens(ctx: ModeContext): boolean {
+    const canBreak = phase === 'break' && brk.on && !brk.struck && !brk.counterLive && brk.clock >= BREAK.clockSec - PENS_SWITCH_SEC;
+    const canClassic = phase === 'aim' && !brk.on && !betweenKicks;
+    if (!canBreak && !canClassic) return false;
+    pensStyle = canBreak ? 'classic' : 'breakaway'; writePensStyle(pensStyle);
+    feints = 0; lastFlickSign = 0; kickIn = 0; pendingKick = null;
+    SoundKit.play('uiTick', { pitch: 1.2 });
+    bannerCh?.flash(pensStyle === 'classic' ? 'CLASSIC PENS' : 'BREAKAWAY', 700);
+    if (pensStyle === 'classic') startClassic(ctx, kickPressure); else startBreakaway(ctx, kickPressure);
+    return true;
   }
   /** The shot, any of its kinds: the ball leaves on the boot's contact key; the keeper reads the side and commits. */
   function strikeNow(ctx: ModeContext, kind: ShotKind): void {
     if (phase !== 'break' || brk.struck) return;
-    const kinetic = performance.now() - brk.kineticAt <= FLOW.kineticSec * 1000;
+    const kinetic = gameT - brk.kineticAt <= FLOW.kineticSec;   // IMPROVE (2026-10-06, Penalty #20): game time
     const prof = shotProfile(brk.flow / FLOW.full, kinetic, kind);
-    const high = stickY < -0.5 || kind === 'rainbow';
-    // FLAG: shot shape is when you strike, not where the run stick sits. Still far of the reach is a pull; in close is the other way.
-    const reach = Math.max(0.4, BREAK.strikeReach);
-    const signed = Math.max(-1, Math.min(1, (Vector3.Distance(ball.position, me.root.position) - reach * 0.55) / (reach * 0.55)));
-    let curl = 0; let target = { x: signed * 3.0, y: high || signed > 0.8 ? 1.9 : 0.85 };
-    if (kind === 'curler') { const sgn = signed >= 0 ? 1 : -1; curl = 1.6 * sgn; target = { x: sgn * 2.6, y: 0.9 }; }
-    if (kind === 'rainbow') target = { x: signed * 2.2, y: 2.05 };
+    // IMPROVE (2026-10-06, owner decision "Stick aims"): the stick held at the strike picks the corner (◀ / ▶ / neither =
+    // the middle; up = the chip, as before). The corner was read off the ball's distance ahead of you, and off the
+    // dribble that is always 0.9 m — every plain strike went low, just left of centre. The distance is now the strike's
+    // accuracy: struck off the dribble's sweet spot (jammed, or stretched for) it wobbles off its line (Breakaway.strikeAim).
+    const aim = strikeAim({ x: stickX, y: stickY }, Vector3.Distance(ball.position, me.root.position));
+    const high = aim.high || kind === 'rainbow';
+    let curl = 0; let target = aim.target; let side = aim.side;
+    // the curler always bends into a corner: the middle stick takes the side the slide went (its clip, below, reads the same)
+    if (kind === 'curler') { const sgn = side !== 0 ? side : stickX >= 0 ? 1 : -1; side = sgn; curl = 1.6 * sgn; target = { x: sgn * 2.6, y: 0.9 }; }
+    if (kind === 'rainbow') target = { x: side * 2.2, y: 2.05 };
+    // the keeper reads where the ball ARRIVES — for the bank that is the stick's corner, not its mirror image off the glass
+    // (Math.sign of the mirrored x always read the wall's side, whatever the aim)
+    const aimX = target.x;
     if (kind === 'bank') target = bankTarget(brk.wall === 0 ? 1 : brk.wall, target);
     const from = { x: ball.position.x, y: ball.position.y, z: ball.position.z };
-    const { vel, spin } = launchKick(from, target, prof.power01, { curl, chip: kind === 'rainbow' || (high && kind !== 'bank'), wobble: 0, rand: Math.random() });
+    const { vel, spin } = launchKick(from, target, prof.power01, { curl, chip: kind === 'rainbow' || (high && kind !== 'bank'), wobble: kind === 'strike' || kind === 'overdrive' ? aim.wobble : 0, rand: Math.random() });
     vel.scaleInPlace(prof.speedMult);
-    brk.struck = true; brk.shotKind = kind; brk.lastHigh = high; brk.lastAimSign = Math.sign(target.x || 0.01); brk.lastAimX = target.x; brk.counterLive = false; brk.slideSec = -1;
+    brk.struck = true; brk.shotKind = kind; brk.lastHigh = high; brk.lastAimSign = side; brk.lastAimX = aimX; brk.counterLive = false; brk.slideSec = -1;
     if (brk.wall !== 0) { brk.wall = 0; me.root.position.y = 0; }
     brk.stylePts += kind === 'strike' ? 0 : kind === 'rainbow' ? 15 : kind === 'overdrive' ? 15 : 10; if (kinetic) brk.stylePts += 5;
     brkStats.shots++; if (kind === 'bank') brkStats.banks++; if (kind === 'rainbow') brkStats.rainbows++; if (kind === 'curler') brkStats.curlers++; if (kind === 'overdrive') brkStats.overdrives++; if (kinetic) brkStats.kinetic++;
     goalLatch = false; frameKind = null; flightSec = 0;
     meAnim.beat(SPORT_CLIP.penaltyStrike, { fadeSec: 0.08 });
     if (kind === 'rainbow') { const dir = keeper.root.position.subtract(me.root.position); dir.y = 0; dir.normalize(); brk.vault = { from: me.root.position.clone(), dir }; brk.vaultT = 0; }
-    const aimSign = brk.lastAimSign; const correct = Math.random() < keeperReadProb(aimSign, shotHistory, 0);
+    // IMPROVE (2026-10-06, "Stick aims"): the read is breakawayReadProb — keeperReadProb on a corner, its own streak on
+    // the middle the stick can now pick — and a misread middle shot sends him to a side (keeperDiveX), not nowhere.
+    const correct = Math.random() < breakawayReadProb(side, shotHistory);
     // net/precision phase 6 — A READ THAT IS RIGHT REACHES THE BALL. The dive went 2.0 m toward the read side from wherever he
     // stood; a corner sits at 3.0, past his reach even when he read it, so a random corner beat him as surely as a read one
     // (the masher's shootout: 5 of 5). Right = he goes to the shot's line (inside the post); wrong = the other way.
-    keeperTargetX = correct ? Math.max(-2.9, Math.min(2.9, brk.lastAimX)) : keeper.root.position.x - aimSign * 2.0;
+    keeperTargetX = keeperDiveX(correct, side, brk.lastAimX, keeper.root.position.x, Math.random());
     console.info(`[BREAK] keeper read ${correct ? 'RIGHT' : 'WRONG'} aim ${brk.lastAimX.toFixed(1)} dive to ${keeperTargetX.toFixed(1)}`);
     kickIn = kind === 'rainbow' ? 0.2 : KICK_CONTACT_SEC * 0.6;
     pendingKick = () => {
@@ -1531,7 +1772,7 @@ export const PenaltyMode: ModeDefinition = (() => {
       pball.launch(new Vector3(from.x, from.y, from.z), vel, spin);
     };
     phase = 'flight';
-    ctx.setHud({ kickShape: prof.label, kinetic: kinetic ? 'KINETIC' : '', banner: prof.label, hint: '' }); setTimeout(() => ctx.setHud({ banner: '' }), 700);
+    ctx.setHud({ kickShape: prof.label, kinetic: kinetic ? 'KINETIC' : '', hint: '' }); bannerCh?.flash(prof.label, 700);
     console.info(`[BREAK] ${kind} power ${prof.power01.toFixed(2)} x${prof.speedMult.toFixed(2)} flow ${brk.flow.toFixed(0)} kinetic ${kinetic} clock ${brk.clock.toFixed(1)}`);
   }
   /** The run: the clock, the body with momentum, the glass, the slide, the rainbow's arc, the ball at the feet, the keeper. */
@@ -1542,12 +1783,12 @@ export const PenaltyMode: ModeDefinition = (() => {
     if (brk.slideSec >= 0) { brk.slideSec += dt; if (brk.slideSec >= BREAK.slideSec) { brk.slideSec = -1; brk.slideCool = BREAK.slideCool; meAnim.loop(SPORT_CLIP.moveLoop, { fadeSec: 0.2 }); } }
     const boost = (brk.wall !== 0 ? BREAK.wallRunMult : 1) * (brk.slideSec >= 0 ? BREAK.slideMult : 1);
     brk.run = stepRun(brk.run, { x: stickX, y: stickY }, dt, { boost, trucking: false, held, grip: 1, drag: 1 });
-    const vel = new Vector3(brk.run.vx, 0, brk.run.vz);
+    const vel = RUN_V.set(brk.run.vx, 0, brk.run.vz);   // IMPROVE (2026-10-06, Penalty #15): scratch, not a new Vector3 a frame
     const p = me.root.position;
-    if (!held) p.addInPlace(vel.scale(dt));
+    if (!held) { p.x += vel.x * dt; p.z += vel.z * dt; }
     if (brk.wall === 0 && !held) {
       const g = glassRead(p.x, vel.x, vel.z);
-      if (g !== 0) { brk.wall = g; brk.wallSec = 0; brk.flow = flowAdd(brk.flow, FLOW.wallRun); brk.kineticAt = performance.now(); brk.stylePts += 5; brkStats.wallRuns++; SoundKit.play('whoosh', { pitch: 0.9 }); ctx.setHud({ banner: 'WALL RUN — R1 banks it off the glass' }); setTimeout(() => ctx.setHud({ banner: '' }), 600); console.info('[BREAK] wall run'); }
+      if (g !== 0) { brk.wall = g; brk.wallSec = 0; brk.flow = flowAdd(brk.flow, FLOW.wallRun); brk.kineticAt = gameT; brk.stylePts += 5; brkStats.wallRuns++; SoundKit.play('whoosh', { pitch: 0.9 }); bannerCh?.flash('WALL RUN — R1 banks it off the glass', 600); console.info('[BREAK] wall run'); }
     }
     if (brk.wall !== 0) {
       brk.wallSec += dt; p.x = brk.wall * (BREAK.glassX - 0.35); p.y = BREAK.wallRunY;
@@ -1564,33 +1805,40 @@ export const PenaltyMode: ModeDefinition = (() => {
     // the keeper: off his line, tracking the ball, the slide-tackle on a striker who dawdles inside his range
     const kp = keeper.root.position;
     if (brk.keeperSlide) {
-      brk.keeperSlide.t += dt; kp.addInPlace(brk.keeperSlide.dir.scale(KEEPER.slideSpeed * dt));
+      brk.keeperSlide.t += dt; const sd = brk.keeperSlide.dir; kp.x += sd.x * KEEPER.slideSpeed * dt; kp.z += sd.z * KEEPER.slideSpeed * dt;   // #15: no scale() a frame
       if (!brk.counterLive && brk.vaultT < 0 && Math.hypot(ball.position.x - kp.x, ball.position.z - kp.z) <= KEEPER.slideHitM) {
         brk.keeperSlide = null; brkStats.tackled++; pball.stop(); SoundKit.play('impact', { pitch: 0.7, volume: 0.5 }); ctx.feel?.impact?.(0.4); console.info('[BREAK] slide-tackled');
         resolveKick(ctx, 'saved', 'SLIDE-TACKLED — NO SHOT'); return;
       }
-      if (brk.keeperSlide.t >= KEEPER.slideSec) { brk.keeperSlide = null; brk.keeperCool = KEEPER.slideCool; const sgn = keeperDiveSign; setTimeout(() => { if (!ended && phase === 'break') rise(keeperAnim, sgn, SPORT_CLIP.keeperIdle); }, 300); }
+      if (brk.keeperSlide.t >= KEEPER.slideSec) { brk.keeperSlide = null; brk.keeperCool = KEEPER.slideCool; const sgn = keeperDiveSign; timers.later(() => { if (!ended && phase === 'break') rise(keeperAnim, sgn, SPORT_CLIP.keeperIdle); }, 300); }
     } else {
       const tz = keeperTargetZ(p.z); kp.z += Math.max(-KEEPER.closeRate * dt, Math.min(KEEPER.closeRate * dt, tz - kp.z));
       kp.x += (ball.position.x * KEEPER.trackX - kp.x) * Math.min(1, 3 * dt);
       if (!brk.counterLive && keeperSlideRead({ x: kp.x, z: kp.z }, { x: ball.position.x, z: ball.position.z }, brk.keeperCool, brk.struck)) {
         const dir = ball.position.subtract(kp); dir.y = 0; dir.normalize(); brk.keeperSlide = { t: 0, dir }; keeperDiveSign = dir.x > 0 ? 1 : -1;
         keeperAnim.beat(sided(SPORT_CLIP.keeperDive, keeperDiveSign), { fadeSec: 0.08 });
-        ctx.setHud({ banner: "HE'S COMING OUT — flick it over him (A) or beat him" }); setTimeout(() => ctx.setHud({ banner: '' }), 500); console.info('[BREAK] keeper slide');
+        bannerCh?.flash("HE'S COMING OUT — flick it over him (A) or beat him", 500); console.info('[BREAK] keeper slide');
       }
     }
-    const c = Math.ceil(brk.clock), f = Math.round(brk.flow), kin = performance.now() - brk.kineticAt <= FLOW.kineticSec * 1000 ? 'KINETIC' : '';
+    const c = Math.ceil(brk.clock), f = Math.round(brk.flow), kin = gameT - brk.kineticAt <= FLOW.kineticSec ? 'KINETIC' : '';
     if (c !== brk.hudClock || f !== brk.hudFlow || kin !== brk.hudKin) { brk.hudClock = c; brk.hudFlow = f; brk.hudKin = kin; ctx.setHud({ clock: c, flow: f, kinetic: kin }); }
-    gallery?.update(dt);
+    // IMPROVE (2026-10-06, Penalty #16): the gallery is updated once a frame, in update() — this second call swayed it at
+    // double speed through every breakaway
     ctx.camDirector.update(p, vel, ball.position);
   }
   /** The curved glass down each side of the breakaway. */
   function buildGlass(ctx: ModeContext): void {
     const mat = VenueKit.paint(ctx.scene, 'brk_glass_mat', '#9ad7ff', 0.12, 0.2); mat.alpha = 0.28;
-    for (const side of [1, -1] as const) {
+    // IMPROVE (2026-10-06, Penalty #19): the two 22 m panes are one mesh (one alpha-blended draw, not two), with its world
+    // matrix and its material frozen — the glass never moves and its paint never changes.
+    const panes = ([1, -1] as const).map((side) => {
       const g = MeshBuilder.CreateBox(`brk_glass_${side}`, { width: 0.16, height: 2.4, depth: 22 }, ctx.scene);
-      g.position.set(side * (BREAK.glassX + 0.2), 1.2, 0.5); g.material = mat; g.isPickable = false; furniture.push(g);
-    }
+      g.position.set(side * (BREAK.glassX + 0.2), 1.2, 0.5); return g;
+    });
+    const merged = Mesh.MergeMeshes(panes, true);
+    if (merged) merged.name = 'brk_glass';
+    for (const g of merged ? [merged] : panes) { g.material = mat; g.isPickable = false; g.freezeWorldMatrix(); furniture.push(g); }
+    mat.freeze();
   }
 
   /** The kick decided (was inline in the flight branch): the score, the pips, the juice, the banner, their kick next. */
@@ -1600,7 +1848,7 @@ export const PenaltyMode: ModeDefinition = (() => {
     if (saved) lastSaveBy = 'them';
     const scored = outcome === 'goal';
     shotHistory.push(brk.on ? brk.lastAimSign : Math.sign(reticle.pos.x || 0.01));   // the keeper remembers
-    if (keeperDove) { keeperDove = false; setTimeout(() => { if (!ended) rise(keeperAnim, keeperDiveSign, SPORT_CLIP.keeperIdle); }, RISE_DELAY_MS); }   // decided: off the ground, a beat later
+    if (keeperDove) { keeperDove = false; timers.later(() => { if (!ended) rise(keeperAnim, keeperDiveSign, SPORT_CLIP.keeperIdle); }, RISE_DELAY_MS); }   // decided: off the ground, a beat later
     myKicks.push(scored ? 'goal' : 'miss');
     if (scored) {
       goals++;
@@ -1622,6 +1870,7 @@ export const PenaltyMode: ModeDefinition = (() => {
       console.info(`[PEN-JUICE] ${saved ? 'saved' : 'miss'} (heavy feel + groan)`);
       gallery?.cheer(0.25);               // a save is THEIR moment
     }
+    bannerCh?.cancel();   // IMPROVE (2026-10-06, Penalty #11): the strike label's pending clear must not wipe the result
     ctx.setHud({
       score: goals * 20 + stylePts, ...kicksHud(),   // phase 3: the number the result reports (goals x20 + style); the board is kicksYou / goals / themGoals
       banner: bannerOverride ?? (scored
@@ -1631,7 +1880,8 @@ export const PenaltyMode: ModeDefinition = (() => {
     // YOUR kick, then THEIR answer — the shootout breathes in
     // alternating beats, and a tied fifth round goes to SUDDEN DEATH.
     // YOUR kick, then THEIR kick — and their kick is yours to keep.
-    setTimeout(() => { if (!ended) startKeeperRound(ctx); }, 1200);
+    // IMPROVE (2026-10-06, Penalty #9 / #10): a held beat A can skip (ResultBeat), on the bag dispose() clears
+    resultBeat.hold(gameT, 1200, () => { if (!ended) startKeeperRound(ctx); });
     phase = 'aim'; brk.on = false; brk.counterLive = false; ctx.setHud({ clock: 0, flow: -1, kinetic: '' }); me.root.position.y = 0;
     betweenKicks = true;   // HOTFIX (2026-09-24): the result beat takes no kick input (onInput)
   }
@@ -1662,17 +1912,15 @@ export const PenaltyMode: ModeDefinition = (() => {
     // the pressure line: a must-score kick SAYS so (sudden death or last kick down)
     const s = shootoutState(goals, themGoals, round - 1, themKicks);
     const mustScore = s.phase === 'suddenDeath' && themGoals > goals;
-    const hint = mustScore
-      ? 'SCORE OR YOU ARE OUT — feint, aim, bury it'
-      : s.phase === 'suddenDeath'
-        ? 'SUDDEN DEATH — score and the keeper must answer'
-        : 'BREAKAWAY — run at him, A shoots; LT slide, R1 off the glass';
+    // IMPROVE (2026-10-06, Penalty #2): the line rides the kick's own hint — written here, it was overwritten by
+    // startBreakaway's in the same frame and never seen
+    const pressure = kickPressure = mustScore ? 'SCORE OR YOU ARE OUT' : s.phase === 'suddenDeath' ? 'SUDDEN DEATH — score and the keeper must answer' : null;
     ctx.setHud({
       round: kickLabel(), feints: 0, ...kicksHud(), dive: '', weather: weather.describe(), kickShape: '',
       score: goals * 20 + stylePts,   // HOTFIX (2026-09-24): one type. This was the string '2–1', so the chip flipped to '40 PTS' after every kick; the kicks panel draws goals–themGoals
-      hint,
     });
-    startBreakaway(ctx);   // BREAKAWAY: your kick is the run
+    if (pensStyle === 'classic') startClassic(ctx, pressure);   // IMPROVE (2026-10-06, Penalty #3): the place kick
+    else startBreakaway(ctx, pressure);   // BREAKAWAY: your kick is the run
   }
 
   /** Street-style feint: a hard left↔right stick snap during aim. */
@@ -1681,9 +1929,9 @@ export const PenaltyMode: ModeDefinition = (() => {
   function startKeeperRound(ctx: ModeContext): void {
     const sd = round > REGULATION_KICKS;
     keepPlan = planRivalKick(Math.random, sd);
-    keepT = 0; keepStruck = false; keepDive = 0; keepDiveAt = null;
+    keepT = 0; keepStruck = false; keepCall = 0; keepDiveAt = null;
     betweenKicks = false;
-    ctx.setHud({ ...kicksHud(), dive: 'THEIR KICK — read the run-up · DIVE ◀ ▶ as he strikes', kickPower: null });
+    ctx.setHud({ ...kicksHud(), dive: 'THEIR KICK — read the run-up · DIVE ◀ ▶ · STAY ▼ · SPRING ▲ as he strikes', kickPower: null });
     phase = 'keep';
     keeper.root.position.set(SPOT.x, 0, SPOT.z - 2.2); keeper.root.rotation.set(0, 0, 0);
     keeperAnim.loop(SPORT_CLIP.moveLoop, { fadeSec: 0.2 });
@@ -1692,11 +1940,15 @@ export const PenaltyMode: ModeDefinition = (() => {
     keepKickIn = 0; pendingKeepKick = null;
     ball.position.set(SPOT.x, 0.11, SPOT.z + 0.3);
     ctx.camDirector.setFixedBehind(SPOT, 0, 'keeper', true);   // high behind the spot, the keeper faces the camera at the goal
-    ctx.setHud({ hint: `THEIR KICK — read the run-up · dive ◀ / ▶ as he strikes${sd ? ' · sudden death: he lies more' : ''}`, banner: '' });
+    bannerCh?.cancel();
+    // IMPROVE (2026-10-06, Penalty #7): the run-up's lean is the side; a run-up that barely leans is going down the middle
+    ctx.setHud({ hint: `THEIR KICK — read the run-up · dive ◀ / ▶ as he strikes · a straight run-up goes down the middle: ▼ stay big, ▲ spring for the chip${sd ? ' · sudden death: he lies more' : ''}`, banner: '' });
   }
+  /** IMPROVE (2026-10-06, Penalty #12): the breakaway's tricks go to the results card (they were tracked, then dropped). */
+  const endStats = () => ({ shots: brkStats.shots, wallRuns: brkStats.wallRuns, banks: brkStats.banks, rainbows: brkStats.rainbows, curlers: brkStats.curlers, overdrives: brkStats.overdrives, parries: brkStats.parries });
   function afterTheirKick(ctx: ModeContext): void {
     if (ended) return;
-    ctx.setHud({ banner: '' });
+    bannerCh?.cancel(); ctx.setHud({ banner: '' });
     const s = shootoutState(goals, themGoals, round, themKicks);
     const sdRounds = Math.max(0, Math.min(round, themKicks) - REGULATION_KICKS);
     if (s.phase === 'suddenDeath' && round === themKicks && sdRounds >= SD_CAP) {
@@ -1709,7 +1961,7 @@ export const PenaltyMode: ModeDefinition = (() => {
       ctx.setHud({ banner: won ? `LEVEL AFTER ${SD_CAP} — YOURS ON ${decidedBy === 'style' ? 'STYLE' : decidedBy === 'later-save' ? 'THE LATER SAVE' : 'NERVE'}` : `LEVEL AFTER ${SD_CAP} — THEIRS ON THE LATER SAVE` });
       // stats are numbers: decidedBy 1 = style, 2 = the later save, 3 = nerve
       console.info(`[PEN-END] ${won ? 'WIN' : 'LOSS'} ${goals}-${themGoals} style ${stylePts} sd ${sdRounds}`);
-      ctx.end(won ? 'SHOOTOUT_WIN' : 'SHOOTOUT_LOSS', goals * 20 + stylePts, { goals, stylePts, themGoals, sdRounds, decidedBy: decidedBy === 'style' ? 1 : decidedBy === 'later-save' ? 2 : 3 });
+      ctx.end(won ? 'SHOOTOUT_WIN' : 'SHOOTOUT_LOSS', goals * 20 + stylePts, { goals, stylePts, themGoals, sdRounds, decidedBy: decidedBy === 'style' ? 1 : decidedBy === 'later-save' ? 2 : 3, ...endStats() });
       return;
     }
     if (s.phase === 'decided' && s.winner) {
@@ -1719,7 +1971,7 @@ export const PenaltyMode: ModeDefinition = (() => {
       if (won) SoundKit.play('crowdCheer');
       console.info(`[PEN-END] ${won ? 'WIN' : 'LOSS'} ${goals}-${themGoals} style ${stylePts}`);
       ctx.end(won ? 'SHOOTOUT_WIN' : 'SHOOTOUT_LOSS', goals * 20 + stylePts,
-        { goals, stylePts, themGoals, sdRounds: Math.max(0, round - REGULATION_KICKS) });
+        { goals, stylePts, themGoals, sdRounds: Math.max(0, round - REGULATION_KICKS), ...endStats() });
       return;
     }
     me.root.position.set(-0.4, 0, -1.6); me.root.rotation.set(0, 0, 0);
@@ -1736,8 +1988,7 @@ export const PenaltyMode: ModeDefinition = (() => {
       feints++;
       SoundKit.play('whoosh', { pitch: 1.6, volume: 0.35 });
       meAnim.beat(SPORT_CLIP.footballJukeLeft, { fadeSec: 0.08 });
-      ctx.setHud({ feints, banner: `FEINT${feints > 1 ? ` x${feints}` : '!'}` });
-      setTimeout(() => ctx.setHud({ banner: '' }), 500);
+      ctx.setHud({ feints }); bannerCh?.flash(`FEINT${feints > 1 ? ` x${feints}` : '!'}`, 500);
     }
     lastFlickSign = sign; lastFlickMs = nowMs;
   }
@@ -1762,12 +2013,15 @@ export const PenaltyMode: ModeDefinition = (() => {
       spotMat.specularColor = Color3.Black();
       spot.material = spotMat;
       furniture.push(spot);
-      gallery = new Onlookers(ctx.scene, Array.from({ length: 14 }, (_, i) => {
-        const k = i - 6.5;
+      // IMPROVE (2026-10-06, Penalty #18): five bodies, not the seven the 14 spots got from MAX_BODIES' spread (each a
+      // skinned, animated roster body in frame the whole shootout), the bank kept as wide (x ±8, 4 m apart) — and parked
+      // while the camera is off them (Onlookers.pauseOffscreen: the breakaway's follow cam turns away on a wall run).
+      gallery = new Onlookers(ctx.scene, Array.from({ length: 5 }, (_, i) => {
+        const k = i - 2;
         // a shallow bank behind the goal — 2 m behind the keeper camera (fixed at z 13.4 on THEIR kick): at 13.2 the camera
         // stood inside a spectator and the whole frame was the inside of a body (measured 2026-09-06)
-        return new Vector3(k * 1.5, 0, 15.4 + Math.abs(k) * 0.22);
-      }));
+        return new Vector3(k * 4, 0, 15.4 + Math.abs(k * 4 / 1.5) * 0.22);
+      }), undefined, undefined, { pauseOffscreen: true });
       me = await spawnAthlete(ctx, CFG.heroUrl, new Vector3(-0.4, 0, -1.6), 0, SPORT_CLIP.penaltyIdle);
       keeper = await spawnFoe(ctx, CFG.heroUrl, new Vector3(0, 0, 10.4), Math.PI, SPORT_CLIP.keeperIdle);
       // the left dive is the authored right dive reflected across the sagittal plane, registered as 'keeper_dive.M'
@@ -1816,12 +2070,17 @@ export const PenaltyMode: ModeDefinition = (() => {
 
       round = 0; goals = 0; stylePts = 0; ended = false; betweenKicks = false;
       themGoals = 0; themKicks = 0; shotHistory = []; hintFlags.read = false; myKicks = []; theirKicks = [];
+      // IMPROVE (2026-10-06, Penalty #3 / #11 / #12 / #20): a fresh bag and banner channel, the game clock from zero, the
+      // breakaway's counters from zero (they carried over from the last shootout), the remembered kick style
+      timers.clear(); resultBeat.cancel(); bannerCh = new BannerChannel(timers, (text) => ctx.setHud({ banner: text })); gameT = 0;
+      for (const k of Object.keys(brkStats) as (keyof typeof brkStats)[]) brkStats[k] = 0;
+      pensStyle = readPensStyle();
       SoundKit.startAmbient('stadium');
       ctx.setHud({ score: 0 });   // net/precision phase 3: the score is the NUMBER the result reports; the kicks panel draws the board
       if (process.env.NODE_ENV === 'development') {
         (ctx.scene.metadata ??= {}).soccer = {   // BREAKAWAY probes
           state: () => ({ phase, clock: brk.clock, flow: brk.flow, wall: brk.wall, counterLive: brk.counterLive, struck: brk.struck, x: me.root.position.x, y: me.root.position.y, z: me.root.position.z, vx: brk.run.vx, vz: brk.run.vz, keeperX: keeper.root.position.x, keeperZ: keeper.root.position.z, keeperSliding: !!brk.keeperSlide, rainbowReady: phase === 'break' && brk.vaultT < 0 && rainbowRead(me2(), vel2(), { x: keeper.root.position.x, z: keeper.root.position.z }), slideSec: brk.slideSec, ...brkStats, goals, themGoals, round, ended, ballActive: pball.active, ballZ: ball.position.z }),
-          diveNow: (side: -1 | 1) => { if (phase === 'keep' && keepPlan && keepDiveAt == null) { keepDive = side; keepDiveAt = performance.now(); dive(meAnim, side); meDove = true; meDiveSign = side; } },
+          diveNow: (side: -1 | 1) => { if (phase === 'keep' && keepPlan && keepDiveAt == null) { keepCall = side; keepDiveAt = gameT; dive(meAnim, side); meDove = true; meDiveSign = side; } },
         };
       }
       nextKick(ctx);
@@ -1832,22 +2091,27 @@ export const PenaltyMode: ModeDefinition = (() => {
       if (phase === 'keep') {
         // HOTFIX (2026-09-24): their kick is decided (keepPlan cleared) and the 1.3 s result beat runs in 'keep'. A press
         // there played a dive after the ball was already in or saved, so the beat takes no input.
-        if (!keepPlan) return;
-        // one dive per kick: d-pad or a decisive stick flick picks the side
-        const side: DiveSign = e.t === 'dpad' && e.pressed ? (e.dir === 'left' ? -1 : e.dir === 'right' ? 1 : 0)
-          : e.t === 'stick' && e.side === 'L' && Math.abs(e.x) > 0.6 ? (e.x < 0 ? -1 : 1) : 0;
-        if (e.t === 'button' && e.pressed && e.btn === 'A') refuse(ctx, 'DIVE WITH ◀ ▶');   // PHONE CONTROLS: STRIKE in the keeper round
-        if (side !== 0 && keepDiveAt == null) {
-          keepDive = side; keepDiveAt = performance.now();
-          dive(meAnim, side); meDove = true; meDiveSign = side;
-          ctx.setHud({ hint: '' });
+        // IMPROVE (2026-10-06, Penalty #9): …except A, which skips the rest of the beat (ResultBeat, once it has been read)
+        if (!keepPlan) { if (e.t === 'button' && e.pressed && e.btn === 'A') resultBeat.skip(gameT); return; }
+        // one call per kick: d-pad or a decisive stick flick picks the side — IMPROVE (2026-10-06, Penalty #7): or ▼ stays
+        // big in the middle, ▲ springs for the top of it (stick down / up the same; up is the stick's negative y)
+        const call: KeeperCall = e.t === 'dpad' && e.pressed ? (e.dir === 'left' ? -1 : e.dir === 'right' ? 1 : e.dir === 'down' ? 'stay' : 'high')
+          : e.t === 'stick' && e.side === 'L' ? (Math.abs(e.x) > 0.6 ? (e.x < 0 ? -1 : 1) : e.y > 0.7 ? 'stay' : e.y < -0.7 ? 'high' : 0) : 0;
+        if (e.t === 'button' && e.pressed && e.btn === 'A') refuse(ctx, 'DIVE WITH ◀ ▶ · STAY ▼ · SPRING ▲');   // PHONE CONTROLS: STRIKE in the keeper round
+        if (call !== 0 && keepDiveAt == null) {
+          keepCall = call; keepDiveAt = gameT;   // #20: game time
+          if (call === 'high') { meAnim.beat(SPORT_CLIP.jumpUp, { fadeSec: 0.08 }); meAnim.loop(SPORT_CLIP.keeperIdle, { fadeSec: 0.2 }); }
+          else if (call !== 'stay') { dive(meAnim, call); meDove = true; meDiveSign = call; }   // ▼ is the set he is already in
+          ctx.setHud({ hint: '', ...(call === 'stay' ? { dive: 'STAYING BIG ▼' } : call === 'high' ? { dive: 'SPRING ▲' } : {}) });
         }
         return;
       }
       if (phase === 'break') {   // BREAKAWAY
+        // IMPROVE (2026-10-06, Penalty #3): Y at the top of the kick takes it as a classic pen instead
+        if (e.t === 'button' && e.pressed && e.btn === 'Y') { if (!switchPens(ctx)) refuse(ctx, 'Y SWITCHES AT THE START OF A KICK'); return; }
         if (e.t === 'stick' && e.side === 'L') { stickX = e.x; stickY = e.y; }
         if (e.t === 'trigger' && e.side === 'L' && e.value > 0.5 && brk.slideSec < 0 && brk.slideCool === 0 && brk.vaultT < 0 && brk.wall === 0 && !brk.struck) {
-          brk.slideSec = 0; brk.flow = flowAdd(brk.flow, FLOW.slide); brk.kineticAt = performance.now(); brkStats.slides++;
+          brk.slideSec = 0; brk.flow = flowAdd(brk.flow, FLOW.slide); brk.kineticAt = gameT; brkStats.slides++;
           meAnim.beat(sided(SPORT_CLIP.keeperDive, stickX >= 0 ? 1 : -1), { fadeSec: 0.08 }); SoundKit.play('whoosh', { pitch: 0.8, volume: 0.4 }); console.info('[BREAK] slide');   // the dive's stretch, in the soccer clip scope (a football clip here trips clipScope.test)
         }
         if (e.t === 'button' && e.pressed && e.btn === 'R1') { if (brk.wall !== 0) strikeNow(ctx, 'bank'); else refuse(ctx, 'BANK IT OFF THE GLASS — wall run first'); }
@@ -1865,7 +2129,10 @@ export const PenaltyMode: ModeDefinition = (() => {
       // HOTFIX (2026-09-24): the result beat after your kick takes no kick input. Its phase is 'aim', and the PLACE path
       // below took that as a new kick: A, A ran the meter and fired a second kick for the same round from wherever the
       // ball lay, often the net. That meant a second pip, a possible second goal and a second keeper round.
-      if (betweenKicks) { if (e.t === 'stick' && e.side === 'L') { stickX = e.x; stickY = e.y; } return; }
+      // IMPROVE (2026-10-06, Penalty #9): A skips the rest of the beat once it has been up RESULT_SKIP_MIN_SEC — the presses
+      // above (0 and 0.1 s into it) are still nothing
+      if (betweenKicks) { if (e.t === 'stick' && e.side === 'L') { stickX = e.x; stickY = e.y; } if (e.t === 'button' && e.pressed && e.btn === 'A') resultBeat.skip(gameT); return; }
+      if (e.t === 'button' && e.pressed && e.btn === 'Y') { if (!switchPens(ctx)) refuse(ctx, 'Y SWITCHES AT THE START OF A KICK'); return; }   // #3: back to the breakaway
       if (e.t === 'stick' && e.side === 'L') { stickX = e.x; stickY = e.y; detectFeint(ctx, e.x); }
       if (e.t === 'button' && e.btn === 'A' && e.pressed) {
         if (phase === 'aim') { phase = 'power'; meter.start(); ctx.setHud({ hint: 'KICK at the top of the wave' }); SoundKit.play('uiTick', { pitch: 1.1 }); ctx.juice.callout('POWER — KICK AT THE TOP', '#8fe0a0', 800); }   // PHONE CONTROLS: the run-up is SAID
@@ -1910,6 +2177,10 @@ export const PenaltyMode: ModeDefinition = (() => {
 
     update(ctx: ModeContext, dt: number) {
       if (ended) return;
+      gameT += dt;   // IMPROVE (2026-10-06, Penalty #20)
+      // IMPROVE (2026-10-06, Penalty #1): the weather runs, as golf's does — the rain follows the camera, a storm flashes and
+      // thunders, wet turf soaks, the gusts breathe. (The ball's wind is still WeatherKit.flightWind, the capped base.)
+      weather.update(dt); weatherFx?.update(dt);
       meter.update(dt);
       syncReticle();
       if (phase === 'power') ctx.setHud({ power: Math.round(meter.value * 100), kickPower: Math.round(meter.value * 100), kickZones: METER_ZONES.map((z) => `${z.to}:${z.label}`).join(','), kickShape: stickY < -0.5 ? 'CHIP' : Math.abs(stickX) > 0.3 ? `CURL ${stickX < 0 ? '◀' : '▶'}` : kickZone(meter.value) });
@@ -1932,7 +2203,9 @@ export const PenaltyMode: ModeDefinition = (() => {
       gallery?.update(dt);
       if (phase === 'break') { tickBreak(ctx, dt); return; }   // BREAKAWAY
       if (phase === 'flight') {
-        if (brk.on) ctx.camDirector.update(me.root.position, Vector3.Zero(), ball.position);   // BREAKAWAY: the follow camera rides the shot
+        // BREAKAWAY: the follow camera rides the shot; IMPROVE (2026-10-06, Penalty #3): the classic pen's fixed camera
+        // watches it too (it only re-aims inside update()). #17: a shared zero, not Vector3.Zero() a frame.
+        ctx.camDirector.update(me.root.position, ZERO_V, ball.position);
         if (kickIn > 0) {
           // the run-up / wind-up: the ball waits for the boot
           kickIn -= dt;
@@ -1947,20 +2220,22 @@ export const PenaltyMode: ModeDefinition = (() => {
             const nearPost = Math.abs(Math.abs(keeper.root.position.x) - PEN_GOAL.halfW) <= KEEPER.vaultNearPost;
             const reach = reachFor(KEEPER_REACH + 0.35, { high: brk.lastHigh, kind: brk.shotKind }, nearPost);
             if (Math.abs(ball.position.x - keeper.root.position.x) <= reach && ball.position.y <= (brk.lastHigh && nearPost ? 2.6 : 2.0)) {
-              if (Math.random() < KEEPER.parryChance && brk.clock > 1.5 && brk.shotKind !== 'overdrive') {
+              // IMPROVE (2026-10-06, Penalty #8): the parry is where you put it — at his body it comes back at you; at his
+              // stretch he holds it (parryRead). It was a 45% roll on every save.
+              if (parryRead(ball.position.x, keeper.root.position.x, brk.clock, brk.shotKind)) {
                 const to = me.root.position.subtract(ball.position); to.y = 0; to.normalize();
                 pball.launch(ball.position.clone(), to.scale(KEEPER.counterSpeed).add(new Vector3(0, 2.2, 0)));
                 brkStats.parries++; brk.counterLive = true; brk.struck = false; phase = 'break';
                 keeperAnim.beat(SPORT_CLIP.penaltyStrike, { fadeSec: 0.08 }); if (keeperDove) { keeperDove = false; rise(keeperAnim, keeperDiveSign, SPORT_CLIP.keeperIdle); }
-                SoundKit.play('impact', { pitch: 1.2, volume: 0.5 }); ctx.setHud({ banner: 'PARRIED — BACK AT YOU! hit it again', hint: 'OVERDRIVE — A on the loose ball' });
+                SoundKit.play('impact', { pitch: 1.2, volume: 0.5 }); bannerCh?.cancel(); ctx.setHud({ banner: 'PARRIED — BACK AT YOU! hit it again', hint: 'OVERDRIVE — A on the loose ball' });
                 console.info('[BREAK] parry-kick'); return;
               }
               pball.stop(); resolveKick(ctx, 'saved', 'SAVED — off his line'); return;
             }
           }
           if (frameKind && brk.clock > 0.8 && Vector3.Distance(ball.position, me.root.position) <= BREAK.strikeReach + 0.6 && pball.vel.z < 2) {
-            brk.counterLive = true; brk.struck = false; brk.flow = flowAdd(brk.flow, FLOW.rebound); brk.kineticAt = performance.now(); brkStats.rebounds++; phase = 'break';
-            ctx.setHud({ banner: 'OFF THE FRAME — OVERDRIVE!', hint: 'A — hit it again' }); console.info('[BREAK] rebound live'); return;
+            brk.counterLive = true; brk.struck = false; brk.flow = flowAdd(brk.flow, FLOW.rebound); brk.kineticAt = gameT; brkStats.rebounds++; phase = 'break';
+            bannerCh?.cancel(); ctx.setHud({ banner: 'OFF THE FRAME — OVERDRIVE!', hint: 'A — hit it again' }); console.info('[BREAK] rebound live'); return;
           }
         }
         // A scuffed pen can DIE SHORT of the line (weak meter + gravity) —
@@ -1977,50 +2252,55 @@ export const PenaltyMode: ModeDefinition = (() => {
         }
         return;
       }
+      // IMPROVE (2026-10-06, Penalty #7): ▲ is a spring — up and down in 0.55 s, finished even after the kick is decided
+      if (phase === 'keep' && keepCall === 'high' && keepDiveAt != null) { const u = (gameT - keepDiveAt) / 0.55; me.root.position.y = u < 1 ? 0.5 * Math.sin(Math.PI * u) : 0; }
       if (phase === 'keep' && keepPlan) {
         keepT += dt;
-        // the run-up: the kicker's body drifts toward the tell side and leans
+        // the run-up: the kicker's body drifts toward the tell side and leans — IMPROVE (2026-10-06, Penalty #5 / #6): by
+        // the plan's lean (a centre kick barely leans) over the plan's run-up (1.0–1.3 s; it was always 1.15)
         if (!keepStruck) {
-          const lean = Math.min(1, keepT / KEEP_RUNUP_SEC);
-          keeper.root.position.x = SPOT.x + keepPlan.tellSign * 0.55 * lean;
+          const lean = Math.min(1, keepT / keepPlan.runupSec);
+          keeper.root.position.x = SPOT.x + keepPlan.tellSign * keepPlan.lean * lean;
           keeper.root.position.z = SPOT.z - 2.2 * (1 - lean);
-          keeper.root.rotation.y = keepPlan.tellSign * 0.18 * lean;
-          if (keepT >= KEEP_RUNUP_SEC) {
+          keeper.root.rotation.y = keepPlan.tellSign * keepPlan.lean * 0.33 * lean;   // 0.18 rad on a corner's 0.55 m, as it was
+          if (keepT >= keepPlan.runupSec) {
             keepStruck = true;
             keeperAnim.beat(SPORT_CLIP.penaltyStrike, { fadeSec: 0.08 });
             keeperAnim.loop(SPORT_CLIP.penaltyIdle, { fadeSec: 0.2 });   // a kicker stands after the strike (was the keeper's crouch)
             keepKickIn = KICK_CONTACT_SEC;
             const plan = keepPlan;
             pendingKeepKick = () => {
-              keepStrikeAt = performance.now();   // the strike instant the dive is graded against = the boot on the ball
+              keepStrikeAt = gameT;   // the strike instant the dive is graded against = the boot on the ball (#20: game time)
               SoundKit.play('whoosh');
               ball.position.set(SPOT.x, 0.11, SPOT.z + 0.3);
               frameKind = null; flightSec = 0;
-              const k = launchKick({ x: SPOT.x, y: 0.11, z: SPOT.z + 0.3 }, { x: plan.aimX, y: Math.max(0.3, plan.aimY) }, 0.72, { curl: plan.aimX > 1.5 ? 0.4 : plan.aimX < -1.5 ? -0.4 : 0 });
+              // IMPROVE (2026-10-06, Penalty #5 / #6): the plan's pace (was 0.72 every kick), and the Panenka chipped
+              const k = launchKick({ x: SPOT.x, y: 0.11, z: SPOT.z + 0.3 }, { x: plan.aimX, y: Math.max(0.3, plan.aimY) }, plan.power01, { curl: plan.aimX > 1.5 ? 0.4 : plan.aimX < -1.5 ? -0.4 : 0, chip: plan.chip });
               pball.launch(ball.position.clone(), k.vel, k.spin);
             };
           }
         } else if (keepKickIn > 0) {
           // the boot is on its way to the ball; a dive already committed keeps carrying you
           keepKickIn -= dt;
-          if (keepDive !== 0) me.root.position.x += (keepDive * 2.4 - me.root.position.x) * 6 * dt;
+          if (typeof keepCall === 'number' && keepCall !== 0) me.root.position.x += (keepCall * 2.4 - me.root.position.x) * 6 * dt;
           if (keepKickIn <= 0 && pendingKeepKick) { pendingKeepKick(); pendingKeepKick = null; }
         } else {
           stepBall(dt);
           // your dive carries you toward the side you chose
-          if (keepDive !== 0) me.root.position.x += (keepDive * 2.4 - me.root.position.x) * 6 * dt;
+          if (typeof keepCall === 'number' && keepCall !== 0) me.root.position.x += (keepCall * 2.4 - me.root.position.x) * 6 * dt;
           const diedShort = !pball.active && ball.position.z < PEN_GOAL.z - 0.1;
           if (ball.position.z >= PEN_GOAL.z - 0.1 || diedShort) {
             pball.stop();
-            const timing = gradeDive(keepDiveAt == null ? null : (keepDiveAt - keepStrikeAt) / 1000);
-            const r = diedShort ? { saved: false, why: 'off_target' as const } : resolveSave(keepDive, timing, ball.position.x, ball.position.y);
+            const timing = gradeDive(keepDiveAt == null ? null : keepDiveAt - keepStrikeAt);   // #20: both already seconds of game time
+            const r = diedShort ? { saved: false, why: 'off_target' as const } : resolveSaveRead(keepCall, timing, ball.position.x, ball.position.y);   // #7: resolveSave plus the centre calls
             const theyScore = !r.saved && r.why !== 'off_target';
             if (theyScore) themGoals++;
             themKicks++;
-            if (meDove) { meDove = false; setTimeout(() => { if (!ended) rise(meAnim, meDiveSign, SPORT_CLIP.keeperIdle); }, RISE_DELAY_MS); }   // decided: off the ground, a beat later
+            if (meDove) { meDove = false; timers.later(() => { if (!ended) rise(meAnim, meDiveSign, SPORT_CLIP.keeperIdle); }, RISE_DELAY_MS); }   // decided: off the ground, a beat later
             theirKicks.push(theyScore ? 'goal' : 'miss');
             if (r.saved) { lastSaveBy = 'you'; ctx.juice.scorePop(ball.position, 'SAVED!', '#7CFFB2'); ctx.feel?.impact?.(0.5); }
             SoundKit.play(theyScore ? 'crowdGroan' : 'crowdCheer', { volume: 0.4 });
+            bannerCh?.cancel();
             ctx.setHud({
               score: goals * 20 + stylePts, ...kicksHud(),   // phase 3: the number the result reports (goals x20 + style); the board is kicksYou / goals / themGoals
               // HOTFIX (2026-09-24): `dive: ''` sat inside the comment above, so the DIVE ◀ ▶ prompt stayed up under the
@@ -2028,23 +2308,28 @@ export const PenaltyMode: ModeDefinition = (() => {
               dive: '',
               banner: r.saved ? (timing === 'perfect' ? 'SAVED! — read it perfectly' : 'SAVED!')
                 : r.why === 'wrong_way' ? (keepPlan.feint ? 'THEM: SOLD YOU — the run-up was a feint' : 'THEM: WRONG WAY')
+                : r.why === 'middle' ? 'THEM: DOWN THE MIDDLE — you went'
+                : r.why === 'over' ? (keepPlan.chip ? 'THEM: THE PANENKA — chipped over your set' : 'THEM: OVER YOUR SET')
+                : r.why === 'under' ? 'THEM: UNDER YOUR SPRING — it stayed low'
                 : r.why === 'too_slow' ? 'THEM: BURIES IT — dive as he strikes'
                 : r.why === 'stayed' ? 'THEM: BURIES IT — you stayed home'
                 : 'THEM: OFF TARGET',
             });
             keepPlan = null;
-            setTimeout(() => afterTheirKick(ctx), 1300);
+            resultBeat.hold(gameT, 1300, () => afterTheirKick(ctx));   // IMPROVE (2026-10-06, Penalty #9 / #10): A skips it; dispose clears it
           }
         }
         // the fixed camera only re-aims inside update(): without this it sat
         // behind the goal still facing the way it had been (measured: hero
         // BEHIND camera on every keeper round)
-        ctx.camDirector.update(me.root.position, Vector3.Zero(), ball.position);
+        ctx.camDirector.update(me.root.position, ZERO_V, ball.position);   // #17
         return;
       }
-      ctx.camDirector.update(me.root.position, Vector3.Zero(), reticle.pos);
+      ctx.camDirector.update(me.root.position, ZERO_V, reticle.pos);   // #17
     },
 
-    dispose() { strikerPosture?.dispose(); strikerPosture = null; keeperPosture?.dispose(); keeperPosture = null; penaltyVenue?.dispose?.(); penaltyVenue = null; gallery?.dispose(); gallery = null; me?.dispose(); keeper?.dispose(); furniture.forEach((f) => f.dispose()); ball?.dispose(); reticle?.dispose(); SoundKit.stopAmbient(); },
+    // IMPROVE (2026-10-06, Penalty #10 / #13): ended, and every pending timer cleared — startKeeperRound / afterTheirKick /
+    // the rise checked only `!ended`, which dispose never set; and the weather's particles and light restorers go with it.
+    dispose() { ended = true; timers.clear(); resultBeat.cancel(); bannerCh = null; weatherFx?.dispose(); weatherFx = null; strikerPosture?.dispose(); strikerPosture = null; keeperPosture?.dispose(); keeperPosture = null; penaltyVenue?.dispose?.(); penaltyVenue = null; gallery?.dispose(); gallery = null; me?.dispose(); keeper?.dispose(); furniture.forEach((f) => f.dispose()); ball?.dispose(); reticle?.dispose(); SoundKit.stopAmbient(); },
   };
 })();

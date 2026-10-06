@@ -20,9 +20,11 @@ export interface BuilderStore {
   user?: Row[];
   /** Client sessions (MIRROR-COACH P6): only read, to refuse removing an off day the client has started. */
   cs?: Row[];
+  /** The coaches' rosters (CoachClient): duplicate copies onto a live roster athlete only (owner-approved 2026-10-06). */
+  cc?: Row[];
 }
 
-export const newBuilderStore = (): BuilderStore => ({ seq: 0, fac: [], program: [], block: [], session: [], se: [], pe: [], log: [], user: [], cs: [] });
+export const newBuilderStore = (): BuilderStore => ({ seq: 0, fac: [], program: [], block: [], session: [], se: [], pe: [], log: [], user: [], cs: [], cc: [] });
 
 /**
  * MIRROR-COACH P6 (2026-09-29): the Session columns a write may name (prisma/schema.prisma model Session, less id,
@@ -147,6 +149,11 @@ export function builderMemoryDb(s: BuilderStore) {
   return {
     facilitatorProfile: { findUnique: async (a: Row) => { const f = s.fac.find((x) => x.userId === a.where.userId); return f ? pick(f, a.select) : null; } },
     user: { findUnique: async (a: Row) => { const u = (s.user ?? []).find((x) => x.id === a.where.id); return u ? pick(u, a.select) : null; } },
+    coachClient: {
+      findMany: async (a: Row) => (s.cc ?? [])
+        .filter((r) => r.coachId === a.where.coachId && (a.where.endedAt === null ? r.endedAt == null : true) && (a.where.clientId?.in ?? []).includes(r.clientId))
+        .map((r) => pick(r, a.select)),
+    },
     coachingProgram: {
       findUnique: async (a: Row) => {
         const p = s.program.find((x) => x.id === a.where.id);

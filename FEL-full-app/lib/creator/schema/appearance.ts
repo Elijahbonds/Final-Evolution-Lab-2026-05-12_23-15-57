@@ -37,6 +37,9 @@ import {
  */
 const FACE_DEFAULT = defaultFace() as unknown as Record<string, string>;
 
+/** The honest line for a face option with no 3D shape yet (faceMorphs.faceOptionRenders). */
+const SOON_3D = 'Coming soon in 3D: saved with your look, not yet shaped on the body.';
+
 const face = (id: string, label: string, options: readonly string[], glossary: string): SlotRow => ({
   kind: 'slot', id, label, section: 'appearance', tab: 'Face',
   options, allowNone: false, defaultOption: FACE_DEFAULT[id], requires: null, glossary,
@@ -62,11 +65,14 @@ export const APPEARANCE: SectionTable<AnyRow> = {
     face('faceShape', 'Face Shape', FACE_SHAPES, 'The base skull shape the fine-tune morphs blend on top of.'),
     face('hairStyle', 'Hair', HAIR_STYLES, 'Textured, protective and cultural styles are first-class here, not an afterthought list.'),
     face('hairColor', 'Hair Colour', HAIR_COLORS, 'Natural shades plus the three the Nexus palette uses.'),
-    face('eyeShape', 'Eye Shape', EYE_SHAPES, 'Sets the lid and corner geometry. Visible in every close-up and replay cut.'),
-    face('eyeColor', 'Eye Colour', EYE_COLORS, 'Iris colour. The cyan one is a Nexus look rather than a natural one.'),
-    face('brows', 'Brows', BROWS, 'Brow weight and arch. Carries most of the face in a reaction shot.'),
-    face('mouth', 'Mouth', MOUTHS, 'Lip shape and fullness.'),
-    face('nose', 'Nose', NOSES, 'Bridge and tip shape.'),
+    // IMPROVE (2026-10-06), research item 3: these glossaries promised 3D geometry the body does not have (seven morphs, no
+    // iris material — faceMorphs.faceOptionRenders). They say what is true now; the Closet labels the same options.
+    face('eyeShape', 'Eye Shape', EYE_SHAPES, `Lid and corner shape. ${SOON_3D}`),
+    // CREATOR-PLAN phase 4a: eye colour renders now (the procedural eye texture), any colour in the Closet
+    face('eyeColor', 'Eye Colour', EYE_COLORS, 'Iris colour, drawn into the 3D eyes. The cyan one is a Nexus look rather than a natural one.'),
+    face('brows', 'Brows', BROWS, 'Brow weight and arch. Arched lifts the brow on the 3D body; the other weights are coming soon in 3D.'),
+    face('mouth', 'Mouth', MOUTHS, `Lip shape and fullness. ${SOON_3D}`),
+    face('nose', 'Nose', NOSES, `Bridge and tip shape. ${SOON_3D}`),
     ...FACE_SLIDER_KEYS.map(slider),
   ],
 };

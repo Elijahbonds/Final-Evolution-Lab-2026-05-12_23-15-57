@@ -11,6 +11,7 @@
  */
 
 import { ALL_SEASON_WEARABLES, getSeasonWearable } from '@/lib/season/golden-hour';
+import { sanitizeMorphWeights } from '@/lib/creator/look/faceMorphList';
 
 export interface FaceConfig {
   skinTone: string;      // hex
@@ -47,20 +48,16 @@ export const BROWS = ['Natural', 'Arched', 'Straight', 'Thick', 'Thin', 'Bold'];
 export const MOUTHS = ['Neutral', 'Full', 'Wide', 'Soft', 'Defined'];
 export const NOSES = ['Straight', 'Rounded', 'Wide', 'Narrow', 'Button', 'Aquiline'];
 
-/** Forge morph names the sliders may carry — anything else is dropped. */
+/** Forge morph names the sliders may carry — anything else is dropped. The seven the forge bakes today; the Athlete
+ *  Creator's rows (lib/creator/schema/appearance.ts) still list exactly these. */
 export const FACE_SLIDER_KEYS = ['faceLong', 'faceRound', 'faceSquare', 'faceHeart', 'faceDiamond', 'jawOpen', 'browRaise'] as const;
 
-/** Clamp every slider to 0..1 and drop unknown keys / non-numbers. Returns
- *  undefined when nothing survives so a preset-only face stays compact. */
+/** Clamp every slider to 0..1 and drop bad names / non-numbers. Returns undefined when nothing survives so a preset-only
+ *  face stays compact. CREATOR-PLAN phase 4c (2026-10-06): DATA-DRIVEN — any morph name that passes the face morph rule
+ *  (lib/creator/look/faceMorphList.isFaceMorphName) is kept, the seven known ones first, so a morph phase 5 bakes into the
+ *  body is saved without a code change. A face saved before sanitises to exactly what it was. */
 export function sanitizeFaceSliders(input: unknown): Partial<Record<string, number>> | undefined {
-  if (!input || typeof input !== 'object') return undefined;
-  const out: Partial<Record<string, number>> = {};
-  for (const k of FACE_SLIDER_KEYS) {
-    const v = (input as Record<string, unknown>)[k];
-    if (typeof v !== 'number' || !Number.isFinite(v)) continue;
-    const c = Math.max(0, Math.min(1, v));
-    if (c > 0) out[k] = Math.round(c * 1000) / 1000;
-  }
+  const out = sanitizeMorphWeights(input, false);
   return Object.keys(out).length ? out : undefined;
 }
 

@@ -13,12 +13,16 @@ function oneAttempt(dir: 1 | -1): { attempt: AirAttempt; score: number } {
   const core = makeBigAirSession();
   let started = false, planted = false, stuck = false;
   for (let i = 0; i < 60 * 30 && core.state.attempts.length === 0; i++) {
+    // test changed (IMPROVE 2026-10-06, Big Air item 8): the run-up strides (a good stride every ~260 ms) — coasted, the slope
+    // now stops just short of the landing's speed window and the air knuckles (sketchy at best), which is not this pin
+    if (core.state.phase === 'Run' && i % 16 === 0) core.runTap(i % 32 === 0 ? 'L' : 'R', 'good');
     core.step(DT);
     const s = core.state;
     if (s.phase !== 'Air') continue;
     if (!started) { core.setSpinDir(dir); core.trick(); started = true; continue; }
     if (!planted && Math.abs(core.airTrick.rotation) >= 0.99) { core.trick(); planted = true; }
-    if (planted && !stuck && s.vy < 0 && s.pos.y <= -s.vy * 0.1) { core.stick(); stuck = true; }   // ≤ ~100 ms out: inside the 220 ms window
+    // ≤ ~100 ms out: inside the 220 ms window (test changed: measured over the landing slope's snow, not over y 0)
+    if (planted && !stuck && s.vy < 0 && s.pos.y - core.surface.y(s.pos.z) <= -s.vy * 0.1) { core.stick(); stuck = true; }
   }
   expect(core.state.attempts).toHaveLength(1);
   return { attempt: core.state.attempts[0], score: core.state.score };

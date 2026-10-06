@@ -22,6 +22,7 @@ import {
   freshStakes, call as callTrick, spendAttempt, attemptsLeft, canRetry,
   stakesScale, callLanded, stakesLabel, callPreview, type Stakes,
 } from '../core/DunkStakes';
+import { nextPropCategory, stepPropInCategory, guestSlamFactor, idleTip, trickInput, PROP_CATEGORY_LABEL, type PropCategory, type PropRing } from '../core/DunkAssist';   // IMPROVE (2026-10-06)
 import { readWalkOut, saveWalkOut, countPlay, musicCredential, type WalkOut } from '../music/WalkOut';
 import { resolveWalkOut, walkOutLine, type WalkOutCue } from '../music/WalkOutCue';
 import { StudioLibrary } from '../music/StudioLibrary';
@@ -64,7 +65,7 @@ import { chainRotation, frameAbove } from '../anim/TwoBoneIK';
 import { BodyMotion, dynamicPose } from '../core/DynamicPosture';   // the runway answers its MOTION
 import { POSTURE, posturePose, chestAimCorrection, hipYawStrip, easePose, clonePose, lowPassK, wrapRad, clamp, POSTURE_TAU, AIM_TAU, AIM_SPLIT, EYES_SPLIT, HEAD_YAW_CAP, HEAD_PITCH_CAP, type PosturePose, type PostureWindow, type PostureInput } from '../core/DunkPosture';   // DUNK-POSTURE: the Posture Poses layer
 import type { PlayOpts } from '../anim/CharacterAnimator';
-import { DunkReplayRecorder } from '../scene/DunkReplayCam';
+import { DunkReplayRecorder, pausableDelay } from '../scene/DunkReplayCam';
 import { SoundKit } from '../audio/SoundKit';
 import { refuse } from '../core/Refusal';   // MECHANICS PASS: a press that cannot act is answered
 import { SlamLatch, TakeoffEcho, type LaunchCause } from '../core/slamPress';   // HOTFIX (2026-09-24): the take-off's A is not the slam
@@ -89,6 +90,7 @@ import { SKY, skyTierFor, skyTapAllowed, skyTapRefusal, type SkyTier } from '../
 import { readSeasonLane, specialOpen, specialLockLine, SPECIAL_PROPS, type SeasonLane } from '../core/SeasonSpecials';   // SEASON SPECIALS (owner, 2026-09-18): the PRO lane's   // THE SKY TIER (owner, 2026-09-18): a blimp / a rocket / … over the lane, per court
 import { spawnMeshyProp } from '../visual/meshyProps';
 import { SceneLoader } from '@babylonjs/core';
+import { mergeByMaterial } from '../scene/mergeByMaterial';   // IMPROVE (2026-10-06): the station and the sky tier, one draw per material
 import { runwayTrickById, DUNK_TRICKS, SLAM_EDGE_EXEC, slamReadout, slamExecution, signatureFor, landingDustScale, netSplashScale, NET_SPLASH_DROP, type SlamReadout } from '../core/DunkSystem';
 import { dunkCard, slamIsClean } from '../core/DunkCard';
 import { missBeat } from '../core/MissFlavour';
@@ -99,7 +101,7 @@ import { approachAngle, approachBonus, takeoffFor, takeoffTell } from '../core/D
 import { spinBody, spinProgress } from '../core/DunkSpinBody';
 import { emptyCard, addAttempt, forWire, nightReport } from '@/lib/mp/dunkCard';
 import {
-  judgeDunk, ScoreReveal, CrowdEnergy, REVEAL_DURATION_SEC, BAND_TOTAL, JUDGE_COUNT,
+  judgeDunk, ScoreReveal, CrowdEnergy, BAND_TOTAL, JUDGE_COUNT,
   PERFECT_TOTAL, perJudgeAvg, type JudgeScore,
 } from '../core/JudgePanel';
 import { MomentumBus } from '../core/MomentumBus';
@@ -240,6 +242,10 @@ const LOB_PROPS = ['selflob', 'offglass', 'bounce'] as const;
 type LobProp = (typeof LOB_PROPS)[number];
 const lobPropOf = (p: Prop): LobProp | null => (p === 'selflob' || p === 'offglass' || p === 'bounce' ? p : null);
 const nextLobProp = (p: Prop): LobProp => { const k = lobPropOf(p); return k ? LOB_PROPS[(LOB_PROPS.indexOf(k) + 1) % LOB_PROPS.length] : 'selflob'; };
+/** IMPROVE (2026-10-06): THE RING BY FAMILY. X stepped all 32 props one press at a time (ten of them DUBBLE 1–10), so the crate or the
+ *  kangaroo was 10–20 presses away. X steps the families now (core/DunkAssist); the d-pad picks inside one. */
+const propCategory = (p: Prop): PropCategory => p === 'none' ? 'plain' : isOop(p) ? 'oop' : lobPropOf(p) ? 'lob' : isDubble(p) ? 'dubble' : SPECIAL_PROPS.has(p) ? 'special' : 'obstacle';
+const PROP_RING: PropRing<Prop> = { all: PROPS, categoryOf: propCategory };
 
 const STYLE_CLIP: Record<Style, string> = {
   // POWER launch plays the user's real motion capture when MOCAP_DUNK is on
@@ -380,6 +386,7 @@ export const DunkMode: ModeDefinition = (() => {
   let runwayBeat: RunwayTrick | null = null, runwayT = 0, runwayReleased = false, runwayToken = 0;
   let runwayLabels: string[] = [], runwayDifficulty = 0, launchQueued = false;
   let teachHint = '';   // the runway's move list, pushed to the HUD only when it changes
+  let lineHint = '';   // IMPROVE (2026-10-06): the last near-the-line hint sent (the approach writes it on change only)
   let runwayIds: string[] = [];                  // what was thrown, for the signature table (labels are for people)
   let airTrick: { trick: DunkTrick; t0: number; rate: number } | null = null;   // the mid-air trick in flight (its own hand-off clock; `rate` = its clip's pace)
   let catchBlend = 1; const catchFrom = new Vector3(), catchWorld = new Vector3(), _invHand = Matrix.Identity();   // a caught ball eases from where the hand met it into the palm (80 ms), no snap
@@ -522,6 +529,7 @@ export const DunkMode: ModeDefinition = (() => {
     }
     for (const [x, z] of [[-0.7, 1.5], [0.7, 1.5], [-0.7, -1.5], [0.7, -1.5]] as const) add(MeshBuilder.CreateCylinder('station_leg', { diameter: 0.15, height: 1.0, tessellation: 10 }, scene), trim, x, 0.5, z);
     void [can, dock];
+    mergeByMaterial(root);   // IMPROVE (2026-10-06)
     return root;
   }
   /** The court's own thing in the sky, from primitives, hung with its underside at SKY.underY over the lane. */
@@ -551,6 +559,7 @@ export const DunkMode: ModeDefinition = (() => {
       const roof = add(MeshBuilder.CreateCylinder('sky_roof', { diameterTop: 0, diameterBottom: 3.0, height: 1.0, tessellation: 4 }, scene), acc, 0, 2.4, -0.3); roof.rotation.y = Math.PI / 4;
       for (const sx of [-1, 1]) add(MeshBuilder.CreateBox('sky_rail', { width: 0.06, height: 0.7, depth: 2.4 }, scene), acc, sx * 1.65, 0.65, 0);
     }
+    mergeByMaterial(root);   // IMPROVE (2026-10-06): the root keeps swaying (update) — only the parts under it are one mesh per material
     return root;
   }
 
@@ -695,7 +704,7 @@ export const DunkMode: ModeDefinition = (() => {
   // palm into the iron: the wrist target LAGS in (τ WRIST_LAG_TAU), the jam weight eases up (jamWeight), the root follows
   // through JAM_FOLLOW_M, the ball lets go on the frame it meets the ring (ironContact, or the short timeout) and THAT is the
   // contact beat — the punch, the ring's dip, the net. SLAM held through the contact is a real rim hang (hangHold).
-  const lagTarget = new Vector3(), _reachT = new Vector3(), _reachFwd = new Vector3(); let lagLive = false;   // H1: the reach point the wrist trails — seeded from the clip's own hand when the reach comes on
+  const lagTarget = new Vector3(), _reachT = new Vector3(), _reachFwd = new Vector3(), _reachWant = new Vector3(); let lagLive = false;   // H1: the reach point the wrist trails — seeded from the clip's own hand when the reach comes on
   let jamSec = -1;                            // seconds into the JAM (the press, or the windmill's release) — −1 outside it
   let jamContact = false;                     // the ball met the iron this attempt (released there, CONTACT fired)
   // DUNK-BALL-ARMS-RIM (2026-09-14): the make's ball goes over the lip and DOWN THROUGH the ring (RimFlush), out of the net to the
@@ -762,7 +771,7 @@ export const DunkMode: ModeDefinition = (() => {
         liveCeleb = pickLiveCelebration({ made: true, chosen: turn === 'player' ? celebPick : null, rivalId: turn === 'rival' ? foe.id : null, total: turn === 'rival' ? BAND_TOTAL.approval : 35, bands: BAND_TOTAL, seed: seedOf(`${round}:${dunkInRound}`), lastRot: lastRotCeleb });
         if (liveCeleb === 'roar' || liveCeleb === 'toosmall' || liveCeleb === 'itsover') lastRotCeleb = liveCeleb;
         liveHoldMs = holdEndMs(true, liveCeleb);
-        if (liveCeleb) liveCelebTimer = setTimeout(() => startLiveCeleb(ctx, liveCeleb!), celebStartMs());
+        if (liveCeleb) liveCelebTimer = later(() => startLiveCeleb(ctx, liveCeleb!), celebStartMs());
       } else liveHoldMs = holdEndMs(false, null);
       console.info('[HANDS] feet down, live'); return;
     }
@@ -872,7 +881,39 @@ export const DunkMode: ModeDefinition = (() => {
   // 1.0 with TV MODE off, so the direct-display window is the tuned 0.28 s byte for byte. Every read of the base window
   // (open/close, the scoring half, the hang pace to the resolve) goes through the one helper so they cannot disagree.
   let tvFactor = 1;
-  function slamWindowBase(): number { return CFG.qteWindowSec * tvFactor; }
+  // IMPROVE (2026-10-06): A GUEST'S FIRST JUMPS. The same kind of factor, for the same reason the TV one exists: the window a first-time
+  // player meets is widened on their first two jumps (core/DunkAssist.guestSlamFactor, TUNED 1.4× → 1.2× → 1×) and is the tuned window
+  // from the third on. Read at takeoff with the TV factor, never inside a jump; the rival's jumps are always 1×.
+  let guestFactor = 1, playerJumps = 0;
+  function slamWindowBase(): number { return CFG.qteWindowSec * tvFactor * guestFactor; }
+  // IMPROVE (2026-10-06): the PRACTICE RUNWAY (free dunks: no judges, no rival, no attempt spent), the runway's standing tips, the
+  // judges' reveal hurried by a held A, and the rim-hang prompt from the press to the iron.
+  let practice = false;
+  const PRACTICE_CHIP = 'PRACTICE · R1 TO LEAVE';
+  let runwayHint = '', idleSec = 0, idleTipShown: string | null = null;   // runwayHint: the runway's own line, which a standing tip gives back
+  const propMemory: Partial<Record<PropCategory, Prop>> = {};
+  let revealHold = false, revealTail = -1;   // revealTail: seconds left of the beat after the reveal ends (−1 = none pending)
+  const REVEAL_HOLD_SPEED = 3, REVEAL_TAIL_SEC = 0.4;
+  let hangPrompt = false;
+  const HANG_PROMPT = 'HOLD SLAM — HANG ON THE RIM';
+  /** The attempt chip: the stakes on a judged dunk, PRACTICE on the practice runway. */
+  function attemptChip(): string { return practice ? PRACTICE_CHIP : stakesLabel(stakes, calledLabel()); }
+  const propAllowed = (p: Prop): boolean => !(p === 'oopalien' && skyTier?.kind !== 'saucer') && !(SPECIAL_PROPS.has(p) && !specialsOpen());
+  const propLockLine = (p: Prop): string => p === 'oopalien' ? 'NO ALIENS OVER THIS COURT' : specialLockLine(p as 'kangaroo');
+  function togglePractice(ctx: ModeContext): void {
+    practice = !practice;
+    ctx.setHud({ attempt: attemptChip() });
+    flash(ctx, practice ? 'PRACTICE RUNWAY — free dunks: no judges, no rival · R1 to go back' : 'BACK TO THE CONTEST', 1400);
+    SoundKit.play('uiTick', { pitch: practice ? 1.5 : 0.9 });
+    console.info(`[DUNK-PRACTICE] ${practice ? 'on' : 'off'}`);
+  }
+
+  /** IMPROVE (2026-10-06): THE MODE'S LIFE, for the deferred callbacks. The retry, the advance and the judges' beats were timeouts
+   *  that checked only `phase === 'judging'` — still true after dispose — so leaving mid-reveal ran resetForNextAttempt on disposed
+   *  meshes. `dispose` bumps the generation; a callback scheduled under an older one does nothing. */
+  let modeGen = 0;
+  function later(fn: () => void, ms: number): ReturnType<typeof setTimeout> { const gen = modeGen; return setTimeout(() => { if (gen === modeGen) fn(); }, ms); }
+  const alive = (gen: number): boolean => gen === modeGen;
 
   function setPhase(p: Phase): void { phase = p; phaseSec = 0; if (typeof window !== 'undefined' && (window as { __FEL_QA__?: unknown }).__FEL_QA__) console.info(`[DUNK-PHASE] ${p}`); }   // QA trace only (agent bridge on)
   function setWin(w: Win): void { if (win === w) return; win = w; console.info(`[DUNK-WIN] ${w}`); }
@@ -949,12 +990,16 @@ export const DunkMode: ModeDefinition = (() => {
 
   // ── Dunk play tip (2026-09-07): camera-relative stick, facing from velocity ──
   /** The L stick as a world velocity: up = the camera's flat forward, right = its flat right, magnitude = speed. */
+  // IMPROVE (2026-10-06): the per-frame vectors of the run and the flight are scratch — stickVel, the charge's facing, the meter's
+  // head point and the camera's zero velocity each allocated every frame. Each is read inside the frame it is written, never kept.
+  const _stickW = new Vector3(), _faceV = new Vector3(), _meterHead = new Vector3();
+  const ZERO_VEL: Readonly<Vector3> = Vector3.Zero();   // never written: the director only reads the velocity it is handed
   function stickVel(ctx: ModeContext): Vector3 {
     const mag = Math.hypot(stickX, stickY);
-    if (mag < 0.08) return Vector3.Zero();
+    if (mag < 0.08) return _stickW.setAll(0);
     const k = (mag > 1 ? 1 / mag : 1) * APPROACH_SPEED;   // a keyboard diagonal is (1, 1) — cap the magnitude at one stick
     const f = ctx.camDirector.forwardFlat(), r = ctx.camDirector.rightFlat();
-    return new Vector3((r.x * stickX - f.x * stickY) * k, 0, (r.z * stickX - f.z * stickY) * k);   // up is −y on every source
+    return _stickW.set((r.x * stickX - f.x * stickY) * k, 0, (r.z * stickX - f.z * stickY) * k);   // up is −y on every source
   }
   /** HOOPS-DEPTH S1: the approach's locomotion model — the hoops gears (walk under `walkStick`, jog, HOLD = sprint), the
    *  loaded first step, the stop that scales with pace and the cut cost, on the dunk's own top speed. `stickVel` gives the
@@ -993,10 +1038,29 @@ export const DunkMode: ModeDefinition = (() => {
     // samples), while plain and obstacle props — which have no passer — were clean.
     // Detach first: setParent(null) keeps the ball's world transform, and setupProp hands it back to the player.
     if (teammate && ball) releaseBall(ball);
-    teammate?.dispose(); teammate = null;
+    // IMPROVE (2026-10-06): ONE PASSER, KEPT. Every oop pick spawned a whole NPC (spawnNpc) and every prop change threw him away, so
+    // scrolling the ring past the oops hitched on each. He is hidden and kept now (the ball is out of his hand first, above), and the
+    // next oop shows him again where that oop needs him.
+    if (teammate) { teammate.root.setEnabled(false); if (sparePasser && sparePasser !== teammate) sparePasser.dispose(); sparePasser = teammate; teammate = null; }
+  }
+  let sparePasser: SpawnedCharacter | null = null;
+  /** IMPROVE (2026-10-06): THE PICK SETTLES BEFORE THE PROP IS BUILT. Each press of the prop ring ran setupProp (dispose + rebuild the
+   *  obstacle, or the passer) — so scrolling five props built five. The build waits PROP_SETUP_DEBOUNCE_MS after the last press; the
+   *  run (beginRun) and a runway beat take a pending build at once, so nothing launches over a prop that is not there yet. */
+  const PROP_SETUP_DEBOUNCE_MS = 250;
+  let propSetupTimer: ReturnType<typeof setTimeout> | null = null;
+  function queuePropSetup(ctx: ModeContext): void {
+    if (propSetupTimer) clearTimeout(propSetupTimer);
+    propSetupTimer = later(() => { propSetupTimer = null; void setupProp(ctx); }, PROP_SETUP_DEBOUNCE_MS);
+  }
+  function flushPropSetup(ctx: ModeContext): void {
+    if (!propSetupTimer) return;
+    clearTimeout(propSetupTimer); propSetupTimer = null;
+    void setupProp(ctx);
   }
 
   async function setupProp(ctx: ModeContext): Promise<void> {
+    if (propSetupTimer) { clearTimeout(propSetupTimer); propSetupTimer = null; }   // a direct build supersedes a queued one
     clearProps();
     dribble?.update(0, 0, false); gatherLatched = false; gatherStride = false; gatherRun = null;
     if (!lob.live && ball && player) attachBallToHand(ball, player.skeleton, hand('RightHand'));   // DUNK-SOFTS-NAMED: a prop change hands the ball back (the passer had it)
@@ -1007,6 +1071,7 @@ export const DunkMode: ModeDefinition = (() => {
         const o = await spawnDunkObstacle(ctx.scene, kind, rim, 'dunk_obstacle', CFG.heroUrl);   // the TETRIS stack uses the game's own bodies
         if (token !== obstacleToken || ctx.scene.isDisposed) { o.dispose(); return; }   // the prop changed under the load
         obstacle = o;
+        if (phase === 'charge') o.start();   // IMPROVE (2026-10-06): built after the run began (a pick flushed by beginRun) — it rolls as beginRun would have started it
         if (o.dubble && ball) {   // DUNK MOTION phase 10: THE DUBBLE UP — the ball goes on the helper's head; the runner comes in empty-handed
           dribble?.update(0, 0, false); releaseBall(ball); ballSim.stop(); ball.setParent(o.dubble.ballAnchor); ball.position.setAll(0); ball.setEnabled(true);
           console.info(`[DUBBLE] ${o.spec.label}: the ball on the helper's head, ${(o.dubble.holderZ - rim.z).toFixed(2)} m out · take-off ${o.spec.takeoffFromRim.toFixed(2)} m`);
@@ -1024,15 +1089,24 @@ export const DunkMode: ModeDefinition = (() => {
     }
     if (isOop(prop)) {   // every oop variant needs the passer standing there
       const token = ++obstacleToken;
-      const npc = await CharacterPipeline.spawnNpc(ctx.scene, CFG.heroUrl, {
-        // the billboard oop's passer stands on the RUNWAY side of the line near the centre: the corner signs face up the runway, and
-        // from the rim side there is no bank (the solve refuses a throw from behind the face)
-        position: prop === 'oopcorner' ? new Vector3(4.0, 0, gatherLine() + 5.0) : new Vector3(-3.4, 0, CFG.rimZ + 1.6), tint: '#22d3ee', startClip: SPORT_CLIP.teammateIdle,   // the billboard oop: down the left side, so the mirror line meets the sign near its centre (from x −1.2 it crossed 3 m off it, measured)
-      });
-      if (token !== obstacleToken || ctx.scene.isDisposed) { if (ball) releaseBall(ball); npc.dispose(); return; }   // the prop changed under the load — never let the passer take the ball with him
-      teammate = npc;
-      neverBindPose(teammate.animator, SPORT_CLIP.teammateIdle);
-      installSafePlay(teammate.animator, 'dunk-teammate');
+      // the billboard oop's passer stands on the RUNWAY side of the line near the centre: the corner signs face up the runway, and
+      // from the rim side there is no bank (the solve refuses a throw from behind the face)
+      const passerAt = prop === 'oopcorner' ? new Vector3(4.0, 0, gatherLine() + 5.0) : new Vector3(-3.4, 0, CFG.rimZ + 1.6);   // the billboard oop: down the left side, so the mirror line meets the sign near its centre (from x −1.2 it crossed 3 m off it, measured)
+      if (sparePasser) {   // IMPROVE (2026-10-06): the kept passer, shown again where this oop wants him
+        teammate = sparePasser; sparePasser = null;
+        teammate.root.position.copyFrom(passerAt); teammate.root.setEnabled(true);
+        teammate.animator.play(SPORT_CLIP.teammateIdle, { loop: true });
+      } else {
+        const npc = await CharacterPipeline.spawnNpc(ctx.scene, CFG.heroUrl, { position: passerAt, tint: '#22d3ee', startClip: SPORT_CLIP.teammateIdle });
+        if (token !== obstacleToken || ctx.scene.isDisposed) {   // the prop changed under the load — never let the passer take the ball with him
+          if (ball) releaseBall(ball);
+          if (!ctx.scene.isDisposed && !sparePasser) { neverBindPose(npc.animator, SPORT_CLIP.teammateIdle); installSafePlay(npc.animator, 'dunk-teammate'); npc.root.setEnabled(false); sparePasser = npc; } else npc.dispose();   // IMPROVE (2026-10-06): kept for the next oop
+          return;
+        }
+        teammate = npc;
+        neverBindPose(teammate.animator, SPORT_CLIP.teammateIdle);
+        installSafePlay(teammate.animator, 'dunk-teammate');
+      }
       // DUNK-SOFTS-NAMED: the passer holds the ball from the moment he is picked — the dunker runs up empty-handed and the
       // ball never jumps to the far palm at the takeoff (it sat in the dunker's hand until the launch frame: a 3.4 m pop)
       if (!lob.live && (phase === 'approach' || phase === 'charge')) { attachBallToHand(ball, teammate.skeleton, 'RightHand'); console.info('[HANDS] ball → passer'); }
@@ -1171,6 +1245,7 @@ export const DunkMode: ModeDefinition = (() => {
         void spawnMeshyProp(scene, rideKey, null, `dunk_${rideKey}`).then((r) => { if (!r || scene.isDisposed) return; parkOnPane(r, panes[0], 6.4); sideProps.push(r); const { max } = r.getHierarchyBoundingVectors(true); console.info(`[DUNK-PARKOUR] ${rideKey} parked on the right corner (roof ${max.y.toFixed(2)} m)`); });
         if (ride.kind === 'shuttle') {   // ORBIT's other corner (owner, 2026-09-18: "replace the red tent with a space station")
           const st = buildSpaceStation(scene); parkOnPane(st, panes[1], 5.0); sideProps.push(st);
+          st.freezeWorldMatrix(); for (const m of st.getChildMeshes()) m.freezeWorldMatrix();   // IMPROVE (2026-10-06): parked for good — static from here
           console.info('[DUNK-PARKOUR] space station on the left corner');
         } else void SceneLoader.ImportMeshAsync('', '/models/props/racing/', 'tent.glb', scene).then((r) => {
           if (scene.isDisposed) { for (const m of r.meshes) m.dispose(); return; }
@@ -1224,7 +1299,7 @@ export const DunkMode: ModeDefinition = (() => {
       ctx.objectiveRef.current = rim;
       SoundKit.startAmbient('stadium');
       EffectsKit.ambient(ctx.scene, 'venice');
-      trail = EffectsKit.ballTrail(ctx.scene, ball); setTrail('soft');
+      trail?.dispose(); trail = EffectsKit.ballTrail(ctx.scene, ball); trailKey = ''; trailOn = true; setTrail('soft');   // IMPROVE (2026-10-06): a reload never stacks a second trail
       hoopJuice?.dispose(); hoopJuice = new HoopJuice(ctx.scene, rim);
       phoneFlashes?.dispose(); phoneFlashes = new PhoneFlashes(ctx.scene, new Vector3(rim.x, 0, rim.z + 5));   // DUNK MOTION phase 12
       mic?.dispose(); mic = new ModeMic(ctx, { groups: ['dunk', 'names'], court: ctx.location, players: { ...DUNK_RIVAL_VOICES } }); micOpened = false; micFiller = false;
@@ -1247,6 +1322,7 @@ export const DunkMode: ModeDefinition = (() => {
         // (ASSET-POLISH: no second pick here. This one ran after the rival had spawned and put `foe` back to night 1,
         // CASS, so the name on the card never matched the body that walked out.)
     stakes = freshStakes();
+      practice = false; playerJumps = 0; guestFactor = 1; revealTail = -1; revealHold = false; hangPrompt = false; idleSec = 0; idleTipShown = null; lineHint = ''; for (const k of Object.keys(propMemory)) delete propMemory[k as PropCategory];   // IMPROVE (2026-10-06): a new mount is a new guest
       resetLob(); resetRunway(); win = 'run';
       setPhase('approach');
       startWalkOut();
@@ -1255,7 +1331,7 @@ export const DunkMode: ModeDefinition = (() => {
         round: `${round}/${TOTAL_ROUNDS}`, dunkNum: `${dunkInRound + 1}/${DUNKS_PER_ROUND}`, nightCard: null, nightNum: night,
         score: playerTotal, rivalScore: rivalTotal, style: STYLE_LABEL[style], prop: propLabel(prop), hype: 0, chain: 0,
         // F4 (review): this was a 130-character run-on naming six controls. The first run needs two.
-        hint: 'HOLD to run · tap JUMP at the line — then SLAM on NOW!',
+        hint: (runwayHint = 'HOLD to run · tap JUMP at the line — then SLAM on NOW!'),
         // one line, phrased by the module: a mode must not invent its own wording for somebody's track
         walkOutNow: walkOutLine(walkCue),
         attempt: stakesLabel(stakes, calledLabel()),
@@ -1266,6 +1342,13 @@ export const DunkMode: ModeDefinition = (() => {
     onInput(ctx: ModeContext, e: FelInput) {
       SoundKit.unlock();
       slamEcho.see();   // HOTFIX (2026-09-24): a new input — first, before anything in here can launch
+      // IMPROVE (2026-10-06): THE PAD SKIPS THE CUT, AND HURRIES THE JUDGES. The triple cut listened only for a tap or Space, so a pad or a
+      // phone controller sat through every replay and was told "THE JUDGES ARE SCORING"; A or B ends it now. A held through the reveal
+      // (or held on from the skip) runs the judges' beats REVEAL_HOLD_SPEED× — the next run-up follows the reveal's own end.
+      if (!aiFeeding && e.t === 'button' && (e.btn === 'A' || e.btn === 'B')) {
+        if (e.pressed && cutting) { replay.stop(); if (e.btn === 'A') revealHold = true; console.info('[DUNK-SHOW] triple cut skipped on the pad'); return; }
+        if (e.btn === 'A') { if (!e.pressed) revealHold = false; else if (phase === 'judging' && reveal.active) { revealHold = true; return; } }
+      }
       // DUNK MOTION phase 11: on the rival's turn the runway is HIS — the AI's pad is the only one read; the player's presses are
       // answered, never obeyed (his analog streams are dropped quietly)
       if (turn === 'rival' && !aiFeeding) {
@@ -1304,7 +1387,7 @@ export const DunkMode: ModeDefinition = (() => {
         return;
       }
       if ((e.t === 'button' || e.t === 'dpad') && e.pressed && (phase === 'rivalTurn' || phase === 'judging' || phase === 'resolve')) {
-        refuse(ctx, phase === 'rivalTurn' ? "RIVAL'S TURN" : 'THE JUDGES ARE SCORING');
+        refuse(ctx, phase === 'rivalTurn' ? "RIVAL'S TURN" : practice ? 'PRACTICE — THE NEXT RUN IS COMING' : 'THE JUDGES ARE SCORING');
         return;
       }
       // A trick direction belongs to the FLIGHT; on the runway the d-pad is the prop picker, and it fires on the release.
@@ -1316,6 +1399,9 @@ export const DunkMode: ModeDefinition = (() => {
       if (e.t === 'button' && (e.btn === 'B' || e.btn === 'X') && e.pressed && phase !== 'approach' && phase !== 'cinematic' && !qteWindowOpen) {
         refuse(ctx, e.btn === 'B' ? 'PICK THE STYLE ON THE RUNWAY' : 'PICK THE PROP ON THE RUNWAY');
       }
+      // IMPROVE (2026-10-06): R1 on the runway is the PRACTICE RUNWAY (read nowhere else on the runway; Shift — the keyboard's tagged
+      // boost R1 — is not it, `e` is)
+      if (e.t === 'button' && e.btn === 'R1' && e.pressed && e.src !== 'key' && phase === 'approach' && turn === 'player') togglePractice(ctx);
       if (e.t === 'button' && e.btn === 'B' && e.pressed && phase === 'approach') {
         style = STYLES[(STYLES.indexOf(style) + 1) % STYLES.length];
         ctx.setHud({ style: STYLE_LABEL[style] });
@@ -1336,9 +1422,10 @@ export const DunkMode: ModeDefinition = (() => {
         const i = stakes.called ? DUNK_TRICKS.findIndex((t) => t.id === stakes.called) : -1;
         const next = i + 1 >= DUNK_TRICKS.length ? null : DUNK_TRICKS[i + 1].id;
         stakes = callTrick(stakes, next);
-        ctx.setHud({ attempt: stakesLabel(stakes, calledLabel()) });
-        // the bet is PRICED now, not dared -- see DunkStakes.callPreview
-        flash(ctx, stakes.called ? callPreview(calledLabel()) : 'NO CALL', 1100);
+        ctx.setHud({ attempt: attemptChip() });
+        // the bet is PRICED now, not dared -- see DunkStakes.callPreview. IMPROVE (2026-10-06): and it says how to throw it
+        const calledT = stakes.called ? DUNK_TRICKS.find((t) => t.id === stakes.called) : undefined;
+        flash(ctx, stakes.called ? callPreview(calledLabel(), calledT ? trickInput(calledT) : undefined) : 'NO CALL', stakes.called ? 1800 : 1100);
         SoundKit.play('uiTick', { pitch: stakes.called ? 1.3 : 0.9 });
       }
       // d-pad cycles PROP during approach (up=none, right=alley-oop,
@@ -1347,12 +1434,15 @@ export const DunkMode: ModeDefinition = (() => {
       // different phases, never both at once.
       // Pad: X cycles the prop the way the d-pad picks it — one button, no dead bind on the diamond.
       if (e.t === 'button' && e.btn === 'X' && e.pressed && phase === 'approach') {
-        prop = PROPS[(PROPS.indexOf(prop) + 1) % PROPS.length];
-        while (prop === 'oopalien' && skyTier?.kind !== 'saucer') { refuse(ctx, 'NO ALIENS OVER THIS COURT'); prop = PROPS[(PROPS.indexOf(prop) + 1) % PROPS.length]; }
-        while (SPECIAL_PROPS.has(prop) && !specialsOpen()) { refuse(ctx, specialLockLine(prop as 'kangaroo')); prop = PROPS[(PROPS.indexOf(prop) + 1) % PROPS.length]; }   // SEASON SPECIALS
+        // IMPROVE (2026-10-06): X steps the FAMILY (no prop → oops → lobs → obstacles → Dubble Up → specials), landing on the one last
+        // picked in it; a family that is locked here (the specials off the PRO lane) is passed over and named, as the ring always did
+        const pick = nextPropCategory(prop, PROP_RING, propAllowed, propMemory);
+        for (const locked of pick.passed) refuse(ctx, propLockLine(locked));
+        prop = pick.prop; propMemory[pick.category] = prop;
+        if (pick.category !== 'plain') flash(ctx, `${PROP_CATEGORY_LABEL[pick.category]} · D-PAD picks inside`, 900);
         ctx.setHud({ prop: propLabel(prop) });
         SoundKit.play('uiTick', { pitch: 1.3 });
-        void setupProp(ctx);
+        queuePropSetup(ctx);   // IMPROVE (2026-10-06): built once the pick settles
       }
       // Keyboard hotfix (2026-09-07): the arrows are the L stick now (InputBus) — ArrowUp RUNS at the rim, it no longer
       // picks the prop; the pad's d-pad, the touch d-pad and X still do. The keyboard arrows keep arming the mid-air
@@ -1363,12 +1453,17 @@ export const DunkMode: ModeDefinition = (() => {
       if (e.t === 'dpad' && !e.pressed && e.src !== 'key' && dpadPick && dpadPick.dir === e.dir) {
         const pick = dpadPick; dpadPick = null;
         if (!pick.fired && phase === 'approach') {
-          prop = e.dir === 'up' ? 'none' : e.dir === 'right' ? nextOop(prop) : e.dir === 'left' ? nextLobProp(prop) : nextObstacle(obstacleKindOf(prop));   // left cycles SELF-LOB → OFF THE GLASS → BOUNCE LOB
+          // IMPROVE (2026-10-06): DOWN steps inside the obstacle-type family the prop is in (the obstacles, the Dubble Up run, the specials —
+          // X picks the family) instead of walking all 23 of them; from any other family it opens the obstacles where it always did
+          const fam = propCategory(prop);
+          prop = e.dir === 'up' ? 'none' : e.dir === 'right' ? nextOop(prop) : e.dir === 'left' ? nextLobProp(prop)
+            : fam === 'obstacle' || fam === 'dubble' || fam === 'special' ? stepPropInCategory(prop, PROP_RING, propAllowed) : nextObstacle(null);   // left cycles SELF-LOB → OFF THE GLASS → BOUNCE LOB
           while (prop === 'oopalien' && skyTier?.kind !== 'saucer') { refuse(ctx, 'NO ALIENS OVER THIS COURT'); prop = nextOop(prop); }   // the alien lob is the saucer's (Orbit)
           while (SPECIAL_PROPS.has(prop) && !specialsOpen()) { refuse(ctx, specialLockLine(prop as 'kangaroo')); prop = nextObstacle(obstacleKindOf(prop)); }   // SEASON SPECIALS: the animals skip past a free lane, named
+          propMemory[propCategory(prop)] = prop;
           ctx.setHud({ prop: propLabel(prop) });
           SoundKit.play('uiTick', { pitch: 1.3 });
-          void setupProp(ctx);
+          queuePropSetup(ctx);
         }
       }
       // ── RUNWAY TRICKS (DUNK-CONTROL-JUICE): a bare face button while RUN is held — the stick steers, so no direction.
@@ -1572,7 +1667,7 @@ export const DunkMode: ModeDefinition = (() => {
       const vel = phase === 'approach' && !busRun ? approachStep(stickWorld, dt) : stickWorld;
       if (busRun && (phase === 'approach' || phase === 'charge')) busRunTick(ctx, dt);   // THE BUS WALL RUN owns the body
       if (phase === 'approach' && !busRun) {
-        player.root.position.addInPlace(vel.scale(dt));
+        player.root.position.addInPlaceFromFloats(vel.x * dt, vel.y * dt, vel.z * dt);
         player.root.position.z = Math.max(gatherLine(), Math.min(RETREAT_Z, player.root.position.z));   // the runway: takeoff line … a step behind the start
         player.root.position.x = Math.max(-6, Math.min(6, player.root.position.x));
         if (performance.now() < stickReboundUntil) player.root.position.x += stickReboundX * 3.5 * dt;   // DUNK PARKOUR: the reflected stride
@@ -1584,12 +1679,23 @@ export const DunkMode: ModeDefinition = (() => {
         runUpPeak = Math.max(runUpPeak, Math.hypot(vel.x, vel.z));
         const moving = Math.hypot(vel.x, vel.z) > 0.5;
         if (!runwayBeat) { playClip(moving ? runLoop() : SPORT_CLIP.idle, { loop: true }); setWin('run'); if (moving) player.animator.setPlaybackScale(runLoop(), strideRate(Math.hypot(vel.x, vel.z)) * runwayPin(runLoop())); }   // a runway beat owns the body until it ends; the loop paces to the run
+        // IMPROVE (2026-10-06): pushed on CHANGE only — inside 0.2 m of the line this wrote the hint every frame (a React render a
+        // frame; the move-list note below already says not to). Leaving the strip forgets it, so coming back says it again.
         if (player.root.position.z <= gatherLine() + 0.2) {
-          ctx.setHud({
-            hint: runUpPeak < 3.5
-              ? 'HOLD to run — come in FASTER: the run-up buys your air'
-              : 'HOLD to run — then tap jump',
-          });
+          const line = runUpPeak < 3.5 ? 'HOLD to run — come in FASTER: the run-up buys your air' : 'HOLD to run — then tap jump';
+          if (line !== lineHint) { lineHint = line; ctx.setHud({ hint: line }); }
+        } else lineHint = '';
+        // IMPROVE (2026-10-06): THE RUNWAY TEACHES WHILE YOU STAND. The opening line has room for run / jump / slam only; the prop picker,
+        // the L1 call, the Y self-lob and the practice runway were taught nowhere a standing player could read them. Stood still on the
+        // runway (not at the line), the hint cycles one tip at a time (core/DunkAssist.idleTip); the first step gives the runway its line back.
+        const standing = turn === 'player' && !moving && !runwayBeat && runHeld <= 0.02 && player.root.position.z > gatherLine() + 0.2;
+        if (standing) {
+          idleSec += dt;
+          const tip = idleTip(idleSec);
+          if (tip && tip !== idleTipShown) { idleTipShown = tip; ctx.setHud({ hint: tip }); }
+        } else {
+          idleSec = 0;
+          if (idleTipShown) { idleTipShown = null; if (player.root.position.z > gatherLine() + 0.2) ctx.setHud({ hint: runwayHint }); }
         }
       }
 
@@ -1646,7 +1752,7 @@ export const DunkMode: ModeDefinition = (() => {
           holdRunSpeed = runNow;
           player.root.position.z = g.tau >= GATHER_CLIP_SEC ? gatherLine() - 1e-4 : g.z0 - g.dist * gatherProgress(g.tau, g.v0, g.vEnd);
         } else player.root.position.z -= runNow * dt;
-        faceVel(new Vector3(steer, 0, -runNow), dt);
+        faceVel(_faceV.set(steer, 0, -runNow), dt);
         // DUNK MOTION phase 7: THE LEAN INTO THE BEND — the whole body, from the feet (atan of the path's lateral acceleration over g,
         // capped), eased. Babylon's roll: +rotation.z tips the head toward the root's local −x, which in world is (−cos ψ, 0, sin ψ).
         {
@@ -1850,7 +1956,7 @@ export const DunkMode: ModeDefinition = (() => {
           const spot = propCamSpot(obstacle, rim), at = new Vector3(spot.x, spot.y, spot.z);
           console.info(`[DUNK-CAM] prop cut @${clipTime.toFixed(2)} (z ${player.root.position.z.toFixed(2)}, ${obstacle.spec.label} ${obstacle.nearZ.toFixed(2)} … ${obstacle.farZ.toFixed(2)}) from (${at.x.toFixed(1)}, ${at.y.toFixed(1)}, ${at.z.toFixed(1)})`);
           ctx.camDirector.setFixed(at, PROP_CAM.aimH, true);
-          ctx.camDirector.update(player.root.position, Vector3.Zero(), rim);   // aim on the cut frame, not the next
+          ctx.camDirector.update(player.root.position, ZERO_VEL as Vector3, rim);   // aim on the cut frame, not the next
         }
         if (!rimCamCut && !obstacle && (clipTime >= EASTBAY_TIMING.extend * 0.55 || airTrick)) {
           rimCamCut = true; console.info(`[DUNK-CAM] rim cut @${clipTime.toFixed(2)}`);
@@ -1897,7 +2003,7 @@ export const DunkMode: ModeDefinition = (() => {
         const window = slamWindowBase() * (1 - styleTaps * 0.25) * flight.slamWindowScale;
         const openAt = EASTBAY_TIMING.extend - window / 2, closeAt = EASTBAY_TIMING.extend + window / 2;
         qteWindowOpen = clipTime >= openAt && clipTime <= closeAt;
-        if (meter3d) { meter3d.green(slamGreen()); meter3d.set(clipTime / meterSpan, player.root.position.add(new Vector3(0, 1.72, 0))); }
+        if (meter3d) { meter3d.green(slamGreen()); meter3d.set(clipTime / meterSpan, _meterHead.copyFrom(player.root.position).addInPlaceFromFloats(0, 1.72, 0)); }
         // DUNK-BODY-MID: the SLAM READ and the accepted input are the same thing. The window is ~14 rendered frames wide;
         // the call used to appear on its opening frame, so the honest reaction — press when you see it — arrived after the
         // press that would have worked. The cue lifts a buffer's width early and every press from there is taken.
@@ -2006,6 +2112,7 @@ export const DunkMode: ModeDefinition = (() => {
               // slam held from the beat arrived at the ring with hangSec already at the 1 s cap and the hang never engaged (measured:
               // 'slam up 0.95 s after the press' on an ON TIME slam). Held on the contact = a hang; the tick caps it from here.
               console.info(`[HANDS] contact: slam ${aHeld ? 'held' : 'up'} ${hangSec.toFixed(2)} s after the press`);
+              if (hangPrompt) { hangPrompt = false; ctx.setHud({ hint: '' }); }   // IMPROVE (2026-10-06): the prompt's job ends on the iron
               if (aHeld || skyTapped) { hangOn = true; hangHeldSec = 0; hoopJuice?.hold(true); console.info(`[HANDS] rim hang${skyTapped && !aHeld ? ' (the drop hangs)' : ''}`); }   // THE SKY TIER: the drop-in flip hangs on its own   // SLAM still held on the contact = a hang (a tap that overlaps it is a 20 ms pull, released with the tap)
             } else { jamPrevBall.copyFrom(bp); jamPrevLive = true; }
           }
@@ -2120,7 +2227,7 @@ export const DunkMode: ModeDefinition = (() => {
       SoundKit.setAmbientLevel(performance.now() < soundGapUntil ? 0.03 : crowd.level);   // (phase 12: the sound gap before the impact)
 
       if (phase === 'judging') {
-        for (const beat of reveal.update(dt)) {
+        for (const beat of reveal.update(dt * (revealHold ? REVEAL_HOLD_SPEED : 1))) {   // IMPROVE (2026-10-06): A held hurries the judges
           if (beat.kind === 'confer') {
             ctx.setHud({ hint: 'THE JUDGES CONFER…' });
             mic?.say({ moment: 'dunk.judges', priority: 2 });
@@ -2182,6 +2289,9 @@ export const DunkMode: ModeDefinition = (() => {
             }
           }
         }
+        // IMPROVE (2026-10-06): the advance follows the REVEAL'S OWN END (plus its beat), on the mode's clock — it was a wall-clock
+        // timeout of the reveal's full length, which a hurried reveal could not shorten and a paused game could not stop
+        if (revealTail >= 0 && !reveal.active) { revealTail -= dt; if (revealTail < 0) { revealHold = false; void advanceAfterJudging(ctx); } }
       }
 
       if (phase === 'rivalTurn') {
@@ -2193,11 +2303,11 @@ export const DunkMode: ModeDefinition = (() => {
           rivalCamCut = true;
           ctx.camDirector.setFixed(new Vector3(rim.x + 2.9, 1.15, rim.z + 1.9), 1.5, true);
         }
-        ctx.camDirector.update(rival.root.position, Vector3.Zero(), rim);
+        ctx.camDirector.update(rival.root.position, ZERO_VEL as Vector3, rim);
       } else if (phase === 'cinematic' && rimCamCut) {
         // The position is fixed; the AIM tracks. This is the half that was missing — the camera used to
         // hold both and the subject walked out of frame. See the cut above.
-        ctx.camDirector.update(player.root.position, Vector3.Zero(), rim);
+        ctx.camDirector.update(player.root.position, ZERO_VEL as Vector3, rim);
       } else if (phase === 'judging') {
         if (celebFace && !replaying) faceToward(celebFace, dt * 7);   // DUNK MOTION phase 12: he turns to the crowd to celebrate
         // THE VERDICT. The camera used to be left entirely undriven here, so it
@@ -2222,7 +2332,7 @@ export const DunkMode: ModeDefinition = (() => {
             1.25, true,
           );
         }
-        ctx.camDirector.update(player.root.position, Vector3.Zero(), null);
+        ctx.camDirector.update(player.root.position, ZERO_VEL as Vector3, null);
       } else if (phase === 'resolve') {
         // THE LANDING IS NOT THE FLIGHT (2026-09-15). The rim cut is a FIXED camera under the basket aimed at the iron,
         // and 'resolve' fell through to the generic branch below — which only re-AIMS a fixed camera, so the verdict
@@ -2230,14 +2340,14 @@ export const DunkMode: ModeDefinition = (() => {
         // frame since rc10 is that shot, and the Visuals review has charged it as "hero cropped at the frame edge".
         // The judging beat already learned this; the beat before it needs the same release.
         if (rimCamCut) { rimCamCut = false; ctx.camDirector.mode = 'follow'; }
-        ctx.camDirector.update(player.root.position, Vector3.Zero(), null);
+        ctx.camDirector.update(player.root.position, ZERO_VEL as Vector3, null);
       } else if (phase === 'contestOver') {
         // TRY-ONBOARD G1: the night card sits on a LIVE shot. The camera used to be
         // left undriven in this phase — which was harmless when the phase was the last
         // 40 ms before ctx.end tore the stage down, and is a frozen frame now that a
         // guest can sit on the card as long as they like. Same framing the verdict
         // uses: the dunker, waiting, with nothing else pulling on the composition.
-        ctx.camDirector.update(player.root.position, Vector3.Zero(), null);
+        ctx.camDirector.update(player.root.position, ZERO_VEL as Vector3, null);
       } else {
         // ALWAYS frame against the RIM, never the ball.
         //
@@ -2259,11 +2369,14 @@ export const DunkMode: ModeDefinition = (() => {
     },
 
     dispose() {
+      modeGen++;   // IMPROVE (2026-10-06): every deferred retry / advance / reveal callback scheduled before this is void
+      cancelLiveCeleb();
       skyRoot?.dispose(); skyRoot = null;   // THE SKY TIER
       hoopJuice?.dispose(); hoopJuice = null;
       phoneFlashes?.dispose(); phoneFlashes = null;
       mic?.dispose(); mic = null;   // THE MIC stops with the mode
       meter3d?.dispose(); meter3d = null;
+      trail?.dispose(); trail = null; trailKey = '';   // IMPROVE (2026-10-06): the ball trail was made at load and never disposed
       dribble?.dispose(); dribble = null;
       if (ikScene && handIkObs) ikScene.onAfterAnimationsObservable.remove(handIkObs);   // A+ P8 H1
       if (ikScene && hingeObs) ikScene.onAfterAnimationsObservable.remove(hingeObs); hingeObs = null;
@@ -2272,6 +2385,7 @@ export const DunkMode: ModeDefinition = (() => {
       player?.dispose(); rival?.dispose(); replay?.dispose(); ball?.dispose();
       stopWalkOut(); walkAudio = null; walkCue = null; walkOut = null;
       clearProps(); SoundKit.stopAmbient(); feet = { L: null, R: null };
+      sparePasser?.dispose(); sparePasser = null;   // IMPROVE (2026-10-06): the kept passer goes with the mode
       dunkVenue?.dispose(); dunkVenue = null;  // M74
       for (const p of sideProps) p.dispose(); sideProps = [];
     },
@@ -2434,6 +2548,9 @@ export const DunkMode: ModeDefinition = (() => {
     // for it; the contact (contactPunch) snaps both back — the thud, then the roar
     if (qteHit) { soundGapUntil = performance.now() + 480; ctx.juice.slowMo(0.55, 240); }
     resolveDunk(ctx);
+    // IMPROVE (2026-10-06): THE RIM HANG, SAID. It happens only if SLAM is still held when the ball meets the iron, ~1 s after this
+    // press, and nothing on screen ever said so. From the press to the contact the line says it (resolveDunk just cleared the hint).
+    if (qteHit && turn === 'player' && !skyTapped && (phase as Phase) === 'resolve') { hangPrompt = true; ctx.setHud({ hint: HANG_PROMPT }); }
   }
   /** DUNK-BODY-MID: a SLAM press the window has not opened for yet. Held (the newest press wins) and fired on the frame
    *  it opens, if it is still inside SLAM_BUFFER_SEC by then. A press earlier than that is a genuine mistime — it is
@@ -2587,6 +2704,8 @@ export const DunkMode: ModeDefinition = (() => {
     mic?.hold(4);   // THE MIC: nothing from the booth through the flight — the rhythm ticks are the player's (released on the iron)
     setPhase('cinematic'); setWin('takeoff');
     { const f = readDisplaySetting().factor; if (f !== tvFactor) console.info(`[DUNK] TV MODE slam window x${f.toFixed(2)}`); tvFactor = f; }
+    guestFactor = turn === 'player' ? guestSlamFactor(playerJumps++) : 1;   // IMPROVE (2026-10-06): a guest's first jumps (see slamWindowBase)
+    if (guestFactor !== 1) console.info(`[DUNK] first jumps: slam window x${guestFactor.toFixed(2)}`);
     launchZ = player.root.position.z; airTrick = null; obstacleOver = false; obstacleCleared = false; obstacleMargin = Infinity;
     dubbleGrabbed = false; dubbleReachK = 0; straddleK = 0; dubblePassed = false; dubbleAir = null;
     launchX = player.root.position.x; launchBank = runBank; runBank = 0; airDriftX = 0;   // DUNK MOTION phase 7
@@ -2877,8 +2996,9 @@ export const DunkMode: ModeDefinition = (() => {
         // by this frame's palm offset (ball − hand, world), so the ball's centre goes where the reach point is and the hand
         // rides under it (measured before: the wrist ON target with the ball 0.14 m under the ring on the eastbay's left hand)
         _reachT.copyFrom(handIkTarget);
-        if (ball.parent === arm.hand) { ball.computeWorldMatrix(true); _reachT.subtractInPlace(ball.getAbsolutePosition().subtract(hd)); }
-        const want = hd.add(_reachT.subtract(hd).scale(ws));
+        // IMPROVE (2026-10-06): the ToRef forms — `.subtract` / `.add` / `.scale` made four vectors per arm per frame through the reach
+        if (ball.parent === arm.hand) { ball.computeWorldMatrix(true); _reachT.subtractInPlace(ball.getAbsolutePosition()).addInPlace(hd); }
+        const want = _reachT.subtractToRef(hd, _reachWant).scaleInPlace(ws).addInPlace(hd);
         // DUNK MOTION phase 9: the reach's elbow where an elbow can point (out and back was right for a low arm, backward for one
         // going up to the iron — the elbow trailed behind the hand into the flush)
         _reachFwd.set(0, 0, 1).applyRotationQuaternionInPlace(player.root.absoluteRotationQuaternion); _reachFwd.y = 0; _reachFwd.normalize();
@@ -3001,6 +3121,13 @@ export const DunkMode: ModeDefinition = (() => {
   // elevation to the iron (y is y in every frame).
   const hipsBindChain = Quaternion.Identity();
   const _ppQ = Quaternion.Identity(), _ppD = Quaternion.Identity(), _ppV = new Vector3(), _ppRho = Quaternion.Identity();
+  // IMPROVE (2026-10-06): the posture layer's per-joint axis and inverse are scratch — `Vector3.Right().rotateByQuaternionToRef(_ppD,
+  // new Vector3())` and `Quaternion.Inverse(bindChain)` made three objects a joint a frame. Each axis is consumed by the very next call.
+  const _ppAxis = new Vector3(), _ppInv = Quaternion.Identity();
+  /** The bone's own axis (x, y, z in its bind frame) in frame space this frame: `_ppD` must hold the bone's chain × bind⁻¹. */
+  const ppAxis = (x: number, y: number, z: number): Vector3 => _ppAxis.set(x, y, z).rotateByQuaternionToRef(_ppD, _ppAxis).normalize();
+  /** chain rotation × bind⁻¹ into `_ppD`, without allocating the inverse. */
+  const ppDelta = (p: PpNode): void => { chainRotation(p.n, ppFrame!).multiplyToRef(Quaternion.InverseToRef(p.bindChain, _ppInv), _ppD); };
   /** The frame-space yaw of a node's rotation `local` against its bind chain (the clip's own turn: 0 at bind). */
   function frameYawOf(n: TransformNode, local: Quaternion, bindChain: Quaternion): number {
     const par = n.parent as TransformNode | null; const Rp = par && par !== ppFrame ? chainRotation(par, ppFrame!) : Quaternion.Identity();
@@ -3080,6 +3207,7 @@ export const DunkMode: ModeDefinition = (() => {
    *  already down when the runway opened. */
   function beginRun(ctx: ModeContext): void {
     if (phase !== 'approach') return;
+    flushPropSetup(ctx);   // IMPROVE (2026-10-06): a pick still settling is built now (it starts rolling when it lands: setupProp)
     setPhase('charge');
     obstacle?.start();   // a rolling prop comes when you commit to the run (owner, 2026-09-16)
     holdRunSpeed = Math.max(2, runUpPeak);
@@ -3102,8 +3230,8 @@ export const DunkMode: ModeDefinition = (() => {
     // 0) the lumbar lean, ADDED to the clip's Spine (a pitch about the bone's own right axis in frame space, +X = forward)
     if (ppNodes.spine && Math.abs(P.lean) * w > 0.05) {
       const sp = ppNodes.spine; const base = ppBase(sp); sp.n.rotationQuaternion!.copyFrom(base);
-      chainRotation(sp.n, ppFrame).multiplyToRef(Quaternion.Inverse(sp.bindChain), _ppD);
-      const axis = Vector3.Right().rotateByQuaternionToRef(_ppD, new Vector3()).normalize();
+      ppDelta(sp);
+      const axis = ppAxis(1, 0, 0);
       Quaternion.RotationAxisToRef(axis, P.lean * w * Math.PI / 180, _ppRho); rotateInFrame(sp.n, _ppRho); ppCommit(sp);
     } else if (ppNodes.spine) { const sp = ppNodes.spine; const base = ppBase(sp); sp.n.rotationQuaternion!.copyFrom(base); ppCommit(sp); }
     stance(ppNodes.spine1, P.spine1); stance(ppNodes.spine2, P.spine2);
@@ -3120,8 +3248,8 @@ export const DunkMode: ModeDefinition = (() => {
       ppOpen += (up - ppOpen) * lowPassK(dt, 0.1);
       if (Math.abs(ppOpen) > 0.01) {
         for (const [pnode, k] of [[ppNodes.spine1, 0.4], [ppNodes.spine2, 0.6]] as [PpNode, number][]) {
-          chainRotation(pnode.n, ppFrame).multiplyToRef(Quaternion.Inverse(pnode.bindChain), _ppD);
-          const axis = Vector3.Right().rotateByQuaternionToRef(_ppD, new Vector3()).normalize();
+          ppDelta(pnode);
+          const axis = ppAxis(1, 0, 0);
           Quaternion.RotationAxisToRef(axis, -REACH_OPEN_DEG * ppOpen * k * w * Math.PI / 180, _ppRho); rotateInFrame(pnode.n, _ppRho); ppCommit(pnode);
         }
       }
@@ -3139,8 +3267,8 @@ export const DunkMode: ModeDefinition = (() => {
     if (Math.abs(sb.tilt) > 0.05) {
       for (const [pnode, k] of [[ppNodes.spine1, 0.45], [ppNodes.spine2, 0.55]] as [PpNode | null, number][]) {
         if (!pnode) continue;
-        chainRotation(pnode.n, ppFrame).multiplyToRef(Quaternion.Inverse(pnode.bindChain), _ppD);
-        const axis = Vector3.Forward().rotateByQuaternionToRef(_ppD, new Vector3()).normalize();
+        ppDelta(pnode);
+        const axis = ppAxis(0, 0, 1);
         Quaternion.RotationAxisToRef(axis, sb.tilt * k * w * Math.PI / 180, _ppRho); rotateInFrame(pnode.n, _ppRho); ppCommit(pnode);
       }
     }
@@ -3178,8 +3306,8 @@ export const DunkMode: ModeDefinition = (() => {
         if (Math.abs(ppHeadYaw) > 1e-4) { Quaternion.RotationAxisToRef(Vector3.Up(), ppHeadYaw * k, _ppRho); rotateInFrame(p.n, _ppRho); }
         if (Math.abs(ppHeadPitch) > 1e-4) {
           // pitch about the bone's own right axis in frame space (+X = forward / down in every clip key, so up is −pitch)
-          chainRotation(p.n, ppFrame).multiplyToRef(Quaternion.Inverse(p.bindChain), _ppD);
-          const axis = Vector3.Right().rotateByQuaternionToRef(_ppD, new Vector3()).normalize();
+          ppDelta(p);
+          const axis = ppAxis(1, 0, 0);
           Quaternion.RotationAxisToRef(axis, -ppHeadPitch * k, _ppRho); rotateInFrame(p.n, _ppRho);
         }
         ppCommit(p);
@@ -3201,8 +3329,8 @@ export const DunkMode: ModeDefinition = (() => {
           }
           llPitch[side] += (want - llPitch[side]) * kAim;
           if (Math.abs(llPitch[side]) > 1e-4) {
-            chainRotation(pf.n, ppFrame).multiplyToRef(Quaternion.Inverse(pf.bindChain), _ppD);
-            const axis = Vector3.Right().rotateByQuaternionToRef(_ppD, new Vector3()).normalize();
+            ppDelta(pf);
+            const axis = ppAxis(1, 0, 0);
             Quaternion.RotationAxisToRef(axis, -llPitch[side], _ppRho); rotateInFrame(pf.n, _ppRho);   // +X tips the toes down: up is −pitch
           }
           ppCommit(pf);
@@ -3303,6 +3431,7 @@ export const DunkMode: ModeDefinition = (() => {
     // the floor to the hand was a 0.53 m ball jump on the self-lob's auto-toss)
     if (dribble?.active && !atPalm(dribble.phase, 0.12)) { pendingBeat = rt; return; }
     pendingBeat = null;
+    flushPropSetup(ctx);   // IMPROVE (2026-10-06): a toss onto a prop needs the prop that was picked, not the one before it
     dribble?.update(0, 0, false); gatherLatched = false; gatherStride = false; gatherRun = null;
     runwayBeat = rt; runwayT = 0; runwayReleased = false;
     const token = ++runwayToken;
@@ -3683,16 +3812,28 @@ export const DunkMode: ModeDefinition = (() => {
   /** #5 trail ramp: soft on the runway, bright in the hang, a white flash cut on the make, dead on a miss or a clipped air. */
   // THE TRAIL'S LOOK LIVES IN EffectsKit (visuals pass, 2026-09-16) — four levels, one table, taper included. The old
   // numbers here (170/s at 0.2 m, no taper) were what put a dozen fat orange orbs in the sky at the hang.
+  // IMPROVE (2026-10-06): OFF STOPS THE SYSTEM, and a level is applied once. 'off' only zeroed the emit rate, so the 120-particle
+  // system kept updating (and its three size gradients were rebuilt) on every call — 14 call sites, several per attempt. Now an
+  // unchanged look is a no-op (the 3PT pattern), 'off' lets the last particles fade and stops, and any other level starts it again.
+  let trailKey = '', trailOn = true;   // (a stopped system reads isStarted() until its last particle dies, so the switch is tracked here)
+  function trailLook(level: TrailLevel, hex?: string): void {
+    if (!trail) return;
+    const key = `${level}|${hex ?? ''}`;
+    if (key === trailKey) return;
+    trailKey = key;
+    applyTrail(trail, level, hex);
+    if (level === 'off') { if (trailOn) { trail.stop(); trailOn = false; } } else if (!trailOn) { trail.start(); trailOn = true; }
+  }
   function setTrail(level: TrailLevel): void {
     if (!trail) return;
     console.info(`[JUICE-SOFT] trail ${level}`);
-    applyTrail(trail, level);
+    trailLook(level);
   }
   function trailFlash(): void {
     if (!trail) return;
     console.info('[JUICE-SOFT] trail flash');
-    applyTrail(trail, 'flash', '#ffffff');
-    setTimeout(() => setTrail('off'), 130);
+    trailLook('flash', '#ffffff');
+    later(() => setTrail('off'), 130);
   }
 
   function contactPunch(ctx: ModeContext): void {
@@ -3798,6 +3939,8 @@ export const DunkMode: ModeDefinition = (() => {
     finishing = true;
     ctx.setHud({ bannerHigh: false });   // the flush is through: the replay and the judges' banners sit back in the middle
     mic?.release();   // a miss never reaches the iron: the booth's hold ends here
+    hangPrompt = false;
+    if (practice && turn === 'player') { finishPractice(ctx, made); return; }   // IMPROVE (2026-10-06): no judges on the practice runway
 
     if (!made) {
       // A+ P2: the clank is the miss's one hit — no buzzer on the same beat; the crowd groans a breath later, quietly
@@ -3836,7 +3979,7 @@ export const DunkMode: ModeDefinition = (() => {
         ctx.setHud({ judgeReveal: null, hint: '', attempt: stakesLabel(stakes, calledLabel()) });
         landingClip = DUNK_LAND_ABSORB_CLIP; landNow();
         setPhase('judging');
-        setTimeout(() => { clearBanner(ctx); void retryThisDunk(ctx); }, MISS_BEAT_MS);
+        later(() => { clearBanner(ctx); void retryThisDunk(ctx); }, MISS_BEAT_MS);
         finishing = false;
         return;
       }
@@ -3870,7 +4013,7 @@ export const DunkMode: ModeDefinition = (() => {
       setPhase('judging');
       // Pad acceptance #4: a miss is one beat, then the next run-up — no reveal wait, no card, no re-press
       // (a hold still down streams the trigger and starts the next run the frame the approach resets).
-      setTimeout(() => { clearBanner(ctx); void advanceAfterJudging(ctx); }, MISS_BEAT_MS);
+      later(() => { clearBanner(ctx); void advanceAfterJudging(ctx); }, MISS_BEAT_MS);
       finishing = false;
       return;
     }
@@ -4020,13 +4163,21 @@ export const DunkMode: ModeDefinition = (() => {
     phoneFlashes?.burst(big ? 22 : 10, big ? 2.4 : 1.6);
     if (big) pyro(ctx);
     const contactSec = flushRealSec || resolveRealMs / 1000;
+    const harnessPaused = (): boolean => typeof ctx.phase === 'function' && ctx.phase() === 'paused';
+    // IMPROVE (2026-10-06): THE CUT IS ON. `cutting` was declared and reset but never set, so the old re-fly block kept re-firing the
+    // run and launch clips under the recorded pose for the whole cut — blended every frame for nothing (the pose is the frame's last
+    // writer), with those clips' end events firing mid-cut. The recorded pose owns the body now, as the flag always said.
+    cutting = true;
     const cutDone = replay.playCuts(rim, contactSec, TRIPLE_CUT, {
       freezeSec: big ? POSTER_SEC : 0,
       onCut: (i, c) => { ctx.setHud({ cut: `REPLAY ${i + 1}/${TRIPLE_CUT.length} · ${c.label}` }); if (i > 0) SoundKit.play('whoosh', { pitch: 1.6 + i * 0.2, volume: 0.25 }); },
       onFreeze: () => { ctx.setHud({ cut: 'THE POSTER' }); if (turn === 'player') capturePoster(ctx, { title: theName, by: signature?.by ?? '', total: dunkTotal }); },
+      paused: harnessPaused,   // IMPROVE (2026-10-06): the cut holds while the game is paused
     }).then(() => { replaying = false; cutting = false; replayAir = false; player.root.rotationQuaternion = null; dropToFloor = true; console.info('[HANDS] triple cut end'); });
     ctx.camDirector.suspended = true;
-    await Promise.race([cutDone, new Promise((r) => setTimeout(r, (tripleCutSec() + (big ? POSTER_SEC : 0)) * 1000 + 1200))]);
+    const gen = modeGen;
+    await Promise.race([cutDone, pausableDelay((tripleCutSec() + (big ? POSTER_SEC : 0)) * 1000 + 1200, harnessPaused)]);   // IMPROVE (2026-10-06): the net does not run through a pause
+    if (!alive(gen)) return;   // IMPROVE (2026-10-06): left mid-replay — nothing below may touch the disposed scene
     replay.stop(); cutting = false; replaying = false;
     ctx.camDirector.suspended = false;
     ctx.setHud({ cut: '' });
@@ -4040,7 +4191,25 @@ export const DunkMode: ModeDefinition = (() => {
     if (rivalsDunk) ctx.setHud({ rivalScore: rivalTotal, judgeReveal: [] });
     else ctx.setHud({ score: playerTotal, hype: Math.round(hype), chain, judgeReveal: [] });
     setPhase('judging');
-    setTimeout(() => void advanceAfterJudging(ctx), REVEAL_DURATION_SEC * 1000 + 400);
+    revealTail = REVEAL_TAIL_SEC;   // IMPROVE (2026-10-06): advanced from update() REVEAL_TAIL_SEC after the reveal ends (was a REVEAL_DURATION_SEC + 0.4 s timeout)
+    finishing = false;
+  }
+
+  /**
+   * IMPROVE (2026-10-06): THE PRACTICE RUNWAY. Every attempt used to spend one of the night's four judged dunks, so the only place to
+   * learn the slam window and the trick cues was the contest itself. On the practice runway (R1 on the runway) the flight is the real
+   * one — the same window, the same cues, the same flush — and then it is over: the slam's read on the banner, no judges, no replay,
+   * no stakes spent, no score, the night's numbers untouched, and the runway back after one beat. The rival never comes (the dunk
+   * count does not move). A fuller version would add a slow-motion toggle and a per-trick drill list.
+   */
+  function finishPractice(ctx: ModeContext, made: boolean): void {
+    const read = slamTiming?.label ?? '';
+    flash(ctx, `PRACTICE · ${made ? 'MADE IT' : missWhy()}${read ? ` · ${read}` : ''}`, MISS_BEAT_MS);
+    ctx.setHud({ judgeReveal: null, hint: '', slamTiming: read });
+    if (!made) { landingClip = DUNK_LAND_ABSORB_CLIP; landNow(); }
+    console.info(`[DUNK-PRACTICE] ${made ? 'made' : 'missed'}${read ? ` · ${read}` : ''}`);
+    setPhase('judging');
+    later(() => { if (phase !== 'judging') return; cancelLiveCeleb(); celebFace = null; clearBanner(ctx); resetForNextAttempt(ctx); }, MISS_BEAT_MS);
     finishing = false;
   }
 
@@ -4066,6 +4235,7 @@ export const DunkMode: ModeDefinition = (() => {
 
   async function advanceAfterJudging(ctx: ModeContext): Promise<void> {
     if (phase !== 'judging') return;   // already advanced (watchdog vs normal path race)
+    revealTail = -1; revealHold = false;   // IMPROVE (2026-10-06): one advance per reveal, whoever got here first
     clearBanner(ctx); ctx.setHud({ judgeReveal: null });
     if (turn === 'rival') {   // phase 11: the rival's own count, then the runway back
       stakes = freshStakes();
@@ -4119,16 +4289,18 @@ export const DunkMode: ModeDefinition = (() => {
     const isFinalRound = round === TOTAL_ROUNDS;
     const deficit = rivalTotal - playerTotal;
     const need = isFinalRound ? Math.max(0, deficit + RIVAL_PACE) : 0;
+    revealTail = -1; revealHold = false; hangPrompt = false; lineHint = '';   // IMPROVE (2026-10-06)
+    runwayHint = practice ? 'PRACTICE — HOLD to run · JUMP at the line · SLAM on NOW! · R1 back to the contest'
+      : need > 0 ? `FINAL ROUND — you need big numbers (${deficit > 0 ? `down ${deficit}` : `up ${-deficit}`})` : 'HOLD to run · tap JUMP at the line — then SLAM on NOW!';
+    idleSec = 0; idleTipShown = null;
     ctx.setHud({
       dunkNum: `${dunkInRound + 1}/${DUNKS_PER_ROUND}`,
-      attempt: stakesLabel(stakes, calledLabel()),
+      attempt: attemptChip(),
       // the LAST attempt's verdict must not hang over this one: measured on the probe, the readout from
       // attempt 1 was still on screen through attempt 2 because only a resolve ever wrote the field.
       slamTiming: '', breakdown: '', judgeWhy: '',
       need: need > 0 ? need : 0,
-      hint: need > 0
-        ? `FINAL ROUND — you need big numbers (${deficit > 0 ? `down ${deficit}` : `up ${-deficit}`})`
-        : 'HOLD to run · tap JUMP at the line — then SLAM on NOW!',   // F4 (review): six controls in one line taught none of them
+      hint: runwayHint,   // F4 (review): six controls in one line taught none of them (IMPROVE 2026-10-06: the line is kept for the standing tips to give back to)
       charge: 0, slamPulse: false,
     });
     mic?.release();
@@ -4316,7 +4488,7 @@ export const DunkMode: ModeDefinition = (() => {
     // the three numbers per attempt; the card carries them now, and the report names ONE thing to change.
     const report = nightReport(card);
     console.info(`[DUNK-NIGHT] ${report.headline} · ${report.lines.join(' · ')} · ${report.advice}`);
-    setTimeout(() => { if (phase === 'contestOver') flash(ctx, `${report.headline} — ${report.advice}`); }, 1400);
+    later(() => { if (phase === 'contestOver') flash(ctx, `${report.headline} — ${report.advice}`); }, 1400);
   }
 
   /** GO AGAIN — the whole contest resets INSIDE the mode. Nothing is disposed and
@@ -4360,7 +4532,7 @@ export const DunkMode: ModeDefinition = (() => {
     resetForNextAttempt(ctx);           // -> phase 'approach', the runway HUD, a fresh prop
     flash(ctx, `NIGHT ${night}`, 1400);
     // who walked in tonight — phrased by the module so no surface writes its own version of a name
-    setTimeout(() => flash(ctx, rivalIntro(foe), 1600), 1500);
+    later(() => flash(ctx, rivalIntro(foe), 1600), 1500);
   }
 
   return def;

@@ -79,9 +79,16 @@ check('through the core: big air is time-based, the vault stays discrete', () =>
   assert.strictEqual(vault.airTrick.spinRatePerSec, 0, 'vault skin has no time-based spin');
   const grades = new Set<string>();
   // sweep the plant time: 0.3 … 1.5 s after launch; every grade the judge knows must be reachable across the sweep
+  // test changed (IMPROVE 2026-10-06, Big Air item 8): the run-up STRIDES (a good stride every ~260 ms). Coasted, the slope
+  // now stops just short of the landing's speed window and every air knuckles (sketchy at best), which is the run-up's
+  // decision, not the spin judge this check is about.
+  const strideToLip = (c: ReturnType<typeof makeBigAirSession>): void => {
+    let n = 0; while (c.state.phase === 'Run' && n < 6000) { if (n % 16 === 0) c.runTap(n % 32 === 0 ? 'L' : 'R', 'good'); c.step(DT); n++; }
+  };
   for (let plantMs = 300; plantMs <= 1500; plantMs += 100) {
     const c = makeBigAirSession();
-    let n = 0; while (c.state.phase === 'Run' && n++ < 6000) c.step(DT);
+    strideToLip(c);
+    let n = 0;
     assert.strictEqual(c.state.phase, 'Air');
     c.trick();
     let air = 0; let planted = false;
@@ -94,7 +101,8 @@ check('through the core: big air is time-based, the vault stays discrete', () =>
   const unplanted = new Set<string>();
   for (let startMs = 100; startMs <= 700; startMs += 100) {
     const c = makeBigAirSession();
-    let n = 0; while (c.state.phase === 'Run' && n++ < 6000) c.step(DT);
+    strideToLip(c);
+    let n = 0;
     let air = 0; let started = false;
     n = 0; while (c.state.phase === 'Air' && n++ < 6000) { c.step(DT); air += DT * 1000; if (!started && air >= startMs) { c.trick(); started = true; } }
     unplanted.add(c.state.lastGrade as string);

@@ -295,7 +295,7 @@ export const FootballRushMode: ModeDefinition = (() => {
    *  drive used to dispose and rebuild it. Its `collected` is now the session's count, which is what the end stats say. */
   function layCoins(ctx: ModeContext): void {
     if (!coins) coins = new CoinField(ctx.scene);
-    else coins.clear();
+    else coins.clear({ keepCollected: true });   // the drive's coins are re-laid; the session's count runs on
     for (const g of coinLayout(drive)) for (const [x, y, z] of g.points) { const v = new Vector3(x, y, z); coins.line(v, v, 1); }
   }
 

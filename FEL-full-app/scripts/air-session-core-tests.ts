@@ -46,14 +46,19 @@ function check(name: string, fn: () => void) {
   console.log(`  \u2713 ${name}`);
 }
 
-/** Step until the core reaches the Air phase (first launch). */
-function runToAir(core: AirSessionCore, maxFrames = 2000): void {
+/** Step until the core reaches the Air phase (first launch). IMPROVE (2026-10-06, Big Air item 8): with STRIDES — a good
+ *  stride every ~260 ms — because the slope alone now stops just short of the landing's speed window (the run-up's
+ *  decision); `strides: false` is the bare slope. */
+function runToAir(core: AirSessionCore, maxFrames = 2000, strides = true): void {
   for (let i = 0; i < maxFrames; i++) {
+    if (strides && i % 16 === 0) core.runTap(i % 32 === 0 ? 'L' : 'R', 'good');
     core.step(DT);
     if (core.state.phase === 'Air') return;
   }
   throw new Error('never reached Air');
 }
+/** Height over the snow under the rider (the hill's surface; y 0 on the flat). */
+const clearance = (core: AirSessionCore): number => core.state.pos.y - core.surface.y(core.state.pos.z);
 
 /** Big air's spin is TIME-BASED (owner 2026-09-07): one tap starts it, the next plants it. Spin to `turns` and plant. */
 function spinTo(core: AirSessionCore, turns: number, maxFrames = 2000): void {
@@ -88,23 +93,23 @@ check('phase walk Run → Air → Land over one attempt', () => {
   assert.deepStrictEqual(seen, ['Run', 'Air', 'Land'], `unexpected phase walk: ${seen.join('→')}`);
 });
 
-check('negative runDrag: the slope builds speed to maxRunSpeed with no taps', () => {
+// test changed (IMPROVE 2026-10-06, Big Air item 8): this pinned "the slope alone reaches ~terminal speed with no taps" —
+// the very thing the owner asked to change (strides were optional). The slope still builds speed on its own and still
+// carries the rider off the lip, but stops just short of the cap and of the landing's speed window: strides decide the rest.
+check('negative runDrag: the slope builds speed with no taps, to just short of the cap at the lip', () => {
   const core = makeBigAirSession();
   const speeds: number[] = [];
-  for (let i = 0; i < 240 && core.state.phase === 'Run'; i++) {
+  for (let i = 0; i < 2000 && core.state.phase === 'Run'; i++) {
     core.step(DT);
     speeds.push(core.state.speed);
   }
   assert.ok(BIG_AIR_TUNING.runDrag < 0, 'big-air runDrag must be negative (slope accelerates)');
   assert.ok(speeds[10] > speeds[0], 'speed should rise on the slope');
-  assert.ok(
-    speeds[speeds.length - 1] <= BIG_AIR_TUNING.maxRunSpeed + 1e-6,
-    'slope speed clamps to maxRunSpeed',
-  );
-  assert.ok(
-    speeds[speeds.length - 1] > BIG_AIR_TUNING.maxRunSpeed * 0.9,
-    `full slope should approach terminal speed, got ${speeds[speeds.length - 1]}`,
-  );
+  assert.strictEqual(core.state.phase, 'Air', 'the slope alone carries the rider off the lip');
+  const lip = core.state.launchSpeed;
+  assert.ok(lip <= BIG_AIR_TUNING.maxRunSpeed + 1e-6, 'slope speed clamps to maxRunSpeed');
+  assert.ok(lip > BIG_AIR_TUNING.maxRunSpeed * 0.9 && lip < BIG_AIR_TUNING.maxRunSpeed - 0.5,
+    `the bare slope should carry most of the way to terminal speed but not to it, got ${lip}`);
 });
 
 check('launch impulse scales with carried run speed (weak run = weak air)', () => {
@@ -149,7 +154,7 @@ check('stick tap upgrades the clean landing to STUCK (2× points)', () => {
   spinTo(core, 1.0);
   let stuck = false;
   for (let i = 0; i < 2000 && core.state.phase === 'Air'; i++) {
-    if (!stuck && core.state.pos.y < 1.0 && core.state.vy < 0) { core.stick(); stuck = true; }
+    if (!stuck && clearance(core) < 1.0 && core.state.vy < 0) { core.stick(); stuck = true; }   // (test changed: over the landing slope, not over y 0)
     core.step(DT);
   }
   assert.ok(stuck, 'should have found a stick window before touchdown');
