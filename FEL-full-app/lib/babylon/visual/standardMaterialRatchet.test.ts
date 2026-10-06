@@ -42,6 +42,10 @@ const KNOWN: Record<string, number> = {
   // IMPROVE (2026-10-06, Tiebreak #19): ONE unlit-marker helper (disableLighting) for the ball, the hit-window ring and the
   // ball's blob. They are markers that only ever showed an emissive colour, never a PBR palette — the case this table allows.
   'TiebreakMode.ts': 1,
+  // dunk-next phase 7 (2026-10-06): the live take-off mark on the floor is a deliberately unlit marker (disableLighting,
+  // emissive only, alpha) coloured by the zone — the stripe gold, the elbow cyan, the paint white must read as those exact
+  // hues under every venue mood, never as a PBR palette. One material, re-coloured on a zone change.
+  'DunkMode.ts': 1,
 };
 
 function counts(): Record<string, number> {
