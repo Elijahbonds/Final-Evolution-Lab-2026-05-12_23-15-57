@@ -7,6 +7,7 @@ import path from 'node:path';
 
 const DUNK = readFileSync(path.join(__dirname, 'DunkMode.ts'), 'utf8');
 const HOST = readFileSync(path.join(__dirname, '../../../components/games/dunk-babylon.tsx'), 'utf8');
+const SIM = readFileSync(path.join(__dirname, '../core/DunkRivalSim.ts'), 'utf8');
 const fn = (name: string): string => { const i = DUNK.indexOf(`function ${name}(`); expect(i, name).toBeGreaterThan(0); return DUNK.slice(i, DUNK.indexOf('\n  }\n', i)); };
 
 describe('phase 1 — the flight is a four-beat bar', () => {
@@ -49,7 +50,10 @@ describe('phase 1 — the flight is a four-beat bar', () => {
     expect(fn('finishPractice')).toMatch(/flightFlow\(beatMarks, beatSlam\)\.label/);
   });
   it('the rival hits his beats on a clean attempt, and is the old pad otherwise', () => {
-    expect(fn('planRivalAttempt')).toMatch(/onBeat: rivalHitsBeats\(acc, blew\)/);
+    // test changed (dunk-next phase 4): the roll moved, line for line, into core/DunkRivalSim.rollRivalAttempt so a skipped dunk is judged
+    // from the same plan; DunkRivalSim.test holds the move against the old body
+    expect(fn('planRivalAttempt')).toMatch(/const P = rollRivalAttempt\(sit, foe\);\n\s*rivalPlan = P;/);
+    expect(SIM).toMatch(/onBeat: rivalHitsBeats\(acc, blew\)/);
     expect(fn('rivalDrive')).toMatch(/clipTime >= rivalPressAt\(next, after, P\.onBeat\)/);
     expect(fn('rivalDrive')).toMatch(/const after = F\.trickIdx === 0 \? 0\.06 : \(airTrick \? airTrick\.t0 \+ 0\.12 : Infinity\);/);
   });
@@ -140,7 +144,9 @@ describe('phase 3 — the dunk-off', () => {
     expect(miss).toMatch(/else if \(turn === 'rival'\) rivalTotal \+= missTotal;[^\n]*\n\s*else \{\n\s*playerTotal \+= missTotal;/);
   });
   it('the rival in a dunk-off chases the one card in front of him, with nothing left after it', () => {
-    expect(fn('planRivalAttempt')).toMatch(/deficit: dunkOffRival - dunkOffPlayer, isFinalRound: true, attemptsLeft: 1/);
+    // test changed (dunk-next phase 4): the situation moved into rivalSituation(), which the live plan and a skip both read
+    expect(fn('rivalSituation')).toMatch(/deficit: dunkOffRival - dunkOffPlayer, isFinalRound: true, attemptsLeft: 1/);
+    expect(fn('planRivalAttempt')).toMatch(/const sit = rivalSituation\(\);/);
   });
   it('a new night (and a reload) has no dunk-off', () => {
     expect(DUNK.match(/dunkOff = 0; dunkOffPlayer = 0; dunkOffRival = 0;/g)).toHaveLength(2);
@@ -168,5 +174,53 @@ describe('endless dunk-offs (owner decision 2026-10-06)', () => {
   it('the old "after 3, the player wins" limit is gone from the mode', () => {
     expect(DUNK).not.toMatch(/DUNK_OFF_MAX/);
     expect(DUNK).not.toMatch(/dunkOffVerdict\(/);
+  });
+});
+
+describe('phase 4 — skip a rival\'s dunk straight to his card', () => {
+  it('B on his turn skips (before the cut-skip and the refusal read it); the K key is B; the refusal says how', () => {
+    const skipAt = DUNK.indexOf("if (!aiFeeding && turn === 'rival' && e.t === 'button' && e.btn === 'B' && e.pressed) { skipRivalDunk(ctx); return; }");
+    expect(skipAt).toBeGreaterThan(0);
+    expect(skipAt).toBeLessThan(DUNK.indexOf("if (e.pressed && cutting) { replay.stop();"));
+    expect(skipAt).toBeLessThan(DUNK.indexOf(`refuse(ctx, "RIVAL'S TURN · B SKIPS TO HIS CARD")`));
+  });
+  it('a dunk not judged yet is judged by the sim from the plan he is ON — not re-rolled — and a retried miss\'s beat rolls the next', () => {
+    const sk = fn('skipRivalDunk');
+    expect(sk).toMatch(/const onPlan = phase === 'judging' \? null : rivalPlan;/);
+    expect(sk).toMatch(/simRivalDunk\(onPlan, stakes, \(\) => rollRivalAttempt\(sit, foe\), rivalJudgeCtx\(\)\)/);
+    // the live attempt's deferred beats die BEFORE he is parked, and the park does not roll a plan
+    expect(sk.indexOf('modeGen++')).toBeLessThan(sk.indexOf('resetForNextAttempt(ctx)'));
+    expect(sk).toMatch(/holdRivalPlan = true; try \{ resetForNextAttempt\(ctx\); \} finally \{ holdRivalPlan = false; \}/);
+    expect(fn('resetForNextAttempt')).toMatch(/if \(!holdRivalPlan\) planRivalAttempt\(\);/);
+  });
+  it('a dunk already judged is never judged twice: the skip only ends the cut and hurries the reveal', () => {
+    const sk = fn('skipRivalDunk');
+    const scored = sk.indexOf('if (rivalScored) {');
+    expect(scored).toBeGreaterThan(0);
+    expect(scored).toBeLessThan(sk.indexOf('simRivalDunk('));
+    expect(sk.slice(scored, sk.indexOf('return;', scored))).toMatch(/revealHold = true;/);
+    const fin = fn('finishAttempt');
+    expect(fin).toMatch(/if \(turn === 'rival'\) rivalScored = true;/);
+    expect(fin).toMatch(/if \(rivalsDunk\) rivalScored = true;/);
+    expect(fn('resetForNextAttempt')).toMatch(/rivalScored = false;/);
+  });
+  it('the sim judges under the room and rules the live rival is judged under', () => {
+    const c = fn('rivalJudgeCtx');
+    for (const k of ['styleId: style', 'styleTier: STYLE_TIER[style]', 'hype', 'crowd01: momentum.score01', 'slamHalf: slamWindowBase() / 2', 'runUp: rivalRunUp', 'memory: nightMemory', 'usedCombos']) expect(c).toContain(k);
+    expect(fn('launchDunk')).toMatch(/if \(turn === 'rival'\) rivalRunUp = \{ charge, launchSpeed01, approachDifficulty: approach\.difficulty \+ prof\.difficulty,/);
+  });
+  it('the skipped card keeps the night\'s books as finishAttempt does — and a dunk-off\'s card stays off the totals', () => {
+    const c = fn('commitRivalHighlight');
+    expect(c).toMatch(/if \(dunkOff > 0\) \{ dunkOffRival = r\.total; dunkOffCards\.rival = \{[^}]*\}; \}\n\s*else rivalTotal \+= r\.total;/);
+    expect(c).not.toMatch(/playerTotal|addAttempt|card = /);
+    expect(c).toMatch(/noteBest\('rival', r\.total\);/);
+    expect(c).toMatch(/reveal\.start\(r\.scores\); revealHold = true;/);
+    expect(c).toMatch(/later\(\(\) => \{ clearBanner\(ctx\); void advanceAfterJudging\(ctx\); \}, MISS_BEAT_MS\);/);
+  });
+  it('the host shows a SKIP chip on his turn whose tap is a B; the mode raises and lowers it', () => {
+    expect(HOST).toMatch(/hud\.rivalSkip === true && phase === 'playing' && !card && \(/);
+    expect(HOST).toMatch(/const tapSkip = useCallback\(\(\) => \{\n\s*emit\(\{ t: 'button', btn: 'B', pressed: true \}\);\n\s*emit\(\{ t: 'button', btn: 'B', pressed: false \}\);/);
+    expect(fn('rivalRound')).toMatch(/ctx\.setHud\(\{ rivalSkip: true \}\);/);
+    expect(fn('endRivalTurn')).toMatch(/ctx\.setHud\(\{ rivalSkip: false \}\);/);
   });
 });

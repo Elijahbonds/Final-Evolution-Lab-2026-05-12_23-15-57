@@ -16,7 +16,8 @@
 //
 // Only a MADE dunk shows the building anything: a miss you retry is still a surprise when it goes down. Pure: no Babylon.
 
-export type Dunker = 'player' | 'rival';
+/** Who showed it: 'player', 'rival', or (dunk-next phase 5, the four-dunker field) any dunker's own id — the night tells them apart. */
+export type Dunker = 'player' | 'rival' | (string & Record<never, never>);
 export type ElementKind = 'trick' | 'chain' | 'runway' | 'prop' | 'launch' | 'foot' | 'range' | 'side' | 'hang';
 export interface DunkElement { kind: ElementKind; key: string; label: string }
 

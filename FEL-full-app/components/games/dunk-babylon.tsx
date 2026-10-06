@@ -170,6 +170,12 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
     emit({ t: 'button', btn: 'A', pressed: false });
   }, [emit]);
 
+  // dunk-next phase 4: the SKIP chip on the rival's turn is a finger on B — the mode owns the skip (DunkMode.skipRivalDunk)
+  const tapSkip = useCallback(() => {
+    emit({ t: 'button', btn: 'B', pressed: true });
+    emit({ t: 'button', btn: 'B', pressed: false });
+  }, [emit]);
+
   const tapStart = useCallback(() => {
     // READY gate + pause both advance on any button press.
     emit({ t: 'button', btn: 'START', pressed: true });
@@ -297,6 +303,14 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
         <div className={`pointer-events-none absolute inset-x-0 ${hud.bannerHigh === true ? 'top-[13%]' : 'top-[38%]'} text-center`}>
           <span className="fel-heading fel-panel px-4 py-2 text-2xl font-bold text-[var(--fel-cyan)]">{hud.banner}</span>
         </div>
+      )}
+
+      {/* dunk-next phase 4: SKIP the rival's dunk straight to his card (B on a pad, K on a keyboard, this chip on a phone) */}
+      {hud.rivalSkip === true && phase === 'playing' && !card && (
+        <button type="button" onClick={tapSkip} data-fel-dunk-skip
+          className="fel-panel pointer-events-auto absolute right-3 top-[9%] inline-flex items-center gap-2 px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-white">
+          SKIP TO HIS CARD <span className="text-white/45">B ▸▸</span>
+        </button>
       )}
 
       {/* DUNK MOTION phase 12 — THE SHOW: the broadcast bug while the triple cut plays (a tap skips it), the announcer's lower third,
