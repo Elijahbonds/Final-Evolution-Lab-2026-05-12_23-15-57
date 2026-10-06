@@ -1,5 +1,7 @@
 'use client';
 import type { Wardrobe } from '@/lib/babylon/core/kit';
+import type { AccessoryId } from '@/lib/babylon/core/accessories';
+import type { CreatorDoc } from '@/lib/creator/look/doc';
 
 // AvatarPreview — the Closet's live 3D preview: the FORGED hero
 // (public/models/fel-hero.glb, scripts/avatar/forge.mts) wearing the draft
@@ -19,9 +21,13 @@ export interface AvatarPreviewProps {
   jersey: JerseyConfig;
   /** equipped wearable ids per kit slot (ship pass 3: the fitted garment library) */
   wardrobe?: Wardrobe;
+  /** IMPROVE (2026-10-06): the accessories the equipped items render as, and the draft Creator doc — the same two
+   *  fields resolveIdentity fills at spawn, so the preview shows what the game will. */
+  accessories?: readonly AccessoryId[];
+  creator?: CreatorDoc | null;
 }
 
-export default function AvatarPreview({ face, palette, jersey, wardrobe }: AvatarPreviewProps) {
+export default function AvatarPreview({ face, palette, jersey, wardrobe, accessories, creator }: AvatarPreviewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const applyRef = useRef<((p: AvatarPreviewProps) => void) | null>(null);
   const playRef = useRef<(clip: string | null) => void>(() => {});
@@ -82,9 +88,11 @@ export default function AvatarPreview({ face, palette, jersey, wardrobe }: Avata
           wardrobe: p.wardrobe ?? {},
           custom: true,
           body: bodyKind,
+          accessories: p.accessories ?? [],
+          creator: p.creator ?? null,
         });
       };
-      applyRef.current({ face, palette, jersey, wardrobe });
+      applyRef.current({ face, palette, jersey, wardrobe, accessories, creator });
 
       playRef.current = (clip: string | null) => {
         if (!clip) return;
@@ -110,8 +118,8 @@ export default function AvatarPreview({ face, palette, jersey, wardrobe }: Avata
 
   // re-apply the draft on every edit — same pipe, new values
   useEffect(() => {
-    applyRef.current?.({ face, palette, jersey, wardrobe });
-  }, [face, palette, jersey, wardrobe]);
+    applyRef.current?.({ face, palette, jersey, wardrobe, accessories, creator });
+  }, [face, palette, jersey, wardrobe, accessories, creator]);
 
   return (
     <div>

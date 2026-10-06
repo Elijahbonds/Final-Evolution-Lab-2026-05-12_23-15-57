@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
-import { Loader2, Shirt, Palette, Check, Coins, Sparkles } from 'lucide-react';
+import { Loader2, Shirt, Palette, Check, Coins, Sparkles, Undo2, Redo2, Shuffle, Lock, Unlock } from 'lucide-react';
 import { newIdempotencyKey } from '@/lib/wallet/client';
 import { FaceScanCapture } from '@/components/facescan/face-scan-capture';
 import { LookConsent } from '@/components/creator/look-consent';
@@ -17,6 +17,13 @@ import {
   BROWS, MOUTHS, NOSES, defaultFace, defaultEquipped, defaultJersey, sanitizeJersey, SLOTS,
   wearablesForSlot, getWearable, type FaceConfig, type WearableSlot, type JerseyConfig,
 } from '@/lib/closet/wearable-catalog';
+import { faceFieldRenders, faceOptionRenders, type FaceField } from '@/lib/babylon/core/faceMorphs';
+import { accessoriesForEquipped } from '@/lib/closet/wearableAccessories';
+import { emptyCreatorDoc, type ColourSlot } from '@/lib/creator/look/doc';
+import { readCreatorDoc, faceOnly, type StoredFace } from '@/lib/creator/look/storage';
+import { effectivePalette } from '@/lib/creator/look/palette';
+import { canRedo, canUndo, createHistory, pushHistory, redo, resetHistory, undo, type History } from '@/lib/creator/look/history';
+import { RANDOM_SECTIONS, RANDOM_SECTION_FIELDS, randomiseLook, type RandomSection } from '@/lib/creator/look/randomise';
 
 // The 3D preview is client-only (Babylon engine on a canvas) — never SSR it.
 const AvatarPreview = dynamic(() => import('@/components/closet/avatar-preview'), { ssr: false });
@@ -93,8 +100,18 @@ const FACE_SLIDERS: [string, string][] = [
   ['faceHeart', 'Heart'], ['faceDiamond', 'Cheekbones'], ['jawOpen', 'Jaw open'], ['browRaise', 'Brow'],
 ];
 
+/** IMPROVE (2026-10-06): options with no 3D effect yet say so (faceMorphs.faceOptionRenders), instead of pretending. */
+const SOON = '3D coming soon — shows in the sketch only';
+
 export function ClosetView({ adult = false }: { adult?: boolean }) {
-  const [face, setFace] = useState<FaceConfig>(defaultFace());
+  // IMPROVE (2026-10-06), CREATOR-PLAN phase 1: the face (and the Creator doc inside it, face.creator) is an undo
+  // history. `setFace` records a step; a slider or colour drag passes a group so the whole drag is one step.
+  const [hist, setHist] = useState<History<StoredFace>>(() => createHistory<StoredFace>(defaultFace()));
+  const face = hist.present;
+  const setFace = (next: StoredFace | ((p: StoredFace) => StoredFace), group?: string) =>
+    setHist((h) => pushHistory(h, typeof next === 'function' ? next(h.present) : next, group));
+  const loadFace = (next: StoredFace) => setHist((h) => resetHistory(h, next));
+  const [locks, setLocks] = useState<RandomSection[]>([]);
   const [equipped, setEquipped] = useState<Equipped>(defaultEquipped());
   const [jersey, setJersey] = useState<JerseyConfig>(defaultJersey());
   const [owned, setOwned] = useState<Set<string>>(new Set());
@@ -122,7 +139,7 @@ export function ClosetView({ adult = false }: { adult?: boolean }) {
           // The server copy is whatever the hold allowed. The device copy wins for the rest.
           if (!hold.uploadLook && local?.face) nextFace = { ...local.face };
           else if (local?.face?.sliders && !hold.uploadNumbers) nextFace = { ...nextFace, sliders: { ...local.face.sliders } };
-          setFace(nextFace);
+          loadFace(nextFace);
           const serverEquipped = { ...defaultEquipped(), ...(j.look?.equipped ?? {}) };
           setEquipped(!hold.uploadLook && local?.equipped ? { ...defaultEquipped(), ...local.equipped } : serverEquipped);
           setOwned(new Set<string>(j.owned ?? []));
@@ -130,7 +147,7 @@ export function ClosetView({ adult = false }: { adult?: boolean }) {
           setSkinCardId(j.look?.skinCardId ?? null);
           setJersey(!hold.uploadLook && local?.jersey ? sanitizeJersey(local.jersey) : sanitizeJersey(j.look?.jersey ?? defaultJersey()));
         } else if (local?.face && !hold.uploadLook) {
-          setFace({ ...local.face });
+          loadFace({ ...local.face });
         }
       } catch { /* ignore */ }
       finally { hydrated.current = true; setLoading(false); }
@@ -146,14 +163,43 @@ export function ClosetView({ adult = false }: { adult?: boolean }) {
   const accent = useMemo(() => skins.find((s) => s.id === skinCardId)?.accent || '#00E5FF', [skins, skinCardId]);
   // Draft palette — the same mapping resolveIdentity() applies at spawn time,
   // so the preview and the game can never disagree about what a wearable does.
-  const previewPalette = useMemo(() => ({
+  const doc = useMemo(() => readCreatorDoc(face), [face]);
+  const itemPalette = useMemo(() => ({
     jersey: (equipped.tops && getWearable(equipped.tops)?.accent) || '#00E5FF',
     shorts: (equipped.shorts && getWearable(equipped.shorts)?.accent) || '#0b1220',
     shoes: (equipped.shoes && getWearable(equipped.shoes)?.accent) || '#A855F7',
     accent,
   }), [equipped, accent]);
+  // the Creator doc's colours win, exactly as resolveIdentity does at spawn
+  const previewPalette = useMemo(() => effectivePalette(itemPalette, doc?.colours), [itemPalette, doc]);
+  const previewAccessories = useMemo(() => accessoriesForEquipped(equipped), [equipped]);
+  const previewFace = useMemo(() => faceOnly(face) as FaceConfig, [face]);
   const setF = (k: keyof FaceConfig, v: string) => setFace((p) => ({ ...p, [k]: v }));
-  const setSlider = (k: string, v: number) => setFace((p) => ({ ...p, sliders: { ...(p.sliders ?? {}), [k]: v } }));
+  const setSlider = (k: string, v: number) => setFace((p) => ({ ...p, sliders: { ...(p.sliders ?? {}), [k]: v } }), `slider:${k}`);
+  /** One kit colour on the Creator doc; null hands the slot back to the equipped item's own colour. */
+  const setKitColour = (slot: ColourSlot, hex: string | null) => setFace((p) => {
+    const d = readCreatorDoc(p) ?? emptyCreatorDoc();
+    const colours = { ...d.colours };
+    if (hex) colours[slot] = hex.toUpperCase(); else delete colours[slot];
+    return { ...p, creator: { ...d, colours } };
+  }, hex ? `colour:${slot}` : undefined);
+  const roll = () => setFace((p) => {
+    const r = randomiseLook({ face: faceOnly(p) as FaceConfig, doc: readCreatorDoc(p) }, locks);
+    return { ...p, ...r.face, ...(r.doc ? { creator: r.doc } : {}) };
+  });
+  // Ctrl/Cmd+Z undoes, Shift+Ctrl/Cmd+Z or Ctrl+Y redoes — not while typing in a field (the jersey plate has its own).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      if (!(e.ctrlKey || e.metaKey)) return;
+      const k = e.key.toLowerCase();
+      if (k === 'z' && !e.shiftKey) { e.preventDefault(); setHist(undo); }
+      else if ((k === 'z' && e.shiftKey) || k === 'y') { e.preventDefault(); setHist(redo); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   const canEquip = (itemId: string) => canEquipItem(itemId, owned);
 
@@ -216,7 +262,7 @@ export function ClosetView({ adult = false }: { adult?: boolean }) {
         <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
           {/* The actual game model (forged fel-hero) wearing the draft look —
               what you design here is what spawns in every mode. */}
-          <AvatarPreview face={face} palette={previewPalette} jersey={jersey} wardrobe={{ tops: equipped.tops ?? null, shorts: equipped.shorts ?? null, shoes: equipped.shoes ?? null }} />
+          <AvatarPreview face={previewFace} palette={previewPalette} jersey={jersey} wardrobe={{ tops: equipped.tops ?? null, shorts: equipped.shorts ?? null, shoes: equipped.shoes ?? null }} accessories={previewAccessories} creator={doc} />
           <div className="mt-3">
             <FacePreview face={face} accent={accent} />
           </div>
@@ -271,15 +317,39 @@ export function ClosetView({ adult = false }: { adult?: boolean }) {
                 <Sparkles className="h-4 w-4" /> Scan My Face
               </button>
               <p className="-mt-3 text-[11px] leading-relaxed text-white/40">Auto-build your avatar from your camera or a photo. Runs entirely in your browser — nothing is uploaded. You can fine-tune every option below afterwards.</p>
+              <div className="flex flex-wrap items-center gap-2 rounded-xl border border-white/10 bg-white/[0.02] p-3">
+                <button type="button" onClick={() => setHist(undo)} disabled={!canUndo(hist)} aria-label="Undo" title="Undo (Ctrl+Z)"
+                  className="flex items-center gap-1 rounded-lg bg-white/5 px-2.5 py-1.5 text-xs text-white/80 transition hover:bg-white/10 disabled:opacity-30"><Undo2 className="h-3.5 w-3.5" /> Undo</button>
+                <button type="button" onClick={() => setHist(redo)} disabled={!canRedo(hist)} aria-label="Redo" title="Redo (Shift+Ctrl+Z)"
+                  className="flex items-center gap-1 rounded-lg bg-white/5 px-2.5 py-1.5 text-xs text-white/80 transition hover:bg-white/10 disabled:opacity-30"><Redo2 className="h-3.5 w-3.5" /> Redo</button>
+                <button type="button" onClick={roll} disabled={locks.length === RANDOM_SECTIONS.length}
+                  className="flex items-center gap-1 rounded-lg bg-cyan-400/15 px-2.5 py-1.5 text-xs font-semibold text-cyan-200 transition hover:bg-cyan-400/25 disabled:opacity-30"><Shuffle className="h-3.5 w-3.5" /> Randomise</button>
+                <div className="flex flex-wrap gap-1.5">
+                  {RANDOM_SECTIONS.map((sec) => {
+                    const on = locks.includes(sec);
+                    return (
+                      <button key={sec} type="button" title={`${on ? 'Locked' : 'Unlocked'}: ${RANDOM_SECTION_FIELDS[sec]}`} aria-pressed={on}
+                        onClick={() => setLocks((l) => (on ? l.filter((x) => x !== sec) : [...l, sec]))}
+                        className="flex items-center gap-1 rounded-full border px-2 py-1 text-[10px] capitalize transition"
+                        style={{ borderColor: on ? '#FFD700' : 'rgba(255,255,255,0.12)', color: on ? '#FFD700' : 'rgba(255,255,255,0.6)' }}>
+                        {on ? <Lock className="h-3 w-3" /> : <Unlock className="h-3 w-3" />} {sec}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
               <Group title="Skin Tone"><div className="flex flex-wrap gap-2">{SKIN_TONES.map((c) => <Swatch key={c} color={c} active={face.skinTone === c} onClick={() => setF('skinTone', c)} />)}</div></Group>
               <Group title="Face Shape"><div className="flex flex-wrap gap-2">{FACE_SHAPES.map((s) => <Chip key={s} label={s} active={face.faceShape === s} onClick={() => setF('faceShape', s)} />)}</div></Group>
               <Group title="Hair Style"><div className="flex flex-wrap gap-2">{HAIR_STYLES.map((s) => <Chip key={s} label={s} active={face.hairStyle === s} onClick={() => setF('hairStyle', s)} />)}</div></Group>
               <Group title="Hair Color"><div className="flex flex-wrap gap-2">{HAIR_COLORS.map((c) => <Swatch key={c} color={c} active={face.hairColor === c} onClick={() => setF('hairColor', c)} />)}</div></Group>
-              <Group title="Eye Shape"><div className="flex flex-wrap gap-2">{EYE_SHAPES.map((s) => <Chip key={s} label={s} active={face.eyeShape === s} onClick={() => setF('eyeShape', s)} />)}</div></Group>
-              <Group title="Eye Color"><div className="flex flex-wrap gap-2">{EYE_COLORS.map((c) => <Swatch key={c} color={c} active={face.eyeColor === c} onClick={() => setF('eyeColor', c)} />)}</div></Group>
-              <Group title="Brows"><div className="flex flex-wrap gap-2">{BROWS.map((s) => <Chip key={s} label={s} active={face.brows === s} onClick={() => setF('brows', s)} />)}</div></Group>
-              <Group title="Mouth"><div className="flex flex-wrap gap-2">{MOUTHS.map((s) => <Chip key={s} label={s} active={face.mouth === s} onClick={() => setF('mouth', s)} />)}</div></Group>
-              <Group title="Nose"><div className="flex flex-wrap gap-2">{NOSES.map((s) => <Chip key={s} label={s} active={face.nose === s} onClick={() => setF('nose', s)} />)}</div></Group>
+              <Group title="Eye Shape" soon={soonField('eyeShape', EYE_SHAPES)}><div className="flex flex-wrap gap-2">{EYE_SHAPES.map((s) => <Chip key={s} label={s} active={face.eyeShape === s} onClick={() => setF('eyeShape', s)} />)}</div></Group>
+              <Group title="Eye Color" soon={soonField('eyeColor', EYE_COLORS)}><div className="flex flex-wrap gap-2">{EYE_COLORS.map((c) => <Swatch key={c} color={c} active={face.eyeColor === c} onClick={() => setF('eyeColor', c)} />)}</div></Group>
+              <Group title="Brows" soon={soonField('brows', BROWS)}>
+                <div className="flex flex-wrap gap-2">{BROWS.map((s) => <Chip key={s} label={faceOptionRenders('brows', s) ? s : `${s} · soon`} active={face.brows === s} onClick={() => setF('brows', s)} />)}</div>
+                {faceFieldRenders('brows', BROWS) && <p className="mt-1.5 text-[10px] text-white/35">Options marked “soon” show in the sketch only until their 3D shapes land.</p>}
+              </Group>
+              <Group title="Mouth" soon={soonField('mouth', MOUTHS)}><div className="flex flex-wrap gap-2">{MOUTHS.map((s) => <Chip key={s} label={s} active={face.mouth === s} onClick={() => setF('mouth', s)} />)}</div></Group>
+              <Group title="Nose" soon={soonField('nose', NOSES)}><div className="flex flex-wrap gap-2">{NOSES.map((s) => <Chip key={s} label={s} active={face.nose === s} onClick={() => setF('nose', s)} />)}</div></Group>
               <Group title="Fine-tune">
                 <p className="mb-2 text-[11px] text-white/40">Sculpt on top of the shape preset. These are the same morphs the game renders.</p>
                 <div className="space-y-2">
@@ -319,6 +389,27 @@ export function ClosetView({ adult = false }: { adult?: boolean }) {
                       className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 font-mono text-sm font-bold uppercase tracking-wider text-white placeholder:text-white/25"
                     />
                   </div>
+                </div>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+                <h3 className="mb-1 text-sm font-semibold text-white/80">Kit colours</h3>
+                <p className="mb-3 text-[11px] text-white/40">Any colour, on top of each item&apos;s own. Shows in every mode. Reset hands a slot back to the item&apos;s colour.</p>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  {KIT_COLOUR_SLOTS.map(([slot, label]) => {
+                    const own = doc?.colours[slot];
+                    const shown = (own ?? previewPalette[slot]).slice(0, 7).toLowerCase();
+                    return (
+                      <label key={slot} className="flex flex-col gap-1 text-[11px] text-white/60">
+                        <span>{label}</span>
+                        <span className="flex items-center gap-2">
+                          <input type="color" value={/^#[0-9a-f]{6}$/.test(shown) ? shown : '#000000'} aria-label={`${label} colour`}
+                            onChange={(e) => setKitColour(slot, e.target.value)} className="h-8 w-10 cursor-pointer rounded border border-white/15 bg-transparent" />
+                          <span className="font-mono text-[10px] uppercase text-white/45">{shown}</span>
+                        </span>
+                        {own && <button type="button" onClick={() => setKitColour(slot, null)} className="self-start text-[10px] text-cyan-300/80 hover:text-cyan-200">Reset</button>}
+                      </label>
+                    );
+                  })}
                 </div>
               </div>
               {SLOTS.map((slot) => (
@@ -378,10 +469,20 @@ export function ClosetView({ adult = false }: { adult?: boolean }) {
   );
 }
 
-function Group({ title, children }: { title: string; children: React.ReactNode }) {
+const KIT_COLOUR_SLOTS: [ColourSlot, string][] = [['jersey', 'Jersey'], ['shorts', 'Shorts'], ['shoes', 'Shoes'], ['accent', 'Accent']];
+
+/** The whole field has no 3D effect yet → the group says so. */
+function soonField(field: FaceField, options: readonly string[]): boolean {
+  return !faceFieldRenders(field, options);
+}
+
+function Group({ title, soon = false, children }: { title: string; soon?: boolean; children: React.ReactNode }) {
   return (
     <div>
-      <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-white/80"><Palette className="h-3.5 w-3.5 text-cyan-400" /> {title}</h3>
+      <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-white/80">
+        <Palette className="h-3.5 w-3.5 text-cyan-400" /> {title}
+        {soon && <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] font-normal text-white/45" title={SOON}>3D coming soon</span>}
+      </h3>
       {children}
     </div>
   );

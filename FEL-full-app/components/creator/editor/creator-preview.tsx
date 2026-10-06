@@ -47,6 +47,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { PreviewBinding } from '@/lib/creator/editor/previewBinding';
 import { poseLoops } from '@/lib/creator/editor/previewPose';
 import { PreviewControls } from '@/components/creator/editor/preview-controls';
+import { accessoriesForEquipped } from '@/lib/closet/wearableAccessories';
 
 export interface CreatorPreviewProps {
   binding: PreviewBinding;
@@ -110,6 +111,9 @@ export default function CreatorPreview({ binding, poseClip = null, height = 420 
           proportions: null,          // applied below, absolutely — see the header
           face: b.face, palette: b.palette, jersey: b.jersey, wardrobe: b.wardrobe, custom: true,
           body: ownerScan ? 'scan' : b.bodyType === 'female' ? 'kit-female' : 'kit-male',
+          // IMPROVE (2026-10-06), research item 2: the draft's headwear and accessory, as the game hangs them (the
+          // library no longer deals this player body a seeded set).
+          accessories: accessoriesForEquipped(b.wardrobe),
         });
         applyProportions(s, b.proportions, baseScale);   // the SAME absolute pipe every mode spawns with
       };
