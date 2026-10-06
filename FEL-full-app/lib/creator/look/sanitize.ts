@@ -26,6 +26,7 @@ import {
 } from '../../closet/wearable-catalog';
 import { clampCosmetic } from '../../babylon/core/playFrame';
 import { sanitizeMorphWeights } from './faceMorphList';
+import { MAX_MARKS, sanitizeMark, type CreatorMark } from './marks';
 
 type Obj = Record<string, unknown>;
 const isObj = (v: unknown): v is Obj => !!v && typeof v === 'object' && !Array.isArray(v);
@@ -133,6 +134,8 @@ export function sanitizePaintLayer(raw: unknown): PaintLayer | null {
   if (type === 'pattern') { const p = pick(raw.pattern, PAINT_PATTERNS); if (!p) return null; layer.pattern = p; }
   if (type === 'stamp') { const s = pick(raw.stamp, PAINT_STAMPS); if (!s) return null; layer.stamp = s; }
   if (type === 'text') { const t = sanitizeStampText(raw.text); if (!t) return null; layer.text = t; }
+  // phase 4c: a drawn stamp names one of the doc's marks (sanitizeCreatorDoc drops it when that mark is not there)
+  if (type === 'mark') { const m = sanitizeId(raw.mark); if (!m) return null; layer.mark = m; }
   return layer;
 }
 
@@ -183,16 +186,29 @@ export function sanitizeCreatorDoc(raw: unknown, maxChars: number = MAX_DOC_CHAR
     for (const k of HIDE_KEYS) if (hideRaw[k] === true) hide[k] = true;
     if (Object.keys(hide).length) flags.hide = hide;
   }
+  // phase 4c: player-drawn stamps. A mark is kept only while a layer uses it (at most MAX_MARKS, in the doc's order); a
+  // `mark` layer whose mark is missing, refused or past the budget is dropped with it
+  const paintRaw = budgeted(raw.paint, MAX_PAINT_LAYERS, sanitizePaintLayer);
+  const valid = new Map<string, CreatorMark>();
+  if (Array.isArray(raw.marks)) for (const r of raw.marks.slice(0, MAX_MARKS * 4)) {
+    const m = sanitizeMark(r);
+    if (m && !valid.has(m.id)) valid.set(m.id, m);
+  }
+  const used = new Set(paintRaw.flatMap((l) => (l.type === 'mark' && l.mark && valid.has(l.mark) ? [l.mark] : [])));
+  const marks = [...valid.values()].filter((m) => used.has(m.id)).slice(0, MAX_MARKS);
+  const kept = new Set(marks.map((m) => m.id));
+  const paint = paintRaw.filter((l) => l.type !== 'mark' || kept.has(l.mark!));
   const doc: CreatorDoc = {
     v: CREATOR_DOC_VERSION,
     parts: budgeted(raw.parts, MAX_PARTS, sanitizePart),
-    paint: budgeted(raw.paint, MAX_PAINT_LAYERS, sanitizePaintLayer),
+    paint,
     colours,
     shape: Object.keys(girth).length ? { face, body, girth } : { face, body },
     flags,
   };
   const eyes = sanitizeEyes(raw.eyes);
   if (eyes) doc.eyes = eyes;
+  if (marks.length) doc.marks = marks;
   return JSON.stringify(doc).length > maxChars ? null : doc;
 }
 

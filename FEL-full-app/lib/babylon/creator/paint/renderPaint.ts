@@ -44,7 +44,7 @@
 
 import { Color3, RawTexture, Texture } from '@babylonjs/core';
 import type { AbstractMesh, BaseTexture, Material, Mesh, Scene, TransformNode } from '@babylonjs/core';
-import { hiddenParts, type CreatorDoc, type PaintLayer, type PaintRegion } from '../../../creator/look/doc';
+import { hiddenParts, type CreatorDoc, type CreatorMark, type PaintLayer, type PaintRegion } from '../../../creator/look/doc';
 import { kitOf } from '../../core/kit';
 import { scheduleBodyMask } from '../../core/bodyMask';
 import { syncGarmentVisibility } from '../../core/garmentFixes';
@@ -110,6 +110,8 @@ interface BodyPaint {
   tier: PaintTier;
   targets: Map<Mesh, Target>;
   layers: readonly PaintLayer[];
+  /** phase 4c: the doc's player-drawn stamps */
+  marks: readonly CreatorMark[];
   suit: boolean;
   chart: BodyChart | null;
   chartKey: string;
@@ -186,7 +188,7 @@ export function syncPaint(
   if (!visible && !suit && !cut.length) { if (P) releasePaint(root); return { targets: 0, layers: 0 }; }
   const scene = root.getScene();
   if (!P) {
-    P = { root, scene, tier: tierOf(scene), targets: new Map(), layers: [], suit: false, chart: null, chartKey: '', cut: [], cutTable: null, cutSig: '' };
+    P = { root, scene, tier: tierOf(scene), targets: new Map(), layers: [], marks: [], suit: false, chart: null, chartKey: '', cut: [], cutTable: null, cutSig: '' };
     bodies.set(root, P);
     let set = live.get(scene);
     if (!set) { set = new Set(); live.set(scene, set); }
@@ -195,6 +197,7 @@ export function syncPaint(
     if (!hooked.has(root)) { hooked.add(root); root.onDisposeObservable.addOnce(() => releasePaint(root, true)); }
   }
   P.layers = layers;
+  P.marks = doc?.marks ?? [];
   P.suit = suit;
   P.cut = cut;
   P.cutSig = cut.join(',');
@@ -283,7 +286,7 @@ function updateTarget(P: BodyPaint, t: Target): void {
   const map = mapFor(P, t);
   const chart = P.chart!;
   const info: ChartInfo = { radius: chart.groups.map((g) => g.radius), extent: chart.extent };
-  const next = compileLayers(P.layers, info, { target: t.kind, suit: P.suit, aa: map?.metresPerTexel ?? 0.002, glowCap: GLOW_LAYER_CAP[P.tier] });
+  const next = compileLayers(P.layers, info, { target: t.kind, suit: P.suit, aa: map?.metresPerTexel ?? 0.002, glowCap: GLOW_LAYER_CAP[P.tier], marks: P.marks });
   // phase 4c: the emission buffer exists only while a layer glows. A new one starts dark, which is right everywhere no glow
   // layer reaches; the tiles a glow layer reaches are dirty anyway (its signature is new), so they fill it.
   const glows = next.some((l) => l.glow);

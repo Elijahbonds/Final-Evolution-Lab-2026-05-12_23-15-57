@@ -28,7 +28,8 @@ import {
 import { ANG_Q, T_Q, TILE, arcsOverlap, type SurfaceMap } from './rasterise';
 import { PATTERN_PERIOD, gradientMix, samplePattern } from './patterns';
 import { GLYPH_H, stampDistance, textBlock, textDistance } from './stamps';
-import { MAX_PAINT_LAYERS, type PaintLayer, type PaintPattern, type PaintStamp } from '../../../creator/look/doc';
+import { MAX_PAINT_LAYERS, type CreatorMark, type PaintLayer, type PaintPattern, type PaintStamp } from '../../../creator/look/doc';
+import { markField, sampleMark } from './markField';
 
 // local copies for the hot loop (a transpiled import is a getter on every read)
 const ATOM_COUNT = ATOM_COUNT_;
@@ -68,6 +69,8 @@ export interface CompiledLayer {
   weight: number;
   pattern: PaintPattern | null;
   stamp: PaintStamp | null;
+  /** phase 4c: a player-drawn stamp's distance field (markField.ts); drawn exactly like a library stamp */
+  mark: Float32Array | null;
   text: string;
   cos: number; sin: number;
   invPeriod: number; invStretch: number;
@@ -101,6 +104,8 @@ export interface CompileOptions {
   aa: number;
   /** phase 4c: how many glow layers may glow (the tier's cap, GLOW_LAYER_CAP); later ones paint as normal */
   glowCap?: number;
+  /** phase 4c: the doc's player-drawn stamps, for `mark` layers */
+  marks?: readonly CreatorMark[];
 }
 
 /** Does a layer paint this target? */
@@ -118,15 +123,18 @@ export function compileLayers(layers: readonly PaintLayer[], chart: ChartInfo, o
     if (!layerApplies(l, o)) continue;
     const glow = l.blend === 'glow' && glows < (o.glowCap ?? Infinity);
     if (glow) glows++;
-    out.push(compileLayer(l, chart, o.aa, glow));
+    // a mark layer whose mark is not there (the sanitiser never lets one through) draws nothing
+    const markData = l.type === 'mark' ? o.marks?.find((m) => m.id === l.mark)?.data ?? null : null;
+    if (l.type === 'mark' && !(markData && markField(markData))) continue;
+    out.push(compileLayer(l, chart, o.aa, glow, markData));
   }
   return out;
 }
 
-export function compileLayer(l: PaintLayer, chart: ChartInfo, aa: number, glow = l.blend === 'glow'): CompiledLayer {
+export function compileLayer(l: PaintLayer, chart: ChartInfo, aa: number, glow = l.blend === 'glow', markData: string | null = null): CompiledLayer {
   const atoms = REGION_ATOMS[l.region].map(atomIndex);
   const labels = regionLabelMask(l.region);
-  const placedKind = l.type === 'stamp' || l.type === 'text';
+  const placedKind = l.type === 'stamp' || l.type === 'text' || l.type === 'mark';
   // a mirrored stamp's copy lands on the other side's atoms (the right arm for a left-arm stamp)
   if (placedKind && l.mirror) for (const a of atoms) labels[ATOM_MIRROR[a] + 1] = 1;
   let labelBits = 0;
@@ -134,7 +142,8 @@ export function compileLayer(l: PaintLayer, chart: ChartInfo, aa: number, glow =
   const col = new Float32Array(9);
   l.colours.slice(0, 3).forEach((c, i) => col.set(hexRgb(c), i * 3));
   const rot = (l.at.rot * Math.PI) / 180;
-  const kind: CompiledLayer['kind'] = l.type === 'pattern' ? (l.pattern === 'gradient' ? 'gradient' : 'pattern') : l.type;
+  // phase 4c: a drawn stamp ('mark') is placed, sized and outlined exactly like a library stamp
+  const kind: CompiledLayer['kind'] = l.type === 'pattern' ? (l.pattern === 'gradient' ? 'gradient' : 'pattern') : l.type === 'mark' ? 'stamp' : l.type;
   const weight = l.weight ?? 0.5;
   const anchor = regionAnchor(l.region);
   const back = anchor.back;
@@ -185,9 +194,9 @@ export function compileLayer(l: PaintLayer, chart: ChartInfo, aa: number, glow =
   const stretch = l.at.stretch;
   return {
     id: l.id,
-    sig: JSON.stringify([l.type, l.region, l.pattern, l.stamp, l.text, l.at, l.colours, l.opacity, l.mirror, l.blend, weight, ...(glow ? ['glow'] : [])]),
+    sig: JSON.stringify([l.type, l.region, l.pattern, l.stamp, l.text, l.at, l.colours, l.opacity, l.mirror, l.blend, weight, ...(glow ? ['glow'] : []), ...(markData ? [markData] : [])]),
     kind, labels, labelBits, multiply: l.blend === 'multiply', glow, opacity: l.opacity, col, ncol: Math.min(3, l.colours.length), weight,
-    pattern: l.pattern ?? null, stamp: l.stamp ?? null, text: l.text ?? '',
+    pattern: l.pattern ?? null, stamp: l.stamp ?? null, mark: markData ? markField(markData) : null, text: l.text ?? '',
     cos: Math.cos(rot), sin: Math.sin(rot),
     invPeriod: 1 / (PATTERN_PERIOD * l.at.scale), invStretch: 1 / stretch,
     textUy, textUx,
@@ -418,7 +427,7 @@ function layerColour(L: CompiledLayer, grp: number, angF: number, t: number, R: 
       if (ux < -1.36 || ux > 1.36 || vy < -1.36 || vy > 1.36) continue;
       unit = Math.min(I.hw, I.hh);
       acc[0] = Infinity;
-      sd = stampDistance(L.stamp!, ux, vy, acc);
+      sd = L.mark ? sampleMark(L.mark, ux, vy) : stampDistance(L.stamp!, ux, vy, acc);
       ow = 0.04 + 0.3 * L.weight;
       if (acc[0] !== Infinity) pupil = Math.max(pupil, cover(acc[0], aa / unit));
     }

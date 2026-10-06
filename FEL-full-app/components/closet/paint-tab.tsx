@@ -11,9 +11,12 @@ import { ArrowDown, ArrowUp, Copy, Eye, EyeOff, FlipHorizontal, Paintbrush, Plus
 import { PAINT_BLENDS, PAINT_SURFACES, RANGES, type PaintLayer, type PaintPattern, type PaintRegion, type PaintStamp, type PaintSurface, type PaintType } from '@/lib/creator/look/doc';
 import {
   BLEND_LABELS, PAINT_BUDGET, PATTERN_LABELS, PATTERN_ORDER, REGION_GROUPS, REGION_LABELS, STAMP_LABELS, STAMP_ORDER, SURFACE_LABELS, TYPE_LABELS,
-  duplicateLayer, fitsPaintBudget, layerName, moveLayer, newLayer, removeLayer, suitBase, toggleHidden, updateLayer, weightLabel,
+  addMarkLayer, duplicateLayer, fitsMarkBudget, fitsPaintBudget, layerName, moveLayer, newLayer, redrawMark, removeLayer, suitBase, toggleHidden,
+  updateLayer, usedMarks, weightLabel,
 } from '@/lib/creator/look/paint';
 import { sanitizeStampText } from '@/lib/creator/look/sanitize';
+import { MAX_MARKS, decodeMark, discMark, type CreatorMark } from '@/lib/creator/look/marks';
+import { MarkPad } from './mark-pad';
 import { HexField, NumSlider, SliderGroup } from './parts-tab';
 
 export interface PaintTabProps {
@@ -25,27 +28,39 @@ export interface PaintTabProps {
   onSuit: (on: boolean, layers: PaintLayer[]) => void;
   /** The colour a new layer starts in. */
   accent: string;
+  /** Phase 4c: the doc's player-drawn stamps, and a write of layers and marks together (one undo step). */
+  marks?: readonly CreatorMark[];
+  onMarks?: (paint: PaintLayer[], marks: CreatorMark[], group?: string) => void;
   canUndo: boolean; canRedo: boolean; onUndo: () => void; onRedo: () => void;
 }
 
 const HEX6 = /^#[0-9a-fA-F]{6}$/;
-const TYPES: readonly PaintType[] = ['fill', 'pattern', 'stamp', 'text'];
+const TYPES: readonly PaintType[] = ['fill', 'pattern', 'stamp', 'text', 'mark'];
 /** What each colour does, per layer type. */
 const COLOUR_ROLES: Record<PaintType, readonly string[]> = {
   fill: ['Colour'],
   pattern: ['Ink', 'Ground', 'Accent'],
   stamp: ['Fill', 'Outline', 'Detail'],
   text: ['Letters', 'Outline'],
+  mark: ['Fill', 'Outline'],
 };
 const SECOND = '#111111', THIRD = '#FFFFFF';
 
-export function PaintTab({ layers, suit, onChange, onSuit, accent, canUndo, canRedo, onUndo, onRedo }: PaintTabProps) {
+export function PaintTab({ layers, suit, onChange, onSuit, accent, marks, onMarks, canUndo, canRedo, onUndo, onRedo }: PaintTabProps) {
   const [selectedId, setSelectedId] = useState<string | null>(layers[layers.length - 1]?.id ?? null);
   const selected = useMemo(() => layers.find((l) => l.id === selectedId) ?? null, [layers, selectedId]);
   const colour = HEX6.test(accent) ? accent.toUpperCase() : '#00E5FF';
   const full = !fitsPaintBudget(layers);
 
   const add = (type: PaintType) => {
+    if (type === 'mark') {
+      // a drawn stamp starts as a disc on the chest, to draw on or erase from (its pad opens below)
+      const made = onMarks ? addMarkLayer(layers, marks, discMark(), [colour, SECOND]) : null;
+      if (!made) return;
+      onMarks!(made.paint, made.marks);
+      setSelectedId(made.id);
+      return;
+    }
     const l = newLayer(layers, type, type === 'pattern' ? [colour, SECOND] : type === 'stamp' || type === 'text' ? [colour, SECOND] : [colour]);
     if (!l) return;
     onChange([...layers, l]);
@@ -63,7 +78,9 @@ export function PaintTab({ layers, suit, onChange, onSuit, accent, canUndo, canR
   };
   const roles = selected ? COLOUR_ROLES[selected.type] : [];
   const wl = selected ? weightLabel(selected) : null;
-  const placed = selected && (selected.type === 'stamp' || selected.type === 'text');
+  const placed = selected && (selected.type === 'stamp' || selected.type === 'text' || selected.type === 'mark');
+  const selectedMark = selected?.type === 'mark' ? marks?.find((m) => m.id === selected.mark) ?? null : null;
+  const markCells = useMemo(() => (selectedMark ? decodeMark(selectedMark.data) : null), [selectedMark]);
 
   return (
     <div className="space-y-5">
@@ -96,9 +113,9 @@ export function PaintTab({ layers, suit, onChange, onSuit, accent, canUndo, canR
 
       <section>
         <h3 className="mb-2 text-sm font-semibold text-white/80">Add a layer</h3>
-        <div className="grid grid-cols-4 gap-1.5">
+        <div className="grid grid-cols-5 gap-1.5">
           {TYPES.map((t) => (
-            <button key={t} type="button" disabled={full} onClick={() => add(t)} title={`Add a ${TYPE_LABELS[t].toLowerCase()} layer`}
+            <button key={t} type="button" disabled={full || (t === 'mark' && (!onMarks || !fitsMarkBudget(marks)))} onClick={() => add(t)} title={t === 'mark' ? `Draw your own stamp (up to ${MAX_MARKS})` : `Add a ${TYPE_LABELS[t].toLowerCase()} layer`}
               className="flex items-center justify-center gap-1 rounded-lg border border-white/10 bg-white/[0.03] px-2 py-1.5 text-[11px] text-white/80 transition hover:border-cyan-400/50 hover:bg-cyan-400/10 disabled:opacity-30">
               <Plus className="h-3 w-3 text-cyan-300/80" /> {TYPE_LABELS[t]}
             </button>
@@ -130,7 +147,7 @@ export function PaintTab({ layers, suit, onChange, onSuit, accent, canUndo, canR
                     <IconBtn label={`Move ${layerName(l)} up`} disabled={top} onClick={() => onChange(moveLayer(layers, l.id, 1))}><ArrowUp className="h-3.5 w-3.5" /></IconBtn>
                     <IconBtn label={`Move ${layerName(l)} down`} disabled={bottom} onClick={() => onChange(moveLayer(layers, l.id, -1))}><ArrowDown className="h-3.5 w-3.5" /></IconBtn>
                     <IconBtn label={`Duplicate ${layerName(l)}`} disabled={full} onClick={() => { const next = duplicateLayer(layers, l.id); if (next) { onChange(next); setSelectedId(next[next.findIndex((x) => x.id === l.id) + 1].id); } }}><Copy className="h-3.5 w-3.5" /></IconBtn>
-                    <IconBtn label={`Delete ${layerName(l)}`} danger onClick={() => { const i = layers.findIndex((x) => x.id === l.id); const next = removeLayer(layers, l.id); onChange(next); if (on) setSelectedId(next[Math.min(i, next.length - 1)]?.id ?? null); }}><Trash2 className="h-3.5 w-3.5" /></IconBtn>
+                    <IconBtn label={`Delete ${layerName(l)}`} danger onClick={() => { const i = layers.findIndex((x) => x.id === l.id); const next = removeLayer(layers, l.id); if (l.type === 'mark' && onMarks) onMarks(next, usedMarks(next, marks)); else onChange(next); if (on) setSelectedId(next[Math.min(i, next.length - 1)]?.id ?? null); }}><Trash2 className="h-3.5 w-3.5" /></IconBtn>
                   </div>
                 </li>
               );
@@ -171,6 +188,9 @@ export function PaintTab({ layers, suit, onChange, onSuit, accent, canUndo, canR
           )}
           {selected.type === 'text' && (
             <TextField value={selected.text ?? ''} onCommit={(t) => edit({ text: t })} />
+          )}
+          {selected.type === 'mark' && selectedMark && onMarks && (
+            <MarkPad cells={markCells} onCommit={(cells) => { const next = redrawMark(marks, selectedMark.id, cells); if (!next) return false; onMarks([...layers], next); return true; }} />
           )}
 
           <div className="space-y-2">

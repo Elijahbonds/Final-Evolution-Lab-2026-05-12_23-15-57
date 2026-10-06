@@ -20,6 +20,9 @@
 // KEY NAMES MATTER. lookPrivacy.payloadHasImage refuses any save whose keys mention image/photo/png/texture/pixels, so
 // none of the keys below may (a paint layer is a `pattern` or a `stamp`, never a texture).
 
+import type { CreatorMark } from './marks';
+export type { CreatorMark } from './marks';
+
 export const CREATOR_DOC_VERSION = 1 as const;
 
 /** Budgets (CREATOR-PLAN: 64 parts). Past these the sanitiser keeps the first N. */
@@ -27,15 +30,19 @@ export const MAX_PARTS = 64;
 export const MAX_PAINT_LAYERS = 24;
 export const MAX_SLOTS = 5;
 /** Serialised size cap of one sanitised doc, in characters of JSON. A doc at every budget, every field at its longest,
- *  is under this (look.test.ts measures it), so the cap only bites if the budgets and the cap drift apart. */
-export const MAX_DOC_CHARS = 24_000;
+ *  is under this (sanitize.test.ts measures it), so the cap only bites if the budgets and the cap drift apart.
+ *  Phase 4c (2026-10-06) raised it 24 000 → 36 000: two-tone / swing / follow on all 64 parts (+~6k), two drawn marks at
+ *  their most complex (+~4.5k) and 64 data-driven face morph values (+~2k) took the worst case from 20.3k to ~34k. A
+ *  typical look is still 1–9k. */
+export const MAX_DOC_CHARS = 36_000;
 /** Phase 4a (2026-10-06): one saved character (a slot: its doc plus its base, numbers and worn items) is at most this
- *  much JSON — the doc's cap plus room for the rest, which is bounded by allow-lists (sanitize.sanitizeCreatorSlot). */
-export const MAX_SLOT_CHARS = MAX_DOC_CHARS + 2_000;
+ *  much JSON — the doc's cap plus room for the rest, which is bounded by allow-lists (sanitize.sanitizeCreatorSlot).
+ *  Phase 4c: the room went 2 000 → 3 000 (the slot's own face sliders are data-driven now, up to 64 names). */
+export const MAX_SLOT_CHARS = MAX_DOC_CHARS + 3_000;
 /** The whole creator part of `AvatarLook.face` (the active doc, every slot, the pointer): five slots at their cap plus
- *  the active doc is ~154k, so this only bites if the budgets drift (storage.holdCreator drops trailing slots, never
- *  the active one, to fit). */
-export const MAX_FACE_CHARS = 160_000;
+ *  the active doc is ~231k (phase 4c; ~154k before), so this only bites if the budgets drift (storage.holdCreator drops
+ *  trailing slots, never the active one, to fit). */
+export const MAX_FACE_CHARS = 240_000;
 
 /** Procedural part shapes (phase 2 builds each in code, lib/babylon/creator/parts/shapes.ts; no art needed).
  *  APPEND ONLY: saved docs and share codes name these. Phase 2 (2026-10-06) appended the second row, generic building
@@ -75,7 +82,9 @@ export type ToneAxis = typeof TONE_AXES[number];
 export const SWING_SHAPES = ['capeStrip', 'strand', 'tailSeg'] as const;
 export const isSwingShape = (s: string): boolean => (SWING_SHAPES as readonly string[]).includes(s);
 
-export const PAINT_TYPES = ['fill', 'pattern', 'stamp', 'text'] as const;
+/** APPEND ONLY. Phase 4c (2026-10-06) appended `mark`: a stamp the player drew (lib/creator/look/marks.ts), named by id
+ *  from the doc's `marks`. */
+export const PAINT_TYPES = ['fill', 'pattern', 'stamp', 'text', 'mark'] as const;
 export type PaintType = typeof PAINT_TYPES[number];
 
 /** Body regions (phase 3 derives each mask from the skin weights, not a hand-drawn map:
@@ -245,6 +254,8 @@ export interface PaintLayer {
   stamp?: PaintStamp;
   /** type 'text' only — through sanitizeJersey's name rule (A–Z, 0–9, space, hyphen; 12 characters) */
   text?: string;
+  /** type 'mark' only (phase 4c) — the id of one of the doc's `marks` (a player-drawn stamp) */
+  mark?: string;
   at: PaintTransform;
   /** 1–3 colours: primary, secondary, accent (a fill uses the first) */
   colours: string[];
@@ -310,6 +321,8 @@ export interface CreatorDoc {
   flags: CreatorFlags;
   /** Phase 4a: optional, stored only when something differs from EYE_DEFAULTS. */
   eyes?: CreatorEyes;
+  /** Phase 4c: player-drawn stamps (marks.ts), at most MAX_MARKS, each used by a `mark` layer; stored only when one is. */
+  marks?: CreatorMark[];
 }
 
 /** One saved character, v1 (phase 1): `label` through the jersey name rule, `doc` a full CreatorDoc. Still accepted by

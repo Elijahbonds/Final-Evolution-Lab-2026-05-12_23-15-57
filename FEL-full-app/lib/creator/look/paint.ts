@@ -14,13 +14,14 @@ import {
   type PaintBlend, type PaintLayer, type PaintPattern, type PaintRegion, type PaintStamp, type PaintSurface, type PaintType,
 } from './doc';
 import { sanitizePaintLayer } from './sanitize';
+import { MAX_MARKS, encodeMark, nextMarkId, type CreatorMark } from './marks';
 
 export const PAINT_BUDGET = MAX_PAINT_LAYERS;
 export const fitsPaintBudget = (layers: readonly unknown[], extra = 1): boolean => layers.length + extra <= PAINT_BUDGET;
 
 // ── names a player reads ─────────────────────────────────────────────────────────────────────────────────────────────
 
-export const TYPE_LABELS: Record<PaintType, string> = { fill: 'Fill', pattern: 'Pattern', stamp: 'Stamp', text: 'Text' };
+export const TYPE_LABELS: Record<PaintType, string> = { fill: 'Fill', pattern: 'Pattern', stamp: 'Stamp', text: 'Text', mark: 'Drawn' };
 
 export const REGION_LABELS: Record<PaintRegion, string> = {
   all: 'Whole body', body: 'Body (below the head)', head: 'Head', face: 'Face', neck: 'Neck',
@@ -62,7 +63,7 @@ export const BLEND_LABELS: Record<PaintBlend, string> = { normal: 'Paint over', 
 /** What each layer's one shape knob (`weight`) does, per type and pattern. */
 export function weightLabel(l: Pick<PaintLayer, 'type' | 'pattern'>): string | null {
   if (l.type === 'fill') return null;
-  if (l.type === 'stamp' || l.type === 'text') return 'Outline (with a 2nd colour)';
+  if (l.type === 'stamp' || l.type === 'text' || l.type === 'mark') return 'Outline (with a 2nd colour)';
   switch (l.pattern) {
     case 'stripes': case 'chevrons': case 'waves': case 'radial': return 'Stripe width';
     case 'dots': return 'Dot size';
@@ -75,7 +76,7 @@ export function weightLabel(l: Pick<PaintLayer, 'type' | 'pattern'>): string | n
 
 /** A one-line name for a layer in the list. */
 export function layerName(l: PaintLayer): string {
-  const what = l.type === 'pattern' ? PATTERN_LABELS[l.pattern!] : l.type === 'stamp' ? STAMP_LABELS[l.stamp!] : l.type === 'text' ? `“${l.text}”` : 'Fill';
+  const what = l.type === 'pattern' ? PATTERN_LABELS[l.pattern!] : l.type === 'stamp' ? STAMP_LABELS[l.stamp!] : l.type === 'text' ? `“${l.text}”` : l.type === 'mark' ? 'Drawn stamp' : 'Fill';
   return `${what} · ${REGION_LABELS[l.region]}`;
 }
 
@@ -93,6 +94,7 @@ const START: Record<PaintType, Partial<PaintLayer>> = {
   pattern: { region: 'torsoFront', pattern: 'stripes' },
   stamp: { region: 'torsoFront', stamp: 'star', at: { x: 0.5, y: 0.72, rot: 0, scale: 1, stretch: 1 } },
   text: { region: 'torsoBack', text: 'TEAM', at: { x: 0.5, y: 0.72, rot: 0, scale: 1, stretch: 1 } },
+  mark: { region: 'torsoFront', at: { x: 0.5, y: 0.72, rot: 0, scale: 1.4, stretch: 1 } },
 };
 
 /** A new layer on top of the stack, or null at the budget. */
@@ -117,6 +119,9 @@ export function updateLayer(layers: readonly PaintLayer[], id: string, patch: Pa
     if (merged.type !== 'pattern') delete merged.pattern;
     if (merged.type !== 'stamp') delete merged.stamp;
     if (merged.type !== 'text') delete merged.text;
+    // a drawn stamp keeps its mark; nothing else can become one (it needs a drawing: addMarkLayer)
+    if (merged.type !== 'mark') delete merged.mark;
+    if (merged.type === 'mark' && !merged.mark) return l;
     return sanitizePaintLayer(merged) ?? l;
   });
 }
@@ -126,7 +131,7 @@ export function duplicateLayer(layers: readonly PaintLayer[], id: string): Paint
   const i = layers.findIndex((l) => l.id === id);
   if (i < 0 || !fitsPaintBudget(layers)) return null;
   const src = layers[i];
-  const placed = src.type === 'stamp' || src.type === 'text';
+  const placed = src.type === 'stamp' || src.type === 'text' || src.type === 'mark';
   const copy = sanitizePaintLayer({ ...src, id: nextLayerId(layers), at: { ...src.at, x: placed ? Math.min(1, src.at.x + 0.08) : src.at.x } });
   if (!copy) return null;
   return [...layers.slice(0, i + 1), copy, ...layers.slice(i + 1)];
@@ -172,3 +177,33 @@ export const STAMP_ORDER: readonly PaintStamp[] = [
   'bolt', 'flame', 'wing', 'eye', 'eyeSharp', 'chevron', 'arrow', 'tribalCurve', 'tribalSpike', 'slash',
 ];
 export const REGION_ORDER: readonly PaintRegion[] = PAINT_REGIONS;
+
+// ── player-drawn stamps (phase 4c, 2026-10-06; lib/creator/look/marks.ts) ──────────────────────────────────────────
+
+/** Room for another drawn stamp: the doc keeps at most MAX_MARKS. */
+export const fitsMarkBudget = (marks: readonly unknown[] | undefined): boolean => (marks?.length ?? 0) < MAX_MARKS;
+
+/** A new drawn stamp on top of the stack, with its mark: the layers and marks to write together (one undo step), or null
+ *  at either budget or when the drawing is empty or too detailed. */
+export function addMarkLayer(layers: readonly PaintLayer[], marks: readonly CreatorMark[] | undefined, cells: Uint8Array, colours: string[]): { paint: PaintLayer[]; marks: CreatorMark[]; id: string } | null {
+  if (!fitsPaintBudget(layers) || !fitsMarkBudget(marks)) return null;
+  const data = encodeMark(cells);
+  if (!data) return null;
+  const mark: CreatorMark = { id: nextMarkId(marks ?? []), data };
+  const layer = newLayer(layers, 'mark', colours, { mark: mark.id });
+  if (!layer) return null;
+  return { paint: [...layers, layer], marks: [...(marks ?? []), mark], id: layer.id };
+}
+
+/** Redraw mark `id`; null when the drawing is empty or too detailed (the old one stays). */
+export function redrawMark(marks: readonly CreatorMark[] | undefined, id: string, cells: Uint8Array): CreatorMark[] | null {
+  const data = encodeMark(cells);
+  if (!data || !marks?.some((m) => m.id === id)) return null;
+  return marks.map((m) => (m.id === id ? { id, data } : m));
+}
+
+/** The marks some layer still uses (after a delete), in order. */
+export function usedMarks(layers: readonly PaintLayer[], marks: readonly CreatorMark[] | undefined): CreatorMark[] {
+  const used = new Set(layers.flatMap((l) => (l.type === 'mark' && l.mark ? [l.mark] : [])));
+  return (marks ?? []).filter((m) => used.has(m.id));
+}

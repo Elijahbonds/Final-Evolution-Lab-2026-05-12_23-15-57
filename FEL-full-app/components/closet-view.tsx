@@ -20,7 +20,7 @@ import {
 import { FACE_MORPH_NAMES, faceFieldRenders, faceOptionRenders, type FaceField } from '@/lib/babylon/core/faceMorphs';
 import { faceMorphList } from '@/lib/creator/look/faceMorphList';
 import { accessoriesForEquipped, wornPartsForEquipped } from '@/lib/closet/wearableAccessories';
-import { MAX_SLOTS, emptyCreatorDoc, type ColourSlot, type CreatorEyes, type CreatorPart, type CreatorShape, type CreatorSlotV2, type HideKey, type PaintLayer, type SlotBody, type SlotFrame } from '@/lib/creator/look/doc';
+import { MAX_SLOTS, emptyCreatorDoc, type CreatorMark, type ColourSlot, type CreatorEyes, type CreatorPart, type CreatorShape, type CreatorSlotV2, type HideKey, type PaintLayer, type SlotBody, type SlotFrame } from '@/lib/creator/look/doc';
 import { readCreatorDoc, faceOnly, type StoredFace } from '@/lib/creator/look/storage';
 import {
   addSlot, blankSlot, canAddSlot, duplicateSlot, ensureSlots, heroBodyForSlot, mergeDeviceNumbers, newSlotId, newSlotLabel,
@@ -296,6 +296,13 @@ export function ClosetView({ adult = false }: { adult?: boolean }) {
     const d = readCreatorDoc(p) ?? emptyCreatorDoc();
     return { ...p, creator: { ...d, paint: next } };
   }, group);
+  /** Phase 4c: paint layers and the player-drawn stamps they use, written together (one undo step; a stroke is one). */
+  const setPaintMarks = (next: PaintLayer[], marks: CreatorMark[], group?: string) => setFace((p) => {
+    const d = readCreatorDoc(p) ?? emptyCreatorDoc();
+    const out = { ...d, paint: next };
+    if (marks.length) out.marks = marks; else delete out.marks;
+    return { ...p, creator: out };
+  }, group);
   /** Suit mode and the layers it comes with, as one undo step. */
   const setSuit = (on: boolean, paint: PaintLayer[]) => setFace((p) => {
     const d = readCreatorDoc(p) ?? emptyCreatorDoc();
@@ -557,7 +564,7 @@ export function ClosetView({ adult = false }: { adult?: boolean }) {
 
           {tab === 'paint' && (
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
-              <PaintTab layers={doc?.paint ?? []} suit={doc?.flags.suit ?? false} onChange={setPaint} onSuit={setSuit} accent={previewPalette.accent}
+              <PaintTab layers={doc?.paint ?? []} suit={doc?.flags.suit ?? false} onChange={setPaint} onSuit={setSuit} accent={previewPalette.accent} marks={doc?.marks ?? []} onMarks={setPaintMarks}
                 canUndo={canUndo(hist)} canRedo={canRedo(hist)} onUndo={() => setHist(undo)} onRedo={() => setHist(redo)} />
             </motion.div>
           )}

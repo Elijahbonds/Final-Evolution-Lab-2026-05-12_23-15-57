@@ -36,8 +36,9 @@ export const SHARE_CODE_VERSION = 1;
 export const SHARE_CODE_VERSION_DEFLATED = 2;
 /** A deflated payload may inflate to at most this many characters of JSON (a slot is under MAX_SLOT_CHARS). */
 export const MAX_INFLATED_CHARS = 64_000;
-/** A sanitised doc is at most MAX_DOC_CHARS of JSON; base64 adds a third. Anything longer is not one of ours. */
-export const MAX_SHARE_CODE_CHARS = 40_000;
+/** A sanitised doc is at most MAX_DOC_CHARS of JSON; base64 adds a third. Anything longer is not one of ours.
+ *  Phase 4c (2026-10-06): 40 000 → 50 000 with the doc cap (a worst-case v1 code is ~45k; a v2 code is deflated). */
+export const MAX_SHARE_CODE_CHARS = 50_000;
 
 export type DecodeError = 'empty' | 'too_long' | 'not_a_code' | 'unsupported_version' | 'corrupt' | 'invalid';
 /** What a slot code adds to a look (phase 4a). Absent on a phase-1 code. */
@@ -111,6 +112,7 @@ function compactDoc(d: CreatorDoc): Record<string, unknown> {
   if (Object.keys(d.shape.face).length || Object.keys(d.shape.body).length || Object.keys(d.shape.girth ?? {}).length) o.shape = d.shape;
   if (d.flags.suit || d.flags.hide) o.flags = { ...(d.flags.suit ? { suit: true } : {}), ...(d.flags.hide ? { hide: d.flags.hide } : {}) };
   if (d.eyes) o.eyes = d.eyes;
+  if (d.marks?.length) o.marks = d.marks;   // phase 4c: drawn stamps ride along (each ≤ MAX_MARK_CHARS, at most MAX_MARKS)
   return o;
 }
 
