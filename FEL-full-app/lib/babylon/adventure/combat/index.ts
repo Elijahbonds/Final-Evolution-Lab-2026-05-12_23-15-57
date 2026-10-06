@@ -19,6 +19,7 @@
 import { MOVES, pickTarget, stickDirTo, lungeFor, DASH_ATTACK_SEC, type Body2, type StickDir } from '@/lib/babylon/core/HordeDynamics';
 import { DASH } from '@/lib/babylon/core/StormCombat';
 import { ratingsFrom, routeFor } from '@/lib/babylon/core/FighterStyle';
+import { threatLandsIn } from '@/lib/babylon/core/RivalCombatBrain';
 import {
   neutralInput, spendPool, wishDir, type ActorId, type AdventureActor, type AdventureStepContext, type AdventureSystem,
   type CameraHint, type LockTarget, type MoveInput, type Vec3,
@@ -376,10 +377,16 @@ export function createCombatSystem(opts: CombatSystemOptions = {}): CombatSystem
     const target = brain.targetId ? ctx.world.actors.get(brain.targetId) : undefined;
     const atk = brain.attack;
     if (target && atk && brain.attacking) {
-      // The perfect-dodge read: when this swing lands, in the target's own seconds.
-      const real = brain.secToLand / Math.max(1e-3, scale);
-      const tfs = fightStateOf(target);
-      tfs.incomingNext = Math.min(tfs.incomingNext, real * ctx.timeScaleOf(target.id));
+      // The perfect-dodge read: when this swing lands, in the target's own seconds; only a swing that can reach
+      // counts (RivalCombatBrain.threatLandsIn: a whiff already out of range is not a dodge read).
+      const reach = atk.kind === 'projectile' || atk.kind === 'nova' ? atk.range : atk.range + target.radius;
+      const dist = Math.hypot(target.pos.x - a.pos.x, target.pos.z - a.pos.z);
+      const travel = atk.kind === 'projectile' ? dist / Math.max(0.1, atk.projectileSpeed ?? 10) : 0;   // a bolt still has to fly
+      const lands = threatLandsIn(dist, reach, (brain.secToLand + travel) / Math.max(1e-3, scale));
+      if (lands >= 0) {
+        const tfs = fightStateOf(target);
+        tfs.incomingNext = Math.min(tfs.incomingNext, lands * ctx.timeScaleOf(target.id));
+      }
     }
     // A lunge through the strike, until it lands.
     if (atk && atk.lungeSpeed && brain.phase === 'strike') {
