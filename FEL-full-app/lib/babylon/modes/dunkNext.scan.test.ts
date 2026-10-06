@@ -112,7 +112,10 @@ describe('phase 3 — the dunk-off', () => {
     const tie = adv.indexOf("cardVerdict({ playerTotal, rivalTotal }) === 'tied') { startDunkOff(ctx, 1); return; }");
     expect(tie).toBeGreaterThan(0);
     expect(tie).toBeLessThan(adv.indexOf("setPhase('contestOver');"));
-    expect(adv).toMatch(/const v = dunkOffVerdict\(dunkOffPlayer, dunkOffRival, dunkOff\);/);
+    // test changed (owner decision 2026-10-06, "Endless dunk-offs"): was `dunkOffVerdict(dunkOffPlayer, dunkOffRival, dunkOff)` with the
+    // up-to-3-then-the-player rule; the verdict now reads both dunk-off CARDS (the judges' declared tiebreak) and the night's best (the cap)
+    expect(adv).toMatch(/const d = dunkOffDecide\(dunkOffCards\.player \?\? dunkOffPlayer, dunkOffCards\.rival \?\? dunkOffRival, dunkOff, nightBest\);/);
+    expect(adv).toMatch(/const v = d\.verdict;/);
     expect(adv).toMatch(/if \(v === 'again'\) \{ startDunkOff\(ctx, dunkOff \+ 1\); return; \}/);
     expect(adv.indexOf('if (round < TOTAL_ROUNDS) {')).toBeLessThan(tie);   // only after the final round
   });
@@ -146,5 +149,24 @@ describe('phase 3 — the dunk-off', () => {
   it('the host shows the dunk-off\'s cards on the bezel and on the night card', () => {
     expect(HOST).toMatch(/hud\.dunkOff && \(/);
     expect(HOST).toMatch(/hud\.nightDunkOff/);
+  });
+});
+
+describe('endless dunk-offs (owner decision 2026-10-06)', () => {
+  it('each dunk-off card keeps the three numbers the tiebreak reads — made and missed — and never the night\'s totals', () => {
+    const fin = fn('finishAttempt');
+    expect(fin).toMatch(/if \(dunkOff > 0\) dunkOffCards\[turn === 'rival' \? 'rival' : 'player'\] = \{ total: missTotal, execution: 0, difficulty: missDiff, style: missStyle \};/);
+    expect(fin).toMatch(/if \(dunkOff > 0\) dunkOffCards\[rivalsDunk \? 'rival' : 'player'\] = \{ total: dunkTotal, execution, difficulty, style: styleScore \};/);
+    expect(fin.match(/noteBest\(/g)).toHaveLength(2);
+  });
+  it('a new dunk-off clears its cards and names the declared criterion; a new night clears the best and the by-line', () => {
+    expect(fn('startDunkOff')).toMatch(/dunkOffCards = \{ player: null, rival: null \};/);
+    expect(fn('startDunkOff')).toMatch(/const rule = dunkOffRuleLine\(n\);/);
+    expect(DUNK.match(/dunkOffCards = \{ player: null, rival: null \}; nightBest = \{ player: 0, rival: 0 \}; dunkOffBy = '';/g)).toHaveLength(2);
+    expect(fn('showNightCard')).toMatch(/dunkOffBy \? ` · \$\{dunkOffBy\}` : ''/);
+  });
+  it('the old "after 3, the player wins" limit is gone from the mode', () => {
+    expect(DUNK).not.toMatch(/DUNK_OFF_MAX/);
+    expect(DUNK).not.toMatch(/dunkOffVerdict\(/);
   });
 });

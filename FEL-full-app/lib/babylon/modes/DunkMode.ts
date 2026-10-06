@@ -39,7 +39,7 @@ import type { FelInput } from '../core/InputBus';
 import type { BodyEvent } from '@/lib/pose/BodyReader';
 import { DUNK_BODY, DunkBodyBinder } from '@/lib/move/dunkBody';
 import { BallSim } from '../core/BallPhysics';
-import { firstNight, nextNight, cardWon, cardVerdict, dunkOffVerdict, type NightState } from '../core/ContinuousNight';   // TRY-ONBOARD G1: the GO AGAIN ledger
+import { firstNight, nextNight, cardWon, cardVerdict, dunkOffDecide, dunkOffRuleLine, dunkOffByLine, type NightState, type DunkOffCard } from '../core/ContinuousNight';   // TRY-ONBOARD G1: the GO AGAIN ledger
 import { neverBindPose } from '../anim/importSanitizer';
 import { installSafePlay, SPORT_CLIP } from '../anim/clipRegistry';
 import { MOCAP_DUNK, DUNK_FINISH_VARIETY } from '../nexus/dressingFlags';
@@ -1337,7 +1337,7 @@ export const DunkMode: ModeDefinition = (() => {
 
       ({ night, round, dunkInRound, playerTotal, rivalTotal, makes, misses, bestChain } = firstNight());
       nightMemory.reset(); refreshTips();   // dunk-next phase 2: a new night has seen nothing
-      dunkOff = 0; dunkOffPlayer = 0; dunkOffRival = 0;   // dunk-next phase 3
+      dunkOff = 0; dunkOffPlayer = 0; dunkOffRival = 0; dunkOffCards = { player: null, rival: null }; nightBest = { player: 0, rival: 0 }; dunkOffBy = '';   // dunk-next phase 3 (+ endless dunk-offs)
       hype = 0; chain = 0; finishing = false; ended = false; rivalClipToken = 0; card = emptyCard();
       style = 'power'; prop = DEV_PROP && (PROPS as readonly string[]).includes(DEV_PROP) ? (DEV_PROP as Prop) : 'none'; rimCamCut = false;   // (dev ?prop=: the probe's Dubble Up runs) hangSlowMoLatch = false; contactLatch = false;
       styleTaps = 0; hangSec = 0; aHeld = false; usedCombos.clear(); momentum.reset(); flight.reset();
@@ -4045,6 +4045,8 @@ export const DunkMode: ModeDefinition = (() => {
           diff: missDiff, exec: 0, look: missStyle,   // P9: a miss is part of the night's numbers too
         });
       }
+      if (dunkOff > 0) dunkOffCards[turn === 'rival' ? 'rival' : 'player'] = { total: missTotal, execution: 0, difficulty: missDiff, style: missStyle };   // endless dunk-offs: the numbers the tiebreak reads
+      noteBest(turn === 'rival' ? 'rival' : 'player', missTotal);
       lastScores = missScores;
       crowd.onScore(missTotal);
       revealed = [];
@@ -4207,6 +4209,8 @@ export const DunkMode: ModeDefinition = (() => {
     // almost instantly, quietly wrecking the momentum curve. Per-judge average
     // is scale-free: this yields the same 36..60 it always did.
     if (!rivalsDunk) hype = Math.min(100, hype + perJudgeAvg(dunkTotal) * 6);
+    if (dunkOff > 0) dunkOffCards[rivalsDunk ? 'rival' : 'player'] = { total: dunkTotal, execution, difficulty, style: styleScore };   // endless dunk-offs: the numbers the tiebreak reads
+    noteBest(rivalsDunk ? 'rival' : 'player', dunkTotal);
     if (flow.perfect) {   // dunk-next: a perfect flight is the building's — whoever threw it
       SoundKit.play('crowdCheer', { volume: 0.8, pitch: 1.1 }); mic?.crowd('crowd.erupt', 2);
       if (!rivalsDunk) hype = Math.min(100, hype + 6);
@@ -4411,14 +4415,21 @@ export const DunkMode: ModeDefinition = (() => {
   // dunk-next phase 3 — THE DUNK-OFF (core/ContinuousNight): which dunk-off this is (0 = none), and its two cards. NEVER the night's
   // totals and never the staked card: the night is still its four dunks.
   let dunkOff = 0, dunkOffPlayer = 0, dunkOffRival = 0;
+  // ENDLESS DUNK-OFFS (owner decision 2026-10-06): each dunk-off card's three numbers, for the judges' declared tiebreak, and each
+  // dunker's best single card of the night (dunk-offs included) for the safety cap — see ContinuousNight.dunkOffDecide.
+  let dunkOffCards: { player: DunkOffCard | null; rival: DunkOffCard | null } = { player: null, rival: null };
+  let nightBest = { player: 0, rival: 0 }, dunkOffBy = '';
+  function noteBest(who: 'player' | 'rival', total: number): void { nightBest = { ...nightBest, [who]: Math.max(nightBest[who], total) }; }
   /** Dunks each dunker takes this round: two, or one in a dunk-off. */
   const dunksThisRound = (): number => (dunkOff > 0 ? 1 : DUNKS_PER_ROUND);
   const dunkOffChip = (): string => `YOU ${dunkOffPlayer || '—'} · ${foe.name} ${dunkOffRival || '—'}`;
   function startDunkOff(ctx: ModeContext, n: number): void {
-    dunkOff = n; dunkOffPlayer = 0; dunkOffRival = 0; dunkInRound = 0; stakes = freshStakes();
+    dunkOff = n; dunkOffPlayer = 0; dunkOffRival = 0; dunkInRound = 0; stakes = freshStakes(); dunkOffCards = { player: null, rival: null };
     ctx.setHud({ round: n > 1 ? `DUNK-OFF ${n}` : 'DUNK-OFF', dunkOff: dunkOffChip() });
     SoundKit.play('whistle'); SoundKit.play('crowdCheer', { volume: 0.7 }); mic?.crowd('crowd.erupt', 2);
-    flash(ctx, n > 1 ? `STILL TIED — DUNK-OFF ${n} · ONE DUNK EACH` : `TIED AT ${playerTotal} — DUNK-OFF! · ONE DUNK EACH`, 2200);
+    // endless dunk-offs: from the third, the judges DECLARE how a level card is broken — before the dunk, so it is a rule you can play to
+    const rule = dunkOffRuleLine(n);
+    flash(ctx, n > 1 ? `STILL TIED — DUNK-OFF ${n} · ONE DUNK EACH${rule ? ` · ${rule}` : ''}` : `TIED AT ${playerTotal} — DUNK-OFF! · ONE DUNK EACH`, rule ? 2800 : 2200);
     console.info(`[DUNK-OFF] ${n} · tied at ${playerTotal}`);
     resetForNextAttempt(ctx);
   }
@@ -4543,13 +4554,16 @@ export const DunkMode: ModeDefinition = (() => {
       return;
     }
     // dunk-next phase 3: A TIED CARD IS SETTLED BY DUNKS (core/ContinuousNight). The final ties → a dunk-off; a dunk-off still tied → another,
-    // up to DUNK_OFF_MAX; then the old rule. The night's totals and its staked card never see a dunk-off.
+    // until somebody wins it (endless dunk-offs, owner 2026-10-06). The night's totals and its staked card never see a dunk-off.
     let won: boolean;
     if (dunkOff > 0) {
-      const v = dunkOffVerdict(dunkOffPlayer, dunkOffRival, dunkOff);
-      console.info(`[DUNK-OFF] ${dunkOff}: you ${dunkOffPlayer} · ${foe.name} ${dunkOffRival} → ${v}`);
+      // ENDLESS DUNK-OFFS (owner decision 2026-10-06): level goes again — the declared tiebreak from the third, the hard cap at DUNK_OFF_CAP
+      const d = dunkOffDecide(dunkOffCards.player ?? dunkOffPlayer, dunkOffCards.rival ?? dunkOffRival, dunkOff, nightBest);
+      const v = d.verdict;
+      console.info(`[DUNK-OFF] ${dunkOff}: you ${dunkOffPlayer} · ${foe.name} ${dunkOffRival} → ${v}${d.by && d.by !== 'total' ? ` (on ${d.by})` : ''}`);
       if (v === 'again') { startDunkOff(ctx, dunkOff + 1); return; }
       won = v === 'won';   // (the night card says the dunk-off's two cards: nightDunkOff)
+      dunkOffBy = dunkOffByLine(d.by);   // how a level one was taken — on the night card, beside the two cards
     } else if (cardVerdict({ playerTotal, rivalTotal }) === 'tied') { startDunkOff(ctx, 1); return; }
     else won = cardWon({ playerTotal, rivalTotal });
     setPhase('contestOver');
@@ -4588,7 +4602,7 @@ export const DunkMode: ModeDefinition = (() => {
     clearBanner(ctx);
     ctx.setHud({
       nightCard: won ? 'WON' : 'OVER', nightNum: night,
-      nightDunkOff: dunkOff > 0 ? `DUNK-OFF${dunkOff > 1 ? ` ×${dunkOff}` : ''}: YOU ${dunkOffPlayer} · ${foe.name} ${dunkOffRival}` : '',   // dunk-next phase 3
+      nightDunkOff: dunkOff > 0 ? `DUNK-OFF${dunkOff > 1 ? ` ×${dunkOff}` : ''}: YOU ${dunkOffPlayer} · ${foe.name} ${dunkOffRival}${dunkOffBy ? ` · ${dunkOffBy}` : ''}` : '',   // dunk-next phase 3 (+ how a level one was taken)
       rivalName: foe.name,
       nightMakes: makes, nightMisses: misses, nightBest: bestChain,
       // the Passion Pipeline credential -- engagement, stated as engagement, never a rating and never a gate
@@ -4614,7 +4628,7 @@ export const DunkMode: ModeDefinition = (() => {
     const led: NightState = nextNight({ night, round, dunkInRound, playerTotal, rivalTotal, makes, misses, bestChain });
     ({ night, round, dunkInRound, playerTotal, rivalTotal, makes, misses, bestChain } = led);
     nightMemory.reset(); refreshTips();   // dunk-next phase 2: night N+1 is a new building — every idea is fresh again
-    dunkOff = 0; dunkOffPlayer = 0; dunkOffRival = 0;   // dunk-next phase 3
+    dunkOff = 0; dunkOffPlayer = 0; dunkOffRival = 0; dunkOffCards = { player: null, rival: null }; nightBest = { player: 0, rival: 0 }; dunkOffBy = '';   // dunk-next phase 3 (+ endless dunk-offs)
     // HOTFIX (2026-09-24): the card is the night too. The ledger put playerTotal back to 0 but the card kept last
     // night's attempts (addAttempt holds the last twelve), so night 2's report read "YOUR NIGHT: <both nights>" with
     // night 1's dunks on it, and the card no longer added up to the score ctx.card sends out beside it. A card that

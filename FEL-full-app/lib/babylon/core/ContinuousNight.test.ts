@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { firstNight, nextNight, cardWon, isLastAttempt, cardVerdict, dunkOffVerdict, DUNK_OFF_MAX, type NightState } from './ContinuousNight';
+import {
+  firstNight, nextNight, cardWon, isLastAttempt, cardVerdict, dunkOffVerdict, dunkOffDecide, dunkOffCriteria, dunkOffRuleLine, dunkOffByLine,
+  DUNK_OFF_CAP, DUNK_OFF_TIEBREAK_FROM, type NightState, type DunkOffCard,
+} from './ContinuousNight';
 import { emptyCard, addAttempt, nightReport, type DunkCard } from '@/lib/mp/dunkCard';
 
 // A night that has actually been played: scores on the board, a rival ahead, a
@@ -116,15 +119,67 @@ describe('the dunk-off (dunk-next phase 3)', () => {
     expect(dunkOffVerdict(44, 41, 1)).toBe('won');
     expect(dunkOffVerdict(38, 41, 1)).toBe('lost');
   });
-  it('tied again, they go again — until the last one', () => {
-    for (let n = 1; n < DUNK_OFF_MAX; n++) expect(dunkOffVerdict(40, 40, n)).toBe('again');
+  // test changed (owner decision 2026-10-06, "Endless dunk-offs"): these pinned "up to DUNK_OFF_MAX = 3, then the player wins".
+  // The owner replaced that rule: a tied final keeps going until somebody wins, the judges' declared tiebreak makes each further
+  // dunk-off less likely to tie, and a hard cap (settled on the night's best dunk, then the house rule) guards the loop.
+  it('tied, they go again — a level total is never a result before the tiebreak starts', () => {
+    for (let n = 1; n < DUNK_OFF_TIEBREAK_FROM; n++) expect(dunkOffVerdict(40, 40, n)).toBe('again');
+    const a: DunkOffCard = { total: 40, execution: 9, difficulty: 5, style: 5 }, b: DunkOffCard = { total: 40, execution: 6, difficulty: 9, style: 9 };
+    expect(dunkOffVerdict(a, b, DUNK_OFF_TIEBREAK_FROM - 1)).toBe('again');   // the criteria are not read before their dunk-off
   });
-  it('a tie after the last dunk-off falls back to the old rule, so the night always ends', () => {
-    expect(dunkOffVerdict(40, 40, DUNK_OFF_MAX)).toBe(cardWon({ playerTotal: 40, rivalTotal: 40 }) ? 'won' : 'lost');
-    expect(dunkOffVerdict(40, 40, DUNK_OFF_MAX + 5)).not.toBe('again');
+  it('a tie is no longer the player\'s: a level dunk-off past the old limit of 3 still goes again', () => {
+    for (let n = 1; n < DUNK_OFF_CAP; n++) expect(dunkOffVerdict(40, 40, n)).toBe('again');
+    const lvl: DunkOffCard = { total: 31, execution: 0, difficulty: 3.6, style: 0.7 };
+    expect(dunkOffVerdict(lvl, { ...lvl }, 4)).toBe('again');
   });
-  it('the dunk-off is short: a handful at most', () => {
-    expect(DUNK_OFF_MAX).toBeGreaterThanOrEqual(1);
-    expect(DUNK_OFF_MAX).toBeLessThanOrEqual(3);
+  it('from DUNK_OFF_TIEBREAK_FROM, level totals go to EXECUTION, then DIFFICULTY, then STYLE — one more criterion each dunk-off', () => {
+    expect(DUNK_OFF_TIEBREAK_FROM).toBe(3);
+    expect(dunkOffCriteria(2)).toEqual([]);
+    expect(dunkOffCriteria(3)).toEqual(['execution']);
+    expect(dunkOffCriteria(4)).toEqual(['execution', 'difficulty']);
+    expect(dunkOffCriteria(5)).toEqual(['execution', 'difficulty', 'style']);
+    expect(dunkOffCriteria(11)).toEqual(['execution', 'difficulty', 'style']);
+    const p: DunkOffCard = { total: 42, execution: 8.4, difficulty: 6, style: 7 };
+    const r: DunkOffCard = { total: 42, execution: 7.9, difficulty: 9, style: 9 };
+    expect(dunkOffDecide(p, r, 3)).toEqual({ verdict: 'won', by: 'execution' });
+    expect(dunkOffDecide(r, p, 3)).toEqual({ verdict: 'lost', by: 'execution' });
+    const q: DunkOffCard = { ...p, difficulty: 6.5 };
+    expect(dunkOffDecide({ ...p }, q, 3).verdict).toBe('again');            // execution level, difficulty not yet a criterion
+    expect(dunkOffDecide({ ...p }, q, 4)).toEqual({ verdict: 'lost', by: 'difficulty' });
+    expect(dunkOffDecide({ ...p }, { ...p, style: 6.9 }, 4).verdict).toBe('again');
+    expect(dunkOffDecide({ ...p }, { ...p, style: 6.9 }, 5)).toEqual({ verdict: 'won', by: 'style' });
+  });
+  it('the judges read their numbers to a tenth — noise below that is level', () => {
+    const p: DunkOffCard = { total: 40, execution: 8.42, difficulty: 6, style: 7 };
+    expect(dunkOffDecide(p, { ...p, execution: 8.38 }, 3).verdict).toBe('again');
+    expect(dunkOffDecide(p, { ...p, execution: 8.3 }, 3).verdict).toBe('won');
+  });
+  it('the total always comes first, whatever the criteria say', () => {
+    expect(dunkOffDecide({ total: 41, execution: 0, difficulty: 0, style: 0 }, { total: 40, execution: 10, difficulty: 10, style: 10 }, 5)).toEqual({ verdict: 'won', by: 'total' });
+  });
+  it('the HARD CAP ends the night: dead level at DUNK_OFF_CAP goes to the best dunk of the night, then the house rule', () => {
+    expect(DUNK_OFF_CAP).toBeGreaterThan(DUNK_OFF_TIEBREAK_FROM + 2);
+    expect(DUNK_OFF_CAP).toBeLessThanOrEqual(20);
+    const lvl: DunkOffCard = { total: 31, execution: 0, difficulty: 3, style: 1 };
+    expect(dunkOffDecide(lvl, lvl, DUNK_OFF_CAP, { player: 44, rival: 47 })).toEqual({ verdict: 'lost', by: 'nightBest' });
+    expect(dunkOffDecide(lvl, lvl, DUNK_OFF_CAP, { player: 48, rival: 47 })).toEqual({ verdict: 'won', by: 'nightBest' });
+    expect(dunkOffDecide(lvl, lvl, DUNK_OFF_CAP, { player: 47, rival: 47 })).toEqual({ verdict: cardWon({ playerTotal: 1, rivalTotal: 1 }) ? 'won' : 'lost', by: 'house' });
+    expect(dunkOffDecide(lvl, lvl, DUNK_OFF_CAP)).toEqual({ verdict: 'won', by: 'house' });
+    expect(dunkOffDecide(lvl, lvl, DUNK_OFF_CAP - 1, { player: 48, rival: 40 }).verdict).toBe('again');   // the night's best is read ONLY at the cap
+  });
+  it('no counter can loop it: past the cap, or a broken (NaN / Infinity) count, always ends', () => {
+    for (const n of [DUNK_OFF_CAP, DUNK_OFF_CAP + 1, 1e9, NaN, Infinity]) expect(dunkOffVerdict(40, 40, n)).not.toBe('again');
+    // a walk of always-level dunk-offs terminates at the cap, exactly
+    let n = 1;
+    while (dunkOffVerdict(40, 40, n) === 'again' && n < 10_000) n++;   // (bounded, so a broken cap fails here instead of hanging)
+    expect(n).toBe(DUNK_OFF_CAP);
+  });
+  it('the HUD names the declared criterion before the dunk, and the banner says how it was taken', () => {
+    expect(dunkOffRuleLine(1)).toBe('');
+    expect(dunkOffRuleLine(3)).toBe('LEVEL CARDS GO TO EXECUTION');
+    expect(dunkOffRuleLine(5)).toBe('LEVEL CARDS GO TO EXECUTION, THEN DIFFICULTY, THEN STYLE');
+    expect(dunkOffByLine('total')).toBe('');
+    expect(dunkOffByLine('execution')).toBe('LEVEL — TAKEN ON EXECUTION');
+    expect(dunkOffByLine('nightBest')).toMatch(/BEST DUNK OF THE NIGHT/);
   });
 });
