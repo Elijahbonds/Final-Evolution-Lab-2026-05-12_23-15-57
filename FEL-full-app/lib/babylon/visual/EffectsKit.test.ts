@@ -83,6 +83,26 @@ describe('the ball trail', () => {
     expect(g[0].factor1).toBeLessThan(hangHead);                   // the soft head, not the hang's
   });
 
+  // IMPROVE (2026-10-06, 3PT #16): a level change rewrites the taper and the colours IN PLACE (it removed and re-added three
+  // gradients and allocated two Color4s each time) — the same objects, the new numbers, the same look as a fresh apply
+  it('a level change rewrites the taper and the colours in place, to the same values a fresh trail gets', () => {
+    const ball = MeshBuilder.CreateSphere('b_inplace', { diameter: 0.24 }, scene);
+    const ps = EffectsKit.ballTrail(scene, ball);
+    const c1 = ps.color1, c2 = ps.color2, g0 = (ps.getSizeGradients() ?? [])[0];
+    for (const level of ['hang', 'flash', 'off', 'soft'] as TrailLevel[]) {
+      applyTrail(ps, level, '#ffd75e');
+      const fresh = EffectsKit.ballTrail(scene, MeshBuilder.CreateSphere(`b_fresh_${level}`, { diameter: 0.24 }, scene));
+      for (const g of [0, 0.55, 1]) { try { fresh.removeSizeGradient(g); } catch { /* none */ } }
+      applyTrail(fresh, level, '#ffd75e');
+      expect(ps.color1).toBe(c1); expect(ps.color2).toBe(c2);
+      expect(ps.getSizeGradients()?.[0]).toBe(g0);
+      expect(ps.color1.asArray()).toEqual(fresh.color1.asArray());
+      expect(ps.color2.asArray()).toEqual(fresh.color2.asArray());
+      expect((ps.getSizeGradients() ?? []).map((g) => [g.gradient, g.factor1, g.factor2])).toEqual((fresh.getSizeGradients() ?? []).map((g) => [g.gradient, g.factor1, g.factor2]));
+      expect(ps.emitRate).toBe(TRAIL_LOOK[level].rate);
+    }
+  });
+
   it('lays the path rather than spraying: particles stay where the ball was', () => {
     const ball = MeshBuilder.CreateSphere('b_power', { diameter: 0.24 }, scene);
     const ps = EffectsKit.ballTrail(scene, ball);

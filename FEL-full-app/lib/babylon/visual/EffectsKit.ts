@@ -81,21 +81,38 @@ export const TRAIL_LOOK: Record<TrailLevel, { rate: number; head: number; life: 
   flash: { rate: 150, head: 0.13,  life: [0.09, 0.15], alpha: 1.00 },   // the flush: one bright wipe, then nothing
 };
 
-/** Point a trail system at one of the four looks. Safe to call every beat; the taper is rebuilt with it. */
+/** IMPROVE (2026-10-06, 3PT #16): a trail colour parsed once per hex, not on every level change. */
+const TRAIL_HEX = new Map<string, Color3>();
+/** The taper's stops (head, waist, tail). */
+const TAPER_AT = [0, 0.55, 1] as const;
+
+/** Point a trail system at one of the four looks. Safe to call every beat; the taper is rewritten with it. */
 export function applyTrail(ps: ParticleSystem, level: TrailLevel, hex = '#ffb36b'): void {
   const look = TRAIL_LOOK[level];
-  const c = Color3.FromHexString(hex);
-  ps.color1 = new Color4(c.r, c.g, c.b, look.alpha);
-  ps.color2 = new Color4(c.r, c.g, c.b, 0);
+  let c = TRAIL_HEX.get(hex);
+  if (!c) { c = Color3.FromHexString(hex); TRAIL_HEX.set(hex, c); }
+  // IMPROVE (2026-10-06, 3PT #16): the colours are written into the system's own Color4s (two new ones a level change before)
+  if (ps.color1) ps.color1.set(c.r, c.g, c.b, look.alpha); else ps.color1 = new Color4(c.r, c.g, c.b, look.alpha);
+  if (ps.color2) ps.color2.set(c.r, c.g, c.b, 0); else ps.color2 = new Color4(c.r, c.g, c.b, 0);
   ps.minLifeTime = look.life[0]; ps.maxLifeTime = look.life[1];
   ps.emitRate = look.rate;
   // THE TAPER is what makes it a trail. Size gradients override min/maxSize in Babylon, so they are the size now —
-  // and they are rebuilt on every call because a stale gradient would pin the head width of whichever level ran first.
-  for (const g of [0, 0.55, 1]) { try { ps.removeSizeGradient(g); } catch { /* none yet */ } }
-  ps.addSizeGradient(0, look.head, look.head);
-  ps.addSizeGradient(0.55, look.head * 0.45, look.head * 0.45);
-  ps.addSizeGradient(1, 0, 0);
-  ps.minSize = 0; ps.maxSize = look.head;   // kept in step for anything that reads them
+  // and every call rewrites them, because a stale gradient would pin the head width of whichever level ran first.
+  // IMPROVE (2026-10-06, 3PT #16): a taper already in place is rewritten IN PLACE (its three stops' factors); only a system
+  // without exactly these stops has them removed and added (three removes, three adds and their sorts every level change before)
+  const head = look.head, waist = look.head * 0.45;
+  const g = ps.getSizeGradients();
+  if (g && g.length === 3 && g[0].gradient === TAPER_AT[0] && g[1].gradient === TAPER_AT[1] && g[2].gradient === TAPER_AT[2]) {
+    g[0].factor1 = head; g[0].factor2 = head;
+    g[1].factor1 = waist; g[1].factor2 = waist;
+    g[2].factor1 = 0; g[2].factor2 = 0;
+  } else {
+    for (const at of TAPER_AT) { try { ps.removeSizeGradient(at); } catch { /* none yet */ } }
+    ps.addSizeGradient(0, head, head);
+    ps.addSizeGradient(0.55, waist, waist);
+    ps.addSizeGradient(1, 0, 0);
+  }
+  ps.minSize = 0; ps.maxSize = head;   // kept in step for anything that reads them
 }
 
 /** How far out the ambient gulls circle, and how high — far enough to be sky, not traffic over the rim. */

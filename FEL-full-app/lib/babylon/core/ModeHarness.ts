@@ -58,6 +58,7 @@ import type { ModeBodySpec } from '@/lib/input/bodyProfiles';
 import type { SessionStep } from './BodySession';
 import { bodySeamFor, type BodySeam } from './bodySeam';
 import { sessionStore, stanceOnMount, type SessionWriter } from './sessionStore';   // (stanceOnMount: MOVEMENT PLAY P8)
+import { renderDue } from './pausedRender';   // IMPROVE (2026-10-06, 3PT #18): the pause renders at ~10 fps
 // declared beside the profiles they subtract from (step 2); the harness is where a mode meets them
 export type { BodyClaim, BodyChannelName, ModeBodySpec } from '@/lib/input/bodyProfiles';
 
@@ -803,6 +804,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     ring = mountPlayerRing(scene, root, { color: card?.accent ?? '#22d3ee', icon: readPlayerIcon(), harness: true, radius, y });
     ring.setPlayVisible(!def.hideRingInPlay || phase !== 'playing');
   };
+  let lastPausedRender = Number.NEGATIVE_INFINITY;   // IMPROVE (2026-10-06, 3PT #18): see core/pausedRender
   engine.runRenderLoop(() => {
     const dt = engine.getDeltaTime() / 1000;
     ringFollow();
@@ -844,6 +846,10 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
       lights.pipeline.imageProcessing.exposure = g.exposure;
       framePainted = frame.level > 0;
     }
+    // IMPROVE (2026-10-06, 3PT #18): every tick renders, except a paused one inside ~100 ms of the last paused render
+    const renderNow = performance.now();
+    if (!renderDue(phase, renderNow, lastPausedRender)) return;
+    lastPausedRender = phase === 'paused' ? renderNow : Number.NEGATIVE_INFINITY;
     scene.render();
   });
   // M95 re-cap on every fold/rotate signal (FOLDABLE-SCREEN): resize, orientationchange, and the
