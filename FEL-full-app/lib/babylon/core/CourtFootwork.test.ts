@@ -194,3 +194,18 @@ describe('volleyball gets its own model, not tennis with a smaller number', () =
     for (const m of [TENNIS_FOOTWORK, VOLLEY_FOOTWORK]) expect(m.decel).toBeGreaterThan(m.accel);
   });
 });
+
+// IMPROVE (2026-10-06): the net sports step the footwork every frame of a match, so it can write in place.
+describe('stepping in place', () => {
+  it('writing into `out` (even the input itself) gives exactly the allocated step, and returns `out`', () => {
+    let fresh: FootworkState = { ...FOOTWORK_IDLE, x: -1.2, vx: 0.4, sinceOppStrike: 0.1 };
+    const inPlace: FootworkState = { ...fresh };
+    const dt = 1 / 60;
+    for (let i = 0; i < 240; i++) {
+      const intent = i < 80 ? 1 : i < 160 ? -1 : 0;
+      fresh = stepFootwork(fresh, intent, dt, VOLLEY_FOOTWORK);
+      expect(stepFootwork(inPlace, intent, dt, VOLLEY_FOOTWORK, inPlace)).toBe(inPlace);
+      expect(inPlace).toEqual(fresh);
+    }
+  });
+});
