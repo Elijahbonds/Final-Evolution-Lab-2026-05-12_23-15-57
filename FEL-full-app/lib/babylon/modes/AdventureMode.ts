@@ -12,8 +12,9 @@
 //            the HUD, the ring (stamina), and BodyBudget's fidelity picks every half-second.
 //   onBody   A3's Mirror hook: false while the Mirror is off, so the event is not counted.
 //
-// DEV ONLY: registered in MODES so /dev/mode/adventure and /dev/adventure can mount it; NOT in ENABLED_BABYLON_MODES, so no
-// public route or picker serves it (Phase B adds /play/adventure, unlisted until the owner says).
+// HIDDEN: registered in MODES so /dev/adventure (a hidden link on the live site, owner decision 2026-10-06: reachable by its
+// URL, linked from nowhere, noindex) and /dev/mode/adventure (dev only) can mount it; NOT in ENABLED_BABYLON_MODES, so no
+// picker, menu or player route serves it (Phase B adds /play/adventure, unlisted until the owner says).
 //
 // Nothing on screen during play but the HUD (owner rule): no banners, callouts or hints from this mode.
 

@@ -44,8 +44,8 @@ const btn = (b: FelButton, src?: 'key' | 'pad'): Control => (src ? { kind: 'butt
 /**
  * The plan's pad column (A jump · B dash · X / Y light / heavy · R1 lock · L1 guard · R2 cast · L2 slow-time ·
  * D-pad up partner / down fuse-or-mount · D-pad left / right spell slot), plus the keyboard's tagged keys.
- * assumption: D-pad DOWN is one button for fuse AND mount — fuse when the fusion meter is full or already fused (then
- * it unfuses), otherwise mount / dismount a rideable partner. A3's partner system consumes the press when it fuses or
+ * Owner decision (2026-10-06): D-pad DOWN is ONE button for fuse AND mount — fuse when the fusion meter is full or
+ * already fused (then it unfuses), otherwise mount / dismount a rideable partner; D-pad UP is the partner command. A3's partner system consumes the press when it fuses or
  * unfuses; A1's riding reads it otherwise (and refuses to mount while the meter is full: movement/riding mountReason).
  */
 export const DEFAULT_BINDINGS: Readonly<Bindings> = Object.freeze({
