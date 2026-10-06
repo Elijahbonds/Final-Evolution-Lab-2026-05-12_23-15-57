@@ -123,7 +123,7 @@ export const MIRRORED = {
   footballStylePts: 25, footballStyleTypes: 7,
   /** carnivalEvents — each event's clock, its points per unit, and what paces it. */
   slamRushSec: 20, slamRushPpu: 12, slamRushCooldownSec: 0.5,
-  strikeStormSec: 15, strikeStormPpu: 8,
+  strikeStormSec: 15, strikeStormPpu: 8, strikeStormTrioBonus: 1,   // IMPROVE (2026-10-06): +1 hit per GO / TRICK / POWER trio
   trickGauntletSec: 20, trickGauntletPpu: 0.4,
   hotShotSec: 15, hotShotPpu: 15, hotShotGoalZ: 10.9, hotShotMaxSpeed: 20,
   coinStormSec: 15, coinStormPpu: 6, coinStormSpeed: 6, coinStormMagnet: 1.1, coinStormSpacing: 3.77,
@@ -396,7 +396,8 @@ export function carnivalEventBounds(): Record<string, number> {
   const coins = 2 * (Math.floor((m.coinStormSec * m.coinStormSpeed * Math.SQRT2) / coinReach) + 1);
   return {
     slam_rush: (Math.floor(m.slamRushSec / m.slamRushCooldownSec) + 1) * m.slamRushPpu,
-    strike_storm: (m.strikeStormSec * MAX_FRAME_HZ + 1) * m.strikeStormPpu,
+    // a hit every frame, and every third of them closes a three-button trio (its bonus on top)
+    strike_storm: (() => { const hits = m.strikeStormSec * MAX_FRAME_HZ + 1; return (hits + Math.floor(hits / 3) * m.strikeStormTrioBonus) * m.strikeStormPpu; })(),
     trick_gauntlet: Math.round(gauntletRaw * m.trickGauntletPpu),
     hot_shot: (Math.floor(m.hotShotSec / (m.hotShotGoalZ / m.hotShotMaxSpeed)) + 1) * m.hotShotPpu,
     coin_storm: coins * m.coinStormPpu,
