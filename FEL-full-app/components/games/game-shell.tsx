@@ -19,6 +19,7 @@ import type { SessionTallies } from '@/lib/game-systems';
 import { sessionStore, markRun, countedSince } from '@/lib/babylon/core/sessionStore';
 import { arenaRefusal, storyRefusal, ArenaRefusedLine, StoryRefusedPanel, type Refusal } from './end-card-refusal';
 import { unpaidLine, unpaidReason, unpaidTitle } from '@/lib/sessions/unpaidCopy';
+import { PartyInvite } from '@/components/party/party-invite';   // MULTIPLAYER: the results card's door to the party room
 import {
   type CarnivalStop, type CarnivalRunState,
   recordCarnivalResult, carnivalStopLabel, carnivalStopHref, carnivalRunTotalScore, clearCarnivalRun,
@@ -896,6 +897,8 @@ function GameShellInner({
                       <><Share2 className="h-4 w-4" /> CHALLENGE A FRIEND</>
                     )}
                   </button>}
+                  {/* MULTIPLAYER (2026-10-06): a game friends can play together offers the couch, with this game picked */}
+                  {!arenaMatchId && <PartyInvite modeId={mode} variant="card" />}
                   {proofLine && (
                     <button
                       onClick={shareProof}

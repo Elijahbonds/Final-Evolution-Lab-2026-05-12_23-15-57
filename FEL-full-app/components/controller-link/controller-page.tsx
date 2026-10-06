@@ -32,6 +32,12 @@ import {
 } from '@/lib/controller-link/schemas/padFeel';
 import type { LinkState, ModeControllerConfig, RoomState } from '@/lib/controller-link/types';
 import { isLit, roomStateOptIn } from '@/lib/controller-link/roomState';
+// MULTIPLAYER (2026-10-06): the party room — the TV's per-phone view, a remembered name, and plain words when a code is dead
+import type { PartyView } from '@/lib/party/protocol';
+import { cleanPlayerName, PLAYER_NAME_MAX, recallPlayerName, rememberPlayerName } from '@/lib/party/playerName';
+import { partyModeById } from '@/lib/party/catalog';
+import { JOIN_PATH } from '@/lib/party/joinCode';
+import { PhonePartyPanel } from '@/components/party/phone-party-panel';
 
 const STATE_LABEL: Record<LinkState, string> = {
   idle: 'Ready', signaling: 'Finding host…', connecting: 'Connecting…',
@@ -50,6 +56,9 @@ export default function ControllerPage({ code }: { code: string }) {
   const [slot, setSlot] = useState<number | null>(null);
   // MUSIC-SUITE P6 phone-replay: the host's live state (only an opted-in host sends one; only an opted-in config draws it)
   const [roomState, setRoomState] = useState<RoomState | null>(null);
+  // MULTIPLAYER: the party room as this phone sees it (null for every other host — the page is exactly what it was)
+  const [party, setParty] = useState<PartyView | null>(null);
+  const [left, setLeft] = useState(false);
   const clientRef = useRef<ControllerClient | null>(null);
   // PHASE B: a controller paired to THIS PHONE is relayed as canonical binary frames. The touch layout below
   // feeds the same frame, so the host has one code path whether this phone has a gamepad or not.
@@ -57,14 +66,20 @@ export default function ControllerPage({ code }: { code: string }) {
   const [relayClient, setRelayClient] = useState<ControllerClient | null>(null);
   const relay = usePadRelay(relayClient, touchRef);
 
+  // the name this phone used last time: a returning friend joins with one tap
+  useEffect(() => { setName((n) => n || recallPlayerName()); }, []);
+
   const join = useCallback(async () => {
+    rememberPlayerName(name);
+    setLeft(false);
     const client = new ControllerClient({
       code,
-      name: name.trim() || 'Player',
+      name: cleanPlayerName(name) || 'Player',
       onState: setState,
       onConfig: setConfig,
       onSlot: setSlot,
       onRoomState: setRoomState,
+      onParty: setParty,
     });
     clientRef.current = client;
     setRelayClient(client);
@@ -74,11 +89,35 @@ export default function ControllerPage({ code }: { code: string }) {
 
   useEffect(() => () => clientRef.current?.dispose(), []);
 
+  // MULTIPLAYER: leaving is a real goodbye (the TV frees the seat at once), and rejoining is the same one tap
+  const leave = useCallback(() => {
+    clientRef.current?.command('leave');
+    const c = clientRef.current;
+    setTimeout(() => c?.dispose(), 150);   // let the goodbye reach the TV before the link closes
+    clientRef.current = null;
+    setRelayClient(null);
+    setJoined(false); setParty(null); setConfig(null); setSlot(null); setState('idle'); setLeft(true);
+  }, []);
+
   if (!joined) {
     return (
-      <JoinScreen code={code} name={name} setName={setName} onJoin={join} />
+      <JoinScreen code={code} name={name} setName={setName} onJoin={join} left={left} />
     );
   }
+
+  // a dead code says so, and where to go — it used to sit on "Disconnected" with nothing else on the page
+  if (state === 'failed' && !config) {
+    return (
+      <div data-testid="controller-room-missing" className="flex min-h-[100dvh] flex-col items-center justify-center gap-4 bg-[#07090d] px-6 text-center text-white">
+        <p className="font-mono text-xs tracking-[0.3em] text-white/40">ROOM {code}</p>
+        <p className="fel-heading text-2xl font-black">Can’t find that game</p>
+        <p className="max-w-xs text-sm text-white/55">The party screen may have closed, or the code changed. Check the code on the TV.</p>
+        <a href={JOIN_PATH} className="rounded-xl bg-[#00E5FF] px-6 py-3 font-bold text-black">TYPE A CODE</a>
+      </div>
+    );
+  }
+  const partyBetween = party !== null && party.phase !== 'playing';
+  const partyQuiet = party !== null && party.phase === 'playing' && (!party.seat || (party.mode.style === 'turns' && !party.yourGo));
 
   return (
     <div className="flex min-h-[100dvh] flex-col bg-[#07090d] text-white">
@@ -102,10 +141,16 @@ export default function ControllerPage({ code }: { code: string }) {
       )}
 
       <main className="flex flex-1 flex-col justify-center gap-6 px-4 pb-8">
+        {party && <PhonePartyPanel party={party} client={clientRef.current} onLeave={leave} />}
         {!config && (
           <p className="text-center text-sm text-white/40">Waiting for the host…</p>
         )}
-        {config && <SchemaControls config={config} client={clientRef.current} live={roomState} />}
+        {config && !party && <SchemaControls config={config} client={clientRef.current} live={roomState} />}
+        {config && party && !partyBetween && (
+          <div data-testid="phone-party-controls" className={`flex flex-col gap-6 ${partyQuiet ? 'pointer-events-none opacity-30' : ''}`}>
+            <SchemaControls config={config} client={clientRef.current} live={roomState} />
+          </div>
+        )}
       </main>
     </div>
   );
@@ -187,27 +232,39 @@ function RoomChips({ state }: { state: RoomState }) {
 }
 
 function JoinScreen({
-  code, name, setName, onJoin,
-}: { code: string; name: string; setName: (v: string) => void; onJoin: () => void }) {
+  code, name, setName, onJoin, left = false,
+}: { code: string; name: string; setName: (v: string) => void; onJoin: () => void; left?: boolean }) {
+  // MULTIPLAYER: an invite link carries the game (?game=<id>); only a game in the party catalogue is named
+  const [invitedTo, setInvitedTo] = useState<string | null>(null);
+  useEffect(() => {
+    try { setInvitedTo(partyModeById(new URLSearchParams(window.location.search).get('game'))?.title ?? null); } catch { /* no search */ }
+  }, []);
   return (
     <div className="flex min-h-[100dvh] flex-col items-center justify-center gap-6 bg-[#07090d] px-6 text-white">
       <div className="text-center">
-        <p className="font-mono text-xs tracking-[0.3em] text-white/40">FEL CONTROLLER</p>
-        <p className="mt-2 font-mono text-4xl font-bold tracking-[0.2em] text-[#00E5FF]">{code}</p>
+        <p className="font-mono text-xs tracking-[0.3em] text-white/40">{left ? 'YOU LEFT THE ROOM' : invitedTo ? `YOU’RE INVITED TO PLAY ${invitedTo.toUpperCase()}` : 'FEL CONTROLLER'}</p>
+        <p data-testid="controller-code" className="mt-2 font-mono text-4xl font-bold tracking-[0.2em] text-[#00E5FF]">{code}</p>
       </div>
       <input
+        data-testid="controller-name"
         value={name}
         onChange={(e) => setName(e.target.value.slice(0, 16))}
         placeholder="Your name"
+        maxLength={16}
+        autoComplete="nickname"
         className="w-full max-w-xs rounded-lg bg-white/10 px-4 py-3 text-center outline-none placeholder:text-white/30"
       />
+      {name && cleanPlayerName(name) !== name.trim() && (
+        <p className="-mt-4 font-mono text-[10px] text-white/40">The TV will show: {cleanPlayerName(name) || 'PLAYER'} (letters, numbers, up to {PLAYER_NAME_MAX})</p>
+      )}
       {/* The join tap doubles as the user gesture iOS requires before it will
           even consider granting motion access. */}
       <button
+        data-testid="controller-join"
         onClick={onJoin}
         className="w-full max-w-xs rounded-lg bg-[#00E5FF] px-6 py-4 font-bold text-black active:bg-[#00c9e0]"
       >
-        JOIN
+        {left ? 'REJOIN' : 'JOIN'}
       </button>
     </div>
   );

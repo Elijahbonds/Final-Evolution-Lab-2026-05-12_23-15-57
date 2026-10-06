@@ -57,8 +57,9 @@ export async function GET(req: Request): Promise<NextResponse> {
   if (!room) return NextResponse.json({ error: 'room not found' }, { status: 404 });
 
   const messages = await store.poll(code, to, after);
+  // MULTIPLAYER (2026-10-06): no peer ids out (see the rooms route) — names only, which the lobby shows anyway.
   return NextResponse.json({
     messages,
-    peers: room.peers.map((p) => ({ peerId: p.peerId, name: p.name })),
+    peers: room.peers.map((p) => ({ name: p.name })),
   });
 }

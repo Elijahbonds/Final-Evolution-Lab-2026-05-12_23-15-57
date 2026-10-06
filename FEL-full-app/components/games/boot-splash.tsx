@@ -28,6 +28,7 @@ import { arenasFor, readCombatArena, writeCombatArena, COMBAT_MODE_IDS, type Com
 import { COURT_LAYOUTS, COURT_LAYOUT_MODES, readCourtLayout, writeCourtLayout, type CourtLayoutId } from '@/lib/babylon/nexus/courtLayout';   // COURT LAYOUT (2026-09-18): the 3v3's chokepoint
 import { looksFor, readPlaceLook, writePlaceLook } from '@/lib/babylon/nexus/placeLooks';
 import { tierList, readTier, writeTier, profileFor, type Tier } from '@/lib/babylon/core/Difficulty';
+import { PartyInvite } from '@/components/party/party-invite';   // MULTIPLAYER: the start screen's door to the party room
 import {
   readySchools, readBlend, writeBlend, blendName, schoolById, blendTraits, STYLE_TRAIT_KEYS,
   type StyleBlend,
@@ -338,6 +339,8 @@ export function SplashCard(props: BootSplashProps) {
         {/* MOVEMENT PLAY P4 (2026-09-25): "Play with your body" (the games the body drives), "coming", or nothing; once
             chosen, the space check over this card. */}
         {props.phase === 'ready' && <BodyPlayReady tint={v.tint} onStart={props.onStart} />}
+        {/* MULTIPLAYER (2026-10-06): a game friends can play together says so, and opens the party room with it picked */}
+        {props.phase === 'ready' && <PartyInvite modeId={props.modeId} />}
 
         {isCourt && (props.phase === 'ready' || props.phase === 'loading') && readyCourtLocations().length > 1 && (
           <div className="mt-3 flex flex-col items-center gap-1.5">
