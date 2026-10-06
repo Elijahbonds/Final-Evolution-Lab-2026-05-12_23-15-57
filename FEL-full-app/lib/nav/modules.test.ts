@@ -24,6 +24,10 @@ const ROOT = join(__dirname, '..', '..');
 /** Files that are reached some way other than an import, each with the reason. */
 const NOT_IMPORTED: Record<string, string> = {
   'lib/babylon/modes/registry.ts': 'the mode registry — loaded by key at runtime, not by a static import',
+  // CREATOR SOUNDTRACK phase 0 (owner, 2026-10-06, "storage = Google Cloud Storage"): the creative-card upload route was
+  // this file's only caller and now signs GCS uploads (lib/soundtrack/storage.ts). Cards made before still point at S3
+  // objects, and removing the AWS path is the owner's call (a file this lane did not create), so it stays, named here.
+  'lib/s3.ts': 'the old public S3 upload signer; its one caller moved to GCS (2026-10-06) and deleting it is the owner\'s call',
   // Test support. Tests are deliberately NOT counted as consumers (a module used only by its own test is still
   // dead), but this one exists to be imported by them: six rule tests strip comments with it before scanning
   // source. Counting tests generally would blind the check; excusing this one file by name does not.

@@ -14,9 +14,16 @@ import {
   type CreativeCard, type Discipline, type ArtPayload, isDiscipline, validateArtPayload,
   type CardStats, type CardRarity, type ReviewState, type SportDesignation,
 } from './creative-card-types';
+// CREATOR SOUNDTRACK phase 0 (owner, 2026-10-06): approval, privacy and the slim list live in one additive module.
+import {
+  publicCardWhere, slimCard, stripServerStats, ownerIsPublicCreator, wantsPublic, cleanNote, type ReviewRecord,
+} from './creative-card-review';
 
 const EXTRA_SLOT_SHARDS = 200; // mirrors catalog SKU creative_card_slot // TUNE(elijah)
 const PUBLISH_FAUCET_COINS = 50; // mirrors reward rule CREATIVE_CARD_PUBLISH
+// CREATOR SOUNDTRACK (owner, 2026-10-06, "coins=cap"): that rule now pays ONCE per creator per discipline, on the
+// first card an approver passes, never on publish and never twice. The amount is still the reward rule's (50, TUNE(elijah)).
+const firstApprovalKey = (ownerId: string, discipline: string) => `first_${ownerId}_${discipline}`;
 
 export class CardError extends Error {
   status: number;
@@ -104,8 +111,12 @@ export async function createCard(
   const slots = FREE_CARD_SLOTS + (slotDoc?.extra ?? 0);
   if (mineCount >= slots) throw new CardError(402, `card slots full (${slots}) — purchase another slot`);
 
-  const reviewState: ReviewState = NEEDS_REVIEW.includes(input.primary) ? 'pending_review' : 'approved';
-  const isPublic = NEEDS_REVIEW.includes(input.primary) ? false : input.isPublic;
+  // CREATOR SOUNDTRACK (owner, 2026-10-06, "everything public needs approval"): a card asked to be public waits for an
+  // approver whatever its discipline; a private card of a discipline that needs no screen is ready for its owner at once.
+  // No card is public at creation. The creator's wish is kept in stats.wantsPublic, so approval can honour it.
+  const askedPublic = input.isPublic === true;
+  const reviewState: ReviewState = NEEDS_REVIEW.includes(input.primary) || askedPublic ? 'pending_review' : 'approved';
+  const isPublic = false;
   const id = `ccard_${userId}_${Date.now()}`;
 
   const row = await prisma.creativeCard.create({
@@ -117,7 +128,7 @@ export async function createCard(
       secondary: input.secondary,
       sportDesignation: input.sportDesignation ?? null,
       art: input.art as any,
-      stats: (input.stats ?? defaultStats()) as any,
+      stats: { ...stripServerStats(input.stats ?? defaultStats()), wantsPublic: askedPublic } as any,
       rarityTier: input.rarity?.tier ?? defaultRarity().tier,
       rarityMult: input.rarity?.statMultiplier ?? defaultRarity().statMultiplier,
       isPublic,
@@ -127,10 +138,7 @@ export async function createCard(
     },
   });
 
-  // Publish faucet (coins) — only for approved public cards.
-  if (isPublic && reviewState === 'approved') {
-    await creditCoins(prisma, userId, REASON.CREATIVE_CARD_PUBLISH, id);
-  }
+  // (The +50 publish faucet that stood here is gone: owner 2026-10-06, "no pay-per-publish". See reviewCard.)
 
   // Remix royalty: the social/retention loop — parent creator earns on remix.
   if (input.remixOf) {
@@ -159,12 +167,13 @@ export async function buyCardSlot(
 export async function browse(
   prisma: PrismaClient, discipline?: Discipline,
 ): Promise<CreativeCard[]> {
-  const where: Record<string, unknown> = { isPublic: true, reviewState: 'approved' };
+  // CREATOR SOUNDTRACK phase 0: an adult owner's cards only (teens' work is never public), and a slim projection.
+  const where: Record<string, unknown> = { ...publicCardWhere() };
   if (discipline && isDiscipline(discipline)) where.primary = discipline;
   const rows = await prisma.creativeCard.findMany({
     where, orderBy: { createdAt: 'desc' }, take: 100,
   });
-  return rows.map(toCreativeCard);
+  return rows.map((r) => slimCard(toCreativeCard(r)));
 }
 
 // ── GET my cards ────────────────────────────────────────────────────────────
@@ -184,23 +193,39 @@ export async function getCard(
   return row ? toCreativeCard(row) : null;
 }
 
-// ── Moderation (founder/mod role — role check done by the route layer) ───────
+// ── Moderation (founder/admin approve — role check done by the route layer) ───────
+// CREATOR SOUNDTRACK phase 0 (owner, 2026-10-06):
+//  - approval no longer FORCES isPublic: the card goes public only if its creator asked (stats.wantsPublic) and the
+//    creator is a public creator (verified 18+; teens' work stays private, "nothing public").
+//  - the coin is the capped one: once per creator per discipline, on the first card an approver passes, and only when
+//    no earlier public approved card of theirs in that discipline exists (those were paid +50 at publish under the old
+//    rule — no double pay). The idempotency key makes a re-approval or a race pay nothing more.
+//  - the decision is recorded in stats.review {decision, note, by, at}; the note is shown to the creator, never publicly.
 export async function reviewCard(
   prisma: PrismaClient, cardId: string, decision: 'approved' | 'rejected',
-): Promise<{ ok: true }> {
+  opts: { by?: string; note?: string; now?: Date } = {},
+): Promise<{ ok: true; isPublic: boolean; coin: boolean }> {
   const card = await prisma.creativeCard.findUnique({ where: { id: cardId } });
   if (!card) throw new CardError(404, 'no card');
+  const now = opts.now ?? new Date();
+  const stats = ((card.stats ?? {}) as Record<string, unknown>);
+  const isPublic = decision === 'approved' && wantsPublic(stats) && await ownerIsPublicCreator(prisma, card.ownerId, now);
+  const review: ReviewRecord = { decision, by: opts.by ?? 'unknown', at: now.toISOString(), ...(cleanNote(opts.note) ? { note: cleanNote(opts.note) } : {}) };
   await prisma.creativeCard.update({
     where: { id: cardId },
-    data: {
-      reviewState: decision,
-      isPublic: decision === 'approved' ? true : false,
-    },
+    data: { reviewState: decision, isPublic, stats: { ...stats, review } as any },
   });
-  if (decision === 'approved') {
-    await creditCoins(prisma, card.ownerId, REASON.CREATIVE_CARD_PUBLISH, `${cardId}_review`);
+  let coin = false;
+  if (decision === 'approved' && card.reviewState !== 'approved') {
+    const earlier = await prisma.creativeCard.count({
+      where: { ownerId: card.ownerId, primary: card.primary, reviewState: 'approved', isPublic: true, id: { not: cardId } },
+    });
+    if (earlier === 0) {
+      await creditCoins(prisma, card.ownerId, REASON.CREATIVE_CARD_PUBLISH, firstApprovalKey(card.ownerId, card.primary));
+      coin = true;
+    }
   }
-  return { ok: true };
+  return { ok: true, isPublic, coin };
 }
 
 export { PUBLISH_FAUCET_COINS, EXTRA_SLOT_SHARDS };
