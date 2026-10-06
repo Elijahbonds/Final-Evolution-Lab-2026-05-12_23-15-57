@@ -13,7 +13,7 @@
 // The core even reports a genuine 3D position (pos.x/y/z). The old surfaces
 // flattened that to 2D; here it drives the athlete directly.
 
-import { Axis, Color3, MeshBuilder, StandardMaterial, Vector3 } from '@babylonjs/core';
+import { Axis, MeshBuilder, Vector3 } from '@babylonjs/core';
 import type { Mesh, Scene } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { mountPostureLayer } from '../anim/PostureLayer';
@@ -31,7 +31,9 @@ import { SoundKit } from '../audio/SoundKit';
 import type { AirSessionCore } from '../../feel/cores/air-session-core';
 import type { TrickGrade, CadenceSide } from '../../feel';
 import type { VenueMood } from '../scene/moods';
-import { makeBigAirSession, BIG_AIR_TUNING } from '../../feel/cores/big-air-skin';
+import { makeBigAirSession, BIG_AIR_TUNING, BIG_AIR_HILL } from '../../feel/cores/big-air-skin';
+import { hillSurface, type AirHill } from '../../feel/cores/air-hill';
+import { buildAirHill } from './bigAirHill';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import { BoostKit } from '../core/BoostKit';          // FINISH-RELEASE: the shared boost (landings + pads fill it, RB/Shift burns it on the run-in)
@@ -46,7 +48,6 @@ import { dressBoard } from '../visual/meshyProps';   // phase 5: a snowboard und
 // phase are IGNORED (P3's row flipped the spin's direction on every stride a player still jogging took there)
 import { RideIntents, BodyStride, rideLines, type RideIntent } from '../core/rideBody';
 import { grabTrickFor } from '../core/rideTricks';
-import { gravityAccelForVy } from '../../feel';
 import type { BodyView } from '../core/ModeHarness';
 import type { BodyEvent } from '@/lib/pose/BodyReader';
 import { HudDelta } from './rideHud';   // IMPROVE (2026-10-06, big air item 16): publish only what changed
@@ -65,6 +66,10 @@ export interface AirSessionModeOpts {
   winScore: number;
   /** Cosmetic label for the launch object (vault table / kicker lip). */
   launchLabel: string;
+  /** IMPROVE (2026-10-06, Big Air items 1 / 2): the jump the skin's core lands on (its own `hill`) and that core's launchZ —
+   *  built as the kicker and the landing from the same table. Unset = the old 0.5 m launch box. */
+  hill?: AirHill;
+  launchZ?: number;
 }
 
 const GRADE_LABEL: Record<TrickGrade, string> = {
@@ -74,6 +79,9 @@ const GRADE_COLOR: Record<TrickGrade, string> = {
   stuck: '#ffd75e', clean: '#22d3ee', sketchy: '#ff9d5c', crash: '#ef4444',
 };
 const GRADE_RANK: Record<TrickGrade, number> = { crash: 0, sketchy: 1, clean: 2, stuck: 3 };
+
+/** IMPROVE (2026-10-06, Big Air item 9): a session is won on the total the card posts (rotation points + the banked line). */
+export const sessionWon = (postedTotal: number, winScore: number): boolean => postedTotal >= winScore;
 
 export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
   // Per-mode closure state. Deliberately NOT module-level: two air-session
@@ -88,6 +96,10 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
   let props: VenuePropsHandle | null = null; let propsGone = false;
   let core: AirSessionCore | null = null;
   let launchPad: Mesh | null = null;
+  let hillMeshes: Mesh[] = [];
+  /** What the camera frames the run-up against (the lip), and where the rider's eyes go (the landing). */
+  const objective = new Vector3();
+  const landingAt = new Vector3(0, 1.5, 14);
   let gallery: Onlookers | null = null;          // L4 — a judged event is watched
   let loadCount = 0;
   let disposeCount = 0;
@@ -170,11 +182,11 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
    * gravity) simulated forward from here at the spin's rate. The game plants the spin at the biggest half turn inside it
    * (owner call 5's default: "the game finishes them").
    */
-  const reachableTurns = (st: { vy: number; pos: { y: number } }): number => {
+  const reachableTurns = (): number => {
     if (!core) return 0;
-    let vy = st.vy, y = st.pos.y, t = 0;
-    const dt = 1 / 120;
-    while ((y > 0 || vy > 0) && t < 5) { vy -= gravityAccelForVy(vy, core.feel.gravity) * dt; y += vy * dt; t += dt; }
+    // IMPROVE (2026-10-06): the core's own forecast — onto the hill's landing, not down to y 0 (which overstated the air
+    // left by the landing slope's height and planted spins the rider could not finish)
+    const t = core.predictTouchdown()?.sec ?? 0;
     return Math.abs(core.airTrick.rotation) + (core.airTrick.spinRatePerSec || 0) * t;
   };
   /** MOVEMENT PLAY P8: the body's verbs in the core's Air phase. */
@@ -183,7 +195,7 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
     if (it.kind === 'spin') {
       if (core.airTrick.taps > 0 || plantAt !== null) return;   // one body spin an air (a pad's A may still run it)
       // the planted half turn the air can finish (a margin of one frame's spin before touchdown); none fits → no spin
-      const target = Math.floor(reachableTurns(core.state) * 2 - 0.1) / 2;
+      const target = Math.floor(reachableTurns() * 2 - 0.1) / 2;
       if (target < 0.5) { console.info('[AIR-BODY] quarter-turn, no half turn fits the air left'); return; }
       core.setSpinDir(it.side === 'R' ? 1 : -1);   // turned to the right = frontside (the d-pad's ▶)
       core.trick();
@@ -227,10 +239,13 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
   const finish = (ctx: ModeContext): void => {
     if (S.done) return;
     S.done = true;
-    if (S.score >= opts.winScore) finishPunch(ctx);
     S.chain.bank(); S.bonus = S.chain.banked;   // phase 4: the run's open pot banks with the run
     const total = S.score + S.bonus;   // RESULTS-TRUTH WA-5: the HUD total (rotation + banked line) is the one number posted
-    ctx.end(S.score >= opts.winScore ? 'win' : 'complete', total, {
+    // IMPROVE (2026-10-06, Big Air item 9): the win is decided on that SAME number. It checked the rotation points alone
+    // (S.score), so a session the card posted at 1,100 could read FINAL OVER against a 900 bar.
+    const won = sessionWon(total, opts.winScore);
+    if (won) finishPunch(ctx);
+    ctx.end(won ? 'win' : 'complete', total, {
       points: total, bestGrade: S.best ? GRADE_RANK[S.best] : 0, attempts: S.attempt, judgeBest: Math.round(S.judgeBest * 10) / 10,
     });
   };
@@ -264,13 +279,28 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
       propsGone = false;
       if (opts.propSet) void mountVenueProps(ctx.scene, opts.propSet, undefined, { snapToGround: true }).then((h) => { if (propsGone) h?.dispose(); else props = h; });   // ship pass 4 · P9: on the ground under them
 
-      // The launch object: vault table or kicker lip. Placed at the core's own
-      // launchZ so the visual and the physics agree by construction.
-      launchPad = MeshBuilder.CreateBox(`${opts.modeId}_launch`, { width: 1.6, height: 0.5, depth: 1.1 }, ctx.scene);
-      const padMat = new StandardMaterial(`${opts.modeId}_launchMat`, ctx.scene);
-      padMat.diffuseColor = Color3.FromHexString('#d8c9a8');
-      launchPad.material = padMat;
-      launchPad.position.set(0, 0.25, -12);
+      // The launch object. IMPROVE (2026-10-06, Big Air items 1 / 2): the comment here said it sat "at the core's own launchZ
+      // so the visual and the physics agree by construction" — it was a 0.5 m box at z −12 and the core launched at −60,
+      // 48 m later, off bare snow. With a hill the kicker and the landing are built from the core's own table (bigAirHill),
+      // so they DO agree by construction; the camera frames the lip and the rider's eyes go to the landing.
+      const padMat = VenueKit.paint(ctx.scene, `${opts.modeId}_launchMat`, '#d8c9a8');   // (PBR: the StandardMaterial ratchet)
+      hillMeshes.forEach((m) => m.dispose()); hillMeshes = [];
+      if (opts.hill && opts.launchZ !== undefined) {
+        const snow = VenueKit.paint(ctx.scene, `${opts.modeId}_hillSnow`, '#e3ebf4', 0.08, 0.8);
+        const line = VenueKit.paint(ctx.scene, `${opts.modeId}_hillLine`, '#1f6feb', 0.35);
+        const built = buildAirHill(ctx.scene, opts.hill, opts.launchZ, snow, line);
+        hillMeshes = built.all; launchPad = built.kicker;
+        const surf = hillSurface(opts.hill, opts.launchZ);
+        objective.set(0, opts.hill.lipY, opts.launchZ);
+        const mid = (surf.sweetFromZ + surf.bottomZ) / 2;
+        landingAt.set(0, surf.y(mid), mid);
+      } else {
+        launchPad = MeshBuilder.CreateBox(`${opts.modeId}_launch`, { width: 1.6, height: 0.5, depth: 1.1 }, ctx.scene);
+        launchPad.material = padMat;
+        launchPad.position.set(0, 0.25, -12);
+        objective.copyFrom(launchPad.position);
+        landingAt.copyFrom(launchPad.position).addInPlaceFromFloats(0, 0, 14);
+      }
 
       athlete = await CharacterLibrary.spawn(ctx.scene, DEFAULT_HERO_URL, {
         position: new Vector3(0, 0, 0), startClip: 'board_ride_idle', modeId: opts.modeId,   // phase 5: on the board from frame one
@@ -313,12 +343,12 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
         // rider who does not know where the snow is
         // the pad is built before the athlete spawns, but the feed runs on its own observable and must not
         // assume the world still exists mid-teardown
-        const at = launchPad ? eyeAt.copyFrom(launchPad.position).addInPlaceFromFloats(0, 0, 14) : eyeAt.set(0, 1.5, 14);
+        const at = eyeAt.copyFrom(landingAt);
         return { pose, legs, aim: at, eyes: at, window: w };
       }, 'AIR-PP');
 
       // Frame the athlete against the thing they are running at.
-      ctx.objectiveRef.current = launchPad.position;
+      ctx.objectiveRef.current = objective;
 
       core = opts.makeSession((grade, rotations) => {
         if (grade === 'stuck' || grade === 'clean') S.combo += 1; else S.combo = 0;
@@ -363,7 +393,7 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
         else { ctx.feel.impact(0.35); if (grade === 'stuck' || grade === 'clean') landBeat(ctx, grade); }
       });
 
-      ctx.camDirector.snapTo(athlete.root.position, launchPad.position);
+      ctx.camDirector.snapTo(athlete.root.position, objective);
       boost = new BoostKit(0.25); boostHeld = false; baseFov = null;
       boostFx?.dispose(); boostFx = new BoostFx(ctx.scene, ctx.camera, { trailFrom: athlete.root, trailWidth: 0.45 });
       boostPads?.dispose();
@@ -454,11 +484,12 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
         } else if (!core.airTrick.spinning) plantAt = null;   // a pad's A planted it first
       }
 
-      // Drive the athlete straight from the core's own 3D position.
+      // Drive the athlete straight from the core's own 3D position (on the hill: up the kicker, down onto the landing).
       athlete.root.position.set(st.pos.x, Math.max(0, st.pos.y), st.pos.z);
-      // Rotation in the air is the trick; on the ground face the run direction.
+      // Rotation in the air is the trick; on the ground face the run direction — pitched with the snow under the board on the
+      // kicker's ramp and the landing slope (IMPROVE 2026-10-06: nose up the lip, nose down the landing).
       athlete.root.rotation.set(
-        st.phase === 'Air' ? (st.spinTurns ?? 0) * Math.PI * 2 : 0,
+        st.phase === 'Air' ? (st.spinTurns ?? 0) * Math.PI * 2 : -core.surface.pitch(st.pos.z),
         Math.PI,   // running toward -z
         0,
       );
@@ -506,7 +537,7 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
       } else {
         ctx.camDirector.setAir(0);
       }
-      ctx.camDirector.update(athlete.root.position, camVel.set(0, 0, -st.speed), launchPad.position);
+      ctx.camDirector.update(athlete.root.position, camVel.set(0, 0, -st.speed), objective);
       baseFov ??= ctx.camera.fov;
       ctx.camera.fov = stepSpeedFov(ctx.camera.fov, baseFov * (boostFx?.fovMult(boost) ?? 1), st.phase === 'Run' ? st.speed : 0, BIG_AIR_TUNING.maxRunSpeed, dt);
       pushHud(ctx);
@@ -522,7 +553,8 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
       athlete?.dispose(); athlete = null;
       propsGone = true; props?.dispose(); props = null;
       posture?.dispose(); posture = null;
-      launchPad?.dispose(); launchPad = null;
+      if (!hillMeshes.includes(launchPad!)) launchPad?.dispose();
+      launchPad = null; hillMeshes.forEach((m) => m.dispose()); hillMeshes = [];
       gallery?.dispose(); gallery = null;
       boostFx?.dispose(); boostFx = null; boostPads?.dispose(); boostPads = null;
       baseFov = null;
@@ -544,4 +576,5 @@ export const BigAirMode: ModeDefinition = makeAirSessionMode({
     attempts: BIG_AIR_TUNING.attemptsPerRound ?? 3,
     winScore: 900,                                    //TUNE(elijah)
     launchLabel: 'KICKER',
+    hill: BIG_AIR_HILL, launchZ: BIG_AIR_TUNING.launchZ,   // IMPROVE (2026-10-06, items 1 / 2): the core's own jump, built
 });

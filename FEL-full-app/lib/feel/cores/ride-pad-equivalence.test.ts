@@ -18,7 +18,7 @@ import { SprintCore as BaseSprintCore } from '@/tests/fixtures/ride-pre-p8/sprin
 import { AirSessionCore } from './air-session-core';
 import { AirSessionCore as BaseAirSessionCore } from '@/tests/fixtures/ride-pre-p8/air-session-core.base';
 import { SPRINT_TUNING, SPRINT_SENSORY } from './sprint-constants';
-import { makeBigAirSkin } from './big-air-skin';
+import { makeBigAirSkin, BIG_AIR_TUNING } from './big-air-skin';
 
 function mulberry32(seed: number): () => number {
   let a = seed >>> 0;
@@ -30,6 +30,14 @@ function mulberry32(seed: number): () => number {
   };
 }
 const snap = (x: unknown) => JSON.stringify(x);
+// test changed (IMPROVE 2026-10-06, Big Air items 2 / 10): the air core grew two OPT-IN rules after P8 — the skin's hill
+// (a kicker, a table and a landing slope to land on) and the tuning's repeat decay — and four state fields that report them.
+// The frozen pre-P8 core knows neither, so the pad-equivalence pin (P8's runTap option changes nothing on a pad) runs the live
+// core on the big-air skin with both opt-ins off and leaves the four new fields out of the comparison. The hill and the
+// decay are pinned on their own in air-session-core.hill.test.ts.
+const AIR_NEW_KEYS = new Set(['lastZone', 'lastJudged', 'zone', 'repeat']);
+const snapAir = (x: unknown) => JSON.stringify(x, (k, v) => (AIR_NEW_KEYS.has(k) ? undefined : v));
+const preHillSkin = () => ({ ...makeBigAirSkin(), hill: undefined, tuning: { ...BIG_AIR_TUNING, repeatDecay: undefined } });
 
 describe('SprintCore: the pad path is the pre-P8 core, tick for tick', () => {
   it('40 seeded pad streams (a thumb\'s taps, stumbles, gaps, false starts): the same state, stats and phase at every tick and tap', () => {
@@ -84,12 +92,12 @@ describe('AirSessionCore (big air): the pad path is the pre-P8 core, tick for ti
     const seen = { graded: 0, launches: 0, spins: 0, landings: 0 };
     for (let seed = 1; seed <= 30; seed++) {
       const r = mulberry32(100 + seed);
-      const live = new AirSessionCore(makeBigAirSkin());
+      const live = new AirSessionCore(preHillSkin());
       const base = new BaseAirSessionCore(makeBigAirSkin());
       let side: 'L' | 'R' = 'L', next = 200, phase = '';
       for (let now = 0; now < 40000; now += 16) {
         const a = live.step(0.016), b = base.step(0.016);
-        expect(snap(a), `seed ${seed} tick @${now}`).toBe(snap(b));
+        expect(snapAir(a), `seed ${seed} tick @${now}`).toBe(snapAir(b));
         if (a.phase !== phase) { if (a.phase === 'Air') seen.launches++; if (phase === 'Air') seen.landings++; phase = a.phase; }
         while (now >= next) {
           const k = r();
@@ -110,7 +118,7 @@ describe('AirSessionCore (big air): the pad path is the pre-P8 core, tick for ti
             live.trick(); base.trick();
             next += 200 + r() * 400;
           }
-          expect(snap([live.state, live.airTrick]), `seed ${seed} press @${now}`).toBe(snap([base.state, base.airTrick]));
+          expect(snapAir([live.state, live.airTrick]), `seed ${seed} press @${now}`).toBe(snapAir([base.state, base.airTrick]));
         }
       }
     }

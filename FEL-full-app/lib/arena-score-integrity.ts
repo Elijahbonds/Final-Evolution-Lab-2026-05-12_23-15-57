@@ -192,7 +192,9 @@ export function firstToCeiling(target: number, maxPerScore: number): number {
 }
 
 /** Big Air: most turns a boosted launch can spin before touchdown. The test RUNS the real big-air core at full boost with
- *  the spin started at take-off and holds this above what it measures (≈ 4.7 turns). */
+ *  the spin started at take-off and holds this above what it measures (≈ 4.75 turns). IMPROVE (2026-10-06, Big Air items
+ *  2 / 8 / 10): the core now lands on a hill (a 2 m lip; a full boost overshoots the landing onto the flat, capped at
+ *  sketchy) and pays a repeated rotation less — both only LOWER what an attempt can pay, so the ceiling stands unchanged. */
 export const BIG_AIR_MAX_TURNS = 5;
 export function bigAirCeiling(): number {
   const t = BIG_AIR_TUNING;
