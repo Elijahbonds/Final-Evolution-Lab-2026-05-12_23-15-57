@@ -19,6 +19,7 @@ import type { SessionTallies } from '@/lib/game-systems';
 import { sessionStore, markRun, countedSince } from '@/lib/babylon/core/sessionStore';
 import { arenaRefusal, storyRefusal, type Refusal } from './end-card-refusal';
 import { EndScreen } from './end-screen/end-screen';
+import type { EndGoals } from './end-screen/types';
 import { unpaidReason } from '@/lib/sessions/unpaidCopy';
 import {
   type CarnivalStop, type CarnivalRunState,
@@ -84,6 +85,11 @@ interface RecapData {
   /** END SCREEN: the server's streak after this run, and the streak Lab Credits inside `credits` (read for the card only). */
   streakDays?: number;
   streakBonus?: number;
+  /** END SCREEN (2026-10-06): the account XP after the run (the level bar), today's goals, the run's session id (the
+   *  account-best read leaves it out). Read for the card only. */
+  profileXp?: number;
+  goals?: EndGoals | null;
+  sessionId?: string | null;
 }
 
 export function GameShell(props: {
@@ -309,6 +315,9 @@ function GameShellInner({
               capMessage: typeof j?.capMessage === 'string' ? j.capMessage : undefined,
               ...(Number.isFinite(j?.streakDays) ? { streakDays: Number(j.streakDays) } : {}),
               ...(Number.isFinite(j?.streakBonus) ? { streakBonus: Number(j.streakBonus) } : {}),
+              ...(Number.isFinite(j?.profileXp) ? { profileXp: Number(j.profileXp) } : {}),
+              ...(j?.goals && typeof j.goals === 'object' ? { goals: j.goals as EndGoals } : {}),
+              ...(typeof j?.sessionId === 'string' ? { sessionId: j.sessionId } : {}),
             });
             // ECONOMY-SESSIONS-HARDEN (2026-09-28): the wallet coins this run paid come IN the session's answer — the server
             // wrote them in the run's own transaction (they were two earn reports from here, keyed by the new session's id,

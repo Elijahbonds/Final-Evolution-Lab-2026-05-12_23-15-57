@@ -65,6 +65,21 @@ export interface EndRecap {
   streakDays?: number;
   /** The streak Lab Credits inside `credits` (app/api/sessions `streakBonus`): > 0 only when this run counted the day. */
   streakBonus?: number;
+  /** IMPROVE (2026-10-06): the account XP AFTER this run (app/api/sessions `profileXp`) — the player level reads off it. */
+  profileXp?: number;
+  /** IMPROVE (2026-10-06): today's daily goals after this run (app/api/sessions `goals`). */
+  goals?: EndGoals | null;
+  /** The run's GameSession id (app/api/sessions `sessionId`): the account-best read leaves it out. */
+  sessionId?: string | null;
+}
+
+/** IMPROVE (2026-10-06): today's daily goals, as app/api/sessions sends them (lib/goals/daily-goals.ts GoalState). */
+export interface EndGoals {
+  day: string;
+  resetsAt?: string;
+  items: import('@/lib/goals/daily-goals').GoalState[];
+  /** Goal ids THIS run completed (their season XP is inside season.gained). */
+  completedNow: string[];
 }
 
 export interface EndCoins { coins: number; capped: boolean }
@@ -145,4 +160,7 @@ export interface EndScreenProps {
   fx?: import('./fx').EndFx;
   /** Tests and the dev fixture: where the device records live (default: this browser's localStorage). */
   store?: import('./records').RecordStore;
+  /** IMPROVE (2026-10-06): the account's best before this run (verified adults; GET /api/bests). Default: the browser
+   *  fetch. Tests and the fixture pass their own. */
+  fetchAccountBest?: import('./records').AccountBestFetch;
 }

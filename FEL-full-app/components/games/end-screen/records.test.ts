@@ -1,6 +1,6 @@
 // END SCREEN — personal bests and win runs, computed on this device (the server sends none).
 import { describe, it, expect } from 'vitest';
-import { applyRun, parseRecords, playedOn, localDay, EMPTY_RECORDS, memoryStore, type DeviceRecords } from './records';
+import { applyRun, parseRecords, playedOn, localDay, EMPTY_RECORDS, memoryStore, mergeAccountBest, readAccountBestAnswer, type DeviceRecords } from './records';
 
 const T = new Date(2026, 9, 6, 20, 30).getTime();
 const run = (o: Partial<Parameters<typeof applyRun>[1]> = {}) => ({ mode: 'threePoint', score: 20, won: true, accepted: true, nowMs: T, ...o });
@@ -77,5 +77,42 @@ describe('played today, the Signature day, and storage that lies', () => {
     const s = memoryStore();
     s.save(applyRun(s.load(), run()).next);
     expect(s.current.modes.threePoint.best).toBe(20);
+  });
+});
+
+// IMPROVE (2026-10-06, owner decision): verified adults' bests come from the account and are merged with this device's;
+// teens (and anyone the server answers { scope: 'device' }) keep this device's records exactly as they were.
+describe('the account\'s best, merged', () => {
+  const device = applyRun(EMPTY_RECORDS, run({ score: 30, won: true })).next;   // this device: best 30, 1 run, 1 win in a row
+
+  it('a higher best set elsewhere becomes the best to beat here — a 35 is no record against an account best of 40', () => {
+    const merged = mergeAccountBest(device, { mode: 'threePoint', best: 40, runs: 12 });
+    expect(merged.modes.threePoint).toMatchObject({ best: 40, runs: 12, winRun: 1 });
+    const { callouts } = applyRun(merged, run({ score: 35 }));
+    expect(callouts).toMatchObject({ newBest: false, firstRun: false, previousBest: 40, shortBy: 5 });
+    expect(applyRun(merged, run({ score: 41 })).callouts).toMatchObject({ newBest: true, previousBest: 40 });
+  });
+
+  it('the merge only raises: a lower account best leaves this device\'s best alone', () => {
+    expect(mergeAccountBest(device, { mode: 'threePoint', best: 12, runs: 3 }).modes.threePoint.best).toBe(30);
+  });
+
+  it('a first run on this device is not a "first run" when the account has played the mode', () => {
+    const merged = mergeAccountBest(EMPTY_RECORDS, { mode: 'golf', best: 500, runs: 4 });
+    expect(applyRun(merged, run({ mode: 'golf', score: 450 })).callouts).toMatchObject({ firstRun: false, previousBest: 500 });
+  });
+
+  it('teen locality: a device-scoped answer (or none) changes nothing at all', () => {
+    expect(readAccountBestAnswer({ scope: 'device' }, 'threePoint')).toBeNull();
+    expect(mergeAccountBest(device, null)).toBe(device);
+    expect(mergeAccountBest(device, readAccountBestAnswer({ scope: 'device', best: 999, runs: 9 }, 'threePoint'))).toBe(device);
+  });
+
+  it('the answer is checked: the wrong mode, no best or a junk best is no account best', () => {
+    expect(readAccountBestAnswer({ scope: 'account', mode: 'golf', best: 9, runs: 1 }, 'threePoint')).toBeNull();
+    expect(readAccountBestAnswer({ scope: 'account', mode: 'golf', best: null, runs: 0 }, 'golf')).toBeNull();
+    expect(readAccountBestAnswer({ scope: 'account', mode: 'golf', best: 'x', runs: 1 }, 'golf')).toBeNull();
+    expect(readAccountBestAnswer({ scope: 'account', mode: 'golf', best: 9, runs: 2 }, 'golf')).toEqual({ mode: 'golf', best: 9, runs: 2 });
+    expect(mergeAccountBest(device, { mode: 'threePoint', best: 50, runs: 0 })).toBe(device);
   });
 });

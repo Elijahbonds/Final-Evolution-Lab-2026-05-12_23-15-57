@@ -1,12 +1,13 @@
 'use client';
 
-// The season pass bar — the card's LEVEL UP. It fills from where the run started, and for every tier the run crossed it
+// The season pass bar — the card's TIER UP (the player level has its own bar since 2026-10-06: level-card.tsx). It fills from where the run started, and for every tier the run crossed it
 // fills to the end, flashes TIER UP with what that tier booked, and starts again (season-bar.ts rebuilds the start from the
 // server's own numbers). Instant (reduced motion, a skip): the final bar and the tier-up line, no travel.
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo } from 'react';
 import { Crown } from 'lucide-react';
-import { pct, seasonFill, tierRewardWords } from './season-bar';
+import { seasonFill, tierRewardWords } from './season-bar';
+import { useBarFill } from './use-bar-fill';
 import type { SeasonRecap } from './types';
 
 export function SeasonCard({ season, active, instant, ms, onTierUp }: {
@@ -17,33 +18,7 @@ export function SeasonCard({ season, active, instant, ms, onTierUp }: {
   onTierUp?: () => void;
 }) {
   const fill = useMemo(() => seasonFill(season), [season]);
-  const last = fill.segments.length - 1;
-  // [segment, width %, transition on]
-  const [seg, setSeg] = useState(instant ? last : 0);
-  const [width, setWidth] = useState(instant ? pct(fill.segments[last].to, fill.segments[last].need) : pct(fill.segments[0].from, fill.segments[0].need));
-  const [glide, setGlide] = useState(false);
-  const [flash, setFlash] = useState<number | null>(null);
-  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
-  const tierUpRef = useRef(onTierUp);
-  tierUpRef.current = onTierUp;
-
-  useEffect(() => {
-    for (const t of timers.current) clearTimeout(t);
-    timers.current = [];
-    if (instant) { setSeg(last); setGlide(false); setWidth(pct(fill.segments[last].to, fill.segments[last].need)); setFlash(null); return; }
-    if (!active) return;
-    const per = Math.max(120, Math.floor(ms / fill.segments.length));
-    let at = 0;
-    fill.segments.forEach((s, i) => {
-      timers.current.push(setTimeout(() => { setSeg(i); setGlide(false); setWidth(pct(s.from, s.need)); }, at));
-      timers.current.push(setTimeout(() => { setGlide(true); setWidth(pct(s.to, s.need)); }, at + 30));
-      if (s.crossed) {
-        timers.current.push(setTimeout(() => { setFlash(s.tier + 1); tierUpRef.current?.(); }, at + per - 40));
-      }
-      at += per;
-    });
-    return () => { for (const t of timers.current) clearTimeout(t); };
-  }, [active, instant, ms, fill, last]);
+  const { seg, width, glide, flash, glideMs } = useBarFill(fill.segments, { active, instant, ms, onCross: () => onTierUp?.() });
 
   const cur = fill.segments[seg];
   const lastUp = season.tierUps.length > 0 ? season.tierUps[season.tierUps.length - 1] : null;
@@ -64,7 +39,7 @@ export function SeasonCard({ season, active, instant, ms, onTierUp }: {
           <div
             data-season-fill
             className="h-full rounded-full bg-gradient-to-r from-[#FFB020] to-[#FFD700] shadow-[0_0_16px_rgba(255,215,0,0.6)]"
-            style={{ width: `${width}%`, transition: glide ? `width ${Math.max(100, Math.floor(ms / fill.segments.length) - 80)}ms cubic-bezier(0.16,0.8,0.3,1)` : 'none' }}
+            style={{ width: `${width}%`, transition: glide ? `width ${glideMs}ms cubic-bezier(0.16,0.8,0.3,1)` : 'none' }}
           />
         </div>
         <span className="font-mono text-white/60">T{cur.tier + 1}</span>

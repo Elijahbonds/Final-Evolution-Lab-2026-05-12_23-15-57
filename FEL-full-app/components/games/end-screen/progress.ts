@@ -1,8 +1,9 @@
 // PROGRESS TOWARD NEXT — "what is the next thing to earn", from real numbers only.
 //
 // Every line here is read from the server's answer or this device's own records; when the data for a line is missing, the
-// line is missing. No invented goals: FEL ships no daily-goal or quest track today (SeasonPassCore.sessionXp's questsDone
-// is fed nothing), and no account level, so there is no "next level" line (see the owner decisions in the lane report).
+// line is missing. No invented goals. (IMPROVE 2026-10-06: the daily goals and the player level now exist, and each has
+// its own block on the card — the goals card and the level bar, which says the XP to the next level — so neither is
+// repeated here, and these three lines stay free for the season, mastery, the streak and the device's records.)
 
 import { TIERS } from '@/lib/mastery/mastery-core';
 import type { EndRecap } from './types';

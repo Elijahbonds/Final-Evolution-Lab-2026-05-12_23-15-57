@@ -4,8 +4,9 @@
 //
 //   1. THE MOMENT  — the headline slams in, the score counts up, the grade badge (when the mode sent one).
 //   2. THE REWARDS — once the server has answered: the callouts (best, win run, streak), then each reward the run
-//                    actually earned, one at a time (XP, wallet coins, shards, credits, PRQ, the season bar with any
-//                    TIER UP, mastery, the story node), or the honest state instead (NO PLAY, unpaid, capped).
+//                    actually earned, one at a time (XP, wallet coins, shards, credits, PRQ, the player level bar with
+//                    any LEVEL UP, the season bar with any TIER UP, mastery, today's goals, the story node), or the
+//                    honest state instead (NO PLAY, unpaid, capped — and "Coin limit reached today").
 //   3. THE OUTCOMES — the Arena / friend-challenge verdicts, when those answers have landed.
 //   4. PROGRESS    — what is next to earn, from real numbers only.
 // "What's next" (Play again, Next, All modes) is NOT a step: it is on screen from the first frame, and Play again is armed
@@ -19,7 +20,7 @@
 export type StepId =
   | 'moment' | 'score' | 'grade'
   | 'callouts' | 'noplay' | 'unpaid' | 'cap'
-  | 'xp' | 'coins' | 'shards' | 'credits' | 'prq' | 'season' | 'mastery' | 'story' | 'storyRefused'
+  | 'xp' | 'coins' | 'shards' | 'credits' | 'prq' | 'level' | 'season' | 'mastery' | 'goals' | 'story' | 'storyRefused'
   | 'arena' | 'mp' | 'challenge'
   | 'progress';
 
@@ -30,11 +31,12 @@ export const ARM_MS = 450;
 export const BASE_MS: Record<StepId, number> = {
   moment: 700, score: 650, grade: 320,
   callouts: 380, noplay: 400, unpaid: 400, cap: 300,
-  xp: 380, coins: 380, shards: 340, credits: 340, prq: 380, season: 800, mastery: 420, story: 450, storyRefused: 400,
+  xp: 380, coins: 380, shards: 340, credits: 340, prq: 380, level: 600, season: 800, mastery: 420, goals: 420, story: 450, storyRefused: 400,
   arena: 380, mp: 380, challenge: 380,
   progress: 320,
 };
-/** Each season tier crossed adds this to the season beat (the bar fills, flashes, starts again). */
+/** Each season tier crossed adds this to the season beat (the bar fills, flashes, starts again); each level crossed adds
+ *  it to the level beat the same way. */
 export const TIER_UP_MS = 380;
 
 export interface StepData {
@@ -54,6 +56,10 @@ export interface StepData {
   mp: boolean;
   challenge: boolean;
   hasProgress: boolean;
+  /** IMPROVE (2026-10-06): the level bar has its numbers (the answer's profileXp and xp). */
+  hasLevel?: boolean;
+  /** IMPROVE (2026-10-06): the answer carried today's goals. */
+  hasGoals?: boolean;
 }
 
 /** PURE: the beats this run plays, in order. */
@@ -70,11 +76,13 @@ export function buildSteps(d: StepData): StepId[] {
     if (r.capMessage) out.push('cap');
     if (!r.unpaid) {
       if (r.xp > 0) out.push('xp');
-      // ECONOMY-CAPS F-P1: the coins tile only when coins > 0 (a cap that cut the earn to nothing shows no "+0")
-      if (d.coins && d.coins.coins > 0) out.push('coins');
+      // ECONOMY-CAPS F-P1: never a "+0" coins tile. IMPROVE (2026-10-06, owner decision): a cap that cut the earn to
+      // nothing is said — the coins beat shows "Coin limit reached today" instead of no tile at all
+      if (d.coins && (d.coins.coins > 0 || d.coins.capped)) out.push('coins');
       if (r.shards > 0) out.push('shards');
       if (r.credits > 0) out.push('credits');
       if (r.prqDelta !== 0) out.push('prq');
+      if (d.hasLevel && r.xp > 0) out.push('level');
     }
   }
   if (d.storyRefused) out.push('storyRefused');
@@ -84,13 +92,15 @@ export function buildSteps(d: StepData): StepId[] {
   if (d.arena) out.push('arena');
   if (r.season) out.push('season');
   if (r.mastery && r.mastery.ups.length > 0) out.push('mastery');
+  if (d.hasGoals && !r.noPlay && !r.unpaid) out.push('goals');
   if (d.hasProgress) out.push('progress');
   return out;
 }
 
 /** PURE: each beat's length, the whole list scaled down (never up) to fit the budget. */
-export function stepDurations(steps: readonly StepId[], tierUps = 0, budget = REVEAL_BUDGET_MS): number[] {
-  const base = steps.map((s) => BASE_MS[s] + (s === 'season' ? Math.min(3, Math.max(0, tierUps)) * TIER_UP_MS : 0));
+export function stepDurations(steps: readonly StepId[], tierUps = 0, budget = REVEAL_BUDGET_MS, levelUps = 0): number[] {
+  const crossings = (n: number) => Math.min(3, Math.max(0, n)) * TIER_UP_MS;
+  const base = steps.map((s) => BASE_MS[s] + (s === 'season' ? crossings(tierUps) : s === 'level' ? crossings(levelUps) : 0));
   const total = base.reduce((a, b) => a + b, 0);
   const k = total > budget ? budget / total : 1;
   return base.map((ms) => Math.round(ms * k));
@@ -133,11 +143,13 @@ export function pressIntent(s: RevealState, total: number, sinceMountMs: number)
 
 /** The sound and buzz each beat plays — presentation only. */
 export type Cue = 'tick' | 'win' | 'levelUp' | 'record' | 'soft';
-export function cueFor(step: StepId, ctx: { won: boolean; newBest: boolean; tierUps: number }): Cue {
+export function cueFor(step: StepId, ctx: { won: boolean; newBest: boolean; tierUps: number; levelUps?: number; goalsDone?: number }): Cue {
   switch (step) {
     case 'moment': return ctx.won ? 'win' : 'soft';
     case 'callouts': return ctx.newBest ? 'record' : 'tick';
     case 'season': return ctx.tierUps > 0 ? 'levelUp' : 'tick';
+    case 'level': return (ctx.levelUps ?? 0) > 0 ? 'levelUp' : 'tick';
+    case 'goals': return (ctx.goalsDone ?? 0) > 0 ? 'record' : 'tick';
     case 'mastery': return 'levelUp';
     case 'noplay': case 'unpaid': case 'cap': case 'storyRefused': return 'soft';
     default: return 'tick';

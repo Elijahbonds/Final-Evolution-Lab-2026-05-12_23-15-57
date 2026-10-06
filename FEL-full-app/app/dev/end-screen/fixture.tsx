@@ -11,7 +11,16 @@ import type { EndScreenProps } from '@/components/games/end-screen/types';
 
 type Case = Omit<EndScreenProps, 'share' | 'onReplay' | 'onNavigate' | 'store' | 'title'> & { title?: string; seedBest?: number };
 
-const paid = { xp: 140, shards: 3, credits: 35, prqDelta: 0.8, prqAfter: 63.4, grade: { label: 'Elite', color: '#00E5FF' }, streakDays: 4, streakBonus: 20 };
+// IMPROVE (2026-10-06): the account XP after the run (level 9 → the level bar) and today's goals, as app/api/sessions sends them
+const goals = {
+  day: '2026-10-06', resetsAt: '2026-10-07T00:00:00.000Z', completedNow: [] as string[],
+  items: [
+    { id: 'wins-3', kind: 'wins' as const, target: 3, text: 'Win 3 games', progress: 1, done: false },
+    { id: 'modes-2', kind: 'modes' as const, target: 2, text: 'Play 2 different modes', progress: 2, done: true },
+    { id: 'runs-5', kind: 'runs' as const, target: 5, text: 'Finish 5 runs', progress: 3, done: false },
+  ],
+};
+const paid = { xp: 140, shards: 3, credits: 35, prqDelta: 0.8, prqAfter: 63.4, grade: { label: 'Elite', color: '#00E5FF' }, streakDays: 4, streakBonus: 20, profileXp: 12_400, goals };
 const season = { name: 'Season 1 · Boardwalk', gained: 420, tier: 6, into: 610, need: 858, hasPro: false, tierUps: [] };
 
 const CASES: Record<string, Case> = {
@@ -31,7 +40,8 @@ const CASES: Record<string, Case> = {
   levelup: {
     mode: 'freerun', run: { score: 3_820, won: true, duration: 75, stats: { grade: 5, timeSec: 61.2, place: 1 } },
     headline: '1ST · 61.2s · GRADE S', won: true, proofLine: '3820 PTS · 61.2s · 14 TRICK', arenaRefused: false, arenaVerdict: null,
-    recap: { ...paid, season: { ...season, gained: 1500, tier: 9, into: 140, need: 1062, tierUps: [{ tier: 8, rewards: { free: [], pro: [] } }, { tier: 9, rewards: { free: [{ kind: 'cosmetic', rarity: 'common' }], pro: [] } }] },
+    recap: { ...paid, profileXp: 13_600, goals: { ...goals, completedNow: ['wins-3'], items: goals.items.map((g) => (g.id === 'wins-3' ? { ...g, progress: 3, done: true } : g)) },
+      season: { ...season, gained: 1500, tier: 9, into: 140, need: 1062, tierUps: [{ tier: 8, rewards: { free: [], pro: [] } }, { tier: 9, rewards: { free: [{ kind: 'cosmetic', rarity: 'common' }], pro: [] } }] },
       mastery: { mode: 'freerun', tier: 'Gold', tierIndex: 3, ups: [{ tier: 'Gold' }] } },
     coins: { coins: 75, capped: false },
     storyNodeId: null, storyReward: null, storyRefused: null, mpResult: null, challengeResult: null, arenaResult: null, carnivalRun: null,
@@ -41,6 +51,12 @@ const CASES: Record<string, Case> = {
     headline: 'GAME OVER', won: false, proofLine: '8–11 · LOST', arenaRefused: false, arenaVerdict: null,
     recap: { ...paid, xp: 60, shards: 1, credits: 0, prqDelta: -0.2, streakBonus: 0, season: { ...season, gained: 84, into: 274 } },
     coins: { coins: 40, capped: true }, seedBest: 11,
+    storyNodeId: null, storyReward: null, storyRefused: null, mpResult: null, challengeResult: null, arenaResult: null, carnivalRun: null,
+  },
+  coinlimit: {
+    mode: 'threePoint', run: { score: 12, won: false, duration: 60, opponentScore: 15, stats: { points: 12 } },
+    headline: 'SO CLOSE', won: false, proofLine: '12 PTS DOWNTOWN vs 15', arenaRefused: false, arenaVerdict: null,
+    recap: { ...paid, xp: 28, credits: 0, streakBonus: 0, season: { ...season, gained: 86, into: 296 } }, coins: { coins: 0, capped: true },
     storyNodeId: null, storyReward: null, storyRefused: null, mpResult: null, challengeResult: null, arenaResult: null, carnivalRun: null,
   },
   refused: {

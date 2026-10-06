@@ -152,3 +152,60 @@ export function saveRecords(r: DeviceRecords): void {
 }
 
 export const browserStore: RecordStore = { load: loadRecords, save: saveRecords };
+
+// ── THE ACCOUNT'S BEST (IMPROVE 2026-10-06, owner decision: "Personal bests on the account for verified adults (teens stay
+// per device) … merged with the device record") ──
+//
+// GET /api/bests answers a VERIFIED ADULT with their best in the mode from their own paid session records, leaving out
+// the run on the card (so it is the best BEFORE this run), and anyone else with `{ scope: 'device' }` — read nothing,
+// and the card keeps this device's records exactly as before. The merge only ever RAISES a best: the higher of the two
+// wins, and the run count is the larger, so a best set on another device is beaten here only by a higher score.
+
+export interface AccountBest {
+  mode: string;
+  best: number | null;
+  runs: number;
+}
+
+/** The account's best in `mode` before session `excludeSessionId`, or null (not a verified adult, signed out, a failure). */
+export type AccountBestFetch = (mode: string, excludeSessionId: string) => Promise<AccountBest | null>;
+
+/** PURE: GET /api/bests's answer, checked. Anything but an account answer with a finite best is null (device only). */
+export function readAccountBestAnswer(j: unknown, mode: string): AccountBest | null {
+  if (!j || typeof j !== 'object') return null;
+  const o = j as Record<string, unknown>;
+  if (o.scope !== 'account' || o.mode !== mode) return null;
+  const best = o.best, runs = Number(o.runs);
+  if (typeof best !== 'number' || !Number.isFinite(best)) return null;
+  return { mode, best, runs: Number.isFinite(runs) && runs > 0 ? Math.floor(runs) : 0 };
+}
+
+/** PURE: the device records with the account's best folded in. null (a teen, a guest, a failed read) changes nothing. */
+export function mergeAccountBest(records: DeviceRecords, a: AccountBest | null): DeviceRecords {
+  if (!a || typeof a.best !== 'number' || !Number.isFinite(a.best) || a.runs <= 0) return records;
+  const had = records.modes[a.mode];
+  const deviceHasRuns = Boolean(had && had.runs > 0);
+  const merged: ModeRecord = {
+    best: deviceHasRuns ? Math.max(had!.best, a.best) : a.best,
+    runs: Math.max(had?.runs ?? 0, a.runs),
+    winRun: had?.winRun ?? 0,
+    ...(had?.lastDay ? { lastDay: had.lastDay } : {}),
+  };
+  return { ...records, modes: { ...records.modes, [a.mode]: merged } };
+}
+
+/** How long the card waits for the account's best before it settles on this device's records alone. */
+export const ACCOUNT_BEST_WAIT_MS = 1200;
+
+/** The browser's read (no-store; a failure or a slow answer is null — the device records stand). */
+export const browserAccountBest: AccountBestFetch = async (mode, excludeSessionId) => {
+  try {
+    if (typeof fetch !== 'function') return null;
+    const q = new URLSearchParams({ mode, exclude: excludeSessionId });
+    const r = await fetch(`/api/bests?${q.toString()}`, { cache: 'no-store' });
+    if (!r.ok) return null;
+    return readAccountBestAnswer(await r.json().catch(() => null), mode);
+  } catch {
+    return null;
+  }
+};

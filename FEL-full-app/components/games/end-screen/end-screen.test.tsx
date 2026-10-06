@@ -120,11 +120,24 @@ describe('honest states', () => {
     expect(h).toContain('Daily reward cap reached for this mode.');
     expect(h).toMatch(/data-recap="coins" data-capped="1"/);
     expect(h).toContain('limit reached');
+    expect(h).not.toContain('data-recap="coins-limit"');   // coins were paid: the coins tile says the limit, no second tile
   });
-  it('coins capped to nothing: no "+0" tile (ECONOMY-CAPS F-P1)', () => {
+  // test changed (IMPROVE 2026-10-06): the owner chose to show the limit — a cap that cut the coins to nothing was no tile
+  // at all (ECONOMY-CAPS F-P1); it is now a "Coin limit reached today" tile. Still never a "+0".
+  it('coins capped to nothing: a "Coin limit reached today" tile, never a "+0" (owner decision 2026-10-06)', () => {
     const h = html({ recap: { xp: 10, shards: 0, credits: 0, prqDelta: 0, prqAfter: 0 }, coins: { coins: 0, capped: true } });
     expect(h).not.toContain('data-recap="coins"');
+    expect(h).toMatch(/data-recap="coins-limit" data-capped="1"/);
+    expect(h).toContain('Coin limit reached today');
     expect(h).not.toContain('+0');
+  });
+  it('no coins and no cap: no coin tile of either kind', () => {
+    const h = html({ recap: { xp: 10, shards: 0, credits: 0, prqDelta: 0, prqAfter: 0 }, coins: { coins: 0, capped: false } });
+    expect(h).not.toMatch(/data-recap="coins(-limit)?"/);
+  });
+  it('an unpaid run shows no coin limit either (the cap is not why it paid nothing)', () => {
+    const h = html({ recap: { xp: 0, shards: 0, credits: 0, prqDelta: 0, prqAfter: 0, unpaid: 'PLAYTEST' }, coins: { coins: 0, capped: true } });
+    expect(h).not.toContain('Coin limit reached today');
   });
   it('a refused Arena score claims nothing: dim trophy, no challenge mint, no proof share, the refusal in the server\'s words', () => {
     const h = html({
@@ -183,5 +196,77 @@ describe('the helpers the card reads', () => {
   it('B goes to the shelf, or the story map from a story run', () => {
     expect(exitHrefFor(null)).toBe('/play');
     expect(exitHrefFor('golfGreen.r1')).toBe('/story');
+  });
+});
+
+// ── IMPROVE (2026-10-06, owner decisions): the player level, today's goals, the account's best ──
+
+const goalsFixture = {
+  day: '2026-10-06', resetsAt: '2026-10-07T00:00:00.000Z', completedNow: ['runs-3'],
+  items: [
+    { id: 'winRow-2', kind: 'winRow' as const, target: 2, text: 'Win 2 in a row', progress: 1, done: false },
+    { id: 'wins-2', kind: 'wins' as const, target: 2, text: 'Win 2 games', progress: 0, done: false },
+    { id: 'runs-3', kind: 'runs' as const, target: 3, text: 'Finish 3 runs', progress: 3, done: true },
+  ],
+};
+const paidRecap = props().recap!;
+
+describe('the player level bar', () => {
+  it('a run that crosses a level: LEVEL UP with the new level, after the XP tile and before the season', () => {
+    // level 10 starts at 13,500 XP: 13,460 + 120 crosses it
+    const h = html({ recap: { ...paidRecap, profileXp: 13_580 } });
+    expect(h).toContain('data-recap="level" data-level="10" data-level-ups="1"');
+    expect(h).toContain('LEVEL UP! Level 10');
+    const at = order(h, ['data-recap="xp"', 'data-recap="level"', 'data-recap="season"']);
+    expect([...at].sort((a, b) => a - b)).toEqual(at);
+  });
+  it('a run inside a level: the bar and the XP to the next level, no LEVEL UP', () => {
+    const h = html({ recap: { ...paidRecap, profileXp: 13_700 } });
+    expect(h).toContain('data-recap="level" data-level="10" data-level-ups="0"');
+    expect(h).not.toContain('LEVEL UP');
+    expect(h).toContain('XP to level 11');
+  });
+  it('no account XP in the answer, or an unpaid run: no level bar', () => {
+    expect(html()).not.toContain('data-recap="level"');
+    expect(html({ recap: { xp: 0, shards: 0, credits: 0, prqDelta: 0, prqAfter: 0, unpaid: 'AGENT', profileXp: 900 } })).not.toContain('data-recap="level"');
+  });
+  it('the season keeps its TIER UP beside the LEVEL UP', () => {
+    const h = html({ recap: { ...paidRecap, profileXp: 13_580 } });
+    expect(h).toContain('TIER UP! Tier 1');
+    expect(h).toContain('LEVEL UP! Level 10');
+  });
+});
+
+describe('today\'s goals', () => {
+  it('the three goals with their progress; the one this run completed is called out with its season XP', () => {
+    const h = html({ recap: { ...paidRecap, goals: goalsFixture } });
+    expect(h).toContain('data-end-goals');
+    expect(h).toContain('1/3 done');
+    expect(h).toContain('data-goal="runs-3" data-goal-state="just-done"');
+    expect(h).toContain('GOAL COMPLETE · +100 season XP');
+    expect(h).toContain('data-goal="wins-2" data-goal-state="open"');
+    expect(h).toContain('2 more wins to go');
+    expect(h).toContain('1 more win in a row to go');
+    const at = order(h, ['data-recap="season"', 'data-end-goals', 'data-end-progress']);
+    expect([...at].sort((a, b) => a - b)).toEqual(at);
+  });
+  it('no goals in the answer (no active season, an unpaid run): no goals card', () => {
+    expect(html()).not.toContain('data-end-goals');
+    expect(html({ recap: { xp: 0, shards: 0, credits: 0, prqDelta: 0, prqAfter: 0, unpaid: 'AGENT', goals: goalsFixture } })).not.toContain('data-end-goals');
+  });
+});
+
+describe('the account\'s best (verified adults)', () => {
+  it('a paid run with a session id waits for the account\'s best before it judges a record (no callouts on a guess)', () => {
+    const fetchAccountBest = vi.fn(() => new Promise<never>(() => {}));
+    const h = html({ recap: { ...paidRecap, sessionId: 'sess1' }, fetchAccountBest });
+    expect(h).toContain('data-recap="pending"');
+    expect(h).not.toContain('data-callout="first"');
+  });
+  it('no session id (a refused, unpaid or old answer): the device records at once, as before', () => {
+    const fetchAccountBest = vi.fn(() => new Promise<never>(() => {}));
+    const h = html({ fetchAccountBest });
+    expect(h).toContain('data-callout="first"');
+    expect(fetchAccountBest).not.toHaveBeenCalled();
   });
 });

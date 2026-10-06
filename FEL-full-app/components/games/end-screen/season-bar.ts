@@ -1,7 +1,8 @@
-// The season bar's fill, tier by tier — the card's LEVEL UP moment.
+// The season bar's fill, tier by tier — the card's TIER UP moment.
 //
-// FEL has no account level (PlayerProfile.xp is a running total with no curve: grep levelFor / xpToLevel finds nothing),
-// so the bar that "levels up" is the one progression track that has levels: the season pass. Its tiers are the server's
+// (When this was written FEL had no account level, so the season pass was the card's only "level up". IMPROVE
+// (2026-10-06): the player level now reads off PlayerProfile.xp — lib/player-level.ts, level-bar.ts — and has its own
+// bar; the season keeps its TIER UP.) The pass's tiers are the server's
 // (lib/season/season-pass-core.ts, TIER_XP(t) = 450 + 68t), and the session answer carries the state AFTER the run:
 // { gained, tier, into, need, tierUps }. The bar has to start where the run started, so the state BEFORE is rebuilt from
 // those numbers with the same TIER_XP the server tiered with:

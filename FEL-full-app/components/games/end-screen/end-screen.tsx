@@ -11,6 +11,10 @@
 // pieces are pure and tested on their own: reveal.ts (order, pace, skip), season-bar.ts (the tier-up maths), records.ts
 // (the device's personal bests), recommend.ts (what's next), nav.ts (focus movement), progress.ts (next to earn).
 //
+// IMPROVE (2026-10-06, owner decisions): the player level bar (level-bar.ts, off lib/player-level.ts), today's three
+// goals (goals.ts, the server's lib/goals/daily-goals.ts), "Coin limit reached today" when the cap cut a run's coins to
+// nothing, and — for a verified adult — the personal best on the ACCOUNT (records.ts mergeAccountBest, GET /api/bests).
+//
 // SLOTS for the lanes working on the same card: `extraActions` (lane/multiplayer's Challenge a friend / rematch) join the
 // action row and its focus grid; `sideCards` (lane/knowledge-feed's card) render under the rewards — any element inside
 // marked `data-end-focus="<id>"` is reachable by pad and keyboard.
@@ -19,7 +23,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'r
 import { motion } from 'framer-motion';
 import {
   Trophy, Sparkles, Gem, Coins, TrendingUp, TrendingDown, Award, Share2, Check, Loader2, RotateCcw, ArrowRight,
-  LayoutGrid, Home, PartyPopper, Map as MapIcon, Flame, Star, Zap, BookOpen,
+  LayoutGrid, Home, PartyPopper, Map as MapIcon, Flame, Star, Zap, BookOpen, Target, Ban,
 } from 'lucide-react';
 import { reducedMotion as deviceReducedMotion } from '@/lib/a11y/reducedMotion';
 import { unpaidLine, unpaidTitle } from '@/lib/sessions/unpaidCopy';
@@ -29,7 +33,10 @@ import type { EndScreenAction, EndScreenProps } from './types';
 import {
   buildSteps, stepDurations, initialReveal, revealReducer, isShown, revealDone, pressIntent, cueFor, ARM_MS, type StepId,
 } from './reveal';
-import { applyRun, browserStore, localDay, playedOn } from './records';
+import { applyRun, browserStore, localDay, playedOn, browserAccountBest, mergeAccountBest, ACCOUNT_BEST_WAIT_MS, type AccountBest } from './records';
+import { levelFill } from './level-bar';
+import { LevelCard } from './level-card';
+import { goalLines, goalsDoneCount } from './goals';
 import { recommendNext, type NextPick } from './recommend';
 import { gradeBadge } from './grade';
 import { highlights } from './highlights';
@@ -133,7 +140,7 @@ function NextTeaser({ pick, focused, onPress }: { pick: NextPick; focused: boole
 
 export function EndScreen(props: EndScreenProps) {
   const {
-    mode, run, headline, won, proofLine, arenaRefused, recap, coins, storyNodeId, storyReward, storyRefused,
+    mode, run, headline, won, proofLine, arenaRefused, recap: answer, coins, storyNodeId, storyReward, storyRefused,
     mpResult, challengeResult, arenaResult, carnivalRun, signatureRun, share, onReplay, onNavigate, extraActions, sideCards,
   } = props;
   const now = props.now ?? Date.now;
@@ -142,8 +149,26 @@ export function EndScreen(props: EndScreenProps) {
   const [instant] = useState<boolean>(() => props.reducedMotion ?? deviceReducedMotion());
   const mountedAt = useRef<number>(now());
 
+  // ── THE ACCOUNT'S BEST (verified adults): asked once the run has a session id, with that run left out. Until it answers
+  // (or ACCOUNT_BEST_WAIT_MS passes) the rewards wait under "Tallying rewards…", so the callouts are decided once, on the
+  // merged records. A teen, a guest or a failure answers null: this device's records alone, as before. ──
+  const fetchBest = props.fetchAccountBest ?? browserAccountBest;
+  const bestSid = answer && !answer.noPlay && !answer.unpaid && typeof answer.sessionId === 'string' && answer.sessionId ? answer.sessionId : null;
+  const [acct, setAcct] = useState<{ sid: string | null; best: AccountBest | null }>({ sid: null, best: null });
+  useEffect(() => {
+    if (!bestSid) return;
+    let live = true;
+    const done = (best: AccountBest | null) => { if (live) { live = false; setAcct({ sid: bestSid, best }); } };
+    const t = setTimeout(() => done(null), ACCOUNT_BEST_WAIT_MS);
+    fetchBest(mode, bestSid).then(done, () => done(null));
+    return () => { live = false; clearTimeout(t); };
+  }, [bestSid, mode, fetchBest]);
+  const bestReady = !bestSid || acct.sid === bestSid;
+  const recap = bestReady ? answer : null;
+
   // ── THE DEVICE'S RECORDS: read once, before this run; this run's callouts are computed from that snapshot ──
-  const [before] = useState(() => store.load());
+  const [deviceBefore] = useState(() => store.load());
+  const before = useMemo(() => mergeAccountBest(deviceBefore, bestReady ? acct.best : null), [deviceBefore, bestReady, acct.best]);
   const day = useMemo(() => localDay(mountedAt.current), []);
   const settled = Boolean(recap) && (!props.staked || Boolean(arenaResult));
   const accepted = Boolean(recap && !recap.noPlay && !recap.unpaid && !arenaRefused);
@@ -175,6 +200,11 @@ export function EndScreen(props: EndScreenProps) {
   const chips = useMemo(() => calloutChips(callouts, recap, won), [callouts, recap, won]);
   const progress = useMemo(() => progressLines(recap, callouts, won), [recap, callouts, won]);
   const tierUps = recap?.season?.tierUps?.length ?? 0;
+  const paidRecap = Boolean(recap && !recap.noPlay && !recap.unpaid);
+  const lvl = useMemo(() => (paidRecap && recap ? levelFill(recap.profileXp, recap.xp) : null), [paidRecap, recap]);
+  const levelUps = lvl?.levelUps ?? 0;
+  const goals = useMemo(() => (paidRecap && recap ? goalLines(recap.goals) : []), [paidRecap, recap]);
+  const goalsDone = goals.filter((g) => g.justDone).length;
   const steps = useMemo(() => buildSteps({
     hasGrade: Boolean(grade),
     recap: recap ? { ...recap, season: recap.season ?? null, mastery: recap.mastery ?? null } : null,
@@ -186,8 +216,10 @@ export function EndScreen(props: EndScreenProps) {
     mp: Boolean(mpResult),
     challenge: Boolean(challengeResult),
     hasProgress: progress.length > 0,
-  }), [grade, recap, coins, chips.length, storyReward, storyRefused, arenaResult, mpResult, challengeResult, progress.length]);
-  const durs = useMemo(() => stepDurations(steps, tierUps), [steps, tierUps]);
+    hasLevel: Boolean(lvl),
+    hasGoals: goals.length > 0,
+  }), [grade, recap, coins, chips.length, storyReward, storyRefused, arenaResult, mpResult, challengeResult, progress.length, lvl, goals.length]);
+  const durs = useMemo(() => stepDurations(steps, tierUps, undefined, levelUps), [steps, tierUps, levelUps]);
   const [rv, dispatch] = useReducer(revealReducer, instant, initialReveal);
   const at = (id: StepId) => steps.indexOf(id);
   const shown = (id: StepId) => { const i = at(id); return i >= 0 && isShown(rv, i); };
@@ -205,12 +237,12 @@ export function EndScreen(props: EndScreenProps) {
   const newBest = Boolean(callouts?.newBest);
   useEffect(() => {
     if (instant) { if (cued.current === 0) { cued.current = 1; fx.cue(won ? 'win' : 'soft'); } return; }
-    if (rv.skipped) { if (cued.current < steps.length) { cued.current = steps.length; fx.cue(tierUps > 0 || newBest ? 'levelUp' : 'tick'); } return; }
+    if (rv.skipped) { if (cued.current < steps.length) { cued.current = steps.length; fx.cue(tierUps > 0 || levelUps > 0 || newBest ? 'levelUp' : 'tick'); } return; }
     while (cued.current < rv.shown && cued.current < steps.length) {
-      fx.cue(cueFor(steps[cued.current], { won, newBest, tierUps }));
+      fx.cue(cueFor(steps[cued.current], { won, newBest, tierUps, levelUps, goalsDone }));
       cued.current += 1;
     }
-  }, [rv, steps, instant, won, newBest, tierUps, fx]);
+  }, [rv, steps, instant, won, newBest, tierUps, levelUps, goalsDone, fx]);
 
   // ── FOCUS + INPUT ──
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -301,7 +333,9 @@ export function EndScreen(props: EndScreenProps) {
     : { label: 'Play again', Icon: RotateCcw, act: onReplay };
   const showTeaser = Boolean(pick) && !carnivalRun;
   const tilesShown = recap && !recap.noPlay && !recap.unpaid;
-  const anyTile = Boolean(tilesShown && (recap!.xp > 0 || recap!.shards > 0 || recap!.credits > 0 || recap!.prqDelta !== 0 || (coins && coins.coins > 0)));
+  // (a coins limit that cut the earn to nothing is a tile too — "Coin limit reached today", owner decision 2026-10-06)
+  const coinLimit = Boolean(coins && coins.coins <= 0 && coins.capped);
+  const anyTile = Boolean(tilesShown && (recap!.xp > 0 || recap!.shards > 0 || recap!.credits > 0 || recap!.prqDelta !== 0 || (coins && coins.coins > 0) || coinLimit));
 
   return (
     <motion.div
@@ -468,6 +502,14 @@ export function EndScreen(props: EndScreenProps) {
                       <div className="grid grid-cols-2 gap-[0.5em] lg:grid-cols-3">
                         {recap.xp > 0 && <RewardTile show={shown('xp')} instant={fast} ms={msOf('xp')} value={recap.xp} label="XP" color="#00FF9D" Icon={Sparkles} data="xp" />}
                         {coins && coins.coins > 0 && <RewardTile show={shown('coins')} instant={fast} ms={msOf('coins')} value={coins.coins} label={coins.capped ? 'Wallet coins · limit reached' : 'Wallet coins'} color="#FFB020" Icon={Coins} data="coins" capped={coins.capped} />}
+                        {coinLimit && (
+                          <Beat show={shown('coins')} instant={fast}>
+                            <div data-recap="coins-limit" data-capped="1" className="flex h-full items-center gap-[0.5em] rounded-2xl border border-[#FFB020]/25 bg-[#FFB020]/[0.05] px-[0.6em] py-[0.4em]">
+                              <Ban className="h-[1.2em] w-[1.2em] shrink-0 text-[#FFB020]/80" />
+                              <div className="min-w-0 text-[0.8em] font-bold leading-tight text-white/75">Coin limit reached today</div>
+                            </div>
+                          </Beat>
+                        )}
                         {recap.shards > 0 && <RewardTile show={shown('shards')} instant={fast} ms={msOf('shards')} value={recap.shards} label="Shards" color="#A855F7" Icon={Gem} data="shards" />}
                         {recap.credits > 0 && <RewardTile show={shown('credits')} instant={fast} ms={msOf('credits')} value={recap.credits} label="Lab Credits" sub={recap.streakBonus && recap.streakBonus > 0 ? `incl. +${fmt(recap.streakBonus)} streak` : undefined} color="#FFD700" Icon={Coins} data="credits" />}
                         {recap.prqDelta !== 0 && (
@@ -481,6 +523,11 @@ export function EndScreen(props: EndScreenProps) {
                     ) : (
                       <div data-recap="none" className="rounded-2xl border border-white/10 bg-white/[0.03] p-[0.6em] text-center text-[0.85em] text-white/55">No rewards recorded for this run.</div>
                     )
+                  )}
+                  {lvl && recap.xp > 0 && (
+                    <Beat show={shown('level')} instant={fast}>
+                      <LevelCard fill={lvl} gained={recap.xp} active={shown('level')} instant={fast} ms={msOf('level')} onLevelUp={() => fx.cue('levelUp')} />
+                    </Beat>
                   )}
                 </>
               )}
@@ -499,6 +546,28 @@ export function EndScreen(props: EndScreenProps) {
                     <p className="flex items-center justify-center gap-[0.4em] font-bold text-[#00E5FF]">
                       <Award className="h-[1.1em] w-[1.1em]" /> MASTERY UP — {recap.mastery.ups[recap.mastery.ups.length - 1].tier}
                     </p>
+                  </div>
+                </Beat>
+              )}
+
+              {goals.length > 0 && (
+                <Beat show={shown('goals')} instant={fast}>
+                  <div data-end-goals className="rounded-2xl border border-[#FF7A2F]/25 bg-[#FF7A2F]/[0.05] px-[0.7em] py-[0.45em]">
+                    <div className="mb-[0.3em] flex items-center gap-[0.4em] text-[0.72em] font-bold uppercase tracking-[0.2em] text-white/55">
+                      <Target className="h-[1.1em] w-[1.1em] text-[#FF7A2F]" /> Today&apos;s goals <span className="ml-auto font-mono normal-case tracking-normal text-white/45">{goalsDoneCount(goals)}</span>
+                    </div>
+                    <ul className="grid gap-[0.3em] md:grid-cols-3">
+                      {goals.map((g) => (
+                        <li key={g.id} data-goal={g.id} data-goal-state={g.justDone ? 'just-done' : g.done ? 'done' : 'open'} className={`min-w-0 rounded-lg border px-[0.5em] py-[0.3em] ${g.justDone ? 'border-[#FFD700]/60 bg-[#FFD700]/10' : 'border-white/10 bg-black/20'}`}>
+                          <div className="flex items-center gap-[0.3em] text-[0.82em] font-bold text-white/90">
+                            {g.done && <Check className={`h-[1em] w-[1em] shrink-0 ${g.justDone ? 'text-[#FFD700]' : 'text-[#00FF9D]'}`} />}
+                            <span className="truncate">{g.text}</span>
+                          </div>
+                          <div className="mt-[0.2em] h-[0.3em] overflow-hidden rounded-full bg-white/10"><span className="block h-full rounded-full" style={{ width: `${g.pct}%`, background: g.done ? '#00FF9D' : '#FF7A2F' }} /></div>
+                          <div className={`mt-[0.15em] truncate text-[0.72em] ${g.justDone ? 'font-bold text-[#FFD700]' : 'text-white/55'}`}>{g.detail}</div>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                 </Beat>
               )}

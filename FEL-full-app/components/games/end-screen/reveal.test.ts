@@ -39,10 +39,25 @@ describe('the order', () => {
     for (const r of ['xp', 'coins', 'shards', 'credits', 'prq']) expect(steps).not.toContain(r);
   });
 
-  it('a capped run says so; coins capped to nothing are no tile (ECONOMY-CAPS F-P1: no "+0"), capped coins are', () => {
+  // test changed (IMPROVE 2026-10-06, owner decision): coins capped to nothing were no beat at all (ECONOMY-CAPS F-P1);
+  // the owner chose to show the limit, so they are the coins beat ("Coin limit reached today", never a "+0")
+  it('a capped run says so; coins capped to nothing are the coins beat (the limit tile), capped coins are too', () => {
     const steps = buildSteps({ ...base, recap: { xp: 10, shards: 0, credits: 0, prqDelta: 0, capMessage: 'Daily cap reached' }, coins: { coins: 0, capped: true } });
-    expect(steps).toEqual(['moment', 'score', 'cap', 'xp']);
+    expect(steps).toEqual(['moment', 'score', 'cap', 'xp', 'coins']);
     expect(buildSteps({ ...base, recap: { xp: 10, shards: 0, credits: 0, prqDelta: 0 }, coins: { coins: 12, capped: true } })).toContain('coins');
+    expect(buildSteps({ ...base, recap: { xp: 10, shards: 0, credits: 0, prqDelta: 0 }, coins: { coins: 0, capped: false } })).not.toContain('coins');
+  });
+
+  it('IMPROVE (2026-10-06): the level bar follows the reward tiles; today\'s goals follow the season and mastery', () => {
+    const steps = buildSteps({ ...base, recap: paid, coins: { coins: 40, capped: false }, hasProgress: true, hasLevel: true, hasGoals: true, storyReward: true });
+    expect(steps).toEqual(['moment', 'score', 'xp', 'coins', 'shards', 'credits', 'prq', 'level', 'story', 'season', 'mastery', 'goals', 'progress']);
+  });
+
+  it('no level beat without XP paid, no goals beat on an unpaid or NO PLAY run', () => {
+    expect(buildSteps({ ...base, recap: { xp: 0, shards: 1, credits: 0, prqDelta: 0 }, hasLevel: true })).not.toContain('level');
+    expect(buildSteps({ ...base, recap: { ...paid, unpaid: 'AGENT' }, hasLevel: true, hasGoals: true })).not.toContain('goals');
+    expect(buildSteps({ ...base, recap: { ...paid, unpaid: 'AGENT' }, hasLevel: true, hasGoals: true })).not.toContain('level');
+    expect(buildSteps({ ...base, recap: { ...paid, noPlay: true }, hasLevel: true, hasGoals: true })).not.toContain('goals');
   });
 
   it('a story node refused is said before anything else story-shaped', () => {
@@ -67,6 +82,13 @@ describe('the pace: the whole finish fits the budget', () => {
     const [s0] = stepDurations(['season'], 0, 1e9), [s2] = stepDurations(['season'], 2, 1e9), [s9] = stepDurations(['season'], 9, 1e9);
     expect(s2).toBeGreaterThan(s0);
     expect(s9).toBe(stepDurations(['season'], 3, 1e9)[0]);
+  });
+
+  it('each level crossed lengthens the level beat the same way (capped at three), and not the season\'s', () => {
+    const [l0] = stepDurations(['level'], 0, 1e9, 0), [l2] = stepDurations(['level'], 0, 1e9, 2), [l9] = stepDurations(['level'], 0, 1e9, 9);
+    expect(l2).toBeGreaterThan(l0);
+    expect(l9).toBe(stepDurations(['level'], 0, 1e9, 3)[0]);
+    expect(stepDurations(['season'], 0, 1e9, 3)[0]).toBe(BASE_MS.season);
   });
 });
 
@@ -112,5 +134,9 @@ describe('cues', () => {
     expect(cueFor('season', { won: false, newBest: false, tierUps: 1 })).toBe('levelUp');
     expect(cueFor('season', { won: false, newBest: false, tierUps: 0 })).toBe('tick');
     expect(cueFor('unpaid', { won: true, newBest: true, tierUps: 2 })).toBe('soft');
+    expect(cueFor('level', { won: false, newBest: false, tierUps: 0, levelUps: 1 })).toBe('levelUp');
+    expect(cueFor('level', { won: false, newBest: false, tierUps: 3, levelUps: 0 })).toBe('tick');
+    expect(cueFor('goals', { won: false, newBest: false, tierUps: 0, goalsDone: 1 })).toBe('record');
+    expect(cueFor('goals', { won: false, newBest: false, tierUps: 0 })).toBe('tick');
   });
 });
