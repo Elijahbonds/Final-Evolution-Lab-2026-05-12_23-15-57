@@ -11,6 +11,7 @@ import { tierRigSettings, legacyRig, type QualityTier } from './QualityTier';
 import { isLegacyLook } from './graphicsSetting';
 import { mountKickerLight, type KickerHandle } from './KickerLight';
 import { mountEmissiveGlow, type GlowHandle } from './EmissiveGlow';
+import { captureVenueReflection, type VenueReflectionHandle } from './VenueReflection';
 import { mountEnvironmentIBL } from './EnvironmentIBL';
 import { motionPolicy } from '../../a11y/reducedMotion';
 
@@ -37,6 +38,11 @@ export interface LightRigHandle {
   /** Take the pipeline's current exposure/vignette as the new rest — the harness calls it once load() is done, so a
    *  deliberate load-time grade (WeatherFx's time of day) is kept instead of being undone by the first impact. */
   adoptRest(): void;
+  /** A9.7: after load(), capture the venue once for the glossy materials (high tier; false elsewhere). `at` = the play
+   *  area. The capture waits for the scene to be ready, so a scanned venue map still streaming in is in the picture. */
+  captureVenue(at?: Vector3 | null): boolean;
+  /** The venue capture, once taken (high tier). */
+  readonly venueProbe: VenueReflectionHandle | null;
   dispose(): void;
 }
 
@@ -190,6 +196,7 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
   // A9.5: lamp heads, floods, LED strips and neon glow on the tiers that can pay for it; mounted now, before load()
   // builds the venue, so every fixture's glow shader compiles during the load and never mid-play
   const glow = T.glow ? mountEmissiveGlow(scene, tier, mood) : null;
+  let venueProbe: VenueReflectionHandle | null = null;
 
   liftBlackMaterials(scene);
 
@@ -201,6 +208,17 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
       rest.exposure = pipeline.imageProcessing.exposure;
       rest.vignette = pipeline.imageProcessing.vignetteWeight;
     },
+    captureVenue(at) {
+      if (!T.venueProbe) return false;
+      const where = at?.clone() ?? null;
+      scene.executeWhenReady(() => {
+        if (scene.isDisposed) return;
+        venueProbe?.dispose();   // a retried load captures again
+        venueProbe = captureVenueReflection(scene, where);
+      });
+      return true;
+    },
+    get venueProbe() { return venueProbe; },
     flashBeat() {
       // HOTFIX (2026-09-24): reduced motion — no exposure flash (a made three, a momentum tier, the storm's lightning:
       // the thunder still rolls, the sky just does not strobe)
@@ -223,6 +241,7 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
       if ((scene.metadata as { felGradeOwner?: string } | null)?.felGradeOwner === 'rig') delete scene.metadata.felGradeOwner;
       kicker?.dispose();
       glow?.dispose();
+      venueProbe?.dispose();
       hemi.dispose(); sun.dispose(); shadows.dispose(); pipeline.dispose();
       disposeEnv();
     },

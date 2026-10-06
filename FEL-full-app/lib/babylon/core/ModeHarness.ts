@@ -555,6 +555,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
       if (timedOut) return false;                  // late resolve after watchdog: stay on error
       liftBlackMaterials(scene);                   // rescue anything venue-load added
       lights.adoptRest();                          // A9.3: the grade load() settled on is the rest every pulse returns to
+      lights.captureVenue(heroRef.current?.getAbsolutePosition() ?? null);   // A9.7: high tier — the glossy surfaces reflect the real venue
       try { opts.applySkin?.(scene); } catch (e) { console.error('[FEL-ART] applySkin failed', e); }
       // M37: loud spawn assertion — empty world or missing hero never reaches play.
       assertSpawned(scene, { hero: heroRef.current, minWorldMeshes: 8, modeId: def.modeId });

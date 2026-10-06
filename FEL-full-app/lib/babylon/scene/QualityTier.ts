@@ -189,22 +189,24 @@ export interface TierRigSettings {
   fxaa: boolean;
   /** A9.5: the include-list GlowLayer on light fixtures (EmissiveGlow.ts). The phones keep bloom only. */
   glow: boolean;
+  /** A9.7: one 256 px capture of the venue for the glossy materials (VenueReflection.ts). High tier only. */
+  venueProbe: boolean;
 }
 
 /** The pre-pass settings ?look=legacy restores on any tier: FXAA only, no MSAA, no glow. */
-export function legacyRig(t: TierRigSettings): TierRigSettings { return { ...t, msaaSamples: 1, fxaa: true, glow: false }; }
+export function legacyRig(t: TierRigSettings): TierRigSettings { return { ...t, msaaSamples: 1, fxaa: true, glow: false, venueProbe: false }; }
 
 export function tierRigSettings(tier: QualityTier, mood: VenueMood): TierRigSettings {
   if (tier === 'mobile') {
-    return { shadowMapSize: 512, cascaded: false, sharpen: false, bloomScaleMul: 0.7, ssao: false, msaaSamples: 1, fxaa: true, glow: false };
+    return { shadowMapSize: 512, cascaded: false, sharpen: false, bloomScaleMul: 0.7, ssao: false, msaaSamples: 1, fxaa: true, glow: false, venueProbe: false };
   }
-  // high: the desktop rig. The high-only extras arrive with the passes that use them (MSAA, glow, the venue probe).
+  // high: the desktop rig plus the venue reflection probe (the glow's larger target is EmissiveGlow.glowOptions).
   // DESKTOP SHADOWS AT 4096 (owner, 2026-09-19: the graphics pass, "whatever it takes"). 2048 over a 90 m cascade
   // range is ~2 cm of shadow per texel at the far edge, which is why the sunset's long shadows came back soft and
   // stepped while everything else in the frame is sharp. Measured on the dunk arena before and after: the frame is
   // vsync-locked at 16.7 ms either way, zero frames over 33 ms. The map is the one thing in this rig that was
   // visibly under-resolved and the budget had room for it.
-  return { shadowMapSize: 4096, cascaded: OUTDOOR_MOODS.has(mood), sharpen: true, bloomScaleMul: 1, ssao: true, msaaSamples: 4, fxaa: false, glow: true };
+  return { shadowMapSize: 4096, cascaded: OUTDOOR_MOODS.has(mood), sharpen: true, bloomScaleMul: 1, ssao: true, msaaSamples: 4, fxaa: false, glow: true, venueProbe: tier === 'high' };
 }
 
 export interface SsaoHandle { dispose(): void }
