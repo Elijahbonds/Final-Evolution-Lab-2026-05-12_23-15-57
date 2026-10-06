@@ -26,7 +26,7 @@ import { nextPropCategory, stepPropInCategory, guestSlamFactor, idleTip, trickIn
 import { readWalkOut, saveWalkOut, countPlay, musicCredential, type WalkOut } from '../music/WalkOut';
 import { resolveWalkOut, walkOutLine, type WalkOutCue } from '../music/WalkOutCue';
 import { StudioLibrary } from '../music/StudioLibrary';
-import { Color3, Color4, MeshBuilder, Space, Tools, Vector3, type Mesh } from '@babylonjs/core';
+import { Color3, Color4, MeshBuilder, Space, StandardMaterial, Tools, Vector3, type Mesh } from '@babylonjs/core';
 import { TransformNode } from '@babylonjs/core';
 import { dressBall } from '../visual/meshyProps';
 import type { AbstractMesh, AnimationGroup, Camera, Observer, ParticleSystem, PBRMaterial, Scene } from '@babylonjs/core';
@@ -97,7 +97,8 @@ import { missBeat } from '../core/MissFlavour';
 import { spawnDunkObstacle, type DunkObstacle } from './dunkObstacleProps';
 import { LOST_FOUND_HANDOFF, BETWEEN_LEGS_HANDOFF, BEHIND_BACK_SWAP, DOUBLE_EASTBAY_FIRST, DOUBLE_EASTBAY_SECOND, FRONT_SWAP_AT, FRONT_SWAP_BLEND } from '../anim/authored/dunkTricks';
 import { boneNode } from '../anim/boneLookup';
-import { approachAngle, approachBonus, takeoffFor, takeoffTell, rangeLabel } from '../core/DunkApproach';
+import { takeoffFor, takeoffTell, rangeLabel } from '../core/DunkApproach';
+import { takeoffRead, encodeTakeoff, ZONE_HEX, MARK_W, MARK_D, MARK_Y, MARK_ALPHA, type TakeoffInputs, type TakeoffRead, type TakeoffZone } from '../core/DunkTakeoffRead';   // dunk-next phase 7: the live take-off read
 import { NightMemory, dunkElements, originalityLine, freshTip, SHOWPIECE, type Dunker, type OriginalityRead } from '../core/DunkOriginality';   // dunk-next phase 2: the night remembers who showed what first
 import { spinBody, spinProgress } from '../core/DunkSpinBody';
 import { emptyCard, addAttempt, forWire, nightReport } from '@/lib/mp/dunkCard';
@@ -1366,7 +1367,7 @@ export const DunkMode: ModeDefinition = (() => {
         walkOutNow: walkOutLine(walkCue),
         attempt: stakesLabel(stakes, calledLabel()),
         rivalName: foe.name,
-        dunkOff: '', nightDunkOff: '', beats: '', rivalSkip: false,   // dunk-next: a reload starts with no dunk-off, no beat strip, no skip chip
+        dunkOff: '', nightDunkOff: '', beats: '', rivalSkip: false, takeoff: '',   // dunk-next: a reload starts with no dunk-off, no beat strip, no skip chip, no take-off read
       });
       startField(ctx);   // dunk-next phase 5: tonight's four dunkers
       readUnlocks(); challenge = null; ctx.setHud({ challenge: '', nightUnlock: '' });   // dunk-next phase 6: the device's ladder
@@ -1829,6 +1830,7 @@ export const DunkMode: ModeDefinition = (() => {
         // run starts (a single bounce is a ~1 s throw — from standing, Y throws the bounce-BOUNCE with a RUN cue)
         if (prop === 'offglass' && !lob.thrown && !runwayBeat && !pendingBeat && player.root.position.z <= gatherLine() + AUTO_GLASS_AHEAD_M) startRunwayBeat(ctx, runwayTrickById('offglass'));
         if (prop === 'bounce' && !lob.thrown && !runwayBeat && !pendingBeat && phaseSec >= 0.05) startRunwayBeat(ctx, runwayTrickById('bounce'));
+        if (turn === 'player') liveTakeoff(ctx);   // dunk-next phase 7: where he would leave the floor, and on which foot
         const line = gatherLine();
         if (player.root.position.z <= line) {
           player.root.position.z = line;
@@ -2435,6 +2437,7 @@ export const DunkMode: ModeDefinition = (() => {
       if (ikScene && hingeObs) ikScene.onAfterAnimationsObservable.remove(hingeObs); hingeObs = null;
       handIkObs = null; ikScene = null; handIkT = 0;
       ring?.dispose(); ring = null;
+      takeoffMark?.dispose(); takeoffMark = null; takeoffMat?.dispose(); takeoffMat = null; takeoffSent = ''; takeoffZone = null;   // dunk-next phase 7
       player?.dispose(); rival?.dispose(); replay?.dispose(); ball?.dispose();
       stopWalkOut(); walkAudio = null; walkCue = null; walkOut = null;
       clearProps(); SoundKit.stopAmbient(); feet = { L: null, R: null };
@@ -2753,6 +2756,48 @@ export const DunkMode: ModeDefinition = (() => {
 
   /** `cause`: the player's own press launched it (RUN let go, A on the run) or the mode did (the line, a beat, the bus, the
    *  watchdog) — after an automatic launch the player's "tap JUMP" is still coming, and is not the slam (core/slamPress). */
+  // ── dunk-next phase 7: THE LIVE TAKE-OFF READ (core/DunkTakeoffRead) ─────────────────────────────────────────────────────────
+  // Owner, 2026-10-06: "while running up, show where you'll leave the floor and on which foot (a marker on the floor + a small HUD read)".
+  // The read is the take-off you would get going up NOW (A on the run, or letting go of RUN, leaves from the feet; held to the line, the
+  // line is now when you get there), computed by the function launchDunk judges with — the chip is what the card gets. The mark is a
+  // bar across the run at the feet, coloured by the zone (the stripe gold, the elbow cyan, the paint white); at the take-off it stays
+  // on the floor where he left, through the flight and the replay, until the next attempt.
+  let takeoffMark: Mesh | null = null, takeoffMat: StandardMaterial | null = null, takeoffSent = '', takeoffZone: TakeoffZone | null = null;
+  /** TUNED (dunk-next phase 7): the tick when the read crosses into another zone on the run — the beat bar's rising scale, quieter. */
+  const ZONE_TICK_PITCH: Readonly<Record<TakeoffZone, number>> = { rim: 1.0, paint: 1.1, elbow: 1.25, stripe: 1.45 }, ZONE_TICK_VOLUME = 0.16;
+  function takeoffInputs(): TakeoffInputs {
+    const p = player.root.position;
+    return { x: p.x, z: p.z, rimX: rim.x, rimZ: rim.z, jOffsetX: curveOffset(p.z - gatherLine()), runUpPeak, gatherHeld, forceTwo: isDubble(prop) };
+  }
+  function placeTakeoffMark(r: TakeoffRead): void {
+    const scene = player.root.getScene();
+    if (!takeoffMark) {
+      takeoffMark = MeshBuilder.CreateGround('dunk_takeoff_mark', { width: MARK_W, height: MARK_D }, scene);
+      takeoffMat = new StandardMaterial('dunk_takeoff_mark_m', scene);
+      takeoffMat.disableLighting = true; takeoffMat.alpha = MARK_ALPHA; takeoffMat.backFaceCulling = false;
+      takeoffMark.material = takeoffMat; takeoffMark.isPickable = false;
+    }
+    if (takeoffZone !== r.zone && takeoffMat) takeoffMat.emissiveColor = Color3.FromHexString(ZONE_HEX[r.zone]);
+    takeoffMark.position.set(player.root.position.x, MARK_Y, player.root.position.z);
+    takeoffMark.rotation.y = player.root.rotation.y;   // across the run, whichever way it bends
+    takeoffMark.setEnabled(true);
+  }
+  /** Every frame of the player's run: the mark under the feet, the chip on change only (a few writes a run), a tick on a new zone. */
+  function liveTakeoff(ctx: ModeContext): void {
+    const r = takeoffRead(takeoffInputs());
+    const was = takeoffZone;
+    placeTakeoffMark(r);
+    takeoffZone = r.zone;
+    const s = encodeTakeoff(r);
+    if (s === takeoffSent) return;
+    if (takeoffSent && was && was !== r.zone) SoundKit.play('uiTick', { pitch: ZONE_TICK_PITCH[r.zone], volume: ZONE_TICK_VOLUME });
+    takeoffSent = s; ctx.setHud({ takeoff: s });
+  }
+  function clearTakeoff(ctx: ModeContext): void {
+    takeoffMark?.setEnabled(false); takeoffZone = null;
+    if (takeoffSent) { takeoffSent = ''; ctx.setHud({ takeoff: '' }); }
+  }
+
   function launchDunk(ctx: ModeContext, cause: LaunchCause = 'auto'): void {
     if (phase === 'cinematic') return;
     if (runwayBeat) endRunwayBeat(true);   // a toss / kick / cartwheel still running gives the body to the takeoff (no run loop in between — the launch clip crossfades out of the beat)
@@ -2815,13 +2860,12 @@ export const DunkMode: ModeDefinition = (() => {
     // HOW FAR OUT HE LEFT THE FLOOR is the third thing judged now. It was judged nowhere before, so the
     // free-throw-line dunk -- the most iconic moment the event has -- paid exactly what a standing dunk
     // paid. XZ only: the rim is 3.05 m up and counting that would make every dunk read as "from range".
-    const takeoffRange = Math.hypot(player.root.position.x - rim.x, player.root.position.z - rim.z);
-    const approach = approachBonus(
-      // DUNK MOTION phase 7: the J's own offset is the mode's, not the player's — a straight hold-run still reads head-on
-      approachAngle(player.root.position.x - curveOffset(player.root.position.z - gatherLine()), player.root.position.z, rim.x, rim.z),
-      isDubble(prop) ? 'two' : takeoffFor(runUpPeak, gatherHeld),
-      takeoffRange,
-    );
+    // dunk-next phase 7: ONE read — the take-off the run was showing (core/DunkTakeoffRead: DunkApproach's angle, foot and range off
+    // the feet; DUNK MOTION phase 7: the J's own offset is the mode's, not the player's — a straight hold-run still reads head-on)
+    const tread = takeoffRead(takeoffInputs());
+    const takeoffRange = tread.rangeM;
+    const approach = tread.read;
+    if (turn === 'player') { placeTakeoffMark(tread); ctx.setHud({ takeoff: '' }); takeoffSent = ''; }   // the mark stays where he left the floor; the strip takes the HUD
     const prof = launchProfile(approach.takeoff, vectorLive(), vectorWallRun);   // DUNK PARKOUR: the foot's launch, and the corner prop if it was just used
     console.info(`[DUNK-PARKOUR] ${prof.label} apex x${prof.apexMult.toFixed(2)} +${prof.difficulty.toFixed(1)} diff`);
     launchTag = prof.label; launchCarry = prof.carryMult; launchFoot = approach.takeoff;
@@ -4463,6 +4507,7 @@ export const DunkMode: ModeDefinition = (() => {
     const deficit = rivalTotal - playerTotal;
     const need = isFinalRound && dunkOff === 0 ? Math.max(0, deficit + RIVAL_PACE) : 0;   // (dunk-next: the dunk-off has no pace to chase — he answers you)
     revealTail = -1; revealHold = false; hangPrompt = false; lineHint = '';   // IMPROVE (2026-10-06)
+    clearTakeoff(ctx);   // dunk-next phase 7: the mark and the read go with the attempt
     runwayHint = practice ? 'PRACTICE — HOLD to run · JUMP at the line · SLAM on NOW! · R1 back to the contest'
       : dunkOff > 0 ? `DUNK-OFF — one dunk, ${foe.name} answers it. Make it one he cannot.`
       : need > 0 ? `FINAL ROUND — you need big numbers (${deficit > 0 ? `down ${deficit}` : `up ${-deficit}`})` : 'HOLD to run · tap JUMP at the line — then SLAM on NOW!';

@@ -22,6 +22,7 @@ import { hnode, hnum } from './hud-format';
 import { DunkPoster } from './dunk-poster';
 import { DunkBeatStrip } from './dunk-beat-strip';
 import { DunkFieldBoard } from './dunk-field-board';
+import { decodeTakeoff, ZONE_HEX } from '@/lib/babylon/core/DunkTakeoffRead';
 import { MicCaption, MicToggle } from './mic-caption';
 import type { HudPoster } from '@/lib/babylon/core/ModeHarness';
 
@@ -367,6 +368,20 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
           </span>
         </div>
       )}
+
+      {/* dunk-next phase 7 — THE TAKE-OFF READ: on the run, the foot and where he would leave the floor going up NOW, in the judges' own
+          words and the floor mark's colour (the stripe gold, the elbow cyan, the paint white). The beat strip takes this spot in the air. */}
+      {(() => {
+        const t = decodeTakeoff(hud.takeoff);
+        if (!t || phase !== 'playing' || judging || (typeof hud.beats === 'string' && hud.beats)) return null;
+        return (
+          <div className="pointer-events-none absolute inset-x-0 flex justify-center px-3" style={{ bottom: 'calc(clamp(2.5rem, calc((640px - 100vw) * 999), 17.5rem) + 2.6rem)' }}>
+            <span className="fel-panel inline-flex items-center gap-2 px-3 py-1 font-mono text-[11px] font-bold uppercase tracking-[0.14em]" style={{ color: ZONE_HEX[t.zone] }} data-fel-takeoff={t.zone}>
+              <span className="text-white/45">TAKE-OFF</span>{t.chip}
+            </span>
+          </div>
+        );
+      })()}
 
       {/* dunk-next phase 1 — THE BEAT STRIP: RISE · HANG · PRE · SLAM, the tricks under their beats, PERFECT FLIGHT. Above the hint, out of
           the way of the rim; it stands aside for the triple cut and the judges. */}

@@ -304,6 +304,34 @@ describe('owner decision 2026-10-06 — staked and ladder nights play the classi
   });
 });
 
+describe('phase 7 — the live take-off read', () => {
+  it('the run and the take-off read through ONE function with ONE set of inputs — the chip is what the card gets', () => {
+    expect(fn('takeoffInputs')).toMatch(/return \{ x: p\.x, z: p\.z, rimX: rim\.x, rimZ: rim\.z, jOffsetX: curveOffset\(p\.z - gatherLine\(\)\), runUpPeak, gatherHeld, forceTwo: isDubble\(prop\) \};/);
+    const ld = fn('launchDunk');
+    expect(ld).toMatch(/const tread = takeoffRead\(takeoffInputs\(\)\);\n\s*const takeoffRange = tread\.rangeM;\n\s*const approach = tread\.read;/);
+    expect(ld).not.toMatch(/approachBonus\(|approachAngle\(/);
+    expect(fn('liveTakeoff')).toMatch(/const r = takeoffRead\(takeoffInputs\(\)\);/);
+  });
+  it('the player\'s run reads it every frame before the line can launch; the chip goes on change only, with a tick on a new zone', () => {
+    const at = DUNK.indexOf("if (turn === 'player') liveTakeoff(ctx);");
+    expect(at).toBeGreaterThan(0);
+    expect(at).toBeLessThan(DUNK.indexOf('const line = gatherLine();', at));
+    const lt = fn('liveTakeoff');
+    expect(lt).toMatch(/if \(s === takeoffSent\) return;/);
+    expect(lt).toMatch(/if \(takeoffSent && was && was !== r\.zone\) SoundKit\.play\('uiTick'/);
+  });
+  it('at the take-off the mark stays where he left the floor and the strip takes the HUD; the next attempt clears both', () => {
+    expect(fn('launchDunk')).toMatch(/if \(turn === 'player'\) \{ placeTakeoffMark\(tread\); ctx\.setHud\(\{ takeoff: '' \}\); takeoffSent = ''; \}/);
+    expect(fn('resetForNextAttempt')).toMatch(/clearTakeoff\(ctx\);/);
+    expect(DUNK).toMatch(/takeoffMark\?\.dispose\(\); takeoffMark = null; takeoffMat\?\.dispose\(\);/);
+  });
+  it('the host draws the chip in the zone\'s colour, and gives the spot to the beat strip in the air', () => {
+    expect(HOST).toMatch(/const t = decodeTakeoff\(hud\.takeoff\);/);
+    expect(HOST).toMatch(/\(typeof hud\.beats === 'string' && hud\.beats\)\) return null;/);
+    expect(HOST).toMatch(/style=\{\{ color: ZONE_HEX\[t\.zone\] \}\} data-fel-takeoff=\{t\.zone\}/);
+  });
+});
+
 describe('phase 6 — challenges and unlocks', () => {
   it('practice without a challenge is never judged; with one, the card is computed off the night (no totals, card, stakes or memory)', () => {
     const fp = fn('finishPractice');
