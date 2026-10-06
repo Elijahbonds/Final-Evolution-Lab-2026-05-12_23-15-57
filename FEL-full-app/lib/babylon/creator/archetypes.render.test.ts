@@ -81,6 +81,12 @@ describe('the ten archetypes on the real kit (a dunk scene)', () => {
       expect(parts.meshes.length).toBeLessThanOrEqual(24);
       expect(parts.materials.length).toBeLessThanOrEqual(4);
       for (const m of parts.meshes) { expect(m.isPickable).toBe(false); expect(m.checkCollisions).toBe(false); expect(s.meshes).not.toContain(m); }
+      // phase 4c: bendable parts are skinned to their own chain, one mesh per finish, on a skeleton that is never the body's
+      const swing = parts.meshes.filter((m) => m.metadata?.felSwing);
+      if (a.slot.doc.parts.some((p) => (p.swing ?? 0) > 0)) expect(swing.length).toBeGreaterThan(0);
+      for (const m of swing) expect(m.skeleton).not.toBe(s.skeleton);
+      const glow = (paintStats(s.root)?.targets ?? []).filter((t) => t.glowSize > 0);
+      console.info(`[4c draws] ${a.name}: ${parts.meshes.length} part draws (${swing.length} bendable), ${parts.materials.length} materials, ${glow.length} glow textures${glow.length ? ` at ${glow[0].glowSize}²` : ''}`);
       expect(s.meshes.length).toBe(count0);
       expect(s.meshes.map((m) => [m.name, m.isPickable, m.checkCollisions])).toEqual(pickable0);
       // paint at the tier's size
