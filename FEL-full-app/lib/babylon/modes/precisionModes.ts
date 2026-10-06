@@ -25,17 +25,17 @@ import { kickPips, type KickResult } from '../core/penaltyHud';
 import { freshDerby, bankSwing, distanceLine, OUTS_CAP, type DerbyTally } from '../core/derbyHud';
 import { rivalProgress } from '../core/CarnivalNight';
 import { holeName, cardString, windBearingDeg, windWord, holeBoard, ACCURACY_CENTER as GH_ACC_CENTER, ACCURACY_HALF as GH_ACC_HALF, type HoleResult } from '../core/golfHud';
-import { Color3, MeshBuilder, Quaternion, StandardMaterial, Vector3 } from '@babylonjs/core';
+import { Color3, Matrix, MeshBuilder, Quaternion, StandardMaterial, Vector3 } from '@babylonjs/core';
 import { dressBall } from '../visual/meshyProps';
 import { boneNode } from '../anim/boneLookup';
 import { planRivalKick, gradeDive, resolveSave, type DiveSign, type RivalKickPlan } from '../core/KeeperCore';
-import type { AbstractMesh, Observer, Scene } from '@babylonjs/core';
+import type { AbstractMesh, Material, Observer, ParticleSystem, PBRMaterial, Scene } from '@babylonjs/core';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import type { SpawnedCharacter } from '../core/CharacterLibrary';
 import { assertSpawned } from '../core/FrameGuard';
 import {
-  spawnAthlete, Reticle, PowerMeter, Flight, swingQuality, swingSide,
+  spawnAthlete, Reticle, PowerMeter, POWER_METER_RATE, Flight, swingQuality, swingSide,
   buildGolfGreen, buildPlateAndMound, buildGoal, buildBallparkOutfield, spawnFoe } from './aimSwingCore';
 import { SPORT_CLIP } from '../anim/clipRegistry';
 import { BeatOwner } from '../anim/beatOwner';
@@ -57,8 +57,11 @@ import { PRECISION_CONFIG as CFG } from './modeConfigs';
 // lines to gauge power. upgrade physics, weather") — the arrow + landing ring (AimArrow), the meter's carry lines and the
 // shot's launch (GolfAim), the flight itself (GolfBallSim: drag, Magnus, bounce, roll, wind through the air, wet turf),
 // and the weather (WeatherKit read from the start screen's chip, WeatherFx for what it looks like).
-import { GolfBallSim, greenBreakSlope, resolvePutt, type Surface as GolfSurface } from '../core/GolfBall';
-import { WII_CLUBS, WII_PUTTER, turnAim, launchVelocity, simulateShot, meterTicks, carryAt, type WiiClub, type AirLike } from '../core/GolfAim';
+import { GolfBallSim, greenBreakSlope, type Surface as GolfSurface } from '../core/GolfBall';
+import { WII_CLUBS, WII_PUTTER, turnAim, launchVelocity, simulateShot, simulatePutt, puttLaunch, MeterTickJob, carryAt, type WiiClub, type AirLike } from '../core/GolfAim';
+// IMPROVE (2026-10-06, docs/IMPROVEMENTS-2026-10-05.md § Golf): the loop's pure reads — the seeded course, the stick path,
+// the rhythm decay, the OB drop, the timers / banner channel the mode clears on dispose, the meter HUD's change gate.
+import { loopHole, loopSeed, loopWindAngle, LOOP_TEE, stickPathErr, rhythmAfter, obDrop, inBounds, rotateAbout, TimerBag, BannerChannel, MeterHudGate } from '../core/GolfLoop';
 import { mountAimArrow, type AimArrowHandle } from '../visual/AimArrow';
 import { WeatherKit } from '../core/WeatherKit';
 import { readWeather } from '../nexus/weather';
@@ -119,8 +122,14 @@ export const PUTTER: WiiClub = WII_PUTTER;
 
 /** Strokes each hole is expected to take. Golf is scored against this. */
 export const GOLF_PAR = [3, 4, 4, 3, 5] as const;   // FIELD-DEPTH W4: five-hole loop
-/** Within this many metres the ball is holed. */
-export const HOLED_M = 1.6;
+/** Within this many metres the ball is holed — a tap-in gimme; the cup itself is GolfBallSim.tryHole (CUP_RADIUS_M).
+ *  IMPROVE (2026-10-06, Golf #3): was 1.6 m, so most putting was trivial — and it hid that a short putt could not reach
+ *  the cup at all (a 2 m putt at full power rolled 0.8 m; see GolfAim.puttSpeedFor). With the putt rolling its pace,
+ *  the cup does the holing and this is only the gimme. */
+export const HOLED_M = 0.75;
+/** IMPROVE (2026-10-06, Golf #7): the swing meter's wave on the green (rad/s; every other swing runs POWER_METER_RATE
+ *  3.4). Pace is the whole putt, and the full-swing wave made it a coarse grab. */
+export const GOLF_PUTT_METER_RATE = 2.6;
 /** Stick pulled past this is a backswing; pushed past it is the strike. */
 export const SWING_STICK = 0.6;
 
@@ -137,7 +146,11 @@ export const GolfMode: ModeDefinition = (() => {
   let strikeIn = 0; let pendingStrike: (() => void) | null = null; let pendingVel: Vector3 | null = null;
   let furniture: AbstractMesh[] = [];
   let ball: AbstractMesh, sim: GolfBallSim, meter: PowerMeter;
-  let holePos = new Vector3(0, 0, 55);
+  /** IMPROVE (2026-10-06, Golf #2 / #18): ONE vector, moved in place per hole. It was reassigned per hole, so the
+   *  objectiveRef the load handed FrameGuard kept the first value (0, 0, 55) — off the field — for the whole round. */
+  const holePos = new Vector3(0, 0, 55);
+  /** IMPROVE (2026-10-06, Golf #2): the round's course seed — the holes and the wind's heading are new each play. */
+  let seed = 0;
   /** WII AIM: the arrow's yaw (the stick turns it inside ±60° of the pin line), what it draws, the meter's carry lines. */
   let aimYaw = 0; let arrow: AimArrowHandle | null = null; let ticks: number[] = []; let flightSec = 0;
   let weather: WeatherKit = new WeatherKit(); let weatherFx: WeatherFxHandle | null = null;
@@ -145,7 +158,7 @@ export const GolfMode: ModeDefinition = (() => {
   let phase: 'preview' | 'aim' | 'power' | 'accuracy' | 'flight' = 'aim';
   let previewSec = 0, power = 0;
   let club = 0;                       // which club is in hand
-  let wind = new Vector3();           // per-hole wind, applied in flight
+  const wind = new Vector3();         // per-hole wind, applied in flight (written in place)
   let strokes = 0, overPar = 0;       // golf is scored in strokes against par
   let holeLatch = false;              // A+ P0 juice: one holed punch per hole
   let pickUps = 0;   // triple-par pick-ups this round (owner decision 2026-09-05)
@@ -153,6 +166,10 @@ export const GolfMode: ModeDefinition = (() => {
    *  a stick swing does not express on a touch overlay and 3-click is the
    *  better mobile input, so the mode offers both. */
   let backswing = 0, pulling = false;
+  /** IMPROVE (2026-10-06, Golf #1): the stick's peak sideways deflection from the pull-back to the push-through — the path. */
+  let pathPeakX = 0;
+  /** IMPROVE (2026-10-06, Golf #4): where this shot was struck from (the OB drop goes on the line from here). */
+  const lie = new Vector3();
   /**
    * The beat between a ball coming to rest and the player walking to it.
    *
@@ -170,10 +187,28 @@ export const GolfMode: ModeDefinition = (() => {
   let gallery: Onlookers | null = null;
   let flag: AbstractMesh | null = null;
   let ended = false;
+  /** IMPROVE (2026-10-06, Golf #10 / #11): every timeout goes through `timers` (cleared on dispose; each callback also
+   *  checks `ended`), and every flash banner through one channel, so a FLICK's clear can no longer wipe a RING mid-flight. */
+  const timers = new TimerBag();
+  let banners: BannerChannel | null = null;
+  const later = (fn: () => void, ms: number) => timers.later(() => { if (!ended) fn(); }, ms);
+  /** IMPROVE (2026-10-06, Golf #8): the ball's tracer (a shot's flight and roll-out, stopped at rest) and its own white. */
+  let trail: ParticleSystem | null = null;
+  /** IMPROVE (2026-10-06, Golf #6 / #8 / #15): the mode's own materials, made once per load and disposed with the mode —
+   *  the park's four and the wind flag's were made again every hole and never disposed. */
+  let mats: { pad: PBRMaterial; ring: PBRMaterial; fan: PBRMaterial; bank: PBRMaterial; flag: PBRMaterial; ball: PBRMaterial } | null = null;
+  /** IMPROVE (2026-10-06, Golf #13 / #14 / #17 / #18): the aim's last exact prediction (turned with the arrow between
+   *  refreshes), the meter lines being built a flight per frame, the meter HUD's change gate, the frame's scratch. */
+  let aimDirty = false, aimRefreshT = 0, predYaw = 0, predLen = 0;
+  const predCarry = { x: 0, z: 0 }, predRest = { x: 0, z: 0 }, drawCarry = { x: 0, z: 0 }, drawRest = { x: 0, z: 0 };
+  const AIM_REFRESH_SEC = 0.1;
+  let tickJob: MeterTickJob | null = null;
+  const meterHud = new MeterHudGate();
+  const aimDir = new Vector3(); const STILL = Vector3.Zero();   // STILL is read, never written
   const TOTAL = 5;   // FIELD-DEPTH W4: matches GOLF_PAR length
   /** phase 8: the golfer's RHYTHM gauge (the shared FLOW chip): clean strikes build it, at 70+ the strike is steadier (path error halved) */
   let golfFlow = 0;
-  const GOLF_FLOW_CLEAN = 35, GOLF_FLOW_RHYTHM = 70, GOLF_FLOW_FORGIVE = 0.5;
+  const GOLF_FLOW_RHYTHM = 70, GOLF_FLOW_FORGIVE = 0.5;   // the gain and the miss decay: GolfLoop.rhythmAfter
   const PREVIEW_SEC = 1.8;
   const ACCURACY_CENTER = GH_ACC_CENTER;         // wave value to hit on the way down (one source with the drawn band: core/golfHud)
   const ACCURACY_HALF = GH_ACC_HALF;
@@ -192,7 +227,7 @@ export const GolfMode: ModeDefinition = (() => {
   function buildHolePark(ctx: ModeContext): void {
     teePos.copyFrom(ball.position); ringsTaken.clear(); ringMeshes.clear(); ringChain = 0; pad = null; slidePutt = false; bankRode = false; gusting = false;
     const tee = { x: teePos.x, z: teePos.z }, hole = { x: holePos.x, z: holePos.z };
-    const padMat = VenueKit.paint(ctx.scene, 'gp_pad_mat', '#22d3ee', 0.3, 0.5), ringMat = VenueKit.paint(ctx.scene, 'gp_ring_mat', '#9ad7ff', 0.45, 0.4), fanMat = VenueKit.paint(ctx.scene, 'gp_fan_mat', '#d9d2c2', 0.08, 0.6), bankMat = VenueKit.paint(ctx.scene, 'gp_bank_mat', '#2f7a42', 0.06, 0.9);
+    const { pad: padMat, ring: ringMat, fan: fanMat, bank: bankMat } = golfMats(ctx);   // IMPROVE #15: made once, not per hole
     const yaw = Math.atan2(hole.x - tee.x, hole.z - tee.z);
     const board = MeshBuilder.CreateBox('gp_springboard', { width: 1.2, height: 0.12, depth: 0.9 }, ctx.scene);
     board.position.set(tee.x - Math.sin(yaw) * 1.1, 0.06, tee.z - Math.cos(yaw) * 1.1); board.rotation.y = yaw; board.material = padMat; board.isPickable = false; furniture.push(board);
@@ -211,6 +246,34 @@ export const GolfMode: ModeDefinition = (() => {
     bank.position.set(hole.x, -0.25, hole.z); bank.scaling.y = 0.75; bank.material = bankMat; bank.isPickable = false; furniture.push(bank);
   }
 
+  /** IMPROVE (2026-10-06, Golf #6 / #8 / #15): the mode's materials, once per load. */
+  function golfMats(ctx: ModeContext): NonNullable<typeof mats> {
+    if (mats) return mats;
+    const flagMat = VenueKit.paint(ctx.scene, 'golf_wind_flag_m', '#ffcf3a', 0.18, 0.7);
+    flagMat.albedoColor = flagMat.albedoColor.scale(0.42);   // the green's LIT divisor (aimSwingCore): under this rig an unscaled pick clips pale
+    mats = {
+      pad: VenueKit.paint(ctx.scene, 'gp_pad_mat', '#22d3ee', 0.3, 0.5), ring: VenueKit.paint(ctx.scene, 'gp_ring_mat', '#9ad7ff', 0.45, 0.4),
+      fan: VenueKit.paint(ctx.scene, 'gp_fan_mat', '#d9d2c2', 0.08, 0.6), bank: VenueKit.paint(ctx.scene, 'gp_bank_mat', '#2f7a42', 0.06, 0.9),
+      flag: flagMat,
+      ball: VenueKit.paint(ctx.scene, 'golf_ball_m', '#f7f7f2', 0.35, 0.35),   // a white ball that holds its white on the grass
+    };
+    return mats;
+  }
+  /**
+   * IMPROVE (2026-10-06, Golf #15): the hole's furniture goes WITH its per-hole materials. `f.dispose()` leaves a mesh's
+   * material behind, and buildGolfGreen paints four new ones each hole; the mode's own (golfMats) are kept for the next.
+   */
+  function clearFurniture(): void {
+    const keep = new Set<Material>(mats ? Object.values(mats) : []);
+    const drop = new Set<Material>();
+    for (const f of furniture) { const m = f.material; if (m && !keep.has(m)) drop.add(m); f.dispose(); }
+    for (const m of drop) m.dispose();
+    furniture = [];
+  }
+  const parOf = (r: number): number => GOLF_PAR[Math.min(r, GOLF_PAR.length) - 1] ?? 3;
+  /** Flat distance from the ball to the pin (no Vector3 made: onGreen() runs every frame). */
+  function distToPin(): number { return Math.hypot(ball.position.x - holePos.x, ball.position.z - holePos.z); }
+
   function nextShot(ctx: ModeContext): void {
     round++;
     // ON THE COURSE. VenueKit.buildField(scene, 'golf') builds 60 x 90, so the
@@ -218,18 +281,30 @@ export const GolfMode: ModeDefinition = (() => {
     // up to z 69. Holes 2 and 3 sat off the end of the world, the preview camera
     // flew out over the void behind them, and the watchdog reported a black
     // frame. Kept well inside the field now.
-    holePos = new Vector3(((round * 53) % 21) - 10, 0, 26 + ((round * 31) % 13));
-    furniture.forEach((f) => f.dispose());
+    // IMPROVE (2026-10-06, Golf #2): the pin was `((round * 53) % 21) - 10, 26 + ((round * 31) % 13)` — the same five holes
+    // every session, at lengths that ignored the card (hole 1, a par 3, was 30 m; hole 4, a par 3, 33 m). The hole's
+    // LENGTH now comes from its par (GolfLoop.PAR_BANDS: par 3 22–26 m, par 4 28–32 m, par 5 34–37.4 m) and its line from
+    // the round's seed, inside the same x ±10, z ≤ 38 box. GOLF_PAR itself is unchanged (the score ceiling reads it).
+    const h = loopHole(parOf(round), seed, round);
+    holePos.set(h.x, 0, h.z);
+    clearFurniture();
     furniture = buildGolfGreen(ctx.scene, holePos);
     // L2 — THE WIND, READABLE FROM THE COURSE. It was a number in the HUD only,
     // and "course reading" is one of the three pillars the benchmark names: a
     // player should be able to look at the hole and see which way it blows.
     // The flag leans with it, harder in a stronger wind.
+    // IMPROVE (2026-10-06, Golf #6): it wore `furniture[0].material` — the GREEN's paint — so the wind flag vanished
+    // against the green it stood on, while the kit's static red flag (which reads no wind) stood over it at the same
+    // spot. One flag now, the wind's, in a yellow of its own; and it hangs from the POLE and streams DOWNWIND (it turned
+    // about its own middle and lay across the wind, so even when seen it pointed the wrong way).
+    for (const f of furniture) if (f.name === 'flag') f.setEnabled(false);
     flag?.dispose();
-    flag = MeshBuilder.CreateBox('pinFlag', { width: 0.7, height: 0.34, depth: 0.03 }, ctx.scene);
-    flag.position = holePos.add(new Vector3(0.35, 1.85, 0));
-    flag.material = furniture[0]?.material ?? null;
-    ball.position.set(0, 0.05, 0.6);
+    const flagBox = MeshBuilder.CreateBox('pinFlag', { width: 0.7, height: 0.34, depth: 0.03 }, ctx.scene);
+    flagBox.bakeTransformIntoVertices(Matrix.Translation(0.35, 0, 0));   // the box's origin at its pole edge: it turns on the pole
+    flag = flagBox;
+    flag.position.set(holePos.x, 1.85, holePos.z);
+    flag.material = golfMats(ctx).flag; flag.isPickable = false;
+    ball.position.set(LOOP_TEE.x, 0.05, LOOP_TEE.z);
     meAnim.loop(SPORT_CLIP.golfAddress, { fadeSec: 0.3 });
     strikeIn = 0; pendingStrike = null;
     // HOLE PREVIEW — fly the camera to the green, look back at the tee.
@@ -237,19 +312,22 @@ export const GolfMode: ModeDefinition = (() => {
     strokes = 0;
     holeLatch = false;                // A+ P0: a new hole gets its own punch
     settling = false;
+    trail?.stop();
     // COURSE READING — the third pillar, and none of its inputs existed. Wind
     // is the cheapest honest one: it is visible in the HUD before you commit,
     // it pushes the ball for the whole flight, and it makes the reticle a
     // starting point rather than an answer.
-    const wa = (round * 2.399) % (Math.PI * 2);
-    wind = new Vector3(Math.sin(wa) * (1.2 + (round % 3) * 0.9), 0, Math.cos(wa) * 0.6);
+    const wa = loopWindAngle(round, seed);   // IMPROVE #2: the old golden-angle walk from a seeded heading
+    wind.set(Math.sin(wa) * (1.2 + (round % 3) * 0.9), 0, Math.cos(wa) * 0.6);
     // WEATHER: a pick that carries wind (a windy day, a storm, rain) sets the hole's wind — one value, not a second one
-    { const w = weather.flightWind(); if (Math.hypot(w.x, w.z) >= 0.5) wind = new Vector3(w.x, 0, w.z); }
+    { const w = weather.flightWind(); if (Math.hypot(w.x, w.z) >= 0.5) wind.set(w.x, 0, w.z); }
     if (flag) {
       // Point the flag downwind and lean it by strength — the reading a golfer
       // actually takes before choosing a club.
-      flag.rotation.y = Math.atan2(wind.x, wind.z);
-      flag.rotation.z = -Math.min(0.9, wind.length() * 0.35);
+      // IMPROVE #6: the box's long side is its local +x, so DOWNWIND is the wind's bearing less a quarter turn; a still
+      // flag hangs (1.2 rad below level) and a 3 m/s wind flies it out flat — more wind, less droop.
+      flag.rotation.y = Math.atan2(wind.x, wind.z) - Math.PI / 2;
+      flag.rotation.z = -Math.max(0.1, 1.2 - wind.length() * 0.35);
     }
     phase = 'preview'; previewSec = 0;
     // The hole preview is an AUTHORED SHOT: the camera flies to the green and
@@ -264,7 +342,7 @@ export const GolfMode: ModeDefinition = (() => {
     const clutch = round === TOTAL;
     ctx.setHud({
       round: `${round}/${TOTAL}`, power: 0, accuracy: '',
-      hint: clutch ? 'FINAL SHOT — study the green' : `HOLE ${round} — ${Math.round(Vector3.Distance(ball.position, holePos))}m out`,
+      hint: clutch ? 'FINAL SHOT — study the green' : `HOLE ${round} · PAR ${parOf(round)} — ${Math.round(distToPin())}m out`,
     });
     buildHolePark(ctx);   // PARKOUR GOLF
   }
@@ -277,7 +355,7 @@ export const GolfMode: ModeDefinition = (() => {
    *  instead of two implementations that drift apart. */
   /** On the green the club is taken out of your hands — you putt. */
   function onGreen(): boolean {
-    return Vector3.Distance(new Vector3(ball.position.x, 0, ball.position.z), holePos) <= PUTT_RANGE_M;
+    return distToPin() <= PUTT_RANGE_M;   // IMPROVE #18: it built a Vector3 on every call, and it is called every frame
   }
 
   /** The course under the ball: the green is the hole's disc, the fairway the mown strip, the rest is rough. */
@@ -291,15 +369,48 @@ export const GolfMode: ModeDefinition = (() => {
   function pinYaw(): number { const v = holePos.subtract(ball.position); return Math.atan2(v.x, v.z); }
   /** Redraw the arrow (this club, full power, this wind) and, when asked, the meter's carry lines. */
   function refreshAim(ctx: ModeContext, withTicks: boolean): void {
-    const c = onGreen() ? PUTTER : GOLF_CLUBS[club];
+    // IMPROVE (2026-10-06, Golf #5): on the green the ring is the PUTT — resolvePutt's pace and the green's break, rolled
+    // ahead and dropping if it would (GolfAim.simulatePutt) — and the arrow runs to where it STOPS. It was the putter flown
+    // as a club (another speed, no break), so the preview said one thing and the putt did another.
+    const green = onGreen();
     const from = { x: ball.position.x, y: ball.position.y, z: ball.position.z };
-    const pred = simulateShot(c, 1, aimYaw, from, air(), surfaceAt);
-    arrow?.set(ball.position, aimYaw, pred.carryM, pred.carry, pred.rest); lastCarryM = pred.carryM;
-    me.root.rotation.y = aimYaw;   // the golfer faces the arrow
+    const pred = green ? simulatePutt(1, aimYaw, from, holePos, air(), surfaceAt) : simulateShot(GOLF_CLUBS[club], 1, aimYaw, from, air(), surfaceAt);
+    predYaw = aimYaw; predLen = green ? pred.totalM : pred.carryM; lastCarryM = predLen;
+    const land = green ? pred.rest : pred.carry; predCarry.x = land.x; predCarry.z = land.z; predRest.x = pred.rest.x; predRest.z = pred.rest.z;
+    aimDirty = false; aimRefreshT = 0;
+    drawAim();
     const aimDeg = Math.round(((aimYaw - pinYaw() + Math.PI * 3) % (Math.PI * 2) - Math.PI) * 180 / Math.PI);   // the arrow's offset from the pin line, for the HUD
-    if (withTicks) { ticks = meterTicks(c, aimYaw, from, air(), surfaceAt); ctx.setHud({ meterTicks: ticks.join(','), aimCarry: Math.round(pred.carryM), aimDeg }); }
-    else ctx.setHud({ aimCarry: Math.round(pred.carryM), aimDeg });
+    if (withTicks) startTicks(green, from);
+    ctx.setHud({ aimCarry: Math.round(predLen), aimDeg });
   }
+  /**
+   * IMPROVE (2026-10-06, Golf #13): the arrow at THIS yaw from the last exact prediction, turned about the ball. Turning the
+   * aim ran a full flight (up to 1680 sim steps) every frame; the flight is re-run at most every AIM_REFRESH_SEC now, and
+   * between runs the ring turns with the arrow (exact in still air; within a frame or two of exact in a wind).
+   */
+  function drawAim(): void {
+    const d = aimYaw - predYaw;
+    rotateAbout(predCarry, ball.position.x, ball.position.z, d, drawCarry); rotateAbout(predRest, ball.position.x, ball.position.z, d, drawRest);
+    arrow?.set(ball.position, aimYaw, predLen, drawCarry, drawRest);
+    me.root.rotation.y = aimYaw;   // the golfer faces the arrow
+  }
+  /** IMPROVE (2026-10-06, Golf #14): the meter's eleven lines are built a flight per frame (update) instead of eleven in the
+   *  press's frame — the hitch on every B. A swing started before they are in finishes them then (stepTicks(ctx, true)). */
+  function startTicks(green: boolean, from: { x: number; y: number; z: number }): void {
+    const yaw = aimYaw, a = air(), c = GOLF_CLUBS[club], cup = { x: holePos.x, z: holePos.z };
+    // a putt's lines read how far each power ROLLS (no cup); a shot's, where it lands
+    tickJob = new MeterTickJob(green ? (p) => simulatePutt(p, yaw, from, cup, a, surfaceAt, 14, false).totalM : (p) => simulateShot(c, p, yaw, from, a, surfaceAt).carryM);
+    ticks = [];
+  }
+  function stepTicks(ctx: ModeContext, finish: boolean): void {
+    if (!tickJob) return;
+    if (finish) tickJob.finish(); else tickJob.step(1);
+    if (!tickJob.done) return;
+    ticks = tickJob.ticks; tickJob = null;
+    ctx.setHud({ meterTicks: ticks.join(',') });
+  }
+  /** A refresh the stick asked for and the throttle has not run yet: run it now (the swing starts on the true ring). */
+  function flushAim(ctx: ModeContext): void { if (aimDirty) refreshAim(ctx, false); }
 
   function strike(ctx: ModeContext, pwr: number, sideErr: number): void {
     // PUTTING. Half of golf, and the mode had none of it: every shot was a full
@@ -308,12 +419,16 @@ export const GolfMode: ModeDefinition = (() => {
     // green — and it rolls the ball along the ground rather than flying it,
     // which is why its launch is near zero and its forgiveness is the lowest in
     // the bag: on the green the LINE is the whole shot.
-    const c = onGreen() ? PUTTER : GOLF_CLUBS[club];
+    const green = onGreen();
+    const c = green ? PUTTER : GOLF_CLUBS[club];
     phase = 'flight';
-    console.info(`[GOLF-STRIKE] ${c.id} power ${pwr.toFixed(2)} side ${sideErr.toFixed(2)} ${onGreen() ? 'putt' : pad ? 'pad' : 'swing'}`);   // phase 4: the ledger
-    // phase 8: RHYTHM — a clean strike (the path inside 0.2) builds the gauge, a hook / slice empties it; at 70+ the strike is IN RHYTHM
+    lie.copyFrom(ball.position);   // IMPROVE #4: the OB drop goes on the line from here
+    console.info(`[GOLF-STRIKE] ${c.id} power ${pwr.toFixed(2)} side ${sideErr.toFixed(2)} ${green ? 'putt' : pad ? 'pad' : 'swing'}`);   // phase 4: the ledger
+    // phase 8: RHYTHM — a clean strike (the path inside 0.2) builds the gauge, a hook / slice drains it; at 70+ the strike is IN RHYTHM
+    // IMPROVE (2026-10-06, Golf #12): a hook / slice HALVES the gauge (GolfLoop.rhythmAfter) — it emptied it, so one drift
+    // took a 70+ gauge to 0 and the rhythm a round had built was gone on a single swing.
     const inRhythm = golfFlow >= GOLF_FLOW_RHYTHM;
-    golfFlow = Math.abs(sideErr) <= 0.2 ? Math.min(100, golfFlow + GOLF_FLOW_CLEAN) : 0;
+    golfFlow = rhythmAfter(golfFlow, sideErr);
     ctx.setHud({ flow: golfFlow, kinetic: golfFlow >= GOLF_FLOW_RHYTHM ? 'IN RHYTHM' : '' });
     // measured on the first cut: rhythm as EXTRA CARRY (x1.08) sent a club chosen for the distance out of bounds four times on
     // the par 4 — a steadier golfer is not a longer one. In rhythm = a steadier strike: the path error is halved (forgiveness).
@@ -348,16 +463,11 @@ export const GolfMode: ModeDefinition = (() => {
     const sideSign: -1 | 1 = sideErr >= 0 ? 1 : -1; const errMag = Math.min(1, Math.abs(sideErr));
     let vel: Vector3;
     let spin: Vector3;
-    if (onGreen()) {
-      const distM = Math.hypot(ball.position.x - holePos.x, ball.position.z - holePos.z);
-      const putt = resolvePutt(
-        { power01: pwr, face01: Math.max(0, 1 - errMag) },
-        distM,
-        greenBreakSlope(ball.position.x, holePos.x),
-      );
-      const yaw = aimYaw + putt.offlineRad;
-      const spd = putt.paceM / 1.15;
-      vel = new Vector3(Math.sin(yaw) * spd, 0.15, Math.cos(yaw) * spd);
+    if (green) {
+      // IMPROVE (2026-10-06, Golf #3 / #5): one putt launch for the putt and its preview (GolfAim.puttLaunch) — resolvePutt's
+      // pace and break as before, but the speed is now the one that ROLLS that pace (it was pace / 1.15, which left a 2 m
+      // putt 1.2 m short at full power).
+      vel = puttLaunch(pwr, Math.max(0, 1 - errMag), aimYaw, distToPin(), greenBreakSlope(ball.position.x, holePos.x), weather.wet01()).vel;
       spin = Vector3.Zero();
     } else {
       const launched = launchVelocity(c, pwr, aimYaw, errMag, sideSign);
@@ -376,6 +486,7 @@ export const GolfMode: ModeDefinition = (() => {
       ctx.feel?.impact?.(0.25 + pwr * 0.35);   // the contact feel, ON the contact (A+ P0 weight unchanged)
       sim.wind.copyFrom(wind); sim.wet01 = weather.wet01(); sim.airDensity = weather.airDensityMult();
       prevBallPos.copyFrom(ball.position); apexY = 0; sim.launch(ball.position.clone(), vel, spin); flightSec = 0;
+      if (c !== PUTTER) trail?.start();   // IMPROVE #8: the tracer runs from the strike to the rest (a putt rolls at your feet)
     };
     if (strikeIn <= 0) { pendingStrike(); pendingStrike = null; }
     ctx.setHud({
@@ -388,7 +499,8 @@ export const GolfMode: ModeDefinition = (() => {
     phase = 'aim';
     settling = false;
     ctx.camDirector.suspended = false;      // the cinematic is over
-    pulling = false; backswing = 0;
+    pulling = false; backswing = 0; pathPeakX = 0;
+    trail?.stop();
     meAnim.loop(SPORT_CLIP.golfAddress, { fadeSec: 0.3 });   // at the lie: the held finish gives way to the address
     strikeIn = 0; pendingStrike = null;
     ctx.heroRef.current = me.root;      // addressing the ball: frame the player
@@ -426,18 +538,18 @@ export const GolfMode: ModeDefinition = (() => {
     arrow?.show(true); refreshAim(ctx, true);
     ctx.camDirector.mode = 'follow';
     ctx.camDirector.snapTo(me.root.position, holePos);
-    const toPin = Vector3.Distance(new Vector3(ball.position.x, 0, ball.position.z), holePos);
+    const toPin = distToPin();
     const windDeg = windBearingDeg(wind, pinVec);
     ctx.setHud({
       club: onGreen() ? PUTTER.id : GOLF_CLUBS[club].id,
       wind: `${wind.length().toFixed(0)} m/s`,
       // A+ mission #5 (Everybody's Golf read): bearing + word for the lie panel, the hole for the chip; the meter keys
       // below are published while the three-press swing runs
-      windDeg, windWord: windWord(windDeg, wind.length()), hole: round, holes: TOTAL, par: GOLF_PAR[Math.min(round, GOLF_PAR.length) - 1] ?? 3,
+      windDeg, windWord: windWord(windDeg, wind.length()), hole: round, holes: TOTAL, par: parOf(round),
       meterT: null, swingPhase: null, powerLock: null, board: null, boardTitle: '',
       pin: `${toPin.toFixed(0)}m`, weather: weather.describe(),
       strokes, card: card(), pad: '', flicks: onGreen() ? 0 : FLICK.perShot, rings: ringsTaken.size,
-      hint: 'L-STICK turns the ARROW (the ring is a full swing) · A starts the swing · A at the top for POWER · A in the band · B cycles CLUB · or pull the stick back and drive through',
+      hint: 'L-STICK turns the ARROW (the ring is a full swing) · A starts the swing · A at the top for POWER · A in the band · B cycles CLUB · or pull the stick back and drive it STRAIGHT through (drift off line hooks / slices)',
     });
   }
 
@@ -454,6 +566,14 @@ export const GolfMode: ModeDefinition = (() => {
       me = await spawnAthlete(ctx, CFG.heroUrl, new Vector3(-0.5, 0, 0), 0, SPORT_CLIP.golfAddress);
       meAnim = new BeatOwner(me.animator); meAnim.loop(SPORT_CLIP.golfAddress);
       ball = MeshBuilder.CreateSphere('gball', { diameter: 0.1 }, ctx.scene);
+      // IMPROVE (2026-10-06, Golf #8): the ball was an untextured default sphere with no tracer — a 10 cm grey dot against
+      // the sky. It is a lit white now, and a shot draws its line (EffectsKit.ballTrail, as the court sports do; started on
+      // the strike, stopped at rest, so it is not 120 particles on a ball lying still)
+      timers.clear(); mats = null; ended = false;
+      ball.material = golfMats(ctx).ball; ball.isPickable = false;
+      trail = EffectsKit.ballTrail(ctx.scene, ball, '#fff4cf'); trail.stop();
+      banners = new BannerChannel(timers, (text) => ctx.setHud({ banner: text }));
+      seed = loopSeed();   // IMPROVE #2: a new course each play (the weather's seed is the same clock)
       sim = new GolfBallSim(ball);
       // WEATHER: the start screen's pick (natural / random / a condition / a time of day) — read here, after the page exists
       weather = WeatherKit.fromPick(readWeather('golf'), 'links', Math.floor(Date.now() / 1000) % 100000);
@@ -468,19 +588,19 @@ export const GolfMode: ModeDefinition = (() => {
       // 'wind', not 'dojo' — a martial-arts room tone on an alpine golf course.
       // Same class of mistake as the skatepark's stadium crowd bed.
       SoundKit.startAmbient('wind');
-      // L4 — a gallery behind the tee. A links hole is watched; and they are
-      // instanced silhouettes, so the whole gallery costs two draws.
+      // L4 — a gallery behind the tee. A links hole is watched.
       // two rows flanking the tee box (x ±8.5, z −1…+5): the old rows behind the tee at z −4 / −6 sat on the swing camera's
       // plane (offset z −4.2) and two bodies stood beside the lens, over the phone pad (measured 2026-09-06)
-      gallery = new Onlookers(ctx.scene, Array.from({ length: 10 }, (_, i) => new Vector3(
-        (i < 5 ? -8.5 : 8.5) + (i % 2) * (i < 5 ? -0.8 : 0.8),
-        0,
-        -1 + (i % 5) * 1.5,
-      )), '#3d4a3a');
+      // IMPROVE (2026-10-06, Golf #16): these are full skinned roster bodies now (Onlookers, Ship Pass 6), not the instanced
+      // silhouettes "two draws" described: ten spots under MAX_BODIES spawned five, three on one side and two on the other.
+      // Four, two each side of the tee box, and paused while the camera is off them (Onlookers' pauseOffscreen) — which
+      // is every shot after the drive, the whole hole preview and every flight down the fairway.
+      gallery = new Onlookers(ctx.scene, [new Vector3(-8.5, 0, 0.5), new Vector3(-8.5, 0, 3.5), new Vector3(8.5, 0, 0.5), new Vector3(8.5, 0, 3.5)],
+        '#3d4a3a', Vector3.Zero(), { pauseOffscreen: true });
       ctx.setHud({ score: 0, weather: weather.describe() });
       if (process.env.NODE_ENV === 'development') {
         (ctx.scene.metadata ??= {}).golf = {   // PARKOUR GOLF probes
-          state: () => ({ phase, hole: round, strokes, ended, onGreen: onGreen(), ballX: ball.position.x, ballY: ball.position.y, ballZ: ball.position.z, holeX: holePos.x, holeZ: holePos.z, pad, flicksLeft, rings: ringsTaken.size, ringChain, slidePutt, pts, ...golfPark, flying: sim.ball.active, rolling: sim.ball.rolling, carryM: lastCarryM, apexY, distToPin: Vector3.Distance(new Vector3(ball.position.x, 0, ball.position.z), holePos) }),
+          state: () => ({ phase, hole: round, strokes, ended, onGreen: onGreen(), ballX: ball.position.x, ballY: ball.position.y, ballZ: ball.position.z, holeX: holePos.x, holeZ: holePos.z, par: parOf(round), seed, pad, flicksLeft, rings: ringsTaken.size, ringChain, slidePutt, pts, ...golfPark, flying: sim.ball.active, rolling: sim.ball.rolling, carryM: lastCarryM, apexY, distToPin: distToPin() }),
         };
       }
       nextShot(ctx);
@@ -496,7 +616,7 @@ export const GolfMode: ModeDefinition = (() => {
           if (f !== 0) {
             const d = flickVel({ x: sim.ball.vel.x, z: sim.ball.vel.z }, f); sim.ball.vel.x += d.x; sim.ball.vel.z += d.z;
             flicksLeft--; golfPark.flicks++; SoundKit.play('whoosh', { pitch: 1.5, volume: 0.35 }); ctx.feel?.impact?.(0.12);
-            ctx.setHud({ flicks: flicksLeft, banner: `FLICK ${f > 0 ? '▶' : '◀'}` }); setTimeout(() => ctx.setHud({ banner: '' }), 400); console.info(`[GOLF-PARK] flick ${f > 0 ? 'right' : 'left'} (${flicksLeft} left)`);
+            ctx.setHud({ flicks: flicksLeft }); banners?.flash(`FLICK ${f > 0 ? '▶' : '◀'}`, 400); console.info(`[GOLF-PARK] flick ${f > 0 ? 'right' : 'left'} (${flicksLeft} left)`);
           }
         }
         prevFlickX = e.x;
@@ -505,20 +625,33 @@ export const GolfMode: ModeDefinition = (() => {
         // strike: how far you pulled is the power, and where the stick sits
         // laterally as you come through is the path, so a swing that drifts off
         // line hooks or slices exactly as a real one does.
+        // IMPROVE (2026-10-06, Golf #1): it struck with a side error of 0 — "the stick turns the aim; it no longer also hooks
+        // the swing" — so a full pull-and-push was full power AND pure, every time, and the three-press swing was the worse
+        // choice. The aim still never turns during a swing (update() turns it only while not pulling); what the stick does
+        // sideways BETWEEN the pull-back and the push-through is the path now: its peak past a dead zone is the side error
+        // (GolfLoop.stickPathErr), right slices and left hooks, as the three-press swing's late / early do.
         if (phase === 'aim') {
           if (e.y <= -SWING_STICK) {
+            if (!pulling) pathPeakX = 0;
             pulling = true;
             backswing = Math.max(backswing, Math.min(1, -e.y));
-          } else if (pulling && e.y >= SWING_STICK) {
+          }
+          if (pulling && Math.abs(e.x) > Math.abs(pathPeakX)) pathPeakX = e.x;
+          if (pulling && e.y >= SWING_STICK) {
             pulling = false;
-            strike(ctx, backswing, 0);   // FLAG: the stick turns the aim; it no longer also hooks the swing. Direction is the arrow.
-            backswing = 0;
+            flushAim(ctx);
+            strike(ctx, backswing, stickPathErr(pathPeakX));   // the arrow is the direction; the path is the curve
+            backswing = 0; pathPeakX = 0;
           }
         }
       }
       if (e.t === 'button' && e.btn === 'A' && e.pressed) {
         if (phase === 'preview') { backToTee(ctx); return; }   // skip the flyover
-        if (phase === 'aim') { phase = 'power'; meter.start(); ctx.setHud({ hint: 'SWING at the top for POWER' }); }
+        if (phase === 'aim') {
+          flushAim(ctx); stepTicks(ctx, true);   // IMPROVE #13 / #14: the swing starts on the true ring and the full meter lines
+          meter.rate = onGreen() ? GOLF_PUTT_METER_RATE : POWER_METER_RATE;   // IMPROVE #7: a slower wave on the green
+          phase = 'power'; meter.start(); meterHud.reset(); ctx.setHud({ hint: 'SWING at the top for POWER' });
+        }
         else if (phase === 'power') {
           power = meter.value;                    // keep the wave running — accuracy rides it down
           phase = 'accuracy';
@@ -532,7 +665,7 @@ export const GolfMode: ModeDefinition = (() => {
       }
       // PARKOUR GOLF: Y before the swing is the SPRINGBOARD hop (power off the launch position); LT on the green is the SLIDE PUTT
       if (e.t === 'button' && e.btn === 'Y' && e.pressed) {
-        if (phase === 'aim' && !onGreen() && !pad) { pad = 'springboard'; hopT = 0; SoundKit.play('whoosh', { pitch: 1.2, volume: 0.4 }); ctx.setHud({ pad: PAD.springboard.label, banner: `SPRINGBOARD — +${Math.round((PAD.springboard.mult - 1) * 100)}% off the pad` }); setTimeout(() => ctx.setHud({ banner: '' }), 600); console.info('[GOLF-PARK] springboard'); }
+        if (phase === 'aim' && !onGreen() && !pad) { pad = 'springboard'; hopT = 0; SoundKit.play('whoosh', { pitch: 1.2, volume: 0.4 }); ctx.setHud({ pad: PAD.springboard.label }); banners?.flash(`SPRINGBOARD — +${Math.round((PAD.springboard.mult - 1) * 100)}% off the pad`, 600); console.info('[GOLF-PARK] springboard'); }
         else refuse(ctx, onGreen() ? 'NO PAD ON THE GREEN' : pad ? 'ON THE PAD ALREADY' : 'HOP BEFORE THE SWING');
         return;
       }
@@ -541,7 +674,7 @@ export const GolfMode: ModeDefinition = (() => {
       if (e.t === 'button' && e.btn === 'B' && e.pressed && phase === 'aim' && !onGreen()) {
         club = (club + 1) % GOLF_CLUBS.length;
         SoundKit.play('uiTick', { pitch: 1.1 });
-        const toPin = Vector3.Distance(new Vector3(ball.position.x, 0, ball.position.z), holePos);
+        const toPin = distToPin();
         ctx.setHud({ club: GOLF_CLUBS[club].id, pin: `${toPin.toFixed(0)}m` });
         refreshAim(ctx, true);   // a new club is a new arrow and new meter lines
         ctx.juice.callout(`${GOLF_CLUBS[club].id.toUpperCase()} · PIN ${toPin.toFixed(0)} m`, '#8fe0a0');   // the change is SAID, not only a HUD field
@@ -560,11 +693,25 @@ export const GolfMode: ModeDefinition = (() => {
         if (previewSec >= PREVIEW_SEC) backToTee(ctx);
         return;                                   // camera holds the green view
       }
-      if (phase === 'power' || phase === 'accuracy') ctx.setHud({ power: Math.round(meter.value * 100), meterT: Number(meter.value.toFixed(3)), swingPhase: phase, powerLock: phase === 'accuracy' ? Math.round(power * 100) : null, meterCarry: ticks.length ? Math.round(carryAt(ticks, phase === 'accuracy' ? power : meter.value)) : null });
+      // IMPROVE (2026-10-06, Golf #17): the meter's five keys went out as a new object every frame (with a toFixed string),
+      // the unchanged ones included; only the keys whose published (rounded) value moved are pushed now (GolfLoop.MeterHudGate)
+      if (phase === 'power' || phase === 'accuracy') {
+        const v = meter.value, acc = phase === 'accuracy';
+        const patch = meterHud.next(Math.round(v * 100), Math.round(v * 1000) / 1000, phase, acc ? Math.round(power * 100) : null, ticks.length ? Math.round(carryAt(ticks, acc ? power : v)) : null);
+        if (patch) ctx.setHud(patch);
+      }
       // PARKOUR GOLF: the springboard hop, the fan turning
       if (hopT >= 0) { hopT += dt; const u = Math.min(1, hopT / 0.45); me.root.position.y = Math.sin(u * Math.PI) * 0.6; if (u >= 1) { hopT = -1; me.root.position.y = 0; } }
       if (fanBlades) fanBlades.rotation.z += dt * 6;
-      if (phase === 'aim' && !pulling) { const y0 = aimYaw; aimYaw = turnAim(aimYaw, pinYaw(), stickX, dt); if (aimYaw !== y0) refreshAim(ctx, false); }
+      if (phase === 'aim' && !pulling) {
+        // IMPROVE (2026-10-06, Golf #13): the arrow turns every frame from the last prediction; the flight is re-run at most
+        // every AIM_REFRESH_SEC while the stick turns it, and once more when it stops (the ring settles on the exact read)
+        const y0 = aimYaw; aimYaw = turnAim(aimYaw, pinYaw(), stickX, dt);
+        if (aimYaw !== y0) { aimDirty = true; drawAim(); }
+        aimRefreshT += dt;
+        if (aimDirty && aimRefreshT >= AIM_REFRESH_SEC) refreshAim(ctx, false);
+      }
+      if (phase === 'aim') stepTicks(ctx, false);   // IMPROVE #14: one meter line a frame
       // Phase 3 wants update() EVERY frame; this mode drove its camera only
       // during flight, so between shots the camera never converged on its fixed
       // framing — it sat wherever the last snap left it, which after a long
@@ -575,7 +722,10 @@ export const GolfMode: ModeDefinition = (() => {
         // A unit vector toward the pin stands in for velocity, which is how the
         // director is told which way "behind" is for a stationary subject.
         // WII AIM: the camera looks down the ARROW, so turning the aim turns the view
-        const aimDir = new Vector3(Math.sin(aimYaw), 0, Math.cos(aimYaw));
+        // IMPROVE (2026-10-06, Golf #9 / #18): the ONE camera update of an aiming frame, from a scratch vector. A second
+        // update(…, Vector3.Zero(), …) used to follow at the end of update() — zero velocity tells the director "keep
+        // whatever side you are on", so it undid "behind the arrow" and stepped the follow lerp twice a frame.
+        aimDir.set(Math.sin(aimYaw), 0, Math.cos(aimYaw));
         ctx.camDirector.update(me.root.position, aimDir, holePos);
       }
       if (phase === 'flight') {
@@ -583,7 +733,7 @@ export const GolfMode: ModeDefinition = (() => {
           // the club is still coming down: the ball waits on the contact key
           strikeIn -= dt;
           if (strikeIn <= 0 && pendingStrike) { pendingStrike(); pendingStrike = null; }
-          ctx.camDirector.update(ball.position, pendingVel ?? Vector3.Zero(), holePos);
+          ctx.camDirector.update(ball.position, pendingVel ?? STILL, holePos);
           return;
         }
         // THE FLIGHT IS PHYSICS: drag, backspin lift, the wind through the air, a bounce that takes a pitch mark, the
@@ -596,17 +746,17 @@ export const GolfMode: ModeDefinition = (() => {
           const line = { x: holePos.x - teePos.x, z: holePos.z - teePos.z };
           for (const rg of rings) if (!ringsTaken.has(rg.id) && ringPass(prevBallPos, ball.position, rg, line)) {
             ringsTaken.add(rg.id); ringChain++; golfPark.ringsTotal++; const gained = RINGS.pts * (ringChain >= 2 ? RINGS.chainMult : 1); pts += gained;
-            ringMeshes.get(rg.id)?.setEnabled(false); SoundKit.play('score', { pitch: 1.4 }); EffectsKit.burst(ctx.scene, ball.position.clone(), 'sparks');
-            ctx.setHud({ score: pts, rings: ringsTaken.size, banner: ringChain >= 2 ? `RING CHAIN! +${gained}` : `RING! +${gained}` }); setTimeout(() => ctx.setHud({ banner: '' }), 700); console.info(`[GOLF-PARK] ring ${rg.id} +${gained}`);
+            ringMeshes.get(rg.id)?.setEnabled(false); SoundKit.play('score', { pitch: 1.4 }); EffectsKit.burst(ctx.scene, ball.position, 'sparks');   // burst clones its emitter point
+            ctx.setHud({ score: pts, rings: ringsTaken.size }); banners?.flash(ringChain >= 2 ? `RING CHAIN! +${gained}` : `RING! +${gained}`, 700); console.info(`[GOLF-PARK] ring ${rg.id} +${gained}`);
           }
           if (fan && !sim.ball.rolling) {
             const g = gustAt(ball.position, fan);
-            if (g) { sim.ball.vel.x += g.x * dt; sim.ball.vel.z += g.z * dt; if (!gusting) { gusting = true; golfPark.gusts++; ctx.setHud({ banner: 'TURBINE — flick against it' }); setTimeout(() => ctx.setHud({ banner: '' }), 500); console.info('[GOLF-PARK] gust'); } }
+            if (g) { sim.ball.vel.x += g.x * dt; sim.ball.vel.z += g.z * dt; if (!gusting) { gusting = true; golfPark.gusts++; banners?.flash('TURBINE — flick against it', 500); console.info('[GOLF-PARK] gust'); } }
             else gusting = false;
           }
           if (sim.ball.rolling && onGreen()) {
             bankCool = Math.max(0, bankCool - dt);
-            if (bankCool === 0) { const r = bankReflect(ball.position, sim.ball.vel, holePos, slidePutt); if (r) { sim.ball.vel.x = r.x; sim.ball.vel.z = r.z; bankCool = 0.4; if (!bankRode) { bankRode = true; golfPark.bankRides++; ctx.setHud({ banner: slidePutt ? 'SLIDE PUTT — riding the bank' : 'OFF THE BANK' }); setTimeout(() => ctx.setHud({ banner: '' }), 600); } SoundKit.play('clang', { pitch: 1.6, volume: 0.35 }); console.info('[GOLF-PARK] bank ride'); } }
+            if (bankCool === 0) { const r = bankReflect(ball.position, sim.ball.vel, holePos, slidePutt); if (r) { sim.ball.vel.x = r.x; sim.ball.vel.z = r.z; bankCool = 0.4; if (!bankRode) { bankRode = true; golfPark.bankRides++; banners?.flash(slidePutt ? 'SLIDE PUTT — riding the bank' : 'OFF THE BANK', 600); } SoundKit.play('clang', { pitch: 1.6, volume: 0.35 }); console.info('[GOLF-PARK] bank ride'); } }
           }
         }
         prevBallPos.copyFrom(ball.position); apexY = Math.max(apexY, ball.position.y);
@@ -615,11 +765,12 @@ export const GolfMode: ModeDefinition = (() => {
         const flying = sim.ball.active;
         ctx.camDirector.update(ball.position, sim.ball.vel, holePos);
         if (!flying && !settling) {
-          const flat = new Vector3(ball.position.x, 0, ball.position.z);
+          trail?.stop();   // IMPROVE #8: the ball is at rest
+          banners?.cancel();   // IMPROVE #10: the rest's own banner is next; no flash clear may wipe it
           // Owner decision (2026-09-05): TRIPLE-PAR PICK-UP. At three times par the hole is scored as triple par and the
           // round moves on — a hole that is never holed used to never end (traced: the ball wandered and re-dropped for
           // 330 s on hole 1). A real player rarely reaches it; a stuck one always finishes the card.
-          const parNow = GOLF_PAR[Math.min(round, GOLF_PAR.length) - 1] ?? 3;
+          const parNow = parOf(round);
           const pickUp = (why: string) => {
             const rel = strokes - parNow;
             overPar += rel; pickUps++;
@@ -630,7 +781,7 @@ export const GolfMode: ModeDefinition = (() => {
             holeResults.push({ hole: round, par: parNow, strokes, pickedUp: true });
             ctx.setHud({ score: pts, strokes, card: card(), meterT: null, swingPhase: null, powerLock: null, banner: `PICKED UP — ${why} · ${strokes} on a par ${parNow}`, board: holeBoard(holeResults, TOTAL), boardTitle: round >= TOTAL ? 'CARD IN' : `NEXT — HOLE ${round + 1}` });
             settling = true;
-            setTimeout(() => {
+            later(() => {
               ctx.setHud({ banner: '', board: null, boardTitle: '' });
               if (round >= TOTAL) { ended = true; SoundKit.play('whistle'); console.info(`[GOLF-END] card in ${overPar > 0 ? '+' : ''}${overPar} pickUps ${pickUps} pts ${pts}`); ctx.end('CARD_IN', pts, { holes: TOTAL, overPar, pickUps }); }
               else nextShot(ctx);
@@ -640,20 +791,23 @@ export const GolfMode: ModeDefinition = (() => {
           // rule and also stops a shanked drive leaving the course entirely.
           // Out of bounds is the EDGE OF THE FIELD (60 x 90 → ±30, ±45), not an
           // arbitrary number larger than it.
-          if (Math.abs(ball.position.x) > 28 || ball.position.z > 43 || ball.position.z < -6) {
+          if (!inBounds(ball.position)) {   // GolfLoop.LOOP_BOUNDS: |x| > 28, z > 43 or z < −6, as it was
             strokes++;
             if (strokes >= parNow * 3) { pickUp('triple par, out of bounds'); return; }
-            const back = holePos.subtract(new Vector3(0, 0, 14));
-            ball.position.set(back.x, 0.05, Math.max(1, back.z));
+            // IMPROVE (2026-10-06, Golf #4): the drop was always 14 m straight in front of the pin — often a better lie than
+            // a decent drive, so going out of bounds could pay. It is on the shot's own line now, 2 m inside where that line
+            // left the field (GolfLoop.obDrop): the penalty stroke and no lie the shot did not earn.
+            const drop = obDrop(lie, ball.position);
+            ball.position.set(drop.x, 0.05, drop.z);
             SoundKit.play('miss');
             ctx.feel?.impact?.(0.15);   // A+ P0: OB is a light feel only
             console.info('[GOLF-JUICE] out of bounds (light feel)');
             ctx.setHud({ banner: `OUT OF BOUNDS — penalty stroke (${strokes})`, strokes });
             settling = true;
-            setTimeout(() => { ctx.setHud({ banner: '' }); backToTee(ctx); }, 1300);
+            later(() => { ctx.setHud({ banner: '' }); backToTee(ctx); }, 1300);
             return;
           }
-          const dist = Vector3.Distance(flat, holePos);
+          const dist = distToPin();
 
           // NOT HOLED — play it from where it lies. A hole used to be exactly
           // one shot, scored by proximity, which is why there were no strokes
@@ -667,12 +821,12 @@ export const GolfMode: ModeDefinition = (() => {
                 : `${dist.toFixed(1)}m from the pin · stroke ${strokes}`,
             });
             settling = true;
-            setTimeout(() => { ctx.setHud({ banner: '' }); backToTee(ctx); }, 1100);
+            later(() => { ctx.setHud({ banner: '' }); backToTee(ctx); }, 1100);
             return;
           }
 
           // HOLED. Golf is scored in strokes against par.
-          const par = GOLF_PAR[Math.min(round, GOLF_PAR.length) - 1] ?? 3;
+          const par = parOf(round);
           const rel = strokes - par;
           overPar += rel;
           const clutch = round === TOTAL;
@@ -694,10 +848,10 @@ export const GolfMode: ModeDefinition = (() => {
           ctx.setHud({
             score: pts, strokes, card: card(), meterT: null, swingPhase: null, powerLock: null,
             banner: `${bankRode ? 'BANKED IN! ' : ''}${name} — ${strokes} on a par ${par}${clutch ? ' · CLUTCH' : ''}`,
-            board: holeBoard(holeResults, TOTAL), boardTitle: round >= TOTAL ? 'CARD IN' : `NEXT — HOLE ${round + 1} · PAR ${GOLF_PAR[Math.min(round + 1, GOLF_PAR.length) - 1] ?? 3}`,
+            board: holeBoard(holeResults, TOTAL), boardTitle: round >= TOTAL ? 'CARD IN' : `NEXT — HOLE ${round + 1} · PAR ${parOf(round + 1)}`,
           });
           settling = true;
-          setTimeout(() => {
+          later(() => {
             ctx.setHud({ banner: '', board: null, boardTitle: '' });
             if (round >= TOTAL) {
               ended = true; SoundKit.play('whistle');
@@ -707,10 +861,18 @@ export const GolfMode: ModeDefinition = (() => {
         }
         return;
       }
-      ctx.camDirector.update(me.root.position, Vector3.Zero(), holePos);
     },
 
-    dispose() { golfVenue?.dispose?.(); golfVenue = null; gallery?.dispose(); gallery = null; flag?.dispose(); flag = null; me?.dispose(); furniture.forEach((f) => f.dispose()); ball?.dispose(); arrow?.dispose(); arrow = null; weatherFx?.dispose(); weatherFx = null; SoundKit.stopAmbient(); },
+    dispose() {
+      // IMPROVE (2026-10-06, Golf #11): the hole's timers (next hole, back to the lie, the card) could fire on a disposed
+      // scene; the mode is ended and every pending one cleared first (each also checks `ended` when it runs)
+      ended = true; timers.clear(); banners = null; tickJob = null;
+      golfVenue?.dispose?.(); golfVenue = null; gallery?.dispose(); gallery = null; flag?.dispose(); flag = null; me?.dispose();
+      clearFurniture(); trail?.dispose(); trail = null; ball?.dispose(); arrow?.dispose(); arrow = null; weatherFx?.dispose(); weatherFx = null;
+      if (mats) for (const m of Object.values(mats)) m.dispose();   // IMPROVE #15: the mode's own materials go with it
+      mats = null;
+      SoundKit.stopAmbient();
+    },
   };
 })();
 
