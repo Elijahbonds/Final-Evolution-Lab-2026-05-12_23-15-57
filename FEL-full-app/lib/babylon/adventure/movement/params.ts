@@ -73,6 +73,8 @@ export interface AirParams {
   jumpSpeed: number;
   /** Letting go of jump while rising keeps this share of the rise (a short hop on a tap). [TUNE] */
   jumpCutMult: number;
+  /** The cut never comes before this much rise (s): a one-frame tap on a phone is still a hop, not a twitch. [TUNE] */
+  minJumpSec: number;
   /** Seconds after running off a ledge that a jump still counts as from the ground. [TUNE] */
   coyoteSec: number;
   /** Seconds a jump pressed just before landing waits for the ground. [TUNE] */
@@ -185,7 +187,7 @@ export const DEFAULT_MOVEMENT: Readonly<MovementParams> = Object.freeze({
     runFlowPerSec: 40, skidFlowPerSec: 60,
   }),
   air: Object.freeze({
-    gravity: 28, jumpSpeed: 11.1, jumpCutMult: 0.45, coyoteSec: 0.1, jumpBufferSec: 0.12, airAccel: 12, airMinSpeed: 6,
+    gravity: 28, jumpSpeed: 11.1, jumpCutMult: 0.45, minJumpSec: 0.06, coyoteSec: 0.1, jumpBufferSec: 0.12, airAccel: 12, airMinSpeed: 6,
     maxFall: 40, airDashSpeed: 17, airDashSec: 0.22, airDashLift: 2, airDashGravity: 0.25,
   }),
   homing: Object.freeze({

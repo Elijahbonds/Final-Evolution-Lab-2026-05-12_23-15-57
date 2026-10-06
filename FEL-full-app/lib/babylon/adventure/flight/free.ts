@@ -22,11 +22,11 @@ export function stepFree(
   a: AdventureActor, b: BodyState, inp: MoveInput, w: Wish, env: StepEnv, dt: number, source: FlightSource, mult: number,
 ): boolean {
   const F = env.flight, X = env.fx, fl = b.fl;
-  if (fl.glide && flightReserve(a, b, source) >= X.glideResume) fl.glide = false;
+  if (fl.glide && (env.freeFlight || flightReserve(a, b, source) >= X.glideResume)) fl.glide = false;
   const ascend = ascendOf(inp) && !fl.glide, descend = inp.descendHeld;
 
   // The dash burst.
-  if (inp.dash && !fl.glide && fl.dashT <= 0 && payFlight(a, b, source, F.dashCost)) {
+  if (inp.dash && !fl.glide && fl.dashT <= 0 && payFlight(a, b, source, F.dashCost, env.freeFlight)) {
     let dx = w.mag > 0.2 ? w.x / w.mag : Math.sin(a.facingYaw), dz = w.mag > 0.2 ? w.z / w.mag : Math.cos(a.facingYaw);
     let dy = ascend ? 0.45 : descend ? -0.45 : 0;
     const l = Math.hypot(dx, dy, dz) || 1;
@@ -53,7 +53,7 @@ export function stepFree(
   const planar = Math.hypot(a.vel.x, a.vel.z);
   if (!fl.glide && inp.dashHeld && planar >= F.cruiseEnterSpeed) enterCruise(a, b);
 
-  if (!payFlight(a, b, source, F.drainPerSec.free * dt)) fl.glide = true;
+  if (!payFlight(a, b, source, F.drainPerSec.free * dt, env.freeFlight)) fl.glide = true;
 
   a.pos.x += a.vel.x * dt; a.pos.y += a.vel.y * dt; a.pos.z += a.vel.z * dt;
   if (planar > 0.5) a.facingYaw = yawOf(a.vel.x, a.vel.z);

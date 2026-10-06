@@ -133,4 +133,6 @@ export interface StepEnv {
   bounds: WorldBounds | null;
   /** Camera hints for the local player only (null for everyone else). */
   hint: ((h: CameraHint) => void) | null;
+  /** The body being stepped flies at no cost (an innate flyer). */
+  freeFlight: boolean;
 }

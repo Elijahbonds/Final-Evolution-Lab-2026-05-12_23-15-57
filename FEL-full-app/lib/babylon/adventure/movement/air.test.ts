@@ -30,6 +30,15 @@ describe('air: the spin jump', () => {
     expect(sys.inspect('p1')?.spinning).toBe(false);
   });
 
+  it('a one-frame tap is still a hop (the cut waits minJumpSec)', () => {
+    const { r, p } = rig();
+    r.press('p1', 'jump'); r.tick();
+    let apex = 0;
+    r.runUntil(() => p.state === 'ground', 3, () => { apex = Math.max(apex, p.pos.y); });
+    expect(apex).toBeGreaterThan(0.6);
+    expect(apex).toBeLessThan(1.2);
+  });
+
   it('a tap is a short hop (the release cuts the rise)', () => {
     const { r, p, inp } = rig();
     r.press('p1', 'jump'); inp.jumpHeld = true;

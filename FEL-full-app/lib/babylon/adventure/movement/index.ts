@@ -60,6 +60,11 @@ export interface MovementSystemOptions {
   skip?: (a: AdventureActor) => boolean;
   /** The seed for every body's generator (the rail balance's wander). */
   seed?: number;
+  /**
+   * Bodies that fly by nature (A2's flying monsters, a boss): they take off like a fused body, at no energy cost,
+   * and one spawned with `wantsFlight` starts in the air. Players never: their flight is fusion or a flying mount.
+   */
+  innateFlyer?: (a: AdventureActor) => boolean;
 }
 
 /** What a view (or a test, or A2's spin-attack check) can read about a body's traversal. Refreshed by inspect(). */
@@ -121,7 +126,8 @@ export function createMovementSystem(opts: MovementSystemOptions = {}): Movement
   const seed = opts.seed ?? 0x5eed;
   const bodies = new Map<ActorId, BodyState>();
   const telemetry = new Map<ActorId, MovementTelemetry>();
-  const feelBand = new Map<ActorId, string>();
+  /** The PRQ inputs each body's feel was derived from (re-derived only when they change: no per-tick string keys). */
+  const feelBand = new Map<ActorId, { band: string; mental: number | undefined }>();
   const riderOf = new Map<ActorId, AdventureActor>();
   /** Riders at the start of the step: one who mounts this tick is already seated and is not stepped again. */
   const seated = new Set<ActorId>();
@@ -141,7 +147,7 @@ export function createMovementSystem(opts: MovementSystemOptions = {}): Movement
 
   const env: StepEnv = {
     tSec: 0, world: null as unknown as StepEnv['world'], bus: null as unknown as StepEnv['bus'], p: params, flight, fx,
-    rails: null as unknown as RailIndex, bounds: opts.bounds ?? null, hint: null,
+    rails: null as unknown as RailIndex, bounds: opts.bounds ?? null, hint: null, freeFlight: false,
   };
 
   function bodyFor(a: AdventureActor): BodyState {
@@ -152,8 +158,11 @@ export function createMovementSystem(opts: MovementSystemOptions = {}): Movement
       b.speed = Math.hypot(a.vel.x, a.vel.z);
       bodies.set(a.id, b);
     }
-    const key = `${a.stats.prqBand}|${a.stats.attrs?.mental ?? ''}`;
-    if (feelBand.get(a.id) !== key) { b.feel = movementFeelFor(a.stats); feelBand.set(a.id, key); }
+    const fb = feelBand.get(a.id), mental = a.stats.attrs?.mental;
+    if (!fb || fb.band !== a.stats.prqBand || fb.mental !== mental) {
+      b.feel = movementFeelFor(a.stats);
+      feelBand.set(a.id, { band: a.stats.prqBand, mental });
+    }
     return b;
   }
 
@@ -268,10 +277,16 @@ export function createMovementSystem(opts: MovementSystemOptions = {}): Movement
 
     // Flight's source: the fusion for a body on its own, the mount's wings for a body carrying a rider.
     if (isMount && spec && spec.canFly && b.mountStaminaMax === 0) { b.mountStaminaMax = spec.staminaMax; b.mountStamina = spec.staminaMax; }
+    const innate = !isMount && a.kind !== 'player' && !!opts.innateFlyer?.(a);
     const source: FlightSource | null = isMount
       ? (spec?.canFly && a.stats.hp.cur > 0 ? 'mount' : null)
-      : canTakeOff(a, false);
+      : innate ? 'fusion' : canTakeOff(a, false);
+    env.freeFlight = innate;
     const groundTop = isMount && spec ? spec.groundSpeed * b.feel.run : undefined;
+
+    // A body that already wants flight and has a source flies (contracts: fusion.active && wantsFlight → 'flight'):
+    // a restored save, a net handover, a monster spawned on the wing.
+    if (source && a.wantsFlight && (a.state === 'ground' || a.state === 'air')) takeOff(a, b, env);
 
     switch (a.state) {
       case 'flight': {

@@ -44,7 +44,7 @@ export function integrateAir(a: AdventureActor, b: BodyState, inp: MoveInput, w:
   if (b.jumpBuffer > 0) b.jumpBuffer = Math.max(0, b.jumpBuffer - dt);
 
   // The variable jump: a release while rising cuts the rise once.
-  if (b.rising && !inp.jumpHeld && a.vel.y > 0) { a.vel.y *= air.jumpCutMult; b.rising = false; }
+  if (b.rising && !inp.jumpHeld && a.vel.y > 0 && a.stateSec >= air.minJumpSec) { a.vel.y *= air.jumpCutMult; b.rising = false; }
   if (a.vel.y <= 0) b.rising = false;
 
   let gScale = 1;

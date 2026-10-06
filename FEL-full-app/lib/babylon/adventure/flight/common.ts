@@ -23,8 +23,8 @@ import { yawOf } from '../movement/math';
 export const ascendOf = (inp: MoveInput): boolean => inp.ascendHeld || inp.jumpHeld;
 
 /** Pay `cost` for flight from the source's pool. False (nothing spent) when it is short. */
-export function payFlight(a: AdventureActor, b: BodyState, source: FlightSource, cost: number): boolean {
-  if (!(cost > 0)) return true;
+export function payFlight(a: AdventureActor, b: BodyState, source: FlightSource, cost: number, free = false): boolean {
+  if (free || !(cost > 0)) return true;
   if (source === 'fusion') return spendPool(a.stats.energy, cost);
   if (b.mountStamina + 1e-9 < cost) return false;
   b.mountStamina = Math.max(0, b.mountStamina - cost);

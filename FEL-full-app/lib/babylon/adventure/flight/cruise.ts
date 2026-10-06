@@ -81,6 +81,6 @@ export function stepCruise(
   a.pos.x += a.vel.x * dt; a.pos.y += a.vel.y * dt; a.pos.z += a.vel.z * dt;
   a.facingYaw = fl.heading;
 
-  if (!payFlight(a, b, source, F.drainPerSec.cruise * dt)) { fl.glide = true; fl.mode = 'free'; fl.bank = 0; }
+  if (!payFlight(a, b, source, F.drainPerSec.cruise * dt, env.freeFlight)) { fl.glide = true; fl.mode = 'free'; fl.bank = 0; }
   return boxFlight(a, b, false, env, X.cruiseFloorM);
 }

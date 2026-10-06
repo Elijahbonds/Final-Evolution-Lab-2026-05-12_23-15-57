@@ -49,6 +49,30 @@ describe('flight: the gate', () => {
   });
 });
 
+describe('flight: bodies that already want it, and bodies that fly by nature', () => {
+  it('a fused body restored with wantsFlight (a save, a net handover) is flying on its first step', () => {
+    const { r, p } = rig();
+    p.pos.y = 6; p.grounded = false; p.state = 'air'; p.wantsFlight = true;
+    r.tick();
+    expect(p.state).toBe('flight');
+    p.fusion = { ...NO_FUSION }; p.wantsFlight = true; r.tick();
+    expect(p.state).toBe('air');                          // no source: the wish is not enough
+  });
+
+  it('an innate flyer (A2\'s flying monster) spawned on the wing hovers at no cost; a player can never be one', () => {
+    const world = fakeWorld();
+    const sys = createMovementSystem({ innateFlyer: (a) => a.kind === 'monster' || a.kind === 'player' });
+    const r = new Runner(world, [sys]);
+    const m = world.add(makeActor('bat', 'monster', { pos: { x: 0, y: 5, z: 0 }, grounded: false, state: 'air', wantsFlight: true }));
+    const p = world.add(makeActor('p1', 'player', { pos: { x: 3, y: 5, z: 0 }, grounded: false, state: 'air', wantsFlight: true }));
+    r.run(3);
+    expect(m.state).toBe('flight');
+    expect(m.pos.y).toBeGreaterThan(4);
+    expect(m.stats.energy.cur).toBe(100);
+    expect(p.state).toBe('ground');                        // the player fell: no fusion, no mount
+  });
+});
+
 describe('flight: free flight', () => {
   it('fused: jump, jump again — airborne in free flight; hands off, you hover in place', () => {
     const { r, p, sys, inp } = rig();
