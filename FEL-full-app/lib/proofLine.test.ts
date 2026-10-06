@@ -20,6 +20,9 @@ describe('proofLineFor', () => {
   });
   it('ball games fall back to the score pair', () => {
     expect(proofLineFor('hoops1v1', { score: 12, won: true, stats: { foeScore: 9 } })).toBe('12–9 · WON');
+    // IMPROVE (2026-10-06, 1v1 #4): the box score rides the line when the run sent one
+    expect(proofLineFor('hoops1v1', { score: 11, won: true, stats: { foeScore: 7, fgm: 5, fga: 9, threes: 1, steals: 2, blocks: 0, ankles: 1 } }))
+      .toBe('11–7 · WON · FG 5/9 · 3PT 1 · STL 2 · ANKLES 1');
     expect(proofLineFor('tennis', { score: 6, opponentScore: 4, won: true })).toBe('6–4 · WON');
   });
   it('returns null for a mode it does not know or stats it cannot read', () => {

@@ -68,7 +68,7 @@ const STYLE_MODES = new Set(['karate', 'karate-vs', 'duel', 'showdown', 'mixedco
  * Not every mode: a time trial, a routine and a quiz have nobody to be difficult. Offering a tier where
  * nothing reads it is the hollow-picker failure the pickerReach test exists to catch.
  */
-const TIER_MODES = new Set(['velocitykart', 'aeroaces', 'football']);
+const TIER_MODES = new Set(['velocitykart', 'aeroaces', 'football', 'onevone']);   // IMPROVE (2026-10-06): 1v1 reads it (onevoneRules ONEVONE_TIER)
 /** WEATHER (docs/SPEC-WEATHER.md): the outdoor modes that read the pick — pickerReach keeps this honest; WEATHER_FAMILY_OF in nexus/weather names the family. */
 const WEATHER_MODES = new Set(['golf', 'soccer', 'tennis', 'football']);
 // Deliberately SHORT, and it grows as modes are wired rather than ahead of them. The first draft listed

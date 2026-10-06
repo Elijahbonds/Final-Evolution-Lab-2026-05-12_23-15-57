@@ -15,6 +15,10 @@ import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode } from './hud-format';
 import { MicCaption, MicToggle } from './mic-caption';   // THE MIC (2026-09-24): what the court's MC just said, and the switch for the voice
+import { CONTROLS_OFFENCE, CONTROLS_DEFENCE, pipBias } from '@/lib/babylon/modes/onevoneRules';   // IMPROVE (2026-10-06) #1 #10
+
+/** IMPROVE (2026-10-06) #10: a release pip's colour — the world meter's verdict colours (ShotMeter3D VERDICT_HEX). */
+const PIP_HEX: Record<string, string> = { p: '#39ff88', g: '#8cff5c', e: '#ffb340', l: '#ffb340', b: '#ff4b4b' };
 
 type Hud = Record<string, HudValue>;
 
@@ -107,7 +111,19 @@ export default function BasketballBabylon({ onEnd }: GameProps) {
         <span className="fel-panel fel-stat px-3 py-1 text-lg">
           {hnode(hud.score, 0)} – {hnode(hud.foeScore, 0)}
         </span>
-        <span className="fel-panel px-3 py-1 font-mono text-xs text-[var(--fel-gold)]">TO 11</span>
+        <span className="flex flex-col items-end gap-1">
+          <span className="fel-panel px-3 py-1 font-mono text-xs text-[var(--fel-gold)]">{hud.winBy2 === true ? 'TO 11 · WIN BY 2' : 'TO 11'}</span>
+          {/* IMPROVE (2026-10-06) #10: the last five releases, oldest first — green in the window, amber early / late, red way late —
+              and the lean once there are three to read, so a player can see their timing bias */}
+          {phase === 'playing' && typeof hud.shotPips === 'string' && hud.shotPips && (
+            <span className="fel-panel flex items-center gap-1 px-2 py-1" aria-label={`last releases: ${hud.shotPips}`}>
+              {hud.shotPips.split('').map((c, i) => (
+                <span key={i} className="inline-block h-2 w-2 rounded-full" style={{ background: PIP_HEX[c] ?? '#ffffff' }} />
+              ))}
+              {pipBias(hud.shotPips) && <span className="ml-1 font-mono text-[9px] text-white/70">{pipBias(hud.shotPips)}</span>}
+            </span>
+          )}
+        </span>
       </div>
 
       {/* shot meter */}
@@ -133,6 +149,13 @@ export default function BasketballBabylon({ onEnd }: GameProps) {
           <span className="fel-heading text-3xl font-bold text-[var(--fel-cyan)] drop-shadow">{hud.banner}</span>
         </div>
       )}
+      {/* IMPROVE (2026-10-06) #1: ONE line for the state you are in (the mode's hint — it used to be every control at once, and
+          this host never drew it) */}
+      {typeof hud.hint === 'string' && hud.hint && phase === 'playing' && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-16 px-3 text-center">
+          <span className="fel-panel px-3 py-1 font-mono text-[10px] text-white/75">{hud.hint}</span>
+        </div>
+      )}
       {phase === 'playing' && <MicCaption text={hud.mic} who={hud.micWho} />}
       {phase === 'playing' && <MicToggle />}
 
@@ -144,6 +167,15 @@ export default function BasketballBabylon({ onEnd }: GameProps) {
         onStart={tapStart}
         onRetry={tapStart}
       />
+
+      {/* IMPROVE (2026-10-06) #1: the full control list lives on the pause screen — over the splash's pause layer, never catching a tap
+          (the layer's tap is the resume) */}
+      {phase === 'paused' && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-4 mx-auto max-w-3xl space-y-2 px-4 text-[10px] leading-snug text-white/75">
+          <p><span className="font-black tracking-widest text-[var(--fel-cyan)]">OFFENSE</span> · {CONTROLS_OFFENCE}</p>
+          <p><span className="font-black tracking-widest text-[var(--fel-gold)]">DEFENSE</span> · {CONTROLS_DEFENCE}</p>
+        </div>
+      )}
 
       {(phase === 'playing' || phase === 'countdown') && busRef.current && (
         <TouchOverlay bus={busRef.current} modeId="onevone" visible />
