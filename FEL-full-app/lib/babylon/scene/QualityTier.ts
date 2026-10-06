@@ -176,11 +176,23 @@ export interface TierRigSettings {
   sharpen: boolean;
   bloomScaleMul: number;
   ssao: boolean;
+  /**
+   * MSAA samples on the HDR pipeline's first target (A9.2). Once the pipeline is mounted the scene renders OFF-screen,
+   * so the canvas's `antialias: true` does nothing — FXAA was the only anti-aliasing in the game, and FXAA softens the
+   * whole frame to hide stair-steps it cannot remove. Real multisampling resolves the geometry edges (court lines,
+   * rims, limbs against the sky) at the cost of fill rate, which the desktop GPUs have and the phones do not.
+   */
+  msaaSamples: number;
+  /** The FXAA pass: the phones keep it (it is their only AA); MSAA replaces it where MSAA runs. */
+  fxaa: boolean;
 }
+
+/** The pre-pass settings ?look=legacy restores on any tier: FXAA only, no MSAA. */
+export function legacyAa(t: TierRigSettings): TierRigSettings { return { ...t, msaaSamples: 1, fxaa: true }; }
 
 export function tierRigSettings(tier: QualityTier, mood: VenueMood): TierRigSettings {
   if (tier === 'mobile') {
-    return { shadowMapSize: 512, cascaded: false, sharpen: false, bloomScaleMul: 0.7, ssao: false };
+    return { shadowMapSize: 512, cascaded: false, sharpen: false, bloomScaleMul: 0.7, ssao: false, msaaSamples: 1, fxaa: true };
   }
   // high: the desktop rig. The high-only extras arrive with the passes that use them (MSAA, glow, the venue probe).
   // DESKTOP SHADOWS AT 4096 (owner, 2026-09-19: the graphics pass, "whatever it takes"). 2048 over a 90 m cascade
@@ -188,7 +200,7 @@ export function tierRigSettings(tier: QualityTier, mood: VenueMood): TierRigSett
   // stepped while everything else in the frame is sharp. Measured on the dunk arena before and after: the frame is
   // vsync-locked at 16.7 ms either way, zero frames over 33 ms. The map is the one thing in this rig that was
   // visibly under-resolved and the budget had room for it.
-  return { shadowMapSize: 4096, cascaded: OUTDOOR_MOODS.has(mood), sharpen: true, bloomScaleMul: 1, ssao: true };
+  return { shadowMapSize: 4096, cascaded: OUTDOOR_MOODS.has(mood), sharpen: true, bloomScaleMul: 1, ssao: true, msaaSamples: 4, fxaa: false };
 }
 
 export interface SsaoHandle { dispose(): void }

@@ -7,7 +7,8 @@ import {
 } from '@babylonjs/core';
 import type { AbstractMesh, PBRMaterial, StandardMaterial } from '@babylonjs/core';
 import { MOODS, type VenueMood } from './moods';
-import { tierRigSettings, type QualityTier } from './QualityTier';
+import { tierRigSettings, legacyAa, type QualityTier } from './QualityTier';
+import { isLegacyLook } from './graphicsSetting';
 import { mountEnvironmentIBL } from './EnvironmentIBL';
 import { motionPolicy } from '../../a11y/reducedMotion';
 
@@ -40,7 +41,8 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
   const M = MOODS[mood];
   // Ship pass (2026-09-02): desktop 60 fps / mobile 30 fps. The tier decides
   // shadow map size, cascades on outdoor moods, sharpen and bloom weight.
-  const T = tierRigSettings(tier, mood);
+  const legacy = isLegacyLook();   // ?look=legacy: the shared look as it shipped before 2026-10-06 (before/after shots)
+  const T = legacy ? legacyAa(tierRigSettings(tier, mood)) : tierRigSettings(tier, mood);
 
   scene.clearColor = Color4.FromHexString(M.clearColor + 'ff');
   scene.fogMode = Scene.FOGMODE_NONE;          // fog was blacking out high cameras
@@ -138,8 +140,10 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
   pipeline.bloomThreshold = M.bloomThreshold;
   pipeline.bloomWeight = M.bloomWeight;
   pipeline.bloomScale = M.bloomScale * T.bloomScaleMul;
-  // M44: free anti-aliasing + a light sharpen pass (edges were raw/jagged)
-  pipeline.fxaaEnabled = true;
+  // A9.2 (2026-10-06): real anti-aliasing. MSAA on the pipeline's first target where the tier can pay for it; FXAA stays
+  // as the phones' only AA (M44). Set once here, at mount — never toggled at runtime (a rebuild compiles shaders).
+  pipeline.samples = T.msaaSamples;
+  pipeline.fxaaEnabled = T.fxaa;
   pipeline.sharpenEnabled = T.sharpen;               // mobile skips the full-screen pass
   pipeline.sharpen.edgeAmount = 0.25;                             //TUNE(elijah)
   // M44: mood-tinted vignette so the grade reads on the whole frame
