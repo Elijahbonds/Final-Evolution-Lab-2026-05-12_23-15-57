@@ -81,15 +81,15 @@ export default function MusicSource({ entry, userId, publicCreator, onMade }: {
   }, [take]);
 
   useEffect(() => {
-    if (auto.current || !entry.song || !rows || !publicCreator) return;
+    if (auto.current || !entry.song || !rows) return;
     if (rows.some((r) => r.id === entry.song)) { auto.current = true; void fromLibrary(entry.song); }
-  }, [entry.song, rows, fromLibrary, publicCreator]);
+  }, [entry.song, rows, fromLibrary]);
 
   // A rendered song (SongPanel) or a file (FlipShelf) handed over on this device (lib/create/handoff.ts). Without one
   // (another browser, older than 30 minutes) the upload tab asks for the file.
   const [handoffMissing, setHandoffMissing] = useState(false);
   useEffect(() => {
-    if (!publicCreator || (entry.from !== 'song-render' && entry.from !== 'flipshelf')) return;
+    if (entry.from !== 'song-render' && entry.from !== 'flipshelf') return;
     let live = true;
     void (async () => {
       const { takeHandoff } = await import('@/lib/create/handoff');
@@ -105,7 +105,7 @@ export default function MusicSource({ entry, userId, publicCreator, onMade }: {
       finally { if (live) setBusy(null); }
     })();
     return () => { live = false; };
-  }, [entry.from, publicCreator, take]);
+  }, [entry.from, take]);
 
   const fromFile = async (file: File | undefined) => {
     if (!file) return;
@@ -130,18 +130,18 @@ export default function MusicSource({ entry, userId, publicCreator, onMade }: {
   const chart = useMemo(() => (track && withChart ? chartFor(track.bpm) : null), [track, withChart]);
   const chartAvailable = useMemo(() => (track ? !!chartFor(track.bpm) : false), [track]);
 
-  if (!publicCreator) {
-    return (
-      <div className="rounded-2xl bg-neutral-900 p-5 text-sm text-neutral-300" data-qa="teen-audio-note">
-        <p className="font-bold text-neutral-100">Your songs stay on this device for now.</p>
-        <p className="mt-2">Tracks upload to FEL only for creators confirmed 18+. Until then, everything you make in the Academy keeps playing here: your library, the dance floor and your walk-out.</p>
-        <Link href="/play/music" className="mt-4 inline-flex rounded-lg bg-emerald-500 px-4 py-2 font-bold text-black">Open the Academy</Link>
-      </div>
-    );
-  }
+  // PIPELINES (owner, 2026-10-06, "teen private uploads YES"): under 18 (or no birth year) the song is made the same way
+  // and uploads into the creator's owner-only private area (lib/soundtrack/privateUploads.ts): never public, never in the
+  // soundtrack, never heard by anyone else.
+  const privateNote = !publicCreator && (
+    <p className="rounded-2xl bg-neutral-900 p-3 text-xs text-neutral-300" data-qa="teen-private-note">
+      <b className="text-neutral-100">Private area.</b> Under 18, your songs save to your own private space on FEL: only you can hear them. Nothing in it is ever public or played for other players.
+    </p>
+  );
 
   return (
     <div className="space-y-4">
+      {privateNote}
       <div className="flex flex-wrap gap-2" role="tablist">
         {([['academy', 'From my Academy library'], ['upload', 'Upload a file'], ['maker', 'Quick beat maker']] as const).map(([id, label]) => (
           <button key={id} role="tab" aria-selected={tab === id} onClick={() => setTab(id)}

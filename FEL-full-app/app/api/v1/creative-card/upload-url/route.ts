@@ -7,14 +7,15 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { rateLimit } from '@/lib/rate-limit';
 import { ownerIsPublicCreator } from '@/lib/creator/creative-card-review';
-import { checkUpload, pendingObjectName, signCreatorPut, UploadsComingSoon } from '@/lib/soundtrack/storage';
+import { checkUpload, pendingObjectName, privateObjectName, signCreatorPut, UploadsComingSoon } from '@/lib/soundtrack/storage';
+import { ownerSegment, teenUploadGate } from '@/lib/soundtrack/privateUploads';
 
 /** owner-facing limit: a creator publishing a song with its cover and a few stems stays well under this. */
 const UPLOAD_RATE = { limit: 24, windowMs: 10 * 60_000 } as const;
 
 /**
- * POST /api/v1/creative-card/upload-url  { fileName, contentType, bytes, durationSec? }
- *   → { uploadUrl, headers, objectName, publicUrl }
+ * POST /api/v1/creative-card/upload-url  { fileName, contentType, bytes, durationSec?, discipline? }
+ *   → { uploadUrl, headers, objectName, publicUrl, private? }
  *
  * CREATOR SOUNDTRACK phase 0 (owner, 2026-10-06). Before: a presigned S3 PUT of ANY size, stored as a PUBLIC object before
  * anyone reviewed it, with no rate limit and no age check — a minor's voice line went public on upload. Now:
@@ -28,6 +29,12 @@ const UPLOAD_RATE = { limit: 24, windowMs: 10 * 60_000 } as const;
  *  - uploads are for public creators only (verified 18+). Owner: "teens create but nothing of theirs is public"; a teen's
  *    work stays on the device, as their Closet look does (lib/creator/lookPrivacy.ts).
  *  - no bucket configured → 503 "uploads coming soon" (fail closed).
+ *
+ * PIPELINES (owner, 2026-10-06, "teen private uploads YES: owner-only private area, never public; acting/voice stays
+ * adults-only"). A creator who is not a verified 18+ (a teen, or no birth year) may now upload music audio and images
+ * for the disciplines in lib/soundtrack/privateUploads.ts, if the request names the `discipline`. The object lands under
+ * private/<userId>/ instead of pending/, the answer says `private: true`, and nothing ever copies it public (see that
+ * file for every path that holds the line). Acting, or a request with no discipline, is still 403 device_only.
  */
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -37,22 +44,25 @@ export async function POST(req: NextRequest) {
   const rl = rateLimit(`creative-upload:${userId}`, UPLOAD_RATE.limit, UPLOAD_RATE.windowMs);
   if (!rl.ok) return NextResponse.json({ error: 'too many uploads, try again soon' }, { status: 429, headers: { 'Retry-After': String(rl.retryAfterSec) } });
 
-  let body: { fileName?: unknown; contentType?: unknown; bytes?: unknown; durationSec?: unknown };
+  let body: { fileName?: unknown; contentType?: unknown; bytes?: unknown; durationSec?: unknown; discipline?: unknown };
   try { body = await req.json(); } catch { return NextResponse.json({ error: 'invalid json' }, { status: 400 }); }
   const chk = checkUpload({ contentType: body?.contentType, bytes: body?.bytes, durationSec: body?.durationSec });
   if (!chk.ok) return NextResponse.json({ error: chk.error }, { status: 422 });
 
-  if (!(await ownerIsPublicCreator(prisma, userId))) {
-    return NextResponse.json({
-      error: 'device_only',
-      message: 'Uploads are for creators 18 and over. Your work stays on this device.',
-    }, { status: 403 });
+  // Adults upload for review (pending/); everyone else only into their own private area, and only what the teen rules allow.
+  const isPrivate = !(await ownerIsPublicCreator(prisma, userId));
+  if (isPrivate) {
+    const gate = teenUploadGate({ discipline: body.discipline, kind: chk.kind });
+    if (!gate.ok) return NextResponse.json({ error: gate.error, message: gate.message }, { status: 403 });
   }
 
   try {
-    const objectName = pendingObjectName(userId.replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 80), randomUUID().replace(/-/g, ''), chk.ext);
+    const name = isPrivate ? privateObjectName : pendingObjectName;
+    const objectName = name(ownerSegment(userId), randomUUID().replace(/-/g, ''), chk.ext);
     const signed = await signCreatorPut({ objectName, contentType: body.contentType as string, bytes: body.bytes as number });
-    return NextResponse.json({ uploadUrl: signed.url, headers: signed.headers, objectName, publicUrl: signed.pendingUrl });
+    return NextResponse.json({
+      uploadUrl: signed.url, headers: signed.headers, objectName, publicUrl: signed.pendingUrl, ...(isPrivate ? { private: true } : {}),
+    });
   } catch (e) {
     if (e instanceof UploadsComingSoon) return NextResponse.json({ error: 'uploads_coming_soon' }, { status: 503 });
     console.error('[FEL-CREATIVE] upload sign failed', e);

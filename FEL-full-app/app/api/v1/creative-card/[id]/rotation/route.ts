@@ -6,6 +6,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { getCard } from '@/lib/creator/creative-card-service';
 import { canApprove, cleanMoods, roleOf, type SoundtrackRecord } from '@/lib/creator/creative-card-review';
+import { cardHasPrivateMedia } from '@/lib/soundtrack/privateUploads';
 
 /**
  * POST /api/v1/creative-card/[id]/rotation  { rotation: 'on' | 'featured' | 'pulled', moods?: string[] }   founder/admin
@@ -28,7 +29,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   }
   const card = await getCard(prisma, params.id);
   if (!card) return NextResponse.json({ error: 'no card' }, { status: 404 });
-  if (rotation !== 'pulled' && (card.primary !== 'music' || card.reviewState !== 'approved')) {
+  // PIPELINES: an owner-only private upload (a teen's song) never goes into rotation.
+  if (rotation !== 'pulled' && (card.primary !== 'music' || card.reviewState !== 'approved' || cardHasPrivateMedia(card.art))) {
     return NextResponse.json({ error: 'only an approved music card goes into rotation' }, { status: 422 });
   }
   const stats = { ...(card.stats as unknown as Record<string, unknown>) };

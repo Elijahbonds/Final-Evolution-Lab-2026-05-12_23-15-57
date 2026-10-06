@@ -97,7 +97,7 @@ export default function GuidedFlow({ discipline, entry, ...props }: FlowProps & 
       for (const field of pendingFields(draft.art)) {
         const m = media[field];
         if (!m) throw new Error('Something you made is no longer on this page. Go back to step 1 and make it again.');
-        uploaded[field] = await uploadMedia({ body: m.blob, fileName: m.fileName, contentType: m.contentType, durationSec: m.durationSec });
+        uploaded[field] = await uploadMedia({ body: m.blob, fileName: m.fileName, contentType: m.contentType, durationSec: m.durationSec, discipline });
       }
       const art = resolvePending(draft.art, uploaded) as ArtPayloadBody | null;
       const body = art && buildCreateBody({ ...draft, art }, ctx);
