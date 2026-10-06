@@ -66,7 +66,11 @@ export class FramePacer {
   get mode(): PaceMode { return this._mode; }
   get capFps(): FpsCap | null { return this.cap; }
   /** The panel's refresh interval as measured: a low quantile of the raw rAF deltas, so the frames a busy main thread
-   *  stretched do not read as a slow panel (the skipped ticks are cheap and land on the real vsync). */
+   *  stretched do not read as a slow panel (the skipped ticks are cheap and land on the real vsync) — and never slower
+   *  than 60 Hz. Measured 2026-10-06 (the sweep's real-time run): a device too busy to EVER land a frame on vsync has no
+   *  cheap ticks to measure, its estimate becomes its own slowness, and the governor then judged every slow frame
+   *  "on time" and never stepped. No phone panel is slower than 60 Hz; a 30 Hz rAF (iOS Low Power Mode) reads as a 60
+   *  Hz panel that cannot hold 60, which steps it to the 30 cap — the right answer either way. */
   get vsyncMs(): number { return this._vsync; }
   get divisor(): number { return this.cap ? vsyncDivisor(this.cap, this._vsync) : 1; }
   /** The interval a rendered frame is aiming for — what "late" is measured against. */
@@ -95,7 +99,7 @@ export class FramePacer {
         if (this.deltas.length > VSYNC_SAMPLES) this.deltas.shift();
         if (++this.sinceEstimate >= 8 || this.deltas.length < 8) {
           this.sinceEstimate = 0;
-          this._vsync = Math.min(50, Math.max(4, quantile(this.deltas, 0.2)));
+          this._vsync = Math.min(1000 / 60, Math.max(4, quantile(this.deltas, 0.2)));
         }
       }
     }
@@ -160,8 +164,13 @@ export function scaledHardwareLevel(baseLevel: number, renderScale: number): num
 // ── GovernorCore ─────────────────────────────────────────────────────────────────────────────────────────────────────
 
 export interface GovernorConfig {
-  /** One verdict per window of rendered frames. */
+  /** One verdict per window of rendered frames: at least this long, and at least minFrames frames (a very slow device's
+   *  window stretches until it has them, up to maxWindowMs, rather than being skipped as "idle"). */
   windowMs: number;
+  /** The first frames after a mount carry the shader compiles and the last asset uploads: not judged. */
+  warmupMs: number;
+  minFrames: number;
+  maxWindowMs: number;
   /** A frame is LATE past target × this (PerfMonitor's LONG_FRAME_HEADROOM: a dropped vsync, not a rounding error). */
   lateFactor: number;
   /** A window is SLOW when more than this share of its frames were late… */
@@ -194,6 +203,9 @@ export interface GovernorConfig {
 /** TUNED: every number here is a first cut for a 3–4-year-old phone; the real-phone test in the report checks them. */
 export const DEFAULT_GOVERNOR: GovernorConfig = {
   windowMs: 2000,
+  warmupMs: 5000,
+  minFrames: 5,
+  maxWindowMs: 10_000,
   lateFactor: 1.35,
   slowMissRate: 0.12,
   slowWorkShare: 0.9,
@@ -228,7 +240,7 @@ export interface WindowStats { frames: number; missRate: number; workP50: number
 export type Verdict = 'slow' | 'fast' | 'ok';
 
 export function judgeWindow(w: WindowStats, cfg: GovernorConfig = DEFAULT_GOVERNOR): Verdict {
-  if (w.frames < 5) return 'ok';   // an idle or paused window says nothing
+  if (w.frames < 3) return 'ok';   // an idle or paused window says nothing
   if (w.missRate > cfg.slowMissRate || w.workP90 > w.targetMs * cfg.slowWorkShare) return 'slow';
   if (w.missRate < cfg.fastMissRate && w.workP90 < w.targetMs * cfg.fastWorkShare) return 'fast';
   return 'ok';
@@ -267,11 +279,13 @@ export class GovernorCore {
    * the pacer was aiming for. Returns the new state when this frame closed a window that changed it, else null.
    */
   frame(intervalMs: number, workMs: number, t: number, targetMs: number): GovernorState | null {
-    if (!Number.isFinite(this.winStart)) { this.winStart = t; this.lastChangeAt = t; }
-    if (Number.isFinite(intervalMs) && intervalMs > 0 && intervalMs < 1000) this.intervals.push(intervalMs);
+    if (!Number.isFinite(this.winStart)) { this.winStart = t; this.lastChangeAt = t; this.settleUntil = t + this.cfg.warmupMs; }
+    // a frame over 5 s is a stall (a debugger, a backgrounded tab the page missed), not a frame rate
+    if (Number.isFinite(intervalMs) && intervalMs > 0 && intervalMs < 5000) this.intervals.push(intervalMs);
     if (Number.isFinite(workMs) && workMs >= 0) this.works.push(workMs);
     this.winTarget = targetMs > 0 ? targetMs : this.winTarget;
-    if (t - this.winStart < this.cfg.windowMs) return null;
+    const age = t - this.winStart;
+    if (age < this.cfg.windowMs || (this.intervals.length < this.cfg.minFrames && age < this.cfg.maxWindowMs)) return null;
     const w = this.closeWindow();
     this.winStart = t;
     if (t < this.settleUntil) return null;   // the window a change landed in carries its hitch
@@ -356,7 +370,7 @@ export class GovernorCore {
   private judge(w: WindowStats, t: number): GovernorState | null {
     const c = this.cfg;
     const v = judgeWindow(w, c);
-    if (w.frames >= 5) this.trend.push({ t, p50: w.workP50, miss: w.missRate });
+    if (w.frames >= this.cfg.minFrames) this.trend.push({ t, p50: w.workP50, miss: w.missRate });
     if (v === 'slow') { this.slowStreak++; this.fastStreak = 0; }
     else if (v === 'fast') { this.fastStreak++; this.slowStreak = 0; }
     else { this.slowStreak = 0; this.fastStreak = 0; }

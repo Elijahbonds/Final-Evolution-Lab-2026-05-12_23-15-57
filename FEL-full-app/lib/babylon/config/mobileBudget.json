@@ -1,0 +1,267 @@
+{
+  "measuredAt": "2026-10-06",
+  "probe": "scripts/probes/_perf-sweep.mts",
+  "profile": "390x844 portrait, DPR 3, isMobile/hasTouch (mobile tier, 780x1688 backing), SwiftShader, 4x CPU throttle, virtual time, a fake pad playing; ?perf=off (the content, not the governor). Worst frame of the run per metric.",
+  "headroom": 1.2,
+  "ceilingSource": "drawCalls / activeMeshes / textureMb: PerfMonitor MOBILE_BUDGET. skinnedBodies 16 and particles 1500: perf-guard (TUNED).",
+  "ceiling": {
+    "drawCalls": 600,
+    "activeMeshes": 400,
+    "skinnedBodies": 16,
+    "textureMb": 256,
+    "particles": 1500
+  },
+  "modes": {
+    "aeroaces": {
+      "measured": {
+        "drawCalls": 134,
+        "activeMeshes": 57,
+        "skinnedBodies": 6,
+        "textureMb": 231,
+        "particles": 0
+      },
+      "budget": {
+        "drawCalls": 161,
+        "activeMeshes": 69,
+        "skinnedBodies": 8,
+        "textureMb": 256,
+        "particles": 0
+      }
+    },
+    "carnival": {
+      "measured": {
+        "drawCalls": 212,
+        "activeMeshes": 59,
+        "skinnedBodies": 6,
+        "textureMb": 163,
+        "particles": 0
+      },
+      "budget": {
+        "drawCalls": 255,
+        "activeMeshes": 71,
+        "skinnedBodies": 8,
+        "textureMb": 196,
+        "particles": 0
+      }
+    },
+    "dunk": {
+      "measured": {
+        "drawCalls": 154,
+        "activeMeshes": 67,
+        "skinnedBodies": 12,
+        "textureMb": 253,
+        "particles": 10
+      },
+      "budget": {
+        "drawCalls": 185,
+        "activeMeshes": 81,
+        "skinnedBodies": 15,
+        "textureMb": 256,
+        "particles": 12
+      }
+    },
+    "football": {
+      "measured": {
+        "drawCalls": 184,
+        "activeMeshes": 51,
+        "skinnedBodies": 19,
+        "textureMb": 193,
+        "particles": 10
+      },
+      "budget": {
+        "drawCalls": 221,
+        "activeMeshes": 62,
+        "skinnedBodies": 19,
+        "textureMb": 232,
+        "particles": 12
+      }
+    },
+    "golf": {
+      "measured": {
+        "drawCalls": 160,
+        "activeMeshes": 77,
+        "skinnedBodies": 11,
+        "textureMb": 152,
+        "particles": 0
+      },
+      "budget": {
+        "drawCalls": 192,
+        "activeMeshes": 93,
+        "skinnedBodies": 14,
+        "textureMb": 183,
+        "particles": 0
+      }
+    },
+    "karate": {
+      "measured": {
+        "drawCalls": 205,
+        "activeMeshes": 64,
+        "skinnedBodies": 22,
+        "textureMb": 193,
+        "particles": 20
+      },
+      "budget": {
+        "drawCalls": 246,
+        "activeMeshes": 77,
+        "skinnedBodies": 22,
+        "textureMb": 232,
+        "particles": 24
+      }
+    },
+    "karate_vs": {
+      "measured": {
+        "drawCalls": 135,
+        "activeMeshes": 52,
+        "skinnedBodies": 14,
+        "textureMb": 219,
+        "particles": 4
+      },
+      "budget": {
+        "drawCalls": 162,
+        "activeMeshes": 63,
+        "skinnedBodies": 16,
+        "textureMb": 256,
+        "particles": 5
+      }
+    },
+    "mixedcombat": {
+      "measured": {
+        "drawCalls": 133,
+        "activeMeshes": 51,
+        "skinnedBodies": 14,
+        "textureMb": 193,
+        "particles": 0
+      },
+      "budget": {
+        "drawCalls": 160,
+        "activeMeshes": 62,
+        "skinnedBodies": 16,
+        "textureMb": 232,
+        "particles": 0
+      }
+    },
+    "onevone": {
+      "measured": {
+        "drawCalls": 168,
+        "activeMeshes": 69,
+        "skinnedBodies": 12,
+        "textureMb": 214,
+        "particles": 10
+      },
+      "budget": {
+        "drawCalls": 202,
+        "activeMeshes": 83,
+        "skinnedBodies": 15,
+        "textureMb": 256,
+        "particles": 12
+      }
+    },
+    "skateboard": {
+      "measured": {
+        "drawCalls": 264,
+        "activeMeshes": 81,
+        "skinnedBodies": 14,
+        "textureMb": 212,
+        "particles": 0
+      },
+      "budget": {
+        "drawCalls": 317,
+        "activeMeshes": 98,
+        "skinnedBodies": 16,
+        "textureMb": 255,
+        "particles": 0
+      }
+    },
+    "surf": {
+      "measured": {
+        "drawCalls": 153,
+        "activeMeshes": 76,
+        "skinnedBodies": 12,
+        "textureMb": 175,
+        "particles": 44
+      },
+      "budget": {
+        "drawCalls": 184,
+        "activeMeshes": 92,
+        "skinnedBodies": 15,
+        "textureMb": 210,
+        "particles": 53
+      }
+    },
+    "tennis": {
+      "measured": {
+        "drawCalls": 115,
+        "activeMeshes": 49,
+        "skinnedBodies": 13,
+        "textureMb": 141,
+        "particles": 30
+      },
+      "budget": {
+        "drawCalls": 138,
+        "activeMeshes": 59,
+        "skinnedBodies": 16,
+        "textureMb": 170,
+        "particles": 36
+      }
+    },
+    "threepoint": {
+      "measured": {
+        "drawCalls": 220,
+        "activeMeshes": 77,
+        "skinnedBodies": 16,
+        "textureMb": 214,
+        "particles": 0
+      },
+      "budget": {
+        "drawCalls": 264,
+        "activeMeshes": 93,
+        "skinnedBodies": 16,
+        "textureMb": 256,
+        "particles": 0
+      }
+    },
+    "threevthree": {
+      "measured": {
+        "drawCalls": 196,
+        "activeMeshes": 81,
+        "skinnedBodies": 16,
+        "textureMb": 216,
+        "particles": 10
+      },
+      "budget": {
+        "drawCalls": 236,
+        "activeMeshes": 98,
+        "skinnedBodies": 16,
+        "textureMb": 256,
+        "particles": 12
+      }
+    },
+    "velocitykart": {
+      "measured": {
+        "drawCalls": 323,
+        "activeMeshes": 66,
+        "skinnedBodies": 11,
+        "textureMb": 284,
+        "particles": 0
+      },
+      "budget": {
+        "drawCalls": 388,
+        "activeMeshes": 80,
+        "skinnedBodies": 14,
+        "textureMb": 284,
+        "particles": 0
+      }
+    }
+  },
+  "knownOver": {
+    "football": [
+      "skinnedBodies"
+    ],
+    "karate": [
+      "skinnedBodies"
+    ],
+    "velocitykart": [
+      "textureMb"
+    ]
+  }
+}

@@ -34,12 +34,17 @@ const VIEW: Record<string, { width: number; height: number }> = {
   landscape: { width: 844, height: 390 },
 };
 
+// REALTIME=1 keeps the page's own clock: the governor then sees this box's real frame times and steps (the "after"
+// behaviour run); the default virtual clock makes every mode play the same game seconds (the content measurement).
+const REALTIME = !!process.env.REALTIME;
 const INIT = `(() => {
   const realNow = performance.now.bind(performance);
   window.__realNow = realNow;
-  let vt = realNow(); const raf = window.requestAnimationFrame.bind(window);
-  performance.now = () => vt;
-  window.requestAnimationFrame = (cb) => raf(() => { vt += 1000 / 60; cb(vt); });
+  if (!${REALTIME}) {
+    let vt = realNow(); const raf = window.requestAnimationFrame.bind(window);
+    performance.now = () => vt;
+    window.requestAnimationFrame = (cb) => raf(() => { vt += 1000 / 60; cb(vt); });
+  }
   window.__name = window.__name || function (f) { return f; };
   // the harness's 20 s load watchdog (LOAD_WATCHDOG_MS) is a phone-on-a-network guard; a dev build on software GL on a
   // shared box can take longer than that to parse a venue, so the probe gives a load 5 minutes instead
@@ -55,7 +60,9 @@ const INSTRUMENT = `(() => {
   window.__PAD = pad; navigator.getGamepads = () => [pad];
   const ev = new Event('gamepadconnected'); Object.defineProperty(ev, 'gamepad', { value: pad }); window.dispatchEvent(ev);
   const si = dev.instrument();
-  const R = window.__REC = { frames: [], t0: performance.now() };
+  const R = window.__REC = { frames: [], t0: performance.now(), gov: [] };
+  // the guard's own readout (window.__FEL_PERF__, published in dev): its level, cap and scale every 2 s
+  setInterval(() => { const g = window.__FEL_PERF__; if (g) { const s = g.state(); R.gov.push({ t: Math.round((performance.now() - R.t0) / 100) / 10, cap: s.cap, level: s.level, scale: s.renderScale, fps: Math.round(s.fps), js: Math.round(s.workP50 * 10) / 10, thermal: s.thermal, reason: s.reason }); } }, 2000);
   let tb = 0, ta = 0, taa = 0;
   engine.onBeginFrameObservable.add(() => { tb = now(); });
   scene.onBeforeAnimationsObservable.add(() => { ta = now(); });
@@ -122,7 +129,7 @@ interface Row { mode: string; profile: string; ok: boolean; note?: string; [k: s
 async function run(b: Browser, mode: string, profile: string): Promise<Row> {
   const ctx = await b.newContext({ viewport: VIEW[profile], deviceScaleFactor: 3, isMobile: true, hasTouch: true });
   await ctx.addInitScript({ content: INIT });
-  const p = await ctx.newPage();
+  const p = await Promise.race([ctx.newPage(), new Promise<never>((_, rej) => setTimeout(() => rej(new Error('newPage timed out')), 120000))]);
   const errs: string[] = [];
   p.on('pageerror', (e) => errs.push(e.message.slice(0, 120)));
   const cons: string[] = [];
@@ -156,19 +163,22 @@ async function run(b: Browser, mode: string, profile: string): Promise<Row> {
     }
     const loadS = (Date.now() - t0) / 1000;
     await ev(INSTRUMENT);
-    const cdp = await ctx.newCDPSession(p);
-    await cdp.send('Emulation.setCPUThrottlingRate', { rate: THROTTLE });
+    const cdp = await Promise.race([ctx.newCDPSession(p), crash]);
+    const send = (rate: number) => Promise.race([cdp.send('Emulation.setCPUThrottlingRate', { rate }), crash,
+      new Promise<never>((_, rej) => setTimeout(() => rej(new Error('cdp timed out')), 60000))]);
+    await send(THROTTLE);
     // play SECONDS of game time (virtual clock), never more than 6 real minutes
     const tPlay = Date.now();
     for (let k = 0; ; k++) {
       const g = await ev(() => (performance.now() - (window as any).__REC.t0) / 1000);
       if (process.env.VERBOSE && k % 20 === 0) console.log(`  [${mode}/${profile}] game ${g.toFixed(1)}s after ${((Date.now() - tPlay) / 1000).toFixed(0)}s`);
-      if (g >= SECONDS || Date.now() - tPlay > 360000) break;
+      if (g >= SECONDS || Date.now() - tPlay > Number(process.env.PLAY_CAP_S ?? 360) * 1000) break;
       await p.waitForTimeout(500);
     }
     const snap = await ev(SNAPSHOT) as Record<string, unknown>;
-    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
+    await send(1);
     const fr = (await ev(() => (window as any).__REC.frames)) as Array<Record<string, number>>;
+    const govLog = (await ev(() => (window as any).__REC.gov)) as unknown[];
     const f = fr.slice(Math.min(30, Math.floor(fr.length / 4)));   // the first frames carry the throttle switch
     const col = (k: string) => f.map((x) => x[k]);
     const shadows = (snap.shadows as Array<{ size: number; cascades: number; casters: number; blur: boolean }>) ?? [];
@@ -184,7 +194,7 @@ async function run(b: Browser, mode: string, profile: string): Promise<Row> {
       vertsK: pct(col('verts'), 0.5) / 1000, vertsMaxK: Math.max(...col('verts')) / 1000,
       parts: pct(col('parts'), 0.5), partsMax: Math.max(...col('parts')), psysMax: Math.max(...col('psys')),
       fillMpx: (Number(snap.backingPx) * (1 + postPasses) + shadowPx) / 1e6,
-      ...snap, errors: errs.length, err0: errs[0],
+      ...snap, govLog, errors: errs.length, err0: errs[0],
     };
   } catch (e) {
     return { mode, profile, ok: false, crashed, note: String((e as Error).message).slice(0, 140) };
@@ -255,9 +265,10 @@ if (process.env.WRITE_TABLE || process.env.CHECK) {
     if (over.length) process.exitCode = 1;
   } else {
     for (const [mode, m] of Object.entries(worst)) {
-      const budget = Object.fromEntries(METRICS.map((k) => [k, Math.ceil(m[k] * t.headroom)])) as Nums;
+      // the same rule scripts/mobile-budget-tests.ts holds the table to (budgetFor there)
+      const budget = Object.fromEntries(METRICS.map((k) => [k, m[k] > t.ceiling[k] ? m[k] : Math.min(t.ceiling[k], Math.ceil(m[k] * t.headroom))])) as Nums;
       t.modes[mode] = { measured: m, budget };
-      const over = METRICS.filter((k) => budget[k] > t.ceiling[k]);
+      const over = METRICS.filter((k) => m[k] > t.ceiling[k]);
       if (over.length) t.knownOver[mode] = over; else delete t.knownOver[mode];
     }
     t.measuredAt = new Date().toISOString().slice(0, 10);

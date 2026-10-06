@@ -74,6 +74,14 @@ describe('FramePacer', () => {
     expect(p.divisor).toBe(2);
   });
 
+  it('a device too busy to ever hit vsync is still judged against 60 Hz, not against its own slowness', () => {
+    const p = new FramePacer();
+    let t = 0;
+    for (let i = 0; i < 200; i++) { p.tick(t); t += 30; }   // every tick 30 ms late: there are no cheap ticks to measure
+    expect(p.vsyncMs).toBeCloseTo(1000 / 60);
+    expect(p.targetMs).toBeCloseTo(1000 / 60);
+  });
+
   it('low mode refreshes at the idle rate; stop renders nothing', () => {
     const p = new FramePacer();
     drive(p, 60, 500);
@@ -130,6 +138,21 @@ describe('GovernorCore', () => {
     const g = new GovernorCore();
     const r = feed(g, 60_000, 1000 / 60, 4, 0);
     expect(r.changes).toEqual([]);
+    expect(g.state).toMatchObject({ level: 0, cap: 60 });
+  });
+
+  it('a very slow device (a frame every 2 s) still steps: its windows stretch until they hold enough frames', () => {
+    const g = new GovernorCore();
+    const r = feed(g, 120_000, 2000, 150, 0);
+    expect(r.changes.length).toBeGreaterThanOrEqual(3);
+    expect(r.changes[0]).toBe('60/1');
+  });
+
+  it('the first seconds of a mount (shader compiles, uploads) are not judged', () => {
+    const g = new GovernorCore();
+    const bad = feed(g, 4900, 60, 30, 0);                  // awful, but inside the warm-up
+    const good = feed(g, 30_000, 1000 / 60, 4, bad.t);
+    expect([...bad.changes, ...good.changes]).toEqual([]);
     expect(g.state).toMatchObject({ level: 0, cap: 60 });
   });
 
