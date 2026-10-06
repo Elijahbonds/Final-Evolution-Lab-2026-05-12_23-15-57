@@ -18,7 +18,7 @@ import type { Mesh, Scene } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { mountPostureLayer } from '../anim/PostureLayer';
 import { BOARD_POSTURE, BOARD_LEGS, type BoardWindow } from '../core/BoardPosture';
-import { airTrickFor, heldTrickDir, scoreTrick, type BoardTrick } from '../core/BoardTricks';   // boards pass phase 3: the family's trick table on big air
+import { airTrickFor, airPressFor, heldTrickDir, scoreTrick, type BoardTrick } from '../core/BoardTricks';   // boards pass phase 3: the family's trick table on big air
 import { ComboChain } from '../core/ComboChain';   // phase 4: the THPS loop — a landed line is a link, a crash burns the pot
 import { DEFAULT_HERO_URL } from '../core/athleteRoster';
 import { neverBindPose } from '../anim/importSanitizer';
@@ -32,8 +32,11 @@ import type { AirSessionCore } from '../../feel/cores/air-session-core';
 import type { TrickGrade, CadenceSide } from '../../feel';
 import type { VenueMood } from '../scene/moods';
 import { makeBigAirSession, BIG_AIR_TUNING, BIG_AIR_HILL } from '../../feel/cores/big-air-skin';
-import { hillSurface, type AirHill } from '../../feel/cores/air-hill';
+import { hillSurface, sweetBand, type AirHill } from '../../feel/cores/air-hill';
 import { buildAirHill } from './bigAirHill';
+import { BoardTrickLayer } from '../anim/BoardTrickLayer';   // IMPROVE (2026-10-06, item 7): the grab's hand, the cork's tilt
+import { EffectsKit } from '../visual/EffectsKit';            // IMPROVE (2026-10-06, item 14): the snowfall
+import { AIR_HINT, coachLine, barK, stompState, stompCall, LATE_STOMP_SEC, zoneCall, HANG, apexHang, judgeRead, repeatShare, sheetLine } from './bigAirPlay';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import { BoostKit } from '../core/BoostKit';          // FINISH-RELEASE: the shared boost (landings + pads fill it, RB/Shift burns it on the run-in)
@@ -128,6 +131,18 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
   const eyeAt = new Vector3();
   const camFwd = new Vector3();
   let galleryCullT = 0;
+  // IMPROVE (2026-10-06, Big Air items 4 / 7 / 8 / 11 / 12 / 14): the play layer — the trick layer (hands and tilt), the stomp
+  // ring on the predicted touchdown, the B press's distance from it, the apex hang, the wind bed, the speed bar's window
+  let trickLayer: BoardTrickLayer | null = null;
+  let stompRing: Mesh | null = null;
+  let ringMats: { wait: import('@babylonjs/core').Material; now: import('@babylonjs/core').Material } | null = null;
+  let ringState: 'wait' | 'now' | null = null;
+  let stickLeft: number | null = null;       // B pressed this many seconds before the forecast touchdown (null = not this air)
+  let landedAtMs = -1;                       // the last touchdown (performance clock) — a B just after it is LATE
+  let lastStomp: 'wait' | 'now' | null = null;
+  let prevVy = 0, hangFired = false, slowT = 0;
+  let ambientOn = false;
+  let band: { lo: number; hi: number; max: number } | null = null;
 
   /** A clean / stuck landing: a soft shake on top of the scorePop + light feel hit that stay. */
   const landBeat = (ctx: ModeContext, grade: TrickGrade): void => { ctx.juice.shake(0.06, 120); console.info(`[AIR-JUICE] clean land (${grade})`); };
@@ -157,6 +172,7 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
     lookX: 0, lookY: 0,   // R stick → camera look (MODE-STICK-FACE family, 2026-09-07)
     stickX: 0, stickY: 0,    // phase 3: the held direction picks the named trick (the board family's grammar)
     named: [] as BoardTrick[],   // the tricks thrown this air, scored on the landing
+    note: '', noteT: 0,          // IMPROVE (2026-10-06, items 2 / 11): the landing's word — the hill's, the stomp's
     bonus: 0,                    // points the named tricks earned across the session (the core scores rotation only)
     judgeBest: 0,                // phase 9: the best JUDGES read of the session (0–10)
     chain: new ComboChain(undefined, 'air'),   // phase 4: the run's combo — links across attempts, a crash burns the pot
@@ -167,6 +183,7 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
     S.nextFoot = 'L'; S.banner = ''; S.bannerT = 0; S.done = false;
     crashAt = 0; finishLatch = false;
     hudOut.reset(); camPhase = null; galleryCullT = 0;   // IMPROVE (2026-10-06): a remount publishes and frames afresh
+    S.note = ''; S.noteT = 0; stickLeft = null; landedAtMs = -1; lastStomp = null; prevVy = 0; hangFired = false; slowT = 0; ambientOn = false; ringState = null;
     stride.reset(); rideIntents.reset(); plantAt = null; bodyPhase = null; bodySynced = false;   // MOVEMENT PLAY P8
     Object.assign(bodyStats, { strides: 0, perfect: 0, good: 0, off: 0, fault: 0, ignoredInAir: 0, spins: 0, plants: 0, grabs: 0, last: '' });
   };
@@ -209,6 +226,7 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
       const t = grabTrickFor('snow', it.hand, it.edge, 1.2);
       if (!t || S.named.some((n) => n.id === t.id)) return;
       S.named.push(t); grabThisAir = true; say(t.label, 0.7);
+      trickLayer?.start(t);   // IMPROVE (2026-10-06, item 7): the body's grab gets the hand too
       bodyStats.grabs++; bodyStats.last = t.label;
       console.info(`[AIR-TRICK] body grab ${it.hand}/${it.edge ?? '-'} → ${t.id}`);
     }
@@ -229,9 +247,32 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
       nextFoot: S.nextFoot,
       banner: S.banner || null,
       ...boost.hud(),
-      hint: 'D-PAD ←/→ alternate strides · HOLD RB/SHIFT boost the run-in (bigger pop) · in the air ←/→ picks backside/frontside · A starts the spin, A again plants it — land on a half turn · B stick the landing',
+      // IMPROVE (2026-10-06, items 5 / 6): the control card the host now draws — X grabs and Y throws the big spins, as the
+      // board family maps them (it said nothing of grabs, and Y named a B trick, X a Y trick)
+      hint: AIR_HINT,
+      ...playHud(),
     });
     if (patch) ctx.setHud(patch);
+  };
+  /**
+   * IMPROVE (2026-10-06, items 4 / 6 / 8 / 11 / 13): the play layer's HUD. The dial and the speed bar read purpose-built
+   * gauge fields (RESULTS-TRUTH WA-6 keeps the raw speed / height / spin numbers off the HUD; they stay probe telemetry).
+   */
+  const playHud = (): Record<string, string | number | null> => {
+    const st = core?.state;
+    if (!core || !st) return {};
+    const air = st.phase === 'Air', land = st.phase === 'Land';
+    return {
+      coach: coachLine(st.attempt, st.phase, { spinning: core.airTrick.spinning, taps: core.airTrick.taps }, lastStomp === 'now'),
+      dialTurns: air ? Number((st.spinTurns ?? 0).toFixed(2)) : land ? Number(st.lastRotations.toFixed(2)) : null,
+      dialTol: core.airTrick.cleanTolerance,
+      speedK: st.phase === 'Run' && band ? Number(barK(st.speed, band.max).toFixed(2)) : null,
+      bandLoK: band ? Number(barK(band.lo, band.max).toFixed(3)) : null,
+      bandHiK: band ? Number(barK(band.hi, band.max).toFixed(3)) : null,
+      stomp: air ? lastStomp : null,
+      note: S.note || null,
+      sheet: sheetLine(st.attempts) || null,
+    };
   };
 
   const say = (text: string, sec = 1.2): void => { S.banner = text; S.bannerT = sec; };
@@ -346,11 +387,24 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
         const at = eyeAt.copyFrom(landingAt);
         return { pose, legs, aim: at, eyes: at, window: w };
       }, 'AIR-PP');
+      // IMPROVE (2026-10-06, item 7): the board family's trick layer — the grabbing hand on the right edge, the cork's and the
+      // rodeo's off-axis tilt — mounted after the posture layer (the hand is the last word). The core owns the spin (yaw).
+      trickLayer?.dispose();
+      trickLayer = new BoardTrickLayer(ctx.scene, athlete.skeleton, athlete.root, board, { bodySpin: false });
 
       // Frame the athlete against the thing they are running at.
       ctx.objectiveRef.current = objective;
+      // IMPROVE (2026-10-06, item 11): the stomp ring — on the snow where this air will set down, cyan while it falls, gold
+      // inside the stick window. IMPROVE (item 14): the snowfall (the wind bed starts on the first played frame: the harness
+      // sets the alpine mood's bed to none on the first input, which would stop one started here)
+      stompRing?.dispose();
+      stompRing = MeshBuilder.CreateTorus(`${opts.modeId}_stompRing`, { diameter: 2.2, thickness: 0.14, tessellation: 40 }, ctx.scene);
+      ringMats = { wait: VenueKit.paint(ctx.scene, `${opts.modeId}_ringWait`, '#22d3ee', 1), now: VenueKit.paint(ctx.scene, `${opts.modeId}_ringNow`, '#ffd75e', 1) };
+      stompRing.material = ringMats.wait; stompRing.isPickable = false; stompRing.setEnabled(false);
+      EffectsKit.ambient(ctx.scene, 'slope');
 
       core = opts.makeSession((grade, rotations) => {
+        trickLayer?.clear();
         if (grade === 'stuck' || grade === 'clean') S.combo += 1; else S.combo = 0;
         // phase 5: the landing on the BODY — the tree's land / sketchy / bail beat, cleared by the clock below
         grabThisAir = false; lastCrash = grade === 'crash';
@@ -367,7 +421,9 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
         const lineDiff = S.named.reduce((m, t) => Math.max(m, t.difficulty), 0);
         // weights (measured on the first cut: a SKETCHY 720 + rodeo read 7.5 — the landing counted too little): the landing is
         // half the score (stuck 5 / clean 4.2 / sketchy 1.5), the rotation up to 2.5, the line up to 2.5
-        const judge = grade === 'crash' ? 0 : Math.min(10, (grade === 'stuck' ? 5 : grade === 'clean' ? 4.2 : 1.5) + Math.min(2.5, Math.abs(rotations) * 1.25) + Math.min(2.5, lineDiff));
+        // IMPROVE (2026-10-06, item 10): the rotation's part reads at the repeat's share — the same spin again reads lower
+        const lastAtt = core?.state.attempts[core.state.attempts.length - 1];
+        const judge = judgeRead(grade, rotations, lineDiff, repeatShare(lastAtt?.repeat, core?.t.repeatDecay));
         S.judgeBest = Math.max(S.judgeBest, judge);
         console.info(`[AIR-JUDGE] ${judge.toFixed(1)} (${grade}, ${Math.abs(rotations).toFixed(1)} rot, line ${lineDiff.toFixed(1)})`);
         S.named = [];
@@ -381,6 +437,11 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
         // a landing with no spin scores nothing now (pointsNeedTrick) — so it says so, rather than a CLEAN over a zero
         say(line ? `${line} — ${GRADE_LABEL[grade]}${grade === 'crash' ? (lost > 0 ? ` — POT LOST ${lost}` : '') : S.chain.multiplier > 1 ? ` ${S.chain.multiplier}× · POT ${S.chain.pot}` : linePts > 0 ? ` +${linePts}` : ''}` : turns < 0.5 && grade !== 'crash' ? `${GRADE_LABEL[grade]} — NO TRICK, NO POINTS` : `${GRADE_LABEL[grade]}${turns >= 1 ? `  ${turns.toFixed(1)} ROT ${rotations < 0 ? 'BS' : 'FS'}` : ''}`, 1.6);
         S.banner += ` · JUDGES ${judge.toFixed(1)}`;   // phase 9: the read rides the landing banner
+        // IMPROVE (2026-10-06, items 2 / 8 / 11): the landing's word — where on the hill it set down, and the stomp's timing
+        const notes = [zoneCall(core?.state.lastZone), stompCall(core?.state.lastJudged === 'stuck', stickLeft, core?.airTrick.stickWindowMs ?? 0)].filter(Boolean);
+        S.note = notes.join(' · '); S.noteT = S.note ? 2.2 : 0;
+        stickLeft = null; landedAtMs = performance.now(); lastStomp = null;
+        if (S.note) console.info(`[AIR-CALL] ${S.note}`);
         gallery?.cheer(grade === 'stuck' ? 1 : grade === 'clean' ? 0.6 : grade === 'sketchy' ? 0.3 : 0.15);
         SoundKit.play(grade === 'crash' ? 'miss' : 'score');
         ctx.juice.scorePop(
@@ -394,6 +455,9 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
       });
 
       ctx.camDirector.snapTo(athlete.root.position, objective);
+      // IMPROVE (2026-10-06, item 8): the landing's launch-speed window, measured on this core — the run-up's speed bar shows it
+      const sw = opts.hill ? sweetBand(core.t, core.feel.gravity, opts.hill) : null;
+      band = sw ? { lo: sw[0], hi: sw[1], max: core.t.maxRunSpeed * 1.4 } : null;
       boost = new BoostKit(0.25); boostHeld = false; baseFov = null;
       boostFx?.dispose(); boostFx = new BoostFx(ctx.scene, ctx.camera, { trailFrom: athlete.root, trailWidth: 0.45 });
       boostPads?.dispose();
@@ -421,6 +485,7 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
       if (e.t === 'stick' && e.side === 'R') { S.lookX = e.x; S.lookY = e.y; return; }   // MODE-STICK-FACE: R stick → the director's look orbit
       if (e.t === 'stick' && e.side === 'L') { S.stickX = e.x; S.stickY = e.y; }          // phase 3: the held direction
       if (e.t === 'button' && e.btn === 'R1') { boostHeld = e.pressed; return; }   // BOOST: the shared held R1
+      if (e.t === 'button' && !e.pressed && e.btn === 'X') { trickLayer?.release(); return; }   // IMPROVE (item 7): the grab let go
       if (S.done || !core) return;
       const phase = core.state.phase;
 
@@ -444,16 +509,30 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
         // (and names the spin: 540 right, 720 left, a straight air neutral), Y is a grab by direction (method up, stalefish
         // left, tail grab right, indy down), X the big spins (cork 720 right, rodeo left). Before: A spun, B stomped, and
         // the mode named nothing (the trick probe saw two prompts in 50 s of presses).
-        const nameTrick = (btn: 'A' | 'B' | 'Y'): void => {
-          const t = airTrickFor('snow', heldTrickDir(S.stickX, S.stickY), btn, 1.2);
+        // IMPROVE (2026-10-06, item 5): Y → the Y tricks and X → the X grab, as skate, the slalom and surf map them (Y named a 'B'
+        // grab here and X a 'Y' spin). X is the family's grab hold: airPressFor gives the held direction's straight grab.
+        const nameTrick = (btn: 'A' | 'X' | 'Y'): void => {
+          // the air LEFT names what fits (skate's fitToAir idea: the core's own forecast of the touchdown)
+          const left = Math.max(0.3, core?.predictTouchdown()?.sec ?? 1.2);
+          const t = btn === 'X' ? airPressFor('snow', heldTrickDir(S.stickX, S.stickY), 'X', left) : airTrickFor('snow', heldTrickDir(S.stickX, S.stickY), btn, left);
           if (!t || t.kind !== 'air') return;
           if (S.named.some((n) => n.id === t.id)) { say(`${t.label} · REPEAT`, 0.5); return; }
           S.named.push(t); if (t.grab !== 'none') grabThisAir = true; say(t.label, 0.7); console.info(`[AIR-TRICK] ${t.id} (${btn} ${heldTrickDir(S.stickX, S.stickY) ?? 'neutral'})`);
+          trickLayer?.start(t);   // IMPROVE (item 7): its shape on the body — the hand to the edge, the cork's tilt
         };
         if (e.btn === 'A' && phase === 'Air') { core.trick(); nameTrick('A'); SoundKit.play('whoosh', { pitch: 1.2, volume: 0.35 }); }
-        else if (e.btn === 'Y' && phase === 'Air') { nameTrick('B'); SoundKit.play('whoosh', { pitch: 1.0, volume: 0.35 }); }
-        else if (e.btn === 'X' && phase === 'Air') { nameTrick('Y'); SoundKit.play('whoosh', { pitch: 0.9, volume: 0.4 }); }
-        else if (e.btn === 'B' && phase === 'Air') { core.stick(); SoundKit.play('thud', { pitch: 1.1, volume: 0.35 }); }
+        else if (e.btn === 'Y' && phase === 'Air') { nameTrick('Y'); SoundKit.play('whoosh', { pitch: 0.9, volume: 0.4 }); }
+        else if (e.btn === 'X' && phase === 'Air') { nameTrick('X'); SoundKit.play('whoosh', { pitch: 1.0, volume: 0.35 }); }
+        else if (e.btn === 'B' && phase === 'Air') {
+          core.stick(); SoundKit.play('thud', { pitch: 1.1, volume: 0.35 });
+          stickLeft = core.predictTouchdown()?.sec ?? null;   // IMPROVE (item 11): how far out it was pressed
+        }
+        else if (e.btn === 'B' && phase === 'Land' && landedAtMs >= 0 && (performance.now() - landedAtMs) / 1000 <= LATE_STOMP_SEC) {
+          // IMPROVE (item 11): a stomp just after the touchdown is LATE, and says by how much (it used to be refused as off-phase)
+          const ms = Math.round(performance.now() - landedAtMs);
+          S.note = `STOMP LATE · ${ms} MS`; S.noteT = 1.6; landedAtMs = -1;
+          SoundKit.play('uiTick', { pitch: 0.7, volume: 0.45 });
+        }
         else if ((e.btn === 'A' || e.btn === 'B') && phase !== 'Run') refuse(ctx, 'WAIT FOR THE RUN-UP');
         // MECHANICS PASS (2026-09-15): SPIN and STOMP are air verbs, and on the run-up they did nothing and said nothing
         // (the probe: 67% of deliberate presses silent). A press out of its phase is answered with where it belongs.
@@ -461,8 +540,15 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
       }
     },
 
-    update(ctx: ModeContext, dt: number): void {
+    update(ctx: ModeContext, dtRaw: number): void {
       if (S.done || !core || !athlete || !launchPad) return;
+      if (!ambientOn) { ambientOn = true; SoundKit.startAmbient('wind'); }   // IMPROVE (2026-10-06, item 14): the wind bed
+      // IMPROVE (2026-10-06, item 12): the apex hang slows the WHOLE beat — the core's flight and spin with the clips (skate's
+      // spectacle pattern: juice.slowMo only moves the animation clock)
+      if (slowT > 0) slowT = Math.max(0, slowT - dtRaw);
+      const dt = slowT > 0 ? dtRaw * HANG.scale : dtRaw;
+      trickLayer?.begin();   // IMPROVE (item 7): take back last frame's trick offsets before this frame's writes
+      prevVy = core.state.vy;
 
       const bev = boost.update(dt, boostHeld, core.state.phase === 'Run');
       core.boostK = boost.k;
@@ -488,11 +574,32 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
       athlete.root.position.set(st.pos.x, Math.max(0, st.pos.y), st.pos.z);
       // Rotation in the air is the trick; on the ground face the run direction — pitched with the snow under the board on the
       // kicker's ramp and the landing slope (IMPROVE 2026-10-06: nose up the lip, nose down the landing).
+      // IMPROVE (2026-10-06, item 3): a SPIN turns about the vertical (rotation.y). It turned the body about X, so every 540
+      // and 720 read as a front flip; the off-axis tilt of a cork or a rodeo is the trick layer's, on X, below.
       athlete.root.rotation.set(
-        st.phase === 'Air' ? (st.spinTurns ?? 0) * Math.PI * 2 : -core.surface.pitch(st.pos.z),
-        Math.PI,   // running toward -z
+        st.phase === 'Air' ? 0 : -core.surface.pitch(st.pos.z),
+        Math.PI + (st.phase === 'Air' ? (st.spinTurns ?? 0) * Math.PI * 2 : 0),   // running toward -z
         0,
       );
+      trickLayer?.apply(dt, st.phase === 'Air');
+      // IMPROVE (2026-10-06, items 11 / 12): the forecast touchdown — the ring on the snow, the stomp cue, the apex hang (before the
+      // finish hold below, so the ring is put away the moment the last air lands)
+      const td = st.phase === 'Air' ? core.predictTouchdown() : null;
+      lastStomp = stompState(td ? td.sec : null, core.airTrick.stickWindowMs);
+      if (stompRing && ringMats) {
+        stompRing.setEnabled(!!td);
+        if (td) {
+          stompRing.position.set(0, td.y + 0.06, td.z);
+          stompRing.rotation.x = core.surface.pitch(td.z);
+          if (lastStomp !== ringState) { ringState = lastStomp; stompRing.material = lastStomp === 'now' ? ringMats.now : ringMats.wait; }
+        }
+      }
+      if (st.phase === 'Run') hangFired = false;
+      if (td && apexHang(prevVy, st.vy, core.airTrick.spinning, Math.abs(core.airTrick.rotation) + (core.airTrick.spinRatePerSec || 0) * td.sec, hangFired)) {
+        hangFired = true; slowT = HANG.sec;
+        ctx.juice.slowMo(HANG.scale, HANG.sec * 1000, { gameplay: true });   // (the mode slows its own dt for the same span)
+        console.info('[AIR-HANG] apex beat');
+      }
 
       // phase 5: the board tree is the one owner of the clips (was: the sprint loop on the run-in, `jump_up` held through
       // the whole air — 391/729 T-arm frames — and the stand idle on the landing)
@@ -517,7 +624,7 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
       }
 
       if (S.bannerT > 0) { S.bannerT -= dt; if (S.bannerT <= 0) S.banner = ''; }
-
+      if (S.noteT > 0) { S.noteT -= dt; if (S.noteT <= 0) S.note = ''; }
       gallery?.update(dt);
       if (gallery && (galleryCullT -= dt) <= 0) { galleryCullT = 0.25; ctx.camera.getDirectionToRef(Axis.Z, camFwd); gallery.cullBehind(ctx.camera.position, camFwd); }
       boostPads?.update(dt, athlete.root.position, boost);
@@ -533,7 +640,9 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
       if (st.phase === 'Air') {
         ctx.camDirector.setAir(Math.min(1, Math.max(0.35, st.pos.y / 7)));
       } else if (st.phase === 'Land') {
-        ctx.camDirector.setAir(0.25);
+        // IMPROVE (2026-10-06, item 2): on the 20° landing the chase cam sits uphill of the rider — lift it (measured: at 0.25
+        // its eye is ~0.15 m over the slope 7 m back); on the flat, as before
+        ctx.camDirector.setAir(core.surface.pitch(st.pos.z) < 0 ? 0.6 : 0.25);
       } else {
         ctx.camDirector.setAir(0);
       }
@@ -558,6 +667,9 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
       gallery?.dispose(); gallery = null;
       boostFx?.dispose(); boostFx = null; boostPads?.dispose(); boostPads = null;
       baseFov = null;
+      trickLayer?.dispose(); trickLayer = null;
+      stompRing?.dispose(); stompRing = null; ringMats = null;
+      SoundKit.stopAmbient();   // IMPROVE (2026-10-06, item 14)
       core = null;
     },
   };
