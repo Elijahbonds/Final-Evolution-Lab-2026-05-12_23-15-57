@@ -57,6 +57,7 @@ const PUBLIC_BY_DESIGN: Record<string, string> = {
   // checked that. It now reads the session and answers a pending, rejected, private or minor's card only to its owner and
   // the review staff (lib/creator/creative-card-review.test.ts pins it), so the entry stays only for the public read.
   'v1/creative-card/[id]/route.ts': 'an approved, public card by an adult creator is public in the same way a creator card is; anything else answers only its owner and review staff',
+  'v1/soundtrack/route.ts': 'the soundtrack catalogue: house songs and approved, public, in-rotation tracks by adult creators, as slim CDN-cached entries the menus already play to anyone',
   'onboarding/host/route.ts': 'a visitor who scanned a card has no session yet; returns only a published card\'s display name, signature mode and accent',
 };
 
