@@ -141,6 +141,17 @@ export class CoinField {
     return this.coins.reduce((n, c) => n + (c.taken ? 0 : 1), 0);
   }
 
+  /**
+   * IMPROVE (2026-10-06): take every coin off the field but keep the master, its material and the `collected` count, so a
+   * mode that re-lays its coins (a new drive) does not rebuild the mesh and the shader binding each time. The buffer is
+   * resized on the next update to the new layout's count.
+   */
+  clear(): void {
+    this.coins = [];
+    this.buf = null;
+    this.master?.setEnabled(false);
+  }
+
   dispose(): void {
     this.master?.material?.dispose();
     this.master?.dispose();
