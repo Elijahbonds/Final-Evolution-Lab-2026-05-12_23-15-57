@@ -11,6 +11,13 @@ import { Color3, DynamicTexture, MeshBuilder, PBRMaterial, StandardMaterial, Tex
 import { SKIN_DETAIL_NORMAL, SKIN_LIBRARY, type SkinEntry } from './skinLibrary';
 import type { Material } from '@babylonjs/core';
 import type { QualityTier } from '../scene/QualityTier';
+import type { AccessoryId } from './accessories';
+import { wearPlayerAccessories } from './playerAccessories';
+import { applyCreatorLayers } from './creatorLook';
+import type { CreatorDoc } from '../../creator/look/doc';
+import { readCreatorDoc, faceOnly } from '../../creator/look/storage';
+import { effectivePalette, type PaletteOverrides } from '../../creator/look/palette';
+import { accessoriesForEquipped } from '../../closet/wearableAccessories';
 
 type TintMat = Material & { albedoColor?: Color3; diffuseColor?: Color3; bumpTexture?: { dispose(): void } | null };
 
@@ -61,6 +68,13 @@ export interface PlayerIdentity {
    *  is on the device and nowhere else (LOOK PRIVACY, PR #98; the race's local overlay, PR #138). Optional:
    *  dev literals do not carry one. */
   lookLocal?: boolean;
+  /** IMPROVE (2026-10-06): the Creator's look doc (AvatarLook.face.creator), sanitised. Its colours are already folded
+   *  into `palette` by resolveIdentity, and applyIdentity folds them again for a preview that passes a doc. Optional:
+   *  a literal without one wears no doc. Parts / paint render from it through creatorLook.applyCreatorLayers. */
+  creator?: CreatorDoc | null;
+  /** IMPROVE (2026-10-06): the accessories the equipped headwear / accessory render as (wearableAccessories). Optional:
+   *  a literal without one wears none. The player never gets the NPCs' seeded deal. */
+  accessories?: readonly AccessoryId[];
 }
 export interface EquippedCard { id: string; name: string; accent: string; mode: string }
 
@@ -75,10 +89,13 @@ export async function resolveIdentity(force = false): Promise<PlayerIdentity> {
   if (dev) { cached = dev; return dev; }
   const [closet, heroBody] = await Promise.all([
     fetch('/api/v1/closet').then((r) => (r.ok ? r.json() : null)).catch(() => null),
-    fetch('/api/v1/hero-body').then((r) => (r.ok ? r.json() : null)).catch(() => null) as Promise<{ body?: HeroBodyKind; frame?: Record<string, unknown> | null } | null>,
+    fetch('/api/v1/hero-body').then((r) => (r.ok ? r.json() : null)).catch(() => null) as Promise<{ body?: HeroBodyKind; frame?: Record<string, unknown> | null; palette?: PaletteOverrides | null } | null>,
   ]);
 
-  const face: FaceConfig = { ...defaultFace(), ...(closet?.look?.face ?? {}) };
+  // IMPROVE (2026-10-06): the stored face carries the Creator's doc (face.creator / face.creatorSlots); the face pipes
+  // get the FaceConfig alone, and the doc is read (and sanitised again) on its own.
+  const creator = readCreatorDoc(closet?.look?.face);
+  const face: FaceConfig = { ...defaultFace(), ...faceOnly(closet?.look?.face ?? {}) };
   const equipped: Partial<Record<WearableSlot, string | null>> = closet?.look?.equipped ?? {};
   const cardRow = closet?.skins?.find((s: { id: string }) => s.id === closet?.look?.skinCardId) as { id: string; displayName?: string; accent?: string; mode?: string } | undefined;
   const cardAccent: string | undefined = cardRow?.accent;
@@ -88,12 +105,15 @@ export async function resolveIdentity(force = false): Promise<PlayerIdentity> {
     const id = equipped[slot];
     return (id && getWearable(id)?.accent) || fallback;
   };
-  const palette = {
+  // IMPROVE (2026-10-06), research item 1: the Athlete Creator's colour picks (AthleteBuild.palette, sent by hero-body as
+  // overrides only) used to stop at the preview; they now win over the per-garment derivation, and the Creator doc's
+  // colours win over both (lib/creator/look/palette.ts).
+  const palette = effectivePalette({
     jersey: accentOf('tops', FALLBACK_PALETTE.jersey),
     shorts: accentOf('shorts', FALLBACK_PALETTE.shorts),
     shoes: accentOf('shoes', FALLBACK_PALETTE.shoes),
     accent: cardAccent || accentOf('accessory', FALLBACK_PALETTE.accent),
-  };
+  }, heroBody?.palette, creator?.colours);
 
   // The creator frame's height and build, and only those (REACH-FREEZE, 2026-09-29, spec Decision 4). This used to prefer the newest
   // workout scan's stored avatarSpec — a height made from the jump and a reach from the running cadence — so jumping higher made the
@@ -111,7 +131,8 @@ export async function resolveIdentity(force = false): Promise<PlayerIdentity> {
 
   const wardrobe: Wardrobe = { tops: equipped.tops ?? null, shorts: equipped.shorts ?? null, shoes: equipped.shoes ?? null };
   const body: HeroBodyKind = heroBody?.body === 'scan' || heroBody?.body === 'kit-female' ? heroBody.body : 'kit-male';
-  cached = { proportions, face, palette, jersey, wardrobe, custom: Boolean(closet?.look) || Boolean(frame), body, card, lookLocal: closet?.lookLocal === true };
+  const accessories = accessoriesForEquipped(equipped);
+  cached = { proportions, face, palette, jersey, wardrobe, custom: Boolean(closet?.look) || Boolean(frame), body, card, lookLocal: closet?.lookLocal === true, creator, accessories };
   return cached;
 }
 /** The identity resolved so far this session (null before the first spawn asked) — a synchronous read for the ring / icon. */
@@ -201,24 +222,36 @@ export function applyIdentity(
   }
   // 2) Face — skin tone on skin materials (the model has no blendshapes today;
   //    the flat FaceConfig preset variety is handled by the Closet preview rig).
-  applySkinTone(spawn, id.face.skinTone);
+  // IMPROVE (2026-10-06), research item 4: the body's sex picks the skin map family (the female body wore male maps).
+  applySkinTone(spawn, id.face.skinTone, id.body === 'kit-female' ? 'female' : 'male');
   applyHair(spawn, id.face.hairColor, id.face.hairStyle === 'Bald');
   applyHairStyle(spawn.meshes, id.face.hairStyle);   // Phase 3: real hair geometry per style
   applyKit(spawn.meshes, id.wardrobe);              // ship pass 3: fitted garments per equipped wearable (no-op without a kit)
   // Phase 3 (2026-09-02): the forge now has a face. Shape presets and the
   // fine-tune sliders resolve through one table; eye color lands on the
   // iris material. No-ops on a body without morphs or an iris.
-  applyFaceMorphs(spawn.meshes, resolveFaceWeights({ faceShape: id.face.faceShape, brows: id.face.brows, sliders: id.face.sliders as never }));
+  // IMPROVE (2026-10-06): the Creator doc's face values win over the Closet sliders, per morph.
+  const doc = id.creator ?? null;
+  applyFaceMorphs(spawn.meshes, resolveFaceWeights({
+    faceShape: id.face.faceShape, brows: id.face.brows, eyeShape: id.face.eyeShape, mouth: id.face.mouth, nose: id.face.nose,
+    sliders: { ...(id.face.sliders ?? {}), ...(doc?.shape.face ?? {}) } as never,
+  }));
   tintSlot(spawn, ['iris'], id.face.eyeColor);
   watchReadiness(spawn);
   if (parts === 'body') return;
-  // 3) Wardrobe palette — jersey/shorts/shoes tints by mesh/material slot name.
-  tintSlot(spawn, ['jersey', 'top', 'shirt', 'tee'], id.palette.jersey);
-  tintSlot(spawn, ['shorts', 'pants', 'bottom'], id.palette.shorts);
-  tintSlot(spawn, ['shoe', 'sneaker', 'boot'], id.palette.shoes);
+  // 3) Wardrobe palette — jersey/shorts/shoes tints by mesh/material slot name. The doc's colours win (a no-op when
+  //    resolveIdentity already folded them in; a preview passing a draft doc gets them here).
+  const palette = effectivePalette(id.palette, doc?.colours);
+  tintSlot(spawn, ['jersey', 'top', 'shirt', 'tee'], palette.jersey);
+  tintSlot(spawn, ['shorts', 'pants', 'bottom'], palette.shorts);
+  tintSlot(spawn, ['shoe', 'sneaker', 'boot'], palette.shoes);
   // 4) Jersey ID plate on the back — applied for 'body' too: a team-tinted
   //    hero still wears the player's own number.
-  if (id.jersey && (id.jersey.name || id.jersey.number > 0)) attachJerseyPlate(spawn, id.jersey, id.palette.accent);
+  if (id.jersey && (id.jersey.name || id.jersey.number > 0)) attachJerseyPlate(spawn, id.jersey, palette.accent);
+  // 5) IMPROVE (2026-10-06), research item 2: what the player equipped, in the palette's accent (never the NPCs' deal).
+  wearPlayerAccessories(spawn, id.accessories ?? [], palette.accent);
+  // 6) THE CREATOR HOOK — parts (phase 2) and paint (phase 3) render from the doc here, and only here.
+  applyCreatorLayers(spawn, doc);
 }
 
 /** Ship watchdog. A material that never compiles renders NOTHING and throws
@@ -258,8 +291,13 @@ function watchReadiness(spawn: SpawnedCharacter): void {
 function attachJerseyPlate(spawn: SpawnedCharacter, jersey: JerseyConfig, accent: string): void {
   const node = boneNode(spawn.skeleton, 'Spine2');
   if (!node) return;
-  // idempotent — a second application replaces the plate, never stacks it
-  for (const m of spawn.meshes.filter((x) => x.name.startsWith('jersey_decal_'))) m.dispose();
+  // idempotent — a second application replaces the plate, never stacks it. IMPROVE (2026-10-06), research item 16: the
+  // old plate's own material and canvas texture go with it (they were left in the scene on every live-editor keypress),
+  // and it leaves spawn.meshes instead of piling up there disposed.
+  for (const m of spawn.meshes.filter((x) => x.name.startsWith('jersey_decal_'))) {
+    m.dispose(false, true);
+    spawn.meshes.splice(spawn.meshes.indexOf(m), 1);
+  }
   const scene = spawn.root.getScene();
   const W = 256, H = 232;
   const tex = new DynamicTexture(`jersey_decal_tex_${spawn.id}`, { width: W, height: H }, scene, true);
@@ -312,10 +350,57 @@ function attachJerseyPlate(spawn: SpawnedCharacter, jersey: JerseyConfig, accent
 function matColor(m: TintMat): Color3 | undefined {
   return m.albedoColor ?? m.diffuseColor;
 }
-function applySkinTone(spawn: SpawnedCharacter, hex: string): void {
+
+// ── TINTED-MATERIAL CACHE (IMPROVE (2026-10-06), research item 16) ─────────────────────────────────────────────────
+// Every apply used to clone the mesh's CURRENT material: a live editor re-applies per keypress, so each edit cloned the
+// last clone ("skin_skin_skin…") and nothing was ever disposed (measured in playerIdentity.cache.test.ts: +5 materials
+// per re-apply on a five-slot body). Now each body keeps one tinted clone per (source material, slot), made from the
+// ORIGINAL material and re-coloured in place: a colour drag makes no new material at all, which is what a cache keyed
+// by (source, hex) would only approximate. The clones and the textures each one deep-copied are disposed when the
+// body's root disposes. The cache is per body, never shared: modes flash and fade a body's own materials in place.
+// A caller with no root (tintGarmentSlot on a bare mesh list) keeps the old one-off clone.
+const tintSource = new WeakMap<Material, TintMat>();
+const bodyTints = new WeakMap<object, Map<string, { mat: TintMat; owned: { dispose(): void }[] }>>();
+
+/** The material a tint starts from: the original, never an earlier tint's clone. */
+function sourceOf(m: TintMat): TintMat { return tintSource.get(m) ?? m; }
+
+/** This body's tinted clone of `src` for `slot`, made once. Null when the material cannot clone. */
+function tintedFor(spawn: { root?: SpawnedCharacter['root'] }, src: TintMat, slot: string, suffix = slot): TintMat | null {
+  const root = spawn.root;
+  if (!root) return cloneForTint(src, `${src.name}_${suffix}`);
+  let cache = bodyTints.get(root);
+  if (!cache) {
+    const made = new Map<string, { mat: TintMat; owned: { dispose(): void }[] }>();
+    bodyTints.set(root, made);
+    cache = made;
+    root.onDisposeObservable.addOnce(() => {
+      for (const { mat, owned } of made.values()) {
+        try { mat.dispose(false, false); } catch { /* gone with the scene */ }
+        for (const t of owned) { try { t.dispose(); } catch { /* gone with the scene */ } }
+      }
+      made.clear();
+      bodyTints.delete(root);
+    });
+  }
+  const key = `${src.uniqueId}|${slot}`;
+  const hit = cache.get(key);
+  if (hit) return hit.mat;
+  const mat = cloneForTint(src, `${src.name}_${suffix}`);
+  if (!mat) return null;
+  // the textures the clone deep-copied (not the source's own, not the shared bump map) are this clone's to dispose
+  const keep = new Set<unknown>(src.getActiveTextures());
+  const owned = mat.getActiveTextures().filter((t) => !keep.has(t));
+  tintSource.set(mat, src);
+  cache.set(key, { mat, owned });
+  return mat;
+}
+
+function applySkinTone(spawn: SpawnedCharacter, hex: string, sex: 'male' | 'female' = 'male'): void {
   const tone = Color3.FromHexString(hex);
   for (const mesh of spawn.meshes) {
-    const m = mesh.material as TintMat | null;
+    const cur = mesh.material as TintMat | null;
+    const m = cur && sourceOf(cur);
     const c = m && matColor(m);
     if (!c) continue;
     // Name first, colour heuristic second. The heuristic guesses "is this
@@ -327,7 +412,7 @@ function applySkinTone(spawn: SpawnedCharacter, hex: string): void {
     const isSkin = named
       || (c.r > 0.45 && c.g > 0.25 && c.b > 0.15 && c.r > c.b && c.g > c.b * 0.9);
     if (!isSkin) continue;
-    const clone = cloneForTint(m!, `${m!.name}_skin`);
+    const clone = tintedFor(spawn, m!, 'skin');
     if (!clone) continue;
     mesh.material = clone;
     // Real skin (ship pass 3, rung 2): a GLB hero's PBR `skin` material gets a
@@ -339,15 +424,20 @@ function applySkinTone(spawn: SpawnedCharacter, hex: string): void {
     // photographed maps (the import marks its skin material; the forge hero's
     // own UVs would scramble them). Everything else keeps the flat tint.
     const extras = (clone.metadata as { gltf?: { extras?: { felSkinUV?: string } } } | undefined)?.gltf?.extras;
-    if (clone instanceof PBRMaterial && named && extras?.felSkinUV === 'makehuman') applySkinMap(clone, tone, mesh.getScene());
+    if (clone instanceof PBRMaterial && named && extras?.felSkinUV === 'makehuman') applySkinMap(clone, tone, mesh.getScene(), sex);
     else matColor(clone)?.copyFrom(tone);
   }
 }
-function skinFor(tone: Color3): SkinEntry | null {
+/** The photographed skin map for a tone on a body of `sex`. IMPROVE (2026-10-06), research item 4: this always took
+ *  the male entry, so the female body wore male maps although the set ships dark/medium/light female ones. A sex the
+ *  set lacks falls back to the male entry of the family, then to the first entry. */
+export function skinFor(tone: Color3, sex: 'male' | 'female' = 'male'): SkinEntry | null {
   if (!SKIN_LIBRARY.length) return null;
   const lum = 0.2126 * tone.r + 0.7152 * tone.g + 0.0722 * tone.b;
   const family = lum < 0.28 ? 'dark' : lum < 0.5 ? 'medium' : 'light';
-  return SKIN_LIBRARY.find((e) => e.family === family && e.sex === 'male') ?? SKIN_LIBRARY[0];   // sex arrives with the body roster (rung 3)
+  return SKIN_LIBRARY.find((e) => e.family === family && e.sex === sex)
+    ?? SKIN_LIBRARY.find((e) => e.family === family && e.sex === 'male')
+    ?? SKIN_LIBRARY[0];
 }
 /** Contract addendum (pass 4 phase 9, docs/CONTRACTS-PASS4-RUN.md contracts 1 + 2): the skin maps follow the
  *  quality tier. Desktop takes the shipped 2048² set (`public/models/skins/<key>.jpg`); mobile takes the 1024² set
@@ -360,8 +450,8 @@ export function skinMapUrl(url: string, tier: QualityTier): string {
   return url.replace(/\.jpg$/, '-1024.jpg');
 }
 const skinTexCache = new WeakMap<object, Map<string, Texture>>();
-function applySkinMap(mat: PBRMaterial, tone: Color3, scene: ReturnType<PBRMaterial['getScene']>): void {
-  const entry = skinFor(tone);
+function applySkinMap(mat: PBRMaterial, tone: Color3, scene: ReturnType<PBRMaterial['getScene']>, sex: 'male' | 'female'): void {
+  const entry = skinFor(tone, sex);
   if (!entry) { mat.albedoColor.copyFrom(tone); return; }
   let cache = skinTexCache.get(scene); if (!cache) { cache = new Map(); skinTexCache.set(scene, cache); }
   // orientation follows the file's own map (the glTF loader's flag), so the swap lands on the same UV layout
@@ -382,13 +472,14 @@ function applySkinMap(mat: PBRMaterial, tone: Color3, scene: ReturnType<PBRMater
  *  (scripts/avatar/forge.mts). Rigs without one skip cleanly. */
 function applyHair(spawn: SpawnedCharacter, hex: string, bald: boolean): void {
   for (const mesh of spawn.meshes) {
-    const m = mesh.material as TintMat | null;
+    const cur = mesh.material as TintMat | null;
+    const m = cur && sourceOf(cur);
     if (!m || !m.name.toLowerCase().startsWith('hair')) continue;
     // Phase 3: visibility is applyHairStyle's job (Bald = no hair node shown);
     // the brows share this material and must keep their color either way.
     void bald;
     const tone = Color3.FromHexString(hex);
-    const clone = cloneForTint(m, `${m.name}_style`);
+    const clone = tintedFor(spawn, m, 'style');
     if (clone) { matColor(clone)?.copyFrom(tone); mesh.material = clone; }
   }
 }
@@ -400,18 +491,22 @@ export const SLOT_KEYS = {
 } as const;
 
 /** Tint one garment slot on a spawned body. Exported so an outfit can dress a body the same way the Closet does. */
-export function tintGarmentSlot(spawn: Pick<SpawnedCharacter, 'meshes'>, keys: readonly string[], hex: string): void {
-  tintSlot(spawn as SpawnedCharacter, [...keys], hex);
+export function tintGarmentSlot(spawn: Pick<SpawnedCharacter, 'meshes'> & Partial<Pick<SpawnedCharacter, 'root'>>, keys: readonly string[], hex: string): void {
+  tintSlot(spawn, [...keys], hex);
 }
 
-function tintSlot(spawn: SpawnedCharacter, keys: string[], hex: string): void {
+function tintSlot(spawn: Pick<SpawnedCharacter, 'meshes'> & Partial<Pick<SpawnedCharacter, 'root'>>, keys: string[], hex: string): void {
   const tint = Color3.FromHexString(hex);
   for (const mesh of spawn.meshes) {
-    const m = mesh.material as TintMat | null;
+    // IMPROVE (2026-10-06): the number plate is named `jersey_decal_*`, so the jersey keys used to re-tint the previous
+    // plate on every re-apply (swapping its own material for a clone that then leaked). It is a decal, not a garment.
+    if (mesh.name.startsWith('jersey_decal_')) continue;
+    const cur = mesh.material as TintMat | null;
+    const m = cur && sourceOf(cur);
     if (!m) continue;
     const name = `${mesh.name} ${m.name}`.toLowerCase();
     if (!keys.some((k) => name.includes(k))) continue;
-    const clone = cloneForTint(m, `${m.name}_wear`);
+    const clone = tintedFor(spawn, m, `wear_${keys[0]}`, 'wear');
     if (clone) { matColor(clone)?.copyFrom(tint); mesh.material = clone; }
   }
 }

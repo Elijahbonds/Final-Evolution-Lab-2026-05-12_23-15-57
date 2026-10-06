@@ -37,11 +37,22 @@ export function hairNodeFor(style: string | undefined | null): HairNodeKey | nul
 const HAIR_RE = /^Hair_([a-z]+)/;
 
 /**
+ * IMPROVE (2026-10-06), research item 3 / BACKLOG B19: a style whose node a body does not carry falls back to a
+ * covering node instead of showing NO hair. `Hair_hijab` is missing from fel-kit-male/female.glb and fel-hero.glb (read
+ * 2026-10-06: Hair_afro/braids/bun/buzz/cap/ponytail only), so "Hijab" rendered bald, the opposite of a covering. The
+ * cap covers the crown until a hijab mesh is baked; it then wins by name with no code change.
+ */
+export const HAIR_NODE_FALLBACK: Partial<Record<HairNodeKey, readonly HairNodeKey[]>> = { hijab: ['cap'] };
+
+/**
  * Show one hair node, hide the others. Returns the number of hair nodes
  * found (0 on the procedural body or an older GLB — a harmless no-op).
  */
 export function applyHairStyle(meshes: AbstractMesh[], style: string | undefined | null): number {
-  const want = hairNodeFor(style);
+  let want = hairNodeFor(style);
+  const present = new Set<string>();
+  for (const m of meshes) { const match = HAIR_RE.exec(m.name); if (match) present.add(match[1]); }
+  if (want && present.size && !present.has(want)) want = HAIR_NODE_FALLBACK[want]?.find((k) => present.has(k)) ?? want;
   let found = 0;
   for (const m of meshes) {
     const match = HAIR_RE.exec(m.name);
