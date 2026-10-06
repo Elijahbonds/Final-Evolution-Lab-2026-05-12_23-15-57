@@ -8,6 +8,9 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { ControlsPanel } from './controls-panel';
 import { PausedLayer, PAUSED_HEADLINE } from './paused-layer';
 import { SplashCard } from './boot-splash';
+import { controlsSheet } from '@/lib/ui/controlsScreen';
+import { PANEL_MAX_LINES } from '@/lib/babylon/ui/panelLines';
+import { stripComments } from '@/lib/testing/sourceScan';
 
 const card = (phase: 'ready' | 'loading' | 'playing' | 'paused' | 'countdown', modeId = 'threevthree', controls?: string): string =>
   renderToStaticMarkup(createElement(SplashCard, { modeId, title: 'THREES', phase, onStart: () => {}, onRetry: () => {}, controls }));
@@ -20,8 +23,11 @@ describe('ControlsPanel', () => {
     for (const d of ['CONTROLLER', 'KEYBOARD', 'TOUCH']) expect(html).toContain(`>${d}</button>`);
     expect(html).toContain('WASD / ARROWS');
     // test changed (controls-screen-2, owner 2026-10-06: "short and readable"): the 3v3's curated list, not its whole map
-    expect(html).toContain('· SHOOT: hold, let go in the green');
-    expect(html).not.toContain('UP AND UNDER');
+    // test changed (HOOPS PAUSE, owner 2026-10-06: "Hoops pause: Controls panel only"): the hoops panel carries the 3v3's whole
+    // OFFENSE / DEFENSE list again (the one list on the pause and READY), so its words, and UP AND UNDER, are back.
+    // Was: contains the curated '· SHOOT: hold, let go in the green', not 'UP AND UNDER'.
+    expect(html).toContain('· SQUARE (L): hold, release in the green');
+    expect(html).toContain('UP AND UNDER');
     expect(html.indexOf('TAP TO START')).toBeLessThan(html.indexOf('data-controls-panel'));   // START first, then the controls
     expect(card('loading')).toContain('data-controls-panel');
   });
@@ -68,5 +74,53 @@ describe('ControlsPanel', () => {
   it('a mode with nothing to list draws nothing', () => {
     const html = renderToStaticMarkup(createElement(ControlsPanel, { modeId: 'who_scene_it', chooser: false }));
     expect(html).toContain('ANSWER A');
+  });
+});
+
+// HOOPS PAUSE (2026-10-06). Owner, multiple choice: "Hoops pause: Controls panel only". The 1v1 and 3v3 pause showed TWO
+// control lists — the host's full OFFENSE / DEFENSE paragraph along the bottom, and this panel. Now ONE: the panel, with
+// both groups in it; the host keeps only its ONE live state line during play.
+describe('hoops pause — one controls list, the panel', () => {
+  const HOSTS = { onevone: 'basketball-babylon.tsx', threevthree: 'three-v-three-babylon.tsx' } as const;
+
+  it('the 1v1 and 3v3 hosts draw no control list of their own on pause (nor the rules\' CONTROLS_ lists anywhere)', () => {
+    for (const [mode, file] of Object.entries(HOSTS)) {
+      const code = stripComments(readFileSync(path.join(__dirname, file), 'utf8'));
+      expect(code, mode).not.toMatch(/CONTROLS_(OFFENCE|DEFENCE)/);
+      expect(code, mode).not.toMatch(/phase === 'paused'/);          // the splash's PausedLayer is the whole pause
+      expect(code, mode).not.toMatch(/>(OFFENSE|DEFENSE)</);
+      // the ONE live line for the state you are in stays, during play only
+      expect(code, mode).toMatch(/typeof hud\.hint === 'string' && hud\.hint && phase === 'playing'/);
+      expect(code, mode).toMatch(new RegExp(`<BootSplash\\s+modeId="${mode}"`));
+    }
+  });
+
+  it('the pause panel carries both groups, OFFENSE then DEFENSE, every line once — and the old bottom list is gone', () => {
+    for (const mode of Object.keys(HOSTS) as (keyof typeof HOSTS)[]) {
+      const html = card('paused', mode);
+      expect(html, mode).toContain(PAUSED_HEADLINE);
+      expect(html.match(/data-controls-panel=/g), mode).toHaveLength(1);
+      const off = html.indexOf('data-controls-group="OFFENSE"'), def = html.indexOf('data-controls-group="DEFENSE"');
+      expect(off, mode).toBeGreaterThan(html.indexOf('data-controls-lines'));
+      expect(def, mode).toBeGreaterThan(off);
+      for (const g of controlsSheet(mode, 'keys').groups) for (const l of g.lines) {
+        const esc = l.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        expect(html.split(`· ${esc}</span>`).length - 1, `${mode}: ${l}`).toBe(1);
+      }
+      expect(html, mode).toMatch(/data-controls-group="DEFENSE"[^>]*>DEFENSE<\/span><span[^>]*>· STAY IN FRONT/);
+      expect(html, mode).not.toContain('max-w-3xl');                 // the hosts' bottom list's box
+      expect(html.match(/<button/g), mode).toHaveLength(1);            // spans only inside the pause's button
+      expect(html, mode).not.toMatch(/<div/);
+    }
+  });
+
+  it('a long list scrolls inside the panel\'s bounded box rather than spilling off a phone', () => {
+    const html = card('paused', 'onevone');
+    expect(html).toMatch(/data-controls-panel="keys" class="[^"]*\bflex\b[^"]*\bmin-h-0\b[^"]*\bflex-col\b[^"]*\bmax-h-\[60vh\]/);
+    expect(html).toMatch(/data-controls-lines="[^"]*" class="[^"]*\bmin-h-0\b[^"]*\boverflow-y-auto\b/);
+    // the 1v1's list is the longest a panel carries: more lines than any curated list's budget, so the scroll is the plan
+    expect(controlsSheet('onevone', 'keys').lines.length).toBeGreaterThan(PANEL_MAX_LINES * 2);
+    // READY's panel is bounded too (26vh, 38vh from sm) — the same lines box scrolls there
+    expect(card('ready', 'onevone')).toMatch(/data-controls-panel="keys" class="[^"]*max-h-\[26vh\][^"]*sm:max-h-\[38vh\]/);
   });
 });

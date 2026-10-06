@@ -23,7 +23,7 @@
 import { MODE_VERBS } from '../babylon/ui/modeVerbs';
 import { buttonMap, slotModeKey } from '../creator/cardSlot';
 import { staticControlsFor } from '../babylon/ui/staticControls';
-import { panelLinesFor, BODY_BOOST_LINE, PANEL_MAX_CHARS } from '../babylon/ui/panelLines';
+import { panelLinesFor, BODY_BOOST_LINE, PANEL_MAX_CHARS, PANEL_GROUPS } from '../babylon/ui/panelLines';
 
 export type ControlsDevice = 'pad' | 'keys' | 'touch';
 export const CONTROLS_DEVICES: readonly ControlsDevice[] = ['pad', 'keys', 'touch'];
@@ -36,11 +36,21 @@ export interface ControlRow {
   action: string;
 }
 
+/** Some of the sheet's lines under a heading (the hoops modes' OFFENSE / DEFENSE); untitled, the plain list. */
+export interface ControlsGroup {
+  title?: string;
+  /** The heading's colour (a CSS colour). */
+  color?: string;
+  lines: string[];
+}
+
 export interface ControlsSheet {
   device: ControlsDevice;
   rows: ControlRow[];
   /** The mode's own words, one idea per line. */
   lines: string[];
+  /** The same lines as the panel draws them: one untitled group for most modes; the hoops modes' titled groups. */
+  groups: ControlsGroup[];
 }
 
 /** InputBus KEYMAP, read the other way: the key that sends each pad button. */
@@ -159,6 +169,8 @@ export function splitHint(hint: string): string[] {
  */
 export function controlLines(modeId: string, opts: { body?: boolean; fallback?: string } = {}): string[] {
   const key = slotModeKey(modeId);
+  const grouped = titledGroups(key);
+  if (grouped) return [...new Set(grouped.flatMap((g) => g.lines))];
   const curated = panelLinesFor(key, !!opts.body);
   const own = curated ?? staticControlsFor(key, !!opts.body).flatMap(splitHint);
   const src = own.length ? own : opts.fallback ? splitHint(opts.fallback) : [];
@@ -166,9 +178,24 @@ export function controlLines(modeId: string, opts: { body?: boolean; fallback?: 
   return [...new Set(boost ? [...src, boost] : src)];
 }
 
-/** The device's rows; then its trick lines (a board's table), then the mode's own lines. */
+/**
+ * HOOPS PAUSE (2026-10-06; owner: "Hoops pause: Controls panel only"): a mode's titled groups (panelLines PANEL_GROUPS —
+ * the 1v1 and 3v3 OFFENSE / DEFENSE lists), each split like a hint, or null. They are the same for the body (the hoops
+ * modes have no body words).
+ */
+export function titledGroups(modeKey: string): ControlsGroup[] | null {
+  const g = PANEL_GROUPS[modeKey];
+  return g ? g.map((x) => ({ title: x.title, color: x.color, lines: splitHint(x.text) })) : null;
+}
+
+/** The device's rows; then its trick lines (a board's table), then the mode's own lines — in its titled groups, if it has them. */
 export function controlsSheet(modeId: string, device: ControlsDevice, opts: { body?: boolean; fallback?: string } = {}): ControlsSheet {
-  return { device, rows: controlRows(modeId, device), lines: [...moveLines(modeId, device), ...controlLines(modeId, opts)] };
+  const moves = moveLines(modeId, device);
+  const titled = titledGroups(slotModeKey(modeId));
+  const groups: ControlsGroup[] = titled
+    ? [...(moves.length ? [{ lines: moves }] : []), ...titled]
+    : [{ lines: [...moves, ...controlLines(modeId, opts)] }];
+  return { device, rows: controlRows(modeId, device), lines: groups.flatMap((g) => g.lines), groups };
 }
 
 /** The smallest the panel's rows and lines may step down to so a list fits its box (ControlsPanel's fit): 10 px → 8.5 px. */

@@ -137,10 +137,10 @@ export function passPreviewLabel(type: PassType | null): string {
 export const MARK_COLOR: Readonly<Record<PassType | 'driver', string>> = { chest: '#22d3ee', bounce: '#fbbf24', lob: '#39ff88', driver: '#ff2d78' };
 
 // ── #7 THE CONTEXTUAL HINT, AND THE FULL LIST FOR THE PAUSE SCREEN ───────────────────────────────────────────────────
-/** Every control on offence (what the old always-on hint said, ~380 characters). The pause shows it. */
-export const CONTROLS_OFFENCE = 'HOLD R2 (SHIFT) + a direction to SPRINT · R2 + SQUARE (SHIFT + L) at the rim = DUNK, SQUARE (L) alone = LAY IT IN · SQUARE (L): hold, release in the green · BOTTOM BUTTON (J): PASS — lean the stick at a mate (hold to FAKE); off the ball it CALLS FOR IT · CIRCLE (K): call a SCREEN · L2 (F): POST UP (shoot = HOOK · stick off the rim = FADE, with R2 = SHIMMY FADE · stick at the rim = DROP STEP · stick across = SPIN · let go early = PUMP, then shoot = UP AND UNDER) · RIGHT STICK: the dribble moves · snap the stick to break ankles';
-/** Every control on defence. */
-export const CONTROLS_DEFENCE = 'STAY IN FRONT of the ball (the pink ring) · HOLD L2 (F): SIT DOWN and slide · SQUARE (L): POKE (hold it for a HAND UP) · TRIANGLE (I): jump on the gather to BLOCK · HOLD CIRCLE (K): plant and TAKE THE CHARGE · L1 (Q): BOX OUT on a shot';
+// HOOPS PAUSE (2026-10-06): the two lists live in threevthreeControls.ts — a file with no imports, so the shared CONTROLS
+// panel (lib/babylon/ui/panelLines.ts) can carry them without pulling this file's BasketballCore (and Babylon) into every
+// splash. Re-exported here under the same names, so every importer is unchanged.
+export { CONTROLS_OFFENCE, CONTROLS_DEFENCE } from './threevthreeControls';
 
 export interface HintState {
   defence: boolean;

@@ -12,6 +12,7 @@ const fn = (name: string): string => { const i = SRC.indexOf(`function ${name}(`
 const CARRY = readFileSync(path.join(__dirname, '../anim/ballCarry.ts'), 'utf8');
 const HOST = readFileSync(path.join(__dirname, '../../../components/games/basketball-babylon.tsx'), 'utf8');
 const SPLASH = readFileSync(path.join(__dirname, '../../../components/games/boot-splash.tsx'), 'utf8');
+const PANEL = readFileSync(path.join(__dirname, '../ui/panelLines.ts'), 'utf8');   // HOOPS PAUSE: the pause's one list
 const TOGGLE = readFileSync(path.join(__dirname, '../../../components/games/onevone-win-by-2.tsx'), 'utf8');
 
 describe('the beats and the flights run on the mode clock and die with the mode (#5 #6 #13)', () => {
@@ -85,8 +86,11 @@ describe('the rules reach the game (#1 #2 #3 #4 #10)', () => {
     expect(fn('tickHint')).toMatch(/const want = hintFor\(\{/);
     expect(CODE).not.toMatch(/HINT_OFFENCE|HINT_DEFENCE/);
     expect(HOST).toMatch(/typeof hud\.hint === 'string' && hud\.hint && phase === 'playing'/);
-    expect(HOST).toMatch(/phase === 'paused' && \(/);
-    expect(HOST).toMatch(/\{CONTROLS_OFFENCE\}/);
+    // test changed (HOOPS PAUSE, owner 2026-10-06: "Hoops pause: Controls panel only"): the full list is on the pause in the
+    // shared CONTROLS panel's OFFENSE / DEFENSE groups, not a second list the host draws. Was: HOST has `phase === 'paused' && (`
+    // and `{CONTROLS_OFFENCE}`.
+    expect(HOST).not.toMatch(/CONTROLS_OFFENCE|CONTROLS_DEFENCE|phase === 'paused' && \(/);
+    expect(PANEL).toMatch(/onevone: \[\n\s*\{ title: 'OFFENSE', color: 'var\(--fel-cyan\)', text: ONES_OFFENCE \},\n\s*\{ title: 'DEFENSE', color: 'var\(--fel-gold\)', text: ONES_DEFENCE \},/);
   });
   it('#10 every graded release becomes a pip on the HUD', () => {
     expect(fn('releaseJumper')).toMatch(/pips = pushPip\(pips, quality\); putHud\(ctx, \{ shotPips: pips \}\);/);

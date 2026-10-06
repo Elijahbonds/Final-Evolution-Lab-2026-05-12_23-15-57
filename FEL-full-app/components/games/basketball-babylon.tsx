@@ -16,7 +16,7 @@ import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode } from './hud-format';
 import { MicCaption, MicToggle } from './mic-caption';   // THE MIC (2026-09-24): what the court's MC just said, and the switch for the voice
-import { CONTROLS_OFFENCE, CONTROLS_DEFENCE, pipBias } from '@/lib/babylon/modes/onevoneRules';   // IMPROVE (2026-10-06) #1 #10
+import { pipBias } from '@/lib/babylon/modes/onevoneRules';   // IMPROVE (2026-10-06) #10
 
 /** IMPROVE (2026-10-06) #10: a release pip's colour — the world meter's verdict colours (ShotMeter3D VERDICT_HEX). */
 const PIP_HEX: Record<string, string> = { p: '#39ff88', g: '#8cff5c', e: '#ffb340', l: '#ffb340', b: '#ff4b4b' };
@@ -170,14 +170,9 @@ export default function BasketballBabylon({ onEnd }: GameProps) {
         onRetry={tapStart}
       />
 
-      {/* IMPROVE (2026-10-06) #1: the full control list lives on the pause screen — over the splash's pause layer, never catching a tap
-          (the layer's tap is the resume) */}
-      {phase === 'paused' && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-4 mx-auto max-w-3xl space-y-2 px-4 text-[10px] leading-snug text-white/75">
-          <p><span className="font-black tracking-widest text-[var(--fel-cyan)]">OFFENSE</span> · {CONTROLS_OFFENCE}</p>
-          <p><span className="font-black tracking-widest text-[var(--fel-gold)]">DEFENSE</span> · {CONTROLS_DEFENCE}</p>
-        </div>
-      )}
+      {/* HOOPS PAUSE (2026-10-06). Owner: "Hoops pause: Controls panel only" — the full OFFENSE / DEFENSE list that sat along the
+          bottom here on pause (IMPROVE #1) is in the splash's CONTROLS panel now (lib/babylon/ui/panelLines.ts PANEL_GROUPS): one
+          list on the pause, the same as every other mode. */}
 
       {(phase === 'playing' || phase === 'countdown') && busRef.current && (
         <TouchOverlay bus={busRef.current} modeId="onevone" visible />
