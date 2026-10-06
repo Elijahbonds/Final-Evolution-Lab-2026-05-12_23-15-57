@@ -11,7 +11,7 @@ import type { Scene, TransformNode } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { DEFAULT_HERO_URL } from '../core/athleteRoster';
 
-interface Figure { char: SpawnedCharacter; root: TransformNode; baseY: number; phase: number }
+interface Figure { char: SpawnedCharacter; root: TransformNode; baseY: number; phase: number; hidden?: boolean }
 
 const BOB_HEIGHT = 0.02;
 const CHEER_SEC = 1.6;
@@ -55,16 +55,39 @@ export class Onlookers {
     if (this.cheerT > 0) this.cheerT = Math.max(0, this.cheerT - dt);
     const excite = this.cheerT / CHEER_SEC;
     for (const f of this.figures) {
+      if (f.hidden) continue;   // IMPROVE (2026-10-06, surf item 6): put away behind the lens (cullBehind)
       const sway = Math.sin(this.t * (1.4 + excite * 6) + f.phase);
       const lift = BOB_HEIGHT * sway + (excite > 0 ? Math.abs(Math.sin(this.t * 9 + f.phase)) * CHEER_HOP * excite : 0);
       f.root.position.y = f.baseY + lift;
     }
   }
 
+  /**
+   * IMPROVE (2026-10-06, surf item 6): opt-in — the bodies BEHIND the lens are put away. Surf's crowd stands on the sand while
+   * its camera faces out to sea (forward.z ≈ −0.98), and up to six skinned bodies were skinned, animated and drawn for nothing.
+   * A body more than `margin` m behind the camera's plane (`eye`, unit `forward`) is disabled and its clip paused; it comes
+   * back, clip resumed, the moment it is in front again. Returns how many are shown. Modes that never call it are unchanged.
+   */
+  cullBehind(eye: { x: number; y: number; z: number }, forward: { x: number; y: number; z: number }, margin = 3): number {
+    let shown = 0;
+    for (const f of this.figures) {
+      const p = f.root.position;
+      const ahead = (p.x - eye.x) * forward.x + (p.y + 1 - eye.y) * forward.y + (p.z - eye.z) * forward.z;
+      const hide = ahead < -margin;
+      if (!hide) shown++;
+      if (hide === !!f.hidden) continue;
+      f.hidden = hide;
+      f.root.setEnabled(!hide);
+      const g = f.char.animator?.currentGroup;
+      try { if (hide) g?.pause(); else g?.restart(); } catch { /* a body with no clip playing has nothing to pause */ }
+    }
+    return shown;
+  }
+
   /** The big moment happened. 0..1 — a bigger moment cheers longer. */
   cheer(strength = 1): void {
     this.cheerT = Math.max(this.cheerT, CHEER_SEC * Math.max(0.2, Math.min(1, strength)));
-    for (const f of this.figures) { try { f.char.animator?.play?.('cheer', { loop: false }); } catch { /* no cheer clip on this body — the hop carries it */ } }
+    for (const f of this.figures) { if (f.hidden) continue; try { f.char.animator?.play?.('cheer', { loop: false }); } catch { /* no cheer clip on this body — the hop carries it */ } }
   }
 
   dispose(): void {

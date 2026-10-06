@@ -252,11 +252,14 @@ export class TrickMachine {
       this.bail();
       return 'BAILED';
     }
-    if (!this.active && r.grounded && this.comboPts > 0) {  // bank the combo
+    if (!this.active && r.grounded && (this.comboPts > 0 || this.links.length > 0)) {  // bank the combo
       // phase 4: the combo stays OPEN for the grace window (it used to bank the very next frame, so 2× never happened);
       // when the window runs out the bank NAMES the line it paid (THPS: the combo reads out as it banks)
       this.graceT -= dt;
       if (this.graceT > 0) return null;
+      // IMPROVE (2026-10-06, surf item 15): a chain of links that put nothing in the pot (a lone wave move paid outside it)
+      // closes quietly — it must not stay open to multiply a landing a minute later
+      if (this.comboPts <= 0) { this.comboPts = 0; this.combo = 0; this.links = []; this.onHud({ combo: '' }); this.publishPot(); return null; }
       const banked = this.comboPts, line = this.links.map((l) => l.key).join(' → ');
       this.score += banked;
       this.onHud({ score: this.score, combo: '' });
@@ -284,6 +287,25 @@ export class TrickMachine {
     // IMPROVE (2026-10-06, snow item 4): a rail opens (or extends) the chain like a landing does — the ticker shows it
     this.onHud({ combo: `${this.combo}x` });
     this.publishPot();
+  }
+
+  /**
+   * IMPROVE (2026-10-06, surf item 15): A MOVE ON THE GROUND IS A LINK. Opt-in (surf's wave moves and near misses call it; the
+   * other boards never do): `name` joins the open chain like a landing — the multiplier counts it, the repeat rule keys on it,
+   * the grace window reopens — and `pts` go into the pot at the multiplier it lands at. With `paidOutside` the move's own
+   * points were already paid to the score (surf pays its wave moves at once, as it always has), so the pot takes only what
+   * the chain adds on top: `pts × (multiplier − 1)`. Returns what the pot took.
+   */
+  link(name: string, pts: number, paidOutside = false): number {
+    const key = moveKey(name);
+    this.links.push({ key, rep: this.links.filter((l) => l.key === key).length });
+    this.graceT = TrickMachine.LINK_GRACE_SEC;
+    this.combo = this.multiplier; this.bestCombo = Math.max(this.bestCombo, this.combo);
+    const add = Math.max(0, Math.round(pts)) * (paidOutside ? this.combo - 1 : this.combo);
+    this.comboPts += add;
+    this.onHud({ combo: `${this.combo}x` });
+    this.publishPot();
+    return add;
   }
 
   /** IMPROVE (2026-10-06, snow item 4): THE POT IS PUBLISHED. The host's big gold number reads `pot` and this machine only ever

@@ -22,7 +22,7 @@ import { mountOcean, oceanShade } from '../visual/OceanSurface';   // SURF OCEAN
 import type { GrindLine } from '../core/GroundRide';
 import { SKATE_VENUES, SNOW_VENUES, SURF_VENUES, rideOf, type BoardVenue } from '../nexus/boardVenues';
 import { applyFloorDetailToMesh } from '../visual/groundTextures';
-import { VertexData, Texture } from '@babylonjs/core';
+import { VertexData, Texture, VertexBuffer, BoundingInfo } from '@babylonjs/core';
 import { readableFloorHex, separatedHex, paintGraffitiWall, buildGraffitiStage } from '../visual/PlacePack';
 import { plazaCrowd, plazaMarkers, plazaRails, plazaSolids, SKATE_LANE, SKATE_BOWL, SKATE_CENTRE_BOX } from './skatePlaza';
 import { SNOW_SLOPE, snowCrowd } from './snowSlope';
@@ -1219,6 +1219,11 @@ export function buildSurfBreak(scene: Scene, pocket: { min: number; max: number 
   updateSea(dt: number, camera: Camera): void;
   /** The swell's height at a world point (for spray and anything that floats). */
   seaHeightAt(x: number, z: number): number;
+  /** IMPROVE (2026-10-06, surf items 8 / 9 / 20): counts up each time a new swell becomes the one being ridden — the mode
+   *  reads a change as "a new wave": the repeat list clears, the last ride is judged, the set is called. */
+  swellSeq(): number;
+  /** IMPROVE (2026-10-06, surf item 14): the buoy meshes, in world.obstacles' order (the mode lights the one in the line). */
+  buoys: Mesh[];
 } {
   const all: AbstractMesh[] = [];
   const P = venue.palette;
@@ -1257,13 +1262,25 @@ export function buildSurfBreak(scene: Scene, pocket: { min: number; max: number 
   const US = [12, WAVE_FACE_LEN, 7.2, 5.5, 3.8, 2.4, 1.3, 0.5, 0, -0.8, -1.8, -3.2, -5, -7];
   const pathsFor = (rows: number[], tSec: number, lift = 0): Vector3[][] =>
     rows.map((u) => XS.map((x) => new Vector3(x, waveProfile(u, crestHeightAt(x, tSec)) + lift, u)));
+  // IMPROVE (2026-10-06, surf item 1): THE RIBBONS ARE WRITTEN, NOT REBUILT. Every frame each strip was rebuilt through
+  // CreateRibbon from a fresh Vector3[][] (75 columns × 26 rows ≈ 1,950 vectors a frame at bound 100) plus a bounding refresh.
+  // Only the heights move — x and u are fixed — so each strip keeps its own position / normal arrays and the frame writes y
+  // into them (the crest height once per column, shared by every strip), recomputes the normals in place and uploads both.
+  // The bounds are set once to the tallest the wave can stand (crestHeightAt tops out at WAVE_HEIGHT + 0.12).
+  const crestAt = new Float32Array(XS.length);
   // FLAT ALBEDO PER STRIP. Both vertex colours and a DynamicTexture rendered this ribbon plain white under the PBR shader
   // (measured 2026-09-08, four variants — a flat albedoColor on the same mesh rendered blue), so the wave's colour is a set
   // of ribbons: the face in deep water blue, a foam strip along the crest, whitewater down the back, and the scored
   // POCKET as a pale translucent band riding the face — the band the mode scores, drawn on the wave itself.
-  const strips: { mesh: Mesh; rows: number[]; lift: number }[] = [];
+  const strips: { mesh: Mesh; rows: number[]; lift: number; pos: Float32Array | null; nrm: Float32Array; idx: number[] }[] = [];
   const strip = (name: string, rows: number[], hex: string, alpha: number, lift: number, rough = 0.8): Mesh => {
     const m = MeshBuilder.CreateRibbon(name, { pathArray: pathsFor(rows, 0, lift), updatable: true }, scene);
+    // (a ribbon of open paths lays its vertices out path by path, point by point; anything else keeps the old rebuild)
+    const built = m.getVerticesData(VertexBuffer.PositionKind);
+    const pos = built && built.length === rows.length * XS.length * 3 ? Float32Array.from(built) : null;
+    const idx = Array.from(m.getIndices() ?? []);
+    const nrm = new Float32Array(pos?.length ?? 0);
+    m.setBoundingInfo(new BoundingInfo(new Vector3(XS[0], -0.5, Math.min(...rows) - 0.5), new Vector3(XS[XS.length - 1], WAVE_HEIGHT + 0.6 + lift, Math.max(...rows) + 0.5)));
     m.parent = waveRoot;
     const pm = new PBRMaterial(`${name}M`, scene);
     pm.albedoColor = Color3.FromHexString(hex);
@@ -1273,16 +1290,28 @@ export function buildSurfBreak(scene: Scene, pocket: { min: number; max: number 
     if (alpha < 1) pm.alpha = alpha;
     m.material = pm;
     m.isPickable = false;
-    strips.push({ mesh: m, rows, lift });
+    strips.push({ mesh: m, rows, lift, pos, nrm, idx });
     all.push(m);
     return m;
+  };
+  const writeStrips = (tSec: number): void => {
+    for (let j = 0; j < XS.length; j++) crestAt[j] = crestHeightAt(XS[j], tSec);
+    for (const st of strips) {
+      if (!st.pos) { MeshBuilder.CreateRibbon(st.mesh.name, { pathArray: pathsFor(st.rows, tSec, st.lift), instance: st.mesh }); continue; }
+      let k = 1;
+      for (const u of st.rows) for (let j = 0; j < XS.length; j++, k += 3) st.pos[k] = waveProfile(u, crestAt[j]) + st.lift;
+      VertexData.ComputeNormals(st.pos, st.idx, st.nrm);
+      st.mesh.updateVerticesData(VertexBuffer.PositionKind, st.pos, false, false);
+      st.mesh.updateVerticesData(VertexBuffer.NormalKind, st.nrm, false, false);
+    }
   };
   const face = strip('waveFace', US, mixHex(P.ground, P.structure, 0.45), 1, 0);
   face.isPickable = true;
   face.checkCollisions = true;
   strip('waveFoam', [0.9, 0.4, 0, -0.4, -0.9], mixHex(P.line, '#ffffff', 0.55), 1, 0.05, 0.9);
-  const whitewater = strip('waveWhitewater', [-0.9, -1.6, -2.4, -3.4], P.line, 0.5, 0.03, 0.9);   // SURF OCEAN: translucent, over the new sea
-  strip('wavePocket', [pocket.max, (pocket.min + pocket.max) / 2, pocket.min], P.accent, 0.35, 0.03, 0.9);
+  // IMPROVE (2026-10-06, surf item 5): the WHITEWATER down the back (α 0.5) and the scored POCKET band (α 0.16) were two more
+  // full-width alpha-blended ribbons over the face. They are painted into the face's own ocean shading now (oceanShade's
+  // `bands`, below) — the same two reads, no extra transparent passes. The tube and the lip keep their alpha: both fade.
   // the lip line — a foam roll along the crest; the barrel hood hangs off it (as before) so the two breathe together
   const lip = MeshBuilder.CreateCylinder('waveLip', { diameter: 0.7, height: (HALF + 12) * 2, tessellation: 10 }, scene);
   lip.rotation.z = Math.PI / 2;
@@ -1329,6 +1358,7 @@ export function buildSurfBreak(scene: Scene, pocket: { min: number; max: number 
 
   // BUOYS — fixed obstacles in the lineup; hitting one is a wipeout
   const obstacles: RideObstacle[] = [];
+  const buoys: Mesh[] = [];
   const buoyM = mat(scene, 'buoyM', P.accent);
   for (const [x, z] of [[-14, -8], [18, 12], [-22, 38], [9, 62]] as const) {
     const buoy = MeshBuilder.CreateSphere(`buoy_${x}_${z}`, { diameter: 1.1 }, scene);
@@ -1336,6 +1366,7 @@ export function buildSurfBreak(scene: Scene, pocket: { min: number; max: number 
     buoy.material = buoyM;
     buoy.isPickable = false;
     all.push(buoy);
+    buoys.push(buoy);
     obstacles.push({ pos: buoy.position, radius: 0.9 });
   }
 
@@ -1437,8 +1468,14 @@ export function buildSurfBreak(scene: Scene, pocket: { min: number; max: number 
   faceM.albedoColor = Color3.FromHexString(mixHex(oceanOpts.deep, P.line, 0.12));
   faceM.emissiveColor = faceM.albedoColor.scale(0.07);
   faceM.roughness = 0.16; faceM.environmentIntensity = 0.45; faceM.directIntensity = 0.7;   // grazing sky reflection had washed it pale
-  const faceShade = oceanShade(faceM, oceanOpts);
-  const foamShade = oceanShade(whitewater.material as PBRMaterial, oceanOpts);
+  // IMPROVE (2026-10-06, surf item 5): the scored pocket (the band the mode scores, passed in) and the whitewater, painted in
+  const faceShade = oceanShade(faceM, {
+    ...oceanOpts,
+    bands: [
+      { from: pocket.min, to: pocket.max, color: P.accent, mix: 0.16, soft: 0.3 },
+      { from: -3.4, to: -0.9, color: P.line, mix: 0.5, soft: 0.35, chop: 0.8 },
+    ],
+  });
   // THE BARREL IS WATER. The hood was a pale 35 %-alpha cylinder: from inside the tube (where the camera is while you are
   // barreled) it filled the frame as a white pipe over the rider. It is the sea's own colour now — glassy, translucent,
   // lit through, with the chop — and the lip roll above it is lighter foam rather than a solid white bar.
@@ -1453,14 +1490,14 @@ export function buildSurfBreak(scene: Scene, pocket: { min: number; max: number 
   };
   let oceanT = 0;
   /** Every frame: the swell moves and follows the camera; the face's chop stays in step with it. */
-  // the pocket band is a hint drawn ON the water, not a sheet over it (35 % alpha washed the whole face out, measured by multiPick)
-  (scene.getMaterialByName('wavePocketM') as PBRMaterial | null)?.alpha !== undefined && ((scene.getMaterialByName('wavePocketM') as PBRMaterial).alpha = 0.16);
+  // (the pocket band is a hint drawn ON the water, not a sheet over it: 35 % alpha washed the whole face out, measured by
+  // multiPick; it is painted at 16 % into the face's shading now — item 5 above)
   const updateSea = (dt: number, camera: Camera): void => {
     // the lip roll fades as the lens comes up to it: barreled, the camera sits ~1.8 m from the crest and the roll filled the
     // frame as a white bar over the rider (multiPick: waveLip d1.8). Distance to the crest LINE (it runs along x).
     const dLip = Math.hypot(camera.position.y - lip.position.y, camera.position.z - (waveRoot.position.z + lip.position.z));
     lipM.alpha = 0.62 * Math.max(0, Math.min(1, (dLip - 2) / 5));
-    ocean.update(dt, camera); oceanT += Math.max(0, Math.min(0.1, dt)); faceShade.setTime(oceanT); foamShade.setTime(oceanT); tubeShade.setTime(oceanT); };
+    ocean.update(dt, camera); oceanT += Math.max(0, Math.min(0.1, dt)); faceShade.setTime(oceanT); tubeShade.setTime(oceanT); };
   // The tube opens on the swell's own barrel section (surfLineup), not an 18s clock.
   let lineup: LineupState = startLineup();
   let syncedAt = 0;
@@ -1468,6 +1505,7 @@ export function buildSurfBreak(scene: Scene, pocket: { min: number; max: number 
   let along = 0;
   let riding = false;
   let pending: WaveProfile | null = null;
+  let seq = 0;   // IMPROVE (2026-10-06, surf items 8 / 9 / 20): a new ride, counted
   const syncSwell = (tSec: number): void => {
     if (tSec + 1e-4 < syncedAt) {
       lineup = startLineup();
@@ -1484,13 +1522,13 @@ export function buildSurfBreak(scene: Scene, pocket: { min: number; max: number 
     syncedAt = tSec;
     if (stepped.broke.length > 0) {
       const next = stepped.broke[stepped.broke.length - 1].profile;
-      if (!riding) { ride = next; along = 0; riding = true; pending = null; }
+      if (!riding) { ride = next; along = 0; riding = true; pending = null; seq++; }
       else pending = next;
     }
     if (riding) {
       along += WAVE_SPEED * dt;
       if (along >= ride.wall) {
-        if (pending) { ride = pending; pending = null; along = 0; }
+        if (pending) { ride = pending; pending = null; along = 0; seq++; }
         else riding = false;
       }
     }
@@ -1505,19 +1543,27 @@ export function buildSurfBreak(scene: Scene, pocket: { min: number; max: number 
   const waveLipAt = (tSec: number): Vector3 => {
     const z = -50 + ((tSec * WAVE_SPEED) % WAVE_LAP);
     waveRoot.position.z = z;
-    // the set peels: rebuild the ribbon's heights (546 points) — every frame is cheap, and the crest visibly travels
-    if (tSec !== lastRebuild) {
+    // the set peels: the ribbon's heights are written (item 1 above) — every frame is cheap, and the crest visibly travels
+    // IMPROVE (2026-10-06, surf item 17): the time since the last write is this frame's step for the tube's fade too
+    const step = lastRebuild < 0 ? 0 : Math.max(0, Math.min(0.1, tSec - lastRebuild));
+    const fresh = tSec !== lastRebuild;
+    if (fresh) {
       lastRebuild = tSec;
-      for (const st of strips) MeshBuilder.CreateRibbon(st.mesh.name, { pathArray: pathsFor(st.rows, tSec, st.lift), instance: st.mesh });
-      face.refreshBoundingInfo();
+      writeStrips(tSec);
     }
     lip.position.y = vH * 0.78 + Math.sin(tSec * 2.2) * 0.08;
-    // the funnel breathes with the barrel cycle
+    // the funnel breathes with the barrel cycle. IMPROVE (2026-10-06, surf item 17): on the clock, not the frame — it eased a
+    // fixed 0.06 a frame, so the barrel read open ~2.4× faster at 144 fps than at 60. TUBE_FADE_K (s⁻¹) is that 0.06 at 60.
     const active = barrelActive(tSec);
-    tubeM.alpha += ((active ? 0.3 : 0.04) - tubeM.alpha) * 0.06;
+    if (fresh) tubeM.alpha += ((active ? 0.3 : 0.04) - tubeM.alpha) * tubeFadeStep(step);
     lipWorld.set(0, lip.position.y, z);
     return lipWorld;
   };
   const faceHeightAt = (x: number, z: number, tSec: number): number => waveProfile(z - waveRoot.position.z, crestHeightAt(x, tSec));
-  return { world, waveLipAt, barrelActive, activeProfile, faceHeightAt, updateSea, seaHeightAt: ocean.heightAt };
+  return { world, waveLipAt, barrelActive, activeProfile, faceHeightAt, updateSea, seaHeightAt: ocean.heightAt, swellSeq: () => seq, buoys };
 }
+
+/** IMPROVE (2026-10-06, surf item 17): the tube's fade rate (s⁻¹) — 0.06 a frame at 60 fps, as it was tuned. */
+export const TUBE_FADE_K = -Math.log(1 - 0.06) * 60;
+/** The share of the gap to the target the tube's alpha closes in `dt` seconds: the same at any frame rate. */
+export function tubeFadeStep(dt: number): number { return 1 - Math.exp(-TUBE_FADE_K * Math.max(0, dt)); }
