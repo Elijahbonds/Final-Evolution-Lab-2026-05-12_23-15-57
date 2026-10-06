@@ -19,6 +19,8 @@ import {
   carnivalEventBounds, STAKE_MODE_ALIASES, REJUDGED_STAKE_MODES, SESSION_RULES_CEILINGS, sessionRulesMax, firstToCeiling, type ScoreCeiling,
 } from './arena-score-integrity';
 import { ARENA_MODES } from './arena';
+import { versusScore } from './babylon/core/VersusScore';
+import { mixedScore } from './babylon/core/MixedScore';
 import { ARENA_SCORE_BASELINES } from './arena-rivals';
 import { MODE_INFO } from './game-data';
 import { emptyCard, addAttempt, forWire, type DunkAttempt } from './mp/dunkCard';
@@ -358,8 +360,10 @@ const PERFECT_RUNS: Record<string, () => number> = {
     }
     return match.players[0].score;
   },
-  karateVersus: () => MIRRORED.versusRoundsToWin * 100 - 0 * 40,
-  mixedcombat: () => MIRRORED.versusRoundsToWin * 100 - 0 * 40,
+  // IMPROVE (2026-10-06): the Storm Duel scores through core/VersusScore — a sweep at full HP, every bonus past its cap
+  karateVersus: () => versusScore({ myWins: MIRRORED.versusRoundsToWin, foeWins: 0, hpLeftOnWins: Array(MIRRORED.versusRoundsToWin).fill(1), perfectDodges: 99, routes: 99 }),
+  // IMPROVE (2026-10-06): Mixed Combat scores through core/MixedScore — a sweep, every round a ring-out
+  mixedcombat: () => mixedScore({ myWins: MIRRORED.versusRoundsToWin, foeWins: 0, ringOutWins: 99 }),
   dance: () => {
     const minBeats = Math.min(...DANCE_LIBRARY.map((c) => c.beats));
     const steps = Math.floor((MAX_SONG_BARS * 4) / minBeats);
@@ -423,7 +427,7 @@ describe('the ceiling table', () => {
   it('sets the rules ceilings at what the rules can award', () => {
     const want: Record<string, number> = {
       dunkContest: 240, hoops1v1: 13, hoops3v3: 23, threePoint: 30, bigAir: 33_260, golf: 2250, baseball: 6432,
-      soccer: 6660, tennis: 6, tiebreak: 1350, brainBrawl: 4500, whoSceneIt: 3540, karateVersus: 200, mixedcombat: 200,
+      soccer: 6660, tennis: 6, tiebreak: 1350, brainBrawl: 4500, whoSceneIt: 3540, karateVersus: 300, mixedcombat: 250,
       dance: 79680, training: 9400, music: 378_300,
     };
     for (const [mode, max] of Object.entries(want)) {
@@ -963,8 +967,21 @@ describe('drift guards — the numbers mirrored out of mode files still match th
     for (const f of ['lib/babylon/modes/KarateVSMode.ts', 'lib/babylon/modes/MixedCombatMode.ts']) {
       const t = src(f);
       expect(num(t, /const ROUNDS_TO_WIN = (\d+);/, `${f} ROUNDS_TO_WIN`)).toBe(MIRRORED.versusRoundsToWin);
-      expect(t).toContain('myWins * 100 - foeWins * 40');
     }
+    // IMPROVE (2026-10-06): Mixed Combat ends on core/MixedScore.mixedScore (the ceiling imports the same module): the rounds
+    // as before (×100 won, −40 lost) plus 25 per round WON by a ring-out, so a ring-out can never pay a lost round
+    const mc = src('lib/babylon/modes/MixedCombatMode.ts');
+    expect(mc).toContain("ctx.end(won ? 'MATCH_WON' : 'MATCH_LOST', mixedScore({ myWins, foeWins, ringOutWins })");
+    expect(mc.split('ctx.end(').length - 1).toBe(1);
+    expect(mixedScore({ myWins: 2, foeWins: 1, ringOutWins: 0 })).toBe(2 * MIRRORED.versusWinPts - 40);
+    expect(mixedScore({ myWins: 1, foeWins: 2, ringOutWins: 5 })).toBe(MIRRORED.versusWinPts - 80 + 25);
+    expect(mixedScore({ myWins: 2, foeWins: 0, ringOutWins: 1e6 })).toBe(SCORE_CEILINGS.mixedcombat.max);
+    // IMPROVE (2026-10-06): Karate VS ends on core/VersusScore (the ceiling imports the same module), and every term of it is capped
+    const kvs = src('lib/babylon/modes/KarateVSMode.ts');
+    expect(kvs).toContain("ctx.end(won ? 'MATCH_WON' : 'MATCH_LOST', versusScore(t)");
+    expect(kvs.split('ctx.end(').length - 1).toBe(1);
+    expect(versusScore({ myWins: 2, foeWins: 0, hpLeftOnWins: [1, 1], perfectDodges: 0, routes: 0 })).toBe(MIRRORED.versusRoundsToWin * MIRRORED.versusWinPts + 50);
+    expect(versusScore({ myWins: 2, foeWins: 0, hpLeftOnWins: [5, 5, 5], perfectDodges: 1e6, routes: 1e6 })).toBe(SCORE_CEILINGS.karateVersus.max);
   });
 
   it('dance and training', () => {

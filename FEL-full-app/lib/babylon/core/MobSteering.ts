@@ -96,18 +96,19 @@ export class Mob {
 
     const me = this.char.root.position;
     // Pursue predicted position; containment biases toward the target's lane
+    // IMPROVE (2026-10-06): plain numbers, not three Vector3 allocations per mob per call (the same maths)
     const lead = Vector3.Distance(me, targetPos) / Math.max(this.cfg.maxSpeed, 0.1);
-    const predicted = targetPos.add(targetVel.scale(Math.min(lead, 0.6)));
-    const toTarget = predicted.subtract(me);
+    const ahead = Math.min(lead, 0.6);
+    let tx = targetPos.x + targetVel.x * ahead - me.x;
+    const tz = targetPos.z + targetVel.z * ahead - me.z;
     if (this.cfg.containmentBias > 0) {
-      toTarget.x += (targetPos.x - me.x) * this.cfg.containmentBias;
+      tx += (targetPos.x - me.x) * this.cfg.containmentBias;
     }
-    toTarget.y = 0;
-    const dist = toTarget.length();
+    const dist = Math.hypot(tx, tz);
     if (dist < contactRadius) return true;         // caller plays tackle/knockdown
 
     // Yaw slew toward the pursuit direction, then move along facing
-    const wantYaw = Math.atan2(toTarget.x, toTarget.z);
+    const wantYaw = Math.atan2(tx, tz);
     let dYaw = wantYaw - this.yaw;
     while (dYaw > Math.PI) dYaw -= 2 * Math.PI;
     while (dYaw < -Math.PI) dYaw += 2 * Math.PI;
@@ -140,17 +141,48 @@ export class Mob {
 /** Two shoulders' width: closer than this and the bodies are inside each other on screen. */
 export const BODY_SPACING = 0.82;
 
+export interface MobPoolOpts {
+  /** IMPROVE (2026-10-06): move EVERY mob EVERY frame on the real dt. The default staggers a quarter of the pool per frame
+   *  on dt×4, so each body hops every fourth frame (15 Hz at 60) and a contact can be seen up to three frames late. The
+   *  steering is a handful of flops per mob once it stops allocating, so a crowd mode that reads contacts as attacks
+   *  (The Hundred) opts in; the football / yeti pools keep the stagger they were tuned on. */
+  everyFrame?: boolean;
+  /** IMPROVE (2026-10-06): a per-mob chase target (null = the shared target). Lets a mode split the pack between two
+   *  people (The Hundred's partner) without a second pool. */
+  targetOf?: (m: Mob) => { pos: Vector3; vel: Vector3 } | null;
+}
+
 export class MobPool {
   private mobs: Mob[] = [];
   private cursor = 0;
+  constructor(private opts: MobPoolOpts = {}) {}
   add(m: Mob): void { this.mobs.push(m); }
+  /** IMPROVE (2026-10-06): take a mob out (a KO'd body). The pool only ever grew, so update() and the O(n²) separate()
+   *  kept walking every corpse of every wave. Returns false when it was not in the pool. */
+  remove(m: Mob): boolean {
+    const i = this.mobs.indexOf(m);
+    if (i < 0) return false;
+    this.mobs.splice(i, 1);
+    if (this.cursor > i) this.cursor--;
+    if (this.cursor >= this.mobs.length) this.cursor = 0;
+    return true;
+  }
   all(): Mob[] { return this.mobs; }
   update(dt: number, targetPos: Vector3, targetVel: Vector3, contactRadius = 0.9): Mob[] {
     const contacts: Mob[] = [];
+    if (this.opts.everyFrame) {
+      for (const m of this.mobs) {
+        const t = this.opts.targetOf?.(m) ?? null;
+        if (m.update(dt, t ? t.pos : targetPos, t ? t.vel : targetVel, contactRadius)) contacts.push(m);
+      }
+      this.separate();
+      return contacts;
+    }
     const slice = Math.max(1, Math.ceil(this.mobs.length / 4));
     for (let i = 0; i < slice; i++) {
       const m = this.mobs[(this.cursor + i) % Math.max(this.mobs.length, 1)];
-      if (m && m.update(dt * Math.min(4, this.mobs.length), targetPos, targetVel, contactRadius)) contacts.push(m);
+      const t = m ? this.opts.targetOf?.(m) ?? null : null;
+      if (m && m.update(dt * Math.min(4, this.mobs.length), t ? t.pos : targetPos, t ? t.vel : targetVel, contactRadius)) contacts.push(m);
     }
     this.cursor = (this.cursor + slice) % Math.max(this.mobs.length, 1);
     this.separate();

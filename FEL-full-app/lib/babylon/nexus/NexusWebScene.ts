@@ -250,7 +250,7 @@ function paintMarkings(
     // as a place rather than a hard stop.
     case 'ring': {
       const cx = S / 2, cy = S / 2;
-      arc(cx, cy, S * 0.3125);              // the clamp itself: 7.5 of a 24m mat
+      arc(cx, cy, S * 0.3125);              // the clamp itself: 7.5 of a 24m mat (9.375 of 30 since ARENA_SCALE 1.25 grew both — combat/arenas.test holds the ratio)
       ctx.globalAlpha = 0.45; arc(cx, cy, S * 0.3125 - 26); ctx.globalAlpha = 1;
       ctx.globalAlpha = 0.25; arc(cx, cy, S * 0.3125 + 34); ctx.globalAlpha = 1;
       arc(cx, cy, 60);                      // centre mark, for spawn orientation
