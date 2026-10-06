@@ -1235,8 +1235,14 @@ return {
     driver.root.scaling.setAll(DRIVER_SCALE);         // a kart is small; a full-size body swamps it
     driver.root.position.set(0, KART_HIPS.y - REF_HIPS_Y * DRIVER_SCALE, KART_HIPS.z);
     const seatClip = buildPoseClip(ctx.scene, driver.skeleton, 'kart_seated', 0.5, seatedKeys());
-    if (seatClip) { seatClip.start(true, 1, 0, 0.5, false); seated = seatClip; }
-    if (steerWheel) mountSteerGrip(ctx.scene, driver.skeleton, steerWheel);   // MOVEMENT POLISH (2026-10-06): the hands turn with the rim (anim/SteerGrip)
+    if (seatClip) {
+      seatClip.start(true, 1, 0, 0.5, false); seated = seatClip;
+      // MOVEMENT POLISH (2026-10-06): the hands turn with the rim (anim/SteerGrip).
+      // INTEGRATION (2026-10-06): inside the seated branch. The one-line hook had split `if (seatClip)` from its `else`,
+      // so the warning fired on a missing wheel instead of a missing seat, and a STANDING driver (no seat clip) had his
+      // arms reached to the wheel. The grip records the seated pose's hands, so it only means anything once seated.
+      if (steerWheel) mountSteerGrip(ctx.scene, driver.skeleton, steerWheel);
+    }
     else console.warn('[FEL-KART] seated pose could not be built — the driver stands');
 
     // the field: one simplified kart per rival, tinted so they are telling apart at speed
