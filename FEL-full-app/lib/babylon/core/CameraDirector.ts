@@ -403,6 +403,17 @@ export class CameraDirector {
     const d = this.camera.getDirection(Axis.X); d.y = 0;
     return d.lengthSquared() < 1e-6 ? new Vector3(-1, 0, 0) : d.normalize();
   }
+  /** IMPROVE (2026-10-06, 1v1 #14): forwardFlat into `out` — the same vector, nothing built (a per-frame stick mapping read two new
+   *  vectors a frame through forwardFlat / rightFlat). */
+  forwardFlatToRef(out: Vector3): Vector3 {
+    this.camera.getDirectionToRef(Axis.Z, out); out.y = 0;
+    return out.lengthSquared() < 1e-6 ? out.set(0, 0, -1) : out.normalize();
+  }
+  /** IMPROVE (2026-10-06, 1v1 #14): rightFlat into `out`. */
+  rightFlatToRef(out: Vector3): Vector3 {
+    this.camera.getDirectionToRef(Axis.X, out); out.y = 0;
+    return out.lengthSquared() < 1e-6 ? out.set(-1, 0, 0) : out.normalize();
+  }
 
   constructor(
     private scene: Scene,

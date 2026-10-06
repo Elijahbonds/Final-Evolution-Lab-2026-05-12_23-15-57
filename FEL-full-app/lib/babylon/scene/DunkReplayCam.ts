@@ -31,6 +31,23 @@ function freshWorld(node: TransformNode): Matrix {
   return node.getWorldMatrix();
 }
 
+/**
+ * IMPROVE (2026-10-06): a wait that does not count paused time — the mode's safety net around the triple cut. A wall-clock
+ * timeout ran on through a pause, so the net fired mid-pause and ended a replay the player had frozen (see `paused` below).
+ */
+export function pausableDelay(ms: number, paused: () => boolean, now: () => number = () => performance.now(), tickMs = 100): Promise<void> {
+  return new Promise((resolve) => {
+    let left = ms, last = now();
+    const tick = (): void => {
+      const t = now();
+      if (!paused()) left -= t - last;
+      last = t;
+      if (left <= 0) resolve(); else setTimeout(tick, Math.max(1, Math.min(tickMs, left)));
+    };
+    setTimeout(tick, Math.max(1, Math.min(tickMs, ms)));
+  });
+}
+
 export class DunkReplayRecorder {
   private buf: Sample[] = [];
   private acc = 0;
@@ -190,7 +207,7 @@ export class DunkReplayRecorder {
    * has drawn. The RECORDED POSE is written as the frame's last word (after the clips, the reach, the posture), so what plays is what
    * happened. Skippable (a tap, space, or `stop()`); the live root and ball are put back where they were when it ends.
    */
-  playCuts(rimCenter: Vector3, contactAt: number, cuts: readonly CutSpec[], opts: { freezeSec?: number; onCut?: (i: number, c: CutSpec) => void; onFreeze?: () => void } = {}): Promise<void> {
+  playCuts(rimCenter: Vector3, contactAt: number, cuts: readonly CutSpec[], opts: { freezeSec?: number; onCut?: (i: number, c: CutSpec) => void; onFreeze?: () => void; paused?: () => boolean } = {}): Promise<void> {
     const all = this.buf.filter((f) => !!f.pose);
     if (all.length < 4 || !this.poseNodes.length) return Promise.resolve();
     const nearest = (t: number): number => { let bi = 0, bd = Infinity; all.forEach((f, i) => { const d = Math.abs(f.t - t); if (d < bd) { bd = d; bi = i; } }); return bi; };
@@ -213,13 +230,19 @@ export class DunkReplayRecorder {
       };
       let cur: { a: Sample; b: Sample; k: number } = { a: contact, b: contact, k: 0 };
       let rider: TransformNode | null | undefined, lastBall: Vector3 | null = null; const blend = new Vector3();
-      const skip = () => finish();
+      // IMPROVE (2026-10-06): A PAUSED REPLAY IS FROZEN. The cut runs on the engine's clock in onBeforeRender, and the harness keeps
+      // rendering through a pause — so a replay paused on its first cut finished unseen behind the pause card. With `paused` (the mode
+      // passes the harness phase) the clock holds, the recorded pose stays the frame's last word (a still), and the tap / Space that
+      // resumes the game is not also taken as a skip.
+      const isPaused = (): boolean => opts.paused?.() ?? false;
+      const skip = () => { if (!isPaused()) finish(); };
       window.addEventListener('pointerdown', skip);
       const onKey = (e: KeyboardEvent) => { if (e.key === ' ') skip(); };
       window.addEventListener('keydown', onKey);
       // the pose is the LAST writer of the frame (after the clips and every layer that runs on the animations' observable)
       const poseObs = this.scene.onAfterAnimationsObservable.add(() => { if (cur.a.pose && cur.b.pose) this.applyPose(cur.a.pose, cur.b.pose, cur.k); });
       const obs = this.scene.onBeforeRenderObservable.add(() => {
+        if (isPaused()) return;
         rt += this.scene.getEngine().getDeltaTime() / 1000;
         // which segment, and where in the recording
         let left = rt, s = 0;

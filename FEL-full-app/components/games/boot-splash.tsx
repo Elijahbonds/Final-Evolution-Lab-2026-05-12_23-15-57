@@ -29,6 +29,8 @@ import { COURT_LAYOUTS, COURT_LAYOUT_MODES, readCourtLayout, writeCourtLayout, t
 import { SET_LENGTH_MODES, setLengthsFor, setLengthLabel, readSetLength, writeSetLength, setLengthLocked, type SetLengthId } from '@/lib/babylon/nexus/setLength';   // IMPROVE (2026-10-06): volleyball's short set, tennis's quick match
 import { looksFor, readPlaceLook, writePlaceLook } from '@/lib/babylon/nexus/placeLooks';
 import { tierList, readTier, writeTier, profileFor, type Tier } from '@/lib/babylon/core/Difficulty';
+import { OneVOneWinBy2 } from './onevone-win-by-2';   // owner 2026-10-06: the 1v1's win-by-2 pick
+import { ThreePointOptions } from './three-point-options';   // IMPROVE (2026-10-06): 3PT #5 #6 #8
 import {
   readySchools, readBlend, writeBlend, blendName, schoolById, blendTraits, STYLE_TRAIT_KEYS,
   type StyleBlend,
@@ -69,7 +71,7 @@ const STYLE_MODES = new Set(['karate', 'karate-vs', 'duel', 'showdown', 'mixedco
  * Not every mode: a time trial, a routine and a quiz have nobody to be difficult. Offering a tier where
  * nothing reads it is the hollow-picker failure the pickerReach test exists to catch.
  */
-const TIER_MODES = new Set(['velocitykart', 'aeroaces', 'football']);
+const TIER_MODES = new Set(['velocitykart', 'aeroaces', 'football', 'onevone', 'threevthree']);   // IMPROVE (2026-10-06): 1v1 reads it (onevoneRules ONEVONE_TIER); 3v3 too (threevthreeRules THREEV_TIER)
 /** WEATHER (docs/SPEC-WEATHER.md): the outdoor modes that read the pick — pickerReach keeps this honest; WEATHER_FAMILY_OF in nexus/weather names the family. */
 const WEATHER_MODES = new Set(['golf', 'soccer', 'tennis', 'football']);
 // Deliberately SHORT, and it grows as modes are wired rather than ahead of them. The first draft listed
@@ -668,6 +670,12 @@ export function SplashCard(props: BootSplashProps) {
             </p>
           </div>
         )}
+
+        {/* 1v1 WIN BY 2 (owner 2026-10-06): a player option, off by default; it draws nothing on a staked / head-to-head run */}
+        {props.modeId === 'onevone' && (props.phase === 'ready' || props.phase === 'loading') && <OneVOneWinBy2 />}
+        {/* 3PT OPTIONS (IMPROVE 2026-10-06 #5 #6 #8): the shot input, and — never on a staked / head-to-head run — the practice rack
+            and the money rack */}
+        {props.modeId === 'threepoint' && (props.phase === 'ready' || props.phase === 'loading') && <ThreePointOptions />}
 
         {/* CARD SLOT (FINISH-RELEASE, 2026-09-15): the creator card beside the setting and the items, on every mode —
             and the button map it carries, so a player can read what every press does before the first one. */}

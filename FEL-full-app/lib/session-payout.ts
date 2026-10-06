@@ -70,7 +70,7 @@
  */
 
 import { canonicalModeKey, MODE_INFO } from '@/lib/game-data';
-import { scoreCeilingFor, killSwitchOn, SCORE_CEILINGS } from '@/lib/arena-score-integrity';
+import { scoreCeilingFor, killSwitchOn, SCORE_CEILINGS, sessionRulesMax } from '@/lib/arena-score-integrity';
 import { performSetMax } from '@/lib/babylon/music/performSet';
 
 /**
@@ -399,7 +399,7 @@ export function sessionScoreCap(mode: string, stats: RoomStats | null, durationS
   const c = scoreCeilingFor(m);
   if (!c || c.kind !== 'rules') return null;
   if ((opts.killSwitch ?? killSwitchOn()) && c.swapsUnderKillSwitch) return null;
-  return c.max;
+  return sessionRulesMax(m, c);   // owner 2026-10-06: the 1v1's win-by-2 option posts up to 17; the stake row stays 13
 }
 
 export interface SessionPayout {

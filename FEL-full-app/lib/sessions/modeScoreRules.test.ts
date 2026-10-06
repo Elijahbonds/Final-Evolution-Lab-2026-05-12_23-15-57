@@ -9,7 +9,7 @@ import { homedir } from 'node:os';
 import { join, relative, sep } from 'node:path';
 import {
   MAX_DURATION_FLOOR_MS, MEASURED_RUNS, MIN_DURATION_FLOOR_MS, MODE_SCORE_RULES, RATE_HEADROOM, SCORE_COLUMN_MAX, SCORE_HEADROOM, STORY_MIRRORED,
-  checkRunScore, checkUnruledScore, deriveRule, derivedBounds, derivedRule, rulesMaxFor, storyBossBound, storyRailBound, unmeasuredModes, type MeasuredRun,
+  checkRunScore, checkUnruledScore, deriveRule, derivedBounds, derivedRule, dunkDuelBound, rulesMaxFor, storyBossBound, storyRailBound, unmeasuredModes, type MeasuredRun,
 } from './modeScoreRules';
 import { DUNK_ATTEMPT_MAX } from '@/lib/arena-score-integrity';
 import { MODE_INFO } from '@/lib/game-data';
@@ -35,9 +35,11 @@ function sessionKeys(): string[] {
 
 describe('deriveRule: one arithmetic for every mode', () => {
   it('a mode with an exact rules maximum is capped at exactly that, whatever was measured', () => {
-    expect(rulesMaxFor('threePoint', { killSwitch: false })).toBe(30);
+    // IMPROVE (2026-10-06, 3PT #5): a session may play the money-rack option (one all-money rack: 34); the Arena stake row
+    // stays the 2009 format's 30 (arena-score-integrity SESSION_RULES_CEILINGS — the 1v1 win-by-2's split)
+    expect(rulesMaxFor('threePoint', { killSwitch: false })).toBe(34);
     const r = deriveRule('threePoint', [run(6, 150, 'upper')], { killSwitch: false })!;
-    expect(r).toMatchObject({ maxScore: 30, maxScoreFrom: 'rules' });
+    expect(r).toMatchObject({ maxScore: 34, maxScoreFrom: 'rules' });
   });
 
   it('any other mode: the best measured score × SCORE_HEADROOM; its pace × RATE_HEADROOM, never below a max run at the shortest length', () => {
@@ -213,7 +215,9 @@ describe('OWNER DECISION (2026-09-28): derived per-run bounds', () => {
     expect(storyBossBound()).toBe(950);
     expect(storyRailBound()).toBe(2196);
     expect(b.storyMode.maxScore).toBe(2196);
-    expect(b.dunkduel.maxScore).toBe(2 * DUNK_ATTEMPT_MAX);
+    // owner 2026-10-06 (moderate): the longest match (5 each) plus the dunk-off's 3 rounds — the duel reports real totals
+    expect(dunkDuelBound()).toBe((5 + 3) * DUNK_ATTEMPT_MAX);
+    expect(b.dunkduel.maxScore).toBe(dunkDuelBound());
     expect(b.dunkduel.payFloorOnly).toBe(true);
     expect(Object.entries(b).filter(([, v]) => v.payFloorOnly).map(([k]) => k)).toEqual(['dunkduel']);
   });
@@ -234,9 +238,12 @@ describe('OWNER DECISION (2026-09-28): derived per-run bounds', () => {
   it('the EXPORTED table carries Prove It\'s played-floor flag, and only Prove It\'s (review: dropping it in derivedRule paid Prove It in full, every test green)', () => {
     // the route reads the flag off the real row (app/api/sessions/route.ts floorOnly), not off derivedBounds()
     expect(derivedRule(b.dunkduel).payFloorOnly).toBe(true);
-    expect(MODE_SCORE_RULES.dunkduel).toMatchObject({ maxScoreFrom: 'derived', maxScore: 2 * DUNK_ATTEMPT_MAX, payFloorOnly: true });
+    expect(MODE_SCORE_RULES.dunkduel).toMatchObject({ maxScoreFrom: 'derived', maxScore: dunkDuelBound(), payFloorOnly: true });
     expect(Object.entries(MODE_SCORE_RULES).filter(([, r]) => r.payFloorOnly).map(([k]) => k)).toEqual(['dunkduel']);
     expect(checkRunScore({ mode: 'dunkduel', score: 96, durationMs: 60_000 })).toMatchObject({ ok: true, rule: { payFloorOnly: true } });
+    // a perfect 5-dunk match, reported unscaled (5 × the panel's 50), is inside the bound; one past the bound is not
+    expect(checkRunScore({ mode: 'dunkduel', score: 250, durationMs: 5 * 60_000 })).toMatchObject({ ok: true });
+    expect(checkRunScore({ mode: 'dunkduel', score: dunkDuelBound() + 1, durationMs: 5 * 60_000 })).toMatchObject({ ok: false, detail: 'above_max_score' });
   });
 
   it('DRIFT: the story, acting and Prove It constants are still what their code says', () => {
@@ -261,7 +268,16 @@ describe('OWNER DECISION (2026-09-28): derived per-run bounds', () => {
     expect(Math.min(...speedMults)).toBe(STORY_MIRRORED.railMinSpeedMult);
     expect(src('components/games/acting-game.tsx')).toContain('score: Math.round(res.average * 100),');
     expect(src('lib/babylon/core/ActingCore.ts')).toContain('const adjusted = clamp01(average * coverage);');
-    expect(src('lib/babylon/modes/DunkDuelMode.ts')).toContain(`const DUNKS_EACH = ${STORY_MIRRORED.dunkDuelDunksEach};`);
+    // owner 2026-10-06: the bound mirrors the duel's longest match and its dunk-off rounds (dunkDuelRules), and the mode
+    // reports its real totals (no scaling left)
+    const rules = src('lib/babylon/modes/dunkDuelRules.ts');
+    const lengths = rules.match(/export const MATCH_LENGTHS: readonly number\[\] = \[([\d, ]+)\];/);
+    expect(lengths, 'MATCH_LENGTHS').not.toBeNull();
+    expect(Math.max(...lengths![1].split(',').map(Number))).toBe(STORY_MIRRORED.dunkDuelMaxDunksEach);
+    expect(rules).toContain(`export const DUNKOFF_MAX_ROUNDS = ${STORY_MIRRORED.dunkDuelDunkOffRounds};`);
+    const duel = src('lib/babylon/modes/DunkDuelMode.ts');
+    expect(duel).not.toMatch(/reportedScore\(/);
+    expect(duel).toContain('Math.max(totals[0], totals[1]), { p1: totals[0], p2: totals[1],');
   });
 });
 

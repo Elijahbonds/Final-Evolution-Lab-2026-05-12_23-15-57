@@ -4,7 +4,7 @@
 // (measured in the live replay: 0.1–0.54 m off the palm with the body in the air). The ball now rides the node it rode live.
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { FreeCamera, MeshBuilder, NullEngine, Scene, TransformNode, Vector3 } from '@babylonjs/core';
-import { DunkReplayRecorder } from './DunkReplayCam';
+import { DunkReplayRecorder, pausableDelay } from './DunkReplayCam';
 import type { CutSpec } from '../core/DunkCuts';
 
 const PALM = new Vector3(0.12, -0.04, -0.08);
@@ -70,5 +70,59 @@ describe('the triple-cut replay keeps the ball in the replayed hand', () => {
     for (let i = 0; i < 12; i++) { r.step(); if (r.rec.cutNow === 0 && r.rec.riderName === '') freeFrames++; }
     r.rec.stop(); await done;
     expect(freeFrames).toBeGreaterThan(3);
+  });
+});
+
+// IMPROVE (2026-10-06): the harness keeps rendering through a pause, and the cut ran on the engine's clock — so a paused replay
+// finished unseen. With `paused` the cut's clock holds and the frame stays where it was; unpaused, it runs on to its end.
+describe('the triple cut while the game is paused', () => {
+  it('holds its clock (same cut, same ball) and does not finish; it plays on once unpaused', async () => {
+    const r = rig();
+    for (let i = 0; i < 40; i++) r.step((k) => { r.root.position.y = Math.min(1.2, k * 0.03); r.arm.rotation.z = -k * 0.04; }, i);
+    const contact = r.nowSec() - 0.1;
+    let paused = false, ended = false;
+    const done = r.rec.playCuts(new Vector3(0, 3.05, 5), contact, [{ id: 'baseline', lead: 0.5, tail: 0.05, speed: 1, label: 'test' }], { paused: () => paused });
+    void done.then(() => { ended = true; });
+    for (let i = 0; i < 4; i++) r.step();
+    expect(r.rec.cutNow).toBe(0);
+    paused = true;
+    r.step();   // the pose the last live frame chose is drawn on this one (the pose writes before the cut's own observer)
+    r.ball.computeWorldMatrix(true);
+    const held = r.ball.getAbsolutePosition().clone();
+    for (let i = 0; i < 90; i++) r.step();   // three seconds of paused frames: far longer than the whole cut
+    await Promise.resolve();
+    expect(ended).toBe(false);
+    expect(r.rec.cutNow).toBe(0);
+    r.ball.computeWorldMatrix(true);
+    expect(Vector3.Distance(held, r.ball.getAbsolutePosition())).toBeLessThan(1e-6);
+    paused = false;
+    for (let i = 0; i < 40 && !ended; i++) { r.step(); await Promise.resolve(); }
+    expect(ended).toBe(true);
+  });
+
+  it('stop() (the pad skip) ends it in flight', async () => {
+    const r = rig();
+    for (let i = 0; i < 40; i++) r.step();
+    const done = r.rec.playCuts(new Vector3(0, 3.05, 5), r.nowSec() - 0.1, [{ id: 'baseline', lead: 0.5, tail: 0.05, speed: 1, label: 'test' }]);
+    r.step();
+    expect(r.rec.cutNow).toBe(0);
+    r.rec.stop();
+    await done;
+    expect(r.rec.cutNow).toBe(-1);
+  });
+});
+
+describe('pausableDelay', () => {
+  it('counts only the time the game was not paused', async () => {
+    vi.useFakeTimers();
+    try {
+      let clock = 0, paused = false, done = false;
+      void pausableDelay(1000, () => paused, () => clock).then(() => { done = true; });
+      const run = async (ms: number) => { for (let t = 0; t < ms; t += 50) { clock += 50; await vi.advanceTimersByTimeAsync(50); } };
+      await run(600); expect(done).toBe(false);
+      paused = true; await run(5000); expect(done).toBe(false);   // five paused seconds do not count
+      paused = false; await run(300); expect(done).toBe(false);
+      await run(200); expect(done).toBe(true);
+    } finally { vi.useRealTimers(); }
   });
 });
