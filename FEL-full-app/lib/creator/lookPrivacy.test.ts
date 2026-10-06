@@ -14,7 +14,7 @@ const built = (): FaceConfig => ({
   ...defaultFace(),
   hairStyle: 'Afro',
   faceShape: 'Heart',
-  sliders: { faceLong: 0.8, faceRound: 0.4, notAMorph: 1 },
+  sliders: { faceLong: 0.8, faceRound: 0.4, 'not-a-morph': 1 },
 });
 
 describe('under 18 the look does not upload', () => {

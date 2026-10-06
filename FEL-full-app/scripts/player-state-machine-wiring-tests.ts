@@ -20,7 +20,8 @@ for (const [name, path] of [['1v1', '../lib/babylon/modes/OneVOneMode.ts'], ['3v
   const src = readFileSync(new URL(path, import.meta.url), 'utf8');
   ok(src.includes("import { PlayerStateMachine } from '../core/PlayerStateMachine';"), `${name} imports PlayerStateMachine`);
   ok(/const myStateMachine = new PlayerStateMachine\(\);/.test(src), `${name} instantiates one machine for the hero`);
-  ok(/ctx\.setHud\(\{ playerState: myStateMachine\.update\(\{/.test(src), `${name} publishes playerState every frame from a fresh update() call, not a stale read`);
+  // IMPROVE (2026-10-06, 1v1 #11): 1v1 publishes through putHud (the machine is still updated every frame; the host hears only a change)
+  ok(/(ctx\.setHud\(|putHud\(ctx, )\{ playerState: myStateMachine\.update\(\{/.test(src), `${name} publishes playerState from a fresh update() call every frame, not a stale read`);
   ok(/shooting, dunking,/.test(src) && /myStateMachine\.update/.test(src), `${name}'s update() call reads the SAME shooting/dunking booleans the mode's own control flow already uses (no second source of truth)`);
 }
 

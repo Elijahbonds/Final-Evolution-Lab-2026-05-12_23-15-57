@@ -15,6 +15,7 @@ import { CardSlot } from './card-slot';
 import { MotionSetting } from '@/components/settings/motion-setting';
 import { PausedLayer } from './paused-layer';
 import { BodyPlayReady, BodyPlayReadyLine, BodyPlayLayer } from './body-play';
+import { PlayAsSwitcher } from '@/components/closet/play-as-switcher';   // CREATOR-PLAN phase 4a: "Play as …" a saved character
 import { BASKETBALL_MODE_IDS, COURT_LOCATIONS, readCourtLocation, readyCourtLocations, writeCourtLocation, type CourtLocationId } from '@/lib/babylon/nexus/courtLocations';
 import { BALL_SKINS, readBallSkin, readyBallSkins, writeBallSkin, type BallSkinId } from '@/lib/babylon/nexus/ballSkins';
 import { readyVenues, readBoardVenue, writeBoardVenue, type BoardDiscipline } from '@/lib/babylon/nexus/boardVenues';
@@ -26,8 +27,11 @@ import { readyVehicles, readVehicle, writeVehicle, type RaceKind } from '@/lib/b
 import { readyWeapons, readWeapon, writeWeapon } from '@/lib/babylon/combat/arsenal';
 import { arenasFor, readCombatArena, writeCombatArena, COMBAT_MODE_IDS, type CombatModeId } from '@/lib/babylon/combat/arenas';
 import { COURT_LAYOUTS, COURT_LAYOUT_MODES, readCourtLayout, writeCourtLayout, type CourtLayoutId } from '@/lib/babylon/nexus/courtLayout';   // COURT LAYOUT (2026-09-18): the 3v3's chokepoint
+import { SET_LENGTH_MODES, setLengthsFor, setLengthLabel, readSetLength, writeSetLength, setLengthLocked, type SetLengthId } from '@/lib/babylon/nexus/setLength';   // IMPROVE (2026-10-06): volleyball's short set, tennis's quick match
 import { looksFor, readPlaceLook, writePlaceLook } from '@/lib/babylon/nexus/placeLooks';
 import { tierList, readTier, writeTier, profileFor, type Tier } from '@/lib/babylon/core/Difficulty';
+import { OneVOneWinBy2 } from './onevone-win-by-2';   // owner 2026-10-06: the 1v1's win-by-2 pick
+import { ThreePointOptions } from './three-point-options';   // IMPROVE (2026-10-06): 3PT #5 #6 #8
 import {
   readySchools, readBlend, writeBlend, blendName, schoolById, blendTraits, STYLE_TRAIT_KEYS,
   type StyleBlend,
@@ -68,7 +72,7 @@ const STYLE_MODES = new Set(['karate', 'karate-vs', 'duel', 'showdown', 'mixedco
  * Not every mode: a time trial, a routine and a quiz have nobody to be difficult. Offering a tier where
  * nothing reads it is the hollow-picker failure the pickerReach test exists to catch.
  */
-const TIER_MODES = new Set(['velocitykart', 'aeroaces', 'football']);
+const TIER_MODES = new Set(['velocitykart', 'aeroaces', 'football', 'onevone', 'threevthree']);   // IMPROVE (2026-10-06): 1v1 reads it (onevoneRules ONEVONE_TIER); 3v3 too (threevthreeRules THREEV_TIER)
 /** WEATHER (docs/SPEC-WEATHER.md): the outdoor modes that read the pick — pickerReach keeps this honest; WEATHER_FAMILY_OF in nexus/weather names the family. */
 const WEATHER_MODES = new Set(['golf', 'soccer', 'tennis', 'football']);
 // Deliberately SHORT, and it grows as modes are wired rather than ahead of them. The first draft listed
@@ -254,6 +258,20 @@ export function SplashCard(props: BootSplashProps) {
     const u = new URL(window.location.href); u.searchParams.set('court', id); u.searchParams.delete('choke'); window.location.assign(u.toString());
   };
 
+  // SET LENGTH (IMPROVE 2026-10-06): volleyball's set to 25, or a short set to 15 — and tennis's first to 6, or a quick
+  // match to 3. Reloads like the court layout — the scorer is built at load. Not offered on a scored run (story / arena /
+  // challenge), which always plays the full length.
+  const [setLenLocked, setSetLenLocked] = useState(true);
+  useEffect(() => { setSetLenLocked(setLengthLocked()); }, []);
+  const hasSetLen = SET_LENGTH_MODES.includes(props.modeId) && !setLenLocked;
+  const [setLenId, setSetLenId] = useState<SetLengthId>('full');
+  useEffect(() => { if (hasSetLen) setSetLenId(readSetLength(props.modeId)); }, [hasSetLen, props.modeId]);
+  const pickSetLen = (id: SetLengthId) => {
+    if (id === setLenId) return;
+    writeSetLength(props.modeId, id);
+    const u = new URL(window.location.href); u.searchParams.set('set', setLengthsFor(props.modeId).find((l) => l.id === id)?.param ?? id); window.location.assign(u.toString());
+  };
+
   // DIFFICULTY (2026-09-13). Phase 0 measured four modes with no tiering at all and four more each inventing
   // their own; this is the one picker, reading the one shared ladder.
   const hasTiers = TIER_MODES.has(props.modeId);
@@ -338,6 +356,8 @@ export function SplashCard(props: BootSplashProps) {
         {/* MOVEMENT PLAY P4 (2026-09-25): "Play with your body" (the games the body drives), "coming", or nothing; once
             chosen, the space check over this card. */}
         {props.phase === 'ready' && <BodyPlayReady tint={v.tint} onStart={props.onStart} />}
+        {/* CREATOR-PLAN phase 4a (2026-10-06): switch to another saved character (renders nothing for a guest or one character) */}
+        {props.phase === 'ready' && <PlayAsSwitcher tint={v.tint} />}
 
         {isCourt && (props.phase === 'ready' || props.phase === 'loading') && readyCourtLocations().length > 1 && (
           <div className="mt-3 flex flex-col items-center gap-1.5">
@@ -457,6 +477,22 @@ export function SplashCard(props: BootSplashProps) {
               ))}
             </div>
             <p className="max-w-[24rem] text-[9px] leading-tight tracking-wide text-white/40">{COURT_LAYOUTS.find((l) => l.id === courtId)?.sub ?? ''}</p>
+          </div>
+        )}
+        {hasSetLen && (props.phase === 'ready' || props.phase === 'loading') && (
+          <div className="mt-3 flex flex-col items-center gap-1.5">
+            <p className="text-[9px] font-black tracking-[0.3em] text-white/45">{setLengthLabel(props.modeId)}</p>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {setLengthsFor(props.modeId).map((l) => (
+                <button key={l.id} type="button" onClick={() => pickSetLen(l.id)} title={l.sub}
+                  aria-label={`${l.name} — ${l.sub}`} aria-pressed={l.id === setLenId}
+                  className={`rounded-full border px-3 py-1 text-[10px] font-black tracking-wider transition ${l.id === setLenId ? 'text-black' : 'text-white/80 hover:bg-white/10'}`}
+                  style={l.id === setLenId ? { background: l.tint, borderColor: l.tint } : { borderColor: `${l.tint}88` }}>
+                  {l.name.toUpperCase()}
+                </button>
+              ))}
+            </div>
+            <p className="max-w-[24rem] text-[9px] leading-tight tracking-wide text-white/40">{setLengthsFor(props.modeId).find((l) => l.id === setLenId)?.sub ?? ''}</p>
           </div>
         )}
         {disc && (props.phase === 'ready' || props.phase === 'loading') && skinsFor(disc).length > 1 && (
@@ -637,6 +673,12 @@ export function SplashCard(props: BootSplashProps) {
             </p>
           </div>
         )}
+
+        {/* 1v1 WIN BY 2 (owner 2026-10-06): a player option, off by default; it draws nothing on a staked / head-to-head run */}
+        {props.modeId === 'onevone' && (props.phase === 'ready' || props.phase === 'loading') && <OneVOneWinBy2 />}
+        {/* 3PT OPTIONS (IMPROVE 2026-10-06 #5 #6 #8): the shot input, and — never on a staked / head-to-head run — the practice rack
+            and the money rack */}
+        {props.modeId === 'threepoint' && (props.phase === 'ready' || props.phase === 'loading') && <ThreePointOptions />}
 
         {/* CARD SLOT (FINISH-RELEASE, 2026-09-15): the creator card beside the setting and the items, on every mode —
             and the button map it carries, so a player can read what every press does before the first one. */}

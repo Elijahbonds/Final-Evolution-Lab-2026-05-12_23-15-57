@@ -14,8 +14,10 @@ export default async function ClosetPage() {
   if (!session) redirect(loginPath('/closet'));
   const userId = (session.user as { id?: string } | undefined)?.id;
   const adult = userId ? verifiedAdult(await readDobYear(prisma, userId, 'look_hold_page')) : false;
+  // CREATOR-PLAN phase 4d: the Closet is the Studio — a full-screen stage sized to the viewport under the status rail
+  // (and above the phone's tab bar), so the page itself no longer pads for the bottom bar.
   return (
-    <div className="min-h-screen bg-[#050505] pb-24">
+    <div className="bg-[#050505]">
       <ClosetView adult={adult} />
     </div>
   );

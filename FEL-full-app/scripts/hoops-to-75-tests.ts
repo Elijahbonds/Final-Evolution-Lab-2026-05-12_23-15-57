@@ -52,7 +52,7 @@ function myJumpAgeGuard(): boolean {
   const src = readFileSync('lib/babylon/modes/ThreeVThreeMode.ts', 'utf8');
   ok(src.includes('let buzzer = false') && src.includes('liveAtBuzzer'),
     'WA-1 buzzer holds until arcs and dunk flights finish');
-  ok(src.includes('foeShotScored = true') && src.match(/foeScore \+= 2; foeShotScored = true/g)!.length >= 2,
+  ok(src.includes('foeShotScored = true') && src.match(/foeScore \+= (2|points); foeShotScored = true/g)!.length >= 2,   // IMPROVE (2026-10-06, 3v3 #2): the jumper release banks what it was worth (`points`: a three is three)
     'WA-1 rival dunk marks foeShotScored like the jumper release');
 }
 

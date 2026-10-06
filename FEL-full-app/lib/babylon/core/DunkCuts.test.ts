@@ -55,6 +55,11 @@ describe('the celebrations', () => {
     expect(CELEBRATIONS.itsover.by).toBe('FLIGHT NIGHT');
     for (const c of Object.values(CELEBRATIONS)) expect(c.clip).toMatch(/^dunk_/);   // the dunk family: mirrored to the right hand with the rest
   });
+  it('no label names a trademarked character (owner 2026-10-06): the splits are THE AIR SPLITS; the id and clip stay for saved data', () => {
+    expect(CELEBRATIONS.spiderman.label).toBe('THE AIR SPLITS');
+    expect(CELEBRATIONS.spiderman.clip).toBe('dunk_celeb_spiderman_splits');   // internal: clip registry, creator saves, voice tags
+    for (const c of Object.values(CELEBRATIONS)) expect(c.label).not.toMatch(/spider/i);
+  });
   it('the d-pad throws yours; a thrown one always wins', () => {
     expect(new Set(Object.values(CELEB_BY_DPAD)).size).toBe(4);
     expect(pickCelebration({ total: 31, bands, chosen: 'spiderman' })).toBe('spiderman');

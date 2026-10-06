@@ -13,6 +13,7 @@ import { BREAK } from '../lib/babylon/core/Breakaway';
 import { REGULATION_KICKS } from '../lib/babylon/core/ShootoutCore';
 import { makeBigAirSession } from '../lib/feel/cores/big-air-skin';
 import { TennisScore, VolleyScore } from '../lib/babylon/core/RallyCore';
+import { setLengthOf } from '../lib/babylon/nexus/setLength';
 import { MIN_SAFE_DISTANCE } from '../lib/babylon/core/CameraStandoff';
 import { FOLLOW_PRESETS } from '../lib/babylon/core/CameraDirector';
 
@@ -39,7 +40,11 @@ const pin = (rel: string, re: RegExp): number => {
   ok(BREAK.clockSec === FIELD_DEPTH.breakawayClockSec, `breakaway clock ${FIELD_DEPTH.breakawayClockSec}s`);
   ok(pin('lib/babylon/modes/precisionModes.ts', /const TOTAL = (\d+);\s*\/\/ FIELD-DEPTH W4: matches GOLF_PAR/) === FIELD_DEPTH.golfHoles,
     `golf holes ${FIELD_DEPTH.golfHoles}`);
-  ok(src('lib/babylon/modes/NetSportMode.ts').includes(`new TennisScore(${FIELD_DEPTH.tennisGames})`),
+  // test changed (IMPROVE 2026-10-06, Tennis #5): the match length is the set-length pick's now (a quick match to 3 sits
+  // beside it), so the six games live in nexus/setLength's FULL tennis length, which the mode builds its scorer from
+  ok(src('lib/babylon/modes/NetSportMode.ts').includes('new TennisScore(setLen.target)')
+    && src('lib/babylon/modes/NetSportMode.ts').includes('setLengthOf(readSetLength(o.modeId), o.modeId)')
+    && setLengthOf('full', 'tennis').target === FIELD_DEPTH.tennisGames,
     `tennis first to ${FIELD_DEPTH.tennisGames} games`);
 }
 

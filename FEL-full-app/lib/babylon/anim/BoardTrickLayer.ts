@@ -31,6 +31,17 @@ export interface BoardTrickLayerOpts {
   deckFollowsFeet?: boolean;
 }
 
+/**
+ * IMPROVE (2026-10-06, skate item 13): the HANDS on a wall ride. The wall ride reused the carve clip, so it read as a carve
+ * on its side. With `wall` on the override pose the arms get their own shape after the clip and the posture layer: the
+ * LEAD hand reaches down to the face beside the nose (a palm on the wall), the REAR hand drags behind the tail along it.
+ * `nx, nz` is the face's normal (into the park, away from the wall), `tx, tz` the travel along it — world, planar units.
+ * Lead and rear are measured off the rig (whose shoulder is further down the travel), never assumed from a bone name.
+ */
+export interface WallHands { nx: number; nz: number; tx: number; tz: number }
+/** Where the hands go, metres: the lead palm ahead along the travel and off the face, the rear hand trailing behind. */
+export const WALL_HANDS = { leadAhead: 0.5, leadOff: 0.3, rearBehind: 0.65, rearOff: 0.25, reach: 0.58, leadW: 0.8, rearW: 0.7 } as const;
+
 export class BoardTrickLayer {
   private trick: BoardTrick | null = null;
   private elapsed = 0;
@@ -40,7 +51,7 @@ export class BoardTrickLayer {
   private applied = { yaw: 0, tilt: 0, bx: 0, by: 0, bz: 0, lift: 0 };
   /** WALL RIDES + LIP TRICKS (2026-09-18): a pose the MODE holds while the rider is on a wall or a lip — no BoardTrick behind
    *  it, applied whether or not the rider is airborne, cleared by the mode when the moment ends. */
-  overridePose: { boardRoll?: number; boardPitch?: number; boardYaw?: number; boardLift?: number; bodyTilt?: number } | null = null;
+  overridePose: { boardRoll?: number; boardPitch?: number; boardYaw?: number; boardLift?: number; bodyTilt?: number; wall?: WallHands } | null = null;
   private arms: { Left: ArmChain | null; Right: ArmChain | null };
   private feet: { Left: TransformNode | null; Right: TransformNode | null };
   private toes: { Left: TransformNode | null; Right: TransformNode | null };
@@ -110,6 +121,7 @@ export class BoardTrickLayer {
 
   /** The grabbing hand onto the deck edge — after the clip and the posture layer have posed the arm. */
   private reach(): void {
+    if (this.overridePose?.wall) { this.wallHands(this.overridePose.wall); return; }
     const g = this.pose.grab;
     if (!g || g.weight <= 0.01) return;
     const bw = this.board.computeWorldMatrix(true);
@@ -149,6 +161,31 @@ export class BoardTrickLayer {
       const reachTo = sh.add(across.scale(0.30)).add(new Vector3(0, 0.30, 0));
       reachArm(free, reachTo, across.add(new Vector3(0, -0.3, 0)), g.weight * 0.85);
     }
+  }
+
+  /** The wall ride's arms (see WallHands): each target is put at a full arm's reach from its shoulder, toward the point on
+   *  the face it is going for, so the two-bone solve is never asked past straight. */
+  private wallHands(w: WallHands): void {
+    const L = this.arms.Left, R = this.arms.Right;
+    if (!L || !R) return;
+    const H = WALL_HANDS;
+    const ls = L.shoulder.getAbsolutePosition(), rs = R.shoulder.getAbsolutePosition();
+    const [lead, rear] = (ls.x * w.tx + ls.z * w.tz) >= (rs.x * w.tx + rs.z * w.tz) ? [L, R] : [R, L];
+    this.board.computeWorldMatrix(true);
+    const deck = this.board.getAbsolutePosition();
+    const toward = (arm: ArmChain, gx: number, gy: number, gz: number): Vector3 => {
+      const sh = arm.shoulder.getAbsolutePosition();
+      const d = new Vector3(gx - sh.x, gy - sh.y, gz - sh.z);
+      const n = d.length();
+      return n > H.reach ? sh.add(d.scaleInPlace(H.reach / n)) : new Vector3(gx, gy, gz);
+    };
+    // the elbow points away from the wall and up (a world DIRECTION, as the grab's poles are): folded INTO the face it
+    // would go through it
+    const pole = new Vector3(w.nx * 0.6, 0.5, w.nz * 0.6);
+    const leadT = toward(lead, deck.x + w.tx * H.leadAhead + w.nx * H.leadOff, deck.y, deck.z + w.tz * H.leadAhead + w.nz * H.leadOff);
+    reachArm(lead, leadT, pole, H.leadW);
+    const rearT = toward(rear, deck.x - w.tx * H.rearBehind + w.nx * H.rearOff, deck.y, deck.z - w.tz * H.rearBehind + w.nz * H.rearOff);
+    reachArm(rear, rearT, pole, H.rearW);
   }
 
   dispose(): void {

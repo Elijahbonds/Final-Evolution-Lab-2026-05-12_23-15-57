@@ -14,7 +14,9 @@
 import { Color3, MeshBuilder, StandardMaterial, Vector3 } from '@babylonjs/core';
 import type { AbstractMesh, Scene } from '@babylonjs/core';
 
-export type GoalKind = 'score' | 'combo' | 'gap' | 'collect';
+//     trick   — IMPROVE (2026-10-06): do a named trick, optionally on a named feature (the wall ride, the plant, the lip
+//               stalls — the verbs the plaza gained on 2026-09-18 that no goal ever pointed at)
+export type GoalKind = 'score' | 'combo' | 'gap' | 'collect' | 'trick';
 
 export interface Goal {
   id: string;
@@ -22,14 +24,29 @@ export interface Goal {
   kind: GoalKind;
   target: number;             // points / combo pts / collectible count
   gapId?: string;             // for kind 'gap'
+  /** kind 'trick': the trick's id (a WallRide LIP_TRICKS id, 'wallride', 'wallplant'), and where it has to happen — a
+   *  feature label PREFIX, or any of several (plazaWalls / plazaLips labels), or anywhere when omitted. */
+  trickId?: string;
+  where?: string | readonly string[];
   done: boolean;
 }
 
 export interface GoalEvent {
-  type: 'bank' | 'comboLanded' | 'gap' | 'collect';
+  type: 'bank' | 'comboLanded' | 'gap' | 'collect' | 'trick';
   value?: number;             // bank pts / combo pts
   gapId?: string;
   collectibleId?: string;
+  /** type 'trick': what was done, and the label of the feature it was done on */
+  trickId?: string;
+  where?: string;
+}
+
+/** A trick event meets a trick goal: the same trick, on the named feature (a label prefix) when the goal names one. */
+export function trickMatches(g: Pick<Goal, 'trickId' | 'where'>, e: Pick<GoalEvent, 'trickId' | 'where'>): boolean {
+  if (!g.trickId || g.trickId !== e.trickId) return false;
+  if (!g.where) return true;
+  const at = e.where ?? '';
+  return (typeof g.where === 'string' ? [g.where] : g.where).some((w) => at.startsWith(w));
 }
 
 export class GoalTracker {
@@ -53,6 +70,7 @@ export class GoalTracker {
       if (g.kind === 'combo' && e.type === 'comboLanded') hit = (e.value ?? 0) >= g.target;
       if (g.kind === 'gap' && e.type === 'gap') hit = this.gapsHit.has(g.gapId ?? '');
       if (g.kind === 'collect') hit = this.collected.size >= g.target;
+      if (g.kind === 'trick' && e.type === 'trick') hit = trickMatches(g, e);
       if (hit) { g.done = true; doneNow.push(g); }
     }
     return doneNow;
@@ -170,4 +188,10 @@ export const SKATE_GOALS: Omit<Goal, 'done'>[] = [
   { id: 'gap_hubba', label: 'GRIND THE PYRAMID HUBBA', kind: 'gap', target: 1, gapId: 'plaza_hubba' },
   { id: 'gap_flatbar', label: 'GRIND THE BAR OVER THE GAP', kind: 'gap', target: 1, gapId: 'plaza_gap' },
   { id: 'gap_wallride', label: 'GRIND THE WALLRIDE LIP', kind: 'gap', target: 1, gapId: 'plaza_wallride' },
+  // IMPROVE (2026-10-06): the new verbs, pointed at. The street wall is the free-standing one in the open: its two long
+  // faces are "the wallride (north face)" / "(south face)" (skatePlaza.plazaWalls — the leaned wall on the fence has no
+  // north face and calls its park face plain "the wallride"; the two walls' short ENDS share labels, so they do not count).
+  // The blunt is the right-stick lip stall (WallRide.LIP_TRICKS) on any of the pyramid's four ridges.
+  { id: 'trick_wallplant_street', label: 'WALLPLANT THE STREET WALL', kind: 'trick', target: 1, trickId: 'wallplant', where: ['the wallride (north face)', 'the wallride (south face)'] },
+  { id: 'trick_blunt_pyramid', label: 'BLUNT TO FAKIE ON THE PYRAMID', kind: 'trick', target: 1, trickId: 'blunt_fakie', where: 'the pyramid' },
 ];

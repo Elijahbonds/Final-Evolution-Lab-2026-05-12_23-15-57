@@ -16,7 +16,7 @@
 
 import { Vector3 } from '@babylonjs/core';
 import { BalanceModel, sampleSlope } from './BoardPhysics';
-import type { Scene, AbstractMesh } from '@babylonjs/core';
+import type { Scene, AbstractMesh, PickingInfo } from '@babylonjs/core';
 
 export type BoardStance = 'regular' | 'switch';
 
@@ -118,6 +118,9 @@ export class BoardMovement {
   /** The SHARED boost's ramp, 0..1 (BoostKit — FINISH-RELEASE, 2026-09-14). While it is up the board is driven forward and
    *  the speed ceiling lifts to +40%, so a boost is a real surge, not flat out reached sooner. Set by the mode each frame. */
   boostK = 0;
+  /** IMPROVE (2026-10-06, snow item 16): opt-in — a ground hit the caller already cast this frame (the Rider's), offered to the
+   *  slope sample so it does not cast a second ray when that hit is the surface it would find. Unset (skate, surf): unchanged. */
+  groundHit: (() => PickingInfo | null) | null = null;
 
   /** WALL-UNSTUCK: the last wall touched (its normal) and the seconds the board still counts as on it. */
   private wallNx = 0;
@@ -244,7 +247,7 @@ export class BoardMovement {
     const coasting = !this.stroking && drive <= 0.3 && pump < 0.1 && Math.abs(steer) < 0.5;
     const resist = coasting && t.rollResist ? t.rollResist : 0;
     if (scene && pos && ground?.length) {
-      const s = sampleSlope(scene, pos, this.yaw, ground);
+      const s = sampleSlope(scene, pos, this.yaw, ground, this.groundHit?.());
       slopeAccel += s.gravityAlongSlope;   // += : the stroke above must survive the terrain sample
       if (s.groundGap < 0.35 && s.fallAccel > 0.4) fall = { yaw: s.fallYaw, accel: s.fallAccel };
       // pumping converts slope + transition into extra speed
@@ -287,7 +290,9 @@ export class BoardMovement {
       slopeAccel = Math.max(slopeAccel, fall.accel * Math.max(0.25, Math.cos(d)));
     }
 
-    const fwd = new Vector3(Math.sin(this.yaw), 0, Math.cos(this.yaw));
+    // IMPROVE (2026-10-06): the facing is two numbers, not a new Vector3 plus scaled copies every frame — `vel` is written
+    // in place (same values; the object a caller holds is the one `update` returns, as before)
+    const fx = Math.sin(this.yaw), fz = Math.cos(this.yaw);
     // Steering re-aligns velocity toward facing (committed carves hold
     // speed through the turn; lazy steers scrub). SPEED IS SCALAR-FIRST:
     // pushing/pumping/drag act on magnitude, never re-deriving direction
@@ -299,17 +304,18 @@ export class BoardMovement {
       const turnCost = carveCommit > 0.05
         ? (t.scrubPerSec ? 1 - (1 - carveCommit) * t.scrubRate * 0.6 * dt : 1 - (1 - carveCommit) * t.scrubRate * 0.25)
         : 1;
-      const held = speed * turnCost + (slopeAccel - brake - resist) * dt;
-      this.vel = fwd.scale(Math.max(0, held));
+      const held = Math.max(0, speed * turnCost + (slopeAccel - brake - resist) * dt);
+      this.vel.set(fx * held, 0, fz * held);
     } else if (slopeAccel > 0) {
-      this.vel = fwd.scale(slopeAccel * dt);
+      const v = slopeAccel * dt;
+      this.vel.set(fx * v, 0, fz * v);
     } else if (speed > 0) {
       this.vel.setAll(0);
     }
 
     // BOOST: drive forward along the facing and lift the ceiling, both scaled by the ramp
     const bk = Math.max(0, Math.min(1, this.boostK));
-    if (bk > 0) this.vel.addInPlace(new Vector3(Math.sin(this.yaw), 0, Math.cos(this.yaw)).scale(t.maxSpeed * 1.6 * bk * dt));
+    if (bk > 0) { const b = t.maxSpeed * 1.6 * bk * dt; this.vel.addInPlaceFromFloats(fx * b, 0, fz * b); }
     // drag + clamp
     this.vel.scaleInPlace(Math.max(0, 1 - t.drag * dt));
     const cap = t.maxSpeed * (1 + 0.4 * bk);

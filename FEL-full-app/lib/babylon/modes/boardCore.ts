@@ -99,6 +99,18 @@ export interface TrickMachineOpts {
   /** A grab that a release asked to end has ended — at the release, or when the minimum hold runs out (the mode
    *  lets the trick pose's grab hand go here, so the hand and the score agree). */
   onGrabEnd?: () => void;
+  /** IMPROVE (2026-10-06, snow item 13): A LONG GRAB PAYS. Opt-in: a clean grab (a 'board_grab' trick with no turn) held past
+   *  `fromSec` pays `perSec` more of its points per extra second, up to `max` more. `fromSec` sits clear of a tap's minimum hold
+   *  (MIN_TAP_GRAB_SEC, which a frame's quantisation overshoots), so a tap is never "held". Omitted (surf, the gauntlet): a grab
+   *  pays the same however long it is held, as before. */
+  grabHold?: GrabHoldRule;
+}
+export interface GrabHoldRule { fromSec: number; perSec: number; max: number }
+
+/** IMPROVE (2026-10-06, snow item 13): the extra fraction a grab held `heldSec` earns under `rule` (0 up to `fromSec`). */
+export function grabHoldBonus(heldSec: number, rule: GrabHoldRule | undefined): number {
+  if (!rule) return 0;
+  return Math.min(rule.max, Math.max(0, heldSec - rule.fromSec) * rule.perSec);
 }
 
 export class TrickMachine {
@@ -220,7 +232,9 @@ export class TrickMachine {
         // no link at all (skate's masher lesson: a mashed METHOD × 8 must not out-score a played line). A trick that pays
         // nothing is answered, not silently dropped.
         const rep = this.links.filter((l) => l.key === moveKey(t.name)).length;
-        const paid = Math.round(t.pts * REPEAT_DECAY[Math.min(rep, REPEAT_DECAY.length - 1)] * (sketchy ? 0.5 : 1));
+        // IMPROVE (2026-10-06, snow item 13): a clean grab held longer pays more (opt-in `grabHold`; 0 for everything else)
+        const hold = !sketchy && t.turns === 0 && t.clip === 'board_grab' ? grabHoldBonus(this.grabT, this.opts.grabHold) : 0;
+        const paid = Math.round(t.pts * (1 + hold) * REPEAT_DECAY[Math.min(rep, REPEAT_DECAY.length - 1)] * (sketchy ? 0.5 : 1));
         this.graceT = TrickMachine.LINK_GRACE_SEC;
         if (paid <= 0) { this.playClip('jump_land'); this.opts.onBeat?.('land'); return `${t.name} · REPEAT — NOTHING`; }
         this.links.push({ key: moveKey(t.name), rep });
@@ -232,20 +246,25 @@ export class TrickMachine {
         this.playClip('jump_land');
         this.opts.onBeat?.(sketchy ? 'land_sketchy' : 'land');
         this.onHud({ combo: `${this.combo}x` });
-        return `${sketchy ? 'SKETCHY ' : ''}${t.name}${rep > 0 ? ` · REPEAT ×${rep + 1}` : ''} +${paid * this.combo}${this.combo > 1 ? ` (${this.combo}×)` : ''}`;
+        this.publishPot();
+        return `${sketchy ? 'SKETCHY ' : ''}${t.name}${hold > 0 ? ` · HELD ${this.grabT.toFixed(1)}s` : ''}${rep > 0 ? ` · REPEAT ×${rep + 1}` : ''} +${paid * this.combo}${this.combo > 1 ? ` (${this.combo}×)` : ''}`;
       }
       this.bail();
       return 'BAILED';
     }
-    if (!this.active && r.grounded && this.comboPts > 0) {  // bank the combo
+    if (!this.active && r.grounded && (this.comboPts > 0 || this.links.length > 0)) {  // bank the combo
       // phase 4: the combo stays OPEN for the grace window (it used to bank the very next frame, so 2× never happened);
       // when the window runs out the bank NAMES the line it paid (THPS: the combo reads out as it banks)
       this.graceT -= dt;
       if (this.graceT > 0) return null;
+      // IMPROVE (2026-10-06, surf item 15): a chain of links that put nothing in the pot (a lone wave move paid outside it)
+      // closes quietly — it must not stay open to multiply a landing a minute later
+      if (this.comboPts <= 0) { this.comboPts = 0; this.combo = 0; this.links = []; this.onHud({ combo: '' }); this.publishPot(); return null; }
       const banked = this.comboPts, line = this.links.map((l) => l.key).join(' → ');
       this.score += banked;
       this.onHud({ score: this.score, combo: '' });
       this.comboPts = 0; this.combo = 0; this.links = [];
+      this.publishPot();
       return `BANKED +${banked}${line ? ` · ${line}` : ''}`;
     }
     return null;
@@ -258,11 +277,39 @@ export class TrickMachine {
     this.playClip('skate_bail');   // SHARED-ANIM-BUS: the board's own bail (this borrowed the football tackle fall)
     this.opts.onBeat?.('bail');
     this.onHud({ combo: '' });
+    this.publishPot();
   }
 
   bankGrind(line: GrindLine): void {
     this.links.push({ key: 'GRIND', rep: this.links.filter((l) => l.key === 'GRIND').length }); this.graceT = TrickMachine.LINK_GRACE_SEC;
     this.combo = this.multiplier;
     this.comboPts += line.bonus * this.combo;
+    // IMPROVE (2026-10-06, snow item 4): a rail opens (or extends) the chain like a landing does — the ticker shows it
+    this.onHud({ combo: `${this.combo}x` });
+    this.publishPot();
   }
+
+  /**
+   * IMPROVE (2026-10-06, surf item 15): A MOVE ON THE GROUND IS A LINK. Opt-in (surf's wave moves and near misses call it; the
+   * other boards never do): `name` joins the open chain like a landing — the multiplier counts it, the repeat rule keys on it,
+   * the grace window reopens — and `pts` go into the pot at the multiplier it lands at. With `paidOutside` the move's own
+   * points were already paid to the score (surf pays its wave moves at once, as it always has), so the pot takes only what
+   * the chain adds on top: `pts × (multiplier − 1)`. Returns what the pot took.
+   */
+  link(name: string, pts: number, paidOutside = false): number {
+    const key = moveKey(name);
+    this.links.push({ key, rep: this.links.filter((l) => l.key === key).length });
+    this.graceT = TrickMachine.LINK_GRACE_SEC;
+    this.combo = this.multiplier; this.bestCombo = Math.max(this.bestCombo, this.combo);
+    const add = Math.max(0, Math.round(pts)) * (paidOutside ? this.combo - 1 : this.combo);
+    this.comboPts += add;
+    this.onHud({ combo: `${this.combo}x` });
+    this.publishPot();
+    return add;
+  }
+
+  /** IMPROVE (2026-10-06, snow item 4): THE POT IS PUBLISHED. The host's big gold number reads `pot` and this machine only ever
+   *  sent `combo: "3x"`, so it read 0 under every live chain on snow and surf. Its own call, so the objects the other keys go
+   *  out in are unchanged (the carnival's prefixing host and its tests read those exactly). */
+  private publishPot(): void { this.onHud({ pot: this.comboPts }); }
 }

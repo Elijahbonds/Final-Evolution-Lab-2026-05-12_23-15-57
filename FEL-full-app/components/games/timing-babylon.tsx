@@ -19,6 +19,7 @@ import { timingMaxCombo } from './timing-combo';
 import { timingGameResult } from '@/lib/sessions/gameResultFromSession';
 import { CUE_LOOKAHEAD_SEC, CUE_LINGER_SEC, type HudCue } from '@/lib/babylon/core/danceTracks';
 import { ACCURACY_CENTER as GOLF_ACC_CENTER, ACCURACY_HALF as GOLF_ACC_HALF } from '@/lib/babylon/core/golfHud';
+import { breakawayLine } from '@/lib/babylon/core/penaltyHud';   // IMPROVE (2026-10-06, Penalty #12)
 // MUSIC-SUITE P7 (2026-09-29), room-mix-ux: the Cypher's instrument chips (replacing the MIX bar) and its paused-
 // screen MIX sliders. Dance-only — gated below on hud.instruments / modeKey==='dance', so every other timing sport
 // this host also drives (tennis, derby, penalty, golf, volleyball) renders exactly as before.
@@ -96,8 +97,11 @@ export function makeTimingHost(opts: TimingHostOpts) {
         const headline = modeKey === 'tennis' ? `${won ? 'MATCH WON' : 'MATCH LOST'} · ${r.score} GAMES · ${n('style')} STYLE${st.rackets !== undefined ? ` · ${n('rackets')} RACKETS LEFT` : ''}`
           : modeKey === 'volleyball' ? `${won ? 'SET WON' : 'SET LOST'} · ${r.score} PTS · ${n('style')} STYLE`
           : modeKey === 'golf' ? `${won ? 'CARD IN — UNDER PAR' : 'CARD IN'} · ${n('overPar') > 0 ? '+' : ''}${n('overPar')} · ${n('holes')} HOLES · ${n('pickUps')} PICK-UPS`
-          : modeKey === 'derby' ? `${won ? 'DERBY CHAMPION' : 'DERBY OVER'} · ${n('homers')} HOMERS · ${n('outs')} OUTS · ${Math.round(n('longestFt'))} FT`
-          : modeKey === 'penalty' ? `${won ? 'SHOOTOUT WON' : 'SHOOTOUT LOST'} · ${n('goals')}–${n('themGoals')} · ${n('stylePts')} STYLE`
+          // IMPROVE (2026-10-06, Derby #2): the derby ends WIN / LOSS against the rival's round (the mode's `beatRival`); the
+          // posted `won` (timingWon: three homers, the Story's Diamond goal) is unchanged
+          : modeKey === 'derby' ? `${st.beatRival !== undefined ? (n('beatRival') ? 'BEAT THE RIVAL' : 'RIVAL TAKES IT') : won ? 'DERBY CHAMPION' : 'DERBY OVER'} · ${n('homers')}–${n('rivalHomers')} HR · ${n('outs')} OUTS · ${Math.round(n('longestFt'))} FT`
+          // IMPROVE (2026-10-06, Penalty #12): and the breakaway's tricks, when there were any (penaltyHud.breakawayLine)
+          : modeKey === 'penalty' ? `${won ? 'SHOOTOUT WON' : 'SHOOTOUT LOST'} · ${n('goals')}–${n('themGoals')} · ${n('stylePts')} STYLE${breakawayLine(st) ? ` · ${breakawayLine(st)}` : ''}`
           // IMPROVE (2026-10-06): the Cypher's card names a full combo (#6) and the run's STYLE (#10 / #13)
           : modeKey === 'dance' && n('rounds') ? `${n('fullCombo') ? 'FULL COMBO · ' : ''}${n('hits')}/${n('rounds')} CLEAN · ${r.score} PTS${n('style') ? ` · ${n('style')} STYLE` : ''}`
           : (n('rounds') ? `${n('hits')}/${n('rounds')} CLEAN · ${r.score} PTS` : `${r.score} PTS`);
@@ -178,6 +182,10 @@ export function makeTimingHost(opts: TimingHostOpts) {
               <span className="h-2 w-20 overflow-hidden rounded-full bg-black/50"><span className={`block h-full rounded-full transition-[width] duration-150 ${Number(hud.flow) >= 70 ? 'bg-[#fbbf24]' : 'bg-[var(--fel-cyan)]/80'}`} style={{ width: `${Math.max(0, Math.min(100, Number(hud.flow)))}%` }} /></span>
               {typeof hud.kinetic === 'string' && hud.kinetic ? <span className="text-[10px] font-bold text-[#fbbf24]">{hud.kinetic}</span> : null}
             </span>
+          )}
+          {/* IMPROVE (2026-10-06): volleyball's block cooldown as a ready chip — it only showed as a refusal after the press. Key-gated. */}
+          {typeof hud.blockReady === 'string' && hud.blockReady && (
+            <span className={`fel-panel px-3 py-1 text-[10px] font-bold tracking-wider ${hud.blockReady === 'READY' ? 'text-[#7CFFB2]' : 'text-white/50'}`}>B BLOCK {hud.blockReady}</span>
           )}
           {/* M42 E20: numeric score gets " PTS"; string scores (e.g. "2 GOALS") render as-is */}
           <span className="rounded-md bg-black/50 px-3 py-1 text-white">{typeof hud.score === 'number' ? `${hud.score} PTS` : hnode(hud.score, '0 PTS')}</span>

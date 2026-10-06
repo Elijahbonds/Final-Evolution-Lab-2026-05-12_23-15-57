@@ -34,12 +34,15 @@ function stepUntilLeaves(c: AirSessionCore, from: string, guard = 6000): void {
   while (phaseOf(c) === from && n < guard) { c.step(DT); n++; }
 }
 
-// Play one full attempt: coast the slope to launch, spin `turns` turns mid-air (the big-air spin is TIME-BASED since the
+// Play one full attempt: stride the slope to launch, spin `turns` turns mid-air (the big-air spin is TIME-BASED since the
 // owner's 2026-09-07 decision: one tap starts it, the next plants it — the taps here are placed by watching the rotation),
 // optionally hold to stick, then ride the arc down through touchdown into Land.
+// test changed (IMPROVE 2026-10-06, Big Air item 8): it COASTED the slope to the lip. The slope alone now stops just short of
+// the landing's speed window (the run-up's decision), so a coasted air knuckles on the table; the attempt strides (a good
+// stride every ~260 ms) as a player reaching the landing does.
 function playAttempt(c: AirSessionCore, turns: number, stick: boolean): void {
   // Run -> Air
-  stepUntilLeaves(c, 'Run');
+  for (let n = 0; phaseOf(c) === 'Run' && n < 6000; n++) { if (n % 16 === 0) c.runTap(n % 32 === 0 ? 'L' : 'R', 'good'); c.step(DT); }
   if (turns > 0) c.trick();                       // start the spin at the top of the arc
   let planted = turns <= 0;
   // Fly the arc; plant the spin at `turns`; hold-to-stick during the descent like the component does.
