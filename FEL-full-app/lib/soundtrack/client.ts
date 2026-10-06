@@ -5,7 +5,8 @@
 //   ModeHarness.ts       enterBed() in firstInput(), exitBed() on teardown   (or a mode's `soundtrack: 'own'` → claimMusicFocus)
 //   DanceMode / Academy  const release = claimMusicFocus('dance'); … release();
 //   end-screen sideCards <NowPlayingCard />                      (components/soundtrack/now-playing-card.tsx)
-//   DunkMode walk-out    resolveWalkOutSource(…) + claimMusicFocus('walkout')  (lib/soundtrack/walkout.ts)
+//   DunkMode walk-out    resolveWalkOutSource(…) then playOnMusicBus(src.url, { gainDb: -7, who: 'walkout' })
+//   boot-splash (hook)   useSoundtrackStage(props.phase)        (components/soundtrack/soundtrack-stage.tsx)
 // Every export is a safe no-op on the server and before the dock has mounted.
 
 import { SoundtrackPlayer, type PlayerEnv } from './player';
@@ -17,6 +18,8 @@ import type { SoundtrackStage } from './types';
 export { claimMusicFocus };
 /** The Dunk walk-out's catalogue source (routed: the Dunk lane mounts it). */
 export { resolveWalkOutSource } from './walkout';
+/** A clip (the walk-out) on the music bus, holding focus while it plays. */
+export { playOnMusicBus } from './musicBusPlayer';
 
 const PREFS_KEY = 'fel-soundtrack-prefs';
 type SoundKitLike = { unlock(): void; graph(): { ctx: AudioContext; music: GainNode } | null };
