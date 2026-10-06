@@ -229,7 +229,17 @@ export class StrideRateFilter {
  * the measured foot slide by 1.5 percentage points, because the references were the wrong SIZE rather than slightly
  * off. See the note on combat's residue below.
  */
-export const COMBAT_STRIDE = { walk: 0.6, strafe: 0.5, dash: 4.0 } as const;
+export const COMBAT_STRIDE = { walk: 1.2, strafe: 0.5, dash: 4.8 } as const;
+// MOVEMENT POLISH (2026-10-06), TUNED: walk 0.6 → 1.2, dash 4.0 → 4.8 (strafe unchanged). THE CONTRADICTION BELOW IS RESOLVED: the
+// authored stepping loops MOONWALKED — their knees folded on the back sweep, so the low foot raced forward and the lifted one drifted
+// back (anim/gait.ts; scripts/probes/_movement-probe.ts `clips`). "Which of the three is lying" — the clip measurement took the feet's
+// speed without their direction, and the plant test was right: no rate could plant a foot that travels the wrong way. With the knee
+// on the forward swing the base `run` (the dash and the run gait) covers 4.8 m/s at rate 1 and the guard step, cut to a fighter's
+// ±12° step (karate.ts), 1.2 m/s — each the reference with the least raw slide in the probe's `calib` sweep (run 1.2% of the root's
+// travel at 4.8; guard step 36% at 1.2, a short low step that FootPlanting finishes). The shuffles were not re-authored: 0.5 stands.
+
+/** MOVEMENT POLISH (2026-10-06): the gait split stays where the owner has seen it — the old guard step's reach, 0.6 × RATE_MAX. */
+const GUARD_STEP_SPLIT_MPS = 0.6 * 1.85;
 
 /**
  * The rate for a combat state, PRESERVING THE SIGN of the clip's authored ratio.
@@ -264,8 +274,8 @@ export function combatRateFor(state: string, speed: number, authoredRatio = 1): 
 //
 // The threshold is not a taste call — it is exactly where the guard step runs out of rate.
 
-/** The fastest ground speed a guard step can cover before it becomes a fast-forward. 0.6 × 1.85 = 1.11 m/s. */
-export const GUARD_STEP_CEILING = COMBAT_STRIDE.walk * RATE_MAX;
+/** The fastest ground speed a guard step plays at before the gait becomes a run. 0.6 × 1.85 = 1.11 m/s. */
+export const GUARD_STEP_CEILING = GUARD_STEP_SPLIT_MPS;   // was COMBAT_STRIDE.walk × RATE_MAX; held at 1.11 when the reference moved (above)
 
 /** Which gait a body moving at `speed` should be in. */
 export function combatGait(speed: number): 'step' | 'run' {

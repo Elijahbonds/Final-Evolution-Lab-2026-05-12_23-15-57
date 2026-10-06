@@ -25,6 +25,7 @@ import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrar
 import { DEFAULT_HERO_URL } from '../core/athleteRoster';
 import { buildPoseClip, REF_HIPS_Y } from '../anim/poseClip';
 import { seatedKeys, driverLean, WHEEL_RADIUS, STEER_LOCK_RAD } from '../anim/authored/seated';
+import { mountSteerGrip } from '../anim/SteerGrip';
 import type { AnimationGroup } from '@babylonjs/core';
 import { VenueKit } from '../visual/VenueKit';
 import { SoundKit } from '../audio/SoundKit';
@@ -1235,6 +1236,7 @@ return {
     driver.root.position.set(0, KART_HIPS.y - REF_HIPS_Y * DRIVER_SCALE, KART_HIPS.z);
     const seatClip = buildPoseClip(ctx.scene, driver.skeleton, 'kart_seated', 0.5, seatedKeys());
     if (seatClip) { seatClip.start(true, 1, 0, 0.5, false); seated = seatClip; }
+    if (steerWheel) mountSteerGrip(ctx.scene, driver.skeleton, steerWheel);   // MOVEMENT POLISH (2026-10-06): the hands turn with the rim (anim/SteerGrip)
     else console.warn('[FEL-KART] seated pose could not be built — the driver stands');
 
     // the field: one simplified kart per rival, tinted so they are telling apart at speed
