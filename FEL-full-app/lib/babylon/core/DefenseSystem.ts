@@ -27,8 +27,14 @@ export const SUBSTITUTION_COOLDOWN_SEC = 3.0;
 export const SUBSTITUTION_VULN_SEC = 0.6;          // read-it-and-punish window
 export const COUNTER_DAMAGE_MULT = 1.5;
 
+/** IMPROVE (2026-10-06): 'none' meant BOTH "out of range" and "in range with no defense", and applyDefenseOutcome turned
+ *  it into 'whiff' — so in Showdown and Duel a clean blow on an unguarded fighter never landed (bodyFightFlags noted it).
+ *  The two are apart now:
+ *    'outOfRange' — the swing cannot reach: a whiff.
+ *    'none'       — it reaches and nothing answers it: a HIT. (The body's own read — bodyFight.defenseActionOf — already
+ *                   used 'none' to mean exactly this.) */
 export type DefenseAction =
-  | 'none' | 'blocked' | 'parried' | 'guardImpacted' | 'substituted';
+  | 'none' | 'outOfRange' | 'blocked' | 'parried' | 'guardImpacted' | 'substituted';
 
 export class DefenseController {
   /** set by input: block held, and the timestamp+direction of the last
@@ -61,7 +67,7 @@ export class DefenseController {
    *  the caller apply FightCore state changes (keeps one mutation site).
    */
   resolve(atk: AttackDef, dist: number, blocking: boolean, nowMs: number, windows?: { impactMs?: number; parryMs?: number }): DefenseAction {
-    if (dist > atk.range) return 'none';
+    if (dist > atk.range) return 'outOfRange';
     const sincePress = nowMs - this.pressMs;
     // MOVEMENT PLAY P7 (2026-09-25): a BODY defender's windows are widened (bodyFight: guard impact 160, parry 200 ms);
     // no `windows` (every pad defender) = 90 / 160 as before
@@ -80,6 +86,11 @@ export class DefenseController {
   whiffImpact(nowMs: number): void {
     this.impactRecoveryUntil = nowMs + GUARD_IMPACT_RECOVERY_SEC * 1000;
   }
+
+  /** IMPROVE (2026-10-06): the read-and-punish window made real — what a strike that lands on this fighter is multiplied
+   *  by at `nowMs`: COUNTER_DAMAGE_MULT inside the vulnerability a substitution opened, 1 otherwise. Nothing read
+   *  `vulnerableUntil` before, so the punish the header promises never happened. */
+  counterMult(nowMs: number): number { return nowMs < this.vulnerableUntil ? COUNTER_DAMAGE_MULT : 1; }
 
   /** Spend the substitution: chi is deducted by the caller (FighterState). */
   spendSubstitution(nowMs: number): void {
@@ -105,7 +116,8 @@ export function applyDefenseOutcome(
   attacker: FighterState, defender: FighterState, atk: AttackDef,
 ): 'whiff' | 'blocked' | 'guardBreak' | 'parried' | 'guardImpacted' | 'substituted' | 'hit' {
   switch (action) {
-    case 'none': return 'whiff';
+    case 'outOfRange': return 'whiff';
+    case 'none': return 'hit';             // IMPROVE (2026-10-06): in range and undefended — the blow lands
     case 'blocked': {
       defender.guard -= atk.guardDmg;
       if (defender.guard <= 0) {

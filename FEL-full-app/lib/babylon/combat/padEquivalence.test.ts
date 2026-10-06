@@ -187,8 +187,14 @@ describe('pad equivalence — the fight rules', () => {
         else if (u < 0.45) { n.whiffImpact(now); o.whiffImpact(now); }
         else {
           const atk = pick(r, atks), dist = r() * 4, blocking = r() < 0.5;
-          expect(n.resolve(atk, dist, blocking, now)).toBe(o.resolve(atk, dist, blocking, now));
-          expect(n.resolve(atk, dist, blocking, now, undefined)).toBe(o.resolve(atk, dist, blocking, now));
+          // IMPROVE (2026-10-06): the ONE deliberate vocabulary change — a swing that cannot reach answered 'none' (the
+          // same word as "in range, undefended", which applyDefenseOutcome then turned into a whiff for both); it answers
+          // 'outOfRange' now. Every in-range answer is still the pre-P7 one, exactly.
+          const want = o.resolve(atk, dist, blocking, now);
+          if (dist > atk.range) expect(want).toBe('none');
+          const mapped = dist > atk.range ? 'outOfRange' : want;
+          expect(n.resolve(atk, dist, blocking, now)).toBe(mapped);
+          expect(n.resolve(atk, dist, blocking, now, undefined)).toBe(mapped);
         }
         expect(n.blocking).toBe(o.blocking);
         expect(n.canSubstitute(50, now)).toBe(o.canSubstitute(50, now));
