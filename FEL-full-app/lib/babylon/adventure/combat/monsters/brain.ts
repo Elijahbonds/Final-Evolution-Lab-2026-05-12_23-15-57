@@ -20,6 +20,9 @@ import { stickFor, type MonsterAttack, type MonsterDef } from './defs';
 /** How many monsters may wind up on one target at once: NeoCombatCore's ceiling at its third wave (3). [TUNE] */
 export const ATTACK_TOKENS = maxAttackers(3);
 
+/** How often a monster looks for a better target while it has one. [TUNE] */
+export const RETARGET_SEC = 0.3;
+
 export type BrainPhase = 'idle' | 'pursue' | 'windup' | 'strike' | 'recover' | 'retreat';
 export type BrainEvent = 'windup' | 'strike' | 'land' | null;
 
@@ -60,6 +63,8 @@ export class MonsterBrain {
   private landed = false;
   private hasToken = false;
   private reactionLeft = 0;
+  /** Seconds until the target is re-picked (a valid target is kept between picks: no spatial query every tick). */
+  private retargetSec = 0;
   private readonly side: 1 | -1;
 
   constructor(private readonly def: BrainDef, attacks: readonly MonsterAttack[], private readonly rng: () => number, seedSide = 1) {
@@ -91,7 +96,10 @@ export class MonsterBrain {
 
   private pickTarget(self: AdventureActor, world: AdventureWorld): AdventureActor | null {
     const cur = this.targetId ? world.actors.get(this.targetId) : undefined;
-    if (cur && isHostile(self, cur) && dist2(self, cur) <= (this.def.aggroM * 1.5) ** 2) return cur;
+    const keep = !!cur && isHostile(self, cur) && dist2(self, cur) <= (this.def.aggroM * 1.5) ** 2;
+    if (keep && this.retargetSec > 0) return cur!;
+    this.retargetSec = RETARGET_SEC;
+    if (keep) return cur!;
     let best: AdventureActor | null = null, bestD = this.def.aggroM * this.def.aggroM;
     for (const o of world.near(self.pos, this.def.aggroM)) {
       if (!isHostile(self, o) || o.kind === 'monster' || o.kind === 'boss') continue;
@@ -140,6 +148,7 @@ export class MonsterBrain {
     if (this.def.hoverM > 0) out.ascendHeld = self.pos.y < this.def.hoverM && this.phase !== 'strike';
 
     this.t += dt;
+    this.retargetSec -= dt;
     switch (this.phase) {
       case 'idle':
       case 'pursue': {

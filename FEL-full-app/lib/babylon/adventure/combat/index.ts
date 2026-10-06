@@ -70,6 +70,7 @@ export interface CombatSystem extends AdventureSystem {
   unregister(id: ActorId): void;
   /** The monsters' and bosses' movement intent from this step; A4 merges it into the next step's inputs. */
   readonly aiInputs: ReadonlyMap<ActorId, MoveInput>;
+  /** The tell in progress. The record is reused: read it now, do not keep it. */
   telegraphOf(id: ActorId): Telegraph | null;
   /** 1-based phase of a registered boss, 0 for anything else. */
   bossPhaseOf(id: ActorId): number;
@@ -120,6 +121,8 @@ export function createCombatSystem(opts: CombatSystemOptions = {}): CombatSystem
   const bodies: Body2[] = [];
   const bodyActors: AdventureActor[] = [];
   const hits: AdventureActor[] = [];
+  // One telegraph record, refilled per call (the view asks every frame for every monster: no allocation).
+  const tele: Telegraph = { attackId: '', label: '', kind: 'melee', phase: 'windup', tellSec: 0, t01: 0, lineX: 0, lineZ: 1, range: 0, arcDeg: 0 };
   const hintLock: CameraHint = { preset: 'lock', priority: 50 };
   const hintBoss: CameraHint = { preset: 'boss', priority: 60 };
   const hintBeat: CameraHint = { preset: 'boss', priority: 90 };
@@ -473,12 +476,11 @@ export function createCombatSystem(opts: CombatSystemOptions = {}): CombatSystem
     telegraphOf(id) {
       const brain = monsters.get(id)?.brain ?? bosses.get(id)?.brain;
       if (!brain || !brain.attack || !brain.attacking) return null;
-      const a = brain.attack;
-      return {
-        attackId: a.id, label: a.label, kind: a.kind, phase: brain.phase === 'windup' ? 'windup' : 'strike',
-        tellSec: a.tellSec, t01: brain.phase === 'windup' ? Math.min(1, brain.t / a.tellSec) : 1,
-        lineX: brain.lineX, lineZ: brain.lineZ, range: a.range, arcDeg: a.arcDeg,
-      };
+      const a = brain.attack, t = tele;
+      t.attackId = a.id; t.label = a.label; t.kind = a.kind; t.phase = brain.phase === 'windup' ? 'windup' : 'strike';
+      t.tellSec = a.tellSec; t.t01 = brain.phase === 'windup' ? Math.min(1, brain.t / a.tellSec) : 1;
+      t.lineX = brain.lineX; t.lineZ = brain.lineZ; t.range = a.range; t.arcDeg = a.arcDeg;
+      return t;
     },
 
     bossPhaseOf(id) { const b = bosses.get(id); return b ? b.phase + 1 : 0; },
