@@ -1,0 +1,82 @@
+'use client';
+
+// The season pass bar — the card's LEVEL UP. It fills from where the run started, and for every tier the run crossed it
+// fills to the end, flashes TIER UP with what that tier booked, and starts again (season-bar.ts rebuilds the start from the
+// server's own numbers). Instant (reduced motion, a skip): the final bar and the tier-up line, no travel.
+
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Crown } from 'lucide-react';
+import { pct, seasonFill, tierRewardWords } from './season-bar';
+import type { SeasonRecap } from './types';
+
+export function SeasonCard({ season, active, instant, ms, onTierUp }: {
+  season: SeasonRecap;
+  active: boolean;
+  instant: boolean;
+  ms: number;
+  onTierUp?: () => void;
+}) {
+  const fill = useMemo(() => seasonFill(season), [season]);
+  const last = fill.segments.length - 1;
+  // [segment, width %, transition on]
+  const [seg, setSeg] = useState(instant ? last : 0);
+  const [width, setWidth] = useState(instant ? pct(fill.segments[last].to, fill.segments[last].need) : pct(fill.segments[0].from, fill.segments[0].need));
+  const [glide, setGlide] = useState(false);
+  const [flash, setFlash] = useState<number | null>(null);
+  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const tierUpRef = useRef(onTierUp);
+  tierUpRef.current = onTierUp;
+
+  useEffect(() => {
+    for (const t of timers.current) clearTimeout(t);
+    timers.current = [];
+    if (instant) { setSeg(last); setGlide(false); setWidth(pct(fill.segments[last].to, fill.segments[last].need)); setFlash(null); return; }
+    if (!active) return;
+    const per = Math.max(120, Math.floor(ms / fill.segments.length));
+    let at = 0;
+    fill.segments.forEach((s, i) => {
+      timers.current.push(setTimeout(() => { setSeg(i); setGlide(false); setWidth(pct(s.from, s.need)); }, at));
+      timers.current.push(setTimeout(() => { setGlide(true); setWidth(pct(s.to, s.need)); }, at + 30));
+      if (s.crossed) {
+        timers.current.push(setTimeout(() => { setFlash(s.tier + 1); tierUpRef.current?.(); }, at + per - 40));
+      }
+      at += per;
+    });
+    return () => { for (const t of timers.current) clearTimeout(t); };
+  }, [active, instant, ms, fill, last]);
+
+  const cur = fill.segments[seg];
+  const lastUp = season.tierUps.length > 0 ? season.tierUps[season.tierUps.length - 1] : null;
+  const words = lastUp ? tierRewardWords(lastUp) : [];
+  const showUp = lastUp && (instant || flash !== null);
+  const remaining = Math.max(0, season.need - season.into);
+
+  return (
+    <div data-recap="season" data-tier-ups={season.tierUps.length} className="relative overflow-hidden rounded-2xl border border-[#FFD700]/30 bg-[#FFD700]/[0.07] p-[0.8em] text-left">
+      <div className="flex items-center justify-between gap-3">
+        <span className="flex items-center gap-2 font-bold text-[#FFD700]">
+          <Crown className="h-[1em] w-[1em]" /> {season.name}
+        </span>
+        <span className="font-mono text-white/75">+{Math.round(season.gained).toLocaleString('en-US')} season XP</span>
+      </div>
+      <div className="mt-[0.5em] flex items-center gap-3">
+        <span className="font-mono text-white/60">T{cur.tier}</span>
+        <div className="relative h-[0.6em] flex-1 overflow-hidden rounded-full bg-white/10" role="progressbar" aria-label="Season tier progress" aria-valuemin={0} aria-valuemax={season.need} aria-valuenow={season.into}>
+          <div
+            data-season-fill
+            className="h-full rounded-full bg-gradient-to-r from-[#FFB020] to-[#FFD700] shadow-[0_0_16px_rgba(255,215,0,0.6)]"
+            style={{ width: `${width}%`, transition: glide ? `width ${Math.max(100, Math.floor(ms / fill.segments.length) - 80)}ms cubic-bezier(0.16,0.8,0.3,1)` : 'none' }}
+          />
+        </div>
+        <span className="font-mono text-white/60">T{cur.tier + 1}</span>
+      </div>
+      {showUp ? (
+        <p data-season-tierup className="mt-[0.5em] text-center font-bold text-[#FFD700]" style={instant ? undefined : { animation: 'fel-rise 320ms cubic-bezier(0.2,1.4,0.4,1) both' }}>
+          TIER UP! Tier {lastUp!.tier}{words.length ? ` · ${words.join(' · ')}` : ''}
+        </p>
+      ) : (
+        <p className="mt-[0.4em] text-right font-mono text-[0.85em] text-white/55">{remaining.toLocaleString('en-US')} to Tier {season.tier + 1}</p>
+      )}
+    </div>
+  );
+}

@@ -84,12 +84,18 @@ describe('wallet client — the grant a report was paid', () => {
 
 describe('the shell\'s coins tile (components/games/game-shell.tsx)', () => {
   const shell = stripComments(fs.readFileSync(path.resolve(__dirname, '../../components/games/game-shell.tsx'), 'utf8'));
+  const card = stripComments(fs.readFileSync(path.resolve(__dirname, '../../components/games/end-screen/end-screen.tsx'), 'utf8'));
+  const reveal = stripComments(fs.readFileSync(path.resolve(__dirname, '../../components/games/end-screen/reveal.ts'), 'utf8'));
   it('no tile for a refused earn or a zero grant nothing capped; a capped coin earn says so instead of "+0"', () => {
     // ECONOMY-CAPS F-P1: hide +0 tiles on paid cards; coins tile only when coins > 0
     expect(shell).toContain('if (mine() && j?.paid === true)');
     expect(shell).toContain('const capped = Boolean(j?.coinsCapped);');
     expect(shell).toContain('const coins = Number.isFinite(j?.coins) ? Number(j.coins) : 0;');
-    expect(shell).toContain('recapCoins !== null && recapCoins.coins > 0');
-    expect(shell).toContain('{recap.xp > 0 &&');
+    // END SCREEN (2026-10-06): the tiles moved into components/games/end-screen; the shell hands the card recapCoins as it
+    // holds them, and the card keeps the rule (end-screen.test.tsx renders the zero / capped cases)
+    expect(shell).toContain('coins={recapCoins}');
+    expect(card).toContain('{coins && coins.coins > 0 && <RewardTile');
+    expect(card).toContain('{recap.xp > 0 && <RewardTile');
+    expect(reveal).toContain("if (d.coins && d.coins.coins > 0) out.push('coins');");
   });
 });
