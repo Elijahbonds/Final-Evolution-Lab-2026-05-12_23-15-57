@@ -18,8 +18,8 @@ import {
   wearablesForSlot, getWearable, type FaceConfig, type WearableSlot, type JerseyConfig,
 } from '@/lib/closet/wearable-catalog';
 import { faceFieldRenders, faceOptionRenders, type FaceField } from '@/lib/babylon/core/faceMorphs';
-import { accessoriesForEquipped } from '@/lib/closet/wearableAccessories';
-import { emptyCreatorDoc, type ColourSlot } from '@/lib/creator/look/doc';
+import { accessoriesForEquipped, wornPartsForEquipped } from '@/lib/closet/wearableAccessories';
+import { emptyCreatorDoc, type ColourSlot, type CreatorPart } from '@/lib/creator/look/doc';
 import { readCreatorDoc, faceOnly, type StoredFace } from '@/lib/creator/look/storage';
 import { effectivePalette } from '@/lib/creator/look/palette';
 import { canRedo, canUndo, createHistory, pushHistory, redo, resetHistory, undo, type History } from '@/lib/creator/look/history';
@@ -27,6 +27,8 @@ import { RANDOM_SECTIONS, RANDOM_SECTION_FIELDS, randomiseLook, type RandomSecti
 
 // The 3D preview is client-only (Babylon engine on a canvas) — never SSR it.
 const AvatarPreview = dynamic(() => import('@/components/closet/avatar-preview'), { ssr: false });
+// CREATOR-PLAN phase 2: the Parts tab (place generic shapes on any bone).
+const PartsTab = dynamic(() => import('@/components/closet/parts-tab').then((m) => m.PartsTab), { ssr: false });
 
 type Equipped = Record<WearableSlot, string | null>;
 type CardSkin = { id: string; displayName: string; accent: string; rarity: string };
@@ -117,7 +119,7 @@ export function ClosetView({ adult = false }: { adult?: boolean }) {
   const [owned, setOwned] = useState<Set<string>>(new Set());
   const [skins, setSkins] = useState<CardSkin[]>([]);
   const [skinCardId, setSkinCardId] = useState<string | null>(null);
-  const [tab, setTab] = useState<'face' | 'wear' | 'skins'>('face');
+  const [tab, setTab] = useState<'face' | 'parts' | 'wear' | 'skins'>('face');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [buying, setBuying] = useState<string | null>(null);
@@ -173,6 +175,7 @@ export function ClosetView({ adult = false }: { adult?: boolean }) {
   // the Creator doc's colours win, exactly as resolveIdentity does at spawn
   const previewPalette = useMemo(() => effectivePalette(itemPalette, doc?.colours), [itemPalette, doc]);
   const previewAccessories = useMemo(() => accessoriesForEquipped(equipped), [equipped]);
+  const previewWornParts = useMemo(() => wornPartsForEquipped(equipped), [equipped]);
   const previewFace = useMemo(() => faceOnly(face) as FaceConfig, [face]);
   const setF = (k: keyof FaceConfig, v: string) => setFace((p) => ({ ...p, [k]: v }));
   const setSlider = (k: string, v: number) => setFace((p) => ({ ...p, sliders: { ...(p.sliders ?? {}), [k]: v } }), `slider:${k}`);
@@ -183,6 +186,11 @@ export function ClosetView({ adult = false }: { adult?: boolean }) {
     if (hex) colours[slot] = hex.toUpperCase(); else delete colours[slot];
     return { ...p, creator: { ...d, colours } };
   }, hex ? `colour:${slot}` : undefined);
+  /** The Creator doc's parts (CREATOR-PLAN phase 2). A drag passes a group so it is one undo step. */
+  const setParts = (next: CreatorPart[], group?: string) => setFace((p) => {
+    const d = readCreatorDoc(p) ?? emptyCreatorDoc();
+    return { ...p, creator: { ...d, parts: next } };
+  }, group);
   const roll = () => setFace((p) => {
     const r = randomiseLook({ face: faceOnly(p) as FaceConfig, doc: readCreatorDoc(p) }, locks);
     return { ...p, ...r.face, ...(r.doc ? { creator: r.doc } : {}) };
@@ -262,7 +270,7 @@ export function ClosetView({ adult = false }: { adult?: boolean }) {
         <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
           {/* The actual game model (forged fel-hero) wearing the draft look —
               what you design here is what spawns in every mode. */}
-          <AvatarPreview face={previewFace} palette={previewPalette} jersey={jersey} wardrobe={{ tops: equipped.tops ?? null, shorts: equipped.shorts ?? null, shoes: equipped.shoes ?? null }} accessories={previewAccessories} creator={doc} />
+          <AvatarPreview face={previewFace} palette={previewPalette} jersey={jersey} wardrobe={{ tops: equipped.tops ?? null, shorts: equipped.shorts ?? null, shoes: equipped.shoes ?? null }} accessories={previewAccessories} creator={doc} wornParts={previewWornParts} />
           <div className="mt-3">
             <FacePreview face={face} accent={accent} />
           </div>
@@ -306,6 +314,7 @@ export function ClosetView({ adult = false }: { adult?: boolean }) {
         <div>
           <div className="mb-4 flex gap-2">
             <Chip label="Face" active={tab === 'face'} onClick={() => setTab('face')} />
+            <Chip label="Parts" active={tab === 'parts'} onClick={() => setTab('parts')} />
             <Chip label="Wearables" active={tab === 'wear'} onClick={() => setTab('wear')} />
             <Chip label="Card Skins" active={tab === 'skins'} onClick={() => setTab('skins')} accent="#A855F7" />
           </div>
@@ -364,6 +373,13 @@ export function ClosetView({ adult = false }: { adult?: boolean }) {
                   <button type="button" onClick={() => setFace((p) => ({ ...p, sliders: {} }))} className="text-[11px] text-cyan-300/80 hover:text-cyan-200">Reset sculpt</button>
                 </div>
               </Group>
+            </motion.div>
+          )}
+
+          {tab === 'parts' && (
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+              <PartsTab parts={doc?.parts ?? []} onChange={setParts} accent={previewPalette.accent}
+                canUndo={canUndo(hist)} canRedo={canRedo(hist)} onUndo={() => setHist(undo)} onRedo={() => setHist(redo)} />
             </motion.div>
           )}
 
