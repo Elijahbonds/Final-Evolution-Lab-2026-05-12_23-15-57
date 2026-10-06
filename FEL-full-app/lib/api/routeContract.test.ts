@@ -53,7 +53,10 @@ const PUBLIC_BY_DESIGN: Record<string, string> = {
   'controller-link/rooms/route.ts': 'phone pairing, authenticated by the room code + rate limit',
   'controller-link/signal/route.ts': 'pairing signal relay, rate limited',
   'v1/card/[slug]/route.ts': 'a published creator card is public by design (the card page is too)',
-  'v1/creative-card/[id]/route.ts': 'a published creative card is public in the same way a creator card is',
+  // CREATOR SOUNDTRACK (2026-10-06): the reason used to be "a published creative card is public", and the route never
+  // checked that. It now reads the session and answers a pending, rejected, private or minor's card only to its owner and
+  // the review staff (lib/creator/creative-card-review.test.ts pins it), so the entry stays only for the public read.
+  'v1/creative-card/[id]/route.ts': 'an approved, public card by an adult creator is public in the same way a creator card is; anything else answers only its owner and review staff',
   'onboarding/host/route.ts': 'a visitor who scanned a card has no session yet; returns only a published card\'s display name, signature mode and accent',
 };
 

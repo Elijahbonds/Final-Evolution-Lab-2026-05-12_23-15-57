@@ -8,7 +8,9 @@
  *   1. Unlicensed card  -> 422 (license gate is SERVER-enforced).
  *   2. Music/acting card -> pending_review + NOT public (moderation queue).
  *   3. Remix pays the PARENT creator a royalty (a real LEDGER ENTRY).
- *   4. Moderator approve -> card becomes public + publish faucet fires.
+ *   4. Approver approve -> card becomes public (creator asked, creator is 18+) + the one-time coin fires.
+ *   5. CREATOR SOUNDTRACK (owner, 2026-10-06): the coin is once per creator per discipline; a teen's card stays private;
+ *      a card asked to be public waits for review whatever its discipline.
  * Plus discipline validation guards (secondary rules, sport designation, art/kind).
  */
 
@@ -52,9 +54,9 @@ function baseInput(over: Partial<CreateCardInput> = {}): CreateCardInput {
   } as CreateCardInput;
 }
 
-async function mkUser(tag: string): Promise<string> {
+async function mkUser(tag: string, dobYear?: number): Promise<string> {
   const u = await prisma.user.create({
-    data: { email: `__cctest_${tag}_${Date.now()}@fel.test`, name: `CC ${tag}`, password: 'x' },
+    data: { email: `__cctest_${tag}_${Date.now()}@fel.test`, name: `CC ${tag}`, password: 'x', ...(dobYear ? { dobYear } : {}) },
     select: { id: true },
   });
   return u.id;
@@ -79,8 +81,8 @@ async function ledgerCount(userId: string, reasonCode: string): Promise<number> 
 
 async function main() {
   console.log('M28 CREATIVE CARD — server acceptance');
-  const alice = await mkUser('alice'); // creator / moderator target
-  const bob = await mkUser('bob');     // remixer
+  const alice = await mkUser('alice', 1990); // creator / moderator target (an adult: her approved work may be public)
+  const bob = await mkUser('bob', new Date().getFullYear() - 15);     // remixer (a teen: nothing of his is public)
   // These tests author many cards; grant ample slots so the 3-free cap doesn't
   // fire mid-suite (slot enforcement itself is covered by economy/catalog tests).
   await prisma.cardSlot.create({ data: { userId: alice, extra: 50 } });
@@ -133,7 +135,21 @@ async function main() {
       assert.equal(card.isPublic, false);
     });
 
-    // 4) Moderator approve -> public + publish faucet
+    // test changed (CREATOR SOUNDTRACK, owner 2026-10-06): a card asked to be public now waits for review in every
+    // discipline ("everything public needs approval"), so the art card below is pending and not public. It was approved
+    // and public at once, because art was not in NEEDS_REVIEW.
+    await check('an art card asked to be public waits for review and is NOT public', async () => {
+      const card = await createCard(prisma, alice, baseInput({ title: 'Public art' }));
+      assert.equal(card.reviewState, 'pending_review');
+      assert.equal(card.isPublic, false);
+    });
+    await check('a private art card is ready for its owner at once and stays private', async () => {
+      const card = await createCard(prisma, alice, baseInput({ title: 'Private art', isPublic: false }));
+      assert.equal(card.reviewState, 'approved');
+      assert.equal(card.isPublic, false);
+    });
+
+    // 4) Approver approve -> public + the one-time coin
     await check('approving a pending music card publishes it + fires faucet', async () => {
       const card = await createCard(prisma, alice, baseInput({
         primary: 'music',
@@ -146,6 +162,26 @@ async function main() {
       assert.equal(row?.isPublic, true);
       const after = await ledgerCount(alice, REASON.CREATIVE_CARD_PUBLISH);
       assert.ok(after > before, 'expected a publish faucet ledger entry after approval');
+    });
+    await check('a second approved music card pays nothing more (one coin per discipline)', async () => {
+      const card = await createCard(prisma, alice, baseInput({
+        primary: 'music',
+        art: { kind: 'music', trackId: 't3', stemUrls: ['https://x/s3.wav'], coverArtUrl: '', bpm: 100, keySignature: 'C' } as any,
+      }));
+      const before = await ledgerCount(alice, REASON.CREATIVE_CARD_PUBLISH);
+      await reviewCard(prisma, card.id, 'approved');
+      await reviewCard(prisma, card.id, 'approved');
+      assert.equal(await ledgerCount(alice, REASON.CREATIVE_CARD_PUBLISH), before);
+    });
+    await check("a teen's approved card stays private", async () => {
+      const card = await createCard(prisma, bob, baseInput({
+        primary: 'music',
+        art: { kind: 'music', trackId: 't4', stemUrls: [], coverArtUrl: '', bpm: 100, keySignature: 'C' } as any,
+      }));
+      const res = await reviewCard(prisma, card.id, 'approved');
+      assert.equal(res.isPublic, false);
+      const row = await prisma.creativeCard.findUnique({ where: { id: card.id } });
+      assert.equal(row?.isPublic, false);
     });
 
     // 3) Remix pays the PARENT creator a royalty ledger entry
