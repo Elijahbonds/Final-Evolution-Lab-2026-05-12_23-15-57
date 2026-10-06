@@ -18,6 +18,8 @@
 //     wrong more often and pays a style bonus on a goal, but each also adds
 //     a little shot wobble. Commitment tradeoff, not a free win.
 // Derby is unchanged from M43 apart from riding the same file.
+// (IMPROVE 2026-10-06: the TENNIS described above was never the live one — the registry serves TennisMode.ts — and is
+// deleted from this file; golf, derby and penalty are what it holds.)
 
 import { kickPips, type KickResult } from '../core/penaltyHud';
 import { freshDerby, bankSwing, distanceLine, OUTS_CAP, type DerbyTally } from '../core/derbyHud';
@@ -34,7 +36,7 @@ import type { SpawnedCharacter } from '../core/CharacterLibrary';
 import { assertSpawned } from '../core/FrameGuard';
 import {
   spawnAthlete, Reticle, PowerMeter, Flight, swingQuality, swingSide,
-  buildTennisNet, buildGolfGreen, buildPlateAndMound, buildGoal, buildBallparkOutfield, spawnFoe } from './aimSwingCore';
+  buildGolfGreen, buildPlateAndMound, buildGoal, buildBallparkOutfield, spawnFoe } from './aimSwingCore';
 import { SPORT_CLIP } from '../anim/clipRegistry';
 import { BeatOwner } from '../anim/beatOwner';
 import { registerMirroredClips } from '../anim/mirrored-clips';
@@ -123,149 +125,9 @@ export const HOLED_M = 1.6;
 export const SWING_STICK = 0.6;
 
 // ════════════════════════════════════════════════════════════════ TENNIS ══
-// ⚠️ DEAD CODE — NOT THE TENNIS THE GAME RUNS.
-//
-// The registry imports Tennis from `./TennisMode` (the M74 net-sport core) and
-// takes only Golf, Derby and Penalty from this file; its own import line says
-// "M74 net-sport replaces precision tennis". This implementation is unreachable.
-//
-// Unlike the dead `GolfMode.ts`, it is NOT excluded in tsconfig, so it
-// type-checks and reads as live code. Editing it changes nothing in the game.
-// Kept rather than deleted because it is a working reference for the rally feel
-// described at the top of this file; git has it either way if it should go.
-export const TennisMode: ModeDefinition = (() => {
-  let me: SpawnedCharacter, opponent: SpawnedCharacter;
-  let furniture: AbstractMesh[] = [];
-  let ball: AbstractMesh, flight: Flight;
-  let round = 0, pts = 0, stickX = 0, stickY = 0;
-  let incoming = false, swung = false, ended = false;
-  let rally = 0;                                 // exchanges in the current point
-  let awaitingOpponent = false;                  // ball is on its way to them
-  const TOTAL = 7;
-
-  function serve(ctx: ModeContext): void {
-    round++;
-    swung = false; incoming = true; awaitingOpponent = false; rally = 0;
-    const clutch = round === TOTAL;
-    const targetX = ((round * 37) % 7) - 3;
-    ball.position.set(targetX * 0.4, 1.2, 11);
-    flight.launch(ball.position, new Vector3((targetX - ball.position.x) * 0.12, 2.2, -10.5 - round * 0.4));
-    opponent.root.position.set(targetX * 0.4, 0, 11);
-    ctx.setHud({ round: `${round}/${TOTAL}`, rally: 0, hint: clutch ? 'MATCH POINT — build the rally, then put it away' : 'SWING as the ball reaches you · stick UP = topspin · stick DOWN = lob' });
-  }
-
-  /** The opponent tries to return what you just hit. Better swings from you
-   *  (and deeper rallies) make their get harder — that's how points END. */
-  function opponentReturn(ctx: ModeContext, myQuality: number, topspin: boolean): void {
-    awaitingOpponent = true;
-    const reach = Math.max(0.1, 0.85 - myQuality * 0.35 - rally * 0.06 - (topspin ? 0.12 : 0));
-    setTimeout(() => {
-      if (ended) return;
-      awaitingOpponent = false;
-      if (Math.random() < reach) {
-        // they got it back — the rally continues
-        rally++;
-        SoundKit.play('impact', { pitch: 1.4, volume: 0.25 });
-        opponent.animator.play(SPORT_CLIP.tennisForehand, { onEnd: () => opponent.animator.play(SPORT_CLIP.tennisIdle, { loop: true }) });
-        const targetX = (Math.random() * 8) - 4;
-        ball.position.set(opponent.root.position.x, 1.2, 11);
-        flight.launch(ball.position, new Vector3((targetX - ball.position.x) * 0.14, 2.1 + rally * 0.05, -10.5 - rally * 0.6));
-        incoming = true; swung = false;
-        ctx.setHud({ rally, banner: rally >= 3 ? `RALLY x${rally}` : '' });
-        if (rally >= 3) setTimeout(() => ctx.setHud({ banner: '' }), 500);
-      } else {
-        // winner! bank the point at the rally multiplier
-        const clutch = round === TOTAL;
-        const mult = Math.max(1, rally) * (clutch ? CLUTCH_MULT : 1);
-        const gained = Math.round((10 + myQuality * 15) * mult);
-        pts += gained;
-        SoundKit.play('score', { pitch: 1.1 });
-        SoundKit.play('crowdCheer', { volume: Math.min(0.7, 0.25 + rally * 0.1) });
-        ctx.setHud({ score: pts, banner: rally >= 2 ? `WINNER — RALLY x${rally}! +${gained}` : `WINNER! +${gained}` });
-        setTimeout(() => {
-          ctx.setHud({ banner: '' });
-          if (round >= TOTAL) { ended = true; SoundKit.play('whistle'); ctx.end('MATCH_END', pts, { rounds: TOTAL }); return; }
-          serve(ctx);
-        }, 1100);
-      }
-    }, 650 + Math.random() * 300);
-  }
-
-  return {
-    modeId: 'tennis', mood: 'goldenHour', camPreset: 'court',
-
-    async load(ctx: ModeContext) {
-      VenueKit.buildField(ctx.scene, 'tennis');
-      EffectsKit.ambient(ctx.scene, 'park');
-      furniture = buildTennisNet(ctx.scene);
-      me = await spawnAthlete(ctx, CFG.heroUrl, new Vector3(0, 0, -10.5), 0, SPORT_CLIP.tennisIdle);
-      opponent = await spawnFoe(ctx, CFG.heroUrl, new Vector3(0, 0, 11), Math.PI, SPORT_CLIP.tennisIdle);
-      ctx.heroRef.current = me.root;                 // spawnAthlete sets heroRef on each call — reassert the player
-      ball = MeshBuilder.CreateSphere('tball', { diameter: 0.14 }, ctx.scene);
-      void dressBall(ball, 'tennis');   // Meshy ball skin rides the sphere (visual only)
-      flight = new Flight(ball, -8.5);
-      ctx.objectiveRef.current = ball.position;
-      ctx.camDirector.setFixedBehind(me.root.position, 0, 'swing');
-      assertSpawned(ctx.scene, { hero: me.root, minWorldMeshes: 5, modeId: 'tennis' });
-      round = 0; pts = 0; ended = false;
-      SoundKit.startAmbient('stadium');
-      ctx.setHud({ score: 0 });
-      serve(ctx);
-    },
-
-    onInput(ctx: ModeContext, e: FelInput) {
-      SoundKit.unlock();
-      if (e.t === 'stick' && e.side === 'L') { stickX = e.x; stickY = e.y; }
-      if (e.t === 'button' && e.btn === 'A' && e.pressed && incoming && !swung) {
-        swung = true;
-        SoundKit.play('whoosh');
-        me.animator.play(SPORT_CLIP.tennisForehand, {});
-        const q = swingQuality(ball.position.z, me.root.position.z + 0.8, 10.5, 0.34);
-        if (q <= 0) return;                        // early whiff — ball still incoming
-        incoming = false;
-        ctx.feel?.impact?.(0.2 + q * 0.3);
-        // Wii-style: the stick AT CONTACT is the swing — X steers the shot,
-        // Y picks the shot shape (up = topspin, down = lob)
-        const topspin = stickY < -0.35;
-        const lob = stickY > 0.35;
-        SoundKit.play('impact', { pitch: topspin ? 1.5 : lob ? 0.9 : 1.2, volume: 0.3 });
-        flight.launch(ball.position, new Vector3(
-          stickX * 4.5,
-          lob ? 6.5 : topspin ? 3 : 4 + q * 2,
-          (topspin ? 16 : lob ? 10 : 13) + q * 4,
-        ));
-        ctx.setHud({ shotShape: topspin ? 'TOPSPIN' : lob ? 'LOB' : 'DRIVE' });
-        opponentReturn(ctx, q * (lob ? 0.75 : 1), topspin);
-      }
-    },
-
-    update(ctx: ModeContext, dt: number) {
-      if (ended) return;
-      flight.step(dt);
-      // opponent shuffles toward the ball's x while it's coming to them
-      if (awaitingOpponent) {
-        opponent.root.position.x += (ball.position.x - opponent.root.position.x) * 2.5 * dt;
-        opponent.root.position.x = Math.max(-5, Math.min(5, opponent.root.position.x));
-      }
-      me.root.position.x += (ball.position.x - me.root.position.x) * (incoming ? 2.2 : 0) * dt + stickX * 3 * dt;
-      me.root.position.x = Math.max(-5, Math.min(5, me.root.position.x));
-      if (incoming && ball.position.z <= me.root.position.z - 0.6) {
-        // the ball got past you — the point is over, no bank
-        incoming = false;
-        SoundKit.play('miss');
-        ctx.setHud({ banner: rally >= 2 ? `RALLY LOST — x${rally} gone` : 'MISS', rally: 0 });
-        setTimeout(() => {
-          ctx.setHud({ banner: '' });
-          if (round >= TOTAL) { ended = true; SoundKit.play('whistle'); ctx.end('MATCH_END', pts, { rounds: TOTAL }); return; }
-          serve(ctx);
-        }, 900);
-      }
-      ctx.camDirector.update(me.root.position, Vector3.Zero(), ball.position);
-    },
-
-    dispose() { me?.dispose(); opponent?.dispose(); furniture.forEach((f) => f.dispose()); ball?.dispose(); SoundKit.stopAmbient(); },
-  };
-})();
+// IMPROVE (2026-10-06, Golf #20): the dead precision TennisMode that sat here is deleted (owner-picked). The registry
+// has taken tennis from `./TennisMode` (the M74 net-sport core) since M74; this one was unreachable, type-checked and
+// read as live code. `git log -S "precision TennisMode"` finds it if its rally feel is ever wanted as a reference.
 
 // ══════════════════════════════════════════════════════════════════ GOLF ══
 export const GolfMode: ModeDefinition = (() => {
