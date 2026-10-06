@@ -3,12 +3,12 @@
 // textures, so scenes are FULL today; GLB venue pieces can replace parts later.
 
 import {
-  Color3, DynamicTexture, Mesh, MeshBuilder, StandardMaterial, PBRMaterial, Texture, TransformNode, Vector3,
+  Color3, DynamicTexture, Mesh, MeshBuilder, StandardMaterial, PBRMaterial, Texture, TransformNode, Vector3, VertexBuffer,
 } from '@babylonjs/core';
 import type { Scene } from '@babylonjs/core';
 import type { GrindLine } from '../core/GroundRide';
 import { applyFloorDetailToMesh, floorDetailFor } from './groundTextures';
-import { paintCrowdStand, paintTurf, paintTrack } from './PlacePack';
+import { paintCrowdStand, paintTurf, paintTrack, paintTrackTile } from './PlacePack';
 
 /** Venue props are PBR now (Phase 1, 2026-09-03): they take the procedural IBL
  *  and the tier's shadows like the hero does. Matte by default; the emissive
@@ -31,6 +31,8 @@ function paintedGround(
   scene: Scene, w: number, l: number, base: string,
   paint: (ctx: CanvasRenderingContext2D, W: number, H: number) => void,
   texSize: [number, number] = [1024, 1024],
+  /** IMPROVE (2026-10-06): `glow: false` skips the baked centre glow whatever the size (a tile or a patch is not a venue). */
+  opts: { glow?: boolean } = {},
 ): Mesh {
   const ground = MeshBuilder.CreateGround('venue_ground', { width: w, height: l }, scene);
   const [TW, TH] = texSize;
@@ -53,7 +55,7 @@ function paintedGround(
   // So it scales with the ground's own size and is gone entirely past GLOW_MAX_M. Small venues are
   // unchanged; a field keeps its texture and loses the blob.
   const span = Math.max(w, l);
-  const glowK = Math.max(0, Math.min(1, (GLOW_MAX_M - span) / (GLOW_MAX_M - GLOW_FULL_M)));
+  const glowK = opts.glow === false ? 0 : Math.max(0, Math.min(1, (GLOW_MAX_M - span) / (GLOW_MAX_M - GLOW_FULL_M)));
   if (glowK > 0) {
     const glow = ctx.createRadialGradient(TW / 2, TH / 2, 60, TW / 2, TH / 2, 640);
     glow.addColorStop(0, `rgba(255,255,255,${(0.10 * glowK).toFixed(3)})`);
@@ -364,11 +366,39 @@ export const VenueKit = {
     const grass = paintedGround(scene, 44, len + 30, turf, (ctx, W, H) => paintTurf(ctx, W, H, { base: turf, stripes: 16, stripeDepth: 0.1, seed: 5 }));
     grass.name = 'venue_infield'; grass.position.set(0, -0.02, cz); grass.isPickable = false;
     applyFloorDetailToMesh(scene, grass, { kind: 'grass', blend: 0.35 }, [44, len + 30]);
-    const tw = 256, th = Math.round(256 * len / width);   // ~24 px a metre: lane lines and numbers stay crisp down a 138 m strip
-    const track = paintedGround(scene, width, len, tartan, (ctx, W, H) => paintTrack(ctx, W, H, {
-      size: [width, len], center: [cx, cz], laneEdges: edges, startZ: 0, finishZ: -raceDist, color: tartan,
-    }), [tw, th]);
+    // IMPROVE (2026-10-06): RIGHT-SIZED. This was one 256 × (256·len/width) ≈ 256 × 3333 px canvas (~24 px a metre),
+    // non-power-of-two, painted on the CPU and uploaded with its mips (≈4.5 MB, unmeasured). Everything on the straight
+    // but its two ends repeats every 10 m, so the strip is ONE 256² tile repeated down it (the 10 m ticks on the marks from
+    // the start line, ~25 px a metre), and the start (line, lane numbers) and the finish are painted at the same ~24 px a
+    // metre on two 3 m patches laid over it. ≈0.6 MB in all; the look is the same paint.
+    const TILE_M = 10;
+    const track = paintedGround(scene, width, len, tartan, (ctx, W, H) => paintTrackTile(ctx, W, H, {
+      width, centerX: cx, laneEdges: edges, color: tartan,
+    }), [256, 256], { glow: false });
     track.position.set(cx, 0, cz);
+    // v runs 0 → 1 from the far (−z) end to the near; t = v·(len / TILE_M) + off repeats the tile, and `off` puts the tile's
+    // middle row (its ticks) on every 10 m mark counted from the start line (z = 0): t(0) ≡ 0.5
+    const uv = track.getVerticesData(VertexBuffer.UVKind);
+    if (uv) {
+      const rep = len / TILE_M, off = 0.5 - (len / 2 - cz) / TILE_M;
+      const out = Array.from(uv);
+      for (let i = 1; i < out.length; i += 2) out[i] = out[i] * rep + off;
+      track.setVerticesData(VertexBuffer.UVKind, out);
+    }
+    const trackTex = (track.material as PBRMaterial).albedoTexture;
+    if (trackTex) trackTex.wrapV = Texture.WRAP_ADDRESSMODE;
+    // the two ends, painted by the strip's own painter over just their 3 m (its specks pro rata), drawn over the tile
+    const patch = (zNear: number, zFar: number, name: string): void => {
+      const pl = zNear - zFar, pz = (zNear + zFar) / 2;
+      const m = paintedGround(scene, width, pl, tartan, (ctx, W, H) => paintTrack(ctx, W, H, {
+        size: [width, pl], center: [cx, pz], laneEdges: edges, startZ: 0, finishZ: -raceDist, color: tartan,
+        speckles: Math.round(1800 * pl / len),
+      }), [256, Math.round(256 * pl / width)], { glow: false });
+      m.name = name; m.position.set(cx, 0, pz); m.isPickable = false;
+      if (m.material) m.material.zOffset = -2;   // coplanar with the strip: drawn over it, never z-fighting it
+    };
+    patch(2.4, -0.6, 'venue_track_start');
+    patch(-raceDist + 0.6, -raceDist - 2.4, 'venue_track_finish');
     const box = venueBox(scene, 44, len + 30, 7, [paintBleachers(CROWD)]);
     box.position.z = cz;
   },
