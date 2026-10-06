@@ -101,6 +101,8 @@ export default function ShowdownBabylon({ onEnd }: GameProps) {
             <span className="fel-panel px-2 py-0.5 text-cyan-300">HP {hnum(hud.hp, 100)}</span>
             <span className="fel-panel px-2 py-0.5 text-yellow-400">GUARD {hnum(hud.guard, 100)}</span>
             <span className="fel-panel px-2 py-0.5 text-purple-400">CHI {hnum(hud.chi, 0)}</span>
+            {/* IMPROVE (2026-10-06): the assist's cooldown — the mode sent it every frame and nothing drew it */}
+            <span className="fel-panel px-2 py-0.5 text-sky-300">ASSIST {hnode(hud.assist, 'READY')}</span>
           </div>
           <div className="text-center">
             <span className="fel-heading text-xl font-black">ROUND {hnode(hud.round, 1)}</span>
