@@ -14,6 +14,12 @@ export type AmbientKind = 'stadium' | 'dojo' | 'ocean' | 'wind' | 'none';
  *  bed only over a mode that has not chosen one; a mode that chose any bed in load(), 'none' included, keeps it. */
 export function shouldStartMoodBed(current: AmbientKind | null): boolean { return current === null; }
 
+/** AMBIENT FIX (2026-10-06): the harness's per-frame momentum swell (setAmbientLevel(crowdLevel(score))) is a CROWD
+ *  reacting, so it applies to the crowd bed only. 'stadium' is the crowd; 'dojo' is a room tone (brown noise
+ *  band-passed at 220 Hz, gain 0.025 — "a martial-arts room tone", precisionModes), 'wind' and 'ocean' are weather.
+ *  They stay at their base gain: wind does not blow 2.55x harder because the player is on a streak. */
+export function momentumScalesBed(kind: AmbientKind | null): boolean { return kind === 'stadium'; }
+
 // THE IMPACT VOCABULARY (2026-09-14). The kit shipped with nine cues and every physical contact in the
 // game — a body hitting the floor, a ball off the iron, a shoe stopping hard, a ball through the net —
 // played the SAME `impact` with a different pitch. Nine sounds cannot carry a sports game: a rim rattle and
@@ -470,6 +476,8 @@ class SoundKitImpl {
   startVenueAmbient(kind: AmbientKind): void {
     if (shouldStartMoodBed(this.ambientAsked)) this.startAmbient(kind);
   }
+  /** Whether the bed playing now follows momentum (momentumScalesBed) — the harness's per-frame crowd swell asks. */
+  bedFollowsMomentum(): boolean { return momentumScalesBed(this.ambientAsked); }
 }
 
 const MASTER_GAIN = 0.55;

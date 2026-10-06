@@ -11,7 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { FakeAudioContext, installFakeWebAudio, type FakeWebAudio } from '../music/fakeWebAudio';
 import { stripComments } from '@/lib/testing/sourceScan';
-import { shouldStartMoodBed, type AmbientKind } from './SoundKit';
+import { momentumScalesBed, shouldStartMoodBed, type AmbientKind } from './SoundKit';
 
 let fake: FakeWebAudio;
 
@@ -119,6 +119,25 @@ describe('startVenueAmbient — the harness bed defers to a mode-owned bed', () 
   });
 });
 
+describe('momentumScalesBed — only a crowd swells with momentum (TUNED 2026-10-06)', () => {
+  it("'stadium' (the crowd) follows momentum", () => {
+    expect(momentumScalesBed('stadium')).toBe(true);
+  });
+  it("wind, ocean, the dojo room tone, 'none' and no bed stay at their base gain", () => {
+    for (const k of ['wind', 'ocean', 'dojo', 'none', null] as (AmbientKind | null)[]) expect(momentumScalesBed(k), String(k)).toBe(false);
+  });
+  it('bedFollowsMomentum reads the bed playing now, and a teardown clears it', async () => {
+    const { SoundKit } = await freshKit();
+    expect(SoundKit.bedFollowsMomentum()).toBe(false);
+    SoundKit.startAmbient('wind');
+    expect(SoundKit.bedFollowsMomentum()).toBe(false);
+    SoundKit.startAmbient('stadium');
+    expect(SoundKit.bedFollowsMomentum()).toBe(true);
+    SoundKit.stopAmbient();
+    expect(SoundKit.bedFollowsMomentum()).toBe(false);
+  });
+});
+
 describe('the harness consults it (source scan)', () => {
   const ROOT = path.resolve(__dirname, '../../..');
   const harness = stripComments(fs.readFileSync(path.join(ROOT, 'lib/babylon/core/ModeHarness.ts'), 'utf8'));
@@ -138,6 +157,11 @@ describe('the harness consults it (source scan)', () => {
     const first = fnBody('firstInput');
     expect(first).toMatch(/SoundKit\.startVenueAmbient\(bed\);/);
     expect(first).not.toMatch(/SoundKit\.startAmbient\(/);
+  });
+
+  it("the per-frame momentum swell is gated on the bed being a crowd (and still skipped for a mode that ownsCrowd)", () => {
+    expect(harness).toMatch(/if \(!def\.ownsCrowd && SoundKit\.bedFollowsMomentum\(\)\) SoundKit\.setAmbientLevel\(crowdLevel\(momentum\.score01\)\);/);
+    expect([...harness.matchAll(/SoundKit\.setAmbientLevel\(/g)]).toHaveLength(1);
   });
 
   it('nothing else in the harness starts a bed, and teardown still silences it (which also resets the choice)', () => {
