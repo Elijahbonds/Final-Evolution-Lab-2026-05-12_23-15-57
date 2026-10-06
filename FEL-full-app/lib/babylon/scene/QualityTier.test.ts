@@ -153,7 +153,7 @@ describe('tierRigSettings', () => {
   });
   it('mobile drops SSAO, sharpen and cascades and shrinks the shadow map', () => {
     const s = tierRigSettings('mobile', 'goldenHour');
-    expect(s).toEqual({ shadowMapSize: 512, cascaded: false, sharpen: false, bloomScaleMul: 0.7, ssao: false, msaaSamples: 1, fxaa: true, glow: false, venueProbe: false });
+    expect(s).toEqual({ shadowMapSize: 512, cascaded: false, sharpen: false, bloomScaleMul: 0.7, ssao: false, msaaSamples: 1, fxaa: true, glow: false, venueProbe: false, shadowCache: true });
   });
   it('desktop cascades only outdoors', () => {
     expect(tierRigSettings('desktop', 'goldenHour').cascaded).toBe(true);

@@ -8,7 +8,8 @@ import {
 import type { AbstractMesh, PBRMaterial, StandardMaterial } from '@babylonjs/core';
 import { MOODS, type VenueMood, type MoodCurves } from './moods';
 import { tierRigSettings, legacyRig, type QualityTier } from './QualityTier';
-import { isLegacyLook } from './graphicsSetting';
+import { isLegacyLook, readShadowCacheParam } from './graphicsSetting';
+import { mountShadowCache, shadowCacheWanted, gpuCanCopyShadowMap, type ShadowCacheHandle } from './ShadowCache';
 import { mountKickerLight, type KickerHandle } from './KickerLight';
 import { mountEmissiveGlow, type GlowHandle } from './EmissiveGlow';
 import { captureVenueReflection, type VenueReflectionHandle } from './VenueReflection';
@@ -43,6 +44,9 @@ export interface LightRigHandle {
   captureVenue(at?: Vector3 | null): boolean;
   /** The venue capture, once taken (high tier). */
   readonly venueProbe: VenueReflectionHandle | null;
+  /** A9.10: the cached static shadows (ShadowCache.ts) — the phones' single map; null elsewhere. Armed by
+   *  captureVenue (the harness calls it once load() is done). Its setRefreshEvery is the perf governor's shadow lever. */
+  shadowCache: ShadowCacheHandle | null;
   dispose(): void;
 }
 
@@ -132,7 +136,11 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
   // Pass 7 follow-up (2026-09-06): the engine's real draw counter showed ~8 draws per active mesh — every caster is drawn
   // again into each cascade. Scenery that can never throw a useful shadow stays out of the map: the scanned venue maps and
   // seas (bounding radius > 25 m), the sky and backdrop domes, the boardwalk flats, the gulls, the contact-shadow discs.
-  const NEVER_CAST = /^(vb_|bk_|nexus_sky|sky|fel_ground|venue_props_)|_contact$|_gull_|nexus_venue_map/i;
+  // A9.10 (2026-10-06): HUD-in-the-world and light sprites joined the list. The shadow cache's per-frame breakdown on
+  // the dunk named them: 24 phone-flash discs, the 5 shot-meter planes, the player ring and its glyph tag, the 4 gulls —
+  // 35 draws into the shadow map every frame, for a camera flash throwing a shadow (it is light), a gauge shadowing the
+  // court and a ring shadowing the floor it lies on.
+  const NEVER_CAST = /^(vb_|bk_|nexus_sky|sky|fel_ground|venue_props_|phone_flash_|shot_meter|player_ring|player_tag|gull_\d)|_contact$|_gull_|nexus_venue_map/i;
   // FOLIAGE DOES NOT CAST (2026-09-12). Measured on 1v1 with SceneInstrumentation: 377 shadow
   // casters against 150 active meshes, and 377 x 3 cascades accounts for essentially all 1136 draw
   // calls — the draw budget IS the shadow pass. Grouping the casters by name showed the bulk is
@@ -164,6 +172,12 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
   };
   for (const m of scene.meshes as AbstractMesh[]) classify(m);
   const autoObserver = scene.onNewMeshAddedObservable.add((m) => classify(m as AbstractMesh));
+
+  // A9.10: the static scenery's shadow is drawn once, not every frame (ShadowCache.ts). Mounted now, armed after load.
+  const shadowCache = shadowCacheWanted({
+    tierWants: T.shadowCache, cascaded: T.cascaded, legacy, param: readShadowCacheParam(),
+    gpuCanCopy: gpuCanCopyShadowMap(scene.getEngine()),
+  }) ? mountShadowCache(scene, shadows, sun) : null;
 
   const pipeline = new DefaultRenderingPipeline('fel_pipeline', true, scene, scene.cameras);
   pipeline.imageProcessing.toneMappingEnabled = true;
@@ -202,13 +216,14 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
 
   let flashObs: ReturnType<Scene['onBeforeRenderObservable']['add']> | null = null;
   return {
-    hemi, sun, shadows, pipeline, tier, mood, kicker, glow, rest,
+    hemi, sun, shadows, pipeline, tier, mood, kicker, glow, rest, shadowCache,
     adoptRest() {
       if (legacy) return;   // the pre-pass harness kept the mood's grade as its rest, whatever load() wrote
       rest.exposure = pipeline.imageProcessing.exposure;
       rest.vignette = pipeline.imageProcessing.vignetteWeight;
     },
     captureVenue(at) {
+      shadowCache?.arm();   // load() is done: the venue's casters are in — watch, then bake the still ones once
       if (!T.venueProbe) return false;
       const where = at?.clone() ?? null;
       scene.executeWhenReady(() => {
@@ -239,6 +254,7 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
       if (autoObserver) scene.onNewMeshAddedObservable.remove(autoObserver);
       if (flashObs) scene.onBeforeRenderObservable.remove(flashObs);
       if ((scene.metadata as { felGradeOwner?: string } | null)?.felGradeOwner === 'rig') delete scene.metadata.felGradeOwner;
+      shadowCache?.dispose();
       kicker?.dispose();
       glow?.dispose();
       venueProbe?.dispose();

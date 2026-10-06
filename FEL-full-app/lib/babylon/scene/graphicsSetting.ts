@@ -47,6 +47,9 @@ function query(name: string): string | null {
 /** `?tier=` for this load, or null. Parsed by QualityTier.tierFromName. */
 export function readTierParam(): string | null { return query('tier'); }
 
+/** `?shadowcache=0|1` for one load: the A/B switch for the cached static shadows (ShadowCache.ts). */
+export function readShadowCacheParam(): string | null { return query('shadowcache'); }
+
 /** `?look=legacy`: the shared look as it shipped before the visual-foundation pass (screenshots, the owner's A/B). */
 export function isLegacyLook(): boolean { return query('look') === 'legacy'; }
 
