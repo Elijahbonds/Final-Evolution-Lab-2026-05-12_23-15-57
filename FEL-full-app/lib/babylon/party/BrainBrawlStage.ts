@@ -50,6 +50,9 @@ export const HOST_CENTRE = new Vector3(0, 0, -2.4);
 
 const TAU = Math.PI * 2;
 const hex = (h: string) => Color3.FromHexString(h);
+// IMPROVE (2026-10-06, #14): the colours the per-frame tick scales, parsed once — the tick parsed '#ffe7a3' twice and
+// '#8b7bff' once every frame, and the lectern '#ff2d55' every frame of a punch. Read-only: the tick writes through *ToRef.
+const BULB_GLOW = hex('#ffe7a3'), MARQUEE_GLOW = hex('#8b7bff'), BUZZ_GLOW = hex('#ff2d55');
 
 /** A canvas painted once into a texture (never cloned: a cloned DynamicTexture is never ready and the material never draws). */
 function painted(scene: Scene, name: string, w: number, h: number, draw: (g: CanvasRenderingContext2D, w: number, h: number) => void, alpha = false): DynamicTexture {
@@ -462,7 +465,7 @@ function buildLectern(scene: Scene, seat: number, color: string): Lectern {
       punch = Math.max(0, punch - dt * 4);
       const s = 1 + Math.sin(punch * Math.PI) * 0.35;
       buzzer.scaling.set(s, 1 / s, s);
-      buzzMat.emissiveColor = hex('#ff2d55').scale(0.35 + punch * 1.6);
+      BUZZ_GLOW.scaleToRef(0.35 + punch * 1.6, buzzMat.emissiveColor);
     },
   };
 }
@@ -494,7 +497,25 @@ export interface StageHandle {
   flash(hexColor: string, k?: number): void;
   /** Per frame: the flapper, the bulbs, the wall. `spinning` is the wheel's angular speed (rad/s). Returns true on a peg tick. */
   tick(dt: number, spinSpeed: number): boolean;
+  /** IMPROVE (2026-10-06, #19): freeze the materials of the set that never change. Call once the harness has finished with
+   *  the scene's materials (it lifts near-black albedos right AFTER load — a material frozen before that keeps the old value). */
+  freezeStatic(): void;
 }
+
+/**
+ * IMPROVE (2026-10-06, #19): what of the set never moves or changes. The world matrices freeze at build: the LED wall, its
+ * header, the deck, the galleries, the wheel's column, plinth, marquee ring and back plate (on the frame, which never turns),
+ * and the beams. NOT the wheel (it spins), the flapper and pin (the pegs kick them), the risers and lecterns (restage moves
+ * them with the canvas's shape) or anything on them.
+ */
+const STATIC_MESH = /^(bb_wall_|bb_deck$|bb_gallery_|bb_wheel_(column|plinth|marquee|back)$|bb_beam_)/;
+/**
+ * The materials that never change once built, frozen later (freezeStatic). NOT the wall wings and centre (they wash and
+ * breathe), the bulbs and marquee (they chase), the lectern crowns, rings and buzzers (the state light, the punch), the
+ * screens (their texture redraws) or the beams (their visibility breathes, and a frozen material stops binding it) — and
+ * nothing that RECEIVES shadows (the deck, the gallery steps, the riser caps), whose shadow binding stays live.
+ */
+const STATIC_MAT = /^(bb_wall_header_mat|bb_gallery_fascia_mat|bb_chrome|bb_gold|bb_stand|bb_pin_mat|bb_wheel_face_mat|bb_riser_mat_\d|bb_lectern_mat_\d)$/;
 
 export function buildStage(scene: Scene, seatColors: readonly string[]): StageHandle {
   const wall = buildWall(scene);
@@ -511,22 +532,31 @@ export function buildStage(scene: Scene, seatColors: readonly string[]): StageHa
   ];
   let wash = 0, washColor = hex('#ffffff'), t = 0, flapA = 0, flapV = 0, lastPeg = Math.floor(w.root.rotation.z / (TAU / 5));
   const baseGlow = wall.mats.map((m) => m.emissiveColor.clone());
+  for (const m of scene.meshes) if (STATIC_MESH.test(m.name)) m.freezeWorldMatrix();
+  let frozen = false;
   return {
     wheel: w.root, lecterns, crowd,
     flash(hexColor, k = 1) { wash = k; washColor = hex(hexColor); },
+    freezeStatic() {
+      if (frozen) return; frozen = true;
+      for (const m of scene.materials) if (STATIC_MAT.test(m.name) && !m.isFrozen) m.freeze();
+    },
     tick(dt, spinSpeed) {
       t += dt;
       for (const l of lecterns) l.tick(dt);
       // the wall: a colour wash that eases back, and a slow breath
       wash = Math.max(0, wash - dt * 1.2);
       const breath = 0.94 + Math.sin(t * 1.3) * 0.06;
-      wall.mats.forEach((m, i) => { m.emissiveColor = Color3.Lerp(baseGlow[i], washColor, wash * 0.55).scale(breath); });
+      for (let i = 0; i < wall.mats.length; i++) {
+        const e = wall.mats[i].emissiveColor;
+        Color3.LerpToRef(baseGlow[i], washColor, wash * 0.55, e); e.scaleToRef(breath, e);
+      }
       // the bulbs: chase while it spins (faster with the wheel), a slow alternate at rest
       const rate = spinSpeed > 0.3 ? 4 + spinSpeed * 1.2 : 1.1;
       const on = Math.floor(t * rate) % 2;
-      w.bulbs[0].emissiveColor = hex('#ffe7a3').scale(on ? 1.5 : 0.35);
-      w.bulbs[1].emissiveColor = hex('#ffe7a3').scale(on ? 0.35 : 1.5);
-      w.marquee.emissiveColor = hex('#8b7bff').scale(1 + (spinSpeed > 0.3 ? 0.4 * Math.sin(t * 20) : 0) + wash * 0.8);
+      BULB_GLOW.scaleToRef(on ? 1.5 : 0.35, w.bulbs[0].emissiveColor);
+      BULB_GLOW.scaleToRef(on ? 0.35 : 1.5, w.bulbs[1].emissiveColor);
+      MARQUEE_GLOW.scaleToRef(1 + (spinSpeed > 0.3 ? 0.4 * Math.sin(t * 20) : 0) + wash * 0.8, w.marquee.emissiveColor);
       // the flapper: each peg crossing the top kicks it; a damped spring brings it back
       const peg = Math.floor(w.root.rotation.z / (TAU / 5));
       let ticked = false;

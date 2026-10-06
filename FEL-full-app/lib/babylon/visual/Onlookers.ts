@@ -18,6 +18,12 @@ export interface OnlookersOpts {
   /** Hold each body's clip still between cheers: the idle's keyframes stop being evaluated for a body that is only
    *  standing there (the root's own breathe-bob in update() keeps it alive), and a cheer starts it again. */
   restBetweenCheers?: boolean;
+  /** IMPROVE (2026-10-06, Brain Brawl #16): called with each body's root the moment it lands — a mode that wants its crowd
+   *  out of the shadow cascades takes it out here, however late the body arrives (the polls it replaces stopped at 12 s). */
+  onSpawn?: (root: TransformNode) => void;
+  /** IMPROVE (2026-10-06, Brain Brawl #18): while nobody is cheering, write the idle breathe-bob at most this often (s)
+   *  instead of every frame — each write recomputes the body's world matrix. A cheer still moves every frame. */
+  idleBobStepSec?: number;
 }
 /** A body rests this long after it lands and after a cheer ends (s): its clip has posed it (a clip held before its
  *  first evaluated frame would leave the bind pose) and the fade-in has finished. */
@@ -39,11 +45,17 @@ export class Onlookers {
   private rest: boolean;
   /** Seconds since the last cheer ended (or the crowd was built): bodies rest once this passes REST_AFTER_SEC. */
   private calmT = 0;
+  private onSpawn: ((root: TransformNode) => void) | null;
+  private bobStep: number;
+  /** Seconds since the idle bob was last written (idleBobStepSec). */
+  private bobAcc = 0;
   /** Bodies this crowd asked for (the headless checks count the crowd before the spawns land). */
   get count(): number { return Math.max(this.requested, this.figures.length); }
 
   constructor(scene: Scene, spots: Vector3[], tint = '#2b3550', lookAt: Vector3 = Vector3.Zero(), opts: OnlookersOpts = {}) {
     this.rest = opts.restBetweenCheers === true;
+    this.onSpawn = opts.onSpawn ?? null;
+    this.bobStep = Math.max(0, opts.idleBobStepSec ?? 0);
     if (spots.length === 0) return;
     // spread the cap over the spots so a long rail still reads populated end to end
     const step = Math.max(1, Math.ceil(spots.length / MAX_BODIES));
@@ -57,6 +69,7 @@ export class Onlookers {
           if (this.disposed) { char.dispose(); return; }
           for (const m of char.root.getChildMeshes()) m.isPickable = false;
           this.figures.push({ char, root: char.root, baseY: p.y, phase: (i * 2.399) % (Math.PI * 2), resting: false, age: 0 });
+          try { this.onSpawn?.(char.root); } catch (e) { console.warn('[FEL-ONLOOKERS] onSpawn failed', (e as Error)?.message ?? e); }
         })
         .catch((e) => console.warn('[FEL-ONLOOKERS] body did not spawn', (e as Error)?.message ?? e));
     });
@@ -79,6 +92,11 @@ export class Onlookers {
         }
       }
     }
+    if (this.bobStep > 0 && excite === 0) {
+      this.bobAcc += dt;
+      if (this.bobAcc < this.bobStep) return;
+    }
+    this.bobAcc = 0;
     for (const f of this.figures) {
       const sway = Math.sin(this.t * (1.4 + excite * 6) + f.phase);
       const lift = BOB_HEIGHT * sway + (excite > 0 ? Math.abs(Math.sin(this.t * 9 + f.phase)) * CHEER_HOP * excite : 0);
