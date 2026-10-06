@@ -23,7 +23,7 @@ import type { AbstractMesh, Skeleton, TransformNode } from '@babylonjs/core';
 import type { CreatorDoc, CreatorPart } from '../../creator/look/doc';
 import { syncParts } from '../creator/parts/renderParts';
 import { syncPaint } from '../creator/paint/renderPaint';
-import { syncShape } from '../creator/shape/renderShape';
+import { bulkPushFor, syncShape } from '../creator/shape/renderShape';
 
 export interface CreatorLayers {
   /** JSON of the doc last applied (cheap change test for a live editor) */
@@ -73,10 +73,11 @@ export function applyCreatorLayers(
 }
 
 function layersChanged(
-  spawn: { root: TransformNode; skeleton?: Skeleton | null }, root: TransformNode, doc: CreatorDoc | null,
+  spawn: { root: TransformNode; skeleton?: Skeleton | null; meshes?: readonly AbstractMesh[] }, root: TransformNode, doc: CreatorDoc | null,
   worn: readonly CreatorPart[], sig: string, summary: { parts: number; paint: number },
 ): void {
-  if (spawn.skeleton) syncParts({ root, skeleton: spawn.skeleton }, doc?.parts ?? [], worn);
+  // phase 4c: parts marked `follow` ride out on the bulk of their segment (renderShape.bulkPushFor)
+  if (spawn.skeleton) syncParts({ root, skeleton: spawn.skeleton }, doc?.parts ?? [], worn, { bulk: bulkPushFor(spawn, doc) });
   release(root);
   if (!doc && !worn.length) { stamp(root, null); return; }
   const layers: CreatorLayers = { sig, dispose: [] };

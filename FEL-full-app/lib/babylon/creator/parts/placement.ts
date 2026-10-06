@@ -30,11 +30,32 @@ export function rootMatrix(p: Pick<CreatorPart, 'bone' | 'pos' | 'rot' | 'scale'
   return mirrored ? P.multiply(frames.mirror) : P;
 }
 
-/** The part (or its mirror copy) in its bone node's local space — what renderParts bakes. */
-export function nodeMatrix(p: Pick<CreatorPart, 'bone' | 'pos' | 'rot' | 'scale'>, frames: RigFrames, mirrored: boolean): { bone: PartBone; m: Matrix } | null {
+/** The part (or its mirror copy) in its bone node's local space — what renderParts bakes. `push` (phase 4c, a part that
+ *  follows the bulk) moves it this far in root space first, along its own outward direction (renderParts works it out). */
+export function nodeMatrix(p: Pick<CreatorPart, 'bone' | 'pos' | 'rot' | 'scale'>, frames: RigFrames, mirrored: boolean, push?: Vector3 | null): { bone: PartBone; m: Matrix } | null {
   const bone = placementBone(p, mirrored);
   const P = rootMatrix(p, frames, mirrored);
   const inv = frames.restInv.get(bone);
   if (!P || !inv) return null;
-  return { bone, m: P.multiply(inv) };
+  const placed = push ? P.multiply(Matrix.Translation(push.x, push.y, push.z)) : P;
+  return { bone, m: placed.multiply(inv) };
+}
+
+/**
+ * Phase 4c: the outward push for a part that follows the bulk — `amount` metres along the perpendicular from its bone's
+ * line (the joint along the frame's y) to where the part sits, in root space; straight out of the front when it sits on
+ * the line. Null for no push.
+ */
+export function bulkPush(p: Pick<CreatorPart, 'bone' | 'pos' | 'rot' | 'scale'>, frames: RigFrames, mirrored: boolean, amount: number): Vector3 | null {
+  if (!amount) return null;
+  const P = rootMatrix(p, frames, mirrored);
+  const f = frames.frame.get(placementBone(p, mirrored));
+  if (!P || !f) return null;
+  const c = P.getTranslation(), j = f.getTranslation();
+  const y = new Vector3(f.m[4], f.m[5], f.m[6]).normalize();
+  const d = c.subtract(j);
+  const out = d.subtract(y.scale(Vector3.Dot(d, y)));
+  const l = out.length();
+  const dir = l > 1e-4 ? out.scale(1 / l) : new Vector3(f.m[8], f.m[9], f.m[10]).normalize();
+  return dir.scale(amount);
 }

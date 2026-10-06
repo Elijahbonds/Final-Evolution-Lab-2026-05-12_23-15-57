@@ -31,7 +31,7 @@ import { boneNode } from '../../anim/boneLookup';
 import { isSwingShape, type CreatorPart, type Finish, type PartBone } from '../../../creator/look/doc';
 import { PART_BUDGET, renderList } from '../../../creator/look/parts';
 import { append, bake, emptyGeo, pack, type Geo } from './geometry';
-import { nodeMatrix } from './placement';
+import { bulkPush, nodeMatrix } from './placement';
 import { rigFrames } from './rigFrames';
 import { shapeGeo, swingGeo } from './shapes';
 import { cutToned, tonedGeo, type ToneSpec } from './twoTone';
@@ -84,6 +84,8 @@ export function toneSpec(p: Pick<CreatorPart, 'tone' | 'toneAxis' | 'toneAt' | '
 /** What of a part's two-tone changes its bake (empty for a one-colour part, so a phase 2 group's signature is unchanged). */
 /** A bendable part's own geometry cut for its two-tone (the cape strip's denser swing version is not the cached shape). */
 const tonedGeoOf = (g: Geo, p: CreatorPart) => (g === shapeGeo(p.shape) ? tonedGeo(p.shape, toneSpec(p)) : cutToned(g, toneSpec(p), p.shape));
+/** What of the bulk a following part's bake depends on (nothing for a part that does not follow). */
+const followSig = (p: CreatorPart, bone: PartBone, bulk: ((bone: string) => number) | null | undefined): unknown[] => (p.follow ? [Math.round((bulk?.(bone) ?? 0) * 1e5)] : []);
 const toneSig = (p: CreatorPart): unknown[] => (p.colour2 ? [p.colour2, p.tone, p.toneAxis, p.toneAt, p.toneWidth] : []);
 
 function release(root: TransformNode, s: BodyParts): void {
@@ -105,7 +107,10 @@ export function clearParts(root: TransformNode): void {
  * Make the body wear exactly `parts` (within PART_BUDGET, mirrors counted) plus `worn` (store items that render as parts,
  * e.g. the Nexus Visor; outside the player's budget). Idempotent; only changed groups are rebuilt.
  */
-export function syncParts(spawn: { root: TransformNode; skeleton: Skeleton }, parts: readonly CreatorPart[], worn: readonly CreatorPart[] = []): PartsSummary {
+export function syncParts(
+  spawn: { root: TransformNode; skeleton: Skeleton }, parts: readonly CreatorPart[], worn: readonly CreatorPart[] = [],
+  opts: { bulk?: ((bone: string) => number) | null } = {},
+): PartsSummary {
   const { root, skeleton } = spawn;
   const summary: PartsSummary = { asked: parts.length, drawn: 0, meshes: 0, materials: 0, skipped: 0 };
   if (root.isDisposed()) return summary;
@@ -140,7 +145,7 @@ export function syncParts(spawn: { root: TransformNode; skeleton: Skeleton }, pa
   }
   syncSwingParts(s, root, skeleton, frames, swingList, scene);
   for (const [key, w] of want) {
-    const sig = JSON.stringify(w.items.map(({ part, mirrored }) => [part.shape, part.bone, part.pos, part.rot, part.scale, part.colour, mirrored, ...toneSig(part)]));
+    const sig = JSON.stringify(w.items.map(({ part, mirrored }) => [part.shape, part.bone, part.pos, part.rot, part.scale, part.colour, mirrored, ...toneSig(part), ...followSig(part, w.bone, opts.bulk)]));
     const have = s.groups.get(key);
     if (have && have.sig === sig) continue;
     let mat = s.mats.get(w.mat);
@@ -148,7 +153,9 @@ export function syncParts(spawn: { root: TransformNode; skeleton: Skeleton }, pa
     const geo = emptyGeo();
     const colours: number[] = [];
     for (const { part, mirrored } of w.items) {
-      const placed = nodeMatrix(part, frames!, mirrored)!;
+      // phase 4c: a part that follows the bulk sits out by its segment's push
+      const push = part.follow && opts.bulk ? bulkPush(part, frames!, mirrored, opts.bulk(w.bone)) : null;
+      const placed = nodeMatrix(part, frames!, mirrored, push)!;
       // phase 4c: a two-tone part is its shape cut along the split / band (twoTone.ts, cached by its inputs), each
       // vertex carrying the colour of its side
       const toned = part.colour2 ? tonedGeo(part.shape, toneSpec(part)) : null;

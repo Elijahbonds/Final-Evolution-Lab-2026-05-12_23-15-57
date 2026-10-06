@@ -400,6 +400,26 @@ export function syncShape(
   return summary;
 }
 
+/**
+ * Phase 4c (2026-10-06), "follow the surface": how far (metres, outward) the doc's bulk pushes the skin on each bone's
+ * segment here — (girth − 1) × the segment's measured radius, the same amount the inflate moves the skin by — for parts
+ * marked `follow` (renderParts bakes it, so a chest plate rides out on a bulked chest instead of sinking in). Null when
+ * nothing is bulked or the body cannot be measured. Bulk is reach-safe, so the amount is the same in every mode.
+ */
+export function bulkPushFor(
+  spawn: { root: TransformNode; meshes?: readonly AbstractMesh[] }, doc: CreatorDoc | null,
+): ((bone: string) => number) | null {
+  if (!doc?.shape.girth || !Object.keys(doc.shape.girth).length) return null;
+  const s = effectiveShape(doc.shape, playContextOf(spawn.root.getScene()?.metadata));
+  if (GIRTH_KEYS.every((k) => s.girth[k] === 1)) return null;
+  const body = bodyMeshOf(spawn.meshes ?? []);
+  const m = body ? measureBody(body) : null;
+  if (!m) return null;
+  const segOf: Record<string, GirthKey> = {};
+  for (const k of GIRTH_KEYS) for (const b of GIRTH_BONES[k]) segOf[b] = k;
+  return (bone: string) => { const seg = segOf[bone]; return seg ? (s.girth[seg] - 1) * (m.radius[bone] ?? 0) : 0; };
+}
+
 /** The shape target on a mesh (tests and probes), or null. */
 export function shapeTargetOf(mesh: AbstractMesh): MorphTarget | null {
   const mgr = mesh.morphTargetManager;

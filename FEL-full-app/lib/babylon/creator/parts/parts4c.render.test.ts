@@ -117,3 +117,36 @@ describe('two-tone parts', () => {
     s.root.dispose();
   });
 });
+
+describe('parts that follow the bulk', () => {
+  it('a chest plate marked `follow` rides out by the chest\'s bulk ((g − 1) × its radius); unmarked, it stays (and sinks)', async () => {
+    const { applyCreatorLayers } = await import('../../core/creatorLook');
+    const { bodyMeshOf, measureBody } = await import('../shape/renderShape');
+    const { sanitizeCreatorDoc } = await import('../../../creator/look/sanitize');
+    const plate = (follow: boolean) => ({ id: follow ? 'f' : 'n', shape: 'plate', bone: 'Spine2', pos: [follow ? 0.06 : -0.06, 0.03, 0.165], colour: '#808080', ...(follow ? { follow: true } : {}) });
+    const centre = (s: SpawnedCharacter, i: number) => {
+      settle(s.root);
+      const m = partsOn(s.root).meshes[0]; const p = m.getVerticesData('position')!; const W = m.computeWorldMatrix(true);
+      // the two plates are baked into one mesh: average each half's vertices
+      const n = p.length / 3 / 2; const c = Vector3.Zero();
+      for (let v = i * n; v < (i + 1) * n; v++) c.addInPlace(Vector3.TransformCoordinates(new Vector3(p[v * 3], p[v * 3 + 1], p[v * 3 + 2]), W));
+      return c.scale(1 / n);
+    };
+    const s = body(); settle(s.root);
+    const doc = (girth: number) => sanitizeCreatorDoc({ v: 1, parts: [plate(false), plate(true)], shape: { face: {}, body: {}, girth: { chest: girth } } });
+    applyCreatorLayers(s, doc(1));
+    const flat = [centre(s, 0), centre(s, 1)];
+    applyCreatorLayers(s, doc(1.4));
+    const bulked = [centre(s, 0), centre(s, 1)];
+    const r = measureBody(bodyMeshOf(s.meshes)!)!.radius.Spine2;
+    expect(r).toBeGreaterThan(0.05);
+    expect(Vector3.Distance(flat[0], bulked[0]), 'not following: it stays').toBeLessThan(1e-6);
+    const moved = bulked[1].subtract(flat[1]);
+    expect(moved.length()).toBeCloseTo(0.4 * r, 3);
+    expect(moved.z, 'outward: forward, off the chest').toBeGreaterThan(0.8 * moved.length());
+    // and back when the bulk goes
+    applyCreatorLayers(s, doc(1));
+    expect(Vector3.Distance(centre(s, 1), flat[1])).toBeLessThan(1e-6);
+    s.root.dispose();
+  });
+});
