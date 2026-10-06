@@ -46,7 +46,9 @@ export default function DuelBabylon({ onEnd }: GameProps) {
       endedRef.current = true;
       const won = r.outcome === 'DUEL_WON';
       const result: GameResult = {
-        score: Number(r.stats?.wins ?? 0),
+        // IMPROVE (2026-10-06): the mode's score (rounds + ring-outs + guard impacts — duelRules). This read `stats.wins`,
+        // which the mode never sent, so every duel recorded 0; floored at 0 (a 0–2 loss is −80, and a negative score is refused)
+        score: Math.max(0, Math.round(r.score ?? 0)),
         stats: r.stats, outcome: r.outcome,   // pass 5 phase 3: the proof line reads these
         opponentScore: Number(r.stats?.foeWins ?? 0),
         won,
@@ -109,12 +111,29 @@ export default function DuelBabylon({ onEnd }: GameProps) {
           <div className="text-center">
             <span className="fel-heading text-xl font-black">ROUND {hnode(hud.round, 1)}</span>
             <div className="text-xs mt-1">{hnode(hud.wins, 0)} – {hnode(hud.foeWins, 0)}</div>
+            {/* IMPROVE (2026-10-06): the round clock — a round that runs out is decided on HP at the bell (TIME); it was invisible */}
+            {typeof hud.timeLeft === 'number' && (
+              <div className={`text-xs mt-0.5 tabular-nums ${hud.timeLeft <= 10 ? 'text-red-400' : 'text-white/70'}`} title="Round clock">
+                {Math.floor(hud.timeLeft / 60)}:{String(hud.timeLeft % 60).padStart(2, '0')}
+              </div>
+            )}
             {typeof hud.hint === 'string' && hud.hint && <div className="text-xs text-gray-300 mt-1">{hud.hint}</div>}
           </div>
           <div className="flex flex-col gap-1 items-end">
             <span className="fel-panel px-2 py-0.5 text-red-400">FOE HP {hnum(hud.foeHp, 100)}</span>
             <span className="fel-panel px-2 py-0.5 text-yellow-400">FOE GUARD {hnum(hud.foeGuard, 100)}</span>
+            {/* IMPROVE (2026-10-06): the rival's chi fills now — a dash, a substitution, at 100 its CRITICAL EDGE */}
+            <span className="fel-panel px-2 py-0.5 text-purple-400">FOE CHI {hnum(hud.foeChi, 0)}</span>
           </div>
+        </div>
+      )}
+
+      {/* IMPROVE (2026-10-06): the edge call has its own field — it used to overwrite the controls hint and never clear */}
+      {typeof hud.edge === 'string' && hud.edge && phase === 'playing' && (
+        <div className="pointer-events-none absolute inset-x-0 top-[22%] text-center">
+          <span className={`fel-heading animate-pulse text-xl font-black drop-shadow ${hud.edge === 'EDGE BEHIND YOU' ? 'text-[#FF3366]' : 'text-[#00FF9D]'}`}>
+            {hud.edge === 'EDGE BEHIND YOU' ? '⚠ EDGE BEHIND YOU ⚠' : 'RIVAL ON THE EDGE — PRESS!'}
+          </span>
         </div>
       )}
 

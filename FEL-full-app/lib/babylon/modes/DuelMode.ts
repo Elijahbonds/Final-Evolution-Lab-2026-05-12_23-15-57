@@ -14,21 +14,28 @@
 //     is its own win condition, exactly like Soul Calibur.
 //   ROUNDS — best-of-3 scored through the shared JudgePanel's pacing
 //     (staged round markers), not a number flash.
+//
+// IMPROVE (2026-10-06), the owner's twenty (docs/IMPROVEMENTS-2026-10-05.md, duel): the rival's chi fills on a blow that
+// lands and buys a real dash, a substitution that cannot ring itself out and a CRITICAL EDGE; the rival never walks off
+// a drop; its weapon is a counter-pick that changes when it loses; both fighters' parries and guard impacts play; a round
+// ends through the animation tree (the loser holds the floor, the winner celebrates); the start-up screen's weapon is
+// not picked twice; the round clock and the edge call have their own HUD fields; the score pays ring-outs and guard
+// impacts; and the per-frame and per-press garbage is gone. Pure rules: ./duelRules.ts.
 
 import { mountPostureLayer } from '../anim/PostureLayer';
 type PostureHandle = ReturnType<typeof mountPostureLayer>;
 import { combatPose, combatApproach, COMBAT_INPUT_IDLE, type CombatPostureInput } from '../core/CombatPosture';
 import { BodyMotion, dynamicPose, COMBAT_DYNAMIC } from '../core/DynamicPosture';
 import { strafeAxis } from '../core/Biomech';
-import { MeshBuilder, StandardMaterial, Color3, Vector3 } from '@babylonjs/core';
-import type { AbstractMesh } from '@babylonjs/core';
+import { Vector3 } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { neverBindPose } from '../anim/importSanitizer';
-import { installSafePlay, SPORT_CLIP } from '../anim/clipRegistry';
-import { FighterState, KARATE_ATTACKS, STAFF_ATTACKS, PARRY_WINDOW_MS, guardPressMs, rivalDifficulty } from '../core/FightCore';
+import { installSafePlay } from '../anim/clipRegistry';
+import { FighterState, KARATE_ATTACKS, STAFF_ATTACKS, PARRY_WINDOW_MS, CHI_MAX, guardPressMs, rivalDifficulty } from '../core/FightCore';
 import { KnockSlides, makeChestOf } from '../core/FightKit';   // IMPROVE (2026-10-06): the shared knock slide + scratch chest points
 import { readTier } from '../core/Difficulty';   // IMPROVE (2026-10-06): the OPPONENT pick
-import { RivalCombatBrain, chiResource, threatLandsIn } from '../core/RivalCombatBrain';
+import { BannerSlot } from '../core/ModeClock';   // IMPROVE (2026-10-06): one banner, expiring on the game clock
+import { RivalCombatBrain, threatLandsIn, type RivalResource } from '../core/RivalCombatBrain';
 import {
   StrikeController, karateMoveset, staffMoveset, bladeMoveset, MIN_STARTUP_SEC, type CombatMove, bookMoveset, stringRule } from '../core/StrikeSystem';
 import { DefenseController, applyDefenseOutcome, SUBSTITUTION_CHI_COST } from '../core/DefenseSystem';
@@ -44,7 +51,7 @@ import { assertSpawned } from '../core/FrameGuard';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import { KARATE_CONFIG as CFG } from './modeConfigs';
-import { weaponById, readWeapon, equipWeapon } from '../combat/arsenal';
+import { weaponById, readWeapon, equipWeapon, weaponPicked } from '../combat/arsenal';
 import type { Mesh } from '@babylonjs/core';
 import { VenueKit } from '../visual/VenueKit';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';
@@ -52,6 +59,11 @@ import { readCombatArena, arenasFor, arenaClamp, offEdge, insideBy, describeAren
 import { buildArena, type ArenaHandle } from '../combat/arenaBuild';
 import { readBlend, blendTraits } from '../combat/schools';
 import { styleMoveset } from '../combat/loadout';
+import { roundCall, UltimateArm } from './showdownRules';   // IMPROVE (2026-10-06): Showdown's round call and its one-swing ultimate arm
+import {
+  DUEL, DUEL_HINT, DUEL_WEAPONS, chiForOutcome, rivalWeaponFor, edgeCall, holdFromEdge, safeSubstitutionSpot, duelScore,
+  type DuelWeapon,
+} from './duelRules';
 // MOVEMENT PLAY P7 (2026-09-25): the body's own strikes, guard, slips and steps — behind its flag until the live probe
 // measures 0 misfires (bodyFightFlags; READY says "coming" meanwhile)
 import { MOVES as HORDE_MOVES } from '../core/HordeDynamics';
@@ -66,7 +78,7 @@ import { readBodyKicks } from '@/lib/move/bodyPlayChoice';
 import type { BodyEvent } from '@/lib/pose/BodyReader';
 import type { BodyView } from '../core/ModeHarness';
 
-export type DuelWeapon = 'fists' | 'staff' | 'blade';
+export type { DuelWeapon } from './duelRules';
 const WEAPON_MOVESET: Record<DuelWeapon, () => Record<string, CombatMove>> = {
   fists: () => bookMoveset(KARATE_ATTACKS),        // phase 4: empty hands read the Storm book
   staff: () => stringRule(staffMoveset(STAFF_ATTACKS)),   // phase 4: a weapon keeps its own moves under the string rule
@@ -81,13 +93,16 @@ const RIVAL_MOVESET: Record<DuelWeapon, () => Record<string, CombatMove>> = {
   blade: () => bladeMoveset(),
 };
 const WEAPON_TAG: Record<DuelWeapon, string> = { fists: 'FISTS', staff: 'STAFF', blade: 'BLADE' };
+const WHOOSH_PITCH: Record<DuelWeapon, number> = { fists: 1.2, blade: 1.5, staff: 0.8 };
+/** Phase 4: the book's ids beyond these three are reached through the string, not a button. */
+const FIST_IDS = ['jab', 'kick', 'heavy'] as const;
 
 /**
  * The player's start-up screen picks, applied to whatever weapon this round is using.
  *
- * The in-round A/B/Y phase is untouched — the screen sets what you WALK IN with, and the phase still lets you
- * change your mind. The STYLE comes from the screen either way, because a school is how you fight rather than
- * what you fight with.
+ * The STYLE comes from the screen either way, because a school is how you fight rather than what you fight with.
+ * IMPROVE (2026-10-06): built ONCE per weapon change (setMyWeapon), not on every press — it rebuilt the moveset and
+ * re-read the stored blend one to three times per input.
  */
 const styled = (w: DuelWeapon): Record<string, CombatMove> =>
   styleMoveset(WEAPON_MOVESET[w](), blendTraits(readBlend()), MIN_STARTUP_SEC);
@@ -105,11 +120,12 @@ const WEAPON_RANGE: Record<DuelWeapon, number> = {
 // Cliffside Shrine's half-walled disc. All three DROP; Duel is a ring-out game.
 /** How far the platform stands proud of the venue floor. Non-zero or the two surfaces z-fight. */
 const DISC_LIFT = 0.12;
-const EDGE_WARN_IN = 1.1;   // metres inside the edge at which the footing warning shows (was a radius of 5.4 on a 6.5 disc)
-const ROUNDS_TO_WIN = 2;
+const ROUNDS_TO_WIN = DUEL.roundsToWin;
 
-type Phase = 'intro' | 'weaponSelect' | 'fighting' | 'roundOver' | 'matchOver';
-const BUDGET_SEC: Record<Phase, number> = { intro: 3, weaponSelect: 20, fighting: 120, roundOver: 5, matchOver: 999 };
+// IMPROVE (2026-10-06): 'ready' — the round-start beat (ROUND n … FIGHT!); the KO pause ('roundOver') and the gap after the
+// weapon pick run on the game clock now (they were setTimeouts a pause did not hold and a dispose did not cancel).
+type Phase = 'intro' | 'weaponSelect' | 'ready' | 'fighting' | 'roundOver' | 'matchOver';
+const BUDGET_SEC: Record<Phase, number> = { intro: 3, weaponSelect: 20, ready: 3, fighting: DUEL.roundSec, roundOver: 5, matchOver: 999 };
 
 export const DuelMode: ModeDefinition = (() => {
   let player: SpawnedCharacter, rival: SpawnedCharacter;
@@ -138,6 +154,9 @@ export const DuelMode: ModeDefinition = (() => {
   // built, which on Next is during SSR with no window and no URL. See MixedCombatMode for the measured
   // version of that bug.
   let myWeapon: DuelWeapon = 'fists';
+  /** IMPROVE (2026-10-06): the styled moveset and its ids, built on a weapon change (setMyWeapon). */
+  let myMoves: Record<string, CombatMove> = {};
+  let myMoveIds: string[] = [];
   let myProp: Mesh | null = null, foeProp: Mesh | null = null;
   let modeVenue: VenueHandle | null = null;
   let foeWeapon: DuelWeapon = 'staff';
@@ -148,8 +167,17 @@ export const DuelMode: ModeDefinition = (() => {
   /** MODE-STICK-FACE (2026-09-07): the L stick as a WORLD wish, camera-relative — up = the camera's flat forward (the
    *  rival on the disc), right = screen right. The 8-way basis read raw up-stick as RETREAT (−moveY·radial points away
    *  from the foe; measured Δscreen −3.4 m on push-forward). */
-  const wish = (ctx: ModeContext): Vector3 => ctx.camDirector.forwardFlat().scale(-stickY).addInPlace(ctx.camDirector.rightFlat().scale(stickX));
+  // IMPROVE (2026-10-06): into one scratch vector (it built three per call, every frame). The director's forwardFlat /
+  // rightFlat still allocate inside CameraDirector, which is not this mode's file.
+  const wishV = new Vector3();
+  const wish = (ctx: ModeContext): Vector3 => {
+    const f = ctx.camDirector.forwardFlat(), r = ctx.camDirector.rightFlat();
+    return wishV.set(f.x * -stickY + r.x * stickX, 0, f.z * -stickY + r.z * stickX);
+  };
   let round = 1, myWins = 0, foeWins = 0;
+  // IMPROVE (2026-10-06): what the result pays beyond the rounds (duelRules.duelScore), and what the rival's weapon pick reads
+  let ringOutWins = 0, guardImpacts = 0;
+  let lastFoeWeapon: DuelWeapon | null = null, rivalWonLast = false;
   // ── A+ P0 juice (PM brief COMBAT-A-PLUS-P0, 2026-09-06): ONE thud per connect (feel.impact plays its own — the SoundKit
   // impact that stacked on it is gone), a latched hit-stop + shake on heavy / special, a soft round-win beat and a latched
   // Street Fighter–class MATCH punch. No hang slowMo, no juice.impact({ slow }). The parry's scoped slow-mo is the mode's own.
@@ -167,10 +195,30 @@ export const DuelMode: ModeDefinition = (() => {
   }
   let meHitBy: 'light' | 'medium' | 'heavy' | 'finisher' | null = null;
   let foeHitBy: 'light' | 'medium' | 'heavy' | 'finisher' | null = null;
-  let hitT = 0;
-  let discMesh: AbstractMesh | null = null;
+  // IMPROVE (2026-10-06): a hit-react timer PER fighter — the one shared `hitT` let a hit on one fighter cut the other's
+  // reaction short (and a stale one ran on into the next hit)
+  let meHitT = 0, foeHitT = 0;
+  // IMPROVE (2026-10-06): the one-beat guard flashes, per fighter, SET when the defence lands (they were hard-coded false,
+  // so the mode's signature guard impact had no body reaction at all)
+  let parryFlash = 0, giFlash = 0, foeParryFlash = 0, foeGiFlash = 0;
+  // IMPROVE (2026-10-06): the round's verdict on the bodies — the loser holds the floor, the winner celebrates (the tree's
+  // ko / celebrate states). It was a direct animator.play of the knockdown while both trees stopped.
+  let meOut = false, foeOut = false;
+  // IMPROVE (2026-10-06): the rival's spends — its substitution's beat (my swing in flight finds nobody) and its
+  // CRITICAL EDGE, armed on one heavy and played only if that heavy lands clean
+  let foeSubstituted = 0;
+  const foeUlt = new UltimateArm();
+  let foeFullCalled = false;
+  /** IMPROVE (2026-10-06): the rival's chi as the brain reads it — one object rewritten per frame (chiResource built one). */
+  const foeRes: RivalResource = { value: 0, max: CHI_MAX, dashCost: DUEL.rivalDashChi, subCost: SUBSTITUTION_CHI_COST, subReady: true };
+  let clock = 0;   // IMPROVE (2026-10-06): the mode's game clock (banners)
+  const bannerSlot = new BannerSlot();
   let arena: CombatArena = arenasFor('duel')[0];
   let arenaHandle: ArenaHandle | null = null;
+  /** IMPROVE (2026-10-06): metres inside the picked arena's edge at (x, z), through one scratch point (the brain probes it
+   *  every frame; a `{ x, z }` per call was garbage). */
+  const edgeP = { x: 0, z: 0 };
+  const edgeIn = (x: number, z: number): number => { edgeP.x = x; edgeP.z = z; return insideBy(edgeP, arena.shape); };
 
   const setPhase = (p: Phase): void => { phase = p; phaseSec = 0; };
   const now = (): number => performance.now();
@@ -179,8 +227,8 @@ export const DuelMode: ModeDefinition = (() => {
    *  velocity, which the movement model then damped on its own terms — the distance a hit carried was whatever the damping
    *  left, not the attack's knockback. */
   // IMPROVE (2026-10-06): the slide itself is the shared KnockSlides (core/FightKit) — ticked on the ROOM clock in update(),
-  // one per body, cleared at a round reset — instead of a real-clock render observer per hit. checkRingOut still reads
-  // the position every frame, so a slide past a drop edge rings out exactly as before.
+  // one per body, cleared at a round reset and on dispose — instead of a real-clock render observer per hit. checkRingOut
+  // still reads the position every frame, so a slide past a drop edge rings out exactly as before.
   const knock = new KnockSlides();
   function knockSlide(_ctx: ModeContext, char: SpawnedCharacter, fromPos: Vector3, meters: number, clamp?: (q: Vector3) => void): void {
     const dir = char.root.position.subtract(fromPos); dir.y = 0;
@@ -189,12 +237,24 @@ export const DuelMode: ModeDefinition = (() => {
     const to = char.root.position.add(dir.scale(meters)); if (clamp) clamp(to);
     knock.start(char.root.position, to.x, to.z);
   }
+  let rivalBrain = new RivalCombatBrain({ difficulty: 0.72 });
+  /** IMPROVE (2026-10-06): the rival's brain for a weapon (its moves are the brain's moves). Built when its weapon changes. */
+  function brainFor(w: DuelWeapon): RivalCombatBrain {
+    return new RivalCombatBrain({
+      difficulty: 0.72, canSpecial: false,   // IMPROVE (2026-10-06): this mode never upgrades a full-chi heavy to a special
+      moves: Object.entries(RIVAL_MOVESET[w]()).map(([id, m]) => ({
+        id,
+        kind: m.weight === 'light' ? 'jab' as const : m.weight === 'medium' ? 'kick' as const : 'heavy' as const,
+        range: m.atk.range,
+      })),
+    });
+  }
   /** IMPROVE (2026-10-06): the rival at a round's start — the standing (NERVE, once per round now, not per frame), the
    *  OPPONENT pick (PRO = the tuned 0.72), the disc's edge (it circles away from the drop), no slide left running. */
   function roundStartRival(): void {
     rivalBrain.setStanding(foeWins, myWins, ROUNDS_TO_WIN);
     rivalBrain.setDifficulty(rivalDifficulty(0.72, readTier()));
-    rivalBrain.setEdge((x, z) => insideBy({ x, z }, arena.shape));
+    rivalBrain.setEdge(edgeIn);
     knock.clear();
   }
   /** Phase 5 — SOUL CALIBUR WEIGHT (the horde's rule): the connect holds for a beat that grows with the weight. */
@@ -205,7 +265,6 @@ export const DuelMode: ModeDefinition = (() => {
   const xBtn = new XButtonReader();   // phase 3: the Storm X on the duel too — a step (tap), a closing step at the rival (double), the guard (hold)
   const focus = new FocusMeter(); let focusHeld = false, focusHud = -1, focusHudOn = false;   // phase 8
   let foeGuardUntil = 0;
-  let rivalBrain = new RivalCombatBrain({ difficulty: 0.72 });
   let guardUp = false;
   // MOVEMENT PLAY P7: the body's fight read (the Showdown seam; a weapon swings on the plane rule)
   // the READY screen's spin / jump kick opt-in, read when a kick is told: the toggle is offered after load (READY, or the
@@ -217,9 +276,10 @@ export const DuelMode: ModeDefinition = (() => {
   let bodyShift: { v: Vector3; left: number } | null = null;
   let ctxRef: ModeContext | null = null;
   const bodyDriven = (): boolean => drive.driven(!!ctxRef?.body?.()?.read.tracking);
+  /** IMPROVE (2026-10-06): ONE banner slot with an expiry on the game clock (core/ModeClock). Each banner used to start its
+   *  own setTimeout that cleared whatever was showing by then, so an older timer wiped a newer banner early. */
   function banner(ctx: ModeContext, text: string, ms = 900): void {
-    ctx.setHud({ banner: text });
-    setTimeout(() => ctx.setHud({ banner: '' }), ms);
+    ctx.setHud({ banner: bannerSlot.show(text, ms / 1000, clock) });
   }
 
   /** P7: what the rival's blow meets on a BODY player at `impactAt` (page ms) — Showdown's rule (bodyDefenseAt's windows). */
@@ -262,11 +322,11 @@ export const DuelMode: ModeDefinition = (() => {
         console.info(`[DL-BODY] guard ${it.up ? (it.raise ? 'raise' : 'up') : 'down'}`);
         return true;
       case 'strike': {
-        const whooshPitch = { fists: 1.2, blade: 1.5, staff: 0.8 }[myWeapon];
+        const whooshPitch = WHOOSH_PITCH[myWeapon];
         const opts = { elapsedMs: t - it.onsetPage, contactMs: 0 };
         // auto-spacing: a blow thrown with the rival a little out of its reach closes on him (bodyLunge)
         const lungeFor = (id: string): void => {
-          const range = styled(myWeapon)[id]?.atk.range ?? 1.6, d = Vector3.Distance(player.root.position, rival.root.position), L = bodyLunge(d, range);
+          const range = myMoves[id]?.atk.range ?? 1.6, d = Vector3.Distance(player.root.position, rival.root.position), L = bodyLunge(d, range);
           if (L > 0) { const v = rival.root.position.subtract(player.root.position); v.y = 0; bodyShift = { v: v.normalize().scale(L / 0.15), left: 0.15 }; }
         };
         if (myWeapon === 'fists') {
@@ -281,11 +341,11 @@ export const DuelMode: ModeDefinition = (() => {
           if (mv.ender || book.history.length === 0) { const call = stringLabels.join(' → '); stringLabels = []; if (call.includes('→')) banner(ctx, `COMBO: ${call}`, 900); }
           return true;
         }
-        const id = planeMove(Object.keys(styled(myWeapon)), it.body);
+        const id = planeMove(myMoveIds, it.body);
         if (!id) return false;   // a kick with a weapon in hand: nothing to swing
         // a weapon's swing has no capture contact frame to hold to: its whole startup is its wind-up (the hit is never
         // brought forward past the swing the rival sees)
-        opts.contactMs = (styled(myWeapon)[id]?.startupSec ?? 0) * 1000;
+        opts.contactMs = (myMoves[id]?.startupSec ?? 0) * 1000;
         drive.body(t);
         const ok = meStrike.request(id, t, opts);
         if (ok) SoundKit.play('whoosh', { pitch: whooshPitch, volume: 0.4 });
@@ -318,12 +378,14 @@ export const DuelMode: ModeDefinition = (() => {
   /** Ring-out check — leaving the disc ends the round immediately. */
   function checkRingOut(ctx: ModeContext): boolean {
     arenaClamp(player.root.position, arena); arenaClamp(rival.root.position, arena);   // the walls and the AC units hold; the drop does not
-    if (offEdge(rival.root.position, arena)) { endRound(ctx, true, 'RING OUT!'); return true; }
-    if (offEdge(player.root.position, arena)) { endRound(ctx, false, 'RING OUT — YOU FELL'); return true; }
+    if (offEdge(rival.root.position, arena)) { endRound(ctx, true, 'RING OUT!', 'ringout'); return true; }
+    if (offEdge(player.root.position, arena)) { endRound(ctx, false, 'RING OUT — YOU FELL', 'ringout'); return true; }
     return false;
   }
 
-  function resolveActive(ctx: ModeContext, mine: boolean, body?: { move: CombatMove; impactAt: number }): void {
+  /** `body` (P7): the rival's strike on a BODY player, resolved late at its impact instant (and whether it carried the
+   *  rival's CRITICAL EDGE — taken when the swing opened, carried into the deferred resolve). */
+  function resolveActive(ctx: ModeContext, mine: boolean, body?: { move: CombatMove; impactAt: number; ult: boolean }): void {
     const atkChar = mine ? player : rival;
     const defChar = mine ? rival : player;
     const atkState = mine ? meState : foeState;
@@ -332,20 +394,29 @@ export const DuelMode: ModeDefinition = (() => {
     const sc = mine ? meStrike : foeStrike;
     const move = body ? body.move : sc.current?.move;
     if (!move) return;
+    // IMPROVE (2026-10-06): does this swing carry the rival's CRITICAL EDGE? Taken once, as the swing resolves; a dodge, a
+    // whiff or any defence below spends it for nothing
+    let ult = !!body?.ult;
     if (!body) {
       if (!sc.current!.hitLive) return;
+      if (!mine) ult = foeUlt.take(sc.current);
       sc.current!.consumeHit();
       // P7: the rival's blow on a BODY player waits for the body's frames to cover the impact (DefenseLedger)
-      if (!mine && bodyDriven()) { const imp = now(); deferred.push(imp, (at) => resolveActive(ctx, false, { move, impactAt: at })); return; }
+      if (!mine && bodyDriven()) { const imp = now(); deferred.push(imp, (at) => resolveActive(ctx, false, { move, impactAt: at, ult })); return; }
     } else if (phase !== 'fighting') return;
 
     const dist = Vector3.Distance(atkChar.root.position, defChar.root.position);
-    if (!mine && meMove.dashIFrames) { foeState.staggerSec = Math.max(foeState.staggerSec, 0.45); banner(ctx, 'PERFECT DODGE — PUNISH!', 700); ctx.feel?.impact?.(0.3); console.info('[DL-STORM] step i-frames — whiff · perfect dodge'); return; }   // phase 6: the read opens him   // phase 3
+    if (!mine && meMove.dashIFrames) { foeState.staggerSec = Math.max(foeState.staggerSec, 0.45); banner(ctx, ult ? 'CRITICAL EDGE DODGED — PUNISH!' : 'PERFECT DODGE — PUNISH!', 700); ctx.feel?.impact?.(0.3); console.info('[DL-STORM] step i-frames — whiff · perfect dodge'); return; }   // phase 6: the read opens him   // phase 3
     const bodyAct = body ? bodyAction(move.atk, dist, body.impactAt) : null;
     if (bodyAct === 'evaded') { foeState.staggerSec = Math.max(foeState.staggerSec, 0.45); banner(ctx, 'PERFECT DODGE — PUNISH!', 700); ctx.feel?.impact?.(0.3); console.info('[DL-STORM] body slip — whiff · perfect dodge'); return; }
     const action = bodyAct ?? defCtrl.resolve(move.atk, dist, defState.blockHeld, now());
     if (body) console.info(`[DL-DEF] body ${action} (${Math.round(now() - body.impactAt)} ms late)`);
     const outcome = applyDefenseOutcome(action, atkState, defState, move.atk);
+    // IMPROVE (2026-10-06), TUNED: the ATTACKER's chi fills by the move's own chiGain when the blow lands (a hit, a guard it
+    // breaks). Duel never paid chi, so the rival could never afford a dash, a substitution or its CRITICAL EDGE.
+    const gain = chiForOutcome(outcome, move.atk.chiGain);
+    if (gain) atkState.chi = Math.min(CHI_MAX, atkState.chi + gain);
+    if (ult && outcome !== 'hit') { banner(ctx, outcome === 'whiff' ? 'CRITICAL EDGE MISSED!' : 'CRITICAL EDGE STOPPED!', 800); console.info(`[DL-STORM] rival critical edge answered (${outcome})`); }
 
     switch (outcome) {
       case 'whiff': break;
@@ -362,6 +433,7 @@ export const DuelMode: ModeDefinition = (() => {
         banner(ctx, mine ? 'GUARD BREAK!' : 'GUARD SHATTERED!');
         break;
       case 'parried':
+        beatParry(!mine);   // IMPROVE (2026-10-06): the defender's parry plays
         if (!mine) focus.gain(FOCUS.dodgeGain);   // phase 8: a read refills Focus
         SoundKit.play('impact', { pitch: 1.6, volume: 0.5 });
         // A PARRY IS THE NEAR MISS. Reach decides this fight, so reading a swing and answering it is the
@@ -370,7 +442,8 @@ export const DuelMode: ModeDefinition = (() => {
         banner(ctx, mine ? 'PARRIED!' : 'PERFECT PARRY!');
         break;
       case 'guardImpacted':
-        if (!mine) focus.gain(FOCUS.dodgeGain);   // phase 8: a read refills Focus
+        beatGuardImpact(!mine);   // IMPROVE (2026-10-06): the defender's guard impact plays
+        if (!mine) { focus.gain(FOCUS.dodgeGain); guardImpacts++; }   // phase 8: a read refills Focus; IMPROVE (2026-10-06): and the score pays it
         // THE Duel skill: unmistakable stinger + flash + camera beat
         SoundKit.play('impact', { pitch: 2.1, volume: 0.7 });   // the GI stinger is the one sound; the feel thud is replaced by the latched hit-stop + shake
         SoundKit.play('uiTick', { pitch: 1.8, volume: 0.5 });
@@ -382,64 +455,139 @@ export const DuelMode: ModeDefinition = (() => {
       case 'hit': {
         const w = move.weight;
         const scale = Math.max(0.4, 1 - 0.12 * atkState.combo);
-        const dealt = Math.round(move.atk.dmg * scale * (mine && focus.active ? FOCUS.damageMult : 1) * defCtrl.counterMult(now()));   // phase 8: a Focus strike lands harder; IMPROVE (2026-10-06): a read substitution eats COUNTER damage
+        // IMPROVE (2026-10-06), TUNED: the rival's CRITICAL EDGE lands DUEL.critMult harder and carries the body that much further
+        const crit = ult ? DUEL.critMult : 1;
+        const dealt = Math.round(move.atk.dmg * scale * crit * (mine && focus.active ? FOCUS.damageMult : 1) * defCtrl.counterMult(now()));   // phase 8: a Focus strike lands harder; IMPROVE (2026-10-06): a read substitution eats COUNTER damage
         if (mine) focus.gain(FOCUS.hitGain);
         defState.hp = Math.max(0, defState.hp - dealt);
         defState.stunSec = Math.max(defState.stunSec, move.atk.stunSec);
         atkState.combo += 1; atkState.comboTimer = 1.1;
-        if (mine) foeHitBy = w; else meHitBy = w;
-        hitT = 0.3;
+        hitReact(!mine, w);
         ctx.feel?.impact?.(w === 'heavy' ? 0.55 : 0.3);   // ONE thud per connect (the impact SFX that doubled it is gone)
         ctx.momentum.report(mine ? { kind: 'clean_hit', weight: w === 'heavy' || w === 'finisher' ? 16 : 9 } : { kind: 'blunder', weight: -8 });
-        if (w === 'heavy' || w === 'finisher') { heavyPunch(ctx, w); console.info(mine ? '[DUEL-JUICE] heavy landed' : '[DUEL-JUICE] heavy taken'); } else { ctx.juice.hitStop(HIT_STOP_MS[w]); console.info(mine ? '[DUEL-JUICE] hit' : '[DUEL-JUICE] taken'); }   // phase 5
+        if (w === 'heavy' || w === 'finisher' || ult) { heavyPunch(ctx, ult ? 'critical edge' : w); console.info(mine ? '[DUEL-JUICE] heavy landed' : '[DUEL-JUICE] heavy taken'); } else { ctx.juice.hitStop(HIT_STOP_MS[w]); console.info(mine ? '[DUEL-JUICE] hit' : '[DUEL-JUICE] taken'); }   // phase 5
+        if (ult) { ctx.juice.flash('#ff3344', 120); ctx.camDirector.pulse(0.5, 0.45); banner(ctx, 'CRITICAL EDGE!', 900); console.info('[DL-STORM] rival critical edge landed'); }
         // phase 5: the knock slide drives the ring-out game — a drop edge lets the slide run past the rim (knockTo only clamps
         // to walls / pillars there), and checkRingOut reads the position every frame
-        knockSlide(ctx, defChar, atkChar.root.position, move.atk.knockback, (q) => { const kt = knockTo(defChar.root.position, q, arena); q.x = kt.x; q.z = kt.z; });
+        knockSlide(ctx, defChar, atkChar.root.position, move.atk.knockback * crit, (q) => { const kt = knockTo(defChar.root.position, q, arena); q.x = kt.x; q.z = kt.z; });
         if (mine && move.launch) { foeLaunchedSec = LAUNCH_AIR_SEC; console.info('[DL-STORM] LAUNCHED — air string open'); }
         else if (mine && move.air && !move.slam) foeLaunchedSec = Math.max(foeLaunchedSec, 0.5);
         else if (mine && move.slam) foeLaunchedSec = 0;
-        ctx.setHud(mine ? { foeHp: defState.hp } : { hp: defState.hp });
+        // (the HP reaches the HUD at the end of the frame — pushHud — IMPROVE 2026-10-06)
         if (checkRingOut(ctx)) return;
-        if (defState.hp <= 0) endRound(ctx, mine, mine ? 'K.O.' : 'K.O. — YOU');
+        if (defState.hp <= 0) endRound(ctx, mine, mine ? 'K.O.' : 'K.O. — YOU', 'ko');
         break;
       }
     }
   }
 
-  function endRound(ctx: ModeContext, playerWon: boolean, label: string): void {
-    if (phase !== 'fighting') return;
-    setPhase('roundOver');
-    if (playerWon) myWins++; else foeWins++;
-    SoundKit.play(playerWon ? 'crowdCheer' : 'crowdGroan');
-    if (playerWon) roundWinBeat(ctx);
-    (playerWon ? rival : player).animator.play(SPORT_CLIP.karateKnockdown, {});
-    ctx.setHud({ wins: myWins, foeWins, banner: `${label} — ROUND ${round}` });
-    setTimeout(() => {
-      ctx.setHud({ banner: '' });
-      if (myWins >= ROUNDS_TO_WIN || foeWins >= ROUNDS_TO_WIN) {
-        setPhase('matchOver');
-        SoundKit.play('whistle');
-        if (playerWon) matchPunch(ctx);
-        ctx.end(playerWon ? 'DUEL_WON' : 'DUEL_LOST', myWins * 100 - foeWins * 40, { foeWins, weapon: myWeapon as string } as never);
-        return;
-      }
-      round++;
-      startRound(ctx);
-    }, 2000);
+  /** IMPROVE (2026-10-06): the defender's one-beat guard states, per fighter (re-armed so a second parry plays again). */
+  function beatParry(me: boolean): void {
+    if (me) { parryFlash = DUEL.parrySec; meAnim.clearBeat('parry_flash'); } else { foeParryFlash = DUEL.parrySec; foeAnim.clearBeat('parry_flash'); }
+  }
+  function beatGuardImpact(me: boolean): void {
+    if (me) { giFlash = DUEL.impactSec; meAnim.clearBeat('guard_impact'); } else { foeGiFlash = DUEL.impactSec; foeAnim.clearBeat('guard_impact'); }
+  }
+  /** IMPROVE (2026-10-06): a hit reaction on ONE fighter's own timer. */
+  function hitReact(me: boolean, w: CombatMove['weight']): void {
+    if (me) { meHitBy = w; meHitT = DUEL.reactSec; } else { foeHitBy = w; foeHitT = DUEL.reactSec; }
+  }
+  function tickBeats(dt: number): void {
+    meHitT = Math.max(0, meHitT - dt); if (meHitT === 0) meHitBy = null;
+    foeHitT = Math.max(0, foeHitT - dt); if (foeHitT === 0) foeHitBy = null;
+    parryFlash = Math.max(0, parryFlash - dt); giFlash = Math.max(0, giFlash - dt);
+    foeParryFlash = Math.max(0, foeParryFlash - dt); foeGiFlash = Math.max(0, foeGiFlash - dt);
   }
 
+  /** The round's verdict. IMPROVE (2026-10-06): the KO pause is a phase on the GAME clock (update() moves on after it — it
+   *  was a 2000 ms setTimeout that a pause did not hold and a dispose did not cancel), and the bodies show it through
+   *  their trees: the loser `out` (ko → the floor hold), the winner `celebrating`. */
+  function endRound(ctx: ModeContext, playerWon: boolean, label: string, how: 'ko' | 'ringout' | 'time'): void {
+    if (phase !== 'fighting') return;
+    setPhase('roundOver');
+    if (playerWon) { myWins++; if (how === 'ringout') ringOutWins++; } else foeWins++;
+    rivalWonLast = !playerWon;
+    SoundKit.play(playerWon ? 'crowdCheer' : 'crowdGroan');
+    if (playerWon) roundWinBeat(ctx);
+    meOut = !playerWon; foeOut = playerWon;
+    meMove.vel.setAll(0); foeMove.vel.setAll(0); foeUlt.clear();
+    banner(ctx, `${label} — ROUND ${round}`, DUEL.roundOverSec * 1000);
+  }
+
+  /** After the KO pause: the match's end, or the next round. */
+  function afterRound(ctx: ModeContext): void {
+    if (myWins >= ROUNDS_TO_WIN || foeWins >= ROUNDS_TO_WIN) {
+      setPhase('matchOver');
+      SoundKit.play('whistle');
+      const won = myWins >= ROUNDS_TO_WIN;
+      if (won) matchPunch(ctx);
+      // IMPROVE (2026-10-06): the result pays a ring-out round and each guard impact on top of the rounds (duelRules)
+      const score = duelScore({ myWins, foeWins, ringOutWins, guardImpacts });
+      ctx.end(won ? 'DUEL_WON' : 'DUEL_LOST', score, { foeWins, wins: myWins, ringOuts: ringOutWins, guardImpacts, weapon: myWeapon as string } as never);
+      return;
+    }
+    round++;
+    startRound(ctx);
+  }
+
+  /** IMPROVE (2026-10-06): the player's weapon, its styled moveset and its ids built ONCE here (not per press). */
+  function setMyWeapon(ctx: ModeContext, w: DuelWeapon): void {
+    myWeapon = w; myMoves = styled(w); myMoveIds = Object.keys(myMoves);
+    meStrike.swapMoveset(myMoves);
+    showWeapons(ctx);
+  }
+  /** IMPROVE (2026-10-06): the rival's weapon for a round — its moveset, its brain, the prop in its hand. */
+  function setFoeWeapon(ctx: ModeContext, w: DuelWeapon): void {
+    if (w === foeWeapon) return;
+    foeWeapon = w;
+    foeStrike.swapMoveset(RIVAL_MOVESET[w]());
+    rivalBrain = brainFor(w);
+    showWeapons(ctx);
+  }
+
+  /** IMPROVE (2026-10-06): the first frame of play — the start-up screen's weapon, read NOW (its picker is still offered on
+   *  READY, after load), and the in-round pick only when the screen did not make one. It used to read the screen's pick
+   *  and then force a 20 s weapon phase anyway. */
+  function beginPlay(ctx: ModeContext): void {
+    const picked = DUEL_WEAPONS.find((w) => w === weaponPicked()) ?? null;
+    setMyWeapon(ctx, picked ?? myWeapon);
+    if (picked) { console.info(`[DUEL] weapon from the start-up screen: ${picked}`); startMatch(ctx); return; }
+    setPhase('weaponSelect');
+    banner(ctx, 'CHOOSE YOUR WEAPON — A FISTS · B BLADE · Y STAFF', Infinity);
+  }
+
+  function startMatch(ctx: ModeContext): void {
+    round = 1; myWins = 0; foeWins = 0; matchLatch = false; heavyAt = 0;
+    ringOutWins = 0; guardImpacts = 0; lastFoeWeapon = null; rivalWonLast = false;
+    startRound(ctx);
+  }
+
+  /** A round's start — everything reset, the fighters on their marks, the rival's weapon for this round, then the beat:
+   *  "ROUND n" for READY, then FIGHT! (update()). */
   function startRound(ctx: ModeContext): void {
     meState.resetRound(); foeState.resetRound(); xBtn.reset(); padGuard.reset(); guardUp = false; book.reset(); stringLabels = []; deferred.clear(); ledger.reset(); bodyShift = null; focus.stop(); focusHeld = false; rival.animator.setTimeScale(1); player.animator.setTimeScale(1); ctx.juice.tint(null);
+    // IMPROVE (2026-10-06): nothing of the last round carries in — the beats, the verdict, the rival's armed edge, its guard
+    meDef.releaseBlock(); foeDef.releaseBlock(); foeLaunchedSec = 0; foeUlt.clear(); foeSubstituted = 0; foeFullCalled = false;
+    meHitT = 0; foeHitT = 0; meHitBy = null; foeHitBy = null; parryFlash = 0; giFlash = 0; foeParryFlash = 0; foeGiFlash = 0;
+    meOut = false; foeOut = false; meAnim.reset(); foeAnim.reset();
     // SHARED-PLACE-FLOOR (feet on floor): the round reset put both fighters at y 0 — 12 cm INSIDE the raised disc they spawn on
     player.root.position.set(0, DISC_LIFT, 2.4); rival.root.position.set(0, DISC_LIFT, -2.4);
     player.root.rotation.y = Math.PI; rival.root.rotation.y = 0;
     meMove.vel.setAll(0); foeMove.vel.setAll(0);
+    // IMPROVE (2026-10-06): the rival counter-picks your weapon, and changes it when it loses a round (duelRules) — it held
+    // the staff every round, whatever you brought
+    const fw = rivalWeaponFor(round, myWeapon, lastFoeWeapon, rivalWonLast);
+    setFoeWeapon(ctx, fw); lastFoeWeapon = fw;
     roundStartRival();
+    setPhase('ready');
+    banner(ctx, `${roundCall(round, ROUNDS_TO_WIN)} — ${WEAPON_TAG[myWeapon]} vs ${WEAPON_TAG[fw]}`, Infinity);
+    SoundKit.play('whoosh', { pitch: 0.7, volume: 0.35 });
+  }
+  function fight(ctx: ModeContext): void {
     setPhase('fighting');
-    ctx.setHud({
-      hp: 100, foeHp: 100, wins: myWins, foeWins, round: `${round}`,
-      hint: 'Stick orbits your foe · X block — tap+flick TOWARD them at impact for GUARD IMPACT · knock them OFF the disc',
-    });
+    banner(ctx, 'FIGHT!', 600);
+    SoundKit.play('whistle', { volume: 0.5 });
+    ctx.feel?.impact?.(0.25);
   }
 
   /**
@@ -455,6 +603,136 @@ export const DuelMode: ModeDefinition = (() => {
     foeProp?.dispose(); foeProp = null;
     if (player) myProp = equipWeapon(ctx.scene, player.skeleton, weaponById(myWeapon), 'duel_weapon_me');
     if (rival) foeProp = equipWeapon(ctx.scene, rival.skeleton, weaponById(foeWeapon), 'duel_weapon_foe');
+  }
+
+  // ── IMPROVE (2026-10-06): the posture feed, built once (it was a closure recreated every frame), on plain numbers ──
+  function feedBio(bio: CombatPostureInput, mv: CombatMovement, st: FighterState, df: DefenseController, str: StrikeController, hb: typeof meHitBy, yaw: number, foeC: SpawnedCharacter, selfC: SpawnedCharacter, parrying: boolean, impact: boolean, celebrating: boolean): void {
+    const dx = foeC.root.position.x - selfC.root.position.x, dz = foeC.root.position.z - selfC.root.position.z, d = Math.hypot(dx, dz);
+    const closing = d > 1e-3 ? (mv.vel.x * dx + mv.vel.z * dz) / d : 0;
+    bio.speed01 = Math.min(1, Math.hypot(mv.vel.x, mv.vel.z) / 6.4); bio.strafe = strafeAxis(mv.vel, yaw); bio.approach = combatApproach(closing);
+    bio.striking = str.current?.move.weight ?? null; bio.windingUp = false;
+    bio.blocking = df.blocking; bio.parrying = parrying; bio.guardImpact = impact;
+    bio.hitBy = hb; bio.down = st.staggerSec > 0.8; bio.out = st.hp <= 0;
+    bio.rising = false; bio.dodging = false; bio.celebrating = celebrating; bio.engaged = phase === 'fighting';
+  }
+
+  /** The animation trees and the posture bios, in EVERY phase (IMPROVE 2026-10-06): the round's end goes through the trees
+   *  — the loser's ko holds the floor, the winner celebrates — and each fighter's parry / guard impact flash reaches them. */
+  function animate(dt: number): void {
+    const verdict = phase === 'roundOver' || phase === 'matchOver';
+    meAnim.update({
+      speed01: meMove.vel.length() / 6.4, dashing: false, hasWeapon: myWeapon !== 'fists',
+      striking: meStrike.current?.move.weight ?? null,
+      blocking: meDef.blocking, parryFlash: parryFlash > 0, guardImpactFlash: giFlash > 0,
+      hitBy: meHitBy, down: meState.staggerSec > 0.8, out: meState.hp <= 0 || meOut, ulting: false,
+      celebrating: verdict && foeOut,
+    });
+    foeAnim.update({
+      speed01: foeMove.vel.length() / 6.4, dashing: false, hasWeapon: foeWeapon !== 'fists',
+      striking: foeStrike.current?.move.weight ?? null,
+      blocking: foeDef.blocking, parryFlash: foeParryFlash > 0, guardImpactFlash: foeGiFlash > 0,
+      hitBy: foeHitBy, down: foeState.staggerSec > 0.8, out: foeState.hp <= 0 || foeOut, ulting: false,
+      celebrating: verdict && meOut,
+    });
+    // the posture bios, resolved in each fighter's OWN frame so a backstep and a circle read differently
+    // rather than being the same world-space number
+    const meYaw = player.root.rotation.y, foeYaw = rival.root.rotation.y;
+    meMotion.update(meMove.vel.x, meMove.vel.z, meYaw, dt);
+    foeMotion.update(foeMove.vel.x, foeMove.vel.z, foeYaw, dt);
+    feedBio(meBio, meMove, meState, meDef, meStrike, meHitBy, meYaw, rival, player, parryFlash > 0, giFlash > 0, verdict && foeOut);
+    feedBio(foeBio, foeMove, foeState, foeDef, foeStrike, foeHitBy, foeYaw, player, rival, foeParryFlash > 0, foeGiFlash > 0, verdict && meOut);
+  }
+
+  // ── IMPROVE (2026-10-06): the HUD is pushed only where a value changed (four fields went out every frame). The round
+  // clock and the edge call are fields of their own: the edge warning used to overwrite the controls hint and never clear.
+  const hudSent: Record<string, string | number> = {};
+  let hudPatch: Record<string, string | number> | null = null;
+  function hudPut(k: string, v: string | number): void { if (hudSent[k] !== v) { hudSent[k] = v; (hudPatch ??= {})[k] = v; } }
+  function pushHud(ctx: ModeContext): void {
+    hudPut('hp', Math.ceil(meState.hp)); hudPut('foeHp', Math.ceil(foeState.hp));
+    hudPut('guard', Math.round(meState.guard)); hudPut('foeGuard', Math.round(foeState.guard));
+    hudPut('foeChi', Math.round(foeState.chi));
+    hudPut('wins', myWins); hudPut('foeWins', foeWins); hudPut('round', `${round}`);
+    const live = phase === 'fighting';
+    hudPut('timeLeft', live ? Math.max(0, Math.ceil(DUEL.roundSec - phaseSec)) : phase === 'ready' ? DUEL.roundSec : (hudSent.timeLeft ?? DUEL.roundSec));
+    hudPut('edge', live && arena.edge === 'drop' ? edgeCall(insideBy(player.root.position, arena.shape), insideBy(rival.root.position, arena.shape)) : '');
+    if (hudPatch) { ctx.setHud(hudPatch); hudPatch = null; }
+  }
+  function camera(ctx: ModeContext, dt: number): void {
+    ctx.camDirector.look(lookX, lookY, dt);
+    ctx.camDirector.update(player.root.position, meMove.vel, rival.root.position);
+  }
+
+  /** The fists' string direction: the stick toward (f), away from (b) or neither (n), read against the rival. */
+  function stickDirToFoe(ctx: ModeContext): StickDir {
+    if (Math.hypot(stickX, stickY) < 0.35) return 'n';
+    const w = wish(ctx);
+    const tx = rival.root.position.x - player.root.position.x, tz = rival.root.position.z - player.root.position.z;
+    const d = (w.x * tx + w.z * tz) / Math.max(1e-3, Math.hypot(tx, tz) * Math.hypot(w.x, w.z));
+    return d > 0.4 ? 'f' : d < -0.4 ? 'b' : 'n';
+  }
+
+  /** The rival's turn: the shared brain approaches, picks from the whole moveset, and spends chi (IMPROVE 2026-10-06: a
+   *  real dash, an edge-safe substitution with its effect and whiff beat, and the CRITICAL EDGE). */
+  function rivalTurn(ctx: ModeContext, sdtRoom: number): void {
+    if (!(foeState.controllable && !foeStrike.busy)) { foeMove.updateWithSelf(sdtRoom, 0, 0, false, rival.root.position); return; }
+    // (NERVE: set once per round in roundStartRival — IMPROVE 2026-10-06)
+    const meWinding = !!meStrike.current && meStrike.current.phase === 'startup';
+    const incoming = meWinding && meStrike.current ? meStrike.current.secToActive : -1;
+    const dist = Vector3.Distance(rival.root.position, player.root.position);
+    const reach = meStrike.current?.move.atk.range ?? WEAPON_RANGE[foeWeapon];
+    // IMPROVE (2026-10-06): the rival reads my openings (a whiff's recovery, a step, a roll) and its own sub cooldown
+    const meOpen = meStrike.current?.phase === 'recovery' || meMove.dashing || meMove.rolling;
+    foeRes.value = foeState.chi; foeRes.subReady = foeDef.canSubstitute(foeState.chi, now());
+    const decision = rivalBrain.decide(
+      sdtRoom, rival.root.position, player.root.position, foeState, meWinding,
+      foeRes, threatLandsIn(dist, reach, incoming < 0 ? null : incoming), meOpen,
+    );
+    // the brain's wish as orbit / radial around me — plain numbers (IMPROVE 2026-10-06: it was four Vector3s a frame)
+    const tx = player.root.position.x - rival.root.position.x, tz = player.root.position.z - rival.root.position.z, td = Math.hypot(tx, tz);
+    const dx = td > 0.05 ? tx / td : 0, dz = td > 0.05 ? tz / td : 1;
+    const wx = decision.moveX, wz = -decision.moveY;
+    const radial = wx * dx + wz * dz, orbit = wx * -dz + wz * dx;
+    foeMove.updateWithSelf(sdtRoom, orbit, radial, false, rival.root.position);
+    // IMPROVE (2026-10-06): the dash is CombatMovement's own burst at me (it was a 2.2 m position jump); chi only if it goes
+    if (decision.spend === 'dash' && foeState.chi >= DUEL.rivalDashChi && foeMove.dash(dx, dz)) {
+      foeState.chi -= DUEL.rivalDashChi;
+      SoundKit.play('whoosh', { pitch: 1.3, volume: 0.4 });
+      console.info('[DL-STORM] rival dash');
+    }
+    const thrown = decision.attackId ? foeStrike.request(decision.attackId, now()) : false;
+    // IMPROVE (2026-10-06): the full bar rides the heavy the brain throws for it — the CRITICAL EDGE (resolveActive). It
+    // used to zero the bar and nothing else.
+    if (decision.spend === 'ultimate' && thrown && foeStrike.current && foeState.chi >= CHI_MAX) {
+      foeState.chi = 0;
+      foeUlt.arm(foeStrike.current);
+      ctx.juice.flash('#ff3344', 90); ctx.juice.callout('RIVAL CRITICAL EDGE!', '#ff4d5e', 500);
+      SoundKit.play('powerUp', { pitch: 0.45, volume: 0.6 });
+      console.info('[DL-STORM] rival critical edge armed');
+    }
+    if (decision.spend === 'substitution' && foeState.chi >= SUBSTITUTION_CHI_COST) {
+      // IMPROVE (2026-10-06): never onto a spot past the drop (behind me, else beside me, else not at all)
+      const spot = safeSubstitutionSpot(player.root.position.x, player.root.position.z, player.root.rotation.y, edgeIn);
+      if (spot) {
+        foeState.chi -= SUBSTITUTION_CHI_COST;
+        foeDef.spendSubstitution(now());   // IMPROVE (2026-10-06): the rival's substitution has a cooldown and a punish window
+        knock.cancel(rival.root.position);
+        rival.root.position.set(spot.x, rival.root.position.y, spot.z);
+        // seen and heard, like Showdown's — it was a silent teleport — and the swing it read finds nobody
+        foeSubstituted = now() + DUEL.subWhiffMs;
+        SoundKit.play('whoosh', { pitch: 1.8, volume: 0.6 });
+        EffectsKit.burst(ctx.scene, new Vector3(spot.x, rival.root.position.y + 1.2, spot.z), 'glitch');
+        ctx.camDirector.pulse(0.4, 0.35);
+        banner(ctx, 'RIVAL SUBSTITUTED — BEHIND YOU!', 800);
+        console.info('[DL-STORM] rival substitution');
+      } else console.info('[DL-STORM] rival substitution refused — no footing behind or beside you');
+    }
+    if (decision.block && !foeState.blockHeld) {
+      // IMPROVE (2026-10-06): the brain says block / parry / guard impact; the press is stamped for it (was always now − 200)
+      const at = guardPressMs(now(), decision.guard, incoming >= 0 ? incoming * 1000 : null);
+      foeDef.pressBlock(at, decision.guard === 'impact'); foeState.pressBlock(at); foeGuardUntil = now() + 600;
+    }
+    if (!decision.block && foeState.blockHeld && now() > foeGuardUntil) { foeDef.releaseBlock(); foeState.releaseBlock(); }
   }
 
   return {
@@ -473,21 +751,11 @@ export const DuelMode: ModeDefinition = (() => {
       console.info(`[ARENA] duel · ${describeArena(arena)}`);
       modeVenue = mountVenue(ctx, 'karate_h2h', { keepGameplayCamera: true, arena });
       if (!modeVenue) VenueKit.buildDojo(ctx.scene);
-      // the platform, its rim, the pit under it, and any walls: the shared arena builder's (combat/arenaBuild.ts)
+      // the platform, its rim, the pit under it, and any walls: the shared arena builder's (combat/arenaBuild.ts). It is
+      // raised DISC_LIFT proud of the venue floor — a platform coplanar with the floor photographed as z-fighting blotches.
+      // IMPROVE (2026-10-06): the hidden `duel_disc` cylinder this used to keep under it "for the probes" is gone — nothing
+      // read it, it was never shown, and its material was never disposed.
       arenaHandle?.dispose(); arenaHandle = buildArena(ctx.scene, arena, { lift: DISC_LIFT });
-
-      // raised disc arena (ring-out platform) — the builder's platform carries it now; this stays as the disc the
-      // camera bounds and the old probes read, hidden under the platform
-      discMesh = MeshBuilder.CreateCylinder('duel_disc', { diameter: (arena.shape.kind === 'disc' ? arena.shape.radius : Math.min(arena.shape.halfX, arena.shape.halfZ)) * 2, height: 0.4 }, ctx.scene);
-      // THE DISC IS A RAISED PLATFORM, and it has to be raised for a reason beyond flavour: with the dojo
-      // now under it, a disc whose top sat exactly at the venue floor's y = 0 was COPLANAR with it, and the
-      // floor photographed covered in purple z-fighting blotches. It is a ring-out arena — standing it proud
-      // of the floor fixes the artifact and makes the boundary the fight turns on visible at the same time.
-      discMesh.position.y = -0.2 + DISC_LIFT; discMesh.isVisible = false;
-      const dm = new StandardMaterial('discMat', ctx.scene);
-      dm.diffuseColor = new Color3(0.16, 0.18, 0.24);
-      discMesh.material = dm;
-
 
       // 'karate_idle_stance' is a deliberate CLIP_ALIASES entry (guard @ 0.8x
       // — a slower, more grounded ready-stance pace than plain SPORT_CLIP.
@@ -504,20 +772,15 @@ export const DuelMode: ModeDefinition = (() => {
       installSafePlay(rival.animator, 'duel-rival');
 
       meState = new FighterState(100); foeState = new FighterState(100);
-      // what the start-up screen chose, if it is one this mode offers (the gauntlet is not a duel weapon)
-      myWeapon = (['fists', 'staff', 'blade'] as const).find((w) => w === readWeapon().id) ?? 'fists';
+      // what the start-up screen chose, if it is one this mode offers (the gauntlet is not a duel weapon) — read again on the
+      // first frame of play (beginPlay), because the screen's picker is still offered on READY
+      myWeapon = DUEL_WEAPONS.find((w) => w === readWeapon().id) ?? 'fists';
       ctxRef = ctx;   // P7
-      meStrike = new StrikeController(styled(myWeapon));
-      showWeapons(ctx);
+      myMoves = styled(myWeapon); myMoveIds = Object.keys(myMoves);
+      meStrike = new StrikeController(myMoves);
       foeStrike = new StrikeController(RIVAL_MOVESET[foeWeapon]());   // the rival fights unstyled
-      rivalBrain = new RivalCombatBrain({
-        difficulty: 0.72, canSpecial: false,   // IMPROVE (2026-10-06): this mode never upgrades a full-chi heavy to a special
-        moves: Object.entries(RIVAL_MOVESET[foeWeapon]()).map(([id, m]) => ({
-          id,
-          kind: m.weight === 'light' ? 'jab' as const : m.weight === 'medium' ? 'kick' as const : 'heavy' as const,
-          range: m.atk.range,
-        })),
-      });
+      rivalBrain = brainFor(foeWeapon);
+      showWeapons(ctx);
       // phase 6 seam: seconds until the rival's swing lands (−1 = nothing in flight) — the probe's perfect driver reads it
       (ctx.scene.metadata ??= {}).fight = { landsIn: () => { const c = foeStrike.current; return c && c.phase === 'startup' ? c.secToActive : -1; } };
       meMove = new CombatMovement(); foeMove = new CombatMovement();
@@ -542,11 +805,10 @@ export const DuelMode: ModeDefinition = (() => {
       ctx.objectiveRef.current = rival.root.position;
       ctx.camDirector.snapTo(player.root.position, rival.root.position);
       assertSpawned(ctx.scene, { hero: player.root, minWorldMeshes: 4, modeId: 'duel' });
-      setPhase('weaponSelect');
-      ctx.setHud({
-        banner: 'CHOOSE YOUR WEAPON', hp: 100, foeHp: 100,
-        hint: 'A = FISTS (fast, short) · B = BLADE (balanced, combos) · Y = STAFF (long, slow, huge knockback)',
-      });
+      setPhase('intro');
+      // IMPROVE (2026-10-06): ONE static controls line (DUEL_HINT); the weapon pick, when it is needed, is a banner
+      ctx.setHud({ hint: DUEL_HINT });
+      pushHud(ctx);
     },
 
     onInput(ctx: ModeContext, e: FelInput) {
@@ -563,25 +825,22 @@ export const DuelMode: ModeDefinition = (() => {
         padGuard.release(now());
         if ((guardUp || g === 'held') && !bodyGuard) { meDef.releaseBlock(); meState.releaseBlock(); guardUp = false; }   // (P7: a body guard still up keeps the block)
         if (g === 'tap' || g === 'double') {
-          const to = rival.root.position.subtract(player.root.position); to.y = 0;
+          const tx = rival.root.position.x - player.root.position.x, tz = rival.root.position.z - player.root.position.z;
           const w = wish(ctx);
           const useStick = g === 'tap' && Math.hypot(w.x, w.z) > 0.25;
-          const dir = useStick ? w : (to.lengthSquared() > 1e-4 ? to.normalize() : w);
-          if (meState.controllable && meMove.dash(dir.x, dir.z, g === 'double')) { SoundKit.play('whoosh', { pitch: g === 'double' ? 1.35 : 1.2, volume: 0.45 }); console.info(`[DL-STORM] ${g === 'double' ? 'closing step' : 'step'}`); }
+          const toward = tx * tx + tz * tz > 1e-4;
+          const dx = useStick || !toward ? w.x : tx, dz = useStick || !toward ? w.z : tz;
+          if (meState.controllable && meMove.dash(dx, dz, g === 'double')) { SoundKit.play('whoosh', { pitch: g === 'double' ? 1.35 : 1.2, volume: 0.45 }); console.info(`[DL-STORM] ${g === 'double' ? 'closing step' : 'step'}`); }
         }
       }
       if (!e.pressed) return;
 
       if (phase === 'weaponSelect') {
-        if (e.btn === 'A') myWeapon = 'fists';
-        else if (e.btn === 'B') myWeapon = 'blade';
-        else if (e.btn === 'Y') myWeapon = 'staff';
+        if (e.btn === 'A') setMyWeapon(ctx, 'fists');
+        else if (e.btn === 'B') setMyWeapon(ctx, 'blade');
+        else if (e.btn === 'Y') setMyWeapon(ctx, 'staff');
         else { refuse(ctx, 'PICK A WEAPON — A FISTS · B BLADE · Y STAFF'); return; }
-        meStrike.swapMoveset(styled(myWeapon));
-        showWeapons(ctx);
-        banner(ctx, `${WEAPON_TAG[myWeapon]} — ROUND 1`, 1200);
-        round = 1; myWins = 0; foeWins = 0; matchLatch = false; heavyAt = 0;
-        setTimeout(() => startRound(ctx), 900);
+        startMatch(ctx);   // IMPROVE (2026-10-06): the round's READY beat is the gap now (it was a 900 ms setTimeout)
         return;
       }
       // SCORECARD CONTROLS (2026-09-15): 5 of 40 presses were swallowed here — a swing or a guard thrown between rounds,
@@ -592,8 +851,7 @@ export const DuelMode: ModeDefinition = (() => {
         return;
       }
 
-      const moveIds = myWeapon === 'fists' ? ['jab', 'kick', 'heavy'] : Object.keys(styled(myWeapon));   // phase 4: the book's ids beyond these three are reached through the string, not a button
-      const whooshPitch = { fists: 1.2, blade: 1.5, staff: 0.8 }[myWeapon];
+      const whooshPitch = WHOOSH_PITCH[myWeapon];
       const trySwing = (id: string) => {
         if (meStrike.request(id, now())) SoundKit.play('whoosh', { pitch: whooshPitch, volume: 0.4 });
         else refuse(ctx, 'RECOVERING');   // MECHANICS PASS: a swing refused mid-recovery is said, not swallowed
@@ -601,9 +859,11 @@ export const DuelMode: ModeDefinition = (() => {
       if (myWeapon === 'fists') {
         // phase 4: empty hands read the Storm book — the string picks the link (jab → cross → rising dragon…)
         const key = e.btn === 'A' ? 'jab' : e.btn === 'B' ? 'kick' : e.btn === 'Y' ? 'heavy' : null;
-        if (key) { const stickDirToFoe = (): StickDir => { if (Math.hypot(stickX, stickY) < 0.35) return 'n'; const w = wish(ctx); const to = rival.root.position.subtract(player.root.position); to.y = 0; const d = (w.x * to.x + w.z * to.z) / Math.max(1e-3, Math.hypot(to.x, to.z) * Math.hypot(w.x, w.z)); return d > 0.4 ? 'f' : d < -0.4 ? 'b' : 'n'; };
-          const mv = book.press(BTN_OF[key], stickDirToFoe(), now() / 1000, { afterDash: meMove.dashing, air: foeLaunchedSec > 0 }); const ok = meStrike.request(mv.id, now()); if (ok) { SoundKit.play('whoosh', { pitch: whooshPitch, volume: 0.4 }); console.info(`[DL-STORM] link ${mv.id} string ${book.history.length}`); stringLabels.push(mv.label); if (mv.ender || book.history.length === 0) { const call = stringLabels.join(' → '); stringLabels = []; if (call.includes('→')) banner(ctx, `COMBO: ${call}`, 900); } } else refuse(ctx, 'RECOVERING'); return; }   // phase 9: the string is named
+        if (key) {
+          const mv = book.press(BTN_OF[key], stickDirToFoe(ctx), now() / 1000, { afterDash: meMove.dashing, air: foeLaunchedSec > 0 }); const ok = meStrike.request(mv.id, now()); if (ok) { SoundKit.play('whoosh', { pitch: whooshPitch, volume: 0.4 }); console.info(`[DL-STORM] link ${mv.id} string ${book.history.length}`); stringLabels.push(mv.label); if (mv.ender || book.history.length === 0) { const call = stringLabels.join(' → '); stringLabels = []; if (call.includes('→')) banner(ctx, `COMBO: ${call}`, 900); } } else refuse(ctx, 'RECOVERING'); return;   // phase 9: the string is named
+        }
       }
+      const moveIds = myWeapon === 'fists' ? FIST_IDS : myMoveIds;
       if (e.btn === 'A') trySwing(moveIds[0]);
       if (e.btn === 'B') trySwing(moveIds[1]);
       if (e.btn === 'Y') trySwing(moveIds[2]);
@@ -611,17 +871,23 @@ export const DuelMode: ModeDefinition = (() => {
         // STORM X (phase 3): a flick TOWARD the rival on the press is the guard impact (the read lives on the press); else the
         // block waits for the HOLD and a release inside DASH.tapSec is the step — doubled, the closing step at the rival
         xBtn.press(now() / 1000);
-        const to = rival.root.position.subtract(player.root.position);
         const w = wish(ctx);
-        const flick = (w.x * to.x + w.z * to.z) > 0.3;
+        const flick = (w.x * (rival.root.position.x - player.root.position.x) + w.z * (rival.root.position.z - player.root.position.z)) > 0.3;
         if (flick) { meDef.pressBlock(now(), true); meState.pressBlock(now()); padGuard.press(now()); guardUp = true; SoundKit.play('impact', { pitch: 1.6, volume: 0.18 }); ctx.juice.callout('GUARD IMPACT…', '#ffd75e', 450); }
       }
     },
 
     update(ctx: ModeContext, dt: number) {
       phaseSec += dt;
+      clock += dt;   // IMPROVE (2026-10-06): the mode's game clock (banners)
       ctxRef = ctx;
+      { const b = bannerSlot.tick(clock); if (b !== null) ctx.setHud({ banner: b }); }
       { const bv = ctx.body?.(); if (bv) bodyLedgerFrame(bv, now()); deferred.flush(ledger, now()); }   // P7: the body's deferred hits
+      // IMPROVE (2026-10-06): the phase beats on the game clock — the weapon on the first frame of play, FIGHT! after the
+      // round-start beat, the next round (or the result) after the KO pause
+      if (phase === 'intro') { beginPlay(ctx); return; }
+      if (phase === 'ready' && phaseSec >= DUEL.readySec) fight(ctx);
+      else if (phase === 'roundOver' && phaseSec >= DUEL.roundOverSec) { afterRound(ctx); return; }
       // phase 8 — MATRIX FOCUS: the trigger holds bullet time — the rival on the room's clock (his animator, brain, swings,
       // movement), me on mine. `sdtRoom` / `sdtHero` below are the two clocks; nothing else in this update reads `dt` for a body.
       const wasFocus = focus.active;
@@ -632,20 +898,25 @@ export const DuelMode: ModeDefinition = (() => {
       { const fv = Math.round(focus.value); if (fv !== focusHud || focus.active !== focusHudOn) { focusHud = fv; focusHudOn = focus.active; ctx.setHud({ focus: fv, focusOn: focus.active }); } }
       const sdtRoom = dt * focus.worldScale, sdtHero = dt * focus.heroScale;
       knock.tick(sdtRoom);   // IMPROVE (2026-10-06): knockback on the room clock, every phase (a KO's slide finishes)
-      if (foeLaunchedSec > 0) { foeLaunchedSec = Math.max(0, foeLaunchedSec - dt); rival.root.position.y = launchHeight(1 - foeLaunchedSec / LAUNCH_AIR_SEC); if (foeLaunchedSec === 0) rival.root.position.y = 0; }   // phase 5
+      // phase 5 (IMPROVE 2026-10-06: the landing is ON the raised platform, DISC_LIFT — it was y 0, 12 cm inside it)
+      if (foeLaunchedSec > 0) { foeLaunchedSec = Math.max(0, foeLaunchedSec - dt); rival.root.position.y = DISC_LIFT + launchHeight(1 - foeLaunchedSec / LAUNCH_AIR_SEC); if (foeLaunchedSec === 0) rival.root.position.y = DISC_LIFT; }
       if (!padGuard.held && xBtn.guardHeld(now() / 1000) && meState.controllable) { padGuard.press(now()); if (!guardUp) { guardUp = true; meDef.pressBlock(now(), false); meState.pressBlock(now()); SoundKit.play('impact', { pitch: 1.3, volume: 0.18 }); } }   // phase 3: the hold is the guard (P7: the pad's, apart from a body guard already up)
       if (phaseSec > BUDGET_SEC[phase]) {
-        if (phase === 'fighting') endRound(ctx, meState.hp >= foeState.hp, 'TIME');
-        else if (phase === 'weaponSelect') { meStrike.swapMoveset(styled(myWeapon)); startRound(ctx); }
+        if (phase === 'fighting') endRound(ctx, meState.hp >= foeState.hp, 'TIME', 'time');   // the round clock's bell (the HUD shows it now)
+        else if (phase === 'weaponSelect') startMatch(ctx);   // nothing pressed: the weapon in hand
+        else if (phase === 'ready') fight(ctx);
+        else if (phase === 'roundOver') afterRound(ctx);
         return;
       }
-      if (phase !== 'fighting') return;
+      tickBeats(dt);   // IMPROVE (2026-10-06): each fighter's reaction and guard flashes on its own timer
+      if (phase !== 'fighting') {
+        // the weapon pick, READY and the verdict: nobody acts; the trees still run — the KO'd body holds the floor and the
+        // winner celebrates (IMPROVE 2026-10-06)
+        animate(dt); pushHud(ctx); camera(ctx, dt);
+        return;
+      }
 
-      hitT = Math.max(0, hitT - dt);
-      if (hitT === 0) { meHitBy = null; foeHitBy = null; }
       meState.tick(sdtHero); foeState.tick(sdtRoom);   // phase 8: a clock per rig
-      if (meState.blockHeld && meDef.blocking) { /* guard held */ }
-      if (meState.blockHeld && !(stickX || true)) { /* noop */ }
 
       // 8-way movement (both fighters orbit the disc)
       if (meState.controllable && !meStrike.busy && !meDef.blocking) {
@@ -653,105 +924,44 @@ export const DuelMode: ModeDefinition = (() => {
       } else {
         meMove.updateWithSelf(dt, 0, 0, false, player.root.position);
       }
-      player.root.position.addInPlace(meMove.vel.scale(dt));
+      player.root.position.addInPlaceFromFloats(meMove.vel.x * dt, meMove.vel.y * dt, meMove.vel.z * dt);   // (no Vector3 per frame)
       // P7 AUTO-SPACING: a body player has no stick — a step in / out / across moves the fighter (the disc's edge is still
       // the edge: checkRingOut below); a stick past its dead zone always wins
       if (bodyShift) {
         if (Math.hypot(stickX, stickY) > 0.35 || !meState.controllable) bodyShift = null;
-        else { const step = Math.min(dt, bodyShift.left); player.root.position.addInPlace(bodyShift.v.scale(step)); bodyShift.left -= step; if (bodyShift.left <= 0) bodyShift = null; }
+        else { const step = Math.min(dt, bodyShift.left); player.root.position.addInPlaceFromFloats(bodyShift.v.x * step, bodyShift.v.y * step, bodyShift.v.z * step); bodyShift.left -= step; if (bodyShift.left <= 0) bodyShift = null; }
       }
 
-      // rival AI: the shared brain approaches, picks from the whole moveset, and spends chi
-      if (foeState.controllable && !foeStrike.busy) {
-        // (NERVE: set once per round in roundStartRival — IMPROVE 2026-10-06)
-        const meWinding = !!meStrike.current && meStrike.current.phase === 'startup';
-        const incoming = meWinding && meStrike.current ? meStrike.current.secToActive : -1;
-        const dist = Vector3.Distance(rival.root.position, player.root.position);
-        const reach = meStrike.current?.move.atk.range ?? WEAPON_RANGE[foeWeapon];
-        // IMPROVE (2026-10-06): the rival reads my openings (a whiff's recovery, a step, a roll) and its own sub cooldown
-        const meOpen = meStrike.current?.phase === 'recovery' || meMove.dashing || meMove.rolling;
-        const decision = rivalBrain.decide(
-          sdtRoom, rival.root.position, player.root.position, foeState, meWinding,
-          chiResource(foeState.chi, 12, SUBSTITUTION_CHI_COST, foeDef.canSubstitute(foeState.chi, now())),
-          threatLandsIn(dist, reach, incoming < 0 ? null : incoming), meOpen,
-        );
-        const wishV = new Vector3(decision.moveX, 0, -decision.moveY);
-        const to = player.root.position.subtract(rival.root.position); to.y = 0;
-        const dir = to.length() > 0.05 ? to.normalize() : new Vector3(0, 0, 1);
-        const radial = Vector3.Dot(wishV, dir);
-        const orbit = Vector3.Dot(wishV, new Vector3(-dir.z, 0, dir.x));
-        foeMove.updateWithSelf(sdtRoom, orbit, radial, false, rival.root.position);
-        if (decision.spend === 'dash' && foeState.chi >= 12) {
-          foeState.chi -= 12;
-          rival.root.position.addInPlace(dir.scale(2.2));
-        }
-        if (decision.spend === 'ultimate') foeState.chi = 0;
-        if (decision.spend === 'substitution' && foeState.chi >= SUBSTITUTION_CHI_COST) {
-          foeState.chi -= SUBSTITUTION_CHI_COST;
-          foeDef.spendSubstitution(now());   // IMPROVE (2026-10-06): the rival's substitution has a cooldown and a punish window
-          rival.root.position.copyFrom(DefenseController.substitutionSpot(player.root.position, player.root.rotation.y));
-        }
-        if (decision.attackId) foeStrike.request(decision.attackId, now());
-        if (decision.block && !foeState.blockHeld) {
-          // IMPROVE (2026-10-06): the brain says block / parry / guard impact; the press is stamped for it (was always now − 200)
-          const at = guardPressMs(now(), decision.guard, incoming >= 0 ? incoming * 1000 : null);
-          foeDef.pressBlock(at, decision.guard === 'impact'); foeState.pressBlock(at); foeGuardUntil = now() + 600;
-        }
-        if (!decision.block && foeState.blockHeld && now() > foeGuardUntil) { foeDef.releaseBlock(); foeState.releaseBlock(); }
-      } else {
-        foeMove.updateWithSelf(sdtRoom, 0, 0, false, rival.root.position);
-      }
-      rival.root.position.addInPlace(foeMove.vel.scale(sdtRoom));
+      // rival AI
+      if (foeState.chi >= CHI_MAX) { if (!foeFullCalled) { foeFullCalled = true; ctx.juice.callout('RIVAL CHI FULL', '#ff4d5e', 700); } }   // IMPROVE (2026-10-06): the tell before its critical edge
+      else foeFullCalled = false;
+      rivalTurn(ctx, sdtRoom);
+      // IMPROVE (2026-10-06): the rival's OWN step never takes it over a drop (Mixed's "never step off" rule) — only a
+      // blow sends it over; the knock slide is not this step, so a ring-out still lands
+      const foeInBefore = arena.edge === 'drop' ? insideBy(rival.root.position, arena.shape) : Infinity;
+      rival.root.position.addInPlaceFromFloats(foeMove.vel.x * sdtRoom, foeMove.vel.y * sdtRoom, foeMove.vel.z * sdtRoom);
+      if (arena.edge === 'drop' && holdFromEdge(rival.root.position, foeInBefore, arena.shape)) foeMove.vel.setAll(0);
 
       // strike resolution at active-frame open
-      if (meStrike.update(dt, now()).startedActive) resolveActive(ctx, true);
+      if (meStrike.update(dt, now()).startedActive) {
+        // IMPROVE (2026-10-06): the rival's substitution beat — my swing in flight finds nobody (Showdown's rule)
+        if (now() < foeSubstituted) { meStrike.current?.consumeHit(); banner(ctx, 'THEY SUBSTITUTED!', 500); }
+        else resolveActive(ctx, true);
+      }
       if (foeStrike.update(sdtRoom, now()).startedActive) resolveActive(ctx, false);
-      if (checkRingOut(ctx)) return;
+      foeUlt.sync(foeStrike.current);   // an armed swing that ended unresolved carries nothing on
+      if (phase === 'fighting') checkRingOut(ctx);
 
-      // edge warning
-      if (insideBy(player.root.position, arena.shape) < EDGE_WARN_IN) ctx.setHud({ hint: 'EDGE! WATCH YOUR FOOTING' });
-
-      // animation
-      const w8 = (w: DuelWeapon) => w !== 'fists';
-      meAnim.update({
-        speed01: meMove.vel.length() / 6.4, dashing: false, hasWeapon: w8(myWeapon),
-        striking: meStrike.current?.move.weight ?? null,
-        blocking: meDef.blocking, parryFlash: false, guardImpactFlash: false,
-        hitBy: meHitBy, down: meState.staggerSec > 0.8, out: meState.hp <= 0, ulting: false,
-      });
-      foeAnim.update({
-        speed01: foeMove.vel.length() / 6.4, dashing: false, hasWeapon: w8(foeWeapon),
-        striking: foeStrike.current?.move.weight ?? null,
-        blocking: foeDef.blocking, parryFlash: false, guardImpactFlash: false,
-        hitBy: foeHitBy, down: foeState.staggerSec > 0.8, out: foeState.hp <= 0, ulting: false,
-      });
-
-      // the posture bios, resolved in each fighter's OWN frame so a backstep and a circle read differently
-      // rather than being the same world-space number
-      const meYaw = player.root.rotation.y, foeYaw = rival.root.rotation.y;
-      meMotion.update(meMove.vel.x, meMove.vel.z, meYaw, dt);
-      foeMotion.update(foeMove.vel.x, foeMove.vel.z, foeYaw, dt);
-      const feedBio = (bio: CombatPostureInput, mv: typeof meMove, st: typeof meState, df: typeof meDef, str: typeof meStrike, hb: typeof meHitBy, yaw: number, foeC: SpawnedCharacter, selfC: SpawnedCharacter) => {
-        const sp = Math.hypot(mv.vel.x, mv.vel.z);
-        const toFoe = foeC.root.position.subtract(selfC.root.position); toFoe.y = 0;
-        const closing = toFoe.lengthSquared() > 1e-6 ? Vector3.Dot(mv.vel, toFoe.normalize()) : 0;
-        bio.speed01 = Math.min(1, sp / 6.4); bio.strafe = strafeAxis(mv.vel, yaw); bio.approach = combatApproach(closing);
-        bio.striking = str.current?.move.weight ?? null; bio.windingUp = false;
-        bio.blocking = df.blocking; bio.parrying = false; bio.guardImpact = false;
-        bio.hitBy = hb; bio.down = st.staggerSec > 0.8; bio.out = st.hp <= 0;
-        bio.rising = false; bio.dodging = false; bio.celebrating = false; bio.engaged = phase === 'fighting';
-      };
-      feedBio(meBio, meMove, meState, meDef, meStrike, meHitBy, meYaw, rival, player);
-      feedBio(foeBio, foeMove, foeState, foeDef, foeStrike, foeHitBy, foeYaw, player, rival);
-
-      ctx.setHud({ hp: meState.hp, foeHp: foeState.hp, guard: Math.round(meState.guard), foeGuard: Math.round(foeState.guard) });
-      ctx.camDirector.look(lookX, lookY, dt);
-      ctx.camDirector.update(player.root.position, meMove.vel, rival.root.position);
+      animate(dt);
+      pushHud(ctx);
+      camera(ctx, dt);
     },
 
     dispose() {
+      // IMPROVE (2026-10-06): nothing waits on a disposed rig — the slides, the banner and the armed edge go with the mode
+      knock.clear(); bannerSlot.clear(); foeUlt.clear();
       modeVenue?.dispose?.(); modeVenue = null;
-      discMesh?.dispose(); arenaHandle?.dispose(); arenaHandle = null;
+      arenaHandle?.dispose(); arenaHandle = null;
       // the props are parented to a hand bone, so disposing the character takes them — but they are also
       // rebuilt on every weapon change, and a stale one left behind would ride the next round's rig
       myProp?.dispose(); myProp = null;

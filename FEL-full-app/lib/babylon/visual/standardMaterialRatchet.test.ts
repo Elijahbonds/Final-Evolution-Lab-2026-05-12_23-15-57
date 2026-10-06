@@ -36,7 +36,7 @@ const KNOWN: Record<string, number> = {
   'boardCore.ts': 1,
   'ShowdownMode.ts': 1,
   'KarateEndlessMode.ts': 1,
-  'DuelMode.ts': 1,
+  // 'DuelMode.ts' — 0 since IMPROVE (2026-10-06): its one was the hidden duel_disc's material, and the disc is gone
   'AirSessionMode.ts': 1,
 };
 
