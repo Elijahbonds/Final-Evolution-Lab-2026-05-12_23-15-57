@@ -33,6 +33,7 @@ import { MAX_SONG_BARS, MAX_CHAIN_ENTRIES } from './babylon/music/Song';
 import { PerformSet, performSetMax, PERFORM_SET_NOTES, PERFORM_SET_BARS, PERFORM_STEPS_PER_BAR } from './babylon/music/performSet';
 import { houseBeatFor, judgeHouseSet, houseTap, HOUSE_SET_MAX, HOUSE_SET_NOTES, HOUSE_BPMS, HOUSE_SWINGS } from './babylon/music/houseBeat';
 import { TennisScore } from './babylon/core/RallyCore';
+import { coinLayout, FB_COIN_GROUP_MAX } from './babylon/modes/footballRushRules';
 import { buildResult } from './babylon/core/sessionResult';
 import { RINGS, BANK } from './babylon/core/ParkourGolf';
 import { TOKEN, TARGETS } from './babylon/core/ParkourDerby';
@@ -1030,20 +1031,27 @@ describe('drift guards — the numbers mirrored out of mode files still match th
     expect(num(f, /const DRIVES = (\d+);/, 'DRIVES')).toBe(MIRRORED.footballDrives);
     expect(num(f, /const STYLE_CHAIN_PTS = (\d+);/, 'STYLE_CHAIN_PTS')).toBe(MIRRORED.footballStylePts);
     expect(num(f, /const TRUCK_PTS = (\d+);/, 'TRUCK_PTS') * 2).toBe(MIRRORED.footballAwardMax);
-    expect(f).toContain('score += Math.round((100 + evades * 10) * mult);');
+    // IMPROVE (2026-10-06): a touchdown pays THIS drive's evades (tdEvades = evades − evadesAtDrive ≤ evades), so the
+    // bound's model — every touchdown paid on the session's whole count — still over-estimates it; the ceiling is unchanged
+    expect(f).toContain('score += Math.round((100 + tdEvades * 10) * mult);');
+    expect(f).toContain('const tdEvades = evades - evadesAtDrive;');
     expect(f).toContain('const mult = breakawaySec > 0 ? 1.5 : 1;');
     // the score's writers, each named: a new one has to be looked at before it can pay
     const writes = [...f.matchAll(/score \+= ([^;]+);/g)].map((m) => m[1].trim());
     expect(writes).toEqual([
       'bonus', "grade === 'perfect' ? 40 : 15", 'GUNSLING.pts', 'LANES.railPts', 'LANES.rampPts', 'LANES.tunnelPts', 'SLINGSHOT.pts',
       'STIFF.pts', 'BLOCK.catapultPts', '25', 'gained * 5', '20', 'TRUCK_PTS * (breakawaySec > 0 ? 2 : 1)', '20 * mult',
-      'Math.round((100 + evades * 10) * mult)',
+      'Math.round((100 + tdEvades * 10) * mult)',
     ]);
     for (const p of [GUNSLING.pts, SLINGSHOT.pts, STIFF.pts, BLOCK.catapultPts, LANES.railPts, LANES.rampPts, LANES.tunnelPts, 40, 25, 20 * 2, 8 * 5]) expect(p).toBeLessThanOrEqual(MIRRORED.footballAwardMax);
     const types = new Set([...f.matchAll(/styleCredit\(ctx, '(\w+)'\)/g)].map((m) => m[1]));
     for (const m of f.matchAll(/lastDodgeType = e\.btn === 'B' \? '(\w+)' : e\.btn === 'A' \? '(\w+)' : '(\w+)'/g)) [m[1], m[2], m[3]].forEach((t) => types.add(t));
     expect(types.size).toBe(MIRRORED.footballStyleTypes);
-    expect(f).toContain("coins.line(new Vector3(-3, 0.4, fromZ + 4), new Vector3(3, 0.4, toZ), 8);");
+    // IMPROVE (2026-10-06): the coins are laid on the lanes (footballRushRules.coinLayout), in groups of at most
+    // FB_COIN_GROUP_MAX — the `8 * 5` award above is the most one frame can take
+    expect(f).toContain('for (const g of coinLayout(drive)) for (const [x, y, z] of g.points)');
+    for (let d = 1; d <= MIRRORED.footballDrives; d++) for (const g of coinLayout(d)) expect(g.points.length).toBeLessThanOrEqual(FB_COIN_GROUP_MAX);
+    expect(FB_COIN_GROUP_MAX * 5).toBeLessThanOrEqual(MIRRORED.footballAwardMax);
   });
 
   it('Game Night: each event\'s clock, points and pace', () => {

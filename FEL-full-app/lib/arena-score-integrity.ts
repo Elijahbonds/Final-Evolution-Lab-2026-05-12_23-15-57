@@ -118,7 +118,8 @@ export const MIRRORED = {
   /** KarateEndlessMode — a wave's bodies (OnslaughtCore waveSpec, the desktop budget 20); the end card pays kos × 100 + wave × 50 + flow. */
   karateWaveMax: 20, karateKoPts: 100, karateWavePts: 50,
   /** FootballRushMode — DRIVES; the biggest single award (a truck in a breakaway, TRUCK_PTS 30 × 2); a TD pays
-   *  (100 + evades × 10) × 1.5 in a breakaway; a style chain pays STYLE_CHAIN_PTS × (types − 1) for each of 7 evade types. */
+   *  (100 + evades × 10) × 1.5 in a breakaway; a style chain pays STYLE_CHAIN_PTS × (types − 1) for each of 7 evade types.
+   *  (Since IMPROVE 2026-10-06 a TD counts only THIS drive's evades; the bound keeps the session's count — an over-estimate.) */
   footballDrives: 5, footballAwardMax: 60, footballTdBase: 100, footballTdPerEvade: 10, footballTdMult: 1.5,
   footballStylePts: 25, footballStyleTypes: 7,
   /** carnivalEvents — each event's clock, its points per unit, and what paces it. */

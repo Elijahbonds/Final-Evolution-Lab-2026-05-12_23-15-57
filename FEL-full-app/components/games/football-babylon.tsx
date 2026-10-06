@@ -15,8 +15,14 @@ import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode } from './hud-format';
 import { footballHeadline, footballSessionWon, gameResultFromSession } from '@/lib/sessions/gameResultFromSession';
+import { medalName } from '@/lib/babylon/modes/footballRushRules';
 /** FOOTBALL UPGRADE: the breakaway meter's lines arrive as '0.333,0.667'. */
 const ticksOf = (v: unknown): number[] => (typeof v === 'string' && v ? v.split(',').map(Number) : []);
+/** IMPROVE (2026-10-06) #11: the session's medal and a new best on the result line ("TOUCHDOWN! · 43 YD · GOLD · NEW BEST"). */
+function medalSuffix(stats: Record<string, number>): string {
+  const medal = medalName(Number(stats.medal ?? 0));
+  return `${medal ? ` · ${medal}` : ''}${stats.newBest === 1 ? ' · NEW BEST' : ''}`;
+}
 
 type Hud = Record<string, HudValue>;
 
@@ -48,7 +54,7 @@ export default function FootballBabylon({ onEnd }: GameProps) {
       if (endedRef.current) return;
       endedRef.current = true;
       const won = footballSessionWon(r.outcome);
-      onEndRef.current(gameResultFromSession(r, { won, headline: footballHeadline(r, won) }));
+      onEndRef.current(gameResultFromSession(r, { won, headline: footballHeadline(r, won) + medalSuffix(r.stats) }));
     };
 
     const startTimer = setTimeout(() => {
@@ -114,7 +120,12 @@ export default function FootballBabylon({ onEnd }: GameProps) {
         {hud.breakaway === true && (
           <span className="rounded bg-[#ff2d78]/25 px-2 py-0.5 text-[#ff2d78]">BREAKAWAY</span>
         )}
-        <span className={`rounded px-2 py-0.5 ${hud.truckReady === false ? 'bg-white/10 text-white/30' : 'bg-[#00E5FF]/15 text-[#00E5FF]'}`}>
+        {/* IMPROVE (2026-10-06) #7: the cooldown FILLS — a ring around the chip's dot, so a pull while it fills is not a dead button */}
+        <span className={`flex items-center gap-1.5 rounded px-2 py-0.5 ${hud.truckReady === false ? 'bg-white/10 text-white/30' : 'bg-[#00E5FF]/15 text-[#00E5FF]'}`}>
+          <span
+            className="inline-block h-2.5 w-2.5 rounded-full"
+            style={{ background: `conic-gradient(#00E5FF ${Math.round(Math.max(0, Math.min(1, typeof hud.truckCool === 'number' ? hud.truckCool : 1)) * 360)}deg, rgba(255,255,255,0.15) 0deg)` }}
+          />
           TRUCK {hud.truckReady === false ? '…' : 'READY'}
         </span>
         {/* KICKOFF RETURN (owner brief 2026-09-18): the lane you are in, and the SLINGSHOT gauge drafting behind a blocker fills */}
@@ -138,6 +149,8 @@ export default function FootballBabylon({ onEnd }: GameProps) {
           </div>
         )}
         {typeof hud.weather === 'string' && hud.weather && <span className="rounded bg-white/10 px-2 py-0.5 text-white/70">{hud.weather}</span>}
+        {/* IMPROVE (2026-10-06) #11: the session's target — the next medal and the points to it, and the viewer's best */}
+        {typeof hud.par === 'string' && hud.par && <span className="rounded bg-black/50 px-2 py-0.5 text-[var(--fel-gold)]">{hud.par}</span>}
       </div>
 
       {/* A+ mission #9 (Tecmo Bowl feel + Madden readability): the field strip — ball, line of scrimmage, first-down line
@@ -158,6 +171,14 @@ export default function FootballBabylon({ onEnd }: GameProps) {
             <span>GOAL {hud.fieldLen}</span>
             {typeof hud.drive === 'string' && hud.drive && <span className="text-white/50">DRIVE {hud.drive}</span>}
           </div>
+        </div>
+      )}
+      {/* IMPROVE (2026-10-06) #10: the live reads as button chips — B VAULT, A CATAPULT, R1 ARM — when each one will act */}
+      {typeof hud.prompts === 'string' && hud.prompts && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-36 flex justify-center gap-2 font-mono">
+          {hud.prompts.split(' · ').map((p) => (
+            <span key={p} className="rounded-md border border-[#9ad7ff]/50 bg-black/60 px-2 py-0.5 text-xs font-bold text-[#9ad7ff]">{p}</span>
+          ))}
         </div>
       )}
       {typeof hud.target === 'string' && hud.target && (

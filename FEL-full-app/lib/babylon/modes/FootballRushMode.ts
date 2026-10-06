@@ -15,7 +15,7 @@
 // Touch deck note: TRUCK takes SPIN's slot on the touch overlay (4-button
 // budget); SPIN stays available on keyboard (B). See modeVerbs v4.
 
-import { Vector3, MeshBuilder, type Mesh } from '@babylonjs/core';
+import { Vector3, Mesh, MeshBuilder, type PBRMaterial } from '@babylonjs/core';
 import { CATCH, catchGrade, catchStack, type CatchGrade, BLOCK, blockerTarget, blockerLeadPoint, engageRead, hurdleRead, GUNSLING, gunslingRead, vaultArc, SLINGSHOT, parallelRead, draftingRead, slingshotStep, STIFF, stiffArmRead, LANES, railRead, rampAt, tunnelAt, POUNCE, pounceRead, STRIP, fumbleRead, type Exposure } from '../core/KickoffReturn';   // KICKOFF RETURN (owner brief, 2026-09-18)
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { Mob, MobPool, STEERING_PRESETS } from '../core/MobSteering';
@@ -66,6 +66,12 @@ import { WeatherKit } from '../core/WeatherKit';
 import { readWeather } from '../nexus/weather';
 import { mountWeatherFx, type WeatherFxHandle } from '../premium/WeatherFx';
 import { stepYaw } from '../anim/LocoBus';   // SHARED-ANIM-BUS: the shared facing slew
+// IMPROVE (2026-10-06): the owner-picked rules — game timers, the kick's landing, the defense's arc, the lane coins, the
+// context prompts, the session target and the HUD gate (pure, tested in footballRushRules.test.ts).
+import {
+  GameTimers, kickLanding, positionedCatch, kickMoveStep, KICK_LAND, rampTier, coinLayout, contextPrompts, truckReady01, hopY,
+  medalFor, parLine, bestDriveIndex, loadFootballBest, saveFootballBestIfHigher, hudChanges, FB_HUD_HZ,
+} from './footballRushRules';
 
 let rushVenue: VenueHandle | null = null;   // ship pass 4: the mounted venue spec, disposed with the mode
 
@@ -78,6 +84,8 @@ const FIELD_HALF_X = 20;
 const FIELD_LENGTH = 40;
 const DEFENDER_MAX_DEPTH = 22;
 const BREAKAWAY_THRESHOLD = 3;
+/** IMPROVE (2026-10-06) #12: the meter's evade lines never change — built once, not with a map().join() every frame. */
+const BREAKAWAY_TICKS = breakawayMeter(0, BREAKAWAY_THRESHOLD, 0, 1).ticks.map((t) => t.toFixed(3)).join(',');
 const BREAKAWAY_SPEED_MULT = 1.25;
 const BREAKAWAY_SEC = 4;
 const TRUCK_WINDOW_SEC = 0.5;
@@ -95,11 +103,21 @@ const DODGES = {
   A: { gesture: 'footballHurdle' as const,    dx: 0,    iframes: 0.5,  pts: 20 },
 } as const;
 
+/** IMPROVE (2026-10-06) #12: the fields update() reports every frame — sent only when they change (fills at FB_HUD_HZ). */
+type FrameHud = {
+  yards: number; evades: number; ballOn: number; los: number; firstDown: number; target: string;
+  breakawayFill: number; breakawayTicks: string; breakaway: boolean; truckCool: number; prompts: string;
+};
+const FRAME_HUD_CONTINUOUS: ReadonlySet<string> = new Set(['breakawayFill', 'truckCool']);
+
 export const FootballRushMode: ModeDefinition = (() => {
   let runner: SpawnedCharacter;
   let pool = new MobPool();
   let defenders: Mob[] = [];
   const hitCut = makeBroadcastCutState();
+  /** IMPROVE (2026-10-06) #15: the hit-cam's converging read, into buffers re-used every frame. */
+  const convBuf: { yd: number; x: number; cleared: boolean }[] = [];
+  const convRunner = { x: 0, z: 0 };
   let coins: CoinField | null = null;
   let down = 1, toGo = 10, lineOfScrimmage = 0, yards = 0, score = 0, evades = 0;
   // Owner decision (2026-09-05): a session is THREE drives. Each ends on a touchdown or a turnover on downs; the
@@ -110,9 +128,33 @@ export const FootballRushMode: ModeDefinition = (() => {
   let driveLog: { name: string; score: number | string; line: string }[] = [];
   let driveYards = 0;
   const YARD = 0.9144;
+  /** IMPROVE (2026-10-06) #1: the session's evade count when this drive began — the touchdown pays THIS drive's evades.
+   *  It paid the session total (`evades`), so every later touchdown inflated on the earlier drives' work. (`driveEvades`
+   *  is the breakaway's count and resets on a tackle, so it is the play's, not the drive's.) */
+  let evadesAtDrive = 0;
   function logDrive(result: string): void {
-    driveLog.push({ name: `DRIVE ${drive}`, score: driveYards, line: `${result} · ${driveEvades} EVADES` });
+    // the card's evades are the drive's too: it read `driveEvades`, which a tackle had already zeroed on every turnover
+    driveLog.push({ name: `DRIVE ${drive}`, score: driveYards, line: `${result} · ${evades - evadesAtDrive} EVADES` });
   }
+  /** IMPROVE (2026-10-06) #11: the drive card with the longest drive starred, and its title naming it. */
+  function boardRows(): { name: string; score: number | string; line: string }[] {
+    const best = driveLog.length >= 2 ? bestDriveIndex(driveLog) : -1;
+    return driveLog.map((r, i) => (i === best ? { ...r, line: `${r.line} · ★ BEST` } : r));
+  }
+  /** IMPROVE (2026-10-06): the mode clock (seconds of play: it stops in a pause and a hit-stop) and what runs on it. */
+  let clock = 0;
+  const timers = new GameTimers();
+  /** IMPROVE (2026-10-06) #4: ONE banner channel. The newest banner owns the expiry; update() clears it (Infinity = holds). */
+  let bannerUntil = Infinity;
+  /** IMPROVE (2026-10-06) #12: what the HUD was last sent, for the per-frame fields; reset when a drive re-sends them. */
+  let hudSent: Partial<FrameHud> = {};
+  let hudGateSec = 0;
+  /** IMPROVE (2026-10-06) #11: the session target — the viewer's best, and the par line last sent. */
+  let bestScore: number | null = null, parSentFor = -1;
+  /** IMPROVE (2026-10-06) #9: the hurdle's hop clock (0 = not hopping). */
+  let hopT = 0, hopSec = 0;
+  /** IMPROVE (2026-10-06) #2: where this kick comes down. */
+  let kickLand = { x: 0, z: 0 };
   let iframeSec = 0, dodging = false, ended = false;
   /** BIOMECH-WAVE2: the ONE owner of the runner's clips, plus the beats the mode latches for it. */
   let animTree: FootballAnimTree | null = null;
@@ -151,16 +193,42 @@ export const FootballRushMode: ModeDefinition = (() => {
   let lane: 'turf' | 'rail' | 'air' | 'tunnel' = 'turf'; let railSec = 0, railSide: 1 | -1 = 1, airT = 0, airSec = 0;
   let laneMeshes: Mesh[] = [];
   let fumble: { ball: Mesh; t: number } | null = null;
+  /** IMPROVE (2026-10-06) #16: ONE loose ball, built on the first strip and re-used; the kick ball shares its material.
+   *  Each strip built a sphere and a PBR material, and disposing the sphere left the material behind. */
+  let fumbleBall: Mesh | null = null, ballMat: PBRMaterial | null = null;
   const pounces = new Map<Mob, { t: number; dir: Vector3 }>(); let pounceCool = 0;
-  const defPrev = new Map<Mob, Vector3>(), defVel = new Map<Mob, Vector3>();
+  /** IMPROVE (2026-10-06) #13: each defender's last position and velocity, re-used in place, and cleared with the defense.
+   *  The two maps were keyed by a Mob made new every down and never pruned (they grew all session), and allocated a
+   *  subtract and a clone per defender per frame. */
+  const defTrack = new Map<Mob, { prev: Vector3; vel: Vector3; primed: boolean }>();
   let laneHud = '', gaugeHud = -1;
   const ret = { catches: 0, perfect: 0, engages: 0, catapults: 0, vaults: 0, slings: 0, stiffs: 0, rails: 0, ramps: 0, tunnels: 0, bonks: 0, pounces: 0, fumbles: 0, recovered: 0, outOfBounds: 0 };
   const exposure = (): Exposure => vault ? 'vault' : lane === 'rail' ? 'rail' : lane === 'air' ? 'air' : lane === 'tunnel' ? 'slide' : null;
-  const standingGunners = () => defenders.filter((m) => m.state !== 'downed' && m.char.root.isEnabled()).map((m) => ({ x: m.char.root.position.x, z: m.char.root.position.z, down: false, mob: m }));
-  const downedGunners = () => defenders.filter((m) => m.state === 'downed').map((m) => ({ x: m.char.root.position.x, z: m.char.root.position.z }));
-  const me2 = () => ({ x: runner.root.position.x, z: runner.root.position.z });
-  const vel2 = () => ({ x: run.vx, z: run.vz });
-  function flash(ctx: ModeContext, banner: string, ms = 700): void { ctx.setHud({ banner, score }); setTimeout(() => ctx.setHud({ banner: '' }), ms); }
+  // IMPROVE (2026-10-06) #14: the gunner lists, the runner's spot and his velocity are built ONCE per frame into re-used
+  // buffers (refreshReads) — `standingGunners()` (a filter and a map), `me2()` and `vel2()` were rebuilt per blocker, in the
+  // pounce check and in the draft check, every frame. A press between frames refreshes them first.
+  type Gunner = { x: number; z: number; down: boolean; mob: Mob };
+  const standingBuf: Gunner[] = [], downedBuf: { x: number; z: number }[] = [];
+  let standingN = 0, downedN = 0;
+  const standing: Gunner[] = [], downedList: { x: number; z: number }[] = [];
+  const meP = { x: 0, z: 0 }, velP = { x: 0, z: 0 };
+  function refreshReads(): void {
+    meP.x = runner.root.position.x; meP.z = runner.root.position.z; velP.x = run.vx; velP.z = run.vz;
+    standingN = 0; downedN = 0;
+    for (const m of defenders) {
+      const p = m.char.root.position;
+      if (m.state === 'downed') { const d = downedBuf[downedN] ??= { x: 0, z: 0 }; d.x = p.x; d.z = p.z; downedN++; }
+      else if (m.char.root.isEnabled()) { const g = standingBuf[standingN] ??= { x: 0, z: 0, down: false, mob: m }; g.x = p.x; g.z = p.z; g.down = false; g.mob = m; standingN++; }
+    }
+    standing.length = 0; for (let i = 0; i < standingN; i++) standing.push(standingBuf[i]);
+    downedList.length = 0; for (let i = 0; i < downedN; i++) downedList.push(downedBuf[i]);
+  }
+  /** IMPROVE (2026-10-06) #4: ONE banner channel on the mode clock. Every banner used to start its own setTimeout to clear
+   *  whatever banner was up by then, so an older beat's timer wiped a newer one ("BREAKAWAY!" cut by the "EVADED!" before
+   *  it) — and on real time they ran on through a pause. The newest banner owns the expiry; update() clears it. */
+  function flash(ctx: ModeContext, banner: string, ms = 700): void { ctx.setHud({ banner, score }); bannerUntil = clock + ms / 1000; }
+  function holdBanner(ctx: ModeContext, banner: string): void { ctx.setHud({ banner, score }); bannerUntil = Infinity; }
+  function tickBanner(ctx: ModeContext): void { if (clock >= bannerUntil) { bannerUntil = Infinity; ctx.setHud({ banner: '' }); } }
   function burst(sec: number, mult: number): void { launchSec = Math.max(launchSec, sec); launchMult = Math.max(launchMult, mult); }
   let lineArrow: AimArrowHandle | null = null, pursuit: RingHandle | null = null;
   let weather: WeatherKit = new WeatherKit(); let weatherFx: WeatherFxHandle | null = null;
@@ -195,33 +263,40 @@ export const FootballRushMode: ModeDefinition = (() => {
     // how long they take to READ the play, and whether anybody blows their assignment. A rookie is 420 ms
     // late off the snap and busts one now and then; an elite is moving at 120 ms and nobody busts. Per-
     // defender jitter on top, so a defense never releases as one block.
+    // IMPROVE (2026-10-06) #3: …and the defense TIGHTENS drive by drive (rampTier): a quicker read and fewer busts each
+    // drive, so drive 5 is not drive 1 again. Drive 1 is the picked tier exactly.
+    const front = rampTier(tier, drive);
+    // IMPROVE (2026-10-06) #5: the releases run on the MODE clock (they wait out a pause and a hit-stop), tagged so a
+    // tackle or a new defense drops any still pending — real-time setTimeouts used to fire into the next down.
+    timers.clear('pursuit');
     for (const [i, m] of defenders.entries()) {
       if (m === showBlitz && !showBlitzComes) {
         // the show was a bluff: he drops, and starts late
         m.char.root.position.z += 3.5;
-        setTimeout(() => { if (!ended) m.startPursuit(); }, SHOW_BLITZ_DROP_SEC * 1000);
+        timers.later(clock, SHOW_BLITZ_DROP_SEC, () => { if (!ended) m.startPursuit(); }, 'pursuit');
         continue;
       }
       const jitter = i * 35;
       // an unforced error: this defender reads it wrong and is a long beat late getting going
-      const bust = blunders(tier) ? 520 : 0;
-      const delay = tier.reactionMs + jitter + bust;
-      setTimeout(() => { if (!ended) m.startPursuit(); }, delay);
-    }
-    if (showBlitz) {
-      ctx.setHud({ banner: showBlitzComes ? 'BLITZ!' : 'HE DROPPED — coverage' });
-      setTimeout(() => ctx.setHud({ banner: '' }), 700);
+      const bust = blunders(front) ? 520 : 0;
+      const delay = front.reactionMs + jitter + bust;
+      timers.later(clock, delay / 1000, () => { if (!ended) m.startPursuit(); }, 'pursuit');
     }
     SoundKit.play('uiTick', { pitch: 1.3, volume: 0.4 });
-    ctx.setHud({ hint: 'Juke, spin, hurdle — or HOLD TRUCK and run THROUGH them', banner: 'BALL!' });
-    setTimeout(() => ctx.setHud({ banner: '' }), 500);
+    ctx.setHud({ hint: 'Juke, spin, hurdle — or HOLD TRUCK and run THROUGH them' });
+    // one banner: the show's verdict when there was a show (the BALL! sent straight after it used to bury it), else BALL!
+    if (showBlitz) flash(ctx, showBlitzComes ? 'BLITZ!' : 'HE DROPPED — coverage', 700);
+    else flash(ctx, 'BALL!', 500);
   }
 
-  function layCoins(ctx: ModeContext, fromZ: number): void {
-    coins?.dispose();
-    coins = new CoinField(ctx.scene);
-    const toZ = Math.min(FIELD_LENGTH - 2, fromZ + 24);
-    coins.line(new Vector3(-3, 0.4, fromZ + 4), new Vector3(3, 0.4, toZ), 8);
+  /** IMPROVE (2026-10-06) #6 #19: the drive's coins pay the LANES — an arc over each ramp only a launch passes through, a
+   *  run up one rail, a line under one bench — instead of the same straight eight down the middle every drive. And ONE
+   *  CoinField for the session: it is cleared and re-laid in place (its master mesh and material are kept), where each
+   *  drive used to dispose and rebuild it. Its `collected` is now the session's count, which is what the end stats say. */
+  function layCoins(ctx: ModeContext): void {
+    if (!coins) coins = new CoinField(ctx.scene);
+    else coins.clear();
+    for (const g of coinLayout(drive)) for (const [x, y, z] of g.points) { const v = new Vector3(x, y, z); coins.line(v, v, 1); }
   }
 
   /** Variety pay: first use of each evade TYPE in a drive stacks a bonus. */
@@ -232,8 +307,7 @@ export const FootballRushMode: ModeDefinition = (() => {
       const bonus = STYLE_CHAIN_PTS * (styleTypes.size - 1);
       score += bonus;
       SoundKit.play('uiTick', { pitch: 1 + styleTypes.size * 0.15 });
-      ctx.setHud({ score, banner: `STYLE CHAIN x${styleTypes.size} +${bonus}` });
-      setTimeout(() => ctx.setHud({ banner: '' }), 700);
+      flash(ctx, `STYLE CHAIN x${styleTypes.size} +${bonus}`, 700);
     }
   }
 
@@ -263,6 +337,12 @@ export const FootballRushMode: ModeDefinition = (() => {
   async function spawnDefense(ctx: ModeContext): Promise<void> {
     defenders = [];
     pool = new MobPool();
+    // IMPROVE (2026-10-06) #5 #13: a new front drops everything keyed to the old one — its velocity slots, its pounces (a
+    // pounce still flying would carry the SAME pooled body into the new alignment) and any release still pending.
+    defTrack.clear();
+    for (const [m] of pounces) m.char.root.position.y = 0;
+    pounces.clear();
+    timers.clear('pursuit');
     for (const char of defenderBodies) { char.animator.park(); char.root.setEnabled(false); }   // parked: no clip advancing off-screen
 
     const progress = Math.max(0, runner.root.position.z);
@@ -325,30 +405,45 @@ export const FootballRushMode: ModeDefinition = (() => {
   }
 
   /** Eight metres down his own line, at chest height — where the carrier is RUNNING. */
-  function lineAhead(): Vector3 {
-    return runner.root.position.add(new Vector3(Math.sin(runner.root.rotation.y) * 8, 1.4, Math.cos(runner.root.rotation.y) * 8));
+  // IMPROVE (2026-10-06) #18: written into two scratch vectors (aim and eyes are read at once by the posture layer, so
+  // they cannot share one). lineAhead allocated twice per call and the callback calls it up to twice a frame.
+  const aimV = new Vector3(), eyesV = new Vector3();
+  function lineAhead(out: Vector3 = aimV): Vector3 {
+    const p = runner.root.position, yaw = runner.root.rotation.y;
+    return out.set(p.x + Math.sin(yaw) * 8, p.y + 1.4, p.z + Math.cos(yaw) * 8);
+  }
+  /** IMPROVE (2026-10-06) #18: the nearest defender, found ONCE per frame (findNearest) and read by the posture callback,
+   *  the TARGET read and the pursuit ring — each used to scan the defense with Vector3.Distance on its own. */
+  let nearest: Mob | null = null, nearestD = Infinity;
+  function findNearest(): void {
+    nearest = null; let bd = Infinity;
+    const rp = runner.root.position;
+    for (const m of defenders) { const d = Vector3.DistanceSquared(m.char.root.position, rp); if (d < bd) { bd = d; nearest = m; } }
+    nearestD = Math.sqrt(bd);
   }
   /** The man he has to beat: the nearest defender inside 9 m, at chest height. Null out of range — then the eyes go
    *  down his own line instead (a runner in space looks where he is running, not back at the pursuit). */
   function threat(): Vector3 | null {
-    let best: Mob | null = null, bd = Infinity;
-    for (const m of defenders) { const d = Vector3.Distance(m.char.root.position, runner.root.position); if (d < bd) { bd = d; best = m; } }
-    return best && bd <= 9 ? best.char.root.position.add(new Vector3(0, 1.35, 0)) : null;
+    if (!nearest || nearestD > 9) return null;
+    const p = nearest.char.root.position;
+    return eyesV.set(p.x, p.y + 1.35, p.z);
   }
 
   /** BIOMECH-WAVE2: one read of the play, two consumers — the tree picks the clip, the Posture Poses layer picks the
    *  body under it. Called once per frame in EVERY phase (the pre-snap read included, which is where the runner used
    *  to jog on the spot). */
-  function drive3D(speed01: number, trucking: boolean): void {
+  function drive3D(speed01: number, trucking: boolean, kickRun = false): void {
     const t = performance.now();
     if (move && t > moveUntil) { move = null; dodging = false; }   // a move the tree never settled (safety)
     const celebrating = t < celebrateUntil;
-    bio.presnap = preSnap; bio.speed01 = speed01;
+    // IMPROVE (2026-10-06) #2: getting under the kick is a RUN, not the SET window — the returner moves before the snap now
+    const set = preSnap && !(kickRun && speed01 > 0.15);
+    bio.presnap = set; bio.speed01 = speed01;
     bio.move = move === 'spin' ? 'spin' : move === 'stiffArm' ? 'hurdle' : move === 'juke' ? 'juke' : null;
     bio.trucking = trucking; bio.downed = downed; bio.celebrating = celebrating;
     const input: FootballAnimInput = {
-      presnap: preSnap, snapped: !preSnap, isQB: false, droppingBack: false, throwing: false,
-      runningRoute: false, carrying: !preSnap && !downed && speed01 > 0.15,
+      presnap: set, snapped: !set, isQB: false, droppingBack: false, throwing: false,
+      runningRoute: false, carrying: !set && !downed && speed01 > 0.15,
       move, moveClip: move ? moveClip : undefined, catching: 'none',
       beingTackled: downed, blocking: false, rushing: false, celebrating,
     };
@@ -357,38 +452,44 @@ export const FootballRushMode: ModeDefinition = (() => {
 
   // ── KICKOFF RETURN helpers ──────────────────────────────────────────────────────────────────────────────────────
   /** The kick goes up: the ball flies in from deep and the press as it lands is the LAUNCH. */
+  function ballMaterial(ctx: ModeContext): PBRMaterial { return ballMat ??= VenueKit.paint(ctx.scene, 'fb_ball_mat', '#7a3f1d', 0.05, 0.7); }
   function startKick(ctx: ModeContext): void {
-    if (!kickBall) { kickBall = MeshBuilder.CreateSphere('kick_ball', { diameter: 0.3, segments: 10 }, ctx.scene); kickBall.material = VenueKit.paint(ctx.scene, 'kick_ball_mat', '#7a3f1d', 0.05, 0.7); }
-    kickBall.setEnabled(true); kickBall.position.set(0, 9, 34);
+    if (!kickBall) { kickBall = MeshBuilder.CreateSphere('kick_ball', { diameter: 0.3, segments: 10 }, ctx.scene); kickBall.material = ballMaterial(ctx); }
+    // IMPROVE (2026-10-06) #2: the kick comes down somewhere in front of the returner — it always flew to x = 0, so the
+    // catch was timing alone. The ring marks the spot; get under it, then press as it lands.
+    kickLand = kickLanding();
+    kickBall.setEnabled(true); kickBall.position.set(kickLand.x * 0.3, 9, 34);
     kick = { k: 0, caught: false, pressed: null };
-    ctx.setHud({ hint: 'THE KICK IS UP — press A as it LANDS in your hands' });
+    ctx.setHud({ hint: 'THE KICK IS UP — get under the ring, press A as it LANDS' });
   }
   function tickKick(ctx: ModeContext, dt: number): void {
     if (!kick || !kickBall) return;
     kick.k = Math.min(CATCH.lateK, kick.k + dt / CATCH.flightSec);
     const k = Math.min(1, kick.k);
-    kickBall.position.set(0, 1.2 + (9 - 1.2) * (1 - k) + Math.sin(k * Math.PI) * 6, 34 * (1 - k));
+    kickBall.position.set(kickLand.x * (0.3 + 0.7 * k), 1.2 + (9 - 1.2) * (1 - k) + Math.sin(k * Math.PI) * 6, 34 + (kickLand.z - 34) * k);
     if (kick.k < 1) return;
     // it lands: the press that came, graded; none at all is the free (bobbled) catch a beat late
     if (kick.pressed === null && kick.k < CATCH.lateK) return;
-    const grade: CatchGrade | 'late' = kick.pressed ?? 'late';
+    // …and graded on where he stood: under the ball keeps the press's grade, a stretch costs one, further is a bobble
+    const reach = Math.hypot(runner.root.position.x - kickLand.x, runner.root.position.z - kickLand.z);
+    const grade: CatchGrade | 'late' = positionedCatch(kick.pressed ?? 'late', reach);
     const stack = catchStack(grade);
     kick.caught = true; kickBall.setEnabled(false); ret.catches++; if (grade === 'perfect') ret.perfect++;
     snap(ctx);
     run = { vx: 0, vz: (RUN.base + RUN.push) * stack };
     if (stack > 0) { score += grade === 'perfect' ? 40 : 15; SoundKit.play('powerUp', { pitch: grade === 'perfect' ? 1.3 : 1 }); ctx.feel?.impact?.(0.25); }
-    flash(ctx, grade === 'perfect' ? 'LEDGE-POP — 100% STACK!' : grade === 'good' ? 'CLEAN CATCH — +60%' : grade === 'early' ? 'TOO EARLY — no stack' : 'BOBBLED — no stack', 900);
-    console.info(`[FB-RETURN] catch ${grade} at k ${kick.k.toFixed(2)} → stack ${stack}`);
+    flash(ctx, grade === 'perfect' ? 'LEDGE-POP — 100% STACK!' : grade === 'good' ? 'CLEAN CATCH — +60%' : grade === 'early' ? 'TOO EARLY — no stack' : kick.pressed !== null ? 'OUT OF REACH — no stack' : 'BOBBLED — no stack', 900);
+    console.info(`[FB-RETURN] catch ${grade} at k ${kick.k.toFixed(2)}, ${reach.toFixed(1)} m off the spot → stack ${stack}`);
   }
   /** The blocking wall: two lead blockers run the runner's lane and drive the gunners into the turf. */
   function tickBlockers(ctx: ModeContext, dt: number, set: boolean): void {
-    const me = me2(), v = vel2();
+    const me = meP, v = velP;   // IMPROVE (2026-10-06) #14: this frame's reads (refreshReads)
     for (const b of blockers) {
       b.busy = Math.max(0, b.busy - dt);
       const root = b.char.root;
       let target: { x: number; z: number } | null = null;
       if (set) target = { x: b.side * 2.4, z: runner.root.position.z + 2.5 };
-      else if (b.busy === 0) target = blockerTarget(me, v, standingGunners());
+      else if (b.busy === 0) target = blockerTarget(me, v, standing);
       if (!target) target = blockerLeadPoint(me, v, b.side);
       const dx = target.x - root.position.x, dz = target.z - root.position.z, d = Math.hypot(dx, dz);
       const step = Math.min(d, BLOCK.speed * dt);
@@ -398,10 +499,10 @@ export const FootballRushMode: ModeDefinition = (() => {
       else if (set) { root.position.x += (dx) * Math.min(1, dt * 6); root.position.z += dz * Math.min(1, dt * 6); root.rotation.y = 0; }
       if (moving !== b.moving) { b.moving = moving; b.char.animator.play(moving ? SPORT_CLIP.moveLoop : SPORT_CLIP.idle, { loop: true, fadeSec: 0.15 }); }
       if (set || b.busy > 0) continue;
-      for (const g of standingGunners()) {
+      for (const g of standing) {
         if (g.mob.state !== 'pursuing' || pounces.has(g.mob)) continue;
-        if (!engageRead({ x: root.position.x, z: root.position.z }, g)) continue;
-        g.mob.down(); b.busy = BLOCK.busySec; ret.engages++;
+        if (!engageRead(root.position, g)) continue;
+        g.mob.down(); g.down = true; b.busy = BLOCK.busySec; ret.engages++;   // marked down in the frame's list: the other blocker's pick skips him
         EffectsKit.burst(ctx.scene, g.mob.char.root.position.add(new Vector3(0, TURF_Y, 0)), 'dust');
         SoundKit.play('impact', { pitch: 0.9, volume: 0.4 }); flash(ctx, 'BLOCKED! — HURDLE HIM (A)', 600);
         console.info('[FB-RETURN] blocker engage');
@@ -411,13 +512,15 @@ export const FootballRushMode: ModeDefinition = (() => {
   }
   /** The diver: the nearest pursuing gunner arriving inside the gunslinger window (his speed read off his position). */
   function gunslingTarget(): Mob | null {
-    const me = runner.root.position, hv = new Vector3(run.vx, 0, run.vz); const hs = hv.length(); if (hs > 0.5) hv.scaleInPlace(1 / hs); else hv.set(0, 0, 1);
+    // IMPROVE (2026-10-06) #13: no Vector3 per defender per frame — plain numbers off the positions and the velocity slot
+    const me = runner.root.position, hs = Math.hypot(run.vx, run.vz);
+    const hx = hs > 0.5 ? run.vx / hs : 0, hz = hs > 0.5 ? run.vz / hs : 1;
     for (const m of defenders) {
       if (m.state !== 'pursuing' && !pounces.has(m)) continue;
-      const to = m.char.root.position.subtract(me); to.y = 0; const dist = to.length(); if (dist < 1e-3) continue;
-      const dv = defVel.get(m) ?? Vector3.Zero();
-      const closing = -(dv.x * to.x + dv.z * to.z) / dist;
-      const cos = (to.x * hv.x + to.z * hv.z) / dist;
+      const p = m.char.root.position, tx = p.x - me.x, tz = p.z - me.z, dist = Math.hypot(tx, tz); if (dist < 1e-3) continue;
+      const tr = defTrack.get(m), dvx = tr?.primed ? tr.vel.x : 0, dvz = tr?.primed ? tr.vel.z : 0;
+      const closing = -(dvx * tx + dvz * tz) / dist;
+      const cos = (tx * hx + tz * hz) / dist;
       if (gunslingRead(dist, closing, cos)) return m;
     }
     return null;
@@ -437,7 +540,8 @@ export const FootballRushMode: ModeDefinition = (() => {
   /** The strip: a hit while exposed. The ball goes loose; the scramble is the runner's to win. */
   function stripBall(ctx: ModeContext): void {
     if (fumble) return;
-    const ball = MeshBuilder.CreateSphere('fumble_ball', { diameter: 0.3, segments: 10 }, ctx.scene); ball.material = VenueKit.paint(ctx.scene, 'fumble_ball_mat', '#7a3f1d', 0.05, 0.7);
+    if (!fumbleBall) { fumbleBall = MeshBuilder.CreateSphere('fumble_ball', { diameter: 0.3, segments: 10 }, ctx.scene); fumbleBall.material = ballMaterial(ctx); fumbleBall.isPickable = false; }
+    const ball = fumbleBall; ball.setEnabled(true);
     const a = Math.random() * Math.PI * 2;
     ball.position.set(Math.max(-FIELD_HALF_X + 1, Math.min(FIELD_HALF_X - 1, runner.root.position.x + Math.cos(a) * STRIP.launchM)), 0.15, Math.max(1, runner.root.position.z + 1.2 + Math.sin(a) * STRIP.launchM));
     fumble = { ball, t: 0 }; ret.fumbles++; score = Math.max(0, score + STRIP.pts);
@@ -449,18 +553,18 @@ export const FootballRushMode: ModeDefinition = (() => {
     if (!fumble) return 'none';
     fumble.t += dt;
     const d = Vector3.Distance(fumble.ball.position, runner.root.position);
-    if (d <= STRIP.recoverM) { fumble.ball.dispose(); fumble = null; ret.recovered++; SoundKit.play('uiTick', { pitch: 1.4 }); flash(ctx, 'RECOVERED!', 600); console.info('[FB-RETURN] recovered'); return 'none'; }
+    if (d <= STRIP.recoverM) { fumble.ball.setEnabled(false); fumble = null; ret.recovered++; SoundKit.play('uiTick', { pitch: 1.4 }); flash(ctx, 'RECOVERED!', 600); console.info('[FB-RETURN] recovered'); return 'none'; }
     if (fumble.t < STRIP.scrambleSec) return 'none';
-    fumble.ball.dispose(); fumble = null; console.info('[FB-RETURN] fumble lost');
+    fumble.ball.setEnabled(false); fumble = null; console.info('[FB-RETURN] fumble lost');
     return 'turnover';
   }
   /** A gunner near the wall launches: a missile tackle. */
   function tickPounces(ctx: ModeContext, dt: number): Mob | null {
     pounceCool = Math.max(0, pounceCool - dt);
     if (pounceCool === 0 && !downed && !preSnap && !fumble) {
-      for (const g of standingGunners()) {
+      for (const g of standing) {
         if (g.mob.state !== 'pursuing' || pounces.has(g.mob)) continue;
-        if (!pounceRead(g, me2())) continue;
+        if (!pounceRead(g, meP)) continue;
         const to = runner.root.position.add(new Vector3(run.vx, 0, run.vz).scale(0.35)).subtract(g.mob.char.root.position); to.y = 0; to.normalize();
         g.mob.hold(); pounces.set(g.mob, { t: 0, dir: to }); pounceCool = POUNCE.cooldownSec; ret.pounces++;
         g.mob.setYaw(Math.atan2(to.x, to.z)); g.mob.char.animator.play(SPORT_CLIP.footballHurdle, { fadeSec: 0.08 });
@@ -484,14 +588,15 @@ export const FootballRushMode: ModeDefinition = (() => {
   function tackledBy(ctx: ModeContext, mob: Mob, how: string): boolean {
     tackleWeight(ctx);
     EffectsKit.burst(ctx.scene, runner.root.position.add(new Vector3(0, TURF_Y, 0)), 'dust');
-    downed = true; move = null; cutSec = 0; vault = null; lane = 'turf'; runner.root.position.y = 0; launchSec = 0;
+    downed = true; move = null; cutSec = 0; vault = null; lane = 'turf'; runner.root.position.y = 0; launchSec = 0; hopSec = 0;
+    timers.clear('pursuit');   // IMPROVE (2026-10-06) #5: a release still pending from this play never fires into the next
     animTree?.clearBeat('tackled');
     driveEvades = 0; breakawaySec = 0;
     const gainedY = yards;
     if (gainedY >= toGo) {
       down = 1; toGo = 10;
       lineOfScrimmage = runner.root.position.z;
-      ctx.setHud({ down, toGo, banner: how === 'TACKLED' ? 'FIRST DOWN!' : `${how} — FIRST DOWN` });
+      ctx.setHud({ down, toGo }); flash(ctx, how === 'TACKLED' ? 'FIRST DOWN!' : `${how} — FIRST DOWN`, 1000);
     } else {
       down++;
       toGo -= gainedY;
@@ -500,7 +605,7 @@ export const FootballRushMode: ModeDefinition = (() => {
         if (drive >= DRIVES) {
           ended = true;
           SoundKit.play('whistle');
-          ctx.end('TURNOVER_ON_DOWNS', score, { yards, evades, trucks, coinsCollected: coins?.collected ?? 0, drives: DRIVES });
+          ctx.end('TURNOVER_ON_DOWNS', score, endStats());
           return true;
         }
         drive++;
@@ -508,26 +613,39 @@ export const FootballRushMode: ModeDefinition = (() => {
         newDrive(ctx, `TURNOVER ON DOWNS · DRIVE ${drive}/${DRIVES}`);
         return true;
       }
-      ctx.setHud({ down, toGo, banner: `${how} — DOWN ${down}` });
+      ctx.setHud({ down, toGo }); flash(ctx, `${how} — DOWN ${down}`, 1000);
     }
     mob.onContactResolved();
-    setTimeout(() => {
-      ctx.setHud({ banner: '' });
+    // IMPROVE (2026-10-06) #5: the reset runs on the mode clock — a pause holds the runner down instead of resetting him
+    // behind the pause card
+    timers.later(clock, 1, () => {
+      if (ended) return;
       runner.root.position.x = 0; run = { vx: 0, vz: 0 };
       downed = false;
       preSnap = true; preSnapT = 0;
       void spawnDefense(ctx).then(() => {
         if (!ended && preSnap) ctx.setHud({ hint: 'READ THE FRONT — push ▲/W to SNAP' });
       });
-    }, 1000);
+    }, 'reset');
     yards = 0;
     lineOfScrimmage = runner.root.position.z;
     return false;
   }
   function loseDrive(ctx: ModeContext, why: string): boolean {
     logDrive(why);
-    if (drive >= DRIVES) { ended = true; SoundKit.play('whistle'); ctx.end('TURNOVER_ON_DOWNS', score, { yards, evades, trucks, coinsCollected: coins?.collected ?? 0, drives: DRIVES }); return true; }
+    if (drive >= DRIVES) { ended = true; SoundKit.play('whistle'); ctx.end('TURNOVER_ON_DOWNS', score, endStats()); return true; }
     drive++; SoundKit.play('whistle'); newDrive(ctx, `${why} · DRIVE ${drive}/${DRIVES}`); return true;
+  }
+  /** IMPROVE (2026-10-06) #11: the session's end stats — the medal it earned against the ladder, its longest drive, and the
+   *  viewer's best (kept on this device; only a finished session is offered). The score itself is untouched. */
+  function endStats(): Record<string, number> {
+    const medal = medalFor(score);
+    const { improved, previous } = saveFootballBestIfHigher(score);
+    const bi = bestDriveIndex(driveLog);
+    return {
+      yards, evades, trucks, coinsCollected: coins?.collected ?? 0, drives: DRIVES,
+      medal, bestDriveYd: bi >= 0 ? Number(driveLog[bi].score) : 0, newBest: improved ? 1 : 0, prevBest: previous ?? 0,
+    };
   }
   /** The lanes: the sideline rail (HIGH), the turf ramps (MID), the maintenance tunnel (LOW). */
   function tickLanes(ctx: ModeContext, dt: number, vel: Vector3): void {
@@ -560,28 +678,42 @@ export const FootballRushMode: ModeDefinition = (() => {
   function buildLanes(ctx: ModeContext): void {
     for (const m of laneMeshes) m.dispose(); laneMeshes = [];
     const wallMat = VenueKit.paint(ctx.scene, 'fb_wall_mat', '#7c8798', 0.05, 0.8), rampMat = VenueKit.paint(ctx.scene, 'fb_ramp_mat', '#2e7d3a', 0.08, 0.9), benchMat = VenueKit.paint(ctx.scene, 'fb_bench_mat', '#c9a15a', 0.06, 0.7);
+    const walls: Mesh[] = [], ramps: Mesh[] = [], benches: Mesh[] = [];
     for (const side of [1, -1] as const) {
       const wall = MeshBuilder.CreateBox(`fb_wall_${side}`, { width: 0.5, height: 1.7, depth: FIELD_LENGTH + 8 }, ctx.scene);
-      wall.position.set(side * (LANES.railX + 0.5), 0.85, FIELD_LENGTH / 2); wall.material = wallMat; wall.isPickable = false; laneMeshes.push(wall);
+      wall.position.set(side * (LANES.railX + 0.5), 0.85, FIELD_LENGTH / 2); walls.push(wall);
     }
     for (const [i, r] of LANES.ramps.entries()) {
       const ramp = MeshBuilder.CreateBox(`fb_ramp_${i}`, { width: r.halfX * 2, height: 0.5, depth: r.halfZ * 2 }, ctx.scene);
-      ramp.position.set(r.x, 0.12, r.z); ramp.rotation.x = -0.22; ramp.material = rampMat; ramp.isPickable = false; laneMeshes.push(ramp);
+      ramp.position.set(r.x, 0.12, r.z); ramp.rotation.x = -0.22; ramps.push(ramp);
     }
     for (const [i, t] of LANES.tunnels.entries()) {
       const len = t.z1 - t.z0;
       const top = MeshBuilder.CreateBox(`fb_bench_${i}`, { width: t.halfX * 2 + 0.4, height: 0.3, depth: len }, ctx.scene);
-      top.position.set(t.x, 1.25, (t.z0 + t.z1) / 2); top.material = benchMat; top.isPickable = false; laneMeshes.push(top);
+      top.position.set(t.x, 1.25, (t.z0 + t.z1) / 2); benches.push(top);
       for (const zz of [t.z0 + 0.3, t.z1 - 0.3]) for (const sx of [-1, 1]) {
         const leg = MeshBuilder.CreateBox(`fb_bench_leg_${i}_${zz}_${sx}`, { width: 0.18, height: 1.1, depth: 0.18 }, ctx.scene);
-        leg.position.set(t.x + sx * (t.halfX + 0.05), 0.55, zz); leg.material = benchMat; leg.isPickable = false; laneMeshes.push(leg);
+        leg.position.set(t.x + sx * (t.halfX + 0.05), 0.55, zz); benches.push(leg);
       }
+    }
+    // IMPROVE (2026-10-06) #17: ONE mesh per material — walls, ramps, bench tops and legs were 15 separate meshes (15 draws,
+    // and again per shadow cascade). Nothing here moves, so the merged matrices are frozen. Each target is named before the
+    // merge fills it (the light rig classifies a mesh by name the moment it is added); none is pickable, as before.
+    for (const [name, list, m] of [['fb_walls_merged', walls, wallMat], ['fb_ramps_merged', ramps, rampMat], ['fb_benches_merged', benches, benchMat]] as const) {
+      const target = new Mesh(name, ctx.scene);
+      const merged = Mesh.MergeMeshes(list, true, true, target);
+      if (!merged) { target.dispose(); for (const x of list) { x.material = m; x.isPickable = false; laneMeshes.push(x); } continue; }
+      merged.material = m; merged.isPickable = false; merged.freezeWorldMatrix();
+      laneMeshes.push(merged);
     }
   }
 
   function newDrive(ctx: ModeContext, banner: string): void {
+    // IMPROVE (2026-10-06) #5: nothing from the last drive is still pending (a release, a reset, the card's clear)
+    timers.clear();
     down = 1; toGo = 10;
     lineOfScrimmage = 0; yards = 0; driveEvades = 0; breakawaySec = 0;
+    evadesAtDrive = evades; hopSec = 0; hopT = 0;   // #1: the touchdown pays this drive's evades from here
     styleTypes = new Set();
     truckSec = 0; truckCooldown = 0;
     truckLatch = false; tackleLatch = false; tdLatch = false;   // A+ P0: a new drive gets its own beats
@@ -595,17 +727,22 @@ export const FootballRushMode: ModeDefinition = (() => {
     // KICKOFF RETURN: a fresh drive opens with the kick in the air
     vault = null; lane = 'turf'; runner.root.position.y = 0; launchSec = 0; launchMult = 1; slingGauge = 0; slingCool = 0; immuneSec = 0; stiffCool = 0; gunslingNow = null;
     for (const [m] of pounces) { m.char.root.position.y = 0; } pounces.clear(); pounceCool = 1.5;
-    if (fumble) { fumble.ball.dispose(); fumble = null; }
+    if (fumble) { fumble.ball.setEnabled(false); fumble = null; }
     for (const b of blockers) { b.busy = 0; b.char.root.position.set(b.side * 2.4, 0, 2.5); b.char.root.rotation.y = 0; }
     animTree?.reset();   // the tree is the one owner: the pre-snap idle is a WINDOW, not a play() from here
     ctx.camDirector.snapTo(runner.root.position, runner.root.position.add(new Vector3(0, 0, 12)));
     driveYards = 0;
-    ctx.setHud({ down, toGo, banner, breakaway: false, truckReady: true, drive: `${drive}/${DRIVES}`, board: driveLog.length ? driveLog : null, boardTitle: driveLog.length ? `DRIVE ${drive} / ${DRIVES}` : '', ballOn: 0, los: 0, firstDown: 10, fieldLen: Math.round(FIELD_LENGTH / YARD) });
-    setTimeout(() => ctx.setHud({ banner: '', board: null, boardTitle: '' }), 2600);   // long enough to read the card
+    // #11: the card stars the longest drive so far and its title names it
+    const bi = driveLog.length >= 2 ? bestDriveIndex(driveLog) : -1;
+    const bestNote = bi >= 0 ? ` · BEST ${driveLog[bi].name} (${driveLog[bi].score} YD)` : '';
+    ctx.setHud({ down, toGo, breakaway: false, truckReady: true, truckCool: 1, drive: `${drive}/${DRIVES}`, board: driveLog.length ? boardRows() : null, boardTitle: driveLog.length ? `DRIVE ${drive} / ${DRIVES}${bestNote}` : '', ballOn: 0, los: 0, firstDown: 10, fieldLen: Math.round(FIELD_LENGTH / YARD) });
+    hudSent = {}; parSentFor = -1;   // #12: the drive's per-frame fields are all sent again on its first frame
+    flash(ctx, banner, 2600);   // long enough to read the card
+    timers.later(clock, 2.6, () => ctx.setHud({ board: null, boardTitle: '' }), 'card');
     void spawnDefense(ctx).then(() => {
-      ctx.setHud({ hint: 'READ THE FRONT — push ▲/W to SNAP' });
+      if (!ended && preSnap && (!kick || kick.caught)) ctx.setHud({ hint: 'READ THE FRONT — push ▲/W to SNAP' });   // the kick's own hint stands while it hangs
     });
-    layCoins(ctx, 0);
+    layCoins(ctx);
     startKick(ctx);
   }
 
@@ -615,6 +752,12 @@ export const FootballRushMode: ModeDefinition = (() => {
     async load(ctx: ModeContext) {
       tier = readProfile();
       driveLog = []; driveYards = 0;
+      // IMPROVE (2026-10-06): the closure outlives a mount — the clock, its timers, the banner, the HUD cache, the session's
+      // coin field and the loose ball all start over with the scene (a field or a ball kept from the last scene would be
+      // built into a disposed one)
+      clock = 0; timers.clear(); bannerUntil = Infinity; hudSent = {}; hudGateSec = 0; parSentFor = -1; evadesAtDrive = 0; hopT = 0; hopSec = 0;
+      coins?.dispose(); coins = null; fumbleBall = null; ballMat = null; kickBall = null;
+      bestScore = loadFootballBest();
       rushVenue = mountVenue(ctx, 'football_rush', { keepGameplayCamera: true, look: readPlaceLook('football') });   // PLACE: the splash's pick
       // WEATHER: the start screen's pick — rain softens the cut (grip), snow slows the run (drag), fog / night dress it
       weather = WeatherKit.fromPick(readWeather('football'), 'gridiron', Math.floor(Date.now() / 1000) % 100000);
@@ -630,9 +773,17 @@ export const FootballRushMode: ModeDefinition = (() => {
       // past x ±22 / z ±26. Renamed rather than disposed: the camera's venue-shell regex still matches it, and
       // the mesh is still wanted for bounds. (Found by scripts/probes/_ground-audit.mts.)
       if (rushVenue) for (const m of rushVenue.built.root.getChildMeshes()) if (m.name === 'venue_ground') { m.visibility = 0; m.name = 'venue_ground_under'; m.isPickable = false; }
-      runner = await CharacterLibrary.spawn(ctx.scene, CFG.heroUrl, {
-        position: new Vector3(0, 0, 0), yawRad: 0, startClip: SPORT_CLIP.idle,
-      });
+      // IMPROVE (2026-10-06) #20: the runner, the pooled front and the two blockers load TOGETHER — the blockers were
+      // awaited one after the other, after the pool, after the runner (four serial waits on the same hero GLB)
+      for (const b of blockers) b.char.dispose(); blockers = [];
+      defenders = []; pool = new MobPool();
+      const spawnBlocker = (side: 1 | -1) => CharacterLibrary.spawn(ctx.scene, CFG.heroUrl, { position: new Vector3(side * 2.4, 0, 2.5), yawRad: 0, tint: '#1f6feb', startClip: SPORT_CLIP.idle });
+      const [runnerChar, , blockR, blockL] = await Promise.all([
+        CharacterLibrary.spawn(ctx.scene, CFG.heroUrl, { position: new Vector3(0, 0, 0), yawRad: 0, startClip: SPORT_CLIP.idle }),
+        buildDefenderBodies(ctx),   // the pooled front (see spawnDefense)
+        spawnBlocker(1), spawnBlocker(-1),
+      ]);
+      runner = runnerChar;
       neverBindPose(runner.animator, SPORT_CLIP.idle);
       installSafePlay(runner.animator, 'football');
       ctx.groundLock?.track(runner.root, runner.skeleton);
@@ -646,25 +797,21 @@ export const FootballRushMode: ModeDefinition = (() => {
         // The chest squares to where he is running; the EYES go to the man he has to beat. Aiming the chest at a
         // defender off to the side instead turned the carrier's shoulders across his own line — measured, 77/513 carry
         // frames within 30° of it.
-        return { pose, legs, aim: lineAhead(), eyes: threat() ?? lineAhead(), window };
+        return { pose, legs, aim: lineAhead(), eyes: threat() ?? lineAhead(eyesV), window };
       }, 'FB-PP');
       if (process.env.NODE_ENV === 'development') {
         const dev = (window as unknown as { __FEL_DEV__?: { runPosture?: unknown } }).__FEL_DEV__;
         if (dev) dev.runPosture = { me: () => posture?.layer.get() ?? null, bio: () => ({ ...bio }), tree: () => animTree?.state ?? null, aim: () => { const t = lineAhead(); return { x: t.x, y: t.y, z: t.z }; }, eyes: () => { const t = threat() ?? lineAhead(); return { x: t.x, y: t.y, z: t.z }; } };   // BIOMECH-WAVE2 probes
       }
-      defenders = []; pool = new MobPool();
-      await buildDefenderBodies(ctx);   // the pooled front (see spawnDefense)
       // KICKOFF RETURN: the two lead blockers (my colours), the field's parkour, and the dev seam
-      for (const b of blockers) b.char.dispose(); blockers = [];
-      for (const side of [1, -1] as const) {
-        const char = await CharacterLibrary.spawn(ctx.scene, CFG.heroUrl, { position: new Vector3(side * 2.4, 0, 2.5), yawRad: 0, tint: '#1f6feb', startClip: SPORT_CLIP.idle });
+      for (const [side, char] of [[1, blockR], [-1, blockL]] as const) {
         neverBindPose(char.animator, SPORT_CLIP.idle); installSafePlay(char.animator, 'football-blocker'); ctx.groundLock?.track(char.root, char.skeleton);
         blockers.push({ char, side, busy: 0, moving: false, speed: 0 });
       }
       buildLanes(ctx);
       if (process.env.NODE_ENV === 'development') {
         (ctx.scene.metadata ??= {}).football = {
-          state: () => ({ ...ret, lane, kickK: kick ? kick.k : -1, kickCaught: kick ? kick.caught : true, gauge: slingGauge, launch: launchSec, x: runner.root.position.x, y: runner.root.position.y, z: runner.root.position.z, vx: run.vx, vz: run.vz, preSnap, downed, fumble: !!fumble, vault: !!vault, hurdleReady: hurdleRead(me2(), vel2(), downedGunners()), stiffReady: standingGunners().some((g) => stiffArmRead(me2(), vel2(), g)), ended, slingCool, parallel: blockers.some((b) => b.speed >= SLINGSHOT.mateMinSpeed && parallelRead(me2(), vel2(), { x: b.char.root.position.x, z: b.char.root.position.z })), drafting: blockers.some((b) => draftingRead(me2(), vel2(), { x: b.char.root.position.x, z: b.char.root.position.z })), gunsling: !!gunslingNow, blockers: blockers.map((b) => ({ x: b.char.root.position.x, z: b.char.root.position.z, busy: b.busy })), gunners: defenders.map((m) => ({ x: m.char.root.position.x, z: m.char.root.position.z, state: m.state, pouncing: pounces.has(m) })), score, drive, down }),
+          state: () => (refreshReads(), { ...ret, lane, kickK: kick ? kick.k : -1, kickCaught: kick ? kick.caught : true, gauge: slingGauge, launch: launchSec, x: runner.root.position.x, y: runner.root.position.y, z: runner.root.position.z, vx: run.vx, vz: run.vz, preSnap, downed, fumble: !!fumble, vault: !!vault, hurdleReady: hurdleRead(meP, velP, downedList), stiffReady: standing.some((g) => stiffArmRead(meP, velP, g)), ended, slingCool, parallel: blockers.some((b) => b.speed >= SLINGSHOT.mateMinSpeed && parallelRead(meP, velP, b.char.root.position)), drafting: blockers.some((b) => draftingRead(meP, velP, b.char.root.position)), gunsling: !!gunslingNow, blockers: blockers.map((b) => ({ x: b.char.root.position.x, z: b.char.root.position.z, busy: b.busy })), gunners: defenders.map((m) => ({ x: m.char.root.position.x, z: m.char.root.position.z, state: m.state, pouncing: pounces.has(m) })), score, drive, down }),
           snapNow: () => snap(ctx),
           slideHeld: () => slideHeld,
           place: (x: number, z: number) => { runner.root.position.set(x, 0, z); run = { vx: 0, vz: RUN.base }; },   // the probe's instrument: start a run beside the wall / the bench
@@ -705,8 +852,9 @@ export const FootballRushMode: ModeDefinition = (() => {
       }
       // KICKOFF RETURN verbs: L1 the slingshot, R1 the stiff-arm clothesline, B on a diver the gunslinger vault, A over a downed man the catapult
       if (e.t === 'button' && e.pressed && !ended && !preSnap && !downed && !fumble) {
+        refreshReads();   // IMPROVE (2026-10-06) #14: a press between frames reads the field as it stands now
         if (e.btn === 'L1') {
-          const beside = blockers.some((b) => b.speed >= SLINGSHOT.mateMinSpeed && parallelRead(me2(), vel2(), { x: b.char.root.position.x, z: b.char.root.position.z }));
+          const beside = blockers.some((b) => b.speed >= SLINGSHOT.mateMinSpeed && parallelRead(meP, velP, b.char.root.position));
           if (slingCool > 0) refuse(ctx, `SLINGSHOT COOLING — ${slingCool.toFixed(1)}s`);
           else if (beside || slingGauge >= SLINGSHOT.full) {
             burst(SLINGSHOT.blastSec, SLINGSHOT.blastMult); immuneSec = SLINGSHOT.immuneSec; slingGauge = 0; slingCool = SLINGSHOT.cooldownSec; ret.slings++; score += SLINGSHOT.pts;
@@ -716,7 +864,7 @@ export const FootballRushMode: ModeDefinition = (() => {
           return;
         }
         if (e.btn === 'R1') {
-          const g = stiffCool === 0 ? standingGunners().find((x) => stiffArmRead(me2(), vel2(), x)) : undefined;
+          const g = stiffCool === 0 ? standing.find((x) => stiffArmRead(meP, velP, x)) : undefined;
           if (g) {
             g.mob.down(); ret.stiffs++; score += STIFF.pts; stiffCool = STIFF.cooldownSec;
             move = 'stiffArm'; moveClip = 'football_stiff_arm'; moveUntil = performance.now() + MOVE_SEC * 1000;
@@ -727,7 +875,7 @@ export const FootballRushMode: ModeDefinition = (() => {
           return;
         }
         if (e.btn === 'B' && !dodging && !vault) { const diver = gunslingTarget(); if (diver) { gunslingerVault(ctx, diver); return; } }
-        if (e.btn === 'A' && !dodging && hurdleRead(me2(), vel2(), downedGunners())) {
+        if (e.btn === 'A' && !dodging && hurdleRead(meP, velP, downedList)) {
           burst(BLOCK.catapultSec, BLOCK.catapultMult); ret.catapults++; score += BLOCK.catapultPts;
           SoundKit.play('powerUp', { pitch: 1.4, volume: 0.4 }); flash(ctx, 'HURDLE-CATAPULT!', 600); console.info('[FB-RETURN] hurdle-catapult');
           // the generic hurdle below plays the clip and buys the iframes
@@ -753,8 +901,7 @@ export const FootballRushMode: ModeDefinition = (() => {
         truckCooldown = TRUCK_COOLDOWN_SEC;
         truckLatch = false;                       // A+ P0: a fresh window gets one break punch
         SoundKit.play('powerUp', { pitch: 0.8, volume: 0.4 });
-        ctx.setHud({ truckReady: false, banner: 'TRUCK!' });   // the tree reads truckSec — it never needed a play() here
-        setTimeout(() => ctx.setHud({ banner: '' }), 400);
+        ctx.setHud({ truckReady: false }); flash(ctx, 'TRUCK!', 400);   // the tree reads truckSec — it never needed a play() here
       }
 
       // An evade thrown ON TOP of the one still playing, or from the floor, used to vanish (1 of 6 JUKE and 1 of 5
@@ -780,27 +927,35 @@ export const FootballRushMode: ModeDefinition = (() => {
           cutTo = Math.max(-FIELD_HALF_X, Math.min(FIELD_HALF_X, runner.root.position.x + d.dx));
           cutT = 0; cutSec = cutSlideSec(MOVE_SEC * 0.7, weather.gripMult());   // a wet cut takes longer to bite
         }
+        // IMPROVE (2026-10-06) #9: the hurdle LEAVES THE GROUND — a half-sine hop over the move (the clip and the i-frames
+        // played with the root nailed to y 0). Only off the turf lane, in play: the rail, the ramp and the vault own y.
+        if (e.btn === 'A' && !preSnap && lane === 'turf' && !vault) { hopT = 0; hopSec = MOVE_SEC; }
         ctx.feel?.impact?.(0.12);
       }
     },
 
     update(ctx: ModeContext, dt: number) {
       if (ended) return;
+      // IMPROVE (2026-10-06) #4 #5: the mode clock (dt is already 0 in a hit-stop, and update does not run in a pause), the
+      // beats scheduled on it, and the one banner channel
+      clock += dt; hudGateSec += dt;
+      timers.tick(clock);
+      if (ended) return;
+      tickBanner(ctx);
 
       // HIT-CAM: when a stack closes on the runner, pull up and back for half a second so
       // the hit reads as a hit rather than something that happened behind the shoulder.
       // `downed` is the module's `cleared`: a trucked defender is on the floor and is no
       // longer converging on anything. Radius is metres here, the same unit as the
       // positions — the module compares against whatever unit it is handed.
-      const conv = countConverging(
-        defenders.map((m) => ({
-          yd: -m.char.root.position.z,
-          x: m.char.root.position.x,
-          cleared: m.state === 'downed',
-        })),
-        { x: runner.root.position.x, z: runner.root.position.z },
-        CONVERGE_RADIUS_YD * YARD,
-      );
+      // IMPROVE (2026-10-06) #15: into a re-used buffer (it was a fresh array of fresh objects every frame)
+      convBuf.length = defenders.length;
+      for (let i = 0; i < defenders.length; i++) {
+        const m = defenders[i], c = convBuf[i] ??= { yd: 0, x: 0, cleared: false };
+        c.yd = -m.char.root.position.z; c.x = m.char.root.position.x; c.cleared = m.state === 'downed';
+      }
+      convRunner.x = runner.root.position.x; convRunner.z = runner.root.position.z;
+      const conv = countConverging(convBuf, convRunner, CONVERGE_RADIUS_YD * YARD);
       updateBroadcastCut(hitCut, conv, dt);
       ctx.camDirector.broadcast = broadcastBlend(hitCut);
       // SET AT THE LINE — nobody moves until the snap (the player calls it,
@@ -810,13 +965,31 @@ export const FootballRushMode: ModeDefinition = (() => {
         if (showBlitz) {
           // the show: he creeps toward the line while everyone else is set
           showBlitz.char.root.position.z -= SHOW_BLITZ_CREEP * dt;
-          if (preSnapT < 0.1) ctx.setHud({ hint: 'SHOWING BLITZ — snap into it, or wait him out' });
+          if (preSnapT < 0.1 && (!kick || kick.caught)) ctx.setHud({ hint: 'SHOWING BLITZ — snap into it, or wait him out' });
         }
-        if (kick && !kick.caught) tickKick(ctx, dt);
+        // IMPROVE (2026-10-06) #2: while the kick hangs the returner MOVES — he has to get under where it comes down (the
+        // ring marks it). A rate toward the stick's velocity; the snap's forward push still waits for the catch.
+        const kickUp = !!kick && !kick.caught;
+        let speed01 = 0;
+        if (kickUp) {
+          run = kickMoveStep(run, stickX, stickY, dt);
+          const p = runner.root.position;
+          p.x = Math.max(-FIELD_HALF_X, Math.min(FIELD_HALF_X, p.x + run.vx * dt));
+          p.z = Math.max(-3, Math.min(KICK_LAND.zMax + 1, p.z + run.vz * dt));   // never up into the front (its first man stands 6 m off)
+          const sp = Math.hypot(run.vx, run.vz); speed01 = Math.min(1, sp / 8);
+          if (sp > 0.5) runner.root.rotation.y = stepYaw(runner.root.rotation.y, Math.atan2(run.vx, run.vz), dt, TURN_RATE);
+        }
+        if (kickUp) tickKick(ctx, dt);
         else if (preSnapT >= PRESNAP_AUTOSNAP_SEC) snap(ctx);
+        refreshReads();
         tickBlockers(ctx, dt, true);
-        drive3D(0, false);   // the tree runs every phase: SET at the line is a window, not the absence of one
-        weather.update(dt); weatherFx?.update(dt); run = { vx: 0, vz: 0 }; lineArrow?.show(false); pursuit?.show(false);
+        findNearest();
+        drive3D(speed01, false, kickUp);   // the tree runs every phase: SET at the line is a window, not the absence of one
+        weather.update(dt); weatherFx?.update(dt);
+        if (preSnap) { run.vx = 0; run.vz = 0; }   // still SET (the catch snaps it, and sets the run itself)
+        lineArrow?.show(false);
+        const ringOn = kickUp && !!kick && !kick.caught;   // the kick's spot (the catch hides it)
+        pursuit?.show(ringOn); if (ringOn) pursuit?.set(kickLand.x, kickLand.z);
         ctx.camDirector.look(lookX, lookY, dt);   // read the front from the R stick
         ctx.camDirector.update(runner.root.position, Vector3.Zero(), null);
         return;
@@ -827,12 +1000,19 @@ export const FootballRushMode: ModeDefinition = (() => {
       const cooldownWas = truckCooldown;
       truckCooldown = Math.max(0, truckCooldown - dt);
       if (cooldownWas > 0 && truckCooldown === 0) ctx.setHud({ truckReady: true });
-      if (breakawaySec === 0) ctx.setHud({ breakaway: false });
+      // (the breakaway flag rides the frame HUD below: it used to send { breakaway: false } every frame without one)
       // KICKOFF RETURN clocks: the burst, the immunity, the arm, the gauge, the scramble, the gunners' velocities
       launchSec = Math.max(0, launchSec - dt); if (launchSec === 0) launchMult = 1;
       immuneSec = Math.max(0, immuneSec - dt); stiffCool = Math.max(0, stiffCool - dt); slingCool = Math.max(0, slingCool - dt);
-      slingGauge = slingshotStep(slingGauge, !downed && blockers.some((b) => draftingRead(me2(), vel2(), { x: b.char.root.position.x, z: b.char.root.position.z })), dt);
-      if (dt > 1e-4) for (const m of defenders) { const p = m.char.root.position; const prev = defPrev.get(m); if (prev) { const v = p.subtract(prev).scaleInPlace(1 / dt); if (v.length() > 14) v.setAll(0); defVel.set(m, v); } defPrev.set(m, p.clone()); }
+      refreshReads();   // #14: once, before the draft read
+      slingGauge = slingshotStep(slingGauge, !downed && blockers.some((b) => draftingRead(meP, velP, b.char.root.position)), dt);
+      // #13: each defender's velocity in its own re-used slot (no subtract / clone per frame)
+      if (dt > 1e-4) for (const m of defenders) {
+        const p = m.char.root.position; let tr = defTrack.get(m);
+        if (!tr) { tr = { prev: p.clone(), vel: new Vector3(), primed: false }; defTrack.set(m, tr); continue; }
+        p.subtractToRef(tr.prev, tr.vel).scaleInPlace(1 / dt); if (tr.vel.length() > 14) tr.vel.setAll(0);
+        tr.prev.copyFrom(p); tr.primed = true;
+      }
       gunslingNow = downed ? null : gunslingTarget();
       if (tickFumble(ctx, dt) === 'turnover') { if (loseDrive(ctx, 'FUMBLE — TURNOVER')) return; }
 
@@ -855,6 +1035,12 @@ export const FootballRushMode: ModeDefinition = (() => {
       runner.root.position.x = Math.max(-FIELD_HALF_X, Math.min(FIELD_HALF_X, runner.root.position.x));
       // KICKOFF RETURN: the lanes, the blocking wall, the gunners' pounce
       tickLanes(ctx, dt, vel);
+      // IMPROVE (2026-10-06) #9: the hurdle's hop, on the turf only (a ramp, the rail or a vault taking over ends it)
+      if (hopSec > 0) {
+        if (lane !== 'turf' || vault || downed || tdPending) hopSec = 0;
+        else { hopT += dt; runner.root.position.y = hopY(hopT, hopSec); if (hopT >= hopSec) { hopSec = 0; runner.root.position.y = 0; } }
+      }
+      refreshReads();   // #14: the frame's reads, after the runner has moved — the wall, the pounce and the prompts share them
       tickBlockers(ctx, dt, false);
       { const pounced = tickPounces(ctx, dt);
         if (pounced && !downed && !fumble) {
@@ -873,16 +1059,39 @@ export const FootballRushMode: ModeDefinition = (() => {
       driveYards = Math.max(driveYards, Math.floor(runner.root.position.z / YARD));
       // A+ mission #9: the field strip (ball, line of scrimmage, first-down line, all in yards) and the TARGET — where the
       // nearest defender is relative to the runner, so the next move is a read, not a guess
-      let nearest: Mob | null = null, nd = Infinity;
-      for (const m of defenders) { const d = Vector3.Distance(m.char.root.position, runner.root.position); if (d < nd) { nd = d; nearest = m; } }
+      findNearest();   // #18: once per frame — the TARGET read, the pursuit ring and the posture's eyes all read it
+      const nd = nearestD;
       const dx = nearest ? nearest.char.root.position.x - runner.root.position.x : 0;
       const target = !nearest || nd > 9 ? '' : Math.abs(dx) < 1.2 ? 'AHEAD — juke or truck' : dx > 0 ? 'RIGHT — cut left' : 'LEFT — cut right';
       const bm = breakawayMeter(driveEvades, BREAKAWAY_THRESHOLD, breakawaySec, BREAKAWAY_SEC);
-      ctx.setHud({ yards, evades, ballOn: Math.max(0, Math.round(runner.root.position.z / YARD)), los: Math.round(lineOfScrimmage / YARD), firstDown: Math.round((lineOfScrimmage + toGo * YARD) / YARD), target, breakawayFill: Number(bm.fill01.toFixed(3)), breakawayTicks: bm.ticks.map((t) => t.toFixed(3)).join(',') });
+      // IMPROVE (2026-10-06) #10: the reads the buttons answer, as chips — B became a vault, A a catapult and R1 a
+      // clothesline silently; the reads were computed every frame and never shown
+      const live = !downed && !fumble && !held;
+      const prompts = live ? contextPrompts({
+        vault: !!gunslingNow && !dodging && !vault,
+        catapult: !dodging && hurdleRead(meP, velP, downedList),
+        arm: stiffCool === 0 && standing.some((g) => stiffArmRead(meP, velP, g)),
+      }) : '';
+      // IMPROVE (2026-10-06) #12: the frame's HUD goes out only as it CHANGES — it was a full setHud (a React render in the
+      // host) every frame, with a ticks.map().join() in it and { breakaway: false } whenever there was no breakaway. The
+      // fills move continuously, so they ride FB_HUD_HZ; every discrete field goes the frame it changes.
+      const gate = hudGateSec >= 1 / FB_HUD_HZ; if (gate) hudGateSec = 0;
+      const changed = hudChanges(hudSent, {
+        yards, evades, ballOn: Math.max(0, Math.round(runner.root.position.z / YARD)), los: Math.round(lineOfScrimmage / YARD),
+        firstDown: Math.round((lineOfScrimmage + toGo * YARD) / YARD), target,
+        breakawayFill: Math.round(bm.fill01 * 50) / 50, breakawayTicks: BREAKAWAY_TICKS, breakaway: breakawaySec > 0,
+        truckCool: truckReady01(truckCooldown, TRUCK_COOLDOWN_SEC), prompts,   // #7: the truck's cooldown filling
+      }, FRAME_HUD_CONTINUOUS, gate);
+      if (changed) ctx.setHud(changed);
+      // #11: the chase line to the next medal, sent when the score moves
+      if (score !== parSentFor) { parSentFor = score; ctx.setHud({ par: parLine(score, bestScore) }); }
       // THE READ ON THE TURF: your line ahead, and the ring where the nearest man meets it (no ring = he cannot catch you)
       // the arrow starts a stride AHEAD of the body: from the chase camera a line under the runner's own feet is hidden by him
       if (lineArrow) { const sp = Math.hypot(vel.x, vel.z); lineArrow.show(!held && sp > 0.5); if (sp > 0.5) { const yaw = Math.atan2(vel.x, vel.z); lineArrow.set(runner.root.position.add(new Vector3(Math.sin(yaw) * 1.4, 0, Math.cos(yaw) * 1.4)), yaw, Math.min(7, 1.5 + sp * 0.6), null); } }
-      if (pursuit) { const ip = nearest && nd < 16 && !held ? interceptPoint({ x: runner.root.position.x, z: runner.root.position.z }, { x: vel.x, z: vel.z }, { x: nearest.char.root.position.x, z: nearest.char.root.position.z }, DEF_SPEED) : null; pursuit.show(!!ip); if (ip) pursuit.set(ip.x, ip.z); }
+      // IMPROVE (2026-10-06) #8: a live ball takes the ring — the strip threw it a random way with nothing on the turf to
+      // say where; the scramble reads it before the pursuit does
+      if (pursuit && fumble) { pursuit.show(true); pursuit.set(fumble.ball.position.x, fumble.ball.position.z); }
+      else if (pursuit) { const ip = nearest && nd < 16 && !held ? interceptPoint({ x: runner.root.position.x, z: runner.root.position.z }, { x: vel.x, z: vel.z }, { x: nearest.char.root.position.x, z: nearest.char.root.position.z }, DEF_SPEED) : null; pursuit.show(!!ip); if (ip) pursuit.set(ip.x, ip.z); }
 
       const gained = coins?.update(dt, runner.root.position) ?? 0;
       if (gained > 0) {
@@ -905,15 +1114,13 @@ export const FootballRushMode: ModeDefinition = (() => {
           mob.char.animator.play(SPORT_CLIP.footballTackled, {});
           truckPunch(ctx);   // A+ P0: hit-stop + shake + ONE low thud, once per window (replaces feel.impact + a second impact SFX)
           EffectsKit.burst(ctx.scene, mob.char.root.position.add(new Vector3(0, TURF_Y, 0)), 'dust');   // turf at his feet (ANIM-SURGICAL)
-          ctx.setHud({ score, banner: 'TRUCKED!' });
+          flash(ctx, 'TRUCKED!', 600);
           gallery?.cheer(0.6);
-          setTimeout(() => ctx.setHud({ banner: '' }), 600);
           styleCredit(ctx, 'truck');
           if (driveEvades >= BREAKAWAY_THRESHOLD && breakawaySec <= 0) {
             breakawaySec = BREAKAWAY_SEC;
             SoundKit.play('powerUp');
-            ctx.setHud({ banner: 'BREAKAWAY!', breakaway: true });
-            setTimeout(() => ctx.setHud({ banner: '' }), 900);
+            ctx.setHud({ breakaway: true }); hudSent.breakaway = true; flash(ctx, 'BREAKAWAY!', 900);
           }
           continue;
         }
@@ -928,11 +1135,9 @@ export const FootballRushMode: ModeDefinition = (() => {
           if (driveEvades >= BREAKAWAY_THRESHOLD && breakawaySec <= 0) {
             breakawaySec = BREAKAWAY_SEC;
             SoundKit.play('powerUp');
-            ctx.setHud({ banner: 'BREAKAWAY!', breakaway: true });
-            setTimeout(() => ctx.setHud({ banner: '' }), 900);
+            ctx.setHud({ breakaway: true }); hudSent.breakaway = true; flash(ctx, 'BREAKAWAY!', 900);
           } else {
-            ctx.setHud({ banner: 'EVADED!', score });
-            setTimeout(() => ctx.setHud({ banner: '' }), 500);
+            flash(ctx, 'EVADED!', 500);
           }
           continue;
         }
@@ -941,25 +1146,27 @@ export const FootballRushMode: ModeDefinition = (() => {
 
       if (runner.root.position.z >= FIELD_LENGTH && !tdPending) {
         const mult = breakawaySec > 0 ? 1.5 : 1;
-        score += Math.round((100 + evades * 10) * mult);
+        const tdEvades = evades - evadesAtDrive;   // IMPROVE (2026-10-06) #1: THIS drive's evades, not the session's
+        score += Math.round((100 + tdEvades * 10) * mult);
         // G5: the SPIKE is this mode's biggest end pose and it had never been seen — the per-frame carry run cut it on
         // the next frame and `newDrive` reset the body on this one. It holds for TD_HOLD_SEC now, feet planted.
-        tdPending = true; celebrateUntil = performance.now() + TD_HOLD_SEC * 1000; move = null; cutSec = 0; vault = null; lane = 'turf'; runner.root.position.y = 0; launchSec = 0;
+        tdPending = true; celebrateUntil = performance.now() + TD_HOLD_SEC * 1000; move = null; cutSec = 0; vault = null; lane = 'turf'; runner.root.position.y = 0; launchSec = 0; hopSec = 0;
         animTree?.clearBeat('celebrate');
         tdPunch(ctx);   // A+ P0: hit-stop + shake + gold flash + ONE slam, once per drive (replaces the bare feel.impact)
         SoundKit.play('score');
         SoundKit.play('crowdCheer');
         EffectsKit.burst(ctx.scene, runner.root.position.add(new Vector3(0, 1.8, 0)), 'confetti');
-        ctx.setHud({ score, banner: 'TOUCHDOWN!' });
+        holdBanner(ctx, 'TOUCHDOWN!');   // holds through the spike; the next drive's banner replaces it
         gallery?.cheer(1);
         logDrive('TOUCHDOWN');
         if (drive >= DRIVES) {
           ended = true;
           SoundKit.play('whistle');
-          return ctx.end('DRIVES_DONE', score, { yards, evades, trucks, coinsCollected: coins?.collected ?? 0, drives: DRIVES });
+          return ctx.end('DRIVES_DONE', score, endStats());
         }
         const next = drive + 1;
-        setTimeout(() => { if (ended) return; drive = next; newDrive(ctx, `TOUCHDOWN! · DRIVE ${next}/${DRIVES}`); }, TD_HOLD_SEC * 1000);
+        // IMPROVE (2026-10-06) #5: the next drive waits out the spike on the mode clock (a pause holds the spike too)
+        timers.later(clock, TD_HOLD_SEC, () => { if (ended) return; drive = next; newDrive(ctx, `TOUCHDOWN! · DRIVE ${next}/${DRIVES}`); }, 'drive');
       }
 
       drive3D(Math.min(1, vel.length() / 8), trucking);
@@ -976,10 +1183,11 @@ export const FootballRushMode: ModeDefinition = (() => {
       runner?.dispose();
       for (const b of blockers) b.char.dispose(); blockers = [];
       for (const m of laneMeshes) m.dispose(); laneMeshes = [];
-      kickBall?.dispose(); kickBall = null; kick = null; if (fumble) { fumble.ball.dispose(); fumble = null; } pounces.clear(); defPrev.clear(); defVel.clear();
+      kickBall?.dispose(); kickBall = null; kick = null; fumble = null; fumbleBall?.dispose(); fumbleBall = null; ballMat?.dispose(); ballMat = null; pounces.clear(); defTrack.clear();
+      timers.clear(); nearest = null; convBuf.length = 0; standing.length = 0; downedList.length = 0;
       for (const char of defenderBodies) char.dispose();
       defenderBodies = []; defenders = [];
-      coins?.dispose();
+      coins?.dispose(); coins = null;
       SoundKit.stopAmbient();
     },
   };

@@ -144,7 +144,7 @@ describe('each yardstick is what its mode actually posts', () => {
   it('Breakaway: five drives, a touchdown pays 100 or more — and finishing all five posts a win', () => {
     const m = 'lib/babylon/modes/FootballRushMode.ts';
     const drives = pin(m, /const DRIVES = (\d+);/);
-    has(m, 'score += Math.round((100 + evades * 10) * mult);');
+    has(m, 'score += Math.round((100 + tdEvades * 10) * mult);');   // IMPROVE (2026-10-06): this drive's evades (≥ 0, so ≥ 100 a TD)
     expect(STORY_YARDSTICKS.football.reach).toBe(drives * 100);
     has('components/games/football-babylon.tsx', 'footballSessionWon(r.outcome)');
     has(m, "ctx.end('DRIVES_DONE'");
