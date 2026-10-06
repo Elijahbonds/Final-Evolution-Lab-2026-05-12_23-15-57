@@ -35,7 +35,11 @@ describe('GC-13: a pad, the keys and touch keep exactly what they had', () => {
   it('skate says the words SkateRunMode said at the parent, and the gauge its own default', () => {
     expect(skateHudWords(false)).toEqual({ hint: 'HOLD FORWARD to push · POP to ollie · B to MANUAL · GRIND the rails · hold RB / Shift to BOOST', boostHint: 'HOLD RB · SHIFT' });
     const gauge = readFileSync(path.join(__dirname, '../../../components/games/boost-hud.tsx'), 'utf8');
-    expect(gauge).toContain(`: '${PAD_BOOST_HINT}'}`);   // boost-hud's default line when no mode sets one
+    // test changed (controls-screen-2, owner 2026-10-06: "the meter itself stays … with no instruction text"): the gauge
+    // drew PAD_BOOST_HINT as its default caption; it now draws no caption at all, and the pad's words are the CONTROLS
+    // panel's BOOST row (cardSlot buttonMap), the body's its BOOST line (panelLines BODY_BOOST_LINE)
+    expect(gauge).not.toContain(`'${PAD_BOOST_HINT}'`);
+    expect(gauge).not.toMatch(/hud\.boostHint/);
   });
   it('the kart\'s pad words are the ones VelocityKartMode said at the parent (26bec0cc), before and after GO', () => {
     expect(KART_PAD_HINT).toBe('RT throttle · X drift to fill BOOST · hold RB / Shift to burn it · A fires your item');

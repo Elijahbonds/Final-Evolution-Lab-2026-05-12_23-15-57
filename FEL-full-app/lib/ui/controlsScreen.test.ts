@@ -1,7 +1,7 @@
 // The CONTROLS screen's pure half (controls-screen, 2026-10-06): the strip the harness applies, the device lists, the
 // line split, and which list opens first.
 import { describe, expect, it } from 'vitest';
-import { controlLines, controlRows, controlsSheet, pickDevice, splitHint } from './controlsScreen';
+import { FIT_MIN, controlLines, controlRows, controlsSheet, fitScale, moveLines, pickDevice, splitHint } from './controlsScreen';
 import { STATIC_CONTROLS, isStaticControlsHint, staticControlsFor, stripStaticControls } from '../babylon/ui/staticControls';
 import { KART_PAD_HINT, KART_PAD_START_HINT } from '../babylon/modes/rideHud';
 
@@ -76,9 +76,16 @@ describe('controlRows — the list for the device in use', () => {
     expect(row(controlRows('velocitykart', 'pad'), 'BOOST')).toBe('HOLD RB');
     expect(row(controlRows('velocitykart', 'keys'), 'BOOST')).toBe('HOLD SHIFT');
     expect(row(controlRows('velocitykart', 'touch'), 'BOOST')).toBe('HOLD BOOST');
-    const snowPad = controlRows('snowboard', 'pad'), snowKeys = controlRows('snowboard', 'keys');
-    const trick = snowPad.find((r) => /^. \+ B$/.test(r.input))!;
-    expect(snowKeys.find((r) => r.action === trick.action)!.input).toBe(trick.input.replace('B', 'K'));
+    // test changed (controls-screen-2, owner 2026-10-06: the lists must fit without scrolling): the board's trick table
+    // is one line per button below the rows (moveLines), not a row per trick — still in each device's words
+    expect(controlRows('snowboard', 'pad').some((r) => /^. \+ [ABXY]$/.test(r.input))).toBe(false);
+    expect(row(controlRows('snowboard', 'pad'), 'BOARDSLIDE')).toBeUndefined();
+    expect(moveLines('snowboard', 'pad')).toEqual(['B: ↑INDY ←METHOD →STALEFISH ↓TAIL GRAB', 'Y: →720 ←CORK 720 ↓RODEO 540', 'X: BOARDSLIDE']);
+    expect(moveLines('surf', 'pad')[0]).toBe('B: BOTTOM TURN · ←CUTBACK ↑SNAP →FLOATER ↓TUBE RIDE');
+    expect(moveLines('snowboard', 'keys')[0]).toBe(moveLines('snowboard', 'pad')[0].replace(/^B:/, 'K:'));
+    expect(moveLines('snowboard', 'touch')[0]).toMatch(/^SPIN: ↑INDY/);
+    expect(moveLines('surf', 'pad')).toHaveLength(2);
+    expect(moveLines('dunk', 'pad')).toEqual([]);
     expect(row(controlRows('sprint', 'keys'), 'ALTERNATE STRIDES')).toBe('ARROWS ← →');
     expect(row(controlRows('skateboard', 'keys'), 'FLIP TRICK')).toBeUndefined();     // the R-stick flick has no key
     expect(row(controlRows('skateboard', 'touch'), 'FLIP TRICK')).toBe('RIGHT PAD FLICK');
@@ -102,7 +109,9 @@ describe('controlLines / controlsSheet — the mode\'s own words', () => {
     expect(controlLines('dunk')).toEqual(['HOLD to run', 'tap JUMP at the line — then SLAM on NOW!']);
     expect(controlLines('tennis', { fallback: 'Aim with stick · A to swing as the ball arrives' })).toEqual(['Aim with stick', 'A to swing as the ball arrives']);
     expect(controlLines('golf', { fallback: 'ignored' })[0]).toMatch(/^L-STICK turns the ARROW/);   // the mode's own words win
-    expect(controlLines('who_scene_it').filter((l) => l === 'B')).toHaveLength(1);
+    // test changed (controls-screen-2): who-scene-it's lines are now its curated list (its split hint came apart into
+    // 'A', 'B', 'X', 'Y pick the answer …'); the repeat-drop is held on a host line instead
+    expect(controlLines('tennis', { fallback: 'A · B · A' })).toEqual(['A', 'B']);
     expect(controlLines('tennis')).toEqual([]);
   });
 
@@ -119,5 +128,35 @@ describe('pickDevice — which list opens first', () => {
     expect(pickDevice({ pads: 1, touch: true })).toBe('pad');
     expect(pickDevice({ pads: 0, touch: true })).toBe('touch');
     expect(pickDevice({ pads: 0, touch: false })).toBe('keys');
+  });
+});
+
+// controls-screen-2 (console-view lane, 2026-10-06). Owner: "Yes to both proposed fixes for texts and impeding gameplay
+// view" — the lists short, and whole on the screen for a pad that cannot scroll.
+describe('the panel fits its box', () => {
+  it('fitScale: the full size when nothing is cut; else the largest step that shows it all; never under FIT_MIN', () => {
+    const tried: number[] = [];
+    expect(fitScale((s) => { tried.push(s); return false; })).toBe(1);
+    expect(tried).toEqual([1]);                                   // a list that fits is measured once, at full size
+    expect(fitScale((s) => s > 0.9)).toBe(0.9);                   // cut at 1 and 0.95, whole at 0.9
+    expect(fitScale(() => true)).toBe(FIT_MIN);                   // never smaller than the floor, even when still cut
+    expect(FIT_MIN).toBeGreaterThanOrEqual(0.85);                 // 10 px lines stay 8.5 px or more
+    const steps: number[] = [];
+    fitScale((s) => { steps.push(s); return true; });
+    expect(steps).toEqual([1, 0.95, 0.9]);                        // in 0.05 steps, no float drift
+  });
+
+  it('the sheet: the device\'s rows, then the trick lines, then the mode\'s own lines', () => {
+    const s = controlsSheet('surf', 'pad');
+    expect(s.lines.slice(0, 2)).toEqual(moveLines('surf', 'pad'));
+    expect(s.lines.slice(2)).toEqual(controlLines('surf'));
+    expect(controlsSheet('dunk', 'keys').lines).toEqual(controlLines('dunk'));
+  });
+
+  it('a body player\'s list keeps its own words; the curated pad list never replaces them', () => {
+    expect(controlLines('velocitykart', { body: true })[0]).toMatch(/^Grip the wheel/);
+    expect(controlLines('velocitykart', { body: true })).toContain('BOOST: DRIFTS FILL IT · RB ON PAD / TOUCH');
+    expect(controlLines('velocitykart')[0]).toMatch(/^X drift to fill BOOST/);
+    expect(controlLines('threevthree', { body: true })).toEqual(controlLines('threevthree'));   // no body words: the pad's
   });
 });

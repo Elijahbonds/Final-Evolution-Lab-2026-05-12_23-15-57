@@ -12,11 +12,18 @@
 //     right trigger (the dunk's RUN, the football's TRUCK) is R2 on a pad and SPACE on the keys — the card slot's old
 //     "HOLD Y" was the touch slot's letter, which a pad's Y does not send;
 //   - the named moves and the system rows (d-pad strides, the R-stick flick, BOOST): the card slot's buttonMap;
-//   - the mode's own words: its static hint lines (lib/babylon/ui/staticControls.ts), split at its ' · ' separators.
+//   - the mode's own words: its static hint lines (lib/babylon/ui/staticControls.ts), split at its ' · ' separators —
+//     or, for a mode whose hint is a whole controller map, the panel's curated short list (lib/babylon/ui/panelLines.ts).
+//
+// controls-screen-2 (2026-10-06). Owner: "Yes to both proposed fixes for texts and impeding gameplay view." The texts:
+// on a sideways phone the long lists scrolled inside the panel, which a pad cannot do. So: the curated lists, the board
+// modes' trick table folded to one line per button (nine rows were five lines of the grid), and the body's boost line
+// that the gauge no longer says during play.
 
 import { MODE_VERBS } from '../babylon/ui/modeVerbs';
 import { buttonMap, slotModeKey } from '../creator/cardSlot';
 import { staticControlsFor } from '../babylon/ui/staticControls';
+import { panelLinesFor, BODY_BOOST_LINE } from '../babylon/ui/panelLines';
 
 export type ControlsDevice = 'pad' | 'keys' | 'touch';
 export const CONTROLS_DEVICES: readonly ControlsDevice[] = ['pad', 'keys', 'touch'];
@@ -81,6 +88,7 @@ export function controlRows(modeId: string, device: ControlsDevice): ControlRow[
   });
   for (const r of buttonMap(modeId)) {
     if (r.group === 'verb') continue;   // the verbs above, from what they emit
+    if (r.group === 'move' && TRICK.test(r.input)) continue;   // a trick-table move: one line per button (moveLines)
     const input = translate(r.input, device, labels);
     if (input) rows.push({ input, action: r.action });
   }
@@ -90,6 +98,31 @@ export function controlRows(modeId: string, device: ControlsDevice): ControlRow[
   }
   if (device !== 'touch') rows.push({ input: device === 'pad' ? 'START' : 'ESC', action: 'PAUSE' });
   return rows;
+}
+
+/** A board's trick-table move as the card slot writes it: an optional direction, then a face button ('← + B', 'Y'). */
+const TRICK = /^(?:([←↑→↓]) \+ )?([ABXY])$/;
+
+/**
+ * The trick table, one line per button (controls-screen-2): 'B: BOTTOM TURN · ←CUTBACK ↑SNAP →FLOATER …', not a row
+ * each. The surf's nine trick rows were five lines of the grid — the panel's whole height on a sideways phone. The
+ * button is the device's: the letter on a pad, its key on the keys (InputBus KEYMAP), its verb on the touch deck.
+ */
+export function moveLines(modeId: string, device: ControlsDevice): string[] {
+  const cfg = MODE_VERBS[slotModeKey(modeId)] ?? MODE_VERBS.default;
+  const labels: Record<string, string> = {};
+  cfg.buttons.forEach((b, i) => { if (b.emit && b.label) labels[FACE[i]] = b.label; });
+  const byBtn = new Map<string, { plain: string[]; dir: string[] }>();
+  for (const r of buttonMap(modeId)) {
+    const m = r.group === 'move' ? TRICK.exec(r.input) : null;
+    if (!m) continue;
+    const g = byBtn.get(m[2]) ?? { plain: [], dir: [] };
+    if (m[1]) g.dir.push(`${m[1]}${r.action}`); else g.plain.push(r.action);
+    byBtn.set(m[2], g);
+  }
+  const name = (b: string): string => device === 'pad' ? b : device === 'keys' ? KEY_OF[b] ?? b : labels[b] ?? b;
+  // the arrow is each directed move's own bullet: one row of a sideways phone holds the surf's five B moves
+  return [...byBtn].map(([b, g]) => `${name(b)}: ${[...g.plain, g.dir.join(' ')].filter(Boolean).join(' · ')}`);
 }
 
 /**
@@ -111,17 +144,37 @@ export function splitHint(hint: string): string[] {
 }
 
 /**
- * The mode's own lines: its static hint(s) — the body's while the body plays — or, when it has none, the line its host
- * was built with (the board and timing hosts' `hint`, which until now nothing drew). Repeats across lines drop.
+ * The mode's own lines: its curated panel list when it has one (panelLines.ts), else its static hint(s) split — the
+ * body's while the body plays — or, when it has neither, the line its host was built with (the board and timing hosts'
+ * `hint`, which until now nothing drew). A speed mode's body boost line follows (the gauge no longer says it in play).
+ * Repeats across lines drop.
  */
 export function controlLines(modeId: string, opts: { body?: boolean; fallback?: string } = {}): string[] {
-  const own = staticControlsFor(slotModeKey(modeId), !!opts.body);
-  const src = own.length ? own : opts.fallback ? [opts.fallback] : [];
-  return [...new Set(src.flatMap(splitHint))];
+  const key = slotModeKey(modeId);
+  const curated = panelLinesFor(key, !!opts.body);
+  const own = curated ?? staticControlsFor(key, !!opts.body).flatMap(splitHint);
+  const src = own.length ? own : opts.fallback ? splitHint(opts.fallback) : [];
+  const boost = opts.body ? BODY_BOOST_LINE[key] : undefined;
+  return [...new Set(boost ? [...src, boost] : src)];
 }
 
+/** The device's rows; then its trick lines (a board's table), then the mode's own lines. */
 export function controlsSheet(modeId: string, device: ControlsDevice, opts: { body?: boolean; fallback?: string } = {}): ControlsSheet {
-  return { device, rows: controlRows(modeId, device), lines: controlLines(modeId, opts) };
+  return { device, rows: controlRows(modeId, device), lines: [...moveLines(modeId, device), ...controlLines(modeId, opts)] };
+}
+
+/** The smallest the panel's rows and lines may step down to so a list fits its box (ControlsPanel's fit): 10 px → 8.5 px. */
+export const FIT_MIN = 0.85;
+const FIT_STEP = 0.05;
+
+/**
+ * The panel's fit (controls-screen-2, 2026-10-06): the largest size, from 1 down in steps of 0.05, at which `cuts` says
+ * nothing is cut off — or FIT_MIN when even that cuts (the lines then scroll, as before). `cuts(s)` lays the panel out
+ * at `s` and measures it, so the first answer is the full size whenever the list fits.
+ */
+export function fitScale(cuts: (s: number) => boolean, min = FIT_MIN, step = FIT_STEP): number {
+  for (let s = 1; s > min + 1e-9; s = Math.round((s - step) * 1000) / 1000) if (!cuts(s)) return s;
+  return min;
 }
 
 /** Which list to open on: a connected pad wins (it is what a TV player holds), then a touch screen, then the keys. */

@@ -47,4 +47,19 @@ describe('console view — the shell, the stylesheet and the rule agree', () => 
       expect(block, hook).toContain(`[${hook}]`);
     }
   });
+
+  // controls-screen-2 (2026-10-06): at 1080p the dunk's "CONNECT A CONTROLLER" pills lay across its title. While the
+  // card is up they go top-right; the rule finds them by HostLobby's own test ids, so it breaks if those are renamed.
+  it('the controller pills move off the title while the READY card is up, found by HostLobby\'s test ids', () => {
+    const lobby = read('components/controller-link/host-lobby.tsx');
+    for (const id of ['host-lobby-badge', 'usb-connect-hint']) {
+      expect(lobby, id).toContain(`data-testid="${id}"`);
+      expect(block, id).toContain(`[data-fel-console] > div:has(> canvas):has(> [data-fel-fullbleed]) > div:has(> [data-testid="${id}"])`);
+    }
+    const rule = block.slice(block.indexOf('4c. The controller pills'));
+    // off the left (the title's side) and onto a real right edge
+    expect(rule).toMatch(/left: auto !important;\s*right: (?!auto)[\d.]+r?em !important;/);
+    // the hosts that anchor them top-left, beside the title
+    expect(read('components/games/dunk-babylon.tsx')).toMatch(/<HostLobby [^>]*anchor="left-4 top-14"/);
+  });
 });

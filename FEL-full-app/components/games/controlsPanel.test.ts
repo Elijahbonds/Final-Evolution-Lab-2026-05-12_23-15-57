@@ -1,6 +1,8 @@
 // The CONTROLS panel as React draws it (controls-screen, console-view lane, 2026-10-06): on the READY card with its
 // device chooser, on the pause without one (it sits inside the pause's button), and nowhere while playing.
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ControlsPanel } from './controls-panel';
@@ -17,7 +19,9 @@ describe('ControlsPanel', () => {
     expect(html).toContain('CONTROLS');
     for (const d of ['CONTROLLER', 'KEYBOARD', 'TOUCH']) expect(html).toContain(`>${d}</button>`);
     expect(html).toContain('WASD / ARROWS');
-    expect(html).toContain('· snap the stick to break ankles');
+    // test changed (controls-screen-2, owner 2026-10-06: "short and readable"): the 3v3's curated list, not its whole map
+    expect(html).toContain('· SHOOT: hold, let go in the green');
+    expect(html).not.toContain('UP AND UNDER');
     expect(html.indexOf('TAP TO START')).toBeLessThan(html.indexOf('data-controls-panel'));   // START first, then the controls
     expect(card('loading')).toContain('data-controls-panel');
   });
@@ -48,6 +52,17 @@ describe('ControlsPanel', () => {
     expect(old).not.toContain('data-controls-panel');
     expect(card('playing')).toBe('');
     expect(card('countdown')).not.toContain('data-controls-panel');
+  });
+
+  // controls-screen-2 (2026-10-06): a pad cannot scroll — what the box would cut, the rows and lines step down to fit
+  it('the panel fits its box: fitScale sizes the rows and lines, and re-runs when the box changes', () => {
+    const src = readFileSync(path.join(__dirname, 'controls-panel.tsx'), 'utf8');
+    expect(src).toMatch(/fitScale\(\(s\) => \{ apply\(s\); return cutPx\(panel\) > 1; \}\)/);
+    expect(src).toMatch(/new ResizeObserver\(\(\) => fit\(\)\)/);
+    for (const hook of ['data-controls-rows', 'data-controls-lines']) {
+      expect(src, hook).toMatch(new RegExp(`${hook} className="\\[zoom:var\\(--fel-controls-fit,1\\)\\]`));
+    }
+    expect(card('ready')).toContain('data-controls-panel');   // and it still renders on the server (no layout effect there)
   });
 
   it('a mode with nothing to list draws nothing', () => {

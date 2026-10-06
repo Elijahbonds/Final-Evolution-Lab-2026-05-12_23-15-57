@@ -33,7 +33,19 @@ const ROUTES: Record<string, { route: string; id: string }> = {
   karatevs: { route: '/play/karate-vs', id: 'karate_vs' }, kart: { route: '/play/velocity-kart', id: 'velocitykart' },
   onevone: { route: '/play/onevone', id: 'onevone' }, skate: { route: '/play/skateboard', id: 'skateboard' },
   golf: { route: '/play/golf', id: 'golf' }, mixed: { route: '/play/mixedcombat', id: 'mixedcombat' },
+  // the sweep (controls-screen-2, 2026-10-06): every other game route
+  aero: { route: '/play/aero-aces', id: 'aeroaces' }, bigair: { route: '/play/big-air', id: 'bigair' },
+  dance: { route: '/play/dance', id: 'dance' }, duel: { route: '/play/duel', id: 'duel' },
+  dunkduel: { route: '/play/dunkduel', id: 'dunkduel' }, football: { route: '/play/football', id: 'football' },
+  freerun: { route: '/play/freerun', id: 'freerun' }, karate: { route: '/play/karate', id: 'karate' },
+  showdown: { route: '/play/showdown', id: 'showdown' }, snowboard: { route: '/play/snowboard', id: 'snowboard_slalom' },
+  sprint: { route: '/play/sprint', id: 'sprint' }, surf: { route: '/play/surf', id: 'surf' },
+  tennis: { route: '/play/tennis', id: 'tennis' }, threepoint: { route: '/play/threepoint', id: 'threepoint' },
+  volleyball: { route: '/play/volleyball', id: 'volleyball' }, whosceneit: { route: '/play/who-scene-it', id: 'who_scene_it' },
+  brainbrawl: { route: '/play/brain-brawl', id: 'brainbrawl' }, tiebreak: { route: '/play/tiebreak', id: 'tiebreak' },
 };
+/** READY_ONLY=1: measure the READY card and stop (the sweep); otherwise READY, play and pause. */
+const READY_ONLY = !!process.env.READY_ONLY;
 type Size = { w: number; h: number; mobile: boolean };
 const SIZES: Record<string, Size> = {
   portrait: { w: 390, h: 844, mobile: true }, phone844: { w: 844, h: 390, mobile: true },
@@ -60,6 +72,18 @@ const PANEL = `(() => {
   const box = (r) => ({ x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) });
   const panels = [...document.querySelectorAll('[data-controls-panel]')].filter((e) => e.getBoundingClientRect().width > 0);
   const p = panels[0]; const lines = p && p.querySelector('[data-controls-lines]');
+  // controls-screen-2: every row cell and line the panel holds that is NOT wholly visible — cut by the panel's own box,
+  // by a scroll box inside it, or by the screen. 0 = a pad player sees everything without scrolling.
+  const clip = (el) => { const r = el.getBoundingClientRect(); if (r.height === 0) return false;
+    if (r.top < -1 || r.bottom > vh + 1) return true;
+    for (let a = el.parentElement; a && a !== p.parentElement; a = a.parentElement) { const cs = getComputedStyle(a);
+      if (cs.overflowY !== 'visible' || cs.overflowX !== 'visible') { const q = a.getBoundingClientRect(); if (r.top < q.top - 1 || r.bottom > q.bottom + 1) return true; } }
+    return false; };
+  const items = p ? [...p.querySelectorAll('[data-controls-rows] > span > span, [data-controls-lines] > span')] : [];
+  const h1 = [...document.querySelectorAll('h1')].find((e) => e.getBoundingClientRect().width > 0);
+  const pills = [...document.querySelectorAll('[data-testid="host-lobby-badge"], [data-testid="usb-connect-hint"]')].filter((e) => e.getBoundingClientRect().width > 0);
+  const hit = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+  const titleOverlap = h1 ? pills.filter((e) => hit(e.getBoundingClientRect(), h1.getBoundingClientRect())).length : null;
   const start = [...document.querySelectorAll('button')].find((x) => /TAP TO START/.test(x.textContent || '') && x.getBoundingClientRect().width > 0);
   return {
     pageScroll: Math.max(0, document.documentElement.scrollHeight - vh) + Math.max(0, document.documentElement.scrollWidth - vw),
@@ -67,8 +91,10 @@ const PANEL = `(() => {
     panel: p ? { ...box(p.getBoundingClientRect()), onScreen: on(p.getBoundingClientRect()), device: p.getAttribute('data-controls-panel'),
       rows: p.querySelectorAll('[data-controls-rows] > span').length, lines: lines ? lines.children.length : 0,
       hiddenPx: lines ? Math.max(0, lines.scrollHeight - lines.clientHeight) : 0,
+      items: items.length, clipped: items.filter(clip).length, overflowPx: Math.max(0, p.scrollHeight - p.clientHeight),
       fontPx: lines && lines.firstElementChild ? +(parseFloat(getComputedStyle(lines.firstElementChild).fontSize) * (lines.firstElementChild.currentCSSZoom || 1)).toFixed(1) : null } : null,
-    panels: panels.length,
+    panels: panels.length, titleOverlap, pills: pills.length,
+    boostCaption: [...document.querySelectorAll('[data-testid="boost-gauge"]')].map((e) => e.textContent).join(' | ') || null,
   };
 })()`;
 
@@ -96,7 +122,7 @@ for (const mode of modes) {
       await p.goto(`http://localhost:${PORT}${route}`, { waitUntil: 'domcontentloaded', timeout: 240000 });
       const btn = p.locator('button:has-text("TAP TO START") >> visible=true').first();
       let ready = false;
-      for (let i = 0; i < 400 && !ready; i++) {
+      for (let i = 0; i < Number(process.env.READY_TRIES ?? 400) && !ready; i++) {
         const retry = p.locator('button:has-text("RETRY") >> visible=true').first();
         if (i % 5 === 4 && await within(10000, retry.count())) await retry.click({ timeout: 5000 }).catch(() => {});
         ready = !!(await within(20000, btn.count())) && await btn.isVisible().catch(() => false);
@@ -107,6 +133,7 @@ for (const mode of modes) {
         await shot(p, path.join(OUT, `${mode}-${s}-ready.png`));
         log({ mode, size: s, screen: 'ready', ready, ...(await p.evaluate(PANEL) as object) });
       }
+      if (READY_ONLY) { await ctx.close(); continue; }
       await p.setViewportSize({ width: SIZES[group[0]].w, height: SIZES[group[0]].h });
       for (let i = 0; i < 12 && await btn.isVisible().catch(() => false); i++) { await btn.click({ timeout: 3000, force: true }).catch(() => {}); await p.waitForTimeout(2500); }
       await p.waitForTimeout(WAIT_PLAY_S * 1000);
@@ -115,7 +142,8 @@ for (const mode of modes) {
         await shot(p, path.join(OUT, `${mode}-${s}-play.png`));
         const text = await p.evaluate('document.body.innerText') as string;
         const hints = await p.evaluate(`[...document.querySelectorAll('span.fel-panel.font-mono')].map((e) => e.textContent).filter(Boolean).slice(0, 6)`);
-        log({ mode, size: s, screen: 'play', staticOnScreen: statics.filter((t) => text.includes(t)), monoPanels: hints, panels: (await p.evaluate(PANEL) as { panels: number }).panels });
+        const gauge = await p.evaluate(`[...document.querySelectorAll('[data-testid="boost-gauge"]')].map((e) => e.textContent).join(' | ') || null`);
+        log({ mode, size: s, screen: 'play', boostGauge: gauge, staticOnScreen: statics.filter((t) => text.includes(t)), monoPanels: hints, panels: (await p.evaluate(PANEL) as { panels: number }).panels });
       }
       await p.keyboard.press('Escape'); await p.waitForTimeout(2500);
       for (const s of group) {
