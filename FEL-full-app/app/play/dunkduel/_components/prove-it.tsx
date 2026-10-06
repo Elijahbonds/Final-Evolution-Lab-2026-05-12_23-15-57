@@ -32,6 +32,7 @@ import { PLACEMENT_LINES, dunkFraming, firstAttemptAllowed, shotLight, type Fram
 import { endSession, readSession } from '@/lib/session-setup/memory';
 import { adultCsv, adultShareText, type SummaryRow } from '@/lib/session-setup/summary';
 import { ScanSaveCard } from '@/components/privacy/scan-save-card';
+import { naturalSpeaker } from '@/lib/babylon/audio/voice/speakNatural';
 
 const CYAN = '#00E5FF';
 const GOLD = '#FFD700';
@@ -51,22 +52,10 @@ const CLAIMS: { id: ClaimedAge; label: string }[] = [
   { id: 'unknown', label: 'Rather not say' },
 ];
 
+// VOICEOVER (2026-10-06): the device's least robotic voice (was the engine's default), a rendered take where one exists, and every
+// spoken line logged as a content gap until it is recorded (lib/babylon/audio/voice/speakNatural.ts).
 function browserSpeaker(): Speaker {
-  return {
-    cancel() {
-      try { if (typeof speechSynthesis !== 'undefined') speechSynthesis.cancel(); } catch { /* nothing speaking */ }
-    },
-    speak(line, onend) {
-      try {
-        if (typeof speechSynthesis === 'undefined') { onend?.(); return; }
-        const u = new SpeechSynthesisUtterance(line);
-        u.rate = 0.96;
-        u.onend = () => onend?.();
-        u.onerror = () => onend?.();
-        speechSynthesis.speak(u);
-      } catch { onend?.(); }
-    },
-  };
+  return naturalSpeaker('prove-it', 0.96);
 }
 
 export default function ProveIt({

@@ -102,6 +102,7 @@ import type { YouthGate } from '@/lib/mirror/screenCorrectives';
 // summary (lib/mirror/correctives.ts; adults only, youth rules show none).
 import { CorrectivesPicker, SessionCorrectives } from '@/components/mirror/session-correctives';
 import { sessionLikeFromSummary } from '@/lib/mirror/correctives';
+import { speakNatural } from '@/lib/babylon/audio/voice/speakNatural';   // VOICEOVER (2026-10-06)
 
 /** What the screen panel says when a finished screen was not kept (offline, signed out, a server error). */
 const SCREEN_NOT_SAVED = 'Screen finished — it could not be saved, so nothing was paid for it.';
@@ -263,14 +264,10 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
     if (!voiceRef.current || typeof speechSynthesis === 'undefined') return;
     const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
     if (!opts.protect && now < protectedUntilRef.current) return;
-    speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    u.rate = 0.96; u.pitch = 0.9;
-    if (opts.protect) {
-      protectedUntilRef.current = now + PROTECT_MAX_MS;
-      u.onend = u.onerror = () => { protectedUntilRef.current = 0; };
-    }
-    speechSynthesis.speak(u);
+    // VOICEOVER (2026-10-06): a rendered take when the Coach has one for this text, else the device's least robotic voice at its
+    // natural pitch (was the engine's default voice at pitch 0.9); the line is logged as a content gap (lib/babylon/audio/voice).
+    if (opts.protect) protectedUntilRef.current = now + PROTECT_MAX_MS;
+    speakNatural(text, { source: 'mirror', rate: 0.96, protect: opts.protect, onend: opts.protect ? () => { protectedUntilRef.current = 0; } : undefined });
   }, []);
 
   /** Paint the user's skeleton on the 2D canvas — every frame, outside
