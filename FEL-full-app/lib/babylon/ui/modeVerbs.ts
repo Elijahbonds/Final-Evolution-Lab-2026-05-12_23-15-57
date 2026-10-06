@@ -269,6 +269,9 @@ const VERBS: Record<string, Omit<ModeVerbConfig, 'rStick' | 'boost'>> = {
   volleyball: verbs({
     A: { label: 'HIT', emit: A('A') },
     B: { label: 'BLOCK', emit: A('B') },
+    // IMPROVE (2026-10-06): the player calls the set (NetSportMode callSet) — X a quick one, Y a high one
+    X: { label: 'QUICK', emit: A('X') },
+    Y: { label: 'HIGH', emit: A('Y') },
   }),
 
   dance: verbs({ A: { label: 'TAP', emit: A('A') } }),
@@ -287,7 +290,8 @@ const VERBS: Record<string, Omit<ModeVerbConfig, 'rStick' | 'boost'>> = {
 // a control that does nothing. Unlisted = 'LOOK'.
 const R_STICK: Record<string, string | null> = {
   skateboard: 'FLICK',                                   // the trick input — never stolen for the camera
-  tennis: null, tiebreak: null, volleyball: null,         // the rally camera is a cut behind the baseline
+  tennis: null, tiebreak: null,                          // the rally camera is a cut behind the baseline
+  volleyball: 'AIM',                                     // IMPROVE (2026-10-06): the R stick aims the spike and the serve, apart from the feet
   golf: null, derby: null, penalty: null,                // fixed shots (setFixedBehind) — no orbit to give
   carnival: null,                                        // the hub's bursts cut between fixed and follow shots
   dance: null, who_scene_it: null,                       // no follow camera

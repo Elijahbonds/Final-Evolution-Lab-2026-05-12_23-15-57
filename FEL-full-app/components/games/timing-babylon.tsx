@@ -161,6 +161,10 @@ export function makeTimingHost(opts: TimingHostOpts) {
               {typeof hud.kinetic === 'string' && hud.kinetic ? <span className="text-[10px] font-bold text-[#fbbf24]">{hud.kinetic}</span> : null}
             </span>
           )}
+          {/* IMPROVE (2026-10-06): volleyball's block cooldown as a ready chip — it only showed as a refusal after the press. Key-gated. */}
+          {typeof hud.blockReady === 'string' && hud.blockReady && (
+            <span className={`fel-panel px-3 py-1 text-[10px] font-bold tracking-wider ${hud.blockReady === 'READY' ? 'text-[#7CFFB2]' : 'text-white/50'}`}>B BLOCK {hud.blockReady}</span>
+          )}
           {/* M42 E20: numeric score gets " PTS"; string scores (e.g. "2 GOALS") render as-is */}
           <span className="rounded-md bg-black/50 px-3 py-1 text-white">{typeof hud.score === 'number' ? `${hud.score} PTS` : hnode(hud.score, '0 PTS')}</span>
           {/* combo — the rhythm family's core readout (The Cypher publishes it

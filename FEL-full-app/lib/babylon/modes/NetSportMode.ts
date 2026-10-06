@@ -38,8 +38,16 @@ import { mountPostureLayer } from '../anim/PostureLayer';
 import { fieldPose, netWindow, fieldBank, NET_REACH_M } from '../core/FieldPosture';
 import {
   TENNIS_FOOTWORK, VOLLEY_FOOTWORK, FOOTWORK_IDLE, stepFootwork, splitTimed, splitBoostActive,
-  reachOf, gradeAfterStretch, recoveryX, aiTargetX, MAX_REACH_M, type FootworkState,
+  reachOf, gradeAfterStretch, recoveryX, aiTargetX, MAX_REACH_M, COMFORT_M, type FootworkState,
 } from '../core/CourtFootwork';
+// IMPROVE (2026-10-06): volleyball's own rules — the serve rotation and toss, the dig against an attack, the set call,
+// the HUD quantisers — pure and tested in core/VolleyPlay; the set length is the splash's pick.
+import {
+  nextServer, TOSS_SEC, TOSS_RETRIES, tossHeight, gradeToss, tossDropped, degradeDig, AI_SPIKE_SHANK, HUMAN_SPIKE_SHANK,
+  shapeSet, spikeDigSteps, quantiseMeter, blockChip, type SetCall,
+} from '../core/VolleyPlay';
+import { readSetLength, setLengthOf } from '../nexus/setLength';
+import type { ParticleSystem } from '@babylonjs/core';
 
 /** Seconds before the blocker can commit to the net again. */
 const BLOCK_COOLDOWN_SEC = 7;
@@ -94,6 +102,24 @@ export interface NetSportOptions {
   hudLabels: { you: string; them: string };
 }
 
+/** IMPROVE (2026-10-06): the sand grain is drawn ONCE per session. A 1024² canvas of 70 polylines and 900 rects was
+ *  painted on the main thread on every load; the second load copies the first one's pixels in one drawImage. */
+let sandGrain: HTMLCanvasElement | null = null;
+function paintSand(g: CanvasRenderingContext2D): void {
+  if (sandGrain) { g.drawImage(sandGrain, 0, 0); return; }
+  g.fillStyle = '#c7ab76'; g.fillRect(0, 0, 1024, 1024);   // SCORECARD VISUALS: a shade down — the goldenHour sand washed the frame out
+  g.strokeStyle = 'rgba(255,255,255,0.10)'; g.lineWidth = 3;
+  for (let i = 0; i < 70; i++) { const y = (i / 70) * 1024; g.beginPath(); g.moveTo(0, y); for (let x = 0; x <= 1024; x += 24) g.lineTo(x, y + Math.sin(x * 0.02 + i * 0.9) * 6); g.stroke(); }
+  g.fillStyle = 'rgba(120,95,60,0.14)';
+  for (let i = 0; i < 900; i++) g.fillRect(Math.random() * 1024, Math.random() * 1024, 2, 2);
+  try {
+    if (typeof document === 'undefined' || !g.canvas) return;   // headless: nothing to cache into
+    const c = document.createElement('canvas'); c.width = 1024; c.height = 1024;
+    const cg = c.getContext('2d'); if (!cg) return;
+    cg.drawImage(g.canvas as CanvasImageSource, 0, 0); sandGrain = c;
+  } catch { /* a cache miss only costs the redraw */ }
+}
+
 /** ARENA-10PHASE P5 (2026-09-07): the beach the Beach Pro court sits on. Sand out to ±100 m (tiled ripple grain), the sea
  *  past the far baseline with a foam line where it meets the sand — so the prop set's shops, bus, palms and rocks all
  *  stand on ground, and the reverse angles have somewhere to look. */
@@ -101,12 +127,7 @@ function buildBeach(scene: Scene): { dispose(): void } {
   const sand = MeshBuilder.CreateGround('beach_sand', { width: 220, height: 220 }, scene);
   sand.position.y = -0.02; sand.isPickable = false; sand.receiveShadows = true;
   const tex = new DynamicTexture('beach_sand_tex', { width: 1024, height: 1024 }, scene, false);
-  const g = tex.getContext() as unknown as CanvasRenderingContext2D;
-  g.fillStyle = '#c7ab76'; g.fillRect(0, 0, 1024, 1024);   // SCORECARD VISUALS: a shade down — the goldenHour sand washed the frame out
-  g.strokeStyle = 'rgba(255,255,255,0.10)'; g.lineWidth = 3;
-  for (let i = 0; i < 70; i++) { const y = (i / 70) * 1024; g.beginPath(); g.moveTo(0, y); for (let x = 0; x <= 1024; x += 24) g.lineTo(x, y + Math.sin(x * 0.02 + i * 0.9) * 6); g.stroke(); }
-  g.fillStyle = 'rgba(120,95,60,0.14)';
-  for (let i = 0; i < 900; i++) g.fillRect(Math.random() * 1024, Math.random() * 1024, 2, 2);
+  paintSand(tex.getContext() as unknown as CanvasRenderingContext2D);
   tex.update(); tex.uScale = 7; tex.vScale = 7;
   const sandM = new PBRMaterial('beach_sand_mat', scene);
   sandM.albedoTexture = tex; sandM.metallic = 0; sandM.roughness = 0.95; sandM.environmentIntensity = 0.6;
@@ -121,7 +142,14 @@ function buildBeach(scene: Scene): { dispose(): void } {
   const foamM = new PBRMaterial('beach_foam_mat', scene);
   foamM.albedoColor = Color3.White(); foamM.alpha = 0.75; foamM.metallic = 0; foamM.roughness = 0.6;
   foam.material = foamM;
-  return { dispose() { sand.dispose(); sea.dispose(); foam.dispose(); tex.dispose(); sandM.dispose(); seaM.dispose(); foamM.dispose(); } };
+  // IMPROVE (2026-10-06): three static 220 m meshes recomputed their world matrices every frame — frozen now, as the
+  // readable net's are. Their MATERIALS freeze once the scene is ready, not here: the weather's fog, the environment
+  // texture and the shadow casters are all set after this runs, and a material frozen before them would never pick
+  // them up (a frozen material compiles once).
+  for (const m of [sand, sea, foam]) m.freezeWorldMatrix();
+  let alive = true;
+  scene.executeWhenReady(() => { if (alive) for (const mat of [sandM, seaM, foamM]) mat.freeze(); });
+  return { dispose() { alive = false; sand.dispose(); sea.dispose(); foam.dispose(); tex.dispose(); sandM.dispose(); seaM.dispose(); foamM.dispose(); } };
 }
 
 /**
@@ -156,7 +184,8 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
   let venue: VenueHandle | null = null;
   let beach: { dispose(): void } | null = null;      // P5
   let readableNet: { dispose(): void } | null = null;
-  let crowdEnds: Onlookers | null = null;            // P5
+  /** The three-touch sport. Volleyball-only behaviour below is gated on this, so tennis plays exactly as it did. */
+  const VOLLEY = o.cfg.touchesPerSide > 1;
 
   let rally: RallyState;
   let tennisScore: TennisScore | null = null;
@@ -205,6 +234,20 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
   /** Is the ball in flight a Zone Shot? It answers differently to everything. */
   let incomingZone = false;
   let aimX = 0;
+  /** IMPROVE (2026-10-06) #2: the R stick's x. Aims the spike (and the serve) apart from the L stick, which moves the feet. */
+  let aimRX = 0;
+  /** IMPROVE #3/#4: who serves this rally (rally scoring: the last rally's winner), and the toss in progress. */
+  let server: 0 | 1 = 0, serveBy: 0 | 1 = 0, tossT = 0, tossMisses = 0, foeServeCued = false, foeServe = false;
+  /** IMPROVE #13: the set the player has called for the next second touch, and whether the set just played was quick
+   *  (the spike off it is harder to dig). */
+  let setCall: SetCall = 'high', quickSet = false, quickSpike = false;
+  /** IMPROVE #9: the opponent's setter — their second touch is played by a second body, like ours. */
+  let foeSetter: SpawnedCharacter | null = null;
+  const foeSetterHome = new Vector3(), foeSetterAt = new Vector3();
+  /** IMPROVE #19: the ball trail, running only while the ball is in flight. */
+  let trail: ParticleSystem | null = null;
+  /** IMPROVE #18 / #7: what the HUD last got, so it is pushed on a change and not every frame. */
+  let meterQ = -1, meterIncoming = '', blockShown = '';
   /** WII READ: the landing ring, the weather. */
   let landing: RingHandle | null = null;
   let weather: WeatherKit = new WeatherKit(); let weatherFx: WeatherFxHandle | null = null;
@@ -292,6 +335,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
   }
 
   function pushHud(ctx: ModeContext): void {
+    if (volleyScore) ctx.setHud({ round: `SET TO ${volleyScore.target}` });   // IMPROVE #10: which set this is
     if (o.energy) {
       ctx.setHud({
         energy: Math.round(energy[0]),
@@ -321,15 +365,36 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     bannerTimer = setTimeout(() => { bannerTimer = null; ctx.setHud({ banner: '' }); }, ms);
   }
 
-  /** Award a point to `side` (0 = hero) and set up the next serve. */
-  function awardPoint(ctx: ModeContext, side: 0 | 1, why: string): void {
+  /** The rally is over (a point, or a replay): the ball is dead, the helpers go home, the trail and the meter stop. */
+  function resetRally(ctx: ModeContext): void {
     rally.end();
     rallyAge = 0;
     setterAt.copyFrom(setterHome);
-    if (o.cage) { if (side === 0) style += stylePts(mult); cageStats.rallies++; if (mult > 1 && side === 0) why = `${why} · x${mult}`; mult = 1; aerialNow = null; incomingMeteor = false; ctx.setHud({ mult: 1, style }); }   // PARKOUR TENNIS
+    foeSetterAt.copyFrom(foeSetterHome);
     shot = null;
     contactArmed = false;
-    ctx.setHud({ incomingShot: '', incomingTell: '', answer: '' });
+    serveFrom = null;
+    quickSet = false; quickSpike = false;
+    trail?.stop();                                 // IMPROVE #19: no trail behind a dead ball
+    // IMPROVE (2026-10-06): a rally that ended mid-window (a stuff, a net touch, their miss) left the meter on screen
+    // until the next landing; it clears with the rally now
+    meterQ = -1; meterIncoming = '';
+    ctx.setHud({ incomingShot: '', incomingTell: '', answer: '', shotMeterT: 0, shotMeterBands: '', incoming: '' });
+  }
+
+  /** IMPROVE #12 (TUNED): the rally cap REPLAYS the point — same server, nobody scores. It handed the point to whichever
+   *  side was not receiving at the 24 s mark, which is arbitrary, and losing to it felt unfair. */
+  function replayPoint(ctx: ModeContext): void {
+    resetRally(ctx);
+    flash(ctx, 'RALLY CAP — REPLAY THE POINT', 1100);
+    restSec = 1.4;
+  }
+
+  /** Award a point to `side` (0 = hero) and set up the next serve. */
+  function awardPoint(ctx: ModeContext, side: 0 | 1, why: string): void {
+    resetRally(ctx);
+    if (VOLLEY) server = nextServer(side);         // IMPROVE #3: rally scoring — the winner serves
+    if (o.cage) { if (side === 0) style += stylePts(mult); cageStats.rallies++; if (mult > 1 && side === 0) why = `${why} · x${mult}`; mult = 1; aerialNow = null; incomingMeteor = false; ctx.setHud({ mult: 1, style }); }   // PARKOUR TENNIS
     if (o.energy) {
       energy[side] = Math.min(ENERGY_MAX, energy[side] + ENERGY_RALLY_WON);
     }
@@ -338,8 +403,9 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     SoundKit.play(side === 0 ? 'score' : 'miss');
     // L4: they react to the point, or they are set dressing. Louder for the
     // home side, which is what a crowd at a beach court actually does.
-    crowd?.cheer(side === 1 ? 1 : 0.35);
-    crowdEnds?.cheer(side === 0 ? 1 : 0.35);   // P5: the end banks are the home crowd
+    // IMPROVE #14: the beach court's crowd is ONE bank now (it was the sideline bank plus the end banks, 16 skinned
+    // bodies); it is the home crowd the end banks were, so it is loudest on the player's point.
+    crowd?.cheer(o.beach ? (side === 0 ? 1 : 0.35) : (side === 1 ? 1 : 0.35));
 
     // M107 point feedback → ARENA-10PHASE P6: the point's TEXT lives in the banner alone (see flash); the feel hit, the
     // shake and the loss flash stay. The streak still builds tension across a game.
@@ -412,7 +478,9 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     // the timing meter's bands for THIS flight (they scale with its duration)
     // net/precision phase 4: the bands for BOTH sports — volleyball published the ramp and no bands, and the HUD draws the meter only with
     // bands, so the three-touch sport showed no timing cue at all (bump 1.56 s / set 1.88 s / spike 0.88 s, all blind)
-    if (toSide > 0) { const b = meterBandsFor(planned.duration); _ctx.setHud({ shotMeterBands: `${b.okFrom.toFixed(3)},${b.goodFrom.toFixed(3)},${b.perfectFrom.toFixed(3)}` }); }
+    if (toSide > 0) publishBands(_ctx, planned.duration);
+    meterQ = -1;                                    // IMPROVE #18: a new flight re-arms the meter's first push
+    if (trail && !trail.isStarted()) trail.start();   // IMPROVE #19: the trail runs from the strike
     // the tell describes THEIR ball; once ours is away it is stale
     if (toSide < 0 && o.cfg.touchesPerSide === 1) _ctx.setHud({ incomingShot: '', incomingTell: '', answer: '' });
 
@@ -463,7 +531,24 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
 
   let pendingFault: RallyFault | null = null;
 
+  /** The timing meter's bands for a window `durationSec` long (the HUD draws the meter only with bands). */
+  function publishBands(ctx: ModeContext, durationSec: number): void {
+    const b = meterBandsFor(durationSec);
+    ctx.setHud({ shotMeterT: 0, shotMeterBands: `${b.okFrom.toFixed(3)},${b.goodFrom.toFixed(3)},${b.perfectFrom.toFixed(3)}` });
+  }
+
+  /**
+   * IMPROVE (2026-10-06) #2: where the attack goes. The R stick when it is pushed, so the player can hit cross-court
+   * without running there; otherwise the L stick, as before. Screen-relative, the same rule the feet use: behind the
+   * +Z baseline world +x is screen-LEFT, and the spike used the raw stick, so stick-right sent it to the player's left.
+   */
+  function attackAim(ctx: ModeContext): number {
+    const stick = Math.abs(aimRX) > 0.2 ? aimRX : aimX;
+    return Math.max(-1, Math.min(1, stick * Math.sign(ctx.camDirector.rightFlat().x || 1)));
+  }
+
   function serve(ctx: ModeContext): void {
+    if (VOLLEY) { volleyServe(ctx); return; }
     rally.serve(0);
     const from = new Vector3(me.root.position.x, 1.5, o.cfg.halfLength * 0.92);
     ball.position.copyFrom(from);
@@ -473,6 +558,77 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     serveFrom = from; serveAim = (Math.random() - 0.5) * 0.5; serveIn = serveTotal = NET_CONTACT_SEC[clips.serve] ?? 0;
     if (serveIn <= 0) { launch(ctx, from, -1, serveAim, 'good'); serveFrom = null; }
     flash(ctx, 'SERVE', 600);
+  }
+
+  /**
+   * IMPROVE (2026-10-06) #3 + #4: the volleyball serve. Whoever won the last rally serves (the opponent too, so there is
+   * a serve to RECEIVE), and the player's serve is a toss and a strike: the ball goes up off the hand and A (or the
+   * trigger) hits it, graded on the swing bands around the toss's contact point. A toss let fall is tossed again once,
+   * then goes over as a weak serve — a serve that waits forever would stall the match.
+   */
+  function volleyServe(ctx: ModeContext): void {
+    serveBy = server;
+    rally.serve(serveBy);
+    const body = serveBy === 0 ? me : foe;
+    const from = new Vector3(body.root.position.x, 1.5, (serveBy === 0 ? 1 : -1) * o.cfg.halfLength * 0.92);
+    ball.position.copyFrom(from);
+    serveFrom = from; tossT = 0; tossMisses = 0; foeServeCued = false;
+    SoundKit.play('uiTick', { pitch: serveBy === 0 ? 1.2 : 0.9, volume: 0.4 });
+    if (serveBy === 0) { publishBands(ctx, TOSS_SEC / 0.45); flash(ctx, 'SERVE — A AS THE TOSS FALLS', 1100); }
+    else flash(ctx, 'THEIR SERVE', 700);
+  }
+
+  /** The player pressed during their own toss. Too early is not a serve at all — refused, no penalty. */
+  function humanServePress(ctx: ModeContext): void {
+    const g = gradeToss(tossT);
+    if (g === 'wait') { refuse(ctx, 'WAIT FOR THE TOSS'); return; }
+    humanServeStrike(ctx, g === 'miss' ? 'late' : g);
+  }
+
+  function humanServeStrike(ctx: ModeContext, q: SwingQuality, auto = false): void {
+    const at = ball.getAbsolutePosition();
+    const from = new Vector3(at.x, at.y, at.z);
+    serveFrom = null;
+    meTree.clearBeat('serve'); meServe = true;
+    ctx.setHud({ shotType: auto ? 'LATE SERVE' : `SERVE · ${q.toUpperCase()}`, shotMeterT: 0, shotMeterBands: '' });
+    setTimeout(() => ctx.setHud({ shotType: '' }), 500);
+    SoundKit.play('uiTick', { pitch: q === 'perfect' ? 1.6 : 1.1, volume: 0.5 });
+    if (q === 'perfect') { ctx.juice.scorePop(from, 'PERFECT!', '#00E5FF'); ctx.feel.impact(0.3); }
+    console.info(`[NET-SERVE] ${q}${auto ? ' (auto)' : ''} toss ${tossT.toFixed(3)}`);
+    launch(ctx, from, -1, attackAim(ctx), q);
+  }
+
+  /** The opponent's serve, struck at the toss's contact point. Mostly a good ball; now and then a perfect or a weak one. */
+  function aiServe(ctx: ModeContext): void {
+    const at = ball.getAbsolutePosition();
+    const from = new Vector3(at.x, at.y, at.z);
+    serveFrom = null;
+    const r = Math.random();
+    const q: SwingQuality = r < 0.3 ? 'perfect' : r < 0.92 ? 'good' : 'late';
+    sinceOppStrike = 0;                              // the split step is timed against the serve as well
+    SoundKit.play('uiTick', { pitch: 0.9, volume: 0.35 });
+    launch(ctx, from, 1, aiTargetX(foot.x, o.cfg.halfWidth, 0.6) / o.cfg.halfWidth, q);
+  }
+
+  /** One frame of the volleyball toss: the ball rides the server's hand up and down; the opponent strikes on the beat. */
+  function stepToss(ctx: ModeContext, dt: number): void {
+    if (!serveFrom) return;
+    tossT += dt;
+    serveFrom.x = (serveBy === 0 ? me : foe).root.position.x;   // the ball stays over the server's hand
+    ball.position.set(serveFrom.x, serveFrom.y + tossHeight(tossT), serveFrom.z);
+    if (serveBy === 1) {
+      // the serve clip's contact beat lands on the toss's contact point
+      if (!foeServeCued && tossT >= TOSS_SEC - (NET_CONTACT_SEC[clips.serve] ?? 0)) { foeServeCued = true; foeTree.clearBeat('serve'); foeServe = true; }
+      if (tossT >= TOSS_SEC) aiServe(ctx);
+      return;
+    }
+    // the meter spans the whole toss (its bands were published for a window TOSS_SEC long), contact at the right edge
+    const mq = quantiseMeter(tossT / TOSS_SEC);
+    if (mq !== meterQ) { meterQ = mq; ctx.setHud({ shotMeterT: mq }); }
+    if (tossDropped(tossT)) {
+      if (tossMisses < TOSS_RETRIES) { tossMisses++; tossT = 0; meterQ = -1; flash(ctx, 'TOSS AGAIN — A AS IT FALLS', 900); }
+      else humanServeStrike(ctx, 'late', true);
+    }
   }
 
   /**
@@ -511,8 +667,10 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     // net/precision phase 6 — THE FOE HAS FEET. The roll above was the whole return, taken wherever the ball landed; the
     // foe's body never moved, so placement meant nothing and no driver ever won a game. The foe now runs to the landing
     // (see the frame step) and its return is graded through the SAME reach model the human plays under.
+    // IMPROVE #9: the opponent's SECOND touch is their setter's, so the setter's feet are the ones graded for it
+    const setterTakes = VOLLEY && !!foeSetter && volleyTouchFor(rally.touches + 1, o.cfg.touchesPerSide) === 'set';
     if (ball) {
-      const foeReach = reachOf(foeFoot.x, ball.position.x);
+      const foeReach = reachOf(setterTakes ? foeSetter!.root.position.x : foeFoot.x, ball.position.x);
       const before = q;
       const stretched = gradeAfterStretch(q === 'miss' ? 'miss' : q, foeReach);
       q = stretched === 'early' ? 'late' : stretched;
@@ -555,14 +713,14 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     // at exactly the same rate as a lob, which is not what the benchmark's
     // sequence is for. Receiving one degrades the return by a step.
     if (incomingTouch === 'spike') {
-      // phase 8: a KINETIC spike (rally flow 70+) degrades the dig TWO steps — the set-up is what the gauge pays for
-      const steps = rallyFlow >= FLOW_KINETIC ? 2 : 1;
-      for (let i = 0; i < steps; i++) {
-        if (q === 'perfect') q = 'good';
-        else if (q === 'good') q = 'late';
-        else if (q === 'late' && Math.random() < 0.45) q = 'miss';
-      }
-      if (q === 'miss') { rallyFlow = Math.min(100, rallyFlow + FLOW_KILL); ctx.setHud({ flow: rallyFlow }); awardPoint(ctx, 0, steps === 2 ? 'KINETIC KILL' : 'KILL — THEY COULD NOT DIG IT'); return; }
+      // phase 8: a KINETIC spike (rally flow 70+) degrades the dig TWO steps — the set-up is what the gauge pays for.
+      // IMPROVE #13: so does a spike off a QUICK set (never past two). The rule itself is VolleyPlay.degradeDig, the
+      // same loop this was, now shared with the player's dig of THEIR spike.
+      const kinetic = rallyFlow >= FLOW_KINETIC, offQuick = quickSpike;
+      const steps = spikeDigSteps(kinetic, offQuick);
+      quickSpike = false;
+      q = degradeDig(q, steps, AI_SPIKE_SHANK);
+      if (q === 'miss') { rallyFlow = Math.min(100, rallyFlow + FLOW_KILL); ctx.setHud({ flow: rallyFlow }); awardPoint(ctx, 0, kinetic ? 'KINETIC KILL' : offQuick ? 'QUICK KILL — THEY COULD NOT DIG IT' : 'KILL — THEY COULD NOT DIG IT'); return; }
     }
 
     // PARKOUR TENNIS: a ball off the glass is harder to read — the answer slips a step a third of the time
@@ -582,7 +740,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     if (rally.touch() === 'fault') { awardPoint(ctx, 0, 'FOUR TOUCHES'); return; }
     if (aiCrosses) rally.cross();
 
-    foeTree.clearBeat('swing'); foeSwing = true;
+    if (!setterTakes) { foeTree.clearBeat('swing'); foeSwing = true; }   // IMPROVE #9: the setter's touch is not the attacker's swing
     SoundKit.play('uiTick', { pitch: 0.9, volume: 0.35 });
     EffectsKit.burst(ctx.scene, ball.getAbsolutePosition(), 'sparks');
 
@@ -617,6 +775,11 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       ? (o.cage && (q === 'perfect' || q === 'good') && Math.random() < 0.25 ? (Math.random() < 0.5 ? 1 : -1) : aiTargetX(foot.x, o.cfg.halfWidth, commit) / o.cfg.halfWidth)   // PARKOUR TENNIS: the opponent banks off the glass too
       : (Math.random() - 0.5) * 1.6;                 // a self-pass is not aimed at the opponent
     launch(ctx, ball.getAbsolutePosition(), aiCrosses ? 1 : -1, aiIntent, q, aiIsVolley ? aiTouch : undefined, aiShot, aiZone);
+    // IMPROVE #9: their setter runs to where their bump comes down, and goes home once the set is away
+    if (VOLLEY && foeSetter) {
+      if (aiTouch === 'bump' && shot) foeSetterAt.set(shot.to.x, 0, shot.to.z);
+      else if (aiTouch === 'set') foeSetterAt.copyFrom(foeSetterHome);
+    }
   }
 
   /**
@@ -716,10 +879,32 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     awardPoint(ctx, 0, 'STUFF BLOCK');
   }
 
+  /**
+   * IMPROVE (2026-10-06) #13: the second touch was fully automatic — the player played the bump and the spike and
+   * watched the set. X calls a QUICK set and Y a HIGH one (the default) for the next set: the setter's, or the
+   * player's own. A quick set is low and fast: less time to get under it, and a spike off it is harder to dig.
+   */
+  function callSet(ctx: ModeContext, call: SetCall): void {
+    setCall = call;
+    ctx.setHud({ shotType: call === 'quick' ? 'QUICK SET CALLED' : 'HIGH SET CALLED' });
+    setTimeout(() => ctx.setHud({ shotType: '' }), 600);
+    SoundKit.play('uiTick', { pitch: call === 'quick' ? 1.5 : 1.0, volume: 0.3 });
+  }
+  /** Reshape the set just launched to the player's call, re-draw the meter for its new length, and spend the call. */
+  function playCalledSet(ctx: ModeContext): void {
+    if (!shot) return;
+    shapeSet(shot, setCall);
+    publishBands(ctx, shot.duration);
+    quickSet = setCall === 'quick';
+    if (quickSet) flash(ctx, 'QUICK SET', 600);
+    setCall = 'high';
+  }
+
   /** The human's swing. Called on the action edge. */
   function humanSwing(ctx: ModeContext, aerial: AerialKind = null): void {
     // MECHANICS PASS (2026-09-15): tennis X was silent 5 of 7 and volleyball 29 % of hits — a swing with no ball coming, or
     // one too early / out of reach, returned without a word. The rally game's whole read is timing, so timing is SAID.
+    if (VOLLEY && serveFrom && serveBy === 0) { humanServePress(ctx); return; }   // IMPROVE #4: A strikes the toss
     if (!shot || !awaitingHuman) { refuse(ctx, 'WAIT FOR THE BALL'); return; }
     // dt vs the ideal contact moment, which is the end of the flight
     const dt = (flightT - 1) * shot.duration;
@@ -730,10 +915,24 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     // ball further away than MAX_REACH_M cannot be touched at all, however well it was timed. This is the
     // line that makes planShot's placement mean something for the first time.
     lastReach = reachOf(foot.x, ball.position.x);
-    const q = gradeAfterStretch(timing as 'perfect' | 'good' | 'early' | 'late' | 'miss', lastReach);
+    let q = gradeAfterStretch(timing as 'perfect' | 'good' | 'early' | 'late' | 'miss', lastReach);
 
     if (q === 'miss') { refuse(ctx, lastReach > MAX_REACH_M ? 'OUT OF REACH' : dt < 0 ? 'TOO EARLY' : 'TOO LATE'); return; }   // early flail, or never got there; not a fault yet
-    if (timing !== q) {
+    // IMPROVE (2026-10-06) #5, TUNED: THEIR SPIKE IS HEAVY. aiReturn has always degraded the opponent's dig of the
+    // player's spike a step; the player's dig of theirs was as easy as a free ball. It drops a step now too, and a
+    // late (or early) dig of it is shanked HUMAN_SPIKE_SHANK of the time — under the opponent's 0.45.
+    let heavy = false;
+    if (VOLLEY && incomingTouch === 'spike' && volleyTouchFor(rally.touches + 1, o.cfg.touchesPerSide) === 'bump') {
+      const dug = degradeDig(q, 1, HUMAN_SPIKE_SHANK);
+      if (dug === 'miss') {
+        rallyFlow = Math.max(0, rallyFlow - FLOW_TOUCH); ctx.setHud({ flow: rallyFlow, kinetic: rallyFlow >= FLOW_KINETIC ? 'KINETIC' : '' });
+        console.info(`[NET-SWING] shank timing ${timing} dt ${dt.toFixed(3)} reach ${lastReach.toFixed(2)}`);
+        awardPoint(ctx, 1, 'KILL — YOUR DIG SHANKED');
+        return;
+      }
+      heavy = dug !== q; q = dug;
+    }
+    if (timing !== q && !heavy) {
       ctx.setHud({ shotType: lastReach > NET_REACH_M ? 'STRETCHED' : 'REACHING' });
       setTimeout(() => ctx.setHud({ shotType: '' }), 450);
     }
@@ -785,7 +984,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     // they are about to play, and the difference between a set and a spike is
     // the difference between building the point and winning it.
     const label = o.cfg.touchesPerSide > 1
-      ? `${touchKind.toUpperCase()} · ${q.toUpperCase()}`
+      ? `${touchKind.toUpperCase()} · ${q.toUpperCase()}${heavy ? ' · HEAVY BALL' : ''}`
       : `${pendingShot.toUpperCase()} · ${q.toUpperCase()}`;
     ctx.setHud({ shotType: label, touch: o.cfg.touchesPerSide > 1 ? `${touchNo}/${o.cfg.touchesPerSide}` : '' });
     setTimeout(() => ctx.setHud({ shotType: '' }), 500);
@@ -831,9 +1030,13 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
 
     // WII READ: in tennis WHEN you swing is WHERE it goes — early pulls it across your body, late pushes it the other way
     const wallRun = o.cage && !isVolley && wallRunRead(foot.x, o.cfg.halfWidth);
-    const away = launch(ctx, swingPos, crosses ? -1 : 1, isVolley ? aimX : aimFor(0, dt), q,
+    // IMPROVE #2: the spike aims from attackAim (the R stick, or the L stick screen-relative), apart from the feet
+    const away = launch(ctx, swingPos, crosses ? -1 : 1, isVolley ? (touchKind === 'spike' ? attackAim(ctx) : aimX) : aimFor(0, dt), q,
       isVolley ? touchKind : undefined,
       isVolley ? undefined : pendingShot, zone);
+    // IMPROVE #13: a set the player plays themselves takes their call too; a spike remembers whether its set was quick
+    if (isVolley && away && touchKind === 'set') playCalledSet(ctx);
+    if (isVolley && touchKind === 'spike') { quickSpike = away && quickSet; quickSet = false; }
     // PARKOUR TENNIS: the wall run and the aerials are faster balls and a higher multiplier
     if (o.cage && away && shot) {
       if (aerial) {
@@ -865,7 +1068,9 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       // phase 6: a QA seam for BOTH nets (the cage's was tennis-only, so no driver could play volleyball — it never swung)
       (ctx.scene.metadata ??= {}).net = {
         state: () => ({ awaitingHuman, flightT, shot: shot ? { toX: shot.to.x, toZ: shot.to.z, duration: shot.duration } : null, footX: foot.x, foeX: foeFoot.x,
-          touch: incomingTouch, touches: rally.touches, ended, steerSign: Math.sign(ctx.camDirector.rightFlat().x || 1) }),
+          touch: incomingTouch, touches: rally.touches, ended, steerSign: Math.sign(ctx.camDirector.rightFlat().x || 1),
+          // IMPROVE (2026-10-06): the serve is an input now — a driver has to see whose toss it is and where it is in it
+          serving: serveFrom ? (serveBy === 0 ? 'me' : 'them') : '', tossT, setCall, blockCooldown }),
       };
       if (o.cage) {   // PARKOUR TENNIS: the glass, and the dev seam
         for (const g of glassMeshes) g.dispose(); glassMeshes = []; buildCage(ctx);
@@ -889,7 +1094,10 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       neverBindPose(foe.animator, clips.ready); installSafePlay(foe.animator, `${o.modeId}-foe`);
       ctx.groundLock?.track(foe.root, foe.skeleton);
       foeTree = new NetAnimTree(foe.animator, clips);
-      foeTree.onSettle = (st) => { if (st === 'swing') foeSwing = false; };
+      foeTree.onSettle = (st) => { if (st === 'swing') foeSwing = false; else if (st === 'serve') foeServe = false; };
+      // IMPROVE (2026-10-06): a second load of this mode (the same definition) found netAlive still false from the last
+      // dispose and threw its setter away the moment it spawned
+      netAlive = true;
       if (o.cfg.touchesPerSide > 1) {
         setterHome.set(2.6, 0, o.cfg.halfLength * 0.55);
         setterAt.copyFrom(setterHome);
@@ -902,8 +1110,23 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
           installSafePlay(c.animator, `${o.modeId}-setter`);
           ctx.groundLock?.track(c.root, c.skeleton);
         });
+        // IMPROVE #9: THEIR setter, mirrored on their side — one opponent body bumped, set and spiked while the player
+        // had a helper, which did not read as volleyball
+        foeSetterHome.set(-2.6, 0, -o.cfg.halfLength * 0.55);
+        foeSetterAt.copyFrom(foeSetterHome);
+        void CharacterLibrary.spawn(ctx.scene, o.heroUrl, {
+          position: foeSetterHome.clone(), tint: '#ff8fb8', startClip: clips.ready,
+        }).then((c) => {
+          if (!netAlive) { c.dispose(); return; }
+          foeSetter = c;
+          neverBindPose(c.animator, clips.ready);
+          installSafePlay(c.animator, `${o.modeId}-foe-setter`);
+          ctx.groundLock?.track(c.root, c.skeleton);
+        });
       }
-      meSwing = meServe = meBlock = foeSwing = false; serveIn = 0; serveFrom = null; foeFoot.x = 0; rallyFlow = 0;
+      meSwing = meServe = meBlock = foeSwing = foeServe = false; serveIn = 0; serveFrom = null; foeFoot.x = 0; rallyFlow = 0;
+      server = 0; serveBy = 0; tossT = 0; tossMisses = 0; foeServeCued = false; aimRX = 0;
+      setCall = 'high'; quickSet = false; quickSpike = false; blockCooldown = 0; meterQ = -1; meterIncoming = ''; blockShown = '';
       if (o.cfg.touchesPerSide > 1) ctx.setHud({ flow: 0 });
 
       // Real characters are in — drop the venue's placeholder bodies, or every
@@ -912,7 +1135,10 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
 
       ball = MeshBuilder.CreateSphere('ball', { diameter: o.ballDiameter }, ctx.scene);
       void dressBall(ball, ballKindFor(o.ballDiameter));   // Meshy ball skin (visual only; volleyball keeps its sphere)
-      EffectsKit.ballTrail(ctx.scene, ball);
+      // IMPROVE #19: the 120-particle trail ran for the whole match, the ball sitting still between points included; it
+      // starts on each launch() now and stops when the rally ends
+      trail = EffectsKit.ballTrail(ctx.scene, ball);
+      trail.stop();
       SoundKit.startAmbient(o.ambient);
       if (o.crowd) {
         // Down both sidelines, derived from THIS court rather than hardcoded:
@@ -926,27 +1152,32 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
           const t = (i % 6) / 5;                       // 0..1 along the sideline
           spots.push(new Vector3(i < 6 ? -sideX : sideX, 0, -spread + t * spread * 2 + (i % 2) * 0.6));
         }
-        crowd = new Onlookers(ctx.scene, spots, '#3E5A70');
         if (o.beach) {
           // P5: a second bank behind each baseline — the beach court's people read as a crowd, not four figures on a
           // sideline ("billboard" bodies, playtest d3d4a93). Outside the free zone, in the foe's backdrop and the hero's.
           const endZ = o.cfg.halfLength + 4.2;
-          const ends: Vector3[] = [];
-          for (let i = 0; i < 10; i++) { const t = (i % 5) / 4; ends.push(new Vector3(-5 + t * 10 + (i % 2) * 0.5, 0, i < 5 ? -endZ - (i % 2) * 0.8 : endZ + (i % 2) * 0.8)); }
-          crowdEnds = new Onlookers(ctx.scene, ends, '#F25F5C');
+          for (let i = 0; i < 10; i++) { const t = (i % 5) / 4; spots.push(new Vector3(-5 + t * 10 + (i % 2) * 0.5, 0, i < 5 ? -endZ - (i % 2) * 0.8 : endZ + (i % 2) * 0.8)); }
         }
+        // IMPROVE (2026-10-06) #14: ONE bank. The ends were a second Onlookers, so the beach court stood 16 skinned bodies
+        // (two MAX_BODIES banks, ~6 draws each) on top of the four players. Onlookers spreads its cap over every spot it
+        // is given, so the 22 spots now share 8 bodies: two down each sideline, two behind each baseline.
+        crowd = new Onlookers(ctx.scene, spots, '#3E5A70');
       }
 
       rally = new RallyState(o.cfg);
       tennisScore = o.scoring === 'tennis' ? new TennisScore(6) : null;   // FIELD-DEPTH W4: first to six games
-      volleyScore = o.scoring === 'volley' ? new VolleyScore(25) : null;
+      // IMPROVE #10: the set is to 25 or, picked on the splash (`?set=15`), a short set to 15
+      const setLen = setLengthOf(readSetLength(o.modeId));
+      volleyScore = o.scoring === 'volley' ? new VolleyScore(setLen.target, setLen.cap) : null;
       ended = false; restSec = 0.8; shot = null; aimX = 0; heroStreak = 0; gameLatch = false;
 
       ctx.heroRef.current = me.root;
       // WEATHER (the start screen's chip; tennis only — the beach court has no chip yet) and the landing ring
       weather = WeatherKit.fromPick(o.cfg.touchesPerSide === 1 ? readWeather(o.modeId) : 'natural', 'court', Math.floor(Date.now() / 1000) % 100000);
       weatherFx?.dispose(); weatherFx = mountWeatherFx(ctx.scene, ctx.lights, weather, { tier: ctx.lights.tier, keepSky: !!readPlaceLook(o.venueId)?.sky });   // a place with its own sky keeps it
-      landing?.dispose(); landing = o.cfg.touchesPerSide === 1 ? mountRing(ctx.scene, '#22d3ee', 1.4) : null; landing?.show(false);
+      // IMPROVE #1: volleyball gets a ring too — where the incoming ball comes down, the comfortable reach wide, so a
+      // sport that grades your feet with reachOf shows you where to put them
+      landing?.dispose(); landing = o.cfg.touchesPerSide === 1 ? mountRing(ctx.scene, '#22d3ee', 1.4) : mountRing(ctx.scene, '#ffd75e', COMFORT_M * 2); landing.show(false);
       // THE BODY. Neither net sport mounted a posture layer, so between shots the chest, the neck and the head
       // sat wherever the last swing clip left them — no ready position, no split step, and the eyes never on
       // the ball. FieldPosture's net windows are the ready / split / move / load / strike / reach / serve chain.
@@ -967,7 +1198,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       posture = mountPostureLayer(ctx.scene, me.skeleton, me.root, () => {
         const w = netWindow({
           incoming: awaitingHuman && !!shot,
-          serving: !!serveFrom,
+          serving: !!serveFrom && (!VOLLEY || serveBy === 0),   // IMPROVE #3: their toss is not our serve
           swinging: swingingNow,
           reachM: shot && awaitingHuman ? reachOf(foot.x, ball.position.x) : lastReach,
           speed: Math.abs(foot.vx),
@@ -997,6 +1228,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       // 60/s on a pad (7 m/s), once per key on a keyboard — in a sliding idle_stand, and toward world +x, which is
       // screen-LEFT from behind the baseline (measured Δscreen −4.7 m on stick-right).
       if (e.t === 'stick' && e.side === 'L') aimX = e.x;
+      if (e.t === 'stick' && e.side === 'R') aimRX = e.x;   // IMPROVE #2: the attack's aim, apart from the feet
       if (e.t === 'trigger' && e.side === 'R' && e.value > 0.5) humanSwing(_ctx);
       if (e.t === 'button' && e.btn === 'R1' && e.pressed && o.cage) humanAerial(_ctx);   // PARKOUR TENNIS: the aerial
       // THE SPLIT STEP (L1). The highest-skill, lowest-visibility mechanic in tennis: hop just before the
@@ -1004,7 +1236,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       // is forgiven, late is not — and it buys ONE faster first step, never a sprint button.
       if (e.t === 'button' && e.btn === 'L1' && e.pressed) {
         const timed = splitTimed(sinceOppStrike === Infinity ? Infinity : -sinceOppStrike);
-        foot = { ...foot, sinceSplit: timed ? 0 : Infinity };
+        foot.sinceSplit = timed ? 0 : Infinity;   // IMPROVE #17: in place, like the frame step
         splittingNow = 0.22;
         _ctx.setHud({ shotType: timed ? 'SPLIT' : '' });
         if (timed) { SoundKit.play('uiTick', { pitch: 1.8, volume: 0.3 }); setTimeout(() => _ctx.setHud({ shotType: '' }), 360); }
@@ -1021,6 +1253,8 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       } else if (e.t === 'button' && e.pressed) {
         if (e.btn === 'A') humanSwing(_ctx);
         if (e.btn === 'B') humanBlock(_ctx);
+        if (e.btn === 'X') callSet(_ctx, 'quick');   // IMPROVE #13: call the next set
+        if (e.btn === 'Y') callSet(_ctx, 'high');
       }
     },
 
@@ -1032,7 +1266,9 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       if (landing) {
         const show = !!shot && awaitingHuman && !!ball;
         landing.show(show);
-        if (show && shot) { const l = landingFor(o.cfg, { x: shot.to.x, y: 1, z: shot.to.z }, -1, aimFor(0, 0), pendingShot); if (l) landing.set(l.x, l.z); }
+        // IMPROVE #1: in volleyball the ring is where the ball coming to you comes down — the spot to get your feet to
+        if (show && shot && VOLLEY) landing.set(shot.to.x, shot.to.z);
+        else if (show && shot) { const l = landingFor(o.cfg, { x: shot.to.x, y: 1, z: shot.to.z }, -1, aimFor(0, 0), pendingShot); if (l) landing.set(l.x, l.z); }
       }
 
       // Baseline shuffle (MODE-STICK-FACE, 2026-09-07): lateral only (depth is fixed so the player is always in a
@@ -1044,7 +1280,10 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
         // (the camera's right), because behind a baseline world +x is screen-LEFT.
         const intent = Math.abs(aimX) > 0.12 ? aimX * Math.sign(ctx.camDirector.rightFlat().x || 1) : 0;
         const before = foot.x;
-        foot = stepFootwork({ ...foot, sinceOppStrike }, intent, dt, FOOT);
+        // IMPROVE (2026-10-06) #17: stepped in place — `{ ...foot, sinceOppStrike }` and the returned state were two
+        // objects a frame for the whole match
+        foot.sinceOppStrike = sinceOppStrike;
+        stepFootwork(foot, intent, dt, FOOT, foot);
         sinceOppStrike += dt;
         me.root.position.x = foot.x;
         // lean INTO the run, the same rule the boards carry: a body that changes direction without banking
@@ -1069,32 +1308,37 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
         // "hero off-screen (off BOTTOM)" on the rc7 gauntlet (hero x 5.5, subject x 1.9). The further the body strays from
         // the pan, the more of the aim point is pulled from the ball back toward the body (up to 60 %).
         const stray = Math.abs(foot.x - camX);
-        if (ball) camAim.copyFrom(ball.position).scaleInPlace(1 - Math.min(0.6, Math.max(0, (stray - 1.5) / 3))).addInPlace(me.root.position.scale(Math.min(0.6, Math.max(0, (stray - 1.5) / 3))));
+        const pull = Math.min(0.6, Math.max(0, (stray - 1.5) / 3));
+        if (ball) { camAim.copyFrom(ball.position).scaleInPlace(1 - pull); me.root.position.scaleAndAddToRef(pull, camAim); }   // #17: no scale() temporary
         ctx.camDirector.update(camSubject, camVel, ball ? camAim : null);
         const bodyRightX = Math.cos(me.root.rotation.y);
         // the tree owns the clips: the shuffle INTENT in the body frame, plus the beat latches — fed every frame, every phase
         meTree.update({ move: step ? (step * bodyRightX > 0 ? 1 : -1) : 0, swing: meSwing, serve: meServe, block: meBlock });
         // phase 6: the foe's FEET — toward the incoming landing while the ball comes to them, back toward the middle after
         {
-          const toFoe = !!shot && shot.to.z < 0 && flightT < 1 && flightT * shot.duration >= foeReactSec;   // he moves once he has read it
+          // IMPROVE #9: their own bump is their SETTER's ball — the attacker holds and waits for the set
+          const setterBall = VOLLEY && !!foeSetter && !awaitingHuman && incomingTouch === 'bump';
+          const toFoe = !!shot && !setterBall && shot.to.z < 0 && flightT < 1 && flightT * shot.duration >= foeReactSec;   // he moves once he has read it
           const target = toFoe ? shot!.to.x : foeFoot.x * 0.85;   // a slow drift back to the middle (he does not teleport home)
           const speed = FOE_FOOT_BASE + FOE_FOOT_SKILL * Math.max(SKILL_FLOOR, Math.min(SKILL_CEIL, o.aiSkill));
           const dx = target - foeFoot.x, stepF = Math.sign(dx) * Math.min(Math.abs(dx), speed * dt);
           foeFoot.x = Math.max(-o.cfg.halfWidth * 0.95, Math.min(o.cfg.halfWidth * 0.95, foeFoot.x + stepF));
           foe.root.position.x = foeFoot.x;
           const foeRightX = Math.cos(foe.root.rotation.y);
-          foeTree.update({ move: Math.abs(stepF) > 0.002 ? (stepF * foeRightX > 0 ? 1 : -1) : 0, swing: foeSwing, serve: false, block: false });
+          foeTree.update({ move: Math.abs(stepF) > 0.002 ? (stepF * foeRightX > 0 ? 1 : -1) : 0, swing: foeSwing, serve: foeServe, block: false });
         }
       }
 
       if (splittingNow > 0) splittingNow = Math.max(0, splittingNow - dt);
 
+      // IMPROVE (2026-10-06) #8: the crowd steps BEFORE the rest's early return. awardPoint cheers and then rests 1.4 s,
+      // and the rest skipped update() — so the hop every cheer is for never played. (Tennis and volleyball both.)
+      crowd?.update(dt);
       if (restSec > 0) {
         restSec -= dt;
         if (restSec <= 0) serve(ctx);
         return;
       }
-      crowd?.update(dt); crowdEnds?.update(dt);
       if (setter?.root) {
         const p = setter.root.position;
         const k = Math.min(1, dt * 3.5);
@@ -1102,7 +1346,18 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
         p.z += (setterAt.z - p.z) * k;
         p.y = 0;
       }
+      if (foeSetter?.root) {   // IMPROVE #9: the same walk for theirs
+        const p = foeSetter.root.position;
+        const k = Math.min(1, dt * 3.5);
+        p.x += (foeSetterAt.x - p.x) * k;
+        p.z += (foeSetterAt.z - p.z) * k;
+        p.y = 0;
+      }
       if (blockCooldown > 0) blockCooldown = Math.max(0, blockCooldown - dt);
+      // IMPROVE #7: the block's cooldown on the HUD as a ready chip (it only showed as a refusal AFTER the press);
+      // pushed when the whole second changes, not every frame
+      if (VOLLEY) { const chip = blockChip(blockCooldown); if (chip !== blockShown) { blockShown = chip; ctx.setHud({ blockReady: chip }); } }
+      if (VOLLEY && serveFrom) { stepToss(ctx, dt); return; }   // IMPROVE #3/#4: the volleyball toss
       if (serveFrom) {
         // the toss: the ball rises off the hand and the serve strikes it on the clip's contact beat
         serveIn -= dt;
@@ -1117,7 +1372,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       if (o.cfg.touchesPerSide > 1) {
         rallyAge += dt;
         if (rallyAge >= RALLY_CAP_SEC) {
-          awardPoint(ctx, awaitingHuman ? 1 : 0, 'RALLY CAP');
+          replayPoint(ctx);   // IMPROVE #12 (TUNED): was awardPoint(ctx, awaitingHuman ? 1 : 0, 'RALLY CAP')
           return;
         }
       }
@@ -1131,6 +1386,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
         if (rally.touch() === 'fault') { awardPoint(ctx, 1, 'TOO MANY TOUCHES'); return; }
         launch(ctx, at, 1, 0, 'good', 'set');
         flash(ctx, 'SET', 600);
+        playCalledSet(ctx);   // IMPROVE #13: the set the player called
         return;
       }
       // PARKOUR TENNIS: the ball reaching a pane is mirrored off it (live); the aerial read on the incoming ball
@@ -1159,20 +1415,23 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       // driver could time a swing either: flights differ per touch, so a fixed
       // delay is wrong for all of them (bump 1.56s, set 1.88s, spike 0.88s).
       // Ramp it across the window, contact at 1.
+      //
+      // IMPROVE (2026-10-06) #18: quantised to 1/50 and pushed only when it changes — it was a new HUD object every
+      // frame of every contact window.
       if (contactArmed && awaitingHuman) {
-        ctx.setHud({
-          shotMeterT: Math.max(0, Math.min(1, (flightT - 0.55) / 0.45)),
-          // Tell the receiver an ATTACK is coming. You cannot decide to block
-          // something you were not shown, and the block is a read on the spike
-          // rather than a button you can hold down.
-          incoming: o.cfg.touchesPerSide > 1 && incomingTouch === 'spike' ? 'SPIKE' : '',
-        });
+        const mq = quantiseMeter((flightT - 0.55) / 0.45);
+        // Tell the receiver an ATTACK is coming. You cannot decide to block
+        // something you were not shown, and the block is a read on the spike
+        // rather than a button you can hold down.
+        const inc = o.cfg.touchesPerSide > 1 && incomingTouch === 'spike' ? 'SPIKE' : '';
+        if (mq !== meterQ || inc !== meterIncoming) { meterQ = mq; meterIncoming = inc; ctx.setHud({ shotMeterT: mq, incoming: inc }); }
       }
 
       if (flightT < 1) return;
 
       // The flight has landed.
       ctx.setHud({ shotMeterT: 0, incoming: '', shotMeterBands: '' });
+      meterQ = -1; meterIncoming = '';
       if (pendingFault) {
         // Whoever last hit it committed the fault.
         const offender: 0 | 1 = awaitingHuman ? 1 : 0;
@@ -1194,12 +1453,13 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     dispose() {
       for (const g of glassMeshes) g.dispose(); glassMeshes = [];   // PARKOUR TENNIS
       crowd?.dispose(); crowd = null;
-      crowdEnds?.dispose(); crowdEnds = null; beach?.dispose(); beach = null; readableNet?.dispose(); readableNet = null;   // P5
+      beach?.dispose(); beach = null; readableNet?.dispose(); readableNet = null;   // P5
+      trail = null;   // the scene owns the system; the handle must not outlive the match
       venue?.dispose(); venue = null;
       posture?.dispose(); posture = null;
       recoverMark?.dispose(); recoverMark = null;
       landing?.dispose(); landing = null; weatherFx?.dispose(); weatherFx = null;
-      me?.dispose(); foe?.dispose(); setter?.dispose(); setter = null; netAlive = false;
+      me?.dispose(); foe?.dispose(); setter?.dispose(); setter = null; foeSetter?.dispose(); foeSetter = null; netAlive = false;
       SoundKit.stopAmbient();
       shot = null; ended = true;
     },

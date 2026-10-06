@@ -24,6 +24,7 @@ import { storySessionMode } from './progression';
 import { STORY_YARDSTICKS, storyGoalLabel, storyModeLabel, yardstickFor } from './story-yardstick';
 import { MODE_INFO } from './game-data';
 import { TennisScore, VolleyScore } from './babylon/core/RallyCore';
+import { readSetLength, setLengthOf } from './babylon/nexus/setLength';
 import { shootoutState, REGULATION_KICKS } from './babylon/core/ShootoutCore';
 import { TIERS, runGrade } from './babylon/core/FreeRunCore';
 import { TARGETS, predictWallCross, robRead, targetHit, verdictFor, PARK } from './babylon/core/ParkourDerby';
@@ -52,7 +53,12 @@ describe('each yardstick is what its mode actually posts', () => {
   });
 
   it('Beach Rally: a set to 25 (win by 2, cap 30) posts your points — run on RallyCore', () => {
-    has('lib/babylon/modes/NetSportMode.ts', "volleyScore = o.scoring === 'volley' ? new VolleyScore(25) : null;");
+    // IMPROVE (2026-10-06): the set is built from the splash's set-length pick (a short set to 15 exists now) — and a
+    // Story run always gets the FULL set, which is the set these yardsticks are measured on
+    has('lib/babylon/modes/NetSportMode.ts', "volleyScore = o.scoring === 'volley' ? new VolleyScore(setLen.target, setLen.cap) : null;");
+    has('lib/babylon/modes/NetSportMode.ts', 'const setLen = setLengthOf(readSetLength(o.modeId));');
+    expect(readSetLength('volleyball', '?story=sandPit.boss&set=15')).toBe('full');
+    expect(setLengthOf('full')).toMatchObject({ target: 25, cap: 30 });
     const won = new VolleyScore(25);
     let r: string = 'point';
     while (r !== 'set') r = won.award(0);
