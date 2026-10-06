@@ -26,6 +26,9 @@ export const vehicleBodyUrl = (kind: VehicleKind, id: string): string => `/model
  */
 export const VEHICLE_LOD: Partial<Record<VehicleKind, Record<string, string>>> = {
   plane: { rival: 'v-d5a0bbed-lod1' },
+  // IMPROVE (2026-10-06), velocitykart #20: the kart field's body, made the same way — the phone profile measured the kart
+  // at 284 MB of textures against a 256 MB ceiling, and the field's 2048² maps were ~64 MB of it
+  kart: { rival: 'v-f920e610-lod1' },
 };
 export const vehicleLodUrl = (kind: VehicleKind, id: string): string | null => {
   const f = VEHICLE_LOD[kind]?.[id];

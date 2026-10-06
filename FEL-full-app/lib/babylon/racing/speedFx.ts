@@ -165,6 +165,58 @@ export class DustEmitter {
 }
 
 /**
+ * IMPROVE (2026-10-06), velocitykart #15: THE MINI-TURBO SPARKS as one system. The mode rolled dice every frame and
+ * spawned a fresh `EffectsKit.burst` ParticleSystem ~14 times a second for as long as a slide held a tier (each one
+ * allocated, started and disposed itself). One emitter at the rear axle, its rate and colour set by the tier the
+ * slide has reached — the DustEmitter's pattern. Rate 0 at tier 0, so it costs nothing on the straight.
+ */
+export const SPARK_RATE: readonly number[] = [0, 50, 75, 100];
+export function sparkRateFor(tier: number): number { return SPARK_RATE[Math.max(0, Math.min(3, Math.floor(tier) || 0))]; }
+
+export class SparkEmitter {
+  private ps: ParticleSystem | null = null;
+  private node: Mesh | null = null;
+  private tier = -1;
+
+  constructor(scene: Scene, parent: TransformNode, name: string, private colors: readonly string[]) {
+    try {
+      this.node = MeshBuilder.CreateBox(`sparkNode_${name}`, { size: 0.01 }, scene);
+      this.node.isVisible = false; this.node.isPickable = false;
+      this.node.parent = parent;
+      this.node.position.set(0, 0.1, -0.8);   // the rear axle, where the old bursts landed
+      const ps = new ParticleSystem(`sparks_${name}`, 140, scene);
+      ps.particleTexture = moteTexture(scene);
+      ps.emitter = this.node;
+      ps.minEmitBox = new Vector3(-0.6, 0, -0.05); ps.maxEmitBox = new Vector3(0.6, 0.05, 0.05);   // both rear wheels
+      ps.direction1 = new Vector3(-1.2, 1.4, -1.5); ps.direction2 = new Vector3(1.2, 2.6, -3);
+      ps.minEmitPower = 1.5; ps.maxEmitPower = 3.2;
+      ps.minLifeTime = 0.16; ps.maxLifeTime = 0.34;
+      ps.minSize = 0.06; ps.maxSize = 0.15;
+      ps.gravity = new Vector3(0, -7, 0);
+      ps.blendMode = ParticleSystem.BLENDMODE_ADD;
+      ps.emitRate = 0;
+      ps.start();
+      this.ps = ps;
+    } catch { this.ps = null; }
+  }
+
+  /** Call every frame with the mini-turbo tier (0 = no sparks). A colour change only lands on a tier change. */
+  update(tier: number): void {
+    const ps = this.ps;
+    if (!ps) return;
+    ps.emitRate = sparkRateFor(tier);
+    if (tier !== this.tier && tier > 0) {
+      const c = Color3.FromHexString(this.colors[tier] ?? '#ffffff');
+      ps.color1 = new Color4(c.r, c.g, c.b, 1); ps.color2 = new Color4(Math.min(1, c.r + 0.3), Math.min(1, c.g + 0.3), Math.min(1, c.b + 0.3), 0.9);
+      ps.colorDead = new Color4(c.r, c.g, c.b, 0);
+    }
+    this.tier = tier;
+  }
+
+  dispose(): void { this.ps?.dispose(); this.ps = null; this.node?.dispose(); this.node = null; }
+}
+
+/**
  * The plane's wingtip ribbons: one TrailMesh per wingtip anchor (the BoostFx trail pattern — unlit PBR,
  * alpha follows the gate), awake in a hard bank or near top speed. A trail that is always on reads as a
  * banner; gated, it reads as the air coming off the wing when the plane is working.
