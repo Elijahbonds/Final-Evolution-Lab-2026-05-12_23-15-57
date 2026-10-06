@@ -14,7 +14,7 @@ import {
   SCORE_CEILINGS, MIRRORED, BOUND_MARGIN, UNTIMED_RUN_SEC, MAX_FRAME_HZ, SKATE_LINK_SEC, BOARD_EVENT_SEC, FREERUN_LINK_SEC,
   KARATE_SWING_SEC, FOOTBALL_EVENT_SEC, DUNK_ATTEMPT_MAX, DUNK_CONTEST_ATTEMPTS, DUNK_MAX_SCALE, BIG_AIR_MAX_TURNS,
   checkStakeScore, checkDunkCard, scoreCeilingFor, canonicalStakeMode, killSwitchOn, dunkAttemptCeiling, aboveCeilingDetail,
-  whoSceneItCeiling, danceCeiling, brainBrawlCeiling, bigAirCeiling, skateLinkMax, chainRunBound, frameRoundedRate,
+  whoSceneItCeiling, danceCeiling, brainBrawlCeiling, bigAirCeiling, bigAirLineMax, bigAirLineBonusMax, skateLinkMax, chainRunBound, frameRoundedRate,
   carnivalEventBounds, STAKE_MODE_ALIASES, REJUDGED_STAKE_MODES, type ScoreCeiling,
 } from './arena-score-integrity';
 import { ARENA_MODES } from './arena';
@@ -41,7 +41,7 @@ import { BREAK } from './babylon/core/Breakaway';
 import { RUN } from './babylon/core/RushRun';
 import { ComboChain, REPEAT_DECAY, REPEAT_NO_MULT } from './babylon/core/ComboChain';
 import { TRICKS, TrickMachine, type BoardRig, type TrickDef } from './babylon/modes/boardCore';
-import { SKATE_TRICKS, SNOW_TRICKS, SURF_TRICKS, asTrickDef, basePts } from './babylon/core/BoardTricks';
+import { SKATE_TRICKS, SNOW_TRICKS, SURF_TRICKS, asTrickDef, basePts, scoreTrick } from './babylon/core/BoardTricks';
 import { WALL_RIDE, LIP, LIP_TRICKS } from './babylon/core/WallRide';
 import { Freeflow, FREEFLOW } from './babylon/core/Freeflow';
 import { GUNSLING, SLINGSHOT, STIFF, BLOCK, LANES } from './babylon/core/KickoffReturn';
@@ -274,6 +274,19 @@ function bigAirRun(plantAt: number | null): { score: number; maxTurns: number } 
   return { score: core.state.score, maxTurns };
 }
 
+/** IMPROVE (2026-10-06): Big Air's banked line, scored as AirSessionMode scores it — one ComboChain (scope 'air') for the
+ *  session, every landing a stuck one naming `named(i)` (a line is each trick once, scoreTrick at landed01 1), banked at the
+ *  end. The default names every snow air trick in a fresh order each air, so no line repeats. */
+function bigAirLineRun(named: (i: number) => typeof SNOW_TRICKS = (i) => { const a = SNOW_TRICKS.filter((t) => t.kind === 'air'); return [...a.slice(i), ...a.slice(0, i)]; }): number {
+  const chain = new ComboChain(undefined, 'air');
+  for (let i = 0; i < BIG_AIR_TUNING.attemptsPerRound; i++) {
+    const line = named(i);
+    chain.add(line.map((t) => t.label).join(' → '), line.reduce((sum, t) => sum + scoreTrick(t, 1), 0), 'air');
+  }
+  chain.bank();
+  return chain.banked;
+}
+
 /** First to `target` on buckets of 2 or 3 — every reachable final score, searched. */
 function firstToMax(target: number): number {
   let best = 0;
@@ -295,7 +308,7 @@ const PERFECT_RUNS: Record<string, () => number> = {
     for (let r = 0; r < MIRRORED.threePointRacks; r++) for (let b = 0; b < MIRRORED.threePointBallsPerRack; b++) s += b === MIRRORED.threePointBallsPerRack - 1 ? MIRRORED.threePointMoneyWorth : 1;
     return s;
   },
-  bigAir: () => bigAirRun(Math.floor(bigAirRun(null).maxTurns * 2) / 2).score,
+  bigAir: () => bigAirRun(Math.floor(bigAirRun(null).maxTurns * 2) / 2).score + bigAirLineRun(),   // the posted total: rotation + banked line
   golf: () => {
     let s = 0;
     MIRRORED.golfPar.forEach((par, h) => {
@@ -405,7 +418,7 @@ describe('the ceiling table', () => {
 
   it('sets the rules ceilings at what the rules can award', () => {
     const want: Record<string, number> = {
-      dunkContest: 240, hoops1v1: 13, hoops3v3: 23, threePoint: 30, bigAir: 8000, golf: 2250, baseball: 6432,
+      dunkContest: 240, hoops1v1: 13, hoops3v3: 23, threePoint: 30, bigAir: 33_260, golf: 2250, baseball: 6432,
       soccer: 6660, tennis: 6, tiebreak: 1350, brainBrawl: 4500, whoSceneIt: 3540, karateVersus: 200, mixedcombat: 200,
       dance: 79680, training: 9400, music: 378_300,
     };
@@ -602,6 +615,24 @@ describe('a perfect run of maximum length stays under its ceiling — every stak
     expect(maxTurns).toBeGreaterThan(3);                    // the spin really ran (≈ 4.7 turns)
     expect(maxTurns).toBeLessThan(BIG_AIR_MAX_TURNS);
     expect(core.state.score).toBeLessThanOrEqual(bigAirCeiling());
+  });
+
+  // IMPROVE (2026-10-06, owner-approved "Big Air ceiling counts the line bonus"): the card posts rotation + the banked line,
+  // and the ceiling counted rotation only (8,000) — a top session (~14,000 measured) was refused as a stake.
+  it('Big Air: the ceiling counts the banked line bonus, exactly what the real ComboChain banks for the biggest fresh lines', () => {
+    const airs = SNOW_TRICKS.filter((t) => t.kind === 'air');
+    expect(bigAirLineMax()).toBe(airs.reduce((s, t) => s + scoreTrick(t, 1), 0));   // every snow air named once, stuck
+    expect(bigAirLineRun()).toBe(bigAirLineBonusMax());                              // the chain's N× links, five fresh lines
+    // the same line every air (the repeat decay) or a fresh but shorter line banks less
+    expect(bigAirLineRun(() => airs)).toBeLessThan(bigAirLineBonusMax());
+    expect(bigAirLineRun((i) => [...airs.slice(i), ...airs.slice(0, i)].slice(1))).toBeLessThan(bigAirLineBonusMax());
+    const rotation = bigAirCeiling() - bigAirLineBonusMax();
+    expect(rotation).toBe(8000);                                                      // the rotation part is unchanged
+    const top = PERFECT_RUNS.bigAir();
+    expect(top).toBeGreaterThan(rotation);                                            // the old ceiling refused it
+    expect(stake('bigAir', top).ok).toBe(true);
+    expect(stake('bigAir', 14_000).ok).toBe(true);                                    // the measured top session
+    expect(stake('bigAir', bigAirCeiling() + 1).ok).toBe(false);
   });
 
   it('Brain Brawl, Who Scene It, dance and tennis land exactly on their ceilings through their real cores', () => {
@@ -822,6 +853,21 @@ describe('the card reaches the server', () => {
 });
 
 describe('drift guards — the numbers mirrored out of mode files still match them', () => {
+  // IMPROVE (2026-10-06): bigAirLineBonusMax rests on how AirSessionMode (a Babylon file the route must not import) scores a
+  // line — not a number to mirror, so its shape is held here: one 'air' chain for the session, banked once at the end, a
+  // line of snow tricks each named once an air, each paying scoreTrick, and the posted total rotation + that bonus.
+  it('Big Air: the line bonus is scored the way bigAirLineBonusMax models it', () => {
+    const t = src('lib/babylon/modes/AirSessionMode.ts');
+    expect(t).toMatch(/chain: new ComboChain\(undefined, 'air'\)/);
+    expect(t.match(/S\.chain\.bank\(\)/g)?.length, 'the chain banks only when the session ends').toBe(1);
+    expect(t.match(/S\.chain\.add\(/g)?.length, 'one link a landing').toBe(1);
+    expect(t).not.toMatch(/S\.chain\.accrue\(/);
+    expect(t).toMatch(/const linePts = S\.named\.reduce\(\(sum, t\) => sum \+ scoreTrick\(t, landed01\), 0\);/);
+    for (const m of t.matchAll(/(?:airTrickFor|airPressFor|grabTrickFor)\('(\w+)'/g)) expect(m[1]).toBe('snow');
+    for (const m of t.matchAll(/S\.named\.push\(t\)/g)) expect(t.slice(Math.max(0, m.index! - 400), m.index)).toMatch(/S\.named\.some\(\(n\) => n\.id === t\.id\)/);
+    expect(t).toMatch(/const total = S\.score \+ S\.bonus;/);
+  });
+
   it('Flight Night rounds and dunks', () => {
     const t = src('lib/babylon/modes/DunkMode.ts');
     expect(num(t, /const TOTAL_ROUNDS = (\d+);/, 'TOTAL_ROUNDS')).toBe(MIRRORED.dunkRounds);

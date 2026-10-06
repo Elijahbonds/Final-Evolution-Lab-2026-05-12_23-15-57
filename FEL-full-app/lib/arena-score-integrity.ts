@@ -194,12 +194,30 @@ export function firstToCeiling(target: number, maxPerScore: number): number {
 /** Big Air: most turns a boosted launch can spin before touchdown. The test RUNS the real big-air core at full boost with
  *  the spin started at take-off and holds this above what it measures (≈ 4.75 turns). IMPROVE (2026-10-06, Big Air items
  *  2 / 8 / 10): the core now lands on a hill (a 2 m lip; a full boost overshoots the landing onto the flat, capped at
- *  sketchy) and pays a repeated rotation less — both only LOWER what an attempt can pay, so the ceiling stands unchanged. */
+ *  sketchy) and pays a repeated rotation less — both only LOWER what an attempt can pay, so the rotation part stands unchanged. */
 export const BIG_AIR_MAX_TURNS = 5;
+/** IMPROVE (2026-10-06, owner-approved "Big Air ceiling counts the line bonus"): the most one landing's named line can pay.
+ *  AirSessionMode names a trick from the snow table at most once an air (S.named is de-duplicated by id) and scores each at
+ *  scoreTrick(t, landed01) — basePts × landed01², so a stuck/clean landing pays every named trick's basePts in full. The
+ *  largest line is every snow air trick named in one air. */
+export function bigAirLineMax(): number {
+  return airPts(SNOW_TRICKS).reduce((a, b) => a + b, 0);
+}
+/** The whole banked line bonus a session can post. AirSessionMode runs ONE ComboChain (scope 'air') for the session and
+ *  banks it only when the session ends; the Nth link pays N× (ComboChain's multiplier is its link count), a landing is at
+ *  most one link, and a repeated line only pays less. So attemptsPerRound landings, each the largest line and each a fresh
+ *  one: lineMax × (1 + 2 + … + attemptsPerRound). */
+export function bigAirLineBonusMax(): number {
+  const n = BIG_AIR_TUNING.attemptsPerRound;
+  return bigAirLineMax() * (n * (n + 1)) / 2;
+}
+/** Rotation points (the core's score) + the banked line bonus — the one total AirSessionMode posts (RESULTS-TRUTH WA-5).
+ *  IMPROVE (2026-10-06): it counted the rotation points alone (8,000), so a legitimate top session (~14,000 measured with the
+ *  line) was refused as a stake. */
 export function bigAirCeiling(): number {
   const t = BIG_AIR_TUNING;
   const perAttempt = Math.round((t.basePoints + BIG_AIR_MAX_TURNS * t.pointsPerRotation) * Math.max(...Object.values(t.gradePoints)));
-  return t.attemptsPerRound * perAttempt;
+  return t.attemptsPerRound * perAttempt + bigAirLineBonusMax();
 }
 
 /** Golf: a hole in one on every hole (the last one clutch), both rings, and the bank ride. */
@@ -466,8 +484,8 @@ export const SCORE_CEILINGS: Readonly<Record<string, ScoreCeiling>> = {
   },
   bigAir: {
     max: bigAirCeiling(), kind: 'rules', swapsUnderKillSwitch: true,
-    why: `${BIG_AIR_TUNING.attemptsPerRound} hits, each at most ${BIG_AIR_MAX_TURNS} turns stuck`,
-    basis: `BIG_AIR_TUNING attemptsPerRound × round((basePoints + ${BIG_AIR_MAX_TURNS} turns × pointsPerRotation) × gradePoints.stuck); ${BIG_AIR_MAX_TURNS} turns is above the full-boost air the core allows (measured by the test)`,
+    why: `${BIG_AIR_TUNING.attemptsPerRound} hits, each at most ${BIG_AIR_MAX_TURNS} turns stuck, each naming every snow air trick in a fresh line`,
+    basis: `BIG_AIR_TUNING attemptsPerRound × round((basePoints + ${BIG_AIR_MAX_TURNS} turns × pointsPerRotation) × gradePoints.stuck); ${BIG_AIR_MAX_TURNS} turns is above the full-boost air the core allows (measured by the test) + the banked line: Σ SNOW_TRICKS airs' basePts × (1 + … + attemptsPerRound), ComboChain's Nth link paying N×`,
   },
   golf: {
     max: golfCeiling(), kind: 'rules', swapsUnderKillSwitch: true,
