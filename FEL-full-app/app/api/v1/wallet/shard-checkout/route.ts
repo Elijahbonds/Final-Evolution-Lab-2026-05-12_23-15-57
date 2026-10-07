@@ -77,7 +77,9 @@ export async function POST(req: NextRequest) {
       metadata: { playerId, product: 'SHARD_PACK', packId: pack.id, shards: String(totalShards) },
       // Mirror onto the PaymentIntent/Charge so charge.refunded can debit back.
       payment_intent_data: { metadata: { playerId, product: 'SHARD_PACK', shards: String(totalShards) } },
-      success_url: `${origin}/shop/shards?paid=1`,
+      // session_id lets /shop/shards fulfil through POST /api/stripe/verify-session even
+      // when no webhook is configured (SEC-F4 NO-WEBHOOK follow-up).
+      success_url: `${origin}/shop/shards?paid=1&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/shop/shards?canceled=1`,
     });
     return NextResponse.json({ url: checkoutSession.url });

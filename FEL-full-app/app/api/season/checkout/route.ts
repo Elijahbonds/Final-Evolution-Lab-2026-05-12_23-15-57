@@ -103,7 +103,9 @@ export async function POST(req: NextRequest) {
           seasonId: activeSeason.id,
         },
       },
-      success_url: `${origin}/?season=pro-unlocked`,
+      // session_id lets the landing page fulfil through POST /api/stripe/verify-session
+      // even when no webhook is configured (SEC-F4 NO-WEBHOOK follow-up).
+      success_url: `${origin}/?season=pro-unlocked&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/?season=pro-cancelled`,
     });
     return NextResponse.json({ url: checkoutSession.url });

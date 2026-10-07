@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { VerifyCheckoutSession } from '@/components/stripe/verify-checkout-session';
 
-export function ThanksPoll({ rowId }: { rowId: string }) {
+export function ThanksPoll({ rowId, sessionId }: { rowId: string; sessionId?: string | null }) {
   const [status, setStatus] = useState('waiting');
   const [code, setCode] = useState<string | null>(null);
   const [ics, setIcs] = useState<string | null>(null);
@@ -33,6 +34,9 @@ export function ThanksPoll({ rowId }: { rowId: string }) {
   };
   return (
     <div className="text-white">
+      {/* SEC-F4 NO-WEBHOOK: check with Stripe first so the row flips to paid even with no
+          webhook configured; the status poll below then picks it up. Idempotent on reload. */}
+      <VerifyCheckoutSession sessionId={sessionId} />
       <h1 className="text-2xl font-black">Thanks</h1>
       <p className="mt-2 text-sm">Payment status: {status}. The receipt is the source of truth once this says paid.</p>
       {code ? <p className="mt-4 text-sm">Teen code (shown once here): {code}. Progress stays on the phone that redeems it.</p> : null}
