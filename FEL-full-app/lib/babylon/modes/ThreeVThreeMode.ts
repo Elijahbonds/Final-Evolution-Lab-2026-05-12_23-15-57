@@ -989,7 +989,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       putHud(ctx, {
         score: myScore, foeScore, target: TARGET_SCORE, time: timeLeft, ast: assists,
         // IMPROVE (2026-10-06) #7: no ~380-character control string here any more — the hint is one line for the state you are in
-        // (tickHint); the full lists are on the pause screen (threevthreeRules CONTROLS_*, drawn by the host)
+        // (tickHint); the full lists are on the pause screen (threevthreeRules CONTROLS_*, the CONTROLS panel's OFFENSE / DEFENSE groups)
       });
     },
 

@@ -15,6 +15,7 @@ const fn = (name: string): string => {
 };
 const HOST = readFileSync(path.join(__dirname, '../../../components/games/three-v-three-babylon.tsx'), 'utf8');
 const SPLASH = readFileSync(path.join(__dirname, '../../../components/games/boot-splash.tsx'), 'utf8');
+const PANEL = readFileSync(path.join(__dirname, '../ui/panelLines.ts'), 'utf8');   // HOOPS PAUSE: the pause's one list
 
 describe('#4 #10 #17: the beats, the drive and the flights run on the mode clock and die with the mode', () => {
   it('no raw setTimeout and no onBeforeRender pass is left in the mode', () => {
@@ -121,7 +122,12 @@ describe('the rules reach the game (#1 #2 #5 #6 #7 #9)', () => {
     expect(cues).toMatch(/const read = passRead\(stick\);/);
     expect(cues).toMatch(/at = foePass\.active \? foePassTo : driver;/);
     expect(cues).toMatch(/hintSwap\(hintShown, want, modeClock - hintAt, turned\)/);
-    expect(HOST).toMatch(/CONTROLS_OFFENCE/); expect(HOST).toMatch(/hud\.passPreview/);
+    // test changed (HOOPS PAUSE, owner 2026-10-06: "Hoops pause: Controls panel only"): #7's full list is on the pause in the
+    // shared CONTROLS panel's OFFENSE / DEFENSE groups, not a second list the host draws. Was: HOST matches /CONTROLS_OFFENCE/.
+    expect(HOST).not.toMatch(/CONTROLS_OFFENCE|CONTROLS_DEFENCE|phase === 'paused' && \(/);
+    expect(PANEL).toMatch(/threevthree: \[\n\s*\{ title: 'OFFENSE', color: 'var\(--fel-cyan\)', text: THREES_OFFENCE \},\n\s*\{ title: 'DEFENSE', color: 'var\(--fel-gold\)', text: THREES_DEFENCE \},/);
+    expect(HOST).toMatch(/typeof hud\.hint === 'string' && hud\.hint && phase === 'playing'/);   // the ONE live line stays
+    expect(HOST).toMatch(/hud\.passPreview/);
   });
   it('#9 every ending posts the box score', () => {
     expect(CODE).not.toMatch(/ctx\.end\([^)]*\{ foeScore, assists \}\)/);

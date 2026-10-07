@@ -19,8 +19,14 @@
 // 1080p; this is the net under them for a size or a state nobody measured (a body player's longer list, a 932x430
 // phone): when the box still cuts something, the rows and lines step down in size — never below FIT_MIN (0.85) of it —
 // until it all shows. It reads the box, so it re-runs when the box changes (a rotate, the body's card opening above it).
+//
+// HOOPS PAUSE (2026-10-06). Owner: "Hoops pause: Controls panel only" — the 1v1 and 3v3 pause no longer draw their own
+// full list along the bottom; this panel carries it, as titled OFFENSE / DEFENSE groups (lib/babylon/ui/panelLines.ts
+// PANEL_GROUPS). Those lists are longer than any box on a sideways phone: past FIT_MIN the lines scroll in their own box
+// (`min-h-0 overflow-y-auto` in a column the panel's max height bounds), and the panel never spills off the screen.
+// Every other mode is one untitled group: its markup is what it was.
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { sessionStore } from '@/lib/babylon/core/sessionStore';
 import { CONTROLS_DEVICES, DEVICE_LABEL, controlsSheet, detectDevice, fitScale, type ControlsDevice } from '@/lib/ui/controlsScreen';
 
@@ -105,8 +111,16 @@ export function ControlsPanel({ modeId, hint, chooser = true, className = '' }: 
       )}
       {sheet.lines.length > 0 && (
         <span data-controls-lines className="[zoom:var(--fel-controls-fit,1)] block min-h-0 overflow-y-auto border-t border-white/10 pt-1.5 [scrollbar-width:thin]">
-          {sheet.lines.map((l) => (
-            <span key={l} className="block pl-3 -indent-3 font-mono text-[10px] leading-snug text-white/75">· {l}</span>
+          {sheet.groups.map((g, gi) => (
+            <Fragment key={g.title ?? `group-${gi}`}>
+              {g.title && (
+                <span data-controls-group={g.title} style={{ color: g.color }}
+                  className={`block text-[9px] font-black tracking-[0.3em]${gi > 0 ? ' pt-1.5' : ''}`}>{g.title}</span>
+              )}
+              {g.lines.map((l) => (
+                <span key={l} className="block pl-3 -indent-3 font-mono text-[10px] leading-snug text-white/75">· {l}</span>
+              ))}
+            </Fragment>
           ))}
         </span>
       )}
