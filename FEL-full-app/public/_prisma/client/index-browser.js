@@ -1078,7 +1078,8 @@ exports.Prisma.ProgramMessageScalarFieldEnum = {
   programId: 'programId',
   authorId: 'authorId',
   body: 'body',
-  createdAt: 'createdAt'
+  createdAt: 'createdAt',
+  readAt: 'readAt'
 };
 
 exports.Prisma.FacilitatorProfileScalarFieldEnum = {
@@ -1288,6 +1289,14 @@ exports.Prisma.CoachClientScalarFieldEnum = {
   via: 'via',
   endedAt: 'endedAt',
   createdAt: 'createdAt'
+};
+
+exports.Prisma.CoachAvailabilityScalarFieldEnum = {
+  coachId: 'coachId',
+  clientId: 'clientId',
+  status: 'status',
+  returnBy: 'returnBy',
+  setAt: 'setAt'
 };
 
 exports.Prisma.InstructorScalarFieldEnum = {
@@ -1715,6 +1724,7 @@ exports.Prisma.ModelName = {
   ShareLink: 'ShareLink',
   CoachInvite: 'CoachInvite',
   CoachClient: 'CoachClient',
+  CoachAvailability: 'CoachAvailability',
   Instructor: 'Instructor',
   ProgramAccess: 'ProgramAccess',
   Booking: 'Booking',
