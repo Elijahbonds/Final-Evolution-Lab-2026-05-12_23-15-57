@@ -39,7 +39,7 @@ const UA = 'AgeScreenTest/1.0';
 // 377a4c09 — all of them together first at the integration-3 merge of lane/finish-release).
 // AGE-SCREEN originally pinned the pre-age-screen tip so that PR could not smuggle a schema change; every
 // intentional schema PR must bump this to the commit that contains its prisma/ files, or CI stays red.
-const PARENT = 'e8be09a93112bf9db0d7bfff69f6ca6741bd90e9';
+const PARENT = 'c6f58eeda60b821cec52cacb94e915255d0c4bf7';
 
 /** Resolve a diff base for the schema-ban check when CI's checkout is shallow. */
 function resolvePrismaDiffBase(): string {
