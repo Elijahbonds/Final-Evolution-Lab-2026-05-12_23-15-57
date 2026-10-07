@@ -93,9 +93,15 @@ import { nextTimedRow } from '@/lib/coach/setTimer';
 import type { OpenLog, TodayPayload } from '@/lib/coach/todayServer';
 // MIRROR-COACH P9 fix (2026-09-30): a screen prescription's note links the Mirror's written corrective (rule (e))
 import { CoachNote } from '@/components/coach/coach-note';
+// COACH-AI Phase 8 (2026-10-07): the thread's read markers ("N new", "Seen"; nothing until the pending SQL is applied)
+import { ThreadMessages, UnreadPill } from '@/components/coach/thread-messages';
+import { markReadIfNeeded, unreadInThread } from '@/lib/coach/messageReadsView';
+// COACH-AI Phase 8 (2026-10-07): the availability the coach set (Full / Limited / Out), one line, never a diagnosis
+import { MyAvailabilityLine } from '@/components/coach/my-availability';
+import { AVAILABILITY_API } from '@/components/coach/availability-picker';
 
-export interface TodayApi { today: string; log: string; messages: string | null; warmup?: string | null; cooldown?: string | null; ramp?: string | null }
-export const TODAY_API: TodayApi = { today: '/api/coach/me/today', log: '/api/coach/me/log', messages: '/api/coach/messages', warmup: '/api/coach/me/warmup', cooldown: '/api/coach/me/cooldown', ramp: RAMP_API };
+export interface TodayApi { today: string; log: string; messages: string | null; warmup?: string | null; cooldown?: string | null; ramp?: string | null; availability?: string | null }
+export const TODAY_API: TodayApi = { today: '/api/coach/me/today', log: '/api/coach/me/log', messages: '/api/coach/messages', warmup: '/api/coach/me/warmup', cooldown: '/api/coach/me/cooldown', ramp: RAMP_API, availability: AVAILABILITY_API };
 
 /**
  * Whether the key set is under way on this device (MIRROR-COACH P7 FIX): a set row has something typed in it, or one of
@@ -114,7 +120,7 @@ export const rampEndpointFor = (e: { isKeySet?: boolean | null }, kind: string |
 interface FinishedSession { programId: string; sessionId: string; label: string; exercises: TodayExercise[] }
 
 interface ExerciseDraft { sets: SetDraft[]; clientNote: string; videoUrl: string }
-interface Msg { id: string; body: string; mine: boolean; fromCoach: boolean; createdAt: string }
+interface Msg { id: string; body: string; mine: boolean; fromCoach: boolean; createdAt: string; readAt?: string | null; unread?: boolean }
 
 export function TodayView({ api = TODAY_API }: { api?: TodayApi }) {
   const [data, setData] = useState<TodayPayload | null>(null);
@@ -147,7 +153,10 @@ export function TodayView({ api = TODAY_API }: { api?: TodayApi }) {
       }
       setDrafts(d);
     }
-    if (j.program && api.messages) { const t = await fetch(`${api.messages}?programId=${j.program.id}`); setThread((await t.json()).messages ?? []); }
+    if (j.program && api.messages) {
+      const t = await fetch(`${api.messages}?programId=${j.program.id}`); const msgs: Msg[] = (await t.json()).messages ?? []; setThread(msgs);
+      void markReadIfNeeded(`${api.messages}/read`, j.program.id, msgs);
+    }
   }, [api]);
   useEffect(() => { const u = readWeightUnit(); unitRef.current = u; setUnit(u); void load(); }, [load]);
 
@@ -238,6 +247,7 @@ export function TodayView({ api = TODAY_API }: { api?: TodayApi }) {
   return (
     <div className="space-y-4" data-testid="today">
       {finishedCard}
+      {api.availability && <MyAvailabilityLine endpoint={api.availability} />}
       <NextMorningFollowUps />
       <ReadinessCheckInCard onRead={(r) => setReadiness(r.level)} warmup={todayWarmupKind(today.session.exercises, today.session.kind)} />
       <div className="fel-card rounded-xl p-4" data-session-kind={today.session.kind}>
@@ -290,8 +300,8 @@ export function TodayView({ api = TODAY_API }: { api?: TodayApi }) {
       )}
       {api.messages && (
         <div className="fel-card rounded-xl p-4 space-y-2">
-          <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-white/40"><MessageSquare className="h-3.5 w-3.5" /> Thread with {program.coachName}</div>
-          <div className="space-y-1 max-h-48 overflow-y-auto">{thread.map((m) => <div key={m.id} className={`text-sm rounded-lg px-3 py-1.5 ${m.mine ? 'bg-[#00E5FF]/10 text-white ml-8' : 'bg-white/5 text-white/80 mr-8'}`}>{m.body}</div>)}</div>
+          <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-white/40"><MessageSquare className="h-3.5 w-3.5" /> Thread with {program.coachName}<UnreadPill n={unreadInThread(thread)} /></div>
+          <ThreadMessages thread={thread} />
           <div className="flex gap-2"><input value={msg} onChange={(e) => setMsg(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void send(); }} placeholder="Message your coach" className="flex-1 min-w-0 rounded-lg bg-white/5 border border-white/10 px-2 py-1.5 text-white text-sm" /><button onClick={send} className="rounded-lg border border-white/10 px-3 text-sm text-white/80">Send</button></div>
         </div>
       )}

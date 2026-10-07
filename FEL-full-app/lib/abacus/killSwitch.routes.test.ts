@@ -17,8 +17,11 @@ const prisma = vi.hoisted(() => ({
     cellWisdom: { findMany: vi.fn(async () => [] as unknown[]), create: vi.fn(async () => ({})) },
     projectFile: { findMany: vi.fn(async () => []) },
     lessonProgress: { count: vi.fn(async () => 0) },
-    // PR #29 (merged 3fe481af) reads User.dobYear in the Coach route to ground its minor-safety rule
-    user: { findUnique: vi.fn(async () => ({ dobYear: null })) },
+    // PR #29 (merged 3fe481af) reads User.dobYear in the Coach route to ground its minor-safety rule.
+    // COACH-AI Phase 8 (2026-10-07): the route is now adults-only behind a live AI-sharing grant, so the flag-on
+    // fixture is a verified adult who has agreed (lib/coach/aiChatRoute.test.ts covers the refusals).
+    user: { findUnique: vi.fn(async () => ({ dobYear: 1980 })) },
+    healthConsent: { findMany: vi.fn(async () => [{ scope: 'ai_coach_share', grantedAt: new Date('2026-10-01'), revokedAt: null }]) },
     exercise: { findMany: vi.fn(async () => []) },
   },
 }));
