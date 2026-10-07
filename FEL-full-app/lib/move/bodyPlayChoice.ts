@@ -95,12 +95,13 @@ export function kicksOptInOffer(v: BodyCard & { key: string | null }, spaceStage
 }
 
 /**
- * Train → Drills' wake-up (P9). The space check OFFERS it once the space is set ("2-minute wake-up first?"): the owner's
- * call, routed to the drills when they exist. There is no /play/drills route yet (P9 builds it and sets this), so it
- * is null and the offer is hidden.
+ * Train → Drills' wake-up (P9). The space check OFFERS it once the space is set: the owner's call, routed to the drills.
+ * DRILLS (2026-10-07, Mirror & coaching Phase 6, owner-approved routed change): /play/drills exists, so the offer opens
+ * the Wake-Up's page there (its own tap starts the camera; leaving the game page turns this one off). The label lost its
+ * "2-minute": the Wake-Up is the Playbook's ten-minute protocol (owner: "Wake-up first?", no minute count).
  */
-export const WARMUP_HREF: string | null = null;
-export const WARMUP_LABEL = '2-minute wake-up first?';
+export const WARMUP_HREF: string | null = '/play/drills?drill=wake-up';
+export const WARMUP_LABEL = 'Wake-up first?';
 
 /** The wake-up link to show, once the space is set and only if the drills exist. */
 export function warmupOffer(stage: string | null, href: string | null = WARMUP_HREF): { href: string; label: string } | null {
