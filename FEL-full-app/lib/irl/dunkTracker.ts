@@ -54,7 +54,7 @@ export type DunkRefusal = 'implausible_vertical' | 'implausible_flight' | 'rim_h
 // but named, with its air time, instead of blamed on the camera.
 const RIM_HANG_MIN_AIR_MS = 950;       // TUNE(elijah): feet-off time over this (or vertical over MAX_VERTICAL_CM) is a candidate
 const RIM_HANG_HANDS_MS = 150;         // TUNE(elijah): both wrists above the nose AND hips still for this long = hanging
-const RIM_HANG_HIP_SPEED = 0.15;       // TUNE(elijah): "hips still" = |Δy|/Δt under this, image units/s (a hip at a jump's apex is under it for ~70 ms)
+const RIM_HANG_HIP_SPEED = 0.02;       // TUNE(elijah): "hips still" = |Δy|/Δt under this, image units/s; tight so a parabolic apex never banks RIM_HANG_HANDS_MS, a fixed-hip hang does (was 0.15)
 
 /** What a screen can say about a refused attempt. `airTimeMs` is only read for 'rim_hang'. */
 export function refusalLine(r: DunkRefusal, airTimeMs = 0): string {
