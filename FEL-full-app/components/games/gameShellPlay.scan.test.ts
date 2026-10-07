@@ -175,3 +175,18 @@ describe('the profile failure state is a stop, not a spinner plus a stop', () =>
     expect(profileBlock).toContain(') : null}');
   });
 });
+
+// HOOPS BODY (P10, form-send 2026-10-07): the run's FORM read goes to /api/sessions only through formForPost (null for a
+// minor or an unknown age), read once at the end from the run the shell is ending — never a raw view, never on a refusal path.
+describe('the FORM read rides the session POST, adults only (hoops body P10)', () => {
+  it('handleEnd spreads formForPost(formReadStore.finishRun(run)) into the body, and only when it is non-null', () => {
+    const body = sessionBody();
+    expect(body).toContain('formForPost(formReadStore.finishRun(sessionStore.record()?.runId), st)');
+    expect(body).toMatch(/return form \? \{ form \} : \{\};/);
+    expect(shell).toMatch(/import \{ formReadStore, formForPost \} from '@\/lib\/move\/formRead';/);
+  });
+  it('no other path sends a form field', () => {
+    expect(shell.split('formForPost(').length - 1).toBe(1);
+    expect(shell).not.toMatch(/form:\s*formReadStore/);
+  });
+});

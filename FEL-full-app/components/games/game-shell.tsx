@@ -25,6 +25,7 @@ import { EndScreen } from './end-screen/end-screen';
 import type { EndGoals } from './end-screen/types';
 import { unpaidReason } from '@/lib/sessions/unpaidCopy';
 import { PartyInvite } from '@/components/party/party-invite';   // MULTIPLAYER: the results card's door to the party room
+import { formReadStore, formForPost } from '@/lib/move/formRead';   // HOOPS BODY (P10): the run's FORM read, adults only
 import {
   type CarnivalStop, type CarnivalRunState,
   recordCarnivalResult, clearCarnivalRun,
@@ -297,6 +298,10 @@ function GameShellInner({
           stats: res?.stats,
           ...(arenaMatchId ? { arenaMatchId } : {}),
           played: inputCount.current >= 3 || countedSince(sessionStore.record(), runMark.current) >= 3,
+          // HOOPS BODY (P10): the body's form read for this run — null for a minor or an unknown age (formForPost); the route
+          // bounds it (formSummary.boundFormSummary) and writes it only for a verified, opted-in 18+ account
+          ...(() => { let st: Storage | null = null; try { st = sessionStorage; } catch { /* none */ }
+            const form = formForPost(formReadStore.finishRun(sessionStore.record()?.runId), st); return form ? { form } : {}; })(),
         }),
       }))
         // a refusal (SCORE_INVALID, RUN_MISSING, RUN_EXPIRED…) is a 4xx whose body says why: read it for the card
