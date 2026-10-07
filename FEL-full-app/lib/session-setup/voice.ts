@@ -28,7 +28,7 @@ export const NEXT_UP_SPOKEN = 'Next up!';
 
 const judgesText = (judgeAverage: number): string => (Math.round(judgeAverage * 10) / 10).toFixed(1);
 
-/** The spoken result: "34 inches, judges 8.5" — the on-screen resultLine without the name. */
+/** The spoken result keeps no ± (speech would read it awkwardly); the band is on screen only. "34 inches, judges 8.5" — the on-screen resultLine without the name. */
 export function spokenResultLine(verticalCm: number, judgeAverage: number): string {
   return `${inchesFromCm(verticalCm)} inches, judges ${judgesText(judgeAverage)}`;
 }
@@ -43,8 +43,9 @@ export function goWhenReadyLine(): string {
 }
 
 /** "<name>, 34 inches, judges 8.5" — inches from the measured centimetres, judges as the card average. */
-export function resultLine(name: string, verticalCm: number, judgeAverage: number): string {
-  return `${name}, ${inchesFromCm(verticalCm)} inches, judges ${judgesText(judgeAverage)}`;
+export function resultLine(name: string, verticalCm: number, judgeAverage: number, bandInches?: number): string {
+  const inches = bandInches ? `${inchesFromCm(verticalCm)} ±${bandInches} in` : `${inchesFromCm(verticalCm)} inches`;
+  return `${name}, ${inches}, judges ${judgesText(judgeAverage)}`;
 }
 
 export function judgeAverage(scores: readonly number[]): number {

@@ -30,7 +30,11 @@ export interface TrackerLandmark { x: number; y: number; visibility: number }
 export interface TrackerFrame { landmarks: TrackerLandmark[]; timestampMs: number; present: boolean }
 
 const MIN_VIS = 0.5;              // TUNE(elijah): landmark confidence floor
-const AIRBORNE_RISE = 0.03;       // TUNE(elijah): ankle rise above floor, image units
+const AIRBORNE_RISE = 0.03;       // TUNE(elijah): FALLBACK ankle rise above floor, image units (no usable body span)
+/** Airborne rise as a fraction of the standing hip-to-ankle span. 0.03 image units ÷ a typical ~0.35 span at dunk
+ *  framing ≈ 0.086, so framing like today's reads the same; a farther camera now needs a proportionally smaller rise. */
+const AIRBORNE_RISE_FRACTION = 0.086;  // TUNE(elijah)
+const MIN_SPAN = 0.12;            // a standing span smaller than this is a bad read: use the fixed rise
 const MIN_FLIGHT_MS = 180;        // TUNE(elijah): matches IRLCore MIN_FLIGHT
 const MAX_FLIGHT_MS = 1200;       // TUNE(elijah): matches IRLCore MAX_FLIGHT
 const SETTLE_MS = 500;            // TUNE(elijah): landing = this long re-grounded
@@ -107,6 +111,9 @@ export class DunkTracker {
   private phase: Phase = 'idle';
   private floorY = 0;
   private calibration: number[] = [];
+  private calibrationSpan: number[] = [];
+  private span = 0;
+  private prevLow: { t: number; y: number } | null = null;
   private hipTrail: { t: number; x: number; y: number }[] = [];
   private airFrames: TrackerFrame[] = [];
   private takeoffAt = 0;
@@ -119,7 +126,10 @@ export class DunkTracker {
   reset(): void {
     this.phase = 'idle';
     this.floorY = 0;
+    this.span = 0;
+    this.prevLow = null;
     this.calibration = [];
+    this.calibrationSpan = [];
     this.hipTrail = [];
     this.airFrames = [];
     this.preFrames = [];
@@ -141,6 +151,8 @@ export class DunkTracker {
     this.airFrames = [];
     this.preFrames = [];
     this.calibration = [];
+    this.calibrationSpan = [];
+    this.prevLow = null;
     this.result = null;
     this.refusal = null;
     this.takeoffAt = 0;
@@ -151,6 +163,19 @@ export class DunkTracker {
     }
     this.phase = 'idle';
     this.floorY = 0;
+    this.span = 0;
+  }
+
+  /** Ankle rise that counts as airborne: a fraction of the standing span once known, else the fixed image-unit rise. */
+  private get rise(): number {
+    return this.span >= MIN_SPAN ? AIRBORNE_RISE_FRACTION * this.span : AIRBORNE_RISE;
+  }
+
+  /** Sub-frame time of a threshold crossing between the previous and this frame, by the fraction of the gap crossed. */
+  private crossing(prev: { t: number; y: number } | null, t: number, y: number, line: number): number {
+    if (!prev || prev.y === y || t <= prev.t) return t;
+    const frac = Math.max(0, Math.min(1, (prev.y - line) / (prev.y - y)));
+    return prev.t + frac * (t - prev.t);
   }
 
   get state(): Phase { return this.phase; }
@@ -190,9 +215,12 @@ export class DunkTracker {
         break;
       case 'calibrating':
         this.calibration.push(lowAnkleY);
+        this.calibrationSpan.push(lowAnkleY - hip.y);
         if (this.calibration.length >= 20) {         // ~0.65s of stillness
           this.calibration.sort((a, b) => a - b);
           this.floorY = this.calibration[Math.floor(this.calibration.length / 2)];
+          this.calibrationSpan.sort((a, b) => a - b);
+          this.span = this.calibrationSpan[Math.floor(this.calibrationSpan.length / 2)];
           this.phase = 'ready';
         }
         break;
@@ -200,9 +228,10 @@ export class DunkTracker {
         this.preFrames.push(f);
         if (this.preFrames.length > 20) this.preFrames.shift();
         // both feet off the floor line = airborne
-        if (lowAnkleY < this.floorY - AIRBORNE_RISE) {
+        const line = this.floorY - this.rise;
+        if (lowAnkleY < line) {
           this.phase = 'airborne';
-          this.takeoffAt = f.timestampMs;
+          this.takeoffAt = this.crossing(this.prevLow, f.timestampMs, lowAnkleY, line);
           this.airFrames = [f];
         }
         break;
@@ -210,9 +239,10 @@ export class DunkTracker {
       case 'airborne': {
         this.airFrames.push(f);
         // the first foot back down ends the flight (flight = both feet off)
-        if (lowAnkleY >= this.floorY - AIRBORNE_RISE * 0.5) {
+        const landLine = this.floorY - this.rise * 0.5;
+        if (lowAnkleY >= landLine) {
           this.phase = 'settling';
-          this.landedAt = f.timestampMs;
+          this.landedAt = this.crossing(this.prevLow, f.timestampMs, lowAnkleY, landLine);
         }
         // safety: never settle (occluded landing) — close the attempt anyway
         if (f.timestampMs - this.takeoffAt > MAX_FLIGHT_MS + 1500) {
@@ -225,11 +255,13 @@ export class DunkTracker {
         if (f.timestampMs - this.landedAt >= SETTLE_MS) {
           this.result = this.compute();
           this.phase = 'ready';
+          this.prevLow = { t: f.timestampMs, y: lowAnkleY };
           return this.result;
         }
         break;
       }
     }
+    this.prevLow = { t: f.timestampMs, y: lowAnkleY };
     return null;
   }
 

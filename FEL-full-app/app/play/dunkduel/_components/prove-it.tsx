@@ -12,7 +12,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { setReady } from '@/lib/babylon/core/readyMarker';
 import { Camera, CameraOff, Pause, Play, RotateCcw, SwitchCamera, Trophy, Volume2, VolumeX } from 'lucide-react';
-import { MediaPipePoseAdapter } from '@/lib/babylon/nexus/neuro-mirror/pose/mediapipe-adapter';
+import { MediaPipePoseAdapter, onVideoFrames, type VideoFrameTick } from '@/lib/babylon/nexus/neuro-mirror/pose/mediapipe-adapter';
 import { DunkTracker, scoreIrlDunk, refusalLine, type DunkMetrics, type DunkRefusal } from '@/lib/irl/dunkTracker';
 import { judgeDunk, type JudgeScore } from '@/lib/babylon/core/JudgePanel';
 import { clipWasSaved, downloadBlob } from '@/lib/capture/shareClip';
@@ -34,6 +34,7 @@ import { KIDS_IN_SHOT, mayRecord, recordingOnHandoff, saveClipOnDevice } from '@
 import {
   PLACEMENT_LINES, armAllowed, autoArmReady, dunkFraming, firstAttemptAllowed, newAutoArmGate, shotLight, type FramingLight,
 } from '@/lib/session-setup/framing';
+import { FpsMeter, errorBandInches } from '@/lib/session-setup/accuracy';
 import { endSession, readSession } from '@/lib/session-setup/memory';
 import { adultCsv, adultShareText, type SummaryRow } from '@/lib/session-setup/summary';
 import { ScanSaveCard } from '@/components/privacy/scan-save-card';
@@ -77,7 +78,9 @@ export default function ProveIt({
   const streamRef = useRef<MediaStream | null>(null);
   const adapterRef = useRef<MediaPipePoseAdapter | null>(null);
   const trackerRef = useRef(new DunkTracker());
-  const rafRef = useRef(0);
+  const stopFramesRef = useRef<(() => void) | null>(null);
+  const fpsMeterRef = useRef(new FpsMeter());
+  const cameraFpsRef = useRef(0);
   const liveRef = useRef(false);
   const genRef = useRef(0);
   const facingRef = useRef<'environment' | 'user'>('environment');
@@ -192,7 +195,8 @@ export default function ProveIt({
   const stopAll = useCallback(() => {
     genRef.current++;
     liveRef.current = false;
-    cancelAnimationFrame(rafRef.current);
+    stopFramesRef.current?.();
+    stopFramesRef.current = null;
     stopRecorder(true);
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
@@ -212,6 +216,13 @@ export default function ProveIt({
     const v = videoRef.current;
     if (!v) { stream.getTracks().forEach((t) => t.stop()); return false; }
     v.srcObject = stream;
+    // ask for 60 fps (the assess screen's pattern); a camera that refuses keeps its rate, and the ± band says so
+    const track = stream.getVideoTracks?.()?.[0];
+    cameraFpsRef.current = track?.getSettings?.().frameRate ?? 0;
+    track?.applyConstraints?.({ frameRate: { ideal: 60 } })
+      .then(() => { cameraFpsRef.current = track.getSettings?.().frameRate ?? cameraFpsRef.current; })
+      .catch(() => { /* keep the camera's own rate */ });
+    fpsMeterRef.current = new FpsMeter();
     await v.play();
     return gen === genRef.current;
   }, []);
@@ -347,12 +358,15 @@ export default function ProveIt({
     const preview = stage === 'prop-phone' || stage === 'watching' || stage === 'countdown' || stage === 'paused';
     if (!preview) return;
     liveRef.current = true;
-    const loop = () => {
+    const v0 = videoRef.current;
+    if (!v0) return;
+    const onTick = (tick: VideoFrameTick) => {
       if (!liveRef.current) return;
       const v = videoRef.current;
       const adapter = adapterRef.current;
+      fpsMeterRef.current.push(tick.timestampMs);
       if (v && adapter?.ready) {
-        const frame = adapter.detect(v, performance.now());
+        const frame = adapter.detect(v, tick.timestampMs, { frameId: tick.frameId });
         const check = dunkFraming({ landmarks: frame.landmarks, present: frame.present });
         const nextLight = shotLight(check);
         if (nextLight !== framingRef.current) {
@@ -363,6 +377,7 @@ export default function ProveIt({
         if (stage === 'prop-phone' && attemptedRef.current && !pausedRef.current
           && autoArmReady(gateRef.current, check, performance.now(), true)) {
           liveRef.current = false;
+          stopFramesRef.current?.();
           armNext(false, true);
           return;
         }
@@ -375,15 +390,16 @@ export default function ProveIt({
           else if (st === 'airborne') setRefused(null);
           if (got) {
             liveRef.current = false;
+            stopFramesRef.current?.();
             onMeasured(got);
             return;
           }
         }
       }
-      rafRef.current = requestAnimationFrame(loop);
     };
-    rafRef.current = requestAnimationFrame(loop);
-    return () => { liveRef.current = false; cancelAnimationFrame(rafRef.current); };
+    const stop = onVideoFrames(v0, onTick);
+    stopFramesRef.current = stop;
+    return () => { liveRef.current = false; stop(); };
   }, [armNext, onMeasured, stage]);
 
   useEffect(() => {
@@ -810,7 +826,7 @@ export default function ProveIt({
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 overflow-y-auto bg-black/80 p-4 text-center">
             <div className="text-xl font-bold" style={{ color: GOLD }}>{current.metrics.family}</div>
             <p className="text-base text-white">
-              {resultLine(roster[current.playerIndex]?.name ?? '', current.metrics.verticalCm, judgeAverage(current.scores.map((j) => j.score)))}
+              {resultLine(roster[current.playerIndex]?.name ?? '', current.metrics.verticalCm, judgeAverage(current.scores.map((j) => j.score)), errorBandInches(fpsMeterRef.current.fps || cameraFpsRef.current, current.metrics.verticalCm))}
             </p>
             <p className="text-2xl font-black">{stage === 'paused' ? 'Paused' : `Next up in ${secondsLeft}`}</p>
             {boardRef.current.players[boardRef.current.index] && (
