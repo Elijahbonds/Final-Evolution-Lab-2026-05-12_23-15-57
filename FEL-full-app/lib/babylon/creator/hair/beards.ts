@@ -38,7 +38,7 @@ const full = (x: number, y: number, _z: number, a: number, k: HeadKit, extra = 0
   smooth(cheekY(a, k) + 0.004, cheekY(a, k) - 0.006, y) * smooth(neckEdge(a, k, extra) - 0.004, neckEdge(a, k, extra) + 0.008, y) * sideOk(a) * mouthOpen(x, y, k);
 
 const BEARDS: Record<BeardStyle, BeardDef> = {
-  stubble: { mask: (x, y, z, a, k) => full(x, y, z, a, k), t: 0.0009, dens: 0.5 },
+  stubble: { mask: (x, y, z, a, k) => full(x, y, z, a, k), t: 0.0007, dens: 0.72 },
   short: { mask: (x, y, z, a, k) => full(x, y, z, a, k), t: 0.0045, dens: 0.95 },
   full: { mask: (x, y, z, a, k) => full(x, y, z, a, k, 0.012), t: 0.012, dens: 1, chin: 0.022 },
   long: { mask: (x, y, z, a, k) => full(x, y, z, a, k, 0.014), t: 0.013, dens: 1, chin: 0.07 },
@@ -94,11 +94,12 @@ export function beard(c: Ctx, style: BeardStyle): void {
   }
   c.g.with({ kind: K.beard }, () => c.g.grid(rows, cols, (r, cc) => {
     const { p, m } = pts[r][cc];
-    return { p, dens: def.dens * smooth(0, 0.35, m), shade: 0.82 + 0.18 * coil(p, 90, 0).shade, along: m };
+    // solid colour to the edge (a soft edge blended to a skin colour read as a pale outline); the edge is the cut below
+    return { p, dens: def.dens, shade: (def.t < 0.002 ? 0.7 : 0.82) + 0.18 * coil(p, def.t < 0.002 ? 160 : 90, 0).shade, along: m };
   }, {
     out: (p) => p,
     // leave out the quads with no beard at any corner (the mouth, the bare cheek)
-    skip: (r, cc) => Math.max(pts[r][cc].m, pts[r + 1][cc].m, pts[r][cc + 1].m, pts[r + 1][cc + 1].m) < 0.02,
+    skip: (r, cc) => Math.min(pts[r][cc].m, pts[r + 1][cc].m, pts[r][cc + 1].m, pts[r + 1][cc + 1].m) < 0.3,
   }));
 }
 

@@ -6,6 +6,7 @@
 
 import { angOf, dirOf } from './headField';
 import { DEG } from './headKit';
+import { keyed } from './geo';
 import { K, add, cross, len, mix, norm, perp, scale, sub, type Anchor, type Ctx, type V3 } from './prims';
 import type { HairAcc } from '../../../creator/look/doc';
 
@@ -57,31 +58,28 @@ function hull(c: Ctx): (a: number, b: number) => number {
     map[j * NA + i] = Math.max(map[j * NA + i], Math.hypot(x, y, z));
   }
   return (a, b) => {
-    const i = Math.floor(((a + Math.PI) / (2 * Math.PI)) * NA), j = Math.floor(((b + Math.PI / 2) / Math.PI) * NB);
-    let m = 0;
-    for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
-      const jj = j + dj; if (jj < 0 || jj >= NB) continue;
-      m = Math.max(m, map[jj * NA + ((i + di) % NA + NA) % NA]);
-    }
-    return m;
+    const i = Math.floor(((a + Math.PI) / (2 * Math.PI)) * NA), j = Math.min(NB - 1, Math.max(0, Math.floor(((b + Math.PI / 2) / Math.PI) * NB)));
+    return map[j * NA + ((i % NA) + NA) % NA];
   };
 }
 
 function headband(c: Ctx): void {
-  const k = c.k;
+  const k = c.k, L = k.L;
   const h = hull(c);
-  // over the head from ear to ear, in a plane tilted forward of the crown
-  const U = norm([0, 0.8, 0.6]), X: V3 = [1, 0, 0];
-  const pts: V3[] = [];
-  const n = 22;
-  for (let i = 0; i <= n; i++) {
-    const phi = mix(-1, 1, i / n) * 98 * DEG;
-    const d = norm(add(scale(U, Math.cos(phi)), X, Math.sin(phi)));
-    const [a, b] = angOf(d[0], d[1], d[2]);
-    const r = Math.max(h(a, b), k.r(a, b, true) + 0.002) + 0.004;
-    pts.push(scale(dirOf(a, b), r));
+  // a ring round the head: across the front at the hairline, over the ears, low at the back (a sweatband / an elastic
+  // band); it rides on the hair where there is hair and on the scalp where there is none, smoothed so it never zig-zags
+  const n = 48;
+  const ring: { a: number; y: number; r: number }[] = [];
+  for (let i = 0; i < n; i++) {
+    const a = -Math.PI + (i / n) * 2 * Math.PI;
+    const y = keyed([[0, L.hairFront + 0.006], [60, L.ear.top + 0.034], [90, L.ear.top + 0.02], [180, L.ear.top - 0.004]], Math.abs(a) / DEG);
+    const b = k.betaAt(a, y, true);
+    ring.push({ a, y, r: Math.max(h(a, b), k.r(a, b, true) + 0.002) });
   }
-  c.g.with({ kind: K.acc }, () => c.g.tube(pts, () => 0.011, 6, { profile: (_t, phi) => 1 - 0.7 * Math.abs(Math.sin(phi)) }));
+  const smoothR = ring.map((_, i) => { let sum = 0; for (let d = -2; d <= 2; d++) sum += ring[(i + d + n) % n].r; return sum / 5; });
+  const pts: V3[] = ring.map((q, i) => { const b = k.betaAt(q.a, q.y, true); return scale(dirOf(q.a, b), Math.max(q.r, Math.min(smoothR[i], q.r + 0.004)) + 0.003); });
+  pts.push(pts[0], pts[1]);
+  c.g.with({ kind: K.acc }, () => c.g.tube(pts, () => 0.0075, 6, { profile: (_t, phi) => 1 - 0.6 * Math.abs(Math.sin(phi)) }));
 }
 
 /** Add the accessories that fit (the caller has already filtered them to the style). */

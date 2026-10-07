@@ -100,6 +100,8 @@ export function resetHairCaches(): void { cache.clear(); }
 type RGB = [number, number, number];
 const rgb = (hex: string): RGB => { const c = Color3.FromHexString(/^#[0-9A-F]{6}$/i.test(hex) ? hex : '#FFFFFF'); return [c.r, c.g, c.b]; };
 const mixRGB = (a: RGB, b: RGB, t: number): RGB => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+/** How much darker than the flat skin swatch the lit, textured skin reads (TUNED 2026-10-07, by eye in the harness). */
+export const SKIN_SHADE = 0.42;
 const sm = (e0: number, e1: number, x: number) => { const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0))); return t * t * (3 - 2 * t); };
 
 /** The colour inputs, as a key (a change here rewrites the colour buffers only). */
@@ -112,7 +114,13 @@ export const hairColourKey = (h: ResolvedHair): string => JSON.stringify([h.colo
  */
 export function hairColours(geo: HairGeo, H: HeadField, h: ResolvedHair): Float32Array {
   const n = geo.verts, out = new Float32Array(n * 4);
-  const hair = rgb(h.colour), skin = rgb(h.skin), beard = rgb(h.beardColour), acc = rgb(h.accColour);
+  // the skin a shaved side or stubble lets through: the skin tone as the lit, textured skin reads, which is well under the
+  // flat swatch (seen 2026-10-07: the swatch itself made every fade and beard edge a pale outline)
+  const skin = mixRGB(rgb(h.skin), [0, 0, 0], SKIN_SHADE);
+  const hair = rgb(h.colour), beard = rgb(h.beardColour), acc = rgb(h.accColour);
+  // 'tips' on a style with strands is their ends; on a short cut (no strands) it is a frosted top
+  let strands = false;
+  for (let v = 0; v < n && !strands; v++) if (geo.kind[v] === K.hair && geo.along[v] > 0.5) strands = true;
   // 'Streaks' always shows its streaks: a lighter hair colour when the player has not picked a second one
   const second: RGB | null = h.colour2 ? rgb(h.colour2) : h.style === 'Streaks' ? mixRGB(hair, [1, 1, 1], 0.5) : null;
   const tone = h.colour2 ? h.tone : 'streaks';
@@ -126,7 +134,7 @@ export function hairColours(geo: HairGeo, H: HeadField, h: ResolvedHair): Float3
       if (second) {
         const y = geo.hf[v * 3 + 1];
         let t = 0;
-        if (tone === 'tips') t = geo.along[v] > 0 ? sm(0.55, 0.78, geo.along[v]) : sm(L.top - 0.05, L.top - 0.015, y) * 0.9;
+        if (tone === 'tips') t = strands ? sm(0.55, 0.78, geo.along[v]) : sm(L.top - 0.05, L.top - 0.015, y) * 0.9;
         else if (tone === 'streaks') t = geo.streak[v] ? 1 : Math.sin(Math.atan2(geo.hf[v * 3], geo.hf[v * 3 + 2]) * 9) > 0.72 ? 0.9 : 0;
         else if (tone === 'top') t = sm(L.ear.top + 0.03, L.ear.top + 0.05, y);
         else t = 1 - sm(L.ear.top - 0.012, L.ear.top + 0.01, y);
