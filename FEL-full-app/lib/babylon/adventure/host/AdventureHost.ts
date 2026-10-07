@@ -68,6 +68,12 @@ export interface AdventureHostOptions {
   loadout?: SpellLoadout | null;
   /** Every body passes through this as it enters the world (the ownership test's write tracker). Default: itself. */
   instrument?: (a: AdventureActor) => AdventureActor;
+  /**
+   * PHASE B (2026-10-07): the story's gates on fusion and flight (story/flags.ts storyGates: live reads of
+   * `save.story.flags`), handed to A3's partner system. Absent = open: the test yard and the BR keep the whole toolkit.
+   */
+  fusionUnlocked?: () => boolean;
+  flightUnlocked?: () => boolean;
 }
 
 /** What a tick listener sees (the host's "events" stage, after the systems). */
@@ -140,7 +146,10 @@ export class AdventureHost {
     const partnerId = this.partnerId;
     const def = this.partnerDef;
     this.partner = def && partnerId
-      ? createPartnerSystem({ playerId: this.playerId, partnerId, def, stats: this.stats, seed: seed ^ 0xa3, onBleedOut: (id) => o.onBleedOut?.(id) })
+      ? createPartnerSystem({
+        playerId: this.playerId, partnerId, def, stats: this.stats, seed: seed ^ 0xa3, onBleedOut: (id) => o.onBleedOut?.(id),
+        fusionUnlocked: o.fusionUnlocked, flightUnlocked: o.flightUnlocked,
+      })
       : null;
     const partner = this.partner;
     this.movement = createMovementSystem({

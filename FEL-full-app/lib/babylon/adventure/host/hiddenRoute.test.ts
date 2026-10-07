@@ -39,3 +39,65 @@ describe('/dev/adventure: a hidden link on the live site', () => {
     expect(PARTY_MODES.some((m) => m.id === 'adventure')).toBe(false);
   });
 });
+
+// ADVENTURE C (2026-10-07): /play/adventure-br is UNLISTED the same way (owner rule for new routes): served by its URL,
+// noindex, linked from nothing, and its mode registered but not enabled.
+describe('/play/adventure-br: unlisted', () => {
+  const BR_PAGE = path.join(ROOT, 'app/play/adventure-br/page.tsx');
+
+  it('is served (no NODE_ENV gate, no notFound, no sign-in wall) and asks never to be indexed', () => {
+    const src = stripComments(read(BR_PAGE));
+    expect(src).not.toMatch(/NODE_ENV/);
+    expect(src).not.toMatch(/notFound/);
+    expect(src).not.toMatch(/redirect\(/);
+    expect(src).toMatch(/robots:\s*\{\s*index:\s*false,\s*follow:\s*false/);
+  });
+
+  it('nothing links to it: no source outside its own folder names the route (comments aside)', () => {
+    const files = sourceFiles(ROOT, ['app', 'components', 'lib'], fs, path)
+      .filter((f) => !f.split(path.sep).join('/').startsWith('app/play/adventure-br/'));
+    expect(files.length).toBeGreaterThan(500);
+    const linkers = files.filter((f) => /\/play\/adventure-br\b/.test(stripComments(read(path.join(ROOT, f)))));
+    expect(linkers).toEqual([]);
+  });
+
+  it('its mode is registered for the page and the probe, and enabled nowhere', () => {
+    expect(MODES.adventure_br).toBeTruthy();
+    expect(ENABLED_BABYLON_MODES.has('adventure_br')).toBe(false);
+    expect(AGENT_MODES.some((m) => m.id === 'adventure_br')).toBe(false);
+    expect(PARTY_MODES.some((m) => m.id === 'adventure_br')).toBe(false);
+  });
+});
+
+// PHASE B (2026-10-07): /play/adventure, the story, is UNLISTED the same way (owner decision 2026-10-06: new routes are
+// reachable by URL, noindex, linked from no menu, picker or sitemap until the owner says). Its own case, beside the
+// yard's: served (no notFound, no environment gate), noindex, and named by no source outside its folder. The route
+// pattern stops at `adventure` so the BR's own route (Phase C's `/play/adventure-br`) is not this one.
+describe('/play/adventure: the story, unlisted', () => {
+  const STORY_PAGE = path.join(ROOT, 'app/play/adventure/page.tsx');
+  const STORY_ROUTE = /\/play\/adventure(?![-\w])/;
+
+  it('is served (no NODE_ENV gate, no notFound, no sign-in redirect) and asks never to be indexed', () => {
+    const src = stripComments(read(STORY_PAGE));
+    expect(src).not.toMatch(/NODE_ENV/);
+    expect(src).not.toMatch(/notFound/);
+    expect(src).not.toMatch(/redirect\(/);
+    expect(src).toMatch(/robots:\s*\{\s*index:\s*false,\s*follow:\s*false/);
+  });
+
+  it('nothing links to it: no source outside its own folder names the route (comments aside)', () => {
+    const files = sourceFiles(ROOT, ['app', 'components', 'lib'], fs, path)
+      .filter((f) => !f.split(path.sep).join('/').startsWith('app/play/adventure/'));
+    expect(files.length).toBeGreaterThan(500);
+    const linkers = files.filter((f) => STORY_ROUTE.test(stripComments(read(path.join(ROOT, f)))));
+    expect(linkers).toEqual([]);
+  });
+
+  it('the mode stays out of every enabled list (the story mounts MODES.adventure by key, by its own route)', () => {
+    expect(ENABLED_BABYLON_MODES.has('adventure')).toBe(false);
+    expect(AGENT_MODES.some((m) => m.id === 'adventure')).toBe(false);
+    expect(PARTY_MODES.some((m) => m.id === 'adventure')).toBe(false);
+    expect(stripComments(read(path.join(ROOT, 'app/sitemap.ts')))).not.toMatch(/adventure/i);
+  });
+});
+

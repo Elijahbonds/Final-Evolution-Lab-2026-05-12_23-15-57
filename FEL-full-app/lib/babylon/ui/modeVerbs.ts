@@ -288,6 +288,7 @@ const VERBS: Record<string, Omit<ModeVerbConfig, 'rStick' | 'boost'>> = {
   // ADVENTURE A4 (2026-10-06, the plan's "Default controls"): the face diamond is the run and the fight; lock, cast,
   // guard, slow-time, partner and fuse ride the d-pad and the Adventure's own touch radial (adventure/host/touchRadial)
   adventure: verbs({ A: { label: 'JUMP', emit: A('A') }, B: { label: 'DASH', emit: A('B') }, X: { label: 'LIGHT', emit: A('X') }, Y: { label: 'HEAVY', emit: A('Y') } }),
+  adventure_br: verbs({ A: { label: 'JUMP', emit: A('A') }, B: { label: 'DASH', emit: A('B') }, X: { label: 'LIGHT', emit: A('X') }, Y: { label: 'HEAVY', emit: A('Y') } }),   // ADVENTURE C: the BR plays on the same buttons
 
   default: verbs({ A: { label: 'ACTION', emit: A('A') } }),
 };
