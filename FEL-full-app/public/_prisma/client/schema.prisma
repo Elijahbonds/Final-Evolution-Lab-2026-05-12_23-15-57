@@ -1810,6 +1810,7 @@ model ProgramMessage {
   authorId  String
   body      String
   createdAt DateTime        @default(now())
+  readAt    DateTime?
 
   @@index([programId, createdAt])
 }
@@ -2281,18 +2282,34 @@ model CoachInvite {
 /// before any programming exists — which is the right way round, because you write the program
 /// for somebody who is already there.
 model CoachClient {
-  id        String    @id @default(cuid())
-  coachId   String
-  coach     User      @relation("CoachOf", fields: [coachId], references: [id], onDelete: Cascade)
-  clientId  String
-  client    User      @relation("ClientOf", fields: [clientId], references: [id], onDelete: Cascade)
+  id           String             @id @default(cuid())
+  coachId      String
+  coach        User               @relation("CoachOf", fields: [coachId], references: [id], onDelete: Cascade)
+  clientId     String
+  client       User               @relation("ClientOf", fields: [clientId], references: [id], onDelete: Cascade)
   /// How they got here, for the coach's own history: invite | manual.
-  via       String    @default("invite")
+  via          String             @default("invite")
   /// Set when the relationship ends; the row survives so neither side loses the history.
-  endedAt   DateTime?
-  createdAt DateTime  @default(now())
+  endedAt      DateTime?
+  createdAt    DateTime           @default(now())
+  availability CoachAvailability?
 
   @@unique([coachId, clientId])
+  @@index([clientId])
+}
+
+/// Coach <-> athlete availability: one row while the athlete is Limited or Out. Full is no row. No free text, by design.
+model CoachAvailability {
+  coachId  String
+  clientId String
+  /// 'limited' | 'out'.
+  status   String
+  /// Expected return day 'YYYY-MM-DD', or null.
+  returnBy String?
+  setAt    DateTime    @default(now())
+  link     CoachClient @relation(fields: [coachId, clientId], references: [coachId, clientId], onDelete: Cascade, onUpdate: Cascade)
+
+  @@id([coachId, clientId])
   @@index([clientId])
 }
 
