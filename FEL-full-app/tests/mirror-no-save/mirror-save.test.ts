@@ -88,6 +88,17 @@ describe('STATIC: mirror-harness.tsx', () => {
     expect(code).not.toMatch(/localStorage|sessionStorage|indexedDB|document\.cookie/);
   });
 
+  // MIRROR-PROGRESS (2026-10-07; owner decision 1: under-18s keep their progress ON THE DEVICE ONLY). The one exception to
+  // the test above: "vs your last 3" for anyone whose sets are not saved is kept on the phone by lib/mirror/deviceProgress.ts
+  // (one key, the headline number and a time; lib/mirror/deviceProgress.test.ts pins what it holds and that it never sends).
+  // The harness reaches storage only through it: one record, in the device branch, and one forget.
+  it('its only storage is the phone-only progress history, recorded only on the device path', () => {
+    expect(code.match(/recordDeviceProgress\(/g)).toHaveLength(1);
+    expect(code.match(/forgetDeviceProgress\(/g)).toHaveLength(1);
+    const at = code.indexOf('recordDeviceProgress(');
+    expect(code.slice(at - 200, at)).toMatch(/else if \(source === 'device'\) \{/);
+  });
+
   it('a screen that was not sent keeps its local score, is marked unsaved, and says NOT_SAVED_ON_DEVICE', () => {
     const at = code.indexOf("mirrorSave(canSaveScan, fetch, '/api/mirror/screen'");
     const tail = code.slice(at, at + 1400);

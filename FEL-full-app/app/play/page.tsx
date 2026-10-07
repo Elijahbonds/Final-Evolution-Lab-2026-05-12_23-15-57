@@ -11,6 +11,10 @@ import { SHELF_LEDE } from '@/lib/nav/families';
 import { VenueStrip } from '@/components/shell/venue-strip';
 // The season pass came off the retired hub with the venues. It is what playing earns, so it belongs on Play.
 import { SeasonPassTrack } from '@/components/season-pass-track';
+// MIRROR-PROGRESS (2026-10-07): a coached athlete's door to today's session, first on the page (nothing for anyone else)
+import { TodayCard } from '@/components/coach/today-card';
+import { todayCardFor } from '@/lib/coach/todayCard';
+import { prisma } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,6 +22,8 @@ export const dynamic = 'force-dynamic';
 export default async function PlayPage() {
   const session = await getServerSession(authOptions);
   if (!session) redirect(loginPath('/play'));
+  const me = (session.user as { id?: string } | undefined)?.id;
+  const todayCard = me ? await todayCardFor(prisma, me) : null;
   return (
     <TabPage
       eyebrow="Play"
@@ -54,6 +60,7 @@ export default async function PlayPage() {
         </div>
       }
     >
+      <TodayCard view={todayCard} />
       <PlayShelf />
       <VenueStrip />
       <div className="mt-10 empty:mt-0"><SeasonPassTrack /></div>
