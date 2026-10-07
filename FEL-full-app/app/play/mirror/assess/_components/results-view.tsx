@@ -16,17 +16,17 @@
 // UNDER 18, OR "RATHER NOT SAY": never these cards. Their results never reach this address (nothing is kept for them:
 // lib/screen/store.ts), so this is only a guard: a kid's age gets the kid view, their number and nothing else.
 import Link from 'next/link';
-import { Play } from 'lucide-react';
 import { priorities, type CheckBand, type ScreenSummary } from '@/lib/screen/checks';
 import { BAND_WORDS, cueOf, checkById, GRADED_CHECKS, type BandWord, type CheckId } from '@/lib/screen/PROPOSED-thresholds';
 import { isKid, type AgeBand } from '@/lib/screen/age';
 import { PRIVACY_PATH } from '@/lib/screen/routes';
 import {
-  DEMO_COMING, DISCLAIMER, DONE_CLEAR, KINDLE_BOOK_LABEL, KINDLE_BOOK_URL, NOTHING_TO_RANK, PRIVACY_LINK, SCREENSHOT_LINE,
+  DISCLAIMER, DONE_CLEAR, KINDLE_BOOK_LABEL, KINDLE_BOOK_URL, NOTHING_TO_RANK, PRIVACY_LINK, SCREENSHOT_LINE,
   SCREEN_TEST_NAMES, WIN_LINE,
 } from '@/lib/screen/copy';
 import { BandChip, EarlyTag, PreviewLabel, StopLine, primaryBtn, quietBtn, BAND_COLOUR, UNREAD_WORD } from './screen-ui';
 import { KidResults } from './kid-results';
+import { DrillDemo } from './drill-demo';   // EDU-LINKS (2026-10-07): the demo slot, filled with the 3D ExerciseDemo
 
 type TestId = keyof typeof SCREEN_TEST_NAMES;
 /** The checks the start card lists, in check order (A3-3). */
@@ -107,8 +107,8 @@ export function ResultsView({ summary, age, onClear, onRunAgain, trainWithElijah
                   </>
                 ) : null}
                 {top ? (
-                  <div data-demo-slot className="mt-2 flex items-center gap-2 rounded-xl border border-dashed border-white/20 px-3 py-2 text-[16px] text-white/60">
-                    <Play aria-hidden className="h-4 w-4" /> {DEMO_COMING}
+                  <div data-demo-slot className="mt-2">
+                    <DrillDemo test={test} drill={row ? cueOf(row.id) : SCREEN_TEST_NAMES[test]} />
                   </div>
                 ) : null}
               </li>
