@@ -52,7 +52,7 @@ export function buildWorld1(): StoryWorldSpec {
       block('w1.wall', W.x0, W.x1, W.z0, W.z1, W.h, -14),
       // the field's cover (line of sight breaks for the casters, something to fight around)
       block('w1.cover.a', -12, -9, -296, -292, 2.2), block('w1.cover.b', 9, 12, -250, -246, 2.2),
-      block('w1.cover.c', -11, -8, -214, -210, 2.2),
+      block('w1.cover.c', -15, -12, -204, -200, 2.2),
       // the arena's side walls
       block('w1.arena.w', -30, -29, -180, -110, 2), block('w1.arena.e', 29, 30, -180, -110, 2),
     ],
