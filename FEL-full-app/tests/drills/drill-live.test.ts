@@ -44,7 +44,9 @@ vi.mock('@/lib/move/bodyPlay', () => ({
   bodyPlay: { confirmGrownUp: async () => { h.confirm++; return true; }, collapse: () => {} },
 }));
 
-import { DrillLive, NOTHING_SAVED_LINE, PAUSED_LINE } from '@/app/play/drills/_components/drill-live';
+import { DrillLive, HIDE_WARMUP_OFFER_CSS, NOTHING_SAVED_LINE, PAUSED_LINE } from '@/app/play/drills/_components/drill-live';
+import { WARMUP_HREF } from '@/lib/move/bodyPlayChoice';
+import { DRILLS_PATH } from '@/lib/drills/route';
 import { GrownUpStep } from '@/app/play/mirror/assess/_components/gate-steps';
 import { SpaceCheckPanel } from '@/components/games/body-play';
 import { mount } from '@/tests/helpers/hookRuntime';
@@ -94,6 +96,16 @@ describe('the drill screen', () => {
     expect(panel.props.variant).toBe('ready');
     panel.props.onStart();
     expect(h.calls).toContain('go');
+  });
+
+  it('the space check\'s own "Wake-up first?" link (a link to this page) is hidden inside the drill\'s panel', async () => {
+    const m = mount(() => DrillLive({ drill: SAFE_LANDING, onLeave: () => {} }));
+    await settle();
+    const [box] = findAll(m.tree as ReactNode, (el) => el.props['data-drill-space'] !== undefined);
+    const [style] = findAll(box.props.children as ReactNode, (el) => el.type === 'style');
+    expect(style.props.children).toBe(HIDE_WARMUP_OFFER_CSS);
+    expect(WARMUP_HREF!.startsWith(DRILLS_PATH)).toBe(true);
+    expect(HIDE_WARMUP_OFFER_CSS).toBe('[data-drill-space] a[href^="/play/drills"]{display:none}');
   });
 
   it('an under-18 or unknown age: the Mirror\'s grown-up step, before the space check; Continue is body play\'s confirm', async () => {

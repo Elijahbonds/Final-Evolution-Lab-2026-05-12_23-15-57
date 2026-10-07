@@ -23,6 +23,7 @@ import { CUE_LOOKAHEAD_SEC, type HudCue } from '@/lib/babylon/core/danceTracks';
 import type { Drill } from '@/lib/drills/chart';
 import type { DrillResult } from '@/lib/drills/DrillRunner';
 import type { LiveDrillView } from '@/lib/drills/liveDrill';
+import { DRILLS_PATH } from '@/lib/drills/route';
 import { useLiveDrill } from './use-live-drill';
 
 export const RESULT_ESTIMATE_LINE = 'A camera estimate of the moves it saw, not a measurement.';
@@ -30,6 +31,8 @@ export const NOTHING_SAVED_LINE = 'Nothing from this drill is saved or sent. The
 export const PAUSED_LINE = 'Paused: the camera went off when you left the page.';
 export const STEP_BACK_LINE = 'Step back into the picture: the drill waits for you.';
 export const STEP_IN_LINE = 'Step into the picture to start the clock.';
+/** Hides the space check's own "Wake-up first?" link (lib/move/bodyPlayChoice.ts WARMUP_HREF) inside this page's panel. */
+export const HIDE_WARMUP_OFFER_CSS = `[data-drill-space] a[href^="${DRILLS_PATH}"]{display:none}`;
 
 /** The cue lane: the next targets sliding to the line, each named and coloured by its move (the dance lane's idea). */
 function CueLane({ cues }: { cues: readonly HudCue[] }) {
@@ -145,7 +148,10 @@ export function DrillLive({ drill, onLeave }: { drill: Drill; onLeave: () => voi
       <button type="button" onClick={() => bodyPlay.collapse(false)}
         className="rounded-full border border-[#00FF9D]/50 px-3 py-1 text-[12px] font-bold text-[#00FF9D]">Space check on · Show</button>
     ) : (
-      <div className="relative min-h-[78vh] overflow-hidden rounded-2xl">
+      <div className="relative min-h-[78vh] overflow-hidden rounded-2xl" data-drill-space="">
+        {/* body play's panel offers "Wake-up first?" once the space is set (WARMUP_HREF, a link to this page): here the
+            player is already in a drill, so that one link is hidden (the panel is body play's, read-only) */}
+        <style>{HIDE_WARMUP_OFFER_CSS}</style>
         <SpaceCheckPanel onStart={() => handle?.live.go()} variant={view.phase === 'paused' ? 'paused' : 'ready'} />
       </div>
     );

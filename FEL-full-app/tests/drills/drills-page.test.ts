@@ -16,7 +16,10 @@ const h = vi.hoisted(() => ({
   ctxThrows: false,
 }));
 vi.mock('next-auth', () => ({ getServerSession: async () => (h.userId ? { user: { id: h.userId } } : null) }));
-vi.mock('next/navigation', () => ({ redirect: (to: string) => { throw new Error(`NEXT_REDIRECT ${to}`); } }));
+vi.mock('next/navigation', () => ({
+  redirect: (to: string) => { throw new Error(`NEXT_REDIRECT ${to}`); },
+  useRouter: () => ({ refresh: () => {} }),
+}));
 vi.mock('@/lib/auth', () => ({ authOptions: {} }));
 vi.mock('@/lib/db', () => ({
   prisma: new Proxy({}, {
@@ -44,7 +47,10 @@ import TrainPage from '@/app/train/page';
 import { ChapterReader } from '@/components/education/chapter-reader';
 import { chapterByNumber } from '@/lib/education/course';
 import { NOTE_COPY } from '@/lib/coach/warmup';
-import { ROUTE_DRILLS } from '@/lib/drills/route';
+import { LANDING_UNLOCK_LIVE, ROUTE_DRILLS } from '@/lib/drills/route';
+import { drillsAccess } from '@/lib/drills/access';
+import { LANDING_CHECK_HREF } from '@/lib/coach/protocolGate';
+import { DrillsApp } from '@/app/play/drills/_components/drills-app';
 
 const ADULT: WarmupContext = {
   isYouth: false, painDecision: null, zone: null, screen: 'none', screenAt: null, hardStopped: false,
@@ -181,5 +187,48 @@ describe('linked from /train and from the Playbook', () => {
   it('the reader mounts the link beside the camera link (one import, one line)', () => {
     const src = readFileSync('components/education/chapter-reader.tsx', 'utf8');
     expect(src).toMatch(/<DrillsLink lessonId=\{id\} \/>/);
+  });
+});
+
+describe('"Do the 1-minute landing check to unlock" (owner, 2026-10-07: keep the jump gate, offer the way through it)', () => {
+  const LANDING = { ...ADULT, jumpGate: { closed: true, why: 'Jumps and drops wait for a landing check: the jump test in the Quick Screen.', href: LANDING_CHECK_HREF } };
+  const app = (ctx: WarmupContext, drillId: string | null, unlockLive?: boolean) => renderToStaticMarkup(createElement(DrillsApp, {
+    access: drillsAccess(ctx), drillId, lessons: [], dobYear: 1990,
+    ...(unlockLive === undefined ? {} : { unlockLive }),
+  }));
+
+  it('OFF as shipped (no landing check reaches the gate today: lib/drills/route.ts) — the page shows no unlock button', async () => {
+    expect(LANDING_UNLOCK_LIVE).toBe(false);
+    h.ctx = LANDING;
+    expect(await render()).not.toContain('data-drill-landing-unlock');
+    expect(await render('pogo-bilateral')).not.toContain('data-drill-landing-unlock');
+    // the note's own link already goes in at the Quick Screen's front page, never past its age step
+    expect(await render()).toMatch(/href="\/screen"/);
+    expect(await render()).not.toMatch(/href="\/play\/mirror\/assess/);
+  });
+
+  it('switched on: on the shelf, on a held drill\'s page and on the Wake-Up\'s page with its jumps left out — each to /screen', () => {
+    for (const [id, where] of [[null, 'shelf'], ['pogo-bilateral', 'held'], ['safe-landing', 'held'], ['wake-up', 'trimmed']] as const) {
+      const html = app(LANDING, id, true);
+      expect(hrefOf(html, 'data-drill-landing-unlock'), `${where} ${id}`).toBe('/screen');
+      expect(text(html)).toContain('Do the 1-minute landing check to unlock');
+    }
+    // a drill the gate does not hold: no button on its page
+    expect(app(LANDING, 'countermovement-geometry', true)).not.toContain('data-drill-landing-unlock');
+  });
+
+  it('switched on, it is still only for the landing check: not for youth, a health answer, or a gate that is open', () => {
+    expect(app({ ...LANDING, isYouth: true }, null, true)).not.toContain('data-drill-landing-unlock');
+    expect(app({ ...ADULT, jumpGate: { closed: true, why: 'x', href: '/play/mirror' } }, null, true)).not.toContain('data-drill-landing-unlock');
+    expect(app(ADULT, null, true)).not.toContain('data-drill-landing-unlock');
+  });
+
+  it('coming back re-reads the gate: the page is rendered per request, and the client refreshes it on return', () => {
+    const page = readFileSync('app/play/drills/page.tsx', 'utf8');
+    expect(page).toMatch(/export const dynamic = 'force-dynamic'/);
+    const client = readFileSync('app/play/drills/_components/drills-app.tsx', 'utf8');
+    expect(client).toMatch(/if \(!access\.landingCheck\) return;/);
+    expect(client).toMatch(/visibilitychange[\s\S]*router\.refresh\(\)|router\.refresh\(\)[\s\S]*visibilitychange/);
+    expect(client).toMatch(/pageshow/);
   });
 });

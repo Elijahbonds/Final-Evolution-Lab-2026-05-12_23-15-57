@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { drillsAccess, drillToRun, CAREFUL_ACCESS, type DrillsAccess } from './access';
 import { ROUTE_DRILLS } from './route';
 import { WAKE_UP, COUNTERMOVEMENT_GEOMETRY, POGO_BILATERAL, POGO_UNILATERAL, SAFE_LANDING, drillById } from './drills';
+import { LANDING_CHECK_HREF } from '../coach/protocolGate';
+import { SCREEN_HOME } from '../screen/routes';
 import { NOTE_COPY, jumpGateNote, phaseImpact, FALLBACK_WARMUP_CONTEXT, type WarmupContext } from '../coach/warmup';
 
 // Mirror & coaching plan Phase 6: the warm-up's gates (lib/coach/warmup.ts generateWarmup) on the drills page. Nothing
@@ -10,7 +12,7 @@ import { NOTE_COPY, jumpGateNote, phaseImpact, FALLBACK_WARMUP_CONTEXT, type War
 type Ctx = Pick<WarmupContext, 'isYouth' | 'painDecision' | 'hardStopped' | 'jumpGate' | 'unavailable'>;
 const ADULT_OPEN: Ctx = { isYouth: false, painDecision: null, hardStopped: false, jumpGate: { closed: false, why: '', href: null } };
 const GATE_WHY = 'Jumps wait for a landing check from the last 4 weeks.';
-const ADULT_GATED: Ctx = { ...ADULT_OPEN, jumpGate: { closed: true, why: GATE_WHY, href: '/play/mirror/assess' } };
+const ADULT_GATED: Ctx = { ...ADULT_OPEN, jumpGate: { closed: true, why: GATE_WHY, href: LANDING_CHECK_HREF } };
 const gate = (a: DrillsAccess, id: string) => a.drills.find((d) => d.id === id)!;
 
 describe('the drills on the route: the Playbook\'s ch. 5 wake-up and ch. 6 jump-and-land drills', () => {
@@ -31,6 +33,7 @@ describe('an adult with every check open: every drill as written', () => {
     expect(a.note).toBeNull();
     for (const d of ROUTE_DRILLS) {
       expect(gate(a, d.id)).toEqual({ id: d.id, gate: 'open', phases: d.phases.map((p) => p.id), heldPhases: [] });
+      expect(a.landingCheck).toBe(false);
       expect(drillToRun(a, d.id)).toBe(drillById(d.id));        // the chart itself, never a copy
     }
   });
@@ -55,12 +58,31 @@ describe('jumps and landings wait, by the warm-up\'s rules', () => {
     expect(run.phases.every((p) => WAKE_UP.phases.includes(p))).toBe(true);   // the chart's own phases, unedited
   };
 
-  it('an adult whose jump gate is shut (no landing check yet: most adults at launch) — the gate\'s own line and link', () => {
+  it('an adult whose jump gate waits on a landing check — the gate\'s own line; its link is the Quick Screen\'s FRONT page', () => {
     const a = drillsAccess(ADULT_GATED);
     shapeHeld(a);
     expect(a.impactHeld).toBe('jump_gate');
     expect(a.note).toBe(jumpGateNote(GATE_WHY));
-    expect(a.noteHref).toBe('/play/mirror/assess');
+    expect(ADULT_GATED.jumpGate.href).toBe(LANDING_CHECK_HREF);   // the gate's own link goes past the screen's age step…
+    expect(a.noteHref).toBe('/screen');                         // …this page's goes in at its front door (SCREEN_HOME)
+    expect(a.noteHref).toBe(SCREEN_HOME);
+    expect(a.landingCheck).toBe(true);
+  });
+
+  it('a gate shut for a health answer (not the landing check): its own link, and no landing-check offer', () => {
+    const a = drillsAccess({ ...ADULT_OPEN, jumpGate: { closed: true, why: 'Jumps and drops wait for your health answers.', href: '/play/mirror' } });
+    expect(a.impactHeld).toBe('jump_gate');
+    expect(a.noteHref).toBe('/play/mirror');
+    expect(a.landingCheck).toBe(false);
+  });
+
+  it('the landing-check offer is only ever for the jump gate: never youth, pain, an unread context or a hard stop', () => {
+    const landing = { closed: true, why: GATE_WHY, href: LANDING_CHECK_HREF };
+    expect(drillsAccess({ ...ADULT_OPEN, isYouth: true, jumpGate: landing }).landingCheck).toBe(false);
+    expect(drillsAccess({ ...ADULT_OPEN, painDecision: 'stop_see_clinician', jumpGate: landing }).landingCheck).toBe(false);
+    expect(drillsAccess({ ...ADULT_OPEN, unavailable: true, jumpGate: landing }).landingCheck).toBe(false);
+    expect(drillsAccess({ ...ADULT_OPEN, hardStopped: true, jumpGate: landing }).landingCheck).toBe(false);
+    expect(drillsAccess(ADULT_OPEN).landingCheck).toBe(false);
   });
 
   it('an answer that does not say the gate is open is shut', () => {

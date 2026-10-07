@@ -25,8 +25,12 @@ export interface DrillsAccess {
   impactHeld: Extract<HeldReason, 'youth_impact' | 'pain' | 'jump_gate' | 'unavailable'> | null;
   /** The one line that says so (the warm-up's words), or null. */
   note: string | null;
-  /** Where that line points (the gate's own link: the health answers, the landing check), or null. */
+  /** Where that line points (the gate's own link: the health answers; for the landing check, the Quick Screen's front
+   *  page), or null. */
   noteHref: string | null;
+  /** The jumps wait on P8's jump gate for a LANDING CHECK (its lead reason is landing_*): the one wait a player can end
+   *  here and now, with the Quick Screen's jump test (the owner's "landing check to unlock" button, 2026-10-07). */
+  landingCheck: boolean;
   drills: DrillAccess[];
 }
 

@@ -11,6 +11,7 @@
 // chapterHref) so the drills page does not pull the whole imported book into its bundle; tests/drills holds it to the
 // course's real chapters.
 import type { Drill } from './chart';
+import { SCREEN_HOME } from '../screen/routes';
 import { COUNTERMOVEMENT_GEOMETRY, POGO_BILATERAL, POGO_UNILATERAL, SAFE_LANDING, WAKE_UP, drillById } from './drills';
 
 export const DRILLS_PATH = '/play/drills';
@@ -47,3 +48,23 @@ export function drillSourceLine(d: Pick<Drill, 'source'>): string {
 export function drillMinutes(d: Pick<Drill, 'phases'>): number {
   return Math.max(1, Math.ceil(d.phases.reduce((s, p) => s + p.durationSec, 0) / 60));
 }
+
+// ── the landing check (owner decision, 2026-10-07: keep the jump gate; offer "do the landing check to unlock") ─────────
+
+/** Where the landing check starts: the Quick Screen's FRONT page, whose first button is the jump test (about a minute).
+ *  Never a deep link past it: the screen's age question and grown-up step come first for every visitor. */
+export const LANDING_CHECK_ENTRY = SCREEN_HOME;
+export const LANDING_UNLOCK_LABEL = 'Do the 1-minute landing check to unlock';
+
+/**
+ * The unlock button is built, and OFF, because today it cannot unlock anything (measured 2026-10-07):
+ *   · P8's jump gate reads its landing check from WorkoutScan rows of kind 'mirror_assessment' (lib/coach/
+ *     protocolGateServer.ts, LANDING_SCANS_READ), and the only writer of that kind is POST /api/mirror/assessment;
+ *   · nothing in app/ or components/ calls that route: the Quick Screen sends no assessment at all ("No assessment POST",
+ *     app/play/mirror/assess/_components/assess-app.tsx), and its verified-adult save (lib/privacy/screenHistoryClient.ts)
+ *     writes kind 'rescreen' with check bands and the jump height, no T5 landing metrics.
+ * So a player who did the landing check would come back to the same held drills. Turn this on once a verified adult's
+ * Quick Screen jump test stores its T5 record where the gate reads it (the screen lanes' files); the button, its places
+ * and the re-read on return are built and tested with it on.
+ */
+export const LANDING_UNLOCK_LIVE = false;

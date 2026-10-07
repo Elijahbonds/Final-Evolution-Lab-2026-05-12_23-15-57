@@ -6,10 +6,14 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { ArrowLeft, BookOpen, Camera, Clock } from 'lucide-react';
 import { setBodyPlayDobYear } from '@/lib/move/bodyPlayGrownUp';
 import { drillById } from '@/lib/drills/drills';
-import { DRILLS_PATH, ROUTE_DRILLS, drillChapterHref, drillHref, drillMinutes, drillSourceLine } from '@/lib/drills/route';
+import {
+  DRILLS_PATH, LANDING_CHECK_ENTRY, LANDING_UNLOCK_LABEL, LANDING_UNLOCK_LIVE, ROUTE_DRILLS, drillChapterHref, drillHref,
+  drillMinutes, drillSourceLine,
+} from '@/lib/drills/route';
 import { drillToRun, type DrillAccess, type DrillsAccess } from '@/lib/drills/gate';
 import type { BookLesson } from '@/lib/drills/playbookLinks';
 import { DrillDemo } from './drill-demo';
@@ -39,10 +43,27 @@ function Note({ access }: { access: DrillsAccess }) {
   );
 }
 
-function Shelf({ access }: { access: DrillsAccess }) {
+/**
+ * "Do the 1-minute landing check to unlock" (owner, 2026-10-07): where jumps wait on the jump gate's landing check — the
+ * shelf, a held drill's page, the Wake-Up's page with its jump phases left out. A plain anchor to the Quick Screen's
+ * front page (its age step first); coming back re-reads the gate (DrillsApp). Shown only while LANDING_UNLOCK_LIVE: today
+ * no landing check reaches the gate (lib/drills/route.ts says why), and a button that cannot unlock is not offered.
+ */
+export function LandingUnlock({ access, live = LANDING_UNLOCK_LIVE }: { access: Pick<DrillsAccess, 'landingCheck'>; live?: boolean }) {
+  if (!live || !access.landingCheck) return null;
+  return (
+    <a href={LANDING_CHECK_ENTRY} data-drill-landing-unlock
+      className="inline-flex items-center gap-2 rounded-2xl border border-[#00E5FF]/40 bg-[#00E5FF]/[0.07] px-4 py-2.5 text-sm font-black text-[#00E5FF] hover:border-[#00E5FF]/70">
+      {LANDING_UNLOCK_LABEL}
+    </a>
+  );
+}
+
+function Shelf({ access, unlockLive }: { access: DrillsAccess; unlockLive?: boolean }) {
   return (
     <div className="space-y-4">
       <Note access={access} />
+      {access.drills.some((d) => d.gate !== 'open') && <LandingUnlock access={access} live={unlockLive} />}
       <ul className="grid gap-3 sm:grid-cols-2">
         {ROUTE_DRILLS.map((d) => {
           const a = access.drills.find((x) => x.id === d.id)!;
@@ -92,7 +113,7 @@ function BookWords({ lessons, chapterHref }: { lessons: BookLesson[]; chapterHre
   );
 }
 
-function DrillPage({ id, access, lessons }: { id: string; access: DrillsAccess; lessons: BookLesson[] }) {
+function DrillPage({ id, access, lessons, unlockLive }: { id: string; access: DrillsAccess; lessons: BookLesson[]; unlockLive?: boolean }) {
   const drill = drillById(id)!;
   const a = access.drills.find((x) => x.id === id)!;
   const run = useMemo(() => drillToRun(access, id), [access, id]);
@@ -111,6 +132,7 @@ function DrillPage({ id, access, lessons }: { id: string; access: DrillsAccess; 
       </header>
       {a.gate !== 'open' && <Note access={access} />}
       {a.gate === 'trimmed' && <p className="text-[13px] text-white/60" data-drill-held-phases>Left out today: {a.heldPhases.join(', ')}.</p>}
+      {a.gate !== 'open' && <LandingUnlock access={access} live={unlockLive} />}
       <ol className="space-y-1.5" data-drill-phases>
         {(run ?? drill).phases.map((p) => (
           <li key={p.id} className="rounded-xl bg-white/[0.03] px-3 py-2 text-[13px] text-white/75">
@@ -132,9 +154,22 @@ function DrillPage({ id, access, lessons }: { id: string; access: DrillsAccess; 
   );
 }
 
-export function DrillsApp({ access, drillId, lessons, dobYear }: {
+export function DrillsApp({ access, drillId, lessons, dobYear, unlockLive }: {
   access: DrillsAccess; drillId: string | null; lessons: BookLesson[]; dobYear: number | null;
+  /** Tests only: the landing-unlock button with LANDING_UNLOCK_LIVE's value overridden. */
+  unlockLive?: boolean;
 }) {
+  const router = useRouter();
+  // back from the landing check (a return to this tab, or the browser's Back restoring the page): read the gate again,
+  // so jumps it now opens show unlocked without a manual reload
+  useEffect(() => {
+    if (!access.landingCheck) return;
+    const again = () => { if (document.visibilityState === 'visible') router.refresh(); };
+    const shown = (e: PageTransitionEvent) => { if (e.persisted) router.refresh(); };
+    document.addEventListener('visibilitychange', again);
+    window.addEventListener('pageshow', shown);
+    return () => { document.removeEventListener('visibilitychange', again); window.removeEventListener('pageshow', shown); };
+  }, [access.landingCheck, router]);
   // body play's grown-up step reads the account's birth year when the page has it (lib/move/bodyPlayGrownUp): a verified
   // adult is not asked; under 18 or none on file, the step comes before the camera
   useEffect(() => { setBodyPlayDobYear(dobYear); return () => setBodyPlayDobYear(undefined); }, [dobYear]);
@@ -146,5 +181,7 @@ export function DrillsApp({ access, drillId, lessons, dobYear }: {
       </div>
     );
   }
-  return drillId ? <DrillPage key={drillId} id={drillId} access={access} lessons={lessons} /> : <Shelf access={access} />;
+  return drillId
+    ? <DrillPage key={drillId} id={drillId} access={access} lessons={lessons} unlockLive={unlockLive} />
+    : <Shelf access={access} unlockLive={unlockLive} />;
 }

@@ -24,13 +24,15 @@ import {
   NOTE_COPY, WAKE_UP_IMPACT_GATED, WARMUP_FOLLOWS_JUMP_GATE, jumpGateNote, phaseImpact, type WarmupContext,
 } from '../coach/warmup';
 import { isHardStop, isStopOutcome } from '../health/painRule';
+import { LANDING_CHECK_HREF } from '../coach/protocolGate';
+import { LANDING_CHECK_ENTRY } from './route';
 
 export { drillToRun, type DrillAccess, type DrillGate, type DrillsAccess } from './gate';
 
 export function drillsAccess(ctx: Pick<WarmupContext, 'isYouth' | 'painDecision' | 'hardStopped' | 'jumpGate' | 'unavailable'>): DrillsAccess {
   if (ctx.hardStopped) {
     return {
-      stopped: true, impactHeld: null, note: null, noteHref: null,
+      stopped: true, impactHeld: null, note: null, noteHref: null, landingCheck: false,
       drills: ROUTE_DRILLS.map((d) => ({ id: d.id, gate: 'held', phases: [], heldPhases: d.phases.map((p) => p.name) })),
     };
   }
@@ -64,7 +66,11 @@ export function drillsAccess(ctx: Pick<WarmupContext, 'isYouth' | 'painDecision'
   else if (impactHeld === 'unavailable') note = NOTE_COPY.context_unavailable;
   else if (impactHeld === 'youth_impact') note = NOTE_COPY.youth_impact;
   else if (impactHeld === 'jump_gate') { note = jumpGateNote(ctx.jumpGate?.why ?? ''); noteHref = ctx.jumpGate?.href ?? null; }
-  return { stopped: false, impactHeld, note, noteHref, drills };
+  // the gate's landing link is the screen's inside page (protocolGate LANDING_CHECK_HREF): from here it goes in at the
+  // Quick Screen's front door, so its age question and grown-up step come first (Phase 1's rule for every screen link)
+  const landingCheck = impactHeld === 'jump_gate' && noteHref === LANDING_CHECK_HREF;
+  if (landingCheck) noteHref = LANDING_CHECK_ENTRY;
+  return { stopped: false, impactHeld, note, noteHref, landingCheck, drills };
 }
 
 /** The access when nothing could be read: the careful context (youth rules, the gate shut), said as such. */
