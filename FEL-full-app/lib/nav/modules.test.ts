@@ -50,6 +50,11 @@ const NOT_IMPORTED: Record<string, string> = {
   'lib/ui/hintLiterals.ts': 'test support — the hint-literal reader controlsScreen.scan.test.ts sorts every mode\'s `hint` with (console-view lane); tests are not counted as consumers',
   'lib/babylon/combat/difficultySim.ts': 'test support — the combat difficulty harness "trimmed for the regression test" (its header); difficultyBands.test.ts pins each duel mode\'s bands with it (improve-combat lane); tests are not counted as consumers',
   'lib/mirror/fixtures/storedRows.ts': 'test support — the stored screen rows the coach and attention tests read, built as the Mirror route writes them; tests are not counted as consumers',
+  // ADVENTURE (2026-10-06): each Phase A lane tests its sim against a headless rig built from contracts.ts (the plan's
+  // rule: no lane imports another's code or a scene); A4's sandbox tests drive A1's. Same class as sourceScan above.
+  'lib/babylon/adventure/movement/testkit.ts': 'test support — A1\'s headless world, actors and 60 Hz runner; tests are not counted as consumers',
+  'lib/babylon/adventure/combat/testArena.ts': 'test support — A2\'s headless arena with a contract-built stand-in for A1; tests are not counted as consumers',
+  'lib/babylon/adventure/partner/testRig.ts': 'test support — A3\'s headless party rig with stand-ins for A1 and A2; tests are not counted as consumers',
   // ECONOMY-SESSIONS-HARDEN (2026-09-28), FIX 2 step 7: written, tested and deliberately NOT imported by any route (FE PM:
   // staged until the live database is back). lib/sessions/sessionsHardening.scan.test.ts fails the day a route imports it
   // without that GO; wiring it is two lines per sessions route, then this line goes.

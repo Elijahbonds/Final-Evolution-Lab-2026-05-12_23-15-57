@@ -158,7 +158,12 @@ describe('every mode has its body profile', () => {
   it('no orphan rows: every row names a registered, enabled mode, once', () => {
     const rows = Object.values(BODY_PROFILES);
     expect(rows.filter((p) => !(p.key in MODES) || !ENABLED_BABYLON_MODES.has(p.key)).map((p) => p.key)).toEqual([]);
-    expect(rows.length).toBe(Object.keys(MODES).length);
+    // test changed (ADVENTURE A4, 2026-10-06): this was rows === every registered mode, which held only while every
+    // registered mode was also enabled. A DEV-ONLY mode (registered for /dev/mode, not enabled, no player route) plays
+    // session-only (resolveBodyProfile's fallback) and has no row; each one is named here, so a new gap still fails.
+    const DEV_ONLY = ['adventure'];
+    for (const k of DEV_ONLY) expect(ENABLED_BABYLON_MODES.has(k), `${k} is enabled: it needs its body row`).toBe(false);
+    expect(rows.length).toBe(Object.keys(MODES).length - DEV_ONLY.length);
     expect(new Set(rows.map((p) => p.key)).size).toBe(rows.length);
   });
 });
