@@ -16,6 +16,7 @@ import { chapterProgress, lessonId, nextChapterHref } from '@/lib/education/cour
 // Mirror movement links to the camera, and the chapter check (owner decision 6: shards at 80%) sits under the recap.
 import { movementForLesson } from '@/lib/education/lessonMovement';
 import { CameraLink } from './camera-link';
+import { DrillsLink } from '@/components/drills/drills-link';
 import { ChapterCheck } from './chapter-check';
 
 export function ChapterReader({ chapter, filmFor }: { chapter: Chapter; filmFor?: Record<string, string> }) {
@@ -162,6 +163,8 @@ export function ChapterReader({ chapter, filmFor }: { chapter: Chapter; filmFor?
 
         {/* Learn it, then check it on camera (lib/education/lessonMovement.ts). */}
         {movement && <div className="mt-6"><CameraLink movement={movement} /></div>}
+        {/* …and run its drill on camera (lib/drills/playbookLinks.ts; Mirror & coaching Phase 6) */}
+        {id && <DrillsLink lessonId={id} />}
       </article>
 
       <div className="mt-5 flex items-center gap-3">
