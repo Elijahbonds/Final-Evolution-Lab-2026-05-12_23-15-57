@@ -31,8 +31,10 @@ async function gateOrFalse(userId: string | undefined, gate: (userId: string) =>
 // MIRROR-MOVES P2 (2026-10-07): `?pattern=<tab>` opens that tab (lib/mirror/patternParam.ts) — the Form Check and the
 // Playbook's "Check it on camera" links. Read here, on the server, and handed to the harness as its first tab; signed out,
 // the login round-trip keeps it (only a known tab is carried).
-export default async function MirrorPage({ searchParams }: { searchParams?: { pattern?: string | string[] } } = {}) {
-  const initialPattern = tabFromParam(searchParams?.pattern);
+// (`props` is required for Next's PageProps check — an optional one types as `| undefined`, which the build rejects — and read
+// with `?.` so a bare MirrorPage() call, as the tests make, still renders the default tab.)
+export default async function MirrorPage(props: { searchParams?: { pattern?: string | string[] } }) {
+  const initialPattern = tabFromParam(props?.searchParams?.pattern);
   const session = await getServerSession(authOptions);
   if (!session) {
     // a known tab rides along in ?next= (patternParam.ts names only the Mirror's own tabs, so nothing unknown is carried)
