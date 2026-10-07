@@ -34,11 +34,12 @@ const UA = 'AgeScreenTest/1.0';
 // Advanced for intentional schema landings (MIRROR-COACH ServedExercise; ECONOMY-CAPS runId/agentRun;
 // ADULT-OPTIN-AB04 ScanSaveOptIn at 9ca276ac; COACH-STORE-V1 Instructor, ProgramAccess, Booking, CallSignal,
 // CoachStoreReferral; pinned at the PR #161 lane sync merge dd50d6f1, the first commit carrying both; ADVENTURE-B
-// prisma/pending/2026-10-07-adventure-save.sql, a pending file only — no schema.prisma change — at 70a65f45;
-// ADVENTURE-SAVE-MODEL (PR #197) AdventureSave model matching the applied table, at e8be09a9).
+// prisma/pending/2026-10-07-adventure-save.sql at 70a65f45; ADVENTURE-SAVE-MODEL (PR #197) AdventureSave model matching
+// the applied table, at e8be09a9; COACH-AI Phase 8 prisma/pending/2026-10-07-coach-ai-{1,2}-*.sql (pending SQL only) at
+// 377a4c09 — all of them together first at the integration-3 merge of lane/finish-release).
 // AGE-SCREEN originally pinned the pre-age-screen tip so that PR could not smuggle a schema change; every
 // intentional schema PR must bump this to the commit that contains its prisma/ files, or CI stays red.
-const PARENT = 'e8be09a93112bf9db0d7bfff69f6ca6741bd90e9';
+const PARENT = 'c6f58eeda60b821cec52cacb94e915255d0c4bf7';
 
 /** Resolve a diff base for the schema-ban check when CI's checkout is shallow. */
 function resolvePrismaDiffBase(): string {

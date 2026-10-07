@@ -11,12 +11,18 @@ import { ProgramBuilder, type BuilderCatalogueItem } from '@/components/coach/pr
 import { CoverageLegend, CoverageStrip } from '@/components/coach/coverage-strip';
 import type { CoverageStrip as CoverageStripData } from '@/lib/coach/coverage';
 import type { ProgramTree } from '@/lib/coach/loop';
+// COACH-AI Phase 8 (2026-10-07): read markers (unread per program, "N new", "Seen") — nothing shows until the pending
+// SQL is applied (lib/coach/messageReads.ts) — and each athlete's availability (Full / Limited / Out).
+import { ThreadMessages, UnreadPill } from '@/components/coach/thread-messages';
+import { clearProgram, markReadIfNeeded, unreadBadge, unreadInThread, type ThreadMsg, type UnreadView } from '@/lib/coach/messageReadsView';
+import { AVAILABILITY_API, AvailabilityPicker } from '@/components/coach/availability-picker';
+import { availabilityLine, type AvailabilityView } from '@/lib/coach/availability';
 
 interface Program { tree: ProgramTree; role: 'coach' | 'client' | null; clientName: string; clientId?: string; completedSessionIds: string[]; plan: { status: string; goalText: string } | null }
 type Catalogue = BuilderCatalogueItem;
 interface InboxLog { id: string; exercise: string; prescribed: string; /** MIRROR-COACH P8 FIX: the easier step the gate served on this slot, said. */ servedLine?: string | null; actualSets: number | null; actualReps: string | null; actualLoad: string | null; rpe: number | null; setLines?: string[]; clientNote: string | null; videoUrl: string | null; coachComment: string | null }
 interface InboxItem { id: string; completedAt: string; program: { id: string; name: string }; session: string; clientName: string; logs: InboxLog[] }
-interface Msg { id: string; body: string; mine: boolean; fromCoach: boolean }
+type Msg = ThreadMsg;
 interface RosterRow { clientId: string; name: string; programs: { id: string; name: string; isActive: boolean }[]; card: { slug: string; published: boolean; rarity: string; prq: number; topScore: number; wins: number } | null; prq: Record<string, number> | null; prqDelta: Record<string, number> | null; sessions: number; wins: number; resiliency: { attempts: number; retryRate: number }; games?: number; gamesAtCap?: boolean; coachedSessions?: number; coverage?: CoverageStripData | null }
 
 export function ClientsView() {
@@ -28,6 +34,10 @@ export function ClientsView() {
   const [thread, setThread] = useState<Msg[]>([]);
   const [msg, setMsg] = useState('');
   const [roster, setRoster] = useState<RosterRow[]>([]);
+  const [unread, setUnread] = useState<UnreadView | null>(null);
+  // null until the server says the feature is on (the pending SQL applied); then every roster row gets the picker
+  const [availability, setAvailability] = useState<Record<string, AvailabilityView> | null>(null);
+  const [linked, setLinked] = useState<string[]>([]);
 
   const load = useCallback(async () => {
     const [p, c, i, ro] = await Promise.all([fetch('/api/coach/programs').then((r) => r.json()), fetch('/api/coach/programs/exercises').then((r) => r.json()), fetch('/api/coach/inbox').then((r) => r.json()), fetch('/api/coach/roster').then((r) => r.json())]);
@@ -37,7 +47,17 @@ export function ClientsView() {
     if (!selected && mine[0]) setSelected(mine[0].tree.id);
   }, [selected]);
   useEffect(() => { void load(); }, [load]);
-  useEffect(() => { if (!selected) return; fetch(`/api/coach/messages?programId=${selected}`).then((r) => r.json()).then((j) => setThread(j.messages ?? [])); }, [selected]);
+  useEffect(() => { fetch('/api/coach/messages/unread').then((r) => (r.ok ? r.json() : null)).then((j) => setUnread(j)).catch(() => {}); }, []);
+  useEffect(() => { fetch(AVAILABILITY_API).then((r) => (r.ok ? r.json() : null)).then((j) => { if (j?.available) { setAvailability(j.byClient ?? {}); setLinked(Array.isArray(j.linked) ? j.linked : []); } }).catch(() => {}); }, []);
+  useEffect(() => {
+    if (!selected) return;
+    fetch(`/api/coach/messages?programId=${selected}`).then((r) => r.json()).then((j) => {
+      const t: Msg[] = j.messages ?? [];
+      setThread(t);
+      // the thread is on screen: the client's messages in it are read now (the "N new" stays for this visit)
+      void markReadIfNeeded('/api/coach/messages/read', selected, t).then((did) => { if (did) setUnread((u) => clearProgram(u, selected)); });
+    });
+  }, [selected]);
 
   // true when the builder saved it (MIRROR-COACH P3: the screen panel marks a corrective "In Prep" only then)
   const builder = async (programId: string, body: Record<string, unknown>): Promise<boolean> => {
@@ -84,6 +104,13 @@ export function ClientsView() {
               <div className="text-white/50 truncate">{r.prq ? Object.entries(r.prq).slice(0, 4).map(([k, v]) => `${k.slice(0, 3)} ${Math.round(v)}${r.prqDelta?.[k] ? ` (${r.prqDelta[k] > 0 ? '+' : ''}${Math.round(r.prqDelta[k])})` : ''}`).join(' · ') : 'no PRQ yet'}</div>
               {/* the six-pattern strip, last 7 days; absent when this coach has no active program for them */}
               {r.coverage && <CoverageStrip strip={r.coverage} />}
+              {availability && linked.includes(r.clientId) && (
+                <AvailabilityPicker
+                  clientId={r.clientId}
+                  value={availability[r.clientId] ?? { status: 'full', returnBy: null }}
+                  onSaved={(v) => { setAvailability((a) => ({ ...(a ?? {}), [r.clientId]: v })); toast.success(`${r.name}: ${availabilityLine(v, 'coach')}`); }}
+                />
+              )}
             </div>
             {r.card?.published ? <a href={`/card/${r.card.slug}`} target="_blank" rel="noreferrer" className="shrink-0 rounded-md border border-[#00E5FF]/40 px-2 py-1 text-[#00E5FF]">card · {r.card.rarity}</a> : <span className="shrink-0 text-white/30">no public card</span>}
           </div>
@@ -121,7 +148,7 @@ export function ClientsView() {
       <div className="fel-card rounded-xl p-4 space-y-3">
         <div className="text-[11px] uppercase tracking-wider text-white/40">Programs I coach</div>
         {programs.length === 0 && <div className="text-sm text-white/50">Draft a Plan for a mentee in Camp — its milestones become the program you build here.</div>}
-        <div className="flex gap-2 flex-wrap">{programs.map((p) => <button key={p.tree.id} onClick={() => setSelected(p.tree.id)} className={`rounded-lg px-3 py-1.5 text-xs border ${selected === p.tree.id ? 'border-[#00E5FF]/50 text-[#00E5FF] bg-[#00E5FF]/10' : 'border-white/10 text-white/70'}`}>{p.clientName} · {p.tree.name}</button>)}</div>
+        <div className="flex gap-2 flex-wrap">{programs.map((p) => <button key={p.tree.id} onClick={() => setSelected(p.tree.id)} className={`rounded-lg px-3 py-1.5 text-xs border ${selected === p.tree.id ? 'border-[#00E5FF]/50 text-[#00E5FF] bg-[#00E5FF]/10' : 'border-white/10 text-white/70'}`}>{p.clientName} · {p.tree.name}<UnreadPill n={unreadBadge(unread, p.tree.id)} /></button>)}</div>
         {/* The screen's correctives, offered before the blank builder below them: the coach came here to write
             work for this athlete, and the athlete's own screen already says what the work should be. */}
         {prog?.clientId && (
@@ -151,8 +178,8 @@ export function ClientsView() {
       </div>
       {prog && (
         <div className="fel-card rounded-xl p-4 space-y-2">
-          <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-white/40"><MessageSquare className="h-3.5 w-3.5" /> Thread with {prog.clientName}</div>
-          <div className="space-y-1 max-h-48 overflow-y-auto">{thread.map((m) => <div key={m.id} className={`text-sm rounded-lg px-3 py-1.5 ${m.mine ? 'bg-[#00E5FF]/10 text-white ml-8' : 'bg-white/5 text-white/80 mr-8'}`}>{m.body}</div>)}</div>
+          <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-white/40"><MessageSquare className="h-3.5 w-3.5" /> Thread with {prog.clientName}<UnreadPill n={unreadInThread(thread)} /></div>
+          <ThreadMessages thread={thread} />
           <div className="flex gap-2"><input value={msg} onChange={(e) => setMsg(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void send(); }} placeholder="Message your client" className="flex-1 rounded-lg bg-white/5 border border-white/10 px-2 py-1.5 text-white text-sm" /><button onClick={send} className="rounded-lg border border-white/10 px-3 text-sm text-white/80">Send</button></div>
         </div>
       )}
