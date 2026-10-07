@@ -46,6 +46,11 @@ describe('the chip', () => {
     expect(chipLabel({ ...base, pattern: 'lunge', lungeStage: 'left' })).toBe('left leg');
     expect(chipLabel({ ...base, pattern: 'lunge', lungeStage: 'right' })).toBe('right leg');
     expect(chipLabel({ ...base, pattern: 'lunge', lungeStage: 'review' })).toBe('Review');
+    // MIRROR-MOVES P2: the side-on sets — waiting to be side-on first, then the stage
+    expect(chipLabel({ ...base, pattern: 'hinge', hingeStage: 'setup' })).toBe('Get side-on');
+    expect(chipLabel({ ...base, pattern: 'hinge' })).toBe('Get side-on');
+    expect(chipLabel({ ...base, pattern: 'pushup', pushupStage: 'work' })).toBe('work');
+    expect(chipLabel({ ...base, pattern: 'hinge', hingeStage: 'review', pushupStage: 'check' })).toBe('review');
     expect(lungeChip('left')).toBe('left leg');
     expect(lungeChip('review')).toBe('Review');
   });
@@ -54,7 +59,8 @@ describe('the chip', () => {
 describe('the harness', () => {
   const h = readFileSync(new URL('../../app/play/mirror/_components/mirror-harness.tsx', import.meta.url), 'utf8');
   it('renders the chip from chipLabel, not a ternary that ends in squatStage', () => {
-    expect(h).toContain('{chipLabel({ pattern, phase, jumpState, squatStage, lungeStage: lungeSession.stage, runner })}');
+    // MIRROR-MOVES P2: the hinge's and the push-up's stages ride along
+    expect(h).toContain('{chipLabel({ pattern, phase, jumpState, squatStage, lungeStage: lungeSession.stage, runner, hingeStage: hingeSession.stage, pushupStage: pushupSession.stage })}');
     expect(h).not.toMatch(/: pattern === 'jump' \? \(jumpState === 'ready'/);
   });
 

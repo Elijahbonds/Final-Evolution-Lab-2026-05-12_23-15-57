@@ -22,6 +22,7 @@ import {
   type CreatorCloth, type ClothKind, type ClothDefaults,
   type CreatorDoc, type CreatorPart, type PaintLayer, type Vec3, type ColourSlot, type CreatorEyes, type CreatorFlags,
   type CreatorSlotV2, type SlotBody, type SlotFrame, type SlotPresentation,
+  HAIR_TONES, HAIR_ACCS, BEARD_STYLES, MAX_HAIR_ACCS, HAIR_DEFAULTS, type CreatorHair,
 } from './doc';
 import {
   sanitizeJersey, sanitizeFaceSliders, getWearable, SLOTS as WEARABLE_SLOTS,
@@ -215,7 +216,41 @@ export function sanitizeCreatorDoc(raw: unknown, maxChars: number = MAX_DOC_CHAR
   // phase 4e: code-built clothes (stored only when there is one, so a phase 1–4d doc sanitises to exactly what it was)
   const clothes = sanitizeClothes(raw.clothes);
   if (clothes.length) doc.clothes = clothes;
+  // 2026-10-07: hair extras (stored only when something is set, so an older doc sanitises to exactly what it was)
+  const hair = sanitizeHairExtras(raw.hair);
+  if (hair) doc.hair = hair;
   return JSON.stringify(doc).length > maxChars ? null : doc;
+}
+
+/** The hair extras block (doc.ts CreatorHair, 2026-10-07). Every field optional and kept only when it means something: a
+ *  tone only with a second colour (and not the default 'tips'), an accessory colour only with an accessory (and not the
+ *  default gold), a beard colour only with a beard. Accessories are unique, known, at most MAX_HAIR_ACCS, in HAIR_ACCS
+ *  order (so the same set always serialises the same). Undefined when nothing survives. */
+export function sanitizeHairExtras(raw: unknown): CreatorHair | undefined {
+  if (!isObj(raw)) return undefined;
+  const out: CreatorHair = {};
+  const colour2 = sanitizeHex(raw.colour2);
+  if (colour2) {
+    out.colour2 = colour2;
+    const tone = pick(raw.tone, HAIR_TONES);
+    if (tone && tone !== HAIR_DEFAULTS.tone) out.tone = tone;
+  }
+  if (Array.isArray(raw.acc)) {
+    const want = new Set(raw.acc.slice(0, HAIR_ACCS.length * 2).filter((a): a is string => typeof a === 'string'));
+    const acc = HAIR_ACCS.filter((a) => want.has(a)).slice(0, MAX_HAIR_ACCS);
+    if (acc.length) {
+      out.acc = acc;
+      const accColour = sanitizeHex(raw.accColour);
+      if (accColour && accColour !== HAIR_DEFAULTS.accColour) out.accColour = accColour;
+    }
+  }
+  const beard = pick(raw.beard, BEARD_STYLES);
+  if (beard) {
+    out.beard = beard;
+    const beardColour = sanitizeHex(raw.beardColour);
+    if (beardColour) out.beardColour = beardColour;
+  }
+  return Object.keys(out).length ? out : undefined;
 }
 
 // ── code-built clothes (phase 4e) ───────────────────────────────────────────────────────────────────────────────────

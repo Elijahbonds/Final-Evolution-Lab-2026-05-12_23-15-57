@@ -37,7 +37,7 @@ export const SHOTS: Record<StudioShot, ShotDef> = {
 export const BODY_HEIGHT = 1.8;
 
 /** The Closet's editor tabs (components/closet-view.tsx). */
-export type StudioTab = 'face' | 'shape' | 'parts' | 'paint' | 'clothes' | 'wear' | 'skins';
+export type StudioTab = 'face' | 'hair' | 'shape' | 'parts' | 'paint' | 'clothes' | 'wear' | 'skins';
 
 /** What is selected on the body, as far as the camera cares. */
 export type StudioFocus =
@@ -98,7 +98,8 @@ export function framingFor(tab: StudioTab, focus: StudioFocus): Framing {
   if (tab === 'clothes' && focus?.kind === 'cloth') return { shot: shotForCloth(focus), facing: 0 };
   if (tab === 'parts' && focus?.kind === 'part') return { shot: shotForBone(focus.bone), facing: facingFor(focus) };
   if (tab === 'paint' && focus?.kind === 'layer') return { shot: shotForRegion(focus.region), facing: facingFor(focus) };
-  return { shot: tab === 'face' ? 'bust' : 'full', facing: null };
+  // 2026-10-07: the Hair tab frames the bust too (long hair and a hijab's drape reach the chest)
+  return { shot: tab === 'face' || tab === 'hair' ? 'bust' : 'full', facing: null };
 }
 
 export interface CameraPose { targetY: number; radius: number; beta: number }

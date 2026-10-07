@@ -63,7 +63,7 @@ export const APPEARANCE: SectionTable<AnyRow> = {
   rows: [
     face('skinTone', 'Skin Tone', SKIN_TONES, 'Twelve swatches spanning the full range. Applied through the tint system, so garments and ink sit on top of it correctly.'),
     face('faceShape', 'Face Shape', FACE_SHAPES, 'The base skull shape the fine-tune morphs blend on top of.'),
-    face('hairStyle', 'Hair', HAIR_STYLES, 'Textured, protective and cultural styles are first-class here, not an afterthought list.'),
+    face('hairStyle', 'Hair', HAIR_STYLES, 'Four packs — textured & protective, fades & cuts, long & tied, game flair — every style its own shape, built to fit your head. Textured, protective and cultural styles are first-class here, not an afterthought list. Beards, a second colour and accessories are on the Closet\'s Hair tab.'),
     face('hairColor', 'Hair Colour', HAIR_COLORS, 'Natural shades plus the three the Nexus palette uses.'),
     // IMPROVE (2026-10-06), research item 3: these glossaries promised 3D geometry the body does not have (seven morphs, no
     // iris material — faceMorphs.faceOptionRenders). They say what is true now; the Closet labels the same options.

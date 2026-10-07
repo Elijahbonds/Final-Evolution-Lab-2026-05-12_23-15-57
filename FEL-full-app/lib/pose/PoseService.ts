@@ -19,6 +19,11 @@
 //                               hosts STACK — the last one shown wins, and an undo hands the picture back to the one
 //                               under it (or parks it), never taking it from a host shown since.
 //   stats / model               fps, detect ms, capture→result latency; which model and why
+//   requestHighRate() / endHighRate() / rate
+//                               MIRROR PHASE 3 (2026-10-07): the jump test's opt-in higher pose rate. The camera is asked
+//                               for 60 fps and detection is thinned to 60 instead of 30, then measured on the first body
+//                               frames (modelChoice.ts HighRateTrial); a device that cannot hold it falls back to 30 with
+//                               the reason. Only the caller that asked turns it off; a stop() always does.
 //
 // The model: full on a desktop, lite on a phone or tablet, and full drops to lite when its first seconds of body frames
 // are over budget (lib/pose/modelChoice.ts: the rules and where each number comes from). The wasm and models are ours
@@ -33,8 +38,9 @@ import { agentRunHooksAllowed, registerProdHookSync } from '@/lib/agentRunHooks'
 import { LANDMARK_COUNT, emptyFrame, type PoseFrame } from './landmarks';
 import type { PoseModel } from './assets';
 import {
-  DetectBudget, FULL_BUDGET_MS, MIN_DETECT_GAP_MS, MODEL_MEMORY_KEY, askedModel, cameraConstraints,
-  cameraFallbackConstraints, cameraTooSlow, deviceClass, initialModel, parseRemembered, rememberFallback, type DeviceHints,
+  CAMERA_FPS, DetectBudget, FULL_BUDGET_MS, HIGH_RATE_FPS, HIGH_RATE_GAP_MS, HighRateTrial, MIN_DETECT_GAP_MS, MODEL_MEMORY_KEY,
+  askedModel, cameraBelowHighRate, cameraConstraints, cameraFallbackConstraints, cameraTooSlow, deviceClass, initialModel,
+  parseRemembered, rememberFallback, type DeviceHints,
 } from './modelChoice';
 import { FeedSchedule, feedHookAllowed, type FeedPlayOptions, type PoseFeed } from './feed';
 
@@ -81,6 +87,22 @@ export interface PoseStartOptions {
   facingMode?: 'user' | 'environment';
 }
 
+/**
+ * The pose rate the service is detecting at (MIRROR PHASE 3). 'standard' = thinned to 30 Hz (everything but the jump);
+ * 'trial' = the jump asked for the high rate and it is being measured; 'high' = it held; 'fallback' = it was asked for
+ * and the device could not hold it, so frames are thinned to 30 again (`why` says what was measured).
+ */
+export type PoseRateMode = 'standard' | 'trial' | 'high' | 'fallback';
+
+export interface PoseRateStatus {
+  mode: PoseRateMode;
+  /** The camera frame rate the track reports after the last ask, when it reports one. */
+  cameraFps: number | null;
+  why: string | null;
+}
+
+const STANDARD_RATE: PoseRateStatus = { mode: 'standard', cameraFps: null, why: null };
+
 /** A landmarker as the service uses it: MediaPipePoseAdapter, or a test's stand-in. */
 export interface PoseDetector {
   detect(video: HTMLVideoElement, timestampMs: number, info?: DetectFrameInfo): AdapterFrame;
@@ -121,6 +143,20 @@ const median = (v: number[]) => {
   const s = [...v].sort((a, b) => a - b), m = s.length >> 1;
   return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
 };
+
+/**
+ * A new frame rate for a live track, keeping the picture's size and facing as ideals: applyConstraints REPLACES the
+ * whole constraint set, so a bare { frameRate } would let the camera pick any size (MIRROR PHASE 3).
+ */
+function rateConstraints(track: MediaStreamTrack, fps: number): MediaTrackConstraints {
+  const s: MediaTrackSettings = track.getSettings?.() ?? {};
+  return {
+    ...(s.facingMode ? { facingMode: s.facingMode } : {}),
+    ...(s.width ? { width: { ideal: s.width } } : {}),
+    ...(s.height ? { height: { ideal: s.height } } : {}),
+    frameRate: { ideal: fps },
+  };
+}
 
 function readCamera(track: MediaStreamTrack | undefined, video: HTMLVideoElement): PoseCameraInfo {
   const s: MediaTrackSettings = track?.getSettings?.() ?? {};
@@ -169,6 +205,12 @@ export class PoseService {
   private lastRaw: AdapterFrame | null = null;
   private lastDetectT = -Infinity;
   private _latest: PoseFrame | null = null;
+  /** The thinning gap in force: MIN_DETECT_GAP_MS (30 Hz), or HIGH_RATE_GAP_MS while the jump's high rate runs. */
+  private detectGapMs = MIN_DETECT_GAP_MS;
+  private rateTrial: HighRateTrial | null = null;
+  private _rate: PoseRateStatus = STANDARD_RATE;
+  /** Bumped by every requestHighRate/endHighRate/stop, so a camera answer that lands late knows it is stale. */
+  private rateAsk = 0;
 
   private clock: PoseStats['clock'] = null;
   private readonly times: number[] = [];
@@ -191,6 +233,8 @@ export class PoseService {
   get model(): PoseModel | null { return this._status.model; }
   get video(): HTMLVideoElement | null { return this._video; }
   get latest(): PoseFrame | null { return this._latest; }
+  /** The pose rate in force (the jump's opt-in; MIRROR PHASE 3). */
+  get rate(): PoseRateStatus { return this._rate; }
 
   get stats(): PoseStats {
     return {
@@ -333,9 +377,10 @@ export class PoseService {
   private onTick = (tick: VideoFrameTick): void => {
     const v = this._video, d = this.detector;
     if (!v || !d) return;
-    // A camera faster than 30 fps is thinned to 30, so the detect budget holds (MIN_DETECT_GAP_MS).
+    // A camera faster than 30 fps is thinned to 30, so the detect budget holds (MIN_DETECT_GAP_MS); while the jump's
+    // high rate runs, to 60 (HIGH_RATE_GAP_MS).
     const gap = tick.timestampMs - this.lastDetectT;
-    if (gap >= 0 && gap < MIN_DETECT_GAP_MS) return;
+    if (gap >= 0 && gap < this.detectGapMs) return;
     const before = this.deps.now();
     const raw = d.detect(v, tick.timestampMs, { frameId: tick.frameId });
     // No detect ran for this frame: the same video frame again, a detect that failed, or a picture not decoded yet (the
@@ -349,6 +394,7 @@ export class PoseService {
     const frame = toPoseFrame(raw, tick.timestampMs, after);
     this.note(frame, after - before);
     if (this.budget) this.judgeBudget(after - before, frame.present);
+    if (this.rateTrial) this.judgeRate(tick.timestampMs, after - before, frame.present);
     this.deliver(frame);
   };
 
@@ -387,6 +433,73 @@ export class PoseService {
     });
   }
 
+  // ── the jump's higher pose rate (MIRROR PHASE 3) ──
+
+  /**
+   * The jump test (T5) asks for a higher pose rate: the camera for 60 fps, detection thinned to 60 instead of 30, then
+   * measured (modelChoice.ts HighRateTrial). Resolves with the rate in force once the camera has answered: 'trial'
+   * while it is measured, or 'fallback' at once when the camera says it cannot go past 50. Read `rate` later for the
+   * verdict. The dev feed has no camera and no thinning: it stays 'standard'. Idempotent while a trial or a hold runs.
+   */
+  async requestHighRate(): Promise<PoseRateStatus> {
+    if (this._status.source !== 'camera' || this._status.state !== 'live' || !this.stream) return this._rate;
+    if (this._rate.mode === 'trial' || this._rate.mode === 'high') return this._rate;
+    const ask = ++this.rateAsk;
+    const track = this.stream.getVideoTracks()[0];
+    let cameraFps: number | null = null;
+    try {
+      await track?.applyConstraints?.(rateConstraints(track, HIGH_RATE_FPS));
+    } catch (e) {
+      this.deps.warn('[FEL-POSE] the camera would not change its rate', e);   // it keeps its rate; the trial measures it
+    }
+    if (ask !== this.rateAsk) return this._rate;   // ended, stopped or asked again meanwhile
+    const fr = track?.getSettings?.().frameRate;
+    cameraFps = typeof fr === 'number' && fr > 0 ? fr : null;
+    if (cameraBelowHighRate(cameraFps)) {
+      this._rate = { mode: 'fallback', cameraFps, why: `the camera gives ${Math.round(cameraFps!)} fps: 30 Hz` };
+      return this._rate;
+    }
+    this.detectGapMs = HIGH_RATE_GAP_MS;
+    this.rateTrial = new HighRateTrial();
+    this._rate = { mode: 'trial', cameraFps, why: 'measuring the high rate' };
+    return this._rate;
+  }
+
+  /** Back to 30 Hz after the jump: the thinning restored and the camera asked for 30 again (battery, heat). */
+  endHighRate(): void {
+    if (this._rate.mode === 'standard') return;
+    this.rateAsk++;
+    this.resetRate();
+    const track = this.stream?.getVideoTracks()[0];
+    try {
+      void track?.applyConstraints?.(rateConstraints(track, CAMERA_FPS))?.catch?.(() => { /* keeps its rate; thinned anyway */ });
+    } catch { /* keeps its rate; thinned anyway */ }
+  }
+
+  private resetRate(): void {
+    this.detectGapMs = MIN_DETECT_GAP_MS;
+    this.rateTrial = null;
+    this._rate = STANDARD_RATE;
+  }
+
+  private judgeRate(t: number, ms: number, body: boolean): void {
+    const trial = this.rateTrial!;
+    const verdict = trial.add(t, ms, body);
+    if (verdict === 'measuring') return;
+    this.rateTrial = null;
+    if (verdict === 'hold') {
+      this._rate = { ...this._rate, mode: 'high', why: trial.why };
+      return;
+    }
+    // Over budget, or the rate never got there: thinned to 30 again from the next frame, and the camera asked for 30.
+    this.detectGapMs = MIN_DETECT_GAP_MS;
+    this._rate = { ...this._rate, mode: 'fallback', why: trial.why };
+    const track = this.stream?.getVideoTracks()[0];
+    try {
+      void track?.applyConstraints?.(rateConstraints(track, CAMERA_FPS))?.catch?.(() => { /* keeps its rate; thinned anyway */ });
+    } catch { /* keeps its rate; thinned anyway */ }
+  }
+
   private fail(why: string): void {
     this.session++;
     this.starting = null;
@@ -405,6 +518,8 @@ export class PoseService {
     this.lastRaw = null;
     this.lastDetectT = -Infinity;
     this._latest = null;
+    this.rateAsk++;
+    this.resetRate();
     this.clock = null;
     this.times.length = 0; this.costs.length = 0; this.lags.length = 0;
     this.count = 0; this.fed = 0;

@@ -37,7 +37,25 @@ export type FaultId =
   | 'kneeValgus' | 'heelRise' | 'armFall' | 'lateralShift' | 'shallow'
   | 'elbowFlare' | 'shrug' | 'trunkOffset';
 
-interface CueCard { cue: string; escalate: string; regress: string }
+/**
+ * One fault's voice. `reply` (MIRROR-MOVES P2, 2026-10-07) is the REPLY TO A REPEATED FAULT: a different, simpler wording
+ * of `cue` for a fault that keeps coming back in the same set (REPEAT_REPLY_FIRES) — said in place of the cue, never in
+ * addition to it, and only where the cue itself would have been said (see decideVoice). Optional: a card without one
+ * keeps saying its cue.
+ */
+export interface CueCard { cue: string; escalate: string; regress: string; reply?: string }
+
+/**
+ * What one engine coaches (MIRROR-MOVES P2): its faults in coaching order and a card for each. The squat and the press/row
+ * share MIRROR_COACH_TABLE (this file's own CUES, FAULT_PRIORITY); a pattern with its own cue table (the lunge, the hinge,
+ * the push-up — lib/mirror/patternCues.ts builds theirs from the pattern's CueRule list) gets its own engine and its own
+ * table, so a fault id one pattern shares with another ('shallow': the squat's and the lunge's) never borrows the other
+ * pattern's words.
+ */
+export interface CueTable<F extends string = FaultId> {
+  priority: readonly F[];
+  cards: Readonly<Record<F, CueCard>>;
+}
 
 /** Priority is the coaching order: the knee first, then the feet, then the trunk. */
 export const FAULT_PRIORITY: FaultId[] = [
@@ -56,6 +74,8 @@ const CUES: Record<FaultId, CueCard> = {
     cue: 'Press the floor apart with your feet — knees travel out over your second toes.',
     escalate: 'Still drifting. Spread the floor apart with your feet — all the way down, all the way up.',
     regress: 'Hold the bottom. Breathe. Own the position before you move again.',
+    // MIRROR-MOVES P2: the reply to a repeated fault — simpler, the same outside anchor
+    reply: 'Spread the floor with your feet on the way down.',
   },
   heelRise: {
     // was: 'Heels heavy. Toes long and flat — pull the floor toward your heel.'
@@ -63,6 +83,7 @@ const CUES: Record<FaultId, CueCard> = {
     // was: 'Your heels are leaving me. Sit SLOWER, heels pinned — the ankle earns the depth.'
     escalate: 'Still lifting. Sit slower and keep the floor under your heels — the depth can wait.',
     regress: 'Stop the set. Ankle rocks against the wall, ten each side, then we go again.',
+    reply: 'Whole foot on the floor. Sit slower.',
   },
   // armFall is the shoulder midpoint drifting SIDEWAYS (a front camera reads x — squat-audit.ts). The card used to
   // coach a forward fall ("reach the ceiling", "your arms are falling to the floor"), which is not what was measured.
@@ -72,17 +93,20 @@ const CUES: Record<FaultId, CueCard> = {
     // was: 'Still drifting to one side. Slow the descent and press both feet evenly.'
     escalate: 'Still drifting to one side. Slow the descent and press evenly into the ground under both feet.',
     regress: 'Hold the top. Reset your stance, breathe twice, then descend only as far as you stay centred.',
+    reply: 'Straight down the middle of your stance.',
   },
   lateralShift: {
     cue: 'Fifty-fifty. Don\'t travel — split the floor between both feet.',
     escalate: 'You\'re sliding off centre. Freeze at the bottom — find the middle, then rise.',   // one spelling: centre (P1 review)
     regress: 'Stop. Reset your tripod, and give me a half-squat with no travel.',
+    reply: 'Even on the floor under both feet.',
   },
   shallow: {
     // was: 'Own the bottom — hip crease to your knee line, then drive up.'
     cue: 'Own the bottom — sit to about chair height, then push the floor away.',
     escalate: 'Deeper. Slow the way down and sit INTO it — then explode.',
     regress: 'Box squat: sit to a chair height, touch, and stand tall. Depth before speed.',
+    reply: 'Sit to chair height, then stand.',
   },
   // elbowFlare is the working (right) elbow rising toward or above the shoulder line, on the press or the row
   // (kinematic-engine.ts: flareRatio). The card used to say "pull it to your ribs, not out to the side" and "feel the
@@ -94,6 +118,7 @@ const CUES: Record<FaultId, CueCard> = {
     escalate: 'Still climbing. Aim the handle at your back pocket on the row, and straight at the wall ahead on the press.',
     // was: 'Slow the rep down. Half speed, elbow glued, feel the lat do the work.'
     regress: 'Half speed and a lighter handle — row to your back pocket until the path stays low.',
+    reply: 'Handle to your back pocket.',
   },
   // shrug is the working shoulder riding up above the shoulder line during the PULL (kinematic-engine.ts).
   shrug: {
@@ -103,6 +128,7 @@ const CUES: Record<FaultId, CueCard> = {
     escalate: 'Still riding up. Let the handle pull your arm long first, then row it back to your pocket.',
     // was: 'Reset. Shoulder blade down and back, hold two seconds, then pull.'
     regress: 'Reset with a lighter handle. Let it hang from a long arm for two seconds, then row.',
+    reply: 'Pull back to the wall, not up.',
   },
   // MIRROR-COACH P1 review (2026-09-25): the base cue still said "Ribs stacked over pelvis — seal the cylinder" after the
   // escalation was reworded; the pose model has no rib landmark, and this fault is shoulders over hips.
@@ -112,8 +138,13 @@ const CUES: Record<FaultId, CueCard> = {
     // was: 'Your shoulders are drifting off your hips. Exhale fully, stack up, then go.'
     escalate: 'Still leaning off to one side. Exhale fully, grow tall toward the ceiling, then go.',
     regress: 'Stop. Ninety-ninety breathing, three breaths, then we rebuild the rep.',
+    reply: 'Grow tall toward the ceiling.',
   },
 };
+
+/** The squat's and the press/row's table: this file's CUES in FAULT_PRIORITY order (MIRROR-MOVES P2: what every engine
+ *  used before tables existed, and still the default). */
+export const MIRROR_COACH_TABLE: CueTable<FaultId> = { priority: FAULT_PRIORITY, cards: CUES };
 
 /**
  * THE KNEE CUE — ON SINCE 2026-09-26, VERIFIED ON SYNTHETIC GEOMETRY ONLY (NO REAL CAPTURE).
@@ -172,7 +203,9 @@ export function cueableFaults<F extends string>(
   return faults.filter((f) => (valgusVerified || f !== 'kneeValgus') && (pressRowVerified || !(PRESS_ROW_CUE_FAULTS as readonly string[]).includes(f)));
 }
 
-export interface CueEngineOptions {
+export interface CueEngineOptions<F extends string = FaultId> {
+  /** What this engine coaches (MIRROR-MOVES P2). Absent: MIRROR_COACH_TABLE, the squat's and the press/row's. */
+  table?: CueTable<F>;
   /** Defaults to VALGUS_CUE_VERIFIED (true since 2026-09-26). Tests of the silent path pass false. */
   valgusVerified?: boolean;
   /** Defaults to PRESS_ROW_CUE_VERIFIED (MIRROR-COACH P9 fix). Tests of the silent path pass false. */
@@ -189,10 +222,12 @@ export interface CueEngineOptions {
   clearByRep?: boolean;
 }
 
-export interface CueEvent {
-  fault: FaultId;
+export interface CueEvent<F extends string = FaultId> {
+  fault: F;
   text: string;
-  level: 'cue' | 'escalate' | 'regress' | 'confirm';
+  /** 'reply': the card's simpler wording for a fault repeated this set (REPEAT_REPLY_FIRES) — the cue's own level, said
+   *  in its place (MIRROR-MOVES P2). */
+  level: 'cue' | 'reply' | 'escalate' | 'regress' | 'confirm';
 }
 
 const HOLD_DOWN_MS = 6000;        // TUNE(elijah): one cue lands before the next
@@ -235,9 +270,23 @@ export const FADED_CUE_EVERY = 3;
 /** A faded fault on this many reps in a row has come back: straight back to 'everyRep'. TUNE(elijah) */
 export const RETURN_FAULT_REPS = 2;
 
+// ── THE REPLY TO A REPEATED FAULT (MIRROR-MOVES P2, 2026-10-07) ─────────────────────────────────────────────────────
+//
+// A fault that keeps coming back in a set used to hear the SAME cue each time it was voiced: with clearByRep a clean rep
+// starts the fault's escalation over, so a fault on reps 1, 3, 5 and 7 heard "Press the floor apart with your feet —
+// knees travel out over your second toes." four times — nagging, in the coach's own words. Now, from the
+// REPEAT_REPLY_FIRES-th rep of a set that shows the fault, a voiced cue-level line says the card's `reply` instead: a
+// different, shorter wording of the same action. It alternates with the cue after that (reply, cue, reply…), so neither
+// wording is said twice running for the same fault. NOTHING ELSE MOVES: the reply is said only where the cue would have
+// been — the same voiceable() schedule (every rep / every third / summary only), the same hold-down, the same priority —
+// and escalate and regress are untouched (a fault that survives the repeat window still gets "Still …" and then the
+// regression). It counts reps the way the fade does (endRep), so a set that never calls endRep never replies.
+/** The rep of a set (counting the one under way) from which a repeated fault's cue is said as its reply. TUNE(elijah) */
+export const REPEAT_REPLY_FIRES = 3;
+
 /** One fault's set, as endSet() closes it. */
-export interface FaultSetReport {
-  fault: FaultId;
+export interface FaultSetReport<F extends string = FaultId> {
+  fault: F;
   /** The schedule it ran on this set (after any return — 'everyRep' if it came back). */
   level: FadeLevel;
   /** The schedule it starts the next set on. */
@@ -254,25 +303,30 @@ export interface FaultSetReport {
   slipped: boolean;
 }
 
-export interface SetReport {
+export interface SetReport<F extends string = FaultId> {
   reps: number;
-  /** Every fault that was cued, showed, or carries a faded schedule — in FAULT_PRIORITY order. */
-  faults: FaultSetReport[];
+  /** Every fault that was cued, showed, or carries a faded schedule — in the table's priority order. */
+  faults: FaultSetReport<F>[];
 }
 
-export class CueEngine {
+export class CueEngine<F extends string = FaultId> {
   private readonly valgusVerified: boolean;
   private readonly pressRowVerified: boolean;
   private readonly clearByRep: boolean;
+  private readonly priority: readonly F[];
+  private readonly cards: Readonly<Record<F, CueCard>>;
 
-  constructor(opts: CueEngineOptions = {}) {
+  constructor(opts: CueEngineOptions<F> = {}) {
     this.valgusVerified = opts.valgusVerified ?? VALGUS_CUE_VERIFIED;
     this.pressRowVerified = opts.pressRowVerified ?? PRESS_ROW_CUE_VERIFIED;
     this.clearByRep = opts.clearByRep ?? false;
+    const table = (opts.table ?? MIRROR_COACH_TABLE) as unknown as CueTable<F>;
+    this.priority = table.priority;
+    this.cards = table.cards;
   }
 
   /** The faults this engine may know about at all (the unverified reads are dropped first, everywhere). */
-  private cueable(faults: readonly FaultId[]): FaultId[] {
+  private cueable(faults: readonly F[]): F[] {
     return cueableFaults(faults, this.valgusVerified, this.pressRowVerified);
   }
   /** The last pose time decide() saw — the clock a rep-level clearance is stamped with when endRep gets none. */
@@ -281,23 +335,25 @@ export class CueEngine {
   /** Null until the first cue — a 0 start would hold down the coach for the
    *  session's first HOLD_DOWN_MS (measured: the first fault never got cued). */
   private lastCueAt: number | null = null;
-  private lastFault: FaultId | null = null;
-  private faultSinceMs = new Map<FaultId, number>();
-  private clearedAtMs = new Map<FaultId, number>();
-  private confirmed = new Set<FaultId>();
-  private escalations = new Map<FaultId, number>();
+  private lastFault: F | null = null;
+  private faultSinceMs = new Map<F, number>();
+  private clearedAtMs = new Map<F, number>();
+  private confirmed = new Set<F>();
+  private escalations = new Map<F, number>();
 
   // the faded schedule — outlives a set (reset() keeps it; forget() clears it)
-  private schedule = new Map<FaultId, FadeLevel>();
+  private schedule = new Map<F, FadeLevel>();
   /** Faults the coach has spoken a cue for, ever (a fault never cued has nothing to fade). */
-  private everCued = new Set<FaultId>();
+  private everCued = new Set<F>();
   // this set's rep book — cleared by reset() and endSet()
   private setReps = 0;
-  private faultReps = new Map<FaultId, number>();
-  private faultStreak = new Map<FaultId, number>();
-  private lastFaultRep = new Map<FaultId, number>();
-  private spoken = new Map<FaultId, number>();
-  private returned = new Set<FaultId>();
+  private faultReps = new Map<F, number>();
+  private faultStreak = new Map<F, number>();
+  private lastFaultRep = new Map<F, number>();
+  private spoken = new Map<F, number>();
+  private returned = new Set<F>();
+  /** The cue-level wording last said for each fault this set (cue or reply) — the reply alternates with the cue. */
+  private lastSaid = new Map<F, string>();
 
   /**
    * A new set: the timers and this set's rep book are cleared. The faded schedule is KEPT — what the athlete fixed last
@@ -318,6 +374,7 @@ export class CueEngine {
     this.lastFaultRep.clear();
     this.spoken.clear();
     this.returned.clear();
+    this.lastSaid.clear();
   }
 
   /** Everything, the faded schedule included: a different athlete, or a coach starting the fade over. */
@@ -328,7 +385,7 @@ export class CueEngine {
   }
 
   /** The schedule a fault is on right now. */
-  levelOf(fault: FaultId): FadeLevel {
+  levelOf(fault: F): FadeLevel {
     return this.schedule.get(fault) ?? 'everyRep';
   }
 
@@ -337,12 +394,12 @@ export class CueEngine {
    * 'everyRep', on the voiced rep at 'everyThird', never at 'summaryOnly' unless it is coming back. The fade's reason —
    * feedback that never thins out is what the athlete leans on — holds for the red overlay as much as for the voice.
    */
-  isVoiceable(fault: FaultId): boolean {
+  isVoiceable(fault: F): boolean {
     return this.voiceable(fault);
   }
 
   /** A confirmation is speech: at a faded level it is said only for a fault the coach spoke about this set. */
-  private mayConfirm(f: FaultId): boolean {
+  private mayConfirm(f: F): boolean {
     return this.levelOf(f) === 'everyRep' || (this.spoken.get(f) ?? 0) > 0;
   }
 
@@ -351,7 +408,7 @@ export class CueEngine {
    * the third (sixth, …) of the set to show it; never at 'summaryOnly' — unless this rep brings it back (the one before
    * showed it too), which is a return and gets the voice at once.
    */
-  private voiceable(f: FaultId): boolean {
+  private voiceable(f: F): boolean {
     const level = this.levelOf(f);
     if (level === 'everyRep') return true;
     if ((this.faultStreak.get(f) ?? 0) + 1 >= RETURN_FAULT_REPS) return true;
@@ -363,11 +420,11 @@ export class CueEngine {
    * A rep ended, and these are the faults it showed (any frame of it). Call once per counted rep, after that rep's
    * frames went through decide(). A fault showing on RETURN_FAULT_REPS reps in a row is reset to 'everyRep' here.
    */
-  endRep(faults: readonly FaultId[], nowMs?: number): void {
+  endRep(faults: readonly F[], nowMs?: number): void {
     const shown = new Set(this.cueable(faults));
     const t = nowMs ?? this.lastNowMs;
     this.setReps += 1;
-    for (const f of FAULT_PRIORITY) {
+    for (const f of this.priority) {
       if (!shown.has(f)) {
         this.faultStreak.set(f, 0);
         // MIRROR-COACH P9 fix: a whole rep without it is a clearance (clearByRep, above) — and its escalation starts over
@@ -395,9 +452,9 @@ export class CueEngine {
    * One engine per pattern: a fault this set never could show (the elbow, in a squat set) would read "clear" here and
    * step down for nothing — mirror-harness.tsx keeps the squat's engine and the press/row's apart for that reason.
    */
-  endSet(): SetReport {
-    const faults: FaultSetReport[] = [];
-    for (const f of FAULT_PRIORITY) {
+  endSet(): SetReport<F> {
+    const faults: FaultSetReport<F>[] = [];
+    for (const f of this.priority) {
       const level = this.levelOf(f);
       const faultReps = this.faultReps.get(f) ?? 0;
       const spoken = this.spoken.get(f) ?? 0;
@@ -415,13 +472,13 @@ export class CueEngine {
       if (next !== 'everyRep') this.schedule.set(f, next); else this.schedule.delete(f);
       faults.push({ fault: f, level, next, faultReps, spoken, landed, returned: this.returned.has(f), slipped });
     }
-    const report: SetReport = { reps: this.setReps, faults };
+    const report: SetReport<F> = { reps: this.setReps, faults };
     this.reset();
     return report;
   }
 
   /** Feed the measured fault set. Returns a cue when the coach speaks. */
-  decide(nowMs: number, active: readonly FaultId[]): CueEvent | null {
+  decide(nowMs: number, active: readonly F[]): CueEvent<F> | null {
     const evt = this.decideVoice(nowMs, active);
     if (evt && evt.level !== 'confirm') {
       this.everCued.add(evt.fault);
@@ -430,7 +487,7 @@ export class CueEngine {
     return evt;
   }
 
-  private decideVoice(nowMs: number, active: readonly FaultId[]): CueEvent | null {
+  private decideVoice(nowMs: number, active: readonly F[]): CueEvent<F> | null {
     this.lastNowMs = nowMs;
     // an unverified read (the knee, the press/row) is dropped before anything else sees it: it cannot be cued,
     // escalated, confirmed, or hold the voice down for the fault behind it.
@@ -445,7 +502,7 @@ export class CueEngine {
 
     // track fault persistence + clearances (a clearance on the first frame without it — or, with clearByRep, only at
     // the end of a whole rep without it: endRep)
-    for (const f of FAULT_PRIORITY) {
+    for (const f of this.priority) {
       if (present.has(f)) {
         this.faultSinceMs.set(f, this.faultSinceMs.get(f) ?? nowMs);
         this.clearedAtMs.delete(f);
@@ -474,7 +531,7 @@ export class CueEngine {
 
     // the highest-priority active fault gets the voice
     // (P9 fix: the faded schedule decides this, and only this — a quiet fault is present, just not voiced)
-    const fault = FAULT_PRIORITY.find((f) => present.has(f) && this.voiceable(f));
+    const fault = this.priority.find((f) => present.has(f) && this.voiceable(f));
     if (!fault) return null;
     // MIRROR-COACH P4 review (2026-09-25) — A LOWER-PRIORITY FAULT COULD HOLD THE MIC DOWN ON THE KNEE. The hold-down
     // used to block ANY new cue for HOLD_DOWN_MS once one had spoken, whichever fault it was for — so a false or minor
@@ -482,8 +539,8 @@ export class CueEngine {
     // higher-priority fault (the knee) for up to HOLD_DOWN_MS. The hold-down still protects a fault from being
     // interrupted by one of EQUAL or LOWER priority (one cue lands before the coach moves on); it no longer protects a
     // lower one from being pre-empted by a higher one that has since started faulting.
-    const heldFault = this.lastFault !== null ? FAULT_PRIORITY.indexOf(this.lastFault) : -1;
-    const outranksHeld = heldFault >= 0 && FAULT_PRIORITY.indexOf(fault) < heldFault;
+    const heldFault = this.lastFault !== null ? this.priority.indexOf(this.lastFault) : -1;
+    const outranksHeld = heldFault >= 0 && this.priority.indexOf(fault) < heldFault;
     if (!outranksHeld && this.lastCueAt !== null && nowMs - this.lastCueAt < HOLD_DOWN_MS) return null;
 
     const since = this.faultSinceMs.get(fault) ?? nowMs;
@@ -495,10 +552,16 @@ export class CueEngine {
     this.lastCueAt = nowMs;
     this.lastFault = fault;
     this.escalations.set(fault, nextLevel);
-    const card = CUES[fault];
+    const card = this.cards[fault];
     if (nextLevel >= 2) return { fault, text: card.regress, level: 'regress' };
     if (nextLevel === 1) return { fault, text: card.escalate, level: 'escalate' };
-    return { fault, text: card.cue, level: 'cue' };
+    // THE REPLY TO A REPEATED FAULT (MIRROR-MOVES P2, above): from the REPEAT_REPLY_FIRES-th rep of the set that shows it,
+    // the cue's slot says the simpler wording — alternating with the cue, so neither is said twice running
+    const fires = (this.faultReps.get(fault) ?? 0) + 1;
+    const reply = card.reply && fires >= REPEAT_REPLY_FIRES && this.lastSaid.get(fault) !== card.reply;
+    const text = reply ? card.reply! : card.cue;
+    this.lastSaid.set(fault, text);
+    return { fault, text, level: reply ? 'reply' : 'cue' };
   }
 }
 
@@ -507,7 +570,7 @@ export class CueEngine {
  * is where a faded fault's reps are said — here, after the set, never during it. `label` names a fault in the review's
  * words (lib/mirror/squatStage.ts SQUAT_FAULT_LABEL, lib/mirror/pressRowStage.ts PRESS_ROW_FAULT_LABEL).
  */
-export function fadeReviewLines(report: SetReport, label: (f: FaultId) => string): string[] {
+export function fadeReviewLines<F extends string>(report: SetReport<F>, label: (f: F) => string): string[] {
   const lines: string[] = [];
   const lower = (t: string) => t.charAt(0).toLowerCase() + t.slice(1);
   for (const r of report.faults) {

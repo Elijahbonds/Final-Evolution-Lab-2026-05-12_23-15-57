@@ -114,6 +114,7 @@ function compactDoc(d: CreatorDoc): Record<string, unknown> {
   if (d.eyes) o.eyes = d.eyes;
   if (d.marks?.length) o.marks = d.marks;   // phase 4c: drawn stamps ride along (each ≤ MAX_MARK_CHARS, at most MAX_MARKS)
   if (d.clothes?.length) o.clothes = d.clothes;   // phase 4e: code-built clothes (the sanitiser already left their defaults out)
+  if (d.hair) o.hair = d.hair;   // 2026-10-07: hair extras (a second colour, accessories, a beard; defaults already left out)
   return o;
 }
 
