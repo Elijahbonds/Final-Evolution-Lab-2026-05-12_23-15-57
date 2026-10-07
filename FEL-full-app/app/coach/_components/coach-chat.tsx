@@ -216,7 +216,7 @@ export function CoachChat() {
           <div className="mb-3 rounded-xl border border-[#00E5FF]/30 bg-[#00E5FF]/5 p-3 text-sm text-white/80 space-y-2" data-ai-share-consent>
             <p>{AI_SHARE_COPY}</p>
             <div className="flex gap-2 justify-end">
-              <button onClick={() => setGate(null)} className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-white/60">Not now</button>
+              <button onClick={() => { setInput(gate.consent); setGate(null); }} className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-white/60">Not now</button>
               <button onClick={agreeAndSend} disabled={consentBusy} className="rounded-lg bg-[#00E5FF] px-3 py-1.5 text-xs font-medium text-black disabled:opacity-40">I agree, send it</button>
             </div>
           </div>
