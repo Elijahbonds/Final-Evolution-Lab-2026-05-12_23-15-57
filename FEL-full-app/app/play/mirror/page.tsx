@@ -8,7 +8,6 @@ import { isHardStopped, latestIntake, needsIntake } from '@/lib/health/intake';
 import { canSaveScanNumbers, logGateFailure } from '@/lib/privacy/scanSaveGate';
 import { canWriteHealthData } from '@/lib/privacy/healthWriteGate';
 import { MirrorHarness } from './_components/mirror-harness';
-import { MIRROR_PATH } from '@/lib/mirror/liveMovements';
 import { DEFAULT_MIRROR_TAB, tabFromParam } from '@/lib/mirror/patternParam';
 import { HealthIntakeGate } from './_components/health-intake-gate';
 import { UNKNOWN_LOCAL_STATUS, type LocalIntakeStatus } from './_components/intake-refusal';
@@ -35,7 +34,11 @@ async function gateOrFalse(userId: string | undefined, gate: (userId: string) =>
 export default async function MirrorPage({ searchParams }: { searchParams?: { pattern?: string | string[] } } = {}) {
   const initialPattern = tabFromParam(searchParams?.pattern);
   const session = await getServerSession(authOptions);
-  if (!session) redirect(loginPath(initialPattern === DEFAULT_MIRROR_TAB ? MIRROR_PATH : `${MIRROR_PATH}?pattern=${initialPattern}`));
+  if (!session) {
+    // a known tab rides along in ?next= (patternParam.ts names only the Mirror's own tabs, so nothing unknown is carried)
+    if (initialPattern !== DEFAULT_MIRROR_TAB) redirect(loginPath(`/play/mirror?pattern=${initialPattern}`));
+    redirect(loginPath('/play/mirror'));
+  }
   // YOUTH RULES (MIRROR-COACH P3 review, 2026-09-26; PLAN item 9, owner decisions #6, #20): the screen's written
   // corrective blocks are off under 18 or with no birth year on file. A read that fails is no birth year — youth rules.
   const userId = (session.user as { id?: string } | undefined)?.id;
