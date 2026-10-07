@@ -384,7 +384,9 @@ describe('P9 fix: a fault cleared by a clean REP (clearByRep), not by a frame be
       }
       ce.endRep(['heelRise']);
     }
-    expect(said).toEqual(['cue', 'cue', 'escalate']);            // what the fault-frames-only wiring gave (squatStage.test.ts)
+    // what the fault-frames-only wiring gave (squatStage.test.ts); MIRROR-MOVES P2: the second voiced line falls on the third
+    // rep to show the fault, so it is the card's reply (REPEAT_REPLY_FIRES) — the escalation timing is unchanged
+    expect(said).toEqual(['cue', 'reply', 'escalate']);
     // the frame-timed engine fed the same frames would clear it at every top and never escalate — why the harness sets it
     const legacy = new CueEngine();
     const l: string[] = [];
@@ -399,8 +401,8 @@ describe('P9 fix: a fault cleared by a clean REP (clearByRep), not by a frame be
       for (let t = 0; t < 3_000; t += 100) { const e = ce.decide(i * 3_000 + t, faulty && t < 1_500 ? ['elbowFlare'] : []); if (e) said.push({ at: i * 3_000 + t, level: e.level }); }
       ce.endRep(faulty ? ['elbowFlare'] : []);
     };
-    for (let i = 0; i < 5; i++) rep(i, true);                     // 15 s of it: cue, cue, escalate
-    expect(said.map((x) => x.level)).toEqual(['cue', 'cue', 'escalate']);
+    for (let i = 0; i < 5; i++) rep(i, true);                     // 15 s of it: cue, reply (MIRROR-MOVES P2: rep 3), escalate
+    expect(said.map((x) => x.level)).toEqual(['cue', 'reply', 'escalate']);
     rep(5, false);                                                 // one clean rep: cleared, escalation forgotten
     rep(6, true);                                                  // (inside CLEAR_CONFIRM_MS, so no confirmation between)
     expect(said[said.length - 1]).toMatchObject({ level: 'cue' });

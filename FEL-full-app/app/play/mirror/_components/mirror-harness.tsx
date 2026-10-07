@@ -75,8 +75,9 @@ import { chipLabel } from '@/lib/mirror/hudChip';
 import { MIRROR_PATTERNS } from '@/lib/mirror/patterns';
 import { LungeAudit, type LungeFault } from '@/lib/mirror/lungeAudit';
 import { checkFraming, framingLine } from '@/lib/mirror/framing';
+import { ConfidenceFloor } from '@/lib/pose/confidenceFloor';   // MIRROR P3 (capture): "move closer / more light" on the lite model
 import {
-  LUNGE_FAULT_LABEL, LUNGE_REPS_PER_SIDE, initialLungeSession, lungePhaseToMovement,
+  LUNGE_CUE_TABLE, LUNGE_FAULT_LABEL, LUNGE_REPS_PER_SIDE, initialLungeSession, lungePhaseToMovement,
   lungeSideResult, stepLungeSession, type LungeSessionState, type LungeSide,
 } from '@/lib/mirror/lungeStage';
 // THE GUIDED MOVEMENT SCREEN. Every one of these was written for this and then never mounted — the runner, the
@@ -102,13 +103,39 @@ import type { YouthGate } from '@/lib/mirror/screenCorrectives';
 import { CorrectivesPicker, SessionCorrectives } from '@/components/mirror/session-correctives';
 import { sessionLikeFromSummary } from '@/lib/mirror/correctives';
 import { speakNatural } from '@/lib/babylon/audio/voice/speakNatural';   // VOICEOVER (2026-10-06)
+// MIRROR-MOVES P2 (2026-10-07; plan Phase 2, "every live movement talks"): `?pattern=` opens a tab (patternParam.ts, read by
+// page.tsx); the hip hinge and the push-up are live tabs (owner decision 2026-10-07: both), each a side-on guided set graded
+// rep by rep by its tested batch audit (sideRepStage.ts) with its own coach; the lunge speaks through its own CueEngine; and
+// every engine replies to a fault repeated in a set with a simpler wording (cue-engine.ts REPEAT_REPLY_FIRES).
+import { DEFAULT_MIRROR_TAB, type MirrorTab } from '@/lib/mirror/patternParam';
+import { applySideRepFrame, finishSideRep, initialSideRep, type SideRepState } from '@/lib/mirror/sideRepStage';
+import { HINGE_CUE_TABLE, HINGE_FAULT_LABEL, HINGE_FRAMING, HINGE_LIVE, HINGE_SETUP_LINE } from '@/lib/mirror/hingeStage';
+import type { HingeFaultId } from '@/lib/mirror/hingeAudit';
+import { PUSHUP_CUE_TABLE, PUSHUP_FAULT_LABEL, PUSHUP_FRAMING, PUSHUP_LIVE, PUSHUP_SETUP_LINE, type PushupFault } from '@/lib/mirror/pushupStage';
+import type { PoseFrame as LibPoseFrame } from '@/lib/pose/landmarks';
+import { SideRepCaption, SideRepChecks, SideRepFraming, SideRepReviewCard } from './side-rep-panels';
 
 /** What the screen panel says when a finished screen was not kept (offline, signed out, a server error). */
 const SCREEN_NOT_SAVED = 'Screen finished — it could not be saved, so nothing was paid for it.';
 /** A protected line (square-up, deeper) holds ordinary cue speech at most this long, even if the voice never ends. */
 const PROTECT_MAX_MS = 6_000;
 
-type Pattern = 'pressRow' | 'squat' | 'lunge' | 'jump' | 'screen';
+/** The tabs: patternParam.ts MIRROR_TABS, the one list (`?pattern=` and every link into the Mirror read it). */
+type Pattern = MirrorTab;
+/** The side-on, rep-graded tabs (MIRROR-MOVES P2). */
+const isSideRep = (p: Pattern): p is 'hinge' | 'pushup' => p === 'hinge' || p === 'pushup';
+
+/** The Mirror adapter's frame → lib/pose's (what the batch audits read). */
+function toLibFrame(pose: PoseFrame): LibPoseFrame {
+  return {
+    t: pose.timestampMs, present: pose.present,
+    image: pose.landmarks.map((l) => ({ x: l.x, y: l.y, z: (l as { z?: number }).z ?? 0, v: l.visibility ?? 0 })),
+  };
+}
+
+const hingeLabel = (f: HingeFaultId) => HINGE_FAULT_LABEL[f];
+const pushupLabel = (f: PushupFault) => PUSHUP_FAULT_LABEL[f];
+const lungeLabel = (f: LungeFault) => LUNGE_FAULT_LABEL[f];
 /** The squat and the lunge, in MIRROR_PATTERNS's own order (the registry's entries one and two — MIRROR-COACH P4 lane
  *  1: "the existing squat is registered as the first entry"). Looked up once, not on every render. */
 const SQUAT_PATTERN = MIRROR_PATTERNS.find((p) => p.id === 'squat')!;
@@ -179,7 +206,7 @@ const BONES: [number, number][] = [
  * `canSaveScan` (R-HEALTH-CLIENT, 2026-09-30): page.tsx's canSaveScanNumbers for this user, asked once on the server. False
  * (the default: a missing prop never saves) → no request to /api/mirror/* at all; results stay in this page's memory.
  */
-export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { youth?: YouthGate; canSaveScan?: boolean } = {}) {
+export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false, initialPattern = DEFAULT_MIRROR_TAB }: { youth?: YouthGate; canSaveScan?: boolean; initialPattern?: MirrorTab } = {}) {
   // THE CAMERA (MIRROR-FIRST P1): use-mirror-camera.ts. A hidden tab turns it off and pauses the session (onPause stops the
   // coach mid-sentence: nobody is in front of the phone); Resume brings it back with the books kept (onResume drops the
   // jump tracker's half-read jump, which cannot span the gap).
@@ -188,7 +215,13 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
     open, resume, stop, summary: sessionSummary, cameraOn, sessionOn,
   } = useMirrorCamera({
     onPause: () => { if (typeof speechSynthesis !== 'undefined') speechSynthesis.cancel(); },
-    onResume: () => { jumpTrackerRef.current.reset(); lungeAuditRef.current.reset(); inShotRef.current.reset(); },
+    onResume: () => {
+      jumpTrackerRef.current.reset(); lungeAuditRef.current.reset(); inShotRef.current.reset(); floorRef.current.reset();
+      // MIRROR-MOVES P2: a rep cannot span the gap — the one under way is dropped (its frames end where the camera went off)
+      for (const r of [hingeSessionRef, pushupSessionRef] as { current: SideRepState<string> }[]) {
+        r.current = { ...r.current, armed: false, armedFrames: 0, buffer: [], lastOkMs: null };
+      }
+    },
   });
   const [readout, hud] = useFrameView<StageReadout>(READOUT_START);
   const {
@@ -196,13 +229,15 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
     lungeFaults, lungeSeen, lungeFramedRight, runner, inShot,
   } = readout;
   const inShotRef = useRef(new InShotLine());
+  const floorRef = useRef(new ConfidenceFloor());   // the Mirror runs lite: the floor's default
   /** The screen runner's phase and station as last painted: a change is painted at once (see onFrame). */
   const runnerKeyRef = useRef('');
   const [summary, setSummary] = useState<SessionSummary | null>(null);
-  const [pattern, setPattern] = useState<Pattern>('pressRow');
+  // MIRROR-MOVES P2: the first tab is the one `?pattern=` named (page.tsx, patternParam.ts) — the default tab otherwise
+  const [pattern, setPattern] = useState<Pattern>(initialPattern);
   // the onFrame closure is created once per session — it reads the pattern
   // through a ref so switching patterns never needs a session restart
-  const patternRef = useRef<Pattern>('pressRow');
+  const patternRef = useRef<Pattern>(initialPattern);
   patternRef.current = pattern;
   const [jumps, setJumps] = useState<DunkMetrics[]>([]);
   const [dunkProgress, setDunkProgress] = useState<DunkProgress | null>(null);
@@ -215,8 +250,8 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
   const [squatFindings, setSquatFindings] = useState<SquatFault[]>([]);
   // Each finished work-set rep's faults, for the review's "did it hold" (set once, when the review opens).
   const [squatWorkReps, setSquatWorkReps] = useState<SquatFault[][]>([]);
-  const [cue, setCue] = useState<CueEvent | null>(null);
-  const [cueLog, setCueLog] = useState<CueEvent[]>([]);
+  const [cue, setCue] = useState<CueEvent<string> | null>(null);
+  const [cueLog, setCueLog] = useState<CueEvent<string>[]>([]);
   const [voiceOn, setVoiceOn] = useState(true);
   // MIRROR-COACH P9: the press/row's own coach (one engine per pattern — a squat set says nothing about the elbow, so it
   // must not step the elbow's faded schedule), its per-frame step, and what the last set's fade says in the review.
@@ -233,9 +268,10 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
     setSkeletonOnly(next);
     writeSkeletonOnly(next);
   }, [skeletonOnly]);
-  // MIRROR-COACH P9 fix: the press/row set has no rep cap, so its cue bubble clears itself (pressRowStage.ts)
+  // MIRROR-COACH P9 fix: the press/row set has no rep cap, so its cue bubble clears itself (pressRowStage.ts). MIRROR-MOVES
+  // P2: so do the lunge's, the hinge's and the push-up's (a cue between reps should not sit over the next three)
   useEffect(() => {
-    if (!cue || pattern !== 'pressRow') return;
+    if (!cue || pattern === 'squat') return;
     const id = window.setTimeout(() => setCue(null), PRESS_ROW_CUE_SHOWN_MS);
     return () => window.clearTimeout(id);
   }, [cue, pattern]);
@@ -260,6 +296,16 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
   const lungeRepCounterRef = useRef(new RepCounter());
   const lungeSessionRef = useRef(initialLungeSession());
   const [lungeSession, setLungeSession] = useState<LungeSessionState>(initialLungeSession());
+  // MIRROR-MOVES P2: the lunge's own coach (its own table — the squat's 'shallow' says something else), one set per side
+  const lungeCueRef = useRef(new CueEngine({ clearByRep: true, table: LUNGE_CUE_TABLE }));
+  // THE HIP HINGE AND THE PUSH-UP (MIRROR-MOVES P2): a side-on guided set each (sideRepStage.ts), stepped once per camera
+  // frame from the ref; the state below mirrors it for rendering, set on a rep, a stage or the turn line. One coach each.
+  const hingeSessionRef = useRef<SideRepState<HingeFaultId>>(initialSideRep());
+  const [hingeSession, setHingeSession] = useState<SideRepState<HingeFaultId>>(initialSideRep());
+  const hingeCueRef = useRef(new CueEngine({ clearByRep: true, table: HINGE_CUE_TABLE }));
+  const pushupSessionRef = useRef<SideRepState<PushupFault>>(initialSideRep());
+  const [pushupSession, setPushupSession] = useState<SideRepState<PushupFault>>(initialSideRep());
+  const pushupCueRef = useRef(new CueEngine({ clearByRep: true, table: PUSHUP_CUE_TABLE }));
   // MIRROR-COACH P4 fix (2026-09-29): this used to be its own flat, never-reset-per-side boolean, so the one-time
   // "turn side-on" line said during the LEFT side's set stayed lit through the whole RIGHT side and into review even
   // when the athlete squared up perfectly for the second leg. lungeSessionRef's own `turnPromptSaid: Record<LungeSide,
@@ -401,6 +447,7 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
     // on its tab until another screen starts, as they always have)
     hud.set(READOUT_FRESH, { now: true });
     inShotRef.current.reset();
+    floorRef.current.reset();
     jumpTrackerRef.current.reset();
     cueEngineRef.current.reset();
     pressRowCueRef.current.reset();
@@ -421,6 +468,13 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
     lungeRepCounterRef.current = new RepCounter();
     lungeSessionRef.current = initialLungeSession();
     setLungeSession(initialLungeSession());
+    lungeCueRef.current.reset();
+    hingeSessionRef.current = initialSideRep();
+    setHingeSession(initialSideRep());
+    hingeCueRef.current.reset();
+    pushupSessionRef.current = initialSideRep();
+    setPushupSession(initialSideRep());
+    pushupCueRef.current.reset();
     protectedUntilRef.current = 0;
     setSummary(null);
     // The camera, the model and the runtime: use-mirror-camera.ts (getUserMedia, the <video>, NeuroMirror.session, the
@@ -435,7 +489,7 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
           hud.set({ phase: p, frameMs: fm, zoneStates: zones, reps: r });
           // a body the camera cannot see whole says so on the stage (lib/mirror/liveCamera.ts InShotLine; the screen's
           // runner says its own framing line)
-          if (patternRef.current !== 'screen') hud.set({ inShot: inShotRef.current.step(checkFraming(pose, 'front'), pose.timestampMs) });
+          if (patternRef.current !== 'screen') hud.set({ inShot: inShotRef.current.step(checkFraming(pose, 'front'), pose.timestampMs) ?? floorRef.current.step(pose, pose.timestampMs) });
           // THE GUIDED SCREEN. The runner owns the protocol: it says the turn, holds the clock only while the
           // shot is good, and pauses rather than fails when somebody steps out to move a chair.
           if (patternRef.current === 'screen' && runnerRef.current) {
@@ -548,9 +602,9 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
               setFadeLines(fadeReviewLines(cueEngineRef.current.endSet(), (f: FaultId) => SQUAT_FAULT_LABEL[f as SquatFault] ?? f));
             }
           } else if (patternRef.current === 'lunge') {
-            // THE LUNGE (MIRROR-COACH P4 lane 1, owner decision #9). No live cue voice or knee overlay here (not asked
-            // for — the squat's is a whole coaching-escalation subsystem this phase does not extend); the skeleton
-            // paints plain, and the per-side rep count, faults and the review card come off lungeSessionRef below.
+            // THE LUNGE (MIRROR-COACH P4 lane 1, owner decision #9). No knee overlay here; the skeleton paints plain, and the
+            // per-side rep count, faults and the review card come off lungeSessionRef below. MIRROR-MOVES P2: and it
+            // SPEAKS — lungeStage.ts hands its own CueEngine the persisted faults (lungeCueRef, below), each side a set.
             const now = pose.timestampMs;
             paintSkeleton(pose, p);
             const lungeRead = lungeAuditRef.current.evaluate({ landmarks: pose.landmarks, timestampMs: now, present: pose.present });
@@ -562,6 +616,7 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
             const framing = checkFraming(framingFrame, 'front');
             hud.set({ lungeFramedRight: framing.ok });
             if (lungeSessionRef.current.stage !== 'review') {
+              const was = lungeSessionRef.current.stage;
               const repInfo = lungeRepCounterRef.current.feed(lungePhaseToMovement(lungeRead.phase), now);
               const step = stepLungeSession(lungeSessionRef.current, {
                 nowMs: now, present: lungeRead.present, framedRight: framing.ok, phase: lungeRead.phase,
@@ -576,7 +631,37 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
               if (step.turnPrompt) {
                 speak(framingLine('turned'), { protect: true });
               }
+              // MIRROR-MOVES P2: the lunge's coach — this frame's cue, then the rep it ended, then the side's set (pressRow's order)
+              if (step.cueFaults) {
+                const evt = lungeCueRef.current.decide(now, step.cueFaults);
+                if (evt) {
+                  setCue(evt);
+                  setCueLog((l) => [...l, evt]);
+                  speak(evt.text);
+                }
+              }
+              if (step.repCueFaults) lungeCueRef.current.endRep(step.repCueFaults, now);
+              if (step.stageChanged) {
+                const sideName = lungeSideName(was);
+                const lines = fadeReviewLines(lungeCueRef.current.endSet(), lungeLabel).map((l) => `${sideName}: ${l}`);
+                if (lines.length) setFadeLines((prev) => [...prev, ...lines]);
+                if (step.state.stage === 'review' && typeof speechSynthesis !== 'undefined') speechSynthesis.cancel();
+              }
             }
+          } else if (patternRef.current === 'hinge' || patternRef.current === 'pushup') {
+            // THE HIP HINGE AND THE PUSH-UP (MIRROR-MOVES P2): side-on, rep by rep (sideRepStage.ts; applySideRepFrame above)
+            paintSkeleton(pose, p);
+            const frame = toLibFrame(pose);
+            const fx = {
+              cue: (evt: CueEvent<string>) => { setCue(evt); setCueLog((l) => [...l, evt]); speak(evt.text); },
+              say: (line: string, protect?: boolean) => speak(line, { protect }),
+              review: (lines: string[]) => {
+                setFadeLines(lines);
+                if (typeof speechSynthesis !== 'undefined') speechSynthesis.cancel();
+              },
+            };
+            if (patternRef.current === 'hinge') applySideRepFrame(HINGE_LIVE, hingeSessionRef, hingeCueRef.current, frame, hingeLabel, { ...fx, state: setHingeSession });
+            else applySideRepFrame(PUSHUP_LIVE, pushupSessionRef, pushupCueRef.current, frame, pushupLabel, { ...fx, state: setPushupSession });
           } else {
             paintSkeleton(pose, p);
             // THE PRESS/ROW'S COACH (MIRROR-COACH P9). Its three faults were read every frame and never reached the voice
@@ -605,7 +690,9 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
     // MIRROR-FIRST P1: the whole session's summary, across any pause (use-mirror-camera.ts summary(): each camera stretch's
     // runtime, merged) — read before stop() lets the camera go. Null when no runtime ever ran (End before the model).
     const s = sessionSummary();
-    if (s) {
+    // MIRROR-MOVES P2: the hinge and the push-up have their own review; the press/row zone summary says nothing about them,
+    // so it is neither shown nor sent for those tabs (their sets are kept in this page only, for everyone)
+    if (s && !isSideRep(patternRef.current)) {
       setSummary(s);
       // PERSIST IT (2026-09-12). This summary — reps, tempo, per-zone time-in-stable and fault
       // counts — was computed on every session and then discarded when the tab closed, so the
@@ -778,6 +865,18 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
         void submitScreen(soFar.results, soFar.screen, soFar.grades, { ended: true });
       }
     }
+    // MIRROR-MOVES P2: a hinge or push-up set ended early goes to its review with what was read (the work set's fade too)
+    if (isSideRep(patternRef.current) && sessionOn()) {
+      if (patternRef.current === 'hinge') {
+        if (hingeSessionRef.current.stage === 'work') setFadeLines(fadeReviewLines(hingeCueRef.current.endSet(), hingeLabel));
+        hingeSessionRef.current = finishSideRep(hingeSessionRef.current);
+        setHingeSession(hingeSessionRef.current);
+      } else {
+        if (pushupSessionRef.current.stage === 'work') setFadeLines(fadeReviewLines(pushupCueRef.current.endSet(), pushupLabel));
+        pushupSessionRef.current = finishSideRep(pushupSessionRef.current);
+        setPushupSession(pushupSessionRef.current);
+      }
+    }
     // MIRROR-COACH P9: a press/row set ends at End — its fade is settled here and said in the summary
     if (patternRef.current === 'pressRow' && sessionOn()) {
       setFadeLines(fadeReviewLines(pressRowCueRef.current.endSet(), (f: FaultId) => PRESS_ROW_FAULT_LABEL[f as PressRowFault] ?? f));
@@ -791,6 +890,8 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
     pressRow: 'Press / Row',
     squat: 'Squat',
     lunge: 'Lunge',
+    hinge: 'Hinge',
+    pushup: 'Push-up',
     jump: 'Jump',
     screen: 'Screen',
   };
@@ -801,6 +902,8 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
     pressRow: 'Split-Stance Press / Row',
     squat: SQUAT_PATTERN.label,
     lunge: LUNGE_PATTERN.label,
+    hinge: 'Hip Hinge',
+    pushup: 'Push-up',
     jump: 'Vertical Jump',
     screen: 'Movement Screen',
   };
@@ -967,7 +1070,7 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
                     the Movement Screen to its last arm, `squatStage`, so the chip read BREATHE through the whole screen. */}
                 <span className="max-w-[58vw] truncate rounded-lg bg-black/55 px-2.5 py-1.5 font-mono text-[10px] font-bold
                                  uppercase tracking-[0.16em] text-white/75 backdrop-blur-sm sm:max-w-none">
-                  {chipLabel({ pattern, phase, jumpState, squatStage, lungeStage: lungeSession.stage, runner })}
+                  {chipLabel({ pattern, phase, jumpState, squatStage, lungeStage: lungeSession.stage, runner, hingeStage: hingeSession.stage, pushupStage: pushupSession.stage })}
                 </span>
                 {showFrameBudget && (
                   <span
@@ -982,7 +1085,8 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
               {/* MIRROR-FIRST P1: a body the camera cannot see whole (feet or head out of shot, or nobody), held a moment —
                   framing's own line (lib/mirror/framing.ts, the rules the games' space check builds its body rule on).
                   Shown, not spoken; the screen says its own, and a set in review is over. */}
-              {inShot && pattern !== 'screen' && !(pattern === 'squat' && squatStage === 'review') && !(pattern === 'lunge' && lungeSession.stage === 'review') && (
+              {inShot && pattern !== 'screen' && !(pattern === 'squat' && squatStage === 'review') && !(pattern === 'lunge' && lungeSession.stage === 'review')
+                && !(pattern === 'hinge' && hingeSession.stage === 'review') && !(pattern === 'pushup' && pushupSession.stage === 'review') && (
                 <div className="pointer-events-none absolute inset-x-4 top-14 flex justify-center">
                   <p data-in-shot className="max-w-md rounded-xl bg-black/60 px-4 py-2 text-center text-[14px] font-bold text-[#FFC24B] backdrop-blur-sm">
                     {inShot}
@@ -1043,6 +1147,20 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
                       <p className="mt-1 font-mono text-[9.5px] uppercase tracking-[0.18em] text-white/45">Best jump · estimated</p>
                     </>
                   )
+                ) : isSideRep(pattern) ? (
+                  (() => {
+                    const ss: SideRepState<string> = pattern === 'hinge' ? hingeSession : pushupSession;
+                    return (
+                      <>
+                        <p className="fel-heading text-[40px] font-black leading-none text-white">
+                          {ss.stage === 'review' ? ss.checkReps.length + ss.workReps.length : ss.reps}
+                        </p>
+                        <p className="mt-1 font-mono text-[9.5px] uppercase tracking-[0.18em] text-white/45">
+                          {ss.stage === 'check' || ss.stage === 'work' ? `Reps · ${ss.stage}` : 'Reps'}
+                        </p>
+                      </>
+                    );
+                  })()
                 ) : pattern === 'lunge' ? (
                   <>
                     <p className="fel-heading text-[40px] font-black leading-none text-white">
@@ -1074,7 +1192,8 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
 
               {/* THE COACH'S VOICE, one cue at a time, over the picture rather than in a panel below it — you are
                   looking at yourself when the correction lands, not at a sidebar. */}
-              {cue && ((pattern === 'squat' && squatStage === 'work') || pattern === 'pressRow') && (
+              {cue && ((pattern === 'squat' && squatStage === 'work') || pattern === 'pressRow' || (pattern === 'lunge' && lungeSession.stage !== 'review')
+                || (pattern === 'hinge' && hingeSession.stage === 'work') || (pattern === 'pushup' && pushupSession.stage === 'work')) && (
                 <div className="pointer-events-none absolute inset-x-4 bottom-24 flex justify-center">
                   <p
                     className="max-w-lg rounded-2xl border px-5 py-3 text-center text-[15px] font-bold backdrop-blur-md"
@@ -1144,7 +1263,7 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
                   </button>
                 )}
                 <SkeletonToggle skeletonOnly={skeletonOnly} onToggle={toggleSkeletonOnly} />
-                {(pattern === 'squat' || pattern === 'lunge' || pattern === 'pressRow') && (
+                {(pattern === 'squat' || pattern === 'lunge' || pattern === 'pressRow' || isSideRep(pattern)) && (
                   <button
                     onClick={() => setVoiceOn((v) => !v)}
                     aria-pressed={voiceOn}
@@ -1205,6 +1324,13 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
         {pattern === 'lunge' && lungeSession.stage !== 'review' && lungeSession.turnPromptSaid[lungeSession.stage] && (
           <p className="mt-2 text-[13px] font-semibold leading-relaxed text-[#FFC24B]">{framingLine('turned')}</p>
         )}
+
+        {/* THE HIP HINGE AND THE PUSH-UP (MIRROR-MOVES P2): the safety-first framing before Start (side-on, where the phone
+            goes, bodyweight, stop if it hurts), then the stage caption and the one-time turn line while live. */}
+        {pattern === 'hinge' && !live && !paused && <SideRepFraming lines={HINGE_FRAMING} />}
+        {pattern === 'pushup' && !live && !paused && <SideRepFraming lines={PUSHUP_FRAMING} />}
+        {pattern === 'hinge' && live && <SideRepCaption spec={HINGE_LIVE} state={hingeSession} setupLine={HINGE_SETUP_LINE} />}
+        {pattern === 'pushup' && live && <SideRepCaption spec={PUSHUP_LIVE} state={pushupSession} setupLine={PUSHUP_SETUP_LINE} />}
 
         {error && (
           <p className="mt-4 rounded-xl border border-[#FF3366]/30 bg-[#FF3366]/10 px-4 py-3 text-[13px] text-[#ff8da8]">
@@ -1368,6 +1494,10 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
                 })}
               </ul>
             </>
+          ) : pattern === 'hinge' ? (
+            <SideRepChecks spec={HINGE_LIVE} state={hingeSession} label={hingeLabel} live={live} />
+          ) : pattern === 'pushup' ? (
+            <SideRepChecks spec={PUSHUP_LIVE} state={pushupSession} label={pushupLabel} live={live} />
           ) : pattern === 'lunge' ? (
             <>
               <h2 className="fel-heading mb-3 text-[15px] font-bold text-white/80">
@@ -1674,7 +1804,25 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
                 );
               })}
             </div>
+            {/* MIRROR-MOVES P2: what the lunge's coach said, and what its fade did on each side */}
+            {cueLog.length > 0 && (
+              <ul className="mt-4 space-y-1.5 border-t border-white/[0.06] pt-4" data-lunge-cues>
+                {cueLog.map((c, i) => (
+                  <li key={i} className="text-[13px] text-white/70">
+                    <span className="font-mono text-[10px] uppercase tracking-wider text-white/30">{c.level}</span>{' '}{c.text}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <FadeLines lines={fadeLines} />
           </section>
+        )}
+
+        {pattern === 'hinge' && hingeSession.stage === 'review' && (
+          <SideRepReviewCard spec={HINGE_LIVE} state={hingeSession} label={hingeLabel} cueLog={cueLog} fadeLines={fadeLines} />
+        )}
+        {pattern === 'pushup' && pushupSession.stage === 'review' && (
+          <SideRepReviewCard spec={PUSHUP_LIVE} state={pushupSession} label={pushupLabel} cueLog={cueLog} fadeLines={fadeLines} />
         )}
 
         {/* SESSION SUMMARY. Real accumulated stats only (brief §4) — but read as figures, not as a bare <table>. */}
@@ -1716,6 +1864,11 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
       </div>
     </div>
   );
+}
+
+/** The lunge's side as the review names it (MIRROR-MOVES P2: the fade lines say which side's set they are about). */
+function lungeSideName(stage: LungeSide | 'review'): string {
+  return stage === 'left' ? 'Left leg forward' : stage === 'right' ? 'Right leg forward' : 'Lunge';
 }
 
 /** What the faded schedule did this set (MIRROR-COACH P9, cue-engine.ts fadeReviewLines): nothing when it did nothing. */

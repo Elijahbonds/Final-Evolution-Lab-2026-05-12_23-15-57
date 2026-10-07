@@ -1,7 +1,7 @@
 import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { Activity, BookOpen, ClipboardList, Dumbbell, UtensilsCrossed, Users, ScanLine, Timer } from 'lucide-react';
+import { Activity, BookOpen, ClipboardList, Dumbbell, Footprints, UtensilsCrossed, Users, ScanLine, Timer } from 'lucide-react';
 import { authOptions } from '@/lib/auth';
 import { loginPath } from '@/lib/auth/safeNext';
 import { prisma } from '@/lib/db';
@@ -48,6 +48,14 @@ export default async function TrainPage() {
       href: '/screen', icon: Timer, accent: '#00E5FF', title: 'Quick Screen',
       line: 'A free movement check on this camera: your jump in about a minute, or the full screen in about five. Nothing is sent.',
       tag: 'Check it',
+    },
+    {
+      // DRILLS (2026-10-07, Mirror & coaching Phase 6): the Playbook's ch. 5 wake-up and ch. 6 jump-and-land drills on the
+      // camera (/play/drills). The page reads the age and today's checks itself and holds back the jumps they say to;
+      // this card reads nothing, so it is the same for every account.
+      href: '/play/drills', icon: Footprints, accent: '#00FF9D', title: 'Drills',
+      line: "The Playbook's wake-up and jump-and-land drills, on your camera. Follow the targets; nothing is sent.",
+      tag: 'Run a drill',
     },
     {
       href: '/training', icon: ClipboardList, accent: '#00E5FF', title: 'Your programming',

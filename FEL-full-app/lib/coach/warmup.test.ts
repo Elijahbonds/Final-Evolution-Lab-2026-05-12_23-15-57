@@ -584,8 +584,8 @@ describe('the guided run on Today', () => {
 });
 
 describe('the camera hand-off: the plan\'s Wake-Up as a Drill a DrillRunner can play', () => {
-  it('no page mounts the drill runner yet, so the link is off (the guided run is the way in)', () => {
-    expect(WAKE_UP_CAMERA_HREF).toBeNull();
+  it('the camera link opens the drills page\'s Wake-Up (DRILLS 2026-10-07: /play/drills mounts the runner)', () => {
+    expect(WAKE_UP_CAMERA_HREF).toBe('/play/drills?drill=wake-up');
   });
 
   it('keeps only the plan\'s phases, in order; the full 10, 14 and 18 are WAKE_UP itself; nothing kept is null', () => {
