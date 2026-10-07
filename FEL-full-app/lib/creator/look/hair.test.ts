@@ -10,6 +10,7 @@ import {
 } from './hair';
 import { randomiseLook, seededRandom } from './randomise';
 import { decodeShareCode, encodeShareCode } from './shareCode';
+import { holdCreator } from './storage';
 
 const ORIGINAL_15 = ['Afro', 'Box Braids', 'Locs', 'Cornrows', 'Fade', 'Waves', 'Curly', 'Straight', 'Wavy', 'Buzz', 'Cropped', 'Bun', 'Ponytail', 'Bald', 'Hijab'];
 
@@ -76,6 +77,14 @@ describe('the extras block (doc.hair)', () => {
     expect(isEmptyCreatorDoc(old)).toBe(true);
     expect(isEmptyCreatorDoc(clean)).toBe(false);
   });
+  it('is sanitised on the server save path (holdCreator), junk dropped', () => {
+    const posted = { creator: { v: 1, parts: [], paint: [], colours: {}, shape: { face: {}, body: {} }, flags: { suit: false },
+      hair: { beard: 'full', beardColour: 'javascript:alert(1)', acc: ['beads', 'nope'], colour2: '#00ff00', tone: 'evil', name: 'Real Name' } } };
+    const out = holdCreator(posted, null, { uploadFace: true, uploadNumbers: false });
+    expect(out.creator?.hair).toEqual({ beard: 'full', acc: ['beads'], colour2: '#00FF00' });
+    // a non-adult's save writes no look at all
+    expect(holdCreator(posted, null, { uploadFace: false, uploadNumbers: false })).toEqual({});
+  });
   it('rides a share code', async () => {
     const doc: CreatorDoc = { ...emptyCreatorDoc(), hair: { beard: 'mustache', acc: ['headband'] } };
     const r = await decodeShareCode(encodeShareCode(doc, { hairStyle: 'Space Buns' }));
@@ -133,7 +142,7 @@ describe('the randomiser', () => {
     const seen = new Set<string>();
     for (let seed = 1; seed < 600; seed++) seen.add(randomiseLook({ face: defaultFace(), doc: null }, [], seededRandom(seed)).face.hairStyle);
     for (const s of ['Twists', 'Bantu Knots', 'High-Top Fade', 'Space Buns', 'Mullet', 'Streaks']) expect(seen, s).toContain(s);
-    for (const s of NOT_ROLLED_HAIR) expect(seen.has(s), s).toBe(false);
+    for (const s of ['Hijab', 'Headwrap']) { expect(NOT_ROLLED_HAIR.has(s), s).toBe(true); expect(seen.has(s), s).toBe(false); }
   });
   it('rolls beards, second colours and fitting accessories; a hair lock keeps them', () => {
     let beards = 0, seconds = 0, accs = 0;
