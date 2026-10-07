@@ -22,3 +22,4 @@ if (failures > 0 || checks === 0) {
   process.exit(1);
 }
 console.log(`avatar-pose: ${checks} checks green`);
+process.exit(0);
