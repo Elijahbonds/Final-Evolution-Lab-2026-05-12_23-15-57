@@ -42,6 +42,9 @@ const SHELL_EXEMPT_ROUTES: Record<string, string> = {
   // MULTIPLAYER (2026-10-06): the party room hosts several games on one screen as FREE PLAY — it mounts each game's own
   // component for a couch session and records no play session, pays nothing, stakes nothing (components/party).
   party: 'party room: free-play couch host for several games; records no session, so no GameShell',
+  // ADVENTURE PHASE B (2026-10-07): the story, unlisted. Its progress is the Adventure's own save (device first); it posts
+  // no account session yet because /api/sessions refuses a mode outside the catalogue, and listing it would unhide it.
+  adventure: 'unlisted story mode: progress lives in the Adventure save; no account session until the owner lists it',
 };
 
 const LOADER_BYPASS_ROUTES: Record<string, string> = {
