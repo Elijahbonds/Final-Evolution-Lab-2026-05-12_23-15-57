@@ -36,7 +36,11 @@
 // MIRROR-COACH-ERASE (2026-09-30, owner 07:53 PT, "No wait and fix"): bumped again, §5 only — an erase keeps the
 // consent records as proof of agreement and withdrawal, and it does not start the Dial-Up Breath's first-week wait
 // over. A first opt-in still waits that week. 2026-09-29c-draft never shipped either; a new string is still the rule.
-export const CURRENT_POLICY_VERSION = '2026-10-01-draft';
+// MIRROR-PROGRESS (2026-10-07, owner decision "Add it + version bump"): bumped again, §6 only — the Mirror's "vs your last
+// 3" keeps one number per finished set (and when) on the device for anyone whose Mirror results are not saved to their
+// account (owner decision 1: under-18s keep their progress on the device only; lib/mirror/deviceProgress.ts), never sent,
+// and "Forget on this phone" removes it. 2026-10-01-draft is the text without this paragraph.
+export const CURRENT_POLICY_VERSION = '2026-10-07-draft';
 
 export const TERMS_CONTENT = `
 # Terms of Service
@@ -142,6 +146,8 @@ Some features use your camera: playing with your body as the controller, the Mir
 When you play, only numbers worked out from the camera (for example jump height, rep counts or form reads) may be saved to your history. Face scan keeps only the face settings it picks, never the picture.
 
 Before body play, a space check makes sure the camera can see all of you and the floor. It also checks how bright the picture is. Both happen on your device, and nothing from them is sent or saved. Your choice to play a game with your body is remembered on this device only. The small self-view of you is shown only on your screen.
+
+The Mirror can compare a set with your last three. If your Mirror results are not saved to your account, that comparison keeps one number for each finished set, and when it was done, on this device only. It is never sent, and "Forget on this phone" in the Mirror's review removes it.
 
 The tracking model files are downloaded to your device when a camera feature first needs them, so the tracking can run there. The body-tracking files come from our own servers only. Face scan's model file comes from Google's servers (storage.googleapis.com). These downloads never include your picture.
 

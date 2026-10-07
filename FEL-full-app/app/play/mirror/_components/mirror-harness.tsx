@@ -114,6 +114,16 @@ import type { HingeFaultId } from '@/lib/mirror/hingeAudit';
 import { PUSHUP_CUE_TABLE, PUSHUP_FAULT_LABEL, PUSHUP_FRAMING, PUSHUP_LIVE, PUSHUP_SETUP_LINE, type PushupFault } from '@/lib/mirror/pushupStage';
 import type { PoseFrame as LibPoseFrame } from '@/lib/pose/landmarks';
 import { SideRepCaption, SideRepChecks, SideRepFraming, SideRepReviewCard } from './side-rep-panels';
+// MIRROR-PROGRESS (2026-10-07; plan Phase 4, "progress you can see"): End reads one comparable number from the set just done
+// and says how it sits against the last 3 — from the server for an opted-in adult (the session POST carries it), on this
+// phone only for everyone else (owner decision 1: under-18s keep their progress on the device; nothing is sent).
+import { compareToRecent } from '@/lib/mirror/baselines';
+import {
+  HEADLINE, lungeReading, pressRowReading, progressMovementFor, progressSource, progressView, savedPatternId, sideRepReading, squatReading,
+  type ProgressReading, type ProgressView,
+} from '@/lib/mirror/progressReading';
+import { forgetDeviceProgress, recordDeviceProgress } from '@/lib/mirror/deviceProgress';
+import { ProgressLine } from './progress-line';
 
 /** What the screen panel says when a finished screen was not kept (offline, signed out, a server error). */
 const SCREEN_NOT_SAVED = 'Screen finished — it could not be saved, so nothing was paid for it.';
@@ -259,6 +269,10 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false, initi
   const pressRowCueRef = useRef(new CueEngine({ clearByRep: true }));
   const pressRowRef = useRef(initialPressRowCues());
   const [fadeLines, setFadeLines] = useState<string[]>([]);
+  // MIRROR-PROGRESS: the "vs your last 3" block End fills (null until a set ends), and whether this phone's history was
+  // just forgotten from it
+  const [progress, setProgress] = useState<ProgressView | null>(null);
+  const [progressForgotten, setProgressForgotten] = useState(false);
   // The skeleton-only view (no camera picture; everything that reads stays). A browser preference, read after mount so
   // the server render and the first client render agree; never a server write.
   const [skeletonOnly, setSkeletonOnly] = useState(false);
@@ -477,6 +491,8 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false, initi
     pushupCueRef.current.reset();
     protectedUntilRef.current = 0;
     setSummary(null);
+    setProgress(null);
+    setProgressForgotten(false);
     // The camera, the model and the runtime: use-mirror-camera.ts (getUserMedia, the <video>, NeuroMirror.session, the
     // honest errors). This passes it what the session reads: which analysis, and the per-frame step.
     await open({
@@ -690,6 +706,28 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false, initi
     // MIRROR-FIRST P1: the whole session's summary, across any pause (use-mirror-camera.ts summary(): each camera stretch's
     // runtime, merged) — read before stop() lets the camera go. Null when no runtime ever ran (End before the model).
     const s = sessionSummary();
+    // MIRROR-PROGRESS: the set's one comparable number (lib/mirror/progressReading.ts), read from what the review reads —
+    // the work set's reps — and where its history lives: the server for an opted-in adult's squat, lunge or press/row
+    // (it rides on the POST below), this phone for everyone else and for the hinge and push-up (never sent).
+    const tab = patternRef.current;
+    const movement = progressMovementFor(tab);
+    const source = movement ? progressSource(movement, canSaveScan) : null;
+    const reading: ProgressReading | null =
+      tab === 'squat' ? squatReading(squatSessionRef.current.workReps, squatJudged(kneeRecordRef.current))
+        : tab === 'lunge' ? lungeReading(lungeSessionRef.current)
+          : tab === 'hinge' ? sideRepReading('hinge', hingeSessionRef.current)
+            : tab === 'pushup' ? sideRepReading('pushup', pushupSessionRef.current)
+              : tab === 'pressRow' && s ? pressRowReading(s) : null;
+    if (movement && source) {
+      if (!reading) setProgress(progressView(movement, source, { kind: 'tooFew' }));
+      else if (source === 'device') {
+        const priors = recordDeviceProgress(movement, reading.value, Date.now());
+        const h = HEADLINE[movement];
+        setProgress(progressView(movement, 'device', priors === null
+          ? { kind: 'unavailable' } : { kind: 'read', comparison: compareToRecent(reading.value, priors, h.direction, h.sameBand) }));
+      }
+    }
+    const serverReading = source === 'server' ? reading : null;
     // MIRROR-MOVES P2: the hinge and the push-up have their own review; the press/row zone summary says nothing about them,
     // so it is neither shown nor sent for those tabs (their sets are kept in this page only, for everyone)
     if (s && !isSideRep(patternRef.current)) {
@@ -703,7 +741,9 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false, initi
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          patternId: s.patternId,
+          // MIRROR-PROGRESS: each tab's own id — it was the runtime's ('split-stance-press-row') for every tab, so a squat,
+          // lunge, jump or screen was saved as a press/row set (progressReading.ts SAVED_PATTERN_ID)
+          patternId: savedPatternId(tab, s.patternId),
           startedAtMs: s.startedAtMs,
           durationMs: s.durationMs,
           reps: s.reps,
@@ -713,8 +753,24 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false, initi
           avgFrameMs: s.avgFrameMs,
           timeInStableMs: s.timeInStableMs,
           faultCounts: s.faultCounts,
+          // MIRROR-PROGRESS (plan item #5): the squat's and the lunge's per-check values (the route stores them with the
+          // session — lib/mirror/baselines.ts recordCheckValues), and the ask for the last 3 saved values to compare with
+          ...(serverReading && (tab === 'squat' || tab === 'lunge') ? { checkValues: serverReading.checkValues } : {}),
+          ...(serverReading ? { recent: true } : {}),
         }),
-      })?.catch(() => { /* offline or signed out: the session still showed on screen */ });
+      })
+        ?.then(async (r) => {
+          if (!serverReading || !movement) return;
+          const j = r.ok ? ((await r.json().catch(() => null)) as { recent?: { values?: unknown } | null } | null) : null;
+          const values = Array.isArray(j?.recent?.values) ? (j!.recent!.values as unknown[]).filter((v): v is number => typeof v === 'number') : null;
+          const h = HEADLINE[movement];
+          setProgress(progressView(movement, 'server', values === null
+            ? { kind: 'unavailable' } : { kind: 'read', comparison: compareToRecent(serverReading.value, values, h.direction, h.sameBand) }));
+        })
+        .catch(() => {
+          // offline or signed out: the session still showed on screen; the comparison says it could not be read
+          if (serverReading && movement) setProgress(progressView(movement, 'server', { kind: 'unavailable' }));
+        });
     }
     stop();
     setStatus('idle');
@@ -1825,6 +1881,15 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false, initi
           <SideRepReviewCard spec={PUSHUP_LIVE} state={pushupSession} label={pushupLabel} cueLog={cueLog} fadeLines={fadeLines} />
         )}
 
+        {/* MIRROR-PROGRESS: "vs your last 3" for the set End just closed — on its own tab only */}
+        {progress && progress.movement === progressMovementFor(pattern) && (
+          <ProgressLine
+            view={progress}
+            forgotten={progressForgotten}
+            onForget={() => { if (forgetDeviceProgress()) setProgressForgotten(true); }}
+          />
+        )}
+
         {/* SESSION SUMMARY. Real accumulated stats only (brief §4) — but read as figures, not as a bare <table>. */}
         {summary && (
           <section className="mt-6 rounded-2xl border border-white/8 bg-white/[0.02] p-5">
@@ -1864,6 +1929,15 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false, initi
       </div>
     </div>
   );
+}
+
+/**
+ * The squat faults the review judges (MIRROR-PROGRESS): the coach's cueable ones, and the knee only when it was read square
+ * at least once — squatReviewVerdict's own `kneeJudged` — so a read the review does not judge never costs a clean rep.
+ */
+function squatJudged(knee: KneeRecord): (faults: readonly string[]) => readonly string[] {
+  const kneeJudged = VALGUS_CUE_VERIFIED && knee.squareFrames > 0;
+  return (faults) => cueableFaults(faults as SquatFault[]).filter((f) => kneeJudged || f !== 'kneeValgus');
 }
 
 /** The lunge's side as the review names it (MIRROR-MOVES P2: the fade lines say which side's set they are about). */
