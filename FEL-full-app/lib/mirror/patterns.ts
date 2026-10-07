@@ -87,6 +87,9 @@ export interface CueRule {
   cue: string;
   escalate: string;
   regress: string;
+  /** MIRROR-MOVES P2 (2026-10-07): the reply to a repeated fault — a different, simpler wording of `cue`, said in its slot
+   *  once the fault keeps coming back in a set (cue-engine.ts REPEAT_REPLY_FIRES). Linted like `cue` (lib/coach/cueLint.ts). */
+  reply?: string;
 }
 
 export interface MirrorPatternContext {

@@ -50,6 +50,11 @@ const NOT_IMPORTED: Record<string, string> = {
   'lib/ui/hintLiterals.ts': 'test support — the hint-literal reader controlsScreen.scan.test.ts sorts every mode\'s `hint` with (console-view lane); tests are not counted as consumers',
   'lib/babylon/combat/difficultySim.ts': 'test support — the combat difficulty harness "trimmed for the regression test" (its header); difficultyBands.test.ts pins each duel mode\'s bands with it (improve-combat lane); tests are not counted as consumers',
   'lib/mirror/fixtures/storedRows.ts': 'test support — the stored screen rows the coach and attention tests read, built as the Mirror route writes them; tests are not counted as consumers',
+  // MIRROR-MOVES P2 (2026-10-07): the live hinge's and push-up's whole-set builders (sideRepBuild.ts) build on the hinge lane's
+  // fixture builder (hingeSetupBuild.ts, which sat on KNOWN_ORPHANS below) — both test-only by design: synthetic bodies
+  // filmed through the synth for sideRepStage.test.ts, lungeCues.test.ts, hingeAudit.test.ts and tests/mirror-moves/**.
+  'lib/mirror/fixtures/sideRepBuild.ts': 'test support — whole guided hinge and push-up sets filmed through the synth; tests are not counted as consumers',
+  'lib/mirror/fixtures/hingeSetupBuild.ts': 'test support — the side-view hinge / set-up fixture builder (moved here from KNOWN_ORPHANS: test-only by design, now also built on by sideRepBuild.ts); tests are not counted as consumers',
   // ADVENTURE (2026-10-06): each Phase A lane tests its sim against a headless rig built from contracts.ts (the plan's
   // rule: no lane imports another's code or a scene); A4's sandbox tests drive A1's. Same class as sourceScan above.
   'lib/babylon/adventure/movement/testkit.ts': 'test support — A1\'s headless world, actors and 60 Hz runner; tests are not counted as consumers',
@@ -118,9 +123,6 @@ const KNOWN_ORPHANS: readonly string[] = [
   'lib/babylon/platform/GenerationService.ts',
   'lib/babylon/server/subscriptionApi.ts',
   'lib/locomotion/moves/MoveGraph.ts',
-  // MIRROR-COACH P4 (2026-09-25/29): the hinge-and-setup lane's own fixture builder for lib/mirror/hingeAudit.ts /
-  // setupLine.ts's tests, landed the same day as this line, not this lane's (registry-and-lunge) file to wire up.
-  'lib/mirror/fixtures/hingeSetupBuild.ts',
   // Everything else.
   'lib/cache/asset-cache.ts',
   'lib/competition/payoutMethods.ts',

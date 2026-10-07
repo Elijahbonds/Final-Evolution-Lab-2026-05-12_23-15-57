@@ -8,7 +8,7 @@
 // LEFT leg forward first, then RIGHT — LUNGE_REPS_PER_SIDE reps each, then a review that reports both sides
 // separately (the whole reason to lunge instead of squat: a squat lets the strong side hide, lib/mirror/lungeAudit.ts
 // header). Unlike the squat, this has no live cue-engine voice or knee overlay (not asked for here — see the
-// harness's own comment at the lunge branch) and no separate check/work split: one set of reps per side, the same
+// harness's own comment at the lunge branch — MIRROR-MOVES P2 gave it the voice: see the block under the imports) and no separate check/work split: one set of reps per side, the same
 // convention's rep TARGET (lib/mirror/hingeAudit.ts's workReps: 8) with no held-back "check" stage first.
 //
 // REP COUNTING IS REUSED, NOT REIMPLEMENTED (the phase brief's own words). This file does not count anything itself:
@@ -22,8 +22,23 @@
 // Frames read wrong-view are not silently graded — they never add to a side's rep count or findings, and the turn
 // line is said ONCE per side after TURN_PROMPT_AFTER_FRAMES wrong, then never repeated (P1's lesson, carried forward
 // from the Movement Screen and the squat's own square-up line: one retry, then record it and move on — never a loop).
-import type { LungeFault, LungePhase, LungeSide } from './lungeAudit';
+import { LUNGE_CUES, type LungeFault, type LungePhase, type LungeSide } from './lungeAudit';
 import type { MovementPhase } from '@/lib/babylon/nexus/neuro-mirror/rules/kinematic-engine';
+import { cueTableFor } from './patternCues';
+
+// THE LUNGE TALKS (MIRROR-MOVES P2, 2026-10-07; plan Phase 2 / item #3: "the lunge still has no spoken cues"). The header
+// above said "no live cue-engine voice … (not asked for here)"; Phase 2 asks for it. The lunge's written, linted cue table
+// (lungeAudit.ts LUNGE_CUES) now reaches its own CueEngine (LUNGE_CUE_TABLE, below — one engine for the lunge, never the
+// squat's: both have a 'shallow', and they say different things about it). This step hands the engine what the press/row's
+// step hands its own (pressRowStage.ts), by the same rules:
+//   · a fault is a fault only once it has held LUNGE_CUE_PERSIST_FRAMES front-on camera frames in a row (LungeAudit reads
+//     raw per-frame numbers — its wobble is frame-to-frame knee travel — so one noisy frame is not a fault to speak about);
+//   · cueFaults: the persisted faults on a front-on frame with a body in it ([] on a clean one, so the coach sees a fault
+//     fixed); null on a wrong-view frame, a repeat, nobody in frame, or the review — a frame the lunge cannot read is not a
+//     clean one;
+//   · repCueFaults: on the frame a rep ends, the persisted faults that rep showed (CueEngine.endRep — the faded schedule's
+//     rep book, and the reply to a repeated fault).
+// The review's own books (findings, workReps) are unchanged: they still read every front-on frame's faults.
 
 export type { LungeSide };
 export type LungeStage = LungeSide | 'review';
@@ -37,6 +52,18 @@ export const TURN_PROMPT_AFTER_FRAMES = 30;
 /** A side is "unreadable" in the review when at most this share of its framing-read frames were front-on — the same
  *  shape squatStage.ts's SQUARE_UP_MAX_SQUARE_SHARE uses for the knee's own off-square-whole-stage read. */
 export const LUNGE_UNREADABLE_MAX_OK_SHARE = 0.1;
+/**
+ * Front-on camera frames in a row a lunge fault must hold before the coach may speak about it (~0.27 s at 30 fps). The
+ * press/row's and the squat knee's gate is 3; the lunge needs more, measured: under lib/pose/synth.ts's default landmark
+ * jitter a CLEAN lunge held hipDrop past its line for up to 6 frames running and shallow for 3 (8 seeds × 8 reps) — a hip
+ * half-width is a short ruler, so 2-D jitter swings the hip-level read — while a real 5 cm front-knee cave held kneeIn for
+ * 36–43. 8 cues none of the noise and all of the cave. TUNE(elijah)
+ */
+export const LUNGE_CUE_PERSIST_FRAMES = 8;
+/** The lunge's coaching order: the front knee first (the squat's order — the knee, then the hips, the trunk, then depth). */
+export const LUNGE_FAULTS: readonly LungeFault[] = ['kneeIn', 'hipDrop', 'torsoDrift', 'wobble', 'shallow'];
+/** The lunge's own coach table: lungeAudit.ts LUNGE_CUES, in LUNGE_FAULTS order. */
+export const LUNGE_CUE_TABLE = cueTableFor(LUNGE_CUES, LUNGE_FAULTS);
 
 export interface LungeSessionState {
   stage: LungeStage;
@@ -55,7 +82,13 @@ export interface LungeSessionState {
   turnPromptSaid: Record<LungeSide, boolean>;
   /** The pose clock of the last frame stepped; a frame at or before it is a repeat and changes nothing. */
   lastMs: number | null;
+  /** MIRROR-MOVES P2: front-on frames in a row each fault has read (the coach's persistence gate). */
+  runs: Record<LungeFault, number>;
+  /** MIRROR-MOVES P2: the persisted faults of the rep under way (the coach's rep book); emptied when the rep ends. */
+  cueRepFaults: LungeFault[];
 }
+
+const NO_RUNS = (): Record<LungeFault, number> => ({ kneeIn: 0, hipDrop: 0, torsoDrift: 0, shallow: 0, wobble: 0 });
 
 export function initialLungeSession(): LungeSessionState {
   return {
@@ -68,6 +101,8 @@ export function initialLungeSession(): LungeSessionState {
     framedWrong: { left: 0, right: 0 },
     turnPromptSaid: { left: false, right: false },
     lastMs: null,
+    runs: NO_RUNS(),
+    cueRepFaults: [],
   };
 }
 
@@ -91,10 +126,14 @@ export interface LungeStep {
   findingsChanged: boolean;
   /** Say the turn line now (once per side — TURN_PROMPT_AFTER_FRAMES of wrong view reached for the first time). */
   turnPrompt: boolean;
+  /** MIRROR-MOVES P2: the faults to hand the lunge's CueEngine this frame (see the header), or null. */
+  cueFaults: LungeFault[] | null;
+  /** MIRROR-MOVES P2: a rep ended on this frame — the persisted faults it showed, for CueEngine.endRep. Else null. */
+  repCueFaults: LungeFault[] | null;
 }
 
 const NOOP_STEP = (state: LungeSessionState): LungeStep =>
-  ({ state, repCounted: false, stageChanged: false, findingsChanged: false, turnPrompt: false });
+  ({ state, repCounted: false, stageChanged: false, findingsChanged: false, turnPrompt: false, cueFaults: null, repCueFaults: null });
 
 /** One frame of the guided lunge. Pure: the same (prev, input) always gives the same step, and prev is not touched. */
 export function stepLungeSession(prev: Readonly<LungeSessionState>, input: LungeFrameInput): LungeStep {
@@ -103,9 +142,17 @@ export function stepLungeSession(prev: Readonly<LungeSessionState>, input: Lunge
   if (prev.stage === 'review') return NOOP_STEP({ ...prev, lastMs: input.nowMs });
 
   const side = prev.stage;
-  let { reps, findings, repFaults, workReps, framedOk, framedWrong, turnPromptSaid } = prev;
+  let { reps, findings, repFaults, workReps, framedOk, framedWrong, turnPromptSaid, cueRepFaults } = prev;
   let stage: LungeStage = prev.stage;
   let repCounted = false, findingsChanged = false, turnPrompt = false;
+  // the coach's persistence gate: a run grows on a front-on frame showing the fault and breaks on anything else
+  const readable = input.present && input.framedRight;
+  const runs = NO_RUNS();
+  for (const f of LUNGE_FAULTS) runs[f] = readable && input.faults.includes(f) ? (prev.runs?.[f] ?? 0) + 1 : 0;
+  const persisted = LUNGE_FAULTS.filter((f) => runs[f] >= LUNGE_CUE_PERSIST_FRAMES);
+  const freshCue = persisted.filter((f) => !cueRepFaults.includes(f));
+  if (freshCue.length) cueRepFaults = [...cueRepFaults, ...freshCue];
+  let repCueFaults: LungeFault[] | null = null;
 
   if (input.present) {
     if (input.framedRight) {
@@ -137,6 +184,8 @@ export function stepLungeSession(prev: Readonly<LungeSessionState>, input: Lunge
     repCounted = true;
     workReps = { ...workReps, [side]: [...workReps[side], repFaults] };
     repFaults = [];
+    repCueFaults = LUNGE_FAULTS.filter((f) => cueRepFaults.includes(f));
+    cueRepFaults = [];
     if (reps >= LUNGE_REPS_PER_SIDE) {
       stage = side === 'left' ? 'right' : 'review';
       reps = 0;
@@ -144,11 +193,13 @@ export function stepLungeSession(prev: Readonly<LungeSessionState>, input: Lunge
   }
 
   return {
-    state: { stage, reps, findings, repFaults, workReps, framedOk, framedWrong, turnPromptSaid, lastMs: input.nowMs },
+    state: { stage, reps, findings, repFaults, workReps, framedOk, framedWrong, turnPromptSaid, lastMs: input.nowMs, runs, cueRepFaults },
     repCounted,
     stageChanged: stage !== prev.stage,
     findingsChanged,
     turnPrompt,
+    cueFaults: readable ? persisted : null,
+    repCueFaults,
   };
 }
 

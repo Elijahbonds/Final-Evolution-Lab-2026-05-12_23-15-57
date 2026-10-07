@@ -63,7 +63,8 @@ describe('WarmupPrep', () => {
     expect(m).toContain(zoneNote('foot'));
     expect(m).toContain('aria-pressed="true" data-minutes="14"');
     expect(m).toContain('Start the warm-up');
-    expect(m).not.toContain('data-warmup-camera');           // WAKE_UP_CAMERA_HREF is null until a drills page exists
+    expect(m).toContain('data-warmup-camera');               // WAKE_UP_CAMERA_HREF: the drills page's Wake-Up (DRILLS 2026-10-07)
+    expect(m).toContain('href="/play/drills?drill=wake-up"');
     expect(m).toMatch(/builds capacity/);
   });
 

@@ -23,11 +23,13 @@ describe('the Mirror\'s live movements', () => {
     expect(MIRROR_PATH).toBe('/play/mirror');
   });
 
-  it('say only what the Mirror does: the lunge reads five ways, the lunge is not said to speak, no clinical words', () => {
+  it('say only what the Mirror does: the lunge reads five ways and speaks, no clinical words', () => {
     expect(Object.keys(LUNGE_FAULT_LABEL)).toHaveLength(5);
     const lunge = MIRROR_LIVE_MOVEMENTS.find((m) => m.id === 'lunge')!;
     expect(lunge.reads).toMatch(/five/);
-    expect(lunge.reads).not.toMatch(/cue|spoken|speak/i);         // the lunge has no spoken cues yet (plan Phase 2)
+    // MIRROR-MOVES P2: the lunge speaks now (lungeStage.ts LUNGE_CUE_TABLE, wired in the harness) — this said it did not
+    expect(lunge.reads).toMatch(/spoken cues/i);
+    expect(harness).toMatch(/lungeCueRef\.current\.decide\(/);
     for (const m of MIRROR_LIVE_MOVEMENTS) {
       expect(m.reads, m.id).not.toMatch(/\bmeasur/i);              // a camera number is an estimate
       expect(screenText(`${m.title}. ${m.reads}`), m.id).toEqual([]);

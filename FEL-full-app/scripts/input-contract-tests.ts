@@ -48,6 +48,9 @@ const SHELL_EXEMPT_ROUTES: Record<string, string> = {
   // ADVENTURE PHASE B (2026-10-07): the story, unlisted. Its progress is the Adventure's own save (device first); it posts
   // no account session yet because /api/sessions refuses a mode outside the catalogue, and listing it would unhide it.
   adventure: 'unlisted story mode: progress lives in the Adventure save; no account session until the owner lists it',
+  // DRILLS (2026-10-07, Mirror & coaching Phase 6): the Playbook drills on the camera. Not a game: no score is posted, no
+  // session recorded, nothing paid; it runs body play's space check and the drill engine (lib/drills) on its own page.
+  drills: 'Train-owned camera drills (lib/drills): records no play session and pays nothing, so no GameShell',
 };
 
 const LOADER_BYPASS_ROUTES: Record<string, string> = {
