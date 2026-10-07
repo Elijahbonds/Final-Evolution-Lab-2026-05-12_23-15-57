@@ -271,15 +271,14 @@ export function AssessApp({ initialRun = null }: { initialRun?: ScreenKind | nul
     return () => { delete window.__FEL_ASSESS__; window.__FEL_POSE_FEED__ = feed; };
   }, []);
 
-  // T5 asks the camera for 60 fps (spec §3.1), and records what it really delivers
+  // T5 asks for the higher pose rate (spec §3.1): the camera for 60 fps AND the pose service's opt-in, measured on the
+  // device, with a fallback to 30 Hz (lib/pose/PoseService.ts requestHighRate; MIRROR PHASE 3). Back to 30 after T5.
   useEffect(() => {
     if (!view?.wantsHighFps || highFpsRef.current) return;
     highFpsRef.current = true;
-    const track = (screenPose().video?.srcObject as MediaStream | null)?.getVideoTracks?.()[0];
-    if (!track?.applyConstraints) return;
-    track.applyConstraints({ frameRate: { ideal: 60 } })
-      .then(() => { cameraFpsRef.current = track.getSettings?.().frameRate ?? cameraFpsRef.current; })
-      .catch(() => { /* the camera keeps its rate; the result records what it was */ });
+    const svc = screenPose();
+    void svc.requestHighRate().then((r) => { cameraFpsRef.current = r.cameraFps ?? cameraFpsRef.current; });
+    return () => { svc.endHighRate(); highFpsRef.current = false; };
   }, [view?.wantsHighFps]);
 
   // the steps before the camera (lib/screen/flow.ts): the camera is asked for only from the camera card's button
