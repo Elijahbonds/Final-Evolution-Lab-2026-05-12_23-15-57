@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { DunkTracker, DUNK_POSE_IDX, type TrackerFrame } from './dunkTracker';
+import { DunkTracker, refusalLine, DUNK_POSE_IDX, type TrackerFrame } from './dunkTracker';
 import { errorBandInches, formatWithBand, FpsMeter } from '../session-setup/accuracy';
-import { resultLine, spokenResultLine } from '../session-setup/voice';
+import { resultLine, rimHangLine, spokenResultLine } from '../session-setup/voice';
 
 const FLIGHT_S = 0.857;                     // g·t²/8 ≈ 90 cm
 const G = 9.80665;
@@ -82,5 +82,54 @@ describe('± band', () => {
     const m = new FpsMeter();
     for (let i = 0; i < 20; i++) m.push(i * (1000 / 60));
     expect(Math.round(m.fps)).toBe(60);
+  });
+});
+
+describe('rim hang vs lost feet', () => {
+  type Opts = { airMs: number; hands: boolean; hipStill: boolean };
+  /** Calibrate 0.7 s standing, jump (ankles up), stay up `airMs`, land, settle. Hips follow ankles unless `hipStill`. */
+  function run({ airMs, hands, hipStill }: Opts) {
+    const tr = new DunkTracker();
+    const dt = 1000 / 60;
+    const takeoff = 1000, land = takeoff + airMs;
+    let got: unknown = null;
+    for (let t = 0; t <= land + 1500; t += dt) {
+      const up = t > takeoff && t < land;
+      const lift = up ? Math.min(0.2, (t - takeoff) / 200 * 0.2) : 0;
+      const lm = Array.from({ length: 33 }, () => ({ x: 0.5, y: 0.5, visibility: 1 }));
+      const set = (i: number, y: number, x = 0.5) => { lm[i] = { x, y, visibility: 1 }; };
+      const ankle = 0.85 - lift;
+      const hip = hipStill && up ? 0.5 - 0.2 : ankle - 0.35 - (up ? 0.04 * Math.sin(t / 80) : 0);
+      set(DUNK_POSE_IDX.leftAnkle, ankle, 0.48); set(DUNK_POSE_IDX.rightAnkle, ankle, 0.52);
+      set(DUNK_POSE_IDX.leftHip, hip, 0.48); set(DUNK_POSE_IDX.rightHip, hip, 0.52);
+      set(DUNK_POSE_IDX.nose, hip - 0.25);
+      const wristY = up && hands ? hip - 0.4 : hip - 0.05;
+      set(DUNK_POSE_IDX.leftWrist, wristY, 0.45); set(DUNK_POSE_IDX.rightWrist, wristY, 0.55);
+      const r = tr.feed({ landmarks: lm, timestampMs: t, present: true });
+      if (r) got = r;
+    }
+    return { got, refusal: tr.takeRefusal(), air: tr.refusalAirTimeMs };
+  }
+
+  it('names a rim hang and reports its air time', () => {
+    const r = run({ airMs: 1150, hands: true, hipStill: true });
+    expect(r.got).toBeNull();
+    expect(r.refusal).toBe('rim_hang');
+    expect(Math.abs((r.air ?? 0) - 1150)).toBeLessThanOrEqual(60);
+    expect(refusalLine('rim_hang', 1120)).toBe('Rim hang. Air time 1.12 s');
+  });
+  it('still refuses lost feet (hands low, hips moving) as implausible_vertical', () => {
+    expect(run({ airMs: 1150, hands: false, hipStill: false }).refusal).toBe('implausible_vertical');
+    expect(run({ airMs: 1150, hands: true, hipStill: false }).refusal).toBe('implausible_vertical');
+    expect(run({ airMs: 1150, hands: false, hipStill: true }).refusal).toBe('implausible_vertical');
+  });
+  it('leaves a normal dunk unchanged', () => {
+    const r = run({ airMs: 600, hands: true, hipStill: true });
+    expect(r.refusal).toBeNull();
+    expect((r.got as { flightTimeMs: number }).flightTimeMs).toBeGreaterThan(500);
+  });
+  it('speaks the air time only, no height', () => {
+    expect(rimHangLine(1120)).toBe('Rim hang. Air time 1.12 seconds');
+    expect(rimHangLine(1120)).not.toMatch(/inch|cm/i);
   });
 });
