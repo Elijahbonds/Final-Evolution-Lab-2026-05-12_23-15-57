@@ -18,8 +18,18 @@
 // fixtures so it never fires on good data (confidenceFloor.test.ts), and tuned by the owner-led capture's dim and far
 // takes (docs/MIRROR-CAPTURE-PROTOCOL.md; the replay report prints its catch and false-alarm rates).
 //
+// THE MIRROR'S WIRING (routed to the mirror-moves lane, which owns mirror-harness.tsx): the floor speaks through the
+// stage line the harness already shows for framing (lib/mirror/liveCamera.ts InShotLine), after it, so a body out of
+// shot is told that first. With `const floorRef = useRef(new ConfidenceFloor());` beside inShotRef, the one line is:
+//
+//   hud.set({ inShot: inShotRef.current.step(checkFraming(pose, 'front'), pose.timestampMs) ?? floorRef.current.step(pose, pose.timestampMs) });
+//
+// (and floorRef.current.reset() wherever inShotRef.current.reset() runs). `floorRef.current.low` is there for a grader
+// that should hold its cue while the line shows.
+//
 // Pure: frames in, a line out. No DOM, no clock of its own.
 import type { PoseModel } from './assets';
+import type { PoseFrame as AdapterFrame } from '../babylon/nexus/neuro-mirror/pose/mediapipe-adapter';
 import {
   LEFT_ANKLE, LEFT_HIP, LEFT_KNEE, LEFT_SHOULDER, RIGHT_ANKLE, RIGHT_HIP, RIGHT_KNEE, RIGHT_SHOULDER,
 } from './landmarks';
@@ -108,7 +118,7 @@ export class ConfidenceFloor {
     this.floor = o.floor ?? CONFIDENCE_FLOOR;
   }
 
-  step(frame: FloorFrame, nowMs: number): string | null {
+  step(frame: FloorFrame | AdapterFrame, nowMs: number): string | null {
     if (!this.on) return null;
     const c = frameConfidence(frame);
     // no body, or a body mostly out of the picture: framing's lines own that, and the window starts again after it

@@ -118,10 +118,12 @@ and nothing is saved.
 
 ## Known limits
 
-- The synthetic bodies are not people: rigid feet, a kind visibility model. The gold-standard capture (spec §12 Phase 1)
-  tunes the thresholds; the replay harness (`lib/assess/replay.ts`) and the register are ready for it.
-- PoseService thins detection to 30 Hz, so the 60 fps request on T5 does not raise the pose rate yet; every CMJ is
-  flagged under 50 Hz and landing symmetry is not scored. Needs an opt-in in `lib/pose/PoseService` (not this lane's file).
+- The synthetic bodies are not people: rigid feet, a kind visibility model. The owner-led capture tunes the
+  thresholds (Mirror Phase 3: `docs/MIRROR-CAPTURE-PROTOCOL.md`, then `scripts/mirror-capture.ts report`, which replays
+  every grader against it). Until the owner signs a value off, it stays PROPOSED.
+- T5 now opts in to a higher pose rate (`PoseService.requestHighRate`, Mirror Phase 3). It is measured on the device
+  and falls back to 30 Hz where the device cannot hold it, and there the CMJ is still flagged under 50 Hz. Which
+  phones hold it is for the capture's frame-rate log to say.
 - `SharedProfile.prq` snapshots are not refreshed by this route (and `snapshotFrom` excludes camera estimates by the
   owner's rule), so the protocol gate does not see the new numbers. Follow-up for Elijah.
 - No entry link from the Mirror or the menus yet (`lib/game-data.ts` / `lib/mode-menu.ts` belong to another lane).

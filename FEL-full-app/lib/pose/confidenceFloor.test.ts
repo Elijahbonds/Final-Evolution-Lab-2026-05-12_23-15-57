@@ -7,6 +7,8 @@ import {
   CONFIDENCE_FLOOR, CONFIDENCE_FLOOR_LINE, ConfidenceFloor, FLOOR_CLEAR_MARGIN, FLOOR_WINDOW_MS, floorApplies, frameConfidence,
 } from './confidenceFloor';
 import { toPoseFrames } from '@/lib/mirror/fixtures';
+import { InShotLine } from '@/lib/mirror/liveCamera';
+import { checkFraming } from '@/lib/mirror/framing';
 import { quickCapture } from '@/lib/assess/replay';
 import type { PoseFrame } from './landmarks';
 
@@ -136,6 +138,29 @@ describe('what is framing\'s job, not the floor\'s', () => {
     let line: string | null = null;
     for (let t = 0; t <= 1500; t += 33) line = f.step(adapter, t);
     expect(line).toBe(CONFIDENCE_FLOOR_LINE);
+  });
+});
+
+describe('the Mirror harness wiring (routed): after the in-shot line, on the same stage line', () => {
+  // exactly the expression the routed wiring adds to mirror-harness.tsx, on the adapter frame the harness hands over
+  const line = (inShot: InShotLine, floor: ConfidenceFloor, pose: { present: boolean; timestampMs: number; landmarks: { x: number; y: number; z: number; visibility: number }[] }) =>
+    inShot.step(checkFraming(pose, 'front'), pose.timestampMs) ?? floor.step(pose, pose.timestampMs);
+  const adapterOf = (f: PoseFrame) => ({ present: f.present, timestampMs: f.t, landmarks: f.image.map((l) => ({ x: l.x, y: l.y, z: l.z, visibility: l.v })) });
+  const squat = toPoseFrames(JSON.parse(readFileSync(join(ROOT, 'lib/mirror/fixtures/squat_clean.json'), 'utf8')));
+
+  it('a dim set shows the floor line; a good set shows nothing', () => {
+    const a = new InShotLine(), b = new ConfidenceFloor();
+    expect(dimmed(squat, 0.35).map((f) => line(a, b, adapterOf(f))).filter(Boolean)).toContain(CONFIDENCE_FLOOR_LINE);
+    const c = new InShotLine(), d = new ConfidenceFloor();
+    expect(squat.map((f) => line(c, d, adapterOf(f))).filter(Boolean)).toEqual([]);
+  });
+
+  it('a body out of shot is told that first (framing outranks the floor)', () => {
+    const cut = dimmed(squat, 0.35).map((f) => ({ ...f, image: f.image.map((l, i) => (i >= 25 ? { ...l, y: 1.15 } : l)) }));
+    const a = new InShotLine(), b = new ConfidenceFloor();
+    const said = cut.map((f) => line(a, b, adapterOf(f))).filter(Boolean);
+    expect(said.length).toBeGreaterThan(0);
+    expect(said).not.toContain(CONFIDENCE_FLOOR_LINE);
   });
 });
 

@@ -75,13 +75,53 @@ the draft's words and cue attach. HIDDEN / NO BAND = never a grade.
   the first ~50 ms of flight. On synthetic hands-on-hips jumps with the synth's jitter: 1.8 cm mean error at 30 fps,
   1.4 cm at 60 fps; on the owner's recorded rebounding take (`jump_two_foot_low`), 5.1 cm. Real feet peel off the floor,
   so the gold-standard capture (jump mat) is what should set `t5.contactLine` / `t5.airLine`.
-- **T5 at 60 fps.** The route asks the camera for 60 fps on the jump, but `lib/pose/PoseService` thins pose detection
-  to 30 Hz (`MIN_DETECT_GAP_MS`), so every CMJ today reads under the 50 Hz gate: flagged, landing symmetry not scored.
+- **T5 at 60 fps.** Until Mirror Phase 3, `lib/pose/PoseService` thinned pose detection to 30 Hz (`MIN_DETECT_GAP_MS`)
+  even though the route asked the camera for 60 fps, so every CMJ read under the 50 Hz gate. Now T5 opts in
+  (`PoseService.requestHighRate`): the camera at 60 fps, detection thinned to 60, measured on the first body frames.
+  It holds where the device reaches 50 Hz with a detect within 12.5 ms, and falls back to 30 Hz with the reason
+  otherwise. On a synthetic 60 fps CMJ the gate clears and landing timing is scored; the same take thinned to 30 Hz
+  cannot. A mid-range phone may well fall back: the capture's frame-rate log says which.
 - **Rep segmentation** (`t1.rep*`, `t2.repRise`, `t3.rep*`) are lane defaults: a squat that dips less than ~45° of knee
 - **SCREEN-SHIP (2026-09-29).** The mapped bands are the research draft's; t1.valgus is the Squad's (hip half-widths,
   0.4 / 0.8: the draft's 10° / 20° are degrees and do not apply to this metric); three reps per check, graded on the
   median of the best three (A2-2). The flight finder's constants, the bottom-window shares, the calibration's acceptance
   and the live flow's limits moved here from the graders and the runner, with their values unchanged.
+
+## Tuning on real people: the owner-led capture (Mirror Phase 3, 2026-10-07)
+
+Owner decision: the thresholds are finished by a capture you lead (you and 2 adults, a mid-range Android and an
+iPhone, pose numbers only, never video, no minors). **Your next step is [`MIRROR-CAPTURE-PROTOCOL.md`](MIRROR-CAPTURE-PROTOCOL.md).**
+
+- **Record** the protocol's 44 labelled takes on `/dev/pose-record?set=capture`. Each take is a good set or one named
+  fault done on purpose. The recorder saves numbers only, under an alias, with "adults only" and "consent" stated.
+- **Ingest** with `npx tsx scripts/mirror-capture.ts ingest <files>`. It writes one fixture per person per phone to
+  `lib/mirror/fixtures/captured/`, checked by `lib/pose/recordingsGuard.ts`.
+- **Replay** with `npx tsx scripts/mirror-capture.ts report`. Every grader runs against the captures:
+  - the Quick Screen's bands above;
+  - the Mirror's squat, lunge, press/row, hinge and push-up audits (the Movement Screen's `LUNGE_THRESHOLDS` included);
+  - the lite confidence floor.
+
+  For each check it prints:
+  - **Before:** the hit rate on good takes, the catch rate on labelled faults and the false alarms, at the value
+    here, overall and by phone.
+  - **A suggested TUNED value:** the line that best separates the labelled good takes from the faults, with the same
+    table **after**.
+- **Sign off** each value yourself. **The report never edits this register or any audit file.** Change the value
+  here, set `signedOff: true`, bump `THRESHOLDS_VERSION`, and regenerate the table below. A Mirror audit's number is
+  changed in its own file.
+
+Two findings from the synthetic replay, for the capture to confirm or clear:
+
+- **The lunge knee line.** Under the synth's landmark jitter, a clean lunge's worst knee read is 0.31 to 0.50 hip
+  half-widths, past `LUNGE_THRESHOLDS.kneeInWarn` 0.30. The lunge has no persistence gate, unlike the squat.
+- **The squat depth line.** The batch squat pattern (`lib/mirror/squatPattern.ts`, depth line 0.5) calls the repo's
+  own clean squat fixture shallow (`squat_clean.json` reads 0.48).
+
+New PROPOSED numbers from Phase 3, outside this register (both in `lib/pose`), which the capture also tunes:
+
+- **The jump's high-rate trial:** 60 fps asked; it holds at 50 Hz or more with a detect within 12.5 ms.
+- **The lite confidence floor:** a 1 s median visibility of 0.5, clearing at 0.6. Measured silent on every good
+  fixture (lowest 0.928).
 
 ## Questions for Elijah (from the research draft, verbatim)
 
