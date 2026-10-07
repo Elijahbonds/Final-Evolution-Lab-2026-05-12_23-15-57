@@ -2,12 +2,14 @@
 
 /**
  * BUNDLE-MISSING-PARTS-UI. Presentational only — no fetch, no routing. book-form.tsx owns the POST to
- * /api/coach-store/checkout for each part and passes the result back in via `busyKey` / `errors`.
+ * /api/coach-store/checkout for each part and passes the result back in via `busyKey` / `errors` / `auth`.
  */
 import type { BundlePartWithListing } from '@/lib/coach-store/bundleParts';
 import { partIsBuyable, partPriceCents } from '@/lib/coach-store/bundleParts';
 import { formatCents } from '@/lib/coach-store/money';
 import type { OwnedBundlePart } from '@/lib/coach-store/entitlement';
+
+export type PartAuthState = 'sign_in' | 'adults_only';
 
 export function BundleMissingParts({
   owned,
@@ -15,12 +17,17 @@ export function BundleMissingParts({
   onBuy,
   busyKey,
   errors,
+  auth,
+  renderAuth,
 }: {
   owned: readonly OwnedBundlePart[];
   missing: readonly BundlePartWithListing[];
   onBuy: (part: BundlePartWithListing) => void;
   busyKey?: string | null;
   errors?: Readonly<Record<string, string>>;
+  /** STORE-SIGNIN-RETURN: per-part 401/403 outcome; rendered through renderAuth so the copy lives in book-form. */
+  auth?: Readonly<Record<string, PartAuthState>>;
+  renderAuth?: (part: BundlePartWithListing, state: PartAuthState) => React.ReactNode;
 }) {
   const allOwned = missing.length === 0;
   return (
@@ -64,6 +71,7 @@ export function BundleMissingParts({
                 )}
               </div>
               {error ? <p role="alert" className="text-xs text-red-300">{error}</p> : null}
+              {auth?.[part.key] && renderAuth ? renderAuth(part, auth[part.key]) : null}
             </li>
           );
         })}
