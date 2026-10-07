@@ -7,7 +7,8 @@ import { isVerifiedAdult } from './adult';
 import { isAllowlistedCoach } from './coaches';
 import { iceServers } from './call/iceServers';
 import { makingOfferCollision, signalExpiresAt, signalRole, signalRowCap, signalTooBig } from './call/limits';
-import { isMissingTable, logStoreUnavailable, reviewsCanBeSold } from './gate';
+import { programAccessOpen } from './access';
+import { isMissingTable, logStoreUnavailable, reviewsCanBeSold, storeClosed } from './gate';
 import { coachingIcs } from './ics';
 import { parseManifest, priceOk } from './manifest';
 import { connectionFailureReschedule, decideCancel, decideJoin } from './policy';
@@ -88,7 +89,11 @@ export async function rowStatus(userId: string, rowId: string, origin = ''): Pro
       });
     }
     const access = await prisma.programAccess.findUnique({ where: { id: rowId } });
-    if (access && access.userId === userId) return NextResponse.json({ kind: 'access', status: access.status });
+    // STORE-READY B4: programOpen is server-computed so the thanks page links "Open your program" only for an
+    // open row (ACTIVE/PAST_DUE and not past accessUntil) — never for an unpaid/expired/refunded one.
+    if (access && access.userId === userId) {
+      return NextResponse.json({ kind: 'access', status: access.status, programOpen: programAccessOpen(access, new Date()) });
+    }
     return NextResponse.json({ error: 'not_found' }, { status: 404 });
   } catch (err) {
     const gone = unavailable(err);
@@ -453,6 +458,10 @@ export async function receiptFor(userId: string, rowId: string): Promise<NextRes
     const access = booking ? null : await prisma.programAccess.findUnique({ where: { id: rowId } });
     const owner = booking?.clientUserId === userId || access?.userId === userId;
     if (!owner) return NextResponse.json({ error: 'not_found' }, { status: 404 });
+    // STORE-READY B4: a receipt exists only for a PAID booking or an ACTIVE / PAST_DUE / CANCELED access row —
+    // a PENDING (unpaid), EXPIRED, REFUNDED or PAUSED row has no paid receipt to issue.
+    const receiptOk = booking ? booking.status === 'PAID' : ['ACTIVE', 'PAST_DUE', 'CANCELED'].includes(access!.status);
+    if (!receiptOk) return NextResponse.json({ error: 'not_found' }, { status: 404 });
     const instructorId = booking?.instructorId ?? access?.instructorId;
     const instructor = instructorId ? await prisma.instructor.findUnique({ where: { id: instructorId } }) : null;
     const text = receiptText({
