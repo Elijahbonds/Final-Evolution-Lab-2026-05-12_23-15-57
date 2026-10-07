@@ -273,16 +273,16 @@ export class BRMatch {
     this.bus.on('time:scale', (e) => this.clock.request(e));
 
     // ── the bots' window on the match ──
-    const self = this;
+    const clock = this.clock, loot = this.loot;   // both readonly and set above: the getters read them live
     this.botView = {
       world: this.world,
-      get tSec() { return self.clock.tSec; },
+      get tSec() { return clock.tSec; },
       zone,
       rails: this.rails,
       bodies: () => this.world.actors.values(),
       noisy: (id: ActorId) => { const at = this.noiseAt.get(id); return at !== undefined && this.clock.tSec - at <= 1; },
-      get items() { return self.loot.items; },
-      get chests() { return self.loot.chests; },
+      get items() { return loot.items; },
+      get chests() { return loot.chests; },
       kitOf: (id: ActorId) => this.byId.get(id)?.kit ?? null,
       spell: (id: string) => this.magic.spells.get(id),
       spellCooldown: (aid: ActorId, sid: string) => this.magic.cooldownOf(aid, sid),
