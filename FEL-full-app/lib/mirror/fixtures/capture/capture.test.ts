@@ -208,6 +208,13 @@ describe('the suggestion (pure)', () => {
     expect(bestLine(20, candidateLines('exact', 20, rows.map((r) => r.v)), (c) => tally(rows, '>', c)).value).toBe(20);
   });
 
+  it('a tie goes to the line nearest the PROPOSED value', () => {
+    // good 3 and 12, faults 10 and 20: a line at 6.5 and one at 16 separate them equally well (catch − false alarms)
+    const rows = [{ role: 'good' as const, v: 3 }, { role: 'fault' as const, v: 10 }, { role: 'good' as const, v: 12 }, { role: 'fault' as const, v: 20 }];
+    const best = bestLine(25, candidateLines('exact', 25, rows.map((r) => r.v)), (c) => tally(rows, '>', c));
+    expect(best.value).toBe(16);
+  });
+
   it('a re-run check tries multiples of the PROPOSED value', () => {
     expect(candidateLines('rerun', 0.5, [])).toEqual([0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.625, 0.75, 0.875, 1]);
   });
@@ -308,7 +315,9 @@ describe('it never edits a threshold', () => {
     execFileSync(tsx, ['scripts/mirror-capture.ts', 'report', '--dir', fixtures, '--out', md], { cwd: APP, encoding: 'utf8' });
     expect(readFileSync(md, 'utf8')).toMatch(/\| `t1\.valgus` .* \| 100% \(1\/1\) \|/);
     let refused = '';
-    try { execFileSync(tsx, ['scripts/mirror-capture.ts', 'report', '--dir', fixtures, '--out', 'lib/screen/PROPOSED-thresholds.md'], { cwd: APP, encoding: 'utf8', stdio: 'pipe' }); } catch (e) { refused = String((e as { stderr?: string }).stderr); }
+    // aimed at a lib/ folder inside the temp dir, so even a broken guard could never write into the repo
+    const libOut = join(dir, 'lib', 'PROPOSED-thresholds.md');
+    try { execFileSync(tsx, ['scripts/mirror-capture.ts', 'report', '--dir', fixtures, '--out', libOut], { cwd: APP, encoding: 'utf8', stdio: 'pipe' }); } catch (e) { refused = String((e as { stderr?: string }).stderr); }
     expect(refused).toMatch(/--out must be a \.md path outside lib/);
     expect(hash()).toEqual(before);
   });
