@@ -27,7 +27,7 @@ import {
   restLabel, restSecondsLeft, tenSecondWarningAt, type Board,
 } from '@/lib/session-setup/rotation';
 import {
-  MUTE_KEY, cuesAfterDunk, goWhenReadyLine, judgeAverage, nextUpLine, readMuted, resultLine, speakCues, writeMuted,
+  MUTE_KEY, cuesAfterDunk, goWhenReadyLine, judgeAverage, nextUpLine, readMuted, resultLine, rimHangLine, speakCues, writeMuted,
   type Speaker,
 } from '@/lib/session-setup/voice';
 import { KIDS_IN_SHOT, mayRecord, recordingOnHandoff, saveClipOnDevice } from '@/lib/session-setup/record';
@@ -117,6 +117,7 @@ export default function ProveIt({
   const [current, setCurrent] = useState<Attempt | null>(null);
   const [trackerState, setTrackerState] = useState('idle');
   const [refused, setRefused] = useState<DunkRefusal | null>(null);
+  const [rimAirMs, setRimAirMs] = useState(0);
   const [muted, setMuted] = useState(false);
   const [facing, setFacing] = useState<'environment' | 'user'>('environment');
   const [light, setLight] = useState<FramingLight>('red');
@@ -386,7 +387,14 @@ export default function ProveIt({
           const st = trackerRef.current.state;
           if (st !== trackerSeen.current) { trackerSeen.current = st; setTrackerState(st); }
           const why = trackerRef.current.takeRefusal();
-          if (why) setRefused(why);
+          if (why) {
+            setRefused(why);
+            if (why === 'rim_hang') {
+              const air = trackerRef.current.refusalAirTimeMs ?? 0;
+              setRimAirMs(air);
+              speakCues(speakerRef.current, [rimHangLine(air)], mutedRef.current);
+            }
+          }
           else if (st === 'airborne') setRefused(null);
           if (got) {
             liveRef.current = false;
@@ -794,7 +802,7 @@ export default function ProveIt({
         )}
         {watching && (() => {
           const w = trackerState === 'airborne' ? { word: 'UP', color: GOLD }
-            : trackerState === 'ready' ? (refused ? { word: 'AGAIN', color: RED } : { word: 'GO', color: GREEN })
+            : trackerState === 'ready' ? (refused ? { word: refused === 'rim_hang' ? 'RIM' : 'AGAIN', color: RED } : { word: 'GO', color: GREEN })
             : trackerState === 'settling' ? { word: 'LAND', color: GOLD }
             : { word: 'HOLD', color: CYAN };
           return (
@@ -802,13 +810,22 @@ export default function ProveIt({
               <div className="pointer-events-none absolute inset-0" style={{ background: w.color, opacity: 0.3 }} data-testid="dunk-wash" />
               <div
                 role="status"
-                aria-label={trackerState === 'ready' && refused ? refusalLine(refused) : w.word}
+                aria-label={trackerState === 'ready' && refused ? refusalLine(refused, rimAirMs) : w.word}
                 className="pointer-events-none absolute inset-0 flex items-center justify-center text-center font-black leading-none text-white"
                 style={{ fontSize: `${WATCHING_STATUS_MIN_VH}vh`, textShadow: '0 4px 24px rgba(0,0,0,0.8)' }}
                 data-testid="dunk-status"
               >
                 {w.word}
               </div>
+              {trackerState === 'ready' && refused === 'rim_hang' && (
+                <p
+                  className="pointer-events-none absolute inset-x-0 bottom-24 px-4 text-center text-xl font-bold text-white"
+                  style={{ textShadow: '0 2px 12px rgba(0,0,0,0.9)' }}
+                  data-testid="dunk-rim-hang-line"
+                >
+                  {refusalLine('rim_hang', rimAirMs)}
+                </p>
+              )}
               <button
                 type="button"
                 onClick={toggleMute}

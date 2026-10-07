@@ -38,6 +38,11 @@ export function cuesAfterDunk(verticalCm: number, judgeAverage: number, hasNext:
   return hasNext ? [spokenResultLine(verticalCm, judgeAverage), NEXT_UP_SPOKEN] : [spokenResultLine(verticalCm, judgeAverage)];
 }
 
+/** Spoken for a rim hang: the air time only, never a height. */
+export function rimHangLine(airTimeMs: number): string {
+  return `Rim hang. Air time ${(airTimeMs / 1000).toFixed(2)} seconds`;
+}
+
 export function goWhenReadyLine(): string {
   return 'Go when ready';
 }
