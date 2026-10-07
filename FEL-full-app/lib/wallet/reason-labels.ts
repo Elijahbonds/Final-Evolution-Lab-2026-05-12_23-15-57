@@ -35,6 +35,7 @@ export const REASON_LABELS: Record<string, ReasonLabel> = {
   // HOTFIX (2026-09-24): the Playbook's chapter shards (5d8e23c, 2026-09-20) shipped without a label, so the ledger read
   // "edu chapter complete" and wallet-tests has been red in CI ever since.
   EDU_CHAPTER_COMPLETE: { label: 'Playbook chapter complete', kind: 'earn' },
+  EDU_COURSE_COMPLETE: { label: 'Playbook finished: course bonus', kind: 'earn' },   // EDU-LINKS (2026-10-07)
   MOVEMENT_SCREEN_COMPLETED: { label: 'Movement screen', kind: 'earn' },
   CREATIVE_CARD_PUBLISH: { label: 'Creative card published', kind: 'earn' },
   CREATIVE_CARD_REMIX_ROYALTY: { label: 'Remix royalty', kind: 'earn' },
