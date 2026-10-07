@@ -61,6 +61,7 @@ import type { ModeBodySpec } from '@/lib/input/bodyProfiles';
 import type { SessionStep } from './BodySession';
 import { bodySeamFor, type BodySeam } from './bodySeam';
 import { sessionStore, stanceOnMount, type SessionWriter } from './sessionStore';   // (stanceOnMount: MOVEMENT PLAY P8)
+import { formReadStore } from '@/lib/move/formRead';   // HOOPS BODY (2026-10-07): the end card's FORM block
 import { renderDue } from './pausedRender';   // IMPROVE (2026-10-06, 3PT #18): the pause renders at ~10 fps
 import { stripStaticControls } from '../ui/staticControls';   // controls-screen (2026-10-06): button maps leave the play screen
 // declared beside the profiles they subtract from (step 2); the harness is where a mode meets them
@@ -707,6 +708,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     if (p.final) releaseBody();
     if (phase === 'playing') {
       for (const e of floor.step(p, now, s.latched)) input.emitBody(e);
+      if (seam.drives && !s.latched) formReadStore.tap(def.modeId, sessionStore.record()?.runId ?? 0, p.read, p.events);   // HOOPS BODY (2026-10-07): the FORM block's reads (lib/move/formRead)
       for (const ev of p.events) {
         qa?.body(ev.kind, now - ev.t);
         // MOVEMENT PLAY P7 (2026-09-25): a claimed kind reaches the mode only past the START latch (the floor presses nothing

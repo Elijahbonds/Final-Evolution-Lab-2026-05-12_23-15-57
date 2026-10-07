@@ -93,6 +93,11 @@ const ROWS: readonly BodyProfile[] = [
   none('dunkduel', 'dunkduel', 'dunk', 'P5', true),
   // ── hoops (P6). The 3PT release is told ~330 ms late against a timed bar; in 1v1 / 3v3 a dip would be the turbo and a
   //    jump a pass or a block. P6 merges a BodyControlSource into the hoops ControlSource instead.
+  //    HOOPS BODY (2026-10-07, Mirror & coaching Phase 7): P6 LANDED. These three rows stay SESSION-ONLY on purpose: the floor
+  //    presses nothing in a hoops game, ever — no turbo from a dip, no pass from a jump, no shot from a stray hop. The modes
+  //    read the body themselves (their onBody, so `drives` is true and READY offers body play): the 3PT through
+  //    lib/move/hoopsBody (THREE_BODY: the jump starts the shot, the release is graded against the body's own apex), 1v1 and
+  //    3v3 through lib/move/bodyControlSource (COURT_BODY: a BodyControlSource merged into the hero's ControlSource).
   none('threepoint', 'threepoint', 'hoops', 'P6', true),
   none('onevone', 'onevone', 'hoops', 'P6', true),
   none('threevthree', 'threevthree', 'hoops', 'P6', true),

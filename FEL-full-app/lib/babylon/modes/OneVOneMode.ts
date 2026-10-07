@@ -140,6 +140,7 @@ import { FLICK_RETRACT_SEC, StickHandleReader, stickMoveFor, pausinWanted, sizeU
 import type { HoopsDunk } from '../core/HoopsDunks';   // STICK HANDLE (2026-09-17): the right stick is the dribble stick on the floor (2K17 vocabulary)
 import { driveDunkKFor, handForward, handShiftTarget, stepShift, driveDunkPos, hangWanted, RIM_HANG, rimProtectorJump, rimProtectorSwats, RIM_PROTECT, chestRide, VICTIM_SLIDE, slideStep, type ShowtimeJudge } from '../core/DriveFlight';   // DUNK-FANATIC (2026-09-17): at the iron by the resolve, the rim hang, the rim protector, the chest ride
 import { PlayerSlot, LocalInputSource, AISource } from '../core/PlayerSlot';
+import { BodyControlSource, MergedControlSource, COURT_BODY } from '@/lib/move/bodyControlSource';   // HOOPS BODY (2026-10-07): 1v1 by body
 import { attachNetplay, type NetplayHandle } from '../../net/attach';   // opt-in: ?net=<room>, same shape as ?agent=1
 import { AgentControlSource } from '../core/AgentControlSource';  // M69: intent play under ?agent=1
 import { agentBridge } from '../core/AgentBridge';
@@ -199,7 +200,8 @@ import type { ParticleSystem } from '@babylonjs/core';   // suite pass: the hot 
 import { HoopJuice } from '../visual/HoopJuice';   // A+ P0: the hoop answers the make (shared with Dunk; Meshy never scaled)
 import { mountShotMeter3D, type ShotMeter3DHandle } from '../visual/ShotMeter3D';   // THE SHOT METER (owner, 2026-09-18): the 2K bar beside the shooter's head
 import { assertSpawned } from '../core/FrameGuard';
-import type { ModeContext, ModeDefinition, HudValue } from '../core/ModeHarness';
+import type { ModeContext, ModeDefinition, HudValue, BodyView } from '../core/ModeHarness';
+import type { BodyEvent } from '@/lib/pose/BodyReader';
 import type { FelInput } from '../core/InputBus';
 import { DUNK_CONFIG as SHARED_CFG } from './modeConfigs';
 import { readTier } from '../core/Difficulty';   // IMPROVE (2026-10-06) #2: the shared OPPONENT pick
@@ -308,6 +310,7 @@ export const OneVOneMode: ModeDefinition = (() => {
   let me: SpawnedCharacter, foe: SpawnedCharacter, ball: AbstractMesh, ballSim: BallSim;
   let onevoneVenue: VenueHandle | null = null;  // M74
   let meSlot: PlayerSlot, foeSlot: PlayerSlot, localSource: LocalInputSource;
+  let bodyCtl: BodyControlSource | null = null;   // HOOPS BODY: the body's half of the hero's source (merged with the pad's)
   /** Null unless ?net=<room> and NEXT_PUBLIC_NETD_URL are both present. */
   let net: NetplayHandle | null = null;
   let meDribble: DribbleController;
@@ -903,6 +906,9 @@ export const OneVOneMode: ModeDefinition = (() => {
 
   return {
     modeId: 'onevone', mood: 'goldenHour', camPreset: 'hoops',
+    // HOOPS BODY (2026-10-07): the body plays 1v1 through the hero's ControlSource; its claimed events land here
+    body: COURT_BODY,
+    onBody: (_ctx: ModeContext, ev: BodyEvent, view: BodyView): boolean => bodyCtl?.see(ev, view) ?? false,
 
     async load(ctx: ModeContext) {
       // ONE BUS PER MOUNT, OWNED BY THE HARNESS. This mode built its own, which worked and was
@@ -969,7 +975,10 @@ export const OneVOneMode: ModeDefinition = (() => {
         ctx.agent.control = agentCtl;
         ctx.agent.getScore = () => myScore;
       }
-      meSlot = new PlayerSlot('me', agentCtl ?? localSource, true);
+      // HOOPS BODY (2026-10-07, Mirror & coaching Phase 7): the body's reads merged into the pad's (lib/move/bodyControlSource) —
+      // with no body in frame the merge IS the pad's Intent, field for field, so button play is unchanged
+      bodyCtl = new BodyControlSource({ role: () => (possession === 'mine' ? 'offense' : 'defense'), view: () => ctx.body?.() ?? null, meter: () => shotMeter ?? null, hand: () => meCarry?.hand ?? 'Right', emit: (e) => OneVOneMode.onInput(ctx, e) });
+      meSlot = new PlayerSlot('me', agentCtl ?? new MergedControlSource(localSource, bodyCtl), true);
       // NETPLAY (2026-09-12): with ?net=<room> the opponent is driven by a remote player instead
       // of the DefenderBrain. Exactly the ?agent=1 precedent above — one source swap, and with no
       // flag present nothing is constructed and nothing connects.

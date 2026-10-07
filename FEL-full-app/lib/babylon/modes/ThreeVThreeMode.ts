@@ -86,6 +86,7 @@ import { isFinishStyle, planDropStep, planShimmyFade, stickAtRim01, POST_DROP_ST
 import { mountBallCarry, type BallCarry } from '../anim/ballCarry';
 import { rightHandDunks, dunkHandPass } from '../anim/dunkHand';   // DUNK MOTION phase 11: right-handed game dunks
 import { PlayerSlot, LocalInputSource, AISource } from '../core/PlayerSlot';
+import { BodyControlSource, MergedControlSource, COURT_BODY } from '@/lib/move/bodyControlSource';   // HOOPS BODY (2026-10-07): 3v3 by body
 import { attachNetplay, type NetplayHandle } from '../../net/attach';   // opt-in: ?net=<room> seats a human in the first AI slot
 import { AgentControlSource } from '../core/AgentControlSource';  // M69: intent play under ?agent=1 (same seam as 1v1)
 import { agentBridge } from '../core/AgentBridge';
@@ -156,7 +157,8 @@ import { CHOKE, CHOKE_RAILS, readChoke, resolveRails, inChokeLane, railRunRead }
 import { readCourtLayout } from '../nexus/courtLayout';   // CHOKEPOINT COURT (owner brief, 2026-09-18 — the deferred layout)   // HOOPS KINETIC 3v3 (owner, 2026-09-18): slipstream / sling / synergy + the 1v1's duel reads
 import { driveIntent, driveLateral, bodiesMet } from '../core/DriveLine';
 import { assertSpawned } from '../core/FrameGuard';
-import type { ModeContext, ModeDefinition, HudValue } from '../core/ModeHarness';
+import type { ModeContext, ModeDefinition, HudValue, BodyView } from '../core/ModeHarness';
+import type { BodyEvent } from '@/lib/pose/BodyReader';
 import { readTier } from '../core/Difficulty';   // IMPROVE (2026-10-06) #3: the shared OPPONENT pick
 import { hintSwap } from './onevoneRules';     // IMPROVE (2026-10-06) #7: the 1v1's hint dwell (the urgent lines share its prefixes)
 import {   // IMPROVE (2026-10-06): the threevthree items of docs/IMPROVEMENTS-2026-10-05.md, as pure logic
@@ -245,6 +247,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   let foes: Body[] = [];
   let ball: AbstractMesh, ballSim: BallSim;
   let localSource: LocalInputSource;
+  let bodyCtl: BodyControlSource | null = null;   // HOOPS BODY: the body's half of the hero's source (teammates stay AI)
   /** Null unless ?net=<room>. One AI seat becomes a remote player. */
   let net: NetplayHandle | null = null;
   let netSeatTaken = false;
@@ -820,6 +823,9 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
 
   return {
     modeId: 'threevthree', mood: 'goldenHour', camPreset: 'team',
+    // HOOPS BODY (2026-10-07): the body plays my man through his ControlSource; its claimed events land here
+    body: COURT_BODY,
+    onBody: (_ctx: ModeContext, ev: BodyEvent, view: BodyView): boolean => bodyCtl?.see(ev, view) ?? false,
 
     async load(ctx: ModeContext) {
       // ONE BUS PER MOUNT, OWNED BY THE HARNESS. This mode built its own, which worked and was
@@ -889,7 +895,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           ? new PlayerSlot('net1', net!.sourceFor('net1'), false)
           : ai && brain
             ? new PlayerSlot('ai', new AISource(char.root.position, world, brain), false)
-            : new PlayerSlot('me', agentCtl ?? localSource, true);
+            : new PlayerSlot('me', agentCtl ?? (bodyCtl ? new MergedControlSource(localSource, bodyCtl) : localSource), true);
         // BIOMECH-HOOPS-WAVE1: one animation owner per rig, and the Posture Poses layer (mounted here, BEFORE the carries —
         // the dribble arm solves against the posed shoulders); the layer owns the eyes
         char.secondary?.setLookTarget(() => null);
@@ -905,6 +911,9 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       };
 
       localSource = new LocalInputSource();
+      // HOOPS BODY (2026-10-07, Mirror & coaching Phase 7): the body's reads merged into the pad's for MY body only (lib/move/bodyControlSource);
+      // with no body in frame the merge IS the pad's Intent, so button play is unchanged
+      bodyCtl = new BodyControlSource({ role: () => (carrierId === 'foeTeam' ? 'defense' : 'offense'), view: () => ctx.body?.() ?? null, meter: () => shotMeter ?? null, hand: () => carries.get(me)?.hand ?? 'Right', emit: (e) => ThreeVThreeMode.onInput(ctx, e) });
 
       net = attachNetplay('threevthree'); netSeatTaken = false;   // no-op without ?net=
       // M69 (mirrors 1v1): when driven by an agent (?agent=1), the hero slot reads from the AgentControlSource
