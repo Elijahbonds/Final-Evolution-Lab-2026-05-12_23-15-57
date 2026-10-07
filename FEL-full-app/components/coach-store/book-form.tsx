@@ -10,12 +10,14 @@ export function BookForm({
   kind,
   durationMin = 30,
   audience,
+  continueLabel = 'Continue',
 }: {
   slug: string;
   listingId: string;
   kind: string;
   durationMin?: 30 | 60;
   audience?: 'adult' | 'teen';
+  continueLabel?: string;
 }) {
   const [slots, setSlots] = useState<{ startsAt: string; label: string; durationMin: number }[]>([]);
   const [who, setWho] = useState<'self' | 'teen'>(audience === 'teen' ? 'teen' : 'self');
@@ -138,7 +140,7 @@ export function BookForm({
           errors={partErrors}
         />
       ) : error ? <p className="text-sm text-red-300">{error}</p> : null}
-      <button type="button" className="rounded-xl bg-cyan-300 px-4 py-2 text-sm font-bold text-black" onClick={submit}>Continue</button>
+      <button type="button" className="rounded-xl bg-cyan-300 px-4 py-2 text-sm font-bold text-black" onClick={submit}>{continueLabel}</button>
     </div>
   );
 }
