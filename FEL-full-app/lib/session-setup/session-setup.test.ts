@@ -7,7 +7,7 @@ import {
   readAdults, rosterReady, sealRoster, writeAdults, type Athlete, type KeyValueStore,
 } from './roster';
 import {
-  REARM_MS, REST_PRESETS_MS, TEN_SECONDS_LINE, freshBoard, normalizeRestMs, recordDunk, restSecondsLeft, runRotationUntapped,
+  REARM_MS, REST_PRESETS_MS, TEN_SECONDS_LINE, freshBoard, nextRound, normalizeRestMs, recordDunk, restSecondsLeft, runRotationUntapped,
   tenSecondWarningAt,
 } from './rotation';
 import {
@@ -18,7 +18,8 @@ import { FILL_MIN, checkFraming, type FramingCheck, type FramingFrame } from '@/
 import { NEXT_UP_SPOKEN, cuesAfterDunk, goWhenReadyLine, nextUpLine, resultLine, speakCues, spokenResultLine, type Speaker } from './voice';
 import { KIDS_IN_SHOT, mayRecord, recordingOnHandoff } from './record';
 import { endSession, readSession, rememberSession } from './memory';
-import { adultCsv } from './summary';
+import { adultCsv, sessionSummary, type Rep } from './summary';
+import { HANDS_UP_MS, HandsUpGesture } from './gesture';
 import { postOptInSession, serverJumpForm, type MeasuredJump } from './saveNumbers';
 import { ADULT_NUMBER_SYNC_ENABLED, queueAdultNumbers } from './sync';
 import { drillPhase } from './drills';
@@ -483,5 +484,81 @@ describe('dunk loop: solo Start, consent, hard rule', () => {
     expect(prove.match(/fetch\(/g)?.length).toBe(3);
     expect(prove).not.toMatch(/XMLHttpRequest|sendBeacon/);
     expect(prove).toContain('width: { ideal: 1280 }, height: { ideal: 720 }');
+  });
+});
+
+describe('Tip 5: rounds, make rate, drop-off, gesture', () => {
+  const rep = (cm: number, extra: Partial<Rep> = {}): Rep => ({ round: 1, band: '18+', family: 'TWO-HAND JAM', verticalCm: cm, ...extra });
+  const players: Athlete[] = [{ id: 'p0', name: 'Ada', band: '18+' }];
+
+  it('1. 3 rounds x 5 keeps 15 reps', () => {
+    let log = { round: 1, reps: [] as number[] };
+    for (let r = 0; r < 3; r++) {
+      const reps = [...log.reps, ...[1, 2, 3, 4, 5].map((n) => r * 10 + n)];
+      const next = nextRound({ round: log.round, reps }, players, 5);
+      expect(next.board.counts).toEqual([0]);
+      log = { round: next.round, reps: next.reps };
+    }
+    expect(log.reps).toHaveLength(15);
+    expect(log.round).toBe(4);
+  });
+
+  it('2. make rate overall and by family; refusals excluded', () => {
+    const s = sessionSummary([
+      rep(80, { make: true }), rep(80, { make: false }), rep(80, { make: true, family: 'WINDMILL' }),
+      rep(80, { make: null }), rep(200, { refusal: 'rim_hang', make: true }),
+    ]);
+    expect(s.marked).toBe(3);
+    expect(s.makes).toBe(2);
+    expect(s.makeRate).toBeCloseTo(2 / 3);
+    expect(s.byFamily.find((f) => f.family === 'TWO-HAND JAM')).toMatchObject({ makes: 1, marked: 2, rate: 0.5 });
+    expect(s.byFamily.find((f) => f.family === 'WINDMILL')).toMatchObject({ makes: 1, marked: 1, rate: 1 });
+    expect(s.bestCm).toBe(80);
+    expect(s.measured).toBe(4);
+  });
+
+  it('3. dropOff fires on a decline, not on noise within 4%', () => {
+    const decline = sessionSummary([90, 89, 88, 80, 78, 75].map((c) => rep(c)));
+    expect(decline.dropOff).toBe(true);
+    const noise = sessionSummary([90, 88, 91, 87.5, 89, 88.5, 87.4].map((c) => rep(c)));
+    expect(noise.dropOff).toBe(false);
+    const two = sessionSummary([90, 90, 90, 80, 80].map((c) => rep(c)));
+    expect(two.dropOff).toBe(false);
+  });
+
+  it('4. kid tags and makes never reach storage or the CSV', () => {
+    const csv = adultCsv([
+      { name: 'Ada', band: '18+', verticalCm: 80, judges: 8, round: 2, make: true, tags: ['Plant', 'Arm swing'] },
+      { name: 'Kid', band: '13-17', verticalCm: 80, judges: 8, round: 1, make: false, tags: ['Landing'] },
+      { name: 'Who', band: 'unknown', verticalCm: 80, judges: 8, round: 1, make: true, tags: ['Ball'] },
+    ]);
+    expect(csv.split('\n')[0]).toBe('name,round,vertical_in,judges,make,tags');
+    expect(csv).toContain('Ada,2,');
+    expect(csv).toContain('make,Plant;Arm swing');
+    expect(csv).not.toMatch(/Kid|Who|Landing|Ball|miss/);
+    const prove = readFileSync(join(ROOT, 'app/play/dunkduel/_components/prove-it.tsx'), 'utf8');
+    expect(prove).not.toMatch(/(localStorage|sessionStorage|indexedDB)[^\n]*(tags|make)/);
+    expect(prove).not.toMatch(/(tags|\.make)[^\n]*(localStorage|sessionStorage|indexedDB)/);
+    expect(prove).not.toMatch(/fetch\([^)]*(tags|make)/);
+  });
+
+  it('5. hands-up marks MAKE; a normal landing does not', () => {
+    const frame = (t: number, wristY: number): TrackerFrame => {
+      const lm = Array.from({ length: 33 }, () => ({ x: 0.5, y: 0.5, visibility: 1 }));
+      lm[DUNK_POSE_IDX.nose] = { x: 0.5, y: 0.3, visibility: 1 };
+      lm[DUNK_POSE_IDX.leftWrist] = { x: 0.4, y: wristY, visibility: 1 };
+      lm[DUNK_POSE_IDX.rightWrist] = { x: 0.6, y: wristY, visibility: 1 };
+      return { landmarks: lm, timestampMs: t, present: true };
+    };
+    const up = new HandsUpGesture();
+    const fired: number[] = [];
+    for (let t = 0; t <= 800; t += 33) if (up.feed(frame(t, 0.1))) fired.push(t);
+    expect(fired).toHaveLength(1);
+    expect(fired[0]).toBeGreaterThanOrEqual(HANDS_UP_MS);
+    const landing = new HandsUpGesture();
+    let hit = false;
+    for (let t = 0; t <= 300; t += 33) hit ||= landing.feed(frame(t, 0.1));
+    for (let t = 330; t <= 1500; t += 33) hit ||= landing.feed(frame(t, 0.6));
+    expect(hit).toBe(false);
   });
 });
