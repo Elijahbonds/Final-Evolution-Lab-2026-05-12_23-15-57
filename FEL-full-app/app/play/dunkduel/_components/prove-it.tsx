@@ -217,7 +217,7 @@ export default function ProveIt({
     if (!v) { stream.getTracks().forEach((t) => t.stop()); return false; }
     v.srcObject = stream;
     // ask for 60 fps (the assess screen's pattern); a camera that refuses keeps its rate, and the ± band says so
-    const track = stream.getVideoTracks()[0];
+    const track = stream.getVideoTracks?.()?.[0];
     cameraFpsRef.current = track?.getSettings?.().frameRate ?? 0;
     track?.applyConstraints?.({ frameRate: { ideal: 60 } })
       .then(() => { cameraFpsRef.current = track.getSettings?.().frameRate ?? cameraFpsRef.current; })
