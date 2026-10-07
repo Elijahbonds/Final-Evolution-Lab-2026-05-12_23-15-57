@@ -83,6 +83,16 @@ export function recordDunk(board: Board): DunkAdvance {
   };
 }
 
+export interface RoundLog<T> {
+  round: number;
+  reps: T[];
+}
+
+/** Round N+1: a fresh rotation, the same players, and every rep so far kept. */
+export function nextRound<T>(log: RoundLog<T>, players: readonly Athlete[], dunksEach: number): { round: number; reps: T[]; board: Board } {
+  return { round: log.round + 1, reps: log.reps.slice(), board: freshBoard(players, dunksEach) };
+}
+
 export type LivePhase = 'setup' | 'framing' | 'watching' | 'countdown' | 'paused' | 'final';
 
 /**
