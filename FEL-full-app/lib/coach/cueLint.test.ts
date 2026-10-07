@@ -84,8 +84,9 @@ describe('the corpus: every cue the policy covers', () => {
       'pattern:setupLine:', 'setup:', 'template:', 'warmup:', 'wakeup:'];
     for (const p of prefixes) expect(corpus.some((e) => e.id.startsWith(p)), p).toBe(true);
     expect(new Set(corpus.map((e) => e.id)).size).toBe(corpus.length);
-    // the live coach's eight cards, three levels each
-    expect(corpus.filter((e) => e.id.startsWith('mirror-coach:'))).toHaveLength(24);
+    // the live coach's eight cards, three levels each, and (MIRROR-MOVES P2) each card's reply to a repeated fault
+    expect(corpus.filter((e) => e.id.startsWith('mirror-coach:'))).toHaveLength(32);
+    expect(corpus.filter((e) => e.id.endsWith(':reply')).length).toBeGreaterThanOrEqual(8 + 5 + 3 + 4);   // + lunge, hinge, push-up
     expect(corpus.length).toBeGreaterThanOrEqual(390);
   });
 

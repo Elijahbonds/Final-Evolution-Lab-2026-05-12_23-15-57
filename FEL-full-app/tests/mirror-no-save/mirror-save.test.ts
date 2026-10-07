@@ -80,7 +80,8 @@ describe('STATIC: mirror-harness.tsx', () => {
   });
 
   it('canSaveScan defaults to false (a missing prop never saves)', () => {
-    expect(code).toContain("export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }");
+    // MIRROR-MOVES P2 (2026-10-07): a third prop (initialPattern, the `?pattern=` tab) follows — the default under test is unchanged
+    expect(code).toMatch(/export function MirrorHarness\(\{ youth = 'unknownAge', canSaveScan = false[,}]/);
   });
 
   it('writes nothing to browser storage', () => {

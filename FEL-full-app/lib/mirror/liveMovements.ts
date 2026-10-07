@@ -5,14 +5,18 @@
 // now links into it, one link per movement the Mirror runs today (the harness's tabs: app/play/mirror/_components/
 // mirror-harness.tsx PATTERN_SHORT; liveMovements.test.ts holds the two lists together).
 //
-// The address carries `?pattern=<id>`, the one plan Phase 2 reads to open that tab (edu-links builds its "Check it on
-// camera" links the same way). Until Phase 2 lands the Mirror opens on its first tab, so every link also names the tab
-// to pick — a line that stays true after it.
+// The address carries `?pattern=<id>`, which the Mirror reads to open that tab (MIRROR-MOVES P2, 2026-10-07:
+// lib/mirror/patternParam.ts; edu-links builds its "Check it on camera" links the same way). Every link also names the
+// tab, so a reader knows where it goes before tapping.
+//
+// MIRROR-MOVES P2: the hip hinge and the push-up are live tabs now (owner decision 2026-10-07, "both"), and the lunge
+// speaks its cues — the lines below say so.
 //
 // Pure data. What each line says is what the harness does today, in the Mirror's own words (estimated, never measured).
+import type { MirrorTab } from './patternParam';
 
-/** The Mirror's live tabs, by the harness's own keys. */
-export type LiveMirrorPattern = 'squat' | 'lunge' | 'pressRow' | 'jump' | 'screen';
+/** The Mirror's live tabs, by the harness's own keys (patternParam.ts MIRROR_TABS — the one list). */
+export type LiveMirrorPattern = MirrorTab;
 
 export interface LiveMovement {
   id: LiveMirrorPattern;
@@ -32,7 +36,15 @@ export const MIRROR_LIVE_MOVEMENTS: readonly LiveMovement[] = [
   },
   {
     id: 'lunge', tab: 'Lunge', title: 'Lunge',
-    reads: 'Each leg forward in turn, read the same five ways, and the two sides compared in the review.',
+    reads: 'Each leg forward in turn, read the same five ways, with spoken cues as you go, and the two sides compared in the review.',
+  },
+  {
+    id: 'hinge', tab: 'Hinge', title: 'Hip Hinge',
+    reads: 'Side-on: a short check, then a work set. Each rep is read for the head-to-hips line, how far the hips travel back against the knee, and the shin, with spoken cues between reps.',
+  },
+  {
+    id: 'pushup', tab: 'Push-up', title: 'Push-up',
+    reads: 'Phone on the floor, side-on: a short check, then a work set. Each rep is read for the body line, the hands, the head and the depth, with spoken cues between reps.',
   },
   {
     id: 'pressRow', tab: 'Press / Row', title: 'Split-Stance Press / Row',
@@ -48,5 +60,5 @@ export const MIRROR_LIVE_MOVEMENTS: readonly LiveMovement[] = [
   },
 ];
 
-/** The Mirror on this movement's tab (once plan Phase 2 reads `?pattern=`; the Mirror's first tab until then). */
+/** The Mirror on this movement's tab (`?pattern=`, read by app/play/mirror/page.tsx — lib/mirror/patternParam.ts). */
 export const mirrorMovementHref = (id: LiveMirrorPattern): string => `${MIRROR_PATH}?pattern=${id}`;

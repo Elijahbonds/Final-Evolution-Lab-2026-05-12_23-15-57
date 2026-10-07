@@ -95,16 +95,20 @@ export const PUSHUP_THRESHOLDS: PushupThresholds = {
 export const PUSHUP_CUES: readonly CueRule[] = [
   { faultId: 'depth', cue: 'All the way down — chest to a fist off the floor.',
     escalate: 'Still stopping short. Slow the descent and own the bottom before you press.',
-    regress: 'Knees down. Same line, same depth, less weight to press.' },
+    regress: 'Knees down. Same line, same depth, less weight to press.',
+    reply: 'Chest to a fist off the floor.' },
   { faultId: 'bodyLine', cue: 'Be one stiff plank from the floor up — a straight line, head to heels, before you move.',
     escalate: 'Still bending in the middle. Push the floor away and move as one stiff plank.',
-    regress: 'Knees down, or hands on a box — same line, less line to hold.' },
+    regress: 'Knees down, or hands on a box — same line, less line to hold.',
+    reply: 'One stiff plank from the floor up.' },
   { faultId: 'headLine', cue: 'Eyes on the floor just past your hands — a long neck, not a reaching chin.',
     escalate: 'Still reaching. Eyes back down to a spot on the floor just past your hands.',
-    regress: 'Pause at the top. Set the neck first, THEN start the rep.' },
+    regress: 'Pause at the top. Set the neck first, THEN start the rep.',
+    reply: 'Eyes on the floor past your hands.' },
   { faultId: 'handSetup', cue: 'Set the hands on the floor right under the shoulders before you go down.',
     escalate: 'Still walked out. Reset the top position — hands under shoulders, then descend.',
-    regress: 'From your knees: set the hands under the shoulders, hold two seconds, then rep.' },
+    regress: 'From your knees: set the hands under the shoulders, hold two seconds, then rep.',
+    reply: 'Hands on the floor under the shoulders.' },
 ];
 
 const vis = (l: Lm | undefined, t: number): l is Lm => !!l && l.v >= t;
@@ -259,9 +263,13 @@ export function auditPushup(frames: PoseFrame[], ctx: MirrorPatternContext = {})
       if (bodyLineRun >= t.bodyLinePersistFrames) bodyLinePersisted = true;
     }
 
-    // head line: the ear against the ankle→shoulder line, extended past the shoulder toward the head
-    if (vis(ear, t.minVis) && vis(ankle, t.minVis)) {
-      const off = lineOffsetRatio(ankle, sh, ear);
+    // head line: the ear against the floor-contact→shoulder line, extended past the shoulder toward the head.
+    // MIRROR-MOVES P2 (2026-10-07): the floor contact is the KNEE on a knee push-up, as the body line above already reads
+    // it — this read the ankle always, and the ankle is in the air on a knee push-up (the shin folds up off the floor), so
+    // the line tipped and a neutral head on the clean knee fixture read past headLineWarn on every rep: the live coach
+    // would have said "a long neck, not a reaching chin" to every knee push-up. The straight-leg read is unchanged.
+    if (vis(ear, t.minVis) && vis(floorRef, t.minVis)) {
+      const off = lineOffsetRatio(floorRef, sh, ear);
       headLineSamples++;
       if (Math.abs(off) > Math.abs(worstHeadLine)) worstHeadLine = off;
     }
