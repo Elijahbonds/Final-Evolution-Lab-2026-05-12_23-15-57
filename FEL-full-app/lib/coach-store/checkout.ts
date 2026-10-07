@@ -237,7 +237,8 @@ async function bookTime(
       client_reference_id: userId,
       mode: 'payment',
       expires_at: checkoutExpiresAtUnix(now),
-      payment_method_types: ['card'],
+      // No payment_method_types: Stripe's automatic payment methods offer whatever the
+      // Dashboard has enabled (SEC-F4 addendum). Pinning ['card'] hid every wallet/BNPL here.
       line_items: [{
         quantity: 1,
         price_data: {

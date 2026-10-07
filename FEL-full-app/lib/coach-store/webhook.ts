@@ -31,6 +31,17 @@ export function coachStoreMeta(event: Stripe.Event): Meta | null {
     parent?: { subscription_details?: { metadata?: unknown } };
     subscription_details?: { metadata?: unknown };
   };
+  return coachStoreSessionMeta(obj);
+}
+
+/** The coach-store metadata of a Checkout Session (or null when the session is not one). The invoice
+ *  shapes (parent/subscription_details metadata) are read by coachStoreMeta above, not here — the
+ *  server-verified success path only ever holds a session. */
+export function coachStoreSessionMeta(obj: {
+  metadata?: unknown;
+  parent?: { subscription_details?: { metadata?: unknown } };
+  subscription_details?: { metadata?: unknown };
+}): Meta | null {
   const meta = {
     ...asMeta(obj.parent?.subscription_details?.metadata),
     ...asMeta(obj.subscription_details?.metadata),
@@ -53,6 +64,21 @@ export async function fulfilCoachStore(event: Stripe.Event, idempotencyKey: stri
   } else if (event.type === 'charge.refunded' || event.type === 'charge.dispute.created') {
     await onReverse(meta, event.type === 'charge.dispute.created');
   }
+}
+
+/**
+ * The checkout.session.completed half of fulfilCoachStore, on the session itself rather than the event,
+ * so the server-verified success path (SEC-F4 NO-WEBHOOK, lib/stripe/verify-checkout.ts) fulfils a paid
+ * coach-store checkout through the SAME code as the webhook. Idempotent the way the webhook is: the
+ * HELD→PAID / PENDING→ACTIVE status CAS runs once, and the sale's ledger row is unique on the caller's
+ * idempotency key (the webhook's stripe-event key, or the verify path's stripe-session one).
+ */
+export async function fulfilCoachStoreCheckout(
+  session: Stripe.Checkout.Session,
+  meta: Meta,
+  idempotencyKey: string,
+): Promise<void> {
+  return onCheckoutSession(session, meta, idempotencyKey);
 }
 
 function feeOf(bt: unknown): number {
@@ -105,7 +131,10 @@ async function postSale(idempotencyKey: string, price: number, fee: number, coac
 }
 
 async function onCheckout(event: Stripe.Event, meta: Meta, idempotencyKey: string): Promise<void> {
-  const session = event.data.object as Stripe.Checkout.Session;
+  return onCheckoutSession(event.data.object as Stripe.Checkout.Session, meta, idempotencyKey);
+}
+
+async function onCheckoutSession(session: Stripe.Checkout.Session, meta: Meta, idempotencyKey: string): Promise<void> {
   const booking = await prisma.booking.findUnique({ where: { id: meta.rowId } });
   if (booking) {
     if (booking.status === 'PAID') {
@@ -144,7 +173,15 @@ async function onCheckout(event: Stripe.Event, meta: Meta, idempotencyKey: strin
 
   const access = await prisma.programAccess.findUnique({ where: { id: meta.rowId } });
   if (!access || access.status === 'ACTIVE') {
-    if (access?.status === 'ACTIVE') await postSale(idempotencyKey, access.priceCents, access.stripeFeeCents, await coachOf(access.instructorId), access.id);
+    if (access?.status === 'ACTIVE') {
+      await postSale(idempotencyKey, access.priceCents, access.stripeFeeCents, await coachOf(access.instructorId), access.id);
+      // A replay still closes the bookkeeping row: the buy lane writes a PENDING Order at checkout time
+      // (lib/coach-store/checkout.ts), so the Order status is not proof the sale was posted.
+      await prisma.order.updateMany({
+        where: { stripeSessionId: session.id, status: { not: 'PAID' } },
+        data: { status: 'PAID' },
+      });
+    }
     return;
   }
   const subscription = session.mode === 'subscription';
@@ -171,7 +208,15 @@ async function onCheckout(event: Stripe.Event, meta: Meta, idempotencyKey: strin
       renewalIndex: 0, sessionEndsAt: null, billing: 'one_time',
     });
   }
-  await prisma.order.updateMany({ where: { stripeSessionId: session.id }, data: { status: 'PAID' } });
+  // FLAG (SEC-F4): the where clause gained `status: { not: 'PAID' }`. The buy lane creates this Order as
+  // PENDING when checkout starts, and without the guard the updateMany throws P2025 on it (a real
+  // no-webhook fulfilment would die AFTER the access was granted, on the bookkeeping row). The guard
+  // only widens which row is flipped to PAID; a row already PAID — the true already-fulfilled signal —
+  // behaves exactly as before (0 rows, nothing thrown).
+  await prisma.order.updateMany({
+    where: { stripeSessionId: session.id, status: { not: 'PAID' } },
+    data: { status: 'PAID' },
+  });
 }
 
 async function coachOf(instructorId: string): Promise<string> {

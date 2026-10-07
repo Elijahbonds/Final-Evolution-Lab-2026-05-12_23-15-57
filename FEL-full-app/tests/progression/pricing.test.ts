@@ -30,38 +30,72 @@ describe('two cadences, one entitlement', () => {
 });
 
 describe('payment methods offered are ones Stripe can actually take', () => {
+  // SEC-F4 addendum: the default is automatic payment methods — paymentMethodsFor returns
+  // undefined, so no payment_method_types is sent and the Dashboard decides (Afterpay,
+  // Klarna, Affirm, Apple/Google Pay, Link, Cash App, PayPal can all be switched on there).
+  // The fixed lists remain only as the STRIPE_PM_PIN=1 opt-in, which is what the
+  // containment assertions below exercise.
+  const pin = (fn: () => void) => {
+    const prev = process.env.STRIPE_PM_PIN;
+    process.env.STRIPE_PM_PIN = '1';
+    try { fn(); } finally {
+      if (prev === undefined) delete process.env.STRIPE_PM_PIN; else process.env.STRIPE_PM_PIN = prev;
+    }
+  };
+
+  it('by default nothing is pinned — the Dashboard decides without a deploy', () => {
+    const prev = process.env.STRIPE_PM_PIN;
+    delete process.env.STRIPE_PM_PIN;
+    try {
+      expect(paymentMethodsFor('subscription')).toBeUndefined();
+      expect(paymentMethodsFor('payment')).toBeUndefined();
+    } finally {
+      if (prev === undefined) delete process.env.STRIPE_PM_PIN; else process.env.STRIPE_PM_PIN = prev;
+    }
+  });
+
   it('Cash App is on both, because Stripe supports it for both', () => {
-    expect(paymentMethodsFor('subscription')).toContain('cashapp');
-    expect(paymentMethodsFor('payment')).toContain('cashapp');
+    pin(() => {
+      expect(paymentMethodsFor('subscription')).toContain('cashapp');
+      expect(paymentMethodsFor('payment')).toContain('cashapp');
+    });
   });
 
   it('Afterpay is one-time only — Stripe does not support BNPL on subscriptions', () => {
-    expect(paymentMethodsFor('payment')).toContain('afterpay_clearpay');
-    expect(paymentMethodsFor('subscription')).not.toContain('afterpay_clearpay');
+    pin(() => {
+      expect(paymentMethodsFor('payment')).toContain('afterpay_clearpay');
+      expect(paymentMethodsFor('subscription')).not.toContain('afterpay_clearpay');
+    });
     expect(NOT_ON_SUBSCRIPTION.afterpay_clearpay).toBeTruthy();
   });
 
   it('PayPal is offered on the store, kept off the recurring plan', () => {
-    expect(paymentMethodsFor('payment')).toContain('paypal');
-    expect(paymentMethodsFor('subscription')).not.toContain('paypal');
+    pin(() => {
+      expect(paymentMethodsFor('payment')).toContain('paypal');
+      expect(paymentMethodsFor('subscription')).not.toContain('paypal');
+    });
   });
 
   it('Shop Pay is recorded as impossible, not silently dropped', () => {
     expect(UNAVAILABLE_METHODS.shop_pay).toMatch(/Shopify/);
-    expect(paymentMethodsFor('payment')).not.toContain('shop_pay');
-    expect(paymentMethodsFor('subscription')).not.toContain('shop_pay');
+    pin(() => {
+      expect(paymentMethodsFor('payment')).not.toContain('shop_pay');
+      expect(paymentMethodsFor('subscription')).not.toContain('shop_pay');
+    });
   });
 
   it('card is always available', () => {
-    expect(paymentMethodsFor('subscription')).toContain('card');
-    expect(paymentMethodsFor('payment')).toContain('card');
+    pin(() => {
+      expect(paymentMethodsFor('subscription')).toContain('card');
+      expect(paymentMethodsFor('payment')).toContain('card');
+    });
   });
 
-  it('STRIPE_PM_AUTO hands control to the Dashboard without a deploy', () => {
-    const prev = process.env.STRIPE_PM_AUTO;
-    process.env.STRIPE_PM_AUTO = '1';
-    expect(paymentMethodsFor('subscription')).toBeUndefined();
-    expect(paymentMethodsFor('payment')).toBeUndefined();
-    if (prev === undefined) delete process.env.STRIPE_PM_AUTO; else process.env.STRIPE_PM_AUTO = prev;
+  it('STRIPE_PM_PIN=1 is the explicit opt-in to the fixed lists', () => {
+    const prev = process.env.STRIPE_PM_PIN;
+    process.env.STRIPE_PM_PIN = '1';
+    expect(paymentMethodsFor('subscription')).toEqual(['card', 'link', 'cashapp']);
+    expect(paymentMethodsFor('payment')).toEqual(['card', 'link', 'cashapp', 'afterpay_clearpay', 'klarna', 'paypal']);
+    if (prev === undefined) delete process.env.STRIPE_PM_PIN; else process.env.STRIPE_PM_PIN = prev;
   });
 });
