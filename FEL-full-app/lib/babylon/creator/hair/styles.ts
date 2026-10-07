@@ -48,17 +48,20 @@ function slickCap(c: Ctx, toward: V3, opts: { t?: number; part?: boolean; kind?:
 /** A fade: `top` thickness above the fade line `fadeY(a)`, down to bare skin at the hairline below it. */
 function fadeCap(c: Ctx, o: { top: (a: number, b: number, s: number) => number; fadeY: (a: number) => number; side?: number; band?: number; texture?: number }): void {
   const band = o.band ?? 0.02;
+  // the fade line never dips under the hairline (over the forehead the hairline is the higher of the two): a fade line
+  // below it read as a bare scalp on top (seen in the Studio 2026-10-07)
+  const fadeAt = (a: number) => Math.max(o.fadeY(a), c.k.hairline(a) + 0.012);
   shell(c, {
     low: std(c), rows: Math.round(c.d.rows * 1.3),
     outer: (a, b, s, e) => {
-      const y = s * Math.sin(b), f = o.fadeY(a);
+      const y = s * Math.sin(b), f = fadeAt(a);
       const k = smooth(f - band * 0.3, f + band, y);
       const sideT = (o.side ?? 0.0025) * smooth(0, 0.012, e);
       const tex = o.texture ? coil(scale(dirOf(a, b), s), 70, o.texture).off * k : 0;
       return s + mix(sideT, o.top(a, b, s), k) + tex;
     },
     attrs: (a, b, e, _h, r, s) => {
-      const y = s * Math.sin(b), f = o.fadeY(a);
+      const y = s * Math.sin(b), f = fadeAt(a);
       const dens = mix(0.08, 1, smooth(c.k.hairline(a) + 0.002, f + 0.006, y)) * mix(0.6, 1, smooth(0, 0.006, e));
       const sh = o.texture ? coil(scale(dirOf(a, b), r), 70, o.texture).shade : 1;
       return { dens, shade: sh };
