@@ -13,13 +13,18 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Loader2, ScanLine, Volume2, VolumeX } from 'lucide-react';
+import { ArrowLeft, Loader2, PauseCircle, ScanLine, Volume2, VolumeX } from 'lucide-react';
 import { NOT_SAVED_ON_DEVICE, mirrorSave } from './mirror-save';   // R-HEALTH-CLIENT: no save request unless the server said so
+// MIRROR-FIRST P1 (2026-10-07): the camera, the pose runtime, the screen-awake lock and the pause on a hidden tab live in
+// use-mirror-camera.ts; this file keeps everything that reads a frame. The per-frame readouts go through useFrameView
+// (painted at most HUD_HZ times a second) instead of a setState per pose frame.
+import { useFrameView, useMirrorCamera } from './use-mirror-camera';
+import { InShotLine, wakeLockLine } from '@/lib/mirror/liveCamera';
 // CODE-SPLIT (2026-09-12). `NeuroMirror` reaches @babylonjs through render/overlay-compositor and
 // rig/zone-binding, so importing it here as a VALUE pulled the whole engine into this route's
 // first-load bundle: /play/mirror shipped 2.03 MB against ~160 kB for every other /play route,
 // which lazy-load Babylon via dynamicImport (see app/play/onevone/_components/loader.tsx).
-// The labels and zone tables below are plain data and stay static; the engine loads on demand.
+// The labels and zone tables below are plain data and stay static; the engine loads on demand (use-mirror-camera.ts).
 // Pulled from the SOURCE modules, not the barrel. The barrel's own top-level import of
 // render/overlay-compositor reaches @babylonjs, so importing even a label through index.ts loads
 // the engine — which is why splitting only the NeuroMirror value changed nothing (measured:
@@ -27,13 +32,7 @@ import { NOT_SAVED_ON_DEVICE, mirrorSave } from './mirror-save';   // R-HEALTH-C
 import { PATTERN_ZONES, ZONE_LABEL } from '@/lib/babylon/nexus/neuro-mirror/patterns/split-stance-press-row';
 import { ZONE_STATE_COLOR, ZONE_STATE_LABEL, type ZoneState } from '@/lib/babylon/nexus/neuro-mirror/rules/config';
 import type { ZoneId } from '@/lib/babylon/nexus/neuro-mirror/patterns/split-stance-press-row';
-import type { MirrorRuntime, SessionSummary } from '@/lib/babylon/nexus/neuro-mirror/render/overlay-compositor';
-
-type MirrorModule = typeof import('@/lib/babylon/nexus/neuro-mirror');
-/** Cached so a second session does not re-fetch the chunk. */
-let mirrorModPromise: Promise<MirrorModule> | null = null;
-const loadMirror = (): Promise<MirrorModule> =>
-  (mirrorModPromise ??= import('@/lib/babylon/nexus/neuro-mirror'));
+import type { SessionSummary } from '@/lib/babylon/nexus/neuro-mirror/render/overlay-compositor';
 import { DunkTracker, refusalLine, type DunkMetrics } from '@/lib/irl/dunkTracker';
 // THE REASON TO COME BACK. DunkTracker has always measured a jump beautifully and then thrown it away when the
 // session ended. This keeps the numbers — and only the numbers; the clip never leaves the phone.
@@ -109,7 +108,6 @@ const SCREEN_NOT_SAVED = 'Screen finished — it could not be saved, so nothing 
 /** A protected line (square-up, deeper) holds ordinary cue speech at most this long, even if the voice never ends. */
 const PROTECT_MAX_MS = 6_000;
 
-type Status = 'idle' | 'requesting' | 'loading-model' | 'live' | 'error';
 type Pattern = 'pressRow' | 'squat' | 'lunge' | 'jump' | 'screen';
 /** The squat and the lunge, in MIRROR_PATTERNS's own order (the registry's entries one and two — MIRROR-COACH P4 lane
  *  1: "the existing squat is registered as the first entry"). Looked up once, not on every render. */
@@ -121,6 +119,50 @@ const LUNGE_PATTERN = MIRROR_PATTERNS.find((p) => p.id === 'lunge')!;
 
 // (The knee record — worst inward read per side over the frames read square, flagged frames, frames not square — is
 // lib/mirror/squatStage.ts KneeRecord / stepKneeRecord since MIRROR-COACH P2, 2026-09-26: it counted display frames here.)
+
+/**
+ * What the stage paints from each camera frame (MIRROR-FIRST P1, 2026-10-07). These were React state set on every pose
+ * frame — four setStates for every pattern (phase, frame time, zones, reps) and more per pattern (the screen runner, the
+ * jump state, the pacer's seconds, the squat's and the lunge's rows) — so a phone re-rendered this whole page ~30 times a
+ * second beside the pose model. Now the frame writes them into the frame view and the page paints at most HUD_HZ
+ * (lib/mirror/liveCamera.ts) times a second. Everything that DECIDES — the steps, the coach, the runner — still runs on
+ * every frame, from refs; the events a frame produces (a rep, a stage, a cue, a jump) are still state, set when they happen.
+ */
+interface StageReadout {
+  phase: string;
+  frameMs: number;
+  zoneStates: Record<ZoneId, ZoneState>;
+  reps: RepState | null;
+  jumpState: string;
+  // seconds into the breathe stage on the POSE clock (squatStage.ts breathElapsedSec) — what the pacer is drawn at
+  breathSec: number;
+  squatFaults: SquatFault[];
+  // Whether the latest squat read saw a body. The four checks said "Estimated stable" with nobody in frame — and
+  // before the camera had even started — because "no fault" was all they looked at (MIRROR-COACH P1, 2026-09-25).
+  squatSeen: boolean;
+  // MIRROR-COACH P2 (2026-09-26): the knee is read only square to the camera (squat-audit.ts squareOn). The latest
+  // read's squareness, for the knee row ("Not square · not read").
+  squatSquare: boolean | null;
+  lungeFaults: LungeFault[];
+  lungeSeen: boolean;
+  lungeFramedRight: boolean | null;
+  runner: RunnerState | null;
+  /** framing's line for a body the camera cannot see whole (lib/mirror/liveCamera.ts InShotLine), or null. */
+  inShot: string | null;
+}
+/** A session's readouts before its first frame (Start puts these back, except the screen's runner: see start()). */
+const READOUT_FRESH: Omit<StageReadout, 'runner' | 'phase' | 'frameMs' | 'zoneStates' | 'jumpState'> = {
+  reps: null, breathSec: 0, squatFaults: [], squatSeen: false, squatSquare: null,
+  lungeFaults: [], lungeSeen: false, lungeFramedRight: null, inShot: null,
+};
+const READOUT_START: StageReadout = {
+  ...READOUT_FRESH,
+  phase: 'hold', frameMs: 0, jumpState: 'idle', runner: null,
+  zoneStates: {
+    posterior_chain: 'unavailable', lat_rhomboid: 'unavailable', upper_traps: 'unavailable',
+    rib_thoracic: 'unavailable', lumbo_pelvic: 'unavailable',
+  },
+};
 
 /** Pose skeleton bone pairs (MediaPipe indices) — the visible proof the
  *  tracker is locked on you. */
@@ -138,41 +180,38 @@ const BONES: [number, number][] = [
  * (the default: a missing prop never saves) → no request to /api/mirror/* at all; results stay in this page's memory.
  */
 export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { youth?: YouthGate; canSaveScan?: boolean } = {}) {
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const runtimeRef = useRef<MirrorRuntime | null>(null);
-
-  const [status, setStatus] = useState<Status>('idle');
-  const [error, setError] = useState('');
-  const [phase, setPhase] = useState<string>('hold');
-  const [frameMs, setFrameMs] = useState<number>(0);
-  const [zoneStates, setZoneStates] = useState<Record<ZoneId, ZoneState>>({
-    posterior_chain: 'unavailable', lat_rhomboid: 'unavailable', upper_traps: 'unavailable',
-    rib_thoracic: 'unavailable', lumbo_pelvic: 'unavailable',
+  // THE CAMERA (MIRROR-FIRST P1): use-mirror-camera.ts. A hidden tab turns it off and pauses the session (onPause stops the
+  // coach mid-sentence: nobody is in front of the phone); Resume brings it back with the books kept (onResume drops the
+  // jump tracker's half-read jump, which cannot span the gap).
+  const {
+    videoRef, canvasRef, status, setStatus, error, wakeLock,
+    open, resume, stop, summary: sessionSummary, cameraOn, sessionOn,
+  } = useMirrorCamera({
+    onPause: () => { if (typeof speechSynthesis !== 'undefined') speechSynthesis.cancel(); },
+    onResume: () => { jumpTrackerRef.current.reset(); lungeAuditRef.current.reset(); inShotRef.current.reset(); },
   });
+  const [readout, hud] = useFrameView<StageReadout>(READOUT_START);
+  const {
+    phase, frameMs, zoneStates, reps, jumpState, breathSec, squatFaults, squatSeen, squatSquare,
+    lungeFaults, lungeSeen, lungeFramedRight, runner, inShot,
+  } = readout;
+  const inShotRef = useRef(new InShotLine());
+  /** The screen runner's phase and station as last painted: a change is painted at once (see onFrame). */
+  const runnerKeyRef = useRef('');
   const [summary, setSummary] = useState<SessionSummary | null>(null);
   const [pattern, setPattern] = useState<Pattern>('pressRow');
   // the onFrame closure is created once per session — it reads the pattern
   // through a ref so switching patterns never needs a session restart
   const patternRef = useRef<Pattern>('pressRow');
   patternRef.current = pattern;
-  const [reps, setReps] = useState<RepState | null>(null);
   const [jumps, setJumps] = useState<DunkMetrics[]>([]);
   const [dunkProgress, setDunkProgress] = useState<DunkProgress | null>(null);
   const [dunkSaid, setDunkSaid] = useState<string>('');
-  const [jumpState, setJumpState] = useState('idle');
   const skeletonRef = useRef<HTMLCanvasElement | null>(null);
   const jumpTrackerRef = useRef(new DunkTracker());
   const cueEngineRef = useRef(new CueEngine({ clearByRep: true }));   // P9 fix: a clean REP clears a fault (cue-engine.ts)
   const [squatStage, setSquatStage] = useState<SquatStage>('breathe');
-  // seconds into the breathe stage on the POSE clock (squatStage.ts breathElapsedSec) — what the pacer is drawn at
-  const [breathSec, setBreathSec] = useState(0);
   const [squatReps, setSquatReps] = useState(0);
-  const [squatFaults, setSquatFaults] = useState<SquatFault[]>([]);
-  // Whether the latest squat read saw a body. The four checks said "Estimated stable" with nobody in frame — and
-  // before the camera had even started — because "no fault" was all they looked at (MIRROR-COACH P1, 2026-09-25).
-  const [squatSeen, setSquatSeen] = useState(false);
   const [squatFindings, setSquatFindings] = useState<SquatFault[]>([]);
   // Each finished work-set rep's faults, for the review's "did it hold" (set once, when the review opens).
   const [squatWorkReps, setSquatWorkReps] = useState<SquatFault[][]>([]);
@@ -205,9 +244,8 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
   const squatSessionRef = useRef(initialSquatSession());
   const kneeRecordRef = useRef<KneeRecord>(EMPTY_KNEE_RECORD);
   const [kneeRecord, setKneeRecord] = useState<KneeRecord>(EMPTY_KNEE_RECORD);
-  // MIRROR-COACH P2 (2026-09-26): the knee is read only square to the camera (squat-audit.ts squareOn). The latest
-  // read's squareness, for the knee row ("Not square · not read"), and whether the one-time square-up line was said.
-  const [squatSquare, setSquatSquare] = useState<boolean | null>(null);
+  // MIRROR-COACH P2 (2026-09-26): whether the one-time square-up line was said (the latest read's squareness, for the knee
+  // row, is the readout's squatSquare).
   const [squareUpSaid, setSquareUpSaid] = useState(false);
   // MIRROR-COACH P2 review (2026-09-26): the one-time "sit a little deeper" line (squatStage.ts DEEPER_LINE), said on the
   // first shallow descent of a session; after it, shallow reps count and are marked shallow.
@@ -222,9 +260,6 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
   const lungeRepCounterRef = useRef(new RepCounter());
   const lungeSessionRef = useRef(initialLungeSession());
   const [lungeSession, setLungeSession] = useState<LungeSessionState>(initialLungeSession());
-  const [lungeFaults, setLungeFaults] = useState<LungeFault[]>([]);
-  const [lungeSeen, setLungeSeen] = useState(false);
-  const [lungeFramedRight, setLungeFramedRight] = useState<boolean | null>(null);
   // MIRROR-COACH P4 fix (2026-09-29): this used to be its own flat, never-reset-per-side boolean, so the one-time
   // "turn side-on" line said during the LEFT side's set stayed lit through the whole RIGHT side and into review even
   // when the athlete squared up perfectly for the second leg. lungeSessionRef's own `turnPromptSaid: Record<LungeSide,
@@ -239,7 +274,6 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
   // every runner was 'modified' whatever the picker said).
   const screenIdRef = useRef<ScreenId>('modified');
   screenIdRef.current = screenId;
-  const [runner, setRunner] = useState<RunnerState | null>(null);
   const [screenSummary, setScreenSummary] = useState<ScreenResultSummary | null>(null);
   const [screenMessage, setScreenMessage] = useState<string>('');
   /** The id the finished screen was SAVED under (the answers card PATCHes it); 'unsaved' when the save failed. */
@@ -347,14 +381,8 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
     }
   }, []);
 
-  const stop = useCallback(() => {
-    runtimeRef.current?.dispose();
-    runtimeRef.current = null;
-    streamRef.current?.getTracks().forEach((t) => t.stop());
-    streamRef.current = null;
-  }, []);
-
-  useEffect(() => () => { stop(); }, [stop]);
+  // (stop() — the camera off and the runtime gone, on End, on a finished screen and on leaving the page — is
+  // use-mirror-camera.ts's since MIRROR-FIRST P1.)
 
   // (The check → work → review hand-overs used to run here, in an effect one render after the rep that earned them.
   // They are part of stepSquatSession now, on the frame the rep lands.)
@@ -365,21 +393,21 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
       runnerRef.current = new ScreenRunner(screenIdRef.current);
       screenSentRef.current = false;
       lastSaidRef.current = '';
-      setRunner(null); setScreenSummary(null); setScreenMessage(''); setSavedScreenId(null); setEndedWith(null);
+      runnerKeyRef.current = '';
+      hud.set({ runner: null }, { now: true }); setScreenSummary(null); setScreenMessage(''); setSavedScreenId(null); setEndedWith(null);
     }
-    setError('');
     setJumps([]);
-    setReps(null);
+    // the frame readouts back to a fresh session's (the runner, above, only for a new screen: the last screen's cards stay
+    // on its tab until another screen starts, as they always have)
+    hud.set(READOUT_FRESH, { now: true });
+    inShotRef.current.reset();
     jumpTrackerRef.current.reset();
     cueEngineRef.current.reset();
     pressRowCueRef.current.reset();
     pressRowRef.current = initialPressRowCues();
     setFadeLines([]);
     setSquatStage('breathe');
-    setBreathSec(0);
     setSquatReps(0);
-    setSquatFaults([]);
-    setSquatSeen(false);
     setSquatFindings([]);
     setSquatWorkReps([]);
     setCue(null);
@@ -387,47 +415,27 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
     squatSessionRef.current = initialSquatSession();
     kneeRecordRef.current = EMPTY_KNEE_RECORD;
     setKneeRecord(EMPTY_KNEE_RECORD);
-    setSquatSquare(null);
     setSquareUpSaid(false);
     setDeeperSaid(false);
     lungeAuditRef.current.reset();
     lungeRepCounterRef.current = new RepCounter();
     lungeSessionRef.current = initialLungeSession();
     setLungeSession(initialLungeSession());
-    setLungeFaults([]);
-    setLungeSeen(false);
-    setLungeFramedRight(null);
     protectedUntilRef.current = 0;
     setSummary(null);
-    setStatus('requesting');
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        // front camera preferred for form work, but as an IDEAL: a hard
-        // 'user' constraint rejects devices that don't declare facing modes
-        // at all (measured: some webcams/fake devices refuse and the session
-        // never starts)
-        video: { facingMode: { ideal: 'user' }, width: { ideal: 960 }, height: { ideal: 720 } }, audio: false,
-      });
-      streamRef.current = stream;
-      const v = videoRef.current!;
-      v.srcObject = stream;
-      await v.play();
-      // the graders take lengths and angles in pixels, so they need the frame's shape (MediaPipe reads the raw frame; the
-      // stage's object-cover crop is display only)
-      if (v.videoWidth > 0 && v.videoHeight > 0) runnerRef.current?.setAspect(v.videoWidth / v.videoHeight);
-
-      setStatus('loading-model');
-      const { NeuroMirror } = await loadMirror();
-      const runtime = await NeuroMirror.session({
-        video: v,
-        overlayCanvas: canvasRef.current!,
+    // The camera, the model and the runtime: use-mirror-camera.ts (getUserMedia, the <video>, NeuroMirror.session, the
+    // honest errors). This passes it what the session reads: which analysis, and the per-frame step.
+    await open({
         analysis: patternRef.current === 'squat' ? 'squat' : 'zones',
-        onReady: () => setStatus('live'),
-        onFrame: ({ phase: p, frameMs: fm, zones, reps: r, pose, squat }) => {
-          setPhase(p);
-          setFrameMs(fm);
-          setZoneStates(zones);
-          setReps(r);
+        // the graders take lengths and angles in pixels, so they need the frame's shape (MediaPipe reads the raw frame;
+        // the stage's object-cover crop is display only)
+        onVideo: (v) => { if (v.videoWidth > 0 && v.videoHeight > 0) runnerRef.current?.setAspect(v.videoWidth / v.videoHeight); },
+        onFrame: ({ phase: p, frameMs: fm, zones, reps: r, pose, squat }, v) => {
+          // MIRROR-FIRST P1: the four readouts every pattern shows, written every frame and painted at most HUD_HZ a second
+          hud.set({ phase: p, frameMs: fm, zoneStates: zones, reps: r });
+          // a body the camera cannot see whole says so on the stage (lib/mirror/liveCamera.ts InShotLine; the screen's
+          // runner says its own framing line)
+          if (patternRef.current !== 'screen') hud.set({ inShot: inShotRef.current.step(checkFraming(pose, 'front'), pose.timestampMs) });
           // THE GUIDED SCREEN. The runner owns the protocol: it says the turn, holds the clock only while the
           // shot is good, and pauses rather than fails when somebody steps out to move a chair.
           if (patternRef.current === 'screen' && runnerRef.current) {
@@ -439,7 +447,11 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
             // 'cameraMoved' (lib/mirror/stationGraders.ts).
             if (v.videoWidth > 0 && v.videoHeight > 0) runnerRef.current.setAspect(v.videoWidth / v.videoHeight);
             const st = runnerRef.current.tick(pose, pose.timestampMs);
-            setRunner(st);
+            // the countdown repaints at HUD_HZ; a new phase or station at once (a finished screen is submitted by an effect
+            // on it, and the retest button appears with it)
+            const runnerKey = `${st.phase}:${st.stationIndex}`;
+            hud.set({ runner: st }, { now: runnerKey !== runnerKeyRef.current });
+            runnerKeyRef.current = runnerKey;
             paintSkeleton(pose, p);
             // Said once per change, because the athlete is across the room and cannot read the phone — and
             // because repeating a cue every frame would be unusable. MIRROR-COACH P3 follow-up (2026-09-28): a change is
@@ -458,7 +470,7 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
           // stream — floor calibration, flight time, landing
           if (patternRef.current === 'jump') {
             const got = jumpTrackerRef.current.feed(pose);
-            setJumpState(jumpTrackerRef.current.state);
+            hud.set({ jumpState: jumpTrackerRef.current.state });
             if (got) {
               setJumps((prev) => [...prev, got]);
               void recordDunk(got);
@@ -484,9 +496,8 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
           // degrees off square, is "not square — not read" (squat-audit.ts squareOn).
           if (patternRef.current === 'squat' && squat) {
             const now = pose.timestampMs;
-            setSquatFaults(squat.faults);
-            setSquatSeen(squat.present);
-            if (squat.present && squat.phase !== 'standing' && squat.square !== undefined) setSquatSquare(squat.square);
+            hud.set({ squatFaults: squat.faults, squatSeen: squat.present });
+            if (squat.present && squat.phase !== 'standing' && squat.square !== undefined) hud.set({ squatSquare: squat.square });
             const was = squatSessionRef.current.stage;
             // the painter gets only what the coach may cue — an unverified knee read is never painted as a correction —
             // and only in the WORK set, where the voice cues too (MIRROR-COACH P2 review, 2026-09-26): painted during the
@@ -498,7 +509,7 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
             });
             squatSessionRef.current = step.state;
             // the pacer rides the same pose clock the step ends the breath on (MIRROR-COACH P7)
-            if (step.state.stage === 'breathe') setBreathSec(breathElapsedSec(step.state, now));
+            if (step.state.stage === 'breathe') hud.set({ breathSec: breathElapsedSec(step.state, now) });
             // the knee read over the check and the work set, per POSE frame, square frames only (kept in memory for
             // this session's review — nothing is sent or saved)
             kneeRecordRef.current = stepKneeRecord(kneeRecordRef.current, was, squat, now);
@@ -543,14 +554,13 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
             const now = pose.timestampMs;
             paintSkeleton(pose, p);
             const lungeRead = lungeAuditRef.current.evaluate({ landmarks: pose.landmarks, timestampMs: now, present: pose.present });
-            setLungeFaults(lungeRead.faults);
-            setLungeSeen(lungeRead.present);
+            hud.set({ lungeFaults: lungeRead.faults, lungeSeen: lungeRead.present });
             // VIEW AWARENESS (baseline F5): lib/mirror/framing.ts's own front-view test, reused rather than
             // re-derived — the same check lib/mirror/lungeAudit.ts's auditLunge uses for the batch contract.
             // framing.ts's own FramingPoint never reads z, so present + landmarks is genuinely everything it takes.
             const framingFrame = { present: pose.present, landmarks: pose.landmarks };
             const framing = checkFraming(framingFrame, 'front');
-            setLungeFramedRight(framing.ok);
+            hud.set({ lungeFramedRight: framing.ok });
             if (lungeSessionRef.current.stage !== 'review') {
               const repInfo = lungeRepCounterRef.current.feed(lungePhaseToMovement(lungeRead.phase), now);
               const step = stepLungeSession(lungeSessionRef.current, {
@@ -586,31 +596,16 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
             }
           }
         },
-      });
-      runtimeRef.current = runtime;
-    } catch (e: any) {
-      console.error('[FEL-MIRROR] start failed', e);
-      // Honest errors: a denied camera, a missing camera, and a dead 3D
-      // overlay are three different problems (measured: a WebGL-less
-      // environment hit the overlay path and the page blamed the camera).
-      setError(
-        e?.name === 'NotAllowedError'
-          ? 'Camera permission denied. Allow camera access and try again.'
-          : e?.name === 'NotFoundError' || e?.name === 'OverconstrainedError' || e?.name === 'NotReadableError'
-            ? 'Camera unavailable in this browser/environment.'
-            : 'The coaching overlay failed to start (3D renderer). Try a WebGL-capable browser.');
-      setStatus('error');
-    }
-  }, []);
+    });
+  }, [open, hud]);
 
   // What End does to the camera and the press/row zone summary. endSession (below submitScreen) wraps it: End also posts
   // the screen read so far — MIRROR-COACH P3 follow-up, 2026-09-28.
   const endZoneSession = useCallback(() => {
-    const rt = runtimeRef.current;
-    // the module is necessarily loaded by now (a runtime only exists after session() resolved),
-    // but this stays async-safe rather than assuming it
-    if (rt) void loadMirror().then((m) => {
-      const s = m.NeuroMirror.sessionSummary(rt);
+    // MIRROR-FIRST P1: the whole session's summary, across any pause (use-mirror-camera.ts summary(): each camera stretch's
+    // runtime, merged) — read before stop() lets the camera go. Null when no runtime ever ran (End before the model).
+    const s = sessionSummary();
+    if (s) {
       setSummary(s);
       // PERSIST IT (2026-09-12). This summary — reps, tempo, per-zone time-in-stable and fault
       // counts — was computed on every session and then discarded when the tab closed, so the
@@ -633,10 +628,10 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
           faultCounts: s.faultCounts,
         }),
       })?.catch(() => { /* offline or signed out: the session still showed on screen */ });
-    });
+    }
     stop();
     setStatus('idle');
-  }, [stop, canSaveScan]);
+  }, [stop, setStatus, sessionSummary, canSaveScan]);
 
   const secs = (ms: number) => (ms / 1000).toFixed(1);
 
@@ -763,7 +758,7 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
   useEffect(() => {
     if (pattern !== 'screen' || runner?.phase !== 'complete') return;
     void submitScreen(runner.results, runner.screen, runner.grades);
-    if (runtimeRef.current || streamRef.current) {
+    if (cameraOn()) {
       stop();
       setStatus('idle');
     }
@@ -784,11 +779,11 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
       }
     }
     // MIRROR-COACH P9: a press/row set ends at End — its fade is settled here and said in the summary
-    if (patternRef.current === 'pressRow' && runtimeRef.current) {
+    if (patternRef.current === 'pressRow' && sessionOn()) {
       setFadeLines(fadeReviewLines(pressRowCueRef.current.endSet(), (f: FaultId) => PRESS_ROW_FAULT_LABEL[f as PressRowFault] ?? f));
     }
     endZoneSession();
-  }, [endZoneSession, submitScreen]);
+  }, [endZoneSession, submitScreen, sessionOn]);
 
   /** The short label on the control, beside the full one it is announced by. A ternary here silently labelled
    *  the new pattern "Jump" — a map cannot, because TypeScript makes it name every case. */
@@ -810,6 +805,8 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
     screen: 'Movement Screen',
   };
   const live = status === 'live';
+  // MIRROR-FIRST P1: the tab went to the background mid-session — the camera is off, the session waits for Resume
+  const paused = status === 'paused';
   // ms/frame is an engineering number. It belongs to whoever is tuning the pipeline, not to an athlete standing
   // in their front room trying to squat, so it shows in development and stays out of the way in a shipped build.
   const showFrameBudget = process.env.NODE_ENV !== 'production';
@@ -855,7 +852,7 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
               className="h-1.5 w-1.5 rounded-full"
               style={{ background: live ? '#00FF9D' : 'rgba(255,255,255,0.3)' }}
             />
-            {live ? 'Live' : status === 'requesting' ? 'Camera' : status === 'loading-model' ? 'Loading' : 'Ready'}
+            {live ? 'Live' : paused ? 'Paused' : status === 'requesting' ? 'Camera' : status === 'loading-model' ? 'Loading' : 'Ready'}
           </span>
         </header>
 
@@ -881,7 +878,7 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
                 // full one, so what a screen reader announces is the pattern's actual name.
                 aria-label={PATTERN_TITLE[key]}
                 onClick={() => setPattern(key)}
-                disabled={live}
+                disabled={live || paused}
                 className={`shrink-0 whitespace-nowrap rounded-xl px-3.5 py-2 text-[12.5px] font-bold transition-all duration-200
                             disabled:cursor-not-allowed disabled:opacity-40
                             ${on ? 'bg-white/[0.07] text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.10)]'
@@ -892,6 +889,18 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
             );
           })}
         </div>
+        {/* THE QUICK SCREEN, from the picker (MIRROR-FIRST P1, 2026-10-07). The no-sign-in screen (/screen →
+            /play/mirror/assess) was linked from nowhere in the app. It goes in at its front door, so its own age question
+            and grown-up step come first, for everyone (lib/screen/routes.ts). Not offered mid-session: leaving the page
+            ends the set. */}
+        {!live && !paused && (
+          <p className="-mt-2 mb-4 text-[12px] text-white/45">
+            <Link href="/screen" data-quick-screen className="font-semibold text-white/70 underline-offset-2 hover:text-white hover:underline">
+              Quick Screen
+            </Link>
+            {' '}— your jump in about a minute, or the full screen in about five. No account needed.
+          </p>
+        )}
         <CorrectivesPicker youth={youth} />
 
         {/* THE STAGE. The camera is the product here, so it gets the whole width and everything else floats over
@@ -918,6 +927,17 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
                     {status === 'requesting' ? 'Asking for the camera' : 'Loading the pose model'}
                   </p>
                 </>
+              ) : paused ? (
+                // MIRROR-FIRST P1 (owner decision 7, 2026-10-07): the camera goes off with the page. Nothing was seen while
+                // it was off; the set's count, stage and screen station are kept for Resume.
+                <div data-paused>
+                  <PauseCircle className="mx-auto h-8 w-8 text-[#FFC24B]" strokeWidth={1.6} />
+                  <p className="fel-heading mt-4 text-[20px] font-black leading-tight text-white">Paused — the camera is off</p>
+                  <p className="mx-auto mt-2 max-w-sm text-[13px] leading-relaxed text-white/50">
+                    The Mirror turns the camera off when it goes to the background, so it saw nothing while you were away.
+                    Resume picks the set up where you left it.
+                  </p>
+                </div>
               ) : (
                 <>
                   <ScanLine className="h-8 w-8 text-[#00E5FF]" strokeWidth={1.6} />
@@ -958,6 +978,17 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
                   </span>
                 )}
               </div>
+
+              {/* MIRROR-FIRST P1: a body the camera cannot see whole (feet or head out of shot, or nobody), held a moment —
+                  framing's own line (lib/mirror/framing.ts, the rules the games' space check builds its body rule on).
+                  Shown, not spoken; the screen says its own, and a set in review is over. */}
+              {inShot && pattern !== 'screen' && !(pattern === 'squat' && squatStage === 'review') && !(pattern === 'lunge' && lungeSession.stage === 'review') && (
+                <div className="pointer-events-none absolute inset-x-4 top-14 flex justify-center">
+                  <p data-in-shot className="max-w-md rounded-xl bg-black/60 px-4 py-2 text-center text-[14px] font-bold text-[#FFC24B] backdrop-blur-sm">
+                    {inShot}
+                  </p>
+                </div>
+              )}
 
               {/* THE SCREEN'S OWN HUD. The athlete is across the room with the phone propped up, so the cue is the
                   biggest thing on the stage and the countdown is a ring rather than a number to squint at. */}
@@ -1063,7 +1094,24 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
           {/* The action is docked to the stage, the way a camera's shutter is part of the camera. */}
           <div className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-3 bg-gradient-to-t
                           from-black/80 to-transparent px-4 pb-5 pt-12">
-            {!live ? (
+            {paused ? (
+              <>
+                <button
+                  onClick={() => { void resume(); }}
+                  className="rounded-2xl bg-[#00E5FF] px-7 py-3 text-[14px] font-black text-black shadow-[0_10px_40px_-12px_#00E5FF]
+                             transition-transform hover:scale-[1.02] active:scale-[0.99]"
+                >
+                  Resume
+                </button>
+                <button
+                  onClick={endSession}
+                  className="rounded-2xl border border-white/20 bg-black/50 px-6 py-3 text-[14px] font-bold text-white
+                             backdrop-blur-md transition-colors hover:border-[#FF3366]/60 hover:text-[#FF3366]"
+                >
+                  End session
+                </button>
+              </>
+            ) : !live ? (
               <>
                 <button
                   onClick={start}
@@ -1162,6 +1210,10 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false }: { y
           <p className="mt-4 rounded-xl border border-[#FF3366]/30 bg-[#FF3366]/10 px-4 py-3 text-[13px] text-[#ff8da8]">
             {error}
           </p>
+        )}
+        {/* MIRROR-FIRST P1: the screen is kept on while the camera is; where the browser cannot, it says what to do */}
+        {live && wakeLockLine(wakeLock) && (
+          <p data-wake-lock className="mt-3 text-[12.5px] leading-relaxed text-[#FFC24B]">{wakeLockLine(wakeLock)}</p>
         )}
 
         {/* Which screen, chosen before it starts. The full one adds the stations a coach has to answer for,
