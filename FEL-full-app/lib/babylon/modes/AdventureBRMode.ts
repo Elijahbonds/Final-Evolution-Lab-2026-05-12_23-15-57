@@ -398,7 +398,10 @@ function syncFrame(ctx: ModeContext, S: St, dt: number): void {
     ctx.camDirector.look(S.stickR.x, S.stickR.y, dt);
     const target = rig.objectiveId ? m.world.actors.get(rig.objectiveId) : undefined;
     TMP_SUBJECT.set(me.pos.x, me.pos.y, me.pos.z);
-    TMP_VEL.set(me.vel.x, me.vel.y, me.vel.z);
+    // the follow reads its bearing off the velocity: a straight-down drop has no bearing (the director's back vector
+    // would be zero and the camera would sit on the hero), so the vertical counts only when the body also moves across
+    const across = Math.hypot(me.vel.x, me.vel.z);
+    TMP_VEL.set(me.vel.x, across > 1 ? me.vel.y : 0, me.vel.z);
     ctx.camDirector.update(TMP_SUBJECT, TMP_VEL, target ? TMP_OBJ.set(target.pos.x, target.pos.y + target.height * 0.5, target.pos.z) : null);
     S.fovBoost += (rig.fovBoostDeg - S.fovBoost) * (1 - Math.exp(-FOV_EASE * Math.max(0, dt)));
     ctx.camera.fov = S.baseFov + (S.fovBoost * Math.PI) / 180;

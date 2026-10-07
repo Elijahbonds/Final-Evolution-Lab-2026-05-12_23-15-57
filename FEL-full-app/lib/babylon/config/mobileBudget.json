@@ -28,6 +28,22 @@
         "particles": 24
       }
     },
+    "adventure_br": {
+      "measured": {
+        "drawCalls": 86,
+        "activeMeshes": 34,
+        "skinnedBodies": 7,
+        "textureMb": 169,
+        "particles": 492
+      },
+      "budget": {
+        "drawCalls": 104,
+        "activeMeshes": 41,
+        "skinnedBodies": 9,
+        "textureMb": 203,
+        "particles": 591
+      }
+    },
     "aeroaces": {
       "measured": {
         "drawCalls": 134,
