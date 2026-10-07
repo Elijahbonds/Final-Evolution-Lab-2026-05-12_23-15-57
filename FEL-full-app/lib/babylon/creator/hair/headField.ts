@@ -313,8 +313,9 @@ export function measureHeadField(inp: HeadInput): HeadField | null {
     key: inp.key, c, X: left, Y: up, Z: fwd, R, Rf, clear,
     L: {
       // the chart's face/scalp line sits low on the forehead (measured: 3 cm over the brow on the male kit, where a hairline
-      // is ~5 cm), so the front hairline is at least 4.6 cm over the brow and at most 4.4 cm under the crown
-      top: top - oy, back, halfWidth: halfW, hairFront: Math.min(top - oy - 0.044, Math.max(hairFront, nasion + 0.012 + 0.046)), foreheadZ,
+      // is ~5 cm; seen on screen 2026-10-07 as a fringe on every short cut), so the front hairline is at least 9.8 cm over
+      // the nose tip (a third of the face above the brow) and at most 4.4 cm under the crown
+      top: top - oy, back, halfWidth: halfW, hairFront: Math.min(top - oy - 0.044, Math.max(hairFront, noseY + 0.098)), foreheadZ,
       brow: nasion + 0.012, nose: { y: noseY, z: noseZ }, subnasal, mouth: { y: mouthY, z: zAt(mouthY) > -Infinity ? zAt(mouthY) : chinZ },
       chin: { y: chinY, z: chinZ },
       ear: { x: ex, y: ey - oy, z: ez - oz, top: eTop - oy, bottom: eBot - oy, front: eFront - oz, rear: eRear - oz },
