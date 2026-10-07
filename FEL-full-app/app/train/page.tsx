@@ -1,7 +1,7 @@
 import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { Activity, BookOpen, ClipboardList, Dumbbell, UtensilsCrossed, Users, ScanLine } from 'lucide-react';
+import { Activity, BookOpen, ClipboardList, Dumbbell, UtensilsCrossed, Users, ScanLine, Timer } from 'lucide-react';
 import { authOptions } from '@/lib/auth';
 import { loginPath } from '@/lib/auth/safeNext';
 import { prisma } from '@/lib/db';
@@ -38,6 +38,16 @@ export default async function TrainPage() {
       href: '/play/mirror', icon: ScanLine, accent: '#00FF9D', title: 'The Mirror',
       line: 'A squat coach and a movement screen on your own camera. It cues what it can see, and every number it shows is an estimate.',
       tag: 'Start a screen',
+    },
+    {
+      // MIRROR-FIRST P1 (2026-10-07): the Quick Screen (/screen → /play/mirror/assess, no sign-in) was linked from nowhere
+      // in the app. It goes in at its front door, never a deep link past it: the screen asks its own age question first and,
+      // under 18 or unanswered, the grown-up step (app/play/mirror/assess/_components/gate-steps.tsx), for every visitor —
+      // it does not read the account, so the same card is right for a teen and an adult. Nothing is sent: the screen has
+      // no fetch (assess-app.tsx "KIDS SEND NOTHING"), and results stay in the tab.
+      href: '/screen', icon: Timer, accent: '#00E5FF', title: 'Quick Screen',
+      line: 'A free movement check on this camera: your jump in about a minute, or the full screen in about five. Nothing is sent.',
+      tag: 'Check it',
     },
     {
       href: '/training', icon: ClipboardList, accent: '#00E5FF', title: 'Your programming',
