@@ -149,6 +149,9 @@ model User {
   crmDeals        CrmDeal[]     @relation("CrmDealOwner")
   crmActivities   CrmActivity[] @relation("CrmActivityOwner")
   crmNotes        CrmNote[]     @relation("CrmNoteAuthor")
+
+  // ADVENTURE PHASE B (2026-10-07): the Adventure's server save, one row per account. See AdventureSave below.
+  adventureSave AdventureSave?
 }
 
 model PlayerProfile {
@@ -2466,4 +2469,15 @@ model CoachStoreReferral {
   @@index([referrerUserId, status])
   @@index([buyerUserId])
   @@index([holdUntil])
+}
+
+/// ADVENTURE PHASE B (2026-10-07): one row per account, the Adventure's save document as JSON (save/save.ts).
+/// Matches the live table from prisma/pending/2026-10-07-adventure-save.sql (applied by the owner). Verified adults only;
+/// the route must refuse teen / unknown-age uploads (save/policy.ts adventureSavePolicy).
+model AdventureSave {
+  userId    String   @id
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  version   Int
+  doc       Json
+  updatedAt DateTime @default(now())
 }
