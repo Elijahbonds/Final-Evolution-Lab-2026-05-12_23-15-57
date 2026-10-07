@@ -28,6 +28,13 @@
 // it is the Red line (the score reaches 0 where Red starts; no new number).
 //
 // Pure data: no DOM, no Prisma. Movement Screen (PR #22) thresholds are listed at the bottom, re-exported, unchanged.
+//
+// FROM PROPOSED TO TUNED (Mirror Phase 3, 2026-10-07). The owner-led capture (docs/MIRROR-CAPTURE-PROTOCOL.md: the owner
+// and 2 adults, 2 phones, numbers only, no minors) records labelled good and fault takes; `npx tsx
+// scripts/mirror-capture.ts report` replays every grader against them and prints, for each graded entry here, the hit,
+// catch and false-alarm rates at its current value and at a suggested one. The report never edits this file. The owner
+// signs a value off by changing it here, setting signedOff (Threshold.signedOff is typed `false` today, so the first
+// sign-off widens it to boolean), bumping THRESHOLDS_VERSION, and regenerating docs/MIRROR-ASSESS-THRESHOLDS.md.
 
 export const PROPOSED_HEADER = 'PROPOSED — pending Elijah (NASM-CES/PES) approval. NOT FINAL.';
 export const THRESHOLDS_VERSION = 'jump-screen-0.2-proposed';
