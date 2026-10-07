@@ -55,6 +55,7 @@ const NOT_IMPORTED: Record<string, string> = {
   'lib/babylon/adventure/movement/testkit.ts': 'test support — A1\'s headless world, actors and 60 Hz runner; tests are not counted as consumers',
   'lib/babylon/adventure/combat/testArena.ts': 'test support — A2\'s headless arena with a contract-built stand-in for A1; tests are not counted as consumers',
   'lib/babylon/adventure/partner/testRig.ts': 'test support — A3\'s headless party rig with stand-ins for A1 and A2; tests are not counted as consumers',
+  'lib/babylon/adventure/br/testkit.ts': 'test support — Phase C\'s headless BR scenarios (a landed match, placing bodies, steering the zone); tests are not counted as consumers',
   // ECONOMY-SESSIONS-HARDEN (2026-09-28), FIX 2 step 7: written, tested and deliberately NOT imported by any route (FE PM:
   // staged until the live database is back). lib/sessions/sessionsHardening.scan.test.ts fails the day a route imports it
   // without that GO; wiring it is two lines per sessions route, then this line goes.

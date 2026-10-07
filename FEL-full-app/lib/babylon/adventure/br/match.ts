@@ -179,7 +179,7 @@ export class BRMatch {
 
   private readonly ctx: AdventureStepContext;
   private readonly byId = new Map<ActorId, BRFighter>();
-  private readonly summonBrains = new Map<ActorId, { brain: PartnerBrain; owner: BRFighter; input: MoveInput }>();
+  private readonly summonBrains = new Map<ActorId, { brain: PartnerBrain; owner: BRFighter; input: MoveInput; bornTick: number }>();
   private readonly noiseAt = new Map<ActorId, number>();
   private readonly removeAt = new Map<ActorId, number>();
   private readonly sources: { id: ActorId; fill: (out: MoveInput) => void; inp: MoveInput }[] = [];
@@ -390,7 +390,7 @@ export class BRMatch {
     const brain = new PartnerBrain(forkSeed(this.seed, `summon:${f.id}:${this.tick}`));
     const input = neutralInput();
     this.inputs.set(id, input);
-    this.summonBrains.set(id, { brain, owner: f, input });
+    this.summonBrains.set(id, { brain, owner: f, input, bornTick: this.tick });
     this.peakSummons = Math.max(this.peakSummons, this.summonBrains.size);
     return added;
   }
@@ -405,7 +405,8 @@ export class BRMatch {
   private stepSummons(ctx: AdventureStepContext, dt: number): void {
     for (const [id, s] of this.summonBrains) {
       const self = ctx.world.actors.get(id), owner = ctx.world.actors.get(s.owner.id);
-      if (!self || !owner) continue;
+      // its first step it only arrives (A3's stats fill a new body's pools on their first step: nothing spends before)
+      if (!self || !owner || s.bornTick === this.tick) continue;
       const out = s.brain.think({ self, player: owner, world: ctx.world, command: 'engage', playerDowned: s.owner.status === 'downed' }, dt);
       copyMoveInput(out, s.input);
     }

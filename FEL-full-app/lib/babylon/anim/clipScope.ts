@@ -98,6 +98,7 @@ export const MODE_CLIP_SCOPES: Record<string, { suites: readonly ClipSuite[]; bo
   who_scene_it: PARTY, brainbrawl: { suites: ['party'], borrow: PARTY.borrow },
   // ADVENTURE A4 (2026-10-06): the Adventure's bodies run, grind and fight — A1's MOVEMENT_CLIP_SUITES (freerun, board, combat)
   adventure: { suites: ['freerun', 'board', 'combat'], borrow: [] },
+  adventure_br: { suites: ['freerun', 'board', 'combat'], borrow: [] },   // ADVENTURE C: the BR's fighters are the Adventure's bodies
 };
 
 /** The scope for a mode, or null (unscoped: every suite) for a body no mode owns. */
