@@ -387,3 +387,30 @@ describe('a minor or an unknown age: the 1v1 / 3v3 camera waits for the grown-up
     expect(r.grownUp).toBe('ask');
   });
 });
+
+// ── stepping out pauses a hoops game the body plays (the live probe's L7, offline: a software-GL page cannot time it) ──
+describe('stepping out of frame pauses a hoops game the body is playing', () => {
+  it.each([['onevone', COURT_BODY], ['threevthree', COURT_BODY], ['threepoint', null]] as const)('%s', async (modeId, spec) => {
+    const { LOST_PAUSE_MS } = await import('@/lib/babylon/core/BodySession');
+    const { dropout } = await import('@/lib/pose/streamKit');
+    const { THREE_BODY } = await import('./hoopsBody');
+    const frames = shoot([hold(REST, 3.2)]);
+    const holeAt = frames[Math.floor(frames.length * 0.45)].t;
+    const packets = bodyPackets(dropout(frames, holeAt, holeAt + LOST_PAUSE_MS + 800));
+    const { session, drives } = bodySeamFor({ modeId, body: spec ?? THREE_BODY, onBody: () => true });
+    expect(drives).toBe(true);
+    const intents: string[] = [];
+    let phase: 'playing' | 'paused' = 'playing';
+    let last = -Infinity;
+    session.begin(packets[0].arrivedAt, 'body');
+    session.noteInput('body', packets[0].arrivedAt);   // the body is the one playing (a shot, a step taken)
+    const take = (xs: readonly string[]) => { for (const x of xs) { intents.push(x); if (x === 'pause-lost' || x === 'pause-stall') phase = 'paused'; } };
+    for (const p of packets) {
+      if (last > -Infinity && p.arrivedAt - last > 40) for (let now = last + 16; now < p.arrivedAt; now += 16) take(session.tick(phase, now, last).intents);
+      take(session.step(phase, p as never, p.arrivedAt).intents);
+      last = p.arrivedAt;
+    }
+    for (let now = last + 16; now <= last + LOST_PAUSE_MS + 400; now += 16) take(session.tick(phase, now, last).intents);
+    expect(intents).toContain('pause-lost');
+  });
+});
