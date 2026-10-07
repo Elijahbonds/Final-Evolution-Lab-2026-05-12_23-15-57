@@ -32,8 +32,13 @@ export function VerifyCheckoutParams({ signedIn }: { signedIn: boolean }) {
         if (r.state === 'error') console.warn('[verify-checkout-params] server verify failed:', r.error);
       })
       .finally(go);
+    // The redirect is the buyer's landing, not a timeout: if the verify POST has not
+    // settled in 4s (a cold function, a slow tunnel), send them on — the webhook, or
+    // the next wallet read's verify, still fulfils. Never trap anyone on a blank page.
+    const bail = setTimeout(go, 4000);
     return () => {
       cancelled = true;
+      clearTimeout(bail);
     };
     // The session id IS the purchase; router/signedIn identity is not a reason to re-verify.
     // eslint-disable-next-line react-hooks/exhaustive-deps
