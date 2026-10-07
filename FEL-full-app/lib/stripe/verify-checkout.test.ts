@@ -182,7 +182,13 @@ vi.mock('@/lib/stripe', async (importOriginal) => {
             h.createCalls.push(params);
             return { id: `cs_created_${h.createCalls.length}`, url: 'https://stripe.test/pay' };
           }),
+          listLineItems: vi.fn(async () => ({ data: [] })),
         },
+      },
+      webhooks: {
+        // Signature verification is Stripe's; what this suite asserts is what the handler does
+        // with the verified event, so constructEvent hands the fixture straight back.
+        constructEvent: vi.fn((raw: string) => JSON.parse(raw)),
       },
       subscriptions: {
         retrieve: vi.fn(async (id: string) => h.subscriptions[id] ?? {
@@ -211,9 +217,11 @@ vi.mock('@/lib/season/season-service', () => ({
   unlockProLane: vi.fn(async (a: any) => { h.grants.pro.push(a); return { seasonKey: 's1', tier: 3, backfilled: 3, delivered: 3 }; }),
 }));
 
-const { verifyCheckoutSession, isPaidSession } = await import('./verify-checkout');
+const { verifyCheckoutSession, isPaidSession, verifyIdempotencyKey } = await import('./verify-checkout');
 const { POST: verifySessionRoute } = await import('@/app/api/stripe/verify-session/route');
+const { POST: walletWebhookRoute } = await import('@/app/api/v1/wallet/stripe-webhook/route');
 const { fulfilCheckoutSession } = await import('./checkout-fulfil');
+const { fulfilCoachStore } = await import('@/lib/coach-store/webhook');
 const { paymentMethodsFor } = await import('@/lib/stripe-payment-methods');
 
 // ---------------------------------------------------------------------------
@@ -238,6 +246,22 @@ function paidSession(over: Row = {}): Row {
 
 function req(body: unknown): any {
   return { json: async () => body, headers: { get: () => null } };
+}
+
+let eventSeq = 0;
+/** A signed checkout.session.completed POST to the REAL v1 wallet webhook handler. */
+function walletWebhook(session: Row, eventId?: string): any {
+  const event = { id: eventId ?? `evt_${++eventSeq}`, type: 'checkout.session.completed', data: { object: session } };
+  return {
+    text: async () => JSON.stringify(event),
+    headers: { get: (k: string) => (k === 'stripe-signature' ? 'sig_test' : null) },
+  };
+}
+
+/** The stripe webhook's coach-store dispatch for the same session, as fulfilCoachStore sees it. */
+async function fulfilCoachStoreWebhookEvent(session: Row, eventId?: string): Promise<void> {
+  const event = { id: eventId ?? `evt_${++eventSeq}`, type: 'checkout.session.completed', data: { object: session } } as any;
+  await fulfilCoachStore(event, `stripe-event:${event.id}`);
 }
 
 beforeEach(() => {
@@ -281,21 +305,20 @@ describe('verifyCheckoutSession — the no-webhook fulfilment path', () => {
     expect(h.store.ledgerPosting).toHaveLength(2);     // still the one balanced pair
   });
 
-  it('the webhook firing AS WELL still grants once — the ledger key dedupes, the Order upserts', async () => {
+  it('the webhook firing AS WELL still grants once — one key, one Order, one balanced pair', async () => {
     h.stripeSessions.cs_1 = paidSession();
-    // The webhook (fulfilCheckoutSession under its stripe-event key)…
-    await fulfilCheckoutSession(h.stripeSessions.cs_1 as any, 'stripe-event:evt_1');
+    // The webhook (fulfilCheckoutSession under the SAME session key it now fulfils with)…
+    await fulfilCheckoutSession(h.stripeSessions.cs_1 as any, verifyIdempotencyKey('cs_1'));
     // …and the no-webhook verify path, in either order.
     const r = await verifyCheckoutSession(USER, 'cs_1');
     expect(r).toMatchObject({ ok: true, status: 'fulfilled' });
-    await fulfilCheckoutSession(h.stripeSessions.cs_1 as any, 'stripe-event:evt_1');
+    await fulfilCheckoutSession(h.stripeSessions.cs_1 as any, verifyIdempotencyKey('cs_1'));
     expect(h.store.order).toHaveLength(1);
-    // Each idempotency key (the webhook's stripe-event one, the verify path's stripe-session one)
-    // posted its ledger transaction at most once — re-running either path is a no-op, and the
-    // per-session truth (the Order row, unique on stripeSessionId) is one PAID row.
-    const byKey = new Map<string, number>();
-    for (const t of h.store.ledgerTransaction ?? []) byKey.set(t.idempotencyKey, (byKey.get(t.idempotencyKey) ?? 0) + 1);
-    for (const [k, n] of byKey) expect(n, k).toBe(1);
+    // SEC-F4 follow-up 1: BOTH paths post under the one `stripe-session:<id>` key, so the
+    // ledger holds exactly one transaction however often either path runs.
+    expect(h.store.ledgerTransaction).toHaveLength(1);
+    expect(h.store.ledgerTransaction[0].idempotencyKey).toBe('stripe-session:cs_1');
+    expect(h.store.ledgerPosting).toHaveLength(2); // still the one balanced pair
   });
 
   it.each([
@@ -358,7 +381,11 @@ describe('verifyCheckoutSession — the no-webhook fulfilment path', () => {
     h.stripeSessions.cs_season = paidSession({ id: 'cs_season', metadata: { playerId: USER, product: 'SEASON_PASS_PRO', seasonId: 'season-1', seasonKey: 's1' }, client_reference_id: USER });
     const r = await verifyCheckoutSession(USER, 'cs_season');
     expect(r).toMatchObject({ ok: true, status: 'fulfilled', product: 'SEASON_PASS_PRO' });
-    expect(h.grants.pro).toEqual([expect.objectContaining({ userId: USER, seasonId: 'season-1' })]);
+    // The verify path keys the unlock on the session id — the same key the webhook uses,
+    // so whichever runs, the dedupe identity the lane is recorded under is one per payment.
+    expect(h.grants.pro).toEqual([
+      expect.objectContaining({ userId: USER, seasonId: 'season-1', stripeEventId: 'stripe-session:cs_season' }),
+    ]);
   });
 
   it('a subscription checkout grants only when complete AND paid', async () => {
@@ -398,6 +425,82 @@ describe('verifyCheckoutSession — the no-webhook fulfilment path', () => {
     expect(again).toMatchObject({ ok: true, status: 'fulfilled' });
     expect(h.store.booking).toHaveLength(1);
     expect(h.store.booking[0].status).toBe('PAID');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// SEC-F4 follow-up 1 — ONE PAYMENT, ONE GRANT. The REAL v1 wallet webhook handler
+// (constructEvent mocked to the fixture) and the verify path both fire for the same
+// paid session, then verify fires again — the buyer still gets exactly one grant.
+// ---------------------------------------------------------------------------
+
+describe('one payment, one grant — webhook + verify + verify again', () => {
+  beforeEach(() => {
+    process.env.STRIPE_WEBHOOK_SECRET = 'whsec_test';
+  });
+
+  it('COIN_PACK: webhook and verify are the same mint, however often they run', async () => {
+    const cs = paidSession({ id: 'cs_coins', metadata: { playerId: USER, product: 'COIN_PACK', packId: 'starter', coins: '1250' }, client_reference_id: USER });
+    h.stripeSessions.cs_coins = cs;
+    const res = await walletWebhookRoute(walletWebhook(cs));
+    expect(res.status).toBe(200);
+    expect(h.grants.coins).toEqual([expect.objectContaining({ playerId: USER, coins: 1250, idempotencyKey: 'stripe-session:cs_coins' })]);
+    await verifyCheckoutSession(USER, 'cs_coins');
+    await verifyCheckoutSession(USER, 'cs_coins');
+    // Every path offered the wallet the SAME key (the wallet service is spied at this
+    // layer; its unique-idempotencyKey replay is its own suite) — so the session mints once.
+    expect(h.grants.coins).toHaveLength(3);
+    expect(new Set(h.grants.coins.map((g) => g.idempotencyKey))).toEqual(new Set(['stripe-session:cs_coins']));
+    // A redelivered webhook is a NEW event id for the SAME session — event-keying is what
+    // used to double-mint. The key offered is still the session's.
+    await walletWebhookRoute(walletWebhook(cs, 'evt_redelivery'));
+    expect(h.grants.coins).toHaveLength(4);
+    expect(new Set(h.grants.coins.map((g) => g.idempotencyKey))).toEqual(new Set(['stripe-session:cs_coins']));
+  });
+
+  it('SHARD_PACK: verify first, then the webhook — one key offered, one mint', async () => {
+    const cs = paidSession({ id: 'cs_shards', metadata: { playerId: USER, product: 'SHARD_PACK', packId: 's', shards: '40' }, client_reference_id: USER });
+    h.stripeSessions.cs_shards = cs;
+    await verifyCheckoutSession(USER, 'cs_shards');
+    await walletWebhookRoute(walletWebhook(cs));
+    await verifyCheckoutSession(USER, 'cs_shards');
+    expect(h.grants.shards).toHaveLength(3);
+    expect(new Set(h.grants.shards.map((g) => g.idempotencyKey))).toEqual(new Set(['stripe-session:cs_shards']));
+  });
+
+  it('SEASON_PASS_PRO: webhook + verify + verify again open the lane under one key', async () => {
+    const cs = paidSession({ id: 'cs_season', metadata: { playerId: USER, product: 'SEASON_PASS_PRO', seasonId: 'season-1', seasonKey: 's1' }, client_reference_id: USER });
+    h.stripeSessions.cs_season = cs;
+    await walletWebhookRoute(walletWebhook(cs));
+    await verifyCheckoutSession(USER, 'cs_season');
+    await verifyCheckoutSession(USER, 'cs_season');
+    expect(h.grants.pro).toHaveLength(3);
+    expect(h.grants.pro.map((g) => g.stripeEventId)).toEqual(['stripe-session:cs_season', 'stripe-session:cs_season', 'stripe-session:cs_season']);
+  });
+
+  it('coach-store: webhook + verify + verify again post ONE sale (real ledger dedupe)', async () => {
+    (h.store.programAccess ??= []).push({
+      id: 'pa_1', userId: USER, instructorId: 'ins_1', listingId: 'lst_1', status: 'PENDING',
+      priceCents: 4900, stripeFeeCents: 0, beneficiary: 'self', scope: 'lane', billing: 'one_time',
+    });
+    (h.store.instructor ??= []).push({ id: 'ins_1', userId: 'coach-1' });
+    const cs = paidSession({
+      id: 'cs_coach',
+      metadata: { product: 'COACH_STORE', userId: USER, rowId: 'pa_1', kind: 'program', beneficiary: 'self' },
+      client_reference_id: USER,
+    });
+    h.stripeSessions.cs_coach = cs;
+    await walletWebhookRoute(walletWebhook(cs)); // the v1 handler ignores COACH_STORE…
+    expect(h.store.programAccess[0].status).toBe('PENDING'); // …so verify runs the coach fulfilment…
+    await verifyCheckoutSession(USER, 'cs_coach');
+    expect(h.store.programAccess[0].status).toBe('ACTIVE');
+    await fulfilCoachStoreWebhookEvent(cs, 'evt_coach_1'); // …and the stripe webhook's coach-store path fires too
+    await verifyCheckoutSession(USER, 'cs_coach');
+    const sales = (h.store.ledgerTransaction ?? []).filter((t) => t.kind === 'MARKETPLACE_SALE');
+    expect(sales).toHaveLength(1);
+    expect(sales[0].idempotencyKey).toBe('stripe-session:cs_coach');
+    const order = (h.store.order ?? []).filter((o) => o.stripeSessionId === 'cs_coach');
+    expect(order.length <= 1).toBe(true); // at most one bookkeeping row per session
   });
 });
 

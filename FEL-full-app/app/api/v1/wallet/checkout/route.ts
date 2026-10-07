@@ -72,7 +72,9 @@ export async function POST(req: NextRequest) {
       // The webhook mints coins from this metadata (product COIN_PACK).
       metadata: { playerId, product: 'COIN_PACK', packId: pack.id, coins: String(totalCoins) },
       payment_intent_data: { metadata: { playerId, coins: String(totalCoins) } },
-      success_url: `${origin}/store?purchase=success`,
+      // session_id lets /store fulfil through POST /api/stripe/verify-session even when
+      // no webhook is configured (SEC-F4 NO-WEBHOOK follow-up).
+      success_url: `${origin}/store?purchase=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/store?purchase=cancel`,
     });
     return NextResponse.json({ url: checkoutSession.url });

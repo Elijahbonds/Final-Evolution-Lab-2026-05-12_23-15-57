@@ -16,12 +16,15 @@
  *   3. the session belongs to the signed-in user — metadata.userId /
  *      client_reference_id must match the authenticated session user, or 403;
  *   4. fulfilment runs through the SAME functions the webhooks use, keyed
- *      `stripe-session:<id>` — a key the webhooks never write (they key on the
- *      Stripe event id), and one the schema already dedupes: Order.stripeSessionId
- *      is unique, every ledger/wallet row is unique on its idempotency key, the
- *      entitlements are upserts (MarketplacePurchase) or status CAS
- *      (Booking HELD→PAID, ProgramAccess PENDING→ACTIVE). A page reload, a second
- *      verify call, or the webhook ALSO firing can never double-grant.
+ *      `stripe-session:<id>` — the SAME key the webhooks fulfil a
+ *      checkout.session.completed under (ONE PAYMENT, ONE GRANT, SEC-F4
+ *      follow-up 1: the v1 wallet webhook used to key on the Stripe event id,
+ *      so webhook + verify minted COIN_PACK/SHARD_PACK twice), and one the
+ *      schema already dedupes: Order.stripeSessionId is unique, every
+ *      ledger/wallet row is unique on its idempotency key, the entitlements
+ *      are upserts (MarketplacePurchase) or status CAS (Booking HELD→PAID,
+ *      ProgramAccess PENDING→ACTIVE). A page reload, a second verify call, or
+ *      the webhook ALSO firing can never double-grant.
  */
 
 import type Stripe from 'stripe';
@@ -37,9 +40,12 @@ export type VerifyCheckoutResult =
   | { ok: true; status: 'pending'; product: string | null }
   | { ok: false; status: number; error: string };
 
-/** The ledger/wallet key this path fulfils under. Never written by the webhooks (they use
- *  `stripe-event:<id>` / the raw event id), always deduped per session by the schema's
- *  unique keys — see the header. Exported so a test (and a future reader) can assert on it. */
+/** The ledger/wallet key EVERY fulfilment of a Checkout Session runs under — this verify
+ *  path AND the checkout.session.completed branch of both webhooks (SEC-F4 follow-up 1:
+ *  one payment, one grant). Keyed on the session, not the event: a redelivered webhook
+ *  carries a NEW event id for the SAME session, so event-keying was both a double-grant
+ *  hole (vs. this path) and a redelivery hole. Deduped per session by the schema's unique
+ *  keys — see the header. Exported so the webhooks (and a test) share it. */
 export function verifyIdempotencyKey(sessionId: string): string {
   return `stripe-session:${sessionId}`;
 }

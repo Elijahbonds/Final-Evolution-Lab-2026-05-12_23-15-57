@@ -70,8 +70,9 @@ export async function fulfilCoachStore(event: Stripe.Event, idempotencyKey: stri
  * The checkout.session.completed half of fulfilCoachStore, on the session itself rather than the event,
  * so the server-verified success path (SEC-F4 NO-WEBHOOK, lib/stripe/verify-checkout.ts) fulfils a paid
  * coach-store checkout through the SAME code as the webhook. Idempotent the way the webhook is: the
- * HELD→PAID / PENDING→ACTIVE status CAS runs once, and the sale's ledger row is unique on the caller's
- * idempotency key (the webhook's stripe-event key, or the verify path's stripe-session one).
+ * HELD→PAID / PENDING→ACTIVE status CAS runs once, and the sale's ledger row is unique on the session's
+ * `stripe-session:<id>` key — the caller's idempotency key argument is ignored for this event type
+ * (SEC-F4 follow-up 1: one payment, one grant, whichever path — or how many event deliveries — ran).
  */
 export async function fulfilCoachStoreCheckout(
   session: Stripe.Checkout.Session,
@@ -134,7 +135,13 @@ async function onCheckout(event: Stripe.Event, meta: Meta, idempotencyKey: strin
   return onCheckoutSession(event.data.object as Stripe.Checkout.Session, meta, idempotencyKey);
 }
 
-async function onCheckoutSession(session: Stripe.Checkout.Session, meta: Meta, idempotencyKey: string): Promise<void> {
+async function onCheckoutSession(session: Stripe.Checkout.Session, meta: Meta, _callerKey: string): Promise<void> {
+  // ONE PAYMENT, ONE GRANT (SEC-F4 follow-up 1): the sale's ledger row is keyed on the Checkout
+  // Session id — the same key the server-verified success path (lib/stripe/verify-checkout.ts)
+  // fulfils under — never on the Stripe event id, which a redelivery does not keep. Imported
+  // lazily so this module never pays for the verify import graph outside this one call.
+  const { verifyIdempotencyKey } = await import('@/lib/stripe/verify-checkout');
+  const idempotencyKey = verifyIdempotencyKey(session.id);
   const booking = await prisma.booking.findUnique({ where: { id: meta.rowId } });
   if (booking) {
     if (booking.status === 'PAID') {

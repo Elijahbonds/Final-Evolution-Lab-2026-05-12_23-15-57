@@ -7,6 +7,7 @@ import {
   ledgerSubscriptionPayment,
 } from '@/lib/stripe-helpers';
 import { fulfilCheckoutSession } from '@/lib/stripe/checkout-fulfil';
+import { verifyIdempotencyKey } from '@/lib/stripe/verify-checkout';
 import { coachStoreMeta, fulfilCoachStore } from '@/lib/coach-store/webhook';
 import type Stripe from 'stripe';
 
@@ -85,11 +86,15 @@ export async function POST(req: NextRequest) {
 
 // The grants themselves live in lib/stripe/checkout-fulfil.ts so the
 // server-verified success path (app/api/stripe/verify-session) fulfils through
-// the SAME code as this webhook (SEC-F4 NO-WEBHOOK). Behavior here is unchanged:
-// signature-verified checkout.session.completed, keyed on the Stripe event id.
-async function handleCheckoutCompleted(event: Stripe.Event, idempotencyKey: string) {
+// the SAME code as this webhook (SEC-F4 NO-WEBHOOK). SEC-F4 follow-up 1: the
+// fulfilment key is the CHECKOUT SESSION id, not this event's id — the same key
+// verify-session uses, so webhook + verify (or a redelivered event, which is a
+// NEW event id for the SAME session) grants once. The pre-dispatch dedupe above
+// still runs on the event id: that one answers Stripe's retry with `deduped`,
+// this one makes the grant itself one-per-payment.
+async function handleCheckoutCompleted(event: Stripe.Event, _eventIdempotencyKey: string) {
   const session = event.data.object as Stripe.Checkout.Session;
-  await fulfilCheckoutSession(session, idempotencyKey);
+  await fulfilCheckoutSession(session, verifyIdempotencyKey(session.id));
 }
 
 async function handleInvoicePaid(event: Stripe.Event, idempotencyKey: string) {

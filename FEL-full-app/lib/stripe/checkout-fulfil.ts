@@ -9,10 +9,11 @@
  *
  * Idempotency is the schema's, not the caller's: Order.stripeSessionId is unique
  * (upserted), LedgerTransaction.idempotencyKey is unique (postTransaction returns the
- * prior row), and MarketplacePurchase is unique on (buyerId, listingId). The webhook
- * keys on the Stripe event id (`stripe-event:<id>`); the verify path keys on the
- * session id (`stripe-session:<id>`) — the two never collide, and both are deduped
- * per session by the Order/entitlement upserts, so webhook + verify = one grant.
+ * prior row), and MarketplacePurchase is unique on (buyerId, listingId). BOTH the
+ * webhook and the verify path fulfil under the session key `stripe-session:<id>`
+ * (SEC-F4 follow-up 1 — the webhook used to key on the Stripe event id, which a
+ * redelivery does not keep and the verify path never writes, so the same payment
+ * could be booked twice), so webhook + verify = one grant.
  */
 
 import type Stripe from 'stripe';

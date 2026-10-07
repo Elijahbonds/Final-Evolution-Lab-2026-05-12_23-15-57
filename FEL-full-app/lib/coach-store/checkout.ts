@@ -247,7 +247,9 @@ async function bookTime(
           product_data: { name: listing.title },
         },
       }],
-      success_url: `${origin}/coach/thanks?row=${booking.id}`,
+      // session_id lets /coach/thanks fulfil through POST /api/stripe/verify-session
+      // even when no webhook is configured (SEC-F4 NO-WEBHOOK follow-up).
+      success_url: `${origin}/coach/thanks?row=${booking.id}&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/coach/${instructor.slug}`,
       metadata: meta(userId, booking.id, manifest.kind, 'self', referrerUserId),
     }, { idempotencyKey: `coach-store:checkout:${booking.id}` });
@@ -353,8 +355,10 @@ async function buyAccess(
         ...(manifest.kind === 'membership' ? { recurring: { interval: 'month' as const } } : {}),
       },
     }],
-    success_url: `${origin}/coach/thanks?row=${row.id}`,
-    cancel_url: `${origin}/coach/${instructor?.slug ?? 'elijah'}`,
+    // session_id lets /coach/thanks fulfil through POST /api/stripe/verify-session even
+    // when no webhook is configured (SEC-F4 NO-WEBHOOK follow-up).
+    success_url: `${origin}/coach/thanks?row=${row.id}&session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${origin}/coach/${instructor?.slug ?? 'elijahbonds'}`,
     metadata: metaData,
     ...(manifest.kind === 'membership' ? { subscription_data: { metadata: metaData } } : {}),
   }, { idempotencyKey: `coach-store:checkout:${row.id}` });
