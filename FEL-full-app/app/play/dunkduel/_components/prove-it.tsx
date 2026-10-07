@@ -18,17 +18,22 @@ import { judgeDunk, type JudgeScore } from '@/lib/babylon/core/JudgePanel';
 import { clipWasSaved, downloadBlob } from '@/lib/capture/shareClip';
 import { verifiedAdult } from '@/lib/privacy/verifiedAdult';
 import {
-  DEFAULT_DUNKS, MAX_DUNKS, MAX_PLAYERS, MIN_DUNKS, MIN_PLAYERS,
-  readAdults, rosterReady, sealRoster,
+  DEFAULT_DUNKS, MAX_DUNKS, MAX_PLAYERS, MIN_DUNKS, MIN_PLAYERS, WATCHING_STATUS_MIN_VH,
+  readAdults, rosterReady, sealRoster, soloDefaults,
   type Athlete, type ClaimedAge, type RosterRow, type SessionBand,
 } from '@/lib/session-setup/roster';
-import { REARM_MS, freshBoard, phaseAfterCountdown, phaseAfterDunk, recordDunk, type Board } from '@/lib/session-setup/rotation';
+import {
+  REARM_MS, REST_PRESETS_MS, TEN_SECONDS_LINE, freshBoard, normalizeRestMs, phaseAfterCountdown, phaseAfterDunk, recordDunk,
+  restLabel, restSecondsLeft, tenSecondWarningAt, type Board,
+} from '@/lib/session-setup/rotation';
 import {
   MUTE_KEY, cuesAfterDunk, goWhenReadyLine, judgeAverage, nextUpLine, readMuted, resultLine, speakCues, writeMuted,
   type Speaker,
 } from '@/lib/session-setup/voice';
 import { KIDS_IN_SHOT, mayRecord, recordingOnHandoff, saveClipOnDevice } from '@/lib/session-setup/record';
-import { PLACEMENT_LINES, dunkFraming, firstAttemptAllowed, shotLight, type FramingLight } from '@/lib/session-setup/framing';
+import {
+  PLACEMENT_LINES, armAllowed, autoArmReady, dunkFraming, firstAttemptAllowed, newAutoArmGate, shotLight, type FramingLight,
+} from '@/lib/session-setup/framing';
 import { endSession, readSession } from '@/lib/session-setup/memory';
 import { adultCsv, adultShareText, type SummaryRow } from '@/lib/session-setup/summary';
 import { ScanSaveCard } from '@/components/privacy/scan-save-card';
@@ -90,13 +95,18 @@ export default function ProveIt({
   const proveSavesRef = useRef<Promise<boolean>[]>([]);
   const prqRef = useRef(60);
   const levelsRef = useRef<(number | null)[]>([]);
+  const attemptedRef = useRef(false);
+  const gateRef = useRef(newAutoArmGate());
 
   const [stage, setStage] = useState<Stage>('consent');
   const [error, setError] = useState<string | null>(null);
   const [prq, setPrq] = useState(60);
-  const [rows, setRows] = useState<RosterRow[]>([{ name: '', claimed: 'unknown' }]);
+  // Solo defaults. The starting age comes from the server's verified-adult answer only (soloDefaults).
+  const [rows, setRows] = useState<RosterRow[]>(() => soloDefaults(serverVerified).rows);
   const [levels, setLevels] = useState<string[]>(['']);
   const [dunksEach, setDunksEach] = useState(DEFAULT_DUNKS);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [restMs, setRestMs] = useState<number>(REARM_MS);
   const [blockedUnder13, setBlockedUnder13] = useState(false);
   const [roster, setRoster] = useState<Athlete[]>([]);
   const [attempts, setAttempts] = useState<Attempt[][]>([]);
@@ -108,7 +118,7 @@ export default function ProveIt({
   const [facing, setFacing] = useState<'environment' | 'user'>('environment');
   const [light, setLight] = useState<FramingLight>('red');
   const [framingLine, setFramingLine] = useState('Step into the shot.');
-  const [secondsLeft, setSecondsLeft] = useState(3);
+  const [secondsLeft, setSecondsLeft] = useState(REARM_MS / 1000);
   const [recording, setRecording] = useState(false);
   const [remind, setRemind] = useState(false);
   const [saveLine, setSaveLine] = useState('');
@@ -194,7 +204,7 @@ export default function ProveIt({
 
   const openCamera = useCallback(async (facingMode: 'environment' | 'user', gen: number) => {
     const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: facingMode }, width: { ideal: 960 }, height: { ideal: 540 } },
+      video: { facingMode: { ideal: facingMode }, width: { ideal: 1280 }, height: { ideal: 720 } },
       audio: false,
     });
     if (gen !== genRef.current) { stream.getTracks().forEach((t) => t.stop()); return false; }
@@ -217,6 +227,7 @@ export default function ProveIt({
       ? sealed.athletes
       : [{ id: 'p0', name: rows[0]?.name.trim() || 'Athlete', band: 'unknown' as SessionBand }];
     rosterRef.current = athletes;
+    attemptedRef.current = false;
     const dunks = dunksEach;
     boardRef.current = freshBoard(athletes, dunks);
     levelsRef.current = athletes.map((_, i) => {
@@ -306,6 +317,7 @@ export default function ProveIt({
     // Save this jumper's clip only when they may be recorded. The index effect
     // discards anything still rolling when the next athlete is a kid or unknown.
     stopRecorder(!mayRecord(athlete.band, dobYear));
+    attemptedRef.current = true;
     const adv = recordDunk(board);
     boardRef.current = adv.board;
     setIndex(adv.board.index);
@@ -316,7 +328,22 @@ export default function ProveIt({
     setStage(phase === 'paused' ? 'paused' : phase === 'final' ? 'final' : 'countdown');
   }, [dobYear, stopRecorder]);
 
+  const armNext = useCallback((forceRecalibrate: boolean, isRearm: boolean) => {
+    if (!armAllowed(framingRef.current, isRearm)) {
+      trackerRef.current.reset();
+      setStage('prop-phone');
+      return;
+    }
+    if (forceRecalibrate || trackerRef.current.state !== 'ready') trackerRef.current.reset();
+    else trackerRef.current.rearm();
+    setRefused(null);
+    setCurrent(null);
+    setStage('watching');
+    speakCues(speakerRef.current, [goWhenReadyLine()], mutedRef.current);
+  }, []);
+
   useEffect(() => {
+    if (stage !== 'prop-phone') gateRef.current.reset();
     const preview = stage === 'prop-phone' || stage === 'watching' || stage === 'countdown' || stage === 'paused';
     if (!preview) return;
     liveRef.current = true;
@@ -332,6 +359,12 @@ export default function ProveIt({
           framingRef.current = nextLight;
           setLight(nextLight);
           setFramingLine(check.ok ? 'Framing looks good.' : check.instruction);
+        }
+        if (stage === 'prop-phone' && attemptedRef.current && !pausedRef.current
+          && autoArmReady(gateRef.current, check, performance.now(), true)) {
+          liveRef.current = false;
+          armNext(false, true);
+          return;
         }
         if (stage === 'watching') {
           const got = trackerRef.current.feed(frame);
@@ -351,38 +384,29 @@ export default function ProveIt({
     };
     rafRef.current = requestAnimationFrame(loop);
     return () => { liveRef.current = false; cancelAnimationFrame(rafRef.current); };
-  }, [onMeasured, stage]);
-
-  const armNext = useCallback((forceRecalibrate: boolean) => {
-    const green = firstAttemptAllowed(framingRef.current);
-    if (!green) {
-      trackerRef.current.reset();
-      setStage('prop-phone');
-      return;
-    }
-    if (forceRecalibrate || trackerRef.current.state !== 'ready') trackerRef.current.reset();
-    else trackerRef.current.rearm();
-    setRefused(null);
-    setCurrent(null);
-    setStage('watching');
-    speakCues(speakerRef.current, [goWhenReadyLine()], mutedRef.current);
-  }, []);
+  }, [armNext, onMeasured, stage]);
 
   useEffect(() => {
     if (stage !== 'countdown') return;
-    setSecondsLeft(3);
+    const rest = normalizeRestMs(restMs);
+    setSecondsLeft(restSecondsLeft(rest, 0));
     const started = Date.now();
     const tick = window.setInterval(() => {
-      setSecondsLeft(Math.max(0, Math.ceil((REARM_MS - (Date.now() - started)) / 1000)));
+      setSecondsLeft(restSecondsLeft(rest, Date.now() - started));
     }, 200);
+    const warnAt = tenSecondWarningAt(rest);
+    const warn = warnAt === null ? 0 : window.setTimeout(() => {
+      if (!pausedRef.current) speakCues(speakerRef.current, [TEN_SECONDS_LINE], mutedRef.current);
+    }, warnAt);
     const done = window.setTimeout(() => {
       if (pausedRef.current) return;
-      const phase = phaseAfterCountdown(false, false, firstAttemptAllowed(framingRef.current));
-      if (phase === 'watching') armNext(false);
+      gateRef.current.reset();
+      const phase = phaseAfterCountdown(false, false, armAllowed(framingRef.current, true));
+      if (phase === 'watching') armNext(false, true);
       else setStage('prop-phone');
-    }, REARM_MS);
-    return () => { window.clearInterval(tick); window.clearTimeout(done); };
-  }, [armNext, stage]);
+    }, rest);
+    return () => { window.clearInterval(tick); window.clearTimeout(done); if (warn) window.clearTimeout(warn); };
+  }, [armNext, restMs, stage]);
 
   useEffect(() => {
     const athlete = roster[index];
@@ -457,6 +481,7 @@ export default function ProveIt({
     setPendingClip(null);
   }
 
+  const watching = stage === 'watching';
   const ready = rosterReady(rows, dunksEach) && !blockedUnder13;
   const up = roster[index];
   const showRecord = !!up && mayRecord(up.band, dobYear) && stage !== 'consent' && stage !== 'loading-model' && stage !== 'camera-off';
@@ -480,6 +505,7 @@ export default function ProveIt({
     setIndex(0);
     setCurrent(null);
     trackerRef.current.reset();
+    attemptedRef.current = false;
     setStage('prop-phone');
   }
 
@@ -499,8 +525,23 @@ export default function ProveIt({
   }
 
 
+  const cameraButtons = (
+    <>
+      <button type="button" onClick={() => void flipCamera()} className="inline-flex min-h-12 items-center gap-2 rounded-lg border border-white/20 px-4 text-base font-bold">
+        <SwitchCamera className="h-5 w-5" />
+        {facing === 'environment' ? 'Rear camera' : 'Front camera'}
+      </button>
+      {showRecord && (
+        <button type="button" onClick={startRecording} className="inline-flex min-h-12 items-center gap-2 rounded-lg px-4 text-base font-bold text-black" style={{ background: recording ? RED : GREEN }}>
+          {recording ? 'Recording' : 'Record'}
+        </button>
+      )}
+    </>
+  );
+
   return (
     <div className="mx-auto max-w-[880px] overflow-x-hidden px-4 py-6 text-base text-white">
+      {!watching && (<>
       <div className="flex items-center gap-3">
         <Camera className="h-8 w-8" style={{ color: PINK }} />
         <h1 className="fel-heading text-3xl font-bold">PROVE <span style={{ color: PINK }}>IT</span></h1>
@@ -518,6 +559,7 @@ export default function ProveIt({
         One phone, up to eight athletes. Voice is on. A clip stays on this phone, and only for a verified adult.
         No video is uploaded.
       </p>
+      </>)}
 
       {stage === 'consent' && (
         <div className="mt-4 rounded-xl border border-white/15 bg-white/[0.03] p-4">
@@ -534,11 +576,27 @@ export default function ProveIt({
             <text x="232" y="22" fill="#FFD700" fontSize="14">rim</text>
             <text x="96" y="112" fill="#fff" fontSize="14">side-on, landscape</text>
           </svg>
+          {settingsOpen && (<div data-testid="dunk-settings">
           {serverAdult && (
             <div className="mt-3">
               <ScanSaveCard checked={saveChecked} onChange={(next) => { void setProveOptIn(next); }} />
             </div>
           )}
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className="text-sm text-white/70">Rest between dunks</span>
+            {REST_PRESETS_MS.map((ms) => (
+              <button
+                key={ms}
+                type="button"
+                onClick={() => setRestMs(ms)}
+                aria-pressed={restMs === ms}
+                className="min-h-12 min-w-12 rounded-lg border border-white/20 px-3 text-base font-bold"
+                style={{ background: restMs === ms ? GOLD : 'transparent', color: restMs === ms ? '#000' : '#fff' }}
+              >
+                {restLabel(ms)}
+              </button>
+            ))}
+          </div>
           <div className="mt-4 flex flex-wrap gap-2">
             <span className="self-center text-sm text-white/70">Players</span>
             {Array.from({ length: MAX_PLAYERS }, (_, n) => n + 1).map((n) => (
@@ -645,10 +703,11 @@ export default function ProveIt({
               Add saved adults
             </button>
           )}
+          </div>)}
         </div>
       )}
 
-      {roster.length > 0 && stage !== 'consent' && (
+      {roster.length > 0 && stage !== 'consent' && !watching && (
         <div className="mt-4 grid grid-cols-2 gap-2 overflow-x-hidden sm:grid-cols-4">
           {roster.map((p, i) => (
             <div key={p.id} className="rounded-xl border border-white/10 px-3 py-2" style={{ outline: i === index && stage !== 'final' ? `2px solid ${CYAN}` : undefined }}>
@@ -660,7 +719,12 @@ export default function ProveIt({
         </div>
       )}
 
-      <div className="relative mt-4 aspect-[16/9] w-full overflow-hidden rounded-xl border border-white/10 bg-black">
+      <div
+        className={watching
+          ? 'fixed inset-0 z-50 overflow-hidden bg-black'
+          : 'relative mt-4 aspect-[16/9] w-full overflow-hidden rounded-xl border border-white/10 bg-black'}
+        data-testid={watching ? 'dunk-watching' : undefined}
+      >
         <video
           ref={videoRef}
           playsInline
@@ -672,11 +736,23 @@ export default function ProveIt({
           <Gate
             icon={<Camera className="h-8 w-8" style={{ color: CYAN }} />}
             title="READY WHEN YOU ARE"
-            body="Names first. The tracker downloads after you start, and it runs on this phone."
-            cta="SET UP THE CAMERA"
+            body="One tap. The tracker downloads after you start, and it runs on this phone."
+            cta="START"
+            big
+            testId="dunk-start"
             disabled={!ready || rows.length < MIN_PLAYERS}
             onClick={startCamera}
-          />
+          >
+            <button
+              type="button"
+              data-testid="dunk-settings-toggle"
+              aria-expanded={settingsOpen}
+              onClick={() => setSettingsOpen((v) => !v)}
+              className="min-h-12 rounded-lg border border-white/30 px-5 text-base font-bold text-white"
+            >
+              Settings
+            </button>
+          </Gate>
         )}
         {stage === 'camera-off' && (
           <Gate
@@ -697,18 +773,41 @@ export default function ProveIt({
             body={framingLine}
             cta={up ? `${up.name} — start the attempt` : 'START THE ATTEMPT'}
             disabled={!firstAttemptAllowed(light)}
-            onClick={() => armNext(true)}
+            onClick={() => armNext(true, false)}
           />
         )}
-        {stage === 'watching' && (
-          <div className="pointer-events-none absolute inset-x-0 top-3 text-center">
-            <span className="fel-panel px-4 py-2 text-base font-bold" style={{ color: trackerState === 'airborne' ? GOLD : refused && trackerState === 'ready' ? RED : CYAN }}>
-              {trackerState === 'airborne' ? 'AIRBORNE' : trackerState === 'ready' ? (refused ? refusalLine(refused) : 'TRACKING — GO WHEN READY') : trackerState === 'settling' ? 'LANDING…' : 'CALIBRATING — HOLD STILL'}
-            </span>
-          </div>
-        )}
+        {watching && (() => {
+          const w = trackerState === 'airborne' ? { word: 'UP', color: GOLD }
+            : trackerState === 'ready' ? (refused ? { word: 'AGAIN', color: RED } : { word: 'GO', color: GREEN })
+            : trackerState === 'settling' ? { word: 'LAND', color: GOLD }
+            : { word: 'HOLD', color: CYAN };
+          return (
+            <>
+              <div className="pointer-events-none absolute inset-0" style={{ background: w.color, opacity: 0.3 }} data-testid="dunk-wash" />
+              <div
+                role="status"
+                aria-label={trackerState === 'ready' && refused ? refusalLine(refused) : w.word}
+                className="pointer-events-none absolute inset-0 flex items-center justify-center text-center font-black leading-none text-white"
+                style={{ fontSize: `${WATCHING_STATUS_MIN_VH}vh`, textShadow: '0 4px 24px rgba(0,0,0,0.8)' }}
+                data-testid="dunk-status"
+              >
+                {w.word}
+              </div>
+              <button
+                type="button"
+                onClick={toggleMute}
+                aria-pressed={muted}
+                data-testid="dunk-corner-mute"
+                className="absolute right-3 top-3 z-10 inline-flex min-h-12 min-w-12 items-center justify-center gap-2 rounded-lg border border-white/30 bg-black/60 px-4 text-base font-bold"
+              >
+                {muted ? <VolumeX className="h-6 w-6" /> : <Volume2 className="h-6 w-6" />}
+                {muted ? 'Muted' : 'Mute'}
+              </button>
+            </>
+          );
+        })()}
         {(stage === 'countdown' || stage === 'paused') && current && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/80 p-4 text-center">
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 overflow-y-auto bg-black/80 p-4 text-center">
             <div className="text-xl font-bold" style={{ color: GOLD }}>{current.metrics.family}</div>
             <p className="text-base text-white">
               {resultLine(roster[current.playerIndex]?.name ?? '', current.metrics.verticalCm, judgeAverage(current.scores.map((j) => j.score)))}
@@ -727,6 +826,7 @@ export default function ProveIt({
               {stage === 'paused' ? <Play className="h-5 w-5" /> : <Pause className="h-5 w-5" />}
               {stage === 'paused' ? 'Resume' : 'Pause'}
             </button>
+            {cameraButtons}
           </div>
         )}
         {stage === 'final' && (
@@ -765,20 +865,8 @@ export default function ProveIt({
         )}
       </div>
 
-      {(stage === 'prop-phone' || stage === 'watching' || stage === 'countdown' || stage === 'paused') && (
-        <div className="mt-3 flex flex-wrap gap-2">
-          <button type="button" onClick={() => void flipCamera()} className="inline-flex min-h-12 items-center gap-2 rounded-lg border border-white/20 px-4 text-base font-bold">
-            <SwitchCamera className="h-5 w-5" />
-            {facing === 'environment' ? 'Rear camera' : 'Front camera'}
-          </button>
-          {showRecord && (
-            <button type="button" onClick={startRecording} className="inline-flex min-h-12 items-center gap-2 rounded-lg px-4 text-base font-bold text-black" style={{ background: recording ? RED : GREEN }}>
-              {recording ? 'Recording' : 'Record'}
-            </button>
-          )}
-        </div>
-      )}
-      {pendingClip && (
+      {stage === 'prop-phone' && <div className="mt-3 flex flex-wrap gap-2">{cameraButtons}</div>}
+      {!watching && pendingClip && (
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <button
             type="button"
@@ -791,10 +879,10 @@ export default function ProveIt({
           {clipNote && <p className="text-base text-white/80">{clipNote}</p>}
         </div>
       )}
-      {!pendingClip && clipNote && (
+      {!watching && !pendingClip && clipNote && (
         <p className="mt-3 text-base text-white/80">{clipNote}</p>
       )}
-      {remind && showRecord && (
+      {!watching && remind && showRecord && (
         <div className="mt-3 rounded-xl border border-white/15 p-4">
           <p className="text-base">{KIDS_IN_SHOT}</p>
           <button
@@ -808,7 +896,7 @@ export default function ProveIt({
         </div>
       )}
 
-      {attempts.some((list) => list.length > 0) && stage !== 'consent' && (
+      {!watching && attempts.some((list) => list.length > 0) && stage !== 'consent' && (
         <div className="mt-4 grid gap-2 sm:grid-cols-2">
           {roster.map((p, i) => (
             <div key={p.id} className="rounded-xl border border-white/10 p-3">
@@ -830,7 +918,10 @@ export default function ProveIt({
   );
 }
 
-function Gate(props: { icon: React.ReactNode; title: string; body: string; cta?: string; onClick?: () => void; disabled?: boolean }) {
+function Gate(props: {
+  icon: React.ReactNode; title: string; body: string; cta?: string; onClick?: () => void; disabled?: boolean;
+  big?: boolean; testId?: string; children?: React.ReactNode;
+}) {
   return (
     <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 overflow-y-auto bg-black/70 p-6 text-center">
       {props.icon}
@@ -841,12 +932,14 @@ function Gate(props: { icon: React.ReactNode; title: string; body: string; cta?:
           type="button"
           onClick={props.onClick}
           disabled={props.disabled}
-          className="mt-2 min-h-12 rounded-lg px-5 text-base font-bold text-black disabled:opacity-40"
+          data-testid={props.testId}
+          className={`mt-2 rounded-lg px-5 font-bold text-black disabled:opacity-40 ${props.big ? 'min-h-16 min-w-48 text-3xl' : 'min-h-12 text-base'}`}
           style={{ background: CYAN }}
         >
           {props.cta}
         </button>
       )}
+      {props.children}
     </div>
   );
 }
