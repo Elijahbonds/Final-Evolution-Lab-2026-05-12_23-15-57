@@ -62,8 +62,11 @@ async function main() {
     const gap = Vector3.Distance(rootA.position, rootB.position);
     const defMoved = rootB.position.x;
     const events = cs.drainContacts();
+    const driverX = rootA.position.x;
+    cs.dispose();
+    scene.dispose();
     engine.dispose();
-    return { gap, defMoved, driverX: rootA.position.x, events };
+    return { gap, defMoved, driverX, events };
   };
 
   const unbraced = await run(false);

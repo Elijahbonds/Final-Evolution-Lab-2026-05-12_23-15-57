@@ -5,6 +5,7 @@ import { prisma } from '@/lib/db';
 import { isCoachStoreEnabled } from '@/lib/flags';
 import { isMissingTable, logStoreUnavailable, reviewsCanBeSold } from '@/lib/coach-store/gate';
 import { parseManifest } from '@/lib/coach-store/manifest';
+import { listingPriceLabel } from '@/lib/coach-store/priceLabel';
 import { SCREEN_CONTACT_EMAIL } from '@/lib/screen/copy';
 import { isTestKey } from '@/lib/coach-store/stripeMode';
 
@@ -57,6 +58,7 @@ export default async function CoachStorePage({ params }: { params: { slug: strin
               <li key={listing.id} className="rounded-2xl border border-white/10 p-4">
                 <h2 className="font-bold">{listing.title}</h2>
                 <p className="text-sm text-white/60">{listing.description}</p>
+                <p className="mt-2 text-sm font-bold">{listingPriceLabel(listing.priceUsd, manifest)}</p>
                 {soon || reviewClosed ? <p className="mt-2 text-sm">Coming soon</p> : (
                   <Link href={href} className="mt-3 inline-block rounded-xl bg-cyan-300 px-3 py-2 text-sm font-bold text-black">View</Link>
                 )}

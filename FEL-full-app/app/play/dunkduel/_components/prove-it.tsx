@@ -12,7 +12,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { setReady } from '@/lib/babylon/core/readyMarker';
 import { Camera, CameraOff, Pause, Play, RotateCcw, SwitchCamera, Trophy, Volume2, VolumeX } from 'lucide-react';
-import { MediaPipePoseAdapter } from '@/lib/babylon/nexus/neuro-mirror/pose/mediapipe-adapter';
+import { MediaPipePoseAdapter, onVideoFrames, type VideoFrameTick } from '@/lib/babylon/nexus/neuro-mirror/pose/mediapipe-adapter';
 import { DunkTracker, scoreIrlDunk, refusalLine, type DunkMetrics, type DunkRefusal } from '@/lib/irl/dunkTracker';
 import { judgeDunk, type JudgeScore } from '@/lib/babylon/core/JudgePanel';
 import { clipWasSaved, downloadBlob } from '@/lib/capture/shareClip';
@@ -23,19 +23,21 @@ import {
   type Athlete, type ClaimedAge, type RosterRow, type SessionBand,
 } from '@/lib/session-setup/roster';
 import {
-  REARM_MS, REST_PRESETS_MS, TEN_SECONDS_LINE, freshBoard, normalizeRestMs, phaseAfterCountdown, phaseAfterDunk, recordDunk,
+  REARM_MS, REST_PRESETS_MS, TEN_SECONDS_LINE, freshBoard, nextRound, normalizeRestMs, phaseAfterCountdown, phaseAfterDunk, recordDunk,
   restLabel, restSecondsLeft, tenSecondWarningAt, type Board,
 } from '@/lib/session-setup/rotation';
 import {
-  MUTE_KEY, cuesAfterDunk, goWhenReadyLine, judgeAverage, nextUpLine, readMuted, resultLine, speakCues, writeMuted,
+  MUTE_KEY, cuesAfterDunk, goWhenReadyLine, judgeAverage, nextUpLine, readMuted, resultLine, rimHangLine, speakCues, writeMuted,
   type Speaker,
 } from '@/lib/session-setup/voice';
 import { KIDS_IN_SHOT, mayRecord, recordingOnHandoff, saveClipOnDevice } from '@/lib/session-setup/record';
 import {
   PLACEMENT_LINES, armAllowed, autoArmReady, dunkFraming, firstAttemptAllowed, newAutoArmGate, shotLight, type FramingLight,
 } from '@/lib/session-setup/framing';
+import { FpsMeter, errorBandInches } from '@/lib/session-setup/accuracy';
 import { endSession, readSession } from '@/lib/session-setup/memory';
-import { adultCsv, adultShareText, type SummaryRow } from '@/lib/session-setup/summary';
+import { CUE_TAGS, adultCsv, adultShareText, sessionSummary, type Rep, type SummaryRow } from '@/lib/session-setup/summary';
+import { HandsUpGesture } from '@/lib/session-setup/gesture';
 import { ScanSaveCard } from '@/components/privacy/scan-save-card';
 import { naturalSpeaker } from '@/lib/babylon/audio/voice/speakNatural';
 
@@ -49,7 +51,11 @@ type Stage =
   | 'consent' | 'camera-off' | 'loading-model' | 'prop-phone'
   | 'watching' | 'countdown' | 'paused' | 'final';
 
-interface Attempt { metrics: DunkMetrics; scores: JudgeScore[]; total: number; playerIndex: number }
+// make and tags live in page memory only. Nothing here is written to storage; the CSV takes 18+ rows only.
+interface Attempt {
+  metrics: DunkMetrics; scores: JudgeScore[]; total: number; playerIndex: number;
+  id: number; round: number; make: boolean | null; tags: string[];
+}
 
 const CLAIMS: { id: ClaimedAge; label: string }[] = [
   { id: '13-17', label: '13–17' },
@@ -77,13 +83,19 @@ export default function ProveIt({
   const streamRef = useRef<MediaStream | null>(null);
   const adapterRef = useRef<MediaPipePoseAdapter | null>(null);
   const trackerRef = useRef(new DunkTracker());
-  const rafRef = useRef(0);
+  const stopFramesRef = useRef<(() => void) | null>(null);
+  const fpsMeterRef = useRef(new FpsMeter());
+  const cameraFpsRef = useRef(0);
   const liveRef = useRef(false);
   const genRef = useRef(0);
   const facingRef = useRef<'environment' | 'user'>('environment');
   const rosterRef = useRef<Athlete[]>([]);
   const boardRef = useRef<Board>(freshBoard([], DEFAULT_DUNKS));
   const attemptsRef = useRef<Attempt[][]>([]);
+  const repIdRef = useRef(0);
+  const roundRef = useRef(1);
+  const gestureRef = useRef(new HandsUpGesture());
+  const currentIdRef = useRef<number | null>(null);
   const pausedRef = useRef(false);
   const mutedRef = useRef(false);
   const framingRef = useRef<FramingLight>('red');
@@ -111,9 +123,11 @@ export default function ProveIt({
   const [roster, setRoster] = useState<Athlete[]>([]);
   const [attempts, setAttempts] = useState<Attempt[][]>([]);
   const [index, setIndex] = useState(0);
+  const [round, setRound] = useState(1);
   const [current, setCurrent] = useState<Attempt | null>(null);
   const [trackerState, setTrackerState] = useState('idle');
   const [refused, setRefused] = useState<DunkRefusal | null>(null);
+  const [rimAirMs, setRimAirMs] = useState(0);
   const [muted, setMuted] = useState(false);
   const [facing, setFacing] = useState<'environment' | 'user'>('environment');
   const [light, setLight] = useState<FramingLight>('red');
@@ -192,7 +206,8 @@ export default function ProveIt({
   const stopAll = useCallback(() => {
     genRef.current++;
     liveRef.current = false;
-    cancelAnimationFrame(rafRef.current);
+    stopFramesRef.current?.();
+    stopFramesRef.current = null;
     stopRecorder(true);
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
@@ -212,6 +227,13 @@ export default function ProveIt({
     const v = videoRef.current;
     if (!v) { stream.getTracks().forEach((t) => t.stop()); return false; }
     v.srcObject = stream;
+    // ask for 60 fps (the assess screen's pattern); a camera that refuses keeps its rate, and the ± band says so
+    const track = stream.getVideoTracks?.()?.[0];
+    cameraFpsRef.current = track?.getSettings?.().frameRate ?? 0;
+    track?.applyConstraints?.({ frameRate: { ideal: 60 } })
+      .then(() => { cameraFpsRef.current = track.getSettings?.().frameRate ?? cameraFpsRef.current; })
+      .catch(() => { /* keep the camera's own rate */ });
+    fpsMeterRef.current = new FpsMeter();
     await v.play();
     return gen === genRef.current;
   }, []);
@@ -230,6 +252,8 @@ export default function ProveIt({
     attemptedRef.current = false;
     const dunks = dunksEach;
     boardRef.current = freshBoard(athletes, dunks);
+    roundRef.current = 1;
+    setRound(1);
     levelsRef.current = athletes.map((_, i) => {
       const n = Number(levels[i]);
       return Number.isFinite(n) && n >= 1 && n <= 100 ? Math.round(n) : null;
@@ -285,7 +309,9 @@ export default function ProveIt({
     const s = scoreIrlDunk(got, level);
     const scores = judgeDunk(s.difficulty, s.execution, s.style);
     const total = scores.reduce((sum, j) => sum + j.score, 0);
-    const attempt: Attempt = { metrics: got, scores, total, playerIndex: idx };
+    const attempt: Attempt = { metrics: got, scores, total, playerIndex: idx, id: ++repIdRef.current, round: roundRef.current, make: null, tags: [] };
+    currentIdRef.current = attempt.id;
+    gestureRef.current.reset();
     // AB-04 Prove It history: only roster slot 0 (the signed-in athlete), only 18+,
     // only with the opt-in on and the box checked. Other athletes on this phone are never saved.
     const gate = saveRef.current;
@@ -328,6 +354,19 @@ export default function ProveIt({
     setStage(phase === 'paused' ? 'paused' : phase === 'final' ? 'final' : 'countdown');
   }, [dobYear, stopRecorder]);
 
+  const patchAttempt = useCallback((id: number, patch: (a: Attempt) => Partial<Attempt>) => {
+    setAttempts((prev) => prev.map((list) => list.map((a) => (a.id === id ? { ...a, ...patch(a) } : a))));
+    setCurrent((c) => (c && c.id === id ? { ...c, ...patch(c) } : c));
+  }, []);
+  const markMake = useCallback((make: boolean) => {
+    if (currentIdRef.current !== null) patchAttempt(currentIdRef.current, () => ({ make }));
+  }, [patchAttempt]);
+  const toggleTag = useCallback((tag: string) => {
+    if (currentIdRef.current !== null) {
+      patchAttempt(currentIdRef.current, (a) => ({ tags: a.tags.includes(tag) ? a.tags.filter((t) => t !== tag) : [...a.tags, tag] }));
+    }
+  }, [patchAttempt]);
+
   const armNext = useCallback((forceRecalibrate: boolean, isRearm: boolean) => {
     if (!armAllowed(framingRef.current, isRearm)) {
       trackerRef.current.reset();
@@ -347,12 +386,15 @@ export default function ProveIt({
     const preview = stage === 'prop-phone' || stage === 'watching' || stage === 'countdown' || stage === 'paused';
     if (!preview) return;
     liveRef.current = true;
-    const loop = () => {
+    const v0 = videoRef.current;
+    if (!v0) return;
+    const onTick = (tick: VideoFrameTick) => {
       if (!liveRef.current) return;
       const v = videoRef.current;
       const adapter = adapterRef.current;
+      fpsMeterRef.current.push(tick.timestampMs);
       if (v && adapter?.ready) {
-        const frame = adapter.detect(v, performance.now());
+        const frame = adapter.detect(v, tick.timestampMs, { frameId: tick.frameId });
         const check = dunkFraming({ landmarks: frame.landmarks, present: frame.present });
         const nextLight = shotLight(check);
         if (nextLight !== framingRef.current) {
@@ -363,28 +405,40 @@ export default function ProveIt({
         if (stage === 'prop-phone' && attemptedRef.current && !pausedRef.current
           && autoArmReady(gateRef.current, check, performance.now(), true)) {
           liveRef.current = false;
+          stopFramesRef.current?.();
           armNext(false, true);
           return;
+        }
+        if (stage === 'countdown' && gestureRef.current.feed({ landmarks: frame.landmarks, timestampMs: tick.timestampMs, present: frame.present })) {
+          markMake(true);
         }
         if (stage === 'watching') {
           const got = trackerRef.current.feed(frame);
           const st = trackerRef.current.state;
           if (st !== trackerSeen.current) { trackerSeen.current = st; setTrackerState(st); }
           const why = trackerRef.current.takeRefusal();
-          if (why) setRefused(why);
+          if (why) {
+            setRefused(why);
+            if (why === 'rim_hang') {
+              const air = trackerRef.current.refusalAirTimeMs ?? 0;
+              setRimAirMs(air);
+              speakCues(speakerRef.current, [rimHangLine(air)], mutedRef.current);
+            }
+          }
           else if (st === 'airborne') setRefused(null);
           if (got) {
             liveRef.current = false;
+            stopFramesRef.current?.();
             onMeasured(got);
             return;
           }
         }
       }
-      rafRef.current = requestAnimationFrame(loop);
     };
-    rafRef.current = requestAnimationFrame(loop);
-    return () => { liveRef.current = false; cancelAnimationFrame(rafRef.current); };
-  }, [armNext, onMeasured, stage]);
+    const stop = onVideoFrames(v0, onTick);
+    stopFramesRef.current = stop;
+    return () => { liveRef.current = false; stop(); };
+  }, [armNext, markMake, onMeasured, stage]);
 
   useEffect(() => {
     if (stage !== 'countdown') return;
@@ -487,14 +541,43 @@ export default function ProveIt({
   const showRecord = !!up && mayRecord(up.band, dobYear) && stage !== 'consent' && stage !== 'loading-model' && stage !== 'camera-off';
   const totals = roster.map((_, i) => (attempts[i] ?? []).reduce((s, a) => s + a.total, 0));
   const best = (i: number) => (attempts[i] ?? []).reduce((m, a) => Math.max(m, a.metrics.verticalCm), 0);
-  const summaryRows: SummaryRow[] = roster.map((p, i) => ({
+  const summaryRows: SummaryRow[] = roster.flatMap((p, i) => (attempts[i] ?? []).map((a) => ({
+    name: p.name,
+    band: p.band,
+    verticalCm: a.metrics.verticalCm,
+    judges: judgeAverage(a.scores.map((s) => s.score)),
+    round: a.round,
+    make: a.make,
+    tags: a.tags,
+  })));
+  const athleteRows: SummaryRow[] = roster.map((p, i) => ({
     name: p.name,
     band: p.band,
     verticalCm: best(i),
-    judges: judgeAverage((attempts[i] ?? []).flatMap((a) => a.scores.map((s) => s.score))),
+    judges: judgeAverage((attempts[i] ?? []).flatMap((a) => a.scores.map((sc) => sc.score))),
   }));
+  const sessionStats = roster.map((p, i) => sessionSummary((attempts[i] ?? []).map((a): Rep => ({
+    round: a.round, band: p.band, family: a.metrics.family, verticalCm: a.metrics.verticalCm, make: a.make, tags: a.tags,
+  }))));
+
+  function newRound() {
+    const log = nextRound({ round: roundRef.current, reps: attemptsRef.current.flat() }, rosterRef.current, boardRef.current.dunksEach || dunksEach);
+    roundRef.current = log.round;
+    setRound(log.round);
+    boardRef.current = log.board;
+    saveOnceRef.current = false;
+    setIndex(0);
+    setCurrent(null);
+    currentIdRef.current = null;
+    trackerRef.current.reset();
+    attemptedRef.current = false;
+    setStage('prop-phone');
+  }
 
   function runItBack() {
+    roundRef.current = 1;
+    setRound(1);
+    currentIdRef.current = null;
     saveOnceRef.current = false;
     proveSavesRef.current = [];
     setSaveLine('');
@@ -778,7 +861,7 @@ export default function ProveIt({
         )}
         {watching && (() => {
           const w = trackerState === 'airborne' ? { word: 'UP', color: GOLD }
-            : trackerState === 'ready' ? (refused ? { word: 'AGAIN', color: RED } : { word: 'GO', color: GREEN })
+            : trackerState === 'ready' ? (refused ? { word: refused === 'rim_hang' ? 'RIM' : 'AGAIN', color: RED } : { word: 'GO', color: GREEN })
             : trackerState === 'settling' ? { word: 'LAND', color: GOLD }
             : { word: 'HOLD', color: CYAN };
           return (
@@ -786,13 +869,22 @@ export default function ProveIt({
               <div className="pointer-events-none absolute inset-0" style={{ background: w.color, opacity: 0.3 }} data-testid="dunk-wash" />
               <div
                 role="status"
-                aria-label={trackerState === 'ready' && refused ? refusalLine(refused) : w.word}
+                aria-label={trackerState === 'ready' && refused ? refusalLine(refused, rimAirMs) : w.word}
                 className="pointer-events-none absolute inset-0 flex items-center justify-center text-center font-black leading-none text-white"
                 style={{ fontSize: `${WATCHING_STATUS_MIN_VH}vh`, textShadow: '0 4px 24px rgba(0,0,0,0.8)' }}
                 data-testid="dunk-status"
               >
                 {w.word}
               </div>
+              {trackerState === 'ready' && refused === 'rim_hang' && (
+                <p
+                  className="pointer-events-none absolute inset-x-0 bottom-24 px-4 text-center text-xl font-bold text-white"
+                  style={{ textShadow: '0 2px 12px rgba(0,0,0,0.9)' }}
+                  data-testid="dunk-rim-hang-line"
+                >
+                  {refusalLine('rim_hang', rimAirMs)}
+                </p>
+              )}
               <button
                 type="button"
                 onClick={toggleMute}
@@ -810,7 +902,7 @@ export default function ProveIt({
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 overflow-y-auto bg-black/80 p-4 text-center">
             <div className="text-xl font-bold" style={{ color: GOLD }}>{current.metrics.family}</div>
             <p className="text-base text-white">
-              {resultLine(roster[current.playerIndex]?.name ?? '', current.metrics.verticalCm, judgeAverage(current.scores.map((j) => j.score)))}
+              {resultLine(roster[current.playerIndex]?.name ?? '', current.metrics.verticalCm, judgeAverage(current.scores.map((j) => j.score)), errorBandInches(fpsMeterRef.current.fps || cameraFpsRef.current, current.metrics.verticalCm))}
             </p>
             <p className="text-2xl font-black">{stage === 'paused' ? 'Paused' : `Next up in ${secondsLeft}`}</p>
             {boardRef.current.players[boardRef.current.index] && (
@@ -822,6 +914,20 @@ export default function ProveIt({
                 </span>
               </div>
             )}
+            <div className="flex flex-col items-center gap-2" data-testid="make-miss">
+              <span className="text-base font-bold text-white/80">
+                Last dunk{current.make === true ? ': MAKE' : current.make === false ? ': MISS' : ''} · or hands up for a make
+              </span>
+              <div className="flex gap-3">
+                <button type="button" aria-pressed={current.make === true} onClick={() => markMake(true)} className="min-h-14 min-w-28 rounded-lg px-5 text-xl font-black text-black" style={{ background: current.make === true ? GOLD : '#9be7a5' }}>MAKE</button>
+                <button type="button" aria-pressed={current.make === false} onClick={() => markMake(false)} className="min-h-14 min-w-28 rounded-lg px-5 text-xl font-black text-black" style={{ background: current.make === false ? GOLD : '#f5a3a3' }}>MISS</button>
+              </div>
+              <div className="flex max-w-md flex-wrap justify-center gap-2" role="group" aria-label="Cue tags">
+                {CUE_TAGS.map((t) => (
+                  <button key={t} type="button" aria-pressed={current.tags.includes(t)} onClick={() => toggleTag(t)} className="min-h-12 rounded-full border border-white/30 px-4 text-base font-bold" style={current.tags.includes(t) ? { background: CYAN, color: '#000' } : undefined}>{t}</button>
+                ))}
+              </div>
+            </div>
             <button type="button" onClick={pauseToggle} className="inline-flex min-h-12 items-center gap-2 rounded-lg px-4 text-base font-bold text-black" style={{ background: GOLD }}>
               {stage === 'paused' ? <Play className="h-5 w-5" /> : <Pause className="h-5 w-5" />}
               {stage === 'paused' ? 'Resume' : 'Pause'}
@@ -841,9 +947,17 @@ export default function ProveIt({
                 </li>
               ))}
             </ul>
+            {sessionStats.map((st, i) => st.measured > 0 && (
+              <p key={roster[i]?.id ?? i} className="text-base text-white/80" data-testid="session-stats">
+                {roster[i]?.name}: round {round}, avg {Math.round((st.averageCm ?? 0) / 2.54)} in
+                {st.makeRate !== null ? `, makes ${st.makes}/${st.marked}` : ''}
+                {st.dropOff ? ' · heights are dropping, rest up' : ''}
+              </p>
+            ))}
             {saveLine && <p className="text-base text-white/80">{saveLine}</p>}
             <div className="flex flex-wrap justify-center gap-2">
-              <button type="button" onClick={runItBack} className="min-h-12 rounded-lg px-4 text-base font-bold text-black" style={{ background: CYAN }}>Run it back</button>
+              <button type="button" onClick={newRound} className="min-h-12 rounded-lg px-4 text-base font-bold text-black" style={{ background: CYAN }}>Next round</button>
+              <button type="button" onClick={runItBack} className="min-h-12 rounded-lg border border-white/20 px-4 text-base font-bold">New session</button>
               {serverVerified && summaryRows.some((r) => r.band === '18+') && (
                 <button
                   type="button"
@@ -911,8 +1025,8 @@ export default function ProveIt({
           ))}
         </div>
       )}
-      {stage === 'final' && adultShareText(summaryRows) && (
-        <p className="mt-3 text-base text-white/70">{adultShareText(summaryRows)}</p>
+      {stage === 'final' && adultShareText(athleteRows) && (
+        <p className="mt-3 text-base text-white/70">{adultShareText(athleteRows)}</p>
       )}
     </div>
   );

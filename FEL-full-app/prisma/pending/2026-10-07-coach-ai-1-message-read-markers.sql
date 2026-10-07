@@ -1,0 +1,35 @@
+-- COACH-AI Phase 8 (2026-10-07; owner decision 9 "read markers: approve a pending SQL file, owner applies"):
+-- ProgramMessage.readAt — when the OTHER person in a coach <-> athlete thread first opened it after the message was sent.
+-- ADDITIVE ONLY: one nullable column on an existing table. No default, no backfill, no index, nothing changed or dropped.
+--
+-- Written by hand in `prisma migrate diff --script` form. This lane ran no Prisma command (no migrate, no db push, no
+-- generate) and did NOT change prisma/schema.prisma or public/_prisma/** (lib/db/prismaSchemaSync.test.ts would go red
+-- on a schema change whose client is not regenerated; the Knowledge Feed lane's schema change was held back from
+-- integration for exactly that, b755797b).
+--
+-- SAFE IN EITHER ORDER WITH THE DEPLOY. The code (lib/coach/messageReads.ts) reads and writes the column with raw,
+-- parameterised SQL after an information_schema probe: without the column every marker answers "not available", the
+-- thread works as before, and nothing 500s. Within ~5 minutes of this file being applied the markers switch on, with
+-- no deploy and no env change. Existing Prisma queries are unaffected either way: the committed client does not
+-- select a column it has never heard of.
+--
+-- THE OWNER'S STEPS (docs/LANES.md section 4), in this order:
+--   1. Locally, add ONE line to `model ProgramMessage` in prisma/schema.prisma, after `createdAt`:
+--          readAt     DateTime?
+--      (Without it, step 2 shows nothing and, after step 3, every later `migrate diff` would propose DROP COLUMN "readAt".)
+--   2. Preview, read-only: npx prisma migrate diff --from-url "$PROD_DIRECT_URL" --to-schema-datamodel prisma/schema.prisma --script
+--      It should print exactly the ALTER below (plus 2026-10-07-coach-ai-2-coach-availability.sql if that is staged too,
+--      plus anything another unapplied lane adds — stop and review if so).
+--   3. Apply: npx prisma db execute --url "$PROD_DIRECT_URL" --file prisma/pending/2026-10-07-coach-ai-1-message-read-markers.sql
+--   4. Verify: the same migrate diff prints an empty migration.
+--   5. Then the client: node scripts/copy-prisma-schema.mjs && npm run prisma:generate; npx vitest run
+--      lib/db/prismaSchemaSync.test.ts and npx tsx scripts/prisma-artifact-tests.ts; commit prisma/schema.prisma,
+--      public/_prisma/schema.prisma and public/_prisma/client, and bump PARENT in lib/privacy/u13-lock-log.test.ts to
+--      that commit. A deploy of that regenerated client MUST come after step 3: the regenerated client selects readAt
+--      on every ProgramMessage read.
+--
+-- ROLLBACK (loses only the read times; the messages stay): ALTER TABLE "ProgramMessage" DROP COLUMN "readAt";
+--   (Revert the schema line too if step 5 was done; the code goes back to "not available" on its own.)
+
+-- AlterTable
+ALTER TABLE "ProgramMessage" ADD COLUMN     "readAt" TIMESTAMP(3);

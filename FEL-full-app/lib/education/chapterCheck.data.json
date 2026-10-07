@@ -1,0 +1,1413 @@
+{
+  "source": "docs/PLAYBOOK-QUIZ-DRAFTS.md",
+  "questions": [
+    {
+      "id": "q-1-0",
+      "chapter": 1,
+      "section": "1.0",
+      "title": "Your Body Has a Governor",
+      "question": "In the Playbook, what does the nervous system's 'governor' care about above all?",
+      "options": [
+        "How much horsepower you built in the weight room",
+        "Survival",
+        "How many reps you did today",
+        "Your vertical jump number"
+      ],
+      "answer": 1,
+      "bookLine": "A governor does not care how much horsepower you built in the weight room. It cares about one thing: survival.",
+      "status": "draft"
+    },
+    {
+      "id": "q-1-2",
+      "chapter": 1,
+      "section": "1.2",
+      "title": "Why Strong Isn't Enough",
+      "question": "Why can a 'governed' athlete squat four hundred pounds and still not jump high?",
+      "options": [
+        "The nervous system will not release the strength while it has flagged a vulnerability",
+        "Squats make athletes slower",
+        "Strength only counts after age 18",
+        "They need more plyometrics"
+      ],
+      "answer": 0,
+      "bookLine": "The nervous system will not release it, because somewhere in the kinetic chain — at the ankle, at the hip, at the thoracic spine, in the breathing pattern — there is a structural vulnerability that the governor has flagged.",
+      "status": "draft"
+    },
+    {
+      "id": "q-1-4",
+      "chapter": 1,
+      "section": "1.4",
+      "title": "The Sequence That Changes Everything",
+      "question": "What is the Playbook's four-step sequence, in order?",
+      "options": [
+        "Load → Perform → Assess → Correct",
+        "Assess → Correct → Load → Perform",
+        "Correct → Assess → Perform → Load",
+        "Perform → Load → Correct → Assess"
+      ],
+      "answer": 1,
+      "bookLine": "Assess → Correct → Load → Perform.",
+      "status": "draft"
+    },
+    {
+      "id": "q-1-5",
+      "chapter": 1,
+      "section": "1.5",
+      "title": "What This Means for You Tonight",
+      "question": "A coach sees a lazy-looking lateral slide on film. What does the Playbook say not to default to?",
+      "options": [
+        "Ankle work",
+        "Breathing resets",
+        "Cone drills",
+        "The five-minute check"
+      ],
+      "answer": 2,
+      "bookLine": "If you are a coach and an athlete's lateral slide looks lazy on film, do not default to cone drills.",
+      "status": "draft"
+    },
+    {
+      "id": "q-2-0",
+      "chapter": 2,
+      "section": "2.0",
+      "title": "The Pressure Cylinder",
+      "question": "Why does the Playbook say a youth athlete needs a hydraulic model of the trunk?",
+      "options": [
+        "Every landing is a pressure event",
+        "It makes the spine more flexible",
+        "It replaces strength training",
+        "It only matters for adults"
+      ],
+      "answer": 0,
+      "bookLine": "Because every landing is a pressure event.",
+      "status": "draft"
+    },
+    {
+      "id": "q-2-1",
+      "chapter": 2,
+      "section": "2.1",
+      "title": "Cavity 1: The Cranial Vault (Your Head)",
+      "question": "What does forward head posture shorten, according to the Playbook?",
+      "options": [
+        "The hamstrings",
+        "The small muscles at the base of the skull (the suboccipitals)",
+        "The calf muscles",
+        "The diaphragm"
+      ],
+      "answer": 1,
+      "bookLine": "Forward head posture — ear sitting clearly in front of the shoulder — shortens the small muscles at the base of the skull (the suboccipitals).",
+      "status": "draft"
+    },
+    {
+      "id": "q-2-2",
+      "chapter": 2,
+      "section": "2.2",
+      "title": "Cavity 2: The Thoracic Cage (Your Rib Cage)",
+      "question": "When the rib V-angle opens wider than about 90 degrees, what is lost?",
+      "options": [
+        "Grip strength",
+        "The zone of apposition (ZOA)",
+        "Ankle eversion",
+        "The foot tripod"
+      ],
+      "answer": 1,
+      "bookLine": "When the rib cage is flared — the V-angle where the bottom ribs meet at the breastbone opens wider than about 90 degrees — the ZOA is lost.",
+      "status": "draft"
+    },
+    {
+      "id": "q-2-3",
+      "chapter": 2,
+      "section": "2.3",
+      "title": "Cavity 3: The Pelvic Basin (Your Pelvis and Floor)",
+      "question": "In the pressure cylinder, which part is the inferior (bottom) piston?",
+      "options": [
+        "The diaphragm",
+        "The abdominal wall",
+        "The pelvic floor",
+        "The skull"
+      ],
+      "answer": 2,
+      "bookLine": "The pelvic floor is the inferior piston of the pressure cylinder.",
+      "status": "draft"
+    },
+    {
+      "id": "q-2-4",
+      "chapter": 2,
+      "section": "2.4",
+      "title": "Your Breath Is the Control Dial",
+      "question": "Why does the Playbook call breath the control dial?",
+      "options": [
+        "It is the only autonomic function you can also run on purpose",
+        "It is the fastest way to build muscle",
+        "It sets your heart rate directly",
+        "It replaces a warm-up"
+      ],
+      "answer": 0,
+      "bookLine": "Breath is the only autonomic function you can also run on purpose.",
+      "status": "draft"
+    },
+    {
+      "id": "q-2-6",
+      "chapter": 2,
+      "section": "2.6",
+      "title": "Force From the Ground Up",
+      "question": "To slide left, which way does the right foot push the ground?",
+      "options": [
+        "To the left",
+        "To the right",
+        "Straight down only",
+        "Backward"
+      ],
+      "answer": 1,
+      "bookLine": "To slide left, the right foot pushes the ground to the right.",
+      "status": "draft"
+    },
+    {
+      "id": "q-2-7",
+      "chapter": 2,
+      "section": "2.7",
+      "title": "The Foot Tripod",
+      "question": "What are the three points of the foot tripod?",
+      "options": [
+        "Toes, arch and heel edge",
+        "Center of the heel, base of the first metatarsal, base of the fifth metatarsal",
+        "Big toe, little toe and ankle bone",
+        "Heel, arch and ball of the foot only"
+      ],
+      "answer": 1,
+      "bookLine": "Three points of ground contact make a stable foot: the center of the heel, the base of the first metatarsal (the big-toe joint), and the base of the fifth metatarsal (the pinky-toe joint).",
+      "status": "draft"
+    },
+    {
+      "id": "q-2-8",
+      "chapter": 2,
+      "section": "2.8",
+      "title": "Movement Snack: The Ankle Architecture Reset",
+      "question": "In the Single-Leg Oscillatory Pogo, what does a mushy or heavy bounce mean?",
+      "options": [
+        "You are bouncing too high",
+        "The arch collapsed and is absorbing energy instead of returning it",
+        "You need heavier shoes",
+        "The drill is working"
+      ],
+      "answer": 1,
+      "bookLine": "Mushy or heavy means the arch collapsed and is absorbing energy instead of returning it.",
+      "status": "draft"
+    },
+    {
+      "id": "q-2-10",
+      "chapter": 2,
+      "section": "2.10",
+      "title": "Putting the Cylinder and the Ground Together",
+      "question": "An athlete foam-rolls for twenty minutes and still looks flat in the first step. What does the Playbook suggest instead?",
+      "options": [
+        "Roll for longer",
+        "Two minutes of tripod and short foot plus one minute of long-exhale rib resets",
+        "Skip the warm-up",
+        "Heavier squats"
+      ],
+      "answer": 1,
+      "bookLine": "Two minutes of tripod and short foot plus one minute of long-exhale rib resets will usually beat passive rolling for court transfer.",
+      "status": "draft"
+    },
+    {
+      "id": "q-3-0",
+      "chapter": 3,
+      "section": "3.0",
+      "title": "Why 5 Minutes Is Enough to Find the Problem",
+      "question": "The quick check treats the body as three building blocks stacked on what?",
+      "options": [
+        "A foot-and-ankle foundation",
+        "The shoulders",
+        "A barbell",
+        "The knees"
+      ],
+      "answer": 0,
+      "bookLine": "You need a fast visual system that treats the body as three building blocks — cranial vault, thoracic cage, pelvic basin — stacked on a foot-and-ankle foundation.",
+      "status": "draft"
+    },
+    {
+      "id": "q-3-2",
+      "chapter": 3,
+      "section": "3.2",
+      "title": "The 5 Checks",
+      "question": "In Check 1, the Heel Line, where do you stand and what do you look at?",
+      "options": [
+        "In front, at the toes",
+        "Behind the athlete, at the heel bone",
+        "At the side, at the ear",
+        "Behind, at the shoulder blades"
+      ],
+      "answer": 1,
+      "bookLine": "Stand behind the athlete. Look at the heel bone (calcaneus).",
+      "status": "draft"
+    },
+    {
+      "id": "q-3-3",
+      "chapter": 3,
+      "section": "3.3",
+      "title": "Check 2: The Knee Window (view from the front)",
+      "question": "In Check 2, the Knee Window, what are inward-facing 'squinting kneecaps' a flag for?",
+      "options": [
+        "ACL risk",
+        "Strong quads",
+        "A good jump",
+        "Nothing — they are normal"
+      ],
+      "answer": 0,
+      "bookLine": "Inward-facing kneecaps — ‘squinting kneecaps’ — are an ACL-risk flag and often trace back to the foot findings from Check 1.",
+      "status": "draft"
+    },
+    {
+      "id": "q-3-4",
+      "chapter": 3,
+      "section": "3.4",
+      "title": "Check 3: The Hip Level Check (view from the front, waistline)",
+      "question": "In the Hip Level Check, how big a difference between the hip points is significant?",
+      "options": [
+        "Any difference at all",
+        "More than about one finger-width",
+        "More than a hand-width",
+        "Only if it hurts"
+      ],
+      "answer": 1,
+      "bookLine": "A difference of more than about one finger-width is significant.",
+      "status": "draft"
+    },
+    {
+      "id": "q-3-5",
+      "chapter": 3,
+      "section": "3.5",
+      "title": "Check 4: The Rib Angle (view from the front, chest)",
+      "question": "In the Rib Angle check, what is the ideal angle of the V where the bottom ribs meet?",
+      "options": [
+        "About 45 degrees",
+        "Roughly 90 degrees",
+        "About 135 degrees",
+        "As wide as possible"
+      ],
+      "answer": 1,
+      "bookLine": "Ideal is roughly a 90-degree angle.",
+      "status": "draft"
+    },
+    {
+      "id": "q-3-6",
+      "chapter": 3,
+      "section": "3.6",
+      "title": "Check 5: The Head Float (view from the side)",
+      "question": "In the Head Float check, the vertical line from the earlobe should pass through what?",
+      "options": [
+        "The elbow",
+        "The hip point",
+        "The bony tip of the shoulder (the acromion)",
+        "The front of the chest"
+      ],
+      "answer": 2,
+      "bookLine": "That line should pass through the bony tip of the shoulder (the acromion).",
+      "status": "draft"
+    },
+    {
+      "id": "q-3-7",
+      "chapter": 3,
+      "section": "3.7",
+      "title": "The Single-Leg Wobble Test",
+      "question": "In the Single-Leg Wobble Test, what is the headline finding?",
+      "options": [
+        "A mild wobble on both sides",
+        "One side stable and the other failing",
+        "Holding for more than a minute",
+        "Which foot is bigger"
+      ],
+      "answer": 1,
+      "bookLine": "If one side is stable and the other fails, that asymmetry is your headline finding — more important than a mild bilateral wobble.",
+      "status": "draft"
+    },
+    {
+      "id": "q-3-9",
+      "chapter": 3,
+      "section": "3.9",
+      "title": "What to Do With Findings",
+      "question": "With 1–2 red flags, what does the Playbook's triage say to do?",
+      "options": [
+        "Stop all training",
+        "Keep training, but address the specific faults before you add intensity",
+        "Ignore them",
+        "Add intensity first"
+      ],
+      "answer": 1,
+      "bookLine": "1–2 red flags: Keep training, but address the specific faults before you add intensity.",
+      "status": "draft"
+    },
+    {
+      "id": "q-3-10",
+      "chapter": 3,
+      "section": "3.10",
+      "title": "How to Run This Before Practice",
+      "question": "How many athletes per practice does the Playbook suggest a coach screens?",
+      "options": [
+        "Two",
+        "The whole team",
+        "One a week",
+        "Ten"
+      ],
+      "answer": 0,
+      "bookLine": "Coaches: pick two athletes per practice to screen while the team foam-rolls or shoots free throws.",
+      "status": "draft"
+    },
+    {
+      "id": "q-4-0",
+      "chapter": 4,
+      "section": "4.0",
+      "title": "Joint 1 — The Ankle",
+      "question": "What does the Playbook call the most common mobility deficit in basketball athletes?",
+      "options": [
+        "Limited shoulder rotation",
+        "Limited dorsiflexion",
+        "Tight hamstrings",
+        "Weak wrists"
+      ],
+      "answer": 1,
+      "bookLine": "Limited dorsiflexion is the most common mobility deficit in basketball athletes.",
+      "status": "draft"
+    },
+    {
+      "id": "q-4-2",
+      "chapter": 4,
+      "section": "4.2",
+      "title": "Joint 2 — The Hip",
+      "question": "Restricted hip external rotation is a root driver of what?",
+      "options": [
+        "Shooting slumps",
+        "Defensive stance breakdowns",
+        "Ankle sprains only",
+        "Slow reaction time"
+      ],
+      "answer": 1,
+      "bookLine": "Restricted hip external rotation is a root driver of defensive stance breakdowns — the athlete cannot sit into a wide base without the knees collapsing or the low back taking over.",
+      "status": "draft"
+    },
+    {
+      "id": "q-4-3",
+      "chapter": 4,
+      "section": "4.3",
+      "title": "The Hip 90/90 Position — Mobility Home Base",
+      "question": "In the 90/90 position, which way is each hip working?",
+      "options": [
+        "Both in external rotation",
+        "Front hip in external rotation, rear hip in internal rotation",
+        "Both in internal rotation",
+        "Neither — it is a rest position"
+      ],
+      "answer": 1,
+      "bookLine": "This loads both directions at once: the front hip is in external rotation, the rear hip is in internal rotation.",
+      "status": "draft"
+    },
+    {
+      "id": "q-4-5",
+      "chapter": 4,
+      "section": "4.5",
+      "title": "Joint 3 — The Thoracic Spine",
+      "question": "How much thoracic rotation to each side does the Playbook call a reasonable expectation in a healthy athlete?",
+      "options": [
+        "About 10 degrees",
+        "Roughly 45 to 50 degrees",
+        "A full 90 degrees",
+        "As much as the lower back allows"
+      ],
+      "answer": 1,
+      "bookLine": "From the Blueprint's seated rotation screen: roughly 45 to 50 degrees of thoracic rotation to each side is a reasonable expectation in a healthy athlete.",
+      "status": "draft"
+    },
+    {
+      "id": "q-4-6",
+      "chapter": 4,
+      "section": "4.6",
+      "title": "The 7-Minute Daily Joint Unlock",
+      "question": "How long is the Daily Joint Unlock, and what does it need?",
+      "options": [
+        "7 minutes, no equipment",
+        "20 minutes, a foam roller",
+        "45 minutes, a mobility class",
+        "2 minutes, a band"
+      ],
+      "answer": 0,
+      "bookLine": "Total: 7 minutes. No equipment. Any room.",
+      "status": "draft"
+    },
+    {
+      "id": "q-5-0",
+      "chapter": 5,
+      "section": "5.0",
+      "title": "Why Static Stretching Before a Game Is the Wrong Call",
+      "question": "For how long after static stretching may force production be reduced, according to the Playbook?",
+      "options": [
+        "About 30 seconds",
+        "Up to 30 minutes",
+        "Two days",
+        "It is never reduced"
+      ],
+      "answer": 1,
+      "bookLine": "The effect may persist for up to 30 minutes and varies by stretch duration and muscle group — treat it as a guideline rather than a universal rule.",
+      "status": "draft"
+    },
+    {
+      "id": "q-5-1",
+      "chapter": 5,
+      "section": "5.1",
+      "title": "The 10-Minute Pre-Game Protocol",
+      "question": "What does the Playbook say about the order of the pre-game phases?",
+      "options": [
+        "Shuffle them for variety",
+        "Run them in order — each phase sets up the next",
+        "Do only the ones you like",
+        "Start with the jumps"
+      ],
+      "answer": 1,
+      "bookLine": "Run the phases in order. Do not shuffle them. Each phase sets up the next — release, pressurize, feet, joints, rhythm, launch.",
+      "status": "draft"
+    },
+    {
+      "id": "q-5-2",
+      "chapter": 5,
+      "section": "5.2",
+      "title": "Phase 1: Release the Locks (2 minutes)",
+      "question": "Phase 1 clears the two most common tight spots before a game. Which two?",
+      "options": [
+        "Wrists and neck",
+        "Ankles and hip flexors",
+        "Hamstrings and shoulders",
+        "Calves and lower back"
+      ],
+      "answer": 1,
+      "bookLine": "What it is: two quick contract-relax cycles for the two most common tight spots in athletes before a game — ankles and hip flexors.",
+      "status": "draft"
+    },
+    {
+      "id": "q-5-3",
+      "chapter": 5,
+      "section": "5.3",
+      "title": "Phase 2: Pressurize the System (1 minute)",
+      "question": "In the Phase 2 IAP breath, how long is the exhale?",
+      "options": [
+        "Two seconds",
+        "Four seconds",
+        "Six seconds",
+        "Twelve seconds"
+      ],
+      "answer": 2,
+      "bookLine": "Exhale through pursed lips for six seconds — feel the ribs compress.",
+      "status": "draft"
+    },
+    {
+      "id": "q-5-4",
+      "chapter": 5,
+      "section": "5.4",
+      "title": "Phase 3: Wake Up the Tripod (1 minute)",
+      "question": "In Phase 3, how long do you hold the short-foot activation?",
+      "options": [
+        "One second",
+        "Three seconds",
+        "Ten seconds",
+        "One minute"
+      ],
+      "answer": 1,
+      "bookLine": "Draw the big-toe base gently toward the heel without curling the toes (short foot activation). Hold three seconds.",
+      "status": "draft"
+    },
+    {
+      "id": "q-5-5",
+      "chapter": 5,
+      "section": "5.5",
+      "title": "Phase 4: Open the Joints (2 minutes)",
+      "question": "What is Phase 4, Open the Joints?",
+      "options": [
+        "Long static stretches",
+        "Quick joint circles for ankles and hips, moving through range with intent",
+        "Chapter 4's full seven-minute unlock",
+        "Foam rolling"
+      ],
+      "answer": 1,
+      "bookLine": "What it is: quick joint circles for ankles and hips — not stretching, just moving through range with intent.",
+      "status": "draft"
+    },
+    {
+      "id": "q-5-6",
+      "chapter": 5,
+      "section": "5.6",
+      "title": "Phase 5: Build the Rhythm (2 minutes)",
+      "question": "In Phase 5's pogos, how much knee bend does the Playbook allow?",
+      "options": [
+        "None at all",
+        "15 to 20 degrees max",
+        "About 45 degrees",
+        "A full squat"
+      ],
+      "answer": 1,
+      "bookLine": "Begin bouncing on the balls of the feet — minimal knee bend (15 to 20 degrees max).",
+      "status": "draft"
+    },
+    {
+      "id": "q-5-8",
+      "chapter": 5,
+      "section": "5.8",
+      "title": "Phase 6: Prime the Launch (2 minutes)",
+      "question": "How many rounds of the Jump Readiness Sequence does Phase 6 call for?",
+      "options": [
+        "One",
+        "Three",
+        "Five",
+        "Ten"
+      ],
+      "answer": 1,
+      "bookLine": "Three rounds is enough when each round is honest.",
+      "status": "draft"
+    },
+    {
+      "id": "q-6-0",
+      "chapter": 6,
+      "section": "6.0",
+      "title": "How a Jump Actually Works",
+      "question": "Once you leave the floor, what sets your jump height?",
+      "options": [
+        "Swinging your arms in the air",
+        "Vertical velocity at takeoff",
+        "How long you dip",
+        "Your shoe size"
+      ],
+      "answer": 1,
+      "bookLine": "Height is set by vertical velocity at takeoff.",
+      "status": "draft"
+    },
+    {
+      "id": "q-6-1",
+      "chapter": 6,
+      "section": "6.1",
+      "title": "Concept 1: The Countermovement Is Where the Jump Is Won",
+      "question": "What does the Playbook call the bigger gift of the countermovement?",
+      "options": [
+        "Stretching the hamstrings",
+        "Time for the nervous system to get online",
+        "A rest at the bottom",
+        "Looking more athletic"
+      ],
+      "answer": 1,
+      "bookLine": "The Blueprint is blunt here: the spring is real, but the bigger gift of the countermovement is time for the nervous system to get online.",
+      "status": "draft"
+    },
+    {
+      "id": "q-6-2",
+      "chapter": 6,
+      "section": "6.2",
+      "title": "Concept 2: The 90-Degree Law for Approach Jumps",
+      "question": "In the 90-Degree Law, what should be at roughly 90 degrees when the plant foot owns the floor?",
+      "options": [
+        "The elbow",
+        "The knee",
+        "The ankle",
+        "The torso lean"
+      ],
+      "answer": 1,
+      "bookLine": "As a coaching law for youth athletes: the knee should hit roughly 90 degrees of flexion at the moment the plant foot owns the floor.",
+      "status": "draft"
+    },
+    {
+      "id": "q-6-3",
+      "chapter": 6,
+      "section": "6.3",
+      "title": "What a Dangerous Landing Looks Like — and What to Listen For",
+      "question": "In a safe landing, in what order do the joints absorb force?",
+      "options": [
+        "Hip, then knee, then ankle",
+        "Ankle first, then knee, then hip",
+        "Knee only",
+        "All locked straight"
+      ],
+      "answer": 1,
+      "bookLine": "A safe landing absorbs force across three joints — ankle first, then knee, then hip.",
+      "status": "draft"
+    },
+    {
+      "id": "q-6-4",
+      "chapter": 6,
+      "section": "6.4",
+      "title": "Drill 1: The Countermovement Geometry Check (60 seconds)",
+      "question": "In the Countermovement Geometry Check, how long do you hold the bottom position?",
+      "options": [
+        "One second",
+        "Three seconds",
+        "Ten seconds",
+        "You don't hold it — you jump"
+      ],
+      "answer": 1,
+      "bookLine": "Hold that position for three seconds.",
+      "status": "draft"
+    },
+    {
+      "id": "q-6-6",
+      "chapter": 6,
+      "section": "6.6",
+      "title": "Drill 2: The Oscillatory Pogo Progression",
+      "question": "How long should the pogo base be built before high boxes or depth jumps?",
+      "options": [
+        "One day",
+        "Two to four weeks",
+        "A full season",
+        "No base is needed"
+      ],
+      "answer": 1,
+      "bookLine": "Do not jump onto high boxes or do depth jumps without first spending two to four weeks building this base.",
+      "status": "draft"
+    },
+    {
+      "id": "q-6-7",
+      "chapter": 6,
+      "section": "6.7",
+      "title": "Weeks 1–2: Bilateral Pogos (Both Feet)",
+      "question": "What do weeks 1–2 of the pogo progression prescribe?",
+      "options": [
+        "Three sets of about 20 contacts, both feet",
+        "One set of 100 contacts",
+        "Single-leg pogos only",
+        "Depth jumps"
+      ],
+      "answer": 0,
+      "bookLine": "Carry Phase 5 of the warm-up into training sets: three sets of about 20 contacts, crisp pop sound, arms in opposition, no heel slap.",
+      "status": "draft"
+    },
+    {
+      "id": "q-6-8",
+      "chapter": 6,
+      "section": "6.8",
+      "title": "Weeks 3–4: Unilateral Pogos (One Foot)",
+      "question": "What do one-foot pogos in weeks 3–4 expose immediately?",
+      "options": [
+        "Ankle weakness and asymmetry",
+        "Shoulder tightness",
+        "Breathing problems",
+        "Nothing new"
+      ],
+      "answer": 0,
+      "bookLine": "This exposes ankle weakness and asymmetry immediately.",
+      "status": "draft"
+    },
+    {
+      "id": "q-6-9",
+      "chapter": 6,
+      "section": "6.9",
+      "title": "Drill 3: The Safe Landing Check",
+      "question": "In the Safe Landing Check, what do you step off, and how long do you hold the landing?",
+      "options": [
+        "A 12-inch box; three seconds",
+        "A 36-inch box; one second",
+        "The floor; ten seconds",
+        "A chair; no hold"
+      ],
+      "answer": 0,
+      "bookLine": "Safe landing check: step off a 12-inch box. Land softly, hold the landing position for 3 seconds without knee cave or forward trunk collapse.",
+      "status": "draft"
+    },
+    {
+      "id": "q-6-11",
+      "chapter": 6,
+      "section": "6.11",
+      "title": "What Parents Should Watch on Film",
+      "question": "In the fifteen-minute driveway session, at what effort are the three countermovement jumps done?",
+      "options": [
+        "Maximum effort",
+        "Seventy percent",
+        "Thirty percent",
+        "Whatever feels good"
+      ],
+      "answer": 1,
+      "bookLine": "then three submaximal countermovement jumps at seventy percent effort for pattern proof — not testing day.",
+      "status": "draft"
+    },
+    {
+      "id": "q-7-0",
+      "chapter": 7,
+      "section": "7.0",
+      "title": "Why Ladder Drills Are the Wrong Starting Point",
+      "question": "What kind of problem does the Playbook say speed is?",
+      "options": [
+        "A footwork problem",
+        "A force problem",
+        "A flexibility problem",
+        "A shoe problem"
+      ],
+      "answer": 1,
+      "bookLine": "Speed is a force problem.",
+      "status": "draft"
+    },
+    {
+      "id": "q-7-1",
+      "chapter": 7,
+      "section": "7.1",
+      "title": "Drill 1 — The Wall Drive",
+      "question": "In the Wall Drive, where does the forward lean come from?",
+      "options": [
+        "The head and chest only",
+        "The waist",
+        "The ankles — the entire body, like a ramp",
+        "The knees"
+      ],
+      "answer": 2,
+      "bookLine": "Lean your ENTIRE body forward from the ankles — not just the head and chest.",
+      "status": "draft"
+    },
+    {
+      "id": "q-7-3",
+      "chapter": 7,
+      "section": "7.3",
+      "title": "Drill 2 — The 3-Step Decel",
+      "question": "In the 3-Step Decel, how far should the planted knee bend on landing?",
+      "options": [
+        "Barely at all",
+        "At least 90 degrees",
+        "Exactly 45 degrees",
+        "Until the knee touches the floor"
+      ],
+      "answer": 1,
+      "bookLine": "Let the knee bend deeply on landing — at least 90 degrees — and let the hip drop back and down simultaneously.",
+      "status": "draft"
+    },
+    {
+      "id": "q-7-4",
+      "chapter": 7,
+      "section": "7.4",
+      "title": "Drill 3 — The Lateral Bound and Stick",
+      "question": "In the Lateral Bound and Stick, how long do you hold the single-leg landing?",
+      "options": [
+        "Half a second",
+        "Two full seconds",
+        "Ten seconds",
+        "No hold — bound straight back"
+      ],
+      "answer": 1,
+      "bookLine": "LAND on the opposite foot. Single-leg landing. HOLD for two full seconds.",
+      "status": "draft"
+    },
+    {
+      "id": "q-7-5",
+      "chapter": 7,
+      "section": "7.5",
+      "title": "Drill 4 — The T-Drill (No Cones Needed)",
+      "question": "How is the T-Drill laid out?",
+      "options": [
+        "A marker 10 yards ahead, with markers 5 yards to its left and right",
+        "Four markers in a square, 5 yards apart",
+        "A straight line of 10 cones",
+        "Two markers 20 yards apart"
+      ],
+      "answer": 0,
+      "bookLine": "Place one start marker. Place one marker 10 yards straight ahead. Place one marker 5 yards to the left of the forward marker. Place one marker 5 yards to the right.",
+      "status": "draft"
+    },
+    {
+      "id": "q-7-8",
+      "chapter": 7,
+      "section": "7.8",
+      "title": "Setup and Execution",
+      "question": "In the Resisted March to Sprint, what does the working athlete lean into?",
+      "options": [
+        "A wall",
+        "A resistance band",
+        "A partner's shoulders",
+        "A sled"
+      ],
+      "answer": 2,
+      "bookLine": "The working athlete places their hands on the back of a partner's shoulders.",
+      "status": "draft"
+    },
+    {
+      "id": "q-7-9",
+      "chapter": 7,
+      "section": "7.9",
+      "title": "Common Errors and Fast Fixes",
+      "question": "Lateral bounds are turning into diagonal hops with a falling stick. What is the fix?",
+      "options": [
+        "Add two feet of distance",
+        "Shrink distance until the stick is silent and balanced for two seconds",
+        "Bound faster",
+        "Skip the stick"
+      ],
+      "answer": 1,
+      "bookLine": "Fix: shrink distance until the stick is silent and balanced for two seconds.",
+      "status": "draft"
+    },
+    {
+      "id": "q-7-10",
+      "chapter": 7,
+      "section": "7.10",
+      "title": "A 15-Minute Coach Script",
+      "question": "In the 15-minute coach script, what does the coach watch during the Lateral Bound and Stick?",
+      "options": [
+        "Distance",
+        "Knees, not distance",
+        "The stopwatch",
+        "Arm action"
+      ],
+      "answer": 1,
+      "bookLine": "Minute 6–10: Lateral Bound and Stick, six each way. Coach watches knees, not distance.",
+      "status": "draft"
+    },
+    {
+      "id": "q-8-0",
+      "chapter": 8,
+      "section": "8.0",
+      "title": "The Developing Frame — Why Technique Comes Before Load",
+      "question": "Around what age do growth plates in adolescent athletes fully close?",
+      "options": [
+        "10–12",
+        "Around 17–18",
+        "21–25",
+        "They never close"
+      ],
+      "answer": 1,
+      "bookLine": "The growth plates in adolescent athletes do not fully close until around 17–18 years old — often earlier for females, later for males.",
+      "status": "draft"
+    },
+    {
+      "id": "q-8-1",
+      "chapter": 8,
+      "section": "8.1",
+      "title": "Movement 1 — The Hip Hinge",
+      "question": "In the bodyweight RDL, when do you stop lowering?",
+      "options": [
+        "When your hands touch the floor",
+        "Before the lower back rounds",
+        "At a full squat",
+        "When your knees lock"
+      ],
+      "answer": 1,
+      "bookLine": "STOP before the lower back rounds.",
+      "status": "draft"
+    },
+    {
+      "id": "q-8-3",
+      "chapter": 8,
+      "section": "8.3",
+      "title": "Movement 2 — The Split Squat",
+      "question": "Why does the Playbook favour the split squat for basketball?",
+      "options": [
+        "It is easier than a squat",
+        "Basketball is a single-leg sport pretending to be a two-leg sport",
+        "It needs no balance",
+        "It builds arm strength"
+      ],
+      "answer": 1,
+      "bookLine": "Why it matters: basketball is a single-leg sport pretending to be a two-leg sport.",
+      "status": "draft"
+    },
+    {
+      "id": "q-8-4",
+      "chapter": 8,
+      "section": "8.4",
+      "title": "Movement 3 — The Glute Bridge",
+      "question": "Why are most youth athletes' glutes inhibited, according to the Playbook?",
+      "options": [
+        "Too much running",
+        "Excessive sitting",
+        "Too much stretching",
+        "Growth plates"
+      ],
+      "answer": 1,
+      "bookLine": "Most youth athletes have significantly inhibited glutes from excessive sitting — the hip flexors shorten and neurologically quiet the glutes through reciprocal inhibition (when one muscle group tightens, its opposite group down-regulates).",
+      "status": "draft"
+    },
+    {
+      "id": "q-8-5",
+      "chapter": 8,
+      "section": "8.5",
+      "title": "Glute Bridge with Pressure Cylinder",
+      "question": "In the Glute Bridge with Pressure Cylinder, when do you drive the hips up?",
+      "options": [
+        "On the inhale",
+        "On the exhale",
+        "While holding your breath",
+        "It doesn't matter"
+      ],
+      "answer": 1,
+      "bookLine": "On the exhale, drive the hips UP by squeezing the glutes.",
+      "status": "draft"
+    },
+    {
+      "id": "q-8-7",
+      "chapter": 8,
+      "section": "8.7",
+      "title": "Scapular-Controlled Push-Up",
+      "question": "In the scapular-controlled push-up, at what angle are the elbows?",
+      "options": [
+        "Flared wide like a T",
+        "Tucked tight like a military press",
+        "About 45 degrees from the body",
+        "Straight out to the sides"
+      ],
+      "answer": 2,
+      "bookLine": "Elbows at about 45 degrees from the body (not flared wide like a T, not tucked tight like a military press).",
+      "status": "draft"
+    },
+    {
+      "id": "q-8-9",
+      "chapter": 8,
+      "section": "8.9",
+      "title": "Breathing Plank",
+      "question": "What is the breathing rhythm of the Breathing Plank?",
+      "options": [
+        "Hold your breath for 30 seconds",
+        "4 seconds in, 6 seconds out",
+        "Quick breaths through the mouth",
+        "6 in, 4 out"
+      ],
+      "answer": 1,
+      "bookLine": "Take a full IAP breath cycle: 4 seconds in, 6 seconds out, without losing the brace.",
+      "status": "draft"
+    },
+    {
+      "id": "q-8-11",
+      "chapter": 8,
+      "section": "8.11",
+      "title": "The Weekly Bodyweight Strength Template",
+      "question": "When does the template say to add load, bands or backpack weight?",
+      "options": [
+        "From the first week",
+        "Only when the bodyweight version is boringly solid",
+        "When the athlete asks",
+        "After every session"
+      ],
+      "answer": 1,
+      "bookLine": "Do not add load, bands, or backpack weight until the bodyweight version is boringly solid — no shaking, full holds, matching left-to-right quality on split squats and single-leg bridges.",
+      "status": "draft"
+    },
+    {
+      "id": "q-8-12",
+      "chapter": 8,
+      "section": "8.12",
+      "title": "Progressions Without a Weight Room",
+      "question": "In the split squat progression, when do light dumbbells come in?",
+      "options": [
+        "At the start",
+        "Only after the elevated version is stable",
+        "Never",
+        "After one week"
+      ],
+      "answer": 1,
+      "bookLine": "light dumbbells only after the elevated version is stable.",
+      "status": "draft"
+    },
+    {
+      "id": "q-8-13",
+      "chapter": 8,
+      "section": "8.13",
+      "title": "Where This Fits With Sport Practice",
+      "question": "Where does the Playbook say SAQ from Chapter 7 should go in the week?",
+      "options": [
+        "After grinding conditioning",
+        "Before grinding conditioning, on fresh legs",
+        "Right after a lower-body strength day",
+        "The night before a game"
+      ],
+      "answer": 1,
+      "bookLine": "SAQ from Chapter 7 prefers fresh legs — put it before grinding conditioning, not after.",
+      "status": "draft"
+    },
+    {
+      "id": "q-9-0",
+      "chapter": 9,
+      "section": "9.0",
+      "title": "Recovery Is When the Adaptation Happens",
+      "question": "Who does the Playbook say wins: six training days with poor recovery, or four with complete recovery?",
+      "options": [
+        "Six days, poor recovery",
+        "Four days, complete recovery",
+        "They come out even",
+        "Whoever trains harder"
+      ],
+      "answer": 1,
+      "bookLine": "An athlete who trains six days a week and recovers poorly will be outperformed by an athlete who trains four days a week and recovers completely.",
+      "status": "draft"
+    },
+    {
+      "id": "q-9-1",
+      "chapter": 9,
+      "section": "9.1",
+      "title": "Your Breath Is the Switch — Sympathetic to Parasympathetic",
+      "question": "Which kind of breathing biases the system toward parasympathetic activation?",
+      "options": [
+        "Apical breathing — high chest and shoulders",
+        "Diaphragmatic breathing — belly first, then 360-degree rib expansion",
+        "Holding your breath",
+        "Fast mouth breathing"
+      ],
+      "answer": 1,
+      "bookLine": "Diaphragmatic breathing — belly first, then 360-degree rib expansion — stimulates the vagus nerve pathway and biases the system toward parasympathetic activation.",
+      "status": "draft"
+    },
+    {
+      "id": "q-9-2",
+      "chapter": 9,
+      "section": "9.2",
+      "title": "Protocol 1 — The 4-6 Recovery Breath",
+      "question": "In the 4-6 Recovery Breath, why is the exhale longer than the inhale?",
+      "options": [
+        "It burns more calories",
+        "The longer exhale is the parasympathetic nudge",
+        "It strengthens the lungs",
+        "It is easier to count"
+      ],
+      "answer": 1,
+      "bookLine": "Make the exhale longer than the inhale. The longer exhale is the parasympathetic nudge.",
+      "status": "draft"
+    },
+    {
+      "id": "q-9-4",
+      "chapter": 9,
+      "section": "9.4",
+      "title": "Protocol 2 — The Pre-Sleep Wind-Down",
+      "question": "When does the Pre-Sleep Wind-Down start?",
+      "options": [
+        "Right after dinner",
+        "20–30 minutes before intended sleep time",
+        "After you are in bed with the lights off",
+        "An hour after waking"
+      ],
+      "answer": 1,
+      "bookLine": "Timing: start this routine 20–30 minutes before intended sleep time.",
+      "status": "draft"
+    },
+    {
+      "id": "q-9-5",
+      "chapter": 9,
+      "section": "9.5",
+      "title": "Step 1 — Technology Off",
+      "question": "How long before the wind-down routine do screens go off?",
+      "options": [
+        "10 minutes",
+        "One minute",
+        "Two hours",
+        "They can stay on for the alarm"
+      ],
+      "answer": 0,
+      "bookLine": "Screens off 10 minutes before this routine begins.",
+      "status": "draft"
+    },
+    {
+      "id": "q-9-6",
+      "chapter": 9,
+      "section": "9.6",
+      "title": "Step 2 — Legs Up the Wall (5 minutes)",
+      "question": "How long do you stay in Legs Up the Wall?",
+      "options": [
+        "30 seconds",
+        "5 minutes",
+        "20 minutes",
+        "Until you fall asleep"
+      ],
+      "answer": 1,
+      "bookLine": "Stay for 5 minutes.",
+      "status": "draft"
+    },
+    {
+      "id": "q-9-7",
+      "chapter": 9,
+      "section": "9.7",
+      "title": "Step 3 — Supine Spinal Twist (2 minutes each side)",
+      "question": "In the Sleep Breath, how do you exhale?",
+      "options": [
+        "Through the mouth for 2 seconds",
+        "Through the nose for 6–8 seconds",
+        "Through pursed lips for 4 seconds",
+        "You hold it instead"
+      ],
+      "answer": 1,
+      "bookLine": "Exhale through the nose (not the mouth) for 6–8 seconds.",
+      "status": "draft"
+    },
+    {
+      "id": "q-9-8",
+      "chapter": 9,
+      "section": "9.8",
+      "title": "Protocol 3 — The Sleep Quality Checklist for Parents",
+      "question": "How often should parents run the Sleep Quality Checklist?",
+      "options": [
+        "Every night, with alarm",
+        "Weekly",
+        "Once a year",
+        "Only after a loss"
+      ],
+      "answer": 1,
+      "bookLine": "Audit weekly.",
+      "status": "draft"
+    },
+    {
+      "id": "q-9-9",
+      "chapter": 9,
+      "section": "9.9",
+      "title": "Why Sleep Matters for Athletic Development",
+      "question": "When does growth hormone secretion peak?",
+      "options": [
+        "During deep sleep",
+        "During a game",
+        "Right after breakfast",
+        "During a cold shower"
+      ],
+      "answer": 0,
+      "bookLine": "Growth hormone secretion peaks during deep sleep.",
+      "status": "draft"
+    },
+    {
+      "id": "q-9-11",
+      "chapter": 9,
+      "section": "9.11",
+      "title": "Tournament and Back-to-Back Days",
+      "question": "Between two games on the same day, how many rounds of 4-6 breathing does the Playbook suggest?",
+      "options": [
+        "None — stay hyped",
+        "6–8 rounds",
+        "50 rounds",
+        "The full pre-sleep wind-down"
+      ],
+      "answer": 1,
+      "bookLine": "Use 6–8 rounds of 4-6 breathing in a quiet chair, sip water, light snack if timing allows, then a short reactivation from Chapter 5 before tip — feet, hips, cylinder, two light jumps.",
+      "status": "draft"
+    },
+    {
+      "id": "q-9-12",
+      "chapter": 9,
+      "section": "9.12",
+      "title": "Troubleshooting the Protocols",
+      "question": "If the 4-6 breath makes an athlete anxious, what does the Playbook suggest?",
+      "options": [
+        "Stop breathing drills for good",
+        "Shorten the exhale to five seconds for a week and sit instead of lying down",
+        "Lengthen the exhale to ten seconds",
+        "Do it in the car"
+      ],
+      "answer": 1,
+      "bookLine": "If the 4-6 breath makes the athlete anxious, shorten the exhale to five seconds for a week, keep the nasal inhale, and sit instead of lying down.",
+      "status": "draft"
+    },
+    {
+      "id": "q-9-13",
+      "chapter": 9,
+      "section": "9.13",
+      "title": "A Note to Athletes Who Think Recovery Is Soft",
+      "question": "How does the Playbook reframe recovery for hard workers?",
+      "options": [
+        "A loophole for people who can't handle drills",
+        "How you earn the right to train hard again tomorrow",
+        "Something only pros need",
+        "Optional on game weeks"
+      ],
+      "answer": 1,
+      "bookLine": "Recovery is how you earn the right to train hard again tomorrow with a nervous system that still trusts you.",
+      "status": "draft"
+    },
+    {
+      "id": "q-10-0",
+      "chapter": 10,
+      "section": "10.0",
+      "title": "Section 1 — The Red Flags: What to Watch For",
+      "question": "What does the Playbook ask a parent to do with a red flag?",
+      "options": [
+        "Diagnose the problem",
+        "Recognize the flag and ask questions",
+        "Pull the athlete from the team",
+        "Ignore it until it repeats"
+      ],
+      "answer": 1,
+      "bookLine": "You do not need to diagnose the problem. You need to recognize the flag and ask questions.",
+      "status": "draft"
+    },
+    {
+      "id": "q-10-1",
+      "chapter": 10,
+      "section": "10.1",
+      "title": "Red Flag 1 — Pain Is Normalized",
+      "question": "Which of these does the Playbook say is NOT normal soreness?",
+      "options": [
+        "A dull ache 24–48 hours after a hard session",
+        "General heaviness the next day",
+        "Pain that persists beyond 72 hours",
+        "Tired legs after a tournament"
+      ],
+      "answer": 2,
+      "bookLine": "Sharp pain during movement, joint pain, or pain that persists beyond 72 hours is not.",
+      "status": "draft"
+    },
+    {
+      "id": "q-10-2",
+      "chapter": 10,
+      "section": "10.2",
+      "title": "Red Flag 2 — No Mobility or Movement Prep Before Intensity",
+      "question": "About how long does the Chapter 5 pre-game protocol take?",
+      "options": [
+        "About 10 minutes",
+        "About 45 minutes",
+        "About 2 minutes",
+        "About an hour"
+      ],
+      "answer": 0,
+      "bookLine": "The pre-game protocol in Chapter 5 takes about 10 minutes.",
+      "status": "draft"
+    },
+    {
+      "id": "q-10-3",
+      "chapter": 10,
+      "section": "10.3",
+      "title": "Red Flag 3 — Heavier in Training Than in Games",
+      "question": "In-season, what does general sports science support doing with training volume?",
+      "options": [
+        "Increasing it",
+        "Reducing it relative to the off-season while maintaining intensity",
+        "Cutting intensity and keeping volume",
+        "Stopping all strength work"
+      ],
+      "answer": 1,
+      "bookLine": "General sports science consensus supports reducing total training volume in-season relative to the off-season — maintaining intensity while cutting volume allows performance to peak at competition while managing cumulative tissue load.",
+      "status": "draft"
+    },
+    {
+      "id": "q-10-4",
+      "chapter": 10,
+      "section": "10.4",
+      "title": "Red Flag 4 — Single-Sport Specialization Before Age 14 Without Physical Preparation",
+      "question": "Year-round single-sport training below what age is associated with more overuse injury and burnout?",
+      "options": [
+        "10",
+        "14",
+        "18",
+        "21"
+      ],
+      "answer": 1,
+      "bookLine": "Year-round single-sport training in athletes younger than 14 is associated with higher rates of overuse injury and burnout.",
+      "status": "draft"
+    },
+    {
+      "id": "q-10-5",
+      "chapter": 10,
+      "section": "10.5",
+      "title": "Red Flag 5 — The Athlete Stops Enjoying the Sport",
+      "question": "An athlete who loved the game becomes reluctant to go to practice, with no obvious reason. What does the Playbook say it may be?",
+      "options": [
+        "A motivational failure",
+        "Overtraining — a physiological signal",
+        "Laziness",
+        "A phase to ignore"
+      ],
+      "answer": 1,
+      "bookLine": "This is not a motivational failure. It is a physiological signal.",
+      "status": "draft"
+    },
+    {
+      "id": "q-10-6",
+      "chapter": 10,
+      "section": "10.6",
+      "title": "Red Flag 6 — Rapid Technique Degradation Late in Sessions or Games",
+      "question": "What does late-session technique breakdown mean, according to the Playbook?",
+      "options": [
+        "Mental toughness training",
+        "The athlete has exceeded their technical training capacity",
+        "The drill is too easy",
+        "Nothing — it is normal"
+      ],
+      "answer": 1,
+      "bookLine": "Form breakdown late in a session — knee caving in, back rounding on hinges, arm swing disappearing, landings getting loud and stiff — means the athlete has exceeded their technical training capacity.",
+      "status": "draft"
+    },
+    {
+      "id": "q-10-7",
+      "chapter": 10,
+      "section": "10.7",
+      "title": "Section 2 — Questions to Ask Any Coach",
+      "question": "What do a coach's answers to precise questions tell you more about than the facility tour?",
+      "options": [
+        "The coach's salary",
+        "Program quality",
+        "The team's schedule",
+        "Nothing"
+      ],
+      "answer": 1,
+      "bookLine": "The answers tell you more about program quality than the facility tour or the win-loss record.",
+      "status": "draft"
+    },
+    {
+      "id": "q-10-8",
+      "chapter": 10,
+      "section": "10.8",
+      "title": "Section 3 — Training Load Management",
+      "question": "What should training load match, according to the Playbook?",
+      "options": [
+        "A fixed calendar PDF",
+        "What the athlete's nervous system can currently express with good technique",
+        "What older athletes do",
+        "The number of hours available"
+      ],
+      "answer": 1,
+      "bookLine": "What appropriate training volume looks like for ages 13–18 starts with one principle: load should match what the athlete's nervous system can currently express with good technique — not what a fixed calendar PDF demands.",
+      "status": "draft"
+    },
+    {
+      "id": "q-10-9",
+      "chapter": 10,
+      "section": "10.9",
+      "title": "Weekly Volume Guideline (Starting Reference)",
+      "question": "In-season, about how many hard strength/power sessions a week does the starting reference cap?",
+      "options": [
+        "About 3",
+        "About 7",
+        "About 10",
+        "No cap"
+      ],
+      "answer": 0,
+      "bookLine": "Cap total hard strength/power sessions around 4–5 off-season and about 3 in-season — assuming 8–10 hours of sleep and solid nutrition.",
+      "status": "draft"
+    },
+    {
+      "id": "q-10-12",
+      "chapter": 10,
+      "section": "10.12",
+      "title": "How to Talk to Coaches Without Starting a War",
+      "question": "How does the Playbook suggest opening a conversation with a coach?",
+      "options": [
+        "Lead with accusation",
+        "Lead with observation, not accusation",
+        "Email the club director first",
+        "Post about it online"
+      ],
+      "answer": 1,
+      "bookLine": "Lead with observation, not accusation.",
+      "status": "draft"
+    },
+    {
+      "id": "q-10-13",
+      "chapter": 10,
+      "section": "10.13",
+      "title": "Multi-Team Math",
+      "question": "If the monthly calendar shows four high-intensity days in a row, what should happen?",
+      "options": [
+        "Nothing — fees are paid",
+        "Something becomes a technical day, a mobility day, or a rest day",
+        "Add a fifth",
+        "Move them all to the weekend"
+      ],
+      "answer": 1,
+      "bookLine": "If you see four high-intensity days in a row, something has to become a technical day, a mobility day, or a rest day — even if a fee already paid makes that emotionally hard.",
+      "status": "draft"
+    },
+    {
+      "id": "q-10-14",
+      "chapter": 10,
+      "section": "10.14",
+      "title": "Your Role as the Architect",
+      "question": "What is the one thing the Playbook says no book can give your athlete?",
+      "options": [
+        "Talent",
+        "Consistency",
+        "A coach",
+        "Equipment"
+      ],
+      "answer": 1,
+      "bookLine": "The one thing no book can give your athlete is consistency.",
+      "status": "draft"
+    }
+  ]
+}

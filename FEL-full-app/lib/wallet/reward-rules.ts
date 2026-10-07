@@ -53,6 +53,9 @@ export const REASON = {
   // The movement course (lib/education/course.ts). Finishing a chapter of the Playbook is a milestone, which is
   // what shards are for -- earned, never purchasable.
   EDU_CHAPTER_COMPLETE: 'EDU_CHAPTER_COMPLETE', // shards
+  // EDU-LINKS (2026-10-07): the course bonus for finishing the whole book (COURSE_BONUS_SHARDS), once per account
+  // (lib/education/rewards.ts keys it playbook:course:<userId>). Server-granted only, never an event a client can name.
+  EDU_COURSE_COMPLETE: 'EDU_COURSE_COMPLETE', // shards
   MOVEMENT_SCREEN_COMPLETED: 'MOVEMENT_SCREEN_COMPLETED', // shards — one graded screen
   // Phase 6 — async multiplayer settlement. Both players earn coins for
   // playing a resolved match; the winner earns shards. Server-granted only.
@@ -115,6 +118,7 @@ export const SHARD_REASONS: ReadonlySet<string> = new Set([
   REASON.REFERRAL_BONUS,
   REASON.MP_MATCH_WON,
   REASON.EDU_CHAPTER_COMPLETE,
+  REASON.EDU_COURSE_COMPLETE,
 ]);
 
 // ---------------------------------------------------------------------------
@@ -182,6 +186,16 @@ export const DEFAULT_REWARD_RULES: Record<string, RewardRuleConfig> = {
     // Matches CHAPTER_SHARDS in lib/education/course.ts, which a test keeps in step. The AMOUNT LIVES HERE, not
     // in the request -- a client saying it finished a chapter is a claim, and the server prices it.
     baseAmount: 15, scaleNum: 0, minGrant: 15, maxGrant: 15, // TUNE(elijah)
+    perMinuteCap: 0, perDayCurrencyCap: 0, active: true,
+  },
+  // EDU-LINKS (2026-10-07), Mirror & coaching plan Phase 5: finishing the whole Playbook. Matches COURSE_BONUS_SHARDS in
+  // lib/education/course.ts (course.test.ts keeps them in step). ITS CAP: maxGrant is one bonus, and the idempotency key
+  // names only the account (playbook:course:<userId>), so it pays once per account, ever. grantServerReward does not
+  // read the per-minute or per-day caps (only earn() does), so they stay 0 rather than promise a limit nothing enforces;
+  // a day cap here would also count the tenth chapter's own 15 shards paid in the same request and trim the bonus.
+  [REASON.EDU_COURSE_COMPLETE]: {
+    reasonCode: REASON.EDU_COURSE_COMPLETE, currency: 'shards', formula: 'flat',
+    baseAmount: 50, scaleNum: 0, minGrant: 50, maxGrant: 50, // TUNE(elijah) — COURSE_BONUS_SHARDS, priced 2026-09-20
     perMinuteCap: 0, perDayCurrencyCap: 0, active: true,
   },
   // THE MOVEMENT SCREEN (owner, 2026-09-19: shards for a completed scan, body scan first). Server-granted and
