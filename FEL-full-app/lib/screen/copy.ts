@@ -126,7 +126,10 @@ export const NOT_SAVED_BODY = 'Results live only in this tab, and only until you
 export const RUN_AGAIN = 'Run the screen again';
 export const BACK_TO_RESULTS = 'Back to my results';
 export const PROGRAM_COMING = 'Dunk Program coming soon';
-export const DEMO_COMING = 'Demo coming (20–30 s)';
+/** EDU-LINKS (2026-10-07), owner decision "drill demos: reuse the 3D ExerciseDemo": the slot that said "Demo coming (20–30 s)"
+ *  opens the 3D demo (app/play/mirror/assess/_components/drill-demo.tsx). */
+export const DEMO_WATCH = 'Watch the demo';
+export const DEMO_NOTE = 'A 3D demo to move along with. The cue above is the drill.';
 
 /** Squad gate 2: tracking lost. */
 export const TRACKING_LOSS_PROMPT = 'Step back into the light';
