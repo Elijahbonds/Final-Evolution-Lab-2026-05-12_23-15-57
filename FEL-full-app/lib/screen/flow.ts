@@ -1,6 +1,7 @@
 // flow — the Quick Screen's steps before the camera, as a pure reducer (SCREEN-SHIP, 2026-09-29; SCREEN-FIX).
 //
-//   start → age → (under 18 or no age: "A grown-up is with me") → "Does anything hurt right now?" → the camera card
+//   start → age → (under 18 or no age: "A grown-up is with me") → "Does anything hurt right now?"
+//         → "Which foot do you take off from when you jump?" (SCREEN A, tap: Left / Right / Not sure) → the camera card
 //         → camera
 //
 // The age is asked ONCE per run: a `start` carrying a locked answer (lib/screen/store.ts lockAge) skips the question —
@@ -17,7 +18,7 @@
 import { gateRecord, type GateRecord } from './store';
 import { needsGrownUp, type AgeBand } from './age';
 
-export type PreStep = 'intro' | 'age' | 'grownUp' | 'pain' | 'painStop' | 'cameraInfo' | 'camera';
+export type PreStep = 'intro' | 'age' | 'grownUp' | 'pain' | 'painStop' | 'takeoff' | 'cameraInfo' | 'camera';
 
 /** Jump-only runs T5. Full runs T1–T3 and T5. A start with no kind is the full screen. */
 export type ScreenKind = 'jump' | 'full';
@@ -35,6 +36,8 @@ export type PreEvent =
   | { type: 'grownUp' }
   | { type: 'back' }
   | { type: 'pain'; hurts: boolean }
+  /** SCREEN A: the take-off foot tap. null is "Not sure" — an answer given, not an answer skipped. */
+  | { type: 'takeoff'; side: 'left' | 'right' | null }
   | { type: 'cameraOn' }
   | { type: 'restart' };
 
@@ -53,7 +56,8 @@ export function backStep(s: PreState): PreState {
     case 'intro': return s;                                        // the page leaves to /screen
     case 'age': case 'grownUp': case 'painStop': return PRE_START;
     case 'pain': return s.age && needsGrownUp(s.age) ? { step: 'grownUp', age: s.age, gate: null, kind: s.kind } : PRE_START;
-    case 'cameraInfo': return { ...s, step: 'pain' };
+    case 'takeoff': return { ...s, step: 'pain' };
+    case 'cameraInfo': return { ...s, step: 'takeoff' };
     case 'camera': return { ...s, step: 'cameraInfo' };
   }
 }
@@ -75,7 +79,10 @@ export function preStep(s: PreState, e: PreEvent, now: Date = new Date()): PreSt
       return backStep(s);
     case 'pain':
       if (s.step !== 'pain' || !s.gate) return s;
-      return e.hurts ? { step: 'painStop', age: s.age, gate: null, kind: s.kind } : { ...s, step: 'cameraInfo' };
+      return e.hurts ? { step: 'painStop', age: s.age, gate: null, kind: s.kind } : { ...s, step: 'takeoff' };
+    case 'takeoff':
+      if (s.step !== 'takeoff' || !s.gate) return s;
+      return { ...s, step: 'cameraInfo' };
     case 'cameraOn':
       if (s.step !== 'cameraInfo' || !s.gate) return s;
       return { ...s, step: 'camera' };

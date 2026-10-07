@@ -9,13 +9,29 @@ import { mayPersist } from './store';
 const run = (events: PreEvent[], from: PreState = PRE_START): PreState => events.reduce((s, e) => preStep(s, e, new Date('2026-09-29T12:00:00Z')), from);
 
 describe('every age band → the right next step', () => {
-  it('18 or older: age → pain → the camera card → camera; the gate allows keeping the result', () => {
+  it('18 or older: age → pain → the take-off tap → the camera card → camera; the gate allows keeping the result', () => {
     const s = run([{ type: 'start' }, { type: 'age', age: '18+' }]);
     expect(s.step).toBe('pain');
-    const c = run([{ type: 'pain', hurts: false }], s);
+    const t = run([{ type: 'pain', hurts: false }], s);
+    expect(t.step).toBe('takeoff');                                    // SCREEN A: the take-off tap sits between
+    const c = run([{ type: 'takeoff', side: 'left' }], t);
     expect(c.step).toBe('cameraInfo');
     expect(run([{ type: 'cameraOn' }], c).step).toBe('camera');
     expect(mayPersist(c.gate)).toBe(true);
+  });
+
+  it('SCREEN A: pain "no" → takeoff → camera card, for jump and full alike; "Not sure" is an answer (null)', () => {
+    for (const kind of ['jump', 'full'] as const) {
+      const t = run([{ type: 'start', kind }, { type: 'age', age: '18+' }, { type: 'pain', hurts: false }]);
+      expect(t.step, kind).toBe('takeoff');
+      expect(t.kind, kind).toBe(kind);
+      const c = run([{ type: 'takeoff', side: null }], t);             // Not sure
+      expect(c.step, kind).toBe('cameraInfo');
+      expect(run([{ type: 'cameraOn' }], c).step, kind).toBe('camera');
+    }
+    // the take-off tap cannot be reached before the pain answer, and answers nowhere else
+    expect(run([{ type: 'start' }, { type: 'age', age: '18+' }, { type: 'takeoff', side: 'left' }]).step).toBe('pain');
+    expect(run([{ type: 'takeoff', side: 'right' }]).step).toBe('intro');
   });
 
   it('13–17, under 13 and "rather not say" go through the grown-up step first', () => {
@@ -51,25 +67,30 @@ describe('the age is asked once per run', () => {
 });
 
 describe('nothing skips the grown-up step, and the camera waits for the camera card', () => {
-  it('pain and the camera cannot be reached from the grown-up step', () => {
+  it('pain, the take-off tap and the camera cannot be reached from the grown-up step', () => {
     const c = run([{ type: 'start' }, { type: 'age', age: '13-17' }]);
     expect(preStep(c, { type: 'pain', hurts: false }).step).toBe('grownUp');
+    expect(preStep(c, { type: 'takeoff', side: 'left' }).step).toBe('grownUp');
     expect(preStep(c, { type: 'cameraOn' }).step).toBe('grownUp');
     expect(run([{ type: 'pain', hurts: false }]).step).toBe('intro');   // from the start: nothing
     expect(run([{ type: 'start' }, { type: 'pain', hurts: false }]).step).toBe('age');
   });
 
-  it('S-3: "no" to pain shows the camera card; only its button reaches the camera', () => {
-    const p = run([{ type: 'start' }, { type: 'age', age: '18+' }, { type: 'pain', hurts: false }]);
+  it('S-3: "no" to pain shows the take-off tap, then the camera card; only its button reaches the camera', () => {
+    const t = run([{ type: 'start' }, { type: 'age', age: '18+' }, { type: 'pain', hurts: false }]);
+    expect(t.step).toBe('takeoff');
+    const p = run([{ type: 'takeoff', side: 'right' }], t);
     expect(p.step).toBe('cameraInfo');
     expect(run([{ type: 'cameraOn' }], p).step).toBe('camera');
+    expect(run([{ type: 'cameraOn' }], t).step).toBe('takeoff');        // no card shown yet: the button does nothing
     expect(run([{ type: 'cameraOn' }]).step).toBe('intro');
   });
 
-  it('PAIN: "yes" ends it with no camera and no gate kept', () => {
+  it('PAIN: "yes" ends it with no take-off tap, no camera and no gate kept', () => {
     const yes = run([{ type: 'start' }, { type: 'age', age: '18+' }, { type: 'pain', hurts: true }]);
     expect(yes.step).toBe('painStop');
     expect(yes.gate).toBeNull();
+    expect(preStep(yes, { type: 'takeoff', side: 'left' }).step).toBe('painStop');
     expect(preStep(yes, { type: 'cameraOn' }).step).toBe('painStop');
   });
 
@@ -109,17 +130,21 @@ describe('S-2: the back arrow is one step back, inside the flow', () => {
     expect(backStep(at('painStop'))).toEqual(PRE_START);
   });
 
-  it('the camera card → pain (the gate kept); the camera → the camera card; the start stays (the page goes to /screen)', () => {
+  it('the take-off tap → pain; the camera card → the take-off tap; the camera → the camera card; the start stays', () => {
     const p = run([{ type: 'start' }, { type: 'age', age: '18+' }, { type: 'pain', hurts: false }]);
-    const b = preStep(p, { type: 'back' });
+    expect(p.step).toBe('takeoff');
+    const b = preStep(p, { type: 'back' });                              // SCREEN A: back from the take-off tap is pain
     expect(b.step).toBe('pain');
     expect(b.gate).toEqual(p.gate);
-    expect(backStep({ ...p, step: 'camera' }).step).toBe('cameraInfo');
+    const c = preStep(p, { type: 'takeoff', side: 'left' });
+    expect(backStep(c).step).toBe('takeoff');
+    expect(backStep(c).gate).toEqual(p.gate);
+    expect(backStep({ ...c, step: 'camera' }).step).toBe('cameraInfo');
     expect(backStep(PRE_START)).toBe(PRE_START);
   });
 
   it('every step\'s back lands on a step of the flow: never a URL, never out of the screen', () => {
-    const steps: PreStep[] = ['intro', 'age', 'grownUp', 'pain', 'painStop', 'cameraInfo', 'camera'];
+    const steps: PreStep[] = ['intro', 'age', 'grownUp', 'pain', 'painStop', 'takeoff', 'cameraInfo', 'camera'];
     for (const step of steps) for (const age of [...AGE_BANDS, null]) expect(steps, `${step}/${age}`).toContain(backStep({ step, age, gate: null, kind: 'full' }).step);
   });
 });

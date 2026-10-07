@@ -88,11 +88,15 @@ function playScreen(events: PreEvent[], tab = new MemStore()) {
   }
   const stored = { beforeCamera: [...tab.writes] };
   if (pre.step !== 'camera') return { tab, pre, stored };
-  const r = new AssessRunner({ aspect: 4 / 3, painAsked: true, takeoffLeg: null, cameraFps: () => 30 });
+  // SCREEN A: as the page's answerTakeoffPre does — the tap's side is kept in page memory, written for adults only,
+  // and passed into the runner (never left for the runner to guess)
+  const takeoff = (events.find((e) => e.type === 'takeoff') as { side: 'left' | 'right' | null } | undefined)?.side ?? null;
+  if (takeoff) writeTakeoff(tab, pre.gate, takeoff);
+  const r = new AssessRunner({ aspect: 4 / 3, painAsked: true, takeoffLeg: takeoff, cameraFps: () => 30 });
   let t = 0;
   r.tick({ t, present: false, image: [] }, t);
-  // a few frames and the takeoff prompt, as the page would; the grade itself comes from the synthetic session
-  for (const f of standFront(1).frames) { t += 33; const v = r.tick({ ...f, t }, t); if (v.step === 'takeoff') { writeTakeoff(tab, pre.gate, 'left'); r.answerTakeoff('left', t); } }
+  // a few frames, as the page would; the grade itself comes from the synthetic session
+  for (const f of standFront(1).frames) { t += 33; r.tick({ ...f, t }, t); }
   const s = summarize(SESSION)!;
   keepResult(tab, pre.gate, s);                                       // as the page's end does (SCREEN-FIX-2)
   return { tab, pre, stored, summary: s };
@@ -118,9 +122,9 @@ describe('the screen\'s client code makes no network call', () => {
   });
 });
 
-/** The whole screen for one band: start, the age, the grown-up step when asked, "no" to pain, the camera card. */
+/** The whole screen for one band: start, the age, the grown-up step when asked, "no" to pain, the take-off tap, the camera card. */
 const whole = (age: AgeBand): PreEvent[] => [
-  { type: 'start' }, { type: 'age', age }, ...(age === '18+' ? [] : [{ type: 'grownUp' } as const]), { type: 'pain', hurts: false }, { type: 'cameraOn' },
+  { type: 'start' }, { type: 'age', age }, ...(age === '18+' ? [] : [{ type: 'grownUp' } as const]), { type: 'pain', hurts: false }, { type: 'takeoff', side: 'left' }, { type: 'cameraOn' },
 ];
 
 describe('a whole screen, played: 0 requests, 0 database writes, storage only the age answer until the result', () => {
@@ -135,6 +139,7 @@ describe('a whole screen, played: 0 requests, 0 database writes, storage only th
     if (age === '18+') {
       expect(readResult(run.tab)!.summary).toEqual(run.summary);
       expect(readResult(run.tab)!.gate).toMatchObject({ ageBand: age, grownUp: false });
+      expect(run.tab.writes).toContain(KEYS.takeoff);            // SCREEN A: the adult's take-off tap is kept
     } else {
       // CHANGED (SCREEN-FIX-2): was the result kept in this tab after the grown-up step; a kid keeps the age answer only
       expect(readResult(run.tab)).toBeNull();
@@ -145,7 +150,7 @@ describe('a whole screen, played: 0 requests, 0 database writes, storage only th
   it('under 18 or an age not given WITHOUT the grown-up step never reaches the camera; only the age answer is written', () => {
     for (const age of ['under-13', '13-17', 'unknown'] as const) {
       forgetAgeForTests();
-      const run = playScreen([{ type: 'start' }, { type: 'age', age }, { type: 'pain', hurts: false }, { type: 'cameraOn' }]);
+      const run = playScreen([{ type: 'start' }, { type: 'age', age }, { type: 'pain', hurts: false }, { type: 'takeoff', side: 'left' }, { type: 'cameraOn' }]);
       expect(run.pre.step, age).toBe('grownUp');
       expect(run.tab.writes, age).toEqual([KEYS.age]);
       // and a result handed to the store without the grown-up step is refused
@@ -160,7 +165,7 @@ describe('a whole screen, played: 0 requests, 0 database writes, storage only th
     const tab = new MemStore();
     playScreen(whole('under-13'), tab);
     // an adult after a kid: the reset means the adult answers for themselves — the kid's answer is not inherited
-    const adult = playScreen([{ type: 'start' }, { type: 'age', age: '18+' }, { type: 'pain', hurts: false }, { type: 'cameraOn' }], tab);
+    const adult = playScreen([{ type: 'start' }, { type: 'age', age: '18+' }, { type: 'pain', hurts: false }, { type: 'takeoff', side: 'left' }, { type: 'cameraOn' }], tab);
     expect(adult.pre.step).toBe('camera');
     expect(adult.pre.age).toBe('18+');
     // and a kid after an adult — the case that mattered: kid handling, the grown-up step, nothing kept

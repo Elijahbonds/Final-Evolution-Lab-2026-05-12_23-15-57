@@ -245,7 +245,7 @@ describe('a new Start asks the age again: nobody inherits the last person\'s ans
 
   it.each(['13-17', 'under-13'] as const)('adult, then %s, in one tab: the second run answers again, gets the grown-up step and keeps nothing', (second) => {
     const p = page(s);
-    p.run([{ type: 'start' }, { type: 'age', age: '18+' }, { type: 'pain', hurts: false }, { type: 'cameraOn' }]);
+    p.run([{ type: 'start' }, { type: 'age', age: '18+' }, { type: 'pain', hurts: false }, { type: 'takeoff', side: 'left' }, { type: 'cameraOn' }]);
     expect(p.pre.step).toBe('camera');
     expect(keepResult(s, p.pre.gate, SUMMARY)).toBe('adult');
     expect(readAge(s)).toBe('18+');
@@ -255,7 +255,7 @@ describe('a new Start asks the age again: nobody inherits the last person\'s ans
     expect(readAge(s)).toBeNull();
     p.run([{ type: 'age', age: second }]);
     expect(p.pre.step).toBe('grownUp');                            // kid handling: the grown-up step before the camera
-    p.run([{ type: 'grownUp' }, { type: 'pain', hurts: false }, { type: 'cameraOn' }]);
+    p.run([{ type: 'grownUp' }, { type: 'pain', hurts: false }, { type: 'takeoff', side: 'right' }, { type: 'cameraOn' }]);
     expect(p.pre.step).toBe('camera');
     expect(keepResult(s, p.pre.gate, SUMMARY)).toBe('kid');        // and nothing of theirs is kept
     expect(readResult(s)).toBeNull();
@@ -264,9 +264,9 @@ describe('a new Start asks the age again: nobody inherits the last person\'s ans
 
   it('kid, then adult, in one tab: the second run answers 18 or older and keeps its result', () => {
     const p = page(s);
-    p.run([{ type: 'start' }, { type: 'age', age: 'under-13' }, { type: 'grownUp' }, { type: 'pain', hurts: false }, { type: 'cameraOn' }]);
+    p.run([{ type: 'start' }, { type: 'age', age: 'under-13' }, { type: 'grownUp' }, { type: 'pain', hurts: false }, { type: 'takeoff', side: null }, { type: 'cameraOn' }]);
     expect(keepResult(s, p.pre.gate, SUMMARY)).toBe('kid');
-    p.run([{ type: 'start' }, { type: 'age', age: '18+' }, { type: 'pain', hurts: false }, { type: 'cameraOn' }]);
+    p.run([{ type: 'start' }, { type: 'age', age: '18+' }, { type: 'pain', hurts: false }, { type: 'takeoff', side: 'left' }, { type: 'cameraOn' }]);
     expect(p.pre.step).toBe('camera');
     expect(keepResult(s, p.pre.gate, SUMMARY)).toBe('adult');
     expect(readResult(s)!.summary).toEqual(SUMMARY);
