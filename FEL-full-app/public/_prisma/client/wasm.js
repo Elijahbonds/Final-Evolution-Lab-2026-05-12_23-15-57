@@ -1423,6 +1423,13 @@ exports.Prisma.CoachStoreReferralScalarFieldEnum = {
   updatedAt: 'updatedAt'
 };
 
+exports.Prisma.AdventureSaveScalarFieldEnum = {
+  userId: 'userId',
+  version: 'version',
+  doc: 'doc',
+  updatedAt: 'updatedAt'
+};
+
 exports.Prisma.SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -1712,7 +1719,8 @@ exports.Prisma.ModelName = {
   ProgramAccess: 'ProgramAccess',
   Booking: 'Booking',
   CallSignal: 'CallSignal',
-  CoachStoreReferral: 'CoachStoreReferral'
+  CoachStoreReferral: 'CoachStoreReferral',
+  AdventureSave: 'AdventureSave'
 };
 
 /**

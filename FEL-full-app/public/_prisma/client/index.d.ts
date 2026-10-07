@@ -597,6 +597,13 @@ export type CallSignal = $Result.DefaultSelection<Prisma.$CallSignalPayload>
  * Referral cut on a coach-store sale, paid out of FEL's 15% fee. The ledger has no referral account, so this table holds it.
  */
 export type CoachStoreReferral = $Result.DefaultSelection<Prisma.$CoachStoreReferralPayload>
+/**
+ * Model AdventureSave
+ * ADVENTURE PHASE B (2026-10-07): one row per account, the Adventure's save document as JSON (save/save.ts).
+ * Matches the live table from prisma/pending/2026-10-07-adventure-save.sql (applied by the owner). Verified adults only;
+ * the route must refuse teen / unknown-age uploads (save/policy.ts adventureSavePolicy).
+ */
+export type AdventureSave = $Result.DefaultSelection<Prisma.$AdventureSavePayload>
 
 /**
  * Enums
@@ -2023,6 +2030,16 @@ export class PrismaClient<
     * ```
     */
   get coachStoreReferral(): Prisma.CoachStoreReferralDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.adventureSave`: Exposes CRUD operations for the **AdventureSave** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more AdventureSaves
+    * const adventureSaves = await prisma.adventureSave.findMany()
+    * ```
+    */
+  get adventureSave(): Prisma.AdventureSaveDelegate<ExtArgs, ClientOptions>;
 }
 
 export namespace Prisma {
@@ -2560,7 +2577,8 @@ export namespace Prisma {
     ProgramAccess: 'ProgramAccess',
     Booking: 'Booking',
     CallSignal: 'CallSignal',
-    CoachStoreReferral: 'CoachStoreReferral'
+    CoachStoreReferral: 'CoachStoreReferral',
+    AdventureSave: 'AdventureSave'
   };
 
   export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -2579,7 +2597,7 @@ export namespace Prisma {
       omit: GlobalOmitOptions
     }
     meta: {
-      modelProps: "user" | "playerProfile" | "gameSession" | "sessionRun" | "sessionGrant" | "creditLedger" | "cardOwnership" | "storyNodeProgress" | "lessonProgress" | "cellProject" | "cellApiKey" | "cellSettings" | "cellUsage" | "projectFile" | "cellMessage" | "cellWisdom" | "exerciseCategory" | "exercise" | "ledgerAccount" | "ledgerTransaction" | "ledgerPosting" | "stripeCustomer" | "subscription" | "order" | "payoutRequest" | "marketplaceListing" | "studioPartnerKey" | "partnerUsage" | "marketplacePurchase" | "ladderSeason" | "ladderEntry" | "competitionMatch" | "matchEvent" | "mirrorTriumph" | "prqEntry" | "guestSession" | "season" | "passProgress" | "passGrant" | "modeMastery" | "signatureAttempt" | "challengeLink" | "analyticsEvent" | "metricRollup" | "wallet" | "walletLedgerEntry" | "rewardRule" | "perfEarnEvent" | "playerEntitlement" | "marketingLead" | "referralCode" | "referralConversion" | "mpMatch" | "creativeCard" | "cardSlot" | "creatorCard" | "workoutScan" | "workoutPlan" | "athleteBuild" | "avatarLook" | "ownedWearable" | "sessionBooking" | "sessionJoinLink" | "crmCompany" | "crmContact" | "crmDeal" | "crmActivity" | "crmNote" | "programExercise" | "coachingProgram" | "block" | "session" | "sessionExercise" | "clientSession" | "exerciseLog" | "setLog" | "programMessage" | "facilitatorProfile" | "credential" | "guardianConsent" | "goalPlan" | "campSession" | "campTemplate" | "mirrorSession" | "healthIntake" | "painCheckIn" | "healthConsent" | "scanSaveOptIn" | "readinessCheckIn" | "breathLog" | "shareLink" | "coachInvite" | "coachClient" | "instructor" | "programAccess" | "booking" | "callSignal" | "coachStoreReferral"
+      modelProps: "user" | "playerProfile" | "gameSession" | "sessionRun" | "sessionGrant" | "creditLedger" | "cardOwnership" | "storyNodeProgress" | "lessonProgress" | "cellProject" | "cellApiKey" | "cellSettings" | "cellUsage" | "projectFile" | "cellMessage" | "cellWisdom" | "exerciseCategory" | "exercise" | "ledgerAccount" | "ledgerTransaction" | "ledgerPosting" | "stripeCustomer" | "subscription" | "order" | "payoutRequest" | "marketplaceListing" | "studioPartnerKey" | "partnerUsage" | "marketplacePurchase" | "ladderSeason" | "ladderEntry" | "competitionMatch" | "matchEvent" | "mirrorTriumph" | "prqEntry" | "guestSession" | "season" | "passProgress" | "passGrant" | "modeMastery" | "signatureAttempt" | "challengeLink" | "analyticsEvent" | "metricRollup" | "wallet" | "walletLedgerEntry" | "rewardRule" | "perfEarnEvent" | "playerEntitlement" | "marketingLead" | "referralCode" | "referralConversion" | "mpMatch" | "creativeCard" | "cardSlot" | "creatorCard" | "workoutScan" | "workoutPlan" | "athleteBuild" | "avatarLook" | "ownedWearable" | "sessionBooking" | "sessionJoinLink" | "crmCompany" | "crmContact" | "crmDeal" | "crmActivity" | "crmNote" | "programExercise" | "coachingProgram" | "block" | "session" | "sessionExercise" | "clientSession" | "exerciseLog" | "setLog" | "programMessage" | "facilitatorProfile" | "credential" | "guardianConsent" | "goalPlan" | "campSession" | "campTemplate" | "mirrorSession" | "healthIntake" | "painCheckIn" | "healthConsent" | "scanSaveOptIn" | "readinessCheckIn" | "breathLog" | "shareLink" | "coachInvite" | "coachClient" | "instructor" | "programAccess" | "booking" | "callSignal" | "coachStoreReferral" | "adventureSave"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -9835,6 +9853,80 @@ export namespace Prisma {
           }
         }
       }
+      AdventureSave: {
+        payload: Prisma.$AdventureSavePayload<ExtArgs>
+        fields: Prisma.AdventureSaveFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.AdventureSaveFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AdventureSavePayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.AdventureSaveFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AdventureSavePayload>
+          }
+          findFirst: {
+            args: Prisma.AdventureSaveFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AdventureSavePayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.AdventureSaveFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AdventureSavePayload>
+          }
+          findMany: {
+            args: Prisma.AdventureSaveFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AdventureSavePayload>[]
+          }
+          create: {
+            args: Prisma.AdventureSaveCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AdventureSavePayload>
+          }
+          createMany: {
+            args: Prisma.AdventureSaveCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.AdventureSaveCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AdventureSavePayload>[]
+          }
+          delete: {
+            args: Prisma.AdventureSaveDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AdventureSavePayload>
+          }
+          update: {
+            args: Prisma.AdventureSaveUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AdventureSavePayload>
+          }
+          deleteMany: {
+            args: Prisma.AdventureSaveDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.AdventureSaveUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.AdventureSaveUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AdventureSavePayload>[]
+          }
+          upsert: {
+            args: Prisma.AdventureSaveUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AdventureSavePayload>
+          }
+          aggregate: {
+            args: Prisma.AdventureSaveAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateAdventureSave>
+          }
+          groupBy: {
+            args: Prisma.AdventureSaveGroupByArgs<ExtArgs>
+            result: $Utils.Optional<AdventureSaveGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.AdventureSaveCountArgs<ExtArgs>
+            result: $Utils.Optional<AdventureSaveCountAggregateOutputType> | number
+          }
+        }
+      }
     }
   } & {
     other: {
@@ -10017,6 +10109,7 @@ export namespace Prisma {
     booking?: BookingOmit
     callSignal?: CallSignalOmit
     coachStoreReferral?: CoachStoreReferralOmit
+    adventureSave?: AdventureSaveOmit
   }
 
   /* Types for Logging */
@@ -11886,6 +11979,7 @@ export namespace Prisma {
     crmDeals?: boolean | User$crmDealsArgs<ExtArgs>
     crmActivities?: boolean | User$crmActivitiesArgs<ExtArgs>
     crmNotes?: boolean | User$crmNotesArgs<ExtArgs>
+    adventureSave?: boolean | User$adventureSaveArgs<ExtArgs>
     _count?: boolean | UserCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["user"]>
 
@@ -12004,6 +12098,7 @@ export namespace Prisma {
     crmDeals?: boolean | User$crmDealsArgs<ExtArgs>
     crmActivities?: boolean | User$crmActivitiesArgs<ExtArgs>
     crmNotes?: boolean | User$crmNotesArgs<ExtArgs>
+    adventureSave?: boolean | User$adventureSaveArgs<ExtArgs>
     _count?: boolean | UserCountOutputTypeDefaultArgs<ExtArgs>
   }
   export type UserIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {}
@@ -12077,6 +12172,7 @@ export namespace Prisma {
       crmDeals: Prisma.$CrmDealPayload<ExtArgs>[]
       crmActivities: Prisma.$CrmActivityPayload<ExtArgs>[]
       crmNotes: Prisma.$CrmNotePayload<ExtArgs>[]
+      adventureSave: Prisma.$AdventureSavePayload<ExtArgs> | null
     }
     scalars: $Extensions.GetPayloadResult<{
       id: string
@@ -12549,6 +12645,7 @@ export namespace Prisma {
     crmDeals<T extends User$crmDealsArgs<ExtArgs> = {}>(args?: Subset<T, User$crmDealsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CrmDealPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     crmActivities<T extends User$crmActivitiesArgs<ExtArgs> = {}>(args?: Subset<T, User$crmActivitiesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CrmActivityPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     crmNotes<T extends User$crmNotesArgs<ExtArgs> = {}>(args?: Subset<T, User$crmNotesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CrmNotePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    adventureSave<T extends User$adventureSaveArgs<ExtArgs> = {}>(args?: Subset<T, User$adventureSaveArgs<ExtArgs>>): Prisma__AdventureSaveClient<$Result.GetResult<Prisma.$AdventureSavePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -14410,6 +14507,25 @@ export namespace Prisma {
     take?: number
     skip?: number
     distinct?: CrmNoteScalarFieldEnum | CrmNoteScalarFieldEnum[]
+  }
+
+  /**
+   * User.adventureSave
+   */
+  export type User$adventureSaveArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AdventureSave
+     */
+    select?: AdventureSaveSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AdventureSave
+     */
+    omit?: AdventureSaveOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AdventureSaveInclude<ExtArgs> | null
+    where?: AdventureSaveWhereInput
   }
 
   /**
@@ -127233,6 +127349,1081 @@ export namespace Prisma {
 
 
   /**
+   * Model AdventureSave
+   */
+
+  export type AggregateAdventureSave = {
+    _count: AdventureSaveCountAggregateOutputType | null
+    _avg: AdventureSaveAvgAggregateOutputType | null
+    _sum: AdventureSaveSumAggregateOutputType | null
+    _min: AdventureSaveMinAggregateOutputType | null
+    _max: AdventureSaveMaxAggregateOutputType | null
+  }
+
+  export type AdventureSaveAvgAggregateOutputType = {
+    version: number | null
+  }
+
+  export type AdventureSaveSumAggregateOutputType = {
+    version: number | null
+  }
+
+  export type AdventureSaveMinAggregateOutputType = {
+    userId: string | null
+    version: number | null
+    updatedAt: Date | null
+  }
+
+  export type AdventureSaveMaxAggregateOutputType = {
+    userId: string | null
+    version: number | null
+    updatedAt: Date | null
+  }
+
+  export type AdventureSaveCountAggregateOutputType = {
+    userId: number
+    version: number
+    doc: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type AdventureSaveAvgAggregateInputType = {
+    version?: true
+  }
+
+  export type AdventureSaveSumAggregateInputType = {
+    version?: true
+  }
+
+  export type AdventureSaveMinAggregateInputType = {
+    userId?: true
+    version?: true
+    updatedAt?: true
+  }
+
+  export type AdventureSaveMaxAggregateInputType = {
+    userId?: true
+    version?: true
+    updatedAt?: true
+  }
+
+  export type AdventureSaveCountAggregateInputType = {
+    userId?: true
+    version?: true
+    doc?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type AdventureSaveAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which AdventureSave to aggregate.
+     */
+    where?: AdventureSaveWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of AdventureSaves to fetch.
+     */
+    orderBy?: AdventureSaveOrderByWithRelationInput | AdventureSaveOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: AdventureSaveWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` AdventureSaves from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` AdventureSaves.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned AdventureSaves
+    **/
+    _count?: true | AdventureSaveCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to average
+    **/
+    _avg?: AdventureSaveAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: AdventureSaveSumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: AdventureSaveMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: AdventureSaveMaxAggregateInputType
+  }
+
+  export type GetAdventureSaveAggregateType<T extends AdventureSaveAggregateArgs> = {
+        [P in keyof T & keyof AggregateAdventureSave]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateAdventureSave[P]>
+      : GetScalarType<T[P], AggregateAdventureSave[P]>
+  }
+
+
+
+
+  export type AdventureSaveGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: AdventureSaveWhereInput
+    orderBy?: AdventureSaveOrderByWithAggregationInput | AdventureSaveOrderByWithAggregationInput[]
+    by: AdventureSaveScalarFieldEnum[] | AdventureSaveScalarFieldEnum
+    having?: AdventureSaveScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: AdventureSaveCountAggregateInputType | true
+    _avg?: AdventureSaveAvgAggregateInputType
+    _sum?: AdventureSaveSumAggregateInputType
+    _min?: AdventureSaveMinAggregateInputType
+    _max?: AdventureSaveMaxAggregateInputType
+  }
+
+  export type AdventureSaveGroupByOutputType = {
+    userId: string
+    version: number
+    doc: JsonValue
+    updatedAt: Date
+    _count: AdventureSaveCountAggregateOutputType | null
+    _avg: AdventureSaveAvgAggregateOutputType | null
+    _sum: AdventureSaveSumAggregateOutputType | null
+    _min: AdventureSaveMinAggregateOutputType | null
+    _max: AdventureSaveMaxAggregateOutputType | null
+  }
+
+  type GetAdventureSaveGroupByPayload<T extends AdventureSaveGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<AdventureSaveGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof AdventureSaveGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], AdventureSaveGroupByOutputType[P]>
+            : GetScalarType<T[P], AdventureSaveGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type AdventureSaveSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    userId?: boolean
+    version?: boolean
+    doc?: boolean
+    updatedAt?: boolean
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["adventureSave"]>
+
+  export type AdventureSaveSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    userId?: boolean
+    version?: boolean
+    doc?: boolean
+    updatedAt?: boolean
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["adventureSave"]>
+
+  export type AdventureSaveSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    userId?: boolean
+    version?: boolean
+    doc?: boolean
+    updatedAt?: boolean
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["adventureSave"]>
+
+  export type AdventureSaveSelectScalar = {
+    userId?: boolean
+    version?: boolean
+    doc?: boolean
+    updatedAt?: boolean
+  }
+
+  export type AdventureSaveOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"userId" | "version" | "doc" | "updatedAt", ExtArgs["result"]["adventureSave"]>
+  export type AdventureSaveInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }
+  export type AdventureSaveIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }
+  export type AdventureSaveIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }
+
+  export type $AdventureSavePayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "AdventureSave"
+    objects: {
+      user: Prisma.$UserPayload<ExtArgs>
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      userId: string
+      version: number
+      doc: Prisma.JsonValue
+      updatedAt: Date
+    }, ExtArgs["result"]["adventureSave"]>
+    composites: {}
+  }
+
+  type AdventureSaveGetPayload<S extends boolean | null | undefined | AdventureSaveDefaultArgs> = $Result.GetResult<Prisma.$AdventureSavePayload, S>
+
+  type AdventureSaveCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<AdventureSaveFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: AdventureSaveCountAggregateInputType | true
+    }
+
+  export interface AdventureSaveDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['AdventureSave'], meta: { name: 'AdventureSave' } }
+    /**
+     * Find zero or one AdventureSave that matches the filter.
+     * @param {AdventureSaveFindUniqueArgs} args - Arguments to find a AdventureSave
+     * @example
+     * // Get one AdventureSave
+     * const adventureSave = await prisma.adventureSave.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends AdventureSaveFindUniqueArgs>(args: SelectSubset<T, AdventureSaveFindUniqueArgs<ExtArgs>>): Prisma__AdventureSaveClient<$Result.GetResult<Prisma.$AdventureSavePayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one AdventureSave that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {AdventureSaveFindUniqueOrThrowArgs} args - Arguments to find a AdventureSave
+     * @example
+     * // Get one AdventureSave
+     * const adventureSave = await prisma.adventureSave.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends AdventureSaveFindUniqueOrThrowArgs>(args: SelectSubset<T, AdventureSaveFindUniqueOrThrowArgs<ExtArgs>>): Prisma__AdventureSaveClient<$Result.GetResult<Prisma.$AdventureSavePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first AdventureSave that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {AdventureSaveFindFirstArgs} args - Arguments to find a AdventureSave
+     * @example
+     * // Get one AdventureSave
+     * const adventureSave = await prisma.adventureSave.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends AdventureSaveFindFirstArgs>(args?: SelectSubset<T, AdventureSaveFindFirstArgs<ExtArgs>>): Prisma__AdventureSaveClient<$Result.GetResult<Prisma.$AdventureSavePayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first AdventureSave that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {AdventureSaveFindFirstOrThrowArgs} args - Arguments to find a AdventureSave
+     * @example
+     * // Get one AdventureSave
+     * const adventureSave = await prisma.adventureSave.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends AdventureSaveFindFirstOrThrowArgs>(args?: SelectSubset<T, AdventureSaveFindFirstOrThrowArgs<ExtArgs>>): Prisma__AdventureSaveClient<$Result.GetResult<Prisma.$AdventureSavePayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more AdventureSaves that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {AdventureSaveFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all AdventureSaves
+     * const adventureSaves = await prisma.adventureSave.findMany()
+     * 
+     * // Get first 10 AdventureSaves
+     * const adventureSaves = await prisma.adventureSave.findMany({ take: 10 })
+     * 
+     * // Only select the `userId`
+     * const adventureSaveWithUserIdOnly = await prisma.adventureSave.findMany({ select: { userId: true } })
+     * 
+     */
+    findMany<T extends AdventureSaveFindManyArgs>(args?: SelectSubset<T, AdventureSaveFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$AdventureSavePayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a AdventureSave.
+     * @param {AdventureSaveCreateArgs} args - Arguments to create a AdventureSave.
+     * @example
+     * // Create one AdventureSave
+     * const AdventureSave = await prisma.adventureSave.create({
+     *   data: {
+     *     // ... data to create a AdventureSave
+     *   }
+     * })
+     * 
+     */
+    create<T extends AdventureSaveCreateArgs>(args: SelectSubset<T, AdventureSaveCreateArgs<ExtArgs>>): Prisma__AdventureSaveClient<$Result.GetResult<Prisma.$AdventureSavePayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many AdventureSaves.
+     * @param {AdventureSaveCreateManyArgs} args - Arguments to create many AdventureSaves.
+     * @example
+     * // Create many AdventureSaves
+     * const adventureSave = await prisma.adventureSave.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends AdventureSaveCreateManyArgs>(args?: SelectSubset<T, AdventureSaveCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many AdventureSaves and returns the data saved in the database.
+     * @param {AdventureSaveCreateManyAndReturnArgs} args - Arguments to create many AdventureSaves.
+     * @example
+     * // Create many AdventureSaves
+     * const adventureSave = await prisma.adventureSave.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many AdventureSaves and only return the `userId`
+     * const adventureSaveWithUserIdOnly = await prisma.adventureSave.createManyAndReturn({
+     *   select: { userId: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends AdventureSaveCreateManyAndReturnArgs>(args?: SelectSubset<T, AdventureSaveCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$AdventureSavePayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a AdventureSave.
+     * @param {AdventureSaveDeleteArgs} args - Arguments to delete one AdventureSave.
+     * @example
+     * // Delete one AdventureSave
+     * const AdventureSave = await prisma.adventureSave.delete({
+     *   where: {
+     *     // ... filter to delete one AdventureSave
+     *   }
+     * })
+     * 
+     */
+    delete<T extends AdventureSaveDeleteArgs>(args: SelectSubset<T, AdventureSaveDeleteArgs<ExtArgs>>): Prisma__AdventureSaveClient<$Result.GetResult<Prisma.$AdventureSavePayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one AdventureSave.
+     * @param {AdventureSaveUpdateArgs} args - Arguments to update one AdventureSave.
+     * @example
+     * // Update one AdventureSave
+     * const adventureSave = await prisma.adventureSave.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends AdventureSaveUpdateArgs>(args: SelectSubset<T, AdventureSaveUpdateArgs<ExtArgs>>): Prisma__AdventureSaveClient<$Result.GetResult<Prisma.$AdventureSavePayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more AdventureSaves.
+     * @param {AdventureSaveDeleteManyArgs} args - Arguments to filter AdventureSaves to delete.
+     * @example
+     * // Delete a few AdventureSaves
+     * const { count } = await prisma.adventureSave.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends AdventureSaveDeleteManyArgs>(args?: SelectSubset<T, AdventureSaveDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more AdventureSaves.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {AdventureSaveUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many AdventureSaves
+     * const adventureSave = await prisma.adventureSave.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends AdventureSaveUpdateManyArgs>(args: SelectSubset<T, AdventureSaveUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more AdventureSaves and returns the data updated in the database.
+     * @param {AdventureSaveUpdateManyAndReturnArgs} args - Arguments to update many AdventureSaves.
+     * @example
+     * // Update many AdventureSaves
+     * const adventureSave = await prisma.adventureSave.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more AdventureSaves and only return the `userId`
+     * const adventureSaveWithUserIdOnly = await prisma.adventureSave.updateManyAndReturn({
+     *   select: { userId: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends AdventureSaveUpdateManyAndReturnArgs>(args: SelectSubset<T, AdventureSaveUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$AdventureSavePayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one AdventureSave.
+     * @param {AdventureSaveUpsertArgs} args - Arguments to update or create a AdventureSave.
+     * @example
+     * // Update or create a AdventureSave
+     * const adventureSave = await prisma.adventureSave.upsert({
+     *   create: {
+     *     // ... data to create a AdventureSave
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the AdventureSave we want to update
+     *   }
+     * })
+     */
+    upsert<T extends AdventureSaveUpsertArgs>(args: SelectSubset<T, AdventureSaveUpsertArgs<ExtArgs>>): Prisma__AdventureSaveClient<$Result.GetResult<Prisma.$AdventureSavePayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of AdventureSaves.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {AdventureSaveCountArgs} args - Arguments to filter AdventureSaves to count.
+     * @example
+     * // Count the number of AdventureSaves
+     * const count = await prisma.adventureSave.count({
+     *   where: {
+     *     // ... the filter for the AdventureSaves we want to count
+     *   }
+     * })
+    **/
+    count<T extends AdventureSaveCountArgs>(
+      args?: Subset<T, AdventureSaveCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], AdventureSaveCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a AdventureSave.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {AdventureSaveAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends AdventureSaveAggregateArgs>(args: Subset<T, AdventureSaveAggregateArgs>): Prisma.PrismaPromise<GetAdventureSaveAggregateType<T>>
+
+    /**
+     * Group by AdventureSave.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {AdventureSaveGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends AdventureSaveGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: AdventureSaveGroupByArgs['orderBy'] }
+        : { orderBy?: AdventureSaveGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, AdventureSaveGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetAdventureSaveGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the AdventureSave model
+   */
+  readonly fields: AdventureSaveFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for AdventureSave.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__AdventureSaveClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    user<T extends UserDefaultArgs<ExtArgs> = {}>(args?: Subset<T, UserDefaultArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the AdventureSave model
+   */
+  interface AdventureSaveFieldRefs {
+    readonly userId: FieldRef<"AdventureSave", 'String'>
+    readonly version: FieldRef<"AdventureSave", 'Int'>
+    readonly doc: FieldRef<"AdventureSave", 'Json'>
+    readonly updatedAt: FieldRef<"AdventureSave", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * AdventureSave findUnique
+   */
+  export type AdventureSaveFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AdventureSave
+     */
+    select?: AdventureSaveSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AdventureSave
+     */
+    omit?: AdventureSaveOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AdventureSaveInclude<ExtArgs> | null
+    /**
+     * Filter, which AdventureSave to fetch.
+     */
+    where: AdventureSaveWhereUniqueInput
+  }
+
+  /**
+   * AdventureSave findUniqueOrThrow
+   */
+  export type AdventureSaveFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AdventureSave
+     */
+    select?: AdventureSaveSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AdventureSave
+     */
+    omit?: AdventureSaveOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AdventureSaveInclude<ExtArgs> | null
+    /**
+     * Filter, which AdventureSave to fetch.
+     */
+    where: AdventureSaveWhereUniqueInput
+  }
+
+  /**
+   * AdventureSave findFirst
+   */
+  export type AdventureSaveFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AdventureSave
+     */
+    select?: AdventureSaveSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AdventureSave
+     */
+    omit?: AdventureSaveOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AdventureSaveInclude<ExtArgs> | null
+    /**
+     * Filter, which AdventureSave to fetch.
+     */
+    where?: AdventureSaveWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of AdventureSaves to fetch.
+     */
+    orderBy?: AdventureSaveOrderByWithRelationInput | AdventureSaveOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for AdventureSaves.
+     */
+    cursor?: AdventureSaveWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` AdventureSaves from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` AdventureSaves.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of AdventureSaves.
+     */
+    distinct?: AdventureSaveScalarFieldEnum | AdventureSaveScalarFieldEnum[]
+  }
+
+  /**
+   * AdventureSave findFirstOrThrow
+   */
+  export type AdventureSaveFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AdventureSave
+     */
+    select?: AdventureSaveSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AdventureSave
+     */
+    omit?: AdventureSaveOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AdventureSaveInclude<ExtArgs> | null
+    /**
+     * Filter, which AdventureSave to fetch.
+     */
+    where?: AdventureSaveWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of AdventureSaves to fetch.
+     */
+    orderBy?: AdventureSaveOrderByWithRelationInput | AdventureSaveOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for AdventureSaves.
+     */
+    cursor?: AdventureSaveWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` AdventureSaves from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` AdventureSaves.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of AdventureSaves.
+     */
+    distinct?: AdventureSaveScalarFieldEnum | AdventureSaveScalarFieldEnum[]
+  }
+
+  /**
+   * AdventureSave findMany
+   */
+  export type AdventureSaveFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AdventureSave
+     */
+    select?: AdventureSaveSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AdventureSave
+     */
+    omit?: AdventureSaveOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AdventureSaveInclude<ExtArgs> | null
+    /**
+     * Filter, which AdventureSaves to fetch.
+     */
+    where?: AdventureSaveWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of AdventureSaves to fetch.
+     */
+    orderBy?: AdventureSaveOrderByWithRelationInput | AdventureSaveOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing AdventureSaves.
+     */
+    cursor?: AdventureSaveWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` AdventureSaves from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` AdventureSaves.
+     */
+    skip?: number
+    distinct?: AdventureSaveScalarFieldEnum | AdventureSaveScalarFieldEnum[]
+  }
+
+  /**
+   * AdventureSave create
+   */
+  export type AdventureSaveCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AdventureSave
+     */
+    select?: AdventureSaveSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AdventureSave
+     */
+    omit?: AdventureSaveOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AdventureSaveInclude<ExtArgs> | null
+    /**
+     * The data needed to create a AdventureSave.
+     */
+    data: XOR<AdventureSaveCreateInput, AdventureSaveUncheckedCreateInput>
+  }
+
+  /**
+   * AdventureSave createMany
+   */
+  export type AdventureSaveCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many AdventureSaves.
+     */
+    data: AdventureSaveCreateManyInput | AdventureSaveCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * AdventureSave createManyAndReturn
+   */
+  export type AdventureSaveCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AdventureSave
+     */
+    select?: AdventureSaveSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the AdventureSave
+     */
+    omit?: AdventureSaveOmit<ExtArgs> | null
+    /**
+     * The data used to create many AdventureSaves.
+     */
+    data: AdventureSaveCreateManyInput | AdventureSaveCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AdventureSaveIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * AdventureSave update
+   */
+  export type AdventureSaveUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AdventureSave
+     */
+    select?: AdventureSaveSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AdventureSave
+     */
+    omit?: AdventureSaveOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AdventureSaveInclude<ExtArgs> | null
+    /**
+     * The data needed to update a AdventureSave.
+     */
+    data: XOR<AdventureSaveUpdateInput, AdventureSaveUncheckedUpdateInput>
+    /**
+     * Choose, which AdventureSave to update.
+     */
+    where: AdventureSaveWhereUniqueInput
+  }
+
+  /**
+   * AdventureSave updateMany
+   */
+  export type AdventureSaveUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update AdventureSaves.
+     */
+    data: XOR<AdventureSaveUpdateManyMutationInput, AdventureSaveUncheckedUpdateManyInput>
+    /**
+     * Filter which AdventureSaves to update
+     */
+    where?: AdventureSaveWhereInput
+    /**
+     * Limit how many AdventureSaves to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * AdventureSave updateManyAndReturn
+   */
+  export type AdventureSaveUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AdventureSave
+     */
+    select?: AdventureSaveSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the AdventureSave
+     */
+    omit?: AdventureSaveOmit<ExtArgs> | null
+    /**
+     * The data used to update AdventureSaves.
+     */
+    data: XOR<AdventureSaveUpdateManyMutationInput, AdventureSaveUncheckedUpdateManyInput>
+    /**
+     * Filter which AdventureSaves to update
+     */
+    where?: AdventureSaveWhereInput
+    /**
+     * Limit how many AdventureSaves to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AdventureSaveIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * AdventureSave upsert
+   */
+  export type AdventureSaveUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AdventureSave
+     */
+    select?: AdventureSaveSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AdventureSave
+     */
+    omit?: AdventureSaveOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AdventureSaveInclude<ExtArgs> | null
+    /**
+     * The filter to search for the AdventureSave to update in case it exists.
+     */
+    where: AdventureSaveWhereUniqueInput
+    /**
+     * In case the AdventureSave found by the `where` argument doesn't exist, create a new AdventureSave with this data.
+     */
+    create: XOR<AdventureSaveCreateInput, AdventureSaveUncheckedCreateInput>
+    /**
+     * In case the AdventureSave was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<AdventureSaveUpdateInput, AdventureSaveUncheckedUpdateInput>
+  }
+
+  /**
+   * AdventureSave delete
+   */
+  export type AdventureSaveDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AdventureSave
+     */
+    select?: AdventureSaveSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AdventureSave
+     */
+    omit?: AdventureSaveOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AdventureSaveInclude<ExtArgs> | null
+    /**
+     * Filter which AdventureSave to delete.
+     */
+    where: AdventureSaveWhereUniqueInput
+  }
+
+  /**
+   * AdventureSave deleteMany
+   */
+  export type AdventureSaveDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which AdventureSaves to delete
+     */
+    where?: AdventureSaveWhereInput
+    /**
+     * Limit how many AdventureSaves to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * AdventureSave without action
+   */
+  export type AdventureSaveDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AdventureSave
+     */
+    select?: AdventureSaveSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AdventureSave
+     */
+    omit?: AdventureSaveOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AdventureSaveInclude<ExtArgs> | null
+  }
+
+
+  /**
    * Enums
    */
 
@@ -128843,6 +130034,16 @@ export namespace Prisma {
   export type CoachStoreReferralScalarFieldEnum = (typeof CoachStoreReferralScalarFieldEnum)[keyof typeof CoachStoreReferralScalarFieldEnum]
 
 
+  export const AdventureSaveScalarFieldEnum: {
+    userId: 'userId',
+    version: 'version',
+    doc: 'doc',
+    updatedAt: 'updatedAt'
+  };
+
+  export type AdventureSaveScalarFieldEnum = (typeof AdventureSaveScalarFieldEnum)[keyof typeof AdventureSaveScalarFieldEnum]
+
+
   export const SortOrder: {
     asc: 'asc',
     desc: 'desc'
@@ -129378,6 +130579,7 @@ export namespace Prisma {
     crmDeals?: CrmDealListRelationFilter
     crmActivities?: CrmActivityListRelationFilter
     crmNotes?: CrmNoteListRelationFilter
+    adventureSave?: XOR<AdventureSaveNullableScalarRelationFilter, AdventureSaveWhereInput> | null
   }
 
   export type UserOrderByWithRelationInput = {
@@ -129457,6 +130659,7 @@ export namespace Prisma {
     crmDeals?: CrmDealOrderByRelationAggregateInput
     crmActivities?: CrmActivityOrderByRelationAggregateInput
     crmNotes?: CrmNoteOrderByRelationAggregateInput
+    adventureSave?: AdventureSaveOrderByWithRelationInput
   }
 
   export type UserWhereUniqueInput = Prisma.AtLeast<{
@@ -129539,6 +130742,7 @@ export namespace Prisma {
     crmDeals?: CrmDealListRelationFilter
     crmActivities?: CrmActivityListRelationFilter
     crmNotes?: CrmNoteListRelationFilter
+    adventureSave?: XOR<AdventureSaveNullableScalarRelationFilter, AdventureSaveWhereInput> | null
   }, "id" | "email">
 
   export type UserOrderByWithAggregationInput = {
@@ -137761,6 +138965,58 @@ export namespace Prisma {
     updatedAt?: DateTimeWithAggregatesFilter<"CoachStoreReferral"> | Date | string
   }
 
+  export type AdventureSaveWhereInput = {
+    AND?: AdventureSaveWhereInput | AdventureSaveWhereInput[]
+    OR?: AdventureSaveWhereInput[]
+    NOT?: AdventureSaveWhereInput | AdventureSaveWhereInput[]
+    userId?: StringFilter<"AdventureSave"> | string
+    version?: IntFilter<"AdventureSave"> | number
+    doc?: JsonFilter<"AdventureSave">
+    updatedAt?: DateTimeFilter<"AdventureSave"> | Date | string
+    user?: XOR<UserScalarRelationFilter, UserWhereInput>
+  }
+
+  export type AdventureSaveOrderByWithRelationInput = {
+    userId?: SortOrder
+    version?: SortOrder
+    doc?: SortOrder
+    updatedAt?: SortOrder
+    user?: UserOrderByWithRelationInput
+  }
+
+  export type AdventureSaveWhereUniqueInput = Prisma.AtLeast<{
+    userId?: string
+    AND?: AdventureSaveWhereInput | AdventureSaveWhereInput[]
+    OR?: AdventureSaveWhereInput[]
+    NOT?: AdventureSaveWhereInput | AdventureSaveWhereInput[]
+    version?: IntFilter<"AdventureSave"> | number
+    doc?: JsonFilter<"AdventureSave">
+    updatedAt?: DateTimeFilter<"AdventureSave"> | Date | string
+    user?: XOR<UserScalarRelationFilter, UserWhereInput>
+  }, "userId">
+
+  export type AdventureSaveOrderByWithAggregationInput = {
+    userId?: SortOrder
+    version?: SortOrder
+    doc?: SortOrder
+    updatedAt?: SortOrder
+    _count?: AdventureSaveCountOrderByAggregateInput
+    _avg?: AdventureSaveAvgOrderByAggregateInput
+    _max?: AdventureSaveMaxOrderByAggregateInput
+    _min?: AdventureSaveMinOrderByAggregateInput
+    _sum?: AdventureSaveSumOrderByAggregateInput
+  }
+
+  export type AdventureSaveScalarWhereWithAggregatesInput = {
+    AND?: AdventureSaveScalarWhereWithAggregatesInput | AdventureSaveScalarWhereWithAggregatesInput[]
+    OR?: AdventureSaveScalarWhereWithAggregatesInput[]
+    NOT?: AdventureSaveScalarWhereWithAggregatesInput | AdventureSaveScalarWhereWithAggregatesInput[]
+    userId?: StringWithAggregatesFilter<"AdventureSave"> | string
+    version?: IntWithAggregatesFilter<"AdventureSave"> | number
+    doc?: JsonWithAggregatesFilter<"AdventureSave">
+    updatedAt?: DateTimeWithAggregatesFilter<"AdventureSave"> | Date | string
+  }
+
   export type UserCreateInput = {
     id?: string
     email: string
@@ -137838,6 +139094,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateInput = {
@@ -137917,6 +139174,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserUpdateInput = {
@@ -137996,6 +139254,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateInput = {
@@ -138075,6 +139334,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateManyInput = {
@@ -147191,6 +148451,54 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
+  export type AdventureSaveCreateInput = {
+    version: number
+    doc: JsonNullValueInput | InputJsonValue
+    updatedAt?: Date | string
+    user: UserCreateNestedOneWithoutAdventureSaveInput
+  }
+
+  export type AdventureSaveUncheckedCreateInput = {
+    userId: string
+    version: number
+    doc: JsonNullValueInput | InputJsonValue
+    updatedAt?: Date | string
+  }
+
+  export type AdventureSaveUpdateInput = {
+    version?: IntFieldUpdateOperationsInput | number
+    doc?: JsonNullValueInput | InputJsonValue
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    user?: UserUpdateOneRequiredWithoutAdventureSaveNestedInput
+  }
+
+  export type AdventureSaveUncheckedUpdateInput = {
+    userId?: StringFieldUpdateOperationsInput | string
+    version?: IntFieldUpdateOperationsInput | number
+    doc?: JsonNullValueInput | InputJsonValue
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type AdventureSaveCreateManyInput = {
+    userId: string
+    version: number
+    doc: JsonNullValueInput | InputJsonValue
+    updatedAt?: Date | string
+  }
+
+  export type AdventureSaveUpdateManyMutationInput = {
+    version?: IntFieldUpdateOperationsInput | number
+    doc?: JsonNullValueInput | InputJsonValue
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type AdventureSaveUncheckedUpdateManyInput = {
+    userId?: StringFieldUpdateOperationsInput | string
+    version?: IntFieldUpdateOperationsInput | number
+    doc?: JsonNullValueInput | InputJsonValue
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type StringFilter<$PrismaModel = never> = {
     equals?: string | StringFieldRefInput<$PrismaModel>
     in?: string[] | ListStringFieldRefInput<$PrismaModel>
@@ -147577,6 +148885,11 @@ export namespace Prisma {
     every?: CrmNoteWhereInput
     some?: CrmNoteWhereInput
     none?: CrmNoteWhereInput
+  }
+
+  export type AdventureSaveNullableScalarRelationFilter = {
+    is?: AdventureSaveWhereInput | null
+    isNot?: AdventureSaveWhereInput | null
   }
 
   export type SortOrderInput = {
@@ -153454,6 +154767,33 @@ export namespace Prisma {
     renewalIndex?: SortOrder
   }
 
+  export type AdventureSaveCountOrderByAggregateInput = {
+    userId?: SortOrder
+    version?: SortOrder
+    doc?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type AdventureSaveAvgOrderByAggregateInput = {
+    version?: SortOrder
+  }
+
+  export type AdventureSaveMaxOrderByAggregateInput = {
+    userId?: SortOrder
+    version?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type AdventureSaveMinOrderByAggregateInput = {
+    userId?: SortOrder
+    version?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type AdventureSaveSumOrderByAggregateInput = {
+    version?: SortOrder
+  }
+
   export type PlayerProfileCreateNestedOneWithoutUserInput = {
     create?: XOR<PlayerProfileCreateWithoutUserInput, PlayerProfileUncheckedCreateWithoutUserInput>
     connectOrCreate?: PlayerProfileCreateOrConnectWithoutUserInput
@@ -153877,6 +155217,12 @@ export namespace Prisma {
     connect?: CrmNoteWhereUniqueInput | CrmNoteWhereUniqueInput[]
   }
 
+  export type AdventureSaveCreateNestedOneWithoutUserInput = {
+    create?: XOR<AdventureSaveCreateWithoutUserInput, AdventureSaveUncheckedCreateWithoutUserInput>
+    connectOrCreate?: AdventureSaveCreateOrConnectWithoutUserInput
+    connect?: AdventureSaveWhereUniqueInput
+  }
+
   export type PlayerProfileUncheckedCreateNestedOneWithoutUserInput = {
     create?: XOR<PlayerProfileCreateWithoutUserInput, PlayerProfileUncheckedCreateWithoutUserInput>
     connectOrCreate?: PlayerProfileCreateOrConnectWithoutUserInput
@@ -154298,6 +155644,12 @@ export namespace Prisma {
     connectOrCreate?: CrmNoteCreateOrConnectWithoutAuthorInput | CrmNoteCreateOrConnectWithoutAuthorInput[]
     createMany?: CrmNoteCreateManyAuthorInputEnvelope
     connect?: CrmNoteWhereUniqueInput | CrmNoteWhereUniqueInput[]
+  }
+
+  export type AdventureSaveUncheckedCreateNestedOneWithoutUserInput = {
+    create?: XOR<AdventureSaveCreateWithoutUserInput, AdventureSaveUncheckedCreateWithoutUserInput>
+    connectOrCreate?: AdventureSaveCreateOrConnectWithoutUserInput
+    connect?: AdventureSaveWhereUniqueInput
   }
 
   export type StringFieldUpdateOperationsInput = {
@@ -155148,6 +156500,16 @@ export namespace Prisma {
     deleteMany?: CrmNoteScalarWhereInput | CrmNoteScalarWhereInput[]
   }
 
+  export type AdventureSaveUpdateOneWithoutUserNestedInput = {
+    create?: XOR<AdventureSaveCreateWithoutUserInput, AdventureSaveUncheckedCreateWithoutUserInput>
+    connectOrCreate?: AdventureSaveCreateOrConnectWithoutUserInput
+    upsert?: AdventureSaveUpsertWithoutUserInput
+    disconnect?: AdventureSaveWhereInput | boolean
+    delete?: AdventureSaveWhereInput | boolean
+    connect?: AdventureSaveWhereUniqueInput
+    update?: XOR<XOR<AdventureSaveUpdateToOneWithWhereWithoutUserInput, AdventureSaveUpdateWithoutUserInput>, AdventureSaveUncheckedUpdateWithoutUserInput>
+  }
+
   export type PlayerProfileUncheckedUpdateOneWithoutUserNestedInput = {
     create?: XOR<PlayerProfileCreateWithoutUserInput, PlayerProfileUncheckedCreateWithoutUserInput>
     connectOrCreate?: PlayerProfileCreateOrConnectWithoutUserInput
@@ -155970,6 +157332,16 @@ export namespace Prisma {
     update?: CrmNoteUpdateWithWhereUniqueWithoutAuthorInput | CrmNoteUpdateWithWhereUniqueWithoutAuthorInput[]
     updateMany?: CrmNoteUpdateManyWithWhereWithoutAuthorInput | CrmNoteUpdateManyWithWhereWithoutAuthorInput[]
     deleteMany?: CrmNoteScalarWhereInput | CrmNoteScalarWhereInput[]
+  }
+
+  export type AdventureSaveUncheckedUpdateOneWithoutUserNestedInput = {
+    create?: XOR<AdventureSaveCreateWithoutUserInput, AdventureSaveUncheckedCreateWithoutUserInput>
+    connectOrCreate?: AdventureSaveCreateOrConnectWithoutUserInput
+    upsert?: AdventureSaveUpsertWithoutUserInput
+    disconnect?: AdventureSaveWhereInput | boolean
+    delete?: AdventureSaveWhereInput | boolean
+    connect?: AdventureSaveWhereUniqueInput
+    update?: XOR<XOR<AdventureSaveUpdateToOneWithWhereWithoutUserInput, AdventureSaveUpdateWithoutUserInput>, AdventureSaveUncheckedUpdateWithoutUserInput>
   }
 
   export type UserCreateNestedOneWithoutProfileInput = {
@@ -159456,6 +160828,20 @@ export namespace Prisma {
     update?: XOR<XOR<BookingUpdateToOneWithWhereWithoutSignalsInput, BookingUpdateWithoutSignalsInput>, BookingUncheckedUpdateWithoutSignalsInput>
   }
 
+  export type UserCreateNestedOneWithoutAdventureSaveInput = {
+    create?: XOR<UserCreateWithoutAdventureSaveInput, UserUncheckedCreateWithoutAdventureSaveInput>
+    connectOrCreate?: UserCreateOrConnectWithoutAdventureSaveInput
+    connect?: UserWhereUniqueInput
+  }
+
+  export type UserUpdateOneRequiredWithoutAdventureSaveNestedInput = {
+    create?: XOR<UserCreateWithoutAdventureSaveInput, UserUncheckedCreateWithoutAdventureSaveInput>
+    connectOrCreate?: UserCreateOrConnectWithoutAdventureSaveInput
+    upsert?: UserUpsertWithoutAdventureSaveInput
+    connect?: UserWhereUniqueInput
+    update?: XOR<XOR<UserUpdateToOneWithWhereWithoutAdventureSaveInput, UserUpdateWithoutAdventureSaveInput>, UserUncheckedUpdateWithoutAdventureSaveInput>
+  }
+
   export type NestedStringFilter<$PrismaModel = never> = {
     equals?: string | StringFieldRefInput<$PrismaModel>
     in?: string[] | ListStringFieldRefInput<$PrismaModel>
@@ -162308,6 +163694,23 @@ export namespace Prisma {
     skipDuplicates?: boolean
   }
 
+  export type AdventureSaveCreateWithoutUserInput = {
+    version: number
+    doc: JsonNullValueInput | InputJsonValue
+    updatedAt?: Date | string
+  }
+
+  export type AdventureSaveUncheckedCreateWithoutUserInput = {
+    version: number
+    doc: JsonNullValueInput | InputJsonValue
+    updatedAt?: Date | string
+  }
+
+  export type AdventureSaveCreateOrConnectWithoutUserInput = {
+    where: AdventureSaveWhereUniqueInput
+    create: XOR<AdventureSaveCreateWithoutUserInput, AdventureSaveUncheckedCreateWithoutUserInput>
+  }
+
   export type PlayerProfileUpsertWithoutUserInput = {
     update: XOR<PlayerProfileUpdateWithoutUserInput, PlayerProfileUncheckedUpdateWithoutUserInput>
     create: XOR<PlayerProfileCreateWithoutUserInput, PlayerProfileUncheckedCreateWithoutUserInput>
@@ -164210,6 +165613,29 @@ export namespace Prisma {
     updatedAt?: DateTimeFilter<"CrmNote"> | Date | string
   }
 
+  export type AdventureSaveUpsertWithoutUserInput = {
+    update: XOR<AdventureSaveUpdateWithoutUserInput, AdventureSaveUncheckedUpdateWithoutUserInput>
+    create: XOR<AdventureSaveCreateWithoutUserInput, AdventureSaveUncheckedCreateWithoutUserInput>
+    where?: AdventureSaveWhereInput
+  }
+
+  export type AdventureSaveUpdateToOneWithWhereWithoutUserInput = {
+    where?: AdventureSaveWhereInput
+    data: XOR<AdventureSaveUpdateWithoutUserInput, AdventureSaveUncheckedUpdateWithoutUserInput>
+  }
+
+  export type AdventureSaveUpdateWithoutUserInput = {
+    version?: IntFieldUpdateOperationsInput | number
+    doc?: JsonNullValueInput | InputJsonValue
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type AdventureSaveUncheckedUpdateWithoutUserInput = {
+    version?: IntFieldUpdateOperationsInput | number
+    doc?: JsonNullValueInput | InputJsonValue
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type UserCreateWithoutProfileInput = {
     id?: string
     email: string
@@ -164286,6 +165712,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutProfileInput = {
@@ -164364,6 +165791,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutProfileInput = {
@@ -164458,6 +165886,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutProfileInput = {
@@ -164536,6 +165965,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutSessionsInput = {
@@ -164614,6 +166044,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutSessionsInput = {
@@ -164692,6 +166123,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutSessionsInput = {
@@ -164829,6 +166261,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutSessionsInput = {
@@ -164907,6 +166340,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type SessionRunUpsertWithoutGameSessionInput = {
@@ -165034,6 +166468,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutSessionRunsInput = {
@@ -165112,6 +166547,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutSessionRunsInput = {
@@ -165279,6 +166715,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutSessionRunsInput = {
@@ -165357,6 +166794,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type SessionGrantUpsertWithWhereUniqueWithoutRunInput = {
@@ -165502,6 +166940,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutSessionGrantsInput = {
@@ -165580,6 +167019,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutSessionGrantsInput = {
@@ -165717,6 +167157,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutSessionGrantsInput = {
@@ -165795,6 +167236,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type SessionRunUpsertWithoutGrantsInput = {
@@ -165922,6 +167364,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutLedgerInput = {
@@ -166000,6 +167443,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutLedgerInput = {
@@ -166094,6 +167538,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutLedgerInput = {
@@ -166172,6 +167617,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutCardsInput = {
@@ -166250,6 +167696,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutCardsInput = {
@@ -166328,6 +167775,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutCardsInput = {
@@ -166422,6 +167870,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCardsInput = {
@@ -166500,6 +167949,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutStoryProgressInput = {
@@ -166578,6 +168028,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutStoryProgressInput = {
@@ -166656,6 +168107,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutStoryProgressInput = {
@@ -166750,6 +168202,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutStoryProgressInput = {
@@ -166828,6 +168281,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutLessonsInput = {
@@ -166906,6 +168360,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutLessonsInput = {
@@ -166984,6 +168439,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutLessonsInput = {
@@ -167078,6 +168534,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutLessonsInput = {
@@ -167156,6 +168613,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutCellProjectsInput = {
@@ -167234,6 +168692,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutCellProjectsInput = {
@@ -167312,6 +168771,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutCellProjectsInput = {
@@ -167532,6 +168992,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCellProjectsInput = {
@@ -167610,6 +169071,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type CellWisdomUpsertWithWhereUniqueWithoutProjectInput = {
@@ -167811,6 +169273,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutCellApiKeysInput = {
@@ -167889,6 +169352,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutCellApiKeysInput = {
@@ -167983,6 +169447,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCellApiKeysInput = {
@@ -168061,6 +169526,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutCellSettingsInput = {
@@ -168139,6 +169605,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutCellSettingsInput = {
@@ -168217,6 +169684,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutCellSettingsInput = {
@@ -168311,6 +169779,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCellSettingsInput = {
@@ -168389,6 +169858,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type CellProjectCreateWithoutUsagesInput = {
@@ -169134,6 +170604,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutStripeCustomerInput = {
@@ -169212,6 +170683,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutStripeCustomerInput = {
@@ -169306,6 +170778,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutStripeCustomerInput = {
@@ -169384,6 +170857,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutSubscriptionsInput = {
@@ -169462,6 +170936,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutSubscriptionsInput = {
@@ -169540,6 +171015,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutSubscriptionsInput = {
@@ -169634,6 +171110,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutSubscriptionsInput = {
@@ -169712,6 +171189,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutOrdersInput = {
@@ -169790,6 +171268,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutOrdersInput = {
@@ -169868,6 +171347,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutOrdersInput = {
@@ -169962,6 +171442,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutOrdersInput = {
@@ -170040,6 +171521,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutPayoutRequestsInput = {
@@ -170118,6 +171600,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutPayoutRequestsInput = {
@@ -170196,6 +171679,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutPayoutRequestsInput = {
@@ -170290,6 +171774,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutPayoutRequestsInput = {
@@ -170368,6 +171853,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutCreatorListingsInput = {
@@ -170446,6 +171932,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutCreatorListingsInput = {
@@ -170524,6 +172011,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutCreatorListingsInput = {
@@ -170644,6 +172132,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCreatorListingsInput = {
@@ -170722,6 +172211,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type MarketplacePurchaseUpsertWithWhereUniqueWithoutListingInput = {
@@ -170816,6 +172306,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutPartnerKeysInput = {
@@ -170894,6 +172385,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutPartnerKeysInput = {
@@ -171018,6 +172510,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutPartnerKeysInput = {
@@ -171096,6 +172589,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type PartnerUsageUpsertWithWhereUniqueWithoutPartnerKeyInput = {
@@ -171276,6 +172770,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutBuyerPurchasesInput = {
@@ -171354,6 +172849,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutBuyerPurchasesInput = {
@@ -171485,6 +172981,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutBuyerPurchasesInput = {
@@ -171563,6 +173060,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type MarketplaceListingUpsertWithoutPurchasesInput = {
@@ -171755,6 +173253,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutLadderEntriesInput = {
@@ -171833,6 +173332,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutLadderEntriesInput = {
@@ -171958,6 +173458,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutLadderEntriesInput = {
@@ -172036,6 +173537,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutCompetitionMatchesP1Input = {
@@ -172114,6 +173616,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutCompetitionMatchesP1Input = {
@@ -172192,6 +173695,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutCompetitionMatchesP1Input = {
@@ -172275,6 +173779,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutCompetitionMatchesP2Input = {
@@ -172353,6 +173858,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutCompetitionMatchesP2Input = {
@@ -172436,6 +173942,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutCompetitionMatchesWinnerInput = {
@@ -172514,6 +174021,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutCompetitionMatchesWinnerInput = {
@@ -172636,6 +174144,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCompetitionMatchesP1Input = {
@@ -172714,6 +174223,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserUpsertWithoutCompetitionMatchesP2Input = {
@@ -172803,6 +174313,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCompetitionMatchesP2Input = {
@@ -172881,6 +174392,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserUpsertWithoutCompetitionMatchesWinnerInput = {
@@ -172970,6 +174482,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCompetitionMatchesWinnerInput = {
@@ -173048,6 +174561,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type MatchEventUpsertWithWhereUniqueWithoutMatchInput = {
@@ -173201,6 +174715,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutMatchEventsInput = {
@@ -173279,6 +174794,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutMatchEventsInput = {
@@ -173438,6 +174954,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutMatchEventsInput = {
@@ -173516,6 +175033,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutMirrorTriumphsInput = {
@@ -173594,6 +175112,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutMirrorTriumphsInput = {
@@ -173672,6 +175191,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutMirrorTriumphsInput = {
@@ -173766,6 +175286,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutMirrorTriumphsInput = {
@@ -173844,6 +175365,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutPrqEntriesInput = {
@@ -173922,6 +175444,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutPrqEntriesInput = {
@@ -174000,6 +175523,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutPrqEntriesInput = {
@@ -174094,6 +175618,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutPrqEntriesInput = {
@@ -174172,6 +175697,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type PassProgressCreateWithoutSeasonInput = {
@@ -174517,6 +176043,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutWalletInput = {
@@ -174595,6 +176122,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutWalletInput = {
@@ -174723,6 +176251,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutWalletInput = {
@@ -174801,6 +176330,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type WalletLedgerEntryUpsertWithWhereUniqueWithoutWalletInput = {
@@ -174971,6 +176501,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutPerfEarnEventsInput = {
@@ -175049,6 +176580,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutPerfEarnEventsInput = {
@@ -175143,6 +176675,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutPerfEarnEventsInput = {
@@ -175221,6 +176754,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutEntitlementsInput = {
@@ -175299,6 +176833,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutEntitlementsInput = {
@@ -175377,6 +176912,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutEntitlementsInput = {
@@ -175471,6 +177007,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutEntitlementsInput = {
@@ -175549,6 +177086,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutLeadRecordInput = {
@@ -175627,6 +177165,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutLeadRecordInput = {
@@ -175705,6 +177244,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutLeadRecordInput = {
@@ -175799,6 +177339,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutLeadRecordInput = {
@@ -175877,6 +177418,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutReferralCodeInput = {
@@ -175955,6 +177497,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutReferralCodeInput = {
@@ -176033,6 +177576,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutReferralCodeInput = {
@@ -176153,6 +177697,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutReferralCodeInput = {
@@ -176231,6 +177776,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type ReferralConversionUpsertWithWhereUniqueWithoutCodeInput = {
@@ -176389,6 +177935,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutMpMatchesHostInput = {
@@ -176467,6 +178014,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutMpMatchesHostInput = {
@@ -176550,6 +178098,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutMpMatchesGuestInput = {
@@ -176628,6 +178177,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutMpMatchesGuestInput = {
@@ -176722,6 +178272,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutMpMatchesHostInput = {
@@ -176800,6 +178351,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserUpsertWithoutMpMatchesGuestInput = {
@@ -176889,6 +178441,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutMpMatchesGuestInput = {
@@ -176967,6 +178520,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutCreativeCardsInput = {
@@ -177045,6 +178599,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutCreativeCardsInput = {
@@ -177123,6 +178678,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutCreativeCardsInput = {
@@ -177217,6 +178773,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCreativeCardsInput = {
@@ -177295,6 +178852,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutCardSlotInput = {
@@ -177373,6 +178931,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutCardSlotInput = {
@@ -177451,6 +179010,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutCardSlotInput = {
@@ -177545,6 +179105,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCardSlotInput = {
@@ -177623,6 +179184,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutCreatorCardsInput = {
@@ -177701,6 +179263,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutCreatorCardsInput = {
@@ -177779,6 +179342,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutCreatorCardsInput = {
@@ -177873,6 +179437,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCreatorCardsInput = {
@@ -177951,6 +179516,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutWorkoutScansInput = {
@@ -178029,6 +179595,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutWorkoutScansInput = {
@@ -178107,6 +179674,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutWorkoutScansInput = {
@@ -178229,6 +179797,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutWorkoutScansInput = {
@@ -178307,6 +179876,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type WorkoutPlanUpsertWithWhereUniqueWithoutScanInput = {
@@ -178401,6 +179971,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutWorkoutPlansInput = {
@@ -178479,6 +180050,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutWorkoutPlansInput = {
@@ -178596,6 +180168,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutWorkoutPlansInput = {
@@ -178674,6 +180247,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type WorkoutScanUpsertWithoutPlansInput = {
@@ -178781,6 +180355,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutAthleteBuildInput = {
@@ -178859,6 +180434,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutAthleteBuildInput = {
@@ -178953,6 +180529,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutAthleteBuildInput = {
@@ -179031,6 +180608,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutAvatarLookInput = {
@@ -179109,6 +180687,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutAvatarLookInput = {
@@ -179187,6 +180766,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutAvatarLookInput = {
@@ -179281,6 +180861,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutAvatarLookInput = {
@@ -179359,6 +180940,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutOwnedWearablesInput = {
@@ -179437,6 +181019,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutOwnedWearablesInput = {
@@ -179515,6 +181098,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutOwnedWearablesInput = {
@@ -179609,6 +181193,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutOwnedWearablesInput = {
@@ -179687,6 +181272,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutSessionBookingsInput = {
@@ -179765,6 +181351,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutSessionBookingsInput = {
@@ -179843,6 +181430,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutSessionBookingsInput = {
@@ -179937,6 +181525,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutSessionBookingsInput = {
@@ -180015,6 +181604,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type CrmContactCreateWithoutCompanyInput = {
@@ -180215,6 +181805,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutCrmContactLinksInput = {
@@ -180293,6 +181884,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutCrmContactLinksInput = {
@@ -180409,6 +182001,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutCrmContactsInput = {
@@ -180487,6 +182080,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutCrmContactsInput = {
@@ -180687,6 +182281,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCrmContactLinksInput = {
@@ -180765,6 +182360,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type CrmCompanyUpsertWithoutContactsInput = {
@@ -180893,6 +182489,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCrmContactsInput = {
@@ -180971,6 +182568,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type CrmDealUpsertWithWhereUniqueWithoutContactInput = {
@@ -181173,6 +182771,7 @@ export namespace Prisma {
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutCrmDealsInput = {
@@ -181251,6 +182850,7 @@ export namespace Prisma {
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutCrmDealsInput = {
@@ -181497,6 +183097,7 @@ export namespace Prisma {
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCrmDealsInput = {
@@ -181575,6 +183176,7 @@ export namespace Prisma {
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type CrmActivityUpsertWithWhereUniqueWithoutDealInput = {
@@ -181765,6 +183367,7 @@ export namespace Prisma {
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutCrmActivitiesInput = {
@@ -181843,6 +183446,7 @@ export namespace Prisma {
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutCrmActivitiesInput = {
@@ -182029,6 +183633,7 @@ export namespace Prisma {
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCrmActivitiesInput = {
@@ -182107,6 +183712,7 @@ export namespace Prisma {
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type CrmContactCreateWithoutCrmNotesInput = {
@@ -182265,6 +183871,7 @@ export namespace Prisma {
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutCrmNotesInput = {
@@ -182343,6 +183950,7 @@ export namespace Prisma {
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutCrmNotesInput = {
@@ -182529,6 +184137,7 @@ export namespace Prisma {
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCrmNotesInput = {
@@ -182607,6 +184216,7 @@ export namespace Prisma {
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type SessionExerciseCreateWithoutExerciseInput = {
@@ -184090,6 +185700,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutFacilitatorProfileInput = {
@@ -184168,6 +185779,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutFacilitatorProfileInput = {
@@ -184386,6 +185998,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutFacilitatorProfileInput = {
@@ -184464,6 +186077,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type GoalPlanUpsertWithWhereUniqueWithoutFacilitatorProfileInput = {
@@ -184627,6 +186241,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutCredentialsInput = {
@@ -184705,6 +186320,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutCredentialsInput = {
@@ -184799,6 +186415,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCredentialsInput = {
@@ -184877,6 +186494,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutGuardianConsentsInput = {
@@ -184955,6 +186573,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutGuardianConsentsInput = {
@@ -185033,6 +186652,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutGuardianConsentsInput = {
@@ -185127,6 +186747,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutGuardianConsentsInput = {
@@ -185205,6 +186826,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutGoalPlansAsMenteeInput = {
@@ -185283,6 +186905,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutGoalPlansAsMenteeInput = {
@@ -185361,6 +186984,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutGoalPlansAsMenteeInput = {
@@ -185444,6 +187068,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutGoalPlansAsFacilitatorInput = {
@@ -185522,6 +187147,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutGoalPlansAsFacilitatorInput = {
@@ -185693,6 +187319,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutGoalPlansAsMenteeInput = {
@@ -185771,6 +187398,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserUpsertWithoutGoalPlansAsFacilitatorInput = {
@@ -185860,6 +187488,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutGoalPlansAsFacilitatorInput = {
@@ -185938,6 +187567,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type FacilitatorProfileUpsertWithoutGoalPlansInput = {
@@ -186323,6 +187953,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutMirrorSessionsInput = {
@@ -186401,6 +188032,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutMirrorSessionsInput = {
@@ -186495,6 +188127,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutMirrorSessionsInput = {
@@ -186573,6 +188206,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutHealthIntakesInput = {
@@ -186651,6 +188285,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutHealthIntakesInput = {
@@ -186729,6 +188364,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutHealthIntakesInput = {
@@ -186823,6 +188459,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutHealthIntakesInput = {
@@ -186901,6 +188538,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutPainCheckInsInput = {
@@ -186979,6 +188617,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutPainCheckInsInput = {
@@ -187057,6 +188696,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutPainCheckInsInput = {
@@ -187151,6 +188791,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutPainCheckInsInput = {
@@ -187229,6 +188870,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutHealthConsentsInput = {
@@ -187307,6 +188949,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutHealthConsentsInput = {
@@ -187385,6 +189028,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutHealthConsentsInput = {
@@ -187479,6 +189123,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutHealthConsentsInput = {
@@ -187557,6 +189202,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutScanSaveOptInInput = {
@@ -187635,6 +189281,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutScanSaveOptInInput = {
@@ -187713,6 +189360,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutScanSaveOptInInput = {
@@ -187807,6 +189455,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutScanSaveOptInInput = {
@@ -187885,6 +189534,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutReadinessCheckInsInput = {
@@ -187963,6 +189613,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutReadinessCheckInsInput = {
@@ -188041,6 +189692,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutReadinessCheckInsInput = {
@@ -188135,6 +189787,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutReadinessCheckInsInput = {
@@ -188213,6 +189866,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutBreathLogsInput = {
@@ -188291,6 +189945,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutBreathLogsInput = {
@@ -188369,6 +190024,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutBreathLogsInput = {
@@ -188463,6 +190119,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutBreathLogsInput = {
@@ -188541,6 +190198,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutCoachSharesInput = {
@@ -188619,6 +190277,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutCoachSharesInput = {
@@ -188697,6 +190356,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutCoachSharesInput = {
@@ -188791,6 +190451,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCoachSharesInput = {
@@ -188869,6 +190530,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutCoachInvitesInput = {
@@ -188947,6 +190609,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutCoachInvitesInput = {
@@ -189025,6 +190688,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutCoachInvitesInput = {
@@ -189119,6 +190783,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCoachInvitesInput = {
@@ -189197,6 +190862,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutClientsCoachedInput = {
@@ -189275,6 +190941,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutClientsCoachedInput = {
@@ -189353,6 +191020,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutClientsCoachedInput = {
@@ -189436,6 +191104,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutCoachesInput = {
@@ -189514,6 +191183,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutCoachesInput = {
@@ -189608,6 +191278,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutClientsCoachedInput = {
@@ -189686,6 +191357,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserUpsertWithoutCoachesInput = {
@@ -189775,6 +191447,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCoachesInput = {
@@ -189853,6 +191526,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type ProgramAccessCreateWithoutInstructorInput = {
@@ -190643,6 +192317,338 @@ export namespace Prisma {
     cancelledBy?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type UserCreateWithoutAdventureSaveInput = {
+    id?: string
+    email: string
+    name?: string | null
+    password: string
+    role?: string
+    createdAt?: Date | string
+    dobYear?: number | null
+    kycStatus?: string
+    kycProvider?: string | null
+    kycVerifiedAt?: Date | string | null
+    selfExcludedAt?: Date | string | null
+    declaredState?: string | null
+    policyVersion?: string | null
+    policyAcceptedAt?: Date | string | null
+    profile?: PlayerProfileCreateNestedOneWithoutUserInput
+    sessions?: GameSessionCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantCreateNestedManyWithoutUserInput
+    ledger?: CreditLedgerCreateNestedManyWithoutUserInput
+    cards?: CardOwnershipCreateNestedManyWithoutUserInput
+    prqEntries?: PrqEntryCreateNestedManyWithoutUserInput
+    lessons?: LessonProgressCreateNestedManyWithoutUserInput
+    storyProgress?: StoryNodeProgressCreateNestedManyWithoutUserInput
+    cellProjects?: CellProjectCreateNestedManyWithoutUserInput
+    cellApiKeys?: CellApiKeyCreateNestedManyWithoutUserInput
+    cellSettings?: CellSettingsCreateNestedOneWithoutUserInput
+    athleteBuild?: AthleteBuildCreateNestedOneWithoutUserInput
+    stripeCustomer?: StripeCustomerCreateNestedOneWithoutUserInput
+    subscriptions?: SubscriptionCreateNestedManyWithoutUserInput
+    mirrorSessions?: MirrorSessionCreateNestedManyWithoutUserInput
+    orders?: OrderCreateNestedManyWithoutUserInput
+    payoutRequests?: PayoutRequestCreateNestedManyWithoutUserInput
+    creatorListings?: MarketplaceListingCreateNestedManyWithoutCreatorInput
+    buyerPurchases?: MarketplacePurchaseCreateNestedManyWithoutBuyerInput
+    coachShares?: ShareLinkCreateNestedManyWithoutCoachInput
+    coachInvites?: CoachInviteCreateNestedManyWithoutCoachInput
+    clientsCoached?: CoachClientCreateNestedManyWithoutCoachInput
+    coaches?: CoachClientCreateNestedManyWithoutClientInput
+    ladderEntries?: LadderEntryCreateNestedManyWithoutUserInput
+    partnerKeys?: StudioPartnerKeyCreateNestedManyWithoutUserInput
+    competitionMatchesP1?: CompetitionMatchCreateNestedManyWithoutPlayer1Input
+    competitionMatchesP2?: CompetitionMatchCreateNestedManyWithoutPlayer2Input
+    competitionMatchesWinner?: CompetitionMatchCreateNestedManyWithoutWinnerInput
+    matchEvents?: MatchEventCreateNestedManyWithoutUserInput
+    mirrorTriumphs?: MirrorTriumphCreateNestedManyWithoutUserInput
+    wallet?: WalletCreateNestedOneWithoutPlayerInput
+    perfEarnEvents?: PerfEarnEventCreateNestedManyWithoutPlayerInput
+    entitlements?: PlayerEntitlementCreateNestedManyWithoutPlayerInput
+    leadRecord?: MarketingLeadCreateNestedOneWithoutConvertedUserInput
+    referralCode?: ReferralCodeCreateNestedOneWithoutUserInput
+    mpMatchesHost?: MpMatchCreateNestedManyWithoutHostInput
+    mpMatchesGuest?: MpMatchCreateNestedManyWithoutGuestInput
+    creatorCards?: CreatorCardCreateNestedManyWithoutOwnerInput
+    creativeCards?: CreativeCardCreateNestedManyWithoutOwnerInput
+    cardSlot?: CardSlotCreateNestedOneWithoutUserInput
+    workoutScans?: WorkoutScanCreateNestedManyWithoutUserInput
+    workoutPlans?: WorkoutPlanCreateNestedManyWithoutUserInput
+    avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
+    ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
+    sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
+    facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
+    goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
+    goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
+    credentials?: CredentialCreateNestedManyWithoutUserInput
+    guardianConsents?: GuardianConsentCreateNestedManyWithoutMenteeInput
+    healthIntakes?: HealthIntakeCreateNestedManyWithoutUserInput
+    painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
+    healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
+    readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
+    crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
+    crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
+    crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
+    crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
+    crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+  }
+
+  export type UserUncheckedCreateWithoutAdventureSaveInput = {
+    id?: string
+    email: string
+    name?: string | null
+    password: string
+    role?: string
+    createdAt?: Date | string
+    dobYear?: number | null
+    kycStatus?: string
+    kycProvider?: string | null
+    kycVerifiedAt?: Date | string | null
+    selfExcludedAt?: Date | string | null
+    declaredState?: string | null
+    policyVersion?: string | null
+    policyAcceptedAt?: Date | string | null
+    profile?: PlayerProfileUncheckedCreateNestedOneWithoutUserInput
+    sessions?: GameSessionUncheckedCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunUncheckedCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantUncheckedCreateNestedManyWithoutUserInput
+    ledger?: CreditLedgerUncheckedCreateNestedManyWithoutUserInput
+    cards?: CardOwnershipUncheckedCreateNestedManyWithoutUserInput
+    prqEntries?: PrqEntryUncheckedCreateNestedManyWithoutUserInput
+    lessons?: LessonProgressUncheckedCreateNestedManyWithoutUserInput
+    storyProgress?: StoryNodeProgressUncheckedCreateNestedManyWithoutUserInput
+    cellProjects?: CellProjectUncheckedCreateNestedManyWithoutUserInput
+    cellApiKeys?: CellApiKeyUncheckedCreateNestedManyWithoutUserInput
+    cellSettings?: CellSettingsUncheckedCreateNestedOneWithoutUserInput
+    athleteBuild?: AthleteBuildUncheckedCreateNestedOneWithoutUserInput
+    stripeCustomer?: StripeCustomerUncheckedCreateNestedOneWithoutUserInput
+    subscriptions?: SubscriptionUncheckedCreateNestedManyWithoutUserInput
+    mirrorSessions?: MirrorSessionUncheckedCreateNestedManyWithoutUserInput
+    orders?: OrderUncheckedCreateNestedManyWithoutUserInput
+    payoutRequests?: PayoutRequestUncheckedCreateNestedManyWithoutUserInput
+    creatorListings?: MarketplaceListingUncheckedCreateNestedManyWithoutCreatorInput
+    buyerPurchases?: MarketplacePurchaseUncheckedCreateNestedManyWithoutBuyerInput
+    coachShares?: ShareLinkUncheckedCreateNestedManyWithoutCoachInput
+    coachInvites?: CoachInviteUncheckedCreateNestedManyWithoutCoachInput
+    clientsCoached?: CoachClientUncheckedCreateNestedManyWithoutCoachInput
+    coaches?: CoachClientUncheckedCreateNestedManyWithoutClientInput
+    ladderEntries?: LadderEntryUncheckedCreateNestedManyWithoutUserInput
+    partnerKeys?: StudioPartnerKeyUncheckedCreateNestedManyWithoutUserInput
+    competitionMatchesP1?: CompetitionMatchUncheckedCreateNestedManyWithoutPlayer1Input
+    competitionMatchesP2?: CompetitionMatchUncheckedCreateNestedManyWithoutPlayer2Input
+    competitionMatchesWinner?: CompetitionMatchUncheckedCreateNestedManyWithoutWinnerInput
+    matchEvents?: MatchEventUncheckedCreateNestedManyWithoutUserInput
+    mirrorTriumphs?: MirrorTriumphUncheckedCreateNestedManyWithoutUserInput
+    wallet?: WalletUncheckedCreateNestedOneWithoutPlayerInput
+    perfEarnEvents?: PerfEarnEventUncheckedCreateNestedManyWithoutPlayerInput
+    entitlements?: PlayerEntitlementUncheckedCreateNestedManyWithoutPlayerInput
+    leadRecord?: MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput
+    referralCode?: ReferralCodeUncheckedCreateNestedOneWithoutUserInput
+    mpMatchesHost?: MpMatchUncheckedCreateNestedManyWithoutHostInput
+    mpMatchesGuest?: MpMatchUncheckedCreateNestedManyWithoutGuestInput
+    creatorCards?: CreatorCardUncheckedCreateNestedManyWithoutOwnerInput
+    creativeCards?: CreativeCardUncheckedCreateNestedManyWithoutOwnerInput
+    cardSlot?: CardSlotUncheckedCreateNestedOneWithoutUserInput
+    workoutScans?: WorkoutScanUncheckedCreateNestedManyWithoutUserInput
+    workoutPlans?: WorkoutPlanUncheckedCreateNestedManyWithoutUserInput
+    avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
+    ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
+    sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
+    facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
+    goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
+    goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
+    credentials?: CredentialUncheckedCreateNestedManyWithoutUserInput
+    guardianConsents?: GuardianConsentUncheckedCreateNestedManyWithoutMenteeInput
+    healthIntakes?: HealthIntakeUncheckedCreateNestedManyWithoutUserInput
+    painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
+    healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
+    readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
+    crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
+    crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
+    crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
+    crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
+    crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+  }
+
+  export type UserCreateOrConnectWithoutAdventureSaveInput = {
+    where: UserWhereUniqueInput
+    create: XOR<UserCreateWithoutAdventureSaveInput, UserUncheckedCreateWithoutAdventureSaveInput>
+  }
+
+  export type UserUpsertWithoutAdventureSaveInput = {
+    update: XOR<UserUpdateWithoutAdventureSaveInput, UserUncheckedUpdateWithoutAdventureSaveInput>
+    create: XOR<UserCreateWithoutAdventureSaveInput, UserUncheckedCreateWithoutAdventureSaveInput>
+    where?: UserWhereInput
+  }
+
+  export type UserUpdateToOneWithWhereWithoutAdventureSaveInput = {
+    where?: UserWhereInput
+    data: XOR<UserUpdateWithoutAdventureSaveInput, UserUncheckedUpdateWithoutAdventureSaveInput>
+  }
+
+  export type UserUpdateWithoutAdventureSaveInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    name?: NullableStringFieldUpdateOperationsInput | string | null
+    password?: StringFieldUpdateOperationsInput | string
+    role?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    dobYear?: NullableIntFieldUpdateOperationsInput | number | null
+    kycStatus?: StringFieldUpdateOperationsInput | string
+    kycProvider?: NullableStringFieldUpdateOperationsInput | string | null
+    kycVerifiedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    selfExcludedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    declaredState?: NullableStringFieldUpdateOperationsInput | string | null
+    policyVersion?: NullableStringFieldUpdateOperationsInput | string | null
+    policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    profile?: PlayerProfileUpdateOneWithoutUserNestedInput
+    sessions?: GameSessionUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUpdateManyWithoutUserNestedInput
+    ledger?: CreditLedgerUpdateManyWithoutUserNestedInput
+    cards?: CardOwnershipUpdateManyWithoutUserNestedInput
+    prqEntries?: PrqEntryUpdateManyWithoutUserNestedInput
+    lessons?: LessonProgressUpdateManyWithoutUserNestedInput
+    storyProgress?: StoryNodeProgressUpdateManyWithoutUserNestedInput
+    cellProjects?: CellProjectUpdateManyWithoutUserNestedInput
+    cellApiKeys?: CellApiKeyUpdateManyWithoutUserNestedInput
+    cellSettings?: CellSettingsUpdateOneWithoutUserNestedInput
+    athleteBuild?: AthleteBuildUpdateOneWithoutUserNestedInput
+    stripeCustomer?: StripeCustomerUpdateOneWithoutUserNestedInput
+    subscriptions?: SubscriptionUpdateManyWithoutUserNestedInput
+    mirrorSessions?: MirrorSessionUpdateManyWithoutUserNestedInput
+    orders?: OrderUpdateManyWithoutUserNestedInput
+    payoutRequests?: PayoutRequestUpdateManyWithoutUserNestedInput
+    creatorListings?: MarketplaceListingUpdateManyWithoutCreatorNestedInput
+    buyerPurchases?: MarketplacePurchaseUpdateManyWithoutBuyerNestedInput
+    coachShares?: ShareLinkUpdateManyWithoutCoachNestedInput
+    coachInvites?: CoachInviteUpdateManyWithoutCoachNestedInput
+    clientsCoached?: CoachClientUpdateManyWithoutCoachNestedInput
+    coaches?: CoachClientUpdateManyWithoutClientNestedInput
+    ladderEntries?: LadderEntryUpdateManyWithoutUserNestedInput
+    partnerKeys?: StudioPartnerKeyUpdateManyWithoutUserNestedInput
+    competitionMatchesP1?: CompetitionMatchUpdateManyWithoutPlayer1NestedInput
+    competitionMatchesP2?: CompetitionMatchUpdateManyWithoutPlayer2NestedInput
+    competitionMatchesWinner?: CompetitionMatchUpdateManyWithoutWinnerNestedInput
+    matchEvents?: MatchEventUpdateManyWithoutUserNestedInput
+    mirrorTriumphs?: MirrorTriumphUpdateManyWithoutUserNestedInput
+    wallet?: WalletUpdateOneWithoutPlayerNestedInput
+    perfEarnEvents?: PerfEarnEventUpdateManyWithoutPlayerNestedInput
+    entitlements?: PlayerEntitlementUpdateManyWithoutPlayerNestedInput
+    leadRecord?: MarketingLeadUpdateOneWithoutConvertedUserNestedInput
+    referralCode?: ReferralCodeUpdateOneWithoutUserNestedInput
+    mpMatchesHost?: MpMatchUpdateManyWithoutHostNestedInput
+    mpMatchesGuest?: MpMatchUpdateManyWithoutGuestNestedInput
+    creatorCards?: CreatorCardUpdateManyWithoutOwnerNestedInput
+    creativeCards?: CreativeCardUpdateManyWithoutOwnerNestedInput
+    cardSlot?: CardSlotUpdateOneWithoutUserNestedInput
+    workoutScans?: WorkoutScanUpdateManyWithoutUserNestedInput
+    workoutPlans?: WorkoutPlanUpdateManyWithoutUserNestedInput
+    avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
+    ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
+    sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
+    facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
+    goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
+    goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
+    credentials?: CredentialUpdateManyWithoutUserNestedInput
+    guardianConsents?: GuardianConsentUpdateManyWithoutMenteeNestedInput
+    healthIntakes?: HealthIntakeUpdateManyWithoutUserNestedInput
+    painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
+    healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
+    readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
+    crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
+    crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
+    crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
+    crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
+    crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+  }
+
+  export type UserUncheckedUpdateWithoutAdventureSaveInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    name?: NullableStringFieldUpdateOperationsInput | string | null
+    password?: StringFieldUpdateOperationsInput | string
+    role?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    dobYear?: NullableIntFieldUpdateOperationsInput | number | null
+    kycStatus?: StringFieldUpdateOperationsInput | string
+    kycProvider?: NullableStringFieldUpdateOperationsInput | string | null
+    kycVerifiedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    selfExcludedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    declaredState?: NullableStringFieldUpdateOperationsInput | string | null
+    policyVersion?: NullableStringFieldUpdateOperationsInput | string | null
+    policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    profile?: PlayerProfileUncheckedUpdateOneWithoutUserNestedInput
+    sessions?: GameSessionUncheckedUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUncheckedUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUncheckedUpdateManyWithoutUserNestedInput
+    ledger?: CreditLedgerUncheckedUpdateManyWithoutUserNestedInput
+    cards?: CardOwnershipUncheckedUpdateManyWithoutUserNestedInput
+    prqEntries?: PrqEntryUncheckedUpdateManyWithoutUserNestedInput
+    lessons?: LessonProgressUncheckedUpdateManyWithoutUserNestedInput
+    storyProgress?: StoryNodeProgressUncheckedUpdateManyWithoutUserNestedInput
+    cellProjects?: CellProjectUncheckedUpdateManyWithoutUserNestedInput
+    cellApiKeys?: CellApiKeyUncheckedUpdateManyWithoutUserNestedInput
+    cellSettings?: CellSettingsUncheckedUpdateOneWithoutUserNestedInput
+    athleteBuild?: AthleteBuildUncheckedUpdateOneWithoutUserNestedInput
+    stripeCustomer?: StripeCustomerUncheckedUpdateOneWithoutUserNestedInput
+    subscriptions?: SubscriptionUncheckedUpdateManyWithoutUserNestedInput
+    mirrorSessions?: MirrorSessionUncheckedUpdateManyWithoutUserNestedInput
+    orders?: OrderUncheckedUpdateManyWithoutUserNestedInput
+    payoutRequests?: PayoutRequestUncheckedUpdateManyWithoutUserNestedInput
+    creatorListings?: MarketplaceListingUncheckedUpdateManyWithoutCreatorNestedInput
+    buyerPurchases?: MarketplacePurchaseUncheckedUpdateManyWithoutBuyerNestedInput
+    coachShares?: ShareLinkUncheckedUpdateManyWithoutCoachNestedInput
+    coachInvites?: CoachInviteUncheckedUpdateManyWithoutCoachNestedInput
+    clientsCoached?: CoachClientUncheckedUpdateManyWithoutCoachNestedInput
+    coaches?: CoachClientUncheckedUpdateManyWithoutClientNestedInput
+    ladderEntries?: LadderEntryUncheckedUpdateManyWithoutUserNestedInput
+    partnerKeys?: StudioPartnerKeyUncheckedUpdateManyWithoutUserNestedInput
+    competitionMatchesP1?: CompetitionMatchUncheckedUpdateManyWithoutPlayer1NestedInput
+    competitionMatchesP2?: CompetitionMatchUncheckedUpdateManyWithoutPlayer2NestedInput
+    competitionMatchesWinner?: CompetitionMatchUncheckedUpdateManyWithoutWinnerNestedInput
+    matchEvents?: MatchEventUncheckedUpdateManyWithoutUserNestedInput
+    mirrorTriumphs?: MirrorTriumphUncheckedUpdateManyWithoutUserNestedInput
+    wallet?: WalletUncheckedUpdateOneWithoutPlayerNestedInput
+    perfEarnEvents?: PerfEarnEventUncheckedUpdateManyWithoutPlayerNestedInput
+    entitlements?: PlayerEntitlementUncheckedUpdateManyWithoutPlayerNestedInput
+    leadRecord?: MarketingLeadUncheckedUpdateOneWithoutConvertedUserNestedInput
+    referralCode?: ReferralCodeUncheckedUpdateOneWithoutUserNestedInput
+    mpMatchesHost?: MpMatchUncheckedUpdateManyWithoutHostNestedInput
+    mpMatchesGuest?: MpMatchUncheckedUpdateManyWithoutGuestNestedInput
+    creatorCards?: CreatorCardUncheckedUpdateManyWithoutOwnerNestedInput
+    creativeCards?: CreativeCardUncheckedUpdateManyWithoutOwnerNestedInput
+    cardSlot?: CardSlotUncheckedUpdateOneWithoutUserNestedInput
+    workoutScans?: WorkoutScanUncheckedUpdateManyWithoutUserNestedInput
+    workoutPlans?: WorkoutPlanUncheckedUpdateManyWithoutUserNestedInput
+    avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
+    ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
+    sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
+    facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
+    goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
+    goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
+    credentials?: CredentialUncheckedUpdateManyWithoutUserNestedInput
+    guardianConsents?: GuardianConsentUncheckedUpdateManyWithoutMenteeNestedInput
+    healthIntakes?: HealthIntakeUncheckedUpdateManyWithoutUserNestedInput
+    painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
+    healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
+    readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
+    crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
+    crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
+    crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
+    crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
+    crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
   }
 
   export type GameSessionCreateManyUserInput = {
