@@ -52,6 +52,8 @@ export interface StoryPort {
   grantXp(amount: number): void;
   /** The progress is worth keeping now (a checkpoint, a beat, the chapter's end). */
   save(reason: 'beat' | 'checkpoint' | 'chapter'): void;
+  /** A scene starts: bodies already down are cleared away now (a corpse must not fill the cutscene's frame). */
+  clearFallen?(): void;
 }
 
 export type RunnerEvent =
@@ -186,6 +188,7 @@ export class ChapterRunner {
     if (b.checkpoint) story.checkpoint = { worldId: b.checkpoint.worldId, spawnId: b.checkpoint.spawnId };
     this.emit({ kind: 'beat', beatId: b.id, beatKind: b.kind });
     const port = this.o.port;
+    if (b.kind === 'cutscene' || b.kind === 'dialogue' || b.kind === 'choice') port.clearFallen?.();
     switch (b.kind) {
       case 'cutscene': {
         const f = port.focusOf(b.focus ?? 'player', b.focusSpawn);

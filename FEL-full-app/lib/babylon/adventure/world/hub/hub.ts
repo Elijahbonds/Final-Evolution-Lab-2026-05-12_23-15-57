@@ -54,8 +54,8 @@ export function buildHub(): StoryWorldSpec {
       { id: 'gate.w3', label: '[PLACEHOLDER] World 3', pos: v3(22, 0, 4), radius: 2.6, to: null },
     ],
     decor: [
-      { x: 0, z: -11.2, w: 1.2, d: 1.2, h: 2.4, y: 0.3, color: '#38bdf8' },  // the save beacon
-      { x: -3, z: -14, w: 3, d: 2, h: 0.5, color: '#a16207' },             // the partner's nest
+      { x: 6, z: -9, w: 1.2, d: 1.2, h: 2.4, color: '#38bdf8' },     // the save beacon (off the home spawn's camera line)
+      { x: -7, z: -9, w: 3, d: 2, h: 0.5, color: '#a16207' },              // the partner's nest
     ],
   };
 }

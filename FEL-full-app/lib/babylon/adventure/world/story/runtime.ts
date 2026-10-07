@@ -132,6 +132,16 @@ export class StoryRuntime implements StoryPort {
   grantXp(amount: number): void { if (amount > 0) this.host.bus.emit('xp', { actorId: this.host.playerId, amount, source: 'story' }); }
   save(reason: 'beat' | 'checkpoint' | 'chapter'): void { this.hooks.onSave?.(reason); }
 
+  /** Clear away every downed encounter body now (a scene is starting). */
+  clearFallen(): void {
+    for (const l of [...this.live.values(), ...this.world.values()]) {
+      for (const id of l.ids) {
+        const a = this.host.world.actors.get(id);
+        if (a && !(a.stats.hp.cur > 0)) { this.host.despawn(id); this.downAt.delete(id); }
+      }
+    }
+  }
+
   /** How many bodies are in the scene now (the body budget). */
   bodies(): number { return this.host.world.actors.size; }
 

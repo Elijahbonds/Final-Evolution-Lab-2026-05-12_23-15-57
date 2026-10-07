@@ -16,8 +16,8 @@ import type { HubGates } from '../../story/gates';
 
 /** Per world: the ground, the raised blocks, the walls. Placeholder palette. [PLACEHOLDER] */
 const LOOK: Readonly<Record<string, { ground: string; block: string; wall: string }>> = {
-  hub: { ground: '#4b5563', block: '#6b7280', wall: '#94a3b8' },
-  w1: { ground: '#3f4a3a', block: '#57534e', wall: '#a8a29e' },
+  hub: { ground: '#334155', block: '#475569', wall: '#94a3b8' },
+  w1: { ground: '#2f3a2c', block: '#57534e', wall: '#a8a29e' },
 };
 const DEFAULT_LOOK = { ground: '#3f3f46', block: '#52525b', wall: '#a1a1aa' };
 /** The slab under a flat, metres (the cliff a void shows). [TUNE] */

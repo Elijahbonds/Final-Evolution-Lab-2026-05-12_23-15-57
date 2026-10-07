@@ -24,7 +24,7 @@
 //
 // Nothing on screen during play but the HUD (owner rule): no banners, callouts or hints from this mode.
 
-import { TransformNode, Vector3, type Scene } from '@babylonjs/core';
+import { TransformNode, Vector3, type AbstractMesh, type Scene } from '@babylonjs/core';
 import type { ModeContext, ModeDefinition, BodyView } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import type { BodyEvent } from '@/lib/pose/BodyReader';
@@ -446,6 +446,10 @@ interface StoryState {
   chapterTitle: string | null;
   placeholder: boolean;
   budgetIn: St['budgetIn'];
+  /** Mounted by a probe at `?beat=`: never stored. */
+  probe: boolean;
+  /** The harness's backdrop meshes (found once), carried with the camera. */
+  sky?: AbstractMesh[];
 }
 
 const stories = new WeakMap<Scene, StoryState>();
@@ -459,6 +463,7 @@ const STORY_SPEAKER: StorySpeaker = {
 };
 
 function storeStory(T: StoryState, save?: AdventureSave): void {
+  if (T.probe) return;   // a probe's resumed copy never overwrites the player's save
   try { storeStorySave(save ?? T.session.progressSave(), { now: Date.now(), who: storyUi.who }); } catch { /* best-effort: the device store */ }
 }
 
@@ -468,6 +473,15 @@ async function loadStory(ctx: ModeContext): Promise<void> {
   // the page's first-run picker writes the partner before START; a direct mount without one gets the default creature
   // (assumption: the probe and /dev/mode mounts), never stored until the session saves
   if (!loaded.partner) loaded.partner = partnerFromPick({ kind: 'creature', speciesId: 'strideraptor' });
+  // ?beat=<id> (a probe's seam: the perf sweep measures a camp, not the hub): Chapter 1 resumed at that beat, at the
+  // last checkpoint before it, through the real resume path; nothing of it is saved
+  const probeBeat = param('beat');
+  const ch1 = probeBeat ? chapterById('ch01') : null;
+  const at = ch1 ? ch1.beats.findIndex((b) => b.id === probeBeat) : -1;
+  if (ch1 && at >= 0) {
+    const cp = ch1.beats.slice(0, at + 1).reverse().find((b) => b.checkpoint)?.checkpoint ?? null;
+    loaded.story = { ...loaded.story, chapterId: ch1.id, beatId: probeBeat, checkpoint: cp, flags: {} };
+  }
   const seedQ = Number(param('seed'));
   let T: StoryState | null = null;
   const session = new StorySession({
@@ -521,7 +535,7 @@ async function loadStory(ctx: ModeContext): Promise<void> {
     sparks: new GrindSparksView(scene, me.root, 'player'), speed: new SpeedFlightView(scene, ctx.camera, 'player'),
     stickL: { x: 0, y: 0 }, stickR: { x: 0, y: 0 }, latchedYaw: null, baseFov: ctx.camera.fov, fovBoost: 0,
     hudSec: 0, uiSec: 0, saveSec: 0, frame: 0, lastHud: '', mirror: session.save.settings.mirror === true, preset: 'runner', rigKey: '',
-    snap: true, flight: flightUnlockedIn(session.save.story.flags), demo: null, offKeys: null,
+    snap: true, flight: flightUnlockedIn(session.save.story.flags), demo: null, offKeys: null, probe: at >= 0,
     chapterTitle: chapter?.title ?? null, placeholder: !!chapter?.placeholder,
     budgetIn: {
       tier: (scene.metadata as { felTier?: 'mobile' | 'desktop' } | undefined)?.felTier ?? 'desktop',
@@ -692,6 +706,11 @@ function storySync(ctx: ModeContext, T: StoryState, dt: number): void {
       objective: s.runner.objective(), chapterTitle: T.chapterTitle, placeholderChapter: T.placeholder, mirror: T.mirror, storyMode: s.storyMode,
     });
   }
+
+  // the harness's painted sky is a 280 m dome round the origin; the story's worlds reach 600 m out, so the sky travels
+  // with the camera on the ground plane (a skybox's rule) instead of the camera leaving it
+  if (!T.sky) T.sky = ['bk_dome', 'bk_ring'].map((n) => scene.getMeshByName(n)).filter((m): m is NonNullable<typeof m> => !!m);
+  for (const m of T.sky) { m.position.x = ctx.camera.position.x; m.position.z = ctx.camera.position.z; }
 
   T.budgetIn.eye = me.pos;
   T.budget.update(h.world.actors.values(), dt, T.budgetIn);

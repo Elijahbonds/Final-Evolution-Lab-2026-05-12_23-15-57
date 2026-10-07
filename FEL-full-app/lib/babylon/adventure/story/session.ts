@@ -85,7 +85,7 @@ export class StorySession {
         startEncounter: (id) => this.runtime.startEncounter(id), encounterCleared: (id) => this.runtime.encounterCleared(id),
         bossOf: (id) => this.runtime.bossOf(id), storyFuse: () => this.runtime.storyFuse(), fused: () => this.runtime.fused(),
         partnerName: () => this.runtime.partnerName(), partnerElement: () => this.runtime.partnerElement(),
-        grantXp: (n) => this.runtime.grantXp(n), save: (r) => this.persist(r),
+        grantXp: (n) => this.runtime.grantXp(n), save: (r) => this.persist(r), clearFallen: () => this.runtime.clearFallen(),
       },
       cast: this.index.cast,
       voice: o.voice ?? null,
