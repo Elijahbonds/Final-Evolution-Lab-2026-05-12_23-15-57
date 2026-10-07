@@ -149,7 +149,16 @@ Each take saves the rate that phone really managed, so the report can show what 
 
 ## 9. Ingest, then replay every grader
 
-From `FEL-full-app/`:
+**A dry run first (optional, 2 minutes, no phones).** This writes two synthetic recorder files, built from the app's
+own synthetic bodies (no person), and puts them through the same steps:
+
+```
+npx tsx scripts/mirror-capture.ts demo --out ~/FEL-captures/demo
+npx tsx scripts/mirror-capture.ts ingest ~/FEL-captures/demo/*.json --out ~/FEL-captures/demo/fixtures
+npx tsx scripts/mirror-capture.ts report --dir ~/FEL-captures/demo/fixtures
+```
+
+For the real files, from `FEL-full-app/`:
 
 ```
 npx tsx scripts/mirror-capture.ts ingest ~/FEL-captures/fel-capture-*.json

@@ -284,7 +284,8 @@ describe('it never edits a threshold', () => {
       expect(readFileSync(join(__dirname, f), 'utf8'), f).not.toMatch(/node:fs|writeFile|require\(['"]fs/);
     }
     const script = readFileSync(join(APP, 'scripts/mirror-capture.ts'), 'utf8');
-    expect([...script.matchAll(/writeFileSync\(([^,]+),/g)].map((m) => m[1].trim()).sort()).toEqual(['json', 'out']);
+    expect([...script.matchAll(/writeFileSync\(([^,]+),/g)].map((m) => m[1].trim()).sort()).toEqual(['json', 'out', 'path']);
+    expect(script).toMatch(/reportPathOk\(join\(out, 'x\.json'\), '\.json'\)/);   // demo: synthetic files only, never into lib/
     expect(script).toMatch(/reportPathOk\(out, '\.md'\)/);
     expect(script).toMatch(/reportPathOk\(json, '\.json'\)/);
   });

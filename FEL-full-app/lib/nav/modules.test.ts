@@ -118,9 +118,6 @@ const KNOWN_ORPHANS: readonly string[] = [
   'lib/babylon/platform/GenerationService.ts',
   'lib/babylon/server/subscriptionApi.ts',
   'lib/locomotion/moves/MoveGraph.ts',
-  // MIRROR-COACH P4 (2026-09-25/29): the hinge-and-setup lane's own fixture builder for lib/mirror/hingeAudit.ts /
-  // setupLine.ts's tests, landed the same day as this line, not this lane's (registry-and-lunge) file to wire up.
-  'lib/mirror/fixtures/hingeSetupBuild.ts',
   // Everything else.
   'lib/cache/asset-cache.ts',
   'lib/competition/payoutMethods.ts',

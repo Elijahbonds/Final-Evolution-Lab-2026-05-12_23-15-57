@@ -144,6 +144,20 @@ const median = (v: number[]) => {
   return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
 };
 
+/**
+ * A new frame rate for a live track, keeping the picture's size and facing as ideals: applyConstraints REPLACES the
+ * whole constraint set, so a bare { frameRate } would let the camera pick any size (MIRROR PHASE 3).
+ */
+function rateConstraints(track: MediaStreamTrack, fps: number): MediaTrackConstraints {
+  const s: MediaTrackSettings = track.getSettings?.() ?? {};
+  return {
+    ...(s.facingMode ? { facingMode: s.facingMode } : {}),
+    ...(s.width ? { width: { ideal: s.width } } : {}),
+    ...(s.height ? { height: { ideal: s.height } } : {}),
+    frameRate: { ideal: fps },
+  };
+}
+
 function readCamera(track: MediaStreamTrack | undefined, video: HTMLVideoElement): PoseCameraInfo {
   const s: MediaTrackSettings = track?.getSettings?.() ?? {};
   // The video's own size wins: it is the picture the model sees and the landmarks are normalised to, while a phone's
@@ -434,7 +448,7 @@ export class PoseService {
     const track = this.stream.getVideoTracks()[0];
     let cameraFps: number | null = null;
     try {
-      await track?.applyConstraints?.({ frameRate: { ideal: HIGH_RATE_FPS } });
+      await track?.applyConstraints?.(rateConstraints(track, HIGH_RATE_FPS));
     } catch (e) {
       this.deps.warn('[FEL-POSE] the camera would not change its rate', e);   // it keeps its rate; the trial measures it
     }
@@ -458,7 +472,7 @@ export class PoseService {
     this.resetRate();
     const track = this.stream?.getVideoTracks()[0];
     try {
-      void track?.applyConstraints?.({ frameRate: { ideal: CAMERA_FPS } })?.catch?.(() => { /* keeps its rate; thinned anyway */ });
+      void track?.applyConstraints?.(rateConstraints(track, CAMERA_FPS))?.catch?.(() => { /* keeps its rate; thinned anyway */ });
     } catch { /* keeps its rate; thinned anyway */ }
   }
 
@@ -482,7 +496,7 @@ export class PoseService {
     this._rate = { ...this._rate, mode: 'fallback', why: trial.why };
     const track = this.stream?.getVideoTracks()[0];
     try {
-      void track?.applyConstraints?.({ frameRate: { ideal: CAMERA_FPS } })?.catch?.(() => { /* keeps its rate; thinned anyway */ });
+      void track?.applyConstraints?.(rateConstraints(track, CAMERA_FPS))?.catch?.(() => { /* keeps its rate; thinned anyway */ });
     } catch { /* keeps its rate; thinned anyway */ }
   }
 

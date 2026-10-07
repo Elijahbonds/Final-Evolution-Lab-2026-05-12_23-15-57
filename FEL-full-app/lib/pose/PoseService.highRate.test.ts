@@ -94,7 +94,7 @@ describe('the jump test\'s higher pose rate (T5 opt-in)', () => {
     const asked = await r.svc.requestHighRate();
     expect(asked.mode).toBe('trial');
     expect(asked.cameraFps).toBe(60);
-    expect(r.track.asked.at(-1)).toEqual({ frameRate: { ideal: 60 } });
+    expect(r.track.asked.at(-1)).toEqual({ width: { ideal: 480 }, height: { ideal: 640 }, frameRate: { ideal: 60 } });   // the size kept
     r.frames(HIGH_RATE_WARMUP + HIGH_RATE_SAMPLES + 30);
     expect(r.svc.rate.mode).toBe('high');
     expect(r.svc.rate.why).toMatch(/60 Hz/);
@@ -108,7 +108,7 @@ describe('the jump test\'s higher pose rate (T5 opt-in)', () => {
     r.frames(HIGH_RATE_WARMUP + HIGH_RATE_SAMPLES + 2);
     expect(r.svc.rate.mode).toBe('fallback');
     expect(r.svc.rate.why).toMatch(/ms a detect/);
-    expect(r.track.asked.at(-1)).toEqual({ frameRate: { ideal: 30 } });
+    expect(r.track.asked.at(-1)).toMatchObject({ width: { ideal: 480 }, height: { ideal: 640 }, frameRate: { ideal: 30 } });
     const before = r.delivered.length;
     r.frames(60, 60);   // whatever the camera still sends, thinned to 30 again
     expect(r.delivered.length - before).toBeLessThanOrEqual(31);
@@ -150,7 +150,7 @@ describe('the jump test\'s higher pose rate (T5 opt-in)', () => {
     expect(r.svc.rate.mode).toBe('high');
     r.svc.endHighRate();
     expect(r.svc.rate.mode).toBe('standard');
-    expect(r.track.asked.at(-1)).toEqual({ frameRate: { ideal: 30 } });
+    expect(r.track.asked.at(-1)).toMatchObject({ width: { ideal: 480 }, height: { ideal: 640 }, frameRate: { ideal: 30 } });
     const before = r.delivered.length;
     r.frames(60, 60);
     expect(r.delivered.length - before).toBeLessThanOrEqual(31);

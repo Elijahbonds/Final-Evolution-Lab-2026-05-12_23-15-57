@@ -126,10 +126,16 @@ export default function PoseRecorder() {
   setRef.current = set;
   leadInRef.current = leadIn;
 
-  /** The capture set's jump takes ask the camera for 60 fps; everything else for the usual 30. Never fails a take. */
+  /** The camera request this session opened with (the capture set re-asks it with a new frame rate). */
+  const videoAskRef = useRef<MediaTrackConstraints | null>(null);
+  /**
+   * The capture set's jump takes ask the camera for 60 fps, everything else for 30, keeping the opening request's size
+   * (applyConstraints replaces the whole set). Never fails a take. The movement-play set never re-asks.
+   */
   const askRate = (fps: number) => {
+    if (setRef.current !== 'capture' || !videoAskRef.current) return;
     const track = streamRef.current?.getVideoTracks()[0];
-    try { void track?.applyConstraints?.({ frameRate: { ideal: fps } })?.catch(() => { /* keeps its rate; the take logs it */ }); } catch { /* same */ }
+    try { void track?.applyConstraints?.({ ...videoAskRef.current, frameRate: { ideal: fps } })?.catch(() => { /* keeps its rate; the take logs it */ }); } catch { /* same */ }
   };
 
   // ── sound: a beep per count, so the owner does not have to read the screen mid-move ──
@@ -197,6 +203,7 @@ export default function PoseRecorder() {
       const video: MediaTrackConstraints = setRef.current === 'capture'
         ? cameraConstraints(deviceClass({ userAgent: navigator.userAgent, maxTouchPoints: navigator.maxTouchPoints }), window.matchMedia?.('(orientation: portrait)').matches ?? false)
         : { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } };
+      videoAskRef.current = video;
       stream = await navigator.mediaDevices.getUserMedia({ video, audio: false });
     } catch (e) {
       if (!aliveRef.current) return;
