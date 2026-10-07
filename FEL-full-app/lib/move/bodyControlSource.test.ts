@@ -314,9 +314,9 @@ describe('lost from the frame: the body lets go', () => {
 
 // ── the modes ────────────────────────────────────────────────────────────────────────────────────────────────────
 
-describe('1v1 offers body play through the hero\'s ControlSource', () => {
+describe('1v1 and 3v3 offer body play through the hero\'s ControlSource', () => {
   it('the card is play, with the readable set\'s lines', () => {
-    for (const modeId of ['onevone']) {
+    for (const modeId of ['onevone', 'threevthree']) {
       const seam = bodySeamFor({ modeId, body: COURT_BODY, onBody: () => true });
       expect(seam.drives).toBe(true);
       expect(bodyPlayOffer(seam.card)).toBe('play');
@@ -333,6 +333,13 @@ describe('1v1 offers body play through the hero\'s ControlSource', () => {
     expect(one).toContain("role: () => (possession === 'mine' ? 'offense' : 'defense')");
     expect(one).toContain('body: COURT_BODY,');
     expect(one).toContain('bodyCtl?.see(ev, view) ?? false');
+    const three = readFileSync(join(ROOT, 'lib/babylon/modes/ThreeVThreeMode.ts'), 'utf8');
+    expect(three).toContain("new PlayerSlot('me', agentCtl ?? (bodyCtl ? new MergedControlSource(localSource, bodyCtl) : localSource), true)");
+    expect(three).toContain("role: () => (carrierId === 'foeTeam' ? 'defense' : 'offense')");
+    expect(three).toContain('body: COURT_BODY,');
+    expect(three).toContain('bodyCtl?.see(ev, view) ?? false');
+    // teammates stay AI: only the hero's slot takes the body
+    expect(three.match(/MergedControlSource\(/g)?.length).toBe(1);
   });
 });
 
@@ -365,7 +372,7 @@ describe('a minor or an unknown age: the 1v1 / 3v3 camera waits for the grown-up
     } finally { writer.unmount(); }
   }
 
-  it.each(['onevone'])('%s, a 13-year-old: no camera and no pause until the grown-up ticks', async (modeId) => {
+  it.each(['onevone', 'threevthree'])('%s, a 13-year-old: no camera and no pause until the grown-up ticks', async (modeId) => {
     const r = await begin(modeId, { dobYear: 2013 });
     expect(r.action).toBe('begin-paused');
     expect(r.calls).toEqual([]);
@@ -374,7 +381,7 @@ describe('a minor or an unknown age: the 1v1 / 3v3 camera waits for the grown-up
     expect(r.after).toContain('start');
   });
 
-  it.each(['onevone'])('%s, age unknown: the same wait', async (modeId) => {
+  it.each(['onevone', 'threevthree'])('%s, age unknown: the same wait', async (modeId) => {
     const r = await begin(modeId, {});
     expect(r.calls).toEqual([]);
     expect(r.grownUp).toBe('ask');
