@@ -143,6 +143,8 @@ function allowed(w: Write): string | null {
   if (pool && w.writer === 'partner' && typeof w.now === 'number' && typeof w.was === 'number' && w.now < w.was
     && w.now <= (w.actor.stats as unknown as Record<string, { max: number }>)[pool[1]].max + 1e-9) return 'pool-invariant';
   if (w.writer === 'partner' && w.actor.kind === 'partner' && /^(pos|vel)(\.|$)/.test(w.path)) return 'fused-partner';
+  // the partner's bled-out stand-up: stepRevive calls onBleedOut, and the story runtime's placeBeside stands the partner back up
+  if (w.writer === 'partner' && w.actor.kind === 'partner' && /^(facingYaw|state|stateSec)$/.test(w.path)) return 'bleed-out-respawn';
   if (w.writer === 'movement' && (w.path === 'impulse' || w.path === 'warp') && w.now === null) return 'consumed';
   return null;
 }
