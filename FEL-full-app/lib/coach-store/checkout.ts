@@ -8,7 +8,7 @@ import { attachListingMatches, type PartListingMatch } from './bundleParts';
 import { isAllowlistedCoach } from './coaches';
 import * as bundlePolicy from './bundlePolicy';
 import { missingBundleParts, ownedBundleParts, productsGrantedBy } from './entitlement';
-import { isMissingTable, logStoreUnavailable, reviewsCanBeSold } from './gate';
+import { isMissingTable, logStoreUnavailable, reviewsCanBeSold, storeClosed } from './gate';
 import { itemKeyFor, parseManifest, priceOk, programComingSoon, type CoachManifest } from './manifest';
 import { checkoutExpiresAtUnix, holdExpiresAt } from './policy';
 import { shareWithCoachAllowed } from './rescreen';
@@ -56,10 +56,11 @@ async function customerId(userId: string, stripe: Stripe): Promise<string> {
 export async function startCheckout(userId: string, body: CheckoutBody, origin: string): Promise<NextResponse> {
   const paymentsOff = !process.env.COACH_STORE_PAYMENTS_ENABLED || !['1', 'true', 'on', 'yes'].includes((process.env.COACH_STORE_PAYMENTS_ENABLED ?? '').toLowerCase());
   if (paymentsOff) {
-    return NextResponse.json({ error: 'payments_not_set_up', message: 'payments not set up' }, { status: 503 });
+    return storeClosed('payments_off');
   }
   const gate = stripeTestGate();
-  if (!gate.ok) return NextResponse.json({ error: gate.error, message: gate.message }, { status: gate.status });
+  // STORE-READY B2: a not-ok gate is 409 store_closed BEFORE getStripe() can throw for a missing key.
+  if (!gate.ok) return storeClosed(gate.reason);
   if (!(await isVerifiedAdult(prisma, userId))) {
     return NextResponse.json({ error: 'adults_only' }, { status: 403 });
   }

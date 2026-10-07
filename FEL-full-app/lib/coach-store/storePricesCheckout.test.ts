@@ -22,6 +22,8 @@ vi.mock('@/lib/db', () => ({
   prisma: new Proxy({}, { get: (_t, p) => (p === 'then' ? undefined : spyPrisma(h.db)[p]) }),
 }));
 vi.mock('./adult', () => ({ isVerifiedAdult: async () => h.isAdult }));
+// STORE-READY B2: the gate's not-ok shape changed (error 'store_closed' + a reason, status 409); the ok shape the
+// checkout path consumes is unchanged, so the mock keeps the stripeTestGate export name and ok:true form.
 vi.mock('./stripeMode', () => ({ stripeTestGate: () => ({ ok: true, key: 'sk_test_fake' }) }));
 vi.mock('@/lib/stripe', () => ({ getStripe: () => h.stripe }));
 vi.mock('./bundlePolicy', () => ({

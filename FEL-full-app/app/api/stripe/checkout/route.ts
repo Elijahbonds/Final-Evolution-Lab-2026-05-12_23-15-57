@@ -8,6 +8,9 @@ import { getStripe, STRIPE_PRODUCTS, COSMETIC_SKUS } from '@/lib/stripe';
 import { STUDIO_CREDIT_PACKS } from '@/lib/studio-plan';
 import { isStudioCreatorEnabled } from '@/lib/flags';
 import { paymentMethodsFor } from '@/lib/stripe-payment-methods';   // Cash App / BNPL / PayPal where each is actually supported
+import { stripeTestGate } from '@/lib/coach-store/stripeMode';
+import { storeClosed } from '@/lib/coach-store/gate';
+import { siteOrigin } from '@/lib/stripe/site-origin';
 import { previewPurchase } from '@/lib/store/coachListing';
 import { loadSharedProfile } from '@/lib/profile/profileServer';
 import { PLATFORM_PROTOCOLS } from '@/lib/profile/protocol';
@@ -28,7 +31,12 @@ export async function POST(req: NextRequest) {
 
   if (!product) return NextResponse.json({ error: 'product required' }, { status: 400 });
 
-  const origin = req.headers.get('origin') || process.env.NEXTAUTH_URL || '';
+  // STORE-READY B2: no usable key is 409 store_closed BEFORE getStripe() can throw (it used to 500 unhandled).
+  const gate = stripeTestGate();
+  if (!gate.ok) return storeClosed(gate.reason);
+  // STORE-READY B3: Stripe URLs come from the server constant NEXTAUTH_URL, never the Origin header.
+  const origin = siteOrigin();
+  if (!origin) return storeClosed('site_url_not_set');
   const stripe = getStripe();
 
   try {

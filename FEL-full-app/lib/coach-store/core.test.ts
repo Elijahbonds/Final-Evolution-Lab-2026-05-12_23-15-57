@@ -125,13 +125,18 @@ describe('adults, teens, stripe shapes, copy', () => {
     expect(addressRejected('PO Box 1')).toBe(null);
   });
 
-  it('reads both invoice shapes and fails closed without a test key', () => {
+  it('reads both invoice shapes and fails closed without a key (STORE-READY B2: live opens only with COACH_STORE_LIVE)', () => {
     expect(invoiceSubscriptionId({ parent: { subscription_details: { subscription: 'sub_1' } } })).toBe('sub_1');
     expect(invoiceSubscriptionId({ subscription: 'sub_old' })).toBe('sub_old');
     expect(subscriptionPeriodEndUnix({ items: { data: [{ current_period_end: 10 }] }, current_period_end: 9 })).toBe(10);
     expect(stripeTestGate({ STRIPE_SECRET_KEY: '' } as NodeJS.ProcessEnv).ok).toBe(false);
-    expect(stripeTestGate({ STRIPE_SECRET_KEY: 'sk_live_x' } as NodeJS.ProcessEnv).ok).toBe(false);
     expect(stripeTestGate({ STRIPE_SECRET_KEY: 'sk_test_x' } as NodeJS.ProcessEnv).ok).toBe(true);
+    // B2: a live key is ok ONLY when COACH_STORE_LIVE reads truthy from the PASSED env.
+    const liveOff = stripeTestGate({ STRIPE_SECRET_KEY: 'sk_live_x' } as NodeJS.ProcessEnv);
+    expect(liveOff.ok).toBe(false);
+    if (!liveOff.ok) expect(liveOff.reason).toBe('live_mode_off');
+    expect(stripeTestGate({ STRIPE_SECRET_KEY: 'sk_live_x', COACH_STORE_LIVE: '1' } as NodeJS.ProcessEnv).ok).toBe(true);
+    expect(stripeTestGate({ STRIPE_SECRET_KEY: 'rk_live_x', COACH_STORE_LIVE: 'true' } as NodeJS.ProcessEnv).ok).toBe(true);
   });
 
   it('hides adult-only drills from a teen and keeps the offline grace at 7 days', () => {

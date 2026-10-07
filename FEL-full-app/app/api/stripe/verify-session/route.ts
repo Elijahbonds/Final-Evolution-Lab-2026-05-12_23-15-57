@@ -4,6 +4,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { verifyCheckoutSession } from '@/lib/stripe/verify-checkout';
+import { stripeTestGate } from '@/lib/coach-store/stripeMode';
+import { storeClosed } from '@/lib/coach-store/gate';
 
 /**
  * POST /api/stripe/verify-session  { session_id }
@@ -23,16 +25,16 @@ import { verifyCheckoutSession } from '@/lib/stripe/verify-checkout';
  *   401                               — signed out
  *   403 not_your_session              — the session belongs to someone else
  *   404 session_not_found             — Stripe has no such session on this account
- *   503                               — payments not configured
+ *   409 store_closed                  — payments not configured (STORE-READY B2; was 503)
  */
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   const userId = (session?.user as any)?.id as string | undefined;
   if (!userId) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
-  if (!process.env.STRIPE_SECRET_KEY) {
-    return NextResponse.json({ error: 'not_configured' }, { status: 503 });
-  }
+  // STORE-READY B2: no usable key is a 409 store_closed before any Stripe call (never a 503, nothing thrown).
+  const gate = stripeTestGate();
+  if (!gate.ok) return storeClosed(gate.reason);
 
   let body: any;
   try {
