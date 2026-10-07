@@ -5,6 +5,10 @@
 // the page hands it to the browser's download; nothing here or in the page talks to a server.
 
 import { LANDMARK_NAMES, type PoseFrame } from '@/lib/pose/landmarks';
+import {
+  CAPTURE_PROTOCOL, CAPTURE_TAKES, LABEL_NAME, MOVEMENT_NAME, captureFileName, isCaptureDevice, isPersonAlias,
+  type CaptureDevice, type CaptureMeta, type PersonAlias,
+} from '@/lib/pose/captureProtocol';
 
 // Every recorded frame is the app's one PoseFrame (lib/pose/landmarks.ts): { t, present, image[33], world[33], arrive },
 // so a detector reads the owner's recording exactly as it reads the camera and the synthetic fixtures.
@@ -24,6 +28,8 @@ export interface TakeSpec {
   prompt: string;
   /** Seconds recorded after GO. The 3-2-1 before it is recorded too, as the standing-ready lead-in. */
   seconds: number;
+  /** Ask the camera for 60 fps for this take (MIRROR PHASE 3: the jump's opt-in, measured on the phone). */
+  highRate?: boolean;
 }
 
 /** The 3-2-1 is recorded: the detectors need the owner standing ready before the move, the same as a game gets. */
@@ -53,6 +59,36 @@ export const TAKES: TakeSpec[] = [
   { id: 'space', label: 'Space check', prompt: 'At your play spot: stand still, reach both arms overhead for 2 seconds, lower them, stand still.', seconds: 8 },
 ];
 
+// ── the Mirror capture set (MIRROR PHASE 3, owner decision 2026-10-07) ──
+//
+// The owner plus two adults, on two phones, numbers only: the protocol's takes (lib/pose/captureProtocol.ts), each
+// labelled GOOD or a named fault, and a file that says who (an alias, never a name), which phone, that everyone in it
+// is an adult, and that the consent was read and agreed. The owner's free-text notes are NOT written in this set: a
+// note is where a name would slip in. docs/MIRROR-CAPTURE-PROTOCOL.md is the walk-through.
+
+/** The capture set's takes, as the recorder runs them. */
+export const CAPTURE_TAKE_SPECS: TakeSpec[] = CAPTURE_TAKES.map((t) => ({
+  id: t.id,
+  label: `${MOVEMENT_NAME[t.movement].replace(/ \(.*\)$/, '')}${t.side ? ` (${t.side})` : ''}: ${LABEL_NAME[t.label] ?? t.label}${t.optional ? ' · optional' : ''}`,
+  prompt: t.prompt,
+  seconds: t.seconds,
+  ...(t.highRate ? { highRate: true } : {}),
+}));
+
+/** What the capture set needs before it will save: an alias, a phone, and both statements ticked. */
+export interface CaptureChoice { person: string; device: string; adult: boolean; consent: boolean }
+
+/** The capture block, or null while anything is missing (the download stays off). */
+export function captureMetaOf(c: CaptureChoice): CaptureMeta | null {
+  if (!isPersonAlias(c.person) || !isCaptureDevice(c.device) || !c.adult || !c.consent) return null;
+  return { protocol: CAPTURE_PROTOCOL, person: c.person, device: c.device, adult: true, consent: true };
+}
+
+/** The capture set's file name: alias, phone, date. */
+export function captureDownloadName(meta: { person: PersonAlias; device: CaptureDevice }, d: Date): string {
+  return captureFileName(meta.person, meta.device, d);
+}
+
 /** Which clock the frame times came from (the adapter's onVideoFrames). 'capture' is the one to trust; 'mixed'
  *  means it changed mid-take, so the take's times are not one timeline. */
 export type FrameClock = 'capture' | 'display' | 'now' | 'mixed';
@@ -74,11 +110,17 @@ export interface RecordedTake {
   /** t of GO (the end of the 3-2-1), and of the end of the take. */
   goT: number;
   endT: number;
+  /** The camera was asked for 60 fps for this take (the capture set's jump). */
+  highRate?: boolean;
   frames: PoseFrame[];
 }
 
 export interface TakesFile {
   format: 'fel-pose-takes/1';
+  /** The capture set: an owner-led capture of adults (lib/pose/recordingsGuard.ts checks a committed one). */
+  origin?: 'owner-capture';
+  child?: false;
+  capture?: CaptureMeta;
   privacy: string;
   savedAt: string;
   device: string;
@@ -136,16 +178,19 @@ export function shortUserAgent(ua: string): string {
 
 /** The whole session as one file, takes in the guided order. */
 export function buildTakesFile(
-  takes: Record<string, RecordedTake>, meta: { device: string; model: string; notes: string; savedAt: Date },
+  takes: Record<string, RecordedTake>,
+  meta: { device: string; model: string; notes: string; savedAt: Date; capture?: CaptureMeta | null },
 ): TakesFile {
-  const order = new Map(TAKES.map((s, i) => [s.id, i]));
+  const set = meta.capture ? CAPTURE_TAKE_SPECS : TAKES;
+  const order = new Map(set.map((s, i) => [s.id, i]));
   return {
     format: 'fel-pose-takes/1',
+    ...(meta.capture ? { origin: 'owner-capture' as const, child: false as const, capture: { ...meta.capture } } : {}),
     privacy: 'Landmark numbers only. No video or image. Recorded and saved on this device; nothing was uploaded.',
     savedAt: meta.savedAt.toISOString(),
     device: meta.device,
     model: meta.model,
-    notes: meta.notes,
+    notes: meta.capture ? '' : meta.notes,
     frameShape:
       'lib/pose/landmarks.ts PoseFrame. t = capture ms from the take start (the 3-2-1 is recorded; goT marks GO); ' +
       'arrive = ms the landmarks came back; image = 33 {x,y 0..1 of the unmirrored frame, y down; z relative depth; ' +
