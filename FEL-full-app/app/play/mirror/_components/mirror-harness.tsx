@@ -75,6 +75,7 @@ import { chipLabel } from '@/lib/mirror/hudChip';
 import { MIRROR_PATTERNS } from '@/lib/mirror/patterns';
 import { LungeAudit, type LungeFault } from '@/lib/mirror/lungeAudit';
 import { checkFraming, framingLine } from '@/lib/mirror/framing';
+import { ConfidenceFloor } from '@/lib/pose/confidenceFloor';   // MIRROR P3 (capture): "move closer / more light" on the lite model
 import {
   LUNGE_CUE_TABLE, LUNGE_FAULT_LABEL, LUNGE_REPS_PER_SIDE, initialLungeSession, lungePhaseToMovement,
   lungeSideResult, stepLungeSession, type LungeSessionState, type LungeSide,
@@ -215,7 +216,7 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false, initi
   } = useMirrorCamera({
     onPause: () => { if (typeof speechSynthesis !== 'undefined') speechSynthesis.cancel(); },
     onResume: () => {
-      jumpTrackerRef.current.reset(); lungeAuditRef.current.reset(); inShotRef.current.reset();
+      jumpTrackerRef.current.reset(); lungeAuditRef.current.reset(); inShotRef.current.reset(); floorRef.current.reset();
       // MIRROR-MOVES P2: a rep cannot span the gap — the one under way is dropped (its frames end where the camera went off)
       for (const r of [hingeSessionRef, pushupSessionRef] as { current: SideRepState<string> }[]) {
         r.current = { ...r.current, armed: false, armedFrames: 0, buffer: [], lastOkMs: null };
@@ -228,6 +229,7 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false, initi
     lungeFaults, lungeSeen, lungeFramedRight, runner, inShot,
   } = readout;
   const inShotRef = useRef(new InShotLine());
+  const floorRef = useRef(new ConfidenceFloor());   // the Mirror runs lite: the floor's default
   /** The screen runner's phase and station as last painted: a change is painted at once (see onFrame). */
   const runnerKeyRef = useRef('');
   const [summary, setSummary] = useState<SessionSummary | null>(null);
@@ -445,6 +447,7 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false, initi
     // on its tab until another screen starts, as they always have)
     hud.set(READOUT_FRESH, { now: true });
     inShotRef.current.reset();
+    floorRef.current.reset();
     jumpTrackerRef.current.reset();
     cueEngineRef.current.reset();
     pressRowCueRef.current.reset();
@@ -486,7 +489,7 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false, initi
           hud.set({ phase: p, frameMs: fm, zoneStates: zones, reps: r });
           // a body the camera cannot see whole says so on the stage (lib/mirror/liveCamera.ts InShotLine; the screen's
           // runner says its own framing line)
-          if (patternRef.current !== 'screen') hud.set({ inShot: inShotRef.current.step(checkFraming(pose, 'front'), pose.timestampMs) });
+          if (patternRef.current !== 'screen') hud.set({ inShot: inShotRef.current.step(checkFraming(pose, 'front'), pose.timestampMs) ?? floorRef.current.step(pose, pose.timestampMs) });
           // THE GUIDED SCREEN. The runner owns the protocol: it says the turn, holds the clock only while the
           // shot is good, and pauses rather than fails when somebody steps out to move a chair.
           if (patternRef.current === 'screen' && runnerRef.current) {
