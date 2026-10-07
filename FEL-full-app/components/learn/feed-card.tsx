@@ -10,6 +10,7 @@ import { optionOrder } from '@/lib/knowledge/quiz';
 import { NOT_ADVICE_LINE, topicById } from '@/lib/knowledge/topics';
 import type { PlanReason } from '@/lib/knowledge/scheduler';
 import type { Card } from '@/lib/knowledge/types';
+import { PlaybookCardLinks } from '@/components/education/playbook-card-links';   // EDU-LINKS (2026-10-07): chapter + camera
 
 export interface FeedSlide {
   key: string;
@@ -134,6 +135,7 @@ export function FeedCard({
         {topic.notAdvice && <p className="text-[11px] font-semibold text-amber-200/70 md:text-sm">{NOT_ADVICE_LINE[topic.notAdvice]}</p>}
         {note && <p className="text-[11px] font-semibold md:text-sm" style={{ color: accent }} data-card-note>{note}</p>}
         <p className="line-clamp-2 text-[10.5px] leading-snug md:text-[13px]" style={{ color: 'rgba(255,255,255,0.42)' }}>Source: {card.source}</p>
+        <PlaybookCardLinks cardId={card.id} />
       </footer>
     </article>
   );

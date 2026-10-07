@@ -10,6 +10,9 @@ import { CameraLink } from './camera-link';
 import { ChapterReader } from './chapter-reader';
 import { CHECK_COPY, ChapterCheckView, type CheckInfo, type CheckResult } from './chapter-check';
 import { chapterByNumber } from '@/lib/education/course';
+import { FeedCard } from '@/components/learn/feed-card';
+import { buildPlaybookPack } from '@/lib/knowledge/playbookPack';
+import { CARDS } from '@/lib/knowledge/catalog';
 
 const text = (h: string) => h.replace(/<[^>]+>/g, ' ').replace(/&#x27;/g, "'").replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
 const noop = () => {};
@@ -35,6 +38,19 @@ describe('a Playbook card in the Knowledge Feed', () => {
     expect(h).toMatch(/href="\/play\/mirror\?pattern=hinge"[^>]*data-camera-link="hinge"/);
     expect(text(h)).toContain('Read chapter 8');
     expect(text(h)).toContain('Check it on camera: Hip hinge');
+  });
+
+  it('the feed itself draws them under a Playbook card, and nothing under any other card', () => {
+    const feed = (card: (typeof CARDS)[number]) => renderToStaticMarkup(createElement(FeedCard, {
+      slide: { key: card.id, card, reason: 'new' as const }, picked: undefined, focus: null, onPick: noop, active: true, reduced: true,
+    }));
+    const ch8 = buildPlaybookPack().cards.find((c) => c.id.startsWith('playbook.ch8-'))!;
+    const h = feed(ch8);
+    expect(h).toContain('data-playbook-links');
+    expect(h).toContain('href="/education/playbook/8"');
+    expect(h).toContain('href="/play/mirror?pattern=hinge"');
+    const other = CARDS.find((c) => c.topic !== 'playbook')!;
+    expect(feed(other)).not.toContain('data-playbook-links');
   });
 
   it('a chapter with no Mirror movement gets the chapter link only; a card from another topic gets nothing', () => {
