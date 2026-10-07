@@ -34,13 +34,18 @@ export const BOND_MAX = 100;
 
 export const fusionDurationSec = (tier: FusionState['tier']): number => FUSION_BASE_SEC + FUSION_PER_TIER_SEC * tier;
 
-export type FuseRefusal = 'already' | 'tier' | 'meter' | 'energy' | 'riding' | 'down' | 'partnerDown';
+/** `locked` (Phase B): the story has not reached the first fusion yet (story/flags.ts FLAG_FUSION_UNLOCKED). */
+export type FuseRefusal = 'already' | 'tier' | 'meter' | 'energy' | 'riding' | 'down' | 'partnerDown' | 'locked';
 
 const isDown = (a: AdventureActor): boolean => a.state === 'ko' || a.stats.hp.cur <= 0;
 
-/** Why the party cannot fuse now, or null when it can. */
-export function fuseRefusal(player: AdventureActor, partner: AdventureActor, bond: number): FuseRefusal | null {
+/**
+ * Why the party cannot fuse now, or null when it can. `unlocked` (Phase B, default true): false while the story has not
+ * reached its first fusion (Chapter 1's finale); the test yard and the BR never pass it.
+ */
+export function fuseRefusal(player: AdventureActor, partner: AdventureActor, bond: number, unlocked = true): FuseRefusal | null {
   if (player.fusion.active) return 'already';
+  if (!unlocked) return 'locked';
   if (isDown(player)) return 'down';
   if (isDown(partner)) return 'partnerDown';
   if (player.ridingId) return 'riding';
@@ -50,26 +55,28 @@ export function fuseRefusal(player: AdventureActor, partner: AdventureActor, bon
   return null;
 }
 
-function setFusion(f: FusionState, active: boolean, tier: FusionState['tier'], remainingSec: number, partnerId: string | null, element: Element | null): void {
+function setFusion(f: FusionState, active: boolean, tier: FusionState['tier'], remainingSec: number, partnerId: string | null, element: Element | null, flight = true): void {
   f.active = active;
   f.tier = tier;
   f.remainingSec = remainingSec;
   f.partnerId = partnerId;
   f.element = element;
-  f.grantsFlight = active;
+  f.grantsFlight = active && flight;
 }
 
 /**
  * Fuse. Spends the energy and the meter, sets both actors' fusion, and returns the tier, or null (nothing changed)
  * when refused. `bond` is the partner def's; the caller adds BOND_PER_FUSION to it.
+ * `grantsFlight` (Phase B, default true): the fusion grants flight only when the story has unlocked it (owner: "flight
+ * first unlocks after Chapter 1's boss"; story/flags.ts FLAG_FLIGHT_UNLOCKED). The yard and the BR never pass it.
  */
-export function beginFusion(player: AdventureActor, partner: AdventureActor, bond: number, element: Element): FusionState['tier'] | null {
+export function beginFusion(player: AdventureActor, partner: AdventureActor, bond: number, element: Element, grantsFlight = true): FusionState['tier'] | null {
   if (fuseRefusal(player, partner, bond) !== null) return null;
   if (!spendPool(player.stats.energy, FUSION_ENERGY_COST)) return null;
   const tier = fusionTierFor(bond);
   const sec = fusionDurationSec(tier);
-  setFusion(player.fusion, true, tier, sec, partner.id, element);
-  setFusion(partner.fusion, true, tier, sec, player.id, element);
+  setFusion(player.fusion, true, tier, sec, partner.id, element, grantsFlight);
+  setFusion(partner.fusion, true, tier, sec, player.id, element, grantsFlight);
   player.fusion.meter = 0;
   partner.fusion.meter = 0;
   return tier;

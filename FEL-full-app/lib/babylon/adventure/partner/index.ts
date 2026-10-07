@@ -67,6 +67,14 @@ export interface PartnerSystemOptions {
   /** A downed actor bled out (DownRevive.BLEED_OUT_SEC) without a revive. */
   onBleedOut?: (actorId: ActorId) => void;
   onEvolve?: (def: PartnerDef, stage: number) => void;
+  /**
+   * PHASE B (2026-10-07), the story's gates (story/flags.ts; owner: "flight first unlocks after Chapter 1's boss", the
+   * first fusion is its finale). Read live each step. Absent = true: the test yard and the BR keep the whole toolkit.
+   *   fusionUnlocked  false: the fuse button never fuses (refusal 'locked'); a press is left for A1's mount.
+   *   flightUnlocked  false: a fusion does not grant flight, and a flying mount may not take off with a rider.
+   */
+  fusionUnlocked?: () => boolean;
+  flightUnlocked?: () => boolean;
 }
 
 export interface PartnerRevive { playerDowned: boolean; partnerDowned: boolean; channel01: number }
@@ -84,7 +92,19 @@ export interface PartnerSystem extends AdventureSystem {
   revive(): PartnerRevive;
   /** A4 passes this to A1 (createMovementSystem's mountCanFly): may this mount fly with a rider? */
   mountCanFly(mountId: ActorId): boolean;
+  /**
+   * PHASE B: the story fuses the party (Chapter 1's finale, the first fusion; a flight-travel beat after a respawn). On
+   * the next step, once both are standing and the player is not riding, the party fuses whatever the meter, the bond
+   * tier or the energy say: the bond is raised to the first tier if it is below it, the meter and the energy are filled
+   * (A3's fields), then beginFusion runs with the flight gate as it stands. Idempotent while pending or fused.
+   */
+  storyFuse(): void;
+  /** True while a story fusion waits for its step. */
+  storyFusePending(): boolean;
 }
+
+/** [TUNE] The bond a story fusion raises a partner to, at least: the first fusion tier (contracts fusionTierFor). */
+export const STORY_FUSE_MIN_BOND = 10;
 
 const isDown = (a: AdventureActor): boolean => a.state === 'ko' || a.stats.hp.cur <= 0;
 
@@ -102,6 +122,9 @@ export function createPartnerSystem(opts: PartnerSystemOptions): PartnerSystem {
   let unsubs: (() => void)[] = [];
   let world: AdventureWorld | null = null;
   let linked = false;
+  let storyFuse = false;
+  const fusionOpen = opts.fusionUnlocked ?? (() => true);
+  const flightOpen = opts.flightUnlocked ?? (() => true);
 
   const isParty = (id: ActorId | null): boolean => id === playerId || id === partnerId;
   const isBoss = (id: ActorId): boolean => world?.actors.get(id)?.kind === 'boss';
@@ -218,12 +241,38 @@ export function createPartnerSystem(opts: PartnerSystemOptions): PartnerSystem {
           inp.fuse = false;
           refusal = null;
         } else {
-          refusal = fuseRefusal(player, partner, def.bond);
-          if (refusal === null && beginFusion(player, partner, def.bond, def.element) !== null) {
+          refusal = fuseRefusal(player, partner, def.bond, fusionOpen());
+          if (refusal === null && beginFusion(player, partner, def.bond, def.element, flightOpen()) !== null) {
             def.bond = Math.min(BOND_MAX, def.bond + BOND_PER_FUSION);
             inp.fuse = false;
             emitFusion(true);
           }
+        }
+      }
+
+      // 2b. a story fusion (the first fusion is a scene, not a meter): A3's own fields, then the ordinary fuse
+      if (storyFuse) {
+        if (player.fusion.active) storyFuse = false;
+        else if (isDown(player) || isDown(partner)) {
+          // the scene stands a downed party member up first (hp is A2's: the revive event, applied on its next step)
+          for (const [down, id, by] of [[isDown(player), playerId, partnerId], [isDown(partner), partnerId, playerId]] as const) {
+            if (!down) continue;
+            const r = { actorId: id, byId: by, hpRatio: 1 };
+            ctx.bus.emit('revive', r);
+            opts.onRevive?.(r);
+          }
+        } else if (!player.ridingId) {
+          def.bond = Math.max(def.bond, STORY_FUSE_MIN_BOND);
+          syncIdleTier(player, partner, def.bond, def.element);
+          player.fusion.meter = 1; partner.fusion.meter = 1;
+          if (player.stats.energy.cur < player.stats.energy.max) player.stats.energy.cur = player.stats.energy.max;
+          if (beginFusion(player, partner, def.bond, def.element, flightOpen()) !== null) {
+            def.bond = Math.min(BOND_MAX, def.bond + BOND_PER_FUSION);
+            emitFusion(true);
+            // the fusion spent its energy: the scene gives the flight home a full pool [TUNE]
+            player.stats.energy.cur = player.stats.energy.max;
+          }
+          storyFuse = false;
         }
       }
 
@@ -255,7 +304,9 @@ export function createPartnerSystem(opts: PartnerSystemOptions): PartnerSystem {
       playerDowned: playerDown.downed, partnerDowned: partnerDown.downed,
       channel01: Math.max(playerDown.channelSec, partnerDown.channelSec) / REVIVE_CHANNEL_SEC,
     }),
-    mountCanFly: (mountId) => mountId === partnerId && partnerCanCarry(def).fly,
+    mountCanFly: (mountId) => mountId === partnerId && partnerCanCarry(def).fly && flightOpen(),
+    storyFuse() { storyFuse = true; },
+    storyFusePending: () => storyFuse,
     dispose() { for (const u of unsubs) u(); unsubs = []; bus = null; },
   };
 }

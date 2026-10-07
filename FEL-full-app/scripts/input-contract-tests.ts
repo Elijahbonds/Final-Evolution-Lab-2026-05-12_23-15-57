@@ -45,6 +45,9 @@ const SHELL_EXEMPT_ROUTES: Record<string, string> = {
   // ADVENTURE C (2026-10-07): the unlisted offline bot Battle Royale prototype. It records no session and pays nothing until
   // the owner decides BR rewards (plan open decision 7); its own stage shows the controls, the HUD and the end screen.
   'adventure-br': 'unlisted offline bot BR prototype: records no session, pays nothing (no session-route row yet), so no GameShell',
+  // ADVENTURE PHASE B (2026-10-07): the story, unlisted. Its progress is the Adventure's own save (device first); it posts
+  // no account session yet because /api/sessions refuses a mode outside the catalogue, and listing it would unhide it.
+  adventure: 'unlisted story mode: progress lives in the Adventure save; no account session until the owner lists it',
 };
 
 const LOADER_BYPASS_ROUTES: Record<string, string> = {

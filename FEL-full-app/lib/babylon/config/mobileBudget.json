@@ -283,6 +283,22 @@
         "textureMb": 284,
         "particles": 0
       }
+    },
+    "adventure-story": {
+      "measured": {
+        "drawCalls": 53,
+        "activeMeshes": 19,
+        "skinnedBodies": 6,
+        "textureMb": 100,
+        "particles": 66
+      },
+      "budget": {
+        "drawCalls": 64,
+        "activeMeshes": 23,
+        "skinnedBodies": 8,
+        "textureMb": 120,
+        "particles": 80
+      }
     }
   },
   "knownOver": {
