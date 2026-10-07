@@ -573,6 +573,11 @@ export type CoachInvite = $Result.DefaultSelection<Prisma.$CoachInvitePayload>
  */
 export type CoachClient = $Result.DefaultSelection<Prisma.$CoachClientPayload>
 /**
+ * Model CoachAvailability
+ * Coach <-> athlete availability: one row while the athlete is Limited or Out. Full is no row. No free text, by design.
+ */
+export type CoachAvailability = $Result.DefaultSelection<Prisma.$CoachAvailabilityPayload>
+/**
  * Model Instructor
  * Coach storefront profile and the hours he sells. One row per coach.
  */
@@ -1982,6 +1987,16 @@ export class PrismaClient<
   get coachClient(): Prisma.CoachClientDelegate<ExtArgs, ClientOptions>;
 
   /**
+   * `prisma.coachAvailability`: Exposes CRUD operations for the **CoachAvailability** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more CoachAvailabilities
+    * const coachAvailabilities = await prisma.coachAvailability.findMany()
+    * ```
+    */
+  get coachAvailability(): Prisma.CoachAvailabilityDelegate<ExtArgs, ClientOptions>;
+
+  /**
    * `prisma.instructor`: Exposes CRUD operations for the **Instructor** model.
     * Example usage:
     * ```ts
@@ -2573,6 +2588,7 @@ export namespace Prisma {
     ShareLink: 'ShareLink',
     CoachInvite: 'CoachInvite',
     CoachClient: 'CoachClient',
+    CoachAvailability: 'CoachAvailability',
     Instructor: 'Instructor',
     ProgramAccess: 'ProgramAccess',
     Booking: 'Booking',
@@ -2597,7 +2613,7 @@ export namespace Prisma {
       omit: GlobalOmitOptions
     }
     meta: {
-      modelProps: "user" | "playerProfile" | "gameSession" | "sessionRun" | "sessionGrant" | "creditLedger" | "cardOwnership" | "storyNodeProgress" | "lessonProgress" | "cellProject" | "cellApiKey" | "cellSettings" | "cellUsage" | "projectFile" | "cellMessage" | "cellWisdom" | "exerciseCategory" | "exercise" | "ledgerAccount" | "ledgerTransaction" | "ledgerPosting" | "stripeCustomer" | "subscription" | "order" | "payoutRequest" | "marketplaceListing" | "studioPartnerKey" | "partnerUsage" | "marketplacePurchase" | "ladderSeason" | "ladderEntry" | "competitionMatch" | "matchEvent" | "mirrorTriumph" | "prqEntry" | "guestSession" | "season" | "passProgress" | "passGrant" | "modeMastery" | "signatureAttempt" | "challengeLink" | "analyticsEvent" | "metricRollup" | "wallet" | "walletLedgerEntry" | "rewardRule" | "perfEarnEvent" | "playerEntitlement" | "marketingLead" | "referralCode" | "referralConversion" | "mpMatch" | "creativeCard" | "cardSlot" | "creatorCard" | "workoutScan" | "workoutPlan" | "athleteBuild" | "avatarLook" | "ownedWearable" | "sessionBooking" | "sessionJoinLink" | "crmCompany" | "crmContact" | "crmDeal" | "crmActivity" | "crmNote" | "programExercise" | "coachingProgram" | "block" | "session" | "sessionExercise" | "clientSession" | "exerciseLog" | "setLog" | "programMessage" | "facilitatorProfile" | "credential" | "guardianConsent" | "goalPlan" | "campSession" | "campTemplate" | "mirrorSession" | "healthIntake" | "painCheckIn" | "healthConsent" | "scanSaveOptIn" | "readinessCheckIn" | "breathLog" | "shareLink" | "coachInvite" | "coachClient" | "instructor" | "programAccess" | "booking" | "callSignal" | "coachStoreReferral" | "adventureSave"
+      modelProps: "user" | "playerProfile" | "gameSession" | "sessionRun" | "sessionGrant" | "creditLedger" | "cardOwnership" | "storyNodeProgress" | "lessonProgress" | "cellProject" | "cellApiKey" | "cellSettings" | "cellUsage" | "projectFile" | "cellMessage" | "cellWisdom" | "exerciseCategory" | "exercise" | "ledgerAccount" | "ledgerTransaction" | "ledgerPosting" | "stripeCustomer" | "subscription" | "order" | "payoutRequest" | "marketplaceListing" | "studioPartnerKey" | "partnerUsage" | "marketplacePurchase" | "ladderSeason" | "ladderEntry" | "competitionMatch" | "matchEvent" | "mirrorTriumph" | "prqEntry" | "guestSession" | "season" | "passProgress" | "passGrant" | "modeMastery" | "signatureAttempt" | "challengeLink" | "analyticsEvent" | "metricRollup" | "wallet" | "walletLedgerEntry" | "rewardRule" | "perfEarnEvent" | "playerEntitlement" | "marketingLead" | "referralCode" | "referralConversion" | "mpMatch" | "creativeCard" | "cardSlot" | "creatorCard" | "workoutScan" | "workoutPlan" | "athleteBuild" | "avatarLook" | "ownedWearable" | "sessionBooking" | "sessionJoinLink" | "crmCompany" | "crmContact" | "crmDeal" | "crmActivity" | "crmNote" | "programExercise" | "coachingProgram" | "block" | "session" | "sessionExercise" | "clientSession" | "exerciseLog" | "setLog" | "programMessage" | "facilitatorProfile" | "credential" | "guardianConsent" | "goalPlan" | "campSession" | "campTemplate" | "mirrorSession" | "healthIntake" | "painCheckIn" | "healthConsent" | "scanSaveOptIn" | "readinessCheckIn" | "breathLog" | "shareLink" | "coachInvite" | "coachClient" | "coachAvailability" | "instructor" | "programAccess" | "booking" | "callSignal" | "coachStoreReferral" | "adventureSave"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -9483,6 +9499,80 @@ export namespace Prisma {
           }
         }
       }
+      CoachAvailability: {
+        payload: Prisma.$CoachAvailabilityPayload<ExtArgs>
+        fields: Prisma.CoachAvailabilityFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.CoachAvailabilityFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CoachAvailabilityPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.CoachAvailabilityFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CoachAvailabilityPayload>
+          }
+          findFirst: {
+            args: Prisma.CoachAvailabilityFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CoachAvailabilityPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.CoachAvailabilityFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CoachAvailabilityPayload>
+          }
+          findMany: {
+            args: Prisma.CoachAvailabilityFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CoachAvailabilityPayload>[]
+          }
+          create: {
+            args: Prisma.CoachAvailabilityCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CoachAvailabilityPayload>
+          }
+          createMany: {
+            args: Prisma.CoachAvailabilityCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.CoachAvailabilityCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CoachAvailabilityPayload>[]
+          }
+          delete: {
+            args: Prisma.CoachAvailabilityDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CoachAvailabilityPayload>
+          }
+          update: {
+            args: Prisma.CoachAvailabilityUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CoachAvailabilityPayload>
+          }
+          deleteMany: {
+            args: Prisma.CoachAvailabilityDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.CoachAvailabilityUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.CoachAvailabilityUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CoachAvailabilityPayload>[]
+          }
+          upsert: {
+            args: Prisma.CoachAvailabilityUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CoachAvailabilityPayload>
+          }
+          aggregate: {
+            args: Prisma.CoachAvailabilityAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateCoachAvailability>
+          }
+          groupBy: {
+            args: Prisma.CoachAvailabilityGroupByArgs<ExtArgs>
+            result: $Utils.Optional<CoachAvailabilityGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.CoachAvailabilityCountArgs<ExtArgs>
+            result: $Utils.Optional<CoachAvailabilityCountAggregateOutputType> | number
+          }
+        }
+      }
       Instructor: {
         payload: Prisma.$InstructorPayload<ExtArgs>
         fields: Prisma.InstructorFieldRefs
@@ -10104,6 +10194,7 @@ export namespace Prisma {
     shareLink?: ShareLinkOmit
     coachInvite?: CoachInviteOmit
     coachClient?: CoachClientOmit
+    coachAvailability?: CoachAvailabilityOmit
     instructor?: InstructorOmit
     programAccess?: ProgramAccessOmit
     booking?: BookingOmit
@@ -100981,6 +101072,7 @@ export namespace Prisma {
     authorId: string | null
     body: string | null
     createdAt: Date | null
+    readAt: Date | null
   }
 
   export type ProgramMessageMaxAggregateOutputType = {
@@ -100989,6 +101081,7 @@ export namespace Prisma {
     authorId: string | null
     body: string | null
     createdAt: Date | null
+    readAt: Date | null
   }
 
   export type ProgramMessageCountAggregateOutputType = {
@@ -100997,6 +101090,7 @@ export namespace Prisma {
     authorId: number
     body: number
     createdAt: number
+    readAt: number
     _all: number
   }
 
@@ -101007,6 +101101,7 @@ export namespace Prisma {
     authorId?: true
     body?: true
     createdAt?: true
+    readAt?: true
   }
 
   export type ProgramMessageMaxAggregateInputType = {
@@ -101015,6 +101110,7 @@ export namespace Prisma {
     authorId?: true
     body?: true
     createdAt?: true
+    readAt?: true
   }
 
   export type ProgramMessageCountAggregateInputType = {
@@ -101023,6 +101119,7 @@ export namespace Prisma {
     authorId?: true
     body?: true
     createdAt?: true
+    readAt?: true
     _all?: true
   }
 
@@ -101104,6 +101201,7 @@ export namespace Prisma {
     authorId: string
     body: string
     createdAt: Date
+    readAt: Date | null
     _count: ProgramMessageCountAggregateOutputType | null
     _min: ProgramMessageMinAggregateOutputType | null
     _max: ProgramMessageMaxAggregateOutputType | null
@@ -101129,6 +101227,7 @@ export namespace Prisma {
     authorId?: boolean
     body?: boolean
     createdAt?: boolean
+    readAt?: boolean
     program?: boolean | CoachingProgramDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["programMessage"]>
 
@@ -101138,6 +101237,7 @@ export namespace Prisma {
     authorId?: boolean
     body?: boolean
     createdAt?: boolean
+    readAt?: boolean
     program?: boolean | CoachingProgramDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["programMessage"]>
 
@@ -101147,6 +101247,7 @@ export namespace Prisma {
     authorId?: boolean
     body?: boolean
     createdAt?: boolean
+    readAt?: boolean
     program?: boolean | CoachingProgramDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["programMessage"]>
 
@@ -101156,9 +101257,10 @@ export namespace Prisma {
     authorId?: boolean
     body?: boolean
     createdAt?: boolean
+    readAt?: boolean
   }
 
-  export type ProgramMessageOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "programId" | "authorId" | "body" | "createdAt", ExtArgs["result"]["programMessage"]>
+  export type ProgramMessageOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "programId" | "authorId" | "body" | "createdAt" | "readAt", ExtArgs["result"]["programMessage"]>
   export type ProgramMessageInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     program?: boolean | CoachingProgramDefaultArgs<ExtArgs>
   }
@@ -101180,6 +101282,7 @@ export namespace Prisma {
       authorId: string
       body: string
       createdAt: Date
+      readAt: Date | null
     }, ExtArgs["result"]["programMessage"]>
     composites: {}
   }
@@ -101609,6 +101712,7 @@ export namespace Prisma {
     readonly authorId: FieldRef<"ProgramMessage", 'String'>
     readonly body: FieldRef<"ProgramMessage", 'String'>
     readonly createdAt: FieldRef<"ProgramMessage", 'DateTime'>
+    readonly readAt: FieldRef<"ProgramMessage", 'DateTime'>
   }
     
 
@@ -119691,6 +119795,7 @@ export namespace Prisma {
     createdAt?: boolean
     coach?: boolean | UserDefaultArgs<ExtArgs>
     client?: boolean | UserDefaultArgs<ExtArgs>
+    availability?: boolean | CoachClient$availabilityArgs<ExtArgs>
   }, ExtArgs["result"]["coachClient"]>
 
   export type CoachClientSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
@@ -119728,6 +119833,7 @@ export namespace Prisma {
   export type CoachClientInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     coach?: boolean | UserDefaultArgs<ExtArgs>
     client?: boolean | UserDefaultArgs<ExtArgs>
+    availability?: boolean | CoachClient$availabilityArgs<ExtArgs>
   }
   export type CoachClientIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     coach?: boolean | UserDefaultArgs<ExtArgs>
@@ -119743,6 +119849,7 @@ export namespace Prisma {
     objects: {
       coach: Prisma.$UserPayload<ExtArgs>
       client: Prisma.$UserPayload<ExtArgs>
+      availability: Prisma.$CoachAvailabilityPayload<ExtArgs> | null
     }
     scalars: $Extensions.GetPayloadResult<{
       id: string
@@ -120153,6 +120260,7 @@ export namespace Prisma {
     readonly [Symbol.toStringTag]: "PrismaPromise"
     coach<T extends UserDefaultArgs<ExtArgs> = {}>(args?: Subset<T, UserDefaultArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
     client<T extends UserDefaultArgs<ExtArgs> = {}>(args?: Subset<T, UserDefaultArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    availability<T extends CoachClient$availabilityArgs<ExtArgs> = {}>(args?: Subset<T, CoachClient$availabilityArgs<ExtArgs>>): Prisma__CoachAvailabilityClient<$Result.GetResult<Prisma.$CoachAvailabilityPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -120584,6 +120692,25 @@ export namespace Prisma {
   }
 
   /**
+   * CoachClient.availability
+   */
+  export type CoachClient$availabilityArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CoachAvailability
+     */
+    select?: CoachAvailabilitySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CoachAvailability
+     */
+    omit?: CoachAvailabilityOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CoachAvailabilityInclude<ExtArgs> | null
+    where?: CoachAvailabilityWhereInput
+  }
+
+  /**
    * CoachClient without action
    */
   export type CoachClientDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -120599,6 +120726,1070 @@ export namespace Prisma {
      * Choose, which related nodes to fetch as well
      */
     include?: CoachClientInclude<ExtArgs> | null
+  }
+
+
+  /**
+   * Model CoachAvailability
+   */
+
+  export type AggregateCoachAvailability = {
+    _count: CoachAvailabilityCountAggregateOutputType | null
+    _min: CoachAvailabilityMinAggregateOutputType | null
+    _max: CoachAvailabilityMaxAggregateOutputType | null
+  }
+
+  export type CoachAvailabilityMinAggregateOutputType = {
+    coachId: string | null
+    clientId: string | null
+    status: string | null
+    returnBy: string | null
+    setAt: Date | null
+  }
+
+  export type CoachAvailabilityMaxAggregateOutputType = {
+    coachId: string | null
+    clientId: string | null
+    status: string | null
+    returnBy: string | null
+    setAt: Date | null
+  }
+
+  export type CoachAvailabilityCountAggregateOutputType = {
+    coachId: number
+    clientId: number
+    status: number
+    returnBy: number
+    setAt: number
+    _all: number
+  }
+
+
+  export type CoachAvailabilityMinAggregateInputType = {
+    coachId?: true
+    clientId?: true
+    status?: true
+    returnBy?: true
+    setAt?: true
+  }
+
+  export type CoachAvailabilityMaxAggregateInputType = {
+    coachId?: true
+    clientId?: true
+    status?: true
+    returnBy?: true
+    setAt?: true
+  }
+
+  export type CoachAvailabilityCountAggregateInputType = {
+    coachId?: true
+    clientId?: true
+    status?: true
+    returnBy?: true
+    setAt?: true
+    _all?: true
+  }
+
+  export type CoachAvailabilityAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which CoachAvailability to aggregate.
+     */
+    where?: CoachAvailabilityWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of CoachAvailabilities to fetch.
+     */
+    orderBy?: CoachAvailabilityOrderByWithRelationInput | CoachAvailabilityOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: CoachAvailabilityWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` CoachAvailabilities from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` CoachAvailabilities.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned CoachAvailabilities
+    **/
+    _count?: true | CoachAvailabilityCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: CoachAvailabilityMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: CoachAvailabilityMaxAggregateInputType
+  }
+
+  export type GetCoachAvailabilityAggregateType<T extends CoachAvailabilityAggregateArgs> = {
+        [P in keyof T & keyof AggregateCoachAvailability]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateCoachAvailability[P]>
+      : GetScalarType<T[P], AggregateCoachAvailability[P]>
+  }
+
+
+
+
+  export type CoachAvailabilityGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: CoachAvailabilityWhereInput
+    orderBy?: CoachAvailabilityOrderByWithAggregationInput | CoachAvailabilityOrderByWithAggregationInput[]
+    by: CoachAvailabilityScalarFieldEnum[] | CoachAvailabilityScalarFieldEnum
+    having?: CoachAvailabilityScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: CoachAvailabilityCountAggregateInputType | true
+    _min?: CoachAvailabilityMinAggregateInputType
+    _max?: CoachAvailabilityMaxAggregateInputType
+  }
+
+  export type CoachAvailabilityGroupByOutputType = {
+    coachId: string
+    clientId: string
+    status: string
+    returnBy: string | null
+    setAt: Date
+    _count: CoachAvailabilityCountAggregateOutputType | null
+    _min: CoachAvailabilityMinAggregateOutputType | null
+    _max: CoachAvailabilityMaxAggregateOutputType | null
+  }
+
+  type GetCoachAvailabilityGroupByPayload<T extends CoachAvailabilityGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<CoachAvailabilityGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof CoachAvailabilityGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], CoachAvailabilityGroupByOutputType[P]>
+            : GetScalarType<T[P], CoachAvailabilityGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type CoachAvailabilitySelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    coachId?: boolean
+    clientId?: boolean
+    status?: boolean
+    returnBy?: boolean
+    setAt?: boolean
+    link?: boolean | CoachClientDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["coachAvailability"]>
+
+  export type CoachAvailabilitySelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    coachId?: boolean
+    clientId?: boolean
+    status?: boolean
+    returnBy?: boolean
+    setAt?: boolean
+    link?: boolean | CoachClientDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["coachAvailability"]>
+
+  export type CoachAvailabilitySelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    coachId?: boolean
+    clientId?: boolean
+    status?: boolean
+    returnBy?: boolean
+    setAt?: boolean
+    link?: boolean | CoachClientDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["coachAvailability"]>
+
+  export type CoachAvailabilitySelectScalar = {
+    coachId?: boolean
+    clientId?: boolean
+    status?: boolean
+    returnBy?: boolean
+    setAt?: boolean
+  }
+
+  export type CoachAvailabilityOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"coachId" | "clientId" | "status" | "returnBy" | "setAt", ExtArgs["result"]["coachAvailability"]>
+  export type CoachAvailabilityInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    link?: boolean | CoachClientDefaultArgs<ExtArgs>
+  }
+  export type CoachAvailabilityIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    link?: boolean | CoachClientDefaultArgs<ExtArgs>
+  }
+  export type CoachAvailabilityIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    link?: boolean | CoachClientDefaultArgs<ExtArgs>
+  }
+
+  export type $CoachAvailabilityPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "CoachAvailability"
+    objects: {
+      link: Prisma.$CoachClientPayload<ExtArgs>
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      coachId: string
+      clientId: string
+      /**
+       * 'limited' | 'out'.
+       */
+      status: string
+      /**
+       * Expected return day 'YYYY-MM-DD', or null.
+       */
+      returnBy: string | null
+      setAt: Date
+    }, ExtArgs["result"]["coachAvailability"]>
+    composites: {}
+  }
+
+  type CoachAvailabilityGetPayload<S extends boolean | null | undefined | CoachAvailabilityDefaultArgs> = $Result.GetResult<Prisma.$CoachAvailabilityPayload, S>
+
+  type CoachAvailabilityCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<CoachAvailabilityFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: CoachAvailabilityCountAggregateInputType | true
+    }
+
+  export interface CoachAvailabilityDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['CoachAvailability'], meta: { name: 'CoachAvailability' } }
+    /**
+     * Find zero or one CoachAvailability that matches the filter.
+     * @param {CoachAvailabilityFindUniqueArgs} args - Arguments to find a CoachAvailability
+     * @example
+     * // Get one CoachAvailability
+     * const coachAvailability = await prisma.coachAvailability.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends CoachAvailabilityFindUniqueArgs>(args: SelectSubset<T, CoachAvailabilityFindUniqueArgs<ExtArgs>>): Prisma__CoachAvailabilityClient<$Result.GetResult<Prisma.$CoachAvailabilityPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one CoachAvailability that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {CoachAvailabilityFindUniqueOrThrowArgs} args - Arguments to find a CoachAvailability
+     * @example
+     * // Get one CoachAvailability
+     * const coachAvailability = await prisma.coachAvailability.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends CoachAvailabilityFindUniqueOrThrowArgs>(args: SelectSubset<T, CoachAvailabilityFindUniqueOrThrowArgs<ExtArgs>>): Prisma__CoachAvailabilityClient<$Result.GetResult<Prisma.$CoachAvailabilityPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first CoachAvailability that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CoachAvailabilityFindFirstArgs} args - Arguments to find a CoachAvailability
+     * @example
+     * // Get one CoachAvailability
+     * const coachAvailability = await prisma.coachAvailability.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends CoachAvailabilityFindFirstArgs>(args?: SelectSubset<T, CoachAvailabilityFindFirstArgs<ExtArgs>>): Prisma__CoachAvailabilityClient<$Result.GetResult<Prisma.$CoachAvailabilityPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first CoachAvailability that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CoachAvailabilityFindFirstOrThrowArgs} args - Arguments to find a CoachAvailability
+     * @example
+     * // Get one CoachAvailability
+     * const coachAvailability = await prisma.coachAvailability.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends CoachAvailabilityFindFirstOrThrowArgs>(args?: SelectSubset<T, CoachAvailabilityFindFirstOrThrowArgs<ExtArgs>>): Prisma__CoachAvailabilityClient<$Result.GetResult<Prisma.$CoachAvailabilityPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more CoachAvailabilities that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CoachAvailabilityFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all CoachAvailabilities
+     * const coachAvailabilities = await prisma.coachAvailability.findMany()
+     * 
+     * // Get first 10 CoachAvailabilities
+     * const coachAvailabilities = await prisma.coachAvailability.findMany({ take: 10 })
+     * 
+     * // Only select the `coachId`
+     * const coachAvailabilityWithCoachIdOnly = await prisma.coachAvailability.findMany({ select: { coachId: true } })
+     * 
+     */
+    findMany<T extends CoachAvailabilityFindManyArgs>(args?: SelectSubset<T, CoachAvailabilityFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CoachAvailabilityPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a CoachAvailability.
+     * @param {CoachAvailabilityCreateArgs} args - Arguments to create a CoachAvailability.
+     * @example
+     * // Create one CoachAvailability
+     * const CoachAvailability = await prisma.coachAvailability.create({
+     *   data: {
+     *     // ... data to create a CoachAvailability
+     *   }
+     * })
+     * 
+     */
+    create<T extends CoachAvailabilityCreateArgs>(args: SelectSubset<T, CoachAvailabilityCreateArgs<ExtArgs>>): Prisma__CoachAvailabilityClient<$Result.GetResult<Prisma.$CoachAvailabilityPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many CoachAvailabilities.
+     * @param {CoachAvailabilityCreateManyArgs} args - Arguments to create many CoachAvailabilities.
+     * @example
+     * // Create many CoachAvailabilities
+     * const coachAvailability = await prisma.coachAvailability.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends CoachAvailabilityCreateManyArgs>(args?: SelectSubset<T, CoachAvailabilityCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many CoachAvailabilities and returns the data saved in the database.
+     * @param {CoachAvailabilityCreateManyAndReturnArgs} args - Arguments to create many CoachAvailabilities.
+     * @example
+     * // Create many CoachAvailabilities
+     * const coachAvailability = await prisma.coachAvailability.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many CoachAvailabilities and only return the `coachId`
+     * const coachAvailabilityWithCoachIdOnly = await prisma.coachAvailability.createManyAndReturn({
+     *   select: { coachId: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends CoachAvailabilityCreateManyAndReturnArgs>(args?: SelectSubset<T, CoachAvailabilityCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CoachAvailabilityPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a CoachAvailability.
+     * @param {CoachAvailabilityDeleteArgs} args - Arguments to delete one CoachAvailability.
+     * @example
+     * // Delete one CoachAvailability
+     * const CoachAvailability = await prisma.coachAvailability.delete({
+     *   where: {
+     *     // ... filter to delete one CoachAvailability
+     *   }
+     * })
+     * 
+     */
+    delete<T extends CoachAvailabilityDeleteArgs>(args: SelectSubset<T, CoachAvailabilityDeleteArgs<ExtArgs>>): Prisma__CoachAvailabilityClient<$Result.GetResult<Prisma.$CoachAvailabilityPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one CoachAvailability.
+     * @param {CoachAvailabilityUpdateArgs} args - Arguments to update one CoachAvailability.
+     * @example
+     * // Update one CoachAvailability
+     * const coachAvailability = await prisma.coachAvailability.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends CoachAvailabilityUpdateArgs>(args: SelectSubset<T, CoachAvailabilityUpdateArgs<ExtArgs>>): Prisma__CoachAvailabilityClient<$Result.GetResult<Prisma.$CoachAvailabilityPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more CoachAvailabilities.
+     * @param {CoachAvailabilityDeleteManyArgs} args - Arguments to filter CoachAvailabilities to delete.
+     * @example
+     * // Delete a few CoachAvailabilities
+     * const { count } = await prisma.coachAvailability.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends CoachAvailabilityDeleteManyArgs>(args?: SelectSubset<T, CoachAvailabilityDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more CoachAvailabilities.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CoachAvailabilityUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many CoachAvailabilities
+     * const coachAvailability = await prisma.coachAvailability.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends CoachAvailabilityUpdateManyArgs>(args: SelectSubset<T, CoachAvailabilityUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more CoachAvailabilities and returns the data updated in the database.
+     * @param {CoachAvailabilityUpdateManyAndReturnArgs} args - Arguments to update many CoachAvailabilities.
+     * @example
+     * // Update many CoachAvailabilities
+     * const coachAvailability = await prisma.coachAvailability.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more CoachAvailabilities and only return the `coachId`
+     * const coachAvailabilityWithCoachIdOnly = await prisma.coachAvailability.updateManyAndReturn({
+     *   select: { coachId: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends CoachAvailabilityUpdateManyAndReturnArgs>(args: SelectSubset<T, CoachAvailabilityUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CoachAvailabilityPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one CoachAvailability.
+     * @param {CoachAvailabilityUpsertArgs} args - Arguments to update or create a CoachAvailability.
+     * @example
+     * // Update or create a CoachAvailability
+     * const coachAvailability = await prisma.coachAvailability.upsert({
+     *   create: {
+     *     // ... data to create a CoachAvailability
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the CoachAvailability we want to update
+     *   }
+     * })
+     */
+    upsert<T extends CoachAvailabilityUpsertArgs>(args: SelectSubset<T, CoachAvailabilityUpsertArgs<ExtArgs>>): Prisma__CoachAvailabilityClient<$Result.GetResult<Prisma.$CoachAvailabilityPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of CoachAvailabilities.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CoachAvailabilityCountArgs} args - Arguments to filter CoachAvailabilities to count.
+     * @example
+     * // Count the number of CoachAvailabilities
+     * const count = await prisma.coachAvailability.count({
+     *   where: {
+     *     // ... the filter for the CoachAvailabilities we want to count
+     *   }
+     * })
+    **/
+    count<T extends CoachAvailabilityCountArgs>(
+      args?: Subset<T, CoachAvailabilityCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], CoachAvailabilityCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a CoachAvailability.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CoachAvailabilityAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends CoachAvailabilityAggregateArgs>(args: Subset<T, CoachAvailabilityAggregateArgs>): Prisma.PrismaPromise<GetCoachAvailabilityAggregateType<T>>
+
+    /**
+     * Group by CoachAvailability.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CoachAvailabilityGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends CoachAvailabilityGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: CoachAvailabilityGroupByArgs['orderBy'] }
+        : { orderBy?: CoachAvailabilityGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, CoachAvailabilityGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetCoachAvailabilityGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the CoachAvailability model
+   */
+  readonly fields: CoachAvailabilityFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for CoachAvailability.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__CoachAvailabilityClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    link<T extends CoachClientDefaultArgs<ExtArgs> = {}>(args?: Subset<T, CoachClientDefaultArgs<ExtArgs>>): Prisma__CoachClientClient<$Result.GetResult<Prisma.$CoachClientPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the CoachAvailability model
+   */
+  interface CoachAvailabilityFieldRefs {
+    readonly coachId: FieldRef<"CoachAvailability", 'String'>
+    readonly clientId: FieldRef<"CoachAvailability", 'String'>
+    readonly status: FieldRef<"CoachAvailability", 'String'>
+    readonly returnBy: FieldRef<"CoachAvailability", 'String'>
+    readonly setAt: FieldRef<"CoachAvailability", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * CoachAvailability findUnique
+   */
+  export type CoachAvailabilityFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CoachAvailability
+     */
+    select?: CoachAvailabilitySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CoachAvailability
+     */
+    omit?: CoachAvailabilityOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CoachAvailabilityInclude<ExtArgs> | null
+    /**
+     * Filter, which CoachAvailability to fetch.
+     */
+    where: CoachAvailabilityWhereUniqueInput
+  }
+
+  /**
+   * CoachAvailability findUniqueOrThrow
+   */
+  export type CoachAvailabilityFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CoachAvailability
+     */
+    select?: CoachAvailabilitySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CoachAvailability
+     */
+    omit?: CoachAvailabilityOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CoachAvailabilityInclude<ExtArgs> | null
+    /**
+     * Filter, which CoachAvailability to fetch.
+     */
+    where: CoachAvailabilityWhereUniqueInput
+  }
+
+  /**
+   * CoachAvailability findFirst
+   */
+  export type CoachAvailabilityFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CoachAvailability
+     */
+    select?: CoachAvailabilitySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CoachAvailability
+     */
+    omit?: CoachAvailabilityOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CoachAvailabilityInclude<ExtArgs> | null
+    /**
+     * Filter, which CoachAvailability to fetch.
+     */
+    where?: CoachAvailabilityWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of CoachAvailabilities to fetch.
+     */
+    orderBy?: CoachAvailabilityOrderByWithRelationInput | CoachAvailabilityOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for CoachAvailabilities.
+     */
+    cursor?: CoachAvailabilityWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` CoachAvailabilities from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` CoachAvailabilities.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of CoachAvailabilities.
+     */
+    distinct?: CoachAvailabilityScalarFieldEnum | CoachAvailabilityScalarFieldEnum[]
+  }
+
+  /**
+   * CoachAvailability findFirstOrThrow
+   */
+  export type CoachAvailabilityFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CoachAvailability
+     */
+    select?: CoachAvailabilitySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CoachAvailability
+     */
+    omit?: CoachAvailabilityOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CoachAvailabilityInclude<ExtArgs> | null
+    /**
+     * Filter, which CoachAvailability to fetch.
+     */
+    where?: CoachAvailabilityWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of CoachAvailabilities to fetch.
+     */
+    orderBy?: CoachAvailabilityOrderByWithRelationInput | CoachAvailabilityOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for CoachAvailabilities.
+     */
+    cursor?: CoachAvailabilityWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` CoachAvailabilities from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` CoachAvailabilities.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of CoachAvailabilities.
+     */
+    distinct?: CoachAvailabilityScalarFieldEnum | CoachAvailabilityScalarFieldEnum[]
+  }
+
+  /**
+   * CoachAvailability findMany
+   */
+  export type CoachAvailabilityFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CoachAvailability
+     */
+    select?: CoachAvailabilitySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CoachAvailability
+     */
+    omit?: CoachAvailabilityOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CoachAvailabilityInclude<ExtArgs> | null
+    /**
+     * Filter, which CoachAvailabilities to fetch.
+     */
+    where?: CoachAvailabilityWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of CoachAvailabilities to fetch.
+     */
+    orderBy?: CoachAvailabilityOrderByWithRelationInput | CoachAvailabilityOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing CoachAvailabilities.
+     */
+    cursor?: CoachAvailabilityWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` CoachAvailabilities from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` CoachAvailabilities.
+     */
+    skip?: number
+    distinct?: CoachAvailabilityScalarFieldEnum | CoachAvailabilityScalarFieldEnum[]
+  }
+
+  /**
+   * CoachAvailability create
+   */
+  export type CoachAvailabilityCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CoachAvailability
+     */
+    select?: CoachAvailabilitySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CoachAvailability
+     */
+    omit?: CoachAvailabilityOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CoachAvailabilityInclude<ExtArgs> | null
+    /**
+     * The data needed to create a CoachAvailability.
+     */
+    data: XOR<CoachAvailabilityCreateInput, CoachAvailabilityUncheckedCreateInput>
+  }
+
+  /**
+   * CoachAvailability createMany
+   */
+  export type CoachAvailabilityCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many CoachAvailabilities.
+     */
+    data: CoachAvailabilityCreateManyInput | CoachAvailabilityCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * CoachAvailability createManyAndReturn
+   */
+  export type CoachAvailabilityCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CoachAvailability
+     */
+    select?: CoachAvailabilitySelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the CoachAvailability
+     */
+    omit?: CoachAvailabilityOmit<ExtArgs> | null
+    /**
+     * The data used to create many CoachAvailabilities.
+     */
+    data: CoachAvailabilityCreateManyInput | CoachAvailabilityCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CoachAvailabilityIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * CoachAvailability update
+   */
+  export type CoachAvailabilityUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CoachAvailability
+     */
+    select?: CoachAvailabilitySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CoachAvailability
+     */
+    omit?: CoachAvailabilityOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CoachAvailabilityInclude<ExtArgs> | null
+    /**
+     * The data needed to update a CoachAvailability.
+     */
+    data: XOR<CoachAvailabilityUpdateInput, CoachAvailabilityUncheckedUpdateInput>
+    /**
+     * Choose, which CoachAvailability to update.
+     */
+    where: CoachAvailabilityWhereUniqueInput
+  }
+
+  /**
+   * CoachAvailability updateMany
+   */
+  export type CoachAvailabilityUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update CoachAvailabilities.
+     */
+    data: XOR<CoachAvailabilityUpdateManyMutationInput, CoachAvailabilityUncheckedUpdateManyInput>
+    /**
+     * Filter which CoachAvailabilities to update
+     */
+    where?: CoachAvailabilityWhereInput
+    /**
+     * Limit how many CoachAvailabilities to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * CoachAvailability updateManyAndReturn
+   */
+  export type CoachAvailabilityUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CoachAvailability
+     */
+    select?: CoachAvailabilitySelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the CoachAvailability
+     */
+    omit?: CoachAvailabilityOmit<ExtArgs> | null
+    /**
+     * The data used to update CoachAvailabilities.
+     */
+    data: XOR<CoachAvailabilityUpdateManyMutationInput, CoachAvailabilityUncheckedUpdateManyInput>
+    /**
+     * Filter which CoachAvailabilities to update
+     */
+    where?: CoachAvailabilityWhereInput
+    /**
+     * Limit how many CoachAvailabilities to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CoachAvailabilityIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * CoachAvailability upsert
+   */
+  export type CoachAvailabilityUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CoachAvailability
+     */
+    select?: CoachAvailabilitySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CoachAvailability
+     */
+    omit?: CoachAvailabilityOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CoachAvailabilityInclude<ExtArgs> | null
+    /**
+     * The filter to search for the CoachAvailability to update in case it exists.
+     */
+    where: CoachAvailabilityWhereUniqueInput
+    /**
+     * In case the CoachAvailability found by the `where` argument doesn't exist, create a new CoachAvailability with this data.
+     */
+    create: XOR<CoachAvailabilityCreateInput, CoachAvailabilityUncheckedCreateInput>
+    /**
+     * In case the CoachAvailability was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<CoachAvailabilityUpdateInput, CoachAvailabilityUncheckedUpdateInput>
+  }
+
+  /**
+   * CoachAvailability delete
+   */
+  export type CoachAvailabilityDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CoachAvailability
+     */
+    select?: CoachAvailabilitySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CoachAvailability
+     */
+    omit?: CoachAvailabilityOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CoachAvailabilityInclude<ExtArgs> | null
+    /**
+     * Filter which CoachAvailability to delete.
+     */
+    where: CoachAvailabilityWhereUniqueInput
+  }
+
+  /**
+   * CoachAvailability deleteMany
+   */
+  export type CoachAvailabilityDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which CoachAvailabilities to delete
+     */
+    where?: CoachAvailabilityWhereInput
+    /**
+     * Limit how many CoachAvailabilities to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * CoachAvailability without action
+   */
+  export type CoachAvailabilityDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CoachAvailability
+     */
+    select?: CoachAvailabilitySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CoachAvailability
+     */
+    omit?: CoachAvailabilityOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CoachAvailabilityInclude<ExtArgs> | null
   }
 
 
@@ -129623,7 +130814,8 @@ export namespace Prisma {
     programId: 'programId',
     authorId: 'authorId',
     body: 'body',
-    createdAt: 'createdAt'
+    createdAt: 'createdAt',
+    readAt: 'readAt'
   };
 
   export type ProgramMessageScalarFieldEnum = (typeof ProgramMessageScalarFieldEnum)[keyof typeof ProgramMessageScalarFieldEnum]
@@ -129884,6 +131076,17 @@ export namespace Prisma {
   };
 
   export type CoachClientScalarFieldEnum = (typeof CoachClientScalarFieldEnum)[keyof typeof CoachClientScalarFieldEnum]
+
+
+  export const CoachAvailabilityScalarFieldEnum: {
+    coachId: 'coachId',
+    clientId: 'clientId',
+    status: 'status',
+    returnBy: 'returnBy',
+    setAt: 'setAt'
+  };
+
+  export type CoachAvailabilityScalarFieldEnum = (typeof CoachAvailabilityScalarFieldEnum)[keyof typeof CoachAvailabilityScalarFieldEnum]
 
 
   export const InstructorScalarFieldEnum: {
@@ -136834,6 +138037,7 @@ export namespace Prisma {
     authorId?: StringFilter<"ProgramMessage"> | string
     body?: StringFilter<"ProgramMessage"> | string
     createdAt?: DateTimeFilter<"ProgramMessage"> | Date | string
+    readAt?: DateTimeNullableFilter<"ProgramMessage"> | Date | string | null
     program?: XOR<CoachingProgramScalarRelationFilter, CoachingProgramWhereInput>
   }
 
@@ -136843,6 +138047,7 @@ export namespace Prisma {
     authorId?: SortOrder
     body?: SortOrder
     createdAt?: SortOrder
+    readAt?: SortOrderInput | SortOrder
     program?: CoachingProgramOrderByWithRelationInput
   }
 
@@ -136855,6 +138060,7 @@ export namespace Prisma {
     authorId?: StringFilter<"ProgramMessage"> | string
     body?: StringFilter<"ProgramMessage"> | string
     createdAt?: DateTimeFilter<"ProgramMessage"> | Date | string
+    readAt?: DateTimeNullableFilter<"ProgramMessage"> | Date | string | null
     program?: XOR<CoachingProgramScalarRelationFilter, CoachingProgramWhereInput>
   }, "id">
 
@@ -136864,6 +138070,7 @@ export namespace Prisma {
     authorId?: SortOrder
     body?: SortOrder
     createdAt?: SortOrder
+    readAt?: SortOrderInput | SortOrder
     _count?: ProgramMessageCountOrderByAggregateInput
     _max?: ProgramMessageMaxOrderByAggregateInput
     _min?: ProgramMessageMinOrderByAggregateInput
@@ -136878,6 +138085,7 @@ export namespace Prisma {
     authorId?: StringWithAggregatesFilter<"ProgramMessage"> | string
     body?: StringWithAggregatesFilter<"ProgramMessage"> | string
     createdAt?: DateTimeWithAggregatesFilter<"ProgramMessage"> | Date | string
+    readAt?: DateTimeNullableWithAggregatesFilter<"ProgramMessage"> | Date | string | null
   }
 
   export type FacilitatorProfileWhereInput = {
@@ -138159,6 +139367,7 @@ export namespace Prisma {
     createdAt?: DateTimeFilter<"CoachClient"> | Date | string
     coach?: XOR<UserScalarRelationFilter, UserWhereInput>
     client?: XOR<UserScalarRelationFilter, UserWhereInput>
+    availability?: XOR<CoachAvailabilityNullableScalarRelationFilter, CoachAvailabilityWhereInput> | null
   }
 
   export type CoachClientOrderByWithRelationInput = {
@@ -138170,6 +139379,7 @@ export namespace Prisma {
     createdAt?: SortOrder
     coach?: UserOrderByWithRelationInput
     client?: UserOrderByWithRelationInput
+    availability?: CoachAvailabilityOrderByWithRelationInput
   }
 
   export type CoachClientWhereUniqueInput = Prisma.AtLeast<{
@@ -138185,6 +139395,7 @@ export namespace Prisma {
     createdAt?: DateTimeFilter<"CoachClient"> | Date | string
     coach?: XOR<UserScalarRelationFilter, UserWhereInput>
     client?: XOR<UserScalarRelationFilter, UserWhereInput>
+    availability?: XOR<CoachAvailabilityNullableScalarRelationFilter, CoachAvailabilityWhereInput> | null
   }, "id" | "coachId_clientId">
 
   export type CoachClientOrderByWithAggregationInput = {
@@ -138209,6 +139420,62 @@ export namespace Prisma {
     via?: StringWithAggregatesFilter<"CoachClient"> | string
     endedAt?: DateTimeNullableWithAggregatesFilter<"CoachClient"> | Date | string | null
     createdAt?: DateTimeWithAggregatesFilter<"CoachClient"> | Date | string
+  }
+
+  export type CoachAvailabilityWhereInput = {
+    AND?: CoachAvailabilityWhereInput | CoachAvailabilityWhereInput[]
+    OR?: CoachAvailabilityWhereInput[]
+    NOT?: CoachAvailabilityWhereInput | CoachAvailabilityWhereInput[]
+    coachId?: StringFilter<"CoachAvailability"> | string
+    clientId?: StringFilter<"CoachAvailability"> | string
+    status?: StringFilter<"CoachAvailability"> | string
+    returnBy?: StringNullableFilter<"CoachAvailability"> | string | null
+    setAt?: DateTimeFilter<"CoachAvailability"> | Date | string
+    link?: XOR<CoachClientScalarRelationFilter, CoachClientWhereInput>
+  }
+
+  export type CoachAvailabilityOrderByWithRelationInput = {
+    coachId?: SortOrder
+    clientId?: SortOrder
+    status?: SortOrder
+    returnBy?: SortOrderInput | SortOrder
+    setAt?: SortOrder
+    link?: CoachClientOrderByWithRelationInput
+  }
+
+  export type CoachAvailabilityWhereUniqueInput = Prisma.AtLeast<{
+    coachId_clientId?: CoachAvailabilityCoachIdClientIdCompoundUniqueInput
+    AND?: CoachAvailabilityWhereInput | CoachAvailabilityWhereInput[]
+    OR?: CoachAvailabilityWhereInput[]
+    NOT?: CoachAvailabilityWhereInput | CoachAvailabilityWhereInput[]
+    coachId?: StringFilter<"CoachAvailability"> | string
+    clientId?: StringFilter<"CoachAvailability"> | string
+    status?: StringFilter<"CoachAvailability"> | string
+    returnBy?: StringNullableFilter<"CoachAvailability"> | string | null
+    setAt?: DateTimeFilter<"CoachAvailability"> | Date | string
+    link?: XOR<CoachClientScalarRelationFilter, CoachClientWhereInput>
+  }, "coachId_clientId">
+
+  export type CoachAvailabilityOrderByWithAggregationInput = {
+    coachId?: SortOrder
+    clientId?: SortOrder
+    status?: SortOrder
+    returnBy?: SortOrderInput | SortOrder
+    setAt?: SortOrder
+    _count?: CoachAvailabilityCountOrderByAggregateInput
+    _max?: CoachAvailabilityMaxOrderByAggregateInput
+    _min?: CoachAvailabilityMinOrderByAggregateInput
+  }
+
+  export type CoachAvailabilityScalarWhereWithAggregatesInput = {
+    AND?: CoachAvailabilityScalarWhereWithAggregatesInput | CoachAvailabilityScalarWhereWithAggregatesInput[]
+    OR?: CoachAvailabilityScalarWhereWithAggregatesInput[]
+    NOT?: CoachAvailabilityScalarWhereWithAggregatesInput | CoachAvailabilityScalarWhereWithAggregatesInput[]
+    coachId?: StringWithAggregatesFilter<"CoachAvailability"> | string
+    clientId?: StringWithAggregatesFilter<"CoachAvailability"> | string
+    status?: StringWithAggregatesFilter<"CoachAvailability"> | string
+    returnBy?: StringNullableWithAggregatesFilter<"CoachAvailability"> | string | null
+    setAt?: DateTimeWithAggregatesFilter<"CoachAvailability"> | Date | string
   }
 
   export type InstructorWhereInput = {
@@ -146005,6 +147272,7 @@ export namespace Prisma {
     authorId: string
     body: string
     createdAt?: Date | string
+    readAt?: Date | string | null
     program: CoachingProgramCreateNestedOneWithoutMessagesInput
   }
 
@@ -146014,6 +147282,7 @@ export namespace Prisma {
     authorId: string
     body: string
     createdAt?: Date | string
+    readAt?: Date | string | null
   }
 
   export type ProgramMessageUpdateInput = {
@@ -146021,6 +147290,7 @@ export namespace Prisma {
     authorId?: StringFieldUpdateOperationsInput | string
     body?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    readAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     program?: CoachingProgramUpdateOneRequiredWithoutMessagesNestedInput
   }
 
@@ -146030,6 +147300,7 @@ export namespace Prisma {
     authorId?: StringFieldUpdateOperationsInput | string
     body?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    readAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   }
 
   export type ProgramMessageCreateManyInput = {
@@ -146038,6 +147309,7 @@ export namespace Prisma {
     authorId: string
     body: string
     createdAt?: Date | string
+    readAt?: Date | string | null
   }
 
   export type ProgramMessageUpdateManyMutationInput = {
@@ -146045,6 +147317,7 @@ export namespace Prisma {
     authorId?: StringFieldUpdateOperationsInput | string
     body?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    readAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   }
 
   export type ProgramMessageUncheckedUpdateManyInput = {
@@ -146053,6 +147326,7 @@ export namespace Prisma {
     authorId?: StringFieldUpdateOperationsInput | string
     body?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    readAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   }
 
   export type FacilitatorProfileCreateInput = {
@@ -147460,6 +148734,7 @@ export namespace Prisma {
     createdAt?: Date | string
     coach: UserCreateNestedOneWithoutClientsCoachedInput
     client: UserCreateNestedOneWithoutCoachesInput
+    availability?: CoachAvailabilityCreateNestedOneWithoutLinkInput
   }
 
   export type CoachClientUncheckedCreateInput = {
@@ -147469,6 +148744,7 @@ export namespace Prisma {
     via?: string
     endedAt?: Date | string | null
     createdAt?: Date | string
+    availability?: CoachAvailabilityUncheckedCreateNestedOneWithoutLinkInput
   }
 
   export type CoachClientUpdateInput = {
@@ -147478,6 +148754,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     coach?: UserUpdateOneRequiredWithoutClientsCoachedNestedInput
     client?: UserUpdateOneRequiredWithoutCoachesNestedInput
+    availability?: CoachAvailabilityUpdateOneWithoutLinkNestedInput
   }
 
   export type CoachClientUncheckedUpdateInput = {
@@ -147487,6 +148764,7 @@ export namespace Prisma {
     via?: StringFieldUpdateOperationsInput | string
     endedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    availability?: CoachAvailabilityUncheckedUpdateOneWithoutLinkNestedInput
   }
 
   export type CoachClientCreateManyInput = {
@@ -147512,6 +148790,58 @@ export namespace Prisma {
     via?: StringFieldUpdateOperationsInput | string
     endedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type CoachAvailabilityCreateInput = {
+    status: string
+    returnBy?: string | null
+    setAt?: Date | string
+    link: CoachClientCreateNestedOneWithoutAvailabilityInput
+  }
+
+  export type CoachAvailabilityUncheckedCreateInput = {
+    coachId: string
+    clientId: string
+    status: string
+    returnBy?: string | null
+    setAt?: Date | string
+  }
+
+  export type CoachAvailabilityUpdateInput = {
+    status?: StringFieldUpdateOperationsInput | string
+    returnBy?: NullableStringFieldUpdateOperationsInput | string | null
+    setAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    link?: CoachClientUpdateOneRequiredWithoutAvailabilityNestedInput
+  }
+
+  export type CoachAvailabilityUncheckedUpdateInput = {
+    coachId?: StringFieldUpdateOperationsInput | string
+    clientId?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    returnBy?: NullableStringFieldUpdateOperationsInput | string | null
+    setAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type CoachAvailabilityCreateManyInput = {
+    coachId: string
+    clientId: string
+    status: string
+    returnBy?: string | null
+    setAt?: Date | string
+  }
+
+  export type CoachAvailabilityUpdateManyMutationInput = {
+    status?: StringFieldUpdateOperationsInput | string
+    returnBy?: NullableStringFieldUpdateOperationsInput | string | null
+    setAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type CoachAvailabilityUncheckedUpdateManyInput = {
+    coachId?: StringFieldUpdateOperationsInput | string
+    clientId?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    returnBy?: NullableStringFieldUpdateOperationsInput | string | null
+    setAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type InstructorCreateInput = {
@@ -153462,6 +154792,7 @@ export namespace Prisma {
     authorId?: SortOrder
     body?: SortOrder
     createdAt?: SortOrder
+    readAt?: SortOrder
   }
 
   export type ProgramMessageMaxOrderByAggregateInput = {
@@ -153470,6 +154801,7 @@ export namespace Prisma {
     authorId?: SortOrder
     body?: SortOrder
     createdAt?: SortOrder
+    readAt?: SortOrder
   }
 
   export type ProgramMessageMinOrderByAggregateInput = {
@@ -153478,6 +154810,7 @@ export namespace Prisma {
     authorId?: SortOrder
     body?: SortOrder
     createdAt?: SortOrder
+    readAt?: SortOrder
   }
 
   export type EnumCertificationStatusFilter<$PrismaModel = never> = {
@@ -154211,6 +155544,11 @@ export namespace Prisma {
     joined?: SortOrder
   }
 
+  export type CoachAvailabilityNullableScalarRelationFilter = {
+    is?: CoachAvailabilityWhereInput | null
+    isNot?: CoachAvailabilityWhereInput | null
+  }
+
   export type CoachClientCoachIdClientIdCompoundUniqueInput = {
     coachId: string
     clientId: string
@@ -154241,6 +155579,40 @@ export namespace Prisma {
     via?: SortOrder
     endedAt?: SortOrder
     createdAt?: SortOrder
+  }
+
+  export type CoachClientScalarRelationFilter = {
+    is?: CoachClientWhereInput
+    isNot?: CoachClientWhereInput
+  }
+
+  export type CoachAvailabilityCoachIdClientIdCompoundUniqueInput = {
+    coachId: string
+    clientId: string
+  }
+
+  export type CoachAvailabilityCountOrderByAggregateInput = {
+    coachId?: SortOrder
+    clientId?: SortOrder
+    status?: SortOrder
+    returnBy?: SortOrder
+    setAt?: SortOrder
+  }
+
+  export type CoachAvailabilityMaxOrderByAggregateInput = {
+    coachId?: SortOrder
+    clientId?: SortOrder
+    status?: SortOrder
+    returnBy?: SortOrder
+    setAt?: SortOrder
+  }
+
+  export type CoachAvailabilityMinOrderByAggregateInput = {
+    coachId?: SortOrder
+    clientId?: SortOrder
+    status?: SortOrder
+    returnBy?: SortOrder
+    setAt?: SortOrder
   }
 
   export type ProgramAccessListRelationFilter = {
@@ -160622,6 +161994,18 @@ export namespace Prisma {
     connect?: UserWhereUniqueInput
   }
 
+  export type CoachAvailabilityCreateNestedOneWithoutLinkInput = {
+    create?: XOR<CoachAvailabilityCreateWithoutLinkInput, CoachAvailabilityUncheckedCreateWithoutLinkInput>
+    connectOrCreate?: CoachAvailabilityCreateOrConnectWithoutLinkInput
+    connect?: CoachAvailabilityWhereUniqueInput
+  }
+
+  export type CoachAvailabilityUncheckedCreateNestedOneWithoutLinkInput = {
+    create?: XOR<CoachAvailabilityCreateWithoutLinkInput, CoachAvailabilityUncheckedCreateWithoutLinkInput>
+    connectOrCreate?: CoachAvailabilityCreateOrConnectWithoutLinkInput
+    connect?: CoachAvailabilityWhereUniqueInput
+  }
+
   export type UserUpdateOneRequiredWithoutClientsCoachedNestedInput = {
     create?: XOR<UserCreateWithoutClientsCoachedInput, UserUncheckedCreateWithoutClientsCoachedInput>
     connectOrCreate?: UserCreateOrConnectWithoutClientsCoachedInput
@@ -160636,6 +162020,40 @@ export namespace Prisma {
     upsert?: UserUpsertWithoutCoachesInput
     connect?: UserWhereUniqueInput
     update?: XOR<XOR<UserUpdateToOneWithWhereWithoutCoachesInput, UserUpdateWithoutCoachesInput>, UserUncheckedUpdateWithoutCoachesInput>
+  }
+
+  export type CoachAvailabilityUpdateOneWithoutLinkNestedInput = {
+    create?: XOR<CoachAvailabilityCreateWithoutLinkInput, CoachAvailabilityUncheckedCreateWithoutLinkInput>
+    connectOrCreate?: CoachAvailabilityCreateOrConnectWithoutLinkInput
+    upsert?: CoachAvailabilityUpsertWithoutLinkInput
+    disconnect?: CoachAvailabilityWhereInput | boolean
+    delete?: CoachAvailabilityWhereInput | boolean
+    connect?: CoachAvailabilityWhereUniqueInput
+    update?: XOR<XOR<CoachAvailabilityUpdateToOneWithWhereWithoutLinkInput, CoachAvailabilityUpdateWithoutLinkInput>, CoachAvailabilityUncheckedUpdateWithoutLinkInput>
+  }
+
+  export type CoachAvailabilityUncheckedUpdateOneWithoutLinkNestedInput = {
+    create?: XOR<CoachAvailabilityCreateWithoutLinkInput, CoachAvailabilityUncheckedCreateWithoutLinkInput>
+    connectOrCreate?: CoachAvailabilityCreateOrConnectWithoutLinkInput
+    upsert?: CoachAvailabilityUpsertWithoutLinkInput
+    disconnect?: CoachAvailabilityWhereInput | boolean
+    delete?: CoachAvailabilityWhereInput | boolean
+    connect?: CoachAvailabilityWhereUniqueInput
+    update?: XOR<XOR<CoachAvailabilityUpdateToOneWithWhereWithoutLinkInput, CoachAvailabilityUpdateWithoutLinkInput>, CoachAvailabilityUncheckedUpdateWithoutLinkInput>
+  }
+
+  export type CoachClientCreateNestedOneWithoutAvailabilityInput = {
+    create?: XOR<CoachClientCreateWithoutAvailabilityInput, CoachClientUncheckedCreateWithoutAvailabilityInput>
+    connectOrCreate?: CoachClientCreateOrConnectWithoutAvailabilityInput
+    connect?: CoachClientWhereUniqueInput
+  }
+
+  export type CoachClientUpdateOneRequiredWithoutAvailabilityNestedInput = {
+    create?: XOR<CoachClientCreateWithoutAvailabilityInput, CoachClientUncheckedCreateWithoutAvailabilityInput>
+    connectOrCreate?: CoachClientCreateOrConnectWithoutAvailabilityInput
+    upsert?: CoachClientUpsertWithoutAvailabilityInput
+    connect?: CoachClientWhereUniqueInput
+    update?: XOR<XOR<CoachClientUpdateToOneWithWhereWithoutAvailabilityInput, CoachClientUpdateWithoutAvailabilityInput>, CoachClientUncheckedUpdateWithoutAvailabilityInput>
   }
 
   export type InstructorCreatecertificationsInput = {
@@ -162259,6 +163677,7 @@ export namespace Prisma {
     endedAt?: Date | string | null
     createdAt?: Date | string
     client: UserCreateNestedOneWithoutCoachesInput
+    availability?: CoachAvailabilityCreateNestedOneWithoutLinkInput
   }
 
   export type CoachClientUncheckedCreateWithoutCoachInput = {
@@ -162267,6 +163686,7 @@ export namespace Prisma {
     via?: string
     endedAt?: Date | string | null
     createdAt?: Date | string
+    availability?: CoachAvailabilityUncheckedCreateNestedOneWithoutLinkInput
   }
 
   export type CoachClientCreateOrConnectWithoutCoachInput = {
@@ -162285,6 +163705,7 @@ export namespace Prisma {
     endedAt?: Date | string | null
     createdAt?: Date | string
     coach: UserCreateNestedOneWithoutClientsCoachedInput
+    availability?: CoachAvailabilityCreateNestedOneWithoutLinkInput
   }
 
   export type CoachClientUncheckedCreateWithoutClientInput = {
@@ -162293,6 +163714,7 @@ export namespace Prisma {
     via?: string
     endedAt?: Date | string | null
     createdAt?: Date | string
+    availability?: CoachAvailabilityUncheckedCreateNestedOneWithoutLinkInput
   }
 
   export type CoachClientCreateOrConnectWithoutClientInput = {
@@ -184381,6 +185803,7 @@ export namespace Prisma {
     authorId: string
     body: string
     createdAt?: Date | string
+    readAt?: Date | string | null
   }
 
   export type ProgramMessageUncheckedCreateWithoutProgramInput = {
@@ -184388,6 +185811,7 @@ export namespace Prisma {
     authorId: string
     body: string
     createdAt?: Date | string
+    readAt?: Date | string | null
   }
 
   export type ProgramMessageCreateOrConnectWithoutProgramInput = {
@@ -184484,6 +185908,7 @@ export namespace Prisma {
     authorId?: StringFilter<"ProgramMessage"> | string
     body?: StringFilter<"ProgramMessage"> | string
     createdAt?: DateTimeFilter<"ProgramMessage"> | Date | string
+    readAt?: DateTimeNullableFilter<"ProgramMessage"> | Date | string | null
   }
 
   export type CoachingProgramCreateWithoutBlocksInput = {
@@ -191191,6 +192616,23 @@ export namespace Prisma {
     create: XOR<UserCreateWithoutCoachesInput, UserUncheckedCreateWithoutCoachesInput>
   }
 
+  export type CoachAvailabilityCreateWithoutLinkInput = {
+    status: string
+    returnBy?: string | null
+    setAt?: Date | string
+  }
+
+  export type CoachAvailabilityUncheckedCreateWithoutLinkInput = {
+    status: string
+    returnBy?: string | null
+    setAt?: Date | string
+  }
+
+  export type CoachAvailabilityCreateOrConnectWithoutLinkInput = {
+    where: CoachAvailabilityWhereUniqueInput
+    create: XOR<CoachAvailabilityCreateWithoutLinkInput, CoachAvailabilityUncheckedCreateWithoutLinkInput>
+  }
+
   export type UserUpsertWithoutClientsCoachedInput = {
     update: XOR<UserUpdateWithoutClientsCoachedInput, UserUncheckedUpdateWithoutClientsCoachedInput>
     create: XOR<UserCreateWithoutClientsCoachedInput, UserUncheckedCreateWithoutClientsCoachedInput>
@@ -191527,6 +192969,81 @@ export namespace Prisma {
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
+  }
+
+  export type CoachAvailabilityUpsertWithoutLinkInput = {
+    update: XOR<CoachAvailabilityUpdateWithoutLinkInput, CoachAvailabilityUncheckedUpdateWithoutLinkInput>
+    create: XOR<CoachAvailabilityCreateWithoutLinkInput, CoachAvailabilityUncheckedCreateWithoutLinkInput>
+    where?: CoachAvailabilityWhereInput
+  }
+
+  export type CoachAvailabilityUpdateToOneWithWhereWithoutLinkInput = {
+    where?: CoachAvailabilityWhereInput
+    data: XOR<CoachAvailabilityUpdateWithoutLinkInput, CoachAvailabilityUncheckedUpdateWithoutLinkInput>
+  }
+
+  export type CoachAvailabilityUpdateWithoutLinkInput = {
+    status?: StringFieldUpdateOperationsInput | string
+    returnBy?: NullableStringFieldUpdateOperationsInput | string | null
+    setAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type CoachAvailabilityUncheckedUpdateWithoutLinkInput = {
+    status?: StringFieldUpdateOperationsInput | string
+    returnBy?: NullableStringFieldUpdateOperationsInput | string | null
+    setAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type CoachClientCreateWithoutAvailabilityInput = {
+    id?: string
+    via?: string
+    endedAt?: Date | string | null
+    createdAt?: Date | string
+    coach: UserCreateNestedOneWithoutClientsCoachedInput
+    client: UserCreateNestedOneWithoutCoachesInput
+  }
+
+  export type CoachClientUncheckedCreateWithoutAvailabilityInput = {
+    id?: string
+    coachId: string
+    clientId: string
+    via?: string
+    endedAt?: Date | string | null
+    createdAt?: Date | string
+  }
+
+  export type CoachClientCreateOrConnectWithoutAvailabilityInput = {
+    where: CoachClientWhereUniqueInput
+    create: XOR<CoachClientCreateWithoutAvailabilityInput, CoachClientUncheckedCreateWithoutAvailabilityInput>
+  }
+
+  export type CoachClientUpsertWithoutAvailabilityInput = {
+    update: XOR<CoachClientUpdateWithoutAvailabilityInput, CoachClientUncheckedUpdateWithoutAvailabilityInput>
+    create: XOR<CoachClientCreateWithoutAvailabilityInput, CoachClientUncheckedCreateWithoutAvailabilityInput>
+    where?: CoachClientWhereInput
+  }
+
+  export type CoachClientUpdateToOneWithWhereWithoutAvailabilityInput = {
+    where?: CoachClientWhereInput
+    data: XOR<CoachClientUpdateWithoutAvailabilityInput, CoachClientUncheckedUpdateWithoutAvailabilityInput>
+  }
+
+  export type CoachClientUpdateWithoutAvailabilityInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    via?: StringFieldUpdateOperationsInput | string
+    endedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    coach?: UserUpdateOneRequiredWithoutClientsCoachedNestedInput
+    client?: UserUpdateOneRequiredWithoutCoachesNestedInput
+  }
+
+  export type CoachClientUncheckedUpdateWithoutAvailabilityInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    coachId?: StringFieldUpdateOperationsInput | string
+    clientId?: StringFieldUpdateOperationsInput | string
+    via?: StringFieldUpdateOperationsInput | string
+    endedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type ProgramAccessCreateWithoutInstructorInput = {
@@ -193941,6 +195458,7 @@ export namespace Prisma {
     endedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     client?: UserUpdateOneRequiredWithoutCoachesNestedInput
+    availability?: CoachAvailabilityUpdateOneWithoutLinkNestedInput
   }
 
   export type CoachClientUncheckedUpdateWithoutCoachInput = {
@@ -193949,6 +195467,7 @@ export namespace Prisma {
     via?: StringFieldUpdateOperationsInput | string
     endedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    availability?: CoachAvailabilityUncheckedUpdateOneWithoutLinkNestedInput
   }
 
   export type CoachClientUncheckedUpdateManyWithoutCoachInput = {
@@ -193965,6 +195484,7 @@ export namespace Prisma {
     endedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     coach?: UserUpdateOneRequiredWithoutClientsCoachedNestedInput
+    availability?: CoachAvailabilityUpdateOneWithoutLinkNestedInput
   }
 
   export type CoachClientUncheckedUpdateWithoutClientInput = {
@@ -193973,6 +195493,7 @@ export namespace Prisma {
     via?: StringFieldUpdateOperationsInput | string
     endedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    availability?: CoachAvailabilityUncheckedUpdateOneWithoutLinkNestedInput
   }
 
   export type CoachClientUncheckedUpdateManyWithoutClientInput = {
@@ -196479,6 +198000,7 @@ export namespace Prisma {
     authorId: string
     body: string
     createdAt?: Date | string
+    readAt?: Date | string | null
   }
 
   export type BlockUpdateWithoutProgramInput = {
@@ -196547,6 +198069,7 @@ export namespace Prisma {
     authorId?: StringFieldUpdateOperationsInput | string
     body?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    readAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   }
 
   export type ProgramMessageUncheckedUpdateWithoutProgramInput = {
@@ -196554,6 +198077,7 @@ export namespace Prisma {
     authorId?: StringFieldUpdateOperationsInput | string
     body?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    readAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   }
 
   export type ProgramMessageUncheckedUpdateManyWithoutProgramInput = {
@@ -196561,6 +198085,7 @@ export namespace Prisma {
     authorId?: StringFieldUpdateOperationsInput | string
     body?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    readAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   }
 
   export type SessionCreateManyBlockInput = {

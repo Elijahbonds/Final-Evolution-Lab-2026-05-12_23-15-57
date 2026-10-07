@@ -5,7 +5,8 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { isProUser, paywall, PAYWALL_STATUS } from '@/lib/pro-guard';
-import { recordCheckValues } from '@/lib/mirror/baselines';
+import { RECENT_SETS, recordCheckValues } from '@/lib/mirror/baselines';
+import { valueFromRow } from '@/lib/mirror/progressReading';
 import { canSaveScanNumbers, refuseScanSave } from '@/lib/privacy/scanSaveGate';
 
 /**
@@ -50,6 +51,15 @@ export async function POST(req: NextRequest) {
   const checkValues = isPlainRecordOfNumbers(body.checkValues) ? body.checkValues : null;
   const faultCounts = checkValues ? recordCheckValues(body.faultCounts, checkValues) : ((body.faultCounts ?? {}) as object);
 
+  // "VS YOUR LAST 3" (MIRROR-PROGRESS, plan Phase 4, 2026-10-07): a body that asks (`recent: true`) gets back the
+  // headline number (lib/mirror/progressReading.ts valueFromRow) of this account's last 3 saved sessions of the SAME
+  // pattern, read BEFORE this one is written — so the review compares the set just done with the ones before it, in one
+  // request. Past the gate above only: a minor, no birth year, or an adult who has not opted in was refused already and
+  // nothing of theirs is read (their "vs your last 3" is on their own phone — lib/mirror/deviceProgress.ts). A failed
+  // read answers `recent: null` and the session still saves. assumption: 3 of the athlete's own newest sessions are the
+  // free tier's "read back the most recent ones" (header), not the Pro trend view.
+  const recent = body.recent === true ? await recentValues(session.user.id, patternId) : undefined;
+
   const created = await prisma.mirrorSession.create({
     data: {
       userId: session.user.id,
@@ -63,7 +73,24 @@ export async function POST(req: NextRequest) {
       faultCounts,
     },
   });
-  return NextResponse.json({ id: created.id, saved: true });
+  return NextResponse.json(recent === undefined ? { id: created.id, saved: true } : { id: created.id, saved: true, recent });
+}
+
+/** The headline of the last RECENT_SETS readable sessions of this pattern, oldest first; null when the read failed. */
+async function recentValues(userId: string, patternId: string): Promise<{ values: number[] } | null> {
+  try {
+    const rows = await prisma.mirrorSession.findMany({
+      where: { userId, patternId },
+      orderBy: { createdAt: 'desc' },
+      // a few spare: a set too short to read was saved without a value and is skipped, not counted as one of the 3
+      take: RECENT_SETS * 4,
+      select: { patternId: true, reps: true, faultCounts: true },
+    });
+    const values = rows.map(valueFromRow).filter((v): v is number => v !== null).slice(0, RECENT_SETS).reverse();
+    return { values };
+  } catch {
+    return null;
+  }
 }
 
 export async function GET(req: NextRequest) {
@@ -101,8 +128,14 @@ export async function GET(req: NextRequest) {
 
 const num = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
 
-/** A plain object of finite numbers — never trusts the client's `checkValues` shape further than that. */
+/** Per-check values a session may carry. A pattern reads a handful; more is not a pattern's readings (MIRROR-PROGRESS). */
+const MAX_CHECK_VALUES = 32;
+
+/** A plain object of finite numbers — never trusts the client's `checkValues` shape further than that. MIRROR-PROGRESS
+ *  (2026-10-07): and at most MAX_CHECK_VALUES of them, each key at most 64 characters; anything bigger is not stored. */
 function isPlainRecordOfNumbers(v: unknown): v is Record<string, number> {
   if (!v || typeof v !== 'object' || Array.isArray(v)) return false;
-  return Object.values(v as Record<string, unknown>).every((n) => typeof n === 'number' && Number.isFinite(n));
+  const entries = Object.entries(v as Record<string, unknown>);
+  if (entries.length > MAX_CHECK_VALUES) return false;
+  return entries.every(([k, n]) => k.length <= 64 && typeof n === 'number' && Number.isFinite(n));
 }

@@ -99,6 +99,9 @@ import { markReadIfNeeded, unreadInThread } from '@/lib/coach/messageReadsView';
 // COACH-AI Phase 8 (2026-10-07): the availability the coach set (Full / Limited / Out), one line, never a diagnosis
 import { MyAvailabilityLine } from '@/components/coach/my-availability';
 import { AVAILABILITY_API } from '@/components/coach/availability-picker';
+// MIRROR-PROGRESS (2026-10-07; plan Phase 4): each card's "Last time: 3×8 @ 60 kg" — the athlete's own newest completed log
+// of that exercise (lib/coach/loop.ts progressSeries, served as today.lastTime), in the unit the card is showing
+import { lastTimeLine } from '@/lib/coach/loop';
 
 export interface TodayApi { today: string; log: string; messages: string | null; warmup?: string | null; cooldown?: string | null; ramp?: string | null; availability?: string | null }
 export const TODAY_API: TodayApi = { today: '/api/coach/me/today', log: '/api/coach/me/log', messages: '/api/coach/messages', warmup: '/api/coach/me/warmup', cooldown: '/api/coach/me/cooldown', ramp: RAMP_API, availability: AVAILABILITY_API };
@@ -240,6 +243,7 @@ export function TodayView({ api = TODAY_API }: { api?: TodayApi }) {
     return (
       <ExerciseCard key={e.id} e={e} label={label} draft={d} unit={unit} error={errors[e.id] ?? null} simpleLog={recovery}
         rampEndpoint={rampEndpointFor(e, today.session.kind, api)}
+        lastTime={lastTimeLine(today.lastTime?.[e.id], unit)}
         prev={data.open?.logs.find((l) => l.sessionExerciseId === e.id) ?? null}
         onSets={(sets) => put({ sets })} onNote={(clientNote) => put({ clientNote })} onVideo={(videoUrl) => put({ videoUrl })} />
     );
@@ -339,12 +343,14 @@ export function WeekStrip({ label, entries }: { label: string; entries: readonly
 }
 
 /** One prescribed exercise: what to do, how to do it, and its sets. */
-function ExerciseCard({ e, label, draft, unit, error, prev, simpleLog = false, rampEndpoint = null, onSets, onNote, onVideo }: {
+function ExerciseCard({ e, label, draft, unit, error, prev, simpleLog = false, rampEndpoint = null, lastTime = null, onSets, onNote, onVideo }: {
   e: TodayExercise; label: string | null; draft: ExerciseDraft; unit: WeightUnit; error: string | null; prev: OpenLog | null;
   /** An off day logs minutes or reps only (MIRROR-COACH P6): no weight, reps left or effort to ask about a walk. */
   simpleLog?: boolean;
   /** MIRROR-COACH P7: GET/POST /api/breath/ramp for the flagged key set (rampEndpointFor), else null — no Dial-Up offer. */
   rampEndpoint?: string | null;
+  /** MIRROR-PROGRESS: "Last time: 3×8 @ 60 kg" (lib/coach/loop.ts lastTimeLine), or null — never done before. */
+  lastTime?: string | null;
   onSets: (s: SetDraft[]) => void; onNote: (v: string) => void; onVideo: (v: string) => void;
 }) {
   const [demo, setDemo] = useState(false);
@@ -376,6 +382,7 @@ function ExerciseCard({ e, label, draft, unit, error, prev, simpleLog = false, r
           <span className="text-white font-medium" data-name>{e.name}</span>
         </div>
         <div className="text-xs text-white/60" data-dose>{e.dose} · tempo {e.tempo} · rest {e.restSeconds}s</div>
+        {lastTime && <div className="text-xs text-[#00E5FF]/75" data-last-time>{lastTime}</div>}
         {tags && <div className="text-[11px] text-white/35">{tags}</div>}
         {e.isKeySet && <div className="text-[11px] text-[#FFD700]/80">{KEY_SET_LINE}</div>}
       </div>

@@ -15,6 +15,7 @@ const TEXT_BY_VERSION: Record<string, string> = {
   '2026-09-29c-draft': '7c6a27b255d6eda1',  // + §5 names the Dial-Up Breath use log and its week after an erase (mirror-coach, phase 7)
   '2026-09-30-draft': 'abc709bb13372227',  // + §5 keeps consent records; an erase does not restart the breath's first week (mirror-coach-erase)
   '2026-10-01-draft': '18b88eec085ba82b',  // §6: body-tracking files from our own servers only (no jsDelivr / Google fallback)
+  '2026-10-07-draft': 'e1c40c0b8dd666d8',  // + §6: the Mirror's "vs your last 3" kept on the device only, never sent, forgettable (mirror-progress)
 };
 
 describe('the policy version', () => {
@@ -80,8 +81,24 @@ describe('privacy policy, the camera', () => {
     const section = PRIVACY_CONTENT.slice(start, PRIVACY_CONTENT.indexOf('## 7.', start));
     expect(section).not.toContain('_');
     const paragraphs = section.split('\n\n').slice(1).map((p) => p.trim()).filter(Boolean);
-    expect(paragraphs.length).toBe(4);
+    // MIRROR-PROGRESS (2026-10-07): 4 → 5, the Mirror's phone-only "vs your last 3" paragraph (owner: "Add it + version bump")
+    expect(paragraphs.length).toBe(5);
     for (const p of paragraphs) expect(p).not.toContain('\n');
+  });
+});
+
+// MIRROR-PROGRESS (2026-10-07; owner decision 1, and "Add it + version bump"): the Mirror's "vs your last 3" keeps one number
+// per finished set on the device for anyone whose Mirror results are not saved (lib/mirror/deviceProgress.ts). §6 says so,
+// in the review's own words for the button.
+describe('privacy policy, the Mirror\'s phone-only history', () => {
+  const text = PRIVACY_CONTENT.toLowerCase();
+  it('says what is kept, where, that it is never sent, and how to remove it', async () => {
+    const { FORGET_LABEL } = await import('@/app/play/mirror/_components/progress-line');
+    expect(text).toContain('compare a set with your last three');
+    expect(text).toContain('one number for each finished set');
+    expect(text).toContain('on this device only');
+    expect(text).toContain('it is never sent');
+    expect(PRIVACY_CONTENT).toContain(`"${FORGET_LABEL}"`);
   });
 });
 

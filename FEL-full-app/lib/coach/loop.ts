@@ -3,7 +3,7 @@
 // and how a client's logs become a progress series. The routes stay thin.
 import type { SessionSection } from '@/public/_prisma/client';
 import { STRUCTURE_DEFAULTS, validateStructure, type CleanStructure, type StructureError, type StructureInput } from './structure';
-import { validateSets, type CleanSet } from './setLog';
+import { fromKg, toKg, validateSets, type CleanSet, type WeightUnit } from './setLog';
 
 /**
  * One prescribed exercise as every reader sees it. MIRROR-COACH P2 (2026-09-25) added the session-structure fields
@@ -164,8 +164,16 @@ export function mergeSpecUpdate(row: Partial<CleanExerciseSpec> & { exerciseId: 
   return merged;
 }
 
-export interface LogRow { exerciseName: string; completedAt: string | Date | null; actualLoad: string | null; actualReps: string | null; rpe: number | null }
-export interface ProgressPoint { at: string; load: number | null; reps: number | null; rpe: number | null }
+/**
+ * `actualSets` (MIRROR-PROGRESS, 2026-10-07): optional — the set count Today's "last time" line reads. A row built without
+ * it (every caller before) reads as before.
+ */
+export interface LogRow { exerciseName: string; completedAt: string | Date | null; actualLoad: string | null; actualReps: string | null; rpe: number | null; actualSets?: number | null }
+/**
+ * MIRROR-PROGRESS (2026-10-07): + `sets`, and the log's own reps and load text — the chart reads the leading numbers, the
+ * "last time: 3×8 @ 60 kg" line (lastTimeLine below) needs every set's reps and the load's unit.
+ */
+export interface ProgressPoint { at: string; load: number | null; reps: number | null; rpe: number | null; sets: number | null; repsText: string | null; loadText: string | null }
 
 /** Leading number of a load/reps string ("225 lbs" → 225, "8-10" → 8, "RPE7" → null). */
 export function leadingNumber(s: string | null): number | null {
@@ -180,10 +188,49 @@ export function progressSeries(logs: LogRow[]): Record<string, ProgressPoint[]> 
   for (const l of logs) {
     if (!l.completedAt) continue;
     const at = typeof l.completedAt === 'string' ? l.completedAt : l.completedAt.toISOString();
-    (out[l.exerciseName] ??= []).push({ at, load: leadingNumber(l.actualLoad), reps: leadingNumber(l.actualReps), rpe: l.rpe });
+    (out[l.exerciseName] ??= []).push({
+      at, load: leadingNumber(l.actualLoad), reps: leadingNumber(l.actualReps), rpe: l.rpe,
+      sets: l.actualSets ?? null, repsText: l.actualReps, loadText: l.actualLoad,
+    });
   }
   for (const k of Object.keys(out)) out[k].sort((a, b) => a.at.localeCompare(b.at));
   return out;
+}
+
+// ── "last time" (MIRROR-PROGRESS, plan Phase 4, 2026-10-07) ─────────────────────────────────────────────────────────
+
+/** One set's reps as a log writes them: "8", a timed "30s", an old card's "8-10". Anything else is not shown. */
+const REPS_TOKEN = /^\d+(?:\s*[-–]\s*\d+)?s?$/;
+const LOAD = /^\s*(\d+(?:\.\d+)?)(?:\s*[-–]\s*(\d+(?:\.\d+)?))?\s*(kgs?|lbs?)?\b/i;
+
+/** A logged load in the athlete's unit: "60 kg", "60–62.5 kg"; a number with no unit stays as typed; "RPE7" is no load. */
+function loadText(text: string | null, unit: WeightUnit): string | null {
+  const m = text ? LOAD.exec(text) : null;
+  if (!m) return null;
+  const lo = Number(m[1]), hi = m[2] !== undefined ? Number(m[2]) : lo;
+  if (!(hi > 0)) return null;                                   // 0 kg is a bodyweight set, not a load
+  const from: WeightUnit | null = m[3] ? (m[3].toLowerCase().startsWith('kg') ? 'kg' : 'lb') : null;
+  const show = (n: number) => (from ? fromKg(toKg(n, from), unit) : n);
+  const span = lo === hi ? `${show(lo)}` : `${show(lo)}–${show(hi)}`;
+  return from ? `${span} ${unit}` : span;
+}
+
+/**
+ * Today's "Last time: 3×8 @ 60 kg" for one exercise, from the newest point of its progressSeries (the athlete's own
+ * completed logs). Sets of equal reps read "3×8"; uneven ones "3 sets: 8, 8, 6"; a load in the athlete's chosen unit.
+ * Null when the log holds no reps, sets or load to show. It reads back what the athlete logged; it prescribes nothing.
+ */
+export function lastTimeLine(p: ProgressPoint | null | undefined, unit: WeightUnit = 'kg'): string | null {
+  if (!p) return null;
+  const reps = (p.repsText ?? '').split(',').map((r) => r.trim()).filter((r) => REPS_TOKEN.test(r));
+  const sets = p.sets !== null && p.sets > 0 ? p.sets : null;
+  let work: string | null = null;
+  if (reps.length > 1 && !reps.every((r) => r === reps[0])) work = `${reps.length} sets: ${reps.join(', ')}`;
+  else if (reps.length) work = sets ? `${sets}×${reps[0]}` : `${reps[0]} reps`;
+  else if (sets) work = `${sets} ${sets === 1 ? 'set' : 'sets'}`;
+  const load = loadText(p.loadText, unit);
+  if (!work && !load) return null;
+  return `Last time: ${[work, load ? `@ ${load}` : null].filter(Boolean).join(' ')}`;
 }
 
 /** Completed client sessions with at least one log the coach has not commented on. */

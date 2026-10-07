@@ -8,6 +8,9 @@ import { prisma } from '@/lib/db';
 import { isUnlistedPlayHref } from '@/lib/unlisted-modes';
 import { TabPage } from '@/components/shell/tab-page';
 import { DoorsRow } from '@/components/shell/doors-row';
+// MIRROR-PROGRESS (2026-10-07): a coached athlete's door to today's session, first on the page (nothing for anyone else)
+import { TodayCard } from '@/components/coach/today-card';
+import { todayCardFor } from '@/lib/coach/todayCard';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,10 +26,11 @@ export default async function TrainPage() {
   const me = (session?.user as { id?: string } | undefined)?.id;
   if (!me) redirect(loginPath('/train'));
 
-  const [coachLink, coachesAnyone, programCount] = await Promise.all([
+  const [coachLink, coachesAnyone, programCount, todayCard] = await Promise.all([
     prisma.coachClient.findFirst({ where: { clientId: me, endedAt: null }, select: { coach: { select: { name: true } } } }).catch(() => null),
     prisma.coachClient.findFirst({ where: { coachId: me, endedAt: null }, select: { id: true } }).catch(() => null),
     prisma.coachingProgram.count({ where: { clientId: me } }).catch(() => 0),
+    todayCardFor(prisma, me),
   ]);
 
   const cards = [
@@ -103,6 +107,7 @@ export default async function TrainPage() {
       lede="Screen it, program it, eat for it. This is the loop the games are the proof of."
       accent="#00FF9D"
     >
+      <TodayCard view={todayCard} />
       <ul className="grid gap-3 sm:grid-cols-2">
         {shown.map((c, i) => {
           const Icon = c.icon;
