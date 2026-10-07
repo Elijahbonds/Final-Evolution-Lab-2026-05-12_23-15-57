@@ -58,6 +58,8 @@ const NOT_IMPORTED: Record<string, string> = {
   // ADVENTURE (2026-10-06): each Phase A lane tests its sim against a headless rig built from contracts.ts (the plan's
   // rule: no lane imports another's code or a scene); A4's sandbox tests drive A1's. Same class as sourceScan above.
   'lib/babylon/adventure/movement/testkit.ts': 'test support — A1\'s headless world, actors and 60 Hz runner; tests are not counted as consumers',
+  // HOOPS BODY (2026-10-07, Mirror & coaching Phase 7): the synthesized hoops bodies the hoops-by-body gates film through the synth.
+  'lib/move/hoopsStreams.ts': 'test support — scripted jump shots, set shots, crossovers, swipes and sit-downs for hoopsBody.test.ts / bodyControlSource.test.ts; tests are not counted as consumers',
   'lib/babylon/adventure/combat/testArena.ts': 'test support — A2\'s headless arena with a contract-built stand-in for A1; tests are not counted as consumers',
   'lib/babylon/adventure/partner/testRig.ts': 'test support — A3\'s headless party rig with stand-ins for A1 and A2; tests are not counted as consumers',
   'lib/babylon/adventure/br/testkit.ts': 'test support — Phase C\'s headless BR scenarios (a landed match, placing bodies, steering the zone); tests are not counted as consumers',

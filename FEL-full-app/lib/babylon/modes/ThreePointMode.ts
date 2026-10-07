@@ -86,6 +86,9 @@ import {
   perfectRun, runOptions, readPracticePick, readMoneyRackPick,
 } from './threePointRules';   // IMPROVE (2026-10-06): the owner-picked items' pure rules
 import type { FelInput } from '../core/InputBus';
+import type { BodyView } from '../core/ModeHarness';
+import type { BodyEvent } from '@/lib/pose/BodyReader';
+import { BodyShot, THREE_BODY, meterTFor, BODY_SHOT_MAX_MS, HELD_ERR_MS, type ShotVerdict } from '@/lib/move/hoopsBody';   // HOOPS BODY (2026-10-07): the shot on the body's clock
 
 let modeVenue: VenueHandle | null = null;   // ship pass 4: the mounted venue spec, disposed with the mode
 // HOOPS-10PHASE-2 (3PT corner camera): CameraDirector.clampToBounds derives its camera-roaming
@@ -197,6 +200,17 @@ let shotMeter = new ShotMeter();
 let shotInputMode: ShotInputMode = DEFAULT_SHOT_INPUT;
 /** True while a hold-release press is held (the gather + jumper are playing, the meter is running toward its own end). */
 let holding = false;
+/**
+ * HOOPS BODY (2026-10-07, Mirror & coaching Phase 7 — the plan's row 6): THE SHOT BY BODY. A real jump starts the hold (the
+ * press's own pressHold: the meter and the rise), and the real release is graded against the body's own apex
+ * (lib/move/hoopsBody BodyShot, both instants on the capture clock, so the camera's lag cancels out); the meter is then
+ * placed where that timing puts it and released through releaseHold, so the make, the arc and EARLY / LATE are the pad's.
+ * While the body's shot is up the meter does not run out on it (the take-off and the release are told late). The pad's
+ * press path is untouched: nothing below runs without a body event.
+ */
+const bodyShot = new BodyShot();
+/** App ms the body began this ball's shot (−1: the body has not). */
+let bodyShotAt = -1;
 /** Distance narrows the window exactly like a defender does (BasketballCore.distanceContest01 → ShotMeter.start's
  *  contestLevel01) — the top-of-key rack (7.24 m) is the hard one, the corners (6.71 m) the forgiving ones, same
  *  as the real event. Capped at 0.4 so a deep rack is harder, not a different game. */
@@ -212,6 +226,7 @@ function beginShootPhase(): void {
   shotInputMode = readShotInputMode();
   shotMeter.start(distanceContestForRack(S.rack), 'jumper', 0);
   shotMeter.widenBy(shotFactor);
+  bodyShot.reset(); bodyShotAt = -1;   // HOOPS BODY: a new ball, a new shot
   meter3d?.begin({ center: shotMeter.greenCenter01, half: shotMeter.greenHalfWidth01 });
   if (shotInputMode === 'tap-timing') shotMeter.update(Math.random() * shotMeter.durationSec);
   else shotMeter.active = false;   // HOLD-RELEASE: shown, not running — the press starts it
@@ -799,6 +814,33 @@ function releaseHold(ctx: ModeContext): void {
   applyShotOutcome(ctx, quality);
 }
 
+/** HOOPS BODY: the body's jump (or a release on the floor) starts the hold, as the press would. */
+function bodyStart(ctx: ModeContext): void {
+  if (S.phase !== 'shoot' || S.fired || holding) return;
+  pressHold(ctx);
+  if (holding) bodyShotAt = performance.now();
+}
+
+/** HOOPS BODY: the body's verdict — the meter placed at the body's timing, then the hold's own release grades it. */
+function bodyRelease(ctx: ModeContext, v: ShotVerdict): void {
+  if (S.phase !== 'shoot' || S.fired) return;
+  if (!holding) pressHold(ctx);
+  if (!holding) return;
+  bodyShotAt = -1;
+  shotMeter.t = meterTFor(v.errMs, shotMeter);
+  console.info(`[3PT-BODY] ${v.why} release ${v.lateMs === null ? '—' : `${Math.round(v.lateMs)} ms`} vs the apex (${v.hand ?? '?'} hand) → t=${shotMeter.t.toFixed(2)}`);
+  releaseHold(ctx);
+}
+
+/** HOOPS BODY: the capture clock moved on — a jump held through, a set shot, or a body gone past the wait. */
+function bodyTick(ctx: ModeContext): void {
+  if (bodyShotAt < 0 || S.phase !== 'shoot' || S.fired) return;
+  const r = ctx.body?.()?.read;
+  const v = r ? bodyShot.tick(r.t) : null;
+  if (v) bodyRelease(ctx, v);
+  else if (performance.now() - bodyShotAt >= BODY_SHOT_MAX_MS) { bodyShotAt = -1; shotMeter.t = meterTFor(HELD_ERR_MS, shotMeter); releaseHold(ctx); }
+}
+
 /** Release the loaded ball, grading on how close the bar was to the sweet spot. */
 function fire(ctx: ModeContext, power?: number): void {
   if (S.phase !== 'shoot' || S.fired || !player || !ball || !flights.length) return;
@@ -1256,6 +1298,16 @@ export const ThreePointMode: ModeDefinition = {
   modeId: 'threepoint',
   mood: 'goldenHour',
   camPreset: 'hoops',
+  // HOOPS BODY (2026-10-07): the body drives the shot (claims: the jump and the release; the card's lines). The floor presses
+  // nothing here (the row binds nothing), so a dip or a stray jump never fires a ball on its own.
+  body: THREE_BODY,
+  onBody(ctx: ModeContext, ev: BodyEvent, _view: BodyView): boolean {
+    if (S.phase !== 'shoot' || S.fired) return false;
+    const act = bodyShot.see(ev);
+    if (act.start) bodyStart(ctx);
+    if (act.verdict) bodyRelease(ctx, act.verdict);
+    return act.took;
+  },
 
   async load(ctx: ModeContext): Promise<void> {
     loadCount += 1;
@@ -1584,13 +1636,16 @@ export const ThreePointMode: ModeDefinition = {
         else if (S.rack > 0) mic?.say({ moment: 'three.rack', priority: 1 });
       }
     } else if (S.phase === 'shoot') {
+      bodyTick(ctx);   // HOOPS BODY
       if (shotInputMode === 'tap-timing') {
         // Sawtooth sweep 0→1, then wraps back to 0 — linear, so the bar crosses the sweet spot at one steady speed (a
         // sine would linger at the extremes and make the sweet spot easier at the top of the arc than the bottom).
         shotMeter.t = (shotMeter.t + dt / shotMeter.durationSec) % 1;
       } else if (holding) {
         shotMeter.update(dt);
-        if (shotMeter.t >= 1) releaseHold(ctx);   // held past the top of the jump — auto-release, same grade a timeout earns on 1v1's meter
+        // held past the top of the jump — auto-release, same grade a timeout earns on 1v1's meter (HOOPS BODY: not while the body's
+        // shot is still up — its release is told late; bodyTick gives it up after BODY_SHOT_MAX_MS)
+        if (shotMeter.t >= 1 && !(bodyShotAt >= 0 && bodyShot.pending)) releaseHold(ctx);
       }
       if (!S.fired) meter3d?.set(shotMeter.t, tmpMeter.set(0, 1.72, 0).addInPlace(player.root.position));   // IMPROVE (2026-10-06) #14: a kept vector
       // Face the rim while loaded — slewed onto it (BIOMECH-HOOPS-WAVE1 G1/G3: a lookAt snap before), the ball in the hand.
