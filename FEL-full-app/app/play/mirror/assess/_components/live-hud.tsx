@@ -127,7 +127,9 @@ export function LiveHud({ view, voiceOn = true, onPain, onTakeoff, onStop }: {
 
       {/* tracking lost: a dark pause (the fix is spoken); the words stay only when the voice is off */}
       {v.step === 'paused' ? (
-        <div data-tracking-loss className="absolute inset-0 z-[8] bg-black/60" aria-hidden={voiceOn} />
+        <div data-tracking-loss className="absolute inset-0 z-[8] grid place-items-center bg-black/60 px-6 text-center" aria-hidden={voiceOn}>
+          {!voiceOn ? <p className="text-[clamp(20px,5.5vw,30px)] font-black leading-tight">{v.instruction}</p> : null}
+        </div>
       ) : null}
 
       {/* done beat */}

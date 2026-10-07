@@ -117,6 +117,23 @@ describe('nothing skips the grown-up step, and the camera waits for the camera c
     const s = run([{ type: 'start' }, { type: 'age', age: '18+' }, { type: 'restart' }]);
     expect(s).toEqual(PRE_START);
   });
+
+  it('SCREEN A (2 and 3): the page answers a pain prompt only from the Yes/No tap — never from a frame', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const app = readFileSync(join(__dirname, '../../app/play/mirror/assess/_components/assess-app.tsx'), 'utf8');
+    // the runner's answerPain is reached by exactly one page function, wired to the LiveHud's onPain and nothing else
+    expect(app).toMatch(/const answerPain = \(pain: boolean\) => runnerRef\.current\?\.answerPain\(pain, now\(\)\);/);
+    expect(app).toMatch(/onPain=\{answerPain\}/);
+    // and that handler is the page's one caller of the runner's answerPain — nothing else reaches it
+    expect(app.match(/answerPain\(/g)!.length).toBe(1);
+    // the auto-"no" this pins against: a painCheck answered from the frame loop (the silent answer the brief forbids)
+    expect(app).not.toMatch(/step === 'painCheck'[^\n]*answerPain/);
+    expect(app).not.toMatch(/lastPainRef/);
+    // and the runner answers nothing on its own either: autoAdvance is the no-op that replaced the silent defaults
+    const runner = readFileSync(join(__dirname, '../assess/runner.ts'), 'utf8');
+    expect(runner).toMatch(/autoAdvance\(now: number\): void \{\s*\n?\s*this\.now = now;\s*\n?\s*\}/);
+  });
 });
 
 describe('S-2: the back arrow is one step back, inside the flow', () => {

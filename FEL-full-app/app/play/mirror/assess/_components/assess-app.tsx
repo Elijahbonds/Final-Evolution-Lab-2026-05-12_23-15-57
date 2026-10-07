@@ -107,7 +107,6 @@ export function AssessApp({ initialRun = null }: { initialRun?: ScreenKind | nul
   const unsubRef = useRef<(() => void)[]>([]);
   const previewRef = useRef<(() => void) | null>(null);
   const lastSayRef = useRef(0);
-  const lastPainRef = useRef(0);                               // the painCheck prompt already tapped (per spoken line)
   const cameraFpsRef = useRef<number | null>(null);
   const highFpsRef = useRef(false);
   const smoothRef = useRef(new PoseFilter(SKELETON_EURO));
@@ -255,7 +254,6 @@ export function AssessApp({ initialRun = null }: { initialRun?: ScreenKind | nul
     });
     runnerRef.current = runner;
     lastSayRef.current = 0;
-    lastPainRef.current = 0;
     setPhase('running');
     unsubRef.current.push(svc.onFrame((f) => {
       const v = runner.tick(f, performance.now());
@@ -268,8 +266,8 @@ export function AssessApp({ initialRun = null }: { initialRun?: ScreenKind | nul
       viewRef.current = v;
       setView(v);
       runner.autoAdvance(performance.now());
-      // SCREEN A: the after-test pain check waits for one big tap instead of being auto-answered "no"
-      if (v.step === 'painCheck' && lastPainRef.current !== v.sayAt) { lastPainRef.current = v.sayAt; runner.answerPain(false, performance.now()); }
+      // SCREEN A: during 'painCheck' the page does nothing on its own — the run moves on only when the athlete taps
+      // the LiveHud full-screen Yes/No (onPain → answerPain → runner.answerPain). No timeout, no default, no auto-advance.
       if (v.step === 'done' || v.step === 'stopped') finish(v);
     }));
   }, [draw, finish, voice]);

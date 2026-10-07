@@ -196,8 +196,6 @@ export interface RunnerView {
   instruction: string;
   /** A line to speak now (id changes on every new line; captions show it). */
   say: { id: number; text: string } | null;
-  /** When the current step began (ms, the page's clock): the pain check's tap is keyed to it (SCREEN A). */
-  sayAt: number;
   /** Skeleton colour: tracking (white), the last rep clean (green) or faulted (amber). */
   skeleton: 'tracking' | 'clean' | 'fault';
   wantsHighFps: boolean;
@@ -821,7 +819,7 @@ export class AssessRunner {
       restartInMs: this.step === 'paused' && this.badSince !== null ? Math.max(0, th('gate.absenceRestartMs') - (now - this.badSince)) : null,
       framing: this.lastFraming, hold: calHold,
       instruction: this.instruction(),
-      say, sayAt: this.stepAt, skeleton: recent as RunnerView['skeleton'],
+      say, skeleton: recent as RunnerView['skeleton'],
       wantsHighFps: !!def?.highFps,
       mini: this.step === 'miniResult' || this.step === 'painCheck' ? this.mini : null,
       done: this.step === 'partDone' ? this.donePart : null,

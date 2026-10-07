@@ -21,7 +21,7 @@ function viewFor(step: RunnerView['step'], over: Partial<RunnerView> = {}): Runn
     restartInMs: step === 'paused' ? 4500 : null,
     framing: null, hold: step === 'calibrate' ? 0.4 : 0,
     instruction: step === 'paused' ? 'Step back into the light. Step into the shot — I cannot see you yet.' : 'Get ready.',
-    say: null, sayAt: 0, skeleton: 'tracking', wantsHighFps: false,
+    say: null, skeleton: 'tracking', wantsHighFps: false,
     mini: step === 'miniResult' || step === 'painCheck' ? { test: 'T1', text: 'Overhead squat: done.' } : null,
     done: step === 'partDone' ? { test: 'T1', part: 'T1-front' } : null,
     result: null, progress: { done: 0, total: 7 }, flash: null,
