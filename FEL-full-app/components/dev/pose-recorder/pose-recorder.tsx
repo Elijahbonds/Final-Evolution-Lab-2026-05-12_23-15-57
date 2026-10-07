@@ -30,7 +30,7 @@ import {
   type PoseFrame,
 } from '@/lib/pose/landmarks';
 import {
-  BYTES_PER_FRAME, CAPTURE_TAKE_SPECS, COUNTDOWN_MS, TAKES, buildTakesFile, captureDownloadName, captureMetaOf, measureFps,
+  BYTES_PER_FRAME, CAPTURE_TAKE_SPECS, COUNTDOWN_MS, TAKES, buildTakesFile, captureDownloadName, captureMetaOf, measureFps, nextRun,
   shortUserAgent, takesFileName, toRecordedFrame, type CaptureChoice, type FrameClock, type RecordedTake, type TakeSpec,
 } from './recording';
 import { CAPTURE_DEVICES, PERSON_ALIASES } from '@/lib/pose/captureProtocol';
@@ -315,7 +315,8 @@ export default function PoseRecorder() {
   const recordOne = (id: string) => { ensureAudio(); queueRef.current = []; beginTake(id); };
   const recordRemaining = () => {
     ensureAudio();
-    const ids = specsRef.current.filter((s) => !takes[s.id]).map((s) => s.id);
+    // stops where the phones have to move (the push-ups are filmed from the floor)
+    const ids = nextRun(specsRef.current, (id) => !!takes[id]);
     if (!ids.length) return;
     queueRef.current = ids.slice(1);
     beginTake(ids[0]);

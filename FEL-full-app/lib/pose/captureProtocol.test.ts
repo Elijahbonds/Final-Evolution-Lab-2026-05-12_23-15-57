@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  CAPTURE_DEVICES, CAPTURE_TAKES, FAULT_LABELS, LABEL_NAME, MOVEMENT_NAME, PERSON_ALIASES, captureFileName, captureMetaProblems,
+  CAPTURE_DEVICES, CAPTURE_TAKES, FAULT_LABELS, GOOD_LABELS, LABEL_NAME, MOVEMENT_NAME, PERSON_ALIASES, captureFileName, captureMetaProblems,
   isPersonAlias, type CaptureMovement,
 } from './captureProtocol';
 import { CHECKS, roleOf } from '@/lib/mirror/fixtures/capture/checks';
@@ -29,6 +29,24 @@ describe('the capture protocol', () => {
     expect(CAPTURE_TAKES.filter((t) => t.movement === 'stand').map((t) => t.id)).toEqual(['stand.front', 'stand.side']);
   });
 
+  it('follows the Mirror tabs\' framing (lane/mirror-moves): 11 clean hinges and push-ups, full lunge sets, the push-ups from the floor', () => {
+    const tk = (id: string) => CAPTURE_TAKES.find((t) => t.id === id)!;
+    expect(tk('hinge.good').reps).toBe(11);
+    expect(tk('pushup.good').reps).toBe(11);
+    expect(tk('lunge.left.good').reps).toBe(8);
+    expect(tk('lunge.right.good').reps).toBe(8);
+    for (const t of CAPTURE_TAKES) expect(t.placement === 'floor', t.id).toBe(t.movement === 'pushup');
+    for (const t of CAPTURE_TAKES.filter((x) => x.movement === 'hinge' || x.movement === 'pushup')) expect(t.view, t.id).toBe('side');
+    const labels = (m: string) => CAPTURE_TAKES.filter((t) => t.movement === m).map((t) => t.label);
+    expect(labels('hinge')).toEqual(expect.arrayContaining(['good', 'kneeDominant', 'headPoke', 'walkIn']));
+    expect(labels('pushup')).toEqual(expect.arrayContaining(['good', 'kneePushup', 'hipsSag', 'partial', 'walkIn']));
+  });
+
+  it('walk-ins and knee push-ups are good takes: nothing may fire on them', () => {
+    expect(GOOD_LABELS).toEqual(['good', 'walkIn', 'kneePushup']);
+    for (const l of GOOD_LABELS) expect(FAULT_LABELS).not.toContain(l);
+  });
+
   it('the jump takes (and only they) ask for 60 fps', () => {
     for (const t of CAPTURE_TAKES) expect(!!t.highRate, t.id).toBe(t.movement === 'jump');
   });
@@ -45,7 +63,7 @@ describe('the capture protocol', () => {
 
   it('every fault done on purpose is one some grader is meant to catch (no orphan labels)', () => {
     const orphans: string[] = [];
-    for (const t of CAPTURE_TAKES.filter((x) => x.label !== 'good')) {
+    for (const t of CAPTURE_TAKES.filter((x) => !GOOD_LABELS.includes(x.label))) {
       const take = { ...t, video: { width: 480, height: 640 }, clock: 'capture', detectFps: 30, inferMs: 9, highRate: false, goT: 0, frames: [] } as CapturedTake;
       if (!CHECKS.some((c) => roleOf(c, take) === 'fault')) orphans.push(t.id);
     }

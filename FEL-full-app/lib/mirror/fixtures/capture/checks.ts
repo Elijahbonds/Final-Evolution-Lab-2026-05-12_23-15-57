@@ -19,7 +19,7 @@
 // Node or browser; no fs.
 import type { PoseFrame } from '@/lib/pose/landmarks';
 import type { PoseFrame as AdapterFrame } from '@/lib/babylon/nexus/neuro-mirror/pose/mediapipe-adapter';
-import type { CaptureMovement, CaptureView } from '@/lib/pose/captureProtocol';
+import { isGoodLabel, type CaptureMovement, type CaptureView } from '@/lib/pose/captureProtocol';
 import { ConfidenceFloor, CONFIDENCE_FLOOR } from '@/lib/pose/confidenceFloor';
 import { calibrateFront, calibrateSide, type Calibration } from '@/lib/assess/calibration';
 import { bandOf, type ThresholdId } from '@/lib/assess/thresholds';
@@ -32,7 +32,9 @@ import { SquatAudit, SQUAT_THRESHOLDS, type SquatFault, type SquatFrameResult, t
 import { KinematicEngine } from '@/lib/babylon/nexus/neuro-mirror/rules/kinematic-engine';
 import { DEFAULT_THRESHOLDS, type KinematicThresholds } from '@/lib/babylon/nexus/neuro-mirror/rules/config';
 import { auditSquat } from '../../squatPattern';
-import { auditLunge, LUNGE_THRESHOLDS } from '../../lungeAudit';
+import { auditLunge, LungeAudit, LUNGE_THRESHOLDS } from '../../lungeAudit';
+import { lungePhaseToMovement } from '../../lungeStage';
+import { RepCounter } from '@/lib/babylon/nexus/neuro-mirror/rules/rep-counter';
 import { auditHinge, HINGE_THRESHOLDS } from '../../hingeAudit';
 import { auditPushup, PUSHUP_THRESHOLDS } from '../../pushupAudit';
 import { PRESS_ROW_PERSIST_FRAMES, pressRowFrameFaults, type PressRowFault } from '../../pressRowStage';
@@ -300,7 +302,7 @@ const MIRROR_CHECKS: Check[] = [
     read(take, s) { return fromReading(reading(take, s, 'hinge', (fs) => auditHinge(fs, { side: take.side })), 'hingeRatio'); },
   },
   {
-    id: 'mirror.hinge.dowelLine', grader: 'Mirror hip hinge', movement: 'hinge', catches: ['roundedBack'],
+    id: 'mirror.hinge.dowelLine', grader: 'Mirror hip hinge', movement: 'hinge', catches: ['headPoke'],
     threshold: { name: 'HINGE_THRESHOLDS.dowelLineWarnDeg', where: 'lib/mirror/hingeAudit.ts', value: HINGE_THRESHOLDS.dowelLineWarnDeg, op: '>', unit: 'deg' },
     mode: 'exact',
     read(take, s) { return fromReading(reading(take, s, 'hinge', (fs) => auditHinge(fs, { side: take.side })), 'dowelLine'); },
@@ -353,7 +355,7 @@ export function roleOf(check: Check, take: CapturedTake): 'good' | 'fault' | nul
   if (check.view && take.view !== check.view) return null;
   if (take.movement === 'stand') return check.movement === '*' ? 'good' : null;
   if (check.catches.includes(take.label)) return 'fault';
-  if (take.label === 'good' || check.silentOn === 'all') return 'good';
+  if (isGoodLabel(take.label) || check.silentOn === 'all') return 'good';
   return null;
 }
 
@@ -362,7 +364,7 @@ export function roleOf(check: Check, take: CapturedTake): 'good' | 'fault' | nul
 export interface RepCount { grader: string; counted: number; asked: number }
 
 export function repsCounted(take: CapturedTake, s: Session): RepCount[] {
-  if (take.label !== 'good' || !take.reps) return [];
+  if (!isGoodLabel(take.label) || !take.reps) return [];
   const out: RepCount[] = [];
   const r = qs(take, s);
   if (r && r.status === 'scored') {
@@ -381,12 +383,30 @@ export function repsCounted(take: CapturedTake, s: Session): RepCount[] {
     if (r?.t5) out.push({ grader: 'Quick Screen T5', counted: r.t5.jumps.filter((j) => j.valid).length, asked: take.reps });
     out.push({ grader: 'Mirror jump (DunkTracker)', counted: s.once('dunk', take, () => dunkJumps(takeFrames(take))), asked: take.reps });
   }
+  if (take.movement === 'lunge') {
+    out.push({ grader: `Mirror lunge (${take.side ?? 'left'} leg)`, counted: s.once('lungeReps', take, () => lungeReps(takeFrames(take))), asked: take.reps });
+  }
   if (take.movement === 'pushup') {
     const rd = reading(take, s, 'pushup', (fs) => auditPushup(fs, { side: take.side }));
     const reps = rd.faults.find((f) => f.id === 'reps');
     out.push({ grader: 'Mirror push-up', counted: reps ? reps.value : 0, asked: take.reps });
   }
   return out;
+}
+
+/**
+ * The Mirror's lunge tab: reps as the harness counts them, the live LungeAudit's phase through the reused RepCounter
+ * (mirror-harness.tsx's lunge branch; one set, one counter). The per-side stage gating on top is not replayed.
+ */
+export function lungeReps(frames: readonly PoseFrame[]): number {
+  const audit = new LungeAudit();
+  const counter = new RepCounter();
+  let n = 0;
+  for (const f of adapter(frames)) {
+    const read = audit.evaluate({ landmarks: f.landmarks, timestampMs: f.timestampMs, present: f.present });
+    if (counter.feed(lungePhaseToMovement(read.phase), f.timestampMs)) n++;
+  }
+  return n;
 }
 
 /** The Mirror's jump tab: jumps the tracker counts (it resets after each, as the harness does). */

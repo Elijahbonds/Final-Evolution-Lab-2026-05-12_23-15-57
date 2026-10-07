@@ -49,6 +49,8 @@ export interface CaptureTake {
   highRate?: boolean;
   /** Optional: the take may be skipped (a fault some people should not do on purpose). */
   optional?: boolean;
+  /** Where the phones go: at hip height (default), or on the floor (the push-up, as the Mirror's push-up tab asks). */
+  placement?: 'floor';
 }
 
 /** Plain names for the movements (the recorder's list and the doc). */
@@ -66,8 +68,9 @@ export const LABEL_NAME: Record<string, string> = {
   frontKneeCavesIn: 'front knee caves in', trunkLean: 'trunk leans sideways',
   elbowFlare: 'elbows flare out', shrug: 'shoulders shrug up',
   stiffLanding: 'stiff landing', kneesCaveInLanding: 'knees cave in on landing', armSwing: 'arm swing (hands leave hips)',
-  kneeDominant: 'knee-led (squats the hinge)', roundedBack: 'rounded back, head forward',
-  hipsSag: 'hips sag', hipsPike: 'hips pike up', partial: 'partial reps',
+  kneeDominant: 'squat-shaped (knees lead the hinge)', headPoke: 'head pokes forward (upper back rounds)',
+  hipsSag: 'hips sag', hipsPike: 'hips pike up', partial: 'half-depth reps',
+  walkIn: 'walk into position, then good reps', kneePushup: 'knee push-ups (good)',
   armsForward: 'arms fall forward', forwardLean: 'chest leans far forward',
   heelLift: 'front heel lifts', shortRange: 'short range (stops halfway)',
   hipDrop: 'free-side hip drops',
@@ -75,7 +78,7 @@ export const LABEL_NAME: Record<string, string> = {
 };
 
 const t = (id: string, movement: CaptureMovement, label: string, view: CaptureView, reps: number, seconds: number, prompt: string,
-  o: { side?: CaptureSide; highRate?: boolean; optional?: boolean } = {}): CaptureTake =>
+  o: { side?: CaptureSide; highRate?: boolean; optional?: boolean; placement?: 'floor' } = {}): CaptureTake =>
   ({ id, movement, label, view, reps, seconds, prompt, ...o });
 
 const GENTLE = 'Only as far as is comfortable.';
@@ -94,8 +97,10 @@ export const CAPTURE_TAKES: readonly CaptureTake[] = [
   t('squat.shiftToOneSide', 'squat', 'shiftToOneSide', 'front', 3, 14, '3 squats shifting your hips toward your RIGHT at the bottom.'),
 
   // ── split squat / lunge (the Mirror's lunge tab: facing the camera; `side` = the front leg) ──
-  t('lunge.left.good', 'lunge', 'good', 'front', 3, 16, 'Facing the camera, LEFT foot forward: 3 slow split squats, back knee toward the floor.', { side: 'left' }),
-  t('lunge.right.good', 'lunge', 'good', 'front', 3, 16, 'Facing the camera, RIGHT foot forward: 3 slow split squats, back knee toward the floor.', { side: 'right' }),
+  // FULL sets of 8 on each leg (lane/mirror-moves, 2026-10-07: under synthetic jitter the lunge's rep counter counts
+  // 4–6 of 8 on the left, so a real set may never reach the right leg; these takes measure that rep count)
+  t('lunge.left.good', 'lunge', 'good', 'front', 8, 36, 'Facing the camera, LEFT foot forward: a full set of 8 slow split squats, back knee toward the floor.', { side: 'left' }),
+  t('lunge.right.good', 'lunge', 'good', 'front', 8, 36, 'Facing the camera, RIGHT foot forward: a full set of 8 slow split squats, back knee toward the floor.', { side: 'right' }),
   t('lunge.left.frontKneeCavesIn', 'lunge', 'frontKneeCavesIn', 'front', 3, 16, `LEFT foot forward: 3 split squats letting the FRONT knee fall inward at the bottom. ${GENTLE}`, { side: 'left' }),
   t('lunge.left.trunkLean', 'lunge', 'trunkLean', 'front', 3, 16, 'LEFT foot forward: 3 split squats leaning your upper body to one side at the bottom.', { side: 'left' }),
   t('lunge.left.shallow', 'lunge', 'shallow', 'front', 3, 14, 'LEFT foot forward: 3 split squats dipping only a little.', { side: 'left' }),
@@ -112,16 +117,19 @@ export const CAPTURE_TAKES: readonly CaptureTake[] = [
   t('jump.kneesCaveInLanding', 'jump', 'kneesCaveInLanding', 'front', 3, 16, 'Hands on hips. 3 SMALL hops, letting the knees fall in a little as you land. Skip this if you are unsure.', { highRate: true, optional: true }),
   t('jump.armSwing', 'jump', 'armSwing', 'front', 3, 16, '3 jumps swinging your arms up (hands leave your hips).', { highRate: true }),
 
-  // ── hip hinge (side-on, left side to the camera) ──
-  t('hinge.good', 'hinge', 'good', 'side', 5, 20, 'LEFT side to the camera, hands on hips: 5 hip hinges. Push the hips back, back flat, soft knees.', { side: 'left' }),
-  t('hinge.kneeDominant', 'hinge', 'kneeDominant', 'side', 3, 14, '3 hinges bending the knees a lot and keeping the hips under you, more like a squat.', { side: 'left' }),
-  t('hinge.roundedBack', 'hinge', 'roundedBack', 'side', 3, 14, `3 hinges letting the upper back round and the head drop forward. ${GENTLE}`, { side: 'left' }),
+  // ── hip hinge (the Mirror's hinge tab: side-on, left side to the camera, phones at hip height) ──
+  t('hinge.good', 'hinge', 'good', 'side', 11, 44, 'LEFT side to the camera, hands on hips: 11 clean hip hinges. Hips back, back flat, soft knees.', { side: 'left' }),
+  t('hinge.kneeDominant', 'hinge', 'kneeDominant', 'side', 3, 14, '3 squat-shaped hinges: bend the knees a lot and drop the hips straight down.', { side: 'left' }),
+  t('hinge.headPoke', 'hinge', 'headPoke', 'side', 3, 14, `3 hinges poking the head forward, letting the upper back round. ${GENTLE}`, { side: 'left' }),
+  t('hinge.walkIn', 'hinge', 'walkIn', 'side', 3, 22, 'Start off to one side. Walk onto the mark, turn LEFT side to the camera, then 3 clean hinges.', { side: 'left' }),
 
-  // ── push-up (side-on, left side to the camera; on the knees is fine) ──
-  t('pushup.good', 'pushup', 'good', 'side', 5, 20, 'LEFT side to the camera: 5 push-ups, body in one straight line (on your knees is fine).', { side: 'left' }),
-  t('pushup.hipsSag', 'pushup', 'hipsSag', 'side', 3, 14, '3 push-ups letting the hips sag toward the floor.', { side: 'left' }),
-  t('pushup.hipsPike', 'pushup', 'hipsPike', 'side', 3, 14, '3 push-ups with the hips pushed up high (a pike).', { side: 'left' }),
-  t('pushup.partial', 'pushup', 'partial', 'side', 3, 12, '3 push-ups going only a quarter of the way down.', { side: 'left' }),
+  // ── push-up (the Mirror's push-up tab: side-on, left side to the camera, PHONES ON THE FLOOR) ──
+  t('pushup.good', 'pushup', 'good', 'side', 11, 44, 'Phones on the floor. LEFT side to the camera: 11 clean push-ups, body in one straight line.', { side: 'left', placement: 'floor' }),
+  t('pushup.knee', 'pushup', 'kneePushup', 'side', 5, 22, '5 knee push-ups: knees down, body straight from knees to shoulders.', { side: 'left', placement: 'floor' }),
+  t('pushup.hipsSag', 'pushup', 'hipsSag', 'side', 3, 14, '3 push-ups letting the hips sag toward the floor.', { side: 'left', placement: 'floor' }),
+  t('pushup.hipsPike', 'pushup', 'hipsPike', 'side', 3, 14, '3 push-ups with the hips pushed up high (a pike).', { side: 'left', placement: 'floor' }),
+  t('pushup.partial', 'pushup', 'partial', 'side', 3, 12, '3 push-ups going only halfway down.', { side: 'left', placement: 'floor' }),
+  t('pushup.walkIn', 'pushup', 'walkIn', 'side', 3, 24, 'Start standing to one side. Walk onto the mark, get down into position, then 3 clean push-ups.', { side: 'left', placement: 'floor' }),
 
   // ── Quick Screen T1: overhead squat, front then side ──
   t('t1.front.good', 't1', 'good', 'front', 3, 16, 'Facing the camera, arms straight overhead, feet shoulder-width: 3 slow overhead squats.'),
@@ -151,8 +159,15 @@ export const CAPTURE_TAKES: readonly CaptureTake[] = [
 
 export const captureTake = (id: string): CaptureTake | undefined => CAPTURE_TAKES.find((x) => x.id === id);
 
-/** Every fault label the protocol names (good excluded). */
-export const FAULT_LABELS: readonly string[] = [...new Set(CAPTURE_TAKES.map((x) => x.label).filter((l) => l !== 'good'))];
+/**
+ * Labels done CORRECTLY: good reps, a walk into position followed by good reps (nothing may fire, and no rep may be
+ * counted, on the walk), and knee push-ups (a correct variant). The graders must stay silent on all three.
+ */
+export const GOOD_LABELS: readonly string[] = ['good', 'walkIn', 'kneePushup'];
+export const isGoodLabel = (label: string): boolean => GOOD_LABELS.includes(label);
+
+/** Every fault label the protocol names (the good ones excluded). */
+export const FAULT_LABELS: readonly string[] = [...new Set(CAPTURE_TAKES.map((x) => x.label).filter((l) => !isGoodLabel(l)))];
 
 export const isPersonAlias = (x: unknown): x is PersonAlias => typeof x === 'string' && (PERSON_ALIASES as readonly string[]).includes(x);
 export const isCaptureDevice = (x: unknown): x is CaptureDevice => typeof x === 'string' && (CAPTURE_DEVICES as readonly string[]).includes(x);

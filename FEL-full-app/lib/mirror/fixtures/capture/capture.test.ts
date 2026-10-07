@@ -150,11 +150,22 @@ describe('the replay report on a synthetic capture (two phones)', () => {
 
   it('counts reps on good takes for every grader that counts them', () => {
     const graders = report.reps.map((r) => r.grader);
-    for (const g of ['Quick Screen T1 (front)', 'Quick Screen T1 (side)', 'Quick Screen T2', 'Quick Screen T3', 'Quick Screen T5', 'Mirror jump (DunkTracker)', 'Mirror push-up']) {
+    for (const g of ['Quick Screen T1 (front)', 'Quick Screen T1 (side)', 'Quick Screen T2', 'Quick Screen T3', 'Quick Screen T5', 'Mirror jump (DunkTracker)', 'Mirror push-up',
+      'Mirror lunge (left leg)', 'Mirror lunge (right leg)']) {
       expect(graders, g).toContain(g);
     }
     const t5 = report.reps.find((r) => r.grader === 'Quick Screen T5')!.byDevice.iphone;
     expect(t5).toEqual({ counted: 3, asked: 3 });
+  });
+
+  it('counts the Mirror lunge\'s reps on full sets of 8 a leg: all of them clean, and reports what jitter loses', () => {
+    const left = report.reps.find((r) => r.grader === 'Mirror lunge (left leg)')!, right = report.reps.find((r) => r.grader === 'Mirror lunge (right leg)')!;
+    expect(left.byDevice['android-mid']).toEqual({ counted: 8, asked: 8 });
+    expect(right.byDevice['android-mid']).toEqual({ counted: 8, asked: 8 });
+    // FINDING (lane/mirror-moves first, confirmed here, 2026-10-07; nothing changed: lungeAudit.ts/RepCounter are not this
+    // lane's): with the synth's landmark jitter the live lunge rep counter counts 1–6 of 8 (seeds 3, 5, 7, 11, 13;
+    // median 3), so a real set may never reach the right leg. The real capture's full sets measure it on the phones.
+    expect(left.byDevice.iphone.counted + right.byDevice.iphone.counted).toBeLessThan(16);
   });
 
   it('the jump at the captured 60 fps clears the 50 Hz gate and scores landing timing; the same take at 30 Hz cannot', () => {

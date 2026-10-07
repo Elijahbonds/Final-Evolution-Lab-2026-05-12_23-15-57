@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  CAPTURE_TAKE_SPECS, TAKES, buildTakesFile, captureDownloadName, captureMetaOf, measureFps, shortUserAgent, takesFileName, toRecordedFrame,
+  CAPTURE_TAKE_SPECS, TAKES, buildTakesFile, captureDownloadName, captureMetaOf, measureFps, nextRun, shortUserAgent, takesFileName, toRecordedFrame,
   type RecordedTake,
 } from './recording';
 import { CAPTURE_TAKES } from '@/lib/pose/captureProtocol';
@@ -82,6 +82,17 @@ describe('the Mirror capture set', () => {
     expect(CAPTURE_TAKE_SPECS.map((s) => s.id)).toEqual(CAPTURE_TAKES.map((t) => t.id));
     expect(CAPTURE_TAKE_SPECS.filter((s) => s.highRate).map((s) => s.id)).toEqual(CAPTURE_TAKES.filter((t) => t.movement === 'jump').map((t) => t.id));
     for (const s of CAPTURE_TAKE_SPECS) expect(s.label).toMatch(/: /);
+  });
+
+  it('"Record all remaining" stops where the phones move to the floor, and again where they come back up', () => {
+    const first = nextRun(CAPTURE_TAKE_SPECS, () => false);
+    expect(first.at(-1)).toBe('hinge.walkIn');
+    const done = new Set(first);
+    const floor = nextRun(CAPTURE_TAKE_SPECS, (id) => done.has(id));
+    expect(floor).toEqual(CAPTURE_TAKES.filter((t) => t.movement === 'pushup').map((t) => t.id));
+    floor.forEach((id) => done.add(id));
+    expect(nextRun(CAPTURE_TAKE_SPECS, (id) => done.has(id))[0]).toBe('t1.front.good');
+    expect(nextRun(TAKES, () => false)).toEqual(TAKES.map((t) => t.id));   // the movement-play set has no floor takes
   });
 
   it('will not save without an alias, a phone and both statements', () => {

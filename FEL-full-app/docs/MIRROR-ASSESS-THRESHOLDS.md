@@ -92,7 +92,7 @@ the draft's words and cue attach. HIDDEN / NO BAND = never a grade.
 Owner decision: the thresholds are finished by a capture you lead (you and 2 adults, a mid-range Android and an
 iPhone, pose numbers only, never video, no minors). **Your next step is [`MIRROR-CAPTURE-PROTOCOL.md`](MIRROR-CAPTURE-PROTOCOL.md).**
 
-- **Record** the protocol's 44 labelled takes on `/dev/pose-record?set=capture`. Each take is a good set or one named
+- **Record** the protocol's 47 labelled takes on `/dev/pose-record?set=capture`. Each take is a good set or one named
   fault done on purpose. The recorder saves numbers only, under an alias, with "adults only" and "consent" stated.
 - **Ingest** with `npx tsx scripts/mirror-capture.ts ingest <files>`. It writes one fixture per person per phone to
   `lib/mirror/fixtures/captured/`, checked by `lib/pose/recordingsGuard.ts`.
@@ -110,10 +110,14 @@ iPhone, pose numbers only, never video, no minors). **Your next step is [`MIRROR
   here, set `signedOff: true`, bump `THRESHOLDS_VERSION`, and regenerate the table below. A Mirror audit's number is
   changed in its own file.
 
-Two findings from the synthetic replay, for the capture to confirm or clear:
+Three findings from the synthetic replay, for the capture to confirm or clear:
 
 - **The lunge knee line.** Under the synth's landmark jitter, a clean lunge's worst knee read is 0.31 to 0.50 hip
   half-widths, past `LUNGE_THRESHOLDS.kneeInWarn` 0.30. The lunge has no persistence gate, unlike the squat.
+- **The lunge rep count** (found by the mirror-moves lane, confirmed here). The Mirror's lunge counts with `LungeAudit`'s
+  phase fed to `RepCounter`. Under the synth's landmark jitter it counts 1 to 6 of 8 reps (median 3, over 5 seeds); clean,
+  it counts 8 of 8. A real set may never reach the right leg. The protocol's lunge takes are full sets of 8 on each leg,
+  and the report prints the count for each phone.
 - **The squat depth line.** The batch squat pattern (`lib/mirror/squatPattern.ts`, depth line 0.5) calls the repo's
   own clean squat fixture shallow (`squat_clean.json` reads 0.48).
 

@@ -30,6 +30,8 @@ export interface TakeSpec {
   seconds: number;
   /** Ask the camera for 60 fps for this take (MIRROR PHASE 3: the jump's opt-in, measured on the phone). */
   highRate?: boolean;
+  /** The phones go on the floor for this take (the capture set's push-ups). "Record all remaining" stops at a change. */
+  placement?: 'floor';
 }
 
 /** The 3-2-1 is recorded: the detectors need the owner standing ready before the move, the same as a game gets. */
@@ -69,11 +71,28 @@ export const TAKES: TakeSpec[] = [
 /** The capture set's takes, as the recorder runs them. */
 export const CAPTURE_TAKE_SPECS: TakeSpec[] = CAPTURE_TAKES.map((t) => ({
   id: t.id,
-  label: `${MOVEMENT_NAME[t.movement].replace(/ \(.*\)$/, '')}${t.side ? ` (${t.side})` : ''}: ${LABEL_NAME[t.label] ?? t.label}${t.optional ? ' · optional' : ''}`,
+  label: `${MOVEMENT_NAME[t.movement].replace(/ \(.*\)$/, '')}${t.side ? ` (${t.side})` : ''}: ${LABEL_NAME[t.label] ?? t.label}${t.optional ? ' · optional' : ''}${t.placement === 'floor' ? ' · phones on the floor' : ''}`,
   prompt: t.prompt,
   seconds: t.seconds,
   ...(t.highRate ? { highRate: true } : {}),
+  ...(t.placement ? { placement: t.placement } : {}),
 }));
+
+/**
+ * The takes "Record all remaining" runs back to back: the unrecorded ones in order, stopping before the first whose
+ * phone placement differs from the first's (the phones have to be moved, by hand, between the two).
+ */
+export function nextRun(specs: readonly TakeSpec[], recorded: (id: string) => boolean): string[] {
+  const left = specs.filter((s) => !recorded(s.id));
+  if (!left.length) return [];
+  const place = left[0].placement ?? 'hip';
+  const out: string[] = [];
+  for (const s of left) {
+    if ((s.placement ?? 'hip') !== place) break;
+    out.push(s.id);
+  }
+  return out;
+}
 
 /** What the capture set needs before it will save: an alias, a phone, and both statements ticked. */
 export interface CaptureChoice { person: string; device: string; adult: boolean; consent: boolean }

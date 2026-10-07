@@ -5,8 +5,8 @@ and 2 other adults, on 2 phones (a mid-range Android and an iPhone), record **po
 minors**: nobody under 18 is recorded, and nobody under 18 is in the shot. Every grader is then replayed against the
 recordings, and each threshold moves from PROPOSED to TUNED when you sign it off.
 
-This page is the whole job, in order. Allow about **20 minutes per person** with both phones recording at once, so about
-**an hour** for the three of you, plus 15 minutes to set up.
+This page is the whole job, in order. Allow about **25 minutes per person** with both phones recording at once, so about
+**an hour and a quarter** for the three of you, plus 15 minutes to set up.
 
 ---
 
@@ -14,7 +14,8 @@ This page is the whole job, in order. Allow about **20 minutes per person** with
 
 - **Two phones:** the mid-range Android (Chrome) and the iPhone (Safari). Both charged above 50 %, or on a charger.
 - **Your Mac,** with this repo, running the dev server (step 4). The recorder page exists only on the dev server.
-- **Somewhere to prop the phones** upright at about hip height (a shelf, a chair with books, two phone stands).
+- **Somewhere to prop the phones** upright at about hip height (a shelf, a chair with books, two phone stands), and a
+  way to stand them upright **on the floor** for the push-ups (a book behind each).
 - **A room** with about 3 m of clear floor in front of the phones and 2 m across, and a clear patch of **wall** (for the
   knee-to-wall test). A lamp you can switch to on its own (for the dim-light takes).
 - **Three adults:** you (**P1**) and two others (**P2**, **P3**). Each wears fitted clothes in a colour unlike the wall,
@@ -110,6 +111,12 @@ tap Show Details › visit this website. If the camera still will not start:
   of the picture. Head to feet must be in the shot, with a hand's room above the head. The jump needs more: if the line
   says "Leave room above your head", step back.
 - **Mark the spot** on the floor with tape. Everyone stands on the same mark.
+- **The hip hinge** is filmed side-on with the phones at hip height, as above. This is how the Mirror's hinge tab asks
+  for it.
+- **The push-ups** are filmed with **both phones on the floor**: stood upright at floor level, side by side, about 2 m
+  from the person's side, so the whole body from head to feet is in the shot lying down. This is how the Mirror's
+  push-up tab asks for it. "Record all remaining" **stops by itself** before the push-ups, so you can move the phones.
+  It stops again after them, so you can put the phones back at hip height.
 - **Behind the person:** a plain wall, no window, no mirror, nobody walking through.
 
 ## 6. Light
@@ -130,9 +137,18 @@ tap Show Details › visit this website. If the camera still will not start:
    keyboard).
 5. Between people: tap **Download all takes** on both phones (step 8), then reload the page and set the next person.
 
-**Reps:** good takes are 5 reps (squat, press/row, hinge, push-up) or 3 (the rest). Fault takes are 3. Every take, its
-label and its prompt are in the table at the end of this page (section 11). The jump takes ask the camera for 60 fps.
-Each take saves the rate that phone really managed, so the report can show what each phone holds.
+**Reps:**
+- **Hinge and push-up:** 11 clean reps. That is the Mirror's check set and work set together.
+- **Lunge:** a full set of 8 on each leg. The report counts the lunge reps, because on a phone the lunge can undercount
+  and never reach the second leg. The mid-range Android matters most here.
+- **Squat and press/row:** 5 reps.
+- **Everything else:** 3 reps. Fault takes are always 3.
+
+**Walk-in takes** (`hinge.walkIn`, `pushup.walkIn`) start off to one side. Walk onto the mark and set up, then do clean
+reps. Nothing should fire and no rep should count while walking.
+
+The jump takes ask the camera for 60 fps. Each take saves the rate that phone really managed, so the report can show
+what each phone holds. Every take, its label and its prompt are in the table at the end of this page (section 11).
 
 ## 8. Saving, naming and sending the files
 
@@ -223,7 +239,7 @@ about 40 MB compressed.
 
 ## 11. Every take
 
-44 takes, about 13 minutes of recording per person per phone, plus lead-ins. The order groups the moves so nobody
+47 takes, about 16 minutes of recording per person per phone, plus lead-ins. The order groups the moves so nobody
 turns round more than they must. "Side" means that side of the body faces the camera. For the lunge and T3, the leg is
 the front leg or the standing leg.
 
@@ -244,12 +260,12 @@ the front leg or the standing leg.
 | `squat.shallow` | fault: shallow | front | 3 | 12 | 3 quarter squats: bend only a little. |
 | `squat.shiftToOneSide` | fault: shift to one side | front | 3 | 14 | 3 squats shifting your hips toward your RIGHT at the bottom. |
 
-**Split squat / lunge (the Mirror's lunge tab)**
+**Split squat / lunge (the Mirror's lunge tab).** Full sets of 8 on each leg: the report counts these reps.
 
 | Take | Good or fault | Camera sees | Reps | Seconds | What to do (shown on the phone) |
 |---|---|---|---|---|---|
-| `lunge.left.good` | good | front · left leg | 3 | 16 | Facing the camera, LEFT foot forward: 3 slow split squats, back knee toward the floor. |
-| `lunge.right.good` | good | front · right leg | 3 | 16 | Facing the camera, RIGHT foot forward: 3 slow split squats, back knee toward the floor. |
+| `lunge.left.good` | good | front · left leg | 8 | 36 | Facing the camera, LEFT foot forward: a full set of 8 slow split squats, back knee toward the floor. |
+| `lunge.right.good` | good | front · right leg | 8 | 36 | Facing the camera, RIGHT foot forward: a full set of 8 slow split squats, back knee toward the floor. |
 | `lunge.left.frontKneeCavesIn` | fault: front knee caves in | front · left leg | 3 | 16 | LEFT foot forward: 3 split squats letting the FRONT knee fall inward at the bottom. Only as far as is comfortable. |
 | `lunge.left.trunkLean` | fault: trunk leans sideways | front · left leg | 3 | 16 | LEFT foot forward: 3 split squats leaning your upper body to one side at the bottom. |
 | `lunge.left.shallow` | fault: shallow | front · left leg | 3 | 14 | LEFT foot forward: 3 split squats dipping only a little. |
@@ -272,22 +288,26 @@ the front leg or the standing leg.
 | `jump.kneesCaveInLanding` | fault: knees cave in on landing (optional) | front · 60 fps | 3 | 16 | Hands on hips. 3 SMALL hops, letting the knees fall in a little as you land. Skip this if you are unsure. |
 | `jump.armSwing` | fault: arm swing (hands leave hips) | front · 60 fps | 3 | 16 | 3 jumps swinging your arms up (hands leave your hips). |
 
-**Hip hinge (the Mirror's hinge)**
+**Hip hinge (the Mirror's hinge tab).** Side-on, phones at hip height.
 
 | Take | Good or fault | Camera sees | Reps | Seconds | What to do (shown on the phone) |
 |---|---|---|---|---|---|
-| `hinge.good` | good | side (left side to camera) | 5 | 20 | LEFT side to the camera, hands on hips: 5 hip hinges. Push the hips back, back flat, soft knees. |
-| `hinge.kneeDominant` | fault: knee-led (squats the hinge) | side (left side to camera) | 3 | 14 | 3 hinges bending the knees a lot and keeping the hips under you, more like a squat. |
-| `hinge.roundedBack` | fault: rounded back, head forward | side (left side to camera) | 3 | 14 | 3 hinges letting the upper back round and the head drop forward. Only as far as is comfortable. |
+| `hinge.good` | good | side (left side to camera) | 11 | 44 | LEFT side to the camera, hands on hips: 11 clean hip hinges. Hips back, back flat, soft knees. |
+| `hinge.kneeDominant` | fault: squat-shaped (knees lead the hinge) | side (left side to camera) | 3 | 14 | 3 squat-shaped hinges: bend the knees a lot and drop the hips straight down. |
+| `hinge.headPoke` | fault: head pokes forward (upper back rounds) | side (left side to camera) | 3 | 14 | 3 hinges poking the head forward, letting the upper back round. Only as far as is comfortable. |
+| `hinge.walkIn` | good: walk into position, then good reps | side (left side to camera) | 3 | 22 | Start off to one side. Walk onto the mark, turn LEFT side to the camera, then 3 clean hinges. |
 
-**Push-up (the Mirror's push-up)**
+**Push-up (the Mirror's push-up tab).** Side-on, **phones on the floor**. "Record all remaining" stops before and after
+this block so you can move the phones.
 
 | Take | Good or fault | Camera sees | Reps | Seconds | What to do (shown on the phone) |
 |---|---|---|---|---|---|
-| `pushup.good` | good | side (left side to camera) | 5 | 20 | LEFT side to the camera: 5 push-ups, body in one straight line (on your knees is fine). |
-| `pushup.hipsSag` | fault: hips sag | side (left side to camera) | 3 | 14 | 3 push-ups letting the hips sag toward the floor. |
-| `pushup.hipsPike` | fault: hips pike up | side (left side to camera) | 3 | 14 | 3 push-ups with the hips pushed up high (a pike). |
-| `pushup.partial` | fault: partial reps | side (left side to camera) | 3 | 12 | 3 push-ups going only a quarter of the way down. |
+| `pushup.good` | good | side (left side to camera) · phones on the floor | 11 | 44 | Phones on the floor. LEFT side to the camera: 11 clean push-ups, body in one straight line. |
+| `pushup.knee` | good: knee push-ups (good) | side (left side to camera) · phones on the floor | 5 | 22 | 5 knee push-ups: knees down, body straight from knees to shoulders. |
+| `pushup.hipsSag` | fault: hips sag | side (left side to camera) · phones on the floor | 3 | 14 | 3 push-ups letting the hips sag toward the floor. |
+| `pushup.hipsPike` | fault: hips pike up | side (left side to camera) · phones on the floor | 3 | 14 | 3 push-ups with the hips pushed up high (a pike). |
+| `pushup.partial` | fault: half-depth reps | side (left side to camera) · phones on the floor | 3 | 12 | 3 push-ups going only halfway down. |
+| `pushup.walkIn` | good: walk into position, then good reps | side (left side to camera) · phones on the floor | 3 | 24 | Start standing to one side. Walk onto the mark, get down into position, then 3 clean push-ups. |
 
 **Overhead squat (Quick Screen T1)**
 
@@ -338,6 +358,13 @@ say the line, and every take above should not.
   - the press/row engine (`rules/config.ts`);
   - the hinge (`hingeAudit.ts`);
   - the push-up (`pushupAudit.ts`).
+- **Rep counting:**
+  - the Quick Screen's T1, T2, T3 and T5;
+  - the Mirror's lunge (its rep counter on full sets of 8 a leg), push-up and jump.
+- **The mirror-moves lane's new numbers.** That lane's hinge and push-up tabs add `HINGE_THRESHOLDS.dowelLinePersistFrames`
+  3, `LUNGE_CUE_PERSIST_FRAMES` 8, `HINGE_REP_DOWN`/`HINGE_REP_UP` 35°/15° and a push-up top line of 165°. The hinge and
+  push-up takes above are filmed the way those tabs ask. Their checks join the report once `lane/mirror-moves` is
+  merged.
 - **New in this phase, all PROPOSED:**
   - **The jump's 60 fps opt-in** (`lib/pose/modelChoice.ts`): it holds above 50 Hz with a detect within 12.5 ms, and
     falls back to 30 Hz otherwise.
