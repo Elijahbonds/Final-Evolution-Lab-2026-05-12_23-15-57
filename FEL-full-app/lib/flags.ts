@@ -85,3 +85,20 @@ export function isPayoutsEnabled(): boolean {
 export function isLiveStreamScheduleEnabled(): boolean {
   return envOn('LIVE_STREAM_SCHEDULE_ENABLED');
 }
+
+/**
+ * STORE-READY B1 — /closet "Scan My Face". Default OFF: the button, its helper line and the
+ * FaceScanCapture module (tasks-vision + the Google model fetch) exist only behind this flag.
+ */
+export function isFaceScanEnabled(): boolean {
+  return envOn('FACE_SCAN_ENABLED');
+}
+
+/**
+ * STORE-READY B2 — a live Stripe key (sk_live_/rk_live_) opens coach-store checkout ONLY while
+ * this is on. Default OFF: a live key with the flag unset answers store_closed live_mode_off.
+ */
+export function isCoachStoreLive(env: NodeJS.ProcessEnv = process.env): boolean {
+  const v = (env.COACH_STORE_LIVE ?? '').trim().toLowerCase();
+  return v === '1' || v === 'true' || v === 'on' || v === 'yes';
+}
