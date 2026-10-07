@@ -294,6 +294,39 @@ async function buyAccess(
   if (existing && (existing.status === 'ACTIVE' || existing.status === 'PAST_DUE')) {
     return NextResponse.json({ error: 'already_owned' }, { status: 409 });
   }
+  // STORE-READY B5 (F21): retrying a purchase within 24 h must not 500. Before any row write, resolve the
+  // existing row's Stripe checkout session: still open at the SAME price -> hand back that URL untouched; the
+  // price changed -> expire it and fall through to a fresh session under a NEW idempotency key; already paid ->
+  // fulfil it and answer 409 already_owned. A Stripe outage answers 502 with nothing written.
+  if (existing?.stripeCheckoutId) {
+    let prior: Stripe.Checkout.Session | null = null;
+    try {
+      prior = await stripe.checkout.sessions.retrieve(existing.stripeCheckoutId);
+    } catch (err) {
+      const e = err as { code?: string; statusCode?: number; type?: string };
+      if (e?.code === 'resource_missing' || e?.statusCode === 404 || e?.type === 'StripeInvalidRequestError') {
+        prior = null; // a session Stripe no longer has is as good as expired
+      } else {
+        console.error('[coach-store] re-buy session check failed');
+        return NextResponse.json({ error: 'stripe_unavailable' }, { status: 502 });
+      }
+    }
+    if (prior) {
+      const { isPaidSession } = await import('@/lib/stripe/verify-checkout');
+      if (prior.status === 'open' && prior.payment_status !== 'paid' && !isPaidSession(prior)) {
+        if (existing.priceCents === listing.priceUsd && prior.url) {
+          return NextResponse.json({ url: prior.url, rowId: existing.id });
+        }
+        try { await stripe.checkout.sessions.expire(prior.id); } catch { /* already closed */ }
+      } else if (isPaidSession(prior)) {
+        const { fulfilCoachStoreCheckout, coachStoreSessionMeta } = await import('./webhook');
+        const { verifyIdempotencyKey } = await import('@/lib/stripe/verify-checkout');
+        const meta = coachStoreSessionMeta(prior) ?? { product: 'COACH_STORE', userId, rowId: existing.id, kind: manifest.kind, beneficiary };
+        await fulfilCoachStoreCheckout(prior, meta, verifyIdempotencyKey(prior.id));
+        return NextResponse.json({ error: 'already_owned' }, { status: 409 });
+      }
+    }
+  }
   // Double-charge guards (./bundlePolicy). A single product (program/course/series) the buyer already owns via
   // another active/past-due listing (e.g. the bundle) is always 409 already_owned. The bundle, under the default
   // 'block_if_any_owned', is 409 already_owned when any member is already owned, and the response lists the
@@ -362,7 +395,9 @@ async function buyAccess(
     cancel_url: `${origin}/coach/${instructor?.slug ?? 'elijahbonds'}`,
     metadata: metaData,
     ...(manifest.kind === 'membership' ? { subscription_data: { metadata: metaData } } : {}),
-  }, { idempotencyKey: `coach-store:checkout:${row.id}` });
+    // STORE-READY B5: a re-buy creates a NEW session, so the idempotency key must be new too — reusing the old
+    // row's key is why a retry within 24 h 500'd (Stripe rejects a reused key with a different payload).
+  }, { idempotencyKey: `coach-store:checkout:${row.id}:${now.getTime()}` });
   await prisma.programAccess.update({ where: { id: row.id }, data: { stripeCheckoutId: session.id } });
   await prisma.order.create({
     data: {
