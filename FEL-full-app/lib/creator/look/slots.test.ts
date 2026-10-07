@@ -27,8 +27,9 @@ describe('sanitising slots: v1 → v2', () => {
     });
   });
   it('a v2 slot keeps its own fields, each through its allow-list (no names, no unknown fields)', () => {
+    // test changed (2026-10-07, the hair expansion): 'Mohawk' became a catalog style, so the off-list name is another one
     const s = sanitizeCreatorSlot({
-      id: 'ab12', label: 'gojo!!', body: 'scan', base: { skinTone: '#abc', hairStyle: 'Mohawk', eyeColor: '#7fd8ff', name: 'Real Name' },
+      id: 'ab12', label: 'gojo!!', body: 'scan', base: { skinTone: '#abc', hairStyle: 'Liberty Spikes', eyeColor: '#7fd8ff', name: 'Real Name' },
       sliders: { faceLong: 2, 'no-pe': 1 }, frame: { heightScale: 3, buildScale: 0.5 },
       equipped: { tops: 'top_lab', shoes: 'not_an_item', shorts: null, wallet: 'x' }, doc: DOC, email: 'a@b.c',
     })!;
@@ -37,7 +38,7 @@ describe('sanitising slots: v1 → v2', () => {
       sliders: { faceLong: 1 }, frame: { heightScale: 1.04, buildScale: 0.94 }, equipped: { tops: 'top_lab', shorts: null },
       doc: expect.any(Object),
     });
-    expect(JSON.stringify(s)).not.toMatch(/Real Name|a@b|wallet|Mohawk/);
+    expect(JSON.stringify(s)).not.toMatch(/Real Name|a@b|wallet|Liberty Spikes/);
   });
   it('at most MAX_SLOTS (5, owner 2026-10-06), ids unique (a duplicate or a missing id gets the next free sN)', () => {
     expect(MAX_SLOTS).toBe(5);

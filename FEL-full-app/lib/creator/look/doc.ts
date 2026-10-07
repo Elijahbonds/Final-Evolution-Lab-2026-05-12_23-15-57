@@ -445,6 +445,47 @@ export const CLOTH_KIT_SLOT: Record<ClothKind, 'tops' | 'shorts' | 'shoes' | nul
 export const kindOfStyle = (style: string): ClothKind | null =>
   (CLOTH_KINDS.find((k) => (CLOTH_STYLES[k] as readonly string[]).includes(style)) ?? null);
 
+// ── CODE-BUILT HAIR EXTRAS (2026-10-07; owner: the hair expansion — "every style a distinct silhouette", beards, a second
+// colour, accessories, hair that moves) ─────────────────────────────────────────────────────────────────────────────
+//
+// THE STYLE ITSELF stays where every mode already reads it: FaceConfig.hairStyle (lib/closet/wearable-catalog HAIR_STYLES,
+// grouped into the four packs by lib/creator/look/hair.ts). Since 2026-10-07 every name there is a code-built shape
+// (lib/babylon/creator/hair), fitted to the body's own head. What a style does NOT carry lives here, all optional and
+// stored only when set, so a look saved before is exactly what it was (no version bump, like phases 4a–4e):
+//   colour2 / tone  a second hair colour and where it goes (the ends, streaks, a dyed top, an under-layer; on a wrap or a
+//                   hijab, its trim);
+//   acc / accColour accessories — beads, cuffs, clips, a headband, hair ties — drawn only on styles they fit
+//                   (hair.HAIR_ACC_FIT), in one colour (gold when absent);
+//   beard / beardColour  a beard style (none when absent), in the hair colour unless set.
+// APPEND ONLY, like every list above.
+
+/** Where a second hair colour goes. */
+export const HAIR_TONES = ['tips', 'streaks', 'top', 'under'] as const;
+export type HairTone = typeof HAIR_TONES[number];
+/** Hair accessories. */
+export const HAIR_ACCS = ['beads', 'cuffs', 'clips', 'headband', 'ties'] as const;
+export type HairAcc = typeof HAIR_ACCS[number];
+/** Beard styles (a face option; none when absent). */
+export const BEARD_STYLES = ['stubble', 'short', 'full', 'long', 'goatee', 'chinstrap', 'mustache'] as const;
+export type BeardStyle = typeof BEARD_STYLES[number];
+/** Most accessories worn at once. */
+export const MAX_HAIR_ACCS = 3;
+/** The defaults the sanitiser leaves out. */
+export const HAIR_DEFAULTS = { tone: 'tips' as HairTone, accColour: '#D4AF37' };
+
+export interface CreatorHair {
+  colour2?: string;
+  /** where colour2 goes ('tips' when absent); dropped without a colour2 */
+  tone?: HairTone;
+  /** accessories, at most MAX_HAIR_ACCS, unique, in HAIR_ACCS order */
+  acc?: HairAcc[];
+  /** the accessories' colour (HAIR_DEFAULTS.accColour when absent); dropped without an accessory */
+  accColour?: string;
+  beard?: BeardStyle;
+  /** the beard's colour (the hair colour when absent); dropped without a beard */
+  beardColour?: string;
+}
+
 export interface CreatorDoc {
   v: typeof CREATOR_DOC_VERSION;
   parts: CreatorPart[];
@@ -458,6 +499,8 @@ export interface CreatorDoc {
   marks?: CreatorMark[];
   /** Phase 4e: code-built clothes, innermost first (at most MAX_CLOTHES); stored only when there is one. */
   clothes?: CreatorCloth[];
+  /** Hair extras (2026-10-07): a second colour, accessories, a beard; stored only when something is set. */
+  hair?: CreatorHair;
 }
 
 /** One saved character, v1 (phase 1): `label` through the jersey name rule, `doc` a full CreatorDoc. Still accepted by
@@ -512,7 +555,8 @@ export function isEmptyCreatorDoc(d: CreatorDoc): boolean {
   return !d.parts.length && !d.paint.length && !Object.keys(d.colours).length
     && !Object.keys(d.shape.face).length && !Object.keys(d.shape.body).length && !Object.keys(d.shape.girth ?? {}).length
     && !d.flags.suit
-    && !Object.keys(d.flags.hide ?? {}).length && !Object.keys(d.eyes ?? {}).length && !d.clothes?.length;
+    && !Object.keys(d.flags.hide ?? {}).length && !Object.keys(d.eyes ?? {}).length && !d.clothes?.length
+    && !Object.keys(d.hair ?? {}).length;
 }
 
 /** What the doc hides, resolved: `head` takes the ears, the eyes and the hair with it. */

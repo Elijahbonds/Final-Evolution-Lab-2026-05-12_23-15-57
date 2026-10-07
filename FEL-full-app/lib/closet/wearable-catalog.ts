@@ -37,9 +37,16 @@ export const SKIN_TONES: string[] = [
 
 export const FACE_SHAPES = ['Oval', 'Round', 'Square', 'Heart', 'Diamond', 'Long'];
 // Textured / protective / cultural styles included by design.
+// 2026-10-07 (the hair expansion, owner's four packs): APPEND ONLY — a saved look names these. Every name is a code-built
+// shape of its own (lib/babylon/creator/hair; the packs and labels: lib/creator/look/hair.ts). The first row is the
+// original fifteen (each now its own silhouette); the rest were added by the expansion.
 export const HAIR_STYLES = [
   'Afro', 'Box Braids', 'Locs', 'Cornrows', 'Fade', 'Waves', 'Curly',
   'Straight', 'Wavy', 'Buzz', 'Cropped', 'Bun', 'Ponytail', 'Bald', 'Hijab',
+  'Twists', 'Bantu Knots', 'Afro Puffs', 'Durag', 'Headwrap',
+  'High-Top Fade', 'Taper', 'Drop Fade', 'Mohawk', 'Frohawk',
+  'Long Layered', 'Bob', 'Top Knot', 'Space Buns', 'Pigtails', 'Braided Ponytail',
+  'Spiky', 'Swept', 'Mullet', 'Streaks',
 ];
 export const HAIR_COLORS = ['#0B0B0B', '#2B1B0E', '#5A351A', '#8D5524', '#C68642', '#E4C590', '#B0B0B0', '#00E5FF', '#A855F7', '#FF3366'];
 export const EYE_SHAPES = ['Almond', 'Round', 'Monolid', 'Hooded', 'Upturned', 'Downturned', 'Wide'];
