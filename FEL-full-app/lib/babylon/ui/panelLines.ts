@@ -18,8 +18,14 @@
 //
 // lib/ui/controlsScreen.ts reads this before the static hint (controlLines); panelLines.test.ts holds every entry to a
 // mode that exists, to the line budget, and (for a mode with static lines) to covering the same verbs.
+//
+// HOOPS PAUSE (2026-10-06): the owner then picked "Hoops pause: Controls panel only" — the 1v1 and 3v3 short lists that
+// sat here are replaced by their full OFFENSE / DEFENSE lists, as titled groups (PANEL_GROUPS below).
 
 import { SKATE_BODY_BOOST_HINT, KART_BODY_BOOST_HINT, AERO_BODY_BOOST_HINT } from '../modes/rideHud';
+import { CONTROLS_OFFENCE as ONES_OFFENCE, CONTROLS_DEFENCE as ONES_DEFENCE } from '../modes/onevoneRules';
+// (threevthreeControls, not threevthreeRules: the rules file imports BasketballCore — Babylon — and this panel is under every splash)
+import { CONTROLS_OFFENCE as THREES_OFFENCE, CONTROLS_DEFENCE as THREES_DEFENCE } from '../modes/threevthreeControls';
 import { STATIC_CONTROLS } from './staticControls';
 
 export interface PanelLines {
@@ -29,35 +35,13 @@ export interface PanelLines {
   body?: readonly string[];
 }
 
-/** Most lines a curated list may hold (the brief: 4–8 for the hoops modes; fewer elsewhere). */
+/** Most lines a curated list may hold (the brief: 4–8 for the hoops modes, until their PANEL_GROUPS; fewer elsewhere). */
 export const PANEL_MAX_LINES = 8;
 /** Longest a curated line may be: one row of the panel's mono text at its narrowest (a sideways phone). */
 export const PANEL_MAX_CHARS = 52;
 
 export const PANEL_LINES: Readonly<Record<string, PanelLines>> = {
-  // ── hoops (the rows above: MOVE · PASS · SCREEN · SHOOT · BLOCK · LOOK) ──
-  threevthree: {
-    lines: [
-      'SPRINT: hold R2 (SHIFT) + a direction',
-      'SHOOT: hold, let go in the green',
-      'DUNK: R2 + SHOOT at the rim · alone, a LAY-UP',
-      'PASS: hold it to FAKE · SCREEN calls a pick',
-      'POST UP: hold L2 (F) · SHOOT = HOOK, off = FADE',
-      'DEFENCE: BLOCK at the release · L1 (Q) BOX OUT',
-    ],
-  },
-  // (the rows above: MOVE · CHARGE · SHOOT · BLOCK · LOOK)
-  onevone: {
-    lines: [
-      'SPRINT: hold R2 (SHIFT) + a direction',
-      'SHOOT: hold, let go in the green',
-      'DUNK: R2 + SHOOT at the rim · alone, a LAY-UP',
-      'MOVES: flick the R-STICK · add R2 to ESCAPE',
-      'POST UP: hold L2 (F) by the block · SHOOT = HOOK',
-      'DEFENCE: slide in front · hold L2 (F) to SIT DOWN',
-      'SHOOT = STEAL · BLOCK on the gather · L1 BOX OUT',
-    ],
-  },
+  // ── hoops: no short list here any more — the panel carries their full OFFENSE / DEFENSE lists (PANEL_GROUPS below) ──
   // ── the sweep: every other mode whose panel cut lines off on a sideways phone (controls-screen-2 probe), or whose
   //    lines only restated a row above them. The mode's own words, merged and with the repeats of its rows dropped. ──
   // the endless dojo's strings (rows: JAB · KICK · DASH · HEAVY): 11 lines → 5
@@ -135,6 +119,39 @@ export const PANEL_LINES: Readonly<Record<string, PanelLines>> = {
       'a wrong one hands the steal over',
     ],
   },
+};
+
+/**
+ * A titled group of the panel's lines: a heading and a list in its mode's own words (split at its dots by the panel,
+ * lib/ui/controlsScreen.ts splitHint — the post-up's bracketed moves stay one line).
+ */
+export interface PanelGroup {
+  title: string;
+  /** The heading's colour (the hosts' old pause list: OFFENSE cyan, DEFENSE gold). */
+  color: string;
+  /** The list, exactly as the mode's rules file writes it. */
+  text: string;
+}
+
+/**
+ * HOOPS PAUSE (2026-10-06). Owner (multiple choice): "Hoops pause: Controls panel only". The 1v1 and 3v3 pause showed TWO
+ * lists — the hoops lane's full OFFENSE / DEFENSE list along the bottom (its picks 1v1 #1 / 3v3 #7: "put the full list in
+ * pause") and this panel's short list over it. Now ONE: this panel, the same as every other mode, carrying the full lists
+ * in two groups, in the rules files' own words (CONTROLS_OFFENCE / CONTROLS_DEFENCE, word for word: nothing to drift).
+ *
+ * This sets aside the line budget above for these two modes, by the owner's pick: the 1v1's offence is 16 lines and some
+ * wrap, so on a sideways phone (by estimate also at 1280x720; not measured in a browser) the lines scroll inside the panel's box — a finger or a wheel scrolls
+ * them; the pause's tap still resumes. The rows and the headings stay put above and in the list.
+ */
+export const PANEL_GROUPS: Readonly<Record<string, readonly PanelGroup[]>> = {
+  onevone: [
+    { title: 'OFFENSE', color: 'var(--fel-cyan)', text: ONES_OFFENCE },
+    { title: 'DEFENSE', color: 'var(--fel-gold)', text: ONES_DEFENCE },
+  ],
+  threevthree: [
+    { title: 'OFFENSE', color: 'var(--fel-cyan)', text: THREES_OFFENCE },
+    { title: 'DEFENSE', color: 'var(--fel-gold)', text: THREES_DEFENCE },
+  ],
 };
 
 /**
