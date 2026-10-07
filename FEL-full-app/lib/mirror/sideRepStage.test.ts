@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { readFixture } from './fixtures/load';
 import { toPoseFrames } from './fixtures';
 import { filmBodies, hingeSet, pushupSet, standingBentArms } from './fixtures/sideRepBuild';
-import { pushupPose } from './fixtures/build';
+import { hingePose, pushupPose } from './fixtures/build';
 import { dimVisibility } from './fixtures/hingeSetupBuild';
 import type { PoseFrame } from '@/lib/pose/landmarks';
 import {
@@ -166,6 +166,13 @@ describe('the push-up, live — whole synthetic sets (built with lib/pose/synth.
 
   it('getting down to the floor is not a rep: standing side-on with bent elbows never sets up, never counts', () => {
     const { s, reps } = run(PUSHUP_LIVE, filmBodies(Array.from({ length: 150 }, () => standingBentArms())));
+    expect(s.stage).toBe('setup');
+    expect(reps).toHaveLength(0);
+  });
+
+  it('standing side-on with straight arms hanging (the elbow reads "at the top") is not the plank: setup waits', () => {
+    const { s, reps } = run(PUSHUP_LIVE, filmBodies(Array.from({ length: 150 }, () => hingePose(0))));
+    expect(PUSHUP_LIVE.up(PUSHUP_LIVE.signal(filmBodies([hingePose(0)])[0].image, 'left')!)).toBe(true);   // the arm IS straight
     expect(s.stage).toBe('setup');
     expect(reps).toHaveLength(0);
   });
