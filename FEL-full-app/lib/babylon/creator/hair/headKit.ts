@@ -150,7 +150,7 @@ export class HeadKit {
 export const HAIR_DETAIL = {
   desktop: { cols: 96, rows: 26, sides: 6, strands: 1, sheet: 40, step: 0.012 },
   mobile: { cols: 64, rows: 18, sides: 5, strands: 0.6, sheet: 28, step: 0.018 },
-  crowd: { cols: 40, rows: 12, sides: 4, strands: 0.35, sheet: 18, step: 0.03 },
+  crowd: { cols: 40, rows: 12, sides: 4, strands: 0.28, sheet: 18, step: 0.03 },
 } as const;
 export type HairTier = keyof typeof HAIR_DETAIL;
 export type Detail = typeof HAIR_DETAIL[HairTier];

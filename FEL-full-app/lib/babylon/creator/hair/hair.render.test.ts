@@ -32,7 +32,7 @@ import { setPaintBaseReader } from '../paint/renderPaint';
 import { dirOf, headFieldOf, sampleMap, type HeadField } from './headField';
 import { buildHair, type HairGeo } from './build';
 import { K } from './geo';
-import { HAIR_BUDGET, hairMeshOf, hairMeshesOf, hairSwingRigOf, resetHairCaches, syncHair } from './renderHair';
+import { DETAIL_H, DETAIL_W, HAIR_ALPHA_CUT, HAIR_BUDGET, hairDetailHeight, hairMeshOf, hairMeshesOf, hairSwingRigOf, resetHairCaches, syncHair } from './renderHair';
 
 const kits: Record<string, AssetContainer> = {};
 let scene: Scene;
@@ -255,8 +255,12 @@ describe('beards and accessories', () => {
       for (let v = 0; v < g.verts; v++) {
         if (g.kind[v] !== K.beard) notBeard++;
         const x = g.hf[v * 3], y = g.hf[v * 3 + 1];
-        // nothing thick over the lips
-        if (Math.abs(x) < 0.012 && Math.abs(y - H.L.mouth.y) < 0.003 && g.along[v] >= 0.1) overMouth++;
+        // nothing thick over the lips. TEST CHANGED (polish pass, 2026-10-07): the owner asked for the mustache to come OVER
+        // the upper lip, so its ragged lower edge now hangs up to ~4 mm under the lip line (measured: 3.6 mm on the male kit);
+        // for it the check moves to the lower lip (4.5–10.5 mm under the line), which must stay open. Every other beard keeps
+        // the original check at the lip line.
+        const lip = b === 'mustache' ? H.L.mouth.y - 0.0075 : H.L.mouth.y;
+        if (Math.abs(x) < 0.012 && Math.abs(y - lip) < 0.003 && g.along[v] >= 0.1) overMouth++;
       }
       expect(notBeard, b).toBe(0);
       expect(overMouth, `${b} over the mouth`).toBe(0);
@@ -345,6 +349,72 @@ describe('a body it cannot fit', () => {
   it('dirOf is a unit vector (the head frame sanity)', () => {
     const d = dirOf(0.7, -0.3);
     expect(Math.hypot(d[0], d[1], d[2])).toBeCloseTo(1, 6);
+  });
+});
+
+describe('the polish pass (owner, 2026-10-07)', () => {
+  it('the detail texture: the three hair bands carry a pattern, the plain band (fabric, accessories) is flat', () => {
+    const h = hairDetailHeight(), bw = DETAIL_W / 4;
+    for (let band = 0; band < 4; band++) {
+      let lo = 1, hi = 0;
+      for (let y = 0; y < DETAIL_H; y++) for (let x = band * bw; x < (band + 1) * bw; x++) { lo = Math.min(lo, h[y * DETAIL_W + x]); hi = Math.max(hi, h[y * DETAIL_W + x]); }
+      if (band === 3) expect(hi - lo, 'plain').toBe(0);
+      else expect(hi - lo, `band ${band}`).toBeGreaterThan(0.3);
+    }
+  });
+  it('fabric and accessories sample the plain band, hair and beards a patterned one', () => {
+    const s = spawn('female');
+    const H = field(s), w = winding(s);
+    const seen = new Set<string>();
+    for (const [style, acc] of [['Hijab', []], ['Box Braids', ['beads', 'cuffs']], ['Durag', []]] as const) {
+      const g = buildHair(H, { style, beard: 'full', acc: [...acc] }, { tier: 'desktop', winding: w });
+      let wrong = 0;
+      for (let v = 0; v < g.verts; v++) {
+        const band = Math.min(3, Math.floor(g.UV[v * 2] * 4 + 1e-6));
+        const hairy = g.kind[v] === K.hair || g.kind[v] === K.beard;
+        if (hairy ? band === 3 : band !== 3) wrong++;
+        seen.add(`${g.kind[v]}`);
+      }
+      expect(wrong, style).toBe(0);
+    }
+    expect(seen.has(`${K.fabric}`) && seen.has(`${K.acc}`) && seen.has(`${K.hair}`) && seen.has(`${K.beard}`)).toBe(true);
+    s.root.dispose();
+  });
+  it('a beard\'s edge is feathered (partial coverage the alpha test dithers away), its middle solid; stubble is sparse', () => {
+    const s = spawn('male');
+    const H = field(s), w = winding(s);
+    for (const b of ['full', 'long', 'stubble'] as const) {
+      const g = buildHair(H, { style: 'Bald', beard: b, acc: [] }, { tier: 'desktop', winding: w });
+      let solid = 0, feather = 0, n = 0;
+      for (let v = 0; v < g.verts; v++) {
+        if (g.kind[v] !== K.beard) continue;
+        n++;
+        if (g.alpha[v] > 0.97) solid++;
+        else if (g.alpha[v] > HAIR_ALPHA_CUT - 0.05) feather++;
+      }
+      if (b === 'stubble') expect(solid, b).toBe(0);
+      else { expect(solid / n, b).toBeGreaterThan(0.1); expect(feather / n, b).toBeGreaterThan(0.1); }
+    }
+    s.root.dispose();
+  });
+  it('long hair falls in clumps that taper to ragged, thinning tips (not a board cut square)', () => {
+    const s = spawn('female');
+    const H = field(s), w = winding(s);
+    for (const style of ['Straight', 'Wavy', 'Curly', 'Long Layered']) {
+      const g = buildHair(H, { style, beard: null, acc: [] }, { tier: 'desktop', winding: w });
+      let tipA = 0, tipN = 0;
+      const ends = new Set<number>();
+      for (let v = 0; v < g.verts; v++) {
+        if (g.kind[v] !== K.hair || g.chain[v] < 0) continue;
+        if (g.along[v] > 0.95) { tipA += g.alpha[v]; tipN++; ends.add(Math.round(g.hf[v * 3 + 1] * 100)); }
+      }
+      expect(tipN, style).toBeGreaterThan(0);
+      // (the clump tips are at ~0.5 coverage; the dark under-curtain's hem, solid, is averaged in)
+      expect(tipA / tipN, style).toBeLessThan(0.75);
+      // the ends lie at many heights (ragged), not one line
+      expect(ends.size, style).toBeGreaterThan(5);
+    }
+    s.root.dispose();
   });
 });
 

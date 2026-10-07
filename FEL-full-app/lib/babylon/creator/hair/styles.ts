@@ -18,10 +18,10 @@
 import { HeadKit, DEG } from './headKit';
 import { angOf, dirOf } from './headField';
 import {
-  K, add, coil, coilKnot, cross, curtain, hash, len, mix, noise3, norm, rayColumn, rayEllipsoid, scalpRoots, scale, shell, smooth, strands, sub, tail,
+  K, add, clumps, coil, coilKnot, cross, curtain, hash, len, mix, noise3, norm, rayColumn, rayEllipsoid, scalpRoots, scale, shell, smooth, strands, sub, tail,
   type Ctx, type V3,
 } from './prims';
-import { keyed } from './geo';
+import { TEX, keyed, type TexBand } from './geo';
 
 type Recipe = (c: Ctx) => void;
 
@@ -210,10 +210,11 @@ R['Frohawk'] = (c) => {
     outer: (a, b, s, e) => s + 0.004 * smooth(0, 0.01, e) + coil(scale(dirOf(a, b), s), 90, 0.001).off,
     attrs: (a, b, e) => ({ dens: 0.35 + 0.45 * smooth(0, 0.012, e), shade: 0.9 }),
   });
-  ridge(c, 0.036, (u, v) => {
-    const H = 0.042 * smooth(0, 0.18, u) * (1 - 0.6 * smooth(0.6, 1, u));
-    return H * Math.pow(Math.max(0, 1 - v * v), 0.55);
-  }, { rows: Math.round(c.d.rows * 2.6), cols: 12, attrs: (u, v) => ({ shade: 0.75 + 0.3 * noise3(u * 30, v * 6, 1) }) });
+  // POLISH (2026-10-07): the crest is soft coily texture (the coil band), fuller and rounder on top
+  c.g.with({ tex: TEX.coil, vLen: 0.035, uLen: 0.035 }, () => ridge(c, 0.038, (u, v) => {
+    const H = 0.046 * smooth(0, 0.16, u) * (1 - 0.55 * smooth(0.6, 1, u));
+    return H * Math.pow(Math.max(0, 1 - v * v), 0.45) + coil([u * 0.3, v * 0.04, 0], 40, 0.003).off;
+  }, { rows: Math.round(c.d.rows * 2.6), cols: 12, attrs: (u, v) => ({ shade: 0.75 + 0.3 * noise3(u * 30, v * 6, 1) }) }));
 };
 
 R['Bald'] = () => { /* nothing */ };
@@ -264,31 +265,25 @@ R['Swept'] = (c) => {
 
 R['Streaks'] = (c) => {
   const k = c.k;
-  // an anime cut: a cap and chunky locks fanning from the crown, swept forward and to the side, every other lock a streak
-  shell(c, { low: (a) => k.hairline(a, 'ears') + 0.01, full: true, outer: (_a, b, s, e) => s + (0.012 + 0.008 * Math.max(0, Math.sin(b))) * smooth(0, 0.01, e) });
-  const crown = k.surf(Math.PI, 70 * DEG, 0.01);
-  const n = Math.round(14 * Math.sqrt(c.d.strands) + 2);
-  for (let i = 0; i < n; i++) {
-    const a = -Math.PI + ((i + 0.5) / n) * Math.PI * 2;
-    // where the lock's tip lands: round the head at the hairline, longer at the sides, swept to the right in front
-    const ta = a - 0.35 * Math.cos(a) * 0.6;
-    const ty = mix(k.L.brow + 0.012, k.L.chin.y + 0.03, smooth(40 * DEG, 100 * DEG, Math.abs(ta)));
-    const tip = HeadKit.cyl(ta, ty, k.horiz(ta, ty) + 0.016);
-    const pts: V3[] = [];
-    for (let j = 0; j <= 10; j++) {
-      const t = j / 10;
-      const p = add(crown, sub(tip, crown), t);
-      const [pa, pb] = angOf(p[0], p[1], p[2]);
-      // ride over the scalp, bulging out in the middle
-      const r = Math.max(len(p), k.r(pa, pb, true) + 0.012 + 0.02 * Math.sin(Math.PI * t));
-      pts.push(scale(dirOf(pa, pb), r));
-    }
-    const streak = i % 2 === 0 ? 1 : 0;
-    c.g.with({ streak }, () => c.g.tube(pts, (t) => 0.016 * Math.sin(Math.PI * Math.min(1, t * 1.15 + 0.08)) + 0.001, c.d.sides, {
-      profile: (_t, phi) => 1 - 0.45 * Math.abs(Math.sin(phi)),   // flat locks
-      attrs: (t) => ({ along: t }),
-    }));
-  }
+  // POLISH (2026-10-07, owner: "should look like dyed streaks, not anime spikes"): a jaw-length layered cut swept from a
+  // left part across the forehead, with bold DYED streaks — whole locks and bands of the cap in the second colour (a
+  // lighter shade of the hair when the player has not picked one). Spiky keeps the anime spikes.
+  const partA = 34 * DEG;
+  shell(c, {
+    rows: Math.round(c.d.rows * 1.3), full: true,
+    low: (a) => {
+      const base = k.hairline(a, 'ears') + 0.01;
+      const fr = smooth(partA, 8 * DEG, a) * smooth(-75 * DEG, -40 * DEG, a);
+      return mix(base, k.L.brow + 0.02 + 0.012 * smooth(-60 * DEG, 20 * DEG, a), fr);
+    },
+    outer: (a, b, s, e) => s + (0.013 + 0.01 * Math.max(0, Math.sin(b)) + 0.012 * smooth(60 * DEG, -20 * DEG, a) * Math.max(0, Math.sin(b))) * smooth(0, 0.01, e) + 0.003,
+    attrs: (a) => ({ streak: Math.sin(a * 7 + 0.4) > 0.55 ? 1 : 0, shade: 0.86 + 0.14 * Math.sin(a * 30) }),
+  });
+  clumps(c, {
+    arc: [52 * DEG, 308 * DEG], count: 20, top: () => k.L.ear.top + 0.03,
+    length: (_a, i) => 0.11 + 0.06 * hash(i, 27), width: 0.016, thick: 0.006, gap: 0.014, volume: 0.007, frontUnder: 96 * DEG,
+    chains: 2, hang: k.L.ear.bottom - 0.01, streak: (i) => i % 3 === 0,
+  });
 };
 
 R['Mullet'] = (c) => {
@@ -298,11 +293,14 @@ R['Mullet'] = (c) => {
     outer: (a, b, s, e) => s + (0.009 + 0.012 * Math.max(0, Math.sin(b)) + 0.006 * smooth(110 * DEG, 160 * DEG, Math.abs(a))) * smooth(0, 0.01, e),
     attrs: (a, b) => ({ shade: 0.86 + 0.14 * Math.sin(a * 26 + b * 8) }),
   });
-  curtain(c, {
-    arc: [118 * DEG, 242 * DEG], top: () => k.L.nape + 0.035, bottom: () => k.L.neckBase - 0.05, gap: 0.009, cols: Math.round(c.d.sheet * 0.6),
-    extra: (_a, _y, t) => 0.012 * t * t,
-    attrs: (a, y) => ({ shade: 0.82 + 0.18 * Math.sin(a * 40 + y * 30) }),
-    panels: { hang: k.L.neckTop - 0.005, n: 2, attach: 'Neck' },
+  // POLISH (2026-10-07): a dark under-layer and, over it, tapering clumps of uneven length down the back of the neck
+  c.g.with({ uLen: 0.05 }, () => curtain(c, {
+    arc: [118 * DEG, 242 * DEG], top: () => k.L.nape + 0.035, bottom: () => k.L.neckBase - 0.01, gap: 0.008, cols: Math.round(c.d.sheet * 0.6),
+    attrs: () => ({ shade: 0.52 }),
+  }));
+  clumps(c, {
+    arc: [114 * DEG, 246 * DEG], count: 13, top: () => k.L.nape + 0.04,
+    length: (_a, i) => 0.12 + 0.06 * hash(i, 26), width: 0.016, thick: 0.006, gap: 0.01, volume: 0.008, chains: 2, hang: k.L.neckTop - 0.005,
   });
 };
 
@@ -349,46 +347,66 @@ function longCurtain(c: Ctx, o: { back: number; sides: number; gap: number; extr
   for (const s of [1, -1]) c.anchors.clips.push({ p: HeadKit.cyl(s * 96 * DEG, k.L.ear.top + 0.022, k.horiz(s * 96 * DEG, k.L.ear.top + 0.022) + o.gap + 0.003), n: [s, 0.15, 0] });
 }
 
+/** POLISH (2026-10-07, owner: "flat cardboard panels that end abruptly at the shoulders"): long hair is CLUMPS over a dark,
+ *  shorter under-layer (the curtain fills the gaps between locks so no neck shows through). The clumps taper to points at
+ *  ragged lengths and drape over the shoulders — the front ones forward onto the chest, the rest down the back. */
+function under(c: Ctx, back: number, sides: number, gap: number, o: { arc?: number; tex?: TexBand } = {}): void {
+  c.g.with({ tex: o.tex ?? TEX.streak, vLen: 0.07, uLen: 0.05 }, () => longCurtain(c, {
+    back, sides, gap, arc: o.arc, shade: (a, y) => 0.5 + 0.08 * Math.sin(a * 46 + y * 4),
+  }));
+}
+const fromFront = (a: number) => Math.abs(((a + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI);
+
 R['Straight'] = (c) => {
   const k = c.k;
   longCap(c, { t: 0.008 });
-  longCurtain(c, { back: -0.40, sides: k.L.neckBase - 0.02, gap: 0.012 });
+  under(c, -0.3, k.L.neckBase + 0.01, 0.01);
+  // sleek: straight clumps, close to the head, long down the back, the front ones over the collarbones
+  clumps(c, {
+    arc: [64 * DEG, 296 * DEG], count: 28, top: () => k.L.ear.top + 0.02,
+    length: (a, i) => mix(0.27, 0.46, smooth(90 * DEG, 150 * DEG, fromFront(a))) * (0.9 + 0.2 * hash(i, 21)),
+    width: 0.021, thick: 0.006, gap: 0.011, frontUnder: 96 * DEG, chains: 3,
+  });
 };
 
 R['Wavy'] = (c) => {
   const k = c.k;
   longCap(c, { t: 0.012, partA: 30 * DEG, volume: 0.006 });
-  longCurtain(c, {
-    back: -0.35, sides: k.L.neckBase - 0.03, gap: 0.016,
-    extra: (a, y, t) => (0.006 + 0.004 * t) * Math.sin(y * 62 + a * 4) + 0.012 * t,
-    shade: (a, y) => 0.8 + 0.2 * (0.5 + 0.5 * Math.sin(y * 62 + a * 4 + 1.2)),
+  under(c, -0.26, k.L.neckBase, 0.018);
+  // soft S-waves you can see from the front, more volume, each clump in its own phase
+  clumps(c, {
+    arc: [60 * DEG, 300 * DEG], count: 26, top: () => k.L.ear.top + 0.022,
+    length: (a, i) => mix(0.25, 0.38, smooth(90 * DEG, 150 * DEG, fromFront(a))) * (0.88 + 0.24 * hash(i, 22)),
+    width: 0.021, thick: 0.007, gap: 0.016, wave: { amp: 0.014, period: 0.075 }, volume: 0.012, frontUnder: 96 * DEG, chains: 3,
   });
 };
 
 R['Curly'] = (c) => {
   const k = c.k;
-  longCap(c, { t: 0.02, volume: 0.016, curls: 0.006 });
-  longCurtain(c, {
-    back: -0.24, sides: k.L.neckBase - 0.0, gap: 0.03, arc: 58 * DEG,
-    extra: (a, y, t) => coil(HeadKit.cyl(a, y, 0.12), 34, 0.01).off + 0.045 * t,
-    shade: (a, y) => coil(HeadKit.cyl(a, y, 0.12), 34, 0).shade,
+  c.g.with({ tex: TEX.coil, vLen: 0.035 }, () => longCap(c, { t: 0.02, volume: 0.016, curls: 0.006 }));
+  under(c, -0.18, k.L.neckBase + 0.02, 0.026, { arc: 58 * DEG, tex: TEX.coil });
+  // ringlets: round curl clumps spiralling down to the shoulders, a big soft volume
+  clumps(c, {
+    arc: [56 * DEG, 304 * DEG], count: 24, top: () => k.L.ear.top + 0.03,
+    length: (a, i) => mix(0.17, 0.25, smooth(90 * DEG, 150 * DEG, fromFront(a))) * (0.85 + 0.3 * hash(i, 23)),
+    width: 0.011, thick: 0.0085, gap: 0.03, curl: { radius: 0.011, pitch: 0.03 }, volume: 0.02, frontUnder: 96 * DEG, chains: 3,
   });
 };
 
 R['Long Layered'] = (c) => {
   const k = c.k;
   longCap(c, { t: 0.012, partA: -28 * DEG, volume: 0.008 });
-  longCurtain(c, { back: -0.42, sides: k.L.neckBase - 0.06, gap: 0.012 });
-  // the outer layer: shorter, face-framing — shortest in front, stepping longer to the back
-  curtain(c, {
-    arc: [58 * DEG, 302 * DEG],
-    top: () => k.L.ear.top + 0.03,
-    bottom: (a) => {
-      const d = Math.abs(((a + Math.PI) % (2 * Math.PI)) - Math.PI);
-      return mix(k.L.chin.y + 0.005, k.L.neckBase - 0.06, smooth(60 * DEG, 160 * DEG, d));
-    },
-    gap: 0.024, extra: (_a, _y, t) => 0.008 * t,
-    attrs: (a, y, t) => ({ shade: 0.88 + 0.12 * Math.sin(a * 40 + y * 5), along: 0.5 * t }),
+  under(c, -0.32, k.L.neckBase - 0.02, 0.012);
+  // the long layer down the back, and over it a shorter, face-framing layer stepping longer towards the back
+  clumps(c, {
+    arc: [70 * DEG, 290 * DEG], count: 22, top: () => k.L.ear.top + 0.018,
+    length: (a, i) => mix(0.3, 0.46, smooth(100 * DEG, 150 * DEG, fromFront(a))) * (0.9 + 0.2 * hash(i, 24)),
+    width: 0.017, thick: 0.0055, gap: 0.012, frontUnder: 96 * DEG, chains: 3,
+  });
+  clumps(c, {
+    arc: [56 * DEG, 304 * DEG], count: 18, top: () => k.L.ear.top + 0.032,
+    length: (a, i) => mix(0.1, 0.2, smooth(60 * DEG, 160 * DEG, fromFront(a))) * (0.85 + 0.3 * hash(i, 25)),
+    width: 0.016, thick: 0.005, gap: 0.02, layer: 0.008, volume: 0.006, frontUnder: 96 * DEG, chains: 2,
   });
 };
 
@@ -467,7 +485,7 @@ R['Ponytail'] = (c) => {
   const g = gatherAt(c, Math.PI, 46 * DEG);
   slickCap(c, g.n);
   const path = ponyPath(g.base, add(g.n, [0, 0.25, 0]), 0.3);
-  tail(c, path, (t) => (t < 0.06 ? 0.016 : 0.016 + 0.014 * Math.sin(Math.min(1, (t - 0.06) / 0.5) * Math.PI / 2)) * (1 - 0.82 * smooth(0.45, 1, t)) + 0.002, {
+  tail(c, path, (t) => (t < 0.06 ? 0.016 : 0.016 + 0.014 * Math.sin(Math.min(1, (t - 0.06) / 0.5) * Math.PI / 2)) * (1 - 0.96 * smooth(0.4, 1, t)) + 0.0006, {
     attach: 'Head', profile: (t, phi) => 1 + 0.1 * Math.sin(phi * 5 + t * 20),
   });
   void k;
@@ -482,7 +500,7 @@ R['Pigtails'] = (c) => {
     const path = ponyPath(g.base, add(g.n, [0, 0.1, 0]), 0.22, 1, 0.025);
     // keep the tail clear of the shoulder behind
     for (const p of path) { const r = Math.hypot(p[0], p[2]); const need = k.horiz(Math.atan2(p[0], p[2]), p[1]) + 0.022; if (r < need) { p[0] *= need / r; p[2] *= need / r; } }
-    tail(c, path, (t) => (0.012 + 0.009 * Math.sin(Math.min(1, t / 0.4) * Math.PI / 2)) * (1 - 0.8 * smooth(0.5, 1, t)) + 0.0015, { attach: 'Head', profile: (t, phi) => 1 + 0.1 * Math.sin(phi * 5 + t * 18) });
+    tail(c, path, (t) => (0.012 + 0.009 * Math.sin(Math.min(1, t / 0.4) * Math.PI / 2)) * (1 - 0.96 * smooth(0.45, 1, t)) + 0.0006, { attach: 'Head', profile: (t, phi) => 1 + 0.1 * Math.sin(phi * 5 + t * 18) });
   }
   for (const s of [1, -1]) c.anchors.clips.push({ p: k.surf(s * 75 * DEG, k.betaAt(s * 75 * DEG, k.L.ear.top + 0.035), 0.008), n: [s, 0.3, 0.2] });
 };
@@ -507,26 +525,29 @@ R['Braided Ponytail'] = (c) => {
 
 R['Afro'] = (c) => {
   const k = c.k;
-  // a ball centred well above the ears, so it is round on top and tucks in at the temples and the nape
-  const ctr: V3 = [0, 0.072, -0.016];
-  const rad: V3 = [k.L.halfWidth + 0.058, k.L.top - 0.072 + 0.064, (k.L.foreheadZ - k.L.back) / 2 + 0.05];
-  shell(c, {
-    low: (a) => mix(k.hairline(a), k.hairline(a, 'ears') + 0.012, smooth(60 * DEG, 85 * DEG, Math.abs(a))), full: true,
-    rows: Math.round(c.d.rows * 1.5), bias: 0.85,
+  // POLISH (2026-10-07, owner: "reads as a mushroom"): a full ROUND ball, centred near the middle of the head so its widest
+  // point is at the temples (full sides, no cap on a stalk), coming down close to the face at the hairline, its surface the
+  // coil band's soft clumps over a gentle lumpiness
+  const ctr: V3 = [0, 0.036, -0.014];
+  const rad: V3 = [k.L.halfWidth + 0.07, k.L.top - 0.036 + 0.062, (k.L.foreheadZ - k.L.back) / 2 + 0.062];
+  c.g.with({ tex: TEX.coil, vLen: 0.04 }, () => shell(c, {
+    low: (a) => k.hairline(a) - 0.006 * smooth(50 * DEG, 0, Math.abs(a)), full: true,
+    rows: Math.round(c.d.rows * 1.5), bias: 0.8,
     outer: (a, b, s, e) => {
       const d = dirOf(a, b);
       const ball = rayEllipsoid(d, ctr, rad);
-      const cl = coil(scale(d, ball), 36, 0.006);
-      // rise from the hairline on a rounded profile, never a step
-      const rise = Math.pow(smooth(0, 0.05, e), 0.7);
+      const cl = coil(scale(d, ball), 22, 0.008);
+      // rises from the hairline on a short rounded profile: the volume starts right at the face
+      const rise = Math.pow(smooth(0, 0.03, e), 0.55);
       return s + 0.003 + Math.max(0, ball - s) * rise + cl.off * rise;
     },
-    attrs: (a, b, _e, _h, r) => ({ shade: coil(scale(dirOf(a, b), r), 36, 0).shade * mix(0.9, 1, smooth(-0.3, 0.6, Math.sin(b))) }),
-  });
+    attrs: (a, b, _e, _h, r) => ({ shade: coil(scale(dirOf(a, b), r), 22, 0).shade * mix(0.86, 1, smooth(-0.4, 0.5, Math.sin(b))) }),
+  }));
 };
 
 R['Afro Puffs'] = (c) => {
   const k = c.k;
+  c.g.a = { ...c.g.a, tex: TEX.coil, vLen: 0.035 };
   shell(c, {
     low: std(c),
     outer: (a, b, s, e) => s + (0.006 + coil(scale(dirOf(a, b), s), 110, 0.0015).off) * smooth(0, 0.008, e),
@@ -540,50 +561,59 @@ R['Afro Puffs'] = (c) => {
     const ctr = add(base, n, R0 * 0.9);
     let chain = -1;
     if (c.sway > 0) chain = c.g.addChain({ attach: 'Head', root: base, dir: n, length: R0 * 1.8, swing: c.sway });
-    c.g.with({ chain }, () => c.g.blob(ctr, (d) => R0 * (1 - 0.18 * Math.max(0, -(d[0] * n[0] + d[1] * n[1] + d[2] * n[2]))) + coil(add(ctr, d, R0), 34, 0.006).off,
+    c.g.with({ chain, uLen: 0.035, vLen: 0.035 }, () => c.g.blob(ctr, (d) => R0 * (1 - 0.18 * Math.max(0, -(d[0] * n[0] + d[1] * n[1] + d[2] * n[2]))) + coil(add(ctr, d, R0), 34, 0.006).off,
       Math.round(c.d.rows * 0.9), Math.round(c.d.cols * 0.45), (d) => ({ shade: coil(add(ctr, d, R0), 34, 0).shade })));
     c.anchors.bases.push({ p: add(base, n, 0.012), t: n, r: 0.03, chain });
   }
+  c.g.a = { ...c.g.a, tex: TEX.streak, vLen: 0.06 };
 };
 
 R['Locs'] = (c) => {
   const k = c.k;
   // the under-layer: dark, so no scalp shows between the ropes
-  shell(c, { low: std(c), outer: (_a, _b, s, e) => s + 0.004 * smooth(0, 0.008, e), attrs: () => ({ shade: 0.62 }) });
-  const roots = scalpRoots(k, 0.037 / Math.sqrt(c.d.strands), { border: 0.012, jitter: 0.25 });
+  c.g.with({ tex: TEX.coil, vLen: 0.03 }, () => shell(c, { low: std(c), outer: (_a, _b, s, e) => s + 0.004 * smooth(0, 0.008, e), attrs: () => ({ shade: 0.55 }) }));
+  const roots = scalpRoots(k, 0.04 / Math.sqrt(c.d.strands), { border: 0.012, jitter: 0.3 });
+  // POLISH (2026-10-07, owner): round ropes, thick and matte — each a little different in thickness, length and colour,
+  // lumpy along its length, rounded at the end; the coil band's matted texture round each one
   strands(c, {
-    roots, rr: (i) => 0.0072 * (0.88 + 0.26 * hash(i, 1)), length: (i) => 0.29 + 0.05 * hash(i, 2),
-    profile: (t, phi, i) => 1 + 0.1 * (noise3(t * 22 + i, Math.cos(phi) * 1.5, Math.sin(phi) * 1.5) - 0.5),
-    radius: (t) => (t > 0.94 ? Math.sqrt(Math.max(0.05, 1 - ((t - 0.94) / 0.06) ** 2)) : 1),
-    chains: 5, layerGain: 2.0, push: 0.4,
+    roots, rr: (i) => 0.0082 * (0.8 + 0.4 * hash(i, 1)), length: (i) => 0.26 + 0.09 * hash(i, 2),
+    profile: (t, phi, i) => 1 + 0.16 * (noise3(t * 16 + i, Math.cos(phi) * 1.2, Math.sin(phi) * 1.2) - 0.5),
+    radius: (t) => (t < 0.04 ? 0.75 + 6 * t : t > 0.92 ? Math.sqrt(Math.max(0.06, 1 - ((t - 0.92) / 0.08) ** 2)) : 1),
+    chains: 5, layerGain: 1.9, push: 0.4, curl: 0.003,
+    tex: { band: TEX.streak, vLen: 0.05 }, shade: (i) => 0.84 + 0.16 * hash(i, 9),
   });
 };
 
 R['Box Braids'] = (c) => {
   const k = c.k;
-  const spacing = 0.036 / Math.sqrt(c.d.strands);
+  const spacing = 0.037 / Math.sqrt(c.d.strands);
   const roots = scalpRoots(k, spacing, { border: 0.01 });
   // each braid's own square part: a pad with the scalp showing round it
   for (const [a, b] of roots) pad(c, a, b, spacing * 0.36, 0.0022);
+  // POLISH (2026-10-07): round braids; the plait is the detail texture's plait band (two crossings per 2.2 cm) so it reads
+  // at any row spacing; a slightly squared section, lengths and shades vary braid to braid, the ends taper
   strands(c, {
-    roots, rr: 0.0042, length: (i) => 0.42 + 0.03 * hash(i, 4),
-    // the plait: each side's crossings alternate, offset half a crossing
-    profile: (t, phi, i) => 1 + 0.24 * Math.abs(Math.sin((t * (0.44 / 0.011)) * Math.PI + (Math.cos(phi) > 0 ? 0 : Math.PI / 2) + i)),
-    radius: (t) => (t > 0.96 ? 0.7 : 1),
+    roots, rr: (i) => 0.0044 * (0.9 + 0.2 * hash(i, 6)), length: (i) => 0.39 + 0.07 * hash(i, 4),
+    profile: (_t, phi) => 1 + 0.08 * Math.cos(4 * phi),
+    radius: (t) => (t > 0.9 ? 1 - 0.55 * smooth(0.9, 1, t) : 1),
     chains: 6, layerGain: 2.4, push: 0.38,
+    tex: { band: TEX.plait, vLen: 0.022 }, shade: (i) => 0.88 + 0.12 * hash(i, 8),
   });
 };
 
 R['Twists'] = (c) => {
   const k = c.k;
-  shell(c, { low: std(c), outer: (_a, _b, s, e) => s + 0.0035 * smooth(0, 0.008, e), attrs: () => ({ shade: 0.66 }) });
+  c.g.with({ tex: TEX.coil, vLen: 0.03 }, () => shell(c, { low: std(c), outer: (_a, _b, s, e) => s + 0.0035 * smooth(0, 0.008, e), attrs: () => ({ shade: 0.6 }) }));
   const roots = scalpRoots(k, 0.035 / Math.sqrt(c.d.strands), { border: 0.01, jitter: 0.2 });
+  // POLISH (2026-10-07): visibly two-strand — a section of two round lobes side by side, the diagonal of the plait band
+  // winding round it (a twist, not a plait), lengths and thickness varying, a coiled flick at the end
   strands(c, {
-    roots, rr: 0.0052, length: (i) => 0.15 + 0.035 * hash(i, 5),
-    // two strands wound round each other: a two-lobed section turning along the twist
-    profile: (t, phi, i) => 1 + 0.34 * Math.cos(2 * phi - t * (0.22 / 0.013) * Math.PI * 2 - i),
-    radius: (t) => (t > 0.93 ? 0.75 : 1),
-    chains: 5, layerGain: 3.2, push: 0.3, curl: 0.006, clearance: 0.02,
+    roots, rr: (i) => 0.0056 * (0.88 + 0.24 * hash(i, 3)), length: (i) => 0.14 + 0.06 * hash(i, 5),
+    profile: (_t, phi) => 0.78 + 0.3 * Math.abs(Math.cos(phi)),
+    twist: (t, i) => t * 9 + i,
+    radius: (t) => (t > 0.9 ? 1 - 0.4 * smooth(0.9, 1, t) : 1),
+    chains: 5, layerGain: 3.2, push: 0.3, curl: 0.007, clearance: 0.02,
+    tex: { band: TEX.plait, vLen: 0.026, uSpan: 0.5 }, shade: (i) => 0.86 + 0.14 * hash(i, 7),
   });
 };
 
@@ -606,9 +636,9 @@ R['Cornrows'] = (c) => {
       pts.push(p);
     }
     if (pts.length < 4) continue;
-    c.g.tube(pts, (t) => 0.0042 * (t < 0.03 ? 0.6 : 1), c.d.sides, {
+    c.g.with({ tex: TEX.plait, vLen: 0.02 }, () => c.g.tube(pts, (t) => 0.0042 * (t < 0.03 ? 0.6 : 1), c.d.sides, {
       profile: (t, phi) => 1 + 0.22 * Math.abs(Math.sin(t * (0.28 / 0.009) * Math.PI + (Math.cos(phi) > 0 ? 0 : Math.PI / 2))),
-    });
+    }));
     // a short braided end hanging from the nape
     const end = pts[pts.length - 1];
     const tl: V3[] = [];

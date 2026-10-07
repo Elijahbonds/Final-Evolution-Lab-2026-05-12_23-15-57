@@ -33,9 +33,30 @@ export interface GP {
   streak?: number;
   /** override the vertex kind */
   kind?: Kind;
+  /** 1 at a strand's root (darker), 0 out along it */
+  root?: number;
+  /** coverage 0..1: under 1 the detail texture's dither thins it out (a feathered beard edge, stubble, a ragged tip) */
+  alpha?: number;
 }
 
-export interface Attrs { kind: Kind; streak: number; chain: number; shade: number; dens: number }
+/** The detail texture's bands (renderHair.hairDetailTexture): strand streaks, a plait's crossings, coils, and PLAIN (cloth,
+ *  accessories, skin: no hair detail, full coverage — a grid of any kind but hair or beard always uses it). A grid's u
+ *  runs once across its band (round a tube, round the head); v tiles every `vLen` metres along the grid's rows. */
+export const TEX = { streak: 0, plait: 1, coil: 2, plain: 3 } as const;
+export type TexBand = typeof TEX[keyof typeof TEX];
+export const TEX_BANDS = 4;
+/** Kept off each band's edges so a mip never bleeds into the next band. */
+export const TEX_MARGIN = 0.02;
+
+export interface Attrs {
+  kind: Kind; streak: number; chain: number; shade: number; dens: number; tex: TexBand; vLen: number;
+  /** how many times the band repeats across the grid's columns (a shell round the whole head repeats it, a tube does not) */
+  uTiles: number;
+  /** how much of the band's width one tile spans (a two-strand twist uses half the plait band: its diagonal) */
+  uSpan: number;
+  /** when set, the band repeats every `uLen` metres across the grid (measured on its widest row) instead of uTiles times */
+  uLen: number;
+}
 
 export const sub = (a: V3, b: V3): V3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 export const cross = (a: V3, b: V3): V3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
@@ -76,10 +97,10 @@ export function perp(d: V3): V3 {
 
 export class GeoBuilder {
   P: number[] = []; N: number[] = []; UV: number[] = []; I: number[] = [];
-  kind: number[] = []; along: number[] = []; streak: number[] = []; dens: number[] = []; shade: number[] = []; chain: number[] = [];
+  kind: number[] = []; along: number[] = []; streak: number[] = []; dens: number[] = []; shade: number[] = []; chain: number[] = []; root: number[] = []; alpha: number[] = [];
   chains: HairChain[] = [];
   /** attributes for the vertices added next */
-  a: Attrs = { kind: K.hair, streak: 0, chain: -1, shade: 1, dens: 1 };
+  a: Attrs = { kind: K.hair, streak: 0, chain: -1, shade: 1, dens: 1, tex: TEX.streak, vLen: 0.06, uTiles: 1, uSpan: 1, uLen: 0 };
 
   get count(): number { return this.P.length / 3; }
 
@@ -102,6 +123,8 @@ export class GeoBuilder {
     this.dens.push(clamp(g.dens ?? this.a.dens, 0, 1));
     this.shade.push(clamp(g.shade ?? this.a.shade, 0, 1.5));
     this.chain.push(this.a.chain);
+    this.root.push(clamp(g.root ?? 0, 0, 1));
+    this.alpha.push(clamp(g.alpha ?? 1, 0, 1));
     return this.count - 1;
   }
 
@@ -110,27 +133,56 @@ export class GeoBuilder {
    * turned to agree with `out(p)` (a direction that points outward there) where one is given. `skip(r, c)` leaves a quad out.
    */
   grid(rows: number, cols: number, fn: (r: number, c: number) => GP, opts: { wrap?: boolean; out?: (p: V3, r: number, c: number) => V3; skip?: (r: number, c: number) => boolean } = {}): void {
-    const nc = opts.wrap ? cols : cols + 1;
+    // a wrapped grid repeats its first column at the end (same point, u = 1), so the detail texture has a seam, not a smear
+    const nc = cols + 1;
     const pts: GP[][] = [];
-    for (let r = 0; r <= rows; r++) { const row: GP[] = []; for (let c = 0; c < nc; c++) row.push(fn(r, c)); pts.push(row); }
-    const base = this.count;
-    for (let r = 0; r <= rows; r++) for (let c = 0; c < nc; c++) {
-      const at = (rr: number, cc: number) => pts[clamp(rr, 0, rows)][opts.wrap ? ((cc % nc) + nc) % nc : clamp(cc, 0, nc - 1)].p;
-      const du = sub(at(r, c + 1), at(r, c - 1));
-      const dv = sub(at(r + 1, c), at(r - 1, c));
-      let n = cross(du, dv);
-      let l = len(n);
-      const p = pts[r][c].p;
-      const hint = opts.out ? opts.out(p, r, c) : null;
-      if (l < 1e-12) { n = hint ?? norm(p); l = 1; }
-      n = scale(n, 1 / l);
-      if (hint && dot(n, hint) < 0) n = scale(n, -1);
-      this.vert(pts[r][c], n, c / cols, r / Math.max(1, rows));
+    for (let r = 0; r <= rows; r++) {
+      const row: GP[] = [];
+      for (let c = 0; c < nc; c++) row.push(opts.wrap && c === cols ? row[0] : fn(r, c));
+      pts.push(row);
+    }
+    // v: metres along each column (rows), in tiles of the band's length
+    const vAt: number[][] = pts.map(() => new Array(nc).fill(0));
+    for (let c = 0; c < nc; c++) for (let r = 1; r <= rows; r++) vAt[r][c] = vAt[r - 1][c] + len(sub(pts[r][c].p, pts[r - 1][c].p));
+    const band = this.a.kind === K.hair || this.a.kind === K.beard ? this.a.tex : TEX.plain, w = 1 / TEX_BANDS;
+    // the band repeats uTiles times across the columns: a column on a tile boundary gets a second vertex (u = 1 for the tile
+    // before it, 0 for the one after) so no quad interpolates across the whole band
+    let tilesWant = this.a.uTiles;
+    if (this.a.uLen > 0) {
+      let widest = 0;
+      for (let r = 0; r <= rows; r++) { let w = 0; for (let c = 1; c < nc; c++) w += len(sub(pts[r][c].p, pts[r][c - 1].p)); widest = Math.max(widest, w); }
+      tilesWant = widest / this.a.uLen;
+    }
+    // a whole number of tiles that divides the columns evenly enough (each tile at least 2 columns)
+    const tiles = Math.max(1, Math.min(Math.floor(cols / 2), Math.round(tilesWant)));
+    const per = cols / tiles;
+    const uOf = (c: number, end: boolean) => { const f = c / per; if (Math.abs(f - Math.round(f)) < 1e-6) return end && c > 0 ? 1 : 0; return f - Math.floor(f); };
+    const boundary = (c: number) => c > 0 && c < cols && Math.abs(c / per - Math.round(c / per)) < 1e-6;
+    const left: number[][] = [], right: number[][] = [];
+    for (let r = 0; r <= rows; r++) {
+      left.push([]); right.push([]);
+      for (let c = 0; c < nc; c++) {
+        const col = (cc: number) => (opts.wrap ? ((cc % cols) + cols) % cols : clamp(cc, 0, nc - 1));
+        const at = (rr: number, cc: number) => pts[clamp(rr, 0, rows)][col(cc)].p;
+        const du = sub(at(r, c + 1), at(r, c - 1));
+        const dv = sub(at(r + 1, c), at(r - 1, c));
+        let n = cross(du, dv);
+        let l = len(n);
+        const p = pts[r][c].p;
+        const hint = opts.out ? opts.out(p, r, c) : null;
+        if (l < 1e-12) { n = hint ?? norm(p); l = 1; }
+        n = scale(n, 1 / l);
+        if (hint && dot(n, hint) < 0) n = scale(n, -1);
+        const uu = (x: number) => band * w + TEX_MARGIN + (w - 2 * TEX_MARGIN) * x * this.a.uSpan;
+        const vv = vAt[r][c] / this.a.vLen;
+        const iEnd = this.vert(pts[r][c], n, uu(uOf(c, true)), vv);
+        right[r][c] = iEnd;
+        left[r][c] = boundary(c) ? this.vert(pts[r][c], n, uu(0), vv) : iEnd;
+      }
     }
     for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
       if (opts.skip?.(r, c)) continue;
-      const c1 = opts.wrap ? (c + 1) % nc : c + 1;
-      const a = base + r * nc + c, b = base + r * nc + c1, d = base + (r + 1) * nc + c, e = base + (r + 1) * nc + c1;
+      const a = left[r][c], b = right[r][c + 1], d = left[r + 1][c], e = right[r + 1][c + 1];
       this.I.push(a, b, e, a, e, d);
     }
   }
@@ -165,7 +217,7 @@ export class GeoBuilder {
       const b = cross(T[r], Nf[r]);
       const k = radius(t) * (opts.profile?.(t, phi) ?? 1);
       const dir: V3 = [Nf[r][0] * Math.cos(phi) + b[0] * Math.sin(phi), Nf[r][1] * Math.cos(phi) + b[1] * Math.sin(phi), Nf[r][2] * Math.cos(phi) + b[2] * Math.sin(phi)];
-      return { p: add(path[r], dir, k), along: t, ...(opts.attrs?.(t, phi) ?? {}) };
+      return { p: add(path[r], dir, k), along: t, root: 1 - smooth(0, 0.22, t), ...(opts.attrs?.(t, phi) ?? {}) };
     }, { wrap: true, out: (p, r) => sub(p, path[r]) });
   }
 

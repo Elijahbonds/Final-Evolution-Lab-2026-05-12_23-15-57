@@ -22,6 +22,10 @@ export interface HairGeo {
   /** skin: 4 joints / weights per vertex into the BODY's skeleton */
   J: Float32Array; W: Float32Array;
   kind: Uint8Array; along: Float32Array; streak: Uint8Array; dens: Float32Array; shade: Float32Array;
+  /** 1 at a strand's root (it reads darker), 0 out along it */
+  root: Float32Array;
+  /** coverage (the dither keeps less of it under 1) */
+  alpha: Float32Array;
   /** −1: the static mesh; else the index of the chain the vertex hangs on */
   chain: Int8Array;
   /** chains in REST SKELETON SPACE (root and direction) */
@@ -111,7 +115,7 @@ function finish(H: HeadField, g: GeoBuilder, winding: 1 | -1): HairGeo {
   return {
     P, N, UV: Float32Array.from(g.UV), hf, ind, J, W,
     kind: Uint8Array.from(g.kind), along: Float32Array.from(g.along), streak: Uint8Array.from(g.streak),
-    dens: Float32Array.from(g.dens), shade: Float32Array.from(g.shade), chain: Int8Array.from(g.chain),
+    dens: Float32Array.from(g.dens), shade: Float32Array.from(g.shade), root: Float32Array.from(g.root), alpha: Float32Array.from(g.alpha), chain: Int8Array.from(g.chain),
     chains, verts: n, tris: ind.length / 3,
   };
 }

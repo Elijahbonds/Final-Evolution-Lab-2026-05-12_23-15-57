@@ -4,8 +4,12 @@
 
 import { HeadKit, DEG, type Detail, type HairlineKind, type HairTier } from './headKit';
 import { dirOf } from './headField';
-import { GeoBuilder, K, add, clamp, cross, dot, hash, keyed, len, lerp3, mix, noise3, norm, perp, scale, smooth, sub, type GP, type V3 } from './geo';
+import { GeoBuilder, K, TEX, add, clamp, cross, dot, hash, keyed, len, lerp3, mix, noise3, norm, perp, scale, smooth, sub, type GP, type TexBand, type V3 } from './geo';
 import type { HairAcc } from '../../../creator/look/doc';
+
+/** the swing rig animates only this many chains on a phone (parts/swing.ts SWING_MAX_CHAINS.mobile; the render test holds
+ *  every style to it) — kept as a number here so this module stays free of the engine */
+const SWING_PHONE_CHAINS = 6;
 
 export interface Anchor { p: V3; t: V3; r: number; chain: number }
 export interface Anchors {
@@ -31,6 +35,8 @@ export interface Ctx {
   /** pressed under headwear: volume above the scalp is scaled down */
   compress: boolean;
   anchors: Anchors;
+  /** a style's own row step for ringlets (else the tier's) */
+  curlStep?: number;
 }
 
 export const emptyAnchors = (): Anchors => ({ ends: [], mids: [], bases: [], clips: [], bandR: null });
@@ -61,7 +67,9 @@ export function shell(c: Ctx, s: ShellSpec): void {
   const wrap = !s.arc;
   const span = s.arc ? s.arc[1] - s.arc[0] : Math.PI * 2;
   const k = c.k;
-  c.g.grid(rows, cols, (r, cc) => {
+  // the detail band repeats about every 4 cm round the shell (measured on its own widest row: an afro's is far wider than
+  // the scalp's), so a strand or a coil is hair-sized
+  c.g.with({ uLen: c.g.a.uLen || 0.04 }, () => c.g.grid(rows, cols, (r, cc) => {
     const a = s.arc ? s.arc[0] + (cc / cols) * span : -Math.PI + (cc / cols) * span;
     const b0 = k.betaAt(a, s.low(a), s.full);
     const b1 = s.high ? k.betaAt(a, s.high(a), s.full) : 89.5 * DEG;
@@ -71,8 +79,11 @@ export function shell(c: Ctx, s: ShellSpec): void {
     const e = (b - b0) * sr;
     let rr = Math.max(sr + 0.0015, s.outer(a, b, sr, e, h));
     if (c.compress) rr = sr + Math.min(0.03, (rr - sr) * 0.45);
-    return { p: scale(dirOf(a, b), rr), ...(s.attrs?.(a, b, e, h, rr, sr) ?? {}) };
-  }, { wrap, out: (p) => p });
+    // the hair right at its edge reads as roots: a little darker
+    // a soft hairline: the last few millimetres of hair thin out (the alpha test's dither), coverings stay solid
+    const alpha = c.g.a.kind === K.hair ? 0.5 + 0.5 * smooth(0, 0.007, e) : 1;
+    return { p: scale(dirOf(a, b), rr), root: 0.6 * (1 - smooth(0, 0.012, e)), alpha, ...(s.attrs?.(a, b, e, h, rr, sr) ?? {}) };
+  }, { wrap, out: (p) => p }));
 }
 
 /** The radius at which a ray from the origin meets an ellipsoid (centre `o`, radii `r`), or 0. */
@@ -204,6 +215,10 @@ export interface StrandSpec {
   curl?: number;
   clearance?: number;
   streakEvery?: number;
+  /** the detail band and its tiling for these strands (geo.TEX; default the streaks every 6 cm) */
+  tex?: { band: TexBand; vLen: number; uSpan?: number };
+  /** per-strand shade (a little variation reads as separate strands, not a sheet) */
+  shade?: (i: number) => number;
 }
 
 /** Many strands: each combed back from its root, off the head and down the body (HeadKit.strandPath); the hanging part
@@ -254,17 +269,20 @@ export function strands(c: Ctx, s: StrandSpec): void {
     const rad = (t: number) => rr * (s.radius ? s.radius(t, i) : 1);
     const ch = nCh ? chainIds[chainOf.get(i)!] : -1;
     const sides = c.d.sides;
+    const look = { tex: s.tex?.band ?? TEX.streak, vLen: s.tex?.vLen ?? 0.06, uSpan: s.tex?.uSpan ?? 1, shade: s.shade?.(i) ?? 1 };
     if (ch < 0) {
-      g.with({ streak }, () => g.tube(q.path, rad, sides, { profile: prof, twist: tw }));
+      g.with({ streak, ...look }, () => g.tube(q.path, rad, sides, { profile: prof, twist: tw }));
     } else {
       // the part on the head stays with the head; the hanging part rides its chain (overlapping by a point)
-      const head = q.path.slice(0, q.exit + 2), hang = q.path.slice(q.exit);
-      const total = pathLen(q.path), headLen = pathLen(head) - len(sub(q.path[q.exit + 1], q.path[q.exit]));
-      const f = headLen / total;
-      g.with({ streak }, () => g.tube(head, (t) => rad(t * (pathLen(head) / total)), sides, { profile: prof ? (t, phi) => prof(t * (pathLen(head) / total), phi) : undefined, twist: tw ? (t) => tw(t * (pathLen(head) / total)) : undefined }));
-      g.with({ streak, chain: ch }, () => g.tube(hang, (t) => rad(f + t * (1 - f)), sides, {
+      // the two parts OVERLAP by a few points (POLISH 2026-10-07: an open tube end showed as a ring where they met)
+      const e0 = Math.max(1, q.exit - 1), e1 = Math.min(q.path.length, q.exit + 2);
+      const head = q.path.slice(0, e1), hang = q.path.slice(e0);
+      const total = pathLen(q.path);
+      const f = pathLen(q.path.slice(0, e0 + 1)) / total;
+      g.with({ streak, ...look }, () => g.tube(head, (t) => rad(t * (pathLen(head) / total)), sides, { profile: prof ? (t, phi) => prof(t * (pathLen(head) / total), phi) : undefined, twist: tw ? (t) => tw(t * (pathLen(head) / total)) : undefined }));
+      g.with({ streak, chain: ch, ...look }, () => g.tube(hang, (t) => rad(f + t * (1 - f)), sides, {
         profile: prof ? (t, phi) => prof(f + t * (1 - f), phi) : undefined, twist: tw ? (t) => tw(f + t * (1 - f)) : undefined,
-        attrs: (t) => ({ along: f + t * (1 - f) }),
+        attrs: (t) => ({ along: f + t * (1 - f), root: 1 - smooth(0, 0.22, f + t * (1 - f)) }),
       }));
     }
     const end = q.path[q.path.length - 1], pen = q.path[Math.max(0, q.path.length - 3)];
@@ -297,6 +315,143 @@ export function scalpRoots(k: HeadKit, spacing: number, opts: { kind?: HairlineK
     }
   }
   return out;
+}
+
+// ── clumps of long hair (POLISH 2026-10-07) ─────────────────────────────────────────────────────────────────────────
+
+export interface ClumpSpec {
+  /** azimuth span round the head the clumps leave the cap from: [from, to] radians increasing (through the back) */
+  arc: [number, number];
+  count: number;
+  /** where a clump leaves the cap (head frame y) */
+  top: (a: number) => number;
+  /** its length in metres (top to tip) */
+  length: (a: number, i: number) => number;
+  /** half-width across (round the head) and half-thickness (outward), metres */
+  width: number;
+  thick: number;
+  /** clearance off what it hangs over */
+  gap: number;
+  /** a sideways S-wave: amplitude (m) and period (m) along the length */
+  wave?: { amp: number; period: number };
+  /** ringlets: a helix of this radius and pitch round the hanging line (curly) */
+  curl?: { radius: number; pitch: number };
+  /** side clumps (|a| under this) drape in FRONT of the shoulder onto the chest; the rest fall behind */
+  frontUnder?: number;
+  /** extra radius per clump (a second layer sits further out) */
+  layer?: number;
+  /** a bulge outward through the middle of the length (volume) */
+  volume?: number;
+  /** split into at most this many swing chains below `hang` */
+  chains?: number;
+  hang?: number;
+  shade?: (i: number) => number;
+  /** which clumps carry the streak bit (a dyed streak in the second colour) */
+  streak?: (i: number) => boolean;
+}
+
+/**
+ * Long hair as CLUMPS (locks): each a rounded, flattened tube that leaves the cap, falls down the head and the body — never
+ * closer than the clearance (it drapes over the shoulders and the back), side clumps going in front of the shoulder or
+ * behind it — and TAPERS to a point, every clump a different length, so the ends are ragged like hair, not a cut board.
+ * Waves and ringlets bend the hanging line. The part on the head stays with the head; the hanging part rides a few swing
+ * chains.
+ */
+export function clumps(c: Ctx, s: ClumpSpec): void {
+  const k = c.k, g = c.g, L = k.L;
+  const span = s.arc[1] - s.arc[0];
+  const n = Math.max(3, Math.round(s.count * Math.sqrt(c.d.strands)));
+  const step = s.curl ? s.curl.pitch / (c.tier === "desktop" ? 5 : c.tier === "mobile" ? 3.5 : 2.5) : c.d.step * 1.2;
+  const items: { path: V3[]; hangAt: number; i: number; a: number }[] = [];
+  const hangY = s.hang ?? L.neckTop - 0.01;
+  for (let i = 0; i < n; i++) {
+    const a0 = s.arc[0] + ((i + 0.5 + 0.35 * (hash(i, 11) - 0.5)) / n) * span;
+    const aW = ((a0 + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;   // −π..π
+    const side = Math.sign(aW || 1), d0 = Math.abs(aW);
+    const front = s.frontUnder != null && d0 < s.frontUnder;
+    const len0 = s.length(aW, i);
+    const lay = (s.layer ?? 0) + 0.004 * hash(i, 12);
+    const pts: V3[] = [];
+    let y = s.top(aW), r = 0, total = 0, prev: V3 | null = null, a = aW, hangAt = 0;
+    const tdir: V3 = [Math.cos(aW), 0, -Math.sin(aW)];   // round the head (the wave's sideways)
+    for (let j = 0; j < 400 && total < len0; j++) {
+      // the bearing drifts: a front clump forward of the shoulder, a back one behind it, below the neck
+      const kk = smooth(L.neckTop + 0.01, L.neckBase - 0.05, y);
+      const want = front ? side * Math.min(d0, 62 * DEG) : d0 < 125 * DEG ? side * mix(d0, 125 * DEG, 0.85) : aW;
+      a = mix(aW, want, kk);
+      const need = k.horiz(a, y) + s.gap + lay + s.thick;
+      r = Math.max(j ? r - step * 0.25 : need, need);
+      const t = total / len0;
+      const bulge = (s.volume ?? 0) * Math.sin(Math.PI * Math.min(1, t * 1.1));
+      let p = HeadKit.cyl(a, y, r + bulge);
+      if (s.wave && y < L.ear.bottom) p = add(p, tdir, s.wave.amp * Math.sin(((L.ear.bottom - y) / s.wave.period) * Math.PI * 2 + i * 1.3) * smooth(L.ear.bottom, L.ear.bottom - 0.04, y));
+      if (s.curl && y < L.ear.top) {
+        const ph = ((L.ear.top - y) / s.curl.pitch) * Math.PI * 2 + i * 2.1;
+        const out: V3 = [Math.sin(a), 0, Math.cos(a)], side2: V3 = [Math.cos(a), 0, -Math.sin(a)];
+        const cr = s.curl.radius * smooth(L.ear.top, L.ear.top - 0.05, y);
+        p = add(add(p, out, cr * (1 + Math.cos(ph)) * 0.6), side2, cr * Math.sin(ph));
+      }
+      if (prev) total += len(sub(p, prev));
+      if (!hangAt && y < hangY) hangAt = pts.length;
+      pts.push(p); prev = p;
+      y -= step;
+    }
+    if (pts.length < 3) continue;
+    items.push({ path: pts, hangAt, i, a: aW });
+  }
+  // chains by bearing round the back — or, when this style already hangs enough chains off the neck that more would pass
+  // the phone's limit (an under-curtain and a second layer of clumps), each clump rides the nearest existing one
+  const nCh = c.sway > 0 ? Math.min(6, s.chains ?? 3) : 0;
+  const chainOf = new Map<number, number>();
+  const pool = g.chains.map((ch, id) => ({ ch, id })).filter((q) => q.ch.attach === 'Neck');
+  if (nCh && pool.length + nCh > SWING_PHONE_CHAINS) {
+    items.forEach((it, idx) => {
+      if (!it.hangAt) return;
+      const at = it.path[it.hangAt];
+      let best = pool[0], bd = Infinity;
+      for (const q of pool) { const d = len(sub(q.ch.root, at)); if (d < bd) { bd = d; best = q; } }
+      chainOf.set(idx, best.id);
+    });
+  } else if (nCh) {
+    const groups: { root: V3; bottom: V3; n: number }[] = Array.from({ length: nCh }, () => ({ root: [0, 0, 0] as V3, bottom: [0, 0, 0] as V3, n: 0 }));
+    const back = items.map((it) => (it.a < 0 ? it.a + 2 * Math.PI : it.a));
+    const lo = Math.min(...back), hi = Math.max(...back);
+    items.forEach((it, idx) => {
+      if (!it.hangAt) return;
+      const j = Math.min(nCh - 1, Math.floor(((back[idx] - lo) / Math.max(1e-6, hi - lo)) * nCh));
+      const gr = groups[j];
+      gr.root = add(gr.root, it.path[it.hangAt]); gr.bottom = add(gr.bottom, it.path[it.path.length - 1]); gr.n++;
+      chainOf.set(idx, j);
+    });
+    const ids = groups.map((gr) => {
+      if (!gr.n) return -1;
+      const root = scale(gr.root, 1 / gr.n), bottom = scale(gr.bottom, 1 / gr.n);
+      return g.addChain({ attach: 'Neck', root, dir: norm(sub(bottom, root)), length: Math.max(0.02, len(sub(bottom, root))), swing: c.sway });
+    });
+    for (const [idx, j] of chainOf) chainOf.set(idx, ids[j]);
+  }
+  const sides = c.tier === 'crowd' ? c.d.sides : Math.max(5, c.d.sides);
+  items.forEach((it, idx) => {
+    const ratio = s.thick / s.width;
+    // a flattened section: across the head wide, outward thin (φ = 0 is outward)
+    const profile = (_t: number, phi: number) => 1 / Math.sqrt((Math.cos(phi) / ratio) ** 2 + Math.sin(phi) ** 2);
+    const rad = (t: number) => s.width * (0.55 + 0.45 * smooth(0, 0.12, t)) * (1 - 0.92 * smooth(0.62, 1, t)) * (0.85 + 0.3 * hash(it.i, 13));
+    const look = { tex: TEX.streak, vLen: 0.07, shade: s.shade?.(it.i) ?? 0.86 + 0.14 * hash(it.i, 14), streak: s.streak?.(it.i) ? 1 : 0 };
+    const out0: V3 = [Math.sin(it.a), 0, Math.cos(it.a)];
+    const ch = chainOf.get(idx) ?? -1;
+    const total = pathLen(it.path);
+    // ragged tips: the last stretch of each clump thins out hair by hair (the alpha test's dither)
+    const tip = (t: number) => ({ alpha: 1 - 0.55 * smooth(0.72, 1, t) });
+    if (ch < 0 || !it.hangAt) { g.with(look, () => g.tube(it.path, rad, sides, { profile, up: out0, attrs: tip })); return; }
+    const e0 = Math.max(1, it.hangAt - 1), e1 = Math.min(it.path.length, it.hangAt + 2);
+    const head = it.path.slice(0, e1), hang = it.path.slice(e0);
+    const f = pathLen(it.path.slice(0, e0 + 1)) / total;
+    const fh = pathLen(head) / total;
+    g.with(look, () => g.tube(head, (t) => rad(t * fh), sides, { profile, up: out0, attrs: (t) => tip(t * fh) }));
+    g.with({ ...look, chain: ch }, () => g.tube(hang, (t) => rad(f + t * (1 - f)), sides, {
+      profile, up: out0, attrs: (t) => ({ along: f + t * (1 - f), root: 0, ...tip(f + t * (1 - f)) }),
+    }));
+  });
 }
 
 // ── a gathered tail, a coil ──────────────────────────────────────────────────────────────────────────────────────────
@@ -349,7 +504,7 @@ export function coilKnot(c: Ctx, base: V3, axis: V3, r0: number, r1: number, hei
   }
   // close the top with a nub
   pts.push(add(base, ax, height + rope * 0.4));
-  c.g.with(opts.chain != null ? { chain: opts.chain } : {}, () => c.g.tube(pts, (t) => rope * (t > 0.97 ? 0.6 : 1), Math.max(5, c.d.sides), {
+  c.g.with(opts.chain != null ? { chain: opts.chain } : {}, () => c.g.tube(pts, (t) => rope * (t > 0.97 ? 0.6 : 1), c.tier === 'crowd' ? c.d.sides : Math.max(5, c.d.sides), {
     profile: (t, phi) => 1 + 0.12 * Math.sin(phi * 2 + t * 40),
     attrs: (t) => ({ shade: 0.78 + 0.22 * Math.abs(Math.sin(t * turns * Math.PI)) }),
   }));

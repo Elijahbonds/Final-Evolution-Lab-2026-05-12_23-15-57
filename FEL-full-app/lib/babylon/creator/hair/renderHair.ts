@@ -23,7 +23,7 @@
 //
 // Cosmetic only: never pickable, never a collider, nothing it does moves a bone.
 
-import { BoundingInfo, Color3, Matrix, Mesh, PBRMaterial, Vector3, VertexBuffer, VertexData } from '@babylonjs/core';
+import { BoundingInfo, Color3, Engine, Matrix, Mesh, PBRMaterial, RawTexture, Texture, Vector3, VertexBuffer, VertexData } from '@babylonjs/core';
 import type { AbstractMesh, Scene, Skeleton, TransformNode } from '@babylonjs/core';
 import type { CreatorPart } from '../../../creator/look/doc';
 import type { ResolvedHair } from '../../../creator/look/hair';
@@ -100,6 +100,8 @@ export function resetHairCaches(): void { cache.clear(); }
 type RGB = [number, number, number];
 const rgb = (hex: string): RGB => { const c = Color3.FromHexString(/^#[0-9A-F]{6}$/i.test(hex) ? hex : '#FFFFFF'); return [c.r, c.g, c.b]; };
 const mixRGB = (a: RGB, b: RGB, t: number): RGB => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+/** How dark a strand's root is against its length (TUNED 2026-10-07, polish pass). */
+export const ROOT_SHADE = 0.72;
 /** How much darker than the flat skin swatch the lit, textured skin reads (TUNED 2026-10-07, by eye in the harness). */
 export const SKIN_SHADE = 0.42;
 const sm = (e0: number, e1: number, x: number) => { const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0))); return t * t * (3 - 2 * t); };
@@ -146,23 +148,123 @@ export function hairColours(geo: HairGeo, H: HeadField, h: ResolvedHair): Float3
     else if (k === K.fabric) c = fabric;
     else if (k === K.trim) c = trim;
     else c = mixRGB(skin, hair, geo.dens[v] * 0.25);
-    const s = geo.shade[v];
-    out[v * 4] = c[0] * s; out[v * 4 + 1] = c[1] * s; out[v * 4 + 2] = c[2] * s; out[v * 4 + 3] = 1;
+    // a strand's root reads darker than its length (and the light catches the length): ROOT_SHADE at the root
+    const s = geo.shade[v] * (k === K.hair || k === K.beard ? 1 - (1 - ROOT_SHADE) * geo.root[v] : 1);
+    out[v * 4] = c[0] * s; out[v * 4 + 1] = c[1] * s; out[v * 4 + 2] = c[2] * s; out[v * 4 + 3] = geo.alpha[v];
   }
   return out;
 }
 
 // ── the meshes ───────────────────────────────────────────────────────────────────────────────────────────────────────
 
-/** The scene's one hair material (white albedo × vertex colour; two-sided, like the cloth: a curtain's inside is hair). */
+const textures = new WeakMap<Scene, { albedo: RawTexture; normal: RawTexture }>();
+/** An 8×8 ordered (Bayer) dither, 0..1: spreads a partial coverage evenly instead of in blotches. */
+const DITHER = (() => {
+  const b = [0, 32, 8, 40, 2, 34, 10, 42, 48, 16, 56, 24, 50, 18, 58, 26, 12, 44, 4, 36, 14, 46, 6, 38, 60, 28, 52, 20, 62, 30, 54, 22,
+    3, 35, 11, 43, 1, 33, 9, 41, 51, 19, 59, 27, 49, 17, 57, 25, 15, 47, 7, 39, 13, 45, 5, 37, 63, 31, 55, 23, 61, 29, 53, 21];
+  return b.map((v) => (v + 0.5) / 64);
+})();
+/** The alpha test's cut: coverage × dither under this is not drawn. */
+export const HAIR_ALPHA_CUT = 0.4;
+/** The detail texture's size: four bands side by side (geo.TEX: streaks, a plait's crossings, coils, plain), each DETAIL_H tall. */
+export const DETAIL_W = 256, DETAIL_H = 128;
+
+/**
+ * The detail pattern (pure; 0..1 height per texel): the streak band is fine strands running along v (u across them); the
+ * plait band is a three-strand plait's crossings, a chevron per half-period with a groove between; the coil band is round
+ * coily clumps. The albedo is 0.72–1 of it (the vertex colour carries the hue), the normal map its slope.
+ */
+export function hairDetailHeight(): Float32Array {
+  const out = new Float32Array(DETAIL_W * DETAIL_H);
+  const bw = DETAIL_W / 4;
+  const h1 = (x: number) => { const s = Math.sin(x * 127.1) * 43758.5453; return s - Math.floor(s); };
+  const n1 = (x: number) => { const i = Math.floor(x), f = x - i, t = f * f * (3 - 2 * f); return h1(i) * (1 - t) + h1(i + 1) * t; };
+  for (let y = 0; y < DETAIL_H; y++) for (let x = 0; x < DETAIL_W; x++) {
+    const band = Math.min(3, Math.floor(x / bw)), u = (x - band * bw) / bw, v = y / DETAIL_H;
+    if (band === 3) { out[y * DETAIL_W + x] = 1; continue; }
+    let h: number;
+    if (band === 0) {
+      // strands: columns of different brightness, each wandering a little along its length (wraps in v)
+      const k = u * 26 + 0.6 * Math.sin(v * Math.PI * 2 + u * 9);
+      h = 0.55 * n1(k) + 0.3 * n1(k * 3.1 + 7) + 0.15 * n1(u * 90);
+    } else if (band === 1) {
+      // a plait: across the strand (u round the tube, 0.5 its front) chevrons, two crossings per tile in v
+      const c = (v * 2 + Math.abs(u - 0.5) * 1.6) % 1;
+      h = 0.25 + 0.75 * Math.pow(Math.sin(c * Math.PI), 0.6) * (0.85 + 0.15 * n1(u * 40));
+    } else {
+      // coils: overlapping round clumps (tiles in v)
+      // many small soft clumps, summed (not the max of hard domes, which read as scales)
+      let m = 0;
+      for (let i = 0; i < 44; i++) {
+        const cx = h1(i * 3.7 + 1), cy = h1(i * 5.3 + 2), r = 0.07 + 0.07 * h1(i * 7.1);
+        for (const oy of [-1, 0, 1]) { const dx = u - cx, dy = v - cy - oy; const d2 = (dx * dx + dy * dy) / (r * r); if (d2 < 1) m += Math.pow(1 - d2, 2) * 0.6; }
+      }
+      h = 0.35 + 0.65 * Math.min(1, m);
+    }
+    out[y * DETAIL_W + x] = Math.min(1, Math.max(0, h));
+  }
+  return out;
+}
+
+function detailTextures(scene: Scene): { albedo: RawTexture; normal: RawTexture } {
+  const have = textures.get(scene);
+  if (have) return have;
+  const H = hairDetailHeight();
+  const alb = new Uint8Array(DETAIL_W * DETAIL_H * 4), nrm = new Uint8Array(DETAIL_W * DETAIL_H * 4);
+  const at = (x: number, y: number) => H[((y + DETAIL_H) % DETAIL_H) * DETAIL_W + Math.min(DETAIL_W - 1, Math.max(0, x))];
+  for (let y = 0; y < DETAIL_H; y++) for (let x = 0; x < DETAIL_W; x++) {
+    const i = (y * DETAIL_W + x) * 4, h = at(x, y);
+    const g = Math.round((0.72 + 0.28 * h) * 255);
+    // alpha: the DITHER the alpha test cuts against (×vertex coverage): fine strand-sized noise in [0.4, 1] — where the
+    // coverage is 1 every texel survives the 0.4 cut, where it falls the thinnest strands go first
+    const dz = x >= (DETAIL_W * 3) / 4 ? 1 : 0.4 + 0.6 * DITHER[(y % 8) * 8 + (x % 8)] * 0.6 + 0.6 * 0.4 * h;
+    alb[i] = g; alb[i + 1] = g; alb[i + 2] = g; alb[i + 3] = Math.round(Math.min(1, dz) * 255);
+    // slope → a tangent-space normal (strength 2.2)
+    // slope strength per band: strands and plaits crisp, coils soft
+    const k = x < DETAIL_W / 2 ? 2.2 : x < (DETAIL_W * 3) / 4 ? 1.1 : 0;
+    const dx = (at(x + 1, y) - at(x - 1, y)) * k, dy = (at(x, y + 1) - at(x, y - 1)) * k;
+    const l = Math.hypot(dx, dy, 1);
+    nrm[i] = Math.round((-dx / l * 0.5 + 0.5) * 255); nrm[i + 1] = Math.round((-dy / l * 0.5 + 0.5) * 255); nrm[i + 2] = Math.round((1 / l * 0.5 + 0.5) * 255); nrm[i + 3] = 255;
+  }
+  const mk = (data: Uint8Array, name: string) => {
+    const t = new RawTexture(data, DETAIL_W, DETAIL_H, Engine.TEXTUREFORMAT_RGBA, scene, true, false, Texture.TRILINEAR_SAMPLINGMODE);
+    t.name = name;
+    t.wrapU = Texture.CLAMP_ADDRESSMODE; t.wrapV = Texture.WRAP_ADDRESSMODE;
+    return t;
+  };
+  const out = { albedo: mk(alb, 'felHairDetail'), normal: mk(nrm, 'felHairDetailN') };
+  textures.set(scene, out);
+  scene.onDisposeObservable.addOnce(() => textures.delete(scene));
+  return out;
+}
+
+/**
+ * The scene's one hair material: white albedo × the detail texture × vertex colour; two-sided, like the cloth (a curtain's
+ * inside is hair). Desktop adds the detail as a normal map and a soft sheen, so the strands catch the light along their
+ * length instead of reading as plastic; a phone keeps the albedo detail only (one texture fetch).
+ */
 export function hairMaterial(scene: Scene): PBRMaterial {
   let m = materials.get(scene);
   if (m && m.getScene() === scene && scene.materials.includes(m)) return m;
+  const phone = (scene.metadata as { felTier?: string } | undefined)?.felTier === 'mobile';
+  const tex = detailTextures(scene);
   m = new PBRMaterial('felHair', scene);
   m.albedoColor = Color3.White();
-  m.metallic = 0; m.roughness = 0.72;
+  m.albedoTexture = tex.albedo;
+  m.metallic = 0; m.roughness = 0.62;
+  // POLISH (2026-10-07): ALPHA TEST, not blending (no sorting, one pass): a vertex's coverage × the texture's dither under
+  // the cut is not drawn — feathered beard edges, stubble as fine hairs, ragged hair tips — all in the same one material
+  tex.albedo.hasAlpha = true;
+  m.useAlphaFromAlbedoTexture = true;
+  m.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHATEST;
+  m.alphaCutOff = HAIR_ALPHA_CUT;
   m.backFaceCulling = false; m.twoSidedLighting = true;
-  m.metadata = { felHair: true };
+  if (!phone) {
+    m.bumpTexture = tex.normal;
+    m.bumpTexture.level = 0.7;
+    m.sheen.isEnabled = true; m.sheen.intensity = 0.14; m.sheen.color = new Color3(1, 0.96, 0.9); m.sheen.roughness = 0.5;
+  }
+  m.metadata = { felHair: true, tier: phone ? 'mobile' : 'desktop' };
   materials.set(scene, m);
   scene.onDisposeObservable.addOnce(() => materials.delete(scene));
   return m;
@@ -202,7 +304,7 @@ const chainPart = (swing: number, sy: number, bone: 'Head' | 'Neck'): CreatorPar
 });
 
 /** Build the sway mesh: every chain's vertices in its own shape space (y down the chain), on the creator's swing rig. */
-function buildSway(root: TransformNode, skeleton: Skeleton, geo: HairGeo, colours: Float32Array, mat: PBRMaterial, name: string): HairState['sway'] {
+function buildSway(root: TransformNode, skeleton: Skeleton, geo: HairGeo, colours: Float32Array, mat: PBRMaterial, name: string, sideOrientation: number): HairState['sway'] {
   if (!geo.chains.length) return null;
   const frames = rigFrames(skeleton, root);
   if (!frames) return null;
@@ -235,7 +337,7 @@ function buildSway(root: TransformNode, skeleton: Skeleton, geo: HairGeo, colour
       const nx = geo.N[v * 3], ny = geo.N[v * 3 + 1], nz = geo.N[v * 3 + 2];
       // the rig divides a normal by the part's scale: hand it the scaled-space normal so it comes out right
       normals.push(nx * xAx.x + ny * xAx.y + nz * xAx.z, (nx * yAx.x + ny * yAx.y + nz * yAx.z) * sy, nx * zAx.x + ny * zAx.y + nz * zAx.z);
-      cols.push(colours[v * 4], colours[v * 4 + 1], colours[v * 4 + 2], 1);
+      cols.push(colours[v * 4], colours[v * 4 + 1], colours[v * 4 + 2], colours[v * 4 + 3]);
     }
     for (let t = 0; t + 2 < geo.ind.length; t += 3) {
       const a = map.get(geo.ind[t]), b = map.get(geo.ind[t + 1]), c = map.get(geo.ind[t + 2]);
@@ -250,6 +352,13 @@ function buildSway(root: TransformNode, skeleton: Skeleton, geo: HairGeo, colour
   const mesh = meshes.get('matte') ?? [...meshes.values()][0];
   if (!mesh) { disposeSwingRig(rig); return null; }
   mesh.metadata = { ...(mesh.metadata ?? {}), felHair: true, felHairSway: true, felCreatorPart: false };
+  // POLISH (2026-10-07): the swing rig builds positions, normals and colours only — the detail texture needs the UVs (the
+  // hanging hair read as flat, untextured planks without them), in the same vertex order
+  const uv = new Float32Array(order.length * 2);
+  order.forEach((v, i) => { uv[i * 2] = geo.UV[v * 2]; uv[i * 2 + 1] = geo.UV[v * 2 + 1]; });
+  mesh.setVerticesData(VertexBuffer.UVKind, uv, false, 2);
+  mesh.hasVertexAlpha = true;
+  mesh.sideOrientation = sideOrientation;
   return { rig, mesh, order: Int32Array.from(order) };
 }
 
@@ -325,7 +434,7 @@ export function syncHair(
       vd.positions = pos; vd.normals = nrm; vd.uvs = uv; vd.indices = ind; vd.matricesIndices = J; vd.matricesWeights = W;
       vd.applyToMesh(mesh, false);
       mesh.setVerticesData(VertexBuffer.ColorKind, col, true, 4);
-      mesh.useVertexColors = true; mesh.hasVertexAlpha = false;
+      mesh.useVertexColors = true; mesh.hasVertexAlpha = true;   // the coverage the alpha test dithers (hairMaterial)
       mesh.skeleton = body.skeleton; mesh.numBoneInfluencers = 3;
       mesh.sideOrientation = body.sideOrientation;
       mesh.parent = body.parent;
@@ -343,7 +452,7 @@ export function syncHair(
       mesh.setBoundingInfo(new BoundingInfo(mn, mx, mesh.computeWorldMatrix(true)));
       st.mesh = mesh;
     }
-    st.sway = buildSway(root, body.skeleton, geo, colours, mat, `HairSway_${root.uniqueId}`);
+    st.sway = buildSway(root, body.skeleton, geo, colours, mat, `HairSway_${root.uniqueId}`, body.sideOrientation);
     st.geo = geo; st.geoKey = key; st.colourKey = colourKey;
     rebuilt = true;
   } else if (st.colourKey !== colourKey) {

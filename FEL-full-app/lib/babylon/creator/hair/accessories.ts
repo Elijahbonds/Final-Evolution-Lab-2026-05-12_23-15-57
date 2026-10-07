@@ -45,42 +45,37 @@ function clip(c: Ctx, p: V3, n: V3): void {
   c.g.with({ kind: K.acc }, () => c.g.tube(pts, () => 0.0035, 6, { up: nn, profile: (_t, phi) => 1 - 0.55 * Math.abs(Math.sin(phi)) }));
 }
 
-/** The hair's outer radius over the head (a coarse map of the static hair's own vertices), for the headband to ride. */
-function hull(c: Ctx): (a: number, b: number) => number {
-  const NA = 48, NB = 24;
-  const map = new Float32Array(NA * NB);
-  const g = c.g;
-  for (let v = 0; v < g.count; v++) {
-    if (g.chain[v] !== -1 || g.kind[v] === K.beard) continue;
-    const x = g.P[v * 3], y = g.P[v * 3 + 1], z = g.P[v * 3 + 2];
-    const [a, b] = angOf(x, y, z);
-    const i = Math.min(NA - 1, Math.floor(((a + Math.PI) / (2 * Math.PI)) * NA)), j = Math.min(NB - 1, Math.max(0, Math.floor(((b + Math.PI / 2) / Math.PI) * NB)));
-    map[j * NA + i] = Math.max(map[j * NA + i], Math.hypot(x, y, z));
-  }
-  return (a, b) => {
-    const i = Math.floor(((a + Math.PI) / (2 * Math.PI)) * NA), j = Math.min(NB - 1, Math.max(0, Math.floor(((b + Math.PI / 2) / Math.PI) * NB)));
-    return map[j * NA + ((i % NA) + NA) % NA];
-  };
-}
-
 function headband(c: Ctx): void {
-  const k = c.k, L = k.L;
-  const h = hull(c);
-  // a ring round the head: across the front at the hairline, over the ears, low at the back (a sweatband / an elastic
-  // band); it rides on the hair where there is hair and on the scalp where there is none, smoothed so it never zig-zags
+  const k = c.k, L = k.L, g = c.g;
+  // a ring round the head: across the front at the hairline, over the ears, level at the back (a sweatband / an elastic
+  // band). POLISH (2026-10-07, owner: "floats ~1 cm on short cuts"): it sits ON the hair — each point of the ring is the
+  // outermost static hair within 4° of its direction (or the scalp where there is none), plus half the band's thickness —
+  // instead of a coarse map's neighbourhood maximum, which stood it off a buzz by the head's own curve
   const n = 48;
-  const ring: { a: number; y: number; r: number }[] = [];
+  const cosLim = Math.cos(4 * DEG);
+  const dirs: V3[] = [], rs: number[] = [];
   for (let i = 0; i < n; i++) {
     const a = -Math.PI + (i / n) * 2 * Math.PI;
     const y = keyed([[0, L.hairFront + 0.006], [60, L.ear.top + 0.034], [90, L.ear.top + 0.02], [180, L.ear.top - 0.004]], Math.abs(a) / DEG);
     const b = k.betaAt(a, y, true);
-    ring.push({ a, y, r: Math.max(h(a, b), k.r(a, b, true) + 0.002) });
+    const d = dirOf(a, b);
+    let r = k.r(a, b, true) + 0.0015;
+    for (let v = 0; v < g.count; v++) {
+      if (g.chain[v] !== -1 || g.kind[v] !== K.hair) continue;
+      const x = g.P[v * 3], yy = g.P[v * 3 + 1], z = g.P[v * 3 + 2], l = Math.hypot(x, yy, z);
+      if (l > r && (x * d[0] + yy * d[1] + z * d[2]) / l > cosLim) r = l;
+    }
+    dirs.push(d); rs.push(r);
   }
-  const smoothR = ring.map((_, i) => { let sum = 0; for (let d = -2; d <= 2; d++) sum += ring[(i + d + n) % n].r; return sum / 5; });
-  const pts: V3[] = ring.map((q, i) => { const b = k.betaAt(q.a, q.y, true); return scale(dirOf(q.a, b), Math.max(q.r, Math.min(smoothR[i], q.r + 0.004)) + 0.003); });
+  // smoothed only where a neighbour is LOWER (a band bridges a gap but never stands off a temple because the forehead
+  // beside it is further out — that was the float on short cuts)
+  const sm = rs.map((_, i) => Math.min(rs[i] + 0.0015, Math.max(rs[i], (rs[(i + n - 1) % n] + 2 * rs[i] + rs[(i + 1) % n]) / 4)));
+  const pts: V3[] = dirs.map((d, i) => scale(d, sm[i] + BAND_HALF + 0.0008));
   pts.push(pts[0], pts[1]);
-  c.g.with({ kind: K.acc }, () => c.g.tube(pts, () => 0.0075, 6, { profile: (_t, phi) => 1 - 0.6 * Math.abs(Math.sin(phi)) }));
+  c.g.with({ kind: K.acc }, () => c.g.tube(pts, () => 0.0075, 6, { up: [0, 1, 0], profile: (_t, phi) => 1 - 0.6 * Math.abs(Math.sin(phi)) }));
 }
+/** The band's half-thickness off the hair (its 7.5 mm section flattened to 40 %). */
+const BAND_HALF = 0.0075 * 0.4;
 
 /** Add the accessories that fit (the caller has already filtered them to the style). */
 export function accessories(c: Ctx, acc: readonly HairAcc[]): void {

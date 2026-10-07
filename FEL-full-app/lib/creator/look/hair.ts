@@ -67,7 +67,7 @@ export const HAIR_STYLE_BLURB: Record<string, string> = {
   'Spiky': 'Gelled spikes',
   'Swept': 'Long fringe swept to the side',
   'Mullet': 'Short on top, long at the back',
-  'Streaks': 'Swept with highlight streaks',
+  'Streaks': 'Jaw-length layers, dyed streaks',
 };
 
 /** Coverings: cloth, not hair. The hair colour is the fabric's colour; the second colour is its trim. */
@@ -91,7 +91,7 @@ export const accFits = (acc: HairAcc, style: string): boolean => HAIR_ACC_FIT[ac
 export const HAIR_SWAY: Record<string, number> = {
   'Locs': 0.55, 'Box Braids': 0.55, 'Twists': 0.5, 'Cornrows': 0.35, 'Ponytail': 0.7, 'Braided Ponytail': 0.6, 'Pigtails': 0.65,
   'Afro Puffs': 0.2, 'Straight': 0.35, 'Wavy': 0.35, 'Curly': 0.3, 'Long Layered': 0.35, 'Mullet': 0.4, 'Bob': 0.15,
-  'Durag': 0.6,
+  'Durag': 0.6, 'Streaks': 0.3,
 };
 
 export const HAIR_TONE_LABELS: Record<HairTone, string> = { tips: 'Tips', streaks: 'Streaks', top: 'Dyed top', under: 'Under-layer' };
