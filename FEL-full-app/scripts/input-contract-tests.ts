@@ -42,6 +42,9 @@ const SHELL_EXEMPT_ROUTES: Record<string, string> = {
   // MULTIPLAYER (2026-10-06): the party room hosts several games on one screen as FREE PLAY — it mounts each game's own
   // component for a couch session and records no play session, pays nothing, stakes nothing (components/party).
   party: 'party room: free-play couch host for several games; records no session, so no GameShell',
+  // ADVENTURE C (2026-10-07): the unlisted offline bot Battle Royale prototype. It records no session and pays nothing until
+  // the owner decides BR rewards (plan open decision 7); its own stage shows the controls, the HUD and the end screen.
+  'adventure-br': 'unlisted offline bot BR prototype: records no session, pays nothing (no session-route row yet), so no GameShell',
 };
 
 const LOADER_BYPASS_ROUTES: Record<string, string> = {

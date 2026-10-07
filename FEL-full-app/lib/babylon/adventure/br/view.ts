@@ -10,8 +10,9 @@
  */
 
 import {
-  Color3, Matrix, Mesh, MeshBuilder, Quaternion, StandardMaterial, Vector3, type Scene,
+  Color3, Matrix, Mesh, MeshBuilder, Quaternion, StandardMaterial, Vector3, type Material, type Scene,
 } from '@babylonjs/core';
+import { VenueKit } from '../../visual/VenueKit';
 import type { GroundPiece } from '../world/pieces';
 import { buildRailMeshes } from '../rails/view';
 import type { BRMap } from './map';
@@ -26,7 +27,16 @@ const TILE_TINT: Readonly<Record<string, string>> = {
   plaza: '#a8a29e', tower: '#78716c', mesa: '#b45309', ruins: '#8b8478', grove: '#3f6212', field: '#6b705c', rim: '#57534e',
 };
 
-function mat(scene: Scene, name: string, hex: string, o: { emissive?: number; alpha?: number; unlit?: boolean } = {}): StandardMaterial {
+/**
+ * A lit surface is the house paint (VenueKit.paint: PBR — the venues light for PBR and a StandardMaterial clips to white
+ * under it); only the storm's unlit glow is a StandardMaterial with its lighting off.
+ */
+function mat(scene: Scene, name: string, hex: string, o: { emissive?: number; alpha?: number; unlit?: boolean } = {}): Material {
+  if (!o.unlit) {
+    const p = VenueKit.paint(scene, name, hex, o.emissive ?? 0.06);
+    if (o.alpha !== undefined) { p.alpha = o.alpha; p.backFaceCulling = false; }
+    return p;
+  }
   const m = new StandardMaterial(name, scene);
   m.diffuseColor = Color3.FromHexString(hex);
   m.specularColor = new Color3(0.05, 0.05, 0.05);

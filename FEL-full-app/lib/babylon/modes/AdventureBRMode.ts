@@ -21,7 +21,8 @@
 // menu) and /dev/mode/adventure_br (dev, the perf probe) can mount it; NOT in ENABLED_BABYLON_MODES.
 // Nothing on screen during play but the HUD (owner rule): the zone and the map live in the HUD, nothing else is drawn.
 
-import { Mesh, MeshBuilder, StandardMaterial, Color3, TransformNode, Vector3, type AbstractMesh, type Scene } from '@babylonjs/core';
+import { Mesh, MeshBuilder, TransformNode, Vector3, type AbstractMesh, type Material, type Scene } from '@babylonjs/core';
+import { VenueKit } from '../visual/VenueKit';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
@@ -97,7 +98,7 @@ interface St {
   endAt: number | null;
   ended: boolean;
   tier: 'mobile' | 'desktop';
-  impMats: Map<number, StandardMaterial>;
+  impMats: Map<number, Material>;
   spawning: Set<ActorId>;
   budgetIn: { tier: 'mobile' | 'desktop'; eye: { x: number; y: number; z: number }; pinned: (a: AdventureActor) => boolean; cap: number };
 }
@@ -140,7 +141,7 @@ export const AdventureBRMode: ModeDefinition = {
 
     // ── the fighters' bodies (all at once: the drop needs everyone in the sky) ──
     const bodies = new Map<ActorId, Body>();
-    const impMats = new Map<number, StandardMaterial>();
+    const impMats = new Map<number, Material>();
     const S0 = { impMats, scene };
     const spawnFighter = async (f: BRFighter): Promise<void> => {
       const a = match.world.actors.get(f.id)!;
@@ -264,7 +265,7 @@ export const AdventureBRMode: ModeDefinition = {
   },
 };
 
-function makeBody(S: { impMats: Map<number, StandardMaterial>; scene: Scene }, match: BRMatch, a: AdventureActor, root: TransformNode,
+function makeBody(S: { impMats: Map<number, Material>; scene: Scene }, match: BRMatch, a: AdventureActor, root: TransformNode,
   pose: TransformNode, char: SpawnedCharacter | undefined, ph: PlaceholderBody | undefined, team: number): Body {
   const view = bindMovementView({
     animator: char ? char.animator : NO_ANIM, poseNode: pose, actor: () => match.world.actors.get(a.id),
@@ -274,9 +275,7 @@ function makeBody(S: { impMats: Map<number, StandardMaterial>; scene: Scene }, m
   if (char) {
     let m = S.impMats.get(team);
     if (!m) {
-      m = new StandardMaterial(`br_imp_${team}`, S.scene);
-      m.diffuseColor = Color3.FromHexString(TEAM_TINT[(team - 1) % TEAM_TINT.length]);
-      m.specularColor = Color3.Black();
+      m = VenueKit.paint(S.scene, `br_imp_${team}`, TEAM_TINT[(team - 1) % TEAM_TINT.length]);
       S.impMats.set(team, m);
     }
     imp = MeshBuilder.CreateCapsule(`br_imp_${a.id}`, { radius: 0.35, height: 1.8, tessellation: 6, subdivisions: 1 }, S.scene);
