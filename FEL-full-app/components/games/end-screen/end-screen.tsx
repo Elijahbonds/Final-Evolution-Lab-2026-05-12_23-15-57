@@ -29,6 +29,7 @@ import { reducedMotion as deviceReducedMotion } from '@/lib/a11y/reducedMotion';
 import { unpaidLine, unpaidTitle } from '@/lib/sessions/unpaidCopy';
 import { modeMenuMetaFor } from '@/lib/mode-menu';
 import { StoryRefusedPanel } from '../end-card-refusal';
+import { FormBlock } from '../form-block';   // HOOPS BODY (2026-10-07): the FORM block
 import type { EndScreenAction, EndScreenProps } from './types';
 import {
   buildSteps, stepDurations, initialReveal, revealReducer, isShown, revealDone, pressIntent, cueFor, ARM_MS, type StepId,
@@ -591,6 +592,9 @@ export function EndScreen(props: EndScreenProps) {
                 </Beat>
               )}
 
+              {/* HOOPS BODY (2026-10-07, Mirror & coaching Phase 7): P10's FORM block — the run's camera form read (3PT, Dunk, the
+                  fights); renders nothing unless the body played this run in a game with a block */}
+              <FormBlock />
               {sideCards && <div data-end-slot="side-cards" className="flex flex-col gap-[0.6em]">{sideCards}</div>}
             </div>
           </div>
