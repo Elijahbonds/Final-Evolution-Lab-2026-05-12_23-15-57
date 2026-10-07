@@ -130,6 +130,50 @@ describe('the kit', () => {
   });
 });
 
+describe('the loot field', () => {
+  it('a fighter walking over loot takes only what improves the kit; a swap drops the old item, which the dropper cannot take straight back', async () => {
+    const { LootField, DROP_HOLD_SEC } = await import('./lootField');
+    const { createAdventureBus } = await import('../contracts');
+    const bus = createAdventureBus();
+    const taken: string[] = [];
+    bus.on('loot', (e) => taken.push(e.lootId));
+    const f = new LootField(1, [], []);
+    const k = newKit();
+    k.armour = 'armour.heavy';
+    const at = { x: 0, y: 0, z: 0 };
+    f.place(lootById('armour.light')!, at, null, 0);
+    f.visit('me', at, k, 0, 1 / 60, null, bus, () => 0, () => {});
+    expect(taken).toEqual([]);                  // worse armour stays on the floor
+    expect(f.items).toHaveLength(1);
+    k.armour = 'armour.light';
+    f.state.items.length = 0;
+    f.place(lootById('armour.mid')!, at, null, 0);
+    f.visit('me', at, k, 1, 1 / 60, null, bus, () => 0, () => {});
+    expect(taken).toEqual(['armour.mid']);
+    expect(k.armour).toBe('armour.mid');
+    expect(f.items.map((i) => i.lootId)).toEqual(['armour.light']);   // the swap's drop, at my feet
+    k.armour = null;                                                  // (even wanting it again …)
+    f.visit('me', at, k, 1 + DROP_HOLD_SEC / 2, 1 / 60, null, bus, () => 0, () => {});
+    expect(taken).toEqual(['armour.mid']);                            // … not straight back
+    f.visit('me', at, k, 1 + DROP_HOLD_SEC + 0.1, 1 / 60, null, bus, () => 0, () => {});
+    expect(taken).toEqual(['armour.mid', 'armour.light']);
+  });
+
+  it('a chest opens when stood at for its time, and spills chest rolls', async () => {
+    const { LootField } = await import('./lootField');
+    const { createAdventureBus } = await import('../contracts');
+    const { LOOT: L } = await import('./tuning');
+    const f = new LootField(2, [], [{ x: 5, y: 0, z: 5 }]);
+    const k = newKit();
+    const bus = createAdventureBus();
+    for (let t = 0; t < L.chestOpenSec - 0.1; t += 1 / 60) { f.decay(1 / 60); f.visit('me', { x: 5, y: 0, z: 6 }, k, t, 1 / 60, null, bus, () => 0, () => {}); }
+    expect(f.chests[0].open).toBe(false);
+    for (let t = 0; t < 0.2; t += 1 / 60) { f.decay(1 / 60); f.visit('me', { x: 5, y: 0, z: 6 }, k, 1, 1 / 60, null, bus, () => 0, () => {}); }
+    expect(f.chests[0].open).toBe(true);
+    expect(f.items.length + k.abilities.length + k.shards).toBeGreaterThanOrEqual(1);
+  });
+});
+
 describe('nothing carries out of a match', () => {
   function deepFreeze<T>(o: T): T {
     if (o && typeof o === 'object') { Object.freeze(o); for (const v of Object.values(o)) deepFreeze(v); }

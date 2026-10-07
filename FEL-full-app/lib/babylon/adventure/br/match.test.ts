@@ -200,3 +200,23 @@ describe('BR sim purity', () => {
     }
   });
 });
+
+describe('fairness: the normalised fighter', () => {
+  it('everyone fights at the BR level whatever their save, and nothing in a match levels anyone up', async () => {
+    const { emptyAdventureSave } = await import('../contracts');
+    const { BR_LEVEL } = await import('./tuning');
+    const save = emptyAdventureSave(0);
+    save.player.level = 40; save.player.xp = 60000;   // a veteran's save: the BR does not read it
+    const m = new BRMatch({ seed: 606, humans: 1, player: { school: save.player.school, partner: null } });
+    run(m, 1);
+    const levels = new Set([...m.world.actors.values()].map((a) => a.stats.level));
+    expect(levels).toEqual(new Set([BR_LEVEL]));
+    const hp = new Set(m.fighters.map((f) => m.world.actors.get(f.id)!.stats.hp.max));
+    expect(hp.size).toBe(1);
+    // rail tricks and knockouts would pay XP in the story; inside a match they pay none
+    for (let i = 0; i < 40; i++) m.bus.emit('rail:trick', { actorId: 'player', trick: 'spin', points: 5000 });
+    run(m, 0.5);
+    expect(m.player!.stats.level).toBe(BR_LEVEL);
+    expect(m.stats.derived('player')!.level).toBe(BR_LEVEL);
+  });
+});

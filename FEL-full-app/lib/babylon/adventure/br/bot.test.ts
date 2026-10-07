@@ -78,12 +78,17 @@ describe('perception: a bot knows only what it senses', () => {
 
   it('a fighter behind the bot is outside its field of view; it is heard only inside the hearing radius', () => {
     const s = stage();
-    const bot = s.add(fighter('bot', 1, 0, -60, 0));                 // facing +z
-    const back = s.add(fighter('back', 2, 0, -60 - (hard.hearM + 6)));
+    // an open field tile: nothing between them but air
+    const bot = s.add(fighter('bot', 1, -64, -60, 0));               // facing +z
+    const back = s.add(fighter('back', 2, -64, -60 - (hard.hearM + 6)));
+    expect(s.world.clear({ x: -64, y: 1.5, z: -60 }, { x: -64, y: 1.5, z: back.pos.z }), 'a clear line').toBe(true);
     expect(inFov(bot, back.pos, hard.fovDeg)).toBe(false);
     expect(canSee(bot, back, s.world, hard)).toBe(false);
+    bot.facingYaw = Math.PI;   // turned round, the same fighter is seen
+    expect(canSee(bot, back, s.world, hard)).toBe(true);
+    bot.facingYaw = 0;
     expect(canHear(bot, back, hard, false)).toBe(false);
-    back.pos.z = -60 - (hard.hearM - 2);
+    back.pos.z = -60 - (hard.hearM - 2);   // closer: heard, though still unseen
     expect(canHear(bot, back, hard, false)).toBe(true);
   });
 
@@ -144,6 +149,21 @@ describe('the bot brain', () => {
     expect(a).toEqual(b);
     expect(a).not.toEqual(c);
     expect(a.some((o) => o.attackLight || o.attackHeavy)).toBe(true);
+  });
+
+  it('hunts a fighter that broke the line where it was last seen, not where it is now', () => {
+    const s = stage();
+    const bot = s.add(fighter('bot', 1, -20, -16, Math.PI / 2));
+    const foe = s.add(fighter('foe', 2, -10, -16));
+    const brain = new BotBrain('bot', 'hard', 5, 0);
+    s.think(brain, bot, 1);
+    expect(brain.goal).toBe('fight');
+    foe.pos.x = 20; foe.pos.z = 16; s.world.reindex();   // behind the monument, far past hearing
+    const outs = s.think(brain, bot, 0.6);
+    expect(brain.goal).toBe('fight');                     // remembered …
+    const o = outs.at(-1)!;
+    expect(o.move.x).toBeGreaterThan(0.5);                // … and sought at (−10, −16): straight along +x
+    expect(Math.abs(o.move.y)).toBeLessThan(0.3);         // not toward the live body (+z as well)
   });
 
   it('goes for loot it can see that improves its kit, and not for loot behind a wall', () => {
