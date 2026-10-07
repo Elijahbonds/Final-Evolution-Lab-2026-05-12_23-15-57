@@ -159,7 +159,8 @@ function runDunk(opts: {
   for (let i = 0; i < 15; i++) step2({ ankleRise: 0.08 });             // both off, 495 ms
   for (let i = 0; i < 6; i++) step2({ leftRise: 0, rightRise: 0.08 });  // left foot down, right still up
   for (let i = 0; i < 20; i++) step2({});
-  ok(m2 !== null && (m2 as { flightTimeMs: number }).flightTimeMs === 495,
+  // sub-frame interpolation puts the crossings between frames, so 495 ms (the frame-snapped value) is within one frame
+  ok(m2 !== null && Math.abs((m2 as { flightTimeMs: number }).flightTimeMs - 495) <= 33,
     `the first foot down ends the flight (got ${(m2 as { flightTimeMs: number } | null)?.flightTimeMs})`);
   // a split stance (one foot nearer the camera sits lower in the image) times the same jump as a level one: the
   // floor is calibrated on the lower ankle, the same signal takeoff and landing read

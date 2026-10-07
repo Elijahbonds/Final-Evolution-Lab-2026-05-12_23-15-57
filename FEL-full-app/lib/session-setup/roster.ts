@@ -121,3 +121,58 @@ export function readAdults(store: KeyValueStore): Athlete[] {
     return [];
   }
 }
+
+/**
+ * The account holder's starting claimed age for a solo session. 18+ only when the SERVER said this
+ * account is a verified adult (verifiedAdult(User.dobYear)). It takes no other input on purpose:
+ * never localStorage, URL params, typed age, device hints, or a cached profile.
+ */
+export function soloClaimedAge(serverVerified: boolean): ClaimedAge {
+  return serverVerified === true ? '18+' : 'unknown';
+}
+
+export const SOLO_NAME = 'You';
+export const SOLO_REST_MS = 3000;
+
+export interface SoloDefaults {
+  players: 1;
+  rows: RosterRow[];
+  dunksEach: number;
+  voiceOn: boolean;
+  restMs: number;
+}
+
+/** One tap on Start: solo, "You", 3 dunks, voice on, 3 s rest. */
+export function soloDefaults(serverVerified: boolean): SoloDefaults {
+  return {
+    players: 1,
+    rows: [{ name: SOLO_NAME, claimed: soloClaimedAge(serverVerified) }],
+    dunksEach: DEFAULT_DUNKS,
+    voiceOn: true,
+    restMs: SOLO_REST_MS,
+  };
+}
+
+/** Consent shows only these until Settings opens. */
+export const CONSENT_CONTROLS = ['start', 'settings', 'mute'] as const;
+export const CONSENT_SETTINGS_CONTROLS = [
+  'players', 'dunks-each', 'name', 'age', 'level', 'saved-adults', 'save-card', 'rest',
+] as const;
+
+export function consentControls(settingsOpen: boolean): readonly string[] {
+  return settingsOpen ? [...CONSENT_CONTROLS, ...CONSENT_SETTINGS_CONTROLS] : CONSENT_CONTROLS;
+}
+
+/** Taps from /play to the OS camera prompt on the solo path: "Dunk session", then "Start". */
+export const SOLO_TAPS_FROM_PLAY = 2;
+
+export type WatchingPiece = 'video' | 'wash' | 'status' | 'mute' | 'title' | 'intro' | 'score-cards' | 'camera' | 'record' | 'attempts' | 'up-next';
+export const WATCHING_SHOWS: readonly WatchingPiece[] = ['video', 'wash', 'status', 'mute'];
+/** The one status word or number is at least this tall, in vh. */
+export const WATCHING_STATUS_MIN_VH = 30;
+
+export function watchingChrome(stage: string): { show: readonly WatchingPiece[]; hidden: readonly WatchingPiece[] } {
+  const all: WatchingPiece[] = ['video', 'wash', 'status', 'mute', 'title', 'intro', 'score-cards', 'camera', 'record', 'attempts', 'up-next'];
+  if (stage !== 'watching') return { show: all, hidden: [] };
+  return { show: WATCHING_SHOWS, hidden: all.filter((p) => !WATCHING_SHOWS.includes(p)) };
+}

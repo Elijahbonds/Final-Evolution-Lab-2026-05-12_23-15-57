@@ -7,6 +7,33 @@ import type { Athlete } from './roster';
 /** Elijah, 6:13 PM PT Oct 3: re-arm after a 3-second "Next up" countdown. */
 export const REARM_MS = 3000;
 
+/** Rest presets, in ms. The first is the default (REARM_MS). */
+export const REST_PRESETS_MS = [REARM_MS, 30_000, 60_000, 90_000] as const;
+export type RestMs = (typeof REST_PRESETS_MS)[number];
+
+/** A rest at least this long is announced ten seconds before it ends. */
+export const TEN_SECOND_WARNING_MIN_MS = 30_000;
+export const TEN_SECONDS_LINE = '10 seconds';
+
+export function restLabel(ms: number): string {
+  return `${Math.round(ms / 1000)} s`;
+}
+
+/** Unknown values fall back to the default. */
+export function normalizeRestMs(ms: number | null | undefined): number {
+  return (REST_PRESETS_MS as readonly number[]).includes(ms as number) ? (ms as number) : REARM_MS;
+}
+
+/** Ms after the countdown starts to say "10 seconds", or null when the rest is too short for it. */
+export function tenSecondWarningAt(restMs: number): number | null {
+  return restMs >= TEN_SECOND_WARNING_MIN_MS ? restMs - 10_000 : null;
+}
+
+/** Whole seconds left on the countdown card. */
+export function restSecondsLeft(restMs: number, elapsedMs: number): number {
+  return Math.max(0, Math.ceil((restMs - elapsedMs) / 1000));
+}
+
 export interface Board {
   players: Athlete[];
   dunksEach: number;
@@ -54,6 +81,16 @@ export function recordDunk(board: Board): DunkAdvance {
     done: false,
     next: { index: nxt, name: board.players[nxt]?.name ?? '' },
   };
+}
+
+export interface RoundLog<T> {
+  round: number;
+  reps: T[];
+}
+
+/** Round N+1: a fresh rotation, the same players, and every rep so far kept. */
+export function nextRound<T>(log: RoundLog<T>, players: readonly Athlete[], dunksEach: number): { round: number; reps: T[]; board: Board } {
+  return { round: log.round + 1, reps: log.reps.slice(), board: freshBoard(players, dunksEach) };
 }
 
 export type LivePhase = 'setup' | 'framing' | 'watching' | 'countdown' | 'paused' | 'final';
