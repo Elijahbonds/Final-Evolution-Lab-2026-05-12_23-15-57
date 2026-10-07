@@ -4,11 +4,13 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { PANEL_LINES, PANEL_MAX_LINES, PANEL_MAX_CHARS, BODY_BOOST_LINE, panelLinesFor } from './panelLines';
+import { PANEL_LINES, PANEL_MAX_LINES, PANEL_MAX_CHARS, BODY_BOOST_LINE, PANEL_GROUPS, panelLinesFor } from './panelLines';
 import { MODES } from '../modes/registry';
 import { BOOST_MODES } from './modeVerbs';
 import { staticControlsFor, isStaticControlsHint } from './staticControls';
-import { controlLines, controlsSheet } from '../../ui/controlsScreen';
+import { controlLines, controlsSheet, splitHint } from '../../ui/controlsScreen';
+import { CONTROLS_OFFENCE as ONES_OFFENCE, CONTROLS_DEFENCE as ONES_DEFENCE } from '../modes/onevoneRules';
+import * as threesRules from '../modes/threevthreeRules';
 
 describe('panel lines — a curated list per long mode', () => {
   it('every entry is a real mode, within the budget: at most 8 lines, each one row of a sideways phone', () => {
@@ -23,24 +25,60 @@ describe('panel lines — a curated list per long mode', () => {
     }
   });
 
-  it('the hoops lists: 4–8 lines covering the brief\'s essentials, and the 1v1 down from 22 lines', () => {
-    for (const mode of ['threevthree', 'onevone']) {
-      const lines = PANEL_LINES[mode].lines;
-      expect(lines.length).toBeGreaterThanOrEqual(4);
-      const all = lines.join(' | ');
-      for (const verb of [/SPRINT/, /SHOOT: hold, let go in the green/, /DUNK/, /LAY-UP/, /POST UP/, /DEFENCE/]) expect(all, `${mode} ${verb}`).toMatch(verb);
+  // test changed (HOOPS PAUSE, owner 2026-10-06: "Hoops pause: Controls panel only"): the 1v1 and 3v3 short lists (4–8 lines,
+  // controls-screen-2) are replaced by their full OFFENSE / DEFENSE lists as two titled groups — the list the hosts drew along
+  // the bottom on pause, now the panel's only one. Was: 4–8 curated lines with the brief's essentials, == controlLines.
+  it('the hoops panel: no short list — two groups, OFFENSE and DEFENSE, in the rules files\' own words', () => {
+    expect(PANEL_LINES.onevone).toBeUndefined();
+    expect(PANEL_LINES.threevthree).toBeUndefined();
+    expect(PANEL_GROUPS.onevone.map((g) => [g.title, g.text])).toEqual([['OFFENSE', ONES_OFFENCE], ['DEFENSE', ONES_DEFENCE]]);
+    // the 3v3's lists come through threevthreeControls (no Babylon under the panel); the rules file still exports the same strings
+    expect(PANEL_GROUPS.threevthree.map((g) => [g.title, g.text])).toEqual([['OFFENSE', threesRules.CONTROLS_OFFENCE], ['DEFENSE', threesRules.CONTROLS_DEFENCE]]);
+    for (const mode of ['onevone', 'threevthree']) {
+      const groups = PANEL_GROUPS[mode];
+      // nothing reworded: the panel's lines are the lists split at their dots, every word of them, offence then defence
+      expect(controlLines(mode)).toEqual([...splitHint(groups[0].text), ...splitHint(groups[1].text)]);
+      expect(controlLines(mode).join(' · ').replace(/\s+/g, ' ')).toBe(`${groups[0].text} · ${groups[1].text}`.replace(/\s+/g, ' '));
+      const all = controlLines(mode).join(' | ');
+      for (const verb of [/SPRINT/, /DUNK/, /LAY IT IN/, /release in the green/, /POST UP/, /STAY IN FRONT/, /TAKE THE CHARGE/, /BOX OUT/, /UP AND UNDER/]) expect(all, `${mode} ${verb}`).toMatch(verb);
+      expect(controlLines(mode, { body: true }), mode).toEqual(controlLines(mode));   // no body words: the same list
+      expect(panelLinesFor(mode), mode).toBeNull();
     }
-    expect(PANEL_LINES.threevthree.lines.join(' ')).toMatch(/FAKE/);
-    expect(PANEL_LINES.threevthree.lines.join(' ')).toMatch(/SCREEN/);
-    // integration-2: the 1v1 writes no static map any more (one live line per state, owner pick 1v1 #1), so the curated list is
-    // the panel's only copy of its controls
+    expect(controlLines('threevthree').join(' ')).toMatch(/FAKE/);
+    expect(controlLines('threevthree').join(' ')).toMatch(/SCREEN/);
+    expect(controlLines('onevone').join(' ')).toMatch(/SNATCHBACK/);   // the depth the short list left out is back
+    // the hoops modes write no static map (one live line per state, owner picks 1v1 #1 / 3v3 #7)
     expect(staticControlsFor('onevone')).toEqual([]);
-    expect(controlLines('onevone')).toEqual(PANEL_LINES.onevone.lines);
-    expect(controlLines('threevthree')).toEqual(PANEL_LINES.threevthree.lines);
+    expect(staticControlsFor('threevthree')).toEqual([]);
+  });
+
+  it('the 3v3\'s lists reach the panel without Babylon: threevthreeControls imports nothing, the panel never the rules file', () => {
+    const controls = readFileSync(path.join(__dirname, '../modes/threevthreeControls.ts'), 'utf8');
+    expect(controls).not.toMatch(/^\s*import\b/m);
+    expect(controls).toMatch(/export const CONTROLS_OFFENCE = '/);
+    const panel = readFileSync(path.join(__dirname, 'panelLines.ts'), 'utf8');
+    expect(panel).not.toMatch(/from '\.\.\/modes\/threevthreeRules'/);
+    expect(readFileSync(path.join(__dirname, '../modes/onevoneRules.ts'), 'utf8').match(/^import (?!type\b).*$/gm) ?? []).toEqual([]);
+  });
+
+  it('the panel draws the hoops groups titled, in order, every line under its heading', () => {
+    for (const mode of ['onevone', 'threevthree']) for (const d of ['pad', 'keys', 'touch'] as const) {
+      const s = controlsSheet(mode, d);
+      expect(s.groups.map((g) => g.title), `${mode} ${d}`).toEqual(['OFFENSE', 'DEFENSE']);
+      expect(s.groups.map((g) => g.color)).toEqual(['var(--fel-cyan)', 'var(--fel-gold)']);
+      expect(s.lines).toEqual(s.groups.flatMap((g) => g.lines));
+      expect(s.groups[1].lines[0]).toMatch(/^STAY IN FRONT/);
+    }
+    // every other mode is one untitled group, its lines as before
+    for (const mode of ['dunk', 'surf', 'karate', 'velocitykart']) {
+      const s = controlsSheet(mode, 'pad');
+      expect(s.groups, mode).toEqual([{ lines: s.lines }]);
+    }
   });
 
   it('the panel reads the curated list in place of the split hint; a mode without one keeps its hint', () => {
-    expect(panelLinesFor('threevthree')).toEqual([...PANEL_LINES.threevthree.lines]);
+    // test changed (HOOPS PAUSE): the 3v3 has no curated list any more (its groups, above); karate's holds this instead
+    expect(panelLinesFor('karate')).toEqual([...PANEL_LINES.karate.lines]);
     expect(panelLinesFor('dunk')).toBeNull();
     expect(controlLines('dunk')).toEqual(['HOLD to run', 'tap JUMP at the line — then SLAM on NOW!']);
   });
