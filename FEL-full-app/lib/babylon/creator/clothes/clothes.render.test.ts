@@ -30,6 +30,7 @@ import { CLOTH_KINDS, CLOTH_STYLES, emptyCreatorDoc, type CreatorCloth, type Cre
 import { sanitizeClothes } from '../../../creator/look/sanitize';
 import { LAYER_GAP, legCutHeight, resolveCloth, riseHeight, shaftHeight, sleeveReach } from '../../../creator/look/clothes';
 import { flushPaint, paintStats, setPaintBaseReader } from '../paint/renderPaint';
+import { hairMeshesOf } from '../hair/renderHair';
 import { shapeTargetOf } from '../shape/renderShape';
 import { clothFieldOf } from './bodyField';
 import { HIDE_MARGIN, buildClothes, convexHull, keepField } from './build';
@@ -689,13 +690,15 @@ describe('the kit interplay', () => {
   });
   it('the hair goes under a raised hood and comes back when it is down', () => {
     const s = spawn('male');
-    const hair = () => s.meshes.filter((m) => /^Hair_/.test(m.name) && m.isVisible).length;
+    // test changed (2026-10-07, the hair expansion): the hair on a kit body is the code-built hair (renderHair), and the
+    // baked Hair_* nodes are always hidden there — so "the hair" is a visible baked node OR a built hair mesh
+    const hair = () => s.meshes.filter((m) => /^Hair_/.test(m.name) && m.isVisible).length + hairMeshesOf(s.root).length;
     wear(s, null);
-    expect(hair()).toBe(1);
+    expect(hair()).toBeGreaterThan(0);
     wear(s, dressed([{ id: 'h', kind: 'top', style: 'hoodie', colour: '#111111', hood: 'up' }]));
     expect(hair()).toBe(0);
     wear(s, dressed([{ id: 'h', kind: 'top', style: 'hoodie', colour: '#111111' }]));
-    expect(hair()).toBe(1);
+    expect(hair()).toBeGreaterThan(0);
     s.root.dispose();
   });
 });

@@ -21,8 +21,9 @@ import {
 import { FACE_MORPH_NAMES, faceFieldRenders, faceOptionRenders, type FaceField } from '@/lib/babylon/core/faceMorphs';
 import { faceMorphList } from '@/lib/creator/look/faceMorphList';
 import { accessoriesForEquipped, wornPartsForEquipped } from '@/lib/closet/wearableAccessories';
-import { CLOTH_KIT_SLOT, MAX_SLOTS, emptyCreatorDoc, type ClothKind, type CreatorCloth, type CreatorMark, type ColourSlot, type CreatorEyes, type CreatorPart, type CreatorShape, type CreatorSlotV2, type HideKey, type PaintLayer, type PaintRegion, type SlotBody, type SlotFrame } from '@/lib/creator/look/doc';
+import { CLOTH_KIT_SLOT, MAX_SLOTS, emptyCreatorDoc, type ClothKind, type CreatorCloth, type CreatorMark, type ColourSlot, type CreatorEyes, type CreatorHair, type CreatorPart, type CreatorShape, type CreatorSlotV2, type HideKey, type PaintLayer, type PaintRegion, type SlotBody, type SlotFrame } from '@/lib/creator/look/doc';
 import { readCreatorDoc, faceOnly, type StoredFace } from '@/lib/creator/look/storage';
+import { hairCover, withHairExtras } from '@/lib/creator/look/hair';
 import {
   addSlot, blankSlot, canAddSlot, duplicateSlot, ensureSlots, heroBodyForSlot, mergeDeviceNumbers, newSlotId, newSlotLabel,
   removeSlot, renameSlot, replaceSlot, slotBodyOf, slotFace, withFace,
@@ -59,11 +60,13 @@ const PaintTab = dynamic(() => import('@/components/closet/paint-tab').then((m) 
 const ShapeTab = dynamic(() => import('@/components/closet/shape-tab').then((m) => m.ShapeTab), { ssr: false });
 // CREATOR-PLAN phase 4e: the Clothing tab (code-built clothes from the body itself; free).
 const ClothesTab = dynamic(() => import('@/components/closet/clothes-tab').then((m) => m.ClothesTab), { ssr: false });
+// 2026-10-07 (the hair expansion): the Hair tab — four packs of code-built styles, a second colour, accessories, beards.
+const HairTab = dynamic(() => import('@/components/closet/hair-tab').then((m) => m.HairTab), { ssr: false });
 // CREATOR-PLAN phase 4d: photo mode (loaded when opened).
 const PhotoMode = dynamic(() => import('@/components/closet/studio/photo-mode').then((m) => m.PhotoMode), { ssr: false });
 
 /** The editor's tabs, in order (the pad's shoulder buttons and the [ ] keys cycle them). */
-const STUDIO_TABS: readonly StudioTab[] = ['face', 'shape', 'parts', 'paint', 'clothes', 'wear', 'skins'];
+const STUDIO_TABS: readonly StudioTab[] = ['face', 'hair', 'shape', 'parts', 'paint', 'clothes', 'wear', 'skins'];
 /** Soft UI sounds and haptics, loaded on first use (SoundKit stays out of the page's first bundle). */
 const cue = (c: FeelCue) => { void import('@/lib/babylon/creator/studio/feel').then((m) => m.feel(c)).catch(() => undefined); };
 
@@ -367,6 +370,12 @@ export function ClosetView({ adult = false, fullBleed = false }: { adult?: boole
     if (next.length) out.clothes = next; else delete out.clothes;
     return { ...p, creator: out };
   });
+  /** 2026-10-07 (the hair expansion): the doc's hair extras — a second colour, accessories, a beard (re-sanitised; an
+   *  emptied block is dropped). A picker drag passes a group so it is one undo step. */
+  const setHairExtras = (patch: Partial<Record<keyof CreatorHair, unknown>>, group?: string) => setFace((p) => {
+    const d = readCreatorDoc(p) ?? emptyCreatorDoc();
+    return { ...p, creator: withHairExtras(d, patch) };
+  }, group);
   /** The procedural eyes block (phase 4a). Defaults are dropped by the sanitiser, so an untouched look carries nothing. */
   const setEyes = (e: CreatorEyes, group?: string) => setFace((p) => {
     const d = readCreatorDoc(p) ?? emptyCreatorDoc();
@@ -737,6 +746,7 @@ export function ClosetView({ adult = false, fullBleed = false }: { adult?: boole
               (seen 2026-10-06: the Clothing list's rows cut behind them) */}
           <div className="sticky -top-4 z-20 -mx-4 mb-4 flex gap-2 bg-[#0a0a0f] px-4 py-2 shadow-[0_6px_10px_-6px_rgba(0,0,0,0.8)] max-md:flex-nowrap max-md:overflow-x-auto max-md:[scrollbar-width:none] md:flex-wrap [&>*]:shrink-0">
             <Chip label="Face" active={tab === 'face'} onClick={() => setTab('face')} />
+            <Chip label="Hair" active={tab === 'hair'} onClick={() => setTab('hair')} />
             <Chip label="Shape" active={tab === 'shape'} onClick={() => setTab('shape')} />
             <Chip label="Parts" active={tab === 'parts'} onClick={() => setTab('parts')} />
             <Chip label="Paint" active={tab === 'paint'} onClick={() => setTab('paint')} />
@@ -783,8 +793,7 @@ export function ClosetView({ adult = false, fullBleed = false }: { adult?: boole
               {/* CREATOR-PLAN phase 4a (tool #5): any colour for skin, hair and eyes */}
               <Group title="Skin Tone"><ColourRow label="Skin tone" swatches={SKIN_TONES} value={face.skinTone} group="colour:skin" onPick={(h, g) => setFace((p) => ({ ...p, skinTone: h }), g)} /></Group>
               <Group title="Face Shape"><div className="flex flex-wrap gap-2">{FACE_SHAPES.map((s) => <Chip key={s} label={s} active={face.faceShape === s} onClick={() => setF('faceShape', s)} />)}</div></Group>
-              <Group title="Hair Style"><div className="flex flex-wrap gap-2">{HAIR_STYLES.map((s) => <Chip key={s} label={s} active={face.hairStyle === s} onClick={() => setF('hairStyle', s)} />)}</div></Group>
-              <Group title="Hair Color"><ColourRow label="Hair colour" swatches={HAIR_COLORS} value={face.hairColor} group="colour:hair" onPick={(h, g) => setFace((p) => ({ ...p, hairColor: h }), g)} /></Group>
+              <Group title="Hair"><button type="button" onClick={() => setTab('hair')} className="min-h-[44px] w-full rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-left text-xs text-white/75 hover:bg-white/[0.06]">{face.hairStyle} · styles, colours, accessories and beards are on the Hair tab →</button></Group>
               <Group title="Eye Shape" soon={soonField('eyeShape', EYE_SHAPES)}><div className="flex flex-wrap gap-2">{EYE_SHAPES.map((s) => <Chip key={s} label={s} active={face.eyeShape === s} onClick={() => setF('eyeShape', s)} />)}</div></Group>
               <Group title="Eye Color"><ColourRow label="Eye colour" swatches={EYE_COLORS} value={face.eyeColor} group="colour:eye" onPick={(h, g) => setFace((p) => ({ ...p, eyeColor: h }), g)} /></Group>
               {/* CREATOR-PLAN phase 4a (tool #3): the procedural eyes */}
@@ -837,6 +846,16 @@ export function ClosetView({ adult = false, fullBleed = false }: { adult?: boole
               <PaintTab layers={doc?.paint ?? []} suit={doc?.flags.suit ?? false} onChange={setPaint} onSuit={setSuit} accent={previewPalette.accent} marks={doc?.marks ?? []} onMarks={setPaintMarks}
                 canUndo={canUndo(hist)} canRedo={canRedo(hist)} onUndo={() => setHist(undo)} onRedo={() => setHist(redo)}
                 selectedId={layerSel} onSelect={(id) => { setLayerSel(id); setTapped(null); }} />
+            </motion.div>
+          )}
+
+          {tab === 'hair' && (
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+              <HairTab style={face.hairStyle} colour={face.hairColor} extras={doc?.hair}
+                onStyle={(st) => setF('hairStyle', st)}
+                onColour={(h, g) => setFace((p) => ({ ...p, hairColor: h }), g)}
+                onExtras={setHairExtras}
+                covered={hairCover(doc, { accessories: previewAccessories, wornParts: previewWornParts }) === 'hide'} />
             </motion.div>
           )}
 

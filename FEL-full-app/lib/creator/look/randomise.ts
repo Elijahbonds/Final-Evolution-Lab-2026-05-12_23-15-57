@@ -15,6 +15,7 @@ import {
 import {
   FRAME_KEYS, GIRTH_KEYS, GIRTH_RANGE, PROPORTION_RANGES, REACH_SAFE_KEYS, emptyCreatorDoc, type CreatorDoc, type CreatorShape,
 } from './doc';
+import { NOT_ROLLED_HAIR, randomHairExtras } from './hair';
 
 export const RANDOM_SECTIONS = ['skin', 'face', 'hair', 'eyes', 'colours'] as const;
 export type RandomSection = typeof RANDOM_SECTIONS[number];
@@ -23,12 +24,14 @@ export type RandomSection = typeof RANDOM_SECTIONS[number];
 export const RANDOM_SECTION_FIELDS: Record<RandomSection, string> = {
   skin: 'skin tone',
   face: 'face shape, brows, eyes, mouth, nose',
-  hair: 'hair style and colour',
+  hair: 'hair style and colour, beard, second colour, accessories',
   eyes: 'eye colour',
   colours: 'kit colours',
 };
 
-const NOT_ROLLED_HAIR = new Set(['Hijab']);
+// 2026-10-07 (the hair expansion): the rule lives with the hair catalogue now (hair.NOT_ROLLED_HAIR: the hijab and the
+// headwrap), and a roll gives the new styles, a beard sometimes, a second colour and an accessory now and then.
+const NOT_ROLLED = NOT_ROLLED_HAIR;
 
 /** mulberry32 — a seeded source for tests and rerolls. */
 export function seededRandom(seed: number): () => number {
@@ -81,12 +84,19 @@ export function randomiseLook(cur: RandomLook, locks: readonly RandomSection[] =
     face.nose = pickFrom(NOSES, rnd);
   }
   if (!locked.has('hair')) {
-    face.hairStyle = pickFrom(HAIR_STYLES.filter((s) => !NOT_ROLLED_HAIR.has(s)), rnd);
+    face.hairStyle = pickFrom(HAIR_STYLES.filter((s) => !NOT_ROLLED.has(s)), rnd);
     face.hairColor = pickFrom(HAIR_COLORS, rnd);
   }
   if (!locked.has('eyes')) face.eyeColor = pickFrom(EYE_COLORS, rnd);
   let doc = cur.doc;
   if (!locked.has('colours')) doc = { ...(doc ?? emptyCreatorDoc()), colours: rollKitColours(rnd) };
+  // the hair's extras roll LAST (after every older draw), so the faces and colours a seed gave before are unchanged
+  if (!locked.has('hair')) {
+    const extras = randomHairExtras(face.hairStyle, face.hairColor, rnd);
+    const base = doc ?? emptyCreatorDoc();
+    if (extras) doc = { ...base, hair: extras };
+    else if (base.hair) { const { hair: _drop, ...rest } = base; void _drop; doc = rest; }
+  }
   return { face, doc };
 }
 

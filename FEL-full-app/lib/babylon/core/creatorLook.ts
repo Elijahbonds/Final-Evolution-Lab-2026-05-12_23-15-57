@@ -29,6 +29,7 @@ import { syncParts } from '../creator/parts/renderParts';
 import { syncPaint } from '../creator/paint/renderPaint';
 import { bulkPushFor, syncShape } from '../creator/shape/renderShape';
 import { syncClothes } from '../creator/clothes/renderClothes';
+import { hairMeshOf } from '../creator/hair/renderHair';
 
 export interface CreatorLayers {
   /** JSON of the doc last applied (cheap change test for a live editor) */
@@ -77,7 +78,10 @@ export function applyCreatorLayers(
   if (!(prev && prev.sig === sig)) layersChanged(spawn, root, doc, worn, sig, summary);
   // SHAPE (phase 4b, 2026-10-06) on every call too, after the parts: the place decides the values (a standard-frame mode
   // plays the frame keys at 1.0), applyIdentity may have just re-set the root, and a part on a hand is scaled with it
-  syncShape(dressed, doc);
+  // THE HAIR EXPANSION (2026-10-07): the code-built hair (applyIdentity built it just before) is shaped like a garment
+  // (a bigger head carries its hair out with it); it is not painted
+  const hair = hairMeshOf(root);
+  syncShape(hair ? { ...dressed, meshes: [...(dressed.meshes ?? []), hair] } : dressed, doc);
   return summary;
 }
 

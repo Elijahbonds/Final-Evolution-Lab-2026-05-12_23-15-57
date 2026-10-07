@@ -11,7 +11,10 @@ describe('hair style mapping', () => {
     for (const v of Object.values(HAIR_STYLE_NODE)) if (v) expect(HAIR_NODE_KEYS).toContain(v);
   });
   it('unknown styles fall back to the cap, Bald to none', () => {
-    expect(hairNodeFor('Mohawk')).toBe('cap');
+    // test changed (2026-10-07, the hair expansion): 'Mohawk' became a catalog style (its nearest baked node is the buzz),
+    // so the unknown name this pins is one no catalog has
+    expect(hairNodeFor('Mystery Cut')).toBe('cap');
+    expect(hairNodeFor('Mohawk')).toBe('buzz');
     expect(hairNodeFor(undefined)).toBe('cap');
     expect(hairNodeFor('Bald')).toBeNull();
   });

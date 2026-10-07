@@ -12,6 +12,7 @@ import { applyIdentity, type PlayerIdentity } from '../../core/playerIdentity';
 import type { SpawnedCharacter } from '../../core/CharacterLibrary';
 import { defaultFace } from '../../../closet/wearable-catalog';
 import { sanitizeCreatorDoc } from '../../../creator/look/sanitize';
+import { hairMeshesOf } from '../hair/renderHair';
 
 const S = EYE_TEX_SIZE;
 const px = (buf: Uint8Array, u: number, v: number) => { const x = Math.min(S - 1, Math.floor(u * S)), y = Math.min(S - 1, Math.floor(v * S)); const o = (y * S + x) * 4; return [buf[o], buf[o + 1], buf[o + 2]]; };
@@ -137,10 +138,13 @@ describe('the kit\'s eyeballs', () => {
   });
   it('hide hair takes every hair node off, whatever the style', () => {
     const s = body();
+    // test changed (2026-10-07, the hair expansion): on the kit body the hair is the code-built mesh and the baked Hair_*
+    // nodes stay hidden — "the hair" is a visible baked node or a built hair mesh
+    const hair = () => s.meshes.filter((m) => /^Hair_/.test(m.name) && m.isVisible && m.isEnabled()).length + hairMeshesOf(s.root).length;
     applyIdentity(s, { ...ID('#2060FF', { v: 1, flags: { hide: { hair: true } } }), face: { ...defaultFace(), hairStyle: 'Afro' } });
-    expect(s.meshes.filter((m) => /^Hair_/.test(m.name) && m.isVisible && m.isEnabled())).toHaveLength(0);
+    expect(hair()).toBe(0);
     applyIdentity(s, { ...ID('#2060FF'), face: { ...defaultFace(), hairStyle: 'Afro' } });
-    expect(s.meshes.filter((m) => /^Hair_/.test(m.name) && m.isEnabled() && m.isVisible).length).toBeGreaterThan(0);
+    expect(hair()).toBeGreaterThan(0);
   });
   it('everything the eyes made goes with the body', () => {
     const s = body();
