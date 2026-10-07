@@ -44,6 +44,7 @@ import { AssessRunner, JUMP_PARTS, REST_PARTS, type RunnerView } from '@/lib/ass
 import type { TestResult } from '@/lib/assess/scoring';
 import type { Side } from '@/lib/assess/protocol';
 import { maybeSaveAdultScreen } from '@/lib/privacy/screenHistoryClient';
+import { landingDevice, maybeSaveLandingCheck } from '@/lib/privacy/landingCheckSave';
 import { summarize } from '@/lib/screen/checks';
 import {
   COACH_READY, LEAVE_BODY, LEAVE_GO, LEAVE_STAY, LEAVE_TITLE, PAIN_STOP, SLOW_DEVICE_LINE, STOP_CHECKS_BODY, STOP_CHECKS_GO, STOP_CHECKS_TITLE,
@@ -190,6 +191,14 @@ export function AssessApp({ initialRun = null }: { initialRun?: ScreenKind | nul
   }, [phase]);
 
   const finish = useCallback((v: RunnerView) => {
+    // the landing record's device line, read before the camera stops (lib/privacy/landingCheckSave.ts)
+    const svc = screenPose(), cam = svc.status.camera;
+    const device = landingDevice({
+      userAgent: navigator.userAgent, maxTouchPoints: navigator.maxTouchPoints,
+      uaMobile: (navigator as Navigator & { userAgentData?: { mobile?: boolean } }).userAgentData?.mobile,
+      model: svc.status.model, poseHz: runnerRef.current?.poseHz ?? 0, cameraFps: cameraFpsRef.current,
+      width: cam?.width ?? 0, height: cam?.height ?? 0,
+    });
     cleanup();                                                   // the camera stops the moment the screen ends
     const summary = v.result ? summarize(v.result) : null;
     if (!summary || v.result?.pain) { setPhase('stopped'); return; }
@@ -204,6 +213,8 @@ export function AssessApp({ initialRun = null }: { initialRun?: ScreenKind | nul
         kid: keepResult(tabStorage(), gateRef.current, summary) === 'kid',
       };
       if (view.kid) lastJumpRef.current = summary.jumpBestIn ?? lastJumpRef.current;
+      // DRILLS round 3: the landing check, for a verified adult who opted in (the server says); a kid's run sends nothing
+      void maybeSaveLandingCheck({ kid: view.kid, tests: v.result!.tests, takeoffLeg: v.result!.takeoffLeg, pain: v.result!.pain }, device);
       setJumpView(view);
       setPhase('jumpResult');
       return;
@@ -218,6 +229,8 @@ export function AssessApp({ initialRun = null }: { initialRun?: ScreenKind | nul
     // Adult branch only. The helper asks the server; kids never get here, and a self-reported 18+ who is not
     // verified (or who has not opted in) is not saved.
     void maybeSaveAdultScreen(summary);
+    // …and the landing check from a full screen's T5 (the rest of a screen begun as the jump carries a T5 already sent)
+    if (modeRef.current !== 'rest') void maybeSaveLandingCheck({ kid: false, tests: v.result!.tests, takeoffLeg: v.result!.takeoffLeg, pain: v.result!.pain }, device);
     setPhase('toResults');                                        // 18 or older: kept in this tab (keepResult)
     router.replace(RESULTS_PATH);
   }, [cleanup, router]);

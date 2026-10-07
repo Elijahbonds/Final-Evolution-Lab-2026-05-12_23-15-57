@@ -57,14 +57,10 @@ export const LANDING_CHECK_ENTRY = SCREEN_HOME;
 export const LANDING_UNLOCK_LABEL = 'Do the 1-minute landing check to unlock';
 
 /**
- * The unlock button is built, and OFF, because today it cannot unlock anything (measured 2026-10-07):
- *   · P8's jump gate reads its landing check from WorkoutScan rows of kind 'mirror_assessment' (lib/coach/
- *     protocolGateServer.ts, LANDING_SCANS_READ), and the only writer of that kind is POST /api/mirror/assessment;
- *   · nothing in app/ or components/ calls that route: the Quick Screen sends no assessment at all ("No assessment POST",
- *     app/play/mirror/assess/_components/assess-app.tsx), and its verified-adult save (lib/privacy/screenHistoryClient.ts)
- *     writes kind 'rescreen' with check bands and the jump height, no T5 landing metrics.
- * So a player who did the landing check would come back to the same held drills. Turn this on once a verified adult's
- * Quick Screen jump test stores its T5 record where the gate reads it (the screen lanes' files); the button, its places
- * and the re-read on return are built and tested with it on.
+ * The unlock button is ON (lane/drills round 3, 2026-10-07). Until today no landing check could reach the gate: it reads
+ * WorkoutScan kind 'mirror_assessment' (lib/coach/protocolGateServer.ts), whose only writer, POST /api/mirror/assessment,
+ * nothing called. The Quick Screen now stores its T5 landing record there for a verified adult who opted in
+ * (lib/privacy/landingCheckSave.ts; the route re-checks canSaveScanNumbers), so a passed landing check opens the gate for
+ * LANDING_CHECK_WEEKS, and this page (force-dynamic, refreshed on return) shows the jumps unlocked.
  */
-export const LANDING_UNLOCK_LIVE = false;
+export const LANDING_UNLOCK_LIVE = true;

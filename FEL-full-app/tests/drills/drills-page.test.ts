@@ -197,14 +197,17 @@ describe('"Do the 1-minute landing check to unlock" (owner, 2026-10-07: keep the
     ...(unlockLive === undefined ? {} : { unlockLive }),
   }));
 
-  it('OFF as shipped (no landing check reaches the gate today: lib/drills/route.ts) — the page shows no unlock button', async () => {
-    expect(LANDING_UNLOCK_LIVE).toBe(false);
+  it('ON as shipped (round 3: the Quick Screen now stores the landing check where the gate reads it) — on the page itself', async () => {
+    expect(LANDING_UNLOCK_LIVE).toBe(true);
     h.ctx = LANDING;
-    expect(await render()).not.toContain('data-drill-landing-unlock');
-    expect(await render('pogo-bilateral')).not.toContain('data-drill-landing-unlock');
-    // the note's own link already goes in at the Quick Screen's front page, never past its age step
-    expect(await render()).toMatch(/href="\/screen"/);
+    expect(hrefOf(await render(), 'data-drill-landing-unlock')).toBe('/screen');
+    expect(hrefOf(await render('pogo-bilateral'), 'data-drill-landing-unlock')).toBe('/screen');
+    // the note's own link goes in at the Quick Screen's front page too, never past its age step
     expect(await render()).not.toMatch(/href="\/play\/mirror\/assess/);
+  });
+
+  it('switched off (the one constant): no button anywhere', () => {
+    for (const id of [null, 'pogo-bilateral', 'wake-up']) expect(app(LANDING, id, false)).not.toContain('data-drill-landing-unlock');
   });
 
   it('switched on: on the shelf, on a held drill\'s page and on the Wake-Up\'s page with its jumps left out — each to /screen', () => {
