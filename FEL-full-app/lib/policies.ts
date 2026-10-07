@@ -1,8 +1,7 @@
 /**
- * lib/policies.ts — policy version + draft content (plumbing only).
+ * lib/policies.ts — policy version + policy content (plumbing only).
  *
- * The actual legal text will be dropped in by Elijah + lawyer.
- * DRAFT — NOT LEGAL TEXT markers are present on every page.
+ * The text is final per the owner's sign-off on 2026-10-07 and carries no draft banner.
  */
 
 import { BUSINESS_CONTACT_EMAIL, BUSINESS_LEGAL_NAME, BUSINESS_MAILING_ADDRESS } from './legal/business';
@@ -48,16 +47,14 @@ import { BUSINESS_CONTACT_EMAIL, BUSINESS_LEGAL_NAME, BUSINESS_MAILING_ADDRESS }
 // email, mailing address — all from lib/legal/business.ts); Privacy §10 "When You Buy From the Store" is new (Research &
 // Advisor verbatim); §4 says an account is deleted by email (no in-app route yet), §7 names Google Cloud as host, and §5's
 // stale "(see §7)" is gone. 2026-10-07-draft is the text without these. A bump re-prompts no one: nothing reads a stored
-// version back, so existing consent records stay as each person accepted them.
+// version back, so existing consent records stay as each person accepted them. The draft banners were removed in the
+// same version on the owner's sign-off (Elijah, 3:00 PM PT Oct 7, "yes to privacy").
 export const CURRENT_POLICY_VERSION = '2026-10-07';
 
 export const TERMS_CONTENT = `
 # Terms of Service
 
 **Version: ${CURRENT_POLICY_VERSION}**
-
-> ⚠️ **DRAFT — NOT LEGAL TEXT.** This is placeholder structure. Final copy
-> will be authored by qualified legal counsel before any paid features launch.
 
 ## 1. Acceptance
 
@@ -110,9 +107,6 @@ export const PRIVACY_CONTENT = `
 # Privacy Policy
 
 **Version: ${CURRENT_POLICY_VERSION}**
-
-> ⚠️ **DRAFT — NOT LEGAL TEXT.** This is placeholder structure. Final copy
-> will be authored by qualified legal counsel.
 
 ## 1. Data We Collect
 

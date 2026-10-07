@@ -17,7 +17,7 @@ const TEXT_BY_VERSION: Record<string, string> = {
   '2026-09-30-draft': 'abc709bb13372227',  // + §5 keeps consent records; an erase does not restart the breath's first week (mirror-coach-erase)
   '2026-10-01-draft': '18b88eec085ba82b',  // §6: body-tracking files from our own servers only (no jsDelivr / Google fallback)
   '2026-10-07-draft': 'e1c40c0b8dd666d8',  // + §6: the Mirror's "vs your last 3" kept on the device only, never sent, forgettable (mirror-progress)
-  '2026-10-07': '5f4b87feb9c09dec',        // LEGAL-COPY: Terms §2 18+, Terms §9 + Privacy §11 Contact, Privacy §10 store, §4/§5/§7 fixes; first non-draft label
+  '2026-10-07': '1817114b5ef24ce7',        // LEGAL-COPY: Terms §2 18+, Terms §9 + Privacy §11 Contact, Privacy §10 store, §4/§5/§7 fixes; first non-draft label; draft banners removed on the owner's sign-off (follow-up 1)
 };
 
 describe('the policy version', () => {
@@ -47,6 +47,16 @@ describe('the policy version', () => {
     expect(CURRENT_POLICY_VERSION).toBe('2026-10-07');
     expect(CURRENT_POLICY_VERSION).not.toBe('2026-10-07-draft');
     expect(CURRENT_POLICY_VERSION).not.toMatch(/-draft$/);
+  });
+
+  // LEGAL-COPY FOLLOW-UP 1 (2026-10-07; owner sign-off 3:00 PM PT, "yes to privacy"): the text is final, so the
+  // DRAFT banners came off both pages in the same version.
+  it('carries no draft banner on either page', () => {
+    for (const content of [TERMS_CONTENT, PRIVACY_CONTENT]) {
+      expect(content).not.toContain('DRAFT');
+      expect(content).not.toContain('NOT LEGAL TEXT');
+      expect(content).not.toContain('qualified legal counsel');
+    }
   });
 
   it('keeps every earlier version fingerprint (the record of what each signup accepted)', () => {
