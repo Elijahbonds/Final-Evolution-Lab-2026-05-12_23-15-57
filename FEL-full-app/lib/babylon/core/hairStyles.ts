@@ -21,6 +21,12 @@ export const HAIR_STYLE_NODE: Record<string, HairNodeKey | null> = {
   'Bun': 'bun', 'Ponytail': 'ponytail',
   'Hijab': 'hijab',
   'Bald': null,
+  // 2026-10-07 (the hair expansion): every style is code-built on a kit body (lib/babylon/creator/hair/renderHair hides
+  // these nodes wherever it fits the head). On a body it cannot fit, a new style shows its nearest baked node, never none.
+  'Twists': 'braids', 'Bantu Knots': 'bun', 'Afro Puffs': 'afro', 'Durag': 'buzz', 'Headwrap': 'bun',
+  'High-Top Fade': 'afro', 'Taper': 'buzz', 'Drop Fade': 'buzz', 'Mohawk': 'buzz', 'Frohawk': 'buzz',
+  'Long Layered': 'cap', 'Bob': 'cap', 'Top Knot': 'bun', 'Space Buns': 'bun', 'Pigtails': 'ponytail', 'Braided Ponytail': 'braids',
+  'Spiky': 'buzz', 'Swept': 'cap', 'Mullet': 'cap', 'Streaks': 'cap',
 };
 
 /** Node key → a representative catalog style (for roster athletes baked with a node key). */

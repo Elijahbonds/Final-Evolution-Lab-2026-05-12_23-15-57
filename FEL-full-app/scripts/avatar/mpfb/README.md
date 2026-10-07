@@ -19,3 +19,12 @@ Modelled outfits (CREATOR-PLAN phase 4e, 2026-10-06): `fit-outfit.py` fits a mod
 or any `.glb/.fbx/.obj/.blend`) to the kit body, weights it from the body, and exports it as a kit pack
 (`public/models/kits/<itemId>.glb`, the game's own 22-bone armature + one `Kit_<slot>_<itemId>` mesh). UNTESTED (no
 Blender in the cloud); the owner's checklist is in `docs/BRIEF-WARDROBE.md` ("Modelled outfits").
+
+Baked hair (the hair expansion, 2026-10-07): every catalog hairstyle ships CODE-BUILT on the player's own head
+(`lib/babylon/creator/hair`). For a higher-quality version of one style, `npx tsx scripts/avatar/export-hair.ts --style
+"<Style>" --sex male|female` writes the code-built style as a guide (`scripts/avatar/out/hair/<slug>-<sex>.obj` + its skin
+in a `.json`), and `blender -b --python scripts/avatar/mpfb/bake-hair.py -- --style "<Style>" --sex <sex> (--grow |
+--mesh <file>)` grows hair curves on it (or fits a modelled hair to it), bakes normals and AO onto the guide, skins it
+from the guide and exports `public/models/hair/<slug>-<sex>.glb` (the kit's 22-bone armature + one `HairPack_<slug>`
+mesh). UNTESTED (no Blender in the cloud), and the game loads none of them yet — the script's closing checklist says what
+wiring one in would take. `lib/babylon/creator/hair/macScript.test.ts` pins the contract.

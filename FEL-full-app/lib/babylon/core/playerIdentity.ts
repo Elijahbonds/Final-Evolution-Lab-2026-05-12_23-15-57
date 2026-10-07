@@ -22,6 +22,8 @@ import { clothKitSlots } from '../../creator/look/clothes';
 import { TEEN_DEVICE_LOOK_EVERYWHERE, activeLook, heroBodyForSlot } from '../../creator/look/slots';
 import { readLocalLook, type StoredLook } from '../../creator/localLook';
 import { applyEyes } from '../creator/eyes/renderEyes';
+import { syncHair } from '../creator/hair/renderHair';
+import { hairCover, resolveHair } from '../../creator/look/hair';
 import { eyeParams } from '../creator/eyes/eyeTexture';
 import { RawTexture } from '@babylonjs/core';
 
@@ -288,6 +290,14 @@ export function applyIdentity(
   // colour, the doc's sclera / iris size / pupil / glow), or are hidden. (This line used to tint an `iris` material the
   // kit never had.)
   applyEyes(spawn, eyeParams(id.face.eyeColor, doc?.eyes), hidden.eyes);
+  // THE HAIR EXPANSION (2026-10-07): every catalog style, the beard and the hair accessories are code-built on the body's
+  // own head (lib/babylon/creator/hair) — after the face morphs, so the head it fits is the face the player made. Where it
+  // can fit the body it hides the baked Hair_* nodes applyHairStyle just chose; elsewhere (the scan, a roster body) that
+  // node stays. A hood up or a helmet part takes the hair off; worn headwear presses tall hair down. On a 'body' apply the
+  // doc's clothes and parts are not built, so they cover nothing.
+  syncHair(spawn, resolveHair(id.face, doc, hidden), {
+    cover: hairCover(parts === 'full' ? doc : null, parts === 'full' ? { accessories: id.accessories, wornParts: id.wornParts } : {}),
+  });
   watchReadiness(spawn);
   if (parts === 'body') return;
   // 3) Wardrobe palette — jersey/shorts/shoes tints by mesh/material slot name. The doc's colours win (a no-op when

@@ -66,7 +66,8 @@ describe('the Studio wires it to the doc, the undo history, the camera and the s
     expect(src).toMatch(/const setClothes = \(next: CreatorCloth\[\], group\?: string\) => setFace\(/);
     expect(src).toMatch(/if \(next\.length\) out\.clothes = next; else delete out\.clothes;/);
     expect(src).toMatch(/<ClothesTab clothes=\{doc\?\.clothes \?\? \[\]\} onChange=\{setClothes\}/);
-    expect(src).toContain("const STUDIO_TABS: readonly StudioTab[] = ['face', 'shape', 'parts', 'paint', 'clothes', 'wear', 'skins'];");
+    // test changed (2026-10-07, the hair expansion): the Hair tab sits after Face
+    expect(src).toContain("const STUDIO_TABS: readonly StudioTab[] = ['face', 'hair', 'shape', 'parts', 'paint', 'clothes', 'wear', 'skins'];");
     expect(src).toContain('<Chip label="Clothing" active={tab === \'clothes\'}');
   });
   it('randomise keeps the locked kinds; the camera frames the selected piece; the store slot says it is covered', () => {
