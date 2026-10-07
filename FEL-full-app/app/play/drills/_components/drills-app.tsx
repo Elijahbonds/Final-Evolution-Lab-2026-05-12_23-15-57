@@ -4,7 +4,7 @@
 // drills, one drill's page (where it is written, the book's own words, the demo, what waits today), and the camera run
 // (drill-live.tsx). The server page decided what may run today (lib/drills/access.ts) and hands it down as ids and lines.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, BookOpen, Camera, Clock } from 'lucide-react';
 import { setBodyPlayDobYear } from '@/lib/move/bodyPlayGrownUp';
@@ -95,7 +95,7 @@ function BookWords({ lessons, chapterHref }: { lessons: BookLesson[]; chapterHre
 function DrillPage({ id, access, lessons }: { id: string; access: DrillsAccess; lessons: BookLesson[] }) {
   const drill = drillById(id)!;
   const a = access.drills.find((x) => x.id === id)!;
-  const run = drillToRun(access, id);
+  const run = useMemo(() => drillToRun(access, id), [access, id]);
   const [live, setLive] = useState(false);
   if (live && run) return <DrillLive drill={run} onLeave={() => setLive(false)} />;
   return (

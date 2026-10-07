@@ -13,7 +13,7 @@
 //             runs again, and hands-up or RESUME carries the drill on.
 //   done      the result, as a camera estimate. Nothing is saved or sent, for any age.
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { bodyPlay } from '@/lib/move/bodyPlay';
 import { SelfView, SpaceCheckPanel, useBodyPlay } from '@/components/games/body-play';
 import { GrownUpStep } from '@/app/play/mirror/assess/_components/gate-steps';
@@ -120,8 +120,10 @@ export function DrillLive({ drill, onLeave }: { drill: Drill; onLeave: () => voi
   const { handle, view } = useLiveDrill(setWake);
   const body = useBodyPlay();
 
-  const start = useCallback(() => { void handle?.live.open(drill); }, [handle, drill]);
-  // the drill opens when this mounts (the tap that mounted it is the camera's tap)
+  // the drill as it was when the tap mounted this: a parent re-render never reopens it (and never restarts the camera)
+  const drillRef = useRef(drill);
+  const start = useCallback(() => { void handle?.live.open(drillRef.current); }, [handle]);
+  // the drill opens once the controller exists (the tap that mounted this is the camera's tap)
   useEffect(() => { start(); }, [start]);
 
   const leave = () => { handle?.live.close(); onLeave(); };
