@@ -98,17 +98,11 @@ export async function reportEarnGrant(report: EarnReport): Promise<EarnGrant | n
 /**
  * One POST to /api/v1/wallet/earn — null on a non-2xx or a network failure. Never throws.
  *
- * ECONOMY-SESSIONS-HARDEN (2026-09-28, merged from origin/lane/finish-release 46a8dc6a): what it resolves to and
- * broadcasts is what was credited NOW. The server answers a key already in the ledger with that key's original
- * grant and `replayed: true` (nothing moved); that is reported here as a zero grant, so no HUD toasts it and no
- * card adds it. The eye saw exactly that answer at 46a8dc6a — the wallet chip's daily_first_session re-sent from a
- * fresh browser, "granted 100 coins", balance unchanged — and a "+100" shown for it would be a reward the server
- * correctly did not pay.
- *
- * QA merge note: this branch's own P0-03 CLAIM feature (claimEarnGrant / EarnClaim / opts.quiet, an end-card button
- * that re-sent a run's reports) was removed in this merge along with its only caller, EndCardRewards / EndCardClaim
- * (components/games/end-card-rewards.tsx, deleted) — the session-embedded payout above makes a separate earn
- * report nothing is left to re-send or claim.
+ * ECONOMY-SESSIONS-HARDEN (2026-09-28): what it resolves to and broadcasts is what was credited NOW. The server answers a
+ * key already in the ledger with that key's original grant and `replayed: true` (nothing moved); that is reported here
+ * as a zero grant, so no HUD toasts it and no card adds it. The eye saw exactly that answer at 46a8dc6a — the wallet
+ * chip's daily_first_session re-sent from a fresh browser, "granted 100 coins", balance unchanged — and a "+100" shown
+ * for it would be a reward the server correctly did not pay.
  */
 async function postEarn(report: EarnReport): Promise<{ granted: { coins: number; shards: number }; capped: boolean; rejected: string | null } | null> {
   try {

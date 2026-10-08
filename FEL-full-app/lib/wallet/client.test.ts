@@ -82,10 +82,7 @@ describe('wallet client — the grant a report was paid', () => {
   });
 });
 
-// ECONOMY-SESSIONS-HARDEN (2026-09-28) replaced the P0-02 tiles this comment used to point at
-// (components/games/end-card-rewards.tsx, deleted in the qa-fixes/movement-lane merge): the wallet coin tile now
-// reads the session's own payout figure, inlined in game-shell.tsx — checked below.
-describe('the shell\'s wallet tiles (components/games/game-shell.tsx)', () => {
+describe('the shell\'s coins tile (components/games/game-shell.tsx)', () => {
   const shell = stripComments(fs.readFileSync(path.resolve(__dirname, '../../components/games/game-shell.tsx'), 'utf8'));
   const card = stripComments(fs.readFileSync(path.resolve(__dirname, '../../components/games/end-screen/end-screen.tsx'), 'utf8'));
   const reveal = stripComments(fs.readFileSync(path.resolve(__dirname, '../../components/games/end-screen/reveal.ts'), 'utf8'));

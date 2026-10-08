@@ -20,11 +20,6 @@ import { GraphicsToggle } from './graphics-toggle';
 import { GameCaptureHud } from '@/components/capture/game-capture-hud';
 import { LearnWhileYouWait } from '@/components/learn/learn-while-you-wait';
 import type { SessionTallies } from '@/lib/game-systems';
-// QA merge note (feature/qa-fixes-0927 x origin/lane/finish-release 46a8dc6a): ECONOMY-SESSIONS-HARDEN removed
-// reportEarnGrant / EndCardRewards / EndCardClaim / walletGrantsFrom / the CLAIM feature entirely — coins now pay
-// once, in the session's own transaction (below), so there is no separate earn report left to claim or re-send.
-// Took origin's side throughout this cluster (payout is server-paired; the old client path would double-pay
-// against the new server).
 import { sessionStore, markRun, countedSince } from '@/lib/babylon/core/sessionStore';
 import { agentPlayEvidence } from '@/lib/babylon/core/AgentBridge';
 import { isPlayedRun } from './played-evidence';
@@ -88,9 +83,6 @@ interface RecapData {
   /** ECONOMY-SESSIONS-HARDEN: the run was recorded but paid nothing (AGENT / PLAYTEST / TEST_ACCOUNT), or the server refused
    *  its result (SCORE_INVALID, RUN_MISSING, RUN_EXPIRED…) — the reason the server gave. Absent on a paid run. */
   unpaid?: string;
-  /** QA (PM ruling, CLAIM redesign): this finish answered a runId already recorded (nothing moved) — the card shows
-   *  the original result, but CLAIM never offers to "claim" a grant that was never this call's to begin with. */
-  replayed?: boolean;
   xp: number;
   shards: number;
   credits: number;
@@ -154,8 +146,8 @@ function GameShellInner({
   // ECONOMY-SESSIONS-HARDEN: an agent or playtest run is started as one, so the server records it and pays nothing
   const agentRun = searchParams.get('agent') === '1';
   const playtestRun = searchParams.get('playtest') === '1';
-  // `display` (PRQ badge/display surfaces, qa-fixes-owned) kept from this branch — origin/lane/finish-release
-  // forked before that feature existed, so its own profile state never had the field to drop.
+  // QA P0-01: `display` is what the header badge prints (the measured PRQ, lib/prq-display); prq / grade stay the modes'
+  // difficulty inputs.
   const [profile, setProfile] = useState<{ prq: number; grade: PrqGrade; display: PrqDisplay } | null>(null);
   // Ship pass 2, Phase 4: the profile request failing (offline, server down)
   // used to leave the shell empty and silent — no game, no message. Measured
@@ -337,7 +329,6 @@ function GameShellInner({
             if (mine()) setRecap({
               noPlay: Boolean(j?.noPlay),
               ...(j?.paid === false && !j?.noPlay ? { unpaid: String(j?.reason ?? 'UNPAID') } : {}),
-              replayed: Boolean(j?.replayed),
               xp: j?.xp ?? 0,
               shards: j?.shards ?? 0,
               credits: j?.credits ?? 0,

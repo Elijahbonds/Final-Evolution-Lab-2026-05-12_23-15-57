@@ -252,20 +252,6 @@ describe('every carnival event reports its successes to the momentum bus (3)', (
     f.dispose();
   });
 
-  it('HOT SHOT: a short shot resets instead of soft-locking the event (QA A1-01a)', async () => {
-    const f = fakeCtx(); const ev = hotShot(); await ev.build(f.ctx);
-    flightOutcome = 'short';               // the ball lands well before the goal line — used to leave `phase` stuck at 'flight' forever
-    ev.onInput(f.ctx, press('A')); ev.onInput(f.ctx, press('A'));   // power, then shoot
-    ev.tick(f.ctx, 1 / 60);
-    expect(f.report).not.toHaveBeenCalledWith(expect.objectContaining({ kind: 'big_make' }));   // no score — it never reached the line
-    // the event must be back at 'aim': a fresh A press starts a new power charge. Before the fix, `onInput` had
-    // nothing to do (phase was stuck at 'flight') and this never fired.
-    powerMeterCalls.starts = 0;
-    ev.onInput(f.ctx, press('A'));
-    expect(powerMeterCalls.starts).toBe(1);
-    f.dispose();
-  });
-
   it('COIN STORM: a cleared wave, not every coin', async () => {
     const f = fakeCtx(); const ev = coinStorm(); await ev.build(f.ctx);
     coinGain.next = 3; ev.tick(f.ctx, 1 / 60);

@@ -168,9 +168,9 @@ describe('pad equivalence — the fight rules', () => {
       nd.lastBlockPressMs = press; od.lastBlockPressMs = press;
       const dist = r() * 4, lat = r() < 0.3 ? undefined : r() * 0.8;
       expect(NF.resolveStrike(atk, dist, nd, now, lat)).toBe(OF.resolveStrike(atk, dist, od, now, lat));
-      // COMBAT DIFFICULTY (2026-10-06): `guardTaken` stays 1 for a pad defender; QA A1-03: stunChain / escapeSec stay 0
-      // with `breakout` unused — the old fixture predates all three, so they are excluded from the shape comparison.
-      const { guardTaken, stunChain: _sc, escapeSec: _es, ...rest } = { ...nd };
+      // COMBAT DIFFICULTY (2026-10-06): FighterState has one field the pre-P7 one does not — `guardTaken`, the guard chip a
+      // POWERED RIVAL takes (FightCore.rivalPower). A pad defender never sets it: it stays 1, and every old field is equal.
+      const { guardTaken, ...rest } = { ...nd };
       expect(guardTaken).toBe(1);
       expect(rest).toEqual({ ...od });
     }

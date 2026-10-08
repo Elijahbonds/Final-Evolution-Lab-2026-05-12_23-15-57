@@ -3,7 +3,7 @@
 // but the stop was labelled with MODE_INFO.carnival.name — "Game Night", the name of the whole night. It reads as the Court
 // Carnival round it is now, and no stop in any night is labelled Game Night.
 import { describe, expect, it } from 'vitest';
-import { CARNIVAL_EXTERNAL_POOL, NATIVE_STOP_LABEL, carnivalStopLabel, drawCarnivalLineup } from './carnival-run';
+import { CARNIVAL_EXTERNAL_POOL, CARNIVAL_NATIVE_STOP_NAME, carnivalStopLabel, drawCarnivalLineup } from './carnival-run';
 import { MODE_INFO, VENUES } from './game-data';
 
 describe('Game Night\'s lineup', () => {
@@ -12,7 +12,7 @@ describe('Game Night\'s lineup', () => {
       const lineup = drawCarnivalLineup();
       const labels = lineup.map(carnivalStopLabel);
       expect(labels).not.toContain(MODE_INFO.carnival.name);
-      expect(labels[0]).toBe(NATIVE_STOP_LABEL);
+      expect(labels[0]).toBe(CARNIVAL_NATIVE_STOP_NAME);
       expect(lineup.filter((s) => s === 'carnival')).toHaveLength(1);        // the 3D round once, never repeated
       expect(new Set(lineup).size).toBe(lineup.length);
       for (const s of lineup.slice(1)) expect(CARNIVAL_EXTERNAL_POOL as readonly string[]).toContain(s);

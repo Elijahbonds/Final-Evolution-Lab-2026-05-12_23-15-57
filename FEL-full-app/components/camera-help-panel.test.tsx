@@ -1,5 +1,6 @@
-// QA P1-23: the three surfaces show the steps. The Mirror renders CameraHelpPanel; Prove It's one-line camera-off gate
-// reads cameraHelpText; body play (Gate Crasher → PLAY WITH YOUR BODY) is the movement lane's file — its patch is routed.
+// QA P1-23: the camera surfaces show the steps. Prove It's one-line camera-off gate reads cameraHelpText. The Mirror
+// (MIRROR-FIRST rebuilt its camera into use-mirror-camera.ts / lib/mirror/liveCamera.ts, the mirror lanes' files) and body
+// play (the movement lane's body-play.tsx) render CameraHelpPanel through routed patches, not this branch.
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -27,12 +28,6 @@ describe('the camera help panel', () => {
 });
 
 describe('the surfaces use it', () => {
-  it('the Mirror: a camera failure renders the panel (a renderer failure keeps its own line)', () => {
-    const src = read('app/play/mirror/_components/mirror-harness.tsx');
-    expect(src).toContain('const help = insecure || isCameraError(e) ? cameraHelp(e, { secure: !insecure }) : null;');
-    expect(src).toContain('{camHelp ? <CameraHelpPanel help={camHelp} onRetry={() => void start()} /> : error && (');
-    expect(src).not.toContain('Camera unavailable in this browser/environment.');
-  });
   it('Prove It: the camera-off gate carries the steps', () => {
     const src = read('app/play/dunkduel/_components/prove-it.tsx');
     expect(src).toContain('setError(`Prove It measures your dunk through the camera. ${cameraHelpText(cameraHelp(e, { secure: !insecure }))}`);');
