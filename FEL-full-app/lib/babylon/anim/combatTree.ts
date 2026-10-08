@@ -102,9 +102,14 @@ const CLIP_FOR: Record<CombatAnimState, { clip: string; loop: boolean; fadeSec: 
   block_hold:      { clip: 'karate_block', loop: true, fadeSec: 0.1 },          // authored high guard (was the stance clip at 1.6× — invisible)
   parry_flash:     { clip: 'karate_parry', loop: false, fadeSec: 0.04 },
   guard_impact:    { clip: 'karate_guard_impact', loop: false, fadeSec: 0.04 },
-  react_light:     { clip: 'karate_hit_react', loop: false, fadeSec: 0.05 },
+  // MOVEMENT POLISH (2026-10-06), TUNED: a hit reads its WEIGHT. All three weights played the one flinch at one rate and one fade — a jab
+  // and a heavy landed identically (_movement-probe: the same 14.9 cm head snap, the same 20 frames). Rate light 1 → 1.35 (a quick snap
+  // the guard recovers from), heavy 1 → 0.82 (the head stays back longer); fade light 0.05 → 0.04, heavy 0.05 → 0.07 (a heavier body
+  // takes a frame longer to be moved). The mode's react window (REACT_SEC) still owns the beat: a heavy flinch still running at its end
+  // is cut by the next state's fade as before; a light one settles back into the guard inside it. Visual only — no hit, stun or timing.
+  react_light:     { clip: 'karate_hit_react', loop: false, fadeSec: 0.04, speedRatio: 1.35 },
   react_medium:    { clip: 'karate_hit_react', loop: false, fadeSec: 0.05 },
-  react_heavy:     { clip: 'karate_hit_react', loop: false, fadeSec: 0.05 },
+  react_heavy:     { clip: 'karate_hit_react', loop: false, fadeSec: 0.07, speedRatio: 0.82 },
   react_launch:    { clip: 'karate_knockdown', loop: false, fadeSec: 0.05 },
   knockdown:       { clip: 'karate_knockdown', loop: false, fadeSec: 0.08 },
   ko:              { clip: 'karate_knockdown', loop: false, fadeSec: 0.1 },

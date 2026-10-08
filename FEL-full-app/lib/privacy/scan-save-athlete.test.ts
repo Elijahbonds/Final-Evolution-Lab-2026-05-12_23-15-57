@@ -1,11 +1,15 @@
 // TEEN-WRITE-BLOCK-2 (FE PM 23:05 PT), GAP 1 row 1g — FE PM's REQUIRED TEST: POST /api/v1/creator/athlete gates ONLY the
-// measured PRQ snapshot. Avatar saves (AvatarLook: the face, its Fine Tune morphs, the jersey, owned wearables) and the
-// build (AthleteBuild.build) stay open to ANY signed-in user, a 15-year-old included; for everyone the save gate refuses,
-// the answer is 200 with the look and build saved, prq not written (DbNull on a create, the key left out on an update, so
-// an older snapshot is neither rewritten nor cleared), and `prqSaved: false` + `prqRefusal` (the 403 scan_save_adults_only
-// refusal, carried inside the 200). ADULTS ARE REFUSED THE SNAPSHOT TOO until PRIVACY-CORE/AB-04 adds the opt-in; the
-// opted-in adult (the opt-in vi.mocked true) is the positive control. Run for real over the write-spy client; the session,
-// the database and the measured axes are stand-ins.
+// measured PRQ snapshot. The build (attributes, stance) and owned-wearable inventory stay open to ANY signed-in
+// user, a 15-year-old included; for everyone the save gate refuses, the answer is 200 with the build saved, prq not
+// written (DbNull on a create, the key left out on an update, so an older snapshot is neither rewritten nor cleared),
+// and `prqSaved: false` + `prqRefusal` (the 403 scan_save_adults_only refusal, carried inside the 200).
+// The jersey plate is look, not inventory: it is written only for a verified adult.
+//
+// LOOK HOLD (owner, 2026-09-29, tightened 2026-10-02). Anyone who is not a verified adult uploads no look:
+// face, sliders, height, build, equipped items, jersey plate, and animation choices are replaced with the
+// catalog defaults. Owned-gear inventory is not a look and is not written by this route. A verified adult
+// keeps the categorical face, the worn items, and the plate. Sliders land only when that adult also sends
+// saveLookNumbers. The PRQ gate is unchanged.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const h = vi.hoisted(() => ({ session: null as unknown, prisma: null as any }));
@@ -21,7 +25,9 @@ vi.mock('@/lib/privacy/scanSaveOptIn', async (importOriginal) => {
 import { NextRequest } from 'next/server';
 import { Prisma } from '@/public/_prisma/client';
 import { POST as athletePOST } from '@/app/api/v1/creator/athlete/route';
+import { defaultEquipped, defaultFace, defaultJersey } from '@/lib/closet/wearable-catalog';
 import { scanSaveOptIn } from '@/lib/privacy/scanSaveOptIn';
+import { verifiedAdult } from '@/lib/privacy/verifiedAdult';
 import { OPTED_IN_ADULT, REFUSED_SCAN_CASES, argsOf, callsOn, newSpyDb, spyPrisma, writesOf, type AgeCase, type SpyDb } from '@/tests/helpers/writeSpyDb';
 
 const UID = 'athlete-creator-1';
@@ -43,6 +49,7 @@ const BUILD = {
     gear: { shoes: 'Evolution Hi-Tops' },
     attributes: { midRange: 70 },
     body: { stance: 'compact' },
+    animations: { animJsBase: 'Set Shot' },
   },
   plate: 'ACE',
 };
@@ -70,18 +77,31 @@ const CASES = REFUSED_SCAN_CASES.map((c) => [c.id, c] as const);
 const ALL = [...REFUSED_SCAN_CASES, OPTED_IN_ADULT].map((c) => [c.id, c] as const);
 const by = (id: string) => REFUSED_SCAN_CASES.find((c) => c.id === id)!;
 
-/** What every account's save must write for the look and the build, whoever they are. */
-function expectLookAndBuildSaved() {
+/**
+ * The build (attributes, stance) saves for every signed-in user.
+ * A verified adult also saves hair, the worn shoes, and the plate. Anyone else gets the catalog face,
+ * the catalog worn set, a blank plate, and no animation labels. Inventory rows are not part of this write.
+ */
+function expectLookAndBuildSaved(adult: boolean) {
   const look = argsOf(db, 'avatarLook.upsert')[0];
   for (const half of [look.update, look.create]) {
-    expect(half.face).toMatchObject({ hairStyle: 'Locs', sliders: { faceLong: 0.4 } });
-    expect(half.jersey).toEqual({ number: 23, name: 'ACE' });
-    expect(half.equipped).toMatchObject({ shoes: 'shoes_evo' });
+    if (adult) {
+      expect(half.face).toMatchObject({ hairStyle: 'Locs' });
+      expect(half.face.sliders).toBeUndefined();
+      expect(half.jersey).toEqual({ number: 23, name: 'ACE' });
+      expect(half.equipped).toMatchObject({ shoes: 'shoes_evo' });
+    } else {
+      expect(half.face).toEqual(defaultFace());
+      expect(half.jersey).toEqual(defaultJersey());
+      expect(half.equipped).toEqual(defaultEquipped());
+    }
   }
   const build = argsOf(db, 'athleteBuild.upsert')[0];
   for (const half of [build.update, build.create]) {
     expect(half.build.attributes).toEqual({ midRange: 70 });
-    expect(half.build.frame).toMatchObject({ stance: 'compact' });
+    expect(half.build.frame).toMatchObject({ stance: 'compact', heightScale: 100, buildScale: 100 });
+    expect(half.build.animations).toEqual(adult ? { animJsBase: 'Set Shot' } : {});
+    expect(half.build.privacy).toEqual({ saveLookNumbers: false, modelTraining: false });
     expect(half.finalizedAt).toBeInstanceOf(Date);
   }
   return build;
@@ -90,17 +110,24 @@ function expectLookAndBuildSaved() {
 beforeEach(() => { h.session = { user: { id: UID } }; });
 
 describe('1g POST /api/v1/creator/athlete — the look and the build save for everyone; only the PRQ snapshot is gated', () => {
-  it('REQUIRED: a 15-year-old saves their avatar and their manual look changes; their PRQ write gets the 403 refusal', async () => {
+  it('REQUIRED: a 15-year-old saves the build only; face, plate, worn items, and animations stay off the server; the PRQ write gets the 403 refusal', async () => {
     as(by('15'));
     const r = await post(BUILD);
     expect(r.status).toBe(200);
-    expect(r.json).toMatchObject({ saved: true, refused: [], prqSaved: false, prqRefusal: PRQ_REFUSAL });
+    expect(r.json).toMatchObject({
+      saved: true, refused: [], prqSaved: false, prqRefusal: PRQ_REFUSAL,
+      lookLocal: true, privacy: { saveLookNumbers: false, modelTraining: false },
+    });
     expect(writesOf(db)).toEqual(['avatarLook.upsert', 'athleteBuild.upsert', '$transaction']);
-    const build = expectLookAndBuildSaved();
+    const build = expectLookAndBuildSaved(false);
     expect(build.create.prq).toBe(Prisma.DbNull);
     expect('prq' in build.update).toBe(false);
-    // what is on file now: the new look and build, and no measured numbers
-    expect(db.tables.avatarLook[0].face).toMatchObject({ hairStyle: 'Locs', sliders: { faceLong: 0.4 } });
+    // what is on file now: the catalog face, the build, and no measured numbers
+    expect(db.tables.avatarLook[0].face).toEqual(defaultFace());
+    expect(db.tables.avatarLook[0].jersey).toEqual(defaultJersey());
+    expect(db.tables.avatarLook[0].equipped).toEqual(defaultEquipped());
+    expect(db.tables.athleteBuild[0].build.animations).toEqual({});
+    expect(db.tables.ownedWearable).toEqual([{ id: 'ow1', userId: UID, itemId: 'shoes_evo' }]);
     expect(db.tables.athleteBuild[0].prq).toBe(Prisma.DbNull);
     expect(db.tables.athleteBuild[0].build.attributes).toEqual({ midRange: 70 });
   });
@@ -110,8 +137,8 @@ describe('1g POST /api/v1/creator/athlete — the look and the build save for ev
     const r = await post(BUILD);
     expect(r.status).toBe(200);
     expect(r.json).toMatchObject({ saved: true, refused: [], prqSaved: false, prqRefusal: PRQ_REFUSAL });
-    expect(Object.keys(r.json).sort()).toEqual(['finalizedAt', 'prqRefusal', 'prqSaved', 'refused', 'saved']);
-    const build = expectLookAndBuildSaved();
+    expect(Object.keys(r.json).sort()).toEqual(['finalizedAt', 'lookLocal', 'privacy', 'prqRefusal', 'prqSaved', 'refused', 'saved']);
+    const build = expectLookAndBuildSaved(verifiedAdult(c.dobYear));
     expect(build.create.prq).toBe(Prisma.DbNull);
     expect(db.tables.athleteBuild[0].prq).toBe(Prisma.DbNull);
     expect(callsOn(db, 'guardianConsent')).toEqual([]);
@@ -122,22 +149,50 @@ describe('1g POST /api/v1/creator/athlete — the look and the build save for ev
     const r = await post(BUILD);
     expect(r.status).toBe(200);
     expect(r.json).toMatchObject({ saved: true, prqSaved: false, prqRefusal: PRQ_REFUSAL });
-    const build = expectLookAndBuildSaved();
+    const build = expectLookAndBuildSaved(verifiedAdult(c.dobYear));
     expect('prq' in build.update).toBe(false);
     expect(db.tables.athleteBuild[0].prq).toEqual(OLD_PRQ);
     expect(db.tables.athleteBuild[0].build.attributes).toEqual({ midRange: 70 });
-    expect(db.tables.avatarLook[0].jersey).toEqual({ number: 23, name: 'ACE' });
+    expect(db.tables.avatarLook[0].jersey).toEqual(verifiedAdult(c.dobYear) ? { number: 23, name: 'ACE' } : defaultJersey());
   });
 
   it('18+ OPTED IN (positive control): exactly today\'s upserts, prq included, and no prqSaved / prqRefusal keys', async () => {
     as(OPTED_IN_ADULT, { optedIn: true, existing: true });
     const r = await post(BUILD);
     expect(r.status).toBe(200);
-    expect(Object.keys(r.json).sort()).toEqual(['finalizedAt', 'refused', 'saved']);
-    const build = expectLookAndBuildSaved();
+    expect(Object.keys(r.json).sort()).toEqual(['finalizedAt', 'lookLocal', 'privacy', 'refused', 'saved']);
+    expect(r.json.lookLocal).toBe(false);
+    const build = expectLookAndBuildSaved(true);
     expect(build.update.prq).toEqual(AXES);
     expect(build.create.prq).toEqual(AXES);
     expect(db.tables.athleteBuild[0].prq).toEqual(AXES);
+  });
+
+  it('numbers upload only for a verified adult who opted in; a minor sending the same flags still writes the default face', async () => {
+    as(OPTED_IN_ADULT, { optedIn: true, existing: true });
+    const adult = await post({ ...BUILD, saveLookNumbers: true, modelTraining: true });
+    expect(adult.status).toBe(200);
+    expect(adult.json.privacy).toEqual({ saveLookNumbers: true, modelTraining: true });
+    expect(adult.json.lookLocal).toBe(false);
+    expect(argsOf(db, 'avatarLook.upsert')[0].update.face).toMatchObject({ hairStyle: 'Locs', sliders: { faceLong: 0.4 } });
+    expect(argsOf(db, 'athleteBuild.upsert')[0].update.build.frame).toMatchObject({ stance: 'compact' });
+
+    as(by('15'));
+    const minor = await post({
+      ...BUILD,
+      values: { ...BUILD.values, gear: { ...BUILD.values.gear, paletteJersey: '#FFD700' } },
+      saveLookNumbers: true,
+      modelTraining: true,
+    });
+    expect(minor.status).toBe(200);
+    expect(minor.json.privacy).toEqual({ saveLookNumbers: false, modelTraining: false });
+    expect(minor.json.lookLocal).toBe(true);
+    expect(argsOf(db, 'avatarLook.upsert')[0].update.face).toEqual(defaultFace());
+    expect(argsOf(db, 'avatarLook.upsert')[0].update.equipped).toEqual(defaultEquipped());
+    expect(argsOf(db, 'avatarLook.upsert')[0].update.jersey).toEqual(defaultJersey());
+    expect(argsOf(db, 'athleteBuild.upsert')[0].update.build.animations).toEqual({});
+    expect(argsOf(db, 'athleteBuild.upsert')[0].update.build.frame).toMatchObject({ heightScale: 100, buildScale: 100 });
+    expect(argsOf(db, 'athleteBuild.upsert')[0].update.build.palette.paletteJersey).toBe('#A855F7');
   });
 
   it.each(ALL)('%s: an illegal build is still a 422, and bad JSON a 400, nothing written', async (_id, c) => {

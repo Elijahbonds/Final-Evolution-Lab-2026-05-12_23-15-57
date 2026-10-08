@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  groundContest, aiBlockChance, bumpExposure, aiBumpStrips, jumpSwats, SWAT_JUMP_MAX_SEC, contestedPct, alteredApex, aiHandsUp, facingCos, contestTier, contestTag, aiShotRead, AI_HAND_UP_CHANCE, AI_BLOCK_JUMP_CHANCE, HAND_UP_FACING_COS,
-  HAND_UP_CONTEST, HAND_UP_RANGE, BUMP_STRIP_WINDOW_SEC, BUMP_STRIP_EXPOSURE, AI_BLOCK_RANGE, AI_BLOCK_BASE, CONTEST_PCT_BITE, ALTER_APEX_ADD,
+  groundContest, aiBlockChance, bumpExposure, aiBumpStrips, jumpSwats, SWAT_JUMP_MAX_SEC, contestedPct, fatiguePct, alteredApex, aiHandsUp, facingCos, contestTier, contestTag, aiShotRead, AI_HAND_UP_CHANCE, AI_BLOCK_JUMP_CHANCE, HAND_UP_FACING_COS,
+  HAND_UP_CONTEST, HAND_UP_RANGE, BUMP_STRIP_WINDOW_SEC, BUMP_STRIP_EXPOSURE, AI_BLOCK_RANGE, AI_BLOCK_BASE, CONTEST_PCT_BITE, FATIGUE_PCT_BITE, ALTER_APEX_ADD,
 } from './HoopsDefense';
 import { STEAL_EXPOSURE_MIN, BLOCK_WINDOW_SEC } from './BasketballCore';
 
@@ -18,6 +18,18 @@ describe('D3 — the grounded contest', () => {
     expect(contestedPct(0.8, 0)).toBeCloseTo(0.8, 5);
     expect(contestedPct(0.8, 1)).toBeCloseTo(0.8 * (1 - CONTEST_PCT_BITE), 5);
     expect(alteredApex(0.3)).toBe(0); expect(alteredApex(0.6)).toBe(ALTER_APEX_ADD);
+  });
+  // HOOPS-10PHASE-2 phase 3: the shot outcome model's fatigue term — a gassed shooter costs make chance,
+  // the same way a contest does, just a smaller, separate bite.
+  it('fatiguePct: fresh legs cost nothing, gassed legs cost up to FATIGUE_PCT_BITE, and it never goes negative', () => {
+    expect(fatiguePct(0.8, 0)).toBeCloseTo(0.8, 5);
+    expect(fatiguePct(0.8, 1)).toBeCloseTo(0.8 * (1 - FATIGUE_PCT_BITE), 5);
+    // monotonic: more gassed never helps the shot
+    let last = 1; for (const f of [0, 0.25, 0.5, 0.75, 1]) { const p = fatiguePct(1, f); expect(p).toBeLessThanOrEqual(last + 1e-9); last = p; }
+    // out-of-range fatigue clamps instead of over/under-shooting
+    expect(fatiguePct(0.8, 2)).toBeCloseTo(fatiguePct(0.8, 1), 5);
+    expect(fatiguePct(0.8, -1)).toBeCloseTo(fatiguePct(0.8, 0), 5);
+    expect(fatiguePct(-0.2, 1)).toBe(0);
   });
   it('facingCos: forward toward the point is 1, away is −1 (yaw 0 = +z)', () => {
     expect(facingCos(0, { x: 0, z: 0 }, { x: 0, z: 2 })).toBeCloseTo(1, 5);

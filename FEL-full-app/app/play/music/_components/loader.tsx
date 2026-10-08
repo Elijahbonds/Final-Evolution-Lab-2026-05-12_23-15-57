@@ -1,6 +1,8 @@
 'use client';
 
 import { useCallback } from 'react';
+import { toast } from 'sonner';
+import { publishHref } from '@/lib/create/flow';
 import dynamic from 'next/dynamic';
 import { useSearchParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
@@ -75,6 +77,19 @@ export function MusicLoader({ playerId = null }: { playerId?: string | null } = 
   // the run the shell stakes is exactly the run whose PERFORM set has an end. Without it the set runs until END SET.
   const arenaSet = Boolean(useSearchParams().get('arena'));
 
+  // CREATE HUB (owner 2026-10-06): StudioMode's Creator Card hook (onPublish, "unwired today" since M28). Every song
+  // published to the Academy library is offered as a card: a toast with one button into the same guided setup as
+  // /create. Not a jump: the player stays in the room unless they choose it.
+  const onPublish = useCallback((payload: unknown) => {
+    const rec = payload as { id?: string; title?: string } | null;
+    if (!rec?.id) return;
+    toast('Make it a Creator Card?', {
+      description: 'Set it up in three steps; FEL reviews it, then it can play in the menus and games, credited to you.',
+      action: { label: 'Publish as card', onClick: () => window.location.assign(publishHref('music', { from: 'academy', song: rec.id, title: rec.title })) },
+      duration: 10_000,
+    });
+  }, []);
+
   // MUSIC IS BOTH (owner, 2026-09-16). The Academy mounts through GameShell like every
   // other mode; the STAGE pick on its boot splash decides which half you get. STUDIO
   // reports nothing — a tool has no run to post — and PERFORM ends on a card through
@@ -86,7 +101,7 @@ export function MusicLoader({ playerId = null }: { playerId?: string | null } = 
       venue="The Academy"
       Game={StudioMode}
       ownControls
-      gameProps={{ spendShards, readOwnedKits, arenaSet, playerId }}
+      gameProps={{ spendShards, readOwnedKits, arenaSet, playerId, onPublish }}
     />
   );
 }

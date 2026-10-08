@@ -753,11 +753,12 @@ export function breathAt(pacer: DrillPhase['pacer'] | undefined, sec: number): R
 }
 
 /**
- * The camera-run Wake-Up's page. null today: no page mounts lib/drills DrillRunner (the header's grep), and the drills
- * are movement play's to mount (their P9 /play/drills). Until then Today runs the warm-up as a guided, camera-free run.
- * When a drills page lands it takes the plan's Wake-Up as a Drill (wakeUpDrillFor) and this is set to its address.
+ * The camera-run Wake-Up's page. DRILLS (2026-10-07, Mirror & coaching Phase 6, owner-approved routed change):
+ * /play/drills mounts DrillRunner, and this opens its Wake-Up. That page applies these same gates (lib/drills/access.ts:
+ * youth, pain, the jump gate, the hard stop) to WAKE_UP itself; it does not read this plan's time cuts or a low day's
+ * short launch (wakeUpDrillFor's), so the camera run is the whole Wake-Up less what the gates hold.
  */
-export const WAKE_UP_CAMERA_HREF: string | null = null;
+export const WAKE_UP_CAMERA_HREF: string | null = '/play/drills?drill=wake-up';
 
 /**
  * The plan's Wake-Up as a Drill a DrillRunner can play: WAKE_UP with only the phases the plan kept, in WAKE_UP's order,

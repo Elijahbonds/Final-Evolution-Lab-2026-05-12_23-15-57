@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
 import { signIn, signOut } from 'next-auth/react';
 import { AgeStep, AgeTurnAway, ageBlockPresent } from '@/components/age-step';
 import { Dumbbell, Gamepad2 } from 'lucide-react';
@@ -16,7 +15,13 @@ import { motion } from 'framer-motion';
 import { Loader2, Check } from 'lucide-react';
 import { CURRENT_POLICY_VERSION } from '@/lib/policies';
 import { AUTH_SERVICE_UNAVAILABLE } from '@/lib/auth-errors';
-import { loginDestination } from '@/lib/auth/safeNext';
+import { loginPath, safeLoginNext, safePostSignInDestination } from '@/lib/auth/safeNext';
+import {
+  challengeCodeFromReturnPath,
+  challengeLoginHref,
+  challengeReturnPath,
+  challengeSignupHref,
+} from '@/lib/social/challenge-routes';
 import { toast } from 'sonner';
 
 // M8.6 — landing hook: marquee sports so the pre-auth page actually shows what
@@ -24,7 +29,6 @@ import { toast } from 'sonner';
 
 
 export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
-  const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -36,6 +40,9 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
   // Phase 5 — referral attribution. A ?ref=CODE from a shared link is captured
   // here (and persisted by EmailCapture) so it survives the hop to /signup.
   const [refCode, setRefCode] = useState<string | null>(null);
+  // A /c/<code> challenge, or any other safe ?next=, survives the hop between login and signup.
+  const [challengeCode, setChallengeCode] = useState<string | null>(null);
+  const [returnPath, setReturnPath] = useState<string | null>(null);
   // WHAT THEY CAME FOR, asked before they commit to anything. Some people arrive to play and some arrive to be
   // assessed; sending both to the same shelf loses one of them.
   const [path, setPath] = useState<OnboardingPath>('play');
@@ -55,6 +62,10 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
     } catch { /* a blocked or empty store is not an error here */ }
     try {
       const url = new URL(window.location.href);
+      const directChallenge = url.searchParams.get('c');
+      const nextParam = url.searchParams.get('next');
+      setChallengeCode(directChallenge || challengeCodeFromReturnPath(nextParam));
+      setReturnPath(safeLoginNext(nextParam));
       const fromUrl = url.searchParams.get('ref');
       const stored = localStorage.getItem('fel:ref');
       const code = (fromUrl || stored || '').toUpperCase();
@@ -135,13 +146,25 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
         return;
       }
       // Land them in the thing they said they came for, not on a menu about it.
-      // S-16: a login ?next= that is a same-origin path wins. Absolute and protocol-relative URLs are ignored.
-      const fallback = destinationFor(path, resolveFirstGame({ creatorMode: host?.mode, chosen: firstGame }));
+      // S-16: a ?next= that is a same-origin path wins, on login and on signup. Absolute and
+      // protocol-relative URLs are ignored. A challenge code returns to /c/<code> first.
       let nextRaw: string | null = null;
-      if (mode === 'login') {
-        try { nextRaw = new URL(window.location.href).searchParams.get('next'); } catch { /* keep the fallback */ }
+      try { nextRaw = new URL(window.location.href).searchParams.get('next'); } catch { /* keep the fallback */ }
+      // LOGIN-LOOP-FIX (2026-10-04): every post-sign-in landing below is a FULL navigation
+      // (window.location.replace), never router.replace. Login prefetches the default game's route while still
+      // logged out (ModeCarousel), and the Next.js router cache keeps that prefetch's redirect-to-login response;
+      // a client-side router.replace right after signIn reused that stale cached redirect and bounced straight
+      // back to /login?next=..., which bounced again — the observed loop. A full navigation always re-requests
+      // the destination from the server with the just-set session cookie, so it can never read a cached
+      // logged-out redirect.
+      if (mode === 'signup' && challengeCode) {
+        window.location.replace(challengeReturnPath(challengeCode));
+        return;
       }
-      const dest = mode === 'login' ? loginDestination(nextRaw, fallback) : fallback;
+      const fallback = destinationFor(path, resolveFirstGame({ creatorMode: host?.mode, chosen: firstGame }));
+      // safePostSignInDestination (not loginDestination) also refuses a ?next= that points back at /login itself
+      // (bare, or nested as next=/login?next=/login), so a crafted or re-encoded query cannot recreate the loop.
+      const dest = safePostSignInDestination(nextRaw, fallback);
       if (mode === 'login') {
         try {
           const gate = await fetch('/api/account/birth-year');
@@ -154,13 +177,13 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
               return;
             }
             if (j?.needed) {
-              router.replace(`/age?next=${encodeURIComponent(dest)}`);
+              window.location.replace(`/age?next=${encodeURIComponent(dest)}`);
               return;
             }
           }
         } catch { /* a failed GET falls through to the destination */ }
       }
-      router.replace(dest);
+      window.location.replace(dest);
     } catch {
       toast.error('Something went wrong');
       setLoading(false);
@@ -355,14 +378,14 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
           {mode === 'login' ? (
             <>
               New athlete?{' '}
-              <Link href="/signup" className="font-semibold text-[#00E5FF] hover:underline">
+              <Link href={challengeCode ? challengeSignupHref(challengeCode) : returnPath ? `/signup?next=${encodeURIComponent(returnPath)}` : '/signup'} className="font-semibold text-[#00E5FF] hover:underline">
                 Create account
               </Link>
             </>
           ) : (
             <>
               Already registered?{' '}
-              <Link href="/login" className="font-semibold text-[#00E5FF] hover:underline">
+              <Link href={challengeCode ? challengeLoginHref(challengeCode) : returnPath ? loginPath(returnPath) : '/login'} className="font-semibold text-[#00E5FF] hover:underline">
                 Sign in
               </Link>
             </>

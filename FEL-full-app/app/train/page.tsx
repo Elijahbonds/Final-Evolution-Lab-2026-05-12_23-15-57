@@ -1,11 +1,16 @@
 import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { Activity, BookOpen, ClipboardList, Dumbbell, UtensilsCrossed, Users, ScanLine } from 'lucide-react';
+import { Activity, BookOpen, ClipboardList, Dumbbell, Footprints, UtensilsCrossed, Users, ScanLine, Timer } from 'lucide-react';
 import { authOptions } from '@/lib/auth';
+import { loginPath } from '@/lib/auth/safeNext';
 import { prisma } from '@/lib/db';
+import { isUnlistedPlayHref } from '@/lib/unlisted-modes';
 import { TabPage } from '@/components/shell/tab-page';
 import { DoorsRow } from '@/components/shell/doors-row';
+// MIRROR-PROGRESS (2026-10-07): a coached athlete's door to today's session, first on the page (nothing for anyone else)
+import { TodayCard } from '@/components/coach/today-card';
+import { todayCardFor } from '@/lib/coach/todayCard';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,12 +24,13 @@ export const dynamic = 'force-dynamic';
 export default async function TrainPage() {
   const session = await getServerSession(authOptions);
   const me = (session?.user as { id?: string } | undefined)?.id;
-  if (!me) redirect('/login?next=%2Ftrain');
+  if (!me) redirect(loginPath('/train'));
 
-  const [coachLink, coachesAnyone, programCount] = await Promise.all([
+  const [coachLink, coachesAnyone, programCount, todayCard] = await Promise.all([
     prisma.coachClient.findFirst({ where: { clientId: me, endedAt: null }, select: { coach: { select: { name: true } } } }).catch(() => null),
     prisma.coachClient.findFirst({ where: { coachId: me, endedAt: null }, select: { id: true } }).catch(() => null),
     prisma.coachingProgram.count({ where: { clientId: me } }).catch(() => 0),
+    todayCardFor(prisma, me),
   ]);
 
   const cards = [
@@ -36,6 +42,24 @@ export default async function TrainPage() {
       href: '/play/mirror', icon: ScanLine, accent: '#00FF9D', title: 'The Mirror',
       line: 'A squat coach and a movement screen on your own camera. It cues what it can see, and every number it shows is an estimate.',
       tag: 'Start a screen',
+    },
+    {
+      // MIRROR-FIRST P1 (2026-10-07): the Quick Screen (/screen → /play/mirror/assess, no sign-in) was linked from nowhere
+      // in the app. It goes in at its front door, never a deep link past it: the screen asks its own age question first and,
+      // under 18 or unanswered, the grown-up step (app/play/mirror/assess/_components/gate-steps.tsx), for every visitor —
+      // it does not read the account, so the same card is right for a teen and an adult. Nothing is sent: the screen has
+      // no fetch (assess-app.tsx "KIDS SEND NOTHING"), and results stay in the tab.
+      href: '/screen', icon: Timer, accent: '#00E5FF', title: 'Quick Screen',
+      line: 'A free movement check on this camera: your jump in about a minute, or the full screen in about five. Nothing is sent.',
+      tag: 'Check it',
+    },
+    {
+      // DRILLS (2026-10-07, Mirror & coaching Phase 6): the Playbook's ch. 5 wake-up and ch. 6 jump-and-land drills on the
+      // camera (/play/drills). The page reads the age and today's checks itself and holds back the jumps they say to;
+      // this card reads nothing, so it is the same for every account.
+      href: '/play/drills', icon: Footprints, accent: '#00FF9D', title: 'Drills',
+      line: "The Playbook's wake-up and jump-and-land drills, on your camera. Follow the targets; nothing is sent.",
+      tag: 'Run a drill',
     },
     {
       href: '/training', icon: ClipboardList, accent: '#00E5FF', title: 'Your programming',
@@ -72,6 +96,10 @@ export default async function TrainPage() {
     },
   ];
 
+  // IRON-PARADISE-OUT (2026-10-03): a card whose href opens a parked mode (lib/unlisted-modes.ts — the Iron
+  // Paradise card's '/play/training' today) stays in the array above, unlisted, and comes back with the list entry.
+  const shown = cards.filter((c) => !isUnlistedPlayHref(c.href));
+
   return (
     <TabPage
       eyebrow="Train"
@@ -79,8 +107,9 @@ export default async function TrainPage() {
       lede="Screen it, program it, eat for it. This is the loop the games are the proof of."
       accent="#00FF9D"
     >
+      <TodayCard view={todayCard} />
       <ul className="grid gap-3 sm:grid-cols-2">
-        {cards.map((c, i) => {
+        {shown.map((c, i) => {
           const Icon = c.icon;
           return (
             <li key={c.href} className="fel-rise" style={{ ['--fel-rise-delay' as string]: `${i * 45}ms` }}>

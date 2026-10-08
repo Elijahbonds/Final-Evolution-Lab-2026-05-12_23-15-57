@@ -1,96 +1,55 @@
 'use client';
 
-// Creative Hub — one entry for all five disciplines: primary + up to 2 secondary,
-// sport designation when sport is involved, license gate (also server-enforced).
+// Creative Hub — CREATE HUB (owner, 2026-10-06: "make the app usable like 2K Beats for creators … easier to access and
+// set up"). The /create landing: nine tiles, each saying where the work shows up in the game, then My Creations with
+// each card's review status. A tile opens the guided three-step flow (/create/<discipline>). The primary/secondary
+// picker and the licence tick that lived here moved into the flow's step 2 (one rights tick, the owner's words).
 
-import React, { useState } from 'react';
-import { DISCIPLINE_META, DISCIPLINES as DISCIPLINE_ORDER, type Discipline, type SportDesignation } from '@/lib/creator/creative-card-types';
+import React from 'react';
+import Link from 'next/link';
+import { ALL_GUIDES } from '@/lib/create/disciplines';
+import { useMyCards } from '@/lib/create/use-my-cards';
+import MyCreations from './my-creations';
 
-const DISCIPLINES: { id: Discipline; label: string; blurb: string; color: string }[] = DISCIPLINE_ORDER.map((id) => ({ id, ...DISCIPLINE_META[id] }));
-
-const SPORTS: SportDesignation[] = [
-  'basketball', 'football', 'soccer', 'baseball', 'tennis', 'golf', 'skate', 'snowboard', 'karate',
-];
-
-export default function CreativeHub({ onEnter }: {
-  onEnter: (primary: Discipline, secondary: Discipline[], licensed: boolean, sport?: SportDesignation) => void;
-}) {
-  const [primary, setPrimary] = useState<Discipline | null>(null);
-  const [secondary, setSecondary] = useState<Discipline[]>([]);
-  const [sport, setSport] = useState<SportDesignation>('basketball');
-  const [licensed, setLicensed] = useState(false);
-
-  const needsSport = primary === 'sport' || secondary.includes('sport');
-  const canProceed = primary !== null && licensed && (!needsSport || !!sport);
-
-  const toggleSecondary = (d: Discipline) => {
-    if (d === primary) return;
-    setSecondary((s) => s.includes(d) ? s.filter((x) => x !== d) : s.length < 2 ? [...s, d] : s);
-  };
-
+export default function CreativeHub({ publicCreator }: { publicCreator: boolean }) {
+  const { cards, loading } = useMyCards({ publicCreator });
+  const pending = cards.filter((c) => c.reviewState === 'pending_review').length;
   return (
-    <div className="min-h-screen bg-neutral-950 p-5 text-neutral-100">
-      <h1 className="mb-1 text-3xl font-black">Create a Card</h1>
-      <p className="mb-6 text-sm text-neutral-400">Pick what you make. Everything you build becomes playable.</p>
+    <div className="min-h-screen bg-neutral-950 pb-20 text-neutral-100">
+      <div className="p-5">
+        <h1 className="text-3xl font-black">Create</h1>
+        <p className="mt-1 max-w-2xl text-sm text-neutral-400">
+          Make it, set it up in three steps, see where it lands. FEL reviews every public card first, then plays it in the game, credited to you.
+        </p>
+        {!publicCreator && (
+          <p data-qa="private-note" className="mt-3 max-w-2xl rounded-xl bg-neutral-900 p-3 text-xs text-neutral-300">
+            Everything you make stays private until your account is a confirmed 18+. You can still make it, keep it and use it yourself.
+          </p>
+        )}
+        {pending > 0 && <p className="mt-3 text-xs text-amber-300">{pending} card{pending === 1 ? '' : 's'} in review. You will see the result here.</p>}
+      </div>
 
-      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {DISCIPLINES.map((d) => (
-          <button key={d.id} data-test-ignore="sets-primary-mode" onClick={() => { setPrimary(d.id); setSecondary((s) => s.filter((x) => x !== d.id)); }}
-            className={`rounded-2xl p-4 text-left transition-all ${
-              primary === d.id ? `${d.color} scale-[1.02] text-black` : 'bg-neutral-900 hover:bg-neutral-800'}`}>
-            <div className="text-lg font-bold">{d.label}</div>
-            <div className="text-sm opacity-80">{d.blurb}</div>
-          </button>
+      <div className="grid grid-cols-1 gap-3 px-5 pb-8 sm:grid-cols-2 lg:grid-cols-3" data-qa="discipline-grid">
+        {ALL_GUIDES.map((g, i) => (
+          <Link key={g.id} href={`/create/${g.id}`} data-qa={`tile-${g.id}`}
+            className={`group relative flex flex-col rounded-2xl bg-neutral-900 p-4 transition hover:bg-neutral-800 ${i === 0 ? 'sm:col-span-2 lg:col-span-1' : ''}`}>
+            <span className={`absolute left-0 top-4 h-8 w-1 rounded-r ${g.color}`} aria-hidden />
+            <span className="text-lg font-black">{g.label}</span>
+            <span className="text-sm text-neutral-400">{g.blurb}</span>
+            <span className="mt-3 text-[10px] uppercase tracking-widest text-neutral-500">Shows up in</span>
+            <ul className="mt-1 space-y-0.5 text-xs">
+              {g.showsUp.map((s) => (
+                <li key={s.where} className={s.live ? 'text-neutral-200' : 'text-neutral-500'}>
+                  {s.live ? '●' : '○'} {s.where}{s.live ? '' : ' · soon'}
+                </li>
+              ))}
+            </ul>
+            <span className="mt-auto pt-4 text-sm font-bold text-amber-300 group-hover:underline">Start →</span>
+          </Link>
         ))}
       </div>
 
-      {primary && (
-        <>
-          <div className="mb-5">
-            <div className="mb-2 text-xs uppercase tracking-wide text-neutral-400">Secondary (up to 2)</div>
-            <div className="flex flex-wrap gap-2">
-              {DISCIPLINES.filter((d) => d.id !== primary).map((d) => (
-                <button key={d.id} onClick={() => toggleSecondary(d.id)}
-                  className={`rounded-lg px-3 py-2 text-sm ${
-                    secondary.includes(d.id) ? 'bg-neutral-100 text-black' : 'bg-neutral-800'}`}>
-                  {d.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {needsSport && (
-            <div className="mb-5">
-              <div className="mb-2 text-xs uppercase tracking-wide text-neutral-400">Sport designation</div>
-              <div className="flex flex-wrap gap-2">
-                {SPORTS.map((s) => (
-                  <button key={s} onClick={() => setSport(s)}
-                    className={`rounded-lg px-3 py-2 text-sm capitalize ${
-                      sport === s ? 'bg-orange-500 text-black' : 'bg-neutral-800'}`}>
-                    {s}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <label className="mb-5 flex cursor-pointer items-start gap-3 rounded-xl bg-neutral-900 p-4">
-            <input type="checkbox" checked={licensed} onChange={(e) => setLicensed(e.target.checked)}
-              className="mt-1 h-5 w-5 shrink-0" />
-            <span className="text-sm text-neutral-300">
-              This is my original work. I grant Final Evolution Lab a license to display
-              and use it in-game, and I confirm it contains no third-party music, footage,
-              likenesses, or trademarks I don&apos;t own.
-            </span>
-          </label>
-
-          <button disabled={!canProceed}
-            onClick={() => onEnter(primary, secondary, licensed, needsSport ? sport : undefined)}
-            className="w-full rounded-xl bg-amber-400 py-4 font-bold text-black disabled:cursor-not-allowed disabled:opacity-30">
-            Start Creating
-          </button>
-        </>
-      )}
+      <MyCreations cards={cards} loading={loading} publicCreator={publicCreator} />
     </div>
   );
 }

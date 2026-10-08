@@ -9,13 +9,29 @@ import { mayPersist } from './store';
 const run = (events: PreEvent[], from: PreState = PRE_START): PreState => events.reduce((s, e) => preStep(s, e, new Date('2026-09-29T12:00:00Z')), from);
 
 describe('every age band → the right next step', () => {
-  it('18 or older: age → pain → the camera card → camera; the gate allows keeping the result', () => {
+  it('18 or older: age → pain → the take-off tap → the camera card → camera; the gate allows keeping the result', () => {
     const s = run([{ type: 'start' }, { type: 'age', age: '18+' }]);
     expect(s.step).toBe('pain');
-    const c = run([{ type: 'pain', hurts: false }], s);
+    const t = run([{ type: 'pain', hurts: false }], s);
+    expect(t.step).toBe('takeoff');                                    // SCREEN A: the take-off tap sits between
+    const c = run([{ type: 'takeoff', side: 'left' }], t);
     expect(c.step).toBe('cameraInfo');
     expect(run([{ type: 'cameraOn' }], c).step).toBe('camera');
     expect(mayPersist(c.gate)).toBe(true);
+  });
+
+  it('SCREEN A: pain "no" → takeoff → camera card, for jump and full alike; "Not sure" is an answer (null)', () => {
+    for (const kind of ['jump', 'full'] as const) {
+      const t = run([{ type: 'start', kind }, { type: 'age', age: '18+' }, { type: 'pain', hurts: false }]);
+      expect(t.step, kind).toBe('takeoff');
+      expect(t.kind, kind).toBe(kind);
+      const c = run([{ type: 'takeoff', side: null }], t);             // Not sure
+      expect(c.step, kind).toBe('cameraInfo');
+      expect(run([{ type: 'cameraOn' }], c).step, kind).toBe('camera');
+    }
+    // the take-off tap cannot be reached before the pain answer, and answers nowhere else
+    expect(run([{ type: 'start' }, { type: 'age', age: '18+' }, { type: 'takeoff', side: 'left' }]).step).toBe('pain');
+    expect(run([{ type: 'takeoff', side: 'right' }]).step).toBe('intro');
   });
 
   it('13–17, under 13 and "rather not say" go through the grown-up step first', () => {
@@ -37,7 +53,7 @@ describe('every age band → the right next step', () => {
   });
 });
 
-describe('the age is asked once per tab', () => {
+describe('the age is asked once per run', () => {
   it('a start that carries the tab\'s locked answer skips the question', () => {
     expect(run([{ type: 'start', locked: '18+' }]).step).toBe('pain');
     for (const locked of ['13-17', 'under-13', 'unknown'] as const) expect(run([{ type: 'start', locked }]).step, locked).toBe('grownUp');
@@ -51,25 +67,30 @@ describe('the age is asked once per tab', () => {
 });
 
 describe('nothing skips the grown-up step, and the camera waits for the camera card', () => {
-  it('pain and the camera cannot be reached from the grown-up step', () => {
+  it('pain, the take-off tap and the camera cannot be reached from the grown-up step', () => {
     const c = run([{ type: 'start' }, { type: 'age', age: '13-17' }]);
     expect(preStep(c, { type: 'pain', hurts: false }).step).toBe('grownUp');
+    expect(preStep(c, { type: 'takeoff', side: 'left' }).step).toBe('grownUp');
     expect(preStep(c, { type: 'cameraOn' }).step).toBe('grownUp');
     expect(run([{ type: 'pain', hurts: false }]).step).toBe('intro');   // from the start: nothing
     expect(run([{ type: 'start' }, { type: 'pain', hurts: false }]).step).toBe('age');
   });
 
-  it('S-3: "no" to pain shows the camera card; only its button reaches the camera', () => {
-    const p = run([{ type: 'start' }, { type: 'age', age: '18+' }, { type: 'pain', hurts: false }]);
+  it('S-3: "no" to pain shows the take-off tap, then the camera card; only its button reaches the camera', () => {
+    const t = run([{ type: 'start' }, { type: 'age', age: '18+' }, { type: 'pain', hurts: false }]);
+    expect(t.step).toBe('takeoff');
+    const p = run([{ type: 'takeoff', side: 'right' }], t);
     expect(p.step).toBe('cameraInfo');
     expect(run([{ type: 'cameraOn' }], p).step).toBe('camera');
+    expect(run([{ type: 'cameraOn' }], t).step).toBe('takeoff');        // no card shown yet: the button does nothing
     expect(run([{ type: 'cameraOn' }]).step).toBe('intro');
   });
 
-  it('PAIN: "yes" ends it with no camera and no gate kept', () => {
+  it('PAIN: "yes" ends it with no take-off tap, no camera and no gate kept', () => {
     const yes = run([{ type: 'start' }, { type: 'age', age: '18+' }, { type: 'pain', hurts: true }]);
     expect(yes.step).toBe('painStop');
     expect(yes.gate).toBeNull();
+    expect(preStep(yes, { type: 'takeoff', side: 'left' }).step).toBe('painStop');
     expect(preStep(yes, { type: 'cameraOn' }).step).toBe('painStop');
   });
 
@@ -80,22 +101,43 @@ describe('nothing skips the grown-up step, and the camera waits for the camera c
     // the one call from the steps before the camera
     expect(app).toMatch(/if \(next\.step === 'camera'\) \{ void startCamera\(\); return; \}/);
     const calls = app.match(/startCamera\(/g)!.length;
-    expect(calls).toBe(3);      // the camera step, the lighter-model restart and the camera card's retry: nothing earlier
+    // the camera step, the lighter-model restart, the camera card's retry, and "Do the full screen"
+    // after a jump (the camera was already allowed this run — nothing before the camera card opens one)
+    expect(calls).toBe(4);
     // a new screen wipes the last one before anything else
     expect(app).toMatch(/if \(e\.type === 'start'\) clearScreen\(tabStorage\(\), localForClear\(\)\);/);
-    // the age answer is locked as it is given, and a start reads the lock
+    // AGE-RESET (audit 2.2): a new Start also clears the last person's age answer, so it is asked again
+    expect(app).toMatch(/if \(e\.type === 'start'\) resetAge\(tabStorage\(\)\);/);
+    // the age answer is locked as it is given, and a start reads the lock (now always none, after the reset above)
     expect(app).toMatch(/\{ type: 'age', age: lockAge\(tabStorage\(\), e\.age\) \}/);
-    expect(app).toMatch(/\{ type: 'start', locked: readAge\(tabStorage\(\)\) \}/);
+    expect(app).toMatch(/\{ type: 'start', locked: readAge\(tabStorage\(\)\), kind: e\.kind \}/);
   });
 
   it('restart forgets the steps (the tab\'s age lock lives in its storage, not here)', () => {
     const s = run([{ type: 'start' }, { type: 'age', age: '18+' }, { type: 'restart' }]);
     expect(s).toEqual(PRE_START);
   });
+
+  it('SCREEN A (2 and 3): the page answers a pain prompt only from the Yes/No tap — never from a frame', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const app = readFileSync(join(__dirname, '../../app/play/mirror/assess/_components/assess-app.tsx'), 'utf8');
+    // the runner's answerPain is reached by exactly one page function, wired to the LiveHud's onPain and nothing else
+    expect(app).toMatch(/const answerPain = \(pain: boolean\) => runnerRef\.current\?\.answerPain\(pain, now\(\)\);/);
+    expect(app).toMatch(/onPain=\{answerPain\}/);
+    // and that handler is the page's one caller of the runner's answerPain — nothing else reaches it
+    expect(app.match(/answerPain\(/g)!.length).toBe(1);
+    // the auto-"no" this pins against: a painCheck answered from the frame loop (the silent answer the brief forbids)
+    expect(app).not.toMatch(/step === 'painCheck'[^\n]*answerPain/);
+    expect(app).not.toMatch(/lastPainRef/);
+    // and the runner answers nothing on its own either: autoAdvance is the no-op that replaced the silent defaults
+    const runner = readFileSync(join(__dirname, '../assess/runner.ts'), 'utf8');
+    expect(runner).toMatch(/autoAdvance\(now: number\): void \{\s*\n?\s*this\.now = now;\s*\n?\s*\}/);
+  });
 });
 
 describe('S-2: the back arrow is one step back, inside the flow', () => {
-  const at = (step: PreStep, age: PreState['age'] = '13-17'): PreState => ({ step, age, gate: null });
+  const at = (step: PreStep, age: PreState['age'] = '13-17'): PreState => ({ step, age, gate: null, kind: 'full' });
   it('age → the start; grown-up → the start (the age is locked); pain → the grown-up step, or the start for 18+', () => {
     expect(backStep(at('age', null))).toEqual(PRE_START);
     expect(backStep(at('grownUp'))).toEqual(PRE_START);
@@ -105,17 +147,21 @@ describe('S-2: the back arrow is one step back, inside the flow', () => {
     expect(backStep(at('painStop'))).toEqual(PRE_START);
   });
 
-  it('the camera card → pain (the gate kept); the camera → the camera card; the start stays (the page goes to /screen)', () => {
+  it('the take-off tap → pain; the camera card → the take-off tap; the camera → the camera card; the start stays', () => {
     const p = run([{ type: 'start' }, { type: 'age', age: '18+' }, { type: 'pain', hurts: false }]);
-    const b = preStep(p, { type: 'back' });
+    expect(p.step).toBe('takeoff');
+    const b = preStep(p, { type: 'back' });                              // SCREEN A: back from the take-off tap is pain
     expect(b.step).toBe('pain');
     expect(b.gate).toEqual(p.gate);
-    expect(backStep({ ...p, step: 'camera' }).step).toBe('cameraInfo');
+    const c = preStep(p, { type: 'takeoff', side: 'left' });
+    expect(backStep(c).step).toBe('takeoff');
+    expect(backStep(c).gate).toEqual(p.gate);
+    expect(backStep({ ...c, step: 'camera' }).step).toBe('cameraInfo');
     expect(backStep(PRE_START)).toBe(PRE_START);
   });
 
   it('every step\'s back lands on a step of the flow: never a URL, never out of the screen', () => {
-    const steps: PreStep[] = ['intro', 'age', 'grownUp', 'pain', 'painStop', 'cameraInfo', 'camera'];
-    for (const step of steps) for (const age of [...AGE_BANDS, null]) expect(steps, `${step}/${age}`).toContain(backStep({ step, age, gate: null }).step);
+    const steps: PreStep[] = ['intro', 'age', 'grownUp', 'pain', 'painStop', 'takeoff', 'cameraInfo', 'camera'];
+    for (const step of steps) for (const age of [...AGE_BANDS, null]) expect(steps, `${step}/${age}`).toContain(backStep({ step, age, gate: null, kind: 'full' }).step);
   });
 });

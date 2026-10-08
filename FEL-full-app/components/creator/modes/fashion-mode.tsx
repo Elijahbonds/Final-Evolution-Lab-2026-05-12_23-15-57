@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 export interface FashionPublishPayload { title: string; lookId: string; wearableIds: string[]; palette: string[]; photoUrl?: string }
 const SWATCHES = ['#00E5FF', '#FF2D95', '#FFD700', '#A855F7', '#22C55E', '#F97316', '#0EA5E9', '#F43F5E', '#FFFFFF', '#111111'];
 
-export default function FashionMode({ onPublish }: { onPublish: (p: FashionPublishPayload) => void }) {
+export default function FashionMode({ onPublish, submitLabel = 'Publish look' }: { onPublish: (p: FashionPublishPayload) => void; submitLabel?: string }) {
   const [owned, setOwned] = useState<string[] | null>(null);
   const [picked, setPicked] = useState<string[]>([]); const [palette, setPalette] = useState<string[]>([]); const [title, setTitle] = useState(''); const [photoUrl, setPhotoUrl] = useState('');
   useEffect(() => { fetch('/api/v1/closet').then((r) => (r.ok ? r.json() : null)).then((j) => setOwned(j?.owned ?? [])).catch(() => setOwned([])); }, []);
@@ -22,7 +22,7 @@ export default function FashionMode({ onPublish }: { onPublish: (p: FashionPubli
       <div className="mt-3 text-xs uppercase tracking-wider text-neutral-500">Palette</div>
       <div className="mt-2 flex flex-wrap gap-2">{SWATCHES.map((c) => <button key={c} onClick={() => setPalette((a) => a.includes(c) ? a.filter((x) => x !== c) : a.length >= 6 ? a : [...a, c])} className={`h-8 w-8 rounded-full ring-2 ${palette.includes(c) ? 'ring-white' : 'ring-transparent'}`} style={{ background: c }} aria-label={c} />)}</div>
       <input value={photoUrl} onChange={(e) => setPhotoUrl(e.target.value)} placeholder="Photo link (https://…, optional)" className="mt-3 w-full rounded-lg bg-neutral-900 px-3 py-2 text-sm" />
-      <button disabled={!ready} onClick={() => onPublish({ title, lookId: `look_${Date.now()}`, wearableIds: picked, palette, photoUrl: photoUrl.trim() || undefined })} className="mt-6 rounded-xl bg-pink-500 px-6 py-3 font-bold text-black disabled:opacity-40">Publish look</button>
+      <button disabled={!ready} onClick={() => onPublish({ title, lookId: `look_${Date.now()}`, wearableIds: picked, palette, photoUrl: photoUrl.trim() || undefined })} className="mt-6 rounded-xl bg-pink-500 px-6 py-3 font-bold text-black disabled:opacity-40">{submitLabel}</button>
     </div>
   );
 }

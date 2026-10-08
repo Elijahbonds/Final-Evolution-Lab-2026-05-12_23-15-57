@@ -45,10 +45,12 @@ export async function GET(req: Request): Promise<NextResponse> {
   const room = await getSignalStore().getRoom(code);
   if (!room) return NextResponse.json({ error: 'not found' }, { status: 404 });
 
-  // Never leak the message buffer or host id to a joining phone.
+  // Never leak the message buffer or host id to a joining phone — nor the other phones' ids (MULTIPLAYER, 2026-10-06):
+  // a peer id is the handle a reconnect uses to take back a seat, so anyone holding the code could have taken someone
+  // else's. A count is all a joining phone needs.
   return NextResponse.json({
     code: room.code,
     modeId: room.modeId,
-    peers: room.peers.map((p) => ({ peerId: p.peerId, name: p.name })),
+    players: room.peers.length,
   });
 }

@@ -109,7 +109,7 @@ export const STORY_YARDSTICKS: Readonly<Record<string, StoryYardstick>> = {
     unit: POINTS, verb: 'Score', postsWin: true, winGoal: 'Score on all five drives',
     winEvidence: 'RESULTS-TRUTH WA-8: five touchdown drives end DRIVES_DONE and the host posts won:true',
     ceiling: null, reach: 500,
-    basis: 'FootballRushMode: 5 drives, a touchdown pays 100 + 10 per evade so far (×1.5 in a breakaway) — 500 is the '
+    basis: 'FootballRushMode: 5 drives, a touchdown pays 100 + 10 per evade this drive (×1.5 in a breakaway) — 500 is the '
       + 'least five touchdowns can post. Finishing all five drives posts DRIVES_DONE and won:true (RESULTS-TRUTH WA-8).',
   },
   soccer: {

@@ -73,6 +73,11 @@ export interface AnimTreeInput {
   closeout?: boolean;
   /** Sitting down on him (L2 / an AI on the ball inside two metres) — the hard slide. */
   intense?: boolean;
+  /**
+   * IMPROVE (2026-10-06, 1v1 #9): this frame's dt (s), for the stride-rate smoothing. The filter was stepped with a fixed 1/60, so its
+   * catch-up ran at half speed at 30 fps and double at 120 Hz. Optional: a mode that does not pass it keeps the 1/60 step exactly.
+   */
+  dtSec?: number;
   /** On the floor (a posterized body) — held until the mode lifts it. */
   floored?: boolean;
   celebrating?: boolean;
@@ -259,7 +264,7 @@ export class BasketballAnimTree {
     // frame. Only locomotion states have a rate; a shot or a knockdown returns null and is left alone.
     if (this.strideClip && !this.override && input.speedMps !== undefined) {
       const want = rateFor(c.state, input.speedMps, this.ref);
-      if (want !== null) this.animator.setPlaybackScale(this.strideClip, this.strideFilter.step(want, 1 / 60));
+      if (want !== null) this.animator.setPlaybackScale(this.strideClip, this.strideFilter.step(want, input.dtSec ?? 1 / 60));   // IMPROVE (2026-10-06) #9: the real frame's dt when the mode passes it
     }
     return c.state;
   }
@@ -324,9 +329,25 @@ export class FootPlant {
   // "explosion"). The pin is now the node-space two-bone solver, applied in
   // onAfterAnimationsObservable so the clip's own leg pose is what gets pinned
   // (the harness updates modes BEFORE the clips evaluate).
-  private lock: { foot: 'Left' | 'Right'; pin: Vector3; left: number; obs: Observer<Scene> } | null = null;
+  private lock: { foot: 'Left' | 'Right'; pin: Vector3; left: number; hip: TransformNode; knee: TransformNode; ankle: TransformNode } | null = null;
+  /**
+   * IMPROVE (2026-10-06, 1v1 #17): ONE after-animations observer for the body's life, gated on the lock. Every plant-and-cut added
+   * an observer and every release removed it (a list splice a cut, both bodies). It is added on the FIRST plant — where every
+   * plant's observer used to be added: after everything the mode mounted at load (the posture layer, the carries) — and stays
+   * there; dispose() takes it.
+   */
+  private obs: Observer<Scene> | null = null;
+  private readonly target = new Vector3();
 
   constructor(private skeleton: Skeleton, private mesh: Mesh) {}
+
+  private pinLeg = (): void => {
+    const l = this.lock;
+    if (!l) return;
+    l.ankle.computeWorldMatrix(true);
+    this.target.set(l.pin.x, l.ankle.getAbsolutePosition().y, l.pin.z);   // the clip keeps its height
+    plantLeg(l.hip, l.knee, l.ankle, this.target, this.mesh.forward);
+  };
 
   /** Which foot is planted (the one currently lower/forward) — captured at
    *  plant start so the cut rotates around a fixed contact point. The factory
@@ -345,14 +366,8 @@ export class FootPlant {
     if (!hip || !knee || !ankle) return;
     ankle.computeWorldMatrix(true);
     const pin = ankle.getAbsolutePosition().clone();
-    const scene = this.mesh.getScene();
-    const target = new Vector3();
-    const obs = scene.onAfterAnimationsObservable.add(() => {
-      ankle.computeWorldMatrix(true);
-      target.set(pin.x, ankle.getAbsolutePosition().y, pin.z);   // the clip keeps its height
-      plantLeg(hip, knee, ankle, target, this.mesh.forward);
-    });
-    this.lock = { foot: side, pin, left: PLANT_LOCK_SEC, obs };
+    this.obs ??= this.mesh.getScene().onAfterAnimationsObservable.add(this.pinLeg);   // IMPROVE (2026-10-06) #17: once, then gated on the lock
+    this.lock = { foot: side, pin, left: PLANT_LOCK_SEC, hip, knee, ankle };
     claimLeg(this.skeleton, side, pin);   // HOOPS MOTION phase 3d (S30): the one writer of this leg until release() — FootPlanting stands off
   }
 
@@ -365,13 +380,15 @@ export class FootPlant {
 
   release(): void {
     if (!this.lock) return;
-    this.mesh.getScene().onAfterAnimationsObservable.remove(this.lock.obs);
     releaseLeg(this.skeleton, this.lock.foot);   // S30: FootPlanting takes the foot over from the lock's pin
-    this.lock = null;
+    this.lock = null;   // IMPROVE (2026-10-06) #17: the observer stays, idle until the next plant
   }
 
   get active(): boolean { return this.lock !== null; }
-  dispose(): void { this.release(); }
+  dispose(): void {
+    this.release();
+    if (this.obs) { this.mesh.getScene().onAfterAnimationsObservable.remove(this.obs); this.obs = null; }
+  }
 }
 
 /** DEFENSE-LOOK (2026-09-17): is this body moving AWAY from the man it faces? (planar; a standing body is not retreating) */

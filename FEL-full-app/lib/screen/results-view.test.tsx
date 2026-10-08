@@ -125,7 +125,10 @@ describe('the priorities and the win card (A4-4)', () => {
       expect(card.match(/data-cue/g)).toHaveLength(1);
       expect(card).toContain('data-top-priority');
       expect(card).toMatch(/data-early-tag[^>]*>Early version</);
-      expect(card).toMatch(/data-demo-slot[^>]*>[\s\S]*Demo coming/);
+      // test changed (EDU-LINKS, 2026-10-07): the slot said "Demo coming"; owner decision "drill demos: reuse the 3D
+      // ExerciseDemo" filled it — a tap opens the demo (drill-demo.tsx), so the first paint is the button, not a placeholder
+      expect(card).toMatch(/data-demo-slot[^>]*>[\s\S]*data-demo-watch[^>]*>[\s\S]*Watch the demo/);
+      expect(card).not.toMatch(/Demo coming/);
     }
     expect(h).not.toContain('data-win-card');
   });
@@ -181,6 +184,26 @@ describe('item 4 and L5 (retest 1): 18 or older get EXACTLY ONE next step, the K
       expect(attrs(h, /href="([^"]+)"/g)).toEqual([KINDLE_BOOK_URL, '/screen/privacy']);
       expect(h.match(/data-cta=/g)).toHaveLength(1);
     }
+  });
+
+  it('Train with Elijah is absent until the server passes a verified-adult href, and a kid never sees it', () => {
+    const adult = renderToStaticMarkup(createElement(ResultsView, { summary: FLAGGED, age: '18+', onClear: () => {}, onRunAgain: () => {}, trainWithElijahHref: '/coach/elijah' }));
+    expect(adult).toContain('data-train-with-elijah');
+    expect(adult).toContain('Train with Elijah');
+    const step = adult.slice(adult.indexOf('data-next-step')).split('</div>')[0];
+    expect(step).not.toContain('Train with Elijah');
+    const kid = renderToStaticMarkup(createElement(ResultsView, { summary: FLAGGED, age: '13-17', onClear: () => {}, onRunAgain: () => {}, trainWithElijahHref: '/coach/elijah' }));
+    expect(kid).not.toContain('Train with Elijah');
+  });
+
+  it('Build my Dunk Program appears only when the lane is given a dunk href', () => {
+    const plain = renderToStaticMarkup(createElement(LaneBody, { lane: 'dunking', s: FLAGGED }));
+    expect(plain).not.toContain('Build my Dunk Program');
+    expect(plain).toContain('data-coming-soon');
+    const linked = renderToStaticMarkup(createElement(LaneBody, { lane: 'dunking', s: FLAGGED, dunkHref: '/coach/elijah/programs/dunking' }));
+    expect(linked).toContain('Build my Dunk Program');
+    const other = renderToStaticMarkup(createElement(LaneBody, { lane: 'posture', s: FLAGGED, dunkHref: '/coach/elijah/programs/dunking' }));
+    expect(other).not.toContain('Build my Dunk Program');
   });
 
   it('CHANGED (L5): "Build my Dunk Program" and "Play the Dunk Game, free" are gone (was: exactly two CTAs, program then game)', () => {

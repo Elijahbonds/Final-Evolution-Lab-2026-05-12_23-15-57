@@ -17,7 +17,8 @@
 import { useMemo, useState, useCallback } from 'react';
 import type { AnyRow, SectionTable } from '@/lib/creator/schema/types';
 import { tabsOf, rowsOfTab } from '@/lib/creator/schema/types';
-import { step, canStep, displayValue, rowCeiling, type RowValue, type Axes } from '@/lib/creator/editor/rowState';
+import { step, canStep, displayValue, rowCeiling, commitRated, type RowValue, type Axes } from '@/lib/creator/editor/rowState';
+import { ceilingNote } from '@/lib/creator/schema/ceilings';
 import type { Issue } from '@/lib/creator/schema/resolve';
 
 export interface CreatorEditorProps {
@@ -31,6 +32,10 @@ export interface CreatorEditorProps {
   issues?: Issue[];
   /** The live 3D preview. Passed in rather than built here: §10 says preview binding is a consumer. */
   preview?: React.ReactNode;
+  /** Budget lines, already worded. The screen prints them; it does not know which pool they came from. */
+  meters?: readonly string[];
+  /** A row was focused, so the preview can play whatever that row is showing. */
+  onFocus?: (rowId: string) => void;
   onBack?: () => void;
 }
 
@@ -38,7 +43,7 @@ export interface CreatorEditorProps {
  *  the value's own shape rather than from the row it came from. */
 const isHex = (s: string) => /^#[0-9a-fA-F]{6}$/.test(s);
 
-export default function CreatorEditor({ table, values, onChange, axes, issues = [], preview, onBack }: CreatorEditorProps) {
+export default function CreatorEditor({ table, values, onChange, axes, issues = [], preview, meters = [], onFocus, onBack }: CreatorEditorProps) {
   const tabs = useMemo(() => tabsOf(table), [table]);
   const [tabIdx, setTabIdx] = useState(0);
   const [focusId, setFocusId] = useState<string | null>(null);
@@ -59,6 +64,8 @@ export default function CreatorEditor({ table, values, onChange, axes, issues = 
     for (const i of issues) m.set(i.rowId, [...(m.get(i.rowId) ?? []), i]);
     return m;
   }, [issues]);
+  const rowIds = useMemo(() => new Set(table.rows.map((r) => r.id)), [table]);
+  const loose = issues.filter((i) => !rowIds.has(i.rowId));
 
   const page = useCallback((d: -1 | 1) => {
     setTabIdx((i) => Math.max(0, Math.min(tabs.length - 1, i + d)));
@@ -76,6 +83,9 @@ export default function CreatorEditor({ table, values, onChange, axes, issues = 
       <div>
         <p className="font-mono text-[10px] uppercase tracking-widest text-white/40">/{table.section}</p>
         <h2 className="fel-heading text-2xl font-bold">{table.title}</h2>
+        {meters.length > 0 && (
+          <p className="mt-1 font-mono text-[10px] uppercase tracking-wide text-white/45">{meters.join(' · ')}</p>
+        )}
       </div>
 
       {/* tab strip: bumper paging, dot indicator, filter (§1) */}
@@ -104,6 +114,9 @@ export default function CreatorEditor({ table, values, onChange, axes, issues = 
       <div className="flex min-h-0 flex-1 gap-3">
         {/* the row list — one renderer, three row kinds */}
         <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+          {loose.map((i, n) => (
+            <p key={`loose-${n}`} className={`mb-2 font-mono text-[10px] ${i.kind === 'violation' ? 'text-[var(--fel-red)]' : 'text-[var(--fel-gold)]'}`}>{i.message}</p>
+          ))}
           {rows.length === 0 && <p className="px-2 py-6 font-mono text-xs text-white/40">Nothing matches that filter.</p>}
           {rows.map((row) => {
             const focused = focusId === row.id;
@@ -112,14 +125,16 @@ export default function CreatorEditor({ table, values, onChange, axes, issues = 
             const rowIssues = issueFor.get(row.id) ?? [];
             const bad = rowIssues.some((i) => i.kind === 'violation');
             return (
-              <div key={row.id} onClick={() => setFocusId(row.id)}
+              <div key={row.id} onClick={() => { setFocusId(row.id); onFocus?.(row.id); }}
                 className={`mb-1 rounded-xl px-3 py-2 transition-colors ${
                   focused ? 'bg-white/10 ring-1 ring-[var(--fel-cyan)]/60' : 'bg-white/[0.03]'} ${bad ? 'ring-1 ring-[var(--fel-red)]/70' : ''}`}>
                 <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
                     <p className="truncate font-mono text-[11px] uppercase tracking-wide text-white/70">{row.label}</p>
-                    {cap !== null && cap < 99 && (
-                      <p className="font-mono text-[9px] text-white/35">ceiling {cap}</p>
+                    {row.kind === 'rated' && ceilingNote(row, axes) && (
+                      <p className="font-mono text-[9px] text-[var(--fel-gold)]">
+                        {canStep(row, val, 1, axes) ? ceilingNote(row, axes) : `Locked. ${ceilingNote(row, axes)}`}
+                      </p>
                     )}
                   </div>
                   <div className="flex items-center gap-2">
@@ -152,6 +167,14 @@ export default function CreatorEditor({ table, values, onChange, axes, issues = 
                     {i.message}
                   </p>
                 ))}
+                {focused && row.kind === 'rated' && (
+                  <input type="range" min={row.min} max={cap ?? row.max}
+                    value={Number.isFinite(val as number) ? Math.round(val as number) : (row.defaultValue ?? row.min)}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={(e) => { e.stopPropagation(); onChange(row.id, commitRated(row, Number(e.target.value), axes)); }}
+                    aria-label={row.label}
+                    className="mt-2 w-full accent-[var(--fel-cyan)]" />
+                )}
                 {focused && (
                   <button onClick={(e) => { e.stopPropagation(); setGlossaryFor(row); }}
                     className="mt-1 font-mono text-[10px] text-[var(--fel-cyan)]/70 underline">What does this do?</button>

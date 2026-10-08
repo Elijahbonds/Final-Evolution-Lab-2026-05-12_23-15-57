@@ -5,17 +5,18 @@
 // It replaces a strip of six hardcoded sports on the sign-up form that saved your pick to localStorage and then
 // sent you to the home page and forgot it. You told it what you came for and it shrugged.
 //
-// ABOUT "LIVE PREVIEW". The focused card preloads its mode's route and chunk, so pressing play enters a game that
-// is already fetched rather than starting a download. That is the part that changes how it FEELS. What it is not
-// is a running 3D scene per card: that would mean several Babylon contexts alive at once on a phone, and this
-// codebase has a whole lane of work about exactly that going wrong (loseContextOnDispose, the scene the engine
-// keeps a handle to after dispose). A `clip` field is on the shape so a captured loop can be dropped in per mode
-// the day those exist — scripts/capture-mode-play.mts is the tool that would make them — and the card plays it
-// instead of the still without any other change.
+// ABOUT "LIVE PREVIEW" — REMOVED (LOGIN-LOOP-FIX, 2026-10-04). This card used to call router.prefetch() for the
+// focused/hovered game so pressing play opened a route that was already fetched. ModeCarousel is only ever
+// rendered by AuthForm on /login and /signup — i.e. always while the visitor is signed OUT — and every game route
+// is auth-gated (its page.tsx redirects to /login when there is no session). Prefetching one from here cached
+// that logged-out redirect-to-login response in the Next.js router/segment cache; signing in right after and
+// landing on that same route reused the stale cached redirect instead of the real page, bouncing straight back to
+// /login — the sign-in redirect loop. The fix is simpler than a flag: this component never prefetches an
+// auth-gated route while logged out, full stop. The fetched-chunk feel this bought can come back once there is a
+// signed-in-aware caller to gate it on.
 
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { MODE_INFO } from '@/lib/game-data';
 import { artFor, carouselOrder } from '@/lib/onboarding/firstRun';
@@ -31,24 +32,13 @@ export interface CarouselProps {
 }
 
 export function ModeCarousel({ lead, value, onChange, accent }: CarouselProps) {
-  const router = useRouter();
   const railRef = useRef<HTMLUListElement | null>(null);
   // THE HOST ARRIVES AFTER THE FIRST RENDER. /api/onboarding/host is a fetch, so `lead` is null on mount and
   // becomes the creator's mode a moment later. Freezing the order in useState meant the banner said "you are
   // starting in Venice Lines" while the rail still opened on the default — the page contradicting itself.
   const order = useMemo(() => carouselOrder(lead), [lead]);
-  const prefetched = useRef(new Set<string>());
 
   const accentOf = accent && /^#[0-9A-Fa-f]{6}$/.test(accent) ? accent : '#00E5FF';
-
-  // Preload the focused game. Entry then starts from a cache rather than from the network, which is the whole
-  // difference between "tap and wait" and "tap and you are in".
-  useEffect(() => {
-    const href = MODE_INFO[value]?.href;
-    if (!href || prefetched.current.has(href)) return;
-    prefetched.current.add(href);
-    try { router.prefetch(href); } catch { /* prefetch is an optimisation, never a requirement */ }
-  }, [value, router]);
 
   const scrollToIndex = useCallback((i: number) => {
     const rail = railRef.current;
@@ -110,7 +100,6 @@ export function ModeCarousel({ lead, value, onChange, accent }: CarouselProps) {
               <button
                 type="button"
                 onClick={() => onChange(key)}
-                onMouseEnter={() => { const h = info.href; if (h && !prefetched.current.has(h)) { prefetched.current.add(h); try { router.prefetch(h); } catch { /* optional */ } } }}
                 aria-pressed={on}
                 className="group relative block h-[180px] w-[148px] overflow-hidden rounded-2xl border text-left
                            transition-all duration-300 sm:h-[200px] sm:w-[168px]"

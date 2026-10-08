@@ -10,6 +10,13 @@
 //
 // The owner stands about 3 m from the screen, so everything they need mid-take (the prompt, the 3-2-1, GO) is drawn
 // big on the video, with a beep on each count, and "Record all remaining" runs the takes back to back.
+//
+// MIRROR PHASE 3 (2026-10-07): a second set, "Mirror capture" (?set=capture), for the owner-led capture of the Mirror's
+// and the Quick Screen's movements on two phones: the protocol's labelled takes (lib/pose/captureProtocol.ts), the
+// person as an alias and the phone by name, two statements ticked before it will save (everyone is an adult; they read
+// the consent and said yes), the phone's own camera request (lib/pose/modelChoice.ts, as the Quick Screen asks), and
+// 60 fps asked for on the jump takes so the file logs what the phone really holds. Still numbers only, still nothing
+// sent: docs/MIRROR-CAPTURE-PROTOCOL.md.
 
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -23,9 +30,11 @@ import {
   type PoseFrame,
 } from '@/lib/pose/landmarks';
 import {
-  BYTES_PER_FRAME, COUNTDOWN_MS, TAKES, buildTakesFile, measureFps, shortUserAgent, takesFileName, toRecordedFrame,
-  type FrameClock, type RecordedTake, type TakeSpec,
+  BYTES_PER_FRAME, CAPTURE_TAKE_SPECS, COUNTDOWN_MS, TAKES, buildTakesFile, captureDownloadName, captureMetaOf, measureFps, nextRun,
+  shortUserAgent, takesFileName, toRecordedFrame, type CaptureChoice, type FrameClock, type RecordedTake, type TakeSpec,
 } from './recording';
+import { CAPTURE_DEVICES, PERSON_ALIASES } from '@/lib/pose/captureProtocol';
+import { CAMERA_FPS, HIGH_RATE_FPS, cameraConstraints, deviceClass } from '@/lib/pose/modelChoice';
 
 const CYAN = '#00E5FF';
 const GOLD = '#FFD700';
@@ -107,7 +116,27 @@ export default function PoseRecorder() {
   const [notes, setNotes] = useState('');
   const [unsaved, setUnsaved] = useState(false);
   const [device] = useState(() => shortUserAgent(navigator.userAgent));
+  // the take set: the movement-play takes, or the Mirror capture (?set=capture)
+  const [set, setSet] = useState<'play' | 'capture'>(() => (new URLSearchParams(window.location.search).get('set') === 'capture' ? 'capture' : 'play'));
+  const [choice, setChoice] = useState<CaptureChoice>({ person: '', device: '', adult: false, consent: false });
+  const specs: TakeSpec[] = set === 'capture' ? CAPTURE_TAKE_SPECS : TAKES;
+  const specsRef = useRef(specs);
+  specsRef.current = specs;
+  const setRef = useRef(set);
+  setRef.current = set;
   leadInRef.current = leadIn;
+
+  /** The camera request this session opened with (the capture set re-asks it with a new frame rate). */
+  const videoAskRef = useRef<MediaTrackConstraints | null>(null);
+  /**
+   * The capture set's jump takes ask the camera for 60 fps, everything else for 30, keeping the opening request's size
+   * (applyConstraints replaces the whole set). Never fails a take. The movement-play set never re-asks.
+   */
+  const askRate = (fps: number) => {
+    if (setRef.current !== 'capture' || !videoAskRef.current) return;
+    const track = streamRef.current?.getVideoTracks()[0];
+    try { void track?.applyConstraints?.({ ...videoAskRef.current, frameRate: { ideal: fps } })?.catch(() => { /* keeps its rate; the take logs it */ }); } catch { /* same */ }
+  };
 
   // ── sound: a beep per count, so the owner does not have to read the screen mid-move ──
   const ensureAudio = () => {
@@ -169,10 +198,13 @@ export default function PoseRecorder() {
     setCam('camera');
     let stream: MediaStream;
     try {
-      stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } },
-        audio: false,
-      });
+      // the capture set asks for what the app asks for on this device (a phone: 4:3 VGA at 30), so the landmarks are
+      // the ones the graders will really get; the movement-play set keeps its 720p
+      const video: MediaTrackConstraints = setRef.current === 'capture'
+        ? cameraConstraints(deviceClass({ userAgent: navigator.userAgent, maxTouchPoints: navigator.maxTouchPoints }), window.matchMedia?.('(orientation: portrait)').matches ?? false)
+        : { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } };
+      videoAskRef.current = video;
+      stream = await navigator.mediaDevices.getUserMedia({ video, audio: false });
     } catch (e) {
       if (!aliveRef.current) return;
       setErr(e instanceof DOMException && e.name === 'NotAllowedError'
@@ -216,8 +248,9 @@ export default function PoseRecorder() {
 
   // ── takes ──
   const beginTake = (id: string, next = false) => {
-    const spec = TAKES.find((s) => s.id === id);
+    const spec = specsRef.current.find((s) => s.id === id);
     if (!spec || !adapterRef.current) return;
+    askRate(spec.highRate ? HIGH_RATE_FPS : CAMERA_FPS);
     const now = performance.now();
     // Back-to-back takes still get a few seconds to read the next prompt and reset.
     const lead = Math.max(next ? 4 : 0, leadInRef.current) * 1000;
@@ -244,8 +277,9 @@ export default function PoseRecorder() {
       clock: run.clock ?? lastClockRef.current ?? 'now',
       detectFps: measureFps(frames),
       inferMs: Math.round((run.inferSum / Math.max(1, run.inferN)) * 10) / 10,
-      goT: COUNTDOWN_MS, endT: Math.round(endT * 10) / 10, frames,
+      goT: COUNTDOWN_MS, endT: Math.round(endT * 10) / 10, ...(run.spec.highRate ? { highRate: true } : {}), frames,
     };
+    if (run.spec.highRate) askRate(CAMERA_FPS);
     setTakes((prev) => ({ ...prev, [take.id]: take }));
     setUnsaved(true);
     beep(330, 250);
@@ -281,7 +315,8 @@ export default function PoseRecorder() {
   const recordOne = (id: string) => { ensureAudio(); queueRef.current = []; beginTake(id); };
   const recordRemaining = () => {
     ensureAudio();
-    const ids = TAKES.filter((s) => !takes[s.id]).map((s) => s.id);
+    // stops where the phones have to move (the push-ups are filmed from the floor)
+    const ids = nextRun(specsRef.current, (id) => !!takes[id]);
     if (!ids.length) return;
     queueRef.current = ids.slice(1);
     beginTake(ids[0]);
@@ -294,17 +329,22 @@ export default function PoseRecorder() {
     if (performance.now() < run.goAt) { runRef.current = null; setRunView(null); return; }
     finishRun(Math.min(performance.now(), run.endAt));   // inside the grace, the take already ended
   };
-  const cancelTake = () => { queueRef.current = []; runRef.current = null; setRunView(null); };
+  const cancelTake = () => {
+    if (runRef.current?.spec.highRate) askRate(CAMERA_FPS);
+    queueRef.current = []; runRef.current = null; setRunView(null);
+  };
   const cancelRef = useRef(cancelTake);
   cancelRef.current = cancelTake;
 
   // ── the one download: every take in one .json, handed to the browser. Nothing is sent anywhere. ──
+  const captureMeta = set === 'capture' ? captureMetaOf(choice) : null;
   const download = () => {
     const now = new Date();
-    const file = buildTakesFile(takes, { device, model: POSE_MODEL_NAME, notes, savedAt: now });
+    if (set === 'capture' && !captureMeta) return;   // no alias, no phone, or a statement not ticked: nothing is saved
+    const file = buildTakesFile(takes, { device, model: POSE_MODEL_NAME, notes, savedAt: now, capture: captureMeta });
     const url = URL.createObjectURL(new Blob([JSON.stringify(file)], { type: 'application/json' }));
     const a = document.createElement('a');
-    a.href = url; a.download = takesFileName(now);
+    a.href = url; a.download = captureMeta ? captureDownloadName(captureMeta, now) : takesFileName(now);
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 10_000);
     setUnsaved(false);
@@ -358,7 +398,7 @@ export default function PoseRecorder() {
   }, [unsaved, takeCount]);
 
   const totalFrames = Object.values(takes).reduce((n, t) => n + t.frames.length, 0);
-  const remaining = TAKES.filter((s) => !takes[s.id]).length;
+  const remaining = specs.filter((s) => !takes[s.id]).length;
   const busy = !!runView;
   const video = videoRef.current;
 
@@ -472,8 +512,52 @@ export default function PoseRecorder() {
         </div>
 
         <aside className="flex flex-col gap-3">
+          <label className="flex flex-col gap-1 text-white/60">
+            Take set
+            <select
+              value={set} disabled={takeCount > 0 || busy}
+              onChange={(e) => setSet(e.target.value === 'capture' ? 'capture' : 'play')}
+              className="rounded border border-white/20 bg-black px-2 py-1.5 text-white disabled:opacity-50"
+            >
+              <option value="play">Movement play (the owner&apos;s detector takes)</option>
+              <option value="capture">Mirror capture (owner + 2 adults, 2 phones)</option>
+            </select>
+            {takeCount > 0 && <span className="text-white/40">Download (or reload) to switch sets.</span>}
+          </label>
+
+          {set === 'capture' && (
+            <section className="flex flex-col gap-2 rounded-lg border border-[#FFD700]/30 bg-[#FFD700]/5 p-3 text-white/80">
+              <b className="text-[#FFD700]">Mirror capture: adults only, an alias, never a name.</b>
+              <div className="flex gap-2">
+                <label className="flex flex-1 flex-col gap-1">
+                  Person
+                  <select value={choice.person} onChange={(e) => setChoice({ ...choice, person: e.target.value })} className="rounded border border-white/20 bg-black px-2 py-1.5 text-white">
+                    <option value="">choose…</option>
+                    {PERSON_ALIASES.map((p) => <option key={p} value={p}>{p === 'P1' ? 'P1 (the owner)' : p}</option>)}
+                  </select>
+                </label>
+                <label className="flex flex-1 flex-col gap-1">
+                  Phone
+                  <select value={choice.device} onChange={(e) => setChoice({ ...choice, device: e.target.value })} className="rounded border border-white/20 bg-black px-2 py-1.5 text-white">
+                    <option value="">choose…</option>
+                    {CAPTURE_DEVICES.map((d) => <option key={d} value={d}>{d === 'android-mid' ? 'Mid-range Android' : 'iPhone'}</option>)}
+                  </select>
+                </label>
+              </div>
+              <label className="flex items-start gap-2">
+                <input type="checkbox" checked={choice.adult} onChange={(e) => setChoice({ ...choice, adult: e.target.checked })} />
+                <span>Everyone in this capture is 18 or over. No child is in the room&apos;s shot.</span>
+              </label>
+              <label className="flex items-start gap-2">
+                <input type="checkbox" checked={choice.consent} onChange={(e) => setChoice({ ...choice, consent: e.target.checked })} />
+                <span>They read the consent wording (docs/MIRROR-CAPTURE-PROTOCOL.md) and said yes. They can stop at any time.</span>
+              </label>
+              <span className="text-white/50">Jump takes ask the camera for 60 fps; each take logs the rate this phone really held.</span>
+            </section>
+          )}
+
           <ol className="flex flex-col gap-1">
-            {TAKES.map((s, i) => {
+            {specs.map((s, i) => {
               const t = takes[s.id];
               const bodyPct = t && t.frames.length ? Math.round((100 * t.frames.filter((f) => f.present).length) / t.frames.length) : 0;
               const active = runView?.spec.id === s.id;
@@ -501,22 +585,26 @@ export default function PoseRecorder() {
             })}
           </ol>
 
-          <label className="flex flex-col gap-1 text-white/60">
+          {set !== 'capture' && <label className="flex flex-col gap-1 text-white/60">
             Notes (saved in the file)
             <input
               value={notes} onChange={(e) => setNotes(e.target.value)}
               placeholder="e.g. orthodox, dunks right-handed, laptop on the TV stand 3 m away"
               className="rounded border border-white/20 bg-black px-2 py-1.5 text-white"
             />
-          </label>
+          </label>}
           <button
-            onClick={download} disabled={!takeCount || busy}
+            onClick={download} disabled={!takeCount || busy || (set === 'capture' && !captureMeta)}
             className="rounded-lg bg-[#00FF9D] px-3 py-3 text-sm font-bold text-black disabled:opacity-30"
           >
             Download all takes (.json): {takeCount} take{takeCount === 1 ? '' : 's'}, ~{((totalFrames * BYTES_PER_FRAME) / 1e6).toFixed(1)} MB
           </button>
           <p className="leading-relaxed text-white/40">
-            The browser saves it on this Mac (usually ~/Downloads). {unsaved && takeCount ? 'Not downloaded since the last take.' : ''}
+            {set === 'capture'
+              ? 'The phone saves it in its Downloads (Files › Downloads on an iPhone). Send it to the owner by cable, AirDrop or Nearby Share: never a chat app or email. '
+              : 'The browser saves it on this Mac (usually ~/Downloads). '}
+            {set === 'capture' && !captureMeta ? 'Choose the person and the phone and tick both statements to save. ' : ''}
+            {unsaved && takeCount ? 'Not downloaded since the last take.' : ''}
           </p>
         </aside>
       </div>

@@ -19,7 +19,7 @@ export interface DancePublishPayload {
 
 const MIN_STEPS = 3; // acceptance: a routine is >= 3 clips incl one mirrored // TUNE(elijah)
 
-export default function DanceMode({ onPublish }: { onPublish: (p: DancePublishPayload) => void }) {
+export default function DanceMode({ onPublish, submitLabel = 'Publish Routine' }: { onPublish: (p: DancePublishPayload) => void; submitLabel?: string }) {
   const [bpm, setBpm] = useState(96); // TUNE(elijah)
   const [seq, setSeq] = useState<DanceStep[]>([]);
 
@@ -97,7 +97,7 @@ export default function DanceMode({ onPublish }: { onPublish: (p: DancePublishPa
       )}
       <button onClick={publish} disabled={!canPublish}
         className="rounded-xl bg-fuchsia-500 px-6 py-3 font-bold text-black transition disabled:cursor-not-allowed disabled:opacity-40">
-        Publish Routine
+        {submitLabel}
       </button>
     </div>
   );

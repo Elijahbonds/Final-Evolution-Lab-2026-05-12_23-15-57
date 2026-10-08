@@ -37,7 +37,7 @@ const src = (rel: string) => readFileSync(new URL(`../${rel}`, import.meta.url),
     for (let seed = 1; seed <= 40; seed++) {
       const run = scriptedCueRun(seed, error);
       if (!run.over || (run.myPts < 7 && run.aiPts < 7)) open++;
-      if (run.myPts === 7 && run.myPts > run.aiPts) wins++;
+      if (run.myPts >= 7 && run.myPts > run.aiPts) wins++;   // IMPROVE (2026-10-06) #10: win by two — 8-6 is a win
       if (run.myPts === 7 && run.aiPts === 0) sweep++;
       if (run.myPts === 0 || run.aiPts === 0) blank++;
       if (!Number.isFinite(postedScore(run.myPts, run.bestRally))) unposted++;
@@ -50,7 +50,8 @@ const src = (rel: string) => readFileSync(new URL(`../${rel}`, import.meta.url),
   ok(h90.open === 0 && h90.unposted === 0, 'tiebreak: every ±90ms run ends and posts');
   ok(h60.sweep === 0 && h90.sweep === 0 && h60.blank === 0 && h90.blank === 0, 'tiebreak: neither timing error goes 7-0');
   ok(h60.wins >= 20 && h60.wins <= 28, `tiebreak: ±60ms wins ${h60.wins}/40 (band 20–28)`);
-  ok(h90.wins >= 6 && h90.wins <= 14, `tiebreak: ±90ms wins ${h90.wins}/40 (band 6–14)`);
+  // IMPROVE (2026-10-06) #10: win by two separates the sides at 6-6 (1000 seeds: ±90ms 8.0 → 5.0 /40) — the floor moves 6 → 3
+  ok(h90.wins >= 3 && h90.wins <= 14, `tiebreak: ±90ms wins ${h90.wins}/40 (band 3–14)`);
   let perfectOpen = 0;
   let perfectLoss = 0;
   for (let seed = 1; seed <= 40; seed++) {
@@ -68,6 +69,11 @@ const src = (rel: string) => readFileSync(new URL(`../${rel}`, import.meta.url),
   ok(host.includes('score: myPts,'), 'tiebreak host: posts the game score (WA-22)');
   ok(host.includes('Math.random() < 0.16 + rally * 0.05'), 'tiebreak host: AI net rate');
   ok(/useStartWake\(!started/.test(host), 'tiebreak host: start card');
+  const loader = src('app/play/tiebreak/_components/loader.tsx');
+  ok(loader.includes('ownControls'), 'tiebreak loader: shell does not draw a second control deck');
+  const registry = src('lib/babylon/modes/registry.ts');
+  ok(registry.includes('tiebreak: TiebreakMode'), 'tiebreak: registered in the Babylon roster');
+  ok(registry.includes("'tiebreak'"), 'tiebreak: enabled in the Babylon roster');
   const mode = src('lib/babylon/modes/TiebreakMode.ts');
   ok(mode.includes("mountVenue(ctx, 'tennis'"), 'tiebreak: mounts the tennis venue');
   ok(mode.includes('MeshBuilder.CreateSphere'), 'tiebreak: the ball is a mesh');
@@ -94,6 +100,7 @@ const src = (rel: string) => readFileSync(new URL(`../${rel}`, import.meta.url),
   const host = src('components/games/who-scene-it-babylon.tsx');
   ok(!host.includes('h-[calc(100dvh-3.25rem)]'), 'who-scene-it host: canvas is not the old viewport height');
   ok(host.includes('whoSceneItStageBox'), 'who-scene-it host: uses the frame box');
+  ok(host.includes("phase === 'error'") && host.includes('RETRY') && host.includes('onClick={tapStart}'), 'who-scene-it host: error overlay gives touch/mouse players a retry');
   const mode = src('lib/babylon/modes/WhoSceneItMode.ts');
   ok(mode.includes('shelf.preload'), 'who-scene-it: preloads venues');
   ok(mode.includes('shelf.show'), 'who-scene-it: shows a cached venue');

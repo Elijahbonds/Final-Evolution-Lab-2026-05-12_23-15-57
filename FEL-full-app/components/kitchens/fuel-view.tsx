@@ -14,6 +14,9 @@ import { LEAK_ONE_LINER } from '@/lib/kitchens/mealRxBuilder';
 import { clearMetrics, loadMetrics, saveMetrics } from '@/lib/kitchens/metrics';
 import { availablePaths } from '@/lib/kitchens/fulfillment';
 import type { FulfillmentPath, MealRx } from '@/lib/kitchens/types';
+import { KITCHEN_RECIPES } from '@/lib/kitchens/recipes.seed';
+import { ALLERGEN_NOTE, loadAllergies, saveAllergies, type Allergen } from '@/lib/kitchens/allergens';
+import { AllergenChips, AllergyPicker } from './allergy-picker';
 import { GroceryList } from './grocery-list';
 import { YourBuildPanel } from './your-build-panel';
 
@@ -30,8 +33,10 @@ export function FuelView() {
   const [error, setError] = useState('');
   const [instacart, setInstacart] = useState<{ available: boolean; url?: string; note?: string }>({ available: false });
   const [metrics, setMetrics] = useState<MovementMetrics>(() => defaultMetrics());
+  // owner-approved 2026-10-06: the allergy pick (this device only) — flagged recipes stay out of the plan
+  const [avoid, setAvoid] = useState<Allergen[]>([]);
 
-  const rebuild = async (m: MovementMetrics = metrics) => {
+  const rebuild = async (m: MovementMetrics = metrics, a: readonly Allergen[] = avoid) => {
     setError('');
     try {
       const r = await fetch('/api/profile', { cache: 'no-store' });
@@ -41,7 +46,7 @@ export function FuelView() {
       // The Build store is read-only upstream; the snapshot is built from the profile's PRQ and the movement screen the
       // athlete entered (Your Build) until a Mirror scan lands. Keyed by today's date, so a rebuild in the same day is
       // idempotent — and an unchanged plan keeps its id, so the basket ticks stay.
-      setRx(KitchenStore.ingest(snapshotFromTree({ prq0to100: score, metrics: m })));
+      setRx(KitchenStore.ingest(snapshotFromTree({ prq0to100: score, metrics: m }), { avoid: a }));
     } catch { setError('Could not read your Build right now.'); }
   };
 
@@ -50,7 +55,14 @@ export function FuelView() {
     setMetrics(m);
     saveMetrics(m);
     if (prq == null) { void rebuild(m); return; }
-    setRx(KitchenStore.ingest(snapshotFromTree({ prq0to100: prq, metrics: m })));
+    setRx(KitchenStore.ingest(snapshotFromTree({ prq0to100: prq, metrics: m }), { avoid }));
+  };
+  /** The allergy pick changed: remember it on this device and rebuild without the flagged recipes. */
+  const applyAllergies = (a: Allergen[]) => {
+    setAvoid(a);
+    saveAllergies(a);
+    if (prq == null) { void rebuild(metrics, a); return; }
+    setRx(KitchenStore.ingest(snapshotFromTree({ prq0to100: prq, metrics }), { avoid: a }));
   };
   const resetMetrics = () => { clearMetrics(); applyMetrics(defaultMetrics()); };
 
@@ -60,7 +72,9 @@ export function FuelView() {
     if (s.current) setRx(s.current); // paint the last plan at once; the rebuild below keeps its id when nothing changed
     const m = loadMetrics();
     setMetrics(m);
-    void rebuild(m);
+    const a = loadAllergies();
+    setAvoid(a);
+    void rebuild(m, a);
     void fetch('/api/kitchens/instacart-list', { cache: 'no-store' }).then((r) => r.json()).then((j: { available?: boolean }) => setInstacart({ available: Boolean(j.available) })).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -97,6 +111,8 @@ export function FuelView() {
 
       <YourBuildPanel metrics={metrics} prq0to100={prq} onChange={applyMetrics} onReset={resetMetrics} />
 
+      <AllergyPicker avoid={avoid} onChange={applyAllergies} />
+
       {rx && (
         <>
           <section className="fel-panel mt-4 rounded-2xl p-4">
@@ -123,9 +139,12 @@ export function FuelView() {
                   </div>
                   <p className="mt-1 text-sm font-bold text-white">{s.title}</p>
                   <p className="mt-1 font-mono text-[11px] tabular-nums text-white/60">{s.macros.kcal} kcal · P {s.macros.proteinG} · C {s.macros.carbG} · F {s.macros.fatG}</p>
+                  {/* allergens: the slot's own, or (a plan stored before they existed) the catalogue's; a hit is badged */}
+                  <AllergenChips allergens={s.allergens ?? KITCHEN_RECIPES.find((r) => r.id === s.recipeId)?.allergens ?? []} avoid={avoid} />
                 </li>
               ))}
             </ul>
+            <p className="mt-2 px-1 text-[11px] leading-snug text-white/45">{ALLERGEN_NOTE}</p>
           </section>
 
           <div className="mt-4">

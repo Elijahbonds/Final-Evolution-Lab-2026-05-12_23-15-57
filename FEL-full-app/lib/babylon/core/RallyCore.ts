@@ -19,15 +19,19 @@ export type SwingQuality = 'perfect' | 'good' | 'early' | 'late' | 'miss';
 export const SWING_BANDS = { perfect: 0.09, good: 0.20, ok: 0.34 } as const;
 /**
  * A STUFF block needs a tighter read than a perfect swing — a third of the
- * window.
+ * window (a little over half of it since 2026-10-06; see below).
  *
  * Without this the block strictly dominates the dig: a player who can time a
  * swing can time a block, so blocking every incoming attack beat digging 9-1
  * against 3-0 and there was never a reason to dig. A choice where one option is
  * better in every case is not a choice. The block is meant to be the read you
  * can be punished for, so it asks for more than the shot it answers.
+ *
+ * IMPROVE (2026-10-06), TUNED 0.03 → 0.05: ±30 ms was about two frames at 60 fps — near-impossible on a touch
+ * screen. ±50 ms is still well inside the perfect swing band (±90 ms), and the block keeps its other costs (the 7 s
+ * cooldown, a spent contact on a miss, the point on a net touch), so it stays the read you can be punished for.
  */
-export const BLOCK_STUFF_WINDOW = 0.03;
+export const BLOCK_STUFF_WINDOW = 0.05;
 
 /**
  * Grade a swing. `dt` is (swingTime − idealContactTime): negative is early.

@@ -4,8 +4,8 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import {
-  skateHudWords, kartHudWords, setRingGlyph, RideHudSwitch, RING_GLYPH_MESH, PAD_BOOST_HINT,
-  SKATE_PAD_HINT, KART_PAD_HINT, KART_PAD_START_HINT, type GlyphMesh,
+  skateHudWords, kartHudWords, aeroHudWords, setRingGlyph, RideHudSwitch, RING_GLYPH_MESH, PAD_BOOST_HINT,
+  SKATE_PAD_HINT, KART_PAD_HINT, KART_PAD_START_HINT, AERO_PAD_HINT, AERO_PAD_START_HINT, type GlyphMesh,
 } from './rideHud';
 
 /** Words that only mean something on a pad or a keyboard, said as an instruction. */
@@ -35,7 +35,11 @@ describe('GC-13: a pad, the keys and touch keep exactly what they had', () => {
   it('skate says the words SkateRunMode said at the parent, and the gauge its own default', () => {
     expect(skateHudWords(false)).toEqual({ hint: 'HOLD FORWARD to push · POP to ollie · B to MANUAL · GRIND the rails · hold RB / Shift to BOOST', boostHint: 'HOLD RB · SHIFT' });
     const gauge = readFileSync(path.join(__dirname, '../../../components/games/boost-hud.tsx'), 'utf8');
-    expect(gauge).toContain(`: '${PAD_BOOST_HINT}'}`);   // boost-hud's default line when no mode sets one
+    // test changed (controls-screen-2, owner 2026-10-06: "the meter itself stays … with no instruction text"): the gauge
+    // drew PAD_BOOST_HINT as its default caption; it now draws no caption at all, and the pad's words are the CONTROLS
+    // panel's BOOST row (cardSlot buttonMap), the body's its BOOST line (panelLines BODY_BOOST_LINE)
+    expect(gauge).not.toContain(`'${PAD_BOOST_HINT}'`);
+    expect(gauge).not.toMatch(/hud\.boostHint/);
   });
   it('the kart\'s pad words are the ones VelocityKartMode said at the parent (26bec0cc), before and after GO', () => {
     expect(KART_PAD_HINT).toBe('RT throttle · X drift to fill BOOST · hold RB / Shift to burn it · A fires your item');
@@ -80,6 +84,40 @@ describe('GC-13: the ring\'s glyph puck', () => {
   it('the ring\'s puck is the mesh the harness mounts under that name (visual/PlayerRing)', () => {
     const ring = readFileSync(path.join(__dirname, '../visual/PlayerRing.ts'), 'utf8');
     expect(ring).toContain(`MeshBuilder.CreatePlane('${RING_GLYPH_MESH}'`);
+  });
+});
+
+describe('GC-13: a body FLYING is told a body\'s words (10-phase pass, phase 10)', () => {
+  it('aero: spread arms GAS, bank STEER, raise / lower CLIMB and DIVE; the boost, the fire and the stunts labelled pad / touch', () => {
+    for (const started of [true, false]) {
+      const w = aeroHudWords(true, started);
+      for (const pad of PAD_ONLY) { expect(w.hint).not.toMatch(pad); expect(w.boostHint).not.toMatch(pad); }
+      expect(w.boostHint).toMatch(/PAD \/ TOUCH/);
+    }
+    const race = aeroHudWords(true, true).hint;
+    for (const verb of [/Spread your arms for GAS/, /bank to STEER/, /raise or lower them to CLIMB and DIVE/, /BOOST \(RB\), FIRE \(A\) and STUNTS \(B \/ Y\) on pad \/ touch/]) expect(race).toMatch(verb);
+    expect(aeroHudWords(true, false).hint).toMatch(/ARMS SPREAD ON "2"/);
+  });
+  it('a pad keeps exactly the words AeroAcesMode said, before and after GO', () => {
+    expect(AERO_PAD_HINT).toBe('RT gas · LT brake · A fire · B: roll, back=loop, fwd=split-s · Y: loop, +stick=knife edge · RB boost');
+    expect(AERO_PAD_START_HINT).toBe('GAS DOWN ON "2" AND HOLD IT FOR A ROCKET START — ON "3" THE ENGINE BOGS');
+    expect(aeroHudWords(false, true)).toEqual({ hint: AERO_PAD_HINT, boostHint: PAD_BOOST_HINT });
+    expect(aeroHudWords(false, false)).toEqual({ hint: AERO_PAD_START_HINT, boostHint: PAD_BOOST_HINT });
+  });
+});
+
+describe('GC-13 wiring: both race modes say the words of whoever rides (source scan)', () => {
+  it('VelocityKartMode switches on the body with the exact call this spec pins', () => {
+    const kart = readFileSync(path.join(__dirname, 'VelocityKartMode.ts'), 'utf8');
+    expect(kart).toMatch(/kartHudWords\(!!\(ctx\.body\?\.\(\) \?\? null\), S\.start\.go\)/);
+    expect(kart).toMatch(/setRingGlyph\(ctx\.scene\.meshes, !sw\)/);
+    expect(kart).not.toContain("'RT throttle · X drift to fill BOOST");   // the pad's words live in rideHud only now
+  });
+  it('AeroAcesMode switches on the body the same way', () => {
+    const aero = readFileSync(path.join(__dirname, 'AeroAcesMode.ts'), 'utf8');
+    expect(aero).toMatch(/aeroHudWords\(!!\(ctx\.body\?\.\(\) \?\? null\), S\.start\.go\)/);
+    expect(aero).toMatch(/setRingGlyph\(ctx\.scene\.meshes, !sw\)/);
+    expect(aero).not.toContain("'RT gas · LT brake");   // the pad's words live in rideHud only now
   });
 });
 

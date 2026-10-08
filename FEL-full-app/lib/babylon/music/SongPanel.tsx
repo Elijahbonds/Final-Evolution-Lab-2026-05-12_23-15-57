@@ -53,6 +53,7 @@ import { MAX_SONG_BARS, SECTION_NAMES, expandChain, newSectionId, normalizeChain
 import type { AudioRef, ProjectSection, ProjectTake, SongSlice } from './StudioProject';
 import RecordBooth, { useTakeBuffers } from './ui/RecordBooth';
 import { engineTakeList } from './takeCapture';
+import { PublishFileAsCard } from '@/components/create/publish-as-card';   // CREATE HUB
 import {
   SECTION_NAME_MAX, chainUses, deleteSection, moveChainEntry, renameSection, sectionForBar, updateSectionFromGrid,
 } from './studioEdit';
@@ -136,6 +137,7 @@ export default function SongPanel({ engine, tracks, playing, bpm, steps, say, S,
   const { buffers, missing, addBuffer } = useTakeBuffers(engine?.context ?? null, takes, loadAudio, say);
   const [stems, setStems] = useState<{ name: string; url: string }[]>([]);
   const [mixUrl, setMixUrl] = useState<string | null>(null); const [rendering, setRendering] = useState(false);
+  const mixBlob = useRef<Blob | null>(null);   // CREATE HUB: the last render, for PUBLISH AS CARD
   const chainRef = useRef(chain); useEffect(() => { chainRef.current = chain; }, [chain]);
   const sectionsRef = useRef(sections); useEffect(() => { sectionsRef.current = sections; }, [sections]);
   const songModeRef = useRef(songMode); songModeRef.current = songMode;
@@ -244,6 +246,7 @@ export default function SongPanel({ engine, tracks, playing, bpm, steps, say, S,
       const mix = await engine.renderSong(bars, shots, len, barSwing, sounds);
       const st = await engine.renderSongStems(bars, shots, len, barSwing, sounds);
       if (mixUrl) URL.revokeObjectURL(mixUrl); for (const s of stems) URL.revokeObjectURL(s.url);
+      mixBlob.current = mix;
       setMixUrl(URL.createObjectURL(mix)); setStems(st.map((s) => ({ name: s.name, url: URL.createObjectURL(s.blob) })));
       const gone = takes.length - playable.length;
       say(`Rendered ${bars.length} bars · ${st.length} stems${shots.length ? ` · ${shots.length} take${shots.length === 1 ? '' : 's'}` : ''}${gone ? ` · ${gone} take${gone === 1 ? '' : 's'} left out (audio missing)` : ''}`);
@@ -346,6 +349,11 @@ export default function SongPanel({ engine, tracks, playing, bpm, steps, say, S,
         <div style={S.row}>
           <button style={S.btn} disabled={rendering || !chain.length} onClick={() => void exportSong()}>{rendering ? 'RENDERING…' : 'RENDER SONG + STEMS'}</button>
           {mixUrl && <a href={mixUrl} download="fel-song-mix.wav" style={{ ...S.btnAlt, textDecoration: 'none' }}>⬇ MIX</a>}
+          {/* CREATE HUB (owner 2026-10-06): the full song as a Creator Card — the render goes to Create on this device */}
+          {mixUrl && (
+            <PublishFileAsCard discipline="music" style={S.btnAlt} entry={{ from: 'song-render', title: song.title }} file={() => mixBlob.current}
+              meta={{ fileName: 'fel-song-mix.wav', mime: 'audio/wav', bpm, title: song.title }}>PUBLISH AS CARD</PublishFileAsCard>
+          )}
           {stems.map((s) => <a key={s.name} href={s.url} download={`fel-stem-${s.name.replace(/\s+/g, '_')}.wav`} style={{ ...S.btnAlt, textDecoration: 'none', fontSize: 11 }}>⬇ {s.name}</a>)}
         </div>
       )}

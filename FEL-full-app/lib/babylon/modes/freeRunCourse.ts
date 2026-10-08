@@ -195,3 +195,100 @@ export function hazardAhead(pieces: readonly Piece[], x: number, z: number, reac
   for (const q of pieces) { if (q.kind !== 'hazard') continue; const dz = q.z - z; if (dz < -0.3 || dz > reach || Math.abs(q.x - x) > 1.2) continue; if (dz < bd) { bd = dz; best = q; } }
   return best;
 }
+
+// ── IMPROVE (2026-10-06): the per-frame readers, indexed once per build ─────────────────────────────────────────────
+//
+// The mode scanned the whole piece list several times a frame (courseLength twice, the bar / checkpoint loop, the slope
+// test, the anchor search, a rival's obstacle closure rebuilt per rival per frame) and ran FOUR whole-scene ray picks for
+// the probe — each pick's predicate visited every mesh in the scene and allocated a Ray. The course is a list of
+// axis-aligned boxes the mode built itself, so the same answers come from arithmetic over the few pieces near the runner.
+
+/** The kinds the probe rays read (all axis-aligned: a slope, the only tilted piece, is never probed). */
+export const PROBE_KINDS = ['vault', 'wall', 'bar', 'ledge', 'roof'] as const;
+export type ProbeKind = (typeof PROBE_KINDS)[number];
+/** Probe buckets are this long along z; a piece is filed in every bucket within PROBE_REACH_M of its extent. */
+export const PROBE_CELL_M = 4;
+/** Further than any probe ray reaches from the runner in x/z (the longest is the ledge ray, cast from 2.2 m ahead). */
+export const PROBE_REACH_M = 4.5;
+
+export interface CourseIndex {
+  finishZ: number;
+  checkpointCount: number;
+  /** Piece indices (stable: a kicked hazard is replaced in place, never removed). */
+  bars: number[]; checkpoints: number[];
+  slopes: Piece[]; anchors: Piece[]; gaps: Piece[]; springs: Piece[]; rails: Piece[]; gates: Piece[];
+  /** What a rival hops: the vault boxes, the loose hazards, the bars. */
+  obstacles: Piece[];
+  /** Probe pieces by z bucket. */
+  probe: Map<number, Piece[]>;
+  indexOf: Map<Piece, number>;
+}
+
+const cellOf = (z: number): number => Math.floor(z / PROBE_CELL_M);
+
+export function indexCourse(pieces: readonly Piece[]): CourseIndex {
+  const idx: CourseIndex = {
+    finishZ: courseLength(pieces), checkpointCount: 0, bars: [], checkpoints: [],
+    slopes: [], anchors: [], gaps: [], springs: [], rails: [], gates: [], obstacles: [], probe: new Map(), indexOf: new Map(),
+  };
+  pieces.forEach((q, i) => {
+    idx.indexOf.set(q, i);
+    switch (q.kind) {
+      case 'bar': idx.bars.push(i); idx.obstacles.push(q); break;
+      case 'checkpoint': idx.checkpoints.push(i); idx.checkpointCount++; break;
+      case 'slope': idx.slopes.push(q); break;
+      case 'anchor': idx.anchors.push(q); break;
+      case 'gap': idx.gaps.push(q); break;
+      case 'spring': idx.springs.push(q); break;
+      case 'rail': idx.rails.push(q); break;
+      case 'gate': idx.gates.push(q); break;
+      case 'vault': case 'hazard': idx.obstacles.push(q); break;
+      default: break;
+    }
+    if ((PROBE_KINDS as readonly string[]).includes(q.kind)) {
+      for (let c = cellOf(q.z - q.d / 2 - PROBE_REACH_M); c <= cellOf(q.z + q.d / 2 + PROBE_REACH_M); c++) {
+        let list = idx.probe.get(c); if (!list) { list = []; idx.probe.set(c, list); } list.push(q);
+      }
+    }
+  });
+  return idx;
+}
+
+/** The probe pieces a ray from a runner at z could reach. */
+const EMPTY: readonly Piece[] = [];
+export function probeNear(idx: CourseIndex, z: number): readonly Piece[] { return idx.probe.get(cellOf(z)) ?? EMPTY; }
+
+/** A ray hit: the distance along the ray and the outward normal of the face it hit. */
+export interface RayHit { t: number; nx: number; ny: number; nz: number }
+
+/** A ray (origin, unit direction, length) against a piece's axis-aligned box — the slab test. A ray that starts inside
+ *  the box hits the face it leaves by (a two-sided triangle pick does the same). Null on a miss or beyond `len`. */
+export function rayPiece(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, len: number, q: Piece): RayHit | null {
+  const o = [ox, oy, oz], d = [dx, dy, dz], c = [q.x, q.y, q.z], h = [q.w / 2, q.h / 2, q.d / 2];
+  let tNear = -Infinity, tFar = Infinity, nearAxis = -1, farAxis = -1, nearSign = 0, farSign = 0;
+  for (let a = 0; a < 3; a++) {
+    const lo = c[a] - h[a], hi = c[a] + h[a];
+    if (Math.abs(d[a]) < 1e-12) { if (o[a] < lo || o[a] > hi) return null; continue; }
+    let t1 = (lo - o[a]) / d[a], t2 = (hi - o[a]) / d[a];
+    if (t1 > t2) { const s = t1; t1 = t2; t2 = s; }
+    if (t1 > tNear) { tNear = t1; nearAxis = a; nearSign = d[a] > 0 ? -1 : 1; }
+    if (t2 < tFar) { tFar = t2; farAxis = a; farSign = d[a] > 0 ? 1 : -1; }
+    if (tNear > tFar) return null;
+  }
+  if (tFar < 0) return null;
+  const inside = tNear < 0;
+  const t = inside ? tFar : tNear, axis = inside ? farAxis : nearAxis, sign = inside ? farSign : nearSign;
+  if (axis < 0 || t > len) return null;
+  return { t, nx: axis === 0 ? sign : 0, ny: axis === 1 ? sign : 0, nz: axis === 2 ? sign : 0 };
+}
+
+/** The nearest hit of a ray against the probe pieces of the given kinds, from a runner at `runnerZ`. */
+export function castCourse(idx: CourseIndex, runnerZ: number, ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, len: number, kinds: readonly ProbeKind[]): RayHit | null {
+  let best: RayHit | null = null;
+  for (const q of probeNear(idx, runnerZ)) {
+    if (!(kinds as readonly string[]).includes(q.kind)) continue;
+    const hit = rayPiece(ox, oy, oz, dx, dy, dz, len, q);
+    if (hit && (!best || hit.t < best.t)) best = hit;
+  }
+  return best;
+}

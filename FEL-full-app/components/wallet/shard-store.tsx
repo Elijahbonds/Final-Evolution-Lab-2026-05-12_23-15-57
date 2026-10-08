@@ -5,8 +5,9 @@
  *
  * Buys SHARD packs via Stripe Checkout (hosted page). No card fields ever live
  * in-app. The shard amount is server-owned; this UI only sends a pack_id. On
- * return, ?paid=1 shows a success toast + refreshes the wallet balance, and
- * ?canceled=1 shows an info toast.
+ * return, ?paid=1&session_id=… checks with Stripe (POST /api/stripe/verify-session,
+ * SEC-F4 NO-WEBHOOK) so the pack is minted even with no webhook configured, then
+ * shows the toast and refreshes the wallet balance; ?canceled=1 shows an info toast.
  */
 
 import { useEffect, useState } from 'react';
@@ -16,6 +17,7 @@ import { toast } from 'sonner';
 import { SHARD_PACKS, shardPackTotal, usd, type ShardPack } from '@/lib/shard-packs';
 import { shardSaleCopy } from '@/lib/wallet/purchases';
 import { usePurchasesEnabled } from '@/lib/wallet/use-purchases-enabled';
+import { postVerifyCheckoutSession } from '@/components/stripe/verify-checkout-session';
 
 export function ShardStore() {
   const params = useSearchParams();
@@ -42,8 +44,23 @@ export function ShardStore() {
   // Handle the post-checkout redirect once.
   useEffect(() => {
     if (params.get('paid') === '1') {
-      toast.success('Shards added!', { description: 'Your purchase is confirmed. Balance updates in a moment.' });
-      // Poll a few times — the webhook credits shards asynchronously.
+      // SEC-F4 NO-WEBHOOK: check with Stripe FIRST — the server verifies the session is paid
+      // and this player's, then mints the shards through the same grant the webhook uses.
+      // Without this the toast below lies whenever no webhook is configured.
+      const sessionId = params.get('session_id');
+      const confirm = sessionId
+        ? postVerifyCheckoutSession(sessionId)
+        : Promise.resolve({ state: 'error' as const, error: 'no_session_id' });
+      void confirm.then((r) => {
+        if (r.state === 'fulfilled') {
+          toast.success('Shards added!', { description: 'Your purchase is confirmed.' });
+        } else if (r.state === 'pending') {
+          toast.info('Payment pending', { description: 'Stripe is still confirming this payment. Balance updates in a moment.' });
+        } else {
+          toast.info('Confirming payment…', { description: 'Balance updates as soon as the payment is confirmed.' });
+        }
+      });
+      // Poll a few times — a configured webhook credits shards asynchronously too.
       let n = 0;
       const iv = setInterval(() => { refreshBalance(); if (++n >= 5) clearInterval(iv); }, 1500);
       window.history.replaceState({}, '', '/shop/shards');

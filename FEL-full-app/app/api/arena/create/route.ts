@@ -17,6 +17,7 @@ import {
 } from '@/lib/arena';
 import { recordServerEvent } from '@/lib/analytics-server';
 import { isStakingPaused, stakingPausedDetail, STAKING_PAUSED_CODE, STAKING_PAUSED_STATUS } from '@/lib/stakingPause';
+import { isUnlistedMode } from '@/lib/unlisted-modes';
 
 /**
  * POST /api/arena/create
@@ -35,6 +36,12 @@ export async function POST(req: NextRequest) {
   const feeLc = Number(body?.feeLc);
 
   if (!isArenaMode(mode)) {
+    return NextResponse.json({ error: 'invalid_mode', detail: 'That mode is not available in the Arena.' }, { status: 400 });
+  }
+  // IRON-PARADISE-OUT (2026-10-03): a parked mode (lib/unlisted-modes.ts) takes no NEW duel — its /play route
+  // redirects, so the stake could never be played out. Duels posted before the parking still settle (lib/arena.ts
+  // keeps the row).
+  if (isUnlistedMode(mode)) {
     return NextResponse.json({ error: 'invalid_mode', detail: 'That mode is not available in the Arena.' }, { status: 400 });
   }
   // MUSIC-SUITE P1 (2026-09-25, owner decision #9: "pause staking both now"): a posted duel on a paused mode (music,

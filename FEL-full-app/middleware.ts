@@ -4,6 +4,17 @@ import type { NextRequest } from 'next/server';
 /** Screen paths only — enforced on every matched response (307, 200, RSC). */
 export const SCREEN_PERMISSIONS_POLICY = 'camera=(self), microphone=()';
 
+/**
+ * Open with no session. Middleware must never send these to /login.
+ * /links is the Instagram bio page. /books and /elijah only redirect there.
+ */
+export const PUBLIC_ROUTE_ALLOWLIST = ['/links', '/books', '/elijah'] as const;
+
+export function isPublicRoute(pathname: string): boolean {
+  const path = pathname.length > 1 ? pathname.replace(/\/+$/, '') : pathname;
+  return (PUBLIC_ROUTE_ALLOWLIST as readonly string[]).includes(path);
+}
+
 function makeNonce(): string {
   const bytes = new Uint8Array(16);
   crypto.getRandomValues(bytes);
@@ -37,6 +48,10 @@ function requestCsp(nonce: string): string {
 }
 
 export function middleware(request: NextRequest) {
+  if (isPublicRoute(request.nextUrl.pathname)) {
+    return NextResponse.next();
+  }
+
   const nonce = makeNonce();
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set('x-nonce', nonce);
@@ -49,5 +64,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/screen', '/screen/:path*', '/play/mirror/assess', '/play/mirror/assess/:path*'],
+  matcher: ['/links', '/books', '/elijah', '/screen', '/screen/:path*', '/play/mirror/assess', '/play/mirror/assess/:path*'],
 };

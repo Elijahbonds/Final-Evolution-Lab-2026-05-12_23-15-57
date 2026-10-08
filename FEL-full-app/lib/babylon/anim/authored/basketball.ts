@@ -715,6 +715,22 @@ export function buildContactReact(scene: Scene, sk: Skeleton): AnimationGroup | 
   ]);
 }
 
+// THE CATCH (HOOPS-10PHASE-2 phase 6: "passing with catch/receive animations"). Every pass already lands the ball
+// exactly on the catching hand (gatherBallToHand) with no body beat to go with it — the same snap-to-hand whether
+// the ball arrived from a chest pass, a bounce, or a call-for-the-ball throwback. A real catch is hands OUT to meet
+// it, then IN to secure it against the body — the opposite shape from the contact react above (that one recoils
+// FROM the body; this one reaches AWAY then draws back TOWARD it). Short and small on purpose: it plays on top of
+// whatever stance the receiver is already in (a cut, a stand-still, a close-out), so it has to read as a beat, not
+// override the whole pose.
+export function buildCatchBall(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  const reach = { Left: [-0.5, -0.4, -0.2] as V3, Right: [0.5, -0.4, -0.2] as V3 };   // elbows out and slightly forward — a target, not a guard
+  return buildPoseClip(scene, sk, 'bball_catch', 0.22, [
+    { t: 0,    bones: { Hips: [0, 0, 0] as Deg3,  Spine: [2, 0, 0] as Deg3,  Neck: [-2, 0, 0] as Deg3 }, hands: { Left: [-0.38, 1.28, 0.42] as V3, Right: [0.38, 1.28, 0.42] as V3 }, poles: reach },   // hands OUT to meet the ball
+    { t: 0.1,  bones: { Hips: [-4, 0, 0] as Deg3, Spine: [-8, 0, 0] as Deg3, Neck: [4, 0, 0] as Deg3 },  hands: { Left: [-0.24, 1.08, 0.26] as V3, Right: [0.24, 1.08, 0.26] as V3 }, poles: reach, hipsY: -0.02 },   // secured: drawn IN to the chest, a small absorb
+    { t: 0.22, bones: { Hips: [0, 0, 0] as Deg3,  Spine: [0, 0, 0] as Deg3,  Neck: [0, 0, 0] as Deg3 },  hands: { Left: OFF_HAND, Right: BALL_HAND } },   // settle into the ordinary carry — the body's own tree takes it from here
+  ]);
+}
+
 // ── ACROBATIC LAYUPS (owner, 2026-09-18: "better layups … better contact layups, acrobatic layups") ──────────────────
 // Three finishes the vocabulary did not have, each defined by ONE tell the eye can name at a glance:
 //   SCOOP  — the contact layup: the ball comes from the HIP, underhand, and is rolled up past a hand that is waiting high;

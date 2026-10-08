@@ -113,11 +113,18 @@ const VERBS: Record<string, Omit<ModeVerbConfig, 'rStick' | 'boost'>> = {
     X: { label: 'DROP', emit: A('X') },
     Y: { label: 'LOB', emit: A('Y') },
   }),
+  // Tiebreak's route draws its own two large swing buttons; the dev harness and
+  // creator-card readout still need honest verbs for the registry entry.
+  tiebreak: verbs({
+    B: { label: 'SWING R', emit: A('B') },
+    X: { label: 'SWING L', emit: A('X') },
+  }),
   // PARKOUR DERBY (2026-09-18): B is the BAT-FLIP VAULT, the wind-up trick that fills flow for a KINETIC swing. It
   // shipped with no touch slot, so on a tablet or the on-screen pad the derby's whole trick economy was unreachable —
   // a player could swing, and could never earn the swing that scores.
   derby: verbs({ A: { label: 'SWING', emit: A('A') }, B: { label: 'BAT FLIP', emit: A('B') } }),
-  penalty: verbs({ A: { label: 'STRIKE', emit: A('A') } }),
+  // IMPROVE (2026-10-06, Penalty #3): Y at the top of a kick switches it between the breakaway and CLASSIC PENS.
+  penalty: verbs({ A: { label: 'STRIKE', emit: A('A') }, Y: { label: 'CLASSIC', emit: A('Y') } }),
   // PARKOUR GOLF (2026-09-18): Y sets the SPRINGBOARD before the swing — a percentage multiplier off the pad, and the
   // only way to get one. Same shape as the derby's bat-flip vault: a new verb on a button with no touch slot.
   golf: verbs({
@@ -263,14 +270,25 @@ const VERBS: Record<string, Omit<ModeVerbConfig, 'rStick' | 'boost'>> = {
   volleyball: verbs({
     A: { label: 'HIT', emit: A('A') },
     B: { label: 'BLOCK', emit: A('B') },
+    // IMPROVE (2026-10-06): the player calls the set (NetSportMode callSet) — X a quick one, Y a high one
+    X: { label: 'QUICK', emit: A('X') },
+    Y: { label: 'HIGH', emit: A('Y') },
   }),
 
-  dance: verbs({ A: { label: 'TAP', emit: A('A') } }),
+  // IMPROVE (2026-10-06, dance #12): MATCH mode puts the move families on the four face buttons (A grooves, B floor,
+  // X arms/spins, Y freeze) and Y toggles it on the pick screen, so touch needs all four. Each slot is labelled with
+  // its letter — the lane shows the same letter on every cue in MATCH mode. Outside MATCH, B taps like A (the mode
+  // reads A or B) and X / Y do nothing during a song.
+  dance: verbs({ A: { label: 'TAP', emit: A('A') }, B: { label: 'B', emit: A('B') }, X: { label: 'X', emit: A('X') }, Y: { label: 'Y', emit: A('Y') } }),
   // lane 3 W1 — the four answers ride the four face buttons
   who_scene_it: verbs({ A: { label: 'A', emit: A('A') }, B: { label: 'B', emit: A('B') }, X: { label: 'C', emit: A('X') }, Y: { label: 'D', emit: A('Y') } }),
   // VERB-KEY (2026-09-07): Brain Brawl reads the same answer diamond (FACE index 0..3 → option A/B/C/D, the HUD's
   // optA/optB/optX/optY); before this it fell through to `default` and touch lost three of the four answers.
   brainbrawl: verbs({ A: { label: 'A', emit: A('A') }, B: { label: 'B', emit: A('B') }, X: { label: 'C', emit: A('X') }, Y: { label: 'D', emit: A('Y') } }),
+  // ADVENTURE A4 (2026-10-06, the plan's "Default controls"): the face diamond is the run and the fight; lock, cast,
+  // guard, slow-time, partner and fuse ride the d-pad and the Adventure's own touch radial (adventure/host/touchRadial)
+  adventure: verbs({ A: { label: 'JUMP', emit: A('A') }, B: { label: 'DASH', emit: A('B') }, X: { label: 'LIGHT', emit: A('X') }, Y: { label: 'HEAVY', emit: A('Y') } }),
+  adventure_br: verbs({ A: { label: 'JUMP', emit: A('A') }, B: { label: 'DASH', emit: A('B') }, X: { label: 'LIGHT', emit: A('X') }, Y: { label: 'HEAVY', emit: A('Y') } }),   // ADVENTURE C: the BR plays on the same buttons
 
   default: verbs({ A: { label: 'ACTION', emit: A('A') } }),
 };
@@ -281,7 +299,8 @@ const VERBS: Record<string, Omit<ModeVerbConfig, 'rStick' | 'boost'>> = {
 // a control that does nothing. Unlisted = 'LOOK'.
 const R_STICK: Record<string, string | null> = {
   skateboard: 'FLICK',                                   // the trick input — never stolen for the camera
-  tennis: null, volleyball: null,                        // the rally camera is a cut behind the baseline
+  tennis: null, tiebreak: null,                          // the rally camera is a cut behind the baseline
+  volleyball: 'AIM',                                     // IMPROVE (2026-10-06): the R stick aims the spike and the serve, apart from the feet
   golf: null, derby: null, penalty: null,                // fixed shots (setFixedBehind) — no orbit to give
   carnival: null,                                        // the hub's bursts cut between fixed and follow shots
   dance: null, who_scene_it: null,                       // no follow camera

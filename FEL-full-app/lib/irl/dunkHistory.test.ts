@@ -127,7 +127,9 @@ describe('attemptFromRow: one mapping for GET and POST', () => {
 describe('the route reads through the helper (static, like lib/api/routeContract.test.ts)', () => {
   it('GET and POST both call loadDunkHistory, and nothing reads the oldest rows any more', () => {
     const route = readFileSync(join(__dirname, '../../app/api/mirror/dunks/route.ts'), 'utf8');
-    expect(route.match(/loadDunkHistory\(prisma, userId\)/g)).toHaveLength(2);
+    // GET, the idempotent replay, and the post-insert read. All three go through the helper (newest rows).
+    // The count was 2 before AB-04 added the replay; the oldest-row bans below are unchanged.
+    expect(route.match(/loadDunkHistory\(prisma, userId\)/g)).toHaveLength(3);
     expect(route).not.toMatch(/createdAt: 'asc'/);
     expect(route).not.toMatch(/workoutScan\.findMany/);
     expect(route).toMatch(/attempts\.slice\(-DUNK_ATTEMPTS_RETURNED\)/);

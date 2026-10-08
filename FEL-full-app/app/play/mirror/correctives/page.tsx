@@ -1,6 +1,7 @@
 import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
 import { authOptions } from '@/lib/auth';
+import { loginPath } from '@/lib/auth/safeNext';
 import { prisma } from '@/lib/db';
 import { canSaveScanNumbers } from '@/lib/privacy/scanSaveGate';
 import { latestIntake } from '@/lib/health/intake';
@@ -28,7 +29,7 @@ const SETS_READ = 40;
  */
 export default async function MirrorCorrectivesPage() {
   const session = await getServerSession(authOptions);
-  if (!session) redirect('/login?next=%2Fplay%2Fmirror%2Fcorrectives');
+  if (!session) redirect(loginPath('/play/mirror/correctives'));
   const userId = (session.user as { id?: string } | undefined)?.id;
   const user = userId
     ? await prisma.user.findUnique({ where: { id: userId }, select: { dobYear: true } }).catch(() => null)

@@ -8,6 +8,7 @@
  */
 import type { Provider } from '@/lib/cell-models';
 import { assertProviderAllowed, type CompliancePolicy } from '@/lib/cell-compliance';
+import { abacusEnabled, AiDisabledError } from '@/lib/abacus/killSwitch';
 
 export interface PMessage {
   role: 'system' | 'user' | 'assistant';
@@ -42,6 +43,9 @@ export async function callModel(opts: {
    */
   compliance?: CompliancePolicy;
 }): Promise<ModelCallResult> {
+  // ABACUS-KILL: every provider (Abacus, and OpenAI/Anthropic/Google on the user's own key) stays off with the
+  // switch, so the Studio sends nothing anywhere until it is on (lib/abacus/killSwitch.ts).
+  if (!abacusEnabled()) throw new AiDisabledError('callModel');
   // M6: jurisdiction/denylist gate runs before we touch the network.
   assertProviderAllowed(opts.provider, opts.compliance);
   const maxTokens = opts.maxTokens ?? 4000;

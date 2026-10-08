@@ -1,6 +1,14 @@
-// NutritionScore — the food-scan reward rubric (M60, Phase 9). The ask:
+// NutritionScore — the food-scan rubric (M60, Phase 9). The original ask was
 // "scan food for coins/XP/Shards, AI-judged nutrition, relative to your
 // goals and data."
+//
+// NO CURRENCY FOR FOOD (owner-approved 2026-10-06, the moderate option):
+// paying coins, XP or Shards for how a plate scores rewards eating to a
+// number — an eating-disorder risk, and the app has under-18 players. A
+// plate gets its score and its one-line verdict as feedback, and nothing
+// else: PlateScore carries no coins, xp or shards, and the anti-farm caps
+// that only existed to ration those rewards are gone with them.
+// lib/babylon/nutrition/NutritionScore.test.ts holds it.
 //
 // THE HONEST DESIGN DECISION, stated up front: identifying food from
 // pixels requires a vision model this batch does not have — so nothing
@@ -9,7 +17,7 @@
 // rubric RELATIVE TO THE USER'S STATED GOAL — which is real personalized
 // judgment, deterministic and auditable. The marked VISION SEAM is where
 // a real Cell vision call replaces manual tags with detected ones; the
-// rubric, goals, rewards, and anti-farm caps all stay identical.
+// rubric and goals stay identical.
 
 export type Goal = 'cut' | 'maintain' | 'bulk';
 export type PlateTag =
@@ -26,12 +34,10 @@ export interface NutritionProfile {
   trainedToday: boolean;             // pulled from the day's session history when wired
 }
 
+/** Feedback only — a score and a line. Never coins, XP or Shards (see the header). */
 export interface PlateScore {
   score: number;                     // 0-100
   verdictLine: string;
-  coins: number;
-  xp: number;
-  shards: number;                    // only on excellent plates, capped daily
 }
 
 /** Base points per tag — then goal-relative adjustments. Transparent by
@@ -66,46 +72,8 @@ export function scorePlate(tags: PlateTag[], profile: NutritionProfile): PlateSc
   const verdictLine = notes[0]
     ?? (score >= 80 ? 'a genuinely strong plate' : score >= 55 ? 'solid — one swap from great' : 'it happens — the next plate is a fresh start');
 
-  return {
-    score,
-    verdictLine,
-    coins: Math.round(score / 2),
-    xp: score,
-    shards: score >= 80 ? 10 : 0,
-  };
+  return { score, verdictLine };
 }
-
-// ── Anti-farm caps: 3 scored scans/day; shards only on the first 2 ────────
-const KEY_DAY = 'fel_food_day_v1';
-interface DayState { day: string; scans: number; shardScans: number }
-const today = (): string => new Date().toISOString().slice(0, 10);
-
-function readDay(): DayState {
-  try {
-    const d = JSON.parse(localStorage.getItem(KEY_DAY) ?? 'null') as DayState | null;
-    if (d && d.day === today()) return d;
-  } catch { /* fresh */ }
-  return { day: today(), scans: 0, shardScans: 0 };
-}
-
-export const FoodScanLimits = {
-  MAX_SCANS_PER_DAY: 3,
-  MAX_SHARD_SCANS_PER_DAY: 2,
-  remainingToday(): number { return Math.max(0, this.MAX_SCANS_PER_DAY - readDay().scans); },
-  /** Register a scored scan; zeroes rewards past the caps. */
-  applyCaps(s: PlateScore): PlateScore {
-    const d = readDay();
-    if (d.scans >= this.MAX_SCANS_PER_DAY) return { ...s, coins: 0, xp: 0, shards: 0, verdictLine: 'daily scans done — rewards resume tomorrow' };
-    const shardsOk = d.shardScans < this.MAX_SHARD_SCANS_PER_DAY;
-    const capped = { ...s, shards: shardsOk ? s.shards : 0 };
-    localStorage.setItem(KEY_DAY, JSON.stringify({
-      day: d.day, scans: d.scans + 1, shardScans: d.shardScans + (capped.shards > 0 ? 1 : 0),
-    }));
-    // SYNC SEAM: POST /api/nutrition/scans { tags, score, photoRef } —
-    // server enforces the same caps authoritatively + stores the photo.
-    return capped;
-  },
-};
 
 // VISION SEAM: async detectTags(photoBlob): Promise<PlateTag[]> — a real
 // Cell vision call returns tags; UI pre-fills them for user confirmation

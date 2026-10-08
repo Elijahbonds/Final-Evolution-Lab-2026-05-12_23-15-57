@@ -4,6 +4,9 @@ import { describe, it, expect } from 'vitest';
 import { rivalTricksFor, rivalSlamOffset, RIVAL_REACH } from './RivalPlay';
 import { DUNK_TRICKS, SIGNATURE_DUNKS, SLAM_EDGE_EXEC, slamExecution } from './DunkSystem';
 import { DUNK_RIVALS } from './DunkRivals';
+import { rivalPressAt, rivalHitsBeats, RIVAL_BEAT_LEAD } from './RivalPlay';
+import { gradeTrickPress, BEAT_TOL_SEC, trickBeats } from './DunkBeats';
+import { CUE_BEAT_T, cueVerdict } from './DunkSystem';
 
 const fixed = (v: number) => () => v;
 
@@ -46,5 +49,38 @@ describe('where his SLAM lands', () => {
     expect(rivalSlamOffset(0.95, true, half)).toBeLessThan(0);
     expect(rivalSlamOffset(0.5, true, half)).toBeGreaterThan(0);
     expect(rivalSlamOffset(0.5, false, half)).toBeLessThan(half);   // still inside the window
+  });
+});
+
+// dunk-next phase 1 — the rival's pad hits the beats when his attempt is clean, and is the old pad when it is not.
+
+describe('the rival and the beats', () => {
+  const T = (id: string) => DUNK_TRICKS.find((t) => t.id === id)!;
+  it('a clean attempt hits beats; a leaky or a blown one does not', () => {
+    expect(rivalHitsBeats(SLAM_EDGE_EXEC, false)).toBe(true);
+    expect(rivalHitsBeats(SLAM_EDGE_EXEC - 0.01, false)).toBe(false);
+    expect(rivalHitsBeats(1, true)).toBe(false);
+    expect(rivalHitsBeats(NaN, false)).toBe(false);
+  });
+  it('off the beat he presses the moment he can — the old pad, unchanged', () => {
+    for (const t of DUNK_TRICKS) expect(rivalPressAt(t, 0.06, false)).toBe(0.06);
+  });
+  it('on the beat every press of his grades ON THE BEAT, and inside the trick\'s window', () => {
+    expect(RIVAL_BEAT_LEAD).toBeLessThan(BEAT_TOL_SEC);
+    for (const t of DUNK_TRICKS) for (const after of [0.06, CUE_BEAT_T.rise + 0.12, CUE_BEAT_T.hang + 0.05]) {
+      const at = rivalPressAt(t, after, true);
+      expect(at).toBeGreaterThanOrEqual(after);
+      const lastBeat = CUE_BEAT_T[trickBeats(t)[trickBeats(t).length - 1]];
+      if (after <= lastBeat - RIVAL_BEAT_LEAD) {
+        expect(gradeTrickPress(t, at).grade, `${t.id} after ${after}`).toBe('onbeat');
+        expect(cueVerdict(t, at + RIVAL_BEAT_LEAD)).toBe('fire');
+      } else expect(at).toBe(after);   // nothing left to hit: he presses when he can (refused late, as before)
+    }
+  });
+  it('a chain goes beat by beat: the 360 on the rise, the eastbay on the hang', () => {
+    const first = rivalPressAt(T('spin360'), 0.06, true);
+    expect(gradeTrickPress(T('spin360'), first)).toMatchObject({ grade: 'onbeat', beat: 'rise' });
+    const second = rivalPressAt(T('eastbay'), CUE_BEAT_T.rise + 0.12, true);
+    expect(gradeTrickPress(T('eastbay'), second)).toMatchObject({ grade: 'onbeat', beat: 'hang' });
   });
 });

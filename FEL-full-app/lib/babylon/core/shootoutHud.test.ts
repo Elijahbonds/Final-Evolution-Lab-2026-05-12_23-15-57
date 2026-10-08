@@ -38,4 +38,15 @@ describe('3PT shootout readability layer', () => {
     expect(pointsLeft(5, 0)).toBe(0);
     expect(pointsLeft(1, 0)).toBe(24);
   });
+
+  // IMPROVE (2026-10-06, 3PT #5): the picked money rack is gold on every ball, and its points are counted that way
+  it('a money rack: every pip of that rack is gold; points left count it double; no pick is the old read', () => {
+    const p = rackPips(0, 0, 5, 5, 2);
+    expect(p[2].every((x) => x.money)).toBe(true);
+    for (const r of [0, 1, 3, 4]) expect(p[r].map((x) => x.money)).toEqual([false, false, false, false, true]);
+    expect(pointsLeft(0, 0, 5, 5, 2)).toBe(34);
+    expect(pointsLeft(2, 3, 5, 5, 2)).toBe(2 + 2 + 6 + 6);
+    expect(pointsLeft(0, 0, 5, 5)).toBe(30);
+    expect(rackPips(1, 2, 5, 5)).toEqual(rackPips(1, 2));
+  });
 });

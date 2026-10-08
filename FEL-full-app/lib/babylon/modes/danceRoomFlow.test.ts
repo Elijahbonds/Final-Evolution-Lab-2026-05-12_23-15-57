@@ -147,7 +147,11 @@ describe('beat 0 can be hit early, in the count-in (review: dropped, then a MISS
     expect(armed).toContain('perf.start(startAt);');
     const flip = DANCE.slice(DANCE.indexOf("phase = 'playing';"), DANCE.indexOf("phase = 'playing';") + 400);
     expect(flip).not.toMatch(/perf\.start\(/);
-    expect(DANCE).toContain('if (countInTapReaches({ countArmed, heard: heardNow, startAt, missAfter: MISS_AFTER })) void perf.hit(heardNow);');
+    // test changed (IMPROVE 2026-10-06): the count-in tap now reaches the judge through pressAt (which notes the tap's
+    // source for a freeze hold and applies MATCH mode), and pressAt hands it to perf.hit on the same heard time
+    expect(DANCE).toContain('if (countInTapReaches({ countArmed, heard: heardNow, startAt, missAfter: MISS_AFTER })) pressAt(ctx, heardNow, e, btn);');
+    const press = DANCE.slice(DANCE.indexOf('function pressAt('), DANCE.indexOf('function releaseHold('));
+    expect(press).toContain('void perf.hit(heardNow);');
   });
 });
 

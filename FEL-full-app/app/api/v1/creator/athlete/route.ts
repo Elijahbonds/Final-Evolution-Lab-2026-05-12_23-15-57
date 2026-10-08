@@ -33,7 +33,10 @@ import { isMissingTable, isUnreachable } from '@/lib/db/errors';
 // HOTFIX (2026-09-24): the page reads the same axes for the editor's ceilings, so the one function lives in lib (a
 // route file may only export its handlers) — and it reads measured axes, not the dice-seeded profile row.
 import { axesFor } from '@/lib/creator/athleteAxes-server';
-import { SCAN_SAVE_REFUSED, canSaveScanNumbers } from '@/lib/privacy/scanSaveGate';
+import { SCAN_SAVE_REFUSED, canSaveScanNumbers, readDobYear } from '@/lib/privacy/scanSaveGate';
+import { verifiedAdult } from '@/lib/privacy/verifiedAdult';
+import { decideLookHold, holdAnimations, holdEquipped, holdFace, holdFrame, holdJersey, payloadHasImage, privacyRecord } from '@/lib/creator/lookPrivacy';
+import { holdCreator } from '@/lib/creator/look/storage';
 
 /**
  * `AthleteBuild` is new and the migration is the owner's to run, so the one error a fresh checkout will
@@ -80,9 +83,17 @@ export async function GET() {
       equipped: (look?.equipped as unknown as LookPayload['equipped']) ?? defaultEquipped(),
       jersey: (look?.jersey as unknown as LookPayload['jersey']) ?? { number: 0, name: '' },
     };
+    const storedBuild = (row?.build ?? null) as (BuildPayload & { privacy?: { saveLookNumbers?: boolean; modelTraining?: boolean } }) | null;
+    const adult = verifiedAdult(await readDobYear(prisma, userId, 'look_hold'));
     return NextResponse.json({
-      values: fromStorage((row?.build as unknown as BuildPayload | null) ?? null, lookPayload),
+      values: fromStorage(storedBuild, lookPayload),
       plate: lookPayload.jersey?.name ?? '',
+      adult,
+      privacy: {
+        saveLookNumbers: storedBuild?.privacy?.saveLookNumbers === true,
+        modelTraining: storedBuild?.privacy?.modelTraining === true,
+      },
+      lookLocal: !adult,
       // HOTFIX (2026-09-24): the measured axes NOW, never the stored snapshot. Finalizes before this hotfix stored the
       // dice-seeded profile axes in AthleteBuild.prq, and `row.prq ?? axesFor` kept serving them as the athlete's PRQ.
       prq: await axesFor(userId),
@@ -102,10 +113,13 @@ export async function POST(req: NextRequest) {
   const userId = (session?.user as { id?: string } | undefined)?.id;
   if (!userId) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
-  let body: { values?: Values; plate?: string };
+  let body: { values?: Values; plate?: string; saveLookNumbers?: boolean; modelTraining?: boolean };
   try { body = await req.json(); } catch { return NextResponse.json({ error: 'invalid_json' }, { status: 400 }); }
+  if (payloadHasImage(body)) return NextResponse.json({ error: 'images_not_stored', saved: false }, { status: 400 });
   const values: Values = body?.values ?? {};
   const plate = typeof body?.plate === 'string' ? body.plate : '';
+  const adult = verifiedAdult(await readDobYear(prisma, userId, 'look_hold'));
+  const hold = decideLookHold(adult, body?.saveLookNumbers === true, body?.modelTraining === true);
 
   const prq = await axesFor(userId);
   const verdict = validateForSave(values, prq);
@@ -116,9 +130,28 @@ export async function POST(req: NextRequest) {
   }
 
   const look = toLook(values, plate);
+  // IMPROVE (2026-10-06): this editor knows nothing about the Creator doc, so the stored one is carried over (an adult's;
+  // a minor's face is the catalog default and carries none) instead of Finalize wiping what the Closet built.
+  const prevFace = hold.uploadFace
+    ? (await prisma.avatarLook.findUnique({ where: { userId }, select: { face: true } }))?.face ?? null
+    : null;
+  // CREATOR-PLAN phase 4a: with a slot active, this editor's face and worn items land on THAT character (holdCreator's fold);
+  // its worn items are ownership-filtered there like the Closet's.
+  const heldFace = holdFace(look.face, hold);
+  const ownedForSlots = new Set((await prisma.ownedWearable.findMany({ where: { userId } })).map((o) => o.itemId));
+  look.face = { ...heldFace, ...holdCreator(undefined, prevFace, hold, { owned: ownedForSlots, fold: { face: heldFace, equipped: look.equipped as Record<string, string | null> } }) };
+  const built = toBuild(values);
+  built.frame = holdFrame(built.frame, hold);
+  built.animations = holdAnimations(built.animations, hold);
+  // Jersey colours live in the build, not on AvatarLook. A minor's row keeps the catalog defaults.
+  if (!hold.uploadLook) built.palette = toBuild({}).palette;
+  const stored = { ...built, privacy: privacyRecord(hold) };
   const owned = new Set((await prisma.ownedWearable.findMany({ where: { userId } })).map((o) => o.itemId));
-  const refused = refusedItems(look.equipped, owned);
-  const equipped = filterEquipped(look.equipped, owned);
+  // Inventory stays. What is WORN does not upload for anyone who is not a verified adult.
+  const refused = hold.uploadLook ? refusedItems(look.equipped, owned) : [];
+  look.equipped = holdEquipped(hold.uploadLook ? filterEquipped(look.equipped, owned) : look.equipped, hold);
+  look.jersey = holdJersey(look.jersey, hold);
+  const equipped = look.equipped;
 
   // TEEN-WRITE-BLOCK (FE PM 23:05 PT): only the PRQ snapshot is a movement save (verified 18+ AND opted in); the look and the Fine Tune build save for every signed-in user.
   const prqAllowed = await canSaveScanNumbers(prisma, userId);
@@ -136,8 +169,8 @@ export async function POST(req: NextRequest) {
         // dice-seeded snapshot an earlier Finalize stored is wiped on the next one instead of living on as "measured".
         // TEEN-WRITE-BLOCK (FE PM 23:05 PT): refused, the snapshot is not written: DbNull on a create, and on an update the
         // key is left out (no new write, and no clear of an older snapshot: this lane deletes nothing; GET serves axesFor).
-        update: { build: toBuild(values) as object, ...(prqAllowed ? { prq: prq ? (prq as object) : Prisma.DbNull } : {}), finalizedAt: new Date() },
-        create: { userId, build: toBuild(values) as object, prq: prqAllowed && prq ? (prq as object) : Prisma.DbNull, finalizedAt: new Date() },
+        update: { build: stored as object, schemaVersion: '1.1.0', ...(prqAllowed ? { prq: prq ? (prq as object) : Prisma.DbNull } : {}), finalizedAt: new Date() },
+        create: { userId, build: stored as object, schemaVersion: '1.1.0', prq: prqAllowed && prq ? (prq as object) : Prisma.DbNull, finalizedAt: new Date() },
       }),
     ]);
     return NextResponse.json({
@@ -147,6 +180,8 @@ export async function POST(req: NextRequest) {
       refused: refused.map((id) => ({ itemId: id, name: getWearable(id)?.name ?? id })),
       // TEEN-WRITE-BLOCK (FE PM 23:05 PT): the PRQ refusal rides inside the 200, because the look and the build did save.
       ...(prqAllowed ? {} : { prqSaved: false, prqRefusal: { status: 403, ...SCAN_SAVE_REFUSED } }),
+      privacy: privacyRecord(hold),
+      lookLocal: !hold.uploadFace,
     });
   } catch (e) {
     const named = dbFailure(e);
