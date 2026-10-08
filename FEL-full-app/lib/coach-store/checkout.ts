@@ -253,6 +253,9 @@ async function bookTime(
       success_url: `${origin}/coach/thanks?row=${booking.id}&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/coach/${instructor.slug}`,
       metadata: meta(userId, booking.id, manifest.kind, 'self', referrerUserId),
+      // STORE-READY B8: the payment intent carries the same metadata so a Dashboard refund/dispute can be
+      // mapped back to this booking by its payment_intent.
+      payment_intent_data: { metadata: meta(userId, booking.id, manifest.kind, 'self', referrerUserId) },
     }, { idempotencyKey: `coach-store:checkout:${booking.id}` });
     await prisma.booking.update({ where: { id: booking.id }, data: { stripeCheckoutId: session.id } });
     return NextResponse.json({ url: session.url, rowId: booking.id });
@@ -394,7 +397,9 @@ async function buyAccess(
     success_url: `${origin}/coach/thanks?row=${row.id}&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${origin}/coach/${instructor?.slug ?? 'elijahbonds'}`,
     metadata: metaData,
-    ...(manifest.kind === 'membership' ? { subscription_data: { metadata: metaData } } : {}),
+    // STORE-READY B8: the payment intent carries the same metadata so a Dashboard refund/dispute maps back to
+    // this row by its payment_intent (payment-mode sessions only; a subscription bills through its invoice).
+    ...(manifest.kind === 'membership' ? { subscription_data: { metadata: metaData } } : { payment_intent_data: { metadata: metaData } }),
     // STORE-READY B5: a re-buy creates a NEW session, so the idempotency key must be new too — reusing the old
     // row's key is why a retry within 24 h 500'd (Stripe rejects a reused key with a different payload).
   }, { idempotencyKey: `coach-store:checkout:${row.id}:${now.getTime()}` });
