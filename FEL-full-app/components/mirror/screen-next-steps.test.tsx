@@ -5,6 +5,7 @@
 import { describe, expect, it } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { screenCorrectiveFor } from '@/lib/mirror/correctives';
 import { ScreenNextSteps } from './screen-next-steps';
 import { CAMERA_NOT_DIAGNOSIS, YOUTH_BLOCKS_OFF, type YouthGate } from '@/lib/mirror/screenCorrectives';
 import { fixLine } from '@/lib/mirror/screen';
@@ -89,5 +90,55 @@ describe('what to work on, after the screen', () => {
     const html = render(grades());
     expect(html).toContain('aria-labelledby="screen-next-steps-heading"');
     expect(html).toContain('id="screen-next-steps-heading"');
+  });
+});
+
+// MIRROR-COACH P9 (2026-09-30), PLAN item 9 rule (e): under a flag, its matching written corrective for an adult (the
+// same mapping as the coach's draft, lib/mirror/correctives.ts SCREEN_CORRECTIVE) and the way into the correctives page.
+describe('P9: the written corrective under a flag', () => {
+  it('an adult: the shoulder flag names its release and band drill and links to them', () => {
+    const html = render(grades({ shoulderLevel: g('shoulderLevel', { value: 0.1 }) }));
+    const t = text(html);
+    expect(t).toContain('Written corrective: release first: where the neck meets the shoulder · band drill: Band-up shoulder hold.');
+    expect(html).toContain('href="/play/mirror/correctives#band-drills"');
+    expect(html).toContain('data-written-corrective="shoulderLevel"');
+    // MIRROR-COACH P9 fix: the screen's own set-up — standing, no rowing handle, and the side the screen read higher
+    expect(t).toMatch(/Stand tall facing the camera, a light band tied high and held in (your (left|right) hand — the side the screen read higher|the hand on the side the screen read higher)\./);
+    expect(t).not.toMatch(/rowing handle|working hand|the pull/);
+  });
+
+  it('P9 fix: the set-up names the side the screen measured (a level check flags the HIGHER side)', () => {
+    for (const side of ['left', 'right'] as const) {
+      const c = screenCorrectiveFor('shoulderLevel', null, side)!;
+      expect(c.drill!.setup).toContain(`held in your ${side} hand — the side the screen read higher`);
+      expect(c.drill!.cue).not.toMatch(/handle/);
+      const hip = screenCorrectiveFor('hipLevel', null, side)!;
+      expect(hip.drill!.setup).toContain(`The screen read your ${side} hip higher`);
+      expect(hip.drill!.setup).not.toMatch(/how far you drift, not which way/);   // the press/row's line
+      expect(screenCorrectiveFor('singleLeg', null, side)!.drill!.setup).toContain(`The screen read your ${side} leg`);
+    }
+  });
+
+  it('the knee flag links to the release; a check with none (the head float) shows no line', () => {
+    const knee = render(grades({ kneeWindow: g('kneeWindow', { value: 0.7, bySide: { left: 0.7, right: 0.05 } }) }));
+    // MIRROR-COACH P9 fix: "release first:" with no drill after it read as cut off — the knee has a release only
+    expect(text(knee)).toContain('Written corrective: release: the back of the hip — the fleshy part you sit on.');
+    expect(text(knee)).not.toContain('release first');
+    expect(knee).toContain('href="/play/mirror/correctives#release"');
+    const head = render(grades({ headFloat: g('headFloat', { value: 0.2 }) }));
+    expect(head).toContain('data-work-item');
+    expect(head).not.toContain('data-written-corrective');
+  });
+
+  it('two flags: each work item gets its own check\'s corrective, in order', () => {
+    const html = render(grades({ hipLevel: g('hipLevel', { value: 0.12 }), shoulderLevel: g('shoulderLevel', { value: 0.1 }) }));
+    const ids = [...html.matchAll(/data-written-corrective="(\w+)"/g)].map((m) => m[1]);
+    expect(ids).toEqual(['hipLevel', 'shoulderLevel']);
+  });
+
+  it('youth rules (and no birth year, the card\'s default): no written corrective at all', () => {
+    const gs = grades({ shoulderLevel: g('shoulderLevel', { value: 0.1 }), kneeWindow: g('kneeWindow', { value: 0.7, bySide: { left: 0.7, right: 0.05 } }) });
+    for (const youth of ['minor', 'unknownAge'] as const) expect(render(gs, youth)).not.toContain('data-written-corrective');
+    expect(renderToStaticMarkup(createElement(ScreenNextSteps, { screen: 'modified', grades: gs }))).not.toContain('data-written-corrective');
   });
 });

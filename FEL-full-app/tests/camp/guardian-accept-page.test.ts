@@ -15,9 +15,9 @@ const render = (step: Parameters<typeof PlayerRequest>[0]['step']) =>
 describe('PlayerRequest — one screen per step, a button only where the route would say yes', () => {
   it('signed out: sign in or make an account, and NO accept button', () => {
     const html = render('sign_in');
-    expect(html).toContain('href="/login"');
-    expect(html).toContain('href="/signup"');
-    expect(html).toContain('then open this link again'); // auth-form ignores ?next=, so no return trip is promised
+    expect(html).toContain('href="/login?next=%2Fconsent%2Fguardian%2Ftok-1"');
+    expect(html).toContain('href="/signup?next=%2Fconsent%2Fguardian%2Ftok-1"');
+    expect(html).toContain('come back to this page');
     expect(html).not.toContain('<button');
   });
 
@@ -114,21 +114,40 @@ describe('wiring, read from source', () => {
   });
 });
 
-// MIRROR-COACH P6 FIX (2026-09-29, code review): the guardian's yes now also covers the optional daily readiness
-// check-in (lib/health/readiness.ts gates it as 'pain_checkin'), and both guardian screens said it covered only the
-// Mirror and pain check-ins — the camp one adding "That's all this does". Both now say what the yes covers, from one list.
-describe('what a guardian is told the yes covers — every gated feature with a consumer, the daily check-in included', () => {
-  it('the list names the Mirror, the pain check-in and the daily check-in, and the readiness gate is one of them', async () => {
+// MIRROR-COACH P6 FIX (2026-09-29, code review): both guardian screens say what the yes covers, from one list.
+// test changed (owner decision 2026-10-06, "Match today"): this held the list to the Mirror, the pain check-in and the
+// daily check-in — what canUse gated in P6. Since TEEN-WRITE-BLOCK a guardian's yes unlocks none of them (pain and
+// daily check-ins save only for a verified 18+; the Mirror has no guardian gate). The owner chose to tell the guardian
+// what it unlocks today — a camp plan going live — so the test now holds the list to the code that gates on it.
+describe('what a guardian is told the yes covers — what it unlocks today, and nothing it no longer does', () => {
+  it('the list names the camp plan going live, and that is what the camp route gates on the consent', async () => {
     const { GUARDIAN_CONSENT_COVERS, guardianConsentAsk } = await import('@/lib/consent/guardianGate');
-    const { READINESS_GUARDIAN_FEATURE } = await import('@/lib/health/readiness');
-    const features = new Set(GUARDIAN_CONSENT_COVERS.map((c) => c.feature));
-    // every feature canUse gates that has a consumer today (body_play has none yet — movement play's, not shipped)
-    for (const f of ['mirror', 'pain_checkin'] as const) expect(features.has(f), f).toBe(true);
-    expect(features.has(READINESS_GUARDIAN_FEATURE)).toBe(true);
-    expect(GUARDIAN_CONSENT_COVERS.some((c) => /daily check-in/.test(c.words) && /sleep/.test(c.words))).toBe(true);
+    expect(GUARDIAN_CONSENT_COVERS.map((c) => c.unlocks)).toEqual(['camp_plan']);
     expect(guardianConsentAsk('Jordan')).toBe(
-      "FEL is a training app. Before Jordan can use its movement-coaching camera tool (the Mirror), log how an exercise feels (a pain check-in) or answer an optional daily check-in on sleep, soreness, energy and mood, we ask a parent or guardian to confirm that's OK.",
+      "FEL is a training app. Before Jordan can start a camp plan their coach builds with them, we ask a parent or guardian to confirm that's OK.",
     );
+    const plans = readFileSync('app/api/v1/camp/plans/route.ts', 'utf8');
+    expect(plans).toMatch(/if \(needsGuardianConsent\(birthYear\) && !consent\) return bad\('guardian_consent_required', 412\);/);
+  });
+
+  it('it no longer asks a guardian to OK the Mirror, pain check-ins or the daily check-in', async () => {
+    const { guardianConsentAsk } = await import('@/lib/consent/guardianGate');
+    const ask = guardianConsentAsk('Jordan');
+    expect(ask).not.toMatch(/Mirror|camera|pain|check-in|sleep|soreness|mood/i);
+    for (const route of ['app/api/health/pain/route.ts', 'app/api/health/readiness/route.ts']) {
+      expect(readFileSync(route, 'utf8'), route).toMatch(/if \(!\(await canWriteHealthData\(prisma, userId\)\)\) return refuseHealthWrite\(\);/);
+    }
+    expect(readFileSync('app/play/mirror/page.tsx', 'utf8').split('\n').filter((l) => !/^\s*(\/\/|\*)/.test(l)).join('\n')).not.toMatch(/<GuardianConsentGate/);
+  });
+
+  it('a consent given under the old wording still reads accepted — nothing is invalidated or re-asked', async () => {
+    const { guardianStatus, canUse } = await import('@/lib/consent/guardianGate');
+    const old = [{ requestedAt: new Date('2026-09-30'), acceptedAt: new Date('2026-10-01'), revokedAt: null }];
+    expect(guardianStatus(old)).toBe('accepted');
+    expect(canUse('pain_checkin', { dobYear: 2012, consents: old }, new Date('2026-10-06'))).toBe(true);
+    // the row stores no wording, and the camp plan's gate reads only acceptedAt / revokedAt — no date or text cut-off
+    const plans = readFileSync('app/api/v1/camp/plans/route.ts', 'utf8');
+    expect(plans).toContain("prisma.guardianConsent.findFirst({ where: { menteeId: plan.menteeId, acceptedAt: { not: null }, revokedAt: null }");
   });
 
   it('the player screen shows it (every step that introduces the request)', async () => {

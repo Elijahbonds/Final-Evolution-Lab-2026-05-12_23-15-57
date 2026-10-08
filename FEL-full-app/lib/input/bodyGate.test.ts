@@ -48,6 +48,7 @@ import { isWakeInput } from '@/lib/babylon/core/StartWake';
 import { START_HOLD_MS, LOST_PAUSE_MS } from '@/lib/babylon/core/BodySession';
 import type { FelInput } from '@/lib/babylon/core/InputBus';
 import type { ModePhase } from '@/lib/babylon/core/ModeHarness';
+import { ENABLED_BABYLON_MODES } from '@/lib/babylon/modes/registry';
 
 // ── the streams ──────────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -454,9 +455,9 @@ describe('THE GATE — every profile, every stream (the oracle derived from the 
     }
   });
 
-  it('covers what it claims: 28 profiles, 78 streams — 12 fixtures twice, 9 ducks, 45 scripts on three seeds', () => {
+  it('covers what it claims: one profile per enabled mode, 78 streams — 12 fixtures twice, 9 ducks, 45 scripts on three seeds', () => {
     const s = streams();
-    expect(PROFILES).toHaveLength(28);
+    expect(PROFILES).toHaveLength(ENABLED_BABYLON_MODES.size);
     expect(s.map((x) => x.kind).reduce<Record<string, number>>((a, k) => ({ ...a, [k]: (a[k] ?? 0) + 1 }), {})).toEqual({ fixture: 12, shipped: 12, duck: 9, script: 45 });
     const jumps = s.filter((x) => x.kind !== 'shipped').flatMap((x) => x.jumps.filter((j) => !j.dangling && j.takeoff >= x.t0 + SPLICE_MS));
     expect(jumps.length).toBeGreaterThanOrEqual(14 + 18 + 9);   // the fixtures' 14, the 18 scripted jumps, 9 in the dropout streams

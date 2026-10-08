@@ -11,6 +11,7 @@ import type { ModePhase } from '@/lib/babylon/core/ModeHarness';
 import { synthesize, restPose, moveJoints, type Joints } from '@/lib/pose/synth';
 import { spaceSession, script, hold } from '@/lib/pose/streamKit';
 import type { PoseFrame } from '@/lib/pose/landmarks';
+import { bodyPlayNeedsGrownUp, type BodyPlayAge } from './bodyPlayGrownUp';
 
 // MOVEMENT PLAY P4 (2026-09-25): the READY screen's body play, with the page taken out — a source, a camera service,
 // storage and a voice that record what they are asked, and the real sessionStore (the harness's writer moves the
@@ -22,7 +23,7 @@ const PLAY = { distance: 3.6, heightM: 1.2 };
 const frames = (seed = 11, clip = spaceSession()) => synthesize(clip, { camera: PLAY, seed }).frames;
 const later = (fs: PoseFrame[], t0: number) => fs.map((f) => ({ ...f, t: f.t + t0, arrive: (f.arrive ?? f.t) + t0 }));
 
-function rig(o: { start?: boolean; bank?: string[] } = {}) {
+function rig(o: { start?: boolean; bank?: string[]; age?: BodyPlayAge } = {}) {
   const calls: string[] = [];
   const store = new Map<string, string>();
   const frameCbs = new Set<(f: PoseFrame) => void>();
@@ -65,6 +66,8 @@ function rig(o: { start?: boolean; bank?: string[] } = {}) {
     pauseGame: () => { calls.push('pause'); writer?.setPhase('paused'); },
     onPageHidden: (fn) => { hiddenCbs.add(fn); },
     now: () => clock,
+    // An adult, unless the test names another age. The grown-up step is bodyPlayGrownUp.test.ts.
+    needsGrownUp: () => bodyPlayNeedsGrownUp(o.age ?? { band: '18+' }, new Date('2026-10-01')),
   };
   const bp = createBodyPlay(deps);
   /** Frames through the camera service, the clock following their arrival. */
@@ -410,11 +413,23 @@ describe('the probe hook', () => {
     return win.__FEL_SPACE__ as Record<string, unknown> | undefined;
   }
 
-  it('__FEL_SPACE__ stays behind the feed\'s gate: development, or a production build on this machine with ?agent=1', async () => {
+  it('__FEL_SPACE__ stays behind the feed\'s gate: development, or production loopback with the server agent-run marker', async () => {
     expect(await load('production', 'finalevolution.us')).toBeUndefined();
-    expect(await load('production', 'finalevolution.us', '?agent=1')).toBeUndefined();
+    expect(await load('production', 'finalevolution.us', '?agent=1')).toBeUndefined();   // a query anyone can type
     expect(await load('production', 'localhost')).toBeUndefined();
-    expect(Object.keys((await load('production', 'localhost', '?agent=1')) ?? {}).sort())
+    expect(await load('production', 'localhost', '?agent=1')).toBeUndefined();             // ?agent=1 alone never arms hooks
+    vi.resetModules();
+    env.NODE_ENV = 'production';
+    const kept = new Map<string, string>();
+    const win: Record<string, unknown> = {
+      location: { hostname: 'localhost', search: '?agent=1' },
+      sessionStorage: { getItem: (k: string) => kept.get(k) ?? null, setItem: (k: string, v: string) => { kept.set(k, v); }, removeItem: (k: string) => { kept.delete(k); } },
+    };
+    g.window = win;
+    const hooks = await import('@/lib/agentRunHooks');
+    hooks.setAgentRunHooksAllowed(true);
+    await import('./bodyPlay');
+    expect(Object.keys((win.__FEL_SPACE__ as Record<string, unknown> | undefined) ?? {}).sort())
       .toEqual(['again', 'begin', 'end', 'handOver', 'session', 'shortcut', 'view']);
     expect(typeof (await load('development', 'fel.example'))?.shortcut).toBe('function');
   });

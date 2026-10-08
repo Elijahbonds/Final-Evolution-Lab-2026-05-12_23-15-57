@@ -173,6 +173,9 @@ export function auditSetup(
 // levels are filled in even though this is a one-shot check (patterns.ts's CueRule requires them, matching
 // pushupAudit.ts's shape): `escalate` for "still like this after resetting once", `regress` for "try it this way
 // instead of the bar for now".
+// MIRROR-COACH P9 (2026-09-30): reworded to FEL's external-focus policy (lib/coach/cueLint.ts, whose test lints this
+// table): a cue that names a body part leads with the floor, the wall, the ceiling, the camera or the load, and nothing
+// names a muscle to squeeze or feel. The fault each line answers, and its three levels, are unchanged.
 export const SETUP_CUES: readonly CueRule[] = [
   {
     faultId: 'hipHeight',
@@ -188,8 +191,8 @@ export const SETUP_CUES: readonly CueRule[] = [
   },
   {
     faultId: 'headLine',
-    cue: 'One long line, ears to hips, before you pull.',
-    escalate: 'Set your head first, hold it, then hinge into the set-up without losing the line.',
+    cue: 'Eyes to a spot on the floor a few feet ahead — one long line, ears to hips, before you pull.',
+    escalate: 'Find that spot on the floor first, hold your eyes on it, then hinge into the set-up without losing the line.',
     regress: 'Set up facing a wall a few feet off and keep your eyes on the same spot the whole time.',
   },
 ];

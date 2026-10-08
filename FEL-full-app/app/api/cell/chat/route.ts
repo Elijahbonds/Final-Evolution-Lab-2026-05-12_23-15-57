@@ -9,6 +9,7 @@ import {
   type CellRole,
   type ChatMessage,
 } from '@/lib/cell-engine';
+import { abacusEnabled, aiComingSoonResponse, AiDisabledError } from '@/lib/abacus/killSwitch';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,6 +22,8 @@ export const dynamic = 'force-dynamic';
  * If no projectId, creates a new CellProject.
  */
 export async function POST(req: Request) {
+  // ABACUS-KILL: before the session, the body or any database read or write (lib/abacus/killSwitch.ts).
+  if (!abacusEnabled()) return aiComingSoonResponse('studio');
   try {
     const session = await getServerSession(authOptions);
     const userId = (session?.user as any)?.id;
@@ -191,6 +194,7 @@ export async function POST(req: Request) {
       },
     });
   } catch (e) {
+    if (e instanceof AiDisabledError) return aiComingSoonResponse('studio');
     console.error('[cell/chat] error', e);
     return NextResponse.json({ error: 'CELL error' }, { status: 500 });
   }

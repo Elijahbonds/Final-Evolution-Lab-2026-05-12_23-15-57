@@ -30,7 +30,11 @@ export interface TrackerLandmark { x: number; y: number; visibility: number }
 export interface TrackerFrame { landmarks: TrackerLandmark[]; timestampMs: number; present: boolean }
 
 const MIN_VIS = 0.5;              // TUNE(elijah): landmark confidence floor
-const AIRBORNE_RISE = 0.03;       // TUNE(elijah): ankle rise above floor, image units
+const AIRBORNE_RISE = 0.03;       // TUNE(elijah): FALLBACK ankle rise above floor, image units (no usable body span)
+/** Airborne rise as a fraction of the standing hip-to-ankle span. 0.03 image units ÷ a typical ~0.35 span at dunk
+ *  framing ≈ 0.086, so framing like today's reads the same; a farther camera now needs a proportionally smaller rise. */
+const AIRBORNE_RISE_FRACTION = 0.086;  // TUNE(elijah)
+const MIN_SPAN = 0.12;            // a standing span smaller than this is a bad read: use the fixed rise
 const MIN_FLIGHT_MS = 180;        // TUNE(elijah): matches IRLCore MIN_FLIGHT
 const MAX_FLIGHT_MS = 1200;       // TUNE(elijah): matches IRLCore MAX_FLIGHT
 const SETTLE_MS = 500;            // TUNE(elijah): landing = this long re-grounded
@@ -44,10 +48,17 @@ const HIP_TRAIL_MS = APPROACH_MS + MAX_FLIGHT_MS + 1500 + SETTLE_MS;
  *  reason, instead of being judged on screen and then silently dropped on upload. 130 cm is a ~1.03 s flight. */
 export const MAX_VERTICAL_CM = 130;
 /** Why a closed attempt was not measured. The route's own error codes, so a screen says what the route would. */
-export type DunkRefusal = 'implausible_vertical' | 'implausible_flight';
+export type DunkRefusal = 'implausible_vertical' | 'implausible_flight' | 'rim_hang';
 
-/** What a screen can say about a refused attempt. */
-export function refusalLine(r: DunkRefusal): string {
+// RIM HANG: a long "flight" with both hands on the rim is a hang, not a jump. Still refused (never judged or counted),
+// but named, with its air time, instead of blamed on the camera.
+const RIM_HANG_MIN_AIR_MS = 950;       // TUNE(elijah): feet-off time over this (or vertical over MAX_VERTICAL_CM) is a candidate
+const RIM_HANG_HANDS_MS = 150;         // TUNE(elijah): both wrists above the nose AND hips still for this long = hanging
+const RIM_HANG_HIP_SPEED = 0.02;       // TUNE(elijah): "hips still" = |Δy|/Δt under this, image units/s; tight so a parabolic apex never banks RIM_HANG_HANDS_MS, a fixed-hip hang does (was 0.15)
+
+/** What a screen can say about a refused attempt. `airTimeMs` is only read for 'rim_hang'. */
+export function refusalLine(r: DunkRefusal, airTimeMs = 0): string {
+  if (r === 'rim_hang') return `Rim hang. Air time ${(airTimeMs / 1000).toFixed(2)} s`;
   return r === 'implausible_vertical'
     ? `Not counted: that read over ${MAX_VERTICAL_CM} cm, so the camera lost your feet. Go again.`
     : 'Not counted: the camera never saw you land. Keep your feet in the shot and go again.';
@@ -107,6 +118,9 @@ export class DunkTracker {
   private phase: Phase = 'idle';
   private floorY = 0;
   private calibration: number[] = [];
+  private calibrationSpan: number[] = [];
+  private span = 0;
+  private prevLow: { t: number; y: number } | null = null;
   private hipTrail: { t: number; x: number; y: number }[] = [];
   private airFrames: TrackerFrame[] = [];
   private takeoffAt = 0;
@@ -114,23 +128,91 @@ export class DunkTracker {
   private preFrames: TrackerFrame[] = [];
   private result: DunkMetrics | null = null;
   private refusal: DunkRefusal | null = null;
+  private refusalAirMs: number | null = null;
 
-  /** Reset for the next attempt. */
+  /** Reset for the next attempt. Clears the floor line, so the next attempt calibrates again. */
   reset(): void {
     this.phase = 'idle';
     this.floorY = 0;
+    this.span = 0;
+    this.prevLow = null;
     this.calibration = [];
+    this.calibrationSpan = [];
     this.hipTrail = [];
     this.airFrames = [];
     this.preFrames = [];
     this.result = null;
     this.refusal = null;
+    this.takeoffAt = 0;
+    this.landedAt = 0;
+  }
+
+  /**
+   * Arm the next attempt without a new floor calibration.
+   *
+   * SESSION-SETUP-V1: the phone stays put between dunks, so the floor line from the first still stance stands.
+   * Call reset() instead when the camera moved (a flip, or framing that goes red). With no floor yet, this is reset().
+   */
+  rearm(): void {
+    const keepFloor = this.floorY > 0 && (this.phase === 'ready' || this.phase === 'settling');
+    this.hipTrail = [];
+    this.airFrames = [];
+    this.preFrames = [];
+    this.calibration = [];
+    this.calibrationSpan = [];
+    this.prevLow = null;
+    this.result = null;
+    this.refusal = null;
+    this.takeoffAt = 0;
+    this.landedAt = 0;
+    if (keepFloor) {
+      this.phase = 'ready';
+      return;
+    }
+    this.phase = 'idle';
+    this.floorY = 0;
+    this.span = 0;
+  }
+
+  /** Ankle rise that counts as airborne: a fraction of the standing span once known, else the fixed image-unit rise. */
+  private get rise(): number {
+    return this.span >= MIN_SPAN ? AIRBORNE_RISE_FRACTION * this.span : AIRBORNE_RISE;
+  }
+
+  /** Sub-frame time of a threshold crossing between the previous and this frame, by the fraction of the gap crossed. */
+  private crossing(prev: { t: number; y: number } | null, t: number, y: number, line: number): number {
+    if (!prev || prev.y === y || t <= prev.t) return t;
+    const frac = Math.max(0, Math.min(1, (prev.y - line) / (prev.y - y)));
+    return prev.t + frac * (t - prev.t);
   }
 
   get state(): Phase { return this.phase; }
   get lastResult(): DunkMetrics | null { return this.result; }
   /** The refusal of the attempt that just closed, handed over once (feed() returns null for it). */
   takeRefusal(): DunkRefusal | null { const r = this.refusal; this.refusal = null; return r; }
+  /** Air time (ms) of the last 'rim_hang' refusal; null for any other. Read it right after takeRefusal(). */
+  get refusalAirTimeMs(): number | null { return this.refusalAirMs; }
+
+  /** Both wrists above the nose and the hips still, held for RIM_HANG_HANDS_MS somewhere in the flight. */
+  private hangingOnRim(): boolean {
+    let runStart: number | null = null;
+    let prev: { t: number; y: number } | null = null;
+    for (const f of this.airFrames) {
+      const nose = this.lm(f, DUNK_POSE_IDX.nose);
+      const lw = this.lm(f, DUNK_POSE_IDX.leftWrist), rw = this.lm(f, DUNK_POSE_IDX.rightWrist);
+      const lh = this.lm(f, DUNK_POSE_IDX.leftHip), rh = this.lm(f, DUNK_POSE_IDX.rightHip);
+      if (!nose || !lw || !rw || !lh || !rh) { runStart = null; prev = null; continue; }
+      const hipY = (lh.y + rh.y) / 2;
+      const dt = prev ? (f.timestampMs - prev.t) / 1000 : 0;
+      const still = prev !== null && dt > 0 && Math.abs(hipY - prev.y) / dt < RIM_HANG_HIP_SPEED;
+      const high = lw.y < nose.y && rw.y < nose.y;
+      prev = { t: f.timestampMs, y: hipY };
+      if (!(high && still)) { runStart = null; continue; }
+      if (runStart === null) runStart = f.timestampMs - dt * 1000;
+      if (f.timestampMs - runStart >= RIM_HANG_HANDS_MS) return true;
+    }
+    return false;
+  }
 
   private lm(f: TrackerFrame, idx: number): TrackerLandmark | null {
     const p = f.landmarks[idx];
@@ -164,9 +246,12 @@ export class DunkTracker {
         break;
       case 'calibrating':
         this.calibration.push(lowAnkleY);
+        this.calibrationSpan.push(lowAnkleY - hip.y);
         if (this.calibration.length >= 20) {         // ~0.65s of stillness
           this.calibration.sort((a, b) => a - b);
           this.floorY = this.calibration[Math.floor(this.calibration.length / 2)];
+          this.calibrationSpan.sort((a, b) => a - b);
+          this.span = this.calibrationSpan[Math.floor(this.calibrationSpan.length / 2)];
           this.phase = 'ready';
         }
         break;
@@ -174,9 +259,10 @@ export class DunkTracker {
         this.preFrames.push(f);
         if (this.preFrames.length > 20) this.preFrames.shift();
         // both feet off the floor line = airborne
-        if (lowAnkleY < this.floorY - AIRBORNE_RISE) {
+        const line = this.floorY - this.rise;
+        if (lowAnkleY < line) {
           this.phase = 'airborne';
-          this.takeoffAt = f.timestampMs;
+          this.takeoffAt = this.crossing(this.prevLow, f.timestampMs, lowAnkleY, line);
           this.airFrames = [f];
         }
         break;
@@ -184,9 +270,10 @@ export class DunkTracker {
       case 'airborne': {
         this.airFrames.push(f);
         // the first foot back down ends the flight (flight = both feet off)
-        if (lowAnkleY >= this.floorY - AIRBORNE_RISE * 0.5) {
+        const landLine = this.floorY - this.rise * 0.5;
+        if (lowAnkleY >= landLine) {
           this.phase = 'settling';
-          this.landedAt = f.timestampMs;
+          this.landedAt = this.crossing(this.prevLow, f.timestampMs, lowAnkleY, landLine);
         }
         // safety: never settle (occluded landing) — close the attempt anyway
         if (f.timestampMs - this.takeoffAt > MAX_FLIGHT_MS + 1500) {
@@ -199,18 +286,27 @@ export class DunkTracker {
         if (f.timestampMs - this.landedAt >= SETTLE_MS) {
           this.result = this.compute();
           this.phase = 'ready';
+          this.prevLow = { t: f.timestampMs, y: lowAnkleY };
           return this.result;
         }
         break;
       }
     }
+    this.prevLow = { t: f.timestampMs, y: lowAnkleY };
     return null;
   }
 
   private compute(): DunkMetrics | null {
     this.refusal = null;
+    this.refusalAirMs = null;
     const flightMs = this.landedAt - this.takeoffAt;
     if (flightMs < MIN_FLIGHT_MS || this.airFrames.length < 3) return null;   // a hop, not an attempt
+    const flightVertCm = (G * (flightMs / 1000) ** 2) / 8 * 100;
+    if ((flightMs > RIM_HANG_MIN_AIR_MS || Math.round(flightVertCm * 10) / 10 > MAX_VERTICAL_CM) && this.hangingOnRim()) {
+      this.refusal = 'rim_hang';
+      this.refusalAirMs = Math.round(flightMs);
+      return null;
+    }
     if (flightMs > MAX_FLIGHT_MS) { this.refusal = 'implausible_flight'; return null; }
 
     const verticalCm = (G * (flightMs / 1000) ** 2) / 8 * 100;

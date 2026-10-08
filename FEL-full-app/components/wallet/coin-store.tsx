@@ -12,14 +12,30 @@
  * always the authoritative server values.
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { Suspense, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Coins, Gem, Loader2, ShoppingCart, Sparkles, History, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { COIN_STORE_PACKS, coinStorePackTotal } from '@/lib/wallet/catalog';
 import { shardSaleCopy } from '@/lib/wallet/purchases';
 import { usePurchasesEnabled } from '@/lib/wallet/use-purchases-enabled';
+import { VerifyCheckoutSession } from '@/components/stripe/verify-checkout-session';
+
+/** Reads ?session_id= off the checkout redirect. Suspense-wrapped: useSearchParams bails out of prerendering. */
+function CoinStoreVerify({ onFulfilled }: { onFulfilled: () => void }) {
+  const sessionId = useSearchParams().get('session_id');
+  return (
+    <VerifyCheckoutSession
+      sessionId={sessionId}
+      onResult={(r) => {
+        if (r.state === 'fulfilled') onFulfilled();
+        if (r.state === 'pending') toast.info('Payment pending', { description: 'Stripe is still confirming this payment. Balance updates in a moment.' });
+      }}
+    />
+  );
+}
 
 interface Balances { coins: number; shards: number }
 
@@ -90,6 +106,11 @@ export function CoinStore() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-6 space-y-10">
+      {/* SEC-F4 NO-WEBHOOK: a ?session_id= landing checks with Stripe and fulfils the pack
+          even with no webhook configured, then refreshes the balance. Idempotent on reload. */}
+      <Suspense fallback={null}>
+        <CoinStoreVerify onFulfilled={loadWallet} />
+      </Suspense>
       {/* Balance header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>

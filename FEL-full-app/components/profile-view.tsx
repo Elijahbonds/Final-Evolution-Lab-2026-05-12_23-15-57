@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { healthEraseToast, healthStoredLine } from '@/lib/health/healthDataCopy';
 import { MasteryBadge } from '@/components/mastery-badge';
 import { motion } from 'framer-motion';
 import { PRQ_ATTRS } from '@/lib/prq';
@@ -9,6 +10,7 @@ import { AvatarFigure } from '@/components/avatar-figure';
 import { Flame, Sparkles, Coins, Gem, Check, Plus, X, Loader2, Download, Trash2, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { Switch } from '@/components/ui/switch';
+import { levelFor } from '@/lib/player-level';
 
 const ATTR_LABELS: Record<string, string> = {
   strength: 'Strength',
@@ -56,6 +58,8 @@ export function ProfileView({ userName, email }: { userName: string; email: stri
   const grade = data?.grade;
   const p = data?.profile;
   const currentAvatar = ROSTER.find((r) => r.key === p?.avatarKey) ?? null;
+  // IMPROVE (2026-10-06, owner decision): the player level, read off the account XP shown below (lib/player-level.ts)
+  const lv = typeof p?.xp === 'number' ? levelFor(p.xp) : null;
 
   return (
     <main className="py-2">
@@ -85,6 +89,15 @@ export function ProfileView({ userName, email }: { userName: string; email: stri
               >
                 {grade?.label} · PRQ {Math.round(data?.prq ?? 0)}
               </span>
+            )}
+            {lv && (
+              <div data-player-level={lv.level} className="mt-2 flex items-center gap-2">
+                <span className="fel-heading text-sm font-bold text-[#00FF9D]">LEVEL {lv.level}</span>
+                <span className="h-1.5 w-28 overflow-hidden rounded-full bg-white/10" role="progressbar" aria-label="Player level progress" aria-valuemin={0} aria-valuemax={lv.need} aria-valuenow={lv.into}>
+                  <span className="block h-full rounded-full bg-[#00FF9D]" style={{ width: `${Math.min(100, (lv.into / lv.need) * 100)}%` }} />
+                </span>
+                <span className="font-mono text-[11px] text-white/50">{lv.into.toLocaleString('en-US')}/{lv.need.toLocaleString('en-US')} XP</span>
+              </div>
             )}
           </div>
           <div className="ml-auto grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-4">
@@ -305,9 +318,11 @@ interface HealthConsentApiView {
   healthData: { granted: boolean; grantedAt: string | null };
   coaches: { coachId: string; name: string; viewGranted: boolean; grantedAt: string | null }[];
   /** MIRROR-COACH P6 (2026-09-29): readinessCheckIns — the daily check-in, stored under this same consent. Optional
-   *  so a response from before P6 still renders (read as 0). */
-  counts: { healthIntakes: number; painCheckIns: number; readinessCheckIns?: number };
+   *  so a response from before P6 still renders (read as 0). MIRROR-COACH P7 FIX (2026-09-29): breathLogs — the Dial-Up
+   *  Breath's use log, which the export and both erases carry; optional for the same reason. */
+  counts: { healthIntakes: number; painCheckIns: number; readinessCheckIns?: number; breathLogs?: number };
 }
+
 
 function HealthDataSection() {
   const [view, setView] = useState<HealthConsentApiView | null>(null);
@@ -354,7 +369,7 @@ function HealthDataSection() {
       const j = await res.json().catch(() => ({}));
       if (res.ok) {
         const e = j?.erased ?? {};
-        toast.success(`Deleted ${e.healthIntakes ?? 0} intake${e.healthIntakes === 1 ? '' : 's'}, ${e.painCheckIns ?? 0} pain check-in${e.painCheckIns === 1 ? '' : 's'}, ${e.readinessCheckIns ?? 0} daily check-in${e.readinessCheckIns === 1 ? '' : 's'} and ${e.healthConsents ?? 0} consent record${e.healthConsents === 1 ? '' : 's'}`);
+        toast.success(healthEraseToast(e));
         setShowErase(false);
         setView(j);
       } else {
@@ -375,7 +390,7 @@ function HealthDataSection() {
         <ShieldCheck className="h-4 w-4 text-[#00E5FF]" /> HEALTH DATA
       </h3>
       <p className="text-xs text-white/40 mb-4">
-        Your health intake, pain check-ins and daily check-ins, kept separately from the rest of your account: opt-in only, stored on FEL
+        Your health intake, pain check-ins, daily check-ins and Dial-Up Breath uses, kept separately from the rest of your account: opt-in only, stored on FEL
         only, never sold, never used for ads, never in a share link, and never scored or paid. See Privacy §5.
       </p>
 
@@ -384,7 +399,7 @@ function HealthDataSection() {
           <div className="text-sm font-bold text-white">Health data collection</div>
           <div className="text-xs text-white/40">
             {granted
-              ? `On${view?.healthData.grantedAt ? ` since ${new Date(view.healthData.grantedAt).toLocaleDateString()}` : ''} — ${view?.counts.healthIntakes ?? 0} intake${(view?.counts.healthIntakes ?? 0) === 1 ? '' : 's'}, ${view?.counts.painCheckIns ?? 0} pain check-in${(view?.counts.painCheckIns ?? 0) === 1 ? '' : 's'}, ${view?.counts.readinessCheckIns ?? 0} daily check-in${(view?.counts.readinessCheckIns ?? 0) === 1 ? '' : 's'} stored.`
+              ? `On${view?.healthData.grantedAt ? ` since ${new Date(view.healthData.grantedAt).toLocaleDateString()}` : ''} — ${healthStoredLine(view?.counts)}`
               : 'Off — nothing is being collected.'}
           </div>
         </div>
@@ -429,7 +444,7 @@ function HealthDataSection() {
           </button>
         ) : (
           <div className="flex items-center gap-2">
-            <span className="text-xs text-[#FF3366]">Deletes your intake, every pain check-in and your consent records. Never touches a workout plan or your PRQ history. This is permanent.</span>
+            <span className="text-xs text-[#FF3366]">Deletes your intake, every pain check-in, every daily check-in and your Dial-Up Breath uses. Your consent records are kept as proof of agreement and withdrawal. Never touches a workout plan or your PRQ history. This is permanent.</span>
             <button
               onClick={handleErase}
               disabled={erasing}

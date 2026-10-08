@@ -42,8 +42,11 @@ describe('the AI bodies move with the hero\'s weight (AiMover)', () => {
     expect(fnBody(one, 'function observeFoe(')).toMatch(/foeMover\.observe\(foe\.root\.position, dt, contact\?\.isReady \? ctx\.scene\.getFrameId\(\) : undefined\)/);
     expect((one.match(/observeFoe\(ctx, dt\)/g) ?? []).length).toBe(3);
     expect((one.match(/foeMover\.observe\(/g) ?? []).length).toBe(1);
-    // the scripted 3v3 driver's speed is read once per frame id too (the drive moves him in the before-render pass)
-    expect(three).toMatch(/!\(driverPrevFor === driver && driverEstFrame === ctx\.scene\.getFrameId\(\)\)/);
+    // the scripted 3v3 driver's speed: it was read once per frame id (the drive moved him in the before-render pass). IMPROVE
+    // (2026-10-06, 3v3 #4): the drive steps in update() now (foeDriveTick, so a pause holds it), every sub-update under ?qaSpeed=N —
+    // so his speed is read every update, after the drive's step on the same dt
+    expect(three).toMatch(/foeDriveTick\?\.\(Math\.min\(0\.05, Math\.max\(0, dt\)\)\);[\s\S]*if \(driver && dt > 1e-4\) \{/);
+    expect(three).not.toMatch(/driverEstFrame/);
   });
   it('3v3: the scripted drive ramps from his stand and its bend follows at a limited rate; his tree is fed the speed he covers', () => {
     const drive = fnBody(three, 'async function opponentPossession(');

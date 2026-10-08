@@ -141,6 +141,14 @@ export const BUILDER_ERROR_COPY: Record<string, string> = {
   off_day_before_done: 'Your athlete has already done a session after this point, so an off day here would send their Today back to it. Add it after the last session they have done.',
   name_taken_fel: 'Another coach on FEL already uses one of the off-day exercise names. Add it to your catalogue under your own name first.',
   off_day_template_invalid: 'The off-day template did not pass its own checks. Nothing was added.',
+  // MIRROR-COACH P8 (2026-09-29): start from a FEL template (builderServer.ts clone_template)
+  template_not_found: 'That template is not on FEL any more. Reload.',
+  template_adults_only: 'That template is for adults: it has jumps and harder sets. This athlete is under 18, or their birth year is not on file yet, so pick a youth template.',
+  program_not_empty: 'A template goes into an empty program. This one already has exercises, a week with a target date, or a session your athlete has opened. Start a new program for the template.',
+  template_invalid: 'The template did not pass its own checks. Nothing was added.',
+  template_name_taken_fel: 'Another coach on FEL already uses one of this template\'s exercise names. Add it to your catalogue under your own name first.',
+  // MIRROR-COACH P8 FIX (2026-09-30): a coach's own row stands in for a template jump but is not tagged as jump work
+  template_row_not_jump: "One of your catalogue's exercises has the name of a jump in this template but isn't tagged as jump work (skill layer Jump & Land, or category plyometric), so FEL's jump checks can't see it. Tag it, or rename it, then start from the template again. Nothing was added.",
   tempo_format: 'Tempo is four numbers like 3-1-1-0.',
   direction_required: 'Move it up or down.',
   facilitator_not_certified: 'Programs are written by certified coaches.',

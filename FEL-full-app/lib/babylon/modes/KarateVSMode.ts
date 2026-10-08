@@ -26,10 +26,9 @@
 
 import { EvadeMoves } from '../core/EvadeMoves';
 import { FOCUS, FocusMeter, WALL_RUN, wallRunAvailableOn, startWallRunOn, wallRunOnAt, wallRunOnSide, startWallKick, wallKickAt, kickHits, type WallRunOn, type WallKickState } from '../core/MatrixFocus';   // MATRIX FOCUS (2026-09-18): bullet time held on the right trigger
-import { readCombatArena, arenasFor, arenaClamp, knockTo, hazardAt, describeArena, ROPES, type CombatArena, type ArenaWall } from '../combat/arenas';   // COMBAT ARENAS (2026-09-18)
+import { readCombatArena, arenasFor, arenaClamp, knockTo, hazardAt, describeArena, crowdRing, CROWD_GAP, CROWD_PHASE, ROPES, type CombatArena, type ArenaWall } from '../combat/arenas';   // COMBAT ARENAS (2026-09-18)
 import { buildArena, type ArenaHandle } from '../combat/arenaBuild';
-import { dodgeReward, tickCounter, counterMult } from '../core/DodgeRead';
-import { nerve, standingOf } from '../core/Nerve';
+import { dodgeReward, dashSecToImpact, tickCounter, counterMult } from '../core/DodgeRead';
 import { Vector3 } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { neverBindPose } from '../anim/importSanitizer';
@@ -51,16 +50,22 @@ import { VenueKit } from '../visual/VenueKit';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';
 import { Onlookers } from '../visual/Onlookers';
 import {
-  FighterState, RivalFightBrain, resolveStrike, applyHit,
+  FighterState, resolveStrike, applyHit,
   KARATE_ATTACKS, SPECIAL_ATTACK, CHI_MAX, GUARD_MAX, PARRY_STAGGER_SEC, PARRY_WINDOW_MS, type AttackDef,
+  guardPressMs, rivalDifficulty, rivalPower, applyRivalPower, poweredAttack, RIVAL_POWER_BASE, type RivalPower,
 } from '../core/FightCore';
+import { KnockSlides, makeChestOf } from '../core/FightKit';   // IMPROVE (2026-10-06): the shared knock slide + scratch chest points
+import { readTier } from '../core/Difficulty';   // IMPROVE (2026-10-06): the OPPONENT pick
+import { threatLandsIn, RivalCombatBrain, type RivalResource } from '../core/RivalCombatBrain';   // IMPROVE (2026-10-06): the shared rival (it dashes now)
+import { GameTimers, BannerSlot } from '../core/ModeClock';   // IMPROVE (2026-10-06): hit beats and banners on the game clock
+import { versusScore, versusScoreParts, type VersusTally } from '../core/VersusScore';   // IMPROVE (2026-10-06): a result a replay can beat
 import { StringBook, attackFromMove, STRIKE_TIMING, DASH_ATTACK_SEC, type StickDir, type StrikeBtn } from '../core/HordeDynamics';   // STORM COMBOS (2026-09-17): the book of strings
-import { XButtonReader, DASH, LAUNCH_AIR_SEC, launchHeight } from '../core/StormCombat';   // STORM: X = dash / double = chakra dash / hold = guard; launchers put him in the air
+import { XButtonReader, DASH, LAUNCH_AIR_SEC, launchHeight, stormDashReady } from '../core/StormCombat';   // STORM: X = dash / double = chakra dash / hold = guard; launchers put him in the air
 import { mountPlayerRing, type PlayerRingHandle } from '../visual/PlayerRing';   // PLAYER RING (owner): who you are, and the gauge at your feet
 import { readPlayerIcon } from '../visual/playerIcon';
 import { SoundKit } from '../audio/SoundKit';
 import {
-  BASELINE_RATINGS, ratingsFrom, routeFor, routeHitStopMs, routeShake, damageScale, hasFightMove, cancelWindowSec,
+  BASELINE_RATINGS, ratingsFrom, ratingsForBand, routeFor, routeHitStopMs, routeShake, damageScale, hasFightMove, cancelWindowSec,
   type FightRatings, type RouteStrike,
 } from '../core/FighterStyle';   // PRQ gates the vocabulary; a combo is a ROUTE, not a counter
 import { EffectsKit } from '../visual/EffectsKit';
@@ -85,10 +90,11 @@ import type { BodyView } from '../core/ModeHarness';
 let modeVenue: VenueHandle | null = null;   // ship pass 4: the mounted venue spec, disposed with the mode
 let crowd: Onlookers | null = null;         // Pass 7 phase 6: a ring of onlookers on the gravel, as the endless gauntlet has
 
-type Phase = 'intro' | 'fighting' | 'roundOver' | 'matchOver';
+// IMPROVE (2026-10-06): 'ready' — the round-start beat (ROUND n … FIGHT!) before control returns
+type Phase = 'intro' | 'ready' | 'fighting' | 'roundOver' | 'matchOver';
 const ROUNDS_TO_WIN = 2;
 /** What the rival fights at in a level match. Nerve moves it from here as the rounds go. */
-const BASE_RIVAL_DIFFICULTY = 0.65;
+const BASE_RIVAL_DIFFICULTY = 0.72;
 const MOVE_SPEED = 3.4;
 // THE FIGHT AREA MUST BE INSET FROM THE ROOM. The dojo floor is 18x18, so its
 // half-extent is 9 — and this was 7.5, leaving 1.5m between a fighter at the
@@ -120,14 +126,47 @@ interface FighterAnim {
 const newFighterAnim = (tree: CombatAnimTree): FighterAnim => ({ tree, strike: null, hitBy: null, hitUntil: 0, parryUntil: 0, impactUntil: 0, downUntil: 0, celebrateUntil: 0, out: false });
 const WEIGHT_OF: Record<'jab' | 'kick' | 'heavy', StrikeWeight> = { jab: 'light', kick: 'medium', heavy: 'heavy' };
 
-const BUDGET_SEC: Record<Phase, number> = { intro: 4, fighting: 120, roundOver: 4, matchOver: 999 };
+/** IMPROVE (2026-10-06): the round clock. It was only the watchdog's budget, so a round that ran out was decided on HP
+ *  with nothing on screen; it is the visible clock now (HUD `timeLeft`), and the bell says TIME. Same 120 s. */
+const ROUND_SEC = 120;
+/** IMPROVE (2026-10-06), TUNED: the round-start beat — "ROUND n" for READY_SEC, then FIGHT! and control. It used to hand
+ *  control back the frame the KO pause ended. */
+const READY_SEC = 0.9;
+/** The KO / round-result pause before the next round (was a 2200 ms setTimeout; the game clock now). */
+const ROUND_OVER_SEC = 2.2;
+/** IMPROVE (2026-10-06), TUNED (new): what a rival dash costs from its chi bar (Duel's rival pays the same 12). */
+const RIVAL_DASH_CHI = 12;
+/** IMPROVE (2026-10-06), TUNED: onlookers on a phone (every fourth spot of the same ring) — the Hundred's phone cut. */
+const KVS_PHONE_ONLOOKERS = 4;
+/** IMPROVE (2026-10-06): the controls, all of them (dash, roll, jump, Focus and the wall run were missing), in one
+ *  static line. The DRAGON needs a body that can throw it (FighterStyle force ≥ 78 — an ELITE scan or ?fight=). */
+export const KVS_HINT = 'A jab · B kick · Y heavy · hold X guard, press it at the last instant to parry · tap X dash, double-tap chakra dash · L1 roll · R1 jump · hold R2 Focus (L1 into a wall: wall run) · full chi + an ELITE body: HEAVY becomes the DRAGON';
+const BUDGET_SEC: Record<Phase, number> = { intro: 4, ready: 3, fighting: ROUND_SEC, roundOver: 4, matchOver: 999 };
+/** IMPROVE (2026-10-06): one read-only zero for the default velocities (was a fresh Vector3.Zero() per call). */
+const ZERO: Readonly<Vector3> = Vector3.Zero();
 /** MOVEMENT PLAY P7: a body strike handed to swing(): its move, its onset on the page clock, what the body threw. */
 interface BodyStrikeArg { move: HordeMove; onsetPage: number; body: string }
 
 export const KarateVSMode: ModeDefinition = (() => {
   let player: SpawnedCharacter, rival: SpawnedCharacter;
   let meState: FighterState, foeState: FighterState;
-  let brain: RivalFightBrain;
+  let brain: RivalCombatBrain;
+  /** COMBAT DIFFICULTY (2026-10-06): the rival's power for this round (rivalPower; set in startRound). */
+  let foePower: RivalPower = rivalPower(1, null);
+  /** IMPROVE (2026-10-06): the rival's dash (its RivalCombatBrain spends chi on one when it is far out), on the room clock. */
+  let foeDash: { dx: number; dz: number; left: number } | null = null;
+  /** IMPROVE (2026-10-06): what the brain is told it can spend. The ultimate is a heavy at a full bar; a rival that cannot
+   *  throw the DRAGON is given a bar it can never fill (max = Infinity), so a full chi never locks it onto heavies. */
+  const foeResource: RivalResource = { value: 0, max: CHI_MAX, dashCost: RIVAL_DASH_CHI, subCost: Infinity, subReady: false };
+  /** IMPROVE (2026-10-06): the game clock (Σ the dt the harness hands update), MY swing's hit beats on my clock, the
+   *  banner slot, and the match tally the result is scored from. */
+  let clock = 0;
+  const meTimers = new GameTimers();
+  const bannerSlot = new BannerSlot();
+  const tally: { hpLeftOnWins: number[]; perfectDodges: number; routes: number } = { hpLeftOnWins: [], perfectDodges: 0, routes: 0 };
+  let timeHud = -1, guardHud = -1, foeGuardHud = -1;
+  /** Show a banner for `sec` (Infinity: until the next one). The one place a banner is set or cleared. */
+  function banner(ctx: ModeContext, text: string, sec: number): void { ctx.setHud({ banner: bannerSlot.show(text, sec, clock) }); }
   /** The player's strikes with their chosen school applied. The rival keeps the unstyled table. */
   let myAttacks: Record<'jab' | 'kick' | 'heavy', AttackDef> = KARATE_ATTACKS;
   let phase: Phase = 'intro';
@@ -145,7 +184,7 @@ export const KarateVSMode: ModeDefinition = (() => {
   // his swing's hit beat via foeTimers) while I keep FOCUS.heroScale; a read refills it, my hits inside it land harder.
   const focus = new FocusMeter();
   let focusHeld = false, focusHud = -1, focusHudOn = false;
-  const foeTimers: { left: number; fn: () => void }[] = [];
+  const foeTimers = new GameTimers();   // IMPROVE (2026-10-06): the shared helper; cleared at round start and dispose
   // THE ARENA (2026-09-18): picked on the splash (combat/arenas.ts), re-read at load (the factory runs at SSR). Its walls
   // take the wall run inside Focus; its edge stops, bounces (ropes) or — never here — drops. `ARENA_HALF` is history.
   let arena: CombatArena = arenasFor('karate_vs')[0];
@@ -154,14 +193,14 @@ export const KarateVSMode: ModeDefinition = (() => {
   const matrixStats = { wallRuns: 0, wallKicks: 0, kickHits: 0 };
   /** L1 inside Focus, running INTO a wall: up onto it and along it. */
   function tryWallRun(ctx: ModeContext): boolean {
-    const pos = player.root.position, v = lastMyVel ?? Vector3.Zero();
+    const pos = player.root.position, v = lastMyVel ?? ZERO;
     const hd = v.length() >= 0.3 ? { x: v.x, z: v.z } : { x: -Math.sin(player.root.rotation.y), z: -Math.cos(player.root.rotation.y) };   // stopped on the wall with the rival in front: the wall is BEHIND (lock-on faces the rival)
     const hit = wallRunAvailableOn({ x: pos.x, z: pos.z }, hd, arena.walls);
     if (!hit) { if (process.env.NODE_ENV === 'development') console.info(`[MATRIX] wall run refused at (${pos.x.toFixed(2)}, ${pos.z.toFixed(2)}) heading (${hd.x.toFixed(2)}, ${hd.z.toFixed(2)}) vel ${v.length().toFixed(2)}`); return false; }
     wallRun = startWallRunOn(hit, hd); matrixStats.wallRuns++;
     endStrike(true); meState.releaseBlock();
     SoundKit.play('whoosh', { pitch: 1.1, volume: 0.45 });
-    ctx.setHud({ banner: 'WALL RUN' }); setTimeout(() => ctx.setHud({ banner: '' }), 500);
+    banner(ctx, 'WALL RUN', 0.5);
     ctx.momentum.report({ kind: 'near_miss', weight: 10 });
     console.info(`[MATRIX] vs wall run on the ${wallRun.wall.label} dir ${wallRun.dir}`);
     return true;
@@ -177,7 +216,7 @@ export const KarateVSMode: ModeDefinition = (() => {
     meAnim.strike = { weight: 'heavy', clip: myAttacks.kick.clip, until: now() + 900 };   // the tree plays the kick; its settle ends the swing
     striking = true;
     SoundKit.play('whoosh', { pitch: 0.8, volume: 0.6 });
-    ctx.setHud({ banner: 'WALL KICK' }); setTimeout(() => ctx.setHud({ banner: '' }), 600);
+    banner(ctx, 'WALL KICK', 0.6);
     console.info('[MATRIX] vs wall kick');
   }
   /** The wall run and the kick own the body while they last. Returns true when they do. */
@@ -202,7 +241,7 @@ export const KarateVSMode: ModeDefinition = (() => {
         EffectsKit.burst(ctx.scene, rp.add(new Vector3(0, 1.1, 0)), 'sparks');
         beatDown(false, WALL_RUN.kickStunSec + GET_UP_SEC);
         knockback(ctx, rival, player.root.position, 1.8);
-        ctx.setHud({ foeHp: foeState.hp, banner: 'WALL KICK!' }); setTimeout(() => ctx.setHud({ banner: '' }), 700);
+        ctx.setHud({ foeHp: foeState.hp }); banner(ctx, 'WALL KICK!', 0.7);
         console.info('[MATRIX] vs wall kick hit');
         if (foeState.hp <= 0) endRound(ctx, true);
       }
@@ -223,18 +262,18 @@ export const KarateVSMode: ModeDefinition = (() => {
       EffectsKit.burst(ctx.scene, c.root.position.add(new Vector3(0, 0.6, 0)), 'sparks');
       ctx.setHud(mine ? { hp: st.hp } : { foeHp: st.hp });
       console.info(`[ARENA] ${mine ? 'you' : 'rival'} in the ${h.label}`);
-      if (st.hp <= 0) { ctx.setHud({ banner: mine ? 'BURNED!' : 'RIVAL BURNED!' }); endRound(ctx, !mine); }
+      if (st.hp <= 0) endRound(ctx, !mine, mine ? 'BURNED!' : 'RIVAL BURNED!');
     }
   }
   function onFocusStart(ctx: ModeContext): void {
     ctx.juice.tint('rgba(16, 70, 34, 0.75)'); ctx.camDirector.pulse(0.45, 0.35);
     SoundKit.play('powerUp', { pitch: 0.55, volume: 0.5 });
-    ctx.setHud({ banner: 'FOCUS' }); setTimeout(() => ctx.setHud({ banner: '' }), 500);
+    banner(ctx, 'FOCUS', 0.5);
     console.info(`[MATRIX] vs focus on at ${Math.round(focus.value)}`);
   }
   function onFocusEnd(ctx: ModeContext, dry: boolean): void {
     ctx.juice.tint(null); SoundKit.play('whoosh', { pitch: 0.6, volume: 0.4 });
-    if (dry) { ctx.setHud({ banner: 'FOCUS DRAINED' }); setTimeout(() => ctx.setHud({ banner: '' }), 600); }
+    if (dry) banner(ctx, 'FOCUS DRAINED', 0.6);
     console.info(`[MATRIX] vs focus off (${dry ? 'dry' : 'released'}) after ${focus.heldSec.toFixed(2)} s`);
   }
   let meAnim: FighterAnim, foeAnim: FighterAnim;
@@ -245,7 +284,7 @@ export const KarateVSMode: ModeDefinition = (() => {
   let mePosture: { layer: PostureLayer; dispose(): void } | null = null, foePosture: { layer: PostureLayer; dispose(): void } | null = null;
   const meBio: CombatPostureInput = { ...COMBAT_INPUT_IDLE }, foeBio: CombatPostureInput = { ...COMBAT_INPUT_IDLE };
   /** The chest aims at his chest, not his feet: the eyes level instead of looking at the floor between you. */
-  const chestOf = (c: SpawnedCharacter): Vector3 => c.root.position.add(new Vector3(0, 1.32, 0));
+  const chestOf = makeChestOf();   // IMPROVE (2026-10-06): one scratch point per target, no per-frame Vector3s
   // DYNAMIC POSTURE for the FOOTWORK. An 8-way duel is mostly sideways, and every authored combat stance is
   // [x, 0, 0] — pitch only — so a fighter circling hard stayed bolt upright. The allowlist is COMBAT_DYNAMIC:
   // strikes, blocks, parries, reactions and knockdowns are choreography and a strike's lean is the authored shape of
@@ -281,6 +320,8 @@ export const KarateVSMode: ModeDefinition = (() => {
   const meEvade = new EvadeMoves();
   let ctx0!: ModeContext;   // STORM: the context the stick read needs (set every update)
   let lastMyVel: Vector3 | null = null, lastFoeVel: Vector3 | null = null;   // FREE RUN: last frame's travel, for the facing
+  // IMPROVE (2026-10-06): the per-frame velocities live in scratch vectors (each was a fresh Vector3 a frame)
+  const moveVelS = new Vector3(), myDashVelS = new Vector3(), foeVelS = new Vector3();
   const FREE_RUN_M = 3.4;
   // STORM (2026-09-17): the string book (every press is its own link), the X reader, the dash and the launched body
   const book = new StringBook(); const xBtn = new XButtonReader();
@@ -304,9 +345,19 @@ export const KarateVSMode: ModeDefinition = (() => {
   let meCounter = 0;
   /** When the rival's in-flight strike would connect, as a game-clock time; null when nothing is coming. */
   let foeImpactAt: number | null = null;
+  let lastFoeRange = 1.8;
   let lookX = 0, lookY = 0;   // R stick → camera look (MODE-STICK-FACE family, 2026-09-07)
 
   function setPhase(p: Phase): void { phase = p; phaseSec = 0; }
+  /** IMPROVE (2026-10-06): the panic roll's direction — straight away from the rival (the camera's back as a fallback when
+   *  the two stand on one spot). */
+  function neutralRollDir(ctx: ModeContext): { x: number; z: number } {
+    const x = player.root.position.x - rival.root.position.x, z = player.root.position.z - rival.root.position.z;
+    const d = Math.hypot(x, z);
+    if (d > 1e-3) return { x: x / d, z: z / d };
+    const f = ctx.camDirector.forwardFlat();
+    return { x: -f.x, z: -f.z };
+  }
   function now(): number { return performance.now(); }
 
   /** G1: the lock-on TURNS. Both fighters ease onto each other at a real pivot rate, and a body on the floor (KO'd, or
@@ -326,24 +377,17 @@ export const KarateVSMode: ModeDefinition = (() => {
 
   /** G3: knockback at a constant SPEED, so a heavier hit takes longer and travels further — it used to be a fixed
    *  160 ms lerp whatever the distance, which made a 0.4 m jab and a 2.2 m DRAGON the same shove played at two speeds. */
-  const KNOCKBACK_SPEED = 9;   // m/s — 0.4 m in 44 ms, 2.2 m in 244 ms
+  // IMPROVE (2026-10-06): the slide itself is the shared KnockSlides (core/FightKit) — ticked on the ROOM clock in update(),
+  // one per body (a second blow replaces a running slide instead of fighting it), cleared at a round reset.
+  const knock = new KnockSlides();
   function knockback(ctx: ModeContext, char: SpawnedCharacter, fromPos: Vector3, meters: number): void {
     const dir = char.root.position.subtract(fromPos); dir.y = 0;
     if (dir.lengthSquared() < 1e-4) return;
     dir.normalize();
-    const from = char.root.position.clone();
-    const kt = knockTo(from, from.add(dir.scale(meters)), arena);   // COMBAT ARENAS: the edge stops it, or the ropes throw it back
-    const to = new Vector3(kt.x, from.y, kt.z);
-    if (kt.rebound) { const mine = char === player; beatDown(mine, ROPES.stunSec + GET_UP_SEC); SoundKit.play('impact', { pitch: 1.4, volume: 0.4 }); ctx.setHud({ banner: mine ? 'YOU HIT THE ROPES!' : 'OFF THE ROPES!' }); setTimeout(() => ctx.setHud({ banner: '' }), 500); console.info('[ARENA] vs off the ropes'); }
-    const ms = Math.max(80, (Vector3.Distance(from, to) / KNOCKBACK_SPEED) * 1000);
-    const t0 = now();
-    const obs = ctx.scene.onBeforeRenderObservable.add(() => {
-      const u = Math.min(1, (now() - t0) / ms);
-      const k = 1 - (1 - u) * (1 - u);   // the body carries the blow out and settles: ease-out, not a linear drag
-      char.root.position.x = from.x + (to.x - from.x) * k;
-      char.root.position.z = from.z + (to.z - from.z) * k;
-      if (u >= 1) ctx.scene.onBeforeRenderObservable.remove(obs);
-    });
+    const from = char.root.position;
+    const kt = knockTo(from, { x: from.x + dir.x * meters, z: from.z + dir.z * meters }, arena);   // COMBAT ARENAS: the edge stops it, or the ropes throw it back
+    if (kt.rebound) { const mine = char === player; beatDown(mine, ROPES.stunSec + GET_UP_SEC); SoundKit.play('impact', { pitch: 1.4, volume: 0.4 }); banner(ctx, mine ? 'YOU HIT THE ROPES!' : 'OFF THE ROPES!', 0.5); console.info('[ARENA] vs off the ropes'); }
+    knock.start(char.root.position, kt.x, kt.z);
   }
 
   // ── the tree's inputs (ANIM-READABILITY) ──
@@ -354,6 +398,7 @@ export const KarateVSMode: ModeDefinition = (() => {
   function tryDash(ctx: ModeContext, homing: boolean): void {
     if (!meState.controllable || !meEvade.canAct || phase !== 'fighting') return;
     if (meDash && !(homing && !meDash.homing)) return;   // a running dash refuses a second tap — unless the tap makes it the CHAKRA dash (the double tap lands mid-burst by definition)
+    if (!stormDashReady(lastDashSec, now() / 1000, homing)) return;   // IMPROVE (2026-10-06): the Storm dash's cooldown (DASH.cooldownSec)
     if (striking) { const st = animOf(true).strike; if (st && st.cancelFrom !== undefined && now() < st.cancelFrom) return; endStrike(true); }   // dash-cancel after the cancel point
     const toFoe = rival.root.position.subtract(player.root.position); toFoe.y = 0;
     const stick = Math.hypot(stickX, stickY) > 0.25 ? ctx.camDirector.forwardFlat().scale(-stickY).addInPlace(ctx.camDirector.rightFlat().scale(stickX)) : null;
@@ -363,7 +408,10 @@ export const KarateVSMode: ModeDefinition = (() => {
     SoundKit.play('whoosh', { pitch: homing ? 1.35 : 1.2, volume: 0.45 }); if (homing) ctx.camDirector.pulse(0.25, 0.3);
     console.info(`[KVS-STORM] ${homing ? 'chakra dash' : 'dash'}`);
   }
-  function endStrike(mine: boolean): void { if (mine) striking = false; else foeStriking = false; animOf(mine).strike = null; }
+  function endStrike(mine: boolean): void { if (mine) { striking = false; myImpactAt = null; } else { foeStriking = false; foeImpactAt = null; } animOf(mine).strike = null; }
+  /** IMPROVE (2026-10-06): when MY swing connects (page ms) — the rival's parry is timed to it, and past it my swing is a
+   *  recovery the rival can punish. null = not swinging. */
+  let myImpactAt: number | null = null;
   function beatHit(mine: boolean, weight: StrikeWeight): void {
     const f = animOf(mine); f.hitBy = weight; f.hitUntil = now() + (weight === 'finisher' ? LAUNCH_SEC : REACT_SEC) * 1000;
     f.tree.clearBeat(...REACT_STATES);   // a second hit inside the first react re-fires it
@@ -372,7 +420,7 @@ export const KarateVSMode: ModeDefinition = (() => {
   function beatDown(mine: boolean, staggerSec: number): void { const f = animOf(mine); f.downUntil = now() + (staggerSec - GET_UP_SEC) * 1000; f.tree.clearBeat('knockdown'); endStrike(mine); }
   function beatParry(mine: boolean): void { const f = animOf(mine); f.parryUntil = now() + PARRY_SEC * 1000; f.tree.clearBeat('parry_flash'); }
   function beatGuardImpact(mine: boolean): void { const f = animOf(mine); f.impactUntil = now() + IMPACT_SEC * 1000; f.tree.clearBeat('guard_impact'); }
-  function treeInput(f: FighterAnim, s: FighterState, speed01: number, mine: boolean, vel: Vector3): CombatAnimInput {
+  function treeInput(f: FighterAnim, s: FighterState, speed01: number, mine: boolean, vel: Readonly<Vector3>): CombatAnimInput {
     const t = now();
     if (f.strike && t > f.strike.until) endStrike(f === meAnim);   // a strike the tree never settled (safety, never measured)
     const me = mine ? player : rival, foe = mine ? rival : player;
@@ -380,8 +428,9 @@ export const KarateVSMode: ModeDefinition = (() => {
     // G2 — WHERE THE FEET ARE GOING against the FACING (the lock-on aims the root at the opponent every frame, so a
     // fighter circling him travels 90° off his own forward and the forward guard step was a moon-walk)
     const strafe = strafeAxis(vel, yaw);
-    const toFoe = foe.root.position.subtract(me.root.position); toFoe.y = 0;
-    const closing = toFoe.lengthSquared() > 1e-6 ? Vector3.Dot(vel, toFoe.normalize()) : 0;   // + = closing on him, − = giving ground
+    // (IMPROVE 2026-10-06: plain numbers — the old `toFoe` was a Vector3 a fighter a frame)
+    const tx = foe.root.position.x - me.root.position.x, tz = foe.root.position.z - me.root.position.z, td = Math.hypot(tx, tz);
+    const closing = td > 1e-3 ? (vel.x * tx + vel.z * tz) / td : 0;   // + = closing on him, − = giving ground
     const moving = s.controllable && !s.blockHeld ? speed01 : 0;
     const bio = mine ? meBio : foeBio;
     bio.speed01 = moving; bio.strafe = strafe; bio.approach = combatApproach(closing);
@@ -390,7 +439,7 @@ export const KarateVSMode: ModeDefinition = (() => {
     bio.hitBy = t < f.hitUntil ? f.hitBy : null; bio.down = t < f.downUntil; bio.out = f.out;
     bio.rising = false; bio.dodging = mine ? meEvade.rolling : false; bio.celebrating = t < f.celebrateUntil; bio.engaged = phase === 'fighting';
     return {
-      speed01: moving, strafe, backing: strafe === 0 && bio.approach < 0, dashing: mine && t < meDashUntil, hasWeapon: false,
+      speed01: moving, strafe, backing: strafe === 0 && bio.approach < 0, dashing: mine ? t < meDashUntil : !!foeDash, hasWeapon: false,
       rolling: mine ? meEvade.rolling : false, airborne: mine ? meEvade.airborne : false,
       striking: f.strike?.weight ?? null, strikeClip: f.strike?.clip, strikeSpeed: f.strike?.speed,
       blocking: s.blockHeld, parryFlash: t < f.parryUntil, guardImpactFlash: t < f.impactUntil,
@@ -399,11 +448,11 @@ export const KarateVSMode: ModeDefinition = (() => {
     };
   }
   /** Once per frame, both fighters, every phase (the KO holds the floor through the round-over beat). */
-  function animate(mySpeed01: number, foeSpeed01: number, myVel = Vector3.Zero(), foeVel = Vector3.Zero()): void {
+  function animate(dt: number, mySpeed01: number, foeSpeed01: number, myVel: Readonly<Vector3> = ZERO, foeVel: Readonly<Vector3> = ZERO): void {
     if (!meAnim || !foeAnim) return;
     // the posture trackers: each fighter's acceleration resolved in HIS own frame, so a backstep and a circle read
-    // differently instead of being the same world-space number
-    const dt = 1 / 60;
+    // differently instead of being the same world-space number. IMPROVE (2026-10-06): on the frame's real dt — a fixed
+    // 1/60 made the lean and the acceleration wrong at 30 or 120 fps (BodyMotion skips a frozen, hit-stop frame itself)
     if (player) meMotion.update(myVel.x, myVel.z, player.root.rotation.y, dt);
     if (rival) foeMotion.update(foeVel.x, foeVel.z, rival.root.rotation.y, dt);
     meAnim.tree.update(treeInput(meAnim, meState, mySpeed01, true, myVel));
@@ -440,22 +489,24 @@ export const KarateVSMode: ModeDefinition = (() => {
     // STORM COMBOS: MY presses read the book — the sequence, the stick and the situation (a launched body: air links; a dash just thrown: the rush) pick the link
     const move = mine && body ? book.pressMove(body.move, BTN_OF[key], body.onsetPage / 1000)   // P7: the body's own move, timed onset to onset
       : mine && !special ? book.press(BTN_OF[key], stickDirToFoe(), now() / 1000, { air: foeLaunchedSec > 0, afterDash: now() / 1000 - lastDashSec < DASH_ATTACK_SEC, airborne: meEvade.airborne, close: Vector3.Distance(player.root.position, rival.root.position) < 1.35 }) : null;
-    const atk: AttackDef = special ? SPECIAL_ATTACK : move ? attackFromMove(move, baseAtk) : baseAtk;
+    const atk0: AttackDef = special ? SPECIAL_ATTACK : move ? attackFromMove(move, baseAtk) : baseAtk;
+    const atk = mine ? atk0 : poweredAttack(atk0, foePower);   // COMBAT DIFFICULTY (2026-10-06): the rival's blow carries its power
     if (mine) striking = true; else foeStriking = true;
     if (special) {
       atkState.chi = 0;
       ctx.setHud(mine ? { chi: 0 } : { foeChi: 0 });
-      ctx.setHud({ banner: mine ? 'DRAGON!' : 'RIVAL DRAGON!' });
+      banner(ctx, mine ? 'DRAGON!' : 'RIVAL DRAGON!', 0.7);
       SoundKit.play('powerUp', { pitch: 0.7 });
-      setTimeout(() => ctx.setHud({ banner: '' }), 700);
     }
     SoundKit.play('whoosh', { pitch: special ? 0.8 : 1.1 });
     if (move) console.info(`[KVS-STORM] link ${move.id} (${move.clip}) weight ${move.weight}${move.air ? ' AIR' : ''}${move.launch ? ' LAUNCH' : ''}${move.slam ? ' SLAM' : ''} string ${book.history.length}${body ? ` body ${body.body} age ${Math.round(now() - body.onsetPage)}` : ''}`);
     if (move && body && book.history.length === 1) stringLabels.length = 0;   // P7: a body strike that starts a string starts its call (a lapsed string's links are not this one's)
-    if (move) { stringLabels.push(move.label); if (move.ender || book.history.length === 0) { const call = stringLabels.join(' → '); stringLabels.length = 0; if (call.includes('→')) { ctx.setHud({ banner: `COMBO: ${call}` }); setTimeout(() => ctx.setHud({ banner: '' }), 900); } } }   // STORM: the string is CALLED when it ends — button presses in sequence are a combo you can read
+    if (move) { stringLabels.push(move.label); if (move.ender || book.history.length === 0) { const call = stringLabels.join(' → '); stringLabels.length = 0; if (call.includes('→')) banner(ctx, `COMBO: ${call}`, 0.9); } }   // STORM: the string is CALLED when it ends — button presses in sequence are a combo you can read
     // P7: a body strike's hit beat is its contact frame (its startup is already spent in the camera's latency), never under
     // the wind-up floor; its cancel point runs from its onset, after that beat
     const hitDelay = body && move ? hitDelayMs(atk.startupMs, contactMsOf(move), now() - body.onsetPage) : atk.startupMs;
+    if (mine) myImpactAt = now() + hitDelay;   // IMPROVE (2026-10-06)
+    const swungAt = now();   // IMPROVE (2026-10-06): the dash read is measured against the swing's start
     if (body && move) { const d = Vector3.Distance(player.root.position, rival.root.position), lunge = bodyLunge(d, atk.range); if (lunge > 0) { const v = rival.root.position.subtract(player.root.position); v.y = 0; bodyShift = { v: v.normalize().scale(lunge / 0.15), left: 0.15 }; } }
     animOf(mine).strike = { weight: special ? 'finisher' : move ? move.weight : WEIGHT_OF[key], clip: atk.clip, speed: move?.speed, cancelFrom: move ? (body ? bodyCancelAt(now() + hitDelay, body.onsetPage, move) : now() + (STRIKE_TIMING[move.weight].cancelAt / move.speed) * 1000) : undefined, until: now() + STRIKE_MAX_SEC * 1000 };   // the tree plays it; its settle ends the swing
 
@@ -464,7 +515,7 @@ export const KarateVSMode: ModeDefinition = (() => {
     // rival's swing is announced: dodging your own strike is not a read.
     // MATRIX FOCUS: the rival's swing lands on the ROOM clock (inside Focus it takes 1/worldScale longer in real time, and the
     // dodge read is told so); mine stays on the wall clock
-    if (!mine) foeImpactAt = now() + atk.startupMs / focus.worldScale;
+    if (!mine) { lastFoeRange = atk.range; foeImpactAt = now() + atk.startupMs / focus.worldScale; }
     const onHitBeat = (impactAt?: number) => {
       if (phase !== 'fighting') { endStrike(mine); return; }
       // P7: the rival's fist on a BODY player waits for the body's frames to cover the impact (DefenseLedger), then resolves
@@ -477,8 +528,9 @@ export const KarateVSMode: ModeDefinition = (() => {
       if (!mine && outcome === 'whiff' && meDashIframeSec > 0) {
         // phase 6 — THE DASH READ: his swing went through where I was. That is the same read the roll's perfect dodge is
         // (DodgeRead), so it pays the same: the counter window, Focus, the beat. Measured before: the whiff was silent.
-        const r = dodgeReward(0);
-        if (r.perfect) { meCounter = r.counterSec; focus.gain(FOCUS.dodgeGain); ctx.juice.slowMo(0.45, Math.round(r.slowMoSec * 1000)); ctx.feel?.impact?.(0.3); ctx.setHud({ banner: 'PERFECT DODGE' }); setTimeout(() => ctx.setHud({ banner: '' }), 600); console.info('[KVS-DEF] perfect dodge (dash)'); }
+        // IMPROVE (2026-10-06): measured from the dash's START against this swing (was dodgeReward(0): always perfect)
+        const r = dodgeReward(dashSecToImpact(lastDashSec * 1000, swungAt, impactAt ?? now()));
+        if (r.perfect) { meCounter = r.counterSec; focus.gain(FOCUS.dodgeGain); ctx.juice.slowMo(0.45, Math.round(r.slowMoSec * 1000)); ctx.feel?.impact?.(0.3); tally.perfectDodges++; banner(ctx, 'PERFECT DODGE', 0.6); console.info('[KVS-DEF] perfect dodge (dash)'); }
       }   // STORM: the dash's / the roll's i-frames — he swings through where I was
 
       switch (outcome) {
@@ -491,8 +543,8 @@ export const KarateVSMode: ModeDefinition = (() => {
           ctx.juice.shake(0.05, 80);
           EffectsKit.burst(ctx.scene, defChar.root.position.add(new Vector3(0, 1.3, 0)), 'sparks');
           beatHit(mine, 'light'); beatParry(!mine);   // the attacker flinches (staggered), the defender's guard flicks
-          ctx.setHud({ banner: mine ? 'PARRIED!' : 'PERFECT PARRY!', ...(mine ? { foeChi: Math.round(defState.chi) } : { chi: Math.round(defState.chi) }) });
-          setTimeout(() => ctx.setHud({ banner: '' }), 700);
+          ctx.setHud(mine ? { foeChi: Math.round(defState.chi) } : { chi: Math.round(defState.chi) });
+          banner(ctx, mine ? 'PARRIED!' : 'PERFECT PARRY!', 0.7);
           break;
         }
         case 'blocked': {
@@ -500,6 +552,7 @@ export const KarateVSMode: ModeDefinition = (() => {
           EffectsKit.burst(ctx.scene, defChar.root.position.add(new Vector3(0, 1.1, 0)), 'dust');
           beatGuardImpact(!mine);
           ctx.setHud(mine ? { foeGuard: Math.round(defState.guard) } : { guard: Math.round(defState.guard) });
+          if (mine) foeGuardHud = Math.round(defState.guard); else guardHud = Math.round(defState.guard);   // IMPROVE (2026-10-06): the trickle's memo
           break;
         }
         case 'guardBreak': {
@@ -512,15 +565,16 @@ export const KarateVSMode: ModeDefinition = (() => {
           console.info('[KVS-JUICE] guard break');
           EffectsKit.burst(ctx.scene, defChar.root.position.add(new Vector3(0, 1.2, 0)), 'glitch');
           beatDown(!mine, defState.staggerSec);   // knock down → floor → get up inside the stagger
-          ctx.setHud({ banner: mine ? 'GUARD BREAK!' : 'YOUR GUARD SHATTERED!', ...(mine ? { foeGuard: 0 } : { guard: 0 }) });
-          setTimeout(() => ctx.setHud({ banner: '' }), 900);
+          ctx.setHud(mine ? { foeGuard: 0 } : { guard: 0 });
+          if (mine) foeGuardHud = 0; else guardHud = 0;
+          banner(ctx, mine ? 'GUARD BREAK!' : 'YOUR GUARD SHATTERED!', 0.9);
           break;
         }
         case 'hit': {
           // A PERFECT DODGE IS AN OPENING, and this is where it is spent: the counter window multiplies the
           // punish and then closes. Bounded at 1.5x by DodgeRead -- an opening, never an execute.
           const counter = mine ? counterMult(meCounter) : 1;
-          if (mine && counter > 1) { meCounter = 0; ctx.setHud({ banner: 'COUNTER!' }); setTimeout(() => ctx.setHud({ banner: '' }), 700); }
+          if (mine && counter > 1) { meCounter = 0; banner(ctx, 'COUNTER!', 0.7); }
           const base = applyHit(atkState, defState, atk);
           const dealt = Math.round(base * counter * (mine && focus.active ? FOCUS.damageMult : 1));   // MATRIX: a Focus strike lands harder
           if (mine) focus.gain(FOCUS.hitGain);
@@ -548,6 +602,7 @@ export const KarateVSMode: ModeDefinition = (() => {
           const hud: Record<string, HudValue> = mine
             ? { foeHp: defState.hp, chi: Math.round(atkState.chi) }
             : { hp: defState.hp, foeChi: Math.round(atkState.chi) };
+          let bannerText = '';
           if (route) {
             // the route's payoff lands on its LAST hit, on top of what applyHit already did
             const bonus = Math.max(1, Math.round(dealt * (route.payoff - 1) * damageScale(ratings)));
@@ -565,19 +620,22 @@ export const KarateVSMode: ModeDefinition = (() => {
             if (route.ender !== 'stun') beatDown(!mine, route.ender === 'launch' ? 1.7 : 1.2);
             landed.length = 0;                     // a completed route is spent; start the next one
             if (mine) hud.foeHp = defState.hp; else hud.hp = defState.hp;
-            hud.banner = mine ? `${route.label}! — ${dealt + bonus} DMG` : `RIVAL ${route.label}!`;
+            if (mine) tally.routes++;
+            bannerText = mine ? `${route.label}! — ${dealt + bonus} DMG` : `RIVAL ${route.label}!`;
             console.info(`[KVS-ROUTE] ${route.label} fx${route.fx} payoff ${route.payoff} bonus ${bonus} mine ${mine}`);
           } else if (atkState.combo >= 2) {
-            hud.banner = mine ? `COMBO x${atkState.combo} — ${dealt} DMG` : `RIVAL COMBO x${atkState.combo}`;
+            bannerText = mine ? `COMBO x${atkState.combo} — ${dealt} DMG` : `RIVAL COMBO x${atkState.combo}`;
           }
           ctx.setHud(hud);
-          if (route || atkState.combo >= 2) setTimeout(() => ctx.setHud({ banner: '' }), route ? 900 : 700);
+          if (bannerText) banner(ctx, bannerText, route ? 0.9 : 0.7);
           if (defState.hp <= 0) endRound(ctx, mine);
           break;
         }
       }
     };
-    if (mine) setTimeout(onHitBeat, hitDelay); else foeTimers.push({ left: atk.startupMs / 1000, fn: onHitBeat });
+    // IMPROVE (2026-10-06): BOTH hit beats on the game clock — mine on my clock (it was a wall-clock setTimeout, so a hit-stop,
+    // a pause or the parry slow-mo never delayed it), his on the room's
+    if (mine) meTimers.after(hitDelay / 1000, () => onHitBeat()); else foeTimers.after(atk.startupMs / 1000, () => onHitBeat());
   }
 
   /** P7: the rival's hit on a BODY player, resolved at its impact against the body's state then (DefenseLedger): a slip's
@@ -587,7 +645,7 @@ export const KarateVSMode: ModeDefinition = (() => {
     const bd = bodyDefenseAt(ledger, impactAt);
     if (bd.d === 'evaded' && dist <= atk.range && meState.controllable) {
       const r = dodgeReward(Math.max(0, (impactAt - bd.evadeOnset!) / 1000));
-      if (r.perfect) { meCounter = r.counterSec; focus.gain(FOCUS.dodgeGain); ctx0.juice.slowMo(0.45, Math.round(r.slowMoSec * 1000)); ctx0.setHud({ banner: 'PERFECT DODGE' }); setTimeout(() => ctx0.setHud({ banner: '' }), 600); }
+      if (r.perfect) { meCounter = r.counterSec; focus.gain(FOCUS.dodgeGain); ctx0.juice.slowMo(0.45, Math.round(r.slowMoSec * 1000)); tally.perfectDodges++; banner(ctx0, 'PERFECT DODGE', 0.6); }
       console.info('[KVS-DEF] body slip — whiff');
       return 'whiff';
     }
@@ -658,45 +716,76 @@ export const KarateVSMode: ModeDefinition = (() => {
     }
   }
 
-  function endRound(ctx: ModeContext, playerWon: boolean): void {
+  /** `why` (IMPROVE 2026-10-06): what ended it, said before the result — 'TIME' at the bell, 'BURNED!' in a pit. */
+  function endRound(ctx: ModeContext, playerWon: boolean, why?: string): void {
     if (phase !== 'fighting') return;
     setPhase('roundOver');
-    if (playerWon) myWins++; else foeWins++;
+    if (playerWon) { myWins++; tally.hpLeftOnWins.push(meState.hp / meState.maxHp); } else foeWins++;
+    // IMPROVE (2026-10-06): the parry slow-mo ends with the round (it only ticks in the fight, so the KO held the bodies at 0.3)
+    slowmoSec = 0; applyTimeScales();
     // THE RIVAL FEELS THE SCOREBOARD NOW. Its difficulty was fixed at construction, so it fought a decider
     // exactly the way it fought round one -- the constant-opponent problem RivalNerve solved for the dunk
     // contest and nowhere else in the game. Nerve keeps the invariant: pressing when behind is paid for in
     // errors, so losing a round is never strictly better than winning one.
-    {
-      const sit = standingOf(foeWins, myWins, ROUNDS_TO_WIN, Math.min(1, Math.max(myWins, foeWins) / ROUNDS_TO_WIN));
-      const shift = nerve(sit);
-      brain.setNerve(shift.aggression, shift.mistake);
-      if (shift.label) console.info(`[KAR-NERVE] ${shift.label} (rounds ${foeWins}-${myWins})`);
-    }
+    // (IMPROVE 2026-10-06: applied at ROUND START now, the one place every duel mode sets it — see startRound)
     SoundKit.play(playerWon ? 'crowdCheer' : 'crowdGroan');
     if (playerWon) roundWinBeat(ctx);
     endStrike(true); endStrike(false);
     animOf(!playerWon).out = true;                                   // KO: knockdown, then the floor until the next round
     animOf(playerWon).celebrateUntil = now() + CELEBRATE_SEC * 1000;
-    ctx.setHud({
-      wins: myWins, foeWins,
-      banner: playerWon ? `ROUND ${round} — YOU` : `ROUND ${round} — RIVAL SENSEI`,
-    });
-    setTimeout(() => {
-      ctx.setHud({ banner: '' });
-      if (myWins >= ROUNDS_TO_WIN || foeWins >= ROUNDS_TO_WIN) {
-        setPhase('matchOver');
-        const won = myWins > foeWins;
-        SoundKit.play('whistle');
-        if (won) { matchPunch(ctx); EffectsKit.burst(ctx.scene, player.root.position.add(new Vector3(0, 2, 0)), 'confetti'); }
-        ctx.end(won ? 'MATCH_WON' : 'MATCH_LOST', myWins * 100 - foeWins * 40, { rounds: round, foeWins });
-        return;
-      }
-      round++;
-      startRound(ctx);
-    }, 2200);
+    ctx.setHud({ wins: myWins, foeWins });
+    banner(ctx, `${why ? `${why} — ` : ''}${playerWon ? `ROUND ${round} — YOU` : `ROUND ${round} — RIVAL SENSEI`}`, Infinity);
+    // (the next round, or the match's end, comes off the GAME clock in update() after ROUND_OVER_SEC — IMPROVE 2026-10-06:
+    // it was a 2.2 s setTimeout that ran on through a pause and fired startRound on a disposed rig)
+  }
+
+  /** The round-over beat is over: the next round, or the result. */
+  function afterRound(ctx: ModeContext): void {
+    banner(ctx, '', 0);
+    if (myWins >= ROUNDS_TO_WIN || foeWins >= ROUNDS_TO_WIN) {
+      setPhase('matchOver');
+      const won = myWins > foeWins;
+      SoundKit.play('whistle');
+      if (won) { matchPunch(ctx); EffectsKit.burst(ctx.scene, player.root.position.add(new Vector3(0, 2, 0)), 'confetti'); }
+      // IMPROVE (2026-10-06): the rounds (myWins * 100 - foeWins * 40, as ever) plus the HP kept in the rounds won, the
+      // perfect dodges and the routes, each capped (core/VersusScore — the server's ceiling reads the same file)
+      const t: VersusTally = { myWins, foeWins, ...tally };
+      const parts = versusScoreParts(t);
+      ctx.end(won ? 'MATCH_WON' : 'MATCH_LOST', versusScore(t), { rounds: round, foeWins, hpBonus: parts.hp, perfectDodges: tally.perfectDodges, routes: tally.routes });
+      return;
+    }
+    round++;
+    startRound(ctx);
+  }
+
+  /** IMPROVE (2026-10-06): each rig's clock = Matrix Focus's scale × the parry slow-mo's, so the slow-mo slows the BODIES too
+   *  (it scaled only the mode's dt: the fighters crept while their clips ran at full speed). Called when either changes. */
+  let slowmoOn = false;
+  function applyTimeScales(): void {
+    slowmoOn = slowmoSec > 0;
+    const k = slowmoOn ? SLOWMO_SCALE : 1;
+    rival?.animator.setTimeScale(focus.worldScale * k); player?.animator.setTimeScale(focus.heroScale * k);
   }
 
   function startRound(ctx: ModeContext): void {
+    brain.setRound(round);
+    {
+      // IMPROVE (2026-10-06): NERVE once per round (memoised), the OPPONENT pick (PRO = the tuned base), and a full chi
+      // bar is only a special when this rival can throw the DRAGON at all
+      const shift = brain.setStanding(foeWins, myWins, ROUNDS_TO_WIN);
+      if (shift.label) console.info(`[KAR-NERVE] ${shift.label} (rounds ${foeWins}-${myWins})`);
+      brain.setDifficulty(rivalDifficulty(BASE_RIVAL_DIFFICULTY, readTier()));
+      brain.setCanSpecial(hasFightMove('dragon', foeRatings));
+      // COMBAT DIFFICULTY (2026-10-06): nothing here reads the line, so a read is a guard, never a sidestep; and the rival's
+      // POWER for the pick (hp, damage, guard — FightCore.rivalPower), on before resetRound fills the HP
+      brain.setStepping(false);
+      foePower = rivalPower(RIVAL_POWER_BASE.karateVs, readTier());
+      applyRivalPower(foeState, foePower);
+      knock.clear();
+      // the rival's dash, and the beats still waiting from the last round (IMPROVE 2026-10-06: never cleared before)
+      foeDash = null; foeTimers.clear(); meTimers.clear();
+      foeResource.max = hasFightMove('dragon', foeRatings) ? CHI_MAX : Infinity;
+    }
     meState.resetRound(); foeState.resetRound(); book.reset(); xBtn.reset(); padBlock.reset(); queuedKey = null; meDash = null; meDashIframeSec = 0; meDashUntil = 0; foeLaunchedSec = 0; rival.root.position.y = 0;   // STORM
     deferred.clear(); ledger.reset(); bodyShift = null;   // P7
     player.root.position.set(0, 0, 2.2);
@@ -704,13 +793,25 @@ export const KarateVSMode: ModeDefinition = (() => {
     player.root.rotation.y = Math.atan2(rival.root.position.x - player.root.position.x, rival.root.position.z - player.root.position.z);
     rival.root.rotation.y = wrapYaw(player.root.rotation.y + Math.PI);   // a ROUND START is a cut, not a turn: they are placed facing each other
     resetAnim(meAnim); resetAnim(foeAnim);
-    striking = false; foeStriking = false; slowmoSec = 0;
-    setPhase('fighting');
+    striking = false; foeStriking = false; slowmoSec = 0; applyTimeScales();
+    // IMPROVE (2026-10-06): THE ROUND-START BEAT — "ROUND n" while they square up, then FIGHT! and control (update())
+    setPhase('ready');
+    guardHud = 100; foeGuardHud = 100; timeHud = ROUND_SEC;
     ctx.setHud({
       hp: meState.hp, foeHp: foeState.hp, guard: 100, foeGuard: 100,
-      chi: 0, foeChi: 0, round: `${round}`, wins: myWins, foeWins,
-      hint: 'Chain hits for combos · tap BLOCK at the last instant to parry · full chi turns HEAVY into the DRAGON',
+      chi: 0, foeChi: 0, round: `${round}`, wins: myWins, foeWins, timeLeft: ROUND_SEC,
+      hint: KVS_HINT,
     });
+    banner(ctx, round === 1 ? 'BEST OF 3 — ROUND 1' : round === ROUNDS_TO_WIN * 2 - 1 ? `FINAL ROUND` : `ROUND ${round}`, Infinity);
+    SoundKit.play('whoosh', { pitch: 0.7, volume: 0.35 });
+  }
+
+  /** IMPROVE (2026-10-06): the beat is over — the fight is on. */
+  function fight(ctx: ModeContext): void {
+    setPhase('fighting');
+    banner(ctx, 'FIGHT!', 0.6);
+    SoundKit.play('whistle', { volume: 0.5 });
+    ctx.feel?.impact?.(0.25);
   }
 
   return {
@@ -725,11 +826,12 @@ export const KarateVSMode: ModeDefinition = (() => {
       modeVenue = mountVenue(ctx, 'karate_h2h', { keepGameplayCamera: true, arena });
       if (!modeVenue) VenueKit.buildDojo(ctx.scene);
       arenaHandle?.dispose(); arenaHandle = buildArena(ctx.scene, arena);
-      const crowdR = (arena.shape.kind === 'disc' ? arena.shape.radius : Math.max(arena.shape.halfX, arena.shape.halfZ)) + 2.6;
-      crowd = new Onlookers(ctx.scene, Array.from({ length: 14 }, (_, i) => {
-        const a = (i / 14) * Math.PI * 2 + 0.22;
-        return new Vector3(Math.sin(a) * crowdR, 0, Math.cos(a) * crowdR);   // outside the arena's walls
-      }), '#3B2A52');
+      // outside the arena's walls. IMPROVE (2026-10-06): the ring was max(halfX, halfZ) + 2.6 — at ARENA_SCALE the Foundry's
+      // corner reached past it; combat/arenas crowdRing keeps it clear of a box's corner too, and arenas.test holds it
+      // IMPROVE (2026-10-06): a phone gets KVS_PHONE_ONLOOKERS of them (every fourth spot of the same ring) — each is a full
+      // animated rig (~6 draws and a skeleton); a desktop keeps its 7
+      const spots = crowdRing(arena, CROWD_GAP.karate_vs, 14, CROWD_PHASE.karate_vs).map((p) => new Vector3(p.x, 0, p.z));
+      crowd = new Onlookers(ctx.scene, ctx.scene.metadata?.felTier === 'mobile' ? spots.filter((_, i) => i % 4 === 0).slice(0, KVS_PHONE_ONLOOKERS) : spots, '#3B2A52');
       player = await CharacterLibrary.spawn(ctx.scene, CFG.heroUrl, {
         position: new Vector3(0, 0, 2.2), yawRad: Math.PI, startClip: IDLE_CLIP,   // BIOMECH-WAVE2 G1/G3: they SPAWN facing each other — the round start used to be a 180° yaw snap on both bodies
       });
@@ -748,7 +850,7 @@ export const KarateVSMode: ModeDefinition = (() => {
       foeAnim = newFighterAnim(new CombatAnimTree(rival.animator));
       meAnim.tree.onSettle = (st) => { if (st.startsWith('strike_')) endStrike(true); };
       // phase 6 seam: when does the rival's swing land? (−1 = nothing in flight) — the probe's perfect-dodge / parry driver reads it
-      (ctx.scene.metadata ??= {}).fight = { landsIn: () => (foeImpactAt === null ? -1 : Math.max(0, (foeImpactAt - now()) / 1000)) };
+      (ctx.scene.metadata ??= {}).fight = { landsIn: () => threatLandsIn(Vector3.Distance(player.root.position, rival.root.position), lastFoeRange, foeImpactAt === null ? null : (foeImpactAt - now()) / 1000) };
       foeAnim.tree.onSettle = (st) => { if (st.startsWith('strike_')) endStrike(false); };
       mePosture?.dispose(); foePosture?.dispose();
       mePosture = mountPostureLayer(ctx.scene, player.skeleton, player.root, () => feedFor(meBio, () => rival, meMotion, 1 - meState.guard / GUARD_MAX), 'KVS-PP');
@@ -760,14 +862,20 @@ export const KarateVSMode: ModeDefinition = (() => {
 
       meState = new FighterState(100);
       foeState = new FighterState(100);
-      brain = new RivalFightBrain(BASE_RIVAL_DIFFICULTY, KARATE_ATTACKS);
+      // IMPROVE (2026-10-06): the shared RivalCombatBrain (the RivalFightBrain inside it, plus a chi bar it SPENDS — a dash
+      // when it is far out), as Showdown and Duel fight with. Its default moves are KARATE_ATTACKS' three.
+      brain = new RivalCombatBrain({ difficulty: BASE_RIVAL_DIFFICULTY, canSpecial: hasFightMove('dragon', foeRatings) });
       // read once at mount — a style cannot change mid-fight, and re-deriving it per strike would be work
       // on the hot path for a value that never moves
       myAttacks = styleAttacks(KARATE_ATTACKS, blendTraits(readBlend()), MIN_STARTUP_SEC * 1000);
       round = 1; myWins = 0; foeWins = 0; matchLatch = false; heavyAt = 0;
+      // IMPROVE (2026-10-06): a fresh match — the clocks, the banner, the tally
+      clock = 0; meTimers.clear(); foeTimers.clear(); bannerSlot.clear(); foeDash = null;
+      tally.hpLeftOnWins = []; tally.perfectDodges = 0; tally.routes = 0; timeHud = -1; guardHud = -1; foeGuardHud = -1;
       myLanded = []; foeLanded = [];
-      // `?fight=` sets MY ratings so the earned routes and the DRAGON can actually be driven and measured;
-      // without a PRQ scan plumbed into the modes both fighters are a baseline body.
+      // IMPROVE (2026-10-06): MY ratings come off the PRQ band the harness carries (a guest / RECOVERING = the baseline);
+      // `?fight=` still overrides them so the earned routes and the DRAGON can be driven and measured.
+      myRatings = ratingsForBand(ctx.prqBand);
       if (typeof window !== 'undefined') {
         const q = new URLSearchParams(window.location.search).get('fight');
         const v = Number(q);
@@ -785,8 +893,10 @@ export const KarateVSMode: ModeDefinition = (() => {
       assertSpawned(ctx.scene, { hero: player.root, minWorldMeshes: 5, modeId: 'karate-vs' });
 
       setPhase('intro');
-      ctx.setHud({ banner: 'BEST OF 3 — RIVAL SENSEI', hp: 100, foeHp: 100, chi: 0, foeChi: 0, round: '1', wins: 0, foeWins: 0 });
-      setTimeout(() => { ctx.setHud({ banner: '' }); startRound(ctx); }, 1800);
+      ctx.setHud({ hp: 100, foeHp: 100, chi: 0, foeChi: 0, round: '1', wins: 0, foeWins: 0, timeLeft: ROUND_SEC, hint: KVS_HINT });
+      banner(ctx, 'BEST OF 3 — RIVAL SENSEI', Infinity);
+      // IMPROVE (2026-10-06): round 1 starts on the first frame of play (update()), not on a 1.8 s setTimeout from load —
+      // that ran out on the READY card and outlived a dispose
     },
 
     onInput(ctx: ModeContext, e: FelInput) {
@@ -810,13 +920,17 @@ export const KarateVSMode: ModeDefinition = (() => {
         if (e.btn === 'L1' && wallRun) wallKickOff(ctx);   // MATRIX: the kick off the wall
         else if (e.btn === 'L1' && meState.controllable && focus.active && !wallKick && phase === 'fighting' && tryWallRun(ctx)) { /* MATRIX: up onto the wall */ }
         else if (e.btn === 'L1' && meState.controllable && !wallKick) {
+          // IMPROVE (2026-10-06): the neutral roll goes AWAY from the rival, as the note above says. It rolled along the
+          // camera's forward — which, the fight camera sitting behind me, is the line TO him (stick-up: closing in).
           const dir = Math.hypot(stickX, stickY) > 0.2
             ? ctx.camDirector.forwardFlat().scale(-stickY).addInPlace(ctx.camDirector.rightFlat().scale(stickX))
-            : ctx.camDirector.forwardFlat().scale(1);   // neutral: away from the rival the camera is looking at
+            : neutralRollDir(ctx);
           if (meEvade.roll(dir.x, dir.z)) {
             // THE REWARD IS A READ, NOT A PRESS (DodgeRead). The window is binary: dodging early pays
             // NOTHING, because any payout for a mistimed press makes mashing optimal again.
-            const secTo = foeImpactAt === null ? null : (foeImpactAt - now()) / 1000;
+            const secRaw = foeImpactAt === null ? null : (foeImpactAt - now()) / 1000;
+            const secGate = threatLandsIn(Vector3.Distance(player.root.position, rival.root.position), lastFoeRange, secRaw);
+            const secTo = secGate < 0 ? null : secGate;
             const r = dodgeReward(secTo);
             if (r.perfect) {
               focus.gain(FOCUS.dodgeGain);   // MATRIX: a read refills Focus
@@ -825,8 +939,8 @@ export const KarateVSMode: ModeDefinition = (() => {
               ctx.feel?.impact?.(0.3);
               ctx.momentum.report({ kind: 'near_miss', weight: 14 });
               SoundKit.play('powerUp', { volume: 0.5, pitch: 1.3 });
-              ctx.setHud({ banner: r.label ?? '' });
-              setTimeout(() => ctx.setHud({ banner: '' }), 800);
+              tally.perfectDodges++;
+              banner(ctx, r.label ?? '', 0.8);
             } else {
               SoundKit.play('whoosh', { pitch: 1.2, volume: 0.35 });
             }
@@ -842,27 +956,39 @@ export const KarateVSMode: ModeDefinition = (() => {
     update(ctx: ModeContext, dt: number) {
       ctx0 = ctx;
       phaseSec += dt;
+      clock += dt;   // IMPROVE (2026-10-06): the mode's game clock (banners)
+      { const b = bannerSlot.tick(clock); if (b !== null) ctx.setHud({ banner: b }); }
       { const bv = ctx.body?.(); if (bv) bodyLedgerFrame(bv, now()); deferred.flush(ledger, now()); }   // P7: the body's deferred hits
       crowd?.update(dt);
+      // IMPROVE (2026-10-06): the phase beats on the game clock — round 1 on the first frame of play, FIGHT! after the
+      // round-start beat, the next round after the KO pause (setTimeouts before: a pause did not hold them, a dispose did
+      // not cancel them)
+      if (phase === 'intro') { startRound(ctx); return; }
+      if (phase === 'ready' && phaseSec >= READY_SEC) fight(ctx);
+      else if (phase === 'roundOver' && phaseSec >= ROUND_OVER_SEC) { afterRound(ctx); return; }
       if (phaseSec > BUDGET_SEC[phase]) {
-        console.warn(`[FEL-WATCHDOG] karate-vs stuck in "${phase}" — auto-advancing`);
-        if (phase === 'fighting') endRound(ctx, meState.hp >= foeState.hp);
-        else if (phase === 'intro' || phase === 'roundOver') startRound(ctx);
+        // the round clock running out is the BELL, not a fault: TIME, and the round goes to whoever has more HP left
+        if (phase === 'fighting') { console.info('[KVS] time — round decided on HP'); SoundKit.play('whistle'); endRound(ctx, meState.hp >= foeState.hp, 'TIME'); }
+        else { console.warn(`[FEL-WATCHDOG] karate-vs stuck in "${phase}" — auto-advancing`); if (phase === 'roundOver') afterRound(ctx); }
         return;
       }
-      if (phase !== 'fighting') { faceEachOther(dt); animate(0, 0); return; }   // the trees still run: the loser holds the floor, the winner celebrates
+      if (phase !== 'fighting') { knock.tick(dt); faceEachOther(dt); animate(dt, 0, 0); return; }   // the trees still run: the loser holds the floor, the winner celebrates (IMPROVE 2026-10-06: a KO's slide finishes)
+      // IMPROVE (2026-10-06): the round clock on screen, pushed only when the second changes
+      { const left = Math.max(0, Math.ceil(ROUND_SEC - phaseSec)); if (left !== timeHud) { timeHud = left; ctx.setHud({ timeLeft: left }); } }
 
-      // scoped slow-mo (parry payoff) — scales this mode's clock only
+      // scoped slow-mo (parry payoff) — scales this mode's clock, and (IMPROVE 2026-10-06) both rigs' clocks
       slowmoSec = Math.max(0, slowmoSec - dt);
       const sdt = slowmoSec > 0 ? dt * SLOWMO_SCALE : dt;
       // MATRIX FOCUS: the trigger holds bullet time — the rival on the room's clock, me on mine (a clock per rig)
       const wasFocus = focus.active;
       if (focusHeld && !focus.active) { if (focus.start()) onFocusStart(ctx); } else if (!focusHeld && focus.active) focus.stop();
       if (focus.tick(dt)) onFocusEnd(ctx, true); else if (wasFocus && !focus.active) onFocusEnd(ctx, false);
-      if (wasFocus !== focus.active) { rival.animator.setTimeScale(focus.worldScale); player.animator.setTimeScale(focus.heroScale); }
+      if (wasFocus !== focus.active || slowmoOn !== slowmoSec > 0) applyTimeScales();
       { const fv = Math.round(focus.value); if (fv !== focusHud || focus.active !== focusHudOn) { focusHud = fv; focusHudOn = focus.active; ctx.setHud({ focus: fv, focusOn: focus.active }); } }
       const sdtRoom = sdt * focus.worldScale, sdtHero = sdt * focus.heroScale;
-      for (let i = foeTimers.length - 1; i >= 0; i--) { foeTimers[i].left -= sdtRoom; if (foeTimers[i].left <= 0) { const t = foeTimers.splice(i, 1)[0]; t.fn(); } }
+      knock.tick(sdtRoom);   // IMPROVE (2026-10-06): knockback on the room clock
+      meTimers.tick(sdtHero); foeTimers.tick(sdtRoom);   // IMPROVE (2026-10-06): both fighters' hit beats on the game clock
+      if (phase !== 'fighting') return;   // a beat just ended the round
 
       meState.tick(sdtHero); foeState.tick(sdtRoom);
       // A route must not complete across two unrelated exchanges: when FightCore closes the combo window it
@@ -875,36 +1001,38 @@ export const KarateVSMode: ModeDefinition = (() => {
       // player, so its flat forward IS the line to the rival — up closes, down retreats, right is SCREEN right. The old
       // world-axis read (x, 0, y) was right only while the camera looked exactly down −z; once it had swung round the
       // rival (it does, every exchange) stick-right ran screen-LEFT (measured Δscreen −2.5 m). No axis is flipped.
-      const moveVel = ctx.camDirector.forwardFlat().scale(-stickY * MOVE_SPEED).addInPlace(ctx.camDirector.rightFlat().scale(stickX * MOVE_SPEED));
-      lastMyVel = meDash ? meDash.dir.scale(DASH.speed) : moveVel;   // FREE RUN
+      // IMPROVE (2026-10-06): into scratch vectors (moveVel, the dash's velocity) — they were new Vector3s every frame
+      const camF = ctx.camDirector.forwardFlat(), camR = ctx.camDirector.rightFlat();
+      const moveVel = moveVelS.set(camF.x * -stickY * MOVE_SPEED + camR.x * stickX * MOVE_SPEED, 0, camF.z * -stickY * MOVE_SPEED + camR.z * stickX * MOVE_SPEED);
+      lastMyVel = meDash ? myDashVelS.set(meDash.dir.x * DASH.speed, 0, meDash.dir.z * DASH.speed) : moveVel;   // FREE RUN
       // the roll outranks the stick: while it owns the body the stick is ignored entirely, which is the
       // commitment that makes it a read rather than a better walk
       const rollVel = meEvade.update(sdtHero);
       meCounter = tickCounter(meCounter, sdtHero);
       let mySpeed01 = moveVel.length() / MOVE_SPEED;   // the INTENT, striking or not: a strike that runs out under a held stick settles straight into the guard step
       if (meDash) {   // STORM: the dash owns the body — a burst, or the chakra dash that homes on the rival and stops a reach short
-        if (meDash.homing) { const toFoe = rival.root.position.subtract(player.root.position); toFoe.y = 0; if (toFoe.length() <= DASH.homingStopM) meDash.left = 0; else meDash.dir = toFoe.normalize(); }
-        player.root.position.addInPlace(meDash.dir.scale((meDash.homing ? DASH.homingSpeed : DASH.speed) * sdtHero));
+        if (meDash.homing) { const tx = rival.root.position.x - player.root.position.x, tz = rival.root.position.z - player.root.position.z, d = Math.hypot(tx, tz); if (d <= DASH.homingStopM) meDash.left = 0; else meDash.dir.set(tx / d, 0, tz / d); }
+        const k = (meDash.homing ? DASH.homingSpeed : DASH.speed) * sdtHero;
+        player.root.position.addInPlaceFromFloats(meDash.dir.x * k, 0, meDash.dir.z * k);
         arenaClamp(player.root.position, arena);
         meDash.left -= sdtHero; if (meDash.left <= 0) meDash = null;
         mySpeed01 = 1;
       } else if (rollVel) {
-        player.root.position.addInPlace(rollVel.scale(sdtHero));
+        player.root.position.addInPlaceFromFloats(rollVel.x * sdtHero, rollVel.y * sdtHero, rollVel.z * sdtHero);
         modeVenue?.constrain(player.root.position);
         arenaClamp(player.root.position, arena);
         mySpeed01 = 0;
       } else if (meState.controllable && !striking && !meState.blockHeld) {
-        const vel = moveVel;
-        const before = player.root.position.clone();
-        player.root.position.addInPlace(vel.scale(sdtHero));
-        arenaClamp(player.root.position, arena);
-        if (sdtHero > 0 && Vector3.Distance(before, player.root.position) / sdtHero < 0.3) mySpeed01 = 0;   // pinned on the boundary: no stepping on the spot
+        const p = player.root.position, bx = p.x, bz = p.z;
+        p.addInPlaceFromFloats(moveVel.x * sdtHero, 0, moveVel.z * sdtHero);
+        arenaClamp(p, arena);
+        if (sdtHero > 0 && Math.hypot(p.x - bx, p.z - bz) / sdtHero < 0.3) mySpeed01 = 0;   // pinned on the boundary: no stepping on the spot
       }
       // P7 AUTO-SPACING: a body player has no stick — a strike out of range closes a little, a step in / out / across moves
       // the fighter; a stick past its dead zone always wins
       if (bodyShift) {
         if (Math.hypot(stickX, stickY) > 0.35 || !meState.controllable) bodyShift = null;
-        else { const step = Math.min(sdtHero, bodyShift.left); player.root.position.addInPlace(bodyShift.v.scale(step)); arenaClamp(player.root.position, arena); bodyShift.left -= step; if (bodyShift.left <= 0) bodyShift = null; }
+        else { const step = Math.min(sdtHero, bodyShift.left); player.root.position.addInPlaceFromFloats(bodyShift.v.x * step, 0, bodyShift.v.z * step); arenaClamp(player.root.position, arena); bodyShift.left -= step; if (bodyShift.left <= 0) bodyShift = null; }
       }
 
       ring?.set(meState.guard / GUARD_MAX);   // PLAYER RING: the guard gauge
@@ -918,27 +1046,49 @@ export const KarateVSMode: ModeDefinition = (() => {
       // rival AI
       if (!tickMatrix(ctx, sdtHero)) player.root.position.y = meEvade.height;   // the arc is EvadeMoves'; nothing here integrates gravity — unless the wall run / kick owns the body (MATRIX)
       arenaHandle?.tick(dt); if (arena.hazards.length) tickHazards(ctx, sdtRoom);
-      const action = brain.decide(sdtRoom, rival.root.position, player.root.position, foeState, striking);
-      if (action.block && !foeState.blockHeld) foeState.pressBlock(now());
+      // IMPROVE (2026-10-06): the rival reads my openings — a dash, a roll, my swing past its impact (its recovery)
+      const meOpen = !!meDash || meEvade.rolling || (striking && myImpactAt !== null && now() > myImpactAt);
+      // IMPROVE (2026-10-06): the shared RivalCombatBrain — the same reads, plus a chi bar it spends on a dash when far out
+      foeResource.value = foeState.chi;
+      const action = brain.decide(sdtRoom, rival.root.position, player.root.position, foeState, striking, foeResource, -1, meOpen);
+      // IMPROVE (2026-10-06): the brain says block or parry; the press is stamped for it (a held block no longer parries a jab by accident)
+      if (action.block && !foeState.blockHeld) foeState.pressBlock(guardPressMs(now(), action.guard, myImpactAt !== null ? myImpactAt - now() : null));
       if (!action.block && foeState.blockHeld) foeState.releaseBlock();
       if (action.attack) swing(ctx, false, action.attack);
+      if (action.spend === 'dash' && !foeDash && foeState.controllable && !foeStriking && foeState.chi >= RIVAL_DASH_CHI) {
+        const tx = player.root.position.x - rival.root.position.x, tz = player.root.position.z - rival.root.position.z, d = Math.hypot(tx, tz);
+        if (d > 1e-3) {
+          foeState.chi -= RIVAL_DASH_CHI; ctx.setHud({ foeChi: Math.round(foeState.chi) });
+          foeDash = { dx: tx / d, dz: tz / d, left: DASH.sec };
+          SoundKit.play('whoosh', { pitch: 1.1, volume: 0.35 });
+          console.info('[KVS-STORM] rival dash');
+        }
+      }
       let foeSpeed01 = Math.min(1, Math.hypot(action.moveX, action.moveY));   // the brain's INTENT, striking or not — the strike's settle lands on the step, not a one-frame stance
-      const foeVel = new Vector3(action.moveX, 0, -action.moveY).scale(MOVE_SPEED * 0.92);
+      const foeVel = foeVelS.set(action.moveX * MOVE_SPEED * 0.92, 0, -action.moveY * MOVE_SPEED * 0.92);   // IMPROVE (2026-10-06): scratch
       lastFoeVel = foeVel;   // FREE RUN
-      if (foeState.controllable && !foeStriking && !foeState.blockHeld) {
-        const vel = foeVel;
-        const before = rival.root.position.clone();
-        rival.root.position.addInPlace(vel.scale(sdtRoom));
-        arenaClamp(rival.root.position, arena);
-        foeSpeed01 = sdtRoom > 0 && Vector3.Distance(before, rival.root.position) / sdtRoom < 0.3 ? 0 : vel.length() / MOVE_SPEED;   // the step only while the body moves
+      if (foeDash) {   // IMPROVE (2026-10-06): the rival's dash owns its body — a burst at me that stops a reach short (the chakra dash's stop)
+        const r = rival.root.position, step = DASH.speed * sdtRoom;
+        r.addInPlaceFromFloats(foeDash.dx * step, 0, foeDash.dz * step);
+        arenaClamp(r, arena);
+        foeVel.set(foeDash.dx * DASH.speed, 0, foeDash.dz * DASH.speed);
+        foeDash.left -= sdtRoom;
+        if (foeDash.left <= 0 || Math.hypot(player.root.position.x - r.x, player.root.position.z - r.z) <= DASH.homingStopM || !foeState.controllable) foeDash = null;
+        foeSpeed01 = 1;
+      } else if (foeState.controllable && !foeStriking && !foeState.blockHeld) {
+        const r = rival.root.position, bx = r.x, bz = r.z;
+        r.addInPlaceFromFloats(foeVel.x * sdtRoom, 0, foeVel.z * sdtRoom);
+        arenaClamp(r, arena);
+        foeSpeed01 = sdtRoom > 0 && Math.hypot(r.x - bx, r.z - bz) / sdtRoom < 0.3 ? 0 : foeVel.length() / MOVE_SPEED;   // the step only while the body moves
       }
 
       faceEachOther(dt);
-      // guard HUD trickle (regen is invisible otherwise)
-      ctx.setHud({ guard: Math.round(meState.guard), foeGuard: Math.round(foeState.guard) });
+      // guard HUD trickle (regen is invisible otherwise). IMPROVE (2026-10-06): pushed only when a value changes — every
+      // push was a React setState on the host
+      { const g = Math.round(meState.guard), fg = Math.round(foeState.guard); if (g !== guardHud || fg !== foeGuardHud) { guardHud = g; foeGuardHud = fg; ctx.setHud({ guard: g, foeGuard: fg }); } }
       ctx.camDirector.look(lookX, lookY, dt);
       ctx.camDirector.update(player.root.position, moveVel, rival.root.position);
-      animate(mySpeed01, foeSpeed01, moveVel, foeVel);
+      animate(dt, mySpeed01, foeSpeed01, moveVel, foeVel);
     },
 
     dispose() {
@@ -946,6 +1096,8 @@ export const KarateVSMode: ModeDefinition = (() => {
       crowd?.dispose(); crowd = null;
       modeVenue?.dispose?.(); modeVenue = null; arenaHandle?.dispose(); arenaHandle = null; wallRun = null; wallKick = null;
       ring?.dispose(); ring = null;
+      // IMPROVE (2026-10-06): nothing outlives the mode — the hit beats waiting on either clock, the slides, the banner
+      meTimers.clear(); foeTimers.clear(); knock.clear(); bannerSlot.clear(); foeDash = null; meDash = null; queuedKey = null;
       player?.dispose(); rival?.dispose(); SoundKit.stopAmbient();
     },
   };

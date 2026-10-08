@@ -20,12 +20,23 @@ export interface TodayStore {
   // red-flag hard stop": loadToday/saveClientLog now read the client's latest HealthIntake the same way
   // lib/health/intake.ts's own latestIntake() does. Empty by default, same as every athlete with no intake on file.
   healthIntake: Row[];
+  // MIRROR-COACH P8 (2026-09-29): the protocol gate's other reads (lib/coach/protocolGateServer.ts) — the health consent
+  // ledger, pain check-ins, stored Quick Screens (WorkoutScan) and facilitator profiles. Optional and empty by default:
+  // a store built before P8 (or a test that never seeds a gated item) reads as an athlete with none of them on file.
+  healthConsent?: Row[];
+  painCheckIn?: Row[];
+  workoutScan?: Row[];
+  fac?: Row[];
 }
 
-export const newTodayStore = (): TodayStore => ({ seq: 0, clock: Date.parse('2026-09-28T09:00:00Z'), program: [], block: [], session: [], se: [], pe: [], user: [], cs: [], log: [], setLog: [], healthIntake: [] });
+export const newTodayStore = (): TodayStore => ({
+  seq: 0, clock: Date.parse('2026-09-28T09:00:00Z'), program: [], block: [], session: [], se: [], pe: [], user: [], cs: [], log: [], setLog: [], healthIntake: [],
+  healthConsent: [], painCheckIn: [], workoutScan: [], fac: [],
+});
 
 /** ExerciseLog columns a write may name (prisma/schema.prisma model ExerciseLog, less id / timestamps / relations). */
-export const EXERCISE_LOG_WRITABLE = ['clientSessionId', 'sessionExerciseId', 'actualSets', 'actualReps', 'actualLoad', 'rpe', 'clientNote', 'videoUrl', 'coachComment', 'coachCommentAt', 'completedAt'] as const;
+// MIRROR-COACH P8 FIX (2026-09-30): + servedExerciseId (what the gate served on the slot; lib/coach/todayServer.ts).
+export const EXERCISE_LOG_WRITABLE = ['clientSessionId', 'sessionExerciseId', 'actualSets', 'actualReps', 'actualLoad', 'rpe', 'clientNote', 'videoUrl', 'coachComment', 'coachCommentAt', 'completedAt', 'servedExerciseId'] as const;
 /** SetLog columns a write may name. */
 export const SET_LOG_WRITABLE = ['exerciseLogId', 'setIndex', 'reps', 'weightKg', 'rir', 'effort', 'workSeconds', 'note'] as const;
 /** ClientSession columns a write may name (MIRROR-COACH P6: cooldownDoneAt joined them — lib/coach/cooldownServer.ts). */
@@ -84,7 +95,36 @@ export function todayMemoryDb(s: TodayStore) {
             .map((c) => csWith(c, a.include.clientSessions.include));
           return { ...clone(p), blocks: tree(p.id, exerciseSelect), clientSessions: cs };
         }),
-      findUnique: async (a: Row) => { const p = s.program.find((x) => x.id === a.where.id); return p ? pick(p, a.select) : null; },
+      // MIRROR-COACH P8 (2026-09-29): with `include` (TREE_INCLUDE — the coach's gates route, lib/coach/
+      // protocolGateServer.ts loadProgramGates reads the whole tree), the program with its blocks → sessions → exercises
+      findUnique: async (a: Row) => {
+        const p = s.program.find((x) => x.id === a.where.id);
+        if (!p) return null;
+        if (a.include?.blocks) return { ...clone(p), blocks: tree(p.id, a.include.blocks.include.sessions.include.exercises.include.exercise.select) };
+        return pick(p, a.select);
+      },
+    },
+    // MIRROR-COACH P8 (2026-09-29): the protocol gate's reads (lib/coach/protocolGateServer.ts), filtered the way it asks
+    healthConsent: {
+      findMany: async (a: Row) => (s.healthConsent ?? [])
+        .filter((c) => c.userId === a.where.userId && (!a.where.scope || c.scope === a.where.scope))
+        .map((c) => pick(c, a.select)),
+    },
+    painCheckIn: {
+      findMany: async (a: Row) => (s.painCheckIn ?? [])
+        .filter((p) => p.userId === a.where.userId && (!a.where.createdAt?.gte || time(p.createdAt) >= time(a.where.createdAt.gte)))
+        .sort((x, y) => time(y.createdAt) - time(x.createdAt))
+        .map((p) => pick(p, a.select)),
+    },
+    workoutScan: {
+      findMany: async (a: Row) => (s.workoutScan ?? [])
+        .filter((w) => w.userId === a.where.userId && (!a.where.kind || w.kind === a.where.kind))
+        .sort((x, y) => time(y.createdAt) - time(x.createdAt))
+        .slice(0, a.take ?? Infinity)
+        .map((w) => pick(w, a.select)),
+    },
+    facilitatorProfile: {
+      findUnique: async (a: Row) => { const f = (s.fac ?? []).find((x) => x.userId === a.where.userId); return f ? pick(f, a.select) : null; },
     },
     user: {
       findUnique: async (a: Row) => { const u = s.user.find((x) => x.id === a.where.id); return u ? pick(u, a.select) : null; },
@@ -98,6 +138,12 @@ export function todayMemoryDb(s: TodayStore) {
         if (!rows.length) return null;
         return clone([...rows].sort((x, y) => time(y.createdAt) - time(x.createdAt))[0]);
       },
+      // MIRROR-COACH P7 FIX (2026-09-29): the Dial-Up Breath reads every intake inside the year (lib/breath/rampServer.ts
+      // loadRampFacts), newest first — a re-take does not erase an earlier lasting "yes"
+      findMany: async (a: Row) => s.healthIntake
+        .filter((r) => r.userId === a.where.userId && (!a.where.createdAt?.gte || time(r.createdAt) >= time(a.where.createdAt.gte)))
+        .sort((x, y) => time(y.createdAt) - time(x.createdAt))
+        .map((r) => pick(r, a.select)),
     },
     programExercise: {
       findMany: async (a: Row) => s.pe.filter((p) => (a.where.id?.in ?? []).includes(p.id) && (a.where.coachId === undefined || p.coachId === a.where.coachId)).map((p) => pick(p, a.select)),
@@ -171,7 +217,7 @@ export function todayMemoryDb(s: TodayStore) {
       create: async (a: Row) => {
         checkColumns('exerciseLog.create', a.data, EXERCISE_LOG_WRITABLE);
         const at = tick();
-        const l = { id: id('log'), actualSets: null, actualReps: null, actualLoad: null, rpe: null, clientNote: null, videoUrl: null, coachComment: null, coachCommentAt: null, completedAt: null, ...clone(a.data), createdAt: at, updatedAt: at };
+        const l = { id: id('log'), actualSets: null, actualReps: null, actualLoad: null, rpe: null, clientNote: null, videoUrl: null, coachComment: null, coachCommentAt: null, completedAt: null, servedExerciseId: null, ...clone(a.data), createdAt: at, updatedAt: at };
         s.log.push(l);
         return clone(l);
       },

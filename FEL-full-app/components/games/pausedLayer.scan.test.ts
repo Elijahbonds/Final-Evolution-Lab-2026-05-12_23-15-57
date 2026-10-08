@@ -144,12 +144,13 @@ describe('one paused layer (plan step 4a)', () => {
         // the review's M2: `{phase !== 'paused' && <BootSplash …/>}`, or the same around a wrapper
         if (s.inside !== null) missing.push(`${f}: BootSplash is rendered only sometimes, inside ${JSON.stringify(s.inside)}`);
       }
-      if (!found.length && !/\{phase === 'paused' && <PausedLayer onResume=\{tapStart\} \/>\}/.test(src)) {
+      // CONTROLS SCREEN (2026-10-06): the layer may carry the mode (its CONTROLS panel) — its tap is still tapStart
+      if (!found.length && !/\{phase === 'paused' && <PausedLayer onResume=\{tapStart\}( modeId="[a-z_]+")? \/>\}/.test(src)) {
         missing.push(`${f}: runs a mode with no BootSplash and no PausedLayer — a pause would freeze it with no word`);
       }
     }
     expect(missing).toEqual([]);
-    expect(read(path.join(GAMES, 'who-scene-it-babylon.tsx'))).toContain('<PausedLayer onResume={tapStart} />');
+    expect(read(path.join(GAMES, 'who-scene-it-babylon.tsx'))).toContain('<PausedLayer onResume={tapStart} modeId="who_scene_it" />');
     // the reader itself, on the review's mutations: it sees a condition wherever it sits, and every attribute as written
     const host = (jsx: string) => splashesIn(`export default function H() { return (\n<div className="relative">\n${jsx}\n</div>\n); }`);
     const SPLASH = '<BootSplash modeId="dunk" phase={phase} onStart={tapStart} onRetry={tapStart} />';

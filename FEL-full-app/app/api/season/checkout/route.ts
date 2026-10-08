@@ -9,7 +9,11 @@
  *     stat, no PRQ, no gameplay balance — only which cosmetics a tier hands out.
  *   - Price is server-owned and OWNER-owned: it comes from env via
  *     seasonPassProPriceUsdCents(). A client-supplied price is ignored, and with
- *     no price configured this route refuses to sell (503) rather than guessing.
+ *     no price configured this route refuses to sell (409 store_closed price_not_set)
+ *     rather than guessing.
+ *   - STORE-READY B10: fenced with VIRTUAL_PURCHASES_ENABLED on top of its own
+ *     SEASON_PASS_PURCHASE + price gates; every refusal below is 409 store_closed
+ *     (never 503) before any Stripe call or prisma write.
  *   - Nothing is unlocked here. The lane opens only in the signature-verified
  *     webhook (app/api/v1/wallet/stripe-webhook) after Stripe confirms payment.
  *   - Dark by default behind SEASON_PASS_PURCHASE (403 while off).
@@ -22,8 +26,10 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { getStripe } from '@/lib/stripe';
-import { FEATURE_DISABLED, isSeasonPassPurchaseEnabled, seasonPassProPriceUsdCents } from '@/lib/flags';
+import { FEATURE_DISABLED, isSeasonPassPurchaseEnabled, isVirtualPurchasesEnabled, seasonPassProPriceUsdCents } from '@/lib/flags';
 import { getActiveSeason, getPassState } from '@/lib/season/season-service';
+import { storeClosed } from '@/lib/coach-store/gate';
+import { siteOrigin } from '@/lib/stripe/site-origin';
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -33,14 +39,16 @@ export async function POST(req: NextRequest) {
   if (!isSeasonPassPurchaseEnabled()) {
     return NextResponse.json(FEATURE_DISABLED, { status: 403 });
   }
-  if (!process.env.STRIPE_SECRET_KEY) {
-    return NextResponse.json({ error: 'not_configured' }, { status: 503 });
-  }
+  // STORE-READY B10: every refusal this route used to answer 503 for is 409 store_closed — no key,
+  // the B10 live-key fence off (the season pass PRO lane is fenced with the SAME flag), no price —
+  // all BEFORE getActiveSeason(), getStripe(), customers.create or any prisma write.
+  if (!(process.env.STRIPE_SECRET_KEY ?? '').trim()) return storeClosed('payments_not_set_up');
+  if (!isVirtualPurchasesEnabled()) return storeClosed('virtual_purchases_off');
 
   const priceUsdCents = seasonPassProPriceUsdCents();
   if (priceUsdCents === null) {
     console.warn('[season/checkout] SEASON_PASS_PRO_PRICE_USD_CENTS unset; refusing to sell');
-    return NextResponse.json({ error: 'not_configured' }, { status: 503 });
+    return storeClosed('price_not_set');
   }
 
   const activeSeason = await getActiveSeason();
@@ -52,7 +60,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'already_owned' }, { status: 409 });
   }
 
-  const origin = req.headers.get('origin') || process.env.NEXTAUTH_URL || '';
+  // STORE-READY B3/B10: Stripe URLs come from the server constant NEXTAUTH_URL, never the Origin header.
+  const origin = siteOrigin();
+  if (!origin) return storeClosed('site_url_not_set');
   const stripe = getStripe();
 
   try {
@@ -103,7 +113,9 @@ export async function POST(req: NextRequest) {
           seasonId: activeSeason.id,
         },
       },
-      success_url: `${origin}/?season=pro-unlocked`,
+      // session_id lets the landing page fulfil through POST /api/stripe/verify-session
+      // even when no webhook is configured (SEC-F4 NO-WEBHOOK follow-up).
+      success_url: `${origin}/?season=pro-unlocked&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/?season=pro-cancelled`,
     });
     return NextResponse.json({ url: checkoutSession.url });

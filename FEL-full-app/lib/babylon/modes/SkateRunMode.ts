@@ -15,11 +15,13 @@ import { stepSpeedFov } from '../core/SpeedFov';
 import { BoostKit } from '../core/BoostKit';          // FINISH-RELEASE: the shared boost (landings and grinds fill it, RB/Shift burns it)
 import { BoostFx } from '../premium/BoostFx';
 import { BoostPads } from '../visual/BoostPads';
-import { Ray, Vector3, type TransformNode } from '@babylonjs/core';
+import { Matrix, Ray, Vector3, type TransformNode } from '@babylonjs/core';
 import type { ModeContext, ModeDefinition, BodyView } from '../core/ModeHarness';
+import { rideFilter } from '../core/rideFilter';
+import { BannerQueue, BANNER_PRIO } from '../core/BannerQueue';   // IMPROVE (2026-10-06): one banner, ticked on the mode's clock
+import { grindTrickFor, grindLabel, railKey, wallKey, lipKey, comboLine, settlePrompt, buzzerCue, wallCamSide, TRANSFER_BONUS, type GrindTrick } from './skateLine';
 import type { FelInput } from '../core/InputBus';
 import type { BodyEvent } from '@/lib/pose/BodyReader';
-import { CharacterLibrary } from '../core/CharacterLibrary';
 import { buildRig, landsSwitch, TRICKS, type BoardRig } from './boardCore';
 import { airTrickFor, basePts as trickPts, heldTrickDir, SKATE_TRICKS, type BoardTrick } from '../core/BoardTricks';   // the named vocabulary
 import { buildSkatepark, PARK_BOUND, type RideWorld } from './rideWorlds';
@@ -33,8 +35,8 @@ import { resolveLanding, BalanceSave, SKETCHY_SCORE_MULT } from '../core/Landing
 import { BalanceChannel, tryRevert, type BalanceChannelKind } from '../core/GrindManual';
 import { pickRail, nearestOnSegment } from '../core/RailMagnet';   // VENICE-SKATE-THPS: the catch window, testable on its own
 import { ComboChain } from '../core/ComboChain';
-import { WALL_RIDE, canWallRide, startWallRide, stepWallRide, wallSide, wallRideExitVel, wallplantVel, canLipStall, startLipStall, stepLipStall, dropInVel, lipStallPts, type Wall, type Lip, type WallRideState, type LipStallState } from '../core/WallRide';   // WALL RIDES + LIP TRICKS (2026-09-18)
-import { plazaWalls, plazaLips, SKATE_COIN_LOOK } from './skatePlaza';
+import { WALL_RIDE, KICK_PLANT, canWallRide, canWallplant, wallAhead, kickPlantVel, startWallRide, stepWallRide, wallSide, wallRideExitVel, wallplantVel, canLipStall, startLipStall, stepLipStall, dropInVel, lipStallPts, type Wall, type Lip, type WallRideState, type LipStallState } from '../core/WallRide';   // WALL RIDES + LIP TRICKS (2026-09-18)
+import { plazaWalls, plazaLips, skateCoinLayout, SKATE_COIN_LOOK } from './skatePlaza';
 import { BoardAnimTree } from '../anim/boardTree';
 // BIOMECH-WAVE2 (2026-09-09) — the game-wide bar on the board family (SPEC-FEL-BIOMECH-GAMEWIDE G1–G6). Measured on
 // 2942860, per rendered frame:
@@ -72,13 +74,13 @@ import { grabTrickFor, spinTrickFor } from '../core/rideTricks';
 // SKATE-SCORE (2026-09-29): the eye's SK-1/2/3/5 (grabs pay and count, a finished spin lands, the card counts landings, the
 // pop scales with the roll) and GC-13 (a body's HUD says a body's words)
 import { GrabBook, LandedTricks, skateLandingError01, skateAirLeft, skateAirBudget, fitToAir, popVy, popHeight, isBigAir } from './skateScore';
-import { RideHudSwitch, skateHudWords, setRingGlyph } from './rideHud';
+import { RideHudSwitch, HudDelta, skateHudWords, setRingGlyph } from './rideHud';
 
 const RUN_SEC = 90;
 /** phase 10: the banked score that wins the run */
 const SKATE_WIN_SCORE = 1500;
 /** Skate 3 banks the moment you roll away clean; the delay is the revert window. */
-const BANK_SETTLE_SEC = 0.45;
+const BANK_SETTLE_SEC = 0.85;
 /** A bank at or above this is the run's big moment and is cued as one. */
 const BIG_BANK_PTS = 500;
 /**
@@ -114,6 +116,10 @@ export const SkateRunMode: ModeDefinition = (() => {
    *  lands before it; THPS holds the button and the wall catches when reached). */
   let wallAskedAt = -1;
   const WALL_ASK_MS = 450;
+  /** KICK PLANT (asset-polish, 2026-10-05): JUMP asked for a plant (in the air with a face coming, or popped at one off the
+   *  ground); the plant lands the frame the face comes into reach, inside KICK_PLANT.askMs. */
+  let plantAskedAt = -1;
+  let wallCue = '';
   let props: VenuePropsHandle | null = null, propsGone = false;   // ship pass 4: CC0 prop dressing (visual/venuePropSets.ts)
   /** Seconds rolling clean on the ground before the pot banks (revert window). */
   let settleT = 0;
@@ -188,9 +194,36 @@ export const SkateRunMode: ModeDefinition = (() => {
   let ended = false;
 
   const flick = new FlickStick();
-  function bannerFlash(ctx: ModeContext, text: string, ms: number): void {
-    ctx.setHud({ banner: text });
-    setTimeout(() => ctx.setHud({ banner: '' }), ms);
+  // IMPROVE (2026-10-06, item 17): ONE banner, queued by priority and ticked on the mode's own clock (update). Each flash
+  // used to own a setTimeout that cleared the banner whatever was up by then — a trick's 500 ms clear wiped a "GOAL:" that
+  // went up after it — and the timers kept running after the mode was disposed. Priorities: a GOAL / GAP is the news and
+  // nothing wipes it early; a trick, a lock, a bank or a bail is a beat and the newest beat wins (as it always did); the
+  // incidental (SWITCH, BONK, BOOST READY, REVERT) is chatter and never covers a beat.
+  const banners = new BannerQueue();
+  function bannerFlash(ctx: ModeContext, text: string, ms: number, prio: number = BANNER_PRIO.beat): void {
+    if (banners.show(text, ms, prio)) ctx.setHud({ banner: banners.text });
+  }
+  /** IMPROVE (2026-10-06, item 2): the per-frame HUD goes out only when a value moved (each setHud is a host setState). */
+  const hudOut = new HudDelta();
+  function pushHud(ctx: ModeContext, patch: Parameters<ModeContext['setHud']>[0]): void {
+    const d = hudOut.diff(patch);
+    if (d) ctx.setHud(d);
+  }
+  /** The goals line is rebuilt when a goal falls, not every frame (it was a map/join per frame). */
+  let goalsShown = -1;
+  // IMPROVE (2026-10-06): the grind the held stick picked at the lock (item 11), and the link it pays into (item 12)
+  let grindPose: GrindTrick | null = null;
+  let grindLink: { label: string; key: string } | null = null;
+  /** IMPROVE (item 19): seconds since the last LAND IT! */
+  let sinceLandIt = 99;
+  /** IMPROVE (item 16): a trick done on a feature — the goals that name it fall. */
+  function reportTrick(ctx: ModeContext, trickId: string, where: string): void {
+    for (const g of goals.report({ type: 'trick', trickId, where })) {
+      bannerFlash(ctx, `GOAL: ${g.label}`, 1200, BANNER_PRIO.news);
+      SoundKit.play('crowdCheer', { volume: 0.6 });
+      crowd.cheer(1);
+      mbus.report({ kind: 'big_make' });
+    }
   }
   // ── Mode 3 shared stack (P2-P9) ──
   const move = new BoardMovement(tuneForVenue(SKATE_TUNING, readBoardVenue('skate')));
@@ -259,7 +292,7 @@ export const SkateRunMode: ModeDefinition = (() => {
   const DOWN = new Vector3(0, -1, 0);
   const groundBelow = (ctx: ModeContext): number => {
     const p = rig.char.root.position;
-    const hit = ctx.scene.pickWithRay(new Ray(new Vector3(p.x, p.y + 0.3, p.z), DOWN, 60), (m) => world.ground.includes(m));
+    const hit = ctx.scene.pickWithRay(new Ray(new Vector3(p.x, p.y + 0.3, p.z), DOWN, 60), rideFilter(world.ground));
     return hit?.hit && hit.pickedPoint ? hit.pickedPoint.y : lastGroundY;
   };
   /** Eased deck pitch (radians): a manual rides the tail with the nose up, everything else is flat. */
@@ -268,13 +301,19 @@ export const SkateRunMode: ModeDefinition = (() => {
    *  the ground, and the two ankle nodes it is read from. */
   const deckLift = { x: 0, y: 0, z: 0 };
   let feetGround: V3Like | null = null;
+  const lookAt = new Vector3();
   let feet: [TransformNode, TransformNode] | null = null;
+  // IMPROVE (2026-10-06, item 7): scratch matrix / vectors / result — this cloned and inverted a matrix and made two vectors
+  // and an object every frame. The result object is reused: callers copy it ({ ...feetNow }) or read it the same frame.
+  const feetScratch = { inv: new Matrix(), a: new Vector3(), b: new Vector3(), out: { x: 0, y: 0, z: 0 } };
   const feetMidLocal = (): V3Like | null => {
     if (!feet) return null;
-    const inv = rig.char.root.getWorldMatrix().clone().invert();
-    const a = Vector3.TransformCoordinates(feet[0].getAbsolutePosition(), inv);
-    const b = Vector3.TransformCoordinates(feet[1].getAbsolutePosition(), inv);
-    const m = { x: (a.x + b.x) / 2, y: Math.min(a.y, b.y), z: (a.z + b.z) / 2 };   // the LOWER ankle: the deck meets the first foot
+    const S = feetScratch;
+    rig.char.root.getWorldMatrix().invertToRef(S.inv);
+    Vector3.TransformCoordinatesToRef(feet[0].getAbsolutePosition(), S.inv, S.a);
+    Vector3.TransformCoordinatesToRef(feet[1].getAbsolutePosition(), S.inv, S.b);
+    const m = S.out;
+    m.x = (S.a.x + S.b.x) / 2; m.y = Math.min(S.a.y, S.b.y); m.z = (S.a.z + S.b.z) / 2;   // the LOWER ankle: the deck meets the first foot
     return Number.isFinite(m.x) && Number.isFinite(m.y) && Number.isFinite(m.z) ? m : null;
   };
   /** THE NaN TRAP (VENICE-SKATE-THPS). The last frame whose position and heading were real numbers, and how many times
@@ -298,28 +337,47 @@ export const SkateRunMode: ModeDefinition = (() => {
     // the grab was still HELD through the whole ride — measured, 57 of 60 detached-feet air frames were board_grab on the
     // wall. The wall takes the board: the grab is banked and released the way a release would.
     letGoGrab();
-    combo.add('WALL RIDE', WALL_RIDE.pts, 'grind');
+    combo.add('WALL RIDE', WALL_RIDE.pts, 'grind', wallKey(w));   // IMPROVE (item 12): the same wall again decays
     bannerFlash(ctx, 'WALL RIDE', 700);
+    reportTrick(ctx, 'wallride', w.label);   // IMPROVE (item 16)
     SoundKit.play('powerUp', { volume: 0.4, pitch: 1.15 }); ctx.feel?.impact?.(0.25);
     console.info(`[SKATE-WALL] ride ${w.label} at y ${pos.y.toFixed(2)} speed ${wallRide.speed.toFixed(1)}`);
     return true;
   }
   function wallplant(ctx: ModeContext): void {
     if (!wallRide) return;
-    const v = wallplantVel(wallRide);
+    const v = wallplantVel(wallRide), on = wallRide.wall.label;
     endWallRide();
+    landPlant(ctx, v, on);
+  }
+  /** KICK PLANT: JUMP in the air at any face, no wall ride first (owner 2026-10-05: "a kick plant with the same button as the
+   *  jump button when you press it off a wall"). */
+  function tryKickPlant(ctx: ModeContext): boolean {
+    if (wallRide || lipStall || rig.rider.grinding) return false;
+    const pos = rig.char.root.position, v = rig.rider.vel;
+    const w = canWallplant({ x: pos.x, y: pos.y, z: pos.z }, { x: v.x, z: v.z }, walls, !rig.rider.grounded);
+    if (!w) return false;
+    letGoGrab(); trickLayer?.clear();
+    plantAskedAt = -1;
+    console.info(`[SKATE-WALL] kick plant off ${w.label} at y ${pos.y.toFixed(2)}`);
+    landPlant(ctx, kickPlantVel(w, { x: v.x, z: v.z }), w.label);
+    return true;
+  }
+  function landPlant(ctx: ModeContext, v: { x: number; y: number; z: number; yaw: number }, on: string): void {
     move.yaw = v.yaw; airEntryYaw = v.yaw;
     move.vel.set(v.x, 0, v.z); rig.rider.vel.set(v.x, v.y, v.z);
     rig.rider.grounded = false;
     combo.add('WALLPLANT', WALL_RIDE.plantPts, 'air');
     bannerFlash(ctx, 'WALLPLANT', 700);
     SoundKit.play('impact', { pitch: 1.3, volume: 0.45 }); ctx.feel?.impact?.(0.35); spectacle(ctx, 'wallplant');
+    rig.char.root.rotation.y = move.yaw + (move.stance === 'switch' ? Math.PI : 0);
     console.info('[SKATE-WALL] wallplant');
+    reportTrick(ctx, 'wallplant', on);   // IMPROVE (item 16): WALLPLANT THE STREET WALL
   }
   function endWallRide(): void {
     if (!wallRide) return;
     const ridden = wallRide.t;
-    if (ridden > 0.2) combo.accrue('WALL RIDE', Math.round(WALL_RIDE.ptsPerSec * ridden), 'grind');
+    if (ridden > 0.2) combo.accrue('WALL RIDE', Math.round(WALL_RIDE.ptsPerSec * ridden), 'grind', wallKey(wallRide.wall));
     wallRide = null;
     if (trickLayer) trickLayer.overridePose = null;
     rig.char.root.rotation.z = 0;
@@ -341,7 +399,8 @@ export const SkateRunMode: ModeDefinition = (() => {
     const st = lipStall; lipStall = null;
     if (trickLayer) trickLayer.overridePose = null;
     const pts = lipStallPts(st);
-    combo.add(st.trick.label, pts, 'grind');
+    combo.add(st.trick.label, pts, 'grind', lipKey(st.lip.label));   // IMPROVE (item 12): the same lip again decays
+    reportTrick(ctx, st.trick.id, st.lip.label);   // IMPROVE (item 16): BLUNT TO FAKIE ON THE PYRAMID
     const v = dropInVel(st);
     move.yaw = v.yaw; move.vel.set(v.x, 0, v.z); rig.rider.vel.set(v.x, v.y, v.z);
     if (st.trick.fakie) move.switchStance();
@@ -351,6 +410,24 @@ export const SkateRunMode: ModeDefinition = (() => {
     console.info(`[SKATE-LIP] drop in after ${st.t.toFixed(2)} s +${pts}`);
   }
   function tickWalls(ctx: ModeContext, dt: number): void {
+    // KICK PLANT: a JUMP asked a moment ago lands the frame the face comes into reach
+    if (plantAskedAt >= 0 && performance.now() - plantAskedAt < KICK_PLANT.askMs && !rig.rider.grounded) tryKickPlant(ctx);
+    else if (plantAskedAt >= 0 && performance.now() - plantAskedAt >= KICK_PLANT.askMs) plantAskedAt = -1;
+    // THE CUE: what the wall in reach will take, said while it can (the moves existed and nobody found them)
+    let cue = '';
+    if (!wallRide && !lipStall && !rig.rider.grounded && !rig.rider.grinding) {
+      const pos = rig.char.root.position, v = rig.rider.vel;
+      const p = { x: pos.x, y: pos.y, z: pos.z };
+      const near = canWallplant(p, { x: v.x, z: v.z }, walls, true) ?? wallAhead(p, { x: v.x, z: v.z }, walls, KICK_PLANT.aheadM, KICK_PLANT.intoMps);
+      if (near) cue = near.rideable === false ? 'JUMP: KICK PLANT' : 'JUMP: KICK PLANT · GRIND: WALL RIDE';
+    } else if (wallRide) cue = 'JUMP: WALLPLANT';
+    else if (lipStall) cue = 'JUMP: DROP IN';
+    // the lip stall has the same problem the walls had: X held at a crest at speed, which nobody finds on their own
+    if (!cue && !wallRide && !lipStall && !rig.rider.grinding) {
+      const pos = rig.char.root.position, v = rig.rider.vel;
+      if (canLipStall({ x: pos.x, y: pos.y, z: pos.z }, { x: v.x, z: v.z }, lips)) cue = 'GRIND: LIP STALL';
+    }
+    if (cue !== wallCue) { wallCue = cue; ctx.setHud({ wallCue: cue }); }
     // the remembered ask: the wall (or the lip) catches the frame it comes into reach while the button is held or was just pressed
     if (!wallRide && !lipStall && !grindCh && !manualCh && (xHeld || performance.now() - wallAskedAt < WALL_ASK_MS)) {
       if (tryWallRide(ctx) || tryLipStall(ctx)) wallAskedAt = -1;
@@ -366,7 +443,8 @@ export const SkateRunMode: ModeDefinition = (() => {
       rig.char.root.rotation.y = p.yaw; rig.char.root.rotation.z = side * WALL_BODY_ROLL;
       move.yaw = p.yaw; move.vel.set(Math.sin(p.yaw) * wallRide.speed, 0, Math.cos(p.yaw) * wallRide.speed);
       rig.rider.vel.set(move.vel.x, wallRide.vy, move.vel.z); rig.rider.grounded = false;
-      if (trickLayer) trickLayer.overridePose = { boardRoll: side * (WALL_RIDE.boardRoll - WALL_BODY_ROLL) };
+      // IMPROVE (item 13): the wall ride's own hands — the lead palm to the face, the rear hand dragging (BoardTrickLayer)
+      if (trickLayer) trickLayer.overridePose = { boardRoll: side * (WALL_RIDE.boardRoll - WALL_BODY_ROLL), wall: { nx: wallRide.wall.nx, nz: wallRide.wall.nz, tx: Math.sin(p.yaw), tz: Math.cos(p.yaw) } };
       if (p.done) {
         const v = wallRideExitVel(wallRide);
         endWallRide();
@@ -427,8 +505,7 @@ export const SkateRunMode: ModeDefinition = (() => {
     // is a spin thrown with a grab (the 540), which AirControl holds as a grab and never put in the chain either
     if (family === 'grab' && air.state.airborne) grabs.thrown(air.state.chain, { id, label, basePts, difficulty });
     if (named) trickLayer?.start(named);
-    ctx.setHud({ banner: label });
-    setTimeout(() => ctx.setHud({ banner: '' }), 500);
+    bannerFlash(ctx, label, 500);   // IMPROVE (item 17): through the one banner, not a timer of its own
     SoundKit.play('whoosh', { pitch: 1 + difficulty * 0.15, volume: 0.4 });
   };
   /**
@@ -491,7 +568,7 @@ export const SkateRunMode: ModeDefinition = (() => {
     if (tall && move.slammedWall && bailBeatT <= 0) {
       combo.bail();
       mbus.report({ kind: 'miss' });
-      bannerFlash(ctx, 'SLAMMED', 900);
+      bannerFlash(ctx, 'SLAMMED', 900, BANNER_PRIO.beat);
       SoundKit.play('miss');
       bailBeatT = BAIL_BEAT_SEC;
       move.vel.scaleInPlace(0.15);   // a fallen rider does not keep sliding at speed (as the blown landing does)
@@ -501,7 +578,7 @@ export const SkateRunMode: ModeDefinition = (() => {
     } else {
       SoundKit.play('impact', { pitch: kind === 'bounce' ? 0.8 : 1.1, volume: kind === 'bounce' ? 0.4 : 0.22 });
       ctx.feel?.impact?.(kind === 'bounce' ? 0.3 : 0.12);
-      if (kind === 'bounce') bannerFlash(ctx, what === 'the fence' ? 'EDGE OF THE PARK' : 'BONK', 700);
+      if (kind === 'bounce') bannerFlash(ctx, what === 'the fence' ? 'EDGE OF THE PARK' : 'BONK', 700, BANNER_PRIO.chatter);
       console.info(`[SKATE-SOLID] ${kind} off ${what} at ${move.speed.toFixed(1)} m/s`);
     }
   }
@@ -547,6 +624,7 @@ export const SkateRunMode: ModeDefinition = (() => {
 
   return {
     modeId: 'skateboard', camPreset: 'board',
+    hideRingInPlay: true,
     // MOVEMENT PLAY P8: the step is the mode's — a kick-push with the back foot is the PUSH (the row binds no step); the card
     // says the floor's lines, then the grab, the spin and the push this mode reads itself
     body: { claims: ['step'], lines: rideLines('skateboard', ['step']) },
@@ -577,12 +655,10 @@ export const SkateRunMode: ModeDefinition = (() => {
       world = buildSkatepark(ctx.scene, venue);
       console.info(`[SKATE-VENUE] ${venue.name} · bound ${venue.bound} · ${venue.mood}`);
       propsGone = false; void mountVenueProps(ctx.scene, 'skatepark', undefined, { spread: world.bound / 36 }).then((h) => { if (propsGone) h?.dispose(); else props = h; });
-      // Gate 0: Validate skeletal rig by spawning placeholder to check skeleton
-      const _validateChar = await CharacterLibrary.spawn(ctx.scene, CFG.heroUrl, { position: new Vector3(0, -1000, 0) });
-      if (_validateChar.skeleton?.bones.length === 65) {
-        // Confirmed: 65-bone Mixamo rig with proper structure
-      }
-      _validateChar.dispose(); // Clean up validation placeholder
+      // GATE 0 is the rider's own spawn: buildRig loads the hero through CharacterLibrary.spawn, whose load gates the rig
+      // (gateContainerRig: the 22-bone FEL spec, AGENT-OPERATING-RULES). IMPROVE (2026-10-06, item 1): the throwaway
+      // "validation" hero this load spawned at y −1000 and disposed again is gone — a full character load and skeleton
+      // build on every mount that checked for a 65-bone rig, did nothing either way, and could never fail.
       // carveAccel 0: the momentum model below owns the velocity; the Rider's own 4.95 m/s² forward creep was the only
       // thing that moved a stick-held rider (0.33 m in 4 s on the baseline probe) and it scaled with frame time
       // stepUp (SKATE-MAJOR): a solid taller than a kerb is a wall, not an elevator (GroundRide.RiderCfgOverrides.stepUp)
@@ -600,8 +676,9 @@ export const SkateRunMode: ModeDefinition = (() => {
         const angled = angulate(pose, rig.char.root.rotation.z, window);
         // G1 on a board sport: the "objective" is where the board is TAKING you. 7 m down the current heading at head
         // height — the chest squares to it and the eyes go with it.
-        const la = lookAhead(rig.char.root.position, rig.char.root.rotation.y, 7, 1.5);
-        const at = new Vector3(la.x, la.y, la.z);
+        // IMPROVE (2026-10-06): a slide turns the whole rider off the rail (item 11) — the eyes stay DOWN the rail
+        const la = lookAhead(rig.char.root.position, rig.char.root.rotation.y - (rig.rider.grinding && grindPose ? grindPose.bodyYaw : 0), 7, 1.5);
+        const at = lookAt.set(la.x, la.y, la.z);   // item 7: one scratch vector (the layer reads it the same frame)
         return { pose: angled, legs, aim: at, eyes: at, window };
       }, 'SKATE-PP');
       trickLayer?.dispose();
@@ -623,6 +700,7 @@ export const SkateRunMode: ModeDefinition = (() => {
           manual: manualCh?.active ?? false, manualNeedle: manualCh?.needle ?? null, manualHeld: manualCh?.heldSec ?? null,
           railD: railDistance(), slow: slowT, slows: slowCount, pop: popBeatT > 0, boardPitch, deck: { ...deckLift }, grab: air.state.grabHeld ?? null,
           wall: !!wallRide, lip: !!lipStall, bailing: bailBeatT > 0,   // SKATE-MAJOR: the wall, the lip and the fall, for the probe
+          grindName: grindLink?.label ?? null, banner: banners.text,   // IMPROVE (2026-10-06): the named grind and the one banner
           chainNow: air.state.chain.map((t) => t.label),
           // the golden goal rail, live: a probe has to be able to LINE UP with it, and a rail that patrols is
           // somewhere different every second
@@ -669,7 +747,7 @@ export const SkateRunMode: ModeDefinition = (() => {
       // the side for the first frames and, on a portrait phone (aspect 0.46),
       // lost the rider until the follow swung round (mobile capture, ~1 run in 2)
       ctx.camDirector.snapTo(rig.char.root.position, aheadOfRider());
-      timeLeft = RUN_SEC; ended = false; fenceHit = false; wallRide = null; lipStall = null; xHeld = false; stickX = 0; stickY = 0; pump = 0; pumpReleased = 0; pumpReleasedAt = -1; pushing = false; settleT = 0; airEntryYaw = 0; snappedForPlay = false;
+      timeLeft = RUN_SEC; ended = false; fenceHit = false; wallRide = null; lipStall = null; xHeld = false; plantAskedAt = -1; wallCue = ''; stickX = 0; stickY = 0; pump = 0; pumpReleased = 0; pumpReleasedAt = -1; pushing = false; settleT = 0; airEntryYaw = 0; snappedForPlay = false;
       landingBeatT = 0; bailBeatT = 0; bailLatch = false; lastLanding = 'none';
       slowT = 0; slowCool = 0; slowCount = 0; popBeatT = 0; crouchAt = -1; boardPitch = 0; lastGroundY = 0;
       grindAskedAt = -1; relockUntil = -1; lastGoodPos = null; lastGoodYaw = 0; nanReports = 0;
@@ -683,14 +761,17 @@ export const SkateRunMode: ModeDefinition = (() => {
       SoundKit.startAmbient('wind');
       EffectsKit.ambient(ctx.scene, 'park');
       coins = new CoinField(ctx.scene, SKATE_COIN_LOOK);   // SK-6: gold you can read across the plaza, not olive dots
-      coins.line(new Vector3(-16, 0.4, -16), new Vector3(16, 0.4, 16), 10);
-      coins.line(new Vector3(16, 0.4, -16), new Vector3(-16, 0.4, 16), 10);
-      coins.arc(new Vector3(-3, 1.2, -2), new Vector3(3, 1.2, -2), 2.4, 6);
-      // NEW LINES — the risk routes pay: down the downhill straight...
-      coins.line(new Vector3(20, 2.6, -19), new Vector3(20, 0.6, 8), 8);
-      // ...and an air arc over the bowl rim
-      coins.arc(new Vector3(-22, 1.6, 14), new Vector3(-10, 1.6, 14), 2.6, 6);
+      // IMPROVE (2026-10-06, item 8): the lines are laid on THIS venue's features (skatePlaza.skateCoinLayout) — the two
+      // diagonals, an arc over the centre funbox, down the downhill straight's own surface and across the bowl. They were
+      // fixed metres from the 33 m park, so at Venice the "downhill" line ran 14 m off the lane and the bowl arc missed it.
+      {
+        const lay = skateCoinLayout(world.bound);
+        for (const [x, y, z] of lay.points) { const p = new Vector3(x, y, z); coins.line(p, p, 1); }
+        for (const a of lay.arcs) coins.arc(new Vector3(...a.from), new Vector3(...a.to), a.apex, a.n);
+      }
       ctx.setHud({ score: 0, combo: '', coins: 0, time: RUN_SEC, goals: `0/${SKATE_GOALS.length}`, ...skateHudWords(false) });   // GC-13: the pad's words (rideHud), until a body plays
+      // IMPROVE (2026-10-06): a remount starts the banner, the HUD diff, the grind's name and the buzzer over
+      banners.clear(); hudOut.reset(); goalsShown = -1; grindPose = null; grindLink = null; sinceLandIt = 99;
     },
 
     onInput(ctx: ModeContext, e: FelInput) {
@@ -787,6 +868,13 @@ export const SkateRunMode: ModeDefinition = (() => {
         if (e.btn === 'X' && !wallRide && !lipStall && !grindCh && !manualCh && tryLipStall(ctx)) return;
         if (e.btn === 'X' && !wallRide && !lipStall && !grindCh) { if (tryWallRide(ctx)) return; wallAskedAt = performance.now(); }
         if (e.btn === 'A' && wallRide) { wallplant(ctx); return; }
+        // KICK PLANT: JUMP in the air at a face kicks off it; with a face just ahead, the press waits for it (askMs) instead
+        // of being spent on an air trick a frame before the wall
+        if (e.btn === 'A' && !lipStall && !rig.rider.grounded && !rig.rider.grinding && !(coyote.ok && !air.state.airborne)) {
+          if (tryKickPlant(ctx)) return;
+          const pos = rig.char.root.position, v = rig.rider.vel;
+          if (wallAhead({ x: pos.x, y: pos.y, z: pos.z }, { x: v.x, z: v.z }, walls, KICK_PLANT.aheadM, KICK_PLANT.intoMps)) { plantAskedAt = performance.now(); return; }
+        }
         if (e.btn === 'A' && lipStall) { dropIn(ctx); return; }
         if (e.btn === 'X' && rig.rider.grounded && !grindCh && !manualCh) {
           if (move.push()) SoundKit.play('whoosh', { pitch: 0.9, volume: 0.3 });   // the push beat is move.stroking (below)
@@ -820,6 +908,9 @@ export const SkateRunMode: ModeDefinition = (() => {
             apexDone = false; lastVy = rig.rider.vel.y;
             popped = true;
             SoundKit.play('whoosh', { pitch: 1.3, volume: 0.4 });
+            // KICK PLANT off the ground: the pop AT a face is the plant's (the jump button "off a wall")
+            { const pos = rig.char.root.position, v = rig.rider.vel;
+              if (wallAhead({ x: pos.x, y: Math.max(pos.y, KICK_PLANT.minY), z: pos.z }, { x: v.x, z: v.z }, walls, KICK_PLANT.groundAheadM, KICK_PLANT.groundIntoMps)) plantAskedAt = performance.now(); }
           }
           // VENICE-SKATE-THPS: the press only ASKS for the rail — it never catches one itself. A raw `tryGrind` here
           // skipped every qualification the magnet applies, so a press over a rail's last centimetre locked and
@@ -836,7 +927,9 @@ export const SkateRunMode: ModeDefinition = (() => {
         // overlay has a right stick -- skate was unscoreable for every player
         // not holding a gamepad. Route them through the same air chain the
         // flick path uses, so the landing grades and banks them.
-        if (!rig.rider.grounded && !popped) {
+        // (asset-polish: never while the wall or a lip has the board — the rider counts as airborne there, and B/Y threw air
+        // tricks and X a grab while pinned to the wall)
+        if (!rig.rider.grounded && !popped && !wallRide && !lipStall) {
           // THE NAMED VOCABULARY. Three buttons used to mean three fixed tricks; now the HELD DIRECTION picks which
           // trick a button throws — the dunk's own grammar (DunkSystem.runwayTrickFor reads dir+btn the same way) — so
           // fifteen skate tricks are reachable from the same three buttons instead of three.
@@ -872,9 +965,12 @@ export const SkateRunMode: ModeDefinition = (() => {
       if (slowT > 0) slowT = Math.max(0, slowT - dtRaw);
       const dt = slowT > 0 ? dtRaw * SLOW_SCALE : dtRaw;
       trickLayer?.begin();   // TRICK POSE: take back last frame's trick offsets before this frame's writes
+      if (banners.tick(dtRaw * 1000)) ctx.setHud({ banner: banners.text });   // IMPROVE (item 17): the banner's one clock (real time, as the timers were)
+      const prevLeft = timeLeft;
       timeLeft -= dtRaw;
       if (timeLeft <= 0) {
         ended = true;
+        banners.clear(); ctx.setHud({ banner: '' });   // IMPROVE (item 17): nothing is left up for a timer to clear
         SoundKit.play('whistle');
         // THE BUZZER DOES NOT PAY FOR A COMBO YOU NEVER LANDED (2026-09-12 mechanic pass).
         // This totalled `combo.banked + combo.pot`, and pot is the LIVE chain — so a run that
@@ -891,14 +987,23 @@ export const SkateRunMode: ModeDefinition = (() => {
         // less per line since the repeat decay, so the par sits at 1500) — it ended 'RUN_COMPLETE' with no win before
         const won = finalScore >= SKATE_WIN_SCORE;
         console.info(`[SKATE-END] ${won ? 'win' : 'complete'} banked ${combo.banked} coins ${coins.collected} best ${combo.bestCombo}x`);
-        return ctx.end(won ? 'win' : 'complete', finalScore, { runSec: RUN_SEC, coinsCollected: coins.collected, bestCombo: combo.bestCombo, tricksLanded: landed.total });   // SK-3: landed tricks only (the live pot's links were never landed)
+        return ctx.end(won ? 'win' : 'complete', finalScore, { runSec: RUN_SEC, coinsCollected: coins.collected, bestCombo: combo.bestCombo, tricksLanded: landed.total, goalsHit: goals.doneCount, goals: SKATE_GOALS.length });   // SK-3: landed tricks only; RESULTS-TRUTH: goals on the card
+      }
+      // IMPROVE (2026-10-06, item 19): THE BUZZER WARNS. It burns a pot still in the air, on a rail or in a manual, and the
+      // clock just ran out on it: the ten-second call as the clock crosses it, and LAND IT! while a pot rides into it.
+      {
+        sinceLandIt += dtRaw;
+        const burnable = !rig.rider.grounded || !!grindCh || !!manualCh || air.state.airborne;
+        const cue = buzzerCue(prevLeft, timeLeft, combo.active, burnable, sinceLandIt);
+        if (cue === 'ten') { ctx.juice.callout('10 SECONDS', '#fde047', 900); SoundKit.play('uiTick', { pitch: 0.8, volume: 0.5 }); }
+        else if (cue === 'landIt') { sinceLandIt = 0; ctx.juice.callout('LAND IT!', '#f87171', 700); }
       }
       const gained = coins.update(dt, rig.char.root.position);
       if (gained > 0) {
         SoundKit.play('uiTick', { pitch: 1.4 });
         ctx.setHud({ coins: coins.collected });
         for (const g of goals.report({ type: 'collect', collectibleId: `c${coins.collected}` })) {
-          bannerFlash(ctx, `GOAL: ${g.label}`, 1200);
+          bannerFlash(ctx, `GOAL: ${g.label}`, 1200, BANNER_PRIO.news);
           SoundKit.play('powerUp', { pitch: 1.3 });
         }
       }
@@ -917,7 +1022,7 @@ export const SkateRunMode: ModeDefinition = (() => {
           // the balance meter was decorative, because failing it cost nothing the player could see. The rider now drops
           // off the side the needle tipped to, the pot burns, and the body plays the bail.
           const side = grindCh.needle >= 0 ? 1 : -1;
-          grindCh = null;
+          grindCh = null; grindPose = null; grindLink = null;
           rig.rider.dismount('slip', side);
           relockUntil = performance.now() + RELOCK_MS;
           combo.bail();
@@ -926,9 +1031,11 @@ export const SkateRunMode: ModeDefinition = (() => {
           move.vel.set(rig.rider.vel.x, 0, rig.rider.vel.z); move.yaw = Math.atan2(move.vel.x, move.vel.z) || move.yaw;
           bailLatch = false; bailPunch(ctx);
           console.info('[SKATE-GRIND] slipped off');
-          bannerFlash(ctx, 'SLIPPED OFF', 800);
+          bannerFlash(ctx, 'SLIPPED OFF', 800, BANNER_PRIO.beat);
         }
-        else if (r.pts > 0) combo.accrue('GRIND', Math.round(r.pts), 'grind');   // ANTI-MASH: a held grind is ONE link that pays while it is held
+        // ANTI-MASH: a held grind is ONE link that pays while it is held — IMPROVE (items 11, 12): the link the lock opened,
+        // by its name and its rail (a transfer lock used to open "TRANSFER GRIND" and then a second "GRIND" link on the hold)
+        else if (r.pts > 0 && grindLink) combo.accrue(grindLink.label, Math.round(r.pts), 'grind', grindLink.key);
       }
       // ── the manual link (VENICE-SKATE-THPS) ──
       // THE INPUT IS READ BEFORE THE BALANCE IS STEPPED. With the channel updated first, a revert flick that lands on
@@ -940,7 +1047,7 @@ export const SkateRunMode: ModeDefinition = (() => {
         const kind = manualWanted; manualWanted = null;
         if (manualCh?.active) {
           manualCh.stop(); manualCh = null;
-          bannerFlash(ctx, 'REVERT', 450);
+          bannerFlash(ctx, 'REVERT', 450, BANNER_PRIO.chatter);
           console.info('[SKATE-MANUAL] out');
         } else if (rig.rider.grounded && !grindCh && move.speed01 > 0.08) {
           manualCh = new BalanceChannel(kind, move.balance);
@@ -963,8 +1070,7 @@ export const SkateRunMode: ModeDefinition = (() => {
       }
       if (manualCh?.active) {
         const r = manualCh.update(dt, stickX, move.speed01);
-        ctx.setHud({ balance: Math.round(manualCh.needle * 100) });   // the needle a manual rides — drawn as a meter, read by a player
-        if (r.slipped) { manualCh = null; console.info('[SKATE-MANUAL] lost it'); combo.bail(); bannerFlash(ctx, 'LOST THE MANUAL', 600); }
+        if (r.slipped) { manualCh = null; console.info('[SKATE-MANUAL] lost it'); combo.bail(); bannerFlash(ctx, 'LOST THE MANUAL', 600, BANNER_PRIO.beat); }
         else if (r.pts > 0) combo.accrue('MANUAL', Math.round(r.pts), 'manual');   // ANTI-MASH: one link, not one per frame
       }
       if (manualCh?.active && (!rig.rider.grounded || move.speed01 < 0.05)) {
@@ -1022,6 +1128,7 @@ export const SkateRunMode: ModeDefinition = (() => {
         console.info(`[SKATE-LAND] touchdown ${res.grade} (${res.chain.length} tricks)`);   // A+ P0 probe: the punch counts are checked against this
         if (res.grade === 'clean') {
           if (chainPts > 0) combo.add(res.chain.map((t) => t.label).join(' → '), chainPts, 'air');
+          if (combo.multiplier >= 2) ctx.juice.callout(`${combo.multiplier}x CHAIN`, '#fde047', 520);
           boost.earn('landingClean'); if (res.chain.length) boost.earn(res.chain.length >= 2 ? 'trickBig' : 'trickSmall');
           lastLanding = 'clean'; landingBeatT = 0.35;
           SoundKit.play('uiTick', { pitch: 1.4, volume: 0.4 });
@@ -1031,12 +1138,12 @@ export const SkateRunMode: ModeDefinition = (() => {
         } else if (res.grade === 'sketchy') {
           if (chainPts > 0) combo.add('SKETCHY ' + res.chain.map((t) => t.label).join('+'), Math.round(chainPts * SKETCHY_SCORE_MULT), 'air');
           save = res.save; lastLanding = 'sketchy'; landingBeatT = 0.5;
-          bannerFlash(ctx, 'SKETCHY — SAVE IT!', 800);
+          bannerFlash(ctx, 'SKETCHY — SAVE IT!', 800, BANNER_PRIO.beat);
         } else {
           combo.bail();
           mbus.report({ kind: 'miss' });
           lastLanding = 'none';
-          bannerFlash(ctx, 'BAILED', 900);
+          bannerFlash(ctx, 'BAILED', 900, BANNER_PRIO.beat);
           SoundKit.play('miss');
           bailBeatT = BAIL_BEAT_SEC;   // the tree plays skate_bail and holds it
           move.vel.scaleInPlace(0.15);   // SKATE-MOVE: a fallen rider does not keep sliding at speed
@@ -1052,7 +1159,7 @@ export const SkateRunMode: ModeDefinition = (() => {
         // even one (a clean 360) returns you to the stance you left with.
         if (landsSwitch(airEntryYaw, rig.char.root.rotation.y)) {
           move.switchStance();
-          bannerFlash(ctx, move.stance === 'switch' ? 'SWITCH' : 'REGULAR', 700);
+          bannerFlash(ctx, move.stance === 'switch' ? 'SWITCH' : 'REGULAR', 700, BANNER_PRIO.chatter);
         }
         // SKATE-MOVE: land where the spin left you. The half turns became the stance above; the residual off the nearest
         // half turn folds into the heading and the board rolls on the way it points (the THPS rule) — the facing is
@@ -1072,8 +1179,8 @@ export const SkateRunMode: ModeDefinition = (() => {
         // often as a read did. The side to lean is SAID, and it updates as the wobble crosses over.
         const lean: 'LEFT' | 'RIGHT' = save.wobble > 0 ? 'LEFT' : 'RIGHT';
         if (lean !== saveLean) { saveLean = lean; ctx.setHud({ saveDir: lean }); ctx.juice.callout(lean === 'LEFT' ? 'LEAN ◀' : 'LEAN ▶', '#fde047', 320); }
-        if (save.saved) { landed.saveResolved(true); console.info('[SKATE-LAND] save held'); bannerFlash(ctx, 'SAVED IT!', 700); mbus.report({ kind: 'big_make' }); save = null; saveLean = null; ctx.setHud({ saveDir: '' }); }   // SK-3: a saved landing's tricks count now
-        else if (save.failed) { landed.saveResolved(false); console.info('[SKATE-LAND] save failed'); combo.bail(); bannerFlash(ctx, 'BAILED', 900); bailBeatT = BAIL_BEAT_SEC; move.vel.scaleInPlace(0.15); bailPunch(ctx); save = null; saveLean = null; ctx.setHud({ saveDir: '' }); }   // A+ P0: the failed save is a bail too
+        if (save.saved) { landed.saveResolved(true); console.info('[SKATE-LAND] save held'); bannerFlash(ctx, 'SAVED IT!', 700, BANNER_PRIO.beat); mbus.report({ kind: 'big_make' }); save = null; saveLean = null; ctx.setHud({ saveDir: '' }); }   // SK-3: a saved landing's tricks count now
+        else if (save.failed) { landed.saveResolved(false); console.info('[SKATE-LAND] save failed'); combo.bail(); bannerFlash(ctx, 'BAILED', 900, BANNER_PRIO.beat); bailBeatT = BAIL_BEAT_SEC; move.vel.scaleInPlace(0.15); bailPunch(ctx); save = null; saveLean = null; ctx.setHud({ saveDir: '' }); }   // A+ P0: the failed save is a bail too
       }
 
       // grind catch: airborne near a rail
@@ -1104,24 +1211,37 @@ export const SkateRunMode: ModeDefinition = (() => {
         letGoGrab();   // SK-1: into the air's chain — paid when this line comes down clean
         grindCh = new BalanceChannel('grind', move.balance);
         grindCh.start(move.speed01);
-        combo.add(line.bonus >= 260 ? 'TRANSFER GRIND' : 'GRIND', line.bonus, 'grind');
-        bannerFlash(ctx, line.bonus >= 260 ? `TRANSFER GRIND +${line.bonus}` : 'GRIND!', 700);
-        SoundKit.play('powerUp', { volume: 0.4, pitch: line.bonus >= 260 ? 1.3 : 1 });
+        // IMPROVE (2026-10-06, item 11): NAMED GRINDS — the stick held as the board meets the bar picks the grind (skateLine:
+        // nothing = 50-50, across = BOARDSLIDE, forward = NOSESLIDE, back = TAILSLIDE) and the rider takes its shape. Every
+        // lock was "GRIND" although the slides were in the trick table. The rail pays what it always paid.
+        // Item 12: the link decays by the RAIL — re-locking the same bar in one combo paid full and raised the multiplier.
+        grindPose = grindTrickFor(heldTrickDir(stickX, stickY));
+        grindLink = { label: grindLabel(grindPose, line.bonus), key: railKey(line.gapId, world.grindLines.indexOf(line)) };
+        const paid = combo.add(grindLink.label, line.bonus, 'grind', grindLink.key);
+        bannerFlash(ctx, line.bonus >= TRANSFER_BONUS ? `${grindLink.label} +${line.bonus}` : `${grindLink.label}!`, 700);
+        SoundKit.play('powerUp', { volume: 0.4, pitch: line.bonus >= TRANSFER_BONUS ? 1.3 : 1 });
         ctx.feel?.impact?.(0.3);
-        console.info(`[SKATE-GRIND] locked +${line.bonus}${patrol ? ' (patrol rail)' : ''}`);
-        if (line.bonus >= 260) spectacle(ctx, 'grind lock');
+        console.info(`[SKATE-GRIND] locked ${grindLink.label} +${line.bonus}${patrol ? ' (patrol rail)' : ''} (${grindLink.key}, paid ${paid})`);
+        if (line.bonus >= TRANSFER_BONUS) spectacle(ctx, 'grind lock');
         // P8: report whatever rail was caught, not only the patrol one. Every GrindLine already carried a gapId
         // field and only the moving rail's was ever read, so the plaza's hubba, flat bar and wallride lip were
         // ungoalable by omission rather than by design.
         if (line.gapId) {
           for (const g of goals.report({ type: 'gap', gapId: line.gapId })) {
-            bannerFlash(ctx, `GAP: ${g.label}`, 1200);
+            bannerFlash(ctx, `GAP: ${g.label}`, 1200, BANNER_PRIO.news);
             SoundKit.play('crowdCheer', { volume: 0.6 });
             crowd.cheer(1);
           }
         }
       }
-      if (!rig.rider.grinding && grindCh) { console.info(`[SKATE-GRIND] off after ${grindCh.heldSec.toFixed(2)}s`); grindCh = null; relockUntil = performance.now() + RELOCK_MS; }
+      if (!rig.rider.grinding && grindCh) { console.info(`[SKATE-GRIND] off after ${grindCh.heldSec.toFixed(2)}s`); grindCh = null; grindPose = null; grindLink = null; relockUntil = performance.now() + RELOCK_MS; }
+      // IMPROVE (2026-10-06, item 9): THE NEEDLE IS DRAWN. The manual published `balance` and nothing drew it; the grind's
+      // needle was a dev probe's only. Whichever channel is live publishes it (−100..100, the side it is tipping to) and
+      // which one it is; nothing live publishes null, so the host's meter goes away with the trick.
+      {
+        const ch = grindCh?.active ? grindCh : manualCh?.active ? manualCh : null;
+        pushHud(ctx, { balance: ch ? Math.round(ch.needle * 100) : null, balanceKind: ch ? (ch === grindCh ? 'GRIND' : 'MANUAL') : '' });
+      }
 
       // ── movement: shared momentum economy drives the rider ──
       // SKATE-MOVE: the L stick's forward axis is the push (hold → cooldown-paced strokes up to cruise, then roll), back
@@ -1139,7 +1259,7 @@ export const SkateRunMode: ModeDefinition = (() => {
       boostPads?.update(dt, rig.char.root.position, boost);
       boostFx?.update(dt, boost, bev);
       if (bev.started) { SoundKit.play('whoosh', { pitch: 1.1, volume: 0.4 }); }
-      if (bev.full) bannerFlash(ctx, 'BOOST READY', 700);
+      if (bev.full) bannerFlash(ctx, 'BOOST READY', 700, BANNER_PRIO.chatter);
       const v = move.update(dt, steer, pump, ctx.scene, rig.char.root.position, world.ground, drive);
       // ── THE NaN TRAP (VENICE-SKATE-THPS, 2026-09-09) ──
       // A run that goes non-finite never comes back on its own: every frame after it multiplies NaN into the position,
@@ -1174,6 +1294,9 @@ export const SkateRunMode: ModeDefinition = (() => {
         // toward the pre-grind heading (a 1-frame yaw snap on every rail exit)
         move.yaw = rig.char.root.rotation.y;
         const sp = move.speed; move.vel.set(Math.sin(move.yaw) * sp, 0, Math.cos(move.yaw) * sp);
+        // IMPROVE (item 11): a slide rides the deck ACROSS the bar — the rider turns off the rail's line (the rail rewrites the
+        // yaw every frame, so this never accumulates, and move.yaw above keeps the rail's own heading for the dismount)
+        if (grindPose?.bodyYaw) rig.char.root.rotation.y += grindPose.bodyYaw;
       } else {
         // air.state alone (not rider.grounded): the frame the wheels touch, the landing block above has not run yet —
         // reading grounded here dropped the spin one frame before the fold put it back (a −65° / +67° two-frame flip)
@@ -1185,7 +1308,8 @@ export const SkateRunMode: ModeDefinition = (() => {
       tickWalls(ctx, dt);   // WALL RIDES + LIP TRICKS: a wall or a lip owns the body while the moment lasts
       if (rig.rider.grounded) lastGroundY = rig.char.root.position.y;
       // the deck rides its back trucks through a manual — nose up, and it eases in and out so the link reads as a beat
-      const wantPitch = manualCh?.active ? (manualCh.kind === 'nosemanual' ? 0.30 : -0.30)
+      const wantPitch = rig.rider.grinding && grindPose ? grindPose.boardPitch   // IMPROVE (item 11): nose / tail on the bar
+        : manualCh?.active ? (manualCh.kind === 'nosemanual' ? 0.30 : -0.30)
         : popBeatT > POP_BEAT_SEC * (1 - OLLIE_NOSE_SHARE) ? OLLIE_NOSE_UP : 0;   // SKATE-MAJOR: the pop lifts the nose
       boardPitch += (wantPitch - boardPitch) * Math.min(1, (popBeatT > 0 ? 16 : 9) * dt);
       // ANIM-RESIDUAL: the deck under the feet. Read off the last rendered frame (the root's and the feet's world matrices
@@ -1205,7 +1329,10 @@ export const SkateRunMode: ModeDefinition = (() => {
       trickLayer?.apply(dt, air.state.airborne && !rig.rider.grounded);   // TRICK POSE: the deck's flip / shuv / grab tweak
       // the AIR CAM: up, back and round to three-quarters while a real air is on (not a kerb flicker), so the trick under
       // the rider is in the picture
-      ctx.camDirector.setAir(air.state.airborne && air.state.airtime > 0.12 ? 1 : 0);
+      // IMPROVE (2026-10-06, item 20): on a wall ride the three-quarter swing goes to the wall's OPEN side — it always went
+      // to the camera's right, which on the street wall could be the wall side (skateLine.wallCamSide)
+      ctx.camDirector.setAir(air.state.airborne && air.state.airtime > 0.12 ? 1 : 0,
+        wallRide ? wallCamSide(rig.rider.vel.x, rig.rider.vel.z, wallRide.wall.nx, wallRide.wall.nz) : 1);
       // the harness cools the shared meter on real time now -- a second update() here decayed it twice as fast
 
       // ── the spectacle beats (H4) ──
@@ -1257,7 +1384,7 @@ export const SkateRunMode: ModeDefinition = (() => {
       // goals: combo completion + banking feed the tracker
       if (!combo.active && combo.banked > 0) {
         for (const g of goals.report({ type: 'bank', value: combo.banked })) {
-          bannerFlash(ctx, `GOAL: ${g.label}`, 1200);
+          bannerFlash(ctx, `GOAL: ${g.label}`, 1200, BANNER_PRIO.news);
           SoundKit.play('powerUp', { pitch: 1.3 });
           crowd.cheer(1);
           mbus.report({ kind: 'big_make' });
@@ -1267,10 +1394,14 @@ export const SkateRunMode: ModeDefinition = (() => {
       // it falls and the bezel showed "GOALS 0/4", so a player was chasing four
       // objectives nobody had told them about. THPS puts the list on screen;
       // this publishes it with each one's done state so the host can too.
-      ctx.setHud({
-        goals: `${goals.doneCount}/${SKATE_GOALS.length}`,
-        goalList: goals.goals.map((g) => `${g.done ? '✓' : '○'} ${g.label}`).join(' · '),
-      });
+      // IMPROVE (item 2): rebuilt and sent when a goal falls, not every frame
+      if (goals.doneCount !== goalsShown) {
+        goalsShown = goals.doneCount;
+        pushHud(ctx, {
+          goals: `${goals.doneCount}/${SKATE_GOALS.length}`,
+          goalList: goals.goals.map((g) => `${g.done ? '✓' : '○'} ${g.label}`).join(' · '),
+        });
+      }
 
       // ── banking: the rule this mode never had ──
       // combo.bank() was called NOWHERE in this file -- only bail(). The pot
@@ -1293,7 +1424,7 @@ export const SkateRunMode: ModeDefinition = (() => {
             // pulse and a heavier haptic -- landing a run-defining combo should
             // not be a slightly higher beep than landing a kickflip.
             const big = banked >= BIG_BANK_PTS;
-            bannerFlash(ctx, big ? `HUGE! +${banked}` : `BANKED +${banked}`, big ? 1000 : 700);
+            bannerFlash(ctx, big ? `HUGE! +${banked}` : `BANKED +${banked}`, big ? 1000 : 700, BANNER_PRIO.beat);
             SoundKit.play('powerUp', { volume: 0.5, pitch: big ? 1.3 : 1 });
             if (big) {
               SoundKit.play('score', { volume: 0.55, pitch: 1.1 });
@@ -1313,7 +1444,7 @@ export const SkateRunMode: ModeDefinition = (() => {
             // has: a pot is worth nothing until you roll away from it. Scored off `banked`, the
             // value bank() actually returns, so the label and the rule finally agree.
             for (const g of goals.report({ type: 'comboLanded', value: banked })) {
-              bannerFlash(ctx, `GOAL: ${g.label}`, 1200);
+              bannerFlash(ctx, `GOAL: ${g.label}`, 1200, BANNER_PRIO.news);
               SoundKit.play('crowdCheer', { volume: 0.6 });
             }
           }
@@ -1321,9 +1452,19 @@ export const SkateRunMode: ModeDefinition = (() => {
         }
       } else settleT = 0;
 
-      // combo HUD
-      const hud = combo.hud;
-      ctx.setHud({ combo: hud.combo, pot: hud.pot, score: hud.banked, momentum: Math.round(mbus.score01 * 100), ...boost.hud() });
+      // combo HUD — IMPROVE (2026-10-06): sent only when a value moved (item 2); and THE THPS LINE (item 10): the links by
+      // name ("KICKFLIP + 50-50 + MANUAL") and what the pot is waiting on. `chainLink` was published and never drawn, and it
+      // repeated the "Nx" the ticker already shows; it is the settle prompt now.
+      const ch = combo.hud;
+      pushHud(ctx, {
+        combo: ch.combo,
+        pot: ch.pot,
+        score: ch.banked,
+        comboLine: combo.active ? comboLine(combo.links) : '',
+        chainLink: settlePrompt(combo.active, settleT > 0),
+        momentum: Math.round(mbus.score01 * 100),
+        ...boost.hud(),
+      });
       // THE FENCE HAS TO TAKE YOUR SPEED. This clamped the POSITION and left the velocity alone, so a rider who rode
       // into the boundary was pinned there while the movement model still reported 6-8 m/s — measured: position frozen
       // at z 33 from t8s to the end of a 60 s run, speed never below 6.1. The board kept rolling, the push kept
@@ -1343,7 +1484,7 @@ export const SkateRunMode: ModeDefinition = (() => {
         hitWall(ctx, nx, nz, 'the fence');
       }
       if (!touchedWall) fenceHit = false;
-      ctx.setHud({ time: Math.ceil(timeLeft) });
+      pushHud(ctx, { time: Math.ceil(timeLeft) });   // IMPROVE (item 2): once a second, not every frame
       // SKATE-SCORE (GC-13): the HUD says the words of whoever is riding — a body the camera sees, or a pad / the keys / touch —
       // and the player ring's puck (a gamepad for most players) is off while a body plays; the ring itself (the boost tank)
       // stays. Once per switch, and the puck re-asserted once a second while a body plays (the harness may mount it late).
@@ -1368,6 +1509,6 @@ export const SkateRunMode: ModeDefinition = (() => {
       ctx.camera.fov = stepSpeedFov(ctx.camera.fov, baseFov * (boostFx?.fovMult(boost) ?? 1), Math.hypot(rig.rider.vel.x, rig.rider.vel.z), SKATE_TUNING.maxSpeed, dt);   // the momentum ceiling, not the Rider's clearance cap (BOARD-SPEED)
     },
 
-    dispose() { trickLayer?.dispose(); trickLayer = null; boostFx?.dispose(); boostFx = null; boostPads?.dispose(); boostPads = null; posture?.dispose(); posture = null; propsGone = true; props?.dispose(); props = null; rig?.dispose(); world?.dispose(); coins?.dispose(); patrolRail?.dispose(); crowd?.dispose(); SoundKit.stopAmbient(); },
+    dispose() { banners.clear(); trickLayer?.dispose(); trickLayer = null; boostFx?.dispose(); boostFx = null; boostPads?.dispose(); boostPads = null; posture?.dispose(); posture = null; propsGone = true; props?.dispose(); props = null; rig?.dispose(); world?.dispose(); coins?.dispose(); patrolRail?.dispose(); crowd?.dispose(); SoundKit.stopAmbient(); },
   };
 })();

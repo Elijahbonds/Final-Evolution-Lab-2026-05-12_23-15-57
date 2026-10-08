@@ -19,8 +19,9 @@ import { KinematicEngine } from '../rules/kinematic-engine';
 import { RepCounter, type RepState } from '../rules/rep-counter';
 import { SquatAudit, type SquatFrameResult } from '../rules/squat-audit';
 import { PoseFrameGate } from './pose-frame-gate';
+import { createZoneAccounting } from './zone-accounting';
 import { applyZoneState, bindHighlightZones, disposeZones, type BoundZone } from '../rig/zone-binding';
-import { SPLIT_STANCE_PRESS_ROW, PATTERN_ZONES, type PatternConfig, type ZoneId } from '../patterns/split-stance-press-row';
+import { SPLIT_STANCE_PRESS_ROW, type PatternConfig, type ZoneId } from '../patterns/split-stance-press-row';
 import type { ZoneState } from '../rules/config';
 
 export interface SessionSummary {
@@ -72,10 +73,6 @@ export interface MirrorMountOpts {
   }) => void;
 }
 
-const emptyPerZone = (): Record<ZoneId, number> => ({
-  posterior_chain: 0, lat_rhomboid: 0, upper_traps: 0, rib_thoracic: 0, lumbo_pelvic: 0,
-});
-
 /**
  * Mount the mirror overlay. Everything runs client-side; the pose model streams
  * no data off-device. Returns a runtime handle for stats + teardown.
@@ -117,12 +114,9 @@ export async function mountMirrorOverlay(opts: MirrorMountOpts): Promise<MirrorR
 
   // Session accounting (all real).
   const startedAtMs = performance.now();
-  const timeInStableMs = emptyPerZone();
-  const faultCounts = emptyPerZone();
-  const prevState: Record<ZoneId, ZoneState> = {
-    posterior_chain: 'unavailable', lat_rhomboid: 'unavailable', upper_traps: 'unavailable',
-    rib_thoracic: 'unavailable', lumbo_pelvic: 'unavailable',
-  };
+  // MIRROR-COACH P9 fix (2026-09-30): counted over the rules' zones, not the highlight meshes (render/zone-accounting.ts)
+  // — with no rig bound the summary used to read 0 faults in every zone.
+  const accounting = createZoneAccounting();
   let frameMsAccum = 0;
   let frameMsCount = 0;
 
@@ -143,19 +137,9 @@ export async function mountMirrorOverlay(opts: MirrorMountOpts): Promise<MirrorR
       const frame = adapter.detect(opts.video, t0);
       if (!poseGate.admit(frame)) { scene.render(); return; }
       const result = kin.evaluate(frame);
-      const zoneStates = {} as Record<ZoneId, ZoneState>;
-      for (const z of zones) {
-        const rep = result.zones[z.id];
-        applyZoneState(z, rep.state);
-        zoneStates[z.id] = rep.state;
-        // accumulate stable time
-        if (rep.state === 'stable') timeInStableMs[z.id] += result.dtMs;
-        // count transitions into fault
-        if (rep.state === 'fault' && prevState[z.id] !== 'fault') faultCounts[z.id] += 1;
-        prevState[z.id] = rep.state;
-      }
-      // ensure zones that had no mesh still report for the HUD
-      for (const id of PATTERN_ZONES) if (!(id in zoneStates)) zoneStates[id] = result.zones[id].state;
+      // every zone is counted and reported whether or not the rig bound a highlight for it; the meshes only recolour
+      const zoneStates = accounting.step(result.zones, result.dtMs);
+      for (const z of zones) applyZoneState(z, zoneStates[z.id]);
       reps.feed(result.phase, frame.timestampMs);
       const squat = squatAudit?.evaluate(frame);
       const frameMs = performance.now() - t0;
@@ -176,8 +160,8 @@ export async function mountMirrorOverlay(opts: MirrorMountOpts): Promise<MirrorR
         patternId: pattern.id,
         startedAtMs,
         durationMs: performance.now() - startedAtMs,
-        timeInStableMs: { ...timeInStableMs },
-        faultCounts: { ...faultCounts },
+        timeInStableMs: { ...accounting.timeInStableMs },
+        faultCounts: { ...accounting.faultCounts },
         avgFrameMs: frameMsCount ? frameMsAccum / frameMsCount : 0,
         reps: repState.reps,
         avgTempo: repState.avg,

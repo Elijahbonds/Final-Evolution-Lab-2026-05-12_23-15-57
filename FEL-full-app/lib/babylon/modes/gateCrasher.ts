@@ -22,8 +22,11 @@
 import { trickSeconds } from '../core/TrickPose';
 import { SNOW_TRICKS, type BoardTrick } from '../core/BoardTricks';
 
+/** The height of the piste plane at `z` (every piste surface is built through the origin at the run's pitch: y = −tan(pitch)·z). */
+export function pisteY(z: number, pitch: number): number { return -Math.tan(pitch) * z; }
+
 /** The poles stand this far either side of a gate's centre. The world draws them HERE and the verdict reads this. */
-export const GATE_HALF_WIDTH = 1.7;
+export const GATE_HALF_WIDTH = 1.9;
 /** A body whose centre crosses within this of a pole's line brushes it: the pole whips (the verdict is the centre's). */
 export const POLE_BRUSH_M = 0.35;
 /** The share of the gates that makes the run a GATE CRASHER — the win. */
@@ -309,7 +312,8 @@ export function timeBonus(elapsed: number): number {
 export const STALL_SPEED = 1.2;
 export const STALL_NUDGE_SEC = 3;
 export const STALL_END_SEC = 14;
-export const RUN_CAP_SEC = 240;
+/** Hard session ceiling — par × 2 (GC-F1 / RESULTS-TRUTH). A missed-gate run must still post. */
+export const RUN_CAP_SEC = TIME_PAR_SEC * 2;
 export type StallAction = 'ride' | 'nudge' | 'end';
 /** What `stillSec` seconds of stall (and `elapsed` of run) call for; the mode nudges once per STALL_NUDGE_SEC. */
 export function stallAction(stillSec: number, elapsed: number): StallAction {
@@ -360,3 +364,46 @@ export function edgePoles(half: number, runLen: number, spacing = 16): { x: numb
   for (let d = 2; d <= runLen; d += spacing) for (const side of [-1, 1]) out.push({ x: side * (half - 0.5), dist: d });
   return out;
 }
+
+// ── IMPROVE (2026-10-06): the slalom's line pays, a missed gate costs time, the pace is told, a long grab pays ───────────────
+
+/** Item 5 — A CLEAN LINE PAYS. Every gate paid a flat 100 and "N IN A ROW" was only said. From the GATE_STREAK_FROM-th gate in a
+ *  row each gate pays GATE_STREAK_STEP more per gate of the streak past the second, capped at GATE_STREAK_MAX (half a gate):
+ *  the 3rd in a row +10, the 4th +20 … the 7th and on +50. A miss resets the streak (the mode's gateStreak). TUNED. */
+export const GATE_STREAK_FROM = 3;
+export const GATE_STREAK_STEP = 10;
+export const GATE_STREAK_MAX = 50;
+export function gateStreakBonus(streak: number): number {
+  if (!(streak >= GATE_STREAK_FROM)) return 0;
+  return Math.min(GATE_STREAK_MAX, GATE_STREAK_STEP * (streak - GATE_STREAK_FROM + 1));
+}
+
+/** Item 8 — A MISSED GATE COSTS TIME (the slalom's own rule). It cost the streak only, so the par barely cared whether the line
+ *  was skipped. Each miss adds this to the run time the clock shows, the time bonus is paid on, and the result card reads. The
+ *  run's safety cap (RUN_CAP_SEC) still counts real time. TUNED. */
+export const GATE_MISS_PENALTY_SEC = 2;
+/** The run time a slalom is judged on: the time ridden plus the misses' penalty. */
+export function runTimeSec(elapsed: number, misses: number): number {
+  return elapsed + Math.max(0, misses) * GATE_MISS_PENALTY_SEC;
+}
+
+/** Item 12 — PACE. Where the par would have the rider at this point of the run: the par shared out over the fall line (z), so a
+ *  split at a gate is the run time there minus the par's share to it (negative: ahead of par). */
+export function paceSplitSec(runSec: number, z: number, finishZ: number, par = TIME_PAR_SEC): number {
+  const share = finishZ > 0 ? Math.max(0, Math.min(1, z / finishZ)) : 1;
+  return runSec - par * share;
+}
+/** A split as the HUD says it: "−1.4" ahead, "+0.6" behind (one decimal; a zero reads ahead). */
+export function splitLabel(sec: number): string {
+  return `${sec <= 0 ? '−' : '+'}${Math.abs(sec).toFixed(1)}`;
+}
+
+/** Item 13 — A LONG GRAB PAYS (TrickMachineOpts.grabHold): a clean grab earns GRAB_HOLD_PER_SEC more of its points per second
+ *  held past GRAB_HOLD_FROM_SEC, up to GRAB_HOLD_MAX more — a whole 1.2 s air held is +40 %. The start sits clear of a tap's
+ *  minimum hold (0.25 s, overshot by a frame), so a tap is a plain clean grab. TUNED. */
+export const GRAB_HOLD_FROM_SEC = 0.4;
+export const GRAB_HOLD_PER_SEC = 0.5;
+export const GRAB_HOLD_MAX = 0.5;
+
+/** Item 6 — THE YETI IS HEARD BEFORE IT IS SEEN: the roar, the powder off the treeline and the side arrow lead the chase by this. */
+export const YETI_WARN_SEC = 1.5;

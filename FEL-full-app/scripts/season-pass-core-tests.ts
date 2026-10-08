@@ -19,12 +19,16 @@
  *      coin store never lists them.
  *   16-18. PACING: the track is finishable by committed play inside the season,
  *      finishes early for dedicated play, and is NOT finishable casually.
+ *   19-21. DAILY GOALS (IMPROVE 2026-10-06): the goals feed questsDone at QUEST_SEASON_XP each, at most
+ *      DAILY_GOAL_COUNT a day; with every goal every day casual play still does not finish, and committed play
+ *      does not finish much more than a week early.
  *
  * Run: yarn tsx scripts/season-pass-core-tests.ts
  */
 
 import assert from 'node:assert';
-import { SeasonPassCore, TIER_XP } from '../lib/season/season-pass-core';
+import { SeasonPassCore, TIER_XP, QUEST_SEASON_XP } from '../lib/season/season-pass-core';
+import { DAILY_GOAL_COUNT } from '../lib/goals/daily-goals';
 import { GOLDEN_HOUR_REWARDS, ALL_SEASON_WEARABLES } from '../lib/season/golden-hour';
 import {
   getWearable,
@@ -259,6 +263,26 @@ check('the track still means something: casual play does not finish it', () => {
   const { tier } = playSeason(dailyXp(2, 2, 0.5));
   assert.ok(tier < 50, `casual play must not complete the track, reached ${tier}`);
   assert.ok(tier >= 25, `casual play should still see most of the track, reached ${tier}`);
+});
+
+// 19-21. DAILY GOALS (IMPROVE 2026-10-06). The quest lever the header warned about, re-checked against the same
+// profiles with EVERY goal cleared EVERY day (the most the goals can add).
+const GOALS_PER_DAY_XP = DAILY_GOAL_COUNT * QUEST_SEASON_XP;
+
+check('daily goals add at most DAILY_GOAL_COUNT x QUEST_SEASON_XP season XP a day', () => {
+  const plain = SeasonPassCore.sessionXp({ score: 400, won: true });
+  assert.strictEqual(SeasonPassCore.sessionXp({ score: 400, won: true, questsDone: DAILY_GOAL_COUNT }) - plain, GOALS_PER_DAY_XP);
+  assert.ok(GOALS_PER_DAY_XP <= 300, `the goals' daily season XP is the TUNED 300 at most, got ${GOALS_PER_DAY_XP}`);
+});
+
+check('with every goal every day, casual play still does not finish the track', () => {
+  const { tier } = playSeason(dailyXp(2, 2, 0.5) + GOALS_PER_DAY_XP);
+  assert.ok(tier < 50, `casual play with every goal must not complete the track, reached ${tier}`);
+});
+
+check('with every goal every day, committed play finishes no more than ~a week early', () => {
+  const { finishedOn } = playSeason(dailyXp(4, 3, 0.6) + GOALS_PER_DAY_XP);
+  assert.ok(finishedOn !== null && finishedOn >= SEASON_DAYS - 10, `committed play with every goal should still take the season, finished day ${finishedOn}`);
 });
 
 console.log(`\n\u2705 season-pass-core: ${passed} checks passed`);

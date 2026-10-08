@@ -64,6 +64,15 @@ export interface HingeThresholds {
   hingeRatioMin: number;
   /** Degrees the ear–shoulder–hip angle may fall short of a straight 180° before the dowel line is flagged (b). */
   dowelLineWarnDeg: number;
+  /**
+   * Readable frames IN A ROW the dowel line must stay past dowelLineWarnDeg before it is a fault (MIRROR-MOVES P2,
+   * 2026-10-07). The read was the single worst frame, and the ear is a short lever: under lib/pose/synth.ts's default
+   * landmark jitter a clean hinge's worst frame read 12.3–17.1° (6 seeds × 6 reps, clean film 4.3°), so the live coach
+   * would have said "that line is still breaking" on about half of a clean set. Measured: the jitter never put 2 frames in
+   * a row past the line; a 10 cm head poke holds it for 86. The same gate the squat's knee (valgusPersistFrames 3) and
+   * the press/row (PRESS_ROW_PERSIST_FRAMES 3) use. The value reported is still the worst frame.
+   */
+  dowelLinePersistFrames: number;
   /** Degrees the shin may lean off vertical, toward the toe, before the knee-over-toe drift is flagged (c). */
   shinAngleWarnDeg: number;
   /** How many readable frames a check needs before its range/worst reading is trusted at all. */
@@ -77,6 +86,7 @@ export const HINGE_THRESHOLDS: HingeThresholds = {
                              // rep (hingeSetupBuild.ts hingeSquatty) reads well under 1. 1.5 sits between with headroom.
   dowelLineWarnDeg: 12,      // TUNE(elijah) — a clean hinge reads a few degrees of natural sway; a 10 cm head poke
                              // (hingeSetupBuild.ts hingeHeadPoke) reads well past this.
+  dowelLinePersistFrames: 3, // TUNE(elijah) — MIRROR-MOVES P2: see the field comment
   shinAngleWarnDeg: 24,      // TUNE(elijah)
   minReadableFrames: 10,
 };
@@ -218,7 +228,7 @@ export function auditHinge(
 
   // per-check readable series
   const hipSeries: number[] = [], kneeSeries: number[] = [];
-  const dowelSeries: number[] = []; let dowelFrames = 0;
+  const dowelSeries: number[] = []; let dowelFrames = 0; let dowelRun = 0, dowelHeld = false;
   const shinSeries: number[] = []; let shinFrames = 0;
   let legFrames = 0;
 
@@ -234,8 +244,11 @@ export function auditHinge(
       }
     }
     if (p.ear && vis(p.ear, t.minVis) && vis(p.shoulder, t.minVis) && vis(p.hip, t.minVis)) {
-      dowelSeries.push(dowelLineDeviationDeg(p.ear, p.shoulder, p.hip));
+      const dev = dowelLineDeviationDeg(p.ear, p.shoulder, p.hip);
+      dowelSeries.push(dev);
       dowelFrames++;
+      dowelRun = dev > t.dowelLineWarnDeg ? dowelRun + 1 : 0;
+      if (dowelRun >= t.dowelLinePersistFrames) dowelHeld = true;
     }
   }
 
@@ -257,7 +270,8 @@ export function auditHinge(
     faults.push(unreadable('dowelLine', side));
   } else {
     const worstDowel = worst(dowelSeries);
-    faults.push({ id: 'dowelLine', side, value: r2(worstDowel), unit: 'deg', status: worstDowel > t.dowelLineWarnDeg ? 'fault' : 'ok' });
+    // a fault only once it HELD past the line (dowelLinePersistFrames) — one jittered frame is not a broken line
+    faults.push({ id: 'dowelLine', side, value: r2(worstDowel), unit: 'deg', status: dowelHeld ? 'fault' : 'ok' });
   }
 
   if (shinFrames < t.minReadableFrames) {
@@ -283,24 +297,30 @@ export function auditHinge(
 // External-focus, action cues (cue-engine.ts's voice): the action, never a muscle, a cause, or a claim about injury
 // or risk. `escalate` if the same check still reads 'fault' next time; `regress` is the simpler version to fall back
 // to (lib/mirror/pushupAudit.ts's own three-level shape, and patterns.ts's CueRule, which this file registers into).
+// MIRROR-COACH P9 (2026-09-30): reworded to FEL's external-focus policy (lib/coach/cueLint.ts, whose test lints this
+// table): a cue that names a body part leads with the floor, the wall, the ceiling, the camera or the load, and nothing
+// names a muscle to squeeze or feel. The fault each line answers, and its three levels, are unchanged.
 export const HINGE_CUES: readonly CueRule[] = [
   {
     faultId: 'hingeRatio',
-    cue: 'More hips back — think of closing a door behind you with your hips. Keep the knee soft, not bent.',
-    escalate: 'Still knee-led. Push the hips straight back before the knee is allowed to bend at all.',
-    regress: 'Hands on a wall or a doorframe. Hinge to where you first feel your hamstrings, no lower — the range earns itself.',
+    cue: 'Close a door behind you with your hips — more hips back, and the knee stays soft.',
+    escalate: 'Still squatting it. Send the hips back to the wall behind you before the knee bends at all.',
+    regress: 'Hands on a wall or a doorframe. Hinge back only until the stretch stops you, no lower — the range earns itself.',
+    reply: 'Hips back to the wall behind you.',
   },
   {
     faultId: 'dowelLine',
-    cue: 'Keep one long line from your ears to your hips — chin tucked easy, chest proud.',
-    escalate: 'That line is still breaking. Set your head first, then hinge without losing it.',
+    cue: 'Hinge as if a broomstick lies along your back — it stays touching your head and your hips.',
+    escalate: 'That line is still breaking. Eyes to a spot on the floor a few feet ahead, then hinge without losing the broomstick.',
     regress: 'Pick a spot on the floor a few feet ahead and hold your eyes there the whole rep — the line follows the eyes.',
+    reply: 'Keep the broomstick touching, head to hips.',
   },
   {
     faultId: 'shinAngle',
-    cue: 'Keep your shin still — let your hips travel, not your knee.',
-    escalate: 'The knee is still drifting forward. Weight back toward your heels as the hips travel back.',
+    cue: 'Send the hips back toward the wall behind you — the shin stays still, the knee stays put.',
+    escalate: 'Still drifting forward. Sit back toward your heels as the hips travel back to the wall.',
     regress: 'Stand an inch off a wall behind you. If your knee taps it, the shin travelled too far — reset and go slower.',
+    reply: 'Hips to the wall, knee stays put.',
   },
 ];
 

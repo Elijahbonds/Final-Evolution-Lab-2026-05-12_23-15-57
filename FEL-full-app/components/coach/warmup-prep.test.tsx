@@ -17,7 +17,7 @@ afterEach(() => { vi.unstubAllGlobals(); });
 const ex = (id: string, order: number, section: string, pattern: string | null, isKeySet = false, jumpLand = false) =>
   ({ id, order, section, isKeySet, coaching: { pattern: pattern ? { id: pattern as 'squat', label: pattern } : null, jumpLand } });
 const SQUAT_DAY = [ex('a', 1, 'key', 'squat', true), ex('b', 2, 'assist', 'lunge'), ex('c', 3, 'cooldown', 'breath')];
-const ADULT_HEEL: WarmupContext = { isYouth: false, painDecision: null, zone: { id: 'foot', words: ZONE_WORDS.foot, checks: ['heelLine'] }, screen: 'flagged', screenAt: '2026-09-28T10:00:00.000Z', hardStopped: false };
+const ADULT_HEEL: WarmupContext = { isYouth: false, painDecision: null, zone: { id: 'foot', words: ZONE_WORDS.foot, checks: ['heelLine'] }, screen: 'flagged', screenAt: '2026-09-28T10:00:00.000Z', hardStopped: false, jumpGate: { closed: false, why: '', href: null } };
 
 const html = (props: Parameters<typeof WarmupPrep>[0]) => renderToStaticMarkup(createElement(WarmupPrep, props));
 const stepIds = (m: string) => [...m.matchAll(/data-step="([^"]+)"/g)].map((x) => x[1]);
@@ -63,7 +63,8 @@ describe('WarmupPrep', () => {
     expect(m).toContain(zoneNote('foot'));
     expect(m).toContain('aria-pressed="true" data-minutes="14"');
     expect(m).toContain('Start the warm-up');
-    expect(m).not.toContain('data-warmup-camera');           // WAKE_UP_CAMERA_HREF is null until a drills page exists
+    expect(m).toContain('data-warmup-camera');               // WAKE_UP_CAMERA_HREF: the drills page's Wake-Up (DRILLS 2026-10-07)
+    expect(m).toContain('href="/play/drills?drill=wake-up"');
     expect(m).toMatch(/builds capacity/);
   });
 

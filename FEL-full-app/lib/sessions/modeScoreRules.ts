@@ -57,7 +57,7 @@
  */
 
 import { canonicalModeKey } from '@/lib/game-data';
-import { DUNK_ATTEMPT_MAX, MIRRORED, SCORE_CEILINGS, UNTIMED_RUN_SEC, killSwitchOn, scoreCeilingFor } from '@/lib/arena-score-integrity';
+import { DUNK_ATTEMPT_MAX, MIRRORED, SCORE_CEILINGS, UNTIMED_RUN_SEC, killSwitchOn, scoreCeilingFor, sessionRulesMax } from '@/lib/arena-score-integrity';
 import { ENDLESS_MODES, isCatalogueMode } from '@/lib/session-payout';
 import { MAX_FLIGHT, heightFromFlight } from '@/lib/babylon/core/IRLCore';
 
@@ -120,7 +120,7 @@ export function rulesMaxFor(mode: string, o: { killSwitch?: boolean } = {}): num
   const c = scoreCeilingFor(k);
   if (!c || c.kind !== 'rules') return null;
   if ((o.killSwitch ?? killSwitchOn()) && c.swapsUnderKillSwitch) return null;
-  return c.max;
+  return sessionRulesMax(k, c);   // owner 2026-10-06: a player option's longer game (1v1 win-by-2, 17); a stake still reads c.max
 }
 
 /** The one derivation every row goes through (see the header). null = the runs cannot support a rule (no row). */
@@ -186,6 +186,20 @@ export const MEASURED_RUNS: Readonly<Record<string, readonly MeasuredRun[]>> = {
   soccer: [{ score: null, sec: 60, secIs: 'upper', source: `${AP}:131 (kick 3/5, "6–2 you": the posted score is not in the capture)` }],
   whoSceneIt: [{ score: 479, sec: 60, secIs: 'upper', source: `${AP}:102` }],
   baseball: [{ score: 0, sec: 60, secIs: 'upper', source: `${AP}:105` }],
+  // ECONOMY-CAPS (a): measured TRUE :3000 runs from eye-a1a1c5f9/MEASURED_RUNS.md
+  tiebreak: [{ score: 1020, sec: 29.8, secIs: 'posted', source: 'eye-a1a1c5f9/MEASURED_RUNS.md tiebreak 1020/29.8 s' }],
+  training: [{ score: 4200, sec: 61.7, secIs: 'posted', source: 'eye-a1a1c5f9/MEASURED_RUNS.md training 4200/61.7 s' }],
+  tennis: [{ score: 4, sec: 90.6, secIs: 'posted', source: 'eye-a1a1c5f9/MEASURED_RUNS.md tennis 4/90.6 s' }],
+  golf: [{ score: 670, sec: 75.0, secIs: 'posted', source: 'eye-a1a1c5f9/MEASURED_RUNS.md golf 670/75.0 s' }],
+  karateVersus: [{ score: 200, sec: 29.2, secIs: 'posted', source: 'eye-a1a1c5f9/MEASURED_RUNS.md karateVersus 200/29.2 s' }],
+  karateEndless: [{ score: 20_520, sec: 127.3, secIs: 'posted', source: 'eye-a1a1c5f9/MEASURED_RUNS.md karateEndless 20520/127.3 s' }],
+  volleyball: [{ score: 25, sec: 287.9, secIs: 'posted', source: 'eye-a1a1c5f9/MEASURED_RUNS.md volleyball 25/287.9 s' }],
+  aeroAces: [{ score: 1100, sec: 155.1, secIs: 'posted', source: 'eye-a1a1c5f9/MEASURED_RUNS.md aeroAces 1100/155.1 s' }],
+  skateboarding: [{ score: 1649, sec: 93.9, secIs: 'posted', source: 'eye-a1a1c5f9/MEASURED_RUNS.md skateboarding 1649/93.9 s' }],
+  surfing: [{ score: 4451, sec: 94.4, secIs: 'posted', source: 'eye-a1a1c5f9/MEASURED_RUNS.md surfing 4451/94.4 s' }],
+  carnival: [{ score: 1216, sec: 98.7, secIs: 'posted', source: 'eye-a1a1c5f9/MEASURED_RUNS.md carnival 1216/98.7 s' }],
+  music: [{ score: 170_300, sec: 89.3, secIs: 'posted', source: 'eye-a1a1c5f9/MEASURED_RUNS.md music 170300/89.3 s (32 bars Arena set)' }],
+  velocityKart: [{ score: 1345, sec: 123.1, secIs: 'posted', source: 'eye-a1a1c5f9/MEASURED_RUNS.md velocityKart 1345/123.1 s' }],
 };
 
 /** The Postgres int4 ceiling of GameSession.score / SessionRun.score: no row can store more, so no rule allows more. */
@@ -205,9 +219,16 @@ export const STORY_MIRRORED = {
   railMinAirSec: 0.3, railLandBase: 20, railLandComboStep: 0.1, railFinishHpMult: 2, railPlayerHp: 100,
   // components/games/acting-game.tsx: score = round(average × 100), average = clamp01(…) (lib/babylon/core/ActingCore.ts)
   actingMax: 100,
-  // lib/babylon/modes/DunkDuelMode.ts: DUNKS_EACH 2, each judged at most DUNK_ATTEMPT_MAX (arena-score-integrity)
-  dunkDuelDunksEach: 2,
+  // lib/babylon/modes/dunkDuelRules.ts (owner 2026-10-06, moderate): the longest match the first card offers (MATCH_LENGTHS,
+  // 5 dunks each) and the dunk-off's DUNKOFF_MAX_ROUNDS 3, each dunk judged at most DUNK_ATTEMPT_MAX (arena-score-integrity).
+  // The dunk-off never adds to a total today; the bound covers it anyway, so the duel reports its real totals at every length.
+  dunkDuelMaxDunksEach: 5, dunkDuelDunkOffRounds: 3,
 } as const;
+
+/** Prove It (dunkduel): the longest match's dunks plus every dunk-off round, each at the most a dunk can score. */
+export function dunkDuelBound(m = STORY_MIRRORED): number {
+  return (m.dunkDuelMaxDunksEach + m.dunkDuelDunkOffRounds) * DUNK_ATTEMPT_MAX;
+}
 
 /** The boss fight: all of the boss's HP plus two maximal hits of overkill (a keyboard and a pad press in one frame), and the full win bonus. */
 export function storyBossBound(m = STORY_MIRRORED): number {
@@ -241,8 +262,7 @@ function modelledBound(key: 'skateboarding' | 'surfing' | 'karateEndless', killS
 export function derivedBounds(o: { killSwitch?: boolean } = {}): Readonly<Record<string, DerivedBound>> {
   const ks = o.killSwitch ?? killSwitchOn();
   return {
-    skateboarding: { maxScore: modelledBound('skateboarding', ks), runSec: MIRRORED.skateRunSec, basis: 'arena-score-integrity skateBound(): the 90 s run chained at the fastest link rate with the largest award, × BOUND_MARGIN' },
-    surfing: { maxScore: modelledBound('surfing', ks), runSec: MIRRORED.surfRunSec, basis: 'arena-score-integrity surfBound(): the 90 s run at the fastest event rate with the largest awards, × BOUND_MARGIN' },
+    // skateboarding and surfing now have MEASURED_RUNS rows (ECONOMY-CAPS a); finite pay cap still limits payout
     karateEndless: { maxScore: modelledBound('karateEndless', ks), runSec: UNTIMED_RUN_SEC, basis: 'arena-score-integrity karateEndlessBound(): a 30-minute run swinging at the cooldown, × BOUND_MARGIN (payout also held by the endless ceiling)' },
     // music: the per-SET bound is the one that already exists — sessionScoreCap (lib/session-payout.ts): a set's score may
     // not exceed what its own hits allow (performSetMax), checked in the route as above_run_cap. This row adds only the
@@ -251,7 +271,7 @@ export function derivedBounds(o: { killSwitch?: boolean } = {}): Readonly<Record
     storyMode: { maxScore: Math.max(storyBossBound(), storyRailBound()), runSec: null, basis: `max of the boss fight (${storyBossBound()}) and the rail (${storyRailBound()}) from their own constants (STORY_MIRRORED)` },
     acting: { maxScore: STORY_MIRRORED.actingMax, runSec: null, basis: 'acting-game: round(average × 100), average clamp01 (ActingCore)' },
     irl: { maxScore: Math.round(heightFromFlight(MAX_FLIGHT) * 100), runSec: null, basis: 'irl-game: best jump in cm; IRLCore refuses a flight over MAX_FLIGHT, so heightFromFlight(MAX_FLIGHT) is the highest' },
-    dunkduel: { maxScore: STORY_MIRRORED.dunkDuelDunksEach * DUNK_ATTEMPT_MAX, runSec: null, basis: 'DunkDuelMode: DUNKS_EACH × DUNK_ATTEMPT_MAX; paid the played floor only (owner)', payFloorOnly: true },
+    dunkduel: { maxScore: dunkDuelBound(), runSec: null, basis: `dunkDuelRules: (the longest match ${STORY_MIRRORED.dunkDuelMaxDunksEach} + DUNKOFF_MAX_ROUNDS ${STORY_MIRRORED.dunkDuelDunkOffRounds}) × DUNK_ATTEMPT_MAX; paid the played floor only (owner)`, payFloorOnly: true },
   };
 }
 

@@ -23,7 +23,7 @@ const DISCIPLINES: Discipline[] = [
   { id: 'sport', name: 'Sport', tagline: 'Time the rise, throw it down. The dunk arena.', href: '/play/dunk', color: '#FFD700', icon: Dumbbell },
   { id: 'art', name: 'Art', tagline: 'The paint studio is in the workshop — arriving in a future drop.', href: null, color: '#A855F7', icon: Palette },
   // lane 4 (2026-09-06): the new disciplines author in /create and publish as Creator Cards
-  { id: 'scene', name: 'Scene', tagline: 'Author a Who Scene It pack from FEL\'s own venues — friends play it as a round.', href: '/create', color: '#8B5CF6', icon: Clapperboard },
+  { id: 'scene', name: 'Scene', tagline: 'Author a Spot the Scene pack from FEL\'s own venues — friends play it as a round.', href: '/create', color: '#8B5CF6', icon: Clapperboard },
   { id: 'cooking', name: 'Cooking', tagline: 'A recipe card the Fuel floor can serve and a coach can assign.', href: '/create', color: '#F43F5E', icon: ChefHat },
   { id: 'fashion', name: 'Fashion', tagline: 'A look from your closet — equippable, shareable, sellable.', href: '/create', color: '#EC4899', icon: Shirt },
   { id: 'writing', name: 'Writing', tagline: 'A story beat, a caption, a verse — reviewed, then read in Story.', href: '/create', color: '#84CC16', icon: PenLine },

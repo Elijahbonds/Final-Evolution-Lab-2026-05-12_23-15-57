@@ -47,33 +47,83 @@
 //     own Cool-down section is both), and simple logging (minutes or reps, no weight or reps-left for a walk).
 //   · THIS WEEK: the week's sessions in order, done / today / next, off days named as off days — a coached client's week
 //     view. Before this Today showed one session and "Session N of M", so a week's off days were not there at all.
+//
+// MIRROR-COACH P7 (2026-09-29): <RampBreath> (components/coach/ramp-breath.tsx) on the flagged KEY SET's card only — the
+// adults-only Dial-Up Breath, before the first set (owner decision #11). The card asks app/api/breath/ramp and shows the
+// option ONLY when the server says eligible (age, consent, intake, today's pain and check-in, FEL's weekly limit, the set
+// not started — lib/breath/rampGate.ts); otherwise nothing at all. Never on an off day; never once a set row of the key
+// set has anything typed in it (`started`); and when the breath ends the card scrolls to its sets: "after it, the set
+// starts". With no `ramp` endpoint (the dev harnesses) it is never offered.
+//
+// MIRROR-COACH P7 FIX (2026-09-29, review), the key set's card:
+//   · `started` is typed rows OR any of the card's timers started (keySetUnderWay). The offer used to stay live after an
+//     untyped set 1 while the rest timer ran — the server's set_started gate sees only SAVED sets — and on a timed key
+//     set it could be started while the Work or Hold timer ran, mid-set. SetTimer now reports every run it starts
+//     (`onRunChange`) and the card latches it for the visit; RampBreath closes everything before the breath and cuts a
+//     breath that is running (components/coach/ramp-breath.tsx rampShown).
+//   · ONE BREATH AT A TIME: while the Dial-Up runs (or its Start is in flight) the Settle chip stays in place, disabled
+//     (`settleBlocked`); the other way round needs nothing extra, since a settle starts a rest and that closes the offer.
+//   · A timed breath item (the off day's 4-6 Recovery Breath) passes its pacer to its timer (`breath`), so its Work run
+//     draws the one pacer's ring instead of a bare countdown (lib/breath/presets.ts workBreathFor).
+//
+// MIRROR-COACH P8 (2026-09-29): THE PROTOCOL GATE's lines (lib/coach/protocolGate.ts; decided server-side in
+// lib/coach/todayServer.ts). A plyometric or depth drop the athlete's gate is closed for arrives as its ladder's easier
+// step, and its card says so in one line with why (<GateSwapLine>, components/coach/protocol-gate-line.tsx); one with no
+// ungated easier step arrives in `session.held` and is listed, one line each, above the first section (<GateHeldList>).
+// Neither is a rule of this file: it draws what the server sent.
 // `api` points the view at other endpoints (the dev harness app/dev/coach-today runs the same server code in memory).
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { CheckCircle2, ExternalLink, KeyRound, Loader2, MessageSquare, PlayCircle, Video } from 'lucide-react';
+import { GateHeldList, GateSwapLine } from '@/components/coach/protocol-gate-line';
 import { SetLogger, UnitSwitch, readWeightUnit, writeWeightUnit } from '@/components/coach/set-logger';
 import { SetTimer } from '@/components/coach/set-timer';
 import { NextMorningFollowUps, PainCheckInChip } from '@/components/coach/pain-checkin';
 import { ReadinessCheckInCard } from '@/components/coach/readiness-checkin';
 import { WarmupPrep } from '@/components/coach/warmup-prep';
 import { CooldownCard } from '@/components/coach/cooldown-card';
+import { RAMP_API, RampBreath } from '@/components/coach/ramp-breath';
 import { needsAutoCooldown, showsGeneratedWarmup, todayWarmupKind } from '@/lib/coach/cooldown';
 import { OFF_DAY_LINE, type WeekEntry } from '@/lib/coach/offDay';
 import type { WarmupReadiness } from '@/lib/coach/warmup';
-import { SET_LOG_ERROR_COPY, convertDrafts, draftsFor, draftsToInput, logLines, type SetDraft, type SetLogError, type WeightUnit } from '@/lib/coach/setLog';
-import { KEY_SET_LINE, NOTE_PROMPT, easierLine, repsPlaceholder, simpleLogging, supersetHint, todayLayout, type TodayExercise } from '@/lib/coach/today';
+import { SET_LOG_ERROR_COPY, convertDrafts, draftIsEmpty, draftsFor, draftsToInput, logLines, type SetDraft, type SetLogError, type WeightUnit } from '@/lib/coach/setLog';
+import { KEY_SET_LINE, NOTE_PROMPT, easierLine, repsPlaceholder, servedClaim, simpleLogging, supersetHint, todayLayout, type TodayExercise } from '@/lib/coach/today';
 import { nextTimedRow } from '@/lib/coach/setTimer';
 import type { OpenLog, TodayPayload } from '@/lib/coach/todayServer';
+// MIRROR-COACH P9 fix (2026-09-30): a screen prescription's note links the Mirror's written corrective (rule (e))
+import { CoachNote } from '@/components/coach/coach-note';
+// COACH-AI Phase 8 (2026-10-07): the thread's read markers ("N new", "Seen"; nothing until the pending SQL is applied)
+import { ThreadMessages, UnreadPill } from '@/components/coach/thread-messages';
+import { markReadIfNeeded, unreadInThread } from '@/lib/coach/messageReadsView';
+// COACH-AI Phase 8 (2026-10-07): the availability the coach set (Full / Limited / Out), one line, never a diagnosis
+import { MyAvailabilityLine } from '@/components/coach/my-availability';
+import { AVAILABILITY_API } from '@/components/coach/availability-picker';
+// MIRROR-PROGRESS (2026-10-07; plan Phase 4): each card's "Last time: 3×8 @ 60 kg" — the athlete's own newest completed log
+// of that exercise (lib/coach/loop.ts progressSeries, served as today.lastTime), in the unit the card is showing
+import { lastTimeLine } from '@/lib/coach/loop';
 
-export interface TodayApi { today: string; log: string; messages: string | null; warmup?: string | null; cooldown?: string | null }
-export const TODAY_API: TodayApi = { today: '/api/coach/me/today', log: '/api/coach/me/log', messages: '/api/coach/messages', warmup: '/api/coach/me/warmup', cooldown: '/api/coach/me/cooldown' };
+export interface TodayApi { today: string; log: string; messages: string | null; warmup?: string | null; cooldown?: string | null; ramp?: string | null; availability?: string | null }
+export const TODAY_API: TodayApi = { today: '/api/coach/me/today', log: '/api/coach/me/log', messages: '/api/coach/messages', warmup: '/api/coach/me/warmup', cooldown: '/api/coach/me/cooldown', ramp: RAMP_API, availability: AVAILABILITY_API };
+
+/**
+ * Whether the key set is under way on this device (MIRROR-COACH P7 FIX): a set row has something typed in it, or one of
+ * the card's timers (work, hold or rest) has been started this visit. A rest counts: on a card whose first set has not
+ * been started, a rest timer means a set went before it. assumption: a settle tapped before set 1 (it starts the rest)
+ * closes the Dial-Up offer too — the two breaths pull opposite ways, and an optional breath lost is the careful side.
+ */
+export const keySetUnderWay = (rows: readonly SetDraft[], timerUsed: boolean): boolean => timerUsed || rows.some((r) => !draftIsEmpty(r));
+
+/** The Dial-Up Breath's endpoint for one card (MIRROR-COACH P7): only the flagged key set, never on an off day, and
+ *  only when the view has one (the dev harnesses do not). The server decides the rest. */
+export const rampEndpointFor = (e: { isKeySet?: boolean | null }, kind: string | null | undefined, api: Pick<TodayApi, 'ramp'>): string | null =>
+  (e.isKeySet && kind !== 'recovery' ? api.ramp ?? null : null);
 
 /** The session just marked Done, kept on screen for its cool-down (MIRROR-COACH P6). */
 interface FinishedSession { programId: string; sessionId: string; label: string; exercises: TodayExercise[] }
 
 interface ExerciseDraft { sets: SetDraft[]; clientNote: string; videoUrl: string }
-interface Msg { id: string; body: string; mine: boolean; fromCoach: boolean; createdAt: string }
+interface Msg { id: string; body: string; mine: boolean; fromCoach: boolean; createdAt: string; readAt?: string | null; unread?: boolean }
 
 export function TodayView({ api = TODAY_API }: { api?: TodayApi }) {
   const [data, setData] = useState<TodayPayload | null>(null);
@@ -106,7 +156,10 @@ export function TodayView({ api = TODAY_API }: { api?: TodayApi }) {
       }
       setDrafts(d);
     }
-    if (j.program && api.messages) { const t = await fetch(`${api.messages}?programId=${j.program.id}`); setThread((await t.json()).messages ?? []); }
+    if (j.program && api.messages) {
+      const t = await fetch(`${api.messages}?programId=${j.program.id}`); const msgs: Msg[] = (await t.json()).messages ?? []; setThread(msgs);
+      void markReadIfNeeded(`${api.messages}/read`, j.program.id, msgs);
+    }
   }, [api]);
   useEffect(() => { const u = readWeightUnit(); unitRef.current = u; setUnit(u); void load(); }, [load]);
 
@@ -121,7 +174,9 @@ export function TodayView({ api = TODAY_API }: { api?: TodayApi }) {
   const submit = async (complete: boolean) => {
     if (!data?.today || !data.program) return;
     setBusy(true); setErrors({});
-    const logs = data.today.session.exercises.map((e) => ({ sessionExerciseId: e.id, sets: draftsToInput(drafts[e.id].sets, unit), clientNote: drafts[e.id].clientNote, videoUrl: drafts[e.id].videoUrl }));
+    // MIRROR-COACH P8 FIX (2026-09-30): what this card served on each slot — the gate's easier step, or null for "as
+    // written" — so the coach's inbox never reads a logged easier step as the jump (the server checks the claim)
+    const logs = data.today.session.exercises.map((e) => ({ sessionExerciseId: e.id, sets: draftsToInput(drafts[e.id].sets, unit), clientNote: drafts[e.id].clientNote, videoUrl: drafts[e.id].videoUrl, servedExerciseId: servedClaim(e) }));
     const r = await fetch(api.log, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ programId: data.program.id, sessionId: data.today.session.id, logs, complete }) });
     setBusy(false);
     if (!r.ok) {
@@ -187,6 +242,8 @@ export function TodayView({ api = TODAY_API }: { api?: TodayApi }) {
     const put = (patch: Partial<ExerciseDraft>) => setDrafts((s) => ({ ...s, [e.id]: { ...s[e.id], ...patch } }));
     return (
       <ExerciseCard key={e.id} e={e} label={label} draft={d} unit={unit} error={errors[e.id] ?? null} simpleLog={recovery}
+        rampEndpoint={rampEndpointFor(e, today.session.kind, api)}
+        lastTime={lastTimeLine(today.lastTime?.[e.id], unit)}
         prev={data.open?.logs.find((l) => l.sessionExerciseId === e.id) ?? null}
         onSets={(sets) => put({ sets })} onNote={(clientNote) => put({ clientNote })} onVideo={(videoUrl) => put({ videoUrl })} />
     );
@@ -194,6 +251,7 @@ export function TodayView({ api = TODAY_API }: { api?: TodayApi }) {
   return (
     <div className="space-y-4" data-testid="today">
       {finishedCard}
+      {api.availability && <MyAvailabilityLine endpoint={api.availability} />}
       <NextMorningFollowUps />
       <ReadinessCheckInCard onRead={(r) => setReadiness(r.level)} warmup={todayWarmupKind(today.session.exercises, today.session.kind)} />
       <div className="fel-card rounded-xl p-4" data-session-kind={today.session.kind}>
@@ -208,7 +266,9 @@ export function TodayView({ api = TODAY_API }: { api?: TodayApi }) {
         </div>
         {today.week && today.week.entries.length > 1 && <WeekStrip label={today.week.label} entries={today.week.entries} />}
       </div>
-      {today.session.exercises.length === 0 && <div className="fel-card rounded-xl p-4 text-sm text-white/60">Your coach has made this session but not put anything in it yet.</div>}
+      {today.session.exercises.length === 0 && !today.session.held?.length && <div className="fel-card rounded-xl p-4 text-sm text-white/60">Your coach has made this session but not put anything in it yet.</div>}
+      {/* MIRROR-COACH P8: items the protocol gate holds back today (no ungated easier step on their ladder) */}
+      {today.session.held && <GateHeldList items={today.session.held} />}
       {today.session.exercises.length > 0 && showsGeneratedWarmup(today.session.kind) && <WarmupPrep exercises={today.session.exercises} contextUrl={api.warmup ?? null} readiness={readiness} />}
       {layout.map((sec) => (
         <section key={sec.section} className="space-y-2" data-section={sec.section} aria-label={sec.label}>
@@ -244,8 +304,8 @@ export function TodayView({ api = TODAY_API }: { api?: TodayApi }) {
       )}
       {api.messages && (
         <div className="fel-card rounded-xl p-4 space-y-2">
-          <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-white/40"><MessageSquare className="h-3.5 w-3.5" /> Thread with {program.coachName}</div>
-          <div className="space-y-1 max-h-48 overflow-y-auto">{thread.map((m) => <div key={m.id} className={`text-sm rounded-lg px-3 py-1.5 ${m.mine ? 'bg-[#00E5FF]/10 text-white ml-8' : 'bg-white/5 text-white/80 mr-8'}`}>{m.body}</div>)}</div>
+          <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-white/40"><MessageSquare className="h-3.5 w-3.5" /> Thread with {program.coachName}<UnreadPill n={unreadInThread(thread)} /></div>
+          <ThreadMessages thread={thread} />
           <div className="flex gap-2"><input value={msg} onChange={(e) => setMsg(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void send(); }} placeholder="Message your coach" className="flex-1 min-w-0 rounded-lg bg-white/5 border border-white/10 px-2 py-1.5 text-white text-sm" /><button onClick={send} className="rounded-lg border border-white/10 px-3 text-sm text-white/80">Send</button></div>
         </div>
       )}
@@ -283,13 +343,26 @@ export function WeekStrip({ label, entries }: { label: string; entries: readonly
 }
 
 /** One prescribed exercise: what to do, how to do it, and its sets. */
-function ExerciseCard({ e, label, draft, unit, error, prev, simpleLog = false, onSets, onNote, onVideo }: {
+function ExerciseCard({ e, label, draft, unit, error, prev, simpleLog = false, rampEndpoint = null, lastTime = null, onSets, onNote, onVideo }: {
   e: TodayExercise; label: string | null; draft: ExerciseDraft; unit: WeightUnit; error: string | null; prev: OpenLog | null;
   /** An off day logs minutes or reps only (MIRROR-COACH P6): no weight, reps left or effort to ask about a walk. */
   simpleLog?: boolean;
+  /** MIRROR-COACH P7: GET/POST /api/breath/ramp for the flagged key set (rampEndpointFor), else null — no Dial-Up offer. */
+  rampEndpoint?: string | null;
+  /** MIRROR-PROGRESS: "Last time: 3×8 @ 60 kg" (lib/coach/loop.ts lastTimeLine), or null — never done before. */
+  lastTime?: string | null;
   onSets: (s: SetDraft[]) => void; onNote: (v: string) => void; onVideo: (v: string) => void;
 }) {
   const [demo, setDemo] = useState(false);
+  // MIRROR-COACH P7 FIX: a timer on this card was started this visit (the set is under way), and the Dial-Up is running
+  const [timerUsed, setTimerUsed] = useState(false);
+  const [rampBusy, setRampBusy] = useState(false);
+  const onRunChange = useCallback((kind: string | null) => { if (kind) setTimerUsed(true); }, []);
+  const cardRef = useRef<HTMLDivElement | null>(null);
+  // MIRROR-COACH P7: after the Dial-Up Breath, the set starts — bring its set-up line (or its first set row) into view
+  const toTheSet = useCallback(() => {
+    cardRef.current?.querySelector('[data-setup], [data-set-row]')?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+  }, []);
   const c = e.coaching;
   const timed = !!e.workSeconds;
   const earlier = prev ? logLines(prev, unit) : null;
@@ -301,7 +374,7 @@ function ExerciseCard({ e, label, draft, unit, error, prev, simpleLog = false, o
     onSets(draft.sets.map((r, k) => (k === i ? { ...r, workSeconds: String(seconds) } : r)));
   }, [draft.sets, onSets]);
   return (
-    <div className={`fel-card rounded-xl p-4 space-y-3 ${e.isKeySet ? 'border border-[#FFD700]/30' : ''}`} data-exercise={e.id} data-key-set={e.isKeySet ? 'true' : undefined}>
+    <div ref={cardRef} className={`fel-card rounded-xl p-4 space-y-3 ${e.isKeySet ? 'border border-[#FFD700]/30' : ''}`} data-exercise={e.id} data-key-set={e.isKeySet ? 'true' : undefined}>
       <div className="space-y-0.5">
         <div className="flex flex-wrap items-center gap-1.5">
           {label && <span className="rounded bg-[#00E5FF]/15 px-1 text-[10px] font-semibold text-[#00E5FF]" data-label>{label}</span>}
@@ -309,9 +382,14 @@ function ExerciseCard({ e, label, draft, unit, error, prev, simpleLog = false, o
           <span className="text-white font-medium" data-name>{e.name}</span>
         </div>
         <div className="text-xs text-white/60" data-dose>{e.dose} · tempo {e.tempo} · rest {e.restSeconds}s</div>
+        {lastTime && <div className="text-xs text-[#00E5FF]/75" data-last-time>{lastTime}</div>}
         {tags && <div className="text-[11px] text-white/35">{tags}</div>}
         {e.isKeySet && <div className="text-[11px] text-[#FFD700]/80">{KEY_SET_LINE}</div>}
       </div>
+      {/* MIRROR-COACH P8: the protocol gate served this easier step in place of what was prescribed, and says why */}
+      {e.protocolGate && <GateSwapLine note={e.protocolGate} />}
+      {/* MIRROR-COACH P7: the Dial-Up Breath, before set-up and the first set — rendered only when the server says so */}
+      {rampEndpoint && <RampBreath sessionExerciseId={e.id} endpoint={rampEndpoint} started={keySetUnderWay(draft.sets, timerUsed)} onDone={toTheSet} onRunningChange={setRampBusy} />}
 
       {c.band && <div className="text-xs text-white/70" data-band={c.band.id}><span className="font-medium text-white">{c.band.label}</span> <span className="text-white/40">({c.band.rir})</span>: {c.band.meaning}</div>}
       {c.setup.length > 0 && (
@@ -320,7 +398,7 @@ function ExerciseCard({ e, label, draft, unit, error, prev, simpleLog = false, o
           {c.setup.map((s) => <div key={s.id} className="text-sm text-white/85">· {s.text}</div>)}
         </div>
       )}
-      {e.coachNote && <div className="text-xs text-[#00E5FF]/80">Coach: {e.coachNote}</div>}
+      {e.coachNote && <CoachNote note={e.coachNote} />}
       {c.cues.length > 0 && (
         <div className="space-y-0.5" data-cues>
           <div className="text-[11px] uppercase tracking-wider text-white/40">Cues</div>
@@ -350,7 +428,8 @@ function ExerciseCard({ e, label, draft, unit, error, prev, simpleLog = false, o
         </div>
       )}
 
-      <SetTimer timers={e.timers} onWorkLogged={timed ? onWork : undefined} testId={`timer-${e.id}`} />
+      <SetTimer timers={e.timers} onWorkLogged={timed ? onWork : undefined} testId={`timer-${e.id}`}
+        onRunChange={onRunChange} settleBlocked={rampBusy} breath={e.breath ?? null} />
       {earlier?.kind === 'legacy' && (
         <div className="rounded-lg border border-white/8 bg-white/[0.03] px-2 py-1.5 text-xs text-white/55" data-legacy-log>
           Saved earlier: {earlier.lines[0]}

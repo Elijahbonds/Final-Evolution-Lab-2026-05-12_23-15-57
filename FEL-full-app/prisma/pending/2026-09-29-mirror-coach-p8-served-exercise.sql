@@ -1,0 +1,21 @@
+-- MIRROR-COACH P8 (protocol gate, fix round 2026-09-30): ExerciseLog.servedExerciseId (schema.prisma model ExerciseLog)
+-- — what the athlete did on a slot the protocol gate swapped for its ladder's easier step: that step's ProgramExercise
+-- id, written server-checked by POST /api/coach/me/log (lib/coach/todayServer.ts servedOnSlots), read by the coach's
+-- inbox (GET /api/coach/inbox) so a logged easier step is never read as the jump. ADDITIVE ONLY: one new column, TEXT,
+-- NULLABLE, no default (NULL = done as written, or a slot the gate never decides — every existing row reads that way).
+-- No index, no foreign key (the ladder links are bare ids too). No existing table or column is changed or dropped.
+--
+-- Generated 2026-09-30 offline, with no database connection (DATABASE_URL pointed at a dead localhost only so the schema
+-- parses):
+--   prisma migrate diff --from-schema-datamodel <prisma/schema.prisma at 97800107> --to-schema-datamodel prisma/schema.prisma --script
+-- The statement below is that output, unchanged.
+--
+-- ORDER: apply AFTER prisma/pending/2026-09-29-mirror-coach-p5-health.sql, 2026-09-29-mirror-coach-p6-warmup-readiness.sql
+-- and 2026-09-29-mirror-coach-p7-breath-log.sql, and BEFORE any deploy that contains this commit. Without it every read
+-- of ExerciseLog through Prisma selects a column that does not exist: GET /api/coach/me/today (the open log), POST
+-- /api/coach/me/log, GET /api/coach/inbox and the builder's log checks all return 500 for every coached athlete and
+-- coach. Applying it is the owner's step (prisma db execute --file, then an --after diff that comes back empty); lanes
+-- don't write to production (owner decision #29).
+
+-- AlterTable
+ALTER TABLE "ExerciseLog" ADD COLUMN     "servedExerciseId" TEXT;

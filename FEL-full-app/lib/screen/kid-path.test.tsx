@@ -1,16 +1,17 @@
 // SCREEN-FIX-2 item 3 (Research 11:01 AM PT; FE PM + Research amend 11:50 AM PT, which sets the storage rule):
 // UNDER 18 (under 13, 13–17, "rather not say") SEES ONLY THEIR OWN NUMBER, AND KEEPS ONLY THE AGE ANSWER.
 //
-//   · The one thing an under-18 run keeps is the AGE ANSWER, in this tab's sessionStorage (the per-tab lock, S-12). Their
-//     result, takeoff leg, gate record and everything else live in page memory only, grown-up ticked or not. Nothing in
-//     localStorage, IndexedDB or cookies, and nothing sent (no fetch, XHR, beacon or socket), start to finish, "Run it
-//     again" included.
+//   · The one thing an under-18 run keeps is the AGE ANSWER, in this tab's sessionStorage (the per-run lock, S-12;
+//     AGE-RESET: every new Start asks it again, "Run it again" included). Their result, takeoff leg, gate record and
+//     everything else live in page memory only, grown-up ticked or not. Nothing in localStorage, IndexedDB or cookies,
+//     and nothing sent (no fetch, XHR, beacon or socket), start to finish.
 //   · 18 or older keep the age answer and their results in this tab's sessionStorage (fel.screen.* keys), as before.
 //   · The kid view: the jump, the change since their last screen on this page, the save-your-number line, "Run it again"
 //     and the privacy page. No band, colour, grade, priority, cue, label, rank or "personal best".
 //
 // The page's own calls are made here as assess-app.tsx makes them (lib/screen/flow.test.ts pins those lines in the page):
-// clearScreen / readAge / lockAge on the steps, writeTakeoff at the takeoff prompt, keepResult at the end, and the
+// clearScreen / readAge / lockAge on the steps, the take-off tap at the pre-camera takeoff step (SCREEN A: kept in the
+// page's ref, writeTakeoff'd for adults only — it refuses a kid's), keepResult at the end, and the
 // screen's PoseService memory (screen-pose.ts) when the model drops to lite. Every browser store and sender is a spy.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createElement } from 'react';
@@ -23,7 +24,7 @@ import { ResultsView } from '@/app/play/mirror/assess/_components/results-view';
 import { screenPose } from '@/app/play/mirror/assess/_components/screen-pose';
 import { summarize, type ScreenSummary } from './checks';
 import { PRE_START, preStep, type PreEvent, type PreState } from './flow';
-import { KEYS, SCREEN_PREFIX, clearScreen, forgetAgeForTests, keepResult, localForClear, lockAge, readAge, readResult, recall, tabStorage, writeTakeoff } from './store';
+import { KEYS, SCREEN_PREFIX, clearScreen, forgetAgeForTests, keepResult, localForClear, lockAge, readAge, readResult, recall, resetAge, tabStorage, writeTakeoff } from './store';
 import { isKid, type AgeBand } from './age';
 import { jumpChange, jumpChangeLine } from './kid';
 import { BAND_WORDS } from './PROPOSED-thresholds';
@@ -74,22 +75,27 @@ const summaryFor = (jumpM: number): ScreenSummary => summarize(gradeSession({
 }))!;
 const FIRST = summaryFor(0.40), SECOND = summaryFor(0.45);
 
-/** The page (assess-app.tsx), its steps and its end, with the page's memory of the last jump (a ref there). */
+/** The page (assess-app.tsx), its steps and its end, with the page's memory of the last jump and the take-off tap (refs there). */
 function page() {
   let pre: PreState = PRE_START;
   let lastIn: number | null = null;
+  let takeoff: 'left' | 'right' | null = null;                 // the page's takeoffRef (SCREEN A): page memory only
   const views: string[] = [];
   const ev = (e: PreEvent) => {
-    if (e.type === 'start') clearScreen(tabStorage(), localForClear());
+    if (e.type === 'start') { clearScreen(tabStorage(), localForClear()); resetAge(tabStorage()); }
     const x: PreEvent = e.type === 'start' ? { type: 'start', locked: readAge(tabStorage()) }
       : e.type === 'age' ? { type: 'age', age: lockAge(tabStorage(), e.age) } : e;
+    if (e.type === 'takeoff') {                               // as the page's answerTakeoffPre does
+      takeoff = e.side;
+      if (e.side) writeTakeoff(tabStorage(), pre.gate, e.side);
+    }
     pre = preStep(pre, x);
   };
-  /** The camera, the takeoff prompt and the end, as the page runs them. */
+  /** The camera, the takeoff answer the tap left behind, and the end, as the page runs them. */
   const checks = (s: ScreenSummary) => {
+    expect(takeoff).not.toBeUndefined();                      // the tap was made before the camera
     // the model drops to lite on a slow desktop: PoseService writes its memory through the screen's storage
     (screenPose() as unknown as { deps: { storage: { set(k: string, v: string): void } } }).deps.storage.set(MODEL_MEMORY_KEY, '{"model":"lite"}');
-    writeTakeoff(tabStorage(), pre.gate, 'left');
     const who = keepResult(tabStorage(), pre.gate, s);
     if (who === 'kid') {
       views.push(renderToStaticMarkup(createElement(KidResults, { jumpIn: s.jumpBestIn, lastIn, onRunAgain: () => {} })));
@@ -102,24 +108,32 @@ function page() {
   return { ev, checks, views, get pre() { return pre; } };
 }
 const through = (age: AgeBand, grownUp = true): PreEvent[] => [
-  { type: 'start' }, { type: 'age', age }, ...(age === '18+' || !grownUp ? [] : [{ type: 'grownUp' } as const]), { type: 'pain', hurts: false }, { type: 'cameraOn' },
+  { type: 'start' }, { type: 'age', age }, ...(age === '18+' || !grownUp ? [] : [{ type: 'grownUp' } as const]), { type: 'pain', hurts: false }, { type: 'takeoff', side: 'left' }, { type: 'cameraOn' },
 ];
-const again: PreEvent[] = [{ type: 'start' }, { type: 'grownUp' }, { type: 'pain', hurts: false }, { type: 'cameraOn' }];   // "Run it again"
+// "Run it again" (AGE-RESET): a fresh run — the age and the grown-up step are asked again, for the same kid too.
+const again = (age: AgeBand): PreEvent[] => [
+  { type: 'start' }, { type: 'age', age }, ...(age === '18+' ? [] : [{ type: 'grownUp' } as const]), { type: 'pain', hurts: false }, { type: 'takeoff', side: 'left' }, { type: 'cameraOn' },
+];
 
 const KIDS = ['under-13', '13-17', 'unknown'] as const;
 const writes = () => calls.filter((c) => c.op !== 'send');
 const sends = () => calls.filter((c) => c.op === 'send');
 
 describe('an under-18 run keeps the age answer and nothing else, and sends nothing', () => {
-  it.each(KIDS)('%s, grown-up ticked: two screens ("Run it again"), then one sessionStorage write in all: the age answer', (age) => {
+  it.each(KIDS)('%s, grown-up ticked: two screens ("Run it again" re-asks the age); the age answer is the only value kept, and nothing is sent', (age) => {
     const p = page();
     for (const e of through(age)) p.ev(e);
     expect(p.pre.step).toBe('camera');
     expect(p.checks(FIRST)).toBe('kid');
-    for (const e of again) p.ev(e);
+    for (const e of again(age)) p.ev(e);
     expect(p.pre.step).toBe('camera');
     expect(p.checks(SECOND)).toBe('kid');
-    expect(writes()).toEqual([{ where: 'sessionStorage', op: 'setItem', key: KEYS.age }]);
+    // the age answer is written per run: run 1's answer, the new Start's reset, run 2's answer — nothing else, ever
+    expect(writes()).toEqual([
+      { where: 'sessionStorage', op: 'setItem', key: KEYS.age },
+      { where: 'sessionStorage', op: 'removeItem', key: KEYS.age },
+      { where: 'sessionStorage', op: 'setItem', key: KEYS.age },
+    ]);
     expect(sends()).toEqual([]);
     expect(session.keys()).toEqual([KEYS.age]);
     expect(local.keys()).toEqual([]);
@@ -144,6 +158,28 @@ describe('an under-18 run keeps the age answer and nothing else, and sends nothi
     expect(session.keys()).toEqual([KEYS.age]);
     expect(isKid(age)).toBe(true);
   });
+
+  it.each(KIDS)('SCREEN A: %s answers the take-off tap and it is never written — page memory only', (age) => {
+    const p = page();
+    for (const e of through(age)) p.ev(e);
+    expect(p.pre.step).toBe('camera');                                   // the tap was on the way to the camera
+    expect(writes()).toEqual([{ where: 'sessionStorage', op: 'setItem', key: KEYS.age }]);
+    expect(session.keys()).toEqual([KEYS.age]);                          // no fel.screen.takeoffLeg, ever
+    p.checks(FIRST);
+    expect(session.keys()).toEqual([KEYS.age]);
+    expect(sends()).toEqual([]);
+  });
+
+  it('SCREEN A: "Not sure" taps null, which writeTakeoff is never even asked to store (adults included)', () => {
+    const p = page();
+    p.ev({ type: 'start' });
+    p.ev({ type: 'age', age: '18+' });
+    p.ev({ type: 'pain', hurts: false });
+    expect(p.pre.step).toBe('takeoff');
+    p.ev({ type: 'takeoff', side: null });
+    expect(p.pre.step).toBe('cameraInfo');
+    expect(writes().filter((w) => w.key === KEYS.takeoff)).toEqual([]);
+  });
 });
 
 describe('18 or older keep the age answer and their results in this tab, and nothing else', () => {
@@ -151,7 +187,7 @@ describe('18 or older keep the age answer and their results in this tab, and not
     const p = page();
     for (const e of through('18+')) p.ev(e);
     expect(p.checks(FIRST)).toBe('adult');
-    for (const e of [{ type: 'start' }, { type: 'pain', hurts: false }, { type: 'cameraOn' }] as PreEvent[]) p.ev(e);
+    for (const e of again('18+')) p.ev(e);                          // the second screen answers the age again (AGE-RESET)
     expect(p.checks(SECOND)).toBe('adult');
     expect(writes().length).toBeGreaterThan(1);
     for (const w of writes()) {
@@ -237,6 +273,6 @@ describe('the kid view: their number, the change, the save line, "Run it again";
     expect(app).toMatch(/const lastJumpRef = useRef<number \| null>\(null\);/);
     expect(app).toMatch(/if \(keepResult\(tabStorage\(\), gateRef\.current, summary\) === 'kid'\)/);
     // the start card's Start is a new screen (maybe a new person on a shared phone): the last number goes
-    expect(app).toMatch(/const startNew = \(\) => \{ lastJumpRef\.current = null; pre\(\{ type: 'start' \}\); \};/);
+    expect(app).toMatch(/const startNew = \(kind: ScreenKind = 'full'\) => \{ lastJumpRef\.current = null; modeRef\.current = kind; pre\(\{ type: 'start', kind \}\); \};/);
   });
 });

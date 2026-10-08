@@ -1,7 +1,7 @@
 import { PRIVACY_CONTACT, PRIVACY_POINTS, PRIVACY_TITLE } from '@/lib/screen/copy';
-import { SCREEN_HOME } from '@/lib/screen/routes';
-import { ScreenFrame, StepCard } from '@/app/play/mirror/assess/_components/screen-ui';
+import { StepCard } from '@/app/play/mirror/assess/_components/screen-ui';
 import { ClearResults } from './clear-results';
+import { PrivacyFrame } from './privacy-frame';
 
 /**
  * /screen/privacy — how the Quick Screen keeps things private, in plain words (SCREEN-FIX, 2026-09-29). Linked from the
@@ -16,17 +16,17 @@ import { ClearResults } from './clear-results';
  */
 export default function ScreenPrivacyPage() {
   return (
-    <ScreenFrame back={SCREEN_HOME} title="Privacy">
+    <PrivacyFrame>
       <StepCard testId="privacy">
         <div data-privacy-text>
           <h2 className="text-[21px] font-black leading-tight">{PRIVACY_TITLE}</h2>
-          <ul data-privacy-points className="mt-3 list-disc space-y-2.5 pl-5 text-[15px] leading-snug text-white/85">
+          <ul data-privacy-points className="mt-3 list-disc space-y-2.5 pl-5 text-[16px] leading-snug text-white/85">
             {PRIVACY_POINTS.map((p) => <li key={p}>{p}</li>)}
           </ul>
-          <p data-contact className="mt-5 text-[14px] text-white/75">{PRIVACY_CONTACT}</p>
+          <p data-contact className="mt-5 text-[16px] text-white/75">{PRIVACY_CONTACT}</p>
         </div>
         <div className="mt-4"><ClearResults /></div>
       </StepCard>
-    </ScreenFrame>
+    </PrivacyFrame>
   );
 }

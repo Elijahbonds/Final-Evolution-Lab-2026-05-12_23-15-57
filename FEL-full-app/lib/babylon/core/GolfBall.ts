@@ -36,7 +36,10 @@ export const WIND_GAIN = 2.5;
 const MAX_STEP = 1 / 240;
 /** The cup: a ball this close, this slow, drops. (The mode keeps its own generous gimme on top.) */
 export const CUP_RADIUS_M = 0.3;
-export const CUP_DROP_SPEED = 2.2;
+/** IMPROVE (2026-10-06, owner-approved, the moderate option): 2.2 → 1.8 m/s. At 2.2 a putt on line dropped for most of
+ *  the meter from any range (2 / 4 / 6 / 8 m: 82 / 69 / 65 / 51 % of powers); at 1.8 pace matters more from 6–8 m.
+ *  The putt preview (GolfAim.simulatePutt → flyAhead → tryHole) reads this same constant, so it stays the putt. */
+export const CUP_DROP_SPEED = 1.8;
 
 export class GolfBallSim {
   readonly ball: SoccerBall;
@@ -122,6 +125,17 @@ export class GolfBallSim {
 
 /** Putting: the same three-click meter with tighter tolerances and a pure
  *  roll read — a putt is a ground ball with pace. */
+/**
+ * How the green breaks under a putt.
+ * assumption: the break is the ball's lateral offset from the hole, divided
+ * by 6 m and clamped to ±1. The live green is still a flat disc; this is the
+ * slope resolvePutt already knew how to read.
+ */
+export function greenBreakSlope(ballX: number, holeX: number): number {
+  const dx = (ballX - holeX) / 6;
+  return Math.max(-1, Math.min(1, dx));
+}
+
 export function resolvePutt(r: { power01: number; face01: number }, distM: number, breakSlope: number): {
   paceM: number; offlineRad: number; lips: boolean;
 } {

@@ -19,7 +19,9 @@
 // hit-stun chain + guard-break rhythm of arena anime fighters, and the
 // spacing/ring-awareness of 3D weapon fighters.
 
-import { Vector3 } from '@babylonjs/core';
+import type { Vector3 } from '@babylonjs/core';
+import { nerve, standingOf, NEUTRAL, type NerveShift } from './Nerve';
+import type { Tier } from './Difficulty';
 
 // ── Attack data ──────────────────────────────────────────────────────────
 export interface AttackDef {
@@ -89,6 +91,10 @@ export class FighterState {
   lastBlockPressMs = -1e9;   // for the parry window
   combo = 0;                 // hits landed BY this fighter in the window
   comboTimer = 0;
+  /** COMBAT DIFFICULTY (2026-10-06): what a blocked blow takes out of THIS fighter's guard gauge, × the blow's guardDmg.
+   *  1 for everyone but a powered rival (rivalPower): a tougher body has a sturdier guard, on the same 100-point gauge
+   *  the HUD draws. */
+  guardTaken = 1;
 
   constructor(public maxHp = 100) { this.hp = maxHp; }
 
@@ -145,7 +151,7 @@ export function resolveStrike(atk: AttackDef, dist: number, defender: FighterSta
   // every pad defender keeps the default
   if (nowMs - defender.lastBlockPressMs <= parryWindowMs) return 'parried';
   if (defender.blockHeld) {
-    defender.guard -= atk.guardDmg;
+    defender.guard -= atk.guardDmg * defender.guardTaken;
     if (defender.guard <= 0) {
       defender.guard = 0;
       defender.blockHeld = false;
@@ -175,11 +181,137 @@ export function applyHit(attacker: FighterState, defender: FighterState, atk: At
 }
 
 // ── AI duelist ───────────────────────────────────────────────────────────
+/** IMPROVE (2026-10-06): what a rival's guard IS when `block` is true. Modes used to guess it from the press stamp —
+ *  Showdown and Duel stamped `now − 200 ms` (always a plain block, never a parry), Karate VS and Mixed stamped `now`
+ *  (a parry whenever the swing landed inside 160 ms, i.e. every jab it read, by accident). The brain says it now:
+ *    block  — hold it; chips the gauge.
+ *    parry  — a tap timed to the impact (PARRY_WINDOW_MS).
+ *    impact — a guard impact: the tap plus the flick, timed to its tighter window (DefenseSystem modes only; a
+ *             FighterState-only mode treats it as a parry). */
+export type GuardIntent = 'block' | 'parry' | 'impact';
+
 export interface FightAction {
   moveX: number; moveY: number;        // same convention as Intent: -1..1, y+ = toward camera
   attack: 'jab' | 'kick' | 'heavy' | null;
   block: boolean;
+  /** IMPROVE (2026-10-06): set when `block` is true — see GuardIntent; null otherwise. Feed it to guardPressMs. */
+  guard?: GuardIntent | null;
 }
+
+/** The guard-impact window as FightCore knows it (DefenseSystem.GUARD_IMPACT_WINDOW_MS imports FightCore, so the
+ *  number lives here too; defense-system tests pin that the two agree). */
+const IMPACT_WINDOW_MS = 90;
+
+/**
+ * IMPROVE (2026-10-06): the timestamp a rival's block press should carry, so the defense code reads the guard the
+ * brain meant. `impactInMs` = ms until the incoming strike connects, when the mode knows it (a StrikeController's
+ * secToActive, a swing's impact stamp); unknown → the press is stamped now, which is what the karate modes did.
+ *   block  → stamped before the parry window, so the hold is a block and never an accidental parry.
+ *   parry  → stamped so the impact lands mid-window.
+ *   impact → stamped so the impact lands inside the guard-impact window (pair it with flick = true).
+ */
+export function guardPressMs(nowMs: number, guard: GuardIntent | null | undefined, impactInMs?: number | null): number {
+  if (guard !== 'parry' && guard !== 'impact') return nowMs - PARRY_WINDOW_MS - 40;
+  if (impactInMs == null || !Number.isFinite(impactInMs) || impactInMs < 0) return nowMs;
+  const win = guard === 'impact' ? IMPACT_WINDOW_MS : PARRY_WINDOW_MS;
+  // never later than the impact itself: a press stamped after the blow is no guard at all
+  return nowMs + Math.max(0, impactInMs - win * 0.5);
+}
+
+/** RIVAL-PRESSURE-FLOOR (2026-10-04): once the rival is in range of a
+ *  stationary, never-blocking foe, it must land its first hit within this
+ *  many seconds of difficulty — otherwise a low roll on the jab share (32%,
+ *  1.6 m) against a rival parked at its circling radius (~1.70 m, outside
+ *  jab range) could whiff indefinitely. Sorted ascending by difficulty,
+ *  clamped at both ends, linearly interpolated between points. Easy rivals
+ *  keep the loose 6 s ceiling — they do not get faster, they just can't
+ *  stall forever. */
+export const PRESSURE_FLOOR_TABLE: Array<[number, number]> = [[0.4, 6.0], [0.7, 3.0]];
+
+export function pressureFloorSec(difficulty: number): number {
+  const table = PRESSURE_FLOOR_TABLE;
+  if (difficulty <= table[0][0]) return table[0][1];
+  const last = table[table.length - 1];
+  if (difficulty >= last[0]) return last[1];
+  for (let i = 0; i < table.length - 1; i++) {
+    const [d0, f0] = table[i];
+    const [d1, f1] = table[i + 1];
+    if (difficulty >= d0 && difficulty <= d1) {
+      const t = (difficulty - d0) / (d1 - d0);
+      return f0 + (f1 - f0) * t;
+    }
+  }
+  return last[1];
+}
+
+/** IMPROVE (2026-10-06), TUNED: of the guard reads (not the sidesteps), the share that is a timed PARRY rather than a
+ *  held block — `PARRY_READ_PER_SKILL × difficulty`, capped. 0.72 → 32 %. Before, Showdown/Duel never parried and
+ *  Karate VS/Mixed parried every jab they read by accident of the press stamp. */
+export const PARRY_READ_PER_SKILL = 0.45;
+export const PARRY_READ_CAP = 0.4;
+/** IMPROVE (2026-10-06), TUNED: the chance to read an opening — the foe in a whiff's recovery, a dash or a roll — and
+ *  punish it, once per opening: `PUNISH_READ_PER_SKILL × difficulty`, capped. 0.72 → 50 %. */
+export const PUNISH_READ_PER_SKILL = 0.7;
+/** The counter window after a guard read's hold ends (it was 0.42 s from the READ — see decide()). */
+export const BLOCK_COUNTER_SEC = 0.42;
+export const PUNISH_READ_CAP = 0.85;
+/** IMPROVE (2026-10-06): edge awareness — how far ahead the brain probes a step, and how much floor it keeps. */
+export const EDGE_PROBE_M = 1.0;
+export const EDGE_SAFE_M = 1.4;
+
+/**
+ * IMPROVE (2026-10-06), TUNED: THE DIFFICULTY PICK reaches the duels. Every combat mode hard-coded its rival's dial
+ * (0.72 Karate VS / Showdown / Duel, 0.68 Mixed) and the brain had no setter, so the shared OPPONENT picker
+ * (core/Difficulty) could not be offered on a fight. PRO is the owner-tuned base exactly; ROOKIE and ELITE move it.
+ * The brain's own round ramp caps the effective dial at 0.92, so ELITE stays a read, never a wall.
+ */
+export const RIVAL_TIER_OFFSET: Readonly<Record<Tier, number>> = { rookie: -0.22, pro: 0, elite: 0.12 };
+export function rivalDifficulty(base: number, tier: Tier | null | undefined): number {
+  const off = tier ? RIVAL_TIER_OFFSET[tier] ?? 0 : 0;
+  return Math.max(0.3, Math.min(0.95, base + off));
+}
+
+/**
+ * COMBAT DIFFICULTY (2026-10-06), TUNED: THE RIVAL'S POWER. The owner's targets for a decent player — ROOKIE 85 % /
+ * PRO 55 % / ELITE 30 % of matches — were measured (scratchpad combat-difficulty harness: a pad bot against each mode's
+ * real brain, strike and defense code, 300 matches a cell) at 100 % in all four duel modes and all three tiers. The dial
+ * above cannot close that: even a rival on difficulty 2.0, which reads every wind-up, lost ~100 % — the player's book
+ * strings out-damage and out-stun its plain set, so how WELL it plays is not the gap; how MUCH it can take and deal is.
+ *
+ * Power `p` is one number per mode (RIVAL_POWER_BASE, the PRO rival) times a tier multiplier, and it means:
+ *   hp          × p      — FighterState.maxHp (the HUD prints it: "FOE HP 240")
+ *   damage      × √p     — every blow the rival lands (a tougher body, not a one-shot one)
+ *   guardTaken  × 1 / p  — its guard gauge lasts as long as its HP does, so a mashed string chips instead of breaking it
+ * The behaviour stays the dial's: ELITE is nearly PRO's body (×1.08), reading, parrying and punishing more
+ * (RIVAL_TIER_OFFSET). ROOKIE is a weaker body as well (×0.65), so a NEW player (slow reactions, few reads) still wins
+ * there — which leaves a decent player near 100 % at ROOKIE, above the 85 % target: the two cannot both hold (measured).
+ */
+export const RIVAL_TIER_POWER: Readonly<Record<Tier, number>> = { rookie: 0.65, pro: 1, elite: 1.08 };
+/** The PRO rival's power per duel mode, for the default pick (fists). It differs per mode because the player's kit does:
+ *  Showdown adds an unconditional ultimate and an assist. The other picks carry a matchup factor on top
+ *  (duelRules DUEL.rivalPowerByWeapon, mixedRules RIVAL_POWER_BY_LOADOUT). 1 = the body every mode shipped with. */
+// COMBAT DIFFICULTY (2026-10-06, the combo breaker): Showdown 2.85 → 2.4 and Duel 2.25 → 2.15 once the rival breaks out
+// of mashed strings (core/ComboBreaker) — the break took the masher's edge, and the lighter body keeps a decent player's
+// ELITE in band.
+export const RIVAL_POWER_BASE = { karateVs: 1.35, showdown: 2.4, duel: 2.15, mixedcombat: 2.2 } as const;
+export interface RivalPower { p: number; hp: number; dmg: number; guardTaken: number }
+export function rivalPower(base: number, tier: Tier | null | undefined): RivalPower {
+  const k = tier ? RIVAL_TIER_POWER[tier] ?? 1 : 1;
+  const p = Math.max(0.5, Math.min(6, (Number.isFinite(base) ? base : 1) * k));
+  return { p, hp: p, dmg: Math.sqrt(p), guardTaken: 1 / p };
+}
+/** Put a power on the rival's FighterState at a round start (before resetRound, which fills hp to maxHp). */
+export function applyRivalPower(st: FighterState, pw: RivalPower, baseHp = 100): void {
+  st.maxHp = Math.round(baseHp * pw.hp);
+  st.guardTaken = pw.guardTaken;
+}
+/** The rival's blow with its power's damage (a copy — the shared tables are never touched). */
+export function poweredAttack(atk: AttackDef, pw: RivalPower): AttackDef {
+  return pw.dmg === 1 ? atk : { ...atk, dmg: atk.dmg * pw.dmg };
+}
+
+/** The covering moves a forced swing picks from, in order (IMPROVE 2026-10-06: a constant, not an array per swing). */
+const FORCED_ORDER = ['heavy', 'kick', 'jab'] as const;
 
 export class RivalFightBrain {
   private cooldown = 1.2;
@@ -193,8 +325,103 @@ export class RivalFightBrain {
   private stepDir = 1;
   /** Have we already reacted to the wind-up currently on screen? */
   private reactedToStrike = false;
+  /** COMBAT-AI (2026-09-30): punishable strings — consecutive player swings. */
+  private foeStrikeStreak = 0;
+  private foeStrikeGap = 0;
+  private wasFoeStriking = false;
+  /** Seconds left to counter after a successful block read. */
+  private punishSec = 0;
+  /** Round ramp: each round the rival reads a little sooner and presses harder. */
+  private roundBonus = 0;
+  /** Vary the attack mix so rounds do not read as jab spam. */
+  private attackBias = 0;
+  /** RIVAL-PRESSURE-FLOOR: seconds spent continuously inside the swing gate
+   *  (dist <= attacks.heavy.range) since the last committed swing that could
+   *  connect. See pressureFloorSec() below for why this exists. */
+  private pressureClock = 0;
+  /** IMPROVE (2026-10-06): what the current guard read is (see GuardIntent). */
+  private guardIntent: GuardIntent = 'block';
+  /** IMPROVE (2026-10-06): may a full chi bar become the special? A mode whose rival cannot throw the DRAGON (the force
+   *  gate, FighterStyle) said nothing, so a full bar locked the brain onto heavies it could never upgrade. */
+  private canSpecial = true;
+  /** COMBAT DIFFICULTY (2026-10-06): may a read be a SIDESTEP? The step is the line grammar's answer — a vertical whiffs
+   *  past a defender off its line — and only Mixed Combat passes the lateral offset that makes it one. In Karate VS,
+   *  Showdown and Duel nothing reads the line, so 30 % of this brain's reads walked it sideways for 0.22 s and answered
+   *  nothing (measured: a fifth of every wind-up it read, wasted). Those modes say false: the read is a guard. */
+  private stepping = true;
+  /** COMBAT DIFFICULTY (2026-10-06): the foe's longest reach (m), 0 = unknown. The read below only looked at wind-ups inside
+   *  the rival's OWN reach (+0.4 m) — so a fists rival never read a staff poke thrown from 2.6 m, and never guarded one
+   *  (measured in Duel: 0 blocks a round against a staff, which won 100 % of matches mashed). It reads what can reach it. */
+  private foeReach = 0;
+  /** IMPROVE (2026-10-06): metres inside the arena's edge at (x, z), negative outside; null = no edge to respect. */
+  private edgeIn: ((x: number, z: number) => number) | null = null;
+  /** IMPROVE (2026-10-06): the whiff/recovery read — have we already looked at the opening on screen? */
+  private wasFoeOpen = false;
+  /** IMPROVE (2026-10-06): memo of the last standing applied (setStanding), so a per-frame caller costs nothing. */
+  private standingKey = '';
+  private standingShift: NerveShift = NEUTRAL;
+  /** IMPROVE (2026-10-06): one output object, rewritten every decide() — no per-frame allocation. Valid until the next
+   *  decide() call; every caller reads it on the spot. */
+  private readonly out: FightAction = { moveX: 0, moveY: 0, attack: null, block: false, guard: null };
 
-  constructor(private difficulty = 0.6, private attacks: Record<'jab' | 'kick' | 'heavy', AttackDef> = KARATE_ATTACKS) {}
+  constructor(private difficulty = 0.6, private attacks: Record<'jab' | 'kick' | 'heavy', AttackDef> = KARATE_ATTACKS) {
+    this.attackBias = Math.random();
+  }
+
+  /** IMPROVE (2026-10-06): the dial is a setter now (a difficulty pick, a ladder rung) — it was fixed at construction. */
+  setDifficulty(d: number): void {
+    if (Number.isFinite(d)) this.difficulty = Math.max(0.05, Math.min(2, d));
+  }
+  get skill(): number { return this.difficulty; }
+
+  /** IMPROVE (2026-10-06): see `canSpecial`. Default true keeps the old behaviour for a mode that never says. */
+  setCanSpecial(ok: boolean): void { this.canSpecial = ok; }
+
+  /** COMBAT DIFFICULTY (2026-10-06): see `stepping`. Default true keeps the old behaviour for a mode that never says. */
+  setStepping(ok: boolean): void { this.stepping = ok; }
+
+  /** COMBAT DIFFICULTY (2026-10-06): the rival has just broken out of a combo (core/ComboBreaker) — the counter window opens
+   *  now and the cooldown is cleared, as an opening read does: it escapes AND strikes back (Storm's substitution). */
+  openCounter(sec: number): void {
+    if (!(sec > 0)) return;
+    this.punishSec = Math.max(this.punishSec, sec);
+    this.cooldown = Math.min(this.cooldown, 0);
+  }
+
+  /** COMBAT DIFFICULTY (2026-10-06): see `foeReach` — the mode says what the foe holds (Duel: the player's weapon). */
+  setFoeReach(m: number): void { this.foeReach = Number.isFinite(m) && m > 0 ? m : 0; }
+
+  /** IMPROVE (2026-10-06): give the brain the arena — `insideBy` for the picked arena. Circling, backing off and the
+   *  sidestep then turn away from an edge instead of walking the rival off a drop arena. null = no edge (the default). */
+  setEdge(edgeIn: ((x: number, z: number) => number) | null): void { this.edgeIn = edgeIn; }
+
+  /**
+   * IMPROVE (2026-10-06): NERVE IN ONE PLACE. Showdown and Duel computed nerve() every frame; Karate VS and Mixed
+   * at round end. The standing only moves when a round ends, so every mode now calls this at ROUND START (next to
+   * setRound) with the rounds as they stand. Memoised: calling it again with the same score is free. Returns the
+   * shift for a log line.
+   */
+  setStanding(rivalWins: number, playerWins: number, toWin: number): NerveShift {
+    const key = `${rivalWins}:${playerWins}:${toWin}`;
+    if (key === this.standingKey) return this.standingShift;
+    this.standingKey = key;
+    const late = Math.min(1, Math.max(rivalWins, playerWins) / Math.max(1, toWin));
+    this.standingShift = nerve(standingOf(rivalWins, playerWins, toWin, late));
+    this.setNerve(this.standingShift.aggression, this.standingShift.mistake);
+    return this.standingShift;
+  }
+
+  /** IMPROVE (2026-10-06): the shared write into `out`. */
+  private emit(moveX: number, moveY: number, attack: FightAction['attack'], block: boolean): FightAction {
+    const o = this.out;
+    o.moveX = moveX; o.moveY = moveY; o.attack = attack; o.block = block; o.guard = block ? this.guardIntent : null;
+    return o;
+  }
+
+  /** IMPROVE (2026-10-06): metres inside the edge one PROBE step along world (wx, wz) from (sx, sz); +Inf with no edge. */
+  private probe(sx: number, sz: number, wx: number, wz: number): number {
+    return this.edgeIn ? this.edgeIn(sx + wx * EDGE_PROBE_M, sz + wz * EDGE_PROBE_M) : Infinity;
+  }
 
   /**
    * How hard it is pressing, and what that costs it. Both 1 = it is playing its normal game.
@@ -216,22 +443,91 @@ export class RivalFightBrain {
     if (Number.isFinite(mistake)) this.loose = Math.max(0.5, Math.min(2, mistake));
   }
 
+  /** COMBAT-AI: later rounds read mash strings and counter more reliably. */
+  setRound(round: number): void {
+    this.roundBonus = Math.max(0, Math.min(0.22, (round - 1) * 0.08));
+  }
+
   /** `foeStriking` = the player is mid-swing (readable startup — what the
    *  rival reacts to, exactly like a human watching the wind-up). */
-  decide(dt: number, self: Vector3, foe: Vector3, selfState: FighterState, foeStriking: boolean): FightAction {
-    const none: FightAction = { moveX: 0, moveY: 0, attack: null, block: false };
-    if (!selfState.controllable) return none;
+  decide(dt: number, self: Pick<Vector3, 'x' | 'z'>, foe: Pick<Vector3, 'x' | 'z'>, selfState: FighterState, foeStriking: boolean, foeOpen = false): FightAction {
+    // IMPROVE (2026-10-06): `foeOpen` = the foe is punishable rather than threatening — a whiff's recovery, a dash, a
+    // roll. The brain only ever read `foeStriking`, so it never punished a whiff. Default false: a mode that does not
+    // say plays exactly as before (no extra roll is drawn).
+    if (!selfState.controllable) { this.wasFoeOpen = foeOpen; return this.emit(0, 0, null, false); }
 
     this.cooldown -= dt;
     this.circleTimer -= dt;
     this.blockHoldSec = Math.max(0, this.blockHoldSec - dt);
     this.stepHoldSec = Math.max(0, this.stepHoldSec - dt);
+    this.punishSec = Math.max(0, this.punishSec - dt);
     if (this.circleTimer <= 0) { this.circleTimer = 1.4 + Math.random() * 1.6; this.circleDir *= -1; }
 
-    const to = foe.subtract(self); to.y = 0;
-    const dist = to.length();
-    const dir = to.normalize();
+    // IMPROVE (2026-10-06): plain numbers — the old `to`, `dir` and `perp` were three Vector3s a frame per rival
+    const tx = foe.x - self.x, tz = foe.z - self.z;
+    const dist = Math.hypot(tx, tz);
+    const dx = dist > 0 ? tx / dist : 0, dz = dist > 0 ? tz / dist : 0;
     const idealRange = this.attacks.jab.range * 0.9;
+    const effDiff = Math.min(0.92, this.difficulty + this.roundBonus);
+
+    // RIVAL-PRESSURE-FLOOR: the clock only runs inside the swing gate used
+    // below (dist <= attacks.heavy.range) and resets the moment it leaves
+    // range — the floor is measured from "in range", not total fight time.
+    const inSwingRange = dist <= this.attacks.heavy.range;
+    if (inSwingRange) this.pressureClock += dt; else this.pressureClock = 0;
+
+    // Track punishable strings: a mash is three swings inside ~1.1 s.
+    if (foeStriking && !this.wasFoeStriking) this.foeStrikeStreak += 1;
+    this.wasFoeStriking = foeStriking;
+    if (foeStriking) this.foeStrikeGap = 0;
+    else {
+      this.foeStrikeGap += dt;
+      if (this.foeStrikeGap > 0.55) this.foeStrikeStreak = 0;
+    }
+    const stringRead = this.foeStrikeStreak >= 2 ? 0.22 : 0;
+
+    // RIVAL-PRESSURE-FLOOR: once the clock gets within a swing's startup of
+    // the per-difficulty ceiling, force a committed swing that is guaranteed
+    // to connect (dist <= chosen attack's range — the same "hit" the tests
+    // use) instead of rolling/circling/guarding this frame. This fires
+    // rarely (only seeds that would otherwise breach the floor) and never
+    // calls Math.random(), so every frame that was never close to breaching
+    // plays out byte-identical to before. attackBias (already rolled once at
+    // construction) still decides which covering move fires, so
+    // personalities keep their mix instead of collapsing onto one move
+    // under pressure.
+    //
+    // Uses this.difficulty (not effDiff) for the floor lookup: effDiff is a
+    // separate per-round ramp; the floor table is keyed to the base dial
+    // the sweep tests set.
+    if (inSwingRange) {
+      const floorSec = pressureFloorSec(this.difficulty);
+      const margin = this.attacks.heavy.startupMs / 1000;
+      if (floorSec - this.pressureClock <= margin) {
+        // IMPROVE (2026-10-06), Duel #20: the same pick without a filtered array per forced swing — the covering moves,
+        // heavy → kick → jab, counted, then the attackBias-th of them
+        let n = 0;
+        for (const k of FORCED_ORDER) if (this.attacks[k].range >= dist) n++;
+        let forcedAttack: 'jab' | 'kick' | 'heavy' = 'heavy';   // (inside the swing gate the heavy always covers: n ≥ 1)
+        if (!(this.canSpecial && selfState.chi >= CHI_MAX) && n > 0) {
+          let i = Math.floor(this.attackBias * n) % n;
+          for (const k of FORCED_ORDER) if (this.attacks[k].range >= dist && i-- === 0) { forcedAttack = k; break; }
+        }
+        this.cooldown = 1.0 / Math.max(0.3, effDiff * this.press);
+        this.pressureClock = 0;
+        this.wasFoeOpen = foeOpen;
+        return this.emit(0, 0, forcedAttack, false);
+      }
+    }
+
+    // IMPROVE (2026-10-06): PUNISH THE OPENING — once per opening (its rising edge), a skill-scaled read; a hit opens
+    // the counter window the block read already uses, and clears the cooldown so the counter can come now. NERVE's
+    // `loose` costs it like the guard read.
+    if (foeOpen && !this.wasFoeOpen && dist <= this.attacks.heavy.range + 0.6 && this.blockHoldSec === 0 && this.stepHoldSec === 0) {
+      const punishAt = Math.min(PUNISH_READ_CAP, (effDiff * PUNISH_READ_PER_SKILL) / this.loose);
+      if (Math.random() < punishAt) { this.punishSec = Math.max(this.punishSec, 0.5); this.cooldown = Math.min(this.cooldown, 0); }
+    }
+    this.wasFoeOpen = foeOpen;
 
     // REACTIVE GUARD — once per wind-up, not once per frame.
     //
@@ -248,43 +544,102 @@ export class RivalFightBrain {
     if (!foeStriking) this.reactedToStrike = false;
     if (foeStriking && !this.reactedToStrike) {
       this.reactedToStrike = true;
-      if (dist < this.attacks.heavy.range + 0.4 && this.blockHoldSec === 0 && this.stepHoldSec === 0) {
+      if (dist < Math.max(this.attacks.heavy.range + 0.4, this.foeReach + 0.2) && this.blockHoldSec === 0 && this.stepHoldSec === 0) {
         const roll = Math.random();
         // One read per wind-up, split between the two honest answers to a
         // vertical: step off the line (the sidestep grammar pays chi and
         // opens a punish) or guard it. Difficulty scales both.
         // NERVE: `loose` is the price of pressing. A rival chasing the fight reads the wind-up less often,
         // so the guard it does not put up is what pays for the pressure it is applying.
-        const read = this.difficulty / this.loose;
-        if (roll < read * 0.35) {
+        const read = Math.min(0.95, effDiff / this.loose + stringRead);
+        // STEP_SHARE of the roll sidesteps; READ_SHARE is the whole answer
+        // (step or guard). The 0.92 / 0.95 caps bound the in-match ramp so a
+        // later round cannot become a wall. They must not also clip a skill
+        // dial that already covers every roll: before the caps, difficulty 2
+        // made `read * 0.85` land past 1, and fight-balance C1 still requires
+        // that a maxed dial always answers the wind-up. In-match bases
+        // (0.68, 0.72) stay under this line, so their step and guard rates
+        // do not move. `loose` still opens a miss — a chasing rival pays for
+        // pressing by reading less, even on a high dial.
+        const STEP_SHARE = 0.30;
+        const READ_SHARE = 0.88;
+        const dialCovers = (this.difficulty / this.loose) * READ_SHARE >= 1;
+        const stepAt = !this.stepping ? 0 : dialCovers ? STEP_SHARE / READ_SHARE : read * STEP_SHARE;
+        const readAt = dialCovers ? 1 : read * READ_SHARE;
+        if (roll < stepAt) {
           this.stepHoldSec = 0.22;
           this.stepDir = Math.random() < 0.5 ? -1 : 1;
-        } else if (roll < read * 0.85) {
-          this.blockHoldSec = 0.45;
+          // IMPROVE (2026-10-06): EDGE — the coin picks the side, unless that side is the drop and the other is not
+          if (this.edgeIn && this.probe(self.x, self.z, -dz * this.stepDir, dx * this.stepDir) < EDGE_SAFE_M
+            && this.probe(self.x, self.z, dz * this.stepDir, -dx * this.stepDir) > this.probe(self.x, self.z, -dz * this.stepDir, dx * this.stepDir)) {
+            this.stepDir = -this.stepDir;
+          }
+        } else if (roll < readAt) {
+          this.blockHoldSec = this.foeStrikeStreak >= 2 ? 0.55 : 0.45;
+          // COMBAT DIFFICULTY (2026-10-06): the counter window opens when the guard COMES DOWN. It was set to 0.42 s at
+          // the read while the hold ran 0.45 / 0.55 s, and both count down together — so it had always closed before the
+          // counter below could look at it (measured: 0 of 178 block reads ever countered). An expert punishes a string
+          // it blocked; this one never did.
+          this.punishSec = this.blockHoldSec + BLOCK_COUNTER_SEC;
+          // IMPROVE (2026-10-06): THE PARRY ON PURPOSE. Where in the guard share the same roll fell decides whether the
+          // guard is a timed tap or a held block — no second roll, so every seeded sequence draws the same numbers.
+          const u = readAt > stepAt ? (roll - stepAt) / (readAt - stepAt) : 1;
+          const parryShare = Math.min(PARRY_READ_CAP, (effDiff * PARRY_READ_PER_SKILL) / this.loose);
+          this.guardIntent = u < parryShare ? 'parry' : 'block';
         }
       }
     }
     if (this.stepHoldSec > 0) {
-      const perp = new Vector3(-dir.z, 0, dir.x).scale(this.stepDir);
-      return { moveX: perp.x, moveY: -perp.z, attack: null, block: false };
+      // perp = (−dir.z, dir.x) × stepDir, in the Intent convention (moveY = −world z)
+      return this.emit(-dz * this.stepDir, -dx * this.stepDir, null, false);
     }
-    if (this.blockHoldSec > 0) return { moveX: 0, moveY: 0, attack: null, block: true };
+    if (this.blockHoldSec > 0) return this.emit(0, 0, null, true);
+
+    // Counter window after a read — punish the string with a heavy or kick.
+    if (this.punishSec > 0 && dist <= this.attacks.heavy.range && this.cooldown <= 0) {
+      this.cooldown = (0.85 + Math.random() * 0.7) / Math.max(0.3, effDiff * this.press);
+      this.punishSec = 0;
+      const attack = this.canSpecial && selfState.chi >= CHI_MAX ? 'heavy'
+        : this.foeStrikeStreak >= 2 || Math.random() < 0.55 ? 'heavy' : 'kick';
+      // RIVAL-PRESSURE-FLOOR: a committed swing that already covers `dist`
+      // resets the clock, same as the forced branch above.
+      if (this.attacks[attack].range >= dist) this.pressureClock = 0;
+      return this.emit(0, 0, attack, false);
+    }
 
     // attack when in range and off cooldown
     if (dist <= this.attacks.heavy.range && this.cooldown <= 0) {
       // NERVE: pressing comes forward sooner. The skill baseline stays `difficulty`; `press` is situation.
-      this.cooldown = (1.0 + Math.random() * 0.9) / Math.max(0.3, this.difficulty * this.press);
-      const roll = Math.random();
-      const attack = selfState.chi >= CHI_MAX ? 'heavy'          // full chi → the mode upgrades heavy to the special
-        : roll < 0.45 ? 'jab' : roll < 0.8 ? 'kick' : 'heavy';
-      return { moveX: 0, moveY: 0, attack, block: false };
+      this.cooldown = (1.0 + Math.random() * 0.9) / Math.max(0.3, effDiff * this.press);
+      const roll = (Math.random() + this.attackBias) % 1;
+      const attack = this.canSpecial && selfState.chi >= CHI_MAX ? 'heavy'          // full chi → the mode upgrades heavy to the special
+        : roll < 0.32 ? 'jab' : roll < 0.68 ? 'kick' : 'heavy';
+      // RIVAL-PRESSURE-FLOOR: same reset as above.
+      if (this.attacks[attack].range >= dist) this.pressureClock = 0;
+      return this.emit(0, 0, attack, false);
     }
 
-    // spacing: approach when out of range, circle when in range
-    if (dist > idealRange + 0.3) {
-      return { moveX: dir.x, moveY: -dir.z, attack: null, block: false };
+    // spacing: back off from a mashing foe; approach when out of range; circle at ideal range
+    // IMPROVE (2026-10-06): EDGE — backing off toward a drop is not spacing, it is a ring-out; it circles instead
+    if (this.foeStrikeStreak >= 2 && dist < idealRange + 0.15 && this.probe(self.x, self.z, -dx, -dz) >= EDGE_SAFE_M) {
+      return this.emit(-dx * 0.85, dz * 0.85, null, false);
     }
-    const perp = new Vector3(-dir.z, 0, dir.x).scale(this.circleDir);
-    return { moveX: perp.x * 0.6, moveY: -perp.z * 0.6, attack: null, block: false };
+    if (dist > idealRange + 0.3) {
+      return this.emit(dx, -dz, null, false);
+    }
+    // circle: perp = (−dir.z, dir.x) × circleDir. EDGE: turn the circle around when this way runs out of floor and the
+    // other way has more, and near the edge lean in toward the foe (he is the inside of the fight)
+    if (this.edgeIn) {
+      const ahead = this.probe(self.x, self.z, -dz * this.circleDir, dx * this.circleDir);
+      if (ahead < EDGE_SAFE_M && this.probe(self.x, self.z, dz * this.circleDir, -dx * this.circleDir) > ahead) {
+        this.circleDir *= -1;
+        this.circleTimer = Math.max(this.circleTimer, 1.0);
+      }
+      if (this.edgeIn(self.x, self.z) < EDGE_SAFE_M) {
+        const px = -dz * this.circleDir * 0.6 + dx * 0.35, pz = dx * this.circleDir * 0.6 + dz * 0.35;
+        return this.emit(px, -pz, null, false);
+      }
+    }
+    return this.emit(-dz * this.circleDir * 0.6, -dx * this.circleDir * 0.6, null, false);
   }
 }

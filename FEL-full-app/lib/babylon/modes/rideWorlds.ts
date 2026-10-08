@@ -22,13 +22,13 @@ import { mountOcean, oceanShade } from '../visual/OceanSurface';   // SURF OCEAN
 import type { GrindLine } from '../core/GroundRide';
 import { SKATE_VENUES, SNOW_VENUES, SURF_VENUES, rideOf, type BoardVenue } from '../nexus/boardVenues';
 import { applyFloorDetailToMesh } from '../visual/groundTextures';
-import { VertexData, Texture } from '@babylonjs/core';
+import { VertexData, Texture, VertexBuffer, BoundingInfo } from '@babylonjs/core';
 import { readableFloorHex, separatedHex, paintGraffitiWall, buildGraffitiStage } from '../visual/PlacePack';
-import { plazaCrowd, plazaMarkers, plazaRails, plazaSolids } from './skatePlaza';
+import { plazaCrowd, plazaMarkers, plazaRails, plazaSolids, SKATE_LANE, SKATE_BOWL, SKATE_CENTRE_BOX } from './skatePlaza';
 import { SNOW_SLOPE, snowCrowd } from './snowSlope';
 import { GATE_HALF_WIDTH, FINISH_AFTER_M, treeline, edgePoles, rockSpots, type RideSolid } from './gateCrasher';
 import { snowParkMaterials, parkBoxUV, PARK_TILE_M } from '../visual/snowParkTextures';   // GATE-CRASHER-POLISH-2: the park, painted
-import { surfCrowd } from './surfLineup';
+import { barrelOpen, startLineup, stepLineup, surfCrowd, type LineupState, type WaveProfile } from './surfLineup';
 
 export interface RideObstacle { pos: Vector3; radius: number }
 
@@ -93,13 +93,60 @@ function paintGround(scene: Scene, w: number, h: number, painter: (g: CanvasRend
   return m;
 }
 
-function makeRail(scene: Scene, all: AbstractMesh[], lines: GrindLine[], a: Vector3, b: Vector3, bonus: number, gapId?: string): void {
+/** A seeded LCG (the same painting every mount): Math.random() painted a different slope on each load. */
+function seededRng(seed: string): () => number {
+  let h = 2166136261;
+  for (let i = 0; i < seed.length; i++) h = Math.imul(h ^ seed.charCodeAt(i), 16777619);
+  let s = (h >>> 0) || 1;
+  return () => { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return s / 4294967296; };
+}
+
+/** Run `draw(dx, dy)` once per copy of a shape at (x, y) of size (w, h) that shows on a wrapping S×S tile — a shape over an
+ *  edge is painted again past the opposite one, so the tile repeats without a seam. */
+function wrapped(S: number, x: number, y: number, w: number, h: number, draw: (dx: number, dy: number) => void): void {
+  for (const dx of [-S, 0, S]) for (const dy of [-S, 0, S]) {
+    if (x + dx + w < 0 || x + dx - w > S || y + dy + h < 0 || y + dy - h > S) continue;
+    draw(dx, dy);
+  }
+}
+
+/**
+ * IMPROVE (2026-10-06, snow item 17): THE SNOW IS A TILE. The piste was one 1024² canvas stretched over the whole groom —
+ * ~48 × 820 m, so ~1.3 texels a metre down the fall line, with no mip chain — and painted at load with ~2,200 streaks and
+ * ~500 blobs (the off-piste field ~2,000 more) from Math.random() on the main thread. Now a small seeded tile, `tileM` metres a
+ * side, repeats over the surface (uScale / vScale): ~40 texels a metre, mipmapped and anisotropic for the grazing view down the
+ * run, a few hundred shapes, the same slope every mount. u runs across the run, v down the fall line.
+ */
+function tiledGround(
+  scene: Scene, name: string, size: number, tileM: number, w: number, h: number,
+  painter: (g: CanvasRenderingContext2D, S: number, r: () => number) => void,
+): PBRMaterial {
+  const tex = new DynamicTexture(name, { width: size, height: size }, scene, true);
+  const g = tex.getContext() as unknown as CanvasRenderingContext2D;
+  painter(g, size, seededRng(name));
+  tex.update();
+  tex.wrapU = Texture.WRAP_ADDRESSMODE; tex.wrapV = Texture.WRAP_ADDRESSMODE;
+  tex.uScale = w / tileM; tex.vScale = h / tileM;
+  tex.anisotropicFilteringLevel = 8;
+  const m = new PBRMaterial(`${name}_m`, scene);
+  m.albedoTexture = tex;
+  m.metallic = 0; m.roughness = 0.95;
+  return m;
+}
+
+/** Metres of groomed piste one tile covers (and of the off-piste field). */
+export const PISTE_TILE_M = 12;
+export const OFFPISTE_TILE_M = 16;
+
+/** `material` (IMPROVE 2026-10-06): one shared rail material — the skatepark made a new PBR material for each of its 14
+ *  rails. Omitted, a rail makes its own as it always did (the slope's rails). */
+function makeRail(scene: Scene, all: AbstractMesh[], lines: GrindLine[], a: Vector3, b: Vector3, bonus: number, gapId?: string, material?: Material): void {
   const rail = MeshBuilder.CreateCylinder('rail', { diameter: 0.09, height: Vector3.Distance(a, b) }, scene);
   rail.position = Vector3.Center(a, b);
   const d = b.subtract(a);
   rail.rotation.x = Math.PI / 2 - Math.atan2(d.y, Math.hypot(d.x, d.z));
   rail.rotation.y = Math.atan2(d.x, d.z);
-  rail.material = mat(scene, 'railM', '#d8dce2');
+  rail.material = material ?? mat(scene, 'railM', '#d8dce2');
   all.push(rail);
   lines.push({ a, b, bonus, gapId });
 }
@@ -149,6 +196,17 @@ function rampWedge(scene: Scene, name: string, width: number, depth: number, hei
   vd.applyToMesh(m);
   m.isPickable = true;
   return m;
+}
+
+/** The shadow generators that already cast `mesh` (IMPROVE 2026-10-06: a merged group keeps the shadow its parts had). */
+function shadowGeneratorsCasting(scene: Scene, mesh: AbstractMesh): { addShadowCaster(m: AbstractMesh, includeDescendants?: boolean): unknown }[] {
+  const out: { addShadowCaster(m: AbstractMesh, includeDescendants?: boolean): unknown }[] = [];
+  for (const light of scene.lights) {
+    const g = (light as { getShadowGenerator?: () => unknown }).getShadowGenerator?.() as
+      { getShadowMap?: () => { renderList?: AbstractMesh[] | null } | null; addShadowCaster(m: AbstractMesh, d?: boolean): unknown } | null | undefined;
+    if (g?.getShadowMap?.()?.renderList?.includes(mesh)) out.push(g);
+  }
+  return out;
 }
 
 /** Half-width of the skatepark's playable area. The rider clamps here AND the
@@ -224,12 +282,21 @@ export function buildSkatepark(scene: Scene, venue: BoardVenue = SKATE_VENUES[0]
     c.parent = parent; c.rotation.z = Math.PI / 2; c.position.set(0, y, z); c.material = copeM; c.isPickable = false;
     dressing.push(c);
   };
-  // funboxes and ledges are TAGGED — a park is somewhere people paint
+  // funboxes and ledges are TAGGED — a park is somewhere people paint.
+  // IMPROVE (2026-10-06): THREE tags, painted once and reused — it was seven 512×128 DynamicTextures (four funboxes, the
+  // pyramid, two wallrides), each painted on the canvas at load and each its own material. Seeds 3, 4, 5 are the first
+  // three the park always painted, so the funboxes that carried them look exactly as they did.
+  const TAG_SEEDS = [3, 4, 5] as const;
+  const tagPool = new Map<number, PBRMaterial>();
   const tagM = (seed: number): PBRMaterial => {
-    const tex = new DynamicTexture(`funTag_${seed}`, { width: 512, height: 128 }, scene, true);
-    paintGraffitiWall(tex.getContext() as unknown as CanvasRenderingContext2D, 512, 128, seed, structHex);
+    const use = TAG_SEEDS[((seed - TAG_SEEDS[0]) % TAG_SEEDS.length + TAG_SEEDS.length) % TAG_SEEDS.length];
+    const have = tagPool.get(use);
+    if (have) return have;
+    const tex = new DynamicTexture(`funTag_${use}`, { width: 512, height: 128 }, scene, true);
+    paintGraffitiWall(tex.getContext() as unknown as CanvasRenderingContext2D, 512, 128, use, structHex);
     tex.update(true);
-    const m = new PBRMaterial(`funTagM_${seed}`, scene); m.albedoTexture = tex; m.metallic = 0; m.roughness = 0.9;
+    const m = new PBRMaterial(`funTagM_${use}`, scene); m.albedoTexture = tex; m.metallic = 0; m.roughness = 0.9;
+    tagPool.set(use, m);
     return m;
   };
   const accentM = mat(scene, `accentM_${venue.id}`, P.accent);
@@ -251,8 +318,8 @@ export function buildSkatepark(scene: Scene, venue: BoardVenue = SKATE_VENUES[0]
     w.position.set(f(fx), 0, f(fz)); w.rotation.y = ry; w.material = wedgeM; dressing.push(w);
   }
 
-  // THE BOWL — an octagon of inward-tilted banks around a sunken centre
-  const bowlC = new Vector3(f(-0.48), 0, f(0.42)), bowlR = 6.5;
+  // THE BOWL — an octagon of inward-tilted banks around a sunken centre (skatePlaza.SKATE_BOWL: the coins read it too)
+  const bowlC = new Vector3(f(SKATE_BOWL.fx), 0, f(SKATE_BOWL.fz)), bowlR = SKATE_BOWL.r;
   for (let i = 0; i < 8; i++) {
     const a = (i / 8) * Math.PI * 2;
     const bank = MeshBuilder.CreateBox(`bowl_${i}`, { width: 5.4, height: 0.5, depth: 3.6 }, scene);
@@ -268,19 +335,20 @@ export function buildSkatepark(scene: Scene, venue: BoardVenue = SKATE_VENUES[0]
   }
 
   // THE DOWNHILL STRAIGHT — longer in a longer park, which is the point of a longer park
-  const laneLen = Math.max(30, B * 0.9);
-  const lane = MeshBuilder.CreateBox('dh_lane', { width: 8, height: 0.5, depth: laneLen }, scene);
-  lane.position.set(f(0.6), 1.6, f(-0.18));
-  lane.rotation.set(0.14, 0, 0);
+  // (skatePlaza.SKATE_LANE: the same numbers the coin line down it is laid on)
+  const laneLen = SKATE_LANE.len(B);
+  const lane = MeshBuilder.CreateBox('dh_lane', { width: SKATE_LANE.width, height: SKATE_LANE.thick, depth: laneLen }, scene);
+  lane.position.set(f(SKATE_LANE.fx), SKATE_LANE.y, f(SKATE_LANE.fz));
+  lane.rotation.set(SKATE_LANE.tilt, 0, 0);
   lane.material = laneM;
   lane.checkCollisions = true;
   all.push(lane); rideable.push(lane);
 
   // FUNBOXES and a STAIR SET — something to ollie down rather than only things to ride up
   let tagSeed = 3;
-  for (const [fx, fz] of [[0, -0.06], [-0.24, -0.36], [0.3, 0.68], [-0.6, -0.6]] as const) {
-    const box = MeshBuilder.CreateBox('funbox', { width: 6, height: 1.1, depth: 4 }, scene);
-    box.position.set(f(fx), 0.55, f(fz));
+  for (const [fx, fz] of [[SKATE_CENTRE_BOX.fx, SKATE_CENTRE_BOX.fz], [-0.24, -0.36], [0.3, 0.68], [-0.6, -0.6]] as const) {
+    const box = MeshBuilder.CreateBox('funbox', { width: SKATE_CENTRE_BOX.width, height: SKATE_CENTRE_BOX.height, depth: SKATE_CENTRE_BOX.depth }, scene);
+    box.position.set(f(fx), SKATE_CENTRE_BOX.height / 2, f(fz));
     box.material = tagM(tagSeed++);
     // steel edges along the two long top edges: the line you grind and the line you read
     cope(box, 6, 0.55, 2); cope(box, 6, 0.55, -2);
@@ -316,13 +384,14 @@ export function buildSkatepark(scene: Scene, venue: BoardVenue = SKATE_VENUES[0]
   }
 
   const grindLines: GrindLine[] = [];
-  makeRail(scene, all, grindLines, new Vector3(f(-0.18), 0.8, f(0.12)), new Vector3(f(-0.18), 0.8, f(0.36)), 180);
-  makeRail(scene, all, grindLines, new Vector3(f(0.18), 0.8, f(-0.12)), new Vector3(f(0.18), 0.8, f(-0.36)), 180);
-  makeRail(scene, all, grindLines, new Vector3(f(0.48), 2.9, f(-0.54)), new Vector3(f(0.48), 0.9, f(0.18)), 220);
-  makeRail(scene, all, grindLines, new Vector3(f(-0.06), 0.8, f(0.6)), new Vector3(f(0.18), 0.8, f(0.72)), 260);
-  makeRail(scene, all, grindLines, new Vector3(f(0.18), 0.8, f(0.72)), new Vector3(f(0.42), 0.8, f(0.6)), 300);
+  const railM = mat(scene, `railM_${venue.id}`, '#d8dce2');   // IMPROVE (2026-10-06): one rail material for the park's 14 rails
+  makeRail(scene, all, grindLines, new Vector3(f(-0.18), 0.8, f(0.12)), new Vector3(f(-0.18), 0.8, f(0.36)), 180, undefined, railM);
+  makeRail(scene, all, grindLines, new Vector3(f(0.18), 0.8, f(-0.12)), new Vector3(f(0.18), 0.8, f(-0.36)), 180, undefined, railM);
+  makeRail(scene, all, grindLines, new Vector3(f(0.48), 2.9, f(-0.54)), new Vector3(f(0.48), 0.9, f(0.18)), 220, undefined, railM);
+  makeRail(scene, all, grindLines, new Vector3(f(-0.06), 0.8, f(0.6)), new Vector3(f(0.18), 0.8, f(0.72)), 260, undefined, railM);
+  makeRail(scene, all, grindLines, new Vector3(f(0.18), 0.8, f(0.72)), new Vector3(f(0.42), 0.8, f(0.6)), 300, undefined, railM);
   // the HANDRAIL down the stair set — the one every skater looks for
-  makeRail(scene, all, grindLines, new Vector3(f(0.12) + 5, 1.5, f(-0.62)), new Vector3(f(0.12) + 5, 0.5, f(-0.62) + 4.4), 340);
+  makeRail(scene, all, grindLines, new Vector3(f(0.12) + 5, 1.5, f(-0.62)), new Vector3(f(0.12) + 5, 0.5, f(-0.62) + 4.4), 340, undefined, railM);
 
   // GRAFFITI STAGES (SHARED-PLACE-FLOOR, eye HARD #10: "no park geometry/graffiti"). Venice's art walls, as the MID
   // layer: six painted walls standing just OUTSIDE the fence, tall enough to read over it, two per long side and one
@@ -346,14 +415,6 @@ export function buildSkatepark(scene: Scene, venue: BoardVenue = SKATE_VENUES[0]
   apron.material = apronM;
   applyFloorDetailToMesh(scene, apron, { kind: 'asphalt', blend: 0.6 }, [B * 2 + 150, B * 2 + 150]);
   all.push(apron);
-  // merge the dressing per material: 30-odd copings and prisms become two draws
-  const merged: Mesh[] = [];
-  for (const m of [copeM, wedgeM]) {
-    const parts = dressing.filter((d) => d.material === m);
-    for (const p of parts) p.computeWorldMatrix(true);
-    const one = parts.length ? Mesh.MergeMeshes(parts, true, true) : null;
-    if (one) { one.name = m === copeM ? 'park_coping' : 'park_rampbody'; one.isPickable = false; one.material = m; merged.push(one); }
-  }
 
   // one accent object so the eye has somewhere to land — the thing a place is known by
   const totem = MeshBuilder.CreateCylinder('park_totem', { diameter: 0.9, height: 5.2, tessellation: 8 }, scene);
@@ -376,6 +437,12 @@ export function buildSkatepark(scene: Scene, venue: BoardVenue = SKATE_VENUES[0]
   const markers: Vector3[] = plazaMarkers(B).map(([x, y, z]) => new Vector3(x, y, z));
 
   const binM = mat(scene, `binM_${venue.id}`, mixHex(P.edge, '#2b2f36', 0.45));
+  // IMPROVE (2026-10-06): the dressing's materials, made ONCE — `mat()` ran inside the shrub, cone, deck and banner loops
+  const shrubM = mat(scene, `shrubM_${venue.id}`, '#3f7a44');
+  const coneM = mat(scene, `coneM_${venue.id}`, '#ff7a3d');
+  const deckM = mat(scene, `deckM_${venue.id}`, P.accent);
+  const boomM = mat(scene, `boomM_${venue.id}`, '#22262d');
+  const bannerM = mat(scene, `bannerM_${venue.id}`, P.accent);
   for (const sol of plazaSolids(B)) {
     if (sol.wedge) {
       const w = rampWedge(scene, `plaza_${sol.kind}`, sol.width, sol.depth, sol.height, true);
@@ -404,7 +471,7 @@ export function buildSkatepark(scene: Scene, venue: BoardVenue = SKATE_VENUES[0]
     if (sol.kind === 'planter') {
       const shrub = MeshBuilder.CreateSphere('plaza_shrub', { diameter: 1.7, segments: 6 }, scene);
       shrub.position.set(sol.x, sol.height + 0.4, sol.z);
-      shrub.material = mat(scene, `shrubM_${venue.id}`, '#3f7a44');
+      shrub.material = shrubM;
       dressing.push(shrub);
     }
     if (sol.kind === 'table') {
@@ -424,7 +491,7 @@ export function buildSkatepark(scene: Scene, venue: BoardVenue = SKATE_VENUES[0]
     // P8: the three signature features carry a gapId, which is what makes them goal-capable — ParkGoals already
     // has a 'gap' kind keyed by exactly this, and GrindLine already had the field. Nothing new was needed but
     // handing it a name.
-    makeRail(scene, all, grindLines, new Vector3(...r.a), new Vector3(...r.b), r.bonus, r.gapId);
+    makeRail(scene, all, grindLines, new Vector3(...r.a), new Vector3(...r.b), r.bonus, r.gapId, railM);
   }
 
   // ── AND THE THINGS NOBODY DESIGNED FOR SKATING ────────────────────────────────────────────────────────────
@@ -435,28 +502,58 @@ export function buildSkatepark(scene: Scene, venue: BoardVenue = SKATE_VENUES[0]
     const a = (i / 9) * Math.PI * 2;
     const cone = MeshBuilder.CreateCylinder(`plaza_cone_${i}`, { diameterTop: 0.05, diameterBottom: 0.42, height: 0.62, tessellation: 8 }, scene);
     cone.position.set(f(Math.sin(a) * 0.78), 0.31, f(Math.cos(a) * 0.78));
-    cone.material = mat(scene, `coneM_${venue.id}`, '#ff7a3d');
+    cone.material = coneM;
     dressing.push(cone);
   }
   for (const [bx, bz, ry] of [[f(-0.7), f(0.48), 0.5], [f(-0.74), f(0.62), -0.3]] as const) {
     const deck = MeshBuilder.CreateBox('plaza_parkedboard', { width: 0.24, height: 0.82, depth: 0.05 }, scene);
     deck.position.set(bx, 0.42, bz); deck.rotation.set(0.28, ry, 0);
-    deck.material = mat(scene, `deckM_${venue.id}`, P.accent);
+    deck.material = deckM;
     dressing.push(deck);
   }
   {
     const boom = MeshBuilder.CreateBox('plaza_boombox', { width: 0.7, height: 0.34, depth: 0.26 }, scene);
     boom.position.set(f(0.72), 0.7, f(0.16));
-    boom.material = mat(scene, `boomM_${venue.id}`, '#22262d');
+    boom.material = boomM;
     dressing.push(boom);
   }
   for (const [sx, sz] of [[-0.55, 1], [0.15, 1], [1, -0.4], [-1, 0.2]] as const) {
     const onX = Math.abs(sx) === 1;
     const flag = MeshBuilder.CreateBox('plaza_banner', { width: onX ? 0.08 : 3.4, height: 1.1, depth: onX ? 3.4 : 0.08 }, scene);
     flag.position.set(onX ? sx * (B - 0.5) : f(sx), 2.6, onX ? f(sz) : sz * (B - 0.5));
-    flag.material = mat(scene, `bannerM_${venue.id}`, P.accent);
+    flag.material = bannerM;
     dressing.push(flag);
   }
+
+  // ── MERGE, THEN FREEZE (IMPROVE 2026-10-06, skate items 4 + 5) ───────────────────────────────────────────────────
+  // The dressing merged per material — and ALL of it now. The merge used to run before the plaza was built, so every
+  // plaza piece pushed after it (shrubs, table benches, bench backs, the pyramid's and the ledges' coping, cones, parked
+  // decks, the boombox, banners) stayed its own draw and never entered `all`, so world.dispose() left them in the scene.
+  // The copings and ramp bodies keep exactly the treatment they had (merged, no shadow — their merged bounds are park
+  // sized, which LightRig never casts); a group that DID cast before the merge keeps casting, and keeps receiving.
+  const merged: Mesh[] = [];
+  const HISTORIC = new Set<Material>([copeM, wedgeM]);
+  const groups: [Material, string][] = [
+    [copeM, 'park_coping'], [wedgeM, 'park_rampbody'], [boxM, 'plaza_dressing_box'], [shrubM, 'plaza_dressing_shrub'],
+    [coneM, 'plaza_dressing_cone'], [deckM, 'plaza_dressing_deck'], [boomM, 'plaza_dressing_boom'], [bannerM, 'plaza_dressing_banner'],
+  ];
+  for (const [m, name] of groups) {
+    const parts = dressing.filter((d) => d.material === m && !d.isDisposed());
+    if (!parts.length) continue;
+    const casters = HISTORIC.has(m) ? [] : shadowGeneratorsCasting(scene, parts[0]);
+    const receives = parts[0].receiveShadows;
+    for (const p of parts) p.computeWorldMatrix(true);
+    const one = Mesh.MergeMeshes(parts, true, true);
+    if (!one) continue;
+    one.name = name; one.isPickable = false; one.material = m;
+    if (!HISTORIC.has(m)) { one.receiveShadows = receives; for (const g of casters) g.addShadowCaster(one, false); }
+    merged.push(one);
+  }
+  // The park never moves: its world matrices are computed once, and its materials compiled once. No ride world froze
+  // anything (NetSportMode and Pickups do), so every static mesh recomputed its world matrix every frame. The floor and the
+  // apron keep live materials (the art card and the floor detail own those); every structure and dressing material freezes.
+  for (const m of [...all, ...merged]) m.freezeWorldMatrix();
+  for (const m of [rampM, bankM, laneM, boxM, wedgeM, copeM, fenceM, accentM, binM, railM, shrubM, coneM, deckM, boomM, bannerM, ...tagPool.values()]) m.freeze();
 
   // Where people watch from: the ledges and the bowl rim, clear of every line the player rides, scaled to the venue
   // P9: onlookers stand where there is something to watch. These were ten points chosen before the plaza
@@ -506,21 +603,38 @@ export function buildSlopeRun(scene: Scene, venue: BoardVenue = SNOW_VENUES[0]):
   piste.position.set(0, -Math.sin(PITCH) * pisteCentre, Math.cos(PITCH) * pisteCentre);
   piste.checkCollisions = true;
   piste.isPickable = true;
-  piste.material = paintGround(scene, HALF * 2, PISTE_LEN, (g, W, H) => {
+  // IMPROVE (2026-10-06, item 17): one seeded 12 m tile (tiledGround), not a 1024² canvas stretched down the whole run. The
+  // painting is the one it was — the venue's ground, its line colour in fall-line streaks, wind patches in its edge colour,
+  // the groomer's corduroy and pass seams — at a scale the eye can read at speed.
+  const pisteM = tiledGround(scene, `piste_${venue.id}`, 512, PISTE_TILE_M, HALF * 2, PISTE_LEN, (g, S, r) => {
     // Pass 5 phase 7 (kept): near-white snow under a white sky read as a 211–221 mean-luminance whiteout in the
     // slalom frames, so the snow is never paper-white and the groom lines are dark enough to read speed against.
     // The three colours are the venue's now — the glacier's ice and the night park's blue-grey are the same
     // painting with a different family.
-    g.fillStyle = P.ground; g.fillRect(0, 0, W, H);
-    g.globalAlpha = 0.55; g.fillStyle = P.line;
-    for (let i = 0; i < Math.round(700 * H / 220); i++) g.fillRect(Math.random() * W, Math.random() * H, 2, 16);
-    g.globalAlpha = 0.32; g.fillStyle = P.edge;
-    for (let i = 0; i < Math.round(160 * H / 220); i++) { g.beginPath(); g.ellipse(Math.random() * W, Math.random() * H, 8 + Math.random() * 20, 2 + Math.random() * 5, 0, 0, Math.PI * 2); g.fill(); }
-    // corduroy: the groomer's tracks, the one thing that says a human prepared this
-    g.globalAlpha = 0.25; g.strokeStyle = P.edge; g.lineWidth = 5;
-    for (let i = 0; i < 14; i++) { g.beginPath(); g.moveTo((i / 14) * W, 0); g.lineTo((i / 14) * W + 30, H); g.stroke(); }
+    g.fillStyle = P.ground; g.fillRect(0, 0, S, S);
+    // corduroy: the groomer's ridges down the fall line (every ~14 cm), a shade and a highlight
+    for (let x = 0; x < S; x += 6) {
+      g.globalAlpha = 0.1; g.fillStyle = P.edge; g.fillRect(x, 0, 2, S);
+      g.globalAlpha = 0.12; g.fillStyle = '#ffffff'; g.fillRect(x + 3, 0, 1, S);
+    }
+    // the groomer's pass seams, one a 6 m pass (the line that says a human prepared this)
+    g.globalAlpha = 0.25; g.fillStyle = P.edge;
+    for (const x of [0, S / 2]) wrapped(S, x, 0, 3, S, (dx) => g.fillRect(x + dx - 2, 0, 4, S));
+    // streaks down the fall line in the venue's line colour
+    g.globalAlpha = 0.45; g.fillStyle = P.line;
+    for (let i = 0; i < 120; i++) {
+      const x = r() * S, y = r() * S, len = 10 + r() * 40;
+      wrapped(S, x, y, 2, len, (dx, dy) => g.fillRect(x + dx, y + dy, 2, len));
+    }
+    // wind patches in the edge colour
+    g.globalAlpha = 0.18; g.fillStyle = P.edge;
+    for (let i = 0; i < 14; i++) {
+      const x = r() * S, y = r() * S, rx = 12 + r() * 30, ry = 6 + r() * 18;
+      wrapped(S, x, y, rx, ry, (dx, dy) => { g.beginPath(); g.ellipse(x + dx, y + dy, rx, ry, 0, 0, Math.PI * 2); g.fill(); });
+    }
     g.globalAlpha = 1;
   });
+  piste.material = pisteM;
   all.push(piste); rideable.push(piste);
 
   // ARENA-10PHASE P9 (2026-09-07): OFF-PISTE SNOWFIELDS. The groomed piste is 34 m wide and the tree lines stand at
@@ -528,12 +642,18 @@ export function buildSlopeRun(scene: Scene, venue: BoardVenue = SNOW_VENUES[0]):
   // the void fell away with the pitch, so the further down the run the higher they floated). Two ungroomed fields, the
   // same pitch, 70 m each side: darker, rougher snow with rock speckle, pickable so the prop set can drop onto them,
   // not rideable — the rider still clamps to the groomed width.
-  const offM = paintGround(scene, 70, PISTE_LEN, (g, W, H) => {
-    g.fillStyle = mixHex(P.ground, P.edge, 0.28); g.fillRect(0, 0, W, H);   // ungroomed: the snow toward its own shadow
+  const offM = tiledGround(scene, `offpiste_${venue.id}`, 512, OFFPISTE_TILE_M, 70, PISTE_LEN, (g, S, r) => {
+    g.fillStyle = mixHex(P.ground, P.edge, 0.28); g.fillRect(0, 0, S, S);   // ungroomed: the snow toward its own shadow
     g.globalAlpha = 0.35; g.fillStyle = P.edge;
-    for (let i = 0; i < Math.round(420 * H / 220); i++) { g.beginPath(); g.ellipse(Math.random() * W, Math.random() * H, 10 + Math.random() * 30, 3 + Math.random() * 7, Math.random() * 3, 0, Math.PI * 2); g.fill(); }
+    for (let i = 0; i < 18; i++) {
+      const x = r() * S, y = r() * S, rx = 22 + r() * 60, ry = 16 + r() * 44, rot = r() * 3;
+      wrapped(S, x, y, rx, rx, (dx, dy) => { g.beginPath(); g.ellipse(x + dx, y + dy, rx, ry, rot, 0, Math.PI * 2); g.fill(); });
+    }
     g.globalAlpha = 0.5; g.fillStyle = mixHex(P.edge, '#000000', 0.45);     // rock speckle showing through
-    for (let i = 0; i < Math.round(140 * H / 220); i++) g.fillRect(Math.random() * W, Math.random() * H, 2 + Math.random() * 5, 2 + Math.random() * 3);
+    for (let i = 0; i < 16; i++) {
+      const x = r() * S, y = r() * S, w = 4 + r() * 12, hh = 4 + r() * 8;
+      wrapped(S, x, y, w, hh, (dx, dy) => g.fillRect(x + dx, y + dy, w, hh));
+    }
     g.globalAlpha = 1;
   });
   for (const side of [-1, 1]) {
@@ -628,32 +748,35 @@ export function buildSlopeRun(scene: Scene, venue: BoardVenue = SNOW_VENUES[0]):
   // and the cable IS a grind line (hit the second kicker to reach it)
   const pylonM = mat(scene, 'pylonM', mixHex(P.edge, '#000000', 0.35));
   const cableM = mat(scene, 'cableM', mixHex(P.edge, '#000000', 0.6));
+  // IMPROVE (2026-10-06, item 18): THE LIFT IS THREE DRAWS. Five pylons, three chairs and four cable spans were twelve meshes;
+  // each part is one master now, thin-instanced (a cable span is the unit cylinder stretched to its length). Same places,
+  // same sizes, same materials; not pickable (a thin-instance master would pick at its own origin), and the pylons stay solid
+  // through `solids`, as they always were.
   const pylonTops: Vector3[] = [];
+  const pylonMats: number[] = [], chairMats: number[] = [], cableMats: number[] = [];
   for (let i = 0; i < 5; i++) {
     const p = onPiste(HALF - 3.5, 30 + i * 40);
-    const pylon = MeshBuilder.CreateCylinder(`pylon_${i}`, { diameter: 0.35, height: 5.4 }, scene);
-    pylon.position = p.add(new Vector3(0, 2.7, 0));
-    pylon.material = pylonM;
-    all.push(pylon);
+    pylonMats.push(...Matrix.Translation(p.x, p.y + 2.7, p.z).asArray());
     solids.push({ kind: 'post', tag: `pylon_${i}`, x: p.x, z: p.z, r: 0.18, y0: p.y, h: 5.4 });   // it stands in the groom: it is solid
     pylonTops.push(p.add(new Vector3(0, 5.2, 0)));
     // a hanging chair every other pylon — pure dressing
-    if (i % 2 === 0) {
-      const chair = MeshBuilder.CreateBox(`chair_${i}`, { width: 0.9, height: 0.7, depth: 0.6 }, scene);
-      chair.position = p.add(new Vector3(0, 4.1, 6));
-      chair.material = pylonM;
-      all.push(chair);
-    }
+    if (i % 2 === 0) chairMats.push(...Matrix.Translation(p.x, p.y + 4.1, p.z + 6).asArray());
   }
   for (let i = 0; i < pylonTops.length - 1; i++) {
     const a = pylonTops[i], b = pylonTops[i + 1];
-    const cable = MeshBuilder.CreateCylinder(`cable_${i}`, { diameter: 0.07, height: Vector3.Distance(a, b) }, scene);
-    cable.position = Vector3.Center(a, b);
     const d = b.subtract(a);
-    cable.rotation.x = Math.PI / 2 - Math.atan2(d.y, Math.hypot(d.x, d.z));
-    cable.rotation.y = Math.atan2(d.x, d.z);
-    cable.material = cableM;
-    all.push(cable);
+    const q = Quaternion.RotationYawPitchRoll(Math.atan2(d.x, d.z), Math.PI / 2 - Math.atan2(d.y, Math.hypot(d.x, d.z)), 0);
+    cableMats.push(...Matrix.Compose(new Vector3(1, Vector3.Distance(a, b), 1), q, Vector3.Center(a, b)).asArray());
+  }
+  const lift: [Mesh, Material, number[]][] = [
+    [MeshBuilder.CreateCylinder('lift_pylon', { diameter: 0.35, height: 5.4 }, scene), pylonM, pylonMats],
+    [MeshBuilder.CreateBox('lift_chair', { width: 0.9, height: 0.7, depth: 0.6 }, scene), pylonM, chairMats],
+    [MeshBuilder.CreateCylinder('lift_cable', { diameter: 0.07, height: 1 }, scene), cableM, cableMats],
+  ];
+  for (const [m, material, buf] of lift) {
+    m.material = material; m.isPickable = false;
+    m.thinInstanceSetBuffer('matrix', new Float32Array(buf), 16, true);
+    all.push(m);
   }
   // the whole cable run as one high-value grind line (segment 2→3 sits
   // right past the second kicker's launch arc)
@@ -692,6 +815,8 @@ export function buildSlopeRun(scene: Scene, venue: BoardVenue = SNOW_VENUES[0]):
   // the kickers and rollers, hazard-banded steel jib boxes with an HDPE deck, plywood wallrides with a chevron band, steel
   // rail stands — the eye's "grey box walls, plain white wedge kickers" (GC-4).
   const snowFeatM = park.feature, snowRailM = park.rail, snowBoxM = park.box, snowWallM = park.wall, deckM = park.deck, lipM = park.lip;
+  // IMPROVE (2026-10-06, item 18): one material for the park's bars (each rail made its own identical PBR material)
+  const barM = mat(scene, 'railM', '#d8dce2');
   const up = new Vector3(0, Math.cos(PITCH), Math.sin(PITCH));   // the piste's normal: a feature's "up"
   for (const feat of SNOW_SLOPE) {
     const x = feat.lateral * HALF;
@@ -739,7 +864,7 @@ export function buildSlopeRun(scene: Scene, venue: BoardVenue = SNOW_VENUES[0]):
       // the grind line on the body's top edge, along the piste's normal — the bar you see is the bar you lock
       const a = onPiste(x, feat.dist).add(up.scale(feat.height));
       const b = onPiste(x, feat.dist + feat.length).add(up.scale(feat.height));
-      makeRail(scene, all, grindLines, a, b, feat.bonus);
+      makeRail(scene, all, grindLines, a, b, feat.bonus, undefined, barM);
     }
   }
 
@@ -750,7 +875,35 @@ export function buildSlopeRun(scene: Scene, venue: BoardVenue = SNOW_VENUES[0]):
   const finish = onPiste(0, finishDist);
   buildFinishArch(scene, all, finish, HALF, PITCH, P.accent);
 
-  return { ground: rideable, grindLines, markers, obstacles, crowdSpots, bound: HALF, solids, gates, finish, dispose: () => { all.forEach((m) => m.dispose()); park.dispose(); } };
+  // ── MERGE, THEN FREEZE (IMPROVE 2026-10-06, items 18 + 19) ───────────────────────────────────────────────────────────
+  // The park's features were a mesh each — kickers, rollers, rail stands, boxes and their decks, wallrides, lips, bars: one draw
+  // apiece (and one per shadow cascade). They merge per material now (a rideable group stays rideable and pickable, so the
+  // Rider's ray rides exactly the surfaces it rode; a group that cast a shadow keeps casting). The rocks stay separate (the
+  // mode hides them by name when the kit's rocks land), and so do the gates' moving marker and the thin-instanced masters.
+  const mergeable = new Map<Material, string>([
+    [snowFeatM, 'snow_ramps'], [snowRailM, 'snow_railstands'], [snowBoxM, 'snow_boxes'], [snowWallM, 'snow_wallrides'],
+    [deckM, 'snow_decks'], [lipM, 'snow_lips'], [barM, 'snow_bars'],
+  ]);
+  for (const [m, name] of mergeable) {
+    const parts = all.filter((a): a is Mesh => a instanceof Mesh && a.material === m && !a.hasThinInstances && !a.isDisposed());
+    if (parts.length < 2) continue;
+    const ride = parts.some((a) => rideable.includes(a));
+    const casters = shadowGeneratorsCasting(scene, parts[0]);
+    const receives = parts[0].receiveShadows, pickable = parts[0].isPickable;
+    for (const a of parts) a.computeWorldMatrix(true);
+    const one = Mesh.MergeMeshes(parts, true, true);
+    if (!one) continue;
+    one.name = name; one.material = m; one.isPickable = pickable; one.receiveShadows = receives; one.checkCollisions = ride;
+    for (const g of casters) g.addShadowCaster(one, false);
+    for (const list of [all, rideable]) for (let i = list.length - 1; i >= 0; i--) if (parts.includes(list[i] as Mesh)) list.splice(i, 1);
+    all.push(one);
+    if (ride) rideable.push(one);
+  }
+  // Nothing on the mountain moves but the next-gate marker: every other mesh's world matrix is computed once (no ride world
+  // froze anything, so each recomputed its matrix every frame). Materials stay live (the piste is the art card's surface).
+  for (const m of all) if (m.name !== 'gate_next') m.freezeWorldMatrix();
+
+  return { ground: rideable, grindLines, markers, obstacles, crowdSpots, bound: HALF, solids, gates, finish, dispose: () => { all.forEach((m) => m.dispose()); park.dispose(); for (const m of [pisteM, offM, barM, pylonM, cableM]) m.dispose(true, true); } };
 }
 
 // ── GATE-CRASHER-MAJOR builders: the gates, the pines, the edge poles and the finish ─────────────────────────────────────
@@ -809,9 +962,9 @@ function buildSlalomGates(scene: Scene, all: AbstractMesh[], markers: Vector3[],
   strips.thinInstanceSetBuffer('matrix', stripBuf, 16, true); strips.thinInstanceSetBuffer('color', stripCol, 4, false);
 
   // the marker over the next gate: a lit chevron that bobs, the one bright thing on the run
-  const marker = MeshBuilder.CreateCylinder('gate_next', { diameterTop: 0.9, diameterBottom: 0, height: 0.8, tessellation: 4 }, scene);
+  const marker = MeshBuilder.CreateCylinder('gate_next', { diameterTop: 1.35, diameterBottom: 0, height: 1.2, tessellation: 4 }, scene);
   const markM = new PBRMaterial('gateNextM', scene);
-  markM.albedoColor = Color3.FromHexString(GATE_COLOR.stripNext); markM.emissiveColor = Color3.FromHexString(GATE_COLOR.stripNext).scale(0.9);
+  markM.albedoColor = Color3.FromHexString(GATE_COLOR.stripNext); markM.emissiveColor = Color3.FromHexString(GATE_COLOR.stripNext).scale(1.35);
   markM.metallic = 0; markM.roughness = 0.6;
   marker.material = markM; marker.isPickable = false; marker.setEnabled(false);
   all.push(marker);
@@ -1058,12 +1211,19 @@ export function buildSurfBreak(scene: Scene, pocket: { min: number; max: number 
   world: RideWorld;
   waveLipAt(tSec: number): Vector3;
   barrelActive(tSec: number): boolean;
+  /** The swell being ridden, for the judged heat. */
+  activeProfile(): WaveProfile;
   /** Face height at world (x, z) for the wave at `tSec` — the mode pitches the board with it. */
   faceHeightAt(x: number, z: number, tSec: number): number;
   /** SURF OCEAN: advance the sea and follow the camera, every frame. */
   updateSea(dt: number, camera: Camera): void;
   /** The swell's height at a world point (for spray and anything that floats). */
   seaHeightAt(x: number, z: number): number;
+  /** IMPROVE (2026-10-06, surf items 8 / 9 / 20): counts up each time a new swell becomes the one being ridden — the mode
+   *  reads a change as "a new wave": the repeat list clears, the last ride is judged, the set is called. */
+  swellSeq(): number;
+  /** IMPROVE (2026-10-06, surf item 14): the buoy meshes, in world.obstacles' order (the mode lights the one in the line). */
+  buoys: Mesh[];
 } {
   const all: AbstractMesh[] = [];
   const P = venue.palette;
@@ -1102,13 +1262,25 @@ export function buildSurfBreak(scene: Scene, pocket: { min: number; max: number 
   const US = [12, WAVE_FACE_LEN, 7.2, 5.5, 3.8, 2.4, 1.3, 0.5, 0, -0.8, -1.8, -3.2, -5, -7];
   const pathsFor = (rows: number[], tSec: number, lift = 0): Vector3[][] =>
     rows.map((u) => XS.map((x) => new Vector3(x, waveProfile(u, crestHeightAt(x, tSec)) + lift, u)));
+  // IMPROVE (2026-10-06, surf item 1): THE RIBBONS ARE WRITTEN, NOT REBUILT. Every frame each strip was rebuilt through
+  // CreateRibbon from a fresh Vector3[][] (75 columns × 26 rows ≈ 1,950 vectors a frame at bound 100) plus a bounding refresh.
+  // Only the heights move — x and u are fixed — so each strip keeps its own position / normal arrays and the frame writes y
+  // into them (the crest height once per column, shared by every strip), recomputes the normals in place and uploads both.
+  // The bounds are set once to the tallest the wave can stand (crestHeightAt tops out at WAVE_HEIGHT + 0.12).
+  const crestAt = new Float32Array(XS.length);
   // FLAT ALBEDO PER STRIP. Both vertex colours and a DynamicTexture rendered this ribbon plain white under the PBR shader
   // (measured 2026-09-08, four variants — a flat albedoColor on the same mesh rendered blue), so the wave's colour is a set
   // of ribbons: the face in deep water blue, a foam strip along the crest, whitewater down the back, and the scored
   // POCKET as a pale translucent band riding the face — the band the mode scores, drawn on the wave itself.
-  const strips: { mesh: Mesh; rows: number[]; lift: number }[] = [];
+  const strips: { mesh: Mesh; rows: number[]; lift: number; pos: Float32Array | null; nrm: Float32Array; idx: number[] }[] = [];
   const strip = (name: string, rows: number[], hex: string, alpha: number, lift: number, rough = 0.8): Mesh => {
     const m = MeshBuilder.CreateRibbon(name, { pathArray: pathsFor(rows, 0, lift), updatable: true }, scene);
+    // (a ribbon of open paths lays its vertices out path by path, point by point; anything else keeps the old rebuild)
+    const built = m.getVerticesData(VertexBuffer.PositionKind);
+    const pos = built && built.length === rows.length * XS.length * 3 ? Float32Array.from(built) : null;
+    const idx = Array.from(m.getIndices() ?? []);
+    const nrm = new Float32Array(pos?.length ?? 0);
+    m.setBoundingInfo(new BoundingInfo(new Vector3(XS[0], -0.5, Math.min(...rows) - 0.5), new Vector3(XS[XS.length - 1], WAVE_HEIGHT + 0.6 + lift, Math.max(...rows) + 0.5)));
     m.parent = waveRoot;
     const pm = new PBRMaterial(`${name}M`, scene);
     pm.albedoColor = Color3.FromHexString(hex);
@@ -1118,16 +1290,28 @@ export function buildSurfBreak(scene: Scene, pocket: { min: number; max: number 
     if (alpha < 1) pm.alpha = alpha;
     m.material = pm;
     m.isPickable = false;
-    strips.push({ mesh: m, rows, lift });
+    strips.push({ mesh: m, rows, lift, pos, nrm, idx });
     all.push(m);
     return m;
+  };
+  const writeStrips = (tSec: number): void => {
+    for (let j = 0; j < XS.length; j++) crestAt[j] = crestHeightAt(XS[j], tSec);
+    for (const st of strips) {
+      if (!st.pos) { MeshBuilder.CreateRibbon(st.mesh.name, { pathArray: pathsFor(st.rows, tSec, st.lift), instance: st.mesh }); continue; }
+      let k = 1;
+      for (const u of st.rows) for (let j = 0; j < XS.length; j++, k += 3) st.pos[k] = waveProfile(u, crestAt[j]) + st.lift;
+      VertexData.ComputeNormals(st.pos, st.idx, st.nrm);
+      st.mesh.updateVerticesData(VertexBuffer.PositionKind, st.pos, false, false);
+      st.mesh.updateVerticesData(VertexBuffer.NormalKind, st.nrm, false, false);
+    }
   };
   const face = strip('waveFace', US, mixHex(P.ground, P.structure, 0.45), 1, 0);
   face.isPickable = true;
   face.checkCollisions = true;
   strip('waveFoam', [0.9, 0.4, 0, -0.4, -0.9], mixHex(P.line, '#ffffff', 0.55), 1, 0.05, 0.9);
-  const whitewater = strip('waveWhitewater', [-0.9, -1.6, -2.4, -3.4], P.line, 0.5, 0.03, 0.9);   // SURF OCEAN: translucent, over the new sea
-  strip('wavePocket', [pocket.max, (pocket.min + pocket.max) / 2, pocket.min], P.accent, 0.35, 0.03, 0.9);
+  // IMPROVE (2026-10-06, surf item 5): the WHITEWATER down the back (α 0.5) and the scored POCKET band (α 0.16) were two more
+  // full-width alpha-blended ribbons over the face. They are painted into the face's own ocean shading now (oceanShade's
+  // `bands`, below) — the same two reads, no extra transparent passes. The tube and the lip keep their alpha: both fade.
   // the lip line — a foam roll along the crest; the barrel hood hangs off it (as before) so the two breathe together
   const lip = MeshBuilder.CreateCylinder('waveLip', { diameter: 0.7, height: (HALF + 12) * 2, tessellation: 10 }, scene);
   lip.rotation.z = Math.PI / 2;
@@ -1174,6 +1358,7 @@ export function buildSurfBreak(scene: Scene, pocket: { min: number; max: number 
 
   // BUOYS — fixed obstacles in the lineup; hitting one is a wipeout
   const obstacles: RideObstacle[] = [];
+  const buoys: Mesh[] = [];
   const buoyM = mat(scene, 'buoyM', P.accent);
   for (const [x, z] of [[-14, -8], [18, 12], [-22, 38], [9, 62]] as const) {
     const buoy = MeshBuilder.CreateSphere(`buoy_${x}_${z}`, { diameter: 1.1 }, scene);
@@ -1181,6 +1366,7 @@ export function buildSurfBreak(scene: Scene, pocket: { min: number; max: number 
     buoy.material = buoyM;
     buoy.isPickable = false;
     all.push(buoy);
+    buoys.push(buoy);
     obstacles.push({ pos: buoy.position, radius: 0.9 });
   }
 
@@ -1282,8 +1468,14 @@ export function buildSurfBreak(scene: Scene, pocket: { min: number; max: number 
   faceM.albedoColor = Color3.FromHexString(mixHex(oceanOpts.deep, P.line, 0.12));
   faceM.emissiveColor = faceM.albedoColor.scale(0.07);
   faceM.roughness = 0.16; faceM.environmentIntensity = 0.45; faceM.directIntensity = 0.7;   // grazing sky reflection had washed it pale
-  const faceShade = oceanShade(faceM, oceanOpts);
-  const foamShade = oceanShade(whitewater.material as PBRMaterial, oceanOpts);
+  // IMPROVE (2026-10-06, surf item 5): the scored pocket (the band the mode scores, passed in) and the whitewater, painted in
+  const faceShade = oceanShade(faceM, {
+    ...oceanOpts,
+    bands: [
+      { from: pocket.min, to: pocket.max, color: P.accent, mix: 0.16, soft: 0.3 },
+      { from: -3.4, to: -0.9, color: P.line, mix: 0.5, soft: 0.35, chop: 0.8 },
+    ],
+  });
   // THE BARREL IS WATER. The hood was a pale 35 %-alpha cylinder: from inside the tube (where the camera is while you are
   // barreled) it filled the frame as a white pipe over the rider. It is the sea's own colour now — glassy, translucent,
   // lit through, with the chop — and the lip roll above it is lighter foam rather than a solid white bar.
@@ -1298,34 +1490,80 @@ export function buildSurfBreak(scene: Scene, pocket: { min: number; max: number 
   };
   let oceanT = 0;
   /** Every frame: the swell moves and follows the camera; the face's chop stays in step with it. */
-  // the pocket band is a hint drawn ON the water, not a sheet over it (35 % alpha washed the whole face out, measured by multiPick)
-  (scene.getMaterialByName('wavePocketM') as PBRMaterial | null)?.alpha !== undefined && ((scene.getMaterialByName('wavePocketM') as PBRMaterial).alpha = 0.16);
+  // (the pocket band is a hint drawn ON the water, not a sheet over it: 35 % alpha washed the whole face out, measured by
+  // multiPick; it is painted at 16 % into the face's shading now — item 5 above)
   const updateSea = (dt: number, camera: Camera): void => {
     // the lip roll fades as the lens comes up to it: barreled, the camera sits ~1.8 m from the crest and the roll filled the
     // frame as a white bar over the rider (multiPick: waveLip d1.8). Distance to the crest LINE (it runs along x).
     const dLip = Math.hypot(camera.position.y - lip.position.y, camera.position.z - (waveRoot.position.z + lip.position.z));
     lipM.alpha = 0.62 * Math.max(0, Math.min(1, (dLip - 2) / 5));
-    ocean.update(dt, camera); oceanT += Math.max(0, Math.min(0.1, dt)); faceShade.setTime(oceanT); foamShade.setTime(oceanT); tubeShade.setTime(oceanT); };
-  const BARREL_ON = 8, BARREL_CYCLE = 18;
-  const barrelActive = (tSec: number): boolean => (tSec % BARREL_CYCLE) < BARREL_ON;
+    ocean.update(dt, camera); oceanT += Math.max(0, Math.min(0.1, dt)); faceShade.setTime(oceanT); tubeShade.setTime(oceanT); };
+  // The tube opens on the swell's own barrel section (surfLineup), not an 18s clock.
+  let lineup: LineupState = startLineup();
+  let syncedAt = 0;
+  let ride: WaveProfile = lineup.swells[0].profile;
+  let along = 0;
+  let riding = false;
+  let pending: WaveProfile | null = null;
+  let seq = 0;   // IMPROVE (2026-10-06, surf items 8 / 9 / 20): a new ride, counted
+  const syncSwell = (tSec: number): void => {
+    if (tSec + 1e-4 < syncedAt) {
+      lineup = startLineup();
+      syncedAt = 0;
+      ride = lineup.swells[0].profile;
+      along = 0;
+      riding = false;
+      pending = null;
+    }
+    const dt = Math.max(0, Math.min(0.1, tSec - syncedAt));
+    if (dt <= 0) return;
+    const stepped = stepLineup(lineup, dt);
+    lineup = stepped.state;
+    syncedAt = tSec;
+    if (stepped.broke.length > 0) {
+      const next = stepped.broke[stepped.broke.length - 1].profile;
+      if (!riding) { ride = next; along = 0; riding = true; pending = null; seq++; }
+      else pending = next;
+    }
+    if (riding) {
+      along += WAVE_SPEED * dt;
+      if (along >= ride.wall) {
+        if (pending) { ride = pending; pending = null; along = 0; seq++; }
+        else riding = false;
+      }
+    }
+  };
+  const barrelActive = (tSec: number): boolean => {
+    syncSwell(tSec);
+    return riding && barrelOpen(ride, along);
+  };
+  const activeProfile = (): WaveProfile => ride;
   const lipWorld = new Vector3(0, vH * 0.78, -50);
   let lastRebuild = -1;
   const waveLipAt = (tSec: number): Vector3 => {
     const z = -50 + ((tSec * WAVE_SPEED) % WAVE_LAP);
     waveRoot.position.z = z;
-    // the set peels: rebuild the ribbon's heights (546 points) — every frame is cheap, and the crest visibly travels
-    if (tSec !== lastRebuild) {
+    // the set peels: the ribbon's heights are written (item 1 above) — every frame is cheap, and the crest visibly travels
+    // IMPROVE (2026-10-06, surf item 17): the time since the last write is this frame's step for the tube's fade too
+    const step = lastRebuild < 0 ? 0 : Math.max(0, Math.min(0.1, tSec - lastRebuild));
+    const fresh = tSec !== lastRebuild;
+    if (fresh) {
       lastRebuild = tSec;
-      for (const st of strips) MeshBuilder.CreateRibbon(st.mesh.name, { pathArray: pathsFor(st.rows, tSec, st.lift), instance: st.mesh });
-      face.refreshBoundingInfo();
+      writeStrips(tSec);
     }
     lip.position.y = vH * 0.78 + Math.sin(tSec * 2.2) * 0.08;
-    // the funnel breathes with the barrel cycle
+    // the funnel breathes with the barrel cycle. IMPROVE (2026-10-06, surf item 17): on the clock, not the frame — it eased a
+    // fixed 0.06 a frame, so the barrel read open ~2.4× faster at 144 fps than at 60. TUBE_FADE_K (s⁻¹) is that 0.06 at 60.
     const active = barrelActive(tSec);
-    tubeM.alpha += ((active ? 0.3 : 0.04) - tubeM.alpha) * 0.06;
+    if (fresh) tubeM.alpha += ((active ? 0.3 : 0.04) - tubeM.alpha) * tubeFadeStep(step);
     lipWorld.set(0, lip.position.y, z);
     return lipWorld;
   };
   const faceHeightAt = (x: number, z: number, tSec: number): number => waveProfile(z - waveRoot.position.z, crestHeightAt(x, tSec));
-  return { world, waveLipAt, barrelActive, faceHeightAt, updateSea, seaHeightAt: ocean.heightAt };
+  return { world, waveLipAt, barrelActive, activeProfile, faceHeightAt, updateSea, seaHeightAt: ocean.heightAt, swellSeq: () => seq, buoys };
 }
+
+/** IMPROVE (2026-10-06, surf item 17): the tube's fade rate (s⁻¹) — 0.06 a frame at 60 fps, as it was tuned. */
+export const TUBE_FADE_K = -Math.log(1 - 0.06) * 60;
+/** The share of the gap to the target the tube's alpha closes in `dt` seconds: the same at any frame rate. */
+export function tubeFadeStep(dt: number): number { return 1 - Math.exp(-TUBE_FADE_K * Math.max(0, dt)); }

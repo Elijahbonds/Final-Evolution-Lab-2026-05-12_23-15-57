@@ -7,6 +7,8 @@
 // the result is a COMPLETED COACHED SESSION OF KIND RECOVERY with the walk's seconds in its SetLog — what P9's PRQ
 // recovery reads (lib/coach/offDay.ts COMPLETED_OFF_DAY_WHERE) — and Today moves on to Day 2 with the off day ticked.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { POST_SESSION_BREATH } from '@/lib/breath/presets';
+import { pacerLengthSec } from '@/lib/breath/pacer';
 
 const h = vi.hoisted(() => ({ user: 'client-1' as string | null, store: null as unknown as import('./todayMemoryDb').TodayStore }));
 
@@ -70,6 +72,13 @@ describe('the off day on Today', () => {
     expect(t.today!.session.exercises.map((e) => [e.section, e.name])).toEqual(OFF_DAY_ITEMS.map((i) => [i.prescription.section, i.catalogue.name]));
     expect(t.today!.session.exercises[0].dose).toBe('1 × 12 min · Idle');
     expect(t.today!.session.exercises[0].timers).toEqual([{ kind: 'work', seconds: 720, label: 'Work 12:00' }]);
+    // MIRROR-COACH P7 FIX (2026-09-29): the 4-6 Recovery Breath carries the one pacer's spec through the real route, so
+    // Today's Work timer draws its ring (lib/breath/presets.ts workBreathFor); nothing else on the off day does
+    const breath = t.today!.session.exercises.find((e) => e.name === POST_SESSION_BREATH.name)!;
+    expect(breath.timers).toEqual([{ kind: 'work', seconds: 180, label: 'Work 3:00' }]);
+    expect(breath.breath).toEqual({ ...POST_SESSION_BREATH.spec, from: 0, rounds: 15 });
+    expect(pacerLengthSec(breath.breath!)).toBe(breath.workSeconds);
+    expect(t.today!.session.exercises.filter((e) => e.breath).map((e) => e.name)).toEqual([POST_SESSION_BREATH.name]);
     expect(t.today!.week).toEqual({ label: 'Week 1', entries: [
       { id: D1, label: 'Day 1', kind: 'training', state: 'done' },
       { id: OFF, label: 'Off day', kind: 'recovery', state: 'today' },

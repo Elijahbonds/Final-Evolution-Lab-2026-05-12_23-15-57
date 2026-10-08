@@ -5,7 +5,7 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { button, drive, findAll, textOf } from '@/tests/helpers/driveRender';
 import FlipLesson, { type FlipLessonProps } from './FlipLesson';
-import { parseFlipPack, type FlipPackIndex } from './flipPack';
+import { lessonInOrder, parseFlipPack, type FlipPackIndex, type LessonHit } from './flipPack';
 
 const parsed = parseFlipPack(JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../../public/audio/flip/pack.json'), 'utf8')));
 if (!parsed.ok) throw new Error('pack.json refused');
@@ -77,6 +77,38 @@ describe('CHOP THE FEL THEME', () => {
     expect(pads).toEqual([0]);
     vi.advanceTimersByTime(600);                       // step 3 at 90 BPM, swing 0.54: (2 + 1.08) × 166.7 ms = 513 ms
     expect(pads).toEqual([0, 11]);
+    vi.advanceTimersByTime(10_000);
+    expect(pads).toEqual([0, 11, 7, 3, 4, 0, 11, 7, 3, 4]);
+  });
+
+  // MUSIC-SUITE P10 (2026-09-29): the demo on the AUDIO clock (P5 measured the timer path drifting up to 14–19 ms).
+  it('P10: with onDemo the whole demo goes to the room once, on the audio clock — no per-hit timer fires a pad', () => {
+    const pads: number[] = [];
+    const asked: LessonHit[][] = [];
+    let stopped = 0;
+    const onDemo = (hits: LessonHit[]) => { asked.push(hits); return () => { stopped++; }; };
+    drive(() => FlipLesson(props({ pads, loadedId: 'theme_a_sunday_tape', ready: true, onDemo })), [
+      (t) => byQa(t, 'lesson-order')[0].props.onClick(),
+    ]);
+    const a = PACK.byId.get('theme_a_sunday_tape')!;
+    expect(asked).toHaveLength(1);
+    expect(asked[0]).toEqual(lessonInOrder(a));
+    vi.advanceTimersByTime(30_000);
+    expect(pads).toEqual([]);                         // the room played them; the lesson's timers did not
+    expect(stopped).toBe(0);                          // it ran out on its own
+  });
+  it('P10: ■ STOP (and a second press, and closing the card) stops the scheduled demo', () => {
+    let stopped = 0;
+    const onDemo = () => () => { stopped++; };
+    drive(() => FlipLesson(props({ loadedId: 'theme_a_sunday_tape', ready: true, onDemo })), [
+      (t) => byQa(t, 'lesson-flip')[0].props.onClick(),
+      (t) => { expect(textOf(byQa(t, 'lesson-flip')[0].props.children)).toBe('■ STOP'); byQa(t, 'lesson-flip')[0].props.onClick(); },
+    ]);
+    expect(stopped).toBe(1);
+  });
+  it('P10: a room that cannot schedule (onDemo answers null) still plays the demo on the timer path', () => {
+    const pads: number[] = [];
+    drive(() => FlipLesson(props({ pads, loadedId: 'theme_a_sunday_tape', ready: true, onDemo: () => null })), [(t) => byQa(t, 'lesson-flip')[0].props.onClick()]);
     vi.advanceTimersByTime(10_000);
     expect(pads).toEqual([0, 11, 7, 3, 4, 0, 11, 7, 3, 4]);
   });

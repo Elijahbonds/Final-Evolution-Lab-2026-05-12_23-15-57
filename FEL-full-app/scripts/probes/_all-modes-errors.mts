@@ -4,22 +4,18 @@
 // reports what the page complained about. A killjoy is not only an exception: a mode that never boots, a texture
 // that 404s, a WebGL warning storm, or a mode that boots and then does nothing are all things a player feels.
 import { chromium } from 'playwright-core';
-import { readFileSync } from 'node:fs';
-
-/** Read the enabled list from the registry's SOURCE — importing it pulls the whole engine into node. */
-function enabledModes(): string[] {
-  const src = readFileSync(new URL('../../lib/babylon/modes/registry.ts', import.meta.url), 'utf8');
-  const block = src.slice(src.indexOf('ENABLED_BABYLON_MODES'));
-  const body = block.slice(block.indexOf('['), block.indexOf(']'));
-  return [...body.matchAll(/'([a-zA-Z0-9_-]+)'/g)].map((m) => m[1]);
-}
+import { chromiumExe } from './_chromium.mts';
+import { enabledModes } from './_mode-list-source.mts';
 
 const PORT = process.env.PORT ?? '3011';
 const ONLY = process.env.ONLY ? process.env.ONLY.split(',') : null;
-const EXE = process.env.HOME + '/Library/Caches/ms-playwright/chromium-1234/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing';
 
 const modes = (ONLY ?? enabledModes()).sort();
-const b = await chromium.launch({ executablePath: EXE, args: ['--use-gl=angle','--use-angle=metal','--enable-webgl','--ignore-gpu-blocklist'] });
+const b = await chromium.launch({
+  executablePath: chromiumExe(),
+  headless: true,
+  args: ['--use-gl=angle', '--use-angle=metal', '--enable-webgl', '--ignore-gpu-blocklist'],
+});
 
 interface Row { mode: string; booted: boolean; errors: string[]; warns: string[]; missing: string[]; note: string }
 const rows: Row[] = [];

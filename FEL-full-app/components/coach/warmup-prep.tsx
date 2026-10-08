@@ -14,6 +14,10 @@
 // stretch's rock/hold rounds, the primer's sets. Camera-free, because no page mounts the drill runner yet; when one does,
 // WAKE_UP_CAMERA_HREF lights the "With the camera" link (the plan's Wake-Up goes to it as a Drill: wakeUpDrillFor).
 //
+// MIRROR-COACH P7 (2026-09-29): Pressurize the System's pacer is drawn by the one pacer (components/breath/Pacer.tsx),
+// straight from the drill chart's own spec (WAKE_UP's pacer, from 6 s, 4 in / 2 hold / 6 out, three breaths) on this
+// run's clock, where it was a text line ("Breathe in · 3"). Before its first breath the ring counts down to it.
+//
 // DATA. The server context (GET /api/coach/me/warmup: youth rules, the screen area, today's pain decision, the hard
 // stop) is read once; today's readiness answer comes in as a prop and never goes into a URL. Nothing here is saved,
 // scored, paid or streaked (owner decision #12).
@@ -33,10 +37,10 @@ import {
 } from '@/lib/coach/warmup';
 import { SESSION_SECTIONS } from '@/lib/coach/taxonomy';
 import { formatClock } from '@/lib/coach/setTimer';
+import { BreathPacer } from '@/components/breath/Pacer';
 
 const PREP = SESSION_SECTIONS.find((s) => s.id === 'prep')!;
 const KIND_LABEL: Record<WarmupStep['kind'], string> = { wake_up: 'Wake-Up', rock_hold: 'Stretch', primer: 'Prime' };
-const BREATH_WORD = { in: 'Breathe in', hold: 'Hold', out: 'Breathe out' } as const;
 
 export interface WarmupPrepProps {
   /** Today's session (TodayExercise[] fits). */
@@ -56,6 +60,8 @@ export function planFor(exercises: readonly SessionItemLike[], ctx: WarmupContex
     pattern: s.pattern, patternFrom: s.patternFrom, weakestZone: ctx.zone?.id ?? null, minutes, isYouth: ctx.isYouth,
     painDecision: ctx.painDecision, readiness, coachAssignedImpact: s.coachAssignedImpact, coachPrime: s.coachPrime, screen: ctx.screen,
     contextUnavailable: !!ctx.unavailable,
+    // MIRROR-COACH P8 FIX (2026-09-30): P8's protocol gate — a shut gate holds the Wake-Up's jumps and FEL's jump primer
+    jumpGate: ctx.jumpGate,
   });
 }
 
@@ -216,7 +222,11 @@ function RunPanel({ plan, at, paused, onPause, onNext, onStop }: {
       </div>
       <div className="h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full bg-[#00E5FF]" style={{ width: `${Math.round(fraction * 100)}%` }} /></div>
       <div className="text-sm text-white/85" aria-live="polite" data-run-line>{at.line}</div>
-      {at.breath && <div className="text-sm font-medium text-[#00E5FF]" data-run-breath>{BREATH_WORD[at.breath.phase]} · {at.breath.left}</div>}
+      {s.pacer && (
+        <div className="flex justify-center py-1" data-run-breath={at.breath?.phase ?? 'off'}>
+          <BreathPacer id="wake-up-pressurize" spec={s.pacer} elapsedSec={at.stepSec} size="md" />
+        </div>
+      )}
       <div className="flex items-center gap-1.5">
         <button type="button" onClick={onPause} aria-label={paused ? 'Resume' : 'Pause'} className="rounded-md border border-white/10 p-1.5 text-white/70">{paused ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}</button>
         <button type="button" onClick={onNext} aria-label="Next step" className="rounded-md border border-white/10 p-1.5 text-white/70"><SkipForward className="h-3.5 w-3.5" /></button>

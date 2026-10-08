@@ -63,11 +63,11 @@ import type { ModeContext, ModeDefinition, BodyView } from '../core/ModeHarness'
 import type { FelInput } from '../core/InputBus';
 import type { BodyEvent } from '@/lib/pose/BodyReader';
 import {
-  DancePerformance, generateRoutine, beatDuration, DANCE_LIBRARY, MISS_AFTER, type Judgement, type DanceStep,
+  DancePerformance, generateRoutine, beatDuration, MISS_AFTER, type Judgement, type DanceStep,
 } from '../core/DanceCore';
 import {
   DEFAULT_TRACK_ID, trackById, cycleTrack, trackFromQuery, pickBanner, PICK_TIMEOUT_SEC, stepsFor,
-  gradeFor, bodySpeedFor, cueLane, type DanceTrack,
+  gradeFor, bodySpeedFor, cueLane, CUE_LOOKAHEAD_SEC, CUE_LINGER_SEC, type DanceTrack, type HudCue,
 } from '../core/danceTracks';
 // BIOMECH-WAVE2 (2026-09-09) — the game-wide bar on the stage family (SPEC-FEL-BIOMECH-GAMEWIDE asks dance for "G2 +
 // G5 minimum"). Measured on 2942860: danceClips' procedural steps key the hips, the arms and ONE spine bone and never
@@ -98,6 +98,10 @@ import { readDeviceAudio } from '../music/StudioLibrary';
 // exactly, which it does. songPreviewUrl feeds the pick screen's preview-on-focus; outroRange picks the results
 // screen's clip (its own song's last section).
 import { SongStemBand } from '../audio/SongStemBand';
+// PIPELINES (2026-10-06): an approved community song (a music card with a chart) plays its own mix, muffled by misses.
+import { CardSongBand } from '../dance/cardSongBand';
+import { communityDanceSong, noteCommunityLockIn } from '../dance/communityDance';
+import { claimMusicFocus } from '@/lib/soundtrack/focus';
 import { songPreviewUrl, outroRange } from '../dance/felSongs';
 import { KitPulse, kitPattern } from '../audio/KitPulse';
 import { SongClock, danceTap, tapLatencySec, type TriggerLatch } from '../audio/SongClock';
@@ -126,6 +130,19 @@ import {
   pickHostLine, mulberry32, newRunSeed, estimateSec, hostCaption, clipId, seenFirstTime, SpeechQueue, stillSpeaking,
   type JudgeWindow, type HostLine,
 } from '../audio/mic/hostVoice';
+// MUSIC-SUITE P10 (2026-09-29): Stoop's guard looks past a missed step still pending (dance/stoopWindows.ts).
+import { stoopJudgeWindows, STOOP_LOOKAHEAD } from '../dance/stoopWindows';
+// IMPROVE (2026-10-06): the owner-picked dance pass. The decisions are pure and tested beside their modules:
+// runFeedback (EARLY/LATE on every hit, one banner clear time, the run's timing offset, full combo, the weakest
+// section), chartPlay (level, groove taps, MATCH buttons, freeze holds — none of it edits the chart's own files), and
+// danceBests (a device-local best per track).
+import { BannerClock, judgementBanner, offsetSummary, isFullCombo, SectionTally } from '../dance/runFeedback';
+import {
+  CLIP_BY_ID, categoryOf, chartForLevel, cycleLevel, parseLevel, DANCE_LEVELS, grooveBeats, grooveTap, firstGrooveFrom,
+  GROOVE_WINDOW_SEC, GROOVE_STYLE, buttonForStep, matchPress, pressTarget, tapSource, isReleaseOf, judgeRelease,
+  RELEASE_WINDOW_SEC, RELEASE_TEXT, FAMILY_BUTTON, comparedRun, type DanceLevel, type TapSource,
+} from '../dance/chartPlay';
+import { readBest, recordBest, bestLine } from '../dance/danceBests';
 
 /** Clips are authored at 120 BPM; the animator rescales them per track. */
 const CLIP_REF_BPM = 120;
@@ -144,14 +161,31 @@ function savedOffsetMs(): number | null {
 /** MUSIC-SUITE P8: decision #8's "still camera" comfort setting — see the `stillCam` field's doc for why this reads
  *  a query param / a localStorage key rather than a settings-screen flag no file in this task's scope can add. */
 const STILL_CAMERA_KEY = 'fel-dance-camera';
-function stillCameraPref(): boolean {
+/**
+ * MUSIC-SUITE P10 FIX (2026-09-29): REDUCED MOTION HOLDS THE STAGE CAMERA. Pure (tested in node). P10 made the P8
+ * camera move for the first time (applyStageCamera's CameraDirector.update: a ±0.22 m sway every beat, a push, a 0.7 m
+ * drop on freezes, a +1.8 m widen on streaks) — and the only thing that could stop it was `?camera=still` or a
+ * localStorage key nothing in the app writes. load() read the app/OS reduced-motion policy (lib/a11y/reducedMotion.ts:
+ * Profile → MOTION & FLASHES, or the OS setting) for the lamps only (`reduceFlash`), so a Reduced player got still lamps
+ * and a camera that swayed on every beat. Before P10 nobody's camera moved, so this is a behaviour change of the newly
+ * live camera: FLAGGED. The order: an explicit `?camera=still|move` wins (a shared link, a test), then the stored key
+ * ('still' | 'move'), then the motion policy — reduced → still.
+ */
+export function stillCameraFor(query: string | null, stored: string | null, reducedMotion: boolean): boolean {
+  if (query === 'still') return true;
+  if (query === 'move') return false;
+  if (stored === 'still') return true;
+  if (stored === 'move') return false;
+  return reducedMotion === true;
+}
+function stillCameraPref(reducedMotion: boolean): boolean {
   try {
-    if (typeof window === 'undefined') return false;
+    if (typeof window === 'undefined') return reducedMotion;
     const q = new URLSearchParams(window.location.search).get('camera');
-    if (q === 'still') return true;
-    if (q === 'move') return false;
-    return window.localStorage.getItem(STILL_CAMERA_KEY) === 'still';
-  } catch { return false; }
+    let stored: string | null = null;
+    try { stored = window.localStorage.getItem(STILL_CAMERA_KEY); } catch { /* storage blocked: the policy decides */ }
+    return stillCameraFor(q, stored, reducedMotion);
+  } catch { return reducedMotion; }
 }
 
 /**
@@ -224,7 +258,55 @@ export function nudgeClearOfRing(offset: Vec2, ringRadius: number, clearance: nu
   return { x: offset.x * scale, z: offset.z * scale };
 }
 
+/**
+ * MUSIC-SUITE P10 (2026-09-29): the cypher's ring of onlookers, with the AUDIENCE SIDE left open. The ring is 16 bodies
+ * at `radius` round the dancer (SCORECARD VISUALS, 2026-09-15: "a cypher IS the circle of people around the dancer"),
+ * and two of them (slots 7 and 8: 167.8° and 190.3°) stood 0.8–1.0 m either side of the one line P8's front-audience
+ * camera films down (dancer → AUDIENCE, 180°), 4.5 m out. While that camera never moved (it sat at 5.2 m, 0.7 m behind
+ * them, and they fell outside its frame) nobody saw them; once it moved (the P10 fix in applyStageCamera) the streak
+ * widen (7.1 m) and every freeze put a body between the camera and the dancer — measured live on :3121, the left third
+ * of the 16:9 streak and freeze frames was one onlooker's back (p10/scorecard-perf/stage/*-streak.png / *-freeze.png,
+ * before this). A real cypher filmed from the front opens to the camera, so this leaves out every slot within `gapRad`
+ * of the audience direction. Everything else (count, radius, phase, facing) is the ring it was.
+ * NEW TUNED NUMBER (flag): the gap's half-width. 0.35 rad (~20°) drops exactly slots 7 and 8 — the two measured in the
+ * frame — and keeps the pair at 33° / 35° (2.5–2.6 m off the line: at the widest 16:9 shot they stand at the frame's
+ * edges, framing it, where slot 8 stood 17° off the axis — a third of the way in from the left edge).
+ * Pure: danceStageCameraDrive.test.ts checks every kept body stands outside the central 90 % of the widest shot.
+ */
+export function onlookerRing(count: number, radius: number, phaseRad: number, audience: Vec2, gapRad: number): Vec2[] {
+  const toAudience = Math.atan2(audience.x, audience.z);   // the same sin/cos(angle) convention the slots use
+  const out: Vec2[] = [];
+  for (let i = 0; i < count; i++) {
+    const a = (i / count) * Math.PI * 2 + phaseRad;
+    const d = Math.abs(Math.atan2(Math.sin(a - toAudience), Math.cos(a - toAudience)));
+    if (d < gapRad) continue;
+    out.push({ x: Math.sin(a) * radius, z: Math.cos(a) * radius });
+  }
+  return out;
+}
+/** MUSIC-SUITE P10: onlookerRing's gap half-width (radians) — see its doc. NEW TUNED NUMBER. */
+export const ONLOOKERS_AUDIENCE_GAP = 0.35;
+
 type Phase = 'pick' | 'countin' | 'playing';
+
+/** IMPROVE (2026-10-06, #8): GO AGAIN in place. The timing host runs this room `continuous` (finish() reports a card and
+ *  the stage stays up) and the shell's REPLAY lands here: a finished run goes back to the pick screen on the same stage
+ *  (same track focused: A dances it again, ◀ ▶ picks the next) with no engine reboot. False when no run had finished. */
+let replayHook: (() => boolean) | null = null;
+export function replayDance(): boolean { return replayHook?.() ?? false; }
+
+/** IMPROVE (2026-10-06, #14): the cue lane, the NOW call and the beat dot reach the host at most this often (ms) —
+ *  every setHud is a React state update in the host (timing-babylon.tsx onHud), and the lane went every frame. ~30 Hz. */
+export const LANE_HUD_MS = 33;
+/** IMPROVE (2026-10-06, #17): how many upcoming steps the one per-tick upcoming() list carries — the lane's six, or
+ *  Stoop's STOOP_LOOKAHEAD (8), whichever is more, so both read the same list. */
+const LANE_UPCOMING = Math.max(6, STOOP_LOOKAHEAD);
+
+/** IMPROVE (2026-10-06, #7): the pick screen only starts a track by itself for a viewer with no pad — a pad player
+ *  reading the list is choosing, not idle (BrainBrawlMode's pick rule). */
+export function pickAutoStarts(timerFired: boolean, padCount: number): boolean {
+  return timerFired && padCount === 0;
+}
 
 export const DanceMode: ModeDefinition = (() => {
   let me: SpawnedCharacter;
@@ -259,10 +341,11 @@ export const DanceMode: ModeDefinition = (() => {
   let countBackShown = false;
   /** MUSIC-SUITE P2 FIX PASS: gives back the 'playback' audio session this room claimed at load (lib/audio/session.ts). */
   let releaseSession: (() => void) | null = null;
+  let releaseFocus: (() => void) | null = null;   // PIPELINES (2026-10-06): the soundtrack's music focus
   /** The Class of 3000 layer: the band your dancing builds. MUSIC-SUITE P7: a YourSongBand for YOUR exported song
    *  (its own rendered audio), a SongStemBand for a SHIPPED FEL song (track.song — six-songs), else the synth
    *  StemBand (a pre-P7 export with no real-audio payload). */
-  let band: StemBand | YourSongBand | SongStemBand | null = null;
+  let band: StemBand | YourSongBand | SongStemBand | CardSongBand | null = null;
   let bandJoined = new Set<string>();
   /** MUSIC-SUITE P7 (six-songs): true while the locked-in track is one of the six FEL songs — CONTRACT.md §7: "the
    *  rendered bed replaces KitPulse's 808 floor for these songs; with both, the kick doubles." Only gates the 808's
@@ -328,6 +411,9 @@ export const DanceMode: ModeDefinition = (() => {
   /** MUSIC-SUITE P8 FIX (2026-09-29): half-width of the exclusion band applyStageCamera keeps clear around
    *  ONLOOKERS_RADIUS — see that function's own comment for why this exists and what it does not fully solve. */
   const ONLOOKERS_CLEARANCE = 0.6;
+  /** MUSIC-SUITE P10 (2026-09-29): the velocity handed to CameraDirector.update from applyStageCamera — its fixed branch
+   *  reads only the subject (and an objective, here none), so this is never read; one shared zero, not one per frame. */
+  const STAGE_CAM_NO_VELOCITY = new Vector3(0, 0, 0);
   /** A+ P0 juice (PM brief CARNIVAL-A-PLUS-P0, 2026-09-07): one results punch per routine. */
   let resultLatch = false;
   /** MUSIC-SUITE P7 (six-songs): the pick screen's preview.mp3, playing while its song is focused (playPreview /
@@ -361,6 +447,54 @@ export const DanceMode: ModeDefinition = (() => {
   let missStreak = 0;
   /** device-local, once ever: dance.newdancer instead of dance.open on this player's first pick screen. */
   const DANCE_SEEN_KEY = 'fel:dance:seen';
+
+  // ── IMPROVE (2026-10-06): the owner-picked dance pass ──
+  /** #2: the banner's one clear time (runFeedback.BannerClock) — polled in update(), replacing a setTimeout per banner. */
+  const banner = new BannerClock();
+  /** #3: the run's signed timing offsets (ms, − = early) over every judged hit that carries one. */
+  let offsetSumMs = 0;
+  let offsetHits = 0;
+  /** #9: misses per song section. */
+  let sections = new SectionTally(undefined);
+  /** #11: EASY / NORMAL / HARD (device-local, chosen on the pick screen with ▲ ▼). */
+  let level: DanceLevel = 'normal';
+  /** #12: MATCH — each move family on its own face button (device-local, toggled on the pick screen with Y). */
+  let matchMode = false;
+  /** #11 / #12: this run's score is compared with another player's (chartPlay.comparedRun): the authored chart only. */
+  let compared = false;
+  /** #12: steps a wrong button was pressed for: further presses at them are ignored, so they expire as a MISS. */
+  let fumbled = new Set<DanceStep>();
+  /** #10: the chart's groove beats (whole beats far from every step) and the ones already tapped this run. */
+  let grooves: number[] = [];
+  let grooveTaken = new Set<number>();
+  /** #10 / #13: STYLE — groove taps and held freezes. Its own tally: never added to the (Arena-staked) score. */
+  let style = 0;
+  /** #13: the source of the tap being judged right now (onInput sets it around perf.hit; onJudged reads it), and the
+   *  freeze being held: whose release ends it and when (heard clock) its last beat lands. */
+  let tapSrc: TapSource | null = null;
+  let hold: { src: TapSource; endAt: number } | null = null;
+  /** #14: when the lane last went to the host (performance.now ms), and the count-in digit last shown. */
+  let laneAt = -Infinity;
+  let countDigit = 0;
+  /** #16: applyStageCamera's position, reused every frame. */
+  const camPos = new Vector3();
+  const LEVEL_KEY = 'fel:dance:level';
+  const MATCH_KEY = 'fel:dance:match';
+  function readPref(key: string): string | null { try { return typeof localStorage === 'undefined' ? null : localStorage.getItem(key); } catch { return null; } }
+  function writePref(key: string, v: string): void { try { localStorage.setItem(key, v); } catch { /* storage blocked */ } }
+  /** Per-run state of this pass, cleared on every lock-in (beginCountIn) and every load. */
+  function resetImproveRun(): void {
+    banner.cancel();
+    offsetSumMs = 0; offsetHits = 0;
+    sections = new SectionTally(track.song);
+    fumbled = new Set(); grooves = []; grooveTaken = new Set(); style = 0;
+    tapSrc = null; hold = null; laneAt = -Infinity; countDigit = 0;
+  }
+  /** #2: put a transient banner up; the newest banner's hold is the only clear scheduled. */
+  function flashBanner(ctx: ModeContext, text: string, holdMs: number, extra: Parameters<ModeContext['setHud']>[0] = {}): void {
+    ctx.setHud({ ...extra, banner: text });
+    banner.show(performance.now(), holdMs);
+  }
 
   /** GREAT (stars >= 3): a latched match-class punch — hit-stop + shake + gold flash. GOOD: a softer shake only. No
    *  slowMo.
@@ -429,6 +563,9 @@ export const DanceMode: ModeDefinition = (() => {
       kit?.rewind(s);
       kit?.countIn(clock.audio(countBackFirstBeat(startAt, s, bd)), 4);   // the first beat of the replayed bar
       countBackShown = true;
+      // IMPROVE (2026-10-06, #2 / #14): the count back owns the banner — no older clear may wipe its digit, and its
+      // first digit always goes out
+      banner.cancel(); countDigit = 0;
     } else {
       clock.resume(a, 0);
       if (act === 'resume-rearm') countArmed = false;   // the next update() arms a fresh count-in
@@ -458,12 +595,20 @@ export const DanceMode: ModeDefinition = (() => {
 
   /** The judge window(s) Stoop must not start a new line inside right now: only while a chart is actually being
    *  judged (phase 'playing') — the pick screen and the count-in's clicks are not judged beats, so nothing queues
-   *  there is ever held back. A short pad (0.12 s) around the very next step's own time — perf.upcoming is the same
-   *  lookahead the cue lane already reads off. */
-  function stoopWindows(heardNow: number): JudgeWindow[] {
+   *  there is ever held back. A short pad (0.12 s) around each upcoming step's own time — perf.upcoming is the same
+   *  lookahead the cue lane already reads off.
+   *  MUSIC-SUITE P10 (2026-09-29): EVERY upcoming window that has not closed, not just upcoming()[0]. upcoming() lists
+   *  pending steps first, and a missed step stays pending ~80 ms past its padded window (MISS_AFTER 0.20 s vs the 0.12 s
+   *  pad): the one window this read was already over, so a line started over the NEXT scored step (P9, live on CYPHER:
+   *  2 of 8 lines, after a missed double, ran 1.333 s and 0.279 s into the next window). dance/stoopWindows.ts passes
+   *  over the stale ones and guards the live steps behind them (STOOP_LOOKAHEAD of them, so a missed double's two
+   *  stale steps can never crowd the live one out); stoopWindows.test.ts replays that missed double. */
+  function stoopWindows(heardNow: number, upcoming?: readonly { time: number; step: DanceStep }[] | null): JudgeWindow[] {
     if (phase !== 'playing' || !perf) return [];
-    const next = perf.upcoming(heardNow, 1)[0];
-    return next ? [{ from: next.time - 0.12, to: next.time + 0.12 }] : [];
+    // IMPROVE (2026-10-06, #17): update() hands in the one upcoming() list it already built this tick (LANE_UPCOMING ≥
+    // STOOP_LOOKAHEAD entries) — the lane and Stoop each allocated their own, every frame
+    if (upcoming) return stoopJudgeWindows(upcoming, heardNow);
+    return stoopJudgeWindows(perf.upcoming(heardNow, STOOP_LOOKAHEAD), heardNow);
   }
 
   /** Queue a Stoop line for `moment` (hostVoice.SpeechQueue) — for anything said WHILE a chart may be judging (the
@@ -514,9 +659,9 @@ export const DanceMode: ModeDefinition = (() => {
    *  Stoop is holding for a clear gap, else clear a caption whose hold has run out.
    *  MUSIC-SUITE P8 FIX: never dequeues while `stoopSpeakingUntil` says he is still mid-line — see that field's own
    *  doc. The queued line simply waits (SpeechQueue.poll's own maxWaitSec still applies if he talks long enough). */
-  function pollStoop(ctx: ModeContext): void {
+  function pollStoop(ctx: ModeContext, upcoming?: readonly { time: number; step: DanceStep }[] | null): void {
     const now = stoopClock();
-    const line = stillSpeaking(now, stoopSpeakingUntil) ? null : stoopQueue.poll(now, stoopWindows(now));
+    const line = stillSpeaking(now, stoopSpeakingUntil) ? null : stoopQueue.poll(now, stoopWindows(now, upcoming));
     if (line) playStoopLine(ctx, line, now);
     else if (stoopCaptionUntil && now >= stoopCaptionUntil) { stoopCaptionUntil = 0; ctx.setHud({ mic: '', micWho: '' }); }
   }
@@ -553,12 +698,14 @@ export const DanceMode: ModeDefinition = (() => {
     if (!pulsables.length) return;
     const bob = reduceFlash ? 0 : beatBob(beatPhase) * LAMP_BOB_GAIN;
     const k = 1 + bob + Math.min(1.5, cheerGlow) * LAMP_CHEER_GAIN;
-    for (const p of pulsables) p.mat.emissiveColor = p.base.scale(k);
+    // IMPROVE (2026-10-06, #15): written in place — `p.base.scale(k)` built a new Color3 per lamp per frame
+    for (const p of pulsables) p.base.scaleToRef(k, p.mat.emissiveColor);
   }
 
   /**
-   * The front audience camera, one call per frame (plus one static call for the pick screen — see update()'s two
-   * call sites). `beatPhase`/`streak` are 0 outside a live song, which parks the camera at its neutral framing
+   * The front audience camera, one call per frame of the count-in and the song (update()'s two call sites), plus a
+   * hard-cut neutral shot for the pick screen: load()'s first frame and, MUSIC-SUITE P10 FIX, backToPick (this doc
+   * promised "one static call for the pick screen" that did not exist until then). `beatPhase`/`streak` are 0 outside a live song, which parks the camera at its neutral framing
    * rather than mid-sway. `snap` hard-cuts the camera in (load()'s first frame, the same `true` convention
    * OneVOneMode/DunkMode's own setFixed calls use); every other call eases at CameraDirector's own built-in rate,
    * which IS the "gentle" in decision #8's "a gentle push/sway" — the sway ITSELF is locked to the beat phase, never
@@ -589,8 +736,21 @@ export const DanceMode: ModeDefinition = (() => {
       beatPhase, freeze: currentCategory === 'freeze', streak, stillCamera: stillCam,
     });
     const groundOffset = clearOnlookersRing(frame.groundOffset);
-    const pos = new Vector3(me.root.position.x + groundOffset.x, frame.heightM, me.root.position.z + groundOffset.z);
-    ctx.camDirector.setFixed(pos, frame.targetHeight, snap);
+    // IMPROVE (2026-10-06, #16): one reused Vector3, not a new one per frame (setFixed copies what it is handed)
+    camPos.set(me.root.position.x + groundOffset.x, frame.heightM, me.root.position.z + groundOffset.z);
+    ctx.camDirector.setFixed(camPos, frame.targetHeight, snap);
+    // MUSIC-SUITE P10 (2026-09-29): THE STAGE CAMERA NEVER MOVED. setFixed only STORES the shot (CameraDirector.ts:481-486
+    // — it moves the camera itself on `snap` alone); the glide toward it and the aim both live in CameraDirector.update's
+    // fixed branch (:540-546), and every mode that owns a camera calls that itself each frame (ThreePointMode.ts:1123,
+    // OneVOneMode.ts:1673, KarateVSMode.ts:940). DanceMode never did — before P8 it had one snapTo and a still shot, so it
+    // did not need to. Measured live on :3121 (scripts/probes/_music-p10-stagecam-diag.mts, WARM UP at 16:9): the shot
+    // this function asked for walked 5.39 → 6.66 m as the combo built (the streak widen, the sway ±0.2 m across the line)
+    // while the camera sat at load()'s snap for the whole song — 5.200 m flat, 1.59–1.61 m high, aimed level at its own
+    // height — so none of P8's DEFAULT_STAGE_CAMERA motion (sway, push, freeze drop, streak widen, aim height) had ever
+    // been on screen. One update per stage-camera call: the glide is CameraDirector's own 0.1 lerp (the "gentle" decision
+    // #8 asked for), the aim is the dancer + frame.targetHeight. A paused song never reaches the per-frame call (the
+    // `clock.paused` return in update()), so the camera still freezes with the stage.
+    ctx.camDirector.update(me.root.position, STAGE_CAM_NO_VELOCITY, null);
     pulseStage(beatPhase, cheerGlow);
   }
 
@@ -632,7 +792,7 @@ export const DanceMode: ModeDefinition = (() => {
     // table to the mirrored base groups registered at character spawn.
     currentClip = s.mirrored ? `${id}.M` : id;
     // MUSIC-SUITE P8: which category this step is — the stage camera drops low on a 'freeze' (decision #8).
-    currentCategory = DANCE_LIBRARY.find((c) => c.id === s.clipId)?.category ?? null;
+    currentCategory = categoryOf(s);   // IMPROVE (2026-10-06, #18): a Map lookup, not DANCE_LIBRARY.find per step
     body?.loop(currentClip, { fadeSec: 0.12, speedRatio: clipSpeed() });
     me.animator.setSpeed(currentClip, clipSpeed());   // the same step twice in a row keeps the loop; a GOOD's drag is undone here
   }
@@ -659,7 +819,7 @@ export const DanceMode: ModeDefinition = (() => {
         if (joined) { joinBanner = `${band.name(joined)}${band.isFel(joined) ? ' · FEL' : ''} JOINS THE BAND`; instrumentJoined = true; }
       }
     } else if (band && step) {
-      const cat = DANCE_LIBRARY.find((c) => c.id === step.clipId)?.category;
+      const cat = categoryOf(step);   // IMPROVE (2026-10-06, #18): the Map, not a linear find per judgement
       if (cat) {
         const before = band.level(cat);
         band.judge(cat, label);
@@ -687,11 +847,16 @@ export const DanceMode: ModeDefinition = (() => {
     if (label === 'MISS') { missStreak++; if (missStreak === 3) queueStoop('dance.missstreak'); } else missStreak = 0;
     // Shot-feedback legibility, rhythm edition: a miss says WHICH side of
     // the beat you were on.
-    const dirTag = label === 'MISS' && typeof deltaMs === 'number'
-      ? (deltaMs < 0 ? ' — EARLY' : ' — LATE')
-      : '';
-    ctx.setHud({
-      banner: joinBanner ?? (combo >= 4 ? `${label}  ×${combo}` : `${label}${dirTag}`),
+    // IMPROVE (2026-10-06, #1): so does every GREAT and GOOD (runFeedback.judgementBanner) — the delta comes with every
+    // judgement, and a player who only learns the side on a MISS has already missed. #3 / #9: the run's tallies.
+    if (step && label !== 'MISS' && typeof deltaMs === 'number' && Number.isFinite(deltaMs)) { offsetSumMs += deltaMs; offsetHits++; }
+    if (step) sections.note(step.beat, label);
+    // #13: a freeze caught by a press is HELD through its beats; the release is judged in onInput (bonus STYLE only)
+    if (step && label !== 'MISS' && tapSrc && categoryOf(step) === 'freeze') {
+      hold = { src: tapSrc, endAt: startAt + (step.beat + step.holdBeats) * beatDuration(track.bpm) };
+    }
+    // #2: one tracked clear time (flashBanner) — an older hit's clear can no longer wipe a newer banner
+    flashBanner(ctx, judgementBanner(label, combo, deltaMs, joinBanner), joinBanner ? 1000 : 380, {
       score: perf.score,
       combo,
       // MUSIC-SUITE P7 (2026-09-29): instrument chips replace the one MIX bar (energy/energyLabel) — one chip per
@@ -758,7 +923,6 @@ export const DanceMode: ModeDefinition = (() => {
       crowd?.cheer(0.6);
       if (beatBus?.cheer('join', cheerAt, 1).flash) ctx.juice.flash('#f0abfc', 110);
     }
-    setTimeout(() => ctx.setHud({ banner: '' }), joinBanner ? 1000 : 380);
   }
 
   function finish(ctx: ModeContext): void {
@@ -804,20 +968,40 @@ export const DanceMode: ModeDefinition = (() => {
       crowd?.cheer(1);
       if (beatBus?.cheer('gradeS', resultAt, 1.5).flash) ctx.juice.flash('#fde047', 160, 1);
     }
+    // IMPROVE (2026-10-06): the results say more than counts. #6 a clean run (no MISS) is called out — the crowd goes
+    // up and Stoop speaks; #3 the run's average timing offset, with the calibrate link when it leans; #9 the section
+    // with the most misses; #4 the run goes into this device's best for the track.
+    banner.cancel(); hold = null;
+    const fc = isFullCombo(r.counts);
+    const offset = offsetSummary(offsetSumMs, offsetHits);
+    const practise = sections.line();
+    const prevBest = readBest(track.id, level);
+    const improved = recordBest(track.id, level, { score: r.score, grade, maxCombo: r.maxCombo, fullCombo: fc });
+    const newBest = improved && !!prevBest && r.score > prevBest.score;
+    if (fc) { crowd?.cheer(1); ctx.juice.callout('FULL COMBO', '#fde047', 1400); }
     // MUSIC-SUITE P8: Stoop's grade calls — speakStoopNow, not queueStoop: `ended` is already true (above), so
     // update()'s own early return means pollStoop() will never run again to flush anything left in the queue.
-    if (grade === 'S') speakStoopNow(ctx, 'dance.topgrade');
+    // IMPROVE (#6): a full combo gets the top-grade call too (its lines are "every single step landed") — unless the
+    // grade is D (a full combo of GOODs), where the D line stands. assumption: a reused moment, not a new script line.
+    if (grade === 'S' || (fc && grade !== 'D')) speakStoopNow(ctx, 'dance.topgrade');
     else if (grade === 'D') speakStoopNow(ctx, 'dance.lowgrade');
     ctx.setHud({
-      banner: `${'★'.repeat(r.stars)}${'☆'.repeat(5 - r.stars)}  ${accuracy}%  ·  GRADE ${grade}  ·  MIX ${mixPct}%`,
+      banner: `${fc ? 'FULL COMBO  ·  ' : ''}${'★'.repeat(r.stars)}${'☆'.repeat(5 - r.stars)}  ${accuracy}%  ·  GRADE ${grade}  ·  MIX ${mixPct}%${newBest ? '  ·  NEW BEST' : ''}${style > 0 ? `  ·  STYLE ${style}` : ''}`,
       cues: [],
-      nextStep: '',
+      // IMPROVE (#3 / #9): the top chip carries the timing read, the bottom panel what to practise (nextStepIn null,
+      // or the panel would read the last cue's "NOW —")
+      ...(offset.line ? { round: offset.line } : {}),
+      nextStep: practise,
+      nextStepIn: null,
       instruments: '',   // MUSIC-SUITE P7: the chip row goes with the cue lane — the results screen has its own MIX %
     });
     // Results screen: the timing host reads outcome ('GREAT' => won),
     // stats.hits/stats.rounds for its headline, and score. The proof line
     // (lib/proofLine.ts 'dance') reads stars / accuracy / maxCombo.
-    ctx.end(r.stars >= 3 ? 'GREAT' : 'GOOD', r.score, {
+    // IMPROVE (#8): on a continuous host (timing-babylon runs dance continuous) the run reports a CARD and the stage
+    // stays up for REPLAY (replayDance); anywhere else it ends the session exactly as before.
+    const outcome = r.stars >= 3 ? 'GREAT' : 'GOOD';
+    const stats: Record<string, number> = {
       hits: cleanHits,
       rounds,
       stars: r.stars,
@@ -829,7 +1013,15 @@ export const DanceMode: ModeDefinition = (() => {
       miss: r.counts.MISS,
       bpm: track.bpm,
       difficulty: track.difficulty,
-    });
+      // IMPROVE (2026-10-06): the pass's own reads, beside (never inside) the score: #6 full combo, #10/#13 STYLE,
+      // #11 chartLevel (0 easy · 1 normal · 2 hard), #3 the average offset (ms, + = late) when there were enough hits
+      fullCombo: fc ? 1 : 0,
+      style,
+      chartLevel: DANCE_LEVELS.indexOf(level),
+      ...(offset.avgMs !== null ? { avgOffsetMs: offset.avgMs } : {}),
+    };
+    if (ctx.continuous) ctx.card(outcome, r.score, stats);
+    else ctx.end(outcome, r.score, stats);
   }
 
   // ── the pick screen ───────────────────────────────────────────────────
@@ -871,12 +1063,20 @@ export const DanceMode: ModeDefinition = (() => {
     } catch { /* never let a broken preview take the pick screen down with it */ }
   }
 
+  /** IMPROVE (2026-10-06): the pick banner carries the run's options (#11 the level, #12 MATCH when on) and this
+   *  device's best on the focused track at that level (#4). */
+  function pickLine(): string {
+    const best = bestLine(readBest(track.id, level));
+    return `${pickBanner(track)}  ·  ${level.toUpperCase()}${matchMode ? '  ·  MATCH A B X Y' : ''}${best ? `  ·  ${best}` : ''}`;
+  }
+
   function showPick(ctx: ModeContext): void {
     playPreview(track);
     ctx.setHud({
       round: pickRound(),
-      banner: pickBanner(track),
-      nextStep: '◀ ▶  TRACK   ·   A  START',        // short: on a phone this panel sits beside the TAP button
+      banner: pickLine(),
+      // short: on a phone this panel sits beside the TAP button. IMPROVE (#11 / #12): ▲ ▼ the level, Y the MATCH buttons
+      nextStep: '◀ ▶ TRACK · ▲ ▼ LEVEL · Y MATCH · A START',
       nextStepIn: null,
       score: 0,
       combo: 0,
@@ -890,6 +1090,44 @@ export const DanceMode: ModeDefinition = (() => {
     pickSec = pickTimer(pickSec, { type: 'browse' }, PICK_TIMEOUT_SEC).sec;
     SoundKit.play('uiTick', { pitch: dir > 0 ? 1.2 : 0.9, volume: 0.3 });
     showPick(ctx);
+  }
+
+  /** IMPROVE (2026-10-06, #11 / #12): ▲ ▼ change the level, Y toggles MATCH. Both are browsing (the auto-start waits
+   *  again) and both are remembered on this device. */
+  function changeOption(ctx: ModeContext, what: 'up' | 'down' | 'match'): void {
+    if (compared) { flashBanner(ctx, 'HEAD TO HEAD · THE SONG\'S OWN CHART', 1200); return; }
+    if (what === 'match') { matchMode = !matchMode; writePref(MATCH_KEY, matchMode ? '1' : '0'); }
+    else { level = cycleLevel(level, what === 'up' ? 1 : -1); writePref(LEVEL_KEY, level); }
+    pickSec = pickTimer(pickSec, { type: 'browse' }, PICK_TIMEOUT_SEC).sec;
+    SoundKit.play('uiTick', { pitch: what === 'match' ? 1.4 : what === 'up' ? 1.1 : 1, volume: 0.3 });
+    ctx.setHud({ banner: pickLine() });
+  }
+
+  /** IMPROVE (2026-10-06, #8): GO AGAIN in place — a finished run back to the pick screen on the same stage (the engine,
+   *  the venue, the dancer, the crowd and the audio graph all stay). Everything a run sets is put back the way load()
+   *  leaves it; the next lock-in (beginCountIn) builds the chart, the band and the clock afresh. */
+  function replayToPick(ctx: ModeContext): boolean {
+    if (!ended || phase === 'pick' || ctx.scene.isDisposed) return false;
+    stopPreview();
+    stoopQueue.clear(); VoiceKit.stop('booth', 0.12);
+    perf?.stop();
+    band?.dispose(); band = null;   // the results outro goes with it
+    clock = new SongClock();
+    kit?.dispose();   // finish() already let it go; a fresh kit for the next count-in's clicks (load() builds the same)
+    kit = audioCtx && bus ? new KitPulse(audioCtx, bus, track.bpm, kitPattern(track.id)) : null;
+    kit?.setClock((sec) => clock.audio(sec));
+    void kit?.load().catch(() => 0);
+    ended = false; phase = 'pick'; pickSec = 0; stickLatch = false; currentClip = null; resultLatch = false;
+    pickShownSec = 0; trig = 'up'; countArmed = false; countBackShown = false;
+    currentCategory = null; dragClip = null; dragUntil = 0; bio.dejected = false; bio.beat = null; beatUntil = 0;
+    stoopCaptionUntil = 0; stoopSpeakingUntil = 0; missStreak = 0;
+    resetImproveRun();
+    body?.loop(SPORT_CLIP.idle, { fadeSec: 0.3 });
+    applyStageCamera(ctx, 0, 0, 0);
+    ctx.setHud({ cues: [], nextStepIn: null, instruments: '', hint: '', mic: '', micWho: '' });
+    showPick(ctx);
+    speakStoopNow(ctx, 'dance.open');
+    return true;
   }
 
   /** Lock the track in: build the chart, the band and the kit at ITS tempo
@@ -907,7 +1145,11 @@ export const DanceMode: ModeDefinition = (() => {
     // MUSIC-SUITE P7 (six-songs): mine is non-null for every shipped track too now (stepsFor falls through to
     // stepsForSong), so this generateRoutine call is unreachable for a shipped song — it only still runs for the
     // rare pre-P7 export with steps but no real-audio payload.
-    const routine = mine ?? generateRoutine({ bars: track.bars, difficulty: track.difficulty, seed: track.seed });
+    // IMPROVE (2026-10-06, #11): the chosen level thins (EASY) or fills (HARD) the chart for this run; NORMAL is the
+    // chart as authored. #10: the groove beats are read off the chart actually played.
+    const routine = chartForLevel(mine ?? generateRoutine({ bars: track.bars, difficulty: track.difficulty, seed: track.seed }), level);
+    resetImproveRun();
+    grooves = grooveBeats(routine);
     perf.setRoutine(routine);
     // MUSIC-SUITE P7 (2026-09-29): which instruments THIS chart calls for, decided once, on the exact array perf
     // just got — before any step fires, so the pick screen's follow-on chip row (instrumentsHud, at 'GO' below) is
@@ -920,15 +1162,21 @@ export const DanceMode: ModeDefinition = (() => {
 
     SoundKit.unlock();   // the shared context: a no-op once running (the harness unlocks it on the first gesture)
     band?.dispose();
-    isSongTrack = !!track.song;
+    const cardSong = communityDanceSong(track.id);   // PIPELINES: a community song is a song (no 808 under its own drums)
+    noteCommunityLockIn(track.id);
+    isSongTrack = !!track.song || !!cardSong;
     // MUSIC-SUITE P7 ("your beat"): a track that IS your exported song, with a real-audio payload attached
     // (DanceExport.YourSongExport — absent on an export saved before P7), dances to ITS OWN rendered stems
     // (dance/yourSong.ts). MUSIC-SUITE P7 FIX (six-songs, 2026-09-29): gated on `!track.song`, not on `mine` —
     // stepsFor(track) now ALSO answers every SHIPPED track (danceTracks.stepsForSong), so `mine` alone can no
     // longer tell "an export" from "a shipped song" apart; a shipped track still never pays for the extra
     // localStorage read, it just asks its own `song` field instead of asking `mine`.
-    const myExport = !track.song ? readExportedTrack() : null;
-    if (myExport?.song && audioCtx && bus) {
+    const myExport = !track.song && !cardSong ? readExportedTrack() : null;
+    if (cardSong && audioCtx && bus) {
+      const cardBand = new CardSongBand(audioCtx, bus, cardSong);
+      void cardBand.load().catch(() => 0);   // a mix still decoding when start() fires joins in update()
+      band = cardBand;
+    } else if (myExport?.song && audioCtx && bus) {
       const ac = audioCtx;
       const deps: YourSongRenderDeps = {
         readTake: readDeviceAudio,
@@ -973,6 +1221,88 @@ export const DanceMode: ModeDefinition = (() => {
     console.log(`[FEL-DANCE] count-in armed · latency ${Math.round(latencySec * 1000)} ms (${latencyFrom}) · audio ${audioCtx?.state ?? 'none'}`);
   }
 
+  /**
+   * IMPROVE (2026-10-06): one press, on the heard clock, on its way to the judge. In order:
+   *   #10 a press on a GROOVE beat (a whole beat in a long gap, no step within reach) is STYLE, not a wild tap — it costs
+   *       nothing and never touches the combo or the score;
+   *   #12 in MATCH mode a press at a step with the wrong face button fumbles that step: it is not judged, further presses
+   *       at it are ignored, and it expires as a MISS (one wrong button cannot be mashed into a right one);
+   *   then perf.hit, exactly as before, with the press's source noted so a freeze it catches can be held (#13).
+   */
+  function pressAt(ctx: ModeContext, heardNow: number, e: FelInput, btn: 'A' | 'B' | 'X' | 'Y' | null): void {
+    const near = grooves.length || matchMode ? perf.upcoming(heardNow, STOOP_LOOKAHEAD) : null;
+    if (phase === 'playing' && grooves.length && near) {
+      const bd = beatDuration(track.bpm);
+      const g = grooveTap(grooves, (heardNow - startAt) / bd, GROOVE_WINDOW_SEC / bd, grooveTaken);
+      if (g !== null && !pressTarget(near, heardNow)) {
+        grooveTaken.add(g);
+        style += GROOVE_STYLE;
+        ctx.juice.scorePop(me.root.position.add(new Vector3(0, 2.1, 0)), 'GROOVE', '#e9d5ff');
+        return;
+      }
+    }
+    if (matchMode && btn && near) {
+      const target = pressTarget(near, heardNow);
+      if (target) {
+        if (fumbled.has(target.step)) return;
+        const want = buttonForStep(target.step);
+        if (want !== btn) {
+          fumbled.add(target.step);
+          flashBanner(ctx, `WRONG BUTTON — ${want}`, 500);
+          SoundKit.play('miss', { volume: 0.18 });
+          return;
+        }
+      }
+    }
+    tapSrc = tapSource(e);
+    try { void perf.hit(heardNow); } finally { tapSrc = null; }
+  }
+
+  /**
+   * IMPROVE (2026-10-06): the lane, the NOW call and its countdown into `hud`, from this tick's upcoming() list. On top of
+   * danceTracks.cueLane (movement play's, unchanged): #12 in MATCH mode each marker shows its face button and the call
+   * names it; #13 a freeze says HOLD; #10 the groove beats ride the lane as faint ♪ markers (optional, bonus only).
+   */
+  function laneInto(hud: Parameters<ModeContext['setHud']>[0], upcoming: readonly { time: number; step: DanceStep }[], heard: number): void {
+    let cues: HudCue[] = cueLane(upcoming, heard);
+    if (matchMode || cues.some((c) => c.family === 'freeze')) {
+      cues = cues.map((c) => {
+        const fam = c.family as keyof typeof FAMILY_BUTTON;
+        const btn = matchMode && fam in FAMILY_BUTTON ? FAMILY_BUTTON[fam] : null;
+        return { ...c, ...(btn ? { glyph: btn } : {}), ...(fam === 'freeze' ? { name: `${c.name} · HOLD` } : {}) };
+      });
+    }
+    if (grooves.length) {
+      const bd = beatDuration(track.bpm);
+      const fromBeat = (heard - CUE_LINGER_SEC - startAt) / bd;
+      let added = false;
+      for (let i = firstGrooveFrom(grooves, fromBeat); i < grooves.length; i++) {
+        const dt = startAt + grooves[i] * bd - heard;
+        if (dt > CUE_LOOKAHEAD_SEC) break;
+        if (grooveTaken.has(grooves[i])) continue;
+        cues.push({ in: Math.round(dt * 1000) / 1000, name: 'groove', family: 'groove', glyph: '♪', color: 'rgba(255,255,255,0.3)', mirrored: false, move: 'tap' });
+        added = true;
+      }
+      if (added) cues.sort((x, y) => x.in - y.in);
+    }
+    hud.cues = cues;
+    const next = upcoming[0];
+    if (next) {
+      const clip = CLIP_BY_ID.get(next.step.clipId);   // #18: the Map, not DANCE_LIBRARY.find every frame
+      const name = clip?.name?.toUpperCase() ?? 'MOVE';
+      hud.nextStep = matchMode ? `${name} · ${buttonForStep(next.step)}` : name;
+      hud.nextStepIn = Math.max(0, Math.round((next.time - heard) * 100) / 100);
+    }
+  }
+
+  /** IMPROVE (2026-10-06, #13): the freeze's release, `deltaSec` after its last beat (− = let go early). STYLE only. */
+  function releaseHold(ctx: ModeContext, deltaSec: number): void {
+    hold = null;
+    const r = judgeRelease(deltaSec);
+    style += r.style;
+    ctx.juice.scorePop(me.root.position.add(new Vector3(0, 2.4, 0)), RELEASE_TEXT[r.call], r.style > 0 ? '#fdba74' : '#cbd5e1');
+  }
+
   return {
     modeId: 'dance',
     mood: 'nightGame',
@@ -984,6 +1314,7 @@ export const DanceMode: ModeDefinition = (() => {
       // It was set inside SoundKit for every mode, where (assumed) it also stopped the player's own music app.
       releaseSession?.();
       releaseSession = claimPlaybackSession();
+      releaseFocus?.(); releaseFocus = claimMusicFocus('dance');   // PIPELINES: the Cypher's band owns the music bus
       // MUSIC-SUITE P8 (2026-09-25): `keepGameplayCamera: true` still keeps the venue's own static orbit camera OUT
       // of `scene.activeCamera` — CameraDirector's follow-cam stays the one the player sees; the M104 comment this
       // line used to carry ("keep the over-shoulder follow camera") is the gap decision #8 closes: applyStageCamera
@@ -998,10 +1329,12 @@ export const DanceMode: ModeDefinition = (() => {
       // SCORECARD VISUALS (2026-09-15): a cypher IS the circle of people around the dancer, and the frame review found a
       // lone body on a lit disc in a dark room. The ring watches the floor (the same Onlookers the dojo and the courts use).
       crowd?.dispose(); crowd = null;
-      crowd = new Onlookers(ctx.scene, Array.from({ length: 16 }, (_, i) => {
-        const a = (i / 16) * Math.PI * 2 + 0.18;
-        return new Vector3(Math.sin(a) * ONLOOKERS_RADIUS, 0, Math.cos(a) * ONLOOKERS_RADIUS);
-      }), '#d946ef', new Vector3(0, 1.2, 0));
+      // MUSIC-SUITE P10 (2026-09-29): the ring opens on the audience side, where the stage camera films from — see
+      // onlookerRing (module scope) for the two bodies that stood in the camera's shot once it moved.
+      // IMPROVE (2026-10-06, #20): `restBetweenCheers` — the ring's idle clips hold still between cheers (the root's own
+      // breathing bob carries them), so up to seven skinned bodies 4.6 m out stop evaluating keyframes every frame.
+      crowd = new Onlookers(ctx.scene, onlookerRing(16, ONLOOKERS_RADIUS, 0.18, { x: AUDIENCE.x, z: AUDIENCE.z }, ONLOOKERS_AUDIENCE_GAP)
+        .map((p) => new Vector3(p.x, 0, p.z)), '#d946ef', new Vector3(0, 1.2, 0), { restBetweenCheers: true });
 
       me = await CharacterLibrary.spawn(ctx.scene, SHARED_CFG.heroUrl, {
         // Stand on the stage deck, not in it — podium scale 1.4 -> surface y 0.7.
@@ -1053,9 +1386,17 @@ export const DanceMode: ModeDefinition = (() => {
       // MUSIC-SUITE P8: Stoop's own per-run state — a fresh seed and no memory of the last visit's lines, else every
       // visit after the first would pick up rotating exactly where the last one left off.
       stoopRnd = mulberry32(newRunSeed()); stoopLast = new Map(); stoopQueue.clear(); stoopCaptionUntil = 0; stoopSpeakingUntil = 0; missStreak = 0;
+      // IMPROVE (2026-10-06): this device's level / MATCH choice (#11 / #12), the pass's per-run state, and REPLAY (#8)
+      compared = comparedRun(typeof window !== 'undefined' ? window.location.search : null);
+      level = compared ? 'normal' : parseLevel(readPref(LEVEL_KEY));
+      matchMode = !compared && readPref(MATCH_KEY) === '1';
+      resetImproveRun();
+      replayHook = () => replayToPick(ctx);
       // MUSIC-SUITE P8: read once per load, not every frame — see the `stillCam`/`reduceFlash` fields' own doc.
-      stillCam = stillCameraPref();
-      reduceFlash = !motionPolicy().flash;
+      // MUSIC-SUITE P10 FIX: one policy read, and Reduced motion now holds the camera too (stillCameraFor's doc).
+      const motion = motionPolicy();
+      stillCam = stillCameraPref(motion.reduced);
+      reduceFlash = !motion.flash;
       beatBus?.dispose();
       beatBus = new BeatBus({ bpm: 120, reduceFlashing: () => reduceFlash });   // retuned to the real track's tempo/startAt in update(), the instant the count-in arms one
 
@@ -1141,9 +1482,19 @@ export const DanceMode: ModeDefinition = (() => {
           if (!stickLatch && Math.abs(e.x) > 0.6) { stickLatch = true; movePick(ctx, e.x > 0 ? 1 : -1); }
           else if (Math.abs(e.x) < 0.3) stickLatch = false;
         } else if (e.t === 'button' && e.pressed && (e.btn === 'A' || e.btn === 'B')) beginCountIn(ctx);
+        // IMPROVE (2026-10-06): ▲ ▼ the level (#11), Y the MATCH buttons (#12)
+        else if (e.t === 'dpad' && e.pressed && (e.dir === 'up' || e.dir === 'down')) changeOption(ctx, e.dir);
+        else if (e.t === 'button' && e.pressed && e.btn === 'Y' && e.src !== 'space') changeOption(ctx, 'match');
         return;
       }
-      if (!t.tap) return;
+      // IMPROVE (2026-10-06, #13): a held freeze ends on ITS tap's release — judged against the freeze's last beat
+      if (hold && phase === 'playing' && isReleaseOf(hold.src, e)) {
+        const ac = audioNow();
+        if (clock.accepting(ac, MISS_AFTER)) releaseHold(ctx, clock.song(ac) - latencySec - hold.endAt);
+      }
+      // IMPROVE (#12): in MATCH mode every face button is a tap, and which one it was matters
+      const btn = matchMode ? matchPress(e, t.tap) : null;
+      if (!t.tap && !btn) return;
       if (phase === 'countin') {
         // MUSIC-SUITE P2 FIX PASS (2026-09-25): a tap inside beat 0's early window is a tap on beat 0. This returned for
         // every count-in tap, and the room leaves the count-in on the first frame whose SONG time reaches beat 0 while
@@ -1153,7 +1504,7 @@ export const DanceMode: ModeDefinition = (() => {
         const ac = audioNow();
         if (!clock.accepting(ac, MISS_AFTER)) return;
         const heardNow = clock.song(ac) - latencySec;
-        if (countInTapReaches({ countArmed, heard: heardNow, startAt, missAfter: MISS_AFTER })) void perf.hit(heardNow);
+        if (countInTapReaches({ countArmed, heard: heardNow, startAt, missAfter: MISS_AFTER })) pressAt(ctx, heardNow, e, btn);
         return;
       }
       if (phase !== 'playing') return;
@@ -1161,15 +1512,21 @@ export const DanceMode: ModeDefinition = (() => {
       if (!clock.accepting(a, MISS_AFTER)) return;   // paused, or counting back in (syncHold)
       // judged on the HEARD clock: the song time the press lands at, minus the latency (the step times are when the
       // band SOUNDS them on the song clock)
-      void perf.hit(clock.song(a) - latencySec);   // onJudged already reported it
+      pressAt(ctx, clock.song(a) - latencySec, e, btn);   // onJudged already reported it
     },
 
     update(ctx: ModeContext, dt: number) {
       crowd?.update(dt);
       if (ended) return;
-      pollStoop(ctx);   // MUSIC-SUITE P8: every phase — flushes a queued line the instant its judge window clears
-
-      syncHold(ctx);
+      // IMPROVE (2026-10-06, #2): the banner's one clear time (flashBanner) — the newest banner's, never an older one's
+      if (banner.due(performance.now())) ctx.setHud({ banner: phase === 'pick' ? pickLine() : '' });   // the pick line comes back
+      // IMPROVE (#19): syncHold is NOT called here any more — the render observer load() adds runs it once every frame
+      // in every phase (and visibilitychange / onInput still call it), so a second pass here only re-read
+      // document.hidden and rebuilt holdAction's input. If that observer runs after this tick on the frame a resume
+      // lands, this tick still sees the held clock and returns at `clock.paused` below: the resume shows a frame later.
+      // IMPROVE (#17): a playing tick polls Stoop further down, with the upcoming() list it builds for the lane anyway.
+      let polled = false;
+      if (phase !== 'playing' || clock.paused) { pollStoop(ctx); polled = true; }   // MUSIC-SUITE P8: every phase
       if (phase === 'pick') {
         // A viewer with no controller (or a capture harness) still gets a
         // routine: the default track starts itself after a few seconds.
@@ -1179,7 +1536,8 @@ export const DanceMode: ModeDefinition = (() => {
         const flip = Math.floor(pickShownSec / PICK_CAL_FLIP_SEC);
         pickShownSec += dt;
         if (Math.floor(pickShownSec / PICK_CAL_FLIP_SEC) !== flip) ctx.setHud({ round: pickRound() });
-        if (pt.start) beginCountIn(ctx);
+        // IMPROVE (2026-10-06, #7): only with no pad connected — a pad player reading the list is choosing
+        if (pickAutoStarts(pt.start, ctx.input?.pads?.().length ?? 0)) beginCountIn(ctx);
         return;
       }
       if (clock.paused) return;              // a hidden tab still drawing: the song is held (syncHold)
@@ -1227,7 +1585,15 @@ export const DanceMode: ModeDefinition = (() => {
         if (!isSongTrack) kit?.update(now);
         const remaining = startAt - now;
         if (remaining > 0) {
-          ctx.setHud({ banner: `${Math.min(4, Math.ceil(remaining / bd))}` });
+          // IMPROVE (2026-10-06): #14 the digit only when it changes (it went to the host every frame); #5 the cue lane
+          // is up through the count-in — every chart's first step is on beat 0, and the lane used to stay empty until
+          // GO, so the first hit was blind. Same throttle as the song's lane.
+          const countHud: Parameters<ModeContext['setHud']>[0] = {};
+          const digit = Math.min(4, Math.ceil(remaining / bd));
+          if (digit !== countDigit) { countDigit = digit; countHud.banner = `${digit}`; }
+          const nowMs = performance.now();
+          if (nowMs - laneAt >= LANE_HUD_MS) { laneAt = nowMs; laneInto(countHud, perf.upcoming(heard, LANE_UPCOMING), heard); }
+          if (countHud.banner !== undefined || countHud.cues !== undefined) ctx.setHud(countHud);
           // MUSIC-SUITE P8 FIX (2026-09-29): decision #8 ("front, audience view, moving on the beat") used to go
           // quiet for the entire 4-beat count-in — this early `return` skipped straight past the applyStageCamera
           // call below (after this whole `if (phase === 'countin')` block), leaving the camera and the lamp/podium
@@ -1248,8 +1614,7 @@ export const DanceMode: ModeDefinition = (() => {
         const goHint = band instanceof YourSongBand
           ? "Your song is the band — hit on the beat and each of your own parts joins it"
           : 'Every move family is an instrument — hit on the beat and the band builds';
-        ctx.setHud({ banner: 'GO', hint: goHint, instruments: instrumentsHud() });
-        setTimeout(() => ctx.setHud({ banner: '' }), 500);
+        flashBanner(ctx, 'GO', 500, { hint: goHint, instruments: instrumentsHud() });   // IMPROVE (#2): the one clear time
         // MUSIC-SUITE P8: the GO-beat opener — your own song gets its own call, everything else gets the
         // call-and-response hype (mutually exclusive: exactly one queues, dance.ownsong OR dance.callresponse).
         queueStoop(band instanceof YourSongBand ? 'dance.ownsong' : 'dance.callresponse');
@@ -1259,16 +1624,21 @@ export const DanceMode: ModeDefinition = (() => {
       band?.update(now);
       if (!isSongTrack) kit?.update(now);   // MUSIC-SUITE P7 (six-songs): the song's own bed+drums stems are the floor
 
+      // IMPROVE (2026-10-06, #13): a freeze nobody let go of is judged once its release window has passed
+      if (hold && heard > hold.endAt + RELEASE_WINDOW_SEC) releaseHold(ctx, heard - hold.endAt);
+
       // the count back in after a pause (syncHold): the beats left to the pause point, then the banner clears once
+      // (IMPROVE #14: a count-back digit goes out when it changes, not every frame)
       const hud: Parameters<ModeContext['setHud']>[0] = {};
-      if (clock.countingBack(a)) hud.banner = `${Math.max(1, Math.min(4, Math.ceil(clock.countBackLeft(a) / bd - 1e-9)))}`;
-      else if (countBackShown) { countBackShown = false; hud.banner = ''; }
+      if (clock.countingBack(a)) {
+        const digit = Math.max(1, Math.min(4, Math.ceil(clock.countBackLeft(a) / bd - 1e-9)));
+        if (digit !== countDigit) { countDigit = digit; hud.banner = `${digit}`; }
+      } else if (countBackShown) { countBackShown = false; countDigit = 0; hud.banner = ''; }
 
       // The beat pulse — rhythm games show the beat, and it is the honest
       // way to publish timing (published = rendered): a dot that pops on
       // every beat, decaying through it.
       const songBeat = (heard - startAt) / bd;
-      if (songBeat >= 0) hud.beatPulse = 1 - (songBeat % 1);
 
       // MUSIC-SUITE P8 (2026-09-25): the front audience camera + the lamp/LED-wall/podium pulse — the SAME heard
       // clock the beat-pulse dot above reads, so what the camera does and what the HUD shows agree. `perf.combo`
@@ -1286,15 +1656,18 @@ export const DanceMode: ModeDefinition = (() => {
       // LANE of the next few moves (couch-readable, A+ mission #1) plus the
       // one-line "NOW" call the bezel already drew.
       // (MUSIC-SUITE P2: on the heard clock, so a cue reaches the line when its beat reaches the ear)
-      const upcoming = perf.upcoming(heard, 6);
-      hud.cues = cueLane(upcoming, heard);
-      const next = upcoming[0];
-      if (next) {
-        const clip = DANCE_LIBRARY.find((c) => c.id === next.step.clipId);
-        hud.nextStep = clip?.name?.toUpperCase() ?? 'MOVE';
-        hud.nextStepIn = Math.max(0, Math.round((next.time - heard) * 100) / 100);
+      // IMPROVE (2026-10-06): #17 ONE upcoming() a tick — the lane and Stoop's judge-window guard share it; #14 the lane,
+      // the NOW call and the beat dot go to the host at most every LANE_HUD_MS (they went every frame, a new cue array
+      // and a React state update in the host each time), and at once whenever a count-back digit changes.
+      const upcoming = perf.upcoming(heard, LANE_UPCOMING);
+      if (!polled) pollStoop(ctx, upcoming);
+      const nowMs = performance.now();
+      if (hud.banner !== undefined || nowMs - laneAt >= LANE_HUD_MS) {
+        laneAt = nowMs;
+        if (songBeat >= 0) hud.beatPulse = 1 - (songBeat % 1);
+        laneInto(hud, upcoming, heard);
+        ctx.setHud(hud);
       }
-      ctx.setHud(hud);
 
       // The routine is over one full beat after the last step's window closes,
       // so a final PERFECT is never cut off by the results screen.
@@ -1304,7 +1677,8 @@ export const DanceMode: ModeDefinition = (() => {
     dispose() {
       stopPreview();   // MUSIC-SUITE P7 (six-songs): leaving the room is a blur too
       stoopQueue.clear(); VoiceKit.stop('booth', 0.12);   // MUSIC-SUITE P8: Stoop never bleeds into the next room
-      releaseSession?.(); releaseSession = null;   // MUSIC-SUITE P2 FIX PASS: the audio session goes back
+      releaseSession?.(); releaseSession = null;
+      releaseFocus?.(); releaseFocus = null;   // PIPELINES: the soundtrack may come back   // MUSIC-SUITE P2 FIX PASS: the audio session goes back
       perf?.stop();
       crowd?.dispose(); crowd = null;
       posture?.dispose(); posture = null;
@@ -1326,6 +1700,9 @@ export const DanceMode: ModeDefinition = (() => {
       beatBus?.dispose(); beatBus = null;
       pulsables = [];
       currentCategory = null;
+      // IMPROVE (2026-10-06): REPLAY has no stage to come back to (#8), and nothing of this pass outlives the room
+      replayHook = null;
+      banner.cancel(); hold = null;
       ended = true;
     },
   };

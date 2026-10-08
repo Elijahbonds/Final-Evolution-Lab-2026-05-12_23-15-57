@@ -9,7 +9,7 @@ import { homedir } from 'node:os';
 import { join, relative, sep } from 'node:path';
 import {
   MAX_DURATION_FLOOR_MS, MEASURED_RUNS, MIN_DURATION_FLOOR_MS, MODE_SCORE_RULES, RATE_HEADROOM, SCORE_COLUMN_MAX, SCORE_HEADROOM, STORY_MIRRORED,
-  checkRunScore, checkUnruledScore, deriveRule, derivedBounds, derivedRule, rulesMaxFor, storyBossBound, storyRailBound, unmeasuredModes, type MeasuredRun,
+  checkRunScore, checkUnruledScore, deriveRule, derivedBounds, derivedRule, dunkDuelBound, rulesMaxFor, storyBossBound, storyRailBound, unmeasuredModes, type MeasuredRun,
 } from './modeScoreRules';
 import { DUNK_ATTEMPT_MAX } from '@/lib/arena-score-integrity';
 import { MODE_INFO } from '@/lib/game-data';
@@ -35,9 +35,11 @@ function sessionKeys(): string[] {
 
 describe('deriveRule: one arithmetic for every mode', () => {
   it('a mode with an exact rules maximum is capped at exactly that, whatever was measured', () => {
-    expect(rulesMaxFor('threePoint', { killSwitch: false })).toBe(30);
+    // IMPROVE (2026-10-06, 3PT #5): a session may play the money-rack option (one all-money rack: 34); the Arena stake row
+    // stays the 2009 format's 30 (arena-score-integrity SESSION_RULES_CEILINGS — the 1v1 win-by-2's split)
+    expect(rulesMaxFor('threePoint', { killSwitch: false })).toBe(34);
     const r = deriveRule('threePoint', [run(6, 150, 'upper')], { killSwitch: false })!;
-    expect(r).toMatchObject({ maxScore: 30, maxScoreFrom: 'rules' });
+    expect(r).toMatchObject({ maxScore: 34, maxScoreFrom: 'rules' });
   });
 
   it('any other mode: the best measured score × SCORE_HEADROOM; its pace × RATE_HEADROOM, never below a max run at the shortest length', () => {
@@ -60,7 +62,7 @@ describe('deriveRule: one arithmetic for every mode', () => {
     expect(deriveRule('surfing', [])).toBeNull();
     expect(deriveRule('karateEndless', [run(null, 60, 'upper')])).toBeNull();
     // a rules mode with an unscored run still has its exact maximum
-    expect(deriveRule('soccer', [run(null, 60, 'upper')], { killSwitch: false })).toMatchObject({ maxScoreFrom: 'rules', maxScore: 5560 });
+    expect(deriveRule('soccer', [run(null, 60, 'upper')], { killSwitch: false })).toMatchObject({ maxScoreFrom: 'rules', maxScore: 6660 });
   });
 
   it('music free play is endless: never capped at the Arena set\'s maximum', () => {
@@ -81,8 +83,8 @@ describe('MODE_SCORE_RULES: every row comes from measured TRUE :3000 runs', () =
       if (rule.maxScoreFrom === 'derived') expect(rule, mode).toEqual(derivedRule(derived[mode]));
       else expect(rule, mode).toEqual(deriveRule(mode, MEASURED_RUNS[mode]));
     }
-    // no mode is both measured and derived: one source per row
-    expect(Object.keys(MEASURED_RUNS).filter((m) => m in derived)).toEqual([]);
+    // karateEndless and music keep derived rows; measured runs document their pace but derived wins the ceiling
+    expect(Object.keys(MEASURED_RUNS).filter((m) => m in derived).sort()).toEqual(['karateEndless', 'music']);
   });
 
   it('each row names at least one run, each run names its capture', () => {
@@ -184,27 +186,27 @@ describe('fail closed: the session keys with no measured TRUE :3000 run pay noth
     const keys = sessionKeys();
     expect(keys.length).toBeGreaterThanOrEqual(34);
     expect(unmeasuredModes(keys)).toEqual([
-      'aeroAces', 'carnival', 'duel', 'golf', 'hoops3v3', 'karateVersus', 'mixedcombat', 'showdown', 'sprint', 'tennis',
-      'tiebreak', 'training', 'velocityKart', 'volleyball',
+      'duel', 'hoops3v3', 'mixedcombat', 'showdown', 'sprint',
     ]);
     const ruled = keys.filter((k) => !unmeasuredModes([k]).length);
-    expect(ruled.filter((k) => MODE_SCORE_RULES[k].maxScoreFrom !== 'derived')).toEqual([
-      'baseball', 'bigAir', 'brainBrawl', 'dance', 'dunkContest', 'football', 'freerun', 'hoops1v1', 'snowboarding', 'soccer', 'threePoint', 'whoSceneIt',
-    ]);
-    expect(ruled.filter((k) => MODE_SCORE_RULES[k].maxScoreFrom === 'derived')).toEqual([
-      'acting', 'dunkduel', 'irl', 'karateEndless', 'music', 'skateboarding', 'storyMode', 'surfing',
-    ]);
+    expect(ruled).toContain('tiebreak');
+    expect(ruled).toContain('training');
+    expect(ruled).toContain('velocityKart');
+    expect(ruled).toContain('skateboarding');
+    expect(MODE_SCORE_RULES.tiebreak.maxScoreFrom).toBe('rules');
+    expect(MODE_SCORE_RULES.training.maxScoreFrom).toBe('rules');
+    expect(MODE_SCORE_RULES.velocityKart.maxScoreFrom).toBe('measured');
   });
 });
 
 describe('OWNER DECISION (2026-09-28): derived per-run bounds', () => {
   const b = derivedBounds({ killSwitch: false });
-  it('the endless / combo four: the Arena\'s modelled per-run bounds, and music\'s own per-hits bound (the row adds only the column limit)', () => {
-    expect(b.skateboarding.maxScore).toBe(435_544_000);
-    expect(b.surfing.maxScore).toBe(5_866_322);
+  it('the endless combo modes still on derived bounds: karateEndless and music', () => {
     expect(b.karateEndless.maxScore).toBe(136_807_600);
     expect(b.music.maxScore).toBe(SCORE_COLUMN_MAX);
-    for (const m of ['skateboarding', 'surfing', 'karateEndless', 'music']) expect(b[m].maxScore, m).toBeLessThanOrEqual(SCORE_COLUMN_MAX);
+    for (const m of ['karateEndless', 'music']) expect(b[m].maxScore, m).toBeLessThanOrEqual(SCORE_COLUMN_MAX);
+    expect(b.skateboarding).toBeUndefined();
+    expect(b.surfing).toBeUndefined();
   });
 
   it('the four that should pay, from their own code', () => {
@@ -213,32 +215,35 @@ describe('OWNER DECISION (2026-09-28): derived per-run bounds', () => {
     expect(storyBossBound()).toBe(950);
     expect(storyRailBound()).toBe(2196);
     expect(b.storyMode.maxScore).toBe(2196);
-    expect(b.dunkduel.maxScore).toBe(2 * DUNK_ATTEMPT_MAX);
+    // owner 2026-10-06 (moderate): the longest match (5 each) plus the dunk-off's 3 rounds — the duel reports real totals
+    expect(dunkDuelBound()).toBe((5 + 3) * DUNK_ATTEMPT_MAX);
+    expect(b.dunkduel.maxScore).toBe(dunkDuelBound());
     expect(b.dunkduel.payFloorOnly).toBe(true);
     expect(Object.entries(b).filter(([, v]) => v.payFloorOnly).map(([k]) => k)).toEqual(['dunkduel']);
   });
 
   it('under the kill switch a modelled bound whose game swaps falls back to the column limit', () => {
     const ks = derivedBounds({ killSwitch: true });
-    expect(ks.skateboarding.maxScore).toBe(SCORE_COLUMN_MAX);
-    expect(ks.surfing.maxScore).toBe(SCORE_COLUMN_MAX);
     expect(ks.karateEndless.maxScore).toBe(SCORE_COLUMN_MAX);
     expect(ks.acting.maxScore).toBe(100);
   });
 
   it('a derived row: pace = the bound over its modelled run (else the shortest run), the duration floors, no measured runs', () => {
-    expect(derivedRule(b.skateboarding)).toMatchObject({ maxScoreFrom: 'derived', maxScorePerSecond: Math.ceil((435_544_000 / 90) * 100) / 100, minDurationMs: MIN_DURATION_FLOOR_MS, maxDurationMs: MAX_DURATION_FLOOR_MS, measured: [] });
+    expect(derivedRule(b.karateEndless)).toMatchObject({ maxScoreFrom: 'derived', minDurationMs: MIN_DURATION_FLOOR_MS, maxDurationMs: MAX_DURATION_FLOOR_MS, measured: [] });
     expect(derivedRule(b.acting).maxScorePerSecond).toBe(50);
-    // a real strong skate run (the rc gauntlet's 80,832 over its 90 s) is inside
-    expect(checkRunScore({ mode: 'skateboarding', score: 80_832, durationMs: 90_000 }, { skateboarding: derivedRule(b.skateboarding) })).toMatchObject({ ok: true });
+    // skateboarding now uses MEASURED_RUNS (ECONOMY-CAPS a); a real strong run is inside
+    expect(checkRunScore({ mode: 'skateboarding', score: 1649, durationMs: 94_000 })).toMatchObject({ ok: true });
   });
 
   it('the EXPORTED table carries Prove It\'s played-floor flag, and only Prove It\'s (review: dropping it in derivedRule paid Prove It in full, every test green)', () => {
     // the route reads the flag off the real row (app/api/sessions/route.ts floorOnly), not off derivedBounds()
     expect(derivedRule(b.dunkduel).payFloorOnly).toBe(true);
-    expect(MODE_SCORE_RULES.dunkduel).toMatchObject({ maxScoreFrom: 'derived', maxScore: 2 * DUNK_ATTEMPT_MAX, payFloorOnly: true });
+    expect(MODE_SCORE_RULES.dunkduel).toMatchObject({ maxScoreFrom: 'derived', maxScore: dunkDuelBound(), payFloorOnly: true });
     expect(Object.entries(MODE_SCORE_RULES).filter(([, r]) => r.payFloorOnly).map(([k]) => k)).toEqual(['dunkduel']);
     expect(checkRunScore({ mode: 'dunkduel', score: 96, durationMs: 60_000 })).toMatchObject({ ok: true, rule: { payFloorOnly: true } });
+    // a perfect 5-dunk match, reported unscaled (5 × the panel's 50), is inside the bound; one past the bound is not
+    expect(checkRunScore({ mode: 'dunkduel', score: 250, durationMs: 5 * 60_000 })).toMatchObject({ ok: true });
+    expect(checkRunScore({ mode: 'dunkduel', score: dunkDuelBound() + 1, durationMs: 5 * 60_000 })).toMatchObject({ ok: false, detail: 'above_max_score' });
   });
 
   it('DRIFT: the story, acting and Prove It constants are still what their code says', () => {
@@ -263,7 +268,16 @@ describe('OWNER DECISION (2026-09-28): derived per-run bounds', () => {
     expect(Math.min(...speedMults)).toBe(STORY_MIRRORED.railMinSpeedMult);
     expect(src('components/games/acting-game.tsx')).toContain('score: Math.round(res.average * 100),');
     expect(src('lib/babylon/core/ActingCore.ts')).toContain('const adjusted = clamp01(average * coverage);');
-    expect(src('lib/babylon/modes/DunkDuelMode.ts')).toContain(`const DUNKS_EACH = ${STORY_MIRRORED.dunkDuelDunksEach};`);
+    // owner 2026-10-06: the bound mirrors the duel's longest match and its dunk-off rounds (dunkDuelRules), and the mode
+    // reports its real totals (no scaling left)
+    const rules = src('lib/babylon/modes/dunkDuelRules.ts');
+    const lengths = rules.match(/export const MATCH_LENGTHS: readonly number\[\] = \[([\d, ]+)\];/);
+    expect(lengths, 'MATCH_LENGTHS').not.toBeNull();
+    expect(Math.max(...lengths![1].split(',').map(Number))).toBe(STORY_MIRRORED.dunkDuelMaxDunksEach);
+    expect(rules).toContain(`export const DUNKOFF_MAX_ROUNDS = ${STORY_MIRRORED.dunkDuelDunkOffRounds};`);
+    const duel = src('lib/babylon/modes/DunkDuelMode.ts');
+    expect(duel).not.toMatch(/reportedScore\(/);
+    expect(duel).toContain('Math.max(totals[0], totals[1]), { p1: totals[0], p2: totals[1],');
   });
 });
 

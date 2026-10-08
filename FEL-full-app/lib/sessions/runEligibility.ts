@@ -18,7 +18,7 @@
  * no signal that grants one, so none needs to be trusted.
  */
 
-export type IneligibleReason = 'AGENT' | 'PLAYTEST' | 'TEST_ACCOUNT';
+export type IneligibleReason = 'AGENT' | 'PLAYTEST' | 'TEST_ACCOUNT' | 'NO_RULES';
 
 /** User.role values that mark a test account (server-side only: no API route writes User.role). */
 export const TEST_ROLES: ReadonlySet<string> = new Set(['test', 'qa', 'playtest', 'agent']);
@@ -54,18 +54,44 @@ function pathOf(u: string | null | undefined): string {
   try { return new URL(u, 'http://local.invalid').pathname; } catch { return ''; }
 }
 
+/** Production is detected by NODE_ENV (Next inlines it at build time). */
+export function isProductionEnv(env: Record<string, string | undefined> = process.env): boolean {
+  return env.NODE_ENV === 'production';
+}
+
+/**
+ * Default prod allowlist when FEL_TEST_ACCOUNTS is unset. arena-coins@fel.local is intentionally OFF this list —
+ * it is the clean payout-proof account.
+ */
+export const PROD_DEFAULT_TEST_ACCOUNTS = 'playtest@fel.local';
+
 /** The test allowlist from server env: FEL_TEST_ACCOUNTS = "id-or-email,id-or-email" (case-insensitive for emails). */
 export function testAllowlist(env: Record<string, string | undefined> = process.env): ReadonlySet<string> {
-  const raw = env.FEL_TEST_ACCOUNTS ?? '';
-  return new Set(raw.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean));
+  const raw = env.FEL_TEST_ACCOUNTS;
+  if (raw !== undefined && raw !== '') {
+    return new Set(raw.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean));
+  }
+  if (isProductionEnv(env)) {
+    return new Set(PROD_DEFAULT_TEST_ACCOUNTS.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean));
+  }
+  return new Set();
 }
 
 export function isTestAccount(user: EligibilityInput['user'], env?: Record<string, string | undefined>): boolean {
   if (!user) return false;
-  if (user.role && TEST_ROLES.has(String(user.role).toLowerCase())) return true;
-  const allow = testAllowlist(env);
+  const e = env ?? process.env;
+  if (isProductionEnv(e) && user.role && TEST_ROLES.has(String(user.role).toLowerCase())) return true;
+  const allow = testAllowlist(e);
   if (allow.size === 0) return false;
   return allow.has(String(user.id).toLowerCase()) || (!!user.email && allow.has(String(user.email).toLowerCase()));
+}
+
+/** CYBER (k): the start request asks for an agent run (?agent=1, x-fel-agent, or Referer ?agent=1). */
+export function isAgentRunRequest(i: Pick<EligibilityInput, 'url' | 'headers'>): boolean {
+  const q = params(i.url);
+  const referer = i.headers.get('referer');
+  const ref = params(referer);
+  return truthy(q?.get('agent')) || truthy(i.headers.get('x-fel-agent')) || truthy(ref?.get('agent'));
 }
 
 export function decideRunEligibility(i: EligibilityInput): Eligibility {

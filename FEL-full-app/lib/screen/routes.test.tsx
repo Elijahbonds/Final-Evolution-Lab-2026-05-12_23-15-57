@@ -26,7 +26,8 @@ describe('(a) /play/mirror/assess renders for a guest', () => {
     expect(t).toContain('Hands-on-hips jump');
     expect(t).not.toMatch(/dorsiflexion|countermovement/i);
     expect(h).toMatch(/<a[^>]*href="\/screen\/privacy"/);
-    expect(h).toMatch(/<button[^>]*data-primary[^>]*>Start<\/button>/);
+    expect(h).toMatch(/data-primary[^>]*>Just test my jump \(about 1 min\)/);
+    expect(h).toContain('Full movement screen (about 5 min)');
     expect(t).not.toMatch(/sign in|log in|create an account/i);
     // the page module reads no session any more
     const { readFileSync } = await import('node:fs');
@@ -49,16 +50,24 @@ describe('(a) /play/mirror/assess renders for a guest', () => {
 });
 
 describe('(d) /screen: one stable QR address', () => {
-  const digest = (fn: () => unknown): string => { try { fn(); } catch (e) { return String((e as { digest?: string }).digest); } return 'no redirect'; };
-  it('sends to /play/mirror/assess with a temporary (307) redirect, keeping the query string, with no auth', async () => {
+  it('shows the jump first, then the full screen, and does not forward a query string', async () => {
     const { default: ScreenEntry } = await import('@/app/screen/page');
-    expect(digest(() => ScreenEntry({ searchParams: {} }))).toMatch(/^NEXT_REDIRECT;replace;\/play\/mirror\/assess;307;/);
-    expect(digest(() => ScreenEntry({ searchParams: { src: 'qr' } }))).toMatch(/^NEXT_REDIRECT;replace;\/play\/mirror\/assess\?src=qr;307;/);
-    expect(digest(() => ScreenEntry({ searchParams: { src: 'qr', a: ['1', '2'] } }))).toMatch(/\/play\/mirror\/assess\?src=qr&a=1&a=2;307;/);
+    const h = renderToStaticMarkup(createElement(ScreenEntry));
+    const t = text(h);
+    expect(t.indexOf('Just test my jump (about 1 min)')).toBeGreaterThan(-1);
+    expect(t.indexOf('Just test my jump (about 1 min)')).toBeLessThan(t.indexOf('Full movement screen (about 5 min)'));
+    expect(t.indexOf('Just test my jump (about 1 min)')).toBeLessThan(t.indexOf('This is a free movement check, not a medical exam.'));
+    expect(h).toMatch(/href="\/play\/mirror\/assess\?run=jump"/);
+    expect(h).toMatch(/href="\/play\/mirror\/assess\?run=full"/);
+    expect(h).not.toMatch(/[?&amp;]src=/);
+    expect(h).not.toMatch(/NEXT_REDIRECT|pose|wasm|mediapipe/i);
     const { readFileSync, existsSync } = await import('node:fs');
     const { join } = await import('node:path');
     expect(readFileSync(join(__dirname, '../../app/screen/page.tsx'), 'utf8')).not.toMatch(/getServerSession|authOptions/);
-    expect(existsSync(join(__dirname, '../../middleware.ts'))).toBe(false);
+    // SCREEN-HARDEN: middleware adds screen-path headers only; it must not gate auth.
+    if (existsSync(join(__dirname, '../../middleware.ts'))) {
+      expect(readFileSync(join(__dirname, '../../middleware.ts'), 'utf8')).not.toMatch(/getServerSession|authOptions|next-auth/);
+    }
   });
 });
 
@@ -102,8 +111,10 @@ describe('S-2: the back arrow never leaves the screen', () => {
       privacy: renderToStaticMarkup(createElement((await import('@/app/screen/privacy/page')).default)),
     };
     const got = Object.fromEntries(Object.entries(pages).map(([k, h]) => [k, backHref(h)]));
-    expect(got).toEqual({ frameDefault: '/screen', start: '/screen', results: '/screen', program: '/play/mirror/assess/results', privacy: '/screen' });
+    // S-14: intro back is a button (history), not /screen (307 loop). Privacy uses PrivacyFrame (function back).
+    expect(got).toEqual({ frameDefault: '/screen', start: null, results: '/screen', program: '/play/mirror/assess/results', privacy: null });
     for (const [k, href] of Object.entries(got)) {
+      if (!href) continue;
       expect(isQuickScreenPath(href!), k).toBe(true);
       expect(href, k).not.toMatch(/^\/(login|try)\b|^\/play\/mirror$/);
     }
@@ -122,7 +133,7 @@ describe('S-2: the back arrow never leaves the screen', () => {
     const { join } = await import('node:path');
     const root = join(__dirname, '../..');
     const files = ['app/play/mirror/assess/_components/assess-app.tsx', 'app/play/mirror/assess/_components/results-page.tsx',
-      'app/screen/program/[lane]/program-lane.tsx', 'app/screen/privacy/page.tsx', 'app/play/mirror/assess/_components/screen-ui.tsx'];
+      'app/screen/program/[lane]/program-lane.tsx', 'app/screen/privacy/privacy-frame.tsx', 'app/play/mirror/assess/_components/screen-ui.tsx'];
     const backs = new Set<string>();
     for (const f of files) {
       const src = readFileSync(join(root, f), 'utf8');
@@ -132,7 +143,7 @@ describe('S-2: the back arrow never leaves the screen', () => {
     expect([...backs].sort()).toEqual(['RESULTS_PATH', 'SCREEN_HOME', 'back']);
     // the page's own `back`: the flow's step back, and /screen from the start card
     const app = readFileSync(join(root, 'app/play/mirror/assess/_components/assess-app.tsx'), 'utf8');
-    expect(app).toMatch(/const back: string \| \(\(\) => void\) = phase === 'intro' \|\| phase === 'toResults' \? SCREEN_HOME/);
+    expect(app).toMatch(/const back: string \| \(\(\) => void\) = phase === 'intro' \|\| phase === 'toResults' \? introBack/);
     expect(readFileSync(join(root, 'app/play/mirror/assess/_components/screen-ui.tsx'), 'utf8')).toMatch(/back = SCREEN_HOME/);
   });
 });

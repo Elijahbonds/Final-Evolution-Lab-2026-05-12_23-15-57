@@ -19,6 +19,7 @@ import { prisma } from '@/lib/db';
 import type { Prisma } from '@/public/_prisma/client';
 import { recordServerEvent } from '@/lib/analytics-server';
 import { postLc } from '@/lib/ledger';
+import { settleRecoveryFor } from '@/lib/prq-recovery';
 import {
   SeasonPassCore,
   TIER_XP,
@@ -29,6 +30,8 @@ import {
   type TierUpEvent,
 } from './season-pass-core';
 import { getSeasonRewardTable } from './golden-hour';
+import { dailyGoals, type DailyGoals, type GoalsDb } from '@/lib/goals/daily-goals-db';
+import { DAILY_GOAL_COUNT } from '@/lib/goals/daily-goals';
 
 export interface SeasonPublic {
   id: string;
@@ -48,6 +51,9 @@ export interface AddSeasonXpResult {
   need: number;
   hasPro: boolean;
   events: TierUpEvent[];
+  /** IMPROVE (2026-10-06): today's daily goals after this session, and the ones it completed (their season XP is in
+   *  `gained`). */
+  goals: DailyGoals;
 }
 
 /** The active season, if any (server-owned; one active at a time). */
@@ -120,6 +126,13 @@ async function bookGrant(input: {
   reward: SeasonReward;
   dedupeKey: string;
 }): Promise<boolean> {
+  // MIRROR-COACH P9 fix (2026-09-30, code review): the LC credit below writes PlayerProfile, which moves its updatedAt —
+  // the anchor PRQ recovery's half-life runs from (lib/prq-recovery.ts). Every other PlayerProfile writer settles first
+  // (getOrCreateProfile); this one is also reached from the Stripe webhook and the season claim, which do not, so the
+  // days since the last settle were skipped and recovery stayed HIGH (settled 80, a grant ten days later: the fall to
+  // about 70.7 never happened). Settle first — outside the transaction, so a settle that cannot read can never abort the
+  // grant (it never throws, and it writes only if the row has not moved since it read it).
+  if (input.reward.kind === 'lc' && Number(input.reward.amt ?? 0) > 0) await settleRecoveryFor(prisma, input.userId);
   try {
     await prisma.$transaction(async (tx) => {
       await tx.passGrant.create({
@@ -235,6 +248,9 @@ export interface AddSeasonXpInput {
   mode: string;
   score: number;
   won: boolean;
+  /** IMPROVE (2026-10-06): this session's GameSession row, already written in `db` — the daily goals it completes feed
+   *  questsDone. Without it no goal is credited (the goals are still read for the card). */
+  sessionId?: string | null;
 }
 
 /**
@@ -255,6 +271,11 @@ export async function addSeasonXp(
 
   const progress = await getOrCreateProgress(input.userId, season.id, db);
   const firstOfDayMode = await isFirstOfDayMode(input.userId, input.mode, db);
+  // IMPROVE (2026-10-06): the daily goals this session completed — derived from the day's rows, this one included, so a
+  // goal is credited on exactly the run that takes it over its target, once (a retried run is refused by its ledger
+  // before it gets here). At most DAILY_GOAL_COUNT, the most a day holds.
+  const goals = await dailyGoals(db as unknown as GoalsDb, input.userId, new Date(), input.sessionId ?? null);
+  const questsDone = Math.min(DAILY_GOAL_COUNT, goals.completedNow.length);
 
   const core = new SeasonPassCore({
     tiers: season.tiers,
@@ -267,6 +288,7 @@ export async function addSeasonXp(
     score: input.score,
     won: input.won,
     firstOfDayMode,
+    questsDone,
   });
   const res = core.addXp(gained);
 
@@ -283,6 +305,7 @@ export async function addSeasonXp(
     need: res.need,
     hasPro: progress.hasPro,
     events: res.events,
+    goals,
   };
   if (!opts.deferTierRewards) await bookSeasonTierUps(input.userId, input.mode, out);
   return out;
@@ -322,6 +345,13 @@ export async function getPassState(userId: string) {
     where: { userId, seasonId: season.id },
     orderBy: { tier: 'asc' },
   });
+  // IMPROVE (2026-10-06): today's daily goals beside the track (a read for display: a failure shows no goals, never a 500)
+  let goals: DailyGoals | null = null;
+  try {
+    goals = await dailyGoals(prisma as unknown as GoalsDb, userId);
+  } catch (e) {
+    console.warn('[season] daily goals read failed:', (e as Error)?.message ?? e);
+  }
   return {
     season: toPublic(season),
     tier: core.state.tier,
@@ -333,6 +363,7 @@ export async function getPassState(userId: string) {
     grants: grants.map((g) => ({ tier: g.tier, lane: g.lane, reward: g.reward })),
     claimed: { free: core.state.claimed.free, pro: core.state.claimed.pro },
     claimable: { free: core.claimable('free'), pro: core.claimable('pro') },
+    goals,
   };
 }
 

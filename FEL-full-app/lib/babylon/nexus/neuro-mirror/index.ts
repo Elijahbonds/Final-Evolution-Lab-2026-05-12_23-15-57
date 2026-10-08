@@ -21,19 +21,21 @@ export type { MirrorRuntime, MirrorMountOpts, SessionSummary, PatternConfig, Zon
 export { PATTERN_ZONES, ZONE_LABEL } from './patterns/split-stance-press-row';
 export { ZONE_STATE_COLOR, ZONE_STATE_LABEL, type ZoneState } from './rules/config';
 
-// ── EDUCATION-PILLAR-HOOK ────────────────────────────────────────────────────
-// Content-integration seam. In a later milestone this will resolve a lessonId
-// (book chapter / QR code) to the matching pattern config. For v1 it is
-// hardcoded to return the split-stance press/row config — the only supported
-// pattern — and does NOT fabricate configs for any other lesson.
-export async function loadLessonConfig(lessonId: string): Promise<PatternConfig> {
-  // EDUCATION-PILLAR-HOOK: swap this stub for a real lesson→pattern resolver.
-  if (lessonId && lessonId !== SPLIT_STANCE_PRESS_ROW.id) {
-    console.warn(
-      `[FEL-MIRROR] loadLessonConfig("${lessonId}") — v1 supports only `
-      + `"${SPLIT_STANCE_PRESS_ROW.id}"; returning that pattern.`);
-  }
-  return SPLIT_STANCE_PRESS_ROW;
+// ── Lessons → the Mirror ─────────────────────────────────────────────────────
+// EDU-LINKS (2026-10-07), Mirror & coaching plan Phase 5: the EDUCATION-PILLAR-HOOK stub that lived here is replaced by
+// the real lesson→movement map, lib/education/lessonMovement.ts (pure data: which Playbook lessons teach which Mirror
+// movement). A lesson id is course.ts lessonId, `<chapter>:<lessonKey>` (e.g. "8:the-hip-hinge").
+//
+// loadLessonConfig answers the OVERLAY config — the zone-highlight pattern this module renders. Only one exists, the
+// split-stance press/row, and no Playbook lesson teaches it, so a lesson resolves to null: the Mirror opens on the
+// lesson's movement tab instead (`/play/mirror?pattern=<movement>`, cameraHref). It never fabricates a config: the
+// press/row's own id still resolves to its config, and anything else is null rather than the press/row in disguise.
+import { movementForLesson, lessonsForMovement, cameraHref } from '@/lib/education/lessonMovement';
+export { movementForLesson, lessonsForMovement, cameraHref };
+export type { MirrorMovementId } from '@/lib/education/lessonMovement';
+
+export async function loadLessonConfig(lessonId: string): Promise<PatternConfig | null> {
+  return lessonId === SPLIT_STANCE_PRESS_ROW.id ? SPLIT_STANCE_PRESS_ROW : null;
 }
 
 /**
@@ -42,19 +44,21 @@ export async function loadLessonConfig(lessonId: string): Promise<PatternConfig>
  */
 export const NeuroMirror = {
   loadLessonConfig,
+  /** The Mirror movement a Playbook lesson teaches, or null (lib/education/lessonMovement.ts). */
+  movementForLesson,
+  /** The Playbook lessons that teach a movement, for "learn this" links out of a session. */
+  lessonsForMovement,
 
   /** Start a coaching session over a live camera <video> + overlay canvas. */
   async session(opts: MirrorMountOpts): Promise<MirrorRuntime> {
     return mountMirrorOverlay(opts);
   },
 
-  // ── EDUCATION-PILLAR-HOOK ──────────────────────────────────────────────────
-  // Returns the REAL per-session stats (time-in-stable per zone + fault counts)
-  // so a later milestone can feed progression gating (Level 1→2→3) and aggregate
-  // genuine usage statistics. Never returns fabricated numbers — it forwards
-  // exactly what the runtime accumulated.
+  // The REAL per-session stats (time-in-stable per zone + fault counts), exactly what the runtime accumulated — never
+  // a fabricated number. Consumed: mirror-harness.tsx endZoneSession shows it and saves it (adults who opted in,
+  // /api/mirror/sessions). EDU-LINKS (2026-10-07): the EDUCATION-PILLAR-HOOK note that sat here is resolved — the
+  // lessons for a session's movement are lessonsForMovement (above), not a field on the summary.
   sessionSummary(runtime: MirrorRuntime): SessionSummary {
-    // EDUCATION-PILLAR-HOOK: wire this into progression/aggregation later.
     return runtime.summary();
   },
 };

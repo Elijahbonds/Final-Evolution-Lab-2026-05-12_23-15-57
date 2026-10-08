@@ -38,7 +38,7 @@ function emptyTracks(): TrackState[] {
 type Mode = 'build' | 'perform';
 const EXPIRE_S = 0.25;
 
-export default function MusicMode({ onPublish }: { onPublish: (payload: MusicPublishPayload) => void }) {
+export default function MusicMode({ onPublish, submitLabel = 'Publish as Creator Card' }: { onPublish: (payload: MusicPublishPayload) => void; submitLabel?: string }) {
   const engineRef = useRef<AudioEngine | null>(null);
   const modeRef = useRef<Mode>('build');                // closure-safe mode
   const expectedRef = useRef<{ step: number; time: number }[]>([]);
@@ -205,7 +205,7 @@ export default function MusicMode({ onPublish }: { onPublish: (payload: MusicPub
 
       <button onClick={publish} disabled={busy}
         className="mt-6 w-full rounded-lg bg-amber-400 py-3 font-bold text-black disabled:opacity-40">
-        {busy ? 'Rendering stems…' : 'Publish as Creator Card'}
+        {busy ? 'Rendering stems…' : submitLabel}
       </button>
     </div>
   );

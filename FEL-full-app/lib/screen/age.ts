@@ -7,9 +7,11 @@
 //     keeps nothing but the age answer (lib/screen/store.ts). 18 or older goes straight on.
 //   · LINKS OUT OF THE SCREEN are for 18 or older only (SCREEN-FIX-2: 13–17 lose them, S-10). A kid gets no link to a
 //     sign-in, an account, a sign-up, an email box or the free game.
-//   · THE ANSWER IS LOCKED FOR THE TAB. It is written once to this tab's sessionStorage (lib/screen/store.ts lockAge)
-//     and read back from then on: the age question does not show again in this tab, and a second answer cannot change
-//     it. "Done, clear my results" keeps it, so clearing is not a way to answer again; closing the tab ends it.
+//   · THE ANSWER IS LOCKED FOR THE RUN. It is written once to this tab's sessionStorage (lib/screen/store.ts lockAge)
+//     and read back for the rest of the run: the question is not asked twice within a run, and a second answer can only
+//     tighten it, never loosen it (strictestAge). A NEW RUN ASKS AGAIN (AGE-RESET, audit 2.2): every new Start and every
+//     new Film dunk session resets the answer first, so the next person on a shared phone answers for themselves.
+//     "Done, clear my results" keeps it, so clearing is not a way to answer again; closing the tab ends it.
 //
 // Pure.
 

@@ -1,15 +1,15 @@
 // Squad gate 2 (SCREEN-SHIP): a steady skeleton (One Euro), low-confidence joints hidden, tracking loss, the rep dots;
-// and the runner's beats: framing → 3 → 2 → 1 → running → done, loss → "Step back into the light" → resume.
+// and the runner's beats: framing → 3 → 2 → 1 → running → done, loss → the cause's own fix line (SCREEN A) → resume.
 import { describe, expect, it } from 'vitest';
 import type { Lm, PoseFrame } from '@/lib/pose/landmarks';
 import { PoseFilter } from '@/lib/pose/oneEuro';
 import { AssessRunner, type RunnerView } from '@/lib/assess/runner';
 import { ohsFront, ohsSide, standFront, standSide } from '@/lib/assess/replay';
 import {
-  KEY_JOINTS, LOSS_FRAMES, MIN_CONFIDENT_JOINTS, MOVEMENT_PLAY_EURO, SKELETON_EURO, SKELETON_MIN_VISIBILITY, SYSTEM_FONT_STACK,
-  confidentJoints, jointVisible, repDots, trackingLost,
+  KEY_JOINTS, LOSS_FRAMES, MIN_CONFIDENT_JOINTS, MOVEMENT_PLAY_EURO, PART_RESTART_MAX, SKELETON_EURO, SKELETON_MIN_VISIBILITY,
+  SYSTEM_FONT_STACK, confidentJoints, jointVisible, repDots, trackingLost,
 } from './ui';
-import { TRACKING_LOSS_PROMPT } from './copy';
+import { FRAMING_FIX_LINES } from './copy';
 
 const frame = (x: number, t: number, v = 0.99): PoseFrame => ({ t, present: true, image: Array.from({ length: 33 }, () => ({ x, y: 0.5, z: 0, v })) });
 const sd = (a: number[]) => { const m = a.reduce((p, q) => p + q, 0) / a.length; return Math.sqrt(a.reduce((p, q) => p + (q - m) ** 2, 0) / a.length); };
@@ -84,6 +84,12 @@ describe('the rep dots (A2-2)', () => {
   });
 });
 
+describe('SCREEN A: the restart cap', () => {
+  it('PART_RESTART_MAX is the one auto-retry plus one more, and grades nothing', () => {
+    expect(PART_RESTART_MAX).toBe(2);
+  });
+});
+
 describe('the system font (gate 1)', () => {
   it('is the system stack, never Courier or the display chain', () => {
     expect(SYSTEM_FONT_STACK).toBe("-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif");
@@ -129,20 +135,22 @@ describe('the runner\'s beats (gate 2)', () => {
     expect(run.steps[0]).toBe('framing');
     expect(run.steps).toContain('calibrate');
     expect(run.steps).not.toContain('pain');
-    expect(run.steps.slice(i, i + 5)).toEqual(['position', 'countdown3', 'countdown2', 'countdown1', 'active']);
+    expect(run.steps.slice(i, i + 6)).toEqual(['position', 'countdownnull', 'countdown3', 'countdown2', 'countdown1', 'active']);
     expect(run.steps).toContain('partDone');
     // the third counted rep ends the part on its own frame: the count is said with the done line
     expect(run.counts).toEqual([0, 1, 2]);
     expect(run.said).toContain('Three. Done.');
   });
 
-  it('tracking lost: after a few frames the check pauses with "Step back into the light", then resumes where it was', () => {
+  it('tracking lost: after a few frames the check pauses with the cause\'s own fix line, then resumes where it was', () => {
     const run = drive({ lossAt: 40, lossFrames: LOSS_FRAMES + 4 });
     const k = run.steps.indexOf('paused');
     expect(k).toBeGreaterThan(0);
     expect(run.steps[k - 1]).toBe('active');
     expect(run.steps[k + 1]).toBe('active');
-    expect(run.said).toContain(`${TRACKING_LOSS_PROMPT}.`);
+    // CHANGED (SCREEN A req. 7): an empty shot says its own short line; TRACKING_LOSS_PROMPT is kept for tracking
+    // loss with NO framing cause (runner-voice.test.ts drives that case)
+    expect(run.said).toContain(FRAMING_FIX_LINES.noBody);
     expect(run.counts[run.counts.length - 1]).toBe(2);
     expect(run.said).toContain('Three. Done.');           // it resumed and finished the part
   });

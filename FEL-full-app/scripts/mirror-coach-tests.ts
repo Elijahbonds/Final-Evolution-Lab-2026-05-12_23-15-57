@@ -162,14 +162,24 @@ function runSquat(audit: SquatAudit, fault: SquatPose, t0 = 700): SquatFault[] {
   ok(h.includes('cueEngineRef.current.decide('), 'measured faults feed the cue engine');
   ok(h.includes('speak(evt.text)'), 'cues are voiced (on-device speechSynthesis)');
   ok(/breathe first/i.test(h), 'the session breathes before it moves (the Blueprint)');
-  ok(h.includes('fel-breath'), 'the pacer animates the breath cadence');
+  // MIRROR-COACH P7 (2026-09-29): the check used to be h.includes('fel-breath') — the CSS loop the stage drew. The stage
+  // now draws the ONE pacer (components/breath/Pacer.tsx) with the squat's own spec on the stage's pose clock, so the
+  // check names both halves: the shared component, fed SQUAT_BREATH_PACER at breathElapsedSec. Not relaxed: the old
+  // string would still pass on a page that drew a ring on no clock at all; this one fails if either half goes.
+  // MIRROR-FIRST P1 (2026-10-07), test changed: the pacer's seconds moved from a setState per pose frame into the harness's
+  // frame view (painted at HUD_HZ, use-mirror-camera.ts useFrameView), so the write reads `hud.set({ breathSec: … })`. The
+  // check still fails if the seconds stop coming from breathElapsedSec on the stage's pose clock, or the pacer stops
+  // reading them.
+  ok(/<BreathPacer[^>]*spec=\{SQUAT_BREATH_PACER\}[^>]*elapsedSec=\{breathSec\}/.test(h) && h.includes('hud.set({ breathSec: breathElapsedSec(step.state, now) })'),
+    'the pacer animates the breath cadence (the one pacer, on the stage\'s pose clock)');
   // The negative checks read the CODE, not the comments that explain what was removed.
   const code = h.replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
   // MIRROR-COACH P1 (2026-09-25): there is no band, and an unverified knee read is never painted as a correction
   ok(!/MY BAND|band pulls/i.test(code), 'no overlay claims a band');
   // MIRROR-COACH P4 review (2026-09-25): a 4th argument (squat.valgusBySide) now rides along, so the overlay can paint
   // only the side actually caving (kneeOverlay.ts's own `sides` filter) instead of both knees for a one-sided cave.
-  ok(h.includes('paintSkeleton(pose, p, paintableFaults(was, cueableFaults(squat.faults)), squat.valgusBySide)'), 'the knee overlay only paints a CUEABLE knee fault, on the side actually caving');
+  // (MIRROR-COACH P9 fix, 2026-09-30: the painter also takes the voice's fade — CueEngine.isVoiceable)
+  ok(h.includes('paintSkeleton(pose, p, paintableFaults(was, cueableFaults(squat.faults), (f) => cueEngineRef.current.isVoiceable(f as FaultId)), squat.valgusBySide)'), 'the knee overlay only paints a CUEABLE knee fault, on the side actually caving — and only on a rep the fade lets it be cued');
   ok(/VALGUS_CUE_VERIFIED && faults\.includes\('kneeValgus'\)/.test(h), 'the knee overlay is behind VALGUS_CUE_VERIFIED');
   // MIRROR-COACH P1 review (2026-09-25): "Recording" on a live camera page reads as the video being recorded, and
   // nothing is — the row says the knee is MEASURED, and no knee copy the athlete sees says "record".

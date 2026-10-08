@@ -21,6 +21,17 @@ export const PAIN_QUESTION = 'Does anything hurt right now?';
 export const PAIN_STOP = 'Talk to a coach or a medical pro before training through pain.';
 
 /**
+ * The take-off foot tap (SCREEN A): asked once, after the pain answer and before the camera card, by tap. "Not sure"
+ * answers null, and the sided results are then read with no jumping leg. An under-18 answer lives in page memory only.
+ */
+export const TAKEOFF_QUESTION = 'Which foot do you take off from when you jump?';
+export const TAKEOFF_OPTIONS = [
+  { side: 'left', label: 'Left' },
+  { side: 'right', label: 'Right' },
+  { side: null, label: 'Not sure' },
+] as const;
+
+/**
  * The age question: the first thing asked, before any network or storage. Four answers in age order, none pre-picked,
  * none styled as the expected one, and no hint about which one lets you in (lib/screen/age.ts says what each allows).
  */
@@ -62,6 +73,20 @@ export const SCREEN_TEST_NAMES = {
   T5: 'Hands-on-hips jump',
 } as const;
 
+/** The two ways in, on /screen and the assess start card. The jump is first. */
+export const JUMP_ONLY_BUTTON = 'Just test my jump (about 1 min)';
+export const FULL_SCREEN_BUTTON = 'Full movement screen (about 5 min)';
+/** After a jump-only result: continue this run through T1–T3 and keep the jump. */
+export const JUMP_DO_FULL = 'Do the full screen';
+/** Adults only. Same-origin lane page. Not the removed results constant. */
+export const JUMP_BUILD_PROGRAM = 'Build my Dunk Program';
+/** Adults only. Same-origin free play. The screen itself stays signed-out. */
+export const JUMP_PLAY_FREE = 'Play free (Brain Brawl)';
+/** Adults only. Height has no band in the register: this is the existing personal-best sentence. */
+export const JUMP_MEANING = 'A personal best to beat next time.';
+/** Shown while the pose model and its runtime load, which starts only after Start. */
+export const COACH_READY = 'Getting the camera coach ready…';
+
 /**
  * Under the list: the checks still to come. It used to be built from the engine's NOT_BUILT_LINE, which rendered as
  * "More checks: full screen: coming later." (the double colon, S-7).
@@ -100,8 +125,8 @@ export const RUN_IT_AGAIN = 'Run it again';
 
 /** Under 13, or "rather not say": in place of every link out of the screen (Cyber 3). */
 export const PARENT_TITLE = 'Have a parent open this';
-export const PARENT_BODY = 'The Dunk Program and the free game are for a parent or guardian to open with you. Show them '
-  + 'these results, or take a screenshot to show them later.';
+export const PARENT_BODY = 'Ask a parent or guardian to review these results with you. Show them this screen, or take a '
+  + 'screenshot to share later.';
 
 /** A4-4: only after a real, completed screen where every graded check is green. */
 export const WIN_LINE = 'Clean screen. You\'re ready for Dunking & Plyometrics.';
@@ -112,10 +137,41 @@ export const NOT_SAVED_BODY = 'Results live only in this tab, and only until you
 export const RUN_AGAIN = 'Run the screen again';
 export const BACK_TO_RESULTS = 'Back to my results';
 export const PROGRAM_COMING = 'Dunk Program coming soon';
-export const DEMO_COMING = 'Demo coming (20–30 s)';
+/** EDU-LINKS (2026-10-07), owner decision "drill demos: reuse the 3D ExerciseDemo": the slot that said "Demo coming (20–30 s)"
+ *  opens the 3D demo (app/play/mirror/assess/_components/drill-demo.tsx). */
+export const DEMO_WATCH = 'Watch the demo';
+export const DEMO_NOTE = 'A 3D demo to move along with. The cue above is the drill.';
 
-/** Squad gate 2: tracking lost. */
+/** Squad gate 2: tracking lost with no framing cause (the model cannot read the body, though the shot looks fine). */
 export const TRACKING_LOSS_PROMPT = 'Step back into the light';
+
+/**
+ * SCREEN A: one short spoken fix per framing cause, said instead of the tracking-loss prompt while the camera can see
+ * WHY the shot is wrong (lib/mirror/framing.ts names the cause; a 'turned' athlete hears the runner's existing facing
+ * cue instead, so a side station can name the side). Kept short: these are spoken from across the room, mid-run.
+ */
+export const FRAMING_FIX_LINES = {
+  tooClose: 'Step back.',
+  tooFar: 'Come closer.',
+  cutOffBottom: 'Feet in the shot.',
+  cutOffTop: 'Head in the shot.',
+  offCentre: 'Move to the middle.',
+  noBody: 'Step into the shot.',
+  dim: 'More light please. Face a window.',
+} as const;
+
+/** After each test (SCREEN A): asked by voice, answered with one big tap; it waits — no timeout, no default. */
+export const PAIN_CHECK_LINE = 'Any pain in that one? Tap yes or no when you walk back.';
+
+/** The first counted rep of a run (SCREEN A): what the beep means. Said once per run. */
+export const BEEP_MEANS_COUNTED = 'Beep means it counted.';
+
+/** A part that has already restarted itself the allowed number of times (SCREEN A): it waits, silent, for the athlete. */
+export const RESTART_WAIT_LINE = "Take your time. Walk back into the shot when you're ready.";
+
+/** The calibration stand-stills, said with the reason (SCREEN A); the hold timings are unchanged. */
+export const CALIBRATE_FRONT_LINE = 'Stand still, arms down, while I measure you. Three, two, one.';
+export const CALIBRATE_SIDE_LINE = 'Stay still, side-on, while I measure you. Two, one.';
 
 /** A screen with no program pick yet (a check not finished, no flag to start from). */
 export const NO_PICK_LINE = 'Finish every check to get your program pick.';

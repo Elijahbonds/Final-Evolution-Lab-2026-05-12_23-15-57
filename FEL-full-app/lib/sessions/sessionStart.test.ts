@@ -101,6 +101,7 @@ describe('POST /api/sessions/start', () => {
   });
 
   it('a test account (User.role, or the FEL_TEST_ACCOUNTS allowlist by id or email) is a TEST_ACCOUNT run', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
     h.user = { id: 'u1', email: 'qa@example.test', role: 'qa' };
     expect((await start({ mode: 'dunkContest' })).body).toMatchObject({ payoutEligible: false, reason: 'TEST_ACCOUNT' });
     h.user = { id: 'u1', email: 'QA.Bot@Example.test', role: 'player' };
@@ -129,7 +130,9 @@ describe('decideRunEligibility (pure)', () => {
     const all = { url: 'http://x/api/sessions/start?agent=1&playtest=1', headers: headers(), body: { playtest: true }, user: { ...user, role: 'test' } };
     expect(decideRunEligibility(all)).toEqual({ payoutEligible: false, reason: 'AGENT' });
     expect(decideRunEligibility({ ...all, url: 'http://x/api/sessions/start?playtest=1' })).toEqual({ payoutEligible: false, reason: 'PLAYTEST' });
+    vi.stubEnv('NODE_ENV', 'production');
     expect(decideRunEligibility({ ...all, url: 'http://x/api/sessions/start', body: {} })).toEqual({ payoutEligible: false, reason: 'TEST_ACCOUNT' });
+    vi.stubEnv('NODE_ENV', 'test');
     expect(decideRunEligibility({ url: 'http://x/api/sessions/start', headers: headers(), body: {}, user })).toEqual({ payoutEligible: true, reason: null });
   });
 
@@ -138,8 +141,10 @@ describe('decideRunEligibility (pure)', () => {
       .toEqual({ payoutEligible: true, reason: null });
   });
 
-  it('the test roles, case-insensitive; an empty allowlist lists nobody', () => {
-    for (const role of TEST_ROLES) expect(isTestAccount({ id: 'u', role: role.toUpperCase() }, {}), role).toBe(true);
+  it('the test roles, case-insensitive; an empty allowlist lists nobody on local', () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    for (const role of TEST_ROLES) expect(isTestAccount({ id: 'u', role: role.toUpperCase() }), role).toBe(true);
+    vi.stubEnv('NODE_ENV', 'test');
     expect(isTestAccount({ id: 'u', role: 'player' }, { FEL_TEST_ACCOUNTS: '' })).toBe(false);
     expect(isTestAccount({ id: 'u', role: 'coach' }, { FEL_TEST_ACCOUNTS: ' , ' })).toBe(false);
     expect(isTestAccount(null, { FEL_TEST_ACCOUNTS: 'u' })).toBe(false);

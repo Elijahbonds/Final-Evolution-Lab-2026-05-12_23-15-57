@@ -193,18 +193,19 @@ describe('the couch wiring stays mounted (source scan)', () => {
     expect(dunk).toMatch(/<PadChips bus=\{bus\}/);
     expect(read('components/controller-link/host-lobby.tsx')).toMatch(/z-\[45\]/);   // the splash is z-40: READY is when a phone pairs
   });
-  it('production publishes the input seam on __FEL_DEV__ (the full dev handle stays development-only)', () => {
+  it('production publishes __FEL_DEV__ only behind the server-marked agent-run gate (ECONOMY-CAPS k)', () => {
     const h = read('lib/babylon/core/ModeHarness.ts');
-    // SHARED-ANIM-BUS (2026-09-14) adds the body readout beside the input seam
-    expect(h).toMatch(/const probeHandle = process\.env\.NODE_ENV === 'development' \? devHandle : \{ modeId: def\.modeId, input, anim: animProbe \};/);
-    expect(h).toMatch(/\n  devWindow\.__FEL_DEV__ = probeHandle;/);
+    expect(h).toMatch(/devOrAgentHooks\(\)/);
+    expect(h).toMatch(/if \(probeHandle\) devWindow\.__FEL_DEV__ = probeHandle;/);
+    expect(h).toMatch(/else delete devWindow\.__FEL_DEV__;/);
     expect(h).toMatch(/if \(devWindow\.__FEL_DEV__ === probeHandle\) delete devWindow\.__FEL_DEV__;/);
   });
   it('TV MODE is on the host lobby and the dunk reads it at takeoff through one window helper', () => {
     expect(read('components/controller-link/host-lobby.tsx')).toMatch(/data-testid="tv-mode-toggle"/);
     const mode = read('lib/babylon/modes/DunkMode.ts');
     expect(mode.match(/CFG\.qteWindowSec/g)).toHaveLength(1);   // only inside slamWindowBase()
-    expect(mode).toMatch(/function slamWindowBase\(\): number \{ return CFG\.qteWindowSec \* tvFactor; \}/);
+    // IMPROVE (2026-10-06): the guest's-first-jumps factor rides the same helper (owner-picked; 1 from the third jump on)
+    expect(mode).toMatch(/function slamWindowBase\(\): number \{ return CFG\.qteWindowSec \* tvFactor \* guestFactor; \}/);
     expect(mode).toMatch(/setPhase\('cinematic'\); setWin\('takeoff'\);\n\s*\{ const f = readDisplaySetting\(\)\.factor;/);
   });
 });

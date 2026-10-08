@@ -7,8 +7,8 @@
 //   dressBall(ball, kind)        a textured ball mesh rides the mode's physics sphere (the sphere goes invisible)
 //   dressBoard(board, kind)      a textured deck rides the board sport's box (the box goes invisible)
 // Every load is cached per scene as an AssetContainer; a failed load leaves the procedural look in place and warns once.
-import { AssetContainer, SceneLoader, TransformNode } from '@babylonjs/core';
-import type { AbstractMesh, Scene } from '@babylonjs/core';
+import { AssetContainer, Matrix, Mesh, Quaternion, SceneLoader, TransformNode, Vector3 } from '@babylonjs/core';
+import type { AbstractMesh, Material, Scene } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
 
 export type MeshyPropKey = 'hoop' | 'ball-basketball' | 'ball-soccer' | 'ball-tennis' | 'skateboard' | 'snowboard' | 'surfboard' | 'hoopbus' | 'shuttle' | 'goal' | 'stadium' | 'ballpark' | 'sedan' | 'dojo' | 'store' | 'helmet' | 'helmet2' | 'bat' | 'glove';
@@ -101,6 +101,21 @@ export async function dressBall(ball: AbstractMesh, kind: BallKind | null): Prom
   if (!key) return false;
   const root = await spawnMeshyProp(ball.getScene(), key, ball, `meshy_${key}`);
   if (!root || ball.isDisposed()) { root?.dispose(); return false; }
+  tintBallSkin(root, ball);
+  // the baked ball is real diameter; the sphere's own diameter may differ by mode — match it
+  root.scaling.setAll(skinScale(ball, kind));
+  ball.visibility = 0;
+  return true;
+}
+
+/** The baked ball's scale for a mode's physics sphere (the baked mesh is real diameter; the sphere's may differ by mode). */
+function skinScale(ball: AbstractMesh, kind: BallKind): number {
+  const d = ball.getBoundingInfo().boundingBox.extendSizeWorld.x * 2 / (ball.scaling.x || 1);
+  const baked = { basketball: 0.24, soccer: 0.22, tennis: 0.067, volleyball: 0.21 }[kind];
+  return d > 0 ? d / baked : 1;
+}
+
+function tintBallSkin(root: TransformNode, ball: AbstractMesh): void {
   // THE PLAYER'S BALL. Picked on the boot splash beside the court (ballSkins.ts) and applied here, by
   // re-tinting the baked mesh rather than fetching another one — so every skin is free at runtime and
   // nothing on that screen can 404. A cosmetic must never be the thing that breaks a mode, so the whole
@@ -121,12 +136,78 @@ export async function dressBall(ball: AbstractMesh, kind: BallKind | null): Prom
       console.info(`[FEL-BALL] skin ${skin.id}`);
     }
   } catch (e) { console.warn('[FEL-BALL] skin not applied', (e as Error)?.message ?? e); }
-  // the baked ball is real diameter; the sphere's own diameter may differ by mode — match it
-  const d = ball.getBoundingInfo().boundingBox.extendSizeWorld.x * 2 / (ball.scaling.x || 1);
-  const baked = { basketball: 0.24, soccer: 0.22, tennis: 0.067, volleyball: 0.21 }[kind];
-  root.scaling.setAll(d > 0 ? d / baked : 1);
-  ball.visibility = 0;
-  return true;
+}
+
+/**
+ * IMPROVE (2026-10-06, 3PT #11): MANY STILL BALLS, A FEW DRAW CALLS. dressBall clones the scan per ball (`doNotInstantiate`), so
+ * the shootout's 25 rack balls were 25 draw calls (a gold one swapped in on every fifth). Here the scan is loaded once as a
+ * hidden TEMPLATE and every ball wears INSTANCES of it — one source mesh per look (`lookOf(i, base)`: the material ball i wears
+ * for a template mesh whose own material is `base`, e.g. a money-ball gold), so the draw calls are one per look per template
+ * mesh. The skin is a child of each sphere (it rides a pick like dressBall's) and the sphere goes invisible. Resolves null when
+ * the scan did not load (the spheres keep their look). An instance cannot change its material, so `restyle()` rebuilds every
+ * ball's instances from `lookOf` as it reads now.
+ */
+export interface InstancedBallSkin { readonly count: number; restyle(): void; dispose(): void }
+export async function dressBallsInstanced(balls: readonly AbstractMesh[], kind: BallKind, lookOf: (ballIdx: number, base: Material) => Material = (_i, b) => b): Promise<InstancedBallSkin | null> {
+  const key = BALL_KEY[kind];
+  if (!key || !balls.length) return null;
+  const scene = balls[0].getScene();
+  const root = await spawnMeshyProp(scene, key, null, `meshy_${key}_template`);
+  if (!root || scene.isDisposed) { root?.dispose(); return null; }
+  tintBallSkin(root, balls[0]);
+  return instanceSkinOnto(root, balls, lookOf, (b) => skinScale(b, kind));
+}
+
+/** The instancing half of dressBallsInstanced, on any template (exported for the NullEngine test). The template's meshes become
+ *  hidden sources; it must stay alive as long as the instances (dispose() drops it with every instance). */
+export function instanceSkinOnto(template: TransformNode, balls: readonly AbstractMesh[], lookOf: (ballIdx: number, base: Material) => Material, scaleOf: (ball: AbstractMesh) => number): InstancedBallSkin {
+  template.computeWorldMatrix(true);
+  const inv = Matrix.Invert(template.getWorldMatrix());
+  const parts = template.getChildMeshes(false).filter((m): m is Mesh => m instanceof Mesh && m.getTotalVertices() > 0 && !!m.material);
+  const local = parts.map((m) => {
+    m.computeWorldMatrix(true);
+    const rel = m.getWorldMatrix().multiply(inv);
+    const t = { s: new Vector3(), q: new Quaternion(), p: new Vector3() };
+    rel.decompose(t.s, t.q, t.p);
+    m.isVisible = false; m.isPickable = false;   // a source: only its instances draw
+    return t;
+  });
+  /** One source per (template mesh, look): the template mesh itself for its own material, else a geometry-sharing clone. */
+  const sources = parts.map((m) => new Map<Material, Mesh>([[m.material as Material, m]]));
+  const sourceFor = (j: number, look: Material): Mesh => {
+    let src = sources[j].get(look);
+    if (!src) {
+      src = parts[j].clone(`${parts[j].name}_look${sources[j].size}`, parts[j].parent) as Mesh;
+      src.material = look; src.isVisible = false; src.isPickable = false;
+      sources[j].set(look, src);
+    }
+    return src;
+  };
+  const holders: (TransformNode | null)[] = balls.map(() => null);
+  const build = (): void => {
+    balls.forEach((ball, i) => {
+      holders[i]?.dispose();
+      holders[i] = null;
+      if (ball.isDisposed()) return;
+      const holder = new TransformNode(`${ball.name}_skin`, ball.getScene());
+      holder.parent = ball;
+      holder.scaling.setAll(scaleOf(ball));
+      parts.forEach((m, j) => {
+        const inst = sourceFor(j, lookOf(i, m.material as Material)).createInstance(`${ball.name}_skin_${j}`);
+        inst.parent = holder;
+        inst.position.copyFrom(local[j].p); inst.rotationQuaternion = local[j].q.clone(); inst.scaling.copyFrom(local[j].s);
+        inst.isPickable = false;
+      });
+      holders[i] = holder;
+      ball.visibility = 0;
+    });
+  };
+  build();
+  return {
+    count: balls.length,
+    restyle: build,
+    dispose(): void { for (const h of holders) h?.dispose(); holders.fill(null); template.dispose(); },
+  };
 }
 
 /** A textured deck rides the board box (length along z like the box, pivot at its underside). */

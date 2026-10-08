@@ -22,7 +22,7 @@
 //
 // Pure: frames and a clock in, a view out. The page renders the view, speaks `say`, and answers the prompts.
 import type { PoseFrame } from '@/lib/pose/landmarks';
-import { checkFraming, FramingGate, type FramingCheck } from '@/lib/mirror/framing';
+import { checkFraming, FramingGate, type FramingCheck, type FramingIssue } from '@/lib/mirror/framing';
 import { calibrateFront, calibrateSide, type Calibration } from './calibration';
 import {
   facingSign, fppa, heelHeight, hipDrop, kneeFlexion, kneeFlexionFront, kneeInsideRatio, lateralTrunkLean, nearSide, pelvicTilt,
@@ -34,14 +34,34 @@ import { RepCounter, RockCounter, type Rep } from './reps';
 import { mqs as mqsOf, type Mqs, type TestResult } from './scoring';
 import { bandOf, th } from './thresholds';
 import { countWord, facingCue, testDef, type AssessMode, type Side, type TestId } from './protocol';
-import { DONE_BEAT_MS, LOSS_FRAMES, trackingLost } from '@/lib/screen/ui';
-import { TRACKING_LOSS_PROMPT } from '@/lib/screen/copy';
+import { DONE_BEAT_MS, LOSS_FRAMES, PART_RESTART_MAX, trackingLost } from '@/lib/screen/ui';
+import {
+  BEEP_MEANS_COUNTED, CALIBRATE_FRONT_LINE, CALIBRATE_SIDE_LINE, FRAMING_FIX_LINES, PAIN_CHECK_LINE, RESTART_WAIT_LINE,
+  TRACKING_LOSS_PROMPT,
+} from '@/lib/screen/copy';
 import { gradeT1 } from './graders/t1-overhead-squat';
 import { gradeT2 } from './graders/t2-dorsiflexion';
 import { gradeT3 } from './graders/t3-single-leg-squat';
 import { detectFlights, gradeT5 } from './graders/t5-cmj';
+import { rejectionForPart, type Rejection } from './rejection';
+import { AUTO_ADVANCE_MS, type FlashKind } from '@/lib/screen/realtime-cues';
 import { PAIN_REFERRAL, reasonsFor, topFindings, type Reason } from './why';
 import { prqWritesFor, toRecord, type PrqWrite, type RecordDevice } from './prqWrite';
+
+const STILL_MS = 900;
+
+function moveOf(part: PartId | null, parts: readonly PartDef[]): { index: number; total: number; name: string; cue: string } | null {
+  if (!part) return null;
+  const test = parts.find((p) => p.id === part)?.test ?? null;
+  if (!test) return null;
+  const order: TestId[] = [];
+  for (const p of parts) if (!order.includes(p.test)) order.push(p.test);
+  const index = order.indexOf(test) + 1;
+  const def = testDef(test);
+  const cue = part === 'T1-side' ? 'Turn side-on, left to the camera' : part.includes('right') && part.startsWith('T2')
+    ? 'Right side to the camera' : part.includes('right') && part.startsWith('T3') ? 'Right leg' : def.setup.split('.')[0];
+  return { index, total: order.length, name: def.short, cue };
+}
 
 // ── the session result (the live flow and the replay grade the same way) ──
 
@@ -72,8 +92,12 @@ export interface SessionResult {
 
 const QUICK_ORDER: TestId[] = ['T1', 'T2', 'T3', 'T5'];
 
-/** Grade a whole Quick Screen from its captures. Deterministic: the same captures give an equal result. */
-export function gradeSession(cap: SessionCapture): SessionResult {
+/**
+ * Grade a whole Quick Screen from its captures. Deterministic: the same captures give an equal result.
+ * `prior` fills a test that has no capture (a jump already graded, carried into the rest of the screen).
+ * A capture always grades fresh. The prior object is kept as-is when it is used.
+ */
+export function gradeSession(cap: SessionCapture, prior?: Partial<Record<TestId, TestResult>>): SessionResult {
   const ctx = { calibration: cap.calibration, aspect: cap.calibration.aspect, ...(cap.poseHz ? { poseHz: cap.poseHz } : {}) };
   const tests: TestResult[] = [];
   let stopped = false;
@@ -84,6 +108,7 @@ export function gradeSession(cap: SessionCapture): SessionResult {
     else if (id === 'T2' && cap.T2) t = gradeT2(cap.T2, ctx);
     else if (id === 'T3' && cap.T3) t = gradeT3(cap.T3, ctx);
     else if (id === 'T5' && cap.T5) t = gradeT5(cap.T5, { ...ctx, poseHz: undefined, cameraFps: cap.cameraFps ?? null });
+    else if (prior?.[id]) t = prior[id]!;
     else t = skipped(id);
     if (cap.painAfter === id) { t = { ...t, status: 'painStop', score03: 0, frozen: [] }; stopped = true; }
     tests.push(t);
@@ -143,6 +168,11 @@ export const QUICK_PARTS: readonly PartDef[] = [
   { id: 'T5', test: 'T5', view: 'front', target: th('t5.reps'), maxAttempts: TRIES.T5, maxMs: LIMIT.T5, label: null, highFps: true, setup: `Jump. ${testDef('T5').setup}` },
 ];
 
+/** T5 only: the jump-only screen. */
+export const JUMP_PARTS: readonly PartDef[] = QUICK_PARTS.filter((p) => p.test === 'T5');
+/** T1–T3: the rest of the full screen after a jump that is already graded. */
+export const REST_PARTS: readonly PartDef[] = QUICK_PARTS.filter((p) => p.test !== 'T5');
+
 export type RunnerStep =
   | 'framing' | 'pain' | 'takeoff' | 'calibrate' | 'calibrateSide' | 'position' | 'countdown' | 'active' | 'paused'
   | 'partDone' | 'miniResult' | 'painCheck' | 'done' | 'stopped';
@@ -175,6 +205,20 @@ export interface RunnerView {
   result: SessionResult | null;
   /** Parts finished of all parts. */
   progress: { done: number; total: number };
+  /** Full-screen colour flash (SCREEN-REALTIME). */
+  flash: FlashKind | null;
+  /** Plain rejection line for the last rep that did not count. */
+  rejection: Rejection | null;
+  /** Move N of 4, readable from across the room. */
+  move: { index: number; total: number; name: string; cue: string } | null;
+  /** Framing held long enough to start the countdown. */
+  setupReady: boolean;
+  /** Dim light: a warning, not a hard stop. */
+  dimWarning: boolean;
+  /** Auto-retry message for this part (one retry per move). */
+  retryMessage: string | null;
+  /** Hands-free: no tap prompts in the runner. */
+  handsFree: boolean;
 }
 
 /**
@@ -223,12 +267,23 @@ interface PartState {
 }
 
 export interface RunnerOptions {
-  /** Known from the profile or an earlier session; else the flow asks. */
+  /**
+   * The take-off foot, tapped before the camera (SCREEN A). An omitted (undefined) option means the runner must ask;
+   * an explicit null is the "Not sure" answer already given — it is carried through as null, never re-asked, and
+   * never silently replaced (no default foot: SCREEN A requirement 2).
+   */
   takeoffLeg?: Side | null;
   /** The page already asked "Does anything hurt right now?" before the camera (SCREEN-SHIP): skip the first prompt. */
   painAsked?: boolean;
+  /**
+   * No tap prompts in the runner's own flow (SCREEN-REALTIME). SCREEN A: nothing is answered silently any more — the
+   * page taps the pre-camera answers in, and the after-test pain check waits for its big tap instead of auto-"no".
+   */
+  handsFree?: boolean;
   aspect: number;
   parts?: readonly PartDef[];
+  /** Tests already graded this run (the jump), used when this pass has no capture for them. */
+  priorTests?: Partial<Record<TestId, TestResult>>;
   cameraFps?: () => number | null;
 }
 
@@ -238,6 +293,20 @@ export class AssessRunner {
   private partIdx = 0;
   private part: PartState | null = null;
   private readonly gate = new FramingGate(1000);
+  private readonly stillGate = new FramingGate(STILL_MS, { counted: true });
+  private readonly handsFree: boolean;
+  private flash: FlashKind | null = null;
+  private flashAt = 0;
+  private rejection: Rejection | null = null;
+  private dimWarning = false;
+  private retryMessage: string | null = null;
+  private countdownReady = false;
+  /** SCREEN A: restarts per part, capped (PART_RESTART_MAX): the one auto-retry plus one more, then the part waits. */
+  private readonly restarts = new Map<PartId, number>();
+  private restartCapped = false;
+  /** SCREEN A: "Beep means it counted." is said once per run. */
+  private beepExplained = false;
+  private readonly rejectLog: { part: PartId; text: string; at: number }[] = [];
   private calib: Calibration;
   private calFrames: PoseFrame[] = [];
   private calWhy: string | null = null;
@@ -265,9 +334,14 @@ export class AssessRunner {
 
   constructor(private readonly o: RunnerOptions) {
     this.parts = o.parts ?? QUICK_PARTS;
-    this.takeoff = o.takeoffLeg ?? null;
+    this.handsFree = !!o.handsFree;
+    // SCREEN A: no silent default. `undefined` (not asked) parks on the 'takeoff' prompt; null ("Not sure") does not.
+    this.takeoff = o.takeoffLeg === undefined ? null : o.takeoffLeg;
     this.calib = { aspect: o.aspect, front: null, side: null };
   }
+
+  /** In-memory log of reps that did not count (never uploaded). */
+  get rejectionLog(): readonly { part: PartId; text: string; at: number }[] { return this.rejectLog; }
 
   get calibration(): Calibration { return this.calib; }
   get takeoffLeg(): Side | null { return this.takeoff; }
@@ -278,13 +352,23 @@ export class AssessRunner {
 
   // ── the prompts the page answers ──
 
-  /** "Any pain right now?" (before) or "Any pain in that one?" (after a test). */
+  /** "Any pain right now?" (before) or "Any pain in that one?" (after a test). A tap is the only way past either. */
   answerPain(pain: boolean, now: number): void {
     this.now = now;
     if (this.step !== 'pain' && this.step !== 'painCheck') return;
     if (pain) return this.stopForPain(now);
-    if (this.step === 'pain') return this.go(this.takeoff ? 'calibrate' : 'takeoff', now);
+    // SCREEN A: a takeoff answer the page already tapped in (null = "Not sure") skips straight to the calibration.
+    if (this.step === 'pain') return this.go(this.o.takeoffLeg !== undefined ? 'calibrate' : 'takeoff', now);
     this.nextPart(now);
+  }
+
+  /**
+   * SCREEN A: no silent answers. This used to auto-answer the takeoff prompt with 'left' and both pain prompts with
+   * "no"; now the prompts wait for the page's tap (the pre-camera takeoff tap is passed in as an option, so the
+   * runner never parks here with hands-free at all).
+   */
+  autoAdvance(now: number): void {
+    this.now = now;
   }
 
   answerTakeoff(side: Side, now: number): void {
@@ -306,6 +390,24 @@ export class AssessRunner {
   /** Queue a spoken line (see CueQueue). */
   private say(text: string, force = false): void { this.cues.push(text, this.now, force); }
 
+  /**
+   * SCREEN A: one short spoken fix per framing cause (lib/screen/copy.ts FRAMING_FIX_LINES). 'turned' keeps the
+   * existing facing cue, which names the side for a side-on station; null (a good shot) has no fix.
+   */
+  private fixLine(f: FramingCheck): string | null {
+    if (!f.worst) return null;
+    if (f.worst === 'turned') return facingCue(this.part?.def.view ?? 'front', this.part?.def.near);
+    return FRAMING_FIX_LINES[f.worst as Exclude<FramingIssue, 'turned'>];
+  }
+
+  /**
+   * What a pause says (SCREEN A): the framing cause's own short fix when the camera can see one — dim included, since
+   * this is said while the test is paused, never mid-rep — and TRACKING_LOSS_PROMPT only when it cannot.
+   */
+  private pauseLine(f: FramingCheck | null): string {
+    return (f ? this.fixLine(f) : null) ?? `${TRACKING_LOSS_PROMPT}.`;
+  }
+
   tick(frame: PoseFrame, now: number): RunnerView {
     this.now = now;
     const dt = this.lastT === null ? 0 : Math.max(0, frame.t - this.lastT);
@@ -319,12 +421,20 @@ export class AssessRunner {
 
     switch (this.step) {
       case 'framing': {
-        if (this.gate.ready(framing, frame.t)) { this.gate.reset(); this.go(this.o.painAsked ? (this.takeoff ? 'calibrate' : 'takeoff') : 'pain', now); }
-        else this.say(framing.worst ? framing.instruction : 'Hold that.');
+        if (this.gate.ready(framing, frame.t)) {
+          this.gate.reset();
+          this.pulse('start');
+          // SCREEN A: the pre-camera prompts are tapped on the page (painAsked, and takeoffLeg passed in — null
+          // included). handsFree no longer skips or answers either of them on its own.
+          const next = this.o.painAsked
+            ? (this.o.takeoffLeg !== undefined ? 'calibrate' : 'takeoff')
+            : 'pain';
+          this.go(next, now);
+        } else this.say(this.fixLine(framing) ?? 'Hold that.');
         break;
       }
       case 'calibrate': {
-        if (!framing.ok) { this.calFrames = []; this.say(framing.instruction); break; }
+        if (!framing.ok) { this.calFrames = []; this.say(this.fixLine(framing) ?? framing.instruction); break; }
         this.calFrames.push(frame);
         if (frame.t - this.calFrames[0].t >= th('calib.frontMs')) {
           const r = calibrateFront(this.calFrames, this.o.aspect);
@@ -335,7 +445,7 @@ export class AssessRunner {
         break;
       }
       case 'calibrateSide': {
-        if (!framing.ok) { this.calFrames = []; this.say(framing.worst === 'turned' ? facingCue('side', this.part!.def.near) : framing.instruction); break; }
+        if (!framing.ok) { this.calFrames = []; this.say(this.fixLine(framing) ?? framing.instruction); break; }
         this.calFrames.push(frame);
         if (frame.t - this.calFrames[0].t >= th('calib.sideMs')) {
           const r = calibrateSide(this.calFrames, this.o.aspect);
@@ -347,23 +457,31 @@ export class AssessRunner {
       }
       case 'position': {
         const d = this.part!.def;
+        this.stillGate.reset();
         // a side-on part needs its own side toward the lens (the tested shin is the near one)
         const wrongSide = d.view === 'side' && !!d.near && framing.ok && frame.image.length >= 33 && nearSide(frame.image) !== d.near;
         if (wrongSide) { this.gate.reset(); this.say(facingCue('side', d.near)); break; }
         if (this.gate.ready(framing, frame.t)) {
           this.gate.reset();
-          if (this.part!.def.calibrateSide && !this.calib.side) { this.calFrames = []; this.go('calibrateSide', now); this.say('Stand still for two seconds.', true); }
-          else this.go('countdown', now);
+          if (this.part!.def.calibrateSide && !this.calib.side) { this.calFrames = []; this.go('calibrateSide', now); }
+          else { this.stillGate.reset(); this.countdownReady = false; this.go('countdown', now); }
         } else if (!framing.ok) {
-          this.say(framing.worst === 'turned' ? facingCue(this.part!.def.view, this.part!.def.near) : framing.instruction);
+          this.say(this.fixLine(framing) ?? framing.instruction);
         }
         break;
       }
       case 'countdown': {
-        if (!this.activeOk(framing)) { this.go('position', now); break; }
+        if (!this.positionOk(framing)) { this.stillGate.reset(); this.countdownReady = false; this.go('position', now); break; }
+        if (!this.countdownReady) {
+          if (this.stillGate.step(framing.ok && !trackingLost(frame), frame.t) < 1) break;
+          this.countdownReady = true;
+          this.stepAt = now;
+          this.pulse('countdown');
+        }
         const left = th('ui.timing').countdownMs - (now - this.stepAt);
-        if (left <= 0) { this.go('active', now); this.say('Go.', true); }
-        else this.say(String(Math.ceil(left / 1000)), true);
+        const n = Math.ceil(left / 1000);
+        if (left <= 0) { this.go('active', now); this.pulse('start'); this.say('Go.', true); }
+        else { this.pulse('countdown'); this.say(String(n), true); }
         break;
       }
       case 'active':
@@ -374,11 +492,25 @@ export class AssessRunner {
         if (!this.activeOk(framing) || trackingLost(frame)) {
           this.badSince ??= now;
           this.lostFrames++;
-          if (this.step === 'active' && this.lostFrames >= LOSS_FRAMES) { this.step = 'paused'; this.say(`${TRACKING_LOSS_PROMPT}.`); }
+          // SCREEN A: the pause says the framing cause's own short fix (dim too — this is a pause, not mid-rep);
+          // TRACKING_LOSS_PROMPT is kept for tracking loss with no framing cause.
+          if (this.step === 'active' && this.lostFrames >= LOSS_FRAMES) { this.step = 'paused'; this.say(this.pauseLine(this.lastFraming)); }
           if (now - this.badSince >= th('gate.absenceRestartMs')) {
-            this.resetPart();
-            this.go('position', now);
-            this.say(`Starting that one again. ${p.def.setup}`, true);
+            const n = this.restarts.get(p.def.id) ?? 0;
+            if (n < PART_RESTART_MAX) {
+              // the one auto-retry, then at most one more restart (PART_RESTART_MAX): the runner used to re-speak the
+              // whole setup on every absence forever. The absence clock starts over with the new attempt.
+              this.restarts.set(p.def.id, n + 1);
+              this.retryMessage = 'Lost you for a moment — trying this move once more.';
+              this.resetPart();
+              this.pulse('retry');
+              this.say(this.retryMessage, true);
+            } else if (!this.restartCapped) {
+              // …after which it stops restarting: one forced line, then silence until framing returns
+              this.restartCapped = true;
+              this.resetPart();
+              this.say(RESTART_WAIT_LINE, true);
+            }
           }
           break;
         }
@@ -392,10 +524,12 @@ export class AssessRunner {
         break;
       }
       case 'partDone': {
-        if (now - this.stepAt >= DONE_BEAT_MS) { this.donePart = null; this.startPart(now); }
+        if (now - this.stepAt >= DONE_BEAT_MS) { this.donePart = null; this.retryMessage = null; this.startPart(now); }
         break;
       }
       case 'miniResult': {
+        // SCREEN A: after each TEST the pain check is asked by voice and waits for its big tap — never skipped,
+        // never auto-answered "no" (hands-free used to walk straight past it).
         if (now - this.stepAt >= th('ui.miniResultMs')) this.go('painCheck', now);
         break;
       }
@@ -405,18 +539,32 @@ export class AssessRunner {
     return this.view(now);
   }
 
-  /** Mid-test, only what stops a reading pauses it: no body, feet out of shot, the wrong way round, too dark. */
+  /** Mid-test: dim is a warning only (SCREEN-REALTIME). */
   private activeOk(f: FramingCheck): boolean {
-    return !f.issues.some((i) => i === 'noBody' || i === 'cutOffBottom' || i === 'turned' || i === 'dim');
+    this.dimWarning = f.issues.includes('dim');
+    return !f.issues.some((i) => i === 'noBody' || i === 'cutOffBottom' || i === 'turned');
+  }
+
+  /** Before countdown: same as active, but dim still allowed. */
+  private positionOk(f: FramingCheck): boolean {
+    this.dimWarning = f.issues.includes('dim');
+    return f.ok || f.issues.every((i) => i === 'dim');
+  }
+
+  private pulse(kind: FlashKind): void {
+    this.flash = kind;
+    this.flashAt = this.now;
   }
 
   private go(step: RunnerStep, now: number): void {
     this.step = step;
     this.stepAt = now;
+    if (step !== 'position') this.restartCapped = false;
     if (step === 'pain') this.say('Any pain right now? Tap yes or no.', true);
     if (step === 'takeoff') this.say('Which foot do you take off from? Tap left or right.', true);
-    if (step === 'calibrate') { this.calFrames = []; this.say('Stand still facing the camera, arms by your sides, for three seconds.', true); }
-    if (step === 'painCheck') this.say('Any pain in that one? Tap yes or no.', true);
+    if (step === 'calibrate') { this.calFrames = []; this.say(CALIBRATE_FRONT_LINE, true); }
+    if (step === 'calibrateSide') { this.calFrames = []; this.say(CALIBRATE_SIDE_LINE, true); }
+    if (step === 'painCheck') this.say(PAIN_CHECK_LINE, true);
   }
 
   private startPart(now: number): void {
@@ -430,8 +578,14 @@ export class AssessRunner {
         : null,
     };
     this.gate.reset();
+    this.restarts.delete(def.id);
+    this.restarts.delete(def.id);
+    this.badSince = null;
+    this.lostFrames = 0;
     this.go('position', now);
+    // SCREEN A: dim is said here, before the countdown — never mid-rep (activeOk keeps it a warning only).
     this.say(def.setup, true);
+    if (this.lastFraming?.issues.includes('dim')) this.say(FRAMING_FIX_LINES.dim, true);
   }
 
   private resetPart(): void {
@@ -443,6 +597,8 @@ export class AssessRunner {
     this.badSince = null;
     this.lostFrames = 0;
     this.gate.reset();
+    this.step = 'position';
+    this.stepAt = this.now;
   }
 
   /** One active frame: the live rep counter, and a mark for each rep as it ends. */
@@ -478,9 +634,18 @@ export class AssessRunner {
     this.lastMark = mark;
     this.lastRepAt = now;
     if (mark === 'notRead') {
-      this.say(p.def.test === 'T2' ? 'That one did not count: keep the heel down.' : 'That one did not count.');
+      const rej = rejectionForPart(p.def.id, 'notRead', rep);
+      this.rejection = rej;
+      this.rejectLog.push({ part: p.def.id, text: rej.text, at: now });
+      this.pulse('retry');
+      this.say(rej.text);
     } else {
-      this.say(NUMBERS[p.valid - 1] ?? String(p.valid));
+      this.rejection = null;
+      this.pulse('captured');
+      // SCREEN A: every count is heard — the count line is forced, so "Slower." or a rejection can never replace it;
+      // and the first counted rep of a run says once what the beep means.
+      this.say(NUMBERS[p.valid - 1] ?? String(p.valid), true);
+      if (!this.beepExplained) { this.beepExplained = true; this.say(BEEP_MEANS_COUNTED, true); }
       // allowed coaching (spec §8): tempo and depth, never the pattern
       if (rep.tEnd - rep.tStart < th('cue.slowerRepMs')) this.say('Slower.');
       else if (p.def.test === 'T3' && rep.peak < bandOf('t3.depth').fault!) this.say('A little deeper on the next one.');
@@ -550,7 +715,19 @@ export class AssessRunner {
       p.marks.push(mark);
       this.lastMark = mark;
       this.lastRepAt = now;
-      this.say(j.valid ? `${NUMBERS[p.valid - 1] ?? p.valid}. Stand still, then go again.` : `That one did not count: ${j.invalidWhy}.`);
+      if (!j.valid) {
+        const rej = rejectionForPart('T5', 'notRead', undefined, j.invalidWhy);
+        this.rejection = rej;
+        this.rejectLog.push({ part: 'T5', text: rej.text, at: now });
+        this.pulse('retry');
+        this.say(rej.text);
+      } else {
+        this.rejection = null;
+        this.pulse('captured');
+        // SCREEN A: the count is forced here too (see onRep), and the beep is explained once per run.
+        this.say(`${NUMBERS[p.valid - 1] ?? p.valid}. Stand still, then go again.`, true);
+        if (!this.beepExplained) { this.beepExplained = true; this.say(BEEP_MEANS_COUNTED, true); }
+      }
     }
     p.lastFlightCount = jumps.length;
   }
@@ -565,10 +742,10 @@ export class AssessRunner {
     else if (d.id === 'T5') this.captures.T5 = p.frames;
     const nextDef = this.parts[this.partIdx + 1];
     const testDone = !nextDef || nextDef.test !== d.test;
-    // the last count is said with the done line: "Three. Done." (a forced line would otherwise replace "Three")
+    // the last count is said with the done line: "Three. Done." — one forced line, so it is never displaced
     const lastCount = p.valid >= d.target && p.valid > 0 && d.test !== 'T5' ? `${NUMBERS[p.valid - 1] ?? p.valid}. ` : '';
     // the part is done: a "Done" beat (visual + voice), then the next part's setup
-    if (!testDone) { this.say(`${lastCount}Done.`, true); this.donePart = { test: d.test, part: d.id }; this.part = null; this.partIdx++; this.go('partDone', now); return; }
+    if (!testDone) { this.pulse('done'); this.say(`${lastCount}Done.`, true); this.donePart = { test: d.test, part: d.id }; this.part = null; this.partIdx++; this.go('partDone', now); return; }
     // the test is complete: grade it, show the mini-result, then ask about pain
     const ctx = { calibration: this.calib, aspect: this.o.aspect };
     const t = d.test === 'T1' ? gradeT1(this.captures.T1, ctx)
@@ -594,7 +771,7 @@ export class AssessRunner {
       T2: Object.keys(this.captures.T2).length ? this.captures.T2 : undefined,
       T3: Object.keys(this.captures.T3).length ? this.captures.T3 : undefined,
       T5: this.captures.T5 ?? undefined, painAfter: this.painAfter, takeoffLeg: this.takeoff, cameraFps: this.o.cameraFps?.() ?? null,
-    });
+    }, this.o.priorTests);
     this.step = this.result.pain ? 'stopped' : 'done';
     this.stepAt = now;
     this.say(this.result.pain ? PAIN_REFERRAL : 'That is the screen done. Your results are on the screen.', true);
@@ -628,7 +805,9 @@ export class AssessRunner {
     const def = p?.def ?? null;
     const say = this.cues.take(now);
     const { countdownMs, markMs } = th('ui.timing');
-    const countdown = this.step === 'countdown' ? Math.max(1, Math.ceil((countdownMs - (now - this.stepAt)) / 1000)) : null;
+    const flash = this.flash && now - this.flashAt < 420 ? this.flash : null;
+    const countdown = this.step === 'countdown' && this.countdownReady
+      ? Math.max(1, Math.ceil((countdownMs - (now - this.stepAt)) / 1000)) : null;
     const recent = now - this.lastRepAt < markMs && this.lastMark && this.lastMark !== 'notRead' ? this.lastMark : 'tracking';
     const calHold = (this.step === 'calibrate' || this.step === 'calibrateSide') && this.calFrames.length > 1
       ? Math.min(1, (this.calFrames[this.calFrames.length - 1].t - this.calFrames[0].t) / (this.step === 'calibrate' ? th('calib.frontMs') : th('calib.sideMs'))) : 0;
@@ -646,6 +825,13 @@ export class AssessRunner {
       done: this.step === 'partDone' ? this.donePart : null,
       result: this.result,
       progress: { done: this.partIdx, total: this.parts.length },
+      flash,
+      rejection: this.rejection,
+      move: moveOf(def?.id ?? this.donePart?.part ?? null, this.parts),
+      setupReady: (this.step === 'framing' || this.step === 'position') && !!this.lastFraming?.ok && !this.lastFraming?.issues.some((i) => i !== 'dim'),
+      dimWarning: this.dimWarning,
+      retryMessage: this.retryMessage,
+      handsFree: this.handsFree,
     };
   }
 
@@ -661,7 +847,7 @@ export class AssessRunner {
         ? (this.lastFraming.worst === 'turned' ? facingCue(def!.view, def!.near) : this.lastFraming.instruction) : def?.setup ?? '';
       case 'countdown': return 'Get ready.';
       case 'active': return def?.setup ?? '';
-      case 'paused': return `${TRACKING_LOSS_PROMPT}. ${this.lastFraming?.instruction ?? ''}`.trim();
+      case 'paused': return `${this.pauseLine(this.lastFraming)} ${this.lastFraming?.instruction ?? ''}`.trim();
       case 'partDone': return 'Done.';
       case 'miniResult': return this.mini?.text ?? '';
       case 'painCheck': return 'Any pain in that one?';

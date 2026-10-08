@@ -252,36 +252,44 @@ export function auditLunge(frames: AppPoseFrame[], ctx: MirrorPatternContext = {
 
 /** Cue text for the lunge's five checks — FEL's coaching voice (external-focus action cues, cue-engine.ts's own
  *  three-level shape), reused nowhere yet: never a muscle, a cause, or a risk/injury claim. */
+// MIRROR-COACH P9 (2026-09-30): reworded to FEL's external-focus policy (lib/coach/cueLint.ts, whose test lints this
+// table): a cue that names a body part leads with the floor, the wall, the ceiling, the camera or the load, and nothing
+// names a muscle to squeeze or feel. The fault each line answers, and its three levels, are unchanged.
 export const LUNGE_CUES: readonly CueRule[] = [
   {
     faultId: 'kneeIn',
-    cue: 'Knee out over your toes — press the floor apart with your front foot.',
-    escalate: 'Still drifting in. Slow the descent and drive the knee out the whole way down.',
+    cue: 'Press the floor apart with your front foot — knee out over your toes.',
+    escalate: 'Still drifting in. Slow the descent and keep pressing the floor apart, knee out the whole way down.',
     regress: 'Half range: lunge only as deep as the knee stays out, then build the depth back.',
+    reply: 'Front foot presses the floor apart.',
   },
   {
     faultId: 'hipDrop',
-    cue: 'Level hips — square the belt line to the mirror.',
-    escalate: 'Still tipping. Squeeze the back-leg glute to hold the hip up on the way down.',
+    cue: 'Square the belt line to the camera — hips level.',
+    escalate: 'Still tipping. Keep the belt line level all the way down, like a tray you must not spill.',
     regress: 'Hold the top, hips level, two seconds, before you descend.',
+    reply: 'Belt line level.',
   },
   {
     faultId: 'torsoDrift',
-    cue: 'Stay stacked — shoulders over your hips the whole rep.',
+    cue: 'Sink straight down like an elevator — shoulders stay over your hips the whole rep.',
     escalate: 'Still drifting. Reset stacked at the top and hold that line all the way down, not just at the bottom.',
-    regress: 'Hands on your hips for the set — feel where stacked actually is before adding the reach back.',
+    regress: 'Hands on your hips for the set: sink straight down and up like an elevator, then add the reach back.',
+    reply: 'Straight down, like an elevator.',
   },
   {
     faultId: 'shallow',
     cue: 'Own the bottom — back knee toward the floor, then drive up.',
     escalate: 'Deeper. Slow the way down and sit into the full range.',
     regress: 'Elevate the back foot a couple of inches to find the depth, then lower it as the range builds.',
+    reply: 'Back knee toward the floor.',
   },
   {
     faultId: 'wobble',
-    cue: 'Plant the front foot — spread your toes and grip the floor.',
+    cue: 'Grip the floor with the whole front foot — toes spread, foot planted.',
     escalate: 'Still wobbling. Slow the tempo down until the front foot stops moving.',
     regress: 'Hold a wall or a rack lightly for balance while the ankle and knee learn the position.',
+    reply: 'Whole front foot on the floor.',
   },
 ];
 

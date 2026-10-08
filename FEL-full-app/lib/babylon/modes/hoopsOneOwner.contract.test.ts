@@ -19,7 +19,7 @@ describe('3PT: every clip the shooter and the sideline bodies play goes through 
   });
   it('the set holds, the shot holds, the follow-through chains to its absorb, the jog cuts a beat in flight', () => {
     expect(mode).toMatch(/beats\?\.beat\('bball_pullup_gather', \{ fadeSec: 0\.1, holdEnd: true \}\)/);
-    expect(mode).toMatch(/beats\?\.beat\('jumpshot', \{ speedRatio: SHOT_CLIP_SPEED, fadeSec: 0\.08, holdEnd: true \}\)/);
+    expect(mode).toMatch(/beats\?\.beat\('jumpshot', \{ speedRatio: SHOT_CLIP_SPEED, fadeSec: 0\.08, holdEnd: true, from01: rise01 \}\)/);
     expect(mode).toMatch(/beats\?\.beat\(ftClip, \{ fadeSec: 0\.08, onSettle: \(\) => beats\?\.beat\('bball_land_absorb', \{ fadeSec: 0\.1 \}\) \}\)/);
     expect(mode).toMatch(/beats\?\.loop\(k < 1 \? 'run' : WATCH_IDLE\); beats\?\.settle\(\);/);
   });
@@ -50,7 +50,7 @@ describe('3PT on the real animator: a make\'s celebrate, the next ball\'s set, t
     for (let shot = 0; shot < 3; shot++) {
       beats.beat('bball_pullup_gather', { fadeSec: 0.1, holdEnd: true }); beats.loop(WATCH_IDLE, { fadeSec: 0.2 });   // setFeet
       run(40);                                                                                                           // the bar sweeps: the set holds
-      beats.beat('jumpshot', { speedRatio: 1.5, fadeSec: 0.08, holdEnd: true }); run(27);                                // fire → the release
+      beats.beat('jumpshot', { speedRatio: 1.5, fadeSec: 0.08, holdEnd: true, from01: 0.13 }); run(27);                   // fire → the release (the rise — the held set is the load)
       beats.beat('bball_follow_through', { fadeSec: 0.08, onSettle: () => beats.beat('bball_land_absorb', { fadeSec: 0.1 }) });
       run(20);
       beats.beat('dunk_celebrate_big', { fadeSec: 0.12 });                                                               // the make lands mid follow-through

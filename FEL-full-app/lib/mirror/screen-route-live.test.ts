@@ -26,6 +26,8 @@ const m = vi.hoisted(() => ({
   db: { workoutScan: [] as Row[], coachClient: [] as Row[], coachingProgram: [] as Row[], programExercise: [] as Row[], prqEntry: [] as Row[], gameSession: [] as Row[], user: [] as Row[] },
   grants: [] as unknown[],
   clock: 0,
+  /** TEEN-WRITE-BLOCK-2: the save gate's opt-in (lib/privacy/scanSaveOptIn, false for everyone until PRIVACY-CORE/AB-04). */
+  optedIn: true,
 }));
 
 const match = (row: Row, where: Row = {}) => Object.entries(where).every(([k, v]) => v === null ? row[k] == null : row[k] === v);
@@ -59,6 +61,10 @@ vi.mock('@/lib/camp/server', () => ({
 vi.mock('@/lib/wallet/wallet-service', () => ({
   grantServerReward: vi.fn(async (_db: unknown, args: unknown) => { m.grants.push(args); return { granted: { shards: 25 } }; }),
 }));
+// TEEN-WRITE-BLOCK-2 (FE PM 23:05 PT): the live body is posted as an OPTED-IN ADULT's (athlete-1, dobYear 1990), which is
+// what this file has always tested. Until PRIVACY-CORE/AB-04 adds the opt-in, the real reader answers false for everyone and
+// the route refuses (403 scan_save_adults_only): the one case that sets m.optedIn = false shows it on the live body.
+vi.mock('@/lib/privacy/scanSaveOptIn', () => ({ scanSaveOptIn: async () => m.optedIn }));
 vi.mock('@/lib/db', () => ({
   prisma: new Proxy({}, {
     get: (_t, prop) => {
@@ -95,6 +101,7 @@ beforeEach(() => {
   for (const k of Object.keys(m.db) as (keyof typeof m.db)[]) m.db[k] = [];
   m.db.user = [{ id: 'athlete-1', dobYear: 1990 }];
   m.grants = [];
+  m.optedIn = true;
 });
 
 describe('the live proof\'s captured body is what the proof says it is', () => {
@@ -148,6 +155,14 @@ describe('POST /api/mirror/screen on the live body (the server\'s score)', () =>
     expect((await post({ ...LIVE, screenId: 'live-front', grades: only(['kneeWindow', 'hipLevel', 'shoulderLevel']) })).json).toMatchObject({ provisional: true, readableCameraChecks: 3, paid: false });
   });
 
+  // TEEN-WRITE-BLOCK-2 (FE PM 23:05 PT): the same adult, not opted in (no one is, until PRIVACY-CORE/AB-04).
+  it('the live body from an adult who has not opted in: 403, nothing stored, nothing paid', async () => {
+    m.optedIn = false;
+    expect(await post(LIVE)).toEqual({ status: 403, json: { error: 'scan_save_adults_only', saved: false } });
+    expect(stored()).toEqual([]);
+    expect(m.grants).toEqual([]);
+  });
+
   it('the knee flag posted as a pass is refused (422): nothing stored, nothing paid', async () => {
     const { status, json } = await post({ ...LIVE, screenId: 'live-lie', grades: GRADES.map((g) => (g.checkId === 'kneeWindow' ? { ...g, status: 'pass' } : g)) });
     expect(status).toBe(422);
@@ -190,7 +205,7 @@ describe('PATCH + the coach\'s draft on the live screen', () => {
     const cam = Object.fromEntries(d.review.camera.map((r: Row) => [`${r.checkId}${r.side ? `:${r.side}` : ''}`, r.status]));
     expect(cam).toMatchObject({ heelLine: 'pass', 'kneeWindow:left': 'flag', hipLevel: 'pass', shoulderLevel: 'pass', headFloat: 'retest' });
     const knee = d.review.camera.find((r: Row) => r.checkId === 'kneeWindow');
-    expect(knee.fix).toMatch(/^Hip external-rotation and glute-medius work/);
+    expect(knee.fix).toMatch(/^Hip external-rotation work and banded side steps/);   // P9 fix: no muscle named (cueLint rule 1)
     expect(knee.block).toMatchObject({ title: 'Ask the hips to lead the hinge' });
     expect(d.review.answers.map((a: Row) => a.said)).toEqual([ANSWERS_WITHHELD, ANSWERS_WITHHELD]);
     expect(d.review.coachChecks).toEqual([]);

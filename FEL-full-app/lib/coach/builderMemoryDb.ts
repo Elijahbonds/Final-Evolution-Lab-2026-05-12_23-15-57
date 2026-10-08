@@ -20,9 +20,11 @@ export interface BuilderStore {
   user?: Row[];
   /** Client sessions (MIRROR-COACH P6): only read, to refuse removing an off day the client has started. */
   cs?: Row[];
+  /** The coaches' rosters (CoachClient): duplicate copies onto a live roster athlete only (owner-approved 2026-10-06). */
+  cc?: Row[];
 }
 
-export const newBuilderStore = (): BuilderStore => ({ seq: 0, fac: [], program: [], block: [], session: [], se: [], pe: [], log: [], user: [], cs: [] });
+export const newBuilderStore = (): BuilderStore => ({ seq: 0, fac: [], program: [], block: [], session: [], se: [], pe: [], log: [], user: [], cs: [], cc: [] });
 
 /**
  * MIRROR-COACH P6 (2026-09-29): the Session columns a write may name (prisma/schema.prisma model Session, less id,
@@ -70,21 +72,75 @@ function tree(s: BuilderStore, programId: string): Row[] {
   }));
 }
 
+/**
+ * MIRROR-COACH P8 (2026-09-29): the Block columns a nested write may name (prisma/schema.prisma model Block, less id,
+ * programId, timestamps; `sessions` is the relation) — the template clone (builderServer.ts 'clone_template') is the
+ * first builder action that writes blocks. templates/clone-route.test.ts holds it to the schema.
+ */
+export const BLOCK_WRITABLE = ['order', 'label', 'targetDate'] as const;
+
+/** Nested blocks → sessions → exercises under a program, the way Prisma's `blocks: { create: [...] }` takes them. */
+function createBlocks(s: BuilderStore, programId: string, blocks: Row[]) {
+  const id = (p: string) => `${p}-${++s.seq}`;
+  for (const b of blocks) {
+    const { sessions, ...blockData } = b;
+    checkColumns('block.create', blockData, BLOCK_WRITABLE);
+    const block = { id: id('b'), programId, order: b.order, label: b.label, targetDate: b.targetDate ?? null };
+    s.block.push(block);
+    for (const x of sessions?.create ?? []) {
+      const { exercises, ...sessionData } = x;
+      checkColumns('session.create', sessionData, SESSION_WRITABLE.filter((c) => c !== 'blockId'));
+      const session = { id: id('s'), blockId: block.id, order: x.order, label: x.label, kind: x.kind ?? 'training' };
+      s.session.push(session);
+      for (const e of exercises?.create ?? []) s.se.push({ id: id('se'), sessionId: session.id, ...seData(e) });
+    }
+  }
+}
+
 /** Write a program with nested blocks → sessions → exercises, the way prisma.coachingProgram.create takes it. */
 export function createProgram(s: BuilderStore, data: Row): Row {
   const id = (p: string) => `${p}-${++s.seq}`;
   const p = { id: id('p'), coachId: data.coachId, clientId: data.clientId, name: data.name, startDate: data.startDate ?? new Date(), durationWeeks: data.durationWeeks ?? 4, isActive: true };
   s.program.push(p);
-  for (const b of data.blocks?.create ?? []) {
-    const block = { id: id('b'), programId: p.id, order: b.order, label: b.label, targetDate: b.targetDate ?? null };
-    s.block.push(block);
-    for (const x of b.sessions?.create ?? []) {
-      const session = { id: id('s'), blockId: block.id, order: x.order, label: x.label, kind: x.kind ?? 'training' };
-      s.session.push(session);
-      for (const e of x.exercises?.create ?? []) s.se.push({ id: id('se'), sessionId: session.id, ...seData(e) });
+  createBlocks(s, p.id, data.blocks?.create ?? []);
+  return p;
+}
+
+/**
+ * MIRROR-COACH P8: prisma.coachingProgram.update as the template clone sends it — scalar columns plus
+ * `blocks: { deleteMany: {} | { id: { in } }, create: [...] }`. Prisma runs a nested write in one transaction, so this checks the
+ * restrictions the delete would meet (ClientSession → Session and ExerciseLog → SessionExercise are onDelete: Restrict)
+ * BEFORE it changes anything, and a failed nested create leaves the program as it was.
+ */
+function updateProgram(s: BuilderStore, programId: string, data: Row): Row {
+  const i = s.program.findIndex((p) => p.id === programId);
+  if (i < 0) throw err('Record to update not found.', 'P2025');
+  const { blocks, ...scalars } = data;
+  checkColumns('coachingProgram.update', scalars, ['name', 'startDate', 'durationWeeks', 'isActive', 'completedAt']);
+  if (blocks) {
+    for (const k of Object.keys(blocks)) if (k !== 'deleteMany' && k !== 'create') throw err(`Unknown argument \`${k}\` on blocks.`);
+    const before = JSON.stringify({ block: s.block, session: s.session, se: s.se, seq: s.seq });
+    try {
+      if (blocks.deleteMany) {
+        const w = blocks.deleteMany;
+        if (Object.keys(w).some((k) => k !== 'id') || (w.id && !Array.isArray(w.id.in))) throw err('builderMemoryDb: blocks.deleteMany understands {} and { id: { in } } only');
+        const gone = s.block.filter((b) => b.programId === programId && (!w.id || w.id.in.includes(b.id))).map((b) => b.id);
+        const sessions = s.session.filter((x) => gone.includes(x.blockId)).map((x) => x.id);
+        const ses = s.se.filter((e) => sessions.includes(e.sessionId)).map((e) => e.id);
+        if ((s.cs ?? []).some((c) => sessions.includes(c.sessionId)) || s.log.some((l) => ses.includes(l.sessionExerciseId))) throw err('Foreign key constraint violated', 'P2003');
+        s.se = s.se.filter((e) => !ses.includes(e.id));
+        s.session = s.session.filter((x) => !sessions.includes(x.id));
+        s.block = s.block.filter((b) => !gone.includes(b.id));
+      }
+      createBlocks(s, programId, blocks.create ?? []);
+    } catch (e) {
+      const b = JSON.parse(before);
+      s.block = b.block; s.session = b.session; s.se = b.se; s.seq = b.seq;
+      throw e;
     }
   }
-  return p;
+  s.program[i] = { ...s.program[i], ...clone(scalars) };
+  return s.program[i];
 }
 
 /** A Prisma-shaped object over `s`, covering the builder's, the load's and the duplicate route's calls. */
@@ -93,6 +149,11 @@ export function builderMemoryDb(s: BuilderStore) {
   return {
     facilitatorProfile: { findUnique: async (a: Row) => { const f = s.fac.find((x) => x.userId === a.where.userId); return f ? pick(f, a.select) : null; } },
     user: { findUnique: async (a: Row) => { const u = (s.user ?? []).find((x) => x.id === a.where.id); return u ? pick(u, a.select) : null; } },
+    coachClient: {
+      findMany: async (a: Row) => (s.cc ?? [])
+        .filter((r) => r.coachId === a.where.coachId && (a.where.endedAt === null ? r.endedAt == null : true) && (a.where.clientId?.in ?? []).includes(r.clientId))
+        .map((r) => pick(r, a.select)),
+    },
     coachingProgram: {
       findUnique: async (a: Row) => {
         const p = s.program.find((x) => x.id === a.where.id);
@@ -104,9 +165,24 @@ export function builderMemoryDb(s: BuilderStore) {
         .filter((p) => p.coachId === a.where.coachId && (a.where.clientId?.in ?? []).includes(p.clientId) && String(p.name).startsWith(a.where.name?.startsWith ?? ''))
         .map((p) => pick(p, a.select)),
       create: async (a: Row) => pick(createProgram(s, a.data), a.select),
+      // MIRROR-COACH P8: the template clone replaces a blank program's weeks in one nested write
+      update: async (a: Row) => {
+        const p = updateProgram(s, a.where.id, a.data);
+        return a.include?.blocks ? { ...p, blocks: tree(s, p.id) } : pick(p, a.select);
+      },
     },
     programExercise: {
       findUnique: async (a: Row) => { const p = s.pe.find((x) => x.id === a.where.id); return p ? pick(p, a.select) : null; },
+      // MIRROR-COACH P8: the template clone reads the coach's rows once ({ where: { coachId } }) to reuse any it already has
+      findMany: async (a: Row) => s.pe.filter((x) => a.where?.coachId === undefined || x.coachId === a.where.coachId).map((x) => pick(x, a.select)),
+      // …and links the rungs it seeded ({ where: { id }, data: { regressionOfId?, progressionOfId? } })
+      update: async (a: Row) => {
+        checkColumns('programExercise.update', a.data, PROGRAM_EXERCISE_WRITABLE);
+        const i = s.pe.findIndex((x) => x.id === a.where.id);
+        if (i < 0) throw err('Record to update not found.', 'P2025');
+        s.pe[i] = { ...s.pe[i], ...clone(a.data) };
+        return pick(s.pe[i], a.select);
+      },
       // MIRROR-COACH P6: the off day looks the coach's own row up by name ({ equals, mode: 'insensitive' } or a plain string)
       findFirst: async (a: Row) => {
         const w = a.where;

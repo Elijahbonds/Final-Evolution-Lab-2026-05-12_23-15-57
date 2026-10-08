@@ -52,6 +52,15 @@ export const DEFAULT_OCEAN_WAVES: OceanWave[] = [
 
 const PLUGIN = 'FELOcean';
 
+/**
+ * IMPROVE (2026-10-06, surf item 5): a band of colour painted INTO a surface's shading, by the mesh's own LOCAL z — the surf
+ * face's `u`, metres ahead of the crest. The scored pocket and the whitewater were two full-width alpha-blended ribbons
+ * stacked on the face (α 0.16 and 0.5): two extra transparent passes over the biggest thing on screen. A band is the same
+ * read for nothing: `mix` of `color` over the albedo between `from` and `to`, edges softened over `soft` m, and `chop` > 0
+ * breaks it up with the chop noise (foam rather than a painted stripe). Opt-in: only oceanShade's `bands` turns it on.
+ */
+export interface OceanBand { from: number; to: number; color: string; mix: number; soft?: number; chop?: number }
+
 class OceanPlugin extends MaterialPluginBase {
   time = 0;
   amp = 1;
@@ -62,13 +71,15 @@ class OceanPlugin extends MaterialPluginBase {
   horizon = new Color3(0.7, 0.8, 0.9);
   fadeFrom = 280; fadeTo = 2600;
   private _enabled = false;
+  /** IMPROVE (2026-10-06, surf item 5): up to two bands (A, B) painted by local z; set before the plugin is enabled. */
+  bands: { from: number; to: number; mix: number; soft: number; chop: number; color: Color3 }[] = [];
 
-  constructor(material: Material) { super(material, PLUGIN, 250, { FEL_OCEAN: false }); }
+  constructor(material: Material) { super(material, PLUGIN, 250, { FEL_OCEAN: false, FEL_OCEAN_BAND: false }); }
 
   get isEnabled(): boolean { return this._enabled; }
   set isEnabled(v: boolean) { if (this._enabled === v) return; this._enabled = v; this.markAllDefinesAsDirty(); this._enable(v); }
 
-  prepareDefines(defines: Record<string, unknown>): void { defines.FEL_OCEAN = this._enabled; }
+  prepareDefines(defines: Record<string, unknown>): void { defines.FEL_OCEAN = this._enabled; defines.FEL_OCEAN_BAND = this._enabled && this.bands.length > 0; }
   getClassName(): string { return 'OceanPlugin'; }
 
   getUniforms(lang?: ShaderLanguage): { ubo: { name: string; size: number; type: string }[]; vertex?: string; fragment?: string } {
@@ -84,6 +95,11 @@ class OceanPlugin extends MaterialPluginBase {
       { name: 'felOceanFoam', size: 3, type: 'vec3' },
       { name: 'felOceanHorizon', size: 3, type: 'vec3' },
       { name: 'felOceanFade', size: 2, type: 'vec2' },
+      { name: 'felBandA', size: 4, type: 'vec4' },
+      { name: 'felBandB', size: 4, type: 'vec4' },
+      { name: 'felBandAColor', size: 3, type: 'vec3' },
+      { name: 'felBandBColor', size: 3, type: 'vec3' },
+      { name: 'felBandChop', size: 2, type: 'vec2' },
     ];
     if (lang === ShaderLanguage.WGSL) return { ubo };
     const decl = `
@@ -91,6 +107,7 @@ class OceanPlugin extends MaterialPluginBase {
         uniform float felOceanTime; uniform float felOceanAmp; uniform float felOceanShoreZ; uniform vec2 felOceanOffset;
         uniform vec4 felOceanW1; uniform vec4 felOceanW2; uniform vec4 felOceanW3; uniform vec4 felOceanW4;
         uniform vec3 felOceanFoam; uniform vec3 felOceanHorizon; uniform vec2 felOceanFade;
+        uniform vec4 felBandA; uniform vec4 felBandB; uniform vec3 felBandAColor; uniform vec3 felBandBColor; uniform vec2 felBandChop;
       #endif`;
     return { ubo, vertex: decl, fragment: decl };
   }
@@ -106,6 +123,13 @@ class OceanPlugin extends MaterialPluginBase {
     ubo.updateColor3('felOceanFoam', this.foam);
     ubo.updateColor3('felOceanHorizon', this.horizon);
     ubo.updateFloat2('felOceanFade', this.fadeFrom, this.fadeTo);
+    // (a band with mix 0 paints nothing: the second slot is off when only one band is asked for)
+    const b = (i: number) => this.bands[i] ?? { from: 0, to: 1, mix: 0, soft: 0.1, chop: 0, color: this.foam };
+    ubo.updateFloat4('felBandA', b(0).from, b(0).to, b(0).mix, Math.max(0.01, b(0).soft));
+    ubo.updateFloat4('felBandB', b(1).from, b(1).to, b(1).mix, Math.max(0.01, b(1).soft));
+    ubo.updateColor3('felBandAColor', b(0).color);
+    ubo.updateColor3('felBandBColor', b(1).color);
+    ubo.updateFloat2('felBandChop', b(0).chop, b(1).chop);
   }
 
   getCustomCode(shaderType: string, lang?: ShaderLanguage): Nullable<Record<string, string>> {
@@ -116,6 +140,9 @@ class OceanPlugin extends MaterialPluginBase {
           #ifdef FEL_OCEAN
             varying float vFelCrest;
             varying float vFelShore;
+            #ifdef FEL_OCEAN_BAND
+              varying float vFelLocalZ;
+            #endif
             vec3 felOceanN = vec3(0.0, 1.0, 0.0);
             vec3 felGerstner(vec2 p, vec4 w, float atten, inout vec3 tg, inout vec3 bn) {
               float k = 6.28318 / max(0.5, w.w);
@@ -132,6 +159,9 @@ class OceanPlugin extends MaterialPluginBase {
         CUSTOM_VERTEX_UPDATE_POSITION: `
           #ifdef FEL_OCEAN
           {
+            #ifdef FEL_OCEAN_BAND
+              vFelLocalZ = positionUpdated.z;   // the band's axis: the mesh's own z (the surf face's u), before any displacement
+            #endif
             vec2 wp = positionUpdated.xz + felOceanOffset;
             // the swell calms over the last 40 m to the shore; past it the sea tucks under the sand
             float toShore = felOceanShoreZ - wp.y;
@@ -160,6 +190,12 @@ class OceanPlugin extends MaterialPluginBase {
           #ifdef FEL_OCEAN
             varying float vFelCrest;
             varying float vFelShore;
+            #ifdef FEL_OCEAN_BAND
+              varying float vFelLocalZ;
+              float felBandIn(vec4 b, float z) {
+                return smoothstep(b.x - b.w, b.x + b.w, z) * (1.0 - smoothstep(b.y - b.w, b.y + b.w, z));
+              }
+            #endif
             float felHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
             float felNoise(vec2 p) {
               vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
@@ -189,6 +225,13 @@ class OceanPlugin extends MaterialPluginBase {
             float foam = smoothstep(0.72, 1.0, vFelCrest + (n2 - 0.5) * 0.3) * near * 0.8;
             foam = max(foam, smoothstep(0.75, 1.0, vFelShore + (n1 - 0.5) * 0.3) * 0.5);
             surfaceAlbedo = mix(surfaceAlbedo, felOceanFoam, foam);
+            #ifdef FEL_OCEAN_BAND
+              // IMPROVE (2026-10-06, surf item 5): the bands painted in, by local z (the pocket; the whitewater, broken by the chop)
+              float bandA = felBandIn(felBandA, vFelLocalZ) * felBandA.z * (1.0 + (n2 - 0.5) * felBandChop.x);
+              surfaceAlbedo = mix(surfaceAlbedo, felBandAColor, clamp(bandA, 0.0, 1.0));
+              float bandB = felBandIn(felBandB, vFelLocalZ) * felBandB.z * (1.0 + (n2 - 0.5) * felBandChop.y);
+              surfaceAlbedo = mix(surfaceAlbedo, felBandBColor, clamp(bandB, 0.0, 1.0));
+            #endif
           }
           #endif`,
         CUSTOM_FRAGMENT_BEFORE_FRAGCOLOR: `
@@ -222,9 +265,14 @@ const NEAR_SIZE = 480, NEAR_SUB = 240, FAR_SIZE = 12000;
  * The sea's shading on any PBR surface — the rideable wave ribbon borrows it (amp 0: no displacement, its own normals) so the
  * face you ride is the same water as the sea around it: the same chop in its reflections, the same horizon fade.
  */
-export function oceanShade(mat: PBRMaterial, o: Pick<OceanOptions, 'foam' | 'horizon' | 'shoreZ' | 'fade'>): { setTime(t: number): void } {
+export function oceanShade(mat: PBRMaterial, o: Pick<OceanOptions, 'foam' | 'horizon' | 'shoreZ' | 'fade'> & { bands?: OceanBand[] }): { setTime(t: number): void } {
   const plugin = new OceanPlugin(mat);
   plugin.amp = 0;
+  // IMPROVE (2026-10-06, surf item 5): the colours go in as the strips they replace had them (an albedo straight from hex)
+  plugin.bands = (o.bands ?? []).slice(0, 2).map((b) => ({
+    from: Math.min(b.from, b.to), to: Math.max(b.from, b.to), mix: Math.max(0, Math.min(1, b.mix)),
+    soft: b.soft ?? 0.25, chop: b.chop ?? 0, color: Color3.FromHexString(b.color),
+  }));
   plugin.shoreZ = o.shoreZ;
   plugin.foam = Color3.FromHexString(o.foam).toLinearSpace();
   plugin.horizon = Color3.FromHexString(o.horizon).toLinearSpace();

@@ -79,12 +79,8 @@ async function render(path: string): Promise<string> {
   const u = new URL(path, 'http://screen.test');
   const p = u.pathname.replace(/\/$/, '') || '/';
   if (p === '/screen') {
-    // the QR address: a 307 to the screen (app/screen/page.tsx); follow it
     const { default: Entry } = await import('@/app/screen/page');
-    let to = '';
-    try { Entry({ searchParams: Object.fromEntries(u.searchParams) }); } catch (e) { to = String((e as { digest?: string }).digest).split(';')[2]; }
-    expect(to.startsWith('/play/mirror/assess')).toBe(true);
-    return render(to);
+    return renderToStaticMarkup(createElement(Entry));
   }
   if (p === '/screen/privacy') return privacyPage();
   if (p === '/play/mirror/assess') return renderToStaticMarkup(createElement((await import('@/app/play/mirror/assess/page')).default));
@@ -112,7 +108,7 @@ describe('S-11: from the under-18 results, every reachable link stays in the scr
       for (const next of hrefs(await render(href))) if (!seen.has(next)) queue.push(next);
     }
     expect(out).toEqual([]);
-    // what the walk reached: the privacy page, and the QR address (which opens the screen's start, whose links are these two)
-    expect([...seen].sort()).toEqual(['/screen', '/screen/privacy']);
+    // S-15: privacy back is a button (returns to results or history), not a link to /screen
+    expect([...seen].sort()).toEqual(['/screen/privacy']);
   });
 });

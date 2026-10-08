@@ -416,6 +416,237 @@ export function applyLessonDelta(
 }
 
 // ---------------------------------------------------------------------------
+// PRQ recovery: earned by recovery work, and it falls (MIRROR-COACH P9, 2026-09-30)
+// ---------------------------------------------------------------------------
+//
+// WHAT WAS WRONG (crossref audit item 8, "Recovery is inverted"; owner decision #12). PlayerProfile.recovery is one of
+// the eight numbers lib/prq.ts prqScore averages into every player's PRQ, and it was moved by exactly two things:
+//   · POST /api/sessions adds a play's delta to each attribute in lib/prq.ts MODE_ATTRS[mode]. Three rows named
+//     recovery: brainBrawl (trivia), whoSceneIt (trivia) and training (the Iron Paradise gym game). lib/prq.ts
+//     computePrqDelta never returns a negative number, so recovery could only rise, and a quiz raised it. All three
+//     rows now train other attributes only (P9 took trivia's; the P9 code review took the gym game's — a won round was
+//     0.6 recovery with no daily cap, so a game out-earned a day of real recovery work). No game raises recovery.
+//   · lib/profile-service.ts getOrCreateProfile's inactivity decay: −0.5 on every attribute per idle day, toward 0, and
+//     only once a player stops playing altogether. A player in every day never lost a point.
+// Nothing a person does to recover (a cool-down, an easy day, an easy walk) touched it. (The crossref's critic noted the
+// engine's own applyInactivityDecay above has no production caller; the live decay is profile-service's.)
+//
+// THE RULE NOW.
+//   RISE: recovery work, as the coached log records it (the filters are lib/coach/recoverySources.ts):
+//     · a completed cool-down (Today's automatic one, or a Cool-down section the coach wrote) → RECOVERY_CREDIT_COOLDOWN
+//       (the automatic one only on a session with work logged in it — P9 code review: Done with nothing logged, then
+//       the tap, was 0.6 for no work)
+//     · a completed off day (a coached session of kind recovery with work logged)             → RECOVERY_CREDIT_OFF_DAY
+//     ONE PRESCRIBED SESSION, ONE CREDIT (P9 code review): the same prescribed session completed again the same UTC day
+//     credits nothing more (cool-downs, easy cardio), and the same off day at most once a UTC week — Done can be sent
+//     for one session over and over (lib/coach/todayServer.ts opens a new row each time), so without this one off day
+//     completed twice a day filled the cap. lib/prq-recovery.ts recoveryEventsFromRows does it.
+//     · easy-cardio minutes (a timed locomotion item at the Idle or Cruise band), on a saturating curve per day:
+//       EASY_CARDIO_MAX_CREDIT × (1 − 2^(−minutes / EASY_CARDIO_HALF_MINUTES)): 10 min 0.40, 20 min 0.60, 30 min 0.70,
+//       never past 0.80. A day's minutes are summed before the curve, so two 10-minute walks are one 20-minute day
+//       (0.60), not two fresh first-ten-minutes (0.80).
+//     All of it together is capped at RECOVERY_DAILY_CAP per UTC day and credited in time order (the day's first work is
+//     paid first). UTC days (assumption): the server has no time zone for the player, and a UTC day is the same for
+//     everyone and cannot be moved by a device clock.
+//   FALL: with no recovery work, the part ABOVE baseline (PRQ_BASELINE, 50) halves every RECOVERY_HALF_LIFE_DAYS,
+//     continuously: B + (v − B) × 2^(−days / H). A value at or below baseline does not move by itself: the number falls
+//     when recovery work stops and never rises without it (assumption: "decays toward baseline" is read as a fall to 50
+//     from above, not a free climb to 50 from below; an owner question in the P9 report). SAID PLAINLY (P9 code review):
+//     a value at or under 50 is FROZEN without recovery work — it no longer takes profile-service's old −0.5 per idle
+//     day toward 0 either, so for roughly a third of dice-seeded profiles (seeded 40–70) "it can fall" does not hold
+//     until they first earn their way above 50. The owner's call; the alternative is in the P9 fix report.
+//   WHERE IT SETTLES (steady state, B + daily credit / daily fall): daily recovery work at the cap holds it near
+//     B + CAP / (1 − 2^(−1/H)) ≈ 91; three coached sessions with cool-downs plus one off day a week hold it near 60;
+//     no recovery work at all brings it back to 50.
+//
+// SELF-REPORTS NEVER COUNT (#12). A readiness check-in, a pain check-in, the health intake and the breath log are not
+// inputs here and cannot become one: a RecoveryEvent is a source from a closed list, a time and (easy cardio only)
+// minutes, and anything else on an event is ignored. lib/prq-engine-recovery.test.ts holds the engine to it and
+// lib/prq-recovery-self-reports.test.ts the source tree.
+//
+// MIGRATION: NO HISTORY IS REWRITTEN. There is no backfill. A stored value, trivia-raised or not, is settled forward from
+// its row's last write (PlayerProfile.updatedAt — lib/prq-recovery.ts), and never from before RECOVERY_RULE_SINCE_MS.
+// P9 code review, corrected: that constant is the PHASE date (2026-09-30), not the deploy date, which is the owner's merge
+// and not known here. So on the first settle after a later deploy, the half-life is charged from 2026-09-30 (a
+// trivia-raised value comes down for the days between the phase and the deploy too), and recovery work logged in those
+// days is credited. Both are small and both point the honest way (the inflation came from trivia; the work was real),
+// but "nothing before the rule was live" is only true if RECOVERY_RULE_SINCE_MS is moved to the deploy date at landing —
+// a one-line change the tests follow (they derive from the constant). A value at or under 50 stays exactly where it is
+// until recovery work raises it.
+//
+// Pure, like the rest of this file: callers pass every time (ms) and every event; nothing here reads a clock or a
+// database.
+
+/**
+ * Recovery above baseline halves over this many days without recovery work. FEL's choice, and a conservative one (slow):
+ * two weeks without a cool-down, an off day or an easy walk costs half the earned margin, not all of it.
+ */
+export const RECOVERY_HALF_LIFE_DAYS = 14;
+/** The most recovery work can add in one UTC day, all sources together. */
+export const RECOVERY_DAILY_CAP = 2;
+/** A completed cool-down. */
+export const RECOVERY_CREDIT_COOLDOWN = 0.6;
+/** A completed off day. (Its walk's minutes also count as easy cardio.) */
+export const RECOVERY_CREDIT_OFF_DAY = 1;
+/** Easy cardio's ceiling for one day. */
+export const EASY_CARDIO_MAX_CREDIT = 0.8;
+/** The day's easy-cardio minutes that earn half of EASY_CARDIO_MAX_CREDIT. */
+export const EASY_CARDIO_HALF_MINUTES = 10;
+/** The most minutes one logged session can carry into the curve (a typed 600 is a long day, not a record). */
+export const EASY_CARDIO_MAX_MINUTES_PER_EVENT = 240;
+/**
+ * The rule's start, 2026-09-30T00:00Z (this phase's date, NOT the deploy date — see MIGRATION above): no settle decays
+ * across time before it. Set it to the merge/deploy date at landing to charge nothing before the rule was live.
+ */
+export const RECOVERY_RULE_SINCE_MS = Date.UTC(2026, 8, 30);
+/**
+ * Recovery is stored to this many decimals. Its fall is continuous, and at the 2 decimals every other attribute keeps, a
+ * player seen every few minutes would have each step rounded away (0.003 per 3 minutes on a 30-point margin) and never
+ * fall at all.
+ */
+export const RECOVERY_DECIMALS = 4;
+
+export type RecoverySource = 'cooldown' | 'offDay' | 'easyCardio';
+/** The closed list. Nothing outside it is a source. */
+export const RECOVERY_SOURCES: readonly RecoverySource[] = ['cooldown', 'offDay', 'easyCardio'];
+
+export interface RecoveryEvent {
+  source: RecoverySource;
+  /** When it became countable, ms since epoch (a cool-down: the later of the session's Done and the tap). */
+  at: number;
+  /** easyCardio only: the minutes logged. */
+  minutes?: number;
+  /** A stable tie-break for events in the same millisecond (the ClientSession id). */
+  ref?: string;
+}
+
+export interface RecoveryCredit {
+  event: RecoveryEvent;
+  /** What the event is worth before the day's cap. */
+  raw: number;
+  /** What it was credited after the cap (0 once the day is full). */
+  credit: number;
+}
+
+export interface RecoverySettle {
+  /** The settled value, to RECOVERY_DECIMALS. */
+  value: number;
+  /** false = nothing to write. */
+  changed: boolean;
+  /** The events this settle credited (after the anchor, up to now), in the order they were applied. */
+  credited: RecoveryCredit[];
+  /** Points added by them. */
+  gained: number;
+  /** Points lost to the half-life over the settle. */
+  decayed: number;
+}
+
+const RECOVERY_DAY_MS = 24 * 60 * 60 * 1000;
+/** Same-millisecond order: an off day, then a cool-down, then minutes. */
+const RECOVERY_SOURCE_ORDER: Record<RecoverySource, number> = { offDay: 0, cooldown: 1, easyCardio: 2 };
+
+function roundRecovery(value: number): number {
+  const f = 10 ** RECOVERY_DECIMALS;
+  return Math.round(value * f) / f;
+}
+
+/** One-sided half-life decay toward PRQ_BASELINE: only a value above it falls; nothing ever rises by itself. */
+export function decayRecovery(value: number, fromMs: number, toMs: number): number {
+  if (!Number.isFinite(value)) return value;
+  const days = (toMs - fromMs) / RECOVERY_DAY_MS;
+  if (!(days > 0) || value <= PRQ_BASELINE) return value;
+  return PRQ_BASELINE + (value - PRQ_BASELINE) * Math.pow(2, -days / RECOVERY_HALF_LIFE_DAYS);
+}
+
+/** A day's easy-cardio minutes → credit (before the daily cap): the saturating curve above. */
+export function easyCardioCredit(minutes: number): number {
+  const m = Number.isFinite(minutes) ? Math.max(0, minutes) : 0;
+  return EASY_CARDIO_MAX_CREDIT * (1 - Math.pow(2, -m / EASY_CARDIO_HALF_MINUTES));
+}
+
+/**
+ * Where a settle starts: the stored value's last write, never before RECOVERY_RULE_SINCE_MS. null when there is no
+ * usable time (then nothing is settled).
+ */
+export function recoveryAnchor(lastWrittenAt: number | Date | null | undefined): number | null {
+  const ms = lastWrittenAt instanceof Date ? lastWrittenAt.getTime() : lastWrittenAt;
+  if (typeof ms !== 'number' || !Number.isFinite(ms)) return null;
+  return Math.max(ms, RECOVERY_RULE_SINCE_MS);
+}
+
+/** The start of the UTC day `ms` falls in (a settle's event window opens there, for the day's cap). */
+export function recoveryDayStart(ms: number): number {
+  return Math.floor(ms / RECOVERY_DAY_MS) * RECOVERY_DAY_MS;
+}
+
+/** An event the engine will read: a source on the closed list at a finite time. Anything else is dropped. */
+export function isRecoveryEvent(e: unknown): e is RecoveryEvent {
+  const x = e as RecoveryEvent | null | undefined;
+  return !!x && RECOVERY_SOURCES.includes(x.source) && typeof x.at === 'number' && Number.isFinite(x.at);
+}
+
+/**
+ * Every event's credit, the per-UTC-day cap applied in time order. Only `source`, `at` and (easy cardio) `minutes` are
+ * read: an event carrying anything else is worth exactly what it is worth without it.
+ */
+export function recoveryCredits(events: readonly RecoveryEvent[]): RecoveryCredit[] {
+  const ordered = events.filter(isRecoveryEvent).sort((a, b) =>
+    a.at - b.at || RECOVERY_SOURCE_ORDER[a.source] - RECOVERY_SOURCE_ORDER[b.source] || String(a.ref ?? '').localeCompare(String(b.ref ?? '')));
+  const used = new Map<number, number>();
+  const cardioMinutes = new Map<number, number>();
+  return ordered.map((event) => {
+    const day = Math.floor(event.at / RECOVERY_DAY_MS);
+    let raw: number;
+    if (event.source === 'easyCardio') {
+      const before = cardioMinutes.get(day) ?? 0;
+      const add = clamp(Number(event.minutes ?? 0), 0, EASY_CARDIO_MAX_MINUTES_PER_EVENT);
+      cardioMinutes.set(day, before + add);
+      raw = easyCardioCredit(before + add) - easyCardioCredit(before);
+    } else {
+      raw = event.source === 'offDay' ? RECOVERY_CREDIT_OFF_DAY : RECOVERY_CREDIT_COOLDOWN;
+    }
+    const u = used.get(day) ?? 0;
+    const credit = Math.max(0, Math.min(RECOVERY_DAILY_CAP, u + raw) - u);
+    used.set(day, u + credit);
+    return { event, raw, credit };
+  });
+}
+
+/**
+ * Settles a stored recovery value from `anchorMs` (recoveryAnchor of its last write) to `nowMs`: decay to each event
+ * after the anchor, add its capped credit, decay on to now. `events` should reach back to recoveryDayStart(anchorMs),
+ * because work done earlier that day (credited by an earlier settle) still counts against the day's cap; events at or
+ * before the anchor are never credited again, and events after `nowMs` wait for a later settle.
+ */
+export function settleRecovery(
+  value: number,
+  anchorMs: number,
+  events: readonly RecoveryEvent[],
+  nowMs: number,
+): RecoverySettle {
+  if (!Number.isFinite(value) || !Number.isFinite(anchorMs) || !Number.isFinite(nowMs) || nowMs <= anchorMs) {
+    return { value, changed: false, credited: [], gained: 0, decayed: 0 };
+  }
+  const fresh = recoveryCredits(events.filter((e) => isRecoveryEvent(e) && e.at <= nowMs)).filter((c) => c.event.at > anchorMs);
+  let v = clamp(value, ATTRIBUTE_MIN, ATTRIBUTE_MAX);
+  let t = anchorMs;
+  let gained = 0;
+  let decayed = 0;
+  for (const c of fresh) {
+    const d = decayRecovery(v, t, c.event.at);
+    decayed += v - d;
+    const next = Math.min(ATTRIBUTE_MAX, d + c.credit);
+    gained += next - d;
+    v = next;
+    t = c.event.at;
+  }
+  const end = decayRecovery(v, t, nowMs);
+  decayed += v - end;
+  const out = roundRecovery(end);
+  return { value: out, changed: out !== value, credited: fresh, gained: roundRecovery(gained), decayed: roundRecovery(decayed) };
+}
+
+// ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
 

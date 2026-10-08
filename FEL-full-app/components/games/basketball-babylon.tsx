@@ -6,14 +6,20 @@
 // lib/babylon/* cores (BasketballCore + PlayerSlot + OneVOneMode).
 
 import { readCourtLocation } from '@/lib/babylon/nexus/courtLocations';
+import { courtArtSkin } from '@/lib/modes/art/apply-art-card';
 import { useEffect, useRef, useState, useCallback } from 'react';
 import type { GameProps, GameResult } from './game-shell';
 import { BootSplash } from './boot-splash';
+import { surfaceBootError } from './boot-error';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode } from './hud-format';
 import { MicCaption, MicToggle } from './mic-caption';   // THE MIC (2026-09-24): what the court's MC just said, and the switch for the voice
+import { pipBias } from '@/lib/babylon/modes/onevoneRules';   // IMPROVE (2026-10-06) #10
+
+/** IMPROVE (2026-10-06) #10: a release pip's colour — the world meter's verdict colours (ShotMeter3D VERDICT_HEX). */
+const PIP_HEX: Record<string, string> = { p: '#39ff88', g: '#8cff5c', e: '#ffb340', l: '#ffb340', b: '#ff4b4b' };
 
 type Hud = Record<string, HudValue>;
 
@@ -21,6 +27,8 @@ export default function BasketballBabylon({ onEnd }: GameProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const busRef = useRef<InputBus | null>(null);
   const endedRef = useRef(false);
+  const onEndRef = useRef(onEnd);
+  onEndRef.current = onEnd;
   const [phase, setPhase] = useState<ModePhase>('loading');
   const [countdown, setCountdown] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -46,7 +54,7 @@ export default function BasketballBabylon({ onEnd }: GameProps) {
         duration: r.durationSec,
         headline: won ? 'GAME WON' : 'GAME OVER',
       };
-      onEnd(result);
+      onEndRef.current(result);
     };
 
     // StrictMode runs effect -> cleanup -> effect. Starting immediately means the
@@ -60,6 +68,7 @@ export default function BasketballBabylon({ onEnd }: GameProps) {
       runMode(MODES.onevone, {
       canvas,
       location: readCourtLocation(),   // court location pick (docs/SPEC-COURT-LOCATIONS.md)
+      applySkin: courtArtSkin,   // PIPELINES (2026-10-06): the player's court art card, a centre-court decal
       input: bus,
       onPhase: (p, cd) => {
         setPhase(p);
@@ -73,7 +82,7 @@ export default function BasketballBabylon({ onEnd }: GameProps) {
         if (disposed) { s(); return; }
         stop = s;
       })
-        .catch((e) => console.error('[FEL-HOOPS] boot failed', e));
+        .catch((e) => surfaceBootError(e, { disposed, label: '[FEL-HOOPS] boot failed', setPhase, setLoadError }));
     }, 0);
 
     return () => {
@@ -82,7 +91,8 @@ export default function BasketballBabylon({ onEnd }: GameProps) {
       stop?.();
       busRef.current = null;
     };
-  }, [onEnd]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- G7: the stage is owned by the mount; callbacks are read through refs.
+  }, []);
 
   const emit = useCallback((e: Parameters<InputBus['emit']>[0]) => {
     busRef.current?.emit(e);
@@ -95,7 +105,7 @@ export default function BasketballBabylon({ onEnd }: GameProps) {
   const meter = typeof hud.shotMeterT === 'number' ? Math.max(0, Math.min(1, hud.shotMeterT)) : null;
 
   return (
-    <div className="relative aspect-[16/10] w-full overflow-hidden rounded-xl border border-white/10 bg-black">
+    <div className="relative h-[calc(100dvh-3.25rem)] w-full overflow-hidden rounded-none border-0 bg-transparent">
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full touch-none" />
 
       {/* HUD bezel */}
@@ -103,7 +113,19 @@ export default function BasketballBabylon({ onEnd }: GameProps) {
         <span className="fel-panel fel-stat px-3 py-1 text-lg">
           {hnode(hud.score, 0)} – {hnode(hud.foeScore, 0)}
         </span>
-        <span className="fel-panel px-3 py-1 font-mono text-xs text-[var(--fel-gold)]">TO 11</span>
+        <span className="flex flex-col items-end gap-1">
+          <span className="fel-panel px-3 py-1 font-mono text-xs text-[var(--fel-gold)]">{hud.winBy2 === true ? 'TO 11 · WIN BY 2' : 'TO 11'}</span>
+          {/* IMPROVE (2026-10-06) #10: the last five releases, oldest first — green in the window, amber early / late, red way late —
+              and the lean once there are three to read, so a player can see their timing bias */}
+          {phase === 'playing' && typeof hud.shotPips === 'string' && hud.shotPips && (
+            <span className="fel-panel flex items-center gap-1 px-2 py-1" aria-label={`last releases: ${hud.shotPips}`}>
+              {hud.shotPips.split('').map((c, i) => (
+                <span key={i} className="inline-block h-2 w-2 rounded-full" style={{ background: PIP_HEX[c] ?? '#ffffff' }} />
+              ))}
+              {pipBias(hud.shotPips) && <span className="ml-1 font-mono text-[9px] text-white/70">{pipBias(hud.shotPips)}</span>}
+            </span>
+          )}
+        </span>
       </div>
 
       {/* shot meter */}
@@ -129,6 +151,13 @@ export default function BasketballBabylon({ onEnd }: GameProps) {
           <span className="fel-heading text-3xl font-bold text-[var(--fel-cyan)] drop-shadow">{hud.banner}</span>
         </div>
       )}
+      {/* IMPROVE (2026-10-06) #1: ONE line for the state you are in (the mode's hint — it used to be every control at once, and
+          this host never drew it) */}
+      {typeof hud.hint === 'string' && hud.hint && phase === 'playing' && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-16 px-3 text-center">
+          <span className="fel-panel px-3 py-1 font-mono text-[10px] text-white/75">{hud.hint}</span>
+        </div>
+      )}
       {phase === 'playing' && <MicCaption text={hud.mic} who={hud.micWho} />}
       {phase === 'playing' && <MicToggle />}
 
@@ -140,6 +169,10 @@ export default function BasketballBabylon({ onEnd }: GameProps) {
         onStart={tapStart}
         onRetry={tapStart}
       />
+
+      {/* HOOPS PAUSE (2026-10-06). Owner: "Hoops pause: Controls panel only" — the full OFFENSE / DEFENSE list that sat along the
+          bottom here on pause (IMPROVE #1) is in the splash's CONTROLS panel now (lib/babylon/ui/panelLines.ts PANEL_GROUPS): one
+          list on the pause, the same as every other mode. */}
 
       {(phase === 'playing' || phase === 'countdown') && busRef.current && (
         <TouchOverlay bus={busRef.current} modeId="onevone" visible />

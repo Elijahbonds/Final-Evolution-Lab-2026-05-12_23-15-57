@@ -18,6 +18,7 @@
 //     late taps an earlier time the server cannot check — a staked set judges a phone tap as it arrives, as before.
 
 import type { RoomState } from '@/lib/controller-link/types';
+import type React from 'react';
 
 declare global {
   interface Window {
@@ -90,6 +91,38 @@ export function phoneRoomOpen(open: boolean, view: string): boolean {
  */
 export function phoneBadgeShown(view: string, phones: number, pairing = false): boolean {
   return view === 'flip' || phones > 0 || pairing;
+}
+
+/**
+ * MUSIC-SUITE P10 (2026-09-29): WHERE THE BADGE SITS. HostLobby positions its badge `absolute right-4 top-4` against the
+ * nearest positioned ancestor — in the Academy that was the page, so the "CODE · 0/1 connected" pill floated over the
+ * header: on a 375 px phone across the FEL GROOVE ACADEMY title, on a desktop over the "Calibrate ↗" link (P5's frames
+ * p5flip-phone-flip.png / p5phone-host-studio-phone-connected.png; P5's open item). The room now gives the badge a row
+ * of its own in the page's flow (PHONE_BADGE_ROW: a positioned box as tall as the badge) and anchors it at that row's
+ * top right, so nothing is under it. The lobby's panel (opened on a tap) still overlays the page below, as it does in
+ * every other host.
+ */
+export const PHONE_BADGE_ANCHOR = 'right-0 top-0';
+export const PHONE_BADGE_ROW: Readonly<{ position: 'relative'; minHeight: number; margin: string }> = { position: 'relative', minHeight: 30, margin: '4px 0' };
+
+/**
+ * MUSIC-SUITE P10 FIX (2026-09-29): THE ROW NEVER COLLAPSES UNDER A SET. The badge's own row (above) is in the page's
+ * flow, so when it went from shown to `display: none` everything below it — PERFORM's lanes and pads mid-set included —
+ * jumped up 38 px (30 px + 2 × 4 px margin): a phone that DROPPED in a set paired from FLIP (phones 1 → 0, no PAIR asked
+ * in PERFORM) collapsed the row under the player's thumbs. Before P10 the badge floated (absolute) and took no space.
+ * The review found it by reading the code (assumption in its words, not measured). Now: once the badge has shown on the
+ * view the player is on, its row is RESERVED (kept, invisible) until they change view — a tab switch is a new page
+ * anyway. It still appears in the flow the first time a phone joins on a tab (that is the moment the player looks at it).
+ */
+export type PhoneBadgeRow = 'show' | 'reserve' | 'none';
+export function phoneBadgeRow(shown: boolean, shownOnThisView: boolean): PhoneBadgeRow {
+  return shown ? 'show' : shownOnThisView ? 'reserve' : 'none';
+}
+/** The row's style for each state (reserve = the same box, hidden: the space stays, nothing is drawn or tappable). */
+export function phoneBadgeRowStyle(row: PhoneBadgeRow): React.CSSProperties {
+  if (row === 'show') return PHONE_BADGE_ROW;
+  if (row === 'reserve') return { ...PHONE_BADGE_ROW, visibility: 'hidden', pointerEvents: 'none' };
+  return { display: 'none' };
 }
 
 // ── ROUND TRIP ─────────────────────────────────────────────────────────────────────────────────────────────────────────

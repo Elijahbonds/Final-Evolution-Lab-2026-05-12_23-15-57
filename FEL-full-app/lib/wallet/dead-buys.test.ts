@@ -212,6 +212,25 @@ describe('telling a dead buy from a delivered one', () => {
     expect(refundableDeadBuys([store], { ...NONE, bookedCharges: new Set([store.row.id]) })).toEqual([store]);
   });
 
+  // MIRROR-COACH P8 (2026-09-29), owner decision #24: /workout sells again. A relaunch charge's key is composed on the
+  // server (workout:<player>:<the browser's key>, lib/workout/pastBuyer.ts workoutChargeKey), so it is never a candidate
+  // — its plan is written in the same request under an id fixed by the charge — and the rule above stays exactly what it
+  // was for every charge made before the relaunch (all of them carry the browser's key).
+  it('a workout plan bought since the relaunch is never a candidate, whatever became of its plan; a past one still is', async () => {
+    const { workoutChargeKey } = await import('@/lib/workout/pastBuyer');
+    for (const sku of ['workout_plan_4w', 'workout_program_12w']) {
+      const relaunch = row({ sku, currency: 'shards', delta: sku === 'workout_plan_4w' ? -60 : -200, idempotencyKey: workoutChargeKey('p1', UUID) });
+      expect(isClientMadeKey(relaunch.idempotencyKey)).toBe(false);
+      expect(deadBuyOf(relaunch, 'p1'), sku).toBeNull();
+      expect(deadBuyOf({ ...relaunch, idempotencyKey: UUID }, 'p1'), sku).not.toBeNull();
+      // the rows keep the tiers relaunch plans are stored under, so a relaunch plan is a delivery the rule counts
+      expect(DEAD_CATALOG_BUYS[sku]).toMatchObject({ match: 'workout_plan', deliveredAs: sku === 'workout_plan_4w' ? 'plan_4w' : 'program_12w' });
+    }
+    // a relaunch plan, days after a past charge, does not claim it: the window is minutes
+    const past = buy(row({ sku: 'workout_plan_4w', currency: 'shards', delta: -60, createdAt: at(0) }));
+    expect(refundableDeadBuys([past], { ...NONE, plans: [{ tier: 'plan_4w', createdAt: at(60 * 24 * 10) }] })).toEqual([past]);
+  });
+
   it('a boost card: the earliest charge of it delivered, whatever its key; a later /store charge did not', () => {
     const mk = (min: number, key = UUID, id?: string) => row({ ...(id ? { id } : {}), sku: 'boost_card_neural-max', currency: 'shards', delta: -400, createdAt: at(min), idempotencyKey: key });
     const profile = mk(0, 'boost_card:p1:neural-max'), store1 = mk(10), store2 = mk(20);

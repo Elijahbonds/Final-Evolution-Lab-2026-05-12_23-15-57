@@ -4,7 +4,9 @@
 // jumping; a low readiness day shortens the launch and the primer and says so; and every line a plan can show is FEL's
 // own words — nothing that names a condition, promises an outcome, says "risk" or "prevent", or borrows the book.
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 import type { MovementPattern } from '@/public/_prisma/client';
+import { PROTOCOL_WHY } from './protocolGate';
 import { WAKE_UP } from '@/lib/drills/drills';
 import { DrillRunner } from '@/lib/drills/DrillRunner';
 import { CORRECTIVE_BLOCK } from '@/lib/mirror/screenCorrectives';
@@ -14,6 +16,7 @@ import { PATTERNS } from './catalogue';
 import { SESSION_SECTIONS } from './taxonomy';
 import type { PainDecision } from '@/lib/health/painRule';
 import {
+  JUMP_GATE_DEFAULT_WHY, WARMUP_FOLLOWS_JUMP_GATE, jumpGateNote,
   DEFAULT_WARMUP_MINUTES, FALLBACK_WARMUP_CONTEXT, LOW_DAY_WARMUP_MINUTES, WAKE_UP_IMPACT_GATED, LAUNCH_PHASE_ID, LOW_DAY_LAUNCH_SEC, NOTE_COPY, PAIN_LOOKBACK_DAYS,
   WAKE_UP_BY_MINUTES, WAKE_UP_CAMERA_HREF, WAKE_UP_SOURCE_LINE, WARMUP_MEANING, WARMUP_MINUTES, breathAt, generateWarmup,
   guidedElapsed, heldBackLines, lowDayNote, nextGuided, painDecisionToday, pauseGuided, phaseImpact, pickPrimer, pickRockHolds,
@@ -297,6 +300,27 @@ describe('readiness: a low day shortens the launch and the primer and says why (
   });
 });
 
+// MIRROR-COACH P9 fix (2026-09-30, code review): the owner's Playbook, ch4 — "Don't stretch the psoas … kneeling lunge
+// stretch, hold" — against the Half-Kneel Hip Rock and Hold that ran before every lunge, hinge, squat, locomotion and
+// carry session. The Playbook's line wins; decision #7's rock-then-hold step stays (the other eight).
+describe('no kneeling hip-flexor stretch-and-hold (the owner\'s Playbook, ch4)', () => {
+  it('the pool holds no half-kneeling forward stretch, and the Playbook line it follows is still there', () => {
+    expect(ROCK_HOLDS.map((r) => r.id)).not.toContain('hip-front-rock');
+    for (const r of ROCK_HOLDS) {
+      const kneelingForward = /half-kneel/i.test(`${r.name} ${r.setup}`) && /ease (the hips )?forward|hips forward/i.test(r.cue);
+      expect(kneelingForward, r.id).toBe(false);
+      expect(`${r.name} ${r.setup} ${r.cue}`, r.id).not.toMatch(/hip flexor|psoas|couch stretch/i);
+    }
+    expect(readFileSync('lib/education/playbook.data.json', 'utf8')).toMatch(/Don't stretch the psoas/);
+  });
+  it('every warm-up and every cool-down still has its rock-then-hold (decision #7), for every pattern', () => {
+    for (const pattern of PATTERNS.filter((x) => x !== 'other')) {
+      expect(ROCK_HOLDS.filter((r) => r.patterns.includes(pattern)).length, pattern).toBeGreaterThanOrEqual(2);
+    }
+    expect(ROCK_HOLDS.some((r) => r.zones.includes('lumbo_pelvic'))).toBe(true);   // the hips keep the owner's 90/90
+  });
+});
+
 describe('the stretch aims at the weakest screen area; the primer at the pattern; general is said to be general', () => {
   it('a flagged area picks a stretch for that area (and the pattern where one fits both)', () => {
     for (const zone of WARMUP_ZONES) for (const pattern of ALL_PATTERNS) {
@@ -387,7 +411,10 @@ describe('the content: FEL\'s, youth-safe where it says so, and every line clean
   const BOOK = /Pain[- ]?Free|Rusin|Cordoza|Victory Belt|biphasic|pin[- ]and[- ]stretch|soft[- ]tissue|nervous[- ]system primer|tension table/i;
   // acronyms, case-sensitive: the owner's own Wall Drive says "a straight ramp", which is not the warm-up acronym
   const ACRONYMS = /\bRAMP\b|\bPAILs?\b|\bRAILs?\b|\bCARs\b|\bRPR\b/;
-  const CLAIMS = /\b(injur\w*|prevent\w*|risks?|reduc\w*|protect\w*|heal\w*|cure\w*|treat\w*|rehab\w*|guarantee\w*|safer)\b/i;
+  // MIRROR-COACH P8 FIX (2026-09-30): `heal\w*` also caught "health", so the protocol gate's own lines ("…your health
+  // answers") could not appear in the warm-up's jump-gate note. NARROWED ON PURPOSE, and only that far: heal, heals,
+  // healed, healing (the claim words) stay banned — the negative control below proves it; "health" is not a claim.
+  const CLAIMS = /\b(injur\w*|prevent\w*|risks?|reduc\w*|protect\w*|heal(?!th)\w*|cure\w*|treat\w*|rehab\w*|guarantee\w*|safer)\b/i;
   const lint = (text: string) => {
     expect(text, text).not.toMatch(BOOK);
     expect(text, text).not.toMatch(ACRONYMS);
@@ -396,13 +423,21 @@ describe('the content: FEL\'s, youth-safe where it says so, and every line clean
     expect(screenText(text), text).toEqual([]);
   };
 
+  it('the claims lint still bans the heal words (negative control for the P8 narrowing), and lets "health answers" through', () => {
+    for (const bad of ['It helps you heal', 'Heals the knee', 'healed faster', 'a healing warm-up']) expect(bad).toMatch(CLAIMS);
+    expect('Jumps and drops wait for your health answers.').not.toMatch(CLAIMS);
+  });
+
   it('every line of content, every note and every step of every plan passes the lint', () => {
     for (const r of ROCK_HOLDS) [r.name, r.setup, r.cue].forEach(lint);
     for (const p of PRIMERS) [p.name, p.cue, p.dose.reps, p.lowDay.reps].forEach(lint);
     [WARMUP_MEANING, WAKE_UP_SOURCE_LINE, ...Object.values(NOTE_COPY), ...WARMUP_ZONES.map(zoneNote),
       screenClearNote(true), screenClearNote(false), screenNoneNote(true), screenNoneNote(false),
       untaggedNote('untagged_key_set', false), untaggedNote(null, false), untaggedNote('key_set', true),
-      lowDayNote(true, true), lowDayNote(true, false), lowDayNote(false, true), lowDayNote(false, false)].forEach(lint);
+      lowDayNote(true, true), lowDayNote(true, false), lowDayNote(false, true), lowDayNote(false, false),
+      // MIRROR-COACH P8 FIX: the jump gate's note (with the gate's own lines — protocolGate.test.ts lints those too)
+      jumpGateNote(''), jumpGateNote(PROTOCOL_WHY.landing_never), jumpGateNote(PROTOCOL_WHY.intake_answer), JUMP_GATE_DEFAULT_WHY,
+      ...heldBackLines({ heldBack: [{ id: 'x', name: 'Build the Rhythm', why: 'jump_gate' }] })].forEach(lint);
     const seen = new Set<string>();
     for (const input of everyInput()) for (const t of planText(generateWarmup(input))) seen.add(t);
     seen.forEach(lint);
@@ -549,8 +584,8 @@ describe('the guided run on Today', () => {
 });
 
 describe('the camera hand-off: the plan\'s Wake-Up as a Drill a DrillRunner can play', () => {
-  it('no page mounts the drill runner yet, so the link is off (the guided run is the way in)', () => {
-    expect(WAKE_UP_CAMERA_HREF).toBeNull();
+  it('the camera link opens the drills page\'s Wake-Up (DRILLS 2026-10-07: /play/drills mounts the runner)', () => {
+    expect(WAKE_UP_CAMERA_HREF).toBe('/play/drills?drill=wake-up');
   });
 
   it('keeps only the plan\'s phases, in order; the full 10, 14 and 18 are WAKE_UP itself; nothing kept is null', () => {
@@ -611,5 +646,53 @@ describe('the server\'s answer, read on the client', () => {
     expect(heldBackLines(p)).toEqual(['Build the Rhythm, Prime the Launch, Squat Jump Primer: left out until your details load.']);
     // a real youth context still says why, in its own words
     expect(gen({ isYouth: true }).notes.map((n) => n.id)).toContain('youth_impact');
+  });
+});
+
+
+// ── MIRROR-COACH P8 FIX (2026-09-30, code review): P8's protocol gate reaches the warm-up ────────────────────────────
+describe("THE JUMP GATE (rule (b)): a shut gate holds the Wake-Up's jumps and FEL's jump primer", () => {
+  const shut = { closed: true, why: PROTOCOL_WHY.landing_never, href: '/play/mirror/assess' };
+  it('the switch is on (the owner-decision conflict, resolved on the careful side)', () => {
+    expect(WARMUP_FOLLOWS_JUMP_GATE).toBe(true);
+  });
+  it('an adult, gate open (or no verdict handed in): jumps as before', () => {
+    for (const jumpGate of [undefined, { closed: false, why: '', href: null }]) {
+      expect(gen({ pattern: 'squat', isYouth: false, jumpGate }).steps.filter((x) => x.impact).map((x) => x.id)).toEqual(['build-the-rhythm', 'prime-the-launch', 'squat-jump-primer']);
+    }
+  });
+  for (const pattern of ['squat', 'hinge', 'lunge', 'locomotion'] as const) {
+    it(`an adult, gate shut, a ${pattern} day: no impact step at all, the calm primer, and the gate's line`, () => {
+      const p = gen({ pattern, isYouth: false, jumpGate: shut });
+      expect(p.steps.some((x) => x.impact)).toBe(false);
+      expect(p.steps.find((x) => x.kind === 'primer')?.impact ?? false).toBe(false);
+      expect(p.heldBack.filter((x) => x.why === 'jump_gate').length).toBeGreaterThanOrEqual(3);
+      expect(p.notes.find((n) => n.id === 'jump_gate')!.text).toBe(jumpGateNote(PROTOCOL_WHY.landing_never));
+    });
+  }
+  it("a coach's Prime (no FEL primer that day): the Wake-Up's jumps still wait", () => {
+    const p = gen({ pattern: 'squat', isYouth: false, coachPrime: true, jumpGate: shut });
+    expect(p.steps.some((x) => x.impact)).toBe(false);
+  });
+  it("a youth athlete whose coach put jumps in Prime (the youth rule lifted): the gate's other reasons still hold them", () => {
+    const open = gen({ pattern: 'squat', isYouth: true, coachAssignedImpact: true });
+    expect(open.steps.some((x) => x.kind === 'wake_up' && x.impact)).toBe(true);
+    const p = gen({ pattern: 'squat', isYouth: true, coachAssignedImpact: true, jumpGate: shut });
+    expect(p.steps.some((x) => x.impact)).toBe(false);
+    expect(p.heldBack.filter((x) => x.why === 'jump_gate').map((x) => x.id)).toEqual(['build-the-rhythm', 'prime-the-launch']);
+    expect(p.notes.map((n) => n.id)).not.toContain('coach_impact');
+  });
+  it('the youth rule keeps its own words when both hold', () => {
+    const p = gen({ pattern: 'squat', isYouth: true, jumpGate: shut });
+    expect(p.heldBack.filter((x) => x.why === 'youth_impact').length).toBeGreaterThan(0);
+    expect(p.notes.map((n) => n.id)).toContain('youth_impact');
+  });
+  it('the time the held phases free goes to the stretches exactly as it does for a youth plan (the same steps, the same length)', () => {
+    for (const minutes of WARMUP_MINUTES) {
+      const adult = gen({ pattern: 'squat', isYouth: false, minutes, jumpGate: shut });
+      const youth = gen({ pattern: 'squat', isYouth: true, minutes });
+      expect(adult.steps.map((x) => [x.id, x.seconds])).toEqual(youth.steps.map((x) => [x.id, x.seconds]));
+      expect(adult.totalSec).toBeLessThanOrEqual(minutes * 60);
+    }
   });
 });

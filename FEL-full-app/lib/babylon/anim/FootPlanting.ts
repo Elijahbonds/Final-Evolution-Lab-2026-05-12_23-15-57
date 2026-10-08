@@ -43,6 +43,7 @@ export interface ContactParams {
   liftSpeed?: number;
 }
 
+
 /**
  * HOOPS-DEPTH S7 (2026-09-23): THE FEET POPPED. Contact was read from the ankle's HEIGHT alone, and a defensive shuffle
  * keeps both feet low: the swing foot was pinned like the stance foot, held while the body moved on (7 cm a frame in a
@@ -103,6 +104,9 @@ export function pinWeight(driftM: number, maxDrift: number): number {
 }
 /** A pin let go by the clip (a lift, a swing) fades out over this long instead of dropping in one frame. */
 export const RELEASE_FADE_SEC = 0.1;
+/** MOVEMENT POLISH (2026-10-06): a root moving vertically faster than this (m/s) is in the air — a jump, a drop — and holds no pin. A
+ *  walking body's root does not bob (the clips carry the bob below it); steps and ramps move it well under this. */
+export const AIRBORNE_VY = 1.2;
 
 // ── one writer per leg ──────────────────────────────────────────────────────
 /**
@@ -201,11 +205,16 @@ export function mountFootPlanting(scene: Scene, skinned: AbstractMesh, skeleton:
       const rootStep = pr ? { x: rootPos.x - pr.x, z: rootPos.z - pr.z } : null;
       const clipSpeed = pc && pr && rootStep ? swingSpeed(rootStep, { x: (ankle.x - rootPos.x) - (pc.x - pr.x), z: (ankle.z - rootPos.z) - (pc.z - pr.z) }, dt) : undefined;
       const jumped = !!rootStep && Math.hypot(rootStep.x, rootStep.z) > 2;   // a teleport (a reset)
+      // MOVEMENT POLISH (2026-10-06): A BODY IN THE AIR HAS NO PLANTED FOOT. The contact reads the ankle's height above the ROOT, and a
+      // jump lifts the root with the ankle — so the foot planted at take-off stayed pinned to the floor's XZ while the body flew on, and
+      // let go only at the drift limit (Free Run's take-off at 6 m/s: the trailing foot dragged back, then caught up 34 cm/frame² in a
+      // frame on a hard jump, 25 with this, _movement-probe). The root rising or falling faster than AIRBORNE_VY lifts every pin (with the release fade).
+      const flying = !!pr && Math.abs(rootPos.y - pr.y) / dt > AIRBORNE_VY;
       leg.prevClip = pc ?? new Vector3(); leg.prevClip.copyFrom(ankle); leg.prevRoot = pr ?? new Vector3(); leg.prevRoot.copyFrom(rootPos);
       if (jumped) { debug[leg.side === 'Left' ? 'left' : 'right'] = { planted: false, pin: { x: ankle.x, y: ankle.y, z: ankle.z } }; leg.fadeLeft = 0; leg.claimPin = null; continue; }   // a teleport: nothing to hold
       const key = leg.side === 'Left' ? 'left' : 'right';
       const prev = debug[key];
-      const next = stepContact(prev, ankle.y - rootPos.y, { x: ankle.x, y: ankle.y, z: ankle.z }, params, clipSpeed);
+      const next = flying ? { planted: false, pin: prev.pin } : stepContact(prev, ankle.y - rootPos.y, { x: ankle.x, y: ankle.y, z: ankle.z }, params, clipSpeed);
       debug[key] = next;
       // S30: a claimed leg is the claimant's (the contact state above still reads the clip); the claim's end hands the foot over from its pin
       const claim = legClaims.get(skeleton)?.get(leg.side);
@@ -221,6 +230,7 @@ export function mountFootPlanting(scene: Scene, skinned: AbstractMesh, skeleton:
         // let go by the clip: the pin FADES instead of dropping — a planted foot the clip lifts or swings eases onto the clip
         if (prev.planted && !handover) leg.fadeLeft = RELEASE_FADE_SEC;
         if (leg.fadeLeft > 0 && leg.fadeW > 0.001) {
+          if (flying && rootStep) { leg.fadeTarget.x += rootStep.x; leg.fadeTarget.z += rootStep.z; }   // (polish) a pin let go in the air fades out WITH the body
           leg.fadeLeft = Math.max(0, leg.fadeLeft - dt);
           const w = leg.fadeW * (leg.fadeLeft / RELEASE_FADE_SEC);
           if (w > 0.001) { target.copyFrom(leg.fadeTarget); target.y = ankle.y; Vector3.LerpToRef(ankle, target, w, target); plantLeg(leg.hip, leg.knee, leg.ankle, target, opts.root.forward); }

@@ -60,6 +60,9 @@ describe('the plaza has goals pointing at it', () => {
       if (g.kind === 'score') t.report({ type: 'bank', value: g.target });
       if (g.kind === 'combo') t.report({ type: 'comboLanded', value: g.target });
       if (g.kind === 'collect') for (let i = 0; i < g.target; i++) t.report({ type: 'collect', collectibleId: `c${i}` });
+      // IMPROVE (2026-10-06): the trick goals, done on a feature of their own name (ParkGoals.trick.test.ts proves the names
+      // are real plaza labels)
+      if (g.kind === 'trick') t.report({ type: 'trick', trickId: g.trickId, where: typeof g.where === 'string' ? g.where : g.where?.[0] });
     }
     expect(t.allDone, `only ${t.doneCount}/${SKATE_GOALS.length}`).toBe(true);
   });

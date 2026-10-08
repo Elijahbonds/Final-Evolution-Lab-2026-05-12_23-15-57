@@ -23,7 +23,7 @@ const PAIRS: ReadonlyArray<readonly [string, string]> = [
   ['lib/babylon/modes/CourtCarnivalMode.ts', 'components/games/carnival-babylon.tsx'],
   ['lib/babylon/modes/ShowdownMode.ts', 'components/games/showdown-babylon.tsx'],
   ['lib/babylon/modes/DuelMode.ts', 'components/games/duel-babylon.tsx'],
-  ['lib/babylon/modes/FootballMode.ts', 'components/games/football-babylon.tsx'],
+  ['lib/babylon/modes/FootballRushMode.ts', 'components/games/football-babylon.tsx'],
   ['lib/babylon/modes/ThreeVThreeMode.ts', 'components/games/three-v-three-babylon.tsx'],
 ];
 
@@ -54,6 +54,11 @@ function emittedOutcomes(src: string): string[] {
 function checkedOutcomes(src: string): string[] {
   const out = new Set<string>();
   for (const m of src.matchAll(/r\.outcome\s*===\s*'([A-Za-z_][A-Za-z_0-9]*)'/g)) out.add(m[1]);
+  if (src.includes('footballSessionWon')) {
+    const helper = readFileSync('lib/sessions/gameResultFromSession.ts', 'utf8');
+    const fn = helper.match(/export function footballSessionWon\([^)]*\)[^{]*\{[^}]+\}/)?.[0] ?? '';
+    for (const m of fn.matchAll(/outcome === '([A-Za-z_][A-Za-z_0-9]*)'/g)) out.add(m[1]);
+  }
   return [...out];
 }
 

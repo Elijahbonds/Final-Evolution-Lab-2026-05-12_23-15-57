@@ -16,6 +16,7 @@ const m = vi.hoisted(() => ({
   accessor: true, // false: a Prisma client generated before the model, with no prisma.sessionJoinLink at all
   failWith: null as null | { code: string }, // any other database failure
   spent: [] as { playerId: string; skuId: string; idempotencyKey: string }[], // what the booking route charged
+  dobs: new Map<string, number | null>(),
 }));
 
 vi.mock('next-auth', () => ({ getServerSession: async () => m.session }));
@@ -57,9 +58,8 @@ vi.mock('@/lib/db', () => {
       : v && typeof v === 'object' && Array.isArray(v.in) ? v.in.includes((b as any)[k])
         : (b as any)[k] === v
   ));
-  return {
-    prisma: {
-      user: { findUnique: async ({ where }: any) => (m.roles.has(where.id) ? { role: m.roles.get(where.id) } : null) },
+  const prisma: any = {
+      user: { findUnique: async ({ where }: any) => (m.roles.has(where.id) ? { role: m.roles.get(where.id), dobYear: m.dobs.has(where.id) ? m.dobs.get(where.id) : 1990 } : null) },
       facilitatorProfile: { findUnique: async ({ where }: any) => (m.certified.has(where.userId) ? { certificationStatus: 'certified' } : null) },
       sessionBooking: {
         findMany: async ({ where }: any) => m.bookings.filter((b) => matches(b, where)).sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime()),
@@ -79,10 +79,22 @@ vi.mock('@/lib/db', () => {
           }
           return [...out.values()];
         },
+        update: async ({ where, data }: any) => {
+          const row = m.bookings.find((b) => b.id === where.id);
+          if (row) Object.assign(row, data);
+          return row;
+        },
+        updateMany: async ({ where, data }: any) => {
+          let count = 0;
+          for (const b of m.bookings) if (matches(b, where)) { Object.assign(b, data); count++; }
+          return { count };
+        },
       },
       get sessionJoinLink() { return m.accessor ? joinLinks : undefined; },
-    },
   };
+  prisma.$queryRawUnsafe = async () => [];
+  prisma.$transaction = async (fn: any) => fn(prisma);
+  return { prisma };
 });
 
 import { GET } from '@/app/api/v1/sessions/route';
@@ -112,6 +124,7 @@ beforeEach(() => {
   m.accessor = true;
   m.failWith = null;
   m.spent.length = 0;
+  m.dobs.clear();
   m.roles.set('admin1', 'admin').set('owner1', 'owner').set('p1', 'player').set('p2', 'player').set('p3', 'player').set('coach1', 'player');
   warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 });
@@ -450,6 +463,14 @@ describe('a private 1-on-1 holds one player', () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ booked: true, alreadyBooked: true });
     expect(m.spent).toHaveLength(1);
+  });
+
+  it('refuses an unknown age and a minor before anything is charged', async () => {
+    m.dobs.set('p1', null);
+    expect((await bookPrivate('p1')).status).toBe(403);
+    m.dobs.set('p1', 2012);
+    expect((await bookPrivate('p1')).status).toBe(403);
+    expect(m.spent).toHaveLength(0);
   });
 
   it('a cancelled booking does not hold the slot', async () => {

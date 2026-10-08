@@ -25,6 +25,15 @@ function fakeKv(backing: Map<string, string>): KvTransport & { calls: number } {
       backing.set(key, String(n));
       return n;
     },
+    // MULTIPLAYER (2026-10-06): the mailbox is a list now. Kept as a JSON array in the shared map so two "isolates"
+    // still see one store.
+    async append(key: string, value: string, cap: number) {
+      t.calls++;
+      const list = JSON.parse(backing.get(key) ?? '[]') as string[];
+      list.push(value);
+      backing.set(key, JSON.stringify(list.slice(-cap)));
+    },
+    async list(key: string) { t.calls++; return JSON.parse(backing.get(key) ?? '[]') as string[]; },
   };
   return t;
 }
@@ -89,6 +98,8 @@ async function main(): Promise<void> {
     async get() { throw new Error('kv down'); },
     async set() { throw new Error('kv down'); },
     async incr() { throw new Error('kv down'); },
+    async append() { throw new Error('kv down'); },
+    async list() { throw new Error('kv down'); },
   });
   let threw = false;
   try { await broken.poll('AB12', 'host', 0); } catch { threw = true; }

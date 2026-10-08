@@ -99,6 +99,48 @@ export function trickPoints(t: FreeRunTrick, launch: keyof typeof LAUNCH_MULT, l
 /** Did the air last long enough for the trick to come round? */
 export function trickCompletes(t: FreeRunTrick, airSec: number): boolean { return airSec >= t.airSec * 0.85; }
 
+// IMPROVE (2026-10-06): a trick is judged on the rotation it actually SPUN, not on the airtime around it. Judging on
+// `airSec` paid a flip thrown a frame before touchdown on a long drop as clean while the body was half round — the
+// screen showed a bail and the score said otherwise. The share is the same 85 % `trickCompletes` used, and the mode
+// spins a trick at turns·2π / airSec, so a trick thrown at take-off grades exactly as before.
+/** The share of a trick's rotation that counts as "around" (safe to land). */
+export const TRICK_AROUND = 0.85;
+/** The whole rotation a trick spins, in radians. */
+export function trickTotalRad(t: FreeRunTrick): number { return Math.abs(t.turns) * 2 * Math.PI; }
+/** How far round the trick is, 0..1, from the radians spun so far. */
+export function trickProgress(t: FreeRunTrick, spunRad: number): number { return Math.max(0, Math.min(1, spunRad / trickTotalRad(t))); }
+/** Did the body come round far enough to land the trick? */
+export function trickRotationComplete(t: FreeRunTrick, spunRad: number): boolean { return trickProgress(t, spunRad) >= TRICK_AROUND - 1e-9; }
+
+// ── steering ────────────────────────────────────────────────────────────
+// IMPROVE (2026-10-06): the air and surf steer were per-FRAME lerps (0.04, 0.12), so a 144 Hz screen steered ~2.4× harder
+// than a 60 Hz one. As rates they are k = −60·ln(1 − f): the SAME feel at 60 fps, and the same at every other rate.
+export const AIR_STEER_K = -60 * Math.log(1 - 0.04);    // ≈ 2.45 /s
+export const SURF_STEER_K = -60 * Math.log(1 - 0.12);   // ≈ 7.67 /s
+/** The share of the way to steer this frame for a rate k (1/s): 1 − e^(−k·dt). */
+export function steerAlpha(k: number, dt: number): number { return 1 - Math.exp(-k * Math.max(0, dt)); }
+
+/** IMPROVE (2026-10-06): how fast the run's HEADING (the velocity, not just the mesh) may turn on the ground (rad/s).
+ *  At a walk the stick still pivots you on the spot; above WALK_MAX the heading turns at the runner's body turn rate
+ *  (RunPosture.RUNNER_TURN_RATE, 8 rad/s), so the velocity and the body come round together instead of the velocity
+ *  reversing in one frame while the mesh slewed after it (the body slid sideways). */
+export const GROUND_TURN_RATE = 8.0;
+export function groundTurnRate(speed: number): number { return speed <= WALK_MAX ? Infinity : GROUND_TURN_RATE; }
+
+// ── the slide ───────────────────────────────────────────────────────────
+/** A slide lasts this long from a tap (B, or LT let go early). */
+export const SLIDE_SEC = 0.7;
+/** IMPROVE (2026-10-06): LT HELD keeps the slide going past SLIDE_SEC, up to this. The old release branch carried
+ *  `&& false` because a B slide has no hold (ltHeld is false), so an early release would have cut every B slide to
+ *  0.25 s. A tap is unchanged; the hold is what is new. */
+export const SLIDE_HOLD_MAX_SEC = 1.2;
+/** Should the slide end, `elapsed` seconds in? `byLt` = the slide came from LT, `ltHeld` = LT is down now. */
+export function slideEnds(elapsed: number, byLt: boolean, ltHeld: boolean): boolean {
+  if (elapsed >= SLIDE_HOLD_MAX_SEC) return true;
+  if (elapsed < SLIDE_SEC) return false;
+  return !(byLt && ltHeld);
+}
+
 // ── the run ─────────────────────────────────────────────────────────────
 export interface Tier { id: 1 | 2 | 3; name: string; parSec: number; gaps: number; routeBonus: number }
 export const TIERS: readonly Tier[] = [

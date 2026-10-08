@@ -26,7 +26,7 @@ orchestrator.
 
 | # | Item | Why open | Belongs to |
 |---|---|---|---|
-| B13 | Sprint is disabled in the rollout (`ENABLED_BABYLON_MODES` has no `'sprint'`; retired from the v1 roster 2026-09-01), so its new pause overlay is unexercised by any sweep | the probe can open `/play/sprint` but no gauntlet row covers it | `lib/babylon/modes/SprintMode.ts`, `scripts/gauntlet.sh` |
+| B13 | Sprint is enabled and reachable, and its old gauntlet gap is closed | both `scripts/gauntlet.sh` and `scripts/gauntlet-play.sh` now include `sprint`; leave this row only as the audit trail for the former rollout miss | `lib/babylon/modes/SprintMode.ts`, `scripts/gauntlet.sh`, `scripts/gauntlet-play.sh` |
 | B14 | Music, acting and IRL routes render outside `GameShell` by design (studio experiences with their own full-screen UI) | not sports modes; recorded so the "one shell" claim is read correctly | `components/games/acting-game.tsx`, the music and IRL routes |
 | B15 | Phase 8 e2e proof done for karate VS only when written; the same probe "now runs across the other twenty playable routes" — results not in the findings log | proof per route is the phase 8 gate | `scripts/probes/_session-e2e.mts`, `docs/SHIP-PASS-4.md` |
 | B16 | 13 of 16 game components draw their own "PAUSED — TAP TO RESUME" (now 16) instead of the shell drawing it once | consistency pass added the missing three; did not centralise | `components/games/*-babylon.tsx`, the shell |
@@ -44,7 +44,7 @@ orchestrator.
 | B23 | Kit body tri count 29,647 (body alone 26,756) vs the 25k advisory budget; way down is MPFB's low-poly proxy body | accepted for desktop; not addressed for mobile | `scripts/avatar/mpfb/dress-kit.py` |
 | B24 | `skinFor()` always picks the male map (`sex === 'male'`) — sex was to arrive with the body roster | comment in code says "sex arrives with the body roster (rung 3)"; roster shipped, selector unchanged | `lib/babylon/core/playerIdentity.ts` (perf lane owns this file this run) |
 | B25 | Mocap golf grip test still fails on the candidate (72 of 73 animation tests) | D-M1 closed for the shipped clip; one rig test left | `lib/babylon/anim/authored/`, `public/mocap/` |
-| B26 | `dress-kit.py` hard-codes the MPFB user-data path under `/Users/elijahbonds/...`; five probe scripts hard-code the Chrome for Testing path under `chromium-1234` | reproducibility on another machine | `scripts/avatar/mpfb/dress-kit.py`, `scripts/probes/*.mts`, `scripts/capture-mode-play.mts` |
+| B26 | `dress-kit.py` hard-codes the MPFB user-data path under `/Users/elijahbonds/...`; older one-off probes still hard-code Chrome for Testing paths under `chromium-*` | reproducibility on another machine; the comprehensive all-modes probe now uses `scripts/probes/_chromium.mts`, so this is no longer a blocker for the main boot sweep | `scripts/avatar/mpfb/dress-kit.py`, older `scripts/probes/*.mts` |
 
 ## Matrix gaps carried (from `docs/SHIP-PASS-4-MATRIX.md`, 26 at HEAD)
 

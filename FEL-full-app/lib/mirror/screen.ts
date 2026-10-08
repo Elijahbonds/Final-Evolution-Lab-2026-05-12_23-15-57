@@ -486,7 +486,9 @@ const MEANING: Record<string, string> = {
 
 const FIX: Record<string, string> = {
   heelLine: 'Foot tripod work before anything loaded — short-foot holds, then slow calf raises with the heel tracking straight.',
-  kneeWindow: 'Hip external-rotation and glute-medius work, and slow tempo squats watching the knee track over the second toe.',
+  // MIRROR-COACH P9 fix (2026-09-30): it said "…and glute-medius work" — a muscle by name, which FEL's cue policy
+  // (lib/coach/cueLint.ts rule 1) does not use; the same hip work, named by what it is
+  kneeWindow: 'Hip external-rotation work and banded side steps, then slow tempo squats watching the knee track over the second toe.',
   // P3 review (2026-09-26): capacity to build, not a restriction — the line said "stop loading the tilt with heavy
   // bilateral lifts for now", reachable from one estimated 2-D camera read
   hipLevel: 'Single-leg hip work on the low side, to build that side up alongside your normal lifting.',

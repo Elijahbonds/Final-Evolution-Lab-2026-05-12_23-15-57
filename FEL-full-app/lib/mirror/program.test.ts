@@ -10,7 +10,7 @@
 
 import { describe, it, expect } from 'vitest';
 import {
-  buildProgram, persistence, blockFor, frequencyFor, progressReport, totalMinutes,
+  buildProgram, persistence, blockFor, frequencyFor, progressReport, totalMinutes, programCycle, playbookBlock, retestLine,
   PROGRAM_DISCLAIMER, HISTORY_WINDOW, PERSISTENCE_THRESHOLD, MIN_REPS_FOR_SIGNAL, MAX_BLOCKS, RETEST_AFTER,
   type SessionFinding,
 } from './program';
@@ -182,5 +182,122 @@ describe('progress is reported as a count, never as a claim about health', () =>
     for (const r of progressReport(before, after)) {
       for (const bad of CLINICAL) expect(r.line.toLowerCase(), r.line).not.toContain(bad);
     }
+  });
+});
+
+// ── MIRROR-COACH P9 (2026-09-30) ────────────────────────────────────────────────────────────────────────────────────
+
+describe('P9: the program keeps no pin into the front of the hip', () => {
+  it('"Settle the hips" no longer pins the hip flexor or stretches it', () => {
+    const b = playbookBlock('lumbo_pelvic', 'release');
+    expect(b.movements.join(' | ')).not.toMatch(/hip flexor|psoas|couch stretch/i);
+    // no block anywhere in the playbook does either
+    for (const z of ['rib_thoracic', 'lumbo_pelvic', 'upper_traps', 'lat_rhomboid', 'posterior_chain'] as const) {
+      for (const k of ['release', 'activate', 'pattern'] as const) {
+        const all = [playbookBlock(z, k).title, ...playbookBlock(z, k).movements].join(' | ');
+        expect(all, `${z}/${k}`).not.toMatch(/hip flexor|psoas|couch stretch|under the (lower )?ribs|abdom/i);
+      }
+    }
+  });
+});
+
+describe('P9: the 4-session retest is scheduled, not just carried', () => {
+  // two drifting sessions set the program; every later session counts toward the retest
+  const drift = (at: number) => sess(at, { upper_traps: 3 });
+  const clean = (at: number) => sess(at, {});
+
+  it('no program yet → nothing scheduled, and the program says why', () => {
+    const c = programCycle([drift(1)]);
+    expect(c.cycle).toBe(0);
+    expect(c.sessionsToRetest).toBe(0);
+    expect(c.retestNext).toBe(false);
+    expect(c.line).toBe('');
+    expect(c.program.headline).toMatch(/scan a couple more/i);
+  });
+
+  it('the program is SET by the session that first earns one, and the retest is RETEST_AFTER sessions later', () => {
+    const set = programCycle([drift(1), drift(2)]);
+    expect(RETEST_AFTER).toBe(4);
+    expect(set.cycle).toBe(1);
+    expect(set.sessionsDone).toBe(0);
+    expect(set.sessionsToRetest).toBe(4);
+    expect(set.line).toBe(retestLine(4));
+    expect(set.line).toMatch(/Retest in 4 press\/row sets/);
+    const three = programCycle([drift(1), drift(2), drift(3), drift(4), drift(5)]);
+    expect(three.sessionsDone).toBe(3);
+    expect(three.sessionsToRetest).toBe(1);
+    expect(three.retestNext).toBe(true);
+    expect(three.line).toMatch(/next press\/row set in the Mirror is the retest/);
+  });
+
+  it('the program in force does NOT change inside a cycle, whatever the sessions show', () => {
+    const base = [drift(1), drift(2)];
+    const set = programCycle(base).program;
+    // three spotless sessions after it would rebuild to "nothing to program" if the program re-ran every scan
+    const later = programCycle([...base, clean(3), clean(4), clean(5)]);
+    expect(later.program.blocks).toEqual(set.blocks);
+    expect(buildProgram([...base, clean(3), clean(4), clean(5)]).blocks).not.toEqual(set.blocks);
+  });
+
+  it('the RETEST_AFTER-th session closes the cycle: a comparison, a new program, a fresh count', () => {
+    const h = [drift(1), drift(2), clean(3), clean(4), clean(5), clean(6)];
+    const c = programCycle(h);
+    expect(c.cycle).toBe(2);
+    expect(c.sessionsDone).toBe(0);
+    expect(c.lastRetest).not.toBeNull();
+    expect(c.lastRetest!.at).toBe(6);
+    const [only] = c.lastRetest!.lines;
+    expect(only.zone).toBe('upper_traps');
+    expect(only.title).toBe(programCycle([drift(1), drift(2)]).program.blocks[0].title);
+    expect(only.delta).toBeLessThan(0);
+    expect(only.line).toMatch(/less often/i);
+    // the new program is built from everything up to the retest; four clean sessions out of six → nothing persists
+    expect(c.program.blocks).toEqual(buildProgram(h).blocks);
+  });
+
+  it('the retest compares ONLY the zones the program worked on', () => {
+    // upper_traps set the program; lat_rhomboid first appears during the cycle — it was never worked on
+    const h = [drift(1), drift(2), sess(3, { lat_rhomboid: 3 }), sess(4, { lat_rhomboid: 3 }), clean(5), clean(6)];
+    const c = programCycle(h);
+    expect(c.lastRetest!.lines.map((l) => l.zone)).toEqual(['upper_traps']);
+  });
+
+  it('keeps counting: the second retest is RETEST_AFTER sessions after the first', () => {
+    const h = [drift(1), drift(2), ...Array.from({ length: 8 }, (_, i) => drift(3 + i))];
+    const c = programCycle(h);
+    expect(c.cycle).toBe(3);
+    expect(c.lastRetest!.at).toBe(10);
+    expect(c.lastRetest!.lines[0].line).toMatch(/about the same/i);
+  });
+
+  it('thin sessions do not count toward the retest, and the order sessions arrive in does not matter', () => {
+    const h = [drift(1), drift(2), sess(3, {}, MIN_REPS_FOR_SIGNAL - 1), clean(4)];
+    expect(programCycle(h).sessionsDone).toBe(1);
+    expect(programCycle([...h].reverse())).toEqual(programCycle(h));
+  });
+
+  it('every schedule and retest line is free of clinical vocabulary', () => {
+    const lines = [retestLine(4), retestLine(1), ...programCycle([drift(1), drift(2), clean(3), clean(4), clean(5), clean(6)]).lastRetest!.lines.map((l) => l.line)];
+    for (const l of lines) for (const bad of CLINICAL) expect(l.toLowerCase(), l).not.toContain(bad);
+  });
+});
+
+describe('P9: one block per camera signal — a drift read into two zones earns one block', () => {
+  it('real history persists the pairs together; the program spends one block on each drift, not two', () => {
+    // what the press/row engine writes: the sideways drift into rib_thoracic AND lumbo_pelvic, the elbow path into
+    // posterior_chain AND lat_rhomboid (kinematic-engine.ts)
+    const h = Array.from({ length: 5 }, (_, i) => sess(i, { rib_thoracic: 3, lumbo_pelvic: 3, posterior_chain: 2, lat_rhomboid: 2 }));
+    const zones = buildProgram(h).blocks.map((b) => b.zone);
+    expect(zones).toEqual(['lumbo_pelvic', 'lat_rhomboid']);
+  });
+
+  it('the more persistent zone of a pair is kept when they differ', () => {
+    const h = [sess(1, { rib_thoracic: 3, lumbo_pelvic: 3 }), sess(2, { rib_thoracic: 3 }), sess(3, { rib_thoracic: 3 })];
+    expect(buildProgram(h).blocks.map((b) => b.zone)).toEqual(['rib_thoracic']);
+  });
+
+  it('zones on different signals are all still programmed', () => {
+    const h = Array.from({ length: 4 }, (_, i) => sess(i, { lumbo_pelvic: 3, lat_rhomboid: 3, upper_traps: 3 }));
+    expect(buildProgram(h).blocks.map((b) => b.zone).sort()).toEqual(['lat_rhomboid', 'lumbo_pelvic', 'upper_traps']);
   });
 });

@@ -18,7 +18,9 @@
 //      breathe-first pacer for BEFORE the squats). The brief allowed the Mirror's; the owner wrote this one for exactly
 //      this moment. The Playbook's pause is "1–2 seconds"; FEL takes 2, which makes a 12-second breath — the same cycle
 //      length as the Mirror's pacer. Phase 7 builds the one full pacer; CoolBreath is shaped so it can take this over
-//      (in / hold / out / rest; this breath's hold is 0).
+//      (in / hold / out / rest; this breath's hold is 0). MIRROR-COACH P7 (2026-09-29): it has — coolBreathAt is the
+//      one pacer (lib/breath/pacer.ts), the numbers are the post-session preset's (lib/breath/presets.ts), and the
+//      card draws the breath with the shared ring (components/breath/Pacer.tsx).
 //   2. THEN THE SESSION'S PATTERNS' STRETCHES as rock-and-hold (lib/coach/warmupContent.ts ROCK_HOLDS — FEL's step:
 //      small easy rocks into a position, then a still hold with one long breath out, FEL's 20 s + 10 s). One per
 //      distinct pattern the session TRAINED (the key set's first, then the working sections' in running order), up to
@@ -43,6 +45,8 @@ import type { MovementPattern } from '@/public/_prisma/client';
 import { isPattern } from './catalogue';
 import { WORKING_SECTIONS } from './coverage';
 import { rockHoldLines, guidedElapsed, type GuidedRun } from './warmup';
+import { pacerAt, type PacerPhase, type PacerSpec } from '@/lib/breath/pacer';
+import { POST_SESSION_BREATH } from '@/lib/breath/presets';
 import { GENERAL_ROCK_HOLDS, HOLD_SEC, ROCK_HOLDS, ROCK_HOLD_ROUNDS, ROCK_SEC, type RockHoldStep } from './warmupContent';
 
 // ── the breath ───────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -53,27 +57,31 @@ export interface CoolBreath { inSec: number; holdSec: number; outSec: number; re
 /**
  * The owner's recovery breath (Neuro-Mechanic Playbook ch9, "The 4-6 Recovery Breath"): in 4, out 6, a short pause
  * (the Playbook's 1–2 s, taken at 2), ten breaths — the Playbook's "10 rounds minimum".
+ *
+ * MIRROR-COACH P7 (2026-09-29): read from the post-session preset (lib/breath/presets.ts POST_SESSION_BREATH), which
+ * IS this breath — one post-session breath in the app, not a copy here and a preset there. The numbers are unchanged
+ * (cooldown.test.ts still holds them: 4 / 0 / 6 / 2 × 10, 120 s).
  */
-export const RECOVERY_BREATH: CoolBreath = { inSec: 4, holdSec: 0, outSec: 6, restSec: 2, rounds: 10 };
+const POST = POST_SESSION_BREATH.spec;
+export const RECOVERY_BREATH: CoolBreath = { inSec: POST.inSec, holdSec: POST.holdSec, outSec: POST.outSec, restSec: POST.restSec ?? 0, rounds: POST.rounds };
 export const breathCycleSec = (b: CoolBreath): number => b.inSec + b.holdSec + b.outSec + b.restSec;
 export const breathTotalSec = (b: CoolBreath): number => breathCycleSec(b) * b.rounds;
+/** A cool-down breath as the one pacer's spec, starting at the breath step's own 0 (the card draws it with it). */
+export const coolBreathPacer = (b: CoolBreath): PacerSpec => ({ from: 0, ...b });
 
-export type BreathPhase = 'in' | 'hold' | 'out' | 'rest';
+export type BreathPhase = PacerPhase;
 
-/** Where a breath is `sec` seconds in: the part (in / hold / out / rest), whole seconds left in it, and which breath
- *  (1-based). null before it starts or after the last breath. */
+/**
+ * Where a breath is `sec` seconds in: the part (in / hold / out / rest), whole seconds left in it, and which breath
+ * (1-based). null before it starts or after the last breath.
+ *
+ * MIRROR-COACH P7 (2026-09-29): the one pacer (lib/breath/pacer.ts pacerAt) — this was its own copy of the arithmetic.
+ * lib/breath/pacer.test.ts runs the old body, verbatim, against it over the whole recovery breath and the Mirror's
+ * 4-2-6 at every quarter second: no difference.
+ */
 export function coolBreathAt(b: CoolBreath, sec: number): { phase: BreathPhase; left: number; round: number } | null {
-  const cycle = breathCycleSec(b);
-  if (!(sec >= 0) || cycle <= 0 || sec >= cycle * b.rounds) return null;
-  const c = sec % cycle;
-  const round = Math.floor(sec / cycle) + 1;
-  const parts: [BreathPhase, number][] = [['in', b.inSec], ['hold', b.holdSec], ['out', b.outSec], ['rest', b.restSec]];
-  let from = 0;
-  for (const [phase, len] of parts) {
-    if (len > 0 && c < from + len) return { phase, left: Math.ceil(from + len - c), round };
-    from += len;
-  }
-  return null; // unreachable: c < cycle
+  const p = pacerAt(coolBreathPacer(b), sec);
+  return p ? { phase: p.phase, left: p.left, round: p.round } : null;
 }
 
 // ── copy (FEL's words; cooldown.test.ts lints every line) ───────────────────────────────────────────────────────────
@@ -95,7 +103,8 @@ export const COOLDOWN_DONE_LINE = "Cool-down done. It's logged with today's sess
 /** The breath step, in the owner's Playbook words where they are his (the name, the position, the counts). */
 export const RECOVERY_BREATH_STEP = {
   id: 'recovery-breath',
-  name: '4-6 Recovery Breath',
+  // the post-session preset's name (lib/breath/presets.ts) — the owner's, from the Playbook
+  name: POST_SESSION_BREATH.name,
   cue: 'On your back, one hand on your belly, one on your lower ribs. In through the nose for 4, out slow through pursed lips for 6, then a short pause.',
   source: 'playbook ch9 (Protocol 1, The 4-6 Recovery Breath)',
 } as const;

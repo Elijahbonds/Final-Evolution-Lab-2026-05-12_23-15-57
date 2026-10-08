@@ -20,6 +20,8 @@ export interface Wall {
   /** Top of the face above the slab, and how far back it leans (radians; the top is further from the park). */
   height: number; lean: number;
   label: string;
+  /** False for a face too short to ride along (a bin, a planter, the end of a ledge): it still takes a kick plant. */
+  rideable?: boolean;
 }
 
 /** A lip: the crest of a bank or the top edge of a wall. `u` is the way the rider comes UP it (planar unit, into the feature). */
@@ -28,8 +30,12 @@ export interface Lip {
 }
 
 export const WALL_RIDE = {
-  /** How near the face the board must be (planar), and how fast it must be travelling INTO the wall. */
-  reachM: 0.85, intoMps: 1.2,
+  /** How near the face the board must be (planar), and how fast it must be travelling INTO the wall. ASSET-POLISH
+   *  (2026-10-05): intoMps 1.2 → 0.4. At 1.2 only a steep run at the wall caught; the line a skater actually takes, a shallow
+   *  one that carries speed along the face, was refused (owner: "add wall rides" — they were in, and nobody could find them). */
+  reachM: 0.85, intoMps: 0.4,
+  /** ...or travelling ALONG it, close and fast, and not leaving it: the parallel line onto a wall (asset-polish, new). */
+  alongMps: 3.0, alongReachM: 0.6, alongLeaveMps: 0.2,
   /** Height band the ride may start in (above the slab, below the top). */
   minY: 0.25, topMarginM: 0.15,
   /** Ride length cap, the gravity along the wall, the slowest ride, and where the board sits off the face. */
@@ -67,6 +73,11 @@ export function wallPoint(w: Wall, s: number, y: number): V2 {
   return { x: w.a.x + tx * s + w.nx * (WALL_RIDE.offsetM - back), z: w.a.z + tz * s + w.nz * (WALL_RIDE.offsetM - back) };
 }
 
+/** How far in front of a face (on its park side, along its normal) a point is; negative is behind it. */
+function inFront(p: V2, faceA: V2, w: Wall): number { return (p.x - faceA.x) * w.nx + (p.z - faceA.z) * w.nz; }
+/** A rider may be this far behind the face plane and still be in front of it (the board's own offset, a frame's travel). */
+const FRONT_SLACK_M = 0.1;
+
 /** The wall a body at `pos` moving `vel` could ride now, or null. */
 export function canWallRide(pos: { x: number; y: number; z: number }, vel: { x: number; y: number; z: number }, walls: readonly Wall[], airborne: boolean): Wall | null {
   if (!airborne || pos.y < WALL_RIDE.minY) return null;
@@ -77,11 +88,79 @@ export function canWallRide(pos: { x: number; y: number; z: number }, vel: { x: 
     const face = { a: { x: w.a.x - w.nx * back, z: w.a.z - w.nz * back }, b: { x: w.b.x - w.nx * back, z: w.b.z - w.nz * back } };
     const c = closestOnSegment(pos, face.a, face.b);
     if (c.d > WALL_RIDE.reachM) continue;
+    if (w.rideable === false) continue;
+    // ONLY FROM THE FRONT (asset-polish): a free-standing wall has a face on each side, 0.4 m apart. Leaving one face, the
+    // rider was inside the other's reach and moving INTO it from behind: it caught him, put him back through the wall, and
+    // the two faces traded him every frame, +0.5 m/s a catch (measured live: 7.3 → 16.6 m/s in 40 catches).
+    if (inFront(pos, face.a, w) < -FRONT_SLACK_M) continue;
     const into = -(vel.x * w.nx + vel.z * w.nz);   // speed toward the wall
-    if (into < WALL_RIDE.intoMps) continue;
+    const L = len2(w.a, w.b) || 1, along = Math.abs(vel.x * (w.b.x - w.a.x) / L + vel.z * (w.b.z - w.a.z) / L);
+    const parallel = along >= WALL_RIDE.alongMps && c.d <= WALL_RIDE.alongReachM && into >= -WALL_RIDE.alongLeaveMps;
+    if (into < WALL_RIDE.intoMps && !parallel) continue;
     if (c.d < bestD) { bestD = c.d; best = w; }
   }
   return best;
+}
+
+// ── THE KICK PLANT (asset-polish, owner 2026-10-05: "put a kick plant with the same button as the jump button when you
+// press it off a wall") ──────────────────────────────────────────────────────────────────────────────────────────────
+// The wallplant existed, but only as a way OFF a wall ride: X onto the wall first, then JUMP. The plant a player reaches
+// for is JUMP in the air at a wall, straight off it. Any face takes one, the short ones a ride cannot use included.
+export const KICK_PLANT = {
+  /** In the air, this near a face (planar) and coming at it at least this fast, with the feet on the face's height. */
+  reachM: 0.95, intoMps: 0.5, minY: 0.08, topMarginM: 0.05,
+  /** A JUMP pressed this long before the face comes into reach still plants when it does. */
+  askMs: 350,
+  /** In the air: a face this near AHEAD (along the run) is a plant coming — the press waits for it instead of throwing a trick. */
+  aheadM: 2.2,
+  /** On the ground: the pop toward a face this near, at least this fast, arms the plant for the air it opens. */
+  groundAheadM: 1.8, groundIntoMps: 2.0,
+} as const;
+
+/** The face a body at `pos` moving `vel` can kick off now, or null (the rideable test without the ride's own limits). */
+export function canWallplant(pos: { x: number; y: number; z: number }, vel: { x: number; z: number }, walls: readonly Wall[], airborne: boolean): Wall | null {
+  if (!airborne || pos.y < KICK_PLANT.minY) return null;
+  let best: Wall | null = null, bestD = Infinity;
+  for (const w of walls) {
+    if (pos.y > w.height - KICK_PLANT.topMarginM) continue;
+    const back = pos.y * Math.tan(w.lean);
+    const fa = { x: w.a.x - w.nx * back, z: w.a.z - w.nz * back };
+    const c = closestOnSegment(pos, fa, { x: w.b.x - w.nx * back, z: w.b.z - w.nz * back });
+    if (c.d > KICK_PLANT.reachM) continue;
+    if (inFront(pos, fa, w) < -FRONT_SLACK_M) continue;   // only from the front (see canWallRide)
+    if (-(vel.x * w.nx + vel.z * w.nz) < KICK_PLANT.intoMps) continue;
+    if (c.d < bestD) { bestD = c.d; best = w; }
+  }
+  return best;
+}
+
+/** A face the run is heading into within `reach` metres (on the ground or in the air), or null: where a plant is coming. */
+export function wallAhead(pos: { x: number; y: number; z: number }, vel: { x: number; z: number }, walls: readonly Wall[], reach: number, minInto: number): Wall | null {
+  const sp = Math.hypot(vel.x, vel.z);
+  if (sp < 1e-3) return null;
+  let best: Wall | null = null, bestT = Infinity;
+  for (const w of walls) {
+    if (pos.y > w.height - KICK_PLANT.topMarginM) continue;
+    const into = -(vel.x * w.nx + vel.z * w.nz);
+    if (into < minInto) continue;
+    // where the run meets the face's plane, and whether that is on the face
+    const dist = (pos.x - w.a.x) * w.nx + (pos.z - w.a.z) * w.nz;   // in front of the face (park side) is positive
+    if (dist < -0.1) continue;
+    const tHit = Math.max(0, dist) / into, hx = pos.x + vel.x * tHit, hz = pos.z + vel.z * tHit;
+    if (closestOnSegment({ x: hx, z: hz }, w.a, w.b).d > 0.3) continue;
+    if (tHit * sp > reach) continue;
+    if (tHit < bestT) { bestT = tHit; best = w; }
+  }
+  return best;
+}
+
+/** The kick off a face: away from it and up, keeping a little of the run along it. The rider faces the way he kicks. */
+export function kickPlantVel(w: Wall, vel: { x: number; z: number }): { x: number; y: number; z: number; yaw: number } {
+  const L = len2(w.a, w.b) || 1, tx = (w.b.x - w.a.x) / L, tz = (w.b.z - w.a.z) / L;
+  const along = vel.x * tx + vel.z * tz;
+  const x = w.nx * WALL_RIDE.plantPush + tx * along * WALL_RIDE.plantAlong;
+  const z = w.nz * WALL_RIDE.plantPush + tz * along * WALL_RIDE.plantAlong;
+  return { x, y: WALL_RIDE.plantVy, z, yaw: Math.atan2(x, z) };
 }
 
 export function startWallRide(w: Wall, pos: { x: number; y: number; z: number }, vel: { x: number; y: number; z: number }): WallRideState {

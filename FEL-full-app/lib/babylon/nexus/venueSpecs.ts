@@ -372,7 +372,10 @@ export const VENUE_SPECS: Record<string, NexusWebSpec> = {
       { kind: 'lamp', position: [-9, 0, -6], color: '#E0B0FF' },
     ],
     actors: [{ id: 'you', role: 'player', position: [0, 0, 4], facing: Math.PI, color: '#BF5AF2' }],
-    camera: { alpha: -Math.PI / 2, beta: 1.08, radius: 16, target: [0, 1.4, -1], fov: 0.9 },
+    // WHO-SCENE-IT (W6): alpha −π/2 put this camera behind the wall at z −12 (the framing guard warns, and the
+    // venue reads as a flat wall). +π/2 stands it on the same side as the target, the side the floor is watched from.
+    // Only this venue's camera — the sweep in WhoSceneItMode is separate, and no shared preset is touched.
+    camera: { alpha: Math.PI / 2, beta: 1.08, radius: 16, target: [0, 1.4, -1], fov: 0.9 },
   },
 
   // ── mind & meta ─────────────────────────────────────────────────────────
@@ -400,7 +403,7 @@ export const VENUE_SPECS: Record<string, NexusWebSpec> = {
   },
 
   who_scene_it: {
-    modeId: 'who_scene_it', name: 'Who Scene It', venue: 'Scene Vault',
+    modeId: 'who_scene_it', name: 'Spot the Scene', venue: 'Scene Vault',
     environment: dusk('#FFB35C', '#140A05', '#2E1A0E', '#FFD9A0', 0.5),
     ground: { kind: 'stage', size: [20, 20], color: '#241408', lineColor: '#FFB35C', markings: 'none' },
     props: [

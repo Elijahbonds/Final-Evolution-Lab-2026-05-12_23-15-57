@@ -155,26 +155,37 @@ describe('consent gate — server-side, before any write (P5’s lesson)', () =>
     expect((await post({ date: TODAY, mood: 4 })).json.error).toBe('health_data_consent_required');
   });
 
-  it('health_data is checked FIRST: a minor with no consent at all hears about consent, not the guardian', async () => {
+  // TEEN-WRITE-BLOCK (2026-09-29; Elijah: health data saves ONLY for a verified adult, the parent-consent path is gone).
+  // Before: "health_data is checked FIRST: a minor with no consent at all hears about consent" (412
+  // health_data_consent_required). After: the AGE is checked first, so that minor gets 403 health_data_adults_only; an
+  // adult with no consent still gets the 412 (the tests above).
+  it('the AGE is checked first: a minor with no consent at all gets 403 health_data_adults_only', async () => {
     h.healthConsents = [];
     h.users['client-1'] = { dobYear: 2012 };
-    expect((await post({ date: TODAY, mood: 4 })).json.error).toBe('health_data_consent_required');
+    expect(await post({ date: TODAY, mood: 4 })).toEqual({ status: 403, json: { error: 'health_data_adults_only', saved: false } });
+    expect(h.writes).toEqual([]);
   });
 
-  it('a minor (or a blank birth year) with consent but no accepted guardian → 412 guardian_consent_required', async () => {
+  // TEEN-WRITE-BLOCK: before → 412 guardian_consent_required for a minor or a blank birth year with consent; after → 403
+  // health_data_adults_only for both (unknown age is not an adult), nothing stored.
+  it('a minor (or a blank birth year) with consent → 403 health_data_adults_only, nothing stored', async () => {
     for (const dobYear of [2012, null]) {
       h.users['client-1'] = { dobYear };
       const r = await post({ date: TODAY, sleep: 3 });
-      expect(r).toEqual({ status: 412, json: { error: 'guardian_consent_required' } });
+      expect(r).toEqual({ status: 403, json: { error: 'health_data_adults_only', saved: false } });
     }
     expect(h.rows).toEqual([]);
+    expect(h.writes).toEqual([]);
   });
 
-  it('a minor with an accepted guardian consent can check in', async () => {
+  // TEEN-WRITE-BLOCK: before → "a minor with an accepted guardian consent can check in" (200, one row). After → the
+  // parent's yes no longer unlocks a health write: 403, nothing stored. Flipped, not deleted.
+  it('a minor with an accepted guardian consent can NOT check in any more — 403, nothing stored', async () => {
     h.users['client-1'] = { dobYear: 2012 };
     h.guardian = [{ menteeId: 'client-1', requestedAt: new Date('2026-09-10'), acceptedAt: new Date('2026-09-11'), revokedAt: null }];
-    expect((await post({ date: TODAY, sleep: 3 })).status).toBe(200);
-    expect(h.rows).toHaveLength(1);
+    expect(await post({ date: TODAY, sleep: 3 })).toEqual({ status: 403, json: { error: 'health_data_adults_only', saved: false } });
+    expect(h.rows).toHaveLength(0);
+    expect(h.writes).toEqual([]);
   });
 
   it('GET with no consent reads "nothing stored, usual warm-up" — even when an older row exists (no processing after withdrawal)', async () => {

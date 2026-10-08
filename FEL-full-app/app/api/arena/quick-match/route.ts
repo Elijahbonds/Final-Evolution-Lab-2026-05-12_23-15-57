@@ -19,6 +19,7 @@ import { ensureHouseRivals, pickHouseRival } from '@/lib/arena-rivals';
 import { MODE_INFO } from '@/lib/game-data';
 import { recordServerEvent } from '@/lib/analytics-server';
 import { isStakingPaused, stakingPausedDetail, STAKING_PAUSED_CODE, STAKING_PAUSED_STATUS } from '@/lib/stakingPause';
+import { isUnlistedMode } from '@/lib/unlisted-modes';
 
 /**
  * POST /api/arena/quick-match
@@ -46,6 +47,11 @@ export async function POST(req: NextRequest) {
   const feeLc = Number(body?.feeLc);
 
   if (!isArenaMode(mode)) {
+    return NextResponse.json({ error: 'invalid_mode', detail: 'That mode is not available in the Arena.' }, { status: 400 });
+  }
+  // IRON-PARADISE-OUT (2026-10-03): a parked mode (lib/unlisted-modes.ts) takes no NEW quick match — its /play
+  // route redirects, so neither seat could play it out. Duels opened before the parking still settle.
+  if (isUnlistedMode(mode)) {
     return NextResponse.json({ error: 'invalid_mode', detail: 'That mode is not available in the Arena.' }, { status: 400 });
   }
   // MUSIC-SUITE P1 (2026-09-25, owner decision #9: "pause staking both now"): a Quick Match on a paused mode (music,

@@ -174,4 +174,26 @@ check('sensory: gun fires on Go, crowd fires on finish', () => {
   assert.ok(events.some((e) => e.sfx === 'crowd'), 'finish (crowd) fired');
 });
 
+check('mash loses: an off-beat step every frame does not finish the 100 m', () => {
+  const mash = (offImpulse: number) => {
+    const skin = makeSprintSkin();
+    const core = new SprintCore({ ...skin, tuning: { ...skin.tuning, offImpulse } });
+    tickToGo(core);
+    let side: 'L' | 'R' = 'L';
+    for (let i = 0; i < 20 * 60 && phaseOf(core) !== 'Finish'; i++) {
+      core.tick(DT_MS);
+      if (phaseOf(core) === 'Finish') break;
+      core.step(side);
+      side = side === 'L' ? 'R' : 'L';
+    }
+    return core;
+  };
+  const sloppy = mash(0.25);
+  assert.strictEqual(phaseOf(sloppy), 'Finish', '0.25 m/s off-beat taps still finish');
+  assert.ok(sloppy.state.finishTimeS !== null && sloppy.state.finishTimeS < 13, `0.25 mash finished in ${sloppy.state.finishTimeS}s`);
+  const honest = mash(0);
+  assert.notStrictEqual(phaseOf(honest), 'Finish');
+  assert.ok(honest.state.distanceM < 20, `off-beat taps with 0 impulse travelled ${honest.state.distanceM} m`);
+});
+
 console.log(`\nSprint core: ${passed}/${passed} checks passed.`);
