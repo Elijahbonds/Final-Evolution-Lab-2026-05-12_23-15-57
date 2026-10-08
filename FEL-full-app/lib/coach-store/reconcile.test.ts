@@ -18,6 +18,8 @@ const h = vi.hoisted(() => ({
   refunds: [] as any[],
   disputes: [] as any[],
   charges: {} as Record<string, any>,
+  subscriptions: [] as any[],
+  invoices: [] as any[],
 }));
 
 vi.mock('next-auth', () => ({ getServerSession: vi.fn(async () => (h.sessionUser ? { user: { id: h.sessionUser } } : null)) }));
@@ -37,6 +39,8 @@ vi.mock('@/lib/stripe', async (importOriginal) => {
       disputes: { list: vi.fn(async () => ({ data: h.disputes })) },
       charges: { retrieve: vi.fn(async (id: string) => h.charges[id] ?? { id, refunded: false }) },
       paymentIntents: { retrieve: vi.fn(async () => ({ latest_charge: { balance_transaction: { fee: 55 } } })) },
+      subscriptions: { list: vi.fn(async () => ({ data: h.subscriptions })) },
+      invoices: { list: vi.fn(async () => ({ data: h.invoices })) },
     }),
   };
 });
@@ -55,9 +59,10 @@ function matches(row: Row, where: Row | undefined): boolean {
       return v === cond;
     }
     const c = cond as Row;
-    if (!Object.keys(c).some((op) => ['not', 'in', 'gte', 'gt', 'lte', 'lt'].includes(op))) return matches(row, c);
+    if (!Object.keys(c).some((op) => ['not', 'in', 'notIn', 'gte', 'gt', 'lte', 'lt'].includes(op))) return matches(row, c);
     if ('not' in c && (c.not === null ? v == null : v === c.not)) return false;
     if ('in' in c && !(c.in as unknown[]).includes(v)) return false;
+    if ('notIn' in c && (c.notIn as unknown[]).includes(v)) return false;
     if ('gte' in c && !(v != null && (v instanceof Date && c.gte instanceof Date ? v.getTime() >= c.gte.getTime() : v >= c.gte))) return false;
     if ('gt' in c && !(v != null && (v instanceof Date && c.gt instanceof Date ? v.getTime() > c.gt.getTime() : v > c.gt))) return false;
     if ('lte' in c && !(v != null && (v instanceof Date && c.lte instanceof Date ? v.getTime() <= c.lte.getTime() : v <= c.lte))) return false;
@@ -166,6 +171,7 @@ function paidSession(rowId: string, over: Row = {}) {
 
 beforeEach(() => {
   h.store = {}; h.sessions = {}; h.refunds = []; h.disputes = []; h.charges = {};
+  h.subscriptions = []; h.invoices = [];
   h.sessionUser = USER;
   process.env.STRIPE_SECRET_KEY = 'sk_test_fake';
   process.env.COACH_STORE_COACH_USER_IDS = USER;
@@ -298,6 +304,76 @@ describe('B8 reconcile passes 2-3 (refunds, disputes)', () => {
     const c2 = await run();
     expect((h.store.ledgerTransaction ?? []).length).toBe(salesBefore);
     expect(JSON.stringify(h.store.programAccess)).toBe(before);
+  });
+});
+
+describe('B9 reconcile pass 4 (subscription sync + renewal refund/dispute mapping)', () => {
+  function seedMembership(over: Row = {}) {
+    return seedAccess({ billing: 'month', status: 'ACTIVE', stripeSubscriptionId: 'sub_1', codeActive: true, cancelAtPeriodEnd: false, accessUntil: null, ...over });
+  }
+  const sub = (status: string, over: Row = {}) => ({
+    id: 'sub_1', status, cancel_at_period_end: false,
+    items: { data: [{ current_period_end: Math.floor(NOW.getTime() / 1000) + 30 * 86_400 }] }, ...over,
+  });
+
+  it('(k) an active subscription syncs the row ACTIVE with accessUntil = period end; a canceled one closes it', async () => {
+    const pa = seedMembership({ status: 'PAST_DUE' });
+    h.subscriptions = [sub('active')];
+    let c = await run();
+    expect(c.subscriptionsChecked).toBe(1);
+    expect(c.renewed).toBe(1);
+    let row = h.store.programAccess.find((a) => a.id === pa.id)!;
+    expect(row.status).toBe('ACTIVE');
+    expect(row.accessUntil).toBeInstanceOf(Date);
+
+    h.subscriptions = [sub('canceled')];
+    c = await run();
+    expect(c.canceled).toBe(1);
+    row = h.store.programAccess.find((a) => a.id === pa.id)!;
+    expect(row.status).toBe('CANCELED');
+    expect(row.codeActive).toBe(false);
+  });
+
+  it('(l) a past_due subscription moves an ACTIVE row to PAST_DUE (still open), codeActive stays true', async () => {
+    const pa = seedMembership({ status: 'ACTIVE' });
+    h.subscriptions = [sub('past_due')];
+    const c = await run();
+    expect(c.paused).toBe(1);
+    const row = h.store.programAccess.find((a) => a.id === pa.id)!;
+    expect(row.status).toBe('PAST_DUE');
+    expect(row.codeActive).toBe(true);
+  });
+
+  it('(m) a renewal refund resolves through the invoice -> subscription, not the row PI', async () => {
+    const pa = seedMembership({ status: 'ACTIVE', stripePaymentIntentId: 'pi_first_month' });
+    // The refund is on a DIFFERENT PI (the renewal invoice's), so a direct row lookup misses it.
+    h.refunds = [{ id: 're_1', status: 'succeeded', charge: 'ch_ren' }];
+    h.charges = { ch_ren: { id: 'ch_ren', refunded: true, payment_intent: 'pi_renewal' } };
+    h.invoices = [{ id: 'in_1', parent: { subscription_details: { subscription: 'sub_1' } }, payments: { data: [{ payment: { type: 'payment_intent', payment_intent: 'pi_renewal' } }] } }];
+    const c = await run();
+    expect(c.refunded).toBe(1);
+    const row = h.store.programAccess.find((a) => a.id === pa.id)!;
+    expect(row.status).toBe('REFUNDED');
+    expect(row.codeActive).toBe(false);
+  });
+
+  it('(n) a renewal dispute resolves through the invoice -> subscription and pauses the row', async () => {
+    const pa = seedMembership({ status: 'ACTIVE', stripePaymentIntentId: 'pi_first_month' });
+    h.disputes = [{ id: 'dp_1', status: 'needs_response', payment_intent: 'pi_renewal' }];
+    h.invoices = [{ id: 'in_1', subscription: 'sub_1', payments: { data: [{ payment: { payment_intent: 'pi_renewal' } }] } }];
+    const c = await run();
+    expect(c.disputed).toBe(1);
+    const row = h.store.programAccess.find((a) => a.id === pa.id)!;
+    expect(row.status).toBe('PAUSED');
+    expect(row.codeActive).toBe(false);
+  });
+
+  it('(o) a subscription Stripe does not return is left alone, and an unknown subscription id is skipped', async () => {
+    const pa = seedMembership({ status: 'ACTIVE', stripeSubscriptionId: 'sub_gone' });
+    h.subscriptions = [sub('active', { id: 'sub_other' })]; // a subscription with no FEL row
+    const c = await run();
+    expect(c.subscriptionsChecked).toBe(1);
+    expect(h.store.programAccess.find((a) => a.id === pa.id)!.status).toBe('ACTIVE');
   });
 });
 

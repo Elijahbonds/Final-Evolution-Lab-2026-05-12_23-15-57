@@ -18,6 +18,7 @@ import { shareWithCoachAllowed } from './rescreen';
 import { slotStillFree } from './slotCheck';
 import { openSlots, type WeeklyWindow } from './slots';
 import { isTestKey } from './stripeMode';
+import { subscriptionPeriodEndUnix } from './stripeShapes';
 import { deleteOriginalObject, extForMime, originalObjectName, replyObjectName, signGetUrl, signPutUrl, UploadsComingSoon } from './storage';
 import { hashSecret } from './teen';
 import { addressRejected, blockedAddressTerms } from './address';
@@ -448,17 +449,46 @@ export async function cancelMembership(userId: string, accessId: string): Promis
   try {
     const access = await prisma.programAccess.findUnique({ where: { id: accessId } });
     if (!access || access.userId !== userId) return NextResponse.json({ error: 'not_found' }, { status: 404 });
-    await prisma.programAccess.update({ where: { id: accessId }, data: { cancelAtPeriodEnd: true } });
-    const key = process.env.STRIPE_SECRET_KEY;
-    if (access.stripeSubscriptionId && key && isTestKey(key)) {
-      try {
-        await getStripe().subscriptions.update(access.stripeSubscriptionId, { cancel_at_period_end: true });
-      } catch (err) {
-        console.warn('[coach-store] local cancel stands');
-        void err;
+    // STORE-READY B9(a): the cancel is real in Stripe FIRST for any key (test or live). If the Stripe call
+    // fails the row is left UNTOUCHED and the buyer gets a 502 — a "cancelled" banner with money still coming
+    // out is the one answer this route may never give. The DB write happens only after Stripe confirms, so a
+    // refresh after a 502 still shows an active membership with a working cancel button.
+    if (access.stripeSubscriptionId) {
+      const key = (process.env.STRIPE_SECRET_KEY ?? '').trim();
+      if (key) {
+        let sub: { cancel_at_period_end?: unknown; status?: unknown };
+        let periodEndUnix: number | null;
+        try {
+          const stripe = getStripe();
+          sub = await stripe.subscriptions.update(access.stripeSubscriptionId, { cancel_at_period_end: true });
+          // The returned subscription carries the authoritative period end (basil moved it onto the item).
+          periodEndUnix = subscriptionPeriodEndUnix(sub);
+          if (periodEndUnix == null) {
+            const fresh = await stripe.subscriptions.retrieve(access.stripeSubscriptionId);
+            periodEndUnix = subscriptionPeriodEndUnix(fresh);
+          }
+        } catch (err) {
+          console.warn('[coach-store] cancel membership stripe failed');
+          void err;
+          return NextResponse.json({ error: 'stripe_unavailable' }, { status: 502 });
+        }
+        const ended = sub.status === 'canceled';
+        await prisma.programAccess.update({
+          where: { id: accessId },
+          data: {
+            cancelAtPeriodEnd: true,
+            ...(periodEndUnix != null ? { accessUntil: new Date(periodEndUnix * 1000) } : {}),
+            // An already-ended subscription (cancel_at_period_end had already fired) closes the row outright.
+            ...(ended ? { status: 'CANCELED', codeActive: false } : {}),
+          },
+        });
+        return NextResponse.json({ ok: true, cancelAtPeriodEnd: true, accessUntil: periodEndUnix != null ? new Date(periodEndUnix * 1000) : access.accessUntil });
       }
+      // No key: fall through to the local-only cancel below (the store is closed; there is no live subscription
+      // to stop, and the reconcile Pass 4 subscription sync reconciles the row when a key returns).
     }
-    return NextResponse.json({ ok: true, cancelAtPeriodEnd: true });
+    await prisma.programAccess.update({ where: { id: accessId }, data: { cancelAtPeriodEnd: true } });
+    return NextResponse.json({ ok: true, cancelAtPeriodEnd: true, accessUntil: access.accessUntil });
   } catch (err) {
     const gone = unavailable(err);
     if (gone) return gone;
@@ -585,7 +615,9 @@ export async function setListingPrice(userId: string, listingId: string, priceCe
     return NextResponse.json({ error: 'not_found' }, { status: 404 });
   }
   if (!parseManifest(listing.manifest)) return NextResponse.json({ error: 'bad_manifest' }, { status: 400 });
-  await prisma.marketplaceListing.update({ where: { id: listingId }, data: { priceUsd: priceCents, active: true } });
+  // STORE-READY B9(c): a price change writes priceUsd ONLY. It must never flip `active` — a paused (inactive)
+  // listing stays paused, so editing the price is not a back door that puts a delisted listing back on sale.
+  await prisma.marketplaceListing.update({ where: { id: listingId }, data: { priceUsd: priceCents } });
   return NextResponse.json({ ok: true });
 }
 

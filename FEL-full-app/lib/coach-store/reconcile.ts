@@ -16,9 +16,14 @@
  * Pass 3 (disputes):  disputes.list(created >= now-120d, limit 100). An open dispute (warning_needs_response,
  *   warning_under_review, needs_response, under_review) -> Booking DISPUTED, access PAUSED + codeActive false,
  *   referral REVERSED. lost -> as a full refund. won -> restore ONLY rows still DISPUTED/PAUSED to PAID/ACTIVE.
+ * Pass 4 (subscriptions, B9): subscriptions.list(status 'all') syncs each membership row by stripeSubscriptionId
+ *   (active/trialing -> ACTIVE, past_due/unpaid/incomplete -> PAST_DUE, canceled/incomplete_expired -> CANCELED,
+ *   accessUntil = period end, status-CAS so a replay never moves a row backwards). A Dashboard refund/dispute on
+ *   a subscription RENEWAL lands on the renewal invoice's PaymentIntent, not the row's stored one, so Passes 2-3
+ *   also map payment_intent -> invoice (in the window) -> subscription -> access row.
  *
  * Every row's error is caught, counted and logged by FEL row id; the run continues. Only counts are returned.
- * No emails, amounts, or Stripe ids are logged — only FEL row ids. B9 adds Pass 4 (subscriptions).
+ * No emails, amounts, or Stripe ids are logged — only FEL row ids.
  */
 
 import { createHash, timingSafeEqual } from 'node:crypto';
@@ -26,6 +31,7 @@ import type Stripe from 'stripe';
 import { prisma } from '@/lib/db';
 import { verifyIdempotencyKey, isPaidSession } from '@/lib/stripe/verify-checkout';
 import { coachStoreSessionMeta, fulfilCoachStoreCheckout } from './webhook';
+import { invoiceChargeOrIntent, invoiceSubscriptionId, subscriptionPeriodEndUnix } from './stripeShapes';
 
 export const RECONCILE_SECRET_HEADER = 'x-coach-store-reconcile-secret';
 const OPEN_DISPUTE_STATUSES = new Set(['warning_needs_response', 'warning_under_review', 'needs_response', 'under_review']);
@@ -120,6 +126,92 @@ async function findByPaymentIntent(piId: string): Promise<{ booking: RowRef | nu
   return { booking: null, access };
 }
 
+/**
+ * STORE-READY B9: a Dashboard refund/dispute on a subscription RENEWAL never lands on the access row's
+ * stored PaymentIntent — that PI is the first month. The renewal's PI belongs to the renewal INVOICE, which
+ * names its subscription (basil: parent.subscription_details.subscription; older: subscription). Map
+ * payment_intent -> invoice (in the refund/dispute lookback window) -> subscription -> access row.
+ */
+async function findAccessByRenewalPaymentIntent(stripe: Stripe, piId: string, sinceUnix: number): Promise<RowRef | null> {
+  let invoices: Stripe.ApiList<Stripe.Invoice>;
+  try {
+    invoices = await stripe.invoices.list({ created: { gte: sinceUnix }, limit: 100 });
+  } catch {
+    return null; // the invoice list itself failing must not fail the whole run
+  }
+  for (const invoice of invoices.data) {
+    const { paymentIntentId, chargeId } = invoiceChargeOrIntent(invoice);
+    if (paymentIntentId !== piId && chargeId !== piId) continue;
+    const subId = invoiceSubscriptionId(invoice);
+    if (!subId) continue;
+    const access = await prisma.programAccess.findFirst({
+      where: { stripeSubscriptionId: subId },
+      select: { id: true, status: true },
+    });
+    if (access) return access;
+  }
+  return null;
+}
+
+/** A row lookup that also resolves a renewal PI through its invoice's subscription (B9 Pass 4 mapping). */
+async function findRowForRefundOrDispute(
+  stripe: Stripe,
+  piId: string,
+  invoiceSinceUnix: number,
+): Promise<{ booking: RowRef | null; access: RowRef | null }> {
+  const direct = await findByPaymentIntent(piId);
+  if (direct.booking || direct.access) return direct;
+  const access = await findAccessByRenewalPaymentIntent(stripe, piId, invoiceSinceUnix);
+  return { booking: null, access };
+}
+
+/**
+ * STORE-READY B9 Pass 4: bring one subscription's ProgramAccess row in line with Stripe. Status-CAS on the
+ * current row so a replay or a later state never moves a row backwards:
+ *   active | trialing            -> ACTIVE  (codeActive true),  accessUntil = period end   ('renewed')
+ *   past_due | unpaid | incomplete -> PAST_DUE (codeActive true), accessUntil = period end  ('paused')
+ *   canceled | incomplete_expired  -> CANCELED (codeActive false)                            ('canceled')
+ * A row already CANCELED is not re-opened; a REFUNDED/PAUSED row (a refund/dispute already ran) is left to
+ * Passes 2-3. Returns the bucket it moved to, or null when the row was already in sync / not found.
+ */
+async function syncSubscriptionRow(sub: Stripe.Subscription): Promise<'renewed' | 'paused' | 'canceled' | null> {
+  const access = await prisma.programAccess.findFirst({
+    where: { stripeSubscriptionId: sub.id },
+    select: { id: true, status: true },
+  });
+  if (!access) return null;
+  const endUnix = subscriptionPeriodEndUnix(sub);
+  const periodEnd = endUnix != null ? new Date(endUnix * 1000) : null;
+  const status = sub.status;
+  if (status === 'active' || status === 'trialing') {
+    const moved = await prisma.programAccess.updateMany({
+      where: { id: access.id, status: { in: ['ACTIVE', 'PAST_DUE', 'PAUSED', 'PENDING'] } },
+      data: {
+        status: 'ACTIVE', codeActive: true,
+        cancelAtPeriodEnd: Boolean(sub.cancel_at_period_end),
+        ...(periodEnd ? { accessUntil: periodEnd } : {}),
+      },
+    });
+    // Counted as a renewal only when the row actually came back to life (not a no-op ACTIVE->ACTIVE sync).
+    return moved.count > 0 && access.status !== 'ACTIVE' ? 'renewed' : null;
+  }
+  if (status === 'past_due' || status === 'unpaid' || status === 'incomplete') {
+    const moved = await prisma.programAccess.updateMany({
+      where: { id: access.id, status: { in: ['ACTIVE', 'PAST_DUE', 'PENDING'] } },
+      data: { status: 'PAST_DUE', codeActive: true, ...(periodEnd ? { accessUntil: periodEnd } : {}) },
+    });
+    return moved.count > 0 ? 'paused' : null;
+  }
+  if (status === 'canceled' || status === 'incomplete_expired') {
+    const moved = await prisma.programAccess.updateMany({
+      where: { id: access.id, status: { notIn: ['CANCELED', 'REFUNDED'] } },
+      data: { status: 'CANCELED', codeActive: false, cancelAtPeriodEnd: true, ...(periodEnd ? { accessUntil: periodEnd } : {}) },
+    });
+    return moved.count > 0 ? 'canceled' : null;
+  }
+  return null;
+}
+
 export async function reconcileCoachStore(input: { now: Date; stripe: Stripe }): Promise<ReconcileCounts> {
   const { now, stripe } = input;
   const counts = zeroCounts();
@@ -181,7 +273,10 @@ export async function reconcileCoachStore(input: { now: Date; stripe: Stripe }):
         }
         const piId = typeof charge.payment_intent === 'string' ? charge.payment_intent : charge.payment_intent?.id;
         if (!piId) continue;
-        const { booking, access } = await findByPaymentIntent(piId);
+        // B9: a renewal refund's PI is not on the row — resolve it through its invoice's subscription.
+        const { booking, access } = await findRowForRefundOrDispute(
+          stripe, piId, Math.floor((now.getTime() - 7 * 86_400_000) / 1000),
+        );
         if (!booking && !access) continue;
         const moved = await reverseRow({ booking, access, dispute: false });
         if (moved) counts.refunded++;
@@ -202,7 +297,10 @@ export async function reconcileCoachStore(input: { now: Date; stripe: Stripe }):
       try {
         const piId = typeof dispute.payment_intent === 'string' ? dispute.payment_intent : dispute.payment_intent?.id;
         if (!piId) continue;
-        const { booking, access } = await findByPaymentIntent(piId);
+        // B9: a renewal dispute's PI is not on the row — resolve it through its invoice's subscription.
+        const { booking, access } = await findRowForRefundOrDispute(
+          stripe, piId, Math.floor((now.getTime() - 120 * 86_400_000) / 1000),
+        );
         if (!booking && !access) continue;
         if (OPEN_DISPUTE_STATUSES.has(dispute.status)) {
           const moved = await reverseRow({ booking, access, dispute: true });
@@ -222,6 +320,31 @@ export async function reconcileCoachStore(input: { now: Date; stripe: Stripe }):
   } catch (err) {
     counts.errors++;
     console.warn('[coach-store] reconcile pass3 list failed');
+  }
+
+  // ── Pass 4 (B9): subscription sync ──────────────────────────────────────────────────────────────────────────
+  // Memberships sell at launch (Option B). Subscriptions that are not canceled are retrieved (status 'all' would
+  // also list canceled; canceled subscriptions are not returned by the default list, so a member who cancelled
+  // mid-window is picked up below by the access rows still pointing at a now-canceled subscription).
+  try {
+    const subs = await stripe.subscriptions.list({ status: 'all', limit: 100 });
+    for (const sub of subs.data) {
+      try {
+        const moved = await syncSubscriptionRow(sub);
+        counts.subscriptionsChecked = (counts.subscriptionsChecked ?? 0) + 1;
+        if (moved === 'renewed') counts.renewed = (counts.renewed ?? 0) + 1;
+        else if (moved === 'paused') counts.paused = (counts.paused ?? 0) + 1;
+        else if (moved === 'canceled') counts.canceled = (counts.canceled ?? 0) + 1;
+      } catch (err) {
+        counts.errors++;
+        console.warn('[coach-store] reconcile pass4 subscription row error');
+        void err;
+      }
+    }
+  } catch (err) {
+    counts.errors++;
+    console.warn('[coach-store] reconcile pass4 list failed');
+    void err;
   }
 
   return counts;
