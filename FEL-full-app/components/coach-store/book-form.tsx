@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { BundleMissingParts } from './bundle-missing-parts';
 import { parseAlreadyOwned, partCheckoutBody, type AlreadyOwnedBundleView, type BundlePartWithListing } from '@/lib/coach-store/bundleParts';
 import { coachBookReturnPath, coachSignInHref, isSlotValue } from '@/lib/coach-store/signInReturn';
+import { STORE_TERMS_VERSION } from '@/lib/store-terms';
 
 export function BookForm({
   slug,
@@ -31,6 +32,8 @@ export function BookForm({
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
   const [closedNotice, setClosedNotice] = useState('');
+  // STORE-TERMS-2: the terms checkbox starts UNTICKED on every load (never pre-ticked, never remembered).
+  const [termsAgreed, setTermsAgreed] = useState(false);
   const [authError, setAuthError] = useState<'sign_in' | 'adults_only' | null>(null);
   const [bundleView, setBundleView] = useState<AlreadyOwnedBundleView | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
@@ -43,6 +46,8 @@ export function BookForm({
     if (res.status === 403 && json.error === 'adults_only') return 'adults_only';
     // STORE-READY B2: a closed store is a friendly "Checkout opens soon." notice, never the red error text.
     if (res.status === 409 && json.error === 'store_closed') return 'store_closed';
+    // STORE-TERMS-2: the server rejected a missing/stale terms tick — re-prompt in place.
+    if (res.status === 409 && json.error === 'terms_required') return 'terms_required';
     return json.message || json.error || 'Could not start checkout';
   };
 
@@ -61,6 +66,8 @@ export function BookForm({
     setClosedNotice('');
     setAuthError(null);
     setBundleView(null);
+    // STORE-TERMS-2: required terms tick — a friendly client-side stop before the POST (the server is the real gate).
+    if (!termsAgreed) { setError('Please agree to the store terms to continue.'); return; }
     const beneficiary = currentBeneficiary();
     const res = await fetch('/api/coach-store/checkout', {
       method: 'POST',
@@ -72,6 +79,8 @@ export function BookForm({
         goal: kind === 'video_review' ? goal : undefined,
         painYes: kind === 'video_review' ? painYes : undefined,
         note: kind === 'video_review' ? note : undefined,
+        termsAccepted: true,
+        termsVersion: STORE_TERMS_VERSION,
       }),
     });
     const json = await res.json().catch(() => ({}));
@@ -81,6 +90,7 @@ export function BookForm({
       const outcome = authOrMessage(res, json);
       if (outcome === 'sign_in' || outcome === 'adults_only') setAuthError(outcome);
       else if (outcome === 'store_closed') setClosedNotice('Checkout opens soon.');
+      else if (outcome === 'terms_required') setError('Please agree to the store terms to continue.');
       else setError(outcome);
       return;
     }
@@ -92,17 +102,20 @@ export function BookForm({
     if (!part.listingId) return;
     setPartErrors((prev) => { const next = { ...prev }; delete next[part.key]; return next; });
     setPartAuth((prev) => { const next = { ...prev }; delete next[part.key]; return next; });
+    // STORE-TERMS-2: a bundle-part buy is a checkout too — the same required tick applies (server is the gate).
+    if (!termsAgreed) { setError('Please agree to the store terms to continue.'); return; }
     setBusyKey(part.key);
     try {
       const res = await fetch('/api/coach-store/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(partCheckoutBody(part, currentBeneficiary())),
+        body: JSON.stringify({ ...partCheckoutBody(part, currentBeneficiary()), termsAccepted: true, termsVersion: STORE_TERMS_VERSION }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
         const outcome = authOrMessage(res, json);
         if (outcome === 'sign_in' || outcome === 'adults_only') setPartAuth((prev) => ({ ...prev, [part.key]: outcome }));
+        else if (outcome === 'terms_required') setError('Please agree to the store terms to continue.');
         else setPartErrors((prev) => ({ ...prev, [part.key]: outcome }));
         return;
       }
@@ -193,6 +206,21 @@ export function BookForm({
       ) : authError ? authBlock(authError) : closedNotice ? (
         <p className="rounded-xl border border-white/20 p-3 text-sm text-white/80" role="status">{closedNotice}</p>
       ) : error ? <p className="text-sm text-red-300">{error}</p> : null}
+      <label className="flex items-start gap-2 text-sm text-white/80">
+        <input
+          type="checkbox"
+          className="mt-0.5"
+          checked={termsAgreed}
+          onChange={(e) => setTermsAgreed(e.target.checked)}
+        />
+        <span>
+          I have read and agree to the{' '}
+          <a className="font-bold text-cyan-300 underline" href="/store-terms" target="_blank" rel="noopener noreferrer">
+            store terms &amp; refund policy
+          </a>
+          .
+        </span>
+      </label>
       <button type="button" className="rounded-xl bg-cyan-300 px-4 py-2 text-sm font-bold text-black" onClick={submit}>{continueLabel}</button>
     </div>
   );

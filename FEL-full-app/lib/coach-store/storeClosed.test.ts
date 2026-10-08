@@ -55,6 +55,7 @@ import { POST as portal } from '@/app/api/stripe/portal/route';
 import { POST as verifySession } from '@/app/api/stripe/verify-session/route';
 import { stripeTestGate } from './stripeMode';
 import { siteOrigin } from '@/lib/stripe/site-origin';
+import { STORE_TERMS_VERSION } from '@/lib/store-terms';
 
 const ENV_KEYS = ['COACH_STORE_ENABLED', 'COACH_STORE_PAYMENTS_ENABLED', 'COACH_STORE_LIVE', 'STRIPE_SECRET_KEY', 'NEXTAUTH_URL', 'COACH_STORE_COACH_USER_IDS'] as const;
 const SAVED: Record<string, string | undefined> = {};
@@ -201,7 +202,7 @@ describe('B2 key/flag matrix on the coach-store checkout route', () => {
     process.env.STRIPE_SECRET_KEY = 'sk_live_fake';
     process.env.COACH_STORE_LIVE = '1';
     seedSellableMembership();
-    const r = await read(await coachStoreCheckout(req({ listingId: 'listing-membership' })));
+    const r = await read(await coachStoreCheckout(req({ listingId: 'listing-membership', termsVersion: STORE_TERMS_VERSION })));
     expect(r.status).toBe(200);
     expect(h.sessionsCreate).toHaveLength(1);
     // B3: the success URL is built from the NEXTAUTH_URL server constant, not the request's evil Origin.
@@ -212,7 +213,54 @@ describe('B2 key/flag matrix on the coach-store checkout route', () => {
   it('test key -> 200 unchanged (sessions.create called)', async () => {
     process.env.STRIPE_SECRET_KEY = 'sk_test_fake';
     seedSellableMembership();
+    const r = await read(await coachStoreCheckout(req({ listingId: 'listing-membership', termsVersion: STORE_TERMS_VERSION })));
+    expect(r.status).toBe(200);
+    expect(h.sessionsCreate).toHaveLength(1);
+  });
+
+  it('terms_version is saved in the Stripe session metadata on success', async () => {
+    process.env.STRIPE_SECRET_KEY = 'sk_test_fake';
+    seedSellableMembership();
+    await read(await coachStoreCheckout(req({ listingId: 'listing-membership', termsVersion: STORE_TERMS_VERSION })));
+    expect(h.sessionsCreate[0].metadata?.terms_version).toBe(STORE_TERMS_VERSION);
+    // ...and on the subscription metadata too (membership bills through its invoice).
+    expect(h.sessionsCreate[0].subscription_data?.metadata?.terms_version).toBe(STORE_TERMS_VERSION);
+  });
+});
+
+// ── STORE-TERMS-2: the server is the terms gate — 409 terms_required BEFORE any Stripe call ─────────────────
+describe('STORE-TERMS-2 terms gate (409 terms_required, before any Stripe call)', () => {
+  beforeEach(() => {
+    process.env.STRIPE_SECRET_KEY = 'sk_test_fake';
+    seedSellableMembership();
+  });
+
+  it('no tick -> 409 terms_required, no Stripe call, no adult check needed', async () => {
     const r = await read(await coachStoreCheckout(req({ listingId: 'listing-membership' })));
+    expect(r.status).toBe(409);
+    expect(r.json.error).toBe('terms_required');
+    expect(r.json.termsVersion).toBe(STORE_TERMS_VERSION);
+    expect(h.sessionsCreate).toHaveLength(0);
+  });
+
+  it('an old/stale version -> 409 terms_required (the tick must name the CURRENT version)', async () => {
+    const r = await read(await coachStoreCheckout(req({ listingId: 'listing-membership', termsVersion: 'store-terms-OLD' })));
+    expect(r.status).toBe(409);
+    expect(r.json.error).toBe('terms_required');
+    expect(h.sessionsCreate).toHaveLength(0);
+  });
+
+  it('a closed store still answers #209 409 store_closed BEFORE the terms gate', async () => {
+    delete process.env.STRIPE_SECRET_KEY; // gate not ok -> store_closed wins over the missing tick
+    const r = await read(await coachStoreCheckout(req({ listingId: 'listing-membership' })));
+    expect(r.status).toBe(409);
+    expect(r.json.error).toBe('store_closed');
+    expect(r.json.reason).toBe('payments_not_set_up');
+    expect(h.sessionsCreate).toHaveLength(0);
+  });
+
+  it('the correct version passes the gate and reaches Stripe', async () => {
+    const r = await read(await coachStoreCheckout(req({ listingId: 'listing-membership', termsVersion: STORE_TERMS_VERSION })));
     expect(r.status).toBe(200);
     expect(h.sessionsCreate).toHaveLength(1);
   });

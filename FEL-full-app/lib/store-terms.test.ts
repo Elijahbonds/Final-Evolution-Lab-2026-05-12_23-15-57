@@ -8,11 +8,11 @@ import {
   withBusinessAddress,
 } from './store-terms';
 
-// STORE-TERMS-1 (PART 1 of 2): the approved coach-store terms, Part A, pinned byte-for-byte. The whole-text
+// STORE-TERMS (Parts A + B): the approved coach-store terms, pinned byte-for-byte. The whole-text
 // sha256 is the version's fingerprint: like policies.test.ts, an edit to the text fails here until the version,
 // the text and the fingerprint move together. On a whole-text mismatch the per-section fingerprints below show
 // exactly which section changed (first 12 hex of sha256(section.markdown)).
-const WHOLE_TEXT_SHA256 = '1aa4fc040a7e69ce82cdf3e90d12ff16531aab3ca23667b0e4fb294f4252ebe9';
+const WHOLE_TEXT_SHA256 = '2f616a45b1db6664bf039ec1f6b261751d72ace0f1666857543b6a5be7faccf1';
 const SECTION_SHA256_12: Record<string, string> = {
   title: 'eaf007f479df',
   'short-version': '08da22402bd9',
@@ -40,11 +40,21 @@ const SECTION_SHA256_12: Record<string, string> = {
   'governing-law-and-disputes': '48ee7a6ae280',
   'other-legal-terms': '644e5f72a074',
   contact: '8533028ef830',
+  // STORE-TERMS-2: Part B — the refund & cancellation policy (PART 2 of the approved text).
+  'refund-policy': 'ca07c0b6ec14',
+  'refund-short-version': '165c327caad9',
+  'programs-refunds': '8e0b56965ae1',
+  'membership-renewal-and-cancellation': '89b7ded64022',
+  'teen-membership-refunds': 'fab1d0017267',
+  'video-review-refunds': '9c6c53099286',
+  'live-session-refunds': '8edd7995fdc5',
+  'how-to-request-a-refund': '00bde79c4639',
+  'mailing-address': 'e665a2a6b566',
 };
 
 const sha256 = (s: string) => createHash('sha256').update(s, 'utf8').digest('hex');
 
-describe('the store terms text (Part A)', () => {
+describe('the store terms text (Parts A + B)', () => {
   it('matches the approved fingerprint of store-terms-2026-10-04, section by section', () => {
     const text = storeTermsText(STORE_TERMS_SECTIONS);
     const got = sha256(text);
@@ -74,8 +84,8 @@ describe('the store terms text (Part A)', () => {
 
   it('keeps the business address as a render-time token, never a typed address', () => {
     const text = storeTermsText(STORE_TERMS_SECTIONS);
-    // The token appears exactly once in Part A (the contact section).
-    expect(text.split(BUSINESS_ADDRESS_TOKEN).length - 1).toBe(1);
+    // The token appears exactly twice: Part A's contact section and Part B's mailing-address section.
+    expect(text.split(BUSINESS_ADDRESS_TOKEN).length - 1).toBe(2);
     // And never as an already-typed address.
     expect(text).not.toContain('[Business mailing address');
     // The page substitutes it at render time; afterwards no token remains.
@@ -83,7 +93,11 @@ describe('the store terms text (Part A)', () => {
     expect(withBusinessAddress(text, 'X ADDR')).toContain('X ADDR');
   });
 
-  it('mentions no audiobooks (LEGAL-COPY-2 adds them later as their own version)', () => {
+  it('links buyers to /account/coaching (P2 keeps that URL for "My coaching")', () => {
+    expect(storeTermsText(STORE_TERMS_SECTIONS)).toContain('/account/coaching');
+  });
+
+  it('still mentions no audiobooks (LEGAL-COPY-2 adds them later as their own version)', () => {
     expect(storeTermsText(STORE_TERMS_SECTIONS)).not.toMatch(/audiobook/i);
   });
 });

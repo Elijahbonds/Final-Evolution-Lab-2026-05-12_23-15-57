@@ -45,3 +45,39 @@ describe('B2 book-form: 409 store_closed is a friendly "Checkout opens soon." no
     expect(html).toContain('<button');
   });
 });
+
+// STORE-TERMS-2: every checkout carries a required terms checkbox that starts UNTICKED on every load,
+// and the POST names the current terms version (the server is the real gate — see storeClosed.test.ts).
+describe('STORE-TERMS-2 book-form: required, unticked-on-load terms checkbox', () => {
+  it('renders an unticked checkbox linking to /store-terms (source + first paint)', () => {
+    expect(src).toContain('const [termsAgreed, setTermsAgreed] = useState(false)');
+    expect(src).toContain('href="/store-terms"');
+    expect(src).toContain('checked={termsAgreed}');
+    const html = render({ kind: 'video_review' });
+    expect(html).toContain('type="checkbox"');
+    expect(html).toContain('/store-terms');
+    // Unticked on load: no checked attribute in the static paint.
+    expect(html).not.toMatch(/<input[^>]*checkbox[^>]*checked/);
+  });
+
+  it('never pre-ticks or remembers the box (source)', () => {
+    expect(src).not.toMatch(/setTermsAgreed\(true\)/); // only ever set from the input's onChange
+    expect(src).not.toMatch(/localStorage|sessionStorage[^)]*terms/i);
+    expect(src).toContain('onChange={(e) => setTermsAgreed(e.target.checked)}');
+  });
+
+  it('a submit with the box unticked stops client-side with a friendly message (source)', () => {
+    expect(src).toContain("if (!termsAgreed) { setError('Please agree to the store terms to continue.'); return; }");
+  });
+
+  it('the POST sends termsAccepted + the current termsVersion (source)', () => {
+    expect(src).toContain('termsAccepted: true');
+    expect(src).toContain('termsVersion: STORE_TERMS_VERSION');
+    expect(src).toContain("import { STORE_TERMS_VERSION } from '@/lib/store-terms'");
+  });
+
+  it('a server 409 terms_required re-prompts in place (source)', () => {
+    expect(src).toContain("json.error === 'terms_required'");
+    expect(src).toContain("return 'terms_required'");
+  });
+});

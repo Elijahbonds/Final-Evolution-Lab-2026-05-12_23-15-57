@@ -7,6 +7,7 @@
  */
 
 import { STORE_TERMS_TEXT_A } from './store-terms/text-a';
+import { STORE_TERMS_TEXT_B } from './store-terms/text-b';
 
 // Research COACH-STORE-TOS-REFUND-FINAL.md, Oct 4 2026; FE PM 5:51 PM PT Oct 7. The version is what a
 // purchase records as the text it agreed to, so a text change that keeps the old string leaves that record
@@ -22,10 +23,10 @@ export interface StoreTermsSection {
 }
 
 /**
- * The store terms, in order. Part A for now; STORE-TERMS-2 appends Part B. Kept as data (not one big string)
+ * The store terms, in order: Part A then Part B (STORE-TERMS-2). Kept as data (not one big string)
  * so a later version can swap the whole text and a section can be inserted without breaking a numbered anchor.
  */
-export const STORE_TERMS_SECTIONS: readonly StoreTermsSection[] = [...STORE_TERMS_TEXT_A];
+export const STORE_TERMS_SECTIONS: readonly StoreTermsSection[] = [...STORE_TERMS_TEXT_A, ...STORE_TERMS_TEXT_B];
 
 /** The full terms text: every section's markdown joined with a single newline. */
 export function storeTermsText(sections: readonly StoreTermsSection[] = STORE_TERMS_SECTIONS): string {
