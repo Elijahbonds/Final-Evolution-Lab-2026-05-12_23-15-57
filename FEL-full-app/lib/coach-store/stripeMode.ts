@@ -12,8 +12,15 @@ export function isLiveKey(key: string | undefined | null): boolean {
   return key.startsWith('sk_live_') || key.startsWith('rk_live_');
 }
 
-/** The 'payments not set up' reasons a store-closed answer carries (STORE-READY B2: 409 store_closed, never 503). */
-export type StoreClosedReason = 'payments_off' | 'payments_not_set_up' | 'live_mode_off' | 'site_url_not_set';
+/** The 'payments not set up' reasons a store-closed answer carries (STORE-READY B2: 409 store_closed, never 503). B10 adds the live-key fence and deposit/price refusals. */
+export type StoreClosedReason =
+  | 'payments_off'
+  | 'payments_not_set_up'
+  | 'live_mode_off'
+  | 'site_url_not_set'
+  | 'virtual_purchases_off'
+  | 'deposits_off'
+  | 'price_not_set';
 
 export type StripeGate =
   | { ok: true; key: string }

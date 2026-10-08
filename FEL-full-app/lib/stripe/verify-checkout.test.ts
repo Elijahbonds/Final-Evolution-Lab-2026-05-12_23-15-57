@@ -574,6 +574,7 @@ describe('automatic payment methods (SEC-F4 addendum)', () => {
       'app/api/v1/wallet/shard-checkout/route.ts',
       'app/api/studio/credits/route.ts',
       'lib/coach-store/checkout.ts',
+      'lib/stripe/product-checkout.ts', // B10: the shared in-process STUDIO_CREDITS checkout
       'lib/babylon/server/subscriptionApi.ts',
     ];
     for (const f of files) {

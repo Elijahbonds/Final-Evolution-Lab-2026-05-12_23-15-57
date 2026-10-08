@@ -102,3 +102,14 @@ export function isCoachStoreLive(env: NodeJS.ProcessEnv = process.env): boolean 
   const v = (env.COACH_STORE_LIVE ?? '').trim().toLowerCase();
   return v === '1' || v === 'true' || v === 'on' || v === 'yes';
 }
+
+/**
+ * STORE-READY B10 (FE PM 4:33 PM PT Oct 7) — every real-money checkout that is NOT the coach store
+ * (coin packs, shard packs, all /api/stripe/checkout products, season pass PRO, studio credits,
+ * marketplace) stays refused while this is off. Default OFF: no real-money product outside the
+ * coach store sells at launch — each needs an 18+ check and a refund path before this flag is
+ * turned on. The coach store never reads this flag.
+ */
+export function isVirtualPurchasesEnabled(): boolean {
+  return envOn('VIRTUAL_PURCHASES_ENABLED');
+}
