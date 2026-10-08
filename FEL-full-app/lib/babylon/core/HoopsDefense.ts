@@ -119,6 +119,18 @@ export function contestedPct(pct: number, contest01: number): number {
   return Math.max(0, pct * (1 - CONTEST_PCT_BITE * Math.max(0, Math.min(1, contest01))));
 }
 
+/** HOOPS-10PHASE-2 phase 3: a GASSED shooter costs up to this much of the make chance — a lighter bite than a hand in his
+ *  face (CONTEST_PCT_BITE), because legs miss the shot short before a defender blocks it. TUNED FEEL NUMBER, newly
+ *  introduced here (nothing like it existed before this phase): flag for the owner's eye, same as a contest or a release
+ *  grade. `fatigue01` is the turbo tank run empty (1 − TurboMeter.t01) at every call site that wires it in — the same
+ *  "how gassed is the body" reading the posture layer already uses (meIntensity01), not a new stat. */
+export const FATIGUE_PCT_BITE = 0.12;
+/** The make chance under fatigue: stacks with contestedPct (both bite the SAME pct, in whichever order a caller applies
+ *  them — multiplicative bites commute), never below 0. */
+export function fatiguePct(pct: number, fatigue01: number): number {
+  return Math.max(0, pct * (1 - FATIGUE_PCT_BITE * Math.max(0, Math.min(1, fatigue01))));
+}
+
 /** The extra arc apex of an altered release (0 under a weak contest). */
 export function alteredApex(contest01: number): number {
   return contest01 >= ALTER_CONTEST_MIN ? ALTER_APEX_ADD : 0;

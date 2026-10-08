@@ -4,7 +4,7 @@
 // The canvas is captured. The DOM around it is not, except in stream mode, which is for OBS and a phone's
 // own screen broadcast — that one is the page, and the chrome hides.
 
-import { useCallback, useRef, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { SoundKit } from '@/lib/babylon/audio/SoundKit';
 import type { Aspect } from '@/lib/capture/exportLayout';
 import { exportFramed } from '@/lib/capture/exportVideo';
@@ -26,6 +26,11 @@ function largestCanvas(root: HTMLElement | null): HTMLCanvasElement | null {
     if (a > area) { area = a; best = c; }
   });
   return best;
+}
+
+function fallbackClipBlob(blobs: readonly Blob[]): Blob {
+  if (blobs.length === 1) return blobs[0];
+  return new Blob(Array.from(blobs), { type: blobs[0]?.type || 'video/webm' });
 }
 
 export function GameCaptureHud(props: {
@@ -52,14 +57,22 @@ export function GameCaptureHud(props: {
       setNote('The game picture is not on screen yet.');
       return null;
     }
-    const rec = new GameRecorder(canvasSegmentSource(canvas, () => SoundKit.captureMix(), (pick) => {
-      setCodecNote(pick.fallbackNote);
-    }));
+    const rec = new GameRecorder(
+      canvasSegmentSource(canvas, () => SoundKit.captureMix(), (pick) => {
+        setCodecNote(pick.fallbackNote);
+      }),
+      () => Date.now(),
+      (next) => {
+        setModel(next);
+        setNote(next.note);
+      },
+    );
     recorder.current = rec;
     return rec;
   }, [props.stageRef]);
 
   const onRecord = () => {
+    SoundKit.unlock();
     const rec = ensure();
     if (!rec) return;
     void (async () => {
@@ -71,6 +84,7 @@ export function GameCaptureHud(props: {
   };
 
   const onReplay = () => {
+    SoundKit.unlock();
     const rec = ensure();
     if (!rec) return;
     void (async () => {
@@ -91,17 +105,19 @@ export function GameCaptureHud(props: {
     setBusy(true);
     try {
       const framed = await exportFramed(blobs.map((blob) => ({ blob })), aspect, location.origin);
-      const blob = framed ?? blobs[blobs.length - 1];
+      const blob = framed ?? fallbackClipBlob(blobs);
       const name = shareFileName(which === 'replay' ? 'replay' : 'game', aspect, extForMime(blob.type));
       const plan = await deliverClip(blob, name, 'FEL', {
         share: typeof navigator !== 'undefined' && navigator.share ? (data) => navigator.share(data) : undefined,
         canShare: typeof navigator !== 'undefined' && navigator.canShare ? (data) => navigator.canShare!(data) : undefined,
         download: downloadBlob,
       });
-      const framedNote = framed ? '' : ' The reframed file could not be built, so this is the original piece.';
-      setNote(plan.kind === 'sheet'
-        ? `Share sheet opened. Nothing is posted until you send it.${framedNote}`
-        : `Downloaded ${name}. This browser could not open a share sheet for a video file.${framedNote}`);
+      const framedNote = framed ? '' : ' The reframed file could not be built, so this keeps the original recording pieces.';
+      setNote(plan.kind === 'cancelled'
+        ? 'Share cancelled. Nothing was saved — try again when ready.'
+        : plan.kind === 'sheet'
+          ? `Share sheet opened. Nothing is posted until you send it.${framedNote}`
+          : `Downloaded ${name}. This browser could not open a share sheet for a video file.${framedNote}`);
     } catch (e) {
       setNote(e instanceof Error ? e.message : 'Share did not finish.');
     } finally {
@@ -109,10 +125,45 @@ export function GameCaptureHud(props: {
     }
   };
 
+  const onDiscard = () => {
+    const rec = recorder.current;
+    if (!rec) {
+      setModel(REC_IDLE);
+      setNote(null);
+      return;
+    }
+    void (async () => {
+      await rec.discard();
+      sync(rec);
+      setNote(null);
+    })();
+  };
+
+  const onStream = () => {
+    const next = !props.streamOn;
+    if (next) setHidden(true);
+    props.onStreamMode(next);
+  };
+
+  useEffect(() => () => {
+    const rec = recorder.current;
+    recorder.current = null;
+    if (rec) void rec.discard();
+  }, []);
+
   return (
     <>
       <style>{STREAM_FRAME_CSS}</style>
-      <div style={{ position: 'absolute', top: 8, left: 8, zIndex: 45, pointerEvents: 'auto' }}>
+      <div
+        data-capture-ui="1"
+        style={{
+          position: 'absolute',
+          top: 8,
+          left: 8,
+          zIndex: 45,
+          pointerEvents: 'auto',
+        }}
+      >
         <CaptureHudView
           phase={model.phase}
           aspect={aspect}
@@ -123,11 +174,13 @@ export function GameCaptureHud(props: {
           dunkFilm={DUNK_FILM_MODES.has(props.mode)}
           canShareTake={model.take}
           canShareReplay={model.replay}
+          busy={busy}
           onRecord={onRecord}
           onReplay={onReplay}
           onAspect={setAspect}
           onShare={(which) => { void onShare(which); }}
-          onStream={() => props.onStreamMode(!props.streamOn)}
+          onDiscard={onDiscard}
+          onStream={onStream}
           onHide={() => setHidden(true)}
           onShow={() => setHidden(false)}
           onFilm={() => setFilm(true)}

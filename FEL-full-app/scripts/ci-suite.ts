@@ -62,6 +62,7 @@ export const DB_SUITES = new Set([
   'm4-tests.ts',
   'prq-tests.ts',
   'wallet-tests.ts',
+  'coach-store-db-tests.ts',
 ]);
 
 /**

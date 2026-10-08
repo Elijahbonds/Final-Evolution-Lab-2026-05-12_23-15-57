@@ -35,8 +35,21 @@
  * Casual still does not finish: the track is meant to be an achievement. If
  * the quest track ever ships, questsDone (200 XP each) adds a lever on top of
  * this and the curve should be re-checked against these same profiles.
+ *
+ * IMPROVE (2026-10-06): the quest track shipped as the DAILY GOALS (lib/goals/daily-goals.ts: three a day, derived from
+ * the day's paid runs) at QUEST_SEASON_XP each, so at most 3 × 100 = 300 season XP a day. Re-checked against the same
+ * profiles (scripts/season-pass-core-tests.ts, the goal checks): committed play with every goal finishes around day 48
+ * instead of 55, dedicated a few days earlier, and casual play with every goal still does not finish (~tier 40).
  */
 export const TIER_XP = (tier: number): number => 450 + tier * 68;
+
+/**
+ * Season XP one completed daily goal adds (SessionXpInput.questsDone). TUNED (2026-10-06): 200 → 100. The reference
+ * port's 200 was never fed by anything; at 200, three goals a day (600 XP) moved committed play's finish from day 55 to
+ * about day 42 and took casual play to ~tier 45 — a third of the track for goals alone. 100 keeps the goals worth
+ * chasing (a goal ≈ a first-of-day-in-a-mode bonus) without rewriting the season's pacing.
+ */
+export const QUEST_SEASON_XP = 100;
 
 export type RewardKind = 'lc' | 'cosmetic';
 export type RewardRarity = 'common' | 'rare' | 'legendary';
@@ -73,11 +86,9 @@ export interface SessionXpInput {
   won?: boolean;
   firstOfDayMode?: boolean;
   /**
-   * Quests cleared alongside this session. Part of the verified reference port
-   * and kept so the math stays faithful, but FEL ships no quest system yet —
-   * nothing feeds this today and the server never passes it. When a daily-quest
-   * track lands, pass the count here and season XP picks it up with no other
-   * change. Do NOT repurpose it for streaks: the streak bonus is LC, not pass XP.
+   * Quests cleared alongside this session. Part of the verified reference port. IMPROVE (2026-10-06): fed by the
+   * daily goals — the goals THIS session completed (lib/goals/daily-goals.ts completedBy, via season-service
+   * addSeasonXp), at most DAILY_GOAL_COUNT a day. Do NOT repurpose it for streaks: the streak bonus is LC, not pass XP.
    */
   questsDone?: number;
 }
@@ -135,7 +146,7 @@ export class SeasonPassCore {
         Math.min(220, score * 0.5) +
         (won ? 120 : 0) +
         (firstOfDayMode ? 150 : 0) +
-        questsDone * 200,
+        (Number.isFinite(questsDone) ? Math.max(0, Math.floor(questsDone)) : 0) * QUEST_SEASON_XP,
     ); // TUNE(elijah)
   }
 

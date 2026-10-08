@@ -57,7 +57,7 @@
  */
 
 import { canonicalModeKey } from '@/lib/game-data';
-import { DUNK_ATTEMPT_MAX, MIRRORED, SCORE_CEILINGS, UNTIMED_RUN_SEC, killSwitchOn, scoreCeilingFor } from '@/lib/arena-score-integrity';
+import { DUNK_ATTEMPT_MAX, MIRRORED, SCORE_CEILINGS, UNTIMED_RUN_SEC, killSwitchOn, scoreCeilingFor, sessionRulesMax } from '@/lib/arena-score-integrity';
 import { ENDLESS_MODES, isCatalogueMode } from '@/lib/session-payout';
 import { MAX_FLIGHT, heightFromFlight } from '@/lib/babylon/core/IRLCore';
 
@@ -120,7 +120,7 @@ export function rulesMaxFor(mode: string, o: { killSwitch?: boolean } = {}): num
   const c = scoreCeilingFor(k);
   if (!c || c.kind !== 'rules') return null;
   if ((o.killSwitch ?? killSwitchOn()) && c.swapsUnderKillSwitch) return null;
-  return c.max;
+  return sessionRulesMax(k, c);   // owner 2026-10-06: a player option's longer game (1v1 win-by-2, 17); a stake still reads c.max
 }
 
 /** The one derivation every row goes through (see the header). null = the runs cannot support a rule (no row). */
@@ -219,9 +219,16 @@ export const STORY_MIRRORED = {
   railMinAirSec: 0.3, railLandBase: 20, railLandComboStep: 0.1, railFinishHpMult: 2, railPlayerHp: 100,
   // components/games/acting-game.tsx: score = round(average × 100), average = clamp01(…) (lib/babylon/core/ActingCore.ts)
   actingMax: 100,
-  // lib/babylon/modes/DunkDuelMode.ts: DUNKS_EACH 2, each judged at most DUNK_ATTEMPT_MAX (arena-score-integrity)
-  dunkDuelDunksEach: 2,
+  // lib/babylon/modes/dunkDuelRules.ts (owner 2026-10-06, moderate): the longest match the first card offers (MATCH_LENGTHS,
+  // 5 dunks each) and the dunk-off's DUNKOFF_MAX_ROUNDS 3, each dunk judged at most DUNK_ATTEMPT_MAX (arena-score-integrity).
+  // The dunk-off never adds to a total today; the bound covers it anyway, so the duel reports its real totals at every length.
+  dunkDuelMaxDunksEach: 5, dunkDuelDunkOffRounds: 3,
 } as const;
+
+/** Prove It (dunkduel): the longest match's dunks plus every dunk-off round, each at the most a dunk can score. */
+export function dunkDuelBound(m = STORY_MIRRORED): number {
+  return (m.dunkDuelMaxDunksEach + m.dunkDuelDunkOffRounds) * DUNK_ATTEMPT_MAX;
+}
 
 /** The boss fight: all of the boss's HP plus two maximal hits of overkill (a keyboard and a pad press in one frame), and the full win bonus. */
 export function storyBossBound(m = STORY_MIRRORED): number {
@@ -264,7 +271,7 @@ export function derivedBounds(o: { killSwitch?: boolean } = {}): Readonly<Record
     storyMode: { maxScore: Math.max(storyBossBound(), storyRailBound()), runSec: null, basis: `max of the boss fight (${storyBossBound()}) and the rail (${storyRailBound()}) from their own constants (STORY_MIRRORED)` },
     acting: { maxScore: STORY_MIRRORED.actingMax, runSec: null, basis: 'acting-game: round(average × 100), average clamp01 (ActingCore)' },
     irl: { maxScore: Math.round(heightFromFlight(MAX_FLIGHT) * 100), runSec: null, basis: 'irl-game: best jump in cm; IRLCore refuses a flight over MAX_FLIGHT, so heightFromFlight(MAX_FLIGHT) is the highest' },
-    dunkduel: { maxScore: STORY_MIRRORED.dunkDuelDunksEach * DUNK_ATTEMPT_MAX, runSec: null, basis: 'DunkDuelMode: DUNKS_EACH × DUNK_ATTEMPT_MAX; paid the played floor only (owner)', payFloorOnly: true },
+    dunkduel: { maxScore: dunkDuelBound(), runSec: null, basis: `dunkDuelRules: (the longest match ${STORY_MIRRORED.dunkDuelMaxDunksEach} + DUNKOFF_MAX_ROUNDS ${STORY_MIRRORED.dunkDuelDunkOffRounds}) × DUNK_ATTEMPT_MAX; paid the played floor only (owner)`, payFloorOnly: true },
   };
 }
 

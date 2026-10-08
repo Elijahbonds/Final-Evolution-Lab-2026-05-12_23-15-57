@@ -7,6 +7,19 @@
 // "procedural, zero external assets" philosophy VenueKit used for visuals.
 // One singleton, lazily created on first user gesture (autoplay policy safe).
 
+/** The looping beds startAmbient() can play ('none' = deliberately silent). */
+export type AmbientKind = 'stadium' | 'dojo' | 'ocean' | 'wind' | 'none';
+
+/** AMBIENT FIX (2026-10-06): the harness's first-input decision, pure so it can be tested. It starts the mood's venue
+ *  bed only over a mode that has not chosen one; a mode that chose any bed in load(), 'none' included, keeps it. */
+export function shouldStartMoodBed(current: AmbientKind | null): boolean { return current === null; }
+
+/** AMBIENT FIX (2026-10-06): the harness's per-frame momentum swell (setAmbientLevel(crowdLevel(score))) is a CROWD
+ *  reacting, so it applies to the crowd bed only. 'stadium' is the crowd; 'dojo' is a room tone (brown noise
+ *  band-passed at 220 Hz, gain 0.025 — "a martial-arts room tone", precisionModes), 'wind' and 'ocean' are weather.
+ *  They stay at their base gain: wind does not blow 2.55x harder because the player is on a streak. */
+export function momentumScalesBed(kind: AmbientKind | null): boolean { return kind === 'stadium'; }
+
 // THE IMPACT VOCABULARY (2026-09-14). The kit shipped with nine cues and every physical contact in the
 // game — a body hitting the floor, a ball off the iron, a shoe stopping hard, a ball through the net —
 // played the SAME `impact` with a different pitch. Nine sounds cannot carry a sports game: a rim rattle and
@@ -19,11 +32,17 @@
 //   clang   — a chain net, or metal taking a hit
 //   squeak  — rubber on a hard floor: the sound a hard cut actually makes
 type SfxName = 'whoosh' | 'impact' | 'score' | 'miss' | 'whistle' | 'uiTick' | 'crowdCheer' | 'crowdGroan' | 'powerUp'
-  | 'thud' | 'rattle' | 'swish' | 'clang' | 'squeak';
+  | 'thud' | 'rattle' | 'swish' | 'clang' | 'squeak' | 'exhaust';
 
 // MUSIC-SUITE P7 (2026-09-29), room-mix-ux: the three player-set bus levels (lib/audio/volumes.ts owns the pure
 // arithmetic and the on-device persistence; this file is the only place that arithmetic reaches a real GainNode).
 import { busGain, loadVolumes, saveVolume, VOLUME_RAMP_TC, type VolumeBus, type VolumeSettings } from '@/lib/audio/volumes';
+// VOICEOVER (2026-10-06): the output presets (phone / TV / headphones) and the ducking under every voice.
+import {
+  OUTPUT_PRESETS, browserHints, detectOutputPreset, glueTrimDb, loadOutputPreset, musicDuckDb, saveOutputPreset, type OutputPreset,
+} from './voice/outputPreset';
+import { dbToGain } from './voice/loudness';
+import { duckPlan, type DuckSpec } from './voice/ducking';
 
 /** Every bus's own tuned base gain BEFORE a player's volume multiplies it — voiceBus and musicBus already had these
  *  numbers (P2); SFX_BASE_GAIN is new (sfxBus below) and is 1 because every SfxName's envelope was already tuned to
@@ -71,10 +90,99 @@ class SoundKitImpl {
   setVoice(on: boolean): void { this.voiceEnabled = on; writeVoicePref(on); }
   /** The graph the voice (and, MUSIC-SUITE P2, the music; MUSIC-SUITE P7, sfx) plays into; null before a context can
    *  exist (server, no Web Audio). */
-  graph(): { ctx: AudioContext; voice: GainNode; crowdDuck: GainNode; out: AudioNode; music: GainNode; sfx: GainNode } | null {
+  graph(): { ctx: AudioContext; voice: GainNode; voiceIn: AudioNode; crowdDuck: GainNode; out: AudioNode; music: GainNode; sfx: GainNode } | null {
     const ctx = this.ensure();
-    return ctx && this.voiceBus && this.crowdDuck && this.out && this.musicBus && this.sfxBus
-      ? { ctx, voice: this.voiceBus, crowdDuck: this.crowdDuck, out: this.out, music: this.musicBus, sfx: this.sfxBus } : null;
+    return ctx && this.voiceBus && this.voiceIn && this.crowdDuck && this.out && this.musicBus && this.sfxBus
+      ? { ctx, voice: this.voiceBus, voiceIn: this.voiceIn, crowdDuck: this.crowdDuck, out: this.out, music: this.musicBus, sfx: this.sfxBus } : null;
+  }
+
+  // ── VOICEOVER (2026-10-06): output presets and ducking ──────────────────────────────────────────────────────────────
+  // The voice chain: voiceIn → high-pass → presence → trim → voiceBus (the player's VOICE level). It sits UPSTREAM of the bus so
+  // the bus keeps its own tuned gain and its one hop to master (SoundKit.busRouting.test). VoiceKit plays into voiceIn.
+  // The master chain: master → high-pass → glue compressor → glue trim → the limiter (unchanged, still `out`).
+  private voiceIn: GainNode | null = null;
+  private voiceHp: BiquadFilterNode | null = null;
+  private presence: BiquadFilterNode | null = null;
+  private voiceTrim: GainNode | null = null;
+  private masterHp: BiquadFilterNode | null = null;
+  private glue: DynamicsCompressorNode | null = null;
+  private glueTrim: GainNode | null = null;
+  private presetPicked: OutputPreset | null = loadOutputPreset();
+  private presetDetected: OutputPreset | null = null;
+  /** The voice span the mix is ducked for (audio-clock seconds), and the court it was for (a rhythm room ducks its song less). */
+  private duckSpan: [number, number] | null = null;
+  private duckCourt: string | null = null;
+
+  /** The game's audio context exists and is running (a gesture unlocked it). Never builds one. */
+  get audioRunning(): boolean { return this.ctx?.state === 'running'; }
+
+  /** The output preset in effect: the player's pick, else detected from this device. */
+  get outputPreset(): OutputPreset {
+    return this.presetPicked ?? (this.presetDetected ??= detectOutputPreset(browserHints()));
+  }
+  /** True when the player picked the preset (false: detected). */
+  get outputPresetPicked(): boolean { return this.presetPicked !== null; }
+  /** Pick a preset (null: back to detecting). Persists, and moves the live graph with a short glide. */
+  setOutputPreset(p: OutputPreset | null): void {
+    this.presetPicked = p;
+    saveOutputPreset(p);
+    this.applyPreset(false);
+  }
+
+  /**
+   * A voice plays from t0 to t1 (audio-clock seconds): the music, the effects and the crowd step down under it by the preset's
+   * depths (ducking.ts). A span that starts before the last one has finished releasing extends it: one duck, no bobbing between
+   * the MC and the sidekick. `cut` ends the span early (the voice was cut off or hushed).
+   */
+  duckForVoice(t0: number, t1: number, court?: string | null): void {
+    const ctx = this.ctx; if (!ctx) return;
+    const spec = OUTPUT_PRESETS[this.outputPreset];
+    const cur = this.duckSpan;
+    this.duckSpan = cur && t0 <= cur[1] + spec.release ? [Math.min(cur[0], t0), Math.max(cur[1], t1)] : [t0, t1];
+    this.duckCourt = court ?? null;
+    this.writeDucks();
+  }
+  /** The voice stopped early at `t` (a cut, a hush): release the duck from there. */
+  releaseDuck(t: number): void {
+    if (!this.duckSpan || !this.ctx) return;
+    this.duckSpan = [this.duckSpan[0], Math.min(this.duckSpan[1], Math.max(t, this.ctx.currentTime))];
+    this.writeDucks();
+  }
+
+  private duckSpecs(): { music: DuckSpec; sfx: DuckSpec; crowd: DuckSpec } {
+    const s = OUTPUT_PRESETS[this.outputPreset];
+    const d = (depthDb: number): DuckSpec => ({ depthDb, attack: s.attack, release: s.release });
+    return { music: d(musicDuckDb(s, this.duckCourt)), sfx: d(s.duck.sfx), crowd: d(s.duck.crowd) };
+  }
+  /** Write the duck plan (or the plain resting level) onto the three targets from now on. */
+  private writeDucks(only?: VolumeBus): void {
+    const ctx = this.ctx; if (!ctx) return;
+    const now = ctx.currentTime, specs = this.duckSpecs();
+    const write = (param: AudioParam, level: number, spec: DuckSpec): void => {
+      param.cancelScheduledValues(now);
+      for (const e of duckPlan(now, this.duckSpan, level, spec, VOLUME_RAMP_TC)) param.setTargetAtTime(e.target, e.at, e.tau);
+    };
+    if (this.musicBus && (!only || only === 'music')) write(this.musicBus.gain, busGain(1 / MASTER_GAIN, this.volumes.music), specs.music);
+    if (this.sfxBus && (!only || only === 'sfx')) write(this.sfxBus.gain, busGain(SFX_BASE_GAIN, this.volumes.sfx), specs.sfx);
+    if (this.crowdDuck && !only) write(this.crowdDuck.gain, 1, specs.crowd);
+  }
+  /** Set every preset-driven node (instant on build, a short glide on a change). */
+  private applyPreset(instant: boolean): void {
+    const ctx = this.ctx; if (!ctx) return;
+    const s = OUTPUT_PRESETS[this.outputPreset];
+    const set = (param: AudioParam | undefined, v: number): void => {
+      if (!param) return;
+      if (instant) param.value = v; else param.setTargetAtTime(v, ctx.currentTime, VOLUME_RAMP_TC);
+    };
+    set(this.voiceHp?.frequency, s.voiceHpHz);
+    set(this.presence?.frequency, s.presenceHz); set(this.presence?.gain, s.presenceDb);
+    set(this.voiceTrim?.gain, dbToGain(s.voiceTrimDb));
+    set(this.masterHp?.frequency, s.masterHpHz);
+    if (this.glue) {
+      set(this.glue.threshold, s.glue.threshold); set(this.glue.knee, s.glue.knee); set(this.glue.ratio, s.glue.ratio);
+      set(this.glue.attack, s.glue.attack); set(this.glue.release, s.glue.release);
+    }
+    set(this.glueTrim?.gain, dbToGain(glueTrimDb(s)));
   }
 
   /** MUSIC-SUITE P7: the player's saved MUSIC / SFX / VOICE levels (0..1 each) — read by the settings UI
@@ -92,9 +200,10 @@ class SoundKitImpl {
     this.volumes = saveVolume(bus, level);
     const ctx = this.ctx;
     if (!ctx) return;
-    const node = bus === 'music' ? this.musicBus : bus === 'voice' ? this.voiceBus : this.sfxBus;
-    const base = bus === 'music' ? 1 / MASTER_GAIN : bus === 'voice' ? VOICE_BASE_GAIN : SFX_BASE_GAIN;
-    node?.gain.setTargetAtTime(busGain(base, this.volumes[bus]), ctx.currentTime, VOLUME_RAMP_TC);
+    // VOICEOVER: music and sfx may be mid-duck: their new level goes through the duck plan, so a release scheduled before the
+    // drag cannot later glide them back to the OLD level.
+    if (bus !== 'voice') { this.writeDucks(bus); return; }
+    this.voiceBus?.gain.setTargetAtTime(busGain(VOICE_BASE_GAIN, this.volumes.voice), ctx.currentTime, VOLUME_RAMP_TC);
   }
 
   private ensure(): AudioContext | null {
@@ -109,12 +218,23 @@ class SoundKitImpl {
     this.master.gain.value = MASTER_GAIN;
     const limiter = this.ctx.createDynamicsCompressor();
     limiter.threshold.value = -3; limiter.knee.value = 0; limiter.ratio.value = 20; limiter.attack.value = 0.001; limiter.release.value = 0.12;
-    this.master.connect(limiter).connect(this.ctx.destination);
+    // VOICEOVER (2026-10-06): master → high-pass → glue → glue trim → limiter (the preset sets all three; applyPreset below)
+    this.masterHp = this.ctx.createBiquadFilter(); this.masterHp.type = 'highpass'; this.masterHp.Q.value = 0.707;
+    this.glue = this.ctx.createDynamicsCompressor();
+    this.glueTrim = this.ctx.createGain();
+    this.master.connect(this.masterHp).connect(this.glue).connect(this.glueTrim).connect(limiter).connect(this.ctx.destination);
     this.out = limiter;   // everything the game sounds like, last node before the speakers (a dev probe can tap it)
     this.crowdDuck = this.ctx.createGain(); this.crowdDuck.connect(this.master);
     this.voiceBus = this.ctx.createGain(); this.voiceBus.gain.value = busGain(VOICE_BASE_GAIN, this.volumes.voice); this.voiceBus.connect(this.master);
+    // VOICEOVER: the voice chain feeds the bus (voiceIn → high-pass → presence → trim → voiceBus)
+    this.voiceIn = this.ctx.createGain();
+    this.voiceHp = this.ctx.createBiquadFilter(); this.voiceHp.type = 'highpass'; this.voiceHp.Q.value = 0.707;
+    this.presence = this.ctx.createBiquadFilter(); this.presence.type = 'peaking'; this.presence.Q.value = 0.9;
+    this.voiceTrim = this.ctx.createGain();
+    this.voiceIn.connect(this.voiceHp).connect(this.presence).connect(this.voiceTrim).connect(this.voiceBus);
     this.musicBus = this.ctx.createGain(); this.musicBus.gain.value = busGain(1 / MASTER_GAIN, this.volumes.music); this.musicBus.connect(this.master);   // MUSIC-SUITE P2
     this.sfxBus = this.ctx.createGain(); this.sfxBus.gain.value = busGain(SFX_BASE_GAIN, this.volumes.sfx); this.sfxBus.connect(this.master);   // MUSIC-SUITE P7
+    this.applyPreset(true);
     return this.ctx;
   }
 
@@ -264,6 +384,32 @@ class SoundKitImpl {
         src.start(); src.stop(ctx.currentTime + 0.3);
         break;
       }
+      // AN ENGINE SPOOLING UP (10-phase pass, phase 8 — the kart's boost exhaust note). A boost ignition was a
+      // `whoosh` of moving air and nothing from the machine; the machine is the kart. A low sawtooth RISES (the
+      // revs coming on, not a release falling off) with a brown-noise chug under it through a lowpass — the
+      // two-stroke bark read at phone volume, short enough to layer under the whoosh without smearing it.
+      case 'exhaust': {
+        const osc = ctx.createOscillator();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(68 * pitch, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(180 * pitch, ctx.currentTime + 0.22);
+        const lp = ctx.createBiquadFilter();
+        lp.type = 'lowpass'; lp.frequency.value = 900;
+        const g = ctx.createGain();
+        this.env(g, ctx, 0.008, 0.3, 0.5 * vol);
+        osc.connect(lp).connect(g).connect(this.sfxBus);
+        osc.start(); osc.stop(ctx.currentTime + 0.34);
+
+        const chug = ctx.createBufferSource();
+        chug.buffer = this.noiseBuffer(ctx, 0.16, 'brown');
+        const cl = ctx.createBiquadFilter();
+        cl.type = 'lowpass'; cl.frequency.value = 320;
+        const cg = ctx.createGain();
+        this.env(cg, ctx, 0.004, 0.18, 0.4 * vol);
+        chug.connect(cl).connect(cg).connect(this.sfxBus);
+        chug.start(); chug.stop(ctx.currentTime + 0.2);
+        break;
+      }
       case 'impact': {
         const osc = ctx.createOscillator();
         osc.type = 'square';
@@ -363,8 +509,9 @@ class SoundKitImpl {
 
   /** Looping ambient crowd bed for outdoor/stadium venues. Call once per
    *  mode load; returns nothing — call stopAmbient() on mode dispose. */
-  startAmbient(kind: 'stadium' | 'dojo' | 'ocean' | 'wind' | 'none'): void {
+  startAmbient(kind: AmbientKind): void {
     this.stopAmbient();
+    this.ambientAsked = kind;   // AMBIENT FIX (2026-10-06): recorded before the early returns — see ambientKind()
     if (kind === 'none' || !this.musicEnabled) return;
     const ctx = this.ensure();
     if (!ctx || !this.master) return;
@@ -419,7 +566,25 @@ class SoundKitImpl {
     this.crowdBed?.stop();
     this.crowdBed = null;
     this.crowdGain = null;
+    this.ambientAsked = null;   // AMBIENT FIX: teardown resets it, so a remount on the same page starts like the first
   }
+
+  // AMBIENT FIX (2026-10-06), owner decision "one shared fix for all": the harness started its mood bed on the first
+  // input, and startAmbient stops whatever is playing — so every mode that chose its own bed in load() (wind, ocean,
+  // dojo…) lost it to a stadium crowd (or to silence) on the first press. The harness now asks this first.
+  private ambientAsked: AmbientKind | null = null;
+  /** The bed the last startAmbient() asked for, until stopAmbient(); null when none has been asked for. It is the
+   *  REQUEST, not the audio: 'none' (a mode that wants silence) counts, and so does a bed that cannot sound yet (music
+   *  off, no AudioContext) — the mode chose it either way, and the venue bed must not overrule it. */
+  ambientKind(): AmbientKind | null { return this.ambientAsked; }
+  /** The harness's venue bed for the mood, started on the first input: only when no bed has been asked for since the
+   *  last stopAmbient() (shouldStartMoodBed). A mode that starts its bed later (on its first played frame) still
+   *  replaces this one through startAmbient(), as before. */
+  startVenueAmbient(kind: AmbientKind): void {
+    if (shouldStartMoodBed(this.ambientAsked)) this.startAmbient(kind);
+  }
+  /** Whether the bed playing now follows momentum (momentumScalesBed) — the harness's per-frame crowd swell asks. */
+  bedFollowsMomentum(): boolean { return momentumScalesBed(this.ambientAsked); }
 }
 
 const MASTER_GAIN = 0.55;

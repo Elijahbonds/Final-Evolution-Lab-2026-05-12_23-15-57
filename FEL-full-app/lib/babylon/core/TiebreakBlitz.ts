@@ -1,4 +1,4 @@
-// Tiebreak Blitz rules — a first-to-seven rally the 3D mode and the scripted run share.
+// Tiebreak Blitz rules — a first-to-seven, win-by-two rally the 3D mode and the scripted run share.
 //
 // The ceiling's rally-depth scale (myPts × 120 + bestRally × 30) and the AI net rate (0.16 + 0.05 × rally)
 // stay; the host posts the game score per WA-22. What changed is the contest around that scale: the hit
@@ -7,6 +7,39 @@
 // A read of an on-screen "COMING LEFT" label is not the game any more — the side is the ball's side.
 
 export const TARGET = 7;
+
+/**
+ * IMPROVE (2026-10-06) #10: a real tiebreak is won by two — 6-6 is the drama, not a coin flip. The deuce run is capped so
+ * a match always ends and the posted score (myPts) has a ceiling: at 11-11 the next point wins (sudden death), so no
+ * side ever passes 12. The arena ceiling (lib/arena-score-integrity.ts, 1350) sits far above it.
+ */
+export const WIN_BY = 2;
+export const TIEBREAK_MAX_PTS = 12;
+
+/** The rules' end: a side at TARGET with a two-point lead, or a side at the cap. */
+export function matchOver(myPts: number, aiPts: number): boolean {
+  const top = Math.max(myPts, aiPts);
+  return (top >= TARGET && Math.abs(myPts - aiPts) >= WIN_BY) || top >= TIEBREAK_MAX_PTS;
+}
+
+/** What the scoreboard calls the state of the match: '' in regulation, 'WIN BY 2' from 6-6, 'SUDDEN DEATH' at 11-11,
+ *  'SET POINT' (yours) or 'SET POINT · AI' for the side one point from winning — a tiebreak decides a set. */
+export function matchCall(myPts: number, aiPts: number): string {
+  if (matchOver(myPts, aiPts)) return '';
+  if (myPts === TIEBREAK_MAX_PTS - 1 && aiPts === TIEBREAK_MAX_PTS - 1) return 'SUDDEN DEATH';
+  if (matchOver(myPts + 1, aiPts)) return 'SET POINT';
+  if (matchOver(myPts, aiPts + 1)) return 'SET POINT · AI';
+  if (myPts >= TARGET - 1 && aiPts >= TARGET - 1) return 'WIN BY 2';
+  return '';
+}
+
+/** IMPROVE (2026-10-06) #8 — TUNED (new): after a return the ball flies back to the rival for this long before his
+ *  shot comes in. Presses are ignored while it is going out (the incoming window is untouched). */
+export const RETURN_OUT_SEC = 0.32;
+
+/** IMPROVE (2026-10-06) #9 — TUNED (new): a press this soon after a point does not cut the hold, so a late press on an
+ *  ace does not serve the next ball under "ACE PAST YOU". */
+export const SKIP_LOCK_SEC = 0.3;
 
 export type Side = 'left' | 'right';
 
@@ -99,15 +132,40 @@ export interface BlitzState {
   /** Set when a scripted player has chosen a swing for this ball. */
   pendingAt: number;
   pendingDir: Side | null;
+  /** IMPROVE (2026-10-06) #17: unscored warm-up balls still to play before 0-0. Each is one ball: any swing, or the ball
+   *  passing, ends it. They never touch the score, the rally record or the server's read of your misses. */
+  warmup: number;
 }
 
-export function freshBlitz(): BlitzState {
+export function freshBlitz(warmup = 0): BlitzState {
   return {
     myPts: 0, aiPts: 0, rally: 0, bestRally: 0,
     incoming: 'left', ballT: 0, ballLen: 1, windowOpenAt: 0.7,
     awaiting: false, gap: 0.45, over: false, elapsed: 0, lastMissed: null,
-    pendingAt: 0, pendingDir: null,
+    pendingAt: 0, pendingDir: null, warmup: Math.max(0, Math.floor(warmup)),
   };
+}
+
+/** #8: the returned ball is still on its way out to the rival (the incoming flight has not begun). */
+export function goingOut(s: BlitzState): boolean {
+  return s.awaiting && s.ballT < 0;
+}
+
+/** IMPROVE (2026-10-06) #12: where a swing landed against the window, read BEFORE the swing is committed. `ms` is how far
+ *  outside the window it was (0 inside); `at01` is where inside it landed (0 the opening edge, 1 the ball reaching you). */
+export interface SwingTiming { phase: 'early' | 'in' | 'late'; ms: number; at01: number }
+export function swingTiming(s: Pick<BlitzState, 'ballT' | 'windowOpenAt' | 'ballLen'>): SwingTiming {
+  if (s.ballT < s.windowOpenAt) return { phase: 'early', ms: Math.round((s.windowOpenAt - s.ballT) * 1000), at01: 0 };
+  if (s.ballT >= s.ballLen) return { phase: 'late', ms: Math.round((s.ballT - s.ballLen) * 1000), at01: 1 };
+  const span = Math.max(1e-6, s.ballLen - s.windowOpenAt);
+  return { phase: 'in', ms: 0, at01: Math.min(1, Math.max(0, (s.ballT - s.windowOpenAt) / span)) };
+}
+
+/** IMPROVE (2026-10-06) #1: how far the ring has closed on the ball, 0 (wide, the ball just struck) → 1 (closed: the
+ *  window is open). It closes across the flight up to the window, so the window can be read ahead of time. */
+export function ringClose01(s: Pick<BlitzState, 'ballT' | 'windowOpenAt'>): number {
+  if (s.windowOpenAt <= 0) return 1;
+  return Math.min(1, Math.max(0, s.ballT / s.windowOpenAt));
 }
 
 function leadOf(s: BlitzState): number {
@@ -127,11 +185,22 @@ function serve(s: BlitzState, rng: () => number, reactBase: number, feel: BlitzF
   s.pendingDir = null;
 }
 
-/** A press during the between-point hold cuts it. The next tick serves. */
-export function skipGap(s: BlitzState): boolean {
+/** A press during the between-point hold cuts it. The next tick serves. IMPROVE (2026-10-06) #9: not in the first
+ *  SKIP_LOCK_SEC of the hold — that press was a swing at the ball that just went past, not a call for the next one. */
+export function skipGap(s: BlitzState, feel: BlitzFeel = NORMAL_FEEL): boolean {
   if (s.over || s.awaiting || s.gap <= 0) return false;
+  if (s.gap > feel.gapSec - SKIP_LOCK_SEC) return false;
   s.gap = 0;
   return true;
+}
+
+/** #17: a warm-up ball is over — no score, no rally record, straight into the between-point hold. */
+function endWarmup(s: BlitzState, feel: BlitzFeel): void {
+  s.warmup = Math.max(0, s.warmup - 1);
+  s.rally = 0;
+  s.awaiting = false;
+  s.pendingDir = null;
+  s.gap = feel.gapSec;
 }
 
 function award(s: BlitzState, mine: boolean, feel: BlitzFeel): void {
@@ -142,7 +211,7 @@ function award(s: BlitzState, mine: boolean, feel: BlitzFeel): void {
   s.awaiting = false;
   s.pendingDir = null;
   s.gap = feel.gapSec;
-  if (s.myPts >= TARGET || s.aiPts >= TARGET) s.over = true;
+  if (matchOver(s.myPts, s.aiPts)) s.over = true;
 }
 
 export type SwingResult = 'ignore' | 'return' | 'point-me' | 'point-ai';
@@ -153,8 +222,14 @@ export function commitSwing(
   aiNets: (rally: number, rng: () => number) => boolean,
 ): SwingResult {
   if (s.over || !s.awaiting) return 'ignore';
+  if (s.ballT < 0) return 'ignore';                       // #8: your return is still going out
   const inWindow = s.ballT >= s.windowOpenAt && s.ballT < s.ballLen;
   s.pendingDir = null;
+  if (s.warmup > 0) {
+    // #17: a warm-up ball reports what a real one would ('return' for a clean hit, 'point-ai' for a miss) and scores nothing
+    endWarmup(s, feel);
+    return dir === s.incoming && inWindow ? 'return' : 'point-ai';
+  }
   if (dir === s.incoming && inWindow) {
     s.rally += 1;
     s.bestRally = Math.max(s.bestRally, s.rally);
@@ -163,6 +238,7 @@ export function commitSwing(
       return 'point-me';
     }
     serve(s, rng, reactBase, feel);
+    s.ballT = -RETURN_OUT_SEC;                            // #8: the ball goes back out before his shot comes in
     return 'return';
   }
   s.lastMissed = s.incoming;
@@ -221,6 +297,7 @@ export function tickBlitz(s: BlitzState, dt: number, opts: TickOpts): SwingResul
     s.pendingDir = plan.dir;
   }
   if (s.ballT >= s.ballLen) {
+    if (s.warmup > 0) { endWarmup(s, opts.feel); return 'ace'; }
     s.lastMissed = s.incoming;
     award(s, false, opts.feel);
     return 'ace';

@@ -17,6 +17,7 @@ import {
   type FaceConfig, type JerseyConfig,
 } from '../closet/wearable-catalog';
 import { VITAL_DEFAULT } from './schema/vitals';
+import { sanitizeHex } from './look/sanitize';
 
 export interface LookHold {
   /** Verified 18+. Everyone else is local-only for the look. */
@@ -39,6 +40,9 @@ const EQUIPPED_ROW_IDS = ['headwear', 'tops', 'shorts', 'shoes', 'accessory', 'p
 const VITAL_LOOK_IDS = ['jerseyNumber', 'heightScale', 'buildScale'] as const;
 
 const FACE_KEYS = ['skinTone', 'faceShape', 'hairStyle', 'hairColor', 'eyeShape', 'eyeColor', 'brows', 'mouth', 'nose'] as const;
+/** IMPROVE (2026-10-06), CREATOR-PLAN phase 4a (free colour everywhere): these three are any colour now, and only a colour —
+ *  a hex, normalised to #RRGGBB (look/sanitize.sanitizeHex). Anything else keeps the catalog default. */
+const HEX_FACE_KEYS: ReadonlySet<string> = new Set(['skinTone', 'hairColor', 'eyeColor']);
 
 /** A string that is a picture or a pointer at one. Catalog values are short names and hex swatches. */
 const IMAGE_TEXT = /data:|image\/(png|jpe?g|webp|gif)|base64,|^https?:\/\//i;
@@ -84,6 +88,7 @@ export function holdFace(face: FaceConfig, hold: LookHold): FaceConfig {
   const next = defaultFace();
   for (const k of FACE_KEYS) {
     const v = src[k];
+    if (HEX_FACE_KEYS.has(k)) { const hex = sanitizeHex(v); if (hex) (next as unknown as Record<string, string>)[k] = hex; continue; }
     if (typeof v === 'string' && v && !IMAGE_TEXT.test(v)) (next as unknown as Record<string, string>)[k] = v;
   }
   if (hold.uploadNumbers) {

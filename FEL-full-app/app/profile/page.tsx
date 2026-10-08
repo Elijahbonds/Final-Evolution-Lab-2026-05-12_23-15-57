@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { Gem, Shirt, Store, CalendarDays, PersonStanding } from 'lucide-react';
 import { authOptions } from '@/lib/auth';
+import { loginPath } from '@/lib/auth/safeNext';
 import { prisma } from '@/lib/db';
 import { readWallet } from '@/lib/wallet/wallet-service';
 import { prqScore, prqGrade } from '@/lib/prq';
@@ -27,7 +28,7 @@ export const dynamic = 'force-dynamic';
 export default async function ProfilePage() {
   const session = await getServerSession(authOptions);
   const me = (session?.user as { id?: string } | undefined)?.id;
-  if (!session) redirect('/login?next=%2Fprofile');
+  if (!session) redirect(loginPath('/profile'));
 
   const [profile, entitlements, wallet] = await Promise.all([
     me ? prisma.playerProfile.findUnique({ where: { userId: me } }).catch(() => null) : null,

@@ -1,20 +1,16 @@
-// LINKS-PAGE live probe (2026-09-29): /elijah on a `next start` build (LINKS_BASE; this lane used :3181), signed out, in
-// a fresh browser context. GET /elijah answers 200 with no Location; every button's href; /screen and /try open signed
-// out; every request /elijah makes (first-party only, and whether next-auth's session fetch appears); screenshots at
-// 390×844 and desktop width. The external shops are never opened: checking the hrefs is enough. With the server's
-// NEXTAUTH_URL set to the production host, the web.app count in /elijah's HTML (and, for comparison, in /try's, which
-// keeps the root layout's share-image tags) shows the page names no host (the FE PM amend, two hosts).
+// Live probe for the one bio page: /links on a `next start` build (LINKS_BASE), signed out.
+// GET /elijah is a permanent redirect to /links. External shops are never opened.
 //
-// Run from FEL-full-app (Node 26), with the server up:
+// Run from FEL-full-app, with the server up:
 //   LINKS_BASE=http://127.0.0.1:3181 node node_modules/tsx/dist/cli.mjs --tsconfig tsconfig.json scripts/probes/_links-page-live.mts
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { chromium } from 'playwright-core';
 import { chromiumExe } from './_chromium.mts';
 
-// the data file, as the other probes load app modules under tsx (a default-export fallback)
-const LM = await import('../../app/elijah/links.ts');
-const { ELIJAH_LINKS } = ((LM as unknown as { default?: typeof LM }).default ?? LM);
+const LM = await import('../../lib/links/hub.ts');
+const hub = ((LM as unknown as { default?: typeof LM }).default ?? LM);
+const { HUB_ITEMS } = hub;
 const BASE = process.env.LINKS_BASE ?? 'http://127.0.0.1:3181';
 const ORIGIN = new URL(BASE).origin;
 const OUT = process.env.LINKS_SHOTS ?? join(process.env.HOME ?? '.', 'Claude/outbox/LINKS-PAGE-shots');
@@ -22,12 +18,8 @@ mkdirSync(OUT, { recursive: true });
 type Json = Record<string, any>;
 const report: Json = { base: BASE, date: new Date().toISOString() };
 
-// the raw answer: no redirect followed
 const head = await fetch(`${BASE}/elijah`, { redirect: 'manual' });
 report.get = { status: head.status, location: head.headers.get('location'), setCookie: head.headers.get('set-cookie') };
-const HOST = new RegExp(['web', 'app'].join('\\.'), 'gi');
-const count = async (path: string) => ((await (await fetch(`${BASE}${path}`)).text()).match(HOST) ?? []).length;
-report.hostCount = { '/elijah': await count('/elijah'), '/try': await count('/try') };
 
 const browser = await chromium.launch({ executablePath: chromiumExe(), headless: true });
 try {
@@ -38,27 +30,26 @@ try {
     const page = await ctx.newPage();
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(String(e)));
-    await page.goto(`${BASE}/elijah`);
-    await page.waitForSelector('[data-links-page]');
+    await page.goto(`${BASE}/links`);
+    await page.waitForSelector('[data-links-hub]');
     await page.waitForTimeout(2000);
-    const links = await page.evaluate(`Array.from(document.querySelectorAll('[data-links-page] a')).map((a) => ({ label: a.getAttribute('data-link'), href: a.getAttribute('href'), target: a.getAttribute('target'), rel: a.getAttribute('rel'), paidNote: (a.parentElement.querySelector('[data-paid-link-note]') || {}).textContent || null, height: Math.round(a.getBoundingClientRect().height) }))`);
+    const links = await page.evaluate(`Array.from(document.querySelectorAll('[data-links-hub] a')).map((a) => ({ id: a.getAttribute('data-link'), href: a.getAttribute('href'), target: a.getAttribute('target'), rel: a.getAttribute('rel'), height: Math.round(a.getBoundingClientRect().height) }))`);
     const storage = await page.evaluate(`({ local: Object.keys(localStorage), session: Object.keys(sessionStorage) })`);
-    const shot = join(OUT, `elijah-${tag}.png`);
+    const shot = join(OUT, `links-${tag}.png`);
     await page.screenshot({ path: shot, fullPage: true });
     report[tag] = {
       url: page.url().replace(ORIGIN, ''), title: await page.title(), links, errors, storage, cookies: (await ctx.cookies()).map((c) => c.name),
       requests: reqs, thirdParty: reqs.filter((r) => !r.firstParty), api: reqs.filter((r) => r.url.startsWith('/api/')).map((r) => `${r.method} ${r.url}`), shot,
     };
     if (tag === 'phone') {
-      // the two internal buttons open signed out
-      for (const label of ELIJAH_LINKS.filter((b) => !b.external).map((b) => b.label)) {
-        await page.goto(`${BASE}/elijah`);
-        await page.waitForSelector('[data-links-page]');
-        await page.click(`[data-link="${label}"]`);
+      for (const item of HUB_ITEMS.filter((b) => b.kind === 'internal' && b.url)) {
+        await page.goto(`${BASE}/links`);
+        await page.waitForSelector('[data-links-hub]');
+        await page.click(`[data-link="${item.id}"]`);
         await page.waitForLoadState('networkidle', { timeout: 20_000 }).catch(() => {});
         await page.waitForTimeout(2500);
-        report[`open:${label}`] = { url: page.url().replace(ORIGIN, ''), login: /\/login/.test(page.url()), passwordInputs: await page.locator('input[type="password"]').count(), shot: join(OUT, `open-${label.replace(/\W+/g, '_')}.png`) };
-        await page.screenshot({ path: report[`open:${label}`].shot });
+        report[`open:${item.id}`] = { url: page.url().replace(ORIGIN, ''), login: /\/login/.test(page.url()), passwordInputs: await page.locator('input[type="password"]').count(), shot: join(OUT, `open-${item.id}.png`) };
+        await page.screenshot({ path: report[`open:${item.id}`].shot });
       }
     }
     await ctx.close();
@@ -67,4 +58,4 @@ try {
   await browser.close();
 }
 writeFileSync(join(OUT, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);
-console.log(JSON.stringify({ get: report.get, hostCount: report.hostCount, phone: { ...report.phone, requests: report.phone.requests.length }, desktop: { title: report.desktop.title, requests: report.desktop.requests.length, api: report.desktop.api }, open: Object.fromEntries(Object.entries(report).filter(([k]) => k.startsWith('open:'))) }, null, 1));
+console.log(JSON.stringify({ get: report.get, phone: { ...report.phone, requests: report.phone.requests.length }, desktop: { title: report.desktop.title, requests: report.desktop.requests.length, api: report.desktop.api }, open: Object.fromEntries(Object.entries(report).filter(([k]) => k.startsWith('open:'))) }, null, 1));

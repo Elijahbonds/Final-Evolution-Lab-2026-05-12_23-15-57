@@ -6,9 +6,11 @@
 // lib/babylon/* cores (BasketballCore + PlayerSlot + TeammateBrain).
 
 import { readCourtLocation } from '@/lib/babylon/nexus/courtLocations';
+import { courtArtSkin } from '@/lib/modes/art/apply-art-card';
 import { useEffect, useRef, useState, useCallback } from 'react';
 import type { GameProps, GameResult } from './game-shell';
 import { BootSplash } from './boot-splash';
+import { surfaceBootError } from './boot-error';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
@@ -21,6 +23,8 @@ export default function ThreeVThreeBabylon({ onEnd }: GameProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const busRef = useRef<InputBus | null>(null);
   const endedRef = useRef(false);
+  const onEndRef = useRef(onEnd);
+  onEndRef.current = onEnd;
   const [phase, setPhase] = useState<ModePhase>('loading');
   const [countdown, setCountdown] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -49,7 +53,7 @@ export default function ThreeVThreeBabylon({ onEnd }: GameProps) {
         duration: r.durationSec,
         headline: won ? 'GAME WON' : drew ? 'DEAD EVEN' : 'GAME OVER',
       };
-      onEnd(result);
+      onEndRef.current(result);
     };
 
     // StrictMode runs effect -> cleanup -> effect. Starting the harness
@@ -66,6 +70,7 @@ export default function ThreeVThreeBabylon({ onEnd }: GameProps) {
       runMode(MODES.threevthree, {
         canvas,
         location: readCourtLocation(),   // court location pick (docs/SPEC-COURT-LOCATIONS.md)
+        applySkin: courtArtSkin,   // PIPELINES (2026-10-06): the player's court art card, a centre-court decal
         input: bus,
         onPhase: (p, cd) => {
           setPhase(p);
@@ -79,7 +84,7 @@ export default function ThreeVThreeBabylon({ onEnd }: GameProps) {
           if (disposed) { s(); return; }
           stop = s;
         })
-        .catch((e) => console.error('[FEL-HOOPS3] boot failed', e));
+        .catch((e) => surfaceBootError(e, { disposed, label: '[FEL-HOOPS3] boot failed', setPhase, setLoadError }));
     }, 0);
 
     return () => {
@@ -88,7 +93,8 @@ export default function ThreeVThreeBabylon({ onEnd }: GameProps) {
       stop?.();
       busRef.current = null;
     };
-  }, [onEnd]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- G7: the stage is owned by the mount; callbacks are read through refs.
+  }, []);
 
   const emit = useCallback((e: Parameters<InputBus['emit']>[0]) => {
     busRef.current?.emit(e);
@@ -156,8 +162,15 @@ export default function ThreeVThreeBabylon({ onEnd }: GameProps) {
       {phase === 'playing' && <MicCaption text={hud.mic} who={hud.micWho} />}
       {phase === 'playing' && <MicToggle />}
 
+      {/* IMPROVE (2026-10-06) #5: what the PASS button would throw right now — the ring under the mate is its colour */}
+      {typeof hud.passPreview === 'string' && hud.passPreview && phase === 'playing' && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-[4.25rem] text-center">
+          <span className={`fel-panel px-2 py-0.5 font-mono text-[10px] tracking-wider ${hud.passPreview === 'NO LANE' ? 'text-white/50' : 'text-[var(--fel-cyan)]'}`}>J · {hud.passPreview}</span>
+        </div>
+      )}
+      {/* IMPROVE (2026-10-06) #7: ONE line for the state you are in (it used to be every control at once) */}
       {typeof hud.hint === 'string' && hud.hint && phase === 'playing' && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-10 text-center">
+        <div className="pointer-events-none absolute inset-x-0 bottom-10 px-3 text-center">
           <span className="fel-panel px-3 py-1.5 font-mono text-[11px] text-white/80">{hud.hint}</span>
         </div>
       )}
@@ -171,8 +184,19 @@ export default function ThreeVThreeBabylon({ onEnd }: GameProps) {
         onRetry={tapStart}
       />
 
+      {/* HOOPS PAUSE (2026-10-06). Owner: "Hoops pause: Controls panel only" — the full OFFENSE / DEFENSE list that sat along the
+          bottom here on pause (IMPROVE #7) is in the splash's CONTROLS panel now (lib/babylon/ui/panelLines.ts PANEL_GROUPS): one
+          list on the pause, the same as every other mode. */}
+
       {(phase === 'playing' || phase === 'countdown') && busRef.current && (
-        <TouchOverlay bus={busRef.current} modeId="threevthree" visible />
+        <TouchOverlay
+          bus={busRef.current}
+          modeId="threevthree"
+          visible
+          // CALL FOR THE BALL (Elijah item 2): the pad's PASS slot is BALL! whenever `onBall` reads false — shown
+          // only while off-ball, same press (button A), same wire LocalInputSource already reads as intent.pass.
+          overrides={hud.onBall === false ? { A: { label: 'BALL!', color: '#fbbf24' } } : undefined}
+        />
       )}
     </div>
   );

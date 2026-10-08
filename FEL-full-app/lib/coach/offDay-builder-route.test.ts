@@ -213,6 +213,7 @@ describe('a copied program keeps its off days', () => {
   it('duplicate (the route and the pure draft) carries kind: the off day arrives as an off day, not one more training session', async () => {
     await build({ action: 'add_off_day', blockId: BLOCK, afterSessionId: D1 });
     h.user = 'coach-1';
+    h.store.cc = [{ coachId: 'coach-1', clientId: 'client-2', endedAt: null }];   // owner 2026-10-06: a copy goes to a live roster athlete only
     const res = await duplicatePOST(req('/api/coach/programs/duplicate', { programId: PID, clientIds: ['client-2'], startDate: '2026-10-05T00:00:00.000Z' }));
     expect(res.status).toBe(201);
     const { created } = await res.json() as { created: { programId: string }[] };

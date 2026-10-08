@@ -31,8 +31,13 @@ export const LOSS_FRAMES = 6;
 /** How long a part's "Done" beat holds before the next part's setup. */
 export const DONE_BEAT_MS = 1200;
 
-/** The screen pages' font: the system stack (never Courier, never the --fel-font-display chain). Gate 1. */
-export const SYSTEM_FONT_STACK = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+/**
+ * How many times one part restarts itself on a long absence (SCREEN A): the one auto-retry, plus one more. After
+ * that the part stops restarting and waits for the athlete to walk back into the shot. Pacing only — it grades nothing.
+ */
+export const PART_RESTART_MAX = 2;
+
+export { SYSTEM_FONT_STACK } from './font';
 
 /** Whether one landmark is drawn on the live skeleton. */
 export const jointVisible = (l: Lm | undefined, floor = SKELETON_MIN_VISIBILITY): boolean => !!l && Number.isFinite(l.x) && l.v >= floor;

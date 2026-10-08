@@ -55,7 +55,11 @@ for (const c of CAST) {
     lines.push({ id: `name.${s.key.replace(/:/g, '.')}`, moment: 'name', text: s.key.startsWith('num:') ? s.text.replace(/!$/, '') : s.text, tags: [`name:${s.key}`], group: 'coach' });
   // A REAL VOICE only behind a SIGNED card: their takes (MIC_RECORDINGS/<cast>/<line id>.wav) replace the rendered lines
   const recDir = process.env.MIC_RECORDINGS ? join(process.env.MIC_RECORDINGS, c.id) : null;
-  const recordings = c.card?.status === 'signed' && recDir && existsSync(recDir) ? recDir : undefined;
+  // IMPROVE (2026-10-06): a licensed voice service's takes (the owner's decision of 2026-10-06; tools/voice/import-voices.mts keeps
+  // each levelled take at FEL_VOICE_TAKES/<cast>/<line id>.m4a) replace the rendered lines too, so a re-render keeps them. A signed
+  // card's own recordings still come first: they are a real person's voice.
+  const provider = join(process.env.FEL_VOICE_TAKES ?? join(homedir(), '.cache/fel-voice/takes'), c.id);
+  const recordings = c.card?.status === 'signed' && recDir && existsSync(recDir) ? recDir : existsSync(provider) ? provider : undefined;
   if (recDir && existsSync(recDir) && !recordings) console.warn(`${c.id}: takes found but the card is not signed: NOT used`);
   // every group a mode may ask this voice for (ModeMic asks the MC and the sidekick for each of the mode's groups)
   const groups = c.role === 'mc' ? ['shared', 'dunk', 'three', 'game', 'carnival', 'names'] : c.role === 'side' ? ['shared', 'dunk', 'three', 'game', 'carnival'] : [];

@@ -11,7 +11,9 @@
 
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Crown, Lock, Gift, Star } from 'lucide-react';
+import { Crown, Lock, Gift, Star, Target, Check } from 'lucide-react';
+import { goalRemaining, readGoalStates } from '@/lib/goals/daily-goals';
+import { QUEST_SEASON_XP } from '@/lib/season/season-pass-core';
 
 interface Grant { tier: number; lane: string; reward: any }
 interface PassState {
@@ -24,6 +26,15 @@ interface PassState {
   hasPro?: boolean;
   grants?: Grant[];
   claimable?: { free: number[]; pro: number[] };
+  /** IMPROVE (2026-10-06): today's daily goals (lib/season/season-service getPassState → lib/goals/daily-goals-db). */
+  goals?: { day: string; resetsAt?: string; goals: unknown } | null;
+}
+
+/** Whole hours until the goals turn over (at least 1 while today lasts). */
+function hoursLeft(iso?: string): number | null {
+  if (!iso) return null;
+  const ms = new Date(iso).getTime() - Date.now();
+  return Number.isFinite(ms) && ms > 0 ? Math.max(1, Math.ceil(ms / 3_600_000)) : null;
 }
 
 function daysLeft(iso?: string): number | null {
@@ -90,6 +101,8 @@ export function SeasonPassTrack() {
   const freeCount = (state.grants ?? []).filter((g) => g.lane === 'free').length;
   const proCount = (state.grants ?? []).filter((g) => g.lane === 'pro').length;
   const readyCount = (state.claimable?.free.length ?? 0) + (state.claimable?.pro.length ?? 0);
+  const goals = readGoalStates(state.goals?.goals);
+  const goalsHours = hoursLeft(state.goals?.resetsAt);
 
   return (
     <motion.section
@@ -126,6 +139,32 @@ export function SeasonPassTrack() {
         </div>
         <span className="font-mono text-[11px] text-white/50">{state.into ?? 0}/{state.need ?? 0} XP</span>
       </div>
+
+      {/* IMPROVE (2026-10-06, owner decision): today's three goals — each one done adds season XP to the bar above */}
+      {goals.length > 0 && (
+        <div data-season-goals className="mt-4 rounded-lg border border-[#FF7A2F]/25 bg-[#FF7A2F]/[0.05] p-3">
+          <div className="flex items-center gap-2">
+            <Target className="h-4 w-4 text-[#FF7A2F]" />
+            <span className="fel-heading text-sm font-bold text-[#FF7A2F]">TODAY&apos;S GOALS</span>
+            <span className="font-mono text-[11px] text-white/50">+{QUEST_SEASON_XP} season XP each</span>
+            {goalsHours != null && <span className="ml-auto font-mono text-[11px] text-white/40">new goals in {goalsHours}h</span>}
+          </div>
+          <ul className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
+            {goals.map((g) => (
+              <li key={g.id} data-goal={g.id} data-goal-state={g.done ? 'done' : 'open'} className="rounded-md border border-white/10 bg-black/20 px-2.5 py-2">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-white/90">
+                  {g.done && <Check className="h-3.5 w-3.5 shrink-0 text-[#00FF9D]" />}
+                  <span className="truncate">{g.text}</span>
+                </div>
+                <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-white/10">
+                  <div className="h-full rounded-full" style={{ width: `${Math.round((g.progress / g.target) * 100)}%`, background: g.done ? '#00FF9D' : '#FF7A2F' }} />
+                </div>
+                <div className="mt-1 font-mono text-[11px] text-white/50">{g.done ? 'Done' : `${g.progress}/${g.target} · ${goalRemaining(g)} to go`}</div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
         {/* FREE lane */}

@@ -36,6 +36,9 @@ import {
 } from 'lucide-react';
 import hljs from 'highlight.js/lib/common';
 import { AiDisclosure } from '@/components/ai-disclosure';
+import { AiComingSoon } from '@/components/ai-coming-soon';
+import { isComingSoonResponse } from '@/lib/abacus/aiStatus';
+import { useAiStatus } from '@/lib/abacus/useAiStatus';
 
 interface ProjectFileMeta {
   path: string;
@@ -254,7 +257,25 @@ function PlanMessageCard({ plan }: { plan: BuildPlanData }) {
   );
 }
 
+/**
+ * ABACUS-KILL: the Studio asks /api/ai/status first. Until it says 'available' only the panel shows, so the workspace
+ * never mounts and nothing reaches /api/cell/{chat,compile,projects/[id]/files}.
+ */
 export function StudioShell() {
+  const [ai, markComingSoon] = useAiStatus('studio');
+  if (ai === 'available') return <StudioWorkspace onComingSoon={markComingSoon} />;
+  return (
+    <div className="flex h-screen items-center justify-center bg-[#050505] text-white">
+      {ai === 'coming_soon' ? (
+        <AiComingSoon feature="studio" />
+      ) : (
+        <Loader2 className="h-6 w-6 animate-spin text-white/40" aria-label="Loading" />
+      )}
+    </div>
+  );
+}
+
+export function StudioWorkspace({ onComingSoon }: { onComingSoon: () => void }) {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 'welcome',
@@ -381,11 +402,16 @@ export function StudioShell() {
       if (regenerating) return;
       setRegenerating(path);
       try {
-        await fetch(`/api/cell/projects/${pid}/files`, {
+        const res = await fetch(`/api/cell/projects/${pid}/files`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'regenerate', path }),
         });
+        if (await isComingSoonResponse(res)) {
+          setRegenerating(null);
+          onComingSoon();
+          return;
+        }
         await fetchFiles(pid);
         const pr = await fetch(`/api/cell/projects/${pid}`);
         const pj = await pr.json();
@@ -401,7 +427,7 @@ export function StudioShell() {
       } catch {}
       setRegenerating(null);
     },
-    [regenerating, fetchFiles]
+    [regenerating, fetchFiles, onComingSoon]
   );
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -503,20 +529,26 @@ export function StudioShell() {
           : prev
       );
       startPolling(pid);
+      let comingSoon = false;
       try {
-        await fetch('/api/cell/compile', {
+        const res = await fetch('/api/cell/compile', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ projectId: pid, force }),
         });
+        comingSoon = await isComingSoonResponse(res);
       } catch {}
       stopPolling();
       buildingRef.current = false;
       setBuilding(false);
+      if (comingSoon) {
+        onComingSoon();
+        return;
+      }
       await refreshProject(pid);
       refreshProjectsList();
     },
-    [startPolling, stopPolling, refreshProject, refreshProjectsList]
+    [startPolling, stopPolling, refreshProject, refreshProjectsList, onComingSoon]
   );
 
   // Load a project conversation
@@ -617,6 +649,10 @@ export function StudioShell() {
         body: JSON.stringify({ projectId, message: msg, role: 'architect' }),
       });
 
+      if (await isComingSoonResponse(res)) {
+        onComingSoon();
+        return;
+      }
       if (!res.ok) throw new Error('CELL unavailable');
 
       const reader = res.body?.getReader();
@@ -683,7 +719,7 @@ export function StudioShell() {
       setStreaming(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [input, streaming, projectId, refreshProjectsList, startBuild]);
+  }, [input, streaming, projectId, refreshProjectsList, startBuild, onComingSoon]);
 
   const newProject = () => {
     stopPolling();

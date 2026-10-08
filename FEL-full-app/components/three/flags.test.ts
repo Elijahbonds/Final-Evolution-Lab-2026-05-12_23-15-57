@@ -19,6 +19,46 @@ describe('renderer flags', () => {
     expect(isBabylon('dunk')).toBe(false);          // the registry's key is NOT this table's key
   });
 
+  it('every shipped Babylon session key maps to a true renderer flag', () => {
+    // A missing key here silently hands the route to its legacy/fallback renderer, or makes GameShell think Babylon
+    // does not own input. Session keys are what <GameShell mode="..."> saves; flag keys are what loaders pass to
+    // isBabylon(). They intentionally differ for the shared board host.
+    const shippedBabylonRouteFlags: Record<string, string> = {
+      aeroAces: 'aeroAces',
+      baseball: 'baseball',
+      bigAir: 'bigAir',
+      brainBrawl: 'brainBrawl',
+      carnival: 'carnival',
+      dance: 'dance',
+      duel: 'duel',
+      dunkContest: 'dunkContest',
+      dunkduel: 'dunkduel',
+      football: 'football',
+      freerun: 'freerun',
+      golf: 'golf',
+      hoops1v1: 'hoops1v1',
+      hoops3v3: 'hoops3v3',
+      karateEndless: 'karateEndless',
+      karateVersus: 'karateVersus',
+      mixedcombat: 'mixedcombat',
+      showdown: 'showdown',
+      skateboarding: 'skateboard',
+      snowboarding: 'snowboard_slalom',
+      soccer: 'soccer',
+      sprint: 'sprint',
+      surfing: 'surf',
+      tennis: 'tennis',
+      threePoint: 'threePoint',
+      velocityKart: 'velocityKart',
+      volleyball: 'volleyball',
+      whoSceneIt: 'whoSceneIt',
+    };
+
+    for (const [sessionKey, flagKey] of Object.entries(shippedBabylonRouteFlags)) {
+      expect(isBabylon(flagKey), `${sessionKey} -> ${flagKey}`).toBe(true);
+    }
+  });
+
   it('never answers yes on a prototype-chain key — the classic lookup-table hole', () => {
     for (const k of ['toString', 'constructor', '__proto__', 'hasOwnProperty']) {
       expect(isBabylon(k), k).toBe(false);

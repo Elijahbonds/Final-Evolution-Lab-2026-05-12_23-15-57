@@ -110,8 +110,11 @@ export function splitBoostActive(s: FootworkState): boolean {
  * `intent` is the stick, −1..1. Releasing the stick DECELERATES rather than stopping dead — a body has
  * momentum, and a player who can stop instantly never gets wrong-footed, which removes the point of hitting
  * behind them.
+ *
+ * `out` (IMPROVE 2026-10-06, optional): write the step into this object and return it instead of allocating a new
+ * one — the net sports step every frame of a match. `out` may be `s` itself; every read happens before any write.
  */
-export function stepFootwork(s: FootworkState, intent: number, dt: number, m: FootworkModel): FootworkState {
+export function stepFootwork(s: FootworkState, intent: number, dt: number, m: FootworkModel, out?: FootworkState): FootworkState {
   const want = Math.max(-1, Math.min(1, intent)) * m.topSpeed;
   const boost = splitBoostActive(s) ? SPLIT_BOOST : 1;
   // accelerating toward the intent, or decelerating toward rest — two different rates, and turning ROUND
@@ -125,11 +128,9 @@ export function stepFootwork(s: FootworkState, intent: number, dt: number, m: Fo
   let clamped = vx;
   if (x > limit) { x = limit; clamped = Math.min(0, vx); }
   if (x < -limit) { x = -limit; clamped = Math.max(0, vx); }
-  return {
-    x, vx: clamped,
-    sinceSplit: s.sinceSplit + dt,
-    sinceOppStrike: s.sinceOppStrike + dt,
-  };
+  const sinceSplit = s.sinceSplit + dt, sinceOppStrike = s.sinceOppStrike + dt;
+  if (out) { out.x = x; out.vx = clamped; out.sinceSplit = sinceSplit; out.sinceOppStrike = sinceOppStrike; return out; }
+  return { x, vx: clamped, sinceSplit, sinceOppStrike };
 }
 
 // ── The stretch ────────────────────────────────────────────────────────────

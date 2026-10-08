@@ -7,9 +7,13 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import type { GameProps, GameResult } from './game-shell';
+import { useBabylonPlaytestBridge } from './use-babylon-playtest-bridge';
 import { BootSplash } from './boot-splash';
+import { surfaceBootError } from './boot-error';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
+import { mergeHud } from '@/lib/babylon/core/hudMerge';   // IMPROVE (2026-10-06): an unchanged HUD patch is not a render
+import { clockText } from '@/lib/babylon/core/HundredPacing';   // IMPROVE (2026-10-06, #17): the run's clock to the 180 s cap
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode } from './hud-format';
 import { gameResultFromSession } from '@/lib/sessions/gameResultFromSession';
@@ -20,10 +24,13 @@ export default function KarateBabylon({ onEnd }: GameProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const busRef = useRef<InputBus | null>(null);
   const endedRef = useRef(false);
+  const onEndRef = useRef(onEnd);
+  onEndRef.current = onEnd;
   const [phase, setPhase] = useState<ModePhase>('loading');
   const [countdown, setCountdown] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [hud, setHud] = useState<Hud>({});
+  useBabylonPlaytestBridge('karate', () => ({ phase, countdown, loadError, hud }), busRef.current);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -39,7 +46,7 @@ export default function KarateBabylon({ onEnd }: GameProps) {
       const kos = Number(r.stats?.kos ?? 0);
       const wave = Number(r.stats?.wave ?? 0);
       const capped = r.outcome === 'WAVE_CAP';
-      onEnd(gameResultFromSession(r, {
+      onEndRef.current(gameResultFromSession(r, {
         won: false,
         headline: capped ? `TIME! · WAVE ${wave} · ${kos} KO` : `WAVE ${wave} REACHED · ${kos} KO`,
       }));
@@ -72,14 +79,14 @@ export default function KarateBabylon({ onEnd }: GameProps) {
         setCountdown(p === 'countdown' && typeof cd === 'number' ? cd : null);
         setLoadError(p === 'error' ? (typeof cd === 'string' ? cd : 'Failed to load this mode.') : null);
       },
-      onHud: (u) => setHud((prev) => ({ ...prev, ...u })),
+      onHud: (u) => setHud((prev) => mergeHud(prev, u)),
       resultSink,
     })
       .then((s) => {
         if (disposed) { s(); return; }
         stop = s;
       })
-        .catch((e) => console.error('[FEL-KARATE] boot failed', e));
+        .catch((e) => surfaceBootError(e, { disposed, label: '[FEL-KARATE] boot failed', setPhase, setLoadError }));
       });
     }, 0);
 
@@ -89,7 +96,8 @@ export default function KarateBabylon({ onEnd }: GameProps) {
       stop?.();
       busRef.current = null;
     };
-  }, [onEnd]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- G7: the stage is owned by the mount; callbacks are read through refs.
+  }, []);
 
   const emit = useCallback((e: Parameters<InputBus['emit']>[0]) => {
     busRef.current?.emit(e);
@@ -130,6 +138,8 @@ export default function KarateBabylon({ onEnd }: GameProps) {
         <span className="fel-panel px-3 py-1 font-mono text-xs text-[var(--fel-gold)]">
           WAVE {hnode(hud.wave, 1)} · {hnode(hud.kos, 0)} KO
           {hud.coins != null && <> · <span className="text-white">{hnode(hud.coins, 0)}c</span></>}
+          {/* IMPROVE (2026-10-06, #17): the time left on the run's 180 s cap — red in the last 30 s, which the mode also calls */}
+          {hud.timeLeft != null && <> · <span className={Number(hud.timeLeft) <= 30 ? 'text-[#FF3366]' : 'text-white'} data-testid="hundred-clock">{clockText(Number(hud.timeLeft))}</span></>}
         </span>
       </div>
 

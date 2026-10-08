@@ -7,7 +7,8 @@
  * surfaces preserves the two-AI separation the design calls for.
  *
  * Streams from POST /api/cell/chat (SSE: meta|delta|done), the same backend the
- * full Studio uses. Zero-credit LLM via the server route.
+ * held Studio surface uses. The expand action points at the shipped Creator
+ * Studio until /studio leaves hold.
  */
 
 import { useRef, useState } from 'react';
@@ -15,6 +16,8 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { X, Send, Loader2, Sparkles, Maximize2 } from 'lucide-react';
 
 interface Msg { id: string; role: 'user' | 'cell'; content: string }
+
+export const CELL_STUDIO_HREF = '/create';
 
 export function CellOrb() {
   const [open, setOpen] = useState(false);
@@ -60,7 +63,7 @@ export function CellOrb() {
         }
       }
     } catch {
-      setMessages((prev) => prev.map((m) => (m.id === aid && !m.content ? { ...m, content: 'CELL is offline right now. Try again in a moment.' } : m)));
+      setMessages((prev) => prev.map((m) => (m.id === aid && !m.content ? { ...m, content: 'CELL is offline right now. Try the Creator Studio.' } : m)));
     } finally { setBusy(false); }
   };
 
@@ -91,15 +94,7 @@ export function CellOrb() {
                 <span className="rounded bg-[#A855F7]/20 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-[#C79BFF]">Nexus</span>
               </div>
               <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  disabled
-                  title="Full Studio is not open yet"
-                  className="rounded p-1 text-white/25"
-                  aria-label="Full Studio is not open yet"
-                >
-                  <Maximize2 className="h-4 w-4" />
-                </button>
+                <Link href={CELL_STUDIO_HREF} className="rounded p-1 text-white/50 hover:text-white" aria-label="Open Creator Studio"><Maximize2 className="h-4 w-4" /></Link>
                 <button onClick={() => setOpen(false)} className="rounded p-1 text-white/50 hover:text-white" aria-label="Close"><X className="h-4 w-4" /></button>
               </div>
             </div>

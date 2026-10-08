@@ -93,9 +93,18 @@ import { nextTimedRow } from '@/lib/coach/setTimer';
 import type { OpenLog, TodayPayload } from '@/lib/coach/todayServer';
 // MIRROR-COACH P9 fix (2026-09-30): a screen prescription's note links the Mirror's written corrective (rule (e))
 import { CoachNote } from '@/components/coach/coach-note';
+// COACH-AI Phase 8 (2026-10-07): the thread's read markers ("N new", "Seen"; nothing until the pending SQL is applied)
+import { ThreadMessages, UnreadPill } from '@/components/coach/thread-messages';
+import { markReadIfNeeded, unreadInThread } from '@/lib/coach/messageReadsView';
+// COACH-AI Phase 8 (2026-10-07): the availability the coach set (Full / Limited / Out), one line, never a diagnosis
+import { MyAvailabilityLine } from '@/components/coach/my-availability';
+import { AVAILABILITY_API } from '@/components/coach/availability-picker';
+// MIRROR-PROGRESS (2026-10-07; plan Phase 4): each card's "Last time: 3×8 @ 60 kg" — the athlete's own newest completed log
+// of that exercise (lib/coach/loop.ts progressSeries, served as today.lastTime), in the unit the card is showing
+import { lastTimeLine } from '@/lib/coach/loop';
 
-export interface TodayApi { today: string; log: string; messages: string | null; warmup?: string | null; cooldown?: string | null; ramp?: string | null }
-export const TODAY_API: TodayApi = { today: '/api/coach/me/today', log: '/api/coach/me/log', messages: '/api/coach/messages', warmup: '/api/coach/me/warmup', cooldown: '/api/coach/me/cooldown', ramp: RAMP_API };
+export interface TodayApi { today: string; log: string; messages: string | null; warmup?: string | null; cooldown?: string | null; ramp?: string | null; availability?: string | null }
+export const TODAY_API: TodayApi = { today: '/api/coach/me/today', log: '/api/coach/me/log', messages: '/api/coach/messages', warmup: '/api/coach/me/warmup', cooldown: '/api/coach/me/cooldown', ramp: RAMP_API, availability: AVAILABILITY_API };
 
 /**
  * Whether the key set is under way on this device (MIRROR-COACH P7 FIX): a set row has something typed in it, or one of
@@ -114,7 +123,7 @@ export const rampEndpointFor = (e: { isKeySet?: boolean | null }, kind: string |
 interface FinishedSession { programId: string; sessionId: string; label: string; exercises: TodayExercise[] }
 
 interface ExerciseDraft { sets: SetDraft[]; clientNote: string; videoUrl: string }
-interface Msg { id: string; body: string; mine: boolean; fromCoach: boolean; createdAt: string }
+interface Msg { id: string; body: string; mine: boolean; fromCoach: boolean; createdAt: string; readAt?: string | null; unread?: boolean }
 
 export function TodayView({ api = TODAY_API }: { api?: TodayApi }) {
   const [data, setData] = useState<TodayPayload | null>(null);
@@ -147,7 +156,10 @@ export function TodayView({ api = TODAY_API }: { api?: TodayApi }) {
       }
       setDrafts(d);
     }
-    if (j.program && api.messages) { const t = await fetch(`${api.messages}?programId=${j.program.id}`); setThread((await t.json()).messages ?? []); }
+    if (j.program && api.messages) {
+      const t = await fetch(`${api.messages}?programId=${j.program.id}`); const msgs: Msg[] = (await t.json()).messages ?? []; setThread(msgs);
+      void markReadIfNeeded(`${api.messages}/read`, j.program.id, msgs);
+    }
   }, [api]);
   useEffect(() => { const u = readWeightUnit(); unitRef.current = u; setUnit(u); void load(); }, [load]);
 
@@ -231,6 +243,7 @@ export function TodayView({ api = TODAY_API }: { api?: TodayApi }) {
     return (
       <ExerciseCard key={e.id} e={e} label={label} draft={d} unit={unit} error={errors[e.id] ?? null} simpleLog={recovery}
         rampEndpoint={rampEndpointFor(e, today.session.kind, api)}
+        lastTime={lastTimeLine(today.lastTime?.[e.id], unit)}
         prev={data.open?.logs.find((l) => l.sessionExerciseId === e.id) ?? null}
         onSets={(sets) => put({ sets })} onNote={(clientNote) => put({ clientNote })} onVideo={(videoUrl) => put({ videoUrl })} />
     );
@@ -238,6 +251,7 @@ export function TodayView({ api = TODAY_API }: { api?: TodayApi }) {
   return (
     <div className="space-y-4" data-testid="today">
       {finishedCard}
+      {api.availability && <MyAvailabilityLine endpoint={api.availability} />}
       <NextMorningFollowUps />
       <ReadinessCheckInCard onRead={(r) => setReadiness(r.level)} warmup={todayWarmupKind(today.session.exercises, today.session.kind)} />
       <div className="fel-card rounded-xl p-4" data-session-kind={today.session.kind}>
@@ -290,8 +304,8 @@ export function TodayView({ api = TODAY_API }: { api?: TodayApi }) {
       )}
       {api.messages && (
         <div className="fel-card rounded-xl p-4 space-y-2">
-          <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-white/40"><MessageSquare className="h-3.5 w-3.5" /> Thread with {program.coachName}</div>
-          <div className="space-y-1 max-h-48 overflow-y-auto">{thread.map((m) => <div key={m.id} className={`text-sm rounded-lg px-3 py-1.5 ${m.mine ? 'bg-[#00E5FF]/10 text-white ml-8' : 'bg-white/5 text-white/80 mr-8'}`}>{m.body}</div>)}</div>
+          <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-white/40"><MessageSquare className="h-3.5 w-3.5" /> Thread with {program.coachName}<UnreadPill n={unreadInThread(thread)} /></div>
+          <ThreadMessages thread={thread} />
           <div className="flex gap-2"><input value={msg} onChange={(e) => setMsg(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void send(); }} placeholder="Message your coach" className="flex-1 min-w-0 rounded-lg bg-white/5 border border-white/10 px-2 py-1.5 text-white text-sm" /><button onClick={send} className="rounded-lg border border-white/10 px-3 text-sm text-white/80">Send</button></div>
         </div>
       )}
@@ -329,12 +343,14 @@ export function WeekStrip({ label, entries }: { label: string; entries: readonly
 }
 
 /** One prescribed exercise: what to do, how to do it, and its sets. */
-function ExerciseCard({ e, label, draft, unit, error, prev, simpleLog = false, rampEndpoint = null, onSets, onNote, onVideo }: {
+function ExerciseCard({ e, label, draft, unit, error, prev, simpleLog = false, rampEndpoint = null, lastTime = null, onSets, onNote, onVideo }: {
   e: TodayExercise; label: string | null; draft: ExerciseDraft; unit: WeightUnit; error: string | null; prev: OpenLog | null;
   /** An off day logs minutes or reps only (MIRROR-COACH P6): no weight, reps left or effort to ask about a walk. */
   simpleLog?: boolean;
   /** MIRROR-COACH P7: GET/POST /api/breath/ramp for the flagged key set (rampEndpointFor), else null — no Dial-Up offer. */
   rampEndpoint?: string | null;
+  /** MIRROR-PROGRESS: "Last time: 3×8 @ 60 kg" (lib/coach/loop.ts lastTimeLine), or null — never done before. */
+  lastTime?: string | null;
   onSets: (s: SetDraft[]) => void; onNote: (v: string) => void; onVideo: (v: string) => void;
 }) {
   const [demo, setDemo] = useState(false);
@@ -366,6 +382,7 @@ function ExerciseCard({ e, label, draft, unit, error, prev, simpleLog = false, r
           <span className="text-white font-medium" data-name>{e.name}</span>
         </div>
         <div className="text-xs text-white/60" data-dose>{e.dose} · tempo {e.tempo} · rest {e.restSeconds}s</div>
+        {lastTime && <div className="text-xs text-[#00E5FF]/75" data-last-time>{lastTime}</div>}
         {tags && <div className="text-[11px] text-white/35">{tags}</div>}
         {e.isKeySet && <div className="text-[11px] text-[#FFD700]/80">{KEY_SET_LINE}</div>}
       </div>

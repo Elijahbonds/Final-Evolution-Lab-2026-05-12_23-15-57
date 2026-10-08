@@ -18,6 +18,7 @@ import { boneNode } from '../boneLookup';
 import { bindFrame } from '../bindFrame';
 import { smoothByDefault, smoothQuatKeys, hoopsMotionModeOf, type Q4 } from '../smoothKeys';
 import { SMOOTH_FPS } from '../poseClip';
+import { gaitKnees } from '../gait';
 
 const FPS = 30, D2R = Math.PI / 180;
 type Pose = Record<string, Quaternion>;
@@ -44,7 +45,8 @@ function locomotion(duration: number, thighDeg: number, kneeBase: number, kneeAm
   const keys: ClipKey[] = []; const N = 8;
   for (let k = 0; k <= N; k++) {
     const t = (duration * k) / N, phi = (2 * Math.PI * k) / N, s = Math.sin(phi);
-    const kneeL = kneeBase + kneeAmp * (1 - Math.cos(phi)), kneeR = kneeBase + kneeAmp * (1 - Math.cos(phi + Math.PI));
+    // MOVEMENT POLISH (2026-10-06): the knee folds on the FORWARD swing — it folded on the back sweep, and the gait moonwalked (gait.ts)
+    const { L: kneeL, R: kneeR } = gaitKnees(phi, kneeBase, kneeAmp);
     keys.push({ t, pose: {
       ...armsDown,
       Spine: qAxis('x', 5), Spine2: qAxis('z', sway * s), Hips: qAxis('y', sway * 1.4 * s), Head: qAxis('x', -4),

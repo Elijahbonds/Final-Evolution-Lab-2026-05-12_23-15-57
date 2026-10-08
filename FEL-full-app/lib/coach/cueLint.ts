@@ -150,6 +150,8 @@ export function cueCorpus(): CueEntry[] {
     add(`mirror-coach:${fault}:cue`, card.cue, 'attention', engine);
     add(`mirror-coach:${fault}:escalate`, card.escalate, 'attention', engine);
     add(`mirror-coach:${fault}:regress`, card.regress, 'instruction', engine);
+    // MIRROR-MOVES P2: the reply to a repeated fault is said in the cue's slot, mid-set — an attention cue like it
+    if (card.reply) add(`mirror-coach:${fault}:reply`, card.reply, 'attention', engine);
   }
   // the pattern audits' tables (the squat's entry reuses the coach's table above; the rest are their own)
   for (const p of MIRROR_PATTERNS) {
@@ -159,6 +161,7 @@ export function cueCorpus(): CueEntry[] {
       add(`pattern:${p.id}:${c.faultId}:cue`, c.cue, 'attention', file);
       add(`pattern:${p.id}:${c.faultId}:escalate`, c.escalate, 'attention', file);
       add(`pattern:${p.id}:${c.faultId}:regress`, c.regress, 'instruction', file);
+      if (c.reply) add(`pattern:${p.id}:${c.faultId}:reply`, c.reply, 'attention', file);
     }
   }
   for (const c of SETUP_CUES) add(`setup:${c.id}`, c.text, 'attention', 'lib/coach/taxonomy.ts');

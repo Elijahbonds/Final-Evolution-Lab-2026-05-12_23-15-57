@@ -67,7 +67,9 @@ describe('mode menu contract', () => {
     expect(html).toContain('All live modes');
     expect(html).toContain('Brain Brawl');
     expect(html).toContain('Tiebreak Blitz');
-    expect(html).toContain('Iron Paradise');
+    // IRON-PARADISE-OUT (#150): training stays unlisted. The catalogue reads visibleModeEntries(),
+    // which already drops parked modes, so Iron Paradise must not reappear on /modes.
+    expect(html).not.toContain('Iron Paradise');
     expect(html).toContain('Neuro-Mechanic Mirror');
     expect(html).not.toContain('Marketplace');
     expect(html).not.toContain('FEL Kitchens');

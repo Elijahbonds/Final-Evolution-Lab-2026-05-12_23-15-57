@@ -34,6 +34,17 @@
 
 import { Color3, Color4, MeshBuilder, Vector3 } from '@babylonjs/core';
 import type { AbstractMesh, AnimationGroup, Camera, Observer, ParticleSystem, Scene, TransformNode } from '@babylonjs/core';
+import { tintGarmentSlot, SLOT_KEYS } from '../core/playerIdentity';   // IMPROVE (2026-10-06) #1: P2 wears P2's colour
+import { mountPlayerRing, type PlayerRingHandle } from '../visual/PlayerRing';   // IMPROVE (2026-10-06) #2: a ring per duellist
+import { readPlayerIcon } from '../visual/playerIcon';
+import { dressBall } from '../visual/meshyProps';   // IMPROVE (2026-10-06) #10: the duel ball is a basketball
+import { mountShotMeter3D, type ShotMeter3DHandle } from '../visual/ShotMeter3D';   // IMPROVE (2026-10-06) #7: the contest's slam meter
+import { DunkReplayRecorder, pausableDelay } from '../scene/DunkReplayCam';   // IMPROVE (2026-10-06) #12: the make, replayed
+import { TRIPLE_CUT, tripleCutSec } from '../core/DunkCuts';
+import { DunkFlight, DUNK_TRICKS, cueOf, cueVerdict, cueFireAt, CUE_BEAT_LABEL, type DunkTrick } from '../core/DunkSystem';   // IMPROVE (2026-10-06) #8: air tricks
+import { trickInput } from '../core/DunkAssist';
+import type { AmbientHandle } from '../visual/EffectsKit';
+import { duelNext, duelNeed, needLine, nextMatchLength, styleTierFor, type DuelState } from './dunkDuelRules';   // IMPROVE (2026-10-06) #3 #4 #5 #9
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { FirstPress, PRESS_GRACE } from '../core/timingPress';
 import { TakeoffEcho, type LaunchCause } from '../core/slamPress';   // HOTFIX (2026-09-24): the take-off's A is not the slam
@@ -70,7 +81,7 @@ import { applyOceanCourt } from '../visual/CourtSurface';
 import { DUNK_CONFIG as CFG } from './modeConfigs';
 
 let modeVenue: VenueHandle | null = null;   // ship pass 4: the mounted venue spec, disposed with the mode
-import { judgeDunk, BAND_TOTAL, type JudgeScore } from '../core/JudgePanel';  // Phase 7: shared judges
+import { judgeDunk, BAND_TOTAL, ScoreReveal, MIN_TOTAL, PERFECT_TOTAL, type JudgeScore } from '../core/JudgePanel';  // Phase 7: shared judges (IMPROVE 2026-10-06 #6: and their staged reveal)
 import { ModeMic } from '../audio/mic/ModeMic';   // THE MIC (2026-09-24): the court's MC, the sidekick and the crowd, on the mic
 import { dunkStingers } from '../audio/mic/names';
 
@@ -87,6 +98,17 @@ const STYLE_LABEL: Record<Style, string> = { power: 'POWER', flashy: 'FLASHY', s
 const STYLE_TIER: Record<Style, number> = { power: 3, flashy: 5.5, sig: 8 };
 
 const DUNKS_EACH = 2;
+// IMPROVE (2026-10-06) #2: the duellists' own colours — the bezel's P1 cyan / P2 pink, on the jersey and the ring
+const P_HEX = ['#22d3ee', '#ff2d78'] as const;
+// IMPROVE (2026-10-06) #11: the hand-off card and the verdict beats run on the MODE's clock (update() does not run while the game
+// is paused), never on a wall-clock setTimeout: pausing on "PASS TO P2" used to start P2's runway behind the pause card
+const HANDOFF_SEC = 2.2, HANDOFF_FIRST_SEC = 4, MISS_BEAT_SEC = 1.4, REVEAL_TAIL_SEC = 1.2;
+// IMPROVE (2026-10-06) #16: the bench body's stance eases at this rate (it stands in one spot in the idle loop)
+const BENCH_TICK_SEC = 1 / 15;
+// IMPROVE (2026-10-06) #8: the trick pace, the contest's (DunkMode TRICK_RATE_MIN / MAX)
+const TRICK_RATE_MIN = 0.8, TRICK_RATE_MAX = 1.35;
+/** IMPROVE (2026-10-06) #3: the trick the FLASHY hint names (the tomahawk: D-PAD UP + Y). */
+const FLASHY_EXAMPLE = trickInput(DUNK_TRICKS.find((t) => t.id === 'tomahawk') ?? { dir: 'up', btn: 'Y' });
 
 // DUNK-CONTROL-JUICE (2026-09-08): the chair box is gone — the duel dunks over the same car / barrier / crate as the contest
 // (dunkObstacleProps: real meshes, hitboxes sampled off them, the feet against the top). X and d-pad down cycle them.
@@ -127,8 +149,27 @@ export const DunkDuelMode: ModeDefinition = (() => {
   let phase: Phase = 'handoff';
   let phaseSec = 0;
   let activeIdx: 0 | 1 = 0;                       // whose turn
-  let attemptNum = [0, 0];                        // dunks taken per player
-  let totals = [0, 0];
+  let attemptNum: [number, number] = [0, 0];      // dunks taken per player
+  let totals: [number, number] = [0, 0];
+  // ── IMPROVE (2026-10-06) ──
+  let dunksEach = DUNKS_EACH;                     // #9: the match length, picked on the first hand-off card
+  let offScores: [number[], number[]] = [[], []]; // #4: the dunk-off's scores (never added to the totals)
+  let inDunkOff = false, lastDunk = 0;            // #4: this attempt is a dunk-off dunk; what it scored
+  let rings: PlayerRingHandle[] = [];             // #2: one ring per duellist
+  let meter3d: ShotMeter3DHandle | null = null, meterSpan = 1.5, beatCalled = false;   // #7
+  const _meterHead = new Vector3();
+  const reveal = new ScoreReveal();               // #6: confer → cards → drum → total
+  let revealed: JudgeScore[] = [], revealScores: JudgeScore[] = [], judgeHold = -1, verdictBanner = '', revealOn = false;
+  let replay: DunkReplayRecorder | null = null, cutting = false, contactAt = 0;   // #12
+  let modeGen = 0;                                // #13: bumped on dispose — a promise that resolves after it touches nothing
+  let modeClock = 0, bannerUntil = 0;             // #11: the mode's own clock (it stops with the game) and the banner's expiry
+  const later: { at: number; fn: () => void }[] = [];
+  let ambient: AmbientHandle | null = null;       // #14
+  const flight = new DunkFlight();                // #8: the contest's air budget and d-pad recognizer
+  let armedAir: DunkTrick | null = null, airTricks: DunkTrick[] = [];
+  let loopClip: string | null = null;             // #19: the loop the active body is on (playClip on change only)
+  let benchAcc = BENCH_TICK_SEC;                  // #16
+  const _vel = new Vector3(), _faceV = new Vector3(), _want = new Vector3(), _camPos = new Vector3(), _camAt = new Vector3();   // #18 #20
   let style: Style = 'power';
   let charge = 0, clipTime = 0, qteHit = false, qteWindowOpen = false, qteAccuracy = 0;
   // A SLAM PRESSED A BEAT EARLY USED TO VANISH. The gate was `if (A && pressed && qteWindowOpen)`, so a player who
@@ -150,11 +191,21 @@ export const DunkDuelMode: ModeDefinition = (() => {
   /** The earliest flight-clock second a press still scores (the window's opening less the grace): from here letting go of
    *  Space is a slam press, as it always was — before it, it is the run key coming up (HOTFIX 2026-09-24). */
   const SLAM_FROM = EASTBAY_TIMING.extend - CFG.qteWindowSec / 2 - PRESS_GRACE;
+  /** IMPROVE (2026-10-06) #8: the slam window, tightened by each air trick's tax (DunkFlight.slamWindowScale — the contest's rule);
+   *  with no trick thrown it is the tuned CFG.qteWindowSec, byte for byte. */
+  const slamWindowSec = (): number => CFG.qteWindowSec * flight.slamWindowScale;
+  /** IMPROVE (2026-10-06) #7: the meter's green, in the bar's 0..1 (the contest's slamGreen). */
+  const slamGreen = (): { center: number; half: number } => ({ center: EASTBAY_TIMING.extend / meterSpan, half: slamWindowSec() / 2 / meterSpan });
+  /** IMPROVE (2026-10-06) #7: the bar's verdict for a judged press at flight second `at` (the contest's bands). */
+  function meterVerdict(at: number, v: { hit: boolean; accuracy: number }): void {
+    const side = at < EASTBAY_TIMING.extend ? 'early' : 'late';
+    meter3d?.end(v.hit ? (v.accuracy >= 0.85 ? 'perfect' : v.accuracy >= 0.5 ? 'good' : side) : side);
+  }
   let sinceRelease = 0, releasePos = new Vector3();
   let finishing = false, rimCamCut = false, ended = false;
   let hangSlowMoLatch = false;
   let contactLatch = false;                  // contactPunch once per attempt (the make's flush frame)
-  // ── A+ P8 athlete hands (dunk mirror; no replay in the duel) ──
+  // ── A+ P8 athlete hands (dunk mirror; the make is replayed since IMPROVE 2026-10-06 #12 — makeShow) ──
   const armsOf = new WeakMap<SpawnedCharacter, { Left: ArmChain | null; Right: ArmChain | null }>();   // H1: per body, built once
   let handIkT = 0;                            // H1: 0..1 ease of the wrist reach
   let handIkObs: Observer<Scene> | null = null, ikScene: Scene | null = null;
@@ -166,17 +217,23 @@ export const DunkDuelMode: ModeDefinition = (() => {
   // ── BIOMECH-HOOPS-WAVE1: the Posture Poses layer per body (the contest's windows on the active dunker, the idle stance on the bench) ──
   const postureOf = new WeakMap<SpawnedCharacter, PostureLayer>();
   let landed = false;                         // feet-down: the land crouch owns the stance until its idle returns
+  // IMPROVE (2026-10-06) #17: the feeds are two objects kept for the mode's life, refilled each frame (they were four new objects a
+  // frame, twice over: the input and the result, for each body)
+  const actIn: PostureInput = { phase: 'other', clipTime: 0, made: null, clipped: false, landed: false, celebrate: false, trick: null };
+  const actFeed = { pose: HOOPS_POSTURE.idle, legs: HOOPS_LEGS.idle, aim: null as Vector3 | null, eyes: null as Vector3 | null, window: 'stance' as string };
+  const benchFeedObj = { pose: HOOPS_POSTURE.idle, legs: HOOPS_LEGS.idle, aim: null as Vector3 | null, eyes: null as Vector3 | null, window: 'bench' };
   function activeFeed() {
-    const inp: PostureInput = {
-      phase: phase === 'approach' || phase === 'charge' || phase === 'cinematic' || phase === 'resolve' ? phase : 'other',
-      clipTime, made: phase === 'resolve' ? qteHit : null, clipped: obstacleClipped, landed, celebrate: false, trick: null,
-    };
-    const { window, pose } = posturePose(inp);
-    return { pose, legs: legPose(dropToFloor && window !== 'land' ? 'brace' : window, null), aim: rim, eyes: rim, window };
+    actIn.phase = phase === 'approach' || phase === 'charge' || phase === 'cinematic' || phase === 'resolve' ? phase : 'other';
+    actIn.clipTime = clipTime; actIn.made = phase === 'resolve' ? qteHit : null; actIn.clipped = obstacleClipped; actIn.landed = landed;
+    const { window, pose } = posturePose(actIn);
+    actFeed.pose = pose; actFeed.legs = legPose(dropToFloor && window !== 'land' ? 'brace' : window, null); actFeed.window = window;
+    actFeed.aim = rim; actFeed.eyes = rim;
+    return actFeed;
   }
   function benchFeed(c: SpawnedCharacter) {
     const other = c === p1 ? p2 : p1;
-    return { pose: HOOPS_POSTURE.idle, legs: HOOPS_LEGS.idle, aim: other.root.position, eyes: ball.getAbsolutePosition(), window: 'bench' };
+    benchFeedObj.aim = other.root.position; benchFeedObj.eyes = ball.getAbsolutePosition();
+    return benchFeedObj;
   }
   // the contest systems (owner re-lock: the real dunk-contest bar)
   let prop: Prop = 'none';
@@ -206,14 +263,40 @@ export const DunkDuelMode: ModeDefinition = (() => {
   const bench = (): SpawnedCharacter => (activeIdx === 0 ? p2 : p1);
   const label = (): string => (activeIdx === 0 ? 'P1' : 'P2');
   function setPhase(p: Phase): void { phase = p; phaseSec = 0; }
+  /** IMPROVE (2026-10-06) #11/#13: a beat on the mode's clock — it holds while the game is paused, and dies with the mode (dispose
+   *  empties the queue). Every raw setTimeout the duel had (banner clears, the verdict's advance, the trail cut, the groan) is one. */
+  function after(sec: number, fn: () => void): void { later.push({ at: modeClock + sec, fn }); }
+  function runLater(ctx: ModeContext, dt: number): void {
+    modeClock += dt;
+    for (let i = 0; i < later.length;) {
+      if (later[i].at <= modeClock) { const t = later.splice(i, 1)[0]; t.fn(); } else i++;
+    }
+    if (bannerUntil > 0 && modeClock >= bannerUntil) { bannerUntil = 0; ctx.setHud({ banner: '' }); }
+  }
+  /** IMPROVE (2026-10-06) #11: ONE banner channel. Each banner cleared itself on its own timer, so an older timer wiped a newer banner;
+   *  a banner set here replaces the last one AND its expiry (`sec` 0: it stays until the next). */
+  function setBanner(ctx: ModeContext, text: string, sec = 0): void {
+    bannerUntil = sec > 0 ? modeClock + sec : 0;
+    ctx.setHud({ banner: text });
+  }
+  /** IMPROVE (2026-10-06) #4 #5: the duel as the pure rules read it. */
+  const duelState = (): DuelState => ({ dunksEach, attempts: attemptNum, totals, off: offScores });
+  /** The hand-off's count line: the dunk of the match length, or the dunk-off round — and the number, on the deciding dunk. */
+  function dunkNumLine(): string {
+    const st = duelState();
+    const need = duelNeed(st, activeIdx);
+    const count = inDunkOff ? `OFF · ROUND ${offScores[0].length + (activeIdx === 0 ? 1 : 0)}` : `${attemptNum[activeIdx] + 1}/${dunksEach}`;
+    return need === null ? count : `${count} · ${needLine(need, MIN_TOTAL, PERFECT_TOTAL)}`;
+  }
 
   // ── Dunk play tip (2026-09-07), the dunk mirror: camera-relative stick, facing from velocity ──
+  // IMPROVE (2026-10-06) #18: one scratch vector, read the same frame (it was a new Vector3 a frame, or Vector3.Zero())
   function stickVel(ctx: ModeContext): Vector3 {
     const mag = Math.hypot(stickX, stickY);
-    if (mag < 0.08) return Vector3.Zero();
+    if (mag < 0.08) return _vel.setAll(0);
     const k = (mag > 1 ? 1 / mag : 1) * APPROACH_SPEED;
     const f = ctx.camDirector.forwardFlat(), r = ctx.camDirector.rightFlat();
-    return new Vector3((r.x * stickX - f.x * stickY) * k, 0, (r.z * stickX - f.z * stickY) * k);
+    return _vel.set((r.x * stickX - f.x * stickY) * k, 0, (r.z * stickX - f.z * stickY) * k);
   }
   function faceVel(v: Vector3, dt: number): void {   // slewed at TURN_RATE, shortest arc; the Euler yaw wins over any stale quat
     if (v.x * v.x + v.z * v.z < 0.05) return;
@@ -241,8 +324,12 @@ export const DunkDuelMode: ModeDefinition = (() => {
     ctx.setHud({ prop: PROP_LABEL[prop] });
   }
 
-  function enterHandoff(ctx: ModeContext): void {
+  /** True on the very first card of a duel: the one that offers the match length (#9). */
+  const firstCard = (): boolean => attemptNum[0] === 0 && attemptNum[1] === 0 && !inDunkOff;
+  function enterHandoff(ctx: ModeContext, dunkOffOpens = false): void {
     setPhase('handoff');
+    armedAir = null; airTricks = []; flight.reset(); beatCalled = false; meter3d?.end(null); judgeHold = -1;   // IMPROVE (2026-10-06) #7 #8
+    benchAcc = BENCH_TICK_SEC;   // IMPROVE (2026-10-06) #16: the new bench body's feed is filled on its first frame
     style = 'power'; charge = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; rimCamCut = false; hangSlowMoLatch = false; contactLatch = false;
     dunkBody.reset(); bodySlamClip = null;
     runUpPeak = 0; launchSpeed01 = 0; holdRunSpeed = 0; obstacleClipped = false; toppling = false; obstacleOver = false; obstacleCleared = false;
@@ -259,21 +346,45 @@ export const DunkDuelMode: ModeDefinition = (() => {
     // whole game was framed against P1 idling on the bench spot
     ctx.heroRef.current = active().root;
     ctx.camDirector.snapTo(active().root.position, rim);
+    // IMPROVE (2026-10-06) #12: the recorder rides whoever has the device — a fresh buffer each hand-off (only this flight is replayed)
+    replay?.dispose();
+    replay = new DunkReplayRecorder(ctx.scene, active().root, ball, ctx.camera as never, () => (ball.parent ? ball.parent as TransformNode : null));
+    { const nodes = active().skeleton.bones.map((b) => b.getTransformNode()).filter((n): n is TransformNode => !!n);
+      const hi = nodes.findIndex((n) => /Hips/.test(n.name)); if (hi > 0) nodes.unshift(...nodes.splice(hi, 1));
+      replay.setPoseNodes(nodes); }
     SoundKit.play('uiTick', { pitch: 0.9 });
+    // IMPROVE (2026-10-06) #5: the deciding dunk carries its number; #9: the first card offers the match length
+    const need = duelNeed(duelState(), activeIdx);
     ctx.setHud({
       activePlayer: label(), p1Score: totals[0], p2Score: totals[1],
-      dunkNum: `${attemptNum[activeIdx] + 1}/${DUNKS_EACH}`, style: STYLE_LABEL[style], charge: 0,
+      dunkNum: dunkNumLine(), style: STYLE_LABEL[style], charge: 0,
       prop: PROP_LABEL[prop],
-      banner: `PASS TO ${label()}`, hint: `${label()} — take the device`,
+      hint: firstCard() ? matchLengthHint()
+        : `${label()} — take the device${need !== null ? ` · ${needLine(need, MIN_TOTAL, PERFECT_TOTAL)}` : ''}`,
     });
+    setBanner(ctx, dunkOffOpens ? `DEAD LEVEL — DUNK-OFF! PASS TO ${label()}` : `PASS TO ${label()}`);
     // THE MIC: who takes the device, once the booth has finished the last dunk's call (the first hand-off comes during the load,
     // before the mic can speak: the welcome calls P1 up instead)
     if (micOpened) mic?.then({ moment: 'duel.pass', tags: [`p:${activeIdx + 1}`], priority: 1 });
-    setTimeout(() => {
-      if (phase !== 'handoff' || ended) return;
-      ctx.setHud({ banner: '', hint: 'STYLE to cycle · X / D-PAD down picks the CAR, BARRIER or CRATE · LOOK stick orbits the camera · HOLD to run — then tap jump' });
-      setPhase('approach');
-    }, 2200);
+    // IMPROVE (2026-10-06) #11: the card hands over to the runway from update() (handoffTick), on the mode's clock
+  }
+  const matchLengthHint = (): string => `B — MATCH LENGTH: ${dunksEach} DUNKS EACH (2 / 3 / 5) · any other button starts`;
+  /** The runway's button map: static, so it leaves the play screen for the CONTROLS panel (staticControls.ts). */
+  const RUNWAY_HINT = 'STYLE to cycle · X / D-PAD down picks the CAR, BARRIER or CRATE · LOOK stick orbits the camera · HOLD to run — then tap jump';
+  /** The runway's opening line: the number on a deciding dunk (a live call), else the button map.
+   *  INTEGRATION (2026-10-06, integration-2): the number used to ride in front of the map in one string, which the controls
+   *  screen's exact-match strip could not take apart — so a deciding dunk put the whole map back on the play screen. The
+   *  two are separate lines now; the map is still on the READY card and the pause, and the number on dunkNum as well. */
+  function runwayHint(): string {
+    const need = duelNeed(duelState(), activeIdx);
+    return need !== null ? needLine(need, MIN_TOTAL, PERFECT_TOTAL) : RUNWAY_HINT;
+  }
+  /** IMPROVE (2026-10-06) #11: the hand-off card's own beat — 2.2 s (4 s on the first card, which offers the match length), counted on
+   *  phaseSec in update(), so a game paused on "PASS TO P2" stays on the card. */
+  function handoffTick(ctx: ModeContext): void {
+    if (phase !== 'handoff' || ended || phaseSec < (firstCard() ? HANDOFF_FIRST_SEC : HANDOFF_SEC)) return;
+    setBanner(ctx, ''); ctx.setHud({ hint: runwayHint() });
+    setPhase('approach');
   }
 
   /** `cause`: the player's press launched it (RUN let go, A on the run) or the mode did (the line, the watchdog) — core/slamPress. */
@@ -287,6 +398,10 @@ export const DunkDuelMode: ModeDefinition = (() => {
     console.info('[JUICE-SOFT] launch');
     console.info(`[DUNK-LAUNCH] charge ${charge.toFixed(2)} run ${runUpPeak.toFixed(1)} apex ${((1.05 + charge * 0.55) * (0.85 + launchSpeed01 * 0.3)).toFixed(2)} from z ${launchZ.toFixed(2)} to line ${gatherLine().toFixed(2)}`);
     ctx.camDirector.resetLook();   // the takeoff → rimCamCut framing never inherits a look orbit
+    // IMPROVE (2026-10-06) #8: the run-up buys the air (the contest's budget: a walk-up holds one trick, a real run-up two); #7: the
+    // slam meter rises with the flight, the green drawn where the window is
+    flight.launch(Math.min(1, charge * 0.5 + launchSpeed01 * 0.5), STYLE_TIER[style]); armedAir = null; airTricks = []; beatCalled = false;
+    meterSpan = EASTBAY_TIMING.extend + slamWindowSec() / 2 + 0.16; meter3d?.begin(slamGreen());
     SoundKit.play('whoosh', { pitch: 0.85 });   // the ONE whoosh — never re-triggered on CONTACT
     // THE MIC: nothing from the booth through the flight — the SLAM is the player's (released on the iron, the clank or the prop);
     // the make call is decoded now so it lands on the flush
@@ -303,6 +418,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
     sinceRelease = 0; qteWindowOpen = false; rimCamCut = false;
     ctx.camDirector.snapTo(active().root.position, rim);
     ctx.setHud({ slamPulse: false });
+    if (!slamPress.spent) meter3d?.end(obstacleClipped ? 'brick' : 'late');   // IMPROVE (2026-10-06) #7: the bar ran out with no press (a judged press ended it already)
     releasePos.copyFrom(ball.getAbsolutePosition());
     releaseBall(ball);
     if (!qteHit) { ballSim.launch(releasePos, clankOffRim(ball, rim)); missClank(ctx); setTrail('off'); armSettle(); }   // juice soft #2, #5; A+ P4
@@ -319,7 +435,16 @@ export const DunkDuelMode: ModeDefinition = (() => {
     // BIOMECH-HOOPS-WAVE1: the Posture Poses (thoracic / clavicles / head / hips strip / feet) BEFORE the reach — the wrist
     // solves against the posed shoulders (the contest's order: postureTick → spin → posture → reach)
     { const pdt = (ikScene?.getEngine().getDeltaTime() ?? 16) / 1000;
-      for (const body of [p1, p2]) { const L = postureOf.get(body); if (L) L.step(pdt, body === c ? activeFeed() : benchFeed(body)); } }
+      const La = postureOf.get(c); if (La) La.step(pdt, activeFeed());
+      // IMPROVE (2026-10-06) #16: the bench body stands in one spot in the idle loop — its stance and its feed are eased at ~15 Hz.
+      // The bone write still runs every frame: the idle clip re-poses the bones each frame, so a skipped write would show the raw
+      // clip through the posture on three frames of four (a 15 Hz flicker), not save anything worth that.
+      const b = c === p1 ? p2 : p1, Lb = postureOf.get(b);
+      if (Lb) {
+        benchAcc += pdt;
+        if (benchAcc >= BENCH_TICK_SEC) { Lb.tick(benchAcc, benchFeed(b)); benchAcc = 0; }
+        Lb.apply(pdt, benchFeedObj.aim, benchFeedObj.eyes, 0);
+      } }
     if (w > 0.001) {
       let arms = armsOf.get(c);
       if (!arms) { arms = { Left: armChain(c.skeleton, 'Left'), Right: armChain(c.skeleton, 'Right') }; armsOf.set(c, arms); }
@@ -336,16 +461,18 @@ export const DunkDuelMode: ModeDefinition = (() => {
         // shoulder (aim / pole deltas near ±180°: hand 3.40 → 2.92 m in 17 ms, POWER only); the pull it gave is kept.
         arm.shoulder.computeWorldMatrix(true); arm.elbow.computeWorldMatrix(true); arm.hand.computeWorldMatrix(true);
         const sh = arm.shoulder.getAbsolutePosition(), el = arm.elbow.getAbsolutePosition(), hd = arm.hand.getAbsolutePosition();
-        const want = hd.add(handIkTarget.subtract(hd).scale(ws));
+        // IMPROVE (2026-10-06) #20: the point `ws` of the way to the rim, in one scratch vector (it was three new vectors per arm per frame)
+        const want = _want.copyFrom(handIkTarget).subtractInPlace(hd).scaleInPlace(ws).addInPlace(hd);
         const shaped = shapeReach(sh, el, hd, want, handIkPole, undefined, REACH_POLE_CAP * ws);
         reachArm(arm, shaped.target, shaped.pole, 1);
       }
     }
-    if (activeHandOff && phase === 'cinematic') runHandOffPath(ball, c.skeleton, activeHandOff.t, activeHandOff.spec, ebState);   // the ball after the reach, this frame's hands
+    if (activeHandOff && phase === 'cinematic' && !cutting) runHandOffPath(ball, c.skeleton, activeHandOff.t, activeHandOff.spec, ebState);   // the ball after the reach, this frame's hands
   }
   /** H5: every active-player clip goes through here — a superseded clip's onEnd chain is dead (Babylon raises it on stop()). */
   function playClip(name: string, opts: PlayOpts = {}): AnimationGroup | null {
     const token = ++clipToken;
+    loopClip = opts.loop ? name : null;   // IMPROVE (2026-10-06) #19: what the runway's per-frame pick compares against
     if (opts.loop) return active().animator.play(name, opts);
     return active().animator.play(name, { ...opts, onEnd: () => {
       if (token !== clipToken) return;
@@ -371,6 +498,47 @@ export const DunkDuelMode: ModeDefinition = (() => {
     playClip(SPORT_CLIP.dunkLandCrouch, { onEnd: () => { landed = false; playClip(SPORT_CLIP.idle, { loop: true }); } });
   }
 
+  // ── IMPROVE (2026-10-06) #8: MID-AIR TRICKS (the contest's flight.recognizer / fireTrick, trimmed to the duel) ─────────────────
+  /** A trick button in the air (B / Y / X — A is the slam): the d-pad direction held picks the trick; the cue table decides when. */
+  function airTrickPress(ctx: ModeContext, e: FelInput): void {
+    if (obstacleClipped || slamPress.spent) return;   // the dunk is dead, or the slam is already thrown
+    const trick = flight.peek(e);
+    if (!trick || flight.recognizer.dirSpent) return;   // a bare button, or a direction that already threw its trick
+    // the whole-body turns (360 / 720) need the contest's spin layer (rim-facing by the carry-up) — not in the duel yet
+    if (cueOf(trick).facing === 'spinThrough') { refuse(ctx, `NO ${trick.label} IN THE DUEL — TRY ${FLASHY_EXAMPLE}`); return; }
+    if (clipTime >= EASTBAY_TIMING.extend - slamWindowSec() / 2) { refuse(ctx, 'TOO LATE FOR A TRICK — THE JAM IS ON YOU'); return; }
+    const v = cueVerdict(trick, clipTime);
+    if (v === 'early') {
+      if (armedAir) return;   // one armed at a time — the first press is the one that fires
+      armedAir = trick;
+      ctx.juice.callout(`${trick.label} ARMED · ${CUE_BEAT_LABEL[cueOf(trick).fire]}`, '#ffd75e', 600);
+      SoundKit.play('uiTick', { pitch: 1.4, volume: 0.3 });
+      return;
+    }
+    if (v === 'late') { refuse(ctx, `TOO LATE FOR THE ${trick.label} — ARM IT BY ${CUE_BEAT_LABEL[cueOf(trick).last]}`); return; }
+    fireTrick(ctx, trick);
+  }
+  /** The trick fires: the air budget pays for it (or says why not), its body plays paced to land its finish on the slam's beat, and
+   *  the hang takes over when it ends in the air. Its difficulty is judged (finishAttempt) and its tax tightens the slam window. */
+  function fireTrick(ctx: ModeContext, trick: DunkTrick): void {
+    if (!flight.take(trick)) {
+      refuse(ctx, flight.refusal === 'limit' ? 'TWO TRICKS A FLIGHT — SLAM IT' : 'NOT ENOUGH AIR — come in faster');
+      return;
+    }
+    flight.recognizer.spend();   // one direction, one trick
+    airTricks.push(trick);
+    const ready = active().animator.durationOf(trick.clip) ?? 0.8, left = EASTBAY_TIMING.extend - 0.04 - clipTime;
+    const rate = left <= 0.25 ? TRICK_RATE_MAX : Math.max(TRICK_RATE_MIN, Math.min(TRICK_RATE_MAX, ready / left));
+    console.info(`[DUEL-TRICK] air ${trick.id} @${clipTime.toFixed(2)} x${rate.toFixed(2)}`);
+    playClip(trick.clip, { speedRatio: rate, onEnd: () => { if (phase === 'cinematic') playAir(SPORT_CLIP.dunkScoreHang, hangRateToResolve()); } });
+    SoundKit.play('whoosh', { pitch: 1.1 + trick.difficulty * 0.08, volume: 0.45 });
+    mic?.crowd('crowd.ooh', airTricks.length);   // the stands gasp at the trick (the booth holds through the flight)
+    EffectsKit.burst(ctx.scene, active().root.position.add(new Vector3(0, 1.8, 0)), 'sparks');
+    ctx.juice.callout(airTricks.length > 1 ? `COMBO: ${airTricks.map((t) => t.label).join(' → ')}!` : `${trick.label}!`, '#ffd75e', 700);
+    ctx.camDirector.pulse(airTricks.length > 1 ? 0.7 : 0.45, 0.5);
+    if (meter3d) meter3d.green(slamGreen());   // the window just narrowed: the bar's green says so
+  }
+
   /** The chair caught the dunker mid-flight — the dunk DIES here, whatever
    *  the slam timing was going to be. Same physics as Dunk Contest's prop. */
   function clipBlown(ctx: ModeContext): void {
@@ -378,8 +546,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
     SoundKit.play('impact', { pitch: 0.6, volume: 0.6 }); console.info('[JUICE-SFX] impact chair');   // the prop is the miss's one hit (missClank skips)
     SoundKit.play('crowdGroan', { volume: 0.7 });
     ctx.feel?.impact?.(0.6);
-    ctx.setHud({ banner: `${label()} CAUGHT THE ${obstacle?.spec.label ?? 'PROP'} — BLOWN` });
-    setTimeout(() => ctx.setHud({ banner: '' }), 1200);
+    setBanner(ctx, `${label()} CAUGHT THE ${obstacle?.spec.label ?? 'PROP'} — BLOWN`, 1.2);   // IMPROVE (2026-10-06) #11: the one banner channel
     // THE MIC: the dunk is dead here (no SLAM left to hear), so the booth calls it now — the clank path's 1.2 s is its window
     mic?.release();
     mic?.say({ moment: 'dunk.miss.prop', priority: 2, side: 0.15, crowd: { moment: Math.random() < 0.5 ? 'crowd.groan' : 'crowd.heckle', n: 1 } });
@@ -447,7 +614,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
     if (!trail) return;
     console.info('[JUICE-SOFT] trail flash');
     trail.color1 = new Color4(1, 1, 1, 1); trail.emitRate = 260; trail.maxSize = 0.3;
-    setTimeout(() => { if (trail) trail.emitRate = 0; }, 130);
+    after(0.13, () => { if (trail) trail.emitRate = 0; });   // IMPROVE (2026-10-06) #11 #13: on the mode's clock
   }
 
   function contactPunch(ctx: ModeContext): void {
@@ -461,6 +628,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
     fovRelease(); trailFlash();   // juice soft #4, #5
     armSettle();                  // A+ P4: the settle fires at feet-down, not on this frame
     hoopJuice?.punch();           // juice LOOK #1–#3 (make only)
+    contactAt = performance.now() / 1000;   // IMPROVE (2026-10-06) #12: the iron, on the recorder's clock — the triple cut centres on it
   }
 
   function finishAttempt(ctx: ModeContext, made: boolean): void {
@@ -474,7 +642,8 @@ export const DunkDuelMode: ModeDefinition = (() => {
       // Repeating your own combo costs you; the other player's dunks are not
       // your burden (answering a dunk with the same dunk is a legit duel
       // play — execution decides it).
-      const combo = `${style}_${prop}`;
+      // IMPROVE (2026-10-06) #8: the air tricks thrown are part of the combo (a tomahawk over the car is not a plain one)
+      const combo = `${style}_${prop}` + airTricks.map((t) => `+${t.id}`).join('');
       isRepeat = usedCombos[activeIdx].has(combo);
       usedCombos[activeIdx].add(combo);
       const varietyMod = isRepeat ? 0.8 : 1;
@@ -484,65 +653,121 @@ export const DunkDuelMode: ModeDefinition = (() => {
       // frame). The repeat is named IN the result banner instead.
       // The run-up is judged too (the real panel reads the runway attack),
       // and the chair pays its bonus — but only cleared, never clipped.
+      // IMPROVE (2026-10-06) #3 (TUNED): FLASHY's tier is paid for flash — an air trick — and a FLASHY with none is judged at POWER's
+      // (dunkDuelRules.styleTierFor); #8: each trick thrown adds its own difficulty, as in the contest
+      const tier = styleTierFor(style, airTricks.length, STYLE_TIER);
+      const airDifficulty = airTricks.reduce((sum, t) => sum + t.difficulty, 0);
       const difficulty = Math.max(0, Math.min(10,
-        (STYLE_TIER[style] + PROP_BONUS[prop] + charge * 2 + launchSpeed01 * 1.0 + varietyBonus) * varietyMod));
+        (tier + PROP_BONUS[prop] + charge * 2 + launchSpeed01 * 1.0 + varietyBonus + airDifficulty) * varietyMod));
       const execution = Math.max(0, Math.min(10, qteAccuracy * 10));
-      const styleScore = Math.max(0, Math.min(10, STYLE_TIER[style] * 0.8));
+      const styleScore = Math.max(0, Math.min(10, tier * 0.8));
       scores = judgeDunk(difficulty, execution, styleScore);
       dunkTotal = scores.reduce((s, j) => s + j.score, 0);
-      totals[activeIdx] += dunkTotal;
+      if (!inDunkOff) totals[activeIdx] += dunkTotal;   // IMPROVE (2026-10-06) #4: a dunk-off dunk decides the duel, never the totals
       SoundKit.play('score', { pitch: 1.1 });
       EffectsKit.burst(ctx.scene, rim, 'net');
       // the contest's eruption band (45 of 50): this was `>= 27`, the THREE-judge band, and five judges never card under 30 —
       // every make got the full cheer and confetti, so a 31 landed like a 50
       if (dunkTotal >= BAND_TOTAL.eruption) { SoundKit.play('crowdCheer'); EffectsKit.burst(ctx.scene, active().root.position.add(new Vector3(0, 1.8, 0)), 'confetti'); }
     } else {
-      setTimeout(() => SoundKit.play('crowdGroan', { volume: 0.35 }), 260);   // A+ P2: the clank was the one hit; the crowd groans a breath later, quietly
+      after(0.26, () => SoundKit.play('crowdGroan', { volume: 0.35 }));   // A+ P2: the clank was the one hit; the crowd groans a breath later, quietly (IMPROVE 2026-10-06 #11: on the mode's clock)
     }
+    lastDunk = dunkTotal;
     if (made) dropToFloor = true; else landNow();   // A+ P8 H5: a make lets go of the iron and falls to feet-down; a miss has normally landed already
-    ctx.setHud({
-      p1Score: totals[0], p2Score: totals[1],
-      judgeReveal: made ? scores : null,
-      banner: made
-        ? (isRepeat ? `${label()} SCORES ${dunkTotal} — JUDGES HAVE SEEN THAT ONE` : `${label()} SCORES ${dunkTotal}`)
-        : `${label()} — MISSED, 0 pts`,
-    });
-    // THE MIC: the booth may speak again (the iron, or the clank) — the make with its name and number, or the miss (a clipped
-    // prop was called when it happened)
+    // IMPROVE (2026-10-06) #6: THE VERDICT IS STAGED, the contest's way. The five cards and the total used to land in one setHud the
+    // frame the ball went through. A make now plays its replay (#12), then the judges confer, card by card, Prime last on the drum,
+    // then the number — the banner and the scoreboard move on that beat. A miss is said at once.
+    const tricks = airTricks.length ? `${airTricks.map((t) => t.label).join(' → ')} · ` : '';
+    verdictBanner = made
+      ? (isRepeat ? `${tricks}${label()} SCORES ${dunkTotal} — JUDGES HAVE SEEN THAT ONE` : `${tricks}${label()} SCORES ${dunkTotal}`)
+      : '';
+    if (!made) { ctx.setHud({ p1Score: totals[0], p2Score: totals[1], judgeReveal: null }); setBanner(ctx, `${label()} — MISSED, 0 pts`); }
+    // THE MIC: the booth may speak again (the iron, or the clank) — the make with its name (its number waits for the total), or the
+    // miss (a clipped prop was called when it happened)
     mic?.release();
     if (made) micMake(dunkTotal, isRepeat);
     else if (!obstacleClipped) mic?.say({ moment: 'dunk.miss', priority: 2, side: 0.15, crowd: { moment: Math.random() < 0.5 ? 'crowd.groan' : 'crowd.heckle', n: 1 } });
     setPhase('judging');
-    setTimeout(() => {
-      ctx.setHud({ judgeReveal: null, banner: '' });
-      advance(ctx);
-      finishing = false;
-    }, made ? 2600 : 1400);
+    // IMPROVE (2026-10-06) #11: the advance is counted in update() (judgeHold), on the mode's clock — it was a 2.6 / 1.4 s setTimeout
+    // that ran on through a pause and, after an unmount, called advance() on disposed bodies (#13)
+    if (made) { revealScores = scores; void makeShow(ctx); } else judgeHold = MISS_BEAT_SEC;
+  }
+
+  /** IMPROVE (2026-10-06) #12: THE MAKE, REPLAYED. "No replay in the duel" — so the player holding the device next only ever saw the
+   *  other's dunk from the follow camera. The make plays the contest's triple cut out of the recorded pose (under the rim, on the
+   *  iron, from the stands; the ball in the hand it rode), skippable with A / B, a tap or Space, and frozen while the game is
+   *  paused — then the judges' reveal (#6). A fuller version would add the contest's poster freeze for a big one. */
+  async function makeShow(ctx: ModeContext): Promise<void> {
+    const gen = modeGen, rec = replay;
+    const paused = (): boolean => typeof ctx.phase === 'function' && ctx.phase() === 'paused';
+    if (rec) {
+      cutting = true; ctx.camDirector.suspended = true;
+      const cutDone = rec.playCuts(rim, contactAt, TRIPLE_CUT, {
+        onCut: (i, c) => { ctx.setHud({ hint: `REPLAY ${i + 1}/${TRIPLE_CUT.length} · ${c.label} — A skips` }); if (i > 0) SoundKit.play('whoosh', { pitch: 1.6 + i * 0.2, volume: 0.25 }); },
+        paused,
+      });
+      await Promise.race([cutDone, pausableDelay(tripleCutSec() * 1000 + 1200, paused)]);   // the net does not run through a pause
+      if (gen !== modeGen) return;   // left mid-replay: nothing below may touch the disposed scene (#13)
+      rec.stop(); cutting = false; ctx.camDirector.suspended = false;
+      ctx.setHud({ hint: '' });
+      dropToFloor = true;   // the cut hands the root back where it was at the iron — the fall to feet-down resumes from there
+    }
+    if (phase !== 'judging' || ended) return;
+    revealed = []; reveal.start(revealScores); revealOn = true;
+    ctx.setHud({ judgeReveal: [] });
+  }
+  /** IMPROVE (2026-10-06) #6: the reveal's beats (DunkMode's, trimmed to the duel): confer → each card → the drum → the total, then
+   *  REVEAL_TAIL_SEC to read the number before the device is passed. */
+  function revealTick(ctx: ModeContext, dt: number): void {
+    for (const beat of reveal.update(dt)) {
+      if (beat.kind === 'confer') {
+        ctx.setHud({ hint: 'THE JUDGES CONFER…' });
+        SoundKit.play('uiTick', { pitch: 0.7, volume: 0.3 });
+      } else if (beat.kind === 'card' && beat.judge) {
+        revealed = [...revealed, beat.judge];
+        ctx.setHud({ judgeReveal: revealed });
+        SoundKit.play('uiTick', { pitch: 1 + beat.judge.score * 0.06, volume: 0.5 });
+      } else if (beat.kind === 'drum') {
+        ctx.setHud({ hint: "PRIME'S CARD…" });
+        SoundKit.play('uiTick', { pitch: 0.9, volume: 0.4 });
+      } else if (beat.kind === 'total') {
+        ctx.setHud({ hint: '', p1Score: totals[0], p2Score: totals[1] });
+        setBanner(ctx, verdictBanner);
+        micNumber(beat.total ?? 0);
+        ctx.camDirector.pulse(beat.band === 'eruption' ? 1 : beat.band === 'hush' ? 0.15 : 0.4, 0.6);
+      }
+    }
+    if (revealOn && !reveal.active) { revealOn = false; judgeHold = REVEAL_TAIL_SEC; }
   }
 
   function advance(ctx: ModeContext): void {
     if (phase !== 'judging' || ended) return;
-    attemptNum[activeIdx]++;
-    const p1Done = attemptNum[0] >= DUNKS_EACH, p2Done = attemptNum[1] >= DUNKS_EACH;
-    if (p1Done && p2Done) {
+    if (inDunkOff) offScores[activeIdx].push(lastDunk); else attemptNum[activeIdx]++;
+    // IMPROVE (2026-10-06) #4 #9: the pure rules say who is next — the match length, then a dunk-off on a level total
+    const next = duelNext(duelState());
+    if (next.kind === 'over') {
       setPhase('matchOver');
       ended = true;
       SoundKit.play('whistle');
-      const tie = totals[0] === totals[1];
-      const winner = totals[0] >= totals[1] ? 'P1' : 'P2';
+      const tie = next.winner === null;
+      const winner = next.winner === 1 ? 'P2' : 'P1';
       if (!tie) { SoundKit.play('crowdCheer'); EffectsKit.burst(ctx.scene, rim, 'confetti'); }
-      ctx.setHud({ banner: tie ? 'DEAD HEAT!' : `${winner} TAKES THE DUEL!` });
+      setBanner(ctx, tie ? (next.byDunkOff ? 'DEAD HEAT — EVEN THE DUNK-OFF!' : 'DEAD HEAT!') : next.byDunkOff ? `${winner} TAKES THE DUNK-OFF!` : `${winner} TAKES THE DUEL!`);
       // THE MIC: the result, before ctx.end parks the mode (the voice plays on after it)
       mic?.hush();
       mic?.say(tie
         ? { moment: 'duel.tie', priority: 3, crowd: { moment: 'crowd.ooh', n: 2 } }
         : { moment: 'duel.win', tags: [winner === 'P1' ? 'p:1' : 'p:2'], priority: 3, crowd: { moment: 'crowd.erupt', n: 3 } });
-      ctx.end(tie ? 'DUEL_TIED' : `${winner}_WINS`, Math.max(totals[0], totals[1]), { p1: totals[0], p2: totals[1] });
+      // owner 2026-10-06 (moderate): the server bound covers the longest match and its dunk-off (lib/sessions/modeScoreRules
+      // dunkDuelBound), so every length reports its real totals — no scaling (p1Total / p2Total kept for saved results)
+      ctx.end(tie ? 'DUEL_TIED' : `${winner}_WINS`, Math.max(totals[0], totals[1]), { p1: totals[0], p2: totals[1], p1Total: totals[0], p2Total: totals[1], dunksEach, dunkOffRounds: offScores[1].length });
       return;
     }
-    // alternate: whoever has fewer attempts goes next
-    activeIdx = attemptNum[0] <= attemptNum[1] ? 0 : 1;
-    enterHandoff(ctx);
+    // alternate: whoever has fewer attempts goes next (dunkDuelRules.duelNext)
+    const opens = next.dunkOff && !inDunkOff;
+    inDunkOff = next.dunkOff;
+    activeIdx = next.idx;
+    enterHandoff(ctx, opens);
   }
 
   // ── THE MIC ──────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -569,30 +794,35 @@ export const DunkDuelMode: ModeDefinition = (() => {
    *  SIGNATURE flies the contest's eastbay clip; POWER and FLASHY fly the owner's two-foot capture, called the contest's way
    *  (a clean slam is a hammer). */
   function duelDunkName(): string {
+    if (airTricks.length) return airTricks.map((t) => t.label).join(' → ');   // IMPROVE (2026-10-06) #8: the tricks name the dunk
     if (style === 'sig') return 'EASTBAY';
     return qteAccuracy >= 0.85 ? 'TWO-HAND HAMMER' : style === 'power' ? 'POWER SLAM' : 'TWO-HAND FLUSH';
   }
-  /** The make, called: the MC's line and the dunk's name (the size from the panel's raw sum, the contest's bands), then the
-   *  number. The cards and the total land on the same frame here, so the read follows the call; a fifty gets its own. */
+  /** The make, called: the MC's line and the dunk's name (the size from the panel's raw sum, the contest's bands). IMPROVE
+   *  (2026-10-06) #6: the number waits for the total's beat (micNumber) — the cards are staged now, so the read follows them. */
   function micMake(total: number, isRepeat: boolean): void {
     if (!mic) return;
     const tier = total >= BAND_TOTAL.eruption ? 2 : total >= BAND_TOTAL.approval ? 1 : 0;
     if (isRepeat) mic.say({ moment: 'dunk.repeat', priority: 2, crowd: { moment: 'crowd.cheer', n: 1 } });
     else mic.say({ moment: 'dunk.make', tier, stinger: dunkStingers(duelDunkName()), side: tier === 2 ? 0.4 : 0, crowd: { moment: tier === 2 ? 'crowd.erupt' : 'crowd.cheer', n: tier + 1 } });
-    if (total >= 50) mic.then({ moment: 'dunk.fifty', priority: 3, side: 0.6, crowd: { moment: 'crowd.erupt', n: 3 } });
-    else mic.then({ moment: 'stinger', stinger: [`num:${total}`], priority: 2 });
+  }
+  /** The number, on the total's beat; a fifty gets its own. */
+  function micNumber(total: number): void {
+    if (!mic) return;
+    if (total >= 50) mic.say({ moment: 'dunk.fifty', priority: 3, side: 0.6, crowd: { moment: 'crowd.erupt', n: 3 } });
+    else mic.say({ moment: 'stinger', stinger: [`num:${total}`], priority: 3 });
   }
 
   function watchdog(ctx: ModeContext): void {
     if (phaseSec <= BUDGET_SEC[phase] || finishing || ended) return;
     console.warn(`[FEL-DUNK] duel watchdog tripped in "${phase}" — auto-advancing`);
     switch (phase) {
-      case 'handoff': ctx.setHud({ banner: '' }); setPhase('approach'); break;
+      case 'handoff': setBanner(ctx, ''); setPhase('approach'); break;
       case 'approach': active().root.position.set(0, 0, gatherLine()); phaseSec = 0; break;
       case 'charge': launchDunk(ctx); break;
       case 'cinematic': resolveDunk(ctx); break;
       case 'resolve': finishAttempt(ctx, qteHit); break;
-      case 'judging': ctx.setHud({ judgeReveal: null, banner: '' }); advance(ctx); break;
+      case 'judging': ctx.setHud({ judgeReveal: null }); setBanner(ctx, ''); advance(ctx); break;
     }
   }
 
@@ -624,6 +854,13 @@ export const DunkDuelMode: ModeDefinition = (() => {
       neverBindPose(p2.animator, SPORT_CLIP.idle);
       installSafePlay(p2.animator, 'dunkduel-p2');
       ctx.groundLock?.track(p2.root, p2.skeleton);
+      // IMPROVE (2026-10-06) #1: both duellists spawned from the one hero with no tint — two identical bodies. P2 wears P2's pink
+      // jersey (the 1v1 rival's tint, the bezel's P2 colour); P1 keeps the hero's own kit.
+      tintGarmentSlot(p2, SLOT_KEYS.jersey, P_HEX[1]);
+      // IMPROVE (2026-10-06) #2: a ring per duellist in that player's colour (P1 cyan, P2 pink) — the harness's one ring followed whoever
+      // had the device and was rebuilt in the device owner's colour every hand-off. Mounted here, the harness stands aside.
+      for (const r of rings) r.dispose();
+      rings = [mountPlayerRing(ctx.scene, p1.root, { color: P_HEX[0], icon: readPlayerIcon() }), mountPlayerRing(ctx.scene, p2.root, { color: P_HEX[1], icon: 'basketball' })];
       if (RIGHT_HANDED) for (const c of [p1, p2]) {   // DUNK MOTION phase 11: both duellists right-handed
         const groups = (c.animator as unknown as { groups: Map<string, AnimationGroup> }).groups;
         const done = mirrorGroupsInPlace([...groups.values()].filter((g) => g.name.startsWith('dunk_')), c.skeleton);
@@ -642,11 +879,13 @@ export const DunkDuelMode: ModeDefinition = (() => {
 
       ball = MeshBuilder.CreateSphere('duel_ball', { diameter: 0.24 }, ctx.scene);
       ballSim = new BallSim(ball, 0.12);
+      void dressBall(ball, 'basketball');   // IMPROVE (2026-10-06) #10: the Meshy ball skin rides the physics sphere, as in the other four hoops modes
+      meter3d?.dispose(); meter3d = mountShotMeter3D(ctx.scene);   // IMPROVE (2026-10-06) #7: the contest's slam meter
       ctx.heroRef.current = active().root;
       ctx.objectiveRef.current = rim;
       SoundKit.startAmbient('stadium');
-      EffectsKit.ambient(ctx.scene, 'venice');
-      trail = EffectsKit.ballTrail(ctx.scene, ball); setTrail('soft');
+      ambient?.dispose(); ambient = EffectsKit.ambient(ctx.scene, 'venice');   // IMPROVE (2026-10-06) #14: kept, so dispose() takes the gulls
+      trail?.dispose(); trail = EffectsKit.ballTrail(ctx.scene, ball); setTrail('soft');
       hoopJuice?.dispose(); hoopJuice = new HoopJuice(ctx.scene, rim);
       mic?.dispose(); mic = new ModeMic(ctx, { groups: ['dunk', 'names'], court: ctx.location }); micOpened = false; micFiller = false;   // THE MIC
       if (process.env.NODE_ENV === 'development') { const dev = (window as unknown as { __FEL_DEV__?: { hoopJuiceUsed?: unknown } }).__FEL_DEV__; if (dev) dev.hoopJuiceUsed = hoopJuice.used; }   // OOM-HYGIENE: the handle is gone once the harness is disposed (a load that resolves after an unmount)
@@ -655,6 +894,8 @@ export const DunkDuelMode: ModeDefinition = (() => {
       if (!ctx.location || ctx.location === 'venice') await applyVeniceDunkLookPass(ctx.scene);
 
       activeIdx = 0; attemptNum = [0, 0]; totals = [0, 0]; ended = false; finishing = false;
+      dunksEach = DUNKS_EACH; offScores = [[], []]; inDunkOff = false; lastDunk = 0; cutting = false; revealOn = false; judgeHold = -1;   // IMPROVE (2026-10-06)
+      later.length = 0; modeClock = 0; bannerUntil = 0;
       enterHandoff(ctx);
     },
 
@@ -663,15 +904,25 @@ export const DunkDuelMode: ModeDefinition = (() => {
       slamEcho.see();   // HOTFIX (2026-09-24): a new input — first, before anything in here can launch
       if (e.t === 'stick' && e.side === 'L') { stickX = e.x; stickY = e.y; }
       if (e.t === 'stick' && e.side === 'R') { lookX = e.x; lookY = e.y; if (!lookSeen && (Math.abs(e.x) > 0.12 || Math.abs(e.y) > 0.12)) { lookSeen = true; console.info('[LOOK] R stick live'); } }
+      // IMPROVE (2026-10-06) #12: A or B during the replay cuts it (a tap / Space already did — a pad or a phone could only sit through it)
+      if (cutting && e.t === 'button' && e.pressed && (e.btn === 'A' || e.btn === 'B')) { replay?.stop(); console.info('[DUEL-SHOW] triple cut skipped on the pad'); return; }
+      // IMPROVE (2026-10-06) #9: the FIRST card offers the match length — B steps 2 → 3 → 5 dunks each (and gives the card its time again)
+      if (phase === 'handoff' && firstCard() && e.t === 'button' && e.btn === 'B' && e.pressed) {
+        dunksEach = nextMatchLength(dunksEach); phaseSec = 0;
+        ctx.setHud({ dunkNum: dunkNumLine(), hint: matchLengthHint() });
+        SoundKit.play('uiTick', { pitch: 1.1 });
+        return;
+      }
       if (phase === 'handoff' && e.t === 'button' && e.pressed) {
         // any button skips the handoff card
-        ctx.setHud({ banner: '', hint: 'STYLE to cycle · LOOK stick orbits the camera · HOLD to run — then tap jump' });
+        setBanner(ctx, ''); ctx.setHud({ hint: runwayHint() });
         setPhase('approach');
         return;
       }
       if (e.t === 'button' && e.btn === 'B' && e.pressed && phase === 'approach') {
         style = STYLES[(STYLES.indexOf(style) + 1) % STYLES.length];
-        ctx.setHud({ style: STYLE_LABEL[style] });
+        // IMPROVE (2026-10-06) #3: FLASHY says what it asks for — an air trick, or it is judged as POWER
+        ctx.setHud({ style: STYLE_LABEL[style], ...(style === 'flashy' ? { hint: `FLASHY — throw a trick in the air (${FLASHY_EXAMPLE}) or the judges see a POWER dunk` } : {}) });
         SoundKit.play('uiTick');
       }
       // THE CHAIR — d-pad (keyboard/couch) or X (touch/Controller Link: the
@@ -715,21 +966,36 @@ export const DunkDuelMode: ModeDefinition = (() => {
         const echo = slamEcho.of(e, performance.now(), clipTime >= SLAM_FROM);
         if (echo) console.info(`[DUEL-SLAM] ${echo === 'space' ? "the Space release's own A" : echo === 'late' ? 'the jump pressed after the line took off' : "the take-off's own A"} @${clipTime.toFixed(2)} — not the slam`);
         else {
-          const v = slamPress.press(clipTime, { centre: EASTBAY_TIMING.extend, width: CFG.qteWindowSec });   // too early to judge yet: held for the window
+          const v = slamPress.press(clipTime, { centre: EASTBAY_TIMING.extend, width: slamWindowSec() });   // too early to judge yet: held for the window
           if (v === 'spent') console.info(`[DUEL-SLAM] a second press @${clipTime.toFixed(2)} ignored — the first press decides`);
-          else if (v !== 'held' && v.hit) { qteHit = true; qteAccuracy = v.accuracy; }
+          else if (v !== 'held') { meterVerdict(clipTime, v); if (v.hit) { qteHit = true; qteAccuracy = v.accuracy; } }   // IMPROVE (2026-10-06) #7: the bar says how it landed
         }
       }
+      // IMPROVE (2026-10-06) #8: MID-AIR TRICKS, the contest's grammar — hold a d-pad direction, tap B / Y / X. A stays the slam (the
+      // duel's one timing press is untouched); the cue table says when each trick may fire (early: armed for its beat; late: refused).
+      if (phase === 'cinematic' && e.t === 'dpad') flight.recognizer.feed(e);
+      if (phase === 'cinematic' && e.t === 'button' && e.pressed && (e.btn === 'B' || e.btn === 'X' || e.btn === 'Y')) airTrickPress(ctx, e);
     },
 
     update(ctx: ModeContext, dt: number) {
-      fovTick(dt); settleTick(ctx);
+      runLater(ctx, dt);   // IMPROVE (2026-10-06) #11: the mode's own beats (they hold while paused: update() does not run then)
+      meter3d?.update(dt);   // IMPROVE (2026-10-06) #7
+      fovTick(dt); if (!cutting) settleTick(ctx);
       // A+ P5: the fov pinch starts on the APPROACH — inside 3.6 m (horizontal) of the rim during the run, not at takeoff
       if ((phase === 'approach' || phase === 'charge') && !fovOn && Math.hypot(active().root.position.x - rim.x, active().root.position.z - rim.z) <= 3.6) fovGather(ctx);
       phaseSec += dt;
       watchdog(ctx);
       micTick(ctx);
       if (ended) return;
+      handoffTick(ctx);   // IMPROVE (2026-10-06) #11: the card's beat on phaseSec
+      if (phase === 'judging') {   // IMPROVE (2026-10-06) #6 #11: the staged reveal, then the beat before the device is passed
+        if (!cutting) revealTick(ctx, dt);
+        if (judgeHold >= 0) {
+          judgeHold -= dt;
+          if (judgeHold < 0) { ctx.setHud({ judgeReveal: null }); setBanner(ctx, ''); advance(ctx); finishing = false; }
+        }
+        if (ended) return;
+      }
 
       const lookOn = phase === 'approach' || phase === 'charge';   // R look on the runway only (the rim cut / verdict keep their framing)
       ctx.camDirector.look(lookOn ? lookX : 0, lookOn ? lookY : 0, dt);
@@ -737,7 +1003,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
       const vel = stickVel(ctx);
       if (phase === 'approach') {
         const c = active();
-        c.root.position.addInPlace(vel.scale(dt));
+        c.root.position.addInPlaceFromFloats(vel.x * dt, 0, vel.z * dt);   // IMPROVE (2026-10-06) #18: no scaled copy
         c.root.position.z = Math.max(gatherLine(), Math.min(RETREAT_Z, c.root.position.z));
         c.root.position.x = Math.max(-6, Math.min(6, c.root.position.x));
         faceVel(vel, dt);
@@ -745,7 +1011,10 @@ export const DunkDuelMode: ModeDefinition = (() => {
         // at launch and the judges' difficulty read — a walk-up caps both.
         runUpPeak = Math.max(runUpPeak, Math.hypot(vel.x, vel.z));
         launchSpeed01 = Math.max(0, Math.min(1, (runUpPeak - 2) / 6));
-        playClip(Math.hypot(vel.x, vel.z) > 0.5 ? SPORT_CLIP.moveLoop : SPORT_CLIP.idle, { loop: true });
+        // IMPROVE (2026-10-06) #19: only on a change — every frame's call bumped clipToken and ran the animator's clip resolution and
+        // scope check before its own same-clip early-out
+        const runClip = Math.hypot(vel.x, vel.z) > 0.5 ? SPORT_CLIP.moveLoop : SPORT_CLIP.idle;
+        if (runClip !== loopClip) playClip(runClip, { loop: true });
         if (c.root.position.z <= gatherLine() + 0.2) {
           ctx.setHud({
             hint: runUpPeak < 3.5
@@ -761,7 +1030,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
         const steer = ctx.camDirector.rightFlat().x * stickX * 3 + Math.max(-2, Math.min(2, (rim.x - c.root.position.x) * 0.8));
         c.root.position.x = Math.max(-6, Math.min(6, c.root.position.x + steer * dt));
         c.root.position.z -= holdRunSpeed * dt;
-        faceVel(new Vector3(steer, 0, -holdRunSpeed), dt);
+        faceVel(_faceV.set(steer, 0, -holdRunSpeed), dt);   // IMPROVE (2026-10-06) #18: a scratch vector
         runUpPeak = Math.max(runUpPeak, Math.hypot(steer, holdRunSpeed));
         launchSpeed01 = Math.max(0, Math.min(1, (runUpPeak - 2) / 6));
         const line = gatherLine();
@@ -775,6 +1044,9 @@ export const DunkDuelMode: ModeDefinition = (() => {
           bodySlamClip = null;
           def.onInput(ctx, { t: 'button', btn: 'A', pressed: true, src: 'body' });
         }
+        // IMPROVE (2026-10-06) #8: the air budget burns in clip time; a trick armed early fires on its beat
+        flight.update(dt * (Number.isFinite(animScale) && animScale > 0 ? animScale : 1));
+        if (armedAir && clipTime >= cueFireAt(armedAir)) { const a = armedAir; armedAir = null; if (!obstacleClipped && !slamPress.spent) fireTrick(ctx, a); }
         if (!hangSlowMoLatch && prevClip < EASTBAY_TIMING.rise && clipTime >= EASTBAY_TIMING.rise) {
           hangSlowMoLatch = true;
           ctx.juice.slowMo(0.4, 400, { gameplay: true });   // HOTFIX (2026-09-24): clipTime rides it (the slam window) — reduced motion keeps it whole
@@ -782,7 +1054,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
           setTrail('hang');   // A+ P6: the trail brightens at the hang rise, not at takeoff
         }
         const c = active();
-        activeHandOff = style === 'sig' ? { spec: handOffSpecAt(DUEL_EASTBAY, clipTime), t: clipTime } : null;   // DUNK MOTION phase 10b: up the front to the off hand, back under the thigh (phase 11: on the right-handed body)
+        activeHandOff = style === 'sig' && !airTricks.length ? { spec: handOffSpecAt(DUEL_EASTBAY, clipTime), t: clipTime } : null;   // (IMPROVE 2026-10-06 #8: an air trick's body owns the hands from its press)   // DUNK MOTION phase 10b: up the front to the off hand, back under the thigh (phase 11: on the right-handed body)
         if (activeHandOff && runHandOffPath(ball, c.skeleton, clipTime, activeHandOff.spec, ebState)) console.info(`[HANDS] handoff ${activeHandOff.spec.from[0]}→${activeHandOff.spec.to[0]} eastbay @${clipTime.toFixed(2)}`);
         ikSideK = activeHandOff ? handOffK(activeHandOff.t, activeHandOff.spec) : (ebState.inLeftHand ? 1 : 0);
         // A+ P8 H4: the ball stays parented to the ball hand through the hang — a lost parent that is not a release re-attaches
@@ -812,29 +1084,40 @@ export const DunkDuelMode: ModeDefinition = (() => {
             console.info(`[DUNK-PROP] CLEARED ${obstacle.spec.label}`);
             SoundKit.play('crowdCheer', { volume: 0.35 }); ctx.camDirector.pulse(0.35, 0.3);
             mic?.crowd('crowd.ooh', 1);   // THE MIC: the stands gasp at the clear (the booth holds)
-            ctx.setHud({ banner: `${label()} OVER THE ${obstacle.spec.label}!` }); setTimeout(() => ctx.setHud({ banner: '' }), 700);
+            setBanner(ctx, `${label()} OVER THE ${obstacle.spec.label}!`, 0.7);   // IMPROVE (2026-10-06) #11: the one banner channel
           }
         }
 
         if (!rimCamCut && clipTime >= EASTBAY_TIMING.extend * 0.55) {
           rimCamCut = true;
-          ctx.camDirector.snapTo(new Vector3(rim.x + 2.6, 0.4, rim.z - 1.2), c.root.position.add(new Vector3(0, 1.4, 0)));
+          ctx.camDirector.snapTo(_camPos.set(rim.x + 2.6, 0.4, rim.z - 1.2), _camAt.copyFrom(c.root.position).addInPlaceFromFloats(0, 1.4, 0));   // IMPROVE (2026-10-06) #18
         }
 
-        const wasOpen = qteWindowOpen;
-        qteWindowOpen = clipTime >= EASTBAY_TIMING.extend - CFG.qteWindowSec / 2
-          && clipTime <= EASTBAY_TIMING.extend + CFG.qteWindowSec / 2;
+        const wasOpen = qteWindowOpen, win = slamWindowSec();
+        qteWindowOpen = clipTime >= EASTBAY_TIMING.extend - win / 2
+          && clipTime <= EASTBAY_TIMING.extend + win / 2;
+        // IMPROVE (2026-10-06) #7: the contest's slam meter rides beside the dunker's head, the green where the window is
+        if (meter3d) meter3d.set(clipTime / meterSpan, _meterHead.copyFrom(c.root.position).addInPlaceFromFloats(0, 1.72, 0));
         if (qteWindowOpen && !wasOpen) {
           // the press that beat the window: honoured here, scored from when it actually landed
-          const early = slamPress.open({ centre: EASTBAY_TIMING.extend, width: CFG.qteWindowSec });
+          const early = slamPress.open({ centre: EASTBAY_TIMING.extend, width: win });
+          if (early) meterVerdict(slamPress.pressedAt ?? clipTime, early);   // IMPROVE (2026-10-06) #7
           if (early?.hit && !qteHit) { qteHit = true; qteAccuracy = early.accuracy; }
           // HOTFIX (2026-09-24): a press too early even for the grace was the slam, and it missed — say so, and do not raise a
           // SLAM! the next press cannot answer
-          if (early && !early.hit) refuse(ctx, `TOO EARLY — ${Math.round((EASTBAY_TIMING.extend - CFG.qteWindowSec / 2 - (slamPress.pressedAt ?? 0)) * 1000)} ms BEFORE THE WINDOW`);
+          if (early && !early.hit) refuse(ctx, `TOO EARLY — ${Math.round((EASTBAY_TIMING.extend - win / 2 - (slamPress.pressedAt ?? 0)) * 1000)} ms BEFORE THE WINDOW`);
           else ctx.setHud({ hint: 'SLAM!', slamPulse: true });
         }
+        // IMPROVE (2026-10-06) #7: "NOW!" ON THE BEAT. The duel said SLAM! on the window's opening frame while the press is scored against
+        // its CENTRE — the contest measured players pressing on the opening cue landing ~110 ms early. The word and its tick land on the
+        // centre (the opening keeps its SLAM! read); nothing about the window itself moves.
+        if (qteWindowOpen && !beatCalled && !slamPress.spent && clipTime >= EASTBAY_TIMING.extend) {
+          beatCalled = true;
+          ctx.setHud({ hint: 'NOW!' });
+          SoundKit.play('uiTick', { pitch: 1.9, volume: 0.55 });
+        }
         if (!qteWindowOpen && wasOpen) ctx.setHud({ slamPulse: false });
-        if (clipTime >= EASTBAY_TIMING.extend + CFG.qteWindowSec / 2) resolveDunk(ctx);
+        if (clipTime >= EASTBAY_TIMING.extend + win / 2) resolveDunk(ctx);
       }
 
       if (phase === 'resolve') {
@@ -856,11 +1139,11 @@ export const DunkDuelMode: ModeDefinition = (() => {
 
       obstacle?.tick(dt);
       // ── A+ P8 athlete hands: the fall to feet-down, the reach weight (dunk mirror) ──────────────────────────────
-      if (dropToFloor && !obstacleClipped) {
+      if (dropToFloor && !obstacleClipped && !cutting) {   // (IMPROVE 2026-10-06 #12: the replay owns the root while it plays)
         active().root.position.y = Math.max(0, active().root.position.y - FALL_SPEED * dt);
         if (active().root.position.y <= 0) dropToFloor = false;
       }
-      if (airHeld && phase !== 'cinematic' && active().root.position.y <= (obstacleClipped ? clipFloorY : 0) + 0.05) landNow();
+      if (airHeld && phase !== 'cinematic' && !cutting && active().root.position.y <= (obstacleClipped ? clipFloorY : 0) + 0.05) landNow();
       // DUNK-SOFTS-NAMED: the reach starts at the CARRY-UP (the extension toward the iron), not the rise — through the rise and
       // the mocap's wind-up the hand swings past the shoulder and a reach toward the rim whipped it (0.8 m/frame measured;
       // the clip alone moves 0.22 m/frame), so the catch and the wind-up ride the clip's own hand now
@@ -880,6 +1163,18 @@ export const DunkDuelMode: ModeDefinition = (() => {
     },
 
     dispose() {
+      // IMPROVE (2026-10-06) #13: the mode is over — `ended` stops every beat that checks it, the generation stops the replay's await,
+      // and the mode-clock queue (every former setTimeout) is emptied: the judging beat used to call advance() → enterHandoff on
+      // disposed bodies
+      ended = true; modeGen++; later.length = 0; bannerUntil = 0; cutting = false; revealOn = false; judgeHold = -1;
+      replay?.dispose(); replay = null;
+      // IMPROVE (2026-10-06) #14: everything load() made — the trail, the gulls (planes, material, observers), the meter, the rings;
+      // the posture layers hold no scene resource of their own (the reach observer that steps them is removed below), and are dropped
+      trail?.dispose(); trail = null;
+      ambient?.dispose(); ambient = null;
+      meter3d?.dispose(); meter3d = null;
+      for (const r of rings) r.dispose(); rings = [];
+      if (p1) postureOf.delete(p1); if (p2) postureOf.delete(p2);
       hoopJuice?.dispose(); hoopJuice = null;
       mic?.dispose(); mic = null;   // THE MIC stops with the mode
       modeVenue?.dispose?.(); modeVenue = null;

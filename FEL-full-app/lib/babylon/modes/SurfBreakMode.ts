@@ -1,7 +1,7 @@
 // SurfBreakMode v5 — REPLACES the M44 file. The wave finally barrels
 // (rideWorlds v3 ships alongside):
-//   THE BARREL — the funnel shell over the pocket opens and closes on an
-//     18s cycle (8s open). Riding the pocket while it's open doubles flow
+//   THE BARREL — the funnel opens only inside a wave's barrel section
+//     (surfLineup), not on a fixed clock. Riding the pocket while it's open doubles flow
 //     gain and the score trickle ("IN THE BARREL"); hold it ≥1.5s and
 //     exiting banks a +250 "BARRELED!" bonus. The tube visibly breathes —
 //     you can SEE when the wave is hollow.
@@ -15,10 +15,9 @@ import { BoostKit } from '../core/BoostKit';          // FINISH-RELEASE: the sha
 import { BoostFx } from '../premium/BoostFx';
 import { BoostPads } from '../visual/BoostPads';
 import { MomentumBus } from '../core/MomentumBus';
-import { Vector3 } from '@babylonjs/core';
+import { Vector3, Color3, Axis, type AbstractMesh } from '@babylonjs/core';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
-import { CharacterLibrary } from '../core/CharacterLibrary';
 import { buildRig, TrickMachine, TRICKS, type BoardRig } from './boardCore';
 import { buildSurfBreak, WAVE_SPEED, WAVE_LAP, WAVE_FACE_LEN, type RideWorld } from './rideWorlds';
 import { readBoardVenue } from '../nexus/boardVenues';   // three breaks, three seas
@@ -27,7 +26,7 @@ import { BoardAnimTree } from '../anim/boardTree';
 import { mountPostureLayer, type PostureLayer } from '../anim/PostureLayer';
 import { BoardTrickLayer } from '../anim/BoardTrickLayer';   // TRICK POSE (2026-09-15): tricks recognisable on sight
 import { boardPose, boardBank, lookAhead, BOARD_INPUT_IDLE, type BoardPostureInput } from '../core/BoardPosture';
-import { trickFor, bestFitting, asTrickDef, heldTrickDir, basePts as trickPts, SURF_TRICKS, type BoardTrick } from '../core/BoardTricks';   // the named vocabulary
+import { trickFor, airTrickFor, asTrickDef, heldTrickDir, basePts as trickPts, SURF_TRICKS, type BoardTrick } from '../core/BoardTricks';   // the named vocabulary
 import { angulate } from '../core/DynamicPosture';   // a rider ANGULATES: the board banks, the spine comes back out of it
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
@@ -41,6 +40,18 @@ import { SurfSpray } from '../premium/SurfSpray';   // SURF OCEAN: crest mist, r
 // MOVEMENT PLAY P8 (2026-09-26): the body's grab in the air, a quarter-turn on the face (the CUTBACK) or in the air (a spin)
 import { RideIntents, rideOf, rideLines, type RideIntent } from '../core/rideBody';
 import { spinTrickFor } from '../core/rideTricks';
+import { HeatScore, scoreWave } from '../core/SurfHeat';
+// IMPROVE (2026-10-06): the owner-picked surf items. The pieces skate and snow added on this lane, reused — the one banner on
+// the mode's clock (BannerQueue), the HUD that sends only what moved (HudDelta), the coyote (gameFeel.Coyote), the air-left fit
+// (skateScore.fitToAir) — and the surf rules themselves, pure and tested (./surfBreak).
+import { BannerQueue, BANNER_PRIO } from '../core/BannerQueue';
+import { HudDelta } from './rideHud';
+import { Coyote } from '../core/gameFeel';
+import { fitToAir, skateAirBudget } from './skateScore';
+import {
+  SURF_GRAB, surfGrabFor, grabFits, surfAirLeft, neutralCutSign, pocketBar, barrelVerdict, tubeRead, BuoyWatch, NEAR_MISS_PTS,
+  TrimCoach, swellWorth, setCall, rideCounts, type BuoySpot,
+} from './surfBreak';
 
 const RUN_SEC = 90;
 /** phase 10: the score that wins a session without a barrel */
@@ -54,8 +65,7 @@ export const POCKET = { min: 1, max: 9 };
 /** WALLS + SPEED (2026-09-15): +35% with the other boards (was 9) — the ceiling the surge and the lens normalise against.
  *  BOARD-SPEED (2026-09-21): it rides the shared pace now (9 × BOARD_PACE = 14.4), so the next pace change reaches surf too. */
 export const MAX_FORWARD_SPEED = 9 * BOARD_PACE;
-/** The plain X grab on a wave, as a named shape for the trick layer: an indy on a surfboard (TRICK POSE). */
-const SURF_GRAB: BoardTrick = { id: 'surf_grab', label: 'GRAB', discipline: 'surf', kind: 'air', dir: null, btn: 'X', spinDeg: 0, flipDeg: 0, grab: 'indy', difficulty: 1.4, airSec: 0.3, clip: 'board_grab' };
+/** (The plain X grab's trick-layer shape — an indy — and the named X grabs live in ./surfBreak: SURF_GRAB, SURF_GRABS.) */
 /** How far past the bottom of the face the rider may drift before the rail holds them (m) — the wave catches up anyway. */
 export const FLAT_LEASH = 8;
 /** Wave-relative drift (m/s): stalled on the flat the wave gains this much on you; the face's slide under the lip; the
@@ -65,6 +75,8 @@ export const FLAT_LEASH = 8;
 const RIDE_PACE = BOARD_PACE / 1.35;
 export const DRIFT = { flat: -1.2, slide: 0.9, trim: 0.6, climb: 2.4 * RIDE_PACE, drop: 2.2 * RIDE_PACE, rail: 2.6 * RIDE_PACE };
 export const BARREL_HOLD_SEC = 1.5;
+/** IMPROVE (2026-10-06, item 7): a wipe puts the rider back on the wave this long after (s) — on the mode's own clock. */
+export const RESPAWN_SEC = 1.6;
 export const BARREL_BONUS = 250;
 /** Carve depth at which the rider commits and starts SPENDING flow. */
 export const SURGE_CARVE = 0.85;
@@ -79,6 +91,17 @@ export const FLOW_MAX = 200;
 export const FLOW_FILL_PER_SEC = 28;
 export const SurfBreakMode: ModeDefinition = (() => {
   let world: RideWorld, waveLipAt: (t: number) => Vector3, barrelActive: (t: number) => boolean;
+  let activeProfile: () => { label: string; worth: number } = () => ({ label: 'RUNNER', worth: 1 });
+  const heat = new HeatScore();
+  let waveMoves: { label: string; difficulty: number }[] = [];
+  let riddenTube = 0;
+  // IMPROVE (2026-10-06, items 8 / 9 / 20): THE SWELL. A new swell under the rider (rideWorlds' swellSeq) is a new wave: the
+  // repeat list clears, the last ride is judged, the set is called and its worth multiplies the wave moves.
+  let swellSeq: () => number = () => 0;
+  let swellSeen = 0, swellsRidden = 0;
+  let worth = 1;
+  /** When the ride being judged started (a respawn or a new swell starts the next). */
+  let rideStartT = 0;
   let faceHeightAt: (x: number, z: number, t: number) => number;
   // deep runs light the building here too, not only on a skateboard (boardCore.TrickMachine)
   let trickMomentum = new MomentumBus();
@@ -86,8 +109,6 @@ export const SurfBreakMode: ModeDefinition = (() => {
   let rig: BoardRig, tricks: TrickMachine;
   let crowd: Onlookers;
   let t = 0, timeLeft = RUN_SEC, flow = 0;
-  /** A surf air off the lip is short — this is the hang a pop actually buys. */
-  const AIR_BUDGET_SEC = 0.7;
   let stickX = 0, stickY = 0, carve = 0;
   const rideIntents = new RideIntents();   // MOVEMENT PLAY P8
   let bodySynced = false;   // MOVEMENT PLAY P8: the body's quarters count from the first frame of play (rideIntents.sync)
@@ -112,6 +133,39 @@ export const SurfBreakMode: ModeDefinition = (() => {
   const PUMP_WINDOW_SEC = 1.15, PUMP_DRIVE = 1.8, PUMP_DECAY = 1.1;
   const SURF_LATERAL_MAX = 7;
   let ended = false, wipedOut = false;
+  /** IMPROVE (2026-10-06, item 7): seconds until the wiped rider is put back (−1: not waiting). It was a 1600 ms setTimeout that
+   *  ignored hit-stop, kept running after the session ended and the mode was disposed, and then moved the rig and the camera. */
+  let respawnT = -1;
+  // IMPROVE (2026-10-06, items 2 / 7): ONE BANNER, queued and ticked on the mode's clock (skate's BannerQueue) — every flash here
+  // owned a setTimeout clear, so a cutback's 600 ms clear wiped "IN THE BARREL", and the timers outlived the mode.
+  const banners = new BannerQueue();
+  function bannerFlash(ctx: ModeContext, text: string, ms: number, prio: number = BANNER_PRIO.beat): void {
+    if (banners.show(text, ms, prio)) ctx.setHud({ banner: banners.text });
+  }
+  /** IMPROVE (2026-10-06, item 2): the per-frame HUD (time, flow, boost, pocket, tube) goes out only when a value moved — each
+   *  setHud is a React render in the board host, and time, boost and flow went out every frame. */
+  const hudOut = new HudDelta();
+  function pushHud(ctx: ModeContext, patch: Record<string, string | number | boolean | null>): void {
+    const d = hudOut.diff(patch);
+    if (d) ctx.setHud(d);
+  }
+  /** IMPROVE (2026-10-06, item 4): scratch vectors — the pads' placement and the camera's lead were three `new Vector3` and a
+   *  `scale()` a frame. */
+  const padAt = new Vector3(), leadVel = new Vector3(), camFwd = new Vector3();
+  /** IMPROVE (2026-10-06, item 6): seconds until the beach crowd is checked against the lens again. */
+  let crowdCullT = 0;
+  /** IMPROVE (2026-10-06, item 11): COYOTE on the lip pop (gameFeel.Coyote, skate's and snow's 110 ms). Contact on the face
+   *  flickers, and A popped only when grounded that very frame. TUNED. */
+  const coyote = new Coyote();
+  let wasGrounded = true, leftGroundAt = 0, jumpedAt = 0;
+  /** IMPROVE (2026-10-06, item 18): an X the air could not hold — its release ends nothing (snow's POLISH-2 rule). */
+  let xRefused = false;
+  /** IMPROVE (2026-10-06, item 14): the buoys, watched — the one in the line is lit and pinged, a close pass pays. */
+  const buoyWatch = new BuoyWatch();
+  let buoySpots: BuoySpot[] = [];
+  let buoyMeshes: AbstractMesh[] = [];
+  /** IMPROVE (2026-10-06, item 19): the first wave teaches the trim and the pump. */
+  const coach = new TrimCoach();
   let lapsSeen = 0;
   let barrelSec = 0, inBarrel = false, barrels = 0;
   let surging = false;
@@ -182,11 +236,67 @@ export const SurfBreakMode: ModeDefinition = (() => {
     });
   }
 
+  /**
+   * IMPROVE (2026-10-06, item 10): THE AIR LEFT, seconds — the face under the rider (the wave's own height function), his rise,
+   * and the face falling away under him as he drifts down it (its slope × his wave-relative drift). Airs were judged against a
+   * fixed 0.7 s, so Y threw a full air with 0.05 s left and graded it a bail. 0 on the face.
+   */
+  function airLeftNow(): number {
+    if (rig.rider.grounded) return 0;
+    const p = rig.char.root.position;
+    const under = faceHeightAt(p.x, p.z, t);
+    const dropPerM = under - faceHeightAt(p.x, p.z + 1, t);
+    return surfAirLeft(p.y - Math.max(0, under), rig.rider.vel.y, Math.max(0, dropPerM) * Math.max(0, rel));
+  }
+
+  /** IMPROVE (2026-10-06, items 8 / 9 / 19 / 20): a new swell is under the rider — the last ride is over, the repeat list is
+   *  fresh, the set is called and its worth is what the wave moves pay at; the second wave ends the first wave's lesson. */
+  function onSwell(ctx: ModeContext): void {
+    const first = swellsRidden === 0;
+    swellsRidden++;
+    const p = activeProfile();
+    // item 20: the set is called first, so the last wave's score (a quieter banner) follows it rather than being replaced by it
+    // (the first call is the bezel's alone: the venue's name is up)
+    if (!first) bannerFlash(ctx, setCall(p), 1200, BANNER_PRIO.news);
+    if (!first && !wipedOut) judgeRide(ctx, false);   // judged at the LAST swell's worth (a wipe already judged its ride)
+    waveMoveRepeats.clear();                            // item 8: a new wave, a fresh list
+    worth = swellWorth(p);
+    pushHud(ctx, { swell: setCall(p).replace(/^SET: /, '') });
+    if (!first) { const c = coach.finish(); if (c !== null) pushHud(ctx, { coach: c }); }
+    console.info(`[SURF-SWELL] ${p.label} ×${worth} (wave ${swellsRidden})`);
+  }
+
+  /**
+   * IMPROVE (2026-10-06, item 9): EVERY RIDE IS JUDGED. A wave was judged only on a wipeout or a banked barrel and then locked
+   * until the next wipe, so a clean session of cutbacks and airs judged nothing, and the `heat` it published was never drawn.
+   * A ride ends at a wipeout or when the next swell takes over (and at the horn); each one that was a ride (surfBreak.rideCounts)
+   * is scored by SurfHeat and the heat — the best three, a real heat's format — is on the HUD and the end card.
+   */
+  function judgeRide(ctx: ModeContext, wiped: boolean): void {
+    if (rideCounts(waveMoves.length, riddenTube, t - rideStartT)) {
+      const score = scoreWave({
+        selectionQuality01: Math.max(0, Math.min(1, worth / 1.8)),
+        maneuvers: waveMoves,
+        tubeSec: riddenTube,
+        wipedOut: wiped,
+      });
+      heat.addWave(score);
+      ctx.setHud({ heat: heat.total, waves: heat.waveCount });
+      if (!wiped) bannerFlash(ctx, `WAVE ${score.toFixed(1)} · HEAT ${heat.total.toFixed(1)}`, 1300, BANNER_PRIO.beat);
+      console.info(`[SURF-HEAT] wave ${score} (${wiped ? 'wiped' : 'ridden'}) moves ${waveMoves.length} tube ${riddenTube.toFixed(1)} → heat ${heat.total}`);
+    }
+    waveMoves = [];
+    riddenTube = 0;
+    rideStartT = t;
+  }
+
   function wipeout(ctx: ModeContext, why: string, lipZ: number): void {
-    waveMoveRepeats.clear();   // a new wave, a fresh list
+    // (IMPROVE 2026-10-06, item 8: the repeat list is the SWELL's now — it clears when a new one arrives, never on a wipe, which
+    // paid a rider for falling: after the first wave every cutback decayed to nothing unless you wiped out)
     spray?.splash(rig.char.root.position, 1.2);   // SURF OCEAN: the fall throws the water
     console.info(`[SURF-WIPE] call: ${why}${wipedOut ? ' (already down — ignored)' : ''} | u ${(rig.char.root.position.z - lipZ).toFixed(1)} x ${rig.char.root.position.x.toFixed(1)} rel ${rel.toFixed(1)} pump ${pumpBoost.toFixed(1)}`);   // A+ P0 probe: punches are checked against accepted calls
     if (wipedOut) return;
+    judgeRide(ctx, true);
     wipedOut = true;
     tricks.bail();
     // A+ P0 juice (PM brief BOARD-A-PLUS-P0, 2026-09-06): the wipe HITS — hit-stop + shake + ONE low thud (replaces the bare
@@ -197,9 +307,16 @@ export const SurfBreakMode: ModeDefinition = (() => {
     console.info('[SURF-JUICE] wipeout punch');
     SoundKit.play('crowdGroan', { volume: 0.5 });
     EffectsKit.burst(ctx.scene, rig.char.root.position.clone(), 'dust');
-    ctx.setHud({ banner: why, flow: 0 });
-    flow = 0; barrelSec = 0; inBarrel = false;
-    setTimeout(() => {
+    bannerFlash(ctx, why, RESPAWN_SEC * 1000, BANNER_PRIO.news);
+    flow = 0; barrelSec = 0; inBarrel = false; barrelWorked = 0;
+    pushHud(ctx, { flow: 0, tube: null, tubeOk: null });
+    respawnT = RESPAWN_SEC;   // IMPROVE (2026-10-06, item 7): update() counts it down on the mode's clock
+  }
+
+  /** IMPROVE (2026-10-06, item 7): the rider back on the wave — what the wipe's setTimeout did, run from update(). */
+  function respawn(ctx: ModeContext): void {
+    respawnT = -1;
+    {
       rel = 0;
       // phase 7 (measured): a wipe AT the channel wall respawned at the wall, facing back up the line (the mirrored yaw), and
       // the Rider's own carve accel along that yaw put him behind the crest inside a second — 15 wipes in a row at the edge.
@@ -215,24 +332,28 @@ export const SurfBreakMode: ModeDefinition = (() => {
       ctx.camDirector.snapTo(rig.char.root.position, waveLipAt(t));
       rig.rider.vel.set(0, 0, 0);
       wipedOut = false;
-      ctx.setHud({ banner: '' });
-    }, 1600);
+      rideStartT = t;        // a new ride starts (item 9)
+      buoyWatch.reset();     // the buoys are approached afresh from here (item 14)
+    }
   }
 
   function bankBarrel(ctx: ModeContext): void {
-    if (barrelSec < BARREL_HOLD_SEC) { barrelSec = 0; inBarrel = false; barrelWorked = 0; return; }
+    // (IMPROVE 2026-10-06, item 13: the rule, pure and tested — surfBreak.barrelVerdict — and drawn while it runs: tubeRead)
+    const verdict = barrelVerdict(barrelSec, barrelWorked, BARREL_HOLD_SEC, BARREL_WORK_SHARE);
+    if (verdict === 'short') { barrelSec = 0; inBarrel = false; barrelWorked = 0; return; }
     // MECHANICS PASS (2026-09-15): the board trims itself into the pocket hands-off, so the barrel paid 250 to a rider with the
     // pad down (idle probe, run 2). A barrel is RIDDEN: it banks only when the rider worked the tube — trimmed with the stick
     // or drove with R2 for a real share of the time inside. Otherwise it is said, and pays nothing.
-    const worked = barrelWorked / Math.max(0.001, barrelSec);
-    if (worked < BARREL_WORK_SHARE) {
+    if (verdict === 'unworked') {
       barrelSec = 0; inBarrel = false; barrelWorked = 0;
       refuse(ctx, 'RIDE THE TUBE — TRIM OR DRIVE IN IT');
       return;
     }
     barrelWorked = 0;
     barrels++;
+    waveMoves.push({ label: 'BARREL', difficulty: 4 });
     tricks.score += BARREL_BONUS;
+    // (IMPROVE 2026-10-06, item 9: a barrel no longer closes the wave's judging — the ride goes on, and is judged when it ends)
     SoundKit.play('score', { pitch: 1.3 });
     SoundKit.play('crowdCheer', { volume: 0.5 });
     // The 'surf' preset's own note reads "barrel treatment = tightest (set via
@@ -246,8 +367,8 @@ export const SurfBreakMode: ModeDefinition = (() => {
     ctx.juice.shake(0.08, 140);
     console.info('[SURF-JUICE] barrel bank');
     EffectsKit.burst(ctx.scene, rig.char.root.position.add(new Vector3(0, 1.2, 0)), 'net');
-    ctx.setHud({ score: tricks.score, banner: `BARRELED! +${BARREL_BONUS}` });
-    setTimeout(() => ctx.setHud({ banner: '' }), 900);
+    ctx.setHud({ score: tricks.score });
+    bannerFlash(ctx, `BARRELED! +${BARREL_BONUS}`, 900, BANNER_PRIO.news);
     barrelSec = 0; inBarrel = false;
   }
 
@@ -263,14 +384,23 @@ export const SurfBreakMode: ModeDefinition = (() => {
       yawTarget += Math.PI * 0.5 * turnSign;
       cutbackUntil = t + CUTBACK_LEAN_SEC;
     }
-    const paid = Math.round((trickPts(wave) + Math.round(flow / 4)) * REPEAT_DECAY[Math.min(rep, REPEAT_DECAY.length - 1)]);
+    waveMoves.push({ label: wave.label, difficulty: wave.difficulty });
+    // IMPROVE (2026-10-06, item 20): THE SWELL'S WORTH PAYS. surfLineup documents `worth` as the "multiplier on everything
+    // scored on it" (1.0 / 1.35 / 1.8) and only the heat read it; a wave move on the CAVE pays ×1.8 now. TUNED.
+    const paid = Math.round((trickPts(wave) + Math.round(flow / 4)) * REPEAT_DECAY[Math.min(rep, REPEAT_DECAY.length - 1)] * worth);
     tricks.score += paid;
+    // IMPROVE (2026-10-06, item 15): A WAVE MOVE IS A LINK. It paid straight into the score and never touched the combo, so
+    // cutback → air → snap was three separate scores. It joins the open chain now (TrickMachine.link): the air after it lands at
+    // the multiplier it raised, and the move's own points go on paying at once as they always did — only what the chain adds on
+    // top (paid × (multiplier − 1)) rides the pot, and is lost with it on a wipe. TUNED.
+    const chained = paid > 0 ? tricks.link(wave.label, paid, true) : 0;
     if (rep < 2) boostKit.earn(wave.difficulty >= 3 ? 'trickBig' : 'trickSmall');
     ctx.feel?.impact?.(wave.difficulty >= 3 ? 0.2 : 0.12);
     SoundKit.play('whoosh', { pitch: 1.5, volume: 0.35 });
-    ctx.juice.scorePop(rig.char.root.position.add(new Vector3(0, 2, 0)), `+${paid}`, rep ? '#94a3b8' : '#ffd75e');
-    ctx.setHud({ score: tricks.score, banner: rep ? `${wave.label} · REPEAT ×${rep + 1}` : wave.label });
-    setTimeout(() => ctx.setHud({ banner: '' }), 600);
+    ctx.juice.scorePop(rig.char.root.position.add(new Vector3(0, 2, 0)), chained > 0 ? `+${paid} +${chained} CHAIN` : `+${paid}`, rep ? '#94a3b8' : '#ffd75e');
+    ctx.setHud({ score: tricks.score });
+    const label = `${wave.label}${worth > 1 ? ` ×${worth}` : ''}`;
+    bannerFlash(ctx, rep ? `${label} · REPEAT ×${rep + 1}` : label, 600);
   }
 
   /** MOVEMENT PLAY P8: the body's verbs, polled against the game's own air and face (lib/babylon/core/rideBody). */
@@ -285,10 +415,12 @@ export const SurfBreakMode: ModeDefinition = (() => {
     if (it.kind === 'grabEnd') { tricks.endGrab(); trickLayer?.release(); return; }
     if (it.kind !== 'spin') return;
     if (it.where === 'air') {
-      const t2 = spinTrickFor('surf', it.dir, AIR_BUDGET_SEC);
+      // IMPROVE (2026-10-06, item 10): the spin the air that is LEFT can finish (it was judged against a fixed 0.7 s)
+      const left = airLeftNow();
+      const t2 = fitToAir((b) => spinTrickFor('surf', it.dir, b), skateAirBudget(airT, left), left);
       if (!t2) return;
       tricks.start(asTrickDef(t2)); trickLayer?.start(t2);
-      ctx.setHud({ banner: t2.label }); setTimeout(() => ctx.setHud({ banner: '' }), 560);
+      bannerFlash(ctx, t2.label, 560);
       bodyStats.spins++; bodyStats.last = t2.label;
       console.info(`[SURF-BODY] ${it.dir} quarter in the air → ${t2.label}`);
       return;
@@ -323,17 +455,24 @@ export const SurfBreakMode: ModeDefinition = (() => {
       baseFov = null;
       const venue = readBoardVenue('surf');
       const built = buildSurfBreak(ctx.scene, POCKET, venue);
-      ctx.setHud({ banner: `${venue.name} · ${venue.sub}` });
+      // IMPROVE (2026-10-06): the run's own state — the one banner, the HUD's memory, the heat (it was module state and carried
+      // one mount's waves into the next), the swell, the respawn, the coyote, the buoys, the lesson
+      banners.clear(); hudOut.reset(); heat.waves = [];
+      bannerFlash(ctx, `${venue.name} · ${venue.sub}`, 2200, BANNER_PRIO.news);
       world = built.world; waveLipAt = built.waveLipAt; barrelActive = built.barrelActive; faceHeightAt = built.faceHeightAt;
+      activeProfile = built.activeProfile; swellSeq = built.swellSeq;
+      waveMoves = []; riddenTube = 0; rideStartT = 0; swellSeen = 0; swellsRidden = 0; worth = 1; waveMoveRepeats.clear();
+      respawnT = -1; crowdCullT = 0; wasGrounded = true; leftGroundAt = 0; jumpedAt = 0; xRefused = false;
+      buoyWatch.reset(); coach.reset();
+      buoySpots = world.obstacles.map((o) => ({ x: o.pos.x, z: o.pos.z, radius: o.radius }));
+      buoyMeshes = built.buoys;
+      for (const m of buoyMeshes) { m.overlayColor = new Color3(1, 0.25, 0.2); m.overlayAlpha = 0.55; m.renderOverlay = false; }
       updateSea = built.updateSea;
       spray?.dispose(); spray = new SurfSpray(ctx.scene);
       propsGone = false; void mountVenueProps(ctx.scene, 'surf-break').then((h) => { if (propsGone) h?.dispose(); else props = h; });
-      // Gate 0: Validate skeletal rig by spawning placeholder to check skeleton
-      const _validateChar = await CharacterLibrary.spawn(ctx.scene, CFG.heroUrl, { position: new Vector3(0, -1000, 0) });
-      if (_validateChar.skeleton?.bones.length === 65) {
-        // Confirmed: 65-bone Mixamo rig with proper structure
-      }
-      _validateChar.dispose(); // Clean up validation placeholder
+      // IMPROVE (2026-10-06, item 3): the Gate-0 "validation" spawn is gone — a whole hero body loaded at y −1000, its bone count
+      // compared with an empty if, and disposed: a full character load for nothing (skate's item 1). The rider is the real
+      // check: buildRig spawns it and assertSpawned below fails loudly if it is not there.
       // ARENA-10PHASE P3: spawn IN the pocket (the lip starts at z −50; was z −22 = 28 m out on the flat with nothing under
       // the board for the first 6 s), and glue the rider to the face on the way down it (the wave face falls away faster
       // than one frame of gravity, exactly like the pitched piste — see RiderCfgOverrides.stickDown).
@@ -386,7 +525,14 @@ export const SurfBreakMode: ModeDefinition = (() => {
       boostKit = new BoostKit(0.2); boostHeld = false;
       boostFx?.dispose(); boostFx = new BoostFx(ctx.scene, ctx.camera, { trailFrom: rig.char.root, trailWidth: 0.5, color: '#bff4ff' });
       boostPads?.dispose(); boostPads = new BoostPads(ctx.scene, PAD_XS.map((x) => ({ pos: new Vector3(x, 0, 0), radius: 2.8 })));   // SHARD-PICKUP: one colour for the mechanic
-      ctx.setHud({ score: 0, flow: 0, ...boostKit.hud(), time: RUN_SEC, hint: 'Ride the pocket under the lip · pull BACK to climb, push to drop in · R2 drives · hold RB / Shift to BOOST · miss the buoys' });
+      ctx.setHud({ score: 0, hint: 'Ride the pocket under the lip · pull BACK to climb, push to drop in · R2 drives · hold RB / Shift to BOOST · miss the buoys' });
+      // IMPROVE (2026-10-06): the per-frame keys through the delta; the heat (item 9), the pocket band (item 12) and the first
+      // wave's lesson (item 19) from the start
+      const band = pocketBar(0, POCKET, WAVE_FACE_LEN);
+      pushHud(ctx, {
+        flow: 0, ...boostKit.hud(), time: RUN_SEC, heat: 0, waves: 0, pocketLo: band.lo, pocketHi: band.hi, pocket: null, tubeMark: BARREL_HOLD_SEC,
+        tube: null, tubeOk: null, coach: coach.text, swell: null,
+      });
     },
 
     onInput(ctx: ModeContext, e: FelInput) {
@@ -399,7 +545,8 @@ export const SurfBreakMode: ModeDefinition = (() => {
           if (pumpSign !== 0 && t - pumpAt < PUMP_WINDOW_SEC && !wipedOut) {
             pumpBoost = Math.min(PUMP_DRIVE * 2.5, pumpBoost + PUMP_DRIVE); pumps++;
             console.info(`[SURF-PUMP] ${pumps} drive ${pumpBoost.toFixed(1)}`);
-            if (pumps % 3 === 0) ctx.juice.callout(`PUMP ×${pumps}`, '#7dd3fc', 500);
+            // IMPROVE (2026-10-06, item 19): every stroke is answered (it was every 3rd), short, so a rhythm reads as a rhythm
+            ctx.juice.callout(`PUMP ×${pumps}`, '#7dd3fc', 380);
           }
           pumpSign = sign; pumpAt = t;
         }
@@ -409,7 +556,15 @@ export const SurfBreakMode: ModeDefinition = (() => {
       if (e.t === 'button' && e.btn === 'R1') boostHeld = e.pressed;   // BOOST: the shared held R1
       if (e.t === 'button' && e.pressed && !wipedOut) {
         if (e.btn === 'A') {
-          if (rig.rider.grounded) { rig.rider.jump(0.5 + flow / 200); SoundKit.play('whoosh', { pitch: 1.3, volume: 0.4 }); }   // the tree reads the air
+          // IMPROVE (2026-10-06, item 11): COYOTE. A press inside the window after the board lost the face WITHOUT a pop (contact
+          // flickers on the face) still pops, told late; after a real pop it never pops again mid-air.
+          const late = !rig.rider.grounded && coyote.ok && jumpedAt < leftGroundAt;
+          if (rig.rider.grounded || late) {
+            rig.rider.jump(0.5 + flow / 200, late);   // the tree reads the air
+            jumpedAt = performance.now(); wasGrounded = false;
+            SoundKit.play('whoosh', { pitch: 1.3, volume: 0.4 });
+            if (late) console.info(`[SURF-JUMP] coyote ${(performance.now() - leftGroundAt).toFixed(0)} ms after the face`);
+          }
         }
         if (e.btn === 'B') {
           // THE WAVE LIST (BoardTricks, surf). B used to be one hardcoded cutback; the held direction now picks among
@@ -425,25 +580,45 @@ export const SurfBreakMode: ModeDefinition = (() => {
           // mashing it out-scored surfing 9 to 1 (14,213 vs 1,530). A wave move is now a MOVE: on the face, one at a time
           // (the carve has to finish), and the same move again on this wave pays less (THPS repeat decay).
           if (!rig.rider.grounded) { refuse(ctx, 'ON THE FACE'); return; }
+          // IMPROVE (2026-10-06, item 16): a stick held across picks the side; held up / down or barely off centre, the turn goes
+          // BACK TOWARD THE CURL (surfBreak.neutralCutSign) — it was `stickX >= 0`, so a SNAP with the stick up always cut right
           if (t < waveMoveUntil) { refuse(ctx, 'MID-TURN'); return; }
-          waveMove(ctx, wave, stickX >= 0 ? 1 : -1);   // (MOVEMENT PLAY P8: the body's cutback pays through the same move)
+          waveMove(ctx, wave, Math.abs(stickX) > 0.3 ? Math.sign(stickX) : neutralCutSign(rig.char.root.rotation.y, rig.rider.vel.x, rig.char.root.position.x));   // (MOVEMENT PLAY P8: the body's cutback pays through the same move)
         }
         if (e.btn === 'Y') {
-          // the AIRS: only legal off the lip, and the air the rider has decides which one
-          const air = rig.rider.grounded ? 0 : Math.max(0.35, AIR_BUDGET_SEC);
+          // the AIRS: only legal off the lip, and the air the rider has decides which one. IMPROVE (2026-10-06, item 10): the air
+          // LEFT decides — the held direction's air (or the straight air), stepped down the table while its motion cannot finish
+          // before the water (skate's fitToAir, Gate Crasher's GC-2 rule); with nothing that fits it is said.
+          if (rig.rider.grounded) { refuse(ctx, 'AIRS OFF THE LIP'); return; }
+          const left = airLeftNow();
           const held = heldTrickDir(stickX, stickY);
-          const want = trickFor('surf', held, 'Y');
-          const fits = want && want.airSec <= air ? want : bestFitting('surf', 'Y', air);
+          const fits = fitToAir((b) => airTrickFor('surf', held, 'Y', b), skateAirBudget(airT, left), left);
           if (fits) {
             tricks.start(asTrickDef(fits));
             trickLayer?.start(fits);
-            ctx.setHud({ banner: fits.label });
-            setTimeout(() => ctx.setHud({ banner: '' }), 560);
+            bannerFlash(ctx, fits.label, 560);
+          } else refuse(ctx, 'NO AIR LEFT');
+        }
+        if (e.btn === 'X') {
+          // PHONE CONTROLS: a grab on the face was silent. IMPROVE (2026-10-06, item 18): X + a held direction NAMES the grab —
+          // across for the RAIL GRAB, up / down for the SLOB (surfBreak.SURF_GRABS); a bare X is the plain grab, as before. And
+          // (item 10) a grab the air left cannot hold clean is said rather than thrown into a bail.
+          if (rig.rider.grounded) refuse(ctx, 'GRAB IN THE AIR');
+          else {
+            const named = surfGrabFor(heldTrickDir(stickX, stickY));
+            const shape = named ?? SURF_GRAB;
+            if (!grabFits(shape, airLeftNow())) { xRefused = true; refuse(ctx, 'NO AIR LEFT'); }
+            else {
+              tricks.start(named ? asTrickDef(named) : TRICKS.grab); trickLayer?.start(shape);
+              if (named) bannerFlash(ctx, named.label, 560);
+            }
           }
         }
-        if (e.btn === 'X') { if (rig.rider.grounded) refuse(ctx, 'GRAB IN THE AIR'); else { tricks.start(TRICKS.grab); trickLayer?.start(SURF_GRAB); } }   // PHONE CONTROLS: a grab on the face was silent
       }
-      if (e.t === 'button' && !e.pressed && e.btn === 'X') { tricks.endGrab(); trickLayer?.release(); }
+      if (e.t === 'button' && !e.pressed && e.btn === 'X') {
+        if (xRefused) xRefused = false;   // IMPROVE (item 18): the X the air refused ends nothing (the trick going keeps going)
+        else { tricks.endGrab(); trickLayer?.release(); }
+      }
     },
 
     update(ctx: ModeContext, dt: number) {
@@ -459,17 +634,28 @@ export const SurfBreakMode: ModeDefinition = (() => {
         rig.char.root.position.z -= WAVE_LAP;
         ctx.camDirector.snapTo(rig.char.root.position, waveLipAt(t));   // the wrap is a cut: the camera cuts with it (it used to lerp 140 m)
       }
+      if (banners.tick(dt * 1000)) ctx.setHud({ banner: banners.text });   // IMPROVE (items 2 / 7): the one banner, on this clock
+      // IMPROVE (2026-10-06, items 8 / 9 / 20): a new swell under the rider
+      { const seq = swellSeq(); if (seq !== swellSeen) { swellSeen = seq; onSwell(ctx); } }
+      // IMPROVE (2026-10-06, item 7): the respawn, on the mode's clock — it stops with the session and with the mode
+      if (wipedOut && respawnT > 0) { respawnT -= dt; if (respawnT <= 0) respawn(ctx); }
 
       if (timeLeft <= 0) {
         ended = true;
         SoundKit.play('whistle');
+        if (!wipedOut) judgeRide(ctx, false);   // IMPROVE (item 9): the ride the horn ends is judged too
         // phase 10: the session is WON on a ridden barrel or the score par — it ended 'SESSION_END' with no win before
         const won = barrels >= 1 || tricks.score >= SURF_WIN_SCORE;
-        console.info(`[SURF-END] ${won ? 'win' : 'complete'} barrels ${barrels} score ${tricks.score}`);
-        return ctx.end(won ? 'win' : 'complete', tricks.score, { bestFlow: Math.round(flow), barrels, tricksLanded: tricks.landed, bestCombo: tricks.bestCombo, pumps });
+        console.info(`[SURF-END] ${won ? 'win' : 'complete'} barrels ${barrels} score ${tricks.score} heat ${heat.total}`);
+        // IMPROVE (2026-10-06, item 9): the heat on the end card — its total (best three waves), how many were judged, the best
+        return ctx.end(won ? 'win' : 'complete', tricks.score, { bestFlow: Math.round(flow), barrels, tricksLanded: tricks.landed, bestCombo: tricks.bestCombo, pumps, heat: heat.total, waves: heat.waveCount, bestWave: heat.waves[0] ?? 0 });
       }
 
       if (!wipedOut) {
+        // IMPROVE (2026-10-06, item 11): the coyote's feed — the flag the A press reads, and when the board last left the face
+        if (wasGrounded && !rig.rider.grounded) leftGroundAt = performance.now();
+        wasGrounded = rig.rider.grounded;
+        coyote.update(rig.rider.grounded);
         // SURGE — the flow meter is a resource you SPEND, which is the half of
         // SSX's boost economy this mode did not have. Flow filled by riding the
         // pocket and then only ever gated a passive score trickle: there was no
@@ -481,11 +667,12 @@ export const SurfBreakMode: ModeDefinition = (() => {
         // decision the meter was missing.
         const bev = boostKit.update(dt, boostHeld, true);
         surging = boostKit.burning;
-        if (bev.started) { ctx.setHud({ banner: 'BOOST' }); setTimeout(() => ctx.setHud({ banner: '' }), 600); }
-        if (bev.full) { ctx.setHud({ banner: 'BOOST READY' }); setTimeout(() => ctx.setHud({ banner: '' }), 700); }
+        if (bev.started) bannerFlash(ctx, 'BOOST', 600, BANNER_PRIO.chatter);
+        if (bev.full) bannerFlash(ctx, 'BOOST READY', 700, BANNER_PRIO.chatter);
         boostFx?.update(dt, boostKit, bev);
         if (boostPads) {
-          PAD_XS.forEach((x, i) => { const z = lip.z + PAD_POCKET_U; boostPads!.place(i, new Vector3(x, faceHeightAt(x, z, t), z)); });
+          const z = lip.z + PAD_POCKET_U;
+          PAD_XS.forEach((x, i) => boostPads!.place(i, padAt.set(x, faceHeightAt(x, z, t), z)));   // IMPROVE (item 4): one scratch vector
           boostPads.update(dt, rig.char.root.position, boostKit);
         }
 
@@ -539,7 +726,19 @@ export const SurfBreakMode: ModeDefinition = (() => {
             break;
           }
         }
-        if (wipedOut) { driveAnim(dt); ctx.setHud({ time: Math.ceil(timeLeft) }); return; }
+        if (wipedOut) { driveAnim(dt); pushHud(ctx, { time: Math.ceil(timeLeft) }); return; }
+        // IMPROVE (2026-10-06, item 14): THE BUOY IS CALLED, AND A CLOSE PASS PAYS. Contact was an instant wipe with nothing
+        // before it. The buoy in the rider's line ahead is lit and pinged once (surfBreak.BuoyWatch); a pass that cleared it by
+        // under NEAR_MISS_M pays NEAR_MISS_PTS as a link in the open chain, and a sip of boost. TUNED.
+        for (const ev of buoyWatch.update(dt, p.x, p.z, buoySpots)) {
+          if (ev.kind === 'warn') { SoundKit.play('uiTick', { pitch: 1.7, volume: 0.45 }); continue; }
+          const add = tricks.link('NEAR MISS', NEAR_MISS_PTS);
+          boostKit.earn('trickSmall');
+          SoundKit.play('whoosh', { pitch: 1.9, volume: 0.3 });
+          ctx.juice.scorePop(p.add(new Vector3(0, 2, 0)), `NEAR MISS +${add}`, '#7dd3fc');
+          console.info(`[SURF-BUOY] near miss ${ev.clear.toFixed(2)} m → +${add}`);
+        }
+        buoyMeshes.forEach((m, i) => { const on = buoyWatch.lit(i); if (m.renderOverlay !== on) m.renderOverlay = on; });
 
         const ahead = rig.char.root.position.z - lip.z;
         const hollow = barrelActive(t);
@@ -555,30 +754,36 @@ export const SurfBreakMode: ModeDefinition = (() => {
           // drip is what scored 921 for a rider who never touched the pad, with no cue for any of it (19 unexplained scores).
           if (hollow) {
             barrelSec += dt;
+            riddenTube = Math.max(riddenTube, barrelSec);
             if (Math.hypot(stickX, stickY) > 0.3 || carve > 0.2) barrelWorked += dt;
             if (!inBarrel && barrelSec > 0.3) {
               inBarrel = true;
               SoundKit.play('powerUp', { pitch: 1.2, volume: 0.35 });
               // hood in as the tube closes over you, and hold it while you are inside
               ctx.camDirector.pulse(0.7, 1.2);
-              ctx.setHud({ banner: 'IN THE BARREL' });
-              setTimeout(() => ctx.setHud({ banner: '' }), 800);
+              bannerFlash(ctx, 'IN THE BARREL', 800);
             }
           } else if (inBarrel) {
             bankBarrel(ctx);                       // the tube closed while you were in it — pay out
           }
-          ctx.setHud({ flow: Math.round(flow) });
         } else {
           if (inBarrel) bankBarrel(ctx);           // drifted out of the pocket — pay out if earned
           flow = Math.max(0, flow - dt * 30);
-          ctx.setHud({ flow: Math.round(flow) });
         }
+        // IMPROVE (2026-10-06, items 2 / 12 / 13): the flow, WHERE the rider is between the lip and the bottom (the pocket bar,
+        // its band the scored POCKET), and the TUBE while one is being ridden — its seconds against the 1.5 s mark, and whether
+        // the rider is working it enough to bank (the share rule that made "RIDE THE TUBE" refusals feel random). Sent on change.
+        // (drawn while the tube is open over a rider who has time in it)
+        pushHud(ctx, {
+          flow: Math.round(flow),
+          pocket: wipedOut ? null : pocketBar(ahead, POCKET, WAVE_FACE_LEN).pos,
+          ...(barrelSec > 0 && hollow && !wipedOut ? tubeRead(barrelSec, barrelWorked, BARREL_WORK_SHARE) : { tube: null, tubeOk: null }),
+        });
+        // IMPROVE (2026-10-06, item 19): the first wave's lesson — climb, drop, pump — one prompt at a time, advanced by doing it
+        { const c = coach.update(dt, stickY, pumps); if (c !== null) pushHud(ctx, { coach: c }); }
 
         const banner = tricks.update(dt);
-        if (banner) {
-          ctx.setHud({ banner });
-          setTimeout(() => ctx.setHud({ banner: '' }), 900);
-        }
+        if (banner) bannerFlash(ctx, banner, 900);
         // Clamp AT the water's edge, not 5m inside it. The rider used to stop
         // against nothing while the ocean visibly continued past him.
         const edge = world.bound - 1;   // the break's own width, so the clamp and the water's edge are one number
@@ -616,6 +821,9 @@ export const SurfBreakMode: ModeDefinition = (() => {
       ctx.camDirector.setAir(!rig.rider.grounded && !rig.rider.grinding ? 1 : 0);   // the AIR CAM: the trick in the picture
 
       crowd.update(dt);
+      // IMPROVE (2026-10-06, item 6): the beach crowd stands behind a lens that faces out to sea — four times a second, the bodies
+      // behind the camera's plane are put away (disabled, their clip paused) and come back when the lens turns to them
+      if ((crowdCullT -= dt) <= 0) { crowdCullT = 0.25; ctx.camera.getDirectionToRef(Axis.Z, camFwd); crowd.cullBehind(ctx.camera.position, camFwd); }
       if (spray) {
         const yaw = rig.char.root.rotation.y, yawRate = dt > 0 ? Math.abs(yaw - lastYaw) / dt : 0; lastYaw = yaw;
         const carving = t < cutbackUntil;
@@ -625,9 +833,9 @@ export const SurfBreakMode: ModeDefinition = (() => {
           carveSide: -Math.sign(yaw - lastYaw || rideLean || 1), hollow: barrelActive(t), grounded: rig.rider.grounded && !wipedOut,
         });
       }
-      ctx.setHud({ time: Math.ceil(timeLeft), ...boostKit.hud() });
+      pushHud(ctx, { time: Math.ceil(timeLeft), ...boostKit.hud() });   // IMPROVE (item 2): only what moved
       const vel = rig.rider.vel;
-      const leadVel = vel.lengthSquared() > 0.01 ? vel.scale(1.6) : vel;
+      leadVel.copyFrom(vel); if (vel.lengthSquared() > 0.01) leadVel.scaleInPlace(1.6);   // IMPROVE (item 4): the scratch lead
       ctx.camDirector.look(lookX, lookY, dt);
       ctx.camDirector.update(rig.char.root.position, leadVel, lip);
       // SPEED YOU CANNOT SEE IS NOT SPEED. The lens widens toward top speed and eases back, normalised
@@ -637,7 +845,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
       ctx.camera.fov = stepSpeedFov(ctx.camera.fov, baseFov * (boostFx?.fovMult(boostKit) ?? 1), Math.hypot(rig.rider.vel.x, rig.rider.vel.z), rig.rider.topSpeed, dt);
     },
 
-    dispose() { trickLayer?.dispose(); trickLayer = null; spray?.dispose(); spray = null; updateSea = () => {}; boostFx?.dispose(); boostFx = null; boostPads?.dispose(); boostPads = null; posture?.dispose(); posture = null; propsGone = true; props?.dispose(); props = null; crowd?.dispose(); rig?.dispose(); world?.dispose(); SoundKit.stopAmbient(); },
+    dispose() { respawnT = -1; banners.clear(); trickLayer?.dispose(); trickLayer = null; spray?.dispose(); spray = null; updateSea = () => {}; boostFx?.dispose(); boostFx = null; boostPads?.dispose(); boostPads = null; posture?.dispose(); posture = null; propsGone = true; props?.dispose(); props = null; crowd?.dispose(); rig?.dispose(); world?.dispose(); SoundKit.stopAmbient(); },
   };
 })();
 

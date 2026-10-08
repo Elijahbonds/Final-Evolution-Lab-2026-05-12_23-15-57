@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  computeBaseline, compareToBaseline, describeBaseline, recordCheckValues, readCheckValues,
+  computeBaseline, compareToBaseline, compareToRecent, describeBaseline, recordCheckValues, readCheckValues,
   type BaselineSessionRow,
 } from './baselines';
 
@@ -155,5 +155,30 @@ describe('describeBaseline', () => {
   it('takes a custom number formatter (a check with its own display unit)', () => {
     const s = describeBaseline({ kind: 'compared', status: 'worse', value: 12.4, baselineValue: 9.1 }, (n) => `${n.toFixed(0)}%`);
     expect(s).toBe('vs your baseline: worse (12% vs 9%)');
+  });
+});
+
+// MIRROR-PROGRESS (plan Phase 4, 2026-10-07): "vs your last 3" — the recent comparison beside the fixed baseline
+describe('compareToRecent', () => {
+  it('nothing before it: first', () => {
+    expect(compareToRecent(0.75, [], 'higherIsBetter', 0.1)).toEqual({ kind: 'first' });
+    expect(compareToRecent(0.75, [NaN, Infinity], 'higherIsBetter', 0.1)).toEqual({ kind: 'first' });
+  });
+
+  it('reads only the newest 3 priors, averaged', () => {
+    const c = compareToRecent(0.75, [0.0, 0.5, 0.5, 0.5], 'higherIsBetter', 0.1);
+    expect(c).toEqual({ kind: 'compared', status: 'better', value: 0.75, recentMean: 0.5, n: 3 });
+  });
+
+  it('within the absolute band is the same; outside it, the direction decides', () => {
+    expect(compareToRecent(0.55, [0.5, 0.5, 0.5], 'higherIsBetter', 0.1)).toMatchObject({ status: 'same' });
+    expect(compareToRecent(0.6, [0.5, 0.5, 0.5], 'higherIsBetter', 0.1)).toMatchObject({ status: 'same' });
+    expect(compareToRecent(0.35, [0.5, 0.5, 0.5], 'higherIsBetter', 0.1)).toMatchObject({ status: 'worse' });
+    expect(compareToRecent(0.5, [1.0, 1.0], 'lowerIsBetter', 0.25)).toMatchObject({ status: 'better', n: 2 });
+    expect(compareToRecent(1.5, [1.0], 'lowerIsBetter', 0.25)).toMatchObject({ status: 'worse', n: 1 });
+  });
+
+  it('an absolute band, not the baseline\'s relative one: a small share near zero is not "25% worse"', () => {
+    expect(compareToRecent(0.05, [0.04], 'lowerIsBetter', 0.1)).toMatchObject({ status: 'same' });
   });
 });

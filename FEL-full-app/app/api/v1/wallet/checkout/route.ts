@@ -7,6 +7,8 @@ import { prisma } from '@/lib/db';
 import { getStripe } from '@/lib/stripe';
 import { purchasesEnabledFromEnv } from '@/lib/wallet/purchases';
 import { getCoinStorePack, coinStorePackTotal } from '@/lib/wallet/catalog';
+import { storeClosed } from '@/lib/coach-store/gate';
+import { siteOrigin } from '@/lib/stripe/site-origin';
 
 /**
  * POST /api/v1/wallet/checkout
@@ -18,17 +20,19 @@ import { getCoinStorePack, coinStorePackTotal } from '@/lib/wallet/catalog';
  * granted coin amount travels in session metadata so the webhook can mint them
  * WITHOUT needing a pre-registered Stripe price id.
  *
- * If Stripe is not configured (no STRIPE_SECRET_KEY), returns 503 so the store
- * UI can show "purchases coming soon" while still allowing earned-coin spending.
+ * STORE-READY B10: while the live-key fence is off, this route refuses with 409
+ * store_closed (never 503) BEFORE any body read, Stripe call or DB write; the
+ * store UI shows "purchases coming soon" while earned-coin spending still works.
  */
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   const playerId = (session?.user as any)?.id as string | undefined;
   if (!playerId) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
-  if (!purchasesEnabledFromEnv()) {
-    return NextResponse.json({ error: 'not_configured' }, { status: 503 });
-  }
+  // STORE-READY B10: no key -> payments_not_set_up; key but VIRTUAL_PURCHASES_ENABLED off ->
+  // virtual_purchases_off. Both are 409 store_closed, never 503, before anything else runs.
+  if (!(process.env.STRIPE_SECRET_KEY ?? '').trim()) return storeClosed('payments_not_set_up');
+  if (!purchasesEnabledFromEnv()) return storeClosed('virtual_purchases_off');
 
   let body: any;
   try {
@@ -41,7 +45,9 @@ export async function POST(req: NextRequest) {
   if (!pack) return NextResponse.json({ error: 'unknown_pack' }, { status: 404 });
 
   const totalCoins = coinStorePackTotal(pack);
-  const origin = req.headers.get('origin') || process.env.NEXTAUTH_URL || '';
+  // STORE-READY B3/B10: Stripe URLs come from the server constant NEXTAUTH_URL, never the Origin header.
+  const origin = siteOrigin();
+  if (!origin) return storeClosed('site_url_not_set');
   const stripe = getStripe();
 
   try {
@@ -72,7 +78,9 @@ export async function POST(req: NextRequest) {
       // The webhook mints coins from this metadata (product COIN_PACK).
       metadata: { playerId, product: 'COIN_PACK', packId: pack.id, coins: String(totalCoins) },
       payment_intent_data: { metadata: { playerId, coins: String(totalCoins) } },
-      success_url: `${origin}/store?purchase=success`,
+      // session_id lets /store fulfil through POST /api/stripe/verify-session even when
+      // no webhook is configured (SEC-F4 NO-WEBHOOK follow-up).
+      success_url: `${origin}/store?purchase=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/store?purchase=cancel`,
     });
     return NextResponse.json({ url: checkoutSession.url });

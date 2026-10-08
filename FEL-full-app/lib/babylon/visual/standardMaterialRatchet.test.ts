@@ -27,7 +27,8 @@ const MODES_DIR = join(process.cwd(), 'lib/babylon/modes');
  */
 const KNOWN: Record<string, number> = {
   'MixedCombatMode.ts': 6,
-  'ThreePointMode.ts': 3,
+  'ThreeVThreeMode.ts': 1,  // IMPROVE (2026-10-06, 3v3 #5 #6): the pass/ball-handler floor ring is a deliberately unlit marker (disableLighting) so it reads under every mood
+  'ThreePointMode.ts': 2,   // IMPROVE (2026-10-06, 3PT #12): the five rack materials are one
   'BrainBrawlMode.ts': 3,
   'precisionModes.ts': 2,
   'aimSwingCore.ts': 2,
@@ -36,8 +37,15 @@ const KNOWN: Record<string, number> = {
   'boardCore.ts': 1,
   'ShowdownMode.ts': 1,
   'KarateEndlessMode.ts': 1,
-  'DuelMode.ts': 1,
-  'AirSessionMode.ts': 1,
+  // 'DuelMode.ts' — 0 since IMPROVE (2026-10-06): its one was the hidden duel_disc's material, and the disc is gone
+  // 'AirSessionMode.ts': 1 — fixed 2026-10-06 (IMPROVE, Big Air item 1): the launch box's material is VenueKit.paint now
+  // IMPROVE (2026-10-06, Tiebreak #19): ONE unlit-marker helper (disableLighting) for the ball, the hit-window ring and the
+  // ball's blob. They are markers that only ever showed an emissive colour, never a PBR palette — the case this table allows.
+  'TiebreakMode.ts': 1,
+  // dunk-next phase 7 (2026-10-06): the live take-off mark on the floor is a deliberately unlit marker (disableLighting,
+  // emissive only, alpha) coloured by the zone — the stripe gold, the elbow cyan, the paint white must read as those exact
+  // hues under every venue mood, never as a PBR palette. One material, re-coloured on a zone change.
+  'DunkMode.ts': 1,
 };
 
 function counts(): Record<string, number> {

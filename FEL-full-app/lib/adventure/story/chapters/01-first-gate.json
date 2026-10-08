@@ -1,0 +1,76 @@
+{
+  "formatVersion": 1,
+  "id": "ch01",
+  "number": 1,
+  "title": "[PLACEHOLDER] Chapter 1 — The First Gate",
+  "placeholder": true,
+  "worldId": "w1",
+  "beats": [
+    { "id": "b01-home", "kind": "cutscene", "shot": "push", "focus": "player",
+      "checkpoint": { "worldId": "hub", "spawnId": "hub.home" },
+      "lines": [
+        { "id": "l01", "speaker": "guide", "text": "You made it home. This is where every road starts, and where it brings you back." },
+        { "id": "l02", "speaker": "guide", "text": "Your partner found you before you found yourself. Stay close to each other out there." },
+        { "id": "l03", "speaker": "partner", "text": "I'm right here. Where you go, I go." },
+        { "id": "l04", "speaker": "guide", "text": "The first gate has woken. Step through it when you're ready." }
+      ] },
+    { "id": "b02-to-gate", "kind": "objective", "text": "Step through the first gate",
+      "goal": { "type": "gate", "gateId": "gate.w1" } },
+    { "id": "b03-arrive", "kind": "travel", "text": "Through the gate", "via": "gate",
+      "to": { "worldId": "w1", "spawnId": "w1.start" },
+      "checkpoint": { "worldId": "w1", "spawnId": "w1.start" } },
+    { "id": "b04-arrival", "kind": "dialogue",
+      "lines": [
+        { "id": "l05", "speaker": "partner", "text": "So this is the first world. The only way on is forward." },
+        { "id": "l06", "speaker": "guide", "text": "Build your speed, catch the rail, and don't look down." }
+      ] },
+    { "id": "b05-rail", "kind": "objective", "text": "Grind across the gap",
+      "goal": { "type": "reach", "spawnId": "w1.rail", "radiusM": 10 } },
+    { "id": "b06-wall", "kind": "objective", "text": "Run the wall to the far side",
+      "checkpoint": { "worldId": "w1", "spawnId": "w1.rail" },
+      "goal": { "type": "reach", "spawnId": "w1.wallrun", "radiusM": 10 } },
+    { "id": "b07-chain", "kind": "objective", "text": "Chain across the chasm",
+      "checkpoint": { "worldId": "w1", "spawnId": "w1.wallrun" },
+      "goal": { "type": "reach", "spawnId": "w1.chain", "radiusM": 12 } },
+    { "id": "b08-camp1", "kind": "fight", "text": "Clear the camp", "encounterId": "w1.camp1",
+      "checkpoint": { "worldId": "w1", "spawnId": "w1.chain" }, "xp": 40 },
+    { "id": "b09-mid", "kind": "boss", "text": "Defeat the Champion", "encounterId": "w1.mid",
+      "checkpoint": { "worldId": "w1", "spawnId": "w1.camp1" }, "xp": 60 },
+    { "id": "b10-learn", "kind": "cutscene", "shot": "orbit", "focus": "partner",
+      "learnSpell": "partner.bolt", "setFlags": { "ch01.learned": true },
+      "lines": [
+        { "id": "l07", "speaker": "partner", "text": "Feel that? My element is yours now. Reach for it." },
+        { "id": "l08", "speaker": "guide", "text": "Your partner's power answers when you call. Cast it, and it grows." }
+      ] },
+    { "id": "b11-camp2", "kind": "fight", "text": "Clear the second camp", "encounterId": "w1.camp2",
+      "checkpoint": { "worldId": "w1", "spawnId": "w1.mid" }, "xp": 50 },
+    { "id": "b12-choice", "kind": "choice", "defaultChoice": "together",
+      "lines": [
+        { "id": "l09", "speaker": "warden", "text": "Turn back. Nothing that comes through this arena leaves it." },
+        { "id": "l10", "speaker": "partner", "text": "How do we face it?" }
+      ],
+      "choices": [
+        { "id": "together", "text": "Side by side", "flag": "ch01.stance", "value": "together" },
+        { "id": "lead", "text": "I go first. Watch my back", "flag": "ch01.stance", "value": "lead" }
+      ] },
+    { "id": "b13-boss", "kind": "boss", "text": "Defeat the Warden", "encounterId": "w1.boss",
+      "checkpoint": { "worldId": "w1", "spawnId": "w1.arena" }, "xp": 120 },
+    { "id": "b14-fusion", "kind": "cutscene", "shot": "wide", "focus": "player", "fuse": true,
+      "setFlags": { "fusionUnlocked": true, "flightUnlocked": true },
+      "lines": [
+        { "id": "l11", "speaker": "partner", "text": "It's falling apart. The ground is going. Take my hand!" },
+        { "id": "l12", "speaker": "guide", "text": "Now. Together, as one." },
+        { "id": "l13", "speaker": "partner", "text": "We're one. We can fly! Home is just across the void." }
+      ] },
+    { "id": "b15-fly-home", "kind": "travel", "text": "Fly home", "via": "flight", "radiusM": 18,
+      "to": { "worldId": "hub", "spawnId": "hub.landing" },
+      "checkpoint": { "worldId": "w1", "spawnId": "w1.edge" } },
+    { "id": "b16-home-again", "kind": "cutscene", "shot": "push", "focus": "player", "xp": 100,
+      "checkpoint": { "worldId": "hub", "spawnId": "hub.landing" },
+      "lines": [
+        { "id": "l14", "speaker": "guide", "text": "You came back. And you came back changed." },
+        { "id": "l15", "speaker": "partner", "text": "Look up. The high ground is ours now." },
+        { "id": "l16", "speaker": "guide", "text": "Rest. The next gate will wake soon." }
+      ] }
+  ]
+}

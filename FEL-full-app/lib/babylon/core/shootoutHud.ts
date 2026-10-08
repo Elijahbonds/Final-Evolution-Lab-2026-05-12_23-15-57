@@ -22,14 +22,15 @@ export type PipState = 'taken' | 'next' | 'ahead';
 export interface RackPip { state: PipState; money: boolean }
 
 /** Five racks × five balls as pips: the balls already shot, the one loaded now, the ones ahead; the last ball of every
- *  rack is the money ball. `rack` / `ballIdx` are the mode's zero-based counters. */
-export function rackPips(rack: number, ballIdx: number, racks = RACKS, balls = BALLS_PER_RACK): RackPip[][] {
+ *  rack is the money ball. `rack` / `ballIdx` are the mode's zero-based counters. IMPROVE (2026-10-06, 3PT #5): every ball of
+ *  `moneyRack` (zero-based; −1 = none, the default) is a money ball too. */
+export function rackPips(rack: number, ballIdx: number, racks = RACKS, balls = BALLS_PER_RACK, moneyRack = -1): RackPip[][] {
   const out: RackPip[][] = [];
   for (let r = 0; r < racks; r++) {
     const row: RackPip[] = [];
     for (let b = 0; b < balls; b++) {
       const state: PipState = r < rack || (r === rack && b < ballIdx) ? 'taken' : r === rack && b === ballIdx ? 'next' : 'ahead';
-      row.push({ state, money: b === balls - 1 });
+      row.push({ state, money: b === balls - 1 || r === moneyRack });
     }
     out.push(row);
   }
@@ -44,12 +45,12 @@ export function heatLevel(streak: number): Heat {
   return streak >= FIRE_STREAK ? 'fire' : streak >= 2 ? 'warm' : 'cold';
 }
 
-/** Points still on the rack (money = 2), for the "what is left" read. */
-export function pointsLeft(rack: number, ballIdx: number, racks = RACKS, balls = BALLS_PER_RACK): number {
+/** Points still on the rack (money = 2), for the "what is left" read. IMPROVE (2026-10-06, 3PT #5): `moneyRack` as rackPips. */
+export function pointsLeft(rack: number, ballIdx: number, racks = RACKS, balls = BALLS_PER_RACK, moneyRack = -1): number {
   let left = 0;
   for (let r = rack; r < racks; r++) {
     const from = r === rack ? ballIdx : 0;
-    for (let b = from; b < balls; b++) left += b === balls - 1 ? 2 : 1;
+    for (let b = from; b < balls; b++) left += b === balls - 1 || r === moneyRack ? 2 : 1;
   }
   return left;
 }

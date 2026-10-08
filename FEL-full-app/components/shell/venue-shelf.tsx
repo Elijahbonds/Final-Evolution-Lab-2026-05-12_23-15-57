@@ -15,25 +15,9 @@ import type React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Lock, Play } from 'lucide-react';
-import { MODE_INFO, VENUES } from '@/lib/game-data';
+import { VENUES } from '@/lib/game-data';
+import { modeKeyForHref } from '@/lib/mode-routes';
 import { MasteryBadge } from '@/components/mastery-badge';
-
-function playSlug(href?: string): string | null {
-  return (href ?? '').split('/play/')[1]?.split(/[?#]/)[0] ?? null;
-}
-
-/** A venue's /play/<route> slug is not always the camelCase key its sessions post under; MODE_INFO is canonical. */
-const ROUTE_TO_MODE: Record<string, string> = Object.fromEntries(
-  Object.entries(MODE_INFO).flatMap(([key, info]) => {
-    const slug = playSlug(info.href);
-    return slug ? [[slug, key]] : [];
-  }),
-);
-
-export function venueModeKey(href?: string): string | null {
-  const slug = playSlug(href);
-  return slug ? ROUTE_TO_MODE[slug] ?? slug : null;
-}
 
 export function VenueShelf({ heading = 'Venues' }: { heading?: string | null } = {}) {
   const [mastery, setMastery] = useState<Record<string, { tierIndex: number }>>({});
@@ -67,7 +51,7 @@ export function VenueShelf({ heading = 'Venues' }: { heading?: string | null } =
 
       <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {VENUES.map((venue, i) => {
-          const key = venueModeKey(venue.href);
+          const key = modeKeyForHref(venue.href);
           const tier = key ? mastery[key]?.tierIndex ?? 0 : 0;
           const card = (
             <div

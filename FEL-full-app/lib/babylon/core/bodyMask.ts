@@ -659,6 +659,10 @@ export function maskBodyNow(body: Mesh, meshes: AbstractMesh[], why?: Record<str
   const bones = body.skeleton!.bones;
   const bodyBoneWeight = (v: number, re: RegExp) => { if (!mi || !mw) return 0; let w = 0; for (let k = 0; k < 4; k++) if (mw[v * 4 + k] > 0 && re.test(bones[mi[v * 4 + k]]?.name ?? '')) w += mw[v * 4 + k]; return w; };
   const res = computeBodyMask({ bodyP: bodySkin.P, bodyN: bodySkin.N, bodyInd: meta.felBodyIndices0!, bodyBoneWeight, slots: [...bySlot].map(([slot, surfaces]) => ({ slot, surfaces })), why });
+  // CREATOR-PLAN phase 4e: the skin under the player's code-built clothes too (lib/babylon/creator/clothes: the body
+  // vertices deep inside a built piece, which is made of these very triangles); a triangle goes when all three corners do
+  const clothHide = (meta as { felClothHide?: Uint8Array }).felClothHide;
+  if (clothHide) res.indices = dropHiddenTriangles(res.indices, clothHide, res);
   shareBodyBounds(body, meshes);   // after the shoe's late fold, which refreshed its own box
   if (!meta.felBodyMask) body.makeGeometryUnique();   // this body only — the container's geometry keeps the whole skin
   body.setIndices(res.indices, null, false);
@@ -667,6 +671,24 @@ export function maskBodyNow(body: Mesh, meshes: AbstractMesh[], why?: Record<str
     // what the mask measured (probe diagnostics): the skinned height range of the body and of each slot's surfaces
     measured: { body: yRange(bodySkin.P), ...Object.fromEntries([...bySlot].map(([slot, ss]) => [slot, ss.map((x) => yRange(x.P))])) } } };
   return res;
+}
+
+/** Drop the triangles whose three corners are all in `hide` (code-built clothes, phase 4e), counting them into the
+ *  result's hidden set and triangle count. Pure. */
+export function dropHiddenTriangles(indices: number[], hide: ArrayLike<number>, res?: { hidden: Uint8Array; hiddenBySlot: Record<string, number>; trisAfter: number }): number[] {
+  const out: number[] = [];
+  for (let t = 0; t + 2 < indices.length; t += 3) {
+    const a = indices[t], b = indices[t + 1], c = indices[t + 2];
+    if (hide[a] && hide[b] && hide[c]) continue;
+    out.push(a, b, c);
+  }
+  if (res) {
+    let n = 0;
+    for (let v = 0; v < res.hidden.length; v++) if (hide[v] && !res.hidden[v]) { res.hidden[v] = 1; n++; }
+    res.hiddenBySlot.clothes = n;
+    res.trisAfter = out.length / 3;
+  }
+  return out;
 }
 
 /** What accessories.ts leaves on a limb tube (`metadata.felAccessory.tube`); mirrored there as TubeMeta. */

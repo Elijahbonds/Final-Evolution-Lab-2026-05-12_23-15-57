@@ -32,6 +32,7 @@
 // Pure data + guards: no Prisma client value, no DOM. The enum TYPES come from the generated client so a value added
 // to the schema without a label here fails the type check.
 import type { MovementPattern, SessionSection } from '@/public/_prisma/client';
+import { gapExceedsEighteenYears } from '@/lib/age/ageRules';
 
 // ── session sections ────────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -144,7 +145,9 @@ export const effortBand = (id: string | null | undefined): EffortBand | null => 
  */
 export function youthRules(dobYear: number | null | undefined, now: Date = new Date()): boolean {
   if (typeof dobYear !== 'number' || !Number.isFinite(dobYear) || dobYear < 1900) return true;
-  return !(now.getFullYear() - dobYear > 18);
+  // AGE-HELPERS-CONSOLIDATE (2026-10-04, option (a)): threshold line shared via lib/age/ageRules.ts
+  // (STRICT, `> 18`, rule); this file's own unknown/invalid-year guard above is unchanged.
+  return !gapExceedsEighteenYears(dobYear, now);
 }
 
 /**

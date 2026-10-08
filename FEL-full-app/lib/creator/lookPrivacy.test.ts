@@ -3,8 +3,8 @@
 // sliders only after they opt in. Training stays off unless both of those are true. A picture refuses
 // the save. The routes call this module; they do not decide the policy themselves.
 
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { readFileSync, readdirSync } from 'node:fs';
+import { resolve, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { defaultFace, type FaceConfig } from '../closet/wearable-catalog';
 import { VITAL_DEFAULT } from './schema/vitals';
@@ -14,7 +14,7 @@ const built = (): FaceConfig => ({
   ...defaultFace(),
   hairStyle: 'Afro',
   faceShape: 'Heart',
-  sliders: { faceLong: 0.8, faceRound: 0.4, notAMorph: 1 },
+  sliders: { faceLong: 0.8, faceRound: 0.4, 'not-a-morph': 1 },
 });
 
 describe('under 18 the look does not upload', () => {
@@ -136,6 +136,36 @@ describe('the save routes use the hold, they do not invent a second one', () => 
     for (const rel of readers) {
       const src = readFileSync(resolve(root, rel), 'utf8');
       expect(src, rel).not.toMatch(/openai|fineTune\(|trainModel\(/);
+    }
+  });
+});
+
+// CLOSET-GET-REQ (2026-10-06): an optional first parameter on a route handler (e.g. `req?: NextRequest`)
+// builds locally but `next build`'s type check rejects it, because the framework's generated types
+// require the handler's declared signature to accept the request it is always called with. #179 shipped
+// one of these (app/api/v1/closet/route.ts GET); this walks every route.ts under app/ so it cannot recur
+// silently in a route the author didn't think to grep.
+describe('no app route handler takes an optional request parameter', () => {
+  const findRouteFiles = (dir: string): string[] => {
+    const root = resolve(__dirname, '../..', dir);
+    const out: string[] = [];
+    const walk = (d: string) => {
+      for (const entry of readdirSync(d, { withFileTypes: true })) {
+        const p = join(d, entry.name);
+        if (entry.isDirectory()) walk(p);
+        else if (entry.isFile() && entry.name === 'route.ts') out.push(p);
+      }
+    };
+    walk(root);
+    return out;
+  };
+
+  it('every exported GET/POST/PUT/PATCH/DELETE requires its request argument', () => {
+    const optionalParam = /export\s+async\s+function\s+(GET|POST|PUT|PATCH|DELETE)\s*\(\s*[A-Za-z0-9_]+\?\s*:/g;
+    for (const file of findRouteFiles('app')) {
+      const src = readFileSync(file, 'utf8');
+      const hit = src.match(optionalParam);
+      expect(hit, file).toBeNull();
     }
   });
 });

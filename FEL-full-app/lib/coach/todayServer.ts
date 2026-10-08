@@ -25,9 +25,9 @@
 //     (lib/coach/protocolGateServer.ts) are made only when today's session HAS a gated item: every other Today costs
 //     exactly what it did.
 import type { PrismaClient } from '@/public/_prisma/client';
-import { nextSession, orderedSessions, validateLog, type CleanLog } from './loop';
+import { nextSession, orderedSessions, progressSeries, validateLog, type CleanLog, type LogRow, type ProgressPoint } from './loop';
 import { TREE_INCLUDE, toTree } from './server';
-import { logEntryIsEmpty, summaryToWrite, type CleanSet } from './setLog';
+import { logEntryIsEmpty, logHasWork, summaryToWrite, type CleanSet } from './setLog';
 import { CATALOGUE_COACHING_SELECT, todayExercise, variationIds, type CatalogueCoachingRow, type TodayExercise, type TodayHeldItem } from './today';
 import { youthRules } from './taxonomy';
 import { isHardStopped, latestIntake, RED_FLAG_COPY } from '../health/intake';
@@ -65,6 +65,12 @@ export interface TodayPayload {
     index: number; total: number;
     /** MIRROR-COACH P6: this week (today's block), every session in order with its state, off days named. */
     week: { label: string; entries: WeekEntry[] };
+    /**
+     * MIRROR-PROGRESS (2026-10-07; plan Phase 4): per today's SessionExercise id, the newest completed log of the same
+     * exercise in this program (lib/coach/loop.ts progressSeries) — Today's "Last time: 3×8 @ 60 kg" line (loop.ts
+     * lastTimeLine). Optional: an exercise never done before has no entry, and a payload without it reads as before.
+     */
+    lastTime?: Record<string, ProgressPoint>;
   } | null;
   /** `cooldownDone` (MIRROR-COACH P6): the open session's automatic cool-down was already tapped done. */
   open: { id: string; logs: OpenLog[]; cooldownDone: boolean } | null;
@@ -113,6 +119,37 @@ async function gateToday(
   const athlete = facts ? protocolReasons(facts, now) : null;
   for (const e of gated) actions.set(e.id, athlete ? gateAction(rowOf(e), athlete, byId, { coachAssigned }) : unreadGateAction(rowOf(e), byId));
   return actions;
+}
+
+/**
+ * "Last time" for today's exercises (MIRROR-PROGRESS, 2026-10-07): the newest completed log, with work in it, of what the
+ * athlete actually did — the gate's easier step when that is what was logged (servedExerciseId), else the prescribed
+ * row — matched by catalogue id, so the same exercise on another day of the program counts and two rows sharing a name
+ * never merge. Read from the program rows loadToday already holds: no extra query. assumption: this program only — a
+ * log from an earlier program is not read.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function lastTimeFor(p: any, exercises: readonly TodayExercise[]): Record<string, ProgressPoint> {
+  const catalogueOf = new Map<string, string>();
+  for (const b of p.blocks ?? []) for (const s of b.sessions ?? []) for (const e of s.exercises ?? []) catalogueOf.set(e.id, e.exerciseId);
+  const rows: LogRow[] = [];
+  for (const cs of p.clientSessions ?? []) {
+    for (const l of cs.exerciseLogs ?? []) {
+      if (!l.completedAt || !logHasWork(l)) continue;
+      const did = l.servedExerciseId ?? catalogueOf.get(l.sessionExerciseId);
+      if (!did) continue;
+      // progressSeries groups by `exerciseName`; the catalogue id is the key here (see above). savedAt/id are the
+      // keys its completedAt tie-break sorts on (loop.ts progressSeries), so the newest-saved log wins in any order.
+      rows.push({ exerciseName: did, completedAt: l.completedAt, actualLoad: l.actualLoad, actualReps: l.actualReps, rpe: l.rpe, actualSets: l.actualSets, savedAt: l.createdAt, id: l.id });
+    }
+  }
+  const series = progressSeries(rows);
+  const out: Record<string, ProgressPoint> = {};
+  for (const e of exercises) {
+    const points = series[e.exerciseId];
+    if (points?.length) out[e.id] = points[points.length - 1];
+  }
+  return out;
 }
 
 /** GET /api/coach/me/today — the client's next session across their active programs, with the open log and recent coach comments. */
@@ -192,6 +229,7 @@ export async function loadToday(db: TodayDb, userId: string, now: Date = new Dat
         },
         index: next.index, total: next.total,
         week: { label: next.block.label, entries: weekView(next.block.sessions, done, next.session.id) },
+        lastTime: lastTimeFor(p, exercises),
       },
       open: open ? { id: open.id, logs: open.exerciseLogs as unknown as OpenLog[], cooldownDone: !!open.cooldownDoneAt } : null,
       recentComments: recentComments.map((l) => ({ exercise: l.sessionExercise.exercise.name, comment: l.coachComment, at: l.coachCommentAt })),

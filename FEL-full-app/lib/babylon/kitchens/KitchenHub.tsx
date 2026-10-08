@@ -6,6 +6,7 @@
 // compliance notice renders permanently.
 
 import React, { useState } from 'react';
+import { PublishAsCardLink } from '@/components/create/publish-as-card';   // CREATE HUB
 import {
   KitchenMarket, COMPLIANCE_NOTICE, checkoutNote, heldKitchenLabel, hubCheckout, listedNote, mealSubLabel, planPublishedNote,
   takenShiftLabel, type KitchenCheckout, type KitchenShift,
@@ -186,7 +187,12 @@ export default function KitchenHub({
             </label>
           </div>
           <textarea style={S.area} placeholder={'the week\'s menu — one line per item…'} value={pMenu} onChange={(e) => setPMenu(e.target.value)} />
-          <div style={S.row}><button style={S.btn} onClick={publishPlan}>GO LIVE</button></div>
+          <div style={S.row}>
+            <button style={S.btn} onClick={publishPlan}>GO LIVE</button>
+            {/* CREATE HUB (owner 2026-10-06): a dish from the plan as a recipe Creator Card, through the same guided setup */}
+            <PublishAsCardLink discipline="cooking" qa="kitchen-publish-card" style={S.btnAlt}
+              entry={{ from: 'kitchens', ...(pTitle.trim() ? { title: pTitle.trim() } : {}) }}>PUBLISH A RECIPE CARD</PublishAsCardLink>
+          </div>
         </>
       )}
 

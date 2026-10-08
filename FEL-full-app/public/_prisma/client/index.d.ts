@@ -498,6 +498,22 @@ export type PainCheckIn = $Result.DefaultSelection<Prisma.$PainCheckInPayload>
  */
 export type HealthConsent = $Result.DefaultSelection<Prisma.$HealthConsentPayload>
 /**
+ * Model ScanSaveOptIn
+ * AB-04 (2026-10-03, Elijah): one row per account for saving movement NUMBERS.
+ * Scope `jump_numbers` is the only scope. It covers jump numbers, Prove It, and
+ * re-screen history together — not three consents. `granted` defaults false.
+ * `revokedAt` set means withdrawn; the row stays so the withdrawal has a time.
+ * Video, images, and pose frames are never stored under this grant.
+ * 
+ * `coachShares` is the per-booking "Share with my coach" list, JSON so this
+ * lane does not add columns to SessionBooking (that table is read on the
+ * sessions page; a missing column there would 500 a deploy that raced the SQL).
+ * Each entry is `{ bookingId, coachId, sharedAt, withdrawnAt }`. A withdrawn
+ * entry stays. COACH-STORE-V1 should call `adultOptedInAndSharedWithCoach`
+ * (lib/privacy/coachShare.ts) rather than reading this JSON itself.
+ */
+export type ScanSaveOptIn = $Result.DefaultSelection<Prisma.$ScanSaveOptInPayload>
+/**
  * Model ReadinessCheckIn
  * MIRROR-COACH P6 (2026-09-29): the unscored daily readiness check-in — four tap scales on Today before a session,
  * every one optional, the whole card skippable (lib/health/readiness.ts; owner decision #12). A NEW table rather than
@@ -556,6 +572,43 @@ export type CoachInvite = $Result.DefaultSelection<Prisma.$CoachInvitePayload>
  * for somebody who is already there.
  */
 export type CoachClient = $Result.DefaultSelection<Prisma.$CoachClientPayload>
+/**
+ * Model CoachAvailability
+ * Coach <-> athlete availability: one row while the athlete is Limited or Out. Full is no row. No free text, by design.
+ */
+export type CoachAvailability = $Result.DefaultSelection<Prisma.$CoachAvailabilityPayload>
+/**
+ * Model Instructor
+ * Coach storefront profile and the hours he sells. One row per coach.
+ */
+export type Instructor = $Result.DefaultSelection<Prisma.$InstructorPayload>
+/**
+ * Model ProgramAccess
+ * A buyer's access to a program, the adult membership, or a parent-bought teen code.
+ */
+export type ProgramAccess = $Result.DefaultSelection<Prisma.$ProgramAccessPayload>
+/**
+ * Model Booking
+ * One paid unit of the coach's time: a live 1:1 or an async video review.
+ */
+export type Booking = $Result.DefaultSelection<Prisma.$BookingPayload>
+/**
+ * Model CallSignal
+ * Short-lived WebRTC handshake rows. The app sweeps expired ones. That is the only delete in this lane.
+ */
+export type CallSignal = $Result.DefaultSelection<Prisma.$CallSignalPayload>
+/**
+ * Model CoachStoreReferral
+ * Referral cut on a coach-store sale, paid out of FEL's 15% fee. The ledger has no referral account, so this table holds it.
+ */
+export type CoachStoreReferral = $Result.DefaultSelection<Prisma.$CoachStoreReferralPayload>
+/**
+ * Model AdventureSave
+ * ADVENTURE PHASE B (2026-10-07): one row per account, the Adventure's save document as JSON (save/save.ts).
+ * Matches the live table from prisma/pending/2026-10-07-adventure-save.sql (applied by the owner). Verified adults only;
+ * the route must refuse teen / unknown-age uploads (save/policy.ts adventureSavePolicy).
+ */
+export type AdventureSave = $Result.DefaultSelection<Prisma.$AdventureSavePayload>
 
 /**
  * Enums
@@ -1874,6 +1927,16 @@ export class PrismaClient<
   get healthConsent(): Prisma.HealthConsentDelegate<ExtArgs, ClientOptions>;
 
   /**
+   * `prisma.scanSaveOptIn`: Exposes CRUD operations for the **ScanSaveOptIn** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more ScanSaveOptIns
+    * const scanSaveOptIns = await prisma.scanSaveOptIn.findMany()
+    * ```
+    */
+  get scanSaveOptIn(): Prisma.ScanSaveOptInDelegate<ExtArgs, ClientOptions>;
+
+  /**
    * `prisma.readinessCheckIn`: Exposes CRUD operations for the **ReadinessCheckIn** model.
     * Example usage:
     * ```ts
@@ -1922,6 +1985,76 @@ export class PrismaClient<
     * ```
     */
   get coachClient(): Prisma.CoachClientDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.coachAvailability`: Exposes CRUD operations for the **CoachAvailability** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more CoachAvailabilities
+    * const coachAvailabilities = await prisma.coachAvailability.findMany()
+    * ```
+    */
+  get coachAvailability(): Prisma.CoachAvailabilityDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.instructor`: Exposes CRUD operations for the **Instructor** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more Instructors
+    * const instructors = await prisma.instructor.findMany()
+    * ```
+    */
+  get instructor(): Prisma.InstructorDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.programAccess`: Exposes CRUD operations for the **ProgramAccess** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more ProgramAccesses
+    * const programAccesses = await prisma.programAccess.findMany()
+    * ```
+    */
+  get programAccess(): Prisma.ProgramAccessDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.booking`: Exposes CRUD operations for the **Booking** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more Bookings
+    * const bookings = await prisma.booking.findMany()
+    * ```
+    */
+  get booking(): Prisma.BookingDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.callSignal`: Exposes CRUD operations for the **CallSignal** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more CallSignals
+    * const callSignals = await prisma.callSignal.findMany()
+    * ```
+    */
+  get callSignal(): Prisma.CallSignalDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.coachStoreReferral`: Exposes CRUD operations for the **CoachStoreReferral** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more CoachStoreReferrals
+    * const coachStoreReferrals = await prisma.coachStoreReferral.findMany()
+    * ```
+    */
+  get coachStoreReferral(): Prisma.CoachStoreReferralDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.adventureSave`: Exposes CRUD operations for the **AdventureSave** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more AdventureSaves
+    * const adventureSaves = await prisma.adventureSave.findMany()
+    * ```
+    */
+  get adventureSave(): Prisma.AdventureSaveDelegate<ExtArgs, ClientOptions>;
 }
 
 export namespace Prisma {
@@ -2449,11 +2582,19 @@ export namespace Prisma {
     HealthIntake: 'HealthIntake',
     PainCheckIn: 'PainCheckIn',
     HealthConsent: 'HealthConsent',
+    ScanSaveOptIn: 'ScanSaveOptIn',
     ReadinessCheckIn: 'ReadinessCheckIn',
     BreathLog: 'BreathLog',
     ShareLink: 'ShareLink',
     CoachInvite: 'CoachInvite',
-    CoachClient: 'CoachClient'
+    CoachClient: 'CoachClient',
+    CoachAvailability: 'CoachAvailability',
+    Instructor: 'Instructor',
+    ProgramAccess: 'ProgramAccess',
+    Booking: 'Booking',
+    CallSignal: 'CallSignal',
+    CoachStoreReferral: 'CoachStoreReferral',
+    AdventureSave: 'AdventureSave'
   };
 
   export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -2472,7 +2613,7 @@ export namespace Prisma {
       omit: GlobalOmitOptions
     }
     meta: {
-      modelProps: "user" | "playerProfile" | "gameSession" | "sessionRun" | "sessionGrant" | "creditLedger" | "cardOwnership" | "storyNodeProgress" | "lessonProgress" | "cellProject" | "cellApiKey" | "cellSettings" | "cellUsage" | "projectFile" | "cellMessage" | "cellWisdom" | "exerciseCategory" | "exercise" | "ledgerAccount" | "ledgerTransaction" | "ledgerPosting" | "stripeCustomer" | "subscription" | "order" | "payoutRequest" | "marketplaceListing" | "studioPartnerKey" | "partnerUsage" | "marketplacePurchase" | "ladderSeason" | "ladderEntry" | "competitionMatch" | "matchEvent" | "mirrorTriumph" | "prqEntry" | "guestSession" | "season" | "passProgress" | "passGrant" | "modeMastery" | "signatureAttempt" | "challengeLink" | "analyticsEvent" | "metricRollup" | "wallet" | "walletLedgerEntry" | "rewardRule" | "perfEarnEvent" | "playerEntitlement" | "marketingLead" | "referralCode" | "referralConversion" | "mpMatch" | "creativeCard" | "cardSlot" | "creatorCard" | "workoutScan" | "workoutPlan" | "athleteBuild" | "avatarLook" | "ownedWearable" | "sessionBooking" | "sessionJoinLink" | "crmCompany" | "crmContact" | "crmDeal" | "crmActivity" | "crmNote" | "programExercise" | "coachingProgram" | "block" | "session" | "sessionExercise" | "clientSession" | "exerciseLog" | "setLog" | "programMessage" | "facilitatorProfile" | "credential" | "guardianConsent" | "goalPlan" | "campSession" | "campTemplate" | "mirrorSession" | "healthIntake" | "painCheckIn" | "healthConsent" | "readinessCheckIn" | "breathLog" | "shareLink" | "coachInvite" | "coachClient"
+      modelProps: "user" | "playerProfile" | "gameSession" | "sessionRun" | "sessionGrant" | "creditLedger" | "cardOwnership" | "storyNodeProgress" | "lessonProgress" | "cellProject" | "cellApiKey" | "cellSettings" | "cellUsage" | "projectFile" | "cellMessage" | "cellWisdom" | "exerciseCategory" | "exercise" | "ledgerAccount" | "ledgerTransaction" | "ledgerPosting" | "stripeCustomer" | "subscription" | "order" | "payoutRequest" | "marketplaceListing" | "studioPartnerKey" | "partnerUsage" | "marketplacePurchase" | "ladderSeason" | "ladderEntry" | "competitionMatch" | "matchEvent" | "mirrorTriumph" | "prqEntry" | "guestSession" | "season" | "passProgress" | "passGrant" | "modeMastery" | "signatureAttempt" | "challengeLink" | "analyticsEvent" | "metricRollup" | "wallet" | "walletLedgerEntry" | "rewardRule" | "perfEarnEvent" | "playerEntitlement" | "marketingLead" | "referralCode" | "referralConversion" | "mpMatch" | "creativeCard" | "cardSlot" | "creatorCard" | "workoutScan" | "workoutPlan" | "athleteBuild" | "avatarLook" | "ownedWearable" | "sessionBooking" | "sessionJoinLink" | "crmCompany" | "crmContact" | "crmDeal" | "crmActivity" | "crmNote" | "programExercise" | "coachingProgram" | "block" | "session" | "sessionExercise" | "clientSession" | "exerciseLog" | "setLog" | "programMessage" | "facilitatorProfile" | "credential" | "guardianConsent" | "goalPlan" | "campSession" | "campTemplate" | "mirrorSession" | "healthIntake" | "painCheckIn" | "healthConsent" | "scanSaveOptIn" | "readinessCheckIn" | "breathLog" | "shareLink" | "coachInvite" | "coachClient" | "coachAvailability" | "instructor" | "programAccess" | "booking" | "callSignal" | "coachStoreReferral" | "adventureSave"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -8914,6 +9055,80 @@ export namespace Prisma {
           }
         }
       }
+      ScanSaveOptIn: {
+        payload: Prisma.$ScanSaveOptInPayload<ExtArgs>
+        fields: Prisma.ScanSaveOptInFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.ScanSaveOptInFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ScanSaveOptInPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.ScanSaveOptInFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ScanSaveOptInPayload>
+          }
+          findFirst: {
+            args: Prisma.ScanSaveOptInFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ScanSaveOptInPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.ScanSaveOptInFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ScanSaveOptInPayload>
+          }
+          findMany: {
+            args: Prisma.ScanSaveOptInFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ScanSaveOptInPayload>[]
+          }
+          create: {
+            args: Prisma.ScanSaveOptInCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ScanSaveOptInPayload>
+          }
+          createMany: {
+            args: Prisma.ScanSaveOptInCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.ScanSaveOptInCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ScanSaveOptInPayload>[]
+          }
+          delete: {
+            args: Prisma.ScanSaveOptInDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ScanSaveOptInPayload>
+          }
+          update: {
+            args: Prisma.ScanSaveOptInUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ScanSaveOptInPayload>
+          }
+          deleteMany: {
+            args: Prisma.ScanSaveOptInDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.ScanSaveOptInUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.ScanSaveOptInUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ScanSaveOptInPayload>[]
+          }
+          upsert: {
+            args: Prisma.ScanSaveOptInUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ScanSaveOptInPayload>
+          }
+          aggregate: {
+            args: Prisma.ScanSaveOptInAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateScanSaveOptIn>
+          }
+          groupBy: {
+            args: Prisma.ScanSaveOptInGroupByArgs<ExtArgs>
+            result: $Utils.Optional<ScanSaveOptInGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.ScanSaveOptInCountArgs<ExtArgs>
+            result: $Utils.Optional<ScanSaveOptInCountAggregateOutputType> | number
+          }
+        }
+      }
       ReadinessCheckIn: {
         payload: Prisma.$ReadinessCheckInPayload<ExtArgs>
         fields: Prisma.ReadinessCheckInFieldRefs
@@ -9284,6 +9499,524 @@ export namespace Prisma {
           }
         }
       }
+      CoachAvailability: {
+        payload: Prisma.$CoachAvailabilityPayload<ExtArgs>
+        fields: Prisma.CoachAvailabilityFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.CoachAvailabilityFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CoachAvailabilityPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.CoachAvailabilityFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CoachAvailabilityPayload>
+          }
+          findFirst: {
+            args: Prisma.CoachAvailabilityFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CoachAvailabilityPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.CoachAvailabilityFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CoachAvailabilityPayload>
+          }
+          findMany: {
+            args: Prisma.CoachAvailabilityFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CoachAvailabilityPayload>[]
+          }
+          create: {
+            args: Prisma.CoachAvailabilityCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CoachAvailabilityPayload>
+          }
+          createMany: {
+            args: Prisma.CoachAvailabilityCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.CoachAvailabilityCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CoachAvailabilityPayload>[]
+          }
+          delete: {
+            args: Prisma.CoachAvailabilityDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CoachAvailabilityPayload>
+          }
+          update: {
+            args: Prisma.CoachAvailabilityUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CoachAvailabilityPayload>
+          }
+          deleteMany: {
+            args: Prisma.CoachAvailabilityDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.CoachAvailabilityUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.CoachAvailabilityUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CoachAvailabilityPayload>[]
+          }
+          upsert: {
+            args: Prisma.CoachAvailabilityUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CoachAvailabilityPayload>
+          }
+          aggregate: {
+            args: Prisma.CoachAvailabilityAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateCoachAvailability>
+          }
+          groupBy: {
+            args: Prisma.CoachAvailabilityGroupByArgs<ExtArgs>
+            result: $Utils.Optional<CoachAvailabilityGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.CoachAvailabilityCountArgs<ExtArgs>
+            result: $Utils.Optional<CoachAvailabilityCountAggregateOutputType> | number
+          }
+        }
+      }
+      Instructor: {
+        payload: Prisma.$InstructorPayload<ExtArgs>
+        fields: Prisma.InstructorFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.InstructorFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$InstructorPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.InstructorFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$InstructorPayload>
+          }
+          findFirst: {
+            args: Prisma.InstructorFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$InstructorPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.InstructorFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$InstructorPayload>
+          }
+          findMany: {
+            args: Prisma.InstructorFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$InstructorPayload>[]
+          }
+          create: {
+            args: Prisma.InstructorCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$InstructorPayload>
+          }
+          createMany: {
+            args: Prisma.InstructorCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.InstructorCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$InstructorPayload>[]
+          }
+          delete: {
+            args: Prisma.InstructorDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$InstructorPayload>
+          }
+          update: {
+            args: Prisma.InstructorUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$InstructorPayload>
+          }
+          deleteMany: {
+            args: Prisma.InstructorDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.InstructorUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.InstructorUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$InstructorPayload>[]
+          }
+          upsert: {
+            args: Prisma.InstructorUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$InstructorPayload>
+          }
+          aggregate: {
+            args: Prisma.InstructorAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateInstructor>
+          }
+          groupBy: {
+            args: Prisma.InstructorGroupByArgs<ExtArgs>
+            result: $Utils.Optional<InstructorGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.InstructorCountArgs<ExtArgs>
+            result: $Utils.Optional<InstructorCountAggregateOutputType> | number
+          }
+        }
+      }
+      ProgramAccess: {
+        payload: Prisma.$ProgramAccessPayload<ExtArgs>
+        fields: Prisma.ProgramAccessFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.ProgramAccessFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ProgramAccessPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.ProgramAccessFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ProgramAccessPayload>
+          }
+          findFirst: {
+            args: Prisma.ProgramAccessFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ProgramAccessPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.ProgramAccessFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ProgramAccessPayload>
+          }
+          findMany: {
+            args: Prisma.ProgramAccessFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ProgramAccessPayload>[]
+          }
+          create: {
+            args: Prisma.ProgramAccessCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ProgramAccessPayload>
+          }
+          createMany: {
+            args: Prisma.ProgramAccessCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.ProgramAccessCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ProgramAccessPayload>[]
+          }
+          delete: {
+            args: Prisma.ProgramAccessDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ProgramAccessPayload>
+          }
+          update: {
+            args: Prisma.ProgramAccessUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ProgramAccessPayload>
+          }
+          deleteMany: {
+            args: Prisma.ProgramAccessDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.ProgramAccessUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.ProgramAccessUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ProgramAccessPayload>[]
+          }
+          upsert: {
+            args: Prisma.ProgramAccessUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ProgramAccessPayload>
+          }
+          aggregate: {
+            args: Prisma.ProgramAccessAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateProgramAccess>
+          }
+          groupBy: {
+            args: Prisma.ProgramAccessGroupByArgs<ExtArgs>
+            result: $Utils.Optional<ProgramAccessGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.ProgramAccessCountArgs<ExtArgs>
+            result: $Utils.Optional<ProgramAccessCountAggregateOutputType> | number
+          }
+        }
+      }
+      Booking: {
+        payload: Prisma.$BookingPayload<ExtArgs>
+        fields: Prisma.BookingFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.BookingFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BookingPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.BookingFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BookingPayload>
+          }
+          findFirst: {
+            args: Prisma.BookingFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BookingPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.BookingFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BookingPayload>
+          }
+          findMany: {
+            args: Prisma.BookingFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BookingPayload>[]
+          }
+          create: {
+            args: Prisma.BookingCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BookingPayload>
+          }
+          createMany: {
+            args: Prisma.BookingCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.BookingCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BookingPayload>[]
+          }
+          delete: {
+            args: Prisma.BookingDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BookingPayload>
+          }
+          update: {
+            args: Prisma.BookingUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BookingPayload>
+          }
+          deleteMany: {
+            args: Prisma.BookingDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.BookingUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.BookingUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BookingPayload>[]
+          }
+          upsert: {
+            args: Prisma.BookingUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BookingPayload>
+          }
+          aggregate: {
+            args: Prisma.BookingAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateBooking>
+          }
+          groupBy: {
+            args: Prisma.BookingGroupByArgs<ExtArgs>
+            result: $Utils.Optional<BookingGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.BookingCountArgs<ExtArgs>
+            result: $Utils.Optional<BookingCountAggregateOutputType> | number
+          }
+        }
+      }
+      CallSignal: {
+        payload: Prisma.$CallSignalPayload<ExtArgs>
+        fields: Prisma.CallSignalFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.CallSignalFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CallSignalPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.CallSignalFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CallSignalPayload>
+          }
+          findFirst: {
+            args: Prisma.CallSignalFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CallSignalPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.CallSignalFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CallSignalPayload>
+          }
+          findMany: {
+            args: Prisma.CallSignalFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CallSignalPayload>[]
+          }
+          create: {
+            args: Prisma.CallSignalCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CallSignalPayload>
+          }
+          createMany: {
+            args: Prisma.CallSignalCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.CallSignalCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CallSignalPayload>[]
+          }
+          delete: {
+            args: Prisma.CallSignalDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CallSignalPayload>
+          }
+          update: {
+            args: Prisma.CallSignalUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CallSignalPayload>
+          }
+          deleteMany: {
+            args: Prisma.CallSignalDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.CallSignalUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.CallSignalUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CallSignalPayload>[]
+          }
+          upsert: {
+            args: Prisma.CallSignalUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CallSignalPayload>
+          }
+          aggregate: {
+            args: Prisma.CallSignalAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateCallSignal>
+          }
+          groupBy: {
+            args: Prisma.CallSignalGroupByArgs<ExtArgs>
+            result: $Utils.Optional<CallSignalGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.CallSignalCountArgs<ExtArgs>
+            result: $Utils.Optional<CallSignalCountAggregateOutputType> | number
+          }
+        }
+      }
+      CoachStoreReferral: {
+        payload: Prisma.$CoachStoreReferralPayload<ExtArgs>
+        fields: Prisma.CoachStoreReferralFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.CoachStoreReferralFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CoachStoreReferralPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.CoachStoreReferralFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CoachStoreReferralPayload>
+          }
+          findFirst: {
+            args: Prisma.CoachStoreReferralFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CoachStoreReferralPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.CoachStoreReferralFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CoachStoreReferralPayload>
+          }
+          findMany: {
+            args: Prisma.CoachStoreReferralFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CoachStoreReferralPayload>[]
+          }
+          create: {
+            args: Prisma.CoachStoreReferralCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CoachStoreReferralPayload>
+          }
+          createMany: {
+            args: Prisma.CoachStoreReferralCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.CoachStoreReferralCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CoachStoreReferralPayload>[]
+          }
+          delete: {
+            args: Prisma.CoachStoreReferralDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CoachStoreReferralPayload>
+          }
+          update: {
+            args: Prisma.CoachStoreReferralUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CoachStoreReferralPayload>
+          }
+          deleteMany: {
+            args: Prisma.CoachStoreReferralDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.CoachStoreReferralUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.CoachStoreReferralUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CoachStoreReferralPayload>[]
+          }
+          upsert: {
+            args: Prisma.CoachStoreReferralUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CoachStoreReferralPayload>
+          }
+          aggregate: {
+            args: Prisma.CoachStoreReferralAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateCoachStoreReferral>
+          }
+          groupBy: {
+            args: Prisma.CoachStoreReferralGroupByArgs<ExtArgs>
+            result: $Utils.Optional<CoachStoreReferralGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.CoachStoreReferralCountArgs<ExtArgs>
+            result: $Utils.Optional<CoachStoreReferralCountAggregateOutputType> | number
+          }
+        }
+      }
+      AdventureSave: {
+        payload: Prisma.$AdventureSavePayload<ExtArgs>
+        fields: Prisma.AdventureSaveFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.AdventureSaveFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AdventureSavePayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.AdventureSaveFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AdventureSavePayload>
+          }
+          findFirst: {
+            args: Prisma.AdventureSaveFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AdventureSavePayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.AdventureSaveFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AdventureSavePayload>
+          }
+          findMany: {
+            args: Prisma.AdventureSaveFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AdventureSavePayload>[]
+          }
+          create: {
+            args: Prisma.AdventureSaveCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AdventureSavePayload>
+          }
+          createMany: {
+            args: Prisma.AdventureSaveCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.AdventureSaveCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AdventureSavePayload>[]
+          }
+          delete: {
+            args: Prisma.AdventureSaveDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AdventureSavePayload>
+          }
+          update: {
+            args: Prisma.AdventureSaveUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AdventureSavePayload>
+          }
+          deleteMany: {
+            args: Prisma.AdventureSaveDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.AdventureSaveUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.AdventureSaveUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AdventureSavePayload>[]
+          }
+          upsert: {
+            args: Prisma.AdventureSaveUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AdventureSavePayload>
+          }
+          aggregate: {
+            args: Prisma.AdventureSaveAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateAdventureSave>
+          }
+          groupBy: {
+            args: Prisma.AdventureSaveGroupByArgs<ExtArgs>
+            result: $Utils.Optional<AdventureSaveGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.AdventureSaveCountArgs<ExtArgs>
+            result: $Utils.Optional<AdventureSaveCountAggregateOutputType> | number
+          }
+        }
+      }
     }
   } & {
     other: {
@@ -9455,11 +10188,19 @@ export namespace Prisma {
     healthIntake?: HealthIntakeOmit
     painCheckIn?: PainCheckInOmit
     healthConsent?: HealthConsentOmit
+    scanSaveOptIn?: ScanSaveOptInOmit
     readinessCheckIn?: ReadinessCheckInOmit
     breathLog?: BreathLogOmit
     shareLink?: ShareLinkOmit
     coachInvite?: CoachInviteOmit
     coachClient?: CoachClientOmit
+    coachAvailability?: CoachAvailabilityOmit
+    instructor?: InstructorOmit
+    programAccess?: ProgramAccessOmit
+    booking?: BookingOmit
+    callSignal?: CallSignalOmit
+    coachStoreReferral?: CoachStoreReferralOmit
+    adventureSave?: AdventureSaveOmit
   }
 
   /* Types for Logging */
@@ -10923,6 +11664,77 @@ export namespace Prisma {
 
 
   /**
+   * Count Type InstructorCountOutputType
+   */
+
+  export type InstructorCountOutputType = {
+    programAccess: number
+    bookings: number
+  }
+
+  export type InstructorCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    programAccess?: boolean | InstructorCountOutputTypeCountProgramAccessArgs
+    bookings?: boolean | InstructorCountOutputTypeCountBookingsArgs
+  }
+
+  // Custom InputTypes
+  /**
+   * InstructorCountOutputType without action
+   */
+  export type InstructorCountOutputTypeDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the InstructorCountOutputType
+     */
+    select?: InstructorCountOutputTypeSelect<ExtArgs> | null
+  }
+
+  /**
+   * InstructorCountOutputType without action
+   */
+  export type InstructorCountOutputTypeCountProgramAccessArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: ProgramAccessWhereInput
+  }
+
+  /**
+   * InstructorCountOutputType without action
+   */
+  export type InstructorCountOutputTypeCountBookingsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: BookingWhereInput
+  }
+
+
+  /**
+   * Count Type BookingCountOutputType
+   */
+
+  export type BookingCountOutputType = {
+    signals: number
+  }
+
+  export type BookingCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    signals?: boolean | BookingCountOutputTypeCountSignalsArgs
+  }
+
+  // Custom InputTypes
+  /**
+   * BookingCountOutputType without action
+   */
+  export type BookingCountOutputTypeDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BookingCountOutputType
+     */
+    select?: BookingCountOutputTypeSelect<ExtArgs> | null
+  }
+
+  /**
+   * BookingCountOutputType without action
+   */
+  export type BookingCountOutputTypeCountSignalsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: CallSignalWhereInput
+  }
+
+
+  /**
    * Models
    */
 
@@ -11242,6 +12054,7 @@ export namespace Prisma {
     avatarLook?: boolean | User$avatarLookArgs<ExtArgs>
     ownedWearables?: boolean | User$ownedWearablesArgs<ExtArgs>
     sessionBookings?: boolean | User$sessionBookingsArgs<ExtArgs>
+    scanSaveOptIn?: boolean | User$scanSaveOptInArgs<ExtArgs>
     facilitatorProfile?: boolean | User$facilitatorProfileArgs<ExtArgs>
     goalPlansAsMentee?: boolean | User$goalPlansAsMenteeArgs<ExtArgs>
     goalPlansAsFacilitator?: boolean | User$goalPlansAsFacilitatorArgs<ExtArgs>
@@ -11257,6 +12070,7 @@ export namespace Prisma {
     crmDeals?: boolean | User$crmDealsArgs<ExtArgs>
     crmActivities?: boolean | User$crmActivitiesArgs<ExtArgs>
     crmNotes?: boolean | User$crmNotesArgs<ExtArgs>
+    adventureSave?: boolean | User$adventureSaveArgs<ExtArgs>
     _count?: boolean | UserCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["user"]>
 
@@ -11359,6 +12173,7 @@ export namespace Prisma {
     avatarLook?: boolean | User$avatarLookArgs<ExtArgs>
     ownedWearables?: boolean | User$ownedWearablesArgs<ExtArgs>
     sessionBookings?: boolean | User$sessionBookingsArgs<ExtArgs>
+    scanSaveOptIn?: boolean | User$scanSaveOptInArgs<ExtArgs>
     facilitatorProfile?: boolean | User$facilitatorProfileArgs<ExtArgs>
     goalPlansAsMentee?: boolean | User$goalPlansAsMenteeArgs<ExtArgs>
     goalPlansAsFacilitator?: boolean | User$goalPlansAsFacilitatorArgs<ExtArgs>
@@ -11374,6 +12189,7 @@ export namespace Prisma {
     crmDeals?: boolean | User$crmDealsArgs<ExtArgs>
     crmActivities?: boolean | User$crmActivitiesArgs<ExtArgs>
     crmNotes?: boolean | User$crmNotesArgs<ExtArgs>
+    adventureSave?: boolean | User$adventureSaveArgs<ExtArgs>
     _count?: boolean | UserCountOutputTypeDefaultArgs<ExtArgs>
   }
   export type UserIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {}
@@ -11428,6 +12244,10 @@ export namespace Prisma {
       avatarLook: Prisma.$AvatarLookPayload<ExtArgs> | null
       ownedWearables: Prisma.$OwnedWearablePayload<ExtArgs>[]
       sessionBookings: Prisma.$SessionBookingPayload<ExtArgs>[]
+      /**
+       * AB-04: one opt-in row for saving movement numbers (jump, Prove It, re-screen).
+       */
+      scanSaveOptIn: Prisma.$ScanSaveOptInPayload<ExtArgs> | null
       facilitatorProfile: Prisma.$FacilitatorProfilePayload<ExtArgs> | null
       goalPlansAsMentee: Prisma.$GoalPlanPayload<ExtArgs>[]
       goalPlansAsFacilitator: Prisma.$GoalPlanPayload<ExtArgs>[]
@@ -11443,6 +12263,7 @@ export namespace Prisma {
       crmDeals: Prisma.$CrmDealPayload<ExtArgs>[]
       crmActivities: Prisma.$CrmActivityPayload<ExtArgs>[]
       crmNotes: Prisma.$CrmNotePayload<ExtArgs>[]
+      adventureSave: Prisma.$AdventureSavePayload<ExtArgs> | null
     }
     scalars: $Extensions.GetPayloadResult<{
       id: string
@@ -11899,6 +12720,7 @@ export namespace Prisma {
     avatarLook<T extends User$avatarLookArgs<ExtArgs> = {}>(args?: Subset<T, User$avatarLookArgs<ExtArgs>>): Prisma__AvatarLookClient<$Result.GetResult<Prisma.$AvatarLookPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     ownedWearables<T extends User$ownedWearablesArgs<ExtArgs> = {}>(args?: Subset<T, User$ownedWearablesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$OwnedWearablePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     sessionBookings<T extends User$sessionBookingsArgs<ExtArgs> = {}>(args?: Subset<T, User$sessionBookingsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SessionBookingPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    scanSaveOptIn<T extends User$scanSaveOptInArgs<ExtArgs> = {}>(args?: Subset<T, User$scanSaveOptInArgs<ExtArgs>>): Prisma__ScanSaveOptInClient<$Result.GetResult<Prisma.$ScanSaveOptInPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     facilitatorProfile<T extends User$facilitatorProfileArgs<ExtArgs> = {}>(args?: Subset<T, User$facilitatorProfileArgs<ExtArgs>>): Prisma__FacilitatorProfileClient<$Result.GetResult<Prisma.$FacilitatorProfilePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     goalPlansAsMentee<T extends User$goalPlansAsMenteeArgs<ExtArgs> = {}>(args?: Subset<T, User$goalPlansAsMenteeArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$GoalPlanPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     goalPlansAsFacilitator<T extends User$goalPlansAsFacilitatorArgs<ExtArgs> = {}>(args?: Subset<T, User$goalPlansAsFacilitatorArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$GoalPlanPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
@@ -11914,6 +12736,7 @@ export namespace Prisma {
     crmDeals<T extends User$crmDealsArgs<ExtArgs> = {}>(args?: Subset<T, User$crmDealsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CrmDealPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     crmActivities<T extends User$crmActivitiesArgs<ExtArgs> = {}>(args?: Subset<T, User$crmActivitiesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CrmActivityPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     crmNotes<T extends User$crmNotesArgs<ExtArgs> = {}>(args?: Subset<T, User$crmNotesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CrmNotePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    adventureSave<T extends User$adventureSaveArgs<ExtArgs> = {}>(args?: Subset<T, User$adventureSaveArgs<ExtArgs>>): Prisma__AdventureSaveClient<$Result.GetResult<Prisma.$AdventureSavePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -13404,6 +14227,25 @@ export namespace Prisma {
   }
 
   /**
+   * User.scanSaveOptIn
+   */
+  export type User$scanSaveOptInArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ScanSaveOptIn
+     */
+    select?: ScanSaveOptInSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ScanSaveOptIn
+     */
+    omit?: ScanSaveOptInOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ScanSaveOptInInclude<ExtArgs> | null
+    where?: ScanSaveOptInWhereInput
+  }
+
+  /**
    * User.facilitatorProfile
    */
   export type User$facilitatorProfileArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -13756,6 +14598,25 @@ export namespace Prisma {
     take?: number
     skip?: number
     distinct?: CrmNoteScalarFieldEnum | CrmNoteScalarFieldEnum[]
+  }
+
+  /**
+   * User.adventureSave
+   */
+  export type User$adventureSaveArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AdventureSave
+     */
+    select?: AdventureSaveSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AdventureSave
+     */
+    omit?: AdventureSaveOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AdventureSaveInclude<ExtArgs> | null
+    where?: AdventureSaveWhereInput
   }
 
   /**
@@ -100211,6 +101072,7 @@ export namespace Prisma {
     authorId: string | null
     body: string | null
     createdAt: Date | null
+    readAt: Date | null
   }
 
   export type ProgramMessageMaxAggregateOutputType = {
@@ -100219,6 +101081,7 @@ export namespace Prisma {
     authorId: string | null
     body: string | null
     createdAt: Date | null
+    readAt: Date | null
   }
 
   export type ProgramMessageCountAggregateOutputType = {
@@ -100227,6 +101090,7 @@ export namespace Prisma {
     authorId: number
     body: number
     createdAt: number
+    readAt: number
     _all: number
   }
 
@@ -100237,6 +101101,7 @@ export namespace Prisma {
     authorId?: true
     body?: true
     createdAt?: true
+    readAt?: true
   }
 
   export type ProgramMessageMaxAggregateInputType = {
@@ -100245,6 +101110,7 @@ export namespace Prisma {
     authorId?: true
     body?: true
     createdAt?: true
+    readAt?: true
   }
 
   export type ProgramMessageCountAggregateInputType = {
@@ -100253,6 +101119,7 @@ export namespace Prisma {
     authorId?: true
     body?: true
     createdAt?: true
+    readAt?: true
     _all?: true
   }
 
@@ -100334,6 +101201,7 @@ export namespace Prisma {
     authorId: string
     body: string
     createdAt: Date
+    readAt: Date | null
     _count: ProgramMessageCountAggregateOutputType | null
     _min: ProgramMessageMinAggregateOutputType | null
     _max: ProgramMessageMaxAggregateOutputType | null
@@ -100359,6 +101227,7 @@ export namespace Prisma {
     authorId?: boolean
     body?: boolean
     createdAt?: boolean
+    readAt?: boolean
     program?: boolean | CoachingProgramDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["programMessage"]>
 
@@ -100368,6 +101237,7 @@ export namespace Prisma {
     authorId?: boolean
     body?: boolean
     createdAt?: boolean
+    readAt?: boolean
     program?: boolean | CoachingProgramDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["programMessage"]>
 
@@ -100377,6 +101247,7 @@ export namespace Prisma {
     authorId?: boolean
     body?: boolean
     createdAt?: boolean
+    readAt?: boolean
     program?: boolean | CoachingProgramDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["programMessage"]>
 
@@ -100386,9 +101257,10 @@ export namespace Prisma {
     authorId?: boolean
     body?: boolean
     createdAt?: boolean
+    readAt?: boolean
   }
 
-  export type ProgramMessageOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "programId" | "authorId" | "body" | "createdAt", ExtArgs["result"]["programMessage"]>
+  export type ProgramMessageOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "programId" | "authorId" | "body" | "createdAt" | "readAt", ExtArgs["result"]["programMessage"]>
   export type ProgramMessageInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     program?: boolean | CoachingProgramDefaultArgs<ExtArgs>
   }
@@ -100410,6 +101282,7 @@ export namespace Prisma {
       authorId: string
       body: string
       createdAt: Date
+      readAt: Date | null
     }, ExtArgs["result"]["programMessage"]>
     composites: {}
   }
@@ -100839,6 +101712,7 @@ export namespace Prisma {
     readonly authorId: FieldRef<"ProgramMessage", 'String'>
     readonly body: FieldRef<"ProgramMessage", 'String'>
     readonly createdAt: FieldRef<"ProgramMessage", 'DateTime'>
+    readonly readAt: FieldRef<"ProgramMessage", 'DateTime'>
   }
     
 
@@ -112973,6 +113847,1131 @@ export namespace Prisma {
 
 
   /**
+   * Model ScanSaveOptIn
+   */
+
+  export type AggregateScanSaveOptIn = {
+    _count: ScanSaveOptInCountAggregateOutputType | null
+    _min: ScanSaveOptInMinAggregateOutputType | null
+    _max: ScanSaveOptInMaxAggregateOutputType | null
+  }
+
+  export type ScanSaveOptInMinAggregateOutputType = {
+    id: string | null
+    userId: string | null
+    scope: string | null
+    granted: boolean | null
+    grantedAt: Date | null
+    revokedAt: Date | null
+    consentTextVersion: string | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type ScanSaveOptInMaxAggregateOutputType = {
+    id: string | null
+    userId: string | null
+    scope: string | null
+    granted: boolean | null
+    grantedAt: Date | null
+    revokedAt: Date | null
+    consentTextVersion: string | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type ScanSaveOptInCountAggregateOutputType = {
+    id: number
+    userId: number
+    scope: number
+    granted: number
+    grantedAt: number
+    revokedAt: number
+    consentTextVersion: number
+    coachShares: number
+    createdAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type ScanSaveOptInMinAggregateInputType = {
+    id?: true
+    userId?: true
+    scope?: true
+    granted?: true
+    grantedAt?: true
+    revokedAt?: true
+    consentTextVersion?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type ScanSaveOptInMaxAggregateInputType = {
+    id?: true
+    userId?: true
+    scope?: true
+    granted?: true
+    grantedAt?: true
+    revokedAt?: true
+    consentTextVersion?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type ScanSaveOptInCountAggregateInputType = {
+    id?: true
+    userId?: true
+    scope?: true
+    granted?: true
+    grantedAt?: true
+    revokedAt?: true
+    consentTextVersion?: true
+    coachShares?: true
+    createdAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type ScanSaveOptInAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which ScanSaveOptIn to aggregate.
+     */
+    where?: ScanSaveOptInWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ScanSaveOptIns to fetch.
+     */
+    orderBy?: ScanSaveOptInOrderByWithRelationInput | ScanSaveOptInOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: ScanSaveOptInWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ScanSaveOptIns from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ScanSaveOptIns.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned ScanSaveOptIns
+    **/
+    _count?: true | ScanSaveOptInCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: ScanSaveOptInMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: ScanSaveOptInMaxAggregateInputType
+  }
+
+  export type GetScanSaveOptInAggregateType<T extends ScanSaveOptInAggregateArgs> = {
+        [P in keyof T & keyof AggregateScanSaveOptIn]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateScanSaveOptIn[P]>
+      : GetScalarType<T[P], AggregateScanSaveOptIn[P]>
+  }
+
+
+
+
+  export type ScanSaveOptInGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: ScanSaveOptInWhereInput
+    orderBy?: ScanSaveOptInOrderByWithAggregationInput | ScanSaveOptInOrderByWithAggregationInput[]
+    by: ScanSaveOptInScalarFieldEnum[] | ScanSaveOptInScalarFieldEnum
+    having?: ScanSaveOptInScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: ScanSaveOptInCountAggregateInputType | true
+    _min?: ScanSaveOptInMinAggregateInputType
+    _max?: ScanSaveOptInMaxAggregateInputType
+  }
+
+  export type ScanSaveOptInGroupByOutputType = {
+    id: string
+    userId: string
+    scope: string
+    granted: boolean
+    grantedAt: Date | null
+    revokedAt: Date | null
+    consentTextVersion: string
+    coachShares: JsonValue | null
+    createdAt: Date
+    updatedAt: Date
+    _count: ScanSaveOptInCountAggregateOutputType | null
+    _min: ScanSaveOptInMinAggregateOutputType | null
+    _max: ScanSaveOptInMaxAggregateOutputType | null
+  }
+
+  type GetScanSaveOptInGroupByPayload<T extends ScanSaveOptInGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<ScanSaveOptInGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof ScanSaveOptInGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], ScanSaveOptInGroupByOutputType[P]>
+            : GetScalarType<T[P], ScanSaveOptInGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type ScanSaveOptInSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    userId?: boolean
+    scope?: boolean
+    granted?: boolean
+    grantedAt?: boolean
+    revokedAt?: boolean
+    consentTextVersion?: boolean
+    coachShares?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["scanSaveOptIn"]>
+
+  export type ScanSaveOptInSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    userId?: boolean
+    scope?: boolean
+    granted?: boolean
+    grantedAt?: boolean
+    revokedAt?: boolean
+    consentTextVersion?: boolean
+    coachShares?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["scanSaveOptIn"]>
+
+  export type ScanSaveOptInSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    userId?: boolean
+    scope?: boolean
+    granted?: boolean
+    grantedAt?: boolean
+    revokedAt?: boolean
+    consentTextVersion?: boolean
+    coachShares?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["scanSaveOptIn"]>
+
+  export type ScanSaveOptInSelectScalar = {
+    id?: boolean
+    userId?: boolean
+    scope?: boolean
+    granted?: boolean
+    grantedAt?: boolean
+    revokedAt?: boolean
+    consentTextVersion?: boolean
+    coachShares?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }
+
+  export type ScanSaveOptInOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "userId" | "scope" | "granted" | "grantedAt" | "revokedAt" | "consentTextVersion" | "coachShares" | "createdAt" | "updatedAt", ExtArgs["result"]["scanSaveOptIn"]>
+  export type ScanSaveOptInInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }
+  export type ScanSaveOptInIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }
+  export type ScanSaveOptInIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }
+
+  export type $ScanSaveOptInPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "ScanSaveOptIn"
+    objects: {
+      user: Prisma.$UserPayload<ExtArgs>
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      userId: string
+      /**
+       * 'jump_numbers' — jump numbers, Prove It, and re-screen history.
+       */
+      scope: string
+      granted: boolean
+      grantedAt: Date | null
+      revokedAt: Date | null
+      consentTextVersion: string
+      /**
+       * Per-booking coach shares. Null means none. See the model note.
+       */
+      coachShares: Prisma.JsonValue | null
+      createdAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["scanSaveOptIn"]>
+    composites: {}
+  }
+
+  type ScanSaveOptInGetPayload<S extends boolean | null | undefined | ScanSaveOptInDefaultArgs> = $Result.GetResult<Prisma.$ScanSaveOptInPayload, S>
+
+  type ScanSaveOptInCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<ScanSaveOptInFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: ScanSaveOptInCountAggregateInputType | true
+    }
+
+  export interface ScanSaveOptInDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['ScanSaveOptIn'], meta: { name: 'ScanSaveOptIn' } }
+    /**
+     * Find zero or one ScanSaveOptIn that matches the filter.
+     * @param {ScanSaveOptInFindUniqueArgs} args - Arguments to find a ScanSaveOptIn
+     * @example
+     * // Get one ScanSaveOptIn
+     * const scanSaveOptIn = await prisma.scanSaveOptIn.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends ScanSaveOptInFindUniqueArgs>(args: SelectSubset<T, ScanSaveOptInFindUniqueArgs<ExtArgs>>): Prisma__ScanSaveOptInClient<$Result.GetResult<Prisma.$ScanSaveOptInPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one ScanSaveOptIn that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {ScanSaveOptInFindUniqueOrThrowArgs} args - Arguments to find a ScanSaveOptIn
+     * @example
+     * // Get one ScanSaveOptIn
+     * const scanSaveOptIn = await prisma.scanSaveOptIn.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends ScanSaveOptInFindUniqueOrThrowArgs>(args: SelectSubset<T, ScanSaveOptInFindUniqueOrThrowArgs<ExtArgs>>): Prisma__ScanSaveOptInClient<$Result.GetResult<Prisma.$ScanSaveOptInPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first ScanSaveOptIn that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ScanSaveOptInFindFirstArgs} args - Arguments to find a ScanSaveOptIn
+     * @example
+     * // Get one ScanSaveOptIn
+     * const scanSaveOptIn = await prisma.scanSaveOptIn.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends ScanSaveOptInFindFirstArgs>(args?: SelectSubset<T, ScanSaveOptInFindFirstArgs<ExtArgs>>): Prisma__ScanSaveOptInClient<$Result.GetResult<Prisma.$ScanSaveOptInPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first ScanSaveOptIn that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ScanSaveOptInFindFirstOrThrowArgs} args - Arguments to find a ScanSaveOptIn
+     * @example
+     * // Get one ScanSaveOptIn
+     * const scanSaveOptIn = await prisma.scanSaveOptIn.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends ScanSaveOptInFindFirstOrThrowArgs>(args?: SelectSubset<T, ScanSaveOptInFindFirstOrThrowArgs<ExtArgs>>): Prisma__ScanSaveOptInClient<$Result.GetResult<Prisma.$ScanSaveOptInPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more ScanSaveOptIns that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ScanSaveOptInFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all ScanSaveOptIns
+     * const scanSaveOptIns = await prisma.scanSaveOptIn.findMany()
+     * 
+     * // Get first 10 ScanSaveOptIns
+     * const scanSaveOptIns = await prisma.scanSaveOptIn.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const scanSaveOptInWithIdOnly = await prisma.scanSaveOptIn.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends ScanSaveOptInFindManyArgs>(args?: SelectSubset<T, ScanSaveOptInFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ScanSaveOptInPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a ScanSaveOptIn.
+     * @param {ScanSaveOptInCreateArgs} args - Arguments to create a ScanSaveOptIn.
+     * @example
+     * // Create one ScanSaveOptIn
+     * const ScanSaveOptIn = await prisma.scanSaveOptIn.create({
+     *   data: {
+     *     // ... data to create a ScanSaveOptIn
+     *   }
+     * })
+     * 
+     */
+    create<T extends ScanSaveOptInCreateArgs>(args: SelectSubset<T, ScanSaveOptInCreateArgs<ExtArgs>>): Prisma__ScanSaveOptInClient<$Result.GetResult<Prisma.$ScanSaveOptInPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many ScanSaveOptIns.
+     * @param {ScanSaveOptInCreateManyArgs} args - Arguments to create many ScanSaveOptIns.
+     * @example
+     * // Create many ScanSaveOptIns
+     * const scanSaveOptIn = await prisma.scanSaveOptIn.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends ScanSaveOptInCreateManyArgs>(args?: SelectSubset<T, ScanSaveOptInCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many ScanSaveOptIns and returns the data saved in the database.
+     * @param {ScanSaveOptInCreateManyAndReturnArgs} args - Arguments to create many ScanSaveOptIns.
+     * @example
+     * // Create many ScanSaveOptIns
+     * const scanSaveOptIn = await prisma.scanSaveOptIn.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many ScanSaveOptIns and only return the `id`
+     * const scanSaveOptInWithIdOnly = await prisma.scanSaveOptIn.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends ScanSaveOptInCreateManyAndReturnArgs>(args?: SelectSubset<T, ScanSaveOptInCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ScanSaveOptInPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a ScanSaveOptIn.
+     * @param {ScanSaveOptInDeleteArgs} args - Arguments to delete one ScanSaveOptIn.
+     * @example
+     * // Delete one ScanSaveOptIn
+     * const ScanSaveOptIn = await prisma.scanSaveOptIn.delete({
+     *   where: {
+     *     // ... filter to delete one ScanSaveOptIn
+     *   }
+     * })
+     * 
+     */
+    delete<T extends ScanSaveOptInDeleteArgs>(args: SelectSubset<T, ScanSaveOptInDeleteArgs<ExtArgs>>): Prisma__ScanSaveOptInClient<$Result.GetResult<Prisma.$ScanSaveOptInPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one ScanSaveOptIn.
+     * @param {ScanSaveOptInUpdateArgs} args - Arguments to update one ScanSaveOptIn.
+     * @example
+     * // Update one ScanSaveOptIn
+     * const scanSaveOptIn = await prisma.scanSaveOptIn.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends ScanSaveOptInUpdateArgs>(args: SelectSubset<T, ScanSaveOptInUpdateArgs<ExtArgs>>): Prisma__ScanSaveOptInClient<$Result.GetResult<Prisma.$ScanSaveOptInPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more ScanSaveOptIns.
+     * @param {ScanSaveOptInDeleteManyArgs} args - Arguments to filter ScanSaveOptIns to delete.
+     * @example
+     * // Delete a few ScanSaveOptIns
+     * const { count } = await prisma.scanSaveOptIn.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends ScanSaveOptInDeleteManyArgs>(args?: SelectSubset<T, ScanSaveOptInDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more ScanSaveOptIns.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ScanSaveOptInUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many ScanSaveOptIns
+     * const scanSaveOptIn = await prisma.scanSaveOptIn.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends ScanSaveOptInUpdateManyArgs>(args: SelectSubset<T, ScanSaveOptInUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more ScanSaveOptIns and returns the data updated in the database.
+     * @param {ScanSaveOptInUpdateManyAndReturnArgs} args - Arguments to update many ScanSaveOptIns.
+     * @example
+     * // Update many ScanSaveOptIns
+     * const scanSaveOptIn = await prisma.scanSaveOptIn.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more ScanSaveOptIns and only return the `id`
+     * const scanSaveOptInWithIdOnly = await prisma.scanSaveOptIn.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends ScanSaveOptInUpdateManyAndReturnArgs>(args: SelectSubset<T, ScanSaveOptInUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ScanSaveOptInPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one ScanSaveOptIn.
+     * @param {ScanSaveOptInUpsertArgs} args - Arguments to update or create a ScanSaveOptIn.
+     * @example
+     * // Update or create a ScanSaveOptIn
+     * const scanSaveOptIn = await prisma.scanSaveOptIn.upsert({
+     *   create: {
+     *     // ... data to create a ScanSaveOptIn
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the ScanSaveOptIn we want to update
+     *   }
+     * })
+     */
+    upsert<T extends ScanSaveOptInUpsertArgs>(args: SelectSubset<T, ScanSaveOptInUpsertArgs<ExtArgs>>): Prisma__ScanSaveOptInClient<$Result.GetResult<Prisma.$ScanSaveOptInPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of ScanSaveOptIns.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ScanSaveOptInCountArgs} args - Arguments to filter ScanSaveOptIns to count.
+     * @example
+     * // Count the number of ScanSaveOptIns
+     * const count = await prisma.scanSaveOptIn.count({
+     *   where: {
+     *     // ... the filter for the ScanSaveOptIns we want to count
+     *   }
+     * })
+    **/
+    count<T extends ScanSaveOptInCountArgs>(
+      args?: Subset<T, ScanSaveOptInCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], ScanSaveOptInCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a ScanSaveOptIn.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ScanSaveOptInAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends ScanSaveOptInAggregateArgs>(args: Subset<T, ScanSaveOptInAggregateArgs>): Prisma.PrismaPromise<GetScanSaveOptInAggregateType<T>>
+
+    /**
+     * Group by ScanSaveOptIn.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ScanSaveOptInGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends ScanSaveOptInGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: ScanSaveOptInGroupByArgs['orderBy'] }
+        : { orderBy?: ScanSaveOptInGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, ScanSaveOptInGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetScanSaveOptInGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the ScanSaveOptIn model
+   */
+  readonly fields: ScanSaveOptInFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for ScanSaveOptIn.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__ScanSaveOptInClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    user<T extends UserDefaultArgs<ExtArgs> = {}>(args?: Subset<T, UserDefaultArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the ScanSaveOptIn model
+   */
+  interface ScanSaveOptInFieldRefs {
+    readonly id: FieldRef<"ScanSaveOptIn", 'String'>
+    readonly userId: FieldRef<"ScanSaveOptIn", 'String'>
+    readonly scope: FieldRef<"ScanSaveOptIn", 'String'>
+    readonly granted: FieldRef<"ScanSaveOptIn", 'Boolean'>
+    readonly grantedAt: FieldRef<"ScanSaveOptIn", 'DateTime'>
+    readonly revokedAt: FieldRef<"ScanSaveOptIn", 'DateTime'>
+    readonly consentTextVersion: FieldRef<"ScanSaveOptIn", 'String'>
+    readonly coachShares: FieldRef<"ScanSaveOptIn", 'Json'>
+    readonly createdAt: FieldRef<"ScanSaveOptIn", 'DateTime'>
+    readonly updatedAt: FieldRef<"ScanSaveOptIn", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * ScanSaveOptIn findUnique
+   */
+  export type ScanSaveOptInFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ScanSaveOptIn
+     */
+    select?: ScanSaveOptInSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ScanSaveOptIn
+     */
+    omit?: ScanSaveOptInOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ScanSaveOptInInclude<ExtArgs> | null
+    /**
+     * Filter, which ScanSaveOptIn to fetch.
+     */
+    where: ScanSaveOptInWhereUniqueInput
+  }
+
+  /**
+   * ScanSaveOptIn findUniqueOrThrow
+   */
+  export type ScanSaveOptInFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ScanSaveOptIn
+     */
+    select?: ScanSaveOptInSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ScanSaveOptIn
+     */
+    omit?: ScanSaveOptInOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ScanSaveOptInInclude<ExtArgs> | null
+    /**
+     * Filter, which ScanSaveOptIn to fetch.
+     */
+    where: ScanSaveOptInWhereUniqueInput
+  }
+
+  /**
+   * ScanSaveOptIn findFirst
+   */
+  export type ScanSaveOptInFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ScanSaveOptIn
+     */
+    select?: ScanSaveOptInSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ScanSaveOptIn
+     */
+    omit?: ScanSaveOptInOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ScanSaveOptInInclude<ExtArgs> | null
+    /**
+     * Filter, which ScanSaveOptIn to fetch.
+     */
+    where?: ScanSaveOptInWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ScanSaveOptIns to fetch.
+     */
+    orderBy?: ScanSaveOptInOrderByWithRelationInput | ScanSaveOptInOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for ScanSaveOptIns.
+     */
+    cursor?: ScanSaveOptInWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ScanSaveOptIns from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ScanSaveOptIns.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of ScanSaveOptIns.
+     */
+    distinct?: ScanSaveOptInScalarFieldEnum | ScanSaveOptInScalarFieldEnum[]
+  }
+
+  /**
+   * ScanSaveOptIn findFirstOrThrow
+   */
+  export type ScanSaveOptInFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ScanSaveOptIn
+     */
+    select?: ScanSaveOptInSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ScanSaveOptIn
+     */
+    omit?: ScanSaveOptInOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ScanSaveOptInInclude<ExtArgs> | null
+    /**
+     * Filter, which ScanSaveOptIn to fetch.
+     */
+    where?: ScanSaveOptInWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ScanSaveOptIns to fetch.
+     */
+    orderBy?: ScanSaveOptInOrderByWithRelationInput | ScanSaveOptInOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for ScanSaveOptIns.
+     */
+    cursor?: ScanSaveOptInWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ScanSaveOptIns from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ScanSaveOptIns.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of ScanSaveOptIns.
+     */
+    distinct?: ScanSaveOptInScalarFieldEnum | ScanSaveOptInScalarFieldEnum[]
+  }
+
+  /**
+   * ScanSaveOptIn findMany
+   */
+  export type ScanSaveOptInFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ScanSaveOptIn
+     */
+    select?: ScanSaveOptInSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ScanSaveOptIn
+     */
+    omit?: ScanSaveOptInOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ScanSaveOptInInclude<ExtArgs> | null
+    /**
+     * Filter, which ScanSaveOptIns to fetch.
+     */
+    where?: ScanSaveOptInWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ScanSaveOptIns to fetch.
+     */
+    orderBy?: ScanSaveOptInOrderByWithRelationInput | ScanSaveOptInOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing ScanSaveOptIns.
+     */
+    cursor?: ScanSaveOptInWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ScanSaveOptIns from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ScanSaveOptIns.
+     */
+    skip?: number
+    distinct?: ScanSaveOptInScalarFieldEnum | ScanSaveOptInScalarFieldEnum[]
+  }
+
+  /**
+   * ScanSaveOptIn create
+   */
+  export type ScanSaveOptInCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ScanSaveOptIn
+     */
+    select?: ScanSaveOptInSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ScanSaveOptIn
+     */
+    omit?: ScanSaveOptInOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ScanSaveOptInInclude<ExtArgs> | null
+    /**
+     * The data needed to create a ScanSaveOptIn.
+     */
+    data: XOR<ScanSaveOptInCreateInput, ScanSaveOptInUncheckedCreateInput>
+  }
+
+  /**
+   * ScanSaveOptIn createMany
+   */
+  export type ScanSaveOptInCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many ScanSaveOptIns.
+     */
+    data: ScanSaveOptInCreateManyInput | ScanSaveOptInCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * ScanSaveOptIn createManyAndReturn
+   */
+  export type ScanSaveOptInCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ScanSaveOptIn
+     */
+    select?: ScanSaveOptInSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the ScanSaveOptIn
+     */
+    omit?: ScanSaveOptInOmit<ExtArgs> | null
+    /**
+     * The data used to create many ScanSaveOptIns.
+     */
+    data: ScanSaveOptInCreateManyInput | ScanSaveOptInCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ScanSaveOptInIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * ScanSaveOptIn update
+   */
+  export type ScanSaveOptInUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ScanSaveOptIn
+     */
+    select?: ScanSaveOptInSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ScanSaveOptIn
+     */
+    omit?: ScanSaveOptInOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ScanSaveOptInInclude<ExtArgs> | null
+    /**
+     * The data needed to update a ScanSaveOptIn.
+     */
+    data: XOR<ScanSaveOptInUpdateInput, ScanSaveOptInUncheckedUpdateInput>
+    /**
+     * Choose, which ScanSaveOptIn to update.
+     */
+    where: ScanSaveOptInWhereUniqueInput
+  }
+
+  /**
+   * ScanSaveOptIn updateMany
+   */
+  export type ScanSaveOptInUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update ScanSaveOptIns.
+     */
+    data: XOR<ScanSaveOptInUpdateManyMutationInput, ScanSaveOptInUncheckedUpdateManyInput>
+    /**
+     * Filter which ScanSaveOptIns to update
+     */
+    where?: ScanSaveOptInWhereInput
+    /**
+     * Limit how many ScanSaveOptIns to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * ScanSaveOptIn updateManyAndReturn
+   */
+  export type ScanSaveOptInUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ScanSaveOptIn
+     */
+    select?: ScanSaveOptInSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the ScanSaveOptIn
+     */
+    omit?: ScanSaveOptInOmit<ExtArgs> | null
+    /**
+     * The data used to update ScanSaveOptIns.
+     */
+    data: XOR<ScanSaveOptInUpdateManyMutationInput, ScanSaveOptInUncheckedUpdateManyInput>
+    /**
+     * Filter which ScanSaveOptIns to update
+     */
+    where?: ScanSaveOptInWhereInput
+    /**
+     * Limit how many ScanSaveOptIns to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ScanSaveOptInIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * ScanSaveOptIn upsert
+   */
+  export type ScanSaveOptInUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ScanSaveOptIn
+     */
+    select?: ScanSaveOptInSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ScanSaveOptIn
+     */
+    omit?: ScanSaveOptInOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ScanSaveOptInInclude<ExtArgs> | null
+    /**
+     * The filter to search for the ScanSaveOptIn to update in case it exists.
+     */
+    where: ScanSaveOptInWhereUniqueInput
+    /**
+     * In case the ScanSaveOptIn found by the `where` argument doesn't exist, create a new ScanSaveOptIn with this data.
+     */
+    create: XOR<ScanSaveOptInCreateInput, ScanSaveOptInUncheckedCreateInput>
+    /**
+     * In case the ScanSaveOptIn was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<ScanSaveOptInUpdateInput, ScanSaveOptInUncheckedUpdateInput>
+  }
+
+  /**
+   * ScanSaveOptIn delete
+   */
+  export type ScanSaveOptInDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ScanSaveOptIn
+     */
+    select?: ScanSaveOptInSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ScanSaveOptIn
+     */
+    omit?: ScanSaveOptInOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ScanSaveOptInInclude<ExtArgs> | null
+    /**
+     * Filter which ScanSaveOptIn to delete.
+     */
+    where: ScanSaveOptInWhereUniqueInput
+  }
+
+  /**
+   * ScanSaveOptIn deleteMany
+   */
+  export type ScanSaveOptInDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which ScanSaveOptIns to delete
+     */
+    where?: ScanSaveOptInWhereInput
+    /**
+     * Limit how many ScanSaveOptIns to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * ScanSaveOptIn without action
+   */
+  export type ScanSaveOptInDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ScanSaveOptIn
+     */
+    select?: ScanSaveOptInSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ScanSaveOptIn
+     */
+    omit?: ScanSaveOptInOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ScanSaveOptInInclude<ExtArgs> | null
+  }
+
+
+  /**
    * Model ReadinessCheckIn
    */
 
@@ -117796,6 +119795,7 @@ export namespace Prisma {
     createdAt?: boolean
     coach?: boolean | UserDefaultArgs<ExtArgs>
     client?: boolean | UserDefaultArgs<ExtArgs>
+    availability?: boolean | CoachClient$availabilityArgs<ExtArgs>
   }, ExtArgs["result"]["coachClient"]>
 
   export type CoachClientSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
@@ -117833,6 +119833,7 @@ export namespace Prisma {
   export type CoachClientInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     coach?: boolean | UserDefaultArgs<ExtArgs>
     client?: boolean | UserDefaultArgs<ExtArgs>
+    availability?: boolean | CoachClient$availabilityArgs<ExtArgs>
   }
   export type CoachClientIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     coach?: boolean | UserDefaultArgs<ExtArgs>
@@ -117848,6 +119849,7 @@ export namespace Prisma {
     objects: {
       coach: Prisma.$UserPayload<ExtArgs>
       client: Prisma.$UserPayload<ExtArgs>
+      availability: Prisma.$CoachAvailabilityPayload<ExtArgs> | null
     }
     scalars: $Extensions.GetPayloadResult<{
       id: string
@@ -118258,6 +120260,7 @@ export namespace Prisma {
     readonly [Symbol.toStringTag]: "PrismaPromise"
     coach<T extends UserDefaultArgs<ExtArgs> = {}>(args?: Subset<T, UserDefaultArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
     client<T extends UserDefaultArgs<ExtArgs> = {}>(args?: Subset<T, UserDefaultArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    availability<T extends CoachClient$availabilityArgs<ExtArgs> = {}>(args?: Subset<T, CoachClient$availabilityArgs<ExtArgs>>): Prisma__CoachAvailabilityClient<$Result.GetResult<Prisma.$CoachAvailabilityPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -118689,6 +120692,25 @@ export namespace Prisma {
   }
 
   /**
+   * CoachClient.availability
+   */
+  export type CoachClient$availabilityArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CoachAvailability
+     */
+    select?: CoachAvailabilitySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CoachAvailability
+     */
+    omit?: CoachAvailabilityOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CoachAvailabilityInclude<ExtArgs> | null
+    where?: CoachAvailabilityWhereInput
+  }
+
+  /**
    * CoachClient without action
    */
   export type CoachClientDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -118704,6 +120726,8891 @@ export namespace Prisma {
      * Choose, which related nodes to fetch as well
      */
     include?: CoachClientInclude<ExtArgs> | null
+  }
+
+
+  /**
+   * Model CoachAvailability
+   */
+
+  export type AggregateCoachAvailability = {
+    _count: CoachAvailabilityCountAggregateOutputType | null
+    _min: CoachAvailabilityMinAggregateOutputType | null
+    _max: CoachAvailabilityMaxAggregateOutputType | null
+  }
+
+  export type CoachAvailabilityMinAggregateOutputType = {
+    coachId: string | null
+    clientId: string | null
+    status: string | null
+    returnBy: string | null
+    setAt: Date | null
+  }
+
+  export type CoachAvailabilityMaxAggregateOutputType = {
+    coachId: string | null
+    clientId: string | null
+    status: string | null
+    returnBy: string | null
+    setAt: Date | null
+  }
+
+  export type CoachAvailabilityCountAggregateOutputType = {
+    coachId: number
+    clientId: number
+    status: number
+    returnBy: number
+    setAt: number
+    _all: number
+  }
+
+
+  export type CoachAvailabilityMinAggregateInputType = {
+    coachId?: true
+    clientId?: true
+    status?: true
+    returnBy?: true
+    setAt?: true
+  }
+
+  export type CoachAvailabilityMaxAggregateInputType = {
+    coachId?: true
+    clientId?: true
+    status?: true
+    returnBy?: true
+    setAt?: true
+  }
+
+  export type CoachAvailabilityCountAggregateInputType = {
+    coachId?: true
+    clientId?: true
+    status?: true
+    returnBy?: true
+    setAt?: true
+    _all?: true
+  }
+
+  export type CoachAvailabilityAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which CoachAvailability to aggregate.
+     */
+    where?: CoachAvailabilityWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of CoachAvailabilities to fetch.
+     */
+    orderBy?: CoachAvailabilityOrderByWithRelationInput | CoachAvailabilityOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: CoachAvailabilityWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` CoachAvailabilities from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` CoachAvailabilities.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned CoachAvailabilities
+    **/
+    _count?: true | CoachAvailabilityCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: CoachAvailabilityMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: CoachAvailabilityMaxAggregateInputType
+  }
+
+  export type GetCoachAvailabilityAggregateType<T extends CoachAvailabilityAggregateArgs> = {
+        [P in keyof T & keyof AggregateCoachAvailability]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateCoachAvailability[P]>
+      : GetScalarType<T[P], AggregateCoachAvailability[P]>
+  }
+
+
+
+
+  export type CoachAvailabilityGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: CoachAvailabilityWhereInput
+    orderBy?: CoachAvailabilityOrderByWithAggregationInput | CoachAvailabilityOrderByWithAggregationInput[]
+    by: CoachAvailabilityScalarFieldEnum[] | CoachAvailabilityScalarFieldEnum
+    having?: CoachAvailabilityScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: CoachAvailabilityCountAggregateInputType | true
+    _min?: CoachAvailabilityMinAggregateInputType
+    _max?: CoachAvailabilityMaxAggregateInputType
+  }
+
+  export type CoachAvailabilityGroupByOutputType = {
+    coachId: string
+    clientId: string
+    status: string
+    returnBy: string | null
+    setAt: Date
+    _count: CoachAvailabilityCountAggregateOutputType | null
+    _min: CoachAvailabilityMinAggregateOutputType | null
+    _max: CoachAvailabilityMaxAggregateOutputType | null
+  }
+
+  type GetCoachAvailabilityGroupByPayload<T extends CoachAvailabilityGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<CoachAvailabilityGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof CoachAvailabilityGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], CoachAvailabilityGroupByOutputType[P]>
+            : GetScalarType<T[P], CoachAvailabilityGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type CoachAvailabilitySelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    coachId?: boolean
+    clientId?: boolean
+    status?: boolean
+    returnBy?: boolean
+    setAt?: boolean
+    link?: boolean | CoachClientDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["coachAvailability"]>
+
+  export type CoachAvailabilitySelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    coachId?: boolean
+    clientId?: boolean
+    status?: boolean
+    returnBy?: boolean
+    setAt?: boolean
+    link?: boolean | CoachClientDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["coachAvailability"]>
+
+  export type CoachAvailabilitySelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    coachId?: boolean
+    clientId?: boolean
+    status?: boolean
+    returnBy?: boolean
+    setAt?: boolean
+    link?: boolean | CoachClientDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["coachAvailability"]>
+
+  export type CoachAvailabilitySelectScalar = {
+    coachId?: boolean
+    clientId?: boolean
+    status?: boolean
+    returnBy?: boolean
+    setAt?: boolean
+  }
+
+  export type CoachAvailabilityOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"coachId" | "clientId" | "status" | "returnBy" | "setAt", ExtArgs["result"]["coachAvailability"]>
+  export type CoachAvailabilityInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    link?: boolean | CoachClientDefaultArgs<ExtArgs>
+  }
+  export type CoachAvailabilityIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    link?: boolean | CoachClientDefaultArgs<ExtArgs>
+  }
+  export type CoachAvailabilityIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    link?: boolean | CoachClientDefaultArgs<ExtArgs>
+  }
+
+  export type $CoachAvailabilityPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "CoachAvailability"
+    objects: {
+      link: Prisma.$CoachClientPayload<ExtArgs>
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      coachId: string
+      clientId: string
+      /**
+       * 'limited' | 'out'.
+       */
+      status: string
+      /**
+       * Expected return day 'YYYY-MM-DD', or null.
+       */
+      returnBy: string | null
+      setAt: Date
+    }, ExtArgs["result"]["coachAvailability"]>
+    composites: {}
+  }
+
+  type CoachAvailabilityGetPayload<S extends boolean | null | undefined | CoachAvailabilityDefaultArgs> = $Result.GetResult<Prisma.$CoachAvailabilityPayload, S>
+
+  type CoachAvailabilityCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<CoachAvailabilityFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: CoachAvailabilityCountAggregateInputType | true
+    }
+
+  export interface CoachAvailabilityDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['CoachAvailability'], meta: { name: 'CoachAvailability' } }
+    /**
+     * Find zero or one CoachAvailability that matches the filter.
+     * @param {CoachAvailabilityFindUniqueArgs} args - Arguments to find a CoachAvailability
+     * @example
+     * // Get one CoachAvailability
+     * const coachAvailability = await prisma.coachAvailability.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends CoachAvailabilityFindUniqueArgs>(args: SelectSubset<T, CoachAvailabilityFindUniqueArgs<ExtArgs>>): Prisma__CoachAvailabilityClient<$Result.GetResult<Prisma.$CoachAvailabilityPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one CoachAvailability that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {CoachAvailabilityFindUniqueOrThrowArgs} args - Arguments to find a CoachAvailability
+     * @example
+     * // Get one CoachAvailability
+     * const coachAvailability = await prisma.coachAvailability.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends CoachAvailabilityFindUniqueOrThrowArgs>(args: SelectSubset<T, CoachAvailabilityFindUniqueOrThrowArgs<ExtArgs>>): Prisma__CoachAvailabilityClient<$Result.GetResult<Prisma.$CoachAvailabilityPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first CoachAvailability that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CoachAvailabilityFindFirstArgs} args - Arguments to find a CoachAvailability
+     * @example
+     * // Get one CoachAvailability
+     * const coachAvailability = await prisma.coachAvailability.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends CoachAvailabilityFindFirstArgs>(args?: SelectSubset<T, CoachAvailabilityFindFirstArgs<ExtArgs>>): Prisma__CoachAvailabilityClient<$Result.GetResult<Prisma.$CoachAvailabilityPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first CoachAvailability that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CoachAvailabilityFindFirstOrThrowArgs} args - Arguments to find a CoachAvailability
+     * @example
+     * // Get one CoachAvailability
+     * const coachAvailability = await prisma.coachAvailability.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends CoachAvailabilityFindFirstOrThrowArgs>(args?: SelectSubset<T, CoachAvailabilityFindFirstOrThrowArgs<ExtArgs>>): Prisma__CoachAvailabilityClient<$Result.GetResult<Prisma.$CoachAvailabilityPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more CoachAvailabilities that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CoachAvailabilityFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all CoachAvailabilities
+     * const coachAvailabilities = await prisma.coachAvailability.findMany()
+     * 
+     * // Get first 10 CoachAvailabilities
+     * const coachAvailabilities = await prisma.coachAvailability.findMany({ take: 10 })
+     * 
+     * // Only select the `coachId`
+     * const coachAvailabilityWithCoachIdOnly = await prisma.coachAvailability.findMany({ select: { coachId: true } })
+     * 
+     */
+    findMany<T extends CoachAvailabilityFindManyArgs>(args?: SelectSubset<T, CoachAvailabilityFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CoachAvailabilityPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a CoachAvailability.
+     * @param {CoachAvailabilityCreateArgs} args - Arguments to create a CoachAvailability.
+     * @example
+     * // Create one CoachAvailability
+     * const CoachAvailability = await prisma.coachAvailability.create({
+     *   data: {
+     *     // ... data to create a CoachAvailability
+     *   }
+     * })
+     * 
+     */
+    create<T extends CoachAvailabilityCreateArgs>(args: SelectSubset<T, CoachAvailabilityCreateArgs<ExtArgs>>): Prisma__CoachAvailabilityClient<$Result.GetResult<Prisma.$CoachAvailabilityPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many CoachAvailabilities.
+     * @param {CoachAvailabilityCreateManyArgs} args - Arguments to create many CoachAvailabilities.
+     * @example
+     * // Create many CoachAvailabilities
+     * const coachAvailability = await prisma.coachAvailability.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends CoachAvailabilityCreateManyArgs>(args?: SelectSubset<T, CoachAvailabilityCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many CoachAvailabilities and returns the data saved in the database.
+     * @param {CoachAvailabilityCreateManyAndReturnArgs} args - Arguments to create many CoachAvailabilities.
+     * @example
+     * // Create many CoachAvailabilities
+     * const coachAvailability = await prisma.coachAvailability.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many CoachAvailabilities and only return the `coachId`
+     * const coachAvailabilityWithCoachIdOnly = await prisma.coachAvailability.createManyAndReturn({
+     *   select: { coachId: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends CoachAvailabilityCreateManyAndReturnArgs>(args?: SelectSubset<T, CoachAvailabilityCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CoachAvailabilityPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a CoachAvailability.
+     * @param {CoachAvailabilityDeleteArgs} args - Arguments to delete one CoachAvailability.
+     * @example
+     * // Delete one CoachAvailability
+     * const CoachAvailability = await prisma.coachAvailability.delete({
+     *   where: {
+     *     // ... filter to delete one CoachAvailability
+     *   }
+     * })
+     * 
+     */
+    delete<T extends CoachAvailabilityDeleteArgs>(args: SelectSubset<T, CoachAvailabilityDeleteArgs<ExtArgs>>): Prisma__CoachAvailabilityClient<$Result.GetResult<Prisma.$CoachAvailabilityPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one CoachAvailability.
+     * @param {CoachAvailabilityUpdateArgs} args - Arguments to update one CoachAvailability.
+     * @example
+     * // Update one CoachAvailability
+     * const coachAvailability = await prisma.coachAvailability.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends CoachAvailabilityUpdateArgs>(args: SelectSubset<T, CoachAvailabilityUpdateArgs<ExtArgs>>): Prisma__CoachAvailabilityClient<$Result.GetResult<Prisma.$CoachAvailabilityPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more CoachAvailabilities.
+     * @param {CoachAvailabilityDeleteManyArgs} args - Arguments to filter CoachAvailabilities to delete.
+     * @example
+     * // Delete a few CoachAvailabilities
+     * const { count } = await prisma.coachAvailability.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends CoachAvailabilityDeleteManyArgs>(args?: SelectSubset<T, CoachAvailabilityDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more CoachAvailabilities.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CoachAvailabilityUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many CoachAvailabilities
+     * const coachAvailability = await prisma.coachAvailability.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends CoachAvailabilityUpdateManyArgs>(args: SelectSubset<T, CoachAvailabilityUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more CoachAvailabilities and returns the data updated in the database.
+     * @param {CoachAvailabilityUpdateManyAndReturnArgs} args - Arguments to update many CoachAvailabilities.
+     * @example
+     * // Update many CoachAvailabilities
+     * const coachAvailability = await prisma.coachAvailability.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more CoachAvailabilities and only return the `coachId`
+     * const coachAvailabilityWithCoachIdOnly = await prisma.coachAvailability.updateManyAndReturn({
+     *   select: { coachId: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends CoachAvailabilityUpdateManyAndReturnArgs>(args: SelectSubset<T, CoachAvailabilityUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CoachAvailabilityPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one CoachAvailability.
+     * @param {CoachAvailabilityUpsertArgs} args - Arguments to update or create a CoachAvailability.
+     * @example
+     * // Update or create a CoachAvailability
+     * const coachAvailability = await prisma.coachAvailability.upsert({
+     *   create: {
+     *     // ... data to create a CoachAvailability
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the CoachAvailability we want to update
+     *   }
+     * })
+     */
+    upsert<T extends CoachAvailabilityUpsertArgs>(args: SelectSubset<T, CoachAvailabilityUpsertArgs<ExtArgs>>): Prisma__CoachAvailabilityClient<$Result.GetResult<Prisma.$CoachAvailabilityPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of CoachAvailabilities.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CoachAvailabilityCountArgs} args - Arguments to filter CoachAvailabilities to count.
+     * @example
+     * // Count the number of CoachAvailabilities
+     * const count = await prisma.coachAvailability.count({
+     *   where: {
+     *     // ... the filter for the CoachAvailabilities we want to count
+     *   }
+     * })
+    **/
+    count<T extends CoachAvailabilityCountArgs>(
+      args?: Subset<T, CoachAvailabilityCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], CoachAvailabilityCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a CoachAvailability.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CoachAvailabilityAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends CoachAvailabilityAggregateArgs>(args: Subset<T, CoachAvailabilityAggregateArgs>): Prisma.PrismaPromise<GetCoachAvailabilityAggregateType<T>>
+
+    /**
+     * Group by CoachAvailability.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CoachAvailabilityGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends CoachAvailabilityGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: CoachAvailabilityGroupByArgs['orderBy'] }
+        : { orderBy?: CoachAvailabilityGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, CoachAvailabilityGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetCoachAvailabilityGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the CoachAvailability model
+   */
+  readonly fields: CoachAvailabilityFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for CoachAvailability.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__CoachAvailabilityClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    link<T extends CoachClientDefaultArgs<ExtArgs> = {}>(args?: Subset<T, CoachClientDefaultArgs<ExtArgs>>): Prisma__CoachClientClient<$Result.GetResult<Prisma.$CoachClientPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the CoachAvailability model
+   */
+  interface CoachAvailabilityFieldRefs {
+    readonly coachId: FieldRef<"CoachAvailability", 'String'>
+    readonly clientId: FieldRef<"CoachAvailability", 'String'>
+    readonly status: FieldRef<"CoachAvailability", 'String'>
+    readonly returnBy: FieldRef<"CoachAvailability", 'String'>
+    readonly setAt: FieldRef<"CoachAvailability", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * CoachAvailability findUnique
+   */
+  export type CoachAvailabilityFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CoachAvailability
+     */
+    select?: CoachAvailabilitySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CoachAvailability
+     */
+    omit?: CoachAvailabilityOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CoachAvailabilityInclude<ExtArgs> | null
+    /**
+     * Filter, which CoachAvailability to fetch.
+     */
+    where: CoachAvailabilityWhereUniqueInput
+  }
+
+  /**
+   * CoachAvailability findUniqueOrThrow
+   */
+  export type CoachAvailabilityFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CoachAvailability
+     */
+    select?: CoachAvailabilitySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CoachAvailability
+     */
+    omit?: CoachAvailabilityOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CoachAvailabilityInclude<ExtArgs> | null
+    /**
+     * Filter, which CoachAvailability to fetch.
+     */
+    where: CoachAvailabilityWhereUniqueInput
+  }
+
+  /**
+   * CoachAvailability findFirst
+   */
+  export type CoachAvailabilityFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CoachAvailability
+     */
+    select?: CoachAvailabilitySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CoachAvailability
+     */
+    omit?: CoachAvailabilityOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CoachAvailabilityInclude<ExtArgs> | null
+    /**
+     * Filter, which CoachAvailability to fetch.
+     */
+    where?: CoachAvailabilityWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of CoachAvailabilities to fetch.
+     */
+    orderBy?: CoachAvailabilityOrderByWithRelationInput | CoachAvailabilityOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for CoachAvailabilities.
+     */
+    cursor?: CoachAvailabilityWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` CoachAvailabilities from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` CoachAvailabilities.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of CoachAvailabilities.
+     */
+    distinct?: CoachAvailabilityScalarFieldEnum | CoachAvailabilityScalarFieldEnum[]
+  }
+
+  /**
+   * CoachAvailability findFirstOrThrow
+   */
+  export type CoachAvailabilityFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CoachAvailability
+     */
+    select?: CoachAvailabilitySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CoachAvailability
+     */
+    omit?: CoachAvailabilityOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CoachAvailabilityInclude<ExtArgs> | null
+    /**
+     * Filter, which CoachAvailability to fetch.
+     */
+    where?: CoachAvailabilityWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of CoachAvailabilities to fetch.
+     */
+    orderBy?: CoachAvailabilityOrderByWithRelationInput | CoachAvailabilityOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for CoachAvailabilities.
+     */
+    cursor?: CoachAvailabilityWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` CoachAvailabilities from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` CoachAvailabilities.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of CoachAvailabilities.
+     */
+    distinct?: CoachAvailabilityScalarFieldEnum | CoachAvailabilityScalarFieldEnum[]
+  }
+
+  /**
+   * CoachAvailability findMany
+   */
+  export type CoachAvailabilityFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CoachAvailability
+     */
+    select?: CoachAvailabilitySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CoachAvailability
+     */
+    omit?: CoachAvailabilityOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CoachAvailabilityInclude<ExtArgs> | null
+    /**
+     * Filter, which CoachAvailabilities to fetch.
+     */
+    where?: CoachAvailabilityWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of CoachAvailabilities to fetch.
+     */
+    orderBy?: CoachAvailabilityOrderByWithRelationInput | CoachAvailabilityOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing CoachAvailabilities.
+     */
+    cursor?: CoachAvailabilityWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` CoachAvailabilities from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` CoachAvailabilities.
+     */
+    skip?: number
+    distinct?: CoachAvailabilityScalarFieldEnum | CoachAvailabilityScalarFieldEnum[]
+  }
+
+  /**
+   * CoachAvailability create
+   */
+  export type CoachAvailabilityCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CoachAvailability
+     */
+    select?: CoachAvailabilitySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CoachAvailability
+     */
+    omit?: CoachAvailabilityOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CoachAvailabilityInclude<ExtArgs> | null
+    /**
+     * The data needed to create a CoachAvailability.
+     */
+    data: XOR<CoachAvailabilityCreateInput, CoachAvailabilityUncheckedCreateInput>
+  }
+
+  /**
+   * CoachAvailability createMany
+   */
+  export type CoachAvailabilityCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many CoachAvailabilities.
+     */
+    data: CoachAvailabilityCreateManyInput | CoachAvailabilityCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * CoachAvailability createManyAndReturn
+   */
+  export type CoachAvailabilityCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CoachAvailability
+     */
+    select?: CoachAvailabilitySelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the CoachAvailability
+     */
+    omit?: CoachAvailabilityOmit<ExtArgs> | null
+    /**
+     * The data used to create many CoachAvailabilities.
+     */
+    data: CoachAvailabilityCreateManyInput | CoachAvailabilityCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CoachAvailabilityIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * CoachAvailability update
+   */
+  export type CoachAvailabilityUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CoachAvailability
+     */
+    select?: CoachAvailabilitySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CoachAvailability
+     */
+    omit?: CoachAvailabilityOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CoachAvailabilityInclude<ExtArgs> | null
+    /**
+     * The data needed to update a CoachAvailability.
+     */
+    data: XOR<CoachAvailabilityUpdateInput, CoachAvailabilityUncheckedUpdateInput>
+    /**
+     * Choose, which CoachAvailability to update.
+     */
+    where: CoachAvailabilityWhereUniqueInput
+  }
+
+  /**
+   * CoachAvailability updateMany
+   */
+  export type CoachAvailabilityUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update CoachAvailabilities.
+     */
+    data: XOR<CoachAvailabilityUpdateManyMutationInput, CoachAvailabilityUncheckedUpdateManyInput>
+    /**
+     * Filter which CoachAvailabilities to update
+     */
+    where?: CoachAvailabilityWhereInput
+    /**
+     * Limit how many CoachAvailabilities to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * CoachAvailability updateManyAndReturn
+   */
+  export type CoachAvailabilityUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CoachAvailability
+     */
+    select?: CoachAvailabilitySelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the CoachAvailability
+     */
+    omit?: CoachAvailabilityOmit<ExtArgs> | null
+    /**
+     * The data used to update CoachAvailabilities.
+     */
+    data: XOR<CoachAvailabilityUpdateManyMutationInput, CoachAvailabilityUncheckedUpdateManyInput>
+    /**
+     * Filter which CoachAvailabilities to update
+     */
+    where?: CoachAvailabilityWhereInput
+    /**
+     * Limit how many CoachAvailabilities to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CoachAvailabilityIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * CoachAvailability upsert
+   */
+  export type CoachAvailabilityUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CoachAvailability
+     */
+    select?: CoachAvailabilitySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CoachAvailability
+     */
+    omit?: CoachAvailabilityOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CoachAvailabilityInclude<ExtArgs> | null
+    /**
+     * The filter to search for the CoachAvailability to update in case it exists.
+     */
+    where: CoachAvailabilityWhereUniqueInput
+    /**
+     * In case the CoachAvailability found by the `where` argument doesn't exist, create a new CoachAvailability with this data.
+     */
+    create: XOR<CoachAvailabilityCreateInput, CoachAvailabilityUncheckedCreateInput>
+    /**
+     * In case the CoachAvailability was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<CoachAvailabilityUpdateInput, CoachAvailabilityUncheckedUpdateInput>
+  }
+
+  /**
+   * CoachAvailability delete
+   */
+  export type CoachAvailabilityDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CoachAvailability
+     */
+    select?: CoachAvailabilitySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CoachAvailability
+     */
+    omit?: CoachAvailabilityOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CoachAvailabilityInclude<ExtArgs> | null
+    /**
+     * Filter which CoachAvailability to delete.
+     */
+    where: CoachAvailabilityWhereUniqueInput
+  }
+
+  /**
+   * CoachAvailability deleteMany
+   */
+  export type CoachAvailabilityDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which CoachAvailabilities to delete
+     */
+    where?: CoachAvailabilityWhereInput
+    /**
+     * Limit how many CoachAvailabilities to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * CoachAvailability without action
+   */
+  export type CoachAvailabilityDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CoachAvailability
+     */
+    select?: CoachAvailabilitySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CoachAvailability
+     */
+    omit?: CoachAvailabilityOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CoachAvailabilityInclude<ExtArgs> | null
+  }
+
+
+  /**
+   * Model Instructor
+   */
+
+  export type AggregateInstructor = {
+    _count: InstructorCountAggregateOutputType | null
+    _avg: InstructorAvgAggregateOutputType | null
+    _sum: InstructorSumAggregateOutputType | null
+    _min: InstructorMinAggregateOutputType | null
+    _max: InstructorMaxAggregateOutputType | null
+  }
+
+  export type InstructorAvgAggregateOutputType = {
+    bufferMinutes: number | null
+    minNoticeHours: number | null
+    maxDaysAhead: number | null
+    reviewSlaHours: number | null
+    clientFullRefundHours: number | null
+    refundBusinessDays: number | null
+  }
+
+  export type InstructorSumAggregateOutputType = {
+    bufferMinutes: number | null
+    minNoticeHours: number | null
+    maxDaysAhead: number | null
+    reviewSlaHours: number | null
+    clientFullRefundHours: number | null
+    refundBusinessDays: number | null
+  }
+
+  export type InstructorMinAggregateOutputType = {
+    id: string | null
+    userId: string | null
+    slug: string | null
+    displayName: string | null
+    headline: string | null
+    bio: string | null
+    affiliationLine: string | null
+    creatorCardId: string | null
+    timeZone: string | null
+    bufferMinutes: number | null
+    minNoticeHours: number | null
+    maxDaysAhead: number | null
+    reviewSlaHours: number | null
+    clientFullRefundHours: number | null
+    refundBusinessDays: number | null
+    businessMailingAddress: string | null
+    published: boolean | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type InstructorMaxAggregateOutputType = {
+    id: string | null
+    userId: string | null
+    slug: string | null
+    displayName: string | null
+    headline: string | null
+    bio: string | null
+    affiliationLine: string | null
+    creatorCardId: string | null
+    timeZone: string | null
+    bufferMinutes: number | null
+    minNoticeHours: number | null
+    maxDaysAhead: number | null
+    reviewSlaHours: number | null
+    clientFullRefundHours: number | null
+    refundBusinessDays: number | null
+    businessMailingAddress: string | null
+    published: boolean | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type InstructorCountAggregateOutputType = {
+    id: number
+    userId: number
+    slug: number
+    displayName: number
+    headline: number
+    bio: number
+    certifications: number
+    specialties: number
+    affiliationLine: number
+    creatorCardId: number
+    timeZone: number
+    weeklyHours: number
+    blackoutDates: number
+    bufferMinutes: number
+    minNoticeHours: number
+    maxDaysAhead: number
+    reviewSlaHours: number
+    clientFullRefundHours: number
+    refundBusinessDays: number
+    businessMailingAddress: number
+    published: number
+    createdAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type InstructorAvgAggregateInputType = {
+    bufferMinutes?: true
+    minNoticeHours?: true
+    maxDaysAhead?: true
+    reviewSlaHours?: true
+    clientFullRefundHours?: true
+    refundBusinessDays?: true
+  }
+
+  export type InstructorSumAggregateInputType = {
+    bufferMinutes?: true
+    minNoticeHours?: true
+    maxDaysAhead?: true
+    reviewSlaHours?: true
+    clientFullRefundHours?: true
+    refundBusinessDays?: true
+  }
+
+  export type InstructorMinAggregateInputType = {
+    id?: true
+    userId?: true
+    slug?: true
+    displayName?: true
+    headline?: true
+    bio?: true
+    affiliationLine?: true
+    creatorCardId?: true
+    timeZone?: true
+    bufferMinutes?: true
+    minNoticeHours?: true
+    maxDaysAhead?: true
+    reviewSlaHours?: true
+    clientFullRefundHours?: true
+    refundBusinessDays?: true
+    businessMailingAddress?: true
+    published?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type InstructorMaxAggregateInputType = {
+    id?: true
+    userId?: true
+    slug?: true
+    displayName?: true
+    headline?: true
+    bio?: true
+    affiliationLine?: true
+    creatorCardId?: true
+    timeZone?: true
+    bufferMinutes?: true
+    minNoticeHours?: true
+    maxDaysAhead?: true
+    reviewSlaHours?: true
+    clientFullRefundHours?: true
+    refundBusinessDays?: true
+    businessMailingAddress?: true
+    published?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type InstructorCountAggregateInputType = {
+    id?: true
+    userId?: true
+    slug?: true
+    displayName?: true
+    headline?: true
+    bio?: true
+    certifications?: true
+    specialties?: true
+    affiliationLine?: true
+    creatorCardId?: true
+    timeZone?: true
+    weeklyHours?: true
+    blackoutDates?: true
+    bufferMinutes?: true
+    minNoticeHours?: true
+    maxDaysAhead?: true
+    reviewSlaHours?: true
+    clientFullRefundHours?: true
+    refundBusinessDays?: true
+    businessMailingAddress?: true
+    published?: true
+    createdAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type InstructorAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which Instructor to aggregate.
+     */
+    where?: InstructorWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Instructors to fetch.
+     */
+    orderBy?: InstructorOrderByWithRelationInput | InstructorOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: InstructorWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Instructors from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Instructors.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned Instructors
+    **/
+    _count?: true | InstructorCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to average
+    **/
+    _avg?: InstructorAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: InstructorSumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: InstructorMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: InstructorMaxAggregateInputType
+  }
+
+  export type GetInstructorAggregateType<T extends InstructorAggregateArgs> = {
+        [P in keyof T & keyof AggregateInstructor]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateInstructor[P]>
+      : GetScalarType<T[P], AggregateInstructor[P]>
+  }
+
+
+
+
+  export type InstructorGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: InstructorWhereInput
+    orderBy?: InstructorOrderByWithAggregationInput | InstructorOrderByWithAggregationInput[]
+    by: InstructorScalarFieldEnum[] | InstructorScalarFieldEnum
+    having?: InstructorScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: InstructorCountAggregateInputType | true
+    _avg?: InstructorAvgAggregateInputType
+    _sum?: InstructorSumAggregateInputType
+    _min?: InstructorMinAggregateInputType
+    _max?: InstructorMaxAggregateInputType
+  }
+
+  export type InstructorGroupByOutputType = {
+    id: string
+    userId: string
+    slug: string
+    displayName: string
+    headline: string | null
+    bio: string | null
+    certifications: string[]
+    specialties: string[]
+    affiliationLine: string | null
+    creatorCardId: string | null
+    timeZone: string
+    weeklyHours: JsonValue
+    blackoutDates: JsonValue
+    bufferMinutes: number
+    minNoticeHours: number
+    maxDaysAhead: number
+    reviewSlaHours: number
+    clientFullRefundHours: number
+    refundBusinessDays: number | null
+    businessMailingAddress: string | null
+    published: boolean
+    createdAt: Date
+    updatedAt: Date
+    _count: InstructorCountAggregateOutputType | null
+    _avg: InstructorAvgAggregateOutputType | null
+    _sum: InstructorSumAggregateOutputType | null
+    _min: InstructorMinAggregateOutputType | null
+    _max: InstructorMaxAggregateOutputType | null
+  }
+
+  type GetInstructorGroupByPayload<T extends InstructorGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<InstructorGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof InstructorGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], InstructorGroupByOutputType[P]>
+            : GetScalarType<T[P], InstructorGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type InstructorSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    userId?: boolean
+    slug?: boolean
+    displayName?: boolean
+    headline?: boolean
+    bio?: boolean
+    certifications?: boolean
+    specialties?: boolean
+    affiliationLine?: boolean
+    creatorCardId?: boolean
+    timeZone?: boolean
+    weeklyHours?: boolean
+    blackoutDates?: boolean
+    bufferMinutes?: boolean
+    minNoticeHours?: boolean
+    maxDaysAhead?: boolean
+    reviewSlaHours?: boolean
+    clientFullRefundHours?: boolean
+    refundBusinessDays?: boolean
+    businessMailingAddress?: boolean
+    published?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    programAccess?: boolean | Instructor$programAccessArgs<ExtArgs>
+    bookings?: boolean | Instructor$bookingsArgs<ExtArgs>
+    _count?: boolean | InstructorCountOutputTypeDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["instructor"]>
+
+  export type InstructorSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    userId?: boolean
+    slug?: boolean
+    displayName?: boolean
+    headline?: boolean
+    bio?: boolean
+    certifications?: boolean
+    specialties?: boolean
+    affiliationLine?: boolean
+    creatorCardId?: boolean
+    timeZone?: boolean
+    weeklyHours?: boolean
+    blackoutDates?: boolean
+    bufferMinutes?: boolean
+    minNoticeHours?: boolean
+    maxDaysAhead?: boolean
+    reviewSlaHours?: boolean
+    clientFullRefundHours?: boolean
+    refundBusinessDays?: boolean
+    businessMailingAddress?: boolean
+    published?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }, ExtArgs["result"]["instructor"]>
+
+  export type InstructorSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    userId?: boolean
+    slug?: boolean
+    displayName?: boolean
+    headline?: boolean
+    bio?: boolean
+    certifications?: boolean
+    specialties?: boolean
+    affiliationLine?: boolean
+    creatorCardId?: boolean
+    timeZone?: boolean
+    weeklyHours?: boolean
+    blackoutDates?: boolean
+    bufferMinutes?: boolean
+    minNoticeHours?: boolean
+    maxDaysAhead?: boolean
+    reviewSlaHours?: boolean
+    clientFullRefundHours?: boolean
+    refundBusinessDays?: boolean
+    businessMailingAddress?: boolean
+    published?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }, ExtArgs["result"]["instructor"]>
+
+  export type InstructorSelectScalar = {
+    id?: boolean
+    userId?: boolean
+    slug?: boolean
+    displayName?: boolean
+    headline?: boolean
+    bio?: boolean
+    certifications?: boolean
+    specialties?: boolean
+    affiliationLine?: boolean
+    creatorCardId?: boolean
+    timeZone?: boolean
+    weeklyHours?: boolean
+    blackoutDates?: boolean
+    bufferMinutes?: boolean
+    minNoticeHours?: boolean
+    maxDaysAhead?: boolean
+    reviewSlaHours?: boolean
+    clientFullRefundHours?: boolean
+    refundBusinessDays?: boolean
+    businessMailingAddress?: boolean
+    published?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }
+
+  export type InstructorOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "userId" | "slug" | "displayName" | "headline" | "bio" | "certifications" | "specialties" | "affiliationLine" | "creatorCardId" | "timeZone" | "weeklyHours" | "blackoutDates" | "bufferMinutes" | "minNoticeHours" | "maxDaysAhead" | "reviewSlaHours" | "clientFullRefundHours" | "refundBusinessDays" | "businessMailingAddress" | "published" | "createdAt" | "updatedAt", ExtArgs["result"]["instructor"]>
+  export type InstructorInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    programAccess?: boolean | Instructor$programAccessArgs<ExtArgs>
+    bookings?: boolean | Instructor$bookingsArgs<ExtArgs>
+    _count?: boolean | InstructorCountOutputTypeDefaultArgs<ExtArgs>
+  }
+  export type InstructorIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {}
+  export type InstructorIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {}
+
+  export type $InstructorPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "Instructor"
+    objects: {
+      programAccess: Prisma.$ProgramAccessPayload<ExtArgs>[]
+      bookings: Prisma.$BookingPayload<ExtArgs>[]
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      userId: string
+      slug: string
+      displayName: string
+      headline: string | null
+      bio: string | null
+      certifications: string[]
+      specialties: string[]
+      affiliationLine: string | null
+      creatorCardId: string | null
+      timeZone: string
+      weeklyHours: Prisma.JsonValue
+      blackoutDates: Prisma.JsonValue
+      bufferMinutes: number
+      minNoticeHours: number
+      maxDaysAhead: number
+      /**
+       * Elijah, 6:03 PM PT: reviews are promised within 48 hours. A dashboard setting, not a hardcoded promise.
+       */
+      reviewSlaHours: number
+      /**
+       * Free cancel/reschedule window before start, in hours. Dashboard setting (default 24).
+       */
+      clientFullRefundHours: number
+      /**
+       * CA refund window in business days. Null until set. No default address and no default ruling.
+       */
+      refundBusinessDays: number | null
+      /**
+       * Shown on the store only when set. Never a home address.
+       */
+      businessMailingAddress: string | null
+      published: boolean
+      createdAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["instructor"]>
+    composites: {}
+  }
+
+  type InstructorGetPayload<S extends boolean | null | undefined | InstructorDefaultArgs> = $Result.GetResult<Prisma.$InstructorPayload, S>
+
+  type InstructorCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<InstructorFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: InstructorCountAggregateInputType | true
+    }
+
+  export interface InstructorDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['Instructor'], meta: { name: 'Instructor' } }
+    /**
+     * Find zero or one Instructor that matches the filter.
+     * @param {InstructorFindUniqueArgs} args - Arguments to find a Instructor
+     * @example
+     * // Get one Instructor
+     * const instructor = await prisma.instructor.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends InstructorFindUniqueArgs>(args: SelectSubset<T, InstructorFindUniqueArgs<ExtArgs>>): Prisma__InstructorClient<$Result.GetResult<Prisma.$InstructorPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one Instructor that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {InstructorFindUniqueOrThrowArgs} args - Arguments to find a Instructor
+     * @example
+     * // Get one Instructor
+     * const instructor = await prisma.instructor.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends InstructorFindUniqueOrThrowArgs>(args: SelectSubset<T, InstructorFindUniqueOrThrowArgs<ExtArgs>>): Prisma__InstructorClient<$Result.GetResult<Prisma.$InstructorPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first Instructor that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {InstructorFindFirstArgs} args - Arguments to find a Instructor
+     * @example
+     * // Get one Instructor
+     * const instructor = await prisma.instructor.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends InstructorFindFirstArgs>(args?: SelectSubset<T, InstructorFindFirstArgs<ExtArgs>>): Prisma__InstructorClient<$Result.GetResult<Prisma.$InstructorPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first Instructor that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {InstructorFindFirstOrThrowArgs} args - Arguments to find a Instructor
+     * @example
+     * // Get one Instructor
+     * const instructor = await prisma.instructor.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends InstructorFindFirstOrThrowArgs>(args?: SelectSubset<T, InstructorFindFirstOrThrowArgs<ExtArgs>>): Prisma__InstructorClient<$Result.GetResult<Prisma.$InstructorPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more Instructors that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {InstructorFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all Instructors
+     * const instructors = await prisma.instructor.findMany()
+     * 
+     * // Get first 10 Instructors
+     * const instructors = await prisma.instructor.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const instructorWithIdOnly = await prisma.instructor.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends InstructorFindManyArgs>(args?: SelectSubset<T, InstructorFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$InstructorPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a Instructor.
+     * @param {InstructorCreateArgs} args - Arguments to create a Instructor.
+     * @example
+     * // Create one Instructor
+     * const Instructor = await prisma.instructor.create({
+     *   data: {
+     *     // ... data to create a Instructor
+     *   }
+     * })
+     * 
+     */
+    create<T extends InstructorCreateArgs>(args: SelectSubset<T, InstructorCreateArgs<ExtArgs>>): Prisma__InstructorClient<$Result.GetResult<Prisma.$InstructorPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many Instructors.
+     * @param {InstructorCreateManyArgs} args - Arguments to create many Instructors.
+     * @example
+     * // Create many Instructors
+     * const instructor = await prisma.instructor.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends InstructorCreateManyArgs>(args?: SelectSubset<T, InstructorCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many Instructors and returns the data saved in the database.
+     * @param {InstructorCreateManyAndReturnArgs} args - Arguments to create many Instructors.
+     * @example
+     * // Create many Instructors
+     * const instructor = await prisma.instructor.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many Instructors and only return the `id`
+     * const instructorWithIdOnly = await prisma.instructor.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends InstructorCreateManyAndReturnArgs>(args?: SelectSubset<T, InstructorCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$InstructorPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a Instructor.
+     * @param {InstructorDeleteArgs} args - Arguments to delete one Instructor.
+     * @example
+     * // Delete one Instructor
+     * const Instructor = await prisma.instructor.delete({
+     *   where: {
+     *     // ... filter to delete one Instructor
+     *   }
+     * })
+     * 
+     */
+    delete<T extends InstructorDeleteArgs>(args: SelectSubset<T, InstructorDeleteArgs<ExtArgs>>): Prisma__InstructorClient<$Result.GetResult<Prisma.$InstructorPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one Instructor.
+     * @param {InstructorUpdateArgs} args - Arguments to update one Instructor.
+     * @example
+     * // Update one Instructor
+     * const instructor = await prisma.instructor.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends InstructorUpdateArgs>(args: SelectSubset<T, InstructorUpdateArgs<ExtArgs>>): Prisma__InstructorClient<$Result.GetResult<Prisma.$InstructorPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more Instructors.
+     * @param {InstructorDeleteManyArgs} args - Arguments to filter Instructors to delete.
+     * @example
+     * // Delete a few Instructors
+     * const { count } = await prisma.instructor.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends InstructorDeleteManyArgs>(args?: SelectSubset<T, InstructorDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more Instructors.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {InstructorUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many Instructors
+     * const instructor = await prisma.instructor.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends InstructorUpdateManyArgs>(args: SelectSubset<T, InstructorUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more Instructors and returns the data updated in the database.
+     * @param {InstructorUpdateManyAndReturnArgs} args - Arguments to update many Instructors.
+     * @example
+     * // Update many Instructors
+     * const instructor = await prisma.instructor.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more Instructors and only return the `id`
+     * const instructorWithIdOnly = await prisma.instructor.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends InstructorUpdateManyAndReturnArgs>(args: SelectSubset<T, InstructorUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$InstructorPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one Instructor.
+     * @param {InstructorUpsertArgs} args - Arguments to update or create a Instructor.
+     * @example
+     * // Update or create a Instructor
+     * const instructor = await prisma.instructor.upsert({
+     *   create: {
+     *     // ... data to create a Instructor
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the Instructor we want to update
+     *   }
+     * })
+     */
+    upsert<T extends InstructorUpsertArgs>(args: SelectSubset<T, InstructorUpsertArgs<ExtArgs>>): Prisma__InstructorClient<$Result.GetResult<Prisma.$InstructorPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of Instructors.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {InstructorCountArgs} args - Arguments to filter Instructors to count.
+     * @example
+     * // Count the number of Instructors
+     * const count = await prisma.instructor.count({
+     *   where: {
+     *     // ... the filter for the Instructors we want to count
+     *   }
+     * })
+    **/
+    count<T extends InstructorCountArgs>(
+      args?: Subset<T, InstructorCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], InstructorCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a Instructor.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {InstructorAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends InstructorAggregateArgs>(args: Subset<T, InstructorAggregateArgs>): Prisma.PrismaPromise<GetInstructorAggregateType<T>>
+
+    /**
+     * Group by Instructor.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {InstructorGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends InstructorGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: InstructorGroupByArgs['orderBy'] }
+        : { orderBy?: InstructorGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, InstructorGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetInstructorGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the Instructor model
+   */
+  readonly fields: InstructorFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for Instructor.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__InstructorClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    programAccess<T extends Instructor$programAccessArgs<ExtArgs> = {}>(args?: Subset<T, Instructor$programAccessArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ProgramAccessPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    bookings<T extends Instructor$bookingsArgs<ExtArgs> = {}>(args?: Subset<T, Instructor$bookingsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$BookingPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the Instructor model
+   */
+  interface InstructorFieldRefs {
+    readonly id: FieldRef<"Instructor", 'String'>
+    readonly userId: FieldRef<"Instructor", 'String'>
+    readonly slug: FieldRef<"Instructor", 'String'>
+    readonly displayName: FieldRef<"Instructor", 'String'>
+    readonly headline: FieldRef<"Instructor", 'String'>
+    readonly bio: FieldRef<"Instructor", 'String'>
+    readonly certifications: FieldRef<"Instructor", 'String[]'>
+    readonly specialties: FieldRef<"Instructor", 'String[]'>
+    readonly affiliationLine: FieldRef<"Instructor", 'String'>
+    readonly creatorCardId: FieldRef<"Instructor", 'String'>
+    readonly timeZone: FieldRef<"Instructor", 'String'>
+    readonly weeklyHours: FieldRef<"Instructor", 'Json'>
+    readonly blackoutDates: FieldRef<"Instructor", 'Json'>
+    readonly bufferMinutes: FieldRef<"Instructor", 'Int'>
+    readonly minNoticeHours: FieldRef<"Instructor", 'Int'>
+    readonly maxDaysAhead: FieldRef<"Instructor", 'Int'>
+    readonly reviewSlaHours: FieldRef<"Instructor", 'Int'>
+    readonly clientFullRefundHours: FieldRef<"Instructor", 'Int'>
+    readonly refundBusinessDays: FieldRef<"Instructor", 'Int'>
+    readonly businessMailingAddress: FieldRef<"Instructor", 'String'>
+    readonly published: FieldRef<"Instructor", 'Boolean'>
+    readonly createdAt: FieldRef<"Instructor", 'DateTime'>
+    readonly updatedAt: FieldRef<"Instructor", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * Instructor findUnique
+   */
+  export type InstructorFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Instructor
+     */
+    select?: InstructorSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Instructor
+     */
+    omit?: InstructorOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: InstructorInclude<ExtArgs> | null
+    /**
+     * Filter, which Instructor to fetch.
+     */
+    where: InstructorWhereUniqueInput
+  }
+
+  /**
+   * Instructor findUniqueOrThrow
+   */
+  export type InstructorFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Instructor
+     */
+    select?: InstructorSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Instructor
+     */
+    omit?: InstructorOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: InstructorInclude<ExtArgs> | null
+    /**
+     * Filter, which Instructor to fetch.
+     */
+    where: InstructorWhereUniqueInput
+  }
+
+  /**
+   * Instructor findFirst
+   */
+  export type InstructorFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Instructor
+     */
+    select?: InstructorSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Instructor
+     */
+    omit?: InstructorOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: InstructorInclude<ExtArgs> | null
+    /**
+     * Filter, which Instructor to fetch.
+     */
+    where?: InstructorWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Instructors to fetch.
+     */
+    orderBy?: InstructorOrderByWithRelationInput | InstructorOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for Instructors.
+     */
+    cursor?: InstructorWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Instructors from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Instructors.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of Instructors.
+     */
+    distinct?: InstructorScalarFieldEnum | InstructorScalarFieldEnum[]
+  }
+
+  /**
+   * Instructor findFirstOrThrow
+   */
+  export type InstructorFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Instructor
+     */
+    select?: InstructorSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Instructor
+     */
+    omit?: InstructorOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: InstructorInclude<ExtArgs> | null
+    /**
+     * Filter, which Instructor to fetch.
+     */
+    where?: InstructorWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Instructors to fetch.
+     */
+    orderBy?: InstructorOrderByWithRelationInput | InstructorOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for Instructors.
+     */
+    cursor?: InstructorWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Instructors from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Instructors.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of Instructors.
+     */
+    distinct?: InstructorScalarFieldEnum | InstructorScalarFieldEnum[]
+  }
+
+  /**
+   * Instructor findMany
+   */
+  export type InstructorFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Instructor
+     */
+    select?: InstructorSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Instructor
+     */
+    omit?: InstructorOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: InstructorInclude<ExtArgs> | null
+    /**
+     * Filter, which Instructors to fetch.
+     */
+    where?: InstructorWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Instructors to fetch.
+     */
+    orderBy?: InstructorOrderByWithRelationInput | InstructorOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing Instructors.
+     */
+    cursor?: InstructorWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Instructors from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Instructors.
+     */
+    skip?: number
+    distinct?: InstructorScalarFieldEnum | InstructorScalarFieldEnum[]
+  }
+
+  /**
+   * Instructor create
+   */
+  export type InstructorCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Instructor
+     */
+    select?: InstructorSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Instructor
+     */
+    omit?: InstructorOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: InstructorInclude<ExtArgs> | null
+    /**
+     * The data needed to create a Instructor.
+     */
+    data: XOR<InstructorCreateInput, InstructorUncheckedCreateInput>
+  }
+
+  /**
+   * Instructor createMany
+   */
+  export type InstructorCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many Instructors.
+     */
+    data: InstructorCreateManyInput | InstructorCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * Instructor createManyAndReturn
+   */
+  export type InstructorCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Instructor
+     */
+    select?: InstructorSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the Instructor
+     */
+    omit?: InstructorOmit<ExtArgs> | null
+    /**
+     * The data used to create many Instructors.
+     */
+    data: InstructorCreateManyInput | InstructorCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * Instructor update
+   */
+  export type InstructorUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Instructor
+     */
+    select?: InstructorSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Instructor
+     */
+    omit?: InstructorOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: InstructorInclude<ExtArgs> | null
+    /**
+     * The data needed to update a Instructor.
+     */
+    data: XOR<InstructorUpdateInput, InstructorUncheckedUpdateInput>
+    /**
+     * Choose, which Instructor to update.
+     */
+    where: InstructorWhereUniqueInput
+  }
+
+  /**
+   * Instructor updateMany
+   */
+  export type InstructorUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update Instructors.
+     */
+    data: XOR<InstructorUpdateManyMutationInput, InstructorUncheckedUpdateManyInput>
+    /**
+     * Filter which Instructors to update
+     */
+    where?: InstructorWhereInput
+    /**
+     * Limit how many Instructors to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * Instructor updateManyAndReturn
+   */
+  export type InstructorUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Instructor
+     */
+    select?: InstructorSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the Instructor
+     */
+    omit?: InstructorOmit<ExtArgs> | null
+    /**
+     * The data used to update Instructors.
+     */
+    data: XOR<InstructorUpdateManyMutationInput, InstructorUncheckedUpdateManyInput>
+    /**
+     * Filter which Instructors to update
+     */
+    where?: InstructorWhereInput
+    /**
+     * Limit how many Instructors to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * Instructor upsert
+   */
+  export type InstructorUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Instructor
+     */
+    select?: InstructorSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Instructor
+     */
+    omit?: InstructorOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: InstructorInclude<ExtArgs> | null
+    /**
+     * The filter to search for the Instructor to update in case it exists.
+     */
+    where: InstructorWhereUniqueInput
+    /**
+     * In case the Instructor found by the `where` argument doesn't exist, create a new Instructor with this data.
+     */
+    create: XOR<InstructorCreateInput, InstructorUncheckedCreateInput>
+    /**
+     * In case the Instructor was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<InstructorUpdateInput, InstructorUncheckedUpdateInput>
+  }
+
+  /**
+   * Instructor delete
+   */
+  export type InstructorDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Instructor
+     */
+    select?: InstructorSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Instructor
+     */
+    omit?: InstructorOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: InstructorInclude<ExtArgs> | null
+    /**
+     * Filter which Instructor to delete.
+     */
+    where: InstructorWhereUniqueInput
+  }
+
+  /**
+   * Instructor deleteMany
+   */
+  export type InstructorDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which Instructors to delete
+     */
+    where?: InstructorWhereInput
+    /**
+     * Limit how many Instructors to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * Instructor.programAccess
+   */
+  export type Instructor$programAccessArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ProgramAccess
+     */
+    select?: ProgramAccessSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ProgramAccess
+     */
+    omit?: ProgramAccessOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProgramAccessInclude<ExtArgs> | null
+    where?: ProgramAccessWhereInput
+    orderBy?: ProgramAccessOrderByWithRelationInput | ProgramAccessOrderByWithRelationInput[]
+    cursor?: ProgramAccessWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: ProgramAccessScalarFieldEnum | ProgramAccessScalarFieldEnum[]
+  }
+
+  /**
+   * Instructor.bookings
+   */
+  export type Instructor$bookingsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Booking
+     */
+    select?: BookingSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Booking
+     */
+    omit?: BookingOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BookingInclude<ExtArgs> | null
+    where?: BookingWhereInput
+    orderBy?: BookingOrderByWithRelationInput | BookingOrderByWithRelationInput[]
+    cursor?: BookingWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: BookingScalarFieldEnum | BookingScalarFieldEnum[]
+  }
+
+  /**
+   * Instructor without action
+   */
+  export type InstructorDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Instructor
+     */
+    select?: InstructorSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Instructor
+     */
+    omit?: InstructorOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: InstructorInclude<ExtArgs> | null
+  }
+
+
+  /**
+   * Model ProgramAccess
+   */
+
+  export type AggregateProgramAccess = {
+    _count: ProgramAccessCountAggregateOutputType | null
+    _avg: ProgramAccessAvgAggregateOutputType | null
+    _sum: ProgramAccessSumAggregateOutputType | null
+    _min: ProgramAccessMinAggregateOutputType | null
+    _max: ProgramAccessMaxAggregateOutputType | null
+  }
+
+  export type ProgramAccessAvgAggregateOutputType = {
+    priceCents: number | null
+    platformFeeCents: number | null
+    stripeFeeCents: number | null
+    reviewCredits: number | null
+    reissueCount: number | null
+  }
+
+  export type ProgramAccessSumAggregateOutputType = {
+    priceCents: number | null
+    platformFeeCents: number | null
+    stripeFeeCents: number | null
+    reviewCredits: number | null
+    reissueCount: number | null
+  }
+
+  export type ProgramAccessMinAggregateOutputType = {
+    id: string | null
+    userId: string | null
+    instructorId: string | null
+    listingId: string | null
+    lane: string | null
+    billing: string | null
+    scope: string | null
+    beneficiary: string | null
+    status: string | null
+    priceCents: number | null
+    platformFeeCents: number | null
+    stripeFeeCents: number | null
+    reviewCredits: number | null
+    lastCreditInvoiceId: string | null
+    stripeCheckoutId: string | null
+    stripeSubscriptionId: string | null
+    stripePaymentIntentId: string | null
+    accessUntil: Date | null
+    cancelAtPeriodEnd: boolean | null
+    coachingProgramId: string | null
+    startedAt: Date | null
+    nextRescreenAt: Date | null
+    unlockCodeHash: string | null
+    deviceTokenHash: string | null
+    codeActive: boolean | null
+    redeemedAt: Date | null
+    reissueCount: number | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type ProgramAccessMaxAggregateOutputType = {
+    id: string | null
+    userId: string | null
+    instructorId: string | null
+    listingId: string | null
+    lane: string | null
+    billing: string | null
+    scope: string | null
+    beneficiary: string | null
+    status: string | null
+    priceCents: number | null
+    platformFeeCents: number | null
+    stripeFeeCents: number | null
+    reviewCredits: number | null
+    lastCreditInvoiceId: string | null
+    stripeCheckoutId: string | null
+    stripeSubscriptionId: string | null
+    stripePaymentIntentId: string | null
+    accessUntil: Date | null
+    cancelAtPeriodEnd: boolean | null
+    coachingProgramId: string | null
+    startedAt: Date | null
+    nextRescreenAt: Date | null
+    unlockCodeHash: string | null
+    deviceTokenHash: string | null
+    codeActive: boolean | null
+    redeemedAt: Date | null
+    reissueCount: number | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type ProgramAccessCountAggregateOutputType = {
+    id: number
+    userId: number
+    instructorId: number
+    listingId: number
+    lane: number
+    billing: number
+    scope: number
+    beneficiary: number
+    status: number
+    priceCents: number
+    platformFeeCents: number
+    stripeFeeCents: number
+    reviewCredits: number
+    lastCreditInvoiceId: number
+    stripeCheckoutId: number
+    stripeSubscriptionId: number
+    stripePaymentIntentId: number
+    accessUntil: number
+    cancelAtPeriodEnd: number
+    coachingProgramId: number
+    startedAt: number
+    nextRescreenAt: number
+    unlockCodeHash: number
+    deviceTokenHash: number
+    codeActive: number
+    redeemedAt: number
+    reissueCount: number
+    createdAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type ProgramAccessAvgAggregateInputType = {
+    priceCents?: true
+    platformFeeCents?: true
+    stripeFeeCents?: true
+    reviewCredits?: true
+    reissueCount?: true
+  }
+
+  export type ProgramAccessSumAggregateInputType = {
+    priceCents?: true
+    platformFeeCents?: true
+    stripeFeeCents?: true
+    reviewCredits?: true
+    reissueCount?: true
+  }
+
+  export type ProgramAccessMinAggregateInputType = {
+    id?: true
+    userId?: true
+    instructorId?: true
+    listingId?: true
+    lane?: true
+    billing?: true
+    scope?: true
+    beneficiary?: true
+    status?: true
+    priceCents?: true
+    platformFeeCents?: true
+    stripeFeeCents?: true
+    reviewCredits?: true
+    lastCreditInvoiceId?: true
+    stripeCheckoutId?: true
+    stripeSubscriptionId?: true
+    stripePaymentIntentId?: true
+    accessUntil?: true
+    cancelAtPeriodEnd?: true
+    coachingProgramId?: true
+    startedAt?: true
+    nextRescreenAt?: true
+    unlockCodeHash?: true
+    deviceTokenHash?: true
+    codeActive?: true
+    redeemedAt?: true
+    reissueCount?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type ProgramAccessMaxAggregateInputType = {
+    id?: true
+    userId?: true
+    instructorId?: true
+    listingId?: true
+    lane?: true
+    billing?: true
+    scope?: true
+    beneficiary?: true
+    status?: true
+    priceCents?: true
+    platformFeeCents?: true
+    stripeFeeCents?: true
+    reviewCredits?: true
+    lastCreditInvoiceId?: true
+    stripeCheckoutId?: true
+    stripeSubscriptionId?: true
+    stripePaymentIntentId?: true
+    accessUntil?: true
+    cancelAtPeriodEnd?: true
+    coachingProgramId?: true
+    startedAt?: true
+    nextRescreenAt?: true
+    unlockCodeHash?: true
+    deviceTokenHash?: true
+    codeActive?: true
+    redeemedAt?: true
+    reissueCount?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type ProgramAccessCountAggregateInputType = {
+    id?: true
+    userId?: true
+    instructorId?: true
+    listingId?: true
+    lane?: true
+    billing?: true
+    scope?: true
+    beneficiary?: true
+    status?: true
+    priceCents?: true
+    platformFeeCents?: true
+    stripeFeeCents?: true
+    reviewCredits?: true
+    lastCreditInvoiceId?: true
+    stripeCheckoutId?: true
+    stripeSubscriptionId?: true
+    stripePaymentIntentId?: true
+    accessUntil?: true
+    cancelAtPeriodEnd?: true
+    coachingProgramId?: true
+    startedAt?: true
+    nextRescreenAt?: true
+    unlockCodeHash?: true
+    deviceTokenHash?: true
+    codeActive?: true
+    redeemedAt?: true
+    reissueCount?: true
+    createdAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type ProgramAccessAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which ProgramAccess to aggregate.
+     */
+    where?: ProgramAccessWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ProgramAccesses to fetch.
+     */
+    orderBy?: ProgramAccessOrderByWithRelationInput | ProgramAccessOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: ProgramAccessWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ProgramAccesses from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ProgramAccesses.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned ProgramAccesses
+    **/
+    _count?: true | ProgramAccessCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to average
+    **/
+    _avg?: ProgramAccessAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: ProgramAccessSumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: ProgramAccessMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: ProgramAccessMaxAggregateInputType
+  }
+
+  export type GetProgramAccessAggregateType<T extends ProgramAccessAggregateArgs> = {
+        [P in keyof T & keyof AggregateProgramAccess]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateProgramAccess[P]>
+      : GetScalarType<T[P], AggregateProgramAccess[P]>
+  }
+
+
+
+
+  export type ProgramAccessGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: ProgramAccessWhereInput
+    orderBy?: ProgramAccessOrderByWithAggregationInput | ProgramAccessOrderByWithAggregationInput[]
+    by: ProgramAccessScalarFieldEnum[] | ProgramAccessScalarFieldEnum
+    having?: ProgramAccessScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: ProgramAccessCountAggregateInputType | true
+    _avg?: ProgramAccessAvgAggregateInputType
+    _sum?: ProgramAccessSumAggregateInputType
+    _min?: ProgramAccessMinAggregateInputType
+    _max?: ProgramAccessMaxAggregateInputType
+  }
+
+  export type ProgramAccessGroupByOutputType = {
+    id: string
+    userId: string
+    instructorId: string
+    listingId: string
+    lane: string
+    billing: string
+    scope: string
+    beneficiary: string
+    status: string
+    priceCents: number
+    platformFeeCents: number
+    stripeFeeCents: number
+    reviewCredits: number
+    lastCreditInvoiceId: string | null
+    stripeCheckoutId: string | null
+    stripeSubscriptionId: string | null
+    stripePaymentIntentId: string | null
+    accessUntil: Date | null
+    cancelAtPeriodEnd: boolean
+    coachingProgramId: string | null
+    startedAt: Date | null
+    nextRescreenAt: Date | null
+    unlockCodeHash: string | null
+    deviceTokenHash: string | null
+    codeActive: boolean
+    redeemedAt: Date | null
+    reissueCount: number
+    createdAt: Date
+    updatedAt: Date
+    _count: ProgramAccessCountAggregateOutputType | null
+    _avg: ProgramAccessAvgAggregateOutputType | null
+    _sum: ProgramAccessSumAggregateOutputType | null
+    _min: ProgramAccessMinAggregateOutputType | null
+    _max: ProgramAccessMaxAggregateOutputType | null
+  }
+
+  type GetProgramAccessGroupByPayload<T extends ProgramAccessGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<ProgramAccessGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof ProgramAccessGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], ProgramAccessGroupByOutputType[P]>
+            : GetScalarType<T[P], ProgramAccessGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type ProgramAccessSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    userId?: boolean
+    instructorId?: boolean
+    listingId?: boolean
+    lane?: boolean
+    billing?: boolean
+    scope?: boolean
+    beneficiary?: boolean
+    status?: boolean
+    priceCents?: boolean
+    platformFeeCents?: boolean
+    stripeFeeCents?: boolean
+    reviewCredits?: boolean
+    lastCreditInvoiceId?: boolean
+    stripeCheckoutId?: boolean
+    stripeSubscriptionId?: boolean
+    stripePaymentIntentId?: boolean
+    accessUntil?: boolean
+    cancelAtPeriodEnd?: boolean
+    coachingProgramId?: boolean
+    startedAt?: boolean
+    nextRescreenAt?: boolean
+    unlockCodeHash?: boolean
+    deviceTokenHash?: boolean
+    codeActive?: boolean
+    redeemedAt?: boolean
+    reissueCount?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    instructor?: boolean | InstructorDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["programAccess"]>
+
+  export type ProgramAccessSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    userId?: boolean
+    instructorId?: boolean
+    listingId?: boolean
+    lane?: boolean
+    billing?: boolean
+    scope?: boolean
+    beneficiary?: boolean
+    status?: boolean
+    priceCents?: boolean
+    platformFeeCents?: boolean
+    stripeFeeCents?: boolean
+    reviewCredits?: boolean
+    lastCreditInvoiceId?: boolean
+    stripeCheckoutId?: boolean
+    stripeSubscriptionId?: boolean
+    stripePaymentIntentId?: boolean
+    accessUntil?: boolean
+    cancelAtPeriodEnd?: boolean
+    coachingProgramId?: boolean
+    startedAt?: boolean
+    nextRescreenAt?: boolean
+    unlockCodeHash?: boolean
+    deviceTokenHash?: boolean
+    codeActive?: boolean
+    redeemedAt?: boolean
+    reissueCount?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    instructor?: boolean | InstructorDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["programAccess"]>
+
+  export type ProgramAccessSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    userId?: boolean
+    instructorId?: boolean
+    listingId?: boolean
+    lane?: boolean
+    billing?: boolean
+    scope?: boolean
+    beneficiary?: boolean
+    status?: boolean
+    priceCents?: boolean
+    platformFeeCents?: boolean
+    stripeFeeCents?: boolean
+    reviewCredits?: boolean
+    lastCreditInvoiceId?: boolean
+    stripeCheckoutId?: boolean
+    stripeSubscriptionId?: boolean
+    stripePaymentIntentId?: boolean
+    accessUntil?: boolean
+    cancelAtPeriodEnd?: boolean
+    coachingProgramId?: boolean
+    startedAt?: boolean
+    nextRescreenAt?: boolean
+    unlockCodeHash?: boolean
+    deviceTokenHash?: boolean
+    codeActive?: boolean
+    redeemedAt?: boolean
+    reissueCount?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    instructor?: boolean | InstructorDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["programAccess"]>
+
+  export type ProgramAccessSelectScalar = {
+    id?: boolean
+    userId?: boolean
+    instructorId?: boolean
+    listingId?: boolean
+    lane?: boolean
+    billing?: boolean
+    scope?: boolean
+    beneficiary?: boolean
+    status?: boolean
+    priceCents?: boolean
+    platformFeeCents?: boolean
+    stripeFeeCents?: boolean
+    reviewCredits?: boolean
+    lastCreditInvoiceId?: boolean
+    stripeCheckoutId?: boolean
+    stripeSubscriptionId?: boolean
+    stripePaymentIntentId?: boolean
+    accessUntil?: boolean
+    cancelAtPeriodEnd?: boolean
+    coachingProgramId?: boolean
+    startedAt?: boolean
+    nextRescreenAt?: boolean
+    unlockCodeHash?: boolean
+    deviceTokenHash?: boolean
+    codeActive?: boolean
+    redeemedAt?: boolean
+    reissueCount?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }
+
+  export type ProgramAccessOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "userId" | "instructorId" | "listingId" | "lane" | "billing" | "scope" | "beneficiary" | "status" | "priceCents" | "platformFeeCents" | "stripeFeeCents" | "reviewCredits" | "lastCreditInvoiceId" | "stripeCheckoutId" | "stripeSubscriptionId" | "stripePaymentIntentId" | "accessUntil" | "cancelAtPeriodEnd" | "coachingProgramId" | "startedAt" | "nextRescreenAt" | "unlockCodeHash" | "deviceTokenHash" | "codeActive" | "redeemedAt" | "reissueCount" | "createdAt" | "updatedAt", ExtArgs["result"]["programAccess"]>
+  export type ProgramAccessInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    instructor?: boolean | InstructorDefaultArgs<ExtArgs>
+  }
+  export type ProgramAccessIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    instructor?: boolean | InstructorDefaultArgs<ExtArgs>
+  }
+  export type ProgramAccessIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    instructor?: boolean | InstructorDefaultArgs<ExtArgs>
+  }
+
+  export type $ProgramAccessPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "ProgramAccess"
+    objects: {
+      instructor: Prisma.$InstructorPayload<ExtArgs>
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      userId: string
+      instructorId: string
+      listingId: string
+      lane: string
+      billing: string
+      /**
+       * lane | all | teen_all
+       */
+      scope: string
+      /**
+       * self | teen
+       */
+      beneficiary: string
+      status: string
+      priceCents: number
+      platformFeeCents: number
+      stripeFeeCents: number
+      reviewCredits: number
+      lastCreditInvoiceId: string | null
+      stripeCheckoutId: string | null
+      stripeSubscriptionId: string | null
+      stripePaymentIntentId: string | null
+      accessUntil: Date | null
+      cancelAtPeriodEnd: boolean
+      coachingProgramId: string | null
+      startedAt: Date | null
+      nextRescreenAt: Date | null
+      unlockCodeHash: string | null
+      deviceTokenHash: string | null
+      codeActive: boolean
+      redeemedAt: Date | null
+      reissueCount: number
+      createdAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["programAccess"]>
+    composites: {}
+  }
+
+  type ProgramAccessGetPayload<S extends boolean | null | undefined | ProgramAccessDefaultArgs> = $Result.GetResult<Prisma.$ProgramAccessPayload, S>
+
+  type ProgramAccessCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<ProgramAccessFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: ProgramAccessCountAggregateInputType | true
+    }
+
+  export interface ProgramAccessDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['ProgramAccess'], meta: { name: 'ProgramAccess' } }
+    /**
+     * Find zero or one ProgramAccess that matches the filter.
+     * @param {ProgramAccessFindUniqueArgs} args - Arguments to find a ProgramAccess
+     * @example
+     * // Get one ProgramAccess
+     * const programAccess = await prisma.programAccess.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends ProgramAccessFindUniqueArgs>(args: SelectSubset<T, ProgramAccessFindUniqueArgs<ExtArgs>>): Prisma__ProgramAccessClient<$Result.GetResult<Prisma.$ProgramAccessPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one ProgramAccess that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {ProgramAccessFindUniqueOrThrowArgs} args - Arguments to find a ProgramAccess
+     * @example
+     * // Get one ProgramAccess
+     * const programAccess = await prisma.programAccess.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends ProgramAccessFindUniqueOrThrowArgs>(args: SelectSubset<T, ProgramAccessFindUniqueOrThrowArgs<ExtArgs>>): Prisma__ProgramAccessClient<$Result.GetResult<Prisma.$ProgramAccessPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first ProgramAccess that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ProgramAccessFindFirstArgs} args - Arguments to find a ProgramAccess
+     * @example
+     * // Get one ProgramAccess
+     * const programAccess = await prisma.programAccess.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends ProgramAccessFindFirstArgs>(args?: SelectSubset<T, ProgramAccessFindFirstArgs<ExtArgs>>): Prisma__ProgramAccessClient<$Result.GetResult<Prisma.$ProgramAccessPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first ProgramAccess that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ProgramAccessFindFirstOrThrowArgs} args - Arguments to find a ProgramAccess
+     * @example
+     * // Get one ProgramAccess
+     * const programAccess = await prisma.programAccess.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends ProgramAccessFindFirstOrThrowArgs>(args?: SelectSubset<T, ProgramAccessFindFirstOrThrowArgs<ExtArgs>>): Prisma__ProgramAccessClient<$Result.GetResult<Prisma.$ProgramAccessPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more ProgramAccesses that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ProgramAccessFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all ProgramAccesses
+     * const programAccesses = await prisma.programAccess.findMany()
+     * 
+     * // Get first 10 ProgramAccesses
+     * const programAccesses = await prisma.programAccess.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const programAccessWithIdOnly = await prisma.programAccess.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends ProgramAccessFindManyArgs>(args?: SelectSubset<T, ProgramAccessFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ProgramAccessPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a ProgramAccess.
+     * @param {ProgramAccessCreateArgs} args - Arguments to create a ProgramAccess.
+     * @example
+     * // Create one ProgramAccess
+     * const ProgramAccess = await prisma.programAccess.create({
+     *   data: {
+     *     // ... data to create a ProgramAccess
+     *   }
+     * })
+     * 
+     */
+    create<T extends ProgramAccessCreateArgs>(args: SelectSubset<T, ProgramAccessCreateArgs<ExtArgs>>): Prisma__ProgramAccessClient<$Result.GetResult<Prisma.$ProgramAccessPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many ProgramAccesses.
+     * @param {ProgramAccessCreateManyArgs} args - Arguments to create many ProgramAccesses.
+     * @example
+     * // Create many ProgramAccesses
+     * const programAccess = await prisma.programAccess.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends ProgramAccessCreateManyArgs>(args?: SelectSubset<T, ProgramAccessCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many ProgramAccesses and returns the data saved in the database.
+     * @param {ProgramAccessCreateManyAndReturnArgs} args - Arguments to create many ProgramAccesses.
+     * @example
+     * // Create many ProgramAccesses
+     * const programAccess = await prisma.programAccess.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many ProgramAccesses and only return the `id`
+     * const programAccessWithIdOnly = await prisma.programAccess.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends ProgramAccessCreateManyAndReturnArgs>(args?: SelectSubset<T, ProgramAccessCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ProgramAccessPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a ProgramAccess.
+     * @param {ProgramAccessDeleteArgs} args - Arguments to delete one ProgramAccess.
+     * @example
+     * // Delete one ProgramAccess
+     * const ProgramAccess = await prisma.programAccess.delete({
+     *   where: {
+     *     // ... filter to delete one ProgramAccess
+     *   }
+     * })
+     * 
+     */
+    delete<T extends ProgramAccessDeleteArgs>(args: SelectSubset<T, ProgramAccessDeleteArgs<ExtArgs>>): Prisma__ProgramAccessClient<$Result.GetResult<Prisma.$ProgramAccessPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one ProgramAccess.
+     * @param {ProgramAccessUpdateArgs} args - Arguments to update one ProgramAccess.
+     * @example
+     * // Update one ProgramAccess
+     * const programAccess = await prisma.programAccess.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends ProgramAccessUpdateArgs>(args: SelectSubset<T, ProgramAccessUpdateArgs<ExtArgs>>): Prisma__ProgramAccessClient<$Result.GetResult<Prisma.$ProgramAccessPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more ProgramAccesses.
+     * @param {ProgramAccessDeleteManyArgs} args - Arguments to filter ProgramAccesses to delete.
+     * @example
+     * // Delete a few ProgramAccesses
+     * const { count } = await prisma.programAccess.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends ProgramAccessDeleteManyArgs>(args?: SelectSubset<T, ProgramAccessDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more ProgramAccesses.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ProgramAccessUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many ProgramAccesses
+     * const programAccess = await prisma.programAccess.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends ProgramAccessUpdateManyArgs>(args: SelectSubset<T, ProgramAccessUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more ProgramAccesses and returns the data updated in the database.
+     * @param {ProgramAccessUpdateManyAndReturnArgs} args - Arguments to update many ProgramAccesses.
+     * @example
+     * // Update many ProgramAccesses
+     * const programAccess = await prisma.programAccess.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more ProgramAccesses and only return the `id`
+     * const programAccessWithIdOnly = await prisma.programAccess.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends ProgramAccessUpdateManyAndReturnArgs>(args: SelectSubset<T, ProgramAccessUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ProgramAccessPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one ProgramAccess.
+     * @param {ProgramAccessUpsertArgs} args - Arguments to update or create a ProgramAccess.
+     * @example
+     * // Update or create a ProgramAccess
+     * const programAccess = await prisma.programAccess.upsert({
+     *   create: {
+     *     // ... data to create a ProgramAccess
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the ProgramAccess we want to update
+     *   }
+     * })
+     */
+    upsert<T extends ProgramAccessUpsertArgs>(args: SelectSubset<T, ProgramAccessUpsertArgs<ExtArgs>>): Prisma__ProgramAccessClient<$Result.GetResult<Prisma.$ProgramAccessPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of ProgramAccesses.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ProgramAccessCountArgs} args - Arguments to filter ProgramAccesses to count.
+     * @example
+     * // Count the number of ProgramAccesses
+     * const count = await prisma.programAccess.count({
+     *   where: {
+     *     // ... the filter for the ProgramAccesses we want to count
+     *   }
+     * })
+    **/
+    count<T extends ProgramAccessCountArgs>(
+      args?: Subset<T, ProgramAccessCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], ProgramAccessCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a ProgramAccess.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ProgramAccessAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends ProgramAccessAggregateArgs>(args: Subset<T, ProgramAccessAggregateArgs>): Prisma.PrismaPromise<GetProgramAccessAggregateType<T>>
+
+    /**
+     * Group by ProgramAccess.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ProgramAccessGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends ProgramAccessGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: ProgramAccessGroupByArgs['orderBy'] }
+        : { orderBy?: ProgramAccessGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, ProgramAccessGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetProgramAccessGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the ProgramAccess model
+   */
+  readonly fields: ProgramAccessFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for ProgramAccess.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__ProgramAccessClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    instructor<T extends InstructorDefaultArgs<ExtArgs> = {}>(args?: Subset<T, InstructorDefaultArgs<ExtArgs>>): Prisma__InstructorClient<$Result.GetResult<Prisma.$InstructorPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the ProgramAccess model
+   */
+  interface ProgramAccessFieldRefs {
+    readonly id: FieldRef<"ProgramAccess", 'String'>
+    readonly userId: FieldRef<"ProgramAccess", 'String'>
+    readonly instructorId: FieldRef<"ProgramAccess", 'String'>
+    readonly listingId: FieldRef<"ProgramAccess", 'String'>
+    readonly lane: FieldRef<"ProgramAccess", 'String'>
+    readonly billing: FieldRef<"ProgramAccess", 'String'>
+    readonly scope: FieldRef<"ProgramAccess", 'String'>
+    readonly beneficiary: FieldRef<"ProgramAccess", 'String'>
+    readonly status: FieldRef<"ProgramAccess", 'String'>
+    readonly priceCents: FieldRef<"ProgramAccess", 'Int'>
+    readonly platformFeeCents: FieldRef<"ProgramAccess", 'Int'>
+    readonly stripeFeeCents: FieldRef<"ProgramAccess", 'Int'>
+    readonly reviewCredits: FieldRef<"ProgramAccess", 'Int'>
+    readonly lastCreditInvoiceId: FieldRef<"ProgramAccess", 'String'>
+    readonly stripeCheckoutId: FieldRef<"ProgramAccess", 'String'>
+    readonly stripeSubscriptionId: FieldRef<"ProgramAccess", 'String'>
+    readonly stripePaymentIntentId: FieldRef<"ProgramAccess", 'String'>
+    readonly accessUntil: FieldRef<"ProgramAccess", 'DateTime'>
+    readonly cancelAtPeriodEnd: FieldRef<"ProgramAccess", 'Boolean'>
+    readonly coachingProgramId: FieldRef<"ProgramAccess", 'String'>
+    readonly startedAt: FieldRef<"ProgramAccess", 'DateTime'>
+    readonly nextRescreenAt: FieldRef<"ProgramAccess", 'DateTime'>
+    readonly unlockCodeHash: FieldRef<"ProgramAccess", 'String'>
+    readonly deviceTokenHash: FieldRef<"ProgramAccess", 'String'>
+    readonly codeActive: FieldRef<"ProgramAccess", 'Boolean'>
+    readonly redeemedAt: FieldRef<"ProgramAccess", 'DateTime'>
+    readonly reissueCount: FieldRef<"ProgramAccess", 'Int'>
+    readonly createdAt: FieldRef<"ProgramAccess", 'DateTime'>
+    readonly updatedAt: FieldRef<"ProgramAccess", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * ProgramAccess findUnique
+   */
+  export type ProgramAccessFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ProgramAccess
+     */
+    select?: ProgramAccessSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ProgramAccess
+     */
+    omit?: ProgramAccessOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProgramAccessInclude<ExtArgs> | null
+    /**
+     * Filter, which ProgramAccess to fetch.
+     */
+    where: ProgramAccessWhereUniqueInput
+  }
+
+  /**
+   * ProgramAccess findUniqueOrThrow
+   */
+  export type ProgramAccessFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ProgramAccess
+     */
+    select?: ProgramAccessSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ProgramAccess
+     */
+    omit?: ProgramAccessOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProgramAccessInclude<ExtArgs> | null
+    /**
+     * Filter, which ProgramAccess to fetch.
+     */
+    where: ProgramAccessWhereUniqueInput
+  }
+
+  /**
+   * ProgramAccess findFirst
+   */
+  export type ProgramAccessFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ProgramAccess
+     */
+    select?: ProgramAccessSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ProgramAccess
+     */
+    omit?: ProgramAccessOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProgramAccessInclude<ExtArgs> | null
+    /**
+     * Filter, which ProgramAccess to fetch.
+     */
+    where?: ProgramAccessWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ProgramAccesses to fetch.
+     */
+    orderBy?: ProgramAccessOrderByWithRelationInput | ProgramAccessOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for ProgramAccesses.
+     */
+    cursor?: ProgramAccessWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ProgramAccesses from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ProgramAccesses.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of ProgramAccesses.
+     */
+    distinct?: ProgramAccessScalarFieldEnum | ProgramAccessScalarFieldEnum[]
+  }
+
+  /**
+   * ProgramAccess findFirstOrThrow
+   */
+  export type ProgramAccessFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ProgramAccess
+     */
+    select?: ProgramAccessSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ProgramAccess
+     */
+    omit?: ProgramAccessOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProgramAccessInclude<ExtArgs> | null
+    /**
+     * Filter, which ProgramAccess to fetch.
+     */
+    where?: ProgramAccessWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ProgramAccesses to fetch.
+     */
+    orderBy?: ProgramAccessOrderByWithRelationInput | ProgramAccessOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for ProgramAccesses.
+     */
+    cursor?: ProgramAccessWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ProgramAccesses from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ProgramAccesses.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of ProgramAccesses.
+     */
+    distinct?: ProgramAccessScalarFieldEnum | ProgramAccessScalarFieldEnum[]
+  }
+
+  /**
+   * ProgramAccess findMany
+   */
+  export type ProgramAccessFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ProgramAccess
+     */
+    select?: ProgramAccessSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ProgramAccess
+     */
+    omit?: ProgramAccessOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProgramAccessInclude<ExtArgs> | null
+    /**
+     * Filter, which ProgramAccesses to fetch.
+     */
+    where?: ProgramAccessWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ProgramAccesses to fetch.
+     */
+    orderBy?: ProgramAccessOrderByWithRelationInput | ProgramAccessOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing ProgramAccesses.
+     */
+    cursor?: ProgramAccessWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ProgramAccesses from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ProgramAccesses.
+     */
+    skip?: number
+    distinct?: ProgramAccessScalarFieldEnum | ProgramAccessScalarFieldEnum[]
+  }
+
+  /**
+   * ProgramAccess create
+   */
+  export type ProgramAccessCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ProgramAccess
+     */
+    select?: ProgramAccessSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ProgramAccess
+     */
+    omit?: ProgramAccessOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProgramAccessInclude<ExtArgs> | null
+    /**
+     * The data needed to create a ProgramAccess.
+     */
+    data: XOR<ProgramAccessCreateInput, ProgramAccessUncheckedCreateInput>
+  }
+
+  /**
+   * ProgramAccess createMany
+   */
+  export type ProgramAccessCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many ProgramAccesses.
+     */
+    data: ProgramAccessCreateManyInput | ProgramAccessCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * ProgramAccess createManyAndReturn
+   */
+  export type ProgramAccessCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ProgramAccess
+     */
+    select?: ProgramAccessSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the ProgramAccess
+     */
+    omit?: ProgramAccessOmit<ExtArgs> | null
+    /**
+     * The data used to create many ProgramAccesses.
+     */
+    data: ProgramAccessCreateManyInput | ProgramAccessCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProgramAccessIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * ProgramAccess update
+   */
+  export type ProgramAccessUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ProgramAccess
+     */
+    select?: ProgramAccessSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ProgramAccess
+     */
+    omit?: ProgramAccessOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProgramAccessInclude<ExtArgs> | null
+    /**
+     * The data needed to update a ProgramAccess.
+     */
+    data: XOR<ProgramAccessUpdateInput, ProgramAccessUncheckedUpdateInput>
+    /**
+     * Choose, which ProgramAccess to update.
+     */
+    where: ProgramAccessWhereUniqueInput
+  }
+
+  /**
+   * ProgramAccess updateMany
+   */
+  export type ProgramAccessUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update ProgramAccesses.
+     */
+    data: XOR<ProgramAccessUpdateManyMutationInput, ProgramAccessUncheckedUpdateManyInput>
+    /**
+     * Filter which ProgramAccesses to update
+     */
+    where?: ProgramAccessWhereInput
+    /**
+     * Limit how many ProgramAccesses to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * ProgramAccess updateManyAndReturn
+   */
+  export type ProgramAccessUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ProgramAccess
+     */
+    select?: ProgramAccessSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the ProgramAccess
+     */
+    omit?: ProgramAccessOmit<ExtArgs> | null
+    /**
+     * The data used to update ProgramAccesses.
+     */
+    data: XOR<ProgramAccessUpdateManyMutationInput, ProgramAccessUncheckedUpdateManyInput>
+    /**
+     * Filter which ProgramAccesses to update
+     */
+    where?: ProgramAccessWhereInput
+    /**
+     * Limit how many ProgramAccesses to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProgramAccessIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * ProgramAccess upsert
+   */
+  export type ProgramAccessUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ProgramAccess
+     */
+    select?: ProgramAccessSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ProgramAccess
+     */
+    omit?: ProgramAccessOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProgramAccessInclude<ExtArgs> | null
+    /**
+     * The filter to search for the ProgramAccess to update in case it exists.
+     */
+    where: ProgramAccessWhereUniqueInput
+    /**
+     * In case the ProgramAccess found by the `where` argument doesn't exist, create a new ProgramAccess with this data.
+     */
+    create: XOR<ProgramAccessCreateInput, ProgramAccessUncheckedCreateInput>
+    /**
+     * In case the ProgramAccess was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<ProgramAccessUpdateInput, ProgramAccessUncheckedUpdateInput>
+  }
+
+  /**
+   * ProgramAccess delete
+   */
+  export type ProgramAccessDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ProgramAccess
+     */
+    select?: ProgramAccessSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ProgramAccess
+     */
+    omit?: ProgramAccessOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProgramAccessInclude<ExtArgs> | null
+    /**
+     * Filter which ProgramAccess to delete.
+     */
+    where: ProgramAccessWhereUniqueInput
+  }
+
+  /**
+   * ProgramAccess deleteMany
+   */
+  export type ProgramAccessDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which ProgramAccesses to delete
+     */
+    where?: ProgramAccessWhereInput
+    /**
+     * Limit how many ProgramAccesses to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * ProgramAccess without action
+   */
+  export type ProgramAccessDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ProgramAccess
+     */
+    select?: ProgramAccessSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ProgramAccess
+     */
+    omit?: ProgramAccessOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ProgramAccessInclude<ExtArgs> | null
+  }
+
+
+  /**
+   * Model Booking
+   */
+
+  export type AggregateBooking = {
+    _count: BookingCountAggregateOutputType | null
+    _avg: BookingAvgAggregateOutputType | null
+    _sum: BookingSumAggregateOutputType | null
+    _min: BookingMinAggregateOutputType | null
+    _max: BookingMaxAggregateOutputType | null
+  }
+
+  export type BookingAvgAggregateOutputType = {
+    durationMin: number | null
+    priceCents: number | null
+    platformFeeCents: number | null
+    stripeFeeCents: number | null
+    refundCents: number | null
+    reschedulesUsed: number | null
+  }
+
+  export type BookingSumAggregateOutputType = {
+    durationMin: number | null
+    priceCents: number | null
+    platformFeeCents: number | null
+    stripeFeeCents: number | null
+    refundCents: number | null
+    reschedulesUsed: number | null
+  }
+
+  export type BookingMinAggregateOutputType = {
+    id: string | null
+    kind: string | null
+    instructorId: string | null
+    coachUserId: string | null
+    clientUserId: string | null
+    listingId: string | null
+    status: string | null
+    durationMin: number | null
+    priceCents: number | null
+    platformFeeCents: number | null
+    stripeFeeCents: number | null
+    refundCents: number | null
+    stripeCheckoutId: string | null
+    stripePaymentIntentId: string | null
+    holdExpiresAt: Date | null
+    startsAt: Date | null
+    endsAt: Date | null
+    slotLock: string | null
+    clientTimeZone: string | null
+    clientNote: string | null
+    reschedulesUsed: number | null
+    connectionFailedAt: Date | null
+    failureCreditOpen: boolean | null
+    shareWithCoach: boolean | null
+    goal: string | null
+    painYes: boolean | null
+    reviewNote: string | null
+    clipConsentAt: Date | null
+    consentTextVersion: string | null
+    submittedAt: Date | null
+    dueAt: Date | null
+    replyText: string | null
+    replyClipPath: string | null
+    deliveredAt: Date | null
+    originalClipDeleteAt: Date | null
+    originalsDeletedAt: Date | null
+    cancelledAt: Date | null
+    cancelledBy: string | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type BookingMaxAggregateOutputType = {
+    id: string | null
+    kind: string | null
+    instructorId: string | null
+    coachUserId: string | null
+    clientUserId: string | null
+    listingId: string | null
+    status: string | null
+    durationMin: number | null
+    priceCents: number | null
+    platformFeeCents: number | null
+    stripeFeeCents: number | null
+    refundCents: number | null
+    stripeCheckoutId: string | null
+    stripePaymentIntentId: string | null
+    holdExpiresAt: Date | null
+    startsAt: Date | null
+    endsAt: Date | null
+    slotLock: string | null
+    clientTimeZone: string | null
+    clientNote: string | null
+    reschedulesUsed: number | null
+    connectionFailedAt: Date | null
+    failureCreditOpen: boolean | null
+    shareWithCoach: boolean | null
+    goal: string | null
+    painYes: boolean | null
+    reviewNote: string | null
+    clipConsentAt: Date | null
+    consentTextVersion: string | null
+    submittedAt: Date | null
+    dueAt: Date | null
+    replyText: string | null
+    replyClipPath: string | null
+    deliveredAt: Date | null
+    originalClipDeleteAt: Date | null
+    originalsDeletedAt: Date | null
+    cancelledAt: Date | null
+    cancelledBy: string | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type BookingCountAggregateOutputType = {
+    id: number
+    kind: number
+    instructorId: number
+    coachUserId: number
+    clientUserId: number
+    listingId: number
+    status: number
+    durationMin: number
+    priceCents: number
+    platformFeeCents: number
+    stripeFeeCents: number
+    refundCents: number
+    stripeCheckoutId: number
+    stripePaymentIntentId: number
+    holdExpiresAt: number
+    startsAt: number
+    endsAt: number
+    slotLock: number
+    clientTimeZone: number
+    clientNote: number
+    reschedulesUsed: number
+    connectionFailedAt: number
+    failureCreditOpen: number
+    shareWithCoach: number
+    goal: number
+    painYes: number
+    reviewNote: number
+    clipPaths: number
+    clipConsentAt: number
+    consentTextVersion: number
+    submittedAt: number
+    dueAt: number
+    replyText: number
+    replyClipPath: number
+    attachedDrillIds: number
+    deliveredAt: number
+    originalClipDeleteAt: number
+    originalsDeletedAt: number
+    cancelledAt: number
+    cancelledBy: number
+    createdAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type BookingAvgAggregateInputType = {
+    durationMin?: true
+    priceCents?: true
+    platformFeeCents?: true
+    stripeFeeCents?: true
+    refundCents?: true
+    reschedulesUsed?: true
+  }
+
+  export type BookingSumAggregateInputType = {
+    durationMin?: true
+    priceCents?: true
+    platformFeeCents?: true
+    stripeFeeCents?: true
+    refundCents?: true
+    reschedulesUsed?: true
+  }
+
+  export type BookingMinAggregateInputType = {
+    id?: true
+    kind?: true
+    instructorId?: true
+    coachUserId?: true
+    clientUserId?: true
+    listingId?: true
+    status?: true
+    durationMin?: true
+    priceCents?: true
+    platformFeeCents?: true
+    stripeFeeCents?: true
+    refundCents?: true
+    stripeCheckoutId?: true
+    stripePaymentIntentId?: true
+    holdExpiresAt?: true
+    startsAt?: true
+    endsAt?: true
+    slotLock?: true
+    clientTimeZone?: true
+    clientNote?: true
+    reschedulesUsed?: true
+    connectionFailedAt?: true
+    failureCreditOpen?: true
+    shareWithCoach?: true
+    goal?: true
+    painYes?: true
+    reviewNote?: true
+    clipConsentAt?: true
+    consentTextVersion?: true
+    submittedAt?: true
+    dueAt?: true
+    replyText?: true
+    replyClipPath?: true
+    deliveredAt?: true
+    originalClipDeleteAt?: true
+    originalsDeletedAt?: true
+    cancelledAt?: true
+    cancelledBy?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type BookingMaxAggregateInputType = {
+    id?: true
+    kind?: true
+    instructorId?: true
+    coachUserId?: true
+    clientUserId?: true
+    listingId?: true
+    status?: true
+    durationMin?: true
+    priceCents?: true
+    platformFeeCents?: true
+    stripeFeeCents?: true
+    refundCents?: true
+    stripeCheckoutId?: true
+    stripePaymentIntentId?: true
+    holdExpiresAt?: true
+    startsAt?: true
+    endsAt?: true
+    slotLock?: true
+    clientTimeZone?: true
+    clientNote?: true
+    reschedulesUsed?: true
+    connectionFailedAt?: true
+    failureCreditOpen?: true
+    shareWithCoach?: true
+    goal?: true
+    painYes?: true
+    reviewNote?: true
+    clipConsentAt?: true
+    consentTextVersion?: true
+    submittedAt?: true
+    dueAt?: true
+    replyText?: true
+    replyClipPath?: true
+    deliveredAt?: true
+    originalClipDeleteAt?: true
+    originalsDeletedAt?: true
+    cancelledAt?: true
+    cancelledBy?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type BookingCountAggregateInputType = {
+    id?: true
+    kind?: true
+    instructorId?: true
+    coachUserId?: true
+    clientUserId?: true
+    listingId?: true
+    status?: true
+    durationMin?: true
+    priceCents?: true
+    platformFeeCents?: true
+    stripeFeeCents?: true
+    refundCents?: true
+    stripeCheckoutId?: true
+    stripePaymentIntentId?: true
+    holdExpiresAt?: true
+    startsAt?: true
+    endsAt?: true
+    slotLock?: true
+    clientTimeZone?: true
+    clientNote?: true
+    reschedulesUsed?: true
+    connectionFailedAt?: true
+    failureCreditOpen?: true
+    shareWithCoach?: true
+    goal?: true
+    painYes?: true
+    reviewNote?: true
+    clipPaths?: true
+    clipConsentAt?: true
+    consentTextVersion?: true
+    submittedAt?: true
+    dueAt?: true
+    replyText?: true
+    replyClipPath?: true
+    attachedDrillIds?: true
+    deliveredAt?: true
+    originalClipDeleteAt?: true
+    originalsDeletedAt?: true
+    cancelledAt?: true
+    cancelledBy?: true
+    createdAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type BookingAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which Booking to aggregate.
+     */
+    where?: BookingWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Bookings to fetch.
+     */
+    orderBy?: BookingOrderByWithRelationInput | BookingOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: BookingWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Bookings from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Bookings.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned Bookings
+    **/
+    _count?: true | BookingCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to average
+    **/
+    _avg?: BookingAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: BookingSumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: BookingMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: BookingMaxAggregateInputType
+  }
+
+  export type GetBookingAggregateType<T extends BookingAggregateArgs> = {
+        [P in keyof T & keyof AggregateBooking]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateBooking[P]>
+      : GetScalarType<T[P], AggregateBooking[P]>
+  }
+
+
+
+
+  export type BookingGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: BookingWhereInput
+    orderBy?: BookingOrderByWithAggregationInput | BookingOrderByWithAggregationInput[]
+    by: BookingScalarFieldEnum[] | BookingScalarFieldEnum
+    having?: BookingScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: BookingCountAggregateInputType | true
+    _avg?: BookingAvgAggregateInputType
+    _sum?: BookingSumAggregateInputType
+    _min?: BookingMinAggregateInputType
+    _max?: BookingMaxAggregateInputType
+  }
+
+  export type BookingGroupByOutputType = {
+    id: string
+    kind: string
+    instructorId: string
+    coachUserId: string
+    clientUserId: string
+    listingId: string
+    status: string
+    durationMin: number | null
+    priceCents: number
+    platformFeeCents: number
+    stripeFeeCents: number
+    refundCents: number
+    stripeCheckoutId: string | null
+    stripePaymentIntentId: string | null
+    holdExpiresAt: Date | null
+    startsAt: Date | null
+    endsAt: Date | null
+    slotLock: string | null
+    clientTimeZone: string | null
+    clientNote: string | null
+    reschedulesUsed: number
+    connectionFailedAt: Date | null
+    failureCreditOpen: boolean
+    shareWithCoach: boolean
+    goal: string | null
+    painYes: boolean | null
+    reviewNote: string | null
+    clipPaths: JsonValue | null
+    clipConsentAt: Date | null
+    consentTextVersion: string | null
+    submittedAt: Date | null
+    dueAt: Date | null
+    replyText: string | null
+    replyClipPath: string | null
+    attachedDrillIds: JsonValue | null
+    deliveredAt: Date | null
+    originalClipDeleteAt: Date | null
+    originalsDeletedAt: Date | null
+    cancelledAt: Date | null
+    cancelledBy: string | null
+    createdAt: Date
+    updatedAt: Date
+    _count: BookingCountAggregateOutputType | null
+    _avg: BookingAvgAggregateOutputType | null
+    _sum: BookingSumAggregateOutputType | null
+    _min: BookingMinAggregateOutputType | null
+    _max: BookingMaxAggregateOutputType | null
+  }
+
+  type GetBookingGroupByPayload<T extends BookingGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<BookingGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof BookingGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], BookingGroupByOutputType[P]>
+            : GetScalarType<T[P], BookingGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type BookingSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    kind?: boolean
+    instructorId?: boolean
+    coachUserId?: boolean
+    clientUserId?: boolean
+    listingId?: boolean
+    status?: boolean
+    durationMin?: boolean
+    priceCents?: boolean
+    platformFeeCents?: boolean
+    stripeFeeCents?: boolean
+    refundCents?: boolean
+    stripeCheckoutId?: boolean
+    stripePaymentIntentId?: boolean
+    holdExpiresAt?: boolean
+    startsAt?: boolean
+    endsAt?: boolean
+    slotLock?: boolean
+    clientTimeZone?: boolean
+    clientNote?: boolean
+    reschedulesUsed?: boolean
+    connectionFailedAt?: boolean
+    failureCreditOpen?: boolean
+    shareWithCoach?: boolean
+    goal?: boolean
+    painYes?: boolean
+    reviewNote?: boolean
+    clipPaths?: boolean
+    clipConsentAt?: boolean
+    consentTextVersion?: boolean
+    submittedAt?: boolean
+    dueAt?: boolean
+    replyText?: boolean
+    replyClipPath?: boolean
+    attachedDrillIds?: boolean
+    deliveredAt?: boolean
+    originalClipDeleteAt?: boolean
+    originalsDeletedAt?: boolean
+    cancelledAt?: boolean
+    cancelledBy?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    instructor?: boolean | InstructorDefaultArgs<ExtArgs>
+    signals?: boolean | Booking$signalsArgs<ExtArgs>
+    _count?: boolean | BookingCountOutputTypeDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["booking"]>
+
+  export type BookingSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    kind?: boolean
+    instructorId?: boolean
+    coachUserId?: boolean
+    clientUserId?: boolean
+    listingId?: boolean
+    status?: boolean
+    durationMin?: boolean
+    priceCents?: boolean
+    platformFeeCents?: boolean
+    stripeFeeCents?: boolean
+    refundCents?: boolean
+    stripeCheckoutId?: boolean
+    stripePaymentIntentId?: boolean
+    holdExpiresAt?: boolean
+    startsAt?: boolean
+    endsAt?: boolean
+    slotLock?: boolean
+    clientTimeZone?: boolean
+    clientNote?: boolean
+    reschedulesUsed?: boolean
+    connectionFailedAt?: boolean
+    failureCreditOpen?: boolean
+    shareWithCoach?: boolean
+    goal?: boolean
+    painYes?: boolean
+    reviewNote?: boolean
+    clipPaths?: boolean
+    clipConsentAt?: boolean
+    consentTextVersion?: boolean
+    submittedAt?: boolean
+    dueAt?: boolean
+    replyText?: boolean
+    replyClipPath?: boolean
+    attachedDrillIds?: boolean
+    deliveredAt?: boolean
+    originalClipDeleteAt?: boolean
+    originalsDeletedAt?: boolean
+    cancelledAt?: boolean
+    cancelledBy?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    instructor?: boolean | InstructorDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["booking"]>
+
+  export type BookingSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    kind?: boolean
+    instructorId?: boolean
+    coachUserId?: boolean
+    clientUserId?: boolean
+    listingId?: boolean
+    status?: boolean
+    durationMin?: boolean
+    priceCents?: boolean
+    platformFeeCents?: boolean
+    stripeFeeCents?: boolean
+    refundCents?: boolean
+    stripeCheckoutId?: boolean
+    stripePaymentIntentId?: boolean
+    holdExpiresAt?: boolean
+    startsAt?: boolean
+    endsAt?: boolean
+    slotLock?: boolean
+    clientTimeZone?: boolean
+    clientNote?: boolean
+    reschedulesUsed?: boolean
+    connectionFailedAt?: boolean
+    failureCreditOpen?: boolean
+    shareWithCoach?: boolean
+    goal?: boolean
+    painYes?: boolean
+    reviewNote?: boolean
+    clipPaths?: boolean
+    clipConsentAt?: boolean
+    consentTextVersion?: boolean
+    submittedAt?: boolean
+    dueAt?: boolean
+    replyText?: boolean
+    replyClipPath?: boolean
+    attachedDrillIds?: boolean
+    deliveredAt?: boolean
+    originalClipDeleteAt?: boolean
+    originalsDeletedAt?: boolean
+    cancelledAt?: boolean
+    cancelledBy?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    instructor?: boolean | InstructorDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["booking"]>
+
+  export type BookingSelectScalar = {
+    id?: boolean
+    kind?: boolean
+    instructorId?: boolean
+    coachUserId?: boolean
+    clientUserId?: boolean
+    listingId?: boolean
+    status?: boolean
+    durationMin?: boolean
+    priceCents?: boolean
+    platformFeeCents?: boolean
+    stripeFeeCents?: boolean
+    refundCents?: boolean
+    stripeCheckoutId?: boolean
+    stripePaymentIntentId?: boolean
+    holdExpiresAt?: boolean
+    startsAt?: boolean
+    endsAt?: boolean
+    slotLock?: boolean
+    clientTimeZone?: boolean
+    clientNote?: boolean
+    reschedulesUsed?: boolean
+    connectionFailedAt?: boolean
+    failureCreditOpen?: boolean
+    shareWithCoach?: boolean
+    goal?: boolean
+    painYes?: boolean
+    reviewNote?: boolean
+    clipPaths?: boolean
+    clipConsentAt?: boolean
+    consentTextVersion?: boolean
+    submittedAt?: boolean
+    dueAt?: boolean
+    replyText?: boolean
+    replyClipPath?: boolean
+    attachedDrillIds?: boolean
+    deliveredAt?: boolean
+    originalClipDeleteAt?: boolean
+    originalsDeletedAt?: boolean
+    cancelledAt?: boolean
+    cancelledBy?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }
+
+  export type BookingOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "kind" | "instructorId" | "coachUserId" | "clientUserId" | "listingId" | "status" | "durationMin" | "priceCents" | "platformFeeCents" | "stripeFeeCents" | "refundCents" | "stripeCheckoutId" | "stripePaymentIntentId" | "holdExpiresAt" | "startsAt" | "endsAt" | "slotLock" | "clientTimeZone" | "clientNote" | "reschedulesUsed" | "connectionFailedAt" | "failureCreditOpen" | "shareWithCoach" | "goal" | "painYes" | "reviewNote" | "clipPaths" | "clipConsentAt" | "consentTextVersion" | "submittedAt" | "dueAt" | "replyText" | "replyClipPath" | "attachedDrillIds" | "deliveredAt" | "originalClipDeleteAt" | "originalsDeletedAt" | "cancelledAt" | "cancelledBy" | "createdAt" | "updatedAt", ExtArgs["result"]["booking"]>
+  export type BookingInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    instructor?: boolean | InstructorDefaultArgs<ExtArgs>
+    signals?: boolean | Booking$signalsArgs<ExtArgs>
+    _count?: boolean | BookingCountOutputTypeDefaultArgs<ExtArgs>
+  }
+  export type BookingIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    instructor?: boolean | InstructorDefaultArgs<ExtArgs>
+  }
+  export type BookingIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    instructor?: boolean | InstructorDefaultArgs<ExtArgs>
+  }
+
+  export type $BookingPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "Booking"
+    objects: {
+      instructor: Prisma.$InstructorPayload<ExtArgs>
+      signals: Prisma.$CallSignalPayload<ExtArgs>[]
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      kind: string
+      instructorId: string
+      coachUserId: string
+      clientUserId: string
+      listingId: string
+      status: string
+      durationMin: number | null
+      priceCents: number
+      platformFeeCents: number
+      stripeFeeCents: number
+      refundCents: number
+      stripeCheckoutId: string | null
+      stripePaymentIntentId: string | null
+      holdExpiresAt: Date | null
+      startsAt: Date | null
+      endsAt: Date | null
+      slotLock: string | null
+      clientTimeZone: string | null
+      clientNote: string | null
+      reschedulesUsed: number
+      connectionFailedAt: Date | null
+      failureCreditOpen: boolean
+      shareWithCoach: boolean
+      goal: string | null
+      painYes: boolean | null
+      reviewNote: string | null
+      clipPaths: Prisma.JsonValue | null
+      clipConsentAt: Date | null
+      consentTextVersion: string | null
+      submittedAt: Date | null
+      dueAt: Date | null
+      replyText: string | null
+      replyClipPath: string | null
+      attachedDrillIds: Prisma.JsonValue | null
+      deliveredAt: Date | null
+      originalClipDeleteAt: Date | null
+      originalsDeletedAt: Date | null
+      cancelledAt: Date | null
+      cancelledBy: string | null
+      createdAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["booking"]>
+    composites: {}
+  }
+
+  type BookingGetPayload<S extends boolean | null | undefined | BookingDefaultArgs> = $Result.GetResult<Prisma.$BookingPayload, S>
+
+  type BookingCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<BookingFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: BookingCountAggregateInputType | true
+    }
+
+  export interface BookingDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['Booking'], meta: { name: 'Booking' } }
+    /**
+     * Find zero or one Booking that matches the filter.
+     * @param {BookingFindUniqueArgs} args - Arguments to find a Booking
+     * @example
+     * // Get one Booking
+     * const booking = await prisma.booking.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends BookingFindUniqueArgs>(args: SelectSubset<T, BookingFindUniqueArgs<ExtArgs>>): Prisma__BookingClient<$Result.GetResult<Prisma.$BookingPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one Booking that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {BookingFindUniqueOrThrowArgs} args - Arguments to find a Booking
+     * @example
+     * // Get one Booking
+     * const booking = await prisma.booking.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends BookingFindUniqueOrThrowArgs>(args: SelectSubset<T, BookingFindUniqueOrThrowArgs<ExtArgs>>): Prisma__BookingClient<$Result.GetResult<Prisma.$BookingPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first Booking that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {BookingFindFirstArgs} args - Arguments to find a Booking
+     * @example
+     * // Get one Booking
+     * const booking = await prisma.booking.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends BookingFindFirstArgs>(args?: SelectSubset<T, BookingFindFirstArgs<ExtArgs>>): Prisma__BookingClient<$Result.GetResult<Prisma.$BookingPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first Booking that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {BookingFindFirstOrThrowArgs} args - Arguments to find a Booking
+     * @example
+     * // Get one Booking
+     * const booking = await prisma.booking.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends BookingFindFirstOrThrowArgs>(args?: SelectSubset<T, BookingFindFirstOrThrowArgs<ExtArgs>>): Prisma__BookingClient<$Result.GetResult<Prisma.$BookingPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more Bookings that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {BookingFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all Bookings
+     * const bookings = await prisma.booking.findMany()
+     * 
+     * // Get first 10 Bookings
+     * const bookings = await prisma.booking.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const bookingWithIdOnly = await prisma.booking.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends BookingFindManyArgs>(args?: SelectSubset<T, BookingFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$BookingPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a Booking.
+     * @param {BookingCreateArgs} args - Arguments to create a Booking.
+     * @example
+     * // Create one Booking
+     * const Booking = await prisma.booking.create({
+     *   data: {
+     *     // ... data to create a Booking
+     *   }
+     * })
+     * 
+     */
+    create<T extends BookingCreateArgs>(args: SelectSubset<T, BookingCreateArgs<ExtArgs>>): Prisma__BookingClient<$Result.GetResult<Prisma.$BookingPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many Bookings.
+     * @param {BookingCreateManyArgs} args - Arguments to create many Bookings.
+     * @example
+     * // Create many Bookings
+     * const booking = await prisma.booking.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends BookingCreateManyArgs>(args?: SelectSubset<T, BookingCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many Bookings and returns the data saved in the database.
+     * @param {BookingCreateManyAndReturnArgs} args - Arguments to create many Bookings.
+     * @example
+     * // Create many Bookings
+     * const booking = await prisma.booking.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many Bookings and only return the `id`
+     * const bookingWithIdOnly = await prisma.booking.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends BookingCreateManyAndReturnArgs>(args?: SelectSubset<T, BookingCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$BookingPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a Booking.
+     * @param {BookingDeleteArgs} args - Arguments to delete one Booking.
+     * @example
+     * // Delete one Booking
+     * const Booking = await prisma.booking.delete({
+     *   where: {
+     *     // ... filter to delete one Booking
+     *   }
+     * })
+     * 
+     */
+    delete<T extends BookingDeleteArgs>(args: SelectSubset<T, BookingDeleteArgs<ExtArgs>>): Prisma__BookingClient<$Result.GetResult<Prisma.$BookingPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one Booking.
+     * @param {BookingUpdateArgs} args - Arguments to update one Booking.
+     * @example
+     * // Update one Booking
+     * const booking = await prisma.booking.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends BookingUpdateArgs>(args: SelectSubset<T, BookingUpdateArgs<ExtArgs>>): Prisma__BookingClient<$Result.GetResult<Prisma.$BookingPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more Bookings.
+     * @param {BookingDeleteManyArgs} args - Arguments to filter Bookings to delete.
+     * @example
+     * // Delete a few Bookings
+     * const { count } = await prisma.booking.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends BookingDeleteManyArgs>(args?: SelectSubset<T, BookingDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more Bookings.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {BookingUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many Bookings
+     * const booking = await prisma.booking.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends BookingUpdateManyArgs>(args: SelectSubset<T, BookingUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more Bookings and returns the data updated in the database.
+     * @param {BookingUpdateManyAndReturnArgs} args - Arguments to update many Bookings.
+     * @example
+     * // Update many Bookings
+     * const booking = await prisma.booking.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more Bookings and only return the `id`
+     * const bookingWithIdOnly = await prisma.booking.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends BookingUpdateManyAndReturnArgs>(args: SelectSubset<T, BookingUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$BookingPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one Booking.
+     * @param {BookingUpsertArgs} args - Arguments to update or create a Booking.
+     * @example
+     * // Update or create a Booking
+     * const booking = await prisma.booking.upsert({
+     *   create: {
+     *     // ... data to create a Booking
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the Booking we want to update
+     *   }
+     * })
+     */
+    upsert<T extends BookingUpsertArgs>(args: SelectSubset<T, BookingUpsertArgs<ExtArgs>>): Prisma__BookingClient<$Result.GetResult<Prisma.$BookingPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of Bookings.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {BookingCountArgs} args - Arguments to filter Bookings to count.
+     * @example
+     * // Count the number of Bookings
+     * const count = await prisma.booking.count({
+     *   where: {
+     *     // ... the filter for the Bookings we want to count
+     *   }
+     * })
+    **/
+    count<T extends BookingCountArgs>(
+      args?: Subset<T, BookingCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], BookingCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a Booking.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {BookingAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends BookingAggregateArgs>(args: Subset<T, BookingAggregateArgs>): Prisma.PrismaPromise<GetBookingAggregateType<T>>
+
+    /**
+     * Group by Booking.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {BookingGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends BookingGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: BookingGroupByArgs['orderBy'] }
+        : { orderBy?: BookingGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, BookingGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetBookingGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the Booking model
+   */
+  readonly fields: BookingFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for Booking.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__BookingClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    instructor<T extends InstructorDefaultArgs<ExtArgs> = {}>(args?: Subset<T, InstructorDefaultArgs<ExtArgs>>): Prisma__InstructorClient<$Result.GetResult<Prisma.$InstructorPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    signals<T extends Booking$signalsArgs<ExtArgs> = {}>(args?: Subset<T, Booking$signalsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CallSignalPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the Booking model
+   */
+  interface BookingFieldRefs {
+    readonly id: FieldRef<"Booking", 'String'>
+    readonly kind: FieldRef<"Booking", 'String'>
+    readonly instructorId: FieldRef<"Booking", 'String'>
+    readonly coachUserId: FieldRef<"Booking", 'String'>
+    readonly clientUserId: FieldRef<"Booking", 'String'>
+    readonly listingId: FieldRef<"Booking", 'String'>
+    readonly status: FieldRef<"Booking", 'String'>
+    readonly durationMin: FieldRef<"Booking", 'Int'>
+    readonly priceCents: FieldRef<"Booking", 'Int'>
+    readonly platformFeeCents: FieldRef<"Booking", 'Int'>
+    readonly stripeFeeCents: FieldRef<"Booking", 'Int'>
+    readonly refundCents: FieldRef<"Booking", 'Int'>
+    readonly stripeCheckoutId: FieldRef<"Booking", 'String'>
+    readonly stripePaymentIntentId: FieldRef<"Booking", 'String'>
+    readonly holdExpiresAt: FieldRef<"Booking", 'DateTime'>
+    readonly startsAt: FieldRef<"Booking", 'DateTime'>
+    readonly endsAt: FieldRef<"Booking", 'DateTime'>
+    readonly slotLock: FieldRef<"Booking", 'String'>
+    readonly clientTimeZone: FieldRef<"Booking", 'String'>
+    readonly clientNote: FieldRef<"Booking", 'String'>
+    readonly reschedulesUsed: FieldRef<"Booking", 'Int'>
+    readonly connectionFailedAt: FieldRef<"Booking", 'DateTime'>
+    readonly failureCreditOpen: FieldRef<"Booking", 'Boolean'>
+    readonly shareWithCoach: FieldRef<"Booking", 'Boolean'>
+    readonly goal: FieldRef<"Booking", 'String'>
+    readonly painYes: FieldRef<"Booking", 'Boolean'>
+    readonly reviewNote: FieldRef<"Booking", 'String'>
+    readonly clipPaths: FieldRef<"Booking", 'Json'>
+    readonly clipConsentAt: FieldRef<"Booking", 'DateTime'>
+    readonly consentTextVersion: FieldRef<"Booking", 'String'>
+    readonly submittedAt: FieldRef<"Booking", 'DateTime'>
+    readonly dueAt: FieldRef<"Booking", 'DateTime'>
+    readonly replyText: FieldRef<"Booking", 'String'>
+    readonly replyClipPath: FieldRef<"Booking", 'String'>
+    readonly attachedDrillIds: FieldRef<"Booking", 'Json'>
+    readonly deliveredAt: FieldRef<"Booking", 'DateTime'>
+    readonly originalClipDeleteAt: FieldRef<"Booking", 'DateTime'>
+    readonly originalsDeletedAt: FieldRef<"Booking", 'DateTime'>
+    readonly cancelledAt: FieldRef<"Booking", 'DateTime'>
+    readonly cancelledBy: FieldRef<"Booking", 'String'>
+    readonly createdAt: FieldRef<"Booking", 'DateTime'>
+    readonly updatedAt: FieldRef<"Booking", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * Booking findUnique
+   */
+  export type BookingFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Booking
+     */
+    select?: BookingSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Booking
+     */
+    omit?: BookingOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BookingInclude<ExtArgs> | null
+    /**
+     * Filter, which Booking to fetch.
+     */
+    where: BookingWhereUniqueInput
+  }
+
+  /**
+   * Booking findUniqueOrThrow
+   */
+  export type BookingFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Booking
+     */
+    select?: BookingSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Booking
+     */
+    omit?: BookingOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BookingInclude<ExtArgs> | null
+    /**
+     * Filter, which Booking to fetch.
+     */
+    where: BookingWhereUniqueInput
+  }
+
+  /**
+   * Booking findFirst
+   */
+  export type BookingFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Booking
+     */
+    select?: BookingSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Booking
+     */
+    omit?: BookingOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BookingInclude<ExtArgs> | null
+    /**
+     * Filter, which Booking to fetch.
+     */
+    where?: BookingWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Bookings to fetch.
+     */
+    orderBy?: BookingOrderByWithRelationInput | BookingOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for Bookings.
+     */
+    cursor?: BookingWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Bookings from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Bookings.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of Bookings.
+     */
+    distinct?: BookingScalarFieldEnum | BookingScalarFieldEnum[]
+  }
+
+  /**
+   * Booking findFirstOrThrow
+   */
+  export type BookingFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Booking
+     */
+    select?: BookingSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Booking
+     */
+    omit?: BookingOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BookingInclude<ExtArgs> | null
+    /**
+     * Filter, which Booking to fetch.
+     */
+    where?: BookingWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Bookings to fetch.
+     */
+    orderBy?: BookingOrderByWithRelationInput | BookingOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for Bookings.
+     */
+    cursor?: BookingWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Bookings from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Bookings.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of Bookings.
+     */
+    distinct?: BookingScalarFieldEnum | BookingScalarFieldEnum[]
+  }
+
+  /**
+   * Booking findMany
+   */
+  export type BookingFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Booking
+     */
+    select?: BookingSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Booking
+     */
+    omit?: BookingOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BookingInclude<ExtArgs> | null
+    /**
+     * Filter, which Bookings to fetch.
+     */
+    where?: BookingWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Bookings to fetch.
+     */
+    orderBy?: BookingOrderByWithRelationInput | BookingOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing Bookings.
+     */
+    cursor?: BookingWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Bookings from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Bookings.
+     */
+    skip?: number
+    distinct?: BookingScalarFieldEnum | BookingScalarFieldEnum[]
+  }
+
+  /**
+   * Booking create
+   */
+  export type BookingCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Booking
+     */
+    select?: BookingSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Booking
+     */
+    omit?: BookingOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BookingInclude<ExtArgs> | null
+    /**
+     * The data needed to create a Booking.
+     */
+    data: XOR<BookingCreateInput, BookingUncheckedCreateInput>
+  }
+
+  /**
+   * Booking createMany
+   */
+  export type BookingCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many Bookings.
+     */
+    data: BookingCreateManyInput | BookingCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * Booking createManyAndReturn
+   */
+  export type BookingCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Booking
+     */
+    select?: BookingSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the Booking
+     */
+    omit?: BookingOmit<ExtArgs> | null
+    /**
+     * The data used to create many Bookings.
+     */
+    data: BookingCreateManyInput | BookingCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BookingIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * Booking update
+   */
+  export type BookingUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Booking
+     */
+    select?: BookingSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Booking
+     */
+    omit?: BookingOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BookingInclude<ExtArgs> | null
+    /**
+     * The data needed to update a Booking.
+     */
+    data: XOR<BookingUpdateInput, BookingUncheckedUpdateInput>
+    /**
+     * Choose, which Booking to update.
+     */
+    where: BookingWhereUniqueInput
+  }
+
+  /**
+   * Booking updateMany
+   */
+  export type BookingUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update Bookings.
+     */
+    data: XOR<BookingUpdateManyMutationInput, BookingUncheckedUpdateManyInput>
+    /**
+     * Filter which Bookings to update
+     */
+    where?: BookingWhereInput
+    /**
+     * Limit how many Bookings to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * Booking updateManyAndReturn
+   */
+  export type BookingUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Booking
+     */
+    select?: BookingSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the Booking
+     */
+    omit?: BookingOmit<ExtArgs> | null
+    /**
+     * The data used to update Bookings.
+     */
+    data: XOR<BookingUpdateManyMutationInput, BookingUncheckedUpdateManyInput>
+    /**
+     * Filter which Bookings to update
+     */
+    where?: BookingWhereInput
+    /**
+     * Limit how many Bookings to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BookingIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * Booking upsert
+   */
+  export type BookingUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Booking
+     */
+    select?: BookingSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Booking
+     */
+    omit?: BookingOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BookingInclude<ExtArgs> | null
+    /**
+     * The filter to search for the Booking to update in case it exists.
+     */
+    where: BookingWhereUniqueInput
+    /**
+     * In case the Booking found by the `where` argument doesn't exist, create a new Booking with this data.
+     */
+    create: XOR<BookingCreateInput, BookingUncheckedCreateInput>
+    /**
+     * In case the Booking was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<BookingUpdateInput, BookingUncheckedUpdateInput>
+  }
+
+  /**
+   * Booking delete
+   */
+  export type BookingDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Booking
+     */
+    select?: BookingSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Booking
+     */
+    omit?: BookingOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BookingInclude<ExtArgs> | null
+    /**
+     * Filter which Booking to delete.
+     */
+    where: BookingWhereUniqueInput
+  }
+
+  /**
+   * Booking deleteMany
+   */
+  export type BookingDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which Bookings to delete
+     */
+    where?: BookingWhereInput
+    /**
+     * Limit how many Bookings to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * Booking.signals
+   */
+  export type Booking$signalsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CallSignal
+     */
+    select?: CallSignalSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CallSignal
+     */
+    omit?: CallSignalOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CallSignalInclude<ExtArgs> | null
+    where?: CallSignalWhereInput
+    orderBy?: CallSignalOrderByWithRelationInput | CallSignalOrderByWithRelationInput[]
+    cursor?: CallSignalWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: CallSignalScalarFieldEnum | CallSignalScalarFieldEnum[]
+  }
+
+  /**
+   * Booking without action
+   */
+  export type BookingDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Booking
+     */
+    select?: BookingSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Booking
+     */
+    omit?: BookingOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BookingInclude<ExtArgs> | null
+  }
+
+
+  /**
+   * Model CallSignal
+   */
+
+  export type AggregateCallSignal = {
+    _count: CallSignalCountAggregateOutputType | null
+    _avg: CallSignalAvgAggregateOutputType | null
+    _sum: CallSignalSumAggregateOutputType | null
+    _min: CallSignalMinAggregateOutputType | null
+    _max: CallSignalMaxAggregateOutputType | null
+  }
+
+  export type CallSignalAvgAggregateOutputType = {
+    id: number | null
+    epoch: number | null
+  }
+
+  export type CallSignalSumAggregateOutputType = {
+    id: number | null
+    epoch: number | null
+  }
+
+  export type CallSignalMinAggregateOutputType = {
+    id: number | null
+    bookingId: string | null
+    fromRole: string | null
+    epoch: number | null
+    kind: string | null
+    payload: string | null
+    createdAt: Date | null
+    expiresAt: Date | null
+  }
+
+  export type CallSignalMaxAggregateOutputType = {
+    id: number | null
+    bookingId: string | null
+    fromRole: string | null
+    epoch: number | null
+    kind: string | null
+    payload: string | null
+    createdAt: Date | null
+    expiresAt: Date | null
+  }
+
+  export type CallSignalCountAggregateOutputType = {
+    id: number
+    bookingId: number
+    fromRole: number
+    epoch: number
+    kind: number
+    payload: number
+    createdAt: number
+    expiresAt: number
+    _all: number
+  }
+
+
+  export type CallSignalAvgAggregateInputType = {
+    id?: true
+    epoch?: true
+  }
+
+  export type CallSignalSumAggregateInputType = {
+    id?: true
+    epoch?: true
+  }
+
+  export type CallSignalMinAggregateInputType = {
+    id?: true
+    bookingId?: true
+    fromRole?: true
+    epoch?: true
+    kind?: true
+    payload?: true
+    createdAt?: true
+    expiresAt?: true
+  }
+
+  export type CallSignalMaxAggregateInputType = {
+    id?: true
+    bookingId?: true
+    fromRole?: true
+    epoch?: true
+    kind?: true
+    payload?: true
+    createdAt?: true
+    expiresAt?: true
+  }
+
+  export type CallSignalCountAggregateInputType = {
+    id?: true
+    bookingId?: true
+    fromRole?: true
+    epoch?: true
+    kind?: true
+    payload?: true
+    createdAt?: true
+    expiresAt?: true
+    _all?: true
+  }
+
+  export type CallSignalAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which CallSignal to aggregate.
+     */
+    where?: CallSignalWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of CallSignals to fetch.
+     */
+    orderBy?: CallSignalOrderByWithRelationInput | CallSignalOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: CallSignalWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` CallSignals from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` CallSignals.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned CallSignals
+    **/
+    _count?: true | CallSignalCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to average
+    **/
+    _avg?: CallSignalAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: CallSignalSumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: CallSignalMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: CallSignalMaxAggregateInputType
+  }
+
+  export type GetCallSignalAggregateType<T extends CallSignalAggregateArgs> = {
+        [P in keyof T & keyof AggregateCallSignal]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateCallSignal[P]>
+      : GetScalarType<T[P], AggregateCallSignal[P]>
+  }
+
+
+
+
+  export type CallSignalGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: CallSignalWhereInput
+    orderBy?: CallSignalOrderByWithAggregationInput | CallSignalOrderByWithAggregationInput[]
+    by: CallSignalScalarFieldEnum[] | CallSignalScalarFieldEnum
+    having?: CallSignalScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: CallSignalCountAggregateInputType | true
+    _avg?: CallSignalAvgAggregateInputType
+    _sum?: CallSignalSumAggregateInputType
+    _min?: CallSignalMinAggregateInputType
+    _max?: CallSignalMaxAggregateInputType
+  }
+
+  export type CallSignalGroupByOutputType = {
+    id: number
+    bookingId: string
+    fromRole: string
+    epoch: number
+    kind: string
+    payload: string
+    createdAt: Date
+    expiresAt: Date
+    _count: CallSignalCountAggregateOutputType | null
+    _avg: CallSignalAvgAggregateOutputType | null
+    _sum: CallSignalSumAggregateOutputType | null
+    _min: CallSignalMinAggregateOutputType | null
+    _max: CallSignalMaxAggregateOutputType | null
+  }
+
+  type GetCallSignalGroupByPayload<T extends CallSignalGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<CallSignalGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof CallSignalGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], CallSignalGroupByOutputType[P]>
+            : GetScalarType<T[P], CallSignalGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type CallSignalSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    bookingId?: boolean
+    fromRole?: boolean
+    epoch?: boolean
+    kind?: boolean
+    payload?: boolean
+    createdAt?: boolean
+    expiresAt?: boolean
+    booking?: boolean | BookingDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["callSignal"]>
+
+  export type CallSignalSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    bookingId?: boolean
+    fromRole?: boolean
+    epoch?: boolean
+    kind?: boolean
+    payload?: boolean
+    createdAt?: boolean
+    expiresAt?: boolean
+    booking?: boolean | BookingDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["callSignal"]>
+
+  export type CallSignalSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    bookingId?: boolean
+    fromRole?: boolean
+    epoch?: boolean
+    kind?: boolean
+    payload?: boolean
+    createdAt?: boolean
+    expiresAt?: boolean
+    booking?: boolean | BookingDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["callSignal"]>
+
+  export type CallSignalSelectScalar = {
+    id?: boolean
+    bookingId?: boolean
+    fromRole?: boolean
+    epoch?: boolean
+    kind?: boolean
+    payload?: boolean
+    createdAt?: boolean
+    expiresAt?: boolean
+  }
+
+  export type CallSignalOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "bookingId" | "fromRole" | "epoch" | "kind" | "payload" | "createdAt" | "expiresAt", ExtArgs["result"]["callSignal"]>
+  export type CallSignalInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    booking?: boolean | BookingDefaultArgs<ExtArgs>
+  }
+  export type CallSignalIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    booking?: boolean | BookingDefaultArgs<ExtArgs>
+  }
+  export type CallSignalIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    booking?: boolean | BookingDefaultArgs<ExtArgs>
+  }
+
+  export type $CallSignalPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "CallSignal"
+    objects: {
+      booking: Prisma.$BookingPayload<ExtArgs>
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: number
+      bookingId: string
+      fromRole: string
+      epoch: number
+      kind: string
+      payload: string
+      createdAt: Date
+      expiresAt: Date
+    }, ExtArgs["result"]["callSignal"]>
+    composites: {}
+  }
+
+  type CallSignalGetPayload<S extends boolean | null | undefined | CallSignalDefaultArgs> = $Result.GetResult<Prisma.$CallSignalPayload, S>
+
+  type CallSignalCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<CallSignalFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: CallSignalCountAggregateInputType | true
+    }
+
+  export interface CallSignalDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['CallSignal'], meta: { name: 'CallSignal' } }
+    /**
+     * Find zero or one CallSignal that matches the filter.
+     * @param {CallSignalFindUniqueArgs} args - Arguments to find a CallSignal
+     * @example
+     * // Get one CallSignal
+     * const callSignal = await prisma.callSignal.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends CallSignalFindUniqueArgs>(args: SelectSubset<T, CallSignalFindUniqueArgs<ExtArgs>>): Prisma__CallSignalClient<$Result.GetResult<Prisma.$CallSignalPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one CallSignal that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {CallSignalFindUniqueOrThrowArgs} args - Arguments to find a CallSignal
+     * @example
+     * // Get one CallSignal
+     * const callSignal = await prisma.callSignal.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends CallSignalFindUniqueOrThrowArgs>(args: SelectSubset<T, CallSignalFindUniqueOrThrowArgs<ExtArgs>>): Prisma__CallSignalClient<$Result.GetResult<Prisma.$CallSignalPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first CallSignal that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CallSignalFindFirstArgs} args - Arguments to find a CallSignal
+     * @example
+     * // Get one CallSignal
+     * const callSignal = await prisma.callSignal.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends CallSignalFindFirstArgs>(args?: SelectSubset<T, CallSignalFindFirstArgs<ExtArgs>>): Prisma__CallSignalClient<$Result.GetResult<Prisma.$CallSignalPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first CallSignal that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CallSignalFindFirstOrThrowArgs} args - Arguments to find a CallSignal
+     * @example
+     * // Get one CallSignal
+     * const callSignal = await prisma.callSignal.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends CallSignalFindFirstOrThrowArgs>(args?: SelectSubset<T, CallSignalFindFirstOrThrowArgs<ExtArgs>>): Prisma__CallSignalClient<$Result.GetResult<Prisma.$CallSignalPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more CallSignals that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CallSignalFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all CallSignals
+     * const callSignals = await prisma.callSignal.findMany()
+     * 
+     * // Get first 10 CallSignals
+     * const callSignals = await prisma.callSignal.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const callSignalWithIdOnly = await prisma.callSignal.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends CallSignalFindManyArgs>(args?: SelectSubset<T, CallSignalFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CallSignalPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a CallSignal.
+     * @param {CallSignalCreateArgs} args - Arguments to create a CallSignal.
+     * @example
+     * // Create one CallSignal
+     * const CallSignal = await prisma.callSignal.create({
+     *   data: {
+     *     // ... data to create a CallSignal
+     *   }
+     * })
+     * 
+     */
+    create<T extends CallSignalCreateArgs>(args: SelectSubset<T, CallSignalCreateArgs<ExtArgs>>): Prisma__CallSignalClient<$Result.GetResult<Prisma.$CallSignalPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many CallSignals.
+     * @param {CallSignalCreateManyArgs} args - Arguments to create many CallSignals.
+     * @example
+     * // Create many CallSignals
+     * const callSignal = await prisma.callSignal.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends CallSignalCreateManyArgs>(args?: SelectSubset<T, CallSignalCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many CallSignals and returns the data saved in the database.
+     * @param {CallSignalCreateManyAndReturnArgs} args - Arguments to create many CallSignals.
+     * @example
+     * // Create many CallSignals
+     * const callSignal = await prisma.callSignal.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many CallSignals and only return the `id`
+     * const callSignalWithIdOnly = await prisma.callSignal.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends CallSignalCreateManyAndReturnArgs>(args?: SelectSubset<T, CallSignalCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CallSignalPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a CallSignal.
+     * @param {CallSignalDeleteArgs} args - Arguments to delete one CallSignal.
+     * @example
+     * // Delete one CallSignal
+     * const CallSignal = await prisma.callSignal.delete({
+     *   where: {
+     *     // ... filter to delete one CallSignal
+     *   }
+     * })
+     * 
+     */
+    delete<T extends CallSignalDeleteArgs>(args: SelectSubset<T, CallSignalDeleteArgs<ExtArgs>>): Prisma__CallSignalClient<$Result.GetResult<Prisma.$CallSignalPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one CallSignal.
+     * @param {CallSignalUpdateArgs} args - Arguments to update one CallSignal.
+     * @example
+     * // Update one CallSignal
+     * const callSignal = await prisma.callSignal.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends CallSignalUpdateArgs>(args: SelectSubset<T, CallSignalUpdateArgs<ExtArgs>>): Prisma__CallSignalClient<$Result.GetResult<Prisma.$CallSignalPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more CallSignals.
+     * @param {CallSignalDeleteManyArgs} args - Arguments to filter CallSignals to delete.
+     * @example
+     * // Delete a few CallSignals
+     * const { count } = await prisma.callSignal.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends CallSignalDeleteManyArgs>(args?: SelectSubset<T, CallSignalDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more CallSignals.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CallSignalUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many CallSignals
+     * const callSignal = await prisma.callSignal.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends CallSignalUpdateManyArgs>(args: SelectSubset<T, CallSignalUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more CallSignals and returns the data updated in the database.
+     * @param {CallSignalUpdateManyAndReturnArgs} args - Arguments to update many CallSignals.
+     * @example
+     * // Update many CallSignals
+     * const callSignal = await prisma.callSignal.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more CallSignals and only return the `id`
+     * const callSignalWithIdOnly = await prisma.callSignal.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends CallSignalUpdateManyAndReturnArgs>(args: SelectSubset<T, CallSignalUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CallSignalPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one CallSignal.
+     * @param {CallSignalUpsertArgs} args - Arguments to update or create a CallSignal.
+     * @example
+     * // Update or create a CallSignal
+     * const callSignal = await prisma.callSignal.upsert({
+     *   create: {
+     *     // ... data to create a CallSignal
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the CallSignal we want to update
+     *   }
+     * })
+     */
+    upsert<T extends CallSignalUpsertArgs>(args: SelectSubset<T, CallSignalUpsertArgs<ExtArgs>>): Prisma__CallSignalClient<$Result.GetResult<Prisma.$CallSignalPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of CallSignals.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CallSignalCountArgs} args - Arguments to filter CallSignals to count.
+     * @example
+     * // Count the number of CallSignals
+     * const count = await prisma.callSignal.count({
+     *   where: {
+     *     // ... the filter for the CallSignals we want to count
+     *   }
+     * })
+    **/
+    count<T extends CallSignalCountArgs>(
+      args?: Subset<T, CallSignalCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], CallSignalCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a CallSignal.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CallSignalAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends CallSignalAggregateArgs>(args: Subset<T, CallSignalAggregateArgs>): Prisma.PrismaPromise<GetCallSignalAggregateType<T>>
+
+    /**
+     * Group by CallSignal.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CallSignalGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends CallSignalGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: CallSignalGroupByArgs['orderBy'] }
+        : { orderBy?: CallSignalGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, CallSignalGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetCallSignalGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the CallSignal model
+   */
+  readonly fields: CallSignalFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for CallSignal.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__CallSignalClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    booking<T extends BookingDefaultArgs<ExtArgs> = {}>(args?: Subset<T, BookingDefaultArgs<ExtArgs>>): Prisma__BookingClient<$Result.GetResult<Prisma.$BookingPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the CallSignal model
+   */
+  interface CallSignalFieldRefs {
+    readonly id: FieldRef<"CallSignal", 'Int'>
+    readonly bookingId: FieldRef<"CallSignal", 'String'>
+    readonly fromRole: FieldRef<"CallSignal", 'String'>
+    readonly epoch: FieldRef<"CallSignal", 'Int'>
+    readonly kind: FieldRef<"CallSignal", 'String'>
+    readonly payload: FieldRef<"CallSignal", 'String'>
+    readonly createdAt: FieldRef<"CallSignal", 'DateTime'>
+    readonly expiresAt: FieldRef<"CallSignal", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * CallSignal findUnique
+   */
+  export type CallSignalFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CallSignal
+     */
+    select?: CallSignalSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CallSignal
+     */
+    omit?: CallSignalOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CallSignalInclude<ExtArgs> | null
+    /**
+     * Filter, which CallSignal to fetch.
+     */
+    where: CallSignalWhereUniqueInput
+  }
+
+  /**
+   * CallSignal findUniqueOrThrow
+   */
+  export type CallSignalFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CallSignal
+     */
+    select?: CallSignalSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CallSignal
+     */
+    omit?: CallSignalOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CallSignalInclude<ExtArgs> | null
+    /**
+     * Filter, which CallSignal to fetch.
+     */
+    where: CallSignalWhereUniqueInput
+  }
+
+  /**
+   * CallSignal findFirst
+   */
+  export type CallSignalFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CallSignal
+     */
+    select?: CallSignalSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CallSignal
+     */
+    omit?: CallSignalOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CallSignalInclude<ExtArgs> | null
+    /**
+     * Filter, which CallSignal to fetch.
+     */
+    where?: CallSignalWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of CallSignals to fetch.
+     */
+    orderBy?: CallSignalOrderByWithRelationInput | CallSignalOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for CallSignals.
+     */
+    cursor?: CallSignalWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` CallSignals from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` CallSignals.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of CallSignals.
+     */
+    distinct?: CallSignalScalarFieldEnum | CallSignalScalarFieldEnum[]
+  }
+
+  /**
+   * CallSignal findFirstOrThrow
+   */
+  export type CallSignalFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CallSignal
+     */
+    select?: CallSignalSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CallSignal
+     */
+    omit?: CallSignalOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CallSignalInclude<ExtArgs> | null
+    /**
+     * Filter, which CallSignal to fetch.
+     */
+    where?: CallSignalWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of CallSignals to fetch.
+     */
+    orderBy?: CallSignalOrderByWithRelationInput | CallSignalOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for CallSignals.
+     */
+    cursor?: CallSignalWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` CallSignals from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` CallSignals.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of CallSignals.
+     */
+    distinct?: CallSignalScalarFieldEnum | CallSignalScalarFieldEnum[]
+  }
+
+  /**
+   * CallSignal findMany
+   */
+  export type CallSignalFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CallSignal
+     */
+    select?: CallSignalSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CallSignal
+     */
+    omit?: CallSignalOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CallSignalInclude<ExtArgs> | null
+    /**
+     * Filter, which CallSignals to fetch.
+     */
+    where?: CallSignalWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of CallSignals to fetch.
+     */
+    orderBy?: CallSignalOrderByWithRelationInput | CallSignalOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing CallSignals.
+     */
+    cursor?: CallSignalWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` CallSignals from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` CallSignals.
+     */
+    skip?: number
+    distinct?: CallSignalScalarFieldEnum | CallSignalScalarFieldEnum[]
+  }
+
+  /**
+   * CallSignal create
+   */
+  export type CallSignalCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CallSignal
+     */
+    select?: CallSignalSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CallSignal
+     */
+    omit?: CallSignalOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CallSignalInclude<ExtArgs> | null
+    /**
+     * The data needed to create a CallSignal.
+     */
+    data: XOR<CallSignalCreateInput, CallSignalUncheckedCreateInput>
+  }
+
+  /**
+   * CallSignal createMany
+   */
+  export type CallSignalCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many CallSignals.
+     */
+    data: CallSignalCreateManyInput | CallSignalCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * CallSignal createManyAndReturn
+   */
+  export type CallSignalCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CallSignal
+     */
+    select?: CallSignalSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the CallSignal
+     */
+    omit?: CallSignalOmit<ExtArgs> | null
+    /**
+     * The data used to create many CallSignals.
+     */
+    data: CallSignalCreateManyInput | CallSignalCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CallSignalIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * CallSignal update
+   */
+  export type CallSignalUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CallSignal
+     */
+    select?: CallSignalSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CallSignal
+     */
+    omit?: CallSignalOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CallSignalInclude<ExtArgs> | null
+    /**
+     * The data needed to update a CallSignal.
+     */
+    data: XOR<CallSignalUpdateInput, CallSignalUncheckedUpdateInput>
+    /**
+     * Choose, which CallSignal to update.
+     */
+    where: CallSignalWhereUniqueInput
+  }
+
+  /**
+   * CallSignal updateMany
+   */
+  export type CallSignalUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update CallSignals.
+     */
+    data: XOR<CallSignalUpdateManyMutationInput, CallSignalUncheckedUpdateManyInput>
+    /**
+     * Filter which CallSignals to update
+     */
+    where?: CallSignalWhereInput
+    /**
+     * Limit how many CallSignals to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * CallSignal updateManyAndReturn
+   */
+  export type CallSignalUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CallSignal
+     */
+    select?: CallSignalSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the CallSignal
+     */
+    omit?: CallSignalOmit<ExtArgs> | null
+    /**
+     * The data used to update CallSignals.
+     */
+    data: XOR<CallSignalUpdateManyMutationInput, CallSignalUncheckedUpdateManyInput>
+    /**
+     * Filter which CallSignals to update
+     */
+    where?: CallSignalWhereInput
+    /**
+     * Limit how many CallSignals to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CallSignalIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * CallSignal upsert
+   */
+  export type CallSignalUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CallSignal
+     */
+    select?: CallSignalSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CallSignal
+     */
+    omit?: CallSignalOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CallSignalInclude<ExtArgs> | null
+    /**
+     * The filter to search for the CallSignal to update in case it exists.
+     */
+    where: CallSignalWhereUniqueInput
+    /**
+     * In case the CallSignal found by the `where` argument doesn't exist, create a new CallSignal with this data.
+     */
+    create: XOR<CallSignalCreateInput, CallSignalUncheckedCreateInput>
+    /**
+     * In case the CallSignal was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<CallSignalUpdateInput, CallSignalUncheckedUpdateInput>
+  }
+
+  /**
+   * CallSignal delete
+   */
+  export type CallSignalDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CallSignal
+     */
+    select?: CallSignalSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CallSignal
+     */
+    omit?: CallSignalOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CallSignalInclude<ExtArgs> | null
+    /**
+     * Filter which CallSignal to delete.
+     */
+    where: CallSignalWhereUniqueInput
+  }
+
+  /**
+   * CallSignal deleteMany
+   */
+  export type CallSignalDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which CallSignals to delete
+     */
+    where?: CallSignalWhereInput
+    /**
+     * Limit how many CallSignals to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * CallSignal without action
+   */
+  export type CallSignalDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CallSignal
+     */
+    select?: CallSignalSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CallSignal
+     */
+    omit?: CallSignalOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CallSignalInclude<ExtArgs> | null
+  }
+
+
+  /**
+   * Model CoachStoreReferral
+   */
+
+  export type AggregateCoachStoreReferral = {
+    _count: CoachStoreReferralCountAggregateOutputType | null
+    _avg: CoachStoreReferralAvgAggregateOutputType | null
+    _sum: CoachStoreReferralSumAggregateOutputType | null
+    _min: CoachStoreReferralMinAggregateOutputType | null
+    _max: CoachStoreReferralMaxAggregateOutputType | null
+  }
+
+  export type CoachStoreReferralAvgAggregateOutputType = {
+    grossCents: number | null
+    platformFeeCents: number | null
+    shareOfFee: number | null
+    cutCents: number | null
+    renewalIndex: number | null
+  }
+
+  export type CoachStoreReferralSumAggregateOutputType = {
+    grossCents: number | null
+    platformFeeCents: number | null
+    shareOfFee: number | null
+    cutCents: number | null
+    renewalIndex: number | null
+  }
+
+  export type CoachStoreReferralMinAggregateOutputType = {
+    id: string | null
+    paymentKey: string | null
+    referrerUserId: string | null
+    buyerUserId: string | null
+    coachUserId: string | null
+    sourceKind: string | null
+    sourceId: string | null
+    grossCents: number | null
+    platformFeeCents: number | null
+    shareOfFee: number | null
+    cutCents: number | null
+    renewalIndex: number | null
+    status: string | null
+    holdUntil: Date | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type CoachStoreReferralMaxAggregateOutputType = {
+    id: string | null
+    paymentKey: string | null
+    referrerUserId: string | null
+    buyerUserId: string | null
+    coachUserId: string | null
+    sourceKind: string | null
+    sourceId: string | null
+    grossCents: number | null
+    platformFeeCents: number | null
+    shareOfFee: number | null
+    cutCents: number | null
+    renewalIndex: number | null
+    status: string | null
+    holdUntil: Date | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type CoachStoreReferralCountAggregateOutputType = {
+    id: number
+    paymentKey: number
+    referrerUserId: number
+    buyerUserId: number
+    coachUserId: number
+    sourceKind: number
+    sourceId: number
+    grossCents: number
+    platformFeeCents: number
+    shareOfFee: number
+    cutCents: number
+    renewalIndex: number
+    status: number
+    holdUntil: number
+    createdAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type CoachStoreReferralAvgAggregateInputType = {
+    grossCents?: true
+    platformFeeCents?: true
+    shareOfFee?: true
+    cutCents?: true
+    renewalIndex?: true
+  }
+
+  export type CoachStoreReferralSumAggregateInputType = {
+    grossCents?: true
+    platformFeeCents?: true
+    shareOfFee?: true
+    cutCents?: true
+    renewalIndex?: true
+  }
+
+  export type CoachStoreReferralMinAggregateInputType = {
+    id?: true
+    paymentKey?: true
+    referrerUserId?: true
+    buyerUserId?: true
+    coachUserId?: true
+    sourceKind?: true
+    sourceId?: true
+    grossCents?: true
+    platformFeeCents?: true
+    shareOfFee?: true
+    cutCents?: true
+    renewalIndex?: true
+    status?: true
+    holdUntil?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type CoachStoreReferralMaxAggregateInputType = {
+    id?: true
+    paymentKey?: true
+    referrerUserId?: true
+    buyerUserId?: true
+    coachUserId?: true
+    sourceKind?: true
+    sourceId?: true
+    grossCents?: true
+    platformFeeCents?: true
+    shareOfFee?: true
+    cutCents?: true
+    renewalIndex?: true
+    status?: true
+    holdUntil?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type CoachStoreReferralCountAggregateInputType = {
+    id?: true
+    paymentKey?: true
+    referrerUserId?: true
+    buyerUserId?: true
+    coachUserId?: true
+    sourceKind?: true
+    sourceId?: true
+    grossCents?: true
+    platformFeeCents?: true
+    shareOfFee?: true
+    cutCents?: true
+    renewalIndex?: true
+    status?: true
+    holdUntil?: true
+    createdAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type CoachStoreReferralAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which CoachStoreReferral to aggregate.
+     */
+    where?: CoachStoreReferralWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of CoachStoreReferrals to fetch.
+     */
+    orderBy?: CoachStoreReferralOrderByWithRelationInput | CoachStoreReferralOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: CoachStoreReferralWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` CoachStoreReferrals from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` CoachStoreReferrals.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned CoachStoreReferrals
+    **/
+    _count?: true | CoachStoreReferralCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to average
+    **/
+    _avg?: CoachStoreReferralAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: CoachStoreReferralSumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: CoachStoreReferralMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: CoachStoreReferralMaxAggregateInputType
+  }
+
+  export type GetCoachStoreReferralAggregateType<T extends CoachStoreReferralAggregateArgs> = {
+        [P in keyof T & keyof AggregateCoachStoreReferral]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateCoachStoreReferral[P]>
+      : GetScalarType<T[P], AggregateCoachStoreReferral[P]>
+  }
+
+
+
+
+  export type CoachStoreReferralGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: CoachStoreReferralWhereInput
+    orderBy?: CoachStoreReferralOrderByWithAggregationInput | CoachStoreReferralOrderByWithAggregationInput[]
+    by: CoachStoreReferralScalarFieldEnum[] | CoachStoreReferralScalarFieldEnum
+    having?: CoachStoreReferralScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: CoachStoreReferralCountAggregateInputType | true
+    _avg?: CoachStoreReferralAvgAggregateInputType
+    _sum?: CoachStoreReferralSumAggregateInputType
+    _min?: CoachStoreReferralMinAggregateInputType
+    _max?: CoachStoreReferralMaxAggregateInputType
+  }
+
+  export type CoachStoreReferralGroupByOutputType = {
+    id: string
+    paymentKey: string
+    referrerUserId: string
+    buyerUserId: string
+    coachUserId: string
+    sourceKind: string
+    sourceId: string
+    grossCents: number
+    platformFeeCents: number
+    shareOfFee: number
+    cutCents: number
+    renewalIndex: number
+    status: string
+    holdUntil: Date
+    createdAt: Date
+    updatedAt: Date
+    _count: CoachStoreReferralCountAggregateOutputType | null
+    _avg: CoachStoreReferralAvgAggregateOutputType | null
+    _sum: CoachStoreReferralSumAggregateOutputType | null
+    _min: CoachStoreReferralMinAggregateOutputType | null
+    _max: CoachStoreReferralMaxAggregateOutputType | null
+  }
+
+  type GetCoachStoreReferralGroupByPayload<T extends CoachStoreReferralGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<CoachStoreReferralGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof CoachStoreReferralGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], CoachStoreReferralGroupByOutputType[P]>
+            : GetScalarType<T[P], CoachStoreReferralGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type CoachStoreReferralSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    paymentKey?: boolean
+    referrerUserId?: boolean
+    buyerUserId?: boolean
+    coachUserId?: boolean
+    sourceKind?: boolean
+    sourceId?: boolean
+    grossCents?: boolean
+    platformFeeCents?: boolean
+    shareOfFee?: boolean
+    cutCents?: boolean
+    renewalIndex?: boolean
+    status?: boolean
+    holdUntil?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }, ExtArgs["result"]["coachStoreReferral"]>
+
+  export type CoachStoreReferralSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    paymentKey?: boolean
+    referrerUserId?: boolean
+    buyerUserId?: boolean
+    coachUserId?: boolean
+    sourceKind?: boolean
+    sourceId?: boolean
+    grossCents?: boolean
+    platformFeeCents?: boolean
+    shareOfFee?: boolean
+    cutCents?: boolean
+    renewalIndex?: boolean
+    status?: boolean
+    holdUntil?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }, ExtArgs["result"]["coachStoreReferral"]>
+
+  export type CoachStoreReferralSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    paymentKey?: boolean
+    referrerUserId?: boolean
+    buyerUserId?: boolean
+    coachUserId?: boolean
+    sourceKind?: boolean
+    sourceId?: boolean
+    grossCents?: boolean
+    platformFeeCents?: boolean
+    shareOfFee?: boolean
+    cutCents?: boolean
+    renewalIndex?: boolean
+    status?: boolean
+    holdUntil?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }, ExtArgs["result"]["coachStoreReferral"]>
+
+  export type CoachStoreReferralSelectScalar = {
+    id?: boolean
+    paymentKey?: boolean
+    referrerUserId?: boolean
+    buyerUserId?: boolean
+    coachUserId?: boolean
+    sourceKind?: boolean
+    sourceId?: boolean
+    grossCents?: boolean
+    platformFeeCents?: boolean
+    shareOfFee?: boolean
+    cutCents?: boolean
+    renewalIndex?: boolean
+    status?: boolean
+    holdUntil?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }
+
+  export type CoachStoreReferralOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "paymentKey" | "referrerUserId" | "buyerUserId" | "coachUserId" | "sourceKind" | "sourceId" | "grossCents" | "platformFeeCents" | "shareOfFee" | "cutCents" | "renewalIndex" | "status" | "holdUntil" | "createdAt" | "updatedAt", ExtArgs["result"]["coachStoreReferral"]>
+
+  export type $CoachStoreReferralPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "CoachStoreReferral"
+    objects: {}
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      paymentKey: string
+      referrerUserId: string
+      buyerUserId: string
+      coachUserId: string
+      sourceKind: string
+      sourceId: string
+      grossCents: number
+      platformFeeCents: number
+      shareOfFee: number
+      cutCents: number
+      renewalIndex: number
+      status: string
+      holdUntil: Date
+      createdAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["coachStoreReferral"]>
+    composites: {}
+  }
+
+  type CoachStoreReferralGetPayload<S extends boolean | null | undefined | CoachStoreReferralDefaultArgs> = $Result.GetResult<Prisma.$CoachStoreReferralPayload, S>
+
+  type CoachStoreReferralCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<CoachStoreReferralFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: CoachStoreReferralCountAggregateInputType | true
+    }
+
+  export interface CoachStoreReferralDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['CoachStoreReferral'], meta: { name: 'CoachStoreReferral' } }
+    /**
+     * Find zero or one CoachStoreReferral that matches the filter.
+     * @param {CoachStoreReferralFindUniqueArgs} args - Arguments to find a CoachStoreReferral
+     * @example
+     * // Get one CoachStoreReferral
+     * const coachStoreReferral = await prisma.coachStoreReferral.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends CoachStoreReferralFindUniqueArgs>(args: SelectSubset<T, CoachStoreReferralFindUniqueArgs<ExtArgs>>): Prisma__CoachStoreReferralClient<$Result.GetResult<Prisma.$CoachStoreReferralPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one CoachStoreReferral that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {CoachStoreReferralFindUniqueOrThrowArgs} args - Arguments to find a CoachStoreReferral
+     * @example
+     * // Get one CoachStoreReferral
+     * const coachStoreReferral = await prisma.coachStoreReferral.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends CoachStoreReferralFindUniqueOrThrowArgs>(args: SelectSubset<T, CoachStoreReferralFindUniqueOrThrowArgs<ExtArgs>>): Prisma__CoachStoreReferralClient<$Result.GetResult<Prisma.$CoachStoreReferralPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first CoachStoreReferral that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CoachStoreReferralFindFirstArgs} args - Arguments to find a CoachStoreReferral
+     * @example
+     * // Get one CoachStoreReferral
+     * const coachStoreReferral = await prisma.coachStoreReferral.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends CoachStoreReferralFindFirstArgs>(args?: SelectSubset<T, CoachStoreReferralFindFirstArgs<ExtArgs>>): Prisma__CoachStoreReferralClient<$Result.GetResult<Prisma.$CoachStoreReferralPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first CoachStoreReferral that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CoachStoreReferralFindFirstOrThrowArgs} args - Arguments to find a CoachStoreReferral
+     * @example
+     * // Get one CoachStoreReferral
+     * const coachStoreReferral = await prisma.coachStoreReferral.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends CoachStoreReferralFindFirstOrThrowArgs>(args?: SelectSubset<T, CoachStoreReferralFindFirstOrThrowArgs<ExtArgs>>): Prisma__CoachStoreReferralClient<$Result.GetResult<Prisma.$CoachStoreReferralPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more CoachStoreReferrals that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CoachStoreReferralFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all CoachStoreReferrals
+     * const coachStoreReferrals = await prisma.coachStoreReferral.findMany()
+     * 
+     * // Get first 10 CoachStoreReferrals
+     * const coachStoreReferrals = await prisma.coachStoreReferral.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const coachStoreReferralWithIdOnly = await prisma.coachStoreReferral.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends CoachStoreReferralFindManyArgs>(args?: SelectSubset<T, CoachStoreReferralFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CoachStoreReferralPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a CoachStoreReferral.
+     * @param {CoachStoreReferralCreateArgs} args - Arguments to create a CoachStoreReferral.
+     * @example
+     * // Create one CoachStoreReferral
+     * const CoachStoreReferral = await prisma.coachStoreReferral.create({
+     *   data: {
+     *     // ... data to create a CoachStoreReferral
+     *   }
+     * })
+     * 
+     */
+    create<T extends CoachStoreReferralCreateArgs>(args: SelectSubset<T, CoachStoreReferralCreateArgs<ExtArgs>>): Prisma__CoachStoreReferralClient<$Result.GetResult<Prisma.$CoachStoreReferralPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many CoachStoreReferrals.
+     * @param {CoachStoreReferralCreateManyArgs} args - Arguments to create many CoachStoreReferrals.
+     * @example
+     * // Create many CoachStoreReferrals
+     * const coachStoreReferral = await prisma.coachStoreReferral.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends CoachStoreReferralCreateManyArgs>(args?: SelectSubset<T, CoachStoreReferralCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many CoachStoreReferrals and returns the data saved in the database.
+     * @param {CoachStoreReferralCreateManyAndReturnArgs} args - Arguments to create many CoachStoreReferrals.
+     * @example
+     * // Create many CoachStoreReferrals
+     * const coachStoreReferral = await prisma.coachStoreReferral.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many CoachStoreReferrals and only return the `id`
+     * const coachStoreReferralWithIdOnly = await prisma.coachStoreReferral.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends CoachStoreReferralCreateManyAndReturnArgs>(args?: SelectSubset<T, CoachStoreReferralCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CoachStoreReferralPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a CoachStoreReferral.
+     * @param {CoachStoreReferralDeleteArgs} args - Arguments to delete one CoachStoreReferral.
+     * @example
+     * // Delete one CoachStoreReferral
+     * const CoachStoreReferral = await prisma.coachStoreReferral.delete({
+     *   where: {
+     *     // ... filter to delete one CoachStoreReferral
+     *   }
+     * })
+     * 
+     */
+    delete<T extends CoachStoreReferralDeleteArgs>(args: SelectSubset<T, CoachStoreReferralDeleteArgs<ExtArgs>>): Prisma__CoachStoreReferralClient<$Result.GetResult<Prisma.$CoachStoreReferralPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one CoachStoreReferral.
+     * @param {CoachStoreReferralUpdateArgs} args - Arguments to update one CoachStoreReferral.
+     * @example
+     * // Update one CoachStoreReferral
+     * const coachStoreReferral = await prisma.coachStoreReferral.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends CoachStoreReferralUpdateArgs>(args: SelectSubset<T, CoachStoreReferralUpdateArgs<ExtArgs>>): Prisma__CoachStoreReferralClient<$Result.GetResult<Prisma.$CoachStoreReferralPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more CoachStoreReferrals.
+     * @param {CoachStoreReferralDeleteManyArgs} args - Arguments to filter CoachStoreReferrals to delete.
+     * @example
+     * // Delete a few CoachStoreReferrals
+     * const { count } = await prisma.coachStoreReferral.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends CoachStoreReferralDeleteManyArgs>(args?: SelectSubset<T, CoachStoreReferralDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more CoachStoreReferrals.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CoachStoreReferralUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many CoachStoreReferrals
+     * const coachStoreReferral = await prisma.coachStoreReferral.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends CoachStoreReferralUpdateManyArgs>(args: SelectSubset<T, CoachStoreReferralUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more CoachStoreReferrals and returns the data updated in the database.
+     * @param {CoachStoreReferralUpdateManyAndReturnArgs} args - Arguments to update many CoachStoreReferrals.
+     * @example
+     * // Update many CoachStoreReferrals
+     * const coachStoreReferral = await prisma.coachStoreReferral.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more CoachStoreReferrals and only return the `id`
+     * const coachStoreReferralWithIdOnly = await prisma.coachStoreReferral.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends CoachStoreReferralUpdateManyAndReturnArgs>(args: SelectSubset<T, CoachStoreReferralUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CoachStoreReferralPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one CoachStoreReferral.
+     * @param {CoachStoreReferralUpsertArgs} args - Arguments to update or create a CoachStoreReferral.
+     * @example
+     * // Update or create a CoachStoreReferral
+     * const coachStoreReferral = await prisma.coachStoreReferral.upsert({
+     *   create: {
+     *     // ... data to create a CoachStoreReferral
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the CoachStoreReferral we want to update
+     *   }
+     * })
+     */
+    upsert<T extends CoachStoreReferralUpsertArgs>(args: SelectSubset<T, CoachStoreReferralUpsertArgs<ExtArgs>>): Prisma__CoachStoreReferralClient<$Result.GetResult<Prisma.$CoachStoreReferralPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of CoachStoreReferrals.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CoachStoreReferralCountArgs} args - Arguments to filter CoachStoreReferrals to count.
+     * @example
+     * // Count the number of CoachStoreReferrals
+     * const count = await prisma.coachStoreReferral.count({
+     *   where: {
+     *     // ... the filter for the CoachStoreReferrals we want to count
+     *   }
+     * })
+    **/
+    count<T extends CoachStoreReferralCountArgs>(
+      args?: Subset<T, CoachStoreReferralCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], CoachStoreReferralCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a CoachStoreReferral.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CoachStoreReferralAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends CoachStoreReferralAggregateArgs>(args: Subset<T, CoachStoreReferralAggregateArgs>): Prisma.PrismaPromise<GetCoachStoreReferralAggregateType<T>>
+
+    /**
+     * Group by CoachStoreReferral.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CoachStoreReferralGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends CoachStoreReferralGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: CoachStoreReferralGroupByArgs['orderBy'] }
+        : { orderBy?: CoachStoreReferralGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, CoachStoreReferralGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetCoachStoreReferralGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the CoachStoreReferral model
+   */
+  readonly fields: CoachStoreReferralFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for CoachStoreReferral.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__CoachStoreReferralClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the CoachStoreReferral model
+   */
+  interface CoachStoreReferralFieldRefs {
+    readonly id: FieldRef<"CoachStoreReferral", 'String'>
+    readonly paymentKey: FieldRef<"CoachStoreReferral", 'String'>
+    readonly referrerUserId: FieldRef<"CoachStoreReferral", 'String'>
+    readonly buyerUserId: FieldRef<"CoachStoreReferral", 'String'>
+    readonly coachUserId: FieldRef<"CoachStoreReferral", 'String'>
+    readonly sourceKind: FieldRef<"CoachStoreReferral", 'String'>
+    readonly sourceId: FieldRef<"CoachStoreReferral", 'String'>
+    readonly grossCents: FieldRef<"CoachStoreReferral", 'Int'>
+    readonly platformFeeCents: FieldRef<"CoachStoreReferral", 'Int'>
+    readonly shareOfFee: FieldRef<"CoachStoreReferral", 'Float'>
+    readonly cutCents: FieldRef<"CoachStoreReferral", 'Int'>
+    readonly renewalIndex: FieldRef<"CoachStoreReferral", 'Int'>
+    readonly status: FieldRef<"CoachStoreReferral", 'String'>
+    readonly holdUntil: FieldRef<"CoachStoreReferral", 'DateTime'>
+    readonly createdAt: FieldRef<"CoachStoreReferral", 'DateTime'>
+    readonly updatedAt: FieldRef<"CoachStoreReferral", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * CoachStoreReferral findUnique
+   */
+  export type CoachStoreReferralFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CoachStoreReferral
+     */
+    select?: CoachStoreReferralSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CoachStoreReferral
+     */
+    omit?: CoachStoreReferralOmit<ExtArgs> | null
+    /**
+     * Filter, which CoachStoreReferral to fetch.
+     */
+    where: CoachStoreReferralWhereUniqueInput
+  }
+
+  /**
+   * CoachStoreReferral findUniqueOrThrow
+   */
+  export type CoachStoreReferralFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CoachStoreReferral
+     */
+    select?: CoachStoreReferralSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CoachStoreReferral
+     */
+    omit?: CoachStoreReferralOmit<ExtArgs> | null
+    /**
+     * Filter, which CoachStoreReferral to fetch.
+     */
+    where: CoachStoreReferralWhereUniqueInput
+  }
+
+  /**
+   * CoachStoreReferral findFirst
+   */
+  export type CoachStoreReferralFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CoachStoreReferral
+     */
+    select?: CoachStoreReferralSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CoachStoreReferral
+     */
+    omit?: CoachStoreReferralOmit<ExtArgs> | null
+    /**
+     * Filter, which CoachStoreReferral to fetch.
+     */
+    where?: CoachStoreReferralWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of CoachStoreReferrals to fetch.
+     */
+    orderBy?: CoachStoreReferralOrderByWithRelationInput | CoachStoreReferralOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for CoachStoreReferrals.
+     */
+    cursor?: CoachStoreReferralWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` CoachStoreReferrals from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` CoachStoreReferrals.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of CoachStoreReferrals.
+     */
+    distinct?: CoachStoreReferralScalarFieldEnum | CoachStoreReferralScalarFieldEnum[]
+  }
+
+  /**
+   * CoachStoreReferral findFirstOrThrow
+   */
+  export type CoachStoreReferralFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CoachStoreReferral
+     */
+    select?: CoachStoreReferralSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CoachStoreReferral
+     */
+    omit?: CoachStoreReferralOmit<ExtArgs> | null
+    /**
+     * Filter, which CoachStoreReferral to fetch.
+     */
+    where?: CoachStoreReferralWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of CoachStoreReferrals to fetch.
+     */
+    orderBy?: CoachStoreReferralOrderByWithRelationInput | CoachStoreReferralOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for CoachStoreReferrals.
+     */
+    cursor?: CoachStoreReferralWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` CoachStoreReferrals from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` CoachStoreReferrals.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of CoachStoreReferrals.
+     */
+    distinct?: CoachStoreReferralScalarFieldEnum | CoachStoreReferralScalarFieldEnum[]
+  }
+
+  /**
+   * CoachStoreReferral findMany
+   */
+  export type CoachStoreReferralFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CoachStoreReferral
+     */
+    select?: CoachStoreReferralSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CoachStoreReferral
+     */
+    omit?: CoachStoreReferralOmit<ExtArgs> | null
+    /**
+     * Filter, which CoachStoreReferrals to fetch.
+     */
+    where?: CoachStoreReferralWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of CoachStoreReferrals to fetch.
+     */
+    orderBy?: CoachStoreReferralOrderByWithRelationInput | CoachStoreReferralOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing CoachStoreReferrals.
+     */
+    cursor?: CoachStoreReferralWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` CoachStoreReferrals from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` CoachStoreReferrals.
+     */
+    skip?: number
+    distinct?: CoachStoreReferralScalarFieldEnum | CoachStoreReferralScalarFieldEnum[]
+  }
+
+  /**
+   * CoachStoreReferral create
+   */
+  export type CoachStoreReferralCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CoachStoreReferral
+     */
+    select?: CoachStoreReferralSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CoachStoreReferral
+     */
+    omit?: CoachStoreReferralOmit<ExtArgs> | null
+    /**
+     * The data needed to create a CoachStoreReferral.
+     */
+    data: XOR<CoachStoreReferralCreateInput, CoachStoreReferralUncheckedCreateInput>
+  }
+
+  /**
+   * CoachStoreReferral createMany
+   */
+  export type CoachStoreReferralCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many CoachStoreReferrals.
+     */
+    data: CoachStoreReferralCreateManyInput | CoachStoreReferralCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * CoachStoreReferral createManyAndReturn
+   */
+  export type CoachStoreReferralCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CoachStoreReferral
+     */
+    select?: CoachStoreReferralSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the CoachStoreReferral
+     */
+    omit?: CoachStoreReferralOmit<ExtArgs> | null
+    /**
+     * The data used to create many CoachStoreReferrals.
+     */
+    data: CoachStoreReferralCreateManyInput | CoachStoreReferralCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * CoachStoreReferral update
+   */
+  export type CoachStoreReferralUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CoachStoreReferral
+     */
+    select?: CoachStoreReferralSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CoachStoreReferral
+     */
+    omit?: CoachStoreReferralOmit<ExtArgs> | null
+    /**
+     * The data needed to update a CoachStoreReferral.
+     */
+    data: XOR<CoachStoreReferralUpdateInput, CoachStoreReferralUncheckedUpdateInput>
+    /**
+     * Choose, which CoachStoreReferral to update.
+     */
+    where: CoachStoreReferralWhereUniqueInput
+  }
+
+  /**
+   * CoachStoreReferral updateMany
+   */
+  export type CoachStoreReferralUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update CoachStoreReferrals.
+     */
+    data: XOR<CoachStoreReferralUpdateManyMutationInput, CoachStoreReferralUncheckedUpdateManyInput>
+    /**
+     * Filter which CoachStoreReferrals to update
+     */
+    where?: CoachStoreReferralWhereInput
+    /**
+     * Limit how many CoachStoreReferrals to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * CoachStoreReferral updateManyAndReturn
+   */
+  export type CoachStoreReferralUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CoachStoreReferral
+     */
+    select?: CoachStoreReferralSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the CoachStoreReferral
+     */
+    omit?: CoachStoreReferralOmit<ExtArgs> | null
+    /**
+     * The data used to update CoachStoreReferrals.
+     */
+    data: XOR<CoachStoreReferralUpdateManyMutationInput, CoachStoreReferralUncheckedUpdateManyInput>
+    /**
+     * Filter which CoachStoreReferrals to update
+     */
+    where?: CoachStoreReferralWhereInput
+    /**
+     * Limit how many CoachStoreReferrals to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * CoachStoreReferral upsert
+   */
+  export type CoachStoreReferralUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CoachStoreReferral
+     */
+    select?: CoachStoreReferralSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CoachStoreReferral
+     */
+    omit?: CoachStoreReferralOmit<ExtArgs> | null
+    /**
+     * The filter to search for the CoachStoreReferral to update in case it exists.
+     */
+    where: CoachStoreReferralWhereUniqueInput
+    /**
+     * In case the CoachStoreReferral found by the `where` argument doesn't exist, create a new CoachStoreReferral with this data.
+     */
+    create: XOR<CoachStoreReferralCreateInput, CoachStoreReferralUncheckedCreateInput>
+    /**
+     * In case the CoachStoreReferral was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<CoachStoreReferralUpdateInput, CoachStoreReferralUncheckedUpdateInput>
+  }
+
+  /**
+   * CoachStoreReferral delete
+   */
+  export type CoachStoreReferralDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CoachStoreReferral
+     */
+    select?: CoachStoreReferralSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CoachStoreReferral
+     */
+    omit?: CoachStoreReferralOmit<ExtArgs> | null
+    /**
+     * Filter which CoachStoreReferral to delete.
+     */
+    where: CoachStoreReferralWhereUniqueInput
+  }
+
+  /**
+   * CoachStoreReferral deleteMany
+   */
+  export type CoachStoreReferralDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which CoachStoreReferrals to delete
+     */
+    where?: CoachStoreReferralWhereInput
+    /**
+     * Limit how many CoachStoreReferrals to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * CoachStoreReferral without action
+   */
+  export type CoachStoreReferralDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CoachStoreReferral
+     */
+    select?: CoachStoreReferralSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CoachStoreReferral
+     */
+    omit?: CoachStoreReferralOmit<ExtArgs> | null
+  }
+
+
+  /**
+   * Model AdventureSave
+   */
+
+  export type AggregateAdventureSave = {
+    _count: AdventureSaveCountAggregateOutputType | null
+    _avg: AdventureSaveAvgAggregateOutputType | null
+    _sum: AdventureSaveSumAggregateOutputType | null
+    _min: AdventureSaveMinAggregateOutputType | null
+    _max: AdventureSaveMaxAggregateOutputType | null
+  }
+
+  export type AdventureSaveAvgAggregateOutputType = {
+    version: number | null
+  }
+
+  export type AdventureSaveSumAggregateOutputType = {
+    version: number | null
+  }
+
+  export type AdventureSaveMinAggregateOutputType = {
+    userId: string | null
+    version: number | null
+    updatedAt: Date | null
+  }
+
+  export type AdventureSaveMaxAggregateOutputType = {
+    userId: string | null
+    version: number | null
+    updatedAt: Date | null
+  }
+
+  export type AdventureSaveCountAggregateOutputType = {
+    userId: number
+    version: number
+    doc: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type AdventureSaveAvgAggregateInputType = {
+    version?: true
+  }
+
+  export type AdventureSaveSumAggregateInputType = {
+    version?: true
+  }
+
+  export type AdventureSaveMinAggregateInputType = {
+    userId?: true
+    version?: true
+    updatedAt?: true
+  }
+
+  export type AdventureSaveMaxAggregateInputType = {
+    userId?: true
+    version?: true
+    updatedAt?: true
+  }
+
+  export type AdventureSaveCountAggregateInputType = {
+    userId?: true
+    version?: true
+    doc?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type AdventureSaveAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which AdventureSave to aggregate.
+     */
+    where?: AdventureSaveWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of AdventureSaves to fetch.
+     */
+    orderBy?: AdventureSaveOrderByWithRelationInput | AdventureSaveOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: AdventureSaveWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` AdventureSaves from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` AdventureSaves.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned AdventureSaves
+    **/
+    _count?: true | AdventureSaveCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to average
+    **/
+    _avg?: AdventureSaveAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: AdventureSaveSumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: AdventureSaveMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: AdventureSaveMaxAggregateInputType
+  }
+
+  export type GetAdventureSaveAggregateType<T extends AdventureSaveAggregateArgs> = {
+        [P in keyof T & keyof AggregateAdventureSave]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateAdventureSave[P]>
+      : GetScalarType<T[P], AggregateAdventureSave[P]>
+  }
+
+
+
+
+  export type AdventureSaveGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: AdventureSaveWhereInput
+    orderBy?: AdventureSaveOrderByWithAggregationInput | AdventureSaveOrderByWithAggregationInput[]
+    by: AdventureSaveScalarFieldEnum[] | AdventureSaveScalarFieldEnum
+    having?: AdventureSaveScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: AdventureSaveCountAggregateInputType | true
+    _avg?: AdventureSaveAvgAggregateInputType
+    _sum?: AdventureSaveSumAggregateInputType
+    _min?: AdventureSaveMinAggregateInputType
+    _max?: AdventureSaveMaxAggregateInputType
+  }
+
+  export type AdventureSaveGroupByOutputType = {
+    userId: string
+    version: number
+    doc: JsonValue
+    updatedAt: Date
+    _count: AdventureSaveCountAggregateOutputType | null
+    _avg: AdventureSaveAvgAggregateOutputType | null
+    _sum: AdventureSaveSumAggregateOutputType | null
+    _min: AdventureSaveMinAggregateOutputType | null
+    _max: AdventureSaveMaxAggregateOutputType | null
+  }
+
+  type GetAdventureSaveGroupByPayload<T extends AdventureSaveGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<AdventureSaveGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof AdventureSaveGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], AdventureSaveGroupByOutputType[P]>
+            : GetScalarType<T[P], AdventureSaveGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type AdventureSaveSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    userId?: boolean
+    version?: boolean
+    doc?: boolean
+    updatedAt?: boolean
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["adventureSave"]>
+
+  export type AdventureSaveSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    userId?: boolean
+    version?: boolean
+    doc?: boolean
+    updatedAt?: boolean
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["adventureSave"]>
+
+  export type AdventureSaveSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    userId?: boolean
+    version?: boolean
+    doc?: boolean
+    updatedAt?: boolean
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["adventureSave"]>
+
+  export type AdventureSaveSelectScalar = {
+    userId?: boolean
+    version?: boolean
+    doc?: boolean
+    updatedAt?: boolean
+  }
+
+  export type AdventureSaveOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"userId" | "version" | "doc" | "updatedAt", ExtArgs["result"]["adventureSave"]>
+  export type AdventureSaveInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }
+  export type AdventureSaveIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }
+  export type AdventureSaveIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }
+
+  export type $AdventureSavePayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "AdventureSave"
+    objects: {
+      user: Prisma.$UserPayload<ExtArgs>
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      userId: string
+      version: number
+      doc: Prisma.JsonValue
+      updatedAt: Date
+    }, ExtArgs["result"]["adventureSave"]>
+    composites: {}
+  }
+
+  type AdventureSaveGetPayload<S extends boolean | null | undefined | AdventureSaveDefaultArgs> = $Result.GetResult<Prisma.$AdventureSavePayload, S>
+
+  type AdventureSaveCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<AdventureSaveFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: AdventureSaveCountAggregateInputType | true
+    }
+
+  export interface AdventureSaveDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['AdventureSave'], meta: { name: 'AdventureSave' } }
+    /**
+     * Find zero or one AdventureSave that matches the filter.
+     * @param {AdventureSaveFindUniqueArgs} args - Arguments to find a AdventureSave
+     * @example
+     * // Get one AdventureSave
+     * const adventureSave = await prisma.adventureSave.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends AdventureSaveFindUniqueArgs>(args: SelectSubset<T, AdventureSaveFindUniqueArgs<ExtArgs>>): Prisma__AdventureSaveClient<$Result.GetResult<Prisma.$AdventureSavePayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one AdventureSave that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {AdventureSaveFindUniqueOrThrowArgs} args - Arguments to find a AdventureSave
+     * @example
+     * // Get one AdventureSave
+     * const adventureSave = await prisma.adventureSave.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends AdventureSaveFindUniqueOrThrowArgs>(args: SelectSubset<T, AdventureSaveFindUniqueOrThrowArgs<ExtArgs>>): Prisma__AdventureSaveClient<$Result.GetResult<Prisma.$AdventureSavePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first AdventureSave that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {AdventureSaveFindFirstArgs} args - Arguments to find a AdventureSave
+     * @example
+     * // Get one AdventureSave
+     * const adventureSave = await prisma.adventureSave.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends AdventureSaveFindFirstArgs>(args?: SelectSubset<T, AdventureSaveFindFirstArgs<ExtArgs>>): Prisma__AdventureSaveClient<$Result.GetResult<Prisma.$AdventureSavePayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first AdventureSave that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {AdventureSaveFindFirstOrThrowArgs} args - Arguments to find a AdventureSave
+     * @example
+     * // Get one AdventureSave
+     * const adventureSave = await prisma.adventureSave.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends AdventureSaveFindFirstOrThrowArgs>(args?: SelectSubset<T, AdventureSaveFindFirstOrThrowArgs<ExtArgs>>): Prisma__AdventureSaveClient<$Result.GetResult<Prisma.$AdventureSavePayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more AdventureSaves that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {AdventureSaveFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all AdventureSaves
+     * const adventureSaves = await prisma.adventureSave.findMany()
+     * 
+     * // Get first 10 AdventureSaves
+     * const adventureSaves = await prisma.adventureSave.findMany({ take: 10 })
+     * 
+     * // Only select the `userId`
+     * const adventureSaveWithUserIdOnly = await prisma.adventureSave.findMany({ select: { userId: true } })
+     * 
+     */
+    findMany<T extends AdventureSaveFindManyArgs>(args?: SelectSubset<T, AdventureSaveFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$AdventureSavePayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a AdventureSave.
+     * @param {AdventureSaveCreateArgs} args - Arguments to create a AdventureSave.
+     * @example
+     * // Create one AdventureSave
+     * const AdventureSave = await prisma.adventureSave.create({
+     *   data: {
+     *     // ... data to create a AdventureSave
+     *   }
+     * })
+     * 
+     */
+    create<T extends AdventureSaveCreateArgs>(args: SelectSubset<T, AdventureSaveCreateArgs<ExtArgs>>): Prisma__AdventureSaveClient<$Result.GetResult<Prisma.$AdventureSavePayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many AdventureSaves.
+     * @param {AdventureSaveCreateManyArgs} args - Arguments to create many AdventureSaves.
+     * @example
+     * // Create many AdventureSaves
+     * const adventureSave = await prisma.adventureSave.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends AdventureSaveCreateManyArgs>(args?: SelectSubset<T, AdventureSaveCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many AdventureSaves and returns the data saved in the database.
+     * @param {AdventureSaveCreateManyAndReturnArgs} args - Arguments to create many AdventureSaves.
+     * @example
+     * // Create many AdventureSaves
+     * const adventureSave = await prisma.adventureSave.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many AdventureSaves and only return the `userId`
+     * const adventureSaveWithUserIdOnly = await prisma.adventureSave.createManyAndReturn({
+     *   select: { userId: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends AdventureSaveCreateManyAndReturnArgs>(args?: SelectSubset<T, AdventureSaveCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$AdventureSavePayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a AdventureSave.
+     * @param {AdventureSaveDeleteArgs} args - Arguments to delete one AdventureSave.
+     * @example
+     * // Delete one AdventureSave
+     * const AdventureSave = await prisma.adventureSave.delete({
+     *   where: {
+     *     // ... filter to delete one AdventureSave
+     *   }
+     * })
+     * 
+     */
+    delete<T extends AdventureSaveDeleteArgs>(args: SelectSubset<T, AdventureSaveDeleteArgs<ExtArgs>>): Prisma__AdventureSaveClient<$Result.GetResult<Prisma.$AdventureSavePayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one AdventureSave.
+     * @param {AdventureSaveUpdateArgs} args - Arguments to update one AdventureSave.
+     * @example
+     * // Update one AdventureSave
+     * const adventureSave = await prisma.adventureSave.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends AdventureSaveUpdateArgs>(args: SelectSubset<T, AdventureSaveUpdateArgs<ExtArgs>>): Prisma__AdventureSaveClient<$Result.GetResult<Prisma.$AdventureSavePayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more AdventureSaves.
+     * @param {AdventureSaveDeleteManyArgs} args - Arguments to filter AdventureSaves to delete.
+     * @example
+     * // Delete a few AdventureSaves
+     * const { count } = await prisma.adventureSave.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends AdventureSaveDeleteManyArgs>(args?: SelectSubset<T, AdventureSaveDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more AdventureSaves.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {AdventureSaveUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many AdventureSaves
+     * const adventureSave = await prisma.adventureSave.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends AdventureSaveUpdateManyArgs>(args: SelectSubset<T, AdventureSaveUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more AdventureSaves and returns the data updated in the database.
+     * @param {AdventureSaveUpdateManyAndReturnArgs} args - Arguments to update many AdventureSaves.
+     * @example
+     * // Update many AdventureSaves
+     * const adventureSave = await prisma.adventureSave.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more AdventureSaves and only return the `userId`
+     * const adventureSaveWithUserIdOnly = await prisma.adventureSave.updateManyAndReturn({
+     *   select: { userId: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends AdventureSaveUpdateManyAndReturnArgs>(args: SelectSubset<T, AdventureSaveUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$AdventureSavePayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one AdventureSave.
+     * @param {AdventureSaveUpsertArgs} args - Arguments to update or create a AdventureSave.
+     * @example
+     * // Update or create a AdventureSave
+     * const adventureSave = await prisma.adventureSave.upsert({
+     *   create: {
+     *     // ... data to create a AdventureSave
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the AdventureSave we want to update
+     *   }
+     * })
+     */
+    upsert<T extends AdventureSaveUpsertArgs>(args: SelectSubset<T, AdventureSaveUpsertArgs<ExtArgs>>): Prisma__AdventureSaveClient<$Result.GetResult<Prisma.$AdventureSavePayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of AdventureSaves.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {AdventureSaveCountArgs} args - Arguments to filter AdventureSaves to count.
+     * @example
+     * // Count the number of AdventureSaves
+     * const count = await prisma.adventureSave.count({
+     *   where: {
+     *     // ... the filter for the AdventureSaves we want to count
+     *   }
+     * })
+    **/
+    count<T extends AdventureSaveCountArgs>(
+      args?: Subset<T, AdventureSaveCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], AdventureSaveCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a AdventureSave.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {AdventureSaveAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends AdventureSaveAggregateArgs>(args: Subset<T, AdventureSaveAggregateArgs>): Prisma.PrismaPromise<GetAdventureSaveAggregateType<T>>
+
+    /**
+     * Group by AdventureSave.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {AdventureSaveGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends AdventureSaveGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: AdventureSaveGroupByArgs['orderBy'] }
+        : { orderBy?: AdventureSaveGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, AdventureSaveGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetAdventureSaveGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the AdventureSave model
+   */
+  readonly fields: AdventureSaveFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for AdventureSave.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__AdventureSaveClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    user<T extends UserDefaultArgs<ExtArgs> = {}>(args?: Subset<T, UserDefaultArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the AdventureSave model
+   */
+  interface AdventureSaveFieldRefs {
+    readonly userId: FieldRef<"AdventureSave", 'String'>
+    readonly version: FieldRef<"AdventureSave", 'Int'>
+    readonly doc: FieldRef<"AdventureSave", 'Json'>
+    readonly updatedAt: FieldRef<"AdventureSave", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * AdventureSave findUnique
+   */
+  export type AdventureSaveFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AdventureSave
+     */
+    select?: AdventureSaveSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AdventureSave
+     */
+    omit?: AdventureSaveOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AdventureSaveInclude<ExtArgs> | null
+    /**
+     * Filter, which AdventureSave to fetch.
+     */
+    where: AdventureSaveWhereUniqueInput
+  }
+
+  /**
+   * AdventureSave findUniqueOrThrow
+   */
+  export type AdventureSaveFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AdventureSave
+     */
+    select?: AdventureSaveSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AdventureSave
+     */
+    omit?: AdventureSaveOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AdventureSaveInclude<ExtArgs> | null
+    /**
+     * Filter, which AdventureSave to fetch.
+     */
+    where: AdventureSaveWhereUniqueInput
+  }
+
+  /**
+   * AdventureSave findFirst
+   */
+  export type AdventureSaveFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AdventureSave
+     */
+    select?: AdventureSaveSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AdventureSave
+     */
+    omit?: AdventureSaveOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AdventureSaveInclude<ExtArgs> | null
+    /**
+     * Filter, which AdventureSave to fetch.
+     */
+    where?: AdventureSaveWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of AdventureSaves to fetch.
+     */
+    orderBy?: AdventureSaveOrderByWithRelationInput | AdventureSaveOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for AdventureSaves.
+     */
+    cursor?: AdventureSaveWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` AdventureSaves from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` AdventureSaves.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of AdventureSaves.
+     */
+    distinct?: AdventureSaveScalarFieldEnum | AdventureSaveScalarFieldEnum[]
+  }
+
+  /**
+   * AdventureSave findFirstOrThrow
+   */
+  export type AdventureSaveFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AdventureSave
+     */
+    select?: AdventureSaveSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AdventureSave
+     */
+    omit?: AdventureSaveOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AdventureSaveInclude<ExtArgs> | null
+    /**
+     * Filter, which AdventureSave to fetch.
+     */
+    where?: AdventureSaveWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of AdventureSaves to fetch.
+     */
+    orderBy?: AdventureSaveOrderByWithRelationInput | AdventureSaveOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for AdventureSaves.
+     */
+    cursor?: AdventureSaveWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` AdventureSaves from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` AdventureSaves.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of AdventureSaves.
+     */
+    distinct?: AdventureSaveScalarFieldEnum | AdventureSaveScalarFieldEnum[]
+  }
+
+  /**
+   * AdventureSave findMany
+   */
+  export type AdventureSaveFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AdventureSave
+     */
+    select?: AdventureSaveSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AdventureSave
+     */
+    omit?: AdventureSaveOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AdventureSaveInclude<ExtArgs> | null
+    /**
+     * Filter, which AdventureSaves to fetch.
+     */
+    where?: AdventureSaveWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of AdventureSaves to fetch.
+     */
+    orderBy?: AdventureSaveOrderByWithRelationInput | AdventureSaveOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing AdventureSaves.
+     */
+    cursor?: AdventureSaveWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` AdventureSaves from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` AdventureSaves.
+     */
+    skip?: number
+    distinct?: AdventureSaveScalarFieldEnum | AdventureSaveScalarFieldEnum[]
+  }
+
+  /**
+   * AdventureSave create
+   */
+  export type AdventureSaveCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AdventureSave
+     */
+    select?: AdventureSaveSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AdventureSave
+     */
+    omit?: AdventureSaveOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AdventureSaveInclude<ExtArgs> | null
+    /**
+     * The data needed to create a AdventureSave.
+     */
+    data: XOR<AdventureSaveCreateInput, AdventureSaveUncheckedCreateInput>
+  }
+
+  /**
+   * AdventureSave createMany
+   */
+  export type AdventureSaveCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many AdventureSaves.
+     */
+    data: AdventureSaveCreateManyInput | AdventureSaveCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * AdventureSave createManyAndReturn
+   */
+  export type AdventureSaveCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AdventureSave
+     */
+    select?: AdventureSaveSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the AdventureSave
+     */
+    omit?: AdventureSaveOmit<ExtArgs> | null
+    /**
+     * The data used to create many AdventureSaves.
+     */
+    data: AdventureSaveCreateManyInput | AdventureSaveCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AdventureSaveIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * AdventureSave update
+   */
+  export type AdventureSaveUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AdventureSave
+     */
+    select?: AdventureSaveSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AdventureSave
+     */
+    omit?: AdventureSaveOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AdventureSaveInclude<ExtArgs> | null
+    /**
+     * The data needed to update a AdventureSave.
+     */
+    data: XOR<AdventureSaveUpdateInput, AdventureSaveUncheckedUpdateInput>
+    /**
+     * Choose, which AdventureSave to update.
+     */
+    where: AdventureSaveWhereUniqueInput
+  }
+
+  /**
+   * AdventureSave updateMany
+   */
+  export type AdventureSaveUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update AdventureSaves.
+     */
+    data: XOR<AdventureSaveUpdateManyMutationInput, AdventureSaveUncheckedUpdateManyInput>
+    /**
+     * Filter which AdventureSaves to update
+     */
+    where?: AdventureSaveWhereInput
+    /**
+     * Limit how many AdventureSaves to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * AdventureSave updateManyAndReturn
+   */
+  export type AdventureSaveUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AdventureSave
+     */
+    select?: AdventureSaveSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the AdventureSave
+     */
+    omit?: AdventureSaveOmit<ExtArgs> | null
+    /**
+     * The data used to update AdventureSaves.
+     */
+    data: XOR<AdventureSaveUpdateManyMutationInput, AdventureSaveUncheckedUpdateManyInput>
+    /**
+     * Filter which AdventureSaves to update
+     */
+    where?: AdventureSaveWhereInput
+    /**
+     * Limit how many AdventureSaves to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AdventureSaveIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * AdventureSave upsert
+   */
+  export type AdventureSaveUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AdventureSave
+     */
+    select?: AdventureSaveSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AdventureSave
+     */
+    omit?: AdventureSaveOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AdventureSaveInclude<ExtArgs> | null
+    /**
+     * The filter to search for the AdventureSave to update in case it exists.
+     */
+    where: AdventureSaveWhereUniqueInput
+    /**
+     * In case the AdventureSave found by the `where` argument doesn't exist, create a new AdventureSave with this data.
+     */
+    create: XOR<AdventureSaveCreateInput, AdventureSaveUncheckedCreateInput>
+    /**
+     * In case the AdventureSave was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<AdventureSaveUpdateInput, AdventureSaveUncheckedUpdateInput>
+  }
+
+  /**
+   * AdventureSave delete
+   */
+  export type AdventureSaveDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AdventureSave
+     */
+    select?: AdventureSaveSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AdventureSave
+     */
+    omit?: AdventureSaveOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AdventureSaveInclude<ExtArgs> | null
+    /**
+     * Filter which AdventureSave to delete.
+     */
+    where: AdventureSaveWhereUniqueInput
+  }
+
+  /**
+   * AdventureSave deleteMany
+   */
+  export type AdventureSaveDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which AdventureSaves to delete
+     */
+    where?: AdventureSaveWhereInput
+    /**
+     * Limit how many AdventureSaves to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * AdventureSave without action
+   */
+  export type AdventureSaveDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AdventureSave
+     */
+    select?: AdventureSaveSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AdventureSave
+     */
+    omit?: AdventureSaveOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AdventureSaveInclude<ExtArgs> | null
   }
 
 
@@ -119907,7 +130814,8 @@ export namespace Prisma {
     programId: 'programId',
     authorId: 'authorId',
     body: 'body',
-    createdAt: 'createdAt'
+    createdAt: 'createdAt',
+    readAt: 'readAt'
   };
 
   export type ProgramMessageScalarFieldEnum = (typeof ProgramMessageScalarFieldEnum)[keyof typeof ProgramMessageScalarFieldEnum]
@@ -120082,6 +130990,22 @@ export namespace Prisma {
   export type HealthConsentScalarFieldEnum = (typeof HealthConsentScalarFieldEnum)[keyof typeof HealthConsentScalarFieldEnum]
 
 
+  export const ScanSaveOptInScalarFieldEnum: {
+    id: 'id',
+    userId: 'userId',
+    scope: 'scope',
+    granted: 'granted',
+    grantedAt: 'grantedAt',
+    revokedAt: 'revokedAt',
+    consentTextVersion: 'consentTextVersion',
+    coachShares: 'coachShares',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type ScanSaveOptInScalarFieldEnum = (typeof ScanSaveOptInScalarFieldEnum)[keyof typeof ScanSaveOptInScalarFieldEnum]
+
+
   export const ReadinessCheckInScalarFieldEnum: {
     id: 'id',
     userId: 'userId',
@@ -120152,6 +131076,175 @@ export namespace Prisma {
   };
 
   export type CoachClientScalarFieldEnum = (typeof CoachClientScalarFieldEnum)[keyof typeof CoachClientScalarFieldEnum]
+
+
+  export const CoachAvailabilityScalarFieldEnum: {
+    coachId: 'coachId',
+    clientId: 'clientId',
+    status: 'status',
+    returnBy: 'returnBy',
+    setAt: 'setAt'
+  };
+
+  export type CoachAvailabilityScalarFieldEnum = (typeof CoachAvailabilityScalarFieldEnum)[keyof typeof CoachAvailabilityScalarFieldEnum]
+
+
+  export const InstructorScalarFieldEnum: {
+    id: 'id',
+    userId: 'userId',
+    slug: 'slug',
+    displayName: 'displayName',
+    headline: 'headline',
+    bio: 'bio',
+    certifications: 'certifications',
+    specialties: 'specialties',
+    affiliationLine: 'affiliationLine',
+    creatorCardId: 'creatorCardId',
+    timeZone: 'timeZone',
+    weeklyHours: 'weeklyHours',
+    blackoutDates: 'blackoutDates',
+    bufferMinutes: 'bufferMinutes',
+    minNoticeHours: 'minNoticeHours',
+    maxDaysAhead: 'maxDaysAhead',
+    reviewSlaHours: 'reviewSlaHours',
+    clientFullRefundHours: 'clientFullRefundHours',
+    refundBusinessDays: 'refundBusinessDays',
+    businessMailingAddress: 'businessMailingAddress',
+    published: 'published',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type InstructorScalarFieldEnum = (typeof InstructorScalarFieldEnum)[keyof typeof InstructorScalarFieldEnum]
+
+
+  export const ProgramAccessScalarFieldEnum: {
+    id: 'id',
+    userId: 'userId',
+    instructorId: 'instructorId',
+    listingId: 'listingId',
+    lane: 'lane',
+    billing: 'billing',
+    scope: 'scope',
+    beneficiary: 'beneficiary',
+    status: 'status',
+    priceCents: 'priceCents',
+    platformFeeCents: 'platformFeeCents',
+    stripeFeeCents: 'stripeFeeCents',
+    reviewCredits: 'reviewCredits',
+    lastCreditInvoiceId: 'lastCreditInvoiceId',
+    stripeCheckoutId: 'stripeCheckoutId',
+    stripeSubscriptionId: 'stripeSubscriptionId',
+    stripePaymentIntentId: 'stripePaymentIntentId',
+    accessUntil: 'accessUntil',
+    cancelAtPeriodEnd: 'cancelAtPeriodEnd',
+    coachingProgramId: 'coachingProgramId',
+    startedAt: 'startedAt',
+    nextRescreenAt: 'nextRescreenAt',
+    unlockCodeHash: 'unlockCodeHash',
+    deviceTokenHash: 'deviceTokenHash',
+    codeActive: 'codeActive',
+    redeemedAt: 'redeemedAt',
+    reissueCount: 'reissueCount',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type ProgramAccessScalarFieldEnum = (typeof ProgramAccessScalarFieldEnum)[keyof typeof ProgramAccessScalarFieldEnum]
+
+
+  export const BookingScalarFieldEnum: {
+    id: 'id',
+    kind: 'kind',
+    instructorId: 'instructorId',
+    coachUserId: 'coachUserId',
+    clientUserId: 'clientUserId',
+    listingId: 'listingId',
+    status: 'status',
+    durationMin: 'durationMin',
+    priceCents: 'priceCents',
+    platformFeeCents: 'platformFeeCents',
+    stripeFeeCents: 'stripeFeeCents',
+    refundCents: 'refundCents',
+    stripeCheckoutId: 'stripeCheckoutId',
+    stripePaymentIntentId: 'stripePaymentIntentId',
+    holdExpiresAt: 'holdExpiresAt',
+    startsAt: 'startsAt',
+    endsAt: 'endsAt',
+    slotLock: 'slotLock',
+    clientTimeZone: 'clientTimeZone',
+    clientNote: 'clientNote',
+    reschedulesUsed: 'reschedulesUsed',
+    connectionFailedAt: 'connectionFailedAt',
+    failureCreditOpen: 'failureCreditOpen',
+    shareWithCoach: 'shareWithCoach',
+    goal: 'goal',
+    painYes: 'painYes',
+    reviewNote: 'reviewNote',
+    clipPaths: 'clipPaths',
+    clipConsentAt: 'clipConsentAt',
+    consentTextVersion: 'consentTextVersion',
+    submittedAt: 'submittedAt',
+    dueAt: 'dueAt',
+    replyText: 'replyText',
+    replyClipPath: 'replyClipPath',
+    attachedDrillIds: 'attachedDrillIds',
+    deliveredAt: 'deliveredAt',
+    originalClipDeleteAt: 'originalClipDeleteAt',
+    originalsDeletedAt: 'originalsDeletedAt',
+    cancelledAt: 'cancelledAt',
+    cancelledBy: 'cancelledBy',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type BookingScalarFieldEnum = (typeof BookingScalarFieldEnum)[keyof typeof BookingScalarFieldEnum]
+
+
+  export const CallSignalScalarFieldEnum: {
+    id: 'id',
+    bookingId: 'bookingId',
+    fromRole: 'fromRole',
+    epoch: 'epoch',
+    kind: 'kind',
+    payload: 'payload',
+    createdAt: 'createdAt',
+    expiresAt: 'expiresAt'
+  };
+
+  export type CallSignalScalarFieldEnum = (typeof CallSignalScalarFieldEnum)[keyof typeof CallSignalScalarFieldEnum]
+
+
+  export const CoachStoreReferralScalarFieldEnum: {
+    id: 'id',
+    paymentKey: 'paymentKey',
+    referrerUserId: 'referrerUserId',
+    buyerUserId: 'buyerUserId',
+    coachUserId: 'coachUserId',
+    sourceKind: 'sourceKind',
+    sourceId: 'sourceId',
+    grossCents: 'grossCents',
+    platformFeeCents: 'platformFeeCents',
+    shareOfFee: 'shareOfFee',
+    cutCents: 'cutCents',
+    renewalIndex: 'renewalIndex',
+    status: 'status',
+    holdUntil: 'holdUntil',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type CoachStoreReferralScalarFieldEnum = (typeof CoachStoreReferralScalarFieldEnum)[keyof typeof CoachStoreReferralScalarFieldEnum]
+
+
+  export const AdventureSaveScalarFieldEnum: {
+    userId: 'userId',
+    version: 'version',
+    doc: 'doc',
+    updatedAt: 'updatedAt'
+  };
+
+  export type AdventureSaveScalarFieldEnum = (typeof AdventureSaveScalarFieldEnum)[keyof typeof AdventureSaveScalarFieldEnum]
 
 
   export const SortOrder: {
@@ -120673,6 +131766,7 @@ export namespace Prisma {
     avatarLook?: XOR<AvatarLookNullableScalarRelationFilter, AvatarLookWhereInput> | null
     ownedWearables?: OwnedWearableListRelationFilter
     sessionBookings?: SessionBookingListRelationFilter
+    scanSaveOptIn?: XOR<ScanSaveOptInNullableScalarRelationFilter, ScanSaveOptInWhereInput> | null
     facilitatorProfile?: XOR<FacilitatorProfileNullableScalarRelationFilter, FacilitatorProfileWhereInput> | null
     goalPlansAsMentee?: GoalPlanListRelationFilter
     goalPlansAsFacilitator?: GoalPlanListRelationFilter
@@ -120688,6 +131782,7 @@ export namespace Prisma {
     crmDeals?: CrmDealListRelationFilter
     crmActivities?: CrmActivityListRelationFilter
     crmNotes?: CrmNoteListRelationFilter
+    adventureSave?: XOR<AdventureSaveNullableScalarRelationFilter, AdventureSaveWhereInput> | null
   }
 
   export type UserOrderByWithRelationInput = {
@@ -120751,6 +131846,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookOrderByWithRelationInput
     ownedWearables?: OwnedWearableOrderByRelationAggregateInput
     sessionBookings?: SessionBookingOrderByRelationAggregateInput
+    scanSaveOptIn?: ScanSaveOptInOrderByWithRelationInput
     facilitatorProfile?: FacilitatorProfileOrderByWithRelationInput
     goalPlansAsMentee?: GoalPlanOrderByRelationAggregateInput
     goalPlansAsFacilitator?: GoalPlanOrderByRelationAggregateInput
@@ -120766,6 +131862,7 @@ export namespace Prisma {
     crmDeals?: CrmDealOrderByRelationAggregateInput
     crmActivities?: CrmActivityOrderByRelationAggregateInput
     crmNotes?: CrmNoteOrderByRelationAggregateInput
+    adventureSave?: AdventureSaveOrderByWithRelationInput
   }
 
   export type UserWhereUniqueInput = Prisma.AtLeast<{
@@ -120832,6 +131929,7 @@ export namespace Prisma {
     avatarLook?: XOR<AvatarLookNullableScalarRelationFilter, AvatarLookWhereInput> | null
     ownedWearables?: OwnedWearableListRelationFilter
     sessionBookings?: SessionBookingListRelationFilter
+    scanSaveOptIn?: XOR<ScanSaveOptInNullableScalarRelationFilter, ScanSaveOptInWhereInput> | null
     facilitatorProfile?: XOR<FacilitatorProfileNullableScalarRelationFilter, FacilitatorProfileWhereInput> | null
     goalPlansAsMentee?: GoalPlanListRelationFilter
     goalPlansAsFacilitator?: GoalPlanListRelationFilter
@@ -120847,6 +131945,7 @@ export namespace Prisma {
     crmDeals?: CrmDealListRelationFilter
     crmActivities?: CrmActivityListRelationFilter
     crmNotes?: CrmNoteListRelationFilter
+    adventureSave?: XOR<AdventureSaveNullableScalarRelationFilter, AdventureSaveWhereInput> | null
   }, "id" | "email">
 
   export type UserOrderByWithAggregationInput = {
@@ -126938,6 +138037,7 @@ export namespace Prisma {
     authorId?: StringFilter<"ProgramMessage"> | string
     body?: StringFilter<"ProgramMessage"> | string
     createdAt?: DateTimeFilter<"ProgramMessage"> | Date | string
+    readAt?: DateTimeNullableFilter<"ProgramMessage"> | Date | string | null
     program?: XOR<CoachingProgramScalarRelationFilter, CoachingProgramWhereInput>
   }
 
@@ -126947,6 +138047,7 @@ export namespace Prisma {
     authorId?: SortOrder
     body?: SortOrder
     createdAt?: SortOrder
+    readAt?: SortOrderInput | SortOrder
     program?: CoachingProgramOrderByWithRelationInput
   }
 
@@ -126959,6 +138060,7 @@ export namespace Prisma {
     authorId?: StringFilter<"ProgramMessage"> | string
     body?: StringFilter<"ProgramMessage"> | string
     createdAt?: DateTimeFilter<"ProgramMessage"> | Date | string
+    readAt?: DateTimeNullableFilter<"ProgramMessage"> | Date | string | null
     program?: XOR<CoachingProgramScalarRelationFilter, CoachingProgramWhereInput>
   }, "id">
 
@@ -126968,6 +138070,7 @@ export namespace Prisma {
     authorId?: SortOrder
     body?: SortOrder
     createdAt?: SortOrder
+    readAt?: SortOrderInput | SortOrder
     _count?: ProgramMessageCountOrderByAggregateInput
     _max?: ProgramMessageMaxOrderByAggregateInput
     _min?: ProgramMessageMinOrderByAggregateInput
@@ -126982,6 +138085,7 @@ export namespace Prisma {
     authorId?: StringWithAggregatesFilter<"ProgramMessage"> | string
     body?: StringWithAggregatesFilter<"ProgramMessage"> | string
     createdAt?: DateTimeWithAggregatesFilter<"ProgramMessage"> | Date | string
+    readAt?: DateTimeNullableWithAggregatesFilter<"ProgramMessage"> | Date | string | null
   }
 
   export type FacilitatorProfileWhereInput = {
@@ -127862,6 +138966,86 @@ export namespace Prisma {
     revokedAt?: DateTimeNullableWithAggregatesFilter<"HealthConsent"> | Date | string | null
   }
 
+  export type ScanSaveOptInWhereInput = {
+    AND?: ScanSaveOptInWhereInput | ScanSaveOptInWhereInput[]
+    OR?: ScanSaveOptInWhereInput[]
+    NOT?: ScanSaveOptInWhereInput | ScanSaveOptInWhereInput[]
+    id?: StringFilter<"ScanSaveOptIn"> | string
+    userId?: StringFilter<"ScanSaveOptIn"> | string
+    scope?: StringFilter<"ScanSaveOptIn"> | string
+    granted?: BoolFilter<"ScanSaveOptIn"> | boolean
+    grantedAt?: DateTimeNullableFilter<"ScanSaveOptIn"> | Date | string | null
+    revokedAt?: DateTimeNullableFilter<"ScanSaveOptIn"> | Date | string | null
+    consentTextVersion?: StringFilter<"ScanSaveOptIn"> | string
+    coachShares?: JsonNullableFilter<"ScanSaveOptIn">
+    createdAt?: DateTimeFilter<"ScanSaveOptIn"> | Date | string
+    updatedAt?: DateTimeFilter<"ScanSaveOptIn"> | Date | string
+    user?: XOR<UserScalarRelationFilter, UserWhereInput>
+  }
+
+  export type ScanSaveOptInOrderByWithRelationInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    scope?: SortOrder
+    granted?: SortOrder
+    grantedAt?: SortOrderInput | SortOrder
+    revokedAt?: SortOrderInput | SortOrder
+    consentTextVersion?: SortOrder
+    coachShares?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    user?: UserOrderByWithRelationInput
+  }
+
+  export type ScanSaveOptInWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    userId?: string
+    AND?: ScanSaveOptInWhereInput | ScanSaveOptInWhereInput[]
+    OR?: ScanSaveOptInWhereInput[]
+    NOT?: ScanSaveOptInWhereInput | ScanSaveOptInWhereInput[]
+    scope?: StringFilter<"ScanSaveOptIn"> | string
+    granted?: BoolFilter<"ScanSaveOptIn"> | boolean
+    grantedAt?: DateTimeNullableFilter<"ScanSaveOptIn"> | Date | string | null
+    revokedAt?: DateTimeNullableFilter<"ScanSaveOptIn"> | Date | string | null
+    consentTextVersion?: StringFilter<"ScanSaveOptIn"> | string
+    coachShares?: JsonNullableFilter<"ScanSaveOptIn">
+    createdAt?: DateTimeFilter<"ScanSaveOptIn"> | Date | string
+    updatedAt?: DateTimeFilter<"ScanSaveOptIn"> | Date | string
+    user?: XOR<UserScalarRelationFilter, UserWhereInput>
+  }, "id" | "userId">
+
+  export type ScanSaveOptInOrderByWithAggregationInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    scope?: SortOrder
+    granted?: SortOrder
+    grantedAt?: SortOrderInput | SortOrder
+    revokedAt?: SortOrderInput | SortOrder
+    consentTextVersion?: SortOrder
+    coachShares?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: ScanSaveOptInCountOrderByAggregateInput
+    _max?: ScanSaveOptInMaxOrderByAggregateInput
+    _min?: ScanSaveOptInMinOrderByAggregateInput
+  }
+
+  export type ScanSaveOptInScalarWhereWithAggregatesInput = {
+    AND?: ScanSaveOptInScalarWhereWithAggregatesInput | ScanSaveOptInScalarWhereWithAggregatesInput[]
+    OR?: ScanSaveOptInScalarWhereWithAggregatesInput[]
+    NOT?: ScanSaveOptInScalarWhereWithAggregatesInput | ScanSaveOptInScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"ScanSaveOptIn"> | string
+    userId?: StringWithAggregatesFilter<"ScanSaveOptIn"> | string
+    scope?: StringWithAggregatesFilter<"ScanSaveOptIn"> | string
+    granted?: BoolWithAggregatesFilter<"ScanSaveOptIn"> | boolean
+    grantedAt?: DateTimeNullableWithAggregatesFilter<"ScanSaveOptIn"> | Date | string | null
+    revokedAt?: DateTimeNullableWithAggregatesFilter<"ScanSaveOptIn"> | Date | string | null
+    consentTextVersion?: StringWithAggregatesFilter<"ScanSaveOptIn"> | string
+    coachShares?: JsonNullableWithAggregatesFilter<"ScanSaveOptIn">
+    createdAt?: DateTimeWithAggregatesFilter<"ScanSaveOptIn"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"ScanSaveOptIn"> | Date | string
+  }
+
   export type ReadinessCheckInWhereInput = {
     AND?: ReadinessCheckInWhereInput | ReadinessCheckInWhereInput[]
     OR?: ReadinessCheckInWhereInput[]
@@ -128183,6 +139367,7 @@ export namespace Prisma {
     createdAt?: DateTimeFilter<"CoachClient"> | Date | string
     coach?: XOR<UserScalarRelationFilter, UserWhereInput>
     client?: XOR<UserScalarRelationFilter, UserWhereInput>
+    availability?: XOR<CoachAvailabilityNullableScalarRelationFilter, CoachAvailabilityWhereInput> | null
   }
 
   export type CoachClientOrderByWithRelationInput = {
@@ -128194,6 +139379,7 @@ export namespace Prisma {
     createdAt?: SortOrder
     coach?: UserOrderByWithRelationInput
     client?: UserOrderByWithRelationInput
+    availability?: CoachAvailabilityOrderByWithRelationInput
   }
 
   export type CoachClientWhereUniqueInput = Prisma.AtLeast<{
@@ -128209,6 +139395,7 @@ export namespace Prisma {
     createdAt?: DateTimeFilter<"CoachClient"> | Date | string
     coach?: XOR<UserScalarRelationFilter, UserWhereInput>
     client?: XOR<UserScalarRelationFilter, UserWhereInput>
+    availability?: XOR<CoachAvailabilityNullableScalarRelationFilter, CoachAvailabilityWhereInput> | null
   }, "id" | "coachId_clientId">
 
   export type CoachClientOrderByWithAggregationInput = {
@@ -128233,6 +139420,868 @@ export namespace Prisma {
     via?: StringWithAggregatesFilter<"CoachClient"> | string
     endedAt?: DateTimeNullableWithAggregatesFilter<"CoachClient"> | Date | string | null
     createdAt?: DateTimeWithAggregatesFilter<"CoachClient"> | Date | string
+  }
+
+  export type CoachAvailabilityWhereInput = {
+    AND?: CoachAvailabilityWhereInput | CoachAvailabilityWhereInput[]
+    OR?: CoachAvailabilityWhereInput[]
+    NOT?: CoachAvailabilityWhereInput | CoachAvailabilityWhereInput[]
+    coachId?: StringFilter<"CoachAvailability"> | string
+    clientId?: StringFilter<"CoachAvailability"> | string
+    status?: StringFilter<"CoachAvailability"> | string
+    returnBy?: StringNullableFilter<"CoachAvailability"> | string | null
+    setAt?: DateTimeFilter<"CoachAvailability"> | Date | string
+    link?: XOR<CoachClientScalarRelationFilter, CoachClientWhereInput>
+  }
+
+  export type CoachAvailabilityOrderByWithRelationInput = {
+    coachId?: SortOrder
+    clientId?: SortOrder
+    status?: SortOrder
+    returnBy?: SortOrderInput | SortOrder
+    setAt?: SortOrder
+    link?: CoachClientOrderByWithRelationInput
+  }
+
+  export type CoachAvailabilityWhereUniqueInput = Prisma.AtLeast<{
+    coachId_clientId?: CoachAvailabilityCoachIdClientIdCompoundUniqueInput
+    AND?: CoachAvailabilityWhereInput | CoachAvailabilityWhereInput[]
+    OR?: CoachAvailabilityWhereInput[]
+    NOT?: CoachAvailabilityWhereInput | CoachAvailabilityWhereInput[]
+    coachId?: StringFilter<"CoachAvailability"> | string
+    clientId?: StringFilter<"CoachAvailability"> | string
+    status?: StringFilter<"CoachAvailability"> | string
+    returnBy?: StringNullableFilter<"CoachAvailability"> | string | null
+    setAt?: DateTimeFilter<"CoachAvailability"> | Date | string
+    link?: XOR<CoachClientScalarRelationFilter, CoachClientWhereInput>
+  }, "coachId_clientId">
+
+  export type CoachAvailabilityOrderByWithAggregationInput = {
+    coachId?: SortOrder
+    clientId?: SortOrder
+    status?: SortOrder
+    returnBy?: SortOrderInput | SortOrder
+    setAt?: SortOrder
+    _count?: CoachAvailabilityCountOrderByAggregateInput
+    _max?: CoachAvailabilityMaxOrderByAggregateInput
+    _min?: CoachAvailabilityMinOrderByAggregateInput
+  }
+
+  export type CoachAvailabilityScalarWhereWithAggregatesInput = {
+    AND?: CoachAvailabilityScalarWhereWithAggregatesInput | CoachAvailabilityScalarWhereWithAggregatesInput[]
+    OR?: CoachAvailabilityScalarWhereWithAggregatesInput[]
+    NOT?: CoachAvailabilityScalarWhereWithAggregatesInput | CoachAvailabilityScalarWhereWithAggregatesInput[]
+    coachId?: StringWithAggregatesFilter<"CoachAvailability"> | string
+    clientId?: StringWithAggregatesFilter<"CoachAvailability"> | string
+    status?: StringWithAggregatesFilter<"CoachAvailability"> | string
+    returnBy?: StringNullableWithAggregatesFilter<"CoachAvailability"> | string | null
+    setAt?: DateTimeWithAggregatesFilter<"CoachAvailability"> | Date | string
+  }
+
+  export type InstructorWhereInput = {
+    AND?: InstructorWhereInput | InstructorWhereInput[]
+    OR?: InstructorWhereInput[]
+    NOT?: InstructorWhereInput | InstructorWhereInput[]
+    id?: StringFilter<"Instructor"> | string
+    userId?: StringFilter<"Instructor"> | string
+    slug?: StringFilter<"Instructor"> | string
+    displayName?: StringFilter<"Instructor"> | string
+    headline?: StringNullableFilter<"Instructor"> | string | null
+    bio?: StringNullableFilter<"Instructor"> | string | null
+    certifications?: StringNullableListFilter<"Instructor">
+    specialties?: StringNullableListFilter<"Instructor">
+    affiliationLine?: StringNullableFilter<"Instructor"> | string | null
+    creatorCardId?: StringNullableFilter<"Instructor"> | string | null
+    timeZone?: StringFilter<"Instructor"> | string
+    weeklyHours?: JsonFilter<"Instructor">
+    blackoutDates?: JsonFilter<"Instructor">
+    bufferMinutes?: IntFilter<"Instructor"> | number
+    minNoticeHours?: IntFilter<"Instructor"> | number
+    maxDaysAhead?: IntFilter<"Instructor"> | number
+    reviewSlaHours?: IntFilter<"Instructor"> | number
+    clientFullRefundHours?: IntFilter<"Instructor"> | number
+    refundBusinessDays?: IntNullableFilter<"Instructor"> | number | null
+    businessMailingAddress?: StringNullableFilter<"Instructor"> | string | null
+    published?: BoolFilter<"Instructor"> | boolean
+    createdAt?: DateTimeFilter<"Instructor"> | Date | string
+    updatedAt?: DateTimeFilter<"Instructor"> | Date | string
+    programAccess?: ProgramAccessListRelationFilter
+    bookings?: BookingListRelationFilter
+  }
+
+  export type InstructorOrderByWithRelationInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    slug?: SortOrder
+    displayName?: SortOrder
+    headline?: SortOrderInput | SortOrder
+    bio?: SortOrderInput | SortOrder
+    certifications?: SortOrder
+    specialties?: SortOrder
+    affiliationLine?: SortOrderInput | SortOrder
+    creatorCardId?: SortOrderInput | SortOrder
+    timeZone?: SortOrder
+    weeklyHours?: SortOrder
+    blackoutDates?: SortOrder
+    bufferMinutes?: SortOrder
+    minNoticeHours?: SortOrder
+    maxDaysAhead?: SortOrder
+    reviewSlaHours?: SortOrder
+    clientFullRefundHours?: SortOrder
+    refundBusinessDays?: SortOrderInput | SortOrder
+    businessMailingAddress?: SortOrderInput | SortOrder
+    published?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    programAccess?: ProgramAccessOrderByRelationAggregateInput
+    bookings?: BookingOrderByRelationAggregateInput
+  }
+
+  export type InstructorWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    userId?: string
+    slug?: string
+    AND?: InstructorWhereInput | InstructorWhereInput[]
+    OR?: InstructorWhereInput[]
+    NOT?: InstructorWhereInput | InstructorWhereInput[]
+    displayName?: StringFilter<"Instructor"> | string
+    headline?: StringNullableFilter<"Instructor"> | string | null
+    bio?: StringNullableFilter<"Instructor"> | string | null
+    certifications?: StringNullableListFilter<"Instructor">
+    specialties?: StringNullableListFilter<"Instructor">
+    affiliationLine?: StringNullableFilter<"Instructor"> | string | null
+    creatorCardId?: StringNullableFilter<"Instructor"> | string | null
+    timeZone?: StringFilter<"Instructor"> | string
+    weeklyHours?: JsonFilter<"Instructor">
+    blackoutDates?: JsonFilter<"Instructor">
+    bufferMinutes?: IntFilter<"Instructor"> | number
+    minNoticeHours?: IntFilter<"Instructor"> | number
+    maxDaysAhead?: IntFilter<"Instructor"> | number
+    reviewSlaHours?: IntFilter<"Instructor"> | number
+    clientFullRefundHours?: IntFilter<"Instructor"> | number
+    refundBusinessDays?: IntNullableFilter<"Instructor"> | number | null
+    businessMailingAddress?: StringNullableFilter<"Instructor"> | string | null
+    published?: BoolFilter<"Instructor"> | boolean
+    createdAt?: DateTimeFilter<"Instructor"> | Date | string
+    updatedAt?: DateTimeFilter<"Instructor"> | Date | string
+    programAccess?: ProgramAccessListRelationFilter
+    bookings?: BookingListRelationFilter
+  }, "id" | "userId" | "slug">
+
+  export type InstructorOrderByWithAggregationInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    slug?: SortOrder
+    displayName?: SortOrder
+    headline?: SortOrderInput | SortOrder
+    bio?: SortOrderInput | SortOrder
+    certifications?: SortOrder
+    specialties?: SortOrder
+    affiliationLine?: SortOrderInput | SortOrder
+    creatorCardId?: SortOrderInput | SortOrder
+    timeZone?: SortOrder
+    weeklyHours?: SortOrder
+    blackoutDates?: SortOrder
+    bufferMinutes?: SortOrder
+    minNoticeHours?: SortOrder
+    maxDaysAhead?: SortOrder
+    reviewSlaHours?: SortOrder
+    clientFullRefundHours?: SortOrder
+    refundBusinessDays?: SortOrderInput | SortOrder
+    businessMailingAddress?: SortOrderInput | SortOrder
+    published?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: InstructorCountOrderByAggregateInput
+    _avg?: InstructorAvgOrderByAggregateInput
+    _max?: InstructorMaxOrderByAggregateInput
+    _min?: InstructorMinOrderByAggregateInput
+    _sum?: InstructorSumOrderByAggregateInput
+  }
+
+  export type InstructorScalarWhereWithAggregatesInput = {
+    AND?: InstructorScalarWhereWithAggregatesInput | InstructorScalarWhereWithAggregatesInput[]
+    OR?: InstructorScalarWhereWithAggregatesInput[]
+    NOT?: InstructorScalarWhereWithAggregatesInput | InstructorScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"Instructor"> | string
+    userId?: StringWithAggregatesFilter<"Instructor"> | string
+    slug?: StringWithAggregatesFilter<"Instructor"> | string
+    displayName?: StringWithAggregatesFilter<"Instructor"> | string
+    headline?: StringNullableWithAggregatesFilter<"Instructor"> | string | null
+    bio?: StringNullableWithAggregatesFilter<"Instructor"> | string | null
+    certifications?: StringNullableListFilter<"Instructor">
+    specialties?: StringNullableListFilter<"Instructor">
+    affiliationLine?: StringNullableWithAggregatesFilter<"Instructor"> | string | null
+    creatorCardId?: StringNullableWithAggregatesFilter<"Instructor"> | string | null
+    timeZone?: StringWithAggregatesFilter<"Instructor"> | string
+    weeklyHours?: JsonWithAggregatesFilter<"Instructor">
+    blackoutDates?: JsonWithAggregatesFilter<"Instructor">
+    bufferMinutes?: IntWithAggregatesFilter<"Instructor"> | number
+    minNoticeHours?: IntWithAggregatesFilter<"Instructor"> | number
+    maxDaysAhead?: IntWithAggregatesFilter<"Instructor"> | number
+    reviewSlaHours?: IntWithAggregatesFilter<"Instructor"> | number
+    clientFullRefundHours?: IntWithAggregatesFilter<"Instructor"> | number
+    refundBusinessDays?: IntNullableWithAggregatesFilter<"Instructor"> | number | null
+    businessMailingAddress?: StringNullableWithAggregatesFilter<"Instructor"> | string | null
+    published?: BoolWithAggregatesFilter<"Instructor"> | boolean
+    createdAt?: DateTimeWithAggregatesFilter<"Instructor"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"Instructor"> | Date | string
+  }
+
+  export type ProgramAccessWhereInput = {
+    AND?: ProgramAccessWhereInput | ProgramAccessWhereInput[]
+    OR?: ProgramAccessWhereInput[]
+    NOT?: ProgramAccessWhereInput | ProgramAccessWhereInput[]
+    id?: StringFilter<"ProgramAccess"> | string
+    userId?: StringFilter<"ProgramAccess"> | string
+    instructorId?: StringFilter<"ProgramAccess"> | string
+    listingId?: StringFilter<"ProgramAccess"> | string
+    lane?: StringFilter<"ProgramAccess"> | string
+    billing?: StringFilter<"ProgramAccess"> | string
+    scope?: StringFilter<"ProgramAccess"> | string
+    beneficiary?: StringFilter<"ProgramAccess"> | string
+    status?: StringFilter<"ProgramAccess"> | string
+    priceCents?: IntFilter<"ProgramAccess"> | number
+    platformFeeCents?: IntFilter<"ProgramAccess"> | number
+    stripeFeeCents?: IntFilter<"ProgramAccess"> | number
+    reviewCredits?: IntFilter<"ProgramAccess"> | number
+    lastCreditInvoiceId?: StringNullableFilter<"ProgramAccess"> | string | null
+    stripeCheckoutId?: StringNullableFilter<"ProgramAccess"> | string | null
+    stripeSubscriptionId?: StringNullableFilter<"ProgramAccess"> | string | null
+    stripePaymentIntentId?: StringNullableFilter<"ProgramAccess"> | string | null
+    accessUntil?: DateTimeNullableFilter<"ProgramAccess"> | Date | string | null
+    cancelAtPeriodEnd?: BoolFilter<"ProgramAccess"> | boolean
+    coachingProgramId?: StringNullableFilter<"ProgramAccess"> | string | null
+    startedAt?: DateTimeNullableFilter<"ProgramAccess"> | Date | string | null
+    nextRescreenAt?: DateTimeNullableFilter<"ProgramAccess"> | Date | string | null
+    unlockCodeHash?: StringNullableFilter<"ProgramAccess"> | string | null
+    deviceTokenHash?: StringNullableFilter<"ProgramAccess"> | string | null
+    codeActive?: BoolFilter<"ProgramAccess"> | boolean
+    redeemedAt?: DateTimeNullableFilter<"ProgramAccess"> | Date | string | null
+    reissueCount?: IntFilter<"ProgramAccess"> | number
+    createdAt?: DateTimeFilter<"ProgramAccess"> | Date | string
+    updatedAt?: DateTimeFilter<"ProgramAccess"> | Date | string
+    instructor?: XOR<InstructorScalarRelationFilter, InstructorWhereInput>
+  }
+
+  export type ProgramAccessOrderByWithRelationInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    instructorId?: SortOrder
+    listingId?: SortOrder
+    lane?: SortOrder
+    billing?: SortOrder
+    scope?: SortOrder
+    beneficiary?: SortOrder
+    status?: SortOrder
+    priceCents?: SortOrder
+    platformFeeCents?: SortOrder
+    stripeFeeCents?: SortOrder
+    reviewCredits?: SortOrder
+    lastCreditInvoiceId?: SortOrderInput | SortOrder
+    stripeCheckoutId?: SortOrderInput | SortOrder
+    stripeSubscriptionId?: SortOrderInput | SortOrder
+    stripePaymentIntentId?: SortOrderInput | SortOrder
+    accessUntil?: SortOrderInput | SortOrder
+    cancelAtPeriodEnd?: SortOrder
+    coachingProgramId?: SortOrderInput | SortOrder
+    startedAt?: SortOrderInput | SortOrder
+    nextRescreenAt?: SortOrderInput | SortOrder
+    unlockCodeHash?: SortOrderInput | SortOrder
+    deviceTokenHash?: SortOrderInput | SortOrder
+    codeActive?: SortOrder
+    redeemedAt?: SortOrderInput | SortOrder
+    reissueCount?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    instructor?: InstructorOrderByWithRelationInput
+  }
+
+  export type ProgramAccessWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    stripeCheckoutId?: string
+    stripeSubscriptionId?: string
+    stripePaymentIntentId?: string
+    unlockCodeHash?: string
+    userId_listingId_beneficiary?: ProgramAccessUserIdListingIdBeneficiaryCompoundUniqueInput
+    AND?: ProgramAccessWhereInput | ProgramAccessWhereInput[]
+    OR?: ProgramAccessWhereInput[]
+    NOT?: ProgramAccessWhereInput | ProgramAccessWhereInput[]
+    userId?: StringFilter<"ProgramAccess"> | string
+    instructorId?: StringFilter<"ProgramAccess"> | string
+    listingId?: StringFilter<"ProgramAccess"> | string
+    lane?: StringFilter<"ProgramAccess"> | string
+    billing?: StringFilter<"ProgramAccess"> | string
+    scope?: StringFilter<"ProgramAccess"> | string
+    beneficiary?: StringFilter<"ProgramAccess"> | string
+    status?: StringFilter<"ProgramAccess"> | string
+    priceCents?: IntFilter<"ProgramAccess"> | number
+    platformFeeCents?: IntFilter<"ProgramAccess"> | number
+    stripeFeeCents?: IntFilter<"ProgramAccess"> | number
+    reviewCredits?: IntFilter<"ProgramAccess"> | number
+    lastCreditInvoiceId?: StringNullableFilter<"ProgramAccess"> | string | null
+    accessUntil?: DateTimeNullableFilter<"ProgramAccess"> | Date | string | null
+    cancelAtPeriodEnd?: BoolFilter<"ProgramAccess"> | boolean
+    coachingProgramId?: StringNullableFilter<"ProgramAccess"> | string | null
+    startedAt?: DateTimeNullableFilter<"ProgramAccess"> | Date | string | null
+    nextRescreenAt?: DateTimeNullableFilter<"ProgramAccess"> | Date | string | null
+    deviceTokenHash?: StringNullableFilter<"ProgramAccess"> | string | null
+    codeActive?: BoolFilter<"ProgramAccess"> | boolean
+    redeemedAt?: DateTimeNullableFilter<"ProgramAccess"> | Date | string | null
+    reissueCount?: IntFilter<"ProgramAccess"> | number
+    createdAt?: DateTimeFilter<"ProgramAccess"> | Date | string
+    updatedAt?: DateTimeFilter<"ProgramAccess"> | Date | string
+    instructor?: XOR<InstructorScalarRelationFilter, InstructorWhereInput>
+  }, "id" | "stripeCheckoutId" | "stripeSubscriptionId" | "stripePaymentIntentId" | "unlockCodeHash" | "userId_listingId_beneficiary">
+
+  export type ProgramAccessOrderByWithAggregationInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    instructorId?: SortOrder
+    listingId?: SortOrder
+    lane?: SortOrder
+    billing?: SortOrder
+    scope?: SortOrder
+    beneficiary?: SortOrder
+    status?: SortOrder
+    priceCents?: SortOrder
+    platformFeeCents?: SortOrder
+    stripeFeeCents?: SortOrder
+    reviewCredits?: SortOrder
+    lastCreditInvoiceId?: SortOrderInput | SortOrder
+    stripeCheckoutId?: SortOrderInput | SortOrder
+    stripeSubscriptionId?: SortOrderInput | SortOrder
+    stripePaymentIntentId?: SortOrderInput | SortOrder
+    accessUntil?: SortOrderInput | SortOrder
+    cancelAtPeriodEnd?: SortOrder
+    coachingProgramId?: SortOrderInput | SortOrder
+    startedAt?: SortOrderInput | SortOrder
+    nextRescreenAt?: SortOrderInput | SortOrder
+    unlockCodeHash?: SortOrderInput | SortOrder
+    deviceTokenHash?: SortOrderInput | SortOrder
+    codeActive?: SortOrder
+    redeemedAt?: SortOrderInput | SortOrder
+    reissueCount?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: ProgramAccessCountOrderByAggregateInput
+    _avg?: ProgramAccessAvgOrderByAggregateInput
+    _max?: ProgramAccessMaxOrderByAggregateInput
+    _min?: ProgramAccessMinOrderByAggregateInput
+    _sum?: ProgramAccessSumOrderByAggregateInput
+  }
+
+  export type ProgramAccessScalarWhereWithAggregatesInput = {
+    AND?: ProgramAccessScalarWhereWithAggregatesInput | ProgramAccessScalarWhereWithAggregatesInput[]
+    OR?: ProgramAccessScalarWhereWithAggregatesInput[]
+    NOT?: ProgramAccessScalarWhereWithAggregatesInput | ProgramAccessScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"ProgramAccess"> | string
+    userId?: StringWithAggregatesFilter<"ProgramAccess"> | string
+    instructorId?: StringWithAggregatesFilter<"ProgramAccess"> | string
+    listingId?: StringWithAggregatesFilter<"ProgramAccess"> | string
+    lane?: StringWithAggregatesFilter<"ProgramAccess"> | string
+    billing?: StringWithAggregatesFilter<"ProgramAccess"> | string
+    scope?: StringWithAggregatesFilter<"ProgramAccess"> | string
+    beneficiary?: StringWithAggregatesFilter<"ProgramAccess"> | string
+    status?: StringWithAggregatesFilter<"ProgramAccess"> | string
+    priceCents?: IntWithAggregatesFilter<"ProgramAccess"> | number
+    platformFeeCents?: IntWithAggregatesFilter<"ProgramAccess"> | number
+    stripeFeeCents?: IntWithAggregatesFilter<"ProgramAccess"> | number
+    reviewCredits?: IntWithAggregatesFilter<"ProgramAccess"> | number
+    lastCreditInvoiceId?: StringNullableWithAggregatesFilter<"ProgramAccess"> | string | null
+    stripeCheckoutId?: StringNullableWithAggregatesFilter<"ProgramAccess"> | string | null
+    stripeSubscriptionId?: StringNullableWithAggregatesFilter<"ProgramAccess"> | string | null
+    stripePaymentIntentId?: StringNullableWithAggregatesFilter<"ProgramAccess"> | string | null
+    accessUntil?: DateTimeNullableWithAggregatesFilter<"ProgramAccess"> | Date | string | null
+    cancelAtPeriodEnd?: BoolWithAggregatesFilter<"ProgramAccess"> | boolean
+    coachingProgramId?: StringNullableWithAggregatesFilter<"ProgramAccess"> | string | null
+    startedAt?: DateTimeNullableWithAggregatesFilter<"ProgramAccess"> | Date | string | null
+    nextRescreenAt?: DateTimeNullableWithAggregatesFilter<"ProgramAccess"> | Date | string | null
+    unlockCodeHash?: StringNullableWithAggregatesFilter<"ProgramAccess"> | string | null
+    deviceTokenHash?: StringNullableWithAggregatesFilter<"ProgramAccess"> | string | null
+    codeActive?: BoolWithAggregatesFilter<"ProgramAccess"> | boolean
+    redeemedAt?: DateTimeNullableWithAggregatesFilter<"ProgramAccess"> | Date | string | null
+    reissueCount?: IntWithAggregatesFilter<"ProgramAccess"> | number
+    createdAt?: DateTimeWithAggregatesFilter<"ProgramAccess"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"ProgramAccess"> | Date | string
+  }
+
+  export type BookingWhereInput = {
+    AND?: BookingWhereInput | BookingWhereInput[]
+    OR?: BookingWhereInput[]
+    NOT?: BookingWhereInput | BookingWhereInput[]
+    id?: StringFilter<"Booking"> | string
+    kind?: StringFilter<"Booking"> | string
+    instructorId?: StringFilter<"Booking"> | string
+    coachUserId?: StringFilter<"Booking"> | string
+    clientUserId?: StringFilter<"Booking"> | string
+    listingId?: StringFilter<"Booking"> | string
+    status?: StringFilter<"Booking"> | string
+    durationMin?: IntNullableFilter<"Booking"> | number | null
+    priceCents?: IntFilter<"Booking"> | number
+    platformFeeCents?: IntFilter<"Booking"> | number
+    stripeFeeCents?: IntFilter<"Booking"> | number
+    refundCents?: IntFilter<"Booking"> | number
+    stripeCheckoutId?: StringNullableFilter<"Booking"> | string | null
+    stripePaymentIntentId?: StringNullableFilter<"Booking"> | string | null
+    holdExpiresAt?: DateTimeNullableFilter<"Booking"> | Date | string | null
+    startsAt?: DateTimeNullableFilter<"Booking"> | Date | string | null
+    endsAt?: DateTimeNullableFilter<"Booking"> | Date | string | null
+    slotLock?: StringNullableFilter<"Booking"> | string | null
+    clientTimeZone?: StringNullableFilter<"Booking"> | string | null
+    clientNote?: StringNullableFilter<"Booking"> | string | null
+    reschedulesUsed?: IntFilter<"Booking"> | number
+    connectionFailedAt?: DateTimeNullableFilter<"Booking"> | Date | string | null
+    failureCreditOpen?: BoolFilter<"Booking"> | boolean
+    shareWithCoach?: BoolFilter<"Booking"> | boolean
+    goal?: StringNullableFilter<"Booking"> | string | null
+    painYes?: BoolNullableFilter<"Booking"> | boolean | null
+    reviewNote?: StringNullableFilter<"Booking"> | string | null
+    clipPaths?: JsonNullableFilter<"Booking">
+    clipConsentAt?: DateTimeNullableFilter<"Booking"> | Date | string | null
+    consentTextVersion?: StringNullableFilter<"Booking"> | string | null
+    submittedAt?: DateTimeNullableFilter<"Booking"> | Date | string | null
+    dueAt?: DateTimeNullableFilter<"Booking"> | Date | string | null
+    replyText?: StringNullableFilter<"Booking"> | string | null
+    replyClipPath?: StringNullableFilter<"Booking"> | string | null
+    attachedDrillIds?: JsonNullableFilter<"Booking">
+    deliveredAt?: DateTimeNullableFilter<"Booking"> | Date | string | null
+    originalClipDeleteAt?: DateTimeNullableFilter<"Booking"> | Date | string | null
+    originalsDeletedAt?: DateTimeNullableFilter<"Booking"> | Date | string | null
+    cancelledAt?: DateTimeNullableFilter<"Booking"> | Date | string | null
+    cancelledBy?: StringNullableFilter<"Booking"> | string | null
+    createdAt?: DateTimeFilter<"Booking"> | Date | string
+    updatedAt?: DateTimeFilter<"Booking"> | Date | string
+    instructor?: XOR<InstructorScalarRelationFilter, InstructorWhereInput>
+    signals?: CallSignalListRelationFilter
+  }
+
+  export type BookingOrderByWithRelationInput = {
+    id?: SortOrder
+    kind?: SortOrder
+    instructorId?: SortOrder
+    coachUserId?: SortOrder
+    clientUserId?: SortOrder
+    listingId?: SortOrder
+    status?: SortOrder
+    durationMin?: SortOrderInput | SortOrder
+    priceCents?: SortOrder
+    platformFeeCents?: SortOrder
+    stripeFeeCents?: SortOrder
+    refundCents?: SortOrder
+    stripeCheckoutId?: SortOrderInput | SortOrder
+    stripePaymentIntentId?: SortOrderInput | SortOrder
+    holdExpiresAt?: SortOrderInput | SortOrder
+    startsAt?: SortOrderInput | SortOrder
+    endsAt?: SortOrderInput | SortOrder
+    slotLock?: SortOrderInput | SortOrder
+    clientTimeZone?: SortOrderInput | SortOrder
+    clientNote?: SortOrderInput | SortOrder
+    reschedulesUsed?: SortOrder
+    connectionFailedAt?: SortOrderInput | SortOrder
+    failureCreditOpen?: SortOrder
+    shareWithCoach?: SortOrder
+    goal?: SortOrderInput | SortOrder
+    painYes?: SortOrderInput | SortOrder
+    reviewNote?: SortOrderInput | SortOrder
+    clipPaths?: SortOrderInput | SortOrder
+    clipConsentAt?: SortOrderInput | SortOrder
+    consentTextVersion?: SortOrderInput | SortOrder
+    submittedAt?: SortOrderInput | SortOrder
+    dueAt?: SortOrderInput | SortOrder
+    replyText?: SortOrderInput | SortOrder
+    replyClipPath?: SortOrderInput | SortOrder
+    attachedDrillIds?: SortOrderInput | SortOrder
+    deliveredAt?: SortOrderInput | SortOrder
+    originalClipDeleteAt?: SortOrderInput | SortOrder
+    originalsDeletedAt?: SortOrderInput | SortOrder
+    cancelledAt?: SortOrderInput | SortOrder
+    cancelledBy?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    instructor?: InstructorOrderByWithRelationInput
+    signals?: CallSignalOrderByRelationAggregateInput
+  }
+
+  export type BookingWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    stripeCheckoutId?: string
+    stripePaymentIntentId?: string
+    slotLock?: string
+    AND?: BookingWhereInput | BookingWhereInput[]
+    OR?: BookingWhereInput[]
+    NOT?: BookingWhereInput | BookingWhereInput[]
+    kind?: StringFilter<"Booking"> | string
+    instructorId?: StringFilter<"Booking"> | string
+    coachUserId?: StringFilter<"Booking"> | string
+    clientUserId?: StringFilter<"Booking"> | string
+    listingId?: StringFilter<"Booking"> | string
+    status?: StringFilter<"Booking"> | string
+    durationMin?: IntNullableFilter<"Booking"> | number | null
+    priceCents?: IntFilter<"Booking"> | number
+    platformFeeCents?: IntFilter<"Booking"> | number
+    stripeFeeCents?: IntFilter<"Booking"> | number
+    refundCents?: IntFilter<"Booking"> | number
+    holdExpiresAt?: DateTimeNullableFilter<"Booking"> | Date | string | null
+    startsAt?: DateTimeNullableFilter<"Booking"> | Date | string | null
+    endsAt?: DateTimeNullableFilter<"Booking"> | Date | string | null
+    clientTimeZone?: StringNullableFilter<"Booking"> | string | null
+    clientNote?: StringNullableFilter<"Booking"> | string | null
+    reschedulesUsed?: IntFilter<"Booking"> | number
+    connectionFailedAt?: DateTimeNullableFilter<"Booking"> | Date | string | null
+    failureCreditOpen?: BoolFilter<"Booking"> | boolean
+    shareWithCoach?: BoolFilter<"Booking"> | boolean
+    goal?: StringNullableFilter<"Booking"> | string | null
+    painYes?: BoolNullableFilter<"Booking"> | boolean | null
+    reviewNote?: StringNullableFilter<"Booking"> | string | null
+    clipPaths?: JsonNullableFilter<"Booking">
+    clipConsentAt?: DateTimeNullableFilter<"Booking"> | Date | string | null
+    consentTextVersion?: StringNullableFilter<"Booking"> | string | null
+    submittedAt?: DateTimeNullableFilter<"Booking"> | Date | string | null
+    dueAt?: DateTimeNullableFilter<"Booking"> | Date | string | null
+    replyText?: StringNullableFilter<"Booking"> | string | null
+    replyClipPath?: StringNullableFilter<"Booking"> | string | null
+    attachedDrillIds?: JsonNullableFilter<"Booking">
+    deliveredAt?: DateTimeNullableFilter<"Booking"> | Date | string | null
+    originalClipDeleteAt?: DateTimeNullableFilter<"Booking"> | Date | string | null
+    originalsDeletedAt?: DateTimeNullableFilter<"Booking"> | Date | string | null
+    cancelledAt?: DateTimeNullableFilter<"Booking"> | Date | string | null
+    cancelledBy?: StringNullableFilter<"Booking"> | string | null
+    createdAt?: DateTimeFilter<"Booking"> | Date | string
+    updatedAt?: DateTimeFilter<"Booking"> | Date | string
+    instructor?: XOR<InstructorScalarRelationFilter, InstructorWhereInput>
+    signals?: CallSignalListRelationFilter
+  }, "id" | "stripeCheckoutId" | "stripePaymentIntentId" | "slotLock">
+
+  export type BookingOrderByWithAggregationInput = {
+    id?: SortOrder
+    kind?: SortOrder
+    instructorId?: SortOrder
+    coachUserId?: SortOrder
+    clientUserId?: SortOrder
+    listingId?: SortOrder
+    status?: SortOrder
+    durationMin?: SortOrderInput | SortOrder
+    priceCents?: SortOrder
+    platformFeeCents?: SortOrder
+    stripeFeeCents?: SortOrder
+    refundCents?: SortOrder
+    stripeCheckoutId?: SortOrderInput | SortOrder
+    stripePaymentIntentId?: SortOrderInput | SortOrder
+    holdExpiresAt?: SortOrderInput | SortOrder
+    startsAt?: SortOrderInput | SortOrder
+    endsAt?: SortOrderInput | SortOrder
+    slotLock?: SortOrderInput | SortOrder
+    clientTimeZone?: SortOrderInput | SortOrder
+    clientNote?: SortOrderInput | SortOrder
+    reschedulesUsed?: SortOrder
+    connectionFailedAt?: SortOrderInput | SortOrder
+    failureCreditOpen?: SortOrder
+    shareWithCoach?: SortOrder
+    goal?: SortOrderInput | SortOrder
+    painYes?: SortOrderInput | SortOrder
+    reviewNote?: SortOrderInput | SortOrder
+    clipPaths?: SortOrderInput | SortOrder
+    clipConsentAt?: SortOrderInput | SortOrder
+    consentTextVersion?: SortOrderInput | SortOrder
+    submittedAt?: SortOrderInput | SortOrder
+    dueAt?: SortOrderInput | SortOrder
+    replyText?: SortOrderInput | SortOrder
+    replyClipPath?: SortOrderInput | SortOrder
+    attachedDrillIds?: SortOrderInput | SortOrder
+    deliveredAt?: SortOrderInput | SortOrder
+    originalClipDeleteAt?: SortOrderInput | SortOrder
+    originalsDeletedAt?: SortOrderInput | SortOrder
+    cancelledAt?: SortOrderInput | SortOrder
+    cancelledBy?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: BookingCountOrderByAggregateInput
+    _avg?: BookingAvgOrderByAggregateInput
+    _max?: BookingMaxOrderByAggregateInput
+    _min?: BookingMinOrderByAggregateInput
+    _sum?: BookingSumOrderByAggregateInput
+  }
+
+  export type BookingScalarWhereWithAggregatesInput = {
+    AND?: BookingScalarWhereWithAggregatesInput | BookingScalarWhereWithAggregatesInput[]
+    OR?: BookingScalarWhereWithAggregatesInput[]
+    NOT?: BookingScalarWhereWithAggregatesInput | BookingScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"Booking"> | string
+    kind?: StringWithAggregatesFilter<"Booking"> | string
+    instructorId?: StringWithAggregatesFilter<"Booking"> | string
+    coachUserId?: StringWithAggregatesFilter<"Booking"> | string
+    clientUserId?: StringWithAggregatesFilter<"Booking"> | string
+    listingId?: StringWithAggregatesFilter<"Booking"> | string
+    status?: StringWithAggregatesFilter<"Booking"> | string
+    durationMin?: IntNullableWithAggregatesFilter<"Booking"> | number | null
+    priceCents?: IntWithAggregatesFilter<"Booking"> | number
+    platformFeeCents?: IntWithAggregatesFilter<"Booking"> | number
+    stripeFeeCents?: IntWithAggregatesFilter<"Booking"> | number
+    refundCents?: IntWithAggregatesFilter<"Booking"> | number
+    stripeCheckoutId?: StringNullableWithAggregatesFilter<"Booking"> | string | null
+    stripePaymentIntentId?: StringNullableWithAggregatesFilter<"Booking"> | string | null
+    holdExpiresAt?: DateTimeNullableWithAggregatesFilter<"Booking"> | Date | string | null
+    startsAt?: DateTimeNullableWithAggregatesFilter<"Booking"> | Date | string | null
+    endsAt?: DateTimeNullableWithAggregatesFilter<"Booking"> | Date | string | null
+    slotLock?: StringNullableWithAggregatesFilter<"Booking"> | string | null
+    clientTimeZone?: StringNullableWithAggregatesFilter<"Booking"> | string | null
+    clientNote?: StringNullableWithAggregatesFilter<"Booking"> | string | null
+    reschedulesUsed?: IntWithAggregatesFilter<"Booking"> | number
+    connectionFailedAt?: DateTimeNullableWithAggregatesFilter<"Booking"> | Date | string | null
+    failureCreditOpen?: BoolWithAggregatesFilter<"Booking"> | boolean
+    shareWithCoach?: BoolWithAggregatesFilter<"Booking"> | boolean
+    goal?: StringNullableWithAggregatesFilter<"Booking"> | string | null
+    painYes?: BoolNullableWithAggregatesFilter<"Booking"> | boolean | null
+    reviewNote?: StringNullableWithAggregatesFilter<"Booking"> | string | null
+    clipPaths?: JsonNullableWithAggregatesFilter<"Booking">
+    clipConsentAt?: DateTimeNullableWithAggregatesFilter<"Booking"> | Date | string | null
+    consentTextVersion?: StringNullableWithAggregatesFilter<"Booking"> | string | null
+    submittedAt?: DateTimeNullableWithAggregatesFilter<"Booking"> | Date | string | null
+    dueAt?: DateTimeNullableWithAggregatesFilter<"Booking"> | Date | string | null
+    replyText?: StringNullableWithAggregatesFilter<"Booking"> | string | null
+    replyClipPath?: StringNullableWithAggregatesFilter<"Booking"> | string | null
+    attachedDrillIds?: JsonNullableWithAggregatesFilter<"Booking">
+    deliveredAt?: DateTimeNullableWithAggregatesFilter<"Booking"> | Date | string | null
+    originalClipDeleteAt?: DateTimeNullableWithAggregatesFilter<"Booking"> | Date | string | null
+    originalsDeletedAt?: DateTimeNullableWithAggregatesFilter<"Booking"> | Date | string | null
+    cancelledAt?: DateTimeNullableWithAggregatesFilter<"Booking"> | Date | string | null
+    cancelledBy?: StringNullableWithAggregatesFilter<"Booking"> | string | null
+    createdAt?: DateTimeWithAggregatesFilter<"Booking"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"Booking"> | Date | string
+  }
+
+  export type CallSignalWhereInput = {
+    AND?: CallSignalWhereInput | CallSignalWhereInput[]
+    OR?: CallSignalWhereInput[]
+    NOT?: CallSignalWhereInput | CallSignalWhereInput[]
+    id?: IntFilter<"CallSignal"> | number
+    bookingId?: StringFilter<"CallSignal"> | string
+    fromRole?: StringFilter<"CallSignal"> | string
+    epoch?: IntFilter<"CallSignal"> | number
+    kind?: StringFilter<"CallSignal"> | string
+    payload?: StringFilter<"CallSignal"> | string
+    createdAt?: DateTimeFilter<"CallSignal"> | Date | string
+    expiresAt?: DateTimeFilter<"CallSignal"> | Date | string
+    booking?: XOR<BookingScalarRelationFilter, BookingWhereInput>
+  }
+
+  export type CallSignalOrderByWithRelationInput = {
+    id?: SortOrder
+    bookingId?: SortOrder
+    fromRole?: SortOrder
+    epoch?: SortOrder
+    kind?: SortOrder
+    payload?: SortOrder
+    createdAt?: SortOrder
+    expiresAt?: SortOrder
+    booking?: BookingOrderByWithRelationInput
+  }
+
+  export type CallSignalWhereUniqueInput = Prisma.AtLeast<{
+    id?: number
+    AND?: CallSignalWhereInput | CallSignalWhereInput[]
+    OR?: CallSignalWhereInput[]
+    NOT?: CallSignalWhereInput | CallSignalWhereInput[]
+    bookingId?: StringFilter<"CallSignal"> | string
+    fromRole?: StringFilter<"CallSignal"> | string
+    epoch?: IntFilter<"CallSignal"> | number
+    kind?: StringFilter<"CallSignal"> | string
+    payload?: StringFilter<"CallSignal"> | string
+    createdAt?: DateTimeFilter<"CallSignal"> | Date | string
+    expiresAt?: DateTimeFilter<"CallSignal"> | Date | string
+    booking?: XOR<BookingScalarRelationFilter, BookingWhereInput>
+  }, "id">
+
+  export type CallSignalOrderByWithAggregationInput = {
+    id?: SortOrder
+    bookingId?: SortOrder
+    fromRole?: SortOrder
+    epoch?: SortOrder
+    kind?: SortOrder
+    payload?: SortOrder
+    createdAt?: SortOrder
+    expiresAt?: SortOrder
+    _count?: CallSignalCountOrderByAggregateInput
+    _avg?: CallSignalAvgOrderByAggregateInput
+    _max?: CallSignalMaxOrderByAggregateInput
+    _min?: CallSignalMinOrderByAggregateInput
+    _sum?: CallSignalSumOrderByAggregateInput
+  }
+
+  export type CallSignalScalarWhereWithAggregatesInput = {
+    AND?: CallSignalScalarWhereWithAggregatesInput | CallSignalScalarWhereWithAggregatesInput[]
+    OR?: CallSignalScalarWhereWithAggregatesInput[]
+    NOT?: CallSignalScalarWhereWithAggregatesInput | CallSignalScalarWhereWithAggregatesInput[]
+    id?: IntWithAggregatesFilter<"CallSignal"> | number
+    bookingId?: StringWithAggregatesFilter<"CallSignal"> | string
+    fromRole?: StringWithAggregatesFilter<"CallSignal"> | string
+    epoch?: IntWithAggregatesFilter<"CallSignal"> | number
+    kind?: StringWithAggregatesFilter<"CallSignal"> | string
+    payload?: StringWithAggregatesFilter<"CallSignal"> | string
+    createdAt?: DateTimeWithAggregatesFilter<"CallSignal"> | Date | string
+    expiresAt?: DateTimeWithAggregatesFilter<"CallSignal"> | Date | string
+  }
+
+  export type CoachStoreReferralWhereInput = {
+    AND?: CoachStoreReferralWhereInput | CoachStoreReferralWhereInput[]
+    OR?: CoachStoreReferralWhereInput[]
+    NOT?: CoachStoreReferralWhereInput | CoachStoreReferralWhereInput[]
+    id?: StringFilter<"CoachStoreReferral"> | string
+    paymentKey?: StringFilter<"CoachStoreReferral"> | string
+    referrerUserId?: StringFilter<"CoachStoreReferral"> | string
+    buyerUserId?: StringFilter<"CoachStoreReferral"> | string
+    coachUserId?: StringFilter<"CoachStoreReferral"> | string
+    sourceKind?: StringFilter<"CoachStoreReferral"> | string
+    sourceId?: StringFilter<"CoachStoreReferral"> | string
+    grossCents?: IntFilter<"CoachStoreReferral"> | number
+    platformFeeCents?: IntFilter<"CoachStoreReferral"> | number
+    shareOfFee?: FloatFilter<"CoachStoreReferral"> | number
+    cutCents?: IntFilter<"CoachStoreReferral"> | number
+    renewalIndex?: IntFilter<"CoachStoreReferral"> | number
+    status?: StringFilter<"CoachStoreReferral"> | string
+    holdUntil?: DateTimeFilter<"CoachStoreReferral"> | Date | string
+    createdAt?: DateTimeFilter<"CoachStoreReferral"> | Date | string
+    updatedAt?: DateTimeFilter<"CoachStoreReferral"> | Date | string
+  }
+
+  export type CoachStoreReferralOrderByWithRelationInput = {
+    id?: SortOrder
+    paymentKey?: SortOrder
+    referrerUserId?: SortOrder
+    buyerUserId?: SortOrder
+    coachUserId?: SortOrder
+    sourceKind?: SortOrder
+    sourceId?: SortOrder
+    grossCents?: SortOrder
+    platformFeeCents?: SortOrder
+    shareOfFee?: SortOrder
+    cutCents?: SortOrder
+    renewalIndex?: SortOrder
+    status?: SortOrder
+    holdUntil?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type CoachStoreReferralWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    paymentKey?: string
+    AND?: CoachStoreReferralWhereInput | CoachStoreReferralWhereInput[]
+    OR?: CoachStoreReferralWhereInput[]
+    NOT?: CoachStoreReferralWhereInput | CoachStoreReferralWhereInput[]
+    referrerUserId?: StringFilter<"CoachStoreReferral"> | string
+    buyerUserId?: StringFilter<"CoachStoreReferral"> | string
+    coachUserId?: StringFilter<"CoachStoreReferral"> | string
+    sourceKind?: StringFilter<"CoachStoreReferral"> | string
+    sourceId?: StringFilter<"CoachStoreReferral"> | string
+    grossCents?: IntFilter<"CoachStoreReferral"> | number
+    platformFeeCents?: IntFilter<"CoachStoreReferral"> | number
+    shareOfFee?: FloatFilter<"CoachStoreReferral"> | number
+    cutCents?: IntFilter<"CoachStoreReferral"> | number
+    renewalIndex?: IntFilter<"CoachStoreReferral"> | number
+    status?: StringFilter<"CoachStoreReferral"> | string
+    holdUntil?: DateTimeFilter<"CoachStoreReferral"> | Date | string
+    createdAt?: DateTimeFilter<"CoachStoreReferral"> | Date | string
+    updatedAt?: DateTimeFilter<"CoachStoreReferral"> | Date | string
+  }, "id" | "paymentKey">
+
+  export type CoachStoreReferralOrderByWithAggregationInput = {
+    id?: SortOrder
+    paymentKey?: SortOrder
+    referrerUserId?: SortOrder
+    buyerUserId?: SortOrder
+    coachUserId?: SortOrder
+    sourceKind?: SortOrder
+    sourceId?: SortOrder
+    grossCents?: SortOrder
+    platformFeeCents?: SortOrder
+    shareOfFee?: SortOrder
+    cutCents?: SortOrder
+    renewalIndex?: SortOrder
+    status?: SortOrder
+    holdUntil?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: CoachStoreReferralCountOrderByAggregateInput
+    _avg?: CoachStoreReferralAvgOrderByAggregateInput
+    _max?: CoachStoreReferralMaxOrderByAggregateInput
+    _min?: CoachStoreReferralMinOrderByAggregateInput
+    _sum?: CoachStoreReferralSumOrderByAggregateInput
+  }
+
+  export type CoachStoreReferralScalarWhereWithAggregatesInput = {
+    AND?: CoachStoreReferralScalarWhereWithAggregatesInput | CoachStoreReferralScalarWhereWithAggregatesInput[]
+    OR?: CoachStoreReferralScalarWhereWithAggregatesInput[]
+    NOT?: CoachStoreReferralScalarWhereWithAggregatesInput | CoachStoreReferralScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"CoachStoreReferral"> | string
+    paymentKey?: StringWithAggregatesFilter<"CoachStoreReferral"> | string
+    referrerUserId?: StringWithAggregatesFilter<"CoachStoreReferral"> | string
+    buyerUserId?: StringWithAggregatesFilter<"CoachStoreReferral"> | string
+    coachUserId?: StringWithAggregatesFilter<"CoachStoreReferral"> | string
+    sourceKind?: StringWithAggregatesFilter<"CoachStoreReferral"> | string
+    sourceId?: StringWithAggregatesFilter<"CoachStoreReferral"> | string
+    grossCents?: IntWithAggregatesFilter<"CoachStoreReferral"> | number
+    platformFeeCents?: IntWithAggregatesFilter<"CoachStoreReferral"> | number
+    shareOfFee?: FloatWithAggregatesFilter<"CoachStoreReferral"> | number
+    cutCents?: IntWithAggregatesFilter<"CoachStoreReferral"> | number
+    renewalIndex?: IntWithAggregatesFilter<"CoachStoreReferral"> | number
+    status?: StringWithAggregatesFilter<"CoachStoreReferral"> | string
+    holdUntil?: DateTimeWithAggregatesFilter<"CoachStoreReferral"> | Date | string
+    createdAt?: DateTimeWithAggregatesFilter<"CoachStoreReferral"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"CoachStoreReferral"> | Date | string
+  }
+
+  export type AdventureSaveWhereInput = {
+    AND?: AdventureSaveWhereInput | AdventureSaveWhereInput[]
+    OR?: AdventureSaveWhereInput[]
+    NOT?: AdventureSaveWhereInput | AdventureSaveWhereInput[]
+    userId?: StringFilter<"AdventureSave"> | string
+    version?: IntFilter<"AdventureSave"> | number
+    doc?: JsonFilter<"AdventureSave">
+    updatedAt?: DateTimeFilter<"AdventureSave"> | Date | string
+    user?: XOR<UserScalarRelationFilter, UserWhereInput>
+  }
+
+  export type AdventureSaveOrderByWithRelationInput = {
+    userId?: SortOrder
+    version?: SortOrder
+    doc?: SortOrder
+    updatedAt?: SortOrder
+    user?: UserOrderByWithRelationInput
+  }
+
+  export type AdventureSaveWhereUniqueInput = Prisma.AtLeast<{
+    userId?: string
+    AND?: AdventureSaveWhereInput | AdventureSaveWhereInput[]
+    OR?: AdventureSaveWhereInput[]
+    NOT?: AdventureSaveWhereInput | AdventureSaveWhereInput[]
+    version?: IntFilter<"AdventureSave"> | number
+    doc?: JsonFilter<"AdventureSave">
+    updatedAt?: DateTimeFilter<"AdventureSave"> | Date | string
+    user?: XOR<UserScalarRelationFilter, UserWhereInput>
+  }, "userId">
+
+  export type AdventureSaveOrderByWithAggregationInput = {
+    userId?: SortOrder
+    version?: SortOrder
+    doc?: SortOrder
+    updatedAt?: SortOrder
+    _count?: AdventureSaveCountOrderByAggregateInput
+    _avg?: AdventureSaveAvgOrderByAggregateInput
+    _max?: AdventureSaveMaxOrderByAggregateInput
+    _min?: AdventureSaveMinOrderByAggregateInput
+    _sum?: AdventureSaveSumOrderByAggregateInput
+  }
+
+  export type AdventureSaveScalarWhereWithAggregatesInput = {
+    AND?: AdventureSaveScalarWhereWithAggregatesInput | AdventureSaveScalarWhereWithAggregatesInput[]
+    OR?: AdventureSaveScalarWhereWithAggregatesInput[]
+    NOT?: AdventureSaveScalarWhereWithAggregatesInput | AdventureSaveScalarWhereWithAggregatesInput[]
+    userId?: StringWithAggregatesFilter<"AdventureSave"> | string
+    version?: IntWithAggregatesFilter<"AdventureSave"> | number
+    doc?: JsonWithAggregatesFilter<"AdventureSave">
+    updatedAt?: DateTimeWithAggregatesFilter<"AdventureSave"> | Date | string
   }
 
   export type UserCreateInput = {
@@ -128296,6 +140345,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -128311,6 +140361,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateInput = {
@@ -128374,6 +140425,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -128389,6 +140441,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserUpdateInput = {
@@ -128452,6 +140505,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -128467,6 +140521,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateInput = {
@@ -128530,6 +140585,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -128545,6 +140601,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateManyInput = {
@@ -135215,6 +147272,7 @@ export namespace Prisma {
     authorId: string
     body: string
     createdAt?: Date | string
+    readAt?: Date | string | null
     program: CoachingProgramCreateNestedOneWithoutMessagesInput
   }
 
@@ -135224,6 +147282,7 @@ export namespace Prisma {
     authorId: string
     body: string
     createdAt?: Date | string
+    readAt?: Date | string | null
   }
 
   export type ProgramMessageUpdateInput = {
@@ -135231,6 +147290,7 @@ export namespace Prisma {
     authorId?: StringFieldUpdateOperationsInput | string
     body?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    readAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     program?: CoachingProgramUpdateOneRequiredWithoutMessagesNestedInput
   }
 
@@ -135240,6 +147300,7 @@ export namespace Prisma {
     authorId?: StringFieldUpdateOperationsInput | string
     body?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    readAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   }
 
   export type ProgramMessageCreateManyInput = {
@@ -135248,6 +147309,7 @@ export namespace Prisma {
     authorId: string
     body: string
     createdAt?: Date | string
+    readAt?: Date | string | null
   }
 
   export type ProgramMessageUpdateManyMutationInput = {
@@ -135255,6 +147317,7 @@ export namespace Prisma {
     authorId?: StringFieldUpdateOperationsInput | string
     body?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    readAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   }
 
   export type ProgramMessageUncheckedUpdateManyInput = {
@@ -135263,6 +147326,7 @@ export namespace Prisma {
     authorId?: StringFieldUpdateOperationsInput | string
     body?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    readAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   }
 
   export type FacilitatorProfileCreateInput = {
@@ -136241,6 +148305,96 @@ export namespace Prisma {
     revokedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   }
 
+  export type ScanSaveOptInCreateInput = {
+    id?: string
+    scope?: string
+    granted?: boolean
+    grantedAt?: Date | string | null
+    revokedAt?: Date | string | null
+    consentTextVersion: string
+    coachShares?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    user: UserCreateNestedOneWithoutScanSaveOptInInput
+  }
+
+  export type ScanSaveOptInUncheckedCreateInput = {
+    id?: string
+    userId: string
+    scope?: string
+    granted?: boolean
+    grantedAt?: Date | string | null
+    revokedAt?: Date | string | null
+    consentTextVersion: string
+    coachShares?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type ScanSaveOptInUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    scope?: StringFieldUpdateOperationsInput | string
+    granted?: BoolFieldUpdateOperationsInput | boolean
+    grantedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    revokedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    consentTextVersion?: StringFieldUpdateOperationsInput | string
+    coachShares?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    user?: UserUpdateOneRequiredWithoutScanSaveOptInNestedInput
+  }
+
+  export type ScanSaveOptInUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    scope?: StringFieldUpdateOperationsInput | string
+    granted?: BoolFieldUpdateOperationsInput | boolean
+    grantedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    revokedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    consentTextVersion?: StringFieldUpdateOperationsInput | string
+    coachShares?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ScanSaveOptInCreateManyInput = {
+    id?: string
+    userId: string
+    scope?: string
+    granted?: boolean
+    grantedAt?: Date | string | null
+    revokedAt?: Date | string | null
+    consentTextVersion: string
+    coachShares?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type ScanSaveOptInUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    scope?: StringFieldUpdateOperationsInput | string
+    granted?: BoolFieldUpdateOperationsInput | boolean
+    grantedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    revokedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    consentTextVersion?: StringFieldUpdateOperationsInput | string
+    coachShares?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ScanSaveOptInUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    scope?: StringFieldUpdateOperationsInput | string
+    granted?: BoolFieldUpdateOperationsInput | boolean
+    grantedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    revokedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    consentTextVersion?: StringFieldUpdateOperationsInput | string
+    coachShares?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type ReadinessCheckInCreateInput = {
     id?: string
     date: string
@@ -136580,6 +148734,7 @@ export namespace Prisma {
     createdAt?: Date | string
     coach: UserCreateNestedOneWithoutClientsCoachedInput
     client: UserCreateNestedOneWithoutCoachesInput
+    availability?: CoachAvailabilityCreateNestedOneWithoutLinkInput
   }
 
   export type CoachClientUncheckedCreateInput = {
@@ -136589,6 +148744,7 @@ export namespace Prisma {
     via?: string
     endedAt?: Date | string | null
     createdAt?: Date | string
+    availability?: CoachAvailabilityUncheckedCreateNestedOneWithoutLinkInput
   }
 
   export type CoachClientUpdateInput = {
@@ -136598,6 +148754,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     coach?: UserUpdateOneRequiredWithoutClientsCoachedNestedInput
     client?: UserUpdateOneRequiredWithoutCoachesNestedInput
+    availability?: CoachAvailabilityUpdateOneWithoutLinkNestedInput
   }
 
   export type CoachClientUncheckedUpdateInput = {
@@ -136607,6 +148764,7 @@ export namespace Prisma {
     via?: StringFieldUpdateOperationsInput | string
     endedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    availability?: CoachAvailabilityUncheckedUpdateOneWithoutLinkNestedInput
   }
 
   export type CoachClientCreateManyInput = {
@@ -136632,6 +148790,1043 @@ export namespace Prisma {
     via?: StringFieldUpdateOperationsInput | string
     endedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type CoachAvailabilityCreateInput = {
+    status: string
+    returnBy?: string | null
+    setAt?: Date | string
+    link: CoachClientCreateNestedOneWithoutAvailabilityInput
+  }
+
+  export type CoachAvailabilityUncheckedCreateInput = {
+    coachId: string
+    clientId: string
+    status: string
+    returnBy?: string | null
+    setAt?: Date | string
+  }
+
+  export type CoachAvailabilityUpdateInput = {
+    status?: StringFieldUpdateOperationsInput | string
+    returnBy?: NullableStringFieldUpdateOperationsInput | string | null
+    setAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    link?: CoachClientUpdateOneRequiredWithoutAvailabilityNestedInput
+  }
+
+  export type CoachAvailabilityUncheckedUpdateInput = {
+    coachId?: StringFieldUpdateOperationsInput | string
+    clientId?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    returnBy?: NullableStringFieldUpdateOperationsInput | string | null
+    setAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type CoachAvailabilityCreateManyInput = {
+    coachId: string
+    clientId: string
+    status: string
+    returnBy?: string | null
+    setAt?: Date | string
+  }
+
+  export type CoachAvailabilityUpdateManyMutationInput = {
+    status?: StringFieldUpdateOperationsInput | string
+    returnBy?: NullableStringFieldUpdateOperationsInput | string | null
+    setAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type CoachAvailabilityUncheckedUpdateManyInput = {
+    coachId?: StringFieldUpdateOperationsInput | string
+    clientId?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    returnBy?: NullableStringFieldUpdateOperationsInput | string | null
+    setAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type InstructorCreateInput = {
+    id?: string
+    userId: string
+    slug: string
+    displayName: string
+    headline?: string | null
+    bio?: string | null
+    certifications?: InstructorCreatecertificationsInput | string[]
+    specialties?: InstructorCreatespecialtiesInput | string[]
+    affiliationLine?: string | null
+    creatorCardId?: string | null
+    timeZone?: string
+    weeklyHours?: JsonNullValueInput | InputJsonValue
+    blackoutDates?: JsonNullValueInput | InputJsonValue
+    bufferMinutes?: number
+    minNoticeHours?: number
+    maxDaysAhead?: number
+    reviewSlaHours?: number
+    clientFullRefundHours?: number
+    refundBusinessDays?: number | null
+    businessMailingAddress?: string | null
+    published?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    programAccess?: ProgramAccessCreateNestedManyWithoutInstructorInput
+    bookings?: BookingCreateNestedManyWithoutInstructorInput
+  }
+
+  export type InstructorUncheckedCreateInput = {
+    id?: string
+    userId: string
+    slug: string
+    displayName: string
+    headline?: string | null
+    bio?: string | null
+    certifications?: InstructorCreatecertificationsInput | string[]
+    specialties?: InstructorCreatespecialtiesInput | string[]
+    affiliationLine?: string | null
+    creatorCardId?: string | null
+    timeZone?: string
+    weeklyHours?: JsonNullValueInput | InputJsonValue
+    blackoutDates?: JsonNullValueInput | InputJsonValue
+    bufferMinutes?: number
+    minNoticeHours?: number
+    maxDaysAhead?: number
+    reviewSlaHours?: number
+    clientFullRefundHours?: number
+    refundBusinessDays?: number | null
+    businessMailingAddress?: string | null
+    published?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    programAccess?: ProgramAccessUncheckedCreateNestedManyWithoutInstructorInput
+    bookings?: BookingUncheckedCreateNestedManyWithoutInstructorInput
+  }
+
+  export type InstructorUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    displayName?: StringFieldUpdateOperationsInput | string
+    headline?: NullableStringFieldUpdateOperationsInput | string | null
+    bio?: NullableStringFieldUpdateOperationsInput | string | null
+    certifications?: InstructorUpdatecertificationsInput | string[]
+    specialties?: InstructorUpdatespecialtiesInput | string[]
+    affiliationLine?: NullableStringFieldUpdateOperationsInput | string | null
+    creatorCardId?: NullableStringFieldUpdateOperationsInput | string | null
+    timeZone?: StringFieldUpdateOperationsInput | string
+    weeklyHours?: JsonNullValueInput | InputJsonValue
+    blackoutDates?: JsonNullValueInput | InputJsonValue
+    bufferMinutes?: IntFieldUpdateOperationsInput | number
+    minNoticeHours?: IntFieldUpdateOperationsInput | number
+    maxDaysAhead?: IntFieldUpdateOperationsInput | number
+    reviewSlaHours?: IntFieldUpdateOperationsInput | number
+    clientFullRefundHours?: IntFieldUpdateOperationsInput | number
+    refundBusinessDays?: NullableIntFieldUpdateOperationsInput | number | null
+    businessMailingAddress?: NullableStringFieldUpdateOperationsInput | string | null
+    published?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    programAccess?: ProgramAccessUpdateManyWithoutInstructorNestedInput
+    bookings?: BookingUpdateManyWithoutInstructorNestedInput
+  }
+
+  export type InstructorUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    displayName?: StringFieldUpdateOperationsInput | string
+    headline?: NullableStringFieldUpdateOperationsInput | string | null
+    bio?: NullableStringFieldUpdateOperationsInput | string | null
+    certifications?: InstructorUpdatecertificationsInput | string[]
+    specialties?: InstructorUpdatespecialtiesInput | string[]
+    affiliationLine?: NullableStringFieldUpdateOperationsInput | string | null
+    creatorCardId?: NullableStringFieldUpdateOperationsInput | string | null
+    timeZone?: StringFieldUpdateOperationsInput | string
+    weeklyHours?: JsonNullValueInput | InputJsonValue
+    blackoutDates?: JsonNullValueInput | InputJsonValue
+    bufferMinutes?: IntFieldUpdateOperationsInput | number
+    minNoticeHours?: IntFieldUpdateOperationsInput | number
+    maxDaysAhead?: IntFieldUpdateOperationsInput | number
+    reviewSlaHours?: IntFieldUpdateOperationsInput | number
+    clientFullRefundHours?: IntFieldUpdateOperationsInput | number
+    refundBusinessDays?: NullableIntFieldUpdateOperationsInput | number | null
+    businessMailingAddress?: NullableStringFieldUpdateOperationsInput | string | null
+    published?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    programAccess?: ProgramAccessUncheckedUpdateManyWithoutInstructorNestedInput
+    bookings?: BookingUncheckedUpdateManyWithoutInstructorNestedInput
+  }
+
+  export type InstructorCreateManyInput = {
+    id?: string
+    userId: string
+    slug: string
+    displayName: string
+    headline?: string | null
+    bio?: string | null
+    certifications?: InstructorCreatecertificationsInput | string[]
+    specialties?: InstructorCreatespecialtiesInput | string[]
+    affiliationLine?: string | null
+    creatorCardId?: string | null
+    timeZone?: string
+    weeklyHours?: JsonNullValueInput | InputJsonValue
+    blackoutDates?: JsonNullValueInput | InputJsonValue
+    bufferMinutes?: number
+    minNoticeHours?: number
+    maxDaysAhead?: number
+    reviewSlaHours?: number
+    clientFullRefundHours?: number
+    refundBusinessDays?: number | null
+    businessMailingAddress?: string | null
+    published?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type InstructorUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    displayName?: StringFieldUpdateOperationsInput | string
+    headline?: NullableStringFieldUpdateOperationsInput | string | null
+    bio?: NullableStringFieldUpdateOperationsInput | string | null
+    certifications?: InstructorUpdatecertificationsInput | string[]
+    specialties?: InstructorUpdatespecialtiesInput | string[]
+    affiliationLine?: NullableStringFieldUpdateOperationsInput | string | null
+    creatorCardId?: NullableStringFieldUpdateOperationsInput | string | null
+    timeZone?: StringFieldUpdateOperationsInput | string
+    weeklyHours?: JsonNullValueInput | InputJsonValue
+    blackoutDates?: JsonNullValueInput | InputJsonValue
+    bufferMinutes?: IntFieldUpdateOperationsInput | number
+    minNoticeHours?: IntFieldUpdateOperationsInput | number
+    maxDaysAhead?: IntFieldUpdateOperationsInput | number
+    reviewSlaHours?: IntFieldUpdateOperationsInput | number
+    clientFullRefundHours?: IntFieldUpdateOperationsInput | number
+    refundBusinessDays?: NullableIntFieldUpdateOperationsInput | number | null
+    businessMailingAddress?: NullableStringFieldUpdateOperationsInput | string | null
+    published?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type InstructorUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    displayName?: StringFieldUpdateOperationsInput | string
+    headline?: NullableStringFieldUpdateOperationsInput | string | null
+    bio?: NullableStringFieldUpdateOperationsInput | string | null
+    certifications?: InstructorUpdatecertificationsInput | string[]
+    specialties?: InstructorUpdatespecialtiesInput | string[]
+    affiliationLine?: NullableStringFieldUpdateOperationsInput | string | null
+    creatorCardId?: NullableStringFieldUpdateOperationsInput | string | null
+    timeZone?: StringFieldUpdateOperationsInput | string
+    weeklyHours?: JsonNullValueInput | InputJsonValue
+    blackoutDates?: JsonNullValueInput | InputJsonValue
+    bufferMinutes?: IntFieldUpdateOperationsInput | number
+    minNoticeHours?: IntFieldUpdateOperationsInput | number
+    maxDaysAhead?: IntFieldUpdateOperationsInput | number
+    reviewSlaHours?: IntFieldUpdateOperationsInput | number
+    clientFullRefundHours?: IntFieldUpdateOperationsInput | number
+    refundBusinessDays?: NullableIntFieldUpdateOperationsInput | number | null
+    businessMailingAddress?: NullableStringFieldUpdateOperationsInput | string | null
+    published?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ProgramAccessCreateInput = {
+    id?: string
+    userId: string
+    listingId: string
+    lane: string
+    billing: string
+    scope?: string
+    beneficiary?: string
+    status?: string
+    priceCents: number
+    platformFeeCents?: number
+    stripeFeeCents?: number
+    reviewCredits?: number
+    lastCreditInvoiceId?: string | null
+    stripeCheckoutId?: string | null
+    stripeSubscriptionId?: string | null
+    stripePaymentIntentId?: string | null
+    accessUntil?: Date | string | null
+    cancelAtPeriodEnd?: boolean
+    coachingProgramId?: string | null
+    startedAt?: Date | string | null
+    nextRescreenAt?: Date | string | null
+    unlockCodeHash?: string | null
+    deviceTokenHash?: string | null
+    codeActive?: boolean
+    redeemedAt?: Date | string | null
+    reissueCount?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    instructor: InstructorCreateNestedOneWithoutProgramAccessInput
+  }
+
+  export type ProgramAccessUncheckedCreateInput = {
+    id?: string
+    userId: string
+    instructorId: string
+    listingId: string
+    lane: string
+    billing: string
+    scope?: string
+    beneficiary?: string
+    status?: string
+    priceCents: number
+    platformFeeCents?: number
+    stripeFeeCents?: number
+    reviewCredits?: number
+    lastCreditInvoiceId?: string | null
+    stripeCheckoutId?: string | null
+    stripeSubscriptionId?: string | null
+    stripePaymentIntentId?: string | null
+    accessUntil?: Date | string | null
+    cancelAtPeriodEnd?: boolean
+    coachingProgramId?: string | null
+    startedAt?: Date | string | null
+    nextRescreenAt?: Date | string | null
+    unlockCodeHash?: string | null
+    deviceTokenHash?: string | null
+    codeActive?: boolean
+    redeemedAt?: Date | string | null
+    reissueCount?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type ProgramAccessUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    listingId?: StringFieldUpdateOperationsInput | string
+    lane?: StringFieldUpdateOperationsInput | string
+    billing?: StringFieldUpdateOperationsInput | string
+    scope?: StringFieldUpdateOperationsInput | string
+    beneficiary?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    priceCents?: IntFieldUpdateOperationsInput | number
+    platformFeeCents?: IntFieldUpdateOperationsInput | number
+    stripeFeeCents?: IntFieldUpdateOperationsInput | number
+    reviewCredits?: IntFieldUpdateOperationsInput | number
+    lastCreditInvoiceId?: NullableStringFieldUpdateOperationsInput | string | null
+    stripeCheckoutId?: NullableStringFieldUpdateOperationsInput | string | null
+    stripeSubscriptionId?: NullableStringFieldUpdateOperationsInput | string | null
+    stripePaymentIntentId?: NullableStringFieldUpdateOperationsInput | string | null
+    accessUntil?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    cancelAtPeriodEnd?: BoolFieldUpdateOperationsInput | boolean
+    coachingProgramId?: NullableStringFieldUpdateOperationsInput | string | null
+    startedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    nextRescreenAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    unlockCodeHash?: NullableStringFieldUpdateOperationsInput | string | null
+    deviceTokenHash?: NullableStringFieldUpdateOperationsInput | string | null
+    codeActive?: BoolFieldUpdateOperationsInput | boolean
+    redeemedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    reissueCount?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    instructor?: InstructorUpdateOneRequiredWithoutProgramAccessNestedInput
+  }
+
+  export type ProgramAccessUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    instructorId?: StringFieldUpdateOperationsInput | string
+    listingId?: StringFieldUpdateOperationsInput | string
+    lane?: StringFieldUpdateOperationsInput | string
+    billing?: StringFieldUpdateOperationsInput | string
+    scope?: StringFieldUpdateOperationsInput | string
+    beneficiary?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    priceCents?: IntFieldUpdateOperationsInput | number
+    platformFeeCents?: IntFieldUpdateOperationsInput | number
+    stripeFeeCents?: IntFieldUpdateOperationsInput | number
+    reviewCredits?: IntFieldUpdateOperationsInput | number
+    lastCreditInvoiceId?: NullableStringFieldUpdateOperationsInput | string | null
+    stripeCheckoutId?: NullableStringFieldUpdateOperationsInput | string | null
+    stripeSubscriptionId?: NullableStringFieldUpdateOperationsInput | string | null
+    stripePaymentIntentId?: NullableStringFieldUpdateOperationsInput | string | null
+    accessUntil?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    cancelAtPeriodEnd?: BoolFieldUpdateOperationsInput | boolean
+    coachingProgramId?: NullableStringFieldUpdateOperationsInput | string | null
+    startedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    nextRescreenAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    unlockCodeHash?: NullableStringFieldUpdateOperationsInput | string | null
+    deviceTokenHash?: NullableStringFieldUpdateOperationsInput | string | null
+    codeActive?: BoolFieldUpdateOperationsInput | boolean
+    redeemedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    reissueCount?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ProgramAccessCreateManyInput = {
+    id?: string
+    userId: string
+    instructorId: string
+    listingId: string
+    lane: string
+    billing: string
+    scope?: string
+    beneficiary?: string
+    status?: string
+    priceCents: number
+    platformFeeCents?: number
+    stripeFeeCents?: number
+    reviewCredits?: number
+    lastCreditInvoiceId?: string | null
+    stripeCheckoutId?: string | null
+    stripeSubscriptionId?: string | null
+    stripePaymentIntentId?: string | null
+    accessUntil?: Date | string | null
+    cancelAtPeriodEnd?: boolean
+    coachingProgramId?: string | null
+    startedAt?: Date | string | null
+    nextRescreenAt?: Date | string | null
+    unlockCodeHash?: string | null
+    deviceTokenHash?: string | null
+    codeActive?: boolean
+    redeemedAt?: Date | string | null
+    reissueCount?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type ProgramAccessUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    listingId?: StringFieldUpdateOperationsInput | string
+    lane?: StringFieldUpdateOperationsInput | string
+    billing?: StringFieldUpdateOperationsInput | string
+    scope?: StringFieldUpdateOperationsInput | string
+    beneficiary?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    priceCents?: IntFieldUpdateOperationsInput | number
+    platformFeeCents?: IntFieldUpdateOperationsInput | number
+    stripeFeeCents?: IntFieldUpdateOperationsInput | number
+    reviewCredits?: IntFieldUpdateOperationsInput | number
+    lastCreditInvoiceId?: NullableStringFieldUpdateOperationsInput | string | null
+    stripeCheckoutId?: NullableStringFieldUpdateOperationsInput | string | null
+    stripeSubscriptionId?: NullableStringFieldUpdateOperationsInput | string | null
+    stripePaymentIntentId?: NullableStringFieldUpdateOperationsInput | string | null
+    accessUntil?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    cancelAtPeriodEnd?: BoolFieldUpdateOperationsInput | boolean
+    coachingProgramId?: NullableStringFieldUpdateOperationsInput | string | null
+    startedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    nextRescreenAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    unlockCodeHash?: NullableStringFieldUpdateOperationsInput | string | null
+    deviceTokenHash?: NullableStringFieldUpdateOperationsInput | string | null
+    codeActive?: BoolFieldUpdateOperationsInput | boolean
+    redeemedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    reissueCount?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ProgramAccessUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    instructorId?: StringFieldUpdateOperationsInput | string
+    listingId?: StringFieldUpdateOperationsInput | string
+    lane?: StringFieldUpdateOperationsInput | string
+    billing?: StringFieldUpdateOperationsInput | string
+    scope?: StringFieldUpdateOperationsInput | string
+    beneficiary?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    priceCents?: IntFieldUpdateOperationsInput | number
+    platformFeeCents?: IntFieldUpdateOperationsInput | number
+    stripeFeeCents?: IntFieldUpdateOperationsInput | number
+    reviewCredits?: IntFieldUpdateOperationsInput | number
+    lastCreditInvoiceId?: NullableStringFieldUpdateOperationsInput | string | null
+    stripeCheckoutId?: NullableStringFieldUpdateOperationsInput | string | null
+    stripeSubscriptionId?: NullableStringFieldUpdateOperationsInput | string | null
+    stripePaymentIntentId?: NullableStringFieldUpdateOperationsInput | string | null
+    accessUntil?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    cancelAtPeriodEnd?: BoolFieldUpdateOperationsInput | boolean
+    coachingProgramId?: NullableStringFieldUpdateOperationsInput | string | null
+    startedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    nextRescreenAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    unlockCodeHash?: NullableStringFieldUpdateOperationsInput | string | null
+    deviceTokenHash?: NullableStringFieldUpdateOperationsInput | string | null
+    codeActive?: BoolFieldUpdateOperationsInput | boolean
+    redeemedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    reissueCount?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type BookingCreateInput = {
+    id?: string
+    kind: string
+    coachUserId: string
+    clientUserId: string
+    listingId: string
+    status?: string
+    durationMin?: number | null
+    priceCents: number
+    platformFeeCents?: number
+    stripeFeeCents?: number
+    refundCents?: number
+    stripeCheckoutId?: string | null
+    stripePaymentIntentId?: string | null
+    holdExpiresAt?: Date | string | null
+    startsAt?: Date | string | null
+    endsAt?: Date | string | null
+    slotLock?: string | null
+    clientTimeZone?: string | null
+    clientNote?: string | null
+    reschedulesUsed?: number
+    connectionFailedAt?: Date | string | null
+    failureCreditOpen?: boolean
+    shareWithCoach?: boolean
+    goal?: string | null
+    painYes?: boolean | null
+    reviewNote?: string | null
+    clipPaths?: NullableJsonNullValueInput | InputJsonValue
+    clipConsentAt?: Date | string | null
+    consentTextVersion?: string | null
+    submittedAt?: Date | string | null
+    dueAt?: Date | string | null
+    replyText?: string | null
+    replyClipPath?: string | null
+    attachedDrillIds?: NullableJsonNullValueInput | InputJsonValue
+    deliveredAt?: Date | string | null
+    originalClipDeleteAt?: Date | string | null
+    originalsDeletedAt?: Date | string | null
+    cancelledAt?: Date | string | null
+    cancelledBy?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    instructor: InstructorCreateNestedOneWithoutBookingsInput
+    signals?: CallSignalCreateNestedManyWithoutBookingInput
+  }
+
+  export type BookingUncheckedCreateInput = {
+    id?: string
+    kind: string
+    instructorId: string
+    coachUserId: string
+    clientUserId: string
+    listingId: string
+    status?: string
+    durationMin?: number | null
+    priceCents: number
+    platformFeeCents?: number
+    stripeFeeCents?: number
+    refundCents?: number
+    stripeCheckoutId?: string | null
+    stripePaymentIntentId?: string | null
+    holdExpiresAt?: Date | string | null
+    startsAt?: Date | string | null
+    endsAt?: Date | string | null
+    slotLock?: string | null
+    clientTimeZone?: string | null
+    clientNote?: string | null
+    reschedulesUsed?: number
+    connectionFailedAt?: Date | string | null
+    failureCreditOpen?: boolean
+    shareWithCoach?: boolean
+    goal?: string | null
+    painYes?: boolean | null
+    reviewNote?: string | null
+    clipPaths?: NullableJsonNullValueInput | InputJsonValue
+    clipConsentAt?: Date | string | null
+    consentTextVersion?: string | null
+    submittedAt?: Date | string | null
+    dueAt?: Date | string | null
+    replyText?: string | null
+    replyClipPath?: string | null
+    attachedDrillIds?: NullableJsonNullValueInput | InputJsonValue
+    deliveredAt?: Date | string | null
+    originalClipDeleteAt?: Date | string | null
+    originalsDeletedAt?: Date | string | null
+    cancelledAt?: Date | string | null
+    cancelledBy?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    signals?: CallSignalUncheckedCreateNestedManyWithoutBookingInput
+  }
+
+  export type BookingUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    kind?: StringFieldUpdateOperationsInput | string
+    coachUserId?: StringFieldUpdateOperationsInput | string
+    clientUserId?: StringFieldUpdateOperationsInput | string
+    listingId?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    durationMin?: NullableIntFieldUpdateOperationsInput | number | null
+    priceCents?: IntFieldUpdateOperationsInput | number
+    platformFeeCents?: IntFieldUpdateOperationsInput | number
+    stripeFeeCents?: IntFieldUpdateOperationsInput | number
+    refundCents?: IntFieldUpdateOperationsInput | number
+    stripeCheckoutId?: NullableStringFieldUpdateOperationsInput | string | null
+    stripePaymentIntentId?: NullableStringFieldUpdateOperationsInput | string | null
+    holdExpiresAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    startsAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    endsAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    slotLock?: NullableStringFieldUpdateOperationsInput | string | null
+    clientTimeZone?: NullableStringFieldUpdateOperationsInput | string | null
+    clientNote?: NullableStringFieldUpdateOperationsInput | string | null
+    reschedulesUsed?: IntFieldUpdateOperationsInput | number
+    connectionFailedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    failureCreditOpen?: BoolFieldUpdateOperationsInput | boolean
+    shareWithCoach?: BoolFieldUpdateOperationsInput | boolean
+    goal?: NullableStringFieldUpdateOperationsInput | string | null
+    painYes?: NullableBoolFieldUpdateOperationsInput | boolean | null
+    reviewNote?: NullableStringFieldUpdateOperationsInput | string | null
+    clipPaths?: NullableJsonNullValueInput | InputJsonValue
+    clipConsentAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    consentTextVersion?: NullableStringFieldUpdateOperationsInput | string | null
+    submittedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    dueAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    replyText?: NullableStringFieldUpdateOperationsInput | string | null
+    replyClipPath?: NullableStringFieldUpdateOperationsInput | string | null
+    attachedDrillIds?: NullableJsonNullValueInput | InputJsonValue
+    deliveredAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    originalClipDeleteAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    originalsDeletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    cancelledAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    cancelledBy?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    instructor?: InstructorUpdateOneRequiredWithoutBookingsNestedInput
+    signals?: CallSignalUpdateManyWithoutBookingNestedInput
+  }
+
+  export type BookingUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    kind?: StringFieldUpdateOperationsInput | string
+    instructorId?: StringFieldUpdateOperationsInput | string
+    coachUserId?: StringFieldUpdateOperationsInput | string
+    clientUserId?: StringFieldUpdateOperationsInput | string
+    listingId?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    durationMin?: NullableIntFieldUpdateOperationsInput | number | null
+    priceCents?: IntFieldUpdateOperationsInput | number
+    platformFeeCents?: IntFieldUpdateOperationsInput | number
+    stripeFeeCents?: IntFieldUpdateOperationsInput | number
+    refundCents?: IntFieldUpdateOperationsInput | number
+    stripeCheckoutId?: NullableStringFieldUpdateOperationsInput | string | null
+    stripePaymentIntentId?: NullableStringFieldUpdateOperationsInput | string | null
+    holdExpiresAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    startsAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    endsAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    slotLock?: NullableStringFieldUpdateOperationsInput | string | null
+    clientTimeZone?: NullableStringFieldUpdateOperationsInput | string | null
+    clientNote?: NullableStringFieldUpdateOperationsInput | string | null
+    reschedulesUsed?: IntFieldUpdateOperationsInput | number
+    connectionFailedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    failureCreditOpen?: BoolFieldUpdateOperationsInput | boolean
+    shareWithCoach?: BoolFieldUpdateOperationsInput | boolean
+    goal?: NullableStringFieldUpdateOperationsInput | string | null
+    painYes?: NullableBoolFieldUpdateOperationsInput | boolean | null
+    reviewNote?: NullableStringFieldUpdateOperationsInput | string | null
+    clipPaths?: NullableJsonNullValueInput | InputJsonValue
+    clipConsentAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    consentTextVersion?: NullableStringFieldUpdateOperationsInput | string | null
+    submittedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    dueAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    replyText?: NullableStringFieldUpdateOperationsInput | string | null
+    replyClipPath?: NullableStringFieldUpdateOperationsInput | string | null
+    attachedDrillIds?: NullableJsonNullValueInput | InputJsonValue
+    deliveredAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    originalClipDeleteAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    originalsDeletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    cancelledAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    cancelledBy?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    signals?: CallSignalUncheckedUpdateManyWithoutBookingNestedInput
+  }
+
+  export type BookingCreateManyInput = {
+    id?: string
+    kind: string
+    instructorId: string
+    coachUserId: string
+    clientUserId: string
+    listingId: string
+    status?: string
+    durationMin?: number | null
+    priceCents: number
+    platformFeeCents?: number
+    stripeFeeCents?: number
+    refundCents?: number
+    stripeCheckoutId?: string | null
+    stripePaymentIntentId?: string | null
+    holdExpiresAt?: Date | string | null
+    startsAt?: Date | string | null
+    endsAt?: Date | string | null
+    slotLock?: string | null
+    clientTimeZone?: string | null
+    clientNote?: string | null
+    reschedulesUsed?: number
+    connectionFailedAt?: Date | string | null
+    failureCreditOpen?: boolean
+    shareWithCoach?: boolean
+    goal?: string | null
+    painYes?: boolean | null
+    reviewNote?: string | null
+    clipPaths?: NullableJsonNullValueInput | InputJsonValue
+    clipConsentAt?: Date | string | null
+    consentTextVersion?: string | null
+    submittedAt?: Date | string | null
+    dueAt?: Date | string | null
+    replyText?: string | null
+    replyClipPath?: string | null
+    attachedDrillIds?: NullableJsonNullValueInput | InputJsonValue
+    deliveredAt?: Date | string | null
+    originalClipDeleteAt?: Date | string | null
+    originalsDeletedAt?: Date | string | null
+    cancelledAt?: Date | string | null
+    cancelledBy?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type BookingUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    kind?: StringFieldUpdateOperationsInput | string
+    coachUserId?: StringFieldUpdateOperationsInput | string
+    clientUserId?: StringFieldUpdateOperationsInput | string
+    listingId?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    durationMin?: NullableIntFieldUpdateOperationsInput | number | null
+    priceCents?: IntFieldUpdateOperationsInput | number
+    platformFeeCents?: IntFieldUpdateOperationsInput | number
+    stripeFeeCents?: IntFieldUpdateOperationsInput | number
+    refundCents?: IntFieldUpdateOperationsInput | number
+    stripeCheckoutId?: NullableStringFieldUpdateOperationsInput | string | null
+    stripePaymentIntentId?: NullableStringFieldUpdateOperationsInput | string | null
+    holdExpiresAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    startsAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    endsAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    slotLock?: NullableStringFieldUpdateOperationsInput | string | null
+    clientTimeZone?: NullableStringFieldUpdateOperationsInput | string | null
+    clientNote?: NullableStringFieldUpdateOperationsInput | string | null
+    reschedulesUsed?: IntFieldUpdateOperationsInput | number
+    connectionFailedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    failureCreditOpen?: BoolFieldUpdateOperationsInput | boolean
+    shareWithCoach?: BoolFieldUpdateOperationsInput | boolean
+    goal?: NullableStringFieldUpdateOperationsInput | string | null
+    painYes?: NullableBoolFieldUpdateOperationsInput | boolean | null
+    reviewNote?: NullableStringFieldUpdateOperationsInput | string | null
+    clipPaths?: NullableJsonNullValueInput | InputJsonValue
+    clipConsentAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    consentTextVersion?: NullableStringFieldUpdateOperationsInput | string | null
+    submittedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    dueAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    replyText?: NullableStringFieldUpdateOperationsInput | string | null
+    replyClipPath?: NullableStringFieldUpdateOperationsInput | string | null
+    attachedDrillIds?: NullableJsonNullValueInput | InputJsonValue
+    deliveredAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    originalClipDeleteAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    originalsDeletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    cancelledAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    cancelledBy?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type BookingUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    kind?: StringFieldUpdateOperationsInput | string
+    instructorId?: StringFieldUpdateOperationsInput | string
+    coachUserId?: StringFieldUpdateOperationsInput | string
+    clientUserId?: StringFieldUpdateOperationsInput | string
+    listingId?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    durationMin?: NullableIntFieldUpdateOperationsInput | number | null
+    priceCents?: IntFieldUpdateOperationsInput | number
+    platformFeeCents?: IntFieldUpdateOperationsInput | number
+    stripeFeeCents?: IntFieldUpdateOperationsInput | number
+    refundCents?: IntFieldUpdateOperationsInput | number
+    stripeCheckoutId?: NullableStringFieldUpdateOperationsInput | string | null
+    stripePaymentIntentId?: NullableStringFieldUpdateOperationsInput | string | null
+    holdExpiresAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    startsAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    endsAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    slotLock?: NullableStringFieldUpdateOperationsInput | string | null
+    clientTimeZone?: NullableStringFieldUpdateOperationsInput | string | null
+    clientNote?: NullableStringFieldUpdateOperationsInput | string | null
+    reschedulesUsed?: IntFieldUpdateOperationsInput | number
+    connectionFailedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    failureCreditOpen?: BoolFieldUpdateOperationsInput | boolean
+    shareWithCoach?: BoolFieldUpdateOperationsInput | boolean
+    goal?: NullableStringFieldUpdateOperationsInput | string | null
+    painYes?: NullableBoolFieldUpdateOperationsInput | boolean | null
+    reviewNote?: NullableStringFieldUpdateOperationsInput | string | null
+    clipPaths?: NullableJsonNullValueInput | InputJsonValue
+    clipConsentAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    consentTextVersion?: NullableStringFieldUpdateOperationsInput | string | null
+    submittedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    dueAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    replyText?: NullableStringFieldUpdateOperationsInput | string | null
+    replyClipPath?: NullableStringFieldUpdateOperationsInput | string | null
+    attachedDrillIds?: NullableJsonNullValueInput | InputJsonValue
+    deliveredAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    originalClipDeleteAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    originalsDeletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    cancelledAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    cancelledBy?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type CallSignalCreateInput = {
+    fromRole: string
+    epoch?: number
+    kind: string
+    payload: string
+    createdAt?: Date | string
+    expiresAt: Date | string
+    booking: BookingCreateNestedOneWithoutSignalsInput
+  }
+
+  export type CallSignalUncheckedCreateInput = {
+    id?: number
+    bookingId: string
+    fromRole: string
+    epoch?: number
+    kind: string
+    payload: string
+    createdAt?: Date | string
+    expiresAt: Date | string
+  }
+
+  export type CallSignalUpdateInput = {
+    fromRole?: StringFieldUpdateOperationsInput | string
+    epoch?: IntFieldUpdateOperationsInput | number
+    kind?: StringFieldUpdateOperationsInput | string
+    payload?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    expiresAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    booking?: BookingUpdateOneRequiredWithoutSignalsNestedInput
+  }
+
+  export type CallSignalUncheckedUpdateInput = {
+    id?: IntFieldUpdateOperationsInput | number
+    bookingId?: StringFieldUpdateOperationsInput | string
+    fromRole?: StringFieldUpdateOperationsInput | string
+    epoch?: IntFieldUpdateOperationsInput | number
+    kind?: StringFieldUpdateOperationsInput | string
+    payload?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    expiresAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type CallSignalCreateManyInput = {
+    id?: number
+    bookingId: string
+    fromRole: string
+    epoch?: number
+    kind: string
+    payload: string
+    createdAt?: Date | string
+    expiresAt: Date | string
+  }
+
+  export type CallSignalUpdateManyMutationInput = {
+    fromRole?: StringFieldUpdateOperationsInput | string
+    epoch?: IntFieldUpdateOperationsInput | number
+    kind?: StringFieldUpdateOperationsInput | string
+    payload?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    expiresAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type CallSignalUncheckedUpdateManyInput = {
+    id?: IntFieldUpdateOperationsInput | number
+    bookingId?: StringFieldUpdateOperationsInput | string
+    fromRole?: StringFieldUpdateOperationsInput | string
+    epoch?: IntFieldUpdateOperationsInput | number
+    kind?: StringFieldUpdateOperationsInput | string
+    payload?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    expiresAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type CoachStoreReferralCreateInput = {
+    id?: string
+    paymentKey: string
+    referrerUserId: string
+    buyerUserId: string
+    coachUserId: string
+    sourceKind: string
+    sourceId: string
+    grossCents: number
+    platformFeeCents: number
+    shareOfFee: number
+    cutCents: number
+    renewalIndex?: number
+    status?: string
+    holdUntil: Date | string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type CoachStoreReferralUncheckedCreateInput = {
+    id?: string
+    paymentKey: string
+    referrerUserId: string
+    buyerUserId: string
+    coachUserId: string
+    sourceKind: string
+    sourceId: string
+    grossCents: number
+    platformFeeCents: number
+    shareOfFee: number
+    cutCents: number
+    renewalIndex?: number
+    status?: string
+    holdUntil: Date | string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type CoachStoreReferralUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    paymentKey?: StringFieldUpdateOperationsInput | string
+    referrerUserId?: StringFieldUpdateOperationsInput | string
+    buyerUserId?: StringFieldUpdateOperationsInput | string
+    coachUserId?: StringFieldUpdateOperationsInput | string
+    sourceKind?: StringFieldUpdateOperationsInput | string
+    sourceId?: StringFieldUpdateOperationsInput | string
+    grossCents?: IntFieldUpdateOperationsInput | number
+    platformFeeCents?: IntFieldUpdateOperationsInput | number
+    shareOfFee?: FloatFieldUpdateOperationsInput | number
+    cutCents?: IntFieldUpdateOperationsInput | number
+    renewalIndex?: IntFieldUpdateOperationsInput | number
+    status?: StringFieldUpdateOperationsInput | string
+    holdUntil?: DateTimeFieldUpdateOperationsInput | Date | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type CoachStoreReferralUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    paymentKey?: StringFieldUpdateOperationsInput | string
+    referrerUserId?: StringFieldUpdateOperationsInput | string
+    buyerUserId?: StringFieldUpdateOperationsInput | string
+    coachUserId?: StringFieldUpdateOperationsInput | string
+    sourceKind?: StringFieldUpdateOperationsInput | string
+    sourceId?: StringFieldUpdateOperationsInput | string
+    grossCents?: IntFieldUpdateOperationsInput | number
+    platformFeeCents?: IntFieldUpdateOperationsInput | number
+    shareOfFee?: FloatFieldUpdateOperationsInput | number
+    cutCents?: IntFieldUpdateOperationsInput | number
+    renewalIndex?: IntFieldUpdateOperationsInput | number
+    status?: StringFieldUpdateOperationsInput | string
+    holdUntil?: DateTimeFieldUpdateOperationsInput | Date | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type CoachStoreReferralCreateManyInput = {
+    id?: string
+    paymentKey: string
+    referrerUserId: string
+    buyerUserId: string
+    coachUserId: string
+    sourceKind: string
+    sourceId: string
+    grossCents: number
+    platformFeeCents: number
+    shareOfFee: number
+    cutCents: number
+    renewalIndex?: number
+    status?: string
+    holdUntil: Date | string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type CoachStoreReferralUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    paymentKey?: StringFieldUpdateOperationsInput | string
+    referrerUserId?: StringFieldUpdateOperationsInput | string
+    buyerUserId?: StringFieldUpdateOperationsInput | string
+    coachUserId?: StringFieldUpdateOperationsInput | string
+    sourceKind?: StringFieldUpdateOperationsInput | string
+    sourceId?: StringFieldUpdateOperationsInput | string
+    grossCents?: IntFieldUpdateOperationsInput | number
+    platformFeeCents?: IntFieldUpdateOperationsInput | number
+    shareOfFee?: FloatFieldUpdateOperationsInput | number
+    cutCents?: IntFieldUpdateOperationsInput | number
+    renewalIndex?: IntFieldUpdateOperationsInput | number
+    status?: StringFieldUpdateOperationsInput | string
+    holdUntil?: DateTimeFieldUpdateOperationsInput | Date | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type CoachStoreReferralUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    paymentKey?: StringFieldUpdateOperationsInput | string
+    referrerUserId?: StringFieldUpdateOperationsInput | string
+    buyerUserId?: StringFieldUpdateOperationsInput | string
+    coachUserId?: StringFieldUpdateOperationsInput | string
+    sourceKind?: StringFieldUpdateOperationsInput | string
+    sourceId?: StringFieldUpdateOperationsInput | string
+    grossCents?: IntFieldUpdateOperationsInput | number
+    platformFeeCents?: IntFieldUpdateOperationsInput | number
+    shareOfFee?: FloatFieldUpdateOperationsInput | number
+    cutCents?: IntFieldUpdateOperationsInput | number
+    renewalIndex?: IntFieldUpdateOperationsInput | number
+    status?: StringFieldUpdateOperationsInput | string
+    holdUntil?: DateTimeFieldUpdateOperationsInput | Date | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type AdventureSaveCreateInput = {
+    version: number
+    doc: JsonNullValueInput | InputJsonValue
+    updatedAt?: Date | string
+    user: UserCreateNestedOneWithoutAdventureSaveInput
+  }
+
+  export type AdventureSaveUncheckedCreateInput = {
+    userId: string
+    version: number
+    doc: JsonNullValueInput | InputJsonValue
+    updatedAt?: Date | string
+  }
+
+  export type AdventureSaveUpdateInput = {
+    version?: IntFieldUpdateOperationsInput | number
+    doc?: JsonNullValueInput | InputJsonValue
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    user?: UserUpdateOneRequiredWithoutAdventureSaveNestedInput
+  }
+
+  export type AdventureSaveUncheckedUpdateInput = {
+    userId?: StringFieldUpdateOperationsInput | string
+    version?: IntFieldUpdateOperationsInput | number
+    doc?: JsonNullValueInput | InputJsonValue
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type AdventureSaveCreateManyInput = {
+    userId: string
+    version: number
+    doc: JsonNullValueInput | InputJsonValue
+    updatedAt?: Date | string
+  }
+
+  export type AdventureSaveUpdateManyMutationInput = {
+    version?: IntFieldUpdateOperationsInput | number
+    doc?: JsonNullValueInput | InputJsonValue
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type AdventureSaveUncheckedUpdateManyInput = {
+    userId?: StringFieldUpdateOperationsInput | string
+    version?: IntFieldUpdateOperationsInput | number
+    doc?: JsonNullValueInput | InputJsonValue
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type StringFilter<$PrismaModel = never> = {
@@ -136940,6 +150135,11 @@ export namespace Prisma {
     none?: SessionBookingWhereInput
   }
 
+  export type ScanSaveOptInNullableScalarRelationFilter = {
+    is?: ScanSaveOptInWhereInput | null
+    isNot?: ScanSaveOptInWhereInput | null
+  }
+
   export type FacilitatorProfileNullableScalarRelationFilter = {
     is?: FacilitatorProfileWhereInput | null
     isNot?: FacilitatorProfileWhereInput | null
@@ -137015,6 +150215,11 @@ export namespace Prisma {
     every?: CrmNoteWhereInput
     some?: CrmNoteWhereInput
     none?: CrmNoteWhereInput
+  }
+
+  export type AdventureSaveNullableScalarRelationFilter = {
+    is?: AdventureSaveWhereInput | null
+    isNot?: AdventureSaveWhereInput | null
   }
 
   export type SortOrderInput = {
@@ -141587,6 +154792,7 @@ export namespace Prisma {
     authorId?: SortOrder
     body?: SortOrder
     createdAt?: SortOrder
+    readAt?: SortOrder
   }
 
   export type ProgramMessageMaxOrderByAggregateInput = {
@@ -141595,6 +154801,7 @@ export namespace Prisma {
     authorId?: SortOrder
     body?: SortOrder
     createdAt?: SortOrder
+    readAt?: SortOrder
   }
 
   export type ProgramMessageMinOrderByAggregateInput = {
@@ -141603,6 +154810,7 @@ export namespace Prisma {
     authorId?: SortOrder
     body?: SortOrder
     createdAt?: SortOrder
+    readAt?: SortOrder
   }
 
   export type EnumCertificationStatusFilter<$PrismaModel = never> = {
@@ -142114,6 +155322,43 @@ export namespace Prisma {
     revokedAt?: SortOrder
   }
 
+  export type ScanSaveOptInCountOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    scope?: SortOrder
+    granted?: SortOrder
+    grantedAt?: SortOrder
+    revokedAt?: SortOrder
+    consentTextVersion?: SortOrder
+    coachShares?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type ScanSaveOptInMaxOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    scope?: SortOrder
+    granted?: SortOrder
+    grantedAt?: SortOrder
+    revokedAt?: SortOrder
+    consentTextVersion?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type ScanSaveOptInMinOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    scope?: SortOrder
+    granted?: SortOrder
+    grantedAt?: SortOrder
+    revokedAt?: SortOrder
+    consentTextVersion?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
   export type ReadinessCheckInUserIdDateCompoundUniqueInput = {
     userId: string
     date: string
@@ -142299,6 +155544,11 @@ export namespace Prisma {
     joined?: SortOrder
   }
 
+  export type CoachAvailabilityNullableScalarRelationFilter = {
+    is?: CoachAvailabilityWhereInput | null
+    isNot?: CoachAvailabilityWhereInput | null
+  }
+
   export type CoachClientCoachIdClientIdCompoundUniqueInput = {
     coachId: string
     clientId: string
@@ -142329,6 +155579,591 @@ export namespace Prisma {
     via?: SortOrder
     endedAt?: SortOrder
     createdAt?: SortOrder
+  }
+
+  export type CoachClientScalarRelationFilter = {
+    is?: CoachClientWhereInput
+    isNot?: CoachClientWhereInput
+  }
+
+  export type CoachAvailabilityCoachIdClientIdCompoundUniqueInput = {
+    coachId: string
+    clientId: string
+  }
+
+  export type CoachAvailabilityCountOrderByAggregateInput = {
+    coachId?: SortOrder
+    clientId?: SortOrder
+    status?: SortOrder
+    returnBy?: SortOrder
+    setAt?: SortOrder
+  }
+
+  export type CoachAvailabilityMaxOrderByAggregateInput = {
+    coachId?: SortOrder
+    clientId?: SortOrder
+    status?: SortOrder
+    returnBy?: SortOrder
+    setAt?: SortOrder
+  }
+
+  export type CoachAvailabilityMinOrderByAggregateInput = {
+    coachId?: SortOrder
+    clientId?: SortOrder
+    status?: SortOrder
+    returnBy?: SortOrder
+    setAt?: SortOrder
+  }
+
+  export type ProgramAccessListRelationFilter = {
+    every?: ProgramAccessWhereInput
+    some?: ProgramAccessWhereInput
+    none?: ProgramAccessWhereInput
+  }
+
+  export type BookingListRelationFilter = {
+    every?: BookingWhereInput
+    some?: BookingWhereInput
+    none?: BookingWhereInput
+  }
+
+  export type ProgramAccessOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type BookingOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type InstructorCountOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    slug?: SortOrder
+    displayName?: SortOrder
+    headline?: SortOrder
+    bio?: SortOrder
+    certifications?: SortOrder
+    specialties?: SortOrder
+    affiliationLine?: SortOrder
+    creatorCardId?: SortOrder
+    timeZone?: SortOrder
+    weeklyHours?: SortOrder
+    blackoutDates?: SortOrder
+    bufferMinutes?: SortOrder
+    minNoticeHours?: SortOrder
+    maxDaysAhead?: SortOrder
+    reviewSlaHours?: SortOrder
+    clientFullRefundHours?: SortOrder
+    refundBusinessDays?: SortOrder
+    businessMailingAddress?: SortOrder
+    published?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type InstructorAvgOrderByAggregateInput = {
+    bufferMinutes?: SortOrder
+    minNoticeHours?: SortOrder
+    maxDaysAhead?: SortOrder
+    reviewSlaHours?: SortOrder
+    clientFullRefundHours?: SortOrder
+    refundBusinessDays?: SortOrder
+  }
+
+  export type InstructorMaxOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    slug?: SortOrder
+    displayName?: SortOrder
+    headline?: SortOrder
+    bio?: SortOrder
+    affiliationLine?: SortOrder
+    creatorCardId?: SortOrder
+    timeZone?: SortOrder
+    bufferMinutes?: SortOrder
+    minNoticeHours?: SortOrder
+    maxDaysAhead?: SortOrder
+    reviewSlaHours?: SortOrder
+    clientFullRefundHours?: SortOrder
+    refundBusinessDays?: SortOrder
+    businessMailingAddress?: SortOrder
+    published?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type InstructorMinOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    slug?: SortOrder
+    displayName?: SortOrder
+    headline?: SortOrder
+    bio?: SortOrder
+    affiliationLine?: SortOrder
+    creatorCardId?: SortOrder
+    timeZone?: SortOrder
+    bufferMinutes?: SortOrder
+    minNoticeHours?: SortOrder
+    maxDaysAhead?: SortOrder
+    reviewSlaHours?: SortOrder
+    clientFullRefundHours?: SortOrder
+    refundBusinessDays?: SortOrder
+    businessMailingAddress?: SortOrder
+    published?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type InstructorSumOrderByAggregateInput = {
+    bufferMinutes?: SortOrder
+    minNoticeHours?: SortOrder
+    maxDaysAhead?: SortOrder
+    reviewSlaHours?: SortOrder
+    clientFullRefundHours?: SortOrder
+    refundBusinessDays?: SortOrder
+  }
+
+  export type InstructorScalarRelationFilter = {
+    is?: InstructorWhereInput
+    isNot?: InstructorWhereInput
+  }
+
+  export type ProgramAccessUserIdListingIdBeneficiaryCompoundUniqueInput = {
+    userId: string
+    listingId: string
+    beneficiary: string
+  }
+
+  export type ProgramAccessCountOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    instructorId?: SortOrder
+    listingId?: SortOrder
+    lane?: SortOrder
+    billing?: SortOrder
+    scope?: SortOrder
+    beneficiary?: SortOrder
+    status?: SortOrder
+    priceCents?: SortOrder
+    platformFeeCents?: SortOrder
+    stripeFeeCents?: SortOrder
+    reviewCredits?: SortOrder
+    lastCreditInvoiceId?: SortOrder
+    stripeCheckoutId?: SortOrder
+    stripeSubscriptionId?: SortOrder
+    stripePaymentIntentId?: SortOrder
+    accessUntil?: SortOrder
+    cancelAtPeriodEnd?: SortOrder
+    coachingProgramId?: SortOrder
+    startedAt?: SortOrder
+    nextRescreenAt?: SortOrder
+    unlockCodeHash?: SortOrder
+    deviceTokenHash?: SortOrder
+    codeActive?: SortOrder
+    redeemedAt?: SortOrder
+    reissueCount?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type ProgramAccessAvgOrderByAggregateInput = {
+    priceCents?: SortOrder
+    platformFeeCents?: SortOrder
+    stripeFeeCents?: SortOrder
+    reviewCredits?: SortOrder
+    reissueCount?: SortOrder
+  }
+
+  export type ProgramAccessMaxOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    instructorId?: SortOrder
+    listingId?: SortOrder
+    lane?: SortOrder
+    billing?: SortOrder
+    scope?: SortOrder
+    beneficiary?: SortOrder
+    status?: SortOrder
+    priceCents?: SortOrder
+    platformFeeCents?: SortOrder
+    stripeFeeCents?: SortOrder
+    reviewCredits?: SortOrder
+    lastCreditInvoiceId?: SortOrder
+    stripeCheckoutId?: SortOrder
+    stripeSubscriptionId?: SortOrder
+    stripePaymentIntentId?: SortOrder
+    accessUntil?: SortOrder
+    cancelAtPeriodEnd?: SortOrder
+    coachingProgramId?: SortOrder
+    startedAt?: SortOrder
+    nextRescreenAt?: SortOrder
+    unlockCodeHash?: SortOrder
+    deviceTokenHash?: SortOrder
+    codeActive?: SortOrder
+    redeemedAt?: SortOrder
+    reissueCount?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type ProgramAccessMinOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    instructorId?: SortOrder
+    listingId?: SortOrder
+    lane?: SortOrder
+    billing?: SortOrder
+    scope?: SortOrder
+    beneficiary?: SortOrder
+    status?: SortOrder
+    priceCents?: SortOrder
+    platformFeeCents?: SortOrder
+    stripeFeeCents?: SortOrder
+    reviewCredits?: SortOrder
+    lastCreditInvoiceId?: SortOrder
+    stripeCheckoutId?: SortOrder
+    stripeSubscriptionId?: SortOrder
+    stripePaymentIntentId?: SortOrder
+    accessUntil?: SortOrder
+    cancelAtPeriodEnd?: SortOrder
+    coachingProgramId?: SortOrder
+    startedAt?: SortOrder
+    nextRescreenAt?: SortOrder
+    unlockCodeHash?: SortOrder
+    deviceTokenHash?: SortOrder
+    codeActive?: SortOrder
+    redeemedAt?: SortOrder
+    reissueCount?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type ProgramAccessSumOrderByAggregateInput = {
+    priceCents?: SortOrder
+    platformFeeCents?: SortOrder
+    stripeFeeCents?: SortOrder
+    reviewCredits?: SortOrder
+    reissueCount?: SortOrder
+  }
+
+  export type BoolNullableFilter<$PrismaModel = never> = {
+    equals?: boolean | BooleanFieldRefInput<$PrismaModel> | null
+    not?: NestedBoolNullableFilter<$PrismaModel> | boolean | null
+  }
+
+  export type CallSignalListRelationFilter = {
+    every?: CallSignalWhereInput
+    some?: CallSignalWhereInput
+    none?: CallSignalWhereInput
+  }
+
+  export type CallSignalOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type BookingCountOrderByAggregateInput = {
+    id?: SortOrder
+    kind?: SortOrder
+    instructorId?: SortOrder
+    coachUserId?: SortOrder
+    clientUserId?: SortOrder
+    listingId?: SortOrder
+    status?: SortOrder
+    durationMin?: SortOrder
+    priceCents?: SortOrder
+    platformFeeCents?: SortOrder
+    stripeFeeCents?: SortOrder
+    refundCents?: SortOrder
+    stripeCheckoutId?: SortOrder
+    stripePaymentIntentId?: SortOrder
+    holdExpiresAt?: SortOrder
+    startsAt?: SortOrder
+    endsAt?: SortOrder
+    slotLock?: SortOrder
+    clientTimeZone?: SortOrder
+    clientNote?: SortOrder
+    reschedulesUsed?: SortOrder
+    connectionFailedAt?: SortOrder
+    failureCreditOpen?: SortOrder
+    shareWithCoach?: SortOrder
+    goal?: SortOrder
+    painYes?: SortOrder
+    reviewNote?: SortOrder
+    clipPaths?: SortOrder
+    clipConsentAt?: SortOrder
+    consentTextVersion?: SortOrder
+    submittedAt?: SortOrder
+    dueAt?: SortOrder
+    replyText?: SortOrder
+    replyClipPath?: SortOrder
+    attachedDrillIds?: SortOrder
+    deliveredAt?: SortOrder
+    originalClipDeleteAt?: SortOrder
+    originalsDeletedAt?: SortOrder
+    cancelledAt?: SortOrder
+    cancelledBy?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type BookingAvgOrderByAggregateInput = {
+    durationMin?: SortOrder
+    priceCents?: SortOrder
+    platformFeeCents?: SortOrder
+    stripeFeeCents?: SortOrder
+    refundCents?: SortOrder
+    reschedulesUsed?: SortOrder
+  }
+
+  export type BookingMaxOrderByAggregateInput = {
+    id?: SortOrder
+    kind?: SortOrder
+    instructorId?: SortOrder
+    coachUserId?: SortOrder
+    clientUserId?: SortOrder
+    listingId?: SortOrder
+    status?: SortOrder
+    durationMin?: SortOrder
+    priceCents?: SortOrder
+    platformFeeCents?: SortOrder
+    stripeFeeCents?: SortOrder
+    refundCents?: SortOrder
+    stripeCheckoutId?: SortOrder
+    stripePaymentIntentId?: SortOrder
+    holdExpiresAt?: SortOrder
+    startsAt?: SortOrder
+    endsAt?: SortOrder
+    slotLock?: SortOrder
+    clientTimeZone?: SortOrder
+    clientNote?: SortOrder
+    reschedulesUsed?: SortOrder
+    connectionFailedAt?: SortOrder
+    failureCreditOpen?: SortOrder
+    shareWithCoach?: SortOrder
+    goal?: SortOrder
+    painYes?: SortOrder
+    reviewNote?: SortOrder
+    clipConsentAt?: SortOrder
+    consentTextVersion?: SortOrder
+    submittedAt?: SortOrder
+    dueAt?: SortOrder
+    replyText?: SortOrder
+    replyClipPath?: SortOrder
+    deliveredAt?: SortOrder
+    originalClipDeleteAt?: SortOrder
+    originalsDeletedAt?: SortOrder
+    cancelledAt?: SortOrder
+    cancelledBy?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type BookingMinOrderByAggregateInput = {
+    id?: SortOrder
+    kind?: SortOrder
+    instructorId?: SortOrder
+    coachUserId?: SortOrder
+    clientUserId?: SortOrder
+    listingId?: SortOrder
+    status?: SortOrder
+    durationMin?: SortOrder
+    priceCents?: SortOrder
+    platformFeeCents?: SortOrder
+    stripeFeeCents?: SortOrder
+    refundCents?: SortOrder
+    stripeCheckoutId?: SortOrder
+    stripePaymentIntentId?: SortOrder
+    holdExpiresAt?: SortOrder
+    startsAt?: SortOrder
+    endsAt?: SortOrder
+    slotLock?: SortOrder
+    clientTimeZone?: SortOrder
+    clientNote?: SortOrder
+    reschedulesUsed?: SortOrder
+    connectionFailedAt?: SortOrder
+    failureCreditOpen?: SortOrder
+    shareWithCoach?: SortOrder
+    goal?: SortOrder
+    painYes?: SortOrder
+    reviewNote?: SortOrder
+    clipConsentAt?: SortOrder
+    consentTextVersion?: SortOrder
+    submittedAt?: SortOrder
+    dueAt?: SortOrder
+    replyText?: SortOrder
+    replyClipPath?: SortOrder
+    deliveredAt?: SortOrder
+    originalClipDeleteAt?: SortOrder
+    originalsDeletedAt?: SortOrder
+    cancelledAt?: SortOrder
+    cancelledBy?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type BookingSumOrderByAggregateInput = {
+    durationMin?: SortOrder
+    priceCents?: SortOrder
+    platformFeeCents?: SortOrder
+    stripeFeeCents?: SortOrder
+    refundCents?: SortOrder
+    reschedulesUsed?: SortOrder
+  }
+
+  export type BoolNullableWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: boolean | BooleanFieldRefInput<$PrismaModel> | null
+    not?: NestedBoolNullableWithAggregatesFilter<$PrismaModel> | boolean | null
+    _count?: NestedIntNullableFilter<$PrismaModel>
+    _min?: NestedBoolNullableFilter<$PrismaModel>
+    _max?: NestedBoolNullableFilter<$PrismaModel>
+  }
+
+  export type BookingScalarRelationFilter = {
+    is?: BookingWhereInput
+    isNot?: BookingWhereInput
+  }
+
+  export type CallSignalCountOrderByAggregateInput = {
+    id?: SortOrder
+    bookingId?: SortOrder
+    fromRole?: SortOrder
+    epoch?: SortOrder
+    kind?: SortOrder
+    payload?: SortOrder
+    createdAt?: SortOrder
+    expiresAt?: SortOrder
+  }
+
+  export type CallSignalAvgOrderByAggregateInput = {
+    id?: SortOrder
+    epoch?: SortOrder
+  }
+
+  export type CallSignalMaxOrderByAggregateInput = {
+    id?: SortOrder
+    bookingId?: SortOrder
+    fromRole?: SortOrder
+    epoch?: SortOrder
+    kind?: SortOrder
+    payload?: SortOrder
+    createdAt?: SortOrder
+    expiresAt?: SortOrder
+  }
+
+  export type CallSignalMinOrderByAggregateInput = {
+    id?: SortOrder
+    bookingId?: SortOrder
+    fromRole?: SortOrder
+    epoch?: SortOrder
+    kind?: SortOrder
+    payload?: SortOrder
+    createdAt?: SortOrder
+    expiresAt?: SortOrder
+  }
+
+  export type CallSignalSumOrderByAggregateInput = {
+    id?: SortOrder
+    epoch?: SortOrder
+  }
+
+  export type CoachStoreReferralCountOrderByAggregateInput = {
+    id?: SortOrder
+    paymentKey?: SortOrder
+    referrerUserId?: SortOrder
+    buyerUserId?: SortOrder
+    coachUserId?: SortOrder
+    sourceKind?: SortOrder
+    sourceId?: SortOrder
+    grossCents?: SortOrder
+    platformFeeCents?: SortOrder
+    shareOfFee?: SortOrder
+    cutCents?: SortOrder
+    renewalIndex?: SortOrder
+    status?: SortOrder
+    holdUntil?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type CoachStoreReferralAvgOrderByAggregateInput = {
+    grossCents?: SortOrder
+    platformFeeCents?: SortOrder
+    shareOfFee?: SortOrder
+    cutCents?: SortOrder
+    renewalIndex?: SortOrder
+  }
+
+  export type CoachStoreReferralMaxOrderByAggregateInput = {
+    id?: SortOrder
+    paymentKey?: SortOrder
+    referrerUserId?: SortOrder
+    buyerUserId?: SortOrder
+    coachUserId?: SortOrder
+    sourceKind?: SortOrder
+    sourceId?: SortOrder
+    grossCents?: SortOrder
+    platformFeeCents?: SortOrder
+    shareOfFee?: SortOrder
+    cutCents?: SortOrder
+    renewalIndex?: SortOrder
+    status?: SortOrder
+    holdUntil?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type CoachStoreReferralMinOrderByAggregateInput = {
+    id?: SortOrder
+    paymentKey?: SortOrder
+    referrerUserId?: SortOrder
+    buyerUserId?: SortOrder
+    coachUserId?: SortOrder
+    sourceKind?: SortOrder
+    sourceId?: SortOrder
+    grossCents?: SortOrder
+    platformFeeCents?: SortOrder
+    shareOfFee?: SortOrder
+    cutCents?: SortOrder
+    renewalIndex?: SortOrder
+    status?: SortOrder
+    holdUntil?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type CoachStoreReferralSumOrderByAggregateInput = {
+    grossCents?: SortOrder
+    platformFeeCents?: SortOrder
+    shareOfFee?: SortOrder
+    cutCents?: SortOrder
+    renewalIndex?: SortOrder
+  }
+
+  export type AdventureSaveCountOrderByAggregateInput = {
+    userId?: SortOrder
+    version?: SortOrder
+    doc?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type AdventureSaveAvgOrderByAggregateInput = {
+    version?: SortOrder
+  }
+
+  export type AdventureSaveMaxOrderByAggregateInput = {
+    userId?: SortOrder
+    version?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type AdventureSaveMinOrderByAggregateInput = {
+    userId?: SortOrder
+    version?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type AdventureSaveSumOrderByAggregateInput = {
+    version?: SortOrder
   }
 
   export type PlayerProfileCreateNestedOneWithoutUserInput = {
@@ -142644,6 +156479,12 @@ export namespace Prisma {
     connect?: SessionBookingWhereUniqueInput | SessionBookingWhereUniqueInput[]
   }
 
+  export type ScanSaveOptInCreateNestedOneWithoutUserInput = {
+    create?: XOR<ScanSaveOptInCreateWithoutUserInput, ScanSaveOptInUncheckedCreateWithoutUserInput>
+    connectOrCreate?: ScanSaveOptInCreateOrConnectWithoutUserInput
+    connect?: ScanSaveOptInWhereUniqueInput
+  }
+
   export type FacilitatorProfileCreateNestedOneWithoutUserInput = {
     create?: XOR<FacilitatorProfileCreateWithoutUserInput, FacilitatorProfileUncheckedCreateWithoutUserInput>
     connectOrCreate?: FacilitatorProfileCreateOrConnectWithoutUserInput
@@ -142746,6 +156587,12 @@ export namespace Prisma {
     connectOrCreate?: CrmNoteCreateOrConnectWithoutAuthorInput | CrmNoteCreateOrConnectWithoutAuthorInput[]
     createMany?: CrmNoteCreateManyAuthorInputEnvelope
     connect?: CrmNoteWhereUniqueInput | CrmNoteWhereUniqueInput[]
+  }
+
+  export type AdventureSaveCreateNestedOneWithoutUserInput = {
+    create?: XOR<AdventureSaveCreateWithoutUserInput, AdventureSaveUncheckedCreateWithoutUserInput>
+    connectOrCreate?: AdventureSaveCreateOrConnectWithoutUserInput
+    connect?: AdventureSaveWhereUniqueInput
   }
 
   export type PlayerProfileUncheckedCreateNestedOneWithoutUserInput = {
@@ -143061,6 +156908,12 @@ export namespace Prisma {
     connect?: SessionBookingWhereUniqueInput | SessionBookingWhereUniqueInput[]
   }
 
+  export type ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput = {
+    create?: XOR<ScanSaveOptInCreateWithoutUserInput, ScanSaveOptInUncheckedCreateWithoutUserInput>
+    connectOrCreate?: ScanSaveOptInCreateOrConnectWithoutUserInput
+    connect?: ScanSaveOptInWhereUniqueInput
+  }
+
   export type FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput = {
     create?: XOR<FacilitatorProfileCreateWithoutUserInput, FacilitatorProfileUncheckedCreateWithoutUserInput>
     connectOrCreate?: FacilitatorProfileCreateOrConnectWithoutUserInput
@@ -143163,6 +157016,12 @@ export namespace Prisma {
     connectOrCreate?: CrmNoteCreateOrConnectWithoutAuthorInput | CrmNoteCreateOrConnectWithoutAuthorInput[]
     createMany?: CrmNoteCreateManyAuthorInputEnvelope
     connect?: CrmNoteWhereUniqueInput | CrmNoteWhereUniqueInput[]
+  }
+
+  export type AdventureSaveUncheckedCreateNestedOneWithoutUserInput = {
+    create?: XOR<AdventureSaveCreateWithoutUserInput, AdventureSaveUncheckedCreateWithoutUserInput>
+    connectOrCreate?: AdventureSaveCreateOrConnectWithoutUserInput
+    connect?: AdventureSaveWhereUniqueInput
   }
 
   export type StringFieldUpdateOperationsInput = {
@@ -143797,6 +157656,16 @@ export namespace Prisma {
     deleteMany?: SessionBookingScalarWhereInput | SessionBookingScalarWhereInput[]
   }
 
+  export type ScanSaveOptInUpdateOneWithoutUserNestedInput = {
+    create?: XOR<ScanSaveOptInCreateWithoutUserInput, ScanSaveOptInUncheckedCreateWithoutUserInput>
+    connectOrCreate?: ScanSaveOptInCreateOrConnectWithoutUserInput
+    upsert?: ScanSaveOptInUpsertWithoutUserInput
+    disconnect?: ScanSaveOptInWhereInput | boolean
+    delete?: ScanSaveOptInWhereInput | boolean
+    connect?: ScanSaveOptInWhereUniqueInput
+    update?: XOR<XOR<ScanSaveOptInUpdateToOneWithWhereWithoutUserInput, ScanSaveOptInUpdateWithoutUserInput>, ScanSaveOptInUncheckedUpdateWithoutUserInput>
+  }
+
   export type FacilitatorProfileUpdateOneWithoutUserNestedInput = {
     create?: XOR<FacilitatorProfileCreateWithoutUserInput, FacilitatorProfileUncheckedCreateWithoutUserInput>
     connectOrCreate?: FacilitatorProfileCreateOrConnectWithoutUserInput
@@ -144001,6 +157870,16 @@ export namespace Prisma {
     update?: CrmNoteUpdateWithWhereUniqueWithoutAuthorInput | CrmNoteUpdateWithWhereUniqueWithoutAuthorInput[]
     updateMany?: CrmNoteUpdateManyWithWhereWithoutAuthorInput | CrmNoteUpdateManyWithWhereWithoutAuthorInput[]
     deleteMany?: CrmNoteScalarWhereInput | CrmNoteScalarWhereInput[]
+  }
+
+  export type AdventureSaveUpdateOneWithoutUserNestedInput = {
+    create?: XOR<AdventureSaveCreateWithoutUserInput, AdventureSaveUncheckedCreateWithoutUserInput>
+    connectOrCreate?: AdventureSaveCreateOrConnectWithoutUserInput
+    upsert?: AdventureSaveUpsertWithoutUserInput
+    disconnect?: AdventureSaveWhereInput | boolean
+    delete?: AdventureSaveWhereInput | boolean
+    connect?: AdventureSaveWhereUniqueInput
+    update?: XOR<XOR<AdventureSaveUpdateToOneWithWhereWithoutUserInput, AdventureSaveUpdateWithoutUserInput>, AdventureSaveUncheckedUpdateWithoutUserInput>
   }
 
   export type PlayerProfileUncheckedUpdateOneWithoutUserNestedInput = {
@@ -144611,6 +158490,16 @@ export namespace Prisma {
     deleteMany?: SessionBookingScalarWhereInput | SessionBookingScalarWhereInput[]
   }
 
+  export type ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput = {
+    create?: XOR<ScanSaveOptInCreateWithoutUserInput, ScanSaveOptInUncheckedCreateWithoutUserInput>
+    connectOrCreate?: ScanSaveOptInCreateOrConnectWithoutUserInput
+    upsert?: ScanSaveOptInUpsertWithoutUserInput
+    disconnect?: ScanSaveOptInWhereInput | boolean
+    delete?: ScanSaveOptInWhereInput | boolean
+    connect?: ScanSaveOptInWhereUniqueInput
+    update?: XOR<XOR<ScanSaveOptInUpdateToOneWithWhereWithoutUserInput, ScanSaveOptInUpdateWithoutUserInput>, ScanSaveOptInUncheckedUpdateWithoutUserInput>
+  }
+
   export type FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput = {
     create?: XOR<FacilitatorProfileCreateWithoutUserInput, FacilitatorProfileUncheckedCreateWithoutUserInput>
     connectOrCreate?: FacilitatorProfileCreateOrConnectWithoutUserInput
@@ -144815,6 +158704,16 @@ export namespace Prisma {
     update?: CrmNoteUpdateWithWhereUniqueWithoutAuthorInput | CrmNoteUpdateWithWhereUniqueWithoutAuthorInput[]
     updateMany?: CrmNoteUpdateManyWithWhereWithoutAuthorInput | CrmNoteUpdateManyWithWhereWithoutAuthorInput[]
     deleteMany?: CrmNoteScalarWhereInput | CrmNoteScalarWhereInput[]
+  }
+
+  export type AdventureSaveUncheckedUpdateOneWithoutUserNestedInput = {
+    create?: XOR<AdventureSaveCreateWithoutUserInput, AdventureSaveUncheckedCreateWithoutUserInput>
+    connectOrCreate?: AdventureSaveCreateOrConnectWithoutUserInput
+    upsert?: AdventureSaveUpsertWithoutUserInput
+    disconnect?: AdventureSaveWhereInput | boolean
+    delete?: AdventureSaveWhereInput | boolean
+    connect?: AdventureSaveWhereUniqueInput
+    update?: XOR<XOR<AdventureSaveUpdateToOneWithWhereWithoutUserInput, AdventureSaveUpdateWithoutUserInput>, AdventureSaveUncheckedUpdateWithoutUserInput>
   }
 
   export type UserCreateNestedOneWithoutProfileInput = {
@@ -148013,6 +161912,20 @@ export namespace Prisma {
     update?: XOR<XOR<UserUpdateToOneWithWhereWithoutHealthConsentsInput, UserUpdateWithoutHealthConsentsInput>, UserUncheckedUpdateWithoutHealthConsentsInput>
   }
 
+  export type UserCreateNestedOneWithoutScanSaveOptInInput = {
+    create?: XOR<UserCreateWithoutScanSaveOptInInput, UserUncheckedCreateWithoutScanSaveOptInInput>
+    connectOrCreate?: UserCreateOrConnectWithoutScanSaveOptInInput
+    connect?: UserWhereUniqueInput
+  }
+
+  export type UserUpdateOneRequiredWithoutScanSaveOptInNestedInput = {
+    create?: XOR<UserCreateWithoutScanSaveOptInInput, UserUncheckedCreateWithoutScanSaveOptInInput>
+    connectOrCreate?: UserCreateOrConnectWithoutScanSaveOptInInput
+    upsert?: UserUpsertWithoutScanSaveOptInInput
+    connect?: UserWhereUniqueInput
+    update?: XOR<XOR<UserUpdateToOneWithWhereWithoutScanSaveOptInInput, UserUpdateWithoutScanSaveOptInInput>, UserUncheckedUpdateWithoutScanSaveOptInInput>
+  }
+
   export type UserCreateNestedOneWithoutReadinessCheckInsInput = {
     create?: XOR<UserCreateWithoutReadinessCheckInsInput, UserUncheckedCreateWithoutReadinessCheckInsInput>
     connectOrCreate?: UserCreateOrConnectWithoutReadinessCheckInsInput
@@ -148081,6 +161994,18 @@ export namespace Prisma {
     connect?: UserWhereUniqueInput
   }
 
+  export type CoachAvailabilityCreateNestedOneWithoutLinkInput = {
+    create?: XOR<CoachAvailabilityCreateWithoutLinkInput, CoachAvailabilityUncheckedCreateWithoutLinkInput>
+    connectOrCreate?: CoachAvailabilityCreateOrConnectWithoutLinkInput
+    connect?: CoachAvailabilityWhereUniqueInput
+  }
+
+  export type CoachAvailabilityUncheckedCreateNestedOneWithoutLinkInput = {
+    create?: XOR<CoachAvailabilityCreateWithoutLinkInput, CoachAvailabilityUncheckedCreateWithoutLinkInput>
+    connectOrCreate?: CoachAvailabilityCreateOrConnectWithoutLinkInput
+    connect?: CoachAvailabilityWhereUniqueInput
+  }
+
   export type UserUpdateOneRequiredWithoutClientsCoachedNestedInput = {
     create?: XOR<UserCreateWithoutClientsCoachedInput, UserUncheckedCreateWithoutClientsCoachedInput>
     connectOrCreate?: UserCreateOrConnectWithoutClientsCoachedInput
@@ -148095,6 +162020,244 @@ export namespace Prisma {
     upsert?: UserUpsertWithoutCoachesInput
     connect?: UserWhereUniqueInput
     update?: XOR<XOR<UserUpdateToOneWithWhereWithoutCoachesInput, UserUpdateWithoutCoachesInput>, UserUncheckedUpdateWithoutCoachesInput>
+  }
+
+  export type CoachAvailabilityUpdateOneWithoutLinkNestedInput = {
+    create?: XOR<CoachAvailabilityCreateWithoutLinkInput, CoachAvailabilityUncheckedCreateWithoutLinkInput>
+    connectOrCreate?: CoachAvailabilityCreateOrConnectWithoutLinkInput
+    upsert?: CoachAvailabilityUpsertWithoutLinkInput
+    disconnect?: CoachAvailabilityWhereInput | boolean
+    delete?: CoachAvailabilityWhereInput | boolean
+    connect?: CoachAvailabilityWhereUniqueInput
+    update?: XOR<XOR<CoachAvailabilityUpdateToOneWithWhereWithoutLinkInput, CoachAvailabilityUpdateWithoutLinkInput>, CoachAvailabilityUncheckedUpdateWithoutLinkInput>
+  }
+
+  export type CoachAvailabilityUncheckedUpdateOneWithoutLinkNestedInput = {
+    create?: XOR<CoachAvailabilityCreateWithoutLinkInput, CoachAvailabilityUncheckedCreateWithoutLinkInput>
+    connectOrCreate?: CoachAvailabilityCreateOrConnectWithoutLinkInput
+    upsert?: CoachAvailabilityUpsertWithoutLinkInput
+    disconnect?: CoachAvailabilityWhereInput | boolean
+    delete?: CoachAvailabilityWhereInput | boolean
+    connect?: CoachAvailabilityWhereUniqueInput
+    update?: XOR<XOR<CoachAvailabilityUpdateToOneWithWhereWithoutLinkInput, CoachAvailabilityUpdateWithoutLinkInput>, CoachAvailabilityUncheckedUpdateWithoutLinkInput>
+  }
+
+  export type CoachClientCreateNestedOneWithoutAvailabilityInput = {
+    create?: XOR<CoachClientCreateWithoutAvailabilityInput, CoachClientUncheckedCreateWithoutAvailabilityInput>
+    connectOrCreate?: CoachClientCreateOrConnectWithoutAvailabilityInput
+    connect?: CoachClientWhereUniqueInput
+  }
+
+  export type CoachClientUpdateOneRequiredWithoutAvailabilityNestedInput = {
+    create?: XOR<CoachClientCreateWithoutAvailabilityInput, CoachClientUncheckedCreateWithoutAvailabilityInput>
+    connectOrCreate?: CoachClientCreateOrConnectWithoutAvailabilityInput
+    upsert?: CoachClientUpsertWithoutAvailabilityInput
+    connect?: CoachClientWhereUniqueInput
+    update?: XOR<XOR<CoachClientUpdateToOneWithWhereWithoutAvailabilityInput, CoachClientUpdateWithoutAvailabilityInput>, CoachClientUncheckedUpdateWithoutAvailabilityInput>
+  }
+
+  export type InstructorCreatecertificationsInput = {
+    set: string[]
+  }
+
+  export type InstructorCreatespecialtiesInput = {
+    set: string[]
+  }
+
+  export type ProgramAccessCreateNestedManyWithoutInstructorInput = {
+    create?: XOR<ProgramAccessCreateWithoutInstructorInput, ProgramAccessUncheckedCreateWithoutInstructorInput> | ProgramAccessCreateWithoutInstructorInput[] | ProgramAccessUncheckedCreateWithoutInstructorInput[]
+    connectOrCreate?: ProgramAccessCreateOrConnectWithoutInstructorInput | ProgramAccessCreateOrConnectWithoutInstructorInput[]
+    createMany?: ProgramAccessCreateManyInstructorInputEnvelope
+    connect?: ProgramAccessWhereUniqueInput | ProgramAccessWhereUniqueInput[]
+  }
+
+  export type BookingCreateNestedManyWithoutInstructorInput = {
+    create?: XOR<BookingCreateWithoutInstructorInput, BookingUncheckedCreateWithoutInstructorInput> | BookingCreateWithoutInstructorInput[] | BookingUncheckedCreateWithoutInstructorInput[]
+    connectOrCreate?: BookingCreateOrConnectWithoutInstructorInput | BookingCreateOrConnectWithoutInstructorInput[]
+    createMany?: BookingCreateManyInstructorInputEnvelope
+    connect?: BookingWhereUniqueInput | BookingWhereUniqueInput[]
+  }
+
+  export type ProgramAccessUncheckedCreateNestedManyWithoutInstructorInput = {
+    create?: XOR<ProgramAccessCreateWithoutInstructorInput, ProgramAccessUncheckedCreateWithoutInstructorInput> | ProgramAccessCreateWithoutInstructorInput[] | ProgramAccessUncheckedCreateWithoutInstructorInput[]
+    connectOrCreate?: ProgramAccessCreateOrConnectWithoutInstructorInput | ProgramAccessCreateOrConnectWithoutInstructorInput[]
+    createMany?: ProgramAccessCreateManyInstructorInputEnvelope
+    connect?: ProgramAccessWhereUniqueInput | ProgramAccessWhereUniqueInput[]
+  }
+
+  export type BookingUncheckedCreateNestedManyWithoutInstructorInput = {
+    create?: XOR<BookingCreateWithoutInstructorInput, BookingUncheckedCreateWithoutInstructorInput> | BookingCreateWithoutInstructorInput[] | BookingUncheckedCreateWithoutInstructorInput[]
+    connectOrCreate?: BookingCreateOrConnectWithoutInstructorInput | BookingCreateOrConnectWithoutInstructorInput[]
+    createMany?: BookingCreateManyInstructorInputEnvelope
+    connect?: BookingWhereUniqueInput | BookingWhereUniqueInput[]
+  }
+
+  export type InstructorUpdatecertificationsInput = {
+    set?: string[]
+    push?: string | string[]
+  }
+
+  export type InstructorUpdatespecialtiesInput = {
+    set?: string[]
+    push?: string | string[]
+  }
+
+  export type ProgramAccessUpdateManyWithoutInstructorNestedInput = {
+    create?: XOR<ProgramAccessCreateWithoutInstructorInput, ProgramAccessUncheckedCreateWithoutInstructorInput> | ProgramAccessCreateWithoutInstructorInput[] | ProgramAccessUncheckedCreateWithoutInstructorInput[]
+    connectOrCreate?: ProgramAccessCreateOrConnectWithoutInstructorInput | ProgramAccessCreateOrConnectWithoutInstructorInput[]
+    upsert?: ProgramAccessUpsertWithWhereUniqueWithoutInstructorInput | ProgramAccessUpsertWithWhereUniqueWithoutInstructorInput[]
+    createMany?: ProgramAccessCreateManyInstructorInputEnvelope
+    set?: ProgramAccessWhereUniqueInput | ProgramAccessWhereUniqueInput[]
+    disconnect?: ProgramAccessWhereUniqueInput | ProgramAccessWhereUniqueInput[]
+    delete?: ProgramAccessWhereUniqueInput | ProgramAccessWhereUniqueInput[]
+    connect?: ProgramAccessWhereUniqueInput | ProgramAccessWhereUniqueInput[]
+    update?: ProgramAccessUpdateWithWhereUniqueWithoutInstructorInput | ProgramAccessUpdateWithWhereUniqueWithoutInstructorInput[]
+    updateMany?: ProgramAccessUpdateManyWithWhereWithoutInstructorInput | ProgramAccessUpdateManyWithWhereWithoutInstructorInput[]
+    deleteMany?: ProgramAccessScalarWhereInput | ProgramAccessScalarWhereInput[]
+  }
+
+  export type BookingUpdateManyWithoutInstructorNestedInput = {
+    create?: XOR<BookingCreateWithoutInstructorInput, BookingUncheckedCreateWithoutInstructorInput> | BookingCreateWithoutInstructorInput[] | BookingUncheckedCreateWithoutInstructorInput[]
+    connectOrCreate?: BookingCreateOrConnectWithoutInstructorInput | BookingCreateOrConnectWithoutInstructorInput[]
+    upsert?: BookingUpsertWithWhereUniqueWithoutInstructorInput | BookingUpsertWithWhereUniqueWithoutInstructorInput[]
+    createMany?: BookingCreateManyInstructorInputEnvelope
+    set?: BookingWhereUniqueInput | BookingWhereUniqueInput[]
+    disconnect?: BookingWhereUniqueInput | BookingWhereUniqueInput[]
+    delete?: BookingWhereUniqueInput | BookingWhereUniqueInput[]
+    connect?: BookingWhereUniqueInput | BookingWhereUniqueInput[]
+    update?: BookingUpdateWithWhereUniqueWithoutInstructorInput | BookingUpdateWithWhereUniqueWithoutInstructorInput[]
+    updateMany?: BookingUpdateManyWithWhereWithoutInstructorInput | BookingUpdateManyWithWhereWithoutInstructorInput[]
+    deleteMany?: BookingScalarWhereInput | BookingScalarWhereInput[]
+  }
+
+  export type ProgramAccessUncheckedUpdateManyWithoutInstructorNestedInput = {
+    create?: XOR<ProgramAccessCreateWithoutInstructorInput, ProgramAccessUncheckedCreateWithoutInstructorInput> | ProgramAccessCreateWithoutInstructorInput[] | ProgramAccessUncheckedCreateWithoutInstructorInput[]
+    connectOrCreate?: ProgramAccessCreateOrConnectWithoutInstructorInput | ProgramAccessCreateOrConnectWithoutInstructorInput[]
+    upsert?: ProgramAccessUpsertWithWhereUniqueWithoutInstructorInput | ProgramAccessUpsertWithWhereUniqueWithoutInstructorInput[]
+    createMany?: ProgramAccessCreateManyInstructorInputEnvelope
+    set?: ProgramAccessWhereUniqueInput | ProgramAccessWhereUniqueInput[]
+    disconnect?: ProgramAccessWhereUniqueInput | ProgramAccessWhereUniqueInput[]
+    delete?: ProgramAccessWhereUniqueInput | ProgramAccessWhereUniqueInput[]
+    connect?: ProgramAccessWhereUniqueInput | ProgramAccessWhereUniqueInput[]
+    update?: ProgramAccessUpdateWithWhereUniqueWithoutInstructorInput | ProgramAccessUpdateWithWhereUniqueWithoutInstructorInput[]
+    updateMany?: ProgramAccessUpdateManyWithWhereWithoutInstructorInput | ProgramAccessUpdateManyWithWhereWithoutInstructorInput[]
+    deleteMany?: ProgramAccessScalarWhereInput | ProgramAccessScalarWhereInput[]
+  }
+
+  export type BookingUncheckedUpdateManyWithoutInstructorNestedInput = {
+    create?: XOR<BookingCreateWithoutInstructorInput, BookingUncheckedCreateWithoutInstructorInput> | BookingCreateWithoutInstructorInput[] | BookingUncheckedCreateWithoutInstructorInput[]
+    connectOrCreate?: BookingCreateOrConnectWithoutInstructorInput | BookingCreateOrConnectWithoutInstructorInput[]
+    upsert?: BookingUpsertWithWhereUniqueWithoutInstructorInput | BookingUpsertWithWhereUniqueWithoutInstructorInput[]
+    createMany?: BookingCreateManyInstructorInputEnvelope
+    set?: BookingWhereUniqueInput | BookingWhereUniqueInput[]
+    disconnect?: BookingWhereUniqueInput | BookingWhereUniqueInput[]
+    delete?: BookingWhereUniqueInput | BookingWhereUniqueInput[]
+    connect?: BookingWhereUniqueInput | BookingWhereUniqueInput[]
+    update?: BookingUpdateWithWhereUniqueWithoutInstructorInput | BookingUpdateWithWhereUniqueWithoutInstructorInput[]
+    updateMany?: BookingUpdateManyWithWhereWithoutInstructorInput | BookingUpdateManyWithWhereWithoutInstructorInput[]
+    deleteMany?: BookingScalarWhereInput | BookingScalarWhereInput[]
+  }
+
+  export type InstructorCreateNestedOneWithoutProgramAccessInput = {
+    create?: XOR<InstructorCreateWithoutProgramAccessInput, InstructorUncheckedCreateWithoutProgramAccessInput>
+    connectOrCreate?: InstructorCreateOrConnectWithoutProgramAccessInput
+    connect?: InstructorWhereUniqueInput
+  }
+
+  export type InstructorUpdateOneRequiredWithoutProgramAccessNestedInput = {
+    create?: XOR<InstructorCreateWithoutProgramAccessInput, InstructorUncheckedCreateWithoutProgramAccessInput>
+    connectOrCreate?: InstructorCreateOrConnectWithoutProgramAccessInput
+    upsert?: InstructorUpsertWithoutProgramAccessInput
+    connect?: InstructorWhereUniqueInput
+    update?: XOR<XOR<InstructorUpdateToOneWithWhereWithoutProgramAccessInput, InstructorUpdateWithoutProgramAccessInput>, InstructorUncheckedUpdateWithoutProgramAccessInput>
+  }
+
+  export type InstructorCreateNestedOneWithoutBookingsInput = {
+    create?: XOR<InstructorCreateWithoutBookingsInput, InstructorUncheckedCreateWithoutBookingsInput>
+    connectOrCreate?: InstructorCreateOrConnectWithoutBookingsInput
+    connect?: InstructorWhereUniqueInput
+  }
+
+  export type CallSignalCreateNestedManyWithoutBookingInput = {
+    create?: XOR<CallSignalCreateWithoutBookingInput, CallSignalUncheckedCreateWithoutBookingInput> | CallSignalCreateWithoutBookingInput[] | CallSignalUncheckedCreateWithoutBookingInput[]
+    connectOrCreate?: CallSignalCreateOrConnectWithoutBookingInput | CallSignalCreateOrConnectWithoutBookingInput[]
+    createMany?: CallSignalCreateManyBookingInputEnvelope
+    connect?: CallSignalWhereUniqueInput | CallSignalWhereUniqueInput[]
+  }
+
+  export type CallSignalUncheckedCreateNestedManyWithoutBookingInput = {
+    create?: XOR<CallSignalCreateWithoutBookingInput, CallSignalUncheckedCreateWithoutBookingInput> | CallSignalCreateWithoutBookingInput[] | CallSignalUncheckedCreateWithoutBookingInput[]
+    connectOrCreate?: CallSignalCreateOrConnectWithoutBookingInput | CallSignalCreateOrConnectWithoutBookingInput[]
+    createMany?: CallSignalCreateManyBookingInputEnvelope
+    connect?: CallSignalWhereUniqueInput | CallSignalWhereUniqueInput[]
+  }
+
+  export type NullableBoolFieldUpdateOperationsInput = {
+    set?: boolean | null
+  }
+
+  export type InstructorUpdateOneRequiredWithoutBookingsNestedInput = {
+    create?: XOR<InstructorCreateWithoutBookingsInput, InstructorUncheckedCreateWithoutBookingsInput>
+    connectOrCreate?: InstructorCreateOrConnectWithoutBookingsInput
+    upsert?: InstructorUpsertWithoutBookingsInput
+    connect?: InstructorWhereUniqueInput
+    update?: XOR<XOR<InstructorUpdateToOneWithWhereWithoutBookingsInput, InstructorUpdateWithoutBookingsInput>, InstructorUncheckedUpdateWithoutBookingsInput>
+  }
+
+  export type CallSignalUpdateManyWithoutBookingNestedInput = {
+    create?: XOR<CallSignalCreateWithoutBookingInput, CallSignalUncheckedCreateWithoutBookingInput> | CallSignalCreateWithoutBookingInput[] | CallSignalUncheckedCreateWithoutBookingInput[]
+    connectOrCreate?: CallSignalCreateOrConnectWithoutBookingInput | CallSignalCreateOrConnectWithoutBookingInput[]
+    upsert?: CallSignalUpsertWithWhereUniqueWithoutBookingInput | CallSignalUpsertWithWhereUniqueWithoutBookingInput[]
+    createMany?: CallSignalCreateManyBookingInputEnvelope
+    set?: CallSignalWhereUniqueInput | CallSignalWhereUniqueInput[]
+    disconnect?: CallSignalWhereUniqueInput | CallSignalWhereUniqueInput[]
+    delete?: CallSignalWhereUniqueInput | CallSignalWhereUniqueInput[]
+    connect?: CallSignalWhereUniqueInput | CallSignalWhereUniqueInput[]
+    update?: CallSignalUpdateWithWhereUniqueWithoutBookingInput | CallSignalUpdateWithWhereUniqueWithoutBookingInput[]
+    updateMany?: CallSignalUpdateManyWithWhereWithoutBookingInput | CallSignalUpdateManyWithWhereWithoutBookingInput[]
+    deleteMany?: CallSignalScalarWhereInput | CallSignalScalarWhereInput[]
+  }
+
+  export type CallSignalUncheckedUpdateManyWithoutBookingNestedInput = {
+    create?: XOR<CallSignalCreateWithoutBookingInput, CallSignalUncheckedCreateWithoutBookingInput> | CallSignalCreateWithoutBookingInput[] | CallSignalUncheckedCreateWithoutBookingInput[]
+    connectOrCreate?: CallSignalCreateOrConnectWithoutBookingInput | CallSignalCreateOrConnectWithoutBookingInput[]
+    upsert?: CallSignalUpsertWithWhereUniqueWithoutBookingInput | CallSignalUpsertWithWhereUniqueWithoutBookingInput[]
+    createMany?: CallSignalCreateManyBookingInputEnvelope
+    set?: CallSignalWhereUniqueInput | CallSignalWhereUniqueInput[]
+    disconnect?: CallSignalWhereUniqueInput | CallSignalWhereUniqueInput[]
+    delete?: CallSignalWhereUniqueInput | CallSignalWhereUniqueInput[]
+    connect?: CallSignalWhereUniqueInput | CallSignalWhereUniqueInput[]
+    update?: CallSignalUpdateWithWhereUniqueWithoutBookingInput | CallSignalUpdateWithWhereUniqueWithoutBookingInput[]
+    updateMany?: CallSignalUpdateManyWithWhereWithoutBookingInput | CallSignalUpdateManyWithWhereWithoutBookingInput[]
+    deleteMany?: CallSignalScalarWhereInput | CallSignalScalarWhereInput[]
+  }
+
+  export type BookingCreateNestedOneWithoutSignalsInput = {
+    create?: XOR<BookingCreateWithoutSignalsInput, BookingUncheckedCreateWithoutSignalsInput>
+    connectOrCreate?: BookingCreateOrConnectWithoutSignalsInput
+    connect?: BookingWhereUniqueInput
+  }
+
+  export type BookingUpdateOneRequiredWithoutSignalsNestedInput = {
+    create?: XOR<BookingCreateWithoutSignalsInput, BookingUncheckedCreateWithoutSignalsInput>
+    connectOrCreate?: BookingCreateOrConnectWithoutSignalsInput
+    upsert?: BookingUpsertWithoutSignalsInput
+    connect?: BookingWhereUniqueInput
+    update?: XOR<XOR<BookingUpdateToOneWithWhereWithoutSignalsInput, BookingUpdateWithoutSignalsInput>, BookingUncheckedUpdateWithoutSignalsInput>
+  }
+
+  export type UserCreateNestedOneWithoutAdventureSaveInput = {
+    create?: XOR<UserCreateWithoutAdventureSaveInput, UserUncheckedCreateWithoutAdventureSaveInput>
+    connectOrCreate?: UserCreateOrConnectWithoutAdventureSaveInput
+    connect?: UserWhereUniqueInput
+  }
+
+  export type UserUpdateOneRequiredWithoutAdventureSaveNestedInput = {
+    create?: XOR<UserCreateWithoutAdventureSaveInput, UserUncheckedCreateWithoutAdventureSaveInput>
+    connectOrCreate?: UserCreateOrConnectWithoutAdventureSaveInput
+    upsert?: UserUpsertWithoutAdventureSaveInput
+    connect?: UserWhereUniqueInput
+    update?: XOR<XOR<UserUpdateToOneWithWhereWithoutAdventureSaveInput, UserUpdateWithoutAdventureSaveInput>, UserUncheckedUpdateWithoutAdventureSaveInput>
   }
 
   export type NestedStringFilter<$PrismaModel = never> = {
@@ -148775,6 +162938,19 @@ export namespace Prisma {
     _count?: NestedIntFilter<$PrismaModel>
     _min?: NestedEnumGoalPlanStatusFilter<$PrismaModel>
     _max?: NestedEnumGoalPlanStatusFilter<$PrismaModel>
+  }
+
+  export type NestedBoolNullableFilter<$PrismaModel = never> = {
+    equals?: boolean | BooleanFieldRefInput<$PrismaModel> | null
+    not?: NestedBoolNullableFilter<$PrismaModel> | boolean | null
+  }
+
+  export type NestedBoolNullableWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: boolean | BooleanFieldRefInput<$PrismaModel> | null
+    not?: NestedBoolNullableWithAggregatesFilter<$PrismaModel> | boolean | null
+    _count?: NestedIntNullableFilter<$PrismaModel>
+    _min?: NestedBoolNullableFilter<$PrismaModel>
+    _max?: NestedBoolNullableFilter<$PrismaModel>
   }
 
   export type PlayerProfileCreateWithoutUserInput = {
@@ -149501,6 +163677,7 @@ export namespace Prisma {
     endedAt?: Date | string | null
     createdAt?: Date | string
     client: UserCreateNestedOneWithoutCoachesInput
+    availability?: CoachAvailabilityCreateNestedOneWithoutLinkInput
   }
 
   export type CoachClientUncheckedCreateWithoutCoachInput = {
@@ -149509,6 +163686,7 @@ export namespace Prisma {
     via?: string
     endedAt?: Date | string | null
     createdAt?: Date | string
+    availability?: CoachAvailabilityUncheckedCreateNestedOneWithoutLinkInput
   }
 
   export type CoachClientCreateOrConnectWithoutCoachInput = {
@@ -149527,6 +163705,7 @@ export namespace Prisma {
     endedAt?: Date | string | null
     createdAt?: Date | string
     coach: UserCreateNestedOneWithoutClientsCoachedInput
+    availability?: CoachAvailabilityCreateNestedOneWithoutLinkInput
   }
 
   export type CoachClientUncheckedCreateWithoutClientInput = {
@@ -149535,6 +163714,7 @@ export namespace Prisma {
     via?: string
     endedAt?: Date | string | null
     createdAt?: Date | string
+    availability?: CoachAvailabilityUncheckedCreateNestedOneWithoutLinkInput
   }
 
   export type CoachClientCreateOrConnectWithoutClientInput = {
@@ -150354,6 +164534,35 @@ export namespace Prisma {
     skipDuplicates?: boolean
   }
 
+  export type ScanSaveOptInCreateWithoutUserInput = {
+    id?: string
+    scope?: string
+    granted?: boolean
+    grantedAt?: Date | string | null
+    revokedAt?: Date | string | null
+    consentTextVersion: string
+    coachShares?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type ScanSaveOptInUncheckedCreateWithoutUserInput = {
+    id?: string
+    scope?: string
+    granted?: boolean
+    grantedAt?: Date | string | null
+    revokedAt?: Date | string | null
+    consentTextVersion: string
+    coachShares?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type ScanSaveOptInCreateOrConnectWithoutUserInput = {
+    where: ScanSaveOptInWhereUniqueInput
+    create: XOR<ScanSaveOptInCreateWithoutUserInput, ScanSaveOptInUncheckedCreateWithoutUserInput>
+  }
+
   export type FacilitatorProfileCreateWithoutUserInput = {
     id?: string
     certificationStatus?: $Enums.CertificationStatus
@@ -150905,6 +165114,23 @@ export namespace Prisma {
   export type CrmNoteCreateManyAuthorInputEnvelope = {
     data: CrmNoteCreateManyAuthorInput | CrmNoteCreateManyAuthorInput[]
     skipDuplicates?: boolean
+  }
+
+  export type AdventureSaveCreateWithoutUserInput = {
+    version: number
+    doc: JsonNullValueInput | InputJsonValue
+    updatedAt?: Date | string
+  }
+
+  export type AdventureSaveUncheckedCreateWithoutUserInput = {
+    version: number
+    doc: JsonNullValueInput | InputJsonValue
+    updatedAt?: Date | string
+  }
+
+  export type AdventureSaveCreateOrConnectWithoutUserInput = {
+    where: AdventureSaveWhereUniqueInput
+    create: XOR<AdventureSaveCreateWithoutUserInput, AdventureSaveUncheckedCreateWithoutUserInput>
   }
 
   export type PlayerProfileUpsertWithoutUserInput = {
@@ -152314,6 +166540,41 @@ export namespace Prisma {
     createdAt?: DateTimeFilter<"SessionBooking"> | Date | string
   }
 
+  export type ScanSaveOptInUpsertWithoutUserInput = {
+    update: XOR<ScanSaveOptInUpdateWithoutUserInput, ScanSaveOptInUncheckedUpdateWithoutUserInput>
+    create: XOR<ScanSaveOptInCreateWithoutUserInput, ScanSaveOptInUncheckedCreateWithoutUserInput>
+    where?: ScanSaveOptInWhereInput
+  }
+
+  export type ScanSaveOptInUpdateToOneWithWhereWithoutUserInput = {
+    where?: ScanSaveOptInWhereInput
+    data: XOR<ScanSaveOptInUpdateWithoutUserInput, ScanSaveOptInUncheckedUpdateWithoutUserInput>
+  }
+
+  export type ScanSaveOptInUpdateWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    scope?: StringFieldUpdateOperationsInput | string
+    granted?: BoolFieldUpdateOperationsInput | boolean
+    grantedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    revokedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    consentTextVersion?: StringFieldUpdateOperationsInput | string
+    coachShares?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ScanSaveOptInUncheckedUpdateWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    scope?: StringFieldUpdateOperationsInput | string
+    granted?: BoolFieldUpdateOperationsInput | boolean
+    grantedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    revokedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    consentTextVersion?: StringFieldUpdateOperationsInput | string
+    coachShares?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type FacilitatorProfileUpsertWithoutUserInput = {
     update: XOR<FacilitatorProfileUpdateWithoutUserInput, FacilitatorProfileUncheckedUpdateWithoutUserInput>
     create: XOR<FacilitatorProfileCreateWithoutUserInput, FacilitatorProfileUncheckedCreateWithoutUserInput>
@@ -152774,6 +167035,29 @@ export namespace Prisma {
     updatedAt?: DateTimeFilter<"CrmNote"> | Date | string
   }
 
+  export type AdventureSaveUpsertWithoutUserInput = {
+    update: XOR<AdventureSaveUpdateWithoutUserInput, AdventureSaveUncheckedUpdateWithoutUserInput>
+    create: XOR<AdventureSaveCreateWithoutUserInput, AdventureSaveUncheckedCreateWithoutUserInput>
+    where?: AdventureSaveWhereInput
+  }
+
+  export type AdventureSaveUpdateToOneWithWhereWithoutUserInput = {
+    where?: AdventureSaveWhereInput
+    data: XOR<AdventureSaveUpdateWithoutUserInput, AdventureSaveUncheckedUpdateWithoutUserInput>
+  }
+
+  export type AdventureSaveUpdateWithoutUserInput = {
+    version?: IntFieldUpdateOperationsInput | number
+    doc?: JsonNullValueInput | InputJsonValue
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type AdventureSaveUncheckedUpdateWithoutUserInput = {
+    version?: IntFieldUpdateOperationsInput | number
+    doc?: JsonNullValueInput | InputJsonValue
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type UserCreateWithoutProfileInput = {
     id?: string
     email: string
@@ -152834,6 +167118,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -152849,6 +167134,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutProfileInput = {
@@ -152911,6 +167197,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -152926,6 +167213,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutProfileInput = {
@@ -153004,6 +167292,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -153019,6 +167308,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutProfileInput = {
@@ -153081,6 +167371,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -153096,6 +167387,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutSessionsInput = {
@@ -153158,6 +167450,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -153173,6 +167466,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutSessionsInput = {
@@ -153235,6 +167529,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -153250,6 +167545,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutSessionsInput = {
@@ -153371,6 +167667,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -153386,6 +167683,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutSessionsInput = {
@@ -153448,6 +167746,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -153463,6 +167762,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type SessionRunUpsertWithoutGameSessionInput = {
@@ -153574,6 +167874,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -153589,6 +167890,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutSessionRunsInput = {
@@ -153651,6 +167953,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -153666,6 +167969,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutSessionRunsInput = {
@@ -153817,6 +168121,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -153832,6 +168137,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutSessionRunsInput = {
@@ -153894,6 +168200,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -153909,6 +168216,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type SessionGrantUpsertWithWhereUniqueWithoutRunInput = {
@@ -154038,6 +168346,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -154053,6 +168362,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutSessionGrantsInput = {
@@ -154115,6 +168425,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -154130,6 +168441,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutSessionGrantsInput = {
@@ -154251,6 +168563,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -154266,6 +168579,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutSessionGrantsInput = {
@@ -154328,6 +168642,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -154343,6 +168658,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type SessionRunUpsertWithoutGrantsInput = {
@@ -154454,6 +168770,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -154469,6 +168786,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutLedgerInput = {
@@ -154531,6 +168849,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -154546,6 +168865,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutLedgerInput = {
@@ -154624,6 +168944,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -154639,6 +168960,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutLedgerInput = {
@@ -154701,6 +169023,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -154716,6 +169039,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutCardsInput = {
@@ -154778,6 +169102,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -154793,6 +169118,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutCardsInput = {
@@ -154855,6 +169181,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -154870,6 +169197,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutCardsInput = {
@@ -154948,6 +169276,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -154963,6 +169292,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCardsInput = {
@@ -155025,6 +169355,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -155040,6 +169371,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutStoryProgressInput = {
@@ -155102,6 +169434,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -155117,6 +169450,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutStoryProgressInput = {
@@ -155179,6 +169513,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -155194,6 +169529,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutStoryProgressInput = {
@@ -155272,6 +169608,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -155287,6 +169624,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutStoryProgressInput = {
@@ -155349,6 +169687,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -155364,6 +169703,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutLessonsInput = {
@@ -155426,6 +169766,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -155441,6 +169782,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutLessonsInput = {
@@ -155503,6 +169845,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -155518,6 +169861,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutLessonsInput = {
@@ -155596,6 +169940,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -155611,6 +169956,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutLessonsInput = {
@@ -155673,6 +170019,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -155688,6 +170035,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutCellProjectsInput = {
@@ -155750,6 +170098,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -155765,6 +170114,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutCellProjectsInput = {
@@ -155827,6 +170177,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -155842,6 +170193,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutCellProjectsInput = {
@@ -156046,6 +170398,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -156061,6 +170414,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCellProjectsInput = {
@@ -156123,6 +170477,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -156138,6 +170493,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type CellWisdomUpsertWithWhereUniqueWithoutProjectInput = {
@@ -156323,6 +170679,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -156338,6 +170695,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutCellApiKeysInput = {
@@ -156400,6 +170758,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -156415,6 +170774,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutCellApiKeysInput = {
@@ -156493,6 +170853,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -156508,6 +170869,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCellApiKeysInput = {
@@ -156570,6 +170932,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -156585,6 +170948,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutCellSettingsInput = {
@@ -156647,6 +171011,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -156662,6 +171027,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutCellSettingsInput = {
@@ -156724,6 +171090,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -156739,6 +171106,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutCellSettingsInput = {
@@ -156817,6 +171185,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -156832,6 +171201,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCellSettingsInput = {
@@ -156894,6 +171264,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -156909,6 +171280,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type CellProjectCreateWithoutUsagesInput = {
@@ -157638,6 +172010,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -157653,6 +172026,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutStripeCustomerInput = {
@@ -157715,6 +172089,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -157730,6 +172105,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutStripeCustomerInput = {
@@ -157808,6 +172184,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -157823,6 +172200,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutStripeCustomerInput = {
@@ -157885,6 +172263,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -157900,6 +172279,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutSubscriptionsInput = {
@@ -157962,6 +172342,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -157977,6 +172358,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutSubscriptionsInput = {
@@ -158039,6 +172421,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -158054,6 +172437,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutSubscriptionsInput = {
@@ -158132,6 +172516,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -158147,6 +172532,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutSubscriptionsInput = {
@@ -158209,6 +172595,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -158224,6 +172611,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutOrdersInput = {
@@ -158286,6 +172674,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -158301,6 +172690,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutOrdersInput = {
@@ -158363,6 +172753,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -158378,6 +172769,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutOrdersInput = {
@@ -158456,6 +172848,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -158471,6 +172864,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutOrdersInput = {
@@ -158533,6 +172927,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -158548,6 +172943,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutPayoutRequestsInput = {
@@ -158610,6 +173006,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -158625,6 +173022,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutPayoutRequestsInput = {
@@ -158687,6 +173085,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -158702,6 +173101,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutPayoutRequestsInput = {
@@ -158780,6 +173180,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -158795,6 +173196,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutPayoutRequestsInput = {
@@ -158857,6 +173259,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -158872,6 +173275,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutCreatorListingsInput = {
@@ -158934,6 +173338,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -158949,6 +173354,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutCreatorListingsInput = {
@@ -159011,6 +173417,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -159026,6 +173433,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutCreatorListingsInput = {
@@ -159130,6 +173538,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -159145,6 +173554,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCreatorListingsInput = {
@@ -159207,6 +173617,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -159222,6 +173633,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type MarketplacePurchaseUpsertWithWhereUniqueWithoutListingInput = {
@@ -159300,6 +173712,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -159315,6 +173728,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutPartnerKeysInput = {
@@ -159377,6 +173791,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -159392,6 +173807,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutPartnerKeysInput = {
@@ -159500,6 +173916,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -159515,6 +173932,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutPartnerKeysInput = {
@@ -159577,6 +173995,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -159592,6 +174011,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type PartnerUsageUpsertWithWhereUniqueWithoutPartnerKeyInput = {
@@ -159756,6 +174176,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -159771,6 +174192,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutBuyerPurchasesInput = {
@@ -159833,6 +174255,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -159848,6 +174271,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutBuyerPurchasesInput = {
@@ -159963,6 +174387,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -159978,6 +174403,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutBuyerPurchasesInput = {
@@ -160040,6 +174466,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -160055,6 +174482,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type MarketplaceListingUpsertWithoutPurchasesInput = {
@@ -160231,6 +174659,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -160246,6 +174675,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutLadderEntriesInput = {
@@ -160308,6 +174738,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -160323,6 +174754,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutLadderEntriesInput = {
@@ -160432,6 +174864,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -160447,6 +174880,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutLadderEntriesInput = {
@@ -160509,6 +174943,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -160524,6 +174959,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutCompetitionMatchesP1Input = {
@@ -160586,6 +175022,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -160601,6 +175038,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutCompetitionMatchesP1Input = {
@@ -160663,6 +175101,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -160678,6 +175117,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutCompetitionMatchesP1Input = {
@@ -160745,6 +175185,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -160760,6 +175201,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutCompetitionMatchesP2Input = {
@@ -160822,6 +175264,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -160837,6 +175280,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutCompetitionMatchesP2Input = {
@@ -160904,6 +175348,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -160919,6 +175364,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutCompetitionMatchesWinnerInput = {
@@ -160981,6 +175427,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -160996,6 +175443,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutCompetitionMatchesWinnerInput = {
@@ -161102,6 +175550,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -161117,6 +175566,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCompetitionMatchesP1Input = {
@@ -161179,6 +175629,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -161194,6 +175645,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserUpsertWithoutCompetitionMatchesP2Input = {
@@ -161267,6 +175719,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -161282,6 +175735,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCompetitionMatchesP2Input = {
@@ -161344,6 +175798,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -161359,6 +175814,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserUpsertWithoutCompetitionMatchesWinnerInput = {
@@ -161432,6 +175888,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -161447,6 +175904,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCompetitionMatchesWinnerInput = {
@@ -161509,6 +175967,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -161524,6 +175983,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type MatchEventUpsertWithWhereUniqueWithoutMatchInput = {
@@ -161661,6 +176121,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -161676,6 +176137,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutMatchEventsInput = {
@@ -161738,6 +176200,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -161753,6 +176216,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutMatchEventsInput = {
@@ -161896,6 +176360,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -161911,6 +176376,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutMatchEventsInput = {
@@ -161973,6 +176439,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -161988,6 +176455,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutMirrorTriumphsInput = {
@@ -162050,6 +176518,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -162065,6 +176534,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutMirrorTriumphsInput = {
@@ -162127,6 +176597,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -162142,6 +176613,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutMirrorTriumphsInput = {
@@ -162220,6 +176692,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -162235,6 +176708,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutMirrorTriumphsInput = {
@@ -162297,6 +176771,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -162312,6 +176787,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutPrqEntriesInput = {
@@ -162374,6 +176850,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -162389,6 +176866,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutPrqEntriesInput = {
@@ -162451,6 +176929,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -162466,6 +176945,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutPrqEntriesInput = {
@@ -162544,6 +177024,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -162559,6 +177040,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutPrqEntriesInput = {
@@ -162621,6 +177103,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -162636,6 +177119,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type PassProgressCreateWithoutSeasonInput = {
@@ -162965,6 +177449,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -162980,6 +177465,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutWalletInput = {
@@ -163042,6 +177528,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -163057,6 +177544,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutWalletInput = {
@@ -163169,6 +177657,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -163184,6 +177673,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutWalletInput = {
@@ -163246,6 +177736,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -163261,6 +177752,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type WalletLedgerEntryUpsertWithWhereUniqueWithoutWalletInput = {
@@ -163415,6 +177907,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -163430,6 +177923,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutPerfEarnEventsInput = {
@@ -163492,6 +177986,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -163507,6 +178002,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutPerfEarnEventsInput = {
@@ -163585,6 +178081,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -163600,6 +178097,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutPerfEarnEventsInput = {
@@ -163662,6 +178160,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -163677,6 +178176,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutEntitlementsInput = {
@@ -163739,6 +178239,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -163754,6 +178255,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutEntitlementsInput = {
@@ -163816,6 +178318,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -163831,6 +178334,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutEntitlementsInput = {
@@ -163909,6 +178413,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -163924,6 +178429,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutEntitlementsInput = {
@@ -163986,6 +178492,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -164001,6 +178508,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutLeadRecordInput = {
@@ -164063,6 +178571,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -164078,6 +178587,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutLeadRecordInput = {
@@ -164140,6 +178650,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -164155,6 +178666,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutLeadRecordInput = {
@@ -164233,6 +178745,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -164248,6 +178761,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutLeadRecordInput = {
@@ -164310,6 +178824,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -164325,6 +178840,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutReferralCodeInput = {
@@ -164387,6 +178903,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -164402,6 +178919,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutReferralCodeInput = {
@@ -164464,6 +178982,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -164479,6 +178998,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutReferralCodeInput = {
@@ -164583,6 +179103,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -164598,6 +179119,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutReferralCodeInput = {
@@ -164660,6 +179182,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -164675,6 +179198,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type ReferralConversionUpsertWithWhereUniqueWithoutCodeInput = {
@@ -164817,6 +179341,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -164832,6 +179357,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutMpMatchesHostInput = {
@@ -164894,6 +179420,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -164909,6 +179436,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutMpMatchesHostInput = {
@@ -164976,6 +179504,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -164991,6 +179520,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutMpMatchesGuestInput = {
@@ -165053,6 +179583,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -165068,6 +179599,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutMpMatchesGuestInput = {
@@ -165146,6 +179678,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -165161,6 +179694,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutMpMatchesHostInput = {
@@ -165223,6 +179757,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -165238,6 +179773,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserUpsertWithoutMpMatchesGuestInput = {
@@ -165311,6 +179847,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -165326,6 +179863,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutMpMatchesGuestInput = {
@@ -165388,6 +179926,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -165403,6 +179942,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutCreativeCardsInput = {
@@ -165465,6 +180005,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -165480,6 +180021,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutCreativeCardsInput = {
@@ -165542,6 +180084,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -165557,6 +180100,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutCreativeCardsInput = {
@@ -165635,6 +180179,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -165650,6 +180195,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCreativeCardsInput = {
@@ -165712,6 +180258,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -165727,6 +180274,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutCardSlotInput = {
@@ -165789,6 +180337,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -165804,6 +180353,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutCardSlotInput = {
@@ -165866,6 +180416,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -165881,6 +180432,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutCardSlotInput = {
@@ -165959,6 +180511,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -165974,6 +180527,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCardSlotInput = {
@@ -166036,6 +180590,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -166051,6 +180606,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutCreatorCardsInput = {
@@ -166113,6 +180669,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -166128,6 +180685,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutCreatorCardsInput = {
@@ -166190,6 +180748,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -166205,6 +180764,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutCreatorCardsInput = {
@@ -166283,6 +180843,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -166298,6 +180859,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCreatorCardsInput = {
@@ -166360,6 +180922,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -166375,6 +180938,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutWorkoutScansInput = {
@@ -166437,6 +181001,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -166452,6 +181017,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutWorkoutScansInput = {
@@ -166514,6 +181080,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -166529,6 +181096,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutWorkoutScansInput = {
@@ -166635,6 +181203,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -166650,6 +181219,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutWorkoutScansInput = {
@@ -166712,6 +181282,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -166727,6 +181298,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type WorkoutPlanUpsertWithWhereUniqueWithoutScanInput = {
@@ -166805,6 +181377,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -166820,6 +181393,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutWorkoutPlansInput = {
@@ -166882,6 +181456,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -166897,6 +181472,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutWorkoutPlansInput = {
@@ -166998,6 +181574,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -167013,6 +181590,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutWorkoutPlansInput = {
@@ -167075,6 +181653,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -167090,6 +181669,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type WorkoutScanUpsertWithoutPlansInput = {
@@ -167181,6 +181761,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -167196,6 +181777,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutAthleteBuildInput = {
@@ -167258,6 +181840,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -167273,6 +181856,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutAthleteBuildInput = {
@@ -167351,6 +181935,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -167366,6 +181951,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutAthleteBuildInput = {
@@ -167428,6 +182014,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -167443,6 +182030,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutAvatarLookInput = {
@@ -167505,6 +182093,7 @@ export namespace Prisma {
     workoutPlans?: WorkoutPlanCreateNestedManyWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -167520,6 +182109,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutAvatarLookInput = {
@@ -167582,6 +182172,7 @@ export namespace Prisma {
     workoutPlans?: WorkoutPlanUncheckedCreateNestedManyWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -167597,6 +182188,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutAvatarLookInput = {
@@ -167675,6 +182267,7 @@ export namespace Prisma {
     workoutPlans?: WorkoutPlanUpdateManyWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -167690,6 +182283,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutAvatarLookInput = {
@@ -167752,6 +182346,7 @@ export namespace Prisma {
     workoutPlans?: WorkoutPlanUncheckedUpdateManyWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -167767,6 +182362,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutOwnedWearablesInput = {
@@ -167829,6 +182425,7 @@ export namespace Prisma {
     workoutPlans?: WorkoutPlanCreateNestedManyWithoutUserInput
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -167844,6 +182441,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutOwnedWearablesInput = {
@@ -167906,6 +182504,7 @@ export namespace Prisma {
     workoutPlans?: WorkoutPlanUncheckedCreateNestedManyWithoutUserInput
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -167921,6 +182520,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutOwnedWearablesInput = {
@@ -167999,6 +182599,7 @@ export namespace Prisma {
     workoutPlans?: WorkoutPlanUpdateManyWithoutUserNestedInput
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -168014,6 +182615,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutOwnedWearablesInput = {
@@ -168076,6 +182678,7 @@ export namespace Prisma {
     workoutPlans?: WorkoutPlanUncheckedUpdateManyWithoutUserNestedInput
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -168091,6 +182694,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutSessionBookingsInput = {
@@ -168153,6 +182757,7 @@ export namespace Prisma {
     workoutPlans?: WorkoutPlanCreateNestedManyWithoutUserInput
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -168168,6 +182773,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutSessionBookingsInput = {
@@ -168230,6 +182836,7 @@ export namespace Prisma {
     workoutPlans?: WorkoutPlanUncheckedCreateNestedManyWithoutUserInput
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -168245,6 +182852,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutSessionBookingsInput = {
@@ -168323,6 +182931,7 @@ export namespace Prisma {
     workoutPlans?: WorkoutPlanUpdateManyWithoutUserNestedInput
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -168338,6 +182947,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutSessionBookingsInput = {
@@ -168400,6 +183010,7 @@ export namespace Prisma {
     workoutPlans?: WorkoutPlanUncheckedUpdateManyWithoutUserNestedInput
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -168415,6 +183026,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type CrmContactCreateWithoutCompanyInput = {
@@ -168600,6 +183212,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -168614,6 +183227,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutCrmContactLinksInput = {
@@ -168677,6 +183291,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -168691,6 +183306,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutCrmContactLinksInput = {
@@ -168792,6 +183408,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -168806,6 +183423,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutCrmContactsInput = {
@@ -168869,6 +183487,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -168883,6 +183502,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutCrmContactsInput = {
@@ -169068,6 +183688,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -169082,6 +183703,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCrmContactLinksInput = {
@@ -169145,6 +183767,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -169159,6 +183782,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type CrmCompanyUpsertWithoutContactsInput = {
@@ -169272,6 +183896,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -169286,6 +183911,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCrmContactsInput = {
@@ -169349,6 +183975,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -169363,6 +183990,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type CrmDealUpsertWithWhereUniqueWithoutContactInput = {
@@ -169550,6 +184178,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -169564,6 +184193,7 @@ export namespace Prisma {
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutCrmDealsInput = {
@@ -169627,6 +184257,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -169641,6 +184272,7 @@ export namespace Prisma {
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutCrmDealsInput = {
@@ -169872,6 +184504,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -169886,6 +184519,7 @@ export namespace Prisma {
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCrmDealsInput = {
@@ -169949,6 +184583,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -169963,6 +184598,7 @@ export namespace Prisma {
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type CrmActivityUpsertWithWhereUniqueWithoutDealInput = {
@@ -170138,6 +184774,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -170152,6 +184789,7 @@ export namespace Prisma {
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutCrmActivitiesInput = {
@@ -170215,6 +184853,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -170229,6 +184868,7 @@ export namespace Prisma {
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutCrmActivitiesInput = {
@@ -170400,6 +185040,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -170414,6 +185055,7 @@ export namespace Prisma {
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCrmActivitiesInput = {
@@ -170477,6 +185119,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -170491,6 +185134,7 @@ export namespace Prisma {
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type CrmContactCreateWithoutCrmNotesInput = {
@@ -170634,6 +185278,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -170648,6 +185293,7 @@ export namespace Prisma {
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutCrmNotesInput = {
@@ -170711,6 +185357,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -170725,6 +185372,7 @@ export namespace Prisma {
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutCrmNotesInput = {
@@ -170896,6 +185544,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -170910,6 +185559,7 @@ export namespace Prisma {
     crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCrmNotesInput = {
@@ -170973,6 +185623,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -170987,6 +185638,7 @@ export namespace Prisma {
     crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type SessionExerciseCreateWithoutExerciseInput = {
@@ -171151,6 +185803,7 @@ export namespace Prisma {
     authorId: string
     body: string
     createdAt?: Date | string
+    readAt?: Date | string | null
   }
 
   export type ProgramMessageUncheckedCreateWithoutProgramInput = {
@@ -171158,6 +185811,7 @@ export namespace Prisma {
     authorId: string
     body: string
     createdAt?: Date | string
+    readAt?: Date | string | null
   }
 
   export type ProgramMessageCreateOrConnectWithoutProgramInput = {
@@ -171254,6 +185908,7 @@ export namespace Prisma {
     authorId?: StringFilter<"ProgramMessage"> | string
     body?: StringFilter<"ProgramMessage"> | string
     createdAt?: DateTimeFilter<"ProgramMessage"> | Date | string
+    readAt?: DateTimeNullableFilter<"ProgramMessage"> | Date | string | null
   }
 
   export type CoachingProgramCreateWithoutBlocksInput = {
@@ -172455,6 +187110,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
     credentials?: CredentialCreateNestedManyWithoutUserInput
@@ -172469,6 +187125,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutFacilitatorProfileInput = {
@@ -172532,6 +187189,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
     credentials?: CredentialUncheckedCreateNestedManyWithoutUserInput
@@ -172546,6 +187204,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutFacilitatorProfileInput = {
@@ -172749,6 +187408,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
     credentials?: CredentialUpdateManyWithoutUserNestedInput
@@ -172763,6 +187423,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutFacilitatorProfileInput = {
@@ -172826,6 +187487,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
     credentials?: CredentialUncheckedUpdateManyWithoutUserNestedInput
@@ -172840,6 +187502,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type GoalPlanUpsertWithWhereUniqueWithoutFacilitatorProfileInput = {
@@ -172988,6 +187651,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -173002,6 +187666,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutCredentialsInput = {
@@ -173065,6 +187730,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -173079,6 +187745,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutCredentialsInput = {
@@ -173158,6 +187825,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -173172,6 +187840,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCredentialsInput = {
@@ -173235,6 +187904,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -173249,6 +187919,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutGuardianConsentsInput = {
@@ -173312,6 +187983,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -173326,6 +187998,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutGuardianConsentsInput = {
@@ -173389,6 +188062,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -173403,6 +188077,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutGuardianConsentsInput = {
@@ -173482,6 +188157,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -173496,6 +188172,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutGuardianConsentsInput = {
@@ -173559,6 +188236,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -173573,6 +188251,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutGoalPlansAsMenteeInput = {
@@ -173636,6 +188315,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
     credentials?: CredentialCreateNestedManyWithoutUserInput
@@ -173650,6 +188330,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutGoalPlansAsMenteeInput = {
@@ -173713,6 +188394,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
     credentials?: CredentialUncheckedCreateNestedManyWithoutUserInput
@@ -173727,6 +188409,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutGoalPlansAsMenteeInput = {
@@ -173795,6 +188478,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     credentials?: CredentialCreateNestedManyWithoutUserInput
@@ -173809,6 +188493,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutGoalPlansAsFacilitatorInput = {
@@ -173872,6 +188557,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     credentials?: CredentialUncheckedCreateNestedManyWithoutUserInput
@@ -173886,6 +188572,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutGoalPlansAsFacilitatorInput = {
@@ -174042,6 +188729,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
     credentials?: CredentialUpdateManyWithoutUserNestedInput
@@ -174056,6 +188744,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutGoalPlansAsMenteeInput = {
@@ -174119,6 +188808,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
     credentials?: CredentialUncheckedUpdateManyWithoutUserNestedInput
@@ -174133,6 +188823,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserUpsertWithoutGoalPlansAsFacilitatorInput = {
@@ -174207,6 +188898,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     credentials?: CredentialUpdateManyWithoutUserNestedInput
@@ -174221,6 +188913,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutGoalPlansAsFacilitatorInput = {
@@ -174284,6 +188977,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     credentials?: CredentialUncheckedUpdateManyWithoutUserNestedInput
@@ -174298,6 +188992,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type FacilitatorProfileUpsertWithoutGoalPlansInput = {
@@ -174667,6 +189362,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -174682,6 +189378,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutMirrorSessionsInput = {
@@ -174744,6 +189441,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -174759,6 +189457,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutMirrorSessionsInput = {
@@ -174837,6 +189536,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -174852,6 +189552,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutMirrorSessionsInput = {
@@ -174914,6 +189615,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -174929,6 +189631,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutHealthIntakesInput = {
@@ -174992,6 +189695,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -175006,6 +189710,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutHealthIntakesInput = {
@@ -175069,6 +189774,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -175083,6 +189789,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutHealthIntakesInput = {
@@ -175162,6 +189869,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -175176,6 +189884,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutHealthIntakesInput = {
@@ -175239,6 +189948,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -175253,6 +189963,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutPainCheckInsInput = {
@@ -175316,6 +190027,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -175330,6 +190042,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutPainCheckInsInput = {
@@ -175393,6 +190106,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -175407,6 +190121,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutPainCheckInsInput = {
@@ -175486,6 +190201,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -175500,6 +190216,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutPainCheckInsInput = {
@@ -175563,6 +190280,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -175577,6 +190295,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutHealthConsentsInput = {
@@ -175640,6 +190359,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -175654,6 +190374,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutHealthConsentsInput = {
@@ -175717,6 +190438,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -175731,6 +190453,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutHealthConsentsInput = {
@@ -175810,6 +190533,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -175824,6 +190548,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutHealthConsentsInput = {
@@ -175887,6 +190612,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -175901,9 +190627,10 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
-  export type UserCreateWithoutReadinessCheckInsInput = {
+  export type UserCreateWithoutScanSaveOptInInput = {
     id?: string
     email: string
     name?: string | null
@@ -175972,15 +190699,17 @@ export namespace Prisma {
     healthIntakes?: HealthIntakeCreateNestedManyWithoutUserInput
     painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
+    readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
     breathLogs?: BreathLogCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
-  export type UserUncheckedCreateWithoutReadinessCheckInsInput = {
+  export type UserUncheckedCreateWithoutScanSaveOptInInput = {
     id?: string
     email: string
     name?: string | null
@@ -176049,12 +190778,346 @@ export namespace Prisma {
     healthIntakes?: HealthIntakeUncheckedCreateNestedManyWithoutUserInput
     painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
     healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
+    readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
     breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
     crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
     crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
+  }
+
+  export type UserCreateOrConnectWithoutScanSaveOptInInput = {
+    where: UserWhereUniqueInput
+    create: XOR<UserCreateWithoutScanSaveOptInInput, UserUncheckedCreateWithoutScanSaveOptInInput>
+  }
+
+  export type UserUpsertWithoutScanSaveOptInInput = {
+    update: XOR<UserUpdateWithoutScanSaveOptInInput, UserUncheckedUpdateWithoutScanSaveOptInInput>
+    create: XOR<UserCreateWithoutScanSaveOptInInput, UserUncheckedCreateWithoutScanSaveOptInInput>
+    where?: UserWhereInput
+  }
+
+  export type UserUpdateToOneWithWhereWithoutScanSaveOptInInput = {
+    where?: UserWhereInput
+    data: XOR<UserUpdateWithoutScanSaveOptInInput, UserUncheckedUpdateWithoutScanSaveOptInInput>
+  }
+
+  export type UserUpdateWithoutScanSaveOptInInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    name?: NullableStringFieldUpdateOperationsInput | string | null
+    password?: StringFieldUpdateOperationsInput | string
+    role?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    dobYear?: NullableIntFieldUpdateOperationsInput | number | null
+    kycStatus?: StringFieldUpdateOperationsInput | string
+    kycProvider?: NullableStringFieldUpdateOperationsInput | string | null
+    kycVerifiedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    selfExcludedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    declaredState?: NullableStringFieldUpdateOperationsInput | string | null
+    policyVersion?: NullableStringFieldUpdateOperationsInput | string | null
+    policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    profile?: PlayerProfileUpdateOneWithoutUserNestedInput
+    sessions?: GameSessionUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUpdateManyWithoutUserNestedInput
+    ledger?: CreditLedgerUpdateManyWithoutUserNestedInput
+    cards?: CardOwnershipUpdateManyWithoutUserNestedInput
+    prqEntries?: PrqEntryUpdateManyWithoutUserNestedInput
+    lessons?: LessonProgressUpdateManyWithoutUserNestedInput
+    storyProgress?: StoryNodeProgressUpdateManyWithoutUserNestedInput
+    cellProjects?: CellProjectUpdateManyWithoutUserNestedInput
+    cellApiKeys?: CellApiKeyUpdateManyWithoutUserNestedInput
+    cellSettings?: CellSettingsUpdateOneWithoutUserNestedInput
+    athleteBuild?: AthleteBuildUpdateOneWithoutUserNestedInput
+    stripeCustomer?: StripeCustomerUpdateOneWithoutUserNestedInput
+    subscriptions?: SubscriptionUpdateManyWithoutUserNestedInput
+    mirrorSessions?: MirrorSessionUpdateManyWithoutUserNestedInput
+    orders?: OrderUpdateManyWithoutUserNestedInput
+    payoutRequests?: PayoutRequestUpdateManyWithoutUserNestedInput
+    creatorListings?: MarketplaceListingUpdateManyWithoutCreatorNestedInput
+    buyerPurchases?: MarketplacePurchaseUpdateManyWithoutBuyerNestedInput
+    coachShares?: ShareLinkUpdateManyWithoutCoachNestedInput
+    coachInvites?: CoachInviteUpdateManyWithoutCoachNestedInput
+    clientsCoached?: CoachClientUpdateManyWithoutCoachNestedInput
+    coaches?: CoachClientUpdateManyWithoutClientNestedInput
+    ladderEntries?: LadderEntryUpdateManyWithoutUserNestedInput
+    partnerKeys?: StudioPartnerKeyUpdateManyWithoutUserNestedInput
+    competitionMatchesP1?: CompetitionMatchUpdateManyWithoutPlayer1NestedInput
+    competitionMatchesP2?: CompetitionMatchUpdateManyWithoutPlayer2NestedInput
+    competitionMatchesWinner?: CompetitionMatchUpdateManyWithoutWinnerNestedInput
+    matchEvents?: MatchEventUpdateManyWithoutUserNestedInput
+    mirrorTriumphs?: MirrorTriumphUpdateManyWithoutUserNestedInput
+    wallet?: WalletUpdateOneWithoutPlayerNestedInput
+    perfEarnEvents?: PerfEarnEventUpdateManyWithoutPlayerNestedInput
+    entitlements?: PlayerEntitlementUpdateManyWithoutPlayerNestedInput
+    leadRecord?: MarketingLeadUpdateOneWithoutConvertedUserNestedInput
+    referralCode?: ReferralCodeUpdateOneWithoutUserNestedInput
+    mpMatchesHost?: MpMatchUpdateManyWithoutHostNestedInput
+    mpMatchesGuest?: MpMatchUpdateManyWithoutGuestNestedInput
+    creatorCards?: CreatorCardUpdateManyWithoutOwnerNestedInput
+    creativeCards?: CreativeCardUpdateManyWithoutOwnerNestedInput
+    cardSlot?: CardSlotUpdateOneWithoutUserNestedInput
+    workoutScans?: WorkoutScanUpdateManyWithoutUserNestedInput
+    workoutPlans?: WorkoutPlanUpdateManyWithoutUserNestedInput
+    avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
+    ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
+    sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
+    goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
+    goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
+    credentials?: CredentialUpdateManyWithoutUserNestedInput
+    guardianConsents?: GuardianConsentUpdateManyWithoutMenteeNestedInput
+    healthIntakes?: HealthIntakeUpdateManyWithoutUserNestedInput
+    painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
+    healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
+    readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
+    crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
+    crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
+    crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
+    crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
+    crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
+  }
+
+  export type UserUncheckedUpdateWithoutScanSaveOptInInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    name?: NullableStringFieldUpdateOperationsInput | string | null
+    password?: StringFieldUpdateOperationsInput | string
+    role?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    dobYear?: NullableIntFieldUpdateOperationsInput | number | null
+    kycStatus?: StringFieldUpdateOperationsInput | string
+    kycProvider?: NullableStringFieldUpdateOperationsInput | string | null
+    kycVerifiedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    selfExcludedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    declaredState?: NullableStringFieldUpdateOperationsInput | string | null
+    policyVersion?: NullableStringFieldUpdateOperationsInput | string | null
+    policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    profile?: PlayerProfileUncheckedUpdateOneWithoutUserNestedInput
+    sessions?: GameSessionUncheckedUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUncheckedUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUncheckedUpdateManyWithoutUserNestedInput
+    ledger?: CreditLedgerUncheckedUpdateManyWithoutUserNestedInput
+    cards?: CardOwnershipUncheckedUpdateManyWithoutUserNestedInput
+    prqEntries?: PrqEntryUncheckedUpdateManyWithoutUserNestedInput
+    lessons?: LessonProgressUncheckedUpdateManyWithoutUserNestedInput
+    storyProgress?: StoryNodeProgressUncheckedUpdateManyWithoutUserNestedInput
+    cellProjects?: CellProjectUncheckedUpdateManyWithoutUserNestedInput
+    cellApiKeys?: CellApiKeyUncheckedUpdateManyWithoutUserNestedInput
+    cellSettings?: CellSettingsUncheckedUpdateOneWithoutUserNestedInput
+    athleteBuild?: AthleteBuildUncheckedUpdateOneWithoutUserNestedInput
+    stripeCustomer?: StripeCustomerUncheckedUpdateOneWithoutUserNestedInput
+    subscriptions?: SubscriptionUncheckedUpdateManyWithoutUserNestedInput
+    mirrorSessions?: MirrorSessionUncheckedUpdateManyWithoutUserNestedInput
+    orders?: OrderUncheckedUpdateManyWithoutUserNestedInput
+    payoutRequests?: PayoutRequestUncheckedUpdateManyWithoutUserNestedInput
+    creatorListings?: MarketplaceListingUncheckedUpdateManyWithoutCreatorNestedInput
+    buyerPurchases?: MarketplacePurchaseUncheckedUpdateManyWithoutBuyerNestedInput
+    coachShares?: ShareLinkUncheckedUpdateManyWithoutCoachNestedInput
+    coachInvites?: CoachInviteUncheckedUpdateManyWithoutCoachNestedInput
+    clientsCoached?: CoachClientUncheckedUpdateManyWithoutCoachNestedInput
+    coaches?: CoachClientUncheckedUpdateManyWithoutClientNestedInput
+    ladderEntries?: LadderEntryUncheckedUpdateManyWithoutUserNestedInput
+    partnerKeys?: StudioPartnerKeyUncheckedUpdateManyWithoutUserNestedInput
+    competitionMatchesP1?: CompetitionMatchUncheckedUpdateManyWithoutPlayer1NestedInput
+    competitionMatchesP2?: CompetitionMatchUncheckedUpdateManyWithoutPlayer2NestedInput
+    competitionMatchesWinner?: CompetitionMatchUncheckedUpdateManyWithoutWinnerNestedInput
+    matchEvents?: MatchEventUncheckedUpdateManyWithoutUserNestedInput
+    mirrorTriumphs?: MirrorTriumphUncheckedUpdateManyWithoutUserNestedInput
+    wallet?: WalletUncheckedUpdateOneWithoutPlayerNestedInput
+    perfEarnEvents?: PerfEarnEventUncheckedUpdateManyWithoutPlayerNestedInput
+    entitlements?: PlayerEntitlementUncheckedUpdateManyWithoutPlayerNestedInput
+    leadRecord?: MarketingLeadUncheckedUpdateOneWithoutConvertedUserNestedInput
+    referralCode?: ReferralCodeUncheckedUpdateOneWithoutUserNestedInput
+    mpMatchesHost?: MpMatchUncheckedUpdateManyWithoutHostNestedInput
+    mpMatchesGuest?: MpMatchUncheckedUpdateManyWithoutGuestNestedInput
+    creatorCards?: CreatorCardUncheckedUpdateManyWithoutOwnerNestedInput
+    creativeCards?: CreativeCardUncheckedUpdateManyWithoutOwnerNestedInput
+    cardSlot?: CardSlotUncheckedUpdateOneWithoutUserNestedInput
+    workoutScans?: WorkoutScanUncheckedUpdateManyWithoutUserNestedInput
+    workoutPlans?: WorkoutPlanUncheckedUpdateManyWithoutUserNestedInput
+    avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
+    ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
+    sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
+    goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
+    goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
+    credentials?: CredentialUncheckedUpdateManyWithoutUserNestedInput
+    guardianConsents?: GuardianConsentUncheckedUpdateManyWithoutMenteeNestedInput
+    healthIntakes?: HealthIntakeUncheckedUpdateManyWithoutUserNestedInput
+    painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
+    healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
+    readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
+    crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
+    crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
+    crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
+    crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
+    crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
+  }
+
+  export type UserCreateWithoutReadinessCheckInsInput = {
+    id?: string
+    email: string
+    name?: string | null
+    password: string
+    role?: string
+    createdAt?: Date | string
+    dobYear?: number | null
+    kycStatus?: string
+    kycProvider?: string | null
+    kycVerifiedAt?: Date | string | null
+    selfExcludedAt?: Date | string | null
+    declaredState?: string | null
+    policyVersion?: string | null
+    policyAcceptedAt?: Date | string | null
+    profile?: PlayerProfileCreateNestedOneWithoutUserInput
+    sessions?: GameSessionCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantCreateNestedManyWithoutUserInput
+    ledger?: CreditLedgerCreateNestedManyWithoutUserInput
+    cards?: CardOwnershipCreateNestedManyWithoutUserInput
+    prqEntries?: PrqEntryCreateNestedManyWithoutUserInput
+    lessons?: LessonProgressCreateNestedManyWithoutUserInput
+    storyProgress?: StoryNodeProgressCreateNestedManyWithoutUserInput
+    cellProjects?: CellProjectCreateNestedManyWithoutUserInput
+    cellApiKeys?: CellApiKeyCreateNestedManyWithoutUserInput
+    cellSettings?: CellSettingsCreateNestedOneWithoutUserInput
+    athleteBuild?: AthleteBuildCreateNestedOneWithoutUserInput
+    stripeCustomer?: StripeCustomerCreateNestedOneWithoutUserInput
+    subscriptions?: SubscriptionCreateNestedManyWithoutUserInput
+    mirrorSessions?: MirrorSessionCreateNestedManyWithoutUserInput
+    orders?: OrderCreateNestedManyWithoutUserInput
+    payoutRequests?: PayoutRequestCreateNestedManyWithoutUserInput
+    creatorListings?: MarketplaceListingCreateNestedManyWithoutCreatorInput
+    buyerPurchases?: MarketplacePurchaseCreateNestedManyWithoutBuyerInput
+    coachShares?: ShareLinkCreateNestedManyWithoutCoachInput
+    coachInvites?: CoachInviteCreateNestedManyWithoutCoachInput
+    clientsCoached?: CoachClientCreateNestedManyWithoutCoachInput
+    coaches?: CoachClientCreateNestedManyWithoutClientInput
+    ladderEntries?: LadderEntryCreateNestedManyWithoutUserInput
+    partnerKeys?: StudioPartnerKeyCreateNestedManyWithoutUserInput
+    competitionMatchesP1?: CompetitionMatchCreateNestedManyWithoutPlayer1Input
+    competitionMatchesP2?: CompetitionMatchCreateNestedManyWithoutPlayer2Input
+    competitionMatchesWinner?: CompetitionMatchCreateNestedManyWithoutWinnerInput
+    matchEvents?: MatchEventCreateNestedManyWithoutUserInput
+    mirrorTriumphs?: MirrorTriumphCreateNestedManyWithoutUserInput
+    wallet?: WalletCreateNestedOneWithoutPlayerInput
+    perfEarnEvents?: PerfEarnEventCreateNestedManyWithoutPlayerInput
+    entitlements?: PlayerEntitlementCreateNestedManyWithoutPlayerInput
+    leadRecord?: MarketingLeadCreateNestedOneWithoutConvertedUserInput
+    referralCode?: ReferralCodeCreateNestedOneWithoutUserInput
+    mpMatchesHost?: MpMatchCreateNestedManyWithoutHostInput
+    mpMatchesGuest?: MpMatchCreateNestedManyWithoutGuestInput
+    creatorCards?: CreatorCardCreateNestedManyWithoutOwnerInput
+    creativeCards?: CreativeCardCreateNestedManyWithoutOwnerInput
+    cardSlot?: CardSlotCreateNestedOneWithoutUserInput
+    workoutScans?: WorkoutScanCreateNestedManyWithoutUserInput
+    workoutPlans?: WorkoutPlanCreateNestedManyWithoutUserInput
+    avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
+    ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
+    sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
+    facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
+    goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
+    goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
+    credentials?: CredentialCreateNestedManyWithoutUserInput
+    guardianConsents?: GuardianConsentCreateNestedManyWithoutMenteeInput
+    healthIntakes?: HealthIntakeCreateNestedManyWithoutUserInput
+    painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
+    healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
+    crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
+    crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
+    crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
+    crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
+    crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
+  }
+
+  export type UserUncheckedCreateWithoutReadinessCheckInsInput = {
+    id?: string
+    email: string
+    name?: string | null
+    password: string
+    role?: string
+    createdAt?: Date | string
+    dobYear?: number | null
+    kycStatus?: string
+    kycProvider?: string | null
+    kycVerifiedAt?: Date | string | null
+    selfExcludedAt?: Date | string | null
+    declaredState?: string | null
+    policyVersion?: string | null
+    policyAcceptedAt?: Date | string | null
+    profile?: PlayerProfileUncheckedCreateNestedOneWithoutUserInput
+    sessions?: GameSessionUncheckedCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunUncheckedCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantUncheckedCreateNestedManyWithoutUserInput
+    ledger?: CreditLedgerUncheckedCreateNestedManyWithoutUserInput
+    cards?: CardOwnershipUncheckedCreateNestedManyWithoutUserInput
+    prqEntries?: PrqEntryUncheckedCreateNestedManyWithoutUserInput
+    lessons?: LessonProgressUncheckedCreateNestedManyWithoutUserInput
+    storyProgress?: StoryNodeProgressUncheckedCreateNestedManyWithoutUserInput
+    cellProjects?: CellProjectUncheckedCreateNestedManyWithoutUserInput
+    cellApiKeys?: CellApiKeyUncheckedCreateNestedManyWithoutUserInput
+    cellSettings?: CellSettingsUncheckedCreateNestedOneWithoutUserInput
+    athleteBuild?: AthleteBuildUncheckedCreateNestedOneWithoutUserInput
+    stripeCustomer?: StripeCustomerUncheckedCreateNestedOneWithoutUserInput
+    subscriptions?: SubscriptionUncheckedCreateNestedManyWithoutUserInput
+    mirrorSessions?: MirrorSessionUncheckedCreateNestedManyWithoutUserInput
+    orders?: OrderUncheckedCreateNestedManyWithoutUserInput
+    payoutRequests?: PayoutRequestUncheckedCreateNestedManyWithoutUserInput
+    creatorListings?: MarketplaceListingUncheckedCreateNestedManyWithoutCreatorInput
+    buyerPurchases?: MarketplacePurchaseUncheckedCreateNestedManyWithoutBuyerInput
+    coachShares?: ShareLinkUncheckedCreateNestedManyWithoutCoachInput
+    coachInvites?: CoachInviteUncheckedCreateNestedManyWithoutCoachInput
+    clientsCoached?: CoachClientUncheckedCreateNestedManyWithoutCoachInput
+    coaches?: CoachClientUncheckedCreateNestedManyWithoutClientInput
+    ladderEntries?: LadderEntryUncheckedCreateNestedManyWithoutUserInput
+    partnerKeys?: StudioPartnerKeyUncheckedCreateNestedManyWithoutUserInput
+    competitionMatchesP1?: CompetitionMatchUncheckedCreateNestedManyWithoutPlayer1Input
+    competitionMatchesP2?: CompetitionMatchUncheckedCreateNestedManyWithoutPlayer2Input
+    competitionMatchesWinner?: CompetitionMatchUncheckedCreateNestedManyWithoutWinnerInput
+    matchEvents?: MatchEventUncheckedCreateNestedManyWithoutUserInput
+    mirrorTriumphs?: MirrorTriumphUncheckedCreateNestedManyWithoutUserInput
+    wallet?: WalletUncheckedCreateNestedOneWithoutPlayerInput
+    perfEarnEvents?: PerfEarnEventUncheckedCreateNestedManyWithoutPlayerInput
+    entitlements?: PlayerEntitlementUncheckedCreateNestedManyWithoutPlayerInput
+    leadRecord?: MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput
+    referralCode?: ReferralCodeUncheckedCreateNestedOneWithoutUserInput
+    mpMatchesHost?: MpMatchUncheckedCreateNestedManyWithoutHostInput
+    mpMatchesGuest?: MpMatchUncheckedCreateNestedManyWithoutGuestInput
+    creatorCards?: CreatorCardUncheckedCreateNestedManyWithoutOwnerInput
+    creativeCards?: CreativeCardUncheckedCreateNestedManyWithoutOwnerInput
+    cardSlot?: CardSlotUncheckedCreateNestedOneWithoutUserInput
+    workoutScans?: WorkoutScanUncheckedCreateNestedManyWithoutUserInput
+    workoutPlans?: WorkoutPlanUncheckedCreateNestedManyWithoutUserInput
+    avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
+    ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
+    sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
+    facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
+    goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
+    goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
+    credentials?: CredentialUncheckedCreateNestedManyWithoutUserInput
+    guardianConsents?: GuardianConsentUncheckedCreateNestedManyWithoutMenteeInput
+    healthIntakes?: HealthIntakeUncheckedCreateNestedManyWithoutUserInput
+    painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
+    healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
+    crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
+    crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
+    crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
+    crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
+    crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutReadinessCheckInsInput = {
@@ -176134,6 +191197,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -176148,6 +191212,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutReadinessCheckInsInput = {
@@ -176211,6 +191276,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -176225,6 +191291,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutBreathLogsInput = {
@@ -176288,6 +191355,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -176302,6 +191370,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutBreathLogsInput = {
@@ -176365,6 +191434,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -176379,6 +191449,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutBreathLogsInput = {
@@ -176458,6 +191529,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -176472,6 +191544,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutBreathLogsInput = {
@@ -176535,6 +191608,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -176549,6 +191623,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutCoachSharesInput = {
@@ -176611,6 +191686,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -176626,6 +191702,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutCoachSharesInput = {
@@ -176688,6 +191765,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -176703,6 +191781,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutCoachSharesInput = {
@@ -176781,6 +191860,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -176796,6 +191876,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCoachSharesInput = {
@@ -176858,6 +191939,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -176873,6 +191955,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutCoachInvitesInput = {
@@ -176935,6 +192018,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -176950,6 +192034,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutCoachInvitesInput = {
@@ -177012,6 +192097,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -177027,6 +192113,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutCoachInvitesInput = {
@@ -177105,6 +192192,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -177120,6 +192208,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCoachInvitesInput = {
@@ -177182,6 +192271,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -177197,6 +192287,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateWithoutClientsCoachedInput = {
@@ -177259,6 +192350,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -177274,6 +192366,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutClientsCoachedInput = {
@@ -177336,6 +192429,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -177351,6 +192445,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutClientsCoachedInput = {
@@ -177418,6 +192513,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
@@ -177433,6 +192529,7 @@ export namespace Prisma {
     crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutCoachesInput = {
@@ -177495,6 +192592,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
     ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
     sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
     facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
     goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
     goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
@@ -177510,11 +192608,29 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutCoachesInput = {
     where: UserWhereUniqueInput
     create: XOR<UserCreateWithoutCoachesInput, UserUncheckedCreateWithoutCoachesInput>
+  }
+
+  export type CoachAvailabilityCreateWithoutLinkInput = {
+    status: string
+    returnBy?: string | null
+    setAt?: Date | string
+  }
+
+  export type CoachAvailabilityUncheckedCreateWithoutLinkInput = {
+    status: string
+    returnBy?: string | null
+    setAt?: Date | string
+  }
+
+  export type CoachAvailabilityCreateOrConnectWithoutLinkInput = {
+    where: CoachAvailabilityWhereUniqueInput
+    create: XOR<CoachAvailabilityCreateWithoutLinkInput, CoachAvailabilityUncheckedCreateWithoutLinkInput>
   }
 
   export type UserUpsertWithoutClientsCoachedInput = {
@@ -177588,6 +192704,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -177603,6 +192720,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutClientsCoachedInput = {
@@ -177665,6 +192783,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -177680,6 +192799,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserUpsertWithoutCoachesInput = {
@@ -177753,6 +192873,7 @@ export namespace Prisma {
     avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
@@ -177768,6 +192889,7 @@ export namespace Prisma {
     crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCoachesInput = {
@@ -177830,6 +192952,1205 @@ export namespace Prisma {
     avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
     ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
     sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
+    facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
+    goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
+    goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
+    credentials?: CredentialUncheckedUpdateManyWithoutUserNestedInput
+    guardianConsents?: GuardianConsentUncheckedUpdateManyWithoutMenteeNestedInput
+    healthIntakes?: HealthIntakeUncheckedUpdateManyWithoutUserNestedInput
+    painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
+    healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
+    readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
+    crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
+    crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
+    crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
+    crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
+    crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
+  }
+
+  export type CoachAvailabilityUpsertWithoutLinkInput = {
+    update: XOR<CoachAvailabilityUpdateWithoutLinkInput, CoachAvailabilityUncheckedUpdateWithoutLinkInput>
+    create: XOR<CoachAvailabilityCreateWithoutLinkInput, CoachAvailabilityUncheckedCreateWithoutLinkInput>
+    where?: CoachAvailabilityWhereInput
+  }
+
+  export type CoachAvailabilityUpdateToOneWithWhereWithoutLinkInput = {
+    where?: CoachAvailabilityWhereInput
+    data: XOR<CoachAvailabilityUpdateWithoutLinkInput, CoachAvailabilityUncheckedUpdateWithoutLinkInput>
+  }
+
+  export type CoachAvailabilityUpdateWithoutLinkInput = {
+    status?: StringFieldUpdateOperationsInput | string
+    returnBy?: NullableStringFieldUpdateOperationsInput | string | null
+    setAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type CoachAvailabilityUncheckedUpdateWithoutLinkInput = {
+    status?: StringFieldUpdateOperationsInput | string
+    returnBy?: NullableStringFieldUpdateOperationsInput | string | null
+    setAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type CoachClientCreateWithoutAvailabilityInput = {
+    id?: string
+    via?: string
+    endedAt?: Date | string | null
+    createdAt?: Date | string
+    coach: UserCreateNestedOneWithoutClientsCoachedInput
+    client: UserCreateNestedOneWithoutCoachesInput
+  }
+
+  export type CoachClientUncheckedCreateWithoutAvailabilityInput = {
+    id?: string
+    coachId: string
+    clientId: string
+    via?: string
+    endedAt?: Date | string | null
+    createdAt?: Date | string
+  }
+
+  export type CoachClientCreateOrConnectWithoutAvailabilityInput = {
+    where: CoachClientWhereUniqueInput
+    create: XOR<CoachClientCreateWithoutAvailabilityInput, CoachClientUncheckedCreateWithoutAvailabilityInput>
+  }
+
+  export type CoachClientUpsertWithoutAvailabilityInput = {
+    update: XOR<CoachClientUpdateWithoutAvailabilityInput, CoachClientUncheckedUpdateWithoutAvailabilityInput>
+    create: XOR<CoachClientCreateWithoutAvailabilityInput, CoachClientUncheckedCreateWithoutAvailabilityInput>
+    where?: CoachClientWhereInput
+  }
+
+  export type CoachClientUpdateToOneWithWhereWithoutAvailabilityInput = {
+    where?: CoachClientWhereInput
+    data: XOR<CoachClientUpdateWithoutAvailabilityInput, CoachClientUncheckedUpdateWithoutAvailabilityInput>
+  }
+
+  export type CoachClientUpdateWithoutAvailabilityInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    via?: StringFieldUpdateOperationsInput | string
+    endedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    coach?: UserUpdateOneRequiredWithoutClientsCoachedNestedInput
+    client?: UserUpdateOneRequiredWithoutCoachesNestedInput
+  }
+
+  export type CoachClientUncheckedUpdateWithoutAvailabilityInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    coachId?: StringFieldUpdateOperationsInput | string
+    clientId?: StringFieldUpdateOperationsInput | string
+    via?: StringFieldUpdateOperationsInput | string
+    endedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ProgramAccessCreateWithoutInstructorInput = {
+    id?: string
+    userId: string
+    listingId: string
+    lane: string
+    billing: string
+    scope?: string
+    beneficiary?: string
+    status?: string
+    priceCents: number
+    platformFeeCents?: number
+    stripeFeeCents?: number
+    reviewCredits?: number
+    lastCreditInvoiceId?: string | null
+    stripeCheckoutId?: string | null
+    stripeSubscriptionId?: string | null
+    stripePaymentIntentId?: string | null
+    accessUntil?: Date | string | null
+    cancelAtPeriodEnd?: boolean
+    coachingProgramId?: string | null
+    startedAt?: Date | string | null
+    nextRescreenAt?: Date | string | null
+    unlockCodeHash?: string | null
+    deviceTokenHash?: string | null
+    codeActive?: boolean
+    redeemedAt?: Date | string | null
+    reissueCount?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type ProgramAccessUncheckedCreateWithoutInstructorInput = {
+    id?: string
+    userId: string
+    listingId: string
+    lane: string
+    billing: string
+    scope?: string
+    beneficiary?: string
+    status?: string
+    priceCents: number
+    platformFeeCents?: number
+    stripeFeeCents?: number
+    reviewCredits?: number
+    lastCreditInvoiceId?: string | null
+    stripeCheckoutId?: string | null
+    stripeSubscriptionId?: string | null
+    stripePaymentIntentId?: string | null
+    accessUntil?: Date | string | null
+    cancelAtPeriodEnd?: boolean
+    coachingProgramId?: string | null
+    startedAt?: Date | string | null
+    nextRescreenAt?: Date | string | null
+    unlockCodeHash?: string | null
+    deviceTokenHash?: string | null
+    codeActive?: boolean
+    redeemedAt?: Date | string | null
+    reissueCount?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type ProgramAccessCreateOrConnectWithoutInstructorInput = {
+    where: ProgramAccessWhereUniqueInput
+    create: XOR<ProgramAccessCreateWithoutInstructorInput, ProgramAccessUncheckedCreateWithoutInstructorInput>
+  }
+
+  export type ProgramAccessCreateManyInstructorInputEnvelope = {
+    data: ProgramAccessCreateManyInstructorInput | ProgramAccessCreateManyInstructorInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type BookingCreateWithoutInstructorInput = {
+    id?: string
+    kind: string
+    coachUserId: string
+    clientUserId: string
+    listingId: string
+    status?: string
+    durationMin?: number | null
+    priceCents: number
+    platformFeeCents?: number
+    stripeFeeCents?: number
+    refundCents?: number
+    stripeCheckoutId?: string | null
+    stripePaymentIntentId?: string | null
+    holdExpiresAt?: Date | string | null
+    startsAt?: Date | string | null
+    endsAt?: Date | string | null
+    slotLock?: string | null
+    clientTimeZone?: string | null
+    clientNote?: string | null
+    reschedulesUsed?: number
+    connectionFailedAt?: Date | string | null
+    failureCreditOpen?: boolean
+    shareWithCoach?: boolean
+    goal?: string | null
+    painYes?: boolean | null
+    reviewNote?: string | null
+    clipPaths?: NullableJsonNullValueInput | InputJsonValue
+    clipConsentAt?: Date | string | null
+    consentTextVersion?: string | null
+    submittedAt?: Date | string | null
+    dueAt?: Date | string | null
+    replyText?: string | null
+    replyClipPath?: string | null
+    attachedDrillIds?: NullableJsonNullValueInput | InputJsonValue
+    deliveredAt?: Date | string | null
+    originalClipDeleteAt?: Date | string | null
+    originalsDeletedAt?: Date | string | null
+    cancelledAt?: Date | string | null
+    cancelledBy?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    signals?: CallSignalCreateNestedManyWithoutBookingInput
+  }
+
+  export type BookingUncheckedCreateWithoutInstructorInput = {
+    id?: string
+    kind: string
+    coachUserId: string
+    clientUserId: string
+    listingId: string
+    status?: string
+    durationMin?: number | null
+    priceCents: number
+    platformFeeCents?: number
+    stripeFeeCents?: number
+    refundCents?: number
+    stripeCheckoutId?: string | null
+    stripePaymentIntentId?: string | null
+    holdExpiresAt?: Date | string | null
+    startsAt?: Date | string | null
+    endsAt?: Date | string | null
+    slotLock?: string | null
+    clientTimeZone?: string | null
+    clientNote?: string | null
+    reschedulesUsed?: number
+    connectionFailedAt?: Date | string | null
+    failureCreditOpen?: boolean
+    shareWithCoach?: boolean
+    goal?: string | null
+    painYes?: boolean | null
+    reviewNote?: string | null
+    clipPaths?: NullableJsonNullValueInput | InputJsonValue
+    clipConsentAt?: Date | string | null
+    consentTextVersion?: string | null
+    submittedAt?: Date | string | null
+    dueAt?: Date | string | null
+    replyText?: string | null
+    replyClipPath?: string | null
+    attachedDrillIds?: NullableJsonNullValueInput | InputJsonValue
+    deliveredAt?: Date | string | null
+    originalClipDeleteAt?: Date | string | null
+    originalsDeletedAt?: Date | string | null
+    cancelledAt?: Date | string | null
+    cancelledBy?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    signals?: CallSignalUncheckedCreateNestedManyWithoutBookingInput
+  }
+
+  export type BookingCreateOrConnectWithoutInstructorInput = {
+    where: BookingWhereUniqueInput
+    create: XOR<BookingCreateWithoutInstructorInput, BookingUncheckedCreateWithoutInstructorInput>
+  }
+
+  export type BookingCreateManyInstructorInputEnvelope = {
+    data: BookingCreateManyInstructorInput | BookingCreateManyInstructorInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type ProgramAccessUpsertWithWhereUniqueWithoutInstructorInput = {
+    where: ProgramAccessWhereUniqueInput
+    update: XOR<ProgramAccessUpdateWithoutInstructorInput, ProgramAccessUncheckedUpdateWithoutInstructorInput>
+    create: XOR<ProgramAccessCreateWithoutInstructorInput, ProgramAccessUncheckedCreateWithoutInstructorInput>
+  }
+
+  export type ProgramAccessUpdateWithWhereUniqueWithoutInstructorInput = {
+    where: ProgramAccessWhereUniqueInput
+    data: XOR<ProgramAccessUpdateWithoutInstructorInput, ProgramAccessUncheckedUpdateWithoutInstructorInput>
+  }
+
+  export type ProgramAccessUpdateManyWithWhereWithoutInstructorInput = {
+    where: ProgramAccessScalarWhereInput
+    data: XOR<ProgramAccessUpdateManyMutationInput, ProgramAccessUncheckedUpdateManyWithoutInstructorInput>
+  }
+
+  export type ProgramAccessScalarWhereInput = {
+    AND?: ProgramAccessScalarWhereInput | ProgramAccessScalarWhereInput[]
+    OR?: ProgramAccessScalarWhereInput[]
+    NOT?: ProgramAccessScalarWhereInput | ProgramAccessScalarWhereInput[]
+    id?: StringFilter<"ProgramAccess"> | string
+    userId?: StringFilter<"ProgramAccess"> | string
+    instructorId?: StringFilter<"ProgramAccess"> | string
+    listingId?: StringFilter<"ProgramAccess"> | string
+    lane?: StringFilter<"ProgramAccess"> | string
+    billing?: StringFilter<"ProgramAccess"> | string
+    scope?: StringFilter<"ProgramAccess"> | string
+    beneficiary?: StringFilter<"ProgramAccess"> | string
+    status?: StringFilter<"ProgramAccess"> | string
+    priceCents?: IntFilter<"ProgramAccess"> | number
+    platformFeeCents?: IntFilter<"ProgramAccess"> | number
+    stripeFeeCents?: IntFilter<"ProgramAccess"> | number
+    reviewCredits?: IntFilter<"ProgramAccess"> | number
+    lastCreditInvoiceId?: StringNullableFilter<"ProgramAccess"> | string | null
+    stripeCheckoutId?: StringNullableFilter<"ProgramAccess"> | string | null
+    stripeSubscriptionId?: StringNullableFilter<"ProgramAccess"> | string | null
+    stripePaymentIntentId?: StringNullableFilter<"ProgramAccess"> | string | null
+    accessUntil?: DateTimeNullableFilter<"ProgramAccess"> | Date | string | null
+    cancelAtPeriodEnd?: BoolFilter<"ProgramAccess"> | boolean
+    coachingProgramId?: StringNullableFilter<"ProgramAccess"> | string | null
+    startedAt?: DateTimeNullableFilter<"ProgramAccess"> | Date | string | null
+    nextRescreenAt?: DateTimeNullableFilter<"ProgramAccess"> | Date | string | null
+    unlockCodeHash?: StringNullableFilter<"ProgramAccess"> | string | null
+    deviceTokenHash?: StringNullableFilter<"ProgramAccess"> | string | null
+    codeActive?: BoolFilter<"ProgramAccess"> | boolean
+    redeemedAt?: DateTimeNullableFilter<"ProgramAccess"> | Date | string | null
+    reissueCount?: IntFilter<"ProgramAccess"> | number
+    createdAt?: DateTimeFilter<"ProgramAccess"> | Date | string
+    updatedAt?: DateTimeFilter<"ProgramAccess"> | Date | string
+  }
+
+  export type BookingUpsertWithWhereUniqueWithoutInstructorInput = {
+    where: BookingWhereUniqueInput
+    update: XOR<BookingUpdateWithoutInstructorInput, BookingUncheckedUpdateWithoutInstructorInput>
+    create: XOR<BookingCreateWithoutInstructorInput, BookingUncheckedCreateWithoutInstructorInput>
+  }
+
+  export type BookingUpdateWithWhereUniqueWithoutInstructorInput = {
+    where: BookingWhereUniqueInput
+    data: XOR<BookingUpdateWithoutInstructorInput, BookingUncheckedUpdateWithoutInstructorInput>
+  }
+
+  export type BookingUpdateManyWithWhereWithoutInstructorInput = {
+    where: BookingScalarWhereInput
+    data: XOR<BookingUpdateManyMutationInput, BookingUncheckedUpdateManyWithoutInstructorInput>
+  }
+
+  export type BookingScalarWhereInput = {
+    AND?: BookingScalarWhereInput | BookingScalarWhereInput[]
+    OR?: BookingScalarWhereInput[]
+    NOT?: BookingScalarWhereInput | BookingScalarWhereInput[]
+    id?: StringFilter<"Booking"> | string
+    kind?: StringFilter<"Booking"> | string
+    instructorId?: StringFilter<"Booking"> | string
+    coachUserId?: StringFilter<"Booking"> | string
+    clientUserId?: StringFilter<"Booking"> | string
+    listingId?: StringFilter<"Booking"> | string
+    status?: StringFilter<"Booking"> | string
+    durationMin?: IntNullableFilter<"Booking"> | number | null
+    priceCents?: IntFilter<"Booking"> | number
+    platformFeeCents?: IntFilter<"Booking"> | number
+    stripeFeeCents?: IntFilter<"Booking"> | number
+    refundCents?: IntFilter<"Booking"> | number
+    stripeCheckoutId?: StringNullableFilter<"Booking"> | string | null
+    stripePaymentIntentId?: StringNullableFilter<"Booking"> | string | null
+    holdExpiresAt?: DateTimeNullableFilter<"Booking"> | Date | string | null
+    startsAt?: DateTimeNullableFilter<"Booking"> | Date | string | null
+    endsAt?: DateTimeNullableFilter<"Booking"> | Date | string | null
+    slotLock?: StringNullableFilter<"Booking"> | string | null
+    clientTimeZone?: StringNullableFilter<"Booking"> | string | null
+    clientNote?: StringNullableFilter<"Booking"> | string | null
+    reschedulesUsed?: IntFilter<"Booking"> | number
+    connectionFailedAt?: DateTimeNullableFilter<"Booking"> | Date | string | null
+    failureCreditOpen?: BoolFilter<"Booking"> | boolean
+    shareWithCoach?: BoolFilter<"Booking"> | boolean
+    goal?: StringNullableFilter<"Booking"> | string | null
+    painYes?: BoolNullableFilter<"Booking"> | boolean | null
+    reviewNote?: StringNullableFilter<"Booking"> | string | null
+    clipPaths?: JsonNullableFilter<"Booking">
+    clipConsentAt?: DateTimeNullableFilter<"Booking"> | Date | string | null
+    consentTextVersion?: StringNullableFilter<"Booking"> | string | null
+    submittedAt?: DateTimeNullableFilter<"Booking"> | Date | string | null
+    dueAt?: DateTimeNullableFilter<"Booking"> | Date | string | null
+    replyText?: StringNullableFilter<"Booking"> | string | null
+    replyClipPath?: StringNullableFilter<"Booking"> | string | null
+    attachedDrillIds?: JsonNullableFilter<"Booking">
+    deliveredAt?: DateTimeNullableFilter<"Booking"> | Date | string | null
+    originalClipDeleteAt?: DateTimeNullableFilter<"Booking"> | Date | string | null
+    originalsDeletedAt?: DateTimeNullableFilter<"Booking"> | Date | string | null
+    cancelledAt?: DateTimeNullableFilter<"Booking"> | Date | string | null
+    cancelledBy?: StringNullableFilter<"Booking"> | string | null
+    createdAt?: DateTimeFilter<"Booking"> | Date | string
+    updatedAt?: DateTimeFilter<"Booking"> | Date | string
+  }
+
+  export type InstructorCreateWithoutProgramAccessInput = {
+    id?: string
+    userId: string
+    slug: string
+    displayName: string
+    headline?: string | null
+    bio?: string | null
+    certifications?: InstructorCreatecertificationsInput | string[]
+    specialties?: InstructorCreatespecialtiesInput | string[]
+    affiliationLine?: string | null
+    creatorCardId?: string | null
+    timeZone?: string
+    weeklyHours?: JsonNullValueInput | InputJsonValue
+    blackoutDates?: JsonNullValueInput | InputJsonValue
+    bufferMinutes?: number
+    minNoticeHours?: number
+    maxDaysAhead?: number
+    reviewSlaHours?: number
+    clientFullRefundHours?: number
+    refundBusinessDays?: number | null
+    businessMailingAddress?: string | null
+    published?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    bookings?: BookingCreateNestedManyWithoutInstructorInput
+  }
+
+  export type InstructorUncheckedCreateWithoutProgramAccessInput = {
+    id?: string
+    userId: string
+    slug: string
+    displayName: string
+    headline?: string | null
+    bio?: string | null
+    certifications?: InstructorCreatecertificationsInput | string[]
+    specialties?: InstructorCreatespecialtiesInput | string[]
+    affiliationLine?: string | null
+    creatorCardId?: string | null
+    timeZone?: string
+    weeklyHours?: JsonNullValueInput | InputJsonValue
+    blackoutDates?: JsonNullValueInput | InputJsonValue
+    bufferMinutes?: number
+    minNoticeHours?: number
+    maxDaysAhead?: number
+    reviewSlaHours?: number
+    clientFullRefundHours?: number
+    refundBusinessDays?: number | null
+    businessMailingAddress?: string | null
+    published?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    bookings?: BookingUncheckedCreateNestedManyWithoutInstructorInput
+  }
+
+  export type InstructorCreateOrConnectWithoutProgramAccessInput = {
+    where: InstructorWhereUniqueInput
+    create: XOR<InstructorCreateWithoutProgramAccessInput, InstructorUncheckedCreateWithoutProgramAccessInput>
+  }
+
+  export type InstructorUpsertWithoutProgramAccessInput = {
+    update: XOR<InstructorUpdateWithoutProgramAccessInput, InstructorUncheckedUpdateWithoutProgramAccessInput>
+    create: XOR<InstructorCreateWithoutProgramAccessInput, InstructorUncheckedCreateWithoutProgramAccessInput>
+    where?: InstructorWhereInput
+  }
+
+  export type InstructorUpdateToOneWithWhereWithoutProgramAccessInput = {
+    where?: InstructorWhereInput
+    data: XOR<InstructorUpdateWithoutProgramAccessInput, InstructorUncheckedUpdateWithoutProgramAccessInput>
+  }
+
+  export type InstructorUpdateWithoutProgramAccessInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    displayName?: StringFieldUpdateOperationsInput | string
+    headline?: NullableStringFieldUpdateOperationsInput | string | null
+    bio?: NullableStringFieldUpdateOperationsInput | string | null
+    certifications?: InstructorUpdatecertificationsInput | string[]
+    specialties?: InstructorUpdatespecialtiesInput | string[]
+    affiliationLine?: NullableStringFieldUpdateOperationsInput | string | null
+    creatorCardId?: NullableStringFieldUpdateOperationsInput | string | null
+    timeZone?: StringFieldUpdateOperationsInput | string
+    weeklyHours?: JsonNullValueInput | InputJsonValue
+    blackoutDates?: JsonNullValueInput | InputJsonValue
+    bufferMinutes?: IntFieldUpdateOperationsInput | number
+    minNoticeHours?: IntFieldUpdateOperationsInput | number
+    maxDaysAhead?: IntFieldUpdateOperationsInput | number
+    reviewSlaHours?: IntFieldUpdateOperationsInput | number
+    clientFullRefundHours?: IntFieldUpdateOperationsInput | number
+    refundBusinessDays?: NullableIntFieldUpdateOperationsInput | number | null
+    businessMailingAddress?: NullableStringFieldUpdateOperationsInput | string | null
+    published?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    bookings?: BookingUpdateManyWithoutInstructorNestedInput
+  }
+
+  export type InstructorUncheckedUpdateWithoutProgramAccessInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    displayName?: StringFieldUpdateOperationsInput | string
+    headline?: NullableStringFieldUpdateOperationsInput | string | null
+    bio?: NullableStringFieldUpdateOperationsInput | string | null
+    certifications?: InstructorUpdatecertificationsInput | string[]
+    specialties?: InstructorUpdatespecialtiesInput | string[]
+    affiliationLine?: NullableStringFieldUpdateOperationsInput | string | null
+    creatorCardId?: NullableStringFieldUpdateOperationsInput | string | null
+    timeZone?: StringFieldUpdateOperationsInput | string
+    weeklyHours?: JsonNullValueInput | InputJsonValue
+    blackoutDates?: JsonNullValueInput | InputJsonValue
+    bufferMinutes?: IntFieldUpdateOperationsInput | number
+    minNoticeHours?: IntFieldUpdateOperationsInput | number
+    maxDaysAhead?: IntFieldUpdateOperationsInput | number
+    reviewSlaHours?: IntFieldUpdateOperationsInput | number
+    clientFullRefundHours?: IntFieldUpdateOperationsInput | number
+    refundBusinessDays?: NullableIntFieldUpdateOperationsInput | number | null
+    businessMailingAddress?: NullableStringFieldUpdateOperationsInput | string | null
+    published?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    bookings?: BookingUncheckedUpdateManyWithoutInstructorNestedInput
+  }
+
+  export type InstructorCreateWithoutBookingsInput = {
+    id?: string
+    userId: string
+    slug: string
+    displayName: string
+    headline?: string | null
+    bio?: string | null
+    certifications?: InstructorCreatecertificationsInput | string[]
+    specialties?: InstructorCreatespecialtiesInput | string[]
+    affiliationLine?: string | null
+    creatorCardId?: string | null
+    timeZone?: string
+    weeklyHours?: JsonNullValueInput | InputJsonValue
+    blackoutDates?: JsonNullValueInput | InputJsonValue
+    bufferMinutes?: number
+    minNoticeHours?: number
+    maxDaysAhead?: number
+    reviewSlaHours?: number
+    clientFullRefundHours?: number
+    refundBusinessDays?: number | null
+    businessMailingAddress?: string | null
+    published?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    programAccess?: ProgramAccessCreateNestedManyWithoutInstructorInput
+  }
+
+  export type InstructorUncheckedCreateWithoutBookingsInput = {
+    id?: string
+    userId: string
+    slug: string
+    displayName: string
+    headline?: string | null
+    bio?: string | null
+    certifications?: InstructorCreatecertificationsInput | string[]
+    specialties?: InstructorCreatespecialtiesInput | string[]
+    affiliationLine?: string | null
+    creatorCardId?: string | null
+    timeZone?: string
+    weeklyHours?: JsonNullValueInput | InputJsonValue
+    blackoutDates?: JsonNullValueInput | InputJsonValue
+    bufferMinutes?: number
+    minNoticeHours?: number
+    maxDaysAhead?: number
+    reviewSlaHours?: number
+    clientFullRefundHours?: number
+    refundBusinessDays?: number | null
+    businessMailingAddress?: string | null
+    published?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    programAccess?: ProgramAccessUncheckedCreateNestedManyWithoutInstructorInput
+  }
+
+  export type InstructorCreateOrConnectWithoutBookingsInput = {
+    where: InstructorWhereUniqueInput
+    create: XOR<InstructorCreateWithoutBookingsInput, InstructorUncheckedCreateWithoutBookingsInput>
+  }
+
+  export type CallSignalCreateWithoutBookingInput = {
+    fromRole: string
+    epoch?: number
+    kind: string
+    payload: string
+    createdAt?: Date | string
+    expiresAt: Date | string
+  }
+
+  export type CallSignalUncheckedCreateWithoutBookingInput = {
+    id?: number
+    fromRole: string
+    epoch?: number
+    kind: string
+    payload: string
+    createdAt?: Date | string
+    expiresAt: Date | string
+  }
+
+  export type CallSignalCreateOrConnectWithoutBookingInput = {
+    where: CallSignalWhereUniqueInput
+    create: XOR<CallSignalCreateWithoutBookingInput, CallSignalUncheckedCreateWithoutBookingInput>
+  }
+
+  export type CallSignalCreateManyBookingInputEnvelope = {
+    data: CallSignalCreateManyBookingInput | CallSignalCreateManyBookingInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type InstructorUpsertWithoutBookingsInput = {
+    update: XOR<InstructorUpdateWithoutBookingsInput, InstructorUncheckedUpdateWithoutBookingsInput>
+    create: XOR<InstructorCreateWithoutBookingsInput, InstructorUncheckedCreateWithoutBookingsInput>
+    where?: InstructorWhereInput
+  }
+
+  export type InstructorUpdateToOneWithWhereWithoutBookingsInput = {
+    where?: InstructorWhereInput
+    data: XOR<InstructorUpdateWithoutBookingsInput, InstructorUncheckedUpdateWithoutBookingsInput>
+  }
+
+  export type InstructorUpdateWithoutBookingsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    displayName?: StringFieldUpdateOperationsInput | string
+    headline?: NullableStringFieldUpdateOperationsInput | string | null
+    bio?: NullableStringFieldUpdateOperationsInput | string | null
+    certifications?: InstructorUpdatecertificationsInput | string[]
+    specialties?: InstructorUpdatespecialtiesInput | string[]
+    affiliationLine?: NullableStringFieldUpdateOperationsInput | string | null
+    creatorCardId?: NullableStringFieldUpdateOperationsInput | string | null
+    timeZone?: StringFieldUpdateOperationsInput | string
+    weeklyHours?: JsonNullValueInput | InputJsonValue
+    blackoutDates?: JsonNullValueInput | InputJsonValue
+    bufferMinutes?: IntFieldUpdateOperationsInput | number
+    minNoticeHours?: IntFieldUpdateOperationsInput | number
+    maxDaysAhead?: IntFieldUpdateOperationsInput | number
+    reviewSlaHours?: IntFieldUpdateOperationsInput | number
+    clientFullRefundHours?: IntFieldUpdateOperationsInput | number
+    refundBusinessDays?: NullableIntFieldUpdateOperationsInput | number | null
+    businessMailingAddress?: NullableStringFieldUpdateOperationsInput | string | null
+    published?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    programAccess?: ProgramAccessUpdateManyWithoutInstructorNestedInput
+  }
+
+  export type InstructorUncheckedUpdateWithoutBookingsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    displayName?: StringFieldUpdateOperationsInput | string
+    headline?: NullableStringFieldUpdateOperationsInput | string | null
+    bio?: NullableStringFieldUpdateOperationsInput | string | null
+    certifications?: InstructorUpdatecertificationsInput | string[]
+    specialties?: InstructorUpdatespecialtiesInput | string[]
+    affiliationLine?: NullableStringFieldUpdateOperationsInput | string | null
+    creatorCardId?: NullableStringFieldUpdateOperationsInput | string | null
+    timeZone?: StringFieldUpdateOperationsInput | string
+    weeklyHours?: JsonNullValueInput | InputJsonValue
+    blackoutDates?: JsonNullValueInput | InputJsonValue
+    bufferMinutes?: IntFieldUpdateOperationsInput | number
+    minNoticeHours?: IntFieldUpdateOperationsInput | number
+    maxDaysAhead?: IntFieldUpdateOperationsInput | number
+    reviewSlaHours?: IntFieldUpdateOperationsInput | number
+    clientFullRefundHours?: IntFieldUpdateOperationsInput | number
+    refundBusinessDays?: NullableIntFieldUpdateOperationsInput | number | null
+    businessMailingAddress?: NullableStringFieldUpdateOperationsInput | string | null
+    published?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    programAccess?: ProgramAccessUncheckedUpdateManyWithoutInstructorNestedInput
+  }
+
+  export type CallSignalUpsertWithWhereUniqueWithoutBookingInput = {
+    where: CallSignalWhereUniqueInput
+    update: XOR<CallSignalUpdateWithoutBookingInput, CallSignalUncheckedUpdateWithoutBookingInput>
+    create: XOR<CallSignalCreateWithoutBookingInput, CallSignalUncheckedCreateWithoutBookingInput>
+  }
+
+  export type CallSignalUpdateWithWhereUniqueWithoutBookingInput = {
+    where: CallSignalWhereUniqueInput
+    data: XOR<CallSignalUpdateWithoutBookingInput, CallSignalUncheckedUpdateWithoutBookingInput>
+  }
+
+  export type CallSignalUpdateManyWithWhereWithoutBookingInput = {
+    where: CallSignalScalarWhereInput
+    data: XOR<CallSignalUpdateManyMutationInput, CallSignalUncheckedUpdateManyWithoutBookingInput>
+  }
+
+  export type CallSignalScalarWhereInput = {
+    AND?: CallSignalScalarWhereInput | CallSignalScalarWhereInput[]
+    OR?: CallSignalScalarWhereInput[]
+    NOT?: CallSignalScalarWhereInput | CallSignalScalarWhereInput[]
+    id?: IntFilter<"CallSignal"> | number
+    bookingId?: StringFilter<"CallSignal"> | string
+    fromRole?: StringFilter<"CallSignal"> | string
+    epoch?: IntFilter<"CallSignal"> | number
+    kind?: StringFilter<"CallSignal"> | string
+    payload?: StringFilter<"CallSignal"> | string
+    createdAt?: DateTimeFilter<"CallSignal"> | Date | string
+    expiresAt?: DateTimeFilter<"CallSignal"> | Date | string
+  }
+
+  export type BookingCreateWithoutSignalsInput = {
+    id?: string
+    kind: string
+    coachUserId: string
+    clientUserId: string
+    listingId: string
+    status?: string
+    durationMin?: number | null
+    priceCents: number
+    platformFeeCents?: number
+    stripeFeeCents?: number
+    refundCents?: number
+    stripeCheckoutId?: string | null
+    stripePaymentIntentId?: string | null
+    holdExpiresAt?: Date | string | null
+    startsAt?: Date | string | null
+    endsAt?: Date | string | null
+    slotLock?: string | null
+    clientTimeZone?: string | null
+    clientNote?: string | null
+    reschedulesUsed?: number
+    connectionFailedAt?: Date | string | null
+    failureCreditOpen?: boolean
+    shareWithCoach?: boolean
+    goal?: string | null
+    painYes?: boolean | null
+    reviewNote?: string | null
+    clipPaths?: NullableJsonNullValueInput | InputJsonValue
+    clipConsentAt?: Date | string | null
+    consentTextVersion?: string | null
+    submittedAt?: Date | string | null
+    dueAt?: Date | string | null
+    replyText?: string | null
+    replyClipPath?: string | null
+    attachedDrillIds?: NullableJsonNullValueInput | InputJsonValue
+    deliveredAt?: Date | string | null
+    originalClipDeleteAt?: Date | string | null
+    originalsDeletedAt?: Date | string | null
+    cancelledAt?: Date | string | null
+    cancelledBy?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    instructor: InstructorCreateNestedOneWithoutBookingsInput
+  }
+
+  export type BookingUncheckedCreateWithoutSignalsInput = {
+    id?: string
+    kind: string
+    instructorId: string
+    coachUserId: string
+    clientUserId: string
+    listingId: string
+    status?: string
+    durationMin?: number | null
+    priceCents: number
+    platformFeeCents?: number
+    stripeFeeCents?: number
+    refundCents?: number
+    stripeCheckoutId?: string | null
+    stripePaymentIntentId?: string | null
+    holdExpiresAt?: Date | string | null
+    startsAt?: Date | string | null
+    endsAt?: Date | string | null
+    slotLock?: string | null
+    clientTimeZone?: string | null
+    clientNote?: string | null
+    reschedulesUsed?: number
+    connectionFailedAt?: Date | string | null
+    failureCreditOpen?: boolean
+    shareWithCoach?: boolean
+    goal?: string | null
+    painYes?: boolean | null
+    reviewNote?: string | null
+    clipPaths?: NullableJsonNullValueInput | InputJsonValue
+    clipConsentAt?: Date | string | null
+    consentTextVersion?: string | null
+    submittedAt?: Date | string | null
+    dueAt?: Date | string | null
+    replyText?: string | null
+    replyClipPath?: string | null
+    attachedDrillIds?: NullableJsonNullValueInput | InputJsonValue
+    deliveredAt?: Date | string | null
+    originalClipDeleteAt?: Date | string | null
+    originalsDeletedAt?: Date | string | null
+    cancelledAt?: Date | string | null
+    cancelledBy?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type BookingCreateOrConnectWithoutSignalsInput = {
+    where: BookingWhereUniqueInput
+    create: XOR<BookingCreateWithoutSignalsInput, BookingUncheckedCreateWithoutSignalsInput>
+  }
+
+  export type BookingUpsertWithoutSignalsInput = {
+    update: XOR<BookingUpdateWithoutSignalsInput, BookingUncheckedUpdateWithoutSignalsInput>
+    create: XOR<BookingCreateWithoutSignalsInput, BookingUncheckedCreateWithoutSignalsInput>
+    where?: BookingWhereInput
+  }
+
+  export type BookingUpdateToOneWithWhereWithoutSignalsInput = {
+    where?: BookingWhereInput
+    data: XOR<BookingUpdateWithoutSignalsInput, BookingUncheckedUpdateWithoutSignalsInput>
+  }
+
+  export type BookingUpdateWithoutSignalsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    kind?: StringFieldUpdateOperationsInput | string
+    coachUserId?: StringFieldUpdateOperationsInput | string
+    clientUserId?: StringFieldUpdateOperationsInput | string
+    listingId?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    durationMin?: NullableIntFieldUpdateOperationsInput | number | null
+    priceCents?: IntFieldUpdateOperationsInput | number
+    platformFeeCents?: IntFieldUpdateOperationsInput | number
+    stripeFeeCents?: IntFieldUpdateOperationsInput | number
+    refundCents?: IntFieldUpdateOperationsInput | number
+    stripeCheckoutId?: NullableStringFieldUpdateOperationsInput | string | null
+    stripePaymentIntentId?: NullableStringFieldUpdateOperationsInput | string | null
+    holdExpiresAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    startsAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    endsAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    slotLock?: NullableStringFieldUpdateOperationsInput | string | null
+    clientTimeZone?: NullableStringFieldUpdateOperationsInput | string | null
+    clientNote?: NullableStringFieldUpdateOperationsInput | string | null
+    reschedulesUsed?: IntFieldUpdateOperationsInput | number
+    connectionFailedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    failureCreditOpen?: BoolFieldUpdateOperationsInput | boolean
+    shareWithCoach?: BoolFieldUpdateOperationsInput | boolean
+    goal?: NullableStringFieldUpdateOperationsInput | string | null
+    painYes?: NullableBoolFieldUpdateOperationsInput | boolean | null
+    reviewNote?: NullableStringFieldUpdateOperationsInput | string | null
+    clipPaths?: NullableJsonNullValueInput | InputJsonValue
+    clipConsentAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    consentTextVersion?: NullableStringFieldUpdateOperationsInput | string | null
+    submittedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    dueAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    replyText?: NullableStringFieldUpdateOperationsInput | string | null
+    replyClipPath?: NullableStringFieldUpdateOperationsInput | string | null
+    attachedDrillIds?: NullableJsonNullValueInput | InputJsonValue
+    deliveredAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    originalClipDeleteAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    originalsDeletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    cancelledAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    cancelledBy?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    instructor?: InstructorUpdateOneRequiredWithoutBookingsNestedInput
+  }
+
+  export type BookingUncheckedUpdateWithoutSignalsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    kind?: StringFieldUpdateOperationsInput | string
+    instructorId?: StringFieldUpdateOperationsInput | string
+    coachUserId?: StringFieldUpdateOperationsInput | string
+    clientUserId?: StringFieldUpdateOperationsInput | string
+    listingId?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    durationMin?: NullableIntFieldUpdateOperationsInput | number | null
+    priceCents?: IntFieldUpdateOperationsInput | number
+    platformFeeCents?: IntFieldUpdateOperationsInput | number
+    stripeFeeCents?: IntFieldUpdateOperationsInput | number
+    refundCents?: IntFieldUpdateOperationsInput | number
+    stripeCheckoutId?: NullableStringFieldUpdateOperationsInput | string | null
+    stripePaymentIntentId?: NullableStringFieldUpdateOperationsInput | string | null
+    holdExpiresAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    startsAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    endsAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    slotLock?: NullableStringFieldUpdateOperationsInput | string | null
+    clientTimeZone?: NullableStringFieldUpdateOperationsInput | string | null
+    clientNote?: NullableStringFieldUpdateOperationsInput | string | null
+    reschedulesUsed?: IntFieldUpdateOperationsInput | number
+    connectionFailedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    failureCreditOpen?: BoolFieldUpdateOperationsInput | boolean
+    shareWithCoach?: BoolFieldUpdateOperationsInput | boolean
+    goal?: NullableStringFieldUpdateOperationsInput | string | null
+    painYes?: NullableBoolFieldUpdateOperationsInput | boolean | null
+    reviewNote?: NullableStringFieldUpdateOperationsInput | string | null
+    clipPaths?: NullableJsonNullValueInput | InputJsonValue
+    clipConsentAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    consentTextVersion?: NullableStringFieldUpdateOperationsInput | string | null
+    submittedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    dueAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    replyText?: NullableStringFieldUpdateOperationsInput | string | null
+    replyClipPath?: NullableStringFieldUpdateOperationsInput | string | null
+    attachedDrillIds?: NullableJsonNullValueInput | InputJsonValue
+    deliveredAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    originalClipDeleteAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    originalsDeletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    cancelledAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    cancelledBy?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type UserCreateWithoutAdventureSaveInput = {
+    id?: string
+    email: string
+    name?: string | null
+    password: string
+    role?: string
+    createdAt?: Date | string
+    dobYear?: number | null
+    kycStatus?: string
+    kycProvider?: string | null
+    kycVerifiedAt?: Date | string | null
+    selfExcludedAt?: Date | string | null
+    declaredState?: string | null
+    policyVersion?: string | null
+    policyAcceptedAt?: Date | string | null
+    profile?: PlayerProfileCreateNestedOneWithoutUserInput
+    sessions?: GameSessionCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantCreateNestedManyWithoutUserInput
+    ledger?: CreditLedgerCreateNestedManyWithoutUserInput
+    cards?: CardOwnershipCreateNestedManyWithoutUserInput
+    prqEntries?: PrqEntryCreateNestedManyWithoutUserInput
+    lessons?: LessonProgressCreateNestedManyWithoutUserInput
+    storyProgress?: StoryNodeProgressCreateNestedManyWithoutUserInput
+    cellProjects?: CellProjectCreateNestedManyWithoutUserInput
+    cellApiKeys?: CellApiKeyCreateNestedManyWithoutUserInput
+    cellSettings?: CellSettingsCreateNestedOneWithoutUserInput
+    athleteBuild?: AthleteBuildCreateNestedOneWithoutUserInput
+    stripeCustomer?: StripeCustomerCreateNestedOneWithoutUserInput
+    subscriptions?: SubscriptionCreateNestedManyWithoutUserInput
+    mirrorSessions?: MirrorSessionCreateNestedManyWithoutUserInput
+    orders?: OrderCreateNestedManyWithoutUserInput
+    payoutRequests?: PayoutRequestCreateNestedManyWithoutUserInput
+    creatorListings?: MarketplaceListingCreateNestedManyWithoutCreatorInput
+    buyerPurchases?: MarketplacePurchaseCreateNestedManyWithoutBuyerInput
+    coachShares?: ShareLinkCreateNestedManyWithoutCoachInput
+    coachInvites?: CoachInviteCreateNestedManyWithoutCoachInput
+    clientsCoached?: CoachClientCreateNestedManyWithoutCoachInput
+    coaches?: CoachClientCreateNestedManyWithoutClientInput
+    ladderEntries?: LadderEntryCreateNestedManyWithoutUserInput
+    partnerKeys?: StudioPartnerKeyCreateNestedManyWithoutUserInput
+    competitionMatchesP1?: CompetitionMatchCreateNestedManyWithoutPlayer1Input
+    competitionMatchesP2?: CompetitionMatchCreateNestedManyWithoutPlayer2Input
+    competitionMatchesWinner?: CompetitionMatchCreateNestedManyWithoutWinnerInput
+    matchEvents?: MatchEventCreateNestedManyWithoutUserInput
+    mirrorTriumphs?: MirrorTriumphCreateNestedManyWithoutUserInput
+    wallet?: WalletCreateNestedOneWithoutPlayerInput
+    perfEarnEvents?: PerfEarnEventCreateNestedManyWithoutPlayerInput
+    entitlements?: PlayerEntitlementCreateNestedManyWithoutPlayerInput
+    leadRecord?: MarketingLeadCreateNestedOneWithoutConvertedUserInput
+    referralCode?: ReferralCodeCreateNestedOneWithoutUserInput
+    mpMatchesHost?: MpMatchCreateNestedManyWithoutHostInput
+    mpMatchesGuest?: MpMatchCreateNestedManyWithoutGuestInput
+    creatorCards?: CreatorCardCreateNestedManyWithoutOwnerInput
+    creativeCards?: CreativeCardCreateNestedManyWithoutOwnerInput
+    cardSlot?: CardSlotCreateNestedOneWithoutUserInput
+    workoutScans?: WorkoutScanCreateNestedManyWithoutUserInput
+    workoutPlans?: WorkoutPlanCreateNestedManyWithoutUserInput
+    avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
+    ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
+    sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
+    facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
+    goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
+    goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
+    credentials?: CredentialCreateNestedManyWithoutUserInput
+    guardianConsents?: GuardianConsentCreateNestedManyWithoutMenteeInput
+    healthIntakes?: HealthIntakeCreateNestedManyWithoutUserInput
+    painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
+    healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
+    readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
+    crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
+    crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
+    crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
+    crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
+    crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+  }
+
+  export type UserUncheckedCreateWithoutAdventureSaveInput = {
+    id?: string
+    email: string
+    name?: string | null
+    password: string
+    role?: string
+    createdAt?: Date | string
+    dobYear?: number | null
+    kycStatus?: string
+    kycProvider?: string | null
+    kycVerifiedAt?: Date | string | null
+    selfExcludedAt?: Date | string | null
+    declaredState?: string | null
+    policyVersion?: string | null
+    policyAcceptedAt?: Date | string | null
+    profile?: PlayerProfileUncheckedCreateNestedOneWithoutUserInput
+    sessions?: GameSessionUncheckedCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunUncheckedCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantUncheckedCreateNestedManyWithoutUserInput
+    ledger?: CreditLedgerUncheckedCreateNestedManyWithoutUserInput
+    cards?: CardOwnershipUncheckedCreateNestedManyWithoutUserInput
+    prqEntries?: PrqEntryUncheckedCreateNestedManyWithoutUserInput
+    lessons?: LessonProgressUncheckedCreateNestedManyWithoutUserInput
+    storyProgress?: StoryNodeProgressUncheckedCreateNestedManyWithoutUserInput
+    cellProjects?: CellProjectUncheckedCreateNestedManyWithoutUserInput
+    cellApiKeys?: CellApiKeyUncheckedCreateNestedManyWithoutUserInput
+    cellSettings?: CellSettingsUncheckedCreateNestedOneWithoutUserInput
+    athleteBuild?: AthleteBuildUncheckedCreateNestedOneWithoutUserInput
+    stripeCustomer?: StripeCustomerUncheckedCreateNestedOneWithoutUserInput
+    subscriptions?: SubscriptionUncheckedCreateNestedManyWithoutUserInput
+    mirrorSessions?: MirrorSessionUncheckedCreateNestedManyWithoutUserInput
+    orders?: OrderUncheckedCreateNestedManyWithoutUserInput
+    payoutRequests?: PayoutRequestUncheckedCreateNestedManyWithoutUserInput
+    creatorListings?: MarketplaceListingUncheckedCreateNestedManyWithoutCreatorInput
+    buyerPurchases?: MarketplacePurchaseUncheckedCreateNestedManyWithoutBuyerInput
+    coachShares?: ShareLinkUncheckedCreateNestedManyWithoutCoachInput
+    coachInvites?: CoachInviteUncheckedCreateNestedManyWithoutCoachInput
+    clientsCoached?: CoachClientUncheckedCreateNestedManyWithoutCoachInput
+    coaches?: CoachClientUncheckedCreateNestedManyWithoutClientInput
+    ladderEntries?: LadderEntryUncheckedCreateNestedManyWithoutUserInput
+    partnerKeys?: StudioPartnerKeyUncheckedCreateNestedManyWithoutUserInput
+    competitionMatchesP1?: CompetitionMatchUncheckedCreateNestedManyWithoutPlayer1Input
+    competitionMatchesP2?: CompetitionMatchUncheckedCreateNestedManyWithoutPlayer2Input
+    competitionMatchesWinner?: CompetitionMatchUncheckedCreateNestedManyWithoutWinnerInput
+    matchEvents?: MatchEventUncheckedCreateNestedManyWithoutUserInput
+    mirrorTriumphs?: MirrorTriumphUncheckedCreateNestedManyWithoutUserInput
+    wallet?: WalletUncheckedCreateNestedOneWithoutPlayerInput
+    perfEarnEvents?: PerfEarnEventUncheckedCreateNestedManyWithoutPlayerInput
+    entitlements?: PlayerEntitlementUncheckedCreateNestedManyWithoutPlayerInput
+    leadRecord?: MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput
+    referralCode?: ReferralCodeUncheckedCreateNestedOneWithoutUserInput
+    mpMatchesHost?: MpMatchUncheckedCreateNestedManyWithoutHostInput
+    mpMatchesGuest?: MpMatchUncheckedCreateNestedManyWithoutGuestInput
+    creatorCards?: CreatorCardUncheckedCreateNestedManyWithoutOwnerInput
+    creativeCards?: CreativeCardUncheckedCreateNestedManyWithoutOwnerInput
+    cardSlot?: CardSlotUncheckedCreateNestedOneWithoutUserInput
+    workoutScans?: WorkoutScanUncheckedCreateNestedManyWithoutUserInput
+    workoutPlans?: WorkoutPlanUncheckedCreateNestedManyWithoutUserInput
+    avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
+    ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
+    sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
+    facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
+    goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
+    goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
+    credentials?: CredentialUncheckedCreateNestedManyWithoutUserInput
+    guardianConsents?: GuardianConsentUncheckedCreateNestedManyWithoutMenteeInput
+    healthIntakes?: HealthIntakeUncheckedCreateNestedManyWithoutUserInput
+    painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
+    healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
+    readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
+    crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
+    crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
+    crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
+    crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
+    crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+  }
+
+  export type UserCreateOrConnectWithoutAdventureSaveInput = {
+    where: UserWhereUniqueInput
+    create: XOR<UserCreateWithoutAdventureSaveInput, UserUncheckedCreateWithoutAdventureSaveInput>
+  }
+
+  export type UserUpsertWithoutAdventureSaveInput = {
+    update: XOR<UserUpdateWithoutAdventureSaveInput, UserUncheckedUpdateWithoutAdventureSaveInput>
+    create: XOR<UserCreateWithoutAdventureSaveInput, UserUncheckedCreateWithoutAdventureSaveInput>
+    where?: UserWhereInput
+  }
+
+  export type UserUpdateToOneWithWhereWithoutAdventureSaveInput = {
+    where?: UserWhereInput
+    data: XOR<UserUpdateWithoutAdventureSaveInput, UserUncheckedUpdateWithoutAdventureSaveInput>
+  }
+
+  export type UserUpdateWithoutAdventureSaveInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    name?: NullableStringFieldUpdateOperationsInput | string | null
+    password?: StringFieldUpdateOperationsInput | string
+    role?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    dobYear?: NullableIntFieldUpdateOperationsInput | number | null
+    kycStatus?: StringFieldUpdateOperationsInput | string
+    kycProvider?: NullableStringFieldUpdateOperationsInput | string | null
+    kycVerifiedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    selfExcludedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    declaredState?: NullableStringFieldUpdateOperationsInput | string | null
+    policyVersion?: NullableStringFieldUpdateOperationsInput | string | null
+    policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    profile?: PlayerProfileUpdateOneWithoutUserNestedInput
+    sessions?: GameSessionUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUpdateManyWithoutUserNestedInput
+    ledger?: CreditLedgerUpdateManyWithoutUserNestedInput
+    cards?: CardOwnershipUpdateManyWithoutUserNestedInput
+    prqEntries?: PrqEntryUpdateManyWithoutUserNestedInput
+    lessons?: LessonProgressUpdateManyWithoutUserNestedInput
+    storyProgress?: StoryNodeProgressUpdateManyWithoutUserNestedInput
+    cellProjects?: CellProjectUpdateManyWithoutUserNestedInput
+    cellApiKeys?: CellApiKeyUpdateManyWithoutUserNestedInput
+    cellSettings?: CellSettingsUpdateOneWithoutUserNestedInput
+    athleteBuild?: AthleteBuildUpdateOneWithoutUserNestedInput
+    stripeCustomer?: StripeCustomerUpdateOneWithoutUserNestedInput
+    subscriptions?: SubscriptionUpdateManyWithoutUserNestedInput
+    mirrorSessions?: MirrorSessionUpdateManyWithoutUserNestedInput
+    orders?: OrderUpdateManyWithoutUserNestedInput
+    payoutRequests?: PayoutRequestUpdateManyWithoutUserNestedInput
+    creatorListings?: MarketplaceListingUpdateManyWithoutCreatorNestedInput
+    buyerPurchases?: MarketplacePurchaseUpdateManyWithoutBuyerNestedInput
+    coachShares?: ShareLinkUpdateManyWithoutCoachNestedInput
+    coachInvites?: CoachInviteUpdateManyWithoutCoachNestedInput
+    clientsCoached?: CoachClientUpdateManyWithoutCoachNestedInput
+    coaches?: CoachClientUpdateManyWithoutClientNestedInput
+    ladderEntries?: LadderEntryUpdateManyWithoutUserNestedInput
+    partnerKeys?: StudioPartnerKeyUpdateManyWithoutUserNestedInput
+    competitionMatchesP1?: CompetitionMatchUpdateManyWithoutPlayer1NestedInput
+    competitionMatchesP2?: CompetitionMatchUpdateManyWithoutPlayer2NestedInput
+    competitionMatchesWinner?: CompetitionMatchUpdateManyWithoutWinnerNestedInput
+    matchEvents?: MatchEventUpdateManyWithoutUserNestedInput
+    mirrorTriumphs?: MirrorTriumphUpdateManyWithoutUserNestedInput
+    wallet?: WalletUpdateOneWithoutPlayerNestedInput
+    perfEarnEvents?: PerfEarnEventUpdateManyWithoutPlayerNestedInput
+    entitlements?: PlayerEntitlementUpdateManyWithoutPlayerNestedInput
+    leadRecord?: MarketingLeadUpdateOneWithoutConvertedUserNestedInput
+    referralCode?: ReferralCodeUpdateOneWithoutUserNestedInput
+    mpMatchesHost?: MpMatchUpdateManyWithoutHostNestedInput
+    mpMatchesGuest?: MpMatchUpdateManyWithoutGuestNestedInput
+    creatorCards?: CreatorCardUpdateManyWithoutOwnerNestedInput
+    creativeCards?: CreativeCardUpdateManyWithoutOwnerNestedInput
+    cardSlot?: CardSlotUpdateOneWithoutUserNestedInput
+    workoutScans?: WorkoutScanUpdateManyWithoutUserNestedInput
+    workoutPlans?: WorkoutPlanUpdateManyWithoutUserNestedInput
+    avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
+    ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
+    sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
+    facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
+    goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
+    goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
+    credentials?: CredentialUpdateManyWithoutUserNestedInput
+    guardianConsents?: GuardianConsentUpdateManyWithoutMenteeNestedInput
+    healthIntakes?: HealthIntakeUpdateManyWithoutUserNestedInput
+    painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
+    healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
+    readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
+    crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
+    crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
+    crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
+    crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
+    crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+  }
+
+  export type UserUncheckedUpdateWithoutAdventureSaveInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    name?: NullableStringFieldUpdateOperationsInput | string | null
+    password?: StringFieldUpdateOperationsInput | string
+    role?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    dobYear?: NullableIntFieldUpdateOperationsInput | number | null
+    kycStatus?: StringFieldUpdateOperationsInput | string
+    kycProvider?: NullableStringFieldUpdateOperationsInput | string | null
+    kycVerifiedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    selfExcludedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    declaredState?: NullableStringFieldUpdateOperationsInput | string | null
+    policyVersion?: NullableStringFieldUpdateOperationsInput | string | null
+    policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    profile?: PlayerProfileUncheckedUpdateOneWithoutUserNestedInput
+    sessions?: GameSessionUncheckedUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUncheckedUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUncheckedUpdateManyWithoutUserNestedInput
+    ledger?: CreditLedgerUncheckedUpdateManyWithoutUserNestedInput
+    cards?: CardOwnershipUncheckedUpdateManyWithoutUserNestedInput
+    prqEntries?: PrqEntryUncheckedUpdateManyWithoutUserNestedInput
+    lessons?: LessonProgressUncheckedUpdateManyWithoutUserNestedInput
+    storyProgress?: StoryNodeProgressUncheckedUpdateManyWithoutUserNestedInput
+    cellProjects?: CellProjectUncheckedUpdateManyWithoutUserNestedInput
+    cellApiKeys?: CellApiKeyUncheckedUpdateManyWithoutUserNestedInput
+    cellSettings?: CellSettingsUncheckedUpdateOneWithoutUserNestedInput
+    athleteBuild?: AthleteBuildUncheckedUpdateOneWithoutUserNestedInput
+    stripeCustomer?: StripeCustomerUncheckedUpdateOneWithoutUserNestedInput
+    subscriptions?: SubscriptionUncheckedUpdateManyWithoutUserNestedInput
+    mirrorSessions?: MirrorSessionUncheckedUpdateManyWithoutUserNestedInput
+    orders?: OrderUncheckedUpdateManyWithoutUserNestedInput
+    payoutRequests?: PayoutRequestUncheckedUpdateManyWithoutUserNestedInput
+    creatorListings?: MarketplaceListingUncheckedUpdateManyWithoutCreatorNestedInput
+    buyerPurchases?: MarketplacePurchaseUncheckedUpdateManyWithoutBuyerNestedInput
+    coachShares?: ShareLinkUncheckedUpdateManyWithoutCoachNestedInput
+    coachInvites?: CoachInviteUncheckedUpdateManyWithoutCoachNestedInput
+    clientsCoached?: CoachClientUncheckedUpdateManyWithoutCoachNestedInput
+    coaches?: CoachClientUncheckedUpdateManyWithoutClientNestedInput
+    ladderEntries?: LadderEntryUncheckedUpdateManyWithoutUserNestedInput
+    partnerKeys?: StudioPartnerKeyUncheckedUpdateManyWithoutUserNestedInput
+    competitionMatchesP1?: CompetitionMatchUncheckedUpdateManyWithoutPlayer1NestedInput
+    competitionMatchesP2?: CompetitionMatchUncheckedUpdateManyWithoutPlayer2NestedInput
+    competitionMatchesWinner?: CompetitionMatchUncheckedUpdateManyWithoutWinnerNestedInput
+    matchEvents?: MatchEventUncheckedUpdateManyWithoutUserNestedInput
+    mirrorTriumphs?: MirrorTriumphUncheckedUpdateManyWithoutUserNestedInput
+    wallet?: WalletUncheckedUpdateOneWithoutPlayerNestedInput
+    perfEarnEvents?: PerfEarnEventUncheckedUpdateManyWithoutPlayerNestedInput
+    entitlements?: PlayerEntitlementUncheckedUpdateManyWithoutPlayerNestedInput
+    leadRecord?: MarketingLeadUncheckedUpdateOneWithoutConvertedUserNestedInput
+    referralCode?: ReferralCodeUncheckedUpdateOneWithoutUserNestedInput
+    mpMatchesHost?: MpMatchUncheckedUpdateManyWithoutHostNestedInput
+    mpMatchesGuest?: MpMatchUncheckedUpdateManyWithoutGuestNestedInput
+    creatorCards?: CreatorCardUncheckedUpdateManyWithoutOwnerNestedInput
+    creativeCards?: CreativeCardUncheckedUpdateManyWithoutOwnerNestedInput
+    cardSlot?: CardSlotUncheckedUpdateOneWithoutUserNestedInput
+    workoutScans?: WorkoutScanUncheckedUpdateManyWithoutUserNestedInput
+    workoutPlans?: WorkoutPlanUncheckedUpdateManyWithoutUserNestedInput
+    avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
+    ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
+    sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
     facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
     goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
     goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
@@ -179137,6 +195458,7 @@ export namespace Prisma {
     endedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     client?: UserUpdateOneRequiredWithoutCoachesNestedInput
+    availability?: CoachAvailabilityUpdateOneWithoutLinkNestedInput
   }
 
   export type CoachClientUncheckedUpdateWithoutCoachInput = {
@@ -179145,6 +195467,7 @@ export namespace Prisma {
     via?: StringFieldUpdateOperationsInput | string
     endedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    availability?: CoachAvailabilityUncheckedUpdateOneWithoutLinkNestedInput
   }
 
   export type CoachClientUncheckedUpdateManyWithoutCoachInput = {
@@ -179161,6 +195484,7 @@ export namespace Prisma {
     endedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     coach?: UserUpdateOneRequiredWithoutClientsCoachedNestedInput
+    availability?: CoachAvailabilityUpdateOneWithoutLinkNestedInput
   }
 
   export type CoachClientUncheckedUpdateWithoutClientInput = {
@@ -179169,6 +195493,7 @@ export namespace Prisma {
     via?: StringFieldUpdateOperationsInput | string
     endedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    availability?: CoachAvailabilityUncheckedUpdateOneWithoutLinkNestedInput
   }
 
   export type CoachClientUncheckedUpdateManyWithoutClientInput = {
@@ -181675,6 +198000,7 @@ export namespace Prisma {
     authorId: string
     body: string
     createdAt?: Date | string
+    readAt?: Date | string | null
   }
 
   export type BlockUpdateWithoutProgramInput = {
@@ -181743,6 +198069,7 @@ export namespace Prisma {
     authorId?: StringFieldUpdateOperationsInput | string
     body?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    readAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   }
 
   export type ProgramMessageUncheckedUpdateWithoutProgramInput = {
@@ -181750,6 +198077,7 @@ export namespace Prisma {
     authorId?: StringFieldUpdateOperationsInput | string
     body?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    readAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   }
 
   export type ProgramMessageUncheckedUpdateManyWithoutProgramInput = {
@@ -181757,6 +198085,7 @@ export namespace Prisma {
     authorId?: StringFieldUpdateOperationsInput | string
     body?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    readAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   }
 
   export type SessionCreateManyBlockInput = {
@@ -182359,6 +198688,347 @@ export namespace Prisma {
     resiliency?: NullableJsonNullValueInput | InputJsonValue
     notes?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ProgramAccessCreateManyInstructorInput = {
+    id?: string
+    userId: string
+    listingId: string
+    lane: string
+    billing: string
+    scope?: string
+    beneficiary?: string
+    status?: string
+    priceCents: number
+    platformFeeCents?: number
+    stripeFeeCents?: number
+    reviewCredits?: number
+    lastCreditInvoiceId?: string | null
+    stripeCheckoutId?: string | null
+    stripeSubscriptionId?: string | null
+    stripePaymentIntentId?: string | null
+    accessUntil?: Date | string | null
+    cancelAtPeriodEnd?: boolean
+    coachingProgramId?: string | null
+    startedAt?: Date | string | null
+    nextRescreenAt?: Date | string | null
+    unlockCodeHash?: string | null
+    deviceTokenHash?: string | null
+    codeActive?: boolean
+    redeemedAt?: Date | string | null
+    reissueCount?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type BookingCreateManyInstructorInput = {
+    id?: string
+    kind: string
+    coachUserId: string
+    clientUserId: string
+    listingId: string
+    status?: string
+    durationMin?: number | null
+    priceCents: number
+    platformFeeCents?: number
+    stripeFeeCents?: number
+    refundCents?: number
+    stripeCheckoutId?: string | null
+    stripePaymentIntentId?: string | null
+    holdExpiresAt?: Date | string | null
+    startsAt?: Date | string | null
+    endsAt?: Date | string | null
+    slotLock?: string | null
+    clientTimeZone?: string | null
+    clientNote?: string | null
+    reschedulesUsed?: number
+    connectionFailedAt?: Date | string | null
+    failureCreditOpen?: boolean
+    shareWithCoach?: boolean
+    goal?: string | null
+    painYes?: boolean | null
+    reviewNote?: string | null
+    clipPaths?: NullableJsonNullValueInput | InputJsonValue
+    clipConsentAt?: Date | string | null
+    consentTextVersion?: string | null
+    submittedAt?: Date | string | null
+    dueAt?: Date | string | null
+    replyText?: string | null
+    replyClipPath?: string | null
+    attachedDrillIds?: NullableJsonNullValueInput | InputJsonValue
+    deliveredAt?: Date | string | null
+    originalClipDeleteAt?: Date | string | null
+    originalsDeletedAt?: Date | string | null
+    cancelledAt?: Date | string | null
+    cancelledBy?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type ProgramAccessUpdateWithoutInstructorInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    listingId?: StringFieldUpdateOperationsInput | string
+    lane?: StringFieldUpdateOperationsInput | string
+    billing?: StringFieldUpdateOperationsInput | string
+    scope?: StringFieldUpdateOperationsInput | string
+    beneficiary?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    priceCents?: IntFieldUpdateOperationsInput | number
+    platformFeeCents?: IntFieldUpdateOperationsInput | number
+    stripeFeeCents?: IntFieldUpdateOperationsInput | number
+    reviewCredits?: IntFieldUpdateOperationsInput | number
+    lastCreditInvoiceId?: NullableStringFieldUpdateOperationsInput | string | null
+    stripeCheckoutId?: NullableStringFieldUpdateOperationsInput | string | null
+    stripeSubscriptionId?: NullableStringFieldUpdateOperationsInput | string | null
+    stripePaymentIntentId?: NullableStringFieldUpdateOperationsInput | string | null
+    accessUntil?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    cancelAtPeriodEnd?: BoolFieldUpdateOperationsInput | boolean
+    coachingProgramId?: NullableStringFieldUpdateOperationsInput | string | null
+    startedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    nextRescreenAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    unlockCodeHash?: NullableStringFieldUpdateOperationsInput | string | null
+    deviceTokenHash?: NullableStringFieldUpdateOperationsInput | string | null
+    codeActive?: BoolFieldUpdateOperationsInput | boolean
+    redeemedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    reissueCount?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ProgramAccessUncheckedUpdateWithoutInstructorInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    listingId?: StringFieldUpdateOperationsInput | string
+    lane?: StringFieldUpdateOperationsInput | string
+    billing?: StringFieldUpdateOperationsInput | string
+    scope?: StringFieldUpdateOperationsInput | string
+    beneficiary?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    priceCents?: IntFieldUpdateOperationsInput | number
+    platformFeeCents?: IntFieldUpdateOperationsInput | number
+    stripeFeeCents?: IntFieldUpdateOperationsInput | number
+    reviewCredits?: IntFieldUpdateOperationsInput | number
+    lastCreditInvoiceId?: NullableStringFieldUpdateOperationsInput | string | null
+    stripeCheckoutId?: NullableStringFieldUpdateOperationsInput | string | null
+    stripeSubscriptionId?: NullableStringFieldUpdateOperationsInput | string | null
+    stripePaymentIntentId?: NullableStringFieldUpdateOperationsInput | string | null
+    accessUntil?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    cancelAtPeriodEnd?: BoolFieldUpdateOperationsInput | boolean
+    coachingProgramId?: NullableStringFieldUpdateOperationsInput | string | null
+    startedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    nextRescreenAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    unlockCodeHash?: NullableStringFieldUpdateOperationsInput | string | null
+    deviceTokenHash?: NullableStringFieldUpdateOperationsInput | string | null
+    codeActive?: BoolFieldUpdateOperationsInput | boolean
+    redeemedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    reissueCount?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ProgramAccessUncheckedUpdateManyWithoutInstructorInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    listingId?: StringFieldUpdateOperationsInput | string
+    lane?: StringFieldUpdateOperationsInput | string
+    billing?: StringFieldUpdateOperationsInput | string
+    scope?: StringFieldUpdateOperationsInput | string
+    beneficiary?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    priceCents?: IntFieldUpdateOperationsInput | number
+    platformFeeCents?: IntFieldUpdateOperationsInput | number
+    stripeFeeCents?: IntFieldUpdateOperationsInput | number
+    reviewCredits?: IntFieldUpdateOperationsInput | number
+    lastCreditInvoiceId?: NullableStringFieldUpdateOperationsInput | string | null
+    stripeCheckoutId?: NullableStringFieldUpdateOperationsInput | string | null
+    stripeSubscriptionId?: NullableStringFieldUpdateOperationsInput | string | null
+    stripePaymentIntentId?: NullableStringFieldUpdateOperationsInput | string | null
+    accessUntil?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    cancelAtPeriodEnd?: BoolFieldUpdateOperationsInput | boolean
+    coachingProgramId?: NullableStringFieldUpdateOperationsInput | string | null
+    startedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    nextRescreenAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    unlockCodeHash?: NullableStringFieldUpdateOperationsInput | string | null
+    deviceTokenHash?: NullableStringFieldUpdateOperationsInput | string | null
+    codeActive?: BoolFieldUpdateOperationsInput | boolean
+    redeemedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    reissueCount?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type BookingUpdateWithoutInstructorInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    kind?: StringFieldUpdateOperationsInput | string
+    coachUserId?: StringFieldUpdateOperationsInput | string
+    clientUserId?: StringFieldUpdateOperationsInput | string
+    listingId?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    durationMin?: NullableIntFieldUpdateOperationsInput | number | null
+    priceCents?: IntFieldUpdateOperationsInput | number
+    platformFeeCents?: IntFieldUpdateOperationsInput | number
+    stripeFeeCents?: IntFieldUpdateOperationsInput | number
+    refundCents?: IntFieldUpdateOperationsInput | number
+    stripeCheckoutId?: NullableStringFieldUpdateOperationsInput | string | null
+    stripePaymentIntentId?: NullableStringFieldUpdateOperationsInput | string | null
+    holdExpiresAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    startsAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    endsAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    slotLock?: NullableStringFieldUpdateOperationsInput | string | null
+    clientTimeZone?: NullableStringFieldUpdateOperationsInput | string | null
+    clientNote?: NullableStringFieldUpdateOperationsInput | string | null
+    reschedulesUsed?: IntFieldUpdateOperationsInput | number
+    connectionFailedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    failureCreditOpen?: BoolFieldUpdateOperationsInput | boolean
+    shareWithCoach?: BoolFieldUpdateOperationsInput | boolean
+    goal?: NullableStringFieldUpdateOperationsInput | string | null
+    painYes?: NullableBoolFieldUpdateOperationsInput | boolean | null
+    reviewNote?: NullableStringFieldUpdateOperationsInput | string | null
+    clipPaths?: NullableJsonNullValueInput | InputJsonValue
+    clipConsentAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    consentTextVersion?: NullableStringFieldUpdateOperationsInput | string | null
+    submittedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    dueAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    replyText?: NullableStringFieldUpdateOperationsInput | string | null
+    replyClipPath?: NullableStringFieldUpdateOperationsInput | string | null
+    attachedDrillIds?: NullableJsonNullValueInput | InputJsonValue
+    deliveredAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    originalClipDeleteAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    originalsDeletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    cancelledAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    cancelledBy?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    signals?: CallSignalUpdateManyWithoutBookingNestedInput
+  }
+
+  export type BookingUncheckedUpdateWithoutInstructorInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    kind?: StringFieldUpdateOperationsInput | string
+    coachUserId?: StringFieldUpdateOperationsInput | string
+    clientUserId?: StringFieldUpdateOperationsInput | string
+    listingId?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    durationMin?: NullableIntFieldUpdateOperationsInput | number | null
+    priceCents?: IntFieldUpdateOperationsInput | number
+    platformFeeCents?: IntFieldUpdateOperationsInput | number
+    stripeFeeCents?: IntFieldUpdateOperationsInput | number
+    refundCents?: IntFieldUpdateOperationsInput | number
+    stripeCheckoutId?: NullableStringFieldUpdateOperationsInput | string | null
+    stripePaymentIntentId?: NullableStringFieldUpdateOperationsInput | string | null
+    holdExpiresAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    startsAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    endsAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    slotLock?: NullableStringFieldUpdateOperationsInput | string | null
+    clientTimeZone?: NullableStringFieldUpdateOperationsInput | string | null
+    clientNote?: NullableStringFieldUpdateOperationsInput | string | null
+    reschedulesUsed?: IntFieldUpdateOperationsInput | number
+    connectionFailedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    failureCreditOpen?: BoolFieldUpdateOperationsInput | boolean
+    shareWithCoach?: BoolFieldUpdateOperationsInput | boolean
+    goal?: NullableStringFieldUpdateOperationsInput | string | null
+    painYes?: NullableBoolFieldUpdateOperationsInput | boolean | null
+    reviewNote?: NullableStringFieldUpdateOperationsInput | string | null
+    clipPaths?: NullableJsonNullValueInput | InputJsonValue
+    clipConsentAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    consentTextVersion?: NullableStringFieldUpdateOperationsInput | string | null
+    submittedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    dueAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    replyText?: NullableStringFieldUpdateOperationsInput | string | null
+    replyClipPath?: NullableStringFieldUpdateOperationsInput | string | null
+    attachedDrillIds?: NullableJsonNullValueInput | InputJsonValue
+    deliveredAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    originalClipDeleteAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    originalsDeletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    cancelledAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    cancelledBy?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    signals?: CallSignalUncheckedUpdateManyWithoutBookingNestedInput
+  }
+
+  export type BookingUncheckedUpdateManyWithoutInstructorInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    kind?: StringFieldUpdateOperationsInput | string
+    coachUserId?: StringFieldUpdateOperationsInput | string
+    clientUserId?: StringFieldUpdateOperationsInput | string
+    listingId?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    durationMin?: NullableIntFieldUpdateOperationsInput | number | null
+    priceCents?: IntFieldUpdateOperationsInput | number
+    platformFeeCents?: IntFieldUpdateOperationsInput | number
+    stripeFeeCents?: IntFieldUpdateOperationsInput | number
+    refundCents?: IntFieldUpdateOperationsInput | number
+    stripeCheckoutId?: NullableStringFieldUpdateOperationsInput | string | null
+    stripePaymentIntentId?: NullableStringFieldUpdateOperationsInput | string | null
+    holdExpiresAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    startsAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    endsAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    slotLock?: NullableStringFieldUpdateOperationsInput | string | null
+    clientTimeZone?: NullableStringFieldUpdateOperationsInput | string | null
+    clientNote?: NullableStringFieldUpdateOperationsInput | string | null
+    reschedulesUsed?: IntFieldUpdateOperationsInput | number
+    connectionFailedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    failureCreditOpen?: BoolFieldUpdateOperationsInput | boolean
+    shareWithCoach?: BoolFieldUpdateOperationsInput | boolean
+    goal?: NullableStringFieldUpdateOperationsInput | string | null
+    painYes?: NullableBoolFieldUpdateOperationsInput | boolean | null
+    reviewNote?: NullableStringFieldUpdateOperationsInput | string | null
+    clipPaths?: NullableJsonNullValueInput | InputJsonValue
+    clipConsentAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    consentTextVersion?: NullableStringFieldUpdateOperationsInput | string | null
+    submittedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    dueAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    replyText?: NullableStringFieldUpdateOperationsInput | string | null
+    replyClipPath?: NullableStringFieldUpdateOperationsInput | string | null
+    attachedDrillIds?: NullableJsonNullValueInput | InputJsonValue
+    deliveredAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    originalClipDeleteAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    originalsDeletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    cancelledAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    cancelledBy?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type CallSignalCreateManyBookingInput = {
+    id?: number
+    fromRole: string
+    epoch?: number
+    kind: string
+    payload: string
+    createdAt?: Date | string
+    expiresAt: Date | string
+  }
+
+  export type CallSignalUpdateWithoutBookingInput = {
+    fromRole?: StringFieldUpdateOperationsInput | string
+    epoch?: IntFieldUpdateOperationsInput | number
+    kind?: StringFieldUpdateOperationsInput | string
+    payload?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    expiresAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type CallSignalUncheckedUpdateWithoutBookingInput = {
+    id?: IntFieldUpdateOperationsInput | number
+    fromRole?: StringFieldUpdateOperationsInput | string
+    epoch?: IntFieldUpdateOperationsInput | number
+    kind?: StringFieldUpdateOperationsInput | string
+    payload?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    expiresAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type CallSignalUncheckedUpdateManyWithoutBookingInput = {
+    id?: IntFieldUpdateOperationsInput | number
+    fromRole?: StringFieldUpdateOperationsInput | string
+    epoch?: IntFieldUpdateOperationsInput | number
+    kind?: StringFieldUpdateOperationsInput | string
+    payload?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    expiresAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
 

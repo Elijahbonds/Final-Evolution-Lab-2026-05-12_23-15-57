@@ -22,6 +22,29 @@ function accentFor(d: string): string {
   return (DISCIPLINE_META as Record<string, { color?: string }>)[d]?.color ?? '#00E5FF';
 }
 
+export function PathwayPanelError({ onRetry }: { onRetry?: () => void }) {
+  return (
+    <section className="rounded-2xl border border-amber-300/20 bg-amber-300/[0.06] p-5" data-guidance-error>
+      <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-amber-200/70">
+        Pathways paused
+      </p>
+      <h2 className="fel-heading mt-2 text-[20px] font-bold text-white">
+        We could not load your next-step ideas.
+      </h2>
+      <p className="mt-2 text-[13.5px] leading-relaxed text-white/60">
+        The counsellor still has a home here. Try again in a moment, or keep playing and come back when the signal clears.
+      </p>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="mt-4 rounded-full border border-white/12 bg-white/[0.06] px-4 py-2 text-[12px] font-bold uppercase tracking-[0.14em] text-white/75 transition hover:border-white/25 hover:text-white"
+      >
+        Try again
+      </button>
+    </section>
+  );
+}
+
 export function PathwayPanel() {
   const [data, setData] = useState<Payload | null>(null);
   const [failed, setFailed] = useState(false);
@@ -37,21 +60,7 @@ export function PathwayPanel() {
     return () => { live = false; };
   }, [attempt]);
 
-  if (failed) {
-    return (
-      <div className="rounded-2xl border border-[#FF3366]/30 bg-[#FF3366]/10 p-5 text-center">
-        <p className="font-mono text-sm font-bold text-[#FF9DB3]">Guidance is unavailable right now.</p>
-        <p className="mt-1 text-sm text-white/55">Your pathway suggestions are safe; refresh this panel when the server is reachable.</p>
-        <button
-          type="button"
-          onClick={() => setAttempt((n) => n + 1)}
-          className="mt-4 rounded-lg border border-[#FF9DB3]/50 px-4 py-2 font-mono text-xs text-[#FF9DB3] transition-colors hover:bg-[#FF9DB3]/10"
-        >
-          TRY AGAIN
-        </button>
-      </div>
-    );
-  }
+  if (failed) return <PathwayPanelError onRetry={() => window.location.reload()} />;
   if (!data) return <div className="h-40 animate-pulse rounded-2xl bg-white/[0.03]" />;
 
   return (

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { currentUserId, bad } from '@/lib/camp/server';
 import { accessRole, validateMessage } from '@/lib/coach/loop';
+import { decorateThread, threadReadStates, type RawDb } from '@/lib/coach/messageReads';
 
 async function programFor(programId: string, userId: string) {
   const p = await prisma.coachingProgram.findUnique({ where: { id: programId }, select: { id: true, coachId: true, clientId: true } });
@@ -11,15 +12,23 @@ async function programFor(programId: string, userId: string) {
   return { program: p };
 }
 
-/** GET /api/coach/messages?programId= — the coach ↔ client thread, oldest first (last 100). */
+/**
+ * GET /api/coach/messages?programId= — the coach ↔ client thread, oldest first (last 100).
+ * COACH-AI Phase 8 (2026-10-07): the newest 100, shown oldest first. It read `asc` + `take: 100`, which is the FIRST
+ * 100, so from the 101st message on a new message never appeared. With the read markers on (the pending SQL applied:
+ * lib/coach/messageReads.ts), each message carries `readAt` and `unread`, and `reads` is true; without them neither
+ * field is there and `reads` is false. Reading the thread does not mark it read: POST /api/coach/messages/read does.
+ */
 export async function GET(req: NextRequest) {
   const userId = await currentUserId();
   if (!userId) return bad('unauthorized', 401);
   const programId = req.nextUrl.searchParams.get('programId') ?? '';
   const r = await programFor(programId, userId);
   if ('error' in r) return r.error;
-  const messages = await prisma.programMessage.findMany({ where: { programId }, orderBy: { createdAt: 'asc' }, take: 100 });
-  return NextResponse.json({ messages: messages.map((m) => ({ ...m, mine: m.authorId === userId, fromCoach: m.authorId === r.program.coachId })) });
+  const newest = await prisma.programMessage.findMany({ where: { programId }, orderBy: { createdAt: 'desc' }, take: 100 });
+  const messages = newest.reverse();
+  const reads = await threadReadStates(prisma as unknown as RawDb, programId);
+  return NextResponse.json({ messages: decorateThread(messages, userId, r.program.coachId, reads), reads: reads !== null });
 }
 
 /** POST /api/coach/messages — { programId, body } — either side writes. */

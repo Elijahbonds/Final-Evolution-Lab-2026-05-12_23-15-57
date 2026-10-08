@@ -1,0 +1,182 @@
+{
+  "topic": "science",
+  "version": 1,
+  "cards": [
+    {
+      "id": "science.method",
+      "topic": "science",
+      "type": "lesson",
+      "headline": "The scientific method in one breath",
+      "lines": [
+        "Ask a question, propose a testable explanation, and predict what should happen.",
+        "Run a test that could prove you wrong.",
+        "Keep the idea only if it survives — and share it so others can try to break it."
+      ],
+      "visual": { "kind": "cycle", "steps": ["Question", "Hypothesis", "Test", "Analyse"] },
+      "source": "Popper, 'The Logic of Scientific Discovery' (1959); standard science curricula."
+    },
+    {
+      "id": "science.atoms",
+      "topic": "science",
+      "type": "lesson",
+      "headline": "Everything is made of atoms",
+      "lines": [
+        "An atom has a tiny, dense nucleus of protons and neutrons, with electrons around it.",
+        "The number of protons sets the element: 1 is hydrogen, 6 is carbon, 8 is oxygen.",
+        "Atoms are mostly empty space."
+      ],
+      "visual": { "kind": "motif", "motif": "atom" },
+      "source": "Atkins & Jones, 'Chemical Principles' (introductory chemistry)."
+    },
+    {
+      "id": "science.dna",
+      "topic": "science",
+      "type": "lesson",
+      "headline": "DNA is a four-letter code",
+      "lines": [
+        "DNA stores genetic instructions using four bases: A, T, C and G.",
+        "A pairs with T and C pairs with G, so each strand can rebuild the other.",
+        "Watson and Crick described the double helix in 1953, using Rosalind Franklin's X-ray data."
+      ],
+      "visual": { "kind": "compare", "left": { "label": "A pairs with", "text": "T" }, "right": { "label": "C pairs with", "text": "G" } },
+      "source": "Watson & Crick (1953), Nature; Alberts et al., 'Molecular Biology of the Cell'."
+    },
+    {
+      "id": "science.energy",
+      "topic": "science",
+      "type": "lesson",
+      "headline": "Energy changes form but isn't lost",
+      "lines": [
+        "Conservation of energy: energy can change form, but the total stays the same.",
+        "A falling ball turns height (potential energy) into speed (kinetic energy).",
+        "Some always ends up as heat — which is why no machine is 100% efficient."
+      ],
+      "visual": { "kind": "compare", "left": { "label": "At the top", "text": "All height, no speed" }, "right": { "label": "At the bottom", "text": "All speed, no height" } },
+      "source": "Halliday, Resnick & Walker, 'Fundamentals of Physics'."
+    },
+    {
+      "id": "science.light-speed",
+      "topic": "science",
+      "type": "lesson",
+      "headline": "Light is fast, but not instant",
+      "lines": [
+        "Light travels about 300,000 km every second in a vacuum.",
+        "Sunlight takes about 8 minutes 20 seconds to reach Earth.",
+        "So you always see the Sun as it was a few minutes ago."
+      ],
+      "visual": { "kind": "stat", "value": "≈ 8 min 20 s", "caption": "for sunlight to reach Earth" },
+      "source": "NIST/CODATA value of c (299,792,458 m/s); NASA Sun fact sheet."
+    },
+    {
+      "id": "science.q-water",
+      "topic": "science",
+      "type": "quiz",
+      "question": "What is the chemical formula for water?",
+      "options": ["CO₂", "H₂O", "O₂", "NaCl"],
+      "answer": 1,
+      "why": "Two hydrogen atoms bonded to one oxygen atom.",
+      "source": "Introductory chemistry."
+    },
+    {
+      "id": "science.q-photosynthesis",
+      "topic": "science",
+      "type": "quiz",
+      "question": "In photosynthesis, plants use light to turn carbon dioxide and water into…",
+      "options": ["Sugar and oxygen", "Salt and nitrogen", "Protein and carbon dioxide", "Fat and water"],
+      "answer": 0,
+      "why": "Plants build glucose and release oxygen as a by-product.",
+      "source": "Campbell Biology, photosynthesis chapter."
+    },
+    {
+      "id": "science.q-falling",
+      "topic": "science",
+      "type": "quiz",
+      "question": "A feather and a hammer are dropped together in a vacuum. How do they fall?",
+      "options": ["The hammer falls faster", "The feather falls faster", "They fall at the same rate"],
+      "answer": 2,
+      "why": "Without air resistance, gravity accelerates everything equally. Apollo 15's David Scott showed it on the Moon in 1971.",
+      "source": "NASA Apollo 15 mission record; Halliday, Resnick & Walker."
+    },
+    {
+      "id": "science.q-boiling",
+      "topic": "science",
+      "type": "quiz",
+      "question": "At sea level, pure water boils at…",
+      "options": ["90 °C", "100 °C", "110 °C", "212 °C"],
+      "answer": 1,
+      "why": "100 °C (212 °F). Higher up, lower air pressure means water boils at a lower temperature.",
+      "source": "Introductory physics and chemistry."
+    },
+    {
+      "id": "science.q-nucleus",
+      "topic": "science",
+      "type": "quiz",
+      "question": "In an animal cell, where is most of the DNA kept?",
+      "options": ["The nucleus", "The cell membrane", "The ribosomes", "The vacuole"],
+      "answer": 0,
+      "why": "DNA is packaged in the nucleus. Mitochondria carry a small amount of their own.",
+      "source": "Alberts et al., 'Molecular Biology of the Cell'."
+    },
+    {
+      "id": "science.f-hydrogen",
+      "topic": "science",
+      "type": "fact",
+      "headline": "By count, you're mostly hydrogen atoms",
+      "text": "About 60% of the atoms in a human body are hydrogen — largely because so much of us is water.",
+      "visual": { "kind": "stat", "value": "≈ 60%", "caption": "of your atoms are hydrogen" },
+      "source": "Emsley, 'Nature's Building Blocks'; standard human body composition tables."
+    },
+    {
+      "id": "science.f-honey",
+      "topic": "science",
+      "type": "fact",
+      "headline": "Sealed honey keeps for years",
+      "text": "Honey's low water content and acidity stop most microbes from growing, so it barely spoils when kept sealed.",
+      "source": "Food chemistry references; National Honey Board."
+    },
+    {
+      "id": "science.f-carbon",
+      "topic": "science",
+      "type": "fact",
+      "headline": "Diamond and graphite are both pure carbon",
+      "text": "In diamond, carbon atoms lock into a rigid 3D lattice. In graphite (mixed with clay to make pencil 'lead') they form flat sheets that slide — so one scratches glass and the other smudges paper.",
+      "source": "Atkins & Jones, 'Chemical Principles', allotropes of carbon."
+    },
+    {
+      "id": "science.f-sound",
+      "topic": "science",
+      "type": "fact",
+      "headline": "Sound travels about 343 m every second",
+      "text": "That's in air at 20 °C. Count the seconds between lightning and thunder, divide by 3, and you have the distance in kilometres.",
+      "visual": { "kind": "stat", "value": "≈ 3 s per km", "caption": "lightning-to-thunder rule" },
+      "source": "Halliday, Resnick & Walker, 'Fundamentals of Physics', sound waves."
+    },
+    {
+      "id": "science.d-evolution",
+      "topic": "science",
+      "type": "deeper",
+      "headline": "Natural selection in four steps",
+      "steps": [
+        { "headline": "1 · Variation", "lines": ["Individuals differ — in size, colour, speed and more.", "Some of those differences are inherited."], "visual": { "kind": "motif", "motif": "leaf" } },
+        { "headline": "2 · Too many offspring", "lines": ["Most species produce more young than can survive.", "So individuals compete for food, space and mates."] },
+        { "headline": "3 · Selection", "lines": ["Traits that help an individual survive and reproduce get passed on more often.", "Darwin and Wallace reached the idea independently; their papers were presented together in 1858."] },
+        { "headline": "4 · Change over time", "lines": ["Over many generations, helpful traits become more common.", "Example: bacteria evolving resistance to antibiotics."], "visual": { "kind": "cycle", "steps": ["Vary", "Compete", "Survive", "Inherit"] } }
+      ],
+      "source": "Darwin, 'On the Origin of Species' (1859); Futuyma, 'Evolution'."
+    },
+    {
+      "id": "science.recap",
+      "topic": "science",
+      "type": "recap",
+      "headline": "Science: the takeaways",
+      "points": [
+        "Science tests ideas that could be proven wrong.",
+        "Atoms: a nucleus with electrons around it.",
+        "DNA pairs A with T, C with G.",
+        "Energy changes form but isn't lost.",
+        "The sunlight you see is about 8 minutes old."
+      ],
+      "source": "Summary of this topic's cards."
+    }
+  ]
+}

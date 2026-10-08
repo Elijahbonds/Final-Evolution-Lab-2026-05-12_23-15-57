@@ -519,6 +519,13 @@ export class ShotMeter {
   get durationSec(): number { return this.duration; }
   get greenCenter01(): number { return this.greenCenter; }
   get greenHalfWidth01(): number { return this.greenHalfWidth; }
+  /** HOOPS-10PHASE-2 phase 2: widen the green window AFTER start() — TV MODE compensates a mirrored display's lag by
+   *  widening the window itself (not just what is drawn), so a mode reusing this meter applies its own factor here
+   *  rather than re-deriving contest math. `factor` is never allowed to NARROW the window (≤ 1 is a no-op). */
+  widenBy(factor: number): void {
+    if (!(factor > 1)) return;
+    this.greenHalfWidth *= factor;
+  }
   /** The gather's seconds at the front of the meter, and the rise's own seconds (pace the shot clip to THIS, not durationSec). */
   get gatherSec(): number { return this.gather; }
   get riseSec(): number { return this.rise; }
@@ -781,6 +788,19 @@ export function contestLevel(ballHandler: Vector3, defender: Vector3 | null): nu
   if (!defender) return 0;
   const d = Vector3.Distance(ballHandler, defender);
   return Math.max(0, Math.min(1, 1 - d / 2.2));
+}
+
+/**
+ * HOOPS-10PHASE-2 phase 2: a shot with no defender still has a range that makes it harder — the 3PT shootout's
+ * top-of-key rack (7.24 m) is NBA-recognised as the hard one in the real event, the corners (6.71 m) the easy
+ * ones, and that difference was flattened away by a single bar/target that did not know distance existed.
+ * `distM` maps linearly from `nearM` (0, the shallow end) to `farM` (1, the deep end) — feeds ShotMeter.start()
+ * exactly like `contestLevel` (0 = wide open, 1 = max narrowing), so distance and a defender narrow the SAME window
+ * instead of two unrelated mechanics.
+ */
+export function distanceContest01(distM: number, nearM: number, farM: number): number {
+  if (farM <= nearM) return 0;
+  return Math.max(0, Math.min(1, (distM - nearM) / (farM - nearM)));
 }
 
 // ── AI: teammate (3v3) ──────────────────────────────────────────────────

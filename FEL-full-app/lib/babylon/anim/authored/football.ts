@@ -6,6 +6,7 @@
 // never actually tucked.
 import type { Scene, Skeleton, AnimationGroup } from '@babylonjs/core';
 import { buildPoseClip, type Deg3 } from '../poseClip';
+import { gaitKnees } from '../gait';
 type V3 = [number, number, number];
 
 const CARRY = { Right: [0.20, 1.12, 0.22] as V3, Left: [-0.28, 1.00, 0.18] as V3 };   // ball tucked high on the right, off arm ready to stiff-arm
@@ -56,7 +57,7 @@ export function buildCarryRun(scene: Scene, sk: Skeleton): AnimationGroup | null
   const T = 0.6, N = 8; const keys = [];
   for (let k = 0; k <= N; k++) {
     const phi = (2 * Math.PI * k) / N, s = Math.sin(phi);
-    const kneeL = 18 + 22 * (1 - Math.cos(phi)), kneeR = 18 + 22 * (1 - Math.cos(phi + Math.PI));
+    const { L: kneeL, R: kneeR } = gaitKnees(phi, 18, 22);   // MOVEMENT POLISH (2026-10-06): the knee folds on the forward swing (gait.ts)
     keys.push({
       t: (T * k) / N,
       bones: {

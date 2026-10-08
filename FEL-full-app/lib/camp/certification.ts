@@ -3,6 +3,7 @@
 // route feeds it Credential rows and a profile, it answers with a status.
 
 import { requiredModules, CURRICULUM_VERSION } from '../curriculum/blueprint';
+import { isAdultAtLeast18 } from '@/lib/age/ageRules';
 
 export type CertificationStatus = 'none' | 'in_progress' | 'certified' | 'revoked';
 
@@ -35,8 +36,13 @@ export function certificationStatusFor(
   return { status: 'none', passedModules, missingModules };
 }
 
-/** Under 18 at intake → an accepted guardian consent is required before a plan goes active. */
+/**
+ * Under 18 at intake → an accepted guardian consent is required before a plan goes active.
+ *
+ * AGE-HELPERS-CONSOLIDATE (2026-10-04, option (a)): same guard (`!birthYear` → true) as
+ * lib/age/ageRules.ts's isAdultAtLeast18 (the AT-LEAST-18, `>= 18`, rule), so this is an exact negation of it —
+ * behaviour unchanged, threshold now shared from one place.
+ */
 export function needsGuardianConsent(birthYear: number | null | undefined, now = new Date()): boolean {
-  if (!birthYear) return true;                          // unknown age: be safe
-  return now.getFullYear() - birthYear < 18;
+  return !isAdultAtLeast18(birthYear, now);
 }

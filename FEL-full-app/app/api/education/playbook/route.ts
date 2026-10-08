@@ -5,10 +5,13 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { grantServerReward } from '@/lib/wallet/wallet-service';
-import { REASON } from '@/lib/wallet/reward-rules';
 import {
   CHAPTERS, chapterByNumber, isChapterComplete, lessonId,
 } from '@/lib/education/course';
+// EDU-LINKS (2026-10-07), owner decision 6: a chapter's shards come from its check (80%) once that check is live; the
+// payout and the course bonus now go through lib/education/rewards.ts, the one place both paths pay from.
+import { draftsOn, payPathFor } from '@/lib/education/chapterCheck';
+import { payChapter, prismaRewardDeps } from '@/lib/education/rewards';
 
 /**
  * The Playbook course's progress, and what finishing a chapter pays.
@@ -73,25 +76,28 @@ export async function POST(req: NextRequest) {
   );
   const justFinished = isChapterComplete(chapter, done);
 
+  // EDU-LINKS (2026-10-07): while this chapter's check is live (approved questions, or the draft flag), finishing its
+  // lessons pays nothing — the check pays (app/api/education/playbook/check). While it is not, this pays as it always
+  // has, and now also pays the course bonus on the tenth chapter (rewards.ts payChapter; the same once-only key).
+  const path = payPathFor(chapter.number, { drafts: draftsOn() });
   let awarded = 0;
-  if (justFinished) {
-    // `alreadyPaid` excludes this chapter so the amount is computed as a first payment; the wallet's key is what
-    // actually makes it once-only, which is why the key names the chapter.
-    // THE AMOUNT IS NOT PASSED. grantServerReward prices the grant from the EDU_CHAPTER_COMPLETE rule, so the
-    // request cannot influence it at all; the key names the chapter, so a replay returns the original entry
-    // instead of minting a second payout.
-    const res = await grantServerReward(prisma, {
-      playerId: userId,
-      reasonCode: REASON.EDU_CHAPTER_COMPLETE,
-      idempotencyKey: `playbook:chapter:${userId}:${chapter.number}`,
-      metadata: { track: TRACK, chapter: chapter.number },
-    }).catch(() => null);
-    awarded = res?.granted.shards ?? 0;
+  let bonus = 0;
+  if (justFinished && path === 'finish') {
+    // THE AMOUNT IS NOT PASSED. grantServerReward prices the grant from the EDU_CHAPTER_COMPLETE rule, so the request
+    // cannot influence it at all; the key names the chapter, so a replay returns the original entry instead of minting
+    // a second payout.
+    const paid = await payChapter(prismaRewardDeps(prisma, (a) => grantServerReward(prisma, a)), userId, chapter.number, { via: 'finish' })
+      .catch(() => null);
+    awarded = paid?.chapter ?? 0;
+    bonus = paid?.bonus ?? 0;
   }
 
   return NextResponse.json({
     done: [...done],
     chapterComplete: justFinished,
     awarded,
+    bonus,
+    // 'check': this chapter's shards are paid for passing its check, not for finishing it.
+    payPath: path,
   });
 }

@@ -72,8 +72,11 @@ export const KEEPER = {
   slideDist: 2.8, slideSec: 0.45, slideSpeed: 7.5, slideHitM: 0.8, slideCool: 2.2,
   /** Near a post a high shot is met with the crossbar vault. */
   vaultNearPost: 2.0, vaultReachMult: 1.4,
-  /** A save inside reach comes back as a PARRY-KICK this often; the counter's speed. */
-  parryChance: 0.45, counterSpeed: 9,
+  /** A save inside reach comes back as a PARRY-KICK when the shot was at his body (inside `parryBodyM` of his centre —
+   *  IMPROVE 2026-10-06, Penalty #8; TUNED: was a 45% roll on every save, so it could be neither read nor played around);
+   *  a save at full stretch is held. Not in the last `parryMinClock` s (no time to hit it again), never off an overdrive.
+   *  The counter's speed. */
+  parryBodyM: 0.55, parryMinClock: 1.5, counterSpeed: 9,
   /** What the tricks do to his reach. */
   overdriveReachMult: 0.6, rainbowReachMult: 0.5,
 } as const;
@@ -92,3 +95,51 @@ export function reachFor(base: number, shot: { high: boolean; kind: ShotKind }, 
 }
 /** The ball crossed the keeper's depth this step. */
 export function crossesKeeper(prevZ: number, z: number, keeperZ: number): boolean { return prevZ < keeperZ && z >= keeperZ; }
+/** IMPROVE (2026-10-06, Penalty #8): a save he makes inside reach — a shot at his body comes back at you (the parry-kick),
+ *  one he stretches for is held. */
+export function parryRead(ballX: number, keeperX: number, clock: number, kind: ShotKind): boolean {
+  return Math.abs(ballX - keeperX) <= KEEPER.parryBodyM && clock > KEEPER.parryMinClock && kind !== 'overdrive';
+}
+
+// ── THE STICK AIMS (owner decision 2026-10-06, "Stick aims") ─────────────────────────────────────────────────────────
+// IMPROVE (2026-10-06): the corner used to be read off the ball's distance ahead of the striker at the strike. Off the
+// dribble the ball always rides BREAK.dribbleAhead (0.9 m) ahead, so every plain strike read ≈ x −0.1, low and just left
+// of centre, whatever you did. Now the stick held at the strike picks it: ◀ the left corner, ▶ the right, neither the
+// middle; up (the stick's negative y, as before) lifts it high — the chip. The distance stays as a secondary factor: a
+// ball struck off the sweet spot of the dribble (jammed tight, or stretched for at full reach) wobbles off its line.
+export type AimSide = -1 | 0 | 1;
+export const AIM = {
+  /** TUNED (2026-10-06, new): the stick past this either side picks that corner; inside it is the middle. */
+  sideDeadZone: 0.35,
+  /** The corner's line and the shot's two heights — the old distance read's ends (±3.0, low 0.85, high 1.9), unchanged. */
+  cornerX: 3.0, lowY: 0.85, highY: 1.9,
+  /** Stick up past this lifts it (the old `stickY < -0.5`, unchanged). */
+  highStickY: -0.5,
+  /** TUNED (2026-10-06, new): the wobble (launchKick's, ±1.2 m per unit) on a ball struck a full sweet-spot-to-reach
+   *  away from the dribble's 0.9 m — at most ±0.3 m, a corner shot pulled toward the post or inside it. */
+  stretchWobble: 0.25,
+} as const;
+/** The corner the stick picks: −1 left, +1 right, 0 the middle. */
+export function stickAimSide(stickX: number): AimSide {
+  return stickX <= -AIM.sideDeadZone ? -1 : stickX >= AIM.sideDeadZone ? 1 : 0;
+}
+/** How far off the dribble's sweet spot the ball was struck, 0 (on it) … 1 (a reach's worth off it). */
+export function strikeStretch01(ballDist: number): number {
+  return clamp(Math.abs(ballDist - BREAK.dribbleAhead) / (BREAK.strikeReach - BREAK.dribbleAhead), 0, 1);
+}
+export interface StrikeAim { side: AimSide; high: boolean; target: { x: number; y: number }; wobble: number }
+/** The plain strike's aim off the stick held at the strike, and its wobble off the ball's distance. The tricks shape it
+ *  further in the mode (the curler, the rainbow, the bank) from this side and height. */
+export function strikeAim(stick: { x: number; y: number }, ballDist: number): StrikeAim {
+  const side = stickAimSide(stick.x);
+  const high = stick.y < AIM.highStickY;
+  return { side, high, target: { x: side * AIM.cornerX, y: high ? AIM.highY : AIM.lowY }, wobble: strikeStretch01(ballDist) * AIM.stretchWobble };
+}
+/** Where the keeper dives on the breakaway shot. Read right, he goes to the shot's line (inside the post); read wrong,
+ *  2 m the other way — and on a shot down the middle, read wrong is a dive to either side (`rand` picks it), where
+ *  before `−side × 2` left him standing on a middle shot he had misread. */
+export function keeperDiveX(correct: boolean, side: AimSide, aimX: number, keeperX: number, rand: number): number {
+  if (correct) return clamp(aimX, -2.9, 2.9);
+  const away = side !== 0 ? -side : rand < 0.5 ? -1 : 1;
+  return keeperX + away * 2.0;
+}

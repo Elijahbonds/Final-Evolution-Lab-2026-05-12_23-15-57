@@ -47,10 +47,14 @@ ok('none / block / parry / guard-impact are all different', () => {
   const atk = KARATE_ATTACKS.heavy;
   const fresh = () => ({ atk: new FighterState(), def: new FighterState(), dc: new DefenseController() });
 
-  // 1. no defense
+  // 1. no defense — IMPROVE (2026-10-06): an undefended blow in range LANDS ('none' → 'hit'); it used to be mapped to
+  //    'whiff', which made every clean hit in Showdown and Duel a miss. Out of reach is its own answer now.
   let s = fresh();
   assert.equal(s.dc.resolve(atk, 1.5, false, NOW), 'none');
-  assert.equal(applyDefenseOutcome('none', s.atk, s.def, atk), 'whiff');
+  assert.equal(applyDefenseOutcome('none', s.atk, s.def, atk), 'hit');
+  assert.equal(s.dc.resolve(atk, atk.range + 0.01, false, NOW), 'outOfRange');
+  assert.equal(s.dc.resolve(atk, atk.range + 0.01, true, NOW), 'outOfRange', 'a guard does not matter to a swing that cannot reach');
+  assert.equal(applyDefenseOutcome('outOfRange', s.atk, s.def, atk), 'whiff');
 
   // 2. hold block (chips guard)
   s = fresh();
