@@ -147,3 +147,31 @@ describe('#9 / #17 the frame: one camera update while aiming, the meter pushed o
     expect(g.next(51, 0.512, 'accuracy', 51, 30)).toEqual({ power: 51, meterT: 0.512, swingPhase: 'accuracy', powerLock: 51, meterCarry: 30 });
   });
 });
+
+describe('QA P0-04: a TimerBag on the game clock waits for the mode\'s update()', () => {
+  it('nothing fires on wall time; tick(dt) runs what came due, in order; cancel and clear drop beats', () => {
+    vi.useFakeTimers();
+    try {
+      const bag = new TimerBag({ gameClock: true }); const ran: string[] = [];
+      bag.later(() => ran.push('b'), 800); bag.later(() => ran.push('a'), 300);
+      const c = bag.later(() => ran.push('cancelled'), 100);
+      vi.advanceTimersByTime(10_000);                      // 'ready' / 'paused': wall time, no update()
+      expect(ran).toEqual([]); expect(bag.pending).toBe(3);
+      bag.cancel(c);
+      bag.tick(0.299); expect(ran).toEqual([]);
+      bag.tick(0.002); expect(ran).toEqual(['a']);
+      bag.tick(0.5); expect(ran).toEqual(['a', 'b']); expect(bag.pending).toBe(0);
+      bag.later(() => ran.push('torn down'), 50); bag.clear(); bag.tick(1);
+      expect(ran).toEqual(['a', 'b']);
+    } finally { vi.useRealTimers(); }
+  });
+  it('the default bag keeps the wall clock exactly as before (tick does nothing to it)', () => {
+    vi.useFakeTimers();
+    try {
+      const bag = new TimerBag(); const ran: string[] = [];
+      bag.later(() => ran.push('wall'), 300);
+      bag.tick(5); expect(ran).toEqual([]);
+      vi.advanceTimersByTime(300); expect(ran).toEqual(['wall']);
+    } finally { vi.useRealTimers(); }
+  });
+});

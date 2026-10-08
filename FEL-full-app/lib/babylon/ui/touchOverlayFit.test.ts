@@ -37,8 +37,11 @@ describe('fitDeck: every control lies inside the visible stage and the viewport'
 
   it('both columns are placed through the fit (the safe-area insets still apply under it)', () => {
     const src = readFileSync(path.resolve(__dirname, 'TouchOverlay.tsx'), 'utf8');
-    expect(src).toContain("style={lifted(SAFE_LEFT, fit.l, 'bottom left')}");
+    // the release's console-view layouts (2026-10-06): the compact (sideways phone) columns go through the same fit, on top
+    // of their own COMPACT_SCALE
+    expect(src).toContain("style={lifted(compact ? COMPACT_LEFT : SAFE_LEFT, cs * fit.l, 'bottom left')}");
     expect(src).toContain("style={lifted(SAFE_RIGHT, fit.r, 'bottom right')}");
+    expect(src).toContain("style={lifted(COMPACT_RIGHT, cs * fit.r, 'bottom right')}");
     expect(src).toContain('bottom: `calc(max(0.75rem, env(safe-area-inset-bottom)) + ${fit.lift}px)`');
   });
 });

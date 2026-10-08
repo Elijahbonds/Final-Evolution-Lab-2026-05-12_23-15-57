@@ -24,7 +24,8 @@ describe('Brain Brawl\'s lobby takes Enter', () => {
 
   it('on the pick, a face button (pad A, or the host\'s Enter) begins the match; the pick publishes phase: \'pick\'', () => {
     const pick = mode.slice(mode.indexOf("if (S.phase === 'pick') {", mode.indexOf('onInput(ctx: ModeContext, e: FelInput)')));
-    expect(pick.slice(0, 400)).toContain('else if (face) begin(ctx, S);');
+    // the release's pick (2026-10-06) reads the face press inline: FACE.includes(e.btn) — the same A the host's Enter emits
+    expect(pick.slice(0, 700)).toMatch(/else if \(e\.t === 'button' && e\.pressed && FACE\.includes\(e\.btn as 'A'\)\) begin\(ctx, S\);/);
     expect(mode).toMatch(/players: S\.players, prompt: '', display: '', board: null, boardTitle: '', phase: 'pick',/);
     expect(readFileSync(path.resolve(__dirname, '../../lib/babylon/core/InputBus.ts'), 'utf8')).not.toMatch(/\benter:/i);   // the seam is unchanged
   });

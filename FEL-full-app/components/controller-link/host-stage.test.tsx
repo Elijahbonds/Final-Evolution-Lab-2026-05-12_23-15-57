@@ -7,13 +7,15 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { HostStage, hostModes } from './host-stage';
 import { MODE_CONTROLLERS } from '@/lib/controller-link/schemas/registry';
+import { MODES } from '@/lib/babylon/modes/registry';
 import { drive, findAll } from '@/tests/helpers/driveRender';
 
 describe('/host: a mode chooser', () => {
   it('lists the controller link\'s modes (more than one), not The Flip', () => {
     const modes = hostModes();
     expect(modes.length).toBeGreaterThanOrEqual(2);
-    expect(modes.map((m) => m.modeId)).toEqual(Object.keys(MODE_CONTROLLERS).filter((k) => k !== 'music_flip'));
+    // the stage runs the mode itself now (release, 2026-10-06), so a layout with no MODES entry is not offered
+    expect(modes.map((m) => m.modeId)).toEqual(Object.keys(MODE_CONTROLLERS).filter((k) => k !== 'music_flip' && !!MODES[k]));
     const m = renderToStaticMarkup(createElement(HostStage, { modeId: 'threepoint' }));
     expect((m.match(/data-mode="/g) ?? []).length).toBe(modes.length);
     expect(m).toMatch(/data-mode="threepoint" aria-pressed="true"/);

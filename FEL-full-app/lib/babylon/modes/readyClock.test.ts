@@ -5,9 +5,23 @@
 // only if nothing ELSE moves it. The derby and the shootout moved their rounds on setTimeout — the next pitch (0.8 s) and
 // the end (1 s), the keeper round (1.2 s) and the result of their kick (1.3 s) — and a wall timer does not know the phase:
 // it fires while paused, and it outlives the mount that set it, into the next mount of the same singleton mode. The beats
-// run on the mode's update clock now (core/ModeBeats). Driven here for real on a NullEngine: the real DerbyMode and
+// run on the mode's update clock now (their TimerBag on its game clock, core/GolfLoop).
+// Driven here for real on a NullEngine: the real DerbyMode and
 // PenaltyMode, the real Flight / Reticle / SoccerBall; bodies, venue, sound and weather stubbed (the penaltyFlow set).
 // Wall time passing with no update() is what 'ready' and 'paused' look like to a mode.
+// the derby paints DynamicTextures (its signs and boards, IMPROVE 2026-10-06), which reach for OffscreenCanvas — a no-op 2D
+// surface lets them build under node (rideWorlds.skatepark.test.ts's shim)
+if (typeof (globalThis as { OffscreenCanvas?: unknown }).OffscreenCanvas === 'undefined') {
+  const ctx2d = new Proxy({}, {
+    get: (_t, k) => (k === 'measureText' ? () => ({ width: 0 }) : k === 'createLinearGradient' || k === 'createRadialGradient' ? () => ({ addColorStop: () => undefined }) : () => undefined),
+    set: () => true,
+  });
+  (globalThis as unknown as { OffscreenCanvas: unknown }).OffscreenCanvas = class {
+    width: number; height: number;
+    constructor(w: number, h: number) { this.width = w; this.height = h; }
+    getContext(): unknown { return ctx2d; }
+  };
+}
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NullEngine, Scene, StandardMaterial, TransformNode, Vector3 } from '@babylonjs/core';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
@@ -26,14 +40,14 @@ vi.mock('../anim/boneLookup', () => ({ boneNode: () => null }));
 vi.mock('../visual/meshyProps', () => ({ spawnMeshyProp: async () => null, dressBall: async () => undefined }));
 vi.mock('../core/NexusVenue', () => ({ mountVenue: () => null }));
 vi.mock('../nexus/placeLooks', () => ({ readPlaceLook: () => null }));
-vi.mock('../visual/EffectsKit', () => ({ EffectsKit: { ambient: () => undefined, burst: () => undefined } }));
+vi.mock('../visual/EffectsKit', () => ({ EffectsKit: { ambient: () => undefined, burst: () => undefined, ballTrail: () => ({ start: () => undefined, stop: () => undefined, dispose: () => undefined }) } }));   // the derby's bat tracer (IMPROVE 2026-10-06, Derby #11)
 vi.mock('../visual/Onlookers', () => ({ Onlookers: class { update(): void {} cheer(): void {} dispose(): void {} } }));
 vi.mock('../visual/AimArrow', () => ({ mountAimArrow: () => ({ dispose: () => undefined }) }));
-vi.mock('../premium/WeatherFx', () => ({ mountWeatherFx: () => ({ dispose: () => undefined }) }));
+vi.mock('../premium/WeatherFx', () => ({ mountWeatherFx: () => ({ update: () => undefined, dispose: () => undefined }) }));
 vi.mock('../nexus/weather', () => ({ readWeather: () => null }));
 vi.mock('../core/WeatherKit', async (orig) => ({
   ...(await orig<typeof import('../core/WeatherKit')>()),
-  WeatherKit: class { static fromPick() { return new this(); } flightWind() { return { x: 0, z: 0 }; } describe() { return 'CLEAR'; } },
+  WeatherKit: class { static fromPick() { return new this(); } flightWind() { return { x: 0, z: 0 }; } describe() { return 'CLEAR'; } update(): void {} },   // the penalty's weather runs (IMPROVE 2026-10-06, Penalty #1)
 }));
 vi.mock('../core/FrameGuard', () => ({ assertSpawned: () => undefined }));
 vi.mock('../anim/PostureLayer', () => ({ mountPostureLayer: () => ({ dispose: () => undefined }) }));

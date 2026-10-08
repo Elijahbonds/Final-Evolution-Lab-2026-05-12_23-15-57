@@ -6,7 +6,8 @@
 import { describe, expect, it } from 'vitest';
 import { WHO_SCENE_IT_PACK } from '../content/quizPacks';
 import { VENUE_SPECS } from '../nexus/venueSpecs';
-import { BuzzMatch, buildRounds, categoryOf } from './SceneBuzz';
+import { BuzzMatch, buildRounds, categoryOf, splitSceneVenue } from './SceneBuzz';
+import { COMBAT_MODE_IDS, arenasFor } from '../combat/arenas';
 
 describe('Who Scene It: the deal', () => {
   it('every question has exactly one correct option, among distinct choices', () => {
@@ -17,10 +18,16 @@ describe('Who Scene It: the deal', () => {
   });
 
   it('every question\'s scene exists and names the right answer', () => {
+    // the release's arena questions (IMPROVE 2026-10-06, #11): `karate_h2h@cage` is a venue spec dressed as a combat arena,
+    // and its right answer is the arena's name
+    const arenas = COMBAT_MODE_IDS.flatMap((m) => arenasFor(m));
     for (const q of WHO_SCENE_IT_PACK.questions) {
-      const spec = (VENUE_SPECS as Record<string, { venue?: string }>)[q.sceneVenueId ?? ''];
+      const { venueId, arenaId } = splitSceneVenue(q.sceneVenueId ?? '');
+      const spec = (VENUE_SPECS as Record<string, { venue?: string }>)[venueId];
       expect(spec, q.id).toBeDefined();
-      expect(q.options.find((o) => o.id === q.answer)?.label, q.id).toBe(spec!.venue);
+      const shown = arenaId ? arenas.find((a) => a.id === arenaId)?.name : spec!.venue;
+      expect(shown, q.id).toBeDefined();
+      expect(q.options.find((o) => o.id === q.answer)?.label, q.id).toBe(shown);
       expect(categoryOf(q.sceneVenueId), q.id).not.toBeNull();
     }
   });

@@ -23,7 +23,7 @@ describe('Stomp\'s HUD: no landing grade before the first air', () => {
 
   it('the host latches airborne on the mode\'s Air / Land phase and renders through the readout', () => {
     const src = readFileSync(path.resolve(__dirname, 'air-session-babylon.tsx'), 'utf8');
-    expect(src).toContain("if (h.phase === 'Air' || h.phase === 'Land') setAirborne(true);");
+    expect(src).toContain("if (u.phase === 'Air' || u.phase === 'Land') setAirborne(true);");
     expect(src).toContain('const readout = landingReadout(hud.banner, hud.best, airborne);');
     expect(src).not.toMatch(/\{typeof hud\.banner === 'string' && hud\.banner && \(/);
   });

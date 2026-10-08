@@ -123,17 +123,50 @@ export function rotateAbout(p: { x: number; z: number }, cx: number, cz: number,
 
 // ── #10 / #11 timers and the banner ──────────────────────────────────────────────────────────────────────────────────
 type TimerId = ReturnType<typeof setTimeout>;
-/** Every timeout the mode schedules, so dispose() can clear what is still pending. */
+/**
+ * Every timeout the mode schedules, so dispose() can clear what is still pending.
+ *
+ * QA P0-04 (2026-09-27, ported onto this bag 2026-10-08): `{ gameClock: true }` runs the bag on the mode's OWN clock —
+ * nothing fires until the mode's update() calls tick(dt), and the harness calls update() only while 'playing'. A wall
+ * timer does not know the phase: the derby's next pitch and the shootout's next round fired while paused. The default
+ * (no option) is the wall clock, exactly as before.
+ */
 export class TimerBag {
   private ids = new Set<TimerId>();
+  private readonly game: { id: TimerId; left: number; fn: () => void }[] | null;
+  private seq = 0;
+  constructor(opts: { gameClock?: boolean } = {}) { this.game = opts.gameClock ? [] : null; }
   later(fn: () => void, ms: number): TimerId {
+    if (this.game) {
+      const id = ++this.seq as unknown as TimerId;   // an opaque handle: never handed to clearTimeout
+      this.game.push({ id, left: Math.max(0, ms) / 1000, fn });
+      return id;
+    }
     const id = setTimeout(() => { this.ids.delete(id); fn(); }, ms);
     this.ids.add(id);
     return id;
   }
-  cancel(id: TimerId | null): void { if (id === null) return; clearTimeout(id); this.ids.delete(id); }
-  clear(): void { for (const id of this.ids) clearTimeout(id); this.ids.clear(); }
-  get pending(): number { return this.ids.size; }
+  /** Game clock only: advance by the frame's dt and run what came due, in the order it was scheduled. */
+  tick(dt: number): void {
+    if (!this.game || this.game.length === 0) return;
+    const due: (() => void)[] = [];
+    for (let i = 0; i < this.game.length;) {
+      const t = this.game[i];
+      t.left -= dt;
+      if (t.left <= 0) { due.push(t.fn); this.game.splice(i, 1); } else i++;
+    }
+    for (const fn of due) fn();
+  }
+  cancel(id: TimerId | null): void {
+    if (id === null) return;
+    if (this.game) { const i = this.game.findIndex((t) => t.id === id); if (i >= 0) this.game.splice(i, 1); return; }
+    clearTimeout(id); this.ids.delete(id);
+  }
+  clear(): void {
+    if (this.game) { this.game.length = 0; return; }
+    for (const id of this.ids) clearTimeout(id); this.ids.clear();
+  }
+  get pending(): number { return this.game ? this.game.length : this.ids.size; }
 }
 
 /** One banner at a time: a newer banner cancels the older one's pending clear, so a FLICK's clear never wipes a RING. */

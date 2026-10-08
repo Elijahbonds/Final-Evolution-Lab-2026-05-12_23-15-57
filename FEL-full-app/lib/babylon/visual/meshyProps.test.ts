@@ -36,7 +36,8 @@ describe('no basketball outside hoops (QA P1-02)', () => {
     const root = path.resolve(__dirname, '../modes');
     const callers = readdirSync(root).filter((f) => f.endsWith('.ts') && !f.includes('.test.'))
       .filter((f) => /dress(?:Meshy)?Ball\([^)]*'basketball'\)/.test(readFileSync(path.join(root, f), 'utf8')));
-    expect(callers.sort()).toEqual(['DunkMode.ts', 'OneVOneMode.ts', 'ThreePointMode.ts', 'ThreeVThreeMode.ts', 'carnivalEvents.ts']);
+    // DunkDuelMode joined the hoops modes on the release (IMPROVE 2026-10-06 #10: the duel ball is a basketball)
+    expect(callers.sort()).toEqual(['DunkDuelMode.ts', 'DunkMode.ts', 'OneVOneMode.ts', 'ThreePointMode.ts', 'ThreeVThreeMode.ts', 'carnivalEvents.ts']);
   });
 
   it('the player ring shows the mode\'s own ball in the derby, volleyball and golf, never the basketball', () => {

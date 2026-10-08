@@ -6,7 +6,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { GALLERY_CLEAR_M, penaltyGallerySpots } from './precisionModes';
+import { GALLERY_CLEAR_M, GALLERY_PER_SIDE, penaltyGallerySpots } from './precisionModes';
 import { CROWD_CLEAR_M, CROWD_END_M, CROWD_SIDE_M, netCrowdSpots } from './NetSportMode';
 import { GOAL } from '../core/PenaltyKick';
 import { TENNIS, VOLLEYBALL } from '../core/RallyCore';
@@ -24,6 +24,14 @@ describe('the shootout crowd flanks the goal, never stands in its mouth', () => 
   it('both banks are drawn: no more spots than Onlookers keeps, half each side', () => {
     expect(spots.length).toBeLessThanOrEqual(MAX_BODIES);
     expect(spots.filter((p) => p.x < 0)).toHaveLength(spots.length / 2);
+  });
+  it('the mode mounts GALLERY_PER_SIDE a side (under IMPROVE Penalty #18\'s five bodies), flanking, parked off-camera', () => {
+    const live = penaltyGallerySpots(GALLERY_PER_SIDE);
+    expect(live).toHaveLength(2 * GALLERY_PER_SIDE);
+    expect(live.length).toBeLessThanOrEqual(5);
+    for (const p of live) expect(Math.abs(p.x)).toBeGreaterThanOrEqual(GOAL.halfW + GALLERY_CLEAR_M);
+    expect(readFileSync(path.resolve(__dirname, 'precisionModes.ts'), 'utf8'))
+      .toContain('gallery = new Onlookers(ctx.scene, penaltyGallerySpots(GALLERY_PER_SIDE), undefined, undefined, { pauseOffscreen: true });');
   });
 });
 

@@ -78,7 +78,6 @@ import { mountWeatherFx, type WeatherFxHandle } from '../premium/WeatherFx';
 import { SoccerBall, GRASS } from '../core/SoccerBall';
 import { launchKick, frameHit, judgeKick, kickZone, METER_ZONES, GOAL as PEN_GOAL } from '../core/PenaltyKick';
 import { WIND_GAIN } from '../core/GolfBall';
-import { ModeBeats } from '../core/ModeBeats';   // QA P0-04: the rounds move on the mode's update clock, never a wall timer
 import { BREAK, FLOW, flowAdd, shotProfile, glassRead, bankTarget, rainbowRead, slideCancelRead, rainbowArc, KEEPER, keeperTargetZ, keeperSlideRead, reachFor, crossesKeeper, parryRead, strikeAim, keeperDiveX, type ShotKind } from '../core/Breakaway';   // BREAKAWAY (owner brief, 2026-09-18: "Soccer Shootout")
 import { stepRun } from '../core/RushRun';
 import { PAD, padMult, type PadKind, FLICK, flickRead, flickVel, type Ring, RINGS, ringsFor, ringPass, turbineFor, gustAt, BANK, bankReflect } from '../core/ParkourGolf';   // PARKOUR GOLF (owner brief, 2026-09-18)
@@ -965,8 +964,6 @@ export const DerbyMode: ModeDefinition = (() => {
    *  the re-entry guard; using `incoming` for it meant the whiff test — which
    *  now fires on a ball at rest — retriggered during the gap between pitches. */
   let pending = false;
-  /** QA P0-04: the next pitch and the end wait for update(), so a pause (or a torn-down mount) cannot advance the round. */
-  const beats = new ModeBeats();
   /** A+ mission #7 (MLB Home Run Derby presentation): the round is OUTS_CAP outs or TOTAL pitches, whichever first —
    *  a swing that is not a homer is an out. Ten pitches used to be the whole round; twenty is the cap now that outs end it. */
   const TOTAL = 30;   // FIELD-DEPTH W4: twenty pitches with ten outs ended in ~34 s
@@ -989,7 +986,7 @@ export const DerbyMode: ModeDefinition = (() => {
   let lastVerdict: Verdict | '' = '', lastDetail = '', settledRound = 0;
   // IMPROVE (2026-10-06, Derby #9 / #10): every delayed call goes through one bag dispose() clears, and every banner
   // through one channel — the token's, the settle's, the bat-flip's and the whiff's clears used to wipe each other.
-  const timers = new TimerBag();
+  const timers = new TimerBag({ gameClock: true });   // QA P0-04: the next pitch and the end wait for update() (a pause holds them)
   let bannerCh: BannerChannel | null = null;
   /** #5: this derby's pitch sequence. */
   let seed = 0;
@@ -1417,7 +1414,7 @@ export const DerbyMode: ModeDefinition = (() => {
         return { pose, legs, aim: at, eyes: at, window: w };
       }, 'PITCH-PP');
 
-      round = 0; pts = 0; ended = false; pending = false; trickDone = false; missLine = ''; beats.clear();
+      round = 0; pts = 0; ended = false; pending = false; trickDone = false; missLine = '';
       timers.clear(); bannerCh = new BannerChannel(timers, (text) => ctx.setHud({ banner: text }));
       SoundKit.startAmbient('stadium');
       tally = freshDerby(); rivalTarget = 3 + Math.floor(Math.random() * 6);   // a rival round of 3–8 homers
@@ -1497,7 +1494,7 @@ export const DerbyMode: ModeDefinition = (() => {
     },
 
     update(ctx: ModeContext, dt: number) {
-      beats.update(dt);   // before the ended check: the end itself is a beat
+      timers.tick(dt);   // QA P0-04: the bag runs on this clock — before the ended check: the end itself is a beat
       if (batSwingSec != null) { batSwingSec += dt; if (batSwingSec > BAT_SWING_SEC + BAT_RECOVER_SEC) batSwingSec = null; }
       if (ended) return;
       if (throwIn > 0) {
@@ -1587,10 +1584,13 @@ export const DerbyMode: ModeDefinition = (() => {
  * keeper round's camera sits at z 13.4 and must not stand inside anyone). Eight spots, so Onlookers keeps every one. Pure.
  */
 export const GALLERY_CLEAR_M = 2;
-export function penaltyGallerySpots(): Vector3[] {
+/** IMPROVE (2026-10-06, Penalty #18) kept the shootout's crowd to five skinned bodies (each animated, in frame the whole
+ *  shootout); flanking the goal needs an even count, so two a side — under that budget. */
+export const GALLERY_PER_SIDE = 2;
+export function penaltyGallerySpots(perSide = 4): Vector3[] {
   const inner = PEN_GOAL.halfW + GALLERY_CLEAR_M;
   const out: Vector3[] = [];
-  for (let i = 0; i < 4; i++) for (const side of [-1, 1]) out.push(new Vector3(side * (inner + i * 1.7), 0, 15.4 + i * 0.4));
+  for (let i = 0; i < perSide; i++) for (const side of [-1, 1]) out.push(new Vector3(side * (inner + i * 1.7), 0, 15.4 + i * 0.4));
   return out;
 }
 
@@ -1624,7 +1624,7 @@ export const PenaltyMode: ModeDefinition = (() => {
   // IMPROVE (2026-10-06, Penalty #10 / #11 / #9): every timeout in one bag dispose() clears; one banner channel, so the
   // strike label's clear no longer wipes the result banner that lands 0.4 s later (nor a wall run's, a slide's, a feint's);
   // the result beats after each kick held where A can skip them.
-  const timers = new TimerBag();
+  const timers = new TimerBag({ gameClock: true });   // QA P0-04: the result beats wait for update() (a pause holds them)
   let bannerCh: BannerChannel | null = null;
   const resultBeat = new ResultBeat(timers);
   /** IMPROVE (2026-10-06, Penalty #20): game time (s), the sum of update()'s dt — the dive, the strike and the kinetic
@@ -1688,8 +1688,6 @@ export const PenaltyMode: ModeDefinition = (() => {
   /** L4 — the bank behind the goal. A shootout is watched. */
   let gallery: Onlookers | null = null;
   let strikerPosture: { dispose(): void } | null = null, keeperPosture: { dispose(): void } | null = null;
-  /** QA P0-04: their kick and its result wait for update(), so a pause (or a torn-down mount) cannot advance the kicks. */
-  const beats = new ModeBeats();
   // ── the shootout (D1/D2 built in the depth pass) ──
   /** The rival's goals — a shootout is against SOMEONE. Their kicks are
    *  simulated and revealed between yours (the numbers-only rival
@@ -2037,7 +2035,7 @@ export const PenaltyMode: ModeDefinition = (() => {
       // in the goal mouth behind the keeper, and they read as more keepers. 2 m behind the keeper camera (fixed at z 13.4
       // on THEIR kick): at 13.2 the camera stood inside a spectator (measured 2026-09-06). IMPROVE (2026-10-06, Penalty
       // #18): parked while the camera is off them (Onlookers.pauseOffscreen: the breakaway's follow cam turns away).
-      gallery = new Onlookers(ctx.scene, penaltyGallerySpots(), undefined, undefined, { pauseOffscreen: true });
+      gallery = new Onlookers(ctx.scene, penaltyGallerySpots(GALLERY_PER_SIDE), undefined, undefined, { pauseOffscreen: true });
       me = await spawnAthlete(ctx, CFG.heroUrl, new Vector3(-0.4, 0, -1.6), 0, SPORT_CLIP.penaltyIdle);
       keeper = await spawnFoe(ctx, CFG.heroUrl, new Vector3(0, 0, 10.4), Math.PI, SPORT_CLIP.keeperIdle);
       // the left dive is the authored right dive reflected across the sagittal plane, registered as 'keeper_dive.M'
@@ -2084,7 +2082,7 @@ export const PenaltyMode: ModeDefinition = (() => {
         return { pose, legs, aim: at, eyes: at, window: w };
       }, 'KEEP-PP');
 
-      round = 0; goals = 0; stylePts = 0; ended = false; betweenKicks = false; beats.clear();
+      round = 0; goals = 0; stylePts = 0; ended = false; betweenKicks = false;
       themGoals = 0; themKicks = 0; shotHistory = []; hintFlags.read = false; myKicks = []; theirKicks = [];
       // IMPROVE (2026-10-06, Penalty #3 / #11 / #12 / #20): a fresh bag and banner channel, the game clock from zero, the
       // breakaway's counters from zero (they carried over from the last shootout), the remembered kick style
@@ -2192,7 +2190,7 @@ export const PenaltyMode: ModeDefinition = (() => {
     },
 
     update(ctx: ModeContext, dt: number) {
-      beats.update(dt);
+      timers.tick(dt);   // QA P0-04: the result beats and the keeper's rise wait for play (the bag's game clock)
       if (ended) return;
       gameT += dt;   // IMPROVE (2026-10-06, Penalty #20)
       // IMPROVE (2026-10-06, Penalty #1): the weather runs, as golf's does — the rain follows the camera, a storm flashes and

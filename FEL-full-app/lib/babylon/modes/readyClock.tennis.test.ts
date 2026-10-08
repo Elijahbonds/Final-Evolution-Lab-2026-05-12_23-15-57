@@ -25,7 +25,7 @@ vi.mock('../anim/netTree', async (orig) => ({
 vi.mock('../visual/meshyProps', () => ({ ballKindFor: () => null, dressBall: async () => undefined }));
 vi.mock('../core/NexusVenue', () => ({ mountVenue: () => null }));
 vi.mock('../nexus/placeLooks', () => ({ readPlaceLook: () => null }));
-vi.mock('../visual/EffectsKit', () => ({ EffectsKit: { ballTrail: () => undefined, burst: () => undefined } }));
+vi.mock('../visual/EffectsKit', () => ({ EffectsKit: { ballTrail: () => ({ start: () => undefined, stop: () => undefined, isStarted: () => false, dispose: () => undefined }), burst: () => undefined } }));   // the trail starts per launch now (IMPROVE 2026-10-06)
 vi.mock('../visual/Onlookers', () => ({ Onlookers: class { update(): void {} cheer(): void {} dispose(): void {} } }));
 vi.mock('../visual/AimArrow', () => ({ mountRing: () => ({ show: () => undefined, set: () => undefined, dispose: () => undefined }) }));
 vi.mock('../premium/WeatherFx', () => ({ mountWeatherFx: () => ({ update: () => undefined, dispose: () => undefined }) }));
@@ -89,7 +89,7 @@ describe('Match Point: 0–0 until the player plays', () => {
     expect(last('foeScore')).toBe(0);
     vi.advanceTimersByTime(10_000);   // the wall clock runs; the harness calls no update() outside 'playing'
     expect(board()).toBe(start);
-    expect(hud.some((h) => h.banner === 'SERVE')).toBe(false);
+    expect(hud.some((h) => typeof h.banner === 'string' && h.banner.startsWith('SERVE'))).toBe(false);
     expect(ended).toBeNull();
   });
 
@@ -101,7 +101,7 @@ describe('Match Point: 0–0 until the player plays', () => {
     for (let i = 0; i < 20 * 60 && board() === start; i++) {
       TennisMode.update(ctx, 1 / 60);
       vi.advanceTimersByTime(1000 / 60);
-      if (served < 0 && hud.some((h) => h.banner === 'SERVE')) served = i / 60;
+      if (served < 0 && hud.some((h) => typeof h.banner === 'string' && h.banner.startsWith('SERVE'))) served = i / 60;   // the release's toss serve flashes 'SERVE — SWING AS THE TOSS FALLS' (IMPROVE 2026-10-06, Tennis #2 / #3)
     }
     expect(served).toBeGreaterThan(0.7);
     expect(served).toBeLessThan(1);
