@@ -16,57 +16,10 @@ import { STORE_TERMS_TEXT_B } from './store-terms/text-b';
 // carry stable word-based ids and the text stays swappable by version.
 export const STORE_TERMS_VERSION = 'store-terms-2026-10-04';
 
-/**
- * The FIXED fingerprints of the approved text (STORE-TERMS-3). `text` is the whole-text sha256 the brief
- * pins for store-terms-2026-10-04 (given, never recomputed from the text); `sections` is the per-section
- * sha256 (first 12 hex) keyed by section id, so a failing check names the exact section that changed.
- * An edit to the text moves the version AND these fingerprints together.
- *
- * NOTE (flagged): the per-section values below are recomputed from the on-branch text. The brief that
- * fixes the per-section constants was truncated; the whole-text `text` value IS the brief-given constant
- * (and the on-branch text reproduces it exactly). Replace `sections` with the briefed map when provided.
- */
-export const STORE_TERMS_FINGERPRINTS = {
-  version: STORE_TERMS_VERSION,
-  text: 'cdfda044a8b927caa04ada91414fc028a28ea2d02deb6ca042ebae38f18169a6',
-  sections: {
-    title: 'eaf007f479df',
-    'short-version': '08da22402bd9',
-    'terms-of-service': 'a730c3c8a2ac',
-    'who-we-are': '1e1cb650fa7d',
-    'who-can-buy': '83336723507e',
-    'prices-and-payment': '15caae7efb96',
-    'what-you-can-buy': 'a3e6a4cf827f',
-    programs: '1f683c4a8de3',
-    'fel-membership': 'b72fc214cd09',
-    'teen-membership': '37b94426ccb6',
-    'video-review': 'c6b5802c08ba',
-    'live-sessions': '76e7a384a6a7',
-    'not-medical-advice': '97c69aa8c060',
-    'no-guaranteed-results': '5105957a2163',
-    'exercise-risk': '4256ea1f8861',
-    'recording-policy': 'b6d7a3e397ed',
-    'acceptable-use': '54a9c320332e',
-    'who-owns-what': '3fb95872af19',
-    privacy: '43781e02a36f',
-    'chargebacks-and-disputes': 'f25eea8cd80f',
-    changes: 'e793924083a1',
-    'suspension-and-termination': '53338d765101',
-    'limitation-of-liability': '9ebec4fdeb5d',
-    'governing-law-and-disputes': '48ee7a6ae280',
-    'other-legal-terms': '644e5f72a074',
-    contact: '8533028ef830',
-    // Part B (refund & cancellation policy) — AM's verbatim copy renamed these section ids.
-    'refund-policy': 'e41049c26f76',
-    'refund-program': '5cae66207208',
-    'refund-membership': 'b8dee2b3829e',
-    'refund-teen-membership': 'ce355381d7e0',
-    'refund-video-review': 'ada0637c6e30',
-    'refund-live-sessions': '0cf1b715232d',
-    'refund-every-product': 'f75380f579a6',
-    'mailing-address': 'fdfc6fa886c3',
-  },
-} as const;
+/** The FIXED whole-text sha256 of each approved store-terms version (given by the approved brief; never recomputed from the text). */
+export const STORE_TERMS_FINGERPRINTS: Record<string, string> = {
+  'store-terms-2026-10-04': 'cdfda044a8b927caa04ada91414fc028a28ea2d02deb6ca042ebae38f18169a6',
+};
 
 /** One section of the store terms: a stable, word-based anchor id and its markdown body. */
 export interface StoreTermsSection {
