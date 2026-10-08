@@ -1,11 +1,18 @@
+import { abacusEnabled, aiComingSoonResponse } from '@/lib/abacus/killSwitch';
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { getOrCreateProfile } from '@/lib/profile-service';
-import { prqScore, prqGrade, PRQ_ATTRS } from '@/lib/prq';
+import { PRQ_ATTRS } from '@/lib/prq';
 import { withPainSafety } from '@/lib/coach/aiSystemPrompt';
 import { isMinorForMirror } from '@/lib/mirror/youth';
+import { rateLimit } from '@/lib/rate-limit';
+import { AI_CHAT_ADULTS_ONLY, AI_CHAT_CONSENT_REQUIRED, aiChatAccess, type AiAccessDb } from '@/lib/coach/aiChatAccess';
+import {
+  AI_CHAT_RATE, AI_CHAT_TOP_EXERCISES, catalogueHeading, catalogueText, learnerContext, parseChatBody, relevantAttributes,
+  weakestAttribute, type CatalogueRow,
+} from '@/lib/coach/aiChatGuard';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,61 +42,60 @@ BLUEPRINT PHILOSOPHY:
 - Throw-Catch methodology: Oscillate → Lock → Release → Reset
 - The breath is the foundation of everything`;
 
+// COACH-AI Phase 8 (2026-10-07): the hardening the owner asked for before this route is switched back on (owner
+// decision 8: abacusEnabled() stays as it is, off by default, and still runs FIRST). In order, before anything leaves:
+//   1. the kill switch (unchanged);  2. signed in;  3. rateLimit() per account (a minute and a day window,
+//   lib/coach/aiChatGuard.ts AI_CHAT_RATE);  4. ADULTS ONLY from the DB's User.dobYear and 5. a live AI-sharing consent
+//   (lib/coach/aiChatAccess.ts) — both 403, nothing read from the body;  6. the body: role allowlist and count/length
+//   caps (400 with a fixed code, nothing trimmed silently).
+// What is sent: the question, the one or two attributes it is about (never the whole PRQ, its score or grade), and the
+// top AI_CHAT_TOP_EXERCISES published exercises that target them (never the whole catalogue). The provider's stream is
+// passed through as bytes (lib/coach/chatStream.ts has the client half of plan item #11).
 export async function POST(req: Request) {
   try {
+    if (!abacusEnabled()) return aiComingSoonResponse('coach');
     const session = await getServerSession(authOptions);
     const userId = (session?.user as any)?.id;
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const body = await req.json().catch(() => null);
-    const userMessages = body?.messages ?? [];
-    if (!userMessages.length) return NextResponse.json({ error: 'No messages' }, { status: 400 });
+    for (const [name, w] of [['minute', AI_CHAT_RATE.minute], ['day', AI_CHAT_RATE.day]] as const) {
+      const rl = rateLimit(`coach-chat:${name}:${userId}`, w.limit, w.windowMs);
+      if (!rl.ok) return NextResponse.json({ error: 'rate_limited' }, { status: 429, headers: { 'Retry-After': String(rl.retryAfterSec) } });
+    }
 
-    // Fetch learner's PRQ profile
+    const access = await aiChatAccess(prisma as unknown as AiAccessDb, userId);
+    if (!access.adult) return NextResponse.json({ ...AI_CHAT_ADULTS_ONLY }, { status: 403 });
+    if (!access.consented) return NextResponse.json({ ...AI_CHAT_CONSENT_REQUIRED }, { status: 403 });
+
+    const input = parseChatBody(await req.text().catch(() => ''));
+    if (!input.ok) return NextResponse.json({ error: input.error }, { status: input.error === 'body_too_large' ? 413 : 400 });
+    const userMessages = input.messages;
+    const question = userMessages[userMessages.length - 1].content;
+
+    // MIRROR-COACH P5 FIX (2026-09-29, code review): the chat's minor-safety rule (aiSystemPrompt.ts PAIN_SAFETY_RULES
+    // rule 2) is grounded in the same fact every other age gate reads (lib/mirror/youth.ts isMinorForMirror(User.dobYear)).
+    // COACH-AI: a minor no longer gets this far (step 4), so this is defence in depth — kept so the prompt never
+    // depends on the gate above staying put.
+    const isMinor = isMinorForMirror(access.dobYear);
+
     const profile = await getOrCreateProfile(userId);
     const attrs: Record<string, number> = {};
     for (const a of PRQ_ATTRS) { attrs[a] = Number((profile as any)?.[a] ?? 0); }
-    const score = prqScore(attrs);
-    const grade = prqGrade(score);
+    const relevant = relevantAttributes(attrs, question);
+    const weakest = weakestAttribute(attrs);
 
-    // Find weakest stat
-    let weakest: string = PRQ_ATTRS[0];
-    let weakestVal = Infinity;
-    for (const a of PRQ_ATTRS) {
-      if (attrs[a] < weakestVal) { weakestVal = attrs[a]; weakest = a; }
-    }
-
-    // Fetch lesson completion count
-    const lessonCount = await prisma.lessonProgress.count({ where: { userId } });
-
-    // MIRROR-COACH P5 FIX (2026-09-29, code review): the chat's minor-safety rule (aiSystemPrompt.ts PAIN_SAFETY_RULES
-    // rule 2) used to depend entirely on the model inferring age from conversation. Ground it in the same fact every
-    // other age gate in this app reads (lib/mirror/youth.ts isMinorForMirror(User.dobYear)).
-    const learnerUser = await prisma.user.findUnique({ where: { id: userId }, select: { dobYear: true } });
-    const isMinor = isMinorForMirror(learnerUser?.dobYear ?? null);
-
-    // Fetch full exercise catalogue for context
-    const exercises = await prisma.exercise.findMany({
-      where: { published: true },
-      include: { category: { select: { name: true } } },
+    const exercises: CatalogueRow[] = await prisma.exercise.findMany({
+      where: { published: true, targetPrqStat: { in: relevant } },
+      select: {
+        name: true, phase: true, chapter: true, bounceLevel: true, targetPrqStat: true, dosage: true, coachingCues: true,
+        regressions: true, videoUrl: true, category: { select: { name: true } },
+      },
       orderBy: [{ phase: 'asc' }, { chapter: 'asc' }, { sortOrder: 'asc' }],
+      take: AI_CHAT_TOP_EXERCISES,
     });
 
-    const catalogueText = exercises.map((e: any) => {
-      let entry = `[${e.category?.name}] ${e.name} (Phase ${e.phase}, Ch${e.chapter}, ${e.bounceLevel})`;
-      entry += `\nTarget: ${e.targetPrqStat || 'general'} | Dosage: ${e.dosage}`;
-      entry += `\nCues: ${e.coachingCues}`;
-      if (e.commonMistakes) entry += `\nMistakes: ${e.commonMistakes}`;
-      if (e.progressions) entry += `\nProgressions: ${e.progressions}`;
-      if (e.regressions) entry += `\nRegressions: ${e.regressions}`;
-      if (e.prerequisites) entry += `\nPrerequisites: ${e.prerequisites}`;
-      if (e.videoUrl) entry += `\n🎬 Video demo available`;
-      return entry;
-    }).join('\n\n');
-
-    const learnerContext = `\n\nLEARNER PROFILE:\n- PRQ Score: ${score} (${grade.label})\n- Attributes: ${PRQ_ATTRS.map(a => `${a}: ${Math.round(attrs[a])}`).join(', ')}\n- Weakest stat: ${weakest} (${Math.round(weakestVal)})\n- Lessons completed: ${lessonCount}\n- Streak days: ${profile?.streakDays ?? 0}`;
-
-    const fullSystem = withPainSafety(SYSTEM_PROMPT + learnerContext + `\n\nEXERCISE CATALOGUE:\n${catalogueText}`, { isMinor });
+    const systemBase = SYSTEM_PROMPT + learnerContext(attrs, relevant, weakest) + catalogueHeading(exercises.length) + catalogueText(exercises);
+    const fullSystem = withPainSafety(systemBase, { isMinor });
 
     // Call LLM with streaming
     const response = await fetch('https://apps.abacus.ai/v1/chat/completions', {
@@ -109,34 +115,15 @@ export async function POST(req: Request) {
       }),
     });
 
-    if (!response.ok) {
-      const errText = await response.text().catch(() => 'Unknown error');
-      console.error('LLM API error:', response.status, errText);
+    if (!response.ok || !response.body) {
+      // the status only: a provider's error text can quote the request, which is the user's own words
+      console.error('LLM API error:', response.status);
       return NextResponse.json({ error: 'Coach is temporarily unavailable' }, { status: 502 });
     }
 
-    const stream = new ReadableStream({
-      async start(controller) {
-        const reader = response.body?.getReader();
-        const decoder = new TextDecoder();
-        const encoder = new TextEncoder();
-        if (!reader) { controller.close(); return; }
-        try {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            controller.enqueue(encoder.encode(decoder.decode(value)));
-          }
-        } catch (error) {
-          console.error('Stream error:', error);
-          controller.error(error);
-        } finally {
-          controller.close();
-        }
-      },
-    });
-
-    return new Response(stream, {
+    // The provider's bytes, untouched. The old loop decode()-d each chunk WITHOUT { stream: true } and re-encoded it,
+    // which turned a character split across two chunks into two replacement characters.
+    return new Response(response.body, {
       headers: {
         'Content-Type': 'text/plain; charset=utf-8',
         'Cache-Control': 'no-cache',
@@ -144,7 +131,7 @@ export async function POST(req: Request) {
       },
     });
   } catch (e) {
-    console.error('coach chat error', e);
+    console.error('coach chat error', e instanceof Error ? e.name : typeof e);
     return NextResponse.json({ error: 'Failed' }, { status: 500 });
   }
 }

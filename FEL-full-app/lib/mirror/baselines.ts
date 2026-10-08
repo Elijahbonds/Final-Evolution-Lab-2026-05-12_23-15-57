@@ -146,3 +146,35 @@ export function describeBaseline(cmp: BaselineComparison, fmt: (n: number) => st
   if (cmp.kind === 'building') return `building your baseline (${cmp.sessionsUsed}/${cmp.need})`;
   return `vs your baseline: ${cmp.status} (${fmt(cmp.value)} vs ${fmt(cmp.baselineValue)})`;
 }
+
+// ── "vs your last 3" (MIRROR-PROGRESS, plan Phase 4, 2026-10-07) ─────────────────────────────────────────────────────
+//
+// The baseline above is FIXED (the first three sessions, never moved). The Mirror's review also says how today's set sits
+// against the athlete's most RECENT sets — "vs your last 3" — which is what a returning athlete reads as "am I getting
+// better lately". Same rules as the baseline: a comparison, never a status, never a reward; the audit's own threshold
+// table still says what faulted. The values compared come from lib/mirror/progressReading.ts (one headline number per
+// movement), read either from the server (an opted-in adult's saved sessions) or from this phone (everyone else:
+// lib/mirror/deviceProgress.ts). This function does not know or care which.
+
+/** How many recent sets "vs your last 3" reads. */
+export const RECENT_SETS = 3;
+
+export type RecentComparison =
+  | { kind: 'first' }
+  | { kind: 'compared'; status: 'better' | 'same' | 'worse'; value: number; recentMean: number; n: number };
+
+/**
+ * Today's value against the mean of the last (up to) RECENT_SETS values before it, oldest first in `priors` (only the
+ * newest RECENT_SETS are read). `sameBand` is ABSOLUTE, in the value's own unit (a share of reps reads "the same" within
+ * a rep or so — see progressReading.ts) — the relative SAME_BAND above misreads a share near zero, where 0.05 against
+ * 0.04 is "25% worse". 'first' when there is nothing before it. Non-finite priors are dropped, never averaged in.
+ */
+export function compareToRecent(value: number, priors: readonly number[], direction: CheckDirection, sameBand: number): RecentComparison {
+  const recent = priors.filter((p) => typeof p === 'number' && Number.isFinite(p)).slice(-RECENT_SETS);
+  if (!recent.length || !Number.isFinite(value)) return { kind: 'first' };
+  const recentMean = recent.reduce((a, b) => a + b, 0) / recent.length;
+  const delta = value - recentMean;
+  const status: 'better' | 'same' | 'worse' =
+    Math.abs(delta) <= sameBand ? 'same' : (direction === 'lowerIsBetter') === (delta < 0) ? 'better' : 'worse';
+  return { kind: 'compared', status, value, recentMean, n: recent.length };
+}

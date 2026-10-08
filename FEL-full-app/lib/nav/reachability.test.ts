@@ -36,6 +36,8 @@ const NOT_NAVIGABLE: Record<string, string> = {
   '/profile': 'a tab',
   '/studio': 'HOLD — not shipped, deliberately unlinked',
   '/settings': 'alias of /account; app/settings/page.tsx redirects there, and the consent screen links /account',
+  '/program': 'a bought program or a teen unlock, opened from the receipt, noindex',
+  '/session': 'a paid live call, opened from the booking confirmation, noindex',
 };
 
 function topLevelRoutes(): string[] {

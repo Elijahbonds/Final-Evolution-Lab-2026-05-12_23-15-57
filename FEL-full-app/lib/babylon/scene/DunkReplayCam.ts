@@ -31,6 +31,23 @@ function freshWorld(node: TransformNode): Matrix {
   return node.getWorldMatrix();
 }
 
+/**
+ * IMPROVE (2026-10-06): a wait that does not count paused time — the mode's safety net around the triple cut. A wall-clock
+ * timeout ran on through a pause, so the net fired mid-pause and ended a replay the player had frozen (see `paused` below).
+ */
+export function pausableDelay(ms: number, paused: () => boolean, now: () => number = () => performance.now(), tickMs = 100): Promise<void> {
+  return new Promise((resolve) => {
+    let left = ms, last = now();
+    const tick = (): void => {
+      const t = now();
+      if (!paused()) left -= t - last;
+      last = t;
+      if (left <= 0) resolve(); else setTimeout(tick, Math.max(1, Math.min(tickMs, left)));
+    };
+    setTimeout(tick, Math.max(1, Math.min(tickMs, ms)));
+  });
+}
+
 export class DunkReplayRecorder {
   private buf: Sample[] = [];
   private acc = 0;
@@ -190,7 +207,7 @@ export class DunkReplayRecorder {
    * has drawn. The RECORDED POSE is written as the frame's last word (after the clips, the reach, the posture), so what plays is what
    * happened. Skippable (a tap, space, or `stop()`); the live root and ball are put back where they were when it ends.
    */
-  playCuts(rimCenter: Vector3, contactAt: number, cuts: readonly CutSpec[], opts: { freezeSec?: number; onCut?: (i: number, c: CutSpec) => void; onFreeze?: () => void } = {}): Promise<void> {
+  playCuts(rimCenter: Vector3, contactAt: number, cuts: readonly CutSpec[], opts: { freezeSec?: number; onCut?: (i: number, c: CutSpec) => void; onFreeze?: () => void; paused?: () => boolean } = {}): Promise<void> {
     const all = this.buf.filter((f) => !!f.pose);
     if (all.length < 4 || !this.poseNodes.length) return Promise.resolve();
     const nearest = (t: number): number => { let bi = 0, bd = Infinity; all.forEach((f, i) => { const d = Math.abs(f.t - t); if (d < bd) { bd = d; bi = i; } }); return bi; };
@@ -212,19 +229,27 @@ export class DunkReplayRecorder {
         const a = all[i - 1], b = all[i] ?? a; return { a, b, k: b.t === a.t ? 0 : Math.max(0, Math.min(1, (t - a.t) / (b.t - a.t))) };
       };
       let cur: { a: Sample; b: Sample; k: number } = { a: contact, b: contact, k: 0 };
-      const skip = () => finish();
+      let rider: TransformNode | null | undefined, lastBall: Vector3 | null = null; const blend = new Vector3();
+      // IMPROVE (2026-10-06): A PAUSED REPLAY IS FROZEN. The cut runs on the engine's clock in onBeforeRender, and the harness keeps
+      // rendering through a pause — so a replay paused on its first cut finished unseen behind the pause card. With `paused` (the mode
+      // passes the harness phase) the clock holds, the recorded pose stays the frame's last word (a still), and the tap / Space that
+      // resumes the game is not also taken as a skip.
+      const isPaused = (): boolean => opts.paused?.() ?? false;
+      const skip = () => { if (!isPaused()) finish(); };
       window.addEventListener('pointerdown', skip);
       const onKey = (e: KeyboardEvent) => { if (e.key === ' ') skip(); };
       window.addEventListener('keydown', onKey);
       // the pose is the LAST writer of the frame (after the clips and every layer that runs on the animations' observable)
       const poseObs = this.scene.onAfterAnimationsObservable.add(() => { if (cur.a.pose && cur.b.pose) this.applyPose(cur.a.pose, cur.b.pose, cur.k); });
       const obs = this.scene.onBeforeRenderObservable.add(() => {
+        if (isPaused()) return;
         rt += this.scene.getEngine().getDeltaTime() / 1000;
         // which segment, and where in the recording
         let left = rt, s = 0;
         while (s < segs.length && left > segs[s].dur) { left -= segs[s].dur; s++; }
         const frozen = s >= segs.length;
-        if (s !== seg) {
+        const newCut = s !== seg;   // a hard cut jumps the clock: the ball goes straight to its place, no ease across the cut
+        if (newCut) {
           seg = s; this.cutNow = s;
           const cam = cutCamera(frozen ? 'poster' : segs[s].c.id, rim, { x: contact.cp.x, y: contact.cp.y, z: contact.cp.z }, approach);
           this.camera.position.set(cam.pos.x, cam.pos.y, cam.pos.z); this.camera.setTarget(new Vector3(cam.target.x, cam.target.y, cam.target.z)); this.camera.fov = cam.fov;
@@ -236,7 +261,26 @@ export class DunkReplayRecorder {
         this.character.setAbsolutePosition(Vector3.Lerp(a.cp, b.cp, k));
         if (a.cq && b.cq) this.character.rotationQuaternion = Quaternion.Slerp(a.cq, b.cq, k);
         else { const d = Math.atan2(Math.sin(b.cy - a.cy), Math.cos(b.cy - a.cy)); this.character.rotation.y = a.cy + d * k; }
-        this.ball.setAbsolutePosition(Vector3.Lerp(a.bp, b.bp, k));
+        // ASSET-POLISH (2026-10-05; owner: "the model will dunk but they won't really be holding the ball with an actual limb,
+        // it'll just be floating"). The triple cut put the ball back at its recorded WORLD position, the bug DUNK-BALL-ARMS-RIM
+        // fixed in play() and this replay was written without: measured in every replayed flight, the ball 0.1–0.54 m off the
+        // replayed palm with the body in the air. The ball rides the node it rode live, in that node's frame. The pose was
+        // written on this frame's onAfterAnimations, which runs before this observer, and the root was placed just above, so
+        // the hand is where it is drawn.
+        const ride = k < 0.5 ? a : b;
+        let bp = Vector3.Lerp(a.bp, b.bp, k);
+        if (ride.anchor && ride.bl) {
+          const both = a.anchor === b.anchor && a.bl && b.bl;
+          bp = Vector3.TransformCoordinates(both ? Vector3.Lerp(a.bl!, b.bl!, k) : ride.bl, freshWorld(ride.anchor));
+        }
+        this.riderName = ride.anchor?.name ?? ''; if (ride.bl) this.riderLocal.copyFrom(ride.bl);
+        // a change of rider (the release at the iron, a cut back to before it) eases out of the old place instead of popping
+        if (newCut) blend.setAll(0);
+        if (ride.anchor !== rider) { if (lastBall && !newCut) blend.copyFrom(lastBall.subtract(bp)); else blend.setAll(0); rider = ride.anchor; }
+        blend.scaleInPlace(Math.exp(-this.scene.getEngine().getDeltaTime() / 1000 / 0.05));
+        bp.addInPlace(blend);
+        (lastBall ??= new Vector3()).copyFrom(bp);
+        this.ball.setAbsolutePosition(bp);
         if (!frozen) {
           const c = segs[s].c, cam = cutCamera(c.id, rim, { x: contact.cp.x, y: contact.cp.y, z: contact.cp.z }, approach);
           const push = 1 - 0.06 * (left / segs[s].dur);   // a slow push-in through the cut
@@ -247,6 +291,7 @@ export class DunkReplayRecorder {
         if (rt >= total) finish();
       });
       const finish = () => {
+        this.riderName = '';
         this.scene.onBeforeRenderObservable.remove(obs); this.scene.onAfterAnimationsObservable.remove(poseObs);
         window.removeEventListener('pointerdown', skip); window.removeEventListener('keydown', onKey);
         // back to the live moment: the root and the ball where they were, the lens as it was

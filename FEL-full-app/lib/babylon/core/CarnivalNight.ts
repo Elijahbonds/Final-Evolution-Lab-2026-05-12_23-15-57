@@ -21,9 +21,43 @@ export function pickNight<T>(pool: readonly T[], seed: number, n = EVENTS_PER_NI
   return out.slice(0, Math.min(n, out.length));
 }
 
-/** The simulated rival's raw score for an event, drawn inside its plausible range. */
-export function rollRival(range: readonly [number, number], rnd: () => number = Math.random): number {
-  return range[0] + rnd() * (range[1] - range[0]);
+/**
+ * A simulated rival run: a fixed number of attempts, each made or missed.
+ * The score is the range mapped by the make rate, so it stays inside the
+ * event's plausible band and is no longer a single dice roll.
+ */
+export function simulateRivalRun(range: readonly [number, number], rnd: () => number = Math.random, attempts = 8, makeRate = RIVAL_BASE_RATE): number {
+  const [lo, hi] = range;
+  const span = hi - lo;
+  const n = Math.max(1, attempts);
+  let made = 0;
+  for (let i = 0; i < n; i++) if (rnd() < makeRate) made += 1;
+  return lo + span * (made / n);
+}
+
+/** The rival's make rate on the night's first event (the flat rate every event used to play at). */
+export const RIVAL_BASE_RATE = 0.55;
+/** IMPROVE (2026-10-06): the rival warms up through the night. Every event after the first adds this to its make rate… */
+export const RIVAL_RATE_PER_EVENT = 0.03;
+/** …and every event the player has already taken adds this (the rival answers a hot hand). */
+export const RIVAL_RATE_PER_WIN = 0.02;
+/** The ceiling: even a fourth event after three wins is 0.70, so the band's top stays a stretch, not the norm. */
+export const RIVAL_RATE_MAX = 0.7;
+
+/**
+ * The rival's make rate for the event at `eventIdx` (0-based) when the player has already won `playerWon` events.
+ * IMPROVE (2026-10-06): the rate was a flat 0.55 inside a fixed band all night, so event 4 played like event 1. The band
+ * stays the event's own (the arena never stakes the rival); only how often the rival hits inside it climbs.
+ */
+export function rivalMakeRate(eventIdx: number, playerWon = 0): number {
+  const r = RIVAL_BASE_RATE + RIVAL_RATE_PER_EVENT * Math.max(0, eventIdx) + RIVAL_RATE_PER_WIN * Math.max(0, playerWon);
+  return Math.min(RIVAL_RATE_MAX, r);
+}
+
+/** The simulated rival's raw score for an event. Court Carnival calls this; the run lives here so the hoops mode file stays untouched.
+ *  `makeRate` defaults to the first event's (see rivalMakeRate). */
+export function rollRival(range: readonly [number, number], rnd: () => number = Math.random, makeRate = RIVAL_BASE_RATE): number {
+  return simulateRivalRun(range, rnd, 8, makeRate);
 }
 
 /** How much of the rival's final score is on the board at `t` (0..1 of the event). Slow start, a surge in the middle,

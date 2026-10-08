@@ -2,12 +2,17 @@
 // Fixes: black skatepark, dark football field, mid-dunk sky collapse.
 
 import {
-  CascadedShadowGenerator, Color3, Color4, DefaultRenderingPipeline, DirectionalLight,
+  CascadedShadowGenerator, Color3, Color4, ColorCurves, DefaultRenderingPipeline, DirectionalLight,
   HemisphericLight, ImageProcessingConfiguration, Scene, ShadowGenerator, Vector3,
 } from '@babylonjs/core';
 import type { AbstractMesh, PBRMaterial, StandardMaterial } from '@babylonjs/core';
-import { MOODS, type VenueMood } from './moods';
-import { tierRigSettings, type QualityTier } from './QualityTier';
+import { MOODS, type VenueMood, type MoodCurves } from './moods';
+import { tierRigSettings, legacyRig, legacyMobilePost, type QualityTier } from './QualityTier';
+import { isLegacyLook, readShadowCacheParam, readMobilePostParam } from './graphicsSetting';
+import { mountShadowCache, shadowCacheWanted, gpuCanCopyShadowMap, type ShadowCacheHandle } from './ShadowCache';
+import { mountKickerLight, type KickerHandle } from './KickerLight';
+import { mountEmissiveGlow, type GlowHandle } from './EmissiveGlow';
+import { captureVenueReflection, type VenueReflectionHandle } from './VenueReflection';
 import { mountEnvironmentIBL } from './EnvironmentIBL';
 import { motionPolicy } from '../../a11y/reducedMotion';
 
@@ -17,10 +22,41 @@ export interface LightRigHandle {
   /** The mounted post pipeline (ACES, bloom, FXAA, sharpen, vignette). */
   pipeline: DefaultRenderingPipeline;
   tier: QualityTier;
+  /** The mood this rig lit — after the place resolver (A9.4), so a mode can read the light it actually got. */
+  mood: VenueMood;
+  /** A9.6: the players-only rim light (KickerLight.ts); null under ?look=legacy. */
+  kicker: KickerHandle | null;
+  /** A9.5: the include-list glow on light fixtures (EmissiveGlow.ts); null on mobile and under ?look=legacy. */
+  glow: GlowHandle | null;
   /** M44: brief exposure pulse for a highlight beat (dunk flush, TD, KO,
    *  goal) — reads as a camera-flash without a hard cut. Self-reverts. */
   flashBeat(): void;
+  /**
+   * ONE OWNER FOR THE GRADE (A9.3). The resting exposure and vignette every pulse returns to — the impact frame and the
+   * speed vignette (ModeHarness composes over this object, by reference) and the flash beat. Starts at the mood's.
+   */
+  rest: { exposure: number; vignette: number };
+  /** Take the pipeline's current exposure/vignette as the new rest — the harness calls it once load() is done, so a
+   *  deliberate load-time grade (WeatherFx's time of day) is kept instead of being undone by the first impact. */
+  adoptRest(): void;
+  /** A9.7: after load(), capture the venue once for the glossy materials (high tier; false elsewhere). `at` = the play
+   *  area. The capture waits for the scene to be ready, so a scanned venue map still streaming in is in the picture. */
+  captureVenue(at?: Vector3 | null): boolean;
+  /** The venue capture, once taken (high tier). */
+  readonly venueProbe: VenueReflectionHandle | null;
+  /** A9.10: the cached static shadows (ShadowCache.ts) — the phones' single map; null elsewhere. Armed by
+   *  captureVenue (the harness calls it once load() is done). Its setRefreshEvery is the perf governor's shadow lever. */
+  shadowCache: ShadowCacheHandle | null;
   dispose(): void;
+}
+
+/** The mood's split-tone grade as Babylon ColorCurves (moods.ts MoodDef.curves). */
+export function moodColorCurves(c: MoodCurves): ColorCurves {
+  const cc = new ColorCurves();
+  cc.globalSaturation = c.globalSat;
+  cc.highlightsHue = c.highlightsHue; cc.highlightsDensity = c.highlightsDensity; cc.highlightsSaturation = c.highlightsSat;
+  cc.shadowsHue = c.shadowsHue; cc.shadowsDensity = c.shadowsDensity; cc.shadowsSaturation = c.shadowsSat;
+  return cc;
 }
 
 /**
@@ -40,7 +76,13 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
   const M = MOODS[mood];
   // Ship pass (2026-09-02): desktop 60 fps / mobile 30 fps. The tier decides
   // shadow map size, cascades on outdoor moods, sharpen and bloom weight.
-  const T = tierRigSettings(tier, mood);
+  const legacy = isLegacyLook();   // ?look=legacy: the shared look as it shipped before 2026-10-06 (before/after shots)
+  const T0 = legacy ? legacyRig(tierRigSettings(tier, mood), tier) : tierRigSettings(tier, mood);
+  const T = tier === 'mobile' && readMobilePostParam() === '0' ? legacyMobilePost(T0) : T0;   // the phase-2 A/B
+
+  // A9.3: the rig owns the scene's grade. A spec venue built after this (NexusWebScene.applyVenueGrade) stands down
+  // instead of overwriting the mood — the pipeline reads the SAME scene.imageProcessingConfiguration it would write.
+  if (!legacy) (scene.metadata ??= {}).felGradeOwner = 'rig';
 
   scene.clearColor = Color4.FromHexString(M.clearColor + 'ff');
   scene.fogMode = Scene.FOGMODE_NONE;          // fog was blacking out high cameras
@@ -74,7 +116,7 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
     csm.cascadeBlendPercentage = 0.1;
     csm.usePercentageCloserFiltering = true;
     csm.filteringQuality = ShadowGenerator.QUALITY_MEDIUM;
-    csm.darkness = 0.35;
+    csm.darkness = M.shadowDarkness ?? 0.35;   // overcast joined the cascades 2026-10-06 (A9.4) with its own weak shadow
     // SHADOW ACNE AT A GRAZING SUN (dunk visuals pass, 2026-09-16). Caught under the dunker's feet on the Venice court:
     // not a body shadow but four hard black WEDGES radiating out of her shoes, the shape a shadow map makes when a
     // surface shadows itself. Every outdoor mood here puts the sun low (it is a sunset look), and a low sun is the worst
@@ -95,7 +137,11 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
   // Pass 7 follow-up (2026-09-06): the engine's real draw counter showed ~8 draws per active mesh — every caster is drawn
   // again into each cascade. Scenery that can never throw a useful shadow stays out of the map: the scanned venue maps and
   // seas (bounding radius > 25 m), the sky and backdrop domes, the boardwalk flats, the gulls, the contact-shadow discs.
-  const NEVER_CAST = /^(vb_|bk_|nexus_sky|sky|fel_ground|venue_props_)|_contact$|_gull_|nexus_venue_map/i;
+  // A9.10 (2026-10-06): HUD-in-the-world and light sprites joined the list. The shadow cache's per-frame breakdown on
+  // the dunk named them: 24 phone-flash discs, the 5 shot-meter planes, the player ring and its glyph tag, the 4 gulls —
+  // 35 draws into the shadow map every frame, for a camera flash throwing a shadow (it is light), a gauge shadowing the
+  // court and a ring shadowing the floor it lies on.
+  const NEVER_CAST = /^(vb_|bk_|nexus_sky|sky|fel_ground|venue_props_|phone_flash_|shot_meter|player_ring|player_tag|gull_\d)|_contact$|_gull_|nexus_venue_map/i;
   // FOLIAGE DOES NOT CAST (2026-09-12). Measured on 1v1 with SceneInstrumentation: 377 shadow
   // casters against 150 active meshes, and 377 x 3 cascades accounts for essentially all 1136 draw
   // calls — the draw budget IS the shadow pass. Grouping the casters by name showed the bulk is
@@ -128,6 +174,12 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
   for (const m of scene.meshes as AbstractMesh[]) classify(m);
   const autoObserver = scene.onNewMeshAddedObservable.add((m) => classify(m as AbstractMesh));
 
+  // A9.10: the static scenery's shadow is drawn once, not every frame (ShadowCache.ts). Mounted now, armed after load.
+  const shadowCache = shadowCacheWanted({
+    tierWants: T.shadowCache, cascaded: T.cascaded, legacy, param: readShadowCacheParam(),
+    gpuCanCopy: gpuCanCopyShadowMap(scene.getEngine()),
+  }) ? mountShadowCache(scene, shadows, sun) : null;
+
   const pipeline = new DefaultRenderingPipeline('fel_pipeline', true, scene, scene.cameras);
   pipeline.imageProcessing.toneMappingEnabled = true;
   pipeline.imageProcessing.toneMappingType = ImageProcessingConfiguration.TONEMAPPING_ACES;
@@ -138,25 +190,59 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
   pipeline.bloomThreshold = M.bloomThreshold;
   pipeline.bloomWeight = M.bloomWeight;
   pipeline.bloomScale = M.bloomScale * T.bloomScaleMul;
-  // M44: free anti-aliasing + a light sharpen pass (edges were raw/jagged)
-  pipeline.fxaaEnabled = true;
+  pipeline.bloomKernel = T.bloomKernel;
+  // A9.2 (2026-10-06): real anti-aliasing. MSAA on the pipeline's first target where the tier can pay for it; FXAA stays
+  // as the phones' only AA (M44). Set once here, at mount — never toggled at runtime (a rebuild compiles shaders).
+  pipeline.samples = T.msaaSamples;
+  // the backing density the canvas fit chose (the harness fits the canvas before it mounts the rig)
+  const backingDpr = 1 / Math.max(1e-3, scene.getEngine().getHardwareScalingLevel());
+  pipeline.fxaaEnabled = T.fxaa && backingDpr < T.fxaaMaxDpr;
   pipeline.sharpenEnabled = T.sharpen;               // mobile skips the full-screen pass
   pipeline.sharpen.edgeAmount = 0.25;                             //TUNE(elijah)
   // M44: mood-tinted vignette so the grade reads on the whole frame
   pipeline.imageProcessing.vignetteEnabled = true;
   pipeline.imageProcessing.vignetteColor.set(...M.vignetteColor);
   pipeline.imageProcessing.vignetteWeight = M.vignetteWeight;
+  // A9.3: the mood's colour grade, mounted with the pipeline (one define on a pass that already runs; never toggled).
+  if (!legacy) {
+    pipeline.imageProcessing.colorCurvesEnabled = true;
+    pipeline.imageProcessing.colorCurves = moodColorCurves(M.curves);
+  }
+  const rest = { exposure: M.exposure, vignette: M.vignetteWeight };
+  // A9.6: a rim light on the players only — every tier (one shadowless light on a handful of bodies costs no draws)
+  const kicker = legacy ? null : mountKickerLight(scene, mood);
+  // A9.5: lamp heads, floods, LED strips and neon glow on the tiers that can pay for it; mounted now, before load()
+  // builds the venue, so every fixture's glow shader compiles during the load and never mid-play
+  const glow = T.glow ? mountEmissiveGlow(scene, tier, mood) : null;
+  let venueProbe: VenueReflectionHandle | null = null;
 
   liftBlackMaterials(scene);
 
   let flashObs: ReturnType<Scene['onBeforeRenderObservable']['add']> | null = null;
   return {
-    hemi, sun, shadows, pipeline, tier,
+    hemi, sun, shadows, pipeline, tier, mood, kicker, glow, rest, shadowCache,
+    adoptRest() {
+      if (legacy) return;   // the pre-pass harness kept the mood's grade as its rest, whatever load() wrote
+      rest.exposure = pipeline.imageProcessing.exposure;
+      rest.vignette = pipeline.imageProcessing.vignetteWeight;
+    },
+    captureVenue(at) {
+      shadowCache?.arm();   // load() is done: the venue's casters are in — watch, then bake the still ones once
+      if (!T.venueProbe) return false;
+      const where = at?.clone() ?? null;
+      scene.executeWhenReady(() => {
+        if (scene.isDisposed) return;
+        venueProbe?.dispose();   // a retried load captures again
+        venueProbe = captureVenueReflection(scene, where);
+      });
+      return true;
+    },
+    get venueProbe() { return venueProbe; },
     flashBeat() {
       // HOTFIX (2026-09-24): reduced motion — no exposure flash (a made three, a momentum tier, the storm's lightning:
       // the thunder still rolls, the sky just does not strobe)
       if (!motionPolicy().flash) return;
-      const base = M.exposure;
+      const base = rest.exposure;   // A9.3: the owned rest, not the raw mood (a night's dimmed exposure stays dimmed)
       pipeline.imageProcessing.exposure = base * 1.35;            //TUNE(elijah)
       if (flashObs) return;
       flashObs = scene.onBeforeRenderObservable.add(() => {
@@ -171,6 +257,11 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
     dispose() {
       if (autoObserver) scene.onNewMeshAddedObservable.remove(autoObserver);
       if (flashObs) scene.onBeforeRenderObservable.remove(flashObs);
+      if ((scene.metadata as { felGradeOwner?: string } | null)?.felGradeOwner === 'rig') delete scene.metadata.felGradeOwner;
+      shadowCache?.dispose();
+      kicker?.dispose();
+      glow?.dispose();
+      venueProbe?.dispose();
       hemi.dispose(); sun.dispose(); shadows.dispose(); pipeline.dispose();
       disposeEnv();
     },

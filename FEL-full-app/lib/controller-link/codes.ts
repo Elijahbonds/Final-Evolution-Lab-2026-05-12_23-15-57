@@ -4,7 +4,7 @@ import { customAlphabet } from 'nanoid';
 
 // No 0/O/1/I/L — these get read off a TV across a room and typed on a phone,
 // and every ambiguous glyph is a support ticket.
-const CODE_ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
+export const CODE_ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
 /**
  * SIX characters (mission Phase B: "shows a 6-char join code + QR").
  *

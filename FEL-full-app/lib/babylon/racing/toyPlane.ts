@@ -16,11 +16,20 @@
 import { Color3, Mesh, MeshBuilder, TransformNode, Vector3 } from '@babylonjs/core';
 import type { PBRMaterial, Scene } from '@babylonjs/core';
 import { VenueKit } from '../visual/VenueKit';
+import { vehicleEnvFor, PLANE_ENV_BASE } from './vehicleLight';   // 10-phase pass, phase 7
+import { propBlurK, PROP_BLUR } from './vehicleMotion';           // 10-phase pass, phase 9
+import type { VenueMood } from '../scene/moods';
 
 export interface ToyPlane {
   root: TransformNode;
   /** Turned by the mode, fast. */
   prop: TransformNode;
+  /** The blur disc that takes over from the blades at high rpm (phase 9). */
+  propDisc: Mesh;
+  /** The two blades — faded toward the disc as the rpm climbs (phase 9). */
+  propBlades: Mesh[];
+  /** The wingtip anchors (left, right) the phase-8 trails stream from — model-space, so they ride the scale. */
+  wingtips: [TransformNode, TransformNode];
   /** Where the pilot's hips go (local to root). */
   seat: TransformNode;
   /** The scarf's anchor at the pilot's neck (local to root). */
@@ -28,6 +37,10 @@ export interface ToyPlane {
   body: PBRMaterial;
   /** the primitive parts (models pass phase 5: a dressed Meshy body hides them) */
   parts: Mesh[];
+  /** IMPROVE (2026-10-06), aeroaces #16: the dressed body has arrived — dispose the primitives and their materials
+   *  instead of keeping ~25 hidden meshes (and their shadow-caster slots) per plane for the whole race. The prop,
+   *  wingtip, seat and scarf anchors are TransformNodes and stay. Idempotent. */
+  dropPrimitives(): void;
   dispose(): void;
 }
 
@@ -36,23 +49,54 @@ export const TOY_SCALE = 0.62;
 /** Where the pilot's hips sit, in MODEL units (scaled to the root by TOY_SCALE). */
 export const TOY_SEAT = { y: 0.95, z: 0.2 };
 
-const paint = (scene: Scene, name: string, hex: string, e = 0.08, r = 0.45): PBRMaterial => {
+const paint = (scene: Scene, name: string, hex: string, e = 0.08, r = 0.45, env = PLANE_ENV_BASE): PBRMaterial => {
   const m = VenueKit.paint(scene, name, hex, e, r);
-  m.environmentIntensity = 0.55; m.metallic = 0.05;
+  m.environmentIntensity = env; m.metallic = 0.05;
   return m;
 };
 
-export function buildToyPlane(scene: Scene, name: string, bodyHex: string, trimHex: string, opts: { toyPilot?: boolean } = {}): ToyPlane {
+// IMPROVE (2026-10-06), aeroaces #18: SHARED PAINT. Every toy plane made its own dark, cream, prop-blur, skin and cap
+// materials — the same five colours eight times over (40 materials, of which 10 differ). Only the body and the trim
+// carry a plane's tint, so those stay per plane and the rest are shared per scene, keyed by colour and light, and
+// counted: the last plane to let go of one disposes it.
+const sharedPaints = new WeakMap<Scene, Map<string, { mat: PBRMaterial; users: number }>>();
+function sharedPaint(scene: Scene, key: string, hex: string, e: number, r: number, env: number): { mat: PBRMaterial; release(): void } {
+  let byKey = sharedPaints.get(scene);
+  if (!byKey) { byKey = new Map(); sharedPaints.set(scene, byKey); }
+  const k = `${key}|${hex}|${e}|${r}|${env.toFixed(3)}`;
+  let entry = byKey.get(k);
+  if (!entry) { entry = { mat: paint(scene, `toy_shared_${key}`, hex, e, r, env), users: 0 }; byKey.set(k, entry); }
+  entry.users++;
+  let released = false;
+  const held = entry;
+  return {
+    mat: held.mat,
+    release() {
+      if (released) return; released = true;
+      if (--held.users > 0) return;
+      held.mat.dispose();
+      if (byKey!.get(k) === held) byKey!.delete(k);
+    },
+  };
+}
+/** How many shared toy-plane materials a scene holds (the share's pin). */
+export function sharedToyPaints(scene: Scene): number { return sharedPaints.get(scene)?.size ?? 0; }
+
+export function buildToyPlane(scene: Scene, name: string, bodyHex: string, trimHex: string, opts: { toyPilot?: boolean; mood?: VenueMood } = {}): ToyPlane {
+  // phase 7: the flat 0.55 was tuned under goldenHour; the mood scales it (a flat-light mood leans on the IBL)
+  const env = vehicleEnvFor(PLANE_ENV_BASE, opts.mood ?? 'goldenHour');
   const root = new TransformNode(`toy_${name}`, scene);
   // THE MODEL IS BUILT BIG AND SHOWN AT TOY_SCALE: authored against a 2 m fuselage for easy numbers, the plane dwarfed its
   // pilot (a hero 1.3 m tall in an 8 m aircraft read as a doll in a jumbo — measured on the first frame). The body parts
   // hang off `model`; the seat and scarf anchors stay on the root so the pilot keeps its own scale.
   const model = new TransformNode(`toy_model_${name}`, scene);
   model.parent = root; model.scaling.setAll(TOY_SCALE);
-  const body = paint(scene, `toy_body_${name}`, bodyHex, 0.1, 0.38);
-  const trim = paint(scene, `toy_trim_${name}`, trimHex, 0.12, 0.4);
-  const dark = paint(scene, `toy_dark_${name}`, '#20232b', 0.03, 0.6);
-  const cream = paint(scene, `toy_cream_${name}`, '#f6efdc', 0.12, 0.5);
+  const body = paint(scene, `toy_body_${name}`, bodyHex, 0.1, 0.38, env);
+  const trim = paint(scene, `toy_trim_${name}`, trimHex, 0.12, 0.4, env);
+  const held: { release(): void }[] = [];
+  const share = (key: string, hex: string, e: number, r: number): PBRMaterial => { const h = sharedPaint(scene, key, hex, e, r, env); held.push(h); return h.mat; };
+  const dark = share('dark', '#20232b', 0.03, 0.6);
+  const cream = share('cream', '#f6efdc', 0.12, 0.5);
   const parts: Mesh[] = [];
   const add = <T extends Mesh>(m: T, mat: PBRMaterial, parent: TransformNode = model): T => { m.material = mat; m.parent = parent; m.isPickable = false; parts.push(m); return m; };
 
@@ -70,10 +114,19 @@ export function buildToyPlane(scene: Scene, name: string, bodyHex: string, trimH
   const prop = new TransformNode(`toy_prop_${name}`, scene); prop.parent = model; prop.position.z = 2.45;
   const spinner = add(MeshBuilder.CreateSphere(`toy_spinner_${name}`, { diameterX: 0.6, diameterY: 0.6, diameterZ: 0.95, segments: 12 }, scene), cream, prop);
   spinner.position.z = 0.15;
+  const propBlades: Mesh[] = [];
   for (const s of [0, 1]) {
     const blade = add(MeshBuilder.CreateCapsule(`toy_blade_${name}_${s}`, { height: 2.6, radius: 0.16, tessellation: 10, subdivisions: 2 }, scene), dark, prop);
     blade.rotation.z = s * Math.PI; blade.position.y = 0; blade.scaling.set(1, 1, 0.35);
+    propBlades.push(blade);
   }
+  // the blur disc (phase 9): past the tune's blur gate the blades smear into this — a translucent disc
+  // fading in as the blades fade out, the way a fast prop actually photographs. Its own material (the
+  // blades share `dark` with the struts, and the chase camera watches the disc's back).
+  const blurM = share('blur', '#4a505c', 0.02, 0.7);
+  blurM.backFaceCulling = false;
+  const propDisc = add(MeshBuilder.CreateDisc(`toy_blur_${name}`, { radius: 1.32, tessellation: 28 }, scene), blurM, prop);
+  propDisc.visibility = 0;
 
   // ── one thick straight wing with round tips, a stripe of trim ──
   const wing = add(MeshBuilder.CreateCapsule(`toy_wing_${name}`, { height: 8.6, radius: 0.55, tessellation: 14, subdivisions: 4 }, scene), trim);
@@ -112,28 +165,54 @@ export function buildToyPlane(scene: Scene, name: string, bodyHex: string, trimH
     disc.rotation.z = Math.PI / 2; disc.position.set(side * 1.02, 0.1, -0.7);
   }
 
+  // the wingtip anchors: the wing is an 8.6-long capsule across X at (0, -0.35, 0.35) — the tips are where
+  // the air comes off in a bank. Model-space (they hang off `model`), so the mode never does scale maths.
+  const wingtips = [-1, 1].map((side) => {
+    const tip = new TransformNode(`toy_wingtip_${name}_${side}`, scene);
+    tip.parent = model; tip.position.set(side * 4.25, -0.3, 0.35);
+    return tip;
+  }) as [TransformNode, TransformNode];
+
   const seat = new TransformNode(`toy_seat_${name}`, scene); seat.parent = root; seat.position.set(0, TOY_SEAT.y * TOY_SCALE, TOY_SEAT.z * TOY_SCALE);
   const scarfAnchor = new TransformNode(`toy_scarf_${name}`, scene); scarfAnchor.parent = root; scarfAnchor.position.set(0, TOY_SEAT.y * TOY_SCALE + 0.5, (TOY_SEAT.z - 0.15) * TOY_SCALE);   // the pilot's neck: hips + ~0.5 m at the mode's pilot scale
 
   if (opts.toyPilot) {
     // a simple toy pilot for the rivals: head, leather cap, goggles, shoulders
-    const skin = paint(scene, `toy_skin_${name}`, '#d9a27a', 0.08, 0.7);
+    const skin = share('skin', '#d9a27a', 0.08, 0.7);
     const shoulders = add(MeshBuilder.CreateSphere(`toy_pshoulders_${name}`, { diameterX: 1.1, diameterY: 0.7, diameterZ: 0.7, segments: 10 }, scene), trim);
     shoulders.position.set(0, 1.25, TOY_SEAT.z);
     const head = add(MeshBuilder.CreateSphere(`toy_phead_${name}`, { diameter: 0.72, segments: 12 }, scene), skin);
     head.position.set(0, 1.85, TOY_SEAT.z);
-    const capM = paint(scene, `toy_cap_${name}`, '#6b4a2f', 0.04, 0.8);
+    const capM = share('cap', '#6b4a2f', 0.04, 0.8);
     const cap = add(MeshBuilder.CreateSphere(`toy_pcap_${name}`, { diameter: 0.78, segments: 12, slice: 0.55 }, scene), capM);
     cap.position.set(0, 1.9, TOY_SEAT.z);
     const goggles = add(MeshBuilder.CreateTorus(`toy_pgog_${name}`, { diameter: 0.72, thickness: 0.12, tessellation: 16 }, scene), dark);
     goggles.position.set(0, 1.93, TOY_SEAT.z); goggles.rotation.x = 0.1;
   }
 
-  return {
-    root, prop, seat, scarfAnchor, body,
-    parts,
-    dispose() { for (const p of parts) p.dispose(); model.dispose(); root.dispose(); },
+  let dropped = false;
+  const dropPrimitives = (): void => {
+    if (dropped) return; dropped = true;
+    for (const p of parts) p.dispose();
+    parts.length = 0; propBlades.length = 0;
+    body.dispose(); trim.dispose();
+    for (const h of held) h.release();
   };
+  return {
+    root, prop, propDisc, propBlades, wingtips, seat, scarfAnchor, body,
+    parts,
+    dropPrimitives,
+    dispose() { dropPrimitives(); model.dispose(); root.dispose(); },
+  };
+}
+
+/** Phase 9: the prop's blur for an rpm — the disc fades in as the blades fade out (per-mesh visibility:
+ *  the blades share their material with the struts, so a material alpha would fade half the plane). */
+export function blurProp(plane: ToyPlane, rpm: number, from: number, to: number): void {
+  if (plane.propDisc.isDisposed()) return;   // IMPROVE (2026-10-06): the dressed body's own prop is the one on show
+  const k = propBlurK(rpm, from, to);
+  plane.propDisc.visibility = k * PROP_BLUR.discAlpha;
+  for (const b of plane.propBlades) b.visibility = 1 - k * PROP_BLUR.bladeFade;
 }
 
 /** The pilot's scarf: a ribbon that streams back off the neck and ripples with speed. */

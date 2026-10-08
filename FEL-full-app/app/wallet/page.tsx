@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { ShoppingCart, Gem } from 'lucide-react';
 import { authOptions } from '@/lib/auth';
+import { loginPath } from '@/lib/auth/safeNext';
 import { LedgerHistory } from '@/components/wallet/ledger-history';
 import { ExchangeWidget } from '@/components/wallet/exchange-widget';
 import { purchasesEnabledFromEnv, shardSaleCopy } from '@/lib/wallet/purchases';
@@ -11,7 +12,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function WalletPage() {
   const session = await getServerSession(authOptions);
-  if (!session) redirect('/login');
+  if (!session) redirect(loginPath('/wallet'));
   // FEATURES-UX-SHOP: "Get Shards" led to a store that said COMING SOON — the button now carries the purchases truth itself.
   const shardCopy = shardSaleCopy(purchasesEnabledFromEnv());
   return (

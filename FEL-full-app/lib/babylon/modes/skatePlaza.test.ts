@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   PLAZA_CROWD, SKATE_PLAZA, SPAWN_CLEAR_M, plazaCrowd, plazaMarkers, plazaRails, plazaSolids,
+  plazaWalls, RIDE_FACE_MIN_LEN, RIDE_FACE_MIN_H,
 } from './skatePlaza';
 import { SKATE_VENUES } from '../nexus/boardVenues';
 
@@ -179,5 +180,37 @@ describe('where the crowd stands', () => {
     expect(c.some((x) => x.fx < -0.3)).toBe(true);
     expect(c.some((x) => x.fz > 0.3)).toBe(true);
     expect(c.some((x) => x.fz < -0.3)).toBe(true);
+  });
+});
+
+// ASSET-POLISH (2026-10-05; owner: "add wall rides … make it a better skating game experience"). The park had one rideable
+// face and the fences; a kick plant had nowhere to happen. Every upright solid now offers its faces.
+describe.each(VENUES)('the plaza walls on %s (bound %s)', (_id, bound) => {
+  const walls = plazaWalls(bound);
+  const solids = plazaSolids(bound);
+  it('every face looks out of its own solid, into the park', () => {
+    for (const w of walls.filter((x) => !/fence/.test(x.label))) {
+      const mid = { x: (w.a.x + w.b.x) / 2, z: (w.a.z + w.b.z) / 2 };
+      // the solid the face belongs to is the one whose centre is behind the face (against the normal)
+      const owner = solids.find((s) => Math.abs((s.x - mid.x) * w.nx + (s.z - mid.z) * w.nz + Math.min(s.width, s.depth) / 2) < 0.01
+        || Math.abs((s.x - mid.x) * w.nx + (s.z - mid.z) * w.nz + Math.max(s.width, s.depth) / 2) < 0.01);
+      expect(owner, `${w.label}: no solid behind it`).toBeTruthy();
+      expect(Math.hypot(w.nx, w.nz)).toBeCloseTo(1, 9);
+    }
+  });
+  it('rides the long tall faces, plants off the short ones, and never makes a bank or a bin a wall', () => {
+    const rideable = walls.filter((w) => w.rideable !== false && !/fence/.test(w.label));
+    for (const w of rideable) {
+      expect(Math.hypot(w.b.x - w.a.x, w.b.z - w.a.z), w.label).toBeGreaterThanOrEqual(RIDE_FACE_MIN_LEN - 1e-9);
+      expect(w.height, w.label).toBeGreaterThanOrEqual(RIDE_FACE_MIN_H);
+    }
+    expect(walls.some((w) => /pyramid|bin|spine/.test(w.label))).toBe(false);
+    expect(walls.some((w) => w.rideable === false)).toBe(true);                 // somewhere to kick plant that is not a ride
+    expect(walls.find((w) => w.label === 'the wallride')?.lean).toBeGreaterThan(0);   // the big wall keeps its lean
+  });
+  it('has a street wall in the open that rides from both sides, besides the big one on the fence', () => {
+    const street = walls.filter((w) => w.rideable !== false && /wallride \((north|south) face\)/.test(w.label));
+    expect(street.map((w) => w.label).sort()).toEqual(['the wallride (north face)', 'the wallride (south face)']);
+    for (const w of street) expect(Math.abs(w.a.z), 'clear of the fence').toBeLessThan(bound - 3);
   });
 });

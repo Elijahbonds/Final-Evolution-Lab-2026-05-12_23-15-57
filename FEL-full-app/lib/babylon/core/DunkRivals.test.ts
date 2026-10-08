@@ -8,8 +8,9 @@
 
 import { describe, it, expect } from 'vitest';
 import {
-  DUNK_RIVALS, DEFAULT_RIVAL, rivalForNight, rivalById, rivalIntro, hitSignature,
+  DUNK_RIVALS, DEFAULT_RIVAL, rivalForNight, rivalById, rivalIntro, hitSignature, nextRival, takeNextRival,
 } from './DunkRivals';
+import { ATHLETE_ROSTER, rosterBodyUrl } from './athleteRoster';
 
 describe('DunkRivals — the invariant', () => {
   // THE POINT OF THE FILE.
@@ -87,5 +88,36 @@ describe('DunkRivals — the words', () => {
   it('gives every rival a signature that is a real trick label', () => {
     const labels = new Set(['WINDMILL', '360', 'EASTBAY', 'TOMAHAWK', 'BETWEEN THE LEGS', 'SCORPION', 'LOST & FOUND', 'HIDE & SEEK']);
     for (const r of DUNK_RIVALS) expect(labels.has(r.signature)).toBe(true);
+  });
+});
+
+// WHO WALKS OUT (asset-polish, owner 2026-10-05: "make sure the rival that you play against alternates and it's not the
+// same person each time"). Three faults, each pinned: every visit opened on night 1 (CASS), GO AGAIN never re-picked
+// (CASS all session), and all five spawned on one body (CASS's face, whatever the name said).
+
+describe('the rival you face walks on, and is somebody', () => {
+  it('the next rival is never the last one, from any starting point', () => {
+    for (const r of DUNK_RIVALS) expect(nextRival(r.id).id).not.toBe(r.id);
+  });
+  it('walking on meets all five before anyone comes round again', () => {
+    let id: string | null = null; const met: string[] = [];
+    for (let i = 0; i < DUNK_RIVALS.length; i++) { const r = nextRival(id); met.push(r.id); id = r.id; }
+    expect(new Set(met).size).toBe(DUNK_RIVALS.length);
+  });
+  it('no memory, or a stale id, still gives a real rival', () => {
+    expect(DUNK_RIVALS).toContain(nextRival(null));
+    expect(DUNK_RIVALS).toContain(nextRival('somebody-retired'));
+  });
+  it('takeNextRival never hands out the same rival twice in a row (no storage in tests: the in-memory walk)', () => {
+    let prev = takeNextRival();
+    for (let i = 0; i < 12; i++) { const r = takeNextRival(); expect(r.id).not.toBe(prev.id); prev = r; }
+  });
+  it('five rivals, five different bodies, every one a real roster body', () => {
+    const bodies = DUNK_RIVALS.map((r) => r.body);
+    expect(new Set(bodies).size).toBe(DUNK_RIVALS.length);
+    for (const r of DUNK_RIVALS) {
+      expect(ATHLETE_ROSTER.map((a) => a.key), r.name).toContain(r.body);
+      expect(rosterBodyUrl(r.body), r.name).toMatch(/^\/models\/athletes\/.+\.glb$/);
+    }
   });
 });

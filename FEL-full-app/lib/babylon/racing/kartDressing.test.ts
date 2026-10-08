@@ -172,3 +172,41 @@ describe('the setting', () => {
     }
   });
 });
+
+// ── 10-PHASE PASS, phase 6 (2026-10-03): the venue family's own band past the event dressing ──────────────────────
+import { kartSettingFor } from './kartDressing';
+import { existsSync } from 'node:fs';
+
+describe('the setting band (phase 6)', () => {
+  it('every course gets a band, and every prop in it names a GLB that ships in the repo', () => {
+    for (const c of allKartCircuits()) {
+      const band = kartSettingFor(c);
+      expect(band.length, c.course.id).toBeGreaterThan(10);
+      for (const p of band) {
+        expect(existsSync(`public/models/props/${p.kit}/${p.model}.glb`), `${p.kit}/${p.model}`).toBe(true);
+      }
+    }
+  });
+
+  it('keeps the whole band off the tarmac — checked against the WHOLE line, not the metre it grew from', () => {
+    for (const c of allKartCircuits()) {
+      for (const p of kartSettingFor(c)) {
+        const at = locateOnLine(c.line, p.at[0], p.at[2]);
+        expect(Math.abs(at.lateral), `${c.course.id} ${p.model} at ${p.at[0].toFixed(0)},${p.at[2].toFixed(0)}`).toBeGreaterThan(c.halfWidth + 4.5);
+      }
+    }
+  });
+
+  it('is deterministic — the same course grows the same place every load', () => {
+    for (const c of allKartCircuits()) expect(kartSettingFor(c)).toEqual(kartSettingFor(c));
+  });
+
+  it('dresses each venue as itself: palms at the beach and the quay, pines on the mountain, the city under the rooftops, no trees in orbit', () => {
+    const byVenue = new Map(allKartCircuits().map((c) => [c.course.venue, kartSettingFor(c)] as const));
+    expect(byVenue.get('park')!.some((p) => p.model.startsWith('tree_palm'))).toBe(true);
+    expect(byVenue.get('harbor')!.some((p) => p.model.startsWith('tree_palm'))).toBe(true);
+    expect(byVenue.get('slope')!.some((p) => p.model.startsWith('tree_pine'))).toBe(true);
+    expect(byVenue.get('street')!.some((p) => p.kit === 'city-suburban')).toBe(true);
+    expect(byVenue.get('orbit')!.every((p) => p.kit === 'racing')).toBe(true);
+  });
+});

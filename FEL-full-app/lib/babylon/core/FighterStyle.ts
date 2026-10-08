@@ -22,6 +22,8 @@
 //
 // Pure: no Babylon, no scene.
 
+import type { PrqGrade } from '../../prq';
+
 /** A fighter's two earned numbers, 0..100. */
 export interface FightRatings {
   /** How fast the hands and feet are: startup, cancels, how long a window stays open. */
@@ -52,6 +54,23 @@ export function ratingsFrom(prq: {
 function clamp01to100(v: number): number { return Math.max(0, Math.min(100, v)); }
 
 export const BASELINE_RATINGS: FightRatings = { quickness: BASELINE_RATING, force: BASELINE_RATING };
+
+/**
+ * IMPROVE (2026-10-06): THE DRAGON CAN BE EARNED. The gate is force 78 and every duel mode fought at the 50 baseline,
+ * because no PRQ ever reached the ratings — only the `?fight=` dev override did, so the finisher a scan was meant to
+ * unlock was unreachable for every real player. The harness does carry the PRQ BAND (`ctx.prqBand`); this turns it
+ * into ratings, on the same band scores Karate Endless already reads its vitals off.
+ *
+ * The PrqVitals rules hold: a guest (no band) is the READY baseline, and RECOVERING is never a penalty — it fights at
+ * the baseline too. PRIMED earns the evade and the counter throw; ELITE earns the DRAGON and the STORM route.
+ */
+export const BAND_RATING: Readonly<Record<PrqGrade['key'], number>> = {
+  RECOVERING: BASELINE_RATING, READY: BASELINE_RATING, PRIMED: 70, ELITE: 90,
+};
+export function ratingsForBand(band?: PrqGrade['key'] | null): FightRatings {
+  const v = (band && BAND_RATING[band]) || BASELINE_RATING;
+  return ratingsFrom({ agility: v, speed: v, flexibility: v, power: v, strength: v, mental: v });
+}
 
 /** The earned moves. The basics are never gated — a fresh fighter is never helpless. */
 export type FightMove = 'jab' | 'kick' | 'heavy' | 'block' | 'evade' | 'parry' | 'counter_throw' | 'dragon';

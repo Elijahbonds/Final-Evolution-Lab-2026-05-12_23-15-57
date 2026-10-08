@@ -16,8 +16,11 @@ export default defineConfig({
     // `lib/**/*.test.tsx` was added 2026-09-21 for the same reason components/ was: a .tsx test written beside a
     // .tsx module under lib/ (CaptionRegion lives there) matched no pattern, so it would have been collected by
     // nobody and passed silently forever — which is the failure this include list exists to prevent.
+    // `tests/**/*.test.tsx` was added 2026-10-07 when tests/screen-a/live-hud.test.tsx (app/ is outside the includes,
+    // so the HUD render test lives under tests/) was found to match no pattern either: written 2026-10-07, collected
+    // by nobody, passing silently.
     include: [
-      'lib/**/*.test.ts', 'lib/**/*.test.tsx', 'scripts/**/*.suite.test.ts', 'tests/**/*.test.ts',
+      'lib/**/*.test.ts', 'lib/**/*.test.tsx', 'scripts/**/*.suite.test.ts', 'tests/**/*.test.ts', 'tests/**/*.test.tsx',
       'components/**/*.test.ts', 'components/**/*.test.tsx',
     ],
     // Babylon's NullEngine work and the 3000-sample statistical checks are not

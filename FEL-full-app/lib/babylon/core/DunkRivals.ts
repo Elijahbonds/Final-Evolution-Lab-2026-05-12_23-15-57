@@ -33,6 +33,9 @@ export interface DunkRival {
   /** The dunk they are known for — the banner names it when they land their best one. */
   signature: string;
   tint: string;
+  /** Their face: the athleteRoster key of the body they wear, every night. Five rivals, five people (asset-polish
+   *  2026-10-05: every rival used to spawn on the same roster body, so TY, PILOT, ZO and STACK all had CASS's face). */
+  body: string;
 }
 
 /**
@@ -40,11 +43,11 @@ export interface DunkRival {
  * rather than a hand-written list, so adding a rival out of order fails rather than quietly inverting it.
  */
 export const DUNK_RIVALS: readonly DunkRival[] = [
-  { id: 'cass',  name: 'CASS',   tag: 'Never misses. Never amazes.',        reach: 0.86, risk: 0.70, signature: 'TOMAHAWK',         tint: '#8fe0a0' },
-  { id: 'ty',    name: 'TY',     tag: 'Power. All night, every night.',      reach: 0.94, risk: 0.86, signature: 'WINDMILL',         tint: '#ffd75e' },
-  { id: 'pilot', name: 'PILOT',  tag: 'Reads the room, then takes it.',      reach: 1.00, risk: 1.00, signature: '360',              tint: '#22d3ee' },
-  { id: 'zo',    name: 'ZO',     tag: 'Here for the highlight, not the win.', reach: 1.12, risk: 1.22, signature: 'EASTBAY',          tint: '#ff7b54' },
-  { id: 'stack', name: 'STACK',  tag: 'Goes for the impossible one first.',  reach: 1.24, risk: 1.45, signature: 'BETWEEN THE LEGS', tint: '#ff006e' },
+  { id: 'cass',  name: 'CASS',   tag: 'Never misses. Never amazes.',        reach: 0.86, risk: 0.70, signature: 'TOMAHAWK',         tint: '#8fe0a0', body: 'm22-bb13bdbe' },
+  { id: 'ty',    name: 'TY',     tag: 'Power. All night, every night.',      reach: 0.94, risk: 0.86, signature: 'WINDMILL',         tint: '#ffd75e', body: 'm22-6d8c65ad' },
+  { id: 'pilot', name: 'PILOT',  tag: 'Reads the room, then takes it.',      reach: 1.00, risk: 1.00, signature: '360',              tint: '#22d3ee', body: 'm22-c19ac82e' },
+  { id: 'zo',    name: 'ZO',     tag: 'Here for the highlight, not the win.', reach: 1.12, risk: 1.22, signature: 'EASTBAY',          tint: '#ff7b54', body: 'm22-dab1e0f7' },
+  { id: 'stack', name: 'STACK',  tag: 'Goes for the impossible one first.',  reach: 1.24, risk: 1.45, signature: 'BETWEEN THE LEGS', tint: '#ff006e', body: 'm22-df555984' },
 ] as const;
 
 export const DEFAULT_RIVAL: DunkRival = DUNK_RIVALS[2];
@@ -74,4 +77,33 @@ export function rivalIntro(r: DunkRival): string {
 /** Did this attempt land the dunk they are known for? Drives the banner, not the score. */
 export function hitSignature(r: DunkRival, label: string): boolean {
   return !!label && label.toUpperCase() === r.signature;
+}
+
+/**
+ * The rival after `lastId` in roster order (the first one when there is none, or the id is unknown).
+ *
+ * WHO YOU FACE NEXT (asset-polish, owner 2026-10-05: "make sure the rival that you play against alternates and it's not
+ * the same person each time"). `rivalForNight(night)` was the only pick, and nothing remembered a night between visits:
+ * the ledger opens every load on night 1 (ContinuousNight.firstNight), so every visit was CASS; and GO AGAIN advanced
+ * the night but never re-picked, so a whole session was CASS too. Walking on from the LAST rival actually faced is the
+ * whole fix: it holds within a session and across visits, and it can never repeat.
+ */
+export function nextRival(lastId: string | null | undefined): DunkRival {
+  const i = lastId ? DUNK_RIVALS.findIndex((r) => r.id === lastId) : -1;
+  return DUNK_RIVALS[(i + 1) % DUNK_RIVALS.length];
+}
+
+const LAST_RIVAL_KEY = 'fel.dunk.lastRival';
+let lastRivalMemory: string | null = null;
+
+/** The rival for a night that is starting, remembered as the last one faced. localStorage carries it across visits; if
+ *  storage is unavailable (private mode, SSR) an in-memory copy still walks the roster for this visit, and nothing here
+ *  can throw into the mode. */
+export function takeNextRival(): DunkRival {
+  let last = lastRivalMemory;
+  try { if (typeof window !== 'undefined' && window.localStorage) last = window.localStorage.getItem(LAST_RIVAL_KEY) ?? last; } catch { /* keep memory */ }
+  const next = nextRival(last);
+  lastRivalMemory = next.id;
+  try { if (typeof window !== 'undefined' && window.localStorage) window.localStorage.setItem(LAST_RIVAL_KEY, next.id); } catch { /* memory holds it */ }
+  return next;
 }

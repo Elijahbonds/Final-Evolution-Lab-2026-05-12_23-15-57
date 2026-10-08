@@ -8,6 +8,7 @@ import { prisma } from '@/lib/db';
 import { ARENA_RAKE_PERCENT, ARENA_FEE_TIERS, arenaStakeableModes } from '@/lib/arena';
 import { pausedStakeModes } from '@/lib/stakingPause';
 import { MODE_INFO } from '@/lib/game-data';
+import { isUnlistedMode } from '@/lib/unlisted-modes';
 
 /**
  * GET /api/arena/config
@@ -31,7 +32,10 @@ export async function GET() {
   // MUSIC-SUITE P1 (2026-09-25, owner decision #9: "pause staking both now"): the lobby's mode picker offers only modes
   // a NEW stake can be opened on. The paused ones (lib/stakingPause.ts) are named beside it rather than silently
   // dropped, so a player looking for music or dance reads why; their open duels keep their links in /api/arena/list.
-  const modes = arenaStakeableModes().map((key) => ({
+  // IRON-PARADISE-OUT (2026-10-03): a parked mode (lib/unlisted-modes.ts) is never offered for a NEW stake — its
+  // /play route redirects, and a stake on a redirecting route is a trap. ARENA_MODES keeps the row (lib/arena.ts,
+  // music's file) so a duel posted before the parking still settles.
+  const modes = arenaStakeableModes().filter((key) => !isUnlistedMode(key)).map((key) => ({
     key,
     name: MODE_INFO[key]?.name ?? key,
     venue: MODE_INFO[key]?.venue ?? '',

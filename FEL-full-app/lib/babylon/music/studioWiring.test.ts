@@ -248,7 +248,9 @@ describe('what you hear is what you see, song mode, undo, tier gates (source pin
 
   it('the kits cache is keyed to the player, and both loaders pass one', () => {
     expect(code('app/play/music/page.tsx')).toContain('<MusicLoader playerId={');
-    expect(code('app/play/music/_components/loader.tsx')).toContain('gameProps={{ spendShards, readOwnedKits, arenaSet, playerId }}');
+    // INTEGRATION (2026-10-06): lane/create-hub appends StudioMode's onPublish (the Creator Card hook) to the same props.
+    expect(code('app/play/music/_components/loader.tsx'))
+      .toMatch(/gameProps=\{\{ spendShards, readOwnedKits, arenaSet, playerId(?:, onPublish)? \}\}/);
     expect(code('app/dev/music/loader.tsx')).toContain('playerId={playerId}');
   });
 });

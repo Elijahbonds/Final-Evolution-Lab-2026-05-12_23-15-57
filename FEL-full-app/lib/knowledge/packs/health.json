@@ -1,0 +1,181 @@
+{
+  "topic": "health",
+  "version": 1,
+  "cards": [
+    {
+      "id": "health.sleep",
+      "topic": "health",
+      "type": "lesson",
+      "headline": "Sleep is when training sinks in",
+      "lines": [
+        "Sleep-medicine groups recommend 8–10 hours a night for teens and at least 7 for adults.",
+        "Deep sleep is when growth hormone peaks and much of the body's repair happens.",
+        "In one study of young athletes, those sleeping under 8 hours were injured more often."
+      ],
+      "visual": { "kind": "stat", "value": "8–10 h", "caption": "recommended for 13–18-year-olds" },
+      "source": "Paruthi et al. (2016), AASM consensus, J Clin Sleep Med; Watson et al. (2015), AASM/SRS adult consensus, J Clin Sleep Med; Milewski et al. (2014), J Pediatr Orthop."
+    },
+    {
+      "id": "health.fibre-types",
+      "topic": "health",
+      "type": "lesson",
+      "headline": "Fast and slow muscle fibres",
+      "lines": [
+        "Slow-twitch (type I) fibres resist fatigue and power endurance.",
+        "Fast-twitch (type II) fibres produce force quickly but tire sooner.",
+        "Everyone has a mix, and training changes how each type performs."
+      ],
+      "visual": { "kind": "compare", "left": { "label": "Type I", "text": "Slow, enduring" }, "right": { "label": "Type II", "text": "Fast, powerful" } },
+      "source": "McArdle, Katch & Katch, 'Exercise Physiology'."
+    },
+    {
+      "id": "health.warm-up",
+      "topic": "health",
+      "type": "lesson",
+      "headline": "Why warming up works",
+      "lines": [
+        "Light movement raises muscle temperature, helping muscles contract faster and more forcefully.",
+        "Moving drills generally prepare you for sport better than long static holds.",
+        "Structured warm-ups such as FIFA 11+ have reduced injuries in youth football studies."
+      ],
+      "visual": { "kind": "cycle", "steps": ["Raise", "Activate", "Mobilise", "Potentiate"] },
+      "source": "Jeffreys (2007), the RAMP warm-up, Professional Strength & Conditioning; Soligard et al. (2008), BMJ."
+    },
+    {
+      "id": "health.hydration",
+      "topic": "health",
+      "type": "lesson",
+      "headline": "Water and performance",
+      "lines": [
+        "Losing around 2% of body weight in sweat can noticeably reduce endurance performance.",
+        "In long, hot sessions, the salts lost in sweat matter too.",
+        "Sport scientists sometimes weigh athletes before and after training to estimate fluid lost — drinking to thirst works for most young people."
+      ],
+      "visual": { "kind": "stat", "value": "≈ 2%", "caption": "body-weight loss where endurance can dip" },
+      "source": "Sawka et al. (2007), ACSM Position Stand: Exercise and Fluid Replacement."
+    },
+    {
+      "id": "health.progressive-overload",
+      "topic": "health",
+      "type": "lesson",
+      "headline": "Progressive overload",
+      "lines": [
+        "Muscles, bones and tendons adapt to the demands placed on them.",
+        "Athletes and coaches raise load, reps or difficulty gradually, then allow recovery — young athletes should do this with a coach.",
+        "Big, sudden jumps in training load are a well-known injury risk."
+      ],
+      "visual": { "kind": "bars", "items": [{ "label": "Week 1", "value": 10 }, { "label": "Week 2", "value": 11 }, { "label": "Week 3", "value": 12 }, { "label": "Week 4", "value": 9 }], "caption": "Build gradually, then ease off" },
+      "source": "ACSM (2009), progression models in resistance training; Gabbett (2016), British Journal of Sports Medicine."
+    },
+    {
+      "id": "health.q-heart-rate",
+      "topic": "health",
+      "type": "quiz",
+      "question": "Why does your heart rate rise during exercise?",
+      "options": ["To get more oxygen to working muscles", "To cool the brain", "To digest food faster", "To slow your breathing"],
+      "answer": 0,
+      "why": "Working muscles need more oxygen and fuel, so the heart pumps more blood every minute.",
+      "source": "McArdle, Katch & Katch, 'Exercise Physiology', cardiovascular responses."
+    },
+    {
+      "id": "health.q-doms",
+      "topic": "health",
+      "type": "quiz",
+      "question": "Muscle soreness a day or two after hard exercise is mainly caused by…",
+      "options": ["Lactic acid left in the muscle", "Small-scale muscle damage and repair", "Dehydration", "Weak bones"],
+      "answer": 1,
+      "why": "Lactate clears within about an hour. Delayed soreness (DOMS) comes from tiny muscle damage and the repair that follows.",
+      "source": "Cheung, Hume & Maxwell (2003), 'Delayed Onset Muscle Soreness', Sports Medicine."
+    },
+    {
+      "id": "health.q-fuel",
+      "topic": "health",
+      "type": "quiz",
+      "question": "What is the body's main fuel for high-intensity exercise?",
+      "options": ["Carbohydrate", "Protein", "Fibre", "Vitamin C"],
+      "answer": 0,
+      "why": "Muscles burn stored carbohydrate (glycogen) fastest. Fat fuels more of low-intensity work.",
+      "source": "Jeukendrup & Gleeson, 'Sport Nutrition'."
+    },
+    {
+      "id": "health.q-teen-sleep",
+      "topic": "health",
+      "type": "quiz",
+      "question": "How much sleep does the American Academy of Sleep Medicine recommend for 13–18-year-olds?",
+      "options": ["5–6 hours", "6–7 hours", "8–10 hours", "11–13 hours"],
+      "answer": 2,
+      "why": "8 to 10 hours a night, regularly, for teenagers.",
+      "source": "Paruthi et al. (2016), AASM consensus statement, Journal of Clinical Sleep Medicine."
+    },
+    {
+      "id": "health.q-warm-up",
+      "topic": "health",
+      "type": "quiz",
+      "question": "Right before sprinting, which warm-up is generally better?",
+      "options": ["Long static stretches only", "Moving drills that build up speed", "No warm-up at all"],
+      "answer": 1,
+      "why": "Dynamic drills raise temperature and rehearse the movement; long static holds just before can slightly cut power.",
+      "source": "Behm & Chaouachi (2011), European Journal of Applied Physiology."
+    },
+    {
+      "id": "health.f-bone",
+      "topic": "health",
+      "type": "fact",
+      "headline": "Your skeleton is always rebuilding",
+      "text": "Bone is broken down and laid down all the time. Over about ten years, most of an adult skeleton is replaced.",
+      "source": "Manolagas (2000), Endocrine Reviews; NIH, 'Bone Health and Osteoporosis' (2004)."
+    },
+    {
+      "id": "health.f-heartbeats",
+      "topic": "health",
+      "type": "fact",
+      "headline": "A heart beats about 100,000 times a day",
+      "text": "At around 70 beats a minute, that's roughly 100,000 beats a day. Trained endurance athletes often have lower resting rates.",
+      "visual": { "kind": "stat", "value": "≈ 100,000", "caption": "heartbeats a day at 70 bpm" },
+      "source": "Guyton & Hall, 'Textbook of Medical Physiology'."
+    },
+    {
+      "id": "health.f-vo2max",
+      "topic": "health",
+      "type": "fact",
+      "headline": "Elite endurance athletes have huge aerobic engines",
+      "text": "VO₂max — the most oxygen the body can use — can exceed 80 ml/kg/min in elite male endurance athletes, about double many untrained adults.",
+      "source": "McArdle, Katch & Katch, 'Exercise Physiology', maximal oxygen uptake."
+    },
+    {
+      "id": "health.f-reaction",
+      "topic": "health",
+      "type": "fact",
+      "headline": "Simple reaction time is about a fifth of a second",
+      "text": "Reacting to one expected signal takes around 0.2 s. Choosing between options takes longer, and more options take longer still (Hick's law).",
+      "source": "Hick (1952), Quarterly Journal of Experimental Psychology; Schmidt & Lee, 'Motor Control and Learning'."
+    },
+    {
+      "id": "health.d-energy-systems",
+      "topic": "health",
+      "type": "deeper",
+      "headline": "The body's three energy systems",
+      "steps": [
+        { "headline": "1 · Phosphocreatine", "lines": ["The fastest system powers all-out efforts of a few seconds: a sprint start, a jump.", "It refills within a few minutes of rest."], "visual": { "kind": "motif", "motif": "heart" } },
+        { "headline": "2 · Glycolytic", "lines": ["For hard efforts of roughly 10 seconds to about a minute, carbohydrate is broken down fast without needing oxygen.", "Powerful, but it can't last."] },
+        { "headline": "3 · Aerobic", "lines": ["For anything longer, the aerobic system uses oxygen to burn carbohydrate and fat.", "Slower, but it can run for hours."] },
+        { "headline": "4 · All at once", "lines": ["The systems overlap — none is ever fully on or off.", "A basketball game uses all three: sprints, repeated bursts, and the long game in between."], "visual": { "kind": "timeline", "points": [{ "at": "0–10 s", "label": "Phosphocreatine leads" }, { "at": "10–~60 s", "label": "Glycolytic leads" }, { "at": "~1 min +", "label": "Aerobic leads" }] } }
+      ],
+      "source": "Gastin (2001), 'Energy System Interaction', Sports Medicine; McArdle, Katch & Katch, 'Exercise Physiology'."
+    },
+    {
+      "id": "health.recap",
+      "topic": "health",
+      "type": "recap",
+      "headline": "Health & sport science: the takeaways",
+      "points": [
+        "Teens: 8–10 hours of sleep.",
+        "Type I fibres endure; type II are fast.",
+        "Moving warm-ups prepare you to move.",
+        "Build training load gradually.",
+        "Next-day soreness is repair, not lactic acid."
+      ],
+      "source": "Summary of this topic's cards."
+    }
+  ]
+}

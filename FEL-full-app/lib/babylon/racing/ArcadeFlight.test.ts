@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Vector3 } from '@babylonjs/core';
 import {
-  ARCADE_TRAINER as T, spawnArcade, stepArcade, startStunt, dodging, spinOut, topFor, wallTurn, arcadeFrom,
+  ARCADE_TRAINER as T, spawnArcade, stepArcade, startStunt, dodging, spinOut, topFor, wallTurn, arcadeFrom, forwardOf,
   LOOP_SEC, ROLL_SEC, ROLL_SHIFT, type ArcadeInput,
 } from './ArcadeFlight';
 import { PLANES } from './garage';
@@ -55,6 +55,19 @@ describe('arcade flight: nothing a player does crashes the plane', () => {
     expect(wallTurn(s, -1, 0)).toBe(true);
     expect(Math.sin(s.heading)).toBeLessThan(0.3);
   });
+
+  it('10-PHASE PASS phase 4: the edge’s price is the tune’s wallScrub — the turn-back itself is free', () => {
+    const into = () => spawnArcade(new Vector3(0, 40, 0), Math.PI / 2 - 0.3);
+    const gentle = into(); gentle.speed = 30;
+    const firm = into(); firm.speed = 30;
+    wallTurn(gentle, -1, 0, 0.1);
+    wallTurn(firm, -1, 0, 0.6);
+    expect(gentle.speed).toBeGreaterThan(firm.speed);            // a bigger scrub costs more speed
+    expect(firm.speed).toBeGreaterThan(0);                       // …but never parks the plane
+    expect(Math.sin(firm.heading)).toBeLessThan(0.3);            // and both still turn back along the course
+    expect(Math.sin(gentle.heading)).toBeLessThan(0.3);
+    expect(T.wallScrub).toBe(0.35);                              // the signed-off value, now a tune number
+  });
 });
 
 describe('stunts', () => {
@@ -87,6 +100,66 @@ describe('stunts', () => {
     fly(s, I({ gas: 1, steer: 1 }), 0.5);
     expect(s.heading).toBeCloseTo(h);
     expect(s.speed).toBeLessThan(before);
+  });
+});
+
+describe('10-PHASE PASS, phase 2 — the turn has a body (2026-10-02)', () => {
+  it('the yaw rate rolls in — a full-stick flick is not an instant full-rate pivot', () => {
+    const s = spawnArcade(new Vector3(0, 40, 0), 0);
+    stepArcade(s, I({ steer: 1 }), 1 / 60, T, flat, 200);
+    const steadyPerFrame = T.turnRate / 60;
+    expect(Math.abs(s.heading)).toBeLessThan(steadyPerFrame * 0.25);
+    // …and it gets there: full rate inside a quarter second
+    fly(s, I({ steer: 1 }), 1);
+    expect(Math.abs(s.yawAt)).toBeGreaterThan(T.turnRate * 0.95);
+  });
+
+  it('the bank shows the turn BEING MADE: a brake-turn at half stick banks harder than a cruise turn', () => {
+    const a = spawnArcade(new Vector3(0, 40, 0), 0), b = spawnArcade(new Vector3(0, 40, 0), 0);
+    fly(a, I({ steer: 0.5, gas: 1 }), 1.5);
+    fly(b, I({ steer: 0.5, brake: 1 }), 1.5);
+    expect(Math.abs(b.roll)).toBeGreaterThan(Math.abs(a.roll) * 1.3);
+    // …and even the brake-turn cannot bank past the cap
+    const c = spawnArcade(new Vector3(0, 40, 0), 0);
+    fly(c, I({ steer: 1, brake: 1 }), 2);
+    expect(Math.abs(c.roll)).toBeLessThanOrEqual(T.maxBank + 1e-6);
+  });
+
+  it('a hard turn holds a touch of back-pressure, and it leaves with the turn', () => {
+    const s = spawnArcade(new Vector3(0, 40, 0), 0);
+    fly(s, I({ steer: 1 }), 2);
+    expect(s.pitch).toBeGreaterThan(0.03);           // coordinated-turn nose-up
+    expect(s.pitch).toBeLessThan(0.15);              // a touch, not a climb
+    fly(s, I(), 1.5);
+    expect(Math.abs(s.pitch)).toBeLessThan(0.05);    // hands off: level, exactly as before
+  });
+
+  it('the nose stays along the velocity — steering and climbing hard, outside stunts', () => {
+    const s = spawnArcade(new Vector3(0, 50, 0), 0);
+    for (let i = 0; i < 180; i++) {
+      const prev = s.pos.clone();
+      stepArcade(s, I({ steer: 0.6, climb: 0.4, gas: 1 }), 1 / 60, T, flat, 400);
+      const moved = s.pos.subtract(prev);
+      const dot = Vector3.Dot(moved.normalize(), forwardOf(s));
+      expect(dot).toBeGreaterThan(0.9999);
+    }
+  });
+});
+
+describe('10-PHASE PASS, phase 3 — the launch curve (2026-10-02)', () => {
+  it('the gas reaches 95% of the top inside the target time, and never past it', () => {
+    const s = spawnArcade(new Vector3(0, 40, 0), 0);   // starts at the coast speed
+    let t = 0;
+    while (t < 4 && s.speed < T.top * 0.95) { stepArcade(s, I({ gas: 1 }), 1 / 60, T, flat, 200); t += 1 / 60; }
+    expect(t).toBeLessThan(1.2);
+    fly(s, I({ gas: 1 }), 3);
+    expect(s.speed).toBeLessThanOrEqual(T.top + 1e-6);
+  });
+
+  it('the launch is harder than the old flat rate — from the very first frame', () => {
+    const s = spawnArcade(new Vector3(0, 40, 0), 0);
+    stepArcade(s, I({ gas: 1 }), 1 / 60, T, flat, 200);
+    expect(s.speed - T.coast).toBeGreaterThan((T.accel / 60) * 1.05);   // the flat rate's first frame was accel/60
   });
 });
 

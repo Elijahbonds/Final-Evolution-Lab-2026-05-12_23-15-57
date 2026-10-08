@@ -1,0 +1,182 @@
+{
+  "topic": "nature",
+  "version": 1,
+  "cards": [
+    {
+      "id": "nature.food-chain",
+      "topic": "nature",
+      "type": "lesson",
+      "headline": "Energy shrinks as it moves up a food chain",
+      "lines": [
+        "Plants capture sunlight; plant-eaters eat plants; predators eat plant-eaters.",
+        "Only about 10% of the energy at one level reaches the next.",
+        "That's why there are far fewer lions than zebras."
+      ],
+      "visual": { "kind": "bars", "items": [{ "label": "Plants", "value": 1000 }, { "label": "Plant-eaters", "value": 100 }, { "label": "Predators", "value": 10 }], "caption": "Energy passed up each level (≈ 10% rule)" },
+      "source": "Lindeman (1942), 'The Trophic-Dynamic Aspect of Ecology', Ecology; Campbell Biology."
+    },
+    {
+      "id": "nature.arctic-tern",
+      "topic": "nature",
+      "type": "lesson",
+      "headline": "The longest migration of any animal",
+      "lines": [
+        "Arctic terns fly from Arctic breeding grounds to the Antarctic and back every year.",
+        "Tracked birds averaged about 70,000 km per round trip.",
+        "Over a lifetime, that's like flying to the Moon and back about three times."
+      ],
+      "visual": { "kind": "stat", "value": "≈ 70,000 km", "caption": "an Arctic tern's yearly round trip" },
+      "source": "Egevang et al. (2010), 'Tracking of Arctic Terns', PNAS."
+    },
+    {
+      "id": "nature.phytoplankton",
+      "topic": "nature",
+      "type": "lesson",
+      "headline": "The ocean makes much of our oxygen",
+      "lines": [
+        "Microscopic drifting algae and bacteria called phytoplankton photosynthesise, just like land plants.",
+        "They account for roughly half of all photosynthesis on Earth.",
+        "Their growth depends on sunlight, nutrients and water temperature."
+      ],
+      "visual": { "kind": "stat", "value": "≈ 50%", "caption": "of Earth's photosynthesis happens at sea" },
+      "source": "Field et al. (1998), 'Primary Production of the Biosphere', Science; NOAA Ocean Service."
+    },
+    {
+      "id": "nature.water-cycle",
+      "topic": "nature",
+      "type": "lesson",
+      "headline": "The water cycle",
+      "lines": [
+        "The Sun evaporates water from oceans, lakes and leaves.",
+        "The vapour cools into clouds and falls as rain or snow.",
+        "It flows back to the sea through rivers and the ground — and starts again."
+      ],
+      "visual": { "kind": "cycle", "steps": ["Evaporation", "Condensation", "Precipitation", "Collection"] },
+      "source": "US Geological Survey, Water Science School: 'The Water Cycle'."
+    },
+    {
+      "id": "nature.keystone",
+      "topic": "nature",
+      "type": "lesson",
+      "headline": "Keystone species",
+      "lines": [
+        "Some species have an effect far larger than their numbers suggest.",
+        "Robert Paine removed a predatory starfish from a shoreline: mussels took over and diversity crashed.",
+        "Sea otters protect kelp forests by eating the urchins that graze them."
+      ],
+      "visual": { "kind": "compare", "left": { "label": "Otters present", "text": "Kelp forest thrives" }, "right": { "label": "Otters gone", "text": "Urchins strip the kelp" } },
+      "source": "Paine (1966, 1969), American Naturalist; Estes & Palmisano (1974), Science."
+    },
+    {
+      "id": "nature.q-blue-whale",
+      "topic": "nature",
+      "type": "quiz",
+      "question": "Which is the heaviest animal known to have lived?",
+      "options": ["African elephant", "Blue whale", "Tyrannosaurus rex", "Woolly mammoth"],
+      "answer": 1,
+      "why": "Blue whales reach about 30 m and well over 100 tonnes — heavier than any known dinosaur.",
+      "source": "NOAA Fisheries, blue whale species profile."
+    },
+    {
+      "id": "nature.q-bees",
+      "topic": "nature",
+      "type": "quiz",
+      "question": "Why are bees so important to farming?",
+      "options": ["They pollinate many crops", "They eat crop pests", "They fertilise the soil", "They scare off birds"],
+      "answer": 0,
+      "why": "Carrying pollen between flowers lets many fruits, nuts and vegetables form.",
+      "source": "Klein et al. (2007), 'Importance of Pollinators in Changing Landscapes for World Crops', Proc R Soc B."
+    },
+    {
+      "id": "nature.q-tardigrade",
+      "topic": "nature",
+      "type": "quiz",
+      "question": "Which tiny animal survived exposure to open space on a satellite in 2007?",
+      "options": ["Tardigrade", "Ant", "Earthworm", "Jellyfish"],
+      "answer": 0,
+      "why": "Dried-out tardigrades ('water bears') survived the vacuum of space on the FOTON-M3 mission.",
+      "source": "Jönsson et al. (2008), 'Tardigrades Survive Exposure to Space in Low Earth Orbit', Current Biology."
+    },
+    {
+      "id": "nature.q-ten-percent",
+      "topic": "nature",
+      "type": "quiz",
+      "question": "Roughly what share of energy passes from one level of a food chain to the next?",
+      "options": ["About 10%", "About 50%", "About 90%", "All of it"],
+      "answer": 0,
+      "why": "Most energy is used for living or lost as heat, so only around a tenth moves up.",
+      "source": "Campbell Biology, energy flow in ecosystems."
+    },
+    {
+      "id": "nature.q-octopus",
+      "topic": "nature",
+      "type": "quiz",
+      "question": "How many hearts does an octopus have?",
+      "options": ["One", "Two", "Three", "Eight"],
+      "answer": 2,
+      "why": "Two pump blood through the gills, and one pumps it around the rest of the body.",
+      "source": "Wells, 'Octopus: Physiology and Behaviour of an Advanced Invertebrate' (1978)."
+    },
+    {
+      "id": "nature.f-bristlecone",
+      "topic": "nature",
+      "type": "fact",
+      "headline": "Some living trees are over 4,500 years old",
+      "text": "Great Basin bristlecone pines in California's White Mountains include individuals dated by tree rings at more than 4,800 years.",
+      "visual": { "kind": "stat", "value": "4,800+ years", "caption": "oldest dated bristlecone pine" },
+      "source": "Schulman (1958), National Geographic; US Forest Service, Ancient Bristlecone Pine Forest."
+    },
+    {
+      "id": "nature.f-honey-fungus",
+      "topic": "nature",
+      "type": "fact",
+      "headline": "One of the largest living things is a fungus",
+      "text": "A honey fungus (Armillaria) in Oregon's Blue Mountains spreads underground over roughly 9 square kilometres.",
+      "source": "Ferguson et al. (2003), Canadian Journal of Forest Research; US Forest Service."
+    },
+    {
+      "id": "nature.f-sharks-trees",
+      "topic": "nature",
+      "type": "fact",
+      "headline": "Sharks are older than trees",
+      "text": "Shark fossils go back more than 400 million years. The first trees appeared around 385 million years ago.",
+      "visual": { "kind": "timeline", "points": [{ "at": "400+ Mya", "label": "First sharks" }, { "at": "385 Mya", "label": "First trees" }, { "at": "230 Mya", "label": "First dinosaurs" }] },
+      "source": "Benton, 'Vertebrate Palaeontology'; Stein et al. (2007), Nature (early forests)."
+    },
+    {
+      "id": "nature.f-hummingbird",
+      "topic": "nature",
+      "type": "fact",
+      "headline": "Hummingbirds can fly backwards",
+      "text": "Their wings rotate at the shoulder and trace a figure-eight, letting them hover and reverse — something almost no other bird can do.",
+      "source": "Warrick, Tobalske & Powers (2005), 'Aerodynamics of the Hovering Hummingbird', Nature."
+    },
+    {
+      "id": "nature.d-leaf",
+      "topic": "nature",
+      "type": "deeper",
+      "headline": "How a leaf makes food",
+      "steps": [
+        { "headline": "1 · Light in", "lines": ["Chlorophyll in leaf cells absorbs mostly red and blue light.", "It reflects green — which is why leaves look green."], "visual": { "kind": "motif", "motif": "leaf" } },
+        { "headline": "2 · Water up, CO₂ in", "lines": ["Roots draw water up the stem.", "Tiny pores called stomata let carbon dioxide in."] },
+        { "headline": "3 · Sugar made", "lines": ["Using the light's energy, the plant splits water and builds glucose from CO₂.", "Oxygen is released as a by-product."] },
+        { "headline": "4 · Stored and used", "lines": ["Glucose fuels the plant and is stored as starch or built into cellulose.", "Nearly every food chain on land starts here."], "visual": { "kind": "cycle", "steps": ["Light", "Water + CO₂", "Glucose", "Oxygen out"] } }
+      ],
+      "source": "Campbell Biology, photosynthesis chapter."
+    },
+    {
+      "id": "nature.recap",
+      "topic": "nature",
+      "type": "recap",
+      "headline": "Nature: the takeaways",
+      "points": [
+        "Only about 10% of energy moves up a food chain.",
+        "Ocean phytoplankton do about half of Earth's photosynthesis.",
+        "Water cycles: evaporate, condense, fall, collect.",
+        "Keystone species hold ecosystems together.",
+        "Arctic terns fly about 70,000 km a year."
+      ],
+      "source": "Summary of this topic's cards."
+    }
+  ]
+}

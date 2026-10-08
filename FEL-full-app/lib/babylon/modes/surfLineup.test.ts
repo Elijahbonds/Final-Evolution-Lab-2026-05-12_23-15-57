@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   DRY_SAND_M, LULL_SEC, SAND_DEPTH_M, SET_SIZE, SURF_CROWD, SWELLS_VISIBLE, WAVE_GAP_SEC, WAVE_PROFILES,
-  surfCrowd,
+  barrelOpen, surfCrowd,
   gapAfter, isLastOfSet, nextRideable, profileFor, sectionAt, sectionsOf, startLineup, stepLineup, waveWorth,
 } from './surfLineup';
+import { readFileSync } from 'node:fs';
 
 describe('the surf lineup', () => {
   describe('the waves are different rides, not one ride at three sizes', () => {
@@ -76,6 +77,19 @@ describe('the surf lineup', () => {
       expect(sectionAt(p, 0)!.kind).toBe('takeoff');
       expect(sectionAt(p, p.wall - 0.5)!.kind).toBe('closeout');
       expect(sectionAt(p, p.wall + 10)).toBeNull();
+    });
+
+    it('opens a barrel only on a wave that throws one, and only in that section', () => {
+      const mellow = WAVE_PROFILES.find((p) => p.shape === 'mellow')!;
+      const cave = WAVE_PROFILES.find((p) => p.shape === 'barreling')!;
+      for (let along = 0; along < mellow.wall; along += 1) expect(barrelOpen(mellow, along)).toBe(false);
+      const barrel = sectionsOf(cave).find((s) => s.kind === 'barrel')!;
+      expect(barrelOpen(cave, barrel.from + 0.1)).toBe(true);
+      expect(barrelOpen(cave, 0)).toBe(false);
+      expect(barrelOpen(cave, cave.wall - 0.2)).toBe(false);
+      const worlds = readFileSync(new URL('./rideWorlds.ts', import.meta.url), 'utf8');
+      expect(worlds.includes('BARREL_CYCLE')).toBe(false);
+      expect(worlds.includes('% 18')).toBe(false);
     });
 
     it('is worth more on a harder wave', () => {

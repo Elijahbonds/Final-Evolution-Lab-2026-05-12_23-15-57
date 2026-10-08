@@ -133,7 +133,7 @@ const pillars: BlueprintTrack = {
             'The Camp measures recovery two ways: the PRQ recovery attribute, and the resiliency log — the rate at which a mentee retries after a failed attempt and returns after a losing session. A mentee who stops retrying is not lazy; something in the plan is too heavy.',
           ],
           keyPoints: ['Recovery = return to baseline after load.', 'Resiliency = retry rate after failure + return after a loss.', 'A collapse in retries is a plan problem first.'],
-          drill: { modeKey: 'derby', text: 'After a whiff, swing again within the next pitch. Three retries after fails in one derby.' },
+          drill: { modeKey: 'baseball', text: 'After a whiff, swing again within the next pitch. Three retries after fails in one derby.' },
         },
         {
           ref: 'blueprint/m2/mental', title: 'Mental — the read under pressure',

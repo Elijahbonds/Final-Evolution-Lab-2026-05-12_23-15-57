@@ -22,8 +22,8 @@ import {
   Snowflake,
   Zap,
 } from 'lucide-react';
-import { CARNIVAL_EXTERNAL_POOL } from './carnival-run';
 import { MODE_INFO, canonicalModeKey } from './game-data';
+import { isUnlistedMode } from './unlisted-modes';
 
 export interface ModeMenuMeta {
   icon: LucideIcon;
@@ -56,7 +56,7 @@ export const MODE_MENU_META: Record<string, ModeMenuMeta> = {
   karateVersus: { icon: Shield, color: '#FF3366', desc: 'Best of 3 vs the Rival Sensei. Strike, block the telegraph, unleash your chi special.' },
   whoSceneIt: { icon: Eye, color: '#A855F7', desc: 'Rapid-fire recall. 15 questions, 8 seconds each - speed and streaks multiply your score.' },
   bigAir: { icon: Mountain, color: '#00E5FF', desc: 'Five kickers, huge amplitude. Charge the jump, spin the trick prompts, stomp the landing.' },
-  tiebreak: { icon: Timer, color: '#00FF9D', desc: 'Sudden-death tennis. Read the serve side and swing in the green window. First to 7.' },
+  tiebreak: { icon: Timer, color: '#00FF9D', desc: 'A tennis tiebreak. Read the serve side and swing in the green window. First to 7, win by 2.' },
   storyMode: { icon: BookOpen, color: '#A855F7', desc: 'The Nexus Initiative. Train in the Sanctum, grind the rails, face the Glitch Boss.' },
   football: { icon: Footprints, color: '#FFD700', desc: 'Breakaway football. Read the lane, chain cuts and trucks, then finish through contact.' },
   mixedcombat: { icon: Swords, color: '#FF3366', desc: "Ring's Edge combat. Manage guard, spacing, stamina and finishers in a scored fight." },
@@ -76,9 +76,7 @@ export const MODE_MENU_META: Record<string, ModeMenuMeta> = {
 };
 
 export const SUPPORT_SURFACES = new Set<string>(['marketplace', 'kitchens']);
-export const STANDALONE_CARNIVAL_STOPS = new Set<string>(['sprint']);
 export const HIDDEN_FROM_MODE_MENU = new Set<string>([
-  ...CARNIVAL_EXTERNAL_POOL.filter((key) => !STANDALONE_CARNIVAL_STOPS.has(key)),
   ...SUPPORT_SURFACES,
 ]);
 
@@ -95,7 +93,9 @@ export function modeMenuMetaFor(key: string): ModeMenuMeta {
 }
 
 export function visibleModeEntries() {
-  return Object.entries(MODE_INFO).filter(([key]) => !HIDDEN_FROM_MODE_MENU.has(key));
+  // IRON-PARADISE-OUT (2026-10-03): parked modes (lib/unlisted-modes.ts) are not menu entries either. Their
+  // MODE_MENU_META rows stay, so the tile's copy is still here when the mode comes back.
+  return Object.entries(MODE_INFO).filter(([key]) => !HIDDEN_FROM_MODE_MENU.has(key) && !isUnlistedMode(key));
 }
 
 export function missingModeMenuMetaKeys(): string[] {

@@ -1,19 +1,54 @@
-// lib/privacy/scanSaveOptIn.ts — TEEN-WRITE-BLOCK (2026-09-29): has this account opted in to having its movement
-// numbers saved? The second half of lib/privacy/scanSaveGate.ts canSaveScanNumbers (the first half is a verified 18+
-// birth year). Cyber's PRIVACY-CORE-SCAN-GAPS.md GAP 1, fix 1 names this module; fix 5 is why it answers no.
+// lib/privacy/scanSaveOptIn.ts — AB-04 (2026-10-03): has this account opted in to saving movement numbers?
 //
-// No opt-in record exists yet (no schema field at 86b8a255). PRIVACY-CORE/AB-04 adds the adult opt-in and its consent
-// record (schema: Elijah's yes). Until then nobody is opted in, so no movement numbers are saved for anyone (GAP 1 fix 5).
+// The second half of canSaveScanNumbers (lib/privacy/scanSaveGate.ts). The first half is verifiedAdult() on
+// User.dobYear. This reads ScanSaveOptIn. A live grant is scope `jump_numbers`, granted true, and revokedAt null.
+// One row covers jump numbers, Prove It, and re-screen history.
 //
-// Nothing turns this on: no env var, no flag, no header, no request field. It reads nothing today. When PRIVACY-CORE/
-// AB-04 wires it to a real opt-in record, that change carries its own prisma/pending/ SQL (applied in production before
-// any deploy that contains it) and keeps the gate's never-throw rule: every read wrapped in try/catch, any error →
-// false, one log line with no user id, email, birth year or age in it (lib/privacy/scanSaveGate.ts logGateFailure).
+// FAIL CLOSED. A missing row, a revoked row, a wrong scope, a thrown read (the table is not on production until
+// prisma/pending/2026-10-04-adult-optin-ab04.sql is applied) → false. Nothing here reads an env var, a header, or
+// a request field. The log line is the error's name and code only — never a user id, email, birth year, or age.
 //
-// A module of its own so a test can vi.mock it to true — the positive control that proves an opted-in adult's writes
-// are exactly what they were before this lane.
+// This file does not import scanSaveGate (that file imports this one).
 
-/** Always false until the opt-in record exists (see the header). The arguments are the shape the real reader will take. */
-export async function scanSaveOptIn(_db: unknown, _userId: string): Promise<boolean> {
-  return false;
+const SCOPE = 'jump_numbers';
+
+type OptInRow = { granted: boolean; revokedAt: Date | string | null; scope: string };
+
+type OptInDb = {
+  scanSaveOptIn: {
+    findUnique: (args: {
+      where: { userId: string };
+      select: { granted: true; revokedAt: true; scope: true };
+    }) => Promise<OptInRow | null>;
+  };
+};
+
+function loggable(v: unknown, fallback: string): string {
+  return typeof v === 'string' && /^[A-Za-z0-9_.-]{1,64}$/.test(v) ? v : fallback;
+}
+
+function logOptInFailure(e: unknown): void {
+  const err = (e && typeof e === 'object' ? e : {}) as { name?: unknown; code?: unknown };
+  const code = loggable(err.code, '');
+  console.warn(`[privacy] scan_save_opt_in_read_failed ${loggable(err.name, typeof e)}${code ? ` ${code}` : ''}`);
+}
+
+/**
+ * True only for a live `jump_numbers` grant. False on any error, a missing row, or a revoked row.
+ * The `db` argument is the route's prisma (or a transaction client); a stand-in with the same shape works in tests.
+ */
+export async function scanSaveOptIn(db: unknown, userId: string): Promise<boolean> {
+  if (typeof userId !== 'string' || !userId) return false;
+  try {
+    const client = db as OptInDb;
+    const row = await client.scanSaveOptIn.findUnique({
+      where: { userId },
+      select: { granted: true, revokedAt: true, scope: true },
+    });
+    if (!row || row.scope !== SCOPE || row.granted !== true || row.revokedAt != null) return false;
+    return true;
+  } catch (e) {
+    logOptInFailure(e);
+    return false;
+  }
 }

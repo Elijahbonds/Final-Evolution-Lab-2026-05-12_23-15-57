@@ -204,7 +204,8 @@ describe('the couch wiring stays mounted (source scan)', () => {
     expect(read('components/controller-link/host-lobby.tsx')).toMatch(/data-testid="tv-mode-toggle"/);
     const mode = read('lib/babylon/modes/DunkMode.ts');
     expect(mode.match(/CFG\.qteWindowSec/g)).toHaveLength(1);   // only inside slamWindowBase()
-    expect(mode).toMatch(/function slamWindowBase\(\): number \{ return CFG\.qteWindowSec \* tvFactor; \}/);
+    // IMPROVE (2026-10-06): the guest's-first-jumps factor rides the same helper (owner-picked; 1 from the third jump on)
+    expect(mode).toMatch(/function slamWindowBase\(\): number \{ return CFG\.qteWindowSec \* tvFactor \* guestFactor; \}/);
     expect(mode).toMatch(/setPhase\('cinematic'\); setWin\('takeoff'\);\n\s*\{ const f = readDisplaySetting\(\)\.factor;/);
   });
 });

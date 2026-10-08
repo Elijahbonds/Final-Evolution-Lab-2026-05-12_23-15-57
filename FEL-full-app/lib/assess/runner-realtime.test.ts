@@ -7,7 +7,8 @@ import { cmj, kneeWall, ohsFront, ohsSide, singleLegSquat, standFront, standSide
 const STAND = { front: standFront(0.5), left: standSide('left', 0.5), right: standSide('right', 0.5) };
 
 function driveHandsFree(maxLoops = 4000) {
-  const r = new AssessRunner({ aspect: 4 / 3, painAsked: true, handsFree: true, cameraFps: () => 30 });
+  // SCREEN A: as the page does — the take-off foot is tapped before the camera (here: "Not sure", a tap that answers null)
+  const r = new AssessRunner({ aspect: 4 / 3, painAsked: true, handsFree: true, takeoffLeg: null, cameraFps: () => 30 });
   let t = 0;
   let v: RunnerView = r.tick({ t, present: false, image: [] }, t);
   const steps: string[] = [];
@@ -26,6 +27,8 @@ function driveHandsFree(maxLoops = 4000) {
   };
   const standFor = (vw: RunnerView) => (vw.view === 'side' ? (vw.part === 'T2-right' ? STAND.right : STAND.left) : STAND.front);
   for (let loop = 0; loop < maxLoops && v.step !== 'done' && v.step !== 'stopped'; loop++) {
+    // SCREEN A: the after-test pain check is a tap now, never auto-answered; the hands-free athlete taps "no"
+    if (v.step === 'painCheck') { r.answerPain(false, t); t += 33; v = r.tick({ ...standFor(v).frames[0], t }, t); continue; }
     if (v.step === 'active') {
       const part = v.part!;
       if (!fed.has(part)) {
@@ -42,16 +45,17 @@ function driveHandsFree(maxLoops = 4000) {
 }
 
 describe('hands-free realtime runner', () => {
-  it('finishes with no painCheck or takeoff steps', () => {
+  it('finishes with no pain or takeoff steps; the pain check is a tap now, not an auto-advance', () => {
     const { v, steps } = driveHandsFree();
     expect(v.step).toBe('done');
     expect(steps.some((s) => s.startsWith('pain:'))).toBe(false);
     expect(steps.some((s) => s.startsWith('takeoff:'))).toBe(false);
-    expect(steps.some((s) => s.startsWith('painCheck:'))).toBe(false);
+    // CHANGED (SCREEN A): the pain check IS visited after each test, and the drive answers it by tap (req. 2 & 3)
+    expect(steps.filter((s) => s.startsWith('painCheck:'))).toHaveLength(4);
   });
 
   it('keeps runner state when aspect changes mid-run', () => {
-    const r = new AssessRunner({ aspect: 4 / 3, painAsked: true, handsFree: true });
+    const r = new AssessRunner({ aspect: 4 / 3, painAsked: true, handsFree: true, takeoffLeg: 'left' });
     let t = 0;
     for (let i = 0; i < 120; i++) {
       t += 33;
@@ -63,12 +67,13 @@ describe('hands-free realtime runner', () => {
   });
 
   it('logs rejection reasons in memory', () => {
-    const r = new AssessRunner({ aspect: 4 / 3, painAsked: true, handsFree: true, parts: QUICK_PARTS.filter((p) => p.id === 'T2-left') });
+    const r = new AssessRunner({ aspect: 4 / 3, painAsked: true, handsFree: true, takeoffLeg: null, parts: QUICK_PARTS.filter((p) => p.id === 'T2-left') });
     let t = 0;
     let v = r.tick({ t, present: false, image: [] }, t);
     for (let i = 0; i < 3000 && v.step !== 'done'; i++) {
       t += 33;
       v = r.tick({ ...STAND.left.frames[i % STAND.left.frames.length], t }, t);
+      if (v.step === 'painCheck') r.answerPain(false, t);              // SCREEN A: the tap, as the page makes it
     }
     expect(r.rejectionLog.length).toBeGreaterThanOrEqual(0);
   });

@@ -124,3 +124,4 @@ if (fail.length) {
   process.exit(1);
 }
 console.log(`basketball-rules-tests: ${checks} checks green — rims, arcs and scoring agree across every mode`);
+process.exit(0);

@@ -2,18 +2,29 @@
 // Who Scene It — Babylon host (lane 3 W1). A thin host like dunk-babylon: it owns the canvas, boots the harness with the
 // live venue quiz, and draws the question card over the sweep. The four answers are buttons here AND the four face
 // buttons on any pad (the mode reads A/B/X/Y). Results flow back through GameShell's onEnd like every other mode.
+//
+// IMPROVE (2026-10-06): the reveal marks the right card and each seat's pick (#2); a tap on a card during the reveal moves on
+// once it has had its beat (#5); the second seat may be the CPU (#7, `p2name`); P2's arrows sit on the grid's corners (#14);
+// the match ends on a venue recap (#15); and the mode runs `continuous`, so REPLAY starts a new match in place (#16).
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { GameProps, GameResult } from './game-shell';
+import { useBabylonPlaytestBridge } from './use-babylon-playtest-bridge';
+import { surfaceBootError } from './boot-error';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { hnode } from './hud-format';
 import { PausedLayer, BodyReadyLine } from './paused-layer';
+import { ControlsPanel } from './controls-panel';
 import { whoSceneItStageBox } from '@/lib/babylon/modes/whoSceneItFrame';
+import { replayWhoSceneIt } from '@/lib/babylon/modes/WhoSceneItMode';
+import { useReplayInPlace } from './replay-in-place';
 
 type Hud = Record<string, HudValue>;
+// IMPROVE (#14): P2's arrow is its card's corner turned 45° clockwise — ▲ top-left, ▶ top-right, ◀ bottom-left, ▼ bottom-right
+// (WhoSceneItMode's DPAD). ◀ used to pick the bottom-RIGHT card.
 const OPTS: { key: 'optA' | 'optB' | 'optX' | 'optY'; btn: 'A' | 'B' | 'X' | 'Y'; face: string; dpad: string; color: string }[] = [
   { key: 'optA', btn: 'A', face: 'A', dpad: '\u25b2', color: '#22d3ee' }, { key: 'optB', btn: 'B', face: 'B', dpad: '\u25b6', color: '#f43f5e' },
-  { key: 'optX', btn: 'X', face: 'C', dpad: '\u25bc', color: '#a855f7' }, { key: 'optY', btn: 'Y', face: 'D', dpad: '\u25c0', color: '#facc15' },
+  { key: 'optX', btn: 'X', face: 'C', dpad: '\u25c0', color: '#a855f7' }, { key: 'optY', btn: 'Y', face: 'D', dpad: '\u25bc', color: '#facc15' },
 ];
 /** The between-rounds scoreboard rows the mode publishes (HudScoreCard shape). */
 const isBoard = (v: unknown): v is { name: string; score: number | string; line: string }[] =>
@@ -23,10 +34,15 @@ export default function WhoSceneItBabylon({ onEnd }: GameProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const busRef = useRef<InputBus | null>(null);
   const endedRef = useRef(false);
+  /** When the current match began, if it began on a REPLAY (the harness's clock started with the first one). */
+  const replayAtRef = useRef<number | null>(null);
+  const onEndRef = useRef(onEnd);
+  onEndRef.current = onEnd;
   const [phase, setPhase] = useState<ModePhase>('loading');
   const [countdown, setCountdown] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [hud, setHud] = useState<Hud>({});
+  useBabylonPlaytestBridge('who_scene_it', () => ({ phase, countdown, loadError, hud }), busRef.current);
 
   useEffect(() => {
     const canvas = canvasRef.current; if (!canvas) return;
@@ -35,12 +51,13 @@ export default function WhoSceneItBabylon({ onEnd }: GameProps) {
     const resultSink = async (r: SessionResult) => {
       if (endedRef.current) return; endedRef.current = true;
       const won = r.outcome === 'WIN' || r.outcome === 'win';
+      const duration = replayAtRef.current !== null ? Math.round((performance.now() - replayAtRef.current) / 100) / 10 : r.durationSec;
       const result: GameResult = {
-        score: r.score, stats: r.stats, outcome: r.outcome, opponentScore: 0, won, duration: r.durationSec,
+        score: r.score, stats: r.stats, outcome: r.outcome, opponentScore: 0, won, duration,
         headline: won ? 'SCENE MASTER' : 'ROUND OVER',
         tallies: { hits: r.stats?.correct ?? 0, misses: Math.max(0, (r.stats?.total ?? 0) - (r.stats?.correct ?? 0)), dodges: 0, combos: r.stats?.bestStreak ?? 0 },
       };
-      onEnd(result);
+      onEndRef.current(result);
     };
     const startTimer = setTimeout(() => {
       if (disposed) return;
@@ -49,14 +66,32 @@ export default function WhoSceneItBabylon({ onEnd }: GameProps) {
         onPhase: (p, cd) => { setPhase(p); setCountdown(p === 'countdown' && typeof cd === 'number' ? cd : null); setLoadError(p === 'error' ? (typeof cd === 'string' ? cd : 'Failed to load this mode.') : null); },
         onHud: (u) => setHud((prev) => ({ ...prev, ...u })),
         resultSink,
-      }).then((s) => { if (disposed) { s(); return; } stop = s; }).catch((e) => console.error('[FEL-WSI] boot failed', e));
+        // IMPROVE (#16): the finish reports its card and the stage stays up for REPLAY (replayWhoSceneIt); one sink takes either
+        continuous: true, cardSink: resultSink,
+      }).then((s) => { if (disposed) { s(); return; } stop = s; }).catch((e) => surfaceBootError(e, { disposed, label: '[FEL-WSI] boot failed', setPhase, setLoadError }));
     }, 0);
     return () => { disposed = true; clearTimeout(startTimer); stop?.(); busRef.current = null; };
-  }, [onEnd]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- G7: the stage is owned by the mount; callbacks are read through refs.
+  }, []);
+
+  // IMPROVE (#16): REPLAY on the shell's end card — a new set of rounds on this stage, same players, no reboot
+  const restart = useCallback((): boolean => {
+    const ok = replayWhoSceneIt();
+    if (ok) { endedRef.current = false; replayAtRef.current = performance.now(); }
+    return ok;
+  }, []);
+  useReplayInPlace(restart);
 
   const emit = useCallback((e: Parameters<InputBus['emit']>[0]) => { busRef.current?.emit(e); }, []);
   const tapStart = useCallback(() => emit({ t: 'button', btn: 'START', pressed: true }), [emit]);
   const revealing = typeof hud.reveal === 'string' && hud.reveal.length > 0;
+  // #2: once the question resolves, the right card and each seat's pick (-1 = none)
+  const answerIdx = typeof hud.answerIdx === 'number' ? hud.answerIdx : -1;
+  const picks = [typeof hud.pickP1 === 'number' ? hud.pickP1 : -1, typeof hud.pickP2 === 'number' ? hud.pickP2 : -1];
+  const marked = answerIdx >= 0;
+  const p2name = typeof hud.p2name === 'string' && hud.p2name ? hud.p2name : 'P2';
+  const twoHumans = Number(hud.humans ?? hud.players) === 2;
+  const recap = isBoard(hud.recap) ? hud.recap : null;
   const [box, setBox] = useState(() => whoSceneItStageBox(1200, 800));
   useEffect(() => {
     const measure = () => setBox(whoSceneItStageBox(window.innerWidth, window.innerHeight));
@@ -87,7 +122,7 @@ export default function WhoSceneItBabylon({ onEnd }: GameProps) {
           {Number(hud.players) === 2 ? (
             <>
               <span className="fel-panel fel-stat px-3 py-1 text-lg"><span className="mr-1 text-[10px] text-[#22d3ee]">P1</span>{hnode(hud.score, 0)}</span>
-              <span className="fel-panel fel-stat px-3 py-1 text-lg"><span className="mr-1 text-[10px] text-[#facc15]">P2</span>{hnode(hud.p2score, 0)}</span>
+              <span className="fel-panel fel-stat px-3 py-1 text-lg"><span className="mr-1 text-[10px] text-[#facc15]">{p2name}</span>{hnode(hud.p2score, 0)}</span>
             </>
           ) : (
             <span className="fel-panel fel-stat px-3 py-1 text-lg">{hnode(hud.score, 0)}</span>
@@ -101,19 +136,31 @@ export default function WhoSceneItBabylon({ onEnd }: GameProps) {
         <div className="absolute inset-x-0 bottom-3 flex flex-col items-center gap-2 px-3">
           <div className="fel-panel max-w-[720px] px-5 py-2.5 text-center text-lg font-bold text-white md:text-xl">{hud.prompt}</div>
           <div className="grid w-full max-w-[720px] grid-cols-2 gap-2">
-            {OPTS.map((o) => (
-              <button key={o.key} disabled={revealing} onPointerDown={(e) => { e.preventDefault(); emit({ t: 'button', btn: o.btn, pressed: true }); }}
-                className="fel-panel flex items-center gap-2 rounded-xl px-4 py-4 text-left text-base text-white disabled:opacity-60 md:text-lg" style={{ borderColor: `${o.color}66` }}>
-                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full font-mono text-[13px] font-bold text-black" style={{ background: o.color }}>{o.face}</span>
-                <span className="truncate">{hnode(hud[o.key], '')}</span>
-                {Number(hud.players) === 2 && <span className="ml-auto shrink-0 font-mono text-sm text-white/55">{o.dpad}</span>}
-              </button>
-            ))}
+            {OPTS.map((o, i) => {
+              // #2: green for the right card, red for a wrong pick, each pick tagged with its seat; the rest dim
+              const right = marked && i === answerIdx;
+              const pickedBy = [0, 1].filter((seat) => picks[seat] === i);
+              const wrongPick = marked && !right && pickedBy.length > 0;
+              const border = right ? '#22c55e' : wrongPick ? '#ef4444' : `${o.color}66`;
+              return (
+                // #5: the cards stay live during the reveal — a tap moves on once the answer has had its beat (the mode decides)
+                <button key={o.key} onPointerDown={(e) => { e.preventDefault(); emit({ t: 'button', btn: o.btn, pressed: true }); }}
+                  className={`fel-panel flex items-center gap-2 rounded-xl px-4 py-4 text-left text-base text-white md:text-lg ${revealing && !right && !wrongPick ? 'opacity-50' : ''}`}
+                  style={{ borderColor: border, borderWidth: right || wrongPick ? 2 : undefined, background: right ? 'rgba(34,197,94,0.22)' : wrongPick ? 'rgba(239,68,68,0.18)' : undefined }}>
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full font-mono text-[13px] font-bold text-black" style={{ background: o.color }}>{o.face}</span>
+                  <span className="truncate">{hnode(hud[o.key], '')}</span>
+                  {marked && pickedBy.map((seat) => (
+                    <span key={seat} className="shrink-0 rounded px-1.5 font-mono text-[11px] font-bold text-black" style={{ background: seat === 0 ? '#22d3ee' : '#facc15' }}>{seat === 0 ? 'P1' : p2name}</span>
+                  ))}
+                  {twoHumans && <span className="ml-auto shrink-0 font-mono text-sm text-white/55">{o.dpad}</span>}
+                </button>
+              );
+            })}
           </div>
           <div className="flex items-center gap-2">
             {hud.lockedP1 === true && <span className="fel-panel px-2 py-1 font-mono text-[11px] text-[#22d3ee]">P1 OUT</span>}
             {typeof hud.banner === 'string' && hud.banner && <div className="fel-panel px-3 py-1 font-mono text-sm font-bold text-[var(--fel-gold)]">{hud.banner}</div>}
-            {hud.lockedP2 === true && <span className="fel-panel px-2 py-1 font-mono text-[11px] text-[#facc15]">P2 OUT</span>}
+            {hud.lockedP2 === true && <span className="fel-panel px-2 py-1 font-mono text-[11px] text-[#facc15]">{p2name} OUT</span>}
           </div>
           {revealing && <div className="fel-panel max-w-[560px] px-3 py-1 text-center font-mono text-[11px] text-white/70">{hud.reveal as string}</div>}
         </div>
@@ -122,7 +169,24 @@ export default function WhoSceneItBabylon({ onEnd }: GameProps) {
       {/* A+ mission #2: the player-count screen and the between-rounds scoreboard — both live where the card is not */}
       {phase === 'playing' && !(typeof hud.prompt === 'string' && hud.prompt) && (
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 text-center">
-          {isBoard(hud.board) && typeof hud.boardTitle === 'string' && hud.boardTitle ? (
+          {recap ? (
+            // IMPROVE (#15): the places the match asked — who took each and how fast — before the result card
+            <div className="pointer-events-auto fel-panel w-full max-w-[560px] px-5 py-4">
+              <div className="fel-heading text-2xl font-black text-white">THE VENUES</div>
+              {typeof hud.recapTitle === 'string' && hud.recapTitle && <div className="mt-1 font-mono text-xs text-[var(--fel-gold)]">{hud.recapTitle}</div>}
+              <div className="mt-3 grid gap-1.5">
+                {recap.map((r, i) => (
+                  <div key={`${r.name}-${i}`} className="flex items-center justify-between gap-3 rounded-lg bg-black/40 px-3 py-1.5">
+                    <span className="truncate text-left text-sm font-bold text-white">{r.name}</span>
+                    <span className="shrink-0 font-mono text-xs text-white/60">{r.line}</span>
+                    <span className="fel-stat w-12 shrink-0 text-right text-base">{r.score}</span>
+                  </div>
+                ))}
+              </div>
+              <button type="button" onPointerDown={(e) => { e.preventDefault(); emit({ t: 'button', btn: 'A', pressed: true }); }} onPointerUp={() => emit({ t: 'button', btn: 'A', pressed: false })}
+                className="mt-3 rounded-xl bg-[var(--fel-cyan)] px-6 py-2 font-bold text-black">CONTINUE</button>
+            </div>
+          ) : isBoard(hud.board) && typeof hud.boardTitle === 'string' && hud.boardTitle ? (
             <div className="fel-panel w-full max-w-[520px] px-5 py-4">
               <div className="fel-heading text-2xl font-black text-white">SCOREBOARD</div>
               <div className="mt-3 grid gap-2">
@@ -161,8 +225,10 @@ export default function WhoSceneItBabylon({ onEnd }: GameProps) {
       {/* ready / countdown / error gates */}
       {phase === 'ready' && (
         <button onClick={tapStart} className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 text-center">
-          <span className="fel-heading text-3xl font-black text-white">WHO SCENE IT</span>
+          <span className="fel-heading text-3xl font-black text-white">SPOT THE SCENE</span>
           <span className="mt-2 font-mono text-xs text-white/70">name the place · A B C D answer · faster pays more · ◀ ▶ on the first screen adds a second player (arrows)</span>
+          {/* CONTROLS SCREEN (2026-10-06): the same panel as every BootSplash card — spans only, inside this button */}
+          <ControlsPanel modeId="who_scene_it" chooser={false} className="mt-4" />
           <span className="mt-6 rounded-xl bg-[var(--fel-cyan)] px-6 py-3 font-bold text-black">TAP TO START</span>
           {/* MOVEMENT PLAY P3 (2026-09-24, the step-4a review): the hands-up START works here too — say so, as BootSplash does */}
           <BodyReadyLine className="mt-3" />
@@ -170,9 +236,22 @@ export default function WhoSceneItBabylon({ onEnd }: GameProps) {
       )}
       {/* MOVEMENT PLAY P3 (2026-09-24, step 4a): this host has no BootSplash, so it draws the shared pause itself. It had no
           pause screen at all: a pad's START froze the quiz with no word, and nothing said both hands up bring it back. */}
-      {phase === 'paused' && <PausedLayer onResume={tapStart} />}
+      {phase === 'paused' && <PausedLayer onResume={tapStart} modeId="who_scene_it" />}
       {phase === 'countdown' && countdown != null && <div className="pointer-events-none absolute inset-0 flex items-center justify-center"><span className="fel-heading text-7xl font-black text-white drop-shadow">{countdown}</span></div>}
-      {phase === 'error' && <div className="absolute inset-0 flex items-center justify-center bg-black/60 p-6 text-center font-mono text-sm text-[var(--fel-red)]">{loadError}</div>}
+      {phase === 'error' && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/70 p-6 text-center">
+          <div className="fel-panel max-w-md rounded-2xl border-[var(--fel-red)]/50 px-6 py-5">
+            <div className="font-mono text-sm text-[var(--fel-red)]">{loadError}</div>
+            <button
+              type="button"
+              onClick={tapStart}
+              className="mt-4 rounded-xl bg-[var(--fel-cyan)] px-5 py-2 font-bold text-black"
+            >
+              RETRY
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

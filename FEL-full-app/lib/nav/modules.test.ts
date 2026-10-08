@@ -24,6 +24,10 @@ const ROOT = join(__dirname, '..', '..');
 /** Files that are reached some way other than an import, each with the reason. */
 const NOT_IMPORTED: Record<string, string> = {
   'lib/babylon/modes/registry.ts': 'the mode registry — loaded by key at runtime, not by a static import',
+  // CREATOR SOUNDTRACK phase 0 (owner, 2026-10-06, "storage = Google Cloud Storage"): the creative-card upload route was
+  // this file's only caller and now signs GCS uploads (lib/soundtrack/storage.ts). Cards made before still point at S3
+  // objects, and removing the AWS path is the owner's call (a file this lane did not create), so it stays, named here.
+  'lib/s3.ts': 'the old public S3 upload signer; its one caller moved to GCS (2026-10-06) and deleting it is the owner\'s call',
   // Test support. Tests are deliberately NOT counted as consumers (a module used only by its own test is still
   // dead), but this one exists to be imported by them: six rule tests strip comments with it before scanning
   // source. Counting tests generally would blind the check; excusing this one file by name does not.
@@ -38,11 +42,45 @@ const NOT_IMPORTED: Record<string, string> = {
   'lib/pose/recordingsGuard.ts': 'repo guard — recordingsGuard.test.ts rejects a committed video, image, or child take; tests are not counted as consumers',
   // MIRROR-COACH P3 review (2026-09-26): a stored Mirror screen row reads as server-graded only with the server's evidence
   // beside results that match it, so the coach tests build their rows the way app/api/mirror/screen writes them — here.
+  // CREATOR-PLAN phase 4d (2026-10-06): the creator lane's archetype recipes are TEST-ONLY by design (the game ships tools,
+  // never characters, so no shipped module may import them); 4a added the file without its line here.
+  'lib/creator/look/__fixtures__/archetypes.ts': 'test support — the ten generic archetype recipes the creator tests build and render (never shipped: tools, not characters); tests are not counted as consumers',
+  // INTEGRATION (2026-10-06, integration-2): two test-only modules whose lanes did not add their line (each lane ran its own
+  // tests, not this one). Neither was ever imported by shipped code, so no wiring was lost in a merge.
+  'lib/ui/hintLiterals.ts': 'test support — the hint-literal reader controlsScreen.scan.test.ts sorts every mode\'s `hint` with (console-view lane); tests are not counted as consumers',
+  'lib/babylon/combat/difficultySim.ts': 'test support — the combat difficulty harness "trimmed for the regression test" (its header); difficultyBands.test.ts pins each duel mode\'s bands with it (improve-combat lane); tests are not counted as consumers',
   'lib/mirror/fixtures/storedRows.ts': 'test support — the stored screen rows the coach and attention tests read, built as the Mirror route writes them; tests are not counted as consumers',
+  // MIRROR-MOVES P2 (2026-10-07): the live hinge's and push-up's whole-set builders (sideRepBuild.ts) build on the hinge lane's
+  // fixture builder (hingeSetupBuild.ts, which sat on KNOWN_ORPHANS below) — both test-only by design: synthetic bodies
+  // filmed through the synth for sideRepStage.test.ts, lungeCues.test.ts, hingeAudit.test.ts and tests/mirror-moves/**.
+  'lib/mirror/fixtures/sideRepBuild.ts': 'test support — whole guided hinge and push-up sets filmed through the synth; tests are not counted as consumers',
+  'lib/mirror/fixtures/hingeSetupBuild.ts': 'test support — the side-view hinge / set-up fixture builder (moved here from KNOWN_ORPHANS: test-only by design, now also built on by sideRepBuild.ts); tests are not counted as consumers',
+  // ADVENTURE (2026-10-06): each Phase A lane tests its sim against a headless rig built from contracts.ts (the plan's
+  // rule: no lane imports another's code or a scene); A4's sandbox tests drive A1's. Same class as sourceScan above.
+  'lib/babylon/adventure/movement/testkit.ts': 'test support — A1\'s headless world, actors and 60 Hz runner; tests are not counted as consumers',
+  // HOOPS BODY (2026-10-07, Mirror & coaching Phase 7): the synthesized hoops bodies the hoops-by-body gates film through the synth.
+  'lib/move/hoopsStreams.ts': 'test support — scripted jump shots, set shots, crossovers, swipes and sit-downs for hoopsBody.test.ts / bodyControlSource.test.ts; tests are not counted as consumers',
+  'lib/babylon/adventure/combat/testArena.ts': 'test support — A2\'s headless arena with a contract-built stand-in for A1; tests are not counted as consumers',
+  'lib/babylon/adventure/partner/testRig.ts': 'test support — A3\'s headless party rig with stand-ins for A1 and A2; tests are not counted as consumers',
+  'lib/babylon/adventure/br/testkit.ts': 'test support — Phase C\'s headless BR scenarios (a landed match, placing bodies, steering the zone); tests are not counted as consumers',
   // ECONOMY-SESSIONS-HARDEN (2026-09-28), FIX 2 step 7: written, tested and deliberately NOT imported by any route (FE PM:
   // staged until the live database is back). lib/sessions/sessionsHardening.scan.test.ts fails the day a route imports it
   // without that GO; wiring it is two lines per sessions route, then this line goes.
   'lib/sessions/runRateLimit.ts': 'STAGED, not wired to prod — the sessions rate limits wait for the FE PM\'s GO (live DB back)',
+  // STORE-PRICES (2026-10-04): Elijah's approved coach-store prices, typed and flag-gated (COACH_STORE_ENABLED,
+  // still off). No route, page or component reads from it yet — this tip writes no database rows and the
+  // sellable six still read their price from MarketplaceListing.priceUsd. It is the typed source of truth the
+  // eventual DB-seeding step (see ~/Claude/_observe/STORE-PRICES-LIVE-ROWS.txt) and a future listing/settings UI
+  // read from; wiring either one up means deleting this line.
+  'lib/coach-store/storePrices.ts': 'STAGED, not wired to prod — typed price data for the coach store\'s eventual DB seed; no route/page reads it yet',
+  // INTEGRATION (2026-10-06): voiceover v2's production-script parser is run by tools/voice/import-voices.mts (it imports
+  // '../../lib/babylon/audio/voice/voiceScript.ts' at lines 35 and 39). tools/ is outside the tree this check scans, so
+  // its one real consumer is invisible here; the import runs on the owner's machine when a voice is recorded.
+  'lib/babylon/audio/voice/voiceScript.ts': 'run by tools/voice/import-voices.mts (outside the scanned lib/app/components/scripts tree): the voice-take import, an owner step',
+  // INTEGRATION (2026-10-06): two pure PIPELINES adapters, built and tested, whose mounts the pipelines lane ROUTED to the
+  // lanes that own the hosts (its report, "Routed (not done here)"). Wiring either one means deleting its line.
+  'lib/pipelines/celebration.ts': 'ROUTED, not wired — the equipped-routine dunk celebration; DunkMode\'s startLiveCeleb needs the dance clips on the dunk rig and `dance` in clipScope SCOPES.dunk (rig work for the dunk lane)',
+  'lib/pipelines/feedCommunity.ts': 'ROUTED, not wired — approved community writing as Knowledge Feed fact cards; lib/knowledge needs a `community` topic in TOPIC_IDS fed by feedCardsOf(fetchCommunity(\'reads\')) (knowledge-feed lane)',
   // MIRROR-COACH P5 FIX (2026-09-29, code review): the excuse this line used to carry ("that consuming route/UI is a
   // separate, not-yet-landed piece of this same phase") was already false the day it was committed — lib/health/pain.ts
   // (imported by app/api/health/pain/route.ts) and components/coach/pain-checkin.tsx both import decide() from this
@@ -87,14 +125,10 @@ const KNOWN_ORPHANS: readonly string[] = [
   'lib/babylon/platform/GenerationService.ts',
   'lib/babylon/server/subscriptionApi.ts',
   'lib/locomotion/moves/MoveGraph.ts',
-  // MIRROR-COACH P4 (2026-09-25/29): the hinge-and-setup lane's own fixture builder for lib/mirror/hingeAudit.ts /
-  // setupLine.ts's tests, landed the same day as this line, not this lane's (registry-and-lunge) file to wire up.
-  'lib/mirror/fixtures/hingeSetupBuild.ts',
   // Everything else.
   'lib/cache/asset-cache.ts',
   'lib/competition/payoutMethods.ts',
   'lib/env.ts',
-  'lib/mode-menu.ts',
   'lib/offline-cache.ts',
   'lib/profile/dashboard.ts',
   'lib/story/progression-gates.ts',

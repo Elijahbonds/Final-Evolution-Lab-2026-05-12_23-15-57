@@ -5,7 +5,7 @@ export interface CookingPublishPayload { title: string; steps: string[]; ingredi
 const TAGS = ['protein', 'carbs', 'pre-game', 'recovery', 'hydration', 'quick', 'budget', 'plant-based'];
 const lines = (s: string) => s.split('\n').map((x) => x.trim()).filter(Boolean);
 
-export default function CookingMode({ onPublish }: { onPublish: (p: CookingPublishPayload) => void }) {
+export default function CookingMode({ onPublish, submitLabel = 'Publish recipe' }: { onPublish: (p: CookingPublishPayload) => void; submitLabel?: string }) {
   const [title, setTitle] = useState(''); const [ingredients, setIngredients] = useState(''); const [steps, setSteps] = useState(''); const [tags, setTags] = useState<string[]>([]); const [photoUrl, setPhotoUrl] = useState('');
   const ready = title.trim() && lines(ingredients).length > 0 && lines(steps).length > 0;
   return (
@@ -19,7 +19,7 @@ export default function CookingMode({ onPublish }: { onPublish: (p: CookingPubli
         <input value={photoUrl} onChange={(e) => setPhotoUrl(e.target.value)} placeholder="Photo link (https://…, optional)" className="w-full rounded-lg bg-neutral-900 px-3 py-2 text-sm" />
         <div className="flex flex-wrap gap-1.5">{TAGS.map((t) => <button key={t} onClick={() => setTags((a) => a.includes(t) ? a.filter((x) => x !== t) : [...a, t])} className={`rounded-full px-3 py-1 text-xs ${tags.includes(t) ? 'bg-rose-500 text-black' : 'bg-neutral-800'}`}>{t}</button>)}</div>
       </div>
-      <button disabled={!ready} onClick={() => onPublish({ title, steps: lines(steps).slice(0, 30), ingredients: lines(ingredients).slice(0, 40), fuelTags: tags, photoUrl: photoUrl.trim() || undefined })} className="mt-6 rounded-xl bg-rose-500 px-6 py-3 font-bold text-black disabled:opacity-40">Publish recipe</button>
+      <button disabled={!ready} onClick={() => onPublish({ title, steps: lines(steps).slice(0, 30), ingredients: lines(ingredients).slice(0, 40), fuelTags: tags, photoUrl: photoUrl.trim() || undefined })} className="mt-6 rounded-xl bg-rose-500 px-6 py-3 font-bold text-black disabled:opacity-40">{submitLabel}</button>
     </div>
   );
 }

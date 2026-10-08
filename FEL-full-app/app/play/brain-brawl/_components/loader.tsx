@@ -17,5 +17,5 @@ const spinner = () => (
 const BrainBrawlBabylon = dynamicImport(() => import('@/components/games/brainbrawl-babylon'), { ssr: false, loading: spinner });
 
 export function BrainBrawlLoader() {
-  return <GameShell mode="brainBrawl" title="BRAIN BRAWL" venue="NeuroArena" Game={BrainBrawlBabylon} />;
+  return <GameShell mode="brainBrawl" title="BRAIN BRAWL" venue="NeuroArena" Game={BrainBrawlBabylon} ownControls />;
 }

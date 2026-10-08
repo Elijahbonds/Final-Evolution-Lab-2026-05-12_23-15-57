@@ -162,7 +162,8 @@ describe('the review: did the correction hold, measured on the reps', () => {
 
   it('heels rising on all 8 reps: cued and escalated, never regressed — and the review does NOT say it held', () => {
     const { state, cued } = workSet(() => ['heelRise']);
-    expect(cued.map((c) => c.level)).toEqual(['cue', 'cue', 'escalate']);     // the reproduction: no regress
+    // the reproduction: no regress (MIRROR-MOVES P2: the second line is the card's reply — rep 3 to show it, REPEAT_REPLY_FIRES)
+    expect(cued.map((c) => c.level)).toEqual(['cue', 'reply', 'escalate']);
     expect(cued.some((c) => c.level === 'regress')).toBe(false);
     const v = squatReviewVerdict(state.workReps, cued, opts);
     expect(v.kind).toBe('stillShowing');

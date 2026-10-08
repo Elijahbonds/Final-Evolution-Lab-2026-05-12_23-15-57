@@ -4,9 +4,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-import { isStudioCreatorEnabled, FEATURE_DISABLED } from '@/lib/flags';
+import { isStudioCreatorEnabled, isVirtualPurchasesEnabled, FEATURE_DISABLED } from '@/lib/flags';
 import { STUDIO_CREDIT_PACKS } from '@/lib/studio-plan';
 import { studioCreditBalance } from '@/lib/studio-credits';
+import { getStripe } from '@/lib/stripe';
+import { storeClosed } from '@/lib/coach-store/gate';
+import { siteOrigin } from '@/lib/stripe/site-origin';
+import { createStudioCreditsCheckout } from '@/lib/stripe/product-checkout';
 
 /**
  * GET /api/studio/credits
@@ -47,6 +51,11 @@ export async function GET() {
  * POST /api/studio/credits  { itemKey }
  * Returns a Stripe Checkout URL for a build credit pack (grant happens in the
  * webhook on completion). Requires Stripe to be configured.
+ *
+ * STORE-READY B10: the checkout code is called IN-PROCESS (lib/stripe/product-checkout) — no
+ * server-side HTTP delegation to /api/stripe/checkout with the caller's session forwarded (that
+ * was SSRF-shaped), and no Origin header read. While the B10 live-key fence is off the POST
+ * refuses with 409 store_closed before any body read, Stripe call or prisma write.
  */
 export async function POST(req: NextRequest) {
   if (!isStudioCreatorEnabled()) return NextResponse.json(FEATURE_DISABLED, { status: 403 });
@@ -54,19 +63,26 @@ export async function POST(req: NextRequest) {
   const userId = (session?.user as any)?.id;
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+  // STORE-READY B10: no key -> payments_not_set_up; VIRTUAL_PURCHASES_ENABLED off ->
+  // virtual_purchases_off. Both are 409 store_closed and nothing is fetched, written or charged.
+  if (!(process.env.STRIPE_SECRET_KEY ?? '').trim()) return storeClosed('payments_not_set_up');
+  if (!isVirtualPurchasesEnabled()) return storeClosed('virtual_purchases_off');
+  // STORE-READY B3/B10: Stripe URLs come from the server constant NEXTAUTH_URL, never the Origin header.
+  const origin = siteOrigin();
+  if (!origin) return storeClosed('site_url_not_set');
+
   const body = await req.json().catch(() => ({}));
   const itemKey = String(body?.itemKey ?? '');
   if (!STUDIO_CREDIT_PACKS[itemKey]) {
     return NextResponse.json({ error: 'Invalid credit pack' }, { status: 400 });
   }
 
-  // Delegate to the shared checkout route so the money path stays in one place.
-  const origin = req.headers.get('origin') || process.env.NEXTAUTH_URL || '';
-  const res = await fetch(`${origin}/api/stripe/checkout`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', cookie: req.headers.get('cookie') ?? '' },
-    body: JSON.stringify({ product: 'STUDIO_CREDITS', itemKey }),
-  });
-  const data = await res.json().catch(() => ({}));
-  return NextResponse.json(data, { status: res.status });
+  try {
+    const result = await createStudioCreditsCheckout({ stripe: getStripe(), userId, itemKey, origin });
+    if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status });
+    return NextResponse.json({ url: result.url });
+  } catch (e) {
+    console.error('[studio/credits] stripe error', e);
+    return NextResponse.json({ error: 'checkout_failed' }, { status: 500 });
+  }
 }

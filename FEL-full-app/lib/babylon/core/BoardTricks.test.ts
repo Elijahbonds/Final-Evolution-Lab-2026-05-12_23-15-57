@@ -184,7 +184,10 @@ describe('a mid-air press only ever throws an AIR trick', () => {
   });
   it('the press that pops the ollie is spent on the pop (SkateRunMode source)', () => {
     const src = fs.readFileSync(path.join(ROOT, 'lib/babylon/modes/SkateRunMode.ts'), 'utf8');
-    expect(src).toMatch(/if \(!rig\.rider\.grounded && !popped\)/);
+    // (asset-polish 2026-10-05: the branch also skips while a wall or a lip has the board — extra `&& !flag` terms are allowed,
+    // the pop's own `!popped` is not)
+    expect(src).toMatch(/if \(!rig\.rider\.grounded && !popped(?: && ![A-Za-z]+)*\)/);
+    expect(src).toMatch(/if \(!rig\.rider\.grounded && !popped && !wallRide && !lipStall\)/);
     expect(src).not.toMatch(/bestFitting\('skate'/);
   });
 });

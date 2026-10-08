@@ -274,9 +274,27 @@ export const ACADEMY_MOMENTS: readonly { id: string; say: string; maxWords: numb
   { id: 'academy.published', say: 'A song is published to the Academy library (every publish, not only the first).', maxWords: 16, n: 4 },
 ];
 
+/**
+ * VOICEOVER (2026-10-06): the PAGES' lines, in the Coach's voice. The Mirror coach, the Quick Screen and Prove It build
+ * their lines in code and used to speak every one with the browser's voice; lib/babylon/audio/voice/speakNatural.ts now
+ * plays a rendered take instead whenever the Coach's bank has a line with the same text (or a `match` that equals the page's
+ * string, where the spoken words differ: digits are spelled out). These are those lines' moments, so the script rules
+ * (word limits, clean language) hold them too. `n: 0`: nothing is owed — the pages fall back to the browser voice for any
+ * line not recorded yet. The lines themselves are in tools/voice/script/coach.csv (the production script).
+ */
+export const PAGE_MOMENTS: readonly { id: string; say: string; maxWords: number; n: number }[] = [
+  { id: 'page.mirror.cue', say: 'The Mirror coach\'s form cue for a fault it read (lib/babylon/nexus/neuro-mirror/rules/cue-engine.ts): the cue, the escalation, the regression, the "there it is" confirm.', maxWords: 24, n: 0 },
+  { id: 'page.mirror.framing', say: 'The Mirror\'s framing fix: get the whole body in the shot, square to the camera (lib/mirror/framing.ts, squatStage.ts).', maxWords: 24, n: 0 },
+  { id: 'page.mirror.jump', say: 'The Mirror\'s jump read: not counted (the camera lost the feet), or the fixed half of the progress line.', maxWords: 20, n: 0 },
+  { id: 'page.mirror.screen', say: 'The Mirror\'s movement screen: each station\'s own instruction, the turn, moving on, the retest, done (lib/mirror/screen.ts, screenRunner.ts).', maxWords: 28, n: 0 },
+  { id: 'page.assess', say: 'The Quick Screen (app/play/mirror/assess): hold, the countdown, go, the turn, the calibration fixes and each move\'s setup (lib/assess/runner.ts, protocol.ts, calibration.ts).', maxWords: 40, n: 0 },
+  { id: 'page.proveit', say: 'Prove It (app/play/dunkduel): the go cue and "Next up!" (the athlete\'s name is shown on screen, never spoken).', maxWords: 6, n: 0 },
+];
+
 /** Every moment id any cast member can be asked for. */
 export const ALL_MOMENT_IDS: readonly string[] = [
   ...MOMENTS.map((m) => m.id), ...CROWD_MOMENTS.map((m) => m.id), ...PLAYER_MOMENTS.map((m) => m.id),
-  ...COACH_MOMENTS.map((m) => m.id), ...DANCE_MOMENTS.map((m) => m.id), ...ACADEMY_MOMENTS.map((m) => m.id), 'name',
+  ...COACH_MOMENTS.map((m) => m.id), ...DANCE_MOMENTS.map((m) => m.id), ...ACADEMY_MOMENTS.map((m) => m.id),
+  ...PAGE_MOMENTS.map((m) => m.id), 'name',
 ];
 export const momentSpec = (id: string): MomentSpec | undefined => MOMENTS.find((m) => m.id === id);

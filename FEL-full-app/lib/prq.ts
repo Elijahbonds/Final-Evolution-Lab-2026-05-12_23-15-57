@@ -1,3 +1,5 @@
+import { isUnlistedMode } from './unlisted-modes';
+
 export const PRQ_ATTRS = [
   'strength',
   'speed',
@@ -131,6 +133,10 @@ export function computePrqDelta(opts: {
   /** ACCURACY_PRQ_MODES with no accuracy: 'none' (no gain, the default) or 'score' (the pre-P2 score path: a legacy client). */
   whenNoAccuracy?: 'none' | 'score';
 }): number {
+  // IRON-PARADISE-OUT (2026-10-03): a parked mode's rows above STAY (history reads them; nothing is deleted),
+  // but they pay nothing new — a mode nobody can reach moves no PRQ, whatever posts. Remove the list entry and
+  // the row pays exactly as it did.
+  if (isUnlistedMode(opts?.mode)) return 0;
   const weight = MODE_WEIGHTS?.[opts?.mode] ?? 0.8;
   const completionBonus = opts?.won ? 1.2 : 1.0;
   const timeFactor = Math.min(Math.max((opts?.duration ?? 0) / 120, 0.25), 1);

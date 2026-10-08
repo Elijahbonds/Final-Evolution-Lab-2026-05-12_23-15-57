@@ -19,6 +19,7 @@ import { groundDetailTexture, type GroundKind } from '../visual/groundTextures';
 import { mountOcean, type OceanHandle } from '../visual/OceanSurface';
 import { mountVenueProps, type VenuePropsHandle } from '../visual/VenueProps';
 import { VENUE_PROP_SETS, type PropPlacement } from '../visual/venuePropSets';
+import { buildCloudDeck, type CloudDeckHandle } from '../visual/CloudDeck';
 import { locate, pointAlong, type AeroCircuit } from './aeroCircuits';
 
 export interface AeroWorld {
@@ -210,13 +211,23 @@ function buildStartBanner(scene: Scene, c: AeroCircuit, root: TransformNode): vo
   // the banner: black and white squares, two rows
   const black = VenueKit.paint(scene, 'aero_check_b', '#15171c', 0.02, 0.8), white = VenueKit.paint(scene, 'aero_check_w', '#f7f7f2', 0.12, 0.8);
   const n = 16, w = (half * 2) / n;
+  // IMPROVE (2026-10-06), aeroaces #16 (shadow casters): the 32 tiles were 32 meshes — 32 draws and 32 shadow casters
+  // drawn per cascade, for a banner that never moves. Built as before, then merged into one frozen mesh per colour.
+  const byColour: Mesh[][] = [[], []];
   for (let r = 0; r < 2; r++) for (let i = 0; i < n; i++) {
     const tile = MeshBuilder.CreateBox('aero_check', { width: w, height: 2.2, depth: 0.4 }, scene);
     const across = -half + w * (i + 0.5);
     tile.position.copyFrom(pos.add(right.scale(across))).addInPlace(new Vector3(0, 16 - r * 2.2, 0));
     tile.rotation.y = yaw;
-    tile.material = (i + r) % 2 ? black : white; tile.parent = root; tile.isPickable = false;
+    byColour[(i + r) % 2].push(tile);
   }
+  byColour.forEach((tiles, k) => {
+    const merged = Mesh.MergeMeshes(tiles, true, true);
+    if (!merged) return;
+    merged.name = k ? 'aero_check_b' : 'aero_check_w';
+    merged.material = k ? black : white; merged.parent = root; merged.isPickable = false;
+    merged.freezeWorldMatrix();
+  });
 }
 
 /** The horizon: mesas, island peaks or snow mountains standing well outside the terrain. */
@@ -361,6 +372,14 @@ function sceneryFor(c: AeroCircuit): PropPlacement[] {
         out.push({ kit: 'nature', model: a % 2 ? 'tree_palmShort' : 'tree_palmDetailedShort', at: [x, 0, z], yaw: a, scale: 4.5 });
       }
     }
+    // phase 6: the UNDERGROWTH the beaches were missing — grass and bushes at the palms' feet, never in the water
+    for (let a = 0; a < 130; a++) {
+      const x = -370 + ((a * 197) % 740), z = -290 + ((a * 163) % 620);
+      const h = c.floorAt(x, z);
+      if (h > 1.5 && h < 12 && Math.abs(locate(c.line, x, z).lateral) > c.corridor) {
+        out.push({ kit: 'nature', model: a % 3 === 0 ? 'plant_bush' : a % 3 === 1 ? 'grass_large' : 'plant_bushLarge', at: [x, 0, z], yaw: a * 0.7, scale: 2.2 + (a % 5) * 0.3 });
+      }
+    }
   }
   return out;
 }
@@ -433,14 +452,22 @@ export async function buildAeroWorld(scene: Scene, c: AeroCircuit): Promise<Aero
   if (dome) dome.scaling.setAll(SKY_SCALE);
   if (ring) { ring.scaling.set(SKY_SCALE, SKY_SCALE * 0.6, SKY_SCALE); }
 
+  // THE WEATHER (10-phase pass, phase 6): the dome was the whole sky. Low-poly puffs in the theme's own tint —
+  // warm over the canyon at golden hour, ash over the caldera, night violet between the towers.
+  const CLOUD_TINT: Record<AeroCircuit['theme'], string> = {
+    canyon: '#ffdcbc', island: '#ffffff', glacier: '#eef7ff', volcano: '#7a6a62', city: '#413552',
+  };
+  const clouds: CloudDeckHandle = buildCloudDeck(scene, { span: 2600, yLo: 140, yHi: 260, count: 30, drift: 2.2, tint: CLOUD_TINT[c.theme] });
+
   return {
     root, ocean,
     update(dt, camera) {
       ocean?.update(dt, camera);
+      clouds.update(dt, camera);
       if (emberEmitter) emberEmitter.position.set(camera.position.x, Math.max(-2, Math.min(camera.position.y, 30)) - 6, camera.position.z);
       if (dome) { dome.position.x = camera.position.x; dome.position.z = camera.position.z; }
       if (ring) { ring.position.x = camera.position.x; ring.position.z = camera.position.z; }
     },
-    dispose() { gone = true; props?.dispose(); ocean?.dispose(); embers?.dispose(); emberEmitter?.dispose(); underlight?.dispose(); root.dispose(false, true); },
+    dispose() { gone = true; props?.dispose(); clouds.dispose(); ocean?.dispose(); embers?.dispose(); emberEmitter?.dispose(); underlight?.dispose(); root.dispose(false, true); },
   };
 }

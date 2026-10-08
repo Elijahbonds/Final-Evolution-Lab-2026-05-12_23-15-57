@@ -14,10 +14,11 @@
 // assumption: (FE PM can loosen) the boundary is `thisYear - dobYear > 18`; loosening it to >= 18 is one line in
 // ./verifiedAdult.ts.
 //
-// PRODUCTION-SAFE READS (AM, 19:47 PT). This module and scanSaveOptIn.ts read only columns already on production (User's),
-// never a table or column that only PRIVACY-CORE or AGE-SCREEN adds — a deploy that ran before their pending SQL would
-// 500. And they NEVER throw: every read is wrapped, any error answers false (fail closed) and logs one line with a fixed
-// event name and the error's name/code — never the user id, an email, the birth year or an age.
+// PRODUCTION-SAFE READS (AM, 19:47 PT). User.dobYear is a column already on production. AB-04 also reads ScanSaveOptIn,
+// which is NOT on production until prisma/pending/2026-10-04-adult-optin-ab04.sql is applied. That read is inside
+// scanSaveOptIn's try/catch: a missing table answers false (fail closed), it does not 500. No existing hot table
+// (SessionBooking included) grew a column for this. Every read is wrapped, any error answers false, and the log line
+// is a fixed event name plus the error's name/code — never the user id, an email, the birth year or an age.
 //
 // No import from lib/coach, lib/mirror, lib/camp or lib/move (held by other lanes).
 import { NextResponse } from 'next/server';
@@ -28,8 +29,11 @@ import { verifiedAdult } from './verifiedAdult';
 // The age rule itself lives in ./verifiedAdult (pure, import-free, so client-imported modules can share it).
 export { verifiedAdult };
 
-/** The one read this module makes: User.dobYear. Structural, so a route's `prisma` and a transaction client both fit. */
-export type GateDb = Pick<Prisma.TransactionClient, 'user'>;
+/**
+ * User.dobYear, plus ScanSaveOptIn for the opt-in half. Structural, so a route's `prisma` and a transaction client
+ * both fit. Naming scanSaveOptIn here is safe only because scanSaveOptIn.ts catches a missing table and returns false.
+ */
+export type GateDb = Pick<Prisma.TransactionClient, 'user' | 'scanSaveOptIn'>;
 
 /** A name or code safe to log: short, plain characters only, so nothing a caller put in a message can ride along. */
 function loggable(v: unknown, fallback: string): string {
@@ -100,7 +104,7 @@ export function refuseScanSave(): NextResponse {
   return NextResponse.json({ ...SCAN_SAVE_REFUSED }, { status: 403 });
 }
 
-export type ScanSaveRouteId = '1a' | '1b' | '1c' | '1d' | '1e' | '1f' | '1g' | '1h';
+export type ScanSaveRouteId = '1a' | '1b' | '1c' | '1d' | '1e' | '1f' | '1g' | '1h' | '1i' | '1j';
 
 export interface ScanSaveRoute {
   id: ScanSaveRouteId;
@@ -129,4 +133,6 @@ export const SCAN_SAVE_ROUTES: readonly ScanSaveRoute[] = [
   { id: '1f', file: 'app/api/sessions/route.ts', handler: 'POST (body.form)', writes: 'WorkoutScan.createMany + PrqEntry source camera via writeFormPlan', status: 'gated', holder: null, via: ['lib/move/formWrite.ts'] },
   { id: '1g', file: 'app/api/v1/creator/athlete/route.ts', handler: 'POST', writes: 'AthleteBuild.prq snapshot (the build and the look still save)', status: 'gated', holder: null },
   { id: '1h', file: 'app/api/v1/camp/sessions/route.ts', handler: 'POST', writes: "CampSession prqDelta + movementDelta (the mentee's numbers; the facilitator's record still saves)", status: 'gated', holder: null },
+  { id: '1i', file: 'app/api/mirror/prove-it/route.ts', handler: 'POST', writes: 'WorkoutScan kind prove_it (numbers only, idempotent on runId)', status: 'gated', holder: null },
+  { id: '1j', file: 'app/api/mirror/screen-history/route.ts', handler: 'POST', writes: 'WorkoutScan kind rescreen (scores and flags, idempotent on runId)', status: 'gated', holder: null },
 ];
