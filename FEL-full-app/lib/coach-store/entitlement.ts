@@ -7,13 +7,6 @@ export interface EntitlementPolicy {
   membershipIncludesCourses: boolean;
 }
 
-/**
- * The store-price product key a membership is always recorded as owning (./storePrices), independent of the
- * `membershipIncludesCourses` policy. A member owns SOMETHING — the membership product itself — so a paid
- * membership is never an empty entitlement.
- */
-export const MEMBERSHIP_PRODUCT_KEY = 'membership';
-
 /** The live policy, read at call time from ./bundlePolicy (so tests can mock it). */
 export function currentEntitlementPolicy(): EntitlementPolicy {
   return { membershipIncludesCourses: bundlePolicy.membershipIncludesCourses };
@@ -33,9 +26,8 @@ function membershipCourseProducts(): string[] {
  *
  * `program` (dunking only — the only sellable lane) grants the dunking 8-week product. `course`/`series` grant
  * their own product. `bundle` grants every one of its members. `live_1on1`/`video_review` grant none.
- * `membership` always grants its own membership product (MEMBERSHIP_PRODUCT_KEY — a member owns SOMETHING), and
- * when `membershipIncludesCourses` (./bundlePolicy, now true per Elijah 4:18 PM PT Oct 7 2026) is set it also
- * grants the course and series products.
+ * `membership` grants none unless `membershipIncludesCourses` (./bundlePolicy, default false) is true, in which
+ * case it grants the course and series products — an open question for Elijah (see the PR body).
  */
 export function productsGrantedBy(
   manifest: CoachManifest,
@@ -50,10 +42,7 @@ export function productsGrantedBy(
     case 'bundle':
       return manifest.members;
     case 'membership':
-      return [
-        MEMBERSHIP_PRODUCT_KEY,
-        ...(policy.membershipIncludesCourses ? membershipCourseProducts() : []),
-      ];
+      return policy.membershipIncludesCourses ? membershipCourseProducts() : [];
     case 'live_1on1':
     case 'video_review':
       return [];
