@@ -4,6 +4,7 @@ import { postTransaction } from '@/lib/ledger';
 import { getStripe } from '@/lib/stripe';
 import { PLATFORM_FEE_RATE } from '@/lib/fees';
 import { isVerifiedAdult } from './adult';
+import { slotStillFree } from './slotCheck';
 import {
   coachStorePostings,
   coachStoreSplit,
@@ -74,11 +75,14 @@ export async function fulfilCoachStore(event: Stripe.Event, idempotencyKey: stri
  * `stripe-session:<id>` key — the caller's idempotency key argument is ignored for this event type
  * (SEC-F4 follow-up 1: one payment, one grant, whichever path — or how many event deliveries — ran).
  */
+/** The outcome of one checkout fulfilment (STORE-READY B6): 'refund_due' when a paid booking could not be honoured. */
+export type FulfilOutcome = 'fulfilled' | 'refund_due' | 'noop';
+
 export async function fulfilCoachStoreCheckout(
   session: Stripe.Checkout.Session,
   meta: Meta,
   idempotencyKey: string,
-): Promise<void> {
+): Promise<FulfilOutcome> {
   return onCheckoutSession(session, meta, idempotencyKey);
 }
 
@@ -131,11 +135,11 @@ async function postSale(idempotencyKey: string, price: number, fee: number, coac
   });
 }
 
-async function onCheckout(event: Stripe.Event, meta: Meta, idempotencyKey: string): Promise<void> {
+async function onCheckout(event: Stripe.Event, meta: Meta, idempotencyKey: string): Promise<FulfilOutcome> {
   return onCheckoutSession(event.data.object as Stripe.Checkout.Session, meta, idempotencyKey);
 }
 
-async function onCheckoutSession(session: Stripe.Checkout.Session, meta: Meta, _callerKey: string): Promise<void> {
+async function onCheckoutSession(session: Stripe.Checkout.Session, meta: Meta, _callerKey: string): Promise<FulfilOutcome> {
   // ONE PAYMENT, ONE GRANT (SEC-F4 follow-up 1): the sale's ledger row is keyed on the Checkout
   // Session id — the same key the server-verified success path (lib/stripe/verify-checkout.ts)
   // fulfils under — never on the Stripe event id, which a redelivery does not keep. Imported
@@ -146,28 +150,96 @@ async function onCheckoutSession(session: Stripe.Checkout.Session, meta: Meta, _
   if (booking) {
     if (booking.status === 'PAID') {
       await postSale(idempotencyKey, booking.priceCents, booking.stripeFeeCents, booking.coachUserId, booking.id);
-      return;
+      return 'fulfilled';
     }
+    if (booking.status === 'REFUND_DUE') {
+      // A replay of a session already found refund-due posts nothing again and changes nothing.
+      return 'refund_due';
+    }
+    const paymentIntentId = typeof session.payment_intent === 'string' ? session.payment_intent : session.payment_intent?.id ?? null;
+
+    // STORE-READY B6 (F2): a paid booking is never dropped silently, and the null-slotLock "taken" bug is gone.
+    // For a live_1on1 paid after its hold the notice/maxDaysAhead check runs from the BOOKING's createdAt (the
+    // buyer passed notice when they booked), but a session whose start time has ALREADY passed when the payment
+    // lands goes REFUND_DUE — never PAID — whatever the slot check says.
     if (booking.kind === 'live_1on1' && booking.startsAt) {
-      const taken = await prisma.booking.findFirst({
-        where: { slotLock: booking.slotLock, status: 'PAID', id: { not: booking.id } },
-      });
-      if (taken) {
-        await prisma.booking.update({ where: { id: booking.id }, data: { status: 'REFUND_DUE', slotLock: null } });
-        throw new Error('slot taken after payment');
+      const now = new Date();
+      const instructor = await prisma.instructor.findUnique({ where: { id: booking.instructorId } });
+      const pastStart = booking.startsAt.getTime() <= now.getTime();
+      if (pastStart) {
+        const fee = await stripeFeeCents(session);
+        const due = await prisma.booking.updateMany({
+          where: { id: booking.id, status: { in: ['HELD', 'EXPIRED'] } },
+          data: { status: 'REFUND_DUE', slotLock: null, stripePaymentIntentId: paymentIntentId },
+        });
+        // The sale is posted ONCE (the ledger key dedupes); a refund-due booking still took the money, and the
+        // referral guard below — only PAID bookings refer — keeps it out of the referral tree.
+        if (due.count === 1) await postSale(idempotencyKey, booking.priceCents, fee, booking.coachUserId, booking.id);
+        await prisma.order.updateMany({ where: { stripeSessionId: session.id }, data: { status: 'PAID' } });
+        if (booking.status === 'EXPIRED') console.warn(`[coach-store] coach_store_paid_after_expiry row=${booking.id} outcome=refund_due`);
+        return 'refund_due';
       }
+      // Notice/maxDaysAhead measured from booking.createdAt for a payment landing after the hold sweep (the
+      // buyer had already passed notice when they booked); B7's reschedule passes the real now.
+      const free = instructor
+        ? await slotStillFree({
+            instructor, startsAt: booking.startsAt, durationMin: booking.durationMin ?? 30,
+            excludeBookingId: booking.id, now: booking.createdAt,
+          })
+        : false;
+      if (free && booking.durationMin) {
+        const fee = await stripeFeeCents(session);
+        // ONE status-CAS from HELD|EXPIRED: the unique slotLock makes a same-slot race a P2002, which falls to
+        // the REFUND_DUE branch below instead of paying twice.
+        const moved = await prisma.booking.updateMany({
+          where: { id: booking.id, status: { in: ['HELD', 'EXPIRED'] } },
+          data: {
+            status: 'PAID',
+            slotLock: `${booking.instructorId}:${booking.startsAt.toISOString()}`,
+            stripeFeeCents: fee,
+            platformFeeCents: Math.floor(booking.priceCents * PLATFORM_FEE_RATE),
+            stripePaymentIntentId: paymentIntentId,
+          },
+        }).catch((err) => {
+          if ((err as { code?: string })?.code === 'P2002') return { count: 0 };
+          throw err;
+        });
+        if (moved.count === 1) {
+          if (booking.status === 'EXPIRED') console.warn(`[coach-store] coach_store_paid_after_expiry row=${booking.id} outcome=paid`);
+          await postSale(idempotencyKey, booking.priceCents, fee, booking.coachUserId, booking.id);
+          await recordReferral({
+            meta, priceCents: booking.priceCents, coachUserId: booking.coachUserId, sourceId: booking.id,
+            source: 'live_1on1', renewalIndex: 0, sessionEndsAt: booking.endsAt, billing: 'one_time',
+          });
+          await prisma.order.updateMany({ where: { stripeSessionId: session.id }, data: { status: 'PAID' } });
+          return 'fulfilled';
+        }
+      }
+      // Not free (or the slotLock race lost) -> REFUND_DUE, slotLock null, NEVER throw for slot-taken.
+      const fee = await stripeFeeCents(session);
+      const due = await prisma.booking.updateMany({
+        where: { id: booking.id, status: { in: ['HELD', 'EXPIRED'] } },
+        data: { status: 'REFUND_DUE', slotLock: null, stripePaymentIntentId: paymentIntentId },
+      });
+      if (due.count === 1) await postSale(idempotencyKey, booking.priceCents, fee, booking.coachUserId, booking.id);
+      await prisma.order.updateMany({ where: { stripeSessionId: session.id }, data: { status: 'PAID' } });
+      if (booking.status === 'EXPIRED') console.warn(`[coach-store] coach_store_paid_after_expiry row=${booking.id} outcome=refund_due`);
+      return 'refund_due';
     }
+
+    // video_review (and any non-live_1on1 booking): PAID as today.
     const fee = await stripeFeeCents(session);
     const moved = await prisma.booking.updateMany({
-      where: { id: booking.id, status: 'HELD' },
+      where: { id: booking.id, status: { in: ['HELD', 'EXPIRED'] } },
       data: {
         status: 'PAID',
         stripeFeeCents: fee,
         platformFeeCents: Math.floor(booking.priceCents * PLATFORM_FEE_RATE),
-        stripePaymentIntentId: typeof session.payment_intent === 'string' ? session.payment_intent : session.payment_intent?.id,
+        stripePaymentIntentId: paymentIntentId,
       },
     });
-    if (moved.count === 0) return;
+    if (moved.count === 0) return 'noop';
+    if (booking.status === 'EXPIRED') console.warn(`[coach-store] coach_store_paid_after_expiry row=${booking.id} outcome=paid`);
     await postSale(idempotencyKey, booking.priceCents, fee, booking.coachUserId, booking.id);
     await recordReferral({
       meta, priceCents: booking.priceCents, coachUserId: booking.coachUserId, sourceId: booking.id,
@@ -175,7 +247,7 @@ async function onCheckoutSession(session: Stripe.Checkout.Session, meta: Meta, _
       renewalIndex: 0, sessionEndsAt: booking.endsAt, billing: 'one_time',
     });
     await prisma.order.updateMany({ where: { stripeSessionId: session.id }, data: { status: 'PAID' } });
-    return;
+    return 'fulfilled';
   }
 
   const access = await prisma.programAccess.findUnique({ where: { id: meta.rowId } });
@@ -188,8 +260,9 @@ async function onCheckoutSession(session: Stripe.Checkout.Session, meta: Meta, _
         where: { stripeSessionId: session.id, status: { not: 'PAID' } },
         data: { status: 'PAID' },
       });
+      return 'fulfilled';
     }
-    return;
+    return 'noop';
   }
   const subscription = session.mode === 'subscription';
   const fee = subscription ? 0 : await stripeFeeCents(session);
@@ -205,7 +278,7 @@ async function onCheckoutSession(session: Stripe.Checkout.Session, meta: Meta, _
       stripeSubscriptionId: typeof session.subscription === 'string' ? session.subscription : session.subscription?.id ?? null,
     },
   });
-  if (moved.count === 0) return;
+  if (moved.count === 0) return 'noop';
   // A subscription's money is recorded on invoice.paid so the first invoice and the checkout event are not two sales.
   if (!subscription && instructor) {
     await postSale(idempotencyKey, access.priceCents, fee, instructor.userId, access.id);
@@ -224,6 +297,7 @@ async function onCheckoutSession(session: Stripe.Checkout.Session, meta: Meta, _
     where: { stripeSessionId: session.id, status: { not: 'PAID' } },
     data: { status: 'PAID' },
   });
+  return 'fulfilled';
 }
 
 async function coachOf(instructorId: string): Promise<string> {

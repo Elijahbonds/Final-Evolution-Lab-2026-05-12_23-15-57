@@ -53,6 +53,9 @@ export async function POST(req: NextRequest) {
     if (result.status === 'pending') {
       return NextResponse.json({ status: 'pending', product: result.product, message: 'payment pending' });
     }
+    if (result.status === 'refund_due') {
+      return NextResponse.json({ status: 'refund_due', product: result.product, rowId: result.rowId });
+    }
     return NextResponse.json({ status: 'fulfilled', product: result.product, fulfilment: result.fulfilment });
   } catch (err: any) {
     // Fulfilment is idempotent; a transient error is safe to retry by re-POSTing.

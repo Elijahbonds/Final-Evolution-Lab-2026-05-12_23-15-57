@@ -9,6 +9,8 @@ export function ThanksPoll({ rowId, sessionId }: { rowId: string; sessionId?: st
   const [isAccess, setIsAccess] = useState(false);
   const [code, setCode] = useState<string | null>(null);
   const [ics, setIcs] = useState<string | null>(null);
+  // STORE-READY B6: the verify call says refund_due, or the polled row is REFUND_DUE — either shows the same line.
+  const [refundDue, setRefundDue] = useState(false);
   useEffect(() => {
     setCode(sessionStorage.getItem(`fel-unlock-${rowId}`));
     let stop = false;
@@ -18,6 +20,7 @@ export function ThanksPoll({ rowId, sessionId }: { rowId: string; sessionId?: st
       const json = await res.json();
       if (stop) return;
       setStatus(json.status ?? 'waiting');
+      if (json.status === 'REFUND_DUE') setRefundDue(true);
       // STORE-READY B4: the "Open your program" link shows only for a server-confirmed open access row.
       if (json.kind === 'access') {
         setIsAccess(true);
@@ -43,8 +46,13 @@ export function ThanksPoll({ rowId, sessionId }: { rowId: string; sessionId?: st
     <div className="text-white">
       {/* SEC-F4 NO-WEBHOOK: check with Stripe first so the row flips to paid even with no
           webhook configured; the status poll below then picks it up. Idempotent on reload. */}
-      <VerifyCheckoutSession sessionId={sessionId} />
+      <VerifyCheckoutSession sessionId={sessionId} onResult={(r) => { if (r.state === 'refund_due') setRefundDue(true); }} />
       <h1 className="text-2xl font-black">Thanks</h1>
+      {refundDue ? (
+        <p className="mt-2 rounded-xl border border-white/20 p-3 text-sm text-white/80" role="status">
+          Your time was taken while you paid. Elijah will refund you in full or rebook you.
+        </p>
+      ) : null}
       <p className="mt-2 text-sm">Payment status: {status}. The receipt is the source of truth once this says paid.</p>
       {code ? <p className="mt-4 text-sm">Teen code (shown once here): {code}. Progress stays on the phone that redeems it.</p> : null}
       {/* STORE-READY B4: only an open program access row links to the player; unpaid/expired/refunded rows do not. */}
