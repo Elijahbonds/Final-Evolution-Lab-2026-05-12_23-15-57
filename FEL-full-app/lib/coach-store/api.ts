@@ -15,6 +15,7 @@ import { connectionFailureReschedule, decideCancel, decideJoin } from './policy'
 import { receiptText } from './receipt';
 import { canDeliver, clipRejected, dueAt, goalOk, noteOk, originalDeleteAt, originalsDue, reviewOpening } from './reviews';
 import { shareWithCoachAllowed } from './rescreen';
+import { slotStillFree } from './slotCheck';
 import { openSlots, type WeeklyWindow } from './slots';
 import { isTestKey } from './stripeMode';
 import { deleteOriginalObject, extForMime, originalObjectName, replyObjectName, signGetUrl, signPutUrl, UploadsComingSoon } from './storage';
@@ -333,15 +334,29 @@ async function moveBooking(userId: string, bookingId: string, mode: 'cancel' | '
     }
     const startsAt = startsAtRaw ? new Date(startsAtRaw) : null;
     if (!startsAt || Number.isNaN(startsAt.getTime()) || !booking.durationMin) return NextResponse.json({ error: 'slot_required' }, { status: 400 });
-    await prisma.booking.update({
-      where: { id: bookingId },
-      data: {
-        startsAt,
-        endsAt: new Date(startsAt.getTime() + booking.durationMin * 60_000),
-        slotLock: `${instructor.id}:${startsAt.toISOString()}`,
-        reschedulesUsed: decision.consumesReschedule ? booking.reschedulesUsed + 1 : booking.reschedulesUsed,
-      },
+    // STORE-READY B7 (F3): reschedule goes through the SAME slot check as booking — after decideCancel, never
+    // writing an unchecked startsAt. A taken / off-hours / past / blackout slot is a 409 and nothing is written;
+    // the unique slotLock CAS catches a same-instant race as 409 too.
+    const free = await slotStillFree({
+      instructor, startsAt, durationMin: booking.durationMin, excludeBookingId: booking.id, now: new Date(),
     });
+    if (!free) return NextResponse.json({ error: 'slot_unavailable' }, { status: 409 });
+    try {
+      await prisma.booking.update({
+        where: { id: bookingId },
+        data: {
+          startsAt,
+          endsAt: new Date(startsAt.getTime() + booking.durationMin * 60_000),
+          slotLock: `${instructor.id}:${startsAt.toISOString()}`,
+          reschedulesUsed: decision.consumesReschedule ? booking.reschedulesUsed + 1 : booking.reschedulesUsed,
+        },
+      });
+    } catch (err) {
+      if ((err as { code?: string })?.code === 'P2002') {
+        return NextResponse.json({ error: 'slot_unavailable' }, { status: 409 });
+      }
+      throw err;
+    }
     return NextResponse.json({ ok: true });
   } catch (err) {
     const gone = unavailable(err);
