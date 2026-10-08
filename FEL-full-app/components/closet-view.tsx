@@ -6,7 +6,6 @@ import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { Loader2, Shirt, Palette, Check, Coins, Sparkles, Undo2, Redo2, Shuffle, Lock, Unlock, Camera, RotateCw, SplitSquareHorizontal, FlipHorizontal, ClipboardPaste, Sun, X } from 'lucide-react';
 import { newIdempotencyKey } from '@/lib/wallet/client';
-import { FaceScanCapture } from '@/components/facescan/face-scan-capture';
 import { LookConsent } from '@/components/creator/look-consent';
 import { readConsent, readLocalLook, writeConsent, writeLocalLook, type StoredConsent } from '@/lib/creator/localLook';
 import { closetSaveRequest, decideLookHold } from '@/lib/creator/lookPrivacy';
@@ -58,6 +57,9 @@ const PartsTab = dynamic(() => import('@/components/closet/parts-tab').then((m) 
 const PaintTab = dynamic(() => import('@/components/closet/paint-tab').then((m) => m.PaintTab), { ssr: false });
 // CREATOR-PLAN phase 4b: the Shape tab (proportions, bulk, the Studio size).
 const ShapeTab = dynamic(() => import('@/components/closet/shape-tab').then((m) => m.ShapeTab), { ssr: false });
+// STORE-READY B1: the face scan (and its tasks-vision + Google model downloads) exists only behind FACE_SCAN_ENABLED —
+// it is rendered only under the faceScan prop, and the module loads only then.
+const FaceScanCapture = dynamic(() => import('@/components/facescan/face-scan-capture').then((m) => m.FaceScanCapture), { ssr: false });
 // CREATOR-PLAN phase 4e: the Clothing tab (code-built clothes from the body itself; free).
 const ClothesTab = dynamic(() => import('@/components/closet/clothes-tab').then((m) => m.ClothesTab), { ssr: false });
 // 2026-10-07 (the hair expansion): the Hair tab — four packs of code-built styles, a second colour, accessories, beards.
@@ -137,7 +139,7 @@ const PASTE_ERRORS: Record<DecodeError, string> = {
   invalid: 'That code holds no character.',
 };
 
-export function ClosetView({ adult = false, fullBleed = false }: { adult?: boolean; fullBleed?: boolean }) {
+export function ClosetView({ adult = false, fullBleed = false, faceScan = false }: { adult?: boolean; fullBleed?: boolean; /** STORE-READY B1: /closet passes isFaceScanEnabled(); default OFF everywhere else (dev/studio). */ faceScan?: boolean }) {
   // CREATOR-PLAN phase 4a (owner, 2026-10-06: "5 max slots"): the Closet edits ONE CHARACTER at a time, the selected
   // slot. Its working copy is an undo history of that slot alone (phase 1's history held the whole face, slots and all,
   // in every step): switching slots is not a step, and each slot keeps its own history while you switch between them.
@@ -727,7 +729,7 @@ export function ClosetView({ adult = false, fullBleed = false }: { adult?: boole
           <PublishLookAsCard />{/* PIPELINES (2026-10-06): publish the look as a fashion card — under the characters, beside the Studio's Save Look */}
         </div>
 
-        {scanning && (
+        {faceScan && scanning && (
           <FaceScanCapture
             onClose={() => setScanning(false)}
             onResult={(partial) => {
@@ -759,11 +761,15 @@ export function ClosetView({ adult = false, fullBleed = false }: { adult?: boole
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-5">
               {/* the 2D sketch: where the face options without a 3D shape yet still show */}
               <div className="rounded-xl border border-white/10 bg-white/[0.02] py-3"><FacePreview face={face} accent={accent} /></div>
-              <button onClick={() => setScanning(true)}
-                className="flex w-full items-center justify-center gap-2 rounded-xl border border-cyan-400/40 bg-cyan-400/10 py-2.5 text-sm font-bold text-cyan-300 transition hover:bg-cyan-400/20">
-                <Sparkles className="h-4 w-4" /> Scan My Face
-              </button>
-              <p className="-mt-3 text-[11px] leading-relaxed text-white/40">Auto-build your avatar from your camera or a photo. Runs entirely in your browser — nothing is uploaded. You can fine-tune every option below afterwards.</p>
+              {faceScan ? (
+                <>
+                  <button onClick={() => setScanning(true)}
+                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-cyan-400/40 bg-cyan-400/10 py-2.5 text-sm font-bold text-cyan-300 transition hover:bg-cyan-400/20">
+                    <Sparkles className="h-4 w-4" /> Scan My Face
+                  </button>
+                  <p className="-mt-3 text-[11px] leading-relaxed text-white/40">Auto-build your avatar from your camera or a photo. Runs entirely in your browser — nothing is uploaded. You can fine-tune every option below afterwards.</p>
+                </>
+              ) : null}
               <div className="flex flex-wrap items-center gap-2 rounded-xl border border-white/10 bg-white/[0.02] p-3">
                 <button type="button" onClick={() => setHist(undo)} disabled={!canUndo(hist)} aria-label="Undo" title="Undo (Ctrl+Z)"
                   className="flex items-center gap-1 rounded-lg bg-white/5 px-2.5 py-1.5 text-xs text-white/80 transition hover:bg-white/10 disabled:opacity-30"><Undo2 className="h-3.5 w-3.5" /> Undo</button>

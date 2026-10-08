@@ -6,6 +6,7 @@ import { loginPath } from '@/lib/auth/safeNext';
 import { prisma } from '@/lib/db';
 import { isCoachStoreEnabled } from '@/lib/flags';
 import { isMissingTable, logStoreUnavailable } from '@/lib/coach-store/gate';
+import { programAccessOpen } from '@/lib/coach-store/access';
 import { CancelMembership } from '@/components/coach-store/cancel-membership';
 import { ReissueCode } from '@/components/coach-store/reissue-code';
 
@@ -20,17 +21,26 @@ export default async function CoachingAccountPage() {
   }
   try {
     const rows = await prisma.programAccess.findMany({ where: { userId } });
+    const now = new Date();
     return (
       <main className="mx-auto max-w-xl px-4 py-8 text-white">
         <h1 className="text-2xl font-black">Coaching</h1>
         <ul className="mt-4 space-y-3">
-          {rows.map((row) => (
-            <li key={row.id} className="rounded-xl border border-white/10 p-3 text-sm">
-              <p>{row.lane} · {row.status} · review credits {row.reviewCredits}</p>
-              {row.billing === 'month' ? <CancelMembership accessId={row.id} /> : null}
-              {row.beneficiary === 'teen' ? <ReissueCode accessId={row.id} /> : null}
-            </li>
-          ))}
+          {rows.map((row) => {
+            const open = programAccessOpen(row, now);
+            return (
+              <li key={row.id} className="rounded-xl border border-white/10 p-3 text-sm">
+                <p>{row.lane} · {row.status} · review credits {row.reviewCredits}</p>
+                {/* STORE-READY B4: only an open row links to the program player. */}
+                {open ? <Link className="underline" href={`/program/${row.id}`}>Open your program</Link> : null}
+                {/* STORE-READY B9: a membership set to cancel shows its end date and no cancel button. */}
+                {row.billing === 'month' && row.cancelAtPeriodEnd && row.accessUntil ? (
+                  <p className="mt-2">Ends {row.accessUntil.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
+                ) : row.billing === 'month' ? <CancelMembership accessId={row.id} /> : null}
+                {row.beneficiary === 'teen' ? <ReissueCode accessId={row.id} /> : null}
+              </li>
+            );
+          })}
         </ul>
       </main>
     );

@@ -7,15 +7,18 @@ import { isVerifiedAdult } from './adult';
 import { isAllowlistedCoach } from './coaches';
 import { iceServers } from './call/iceServers';
 import { makingOfferCollision, signalExpiresAt, signalRole, signalRowCap, signalTooBig } from './call/limits';
-import { isMissingTable, logStoreUnavailable, reviewsCanBeSold } from './gate';
+import { programAccessOpen } from './access';
+import { isMissingTable, logStoreUnavailable, reviewsCanBeSold, storeClosed } from './gate';
 import { coachingIcs } from './ics';
 import { parseManifest, priceOk } from './manifest';
 import { connectionFailureReschedule, decideCancel, decideJoin } from './policy';
 import { receiptText } from './receipt';
 import { canDeliver, clipRejected, dueAt, goalOk, noteOk, originalDeleteAt, originalsDue, reviewOpening } from './reviews';
 import { shareWithCoachAllowed } from './rescreen';
+import { slotStillFree } from './slotCheck';
 import { openSlots, type WeeklyWindow } from './slots';
 import { isTestKey } from './stripeMode';
+import { subscriptionPeriodEndUnix } from './stripeShapes';
 import { deleteOriginalObject, extForMime, originalObjectName, replyObjectName, signGetUrl, signPutUrl, UploadsComingSoon } from './storage';
 import { hashSecret } from './teen';
 import { addressRejected, blockedAddressTerms } from './address';
@@ -88,7 +91,11 @@ export async function rowStatus(userId: string, rowId: string, origin = ''): Pro
       });
     }
     const access = await prisma.programAccess.findUnique({ where: { id: rowId } });
-    if (access && access.userId === userId) return NextResponse.json({ kind: 'access', status: access.status });
+    // STORE-READY B4: programOpen is server-computed so the thanks page links "Open your program" only for an
+    // open row (ACTIVE/PAST_DUE and not past accessUntil) — never for an unpaid/expired/refunded one.
+    if (access && access.userId === userId) {
+      return NextResponse.json({ kind: 'access', status: access.status, programOpen: programAccessOpen(access, new Date()) });
+    }
     return NextResponse.json({ error: 'not_found' }, { status: 404 });
   } catch (err) {
     const gone = unavailable(err);
@@ -328,15 +335,29 @@ async function moveBooking(userId: string, bookingId: string, mode: 'cancel' | '
     }
     const startsAt = startsAtRaw ? new Date(startsAtRaw) : null;
     if (!startsAt || Number.isNaN(startsAt.getTime()) || !booking.durationMin) return NextResponse.json({ error: 'slot_required' }, { status: 400 });
-    await prisma.booking.update({
-      where: { id: bookingId },
-      data: {
-        startsAt,
-        endsAt: new Date(startsAt.getTime() + booking.durationMin * 60_000),
-        slotLock: `${instructor.id}:${startsAt.toISOString()}`,
-        reschedulesUsed: decision.consumesReschedule ? booking.reschedulesUsed + 1 : booking.reschedulesUsed,
-      },
+    // STORE-READY B7 (F3): reschedule goes through the SAME slot check as booking — after decideCancel, never
+    // writing an unchecked startsAt. A taken / off-hours / past / blackout slot is a 409 and nothing is written;
+    // the unique slotLock CAS catches a same-instant race as 409 too.
+    const free = await slotStillFree({
+      instructor, startsAt, durationMin: booking.durationMin, excludeBookingId: booking.id, now: new Date(),
     });
+    if (!free) return NextResponse.json({ error: 'slot_unavailable' }, { status: 409 });
+    try {
+      await prisma.booking.update({
+        where: { id: bookingId },
+        data: {
+          startsAt,
+          endsAt: new Date(startsAt.getTime() + booking.durationMin * 60_000),
+          slotLock: `${instructor.id}:${startsAt.toISOString()}`,
+          reschedulesUsed: decision.consumesReschedule ? booking.reschedulesUsed + 1 : booking.reschedulesUsed,
+        },
+      });
+    } catch (err) {
+      if ((err as { code?: string })?.code === 'P2002') {
+        return NextResponse.json({ error: 'slot_unavailable' }, { status: 409 });
+      }
+      throw err;
+    }
     return NextResponse.json({ ok: true });
   } catch (err) {
     const gone = unavailable(err);
@@ -428,17 +449,41 @@ export async function cancelMembership(userId: string, accessId: string): Promis
   try {
     const access = await prisma.programAccess.findUnique({ where: { id: accessId } });
     if (!access || access.userId !== userId) return NextResponse.json({ error: 'not_found' }, { status: 404 });
-    await prisma.programAccess.update({ where: { id: accessId }, data: { cancelAtPeriodEnd: true } });
-    const key = process.env.STRIPE_SECRET_KEY;
-    if (access.stripeSubscriptionId && key && isTestKey(key)) {
-      try {
-        await getStripe().subscriptions.update(access.stripeSubscriptionId, { cancel_at_period_end: true });
-      } catch (err) {
-        console.warn('[coach-store] local cancel stands');
-        void err;
+    // STORE-READY B9(a), B9-fix-1 (FE PM 5:48 PM PT Oct 7): the cancel is real in Stripe FIRST — and ONLY.
+    // With no key or no stripeSubscriptionId there is NO silent local cancel: the buyer gets a retryable
+    // 409 store_closed and the row is saved as it was (a "cancelled" banner while the subscription still
+    // bills is the one answer this route may never give). If the Stripe call fails the row is left
+    // UNTOUCHED and the buyer gets a 502 — the DB write happens only after Stripe confirms, so a refresh
+    // after either refusal still shows an active membership with a working cancel button.
+    const key = (process.env.STRIPE_SECRET_KEY ?? '').trim();
+    if (!key || !access.stripeSubscriptionId) return storeClosed('payments_not_set_up');
+    let sub: { cancel_at_period_end?: unknown; status?: unknown };
+    let periodEndUnix: number | null;
+    try {
+      const stripe = getStripe();
+      sub = await stripe.subscriptions.update(access.stripeSubscriptionId, { cancel_at_period_end: true });
+      // The returned subscription carries the authoritative period end (basil moved it onto the item).
+      periodEndUnix = subscriptionPeriodEndUnix(sub);
+      if (periodEndUnix == null) {
+        const fresh = await stripe.subscriptions.retrieve(access.stripeSubscriptionId);
+        periodEndUnix = subscriptionPeriodEndUnix(fresh);
       }
+    } catch (err) {
+      console.warn('[coach-store] cancel membership stripe failed');
+      void err;
+      return NextResponse.json({ error: 'stripe_unavailable' }, { status: 502 });
     }
-    return NextResponse.json({ ok: true, cancelAtPeriodEnd: true });
+    const ended = sub.status === 'canceled';
+    await prisma.programAccess.update({
+      where: { id: accessId },
+      data: {
+        cancelAtPeriodEnd: true,
+        ...(periodEndUnix != null ? { accessUntil: new Date(periodEndUnix * 1000) } : {}),
+        // An already-ended subscription (cancel_at_period_end had already fired) closes the row outright.
+        ...(ended ? { status: 'CANCELED', codeActive: false } : {}),
+      },
+    });
+    return NextResponse.json({ ok: true, cancelAtPeriodEnd: true, accessUntil: periodEndUnix != null ? new Date(periodEndUnix * 1000) : access.accessUntil });
   } catch (err) {
     const gone = unavailable(err);
     if (gone) return gone;
@@ -453,6 +498,10 @@ export async function receiptFor(userId: string, rowId: string): Promise<NextRes
     const access = booking ? null : await prisma.programAccess.findUnique({ where: { id: rowId } });
     const owner = booking?.clientUserId === userId || access?.userId === userId;
     if (!owner) return NextResponse.json({ error: 'not_found' }, { status: 404 });
+    // STORE-READY B4: a receipt exists only for a PAID booking or an ACTIVE / PAST_DUE / CANCELED access row —
+    // a PENDING (unpaid), EXPIRED, REFUNDED or PAUSED row has no paid receipt to issue.
+    const receiptOk = booking ? booking.status === 'PAID' : ['ACTIVE', 'PAST_DUE', 'CANCELED'].includes(access!.status);
+    if (!receiptOk) return NextResponse.json({ error: 'not_found' }, { status: 404 });
     const instructorId = booking?.instructorId ?? access?.instructorId;
     const instructor = instructorId ? await prisma.instructor.findUnique({ where: { id: instructorId } }) : null;
     const text = receiptText({
@@ -561,7 +610,9 @@ export async function setListingPrice(userId: string, listingId: string, priceCe
     return NextResponse.json({ error: 'not_found' }, { status: 404 });
   }
   if (!parseManifest(listing.manifest)) return NextResponse.json({ error: 'bad_manifest' }, { status: 400 });
-  await prisma.marketplaceListing.update({ where: { id: listingId }, data: { priceUsd: priceCents, active: true } });
+  // STORE-READY B9(c): a price change writes priceUsd ONLY. It must never flip `active` — a paused (inactive)
+  // listing stays paused, so editing the price is not a back door that puts a delisted listing back on sale.
+  await prisma.marketplaceListing.update({ where: { id: listingId }, data: { priceUsd: priceCents } });
   return NextResponse.json({ ok: true });
 }
 

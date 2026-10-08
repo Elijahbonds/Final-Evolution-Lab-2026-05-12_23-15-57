@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { loginPath } from '@/lib/auth/safeNext';
 import { ClosetView } from '@/components/closet-view';
 import { prisma } from '@/lib/db';
+import { isFaceScanEnabled } from '@/lib/flags';
 import { readDobYear } from '@/lib/privacy/scanSaveGate';
 import { verifiedAdult } from '@/lib/privacy/verifiedAdult';
 
@@ -18,7 +19,7 @@ export default async function ClosetPage() {
   // (and above the phone's tab bar), so the page itself no longer pads for the bottom bar.
   return (
     <div className="bg-[#050505]">
-      <ClosetView adult={adult} />
+      <ClosetView adult={adult} faceScan={isFaceScanEnabled()} />
     </div>
   );
 }

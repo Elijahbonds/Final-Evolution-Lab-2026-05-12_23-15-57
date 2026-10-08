@@ -85,3 +85,31 @@ export function isPayoutsEnabled(): boolean {
 export function isLiveStreamScheduleEnabled(): boolean {
   return envOn('LIVE_STREAM_SCHEDULE_ENABLED');
 }
+
+/**
+ * STORE-READY B1 — /closet "Scan My Face". Default OFF: the button, its helper line and the
+ * FaceScanCapture module (tasks-vision + the Google model fetch) exist only behind this flag.
+ */
+export function isFaceScanEnabled(): boolean {
+  return envOn('FACE_SCAN_ENABLED');
+}
+
+/**
+ * STORE-READY B2 — a live Stripe key (sk_live_/rk_live_) opens coach-store checkout ONLY while
+ * this is on. Default OFF: a live key with the flag unset answers store_closed live_mode_off.
+ */
+export function isCoachStoreLive(env: NodeJS.ProcessEnv = process.env): boolean {
+  const v = (env.COACH_STORE_LIVE ?? '').trim().toLowerCase();
+  return v === '1' || v === 'true' || v === 'on' || v === 'yes';
+}
+
+/**
+ * STORE-READY B10 (FE PM 4:33 PM PT Oct 7) — every real-money checkout that is NOT the coach store
+ * (coin packs, shard packs, all /api/stripe/checkout products, season pass PRO, studio credits,
+ * marketplace) stays refused while this is off. Default OFF: no real-money product outside the
+ * coach store sells at launch — each needs an 18+ check and a refund path before this flag is
+ * turned on. The coach store never reads this flag.
+ */
+export function isVirtualPurchasesEnabled(): boolean {
+  return envOn('VIRTUAL_PURCHASES_ENABLED');
+}
