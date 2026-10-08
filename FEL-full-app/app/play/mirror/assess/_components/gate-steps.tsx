@@ -15,7 +15,7 @@ import Link from 'next/link';
 import {
   AGE_OPTIONS, AGE_QUESTION, CAMERA_INFO_BUTTON, CAMERA_INFO_LINES, CAMERA_INFO_TITLE, DISCLAIMER, FULL_SCREEN_BUTTON,
   GROWN_UP_BODY, GROWN_UP_CHECKBOX, GROWN_UP_TITLE, JUMP_ONLY_BUTTON, MORE_CHECKS_LINE, PAIN_QUESTION, PAIN_STOP,
-  PRIVACY_LINK, SCREEN_TEST_NAMES,
+  PRIVACY_LINK, SCREEN_TEST_NAMES, TAKEOFF_OPTIONS, TAKEOFF_QUESTION,
 } from '@/lib/screen/copy';
 import type { AgeBand } from '@/lib/screen/age';
 import { PRIVACY_PATH } from '@/lib/screen/routes';
@@ -93,6 +93,22 @@ export function PainStep({ onAnswer }: { onAnswer: (hurts: boolean) => void }) {
       <div className="mt-4 space-y-2.5">
         <button type="button" data-primary data-pain="no" onClick={() => onAnswer(false)} className={primaryBtn}>No, nothing hurts</button>
         <button type="button" data-pain="yes" onClick={() => onAnswer(true)} className={quietBtn}>Yes, something hurts</button>
+      </div>
+    </StepCard>
+  );
+}
+
+/** SCREEN A: the take-off foot, asked by tap before the camera (and before any rep), so no rep is scored on a guess. */
+export function TakeoffStep({ onAnswer }: { onAnswer: (side: 'left' | 'right' | null) => void }) {
+  return (
+    <StepCard testId="takeoff">
+      <h2 className="text-[22px] font-black leading-tight">{TAKEOFF_QUESTION}</h2>
+      <p className="mt-1 text-[16px] text-white/60">Asked once, before the camera. Your sided results are labelled with your jumping leg.</p>
+      <div role="group" aria-label={TAKEOFF_QUESTION} className="mt-4 space-y-2.5">
+        {TAKEOFF_OPTIONS.map((o, i) => (
+          <button key={o.label} type="button" {...(i === 0 ? { 'data-primary': true } : {})} data-takeoff={o.side ?? 'unsure'}
+            onClick={() => onAnswer(o.side)} className={i === 0 ? primaryBtn : quietBtn}>{o.label}</button>
+        ))}
       </div>
     </StepCard>
   );

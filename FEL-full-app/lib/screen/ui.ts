@@ -31,6 +31,12 @@ export const LOSS_FRAMES = 6;
 /** How long a part's "Done" beat holds before the next part's setup. */
 export const DONE_BEAT_MS = 1200;
 
+/**
+ * How many times one part restarts itself on a long absence (SCREEN A): the one auto-retry, plus one more. After
+ * that the part stops restarting and waits for the athlete to walk back into the shot. Pacing only — it grades nothing.
+ */
+export const PART_RESTART_MAX = 2;
+
 export { SYSTEM_FONT_STACK } from './font';
 
 /** Whether one landmark is drawn on the live skeleton. */

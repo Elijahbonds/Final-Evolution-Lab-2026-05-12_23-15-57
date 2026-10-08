@@ -10,7 +10,8 @@
 //     and the privacy page. No band, colour, grade, priority, cue, label, rank or "personal best".
 //
 // The page's own calls are made here as assess-app.tsx makes them (lib/screen/flow.test.ts pins those lines in the page):
-// clearScreen / readAge / lockAge on the steps, writeTakeoff at the takeoff prompt, keepResult at the end, and the
+// clearScreen / readAge / lockAge on the steps, the take-off tap at the pre-camera takeoff step (SCREEN A: kept in the
+// page's ref, writeTakeoff'd for adults only — it refuses a kid's), keepResult at the end, and the
 // screen's PoseService memory (screen-pose.ts) when the model drops to lite. Every browser store and sender is a spy.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createElement } from 'react';
@@ -74,22 +75,27 @@ const summaryFor = (jumpM: number): ScreenSummary => summarize(gradeSession({
 }))!;
 const FIRST = summaryFor(0.40), SECOND = summaryFor(0.45);
 
-/** The page (assess-app.tsx), its steps and its end, with the page's memory of the last jump (a ref there). */
+/** The page (assess-app.tsx), its steps and its end, with the page's memory of the last jump and the take-off tap (refs there). */
 function page() {
   let pre: PreState = PRE_START;
   let lastIn: number | null = null;
+  let takeoff: 'left' | 'right' | null = null;                 // the page's takeoffRef (SCREEN A): page memory only
   const views: string[] = [];
   const ev = (e: PreEvent) => {
     if (e.type === 'start') { clearScreen(tabStorage(), localForClear()); resetAge(tabStorage()); }
     const x: PreEvent = e.type === 'start' ? { type: 'start', locked: readAge(tabStorage()) }
       : e.type === 'age' ? { type: 'age', age: lockAge(tabStorage(), e.age) } : e;
+    if (e.type === 'takeoff') {                               // as the page's answerTakeoffPre does
+      takeoff = e.side;
+      if (e.side) writeTakeoff(tabStorage(), pre.gate, e.side);
+    }
     pre = preStep(pre, x);
   };
-  /** The camera, the takeoff prompt and the end, as the page runs them. */
+  /** The camera, the takeoff answer the tap left behind, and the end, as the page runs them. */
   const checks = (s: ScreenSummary) => {
+    expect(takeoff).not.toBeUndefined();                      // the tap was made before the camera
     // the model drops to lite on a slow desktop: PoseService writes its memory through the screen's storage
     (screenPose() as unknown as { deps: { storage: { set(k: string, v: string): void } } }).deps.storage.set(MODEL_MEMORY_KEY, '{"model":"lite"}');
-    writeTakeoff(tabStorage(), pre.gate, 'left');
     const who = keepResult(tabStorage(), pre.gate, s);
     if (who === 'kid') {
       views.push(renderToStaticMarkup(createElement(KidResults, { jumpIn: s.jumpBestIn, lastIn, onRunAgain: () => {} })));
@@ -102,11 +108,11 @@ function page() {
   return { ev, checks, views, get pre() { return pre; } };
 }
 const through = (age: AgeBand, grownUp = true): PreEvent[] => [
-  { type: 'start' }, { type: 'age', age }, ...(age === '18+' || !grownUp ? [] : [{ type: 'grownUp' } as const]), { type: 'pain', hurts: false }, { type: 'cameraOn' },
+  { type: 'start' }, { type: 'age', age }, ...(age === '18+' || !grownUp ? [] : [{ type: 'grownUp' } as const]), { type: 'pain', hurts: false }, { type: 'takeoff', side: 'left' }, { type: 'cameraOn' },
 ];
 // "Run it again" (AGE-RESET): a fresh run — the age and the grown-up step are asked again, for the same kid too.
 const again = (age: AgeBand): PreEvent[] => [
-  { type: 'start' }, { type: 'age', age }, ...(age === '18+' ? [] : [{ type: 'grownUp' } as const]), { type: 'pain', hurts: false }, { type: 'cameraOn' },
+  { type: 'start' }, { type: 'age', age }, ...(age === '18+' ? [] : [{ type: 'grownUp' } as const]), { type: 'pain', hurts: false }, { type: 'takeoff', side: 'left' }, { type: 'cameraOn' },
 ];
 
 const KIDS = ['under-13', '13-17', 'unknown'] as const;
@@ -151,6 +157,28 @@ describe('an under-18 run keeps the age answer and nothing else, and sends nothi
     }
     expect(session.keys()).toEqual([KEYS.age]);
     expect(isKid(age)).toBe(true);
+  });
+
+  it.each(KIDS)('SCREEN A: %s answers the take-off tap and it is never written — page memory only', (age) => {
+    const p = page();
+    for (const e of through(age)) p.ev(e);
+    expect(p.pre.step).toBe('camera');                                   // the tap was on the way to the camera
+    expect(writes()).toEqual([{ where: 'sessionStorage', op: 'setItem', key: KEYS.age }]);
+    expect(session.keys()).toEqual([KEYS.age]);                          // no fel.screen.takeoffLeg, ever
+    p.checks(FIRST);
+    expect(session.keys()).toEqual([KEYS.age]);
+    expect(sends()).toEqual([]);
+  });
+
+  it('SCREEN A: "Not sure" taps null, which writeTakeoff is never even asked to store (adults included)', () => {
+    const p = page();
+    p.ev({ type: 'start' });
+    p.ev({ type: 'age', age: '18+' });
+    p.ev({ type: 'pain', hurts: false });
+    expect(p.pre.step).toBe('takeoff');
+    p.ev({ type: 'takeoff', side: null });
+    expect(p.pre.step).toBe('cameraInfo');
+    expect(writes().filter((w) => w.key === KEYS.takeoff)).toEqual([]);
   });
 });
 

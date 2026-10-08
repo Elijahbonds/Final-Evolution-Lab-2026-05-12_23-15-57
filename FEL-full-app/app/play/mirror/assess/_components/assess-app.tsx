@@ -6,7 +6,9 @@
 //
 // SCREEN-SHIP (2026-09-29), SCREEN-FIX: portrait first, one step per screen, system font. Start → age (every new Start:
 // the last person's answer is reset first, audit 2.2) → "A grown-up is with me" (under 18, or an age not given) →
-// "Does anything hurt right now?" → the camera card → only then the camera → the checks → results.
+// "Does anything hurt right now?" → "Which foot do you take off from when you jump?" (SCREEN A, tap: Left / Right /
+// Not sure — kept in takeoffRef, page memory only, so "Do the full screen" and "Run it again" never re-ask it;
+// writeTakeoff persists it for adults only) → the camera card → only then the camera → the checks → results.
 //   · KIDS SEND NOTHING. This file has no fetch. Under 18 (and "rather not say") return before any save. A self-reported
 //     18+ result stays in this tab, and lib/privacy/screenHistoryClient.ts may POST numbers only after the server says
 //     the account is a verified adult who opted in. No assessment POST, no PRQ write, no analytics (SCREEN-FIX-2 amend 4).
@@ -62,15 +64,17 @@ import { CameraHelp } from './camera-help';
 import { KidResults } from './kid-results';
 import { screenPose } from './screen-pose';
 import { LiveHud } from './live-hud';
-import { AgeStep, CameraInfoStep, GrownUpStep, PainStep, PainStopStep, StartStep } from './gate-steps';
+import { AgeStep, CameraInfoStep, GrownUpStep, PainStep, PainStopStep, StartStep, TakeoffStep } from './gate-steps';
 import { JumpResult } from './jump-result';
 import { ScreenFrame, StepCard, primaryBtn, quietBtn } from './screen-ui';
 import { useLeaveGuard } from './use-leave-guard';
 
-type Phase = 'intro' | 'age' | 'grownUp' | 'pain' | 'painStop' | 'cameraInfo' | 'starting' | 'device' | 'running' | 'stopped' | 'toResults' | 'kidResults' | 'jumpResult' | 'cameraError';
+type Phase = 'intro' | 'age' | 'grownUp' | 'pain' | 'painStop' | 'takeoff' | 'cameraInfo' | 'starting' | 'device' | 'running' | 'stopped' | 'toResults' | 'kidResults' | 'jumpResult' | 'cameraError';
 interface JumpView { heightCm: number | null; attempts: number; jumpIn: number | null; lastIn: number | null; kid: boolean }
 /** From the age question to the results: the browser's Back asks before it leaves (S-6). */
-const MID_FLOW: readonly Phase[] = ['age', 'grownUp', 'pain', 'cameraInfo', 'starting', 'device', 'running'];
+const MID_FLOW: readonly Phase[] = ['age', 'grownUp', 'pain', 'takeoff', 'cameraInfo', 'starting', 'device', 'running'];
+/** SCREEN A: while a rep is up, nobody reads — the caption bar hides on these steps (voice off keeps it). */
+const NO_READING_STEPS: ReadonlySet<RunnerView['step']> = new Set(['calibrate', 'calibrateSide', 'countdown', 'active', 'paused']);
 
 /** The QA handle (see the effect that installs it). */
 interface AssessProbe {
@@ -108,6 +112,7 @@ export function AssessApp({ initialRun = null }: { initialRun?: ScreenKind | nul
   const smoothRef = useRef(new PoseFilter(SKELETON_EURO));
   const camRunRef = useRef(0);                                   // the current camera start; a newer one (or a back) cancels it
   const lastJumpRef = useRef<number | null>(null);
+  const takeoffRef = useRef<Side | null>(null);                 // the take-off tap (SCREEN A); an under-18's lives here only
   const modeRef = useRef<ScreenKind | 'rest'>(initialRun ?? 'full');
   const carryRef = useRef<TestResult | null>(null);
   const booted = useRef(false);
@@ -242,7 +247,8 @@ export function AssessApp({ initialRun = null }: { initialRun?: ScreenKind | nul
     previewRef.current?.(); previewRef.current = null;       // the runner draws from here on
     const kind = modeRef.current;
     const runner = new AssessRunner({
-      aspect, takeoffLeg: null, painAsked: true, handsFree: true, cameraFps: () => cameraFpsRef.current,
+      // the pre-camera take-off tap (SCREEN A), null for "Not sure": the runner is never left to guess a foot
+      aspect, takeoffLeg: takeoffRef.current, painAsked: true, handsFree: true, cameraFps: () => cameraFpsRef.current,
       ...(kind === 'jump' ? { parts: JUMP_PARTS } : {}),
       ...(kind === 'rest' ? { parts: REST_PARTS, priorTests: carryRef.current ? { T5: carryRef.current } : undefined } : {}),
     });
@@ -260,6 +266,8 @@ export function AssessApp({ initialRun = null }: { initialRun?: ScreenKind | nul
       viewRef.current = v;
       setView(v);
       runner.autoAdvance(performance.now());
+      // SCREEN A: during 'painCheck' the page does nothing on its own — the run moves on only when the athlete taps
+      // the LiveHud full-screen Yes/No (onPain → answerPain → runner.answerPain). No timeout, no default, no auto-advance.
       if (v.step === 'done' || v.step === 'stopped') finish(v);
     }));
   }, [draw, finish, voice]);
@@ -314,14 +322,19 @@ export function AssessApp({ initialRun = null }: { initialRun?: ScreenKind | nul
   const startNew = (kind: ScreenKind = 'full') => { lastJumpRef.current = null; modeRef.current = kind; pre({ type: 'start', kind }); };
   const answerAge = (a: AgeBand) => pre({ type: 'age', age: a });
   const grownUp = () => pre({ type: 'grownUp' });
-  const answerPainFirst = (hurts: boolean) => {
-    pre({ type: 'pain', hurts });
-    if (!hurts) setTimeout(() => pre({ type: 'cameraOn' }), 0);
+  const answerPainFirst = (hurts: boolean) => pre({ type: 'pain', hurts });   // "no" lands on the take-off tap (SCREEN A)
+  // SCREEN A: the take-off foot, tapped before the camera; persisted for adults only (writeTakeoff refuses a kid's),
+  // kept in takeoffRef for the whole page so "Do the full screen" and "Run it again" reuse it without asking again.
+  const answerTakeoffPre = (side: Side | null) => {
+    takeoffRef.current = side;
+    if (side) writeTakeoff(tabStorage(), gateRef.current, side);
+    pre({ type: 'takeoff', side });
   };
   const cameraOn = () => pre({ type: 'cameraOn' });
   const resetRun = () => { camRunRef.current++; cleanup(); setView(null); viewRef.current = null; setCaption(''); highFpsRef.current = false; };
   const restart = () => { resetRun(); setKid(null); setJumpView(null); pre({ type: 'restart' }); };
-  // "Run it again": a new Start (age is asked again). A jump-only result repeats the jump; after the full screen, the full screen.
+  // "Run it again": a new Start (age is asked again; the take-off tap is not — it stays in takeoffRef). A jump-only
+  // result repeats the jump; after the full screen, the full screen.
   const runAgain = () => {
     const kind: ScreenKind = modeRef.current === 'jump' ? 'jump' : 'full';
     resetRun(); setKid(null); setJumpView(null); modeRef.current = kind; pre({ type: 'start', kind });
@@ -384,6 +397,7 @@ export function AssessApp({ initialRun = null }: { initialRun?: ScreenKind | nul
       {phase === 'grownUp' ? <GrownUpStep onContinue={grownUp} /> : null}
       {phase === 'pain' ? <PainStep onAnswer={answerPainFirst} /> : null}
       {phase === 'painStop' ? <PainStopStep onRestart={restart} /> : null}
+      {phase === 'takeoff' ? <TakeoffStep onAnswer={answerTakeoffPre} /> : null}
       {phase === 'cameraInfo' ? <CameraInfoStep onCamera={cameraOn} /> : null}
       {phase === 'starting' ? (
         <StepCard testId="starting">
@@ -428,13 +442,18 @@ export function AssessApp({ initialRun = null }: { initialRun?: ScreenKind | nul
               autoContinue={begin} okSinceRef={deviceOkSince} />
           ) : null}
           {phase === 'running' && view ? (
-            <LiveHud view={view} onPain={answerPain} onTakeoff={answerTakeoff} onStop={reportPain} />
+            <LiveHud view={view} voiceOn={voice.on} onPain={answerPain} onTakeoff={answerTakeoff} onStop={reportPain} />
           ) : null}
         </div>
       ) : null}
-      {/* the one instruction, under the picture where it has room (portrait), and the last line said when it differs */}
+      {/* SCREEN A: every spoken line reaches a screen reader at all times, from an sr-only live region. The visible
+          instruction bar shows only outside a rep (framing / position / done beats / mini-result / pain check) — while
+          the voice switch is OFF the visible caption stays, because no other channel remains (see the PR body). */}
       {live ? (
-        <div aria-live="polite" data-instruction className="mt-3 min-h-[3em] text-center">
+        <div aria-live="polite" aria-atomic="true" className="sr-only">{caption}</div>
+      ) : null}
+      {live && (phase === 'device' || !view || !NO_READING_STEPS.has(view.step) || !voice.on) ? (
+        <div data-instruction className="mt-3 min-h-[3em] text-center">
           <p className="text-[18px] font-bold leading-snug text-white">{view?.instruction || caption}</p>
           {caption && view?.instruction && caption !== view.instruction ? <p className="mt-1 text-[16px] text-white/65">{caption}</p> : null}
         </div>

@@ -17,7 +17,7 @@ import { HEAD_TURNED_HINT, RETEST_HINT } from '../../../mirror/stationGraders';
 import { refusalLine } from '../../../irl/dunkTracker';
 import { QUICK_PARTS } from '../../../assess/runner';
 import { facingCue } from '../../../assess/protocol';
-import { TRACKING_LOSS_PROMPT } from '../../../screen/copy';
+import { CALIBRATE_FRONT_LINE, TRACKING_LOSS_PROMPT } from '../../../screen/copy';
 import { NEXT_UP_SPOKEN, goWhenReadyLine } from '../../../session-setup/voice';
 
 const APP = join(__dirname, '../../../..');
@@ -111,7 +111,8 @@ describe('the production voice script', () => {
       ...MODIFIED_SCREEN.map((s) => s.cue), ...FULL_SCREEN.map((s) => s.cue), ...Object.values(TURN_CUE), NEXT_LINE, MOVE_ON_LINE, PART_READ_LINE,
       ...Object.values(RETEST_HINT), HEAD_TURNED_HINT,
       ...QUICK_PARTS.map((p) => p.setup), facingCue('front'), facingCue('side', 'left'), facingCue('side', 'right'), `${TRACKING_LOSS_PROMPT}.`,
-      'Hold that.', 'Stand still for two seconds.', 'Go.', '3', '2', '1', 'Lost you for a moment — trying this move once more.',
+      // SCREEN A: the front stand-still explains itself (the runner's old "Stand still for two seconds." is gone)
+      'Hold that.', CALIBRATE_FRONT_LINE, 'Go.', '3', '2', '1', 'Lost you for a moment — trying this move once more.',
       goWhenReadyLine(), NEXT_UP_SPOKEN,
     ];
     const have = new Set([

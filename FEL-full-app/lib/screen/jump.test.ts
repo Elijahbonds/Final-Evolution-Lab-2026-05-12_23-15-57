@@ -110,7 +110,8 @@ describe('the jump result', () => {
 });
 
 function driveJump(maxLoops = 4000) {
-  const r = new AssessRunner({ aspect: 4 / 3, parts: JUMP_PARTS, painAsked: true, handsFree: true, cameraFps: () => 60 });
+  // SCREEN A: as the page does — the take-off tap (null = "Not sure") is passed in, and the pain check is tapped "no"
+  const r = new AssessRunner({ aspect: 4 / 3, parts: JUMP_PARTS, painAsked: true, handsFree: true, takeoffLeg: null, cameraFps: () => 60 });
   let t = 0;
   let v: RunnerView = r.tick({ t, present: false, image: [] }, t);
   const steps: string[] = [];
@@ -130,6 +131,15 @@ function driveJump(maxLoops = 4000) {
   };
   for (let loop = 0; loop < maxLoops && v.step !== 'done' && v.step !== 'stopped'; loop++) {
     r.autoAdvance(t);
+    if (v.step === 'painCheck') {
+      // SCREEN A: the big tap, not an auto-advance
+      r.answerPain(false, t);
+      const frame = stand.frames[loop % stand.frames.length];
+      t += 33;
+      v = r.tick({ ...frame, t }, t);
+      track();
+      continue;
+    }
     if (v.step === 'active' && v.part === 'T5' && !fed.has('T5')) {
       fed.add('T5');
       feed(cmj([{ heightM: 0.4 }, { heightM: 0.45 }, { heightM: 0.42 }]));
