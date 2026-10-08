@@ -8,6 +8,9 @@
 // ACTIVE teen program -> REFUNDED, codeActive false; (g) partial refund -> no change; (h) dispute needs_response
 // -> PAUSED/DISPUTED, won -> restored, lost -> REFUNDED; (i) a second run on the same data -> no writes, no
 // second posting; (j) the route's auth ladder (401 / 404 / coach / secret / no-key skip).
+// B9 fixes: (d2)/(h2) passes 2-3 page past the first 100 rows; (p) Pass 4 never lifts a PAUSED dispute hold;
+// (q) Pass 4 pages past the first 100 subscriptions; (r) unpaid -> EXPIRED, access OFF, then active -> ACTIVE
+// again; (s) canceled -> CANCELED, access off.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const USER = 'coach-1';
@@ -20,7 +23,45 @@ const h = vi.hoisted(() => ({
   charges: {} as Record<string, any>,
   subscriptions: [] as any[],
   invoices: [] as any[],
+  refundPages: null as { pages: any[][]; calls: (any | undefined)[] } | null,
+  disputePages: null as { pages: any[][]; calls: (any | undefined)[] } | null,
+  subPages: null as { pages: any[][]; calls: (any | undefined)[] } | null,
+  refundCalls: [] as (any | undefined)[],
+  disputeCalls: [] as (any | undefined)[],
+  subCalls: [] as (any | undefined)[],
 }));
+
+/**
+ * B9 fixes 4-5: a list mock that supports BOTH paging styles — awaited directly it is one page
+ * ({ data, has_more }); iterated with `for await` it serves every page (starting_after honoured when
+ * given, the harness's page sequence otherwise) and records every request in `calls`.
+ */
+function pagedList(holder: { pages: (any[][] | (() => any[][])); calls: (any | undefined)[] }) {
+  return (args?: any) => {
+    holder.calls.push(args);
+    const pages = typeof holder.pages === 'function' ? holder.pages() : holder.pages;
+    const idx = args?.starting_after ? 1 : 0;
+    const data = pages[Math.min(idx, pages.length - 1)] ?? [];
+    const hasMore = idx < pages.length - 1;
+    // Thenable AND async-iterable: awaited directly it is one page ({ data, has_more }); iterated with
+    // `for await` it serves every page and records each request (for-await does NOT await a thenable
+    // first — the iterator must live on the returned object itself).
+    return {
+      data,
+      has_more: hasMore,
+      then(onFulfilled: any, onRejected: any) {
+        return Promise.resolve({ data, has_more: hasMore }).then(onFulfilled, onRejected);
+      },
+      async *[Symbol.asyncIterator]() {
+        yield* data;
+        for (let p = idx + 1; p < pages.length; p++) {
+          holder.calls.push({ starting_after: pages[p - 1][pages[p - 1].length - 1]?.id });
+          yield* pages[p];
+        }
+      },
+    };
+  };
+}
 
 vi.mock('next-auth', () => ({ getServerSession: vi.fn(async () => (h.sessionUser ? { user: { id: h.sessionUser } } : null)) }));
 vi.mock('@/lib/auth', () => ({ authOptions: {} }));
@@ -35,11 +76,11 @@ vi.mock('@/lib/stripe', async (importOriginal) => {
         if (!s) throw Object.assign(new Error('no such session'), { statusCode: 404, type: 'StripeInvalidRequestError', code: 'resource_missing' });
         return s;
       }) } },
-      refunds: { list: vi.fn(async () => ({ data: h.refunds })) },
-      disputes: { list: vi.fn(async () => ({ data: h.disputes })) },
+      refunds: { list: vi.fn((args?: any) => pagedList(h.refundPages ? { pages: h.refundPages.pages, calls: h.refundPages.calls } : { pages: () => [h.refunds], calls: h.refundCalls })(args)) },
+      disputes: { list: vi.fn((args?: any) => pagedList(h.disputePages ? { pages: h.disputePages.pages, calls: h.disputePages.calls } : { pages: () => [h.disputes], calls: h.disputeCalls })(args)) },
       charges: { retrieve: vi.fn(async (id: string) => h.charges[id] ?? { id, refunded: false }) },
       paymentIntents: { retrieve: vi.fn(async () => ({ latest_charge: { balance_transaction: { fee: 55 } } })) },
-      subscriptions: { list: vi.fn(async () => ({ data: h.subscriptions })) },
+      subscriptions: { list: vi.fn((args?: any) => pagedList(h.subPages ? { pages: h.subPages.pages, calls: h.subPages.calls } : { pages: () => [h.subscriptions], calls: h.subCalls })(args)) },
       invoices: { list: vi.fn(async () => ({ data: h.invoices })) },
     }),
   };
@@ -172,6 +213,8 @@ function paidSession(rowId: string, over: Row = {}) {
 beforeEach(() => {
   h.store = {}; h.sessions = {}; h.refunds = []; h.disputes = []; h.charges = {};
   h.subscriptions = []; h.invoices = [];
+  h.refundPages = null; h.disputePages = null; h.subPages = null;
+  h.refundCalls = []; h.disputeCalls = []; h.subCalls = [];
   h.sessionUser = USER;
   process.env.STRIPE_SECRET_KEY = 'sk_test_fake';
   process.env.COACH_STORE_COACH_USER_IDS = USER;
@@ -296,6 +339,30 @@ describe('B8 reconcile passes 2-3 (refunds, disputes)', () => {
     expect(h.store.booking.find((b) => b.id === bk.id)!.status).toBe('REFUNDED');
   });
 
+  it('(d2) B9 fix 5: a full refund on PAGE 2 of refunds.list is still read -> REFUNDED', async () => {
+    const bk = paidBookingWithReferral();
+    const page1 = Array.from({ length: 100 }, (_, i) => ({ id: `re_un_${i}`, status: 'succeeded', charge: `ch_un_${i}` }));
+    h.charges = { ch_hit: { id: 'ch_hit', refunded: true, payment_intent: bk.stripePaymentIntentId } };
+    h.refundPages = { pages: [page1, [{ id: 're_hit', status: 'succeeded', charge: 'ch_hit' }]], calls: [] };
+    const c = await run();
+    expect(c.refunded).toBe(1);
+    expect(h.store.booking.find((b) => b.id === bk.id)!.status).toBe('REFUNDED');
+    // Page 2 was requested: the first call opens the window, the second asks for what comes after page 1's last id.
+    expect(h.refundPages.calls.length).toBeGreaterThanOrEqual(2);
+    expect(h.refundPages.calls[1]?.starting_after).toBe('re_un_99');
+  });
+
+  it('(h2) B9 fix 5: a needs_response dispute on PAGE 2 of disputes.list is still read -> DISPUTED', async () => {
+    const bk = paidBookingWithReferral({ stripePaymentIntentId: 'pi_p2' });
+    const page1 = Array.from({ length: 100 }, (_, i) => ({ id: `dp_un_${i}`, status: 'won', payment_intent: `pi_un_${i}` }));
+    h.disputePages = { pages: [page1, [{ id: 'dp_hit', status: 'needs_response', payment_intent: 'pi_p2' }]], calls: [] };
+    const c = await run();
+    expect(c.disputed).toBe(1);
+    expect(h.store.booking.find((b) => b.id === bk.id)!.status).toBe('DISPUTED');
+    expect(h.disputePages.calls.length).toBeGreaterThanOrEqual(2);
+    expect(h.disputePages.calls[1]?.starting_after).toBe('dp_un_99');
+  });
+
   it('(i) a second run on the same data writes nothing and posts no second sale', async () => {
     const pa = seedAccess({ stripeCheckoutId: paidSession('pa_1', { metadata: { product: 'COACH_STORE', userId: 'buyer-1', rowId: 'pa_1', kind: 'program', beneficiary: 'self' } }) });
     await run();
@@ -374,6 +441,91 @@ describe('B9 reconcile pass 4 (subscription sync + renewal refund/dispute mappin
     const c = await run();
     expect(c.subscriptionsChecked).toBe(1);
     expect(h.store.programAccess.find((a) => a.id === pa.id)!.status).toBe('ACTIVE');
+  });
+
+  it('(p) B9 fix 3: Pass 4 NEVER lifts a dispute hold — PAUSED stays PAUSED on active, past_due and canceled', async () => {
+    const pa = seedMembership({ status: 'ACTIVE', stripePaymentIntentId: 'pi_first_month' });
+    // An open renewal dispute mapped through the invoice (as (n)) sets the PAUSED hold…
+    h.disputes = [{ id: 'dp_1', status: 'needs_response', payment_intent: 'pi_renewal' }];
+    h.invoices = [{ id: 'in_1', subscription: 'sub_1', payments: { data: [{ payment: { payment_intent: 'pi_renewal' } }] } }];
+    h.subscriptions = [sub('active')];
+    let c = await run();
+    expect(c.disputed).toBe(1);
+    expect(c.renewed ?? 0).toBe(0);
+    let row = h.store.programAccess.find((a) => a.id === pa.id)!;
+    expect(row.status).toBe('PAUSED');
+    expect(row.codeActive).toBe(false);
+
+    // …and run 2 — same open dispute, subscription says 'active' — writes NOTHING to the row.
+    let before = JSON.stringify(row);
+    c = await run();
+    expect(c.renewed ?? 0).toBe(0);
+    row = h.store.programAccess.find((a) => a.id === pa.id)!;
+    expect(JSON.stringify(row)).toBe(before);
+
+    // past_due, then canceled: the hold still never moves.
+    for (const status of ['past_due', 'canceled']) {
+      h.subscriptions = [sub(status)];
+      before = JSON.stringify(h.store.programAccess.find((a) => a.id === pa.id));
+      c = await run();
+      expect(c.renewed ?? 0).toBe(0);
+      row = h.store.programAccess.find((a) => a.id === pa.id)!;
+      expect(row.status).toBe('PAUSED');
+      expect(row.codeActive).toBe(false);
+      expect(JSON.stringify(row)).toBe(before);
+    }
+  });
+
+  it('(q) B9 fix 4: Pass 4 reads past page 1 — a membership on page 2 syncs, subscriptionsChecked is 101', async () => {
+    const pa = seedMembership({ status: 'PAST_DUE', stripeSubscriptionId: 'sub_p2' });
+    const page1 = Array.from({ length: 100 }, (_, i) => ({
+      id: `sub_un_${i}`, status: 'canceled', cancel_at_period_end: false,
+      items: { data: [{ current_period_end: Math.floor(NOW.getTime() / 1000) + 30 * 86_400 }] },
+    }));
+    const periodEnd = Math.floor(NOW.getTime() / 1000) + 30 * 86_400;
+    h.subPages = { pages: [page1, [{ id: 'sub_p2', status: 'active', cancel_at_period_end: false, items: { data: [{ current_period_end: periodEnd }] } }]], calls: [] };
+    const c = await run();
+    expect(c.subscriptionsChecked).toBe(101);
+    const row = h.store.programAccess.find((a) => a.id === pa.id)!;
+    expect(row.status).toBe('ACTIVE');
+    expect(row.accessUntil).toEqual(new Date(periodEnd * 1000));
+    expect(h.subPages.calls.length).toBeGreaterThanOrEqual(2);
+    expect(h.subPages.calls[1]?.starting_after).toBe('sub_un_99');
+  });
+
+  it('(r) B9 fix 6: unpaid -> EXPIRED with access OFF (never PAUSED); active again -> ACTIVE, access on', async () => {
+    const { programAccessOpen } = await import('./access');
+    const { unlockStatus } = await import('./api');
+    const { hashSecret } = await import('./teen');
+    const pa = seedMembership({ status: 'ACTIVE', unlockCodeHash: hashSecret('code_x'), deviceTokenHash: hashSecret('dev_x'), accessUntil: new Date(NOW.getTime() + 30 * 86_400_000) });
+    h.subscriptions = [sub('unpaid')];
+    let c = await run();
+    expect(c.paused).toBe(1);
+    let row = h.store.programAccess.find((a) => a.id === pa.id)!;
+    expect(row.status).toBe('EXPIRED');
+    expect(row.codeActive).toBe(false);
+    expect(programAccessOpen(row, new Date())).toBe(false);
+    const unlock = await unlockStatus('code_x', 'dev_x');
+    expect((await unlock.json()).active).toBe(false);
+
+    h.subscriptions = [sub('active')];
+    c = await run();
+    expect(c.renewed).toBe(1);
+    row = h.store.programAccess.find((a) => a.id === pa.id)!;
+    expect(row.status).toBe('ACTIVE');
+    expect(row.codeActive).toBe(true);
+  });
+
+  it('(s) B9 fix 6: canceled -> CANCELED, codeActive false, the program is closed', async () => {
+    const { programAccessOpen } = await import('./access');
+    const pa = seedMembership({ status: 'ACTIVE', accessUntil: new Date(NOW.getTime() + 30 * 86_400_000) });
+    h.subscriptions = [sub('canceled')];
+    const c = await run();
+    expect(c.canceled).toBe(1);
+    const row = h.store.programAccess.find((a) => a.id === pa.id)!;
+    expect(row.status).toBe('CANCELED');
+    expect(row.codeActive).toBe(false);
+    expect(programAccessOpen(row, new Date())).toBe(false);
   });
 });
 

@@ -1,10 +1,11 @@
 // STORE-READY B9 (memberships, Option B — memberships SELL at launch): two money-path unit suites over a
 // mocked prisma + Stripe (the reschedule-slot-check.test.ts harness).
 //
-//   cancelMembership (B9a): the cancel is real in Stripe FIRST for any key. Stripe fails -> 502 and the row is
-//     UNTOUCHED (a "cancelled" banner with money still coming out is the one answer this route may never give);
-//     success -> cancelAtPeriodEnd true + accessUntil = the subscription's period end; an already-ended
-//     subscription closes the row outright; no subscription id -> the local cancel stands.
+//   cancelMembership (B9a + B9 fixes 1-2): the cancel is real in Stripe FIRST — and ONLY. No key, or no
+//     subscription id -> 409 store_closed and NOTHING is saved (no silent local cancel); Stripe fails -> 502
+//     and the row is UNTOUCHED (a "cancelled" banner with money still coming out is the one answer this route
+//     may never give); success -> cancelAtPeriodEnd true + accessUntil = the subscription's period end; an
+//     already-ended subscription closes the row outright.
 //   setListingPrice (B9c): a price change writes priceUsd ONLY — it never flips `active`, so editing the price
 //     is not a back door that re-activates a paused listing.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -16,7 +17,8 @@ const PERIOD_END = Math.floor(new Date('2026-11-08T00:00:00Z').getTime() / 1000)
 const h = vi.hoisted(() => ({
   store: {} as Record<string, Record<string, any>[]>,
   subscriptionUpdate: { calls: [] as any[], throws: null as null | Error, result: null as any },
-  subscriptionRetrieve: { calls: [] as any[], result: null as any },
+  subscriptionRetrieve: { calls: [] as any[], throws: null as null | Error, result: null as any },
+  writes: { update: 0, updateMany: 0 },
 }));
 
 vi.mock('@/lib/db', () => ({ get prisma() { return clientFor(h.store); } }));
@@ -33,6 +35,7 @@ vi.mock('@/lib/stripe', async (importOriginal) => {
         }),
         retrieve: vi.fn(async (id: string) => {
           h.subscriptionRetrieve.calls.push({ id });
+          if (h.subscriptionRetrieve.throws) throw h.subscriptionRetrieve.throws;
           return h.subscriptionRetrieve.result ?? { id, status: 'active', cancel_at_period_end: true, items: { data: [{ current_period_end: PERIOD_END }] } };
         }),
       },
@@ -62,12 +65,14 @@ function clientFor(store: Record<string, Row[]>): any {
       findUnique: async (a: Row = {}) => rows().find((r) => matches(r, a.where)) ?? null,
       findFirst: async (a: Row = {}) => rows().find((r) => matches(r, a.where)) ?? null,
       update: async (a: Row) => {
+        h.writes.update++;
         const row = rows().find((r) => matches(r, a.where));
         if (!row) throw Object.assign(new Error('P2025'), { code: 'P2025' });
         Object.assign(row, a.data);
         return row;
       },
       updateMany: async (a: Row) => {
+        h.writes.updateMany++;
         const hit = rows().filter((r) => matches(r, a.where));
         for (const r of hit) Object.assign(r, a.data);
         return { count: hit.length };
@@ -78,6 +83,7 @@ function clientFor(store: Record<string, Row[]>): any {
 }
 
 import { cancelMembership, setListingPrice } from './api';
+import { STORE_CLOSED_MESSAGE } from './constants';
 
 function seedAccess(over: Row = {}) {
   const rows = (h.store.programAccess ??= []);
@@ -100,7 +106,8 @@ function seedListing(over: Row = {}) {
 beforeEach(() => {
   h.store = {};
   h.subscriptionUpdate = { calls: [], throws: null, result: null };
-  h.subscriptionRetrieve = { calls: [], result: null };
+  h.subscriptionRetrieve = { calls: [], throws: null, result: null };
+  h.writes = { update: 0, updateMany: 0 };
   process.env.STRIPE_SECRET_KEY = 'sk_test_fake';
   process.env.COACH_STORE_COACH_USER_IDS = COACH;
 });
@@ -155,21 +162,73 @@ describe('B9a cancelMembership — Stripe-first real cancel', () => {
     expect(row.cancelAtPeriodEnd).toBe(true);
   });
 
-  it('no subscription id (a one-time row) -> the local cancel stands, no Stripe call', async () => {
+  // B9 fix 1 (rewritten to the STRICTER contract): no subscription id -> 409 store_closed, NOTHING saved.
+  it('no subscription id (a one-time row) -> 409 store_closed and the row is saved as it was', async () => {
     const pa = seedAccess({ billing: 'one_time', stripeSubscriptionId: null });
+    const before = JSON.stringify(h.store.programAccess.find((a) => a.id === pa.id));
     const res = await cancelMembership(USER, pa.id);
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(409);
+    const json = await res.json();
+    expect(json.error).toBe('store_closed');
+    expect(json.reason).toBe('payments_not_set_up');
+    expect(json.message).toBe(STORE_CLOSED_MESSAGE);
     expect(h.subscriptionUpdate.calls).toHaveLength(0);
-    expect(h.store.programAccess.find((a) => a.id === pa.id)!.cancelAtPeriodEnd).toBe(true);
+    expect(h.subscriptionRetrieve.calls).toHaveLength(0);
+    expect(h.writes).toEqual({ update: 0, updateMany: 0 });
+    expect(JSON.stringify(h.store.programAccess.find((a) => a.id === pa.id))).toBe(before);
   });
 
-  it('no Stripe key -> the local cancel stands (nothing to stop while the store is closed)', async () => {
+  // B9 fix 1 (rewritten to the STRICTER contract): no key -> 409 store_closed, NOTHING saved.
+  it('no Stripe key -> 409 store_closed and the row is saved as it was', async () => {
     delete process.env.STRIPE_SECRET_KEY;
     const pa = seedAccess();
+    const before = JSON.stringify(h.store.programAccess.find((a) => a.id === pa.id));
     const res = await cancelMembership(USER, pa.id);
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(409);
+    const json = await res.json();
+    expect(json.error).toBe('store_closed');
+    expect(json.reason).toBe('payments_not_set_up');
+    expect(json.message).toBe(STORE_CLOSED_MESSAGE);
     expect(h.subscriptionUpdate.calls).toHaveLength(0);
-    expect(h.store.programAccess.find((a) => a.id === pa.id)!.cancelAtPeriodEnd).toBe(true);
+    expect(h.subscriptionRetrieve.calls).toHaveLength(0);
+    expect(h.writes).toEqual({ update: 0, updateMany: 0 });
+    expect(JSON.stringify(h.store.programAccess.find((a) => a.id === pa.id))).toBe(before);
+  });
+
+  it('a month row with stripeSubscriptionId null and a key set -> 409 store_closed, nothing saved', async () => {
+    const pa = seedAccess({ billing: 'month', stripeSubscriptionId: null });
+    const before = JSON.stringify(h.store.programAccess.find((a) => a.id === pa.id));
+    const res = await cancelMembership(USER, pa.id);
+    expect(res.status).toBe(409);
+    const json = await res.json();
+    expect(json.error).toBe('store_closed');
+    expect(json.reason).toBe('payments_not_set_up');
+    expect(json.message).toBe(STORE_CLOSED_MESSAGE);
+    expect(h.subscriptionUpdate.calls).toHaveLength(0);
+    expect(h.subscriptionRetrieve.calls).toHaveLength(0);
+    expect(h.writes).toEqual({ update: 0, updateMany: 0 });
+    expect(JSON.stringify(h.store.programAccess.find((a) => a.id === pa.id))).toBe(before);
+  });
+
+  // B9 fix 2: a 502 changes nothing — proven for an update throw AND a retrieve throw, body name kept
+  // 'stripe_unavailable' (PM ruling 5:48 PM PT), zero prisma writes, the row deep-equal to its seed.
+  it.each([
+    ['update throws', { update: new Error('stripe down') }, null],
+    ['update returns no period end, retrieve throws', null, new Error('stripe down on retrieve')],
+  ] as const)('Stripe failure (%s) -> 502 stripe_unavailable, zero prisma writes, row deep-equal', async (_name, updErr, retrErr) => {
+    if (updErr) h.subscriptionUpdate.throws = updErr as Error;
+    if (retrErr) {
+      h.subscriptionUpdate.result = { id: 'sub_1', status: 'active', cancel_at_period_end: true, items: { data: [{}] } };
+      h.subscriptionRetrieve.throws = retrErr as Error;
+    }
+    const pa = seedAccess();
+    const before = JSON.stringify(h.store.programAccess.find((a) => a.id === pa.id));
+    const res = await cancelMembership(USER, pa.id);
+    expect(res.status).toBe(502);
+    const json = await res.json();
+    expect(json.error).toBe('stripe_unavailable');
+    expect(h.writes).toEqual({ update: 0, updateMany: 0 });
+    expect(JSON.stringify(h.store.programAccess.find((a) => a.id === pa.id))).toBe(before);
   });
 
   it('a row owned by someone else -> 404', async () => {
