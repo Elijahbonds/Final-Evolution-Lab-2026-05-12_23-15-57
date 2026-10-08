@@ -24,6 +24,9 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { CARNIVAL_EXTERNAL_POOL, dealableCarnivalStops, drawCarnivalLineup } from '../lib/carnival-run';
+import { MODE_INFO } from '../lib/game-data';
+import { isUnlistedMode } from '../lib/unlisted-modes';
 
 let checks = 0;
 const fail: string[] = [];
@@ -32,7 +35,6 @@ const ok = (c: boolean, label: string): void => { checks++; if (!c) fail.push(la
 const mode = readFileSync(new URL('../lib/babylon/modes/CourtCarnivalMode.ts', import.meta.url), 'utf8');
 const host = readFileSync(new URL('../components/games/carnival-babylon.tsx', import.meta.url), 'utf8');
 const run = readFileSync(new URL('../lib/carnival-run.ts', import.meta.url), 'utf8');
-const gameData = readFileSync(new URL('../lib/game-data.ts', import.meta.url), 'utf8');
 const root = fileURLToPath(new URL('..', import.meta.url));
 
 // ── A. the rival is a person at the party ─────────────────────────────────
@@ -62,21 +64,28 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 }
 
 // ── C. tonight's lineup points only at live stop routes ────────────────────
+// PR #140 (2026-10-08): read the real pool and the real deal, not the source text. A dealable stop's page may only
+// redirect to login (and back); any other redirect sends the night away mid-run — the 2026-09-01 sprint bug, and
+// the parked Iron Paradise ('training' → /train) the lineup kept dealing after IRON-PARADISE-OUT.
 {
-  const pool = run.slice(run.indexOf('CARNIVAL_EXTERNAL_POOL'), run.indexOf('] as const'));
-  const stops = [...pool.matchAll(/^\s*'([^']+)',?\s*$/gm)].map((m) => m[1]);
-  ok(stops.includes('sprint'), "revived 'sprint' is dealt into the lineup pool");
-  for (const stop of stops) {
-    const row = new RegExp(`^  ${stop}: \\{[^\\n]*href: '([^']+)'`, 'm').exec(gameData);
-    ok(Boolean(row), `MODE_INFO has a link for '${stop}'`);
-    const href = row?.[1] ?? '';
-    if (href.startsWith('/play/')) {
-      const pageFile = join(root, 'app', href.replace(/^\/+/, ''), 'page.tsx');
-      ok(existsSync(pageFile), `${stop} route exists at ${href}`);
-      if (existsSync(pageFile)) {
-        const page = readFileSync(pageFile, 'utf8');
-        ok(!page.includes("redirect('/play')"), `${stop} route does not redirect away from the run`);
-      }
+  const dealable = dealableCarnivalStops();
+  ok((CARNIVAL_EXTERNAL_POOL as readonly string[]).includes('sprint'), "revived 'sprint' is in the lineup pool");
+  ok((dealable as readonly string[]).includes('sprint'), "revived 'sprint' can be dealt");
+  for (const stop of CARNIVAL_EXTERNAL_POOL) {
+    if (isUnlistedMode(stop)) ok(!(dealable as readonly string[]).includes(stop), `parked '${stop}' is never dealt`);
+  }
+  for (let i = 0; i < 200; i++) {
+    const lineup = drawCarnivalLineup();
+    ok(lineup.every((stop) => stop === 'carnival' || (dealable as readonly string[]).includes(stop)), 'a drawn night deals only dealable stops');
+  }
+  for (const stop of dealable) {
+    const href = MODE_INFO[stop]?.href ?? '';
+    ok(href.startsWith('/play/'), `MODE_INFO has a /play link for '${stop}'`);
+    const pageFile = join(root, 'app', href.replace(/^\/+/, ''), 'page.tsx');
+    ok(existsSync(pageFile), `${stop} route exists at ${href}`);
+    if (existsSync(pageFile)) {
+      const page = readFileSync(pageFile, 'utf8').replace(/redirect\(loginPath\(/g, '');
+      ok(!/\bredirect\(/.test(page), `${stop} route does not redirect away from the run`);
     }
   }
 }

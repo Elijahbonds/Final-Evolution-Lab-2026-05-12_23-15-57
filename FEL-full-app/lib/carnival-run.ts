@@ -9,6 +9,7 @@
 // the final recap — it never intercepts the economy pipeline.
 
 import { MODE_INFO } from './game-data';
+import { isUnlistedMode } from './unlisted-modes';
 
 /** Quick, GameShell-scored mini-games with no dedicated "console mode" of
  *  their own — the Court Carnival mini-game pool. Each uses the standard
@@ -17,8 +18,8 @@ export const CARNIVAL_EXTERNAL_POOL = [
   'brainBrawl',
   'bigAir',
   'freerun',
-  'sprint',
-  'training',
+  'sprint',     // retired 2026-09-01, revived by the owner (see MODE_INFO): a live /play/sprint stop again
+  'training',   // parked (IRON-PARADISE-OUT, lib/unlisted-modes.ts): kept in the pool, never dealt while unlisted
   'threePoint',
   'whoSceneIt',
   'tiebreak',
@@ -56,11 +57,19 @@ function shuffled<T>(arr: readonly T[]): T[] {
   return a;
 }
 
+/** The external stops a night can deal: the pool minus any parked mode. IRON-PARADISE-OUT (2026-10-03) parked
+ *  'training' everywhere a mode is OFFERED, but the lineup kept dealing it, and /play/training redirects to /train —
+ *  the mid-night redirect this pool's old retirement note warned about. Filtering on isUnlistedMode keeps that
+ *  decision's one switch: un-park the mode and it comes back here too. (PR #140, 2026-10-08) */
+export function dealableCarnivalStops(): CarnivalExternalMode[] {
+  return CARNIVAL_EXTERNAL_POOL.filter((stop) => !isUnlistedMode(stop));
+}
+
 /** Draw a fresh lineup for tonight: a mix of the native carnival round and
  *  external mini-games, native always included so the night still opens
  *  with the flagship 3D experience. */
 export function drawCarnivalLineup(count: number = STOPS_PER_NIGHT): CarnivalStop[] {
-  const externals = shuffled(CARNIVAL_EXTERNAL_POOL).slice(0, Math.max(0, count - 1));
+  const externals = shuffled(dealableCarnivalStops()).slice(0, Math.max(0, count - 1));
   // ARENA-10PHASE P7 (2026-09-07): the comment above promised the night OPENS with the 3D round, but the whole lineup was
   // shuffled — two nights in three, START THE NIGHT left /play/carnival for a mini-game page and Court Carnival's own canvas
   // never mounted (playtest d3d4a93: "GAME NIGHT lobby 90 s+, no canvas"). Native first, the externals shuffled behind it.
