@@ -3,7 +3,14 @@
 // area the mode defines (court 16×28 centred; dojo mat 14×14; pitch 50×70 with the
 // goal line at z 10.4; gridiron x ±20 over z 0..40; links green 60×90, holes at
 // z 26–39; skatepark ±33; piste half-width 17; surf half-width 45).
-export interface PropPlacement { kit: string; model: string; at: [number, number, number]; yaw?: number; scale?: number; /** multiply the kit palette (e.g. a green over the nature kit's teal canopy) */ tint?: string }
+export interface PropPlacement {
+  kit: string; model: string; at: [number, number, number]; yaw?: number; scale?: number;
+  /** replace the kit palette colour (e.g. a green over the nature kit's teal canopy): one hex for every part, or a hex per
+   *  material name (`{ woodBark: '#…', leafsGreen: '#…' }`) so a trunk and its crown take different colours */
+  tint?: string | Readonly<Record<string, string>>;
+  /** per-axis multiply on top of `scale` — re-proportions a kit model (a Kenney palm drawn as a tall Venice palm) */
+  stretch?: readonly [number, number, number];
+}
 const ring = (kit: string, model: string, r: number, n: number, y = 0, scale = 1, phase = 0): PropPlacement[] =>
   Array.from({ length: n }, (_, i) => { const a = phase + (i / n) * Math.PI * 2; return { kit, model, at: [Math.sin(a) * r, y, Math.cos(a) * r], yaw: -a, scale }; });
 const line = (kit: string, model: string, from: [number, number], to: [number, number], n: number, yaw = 0, scale = 1, tint?: string): PropPlacement[] =>
@@ -22,6 +29,88 @@ const arc = (kit: string, model: string, centre: [number, number], radius: numbe
 const GREEN = '#63D452';
 /** GATE-CRASHER-MAJOR: the slope's pines take a deep needle green, not the lime the broadleaf kit wore on the snow. */
 const CONIFER = '#5E9468';
+
+// ── DUNK-VENICE-ENV-2 (2026-09-28): THE VENICE DUNK'S BAKED DRESSING ──────────────────────────────────────────────────
+// Five GLBs made for this scene (asset drop ~/Claude/outbox/assets/venice-env-2, copied byte for byte): a hero palm in three
+// LODs, a boardwalk row (four storefronts, three vendor stalls, one shared atlas) and a strip of backlit crowd cards. Units
+// metres, Y up, fronts face +Z, origins at the base centre. Mounted by veniceBoardwalk.mountVeniceDunkDressing (dunk + duel).
+
+/** Where the files live. */
+export const VENICE_ENV2_DIR = '/models/props/venice/env2/';
+/** The hero palm's LODs share one origin and scale: LOD0 to 25 m, LOD1 to 60 m, LOD2 beyond (the asset README's bands). */
+export const VENICE_PALM_LODS = { files: ['palm_hero_lod0.glb', 'palm_hero_lod1.glb', 'palm_hero_lod2.glb'], switchM: [25, 60] } as const;
+export interface HeroPalm {
+  at: [number, number, number];
+  /** The trunk leans ~0.6 m toward the file's +X, which the glTF loader's handedness flip turns into Babylon's −X; a turn of
+   *  `yaw` about Y points that lean at `heroPalmLean(yaw)`. */
+  yaw: number;
+  /** Metres to the top of the crown (the file's palm is HERO_PALM_M); unset = as baked. */
+  h?: number;
+  /** Its shadow: `whole` — trunk and alpha-tested crown (the hero palms); `trunk` — the trunk only (the near rows: their
+   *  shadows reach the court, and the kit rows these replace cast their trunks and never their leaves — LightRig's foliage
+   *  rule); unset — none (the far rows). */
+  casts?: 'whole' | 'trunk';
+}
+/** The baked palm's height, metres (bounding box 9.99 m). */
+export const HERO_PALM_M = 10;
+/** The scale that stands a palm `h` metres tall: the trunk grows (capped at 1.45×, where the crown's droop would stretch out
+ *  of shape), the crown and trunk widen half as much — a taller palm, not a bigger one. */
+export function heroPalmScale(h?: number): [number, number, number] {
+  if (!h) return [1, 1, 1];
+  const sy = Math.min(1.45, h / HERO_PALM_M), sxz = 1 + (sy - 1) * 0.5;
+  return [sxz, sy, sxz];
+}
+/** The lean's horizontal direction in the world for a palm turned `yaw` (x, z). */
+export const heroPalmLean = (yaw: number): [number, number] => [-Math.cos(yaw), Math.sin(yaw)];
+/** The backboard's face (the scanned hoop, measured at 3a0f4edf: glass z −10.67 … −10.73, stanchion foot −11.6). */
+export const DUNK_BACKBOARD_Z = -10.7;
+/**
+ * THE HERO PALM stands 2.7 m behind the backboard and 2.6 m off the rim's line (README: 2–4 m behind, 1.5–3 m to the side, so
+ * the trunk is not dead centre behind the rim). West of the hoop, where the rim cut (DunkMode: rim + (2.9, …, 1.9)) and the
+ * FROM THE STANDS replay look past the glass, leaning west and a touch north — away from the court. A second closes the
+ * boardwalk row's west end at mid range (LOD1 from the run-up camera); the east end has the planting strip's palms already,
+ * and past it is the bike path.
+ */
+export const VENICE_HERO_PALMS: HeroPalm[] = [
+  { at: [-2.6, 0, -13.4], yaw: -0.5, casts: 'whole' },
+  { at: [-17.2, 0, -23.2], yaw: -0.35, casts: 'whole' },
+];
+/**
+ * THE ROWS, as the same baked palm (instances of the hero's meshes, so LODs and all: up to six draws for every palm on the
+ * beach). These stood the nature kit's detailed palm, stretched to 12–16 m and tinted — flat-coloured low-poly crowns, the
+ * faceted fronds the eye kept finding in the slam cam and FROM THE STANDS once the backboard palm was fixed (and not the
+ * baked, textured models the owner's art bar asks for); the README offers LOD1/LOD2 for background palms. Same places, same
+ * heights, same turns as the rows they replace: the bike path's planting strip (x 12.3; its z −28 palm now at −32, behind the
+ * boardwalk row it would stand inside), the promenade's far side (x 30.2), the beach path (x −13.8), the north shore (clear of
+ * x ±20), a sparse far-beach line and a plaza row (x 46). The planting strip and the beach path cast their trunks (their shadows
+ * reach the court); the far rows do not cast.
+ */
+const rowPalm = (x: number, z: number, h: number, yaw: number, near: boolean): HeroPalm => ({ at: [x, 0, z], yaw, h, ...(near ? { casts: 'trunk' as const } : {}) });
+export const VENICE_ROW_PALMS: HeroPalm[] = [
+  ...[-40, -32, -16, -4, 8, 20, 32, 44].map((z, i) => rowPalm(12.3, z, 14 + (i % 3) * 1.2, i * 0.9, true)),
+  ...[-38, -26, -12, 2, 14, 28, 52].map((z, i) => rowPalm(30.2, z, 13 + ((i + 1) % 3) * 1.3, i * 1.3, false)),
+  ...[-30, -16, -2, 12, 26].map((z, i) => rowPalm(-13.8, z, 13.5 + (i % 2) * 1.6, i * 0.7, true)),
+  ...[-40, -24, 24, 42].map((x, i) => rowPalm(x, -50, 12 + (i % 2) * 2, i * 1.1, false)),
+  ...[-56, -24, 8, 40].map((z, i) => rowPalm(-34, z, 11 + (i % 2) * 1.5, i * 0.5, false)),
+  ...[-44, -14, 16, 46].map((z, i) => rowPalm(46, z, 15 + (i % 2) * 1.5, i * 0.8, false)),
+];
+/**
+ * THE BOARDWALK ROW (eye VE-6: the run-up camera looked over an empty sand field behind the hoop). The kit file lays its
+ * nodes out as a row already — facades edge to edge along x (±14.1 m), stalls 4 m in front — so the row is mounted whole
+ * at `at`, UNTURNED: its fronts face +Z, which is the court. The facades are single-sided; they are never turned 180°.
+ * (The glTF loader's handedness flip mirrors the layout in x — SURF & SKATE, the file's x −10.5, stands at +10.5, left of the
+ * hoop from the run-up camera — and every sign still reads the right way round.)
+ * The crowd strip (12 cards, ±1.2 m depth jitter, 4 m in front of its file origin) stands at `crowdAt`, between the stalls
+ * and the court. `runupCamZ` is the run-up camera at the start line (measured: (0, 2.89, 8.01), fov 0.8, looking −z).
+ */
+export const VENICE_BOARDWALK_ROW = {
+  at: [0, 0, -26.8] as [number, number, number],
+  crowdAt: [0, 0, -24.3] as [number, number, number],
+  /** the wall block runs 0.75 m behind the origin and the awnings 2.1 m in front (kit bounds, z −0.75 … 2.1) */
+  depth: [-0.75, 2.1] as [number, number],
+  halfWidth: 14.1,
+  runupCamZ: 8.01,
+} as const;
 
 export const VENUE_PROP_SETS: Record<string, PropPlacement[]> = {
   // Court locations (docs/SPEC-COURT-LOCATIONS.md) — placed for the dunk camera: sides at x ±11–13, a back row behind the
@@ -76,9 +165,43 @@ export const VENUE_PROP_SETS: Record<string, PropPlacement[]> = {
     { kit: 'venice', model: 'pier_far', at: [-30, 0, -110], yaw: 0.2 },
     { kit: 'venice', model: 'sail_billboard_0', at: [34, 0, -22], yaw: -Math.PI / 2 }, { kit: 'venice', model: 'sail_billboard_1', at: [34, 0, 6], yaw: -Math.PI / 2 }, { kit: 'venice', model: 'sail_billboard_2', at: [34, 0, 32], yaw: -Math.PI / 2 },
   ],
+  // DUNK-VENICE-ENV-RENDER (2026-09-28): the Venice dunk's own dressing (dunk + dunk duel; the other hoops courts keep
+  // 'venice-court-meshy'). The chunky low-poly palms (tree_palm / Tall / Short / Bend at 3.6–5.2×: 5–7 m green lollipops),
+  // the hedge and grass-tuft lines are gone. The palms are Venice's: tall, slender and in rows down the bike path, the far
+  // side of the promenade and the beach — the kit's DETAILED palm (separate trunk and two frond layers) drawn 12–16 m tall
+  // on a ~0.6 m trunk (`stretch`), bark and fronds each in their own colour. There is no palm GLB in props/venice; this is
+  // the best palm the shipped kits hold. The boats (sail_billboard_*) go on the water, where boats are — they stood on the
+  // grass past the boardwalk. The low fence line on the beach side read as an orange dotted line on the sand (the planter
+  // troughs' old complaint) and is gone too. Placed for the dunk camera (it looks −z from behind the player): the rows recede down both
+  // frame edges, two palms frame the backboard, and x −20…20 on the north shore stays open so the sea shows behind the hoop.
+  // DUNK-VENICE-ENV-2 (2026-09-28): the palms are the baked palm GLB now (VENICE_HERO_PALMS, VENICE_ROW_PALMS — same rows),
+  // and the boardwalk row fills the sand behind the hoop (eye VE-6); the sea shows past its ends.
+  'venice-dunk': [
+    // (the palms are the baked palm now — VENICE_HERO_PALMS + VENICE_ROW_PALMS, mounted by veniceBoardwalk.mountVeniceDunkDressing)
+    ...line('racing', 'lightPostModern', [19, -36], [19, 36], 7, Math.PI, 2.4),   // the promenade's lamps (the boardwalk's FEL flags hang on them)
+    ...line('racing', 'lightPostModern', [-15, -36], [-15, 36], 6, 0, 2.4),       // the beach path's
+    { kit: 'racing', model: 'tent', at: [33, 0, -21], yaw: -Math.PI / 2, scale: 2.6 }, { kit: 'racing', model: 'tent', at: [33, 0, 18], yaw: -Math.PI / 2, scale: 2.6 },
+    { kit: 'racing', model: 'tent', at: [33, 0, 40], yaw: -Math.PI / 2, scale: 2.6 }, { kit: 'racing', model: 'tent', at: [22, 0, -48], yaw: 0, scale: 2.6 },
+    { kit: 'racing', model: 'tent', at: [-22, 0, -48], yaw: 0, scale: 2.6 },
+    // the vendors' second line across the plaza, staggered against the first — the concept's stalls and awnings
+    ...[-52, -34, -4, 8, 30, 56].map((z): PropPlacement => ({ kit: 'racing', model: 'tent', at: [38, 0, z], yaw: -Math.PI / 2, scale: 2.4 })),
+    { kit: 'racing', model: 'flagRed', at: [21, 0, -40], scale: 2.4 }, { kit: 'racing', model: 'flagGreen', at: [21, 0, 40], scale: 2.4 },
+    { kit: 'meshy', model: 'hoopbus', at: [30, 0, -46], yaw: Math.PI / 2 }, { kit: 'meshy', model: 'sedan', at: [29, 0, 44], yaw: Math.PI / 2 },
+    { kit: 'venice', model: 'pier_far', at: [-30, 0, -110], yaw: 0.2 },
+    { kit: 'venice', model: 'sail_billboard_0', at: [-78, 0, -96], yaw: 0.6, scale: 2.5 },
+    { kit: 'venice', model: 'sail_billboard_1', at: [-118, 0, -42], yaw: -0.4, scale: 2.8 },
+    // DUNK-VENICE-ENV-2 (eye VE-8): sail_billboard_2 is gone — it was the "light-blue rectangle on a hairline pole" right of
+    // the hoop. A box hull under a flat rectangular sail, 80–150 m out: from the court the hull is a pixel or two and the sail
+    // and mast read as a sign on a pole, and moored in 15 m off the shore it still did (measured from the duel's run-up
+    // camera). The kit's own record calls these "sail billboards"; the two left stand wide of the hoop.
+  ],
   'dojo': [
-    ...ring('mini-arena', 'column', 9.5, 8, 0, 1.5, Math.PI / 8),   // Pass 7: lantern-post height — at 2.6 they read as Greek temple pillars in a shrine courtyard
-    { kit: 'mini-arena', model: 'statue', at: [0, 0, 11], yaw: Math.PI, scale: 2.4 }, { kit: 'mini-arena', model: 'banner', at: [-4, 0, 11], scale: 2.4 }, { kit: 'mini-arena', model: 'banner', at: [4, 0, 11], scale: 2.4 },
+    // IMPROVE (2026-10-06): the column ring 9.5 → 11 and the statue + banners z 11 → 12.5. The combat arenas grew
+    // (combat/arenas.ts ARENA_SCALE 1.25) and the Shadow Gauntlet's stone ring now stands at r 9.375 — a column at 9.5
+    // was 0.13 m outside it, i.e. inside the wall. At 11 it clears the ring by 1.6 m; the statue and banners step back
+    // with it so a column does not stand 0.9 m off a banner. combat/arenas.test holds every prop clear of every arena.
+    ...ring('mini-arena', 'column', 11, 8, 0, 1.5, Math.PI / 8),   // Pass 7: lantern-post height — at 2.6 they read as Greek temple pillars in a shrine courtyard
+    { kit: 'mini-arena', model: 'statue', at: [0, 0, 12.5], yaw: Math.PI, scale: 2.4 }, { kit: 'mini-arena', model: 'banner', at: [-4, 0, 12.5], scale: 2.4 }, { kit: 'mini-arena', model: 'banner', at: [4, 0, 12.5], scale: 2.4 },
     { kit: 'mini-arena', model: 'tree', at: [-11, 0, -8], scale: 2.6 }, { kit: 'nature', model: 'tree_pineRoundA', at: [11, 0, -9], scale: 4.8 },
     // props+depth pass 2026-09-05 — NEAR: stones at the mat's apron corners (the Kenney blocks read as black cubes under the dusk — gone, Pass 7)
     { kit: 'nature', model: 'rock_smallFlatA', at: [-8.5, 0, 8.5], scale: 2.0 }, { kit: 'nature', model: 'rock_smallG', at: [8.5, 0, -8.5], scale: 1.8 },

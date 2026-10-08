@@ -22,7 +22,7 @@ import { applyRestPoseToSkeleton } from '../anim/restPoseApply';
 import { snapToGround } from './groundSnap';                // M69: feet-on-court
 import { PROCEDURAL_CHARACTERS } from '../characters/CharacterProvider';
 import { spawnProceduralAthlete } from '../characters/ProceduralAthlete';
-import { rosterUrlFor, normalizeHeroUrl, DEFAULT_HERO_URL } from './athleteRoster';
+import { rosterUrlFor, normalizeHeroUrl, DEFAULT_HERO_URL, takeRivalRotation } from './athleteRoster';
 import { urlForHeroBody, KIT_BODY_URL } from './heroBody';
 import { installOpponentMotion, HERO_CAPTURE } from '../anim/opponentMotion';
 import { installStyleMotion } from '../anim/styleMotion';
@@ -31,6 +31,7 @@ import { pickedVocab } from '../combat/styleVocab';
 const STYLE_FIGHT_MODES: ReadonlySet<string> = new Set(['karate', 'karate_vs', 'mixedcombat', 'duel', 'showdown']);
 import { applySkinShading } from './skinShading';
 import { attachAccessories, lookFor, type AccessorySet } from './accessories';
+import { optOutAccessories, playerWearsOwnAccessories } from './playerAccessories';
 import { fitForName, wearFit } from './fits';
 import { applyKit } from './kit';
 import { attachContactShadow } from '../visual/contactShadow';
@@ -86,6 +87,14 @@ export interface SpawnOpts {
 // that is disposed, or hidden (the carnival hides its hub host while an event spawns its own player), no longer counts.
 const livePlayers = new WeakMap<Scene, Set<TransformNode>>();
 const opponentSeq = new WeakMap<Scene, number>();
+/** One rival rotation per scene, i.e. per match (asset-polish 2026-10-05): taken the first time the scene spawns an
+ *  opponent and held for the rest of it, so every body in this match is consistent and the NEXT match is shifted. */
+const sceneRotation = new WeakMap<Scene, number>();
+function rotationFor(scene: Scene): number {
+  let r = sceneRotation.get(scene);
+  if (r === undefined) { r = takeRivalRotation(); sceneRotation.set(scene, r); }
+  return r;
+}
 /** Count `root` as a live player body in `scene` until it is disposed or hidden. */
 export function trackPlayerBody(scene: Scene, root: TransformNode): void {
   let set = livePlayers.get(scene); if (!set) { set = new Set(); livePlayers.set(scene, set); } set.add(root);
@@ -239,7 +248,7 @@ export const CharacterLibrary = {
       const n = opponentSeq.get(scene) ?? 0; opponentSeq.set(scene, n + 1);
       rosterSeed = `opponent-${n}`;
     }
-    const rosterUrl = role === 'opponent' ? rosterUrlFor(heroRequest ? DEFAULT_HERO_URL : url, rosterSeed, (scene.metadata?.felModeId as string | undefined) ?? null) : null;   // phase 7: the mode's cast
+    const rosterUrl = role === 'opponent' ? rosterUrlFor(heroRequest ? DEFAULT_HERO_URL : url, rosterSeed, (scene.metadata?.felModeId as string | undefined) ?? null, rotationFor(scene)) : null;   // phase 7: the mode's cast
     let effectiveUrl = url;
     let rosterPicked = false;
     let container: AssetContainer;
@@ -344,7 +353,13 @@ export const CharacterLibrary = {
     if (fit) wearFit({ meshes }, fit);
 
     const wantsAccessories = opts.accessories !== false;
-    const accDispose = wantsAccessories
+    if (!wantsAccessories) optOutAccessories(root);
+    // IMPROVE (2026-10-06), research item 2: the PLAYER is not dealt a seeded look. A player spawn with no explicit look,
+    // name or tint wears what they EQUIPPED, hung by the identity pipe (applyIdentity → playerAccessories) — here, in
+    // CharacterPipeline.spawnPlayer, and in both editor previews alike. NPCs, rivals and named spawns keep the deal, and
+    // so does a spawn with its own skin tone (it never takes the identity below, so it would otherwise stand bare).
+    const playerDressesSelf = playerWearsOwnAccessories(role, rosterPicked, opts);
+    const accDispose = wantsAccessories && !playerDressesSelf
       ? attachAccessories(scene, skeleton, root, opts.look ?? {
           ...lookFor(opts.name ?? opts.tint ?? `char_${spawnCounter}`),
           ...(fit ? { accent: Color3.FromHexString(fit.accent) } : {}),   // the accessories wear the fit's accent

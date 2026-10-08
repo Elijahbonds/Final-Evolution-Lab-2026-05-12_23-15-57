@@ -96,10 +96,24 @@ export function mountWeatherFx(scene: Scene, lights: LightRigHandle | null, kit:
   }
 
   // ── wet sheen on the ground materials ─────────────────────────────────────────────────────────────────────────
-  const wetMats: { m: PBRMaterial; rough: number; albedo: Color3 }[] = [];
-  const collect = () => { for (const mesh of scene.meshes) { const mat = mesh.material; if (!(mat instanceof PBRMaterial) || !GROUND_RE.test(mesh.name)) continue; if (wetMats.some((w) => w.m === mat)) continue; wetMats.push({ m: mat, rough: mat.roughness ?? 0.85, albedo: mat.albedoColor.clone() }); } };
-  collect();
-  disposers.push(() => { for (const w of wetMats) { try { w.m.roughness = w.rough; w.m.albedoColor = w.albedo; } catch { /* disposed with its mesh */ } } });
+  // IMPROVE (2026-10-06, Tennis #19 — shared with golf, football, penalty; behaviour-identical): the wet albedo is written
+  // into one Color3 per material (`cur`) instead of a new Color3 per material per frame, and the ground meshes are
+  // tracked as they are ADDED instead of a full `scene.meshes` scan every 2 s. The 2 s pass still re-reads the tracked
+  // grounds' materials, so a ground whose material lands after the mesh (a hole's green, a late load) still gets the sheen.
+  // The name is read again on that pass, as the scan read it: a 'venue_ground' renamed to 'venue_apron' before the pass
+  // stays dry, exactly as before (every rename in the venues starts from 'venue_ground', which is tracked on add).
+  const wetMats: { m: PBRMaterial; rough: number; albedo: Color3; cur: Color3 }[] = [];
+  const grounds: AbstractMesh[] = [];
+  let groundsAdded = false;
+  const track = (mesh: AbstractMesh) => { if (GROUND_RE.test(mesh.name) && !grounds.includes(mesh)) { grounds.push(mesh); groundsAdded = true; } };
+  const collect = () => {
+    for (let i = grounds.length - 1; i >= 0; i--) if (grounds[i].isDisposed()) grounds.splice(i, 1);
+    for (const mesh of grounds) { const mat = mesh.material; if (!(mat instanceof PBRMaterial) || !GROUND_RE.test(mesh.name)) continue; if (wetMats.some((w) => w.m === mat)) continue; wetMats.push({ m: mat, rough: mat.roughness ?? 0.85, albedo: mat.albedoColor.clone(), cur: mat.albedoColor.clone() }); }
+  };
+  for (const mesh of scene.meshes) track(mesh);
+  collect(); groundsAdded = false;
+  const meshAdded = scene.onNewMeshAddedObservable.add(track);
+  disposers.push(() => { scene.onNewMeshAddedObservable.remove(meshAdded); for (const w of wetMats) { try { w.m.roughness = w.rough; w.m.albedoColor = w.albedo; } catch { /* disposed with its mesh */ } } });
 
   // ── storm: lightning + thunder ────────────────────────────────────────────────────────────────────────────────
   let nextBolt = s.condition === 'storm' ? 4 + Math.random() * 6 : Infinity; let thunderIn = Infinity;
@@ -108,11 +122,13 @@ export function mountWeatherFx(scene: Scene, lights: LightRigHandle | null, kit:
   return {
     update(dt) {
       t += dt; sinceCollect += dt;
-      if (sinceCollect > 2) { sinceCollect = 0; collect(); }   // a hole's green is built per hole; late meshes get the sheen too
+      if (sinceCollect > 2 || groundsAdded) { sinceCollect = 0; groundsAdded = false; collect(); }   // a hole's green is built per hole; late meshes get the sheen too
       const cam = scene.activeCamera;
       if (emitter && cam) { const f = cam.getForwardRay(1).direction; emitter.position.set(cam.globalPosition.x + f.x * 10, cam.globalPosition.y + 12, cam.globalPosition.z + f.z * 10); }
       const wet = kit.wet01();
-      if (wetMats.length) for (const w of wetMats) { w.m.roughness = w.rough + (0.18 - w.rough) * wet; w.m.albedoColor = w.albedo.scale(1 - 0.3 * wet); }   // a soaked fairway is visibly darker and glossy
+      // a soaked fairway is visibly darker and glossy. `cur` is handed to the material once and then written in place: the
+      // property setter ignores an equal colour, so after the first frame this marks nothing dirty (a new Color3 did, every frame)
+      if (wetMats.length) for (const w of wetMats) { w.m.roughness = w.rough + (0.18 - w.rough) * wet; w.albedo.scaleToRef(1 - 0.3 * wet, w.cur); w.m.albedoColor = w.cur; }
       if (t >= nextBolt) {
         nextBolt = t + 5 + Math.random() * 9; lights?.flashBeat(); thunderIn = 0.5 + Math.random() * 1.2;
       }

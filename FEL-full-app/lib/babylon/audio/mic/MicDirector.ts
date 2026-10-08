@@ -12,6 +12,8 @@
 //   - the PLAYERS (one line each, at a time).
 // Nothing here touches audio: VoiceKit plays the cues, and a test can drive the director with a clock.
 
+import { LineMemory } from '../voice/lineMemory';
+
 export type MicRole = 'mc' | 'side' | 'crowd' | 'player' | 'coach';
 export type Tier = 0 | 1 | 2;
 
@@ -61,6 +63,8 @@ export interface MicCue {
   pan: number;
   /** Relative level (the crowd sits under the booth). */
   gain: number;
+  /** VOICEOVER (2026-10-06): the moment this cue answers ('game.make'): the voice lane's cooldown key. */
+  moment?: string;
 }
 
 export interface MicDirectorOpts {
@@ -71,6 +75,9 @@ export interface MicDirectorOpts {
   /** Player id → the cast id that voices him. */
   players?: Record<string, string>;
   seed?: number;
+  /** VOICEOVER (2026-10-06): which lines each voice said lately (a shuffle bag per voice and moment). ModeMic hands in the
+   *  device's copy (lineMemory.deviceLineMemory) so a new run does not start the rounds over; omitted, the director keeps its own. */
+  memory?: LineMemory;
 }
 
 /** A clip with no rendered length yet is timed from its words (~2.6 words a second on the mic). */
@@ -95,8 +102,10 @@ function mulberry(seed: number): () => number {
 
 export class MicDirector {
   private readonly byCast = new Map<string, CastScript>();
-  private readonly recent = new Map<string, string[]>();          // cast|moment → recently used ids
-  private readonly reserved = new Map<string, MicLine>();         // cast|moment|tier → the pre-picked line (prefetch)
+  // VOICEOVER (2026-10-06): the no-repeat memory is a shuffle bag (every line once before any line twice) that outlives the run.
+  // It replaced a ring of recently used ids that started empty for every ModeMic, i.e. every run.
+  private readonly memory: LineMemory;
+  private readonly reserved = new Map<string, { line: MicLine; key: string }>();   // cast|moment|tier → the pre-picked line (prefetch)
   private readonly rand: () => number;
   private boothUntil = 0; private boothPriority = -1;
   private readonly crowdUntil: number[] = [];
@@ -110,6 +119,7 @@ export class MicDirector {
   constructor(private readonly o: MicDirectorOpts) {
     for (const s of o.scripts) this.byCast.set(s.cast, s);
     this.rand = mulberry(o.seed ?? 20260924);
+    this.memory = o.memory ?? new LineMemory();
   }
 
   /** The line a cast member would say for this event (no side effects beyond the no-repeat memory when `commit`). */
@@ -117,18 +127,15 @@ export class MicDirector {
     const s = this.byCast.get(cast); if (!s) return null;
     const rkey = `${cast}|${ev.moment}|${ev.tier ?? '-'}|${(ev.tags ?? []).join(',')}`;
     const held = this.reserved.get(rkey);
-    if (held) { if (commit) { this.reserved.delete(rkey); this.remember(cast, held); } return held; }
+    if (held) { if (commit) { this.reserved.delete(rkey); this.memory.mark(held.key, held.line.id); } return held.line; }
     for (const m of momentChain(ev.moment)) {
       let pool = s.lines.filter((l) => l.moment === m && (!l.tags?.length || l.tags.every((t) => ev.tags?.includes(t))));
       if (!pool.length) continue;
       pool = this.byTier(pool, ev.tier);
-      const seen = this.recent.get(`${cast}|${m}`) ?? [];
-      const fresh = pool.filter((l) => !seen.includes(l.id));
-      const cands = fresh.length ? fresh : pool;
-      const w = cands.map((l) => (l.tags?.some((t) => ev.tags?.includes(t)) ? 4 : 1));
-      let r = this.rand() * w.reduce((a, b) => a + b, 0), chosen = cands[cands.length - 1];
-      for (let i = 0; i < cands.length; i++) { r -= w[i]; if (r <= 0) { chosen = cands[i]; break; } }
-      if (commit) this.remember(cast, chosen); else this.reserved.set(rkey, chosen);
+      const tiers = new Set(pool.map((l) => l.tier ?? '-'));
+      const key = `${cast}|${m}|${tiers.size === 1 ? [...tiers][0] : '*'}`;
+      const chosen = this.memory.pick(key, pool, this.rand, (l) => (l.tags?.some((t) => ev.tags?.includes(t)) ? 4 : 1));
+      if (commit) this.memory.mark(key, chosen.id); else this.reserved.set(rkey, { line: chosen, key });
       return chosen;
     }
     return null;
@@ -155,14 +162,14 @@ export class MicDirector {
       const line = this.pick(this.o.booth.mc, ev);
       if (line) {
         const names = (ev.stinger ?? []).map((k) => this.nameLine(k)).filter((x): x is MicLine => !!x);
-        const cue = this.boothCue(this.o.booth.mc, [line, ...names], p);
+        const cue = { ...this.boothCue(this.o.booth.mc, [line, ...names], p), moment: ev.moment };
         const placed = this.placeBooth(cue, now);
         if (placed) {
           out.push(...placed.now);
           const side = this.o.booth.side;
           if (side && (ev.side ?? 0) > 0 && this.rand() < (ev.side ?? 0)) {
             const reply = this.pick(side, { moment: ev.moment, tier: ev.tier, tags: ev.tags });
-            if (reply) this.queued.push({ at: placed.endsAt + GAP, cue: this.boothCue(side, [reply], Math.max(0, p - 1)) });
+            if (reply) this.queued.push({ at: placed.endsAt + GAP, cue: { ...this.boothCue(side, [reply], Math.max(0, p - 1)), moment: `side:${ev.moment}` } });
           }
         }
       }
@@ -186,7 +193,7 @@ export class MicDirector {
       const moment = this.filler.moments[Math.floor(this.rand() * this.filler.moments.length)];
       let speaker = who, l = this.pick(who, { moment });
       if (!l && who !== this.o.booth.mc) { speaker = this.o.booth.mc; l = this.pick(speaker, { moment }); }
-      if (l) { const placed = this.placeBooth(this.boothCue(speaker, [l], 0), now); if (placed) out.push(...placed.now); }
+      if (l) { const placed = this.placeBooth({ ...this.boothCue(speaker, [l], 0), moment }, now); if (placed) out.push(...placed.now); }
       this.nextFillerAt = this.boothUntil + this.fillerGap();
     }
     if (this.crowdIdle && now >= this.nextCrowdIdleAt) {
@@ -218,12 +225,6 @@ export class MicDirector {
   clipId(cast: string, l: MicLine): string { return `${cast}/${l.id}`; }
 
   // ── internals ─────────────────────────────────────────────────────────────────────────────────────────────────────
-  private remember(cast: string, l: MicLine): void {
-    const k = `${cast}|${l.moment}`, pool = this.byCast.get(cast)?.lines.filter((x) => x.moment === l.moment).length ?? 1;
-    const ring = (this.recent.get(k) ?? []).filter((id) => id !== l.id); ring.push(l.id);
-    while (ring.length > Math.max(0, Math.min(pool - 1, 8))) ring.shift();
-    this.recent.set(k, ring);
-  }
   private byTier(pool: MicLine[], tier: Tier | undefined): MicLine[] {
     if (tier === undefined) return pool;
     const exact = pool.filter((l) => l.tier === tier); if (exact.length) return exact;
@@ -264,7 +265,7 @@ export class MicDirector {
       const sec = lineSec(l);
       this.crowdUntil.push(now + sec);
       out.push({ cast, role: 'crowd', channel: 'crowd', clips: [this.clipId(cast, l)], caption: l.text, speaker: s.name, sec, priority: 0, interrupt: false,
-        pan: Math.round((this.rand() * 1.6 - 0.8) * 100) / 100, gain: gain * (0.75 + this.rand() * 0.25) });
+        pan: Math.round((this.rand() * 1.6 - 0.8) * 100) / 100, gain: gain * (0.75 + this.rand() * 0.25), moment });
     }
     return out;
   }
@@ -277,7 +278,7 @@ export class MicDirector {
     const names = (ev.stinger ?? []).map((k) => s.lines.find((x) => x.moment === 'name' && x.tags?.includes(`name:${k}`))).filter((x): x is MicLine => !!x);
     const lines = [l, ...names], sec = lines.reduce((a, x) => a + lineSec(x), 0) + GAP * (lines.length - 1);
     this.playerUntil.set(cast, now + sec);
-    return { cast, role: s.role, channel: 'player', clips: lines.map((x) => this.clipId(cast, x)), caption: lines.map((x) => x.text).join(' '), speaker: s.name, sec, priority: priorityOf(ev), interrupt: false, pan: 0, gain: 0.9 };
+    return { cast, role: s.role, channel: 'player', clips: lines.map((x) => this.clipId(cast, x)), caption: lines.map((x) => x.text).join(' '), speaker: s.name, sec, priority: priorityOf(ev), interrupt: false, pan: 0, gain: 0.9, moment: `${cast}:${ev.moment}` };
   }
   private fillerGap(): number { const [a, b] = this.filler?.every ?? [7, 12]; return a + this.rand() * (b - a); }
 }

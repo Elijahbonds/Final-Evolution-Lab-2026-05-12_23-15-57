@@ -16,7 +16,7 @@
 // carries no `Kit_*` meshes at all. It is not naked — it is a scan of a DRESSED person, jacket, shorts,
 // shoes and hair baked into that one mesh, which is precisely why none of it can be swapped.
 //
-// So on today's hero the preview shows skin tone and the three proportions, and CANNOT show garments,
+// So on today's hero the preview shows skin tone and the proportions, and CANNOT show garments,
 // hair or the kit tints — there is nothing in the scene for `applyKit`, `applyHairStyle` or the palette
 // tints to act on. The forge body on disk (fel-hero.glb) does carry all of them: Kit_tops_top_lab,
 // Kit_shoes_shoes_evo, six Hair_* meshes. The Closet's preview has exactly the same gap, for the same
@@ -39,33 +39,51 @@
 // multiplied the hero by 1.01 ten times instead of showing 110%, and the bug would have looked like a
 // runaway animation rather than an arithmetic one. So the root is set ABSOLUTELY here, from the scale the
 // spawn arrived with. (2026-09-14: that is now playerIdentity.applyProportions itself — absolute from the base, girth on
-// the root, reach on the arm joints — so the preview and the game share one implementation, not two lists.)
+// the root — so the preview and the game share one implementation, not two lists. REACH-FREEZE, 2026-09-29: the same pipe
+// clamps height and build to the cosmetic range and keeps the arms at their bind length, so the preview can show nothing a
+// spawn would not.)
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { PreviewBinding } from '@/lib/creator/editor/previewBinding';
+import { poseLoops } from '@/lib/creator/editor/previewPose';
+import { PreviewControls } from '@/components/creator/editor/preview-controls';
+import { accessoriesForEquipped, wornPartsForEquipped } from '@/lib/closet/wearableAccessories';
 
 export interface CreatorPreviewProps {
   binding: PreviewBinding;
+  /** A clip to play when an animation package changes. Null keeps the current pose. */
+  poseClip?: string | null;
   /** Rendered height in px. The editor pane is narrow, so this is not the Closet's number. */
   height?: number;
 }
 
-export default function CreatorPreview({ binding, height = 420 }: CreatorPreviewProps) {
+export default function CreatorPreview({ binding, poseClip = null, height = 420 }: CreatorPreviewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const applyRef = useRef<((b: PreviewBinding) => void) | null>(null);
+  const playRef = useRef<(clip: string | null) => void>(() => {});
+  const spinRef = useRef(true);
+  const poseRef = useRef<string | null>(poseClip);
+  const [spinning, setSpinning] = useState(true);
   const pending = useRef<PreviewBinding>(binding);
   pending.current = binding;
+  poseRef.current = poseClip;
 
   useEffect(() => {
     let disposed = false;
     let cleanup: (() => void) | null = null;
     (async () => {
       const { Engine, Scene, ArcRotateCamera, HemisphericLight, DirectionalLight, Vector3, Color4, Color3 } = await import('@babylonjs/core');
+      const { applyCanvasFit, fitCanvas } = await import('@/lib/babylon/core/canvasFit');
+      const { detectQualityTier } = await import('@/lib/babylon/scene/QualityTier');
       const { CharacterLibrary } = await import('@/lib/babylon/core/CharacterLibrary');
       const { applyIdentity, applyProportions } = await import('@/lib/babylon/core/playerIdentity');
       if (disposed || !canvasRef.current) return;
 
-      const engine = new Engine(canvasRef.current, true, { alpha: true });
+      const box = canvasRef.current;
+      const fit0 = fitCanvas({ cssWidth: box.clientWidth || 320, cssHeight: box.clientHeight || height, dpr: window.devicePixelRatio || 1 });
+      const tier = detectQualityTier(box, fit0);
+      const engine = new Engine(box, tier === 'desktop', { alpha: true, adaptToDeviceRatio: false });
+      applyCanvasFit(engine, box);
       const scene = new Scene(engine);
       scene.clearColor = new Color4(0.02, 0.02, 0.03, 1);
       const cam = new ArcRotateCamera('creatorCam', -Math.PI / 2, 1.2, 3.4, new Vector3(0, 1, 0), scene);
@@ -93,6 +111,10 @@ export default function CreatorPreview({ binding, height = 420 }: CreatorPreview
           proportions: null,          // applied below, absolutely — see the header
           face: b.face, palette: b.palette, jersey: b.jersey, wardrobe: b.wardrobe, custom: true,
           body: ownerScan ? 'scan' : b.bodyType === 'female' ? 'kit-female' : 'kit-male',
+          // IMPROVE (2026-10-06), research item 2: the draft's headwear and accessory, as the game hangs them (the
+          // library no longer deals this player body a seeded set).
+          accessories: accessoriesForEquipped(b.wardrobe),
+          wornParts: wornPartsForEquipped(b.wardrobe),   // CREATOR-PLAN phase 2: the Nexus Visor, as a part
         });
         applyProportions(s, b.proportions, baseScale);   // the SAME absolute pipe every mode spawns with
       };
@@ -117,7 +139,14 @@ export default function CreatorPreview({ binding, height = 420 }: CreatorPreview
       if (disposed || !spawned) { engine.dispose(); return; }
       paint(spawned, pending.current);
 
-      scene.registerBeforeRender(() => { if (spawned) spawned.root.rotation.y += engine.getDeltaTime() * 0.0004; });
+      playRef.current = (clip: string | null) => {
+        if (!spawned || !clip) return;
+        spawned.animator.play(clip, { loop: poseLoops(clip), restart: true });
+      };
+      if (poseRef.current) playRef.current(poseRef.current);
+      const onResize = () => { if (canvasRef.current) applyCanvasFit(engine, canvasRef.current); };
+      window.addEventListener('resize', onResize);
+      scene.registerBeforeRender(() => { if (spawned && spinRef.current) spawned.root.rotation.y += engine.getDeltaTime() * 0.0004; });
       engine.runRenderLoop(() => scene.render());
       // dev-only hook, the same one the Closet preview exposes: this is where the schema and the rig meet
       // without a login, which is the only place a probe can check they agree.
@@ -127,6 +156,7 @@ export default function CreatorPreview({ binding, height = 420 }: CreatorPreview
         };
       }
       cleanup = () => {
+        window.removeEventListener('resize', onResize);
         engine.stopRenderLoop();
         spawned?.dispose();
         scene.dispose();
@@ -138,9 +168,13 @@ export default function CreatorPreview({ binding, height = 420 }: CreatorPreview
   }, []);
 
   useEffect(() => { applyRef.current?.(binding); }, [binding]);
+  useEffect(() => { playRef.current(poseClip); }, [poseClip]);
 
   return (
-    <canvas ref={canvasRef} className="block h-full w-full rounded-xl" style={{ height, touchAction: 'none' }}
-      aria-label="Live athlete preview" />
+    <div className="flex h-full flex-col">
+      <canvas ref={canvasRef} className="block min-h-0 w-full flex-1 rounded-xl" style={{ height, touchAction: 'none' }}
+        aria-label="Live athlete preview" />
+      <PreviewControls spinning={spinning} onToggleSpin={() => { spinRef.current = !spinRef.current; setSpinning(spinRef.current); }} onPose={(clip) => playRef.current(clip)} />
+    </div>
   );
 }

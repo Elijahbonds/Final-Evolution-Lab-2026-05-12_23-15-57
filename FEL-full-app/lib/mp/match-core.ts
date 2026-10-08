@@ -79,7 +79,7 @@ export const MP_MODES: { key: string; label: string }[] = [
   { key: 'karate', label: 'The Hundred' },
   { key: 'mixedcombat', label: 'Mixed Rules' },
   { key: 'dunkduel', label: 'Prove It' },
-  { key: 'who-scene-it', label: 'Who Scene It' },
+  { key: 'who-scene-it', label: 'Spot the Scene' },
   // REVIVED 2026-09-13 — the four that came back into the nav. The multiplayer contract is that an ENABLED
   // mode can always be staked against; a mode you can finish with nothing to challenge is a dead end, and
   // the contract test caught these the moment they were re-enabled. Still stakeable, no longer first (QA P1-27), and

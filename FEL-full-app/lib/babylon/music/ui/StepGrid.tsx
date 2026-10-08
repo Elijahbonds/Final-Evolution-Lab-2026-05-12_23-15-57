@@ -78,6 +78,10 @@ export interface StepGridProps {
   focusRef?: React.RefObject<HTMLDivElement>;
   /** MUSIC-SUITE P4 FIX PASS: the grid got the focus from the KEYBOARD (Tab): the room shows the cursor. */
   onKeyFocus?: () => void;
+  /** MUSIC-SUITE P10 FIX (2026-09-29): a pointer went DOWN anywhere on the grid (a cell, the pager, a ♪, an open
+   *  NoteRow) — on the press, not when an edit is emitted, so the room holds the phone page while the finger is down
+   *  (gridMath followPage `held`; a touch stays pending until it lifts or moves). */
+  onPress?: () => void;
 }
 
 const ON = '#ffb347';
@@ -278,6 +282,7 @@ export default function StepGrid(p: StepGridProps) {
         // so a press on a child button (which takes the focus itself) can't leave the next Tab-in looking like a press
         pressFocus.current = true; setRing(false);
         setTimeout(() => { pressFocus.current = false; }, 0);
+        p.onPress?.();   // MUSIC-SUITE P10 FIX: the room holds the page while this pointer is down
       }}
       onFocus={(e) => {
         if (e.target !== e.currentTarget) return;

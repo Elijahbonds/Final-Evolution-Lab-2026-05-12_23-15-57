@@ -69,8 +69,8 @@ export function announcerCall(o: { total: number; name: string; bands: Bands; se
 // ── the celebrations (anim/authored/dunkCelebrations) ────────────────────────────────────────────────────────────────
 export type CelebId = 'spiderman' | 'itsover' | 'roar' | 'toosmall' | 'armsup';
 export const CELEBRATIONS: Record<CelebId, { clip: string; label: string; by?: string }> = {
-  spiderman: { clip: 'dunk_celeb_spiderman_splits', label: 'THE SPIDER-MAN SPLITS', by: 'Brandon Ruffin' },
-  itsover: { clip: 'dunk_celeb_its_over', label: "IT'S OVER", by: 'Vince Carter' },
+  spiderman: { clip: 'dunk_celeb_spiderman_splits', label: 'THE AIR SPLITS', by: 'FLIGHT NIGHT' },
+  itsover: { clip: 'dunk_celeb_its_over', label: "IT'S OVER", by: 'FLIGHT NIGHT' },
   roar: { clip: 'dunk_celeb_roar', label: 'THE ROAR' },
   toosmall: { clip: 'dunk_celeb_too_small', label: 'TOO SMALL' },
   armsup: { clip: 'dunk_celebrate_big', label: 'ARMS UP' },

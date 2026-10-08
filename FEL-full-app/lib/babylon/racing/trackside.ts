@@ -32,7 +32,7 @@
 
 import { Color3, MeshBuilder, TransformNode, Vector3, type Mesh, type Scene } from '@babylonjs/core';
 import { VenueKit } from '../visual/VenueKit';
-import { TRACK_HALF_WIDTH, type Course } from '../core/RaceCourse';
+import { TRACK_HALF_WIDTH, distToTrack, type Course } from '../core/RaceCourse';
 
 /** Metres between trackside markers. Close enough to read as speed, far enough to stay cheap. */
 export const MARKER_SPACING = 14;
@@ -70,10 +70,10 @@ export interface TracksideHandle {
  *
  * Aero courses get none. There is nowhere to stand.
  */
-export function crowdSpotsFor(course: Course, pts: Vector3[]): Vector3[] {
+export function crowdSpotsFor(course: Course, pts: Vector3[], keepClear?: (x: number, z: number) => boolean): Vector3[] {
   if (course.kind === 'aero' || pts.length < 4) return [];
   const out: Vector3[] = [];
-  const side = TRACK_HALF_WIDTH + VERGE_OFFSET + 2.6;      // behind the verge, not on it
+  const side = TRACK_HALF_WIDTH + VERGE_OFFSET + 8;      // WA-16: behind the verge and off the infield — not on the grass racers cut across
 
   /** A knot of people around one point on the path, on the outside of the bend. */
   const knot = (i: number, n: number) => {
@@ -81,7 +81,9 @@ export function crowdSpotsFor(course: Course, pts: Vector3[]): Vector3[] {
     for (let k = 0; k < n; k++) {
       const along = pts[(i + k - Math.floor(n / 2) + pts.length) % pts.length];
       const jitter = ((k % 3) - 1) * 1.4;
-      out.push(along.add(across.scale(side + jitter)));
+      const spot = along.add(across.scale(side + jitter));
+      // never on the racing surface: spectators standing on the infield read as obstacles
+      if (distToTrack(spot, course) > TRACK_HALF_WIDTH + 4 && (!keepClear || keepClear(spot.x, spot.z))) out.push(spot);
     }
   };
 
@@ -229,7 +231,9 @@ export function furnitureFor(course: Course): Furniture {
  * Spacing widens rather than the count growing once a course is long enough to hit MAX_PER_SIDE — the
  * budget wins over the density, always.
  */
-export function buildTrackside(scene: Scene, course: Course): TracksideHandle {
+/** `keepClear` (IMPROVE 2026-10-06, velocitykart #8, opt-in): false where nothing may stand — a kart shortcut's sand
+ *  path. Markers and crowd spots there are left out; without it every placement is as before. */
+export function buildTrackside(scene: Scene, course: Course, keepClear?: (x: number, z: number) => boolean): TracksideHandle {
   const root = new TransformNode(`trackside_${course.id}`, scene);
 
   // AN AERIAL COURSE NEEDS A FLOOR TO BE AERIAL ABOVE.
@@ -313,6 +317,7 @@ export function buildTrackside(scene: Scene, course: Course): TracksideHandle {
     const across = acrossAt(pts, i, course.loop);
     for (const side of [-1, 1]) {
       const p = pts[i].add(across.scale((TRACK_HALF_WIDTH + VERGE_OFFSET) * side));
+      if (keepClear && !keepClear(p.x, p.z)) continue;
       // an aero course hangs its markers UNDER the ring rather than beside it — there is no ground out
       // there to stand anything on, and a floating post beside a ring reads as a bug
       const y = kit.airborne ? p.y - 2.2 : kit.y;
@@ -331,7 +336,7 @@ export function buildTrackside(scene: Scene, course: Course): TracksideHandle {
   return {
     root,
     count,
-    crowdSpots: crowdSpotsFor(course, pts),
+    crowdSpots: crowdSpotsFor(course, pts, keepClear),
     dispose() { src.dispose(); root.dispose(); },
   };
 }

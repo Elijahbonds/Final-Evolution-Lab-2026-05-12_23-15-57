@@ -4,9 +4,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-import { arenaLockEntry, appendMatchEvent, ArenaError, arenaModeKey } from '@/lib/arena';
+import { arenaLockEntry, appendMatchEvent, ArenaError, arenaModeKey, arenaExpiry } from '@/lib/arena';
 import { recordServerEvent } from '@/lib/analytics-server';
 import { isStakingPaused, stakingPausedDetail, STAKING_PAUSED_CODE, STAKING_PAUSED_STATUS } from '@/lib/stakingPause';
+import { isExpired } from '@/lib/arena-reclaim';
 
 /**
  * POST /api/arena/join
@@ -36,14 +37,26 @@ export async function POST(req: NextRequest) {
       // creator's stake is not stranded — /api/arena/cancel refunds a WAITING duel with no mode check, and the lobby
       // tells them so (components/arena-view.tsx).
       if (isStakingPaused(match.mode)) throw new ArenaError(STAKING_PAUSED_CODE, stakingPausedDetail(match.mode), STAKING_PAUSED_STATUS);
+      // MUSIC-SUITE P6 (2026-09-26, owner decision #30): a posted duel past its expiresAt is the reclaim sweep's to refund
+      // (lib/arena-reclaim.ts), not a challenge — accepting it would lock the joiner's stake on a duel that is refunded at
+      // the next sweep with no time left to play. Refused before the lock; the lobby no longer lists it as open.
+      if (isExpired(match.expiresAt, new Date())) throw new ArenaError('EXPIRED', 'This duel has expired and can no longer be accepted.', 409);
 
       const feeLc = match.entryFeeCents;
       await arenaLockEntry(tx, { userId, matchId: match.id, feeLc });
+      // MUSIC-SUITE P6 FIX PASS (2026-09-26): THE DEADLINE STARTS AGAIN AT THE JOIN. It was left at create + 48 h, and the
+      // creator cannot play before a join (music-attempt and submit-score answer 409 WAITING_OPPONENT) — so a joiner at
+      // hour 47:50 played a 66 s set at once, and at hour 48 the sweep paid them the pot by forfeit: the creator never had a
+      // window to play. Before P6 nothing expired, so this only bit once the sweep existed (all modes, #30). Both players
+      // now get the whole ARENA_EXPIRY_HOURS from the moment the duel is accepted (the open-post window stays 48 h from
+      // create: the lobby lists it, and join refuses it, by the old deadline above). OWNER CALL #30 did not say; this is
+      // the reading that gives the creator a window (flagged in the phase report).
+      const expiresAt = arenaExpiry();
       const updated = await tx.competitionMatch.update({
         where: { id: matchId },
-        data: { player2Id: userId, status: 'ACTIVE' },
+        data: { player2Id: userId, status: 'ACTIVE', expiresAt },
       });
-      await appendMatchEvent(tx, matchId, 'JOINED', userId, { player: 'p2', feeLc });
+      await appendMatchEvent(tx, matchId, 'JOINED', userId, { player: 'p2', feeLc, expiresAt: expiresAt.toISOString() });
       await appendMatchEvent(tx, matchId, 'ESCROW_LOCKED', userId, { player: 'p2', feeLc });
       return updated;
     });

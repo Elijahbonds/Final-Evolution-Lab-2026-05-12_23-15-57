@@ -17,8 +17,13 @@
 //     ?shop=500 or ?shop=offline "Couldn't reach the shop — if it went through, you won't be charged twice" (P2 fix pass);
 //   * readOwnedKits stands in for GET /api/music/unlock: the kits named in ?owned=neon,dust plus every kit this page
 //     load approved (so a REPLAY remount keeps a kit bought before it). ?shop=offline fails the read too (the cache stands);
-//   * GameShell's end card is a small card with REPLAY that REMOUNTS the room — exactly what the shell's REPLAY does
-//     (game-shell.tsx bumps gameKey), so "does my beat survive a PERFORM card" can be driven here;
+//   * GameShell's end card is a small card with REPLAY that does what the shell's REPLAY does: it calls the room's
+//     registered in-place restart and, only when there is none or it answers false, REMOUNTS the room (game-shell.tsx
+//     replay: `if (inPlace.current?.()) return; setGameKey(k + 1)`), so "does my beat survive a PERFORM card" can be
+//     driven here. MUSIC-SUITE P6 phone-replay (2026-09-26): the Academy registers one now (academyReplay.ts — the phone
+//     stays paired); this card reaches it through StudioMode's `registerReplay` prop, NOT ReplayInPlaceContext (whose
+//     presence is how the room knows it is inside GameShell and may post the streak — useStudioProject). ?replay=remount
+//     keeps the old remount, to compare;
 //   * ?stage=studio|perform is read by StudioMode itself (musicStage.ts readMusicStage, `?stage=` wins over the saved
 //     pick) — this route only shows which one the URL asked for; ?arena=1 makes the run a staked 32-bar set.
 //   * MUSIC-SUITE P3 (2026-09-25): the player is a fixed dev id (DEV_PLAYER_ID) — the real route passes the signed-in
@@ -31,11 +36,12 @@
 // and dispose (to forget a closed engine) — and publishes what they see. It changes nothing the engine does; it only
 // watches. Dev route only: the wrap runs when this module loads, and this module is only in /dev/music's bundle.
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import dynamicImport from 'next/dynamic';
 import { prqGrade } from '@/lib/prq';
 import type { GameResult } from '@/components/games/game-shell';
-import { AudioEngine, type SequencerState } from '@/lib/babylon/music/AudioEngine';
+import { AudioEngine, type SequencerState, type TrackState } from '@/lib/babylon/music/AudioEngine';
+import { tapSchedule, type TapEngine } from '@/lib/babylon/music/studioProbeTap';
 import { isMusicStageId } from '@/lib/babylon/music/musicStage';
 import {
   SPEND_REFUSED, SPEND_UNREACHABLE, isKitId, kitForSku, kitSkuId, skuForSpend, spendResultFromStatus,
@@ -48,11 +54,18 @@ export interface StudioProbe {
   /** The track list the scheduler reads right now, as it reads it (null before the room mounts an engine). */
   engine(): {
     running: boolean; bpm: number; swing: number; steps: number;
-    /** MUSIC-SUITE P3: `heard` = the room's selection lets this row sound (the grid draws it). */
+    /** MUSIC-SUITE P3: `heard` = the room's selection lets this row sound (the grid draws it).
+     *  MUSIC-SUITE P10: …and the DESK lets it (AudioEngine.hears: not muted or soloed out on the mixer). */
     tracks: { sampleId: string; hits: number; muted: boolean; loaded: boolean; heard: boolean }[];
   } | null;
-  /** Hits the scheduler actually started since the last reset(), by sampleId (muted, empty and unloaded rows excluded). */
+  /** Hits the scheduler actually started since the last reset(), by sampleId. MUSIC-SUITE P10: read off the engine's own
+   *  report (studioProbeTap) — a row the mixer mutes or solos out, a tier-hidden, empty or unloaded row, and a stalled
+   *  step start nothing and count nothing. */
   audible: Record<string, number>;
+  /** MUSIC-SUITE P10: the note (MIDI) each started pitched row played, in order, by sampleId (null = its own pitch). */
+  notes: Record<string, (number | null)[]>;
+  /** MUSIC-SUITE P10: steps the scheduler reached after their time had passed (nothing started — a stall). */
+  skipped: number;
   /** The last 64 scheduled steps on the audio clock — for the live swing / bar-length check. */
   steps: { step: number; time: number }[];
   /** The engine's audio clock (seconds), to line a tap up with a scheduled note. */
@@ -63,6 +76,8 @@ export interface StudioProbe {
   ownedReads: number;
   /** The last result StudioMode reported to the (stand-in) shell. */
   ended: GameResult | null;
+  /** MUSIC-SUITE P6 phone-replay: what each REPLAY on the stand-in card did — restarted in place, or remounted. */
+  replays: { inPlace: number; remounts: number };
   reset(): void;
 }
 
@@ -75,6 +90,8 @@ type EngineGuts = {
   state: SequencerState;
   samples: Map<string, unknown>;
   timerId: number | null;
+  onStepScheduled: TapEngine['onStepScheduled'];
+  hears(t: Pick<TrackState, 'sampleId' | 'muted'>): boolean;
   setState(s: SequencerState): void;
   scheduleStep(step: number, time: number): void;
   dispose(): void;
@@ -94,17 +111,20 @@ function installStudioProbe(): void {
         running: live.timerId !== null, bpm: s.bpm, swing: s.swing, steps: s.steps,
         tracks: s.tracks.map((t) => ({
           sampleId: t.sampleId, hits: t.pattern.filter(Boolean).length, muted: t.muted, loaded: live!.samples.has(t.sampleId),
-          heard: !live!.audible || live!.audible.has(t.sampleId),
+          heard: live!.hears(t),   // MUSIC-SUITE P10: the engine's own rule (selection AND the desk), not a copy of half of it
         })),
       };
     },
     now: () => (live ? live.ctx.currentTime : null),
     audible: {},
+    notes: {},
+    skipped: 0,
     steps: [],
     spends: [],
     ownedReads: 0,
     ended: null,
-    reset() { probe.audible = {}; probe.steps = []; },
+    replays: { inPlace: 0, remounts: 0 },
+    reset() { probe.audible = {}; probe.notes = {}; probe.skipped = 0; probe.steps = []; },
   };
   // A remount (REPLAY) builds a new engine on a new AudioContext whose clock starts at 0: steps timed on the old clock
   // would read as far in the future, so a new engine starts the record clean.
@@ -112,16 +132,20 @@ function installStudioProbe(): void {
   const origSet = proto.setState;
   proto.setState = function (this: EngineGuts, s: SequencerState) { adopt(this); return origSet.call(this, s); };
   const origStep = proto.scheduleStep;
+  // MUSIC-SUITE P10 (2026-09-29): what the engine REPORTS it started (studioProbeTap: its own StepSound.rows), not a copy
+  // of scheduleStep's skips — the copy here (P1/P3) never learned the P4 mixer's mute / solo, or a stalled step, so a
+  // row muted on the desk was still counted as heard (P4's open item, this file :118 then).
   proto.scheduleStep = function (this: EngineGuts, step: number, time: number) {
     adopt(this);
-    for (const t of this.state.tracks) {
-      if (t.muted || !t.pattern[step] || !this.samples.has(t.sampleId)) continue;   // the same skips scheduleStep makes
-      if (this.audible && !this.audible.has(t.sampleId)) continue;                  // MUSIC-SUITE P3: …and the selection
-      probe.audible[t.sampleId] = (probe.audible[t.sampleId] ?? 0) + 1;
+    const tap = tapSchedule(this, this.state.tracks, step, time, () => origStep.call(this, step, time));
+    for (const id of tap.rows) {
+      probe.audible[id] = (probe.audible[id] ?? 0) + 1;
+      (probe.notes[id] ??= []).push(tap.notes[id] ?? null);
+      if (probe.notes[id].length > 64) probe.notes[id].shift();
     }
+    if (tap.skipped) probe.skipped++;
     probe.steps.push({ step, time });
     if (probe.steps.length > 64) probe.steps.shift();
-    return origStep.call(this, step, time);
   };
   const origDispose = proto.dispose;
   proto.dispose = function (this: EngineGuts) { if (live === this) live = null; return origDispose.call(this); };
@@ -175,8 +199,18 @@ export function DevMusicLoader() {
     if (window.__FEL_STUDIO__) window.__FEL_STUDIO__.ended = r;
     setEnded(r);
   }, []);
-  // GameShell's REPLAY remounts the Game (a new gameKey); the Academy registers no replay-in-place, so neither does this.
-  const replay = () => { setEnded(null); setRemounts((k) => k + 1); };
+  // GameShell's REPLAY (game-shell.tsx replay): the registered in-place restart first, and a remount (a new gameKey) only
+  // when there is none or it answers false. MUSIC-SUITE P6 phone-replay: the Academy registers one (through the
+  // `registerReplay` prop here — see the header); ?replay=remount forces the old remount.
+  const inPlace = useRef<(() => boolean) | null>(null);
+  const registerReplay = useCallback((fn: (() => boolean) | null) => { inPlace.current = fn; }, []);
+  const replay = () => {
+    setEnded(null);
+    const forceRemount = new URLSearchParams(window.location.search).get('replay') === 'remount';
+    if (!forceRemount && inPlace.current?.()) { if (window.__FEL_STUDIO__) window.__FEL_STUDIO__.replays.inPlace += 1; return; }
+    if (window.__FEL_STUDIO__) window.__FEL_STUDIO__.replays.remounts += 1;
+    setRemounts((k) => k + 1);
+  };
 
   return (
     // No padding of its own: the grid's cell size is measured here (the phone-cell finding), so the only insets are
@@ -188,8 +222,8 @@ export function DevMusicLoader() {
       <div className="relative min-h-[80vh]">
         {/* the room mounts once the player is known (read from the URL on the client), as the real route's does */}
         {playerId === null ? null : arenaSet
-          ? <StudioMode key={`a${remounts}`} grade={prqGrade(72)} prq={72} onEnd={onEnd} spendShards={spendShards} readOwnedKits={readOwnedKits} arenaSet playerId={playerId} />
-          : <StudioMode key={`f${remounts}`} grade={prqGrade(72)} prq={72} onEnd={onEnd} spendShards={spendShards} readOwnedKits={readOwnedKits} playerId={playerId} />}
+          ? <StudioMode key={`a${remounts}`} grade={prqGrade(72)} prq={72} onEnd={onEnd} spendShards={spendShards} readOwnedKits={readOwnedKits} arenaSet playerId={playerId} registerReplay={registerReplay} />
+          : <StudioMode key={`f${remounts}`} grade={prqGrade(72)} prq={72} onEnd={onEnd} spendShards={spendShards} readOwnedKits={readOwnedKits} playerId={playerId} registerReplay={registerReplay} />}
         {ended && (
           <div data-dev="end-card" className="absolute inset-0 z-50 flex items-center justify-center bg-black/70 font-mono">
             <div className="rounded-xl border border-white/20 bg-[#0b0d14] px-6 py-4 text-center text-white">

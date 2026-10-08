@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { CalendarDays, Loader2, Users, Lock, Check, Sparkles, Dumbbell } from 'lucide-react';
@@ -55,6 +56,11 @@ export function SessionsView() {
   const [loading, setLoading] = useState(true);
   const [booking, setBooking] = useState<string | null>(null);
   const [shards, setShards] = useState<number | null>(null);
+  const [coachStore, setCoachStore] = useState(false);
+  const [coaches, setCoaches] = useState<{ id: string; name: string }[]>([]);
+  const [shareCoach, setShareCoach] = useState('');
+  const [shareOn, setShareOn] = useState<Record<string, boolean>>({});
+  const [sharedIds, setSharedIds] = useState<string[]>([]);
 
   const load = async () => {
     // the wallet's shard balance, for the Book buttons (QA P1-24); a failed read leaves it unknown
@@ -68,6 +74,15 @@ export function SessionsView() {
         setPrivateOpen(!!j.privateOpen);
         setMyBookings(j.myBookings ?? []);
         setHosting(j.hosting ?? []);
+        setCoachStore(!!j.coachStoreEnabled);
+      }
+      const status = await fetch('/api/account/scan-save');
+      if (status.ok) {
+        const s = await status.json();
+        const list = s.verifiedAdult === true && s.optedIn === true && Array.isArray(s.coaches) ? s.coaches as { id: string; name: string }[] : [];
+        setCoaches(list);
+        setShareCoach((cur) => cur || list[0]?.id || '');
+        setSharedIds(Array.isArray(s.sharedBookingIds) ? s.sharedBookingIds : []);
       }
     } catch { /* ignore */ }
     finally { setLoading(false); }
@@ -78,10 +93,13 @@ export function SessionsView() {
 
   const book = async (kind: 'group_workout' | 'private_1on1', sessionKey: string) => {
     setBooking(sessionKey);
+    const share = coaches.length > 0 && shareOn[sessionKey] && shareCoach
+      ? { shareWithCoach: true, coachId: shareCoach }
+      : {};
     try {
       const res = await fetch('/api/v1/sessions/book', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idempotency_key: newIdempotencyKey(), kind, sessionKey }),
+        body: JSON.stringify({ idempotency_key: newIdempotencyKey(), kind, sessionKey, ...share }),
       });
       const j = await res.json();
       if (res.status === 403 && j?.error === 'minors_cannot_book_private') { toast.error('Private 1-on-1 sessions are for members 18+.'); return; }
@@ -93,6 +111,24 @@ export function SessionsView() {
     } catch (e: any) { toast.error(e?.message || 'Booking failed'); }
     finally { setBooking(null); }
   };
+
+  const shareBox = (sessionKey: string) => coaches.length === 0 ? null : (
+    <label className="mt-2 flex items-start gap-2 text-xs text-white/70">
+      <input
+        type="checkbox"
+        checked={!!shareOn[sessionKey]}
+        onChange={(e) => setShareOn((m) => ({ ...m, [sessionKey]: e.target.checked }))}
+      />
+      <span>
+        Share with my coach
+        {coaches.length > 1 ? (
+          <select value={shareCoach} onChange={(e) => setShareCoach(e.target.value)} className="ml-2 bg-black text-white">
+            {coaches.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        ) : ` (${coaches[0].name})`}
+      </span>
+    </label>
+  );
 
   if (loading) {
     return <div className="flex min-h-[60vh] items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-cyan-400" /></div>;
@@ -110,7 +146,26 @@ export function SessionsView() {
         <section className="mb-6">
           <h2 className="mb-2 text-sm font-bold uppercase tracking-wider text-green-400">Your upcoming sessions</h2>
           <div className="space-y-2">
-            {myBookings.map((b) => <BookingRow key={b.id} b={b} nowMs={Date.now()} />)}
+            {myBookings.map((b) => (
+              <div key={b.id}>
+                <BookingRow b={b} nowMs={Date.now()} />
+                {sharedIds.includes(b.id) ? (
+                  <button
+                    type="button"
+                    className="mb-2 text-xs font-bold text-white/60 underline"
+                    onClick={() => {
+                      void fetch('/api/account/coach-share', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ bookingId: b.id, withdraw: true }),
+                      }).then(() => load());
+                    }}
+                  >
+                    Stop sharing with my coach
+                  </button>
+                ) : null}
+              </div>
+            ))}
           </div>
         </section>
       )}
@@ -128,6 +183,7 @@ export function SessionsView() {
               <motion.div key={s.sessionKey} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
                 <div className="flex items-center gap-2 text-sm font-bold text-white"><Dumbbell className="h-4 w-4 text-red-400" /> {s.label}</div>
                 <div className="text-xs text-white/40">Hosted by {s.host} · up to {s.capacity} athletes</div>
+                {shareBox(s.sessionKey)}
                 <BookButton price={s.shards} balance={shards} isBooked={isBooked} busy={booking === s.sessionKey} color="#00E5FF" textColor="#050505" onBook={() => book('group_workout', s.sessionKey)} />
               </motion.div>
             );
@@ -135,8 +191,13 @@ export function SessionsView() {
         </div>
       </section>
 
-      {/* Private 1-on-1 */}
-      <section className="mb-8">
+      {/* Private 1-on-1. Hidden when the coach store is on; the store is the booking path. The route stays. */}
+      {coachStore ? (
+        <section className="mb-8">
+          <h2 className="mb-3 text-sm font-bold uppercase tracking-wider text-white/70">Private 1-on-1</h2>
+          <Link href="/coach/elijah" className="text-sm text-cyan-300 underline">Book with Elijah on the coach store</Link>
+        </section>
+      ) : <section className="mb-8">
         <h2 className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-white/70"><Lock className="h-4 w-4 text-purple-300" /> Private 1-on-1 (18+)</h2>
         {privateOpen ? (
           <div className="grid gap-3 sm:grid-cols-2">
@@ -146,6 +207,7 @@ export function SessionsView() {
                 <motion.div key={s.sessionKey} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl border border-purple-400/20 bg-purple-400/[0.05] p-4">
                   <div className="text-sm font-bold text-white">{s.label}</div>
                   <div className="text-xs text-white/40">Direct session with Elijah Bonds</div>
+                  {shareBox(s.sessionKey)}
                   <BookButton price={s.shards} balance={shards} isBooked={isBooked} busy={booking === s.sessionKey} color="#A855F7" textColor="#fff" onBook={() => book('private_1on1', s.sessionKey)} />
                 </motion.div>
               );
@@ -154,7 +216,7 @@ export function SessionsView() {
         ) : (
           <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5 text-sm text-white/50">Private 1-on-1 booking is closed for now. It opens again here automatically.</div>
         )}
-      </section>
+      </section>}
     </div>
   );
 }

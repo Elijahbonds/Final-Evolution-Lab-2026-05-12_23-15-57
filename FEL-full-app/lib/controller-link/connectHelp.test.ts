@@ -94,11 +94,14 @@ describe('wiring', () => {
     expect(read('lib/controller-link/transport/signaling.ts')).toMatch(/fetchWithRetry\(\(\) => fetch\('\/api\/controller-link\/rooms'/);
   });
 
-  it('/try (dunk) and 3PT hand the lobby their bus; HostStage shows the phone steps', () => {
+  it('/try, 3PT, and standalone /host hand Controller Link a live game bus', () => {
     expect(read('components/games/dunk-babylon.tsx')).toMatch(/<HostLobby[^>]*bus=\{bus\}/);
     expect(read('components/games/three-point-babylon.tsx')).toMatch(/<HostLobby[\s\S]*?bus=\{busRef\.current\}[\s\S]*?\/>/);
     const stage = read('components/controller-link/host-stage.tsx');
-    expect(stage).toMatch(/PHONE_STEPS\.map/);
-    expect(stage).toMatch(/\[started, config, attempt\]/);
+    expect(stage).toMatch(/runMode\(def,/);
+    expect(stage).toMatch(/\binput,\s*\n/);
+    expect(stage).toMatch(/toInputBus\(input\)/);
+    expect(stage).toMatch(/input\.emitSlot\(slot, e\)/);
+    expect(stage).toMatch(/<HostLobby[\s\S]*?bus=\{bus\}[\s\S]*?\/>/);
   });
 });

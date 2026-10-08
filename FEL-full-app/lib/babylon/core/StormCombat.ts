@@ -11,7 +11,21 @@ export const DASH = {
   doubleSec: 0.32,     // a second tap inside this = the chakra dash
   speed: 9.5, sec: 0.22, iframes: 0.16,
   homingSpeed: 12.5, homingMaxSec: 0.6, homingStopM: 1.5,
+  // IMPROVE (2026-10-06), TUNED: the Storm dash had no cooldown while CombatMovement's (duel, showdown) has 0.55 s, so in
+  // Karate VS and Mixed a mashed X was an unbroken chain of i-frames. The same 0.55 s, from the start of the last dash.
+  cooldownSec: 0.55,
 } as const;
+
+/**
+ * IMPROVE (2026-10-06): may a Storm dash start now? `lastDashSec` = when the last one started (s), `homing` = this press
+ * is the double tap's CHAKRA dash. The chakra dash upgrades the tap's own dash (the double lands mid-burst or just after
+ * it by definition), so inside DASH.doubleSec of the last dash it is never refused — exactly CombatMovement's `force`.
+ */
+export function stormDashReady(lastDashSec: number, nowSec: number, homing = false): boolean {
+  const since = nowSec - lastDashSec;
+  if (!Number.isFinite(since) || since >= DASH.cooldownSec) return true;
+  return homing && since <= DASH.doubleSec;
+}
 /** How long a launched body stays in the air for the air string, and its height curve (0..1 of the window). */
 export const LAUNCH_AIR_SEC = 0.9;
 export function launchHeight(t01: number): number { const u = Math.min(1, Math.max(0, t01)); return Math.sin(u * Math.PI) * 0.55; }

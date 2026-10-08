@@ -180,6 +180,16 @@ export class BodyArbiter {
     ];
   }
 
+  /**
+   * MOVEMENT PLAY P8 (2026-09-26): the L stick's x, as last composed, is the BODY's — no thumb owns x and the body writes
+   * one. The event's `src` cannot say it per axis (a thumb owning y delivers the body's x untagged; a body change of y
+   * delivers the thumb's x tagged), and the boards must know whose x it is: a body's carve held into the game's air must
+   * not spin the skater, nor dismount a snowboarder's rail. Read-only; listeners read it as they get an L stick.
+   */
+  lxFromBody(): boolean {
+    return !(Math.abs(this.extL.x) > AXIS_OWN) && this.bodyL.x !== 0;
+  }
+
   reset(): void {
     this.extL = { x: 0, y: 0 }; this.bodyL = { x: 0, y: 0 }; this.outL = null; this.extR = { x: 0, y: 0 };
     this.extT = { L: 0, R: 0 }; this.bodyT = { L: 0, R: 0 }; this.outT = { L: null, R: null };

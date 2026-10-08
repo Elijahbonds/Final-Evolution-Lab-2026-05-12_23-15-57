@@ -27,6 +27,9 @@ export const MODE_CONTROLLERS: Record<string, ModeControllerConfig> = {
     title: 'The Flip',
     maxPlayers: 1,
     askName: false,
+    // MUSIC-SUITE P6 phone-replay (2026-09-26): the phone SEES the room — the live bank lit, PLAY lit while the transport
+    // runs, REC lit while armed, and chips saying so (types.ts roomState; phonePad.ts phoneRoomState builds it)
+    roomState: true,
     schemas: [
       { kind: 'button', columns: 4, compact: true, haptics: true, buttons: (['A', 'B', 'C', 'D'] as const).map((b) => ({ action: `bank_${b}`, label: `BANK ${b}`, color: '#e8d9c2' })) },
       { kind: 'button', columns: 4, haptics: true, velocity: true, buttons: Array.from({ length: 16 }, (_, i) => ({ action: `pad_${i}`, label: String(i + 1), color: ['#22d3ee', '#ff6b3d', '#a78bfa', '#ffd75e'][Math.floor(i / 4)] })) },
@@ -35,6 +38,28 @@ export const MODE_CONTROLLERS: Record<string, ModeControllerConfig> = {
         { action: 'stop', label: '■ STOP', color: '#e8d9c2' },
         { action: 'rec', label: '● REC', color: '#ff5c5c' },
       ] },
+    ],
+  },
+
+  // ── PERFORM (Music Academy, MUSIC-SUITE P6, 2026-09-25) ───────────────────
+  // Owner decision #11: PERFORM plays your song in four lanes — KICK · SNARE · HATS · FLIP — on keyboard, pad AND phone. The
+  // phone's PERFORM page is four big lane buttons in one row (left to right as the screen draws the lanes, in the lanes'
+  // colours — lib/babylon/music/performSet.ts PERFORM_LANE_COLORS, which are music_flip's row colours) and PAUSE under them.
+  // Actions lane_0 … lane_3 and pause, parsed on the host by lib/babylon/music/performInput.ts performPhoneCommand (its
+  // test pins that every action here parses). The lanes buzz (the opt-in `haptics` hint — it also gives the buttons
+  // touch-action / select-none, so a fast double tap is two taps, not a zoom); no velocity (a lane is hit or not). In an
+  // Arena set the room judges a phone tap as it ARRIVES (P5's rule: the phone answers its own timing pings); in free play
+  // the arrival is moved back by half the measured round trip. music_flip above is unchanged (P5), and a phone paired as
+  // the MPC plays PERFORM too: a pad's row is a lane.
+  music_perform: {
+    modeId: 'music_perform',
+    title: 'PERFORM',
+    maxPlayers: 1,
+    askName: false,
+    roomState: true,   // MUSIC-SUITE P6 phone-replay: the same room chips as the MPC page (bank, PLAYING, REC)
+    schemas: [
+      { kind: 'button', columns: 4, haptics: true, buttons: (['KICK', 'SNARE', 'HATS', 'FLIP'] as const).map((label, i) => ({ action: `lane_${i}`, label, color: ['#22d3ee', '#ff6b3d', '#a78bfa', '#ffd75e'][i] })) },
+      { kind: 'button', columns: 1, compact: true, haptics: true, buttons: [{ action: 'pause', label: '❚❚ PAUSE', color: '#e8d9c2' }] },
     ],
   },
 
@@ -107,8 +132,8 @@ export const MODE_CONTROLLERS: Record<string, ModeControllerConfig> = {
   // The first mode here that needs WALKING, which is why the bridge grew a
   // 'move' action: modes read movement from a left-stick event, so a plain
   // d-pad schema would have delivered every verb except the ability to move.
-  // SHOOT is the analog hold-and-release meter, so it takes the same tilt idiom
-  // as 3PT's shot and Dunk's charge.
+  // The basketball shot meter is NOT the shared RT `charge` idiom: LocalInputSource
+  // follows the 2K map and reads a held FEL X as SHOOT, while RT is turbo.
   threevthree: {
     modeId: 'threevthree',
     title: 'Threes',
@@ -116,37 +141,30 @@ export const MODE_CONTROLLERS: Record<string, ModeControllerConfig> = {
     askName: true,
     schemas: [
       { kind: 'dpad', dpad: { action: 'move' } },
-      {
-        kind: 'motion',
-        motion: {
-          action: 'charge',
-          hint: 'Tilt back to load your shot — release in the green',
-          axis: 'pitch',
-          fullChargeDeg: 40,           //TUNE(elijah)
-        },
-      },
       { kind: 'button', buttons: [
-        { action: 'charge', label: 'SHOOT', hold: true },
-        { action: 'B', label: 'PASS' },
-        { action: 'X', label: 'STEAL' },
-        { action: 'A', label: 'BLOCK' },
+        { action: 'X', label: 'SHOOT', hold: true },
+        { action: 'A', label: 'PASS' },
+        { action: 'Y', label: 'BLOCK' },
+        { action: 'B', label: 'SCREEN', hold: true },
       ] },
     ],
   },
 
   // ── Air-session family ────────────────────────────────────────────────────
-  // The run-up IS a d-pad cadence, so these need the dpad schema as well as the
-  // two air verbs. Same shape for both because they are one shared core.
+  // FreeRun steers from the left stick during the run phase, then still lets the
+  // face buttons start/pick tricks. Sprint and slide are trigger holds in-mode,
+  // so phone fallbacks must be holds too.
   freerun: {
     modeId: 'freerun',
     title: 'Free Run',
     maxPlayers: 1,
     askName: true,
     schemas: [
-      { kind: 'dpad', dpad: { action: 'dpad' } },
+      { kind: 'dpad', dpad: { action: 'move' } },
       { kind: 'button', buttons: [
+        { action: 'charge', label: 'SPRINT', hold: true },
         { action: 'A', label: 'JUMP' },
-        { action: 'B', label: 'SLIDE' },
+        { action: 'brake', label: 'SLIDE', hold: true },
         { action: 'X', label: 'FLIP' },
         { action: 'Y', label: 'TWIST' },
       ] },
@@ -271,6 +289,9 @@ export const MODE_CONTROLLERS: Record<string, ModeControllerConfig> = {
       { kind: 'button', buttons: [
         { action: 'A', label: 'HIT' },
         { action: 'B', label: 'BLOCK' },
+        // IMPROVE (2026-10-06): the set call — NetSportMode reads X as a quick set and Y as a high one
+        { action: 'X', label: 'QUICK' },
+        { action: 'Y', label: 'HIGH' },
       ] },
     ],
   },
@@ -339,9 +360,136 @@ export const MODE_CONTROLLERS: Record<string, ModeControllerConfig> = {
     ],
   },
 
-  // Showdown: RETIRED from the v1 roster with the combat-family trim (owner,
-  // 2026-09-01 — karate-vs is the Storm mode). Schema removed so phones don't
-  // join a mode the roster no longer offers; the mode file stays registered.
+  // Sprint: this is the one enabled mode whose real control is the D-pad itself,
+  // not movement. The bridge action stays 'dpad' so left/right arrive as strides
+  // and up remains the dip at the tape.
+  sprint: {
+    modeId: 'sprint',
+    title: 'Beach Sprint',
+    maxPlayers: 1,
+    askName: true,
+    schemas: [
+      { kind: 'dpad', dpad: { action: 'dpad' } },
+    ],
+  },
+
+  // Showdown and Duel were REVIVED (owner, 2026-09-13) and are back in
+  // ENABLED_BABYLON_MODES, so they are controller-linkable again; without these
+  // rows `/host?mode=<id>` said "No controller layout" for revived games.
+  showdown: {
+    modeId: 'showdown',
+    title: 'Showdown',
+    maxPlayers: 1,
+    askName: true,
+    schemas: [
+      { kind: 'dpad', dpad: { action: 'move' } },
+      { kind: 'button', buttons: [
+        { action: 'A', label: 'JAB' },
+        { action: 'B', label: 'KICK' },
+        { action: 'X', label: 'GUARD' },
+        { action: 'Y', label: 'ULTIMATE' },
+      ] },
+    ],
+  },
+  duel: {
+    modeId: 'duel',
+    title: 'Duel',
+    maxPlayers: 1,
+    askName: true,
+    schemas: [
+      { kind: 'dpad', dpad: { action: 'move' } },
+      { kind: 'button', buttons: [
+        { action: 'A', label: 'FISTS' },
+        { action: 'B', label: 'BLADE' },
+        { action: 'X', label: 'BLOCK' },
+        { action: 'Y', label: 'STAFF' },
+      ] },
+    ],
+  },
+  tiebreak: {
+    modeId: 'tiebreak',
+    title: 'Tiebreak Blitz',
+    maxPlayers: 1,
+    askName: true,
+    schemas: [
+      { kind: 'dpad', dpad: { action: 'dpad' } },
+      { kind: 'button', buttons: [
+        { action: 'X', label: 'SWING L' },
+        { action: 'B', label: 'SWING R' },
+      ] },
+    ],
+  },
+
+  // Kart-racer controls. The bridge maps 'charge' to RT, 'brake' to LT, and the
+  // held R1 button to the boost shoulder, matching the local pad path.
+  aeroaces: {
+    modeId: 'aeroaces',
+    title: 'Aero Aces',
+    maxPlayers: 1,
+    askName: true,
+    schemas: [
+      { kind: 'dpad', dpad: { action: 'move' } },
+      { kind: 'button', buttons: [
+        { action: 'charge', label: 'GAS', hold: true },
+        { action: 'brake', label: 'BRAKE', hold: true },
+        { action: 'A', label: 'FIRE' },
+        { action: 'B', label: 'STUNT' },
+        { action: 'Y', label: 'LOOP' },
+        { action: 'R1', label: 'BOOST', hold: true },
+      ] },
+    ],
+  },
+  velocitykart: {
+    modeId: 'velocitykart',
+    title: 'Velocity Kart',
+    maxPlayers: 1,
+    askName: true,
+    schemas: [
+      { kind: 'dpad', dpad: { action: 'move' } },
+      { kind: 'button', buttons: [
+        { action: 'charge', label: 'GAS', hold: true },
+        { action: 'brake', label: 'BRAKE', hold: true },
+        { action: 'A', label: 'ITEM' },
+        { action: 'X', label: 'DRIFT', hold: true },
+        { action: 'B', label: 'TRICK' },
+        { action: 'Y', label: 'SPIN' },
+        { action: 'R1', label: 'BOOST', hold: true },
+      ] },
+    ],
+  },
+
+  // Party quiz modes: face buttons answer A/B/X/Y; the D-pad stays literal so a
+  // second local player can buzz with directions and the picker can change count.
+  who_scene_it: {
+    modeId: 'who_scene_it',
+    title: 'Spot the Scene',
+    maxPlayers: 2,
+    askName: true,
+    schemas: [
+      { kind: 'dpad', dpad: { action: 'dpad' } },
+      { kind: 'button', buttons: [
+        { action: 'A', label: 'A' },
+        { action: 'B', label: 'B' },
+        { action: 'X', label: 'X' },
+        { action: 'Y', label: 'Y' },
+      ] },
+    ],
+  },
+  brainbrawl: {
+    modeId: 'brainbrawl',
+    title: 'Brain Brawl',
+    maxPlayers: 2,
+    askName: true,
+    schemas: [
+      { kind: 'dpad', dpad: { action: 'dpad' } },
+      { kind: 'button', buttons: [
+        { action: 'A', label: 'A' },
+        { action: 'B', label: 'B' },
+        { action: 'X', label: 'X' },
+        { action: 'Y', label: 'Y' },
+      ] },
+    ],
+  },
 
   // The Cypher: tap on the beat — one verb, no movement. (The touch overlay
   // already covers playing ON the phone; this is the second-screen path.)
@@ -388,7 +536,7 @@ export const MODE_CONTROLLERS: Record<string, ModeControllerConfig> = {
       { kind: 'button', buttons: [
         { action: 'A', label: 'STRIKE' },
         { action: 'B', label: 'KICK' },
-        { action: 'X', label: 'GUARD' },
+        { action: 'X', label: 'GUARD', hold: true },
         { action: 'Y', label: 'HEAVY' },
       ] },
     ],
@@ -406,10 +554,9 @@ export const MODE_CONTROLLERS: Record<string, ModeControllerConfig> = {
     schemas: [
       { kind: 'dpad', dpad: { action: 'move' } },
       { kind: 'button', buttons: [
-        { action: 'charge', label: 'SHOOT', hold: true },
-        { action: 'B', label: 'BOX OUT' },
-        { action: 'X', label: 'STEAL' },
-        { action: 'A', label: 'BLOCK' },
+        { action: 'X', label: 'SHOOT', hold: true },
+        { action: 'Y', label: 'BLOCK' },
+        { action: 'B', label: 'CHARGE', hold: true },
       ] },
     ],
   },
@@ -423,7 +570,7 @@ export const MODE_CONTROLLERS: Record<string, ModeControllerConfig> = {
       { kind: 'button', buttons: [
         { action: 'A', label: 'JAB' },
         { action: 'B', label: 'KICK' },
-        { action: 'X', label: 'BLOCK' },
+        { action: 'X', label: 'BLOCK', hold: true },
         { action: 'Y', label: 'HEAVY' },
       ] },
     ],
@@ -438,7 +585,7 @@ export const MODE_CONTROLLERS: Record<string, ModeControllerConfig> = {
       { kind: 'button', buttons: [
         { action: 'A', label: 'JAB' },
         { action: 'B', label: 'KICK' },
-        { action: 'X', label: 'BLOCK' },
+        { action: 'X', label: 'BLOCK', hold: true },
         { action: 'Y', label: 'HEAVY' },
       ] },
     ],

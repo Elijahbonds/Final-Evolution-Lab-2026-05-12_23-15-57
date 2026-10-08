@@ -7,6 +7,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { GraduationCap, Target, ClipboardList, Copy, Loader2, Check, Lock, Play, Sparkles, BookOpen } from 'lucide-react';
 import Link from 'next/link';
+import { drillPlayHref } from '@/lib/curriculum/drillRoutes';
+import { visiblePlanId } from '@/lib/camp/planSelection';
 // HOTFIX (2026-09-24): blueprint.ts is lesson content only now. The certification questions and their
 // answer key are server-only (lib/curriculum/assessments.ts); this page gets each paper from GET
 // /api/v1/camp/assess with no answers, and the server grades. lib/curriculum/answerKeyBoundary.test.ts
@@ -239,6 +241,10 @@ export function Certify({ state, onDone }: { state: AssessState | null; onDone: 
 }
 
 // ── Plans (intake) ─────────────────────────────────────────────────────────
+/** SAFETY FIX (owner decision 2026-10-06, "Same answer"): GET /api/v1/camp/mentees finds only YOUR mentees (joined through
+ *  your coach invite, or already on a plan of yours), and answers no account and someone else's account alike — so the
+ *  copy can no longer say "no player with that email", and says how a new mentee gets in instead. */
+const NOT_YOUR_MENTEE = 'Not one of your mentees yet — a new mentee joins through your invite link first (Coach → Clients), then you can find them here';
 function Plans({ plans, me, certified, onChange }: { plans: Plan[]; me: string | null; certified: boolean; onChange: () => Promise<void> }) {
   const [email, setEmail] = useState(''); const [mentee, setMentee] = useState<{ id: string; name: string; consentAccepted: boolean } | null>(null);
   const [goal, setGoal] = useState(''); const [followups, setFollowups] = useState<string[]>([]); const [saidBack, setSaidBack] = useState('');
@@ -248,7 +254,7 @@ function Plans({ plans, me, certified, onChange }: { plans: Plan[]; me: string |
 
   const lookup = async () => {
     const r = await api<{ mentee: { id: string; name: string; consentAccepted: boolean } }>(`/api/v1/camp/mentees?email=${encodeURIComponent(email)}`);
-    if (r.error) { toast.error(r.error === 'not_found' ? 'No player with that email' : r.error); setMentee(null); return; }
+    if (r.error) { toast.error(r.error === 'not_found' ? NOT_YOUR_MENTEE : r.error); setMentee(null); return; }
     setMentee(r.mentee);
   };
   const askFollowups = async () => {
@@ -352,24 +358,25 @@ function SessionTab({ plans, onChange }: { plans: Plan[]; onChange: () => Promis
   const lesson = useMemo(() => lessons.find((l) => l.ref === modules.split(',')[0]?.trim()) ?? null, [lessons, modules]);
   const [rows, setRows] = useState<CampSessionRow[]>([]);
   const load = useCallback(async (id: string) => { if (!id) return; const r = await api<{ sessions: CampSessionRow[] }>(`/api/v1/camp/sessions?goalPlanId=${id}`); if (!r.error) setRows(r.sessions ?? []); }, []);
-  useEffect(() => { if (!planId && plans[0]) setPlanId(plans[0].id); }, [plans, planId]);
-  useEffect(() => { void load(planId); }, [planId, load]);
+  const visibleId = visiblePlanId(plans, planId);
+  useEffect(() => { if (planId !== visibleId) setPlanId(visibleId); }, [planId, visibleId]);
+  useEffect(() => { void load(visibleId); }, [visibleId, load]);
   const record = async () => {
     setBusy(true);
-    const r = await api<{ session: CampSessionRow; gamesAttached: number }>('/api/v1/camp/sessions', { method: 'POST', body: JSON.stringify({ goalPlanId: planId, moduleKeys: modules.split(',').map((s) => s.trim()).filter(Boolean), notes }) });
+    const r = await api<{ session: CampSessionRow; gamesAttached: number }>('/api/v1/camp/sessions', { method: 'POST', body: JSON.stringify({ goalPlanId: visibleId, moduleKeys: modules.split(',').map((s) => s.trim()).filter(Boolean), notes }) });
     setBusy(false);
     if (r.error) { toast.error(r.error); return; }
-    toast.success(`Session recorded · ${r.gamesAttached} game${r.gamesAttached === 1 ? '' : 's'} attached`); setNotes(''); await load(planId); await onChange();
+    toast.success(`Session recorded · ${r.gamesAttached} game${r.gamesAttached === 1 ? '' : 's'} attached`); setNotes(''); await load(visibleId); await onChange();
   };
   if (!plans.length) return <p className="rounded-xl border border-white/10 bg-white/[0.02] p-4 text-xs text-white/60">No active plan you facilitate. Activate one on the Plans tab.</p>;
-  const plan = plans.find((p) => p.id === planId) ?? plans[0];
+  const plan = plans.find((p) => p.id === visibleId) ?? plans[0];
   const week = weekOf(plan.lockedAt ?? plan.createdAt);
   const arc = arcWeek(week);
   const bridge = bridgePromptFor(week);
   return (
     <section className="space-y-4">
       <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 space-y-3">
-        <select value={planId} onChange={(e) => setPlanId(e.target.value)} className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white" aria-label="Plan">{plans.map((p) => <option key={p.id} value={p.id}>{p.goalText}</option>)}</select>
+        <select value={visibleId} onChange={(e) => setPlanId(e.target.value)} className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white" aria-label="Plan">{plans.map((p) => <option key={p.id} value={p.id}>{p.goalText}</option>)}</select>
         <div className={`rounded-lg border p-3 text-xs ${arc.plateau ? 'border-amber-400/40 bg-amber-400/10' : 'border-white/10 bg-white/[0.03]'}`} data-testid="camp-week">
           <p className="font-semibold text-white/90">Week {week} of {ARC.length} — {arc.name}{arc.plateau ? ' · scheduled, not accidental' : ''}</p>
           {arc.output && <p className="mt-1 text-white/60"><span className="text-cyan-300">Output:</span> {arc.output}</p>}
@@ -385,7 +392,7 @@ function SessionTab({ plans, onChange }: { plans: Plan[]; onChange: () => Promis
             <p className="font-semibold text-white/90">{lesson.title}</p>
             <ul className="mt-1 list-disc pl-4 text-white/60">{lesson.keyPoints.map((k, i) => <li key={i}>{k}</li>)}</ul>
             <p className="mt-2 text-white/70"><span className="text-cyan-300">Drill:</span> {lesson.drill.text}</p>
-            <Link href={`/play/${lesson.drill.modeKey}`} className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-cyan-400/40 bg-cyan-400/10 px-3 py-1.5 font-bold text-cyan-300"><Play className="h-3.5 w-3.5" /> Play the drill · {lesson.drill.modeKey}</Link>
+            <Link href={drillPlayHref(lesson.drill.modeKey)} className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-cyan-400/40 bg-cyan-400/10 px-3 py-1.5 font-bold text-cyan-300"><Play className="h-3.5 w-3.5" /> Play the drill · {lesson.drill.modeKey}</Link>
             <p className="mt-1 text-[11px] text-white/40">The game attaches itself to this plan when you record the session.</p>
           </div>
         )}
@@ -409,7 +416,8 @@ function SessionTab({ plans, onChange }: { plans: Plan[]; onChange: () => Promis
 function Templates({ templates, plans, certified, onChange }: { templates: Template[]; plans: Plan[]; certified: boolean; onChange: () => Promise<void> }) {
   const [planId, setPlanId] = useState(plans[0]?.id ?? ''); const [name, setName] = useState(''); const [busy, setBusy] = useState<string | null>(null);
   const [importFor, setImportFor] = useState<{ templateId: string; email: string; goal: string } | null>(null);
-  useEffect(() => { if (!planId && plans[0]) setPlanId(plans[0].id); }, [plans, planId]);
+  const visibleId = visiblePlanId(plans, planId);
+  useEffect(() => { if (planId !== visibleId) setPlanId(visibleId); }, [planId, visibleId]);
   const post = async (data: Record<string, unknown>, ok: string): Promise<void> => {
     const r = await api<{ error?: string; templateVersion?: string; currentVersion?: string }>('/api/v1/camp/templates', { method: 'POST', body: JSON.stringify(data) });
     if (r.error === 'curriculum_version_mismatch') {
@@ -423,7 +431,7 @@ function Templates({ templates, plans, certified, onChange }: { templates: Templ
     if (!importFor) return;
     setBusy('import');
     const m = await api<{ mentee: { id: string } }>(`/api/v1/camp/mentees?email=${encodeURIComponent(importFor.email)}`);
-    if (m.error) { setBusy(null); toast.error('No player with that email'); return; }
+    if (m.error) { setBusy(null); toast.error(m.error === 'not_found' ? NOT_YOUR_MENTEE : m.error); return; }
     await post({ action: 'import', templateId: importFor.templateId, menteeId: m.mentee.id, goalText: importFor.goal }, 'Imported as a new draft plan');
     setBusy(null); setImportFor(null);
   };
@@ -432,9 +440,9 @@ function Templates({ templates, plans, certified, onChange }: { templates: Templ
       {certified && plans.length > 0 && (
         <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 space-y-2">
           <h3 className="text-sm font-semibold">Export a plan as a template</h3>
-          <select value={planId} onChange={(e) => setPlanId(e.target.value)} className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white" aria-label="Plan to export">{plans.map((p) => <option key={p.id} value={p.id}>{p.goalText}</option>)}</select>
+          <select value={visibleId} onChange={(e) => setPlanId(e.target.value)} className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white" aria-label="Plan to export">{plans.map((p) => <option key={p.id} value={p.id}>{p.goalText}</option>)}</select>
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Template name" className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white" />
-          <button disabled={!name.trim() || busy === 'export'} onClick={async () => { setBusy('export'); await post({ action: 'export', goalPlanId: planId, name, publish: true }, 'Template published'); setBusy(null); }} className="flex items-center gap-2 rounded-lg bg-cyan-400 px-4 py-2 text-xs font-black text-black disabled:opacity-40"><Copy className="h-3.5 w-3.5" /> Export & publish</button>
+          <button disabled={!name.trim() || busy === 'export'} onClick={async () => { setBusy('export'); await post({ action: 'export', goalPlanId: visibleId, name, publish: true }, 'Template published'); setBusy(null); }} className="flex items-center gap-2 rounded-lg bg-cyan-400 px-4 py-2 text-xs font-black text-black disabled:opacity-40"><Copy className="h-3.5 w-3.5" /> Export & publish</button>
         </div>
       )}
       {templates.map((t) => (
@@ -461,10 +469,11 @@ function Templates({ templates, plans, certified, onChange }: { templates: Templ
 // The owner's Camp Blueprint (docs/CAMP-BLUEPRINT.md), rendered from lib/camp/curriculum.
 function Curriculum({ plans, onChange }: { plans: Plan[]; onChange: () => Promise<void> }) {
   const [planId, setPlanId] = useState(plans[0]?.id ?? '');
-  const plan = plans.find((p) => p.id === planId) ?? plans[0] ?? null;
+  const visibleId = visiblePlanId(plans, planId);
+  const plan = plans.find((p) => p.id === visibleId) ?? null;
   const [worksheet, setWorksheet] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
-  useEffect(() => { if (!planId && plans[0]) setPlanId(plans[0].id); }, [plans, planId]);
+  useEffect(() => { if (planId !== visibleId) setPlanId(visibleId); }, [planId, visibleId]);
   useEffect(() => { setWorksheet(Object.fromEntries(PATHWAY_FIELDS.map((f) => [f.key, plan?.pathwayMap?.[f.key] ?? '']))); }, [plan?.id, plan?.pathwayMap]);
   const saveWorksheet = async () => {
     if (!plan) return;
@@ -523,7 +532,7 @@ function Curriculum({ plans, onChange }: { plans: Plan[]; onChange: () => Promis
         <div className="mt-3 flex flex-wrap items-center gap-2">
           {plans.length > 0 ? (
             <>
-              <select value={planId} onChange={(e) => setPlanId(e.target.value)} className="rounded-lg border border-white/10 bg-black/40 px-3 py-1.5 text-xs text-white" aria-label="Plan for this worksheet">{plans.map((p) => <option key={p.id} value={p.id}>{p.goalText}</option>)}</select>
+              <select value={visibleId} onChange={(e) => setPlanId(e.target.value)} className="rounded-lg border border-white/10 bg-black/40 px-3 py-1.5 text-xs text-white" aria-label="Plan for this worksheet">{plans.map((p) => <option key={p.id} value={p.id}>{p.goalText}</option>)}</select>
               <button type="button" onClick={saveWorksheet} disabled={busy} className="flex items-center gap-2 rounded-lg bg-cyan-400 px-3 py-1.5 text-xs font-black text-black disabled:opacity-40">{busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />} Save to the plan</button>
             </>
           ) : <span className="text-[11px] text-white/40">No plan yet — draft one on the Plans tab to save the worksheet with it.</span>}

@@ -35,6 +35,13 @@ export interface SmoothOpts {
   holds?: number[];
   /** [1 2 1] smoothing passes over the keys before the spline (0 = none). Ends are kept. */
   prefilter?: number;
+  /**
+   * HOOPS MOTION phase 3c: THE LOOP IS A CIRCLE. A looping clip's last key is its first (the authored loops key it so; a capture's
+   * closeLoop blends the last 20% into it), but the end slopes were each end's own secant, so the velocity broke at the seam every
+   * cycle. Periodic: the first and last slopes are one slope, read across the seam (the last segment into the first) with the same
+   * no-overshoot rules. Applied per channel only where the last key equals the first (a loop that does not close keeps its ends).
+   */
+  periodic?: boolean;
 }
 
 const dot4 = (a: Q4, b: Q4) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3];
@@ -49,11 +56,24 @@ export function alignQuatKeys(keys: QuatKey[]): QuatKey[] {
   return out;
 }
 
-/** Slopes for one channel: non-uniform Catmull-Rom, zero at reversals and holds, Fritsch–Carlson limited. */
-function slopes(t: number[], p: number[], hold: boolean[]): number[] {
+/** Slopes for one channel: non-uniform Catmull-Rom, zero at reversals and holds, Fritsch–Carlson limited. `periodic` (the channel's last
+ *  value equals its first): the two end slopes are one, taken across the seam. */
+function slopes(t: number[], p: number[], hold: boolean[], periodic = false): number[] {
   const n = t.length; const m = new Array(n).fill(0);
   if (n < 2) return m;
   const sec = (i: number) => (p[i + 1] - p[i]) / Math.max(1e-6, t[i + 1] - t[i]);
+  if (periodic && n >= 3) {
+    const out = slopes(t, p, hold, false);
+    const a = sec(n - 2), b = sec(0), ha = t[n - 1] - t[n - 2], hb = t[1] - t[0];
+    let s = 0;
+    if (!(hold[0] || hold[n - 1]) && a * b > 0) {
+      s = (a * hb + b * ha) / (ha + hb);
+      const cap = 3 * Math.min(Math.abs(a), Math.abs(b));
+      if (Math.abs(s) > cap) s = Math.sign(s) * cap;
+    }
+    out[0] = s; out[n - 1] = s;
+    return out;
+  }
   for (let i = 0; i < n; i++) {
     if (hold[i]) { m[i] = 0; continue; }
     if (i === 0) { m[i] = sec(0); continue; }
@@ -106,7 +126,9 @@ export function smoothQuatKeys(keys: QuatKey[], o: SmoothOpts): QuatKey[] {
   if (k.length < 2) return k;
   if (o.prefilter) k = prefilterQ(k, o.prefilter);
   const t = k.map((x) => x.t), hold = t.map((x) => isHold(x, o.holds));
-  const ms = [0, 1, 2, 3].map((c) => slopes(t, k.map((x) => x.q[c]), hold));
+  // periodic only when the loop really closes (the last key is the first, on the same hemisphere after alignment)
+  const closes = !!o.periodic && k.length >= 3 && dot4(k[0].q, k[k.length - 1].q) > 0.99999;
+  const ms = [0, 1, 2, 3].map((c) => slopes(t, k.map((x) => x.q[c]), hold, closes));
   const out: QuatKey[] = [];
   let seg = 0;
   for (const s of sampleTimes(o)) {
@@ -128,7 +150,7 @@ export function smoothScalarKeys(keys: ScalarKey[], o: SmoothOpts): ScalarKey[] 
   if (k.length < 2) return k;
   for (let p = 0; p < (o.prefilter ?? 0); p++) k = k.map((x, i) => (i === 0 || i === k.length - 1 ? x : { t: x.t, v: (k[i - 1].v + 2 * x.v + k[i + 1].v) / 4 }));
   const t = k.map((x) => x.t), v = k.map((x) => x.v), hold = t.map((x) => isHold(x, o.holds));
-  const m = slopes(t, v, hold);
+  const m = slopes(t, v, hold, !!o.periodic && k.length >= 3 && Math.abs(v[0] - v[v.length - 1]) < 1e-6);
   const out: ScalarKey[] = [];
   let seg = 0;
   for (const s of sampleTimes(o)) {
@@ -141,9 +163,36 @@ export function smoothScalarKeys(keys: ScalarKey[], o: SmoothOpts): ScalarKey[] 
   return out;
 }
 
-/** Which clips are built smooth by default: the whole dunk family (the contest, the duel, the hoops game dunks). */
-export function smoothByDefault(clipName: string): SmoothOpts['prefilter'] | null {
+/** HOOPS MOTION phase 3c: the prefilter on the hoops CAPTURES (bball_mc_*), decided by the A/B (prefilter 0 against 1 on the one-shot
+ *  captures, hoopsmotion/p3/3c/ab-pf0.txt: 0 was no smoother and whipped more). The dunk captures keep the dunk pass's 1. */
+export const HOOPS_CAPTURE_PREFILTER = 1;
+/** HOOPS MOTION phase 3c: the modes whose bodies get the hoops smoothing and the overhead pole rule — the hoops modes this pass owns
+ *  (the harness's `def.modeId`, stamped on scene.metadata.felModeId before a mode spawns). The dunk contest keeps its clips exactly as they
+ *  were (its runway plays bball_* captures: smoothing them there moved the contest's own numbers — the dunk control, dk3c-a), and every
+ *  other mode keeps its strafe / idle_stand / walk. */
+export const HOOPS_MOTION_MODES: ReadonlySet<string> = new Set(['onevone', 'threevthree', 'threepoint', 'carnival']);
+/** (3c review) THE CARNIVAL IS A NIGHT OF EVENTS, and only Slam Rush is basketball. Its other events spawn their own bodies — Strike Storm
+ *  and Counter Strike (karate), Coin Storm, Trick Gauntlet, Hot Shot (a shot on an empty goal off the penalty idle) — and so does the hub's
+ *  pair of party-goers; they keep their core clips as every non-hoops mode does. CourtCarnivalMode stamps the event it is building on
+ *  scene.metadata.felCarnivalEvent before the event spawns anyone (the hub's pair spawn before any event: none). */
+export const CARNIVAL_HOOPS_EVENTS: ReadonlySet<string> = new Set(['slam_rush']);
+/** The hoops mode a scene's NEW bodies are built for — its felModeId when that is a hoops mode (the carnival only while it builds one of its
+ *  hoops events) — else null. What smoothByDefault and the overhead pole rule are handed. */
+export function hoopsMotionModeOf(meta: { felModeId?: string; felCarnivalEvent?: string } | null | undefined): string | null {
+  const id = meta?.felModeId;
+  if (!id || !HOOPS_MOTION_MODES.has(id)) return null;
+  if (id === 'carnival' && !CARNIVAL_HOOPS_EVENTS.has(meta?.felCarnivalEvent ?? '')) return null;
+  return id;
+}
+/** Which clips are built smooth by default: the whole dunk family (the contest, the duel, the hoops game dunks) and — HOOPS MOTION phase 3c
+ *  (plan §3 "Smoothing"), on a hoops mode's bodies — every basketball clip, authored (bball_*) and captured (bball_mc_*, prefiltered), with
+ *  the core loops the hoops bodies stand and move in: the strafes, idle_stand and walk. */
+export function smoothByDefault(clipName: string, modeId?: string | null): SmoothOpts['prefilter'] | null {
   if (/^dunk_mc_|^dunk_mocap$/.test(clipName)) return 1;   // a capture: dense keys with estimator jitter
   if (/^dunk_/.test(clipName)) return 0;
+  if (!modeId || !HOOPS_MOTION_MODES.has(modeId)) return null;
+  if (/^bball_mc_/.test(clipName)) return HOOPS_CAPTURE_PREFILTER;
+  if (/^bball_/.test(clipName)) return 0;
+  if (/^(strafe_left|strafe_right|idle_stand|walk)$/.test(clipName)) return 0;
   return null;
 }

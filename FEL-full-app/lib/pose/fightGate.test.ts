@@ -30,7 +30,7 @@ import {
   type FightCell, type FightTake, type FightTally,
 } from './fightGrade';
 import { takeOfFixture, scriptedTakes, mirrorTake, TEST_SEEDS, type FightFixture } from './fightTakes';
-import { synthesize, restPose, type Joints } from './synth';
+import { synthesize, restPose, DEFAULT_BLUR, type Joints } from './synth';
 import { script, hold, jumpBeat, armsUp } from './streamKit';
 
 const dir = join(__dirname, '__fixtures__', 'fight');
@@ -199,13 +199,22 @@ describe('G10 — southpaw: the mirrored captures read the same classes on the o
 
 describe('the synth\'s motion blur is off by default (every earlier fixture unchanged)', () => {
   it('blur off: byte-identical to the pre-P7 synth (fingerprint measured against `git show b440b737:…/synth.ts`)', () => {
+    // Numbers are hashed at 6 significant figures: the last bits of Math.hypot/tanh/asin move between V8 builds
+    // (the raw hash was c8486ebbddccd3e6 on Node 26 and f682522a46d106a7 on CI's Node 22), and 6 figures sit far above
+    // that and far below anything the blur model changes (the blur-on hash below must differ). The 6-figure hash was
+    // measured on Node 26 against both `git show b440b737:…/synth.ts` and this synth: 3fad0605bbe49ef6 for each.
+    const sig6 = (_k: string, v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? Number(v.toPrecision(6)) : v);
     const clip = script([hold(restPose(), 0.5), jumpBeat(restPose(), 2.6, 0.3, true), hold(restPose(), 0.5)]);
-    const h = createHash('sha256');
-    for (const seed of [1, 7]) for (const fps of [15, 30]) {
-      const syn = synthesize(clip, { seed, fps, latencyMs: 140 });
-      expect(syn.settings).not.toHaveProperty('blur');
-      h.update(JSON.stringify(syn.frames)); h.update(JSON.stringify(syn.gt));
-    }
-    expect(h.digest('hex').slice(0, 16)).toBe('c8486ebbddccd3e6');
+    const fingerprint = (blur?: { px: number; mult: number }) => {
+      const h = createHash('sha256');
+      for (const seed of [1, 7]) for (const fps of [15, 30]) {
+        const syn = synthesize(clip, { seed, fps, latencyMs: 140, ...(blur ? { blur } : {}) });
+        if (!blur) expect(syn.settings).not.toHaveProperty('blur');
+        h.update(JSON.stringify(syn.frames, sig6)); h.update(JSON.stringify(syn.gt, sig6));
+      }
+      return h.digest('hex').slice(0, 16);
+    };
+    expect(fingerprint()).toBe('3fad0605bbe49ef6');
+    expect(fingerprint(DEFAULT_BLUR)).not.toBe('3fad0605bbe49ef6');
   });
 });

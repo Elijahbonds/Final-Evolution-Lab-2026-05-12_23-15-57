@@ -1,6 +1,8 @@
 // proofLine — pass 5 phase 3: one line that says what happened, per mode, from the mode's own session stats. Rendered on
 // the results card ("Share proof · …") and minted onto the challenge card as `display`. Dunk keeps its make/miss line.
 import { gradeFor } from '@/lib/babylon/core/danceTracks';
+import { boxLine } from '@/lib/babylon/modes/onevoneRules';   // IMPROVE (2026-10-06): the 1v1's box score line (pure)
+import { boxLine as boxLine3 } from '@/lib/babylon/modes/threevthreeBox';   // IMPROVE (2026-10-06, 3v3 #9): the 3v3's (import-free)
 /** ARENA-10PHASE (2026-09-07): an outside verdict overrides the mode's own W/L — a Triumph Arena run is settled against the
  *  house rival, not the mode's in-game rival, and the card must say ONE thing. TIE = both entries refunded; PENDING = the
  *  opponent has not posted yet. */
@@ -25,11 +27,26 @@ export function proofLineFor(mode: string, r: ProofInput): string | null {
     case 'showdown': { const foe = n(s, 'foeRounds'); return `${wl(r)}${foe !== null ? ` · RIVAL TOOK ${foe} ROUND${foe === 1 ? '' : 'S'}` : ''}`; }
     case 'duel': { const foe = n(s, 'foeWins'); return `${wl(r)}${foe !== null ? ` · RIVAL TOOK ${foe}` : ''}${s.weapon ? ` · ${String(s.weapon).toUpperCase()}` : ''}`; }
     case 'karateEndless': { const wave = n(s, 'wave'), kos = n(s, 'kos'); return wave !== null ? `WAVE ${wave} · ${kos ?? 0} KOS` : null; }
-    case 'hoops1v1': { const foe = n(s, 'foeScore'); return `${r.score}–${foe ?? r.opponentScore ?? 0} · ${wl(r)}`; }
-    case 'hoops3v3': return `${r.score}–${r.opponentScore ?? 0} · ${wl(r)}`;
-    case 'threePoint': { const pts = n(s, 'points') ?? r.score; return `${pts} PTS DOWNTOWN · ${wl(r)}`; }
+    case 'hoops1v1': {
+      const foe = n(s, 'foeScore'), line = `${r.score}–${foe ?? r.opponentScore ?? 0} · ${wl(r)}`;
+      // IMPROVE (2026-10-06, 1v1 #4): the box score the mode now ends with (FG, threes, steals, blocks, broken ankles)
+      const fga = n(s, 'fga');
+      return fga === null ? line : `${line} · ${boxLine({ fgm: n(s, 'fgm') ?? 0, fga, threes: n(s, 'threes') ?? 0, steals: n(s, 'steals') ?? 0, blocks: n(s, 'blocks') ?? 0, ankles: n(s, 'ankles') ?? 0 })}`;
+    }
+    case 'hoops3v3': {
+      const line = `${r.score}–${r.opponentScore ?? 0} · ${wl(r)}`;
+      // IMPROVE (2026-10-06, 3v3 #9): the box score the mode now ends with (FG, threes, assists, steals, blocks, overdrives)
+      const fga = n(s, 'fga');
+      return fga === null ? line : `${line} · ${boxLine3({ fgm: n(s, 'fgm') ?? 0, fga, threes: n(s, 'threes') ?? 0, assists: n(s, 'assists') ?? 0, steals: n(s, 'steals') ?? 0, blocks: n(s, 'blocks') ?? 0, overdrives: n(s, 'overdrives') ?? 0 })}`;
+    }
+    case 'threePoint': {
+      const pts = n(s, 'points') ?? r.score;
+      const rival = n(s, 'rivalScore') ?? r.opponentScore;
+      return rival != null && rival > 0 ? `${pts} PTS DOWNTOWN vs ${rival} · ${wl(r)}` : `${pts} PTS DOWNTOWN · ${wl(r)}`;
+    }
     case 'skateboarding': { const combo = n(s, 'bestCombo'), coins = n(s, 'coinsCollected'); return `${r.score} PTS${combo !== null ? ` · x${Math.round(combo)} BEST CHAIN` : ''}${coins !== null ? ` · ${coins} COINS` : ''}`; }
-    case 'snowboarding': { const gates = n(s, 'gatesHit'), t = n(s, 'elapsed'); return `${gates ?? 0} GATES${t !== null ? ` · ${t}s` : ''} · ${r.score} PTS`; }
+    // GATE-CRASHER-POLISH-2 (GC-11): the time bonus left the card's title for this line — named when the run earned one
+    case 'snowboarding': { const gates = n(s, 'gatesHit'), t = n(s, 'elapsed'), tb = n(s, 'timeBonus'); return `${gates ?? 0} GATES${t !== null ? ` · ${t}s` : ''}${tb ? ` · +${tb} TIME` : ''} · ${r.score} PTS`; }
     case 'surfing': { const flow = n(s, 'bestFlow'), barrels = n(s, 'barrels'); return `${r.score} PTS${barrels !== null ? ` · ${barrels} BARREL${barrels === 1 ? '' : 'S'}` : ''}${flow !== null ? ` · FLOW ${flow}` : ''}`; }
     case 'bigAir': return `${r.score} PTS · ${r.outcome === 'win' ? 'STOMPED' : 'COMPLETE'}`;
     case 'freerun': { const t = n(s, 'timeSec'), tricks = n(s, 'tricks'), combo = n(s, 'bestCombo'), high = n(s, 'highLine'); return `${r.score} PTS${t !== null ? ` · ${t}s` : ''}${tricks !== null ? ` · ${tricks} TRICK` : ''}${combo ? ` · ×${combo}` : ''}${high ? ' · HIGH LINE' : ''}`; }
@@ -42,7 +59,13 @@ export function proofLineFor(mode: string, r: ProofInput): string | null {
     }
     case 'soccer': return `${r.score} PTS · ${r.verdict ?? r.outcome?.replace(/_/g, ' ') ?? wl(r)}`;
     case 'football': { const yards = n(s, 'yards'), ev = n(s, 'evades') ?? n(s, 'evaded'), tr = n(s, 'trucks'); return `${yards ?? 0} YDS${ev !== null ? ` · ${ev} EVADES` : ''}${tr !== null ? ` · ${tr} TRUCKS` : ''}`; }
-    case 'tennis': case 'tiebreak': case 'volleyball': return `${r.score}–${r.opponentScore ?? 0} · ${wl(r)}`;
+    case 'tennis': {
+      // IMPROVE (2026-10-06) Tennis #12: the cage's match rides the line when it happened (NetSportMode's cageEnd)
+      const tail = ([['wallRuns', 'WALL RUN'], ['smashes', 'SMASH'], ['meteors', 'METEOR'], ['liveSaves', 'LIVE SAVE']] as const)
+        .map(([k, w]) => { const v = n(s, k); return v ? ` · ${v} ${w}${v === 1 ? '' : w.endsWith('H') ? 'ES' : 'S'}` : ''; }).join('');
+      return `${r.score}–${r.opponentScore ?? 0} · ${wl(r)}${tail}`;
+    }
+    case 'tiebreak': case 'volleyball': return `${r.score}–${r.opponentScore ?? 0} · ${wl(r)}`;
     case 'carnival': { const ev = n(s, 'events'), rp = n(s, 'rivalPoints'); return `${r.score}–${rp ?? r.opponentScore ?? 0} OVER ${ev ?? '?'} EVENTS · ${r.verdict ?? (r.won ? 'CHAMPION' : 'RUNNER-UP')}`; }
     case 'dance': {
       const stars = n(s, 'stars'), acc = n(s, 'accuracy'), combo = n(s, 'maxCombo');

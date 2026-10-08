@@ -31,8 +31,14 @@ export type UploadDoors = Readonly<Record<UploadDoor, boolean>>;
 /**
  * Owner decision #15, as this build reads it — THE SWITCH: may a song that plays an upload go through this door?
  * `false` for all three on-device doors is P5's first (stricter) reading.
+ * CREATE HUB (owner 2026-10-06): `offDevice` is OPEN. Decision #15 kept uploads on the device "until online review
+ * exists"; the owner's review queue (lane/soundtrack's /admin/review, "everything public needs approval") is that
+ * review. Off the device now means one door only: a Creator Card submitted through /create, which an approver passes
+ * before anyone else hears it. The library's SYNC SEAMs are still unbuilt, so nothing else leaves the device.
  */
-export const UPLOAD_DOORS: UploadDoors = { library: true, danceFloor: true, walkOut: true, offDevice: false };
+export const UPLOAD_DOORS: UploadDoors = { library: true, danceFloor: true, walkOut: true, offDevice: true };
+/** The doors before the owner's review queue existed (decision #15's first default), for the tests that pin its words. */
+export const UPLOAD_DOORS_BEFORE_REVIEW: UploadDoors = { library: true, danceFloor: true, walkOut: true, offDevice: false };
 
 export interface UploadPrivacy {
   /** the song plays an uploaded file: it stays on this device (UPLOAD_DOORS says which doors that closes) */
@@ -75,6 +81,7 @@ export function uploadPrivateLine(uploads: readonly string[], doors: UploadDoors
   const what = uploads.length === 1 ? `your upload "${uploads[0]}"` : `${uploads.length} of your uploads`;
   const shut = closedDoors(doors).filter((d): d is Exclude<UploadDoor, 'offDevice'> => d !== 'offDevice').map((d) => DOOR_WORDS[d]);
   if (shut.length) return `Device-only: this song uses ${what} — ${shut.join(', ')} open${shut.length === 1 ? 's' : ''} once FEL can review uploads online.`;
+  if (doors.offDevice) return `This song uses ${what} — it works on this device, and sharing it as a Creator Card goes through FEL's review first.`;
   return `Device-only: this song uses ${what} — your library, the dance floor and your walk-out work on this device; sharing it online opens once FEL can review uploads.`;
 }
 

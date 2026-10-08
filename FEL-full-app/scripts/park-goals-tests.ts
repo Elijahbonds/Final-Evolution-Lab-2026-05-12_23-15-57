@@ -26,6 +26,8 @@ const driveTo = (t: GoalTracker, g: (typeof SKATE_GOALS)[number], idPrefix: stri
     case 'combo': t.report({ type: 'comboLanded', value: g.target + 100 }); break;
     case 'gap': t.report({ type: 'gap', gapId: g.gapId }); break;
     case 'collect': for (let i = 0; i < g.target; i++) t.report({ type: 'collect', collectibleId: `${idPrefix}${i}` }); break;
+    // IMPROVE (2026-10-06): the trick kind — the named trick, done on (the first of) the feature(s) the goal names
+    case 'trick': t.report({ type: 'trick', trickId: g.trickId, where: typeof g.where === 'string' ? g.where : g.where?.[0] }); break;
   }
 };
 

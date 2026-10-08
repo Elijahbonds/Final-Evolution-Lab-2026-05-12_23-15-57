@@ -1,4 +1,5 @@
 import { CARD_CATALOG } from './card-catalog';
+import { isUnlistedMode } from './unlisted-modes';
 
 export interface Venue {
   key: string;
@@ -191,20 +192,14 @@ export const MODE_INFO: Record<string, { name: string; venue: string; href: stri
   carnival: { name: 'Game Night', venue: 'Venice Beach Court', href: '/play/carnival' },
   threePoint: { name: 'Downtown', venue: 'Venice Beach Court', href: '/play/threepoint' },
   karateVersus: { name: 'Storm Duel', venue: 'Shimogamo Dojo', href: '/play/karate-vs' },
-  whoSceneIt: { name: 'Who Scene It', venue: 'NeuroArena', href: '/play/who-scene-it' },
+  whoSceneIt: { name: 'Spot the Scene', venue: 'NeuroArena', href: '/play/who-scene-it' },
   bigAir: { name: 'Stomp', venue: 'Mountain Slope', href: '/play/big-air' },
   tiebreak: { name: 'Tiebreak Blitz', venue: 'Venice Tennis Court', href: '/play/tiebreak' },
-  // sprint: RETIRED from the v1 roster (owner decision, 2026-09-01 — no locked
-  // benchmark and nobody chose one; see PHASE2_BENCHMARK_LOCKS.md TIER B). The
-  // route redirects to /play; the mode file stays in the tree for a future
-  // revival with a real benchmark.
+  // sprint / duel / showdown were retired from the v1 roster on 2026-09-01, then revived when the owner asked
+  // to include and improve them. They are enabled Babylon routes now; keep the catalogue rows live.
   storyMode: { name: 'The Nexus Initiative', venue: 'The Nexus', href: '/story' },
   football: { name: 'Breakaway', venue: 'The Gridiron', href: '/play/football' },
   mixedcombat: { name: "Ring's Edge", venue: 'The Octagon', href: '/play/mixedcombat' },
-  // duel + showdown: RETIRED from the v1 roster (owner, 2026-09-01 — combat is
-  // Karate VS / Karate Endless / Mixed Combat only; karate-vs is the Storm
-  // mode). Routes redirect to /play; mode files stay registered for a future
-  // revival. See PHASE2_BENCHMARK_LOCKS.md post-lock retirements.
   dunkduel: { name: 'Prove It', venue: 'Venice Beach Court', href: '/play/dunkduel' },
   volleyball: { name: 'Beach Rally', venue: 'Nexus Volleyball Court', href: '/play/volleyball' },
   showdown: { name: 'Showdown', venue: 'Shimogamo Dojo', href: '/play/showdown' },
@@ -246,4 +241,21 @@ export const LEGACY_MODE_KEYS: Readonly<Record<string, string>> = {
 export function canonicalModeKey(key: string | null | undefined): string {
   const k = String(key ?? '');
   return Object.prototype.hasOwnProperty.call(LEGACY_MODE_KEYS, k) ? LEGACY_MODE_KEYS[k] : k;
+}
+
+/**
+ * IRON-PARADISE-OUT (2026-10-03): the catalogue LISTING — MODE_INFO minus the parked modes (lib/unlisted-modes.ts,
+ * 'training' / Iron Paradise at Muscle Beach Gym today). MODE_INFO itself keeps every row: stored keys (a saved
+ * first-game pick, an open duel, a GameSession row) still resolve their name and venue through it. Only
+ * enumerations that OFFER a mode to a player read this list. There is no Muscle Beach Gym tile in VENUES — the
+ * venue grid never listed it — so the row above is the whole of that venue's listing; Beach Sprint keeps its own
+ * 'Muscle Beach Gym' venue line and stays listed.
+ */
+export function listedModeEntries(): [string, { name: string; venue: string; href: string }][] {
+  return Object.entries(MODE_INFO).filter(([key]) => !isUnlistedMode(key));
+}
+
+/** The listed mode keys (the catalogue a picker may offer), in MODE_INFO order. */
+export function listedModeKeys(): string[] {
+  return listedModeEntries().map(([key]) => key);
 }

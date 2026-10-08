@@ -72,8 +72,8 @@ export const HOOPS_STRIDE: StrideRef = { run: 3.6, slide: 2.0, walk: 0.72, jog: 
  * the reference leg):
  *
  *     state                               plays (capture)                         reference
- *     run                                 run_forward → bball_mc_drive (78_06)     4.57   (the ball-less runner plays the
- *                                                                                          dribbling capture until phase 3)
+ *     run                                 run → bball_mc_run (78_12)               4.69   (phase 3b: the ball-less runner's own run;
+ *                                                                                          it played the dribbling 78_06 at 4.57)
  *     drive, sprint_dribble               bball_mc_dribble_run (78_06)            4.57   sprint
  *     speed_dribble                       bball_mc_dribble_jog (78_10)            3.87   jog
  *     walk_dribble                        bball_mc_dribble_walk (06_01)           0.97   walk
@@ -82,7 +82,7 @@ export const HOOPS_STRIDE: StrideRef = { run: 3.6, slide: 2.0, walk: 0.72, jog: 
  *     defend_backpedal, carry_back        bball_mc_defend_backpedal (78_24)       3.31
  *     closeout; carry_slide(_right)       AUTHORED (bball_closeout; strafe_*)     3.6; 2.0 — HOOPS_STRIDE's, unchanged
  *
- * (bball_mc_run, 78_12, is 4.69 m/s at real time; no tree state plays it yet.) The previous table (run 3.6, slide 2.0,
+ * (Before phase 3b no tree state played bball_mc_run; `run` asked for run_forward, the dribbling drive.) The previous table (run 3.6, slide 2.0,
  * walk 0.72, jog 2.8, one number per kind) was calibrated by the foot-slide probe while the loops played 0.79–1.37× their
  * real speed through hand-set `duration`s, and read a 25–35% skate band that barely moved between 3.3 and 4.8. At the
  * tree's gears (walk 1.6 / jog 4.2 / sprint 6.4 m/s) the rates are now 1.65 / 1.09 / 1.40, all inside RATE_MAX — the
@@ -98,7 +98,7 @@ export const HOOPS_STRIDE: StrideRef = { run: 3.6, slide: 2.0, walk: 0.72, jog: 
  * standing "stepping defence" decision); every other defence state reaches 4.2 m/s inside RATE_MAX.
  */
 export const HOOPS_STRIDE_CAPTURE: StrideRef = {
-  run: 4.57, sprint: 4.57, jog: 3.87, walk: 0.97, slide: 2.4,
+  run: 4.69, sprint: 4.57, jog: 3.87, walk: 0.97, slide: 2.4,
   byState: {
     defend_slide_right: 1.7, defend_slide_hard: 2.69, defend_slide_hard_right: 2.69, defend_backpedal: 3.31, carry_back: 3.31,
     closeout: HOOPS_STRIDE.run, carry_slide: HOOPS_STRIDE.slide, carry_slide_right: HOOPS_STRIDE.slide,
@@ -229,7 +229,17 @@ export class StrideRateFilter {
  * the measured foot slide by 1.5 percentage points, because the references were the wrong SIZE rather than slightly
  * off. See the note on combat's residue below.
  */
-export const COMBAT_STRIDE = { walk: 0.6, strafe: 0.5, dash: 4.0 } as const;
+export const COMBAT_STRIDE = { walk: 1.2, strafe: 0.5, dash: 4.8 } as const;
+// MOVEMENT POLISH (2026-10-06), TUNED: walk 0.6 → 1.2, dash 4.0 → 4.8 (strafe unchanged). THE CONTRADICTION BELOW IS RESOLVED: the
+// authored stepping loops MOONWALKED — their knees folded on the back sweep, so the low foot raced forward and the lifted one drifted
+// back (anim/gait.ts; scripts/probes/_movement-probe.ts `clips`). "Which of the three is lying" — the clip measurement took the feet's
+// speed without their direction, and the plant test was right: no rate could plant a foot that travels the wrong way. With the knee
+// on the forward swing the base `run` (the dash and the run gait) covers 4.8 m/s at rate 1 and the guard step, cut to a fighter's
+// ±12° step (karate.ts), 1.2 m/s — each the reference with the least raw slide in the probe's `calib` sweep (run 1.2% of the root's
+// travel at 4.8; guard step 36% at 1.2, a short low step that FootPlanting finishes). The shuffles were not re-authored: 0.5 stands.
+
+/** MOVEMENT POLISH (2026-10-06): the gait split stays where the owner has seen it — the old guard step's reach, 0.6 × RATE_MAX. */
+const GUARD_STEP_SPLIT_MPS = 0.6 * 1.85;
 
 /**
  * The rate for a combat state, PRESERVING THE SIGN of the clip's authored ratio.
@@ -264,8 +274,8 @@ export function combatRateFor(state: string, speed: number, authoredRatio = 1): 
 //
 // The threshold is not a taste call — it is exactly where the guard step runs out of rate.
 
-/** The fastest ground speed a guard step can cover before it becomes a fast-forward. 0.6 × 1.85 = 1.11 m/s. */
-export const GUARD_STEP_CEILING = COMBAT_STRIDE.walk * RATE_MAX;
+/** The fastest ground speed a guard step plays at before the gait becomes a run. 0.6 × 1.85 = 1.11 m/s. */
+export const GUARD_STEP_CEILING = GUARD_STEP_SPLIT_MPS;   // was COMBAT_STRIDE.walk × RATE_MAX; held at 1.11 when the reference moved (above)
 
 /** Which gait a body moving at `speed` should be in. */
 export function combatGait(speed: number): 'step' | 'run' {

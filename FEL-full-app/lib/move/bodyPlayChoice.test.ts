@@ -51,9 +51,9 @@ describe('the choice is remembered per game', () => {
 });
 
 describe('which games offer body play', () => {
-  it('exactly the nine games the body drives today (P3\'s binds)', () => {
+  it('exactly the games the body drives today (P3\'s nine binds, and P8\'s kart and plane on the live probe\'s word)', () => {
     const play = cards.filter((c) => bodyPlayOffer(c.card) === 'play').map((c) => c.key).sort();
-    expect(play).toEqual(['bigair', 'freerun', 'karate_vs', 'mixedcombat', 'showdown', 'skateboard', 'snowboard_slalom', 'sprint', 'surf']);
+    expect(play).toEqual(['aeroaces', 'bigair', 'freerun', 'karate_vs', 'mixedcombat', 'showdown', 'skateboard', 'snowboard_slalom', 'sprint', 'surf', 'velocitykart']);
   });
 
   it('a game with a later phase says it is coming; one with none (L, a quiz) says nothing', () => {
@@ -100,15 +100,16 @@ describe('the header Body button is a shortcut to the choice', () => {
 });
 
 describe('the wake-up offer', () => {
-  it('is hidden while there are no drills to route it to (P9 sets the route)', () => {
-    expect(WARMUP_HREF).toBeNull();
-    expect(warmupOffer('ready')).toBeNull();
+  it('opens the drills page\'s Wake-Up once the space is set (DRILLS 2026-10-07: /play/drills exists)', () => {
+    expect(WARMUP_HREF).toBe('/play/drills?drill=wake-up');
+    expect(warmupOffer('ready')).toEqual({ href: '/play/drills?drill=wake-up', label: 'Wake-up first?' });
+    expect(warmupOffer('frame')).toBeNull();
   });
   it('once there are: shown only when the space is set', () => {
     const href = '/play/drills?warmup=wake-up';
     expect(warmupOffer('ready', href)).toEqual({ href, label: WARMUP_LABEL });
     for (const stage of ['frame', 'arms', 'advice', 'still', null]) expect(warmupOffer(stage, href)).toBeNull();
-    expect(WARMUP_LABEL).toBe('2-minute wake-up first?');
+    expect(WARMUP_LABEL).toBe('Wake-up first?');
   });
 });
 

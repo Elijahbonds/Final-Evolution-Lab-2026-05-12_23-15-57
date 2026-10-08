@@ -21,6 +21,9 @@ import { stripComments } from '@/lib/testing/sourceScan';
 const ROOT = path.resolve(__dirname, '../..');
 const read = (rel: string): string => stripComments(fs.readFileSync(path.join(ROOT, rel), 'utf8'));
 const shell = read('components/games/game-shell.tsx');
+// END SCREEN (2026-10-06): the results card the shell mounts, and its outcome panels
+const card = read('components/games/end-screen/end-screen.tsx');
+const cards = read('components/games/end-screen/outcome-cards.tsx');
 const between = (src: string, from: string, to: string): string => {
   const a = src.indexOf(from);
   expect(a, from).toBeGreaterThan(-1);
@@ -82,7 +85,8 @@ describe('the music session request: the fields the server reads (session-payout
     const route = read('app/api/sessions/route.ts');
     const tx = route.slice(route.indexOf('prisma.$transaction'));
     expect(tx).toMatch(/if \(won\) \{\s*const w = await sessionWalletGrant\(tx, \{ playerId: userId, reasonCode: REASON\.MODE_SESSION_WON/);
-    expect(route).toContain('const won = sessionWon(rulesMode, claimedWon, stats, duration, { score });');
+    // the server's verdict (sessionWon); a floor-only mode (Prove It, owner decision 2026-09-28) never wins
+    expect(route).toContain('const won = floorOnly ? false : sessionWon(rulesMode, claimedWon, stats, duration, { score });');
     // the route answers with its own verdict under that name
     expect(tx).toMatch(/const payload: Record<string, unknown> = \{\s*ok: true,\s*paid: true,\s*replayed: false,\s*runId: run\.id,\s*sessionId:[^\n]*\n\s*won,/);
   });
@@ -94,7 +98,10 @@ describe('refusals on the end card (the arena integrity pass, re-applied)', () =
     expect(submit).toContain('const refused = arenaRefusal(r2.status, await r2.json().catch(() => null));');
     expect(submit).toContain("if (refused && mine()) setArenaResult({ settled: false, status: 'REFUSED', myScore: arenaScore, refused });");
     expect(shell).toContain('const arenaVerdict: ProofVerdict | null = arenaMatchId && arenaResult && !arenaResult.refused');
-    expect(shell).toMatch(/\{arenaResult\.refused \? \(\s*<ArenaRefusedLine refusal=\{arenaResult\.refused\} \/>\s*\) : !arenaResult\.settled \? \(/);
+    // END SCREEN (2026-10-06): the panel moved into components/games/end-screen (outcome-cards.tsx); the shell hands it the
+    // result as it holds it, and the panel still says the refusal before any verdict
+    expect(shell).toContain('arenaResult={arenaResult}');
+    expect(cards).toMatch(/\{r\.refused \? \(\s*<ArenaRefusedLine refusal=\{r\.refused\} \/>\s*\) : !r\.settled \? \(/);
   });
 
   it('a refused Arena score claims no win: no trophy, no win headline, no proof line, nothing to share (review)', () => {
@@ -104,19 +111,28 @@ describe('refusals on the end card (the arena integrity pass, re-applied)', () =
     expect(shell).toContain("const cardWon = arenaRefused ? false : arenaVerdict ? arenaVerdict === 'WON' : Boolean(result?.won);");
     expect(shell).toMatch(/const cardHeadline = !result \? '' : arenaRefused \? 'SCORE NOT ACCEPTED' : /);
     // the trophy and the headline read only cardWon / cardHeadline, SHARE PROOF only shows with a proof line, and the
-    // challenge mint is gone for the run
-    expect(shell).toContain("<Trophy className={`mx-auto h-12 w-12 ${cardWon ? 'text-[#FFD700]' : 'text-white/30'}`} />");
-    expect(shell).toMatch(/<h2 className="fel-heading mt-3 text-4xl font-bold text-white">\s*\{cardHeadline\}\s*<\/h2>/);
-    expect(shell).toMatch(/\{proofLine && \(\s*<button\s*onClick=\{shareProof\}/);
-    expect(shell).toMatch(/\{!arenaRefused && <button\s*onClick=\{\(\) => void shareChallenge\(\)\}/);
-    expect(shell.match(/shareChallenge\(/g)).toHaveLength(2);   // those two buttons are the only mints
+    // challenge mint is gone for the run. END SCREEN (2026-10-06): the card is components/games/end-screen; the shell passes
+    // exactly these values, and the card renders them under the same rules (end-screen.test.tsx renders the refused case:
+    // dim trophy, no challenge, no proof)
+    expect(shell).toContain('headline={cardHeadline}');
+    expect(shell).toContain('won={cardWon}');
+    expect(shell).toContain('proofLine={proofLine}');
+    expect(shell).toContain('arenaRefused={arenaRefused}');
+    expect(card).toContain("data-end-trophy={won ? 'gold' : 'dim'}");
+    expect(card).toMatch(/\{headline\}\s*<\/motion\.h2>/);
+    expect(card).toMatch(/\{proofLine && \(\s*<button[^>]*onClick=\{guard\(share\.onProof\)\}/);
+    expect(card).toMatch(/\{!arenaRefused && \(\s*<button[^>]*onClick=\{guard\(share\.onChallenge\)\}/);
+    expect(card.match(/share\.on(Proof|Challenge)\b/g)).toHaveLength(2);   // those two buttons are the only mints
+    expect(shell).toContain('share={{ state: shareState, url: shareUrl, onChallenge: () => void shareChallenge(), onProof: shareProof }}');
+    expect(shell.match(/shareChallenge\(/g)).toHaveLength(2);   // shareProof's mint and the card's challenge button
   });
 
   it('a refused Story node (422 verdict / 409) is said where STORY NODE COMPLETE would be, and REPLAY clears it', () => {
     const story = between(shell, "fetch('/api/story/complete'", 'if (sr?.ok && !sr?.alreadyCompleted)');
     expect(story).toContain('const refused = storyRefusal(r2.status, await r2.json().catch(() => null));');
     expect(story).toContain('if (refused && mine()) setStoryRefused(refused);');
-    expect(shell).toContain('{storyRefused && <StoryRefusedPanel refusal={storyRefused} />}');
+    expect(shell).toContain('storyRefused={storyRefused}');
+    expect(card).toMatch(/\{storyRefused && <Beat show=\{shown\('storyRefused'\)\}[^>]*><StoryRefusedPanel refusal=\{storyRefused\} \/><\/Beat>\}/);
     expect(between(shell, 'const replay = () => {', 'setGameKey((k) => k + 1);')).toContain('setStoryRefused(null);');
   });
 
@@ -161,15 +177,27 @@ describe('an answer that lands after REPLAY writes nothing to the next run\'s ca
   });
 });
 
-describe('CLAIM (QA, PM ruling): a pure client-side reveal, never a second grant', () => {
-  it('EndCardClaim is gated off on a paused/refused run, a replayed finish, a practice run, and an empty run', () => {
-    expect(shell).toMatch(/import \{ EndCardClaim \} from '\.\/end-card-rewards';/);
-    expect(shell).toMatch(
-      /recap && !recap\.unpaid && !recap\.replayed && !agentRun && !playtestRun\s*\n\s*&& \(recap\.xp > 0 \|\| recap\.shards > 0 \|\| recap\.credits > 0 \|\| \(recapCoins\?\.coins \?\? 0\) > 0\)\s*\n\s*&& <EndCardClaim \/>/,
-    );
+describe('the profile failure state is a stop, not a spinner plus a stop', () => {
+  it('when /api/profile is unreachable, the retry panel replaces the loader instead of rendering underneath it', () => {
+    const profileBlock = between(shell, '{!profile && unreachable && (', '<AnimatePresence>');
+    expect(profileBlock).toContain("Can&apos;t reach the server. Check your connection, then try again.");
+    expect(profileBlock).toContain(') : !unreachable ? (');
+    expect(profileBlock).toContain('<Loader2 className="h-8 w-8 animate-spin text-[#00E5FF]" />');
+    expect(profileBlock).toContain(') : null}');
   });
+});
 
-  it('the replayed flag reaches the card from the session answer, for that gate', () => {
-    expect(shell).toContain('replayed: Boolean(j?.replayed),');
+// HOOPS BODY (P10, form-send 2026-10-07): the run's FORM read goes to /api/sessions only through formForPost (null for a
+// minor or an unknown age), read once at the end from the run the shell is ending — never a raw view, never on a refusal path.
+describe('the FORM read rides the session POST, adults only (hoops body P10)', () => {
+  it('handleEnd spreads formForPost(formReadStore.finishRun(run)) into the body, and only when it is non-null', () => {
+    const body = sessionBody();
+    expect(body).toContain('formForPost(formReadStore.finishRun(sessionStore.record()?.runId), st)');
+    expect(body).toMatch(/return form \? \{ form \} : \{\};/);
+    expect(shell).toMatch(/import \{ formReadStore, formForPost \} from '@\/lib\/move\/formRead';/);
+  });
+  it('no other path sends a form field', () => {
+    expect(shell.split('formForPost(').length - 1).toBe(1);
+    expect(shell).not.toMatch(/form:\s*formReadStore/);
   });
 });

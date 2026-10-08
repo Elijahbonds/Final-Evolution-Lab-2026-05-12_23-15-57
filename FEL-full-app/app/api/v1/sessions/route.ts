@@ -8,6 +8,7 @@ import { upcomingGroupSlots, privateSlots, privateBookingAvailable, SESSION_PRIC
 import { readableKeys, hostingRows, slotCoachId, privateHolders, isPrivateKey, LONGEST_SESSION_MIN } from '@/lib/sessions/joinLink';
 import { isSessionAdmin, readJoinLinks } from '@/lib/sessions/joinLinkServer';
 import { isCertifiedCoach } from '@/lib/coach/server';
+import { isCoachStoreEnabled } from '@/lib/flags';
 
 /**
  * GET /api/v1/sessions — upcoming group workouts + private availability + my bookings.
@@ -68,6 +69,7 @@ export async function GET() {
 
   return NextResponse.json({
     group, seminars, privateOpen, private: priv, pricing: SESSION_PRICING,
+    coachStoreEnabled: isCoachStoreEnabled(),
     myBookings: myBookings.map((b) => ({
       ...b, joinUrl: linkOf(b.sessionKey)?.url ?? null, joinHost: linkOf(b.sessionKey)?.host ?? null, noLinkRefund: links !== null && !linkOf(b.sessionKey),
     })),

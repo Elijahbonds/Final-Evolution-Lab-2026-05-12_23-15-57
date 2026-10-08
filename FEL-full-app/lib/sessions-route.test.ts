@@ -31,6 +31,12 @@ const h = vi.hoisted(() => ({
   creationWrites: [] as Array<{ where: Record<string, unknown>; data: Record<string, unknown> }>,
   /** MUSIC-SUITE P3: when set, the profile a request reads (a stale read racing another request); h.profile is the row. */
   staleRead: null as Record<string, unknown> | null,
+  /** MUSIC-SUITE P6 FIX PASS: the duels' MatchEvents (attempts, the pay-once claim) and the row locks the claim took. */
+  matchEvents: [] as Array<{ matchId: string; userId: string | null; eventType: string; payload: string; seq: number; createdAt: Date }>,
+  locks: [] as string[],
+  /** MERGE (2026-09-28): runs when the paying transaction takes a duel's row lock — a rival session committing its claim
+   *  between this post's early check and its own claim (the race the lock exists for). */
+  onLock: null as ((matchId: string) => void) | null,
   /** ECONOMY-SESSIONS-HARDEN: the SessionRun rows, by id; the SessionGrant ledger (unique on user, run, grant); the wallet's
    *  session earns; every write in order (to prove the ledger is written before any balance). */
   runs: {} as Record<string, Record<string, unknown>>,
@@ -83,8 +89,40 @@ vi.mock('@/lib/db', () => {
         return { ...h.profile, ...plain, labCredits: 100 };
       },
     },
-    gameSession: { create: async ({ data }: { data: Record<string, unknown> }) => { h.writes.push('session'); h.sessions.push(data); return { id: 's1', ...data }; } },
+    gameSession: {
+      create: async ({ data }: { data: Record<string, unknown> }) => { h.writes.push('session'); h.sessions.push(data); return { id: 's1', ...data }; },
+      aggregate: async ({ where, _sum }: { where: { userId: string; createdAt?: { gte: Date } }; _sum: { xp?: boolean; shards?: boolean } }) => {
+        const since = where.createdAt?.gte?.getTime() ?? 0;
+        const rows = h.sessions.filter((s) => s.userId === where.userId && (!since || new Date(String(s.createdAt ?? 0)).getTime() >= since));
+        return { _sum: { xp: rows.reduce((n, s) => n + Number(s.xp ?? 0), 0), shards: rows.reduce((n, s) => n + Number(s.shards ?? 0), 0) } };
+      },
+    },
+    walletLedgerEntry: {
+      aggregate: async () => ({ _sum: { delta: 0 } }),
+    },
     prqEntry: { findFirst: async () => null },
+    // MUSIC-SUITE P6 FIX PASS: the pay-once claim (lib/arena-music.ts claimMusicSessionPay): the duel's row lock, then its events
+    competitionMatch: {
+      updateMany: async ({ where }: { where: { id: string } }) => {
+        h.locks.push(where.id);
+        h.writes.push('duel:lock');
+        h.onLock?.(where.id);
+        return { count: h.matches[where.id] ? 1 : 0 };
+      },
+    },
+    matchEvent: {
+      findFirst: async ({ where }: { where: Record<string, unknown> }) => {
+        const rows = h.matchEvents.filter((e) => Object.entries(where).every(([k, v]) => (e as Record<string, unknown>)[k] === v));
+        return rows.length ? { id: 'e', seq: Math.max(...rows.map((e) => e.seq)) } : null;
+      },
+      create: async ({ data }: { data: Record<string, unknown> }) => { h.writes.push(`event:${String(data.eventType)}`); h.matchEvents.push({ ...(data as never), createdAt: new Date() }); return data; },
+    },
+    // ECONOMY-CAPS security fix: the daily-cap check locks the user's PlayerProfile row first (SELECT … FOR UPDATE).
+    // The mock answers it and records the lock order so a test can assert the lock precedes the sum.
+    $queryRawUnsafe: async (sql: string, ...args: unknown[]) => {
+      if (/FOR UPDATE/.test(sql)) { h.writes.push('profile:lock'); return [{ '?column?': 1 }]; }
+      throw new Error(`unexpected raw SQL in test: ${sql} (${args.length} args)`);
+    },
   };
   return {
     prisma: {
@@ -93,7 +131,15 @@ vi.mock('@/lib/db', () => {
         findUnique: async ({ where }: { where: { id: string } }) => (h.runs[where.id] ? { ...h.runs[where.id] } : null),
         updateMany: runUpdateMany,
       },
-      competitionMatch: { findUnique: async ({ where }: { where: { id: string } }) => h.matches[where.id] ?? null },
+      competitionMatch: { findUnique: async ({ where }: { where: { id: string } }) => (h.matches[where.id] ? { id: where.id, ...h.matches[where.id] } : null) },
+      // MUSIC-SUITE P6 FIX PASS: readMusicAttempt / the early pay-once check read the duel's events
+      matchEvent: {
+        findMany: async ({ where }: { where: { matchId: string; userId: string; eventType: { in: string[] } } }) => h.matchEvents
+          .filter((e) => e.matchId === where.matchId && e.userId === where.userId && where.eventType.in.includes(e.eventType))
+          .sort((a, b) => a.seq - b.seq),
+        findFirst: async ({ where }: { where: Record<string, unknown> }) =>
+          (h.matchEvents.some((e) => Object.entries(where).every(([k, v]) => (e as Record<string, unknown>)[k] === v)) ? { id: 'e' } : null),
+      },
       // MUSIC-SUITE P3: matches only while the row still has the lastStreakAt the request read (Postgres equality on a Date)
       playerProfile: {
         updateMany: async ({ where, data }: { where: Record<string, unknown>; data: Record<string, unknown> }) => {
@@ -145,7 +191,12 @@ vi.mock('@/lib/move/formWrite', () => ({ writeFormPlan: async () => null }));
 
 import { POST } from '@/app/api/sessions/route';
 import { performSetMax } from '@/lib/babylon/music/performSet';
+import { houseBeatFor, houseTap, judgeHouseSet, type HouseTap } from '@/lib/babylon/music/houseBeat';
+import { MUSIC_ATTEMPT_START, MUSIC_ATTEMPT_FINISH, MUSIC_SESSION_PAID } from '@/lib/arena-music';
 import { canonicalModeKey } from '@/lib/game-data';
+import { MODE_SCORE_RULES, SCORE_COLUMN_MAX } from '@/lib/sessions/modeScoreRules';
+import { ENDLESS_SESSION_CEILING, endlessCeilingFor, sessionShards, sessionXp } from '@/lib/session-payout';
+import { applyPerRunCap, PER_RUN_SHARDS, PER_RUN_XP } from '@/lib/economy-caps';
 
 let runSeq = 0;
 /** ECONOMY-SESSIONS-HARDEN: an open run the server started `durationSec` ago, as POST /api/sessions/start leaves it. */
@@ -186,9 +237,27 @@ beforeEach(() => {
   for (const k of ['updates', 'sessions', 'lc', 'prqRows', 'season', 'mastery', 'events', 'creationWrites', 'grants', 'wallet', 'writes'] as const) h[k] = [];
   h.matches = {};
   h.staleRead = null;
+  h.matchEvents = [];
+  h.locks = [];
+  h.onLock = null;
   h.runs = {};
   h.rules = null;
 });
+
+/**
+ * MUSIC-SUITE P6 FIX PASS: u1's FINISHED attempt on duel `matchId` (music_attempt_start + music_attempt_finish, as the room
+ * posts them) — every note of the duel's house beat dead on unless `taps` is given. Returns the server's rejudge of it.
+ */
+function finishedSet(matchId: string, taps?: HouseTap[]): number {
+  const beat = houseBeatFor(matchId);
+  const list = taps ?? beat.notes.map((n) => houseTap(n.lane, n.t));
+  const seq = h.matchEvents.filter((e) => e.matchId === matchId).length;
+  h.matchEvents.push(
+    { matchId, userId: 'u1', eventType: MUSIC_ATTEMPT_START, payload: '{}', seq, createdAt: new Date() },
+    { matchId, userId: 'u1', eventType: MUSIC_ATTEMPT_FINISH, payload: JSON.stringify({ taps: list }), seq: seq + 1, createdAt: new Date() },
+  );
+  return judgeHouseSet(beat, list).score;
+}
 
 /** An open LC music duel between u1 and u2 (the Arena's CompetitionMatch row). */
 function musicDuel(o: Record<string, unknown> = {}) {
@@ -201,9 +270,9 @@ describe('the endless ceiling (owner decision #14)', () => {
     expect(score).toBe(33_948_000);
     const r = await post({ mode: 'music', score, won: true, duration: 300, stats: musicSet({ bars: 115, notes: 1840 }) });
     expect(r.status).toBe(200);
-    expect(r.body).toMatchObject({ ok: true, won: true, capped: true, xp: 14_150, shards: 473, credits: 15 });
-    expect(h.sessions[0]).toMatchObject({ mode: 'music', score, won: true, xp: 14_150, shards: 473, credits: 15 });
-    expect(h.updates[0]).toMatchObject({ xp: { increment: 14_150 }, shards: { increment: 473 } });
+    expect(r.body).toMatchObject({ ok: true, won: true, capped: true, xp: 14_150, shards: 100, credits: 15 });
+    expect(h.sessions[0]).toMatchObject({ mode: 'music', score, won: true, xp: 14_150, shards: 100, credits: 15 });
+    expect(h.updates[0]).toMatchObject({ xp: { increment: 14_150 }, shards: { increment: 100 } });
   });
 
   it('a set with no stats is free play: capped — and, now the shell forwards them, a claimed win with no counts is none', async () => {
@@ -211,32 +280,51 @@ describe('the endless ceiling (owner decision #14)', () => {
     // honest one). 2026-09-26: GameShell sends `stats` (ROOM_STATS_FORWARDED), so a set without its counts is not a
     // client from before the contract any more — it is a claim with nothing behind it, and wins nothing
     const r = await post({ mode: 'music', score: 5_000_000, won: true, duration: 240 });
-    expect(r.body).toMatchObject({ won: false, capped: true, xp: 14_150, shards: 473, credits: 0 });
+    expect(r.body).toMatchObject({ won: false, capped: true, xp: 14_150, shards: 100, credits: 0 });
     expect(h.lc).toHaveLength(0);
     // the same set WITH its counts, as the shell posts it now, keeps its win
     const withStats = await post({ mode: 'music', score: 9000, won: true, duration: 30, stats: musicSet({ bars: 8 }) });
     expect(withStats.body).toMatchObject({ won: true, credits: 15 });
   });
 
+  // MUSIC-SUITE P6 (2026-09-26): an Arena set is played on the duel's house beat — 192 charted notes in its 32 bars
+  // (lib/babylon/music/houseBeat.ts HOUSE_SET_NOTES), a perfect one 378,300 = the Arena's music ceiling. (It was 512 notes,
+  // every step of the player's own grid: 2,647,100, paid 3,970,700 XP.)
   it('a real Arena set — its match found — ends itself and is paid as before (a scored game with an end card)', async () => {
-    const score = perfectScore(512);
-    expect(score).toBe(2_647_100);
+    const score = perfectScore(192);
+    expect(score).toBe(378_300);
     h.matches.m1 = musicDuel();
-    const r = await post({ mode: 'music', score, won: true, duration: 90, arenaMatchId: 'm1', stats: musicSet({ bars: 32, arena: true }) });
-    expect(r.body).toMatchObject({ won: true, capped: false, xp: 3_970_700, shards: 132_358 });
+    expect(finishedSet('m1')).toBe(score);   // MUSIC-SUITE P6 FIX PASS: the room posted the finish (it does, before onEnd)
+    const r = await post({ mode: 'music', score, won: true, duration: 66, arenaMatchId: 'm1', stats: musicSet({ bars: 32, notes: 192, arena: true }) });
+    expect(r.body).toMatchObject({ won: true, capped: true, xp: 14_150, shards: 100 });
+    expect(h.matchEvents.filter((e) => e.eventType === MUSIC_SESSION_PAID)).toEqual([expect.objectContaining({ matchId: 'm1', userId: 'u1' })]);
+    expect(h.locks).toEqual(['m1']);   // claimed under the duel's row lock
   });
 
   it('P2 fix pass: ?arena=<anything> is free play — no match, someone else\'s, a dance duel, a settled one: all capped', async () => {
     // review: sessionPayout paid 3,970,700 XP / 132,358 shards for a claimed Arena set while music staking is paused
-    const score = perfectScore(512);
+    // MERGE REVIEW (2026-09-28): since P6 a duel with no FINISHED attempt is free play whatever its row says, so without a
+    // finish on file every case below was refused by the missing attempt, not by the gate it names (removing the mode,
+    // currency, open-status or participant check passed). Each duel now has u1's finished, perfect house set on file and
+    // the post is that house set (at its rejudge, inside the Arena's run cap): only the named gate can say no.
+    const score = perfectScore(192);
     h.matches = {
       theirs: musicDuel({ player1Id: 'u7', player2Id: 'u8' }), dance: musicDuel({ mode: 'dance' }),
       done: musicDuel({ status: 'SETTLED' }), cash: musicDuel({ currency: 'USD_CENTS' }), scored: musicDuel({ player1Score: 5000 }),
     };
+    for (const id of Object.keys(h.matches)) expect(finishedSet(id), id).toBe(score);
+    const body = (arenaMatchId: unknown) => ({ mode: 'music', score, won: true, duration: 66, arenaMatchId, stats: musicSet({ bars: 32, notes: 192, arena: true }) });
     for (const arenaMatchId of [undefined, 'nope', 'theirs', 'dance', 'done', 'cash', 'scored', 42]) {
-      const r = await post({ mode: 'music', score, won: true, duration: 84, arenaMatchId, stats: musicSet({ bars: 32, arena: true }) });
-      expect(r.body, String(arenaMatchId)).toMatchObject({ capped: true, xp: 14_150, shards: 473 });
+      const r = await post(body(arenaMatchId));
+      expect(r.body, String(arenaMatchId)).toMatchObject({ paid: true, capped: true, xp: 14_150, shards: 100 });
     }
+    expect(h.locks).toEqual([]);
+    expect(h.matchEvents.filter((e) => e.eventType === MUSIC_SESSION_PAID)).toEqual([]);
+    // the control: the same finished set on u1's own open LC music duel IS the Arena set — so the refusals above are the gates'
+    h.matches.mine = musicDuel();
+    finishedSet('mine');
+    expect((await post(body('mine'))).body).toMatchObject({ paid: true, capped: true, xp: 14_150, shards: 100 });
+    expect(h.locks).toEqual(['mine']);
   });
 
   it('a WAITING duel with no opponent is free play: the Arena will not record its score, so it can never stop uncapping', async () => {
@@ -247,17 +335,39 @@ describe('the endless ceiling (owner decision #14)', () => {
     h.matches.lonely = musicDuel({ status: 'WAITING', player2Id: null, player1Score: null });
     for (let set = 0; set < 3; set++) {
       const r = await post({ mode: 'music', score, won: true, duration: 84, arenaMatchId: 'lonely', stats: musicSet({ bars: 32, arena: true }) });
-      expect(r.body, `set ${set + 1}`).toMatchObject({ capped: true, xp: 14_150, shards: 473 });
+      expect(r.body, `set ${set + 1}`).toMatchObject({ capped: true, xp: 14_150, shards: 100 });
     }
     // once someone joins it, the Arena records the set: the duel is real, and the set is an Arena set
     h.matches.joined = musicDuel({ status: 'WAITING', player2Id: 'u2', player1Score: null });
-    const r = await post({ mode: 'music', score, won: true, duration: 84, arenaMatchId: 'joined', stats: musicSet({ bars: 32, arena: true }) });
-    expect(r.body).toMatchObject({ capped: false });
+    // (MERGE with ECONOMY-SESSIONS-HARDEN, 2026-09-28: the set as the room plays it since P6 — the house beat's 192 notes,
+    // posted at the rejudge. The old grid's 2,647,100 is above the Arena's music ceiling, 378,300, and a score above the
+    // run's cap is SCORE_INVALID now, where P6 clamped it and paid.)
+    const house = finishedSet('joined');
+    const r = await post({ mode: 'music', score: house, won: true, duration: 66, arenaMatchId: 'joined', stats: musicSet({ bars: 32, notes: 192, arena: true }) });
+    expect(r.body).toMatchObject({ paid: true, capped: true, xp: PER_RUN_XP, shards: PER_RUN_SHARDS });
+  });
+
+  it('MUSIC-SUITE P6: a duel past its expiresAt is free play — the Arena takes no score for it, so it would uncap forever', async () => {
+    // owner decision #30: submit-score 409s an expired duel (EXPIRED) before any write and the reclaim sweep settles it
+    // (lib/arena-reclaim.ts) — so, like the WAITING duel above, its score slot never fills, and verifiedMusicDuel must say no
+    const score = perfectScore(192);
+    h.matches.lapsed = musicDuel({ expiresAt: new Date(Date.now() - 1_000) });
+    h.matches.lapsedIso = musicDuel({ expiresAt: new Date(Date.now() - 60_000).toISOString() });
+    for (const arenaMatchId of ['lapsed', 'lapsedIso']) {
+      const r = await post({ mode: 'music', score, won: true, duration: 66, arenaMatchId, stats: musicSet({ bars: 32, notes: 192, arena: true }) });
+      expect(r.body, arenaMatchId).toMatchObject({ capped: true, xp: 14_150, shards: 100 });
+    }
+    // the same duel with time left is an Arena set, as before (a row with no expiresAt — every test above — keeps its answer)
+    h.matches.live = musicDuel({ expiresAt: new Date(Date.now() + 3_600_000) });
+    finishedSet('live');
+    const live = await post({ mode: 'music', score, won: true, duration: 66, arenaMatchId: 'live', stats: musicSet({ bars: 32, notes: 192, arena: true }) });
+    expect(live.body).toMatchObject({ capped: true, xp: 14_150 });
   });
 
   it('P2 fix pass: an Arena set\'s score above what its counts allow is REJECTED now (review: 1e9 on 16 hits paid 1,500,000,050 XP)', async () => {
     // ECONOMY-SESSIONS-HARDEN: this was clamped to performSetMax(16) and paid; a score no honest run can reach is SCORE_INVALID
     h.matches.m1 = musicDuel();
+    finishedSet('m1');
     const r = await post({ mode: 'music', score: 1_000_000_000, won: true, duration: 30, arenaMatchId: 'm1', stats: musicSet({ bars: 8, notes: 16, perfects: 16, arena: true }) });
     expect(r.status).toBe(422);
     expect(r.body).toMatchObject({ ok: false, paid: false, reason: 'SCORE_INVALID', detail: 'above_run_cap', limit: performSetMax(16) });
@@ -265,7 +375,84 @@ describe('the endless ceiling (owner decision #14)', () => {
     expect(h.updates).toEqual([]);
     // the honest set with the same counts is paid as before
     const honest = await post({ mode: 'music', score: performSetMax(16), won: true, duration: 30, arenaMatchId: 'm1', stats: musicSet({ bars: 8, notes: 16, perfects: 16, arena: true }) });
-    expect(honest.body).toMatchObject({ capped: false, xp: Math.round(performSetMax(16) * 1.5) + 50 });
+    expect(honest.body).toMatchObject({ capped: true, xp: Math.round(performSetMax(16) * 1.5) + 50, shards: PER_RUN_SHARDS });
+  });
+
+  // ══ MUSIC-SUITE P6 FIX PASS (2026-09-26): THE FARM (the review's blocker) ══════════════════════════════════════════════
+  // With music stakeable again, a 25 LC Quick Match is ACTIVE with the house seated from birth, and verifiedMusicDuel asked
+  // nothing of the set: POST /api/sessions {score 378,300, stats {bars 32, notes 512, perfects 512, arena}} paid 567,500 XP
+  // and 18,918 shards per call, in a loop, for 48 h — and the sweep refunded the 25 LC at expiry.
+  it('P6 fix pass: the review\'s farm — no finished attempt is free play, and a second post for the same duel is free play', async () => {
+    h.matches.qm = musicDuel({ player2Id: 'house' });
+    const farm = { mode: 'music', score: 378_300, won: true, duration: 32, arenaMatchId: 'qm', stats: musicSet({ bars: 32, notes: 512, perfects: 512, arena: true }) };
+    const unplayed = await post(farm);
+    expect(unplayed.body).toMatchObject({ capped: true });                           // no attempt on file: free play
+    expect(unplayed.body.xp).toBeLessThan(10_000);
+    finishedSet('qm');                                                                // the one honest set
+    const first = await post(farm);
+    expect(first.body).toMatchObject({ capped: true, xp: 14_150 });
+    for (let i = 0; i < 3; i++) {
+      const again = await post(farm);
+      expect(again.body, `post ${i + 2}`).toMatchObject({ capped: true });            // once per duel
+      expect(again.body.xp).toBeLessThan(10_000);
+    }
+    expect(h.matchEvents.filter((e) => e.eventType === MUSIC_SESSION_PAID)).toHaveLength(1);
+  });
+
+  it('P6 fix pass: the paid score is capped at the server\'s REJUDGE of the recorded taps, never the posted number', async () => {
+    // MERGE with ECONOMY-SESSIONS-HARDEN (2026-09-28): P6 clamped the posted 378,300 to the rejudge and paid that; the
+    // hardening clamps nothing, so a posted number above the rejudge is SCORE_INVALID above_rejudge (the room posts exactly
+    // the rejudge). Refused before any write, it spends neither a ledger row nor the duel's one Arena pay.
+    h.matches.m2 = musicDuel();
+    const beat = houseBeatFor('m2');
+    const rejudged = finishedSet('m2', beat.notes.filter((_, i) => i % 3 === 0).map((n) => houseTap(n.lane, n.t)));
+    expect(rejudged).toBeLessThan(100_000);
+    const set = { mode: 'music', won: true, duration: 66, arenaMatchId: 'm2', stats: musicSet({ bars: 32, notes: 192, arena: true }) };
+    const r = await post({ ...set, score: 378_300 });
+    expect(r.status).toBe(422);
+    expect(r.body).toMatchObject({ ok: false, paid: false, reason: 'SCORE_INVALID', detail: 'above_rejudge', limit: rejudged });
+    expect(h.runs[r.runId!]).toMatchObject({ status: 'rejected', rejectReason: 'SCORE_INVALID:above_rejudge', score: 378_300 });
+    expectNothingPaid();
+    expect(h.locks).toEqual([]);
+    expect(h.matchEvents.filter((e) => e.eventType === MUSIC_SESSION_PAID)).toEqual([]);
+    // one point over is the same refusal
+    expect((await post({ ...set, score: rejudged + 1 })).body).toMatchObject({ reason: 'SCORE_INVALID', detail: 'above_rejudge', limit: rejudged });
+    // the rejudge itself is paid, as the Arena set it is — the posted number was never what paid
+    const honest = await post({ ...set, score: rejudged });
+    const planned = applyPerRunCap(sessionXp(rejudged, true), sessionShards(rejudged, true));
+    expect(honest.body).toMatchObject({ paid: true, capped: planned.capped, xp: planned.xp, shards: planned.shards });
+    expect(h.sessions).toHaveLength(1);
+    expect(h.sessions[0]).toMatchObject({ score: rejudged });
+    expect(h.matchEvents.filter((e) => e.eventType === MUSIC_SESSION_PAID)).toHaveLength(1);
+  });
+
+  it('P6 fix pass: a claim already on file (a session that won the race) makes this post free play', async () => {
+    const set = (arenaMatchId: string) => ({ mode: 'music', score: 378_300, won: true, duration: 66, arenaMatchId, stats: musicSet({ bars: 32, notes: 192, arena: true }) });
+    // on file before the post: the early check says no, and no lock is taken
+    h.matches.m3 = musicDuel();
+    finishedSet('m3');
+    h.matchEvents.push({ matchId: 'm3', userId: 'u1', eventType: MUSIC_SESSION_PAID, payload: '{}', seq: h.matchEvents.length, createdAt: new Date() });
+    const r = await post(set('m3'));
+    expect(r.body).toMatchObject({ paid: true, capped: true });
+    expect(h.locks).toEqual([]);
+    expect(h.matchEvents.filter((e) => e.eventType === MUSIC_SESSION_PAID)).toHaveLength(1);
+    // another session for the same duel claimed the pay between this post's early check and its transaction: it commits
+    // while this one waits on the duel's row lock (MERGE 2026-09-28: h.onLock puts the rival exactly there — pushing it
+    // after post() began landed before the early check, so only the early no was exercised)
+    h.matches.m4 = musicDuel();
+    finishedSet('m4');
+    h.onLock = (matchId) => {
+      h.onLock = null;
+      h.matchEvents.push({ matchId, userId: 'u1', eventType: MUSIC_SESSION_PAID, payload: '{}', seq: h.matchEvents.length, createdAt: new Date() });
+    };
+    const raced = await post(set('m4'));
+    expect(h.locks).toEqual(['m4']);                                                  // the early check said yes
+    expect(raced.body).toMatchObject({ paid: true, capped: true });                   // the claim said no: free play
+    expect(h.matchEvents.filter((e) => e.eventType === MUSIC_SESSION_PAID && e.matchId === 'm4')).toHaveLength(1);
+    // and the ledger files what the run was paid: free play, no Arena note on its xp row
+    const xpRow = h.grants.find((g) => g.runId === raced.runId && g.grantType === 'xp');
+    expect(xpRow).toMatchObject({ amount: raced.body.xp });
+    expect(xpRow?.metadata).toBeUndefined();
   });
 
   it('an "Arena set" longer than an Arena set is free play', async () => {
@@ -275,16 +462,16 @@ describe('the endless ceiling (owner decision #14)', () => {
 
   it('The Hundred is capped too; a strong real run is under the ceiling and untouched', async () => {
     const huge = await post({ mode: 'karateEndless', score: 1_000_000, won: false, duration: 1800 });
-    expect(huge.body).toMatchObject({ capped: true, xp: 14_150, shards: 473 });
+    expect(huge.body).toMatchObject({ capped: true, xp: 14_150, shards: 100 });
     const strong = await post({ mode: 'karateEndless', score: 4000, won: false, duration: 300 });
-    expect(strong.body).toMatchObject({ capped: false, xp: 6010, shards: 200 });
+    expect(strong.body).toMatchObject({ capped: true, xp: 6010, shards: PER_RUN_SHARDS });
   });
 
   it('a finite game is never capped, and pays exactly what it did', async () => {
     const dunk = await post({ mode: 'dunkContest', score: 240, won: true, duration: 120 });
     expect(dunk.body).toMatchObject({ won: true, capped: false, xp: 410, shards: 15, credits: 15 });
     const training = await post({ mode: 'training', score: 9400, won: true, duration: 60 });   // a flawless Iron Paradise minute
-    expect(training.body).toMatchObject({ capped: false, xp: 14_150, shards: 473 });
+    expect(training.body).toMatchObject({ capped: true, xp: PER_RUN_XP, shards: PER_RUN_SHARDS });
   });
 
   it('a finite score above its own rules maximum is REJECTED (was paid as that maximum; before that, training 1,000,000 → 1.5M XP)', async () => {
@@ -313,8 +500,10 @@ describe('the endless ceiling (owner decision #14)', () => {
     for (let i = 0; i < 12; i++) await post({ mode: 'music', score, won: false, duration: 5, stats: musicSet({ bars: 1, notes: 30, perfects: 30 }) });
     const xp = h.sessions.reduce((a, r) => a + Number(r.xp), 0), shards = h.sessions.reduce((a, r) => a + Number(r.shards), 0);
     expect(h.sessions).toHaveLength(12);
-    expect(xp).toBeLessThanOrEqual(14_150);
-    expect(shards).toBeLessThanOrEqual(473);
+    for (const s of h.sessions) {
+      expect(Number(s.xp)).toBeLessThanOrEqual(PER_RUN_XP);
+      expect(Number(s.shards)).toBeLessThanOrEqual(PER_RUN_SHARDS);
+    }
   });
 });
 
@@ -739,9 +928,9 @@ describe('ECONOMY-SESSIONS-HARDEN FIX 2: one run id keys every grant, and the le
     expect(h.grants.find((g) => g.grantType === 'wallet_coins')).toMatchObject({ amount: 40 });
     expect(h.grants.find((g) => g.grantType === 'wallet_shards')).toMatchObject({ amount: 2 });
     // claim, then the ledger, then balances; season and mastery inside the transaction; the answer stored last
-    expect(h.writes).toEqual(['run:paid', 'grants', 'profile', 'session', 'lc', 'wallet:MODE_SESSION_COMPLETED', 'wallet:MODE_SESSION_WON', 'season:tx', 'mastery:tx', 'run:result']);
+    expect(h.writes).toEqual(['run:paid', 'profile:lock', 'grants', 'profile', 'session', 'lc', 'wallet:MODE_SESSION_COMPLETED', 'wallet:MODE_SESSION_WON', 'season:tx', 'mastery:tx', 'run:result']);
     // every wallet movement is keyed by the run
-    expect(h.lc[0]).toMatchObject({ idempotencyKey: `run:${id}:lc` });
+    expect(h.lc[0]).toMatchObject({ idempotencyKey: `session-lc:${id}` });
     expect(h.wallet.map((w) => w.idempotencyKey)).toEqual([`run:${id}:coins`, `run:${id}:won`]);
     expect(h.runs[id]).toMatchObject({ status: 'paid', score: 240, sessionId: 's1' });
     expect((h.runs[id].result as { body: unknown }).body).toEqual(r.body);
@@ -785,5 +974,244 @@ describe('ECONOMY-SESSIONS-HARDEN FIX 3: agent, playtest and test-account runs r
     const runId = openRun('dunkContest', 120, { payoutEligible: false, ineligibleReason: 'AGENT' });
     const r = await post({ mode: 'dunkContest', score: 99_999, won: true, duration: 120, runId });
     expect(r.body).toMatchObject({ reason: 'SCORE_INVALID', detail: 'above_max_score' });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// MERGE (2026-09-28): MUSIC-SUITE P6's Arena music rules inside ECONOMY-SESSIONS-HARDEN's run
+// ---------------------------------------------------------------------------
+
+describe('MERGE: the Arena music rules live inside the run the server started', () => {
+  const PAID = (e: { eventType: string }) => e.eventType === MUSIC_SESSION_PAID;
+  /** A house set on duel `id` (perfect, or every `every`-th note), posted as the room posts it: at the rejudge. */
+  function arenaSet(id: string, every = 1) {
+    h.matches[id] = musicDuel();
+    const house = finishedSet(id, houseBeatFor(id).notes.filter((_, i) => i % every === 0).map((n) => houseTap(n.lane, n.t)));
+    return { house, body: { mode: 'music', score: house, won: true, duration: 66, arenaMatchId: id, stats: musicSet({ bars: 32, notes: 192, arena: true }) } };
+  }
+
+  it('on the real table — music fail closed as landed, or its derived row since owner decision #2 — a creation session still keeps the streak: it needs no run, and pays nothing', async () => {
+    h.rules = MODE_SCORE_RULES as Record<string, unknown>;
+    streakedAgo(25);
+    const r = await post(creation({ runId: undefined }));
+    expect(r.status).toBe(200);
+    expect(r.body).toMatchObject({ ok: true, creation: true, counted: true, streakDays: 4, xp: 0, shards: 0, credits: 0, sessionId: null });
+    expect(h.profile.streakDays).toBe(4);
+    expectNothingPaid();
+  });
+
+  // OWNER RULING (2026-09-29): this REPLACES d31eba5d's "while music is FAIL CLOSED (no MEASURED_RUNS row) nothing of it
+  // pays". That test pinned the as-landed a1a1c5f9 table (music one of the unmeasured keys; a rule-less run 422 no_rules,
+  // run 'rejected'). Owner decision #2 (2026-09-28) gave music a derived row and decision #1 records a rule-less run unpaid,
+  // so no code could satisfy both; asked, the owner kept the decisions and had the old test replaced. What the real table
+  // does now is held here, so the P6 Arena pay path — live with music's row — is tested on the REAL table, not only on
+  // the open one or a synthetic rules() row. (A rule-less run recorded unpaid is held below: NO_RULES, and the NO_RULES
+  // Arena set that never makes the pay-once claim.)
+  it('OWNER DECISIONS #1 + #2 on the REAL table: music has its derived row, a verified Arena set pays once, and a second post or free play is held by the endless ceiling', async () => {
+    expect(MODE_SCORE_RULES.music).toMatchObject({ maxScoreFrom: 'derived', maxScore: SCORE_COLUMN_MAX, enabled: true });
+    h.rules = MODE_SCORE_RULES as Record<string, unknown>;          // the real table, not the open one
+    const { house, body } = arenaSet('m1');
+    const first = await post(body);
+    expect(first.status).toBe(200);
+    expect(first.body).toMatchObject({ ok: true, paid: true, capped: true, xp: 14_150, shards: 100 });
+    expect(h.runs[first.runId!]).toMatchObject({ status: 'paid', score: house });
+    expect(h.grants.find((g) => g.grantType === 'xp')).toMatchObject({ amount: 14_150, metadata: { arenaSet: true, arenaMatchId: 'm1', rejudged: house } });
+    expect(h.matchEvents.filter(PAID)).toHaveLength(1);
+    // a NEW run for the same duel: free play at the endless ceiling, no second claim
+    const again = await post(body);
+    expect(again.body).toMatchObject({ ok: true, paid: true, capped: true });
+    expect(again.body.xp).toBeLessThanOrEqual(endlessCeilingFor(66, true).xp);
+    expect(again.body.xp).toBeLessThanOrEqual(ENDLESS_SESSION_CEILING.xp);
+    // free play with no duel: paid, held by the endless ceiling, never a lock or a claim
+    const free = await post({ mode: 'music', score: 9000, won: true, duration: 30, stats: musicSet({ bars: 8 }) });
+    expect(free.body).toMatchObject({ ok: true, paid: true, capped: true, xp: endlessCeilingFor(30, true).xp });
+    expect(h.locks).toEqual(['m1']);
+    expect(h.matchEvents.filter(PAID)).toHaveLength(1);
+    // the mode's own per-set bound still refuses a score its hits cannot make (sessionScoreCap → above_run_cap)
+    const forged = await post({ mode: 'music', score: performSetMax(128) + 1, won: true, duration: 30, stats: musicSet({ bars: 8 }) });
+    expect(forged.body).toMatchObject({ ok: false, paid: false, reason: 'SCORE_INVALID', detail: 'above_run_cap', limit: performSetMax(128) });
+  });
+
+  it('once music is measured, the mode\'s rules still come first: an Arena set outside them is refused before its duel is read', async () => {
+    rules('music', { maxScore: 400_000, maxScorePerSecond: 10_000, minDurationMs: 30_000, maxDurationMs: 600_000 });
+    const { body } = arenaSet('m1');
+    const early = await post({ ...body, duration: 10 });            // 10 s on the SERVER's clock: too short
+    expect(early.body).toMatchObject({ reason: 'SCORE_INVALID', detail: 'too_short', limit: 30_000 });
+    expect(h.locks).toEqual([]);
+    expect(h.matchEvents.filter(PAID)).toEqual([]);
+    expectNothingPaid();
+    const ok = await post(body);                                    // the same set, inside the rules: the Arena set, once
+    expect(ok.body).toMatchObject({ paid: true, capped: true, xp: 14_150, shards: 100 });
+    expect(h.matchEvents.filter(PAID)).toHaveLength(1);
+  });
+
+  it('the duel\'s one pay is claimed inside the run\'s transaction — after the run, before the ledger — and the xp row names the duel', async () => {
+    const { house, body } = arenaSet('m1');
+    const r = await post(body);
+    expect(r.body).toMatchObject({ paid: true, capped: true, xp: 14_150 });
+    // the daily-cap row lock (ECONOMY-CAPS review fix) runs after the duel's claim and before the ledger is filed
+    expect(h.writes.slice(0, 5)).toEqual(['run:paid', 'duel:lock', `event:${MUSIC_SESSION_PAID}`, 'profile:lock', 'grants']);
+    expect(h.grants.find((g) => g.grantType === 'xp')).toMatchObject({ amount: 14_150, metadata: { arenaSet: true, arenaMatchId: 'm1', rejudged: house } });
+    expect(h.runs[r.runId!]).toMatchObject({ status: 'paid', score: house, sessionId: 's1' });
+  });
+
+  it('a retried Arena run is the first answer: no second claim, no second lock, nothing paid twice', async () => {
+    const { body } = arenaSet('m1');
+    const first = await post(body);
+    const again = await post({ ...body, runId: first.runId });
+    expect(again.body).toEqual({ ...first.body, replayed: true });
+    expect(h.locks).toEqual(['m1']);
+    expect(h.matchEvents.filter(PAID)).toHaveLength(1);
+    expect(h.sessions).toHaveLength(1);
+    // a NEW run for the same duel is the second post P6 names: free play at the endless ceiling
+    const second = await post(body);
+    expect(second.body).toMatchObject({ paid: true, capped: true });
+    expect(second.body.xp).toBeLessThan(20_000);
+    expect(h.matchEvents.filter(PAID)).toHaveLength(1);
+  });
+
+  it('an agent / playtest run of a staked set is validated, recorded, and never spends the player\'s one Arena pay for the duel', async () => {
+    const { house, body } = arenaSet('m1', 2);                      // a half set: its rejudge is well under the ceiling
+    const greedy = await post({ ...body, score: house + 1, runId: openRun('music', 66, { payoutEligible: false, ineligibleReason: 'AGENT' }) });
+    expect(greedy.body).toMatchObject({ reason: 'SCORE_INVALID', detail: 'above_rejudge' });
+    for (const reason of ['AGENT', 'PLAYTEST'] as const) {
+      const r = await post({ ...body, runId: openRun('music', 66, { payoutEligible: false, ineligibleReason: reason }) });
+      expect(r.body, reason).toMatchObject({ ok: true, paid: false, reason, score: house, xp: 0 });
+    }
+    expect(h.locks).toEqual([]);
+    expect(h.matchEvents.filter(PAID)).toEqual([]);
+    expectNothingPaid();
+    const paid = await post(body);
+    expect(paid.body).toMatchObject({ paid: true, capped: true, xp: PER_RUN_XP, shards: PER_RUN_SHARDS });
+    expect(h.matchEvents.filter(PAID)).toHaveLength(1);
+  });
+
+  it('a STARTED attempt that never finished is no Arena set: free play at the endless ceiling, never refused as above a rejudge of 0', async () => {
+    // P6: the payout needs a FINISHED attempt (the reload rule scores an unfinished one 0 at settlement — that is the
+    // duel's business; this session is free play). Without the finish gate it would be "verified" with a rejudge of 0.
+    h.matches.m1 = musicDuel();
+    h.matchEvents.push({ matchId: 'm1', userId: 'u1', eventType: MUSIC_ATTEMPT_START, payload: '{}', seq: 0, createdAt: new Date() });
+    const r = await post({ mode: 'music', score: 60_000, won: true, duration: 66, arenaMatchId: 'm1', stats: musicSet({ bars: 32, notes: 192, arena: true }) });
+    expect(r.body).toMatchObject({ paid: true, capped: true });                       // an Arena set would pay 90,050 XP
+    expect(r.body.xp).toBeLessThan(20_000);
+    expect(h.locks).toEqual([]);
+    expect(h.matchEvents.filter(PAID)).toEqual([]);
+  });
+
+  it('a verified Arena set is held to the Arena\'s music ceiling through the run cap (the tighter cap), before the rejudge is read', async () => {
+    const { house, body } = arenaSet('m1');
+    expect(house).toBe(378_300);
+    // counts that would allow the old grid's 2,647,100 (512 hits): the Arena ceiling is the run cap, SCORE_INVALID above_run_cap
+    const r = await post({ ...body, score: perfectScore(512), stats: musicSet({ bars: 32, notes: 512, arena: true }) });
+    expect(r.body).toMatchObject({ reason: 'SCORE_INVALID', detail: 'above_run_cap', limit: 378_300 });
+    expectNothingPaid();
+    expect(h.matchEvents.filter(PAID)).toEqual([]);
+  });
+
+  it('the duel gates hold inside the run: no opponent, past expiresAt or already scored is free play — no lock, no claim', async () => {
+    const { body } = arenaSet('m1');
+    for (const [label, row] of [
+      ['no opponent', { status: 'WAITING', player2Id: null }],
+      ['expired', { expiresAt: new Date(Date.now() - 1_000) }],
+      ['scored', { player1Score: 378_300 }],
+    ] as const) {
+      h.matches.m1 = musicDuel(row);
+      const r = await post(body);
+      expect(r.body, label).toMatchObject({ paid: true, capped: true });
+    }
+    expect(h.locks).toEqual([]);
+    expect(h.matchEvents.filter(PAID)).toEqual([]);
+  });
+});
+
+describe('OWNER DECISION (2026-09-28): a mode with no rules row is recorded unpaid; Prove It pays the played floor', () => {
+  it('NO_RULES: ok, paid: false, the score recorded on the run — nothing paid, nothing filed, no session row', async () => {
+    rules('volleyball', {});                                          // tennis has no row in this table
+    const r = await post({ mode: 'tennis', score: 3, won: true, duration: 60 });
+    expect(r.status).toBe(200);
+    expect(r.body).toMatchObject({ ok: true, paid: false, reason: 'NO_RULES', score: 3, won: true, sessionId: null, xp: 0, coins: 0 });
+    expect(h.runs[r.runId!]).toMatchObject({ status: 'recorded', score: 3 });
+    expectNothingPaid('NO_RULES');
+    expect(h.events).toContainEqual(expect.objectContaining({ name: 'session_unpaid', props: expect.objectContaining({ reason: 'NO_RULES' }) }));
+  });
+
+  it('NO_RULES still checks what it can: a whole number, not negative — and its own per-run cap', async () => {
+    rules('volleyball', {});
+    for (const [score, detail] of [[2.5, 'score_not_integer'], [-4, 'score_negative']] as const) {
+      const r = await post({ mode: 'tennis', score, won: true, duration: 60 });
+      expect(r.status, String(score)).toBe(422);
+      expect(r.body, String(score)).toMatchObject({ reason: 'SCORE_INVALID', detail });
+    }
+    const capped = await post({ mode: 'tennis', score: 7, won: true, duration: 60 });   // tennis: 6 games at most (the rules)
+    expect(capped.body).toMatchObject({ reason: 'SCORE_INVALID', detail: 'above_run_cap', limit: 6 });
+    expectNothingPaid();
+  });
+
+  it('a key the catalogue does not know is still refused (it is not NO_RULES)', async () => {
+    rules('volleyball', {});
+    expect((await post({ mode: 'notAMode', score: 1, duration: 60 })).body).toMatchObject({ reason: 'SCORE_INVALID', detail: 'unknown_mode' });
+  });
+
+  it('payFloorOnly (Prove It): paid as a score of 0 and no win — 10 XP, 1 shard, the streak — no coins, won shards, season XP or mastery; the score stays on the history row', async () => {
+    rules('dunkduel', { maxScore: 120, payFloorOnly: true, minDurationMs: 2_000 });
+    const r = await post({ mode: 'dunkduel', score: 96, won: true, duration: 60, played: true });
+    expect(r.status).toBe(200);
+    expect(r.body).toMatchObject({ ok: true, paid: true, won: false, xp: 10, shards: 1, credits: 0, coins: 0, walletShards: 0, season: null, mastery: null });
+    expect(h.sessions[0]).toMatchObject({ mode: 'dunkduel', score: 96, won: false, xp: 10, shards: 1 });
+    expect(h.wallet).toEqual([]);
+    expect(h.season).toEqual([]);
+    expect(h.mastery).toEqual([]);
+    expect(h.grants.map((g) => g.grantType).sort()).toEqual(['prq', 'shards', 'xp']);
+    // its streak day still counts and pays its Lab Credits
+    for (const k of ['sessions', 'grants', 'lc'] as const) h[k] = [];
+    h.profile.lastStreakAt = new Date(Date.now() - 25 * 60 * 60 * 1000);
+    const next = await post({ mode: 'dunkduel', score: 96, won: true, duration: 60, played: true });
+    expect(next.body).toMatchObject({ won: false, xp: 10, streakDays: 4, streakBonus: 20, credits: 20 });
+    expect(h.lc[0]).toMatchObject({ delta: 20 });
+  });
+
+  it('Prove It on the REAL table: the exported dunkduel row pays the played floor (review: every other Prove It test used a synthetic row)', async () => {
+    h.rules = MODE_SCORE_RULES as Record<string, unknown>;          // the real table: derivedRule must carry payFloorOnly through
+    const r = await post({ mode: 'dunkduel', score: 96, won: true, duration: 60, played: true });
+    expect(r.status).toBe(200);
+    expect(r.body).toMatchObject({ ok: true, paid: true, won: false, xp: 10, shards: 1, credits: 0, coins: 0, walletShards: 0, season: null, mastery: null });
+    expect(h.sessions[0]).toMatchObject({ mode: 'dunkduel', score: 96, won: false, xp: 10, shards: 1 });
+    expect(h.wallet).toEqual([]);
+    expect(h.season).toEqual([]);
+    expect(h.mastery).toEqual([]);
+    expect(h.grants.map((g) => g.grantType).sort()).toEqual(['prq', 'shards', 'xp']);
+  });
+
+  it('rebased onto MUSIC-SUITE P6: a NO_RULES Arena music set is recorded unpaid and never makes the duel\'s pay-once claim — the honest paid post still gets it', async () => {
+    rules('volleyball', {});                                          // music has no row in this table
+    h.matches.m1 = musicDuel();
+    const house = finishedSet('m1');
+    const body = { mode: 'music', score: house, won: true, duration: 66, arenaMatchId: 'm1', stats: musicSet({ bars: 32, notes: 192, arena: true }) };
+    const r = await post(body);
+    expect(r.status).toBe(200);
+    expect(r.body).toMatchObject({ ok: true, paid: false, reason: 'NO_RULES', score: house, sessionId: null, xp: 0 });
+    expect(h.runs[r.runId!]).toMatchObject({ status: 'recorded', score: house });
+    expect(h.locks).toEqual([]);
+    expect(h.matchEvents.filter((e) => e.eventType === MUSIC_SESSION_PAID)).toEqual([]);
+    expect(h.writes.filter((w) => w.startsWith('duel:') || w.startsWith('event:'))).toEqual([]);
+    expectNothingPaid('NO_RULES arena set');
+    // the duel's one Arena pay is still there for the paid post (open rules: music has its row)
+    h.rules = null;
+    const paid = await post(body);
+    expect(paid.body).toMatchObject({ paid: true, capped: true, xp: 14_150 });
+    expect(h.matchEvents.filter((e) => e.eventType === MUSIC_SESSION_PAID)).toHaveLength(1);
+  });
+});
+
+describe('FOLLOW-UP (2026-09-29): the finite pay cap on skateboarding and surfing', () => {
+  it('a forged skate run is recorded as sent and paid the cap (capped: true); an honest strong run is paid in full', async () => {
+    const forged = await post({ mode: 'skateboarding', score: 400_000_000, won: true, duration: 90 });
+    expect(forged.body).toMatchObject({ paid: true, capped: true, xp: PER_RUN_XP, shards: PER_RUN_SHARDS });
+    expect(h.sessions[0]).toMatchObject({ score: 400_000_000, xp: PER_RUN_XP });
+    expect(h.updates[0]).toMatchObject({ xp: { increment: PER_RUN_XP } });
+    const honest = await post({ mode: 'skateboarding', score: 80_832, won: true, duration: 90 });
+    expect(honest.body).toMatchObject({ capped: true, xp: PER_RUN_XP, shards: PER_RUN_SHARDS });
+    // another finite mode is capped by C1 per-run ceiling too
+    expect((await post({ mode: 'snowboarding', score: 400_000, won: true, duration: 90 })).body).toMatchObject({ capped: true, xp: PER_RUN_XP, shards: PER_RUN_SHARDS });
   });
 });

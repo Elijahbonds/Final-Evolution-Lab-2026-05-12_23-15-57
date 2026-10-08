@@ -7,6 +7,8 @@ import { prisma } from '@/lib/db';
 import { readProgress, type DunkAttempt } from '@/lib/irl/dunkProgress';
 import { MAX_VERTICAL_CM, type DunkFamily } from '@/lib/irl/dunkTracker';
 import { DUNK_ATTEMPTS_RETURNED, MIRROR_FAMILIES, loadDunkHistory } from '@/lib/irl/dunkHistory';
+import { canSaveScanNumbers, refuseScanSave } from '@/lib/privacy/scanSaveGate';
+import { bodyHasMedia, cleanRunId, storedRun } from '@/lib/privacy/numberScan';
 
 /**
  * A measured dunk, and the history it joins.
@@ -43,7 +45,11 @@ export async function POST(req: NextRequest) {
 
   let body: unknown;
   try { body = await req.json(); } catch { return NextResponse.json({ error: 'invalid_json' }, { status: 400 }); }
-  const b = body as Partial<DunkAttempt>;
+  const b = (body && typeof body === 'object' ? body : {}) as Partial<DunkAttempt> & { runId?: unknown };
+
+  if (bodyHasMedia(body)) return NextResponse.json({ error: 'media_not_accepted', saved: false }, { status: 400 });
+  const runId = b.runId === undefined ? null : cleanRunId(b.runId);
+  if (b.runId !== undefined && !runId) return NextResponse.json({ error: 'bad_run_id', saved: false }, { status: 400 });
 
   const verticalCm = Number(b?.verticalCm);
   const flightTimeMs = Number(b?.flightTimeMs);
@@ -57,10 +63,25 @@ export async function POST(req: NextRequest) {
   }
   const family = (MIRROR_FAMILIES.has(b?.family as DunkFamily) ? b!.family : 'ATTEMPT') as DunkFamily;
 
+  // TEEN-WRITE-BLOCK (2026-09-29): a jump is kept only for a verified 18+ account that has opted in (lib/privacy/
+  // scanSaveGate.ts; today that is nobody). Everyone else gets 403 and nothing is written. The jump still showed on
+  // their screen, and a bad measurement above still gets its 400 first.
+  if (!(await canSaveScanNumbers(prisma, userId))) return refuseScanSave();
+
+  if (runId) {
+    const prior = await storedRun(prisma, userId, 'dunk', runId);
+    if (prior === 'unavailable') return NextResponse.json({ error: 'unavailable', saved: false }, { status: 503 });
+    if (prior === 'stored') {
+      const attempts = await loadDunkHistory(prisma, userId);
+      return NextResponse.json({ progress: readProgress(attempts), alreadyStored: true });
+    }
+  }
+
   const metrics = {
     verticalCm: Math.round(verticalCm * 10) / 10,
     flightTimeMs: Math.round(flightTimeMs),
     family,
+    ...(runId ? { runId } : {}),
     ...(typeof b?.difficulty === 'number' ? { difficulty: b.difficulty } : {}),
     ...(typeof b?.execution === 'number' ? { execution: b.execution } : {}),
     ...(typeof b?.style === 'number' ? { style: b.style } : {}),

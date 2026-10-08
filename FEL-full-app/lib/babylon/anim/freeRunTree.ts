@@ -15,6 +15,8 @@
 // the tree itself cut the clip (state + token guard), and holds the floor after a bail until the mode lets him rise.
 
 import type { CharacterAnimator } from './CharacterAnimator';
+import { StrideRateFilter, strideRate } from '../core/StrideMatch';
+import { LOCO_TUNE } from './LocoBus';
 
 export type FreeRunAnimState =
   | 'idle' | 'walk' | 'run'
@@ -25,6 +27,11 @@ export type FreeRunAnimState =
 
 export interface FreeRunAnimInput {
   speed01: number;
+  /** MOVEMENT POLISH (2026-10-06): the runner's planar speed (m/s). The walk and the run played at ONE rate whatever the speed — the
+   *  feet kept the clip's own 4.8 m/s pace from a 3.2 m/s jog to the 6.4 m/s top speed (a 7 m/s run skated 22% of the body's travel on
+   *  a planted foot, _movement-probe). With it the ground gaits pace their stride to the ground (LocoBus's references for the same
+   *  base clips, smoothed). Omitted = the authored rate, as before. */
+  speedMps?: number;
   airborne: boolean;
   /** One-beat: the take-off just happened (jump / vault / wall kick / drop) — plays the take-off clip, then the air hold. */
   jumpBeat: boolean;
@@ -95,6 +102,15 @@ export function chooseFreeRunClip(i: FreeRunAnimInput, prev?: FreeRunAnimState |
   return c;
 }
 
+/** MOVEMENT POLISH (2026-10-06): the stride rate for a free-run state at `speedMps`, or null where the rate is choreography (the
+ *  jump, the air, a landing, the floor). The walk and the run (and the wall run, which plays the run) are the base clips LocoBus
+ *  paces Sprint's runner on, against the same references. */
+export function freeRunRate(state: FreeRunAnimState | null, speedMps: number): number | null {
+  if (state === 'walk') return strideRate(speedMps, LOCO_TUNE.walkRef);
+  if (state === 'run' || state === 'wallrun') return strideRate(speedMps, LOCO_TUNE.runRef);
+  return null;
+}
+
 export const FLOOR_FAMILY: ReadonlySet<FreeRunAnimState> = new Set<FreeRunAnimState>(['bail', 'floor', 'get_up']);
 const isOneShot = (s: FreeRunAnimState): boolean => !CLIP_FOR[s].loop;
 
@@ -121,6 +137,9 @@ export class FreeRunAnimTree {
   private lastInput: FreeRunAnimInput | null = null;
   /** Fires when a one-shot ENDS on its own (never when the tree cut it). */
   onSettle: ((state: FreeRunAnimState) => void) | null = null;
+  /** MOVEMENT POLISH (2026-10-06): stride matching for the ground gaits (FreeRunAnimInput.speedMps). */
+  private strideFilter = new StrideRateFilter();
+  private strideClip: string | null = null;
   constructor(private animator: CharacterAnimator) {}
   get state(): FreeRunAnimState | null { return this.current; }
   update(input: FreeRunAnimInput): FreeRunAnimState {
@@ -132,6 +151,11 @@ export class FreeRunAnimTree {
     if (cur === 'get_up' && c.state !== 'bail') return cur;                                          // the get-up finishes before any standing state
     if (cur && FLOOR_FAMILY.has(cur) && cur !== 'get_up' && !FLOOR_FAMILY.has(c.state)) c = pick('get_up');   // the floor is left through the get-up
     if (c.state !== cur) this.enter(c);
+    // MOVEMENT POLISH (2026-10-06): pace the playing gait to the ground, on the RUNNING clip (never through play(), which would restart it)
+    if (this.strideClip && input.speedMps !== undefined) {
+      const want = freeRunRate(this.current, input.speedMps);
+      if (want !== null) this.animator.setPlaybackScale(this.strideClip, this.strideFilter.step(want, 1 / 60));
+    }
     return c.state;
   }
   private enter(c: FreeRunClipChoice): void {
@@ -148,6 +172,9 @@ export class FreeRunAnimTree {
     this.animator.play(c.clip, onEnd ? { loop: c.loop, fadeSec: c.fadeSec, onEnd } : { loop: c.loop, fadeSec: c.fadeSec });
     this.current = st;
     if (st === 'run' || st === 'walk' || st === 'idle') this.gait = st;
+    const r0 = this.lastInput?.speedMps === undefined ? null : freeRunRate(st, this.lastInput.speedMps);
+    this.strideClip = r0 === null ? null : c.clip;
+    if (r0 !== null) this.strideFilter.set(r0);
   }
   /** One-beat states must be re-playable: call when the beat window closes or a NEW beat of the same kind lands. */
   clearBeat(...states: FreeRunAnimState[]): void {

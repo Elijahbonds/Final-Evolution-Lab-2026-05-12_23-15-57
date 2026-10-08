@@ -36,6 +36,8 @@ import { poseService } from '@/lib/pose/PoseService';
 import { sessionStore } from '@/lib/babylon/core/sessionStore';
 import type { ModePhase } from '@/lib/babylon';
 import { BodyReadyLine, HandsUpLine, HandsUpRing, type BodyLine } from './paused-layer';
+import { stanceLine } from '@/lib/move/rideStance';   // MOVEMENT PLAY P8: the board games' stance line
+import { GrownUpStep } from '@/app/play/mirror/assess/_components/gate-steps';
 
 // ── the words ──
 export const PLAY_WITH_BODY = 'PLAY WITH YOUR BODY';
@@ -147,6 +149,18 @@ function CameraLine({ view }: { view: BodyPlayView }) {
   return <p className="text-center text-2xl font-black text-white">{cameraWords(view)}</p>;
 }
 
+/**
+ * The Mirror's grown-up step, before the camera. Same component, same words, same disabled Continue.
+ * A tap here is not the game's start, and it does not request the camera until Continue.
+ */
+function BodyGrownUp({ className = '' }: { className?: string }) {
+  return (
+    <div data-fel-body-grown-up="" onPointerDown={(e) => e.stopPropagation()} className={`w-full max-w-md text-left ${className}`}>
+      <GrownUpStep onContinue={() => { void bodyPlay.confirmGrownUp(); }} />
+    </div>
+  );
+}
+
 /** The ring for a stage's hold (framing, the reach, the stand). */
 function HoldRing({ progress }: { progress: number }) {
   const r = 11, c = 2 * Math.PI * r, p = Math.min(1, Math.max(0, progress));
@@ -169,6 +183,7 @@ export function SpaceCheckPanel({ onStart, variant = 'ready' }: { onStart: () =>
   const ready = space?.stage === 'ready';
   const warm = warmupOffer(space?.stage ?? null);
   const hint = space && space.stage === 'frame' && space.t - space.since < HINT_MS;
+  const stance = stanceLine(session.stance);   // MOVEMENT PLAY P8
   return (
     <div
       data-fel-space-panel={variant}
@@ -184,9 +199,11 @@ export function SpaceCheckPanel({ onStart, variant = 'ready' }: { onStart: () =>
         overlay={space ? <OverlayLines overlay={space.overlay} /> : null} />
 
       {space ? (
-        <div className="flex max-w-2xl items-center gap-3">
+        <div className="flex max-w-2xl items-center gap-3" data-fel-body-stance={ready && stance ? stance.id : undefined}>
           {!ready && <HoldRing progress={space.hold} />}
-          <p className="text-2xl font-black leading-tight text-white sm:text-3xl" aria-live="polite">{ready ? READY_LINE : space.say.text}</p>
+          {/* MOVEMENT PLAY P8: a board game asks for the stance after "All set" (measured: regular / goofy, or the square fallback) */}
+          {ready && stance?.ring != null && <HoldRing progress={stance.ring} />}
+          <p className="text-2xl font-black leading-tight text-white sm:text-3xl" aria-live="polite">{ready ? stance?.text ?? READY_LINE : space.say.text}</p>
         </div>
       ) : <CameraLine view={view} />}
 
@@ -249,6 +266,7 @@ export function BodyPlayReady({ tint, onStart }: { tint: string; onStart: () => 
   useEffect(() => { setRemembered(key ? bodyPlay.remembered(key) : false); }, [key, view.stage]);
   if (offer === null) return null;
   if (offer === 'coming') return <p className="text-[11px] tracking-wide text-white/45">{COMING_COPY}</p>;
+  if (view.grownUp === 'ask') return <BodyGrownUp />;
   const on = view.stage === 'starting' || view.stage === 'checking' || view.stage === 'set';
   if (on && view.collapsed) {
     return (
@@ -302,6 +320,13 @@ export function BodyPlayLayer({ phase, onStart }: { phase: ModePhase; onStart: (
   const [corner, setCorner] = useState<Corner>(CORNERS[0]);
   useEffect(() => holdSharedPoseSource(), []);
   useEffect(() => { setCorner(readCorner()); }, []);
+  if (view.grownUp === 'ask' && phase !== 'ready') {
+    return (
+      <div className="absolute inset-0 flex items-start justify-center overflow-y-auto bg-[#05060a] px-4 py-6">
+        <BodyGrownUp />
+      </div>
+    );
+  }
   const live = view.camera.state === 'calibrating' || view.camera.state === 'live';
   if (!live || phase === 'ready' || phase === 'loading' || phase === 'error') return null;
   if (phase === 'paused' && view.checking) {

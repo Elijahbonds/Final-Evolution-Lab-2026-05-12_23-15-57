@@ -1,6 +1,7 @@
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { PublicTopBar, PublicLegalFooter } from '@/components/public-chrome';
+import { BUSINESS_CONTACT_EMAIL } from '@/lib/legal/business';
 import Link from 'next/link';
 import { Mail, FileText, Shield, Award } from 'lucide-react';
 
@@ -26,10 +27,10 @@ export default async function SupportPage() {
             <div>
               <h2 className="fel-heading text-lg font-bold text-white">Contact Us</h2>
               <a
-                href="mailto:support@finalevolutionlab.com"
+                href={`mailto:${BUSINESS_CONTACT_EMAIL}`}
                 className="font-mono text-sm text-[#00E5FF] hover:underline"
               >
-                support@finalevolutionlab.com
+                {BUSINESS_CONTACT_EMAIL}
               </a>
             </div>
           </div>

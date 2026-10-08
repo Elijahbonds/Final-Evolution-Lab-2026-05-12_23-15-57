@@ -57,8 +57,10 @@ export const DESKTOP_BUDGET: PerfBudget = {
   frameMs: 16.7, drawCalls: 1600, activeMeshes: 900, textureMb: 512,
 };
 
-export function budgetForTier(tier: 'mobile' | 'desktop' | undefined): PerfBudget {
-  return tier === 'desktop' ? DESKTOP_BUDGET : MOBILE_BUDGET;
+// The high tier (visual-foundation, 2026-10-06: a TV or a desktop-class GPU) runs the desktop scene with a few extra
+// full-screen passes — MSAA, glow — that cost fill rate, not draws, so it shares the desktop ceiling.
+export function budgetForTier(tier: 'mobile' | 'desktop' | 'high' | undefined): PerfBudget {
+  return tier === 'desktop' || tier === 'high' ? DESKTOP_BUDGET : MOBILE_BUDGET;
 }
 
 export interface PerfSample {

@@ -34,7 +34,7 @@ export const REAL_CLIPS = new Set<string>([
   'guard', 'high_kick', 'hook', 'jab', 'jumpshot', 'roundhouse', 'run', 'uppercut', 'walk',
   // authored/code-driven procedural clips (always safe)
   'idle_stand', 'strafe_left', 'strafe_right', 'jump_up', 'jump_land',
-  'dunk_charge_gather', 'dunk_launch', 'dunk_mocap', 'dunk_360_eastbay', 'dunk_score_hang', 'dunk_land_crouch',
+  'dunk_charge_gather', 'dunk_launch', 'dunk_mocap', 'dunk_360_eastbay', 'dunk_score_hang', 'dunk_land_crouch', 'dunk_land_absorb',
   'dunk_finish_windmill', 'dunk_finish_tomahawk', 'dunk_finish_blown', 'dunk_celebrate_big',
   'dunk_self_lob', 'dunk_bounce_throw', 'dunk_kick_up', 'dunk_back_handspring', 'dunk_cartwheel', 'dunk_backflip', 'dunk_flush_scorpion', 'dunk_720_spin', 'dunk_celeb_spiderman_splits', 'dunk_celeb_its_over', 'dunk_celeb_roar', 'dunk_celeb_too_small', 'prop_stack_base', 'prop_stack_rider', 'prop_row_stand', 'prop_row_crouch', 'prop_dubble_hold', 'prop_dubble_kneel', 'prop_bike_rider', 'prop_skate_rider', 'dunk_double_up', 'dunk_scorpion', 'dunk_lost_found', 'dunk_hide_seek', 'dunk_360_spin', 'dunk_between_legs', 'dunk_cradle', 'dunk_double_clutch', 'dunk_behind_back', 'dunk_fake_back', 'dunk_double_eastbay', 'dunk_360_windmill', 'dunk_fake_eastbay', 'dunk_tap',   // DUNK-CONTROL-JUICE (2026-09-08): the named dunks
   'football_juke_left', 'football_juke_right', 'football_spin_move', 'football_tackled_fall', 'football_td_spike',
@@ -55,6 +55,7 @@ export const REAL_CLIPS = new Set<string>([
   'golf_address_idle', 'golf_swing_full', 'golf_putt', 'golf_finish_hold',
   'soccer_kick_shoot', 'keeper_set', 'keeper_dive', 'keeper_dive_hold', 'keeper_rise',
   // basketball packages (anim/authored/basketball) — Phase 4, 2026-09-03
+  'bball_idle_stand',   // HOOPS MOTION phase 3b: the ball-less watch with its own knees (authored + aliased, never listed here)
   'bball_dribble_idle', 'bball_crossover_left', 'bball_crossover_right', 'bball_hesi',
   'bball_layup_gather', 'bball_defend_slide_left', 'bball_defend_slide_right',
   'bball_block_reach', 'bball_steal_reach',
@@ -71,6 +72,7 @@ export const REAL_CLIPS = new Set<string>([
   'board_grab', 'board_air', 'board_grind', 'board_land', 'board_push',
   'skate_kickflip', 'skate_bail', 'board_manual', 'skate_ollie',
   'board_stand_idle', 'board_land_sketchy',   // ANIM-READABILITY (2026-09-21)
+  'snow_bail',   // GATE-CRASHER-POLISH-2 (2026-09-28): the snowboard's wipeout — down in the snow, board strapped on (boardSuite)
   // REGISTRY DRIFT, CLOSED (2026-09-18). 42 authored clips had no entry here — the whole HOOPS handle kit
   // (shammgod, yoyo, snatch-back, the ankle breakers), the layup/finish kit, the hard defensive slides, the
   // elbow strikes and three dunk finishes. They still PLAYED, because installSafePlay's second clause accepts
@@ -86,6 +88,7 @@ export const REAL_CLIPS = new Set<string>([
   'bball_layup_spin_left', 'bball_layup_hang', 'bball_layup_hang_left', 'bball_shimmy', 'bball_drop_step', 'bball_drop_step_left', 'bball_floater_left',
   'bball_euro_step_left', 'bball_defend_backpedal', 'bball_closeout', 'bball_contact_react', 'bball_defend_slide_hard_left',
   'bball_defend_slide_hard_right',
+  'bball_catch',   // HOOPS-10PHASE-2 phase 6: authored/basketball.ts — hands out to meet a pass, in to secure it
   // the quiz podium (BRAINBRAWL-MAJOR, 2026-09-24): authored/party.ts
   'party_think', 'party_buzz', 'party_locked', 'party_yes', 'party_facepalm', 'party_shrug', 'party_win', 'party_win_in', 'party_lose',
   'party_talk', 'party_present',   // BRAINBRAWL-RESIDUAL: the podiums and the host talk

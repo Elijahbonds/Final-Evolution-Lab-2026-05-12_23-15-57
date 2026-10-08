@@ -1,7 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-// POST and GET /api/v1/workout/plan run for real here. Only the session and the database are stand-ins: the database
-// has a workoutPlan table and nothing else, so a charge, a balance read or any other write fails the test.
+// GET /api/v1/workout/plan runs for real here, over plans the OLD generator wrote. Only the session and the database are
+// stand-ins: the database has a workoutPlan table, the reader's birth year, and an empty wallet (MIRROR-COACH P8: the
+// same read now carries the relaunch's offer, which looks up past purchases), and nothing else, so a charge or any other
+// write fails the test.
+//
+// MIRROR-COACH P8 (2026-09-29): P1's POST tests lived here ("the sale is pulled": every purchase refused 403 before the
+// body or the database was read, both SKUs held in NOT_ON_SALE). The relaunch flips both on purpose (owner decision
+// #24): POST sells again, at the same prices, and relaunch-route.test.ts runs it with the real spend().
 const m = vi.hoisted(() => ({
   session: { user: { id: 'u1' } } as unknown,
   rows: [] as { id: string; userId: string; tier: string; focus: string; weeks: unknown; createdAt: Date }[],
@@ -21,21 +27,17 @@ vi.mock('@/lib/db', () => ({
       if (prop === 'workoutPlan') return { findMany: m.findMany, updateMany: m.updateMany };
       // the reader's birth year, and nothing else about them (the revision is for who is reading: owner decision #6)
       if (prop === 'user') return { findUnique: m.userRead };
+      // MIRROR-COACH P8: the offer's past-purchase read (lib/workout/relaunchServer.ts): no wallet, so no ledger read
+      if (prop === 'wallet') return { findUnique: async () => null };
       throw new Error(`the route touched prisma.${String(prop)}`);
     },
   }),
 }));
 
-import { GET, POST } from '@/app/api/v1/workout/plan/route';
-import { NOT_ON_SALE, getSku, skuOnSale } from '@/lib/wallet/catalog';
-import { spend, WalletError } from '@/lib/wallet/wallet-service';
+import { GET } from '@/app/api/v1/workout/plan/route';
 import { PLAN_POOLS, isDepthDrop, legacyWeeks, type PlanWeek } from './plan-generator';
 import { HELD_FOR_PROTOCOL, PLAN_REVISED_NOTE, PLAN_REVISED_NOTE_YOUTH, PLAN_REVISION, PLAN_REVISION_ALL_WEEKS, isPlyometric, revisePlan } from './plan-revision';
-import { PLAN_SALE_PAUSED, WORKOUT_PLAN_SKUS } from './plan-sale';
 
-const post = (body: string) => (POST as unknown as (r: Request) => Promise<Response>)(new Request('http://fel.test/api/v1/workout/plan', {
-  method: 'POST', headers: { 'Content-Type': 'application/json' }, body,
-}));
 const drops = (weeks: unknown): number => (weeks as PlanWeek[])
   .reduce((n, w) => n + w.days.reduce((k, d) => k + d.exercises.filter(isDepthDrop).length, 0), 0);
 
@@ -60,47 +62,6 @@ beforeEach(() => {
     let count = 0;
     for (const r of m.rows) if (r.id === where.id && r.userId === where.userId) { r.weeks = JSON.parse(JSON.stringify(data.weeks)); count++; }
     return { count };
-  });
-});
-
-describe('POST /api/v1/workout/plan: the sale is pulled (owner decision #3)', () => {
-  it('refuses every purchase on the server with the paused-sale message (FEL\'s draft), before it reads the body or the database', async () => {
-    for (const body of [
-      JSON.stringify({ idempotency_key: '3f2b8c1e-9d4a-4e7b-8c2d-1a2b3c4d5e6f', tier: 'plan_4w' }),
-      JSON.stringify({ idempotency_key: 'k_1_a', tier: 'program_12w', scanId: 'scan1' }),
-      JSON.stringify({}),
-      'not json',
-    ]) {
-      const res = await post(body);
-      expect(res.status, body).toBe(403);
-      expect(await res.json(), body).toEqual({ error: 'not_on_sale', message: PLAN_SALE_PAUSED });
-    }
-    expect(m.touched).toEqual([]);                                           // no charge, no plan, no wallet read
-  });
-
-  it('still asks who you are first', async () => {
-    m.session = null;
-    const res = await post('{}');
-    expect(res.status).toBe(401);
-    expect(m.touched).toEqual([]);
-  });
-
-  it('and spend() refuses both SKUs from any other route: they are held in NOT_ON_SALE, still registered', async () => {
-    const lookupOnly = new Proxy({}, {
-      get: (_t, prop) => {
-        if (prop === 'then') return undefined;
-        if (prop === 'walletLedgerEntry') return { findUnique: async () => null };
-        throw new Error(`spend touched prisma.${String(prop)}`);
-      },
-    }) as never;
-    for (const skuId of WORKOUT_PLAN_SKUS) {
-      expect(NOT_ON_SALE.has(skuId), skuId).toBe(true);
-      expect(getSku(skuId), skuId).not.toBeNull();
-      expect(skuOnSale(skuId), skuId).toBe(false);
-      const err = await spend(lookupOnly, { playerId: 'u1', idempotencyKey: `k_${skuId}`, skuId, quantity: 1 }).then(() => null, (e: unknown) => e);
-      expect(err, skuId).toBeInstanceOf(WalletError);
-      expect((err as WalletError).code, skuId).toBe('NOT_ON_SALE');
-    }
   });
 });
 

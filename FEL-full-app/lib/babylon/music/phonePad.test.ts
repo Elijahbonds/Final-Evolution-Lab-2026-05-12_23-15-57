@@ -3,10 +3,14 @@
 // and the round-trip correction a phone tap gets before ARM REC records it and PERFORM judges it. The phone's half (the
 // velocity rule, the buzz, the controller page left unchanged for every other mode) is lib/controller-link/schemas/
 // padFeel.test.ts and components/controller-link/controller-page.test.tsx.
+import fs from 'node:fs';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { toastSpot } from './ui/gridMath';
 import {
-  MAX_ONE_WAY_MS, PAD_GAIN, PHONE_BANKS, RTT_WINDOW, medianRtt, oneWaySec, padGain, padVelocity, phoneBadgeShown, phoneCommand,
+  MAX_ONE_WAY_MS, PAD_GAIN, PHONE_BADGE_ANCHOR, PHONE_BADGE_ROW, PHONE_BANKS, RTT_WINDOW, medianRtt, oneWaySec, padGain, padVelocity, phoneBadgeRow, phoneBadgeRowStyle, phoneBadgeShown, phoneCommand,
   phoneRoomOpen, phoneTapSec, pushRtt, transportEffect, judgesPhoneTap,
+  phonePadRole,
 } from './phonePad';
 import { MODE_CONTROLLERS } from '@/lib/controller-link/schemas/registry';
 import { tapStep, type StepClock } from './FlipPad';
@@ -190,19 +194,25 @@ describe('the room\'s wiring (source pins)', () => {
     expect(lobby).toBeGreaterThan(0);
     expect(room.indexOf('<HostLobby ', lobby + 1)).toBe(-1);                    // one room, not one per tab
     expect(lobby).toBeLessThan(flipTab);
-    expect(room).toMatch(/\{phoneRoom && \(\s*<div data-qa="phone-room"[^>]*>\s*<HostLobby config=\{MODE_CONTROLLERS\.music_flip\} collapsed onInput=\{phoneInput\} onPeers=\{phonePeers\} \/>/);
+    // MUSIC-SUITE P6 phone-replay: + the room's live state for the phone (roomState, phonePad.phoneRoomState)
+    // MUSIC-SUITE P10 (2026-09-29): + the badge's own row (anchor={PHONE_BADGE_ANCHOR}: it floated over the header before)
+    expect(room).toMatch(/\{phoneRoom && \(\s*<div data-qa="phone-room"[^>]*>\s*<HostLobby config=\{MODE_CONTROLLERS\.music_flip\} collapsed onInput=\{phoneInput\} onPeers=\{phonePeers\} roomState=\{phoneState\} anchor=\{PHONE_BADGE_ANCHOR\} \/>/);
     expect(room).toContain('useEffect(() => { setPhoneRoom((on) => phoneRoomOpen(on, view)); }, [view]);');
   });
   it('the bank and ARM REC are the room\'s; a phone pad is judged in PERFORM at its corrected time; FLIP records through the room', () => {
     expect(room).toContain('bank={flipBank} onBank={setFlipBank} recArm={flipRecArm} onRecArm={setFlipRecArm}');
     expect(room).toContain('atSec: phoneTapSec(arrival, rttMs)');
     // MUSIC-SUITE P5 FIX PASS: only where a screen tap counts (judgesPhoneTap: PERFORM on the STUDIO view)
-    expect(room).toContain('if (judgesPhoneTap({ mode: modeRef.current, view }) && hit.atSec !== undefined) performTapAt(hit.atSec);');
+    // MUSIC-SUITE P6 (2026-09-25): …in the lane of the pad's ROW (performInput.performPhoneCommand)
+    expect(room).toContain('const performing = judgesPhoneTap({ mode: modeRef.current, view });');
+    expect(room).toContain("if (performing && hit.atSec !== undefined && perf?.kind === 'lane') performLaneTap(perf.lane, hit.atSec);");
     expect(room).toContain('onRecordHit={recordFlipHit} />');
     expect(room).toContain('if (fx === \'start\' || fx === \'stop\') playOrStop(true, fx);');
   });
   it('an Arena (staked) set judges a phone tap as it ARRIVES — a round trip the phone answers is not trusted with a stake', () => {
-    expect(room).toContain('if (at === undefined || arenaSet) set.tap(eng.context.currentTime); else set.tap(at);');
+    // MUSIC-SUITE P6 (2026-09-25): every tap is a LANE tap now (performLaneTap); the same rule, and the Arena records the arrival
+    expect(room).toContain('const now = at === undefined || arenaSet ? eng.context.currentTime : at;');
+    expect(room).toContain('set.tap(now, lane);');
   });
 });
 
@@ -213,5 +223,66 @@ describe('which phone hits a PERFORM set judges', () => {
     expect(judgesPhoneTap({ mode: 'perform', view: 'studio' })).toBe(true);
     for (const view of ['flip', 'library', 'creator', 'listen']) expect(judgesPhoneTap({ mode: 'perform', view }), view).toBe(false);
     expect(judgesPhoneTap({ mode: 'build', view: 'studio' })).toBe(false);
+  });
+});
+
+// MUSIC-SUITE P6 FIX PASS (2026-09-26): a phone PAD in PERFORM is a lane tap only; REC is refused in PERFORM; a phone can be
+// paired from PERFORM (and the Arena panel) — the badge shows where the player asked.
+describe('P6 fix pass: the phone in PERFORM', () => {
+  it('where a tap is judged (PERFORM on STUDIO) a pad is a LANE, never the Flip chop; elsewhere it is the MPC', () => {
+    expect(phonePadRole({ mode: 'perform', view: 'studio' })).toBe('lane');
+    expect(phonePadRole({ mode: 'perform', view: 'flip' })).toBe('instrument');
+    expect(phonePadRole({ mode: 'build', view: 'studio' })).toBe('instrument');
+  });
+  it('REC: refused while performing (disarm still works); unchanged everywhere else', () => {
+    expect(transportEffect('rec', { running: true, recArm: false, perform: true })).toBe('rec-refused');
+    expect(transportEffect('rec', { running: false, recArm: true, perform: true })).toBe('disarm');
+    expect(transportEffect('rec', { running: true, recArm: false })).toBe('arm');
+    expect(transportEffect('play', { running: false, recArm: false, perform: true })).toBe('start');
+  });
+  it('the pairing badge shows where the player asked to pair (PERFORM / the Arena panel), as well as on FLIP and while paired', () => {
+    expect(phoneBadgeShown('studio', 0)).toBe(false);
+    expect(phoneBadgeShown('studio', 0, true)).toBe(true);
+    expect(phoneBadgeShown('flip', 0)).toBe(true);
+    expect(phoneBadgeShown('library', 1)).toBe(true);
+  });
+});
+
+// MUSIC-SUITE P10 (2026-09-29): P5's open items on a phone — the badge over the header / "Calibrate ↗", and the room's
+// toast over the FLIP waveform right after a source loads. Measured live in musicsuite/p10/parked (the badge's and the
+// toast's rects against the title, the link and the waveform); here the wiring is pinned.
+describe('P10: the badge has its own row; the toast keeps clear of the waveform', () => {
+  const room = fs.readFileSync(path.resolve(__dirname, 'StudioMode.tsx'), 'utf8');
+  it('the badge row is positioned in the flow and the lobby is anchored inside it (not the page\'s top right)', () => {
+    expect(PHONE_BADGE_ROW.position).toBe('relative');
+    expect(PHONE_BADGE_ROW.minHeight).toBeGreaterThanOrEqual(24);      // the pill's height: nothing below slides under it
+    expect(PHONE_BADGE_ANCHOR).toBe('right-0 top-0');
+    // MUSIC-SUITE P10 FIX: the row's style comes from phoneBadgeRowStyle (shown / reserved / gone), not a bare ternary
+    expect(room).toContain('style={phoneBadgeRowStyle(badgeRow)}');
+    expect(room).toContain('const badgeRow = phoneBadgeRow(badgeShownNow, badgeViewRef.current === badgeViewKey);');
+    expect(room).toContain('anchor={PHONE_BADGE_ANCHOR}');
+  });
+  it('P10 FIX: once the badge showed on a view its row is reserved (a dropped phone never collapses it under a set)', () => {
+    // a phone paired from FLIP, PERFORM mid-set: shown; the phone drops (phones 1 → 0, no PAIR asked here): reserved
+    const onPerform = phoneBadgeShown('studio', 1, false);
+    expect(phoneBadgeRow(onPerform, true)).toBe('show');
+    expect(phoneBadgeRow(phoneBadgeShown('studio', 0, false), true)).toBe('reserve');
+    // a view it never showed on: no row at all (no dead space on a tab with no phone)
+    expect(phoneBadgeRow(false, false)).toBe('none');
+    // reserve keeps the SAME box (no shift), drawn invisible and untappable
+    const show = phoneBadgeRowStyle('show'), keep = phoneBadgeRowStyle('reserve');
+    expect([keep.position, keep.minHeight, keep.margin]).toEqual([show.position, show.minHeight, show.margin]);
+    expect(keep.visibility).toBe('hidden');
+    expect(keep.pointerEvents).toBe('none');
+    expect(phoneBadgeRowStyle('none')).toEqual({ display: 'none' });
+    expect(show).toBe(PHONE_BADGE_ROW);
+  });
+  it('the toast\'s keep-clear list includes the FLIP waveform, read by the same toastSpot the grid and transport use', () => {
+    expect(room).toContain("const TOAST_KEEP_CLEAR_QA = ['flip-waveform'] as const;");
+    expect(room).toContain('const rects = [...els, ...more]');
+    // the waveform in the bottom band, nothing else on screen: the line goes up (toastSpot's own rule)
+    expect(toastSpot(812, [{ top: 640, bottom: 760 }])).toBe('top');
+    // in the top band: it stays down
+    expect(toastSpot(812, [{ top: 40, bottom: 160 }])).toBe('bottom');
   });
 });

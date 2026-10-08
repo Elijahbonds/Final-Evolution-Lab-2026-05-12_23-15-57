@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import fs from 'node:fs';
+import path from 'node:path';
 import { Certify, CampGate, loadCamp, type CampLoad } from './camp-view';
 
 // HOTFIX (2026-09-24): the Certify tab reads its paper, and each module's attempt gate, from GET
@@ -133,5 +135,21 @@ describe('Camp, the first load: paywall, error, or the page', () => {
     expect(l.me).toBe('u1');
     const m = gated(l);
     expect(m).toBe(render());
+  });
+});
+
+describe('Camp plan selection wiring', () => {
+  const source = fs.readFileSync(path.resolve(__dirname, 'camp-view.tsx'), 'utf8');
+
+  it('normalizes stale plan selections before posting plan-scoped actions', () => {
+    expect(source).toContain('visiblePlanId(plans, planId)');
+    expect(source).toContain('goalPlanId: visibleId');
+    expect(source).toContain('await load(visibleId)');
+    expect(source).toContain('const plan = plans.find((p) => p.id === visibleId) ?? null');
+  });
+
+  it('binds plan dropdowns to the visible id, not a removed prior id', () => {
+    const selectBindings = source.match(/<select value=\{visibleId\}/g) ?? [];
+    expect(selectBindings.length).toBeGreaterThanOrEqual(3);
   });
 });

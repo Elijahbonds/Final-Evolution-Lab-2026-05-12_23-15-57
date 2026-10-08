@@ -4,17 +4,21 @@ import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { proofLineFor, type ProofVerdict } from '@/lib/proofLine';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Maximize2, Minimize2, ArrowLeft, RotateCcw, Home, Loader2, Trophy, Sparkles, Gem, Coins, TrendingUp, TrendingDown, Crown, Award, Share2, Check, PartyPopper, ArrowRight } from 'lucide-react';
+import { AnimatePresence } from 'framer-motion';
+import { Maximize2, Minimize2, ArrowLeft, Loader2 } from 'lucide-react';
 import type { PrqGrade } from '@/lib/prq';
 import { readPrqDisplay, type PrqDisplay } from '@/lib/prq-display';
 import { PhysicalGamepadPoller } from '@/lib/gamepad-bridge';
 import { getScheme } from '@/lib/input-schemes';
 import { isBabylon } from '@/components/three/flags';
-import { canFullscreen, isFullscreen, isLandscapePhone, toggleFullscreen } from '@/lib/ui/fullscreen';
+import { canFullscreen, isFullscreen, toggleFullscreen } from '@/lib/ui/fullscreen';
+import { consoleLayout, consoleStageVars, type ConsoleLayout } from '@/lib/ui/consoleView';
 import { VirtualController } from './virtual-controller';
 import { ReplayInPlaceContext } from './replay-in-place';
 import { BodyControl } from './body-control';
+import { GraphicsToggle } from './graphics-toggle';
+import { GameCaptureHud } from '@/components/capture/game-capture-hud';
+import { LearnWhileYouWait } from '@/components/learn/learn-while-you-wait';
 import type { SessionTallies } from '@/lib/game-systems';
 // QA merge note (feature/qa-fixes-0927 x origin/lane/finish-release 46a8dc6a): ECONOMY-SESSIONS-HARDEN removed
 // reportEarnGrant / EndCardRewards / EndCardClaim / walletGrantsFrom / the CLAIM feature entirely — coins now pay
@@ -24,12 +28,15 @@ import type { SessionTallies } from '@/lib/game-systems';
 import { sessionStore, markRun, countedSince } from '@/lib/babylon/core/sessionStore';
 import { agentPlayEvidence } from '@/lib/babylon/core/AgentBridge';
 import { isPlayedRun } from './played-evidence';
-import { arenaRefusal, storyRefusal, ArenaRefusedLine, StoryRefusedPanel, type Refusal } from './end-card-refusal';
-import { EndCardClaim } from './end-card-rewards';
-import { unpaidLine, unpaidReason, unpaidTitle } from '@/lib/sessions/unpaidCopy';
+import { arenaRefusal, storyRefusal, type Refusal } from './end-card-refusal';
+import { EndScreen } from './end-screen/end-screen';
+import type { EndGoals } from './end-screen/types';
+import { unpaidReason } from '@/lib/sessions/unpaidCopy';
+import { PartyInvite } from '@/components/party/party-invite';   // MULTIPLAYER: the results card's door to the party room
+import { formReadStore, formForPost } from '@/lib/move/formRead';   // HOOPS BODY (P10): the run's FORM read, adults only
 import {
   type CarnivalStop, type CarnivalRunState,
-  recordCarnivalResult, carnivalStopLabel, carnivalStopHref, carnivalRunTotalScore, clearCarnivalRun,
+  recordCarnivalResult, clearCarnivalRun,
 } from '@/lib/carnival-run';
 
 export interface GameResult {
@@ -92,6 +99,15 @@ interface RecapData {
   grade?: { label: string; color: string };
   season?: SeasonRecap | null;
   mastery?: MasteryRecap | null;
+  capMessage?: string;
+  /** END SCREEN: the server's streak after this run, and the streak Lab Credits inside `credits` (read for the card only). */
+  streakDays?: number;
+  streakBonus?: number;
+  /** END SCREEN (2026-10-06): the account XP after the run (the level bar), today's goals, the run's session id (the
+   *  account-best read leaves it out). Read for the card only. */
+  profileXp?: number;
+  goals?: EndGoals | null;
+  sessionId?: string | null;
 }
 
 export function GameShell(props: {
@@ -133,6 +149,7 @@ function GameShellInner({
   const signatureFlag = searchParams.get('signature');
   const arenaMatchId = searchParams.get('arena');
   const mpCode = searchParams.get('mp');   // pass 5 phase 5: an async challenge code — accept it with this run's session
+  const challengeCode = searchParams.get('c'); // K-factor challenge link: /c/<code> -> /play/<mode>?c=<code>
   const carnivalFlag = searchParams.get('carnival');
   // ECONOMY-SESSIONS-HARDEN: an agent or playtest run is started as one, so the server records it and pays nothing
   const agentRun = searchParams.get('agent') === '1';
@@ -157,11 +174,14 @@ function GameShellInner({
   /** The Story route refused this run (end-card-refusal): the card says why instead of saying nothing. */
   const [storyRefused, setStoryRefused] = useState<Refusal | null>(null);
   const [mpResult, setMpResult] = useState<{ status: string; hostScore: number; guestScore: number; hostName?: string; iWon: boolean; tie: boolean } | null>(null);
+  const [challengeResult, setChallengeResult] = useState<{ beat: boolean; targetScore: number; margin: number; vs?: string; rematchPath?: string } | null>(null);
   const [arenaResult, setArenaResult] = useState<
     | { settled: boolean; status: string; result?: string; iWon?: boolean; payout?: number; feeLc?: number; myScore?: number; oppScore?: number; refused?: Refusal }
     | null
   >(null);
   const [gameKey, setGameKey] = useState(0);
+  /** Stream mode: a 16:9 stage with the chrome hidden, for OBS or a phone's own screen broadcast. */
+  const [streamOn, setStreamOn] = useState(false);
   // FEATURES-UX-SHOP (2026-09-08): browsing is not playing. A mode left idle ends on its own clock and used to post a
   // score-0 session that paid XP, a profile shard, streak credits and the 40-coin "Session completed" floor. The shell
   // now counts the presses it saw while the run was live (keys — the pad bridge and the touch deck both emit them —
@@ -186,8 +206,20 @@ function GameShellInner({
     const url = `/api/sessions/start${agentRun ? '?agent=1' : ''}`;
     return fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode, ...(playtestRun ? { playtest: true } : {}) }) })
       .then((r) => (r?.ok ? r.json() : null))
-      .then((j) => (typeof j?.runId === 'string' ? j.runId : null))
-      .catch(() => null);
+      .then((j) => {
+        if (j && typeof j.runId === 'string') {
+          import('@/lib/agentRunHooks').then(({ setAgentRunHooksAllowed }) => {
+            setAgentRunHooksAllowed(Boolean(j.agentRun));
+          });
+          return j.runId as string;
+        }
+        import('@/lib/agentRunHooks').then(({ setAgentRunHooksAllowed }) => setAgentRunHooksAllowed(false));
+        return null;
+      })
+      .catch(() => {
+        import('@/lib/agentRunHooks').then(({ setAgentRunHooksAllowed }) => setAgentRunHooksAllowed(false));
+        return null;
+      });
   }, [mode, agentRun, playtestRun]);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [shareState, setShareState] = useState<'idle' | 'minting' | 'copied'>('idle');
@@ -290,12 +322,18 @@ function GameShellInner({
             harnessEvidence: countedSince(sessionStore.record(), runMark.current),
             agentEvidence: agentPlayEvidence(),
           }),
+          // HOOPS BODY (P10): the body's form read for this run — null for a minor or an unknown age (formForPost); the route
+          // bounds it (formSummary.boundFormSummary) and writes it only for a verified, opted-in 18+ account
+          ...(() => { let st: Storage | null = null; try { st = sessionStorage; } catch { /* none */ }
+            const form = formForPost(formReadStore.finishRun(sessionStore.record()?.runId), st); return form ? { form } : {}; })(),
         }),
       }))
         // a refusal (SCORE_INVALID, RUN_MISSING, RUN_EXPIRED…) is a 4xx whose body says why: read it for the card
         .then((r) => (r ? r.json().catch(() => null) : null))
         .then(async (j) => {
           if (j?.ok) {
+            // ECONOMY-CAPS (c): a replayed finish returns the stored body verbatim — no second reward card.
+            if (j?.replayed) return;
             if (mine()) setRecap({
               noPlay: Boolean(j?.noPlay),
               ...(j?.paid === false && !j?.noPlay ? { unpaid: String(j?.reason ?? 'UNPAID') } : {}),
@@ -308,6 +346,12 @@ function GameShellInner({
               grade: j?.grade,
               season: j?.season ?? null,
               mastery: j?.mastery ?? null,
+              capMessage: typeof j?.capMessage === 'string' ? j.capMessage : undefined,
+              ...(Number.isFinite(j?.streakDays) ? { streakDays: Number(j.streakDays) } : {}),
+              ...(Number.isFinite(j?.streakBonus) ? { streakBonus: Number(j.streakBonus) } : {}),
+              ...(Number.isFinite(j?.profileXp) ? { profileXp: Number(j.profileXp) } : {}),
+              ...(j?.goals && typeof j.goals === 'object' ? { goals: j.goals as EndGoals } : {}),
+              ...(typeof j?.sessionId === 'string' ? { sessionId: j.sessionId } : {}),
             });
             // ECONOMY-SESSIONS-HARDEN (2026-09-28): the wallet coins this run paid come IN the session's answer — the server
             // wrote them in the run's own transaction (they were two earn reports from here, keyed by the new session's id,
@@ -407,6 +451,25 @@ function GameShellInner({
               } catch {}
             }
 
+            if (challengeCode) {
+              try {
+                const cj = await fetch(`/api/challenge/${encodeURIComponent(challengeCode)}/attempt`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ attemptScore: res?.score ?? 0, attemptTag: 'ATHLETE' }),
+                }).then((r2) => (r2.ok ? r2.json() : null));
+                if (cj && mine()) {
+                  setChallengeResult({
+                    beat: Boolean(cj.beat),
+                    targetScore: Number(cj.targetScore ?? 0),
+                    margin: Number(cj.margin ?? 0),
+                    vs: typeof cj.vs === 'string' ? cj.vs : undefined,
+                    rematchPath: typeof cj.rematch?.path === 'string' ? cj.rematch.path : undefined,
+                  });
+                }
+              } catch {}
+            }
+
             // Court Carnival relay: this stop's reward already posted above
             // through the normal pipeline — this only advances the run so
             // the recap can offer "next stop" instead of Replay/Hub.
@@ -440,7 +503,7 @@ function GameShellInner({
         })
         .catch(() => { if (mine()) setRecap({ xp: 0, shards: 0, credits: 0, prqDelta: 0, prqAfter: 0 }); });
     },
-    [mode, storyNodeId, signatureFlag, arenaMatchId, carnivalFlag, mpCode]
+    [mode, storyNodeId, signatureFlag, arenaMatchId, carnivalFlag, mpCode, challengeCode]
   );
 
   // REPLAY IN PLACE (BRAINBRAWL-RESIDUAL, 2026-09-24): a game that can start its next match on the stage it already has
@@ -458,6 +521,7 @@ function GameShellInner({
     setArenaResult(null);
     setStoryRefused(null);
     setMpResult(null);
+    setChallengeResult(null);
     setShareUrl(null);
     setShareState('idle');
     // the next run's evidence of play starts from zero, as a remount would start it — the game's record too: marked before
@@ -537,11 +601,20 @@ function GameShellInner({
   // plenty of laptops, so a width test gets it exactly backwards.
   const stageRef = useRef<HTMLDivElement | null>(null);
   const [immersive, setImmersive] = useState(false);
+  // CONSOLE VIEW (console-view lane, 2026-10-06; lib/ui/consoleView.ts). Owner: "it looks bad when you screen mirror …
+  // it needs to feel like a console game." The rule above was a landscape PHONE only, so a laptop or console browser on
+  // a TV (1920x1080, 1280x720) kept the page: the header, a 1200 px column, a 16:10 window and a scrolling page. Every
+  // sideways screen is now the console view, and the stage carries the HUD's height-scaled zoom and title-safe frame.
+  const [layout, setLayout] = useState<ConsoleLayout>(() => consoleLayout(0, 0));
   const [fsAvailable, setFsAvailable] = useState(false);
   const [fsOn, setFsOn] = useState(false);
 
   useEffect(() => {
-    const measure = () => setImmersive(isLandscapePhone(window.innerWidth, window.innerHeight));
+    const measure = () => {
+      const l = consoleLayout(window.innerWidth, window.innerHeight);
+      setLayout((prev) => (prev.console === l.console && prev.hudZoom === l.hudZoom && prev.safeX === l.safeX && prev.safeY === l.safeY ? prev : l));
+      setImmersive(l.console);
+    };
     measure();
     setFsAvailable(canFullscreen(stageRef.current));
     const onFs = () => setFsOn(isFullscreen());
@@ -566,6 +639,19 @@ function GameShellInner({
     return () => { document.body.style.overflow = prev; };
   }, [immersive, fsOn]);
 
+  // viewport-fit=cover while a game is mounted (console-view, 2026-10-06). A phone held sideways — the screen that gets
+  // mirrored to the TV — otherwise gives its notch side and home-indicator side to Safari, which paints them as page-colour
+  // bars down both edges of the game. With cover the canvas runs edge to edge and the HUD keeps clear of the notch on its
+  // own (env(safe-area-inset-*): the console frame in app/game-surface.css, TouchOverlay). Set here, not in a layout,
+  // so only the game pages change; restored on the way out.
+  useEffect(() => {
+    const meta = document.querySelector<HTMLMetaElement>('meta[name="viewport"]');
+    if (!meta || /viewport-fit\s*=\s*cover/.test(meta.content)) return;
+    const prev = meta.content;
+    meta.content = `${prev}, viewport-fit=cover`;
+    return () => { meta.content = prev; };
+  }, []);
+
   const onFullscreen = useCallback(() => { void toggleFullscreen(stageRef.current); }, []);
 
   const fullBleed = immersive || fsOn;
@@ -574,7 +660,7 @@ function GameShellInner({
     <div className={fullBleed ? 'flex h-[100dvh] flex-col overflow-hidden bg-[#050505]' : 'flex min-h-screen flex-col bg-[#050505]'}>
       {/* Sideways on a phone, the header is a fifth of the screen spent on a back link. It goes; the way out
           lives on the stage instead, where a thumb already is. */}
-      <header className={`sticky top-0 z-40 border-b border-white/10 bg-[#050505]/85 backdrop-blur-md ${fullBleed ? 'hidden' : ''}`}>
+      <header data-game-chrome className={`sticky top-0 z-40 border-b border-white/10 bg-[#050505]/85 backdrop-blur-md ${fullBleed || streamOn ? 'hidden' : ''}`}>
         <div className="mx-auto flex max-w-[1200px] items-center gap-3 px-4 py-2.5">
           <Link
             href="/"
@@ -598,6 +684,7 @@ function GameShellInner({
               a body to the same FelInput a gamepad produces and emitToLive posts it to whichever bus is running,
               so no mode file knows this exists. */}
           <BodyControl />
+          <GraphicsToggle />   {/* visual-foundation: Auto / Performance / Quality, applied on the next load */}
           {fsAvailable && (
             <button
               type="button"
@@ -614,14 +701,18 @@ function GameShellInner({
 
       <div
         ref={stageRef}
+        data-fel-stream={streamOn ? '1' : undefined}
+        data-fel-console={fullBleed ? '1' : undefined}
+        style={fullBleed ? consoleStageVars(layout) as React.CSSProperties : undefined}
         className={fullBleed
           ? 'relative w-full flex-1 overflow-hidden'
           : 'relative mx-auto w-full max-w-[1200px] flex-1 px-2 py-3 sm:px-4'}
       >
+        <GameCaptureHud mode={mode} stageRef={stageRef} streamOn={streamOn} onStreamMode={setStreamOn} />
         {/* The two controls the header was carrying, as thumb-sized glass over the corner of the stage. Only
             while full-bleed — with the header up they would be a second copy of it. */}
-        {fullBleed && (
-          <div className="pointer-events-none absolute right-2 top-2 z-30 flex items-center gap-1.5">
+        {fullBleed && !streamOn && (
+          <div data-game-chrome data-fel-corner className="pointer-events-none absolute right-2 top-2 z-30 flex items-center gap-1.5">
             <Link
               href="/play"
               aria-label="Leave the game"
@@ -654,269 +745,49 @@ function GameShellInner({
           <ReplayInPlaceContext.Provider value={registerReplay}>
             <Game key={gameKey} grade={profile.grade} prq={profile.prq} prqDisplay={profile.display} onEnd={handleEnd} {...(gameProps ?? {})} />
           </ReplayInPlaceContext.Provider>
-        ) : (
+        ) : !unreachable ? (
           <div className="flex h-[60vh] items-center justify-center">
             <Loader2 className="h-8 w-8 animate-spin text-[#00E5FF]" />
           </div>
-        )}
+        ) : null}
 
+        {/* END SCREEN (owner, 2026-10-06): the sequenced, console-style finish — components/games/end-screen. The card reads
+            exactly what this shell holds; what counts as a win stays decided above (cardWon / cardHeadline). Slots for the
+            lanes building on it: extraActions (multiplayer) and sideCards (knowledge-feed). */}
         <AnimatePresence>
           {result && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 px-4 backdrop-blur-sm"
-            >
-              <motion.div
-                initial={{ y: 60, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                transition={{ type: 'spring', damping: 22 }}
-                className="fel-panel w-full max-w-md rounded-2xl p-7 text-center"
-              >
-                <Trophy className={`mx-auto h-12 w-12 ${cardWon ? 'text-[#FFD700]' : 'text-white/30'}`} />
-                <h2 className="fel-heading mt-3 text-4xl font-bold text-white">
-                  {cardHeadline}
-                </h2>
-                <p className="mt-1 font-mono text-sm text-white/50">
-                  {arenaVerdict && arenaVerdict !== 'PENDING' && typeof arenaOpp === 'number'
-                    ? `Score ${arenaResult?.myScore ?? result.score} — ${arenaOpp} house rival`
-                    : <>Score {result.score}{typeof result.opponentScore === 'number' && result.opponentScore > 0 ? ` — ${result.opponentScore}` : ''}</>}
-                </p>
-
-                {carnivalFlag && carnivalRun && (
-                  <div className="mt-3 rounded-lg border border-[#FFD700]/30 bg-[#FFD700]/10 p-3 text-center">
-                    <p className="flex items-center justify-center gap-1.5 text-xs font-bold text-[#FFD700]">
-                      <PartyPopper className="h-3.5 w-3.5" /> CARNIVAL NIGHT — STOP {carnivalRun.index} OF {carnivalRun.lineup.length}
-                    </p>
-                    <p className="mt-1 font-mono text-sm text-white/70">
-                      Running total: {carnivalRunTotalScore(carnivalRun)}
-                    </p>
-                  </div>
-                )}
-
-                {recap ? (
-                  <>
-                  {recap.noPlay ? (
-                    <div className="fel-card mt-6 rounded-lg p-4 text-center">
-                      <div className="font-mono text-sm font-bold text-white/70">NO PLAY RECORDED</div>
-                      <div className="mt-1 text-xs text-white/40">The run ended before you got going — nothing earned, nothing counted. Play again to score.</div>
-                    </div>
-                  ) : (
-                  <>
-                  {recap.unpaid && (
-                    <div data-recap="unpaid" className="fel-card mt-6 rounded-lg p-3 text-center">
-                      <div className="font-mono text-xs font-bold text-white/70">{unpaidTitle(recap.unpaid)}</div>
-                      <div className="mt-0.5 text-[11px] text-white/40">{unpaidLine(recap.unpaid)}</div>
-                    </div>
-                  )}
-                  <div className="mt-6 grid grid-cols-2 gap-3">
-                    <div className="fel-card rounded-lg p-3">
-                      <Sparkles className="mx-auto h-4 w-4 text-[#00FF9D]" />
-                      <div className="mt-1 font-mono text-xl font-bold text-[#00FF9D]">+{recap.xp}</div>
-                      <div className="text-[10px] uppercase tracking-wider text-white/40">XP</div>
-                    </div>
-                    <div className="fel-card rounded-lg p-3">
-                      <Gem className="mx-auto h-4 w-4 text-[#A855F7]" />
-                      <div className="mt-1 font-mono text-xl font-bold text-[#A855F7]">+{recap.shards}</div>
-                      <div className="text-[10px] uppercase tracking-wider text-white/40">Shards</div>
-                    </div>
-                    <div className="fel-card rounded-lg p-3">
-                      <Coins className="mx-auto h-4 w-4 text-[#FFD700]" />
-                      <div className="mt-1 font-mono text-xl font-bold text-[#FFD700]">+{recap.credits}</div>
-                      <div className="text-[10px] uppercase tracking-wider text-white/40">Credits</div>
-                    </div>
-                    <div className="fel-card rounded-lg p-3">
-                      {recap.prqDelta >= 0 ? (
-                        <TrendingUp className="mx-auto h-4 w-4 text-[#00E5FF]" />
-                      ) : (
-                        <TrendingDown className="mx-auto h-4 w-4 text-[#FF3366]" />
-                      )}
-                      <div className={`mt-1 font-mono text-xl font-bold ${recap.prqDelta >= 0 ? 'text-[#00E5FF]' : 'text-[#FF3366]'}`}>
-                        {recap.prqDelta >= 0 ? '+' : ''}
-                        {recap.prqDelta}
-                      </div>
-                      <div className="text-[10px] uppercase tracking-wider text-white/40">PRQ Δ</div>
-                    </div>
-                    {recapCoins !== null && (
-                      <div data-recap="coins" data-capped={recapCoins.capped ? '1' : undefined} className="fel-card col-span-2 flex items-center justify-center gap-2 rounded-lg p-3">
-                        <Coins className="h-4 w-4 text-[#FFB020]" />
-                        {recapCoins.coins > 0 && <span className="font-mono text-xl font-bold text-[#FFB020]">+{recapCoins.coins}</span>}
-                        <span className="text-[10px] uppercase tracking-wider text-white/40">
-                          {recapCoins.coins > 0 ? (recapCoins.capped ? 'Wallet coins · limit reached' : 'Wallet coins') : 'Wallet coin limit reached for now'}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                  </>
-                  )}
-                  {storyRefused && <StoryRefusedPanel refusal={storyRefused} />}
-                  {storyReward && (
-                    <div className="mt-3 rounded-lg border border-[#A855F7]/30 bg-[#A855F7]/10 p-3 text-center">
-                      <p className="text-xs font-bold text-[#A855F7]">STORY NODE COMPLETE</p>
-                      <p className="mt-1 font-mono text-sm text-[#FFD700]">+{storyReward.rewardLC} LC</p>
-                      {storyReward.badge && (
-                        <p className="mt-1 text-xs text-amber-400">{'🏆'} {storyReward.badge.name}</p>
-                      )}
-                    </div>
-                  )}
-
-                  {/* M14 Triumph Arena — duel result */}
-                  {mpResult && (
-                    <div className={`mt-3 rounded-lg border p-3 text-center ${mpResult.tie ? 'border-white/25 bg-white/[0.05]' : mpResult.iWon ? 'border-[#00FF9D]/40 bg-[#00FF9D]/10' : 'border-[#FF3366]/40 bg-[#FF3366]/10'}`}>
-                      <p className="text-xs font-bold tracking-wide text-white/80">FRIEND CHALLENGE</p>
-                      <p className="mt-1 text-sm text-white/80">{mpResult.tie ? 'Dead heat' : mpResult.iWon ? 'You took it' : `${mpResult.hostName ?? 'They'} held it`} — your best {mpResult.guestScore.toLocaleString('en-US')} vs their {mpResult.hostScore.toLocaleString('en-US')}</p>
-                    </div>
-                  )}
-                  {arenaResult && (
-                    <div
-                      className={`mt-3 rounded-lg border p-3 text-center ${
-                        !arenaResult.settled
-                          ? 'border-white/20 bg-white/[0.04]'
-                          : arenaResult.result === 'tie'
-                          ? 'border-white/25 bg-white/[0.05]'
-                          : arenaResult.iWon
-                          ? 'border-[#00FF9D]/40 bg-[#00FF9D]/10'
-                          : 'border-[#FF3366]/40 bg-[#FF3366]/10'
-                      }`}
-                    >
-                      <p className="text-xs font-bold tracking-wide text-white/80">TRIUMPH ARENA</p>
-                      {arenaResult.refused ? (
-                        <ArenaRefusedLine refusal={arenaResult.refused} />
-                      ) : !arenaResult.settled ? (
-                        <p className="mt-1 text-sm text-white/70">Score locked in — waiting for your opponent to finish.</p>
-                      ) : arenaResult.result === 'tie' ? (
-                        <p className="mt-1 text-sm text-white/80">Tie — both entries refunded ({arenaResult.feeLc} LC each).</p>
-                      ) : arenaResult.iWon ? (
-                        <p className="mt-1 font-mono text-sm font-bold text-[#00FF9D]">You won the duel — +{arenaResult.payout} LC</p>
-                      ) : (
-                        <p className="mt-1 text-sm text-[#FF3366]">You lost this duel. Better luck next time.</p>
-                      )}
-                      {arenaResult.settled && typeof arenaResult.myScore === 'number' && typeof arenaResult.oppScore === 'number' && (
-                        <p className="mt-1 font-mono text-[11px] text-white/60">Your {arenaResult.myScore.toLocaleString('en-US')} vs the house rival&apos;s {arenaResult.oppScore.toLocaleString('en-US')}</p>
-                      )}
-                      <a href="/arena" className="mt-2 inline-block text-[11px] text-[#00E5FF] underline">
-                        Back to the Arena
-                      </a>
-                    </div>
-                  )}
-
-                  {/* M13.2 season pass progress + tier-up feedback */}
-                  {recap.season && (
-                    <div className="mt-3 rounded-lg border border-[#FFD700]/25 bg-[#FFD700]/[0.06] p-3 text-left">
-                      <div className="flex items-center justify-between">
-                        <span className="flex items-center gap-1.5 text-xs font-bold text-[#FFD700]">
-                          <Crown className="h-3.5 w-3.5" /> {recap.season.name}
-                        </span>
-                        <span className="font-mono text-[11px] text-white/60">+{recap.season.gained} season XP</span>
-                      </div>
-                      <div className="mt-2 flex items-center gap-2">
-                        <span className="font-mono text-[11px] text-white/50">T{recap.season.tier}</span>
-                        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/10">
-                          <div
-                            className="h-full rounded-full bg-[#FFD700]"
-                            style={{ width: `${Math.min(100, Math.round((recap.season.into / Math.max(1, recap.season.need)) * 100))}%` }}
-                          />
-                        </div>
-                        <span className="font-mono text-[11px] text-white/50">T{recap.season.tier + 1}</span>
-                      </div>
-                      {recap.season.tierUps.length > 0 && (
-                        <p className="mt-2 text-center text-xs font-bold text-[#FFD700]">
-                          {'🎖'} TIER UP! Reached Tier {recap.season.tierUps[recap.season.tierUps.length - 1].tier}
-                        </p>
-                      )}
-                    </div>
-                  )}
-
-                  {/* M13.3 mastery-up feedback */}
-                  {recap.mastery && recap.mastery.ups.length > 0 && (
-                    <div className="mt-3 rounded-lg border border-[#00E5FF]/30 bg-[#00E5FF]/10 p-3 text-center">
-                      <p className="flex items-center justify-center gap-1.5 text-xs font-bold text-[#00E5FF]">
-                        <Award className="h-3.5 w-3.5" /> MASTERY UP — {recap.mastery.ups[recap.mastery.ups.length - 1].tier}
-                      </p>
-                    </div>
-                  )}
-
-                  {/* M13.4 share challenge (K-factor loop) — not for a score the Arena refused */}
-                  {!arenaRefused && <button
-                    onClick={() => void shareChallenge()}
-                    disabled={shareState === 'minting'}
-                    className="fel-heading mt-3 flex w-full items-center justify-center gap-2 rounded-md border border-[#A855F7]/50 bg-[#A855F7]/10 py-2.5 text-sm font-bold text-[#A855F7] transition-colors hover:bg-[#A855F7]/20 disabled:opacity-60"
-                  >
-                    {shareState === 'copied' ? (
-                      <><Check className="h-4 w-4" /> CHALLENGE LINK COPIED</>
-                    ) : shareState === 'minting' ? (
-                      <><Loader2 className="h-4 w-4 animate-spin" /> MINTING…</>
-                    ) : (
-                      <><Share2 className="h-4 w-4" /> CHALLENGE A FRIEND</>
-                    )}
-                  </button>}
-                  {proofLine && (
-                    <button
-                      onClick={shareProof}
-                      disabled={shareState === 'minting'}
-                      className="fel-heading mt-2 flex w-full items-center justify-center gap-2 rounded-md border border-[#00E5FF]/50 bg-[#00E5FF]/10 py-2.5 text-sm font-bold text-[#00E5FF] transition-colors hover:bg-[#00E5FF]/20 disabled:opacity-60"
-                    >
-                      <Share2 className="h-4 w-4" /> Share proof · {proofLine}
-                    </button>
-                  )}
-                  {shareUrl && (
-                    <p className="mt-1 break-all font-mono text-[10px] text-white/40">{shareUrl}</p>
-                  )}
-                  </>
-                ) : (
-                  <div className="mt-6 flex justify-center">
-                    <Loader2 className="h-6 w-6 animate-spin text-[#00E5FF]" />
-                  </div>
-                )}
-
-                {carnivalFlag && carnivalRun ? (
-                  <div className="mt-6">
-                    {carnivalRun.index < carnivalRun.lineup.length ? (
-                      <button
-                        onClick={() => router.push(carnivalStopHref(carnivalRun.lineup[carnivalRun.index]))}
-                        className="fel-heading flex w-full items-center justify-center gap-2 rounded-md bg-[#FFD700] py-3 text-base font-bold text-black transition-all hover:bg-[#FFD700]/85"
-                      >
-                        <ArrowRight className="h-4 w-4" /> NEXT: {carnivalStopLabel(carnivalRun.lineup[carnivalRun.index]).toUpperCase()}
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => router.push('/play/carnival/recap')}
-                        className="fel-heading flex w-full items-center justify-center gap-2 rounded-md bg-[#FFD700] py-3 text-base font-bold text-black transition-all hover:bg-[#FFD700]/85"
-                      >
-                        <PartyPopper className="h-4 w-4" /> SEE CARNIVAL RESULTS
-                      </button>
-                    )}
-                  </div>
-                ) : (
-                  <div className="mt-6 flex gap-3">
-                    <button
-                      onClick={replay}
-                      className="fel-heading flex flex-1 items-center justify-center gap-2 rounded-md bg-[#00E5FF] py-3 text-base font-bold text-black transition-all hover:bg-[#00E5FF]/85"
-                    >
-                      <RotateCcw className="h-4 w-4" /> REPLAY
-                    </button>
-                    {/* QA (PM ruling): no CLAIM on a paused mode (recap.unpaid — 422 no_rules), a replayed finish
-                        (the original result, not a fresh grant), or a practice run (agent / playtest / /dev) — and
-                        nothing to claim on an empty run either. */}
-                    {recap && !recap.unpaid && !recap.replayed && !agentRun && !playtestRun
-                      && (recap.xp > 0 || recap.shards > 0 || recap.credits > 0 || (recapCoins?.coins ?? 0) > 0)
-                      && <EndCardClaim />}
-                    <Link
-                      href={storyNodeId ? '/story' : '/'}
-                      className="fel-heading flex flex-1 items-center justify-center gap-2 rounded-md border border-white/15 py-3 text-base font-bold text-white/80 transition-colors hover:border-[#00E5FF]/60 hover:text-[#00E5FF]"
-                    >
-                      <Home className="h-4 w-4" /> {storyNodeId ? 'Map' : 'Home'}
-                    </Link>
-                  </div>
-                )}
-              </motion.div>
-            </motion.div>
+            <EndScreen
+              key={runSeq.current}
+              mode={mode}
+              title={title}
+              run={result}
+              headline={cardHeadline}
+              won={cardWon}
+              proofLine={proofLine}
+              arenaRefused={arenaRefused}
+              arenaVerdict={arenaVerdict}
+              staked={Boolean(arenaMatchId)}
+              recap={recap}
+              coins={recapCoins}
+              storyNodeId={storyNodeId}
+              storyReward={storyReward}
+              storyRefused={storyRefused}
+              mpResult={mpResult}
+              challengeResult={challengeResult}
+              arenaResult={arenaResult}
+              carnivalRun={carnivalFlag ? carnivalRun : null}
+              signatureRun={Boolean(signatureFlag)}
+              share={{ state: shareState, url: shareUrl, onChallenge: () => void shareChallenge(), onProof: shareProof }}
+              onReplay={replay}
+              onNavigate={(href) => router.push(href)}
+              /* MULTIPLAYER: a game friends can play together offers the couch (not on a staked run); KNOWLEDGE-FEED v1: one card for the idle moment */
+              sideCards={<>{!arenaMatchId && <PartyInvite modeId={mode} variant="card" />}<LearnWhileYouWait compact /></>}
+            />
           )}
         </AnimatePresence>
       </div>
 
-      {profile && scheme && !result && !ownControls && <VirtualController scheme={scheme} />}
+      {profile && scheme && !result && !babylonOwnsInput && !streamOn && <VirtualController scheme={scheme} />}
     </div>
   );
 }

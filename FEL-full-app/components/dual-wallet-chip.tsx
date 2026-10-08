@@ -24,6 +24,7 @@ import { WALLET_EARN_EVENT, WALLET_SYNC_EVENT, reportEarn, type WalletEarnDetail
 import { shardSaleCopy } from '@/lib/wallet/purchases';
 import { usePurchasesEnabled } from '@/lib/wallet/use-purchases-enabled';
 import { refundToastTexts, unseenRefundNotes, type RefundNote } from '@/lib/wallet/dead-buys';
+import { ptDay } from '@/lib/wallet/dailyKey';
 
 type FetchState = 'loading' | 'ready' | 'error';
 
@@ -91,10 +92,14 @@ export function DualWalletChip({ className }: DualWalletChipProps) {
   // (ECONOMY-SESSIONS-HARDEN, QA acceptance #5; it used to echo the original "granted 100" on an unchanged balance) and
   // nothing is toasted. A per-day localStorage mark keeps it to one request. Wallet chip only — PlayerProfile.shards is
   // not touched.
+  // DAILY-KEY-HOTFIX (2026-09-28): the SERVER keys the claim now (lib/wallet/dailyKey.ts). It pays once per player per
+  // America/Los_Angeles day and ignores the key sent here; the chip built that key, so a forged one paid again. The
+  // chip's day is that PT day too: it goes in the payload and names the mark. The key is still sent, built from the
+  // PT day, so a server from before the fix (a rollback) still dedupes on it.
   const fireDailyFirstSession = useCallback(async () => {
     if (typeof window === 'undefined') return;
-    // the PLAYER's calendar day, not UTC — a 6 pm Pacific login is still today
-    const d = new Date(); const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    // the server's day: the America/Los_Angeles calendar date, not the browser's own (a 6 pm Pacific login is still today)
+    const day = ptDay();
     const mark = `fel:daily_first_session:${day}`;
     try { if (window.localStorage.getItem(mark)) return; } catch { /* storage unavailable: the server key still dedupes */ }
     // the ledger's idempotency key is unique across ALL players, so it must carry this player's id — the wallet

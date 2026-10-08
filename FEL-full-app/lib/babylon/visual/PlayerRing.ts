@@ -17,7 +17,7 @@ export const RING_GLYPH: Record<RingIcon, string> = {
   martial: '🥋', skate: '🛹', snow: '🏂', surf: '🏄', golf: '⛳', soccer: '⚽', tennis: '🎾', volleyball: '🏐', football: '🏈', baseball: '⚾',
 };
 
-export interface PlayerRingHandle { set(stamina01: number): void; setIcon(icon: RingIcon): void; dispose(): void }
+export interface PlayerRingHandle { set(stamina01: number): void; setIcon(icon: RingIcon): void; /** GC-7: hide the ring and glyph during play — boost reads on the HUD bar instead. */ setPlayVisible(on: boolean): void; dispose(): void }
 
 /** True when a MODE mounted its own ring in this scene (1v1, 3v3, 3PT, dunk, the three fight modes) — the harness stays out. */
 export function modeOwnsPlayerRing(scene: Scene): boolean { return !!(scene.metadata as { felPlayerRingMode?: boolean } | null)?.felPlayerRingMode; }
@@ -63,9 +63,12 @@ export function mountPlayerRing(scene: Scene, root: TransformNode, opts: { color
     tagTex.update();
   };
   drawTag(opts.icon ?? 'basketball');
+  let playVisible = true;
+  const syncVis = () => { ring.setEnabled(playVisible); tag.setEnabled(playVisible); };
   return {
     set(v: number) { const q = Math.round(Math.max(0, Math.min(1, v)) * 50) / 50; if (q !== drawn) draw(q); },
     setIcon(icon: RingIcon) { drawTag(icon); },
+    setPlayVisible(on: boolean) { if (on === playVisible) return; playVisible = on; syncVis(); },
     dispose() { scene.onBeforeRenderObservable.remove(follow); ring.dispose(); tag.dispose(); tex.dispose(); tagTex.dispose(); mat.dispose(); tagMat.dispose(); },
   };
 }

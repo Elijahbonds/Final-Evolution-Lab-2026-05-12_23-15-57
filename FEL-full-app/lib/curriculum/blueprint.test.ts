@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
 import { allLessons, lessonByRef, requiredModules } from './blueprint';
+import { drillPlayHref } from './drillRoutes';
 import { TRACKS } from '../game-data';
+
+const ROOT = path.resolve(__dirname, '../..');
 
 describe('the Blueprint curriculum', () => {
   it('has a body for every lesson in the mode tracks', () => {
@@ -13,6 +18,15 @@ describe('the Blueprint curriculum', () => {
       expect(l.body.length, l.ref).toBeGreaterThan(0);
       expect(l.keyPoints.length, l.ref).toBeGreaterThan(0);
       expect(l.drill.modeKey, l.ref).toMatch(/^[a-z_]+$/);
+    }
+  });
+  it('every drill link resolves to a real play route', () => {
+    expect(drillPlayHref('derby')).toBe('/play/baseball');
+    for (const l of allLessons()) {
+      const href = drillPlayHref(l.drill.modeKey);
+      expect(href, l.ref).toMatch(/^\/play\/[a-z0-9-]+$/);
+      const slug = href.replace('/play/', '');
+      expect(fs.existsSync(path.join(ROOT, 'app/play', slug, 'page.tsx')), `${l.ref} -> ${href}`).toBe(true);
     }
   });
   // HOTFIX (2026-09-24): the question/answer/grading checks that lived here moved with the answer key to

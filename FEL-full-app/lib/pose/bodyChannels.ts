@@ -18,6 +18,11 @@
 // Pure: no DOM, no camera. Deterministic.
 import type { BodyRead, BodyEvent } from './BodyReader';
 import { CADENCE_STEPS, CADENCE_WINDOW_MS, LAND_SETTLE_MS, MAX_FLIGHT_MS } from './BodyReader';
+// MOVEMENT PLAY P8 (2026-09-26): the ride read (stance, carve, grab, turn, wheel, wings) needs the frame's world points
+// and the calibration's lens pitch, which a BodyRead does not carry — so the channels own it and publish it as `ride`
+import { RideReader, type RideRead } from './rideReader';
+import type { Calibration } from './calibrate';
+import type { PoseFrame } from './landmarks';
 
 export const ABSORB_MS = 250;          // landing absorb: dips at land +53/+115 ms (fixtures) are not crouches
 export const STRIDE_MIN_HZ = 1.2;
@@ -52,11 +57,17 @@ export interface BodyChannels {
   handsUpMs: number;
   /** Both wrists continuously below the head line (for the post-START latch). */
   handsDownMs: number;
+  /** MOVEMENT PLAY P8: the boards' and the racers' read (lib/pose/rideReader). Present only where the stepper passed the
+   *  frame (poseSource, seamReplay); every field of it null / false while unread. */
+  ride?: RideRead;
 }
 
 const ramp = (v: number, lo: number, hi: number): number => Math.max(0, Math.min(1, (v - lo) / (hi - lo)));
 
 export class ChannelReader {
+  // MOVEMENT PLAY P8: the ride read, and where its calibration comes from (the reader's, read every frame)
+  private readonly rideReader = new RideReader();
+  constructor(private readonly opts: { calibration?: () => Calibration | null } = {}) {}
   // ── the jump ──
   /** 'maybe': an airborne read with no take-off told yet (a small hop is told only MIN_FLIGHT_MS in, and a jog's
    *  82–123 ms double-float never is); 'sure': a take-off told and not yet landed. */
@@ -79,7 +90,7 @@ export class ChannelReader {
   private downFrom: number | null = null;
   private jumpToldAt = -Infinity;
 
-  step(read: BodyRead, events: readonly BodyEvent[]): BodyChannels {
+  step(read: BodyRead, events: readonly BodyEvent[], frame?: PoseFrame): BodyChannels {
     const t = read.t;
     // the time since the last frame belongs to the state that frame left: none of it counts against the stride in a jump
     if (this.lastT !== null && !this.wasInJump) this.since += Math.max(0, t - this.lastT);
@@ -149,6 +160,8 @@ export class ChannelReader {
       // a gap frame holds the hold where its last overhead frame left it: the ring never runs ahead of the arms
       handsUpMs: this.upFrom === null ? 0 : this.upLast - this.upFrom,
       handsDownMs: this.downFrom === null ? 0 : t - this.downFrom,
+      // MOVEMENT PLAY P8: only where the frame came too (a stepper without it gets the P3 channels, unchanged)
+      ...(frame ? { ride: this.rideReader.step(read, events, frame, inJump, this.opts.calibration?.() ?? null) } : {}),
     };
   }
 
@@ -156,6 +169,7 @@ export class ChannelReader {
     this.air = 'none'; this.offT = -Infinity; this.absorbUntil = -Infinity; this.wasInJump = false; this.resumePending = false;
     this.steps = []; this.hz = null; this.since = Infinity; this.lastT = null;
     this.upFrom = null; this.upLast = -Infinity; this.downFrom = null; this.jumpToldAt = -Infinity;
+    this.rideReader.reset();   // MOVEMENT PLAY P8
   }
 
   private addStep(at: number, now: number): void {

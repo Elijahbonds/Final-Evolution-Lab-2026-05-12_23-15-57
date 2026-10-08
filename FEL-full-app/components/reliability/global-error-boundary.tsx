@@ -77,9 +77,10 @@ const S = {
     boxSizing: 'border-box', display: 'flex', minHeight: '100vh', flexDirection: 'column', alignItems: 'center',
     justifyContent: 'center', gap: 16, margin: 0, padding: 24, textAlign: 'center', lineHeight: 1.5,
     background: '#05060a', color: '#f1f5f9',
-    // theme.css's display font when it is loaded (the /play boundary); a system monospace when it is not
-    fontFamily:
-      "var(--fel-font-display, 'Chakra Petch', 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace)",
+    // theme.css's display font when it is loaded (the /play boundary); a system monospace when it is not. No quoted
+    // family names: next/font's faces are registered under hashed names, so 'Chakra Petch' / 'JetBrains Mono' never
+    // matched here either (FONT-SHARED).
+    fontFamily: 'var(--fel-font-display, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace)',
   },
   brand: { margin: 0, fontSize: 11, fontWeight: 900, letterSpacing: '0.4em', color: '#67e8f9' },
   title: { margin: 0, fontSize: 24, lineHeight: '32px', fontWeight: 900 },

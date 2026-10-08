@@ -5,6 +5,8 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { earn } from '@/lib/wallet/wallet-service';
+import { DAILY_EVENT_TYPES } from '@/lib/wallet/reward-rules';
+import { isTestAccount } from '@/lib/sessions/runEligibility';
 
 /**
  * POST /api/v1/wallet/earn
@@ -14,6 +16,15 @@ import { earn } from '@/lib/wallet/wallet-service';
  * the reason code, validates the payload, computes the grant from the editable
  * RewardRule config, applies rate caps, and writes an idempotent ledger row.
  * A replayed idempotency_key returns the ORIGINAL grant (no double-credit).
+ *
+ * DAILY-KEY-HOTFIX (2026-09-28):
+ *   - A daily event (DAILY_EVENT_TYPES) is keyed by the server, once per player per America/Los_Angeles day, and its
+ *     idempotency_key is ignored, so it may be left out. Every other event still needs one (400).
+ *   - A test account (isTestAccount: a test User.role, or its id / email in FEL_TEST_ACCOUNTS) is paid nothing here,
+ *     for any event, as its session runs are paid nothing (app/api/sessions/start). The account is read from the
+ *     DATABASE, never the session token's copy. It gets a 200 with granted 0 and rejected 'test_account', and earn()
+ *     never runs, so no ledger row or event is written. The eye's production run at 3a0f4edf: the wallet chip paid a
+ *     test account +100 at sign-in, and a forged key paid +100 more.
  */
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -30,8 +41,19 @@ export async function POST(req: NextRequest) {
   const idempotencyKey = typeof body?.idempotency_key === 'string' ? body.idempotency_key : '';
   const eventType = typeof body?.event_type === 'string' ? body.event_type : '';
   const payload = body?.payload && typeof body.payload === 'object' ? body.payload : {};
-  if (!idempotencyKey || !eventType) {
+  if (!eventType || (!idempotencyKey && !DAILY_EVENT_TYPES.has(eventType))) {
     return NextResponse.json({ error: 'missing_idempotency_key_or_event_type' }, { status: 400 });
+  }
+
+  const account = await prisma.user.findUnique({ where: { id: playerId }, select: { id: true, email: true, role: true } });
+  if (isTestAccount(account)) {
+    // a read, never a create: the answer writes nothing (readWallet could file a dead-buy refund)
+    const w = await prisma.wallet.findUnique({ where: { playerId }, select: { coins: true, shards: true, lc: true } });
+    return NextResponse.json({
+      granted: { coins: 0, shards: 0 },
+      balances: { coins: Number(w?.coins ?? 0), shards: Number(w?.shards ?? 0), lc: Number(w?.lc ?? 0) },
+      entry_id: null, capped: false, rejected: 'test_account', reason: 'TEST_ACCOUNT', replayed: false, already_claimed: false,
+    });
   }
 
   // NOTE: any client-supplied amount/currency fields inside payload are ignored
@@ -46,7 +68,7 @@ export async function POST(req: NextRequest) {
     // ECONOMY-SESSIONS-HARDEN: true when this key was already in the ledger — `granted` is the original grant and
     // nothing was credited now (the display shows nothing new; lib/wallet/client.ts)
     replayed: result.replayed === true,
-    // the daily first-session reward was already claimed: granted is 0 and this says why
+    // the daily reward was already claimed today (any key, forged or not): granted is 0 and this says why
     already_claimed: result.alreadyClaimed === true,
   });
 }

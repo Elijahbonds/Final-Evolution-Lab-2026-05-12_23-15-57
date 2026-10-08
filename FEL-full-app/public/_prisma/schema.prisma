@@ -109,6 +109,8 @@ model User {
   avatarLook      AvatarLook?
   ownedWearables  OwnedWearable[]
   sessionBookings SessionBooking[]
+  /// AB-04: one opt-in row for saving movement numbers (jump, Prove It, re-screen).
+  scanSaveOptIn   ScanSaveOptIn?
 
   // Camp Blueprint (Education pillar: Mentorship), 2026-09-03
   facilitatorProfile FacilitatorProfile?
@@ -116,6 +118,18 @@ model User {
   goalPlansAsFacilitator GoalPlan[]    @relation("GoalPlanFacilitator")
   credentials        Credential[]
   guardianConsents   GuardianConsent[] @relation("ConsentMentee")
+
+  // MIRROR-COACH P5 (2026-09-29): health intake + pain check-in loop (lib/health/). Additive only — see the
+  // HealthIntake/PainCheckIn/HealthConsent models below for the story.
+  healthIntakes      HealthIntake[]
+  painCheckIns       PainCheckIn[]
+  healthConsents     HealthConsent[]
+  // MIRROR-COACH P6 (2026-09-29): the daily readiness check-in (lib/health/readiness.ts). Additive only — see the
+  // ReadinessCheckIn model below.
+  readinessCheckIns  ReadinessCheckIn[]
+  // MIRROR-COACH P7 (2026-09-29): the breath toolbox's use log (lib/breath/rampGate.ts). Additive only — see the
+  // BreathLog model below.
+  breathLogs         BreathLog[]
 
   // M4 compliance stubs
   dobYear         Int?        // Year of birth for 18+ attestation
@@ -135,6 +149,9 @@ model User {
   crmDeals        CrmDeal[]     @relation("CrmDealOwner")
   crmActivities   CrmActivity[] @relation("CrmActivityOwner")
   crmNotes        CrmNote[]     @relation("CrmNoteAuthor")
+
+  // ADVENTURE PHASE B (2026-10-07): the Adventure's server save, one row per account. See AdventureSave below.
+  adventureSave AdventureSave?
 }
 
 model PlayerProfile {
@@ -180,6 +197,9 @@ model GameSession {
   dodges        Int      @default(0)
   combos        Int      @default(0)
   maxCombo      Int      @default(0)
+  // ECONOMY-CAPS C5: the server-issued SessionRun id — one GameSession row per run (NULL allowed on legacy rows).
+  runId         String?  @unique
+  run           SessionRun? @relation(fields: [runId], references: [id], onDelete: SetNull)
   createdAt     DateTime @default(now())
 
   @@index([userId, createdAt])
@@ -200,6 +220,7 @@ model SessionRun {
   status           String    @default("open")
   payoutEligible   Boolean
   ineligibleReason String?
+  agentRun         Boolean   @default(false)
   startedAt        DateTime  @default(now())
   expiresAt        DateTime
   finishedAt       DateTime?
@@ -210,6 +231,7 @@ model SessionRun {
   result           Json?
 
   grants           SessionGrant[]
+  gameSession      GameSession?
 
   @@index([userId, status])
   @@index([expiresAt])
@@ -1623,7 +1645,15 @@ model Session {
   
   order        Int      // 1, 2, 3... within block
   label        String   // "Day 1 — Lower Push", "Session A", etc.
-  
+
+  // MIRROR-COACH P6 (2026-09-29): AN OFF DAY WAS A BLANK. A week of three sessions had four days nothing said anything
+  // about, and a coach who wanted an easy walk, some mobility and a long-exhale breath on one of them had no way to
+  // write it as anything but another training session (crossref: "no 'recovery day' session type"). `recovery` is
+  // FEL's off-day session (lib/coach/offDay.ts: 15–20 easy minutes, walk + mobility + breath), logged like any other
+  // coached session, so P9's PRQ recovery can count the completed ones by this column. Additive and defaulted: every
+  // existing session reads `training`, exactly what it was.
+  kind         SessionKind @default(training)
+
   exercises    SessionExercise[]
   clientSessions ClientSession[]
   
@@ -1681,6 +1711,13 @@ enum SessionSection {
   cooldown
 }
 
+/// MIRROR-COACH P6 (2026-09-29): what a session is for. `training` = every session written before this (and the
+/// default); `recovery` = FEL's off day (lib/coach/offDay.ts), 15–20 low-intensity minutes.
+enum SessionKind {
+  training
+  recovery
+}
+
 model ClientSession {
   id           String   @id @default(cuid())
   programId    String
@@ -1690,8 +1727,13 @@ model ClientSession {
   session      Session  @relation(fields: [sessionId], references: [id], onDelete: Restrict)
   
   clientId     String
-  
+
   completedAt  DateTime?
+  // MIRROR-COACH P6 (2026-09-29): when the client tapped "done" on Today's automatic cool-down for this session (the
+  // one Today adds after the last item when the coach wrote no Cool-down section — lib/coach/cooldown.ts). null = not
+  // done, or the coach wrote their own cool-down (that one is logged like any exercise). P9's PRQ recovery counts it;
+  // nothing scores, pays or streaks on it here. Additive, nullable.
+  cooldownDoneAt DateTime?
   exerciseLogs ExerciseLog[]
   
   createdAt    DateTime @default(now())
@@ -1722,6 +1764,11 @@ model ExerciseLog {
   coachCommentAt DateTime?
   
   completedAt  DateTime?
+  // MIRROR-COACH P8 FIX (2026-09-30): what the athlete did on a slot the protocol gate swapped for its ladder's easier
+  // step — that step's ProgramExercise id (lib/coach/todayServer.ts servedOnSlots, server-checked). null = done as
+  // written, or a slot the gate never decides. The coach's inbox names it ("Did X in place of Y"), so a logged easier
+  // step is never read as the jump. No relation (the ladder links are bare ids too). Additive, nullable.
+  servedExerciseId String?
 
   setLogs      SetLog[] // MIRROR-COACH P2: per-set rows; the fields above stay as the per-exercise summary
   
@@ -1763,6 +1810,7 @@ model ProgramMessage {
   authorId   String
   body       String
   createdAt  DateTime @default(now())
+  readAt     DateTime?
   @@index([programId, createdAt])
 }
 
@@ -1836,6 +1884,15 @@ model GuardianConsent {
   requestedAt   DateTime  @default(now())
   acceptedAt    DateTime?
   revokedAt     DateTime?
+  // MIRROR-COACH P6 (2026-09-29), both additive. selfRequested: the mentee asked for this themselves (the "Ask a
+  // parent or guardian" screen), set by the SERVER from who made the request, never from the request body — so the
+  // minor, who holds this link, cannot opt their own request out of the stricter accept (app/api/v1/camp/consent).
+  // false = a facilitator asked (coach-managed camp flow, accepted exactly as before), and every row written before
+  // this column existed. acceptedById: the signed-in account that said yes to a self-requested consent; null for camp
+  // accepts (unchanged) and for anything accepted before this column. A plain id, no relation: FEL has no account
+  // delete path today, and a relation would add a field to User for a value nothing reads back by join.
+  selfRequested Boolean   @default(false)
+  acceptedById  String?
 
   @@index([menteeId])
 }
@@ -1950,6 +2007,208 @@ model MirrorSession {
 }
 
 // ===========================================================================
+// HEALTH INTAKE + PAIN LOOP (MIRROR-COACH P5, 2026-09-29)
+//
+// PHASE-5 CONTRACT — these three model names and shapes are the contract the rest of the pass codes against
+// (lib/health/painRule.ts's `decide()`, lib/health/intake.ts's question set, the /api/health/intake route, and
+// whatever mounts the pain check-in UI in a later step of this same phase). Additive only: three new models, three
+// new array relations on User (above). Nothing existing changes shape.
+//
+// Owner decisions #4/#5/#6/#15/#17/#20 (DECISIONS.md, DECISIONS-2.md): opt-in consent before ANY of this is stored;
+// FEL keeps every threshold and every line of pain copy in one reviewable module because there is no clinician
+// review (decision #15 — conservative by construction, not by audit); a coach reads a client's health data only with
+// that client's own coach_view consent; none of it is ever scored, rewarded, or sold; a blank birth year reads as a
+// minor (decision #20) until the intake answers it.
+// ===========================================================================
+
+/// One pre-participation intake, dated and versioned. `answers` is keyed by lib/health/intake.ts's question ids
+/// (INTAKE_QUESTIONS) — FEL's own plain-words questions, never the book's. `redFlags` is the SAME ids, filtered down
+/// by lib/health/intake.ts's `redFlagsFor()`: pure and derived from `answers`, but stored rather than recomputed on
+/// every read, because a later change to which questions count as red flags must never silently reinterpret an
+/// intake someone already consented to and was gated by.
+///
+/// A non-empty `redFlags` hard-stops the Mirror, pain check-ins and training features (lib/health/intake.ts's
+/// `isHardStopped`) until `clearedAt` — a SELF-ATTESTED, dated "I checked with a clinician" tick, never a diagnosis
+/// and never verified by FEL. `birthYear` mirrors what this intake wrote to `User.dobYear` (only when that field was
+/// blank — decision #20: an existing `dobYear` is never overwritten by an intake). Re-asked yearly: a stale
+/// `version` (lib/health/intake.ts's `INTAKE_VERSION`) or a `createdAt` over a year old means the gate asks again
+/// (`needsIntake()`), so a changed question set or a birthday into adulthood is never stuck on a year-old answer.
+model HealthIntake {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// lib/health/intake.ts INTAKE_VERSION at the time this was answered.
+  version     String
+  /// { [questionId]: boolean | number | null }, keyed by INTAKE_QUESTIONS ids. FEL's own questions, never the book's.
+  answers     Json
+  /// Question ids whose answer read as a red flag at submission time (see the model doc above for why this is
+  /// stored, not recomputed).
+  redFlags    String[]
+  /// Written by the intake when User.dobYear was blank (decision #20). Null when the athlete declined ("prefer not
+  /// to say") — which reads as a minor, same as never having answered.
+  birthYear   Int?
+  /// When the opt-in health-data consent (HealthConsent, scope 'health_data') was given for THIS intake. Required:
+  /// an intake is never stored without it (owner decision #4).
+  consentedAt DateTime
+  /// Self-attested, dated clearance after a red-flag stop. Null = still stopped, if redFlags is non-empty.
+  clearedAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([userId, createdAt])
+}
+
+/// One pain check-in — during/after an exercise, or the next-morning follow-up on one. `decision` is the exact
+/// string lib/health/painRule.ts's `decide()` returned for this row, stored (not recomputed) for the same reason
+/// HealthIntake.redFlags is: the rule is allowed to change later, and a row must keep saying what the athlete was
+/// actually told at the time. Never scored, never touches PRQ or any rewarded number (owner decision #4/#12) and
+/// never rides along in a share link (lib/share/screen.ts's leak checks cover WorkoutScan/ShareLink payloads, not
+/// this table — this table is simply never read by anything that builds one).
+model PainCheckIn {
+  id                String   @id @default(cuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// The ProgramExercise this check-in is about, when it came from a coached session. Null for a Mirror-side or
+  /// unprescribed exercise, where only the free-text name below is known.
+  programExerciseId String?
+  /// Always present, even when programExerciseId is set — the display name at check-in time, so history reads even
+  /// if the exercise is later renamed or removed from a coach's catalogue.
+  exerciseName      String
+  /// A fixed id from lib/health/painRule.ts BODY_AREAS — never free text, so the rule and any future reporting can
+  /// group on it.
+  bodyArea          String
+  /// 0–10.
+  score             Int
+  /// during | after | next_morning — which point in lib/health/painRule.ts's decision this row is.
+  kind              String
+  /// Acute-event ids from lib/health/painRule.ts ACUTE_EVENTS present in this check-in (a pop, sudden swelling,
+  /// giving way, pain after a fall/impact). Usually empty.
+  acute             String[]
+  /// Optional free text. Never read by decide() — the rule runs on the fixed fields only, so a coach or a later
+  /// reviewer can't accidentally depend on prose no rule actually used.
+  note              String?
+  /// The exact PainDecision id lib/health/painRule.ts returned for this row at submission time.
+  decision          String
+  createdAt         DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+/// Opt-in consent for health data, scoped separately from the app's general ToS/Privacy acceptance
+/// (User.policyVersion/policyAcceptedAt) because this data gets its own export/erase path and its own rule: never
+/// sold, never used for ads, never in a share link. Two scopes: 'health_data' (the athlete consenting to FEL storing
+/// their own intake/pain-check-in data at all — required before either HealthIntake or PainCheckIn can be written)
+/// and 'coach_view' (that specific athlete additionally letting a named coach read it — scoped to `coachId`, not a
+/// blanket "my coach can see everything"). `revokedAt` null = currently granted; a revoked row survives so consent
+/// history is auditable, it is never deleted out from under the record.
+model HealthConsent {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// 'health_data' | 'coach_view'.
+  scope      String
+  /// Set only for scope 'coach_view' — the one coach this grant is for.
+  coachId    String?
+  grantedAt  DateTime
+  revokedAt  DateTime?
+
+  @@index([userId, scope])
+}
+
+/// AB-04 (2026-10-03, Elijah): one row per account for saving movement NUMBERS.
+/// Scope `jump_numbers` is the only scope. It covers jump numbers, Prove It, and
+/// re-screen history together — not three consents. `granted` defaults false.
+/// `revokedAt` set means withdrawn; the row stays so the withdrawal has a time.
+/// Video, images, and pose frames are never stored under this grant.
+///
+/// `coachShares` is the per-booking "Share with my coach" list, JSON so this
+/// lane does not add columns to SessionBooking (that table is read on the
+/// sessions page; a missing column there would 500 a deploy that raced the SQL).
+/// Each entry is `{ bookingId, coachId, sharedAt, withdrawnAt }`. A withdrawn
+/// entry stays. COACH-STORE-V1 should call `adultOptedInAndSharedWithCoach`
+/// (lib/privacy/coachShare.ts) rather than reading this JSON itself.
+model ScanSaveOptIn {
+  id                 String    @id @default(cuid())
+  userId             String    @unique
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// 'jump_numbers' — jump numbers, Prove It, and re-screen history.
+  scope              String    @default("jump_numbers")
+  granted            Boolean   @default(false)
+  grantedAt          DateTime?
+  revokedAt          DateTime?
+  consentTextVersion String
+  /// Per-booking coach shares. Null means none. See the model note.
+  coachShares        Json?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([userId, scope])
+}
+
+/// MIRROR-COACH P6 (2026-09-29): the unscored daily readiness check-in — four tap scales on Today before a session,
+/// every one optional, the whole card skippable (lib/health/readiness.ts; owner decision #12). A NEW table rather than
+/// P5's: PainCheckIn needs an exercise, a body area, a 0–10 score and a stored rule decision, and none of those exist
+/// here — squeezing this into it would mean fake values in required columns.
+///
+/// Health-adjacent data under P5's rules: written only with a live 'health_data' HealthConsent (and, for a minor, an
+/// accepted guardian consent — the same gate as a pain check-in), exported and erased with the rest of the health
+/// data (lib/prq-data-rights.ts), readable by a coach only with that client's live 'coach_view' grant, never in a
+/// share link, and NEVER read by anything that scores, pays, ranks or keeps a streak (lib/health/readiness-never-scored
+/// .test.ts walks the source tree for that). It only lengthens today's warm-up and suggests an easier day.
+///
+/// ONE ROW PER ATHLETE PER DAY, editable that day: the route upserts on (userId, date), so a second answer the same
+/// day edits the first instead of adding a row, and a day that is no longer "today" anywhere on Earth cannot be written.
+model ReadinessCheckIn {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// The athlete's OWN calendar day, 'YYYY-MM-DD' in their local time zone (the device sends it; the route accepts
+  /// only a day that is currently "today" in some time zone, UTC-12 to UTC+14). A string, not a DateTime: a check-in
+  /// belongs to a day, not an instant, and a Date at UTC midnight reads as the previous day west of Greenwich.
+  date      String
+  /// 1 (rough night) to 5 (great night). Null = not answered.
+  sleep     Int?
+  /// 1 (not sore at all) to 5 (very sore) — the natural direction for the word, so a coach or an export reads it
+  /// without a legend. lib/health/readiness.ts turns it around internally. Null = not answered.
+  soreness  Int?
+  /// 1 (drained) to 5 (charged). Null = not answered.
+  energy    Int?
+  /// 1 (low) to 5 (great). Null = not answered.
+  mood      Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, date])
+}
+
+/// MIRROR-COACH P7 (2026-09-29): one row per use of a breath from FEL's breath toolbox. Today it holds kind 'ramp' —
+/// the adults-only Dial-Up Breath before a session's flagged key set (lib/breath/rampGate.ts), written by
+/// POST /api/breath/ramp at the moment the athlete starts it, and counted against FEL's own weekly limit
+/// (RAMP_LIMIT). A NEW table rather than a column on P5/P6's: a use is not an intake answer, a pain reading or a daily
+/// check-in, and the limit needs a row per use with its time.
+///
+/// It stores no health answer — only that a breath was used, for which coached session, and when. It is still in the
+/// export and in both erases (lib/prq-data-rights.ts), because the ramp kind is only ever written behind the health
+/// gates. NEVER read by anything that scores, pays, ranks or keeps a streak (lib/breath/ramp-never-scored.test.ts).
+/// `seconds` is for a kind that logs time (phase 9 may count breath minutes toward recovery, owner decision #12); a
+/// ramp use leaves it null.
+model BreathLog {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// 'ramp' (lib/breath/rampGate.ts BREATH_LOG_KINDS). A string, not an enum, so a new breath kind is a code change
+  /// and never a schema change.
+  kind      String
+  /// The coached Session (Session.id) the breath was for, when it was for one — how "one key set per session" is
+  /// held. No foreign key on purpose: a coach deleting the session must not erase, or fail on, the athlete's record.
+  sessionId String?
+  /// Seconds breathed, for a kind that logs time. Null for 'ramp'.
+  seconds   Int?
+  createdAt DateTime @default(now())
+
+  @@index([userId, kind, createdAt])
+}
+
+// ===========================================================================
 // TRAINER SHARING — a coach texts programming to a client (lib/share/).
 // Free between a trainer and their own clients; selling to strangers is the
 // store (lib/store/) and is the only path that takes a platform cut.
@@ -2033,7 +2292,209 @@ model CoachClient {
   /// Set when the relationship ends; the row survives so neither side loses the history.
   endedAt   DateTime?
   createdAt DateTime @default(now())
+  availability CoachAvailability?
 
   @@unique([coachId, clientId])
   @@index([clientId])
+}
+
+/// Coach <-> athlete availability: one row while the athlete is Limited or Out. Full is no row. No free text, by design.
+model CoachAvailability {
+  coachId  String
+  clientId String
+  /// 'limited' | 'out'.
+  status   String
+  /// Expected return day 'YYYY-MM-DD', or null.
+  returnBy String?
+  setAt    DateTime @default(now())
+  link     CoachClient @relation(fields: [coachId, clientId], references: [coachId, clientId], onDelete: Cascade, onUpdate: Cascade)
+
+  @@id([coachId, clientId])
+  @@index([clientId])
+}
+
+// ===========================================================================
+// COACH-STORE-V1. New tables only. User ids are plain strings (no relation),
+// like SessionJoinLink, so User is untouched. Nothing here is applied to
+// production by the lane: prisma/pending/ holds the SQL for Elijah's yes.
+// ===========================================================================
+
+/// Coach storefront profile and the hours he sells. One row per coach.
+model Instructor {
+  id                     String   @id @default(cuid())
+  userId                 String   @unique
+  slug                   String   @unique
+  displayName            String
+  headline               String?
+  bio                    String?
+  certifications         String[] @default([])
+  specialties            String[] @default([])
+  affiliationLine        String?
+  creatorCardId          String?
+  timeZone               String   @default("America/Los_Angeles")
+  weeklyHours            Json     @default("[]")
+  blackoutDates          Json     @default("[]")
+  bufferMinutes          Int      @default(15)
+  minNoticeHours         Int      @default(12)
+  maxDaysAhead           Int      @default(28)
+  /// Elijah, 6:03 PM PT: reviews are promised within 48 hours. A dashboard setting, not a hardcoded promise.
+  reviewSlaHours         Int      @default(48)
+  /// Free cancel/reschedule window before start, in hours. Dashboard setting (default 24).
+  clientFullRefundHours  Int      @default(24)
+  /// CA refund window in business days. Null until set. No default address and no default ruling.
+  refundBusinessDays     Int?
+  /// Shown on the store only when set. Never a home address.
+  businessMailingAddress String?
+  published              Boolean  @default(false)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  programAccess ProgramAccess[]
+  bookings      Booking[]
+}
+
+/// A buyer's access to a program, the adult membership, or a parent-bought teen code.
+model ProgramAccess {
+  id                    String    @id @default(cuid())
+  userId                String
+  instructorId          String
+  instructor            Instructor @relation(fields: [instructorId], references: [id], onDelete: Restrict)
+  listingId             String
+  lane                  String
+  billing               String
+  /// lane | all | teen_all
+  scope                 String    @default("lane")
+  /// self | teen
+  beneficiary           String    @default("self")
+  status                String    @default("PENDING")
+  priceCents            Int
+  platformFeeCents      Int       @default(0)
+  stripeFeeCents        Int       @default(0)
+  reviewCredits         Int       @default(0)
+  lastCreditInvoiceId   String?
+  stripeCheckoutId      String?   @unique
+  stripeSubscriptionId  String?   @unique
+  stripePaymentIntentId String?   @unique
+  accessUntil           DateTime?
+  cancelAtPeriodEnd     Boolean   @default(false)
+  coachingProgramId     String?
+  startedAt             DateTime?
+  nextRescreenAt        DateTime?
+  unlockCodeHash        String?   @unique
+  deviceTokenHash       String?
+  codeActive            Boolean   @default(true)
+  redeemedAt            DateTime?
+  reissueCount          Int       @default(0)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@unique([userId, listingId, beneficiary])
+  @@index([instructorId, status])
+  @@index([unlockCodeHash])
+}
+
+/// One paid unit of the coach's time: a live 1:1 or an async video review.
+model Booking {
+  id                    String    @id @default(cuid())
+  kind                  String
+  instructorId          String
+  instructor            Instructor @relation(fields: [instructorId], references: [id], onDelete: Restrict)
+  coachUserId           String
+  clientUserId          String
+  listingId             String
+  status                String    @default("HELD")
+  durationMin           Int?
+  priceCents            Int
+  platformFeeCents      Int       @default(0)
+  stripeFeeCents        Int       @default(0)
+  refundCents           Int       @default(0)
+  stripeCheckoutId      String?   @unique
+  stripePaymentIntentId String?   @unique
+  holdExpiresAt         DateTime?
+  startsAt              DateTime?
+  endsAt                DateTime?
+  slotLock              String?   @unique
+  clientTimeZone        String?
+  clientNote            String?
+  reschedulesUsed       Int       @default(0)
+  connectionFailedAt    DateTime?
+  failureCreditOpen     Boolean   @default(false)
+  shareWithCoach        Boolean   @default(false)
+  goal                  String?
+  painYes               Boolean?
+  reviewNote            String?
+  clipPaths             Json?
+  clipConsentAt         DateTime?
+  consentTextVersion    String?
+  submittedAt           DateTime?
+  dueAt                 DateTime?
+  replyText             String?
+  replyClipPath         String?
+  attachedDrillIds      Json?
+  deliveredAt           DateTime?
+  originalClipDeleteAt  DateTime?
+  originalsDeletedAt    DateTime?
+  cancelledAt           DateTime?
+  cancelledBy           String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  signals CallSignal[]
+
+  @@index([coachUserId, startsAt])
+  @@index([clientUserId, createdAt])
+  @@index([status, holdExpiresAt])
+  @@index([kind, status, dueAt])
+  @@index([originalClipDeleteAt])
+}
+
+/// Short-lived WebRTC handshake rows. The app sweeps expired ones. That is the only delete in this lane.
+model CallSignal {
+  id        Int      @id @default(autoincrement())
+  bookingId String
+  booking   Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  fromRole  String
+  epoch     Int      @default(0)
+  kind      String
+  payload   String
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  @@index([bookingId, id])
+  @@index([expiresAt])
+}
+
+/// Referral cut on a coach-store sale, paid out of FEL's 15% fee. The ledger has no referral account, so this table holds it.
+model CoachStoreReferral {
+  id               String   @id @default(cuid())
+  paymentKey       String   @unique
+  referrerUserId   String
+  buyerUserId      String
+  coachUserId      String
+  sourceKind       String
+  sourceId         String
+  grossCents       Int
+  platformFeeCents Int
+  shareOfFee       Float
+  cutCents         Int
+  renewalIndex     Int      @default(0)
+  status           String   @default("PENDING")
+  holdUntil        DateTime
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([referrerUserId, status])
+  @@index([buyerUserId])
+  @@index([holdUntil])
+}
+
+/// ADVENTURE PHASE B (2026-10-07): one row per account, the Adventure's save document as JSON (save/save.ts).
+/// Matches the live table from prisma/pending/2026-10-07-adventure-save.sql (applied by the owner). Verified adults only;
+/// the route must refuse teen / unknown-age uploads (save/policy.ts adventureSavePolicy).
+model AdventureSave {
+  userId    String   @id
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  version   Int
+  doc       Json
+  updatedAt DateTime @default(now())
 }

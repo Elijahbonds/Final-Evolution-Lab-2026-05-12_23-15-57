@@ -29,10 +29,22 @@
 import type { FelInput } from './InputBus';
 import type { ModePhase } from './ModeHarness';
 import type { BodyProfile } from '@/lib/input/bodyProfiles';
+import type { RideRead } from '@/lib/pose/rideReader';
 
 export type BodyPresence = 'off' | 'calibrating' | 'present' | 'absent';
 export type PauseReason = 'input' | 'body-lost' | 'stall';
 export interface CardLine { move: string; verb: string }          // "Jump" → "POP"
+/**
+ * MOVEMENT PLAY P8 (2026-09-26): a board game's stance for its READY line — taken (side-on: the lead measured, regular =
+ * left foot forward; or the square fallback) or still being held (`hold01`, the ring). Written only for a row that steers
+ * with the carve; nothing about it is stored anywhere (it lives as long as the mount).
+ */
+export interface StanceView { kind: 'side' | 'square' | null; lead: 'L' | 'R' | null; hold01: number }
+/** MOVEMENT PLAY P8: a row that steers with the carve asks for the stance from its mount — the view's stance, not yet taken
+ *  (undefined for every other row). READY's space check holds 'ready' through the turn into it only while it is there. */
+export function stanceOnMount(profile: BodyProfile): StanceView | undefined {
+  return profile.bindings.some((b) => b.from === 'carve') ? { kind: null, lead: null, hold01: 0 } : undefined;
+}
 export interface SessionView {
   modeId: string | null; key: string | null;
   lines: readonly CardLine[]; drives: boolean; later: BodyProfile['later'];
@@ -40,6 +52,8 @@ export interface SessionView {
   pause: PauseReason | null;
   /** The game's phase, as the harness last set it (null: no game mounted). */
   phase: ModePhase | null;
+  /** MOVEMENT PLAY P8: the stance (absent: not a board game that steers with the carve, or no body read yet). */
+  stance?: StanceView;
 }
 export interface RunRecord { runId: number; modeId: string; inputs: number; bodyInputs: number }
 
@@ -72,6 +86,9 @@ export interface SessionWriter {
   setPause(r: PauseReason | null): void;
   /** The harness's setPhase: only a change is a new snapshot. */
   setPhase(p: ModePhase): void;
+  /** MOVEMENT PLAY P8: every body packet, for a row that steers with the carve (others: nothing written). The ring moves in
+   *  steps of 0.1, so a held stance is a handful of snapshots, not thirty a second. */
+  setStance(profile: BodyProfile, ride: RideRead | null | undefined): void;
   /** At wake(): a new run, a new record (the one before it is replaced only now). */
   beginRun(modeId: string): void;
   /** One counted input (EvidenceCounter's verdict, or a claimed onBody verb) into the current run's record. */
@@ -102,10 +119,11 @@ export const sessionStore = {
   // ── the harness's writer ──
   /** A mode mounted: its card, and this harness's writer. The body line and the pause start clear (the harness writes
    *  them as they happen). A later mount makes this writer stale. */
-  mount(m: Pick<SessionView, 'modeId' | 'key' | 'lines' | 'drives' | 'later'>): SessionWriter {
+  mount(m: Pick<SessionView, 'modeId' | 'key' | 'lines' | 'drives' | 'later' | 'stance'>): SessionWriter {
     const me = ++mountSeq;
     owner = me;
-    view = { ...EMPTY, modeId: m.modeId, key: m.key, lines: m.lines, drives: m.drives, later: m.later };
+    // (MOVEMENT PLAY P8: a board game's stance, asked for from the mount's own snapshot — stanceOnMount)
+    view = { ...EMPTY, modeId: m.modeId, key: m.key, lines: m.lines, drives: m.drives, later: m.later, ...(m.stance ? { stance: m.stance } : {}) };
     notify();
     const live = (): boolean => owner === me;
     return {
@@ -123,6 +141,15 @@ export const sessionStore = {
       setPhase(p) {
         if (!live() || view.phase === p) return;
         view = { ...view, phase: p };
+        notify();
+      },
+      setStance(profile, ride) {
+        if (!live() || !stanceOnMount(profile)) return;
+        const st = ride?.stance ?? null;
+        const next: StanceView = { kind: st?.kind ?? null, lead: st?.lead ?? null, hold01: st ? 1 : Math.floor((ride?.stanceHold01 ?? 0) * 10) / 10 };
+        const was = view.stance;
+        if (was && was.kind === next.kind && was.lead === next.lead && was.hold01 === next.hold01) return;
+        view = { ...view, stance: next };
         notify();
       },
       beginRun(modeId) {

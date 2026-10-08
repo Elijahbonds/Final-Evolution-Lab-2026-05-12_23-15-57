@@ -135,12 +135,13 @@ export function clearCarnivalRun(): void {
   if (typeof window !== 'undefined') window.sessionStorage.removeItem(STORAGE_KEY);
 }
 
-/** QA P1-20 (2026-09-27): the native round is labelled by what it is. Under MODE_INFO it is 'Game Night' — the whole night's
- *  name — so Game Night's lineup opened with "1 · Game Night", a stop that looked like the page it was on. It is the Court
- *  Carnival's 3D events round (the venue card's Slam Rush, Strike Storm…), and it keeps its place first in the night. */
-export const NATIVE_STOP_LABEL = 'Court Carnival';
+/** The night's own title. Stop 1 used to borrow it, so the lineup and the night said the same name. */
+export const CARNIVAL_NIGHT_NAME = 'Game Night';
+/** The native stop — the court the night is played on — named apart from the night. */
+export const CARNIVAL_NATIVE_STOP_NAME = 'Court Carnival';
+
 export function carnivalStopLabel(stop: CarnivalStop): string {
-  if (stop === 'carnival') return NATIVE_STOP_LABEL;
+  if (stop === 'carnival') return CARNIVAL_NATIVE_STOP_NAME;
   return MODE_INFO[stop]?.name ?? stop;
 }
 

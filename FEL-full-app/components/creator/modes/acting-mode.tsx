@@ -16,7 +16,7 @@ export interface ActingPublishPayload {
 
 type Phase = 'idle' | 'recording' | 'recorded';
 
-export default function ActingMode({ onPublish }: { onPublish: (p: ActingPublishPayload) => void }) {
+export default function ActingMode({ onPublish, submitLabel = 'Publish for Review' }: { onPublish: (p: ActingPublishPayload) => void; submitLabel?: string }) {
   const [scene, setScene] = useState<ScenePrompt>(SCENE_PROMPTS[0]);
   const [phase, setPhase] = useState<Phase>('idle');
   const [blob, setBlob] = useState<Blob | null>(null);
@@ -81,7 +81,7 @@ export default function ActingMode({ onPublish }: { onPublish: (p: ActingPublish
             <audio src={url} controls className="mx-auto" />
             <div className="flex justify-center gap-3">
               <button onClick={reset} className="rounded-xl bg-neutral-700 px-4 py-2 text-sm font-bold">Re-record</button>
-              <button onClick={publish} className="rounded-xl bg-amber-500 px-6 py-2 text-sm font-bold text-black">Publish for Review</button>
+              <button onClick={publish} className="rounded-xl bg-amber-500 px-6 py-2 text-sm font-bold text-black">{submitLabel}</button>
             </div>
           </div>
         )}

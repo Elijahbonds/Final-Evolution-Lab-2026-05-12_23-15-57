@@ -19,6 +19,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import type { InputBus } from '../core/InputBus';
 import { MODE_VERBS, type VerbButton } from './modeVerbs';
+import { touchDeckLayout, type TouchDeckLayout } from '@/lib/ui/consoleView';
 
 // setPointerCapture throws NotFoundError if the browser has already dropped
 // the pointer session by the time the handler runs (seen on some mobile
@@ -34,6 +35,13 @@ function safeCapture(el: Element, pointerId: number): void {
 // them; env() is 0 wherever there is no inset, so desktop and portrait keep their 12 px.
 const SAFE_LEFT: React.CSSProperties = { left: 'max(0.75rem, env(safe-area-inset-left))', bottom: 'max(0.75rem, env(safe-area-inset-bottom))' };
 const SAFE_RIGHT: React.CSSProperties = { right: 'max(0.75rem, env(safe-area-inset-right))', bottom: 'max(0.75rem, env(safe-area-inset-bottom))' };
+// CONSOLE VIEW (2026-10-06): the compact deck side by side is wider than the stack, so it draws at 85 % from its own
+// corner — the right half was otherwise 252 px of an 844 px phone and its right stick sat on the mode's bottom hint.
+// A transform, not zoom: the stick reads its own getBoundingClientRect against clientX, and both follow a transform.
+// The 64 px verbs draw at 54 px, still above the 44 pt touch minimum.
+const COMPACT_SCALE = 0.85;
+const COMPACT_LEFT: React.CSSProperties = { ...SAFE_LEFT, transform: `scale(${COMPACT_SCALE})`, transformOrigin: 'bottom left' };
+const COMPACT_RIGHT: React.CSSProperties = { ...SAFE_RIGHT, transform: `scale(${COMPACT_SCALE})`, transformOrigin: 'bottom right' };
 
 /**
  * QA P1-10 (2026-09-27): the deck lives inside the mode's 16:10 stage (overflow hidden). A 390-wide phone's stage is ~234 px
@@ -47,15 +55,26 @@ export function fitDeck(stage: { top: number; bottom: number }, viewportH: numbe
   return { lift: Math.max(0, stage.bottom - visBottom), scale: columnH > 0 ? Math.min(1, room / columnH) : 1 };
 }
 
-export function TouchOverlay(props: { bus: InputBus; modeId: string; visible: boolean }) {
+/** Any touch input at all: a touchscreen laptop keeps its deck; a mouse-and-keyboard machine or a TV browser does not. */
+function hasTouch(): boolean {
+  try {
+    return (navigator.maxTouchPoints ?? 0) > 0 || window.matchMedia('(any-pointer: coarse)').matches || 'ontouchstart' in window;
+  } catch { return true; }   // unknown: keep the deck, as before
+}
+
+export function TouchOverlay(props: { bus: InputBus; modeId: string; visible: boolean; overrides?: Partial<Record<'A' | 'B' | 'X' | 'Y', Partial<VerbButton>>> }) {
   const cfg = MODE_VERBS[props.modeId] ?? MODE_VERBS.default;
-  const [landscape, setLandscape] = useState(window.innerWidth > window.innerHeight);
+  // CONSOLE VIEW (2026-10-06): a phone held sideways stacks each stick BESIDE its buttons, not under them ('compact',
+  // lib/ui/consoleView.ts) — stacked, the right side was 318 px of a 390 px screen, a wall up the edge of the picture.
+  // A screen with no touch at all (a laptop or console browser on a TV) draws no deck: nothing can press it ('none').
+  const [deck, setDeck] = useState<TouchDeckLayout>(() => touchDeckLayout(window.innerWidth, window.innerHeight, hasTouch()));
+  // QA P1-10: each column is lifted and scaled into the visible stage (fitDeck), on top of the layout above
   const root = useRef<HTMLDivElement>(null), colL = useRef<HTMLDivElement>(null), colR = useRef<HTMLDivElement>(null);
   const [fit, setFit] = useState({ lift: 0, l: 1, r: 1 });
 
   useEffect(() => {
     const onR = () => {
-      setLandscape(window.innerWidth > window.innerHeight);
+      setDeck(touchDeckLayout(window.innerWidth, window.innerHeight, hasTouch()));
       const stage = root.current?.parentElement?.getBoundingClientRect();
       if (!stage) return;
       const l = fitDeck(stage, window.innerHeight, colL.current?.offsetHeight ?? 0), r = fitDeck(stage, window.innerHeight, colR.current?.offsetHeight ?? 0);
@@ -65,25 +84,47 @@ export function TouchOverlay(props: { bus: InputBus; modeId: string; visible: bo
     window.addEventListener('resize', onR);
     window.addEventListener('scroll', onR, { passive: true });
     return () => { window.removeEventListener('resize', onR); window.removeEventListener('scroll', onR); };
-  }, [props.visible]);
+  }, [props.visible, deck]);
+  const landscape = deck !== 'portrait';
+  const compact = deck === 'compact';
 
-  if (!props.visible || props.bus.gamepadActive) return null;
+  if (!props.visible || props.bus.gamepadActive || deck === 'none') return null;
   const lifted = (side: React.CSSProperties, k: number, origin: string): React.CSSProperties =>
     ({ ...side, bottom: `calc(max(0.75rem, env(safe-area-inset-bottom)) + ${fit.lift}px)`, transform: `scale(${k})`, transformOrigin: origin });
+  const cs = compact ? COMPACT_SCALE : 1;
+
+  // CALL FOR THE BALL (Elijah item 2): a mode can retitle (never re-emit) a slot per frame — e.g. 3v3's PASS
+  // becomes BALL! off the ball. The emit, hold and hollow-socket rules are untouched; only label/color move.
+  const ov = props.overrides;
+  const buttons = (ov
+    ? (['A', 'B', 'X', 'Y'] as const).map((k, i) => (ov[k] ? { ...cfg.buttons[i], ...ov[k] } : cfg.buttons[i]))
+    : cfg.buttons) as [VerbButton, VerbButton, VerbButton, VerbButton];
 
   return (
-    <div ref={root} className={landscape
+    <div ref={root} data-touch-deck className={landscape
       ? 'pointer-events-none absolute inset-0 z-30'
       : 'pointer-events-none absolute inset-x-0 bottom-0 z-30 h-[44vh] bg-gradient-to-t from-black/85 to-transparent'}>
-      <div ref={colL} className="pointer-events-auto absolute bottom-3 left-3 flex flex-col items-center gap-2" style={lifted(SAFE_LEFT, fit.l, 'bottom left')}>
+      {/* compact: the stick in the corner and the d-pad inboard of it (row-reverse keeps the DOM order) */}
+      <div ref={colL} className={`pointer-events-auto absolute bottom-3 left-3 flex gap-2 ${compact ? 'flex-row-reverse items-end' : 'flex-col items-center'}`} style={lifted(compact ? COMPACT_LEFT : SAFE_LEFT, cs * fit.l, 'bottom left')}>
         <DPad bus={props.bus} />
         <AnalogStick bus={props.bus} side="L" label="MOVE" />
       </div>
-      <div ref={colR} className="pointer-events-auto absolute bottom-3 right-3 flex flex-col items-center gap-2" style={lifted(SAFE_RIGHT, fit.r, 'bottom right')}>
-        {cfg.boost && <BoostPill bus={props.bus} />}
-        <ButtonDiamond bus={props.bus} buttons={cfg.buttons} />
-        {cfg.rStick === null ? <HollowStick /> : <AnalogStick bus={props.bus} side="R" label={cfg.rStick} />}
-      </div>
+      {compact ? (
+        // compact: the diamond in the corner with the boost pill over it, the right stick inboard of the diamond
+        <div ref={colR} className="pointer-events-auto absolute bottom-3 right-3 flex flex-row items-end gap-2" style={lifted(COMPACT_RIGHT, cs * fit.r, 'bottom right')}>
+          {cfg.rStick === null ? <HollowStick /> : <AnalogStick bus={props.bus} side="R" label={cfg.rStick} />}
+          <div className="flex flex-col items-center gap-2">
+            {cfg.boost && <BoostPill bus={props.bus} />}
+            <ButtonDiamond bus={props.bus} buttons={buttons} />
+          </div>
+        </div>
+      ) : (
+        <div ref={colR} className="pointer-events-auto absolute bottom-3 right-3 flex flex-col items-center gap-2" style={lifted(SAFE_RIGHT, fit.r, 'bottom right')}>
+          {cfg.boost && <BoostPill bus={props.bus} />}
+          <ButtonDiamond bus={props.bus} buttons={buttons} />
+          {cfg.rStick === null ? <HollowStick /> : <AnalogStick bus={props.bus} side="R" label={cfg.rStick} />}
+        </div>
+      )}
     </div>
   );
 }

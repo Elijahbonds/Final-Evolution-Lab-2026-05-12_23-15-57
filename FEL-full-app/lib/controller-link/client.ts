@@ -9,7 +9,9 @@
 import { PeerLink } from './transport/webrtc';
 import { pollSignals, postSignal, lookupRoom } from './transport/signaling';
 import { getOrCreatePeerId } from './codes';
-import type { ControlEvent, LinkState, ModeControllerConfig } from './types';
+import type { ControlEvent, LinkState, ModeControllerConfig, RoomState } from './types';
+import { parseRoomState } from './roomState';
+import { parsePartyView, type PartyCmd, type PartyView } from '@/lib/party/protocol';
 
 export interface ControllerClientOpts {
   code: string;
@@ -17,6 +19,10 @@ export interface ControllerClientOpts {
   onState: (s: LinkState) => void;
   onConfig: (c: ModeControllerConfig) => void;
   onSlot?: (slot: number) => void;
+  /** MUSIC-SUITE P6 phone-replay: the host's live state, bounded by parseRoomState (only an opted-in host sends one). */
+  onRoomState?: (s: RoomState) => void;
+  /** MULTIPLAYER (2026-10-06): the party room as this phone sees it (lib/party/protocol.ts), bounded on arrival. */
+  onParty?: (v: PartyView) => void;
 }
 
 /** Backoff between reconnect attempts — quick at first, then easing off. */
@@ -79,6 +85,8 @@ export class ControllerClient {
           if (msg.type === 'ping') this.link?.sendFast({ type: 'pong', t: msg.t });
           else if (msg.type === 'lobby') this.opts.onConfig(msg.config);
           else if (msg.type === 'assign') { this.slot = msg.slot; this.opts.onSlot?.(msg.slot); }
+          else if (msg.type === 'state') { const s = parseRoomState(msg.state); if (s) this.opts.onRoomState?.(s); }
+          else if (msg.type === 'party') { const v = parsePartyView(msg.party); if (v) this.opts.onParty?.(v); }
         },
       });
       const answer = await this.link.acceptOffer(data.offer as RTCSessionDescriptionInit);
@@ -104,6 +112,11 @@ export class ControllerClient {
   send(action: string, payload?: unknown): void {
     const ev: ControlEvent = { a: action, p: payload, t: Date.now() };
     this.link?.sendFast({ type: 'input', ev });
+  }
+
+  /** MULTIPLAYER: a party command (ready, pick, start, leave) on the reliable channel. The TV decides whether it counts. */
+  command(cmd: PartyCmd): void {
+    this.link?.sendSafe({ type: 'party-cmd', cmd });
   }
 
   /**

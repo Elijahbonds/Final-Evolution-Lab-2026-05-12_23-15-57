@@ -9,11 +9,11 @@
 //   3. THE METER — power in tenths, with the CARRY each tenth buys written on the tick (meterTicks). A player gauges
 //      "70 % of a driver" as "43 m", which is what Wii's meter lines are for.
 //
-// The clubs are scaled to THIS course (holes 26–39 m out on a 60 x 90 field): a driver reaches the far pin, a wedge
+// The clubs are scaled to THIS course (holes 22–38 m out on a 60 x 90 field, GolfLoop.PAR_BANDS): a driver reaches the far pin, a wedge
 // does not, so the club stays a decision. Every field a headless suite already reads (reach / launch / forgive) is kept.
 
 import { Vector3 } from '@babylonjs/core';
-import { GolfBallSim, type Surface } from './GolfBall';
+import { GOLF_BALL, GolfBallSim, SURFACE_FRICTION, greenBreakSlope, resolvePutt, type Surface } from './GolfBall';
 
 export interface WiiClub {
   id: string;
@@ -86,31 +86,93 @@ export function simulateShot(
   club: WiiClub, power01: number, yaw: number, from: { x: number; y: number; z: number }, air: AirLike = STILL_AIR,
   surfaceAt: (p: Vector3) => Surface = () => 'fairway', maxSec = 14,
 ): ShotPrediction {
+  const { vel, spin } = launchVelocity(club, power01, yaw);
+  return flyAhead(vel, spin, from, air, surfaceAt, maxSec);
+}
+
+/** Any launch, flown ahead on the sim the mode flies (a `cup` lets a slow ball drop, as the live flight's tryHole does). */
+export function flyAhead(
+  vel: Vector3, spin: Vector3, from: { x: number; y: number; z: number }, air: AirLike = STILL_AIR,
+  surfaceAt: (p: Vector3) => Surface = () => 'fairway', maxSec = 14, cup?: { x: number; z: number },
+): ShotPrediction {
   const mesh = { position: new Vector3(from.x, from.y, from.z) };
   const sim = new GolfBallSim(mesh);
   sim.wind.set(air.wind.x, 0, air.wind.z); sim.wet01 = air.wet01; sim.airDensity = air.density;
-  const { vel, spin } = launchVelocity(club, power01, yaw);
   sim.launch(new Vector3(from.x, Math.max(from.y, 0.05), from.z), vel, spin);
   const dt = 1 / 120; let t = 0, hang = 0;
-  while (sim.ball.active && t < maxSec) { sim.step(dt, surfaceAt); t += dt; if (!sim.carryPoint) hang = t; }
+  while (sim.ball.active && t < maxSec) { sim.step(dt, surfaceAt); if (cup) sim.tryHole(cup.x, cup.z); t += dt; if (!sim.carryPoint) hang = t; }
   const c = sim.carryPoint ?? sim.ball.pos; const r = sim.ball.pos;
   const dist = (p: { x: number; z: number }) => Math.hypot(p.x - from.x, p.z - from.z);
   return { carry: { x: c.x, z: c.z }, rest: { x: r.x, z: r.z }, carryM: dist(c), totalM: dist(r), hangSec: hang };
 }
 
-/** QA A1-04: the putter barely leaves the ground (loftDeg 1.5), so its `carryM` — where it first touches down — is a
- *  near-meaningless fraction of a meter; the shot that matters is where it STOPS rolling (`totalM`). A full swing's
- *  carry is still the right read (Wii Sports shows carry, roll is a bonus tail), so only the putter switches. */
-export function shotDistanceM(club: WiiClub, pred: ShotPrediction): number {
-  return club.id === 'PUTTER' ? pred.totalM : pred.carryM;
+// ── THE PUTT (IMPROVE 2026-10-06, Golf #3 / #5) ─────────────────────────────────────────────────────────────────────
+// The mode's putt is not a club launch: resolvePutt sets the PACE (how far it should roll) from the distance and the
+// power, and the green's break turns the line (offlineRad). Two things were wrong with how that reached the ball:
+//   · the arrow's ring was the PUTTER flown by launchVelocity — another speed, no break — so the preview on the green
+//     said one thing and the putt did another (#5). One launch now, for both;
+//   · the pace became a speed as `paceM / 1.15`, as if the roll grew with the speed. The green brakes at a constant
+//     rate (SoccerBall: grassFriction m/s²) after the hop's one skid, so the roll grows with the SQUARE of the speed and
+//     a short putt died far short: measured, a 2 m putt at FULL power rolled 0.8 m, a 4 m putt 2.8 m. The 1.6 m gimme
+//     (HOLED_M) is what hid it. The speed is now the one that rolls `paceM` on a dry or wet green — 42 % power
+//     reaches the cup from any distance, full power runs 35 % past, which is what resolvePutt's [TUNE] always said.
+/** The putt's little hop off the face (m/s up). */
+export const PUTT_LIFT_MPS = 0.15;
+/** The hop's air time from the sim's launch height (0.05 m, flyAhead's floor) down to the turf: ~0.056 s at full speed. */
+const PUTT_HOP_SEC = (PUTT_LIFT_MPS + Math.sqrt(PUTT_LIFT_MPS ** 2 + 2 * 9.81 * (0.05 - GOLF_BALL.radius))) / 9.81;
+/**
+ * The ground speed that rolls `paceM` on the green: the hop carries it `v·t` at full speed, its touch-down keeps `skid`
+ * of it, and the green brakes the rest at a constant rate — `v·t + (v·skid)² / 2·brake = pace`, solved for v. The wet
+ * terms are GolfBallSim.step's (a soaked green brakes harder and the skid keeps less).
+ */
+export function puttSpeedFor(paceM: number, wet01 = 0): number {
+  const w = Math.max(0, Math.min(1, wet01));
+  const brake = SURFACE_FRICTION.green * (1 + 0.6 * w);
+  const skid = GOLF_BALL.skidFactor * (1 - 0.45 * w);
+  const a = (skid * skid) / (2 * brake), b = PUTT_HOP_SEC, pace = Math.max(0, paceM);
+  return (-b + Math.sqrt(b * b + 4 * a * pace)) / (2 * a);
+}
+/** The putt's launch: resolvePutt's pace and line from this power, face, distance and break, along the aim. */
+export function puttLaunch(power01: number, face01: number, aimYaw: number, distM: number, breakSlope: number, wet01 = 0): { vel: Vector3; yaw: number } {
+  const putt = resolvePutt({ power01, face01 }, distM, breakSlope);
+  const yaw = aimYaw + putt.offlineRad;
+  const spd = puttSpeedFor(putt.paceM, wet01);
+  return { vel: new Vector3(Math.sin(yaw) * spd, PUTT_LIFT_MPS, Math.cos(yaw) * spd), yaw };
+}
+/** A pure-faced putt at this power along this aim, rolled ahead on the green's break — dropping if it would, unless
+ *  `dropInCup` is false (the meter's lines read the pace: how far each power ROLLS, cup or no cup). */
+export function simulatePutt(
+  power01: number, aimYaw: number, from: { x: number; y: number; z: number }, cup: { x: number; z: number }, air: AirLike = STILL_AIR,
+  surfaceAt: (p: Vector3) => Surface = () => 'green', maxSec = 14, dropInCup = true,
+): ShotPrediction {
+  const distM = Math.hypot(from.x - cup.x, from.z - cup.z);
+  const { vel } = puttLaunch(power01, 1, aimYaw, distM, greenBreakSlope(from.x, cup.x), air.wet01);
+  return flyAhead(vel, Vector3.Zero(), from, air, surfaceAt, maxSec, dropInCup ? cup : undefined);
 }
 
-/** The meter's lines: the distance (m) a putt rolls, or a swing carries, at 0 %, 10 % … 100 % of this club along this
- *  aim in this air. Eleven numbers. */
+/**
+ * The meter's lines, built a few simulations at a time (IMPROVE 2026-10-06, Golf #14): eleven full flights in one frame
+ * was a visible hitch on every club change. The mode steps this once a frame; `finish()` completes it on demand.
+ */
+export class MeterTickJob {
+  readonly ticks: number[] = [];
+  constructor(private readonly read: (power01: number) => number) {}
+  get done(): boolean { return this.ticks.length >= 11; }
+  /** Run up to `n` more of the eleven; true once all are in. */
+  step(n = 1): boolean {
+    for (let i = 0; i < n && !this.done; i++) this.ticks.push(Math.round(this.read(this.ticks.length / 10)));
+    return this.done;
+  }
+  finish(): number[] { this.step(11); return this.ticks; }
+}
+
+/** The meter's lines: the carry (m) at 0 %, 10 % … 100 % of this club along this aim in this air. Eleven numbers. */
 export function meterTicks(club: WiiClub, yaw: number, from: { x: number; y: number; z: number }, air: AirLike = STILL_AIR, surfaceAt?: (p: Vector3) => Surface): number[] {
-  const out: number[] = [];
-  for (let i = 0; i <= 10; i++) out.push(Math.round(shotDistanceM(club, simulateShot(club, i / 10, yaw, from, air, surfaceAt))));
-  return out;
+  return new MeterTickJob((p) => simulateShot(club, p, yaw, from, air, surfaceAt).carryM).finish();
+}
+/** A putt's meter lines: the ROLL (m) each tenth of power buys — a putt is read by where it stops, not where it lands. */
+export function puttTicks(aimYaw: number, from: { x: number; y: number; z: number }, cup: { x: number; z: number }, air: AirLike = STILL_AIR, surfaceAt?: (p: Vector3) => Surface): number[] {
+  return new MeterTickJob((p) => simulatePutt(p, aimYaw, from, cup, air, surfaceAt, 14, false).totalM).finish();
 }
 /** The carry a meter reading buys, off the ticks. */
 export function carryAt(ticks: readonly number[], power01: number): number {

@@ -171,7 +171,93 @@ export function spawnRadius(arena: CombatArena): number {
   return arena.shape.kind === 'disc' ? arena.shape.radius - 1.5 : Math.min(arena.shape.halfX, arena.shape.halfZ) - 1.2;
 }
 
-// ── the arenas ───────────────────────────────────────────────────────────────────────────────────────────────────────
+/** How far from the arena's centre a body can get: a disc's rim, a box's CORNER (the worst case for a camera, a crowd). */
+export function arenaReach(arena: CombatArena): number {
+  return arena.shape.kind === 'disc' ? arena.shape.radius : Math.hypot(arena.shape.halfX, arena.shape.halfZ);
+}
+
+/**
+ * How far from the centre a body travelling along `dir` (planar, any length) is stopped: by the shape's edge, or sooner
+ * by a wall segment it meets on the way (a cage's eight ropes are chords INSIDE its circle). For a drop edge this is
+ * where the floor ends. IMPROVE (2026-10-06): Showdown stands its gate here, so the gate sits where a body can reach.
+ */
+export function edgeAlong(arena: CombatArena, dir: { x: number; z: number }): number {
+  const l = Math.hypot(dir.x, dir.z) || 1, dx = dir.x / l, dz = dir.z / l;
+  let best = arena.shape.kind === 'disc'
+    ? arena.shape.radius
+    : Math.min(Math.abs(dx) > 1e-9 ? arena.shape.halfX / Math.abs(dx) : Infinity, Math.abs(dz) > 1e-9 ? arena.shape.halfZ / Math.abs(dz) : Infinity);
+  for (const w of arena.walls) {
+    // the ray t·d against the segment a + u·(b − a): solve with 2-D cross products
+    const ex = w.b.x - w.a.x, ez = w.b.z - w.a.z, den = dx * ez - dz * ex;
+    if (Math.abs(den) < 1e-9) continue;
+    const t = (w.a.x * ez - w.a.z * ex) / den, u = (w.a.x * dz - w.a.z * dx) / den;
+    if (t > 0 && u >= 0 && u <= 1) best = Math.min(best, t);
+  }
+  return best;
+}
+
+/**
+ * Showdown's destructible gate: how far out along −z it stands (its centre), just inside where a body is stopped, and
+ * how close the rival has to come to break it. IMPROVE (2026-10-06): the gate stood at a fixed z −12 — behind every
+ * arena Showdown fights in (their −z edges were 5 to 6.4 m out, and arenaClamp holds a body inside them), so since
+ * phase 7 the ultimate's launch could never reach it. It stands on the picked arena's own edge now.
+ */
+export const SHOWDOWN_GATE = { inset: 0.2, breakM: 0.8 } as const;
+export function showdownGateDist(arena: CombatArena): number {
+  return edgeAlong(arena, { x: 0, z: -1 }) - SHOWDOWN_GATE.inset;
+}
+
+/**
+ * IMPROVE (2026-10-06): the radius a ring of onlookers stands on, `gap` metres past the arena's edge and never closer
+ * than CROWD_CORNER_CLEAR to a box's corner. The modes used `max(halfX, halfZ) + gap`, which on a box is measured from
+ * the middle of the LONG side — at ARENA_SCALE the Foundry's corner (8.75, 7.5) reached past that ring and put
+ * onlookers inside the steel walls. On a disc this is exactly the old `radius + gap`.
+ */
+export function crowdRadius(arena: CombatArena, gap: number): number {
+  const side = arena.shape.kind === 'disc' ? arena.shape.radius : Math.max(arena.shape.halfX, arena.shape.halfZ);
+  return Math.max(side + gap, arenaReach(arena) + CROWD_CORNER_CLEAR);
+}
+export const CROWD_CORNER_CLEAR = 1.2;
+/** `n` onlookers evenly round crowdRadius(arena, gap), the first at `phase` (radians from +z toward +x). */
+export function crowdRing(arena: CombatArena, gap: number, n = 14, phase = 0.22): Array<{ x: number; z: number }> {
+  const r = crowdRadius(arena, gap);
+  return Array.from({ length: n }, (_, i) => { const a = (i / n) * Math.PI * 2 + phase; return { x: Math.sin(a) * r, z: Math.cos(a) * r }; });
+}
+/** Each mode's onlooker ring: its gap past the edge and where its first onlooker stands (moved here from the mode files
+ *  so a test can hold every ring outside its arena and on its floor). Mixed's π/2 is its old (cos, sin) ring, unchanged. */
+export const CROWD_GAP = { karate: 2.7, karate_vs: 2.6, mixedcombat: 4.2 } as const;
+export const CROWD_PHASE = { karate: 0.22, karate_vs: 0.22, mixedcombat: Math.PI / 2 } as const;
+
+// ── the size of every arena ──────────────────────────────────────────────────────────────────────────────────────────
+// IMPROVE (2026-10-06) — owner: "Make the maps in the fighting modes a little bigger. They feel too small."
+// TUNED. The arenas below are AUTHORED at their 2026-09-18 size and grown by this one number on the way into
+// COMBAT_ARENAS, so the size of every fighting floor is tuned here and nowhere else. 1.25 = a quarter bigger in every
+// direction (about 56% more floor). What grows: the shape, every wall segment, where the pillars and hazards stand, the
+// lamps around the edge, and the floor the venue paints (floorHalf — which also keeps the gauntlet's painted ring on
+// its clamp: NexusWebScene draws it at a fixed 0.3125 of the mat). What does NOT: anything a body measures itself
+// against — wall and pillar heights, a pillar's girth, a fire pit's radius — and the backdrop walls and banners already
+// standing past the floor. Everything that follows the size (spawn rings, crowds, the Showdown gate, the duel's
+// ring-out, the edge warnings, the wall run) reads the scaled data, so it moves with this.
+export const ARENA_SCALE = 1.25;
+
+/** An arena grown by `s` about its centre (see ARENA_SCALE for what grows and what stays body-sized). */
+export function scaleArena(a: CombatArena, s: number): CombatArena {
+  const pt = (p: { x: number; z: number }) => ({ x: p.x * s, z: p.z * s });
+  return {
+    ...a,
+    shape: a.shape.kind === 'disc' ? { kind: 'disc', radius: a.shape.radius * s } : { kind: 'box', halfX: a.shape.halfX * s, halfZ: a.shape.halfZ * s },
+    walls: a.walls.map((w) => ({ ...w, a: pt(w.a), b: pt(w.b) })),
+    pillars: a.pillars.map((p) => ({ ...p, ...pt(p) })),
+    hazards: a.hazards.map((h) => ({ ...h, ...pt(h) })),
+    look: {
+      ...a.look,
+      floorHalf: a.look.floorHalf * s,
+      props: a.look.props.map((p) => (p.kind === 'lamp' ? { ...p, position: [p.position[0] * s, p.position[1], p.position[2] * s] as [number, number, number] } : p)),
+    },
+  };
+}
+
+// ── the arenas (authored at the 2026-09-18 size; ARENA_SCALE grows them) ─────────────────────────────────────────────
 
 const shrineSky = { skyTop: '#C9D3DC', skyBottom: '#8E9AA6', fog: '#B9C2CA', sun: '#FFF4E6', ambient: 0.7 } as const;
 const nightSky = { skyTop: '#0b0f1e', skyBottom: '#1e1035', fog: '#140c24', sun: '#9ad7ff', ambient: 0.4 } as const;
@@ -262,7 +348,7 @@ const CLIFF: CombatArena = {
     wallColor: '#6b6560', accent: '#34d399', mood: 'overcast', propSet: 'dojo', props: [lamp(4.5, -5.5, '#FFD79A'), lamp(-4.5, -5.5, '#FFD79A')] },
 };
 
-export const COMBAT_ARENAS: readonly CombatArena[] = [GAUNTLET, DOJO, CAGE, FOUNDRY, PIT, ROOFTOP, CLIFF];
+export const COMBAT_ARENAS: readonly CombatArena[] = [GAUNTLET, DOJO, CAGE, FOUNDRY, PIT, ROOFTOP, CLIFF].map((a) => scaleArena(a, ARENA_SCALE));
 
 export function arenasFor(mode: CombatModeId): CombatArena[] {
   return COMBAT_ARENAS.filter((a) => a.ready && a.modes.includes(mode));

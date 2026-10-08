@@ -7,6 +7,7 @@
 //   3. DRIFT GUARDS for the numbers mirrored out of mode files a server route must not import.
 //   4. SERVER SAFETY: nothing the module pulls in, however deep, touches Babylon or a window.
 // The routes are exercised with auth and the database mocked in lib/arenaSubmitRoute.test.ts.
+import { perfectRun, moneyBall as tpMoneyBall, optionsOffered as tpOptionsOffered } from './babylon/modes/threePointRules';
 import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -14,10 +15,12 @@ import {
   SCORE_CEILINGS, MIRRORED, BOUND_MARGIN, UNTIMED_RUN_SEC, MAX_FRAME_HZ, SKATE_LINK_SEC, BOARD_EVENT_SEC, FREERUN_LINK_SEC,
   KARATE_SWING_SEC, FOOTBALL_EVENT_SEC, DUNK_ATTEMPT_MAX, DUNK_CONTEST_ATTEMPTS, DUNK_MAX_SCALE, BIG_AIR_MAX_TURNS,
   checkStakeScore, checkDunkCard, scoreCeilingFor, canonicalStakeMode, killSwitchOn, dunkAttemptCeiling, aboveCeilingDetail,
-  whoSceneItCeiling, danceCeiling, brainBrawlCeiling, bigAirCeiling, skateLinkMax, chainRunBound, frameRoundedRate,
-  carnivalEventBounds, STAKE_MODE_ALIASES, type ScoreCeiling,
+  whoSceneItCeiling, danceCeiling, brainBrawlCeiling, bigAirCeiling, bigAirLineMax, bigAirLineBonusMax, skateLinkMax, chainRunBound, frameRoundedRate,
+  carnivalEventBounds, STAKE_MODE_ALIASES, REJUDGED_STAKE_MODES, SESSION_RULES_CEILINGS, sessionRulesMax, firstToCeiling, type ScoreCeiling,
 } from './arena-score-integrity';
 import { ARENA_MODES } from './arena';
+import { versusScore } from './babylon/core/VersusScore';
+import { mixedScore } from './babylon/core/MixedScore';
 import { ARENA_SCORE_BASELINES } from './arena-rivals';
 import { MODE_INFO } from './game-data';
 import { emptyCard, addAttempt, forWire, type DunkAttempt } from './mp/dunkCard';
@@ -30,8 +33,11 @@ import { buildRounds, BuzzMatch, SCENE_CATEGORIES } from './babylon/core/SceneBu
 import { DancePerformance, DANCE_LIBRARY, type DanceStep } from './babylon/core/DanceCore';
 import { exportSongToDance } from './babylon/music/DanceExport';
 import { MAX_SONG_BARS, MAX_CHAIN_ENTRIES } from './babylon/music/Song';
-import { PerformSet, performHitPoints, PERFORM_SET_NOTES, PERFORM_SET_BARS, PERFORM_STEPS_PER_BAR } from './babylon/music/performSet';
+import { PerformSet, performSetMax, PERFORM_SET_NOTES, PERFORM_SET_BARS, PERFORM_STEPS_PER_BAR } from './babylon/music/performSet';
+import { houseBeatFor, judgeHouseSet, houseTap, HOUSE_SET_MAX, HOUSE_SET_NOTES, HOUSE_BPMS, HOUSE_SWINGS } from './babylon/music/houseBeat';
 import { TennisScore } from './babylon/core/RallyCore';
+import { coinLayout, FB_COIN_GROUP_MAX } from './babylon/modes/footballRushRules';
+import { readSetLength, setLengthOf } from './babylon/nexus/setLength';
 import { buildResult } from './babylon/core/sessionResult';
 import { RINGS, BANK } from './babylon/core/ParkourGolf';
 import { TOKEN, TARGETS } from './babylon/core/ParkourDerby';
@@ -40,7 +46,7 @@ import { BREAK } from './babylon/core/Breakaway';
 import { RUN } from './babylon/core/RushRun';
 import { ComboChain, REPEAT_DECAY, REPEAT_NO_MULT } from './babylon/core/ComboChain';
 import { TRICKS, TrickMachine, type BoardRig, type TrickDef } from './babylon/modes/boardCore';
-import { SKATE_TRICKS, SNOW_TRICKS, SURF_TRICKS, asTrickDef, basePts } from './babylon/core/BoardTricks';
+import { SKATE_TRICKS, SNOW_TRICKS, SURF_TRICKS, asTrickDef, basePts, scoreTrick } from './babylon/core/BoardTricks';
 import { WALL_RIDE, LIP, LIP_TRICKS } from './babylon/core/WallRide';
 import { Freeflow, FREEFLOW } from './babylon/core/Freeflow';
 import { GUNSLING, SLINGSHOT, STIFF, BLOCK, LANES } from './babylon/core/KickoffReturn';
@@ -48,6 +54,9 @@ import { FREERUN_TRICKS, LAUNCH_MULT, TIERS } from './babylon/core/FreeRunCore';
 import { EVENTS_PER_NIGHT } from './babylon/core/CarnivalNight';
 import type { GrindLine } from './babylon/core/GroundRide';
 import { SNOW_SLOPE } from './babylon/modes/snowSlope';
+import { timeBonus, TIME_BONUS_MAX, gateStreakBonus, GATE_STREAK_MAX, GRAB_HOLD_MAX } from './babylon/modes/gateCrasher';
+import { SURF_GRABS, NEAR_MISS_PTS, NEAR_MISS_COOLDOWN_SEC, SWELL_WORTH_MAX } from './babylon/modes/surfBreak';   // IMPROVE (2026-10-06, surf)
+import { WAVE_PROFILES } from './babylon/modes/surfLineup';   // GATE-CRASHER-POLISH-2 (GC-9): the time curve
 
 const src = (p: string) => readFileSync(join(process.cwd(), p), 'utf8');
 const num = (text: string, re: RegExp, what: string): number => {
@@ -216,7 +225,8 @@ function carnivalEventRuns(): Record<string, number> {
   const gauntletRaw = trickMachineRun([TRICKS.flipA, TRICKS.flipB, TRICKS.spin], m.trickGauntletSec);
   return {
     slam_rush: makes * m.slamRushPpu,
-    strike_storm: m.strikeStormSec * MAX_FRAME_HZ * m.strikeStormPpu,                         // the bag hit every frame
+    // the bag hit every frame, rotating GO / TRICK / POWER so every third closes a trio (carnivalEvents.strikeTrio)
+    strike_storm: (m.strikeStormSec * MAX_FRAME_HZ + Math.floor((m.strikeStormSec * MAX_FRAME_HZ) / 3) * m.strikeStormTrioBonus) * m.strikeStormPpu,
     trick_gauntlet: Math.round(gauntletRaw * m.trickGauntletPpu),
     hot_shot: Math.floor(m.hotShotSec / (m.hotShotGoalZ / m.hotShotMaxSpeed)) * m.hotShotPpu,  // full-power goals back to back
     coin_storm: (14 + 10 + 14) * m.coinStormPpu,                                               // three patterns cleared at the stick's top speed
@@ -238,6 +248,20 @@ function performRun(bpm: number, arena = true): { score: number; notes: number; 
   return { score: set.score, notes: set.notes, overAt };
 }
 
+/**
+ * MUSIC-SUITE P6 (2026-09-26): an Arena music set is played on the duel's house beat, every charted note tapped dead on,
+ * through the real judge the room and the server share (judgeHouseSet → PerformSet({ arena: true })).
+ */
+function housePerfectRun(seed: string): { score: number; notes: number; bpm: number; swing: number } {
+  const beat = houseBeatFor(seed);
+  const r = judgeHouseSet(beat, beat.notes.map((n) => houseTap(n.lane, n.t)));
+  return { score: r.score, notes: r.perfects, bpm: beat.bpm, swing: beat.swing };
+}
+
+/** A stake check as the Arena route makes it: a music score arrives with the server's rejudge of it (here, itself). */
+const stake = (mode: string, score: unknown) =>
+  checkStakeScore({ mode, score, ...(REJUDGED_STAKE_MODES.has(canonicalStakeMode(mode)) && typeof score === 'number' ? { rejudged: score } : {}) });
+
 /** Big Air through the real AirSessionCore at full boost: the spin started at take-off, planted the moment it reaches
  *  `plantAt` turns (a whole half turn: clean), the landing stuck (tapped all the way down). `plantAt` null = never
  *  planted, to measure how far the air lets a spin turn. */
@@ -254,6 +278,19 @@ function bigAirRun(plantAt: number | null): { score: number; maxTurns: number } 
     maxTurns = Math.max(maxTurns, Math.abs(core.state.spinTurns));
   }
   return { score: core.state.score, maxTurns };
+}
+
+/** IMPROVE (2026-10-06): Big Air's banked line, scored as AirSessionMode scores it — one ComboChain (scope 'air') for the
+ *  session, every landing a stuck one naming `named(i)` (a line is each trick once, scoreTrick at landed01 1), banked at the
+ *  end. The default names every snow air trick in a fresh order each air, so no line repeats. */
+function bigAirLineRun(named: (i: number) => typeof SNOW_TRICKS = (i) => { const a = SNOW_TRICKS.filter((t) => t.kind === 'air'); return [...a.slice(i), ...a.slice(0, i)]; }): number {
+  const chain = new ComboChain(undefined, 'air');
+  for (let i = 0; i < BIG_AIR_TUNING.attemptsPerRound; i++) {
+    const line = named(i);
+    chain.add(line.map((t) => t.label).join(' → '), line.reduce((sum, t) => sum + scoreTrick(t, 1), 0), 'air');
+  }
+  chain.bank();
+  return chain.banked;
 }
 
 /** First to `target` on buckets of 2 or 3 — every reachable final score, searched. */
@@ -277,7 +314,7 @@ const PERFECT_RUNS: Record<string, () => number> = {
     for (let r = 0; r < MIRRORED.threePointRacks; r++) for (let b = 0; b < MIRRORED.threePointBallsPerRack; b++) s += b === MIRRORED.threePointBallsPerRack - 1 ? MIRRORED.threePointMoneyWorth : 1;
     return s;
   },
-  bigAir: () => bigAirRun(Math.floor(bigAirRun(null).maxTurns * 2) / 2).score,
+  bigAir: () => bigAirRun(Math.floor(bigAirRun(null).maxTurns * 2) / 2).score + bigAirLineRun(),   // the posted total: rotation + banked line
   golf: () => {
     let s = 0;
     MIRRORED.golfPar.forEach((par, h) => {
@@ -323,8 +360,10 @@ const PERFECT_RUNS: Record<string, () => number> = {
     }
     return match.players[0].score;
   },
-  karateVersus: () => MIRRORED.versusRoundsToWin * 100 - 0 * 40,
-  mixedcombat: () => MIRRORED.versusRoundsToWin * 100 - 0 * 40,
+  // IMPROVE (2026-10-06): the Storm Duel scores through core/VersusScore — a sweep at full HP, every bonus past its cap
+  karateVersus: () => versusScore({ myWins: MIRRORED.versusRoundsToWin, foeWins: 0, hpLeftOnWins: Array(MIRRORED.versusRoundsToWin).fill(1), perfectDodges: 99, routes: 99 }),
+  // IMPROVE (2026-10-06): Mixed Combat scores through core/MixedScore — a sweep, every round a ring-out
+  mixedcombat: () => mixedScore({ myWins: MIRRORED.versusRoundsToWin, foeWins: 0, ringOutWins: 99 }),
   dance: () => {
     const minBeats = Math.min(...DANCE_LIBRARY.map((c) => c.beats));
     const steps = Math.floor((MAX_SONG_BARS * 4) / minBeats);
@@ -350,19 +389,22 @@ const PERFECT_RUNS: Record<string, () => number> = {
     }
     return score;
   },
-  music: () => performRun(160).score,
+  music: () => housePerfectRun('perfect-run').score,
   skateboarding: () => Math.max(...[60, 120, 144, 180, 240].map(skateRun)),
   surfing: () => {
     const m = MIRRORED;
-    const airs = trickMachineRun([...SURF_TRICKS.filter((t) => t.kind === 'air').map(asTrickDef), TRICKS.grab], m.surfRunSec);
-    const waveMoves = (Math.floor(m.surfRunSec / m.surfWaveMoveLockSec) + 1) * (Math.max(...SURF_TRICKS.filter((t) => t.kind !== 'air').map(basePts)) + m.surfFlowMax / 4);
+    // (IMPROVE 2026-10-06, surf: the named X grabs are airs too, and a wave move pays × its swell's worth — the CAVE's at most)
+    const airs = trickMachineRun([...SURF_TRICKS.filter((t) => t.kind === 'air').map(asTrickDef), ...SURF_GRABS.map(asTrickDef), TRICKS.grab], m.surfRunSec);
+    const waveMoves = (Math.floor(m.surfRunSec / m.surfWaveMoveLockSec) + 1) * (Math.max(...SURF_TRICKS.filter((t) => t.kind !== 'air').map(basePts)) + m.surfFlowMax / 4) * m.surfWorthMax;
     const barrels = Math.floor(m.surfRunSec / m.surfBarrelHoldSec) * m.surfBarrelBonus;
     return airs + waveMoves + barrels;
   },
   snowboarding: () => {
     const m = MIRRORED;
     const run = trickMachineRun([...SNOW_TRICKS.filter((t) => t.kind === 'air').map(asTrickDef), ...Object.values(TRICKS)], UNTIMED_RUN_SEC, m.boardRailMax);
-    return run + m.slalomGates * m.slalomGatePts + m.yetiClearPts + m.snowTimeBonusMax;
+    // (IMPROVE 2026-10-06, snow item 5: every gate in one streak, each paying its streak bonus on top)
+    const streak = Array.from({ length: m.slalomGates }, (_, i) => gateStreakBonus(i + 1)).reduce((a, b) => a + b, 0);
+    return run + m.slalomGates * m.slalomGatePts + streak + m.yetiClearPts + m.snowTimeBonusMax;
   },
   freerun: freerunRun,
   karateEndless: karateRun,
@@ -384,9 +426,9 @@ describe('the ceiling table', () => {
 
   it('sets the rules ceilings at what the rules can award', () => {
     const want: Record<string, number> = {
-      dunkContest: 240, hoops1v1: 13, hoops3v3: 23, threePoint: 30, bigAir: 4800, golf: 1310, baseball: 4422,
-      soccer: 5560, tennis: 4, tiebreak: 1350, brainBrawl: 4500, whoSceneIt: 3540, karateVersus: 200, mixedcombat: 200,
-      dance: 79680, training: 9400, music: 2_647_100,
+      dunkContest: 240, hoops1v1: 13, hoops3v3: 23, threePoint: 30, bigAir: 33_260, golf: 2250, baseball: 6432,
+      soccer: 6660, tennis: 6, tiebreak: 1350, brainBrawl: 4500, whoSceneIt: 3540, karateVersus: 300, mixedcombat: 250,
+      dance: 79680, training: 9400, music: 378_300,
     };
     for (const [mode, max] of Object.entries(want)) {
       expect(SCORE_CEILINGS[mode].kind, mode).toBe('rules');
@@ -453,7 +495,7 @@ describe('a perfect run of maximum length stays under its ceiling — every stak
       const c = SCORE_CEILINGS[mode];
       expect(run, `${mode}: perfect run ${run} vs ceiling ${c.max}`).toBeLessThanOrEqual(c.max);
       expect(run, mode).toBeGreaterThan(0);
-      expect(checkStakeScore({ mode, score: Math.round(run) }).ok, mode).toBe(true);
+      expect(stake(mode, Math.round(run)).ok, mode).toBe(true);
     }
   });
 
@@ -471,25 +513,49 @@ describe('a perfect run of maximum length stays under its ceiling — every stak
     }
   });
 
-  it('music (HIGH): an Arena set is PERFORM_SET_BARS long, ends itself, and a perfect set at 160 BPM scores exactly the ceiling', () => {
-    for (const bpm of [60, 92, 160]) {
-      const r = performRun(bpm);
-      expect(r.notes, `${bpm} BPM`).toBe(PERFORM_SET_NOTES);
-      expect(r.score, `${bpm} BPM`).toBe(SCORE_CEILINGS.music.max);           // the tempo changes the time, not the notes
-      expect(r.overAt, `${bpm} BPM`).toBeGreaterThanOrEqual(PERFORM_SET_NOTES);        // it ends after the last note, not before
+  // MUSIC-SUITE P6 (2026-09-26): the ceiling moved from performSetMax() = 2,647,100 (all 512 steps of an Arena set a note,
+  // the player's own grid) to the house beat's maximum: every house beat charts HOUSE_SET_NOTES = 192 notes.
+  it('music (HIGH): a perfect Arena set on ANY house beat — every tempo, every swing — scores exactly the ceiling', () => {
+    const seen = new Set<string>();
+    for (let i = 0; i < 120; i++) {
+      const r = housePerfectRun(`seed-${i}`);
+      seen.add(`${r.bpm}|${r.swing}`);
+      expect(r.notes, `seed-${i}`).toBe(HOUSE_SET_NOTES);
+      expect(r.score, `seed-${i} at ${r.bpm} BPM, swing ${r.swing}`).toBe(SCORE_CEILINGS.music.max);   // the tempo changes the time, not the notes
     }
-    // the reviewer's probe: 222 perfect hits in a row (504,000) was refused under the old 500,000 — it is accepted now
-    let s = 0;
-    for (let i = 0; i < 222; i++) s += performHitPoints(true, i);
-    expect(s).toBe(504_000);
-    expect(checkStakeScore({ mode: 'music', score: s }).ok).toBe(true);
-    expect(checkStakeScore({ mode: 'musicAcademy', score: s }).ok).toBe(true);   // a duel stored under the old key
-    // one note past the set pays nothing: the note is never offered
-    const set = new PerformSet({ arena: true });
-    for (let i = 0; i < PERFORM_SET_NOTES + 40; i++) { const t = i * 0.1; expect(set.note(0, t, t).offered).toBe(i < PERFORM_SET_NOTES); set.tap(t); }
-    expect(set.score).toBe(SCORE_CEILINGS.music.max);
-    expect(checkStakeScore({ mode: 'music', score: set.score }).ok).toBe(true);        // the staked maximum is accepted
-    expect(checkStakeScore({ mode: 'music', score: set.score + 1 }).ok).toBe(false);   // and one point over it is not
+    expect(seen.size).toBe(HOUSE_BPMS.length * HOUSE_SWINGS.length);                // every tempo × swing was played
+    expect(SCORE_CEILINGS.music.max).toBe(HOUSE_SET_MAX);
+    expect(HOUSE_SET_MAX).toBe(performSetMax(HOUSE_SET_NOTES));
+    expect(stake('music', HOUSE_SET_MAX).ok).toBe(true);                            // the staked maximum is accepted
+    expect(stake('musicAcademy', HOUSE_SET_MAX).ok).toBe(true);                     // a duel stored under the old key
+    expect(stake('music', HOUSE_SET_MAX + 1).ok).toBe(false);                       // and one point over it is not
+    // the old ceiling's set — every one of the 512 steps a note — is no Arena set any more: refused
+    const everyStep = new PerformSet({ arena: true });
+    for (let i = 0; i < PERFORM_SET_NOTES; i++) { const t = i * 0.1; everyStep.note(0, t, t); everyStep.tap(t); }
+    expect(everyStep.score).toBe(2_647_100);
+    const old = stake('music', everyStep.score);
+    expect(old.ok).toBe(false);
+    if (!old.ok) expect(old.code).toBe('SCORE_ABOVE_CEILING');
+  });
+
+  it('music: the score must be the server\'s rejudge — none given is refused, a different one is refused, the same is taken', () => {
+    const none = checkStakeScore({ mode: 'music', score: 1000 });
+    expect(none.ok).toBe(false);
+    if (!none.ok) { expect(none.code).toBe('SCORE_NOT_REJUDGED'); expect(none.detail).toContain('not recorded'); }
+    const off = checkStakeScore({ mode: 'music', score: 1000, rejudged: 950 });
+    expect(off.ok).toBe(false);
+    if (!off.ok) { expect(off.code).toBe('SCORE_MISMATCH'); expect(off.detail).toContain('(950)'); }
+    expect(checkStakeScore({ mode: 'music', score: 950, rejudged: 950 }).ok).toBe(true);
+    expect(checkStakeScore({ mode: 'musicAcademy', score: 0, rejudged: 0 }).ok).toBe(true);   // a forfeit scores 0
+    for (const bad of [NaN, -1, 1.5]) expect(checkStakeScore({ mode: 'music', score: 0, rejudged: bad }).ok, String(bad)).toBe(false);
+    // the ceiling is checked first: an impossible score is SCORE_ABOVE_CEILING even when "rejudged" agrees
+    const over = checkStakeScore({ mode: 'music', score: HOUSE_SET_MAX + 1, rejudged: HOUSE_SET_MAX + 1 });
+    if (!over.ok) expect(over.code).toBe('SCORE_ABOVE_CEILING'); else throw new Error('accepted');
+    // every other mode ignores `rejudged` — its routes pass none, and nothing about them changed
+    expect([...REJUDGED_STAKE_MODES]).toEqual(['music']);
+    expect(checkStakeScore({ mode: 'hoops1v1', score: 11 }).ok).toBe(true);
+    expect(checkStakeScore({ mode: 'hoops1v1', score: 11, rejudged: 3 }).ok).toBe(true);
+    expect(checkStakeScore({ mode: 'dance', score: 4000 }).ok).toBe(true);
   });
 
   // Owner, 2026-09-24: "Cap only Arena sets — staked Arena sets end after 32 bars; free play stays endless". The ceiling
@@ -559,6 +625,24 @@ describe('a perfect run of maximum length stays under its ceiling — every stak
     expect(core.state.score).toBeLessThanOrEqual(bigAirCeiling());
   });
 
+  // IMPROVE (2026-10-06, owner-approved "Big Air ceiling counts the line bonus"): the card posts rotation + the banked line,
+  // and the ceiling counted rotation only (8,000) — a top session (~14,000 measured) was refused as a stake.
+  it('Big Air: the ceiling counts the banked line bonus, exactly what the real ComboChain banks for the biggest fresh lines', () => {
+    const airs = SNOW_TRICKS.filter((t) => t.kind === 'air');
+    expect(bigAirLineMax()).toBe(airs.reduce((s, t) => s + scoreTrick(t, 1), 0));   // every snow air named once, stuck
+    expect(bigAirLineRun()).toBe(bigAirLineBonusMax());                              // the chain's N× links, five fresh lines
+    // the same line every air (the repeat decay) or a fresh but shorter line banks less
+    expect(bigAirLineRun(() => airs)).toBeLessThan(bigAirLineBonusMax());
+    expect(bigAirLineRun((i) => [...airs.slice(i), ...airs.slice(0, i)].slice(1))).toBeLessThan(bigAirLineBonusMax());
+    const rotation = bigAirCeiling() - bigAirLineBonusMax();
+    expect(rotation).toBe(8000);                                                      // the rotation part is unchanged
+    const top = PERFECT_RUNS.bigAir();
+    expect(top).toBeGreaterThan(rotation);                                            // the old ceiling refused it
+    expect(stake('bigAir', top).ok).toBe(true);
+    expect(stake('bigAir', 14_000).ok).toBe(true);                                    // the measured top session
+    expect(stake('bigAir', bigAirCeiling() + 1).ok).toBe(false);
+  });
+
   it('Brain Brawl, Who Scene It, dance and tennis land exactly on their ceilings through their real cores', () => {
     expect(brainBrawlCeiling()).toBe(PERFECT_RUNS.brainBrawl());
     expect(whoSceneItCeiling()).toBe(PERFECT_RUNS.whoSceneIt());
@@ -585,8 +669,8 @@ describe('checkStakeScore', () => {
   it('accepts every ceiling and refuses one more, for every stakeable mode', () => {
     for (const mode of ARENA_MODES) {
       const max = SCORE_CEILINGS[mode].max;
-      expect(checkStakeScore({ mode, score: max }).ok, `${mode} at ${max}`).toBe(true);
-      const over = checkStakeScore({ mode, score: max + 1 });
+      expect(stake(mode, max).ok, `${mode} at ${max}`).toBe(true);
+      const over = stake(mode, max + 1);
       expect(over.ok, mode).toBe(false);
       if (!over.ok) {
         expect(over.code).toBe('SCORE_ABOVE_CEILING');
@@ -628,8 +712,9 @@ describe('checkStakeScore', () => {
     for (const score of [INT4_MAX, Number.MAX_SAFE_INTEGER]) {
       for (const mode of ARENA_MODES) expect(checkStakeScore({ mode, score }).ok, `${mode} ${score}`).toBe(false);
     }
-    for (const mode of ARENA_MODES.filter((m) => SCORE_CEILINGS[m].kind === 'rules' && m !== 'music')) {
-      expect(checkStakeScore({ mode, score: 999_999 }).ok, mode).toBe(false);
+    // MUSIC-SUITE P6: music is in this list now — its ceiling is the house beat's 378,300, not 2,647,100
+    for (const mode of ARENA_MODES.filter((m) => SCORE_CEILINGS[m].kind === 'rules')) {
+      expect(stake(mode, 999_999).ok, mode).toBe(false);
     }
   });
 
@@ -776,6 +861,25 @@ describe('the card reaches the server', () => {
 });
 
 describe('drift guards — the numbers mirrored out of mode files still match them', () => {
+  // IMPROVE (2026-10-06): bigAirLineBonusMax rests on how AirSessionMode (a Babylon file the route must not import) scores a
+  // line — not a number to mirror, so its shape is held here: one 'air' chain for the session, banked once at the end, a
+  // line of snow tricks each named once an air, each paying scoreTrick, and the posted total rotation + that bonus.
+  it('Big Air: the line bonus is scored the way bigAirLineBonusMax models it', () => {
+    const t = src('lib/babylon/modes/AirSessionMode.ts');
+    expect(t).toMatch(/chain: new ComboChain\(undefined, 'air'\)/);
+    // …and a fresh one each session: the mode is one module-level definition, and reset() runs on every load()
+    const reset = t.slice(t.indexOf('const reset = (): void => {'), t.indexOf('\n  };', t.indexOf('const reset = (): void => {')));
+    expect(reset).toMatch(/S\.chain = new ComboChain\(undefined, 'air'\); S\.bonus = 0;/);
+    expect(t).toMatch(/async load\(ctx: ModeContext\): Promise<void> \{\n\s+loadCount \+= 1;\n\s+reset\(\);/);
+    expect(t.match(/S\.chain\.bank\(\)/g)?.length, 'the chain banks only when the session ends').toBe(1);
+    expect(t.match(/S\.chain\.add\(/g)?.length, 'one link a landing').toBe(1);
+    expect(t).not.toMatch(/S\.chain\.accrue\(/);
+    expect(t).toMatch(/const linePts = S\.named\.reduce\(\(sum, t\) => sum \+ scoreTrick\(t, landed01\), 0\);/);
+    for (const m of t.matchAll(/(?:airTrickFor|airPressFor|grabTrickFor)\('(\w+)'/g)) expect(m[1]).toBe('snow');
+    for (const m of t.matchAll(/S\.named\.push\(t\)/g)) expect(t.slice(Math.max(0, m.index! - 400), m.index)).toMatch(/S\.named\.some\(\(n\) => n\.id === t\.id\)/);
+    expect(t).toMatch(/const total = S\.score \+ S\.bonus;/);
+  });
+
   it('Flight Night rounds and dunks', () => {
     const t = src('lib/babylon/modes/DunkMode.ts');
     expect(num(t, /const TOTAL_ROUNDS = (\d+);/, 'TOTAL_ROUNDS')).toBe(MIRRORED.dunkRounds);
@@ -788,6 +892,13 @@ describe('drift guards — the numbers mirrored out of mode files still match th
     const one = src('lib/babylon/modes/OneVOneMode.ts'), three = src('lib/babylon/modes/ThreeVThreeMode.ts');
     expect(num(one, /const TARGET_SCORE = (\d+);/, '1v1 TARGET_SCORE')).toBe(MIRRORED.onevoneTarget);
     expect(num(three, /const TARGET_SCORE = (\d+);/, '3v3 TARGET_SCORE')).toBe(MIRRORED.threevthreeTarget);
+    // owner 2026-10-06: the 1v1's win-by-2 option — its cap is mirrored for the SESSION ceiling only (the stake row stays 13)
+    expect(num(src('lib/babylon/modes/onevoneRules.ts'), /export const WIN_BY_2_CAP = (\d+);/, 'WIN_BY_2_CAP')).toBe(MIRRORED.onevoneWinBy2Cap);
+    expect(SESSION_RULES_CEILINGS.hoops1v1.max).toBe(firstToCeiling(MIRRORED.onevoneWinBy2Cap, MIRRORED.bucketMax));
+    expect(SCORE_CEILINGS.hoops1v1.max).toBe(firstToCeiling(MIRRORED.onevoneTarget, MIRRORED.bucketMax));
+    expect(sessionRulesMax('onevone', SCORE_CEILINGS.hoops1v1)).toBe(17);
+    expect(sessionRulesMax('hoops3v3', SCORE_CEILINGS.hoops3v3)).toBe(SCORE_CEILINGS.hoops3v3.max);   // no option: the stake row
+    expect(Object.keys(SESSION_RULES_CEILINGS)).toEqual(['hoops1v1', 'threePoint']);   // IMPROVE (2026-10-06, 3PT #5): the money rack is the second option
     for (const t of [one, three]) {
       for (const m of t.matchAll(/myScore \+= (\w+);/g)) expect(['arcPoints', 'points', '2']).toContain(m[1]);
       expect(t).not.toMatch(/arcPoints = [^;]*\? 4/);
@@ -799,6 +910,20 @@ describe('drift guards — the numbers mirrored out of mode files still match th
     expect(num(t, /const RACKS = (\d+);/, 'RACKS')).toBe(MIRRORED.threePointRacks);
     expect(num(t, /const BALLS_PER_RACK = (\d+);/, 'BALLS_PER_RACK')).toBe(MIRRORED.threePointBallsPerRack);
     expect(num(t, /const worth = isMoneyBall\(S\.ballIdx\) \? (\d+) : 1;/, 'money ball worth')).toBe(MIRRORED.threePointMoneyWorth);
+    // IMPROVE (2026-10-06, 3PT #5): the money-rack option — one all-money rack (threePointRules) — reaches the SESSION ceiling
+    // only: the stake row stays the 2009 format's 30, and the option is never offered on a staked or head-to-head run
+    expect(perfectRun()).toBe(SCORE_CEILINGS.threePoint.max);
+    expect(SCORE_CEILINGS.threePoint.max).toBe(30);
+    expect(perfectRun(0)).toBe(SESSION_RULES_CEILINGS.threePoint.max);
+    for (let r = 0; r < MIRRORED.threePointRacks; r++) expect(perfectRun(r)).toBe(34);
+    let allMoney = 0;
+    for (let r = 0; r < MIRRORED.threePointRacks; r++) if ([0, 1, 2, 3, 4].every((b) => tpMoneyBall(r, b, 2))) allMoney++;
+    expect(allMoney).toBe(MIRRORED.threePointMoneyRacks);
+    expect(sessionRulesMax('threepoint', SCORE_CEILINGS.threePoint)).toBe(34);
+    for (const q of ['?arena=x', '?mp=1', '?c=abc']) expect(tpOptionsOffered(q)).toBe(false);
+    expect(tpOptionsOffered('')).toBe(true);
+    expect(src('components/games/three-point-options.tsx')).toMatch(/optionsOffered\(window\.location\.search\)/);
+    expect(t).toMatch(/runOptions\(search, \{ practice: readPracticePick\(\), moneyRack: readMoneyRackPick\(\) \}\)/);
   });
 
   it('golf, derby and penalties', () => {
@@ -824,10 +949,16 @@ describe('drift guards — the numbers mirrored out of mode files still match th
   });
 
   it('tennis, tiebreak, Brain Brawl, Who Scene It and the fight modes', () => {
-    expect(num(src('lib/babylon/modes/NetSportMode.ts'), /new TennisScore\((\d+)\)/, 'TennisScore')).toBe(MIRRORED.tennisGames);
+    // IMPROVE (2026-10-06) Tennis #5: the match length is the set-length pick's (a quick match to 3 exists), so the number
+    // lives in nexus/setLength — and a staked run (arena, challenge, story) always reads the FULL match
+    expect(src('lib/babylon/modes/NetSportMode.ts')).toContain("new TennisScore(setLen.target)");
+    expect(src('lib/babylon/modes/NetSportMode.ts')).toContain('setLengthOf(readSetLength(o.modeId), o.modeId)');
+    expect(setLengthOf('full', 'tennis').target).toBe(MIRRORED.tennisGames);
+    for (const p of ['arena=m1', 'mp=ABC', 'c=xyz', 'story=x']) expect(readSetLength('tennis', `?${p}&set=3`)).toBe('full');
     const tb = src('components/games/tiebreak-game.tsx');
     expect(num(tb, /const TARGET = (\d+);/, 'tiebreak TARGET')).toBe(MIRRORED.tiebreakTarget);
-    expect(tb).toContain('score: myPts * 120 + bestRally * 30');
+    expect(tb).toContain('score: myPts');
+    expect(tb).toContain('opponentScore: aiPts');
     expect(tb).toContain('Math.random() < 0.16 + rally * 0.05');
     expect(num(src('lib/babylon/modes/BrainBrawlMode.ts'), /const MAX_ROUNDS = (\d+);/, 'MAX_ROUNDS')).toBe(MIRRORED.brainBrawlMaxRounds);
     const wsi = src('lib/babylon/modes/WhoSceneItMode.ts');
@@ -836,8 +967,21 @@ describe('drift guards — the numbers mirrored out of mode files still match th
     for (const f of ['lib/babylon/modes/KarateVSMode.ts', 'lib/babylon/modes/MixedCombatMode.ts']) {
       const t = src(f);
       expect(num(t, /const ROUNDS_TO_WIN = (\d+);/, `${f} ROUNDS_TO_WIN`)).toBe(MIRRORED.versusRoundsToWin);
-      expect(t).toContain('myWins * 100 - foeWins * 40');
     }
+    // IMPROVE (2026-10-06): Mixed Combat ends on core/MixedScore.mixedScore (the ceiling imports the same module): the rounds
+    // as before (×100 won, −40 lost) plus 25 per round WON by a ring-out, so a ring-out can never pay a lost round
+    const mc = src('lib/babylon/modes/MixedCombatMode.ts');
+    expect(mc).toContain("ctx.end(won ? 'MATCH_WON' : 'MATCH_LOST', mixedScore({ myWins, foeWins, ringOutWins })");
+    expect(mc.split('ctx.end(').length - 1).toBe(1);
+    expect(mixedScore({ myWins: 2, foeWins: 1, ringOutWins: 0 })).toBe(2 * MIRRORED.versusWinPts - 40);
+    expect(mixedScore({ myWins: 1, foeWins: 2, ringOutWins: 5 })).toBe(MIRRORED.versusWinPts - 80 + 25);
+    expect(mixedScore({ myWins: 2, foeWins: 0, ringOutWins: 1e6 })).toBe(SCORE_CEILINGS.mixedcombat.max);
+    // IMPROVE (2026-10-06): Karate VS ends on core/VersusScore (the ceiling imports the same module), and every term of it is capped
+    const kvs = src('lib/babylon/modes/KarateVSMode.ts');
+    expect(kvs).toContain("ctx.end(won ? 'MATCH_WON' : 'MATCH_LOST', versusScore(t)");
+    expect(kvs.split('ctx.end(').length - 1).toBe(1);
+    expect(versusScore({ myWins: 2, foeWins: 0, hpLeftOnWins: [1, 1], perfectDodges: 0, routes: 0 })).toBe(MIRRORED.versusRoundsToWin * MIRRORED.versusWinPts + 50);
+    expect(versusScore({ myWins: 2, foeWins: 0, hpLeftOnWins: [5, 5, 5], perfectDodges: 1e6, routes: 1e6 })).toBe(SCORE_CEILINGS.karateVersus.max);
   });
 
   it('dance and training', () => {
@@ -855,21 +999,30 @@ describe('drift guards — the numbers mirrored out of mode files still match th
     expect(tr).toContain('const bonus = streak >= 3 ? 20 : 0');
   });
 
-  it('music: StudioMode scores PERFORM through PerformSet and nowhere else', () => {
+  // MUSIC-SUITE P6 (2026-09-26): the staked number is no longer the room's live PerformSet but the server's rejudge
+  // (houseBeat.judgeHouseSet on the recorded taps), so the ceiling rests on judgeHouseSet (pinned above) and this guard
+  // pins only what still matters in the room: PerformSet is its one scorer, an Arena set is built only on an Arena run,
+  // and the Arena set is played on the duel's house beat with the judge the server reruns. (The P2 guard pinned the live
+  // drive's exact lines — `set.tap(eng.context.currentTime)`, `set.note(s, t, now)` — which lane 1's four-lane PERFORM
+  // rewrites; the live number is display now.)
+  it('music: StudioMode scores PERFORM through PerformSet and nowhere else, and an Arena set on the house beat\'s judge', () => {
     const studio = src('lib/babylon/music/StudioMode.tsx');
-    expect(studio).toContain("import { PerformSet, PERFORM_STEPS_PER_BAR, ARENA_SET_NOTE, performStatusLine } from './performSet'");
+    expect(studio).toMatch(/import \{[^}]*\bPerformSet\b[^}]*\} from '\.\/performSet'/);
     expect(studio).toContain('const STEPS = PERFORM_STEPS_PER_BAR;');
-    expect(studio).toContain('set.note(s, t, now)');
-    expect(studio).toContain('set.tap(eng.context.currentTime)');
-    expect(studio).toContain('if (set.over(now)) endSetRef.current();');
-    // MUSIC-SUITE P2 (2026-09-25): the end card reads the set's own result (real best combo, the win rule, the shared
-    // stats contract) — it read `const { score, combo } = setRef.current;` and reported won = score > 0
-    expect(studio).toContain('const r = setRef.current.result(engineRef.current?.context.currentTime ?? 0);');
-    expect(studio).toContain('won: r.won,');
     expect(studio).toContain('setRef.current = new PerformSet({ arena: arenaSet });');   // an Arena set only on an Arena run
     expect(studio).not.toMatch(/new PerformSet\(\{ arena: true \}\)/);                  // never capped by default
     expect(studio).not.toMatch(/setScore\(\(s\) =>/);                            // no second tally beside the set's
-    expect(src('lib/babylon/music/AudioEngine.ts')).toMatch(/this\.onStepAudible\?\.\(s\.step, s\.time\)/);   // one note per step
+    expect(studio).toMatch(/import \{[^}]*\bjudgeHouseSet\b[^}]*\} from '\.\/houseBeat'/);   // the judge the server reruns
+    expect(studio).toMatch(/\bhouseBeatFor\(/);                                   // the duel's beat, from its id
+  });
+
+  // MUSIC-SUITE P6: INTEGRATION WITH THE ROOM (lane 1). Without its start and finish no music duel can be scored at all
+  // (submit-score answers 409 NO_ATTEMPT), and music staking is open again — so the room must post them.
+  it('music: the Groove Academy posts its one attempt to /api/arena/music-attempt', () => {
+    const room = ['lib/babylon/music', 'app/play/music']
+      .flatMap((d) => readdirSync(join(process.cwd(), d), { recursive: true }).map(String).map((f) => join(d, f)))
+      .filter((f) => /\.(ts|tsx)$/.test(f) && !/\.test\.tsx?$/.test(f));
+    expect(room.filter((f) => src(f).includes('/api/arena/music-attempt'))).not.toEqual([]);
   });
 
   it('skate: the run, the held links, the coins and the plaza\'s awards', () => {
@@ -888,7 +1041,8 @@ describe('drift guards — the numbers mirrored out of mode files still match th
     expect(num(src('lib/babylon/core/AirControl.ts'), /GRAB_PTS_PER_SEC = (\d+);/, 'GRAB')).toBe(MIRRORED.grabPtsPerSec);
     expect(num(src('lib/babylon/core/Pickups.ts'), /COIN_RUN_CAP = (\d+);/, 'COIN_RUN_CAP')).toBe(MIRRORED.coinRunCap);
     // every combo.add / accrue in the run pays a table award, a rail's bonus, or a per-second rate — nothing bigger
-    const calls = [...skate.matchAll(/combo\.(add|accrue)\(([^;]*?), ([^,;]+), '(air|grind|manual|revert)'\)/g)];
+    // (IMPROVE 2026-10-06: a lock link may carry a trailing repeat key — `combo.add(label, pts, 'grind', railKey(...))`)
+    const calls = [...skate.matchAll(/combo\.(add|accrue)\(([^;]*?), ([^,;]+), '(air|grind|manual|revert)'(?:, [^;]*?)?\)/g)];
     expect(calls.length).toBe(skate.match(/combo\.(add|accrue)\(/g)!.length);
     for (const m of calls) {
       expect(['pts', 'WALL_RIDE.pts', 'WALL_RIDE.plantPts', 'Math.round(WALL_RIDE.ptsPerSec * ridden)', 'gp', 'chainPts', 'Math.round(chainPts * SKETCHY_SCORE_MULT)', 'line.bonus', 'Math.round(r.pts)'], m[0]).toContain(m[3].trim());
@@ -906,7 +1060,8 @@ describe('drift guards — the numbers mirrored out of mode files still match th
     for (const f of files) {
       const t = src(f);
       for (const m of t.matchAll(/bonus: (\d+)/g)) { seen++; expect(Number(m[1]), `${f}: ${m[0]}`).toBeLessThanOrEqual(MIRRORED.boardRailMax); }
-      for (const m of t.matchAll(/makeRail\([^;]*?, (\d+)\);/g)) { seen++; expect(Number(m[1]), `${f}: ${m[0]}`).toBeLessThanOrEqual(MIRRORED.boardRailMax); }
+      // (IMPROVE 2026-10-06: the skatepark's rails pass a gap id and a shared material after the bonus)
+      for (const m of t.matchAll(/makeRail\([^;]*?, (\d+)(?:, [^;]*?)?\);/g)) { seen++; expect(Number(m[1]), `${f}: ${m[0]}`).toBeLessThanOrEqual(MIRRORED.boardRailMax); }
     }
     // the slope's rails are modes/snowSlope.ts data; the legacy slope-v2 ledges ([x, from, to, bonus] tuples) are gone
     // (GATE-CRASHER-MAJOR: bare bars floating 0.7 m over the snow, one ending on gate 2's pole line) — and stay gone
@@ -930,17 +1085,46 @@ describe('drift guards — the numbers mirrored out of mode files still match th
     expect(num(surf, /export const BARREL_BONUS = (\d+);/, 'BARREL_BONUS')).toBe(MIRRORED.surfBarrelBonus);
     expect(surf).toContain('(trickPts(wave) + Math.round(flow / 4))');
     expect(surf.match(/tricks\.score \+= /g)).toHaveLength(2);                   // a wave move and a barrel; the rest is the machine's
-    expect(surf).toContain('rig.rider.jump(0.5 + flow / 200)');                  // a pop: v ≥ 7.75 m/s → ≥ 1.1 s of hang
+    // IMPROVE (2026-10-06, surf): test changed — the pop takes the coyote's late press (item 11), same power; a wave move pays
+    // × the swell's worth (item 20) and joins the chain with its own points paid outside the pot (item 15); a near miss is the
+    // only other link (item 14); the named grabs (item 18) are mirrored
+    expect(surf).toContain('rig.rider.jump(0.5 + flow / 200, late)');            // a pop: v ≥ 7.75 m/s → ≥ 1.1 s of hang
+    expect(surf).toContain('* REPEAT_DECAY[Math.min(rep, REPEAT_DECAY.length - 1)] * worth);');
+    expect(surf).toContain('tricks.link(wave.label, paid, true)');
+    expect(surf).toContain("tricks.link('NEAR MISS', NEAR_MISS_PTS)");
+    expect(surf.match(/tricks\.link\(/g)).toHaveLength(2);
+    expect(SURF_GRABS.map(basePts)).toEqual([...MIRRORED.surfGrabPts]);
+    expect(NEAR_MISS_PTS).toBe(MIRRORED.surfNearMissPts);
+    expect(NEAR_MISS_COOLDOWN_SEC).toBe(MIRRORED.surfNearMissCooldownSec);
+    expect(SWELL_WORTH_MAX).toBe(MIRRORED.surfWorthMax);
+    expect(Math.max(...WAVE_PROFILES.map((p) => p.worth))).toBe(MIRRORED.surfWorthMax);
     expect((2 * (5 + 0.5 * 5.5)) / 14).toBeGreaterThan(3 * BOARD_EVENT_SEC);
     const snow = src('lib/babylon/modes/SnowboardSlalomMode.ts');
     expect(num(src('lib/babylon/modes/rideWorlds.ts'), /export const SLALOM_GATES = (\d+);/, 'SLALOM_GATES')).toBe(MIRRORED.slalomGates);
     expect(num(snow, /tricks\.score \+= (\d+);/, 'gate points')).toBe(MIRRORED.slalomGatePts);
     expect(num(snow, /const YETI_CLEAR_PTS = (\d+);/, 'YETI_CLEAR_PTS')).toBe(MIRRORED.yetiClearPts);
     expect(snow).toContain('yetiDone = true;                       // one appearance per run');
-    expect(snow).toContain('Math.max(0, Math.round((60 - elapsed) * 10))');
+    // GATE-CRASHER-POLISH-2 (GC-9): the time bonus is gateCrasher.timeBonus — a new CURVE (10 a second under 90 s, so one fall no
+    // longer zeroes it), the SAME ceiling. This guard pinned the old formula's text; it now reads the function's own maximum
+    // against the mirror, and that the mode pays the time through it and nothing hand-rolled beside it.
+    // IMPROVE (2026-10-06, snow item 8): paid on the RUN time (the ride + the missed gates' penalty) — still through timeBonus
+    expect(snow).toContain('timeBonus(runT)');
+    expect(snow).toContain('const runT = runTimeSec(elapsed, misses);');
+    expect(snow).not.toMatch(/Math\.round\(\(\d+ - elapsed\)/);
+    expect(timeBonus(0)).toBe(MIRRORED.snowTimeBonusMax);
+    expect(TIME_BONUS_MAX).toBe(MIRRORED.snowTimeBonusMax);
+    expect(Math.max(...Array.from({ length: 481 }, (_, i) => timeBonus(i * 0.5)))).toBe(MIRRORED.snowTimeBonusMax);
     expect(MIRRORED.snowTimeBonusMax).toBe(60 * 10);
-    expect(snow.match(/tricks\.score \+= /g)).toHaveLength(2);                   // the yeti and a gate
-    expect(snow).toContain('rig.rider.jump(0.5 + tuck * 0.5)');
+    expect(snow.match(/tricks\.score \+= /g)).toHaveLength(3);                   // the yeti, a gate, and its streak (snow item 5)
+    expect(snow).toContain('tricks.score += streakPts;');
+    expect(snow).toContain('const streakPts = gateStreakBonus(gateStreak);');
+    expect(GATE_STREAK_MAX).toBe(MIRRORED.slalomStreakMax);
+    // (snow item 13: a clean grab held long pays up to GRAB_HOLD_MAX more — still under the bound's biggest single event)
+    expect(snow).toContain('grabHold: { fromSec: GRAB_HOLD_FROM_SEC, perSec: GRAB_HOLD_PER_SEC, max: GRAB_HOLD_MAX }');
+    const grabs = [...SNOW_TRICKS.filter((t) => t.kind === 'air').map(asTrickDef), ...Object.values(TRICKS)].filter((d) => d.turns === 0 && d.clip === 'board_grab');
+    expect(grabs.length).toBeGreaterThan(0);
+    expect(Math.max(...grabs.map((d) => d.pts)) * (1 + GRAB_HOLD_MAX)).toBeLessThanOrEqual(Math.max(...SNOW_TRICKS.filter((t) => t.kind === 'air').map(basePts), MIRRORED.boardRailMax));
+    expect(snow).toContain('rig.rider.jump(0.5 + tuck * 0.5, late)');            // (snow item 3: the coyote's late press, same power)
     expect(src('lib/babylon/modes/boardCore.ts')).toContain('this.comboPts += line.bonus * this.combo;');
   });
 
@@ -962,8 +1146,8 @@ describe('drift guards — the numbers mirrored out of mode files still match th
   it('The Hundred: the wave budget and the end card', () => {
     const k = src('lib/babylon/modes/KarateEndlessMode.ts');
     expect(k).toContain(`felTier === 'mobile' ? 12 : ${MIRRORED.karateWaveMax}`);
-    expect(k.split('totalKos * 100 + wave * 50 + Math.round(flow.points)').length - 1).toBe(2);   // every ctx.end
-    expect(k.match(/ctx\.end\(/g)).toHaveLength(2);
+    expect(k.split('totalKos * 100 + wave * 50 + Math.round(flow.points)').length - 1).toBe(3);   // every ctx.end (defeat, bleed-out, time cap)
+    expect(k.match(/ctx\.end\(/g)).toHaveLength(3);
     expect(FREEFLOW.multMax).toBe(4);
   });
 
@@ -972,20 +1156,27 @@ describe('drift guards — the numbers mirrored out of mode files still match th
     expect(num(f, /const DRIVES = (\d+);/, 'DRIVES')).toBe(MIRRORED.footballDrives);
     expect(num(f, /const STYLE_CHAIN_PTS = (\d+);/, 'STYLE_CHAIN_PTS')).toBe(MIRRORED.footballStylePts);
     expect(num(f, /const TRUCK_PTS = (\d+);/, 'TRUCK_PTS') * 2).toBe(MIRRORED.footballAwardMax);
-    expect(f).toContain('score += Math.round((100 + evades * 10) * mult);');
+    // IMPROVE (2026-10-06): a touchdown pays THIS drive's evades (tdEvades = evades − evadesAtDrive ≤ evades), so the
+    // bound's model — every touchdown paid on the session's whole count — still over-estimates it; the ceiling is unchanged
+    expect(f).toContain('score += Math.round((100 + tdEvades * 10) * mult);');
+    expect(f).toContain('const tdEvades = evades - evadesAtDrive;');
     expect(f).toContain('const mult = breakawaySec > 0 ? 1.5 : 1;');
     // the score's writers, each named: a new one has to be looked at before it can pay
     const writes = [...f.matchAll(/score \+= ([^;]+);/g)].map((m) => m[1].trim());
     expect(writes).toEqual([
       'bonus', "grade === 'perfect' ? 40 : 15", 'GUNSLING.pts', 'LANES.railPts', 'LANES.rampPts', 'LANES.tunnelPts', 'SLINGSHOT.pts',
       'STIFF.pts', 'BLOCK.catapultPts', '25', 'gained * 5', '20', 'TRUCK_PTS * (breakawaySec > 0 ? 2 : 1)', '20 * mult',
-      'Math.round((100 + evades * 10) * mult)',
+      'Math.round((100 + tdEvades * 10) * mult)',
     ]);
     for (const p of [GUNSLING.pts, SLINGSHOT.pts, STIFF.pts, BLOCK.catapultPts, LANES.railPts, LANES.rampPts, LANES.tunnelPts, 40, 25, 20 * 2, 8 * 5]) expect(p).toBeLessThanOrEqual(MIRRORED.footballAwardMax);
     const types = new Set([...f.matchAll(/styleCredit\(ctx, '(\w+)'\)/g)].map((m) => m[1]));
     for (const m of f.matchAll(/lastDodgeType = e\.btn === 'B' \? '(\w+)' : e\.btn === 'A' \? '(\w+)' : '(\w+)'/g)) [m[1], m[2], m[3]].forEach((t) => types.add(t));
     expect(types.size).toBe(MIRRORED.footballStyleTypes);
-    expect(f).toContain("coins.line(new Vector3(-3, 0.4, fromZ + 4), new Vector3(3, 0.4, toZ), 8);");
+    // IMPROVE (2026-10-06): the coins are laid on the lanes (footballRushRules.coinLayout), in groups of at most
+    // FB_COIN_GROUP_MAX — the `8 * 5` award above is the most one frame can take
+    expect(f).toContain('for (const g of coinLayout(drive)) for (const [x, y, z] of g.points)');
+    for (let d = 1; d <= MIRRORED.footballDrives; d++) for (const g of coinLayout(d)) expect(g.points.length).toBeLessThanOrEqual(FB_COIN_GROUP_MAX);
+    expect(FB_COIN_GROUP_MAX * 5).toBeLessThanOrEqual(MIRRORED.footballAwardMax);
   });
 
   it('Game Night: each event\'s clock, points and pace', () => {
@@ -1000,13 +1191,13 @@ describe('drift guards — the numbers mirrored out of mode files still match th
     expect([Number(ev('counter_strike')[1]), Number(ev('counter_strike')[2])]).toEqual([m.counterStrikeSec, m.counterStrikePpu]);
     expect(c).toContain('charge = 0; cooldown = 0.5;');
     expect(c).toContain("if (e.t === 'button' && e.pressed && !striking && (e.btn === 'A' || e.btn === 'B' || e.btn === 'Y')) {");
-    // QA A1-01: the old speed (13 + p*7) fell short of the goal line at every power, even dead centre (measured
-    // against the real Flight sim — carnivalEvents.hotShot.physics.test.ts); HOT_SHOT_BASE_MPS/HOT_SHOT_POWER_MPS
-    // replace it, and the goal-line check now also resolves on `!flight.active` so a short shot can never soft-lock
-    // the event again (carnivalEvents.test.ts).
+    expect(num(c, /const TRIO_BONUS = (\d+);/, 'TRIO_BONUS')).toBe(m.strikeStormTrioBonus);
+    // QA A1-01(b): the old speed (13 + p*7) fell short of the goal line at every power, even dead centre (measured against
+    // the real Flight sim — carnivalEvents.hotShot.physics.test.ts); HOT_SHOT_BASE_MPS / HOT_SHOT_POWER_MPS replace it,
+    // and the full-power speed is what the ceiling mirrors (hotShotMaxSpeed). A short shot is a miss (IMPROVE 2026-10-06).
     expect(c).toContain('to.scale(HOT_SHOT_BASE_MPS + p * HOT_SHOT_POWER_MPS)');
-    expect(c).toContain('const reachedGoal = ball.position.z >= 10.9;');
-    expect(c).toContain('if (reachedGoal || !flight.active) {');
+    expect(num(c, /export const HOT_SHOT_BASE_MPS = (\d+);/, 'HOT_SHOT_BASE_MPS') + num(c, /export const HOT_SHOT_POWER_MPS = (\d+);/, 'HOT_SHOT_POWER_MPS')).toBe(m.hotShotMaxSpeed);
+    expect(c).toContain('if (ball.position.z >= 10.9) {');
     expect(c).toContain('.scaleInPlace(6);');
     expect(c).toContain('coins.line(new Vector3(-8, 0.4, -8), new Vector3(8, 0.4, 8), 7);');
     expect(Math.hypot(16, 16) / 6).toBeCloseTo(m.coinStormSpacing, 2);

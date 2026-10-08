@@ -43,7 +43,8 @@ describe('timingWon', () => {
 
   it('the host reads its verdict here, and the modes still send these outcomes', () => {
     const src = (rel: string) => stripComments(readFileSync(join(__dirname, '..', '..', rel), 'utf8'));
-    expect(src('components/games/timing-babylon.tsx')).toContain('const won = timingWon(r.outcome, st);');
+    expect(src('components/games/timing-babylon.tsx')).toContain('timingGameResult(r,');
+    expect(src('lib/sessions/gameResultFromSession.ts')).toContain('timingWon(r.outcome, st)');
     expect(src('lib/babylon/modes/NetSportMode.ts')).toMatch(/ctx\.end\(\s*side === 0 \? 'WIN' : 'LOSS',/);
     expect(src('lib/babylon/modes/precisionModes.ts')).toContain("ctx.end(won ? 'SHOOTOUT_WIN' : 'SHOOTOUT_LOSS', goals * 20 + stylePts,");
     expect(src('lib/babylon/modes/precisionModes.ts')).toContain("ctx.end('CARD_IN', pts, { holes: TOTAL, overPar, pickUps });");

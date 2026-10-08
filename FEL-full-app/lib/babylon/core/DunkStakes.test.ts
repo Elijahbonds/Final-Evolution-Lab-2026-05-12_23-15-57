@@ -10,7 +10,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   freshStakes, call, spendAttempt, attemptsLeft, canRetry,
-  attemptScale, stakesScale, callLanded, stakesLabel,
+  attemptScale, stakesScale, callLanded, stakesLabel, callPreview,
   ATTEMPTS_PER_DUNK, ATTEMPT_SCALE, CALL_BONUS, CALL_MISS_SCALE, FRESH_STAKES,
 } from './DunkStakes';
 
@@ -136,5 +136,18 @@ describe('DunkStakes — the bezel', () => {
   it('names the called trick when there is one', () => {
     expect(stakesLabel(freshStakes(), 'EASTBAY')).toContain('CALLED EASTBAY');
     expect(stakesLabel(freshStakes())).not.toContain('CALLED');
+  });
+});
+
+// IMPROVE (2026-10-06): a priced call you cannot throw is still a guess — the preview names the input when the mode has it.
+describe('DunkStakes — the call preview', () => {
+  it('prices the call, and names the input that throws it', () => {
+    const p = callPreview('WINDMILL', 'D-PAD UP + A');
+    expect(p).toContain('CALLING WINDMILL (D-PAD UP + A IN THE AIR)');
+    expect(p).toContain(`+${Math.round((CALL_BONUS - 1) * 100)}%`);
+    expect(p).toContain(`−${Math.round((1 - CALL_MISS_SCALE) * 100)}%`);
+  });
+  it('without an input it reads exactly as it always did', () => {
+    expect(callPreview('EASTBAY')).toMatch(/^CALLING EASTBAY · LAND IT \+\d+% · MISS IT −\d+%$/);
   });
 });

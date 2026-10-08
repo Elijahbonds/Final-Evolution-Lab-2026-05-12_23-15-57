@@ -7,6 +7,8 @@
  *     returns the ORIGINAL result and never double-grants / double-spends.
  *     An earn replay is marked `replayed`; the daily first-session reward's
  *     replay answers granted 0 with `alreadyClaimed` (ECONOMY-SESSIONS-HARDEN).
+ *   - A daily reward (DAILY_EVENT_TYPES) pays once per player per America/Los_Angeles day under a key the SERVER
+ *     builds (dailyKey); the client's key is ignored (DAILY-KEY-HOTFIX, earnDaily).
  *     Only the wallet whose row it is gets that result: another wallet's row
  *     is never replayed (isOwnEntry) and a write reusing its key is refused
  *     (REPLAYED_KEY), and so is a spend key of another purchase (spendReplay).
@@ -27,6 +29,7 @@
 
 import { Prisma, type PrismaClient, type WalletLedgerEntry } from '@/public/_prisma/client';
 import {
+  DAILY_EVENT_TYPES,
   DEFAULT_REWARD_RULES,
   EVENT_REASON,
   REASON,
@@ -40,6 +43,7 @@ import { postLc } from '../ledger';
 import { payloadHash, validateDunkAttempt } from './validation';
 import { refundDeadBuysOnRead, type DeadBuyCredit } from './dead-buy-refunds';
 import { DEAD_BUY_GRACE_MS, deadBuyOf, refundKey } from './dead-buys';
+import { dailyKey, isReservedDailyKey, ptDayBounds } from './dailyKey';
 
 type Db = PrismaClient | Prisma.TransactionClient;
 
@@ -77,6 +81,14 @@ export interface SpendResult {
 const n = (b: bigint | number): number => (typeof b === 'bigint' ? Number(b) : b);
 
 /**
+ * A unique-key refusal (P2002), read by its code rather than by instanceof (DAILY-KEY-HOTFIX, 2026-09-28). Under next
+ * dev, lib/db's client is cached on globalThis and each route compiles its own copy of the generated client, so the
+ * error came from another copy's class. The instanceof missed it, and the losing claim of two sent together was a 500
+ * (measured on :3100). Only a Prisma known-request error carries a P code, so the code alone is the same test.
+ */
+const isUniqueViolation = (e: unknown): boolean => (e as { code?: unknown } | null)?.code === 'P2002';
+
+/**
  * Is this ledger row in the player's own wallet? An idempotency key is unique across the WHOLE ledger, and a route that
  * takes its key from the client can be handed anybody's: a /shop key is shop:<userId>:<cardKey>, and a user id is on
  * every public card. A replay answers only with the caller's own row. Another wallet's row is never replayed: nothing
@@ -97,7 +109,7 @@ export async function getOrCreateWallet(db: Db, playerId: string) {
   try {
     return await (db as any).wallet.create({ data: { playerId } });
   } catch (e) {
-    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+    if (isUniqueViolation(e)) {
       return (db as any).wallet.findUnique({ where: { playerId } });
     }
     throw e;
@@ -202,8 +214,11 @@ export async function resolveRule(db: Db, reasonCode: string): Promise<RewardRul
 // ---------------------------------------------------------------------------
 export async function earn(
   prisma: PrismaClient,
-  args: { playerId: string; idempotencyKey: string; eventType: string; payload: Record<string, unknown> }
+  /** `now` is the server's clock (a test may pass one); nothing in the request reaches it. */
+  args: { playerId: string; idempotencyKey: string; eventType: string; payload: Record<string, unknown>; now?: Date }
 ): Promise<EarnResult> {
+  // DAILY-KEY-HOTFIX (2026-09-28): a daily event is keyed by the server, whatever key (or none) the client sent.
+  if (DAILY_EVENT_TYPES.has(args.eventType)) return earnDaily(prisma, args);
   const { playerId, idempotencyKey, eventType, payload } = args;
   const hash = payloadHash(payload);
 
@@ -245,12 +260,12 @@ export async function earn(
     data: { playerId, eventType, payload: payload as any, payloadHash: hash },
   });
 
-  const reject = async (reason: string): Promise<EarnResult> => {
-    await prisma.perfEarnEvent.update({ where: { id: evt.id }, data: { rejectedReason: reason } });
-    console.warn(`[wallet/earn] rejected event ${eventType} for ${playerId}: ${reason}`);
-    const bal = await readWallet(prisma, playerId);
-    return { granted: { coins: 0, shards: 0 }, balances: { coins: bal.coins, shards: bal.shards, lc: bal.lc }, entry_id: null, capped: false, rejected: reason };
-  };
+  const reject = rejecter(prisma, evt.id, playerId, eventType);
+
+  // 1b. DAILY-KEY-HOTFIX: a daily event type's key space belongs to the server's daily path (isReservedDailyKey). Filed
+  //     here, `daily_first_session:<a day>:<someone's id>` would sit on that player's daily key, and their claim that
+  //     day would be refused on it.
+  if (isReservedDailyKey(idempotencyKey)) return reject('reserved_key');
 
   // 2. Resolve reason from event type.
   const reasonCode = EVENT_REASON[eventType];
@@ -310,6 +325,103 @@ export async function earn(
     granted: { coins: grantedCoins, shards: grantedShards },
     balances: applied.balances, entry_id: applied.entryId, capped,
     ...(applied.replayed ? { replayed: true } : {}),
+  };
+}
+
+/** A recorded earn event's refusal: the reason goes on the event, and the answer grants nothing. */
+function rejecter(prisma: PrismaClient, evtId: string, playerId: string, eventType: string) {
+  return async (reason: string): Promise<EarnResult> => {
+    await prisma.perfEarnEvent.update({ where: { id: evtId }, data: { rejectedReason: reason } });
+    console.warn(`[wallet/earn] rejected event ${eventType} for ${playerId}: ${reason}`);
+    const bal = await readWallet(prisma, playerId);
+    return { granted: { coins: 0, shards: 0 }, balances: { coins: bal.coins, shards: bal.shards, lc: bal.lc }, entry_id: null, capped: false, rejected: reason };
+  };
+}
+
+/**
+ * DAILY-KEY-HOTFIX (2026-09-28): a daily event (DAILY_EVENT_TYPES) pays at most once per player per America/Los_Angeles
+ * calendar day. The client's idempotency_key is never the ledger key. The client built it, so `…:qa-forged`, a key of
+ * any other shape, or no key at all each paid the reward again: the eye's a1a1c5f9 item 5b, and +100 in production at
+ * 3a0f4edf. The claim is filed under dailyKey(eventType, playerId, now). A second claim that day answers granted 0 with
+ * alreadyClaimed and writes no ledger row.
+ *
+ *   0.  Today's key is already in this player's ledger: already claimed.
+ *   0b. A row of the daily's reason was written in this PT day under any OTHER key: already claimed. These are the
+ *       claims made before this fix under the chip's own key (`daily_first_session:<browser day>:<id or email>`), and
+ *       anything forged beside them. They are judged by createdAt, because their key's day was the browser's.
+ *   There is no payload-hash replay check (earn step 4); the day's key is the dedupe. Step 4 ran before the key was
+ *   tried, so two tabs opening together were both refused replay_detected and nothing was credited (the
+ *   ECONOMY-SESSIONS-HARDEN addendum). Now the unique key settles it: one claim is credited, and the other loses the
+ *   insert, finds the winner's row and answers already claimed.
+ */
+async function earnDaily(
+  prisma: PrismaClient,
+  a: { playerId: string; idempotencyKey: string; eventType: string; payload: Record<string, unknown>; now?: Date },
+): Promise<EarnResult> {
+  const { playerId, eventType, payload } = a;
+  const now = a.now ?? new Date();
+  const reasonCode = EVENT_REASON[eventType];   // DAILY_EVENT_TYPES is derived from EVENT_REASON, so this is always set
+  const key = dailyKey(eventType, playerId, now);
+  const { day, start, end } = ptDayBounds(now);
+  const claimed = async (entryId: string): Promise<EarnResult> => {
+    const bal = await readWallet(prisma, playerId);
+    return {
+      granted: { coins: 0, shards: 0 }, balances: { coins: bal.coins, shards: bal.shards, lc: bal.lc },
+      entry_id: entryId, capped: false, replayed: true, alreadyClaimed: true,
+    };
+  };
+
+  // 0. Today's claim, under today's key.
+  const prior = await prisma.walletLedgerEntry.findUnique({ where: { idempotencyKey: key } });
+  if (prior && (await isOwnEntry(prisma, playerId, prior))) return claimed(prior.id);
+  // 0b. Today's claim, under any other key.
+  const earlier = await prisma.walletLedgerEntry.findFirst({
+    where: { wallet: { playerId }, reasonCode, createdAt: { gte: start, lt: end } }, select: { id: true },
+  });
+  if (earlier) return claimed(earlier.id);
+
+  // 1. Record the raw event, as every earn does.
+  const hash = payloadHash(payload);
+  const evt = await prisma.perfEarnEvent.create({
+    data: { playerId, eventType, payload: payload as any, payloadHash: hash },
+  });
+  const reject = rejecter(prisma, evt.id, playerId, eventType);
+
+  // 5-8. The rule, the grant and its caps.
+  const priced = await capGrant(prisma, playerId, reasonCode, payload);
+  if (!priced) return reject('rule_inactive');
+  const { rule, grant, capped } = priced;
+  if (grant <= 0) {
+    await prisma.perfEarnEvent.update({ where: { id: evt.id }, data: { rejectedReason: capped ? 'rate_capped' : 'zero_grant' } });
+    const bal = await readWallet(prisma, playerId);
+    return { granted: { coins: 0, shards: 0 }, balances: { coins: bal.coins, shards: bal.shards, lc: bal.lc }, entry_id: null, capped };
+  }
+
+  // 10. The claim, under the day's key. The client's key is kept for the audit and keys nothing.
+  // The wallet row is made first, outside the transaction. Inside it, getOrCreateWallet cannot survive losing its own
+  // create race: Postgres aborts the transaction (25P02), so a second claim sent with a player's very first claim was a
+  // 500 (measured on a throwaway Postgres).
+  await getOrCreateWallet(prisma, playerId);
+  let applied: Awaited<ReturnType<typeof applyDelta>>;
+  try {
+    applied = await applyDelta(prisma, {
+      playerId, currency: rule.currency, delta: grant, reasonCode, source: SHARD_REASONS.has(reasonCode) ? 'milestone' : 'gameplay',
+      idempotencyKey: key,
+      metadata: { eventType, perfEventId: evt.id, payloadHash: hash, day, clientKey: a.idempotencyKey ? a.idempotencyKey.slice(0, 200) : null },
+    });
+  } catch (e) {
+    // Today's key is held by another wallet. Before this fix a client could file any key, this one included.
+    if (e instanceof WalletError && e.code === 'REPLAYED_KEY') return reject('replayed_key');
+    throw e;
+  }
+  // A claim racing this one (a second tab) wrote the day's row first. Its row refused our insert, and nothing moved.
+  await prisma.perfEarnEvent.update({
+    where: { id: evt.id }, data: { resolvedEntryId: applied.entryId, ...(applied.replayed ? { rejectedReason: 'already_claimed' } : {}) },
+  });
+  if (applied.replayed) return claimed(applied.entryId);
+  return {
+    granted: { coins: rule.currency === 'coins' ? grant : 0, shards: rule.currency === 'shards' ? grant : 0 },
+    balances: applied.balances, entry_id: applied.entryId, capped,
   };
 }
 
@@ -609,7 +721,7 @@ async function applyDelta(
       return { entryId: entry.id, delta: effectiveDelta, balances: { coins: n(after.coins), shards: n(after.shards), lc: n(after.lc) }, replayed: false };
     });
   } catch (e) {
-    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+    if (isUniqueViolation(e)) {
       const original = await prisma.walletLedgerEntry.findUnique({ where: { idempotencyKey: a.idempotencyKey } });
       if (original && !(await isOwnEntry(prisma, a.playerId, original))) throw new WalletError('REPLAYED_KEY', 'this idempotency key belongs to another wallet');
       const bal = await readWallet(prisma, a.playerId);

@@ -121,7 +121,9 @@ export const SET_LOG_ERROR_COPY: Record<SetLogError, string> = {
   unit_unknown: 'Weight is in kg or lb.',
   rir_range: 'Reps left is 0 to 5 (5 means five or more).',
   effort_range: 'Effort is a whole number from 1 to 10.',
-  work_seconds_range: `Time worked is ${SET_LIMITS.workSeconds.min}–${SET_LIMITS.workSeconds.max} seconds.`,
+  // MIRROR-COACH P6 FIX (2026-09-29): says the cap in minutes too, and what to do past it — the off day's walk logs in
+  // minutes (logsInMinutes), and its own cue invites a longer bike or swim, which is more than one set's cap
+  work_seconds_range: `Time worked is ${SET_LIMITS.workSeconds.min}–${SET_LIMITS.workSeconds.max} seconds a set (up to ${SET_LIMITS.workSeconds.max / 60} minutes). Add a set for longer.`,
 };
 
 const blank = (v: unknown): boolean => v === null || v === undefined || (typeof v === 'string' && v.trim() === '');
@@ -359,4 +361,37 @@ export function convertDrafts(drafts: readonly SetDraft[], from: WeightUnit, to:
 export function copyPrevious(drafts: readonly SetDraft[], i: number): SetDraft[] {
   if (i <= 0 || i >= drafts.length) return drafts.map((d) => ({ ...d }));
   return drafts.map((d, k) => (k === i ? { ...d, reps: drafts[i - 1].reps, weight: drafts[i - 1].weight, workSeconds: drafts[i - 1].workSeconds } : { ...d }));
+}
+
+// ── minutes on a long timed item (MIRROR-COACH P6 FIX, 2026-09-29) ─────────────────────────────────────────────────
+//
+// WHAT WAS WRONG (code review, minor). The off day's walk (lib/coach/offDay.ts, 720 s) reads "1 × 12 min" on its dose
+// line (structure.ts timedAmount), but its logger asked for SECONDS (placeholder "720", an "s" after the box). An athlete
+// who typed "12" logged SetLog.workSeconds 12, which P9 will read as easy-cardio minutes. A timed item prescribed in
+// whole minutes from five up now logs in minutes: the box shows and takes minutes, and the draft keeps seconds, so the
+// validator, the save and P9 see exactly what they saw before.
+
+/** A timed item prescribed in whole minutes from five up logs in minutes — the same rule its dose line uses. */
+export const logsInMinutes = (prescribedSeconds: number | string | null | undefined): boolean => {
+  const n = typeof prescribedSeconds === 'string' ? Number(prescribedSeconds) : prescribedSeconds;
+  return typeof n === 'number' && Number.isFinite(n) && n >= 300 && n % 60 === 0;
+};
+
+/** A draft's seconds as the minutes box shows them: whole minutes, else one decimal ("713" → "11.9"); blank stays blank. */
+export function minutesText(workSeconds: string): string {
+  const t = workSeconds.trim();
+  if (!t) return '';
+  const n = Number(t);
+  if (!Number.isFinite(n)) return t;
+  return n % 60 === 0 ? String(n / 60) : (n / 60).toFixed(1);
+}
+
+/** What was typed in the minutes box, as the draft's seconds: '' for blank, whole seconds for a number of minutes (one
+ *  decimal allowed), or null while it is not a number yet ("1." mid-typing) — the caller keeps the text and waits. */
+export function minutesToSecondsText(text: string): string | null {
+  const t = text.trim();
+  if (!t) return '';
+  if (!/^\d+(\.\d?)?$/.test(t)) return null;
+  if (t.endsWith('.')) return null;
+  return String(Math.round(Number(t) * 60));
 }

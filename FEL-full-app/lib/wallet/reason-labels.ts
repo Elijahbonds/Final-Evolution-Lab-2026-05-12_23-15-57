@@ -28,13 +28,14 @@ export const REASON_LABELS: Record<string, ReasonLabel> = {
   DUNK_FIRST_CLEAR: { label: 'First dunk clear', kind: 'earn' },
   MODE_SESSION_COMPLETED: { label: 'Session completed', kind: 'earn' },
   MODE_SESSION_WON: { label: 'Session won', kind: 'earn' },
-  SCENEIT_FREEUSE_IDENTIFIED: { label: 'Scene It — Free-Use Legend', kind: 'earn' },
+  SCENEIT_FREEUSE_IDENTIFIED: { label: 'Spot the Scene — Free-Use Legend', kind: 'earn' },
   MP_MATCH_WON: { label: 'Multiplayer match won', kind: 'earn' },
   MP_MATCH_PLAYED: { label: 'Multiplayer match played', kind: 'earn' },
   REFERRAL_BONUS: { label: 'Referral bonus', kind: 'earn' },
   // HOTFIX (2026-09-24): the Playbook's chapter shards (5d8e23c, 2026-09-20) shipped without a label, so the ledger read
   // "edu chapter complete" and wallet-tests has been red in CI ever since.
   EDU_CHAPTER_COMPLETE: { label: 'Playbook chapter complete', kind: 'earn' },
+  EDU_COURSE_COMPLETE: { label: 'Playbook finished: course bonus', kind: 'earn' },   // EDU-LINKS (2026-10-07)
   MOVEMENT_SCREEN_COMPLETED: { label: 'Movement screen', kind: 'earn' },
   CREATIVE_CARD_PUBLISH: { label: 'Creative card published', kind: 'earn' },
   CREATIVE_CARD_REMIX_ROYALTY: { label: 'Remix royalty', kind: 'earn' },
@@ -45,6 +46,8 @@ export const REASON_LABELS: Record<string, ReasonLabel> = {
   PURCHASE_REFUND: { label: 'Refund', kind: 'refund' },
   // The row's metadata.note says what was refunded and why; the history shows it under this label.
   DEAD_BUY_REFUND: { label: 'Refund: it delivered nothing', kind: 'refund' },
+  // MUSIC-SUITE P6 (owner decision #23): a zero-shard row; its metadata.note names the kit.
+  KIT_GRANDFATHER_2026_09: { label: 'Music kit kept: unlocked before Sep 20, 2026', kind: 'admin' },
 };
 
 export function reasonLabel(code: string): ReasonLabel {

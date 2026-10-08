@@ -10,7 +10,7 @@ import {
   DEEPER_LINE, REP_END_DROP, paintableFaults, REP_MIN_DROP, SHALLOW_MIN_FRAMES, SHALLOW_REP_DROP, initialSquatSession, kneeReadLine, offSquareWholeStage, squatReviewVerdict, stepKneeRecord, stepSquatSession,
   type KneeRead, type SquatFrameInput, type SquatSessionState,
 } from './squatStage';
-import { CueEngine, cueableFaults } from '@/lib/babylon/nexus/neuro-mirror/rules/cue-engine';
+import { CueEngine, cueableFaults, type FaultId } from '@/lib/babylon/nexus/neuro-mirror/rules/cue-engine';
 
 const frame = (nowMs: number, phase: SquatFrameInput['phase'], faults: SquatFrameInput['faults'] = []): SquatFrameInput =>
   ({ nowMs, phase, present: true, faults });
@@ -26,7 +26,9 @@ function run(state: SquatSessionState, frames: SquatFrameInput[]) {
   const cues: string[][] = [];
   for (const f of frames) {
     const step = stepSquatSession(state, f);
-    if (step.cueFaults) cues.push(step.cueFaults);
+    // MIRROR-COACH P9 fix: a clean work frame is handed over as [] now (tested on its own below); these tests read the
+    // frames that carried a fault
+    if (step.cueFaults?.length) cues.push(step.cueFaults);
     state = step.state;
   }
   return { state, cues };
@@ -128,14 +130,18 @@ describe('the review: did the correction hold, measured on the reps', () => {
   function workSet(faultsOn: (rep: number) => SquatFrameInput['faults']) {
     let state = run(atCheck(), [...squat(40_000), ...squat(42_000), ...squat(44_000)]).state;
     expect(state.stage).toBe('work');
-    const engine = new CueEngine();
+    // MIRROR-COACH P9 fix: fed as the harness feeds it now — every work frame with a body (clean ones as []), a fault
+    // cleared by a clean REP (clearByRep, the harness's setting), and each counted rep's faults handed to endRep
+    const engine = new CueEngine({ clearByRep: true });
     const cued: { fault: string; level: string; atMs: number }[] = [];
     let t = 50_000;
     for (let i = 0; i < SQUAT_WORK_REPS; i++) {
       for (const f of [frame(t, 'descending', faultsOn(i)), frame(t + 800, 'bottom', faultsOn(i)), frame(t + 1600, 'ascending'), frame(t + 2400, 'standing')]) {
+        const was = state.stage;
         const step = stepSquatSession(state, f);
         state = step.state;
         if (step.cueFaults) { const e = engine.decide(f.nowMs, step.cueFaults); if (e) cued.push({ fault: e.fault, level: e.level, atMs: f.nowMs - 50_000 }); }
+        if (was === 'work' && step.repCounted) engine.endRep(state.workReps[state.workReps.length - 1] ?? []);
       }
       t += 2_400;
     }
@@ -156,7 +162,8 @@ describe('the review: did the correction hold, measured on the reps', () => {
 
   it('heels rising on all 8 reps: cued and escalated, never regressed — and the review does NOT say it held', () => {
     const { state, cued } = workSet(() => ['heelRise']);
-    expect(cued.map((c) => c.level)).toEqual(['cue', 'cue', 'escalate']);     // the reproduction: no regress
+    // the reproduction: no regress (MIRROR-MOVES P2: the second line is the card's reply — rep 3 to show it, REPEAT_REPLY_FIRES)
+    expect(cued.map((c) => c.level)).toEqual(['cue', 'reply', 'escalate']);
     expect(cued.some((c) => c.level === 'regress')).toBe(false);
     const v = squatReviewVerdict(state.workReps, cued, opts);
     expect(v.kind).toBe('stillShowing');
@@ -464,9 +471,9 @@ describe('a shallow squat: told once, then counted and marked', () => {
   it('in the work set a shallow rep carries "shallow" in its faults (what the review reads), and the cue engine is not handed it', () => {
     let state: SquatSessionState = { ...atCheck(), stage: 'work', deeperSaid: true };
     const cues: string[][] = [];
-    for (const f of dip(40_000, 0.13, 6)) { const st = stepSquatSession(state, f); state = st.state; if (st.cueFaults) cues.push(st.cueFaults); }
+    for (const f of dip(40_000, 0.13, 6)) { const st = stepSquatSession(state, f); state = st.state; if (st.cueFaults?.length) cues.push(st.cueFaults); }
     expect(state.workReps).toEqual([['shallow']]);
-    expect(cues).toEqual([]);
+    expect(cues).toEqual([]);                  // (clean frames are handed over as [] — P9 fix — and never carry 'shallow')
   });
 });
 
@@ -474,5 +481,52 @@ describe('the correction overlay paints in the work set only (P2 review)', () =>
   it('breath, check and review paint nothing; the work set paints what the coach may cue', () => {
     for (const stage of ['breathe', 'check', 'review'] as const) expect(paintableFaults(stage, ['kneeValgus'])).toEqual([]);
     expect(paintableFaults('work', ['kneeValgus', 'heelRise'])).toEqual(['kneeValgus', 'heelRise']);
+  });
+
+  // MIRROR-COACH P9 fix (2026-09-30, code review): the fade quieted the voice and the painter kept flagging the fault on
+  // every frame. The harness hands the painter the voice's own rule (CueEngine.isVoiceable).
+  it('the picture fades with the voice: a fault faded to summary-only is not painted; at every third, only on its voiced rep', () => {
+    const ce = new CueEngine({ clearByRep: true });
+    ce.decide(0, ['heelRise']); ce.endRep(['heelRise']); for (let i = 0; i < 4; i++) ce.endRep([]); ce.endSet();
+    expect(ce.levelOf('heelRise')).toBe('everyThird');
+    const painted: string[][] = [];
+    for (let rep = 0; rep < 3; rep++) { painted.push(paintableFaults('work', ['heelRise', 'lateralShift'], (f) => ce.isVoiceable(f as FaultId))); ce.endRep(['heelRise']); ce.endRep([]); }
+    expect(painted).toEqual([['lateralShift'], ['lateralShift'], ['heelRise', 'lateralShift']]);
+    for (let i = 0; i < 4; i++) ce.endRep([]);
+    ce.endSet();
+    expect(ce.levelOf('heelRise')).toBe('summaryOnly');
+    expect(paintableFaults('work', ['heelRise'], (f) => ce.isVoiceable(f as FaultId))).toEqual([]);
+    expect(paintableFaults('check', ['heelRise'], () => true)).toEqual([]);
+  });
+});
+
+describe('the coach sees a clean work frame (P9 fix): [] on a clean frame with a body, null otherwise', () => {
+  it('work set: a clean frame is [], a faulting one its faults; nobody in frame, the check and the review: null', () => {
+    const inWork = run(atCheck(), [...squat(40_000), ...squat(42_000), ...squat(44_000)]).state;
+    expect(inWork.stage).toBe('work');
+    expect(stepSquatSession(inWork, frame(50_000, 'ascending')).cueFaults).toEqual([]);
+    expect(stepSquatSession(inWork, frame(50_000, 'descending', ['heelRise'])).cueFaults).toEqual(['heelRise']);
+    expect(stepSquatSession(inWork, { nowMs: 50_000, phase: 'standing', present: false, faults: [] }).cueFaults).toBeNull();
+    expect(stepSquatSession(atCheck(), frame(40_000, 'descending')).cueFaults).toBeNull();
+  });
+
+  it('heels on reps 1–3 then clean: the cue, and — now that clean frames reach it — one "Own it." on a clean frame', () => {
+    let state = run(atCheck(), [...squat(40_000), ...squat(42_000), ...squat(44_000)]).state;
+    const ce = new CueEngine({ clearByRep: true });
+    const said: { level: string; faulty: boolean }[] = [];
+    let t = 50_000;
+    for (let i = 0; i < SQUAT_WORK_REPS; i++) {
+      const faults: SquatFrameInput['faults'] = i < 3 ? ['heelRise'] : [];
+      for (const f of [frame(t, 'descending', faults), frame(t + 800, 'bottom', faults), frame(t + 1600, 'ascending'), frame(t + 2400, 'standing')]) {
+        const was = state.stage;
+        const step = stepSquatSession(state, f);
+        state = step.state;
+        if (step.cueFaults) { const e = ce.decide(f.nowMs, step.cueFaults); if (e) said.push({ level: e.level, faulty: f.faults.length > 0 }); }
+        if (was === 'work' && step.repCounted) ce.endRep(state.workReps[state.workReps.length - 1] ?? []);
+      }
+      t += 2_400;
+    }
+    expect(said.filter((x) => x.level === 'confirm')).toEqual([{ level: 'confirm', faulty: false }]);
+    expect(said[0]).toEqual({ level: 'cue', faulty: true });
   });
 });

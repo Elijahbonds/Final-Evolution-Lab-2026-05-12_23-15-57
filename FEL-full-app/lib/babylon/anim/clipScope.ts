@@ -84,9 +84,9 @@ export const MODE_CLIP_SCOPES: Record<string, { suites: readonly ClipSuite[]; bo
   skateboard: BOARD, surf: BOARD, bigair: BOARD,
   snowboard: { suites: ['board'], borrow: ['karate_knockdown'] },
   freerun: { suites: ['freerun'], borrow: ['karate_floor_hold', 'karate_get_up', 'football_tackled_fall', 'dunk_celebrate_big'] },
-  sprint: { suites: [], borrow: [] },
+  sprint: { suites: [], borrow: ['dunk_celebrate_big'] },   // IMPROVE (2026-10-06, Sprint #7): the run-out's winner celebration (SPORT_CLIP.scoreCelebrate), arms overhead like freerun's
   dance: { suites: [], borrow: ['karate_hit_react'] },
-  tennis: NET, volleyball: NET,
+  tennis: NET, tiebreak: { suites: ['tennis'], borrow: [] }, volleyball: NET,
   golf: { suites: ['golf'], borrow: [] },
   baseball: DERBY, derby: DERBY,
   soccer: { suites: ['soccer'], borrow: ['football_juke_left'] }, penalty: { suites: ['soccer'], borrow: ['football_juke_left'] },
@@ -96,6 +96,9 @@ export const MODE_CLIP_SCOPES: Record<string, { suites: readonly ClipSuite[]; bo
   // BRAINBRAWL-MAJOR (2026-09-24): Brain Brawl's podiums own the party suite (think / buzz / locked / yes / facepalm / shrug / win /
   // lose, authored/party.ts); Who Scene It keeps its borrowed pair until it is given the same pass
   who_scene_it: PARTY, brainbrawl: { suites: ['party'], borrow: PARTY.borrow },
+  // ADVENTURE A4 (2026-10-06): the Adventure's bodies run, grind and fight — A1's MOVEMENT_CLIP_SUITES (freerun, board, combat)
+  adventure: { suites: ['freerun', 'board', 'combat'], borrow: [] },
+  adventure_br: { suites: ['freerun', 'board', 'combat'], borrow: [] },   // ADVENTURE C: the BR's fighters are the Adventure's bodies
 };
 
 /** The scope for a mode, or null (unscoped: every suite) for a body no mode owns. */

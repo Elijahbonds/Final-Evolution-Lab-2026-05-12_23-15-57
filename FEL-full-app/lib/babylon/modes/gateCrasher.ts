@@ -16,9 +16,17 @@
 //   THE FALL. A bail played skate's upright arm-flail for 0.9 s while the board slid on at a third of its speed — no
 //   body on the snow, nothing to read as a crash. `wipeRoll` lays the rider over on the board (bindings: the board goes
 //   with him), holds him in the snow, and brings him back up.
+//
+// GATE-CRASHER-POLISH-2 (2026-09-28) adds the rules behind the eye's GC list: the carve's bank, the rocks off the line and
+// their stumble, the air a trick can still finish, the time bonus curve, the stall, the air shadow (see the section below).
+import { trickSeconds } from '../core/TrickPose';
+import { SNOW_TRICKS, type BoardTrick } from '../core/BoardTricks';
+
+/** The height of the piste plane at `z` (every piste surface is built through the origin at the run's pitch: y = −tan(pitch)·z). */
+export function pisteY(z: number, pitch: number): number { return -Math.tan(pitch) * z; }
 
 /** The poles stand this far either side of a gate's centre. The world draws them HERE and the verdict reads this. */
-export const GATE_HALF_WIDTH = 1.7;
+export const GATE_HALF_WIDTH = 1.9;
 /** A body whose centre crosses within this of a pole's line brushes it: the pole whips (the verdict is the centre's). */
 export const POLE_BRUSH_M = 0.35;
 /** The share of the gates that makes the run a GATE CRASHER — the win. */
@@ -164,9 +172,164 @@ export function wipeRoll(t: number): number {
 }
 
 /** A snowboard carves on its EDGE: the bank reads against the cruise pace, not the 27 m/s ceiling (7° at gate speed). */
-export const SNOW_BANK_GAIN = 1.35;
 export function carveSpeed01(speed: number, cruise: number): number {
   return Math.max(0, Math.min(1, speed / Math.max(1e-6, cruise)));
+}
+
+// ── GATE-CRASHER-POLISH-2 (2026-09-28): the eye's GC list on 46a8dc6a / 9096d7cf, as rules a test can hold ─────────────────
+
+/**
+ * GC-5 THE CARVE, LAID OVER. The bank was the shared board table (22° max) × 1.35, and it never showed: the Rider eases the
+ * root's roll toward −steer × 0.28 (16°) every frame, then the mode eased it toward its own bank — the fixed point of two
+ * writers is their AVERAGE, so the roll plateaued at 16–18° whatever the mode asked (measured p90 17.6°). The mode owns the
+ * roll now, and a snowboard's is its own number: the rider and the board roll as ONE about the board (bindings), so the
+ * feet never leave the deck the way a skater's would past 22°. SSX lays a hard carve over 30–45°.
+ */
+export const SNOW_CARVE_MAX = 38 * Math.PI / 180;
+/** Roll (rad) for a lean at a carve speed. A right lean is a NEGATIVE roll (the board stack's sign, BoardPosture.boardBank).
+ *  The lean is eased (BalanceModel) and a slalom is mostly partial corrections, so the curve is concave: half a lean at
+ *  cruise already lays the rider over ~22°, a committed one the whole 38°. */
+export function snowBank(lean: number, carve01: number): number {
+  const l = Math.max(-1, Math.min(1, lean));
+  const s = Math.max(0, Math.min(1, carve01));
+  return -Math.sign(l) * Math.pow(Math.abs(l), 0.75) * Math.pow(s, 0.8) * SNOW_CARVE_MAX;
+}
+
+/**
+ * GC-1 THE ROCKS. Rock 0 sat at x 0 eight metres after gate 0 (x 0) on the way to gate 1 (x 3.1): the straight line between
+ * the two gates passes x ≈ 1 there, and the eye's rider — steering at gate 1's centre, as told — hit it at x 1.0, z 24.8 at
+ * 2.4 m/s, four seconds in, and lay down in the snow (reproduced at 9096d7cf: x 1.0, z 24.8). Rocks are the run's JUMP
+ * obstacles, not a tax on the line the gates ask for: every rock stands ROCK_LINE_CLEAR_M off the gate-to-gate line and
+ * ROCK_GATE_CLEAR_M off any gate along the fall line, never on a park feature.
+ */
+export const ROCK_LINE_CLEAR_M = 3.6;
+export const ROCK_GATE_CLEAR_M = 5;
+/** …and a rock met at walking pace is a STUMBLE (the board checks, the body stays up), not a wipeout: below this speed. */
+export const ROCK_WIPE_SPEED = 6;
+/** The share of its speed a board keeps through a stumble. */
+export const ROCK_STUMBLE_KEEP = 0.6;
+export type RockOutcome = 'stumble' | 'wipe';
+export function rockOutcome(speed: number): RockOutcome { return speed >= ROCK_WIPE_SPEED ? 'wipe' : 'stumble'; }
+
+/** A gate as the course lays it out: lateral metres and metres down the fall line. */
+export interface GateSpot { x: number; dist: number }
+/** A park feature's footprint in the same terms (lateral x0…x1, fall-line d0…d1). */
+export interface FeatureSpan { x0: number; x1: number; d0: number; d1: number }
+/** The racing line's lateral position `dist` down the fall line: from the start (x 0) straight through every gate centre. */
+export function racingLineX(gates: readonly GateSpot[], dist: number): number {
+  let px = 0, pd = 0;
+  for (const g of gates) {
+    if (dist <= g.dist) return px + (g.x - px) * Math.max(0, Math.min(1, (dist - pd) / Math.max(1e-6, g.dist - pd)));
+    px = g.x; pd = g.dist;
+  }
+  return px;
+}
+/** How far a rock keeps off a feature's footprint (its own radius and a board's width). */
+const ROCK_FEATURE_PAD_M = 1.6;
+/**
+ * Where the run's rocks stand: the authored scatter (every 21 m from 26 m, x = sin(i · 2.9) · 10), each pushed off the racing
+ * line on its own side — or across it when a feature is in the way — and off the gates along the fall line.
+ */
+export function rockSpots(gates: readonly GateSpot[], features: readonly FeatureSpan[], half: number, count = 8): GateSpot[] {
+  const out: GateSpot[] = [];
+  const onFeature = (x: number, d: number) => features.some((f) => x > f.x0 - ROCK_FEATURE_PAD_M && x < f.x1 + ROCK_FEATURE_PAD_M && d > f.d0 - ROCK_FEATURE_PAD_M && d < f.d1 + ROCK_FEATURE_PAD_M);
+  for (let i = 0; i < count; i++) {
+    let dist = 26 + i * 21;
+    for (const g of gates) if (Math.abs(g.dist - dist) < ROCK_GATE_CLEAR_M) dist = g.dist + (dist >= g.dist ? 1 : -1) * ROCK_GATE_CLEAR_M;
+    const line = racingLineX(gates, dist);
+    const scatter = Math.sin(i * 2.9) * 10;
+    const side = scatter >= line ? 1 : -1;
+    const inGroom = (x: number) => Math.abs(x) <= half - 3;
+    const candidates = [
+      Math.abs(scatter - line) >= ROCK_LINE_CLEAR_M ? scatter : line + side * ROCK_LINE_CLEAR_M,
+      line - side * ROCK_LINE_CLEAR_M,
+      line + side * (ROCK_LINE_CLEAR_M + 2),
+      line - side * (ROCK_LINE_CLEAR_M + 2),
+    ];
+    const x = candidates.find((c) => inGroom(c) && !onFeature(c, dist));
+    if (x !== undefined) out.push({ x, dist });
+  }
+  return out;
+}
+
+/**
+ * GC-2 A TRICK THE AIR CAN FINISH. Every button trick in the air was judged against a FIXED 1.2 s budget, whatever air the
+ * rider actually had left — so a Y pressed on the way down of a flat ollie threw the 720 with a fifth of a second to spin it,
+ * and the landing was a forced bail (the eye: `bail 720 0.23`, `bail RODEO 540 0.25`; at 9096d7cf `bail 720 0.50`,
+ * `sketchy RODEO 540 0.77`). The air LEFT is measured now, and SSX's rule applies: a spin that cannot finish is thrown as the
+ * biggest spin that can, and a press with no air left for anything is answered (NO AIR) — the trick already going lands.
+ */
+/** The Rider's gravity (m/s², GroundRide's default — the snow rig does not override it). */
+export const SNOW_GRAVITY = 14;
+/**
+ * Seconds until a body in the air meets the snow: `h` metres above the snow under it, rising at `vy`, over snow that falls away
+ * at `drop` m/s (the piste's tan(pitch) × the board's down-slope speed: a rider flying down a pitched run stays up longer).
+ */
+export function airLeftSec(h: number, vy: number, drop = 0, g = SNOW_GRAVITY): number {
+  const v = vy + Math.max(0, drop);
+  return Math.max(0, (v + Math.sqrt(v * v + 2 * g * Math.max(0, h))) / g);
+}
+/** One clean grab's hold (TrickMachine.MIN_TAP_GRAB_SEC — a grab scores 4 a second against a need of 1). */
+export const MIN_GRAB_SEC = 0.25;
+/** A trick's motion from the press: a spin or flip on the pose clock the TrickMachine grades it on; a grab, one clean hold. */
+export function motionSec(t: BoardTrick): number {
+  return t.spinDeg !== 0 || t.flipDeg !== 0 ? trickSeconds(t) : MIN_GRAB_SEC;
+}
+/** Headroom on the air left: the estimate reads the snow under the rider NOW, and a frame of landing is not a finish. */
+export const AIR_FIT_MARGIN_SEC = 0.06;
+export function fitsAirLeft(t: BoardTrick, airLeft: number): boolean { return motionSec(t) + AIR_FIT_MARGIN_SEC <= airLeft; }
+/** The trick a press throws with `airLeft` seconds to finish it: the one asked for, else the biggest SHORTER spin (same flip
+ *  family first — a cork or a rodeo shortens to a 540 before a 360), else nothing. A grab that cannot finish has nothing shorter. */
+export function shortenToAir(want: BoardTrick, airLeft: number, table: readonly BoardTrick[] = SNOW_TRICKS): BoardTrick | null {
+  if (fitsAirLeft(want, airLeft)) return want;
+  if (want.spinDeg === 0 && want.flipDeg === 0) return null;
+  const shorter = table.filter((t) => t.kind === 'air' && t.spinDeg > 0 && t.spinDeg <= want.spinDeg && t.id !== want.id && fitsAirLeft(t, airLeft));
+  shorter.sort((a, b) => b.spinDeg - a.spinDeg || Math.abs(a.flipDeg - want.flipDeg) - Math.abs(b.flipDeg - want.flipDeg) || b.difficulty - a.difficulty);
+  return shorter[0] ?? null;
+}
+
+/**
+ * GC-9 THE TIME BONUS. It was (60 − elapsed) × 10 against a par a clean run only just beats (~59 s), so one fall zeroed it and
+ * the card read "+0 TIME" on a good run. The curve now pays 10 a second under TIME_BONUS_ZERO_SEC: a 59 s run earns 310, a run
+ * with a fall (~64 s) 260, and it is gone by 90 s. THE CEILING DOES NOT MOVE: the Arena stake mirrors the most the time can pay
+ * (lib/arena-score-integrity `snowTimeBonusMax` = 600), and the bonus is capped at exactly that — reached only by a run under
+ * 30 s, which the course cannot give.
+ */
+export const TIME_PAR_SEC = 60;
+export const TIME_BONUS_ZERO_SEC = 90;
+export const TIME_BONUS_PER_SEC = 10;
+export const TIME_BONUS_MAX = 600;
+export function timeBonus(elapsed: number): number {
+  return Math.min(TIME_BONUS_MAX, Math.max(0, Math.round((TIME_BONUS_ZERO_SEC - elapsed) * TIME_BONUS_PER_SEC)));
+}
+
+/**
+ * GC-F1 A RUN THAT STALLS ENDS. Nothing ended a run whose rider had stopped (a board turned across the fall line, pinned
+ * against a feature): the clock ran on with no way out but the browser. A grounded board slower than STALL_SPEED for
+ * STALL_NUDGE_SEC is turned back down the fall line and given a push (said on screen); still stalled at STALL_END_SEC the run
+ * ends on its card (REPLAY / HOME), and no run outlives RUN_CAP_SEC.
+ */
+export const STALL_SPEED = 1.2;
+export const STALL_NUDGE_SEC = 3;
+export const STALL_END_SEC = 14;
+/** Hard session ceiling — par × 2 (GC-F1 / RESULTS-TRUTH). A missed-gate run must still post. */
+export const RUN_CAP_SEC = TIME_PAR_SEC * 2;
+export type StallAction = 'ride' | 'nudge' | 'end';
+/** What `stillSec` seconds of stall (and `elapsed` of run) call for; the mode nudges once per STALL_NUDGE_SEC. */
+export function stallAction(stillSec: number, elapsed: number): StallAction {
+  if (elapsed >= RUN_CAP_SEC || stillSec >= STALL_END_SEC) return 'end';
+  return stillSec >= STALL_NUDGE_SEC ? 'nudge' : 'ride';
+}
+
+/**
+ * GC-6 THE AIR SHADOW. The shared contact disc holds the TAKE-OFF height in the air and lies level, so off a kicker on a
+ * pitched run it hung at lip height in the air, a hard dark ellipse well away from the rider on screen. The snow's shadow
+ * lies ON the snow under the rider (raycast), tilted with it, and grows soft and faint with height.
+ */
+export function airShadow(h: number): { alpha: number; scale: number } {
+  const hh = Math.max(0, h);
+  const k = Math.max(0, 1 - hh / 4.5);
+  return { alpha: 0.3 * k * k, scale: 1 + hh * 0.45 };
 }
 
 /** A tree beside the run: lateral metres (signed), metres down the fall line, and a size. */
@@ -201,3 +364,46 @@ export function edgePoles(half: number, runLen: number, spacing = 16): { x: numb
   for (let d = 2; d <= runLen; d += spacing) for (const side of [-1, 1]) out.push({ x: side * (half - 0.5), dist: d });
   return out;
 }
+
+// ── IMPROVE (2026-10-06): the slalom's line pays, a missed gate costs time, the pace is told, a long grab pays ───────────────
+
+/** Item 5 — A CLEAN LINE PAYS. Every gate paid a flat 100 and "N IN A ROW" was only said. From the GATE_STREAK_FROM-th gate in a
+ *  row each gate pays GATE_STREAK_STEP more per gate of the streak past the second, capped at GATE_STREAK_MAX (half a gate):
+ *  the 3rd in a row +10, the 4th +20 … the 7th and on +50. A miss resets the streak (the mode's gateStreak). TUNED. */
+export const GATE_STREAK_FROM = 3;
+export const GATE_STREAK_STEP = 10;
+export const GATE_STREAK_MAX = 50;
+export function gateStreakBonus(streak: number): number {
+  if (!(streak >= GATE_STREAK_FROM)) return 0;
+  return Math.min(GATE_STREAK_MAX, GATE_STREAK_STEP * (streak - GATE_STREAK_FROM + 1));
+}
+
+/** Item 8 — A MISSED GATE COSTS TIME (the slalom's own rule). It cost the streak only, so the par barely cared whether the line
+ *  was skipped. Each miss adds this to the run time the clock shows, the time bonus is paid on, and the result card reads. The
+ *  run's safety cap (RUN_CAP_SEC) still counts real time. TUNED. */
+export const GATE_MISS_PENALTY_SEC = 2;
+/** The run time a slalom is judged on: the time ridden plus the misses' penalty. */
+export function runTimeSec(elapsed: number, misses: number): number {
+  return elapsed + Math.max(0, misses) * GATE_MISS_PENALTY_SEC;
+}
+
+/** Item 12 — PACE. Where the par would have the rider at this point of the run: the par shared out over the fall line (z), so a
+ *  split at a gate is the run time there minus the par's share to it (negative: ahead of par). */
+export function paceSplitSec(runSec: number, z: number, finishZ: number, par = TIME_PAR_SEC): number {
+  const share = finishZ > 0 ? Math.max(0, Math.min(1, z / finishZ)) : 1;
+  return runSec - par * share;
+}
+/** A split as the HUD says it: "−1.4" ahead, "+0.6" behind (one decimal; a zero reads ahead). */
+export function splitLabel(sec: number): string {
+  return `${sec <= 0 ? '−' : '+'}${Math.abs(sec).toFixed(1)}`;
+}
+
+/** Item 13 — A LONG GRAB PAYS (TrickMachineOpts.grabHold): a clean grab earns GRAB_HOLD_PER_SEC more of its points per second
+ *  held past GRAB_HOLD_FROM_SEC, up to GRAB_HOLD_MAX more — a whole 1.2 s air held is +40 %. The start sits clear of a tap's
+ *  minimum hold (0.25 s, overshot by a frame), so a tap is a plain clean grab. TUNED. */
+export const GRAB_HOLD_FROM_SEC = 0.4;
+export const GRAB_HOLD_PER_SEC = 0.5;
+export const GRAB_HOLD_MAX = 0.5;
+
+/** Item 6 — THE YETI IS HEARD BEFORE IT IS SEEN: the roar, the powder off the treeline and the side arrow lead the chase by this. */
+export const YETI_WARN_SEC = 1.5;

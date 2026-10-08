@@ -294,16 +294,27 @@ export const CREDITS: Credit[] = [
   },
   // MUSIC-SUITE P5 (2026-09-25): the Flip's own pack. Every file's record (script, seed, sha256) is
   // public/audio/flip/PROVENANCE.json, held to the bytes by lib/babylon/music/provenance.test.ts.
+  // MUSIC-SUITE P7 (2026-09-29): broadened to also cover the six songs (public/audio/songs/**) — both roots
+  // are listed in provenance.test.ts's own MUSIC_ROOTS and share the identical manifest licence string
+  // ('FEL original, generated'), and lib/credits/credits.test.ts requires the ONE credit that claims a
+  // manifest licence string to be the SAME credit that covers the file carrying it — so a second credit
+  // reusing that string (rather than widening this one) would make the songs' own PROVENANCE.json fail that
+  // check (measured: "audio/songs/PROVENANCE.json is credited to a different source than its own licence
+  // names" against a stand-alone 'fel-songs' entry).
   {
     id: 'fel-flip-pack',
     section: 'sound',
-    title: 'The FEL Flip pack',
+    title: 'The FEL Flip pack and the six songs',
     by: 'Final Evolution Lab',
-    used: 'The Flip’s built-in sounds in the Groove Academy: three FEL themes, ten melodic loops, chord stabs, horn and orchestra hits, drums, textures and vocal chops. All generated from our own code; the chops’ voices are Kokoro-82M, run on our own machine, saying our own words.',
+    used: 'Two things, both rendered by our own code with no samples from anywhere else: the Flip’s built-in sounds in the Groove Academy (three FEL themes, ten melodic loops, chord stabs, horn and orchestra hits, drums, textures and vocal chops), and the Cypher’s six original songs (warmup, cypher, goldenhour, battle, canals, evolution — map, preview and stems). The chops’ and songs’ vocals are Kokoro-82M, run on our own machine, saying our own words.',
     licence: 'Our own work',
     status: 'first-party',
-    recordedIn: ['public/audio/flip/PROVENANCE.json', 'scripts/music/flip-pack/README.md', 'lib/babylon/music/provenance.test.ts'],
-    covers: ['audio/flip/'],
+    recordedIn: [
+      'public/audio/flip/PROVENANCE.json', 'scripts/music/flip-pack/README.md',
+      'public/audio/songs/PROVENANCE.json', 'scripts/music/songs/README.md',
+      'lib/babylon/music/provenance.test.ts',
+    ],
+    covers: ['audio/flip/', 'audio/songs/'],
     manifestLicences: ['FEL original, generated'],
   },
 
@@ -406,17 +417,17 @@ export const CREDITS: Credit[] = [
   {
     id: 'fonts',
     section: 'type',
-    title: 'Barlow Condensed, IBM Plex Sans and JetBrains Mono',
-    // HOTFIX (2026-09-24): next/font/google downloads the files at build time and serves them from our own origin, so
-    // the browser never asks Google for them.
-    by: 'Google Fonts families, self-hosted at build time by next/font',
+    title: 'Barlow Condensed, IBM Plex Sans, JetBrains Mono and Chakra Petch',
+    // HOTFIX (2026-09-24): served from our own origin, so the browser never asks Google for them.
+    // FONT-LOCAL (2026-09-30): the files are committed in app/fonts and loaded by next/font/local (no build-time fetch).
+    by: 'Google Fonts families, self-hosted from files in app/fonts by next/font/local',
     used: 'The app’s headings, body text and numbers.',
     licence: 'OFL-1.1',
     licenceUrl: OPEN_LICENCES['OFL-1.1'],
     status: 'open',
-    recordedIn: ['app/layout.tsx'],
+    recordedIn: ['app/layout.tsx', 'app/fonts/README.md'],
     evidence: [
-      'github.com/google/fonts: all three families sit in its ofl/ folder (ofl/barlowcondensed, ofl/ibmplexsans, ofl/jetbrainsmono), the SIL Open Font License 1.1 set',
+      'github.com/google/fonts: all four families sit in its ofl/ folder (ofl/barlowcondensed, ofl/ibmplexsans, ofl/jetbrainsmono, ofl/chakrapetch), the SIL Open Font License 1.1 set',
       'Upstream: github.com/IBM/plex LICENSE.txt and github.com/JetBrains/JetBrainsMono OFL.txt are the SIL Open Font License 1.1',
     ],
     covers: [],
@@ -467,9 +478,15 @@ export const CREDITS: Credit[] = [
   ...pdCredits(),
 ];
 
-/** The signed public-domain recordings as credits (each covers its own /audio/pd/<id>.mp3). */
+/**
+ * The signed public-domain recordings as credits (each covers its own /audio/pd/<id>.mp3), plus — MUSIC-SUITE P7
+ * (2026-09-29), once any are signed — one credit for the shared download record, public/audio/pd/PROVENANCE.json: a
+ * file under public/ needs an entry to cover it (lib/credits/credits.test.ts), and that record's own per-entry
+ * `licence` field ('Public domain (US), sound recording published <year>') is a manifest licence this credit claims,
+ * one per signed year, so the same test that screens every manifest licence in public/ passes it through here.
+ */
 export function pdCredits(entries: readonly PdEntry[] = signedPdEntries()): Credit[] {
-  return entries.map((e) => ({
+  const perFile: Credit[] = entries.map((e) => ({
     id: `pd-${e.id}`,
     section: 'sound' as const,
     title: e.title,
@@ -483,6 +500,20 @@ export function pdCredits(entries: readonly PdEntry[] = signedPdEntries()): Cred
     covers: [`audio/pd/${e.id}.mp3`],
     manifestLicences: [],
   }));
+  if (entries.length === 0) return perFile;
+  const provenanceCredit: Credit = {
+    id: 'pd-shelf-provenance',
+    section: 'sound',
+    title: "The public-domain shelf's download record",
+    by: 'Final Evolution Lab',
+    used: "Where each public-domain recording on the Flip's shelf was downloaded from, the checks made before downloading it (the transfer, the archive's terms, the matrix/take), and its sha256 (the stored MP3 and the original download).",
+    licence: 'Our own work',
+    status: 'first-party',
+    recordedIn: ['public/audio/pd/PROVENANCE.json', 'lib/babylon/music/provenance.test.ts'],
+    covers: ['audio/pd/PROVENANCE.json'],
+    manifestLicences: [...new Set(entries.map((e) => `Public domain (US), sound recording published ${e.year}`))],
+  };
+  return [...perFile, provenanceCredit];
 }
 
 /** Files under public/ that are not assets, each with the reason. */

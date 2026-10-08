@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db';
 import { currentUserId, bad } from '@/lib/camp/server';
 import { isCertifiedCoach } from '@/lib/coach/server';
 import { draftSquad, rebaseTargetDate } from '@/lib/coach/duplicate';
+import { rosterIdsWhere } from '@/lib/coach/rosterLookup';
 import { prescriptionCopy } from '@/lib/coach/structure';
 import type { Prisma } from '@/public/_prisma/client';
 import type { ProgramTree } from '@/lib/coach/loop';
@@ -55,10 +56,16 @@ export async function POST(req: NextRequest) {
     where: { coachId: userId, clientId: { in: clientIds }, name: { startsWith: source.name } },
     select: { clientId: true },
   });
+  // owner-approved 2026-10-06 (safety): a copy goes only to an athlete on this coach's LIVE roster; any other id — a
+  // real account or none — is skipped the same way (lib/coach/rosterLookup.ts)
+  const onRoster = new Set((await prisma.coachClient.findMany({ where: rosterIdsWhere(userId, clientIds), select: { clientId: true } })).map((r) => r.clientId));
+  const offRoster = [...new Set(clientIds)].filter((id) => !onRoster.has(id));
 
   // the pure module decides WHO gets one; the rows below decide what is written
   const asTree = { id: source.id, name: source.name, coachId: source.coachId, clientId: source.clientId, blocks: [] } as ProgramTree;
-  const { drafts, skipped } = draftSquad(asTree, clientIds, { startDate, nameTemplate: body.nameTemplate }, existing.map((e) => e.clientId));
+  const squad = draftSquad(asTree, clientIds.filter((id) => onRoster.has(id)), { startDate, nameTemplate: body.nameTemplate }, existing.map((e) => e.clientId));
+  const drafts = squad.drafts;
+  const skipped = [...squad.skipped, ...offRoster];
 
   // the anchor every block date is measured against: the source's earliest dated block
   const dated = source.blocks.map((b) => (b.targetDate ? b.targetDate.getTime() : NaN)).filter((t) => Number.isFinite(t));
@@ -85,6 +92,9 @@ export async function POST(req: NextRequest) {
               create: b.sessions.map((s) => ({
                 order: s.order,
                 label: s.label,
+                // MIRROR-COACH P6 (2026-09-29): an off day stays an off day in the copy (Session.kind, lib/coach/offDay.ts).
+                // Without it a copied week's off day arrived as one more training session.
+                kind: s.kind,
                 // every prescription column, structure included (MIRROR-COACH P2, 2026-09-25): this listed seven
                 // columns by hand, so a copied program would have lost its sections, key set, supersets, timers,
                 // set-up cues and effort bands. lib/coach/structure.ts PRESCRIPTION_COLUMNS is checked against the

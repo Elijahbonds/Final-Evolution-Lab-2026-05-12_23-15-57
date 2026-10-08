@@ -342,6 +342,18 @@ export function toNextGate(p: RaceProgress, course: Course, from: Vector3): { ga
   return { gate, dist: gate ? Vector3.Distance(from, gate.at) : 0 };
 }
 
+/** KT-4: when off the road, a one-line cue pointing back toward the next gate (or the track centre). */
+export function trackReturnCue(from: Vector3, course: Course, progress: RaceProgress, headingRad: number): string {
+  const { gate, dist } = toNextGate(progress, course, from);
+  const target = gate?.at ?? course.start.at;
+  const dx = target.x - from.x, dz = target.z - from.z;
+  const bearing = Math.atan2(Math.sin(Math.atan2(dx, dz) - headingRad), Math.cos(Math.atan2(dx, dz) - headingRad));
+  const deg = (bearing * 180) / Math.PI;
+  const m = Math.round(Math.max(dist, distToTrack(from, course)));
+  if (Math.abs(deg) < 28) return `↑ ${m}m TO TRACK`;
+  return deg > 0 ? `→ ${m}m TO TRACK` : `← ${m}m TO TRACK`;
+}
+
 export type Medal = 'gold' | 'silver' | 'bronze' | 'none';
 
 /** What the run was worth. Silver is the gold time plus a quarter, bronze plus a half. */

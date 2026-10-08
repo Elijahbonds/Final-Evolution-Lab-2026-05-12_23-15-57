@@ -43,6 +43,7 @@ import {
   type CadenceQuality,
   type SensoryEvent,
 } from '../index';
+import { hillSurface, FLAT_SURFACE, simulateTouchdown, FACE_HIT_M, type AirHill, type HillSurface, type LandingZone, type Touchdown } from './air-hill';
 
 export type AirPhase = 'Run' | 'Air' | 'Land' | 'Done';
 
@@ -97,6 +98,12 @@ export interface AirSessionTuning {
   attemptsPerRound: number;
   /** Beat between attempts / before the round closes (ms). */
   landBeatMs: number;
+  /**
+   * IMPROVE (2026-10-06, Big Air item 10): the same rotation again pays less. A landing whose rotation (direction and
+   * nearest half turn) the session already landed pays `repeatDecay[n]` of its points, n = how many times it was landed
+   * before (the last entry holds past the end). Unset = every repeat pays in full (the vault's rule, and Big Air's before).
+   */
+  repeatDecay?: readonly number[];
   /** RhythmCadence run-up feel. */
   cadenceTargetMs: number;
   cadencePerfectMs: number;
@@ -108,6 +115,9 @@ export interface AirSessionSkin {
   feel?: FeelConfig;
   trick?: AirTrickOpts;
   sensory?: Partial<Record<AirSessionSensoryEvent, SensoryEvent>>;
+  /** IMPROVE (2026-10-06, Big Air items 1 / 2): the jump this skin is ridden on (lib/feel/cores/air-hill.ts). Unset = the flat
+   *  y 0 every skin had: the run-up on the floor, every landing on it, every landing zone the landing proper. */
+  hill?: AirHill;
   onSensory?: (evt: AirSessionSensoryEvent, info: { grade?: TrickGrade; vy: number; pos: Vec3 }) => void;
   onPhase?: (from: AirPhase, to: AirPhase) => void;
   onLanding?: (grade: TrickGrade, rotations: number, pts: number) => void;
@@ -117,7 +127,17 @@ export interface AirAttempt {
   grade: TrickGrade;
   rotations: number;
   pts: number;
+  /** IMPROVE (2026-10-06): where it landed on the hill (always 'sweet' on the flat). */
+  zone?: LandingZone;
+  /** IMPROVE (2026-10-06): how many times this rotation had already been landed this session (0 = new). */
+  repeat?: number;
 }
+
+/** IMPROVE (2026-10-06, Big Air item 10): a rotation's identity for repeats — its direction and its nearest half turn. */
+export const rotationKey = (rotations: number): string => {
+  const half = Math.round(Math.abs(rotations) * 2) / 2;
+  return half === 0 ? '0' : `${rotations < 0 ? 'BS' : 'FS'}${half}`;
+};
 
 export interface AirSessionState {
   phase: AirPhase;
@@ -131,6 +151,9 @@ export interface AirSessionState {
   attempts: AirAttempt[];
   lastGrade: TrickGrade | null;
   lastRotations: number;
+  /** IMPROVE (2026-10-06): the last landing's zone on the hill, and the judge's own grade before the zone capped it. */
+  lastZone: LandingZone | null;
+  lastJudged: TrickGrade | null;
   launchSpeed: number;
   height: number;
   finished: boolean;
@@ -155,11 +178,14 @@ export class AirSessionCore {
   camera: AirSessionCameraFrame = { targetY: 0 };
 
   private _nowMs = 0;
+  /** IMPROVE (2026-10-06): the snow under the rider — the skin's hill, or the flat. */
+  readonly surface: HillSurface;
 
   constructor(skin: AirSessionSkin, bus?: SensoryBus) {
     this.skin = skin;
     this.feel = skin.feel ?? feelConfig;
     this.t = skin.tuning;
+    this.surface = skin.hill ? hillSurface(skin.hill, skin.tuning.launchZ) : FLAT_SURFACE;
     const now = () => this._nowMs;
     this.airTrick = new AirTrick({ ...skin.trick, now });
     this.cadence = new RhythmCadence({
@@ -182,6 +208,8 @@ export class AirSessionCore {
       attempts: [],
       lastGrade: null,
       lastRotations: 0,
+      lastZone: null,
+      lastJudged: null,
       launchSpeed: 0,
       height: 0,
       finished: false,
@@ -206,10 +234,12 @@ export class AirSessionCore {
 
   // ---- Discrete inputs (phase-guarded, like the reference) ----------------
 
-  /** Alternating run-up tap (vault). Ignored outside the Run phase. */
-  runTap(side: CadenceSide): CadenceQuality | null {
+  /** Alternating run-up tap (vault). Ignored outside the Run phase. MOVEMENT PLAY P8 (2026-09-26): `quality` = a body stride
+   *  graded on the camera's clock elsewhere (lib/babylon/core/rideBody); omitted, the core grades the tap itself, as before. */
+  runTap(side: CadenceSide, quality?: CadenceQuality): CadenceQuality | null {
     if (this.fsm.current !== 'Run') return null;
-    const q = this.cadence.tap(side);
+    const q = quality ?? this.cadence.tap(side);
+    if (quality && quality !== 'first') this.cadence.stats[quality]++;
     const t = this.t;
     const cap = this._runCap();
     if (q === 'perfect') this.state.speed = clamp(this.state.speed + t.perfectImpulse, 0, cap);
@@ -267,6 +297,8 @@ export class AirSessionCore {
         s.speed += t.maxRunSpeed * 1.2 * this.boostK * dt;
         s.speed = s.speed > cap ? Math.max(cap, s.speed - t.maxRunSpeed * 1.2 * dt) : clamp(s.speed - t.runDrag * dt, 0, cap);
         s.pos.z -= s.speed * dt;
+        // IMPROVE (2026-10-06, item 1): up the kicker's ramp to the lip (a frame's overshoot past launchZ stays on the lip)
+        s.pos.y = this.surface.y(Math.max(s.pos.z, t.launchZ));
         if (s.pos.z <= t.launchZ) this._launch();
         break;
       }
@@ -275,7 +307,9 @@ export class AirSessionCore {
         s.pos.z -= Math.max(t.airForwardMin, s.speed * t.airForwardFactor) * dt;
         s.vy -= gravityAccelForVy(s.vy, g) * dt;
         s.pos.y += s.vy * dt;
-        if (s.pos.y <= 0 && s.vy < 0) this._touchdown();
+        // IMPROVE (2026-10-06, item 2): down onto the hill's own surface (the flat's is y 0, as before) — or into a face
+        const sy = this.surface.y(s.pos.z);
+        if ((s.pos.y <= sy && s.vy < 0) || s.pos.y < sy - FACE_HIT_M) this._touchdown();
         break;
       }
       case 'Land': {
@@ -309,27 +343,47 @@ export class AirSessionCore {
     this.fsm.transition('Air');
   }
 
+  /**
+   * IMPROVE (2026-10-06): where the air in progress meets the snow — the core's own flight run forward from now (null
+   * outside the Air phase). The HUD's stomp cue and the body's planted spin both aim at it.
+   */
+  predictTouchdown(): Touchdown | null {
+    const s = this.state, t = this.t;
+    if (this.fsm.current !== 'Air') return null;
+    return simulateTouchdown({ z: s.pos.z, y: s.pos.y, vy: s.vy, fwd: Math.max(t.airForwardMin, s.speed * t.airForwardFactor) }, this.feel.gravity, this.surface);
+  }
+
   private _touchdown(): void {
     const s = this.state, t = this.t;
-    s.pos.y = 0;
+    s.pos.y = this.surface.y(s.pos.z);
     const impactVy = s.vy;
     s.vy = 0;
     const judge = this.airTrick.land();
     s.spinTurns = 0;
+    // IMPROVE (2026-10-06, item 2): the hill judges the landing too. Short of the landing slope (the table, the knuckle) or
+    // past it (the flat run-out) is cased or flat-dropped: never better than sketchy, whatever the spin and the stomp were.
+    const zone = this.surface.zone(s.pos.z);
+    s.lastJudged = judge.grade;
+    if (zone !== 'sweet' && (judge.grade === 'stuck' || judge.grade === 'clean')) { judge.grade = 'sketchy'; judge.stuck = false; }
     // HOTFIX (2026-09-24): judge.rotations is SIGNED by the spin direction (backside = −1 on the d-pad), and the points
     // took it as is — a backside spin paid less than a straight air and a stuck backside 360 paid (100 − 140) × 2 = −80,
     // so the session score went down for landing it. Points pay the size of the spin; the attempts log, lastRotations
     // and onLanding keep the signed value so the direction is still readable.
     const turns = Math.abs(judge.rotations);
     const tricked = !t.pointsNeedTrick || turns >= 0.5;
+    // IMPROVE (2026-10-06, item 10): a rotation already landed this session pays its repeat's share (a crash landed nothing)
+    const key = rotationKey(judge.rotations);
+    const repeat = s.attempts.filter((a) => a.grade !== 'crash' && rotationKey(a.rotations) === key).length;
+    const decay = t.repeatDecay?.length ? t.repeatDecay[Math.min(repeat, t.repeatDecay.length - 1)] : 1;
     const pts = tricked ? Math.round(
-      (t.basePoints + turns * t.pointsPerRotation) * t.gradePoints[judge.grade],
+      (t.basePoints + turns * t.pointsPerRotation) * t.gradePoints[judge.grade] * decay,
     ) : 0;
     s.score += pts;
     s.lastGrade = judge.grade;
     s.lastRotations = judge.rotations;
+    s.lastZone = zone;
     s.attempt += 1;
-    s.attempts = [...s.attempts, { grade: judge.grade, rotations: judge.rotations, pts }];
+    s.attempts = [...s.attempts, { grade: judge.grade, rotations: judge.rotations, pts, zone, repeat }];
     const evt: AirSessionSensoryEvent =
       judge.grade === 'stuck' ? 'landStuck'
       : judge.grade === 'clean' ? 'landClean'
@@ -342,7 +396,7 @@ export class AirSessionCore {
 
   private _resetAttempt(): void {
     const s = this.state;
-    s.pos = { x: 0, y: 0, z: 0 };
+    s.pos = { x: 0, y: this.surface.y(0), z: 0 };
     s.speed = 0;
     s.vy = 0;
     s.spinTurns = 0;

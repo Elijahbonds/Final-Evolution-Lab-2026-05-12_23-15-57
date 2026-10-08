@@ -1,0 +1,181 @@
+{
+  "topic": "art",
+  "version": 1,
+  "cards": [
+    {
+      "id": "art.perspective",
+      "topic": "art",
+      "type": "lesson",
+      "headline": "Linear perspective",
+      "lines": [
+        "Parallel lines appear to meet at a vanishing point on the horizon.",
+        "Filippo Brunelleschi demonstrated the method in Florence in the early 1400s.",
+        "It let Renaissance painters create convincing depth on a flat surface."
+      ],
+      "visual": { "kind": "motif", "motif": "perspective" },
+      "source": "Gombrich, 'The Story of Art'; Edgerton, 'The Renaissance Rediscovery of Linear Perspective' (1975)."
+    },
+    {
+      "id": "art.complementary",
+      "topic": "art",
+      "type": "lesson",
+      "headline": "Complementary colours",
+      "lines": [
+        "Colours opposite each other on the colour wheel — like blue and orange — are complementary.",
+        "Side by side, they make each other look more intense.",
+        "Painters and designers use them to make a subject pop."
+      ],
+      "visual": { "kind": "motif", "motif": "wheel" },
+      "source": "Chevreul, 'The Principles of Harmony and Contrast of Colours' (1839); Itten, 'The Art of Color' (1961)."
+    },
+    {
+      "id": "art.octave",
+      "topic": "art",
+      "type": "lesson",
+      "headline": "Why an octave sounds like the same note",
+      "lines": [
+        "Going up an octave doubles a note's frequency.",
+        "Concert A is 440 Hz; the A above it is 880 Hz.",
+        "Because the waves line up so neatly, the two notes blend almost as one."
+      ],
+      "visual": { "kind": "bars", "items": [{ "label": "A3", "value": 220 }, { "label": "A4", "value": 440 }, { "label": "A5", "value": 880 }], "unit": " Hz", "caption": "Each octave doubles the frequency" },
+      "source": "ISO 16 (standard tuning A = 440 Hz); Rossing, 'The Science of Sound'."
+    },
+    {
+      "id": "art.time-signatures",
+      "topic": "art",
+      "type": "lesson",
+      "headline": "Time signatures count the beat",
+      "lines": [
+        "A time signature tells you how many beats are in each bar.",
+        "4/4 has four beats — most pop music uses it.",
+        "3/4 has three: the ONE-two-three of a waltz."
+      ],
+      "visual": { "kind": "compare", "left": { "label": "4/4", "text": "ONE two three four" }, "right": { "label": "3/4", "text": "ONE two three" } },
+      "source": "Taylor, 'The AB Guide to Music Theory', Part I."
+    },
+    {
+      "id": "art.rule-of-thirds",
+      "topic": "art",
+      "type": "lesson",
+      "headline": "The rule of thirds",
+      "lines": [
+        "Imagine the frame split into a 3 × 3 grid.",
+        "Placing the subject on a line or crossing, rather than dead centre, often feels more dynamic.",
+        "It's a guideline — centred compositions can be powerful too."
+      ],
+      "visual": { "kind": "motif", "motif": "thirds" },
+      "source": "Smith, 'Remarks on Rural Scenery' (1797), which named it; standard photography texts."
+    },
+    {
+      "id": "art.q-mona-lisa",
+      "topic": "art",
+      "type": "quiz",
+      "question": "Who painted the Mona Lisa?",
+      "options": ["Michelangelo", "Leonardo da Vinci", "Raphael", "Rembrandt"],
+      "answer": 1,
+      "why": "Leonardo, in the early 1500s. It hangs in the Louvre in Paris.",
+      "source": "Musée du Louvre, collection record; Kemp, 'Leonardo da Vinci: The Marvellous Works of Nature and Man'."
+    },
+    {
+      "id": "art.q-primaries",
+      "topic": "art",
+      "type": "quiz",
+      "question": "In traditional painting, the three primary colours are…",
+      "options": ["Red, yellow, blue", "Red, green, blue", "Cyan, magenta, yellow", "Orange, green, purple"],
+      "answer": 0,
+      "why": "Painters traditionally mix from red, yellow and blue. Screens use red, green and blue light; printers use cyan, magenta and yellow.",
+      "source": "Itten, 'The Art of Color'; Gage, 'Colour and Culture'."
+    },
+    {
+      "id": "art.q-beethoven",
+      "topic": "art",
+      "type": "quiz",
+      "question": "Beethoven composed his Ninth Symphony while he was…",
+      "options": ["Almost completely deaf", "Blind", "Living in America", "Still a teenager"],
+      "answer": 0,
+      "why": "His hearing declined from his late twenties; by the Ninth (1824) he was almost totally deaf.",
+      "source": "Solomon, 'Beethoven' (2nd ed., 1998)."
+    },
+    {
+      "id": "art.q-octave",
+      "topic": "art",
+      "type": "quiz",
+      "question": "A note vibrates at 440 Hz. The same note one octave higher vibrates at…",
+      "options": ["220 Hz", "450 Hz", "880 Hz", "4,400 Hz"],
+      "answer": 2,
+      "why": "An octave up doubles the frequency: 440 × 2 = 880.",
+      "source": "Rossing, 'The Science of Sound'."
+    },
+    {
+      "id": "art.q-impressionism",
+      "topic": "art",
+      "type": "quiz",
+      "question": "Impressionism takes its name from a painting by…",
+      "options": ["Claude Monet", "Vincent van Gogh", "Pablo Picasso", "Salvador Dalí"],
+      "answer": 0,
+      "why": "Monet's 'Impression, Sunrise' (1872). A critic used the title to mock the group — and the name stuck.",
+      "source": "Gombrich, 'The Story of Art'; Musée Marmottan Monet."
+    },
+    {
+      "id": "art.f-starry-night",
+      "topic": "art",
+      "type": "fact",
+      "headline": "The Starry Night was painted at an asylum",
+      "text": "Van Gogh made it in 1889 at Saint-Rémy-de-Provence, drawing on the view from his window. He sold very few paintings in his lifetime.",
+      "source": "Museum of Modern Art, New York, collection record; Naifeh & Smith, 'Van Gogh: The Life' (2011)."
+    },
+    {
+      "id": "art.f-ultramarine",
+      "topic": "art",
+      "type": "fact",
+      "headline": "Ultramarine blue once rivalled gold in price",
+      "text": "Ground from lapis lazuli mined in Afghanistan, it was so costly that Renaissance contracts sometimes specified it for the Virgin Mary's robes.",
+      "source": "Ball, 'Bright Earth: The Invention of Colour' (2001)."
+    },
+    {
+      "id": "art.f-piano",
+      "topic": "art",
+      "type": "fact",
+      "headline": "A standard piano has 88 keys",
+      "text": "52 white and 36 black, spanning just over seven octaves.",
+      "visual": { "kind": "bars", "items": [{ "label": "White keys", "value": 52 }, { "label": "Black keys", "value": 36 }] },
+      "source": "Standard modern piano specification; Rossing, 'The Science of Sound'."
+    },
+    {
+      "id": "art.f-cave-art",
+      "topic": "art",
+      "type": "fact",
+      "headline": "Some cave art is over 40,000 years old",
+      "text": "Paintings in Sulawesi, Indonesia, have been dated to more than 40,000 years ago — made with ochre pigments.",
+      "source": "Aubert et al. (2014), Nature; Brumm et al. (2021), Science Advances."
+    },
+    {
+      "id": "art.d-chords",
+      "topic": "art",
+      "type": "deeper",
+      "headline": "How chords work",
+      "steps": [
+        { "headline": "1 · Twelve steps", "lines": ["Western music divides the octave into 12 semitones.", "On a piano, each key — white or black — is one semitone from the next."], "visual": { "kind": "motif", "motif": "note" } },
+        { "headline": "2 · The major chord", "lines": ["Stack a root, the note 4 semitones up, and the note 7 up: C–E–G.", "Major chords tend to sound bright."] },
+        { "headline": "3 · The minor chord", "lines": ["Lower the middle note by one semitone: C–E♭–G.", "Minor chords tend to sound darker."], "visual": { "kind": "compare", "left": { "label": "C major", "text": "C · E · G" }, "right": { "label": "C minor", "text": "C · E♭ · G" } } },
+        { "headline": "4 · Progressions", "lines": ["Many songs cycle through a few chords, such as I–V–vi–IV.", "In C major, that's C, G, A minor, F."] }
+      ],
+      "source": "Taylor, 'The AB Guide to Music Theory'; Levine, 'The Jazz Theory Book'."
+    },
+    {
+      "id": "art.recap",
+      "topic": "art",
+      "type": "recap",
+      "headline": "Art & music: the takeaways",
+      "points": [
+        "Parallel lines meet at a vanishing point.",
+        "Complementary colours sit opposite on the wheel.",
+        "An octave doubles the frequency.",
+        "A time signature counts the beats in a bar.",
+        "Off-centre subjects can feel more dynamic."
+      ],
+      "source": "Summary of this topic's cards."
+    }
+  ]
+}

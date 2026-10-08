@@ -130,3 +130,41 @@ export function applyCanvasFit(
   }
   return fit;
 }
+
+/**
+ * The signals a folding or rotating screen sends (FOLDABLE-SCREEN). Structural, so the watcher's tests
+ * run under vitest's node environment with an EventTarget — no DOM and no GPU needed.
+ */
+export interface ResizeHost {
+  addEventListener(type: string, listener: () => void): void;
+  removeEventListener(type: string, listener: () => void): void;
+  visualViewport?: {
+    addEventListener(type: string, listener: () => void): void;
+    removeEventListener(type: string, listener: () => void): void;
+  } | null;
+}
+
+/**
+ * Re-fit the engine on every signal a fold or rotation sends: `resize`, `orientationchange`, and the
+ * visualViewport resize a cover↔main display swap fires first. Returns the unwatch.
+ *
+ * The mode never sees these events. A resize re-fits the engine in place (applyCanvasFit → engine.resize);
+ * nothing unmounts, nothing reloads, and no mode state is touched — which is the whole point of the fix:
+ * before this, only window `resize` was heard, so a foldable's mid-session display swap could leave the
+ * canvas mis-sized until something else happened to fire one.
+ */
+export function watchCanvasFit(
+  engine: ScalableEngine,
+  canvas: { clientWidth: number; clientHeight: number },
+  host: ResizeHost = window,
+): () => void {
+  const onResize = () => { applyCanvasFit(engine, canvas); };
+  host.addEventListener('resize', onResize);
+  host.addEventListener('orientationchange', onResize);
+  host.visualViewport?.addEventListener('resize', onResize);
+  return () => {
+    host.removeEventListener('resize', onResize);
+    host.removeEventListener('orientationchange', onResize);
+    host.visualViewport?.removeEventListener('resize', onResize);
+  };
+}

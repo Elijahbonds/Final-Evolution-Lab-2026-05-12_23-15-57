@@ -16,12 +16,14 @@ import type { CharacterAnimator } from './CharacterAnimator';
 
 export interface LoopOpts { fadeSec?: number; speedRatio?: number }
 export interface BeatOpts extends LoopOpts {
-  /** Fires when the beat ENDS on its own (never when the owner cut it). */
+  /** Fires when the beat ENDS on its own (never when the owner cut it). A beat started here is the next link of a chain (the loop waits). */
   onSettle?: () => void;
   /** HOLD the beat's last frame when it runs out, until the next beat or `settle()` (HOTFIX 2026-09-24, the basketballTree's
    *  holdEnd): a ONE-WAY clip (a crouch into a load) that must stay loaded. Looped instead, it snapped back to its first
    *  frame every cycle; settled, it stood the body back up. The held beat stays `busy`, so a `loop()` does not cut it. */
   holdEnd?: boolean;
+  /** Start the beat this fraction into the clip (HOOPS-10PHASE-2: the 3PT jumper enters at its rise — the held set is the load). */
+  from01?: number;
 }
 
 export class BeatOwner {
@@ -46,7 +48,7 @@ export class BeatOwner {
     const tok = ++this.token;
     this.shot = clip;
     this.animator.play(clip, {
-      loop: false, fadeSec: o.fadeSec ?? 0.1, speedRatio: o.speedRatio ?? 1, restart: true,
+      loop: false, fadeSec: o.fadeSec ?? 0.1, speedRatio: o.speedRatio ?? 1, restart: true, from01: o.from01,
       onEnd: () => {
         if (this.token !== tok) return;   // cut by a newer beat / settle — Babylon raises the end from stop()
         // parked on its last frame, still the body's. Called from INSIDE the clip's end callback: CharacterAnimator.freezeAtEnd
@@ -54,6 +56,9 @@ export class BeatOwner {
         if (o.holdEnd) { this.animator.freezeAtEnd(clip); o.onSettle?.(); return; }
         this.shot = null;
         o.onSettle?.();
+        // HOOPS MOTION phase 3d: a beat started from onSettle (a chain: the 3PT follow-through into its absorb) is where the body goes —
+        // the loop played after it cut the chained beat in the frame it began
+        if (this.token !== tok) return;
         if (this.base) this.animator.play(this.base, { loop: true, ...this.baseOpts });
       },
     });

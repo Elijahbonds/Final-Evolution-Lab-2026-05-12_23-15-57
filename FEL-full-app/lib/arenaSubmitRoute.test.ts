@@ -29,9 +29,13 @@ vi.mock('@/lib/arena', async (orig) => ({
 }));
 
 import { emptyCard, addAttempt, forWire, type DunkAttempt } from './mp/dunkCard';
+import { houseBeatFor, houseTap, judgeHouseSet, HOUSE_SET_MAX, type HouseTap } from './babylon/music/houseBeat';
+import { MUSIC_ATTEMPT_START, MUSIC_ATTEMPT_FINISH } from './arena-music';
 
 interface Writes { updates: Record<string, unknown>[]; events: { eventType: string; payload: Record<string, unknown> }[] }
-function fakeTx(match: Record<string, unknown>): Writes {
+/** MUSIC-SUITE P6: a MatchEvent row already in the database before the request (a music attempt's start / finish). */
+interface StoredEvent { matchId: string; userId: string | null; eventType: string; payload: string; createdAt: Date; seq: number }
+function fakeTx(match: Record<string, unknown>, stored: StoredEvent[] = []): Writes {
   const writes: Writes = { updates: [], events: [] };
   h.tx = {
     competitionMatch: {
@@ -41,6 +45,10 @@ function fakeTx(match: Record<string, unknown>): Writes {
     matchEvent: {
       findFirst: async () => null,
       create: async ({ data }: { data: { eventType: string; payload: string } }) => { writes.events.push({ eventType: data.eventType, payload: JSON.parse(data.payload) }); },
+      // MUSIC-SUITE P6: lib/arena-music.ts readMusicAttempt's read of the player's attempt rows
+      findMany: async ({ where }: { where: { matchId: string; userId: string; eventType: { in: string[] } } }) => stored
+        .filter((e) => e.matchId === where.matchId && e.userId === where.userId && where.eventType.in.includes(e.eventType))
+        .sort((a, b) => a.seq - b.seq),
     },
     gameSession: { findMany: async () => [] },
   };
@@ -112,14 +120,14 @@ describe('POST /api/arena/submit-score', () => {
     expect(writes.events[0].payload.card).toBeUndefined();
   });
 
-  it('holds the house rival to the ceiling: a cold-start tennis draw (~21) posts 4, the most a match can end on', async () => {
+  it('holds the house rival to the ceiling: a cold-start tennis draw (~21) posts 6, the most a match can end on', async () => {
     const writes = fakeTx(arenaMatch({ mode: 'tennis', matchType: 'GHOST_DUEL' }));
     const r = await arenaPost({ matchId: 'm1', score: 3 });
     expect(r.status).toBe(200);
     const ghost = writes.events.find((e) => e.eventType === 'GHOST_SCORED')!;
-    expect(ghost.payload.score).toBe(4);
-    expect(Number(ghost.payload.drawnAboveCeiling)).toBeGreaterThan(4);
-    expect(r.json).toMatchObject({ settled: true, p1Score: 3, p2Score: 4 });
+    expect(ghost.payload.score).toBe(6);
+    expect(Number(ghost.payload.drawnAboveCeiling)).toBeGreaterThan(6);
+    expect(r.json).toMatchObject({ settled: true, p1Score: 3, p2Score: 6 });
   });
 
   it('a refused ghost-duel score draws no house score and settles nothing', async () => {
@@ -128,6 +136,106 @@ describe('POST /api/arena/submit-score', () => {
     expect(r.status).toBe(422);
     expect(writes.events.find((e) => e.eventType === 'GHOST_SCORED')).toBeUndefined();
     expect(writes.updates).toHaveLength(0);
+  });
+});
+
+// MUSIC-SUITE P6 (2026-09-26, owner decision #12): a music duel's score is the server's rejudge of the player's one
+// recorded attempt on the duel's house beat. What is proven: no attempt, no score (409, nothing written); a finished
+// attempt's score must be exactly judgeHouseSet on its stored taps (else 422 SCORE_MISMATCH, nothing written); a set
+// started and never finished submits 0 and nothing else (the reload rule, #29); the other player's attempt is not mine;
+// the house rival of a music quick match is held to the house-beat ceiling; and every other mode is untouched (above).
+describe('POST /api/arena/submit-score — a music duel', () => {
+  beforeEach(() => { h.tx = null; });
+
+  const musicMatch = (over: Record<string, unknown> = {}) => arenaMatch({ id: 'mm1', mode: 'music', ...over });
+  let seq = 0;
+  const row = (userId: string, eventType: string, payload: Record<string, unknown> = {}): StoredEvent =>
+    ({ matchId: 'mm1', userId, eventType, payload: JSON.stringify(payload), createdAt: new Date('2026-09-26T10:00:00Z'), seq: seq++ });
+  /** Every `every`-th note of mm1's house beat tapped dead on, and what the server makes of it. */
+  const setOf = (every: number): { taps: HouseTap[]; score: number } => {
+    const beat = houseBeatFor('mm1');
+    const taps = beat.notes.filter((_, i) => i % every === 0).map((n) => houseTap(n.lane, n.t));
+    return { taps, score: judgeHouseSet(beat, taps).score };
+  };
+  const played = (userId: string, taps: HouseTap[]) => [row(userId, MUSIC_ATTEMPT_START), row(userId, MUSIC_ATTEMPT_FINISH, { taps })];
+
+  it('records a finished attempt\'s score when it is exactly the rejudge, and says so in the event', async () => {
+    const { taps, score } = setOf(2);
+    expect(score).toBeGreaterThan(0);
+    const writes = fakeTx(musicMatch(), played('u1', taps));
+    const r = await arenaPost({ matchId: 'mm1', score });
+    expect(r.status).toBe(200);
+    expect(writes.updates[0]).toMatchObject({ player1Score: score });
+    expect(writes.events[0]).toMatchObject({ eventType: 'SCORE_SUBMITTED', payload: { player: 'p1', score, rejudged: true, taps: taps.length } });
+    expect(writes.events[0].payload.forfeit).toBeUndefined();
+  });
+
+  it('refuses any other number — one point off, a perfect set\'s maximum, zero — 422 SCORE_MISMATCH, nothing written', async () => {
+    const { taps, score } = setOf(3);
+    for (const posted of [score + 1, score - 50, HOUSE_SET_MAX, 0]) {
+      const writes = fakeTx(musicMatch(), played('u1', taps));
+      const r = await arenaPost({ matchId: 'mm1', score: posted });
+      expect(r.status, String(posted)).toBe(422);
+      expect(r.json.error).toBe('SCORE_MISMATCH');
+      expect(String(r.json.detail)).toContain(`(${score})`);
+      expect(writes.updates).toHaveLength(0);
+      expect(writes.events).toHaveLength(0);
+    }
+  });
+
+  it('with no attempt at all: 409 NO_ATTEMPT, nothing written, no ghost drawn — even a score of 0', async () => {
+    for (const posted of [0, 5000]) {
+      const writes = fakeTx(musicMatch({ matchType: 'GHOST_DUEL' }));
+      const r = await arenaPost({ matchId: 'mm1', score: posted });
+      expect(r.status).toBe(409);
+      expect(r.json.error).toBe('NO_ATTEMPT');
+      expect(writes.updates).toHaveLength(0);
+      expect(writes.events).toHaveLength(0);
+    }
+  });
+
+  it('a set started and never finished (a reload after the count-in) submits 0 — and only 0', async () => {
+    const refused = fakeTx(musicMatch(), [row('u1', MUSIC_ATTEMPT_START)]);
+    const bad = await arenaPost({ matchId: 'mm1', score: 12_000 });
+    expect(bad).toMatchObject({ status: 422, json: { error: 'SCORE_MISMATCH' } });
+    expect(refused.updates).toHaveLength(0);
+    const writes = fakeTx(musicMatch(), [row('u1', MUSIC_ATTEMPT_START)]);
+    const r = await arenaPost({ matchId: 'mm1', score: 0 });
+    expect(r.status).toBe(200);
+    expect(writes.updates[0]).toMatchObject({ player1Score: 0 });
+    expect(writes.events[0]).toMatchObject({ eventType: 'SCORE_SUBMITTED', payload: { score: 0, rejudged: true, forfeit: 'unfinished_attempt' } });
+  });
+
+  it('the opponent\'s attempt is not mine: their finished set leaves me with no attempt', async () => {
+    const { taps, score } = setOf(2);
+    fakeTx(musicMatch(), played('u2', taps));
+    expect(await arenaPost({ matchId: 'mm1', score })).toMatchObject({ status: 409, json: { error: 'NO_ATTEMPT' } });
+  });
+
+  it('the first finish counts when a race wrote two, and a duel stored as "musicAcademy" is rejudged the same way', async () => {
+    const good = setOf(2), other = setOf(4);
+    const rows = [row('u1', MUSIC_ATTEMPT_START), row('u1', MUSIC_ATTEMPT_FINISH, { taps: good.taps }), row('u1', MUSIC_ATTEMPT_FINISH, { taps: other.taps })];
+    fakeTx(musicMatch({ mode: 'musicAcademy' }), rows);
+    expect(await arenaPost({ matchId: 'mm1', score: other.score })).toMatchObject({ status: 422, json: { error: 'SCORE_MISMATCH' } });
+    fakeTx(musicMatch({ mode: 'musicAcademy' }), rows);
+    expect((await arenaPost({ matchId: 'mm1', score: good.score })).status).toBe(200);
+  });
+
+  it('a music quick match: the house rival is drawn (baseline, no rejudged history) and held to the house-beat ceiling', async () => {
+    const { taps, score } = setOf(2);
+    const writes = fakeTx(musicMatch({ matchType: 'GHOST_DUEL', player2Id: 'house' }), played('u1', taps));
+    (h.tx as { competitionMatch: Record<string, unknown> }).competitionMatch.findMany = async () => [];   // no past duels
+    const r = await arenaPost({ matchId: 'mm1', score });
+    expect(r.status).toBe(200);
+    const ghost = writes.events.find((e) => e.eventType === 'GHOST_SCORED')!;
+    expect(ghost.payload).toMatchObject({ bandSource: 'baseline', bandCenter: 12_000 });   // (P6 fix pass: 5,000 → 12,000)
+    expect(Number(ghost.payload.score)).toBeLessThanOrEqual(HOUSE_SET_MAX);
+    expect(r.json).toMatchObject({ settled: true });
+  });
+
+  it('a score above the house-beat ceiling is refused as such, whatever the attempt', async () => {
+    fakeTx(musicMatch(), [row('u1', MUSIC_ATTEMPT_START)]);
+    expect(await arenaPost({ matchId: 'mm1', score: HOUSE_SET_MAX + 1 })).toMatchObject({ status: 422, json: { error: 'SCORE_ABOVE_CEILING' } });
   });
 });
 
@@ -163,6 +271,15 @@ describe('the dark competition engine', () => {
     fakeTx(compMatch({ mode: 'freestyle-anything' }));
     const r = await compPost('submit-score', { matchId: 'c1', score: 1 });
     expect(r).toMatchObject({ status: 422, json: { code: 'NO_SCORE_CEILING' } });
+  });
+
+  // MUSIC-SUITE P6: this engine records no attempt, so it has no rejudge to give — a music score can never settle here
+  // (arena-score-integrity REJUDGED_STAKE_MODES). The engine is dark (REAL_MONEY_COMPETITION).
+  it('submit-score refuses a music score it cannot rejudge: 422 SCORE_NOT_REJUDGED, nothing written', async () => {
+    const writes = fakeTx(compMatch({ mode: 'music' }));
+    const r = await compPost('submit-score', { matchId: 'c1', score: 1000 });
+    expect(r).toMatchObject({ status: 422, json: { code: 'SCORE_NOT_REJUDGED' } });
+    expect(writes.updates).toHaveLength(0);
   });
 
   it('create will not lock an entry fee on a mode it cannot bound, and lets a bounded one through to eligibility', async () => {

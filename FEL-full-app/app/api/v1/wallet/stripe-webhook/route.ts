@@ -7,6 +7,7 @@ import { prisma } from '@/lib/db';
 import { grantCoinPurchase, refundCoins, grantShardPurchase, refundShards } from '@/lib/wallet/wallet-service';
 import { coinPackForPrice } from '@/lib/wallet/catalog';
 import { unlockProLane, revokeProLane } from '@/lib/season/season-service';
+import { verifyIdempotencyKey } from '@/lib/stripe/verify-checkout';
 
 /**
  * POST /api/v1/wallet/stripe-webhook
@@ -15,8 +16,11 @@ import { unlockProLane, revokeProLane } from '@/lib/season/season-service';
  *   - COIN_PACK sessions mint coins; SHARD_PACK sessions mint shards (M25).
  *     The amount is server-owned (travels in session metadata) so no
  *     pre-registered Stripe price id is required.
- *   - Idempotent on the Stripe event id — a re-delivered webhook never
- *     double-credits.
+ *   - Idempotent on the CHECKOUT SESSION id (`stripe-session:<id>`, the same
+ *     key the server-verified success path fulfils under — SEC-F4 follow-up 1:
+ *     one payment, one grant). It used to key on the Stripe event id, which a
+ *     re-delivered webhook does NOT keep, and which the verify path never
+ *     writes — so webhook + verify, or one redelivery, minted twice.
  *   - Signature-verified against STRIPE_WEBHOOK_SECRET before any mutation.
  *   - charge.refunded debits back the same currency, clamped at 0.
  */
@@ -48,6 +52,10 @@ export async function POST(req: NextRequest) {
         console.warn('[v1/wallet/stripe-webhook] checkout.session without playerId; ignoring');
         return NextResponse.json({ received: true, ignored: 'no_player' });
       }
+      // ONE PAYMENT, ONE GRANT: the grant key is the session, not the event — the same key
+      // POST /api/stripe/verify-session fulfils under, so whichever of webhook/verify runs
+      // first (or both, or a redelivery) the buyer is credited exactly once.
+      const grantKey = verifyIdempotencyKey(cs.id);
       // PRIMARY path: inline coin-store pack — coins travel in session metadata
       // (product COIN_PACK) so no pre-registered Stripe price id is required.
       const meta = (cs.metadata as any) || {};
@@ -60,7 +68,7 @@ export async function POST(req: NextRequest) {
         const res = await grantCoinPurchase(prisma, {
           playerId,
           coins,
-          idempotencyKey: event.id, // Stripe event id = idempotency key.
+          idempotencyKey: grantKey, // Checkout Session id = idempotency key (shared with verify-session).
           metadata: { packId: meta.packId ?? null, stripeSessionId: cs.id, via: 'metadata' },
         });
         return NextResponse.json({ received: true, granted_coins: coins, entry_id: res.entry_id });
@@ -76,7 +84,7 @@ export async function POST(req: NextRequest) {
         const res = await grantShardPurchase(prisma, {
           playerId,
           shards,
-          idempotencyKey: event.id, // Stripe event id = idempotency key.
+          idempotencyKey: grantKey, // Checkout Session id = idempotency key (shared with verify-session).
           metadata: { packId: meta.packId ?? null, stripeSessionId: cs.id, via: 'metadata' },
         });
         return NextResponse.json({ received: true, granted_shards: shards, entry_id: res.entry_id });
@@ -91,7 +99,7 @@ export async function POST(req: NextRequest) {
         const res = await unlockProLane({
           userId: playerId,
           seasonId: typeof meta.seasonId === 'string' ? meta.seasonId : undefined,
-          stripeEventId: event.id,
+          stripeEventId: grantKey,
         });
         if (!res) {
           console.warn('[v1/wallet/stripe-webhook] SEASON_PASS_PRO for unknown season; ignoring');
@@ -112,7 +120,7 @@ export async function POST(req: NextRequest) {
       const res = await grantCoinPurchase(prisma, {
         playerId,
         coins: pack.coins,
-        idempotencyKey: event.id, // Stripe event id = idempotency key.
+        idempotencyKey: grantKey, // Checkout Session id = idempotency key (shared with verify-session).
         metadata: { priceId, packLabel: pack.label, stripeSessionId: cs.id },
       });
       return NextResponse.json({ received: true, granted_coins: pack.coins, entry_id: res.entry_id });

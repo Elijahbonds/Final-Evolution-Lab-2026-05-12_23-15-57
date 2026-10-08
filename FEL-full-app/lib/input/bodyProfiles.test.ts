@@ -1,5 +1,5 @@
 // MOVEMENT PLAY P3 (2026-09-24): the body profiles — one row per mode, what the body may press there, and the card's
-// words for it. What is pinned: the 28 rows and their verbs against the touch deck's own labels (a card that says POP
+// words for it. What is pinned: one row per enabled mode and their verbs against the touch deck's own labels (a card that says POP
 // over a button the deck calls PUMP is a lie), the NEVER-table (the baseline's misfires, each made impossible by the
 // data), and how a mode's own claims and profile override the row. The registry side (every ENABLED key has its row,
 // the four modeId aliases) is registry.drift.test.ts; what the floor does with a row is bodyFloor / bodyGate.
@@ -9,9 +9,14 @@ import {
   sessionOnly, type BodyBinding, type BodyProfile, COMING_COPY, UNAVAILABLE_COPY,
 } from './bodyProfiles';
 import { MODE_VERBS } from '@/lib/babylon/ui/modeVerbs';
+import { ENABLED_BABYLON_MODES } from '@/lib/babylon/modes/registry';
+import { RIDE_ROWS_ON } from './rideProfiles';
 import type { FelInput } from '@/lib/babylon/core/InputBus';
 
 const ROWS = Object.values(BODY_PROFILES);
+const ENABLED_MODE_COUNT = ENABLED_BABYLON_MODES.size;
+/** MOVEMENT PLAY P8: the table as it binds with the ride switch on (the kart and the plane as the probe grades them). */
+const ROWS_ON = ROWS.map((p) => RIDE_ROWS_ON.find((r) => r.modeId === p.modeId) ?? p);
 const byKey = (key: string): BodyProfile => ROWS.find((p) => p.key === key)!;
 const froms = (p: BodyProfile) => p.bindings.map((b) => b.from);
 
@@ -29,12 +34,12 @@ function slotLabel(key: string, to: string): string | null {
 }
 
 describe('the table', () => {
-  it('has 28 rows, one per mode, keyed by modeId, nine of them binding the body', () => {
-    expect(ROWS).toHaveLength(28);
-    expect(new Set(ROWS.map((p) => p.key)).size).toBe(28);
+  it('has one row per enabled mode, keyed by modeId, eleven of them binding the body (P8: the kart and the plane)', () => {
+    expect(ROWS).toHaveLength(ENABLED_MODE_COUNT);
+    expect(new Set(ROWS.map((p) => p.key)).size).toBe(ENABLED_MODE_COUNT);
     for (const [modeId, p] of Object.entries(BODY_PROFILES)) expect(p.modeId).toBe(modeId);
     expect(ROWS.filter((p) => p.bindings.length).map((p) => p.key).sort()).toEqual(
-      ['bigair', 'freerun', 'karate_vs', 'mixedcombat', 'showdown', 'skateboard', 'snowboard_slalom', 'sprint', 'surf'],
+      ['aeroaces', 'bigair', 'freerun', 'karate_vs', 'mixedcombat', 'showdown', 'skateboard', 'snowboard_slalom', 'sprint', 'surf', 'velocitykart'],
     );
     // the four registry keys whose modeId differs
     expect(byKey('karate_vs').modeId).toBe('karate-vs');
@@ -45,18 +50,21 @@ describe('the table', () => {
 
   it('every button or trigger verb is the touch deck\'s own label for the slot that emits it', () => {
     const seen: string[] = [];
-    for (const p of ROWS) {
+    for (const p of ROWS_ON) {
       for (const b of p.bindings) {
         if (b.to === 'Lx' || b.to === 'Ly' || b.to === 'dpadByFoot') continue;
-        expect(b.verb, `${p.key} ${b.from} → ${b.to}`).toBe(slotLabel(p.key, b.to));
+        // MOVEMENT PLAY P8: a trigger no deck slot emits (Free Run's RT) carries a free verb instead
+        const label = slotLabel(p.key, b.to);
+        if (label === null && (b.to === 'RT' || b.to === 'LT')) { expect(FREE_VERBS as readonly string[], `${p.key} ${b.from} → ${b.to}`).toContain(b.verb); seen.push(b.verb); continue; }
+        expect(b.verb, `${p.key} ${b.from} → ${b.to}`).toBe(label);
         seen.push(b.verb);
       }
     }
-    expect([...new Set(seen)].sort()).toEqual(['AIR', 'JAB', 'JUMP', 'KICK', 'POP', 'PUMP', 'STRIKE', 'TUCK']);
+    expect([...new Set(seen)].sort()).toEqual(['AIR', 'DRIFT', 'GAS', 'JAB', 'JUMP', 'KICK', 'POP', 'PUMP', 'SPRINT', 'STRIKE', 'TUCK']);
   });
 
   it('a stick or d-pad verb is a free verb, and no verb anywhere names a button', () => {
-    for (const p of ROWS) {
+    for (const p of ROWS_ON) {
       for (const b of p.bindings) {
         if (b.to === 'Lx' || b.to === 'Ly' || b.to === 'dpadByFoot') expect(FREE_VERBS as readonly string[], `${p.key}`).toContain(b.verb);
         expect(b.verb, `${p.key}`).not.toMatch(/^(A|B|X|Y|L1|R1|L2|R2|RT|LT|START|SELECT)$/);
@@ -69,16 +77,23 @@ describe('the table', () => {
       karate_vs: [['punch', 'A', 'JAB'], ['kick', 'B', 'KICK']],
       mixedcombat: [['punch', 'A', 'STRIKE'], ['kick', 'B', 'KICK']],
       showdown: [['punch', 'A', 'JAB'], ['kick', 'B', 'KICK']],
-      skateboard: [['lean', 'Lx', 'STEER'], ['squat', 'RT', 'PUMP'], ['takeoff', 'A', 'POP']],
-      snowboard_slalom: [['lean', 'Lx', 'STEER'], ['squat', 'RT', 'TUCK'], ['takeoff', 'A', 'JUMP']],
-      surf: [['lean', 'Lx', 'STEER'], ['takeoff', 'A', 'AIR']],
+      // MOVEMENT PLAY P8: the ride rows (lib/input/rideProfiles) — the carve steers, surf trims; big air and sprint keep the
+      // P3 row (their modes claim the step and grade it; the grab, the spin, the push are card lines, never bindings)
+      skateboard: [['carve', 'Lx', 'STEER'], ['squat', 'RT', 'PUMP'], ['takeoff', 'A', 'POP']],
+      snowboard_slalom: [['carve', 'Lx', 'STEER'], ['squat', 'RT', 'TUCK'], ['takeoff', 'A', 'JUMP']],
+      surf: [['carve', 'Lx', 'STEER'], ['trim', 'Ly', 'TRIM'], ['takeoff', 'A', 'AIR']],
       bigair: [['step', 'dpadByFoot', 'STRIDE']],
       sprint: [['step', 'dpadByFoot', 'STRIDE']],
-      freerun: [['cadence', 'Ly', 'RUN'], ['takeoff', 'A', 'JUMP']],
+      freerun: [['cadence', 'Ly', 'RUN'], ['highKnees', 'RT', 'SPRINT'], ['takeoff', 'A', 'JUMP']],
     };
     for (const [key, rows] of Object.entries(want)) {
       expect(byKey(key).bindings.map((b) => [b.from, b.to, b.verb]), key).toEqual(rows);
     }
+    // the kart and the plane: bound since the live probe's 0 misfires (RIDE_DEFAULT_ON), exactly the switched rows
+    const on = (k: string) => RIDE_ROWS_ON.find((p) => p.key === k)!.bindings.map((b) => [b.from, b.to, b.verb]);
+    for (const k of ['velocitykart', 'aeroaces']) expect(byKey(k).bindings.map((b) => [b.from, b.to, b.verb]), k).toEqual(on(k));
+    expect(on('velocitykart')).toEqual([['grip', 'RT', 'GAS'], ['wheel', 'Lx', 'STEER'], ['hopTurn', 'X', 'DRIFT']]);
+    expect(on('aeroaces')).toEqual([['spread', 'RT', 'GAS'], ['wingBank', 'Lx', 'STEER'], ['wingPitch', 'Ly', 'CLIMB']]);
     // overhead is play where the arms go up in the game itself
     expect(ROWS.filter((p) => p.overheadIsPlay).map((p) => p.key).sort()).toEqual(
       ['aeroaces', 'dance', 'dunk', 'dunkduel', 'freerun', 'onevone', 'threepoint', 'threevthree', 'volleyball'],
@@ -102,15 +117,25 @@ describe('THE NEVER-TABLE — the baseline\'s misfires, impossible by the data',
   });
   it('nothing at all in the quizzes, the rhythm game and the modes with no plan phase', () => {
     const where = ROWS.filter((p) => ['quiz', 'rhythm', 'later'].includes(p.family));
-    expect(where.map((p) => p.key).sort()).toEqual(['brainbrawl', 'carnival', 'dance', 'derby', 'football', 'golf', 'penalty', 'tennis', 'volleyball', 'who_scene_it']);
+    expect(where.map((p) => p.key).sort()).toEqual(['brainbrawl', 'carnival', 'dance', 'derby', 'football', 'golf', 'penalty', 'tennis', 'tiebreak', 'volleyball', 'who_scene_it']);
     for (const p of where) expect(p.bindings, p.key).toEqual([]);
     expect(byKey('who_scene_it').later).toBeNull();
     expect(byKey('brainbrawl').later).toBeNull();
   });
-  it('no X, Y, shoulder, START or SELECT anywhere (P3 binds A and B only), and every profile merges', () => {
-    for (const p of ROWS) {
-      for (const b of p.bindings) expect(['Lx', 'Ly', 'RT', 'LT', 'A', 'B', 'dpadByFoot'], p.key).toContain(b.to);
+  it('no X, Y, shoulder, START or SELECT anywhere (P3 binds A and B only; P8: X only as the kart\'s DRIFT hold), and every profile merges', () => {
+    for (const p of ROWS_ON) {
+      for (const b of p.bindings) {
+        if (b.to === 'X') { expect([p.key, b.from, b.verb], p.key).toEqual(['velocitykart', 'hopTurn', 'DRIFT']); continue; }
+        expect(['Lx', 'Ly', 'RT', 'LT', 'A', 'B', 'dpadByFoot'], p.key).toContain(b.to);
+      }
       expect(p.motion, p.key).toBe('merge');
+    }
+  });
+  it('P8: nothing the kart or the plane does is a hop on A or a crouch on the trigger (the item, the throttle) — even switched on', () => {
+    for (const k of ['velocitykart', 'aeroaces']) {
+      const b = RIDE_ROWS_ON.find((p) => p.key === k)!.bindings;
+      expect(b.map((x) => x.from), k).not.toContain('takeoff');
+      expect(b.map((x) => x.from), k).not.toContain('squat');
     }
   });
 });
@@ -127,9 +152,9 @@ describe('resolveBodyProfile', () => {
   });
   it('a claimed move is dropped from the floor (the mode\'s onBody has it), the rest stay; unclaimed leaves the row itself', () => {
     const p = resolveBodyProfile({ modeId: 'skateboard', body: { claims: ['takeoff', 'overhead'] } });
-    expect(froms(p)).toEqual(['lean', 'squat']);
+    expect(froms(p)).toEqual(['carve', 'squat']);                       // (P8: the carve steers)
     expect(BODY_PROFILES.skateboard.bindings).toHaveLength(3);          // the table row is untouched
-    expect(froms(resolveBodyProfile({ modeId: 'freerun', body: { claims: ['cadence', 'takeoff'] } }))).toEqual([]);
+    expect(froms(resolveBodyProfile({ modeId: 'freerun', body: { claims: ['cadence', 'takeoff'] } }))).toEqual(['highKnees']);   // (P8: high knees is no event)
     expect(froms(resolveBodyProfile({ modeId: 'karate-vs', body: { claims: ['punch'] } }))).toEqual(['kick']);
     expect(resolveBodyProfile({ modeId: 'surf', body: { claims: [] } })).toBe(BODY_PROFILES.surf);
   });
@@ -137,10 +162,14 @@ describe('resolveBodyProfile', () => {
 
 describe('the card', () => {
   it('reads move → verb, in binding order; a session-only mode has no lines', () => {
+    // MOVEMENT PLAY P8: the ride rows' lines (the verbs a mode reads itself are its ModeBodySpec.lines: rideBody.test)
     expect(cardLines(BODY_PROFILES.skateboard)).toEqual([
-      { move: 'Lean', verb: 'STEER' }, { move: 'Crouch', verb: 'PUMP' }, { move: 'Jump', verb: 'POP' },
+      { move: 'Lean on your toes / heels', verb: 'STEER' }, { move: 'Crouch', verb: 'PUMP' }, { move: 'Jump', verb: 'POP' },
     ]);
     expect(cardLines(BODY_PROFILES.sprint)).toEqual([{ move: 'Run in place', verb: 'STRIDE' }]);
+    expect(cardLines(RIDE_ROWS_ON.find((p) => p.key === 'velocitykart')!)).toEqual([
+      { move: 'Grip the wheel', verb: 'GAS' }, { move: 'Turn the wheel', verb: 'STEER' }, { move: 'Hop into the turn', verb: 'DRIFT' },
+    ]);
     expect(cardLines(BODY_PROFILES['karate-vs'])).toEqual([{ move: 'Punch', verb: 'JAB' }, { move: 'Kick', verb: 'KICK' }]);
     expect(cardLines(BODY_PROFILES.dunk)).toEqual([]);
     for (const from of Object.keys(MOVE_LABEL)) expect(MOVE_LABEL[from as BodyBinding['from']]).not.toMatch(/^[A-Z]+$/);

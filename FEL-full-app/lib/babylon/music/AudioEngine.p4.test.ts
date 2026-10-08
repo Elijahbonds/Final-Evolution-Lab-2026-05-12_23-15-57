@@ -306,3 +306,30 @@ describe('P4 FIX PASS: a count-in INTO a bar of the running song (the booth\'s R
     eng.stop();
   });
 });
+
+// MUSIC-SUITE P6 FIX PASS (2026-09-26): PERFORM's resume after PAUSE starts at the top of the bar it stopped in —
+// start() always began at bar 0 (a song-mode arrangement from its first section).
+describe('P6 fix pass: startAt(bar) and stepsIntoBar', () => {
+  it('stepsIntoBar counts the steps scheduled into the current bar; startAt(bar) swaps that bar in (onBar) and plays it first', () => {
+    const eng = new AudioEngine({ bpm: BPM, steps: STEPS, swing: 0, tracks: [row('kick', [0, 4, 8, 12])] });
+    eng.loadBuffer('kick', 'Kick', buf(), 'kick');
+    const bars: number[] = [];
+    eng.onBar = (b) => bars.push(b);
+    clock(eng).currentTime = 0; eng.start();
+    run(eng, LEAD + BAR + 5 * BASE - 0.11);                              // into bar 1, a few steps scheduled
+    expect(eng.currentBar).toBe(1);
+    const into = eng.stepsIntoBar;
+    expect(into).toBeGreaterThan(0);
+    expect(into).toBeLessThan(STEPS);
+    eng.stop();
+    bars.length = 0;
+    const t = clock(eng).currentTime;
+    eng.startAt(1);
+    expect(bars).toEqual([1]);                                           // bar 1's patterns first (not bar 0's)
+    expect(eng.currentBar).toBe(1);
+    expect(eng.stepsIntoBar).toBe(0);
+    expect(eng.songStartSec).toBeCloseTo(t + LEAD, 6);
+    eng.stop();
+    eng.dispose();
+  });
+});

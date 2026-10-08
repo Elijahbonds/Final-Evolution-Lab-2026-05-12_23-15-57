@@ -43,7 +43,7 @@ export const SPORT_KIT_DEFAULTS: Readonly<Record<string, SportKit>> = {
   // board
   skateboard: BOARD, surf: BOARD, snowboard: BOARD, snowboard_slalom: BOARD, bigair: BOARD,
   // court
-  tennis: COURT, volleyball: COURT, onevone: COURT, threevthree: COURT, dunk: COURT, dunkduel: COURT, threepoint: COURT,
+  tennis: COURT, tiebreak: COURT, volleyball: COURT, onevone: COURT, threevthree: COURT, dunk: COURT, dunkduel: COURT, threepoint: COURT,
   carnival: COURT,
   // field / track / studio — a jersey and the low trainer
   football: FOOTBALL, sprint: FIELD, soccer: FIELD, penalty: FIELD, baseball: BASEBALL, derby: BASEBALL, golf: FIELD,

@@ -9,8 +9,10 @@
 //     you can SEE, and a skid reads as a smear;
 //   · POWDER — one-shot bursts: a landing (a puff), a wipeout (a cloud that hangs).
 
-import { Color3, Color4, DynamicTexture, Matrix, MeshBuilder, PBRMaterial, ParticleSystem, Quaternion, Vector3 } from '@babylonjs/core';
-import type { Mesh, Scene } from '@babylonjs/core';
+import { Color3, Color4, DynamicTexture, Matrix, Mesh, MeshBuilder, PBRMaterial, ParticleSystem, Quaternion, Ray, StandardMaterial, Vector3, VertexBuffer } from '@babylonjs/core';
+import type { AbstractMesh, PickingInfo, Scene } from '@babylonjs/core';
+import { airShadow } from '../modes/gateCrasher';
+import { rideFilter, groundYUnder } from '../core/rideFilter';
 
 export interface SnowFrame {
   /** The board, world (the rider's root sits on it). */
@@ -60,7 +62,14 @@ export class SnowSpray {
   private trackCol = new Float32Array(TRACK_SEGMENTS * 4);
   private trackHead = 0;
   private lastTrack: Vector3 | null = null;
+  private trackLive = false;   // lastTrack holds a real point (it is kept, not re-allocated, between strokes)
   private tmp = new Matrix();
+  // IMPROVE (2026-10-06, snow item 20): the per-frame directions and the track segment's compose inputs are written in place —
+  // two new direction vectors per system a frame, and a scale, a position, a quaternion and a clone per track segment, were
+  // steady garbage at 60 fps for values that never outlive the call.
+  private readonly segScale = new Vector3();
+  private readonly segPos = new Vector3();
+  private readonly segRot = new Quaternion();
 
   private fresh: Color3;
   private filled: Color3;
@@ -129,25 +138,25 @@ export class SnowSpray {
     this.edgeAt.set(f.at.x - side * fz * 0.15, f.at.y + 0.05, f.at.z + side * fx * 0.15);
     this.edge.emitRate = Math.round(Math.min(1, carve * 1.4) ** 2 * 900 * (0.3 + 0.7 * speed01));
     const ox = -side * fz, oz = side * fx;   // the outside of the turn, across the board
-    this.edge.direction1 = new Vector3(ox * 1.2 - fx * 1.2, 1.4, oz * 1.2 - fz * 1.2);
-    this.edge.direction2 = new Vector3(ox * 3.2 - fx * 0.2, 3.4, oz * 3.2 - fz * 0.2);
+    this.edge.direction1.set(ox * 1.2 - fx * 1.2, 1.4, oz * 1.2 - fz * 1.2);
+    this.edge.direction2.set(ox * 3.2 - fx * 0.2, 3.4, oz * 3.2 - fz * 0.2);
     // WAKE behind a fast board
     this.wakeAt.set(f.at.x - fx * 0.7, f.at.y + 0.05, f.at.z - fz * 0.7);
     this.wake.emitRate = f.grounded ? Math.round(Math.max(0, speed01 - 0.35) * 160) : 0;
-    this.wake.direction1 = new Vector3(-fx * 1.5 - 0.4, 0.5, -fz * 1.5 - 0.4); this.wake.direction2 = new Vector3(-fx * 0.5 + 0.4, 1.4, -fz * 0.5 + 0.4);
+    this.wake.direction1.set(-fx * 1.5 - 0.4, 0.5, -fz * 1.5 - 0.4); this.wake.direction2.set(-fx * 0.5 + 0.4, 1.4, -fz * 0.5 + 0.4);
     // CARVE TRACKS: a segment every TRACK_STEP_M of travel on the snow
     let dirty = false;
     if (f.grounded && f.speed > 1.5) {
-      if (!this.lastTrack || Vector3.DistanceSquared(this.lastTrack, f.at) > TRACK_STEP_M * TRACK_STEP_M) {
+      if (!this.trackLive || !this.lastTrack || Vector3.DistanceSquared(this.lastTrack, f.at) > TRACK_STEP_M * TRACK_STEP_M) {
         const i = this.trackHead; this.trackHead = (this.trackHead + 1) % TRACK_SEGMENTS;
-        const q = Quaternion.RotationYawPitchRoll(f.yaw, f.pitch, 0);
-        Matrix.ComposeToRef(new Vector3(1 + carve * 0.8, 1, 1), q, new Vector3(f.at.x, f.at.y + 0.015, f.at.z), this.tmp);
+        Quaternion.RotationYawPitchRollToRef(f.yaw, f.pitch, 0, this.segRot);
+        Matrix.ComposeToRef(this.segScale.set(1 + carve * 0.8, 1, 1), this.segRot, this.segPos.set(f.at.x, f.at.y + 0.015, f.at.z), this.tmp);
         this.tmp.copyToArray(this.trackBuf, i * 16);
         this.trackAge[i] = 0;
-        this.lastTrack = f.at.clone();
+        (this.lastTrack ??= new Vector3()).copyFrom(f.at); this.trackLive = true;
         dirty = true;
       }
-    } else this.lastTrack = null;
+    } else this.trackLive = false;
     // age + fade: a fresh cut is the track colour and fills back in to the snow's own over its life, then goes
     for (let i = 0; i < TRACK_SEGMENTS; i++) {
       if (this.trackAge[i] >= TRACK_LIFE_SEC) continue;
@@ -178,4 +187,79 @@ export class SnowSpray {
     this.edge.dispose(); this.wake.dispose(); this.powder.dispose(); this.tex.dispose();
     this.tracks.material?.dispose(); this.tracks.dispose();
   }
+}
+
+/**
+ * GC-6 THE SNOW'S SHADOW (GATE-CRASHER-POLISH-2, 2026-09-28). The eye: "a hard-edged black air-shadow ellipse that sits well
+ * away from the rider on screen in a flat ollie". That was the shared contact disc (visual/contactShadow): it lies LEVEL and,
+ * in the air, holds the height the body left from — so off a kicker on a 12.6° run it hung at lip height over the snow the
+ * rider was flying down, dark (it fades only with height above the take-off) and flat to the world, not to the slope.
+ *
+ * The rider's own disc is switched off and this one replaces it: found under the rider every frame by a ray against the
+ * ground the rider rides (the piste, a kicker's deck), laid ON that surface along its normal, and — through
+ * gateCrasher.airShadow — wider, fainter and softer the higher he flies. Vertex alpha on a disc, like the shared one (the
+ * textured-plane path drew nothing on this engine, contactShadow's note).
+ */
+export class SnowShadow {
+  private disc: Mesh;
+  private mat: StandardMaterial;
+  private readonly q = new Quaternion();
+  private readonly base = Quaternion.RotationYawPitchRoll(0, Math.PI / 2, 0);
+  /** Height of the rider above the surface under him on the last update (m; −1 when nothing was under him). */
+  height = -1;
+
+  constructor(private scene: Scene, private ground: AbstractMesh[], radius = 0.6) {
+    this.disc = MeshBuilder.CreateDisc('snow_air_shadow', { radius, tessellation: 32, sideOrientation: Mesh.DOUBLESIDE }, scene);
+    const pos = this.disc.getVerticesData(VertexBuffer.PositionKind)!;
+    const colors = new Float32Array((pos.length / 3) * 4);
+    for (let i = 0; i < pos.length / 3; i++) {
+      const d = Math.hypot(pos[i * 3], pos[i * 3 + 1]) / radius;
+      colors[i * 4 + 3] = Math.max(0, 1 - d) ** 2.2;   // soft all the way out: no rim to read as an edge
+    }
+    this.disc.setVerticesData(VertexBuffer.ColorKind, colors, false, 4);
+    this.disc.hasVertexAlpha = true;
+    this.disc.isPickable = false; this.disc.receiveShadows = false;
+    this.disc.rotationQuaternion = this.base.clone();
+    const m = new StandardMaterial('snow_air_shadow_m', scene);
+    m.disableLighting = true; m.emissiveColor = new Color3(0.05, 0.08, 0.14); m.diffuseColor = Color3.Black(); m.specularColor = Color3.Black();
+    m.backFaceCulling = false; m.alpha = 0.3; m.zOffset = -2;
+    this.mat = m;
+    this.disc.material = m;
+  }
+
+  private readonly ray = new Ray(new Vector3(), new Vector3(0, -1, 0), 60);
+  private readonly n = new Vector3();
+  private readonly hitAt = new Vector3();
+
+  /** Every frame, after the rider has moved. `reuse` (IMPROVE 2026-10-06, snow item 16): the Rider's own ground hit — when it is
+   *  the surface this disc's ray would find (rideFilter.groundYUnder), no ray is cast; otherwise one is, as before. */
+  update(at: Vector3, visible = true, reuse?: PickingInfo | null): void {
+    if (!visible) { this.disc.isVisible = false; this.height = -1; return; }
+    const same = reuse ? groundYUnder(reuse, at.x, at.y, at.z, 0.4, 60) : null;
+    if (same) {
+      this.n.set(same.normal.x, same.normal.y, same.normal.z);
+      this.hitAt.set(at.x, same.y, at.z);
+    } else {
+      this.ray.origin.set(at.x, at.y + 0.4, at.z);
+      const hit = this.scene.pickWithRay(this.ray, rideFilter(this.ground));
+      if (!hit?.hit || !hit.pickedPoint) { this.disc.isVisible = false; this.height = -1; return; }
+      this.n.copyFrom(hit.getNormal(true, true) ?? Vector3.Up());
+      if (this.n.y < 0) this.n.scaleInPlace(-1);
+      this.hitAt.copyFrom(hit.pickedPoint);
+    }
+    const n = this.n, hitPoint = this.hitAt;
+    this.height = Math.max(0, at.y - hitPoint.y);
+    const { alpha, scale } = airShadow(this.height);
+    // lie on the surface: the flat disc (base) tilted from straight up onto the surface's normal
+    const axis = Vector3.Cross(Vector3.Up(), n);
+    const ang = Math.acos(Math.max(-1, Math.min(1, n.y)));
+    if (axis.lengthSquared() > 1e-8) Quaternion.RotationAxisToRef(axis.normalize(), ang, this.q); else this.q.copyFromFloats(0, 0, 0, 1);
+    this.q.multiplyToRef(this.base, this.disc.rotationQuaternion!);
+    this.disc.position.set(hitPoint.x + n.x * 0.03, hitPoint.y + n.y * 0.03, hitPoint.z + n.z * 0.03);
+    this.disc.scaling.setAll(scale);
+    this.mat.alpha = alpha;
+    this.disc.isVisible = alpha > 0.01;
+  }
+
+  dispose(): void { this.mat.dispose(); this.disc.dispose(); }
 }

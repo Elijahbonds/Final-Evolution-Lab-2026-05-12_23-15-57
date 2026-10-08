@@ -74,6 +74,24 @@ export class QaTrace {
 
   reset(): void { this.events.length = 0; this.bodyLog.length = 0; this.last.clear(); }
 
+  /**
+   * RUN-CAPTURE: the whole session as one saveable artifact — modeId, the press/response timeline, the raw
+   * body log, and the result the harness recorded — so a headed 7.5 verdict is a file a future probe can
+   * replay, not a screenshot. QA-only by construction: a QaTrace exists at all only when `?agent=1` armed it.
+   * Pure bookkeeping; nothing here grades.
+   */
+  transcript(modeId: string, result: { outcome: string; score: number } | null): QaTranscript {
+    return {
+      v: 1,
+      modeId,
+      capturedAt: new Date().toISOString(),
+      events: [...this.events],
+      bodyLog: [...this.bodyLog],
+      hud: this.snapshot(),
+      result,
+    };
+  }
+
   /** The last value of every news-bearing HUD key (score, banner, combo…) — what a probe reads an outcome from. */
   snapshot(): Record<string, string> { return Object.fromEntries(this.last); }
 
@@ -125,4 +143,15 @@ export interface QaSummary {
   scores: number;
   unexplainedScores: number;
   responses: number;
+}
+
+/** One headed run, packaged (RUN-CAPTURE). `v` lets a future replay tool reject a shape it no longer reads. */
+export interface QaTranscript {
+  v: 1;
+  modeId: string;
+  capturedAt: string;
+  events: QaEvent[];
+  bodyLog: QaBodyEvent[];
+  hud: Record<string, string>;
+  result: { outcome: string; score: number } | null;
 }

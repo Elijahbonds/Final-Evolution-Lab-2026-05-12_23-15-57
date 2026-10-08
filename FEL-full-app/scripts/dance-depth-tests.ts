@@ -11,7 +11,12 @@
 //   B. The judgement knows WHICH step it judged (DanceCore.onJudged 4th arg,
 //      backward compatible) — without it no per-family mixing is possible.
 //   C. The bezel: combo was published and never rendered (trap "published is
-//      not rendered" again); the energy bar is the MIX with its own label.
+//      not rendered" again); the energy bar was the MIX with its own label.
+//
+// MUSIC-SUITE P7 (2026-09-29) FIX PASS: room-mix-ux dropped the one MIX bar (hud.energy/energyLabel)
+// for a chip per earned instrument (InstrumentChips.ts, hud.instruments) — DanceMode.ts no longer sets
+// `energyLabel: 'MIX'` at all, so the item-C check below now pins the chip row instead (measured:
+// ci-suite's dance-depth-tests.ts failed "the energy bar is labelled MIX" after that change landed).
 //
 // Pure where possible, source-level for the wiring.
 //
@@ -61,7 +66,8 @@ const ok = (c: boolean, label: string): void => { checks++; if (!c) fail.push(la
   ok(mode.includes('band?.update(now)'), 'the scheduler runs on the audio clock every frame');
   ok(mode.includes('band?.start('), 'the band starts at GO');
   ok(mode.includes('band?.dispose()'), 'the band is torn down');
-  ok(mode.includes("energyLabel: 'MIX'"), 'the energy bar is labelled MIX');
+  // MUSIC-SUITE P7 FIX PASS: the MIX bar is gone — instrumentsHud() (InstrumentChips.ts) is the mix UI now.
+  ok(mode.includes('instruments: instrumentsHud()'), 'the instrument chips publish the mix (room-mix-ux replaced the MIX bar)');
   ok(mode.includes('band.mixLevel()'), 'the mix level is published');
   ok(mode.includes('MIX ${mixPct}%'), 'the result names the band you built');
 

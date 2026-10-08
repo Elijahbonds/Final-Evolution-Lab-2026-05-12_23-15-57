@@ -6,17 +6,16 @@
 // The card row appears only for a signed-in player with at least one card (a slot with nothing to pick is a hollow
 // picker). Equipping reloads the route, like a venue pick: the hero's look is applied when the rig spawns, and a card
 // equipped under a spawned hero would change nothing you can see until the next load.
-// The BUTTONS map shows for everyone, collapsed to one line until opened, so it never pushes START off a phone.
+// CONTROLS SCREEN (console-view lane, 2026-10-06): the collapsed BUTTONS map that lived here is now the READY card's
+// CONTROLS panel (controls-panel.tsx) — open, per device, and on the pause too — so this is the card row alone.
 
-import { useEffect, useMemo, useState } from 'react';
-import { buttonMap, type SlotCard } from '@/lib/creator/cardSlot';
+import { useEffect, useState } from 'react';
+import type { SlotCard } from '@/lib/creator/cardSlot';
 
-export function CardSlot({ modeId }: { modeId: string }) {
+export function CardSlot({ modeId }: { modeId: string }) {   // modeId: the slot is per mode (the card row is shared today)
   const [cards, setCards] = useState<SlotCard[]>([]);
   const [equipped, setEquipped] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [open, setOpen] = useState(false);
-  const rows = useMemo(() => buttonMap(modeId), [modeId]);
 
   useEffect(() => {
     let live = true;
@@ -39,11 +38,10 @@ export function CardSlot({ modeId }: { modeId: string }) {
   };
 
   const on = cards.find((c) => c.id === equipped) ?? null;
-  const verbs = rows.filter((r) => r.group !== 'move');
-  const moves = rows.filter((r) => r.group === 'move');
+  if (!cards.length) return null;
 
   return (
-    <div className="mt-3 flex flex-col items-center gap-1.5" data-testid="card-slot">
+    <div className="mt-3 flex flex-col items-center gap-1.5" data-testid="card-slot" data-mode={modeId}>
       {cards.length > 0 && (
         <>
           <p className="text-[9px] font-black tracking-[0.3em] text-white/45">CREATOR CARD</p>
@@ -68,29 +66,6 @@ export function CardSlot({ modeId }: { modeId: string }) {
         </>
       )}
 
-      {rows.length > 0 && (
-        <div className="mt-1 flex flex-col items-center">
-          <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open}
-            className="rounded-full border border-white/20 px-3 py-0.5 text-[9px] font-black tracking-[0.3em] text-white/60 hover:bg-white/10">
-            BUTTONS {open ? '▲' : '▼'}
-          </button>
-          {open && (
-            // the splash starts the game on a pointer-down anywhere that is not a button — reading the map must not
-            <div onPointerDown={(e) => e.stopPropagation()} className="mt-1.5 max-h-40 w-[min(26rem,90vw)] overflow-y-auto rounded-lg border border-white/10 bg-black/55 px-3 py-2 text-left">
-              {[verbs, moves].filter((g) => g.length).map((g, gi) => (
-                <div key={gi} className={`grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 ${gi ? 'mt-1.5 border-t border-white/10 pt-1.5' : ''}`}>
-                  {g.map((r) => (
-                    <div key={`${r.input}-${r.action}`} className="contents">
-                      <span className="font-mono text-[10px] font-black text-[#22d3ee]">{r.input}</span>
-                      <span className="font-mono text-[10px] text-white/80">{r.action}</span>
-                    </div>
-                  ))}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }

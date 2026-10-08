@@ -162,3 +162,18 @@ describe('the one-line preview says what KIND of thing arrived', () => {
     }
   });
 });
+
+// MIRROR-COACH P5 (2026-09-29): this is the text that actually leaves the building, in an iMessage draft — Privacy
+// §5's "never appears on a share link" has to hold here too, not just in the JSON shareable.ts builds. There is no
+// code path from a HealthIntake/PainCheckIn/HealthConsent row into a Share (the types this file renders have no
+// field for one), so this is a belt-and-suspenders text sweep rather than a claim that a leak is reachable.
+describe('NEVER A HEALTH FIELD IN THE MESSAGE ITSELF (Privacy §5)', () => {
+  it('none of the distinctive health field names appear in any rendered message or preview', () => {
+    const shares = [drill({ note: 'Quiet landings.' }), prog(3), sel(), rec('Ready to train unsupervised. Strong on the hinge.')];
+    const bad = ['healthintake', 'paincheckin', 'healthconsent', 'redflags', 'bodyarea', 'consentedat', 'birthyear', 'clearedat'];
+    for (const s of shares) {
+      const rendered = (toPlainText(s, URL) + ' ' + toSummaryLine(s)).toLowerCase();
+      for (const b of bad) expect(rendered, `${s.kind}/${b}`).not.toContain(b);
+    }
+  });
+});

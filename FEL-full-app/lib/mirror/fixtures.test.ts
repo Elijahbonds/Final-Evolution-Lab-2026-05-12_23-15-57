@@ -137,7 +137,9 @@ describe('4. invariants a re-record must never accept', () => {
       const said = s.coach.filter((c) => c.fault === 'kneeValgus');
       if (squats.includes(name) && t.kneeCaves === true) {
         expect(said.length, name).toBeGreaterThan(0);
-        expect(said[0].text, name).toMatch(/^Knees out/);
+        // MIRROR-COACH P9 (2026-09-30): was /^Knees out/. The knee card now leads with the floor (lib/coach/cueLint.ts, the
+        // external-focus policy) — the same card, still telling the knees to go out, pinned as tightly as before.
+        expect(said[0].text, name).toMatch(/^Press the floor apart with your feet — knees travel out/);
         expect(s.shown, name).toContain('kneeValgus');
       } else if (squats.includes(name) || /^(stand|single_leg|seated|hinge|pushup)/.test(name)) {
         expect(said, name).toEqual([]);
@@ -189,6 +191,27 @@ describe('4. invariants a re-record must never accept', () => {
       expect(o.prescribeReason).toBe('ungraded_screen');
       expect(emptyDraftLine(o.prescribeReason ?? undefined)).not.toMatch(/came back clear/i);
       expect(o.athletePanel).toBe(NOT_GRADED_LINE);
+    }
+  });
+
+  // MIRROR-COACH P3 (2026-09-26): the stations are graded now (lib/mirror/stationGraders.ts, fed by the runner from each
+  // hold's good frames). An athlete standing as each cue says, with nothing wrong in the body, is read on every camera
+  // check and flagged on none — and the checks the camera cannot see are never among the results.
+  it('the clean walk: every camera check read, none flagged, nothing but camera results', () => {
+    for (const screen of ['modified', 'full'] as const) {
+      const r = now.screens[screen];
+      expect(r.resultsRecorded, screen).toBe(7);                     // heel, knee, hips, shoulders, head, one leg × 2
+      const res = r.onComplete.stored.results;
+      expect(res.every((x) => x.grade === 'stable' && x.source === 'camera'), screen).toBe(true);
+      expect(res.map((x) => x.checkId)).not.toContain('ribAngle');
+      expect(r.onComplete.summary.graded).toBe(true);
+      expect(r.onComplete.summary.movementFlags).toBe(0);
+      expect(r.onComplete.summary.notMeasured).toEqual([]);
+      for (const x of res) expect(x.detail, x.checkId).toMatch(/estimated/);
+      // MIRROR-COACH P3 follow-up (2026-09-28): 7 results are 6 checks read — the panel said "Checks 7" (results, each leg
+      // counted) where the server counted 6; it now shows the server's count, and the score with it (owner decision #31)
+      expect(r.onComplete.summary).toMatchObject({ readCount: 6, totalCount: 6, notRead: [] });
+      expect(r.onComplete.athletePanel).toBe('Score 100 · from 6 of 6 checks read · Movement flags 0 · One-sided 0 · Checks read 6 of 6');
     }
   });
 });
