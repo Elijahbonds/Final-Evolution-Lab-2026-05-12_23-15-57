@@ -132,9 +132,15 @@ async function gateToday(
 function lastTimeFor(p: any, exercises: readonly TodayExercise[]): Record<string, ProgressPoint> {
   const catalogueOf = new Map<string, string>();
   for (const b of p.blocks ?? []) for (const s of b.sessions ?? []) for (const e of s.exercises ?? []) catalogueOf.set(e.id, e.exerciseId);
+  // p.clientSessions arrive newest-first (loadToday's orderBy), and progressSeries' sort on `at` is stable — so when
+  // two saves tie on completedAt (back-to-back in the same millisecond) the OLDEST tied log would end last and "last
+  // time" would read the older session (MIRROR-TZ). Feed oldest-first instead so the newest tie ends last; the input
+  // order loadToday relies on is left untouched.
+  const createdAt = (v: unknown) => (v instanceof Date ? v.getTime() : typeof v === 'string' ? Date.parse(v) : Number.NaN);
+  const sessions = [...(p.clientSessions ?? [])].sort((a: any, b: any) => (createdAt(a.createdAt) || 0) - (createdAt(b.createdAt) || 0));
   const rows: LogRow[] = [];
-  for (const cs of p.clientSessions ?? []) {
-    for (const l of cs.exerciseLogs ?? []) {
+  for (const cs of sessions) {
+    for (const l of [...(cs.exerciseLogs ?? [])].sort((a: any, b: any) => (createdAt(a.createdAt) || 0) - (createdAt(b.createdAt) || 0))) {
       if (!l.completedAt || !logHasWork(l)) continue;
       const did = l.servedExerciseId ?? catalogueOf.get(l.sessionExerciseId);
       if (!did) continue;
