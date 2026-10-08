@@ -3,10 +3,12 @@
  * came back from, and for Dashboard refunds and disputes — with NO webhook. One authed route
  * (app/api/coach-store/reconcile) runs this on a schedule; there is no scheduler/cron/infra in this PR.
  *
- * Pass 1 (checkouts): Bookings HELD|EXPIRED and ProgramAccess PENDING with a stripeCheckoutId created in the
- *   last 24 h are retrieved (expand payment_intent). A paid session fulfils through the SAME B6 fulfilment
- *   (incl. the past-start limit); an expired session flips a still-HELD booking to EXPIRED (slotLock null) and a
- *   still-PENDING access to EXPIRED (codeActive false), each by status-CAS.
+ * Pass 1 (checkouts): Bookings HELD|EXPIRED and ProgramAccess PENDING with a stripeCheckoutId touched in the
+ *   last 24 h are retrieved (expand payment_intent). The window is bounded on `updatedAt`, not `createdAt`: the
+ *   checkout id is written AFTER the row exists (lib/coach-store/checkout.ts), so `updatedAt` is the "a checkout
+ *   happened recently" signal — a row created 25 h ago but re-bought a minute ago is still found. A paid session
+ *   fulfils through the SAME B6 fulfilment (incl. the past-start limit); an expired session flips a still-HELD
+ *   booking to EXPIRED (slotLock null) and a still-PENDING access to EXPIRED (codeActive false), each by status-CAS.
  * Pass 2 (refunds):   refunds.list(created >= now-7d, limit 100, auto-paginated), status 'succeeded'. The charge
  *   is retrieved and acted on ONLY when charge.refunded === true (a partial refund is a log line, no row move).
  *   A matching PAID|REFUND_DUE|CANCELLED booking -> REFUNDED (slotLock null); an ACTIVE|PAST_DUE|PAUSED access
@@ -123,13 +125,16 @@ export async function reconcileCoachStore(input: { now: Date; stripe: Stripe }):
   const counts = zeroCounts();
 
   // ── Pass 1: checkouts nobody came back from (last 24 h) ────────────────────────────────────────────────────
+  // Bounded on updatedAt: stripeCheckoutId is written after the row exists, so updatedAt is the recent-checkout
+  // signal. A row created outside the window but re-bought inside it (B5) is still found; a row whose checkout
+  // is older than 24 h has already been swept by the hold-expiry sweep and is left alone.
   const dayAgo = new Date(now.getTime() - 24 * 3_600_000);
   const bookings = await prisma.booking.findMany({
-    where: { status: { in: ['HELD', 'EXPIRED'] }, stripeCheckoutId: { not: null }, createdAt: { gte: dayAgo } },
+    where: { status: { in: ['HELD', 'EXPIRED'] }, stripeCheckoutId: { not: null }, updatedAt: { gte: dayAgo } },
     select: { id: true, status: true, stripeCheckoutId: true },
   });
   const accesses = await prisma.programAccess.findMany({
-    where: { status: 'PENDING', stripeCheckoutId: { not: null }, createdAt: { gte: dayAgo } },
+    where: { status: 'PENDING', stripeCheckoutId: { not: null }, updatedAt: { gte: dayAgo } },
     select: { id: true, status: true, stripeCheckoutId: true },
   });
 

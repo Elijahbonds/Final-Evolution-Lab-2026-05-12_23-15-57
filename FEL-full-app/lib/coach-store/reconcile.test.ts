@@ -150,12 +150,12 @@ function nextSlot(now: Date, durationMin = 30): Date {
 }
 function seedBooking(over: Row = {}) {
   const rows = (h.store.booking ??= []);
-  const row = { id: `bk_${rows.length + 1}`, kind: 'live_1on1', instructorId: 'ins-1', coachUserId: USER, clientUserId: 'buyer-1', listingId: 'l', status: 'HELD', priceCents: 6500, stripeFeeCents: 0, durationMin: 30, ...over };
+  const row = { id: `bk_${rows.length + 1}`, kind: 'live_1on1', instructorId: 'ins-1', coachUserId: USER, clientUserId: 'buyer-1', listingId: 'l', status: 'HELD', priceCents: 6500, stripeFeeCents: 0, durationMin: 30, createdAt: new Date(), updatedAt: new Date(), ...over };
   rows.push(row); return row;
 }
 function seedAccess(over: Row = {}) {
   const rows = (h.store.programAccess ??= []);
-  const row = { id: `pa_${rows.length + 1}`, userId: 'buyer-1', instructorId: 'ins-1', listingId: 'l', lane: 'dunking', billing: 'one_time', scope: 'lane', beneficiary: 'self', status: 'PENDING', priceCents: 7900, stripeFeeCents: 0, codeActive: true, ...over };
+  const row = { id: `pa_${rows.length + 1}`, userId: 'buyer-1', instructorId: 'ins-1', listingId: 'l', lane: 'dunking', billing: 'one_time', scope: 'lane', beneficiary: 'self', status: 'PENDING', priceCents: 7900, stripeFeeCents: 0, codeActive: true, createdAt: new Date(), updatedAt: new Date(), ...over };
   rows.push(row); return row;
 }
 function paidSession(rowId: string, over: Row = {}) {
@@ -209,7 +209,6 @@ describe('B8 reconcile pass 1 (paid checkouts nobody came back from)', () => {
   it('(c) a PENDING program with a paid session -> ACTIVE, one sale', async () => {
     const pa = seedAccess({ stripeCheckoutId: paidSession('pa_1', { metadata: { product: 'COACH_STORE', userId: 'buyer-1', rowId: 'pa_1', kind: 'program', beneficiary: 'self' } }) });
     const c = await run();
-    console.log('DEBUG c:', JSON.stringify(c), 'accessStatus', h.store.programAccess.find((a) => a.id === pa.id)!.status, 'sessionId', pa.stripeCheckoutId);
     expect(c.fulfilled).toBe(1);
     expect(h.store.programAccess.find((a) => a.id === pa.id)!.status).toBe('ACTIVE');
     expect((h.store.ledgerTransaction ?? []).filter((t) => t.kind === 'MARKETPLACE_SALE')).toHaveLength(1);
