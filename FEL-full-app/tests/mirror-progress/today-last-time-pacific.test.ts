@@ -24,7 +24,7 @@ import { NextRequest } from 'next/server';
 import { GET as todayGET } from '@/app/api/coach/me/today/route';
 import { POST as logPOST } from '@/app/api/coach/me/log/route';
 import { catalogueRow, newTodayStore, seedProgram } from '@/lib/coach/todayMemoryDb';
-import { lastTimeLine } from '@/lib/coach/loop';
+import { lastTimeLine, progressSeries, type LogRow } from '@/lib/coach/loop';
 import type { TodayPayload } from '@/lib/coach/todayServer';
 
 let PID = '', S: string[] = [], SE: string[][] = [];
@@ -104,7 +104,38 @@ describe('Today serves "last time" in Pacific time', () => {
     }
   });
 
-  it('(c) the newest instant wins across a Pacific midnight', async () => {
+  it('(c) the "NEWEST completed log wins" scenario through the real routes, then progressSeries on the rows REVERSED', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-10-08T04:40:00.000Z') }); // both saves share one completedAt
+    try {
+      await done(S[0], [{ sessionExerciseId: SE[0][0], sets: [{ reps: 8, weight: 60 }, { reps: 8, weight: 60 }, { reps: 8, weight: 60 }] }]);
+      await done(S[1], [
+        { sessionExerciseId: SE[1][0], sets: [{ reps: 8, weight: 62.5 }, { reps: 8, weight: 62.5 }, { reps: 7, weight: 62.5 }] },
+        { sessionExerciseId: SE[1][1], sets: [{ reps: 10, weight: 30, unit: 'lb' }, { reps: 10, weight: 30, unit: 'lb' }] },
+      ]);
+      // the route's own answer (loadToday feeds lastTimeFor newest-first)
+      const p = await today();
+      const [goblet] = p.today!.session.exercises;
+      expect(lastTimeLine(p.today!.lastTime![goblet.id])).toBe('Last time: 3 sets: 8, 8, 7 @ 62.5 kg');
+      // …and the explicit tie-break decides the same way on the rows REVERSED (oldest-first): build the LogRows the
+      // way lastTimeFor does (catalogue id as exerciseName; savedAt the row's createdAt; id the row's id) and sort
+      // both orders.
+      const toRow = (l: (typeof h.store.log)[number]): LogRow => ({
+        exerciseName: 'pe-goblet', completedAt: l.completedAt, actualLoad: l.actualLoad, actualReps: l.actualReps,
+        rpe: l.rpe, actualSets: l.actualSets, savedAt: l.createdAt, id: l.id,
+      });
+      const day2Row = toRow(h.store.log.find((l) => l.completedAt && l.sessionExerciseId === SE[1][0])!);
+      const day1Row = toRow(h.store.log.find((l) => l.completedAt && l.sessionExerciseId === SE[0][0])!);
+      for (const list of [[day2Row, day1Row], [day1Row, day2Row]]) { // newest-first (as loadToday hands over), then reversed
+        const pts = progressSeries(list)['pe-goblet'];
+        expect(pts).toHaveLength(2);
+        expect(lastTimeLine(pts[pts.length - 1])).toBe('Last time: 3 sets: 8, 8, 7 @ 62.5 kg');
+      }
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('(d) the newest instant wins across a Pacific midnight', async () => {
     vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-10-08T06:30:00.000Z') }); // 11:30 PM PT Oct 7
     try {
       await done(S[0], [{ sessionExerciseId: SE[0][0], sets: [{ reps: 8, weight: 60 }, { reps: 8, weight: 60 }, { reps: 8, weight: 60 }] }]);
