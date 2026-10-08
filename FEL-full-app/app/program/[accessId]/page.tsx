@@ -52,15 +52,28 @@ export default async function ProgramPlayerPage({ params }: { params: { accessId
       );
     }
     const isTeen = access.beneficiary === 'teen';
+    // STORE-ECON-EDU-10 Phase 3 (Elijah, 4:18 PM PT Oct 7 2026): memberships SELL at launch, and an ACTIVE
+    // membership opens a REAL program here — not an empty page. A membership row is scope 'all' (adult) or
+    // 'teen_all' (parent-bought teen); both get the full 8-week program below.
     const showDunkWeeks = access.scope === 'lane' && access.lane === 'dunking';
     const showCourse = access.scope === 'product' && access.lane === 'signature-dunk-course';
     const showSeries = access.scope === 'product' && access.lane === 'blueprint-series';
     const showBundle = access.scope === 'bundle';
+    const isAdultMembership = access.scope === 'all';
+    const isTeenMembership = access.scope === 'teen_all';
+    const isMembership = isAdultMembership || isTeenMembership;
+    // The membership program weeks: a teen membership shows only the non-adult drills and no adult-loaded work.
+    const showProgramWeeks = showDunkWeeks || showBundle || isMembership;
+    // The external course/series video libraries open for an ADULT membership only; a teen membership keeps the
+    // program weeks on the phone and never links out.
+    const showCourseLibrary = showCourse || showBundle || isAdultMembership;
+    const showSeriesLibrary = showSeries || showBundle || isAdultMembership;
+    const heading = isMembership ? 'Your membership program' : 'Your program';
     return (
       <main className="mx-auto max-w-xl px-4 py-8 text-white">
-        <h1 className="text-2xl font-black">Your program</h1>
+        <h1 className="text-2xl font-black">{heading}</h1>
         <p className="mt-2 text-sm text-white/70">{isTeen ? 'Your progress stays on this phone.' : 'Re-screens sit on days 14, 28, 42 and 56.'}</p>
-        {showDunkWeeks || showBundle ? DUNK_WEEKS.map((week) => (
+        {showProgramWeeks ? DUNK_WEEKS.map((week) => (
           <section key={week.week} className="mt-4">
             <h2 className="font-bold">Week {week.week}: {week.title}</h2>
             {week.days.map((day) => {
@@ -74,8 +87,8 @@ export default async function ProgramPlayerPage({ params }: { params: { accessId
             })}
           </section>
         )) : null}
-        {showCourse || showBundle ? <ProductVideos title="Signature Dunk Course" videos={videosForProduct('signature-dunk-course')} /> : null}
-        {showSeries || showBundle ? <ProductVideos title="Blueprint series" videos={videosForProduct('blueprint-series')} /> : null}
+        {showCourseLibrary ? <ProductVideos title="Signature Dunk Course" videos={videosForProduct('signature-dunk-course')} /> : null}
+        {showSeriesLibrary ? <ProductVideos title="Blueprint series" videos={videosForProduct('blueprint-series')} /> : null}
       </main>
     );
   } catch (err) {

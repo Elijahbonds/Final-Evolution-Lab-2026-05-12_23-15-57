@@ -1,6 +1,6 @@
 // STORE-LISTING-FORMAT: productsGrantedBy is pure — every manifest kind maps to the right store-price keys.
 import { describe, expect, it } from 'vitest';
-import { missingBundleParts, productsGrantedBy } from './entitlement';
+import { MEMBERSHIP_PRODUCT_KEY, missingBundleParts, productsGrantedBy } from './entitlement';
 
 describe('productsGrantedBy', () => {
   it('a dunking program grants the dunking 8-week product', () => {
@@ -25,22 +25,29 @@ describe('productsGrantedBy', () => {
     expect(productsGrantedBy({ kind: 'bundle', product: 'bundle-all-three', billing: 'one_time', members })).toEqual(members);
   });
 
-  it('memberships grant none of the three course/series/bundle products', () => {
-    expect(productsGrantedBy({ kind: 'membership', audience: 'adult', interval: 'month' })).toEqual([]);
-    expect(productsGrantedBy({ kind: 'membership', audience: 'teen', interval: 'month' })).toEqual([]);
+  it('a membership always grants its own membership product, so a paid membership is never an empty entitlement', () => {
+    expect(productsGrantedBy({ kind: 'membership', audience: 'adult', interval: 'month' })).toContain(MEMBERSHIP_PRODUCT_KEY);
+    expect(productsGrantedBy({ kind: 'membership', audience: 'teen', interval: 'month' })).toContain(MEMBERSHIP_PRODUCT_KEY);
   });
 
-  it('membershipIncludesCourses false (explicit) → memberships grant nothing', () => {
+  it('membershipIncludesCourses false (explicit) → a membership still grants its own product, never the courses', () => {
     const policy = { membershipIncludesCourses: false };
-    expect(productsGrantedBy({ kind: 'membership', audience: 'adult', interval: 'month' }, policy)).toEqual([]);
-    expect(productsGrantedBy({ kind: 'membership', audience: 'teen', interval: 'month' }, policy)).toEqual([]);
+    expect(productsGrantedBy({ kind: 'membership', audience: 'adult', interval: 'month' }, policy)).toEqual([MEMBERSHIP_PRODUCT_KEY]);
+    expect(productsGrantedBy({ kind: 'membership', audience: 'teen', interval: 'month' }, policy)).toEqual([MEMBERSHIP_PRODUCT_KEY]);
   });
 
-  it('membershipIncludesCourses true → memberships grant the course and series products (not the 8-week program)', () => {
+  it('membershipIncludesCourses true → memberships grant their own product plus the course and series (not the 8-week program)', () => {
     const policy = { membershipIncludesCourses: true };
-    const want = ['signature-dunk-course', 'blueprint-series'];
+    const want = [MEMBERSHIP_PRODUCT_KEY, 'signature-dunk-course', 'blueprint-series'];
     expect(productsGrantedBy({ kind: 'membership', audience: 'adult', interval: 'month' }, policy)).toEqual(want);
     expect(productsGrantedBy({ kind: 'membership', audience: 'teen', interval: 'month' }, policy)).toEqual(want);
+  });
+
+  it('a membership never grants the dunking 8-week program product (that stays a separate one-time buy)', () => {
+    for (const membershipIncludesCourses of [false, true]) {
+      const grants = productsGrantedBy({ kind: 'membership', audience: 'adult', interval: 'month' }, { membershipIncludesCourses });
+      expect(grants).not.toContain('dunking-plyometrics-8wk');
+    }
   });
 
   it('the policy never changes what program/course/series/bundle/live/review grant', () => {
