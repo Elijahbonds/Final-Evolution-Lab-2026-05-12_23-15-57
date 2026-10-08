@@ -10,12 +10,31 @@ import { SCREEN_CONTACT_EMAIL } from '../screen/copy';
 export const BUSINESS_LEGAL_NAME = 'Final Evolution LLC';
 
 /**
- * The business mailing address. This is the literal placeholder the store terms (store-terms-2026-10-04) already
- * print; the real business address (never a home/street address) is filled in later by its own change, which moves
- * the version id and "Last updated" date with it. It must keep passing addressRejected() from
- * lib/coach-store/address.ts (no street pattern, not blocked).
+ * Internal marker the policy texts (lib/policies.ts) carry where the mailing address goes. It is never shown to a
+ * user: the legal pages swap it for REAL_MAILING_ADDRESS or drop the line at render time. The value stays fixed
+ * because the policy fingerprint (lib/policies.test.ts) covers it.
  */
 export const BUSINESS_MAILING_ADDRESS = '[Business mailing address – pending]';
+
+/** The real business mailing address, or null while none is set. While null, every legal page drops the line that would print it. Never a home or street address; set it only with the real business mailbox in its own change. */
+export const REAL_MAILING_ADDRESS: string | null = null;
+
+/** True only for a non-empty (after trim) string. */
+export function isMailingAddressSet(address: string | null | undefined): address is string {
+  return typeof address === 'string' && address.trim().length > 0;
+}
+
+/** Fills the marker with the address, or (while unset) drops every line that would print it. Pure; never throws. */
+export function renderMailingAddress(markdown: string, marker: string, address: string | null): string {
+  if (isMailingAddressSet(address)) return markdown.split(marker).join(address.trim());
+  if (!marker) return markdown;
+  const clause = `, or write to ${BUSINESS_LEGAL_NAME}, ${marker}`;
+  return markdown
+    .split('\n')
+    .map((line) => (line.includes(marker) ? line.split(clause).join('') : line))
+    .filter((line) => !line.includes(marker))
+    .join('\n');
+}
 
 /**
  * The contact address for legal, privacy and support mail. Re-exported from lib/screen/copy.ts (the single constant

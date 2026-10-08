@@ -19,6 +19,7 @@ export function BundleMissingParts({
   errors,
   auth,
   renderAuth,
+  termsAgreed = false,
 }: {
   owned: readonly OwnedBundlePart[];
   missing: readonly BundlePartWithListing[];
@@ -28,6 +29,8 @@ export function BundleMissingParts({
   /** STORE-SIGNIN-RETURN: per-part 401/403 outcome; rendered through renderAuth so the copy lives in book-form. */
   auth?: Readonly<Record<string, PartAuthState>>;
   renderAuth?: (part: BundlePartWithListing, state: PartAuthState) => React.ReactNode;
+  /** STORE-TERMS T6: every per-part Buy button stays disabled until the buyer ticks the terms box in book-form. */
+  termsAgreed?: boolean;
 }) {
   const allOwned = missing.length === 0;
   return (
@@ -60,7 +63,7 @@ export function BundleMissingParts({
                     type="button"
                     aria-label={`Buy ${title}, ${formatCents(priceCents as number)}`}
                     aria-busy={busy}
-                    disabled={busy}
+                    disabled={busy || !termsAgreed}
                     className="rounded-lg bg-cyan-300 px-3 py-1 text-xs font-bold text-black disabled:opacity-60"
                     onClick={() => onBuy(part)}
                   >

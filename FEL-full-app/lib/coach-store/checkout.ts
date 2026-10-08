@@ -15,6 +15,7 @@ import { shareWithCoachAllowed } from './rescreen';
 import { openSlots, type WeeklyWindow } from './slots';
 import { stripeTestGate } from './stripeMode';
 import { newUnlockCode } from './teen';
+import { STORE_TERMS_VERSION } from '../store-terms';
 
 export interface CheckoutBody {
   listingId?: unknown;
@@ -25,6 +26,10 @@ export interface CheckoutBody {
   painYes?: unknown;
   note?: unknown;
   shareWithCoach?: unknown;
+  /** STORE-TERMS: the buyer's terms tick. Must be true (the box is required). */
+  termsAccepted?: unknown;
+  /** STORE-TERMS: the terms version the buyer ticked at checkout. Must equal the current version. */
+  termsVersion?: unknown;
 }
 
 function windowsOf(value: unknown): WeeklyWindow[] {
@@ -61,6 +66,12 @@ export async function startCheckout(userId: string, body: CheckoutBody, origin: 
   const gate = stripeTestGate();
   // STORE-READY B2: a not-ok gate is 409 store_closed BEFORE getStripe() can throw for a missing key.
   if (!gate.ok) return storeClosed(gate.reason);
+  // STORE-TERMS (T4): the server is the terms gate. A missing tick (termsAccepted not true) OR a version
+  // that is not the current one is a 409 terms_required BEFORE any Stripe call (and after the store_closed
+  // answers above, which still win). The 409 body names the current version under the `version` key.
+  if (body.termsAccepted !== true || body.termsVersion !== STORE_TERMS_VERSION) {
+    return NextResponse.json({ error: 'terms_required', version: STORE_TERMS_VERSION }, { status: 409 });
+  }
   if (!(await isVerifiedAdult(prisma, userId))) {
     return NextResponse.json({ error: 'adults_only' }, { status: 403 });
   }
@@ -425,6 +436,10 @@ function meta(userId: string, rowId: string, kind: string, beneficiary: string, 
     rowId,
     kind,
     beneficiary,
+    // STORE-TERMS-2: the terms version the buyer agreed to, saved with the purchase so a Dashboard
+    // refund/dispute (and the read-back log) can say which text was accepted. Read-back is a log, never a
+    // block: a paid session/subscription with a missing or old version still fulfils exactly as today.
+    terms_version: STORE_TERMS_VERSION,
     ...(referrerUserId ? { referrerUserId } : {}),
   };
 }
