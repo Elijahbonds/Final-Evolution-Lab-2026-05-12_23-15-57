@@ -14,6 +14,7 @@ import {
   type ReferralSource,
 } from './money';
 import { invoiceChargeOrIntent, invoiceSubscriptionId, subscriptionPeriodEndUnix } from './stripeShapes';
+import { STORE_TERMS_VERSION } from '../store-terms';
 
 type Meta = Record<string, string>;
 
@@ -50,6 +51,25 @@ export function coachStoreSessionMeta(obj: {
   };
   if (meta.product !== 'COACH_STORE') return null;
   return meta;
+}
+
+// STORE-TERMS-3 (T5): READ-BACK IS A LOG, NEVER A BLOCK. The terms version saved on a checkout's Stripe
+// metadata is read back at fulfilment so an old or missing version is VISIBLE, but a paid session or
+// subscription still fulfils exactly as today — a stale terms_version never withholds a paid grant.
+export type TermsVersionStatus = 'current' | 'old' | 'missing';
+
+/** The read-back status of the terms_version a checkout carried (from its coach-store metadata). */
+export function termsVersionStatus(meta: Meta | null | undefined): TermsVersionStatus {
+  const v = meta?.terms_version;
+  if (typeof v !== 'string' || v === '') return 'missing';
+  return v === STORE_TERMS_VERSION ? 'current' : 'old';
+}
+
+/** Log the read-back; returns the status so the caller can count it. Never throws, never blocks. */
+export function logTermsVersionReadBack(kind: string, rowId: string, meta: Meta | null | undefined): TermsVersionStatus {
+  const status = termsVersionStatus(meta);
+  console.warn(`[coach-store] terms_version read-back row=${rowId} kind=${kind} status=${status}`);
+  return status;
 }
 
 /** Fulfilment ignores event.livemode. A test-mode build still records a coach-store event that Stripe marked live, and a live event is not rejected for the rest of the webhook. */
@@ -146,6 +166,9 @@ async function onCheckoutSession(session: Stripe.Checkout.Session, meta: Meta, _
   // lazily so this module never pays for the verify import graph outside this one call.
   const { verifyIdempotencyKey } = await import('@/lib/stripe/verify-checkout');
   const idempotencyKey = verifyIdempotencyKey(session.id);
+  // STORE-TERMS-3 (T5): read the terms_version this checkout carried back and LOG it. A paid session with a
+  // missing or old terms_version still fulfils exactly as today — the log is never a block.
+  logTermsVersionReadBack('checkout', meta.rowId, meta);
   const booking = await prisma.booking.findUnique({ where: { id: meta.rowId } });
   if (booking) {
     if (booking.status === 'PAID') {

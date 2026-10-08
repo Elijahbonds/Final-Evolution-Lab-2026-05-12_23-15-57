@@ -34,7 +34,7 @@ import { createHash, timingSafeEqual } from 'node:crypto';
 import type Stripe from 'stripe';
 import { prisma } from '@/lib/db';
 import { verifyIdempotencyKey, isPaidSession } from '@/lib/stripe/verify-checkout';
-import { coachStoreSessionMeta, fulfilCoachStoreCheckout } from './webhook';
+import { coachStoreSessionMeta, fulfilCoachStoreCheckout, termsVersionStatus } from './webhook';
 import { invoiceChargeOrIntent, invoiceSubscriptionId, subscriptionPeriodEndUnix } from './stripeShapes';
 
 export const RECONCILE_SECRET_HEADER = 'x-coach-store-reconcile-secret';
@@ -260,6 +260,9 @@ export async function reconcileCoachStore(input: { now: Date; stripe: Stripe }):
           product: 'COACH_STORE', rowId: row.id,
           kind: row.kind === 'booking' ? 'live_1on1' : 'program', beneficiary: 'self',
         } as Record<string, string>;
+        // STORE-TERMS-3 (T5): read the terms_version back and LOG it. A paid session or subscription with a
+        // missing or old terms_version still fulfils exactly as today — the log is never a block.
+        console.warn(`[coach-store] terms_version read-back row=${row.id} kind=${row.kind} status=${termsVersionStatus(meta)}`);
         const outcome = await fulfilCoachStoreCheckout(session, { ...meta, rowId: row.id }, verifyIdempotencyKey(session.id));
         if (outcome === 'refund_due') counts.refundDue++;
         else counts.fulfilled++;

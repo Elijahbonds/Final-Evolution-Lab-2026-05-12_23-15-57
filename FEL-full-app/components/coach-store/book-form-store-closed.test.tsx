@@ -67,7 +67,7 @@ describe('STORE-TERMS-2 book-form: required, unticked-on-load terms checkbox', (
   });
 
   it('a submit with the box unticked stops client-side with a friendly message (source)', () => {
-    expect(src).toContain("if (!termsAgreed) { setError('Please agree to the store terms to continue.'); return; }");
+    expect(src).toContain('if (!termsAgreed) { setError(TERMS_REQUIRED_NOTICE); return; }');
   });
 
   it('the POST sends termsAccepted + the current termsVersion (source)', () => {
@@ -79,5 +79,37 @@ describe('STORE-TERMS-2 book-form: required, unticked-on-load terms checkbox', (
   it('a server 409 terms_required re-prompts in place (source)', () => {
     expect(src).toContain("json.error === 'terms_required'");
     expect(src).toContain("return 'terms_required'");
+  });
+});
+
+// STORE-TERMS-3 (T6): the checkbox is the briefed copy, and the buy and buyPart buttons are DISABLED until
+// the box is ticked. The friendly notice is the shared TERMS_REQUIRED_NOTICE constant.
+describe('STORE-TERMS-3 book-form: briefed label + buttons disabled until ticked (T6)', () => {
+  it('the checkbox label is the briefed copy linking to /store-terms', () => {
+    expect(src).toContain('I have read and agree to the');
+    expect(src).toContain('Store Terms &amp; Refund Policy');
+    expect(src).toContain('href="/store-terms"');
+    const html = render({ kind: 'video_review' });
+    expect(html).toContain('I have read and agree to the');
+    expect(html).toContain('Store Terms &amp; Refund Policy');
+    expect(html).toContain('/store-terms');
+  });
+
+  it('the notice copy is the shared TERMS_REQUIRED_NOTICE constant', () => {
+    expect(src).toContain("export const TERMS_REQUIRED_NOTICE = 'Please read and agree to the store terms to continue.'");
+    expect(src).not.toContain('Please agree to the store terms to continue.');
+  });
+
+  it('the main buy button is disabled until the box is ticked (source + first paint)', () => {
+    expect(src).toContain('disabled={!termsAgreed}');
+    // Unticked on load -> the continue/buy button renders disabled.
+    const html = render({ kind: 'video_review' });
+    expect(html).toMatch(/<button[^>]*disabled[^>]*>/);
+  });
+
+  it('a bundle-part buy (buyPart) is also gated on the tick, via buyDisabled', () => {
+    expect(src).toContain('buyDisabled={!termsAgreed}');
+    // buyPart still stops client-side with the friendly notice before the POST.
+    expect(src).toContain('if (!termsAgreed) { setError(TERMS_REQUIRED_NOTICE); return; }');
   });
 });

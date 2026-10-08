@@ -202,7 +202,7 @@ describe('B2 key/flag matrix on the coach-store checkout route', () => {
     process.env.STRIPE_SECRET_KEY = 'sk_live_fake';
     process.env.COACH_STORE_LIVE = '1';
     seedSellableMembership();
-    const r = await read(await coachStoreCheckout(req({ listingId: 'listing-membership', termsVersion: STORE_TERMS_VERSION })));
+    const r = await read(await coachStoreCheckout(req({ listingId: 'listing-membership', termsAccepted: true, termsVersion: STORE_TERMS_VERSION })));
     expect(r.status).toBe(200);
     expect(h.sessionsCreate).toHaveLength(1);
     // B3: the success URL is built from the NEXTAUTH_URL server constant, not the request's evil Origin.
@@ -213,7 +213,7 @@ describe('B2 key/flag matrix on the coach-store checkout route', () => {
   it('test key -> 200 unchanged (sessions.create called)', async () => {
     process.env.STRIPE_SECRET_KEY = 'sk_test_fake';
     seedSellableMembership();
-    const r = await read(await coachStoreCheckout(req({ listingId: 'listing-membership', termsVersion: STORE_TERMS_VERSION })));
+    const r = await read(await coachStoreCheckout(req({ listingId: 'listing-membership', termsAccepted: true, termsVersion: STORE_TERMS_VERSION })));
     expect(r.status).toBe(200);
     expect(h.sessionsCreate).toHaveLength(1);
   });
@@ -221,7 +221,7 @@ describe('B2 key/flag matrix on the coach-store checkout route', () => {
   it('terms_version is saved in the Stripe session metadata on success', async () => {
     process.env.STRIPE_SECRET_KEY = 'sk_test_fake';
     seedSellableMembership();
-    await read(await coachStoreCheckout(req({ listingId: 'listing-membership', termsVersion: STORE_TERMS_VERSION })));
+    await read(await coachStoreCheckout(req({ listingId: 'listing-membership', termsAccepted: true, termsVersion: STORE_TERMS_VERSION })));
     expect(h.sessionsCreate[0].metadata?.terms_version).toBe(STORE_TERMS_VERSION);
     // ...and on the subscription metadata too (membership bills through its invoice).
     expect(h.sessionsCreate[0].subscription_data?.metadata?.terms_version).toBe(STORE_TERMS_VERSION);
@@ -239,7 +239,7 @@ describe('STORE-TERMS-2 terms gate (409 terms_required, before any Stripe call)'
     const r = await read(await coachStoreCheckout(req({ listingId: 'listing-membership' })));
     expect(r.status).toBe(409);
     expect(r.json.error).toBe('terms_required');
-    expect(r.json.termsVersion).toBe(STORE_TERMS_VERSION);
+    expect(r.json.version).toBe(STORE_TERMS_VERSION);
     expect(h.sessionsCreate).toHaveLength(0);
   });
 
@@ -260,9 +260,64 @@ describe('STORE-TERMS-2 terms gate (409 terms_required, before any Stripe call)'
   });
 
   it('the correct version passes the gate and reaches Stripe', async () => {
-    const r = await read(await coachStoreCheckout(req({ listingId: 'listing-membership', termsVersion: STORE_TERMS_VERSION })));
+    const r = await read(await coachStoreCheckout(req({ listingId: 'listing-membership', termsAccepted: true, termsVersion: STORE_TERMS_VERSION })));
     expect(r.status).toBe(200);
     expect(h.sessionsCreate).toHaveLength(1);
+  });
+});
+
+// ── STORE-TERMS-3 (T4): the FULL server terms gate — a missing tick (termsAccepted) AND a wrong version
+// both fail, and the 409 body names the current version under the `version` key (not termsVersion) ──────────
+describe('STORE-TERMS-3 full server terms gate (termsAccepted + termsVersion, 409 body key `version`)', () => {
+  beforeEach(() => {
+    process.env.STRIPE_SECRET_KEY = 'sk_test_fake';
+    seedSellableMembership();
+  });
+
+  it('termsAccepted true + current version passes the gate and reaches Stripe', async () => {
+    const r = await read(await coachStoreCheckout(req({ listingId: 'listing-membership', termsAccepted: true, termsVersion: STORE_TERMS_VERSION })));
+    expect(r.status).toBe(200);
+    expect(h.sessionsCreate).toHaveLength(1);
+  });
+
+  it('no tick at all (termsAccepted missing) -> 409 terms_required, no Stripe call', async () => {
+    const r = await read(await coachStoreCheckout(req({ listingId: 'listing-membership', termsVersion: STORE_TERMS_VERSION })));
+    expect(r.status).toBe(409);
+    expect(r.json.error).toBe('terms_required');
+    expect(r.json.version).toBe(STORE_TERMS_VERSION);
+    expect(h.sessionsCreate).toHaveLength(0);
+  });
+
+  it('termsAccepted false (explicitly unticked) -> 409 terms_required, no Stripe call', async () => {
+    const r = await read(await coachStoreCheckout(req({ listingId: 'listing-membership', termsAccepted: false, termsVersion: STORE_TERMS_VERSION })));
+    expect(r.status).toBe(409);
+    expect(r.json.error).toBe('terms_required');
+    expect(r.json.version).toBe(STORE_TERMS_VERSION);
+    expect(h.sessionsCreate).toHaveLength(0);
+  });
+
+  it('a tick on the WRONG (old) version -> 409 terms_required naming the CURRENT version', async () => {
+    const r = await read(await coachStoreCheckout(req({ listingId: 'listing-membership', termsAccepted: true, termsVersion: 'store-terms-OLD' })));
+    expect(r.status).toBe(409);
+    expect(r.json.error).toBe('terms_required');
+    expect(r.json.version).toBe(STORE_TERMS_VERSION);
+    expect(h.sessionsCreate).toHaveLength(0);
+  });
+
+  it('a tick with NO version -> 409 terms_required', async () => {
+    const r = await read(await coachStoreCheckout(req({ listingId: 'listing-membership', termsAccepted: true })));
+    expect(r.status).toBe(409);
+    expect(r.json.error).toBe('terms_required');
+    expect(r.json.version).toBe(STORE_TERMS_VERSION);
+    expect(h.sessionsCreate).toHaveLength(0);
+  });
+
+  it('the 409 body key is `version`, never `termsVersion`', async () => {
+    const r = await read(await coachStoreCheckout(req({ listingId: 'listing-membership' })));
+    expect(r.status).toBe(409);
+    expect(r.json.error).toBe('terms_required');
+    expect(r.json.version).toBe(STORE_TERMS_VERSION);
+    expect('termsVersion' in r.json).toBe(false);
   });
 });
 
