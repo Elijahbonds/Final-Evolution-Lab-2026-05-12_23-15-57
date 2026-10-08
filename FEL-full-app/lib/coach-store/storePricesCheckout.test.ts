@@ -5,6 +5,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { newSpyDb, spyPrisma, type SpyDb } from '@/tests/helpers/writeSpyDb';
 import { storePriceByKey } from './storePrices';
+import { STORE_TERMS_VERSION } from '@/lib/store-terms';
 import { itemKeyFor } from './manifest';
 
 const h = vi.hoisted(() => ({
@@ -79,8 +80,11 @@ function seedInstructor() {
   });
 }
 
+// STORE-TERMS-2: every checkout helper now ticks the current terms, exactly as the real book-form does —
+// the server gate (409 terms_required) is covered on its own in storeClosed.test.ts. These suites test
+// bundle/membership/adult rules, so they send the tick to reach the behaviour under test.
 async function checkout(listingId: string, body: Record<string, unknown> = {}) {
-  const res = await startCheckout(BUYER_ID, { listingId, ...body }, 'https://fel.test');
+  const res = await startCheckout(BUYER_ID, { listingId, termsAccepted: true, termsVersion: STORE_TERMS_VERSION, ...body }, 'https://fel.test');
   return { status: res.status, json: await res.json() };
 }
 

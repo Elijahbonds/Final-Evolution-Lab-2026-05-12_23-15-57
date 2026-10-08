@@ -8,6 +8,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { storePriceByKey } from './storePrices';
 import { itemKeyFor } from './manifest';
+import { STORE_TERMS_VERSION } from '@/lib/store-terms';
 
 const h = vi.hoisted(() => ({
   db: null as any,
@@ -152,7 +153,8 @@ function seedStore() {
 }
 
 async function buy(listingId: string) {
-  const res = await startCheckout(BUYER, { listingId }, 'https://fel.test');
+  // STORE-TERMS-2: tick the current terms like the real book-form (the terms gate is covered in storeClosed.test.ts).
+  const res = await startCheckout(BUYER, { listingId, termsAccepted: true, termsVersion: STORE_TERMS_VERSION }, 'https://fel.test');
   return { status: res.status, json: await res.json() };
 }
 
