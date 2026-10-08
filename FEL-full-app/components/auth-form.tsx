@@ -145,10 +145,6 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
         setLoading(false);
         return;
       }
-      if (mode === 'signup' && challengeCode) {
-        router.replace(challengeReturnPath(challengeCode));
-        return;
-      }
       // Land them in the thing they said they came for, not on a menu about it.
       // S-16: a ?next= that is a same-origin path wins, on login and on signup. Absolute and
       // protocol-relative URLs are ignored. A challenge code returns to /c/<code> first.

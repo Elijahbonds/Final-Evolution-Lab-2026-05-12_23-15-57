@@ -13,6 +13,7 @@
 
 import { useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
+import Link from 'next/link';
 import { X, Send, Loader2, Sparkles, Maximize2 } from 'lucide-react';
 
 interface Msg { id: string; role: 'user' | 'cell'; content: string }

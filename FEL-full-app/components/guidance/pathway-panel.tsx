@@ -48,17 +48,15 @@ export function PathwayPanelError({ onRetry }: { onRetry?: () => void }) {
 export function PathwayPanel() {
   const [data, setData] = useState<Payload | null>(null);
   const [failed, setFailed] = useState(false);
-  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let live = true;
-    setFailed(false);
     fetch('/api/guidance')
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error('no'))))
       .then((j) => { if (live) setData(j); })
       .catch(() => { if (live) setFailed(true); });
     return () => { live = false; };
-  }, [attempt]);
+  }, []);
 
   if (failed) return <PathwayPanelError onRetry={() => window.location.reload()} />;
   if (!data) return <div className="h-40 animate-pulse rounded-2xl bg-white/[0.03]" />;

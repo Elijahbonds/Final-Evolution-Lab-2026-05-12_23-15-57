@@ -19,7 +19,7 @@ const TABS = [
   { key: 'send', label: 'Send', icon: Send },
   { key: 'chat', label: 'Coach', icon: MessageSquare },
   { key: 'catalogue', label: 'Exercises', icon: BookOpen },
-  { key: 'form', label: 'Form Check (Soon)', icon: Video },
+  { key: 'form', label: 'Form Check', icon: Video },
 ] as const;
 
 const COACH_ONLY: readonly string[] = ['clients', 'send'];
