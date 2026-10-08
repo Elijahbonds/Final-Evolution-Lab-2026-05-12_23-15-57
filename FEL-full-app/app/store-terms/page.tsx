@@ -1,24 +1,26 @@
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { PublicTopBar, PublicLegalFooter } from '@/components/public-chrome';
-import { STORE_TERMS_SECTIONS, STORE_TERMS_VERSION, withBusinessAddress } from '@/lib/store-terms';
+import { STORE_TERMS_SECTIONS, STORE_TERMS_VERSION, BUSINESS_ADDRESS_TOKEN } from '@/lib/store-terms';
 import { renderStoreTerms } from '@/lib/store-terms/render';
-import { BUSINESS_MAILING_ADDRESS } from '@/lib/legal/business';
+import { REAL_MAILING_ADDRESS, isMailingAddressSet, renderMailingAddress } from '@/lib/legal/business';
 
 export const dynamic = 'force-dynamic';
 
 // STORE-TERMS: the public coach-store terms page (Terms of Service + Refund & Cancellation Policy,
 // store-terms-2026-10-04). Public route: legal pages must be reachable logged-out on every hostname (M12.8).
-// The business address is NEVER typed here — the {BUSINESS_ADDRESS} token in the approved text is filled
-// from lib/legal/business.ts at render time.
+// The address is NEVER typed here. While REAL_MAILING_ADDRESS (lib/legal/business.ts) is unset, the lines that
+// would print it are dropped at render time, along with the mailing-address section; once set, the
+// {BUSINESS_ADDRESS} token in the approved text is filled from it.
 // STORE-TERMS-3 (T2): the markdown goes through the SAFE renderer (lib/store-terms/render.ts), which
 // escapes every text cell, emits only "/" links, and wraps each section in a stable <section id> anchor.
 export default async function StoreTermsPage() {
   const session = await getServerSession(authOptions);
-  // Fill the address token section-by-section, then render each section with its anchor id.
-  const sections = STORE_TERMS_SECTIONS.map((s) => ({
+  // Fill (or drop) the address token section-by-section, then render each section with its anchor id.
+  const addressSet = isMailingAddressSet(REAL_MAILING_ADDRESS);
+  const sections = STORE_TERMS_SECTIONS.filter((s) => addressSet || s.id !== 'mailing-address').map((s) => ({
     ...s,
-    markdown: withBusinessAddress(s.markdown, BUSINESS_MAILING_ADDRESS),
+    markdown: renderMailingAddress(s.markdown, BUSINESS_ADDRESS_TOKEN, REAL_MAILING_ADDRESS),
   }));
   const html = renderStoreTerms(sections);
   return (

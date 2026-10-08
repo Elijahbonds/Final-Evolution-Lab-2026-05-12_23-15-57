@@ -24,16 +24,17 @@ import StoreTermsPage from '@/app/store-terms/page';
 const pageSrc = readFileSync('app/store-terms/page.tsx', 'utf8');
 
 describe('(e) the /store-terms page', () => {
-  it('renders the full approved text with the address token filled and the version shown', async () => {
+  it('renders the full approved text with the address line hidden (no address set) and the version shown', async () => {
     // StoreTermsPage is an async server component; await its JSX (React 18 SSR can't take the Promise as a child).
     const jsx = await (StoreTermsPage as unknown as () => Promise<React.ReactElement>)();
     const html = renderToStaticMarkup(jsx);
     // The approved copy is present.
     expect(html).toContain('Terms of Service and Refund');
     expect(html).toContain('REFUND');
-    // The business address is filled at render time — never left as the token, never a typed literal.
+    // No address is set, so the address line is hidden: no token, no placeholder, no "pending".
     expect(html).not.toContain('{BUSINESS_ADDRESS}');
-    expect(html).toContain(escapeHtml(BUSINESS_MAILING_ADDRESS));
+    expect(html).not.toContain(escapeHtml(BUSINESS_MAILING_ADDRESS));
+    expect(html).not.toMatch(/pending/i);
     expect(html).toContain(`Store terms version: ${STORE_TERMS_VERSION}`);
   });
 
