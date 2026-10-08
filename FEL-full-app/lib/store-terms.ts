@@ -49,3 +49,19 @@ export const BUSINESS_ADDRESS_TOKEN = '{BUSINESS_ADDRESS}';
 export function withBusinessAddress(markdown: string, address: string): string {
   return markdown.split(BUSINESS_ADDRESS_TOKEN).join(address);
 }
+
+/**
+ * STORE-TERMS T5 read-back (log only): which terms version a paid Stripe object's metadata carries.
+ * 'current' = terms_version equals STORE_TERMS_VERSION; 'stale' = any other non-empty string;
+ * 'missing' = no metadata, not an object, or terms_version absent / not a string / ''. Pure; never throws.
+ */
+export function termsVersionStatus(metadata: unknown): 'current' | 'missing' | 'stale' {
+  try {
+    if (!metadata || typeof metadata !== 'object') return 'missing';
+    const v = (metadata as Record<string, unknown>).terms_version;
+    if (typeof v !== 'string' || v === '') return 'missing';
+    return v === STORE_TERMS_VERSION ? 'current' : 'stale';
+  } catch {
+    return 'missing';
+  }
+}

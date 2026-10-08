@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db';
 import { postTransaction } from '@/lib/ledger';
 import { getStripe } from '@/lib/stripe';
 import { PLATFORM_FEE_RATE } from '@/lib/fees';
+import { termsVersionStatus } from '@/lib/store-terms';
 import { isVerifiedAdult } from './adult';
 import { slotStillFree } from './slotCheck';
 import {
@@ -83,6 +84,8 @@ export async function fulfilCoachStoreCheckout(
   meta: Meta,
   idempotencyKey: string,
 ): Promise<FulfilOutcome> {
+  const termsStatus = termsVersionStatus(session.metadata);
+  if (termsStatus !== 'current') console.warn(`[coach-store] terms_version ${termsStatus}`, meta.rowId);
   return onCheckoutSession(session, meta, idempotencyKey);
 }
 

@@ -33,6 +33,7 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 import type Stripe from 'stripe';
 import { prisma } from '@/lib/db';
+import { termsVersionStatus } from '@/lib/store-terms';
 import { verifyIdempotencyKey, isPaidSession } from '@/lib/stripe/verify-checkout';
 import { coachStoreSessionMeta, fulfilCoachStoreCheckout } from './webhook';
 import { invoiceChargeOrIntent, invoiceSubscriptionId, subscriptionPeriodEndUnix } from './stripeShapes';
@@ -189,6 +190,8 @@ async function syncSubscriptionRow(sub: Stripe.Subscription): Promise<'renewed' 
     select: { id: true, status: true },
   });
   if (!access) return null;
+  const termsStatus = termsVersionStatus(sub.metadata);
+  if (termsStatus !== 'current') console.warn(`[coach-store] terms_version ${termsStatus}`, access.id);
   const endUnix = subscriptionPeriodEndUnix(sub);
   const periodEnd = endUnix != null ? new Date(endUnix * 1000) : null;
   const status = sub.status;
