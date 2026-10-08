@@ -43,6 +43,18 @@ describe('the safety copy (the research draft, verbatim)', () => {
     expect(COPY.NOT_SAVED_TITLE).toBe('Your results aren\'t saved. Run the screen again');
     expect(COPY.TRACKING_LOSS_PROMPT).toBe('Step back into the light');
   });
+
+  it('SCREEN A: the take-off tap, the pain check, the per-cause fixes, the beep line and the capped-restart line', () => {
+    expect(COPY.TAKEOFF_QUESTION).toBe('Which foot do you take off from when you jump?');
+    expect(COPY.TAKEOFF_OPTIONS.map((o) => [o.side, o.label])).toEqual([['left', 'Left'], ['right', 'Right'], [null, 'Not sure']]);
+    expect(COPY.PAIN_CHECK_LINE).toBe('Any pain in that one? Tap yes or no when you walk back.');
+    expect(COPY.BEEP_MEANS_COUNTED).toBe('Beep means it counted.');
+    expect(COPY.RESTART_WAIT_LINE).toBe("Take your time. Walk back into the shot when you're ready.");
+    expect(COPY.CALIBRATE_FRONT_LINE).toBe('Stand still, arms down, while I measure you. Three, two, one.');
+    expect(COPY.CALIBRATE_SIDE_LINE).toBe('Stay still, side-on, while I measure you. Two, one.');
+    // one short fix per framing cause but 'turned' (the runner's facing cue covers it, side-aware)
+    expect(Object.keys(COPY.FRAMING_FIX_LINES).sort()).toEqual(['cutOffBottom', 'cutOffTop', 'dim', 'noBody', 'offCentre', 'tooClose', 'tooFar']);
+  });
 });
 
 describe('Red says "priority to work on", never anything harsher', () => {
