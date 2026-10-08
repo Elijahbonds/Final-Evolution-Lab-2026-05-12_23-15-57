@@ -44,13 +44,19 @@ function sceneModeId(meshes: AbstractMesh[]): string | undefined {
  * not carry falls to the sport default too, then to the slot's first garment so nobody plays naked. The shown garment
  * gets its runtime read fixes (garmentFixes.ts). Returns kit meshes found (0 = no kit).
  */
-export function applyKit(meshes: AbstractMesh[], wardrobe: Wardrobe | null | undefined, modeId: string | null = null): number {
+export function applyKit(meshes: AbstractMesh[], wardrobe: Wardrobe | null | undefined, modeId: string | null = null, opts: KitOptions = {}): number {
   const bySlot = new Map<KitSlot, AbstractMesh[]>();
   for (const m of meshes) { const k = kitOf(m.name); if (!k) continue; (bySlot.get(k.slot) ?? bySlot.set(k.slot, []).get(k.slot)!).push(m); }
   if (!bySlot.size) return 0;
   const sport = sportKitDefault(modeId ?? sceneModeId(meshes));
+  // CREATOR-PLAN phase 4e: the slots the player's code-built clothes cover show no kit garment at all (not the Closet pick,
+  // not the sport's uniform); remembered on the body's node so a kit pack that lands later stays hidden too
+  const covered = opts.covered ?? new Set<KitSlot>();
+  const owner = kitOwner(meshes);
+  if (owner) coveredSlots.set(owner, covered);
   let found = 0;
   for (const [slot, list] of bySlot) {
+    if (covered.has(slot)) { for (const m of list) { m.isVisible = false; found++; syncGarmentVisibility(m); } continue; }
     const byId = (id: string | null | undefined) => (id ? list.find((m) => kitOf(m.name)!.itemId === id) : undefined);
     const want = wardrobe?.[slot] ?? sport[slot] ?? null;
     const show = byId(wardrobe?.[slot]) ?? byId(sport[slot]) ?? list[0];
@@ -64,6 +70,22 @@ export function applyKit(meshes: AbstractMesh[], wardrobe: Wardrobe | null | und
   const body = meshes.find((m) => isBodyMesh(m.name));
   if (body) { shareBodyBounds(body, meshes); scheduleBodyMask(meshes); }
   return found;
+}
+
+/** CREATOR-PLAN phase 4e (2026-10-06): how applyKit is told what the player's code-built clothes cover. */
+export interface KitOptions {
+  /** kit slots a code-built piece replaces: every garment there is hidden (lib/creator/look/clothes.clothKitSlots) */
+  covered?: ReadonlySet<KitSlot>;
+}
+/** The node a body's garments hang under (the kit's `Human.rig`), which the covered slots are remembered on. */
+function kitOwner(meshes: readonly AbstractMesh[]): object | null {
+  for (const m of meshes) if (kitOf(m.name)) return m.parent ?? m;
+  return null;
+}
+const coveredSlots = new WeakMap<object, ReadonlySet<KitSlot>>();
+/** Is this kit slot covered by code-built clothes on the body `sibling` belongs to (as applyKit last decided)? */
+export function kitSlotCovered(sibling: AbstractMesh, slot: KitSlot): boolean {
+  return coveredSlots.get(sibling.parent ?? sibling)?.has(slot) ?? false;
 }
 
 /**
@@ -152,9 +174,10 @@ async function attachKitPack(sibling: AbstractMesh, slot: KitSlot, itemId: strin
   mesh.position.copyFrom(sibling.position); mesh.rotationQuaternion = sibling.rotationQuaternion?.clone() ?? null; mesh.rotation.copyFrom(sibling.rotation); mesh.scaling.copyFrom(sibling.scaling);
   mesh.isPickable = false;
   mesh.onDisposeObservable.add(() => packSkeleton.dispose());
-  // swap in: the fallback the slot showed goes invisible, the pack garment takes the slot's fixes
+  // swap in: the fallback the slot showed goes invisible, the pack garment takes the slot's fixes — unless code-built clothes
+  // took the slot while the pack loaded (phase 4e): then it stays hidden, ready for when they come off
   for (const m of list) { m.isVisible = false; syncGarmentVisibility(m); }
-  list.push(mesh); mesh.isVisible = true;
+  list.push(mesh); mesh.isVisible = !kitSlotCovered(sibling, slot);
   // pack garments are fitted with ease in Blender (fit-garment.py) — the runtime inflate is a 15k-vertex CPU rewrite per spawn,
   // and football spawns defenders all game (measured 44–50 fps with it, 2026-09-05); shoes still take their fold
   if (slot === 'shoes') fixGarment(mesh, slot, itemId);

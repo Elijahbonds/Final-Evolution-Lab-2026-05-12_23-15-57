@@ -1,0 +1,12 @@
+{
+  "formatVersion": 1,
+  "placeholder": true,
+  "hub": { "worldId": "hub", "title": "[PLACEHOLDER] The Hub" },
+  "cast": {
+    "guide": { "name": "[PLACEHOLDER] Guide" },
+    "warden": { "name": "[PLACEHOLDER] Warden" }
+  },
+  "chapters": [
+    { "id": "ch01", "file": "01-first-gate", "worldId": "w1", "title": "[PLACEHOLDER] Chapter 1 — The First Gate" }
+  ]
+}

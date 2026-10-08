@@ -39,6 +39,21 @@ export function kartHudWords(body: boolean, started: boolean): RideHudWords {
   return { hint: started ? KART_PAD_HINT : KART_PAD_START_HINT, boostHint: PAD_BOOST_HINT };
 }
 
+/** Aero Aces: the pad's words exactly as AeroAcesMode has them, before and after GO. */
+export const AERO_PAD_HINT = 'RT gas · LT brake · A fire · B: roll, back=loop, fwd=split-s · Y: loop, +stick=knife edge · RB boost';
+export const AERO_PAD_START_HINT = 'GAS DOWN ON "2" AND HOLD IT FOR A ROCKET START — ON "3" THE ENGINE BOGS';
+/** A body flies: the arms are the throttle, a bank the steer, raising / lowering them the climb and dive.
+ *  The boost, the fire button and the stunt buttons stay on the pad and the touch deck by design. */
+export const AERO_BODY_HINT = 'Spread your arms for GAS · bank to STEER · raise or lower them to CLIMB and DIVE · BOOST (RB), FIRE (A) and STUNTS (B / Y) on pad / touch';
+export const AERO_BODY_START_HINT = 'ARMS SPREAD ON "2" AND HOLD THEM FOR A ROCKET START — ON "3" THE ENGINE BOGS';
+export const AERO_BODY_BOOST_HINT = 'CLOSE PASSES FILL IT · RB ON PAD / TOUCH';
+
+/** `started`: the race is past GO (before it the hint is the rocket start's). */
+export function aeroHudWords(body: boolean, started: boolean): RideHudWords {
+  if (body) return { hint: started ? AERO_BODY_HINT : AERO_BODY_START_HINT, boostHint: AERO_BODY_BOOST_HINT };
+  return { hint: started ? AERO_PAD_HINT : AERO_PAD_START_HINT, boostHint: PAD_BOOST_HINT };
+}
+
 /** The player ring's glyph puck (visual/PlayerRing: the 'player_tag' plane the harness mounts beside the ring). */
 export const RING_GLYPH_MESH = 'player_tag';
 /** The little of a Babylon mesh this needs — so a test can hand it plain objects. */
@@ -72,4 +87,26 @@ export class RideHudSwitch {
   }
   get isBody(): boolean { return this.body === true; }
   reset(): void { this.body = null; this.since = 0; }
+}
+
+/**
+ * IMPROVE (2026-10-06, skate item 2): the HUD fields that CHANGED since the last publish. Every `setHud` is a React
+ * setState in the board host, and skate pushed its goals, its combo block and its clock every frame — about three
+ * re-renders a frame to repeat the same values. `diff(patch)` answers only the keys whose value moved (or null), so the
+ * mode publishes nothing on a frame where nothing it shows changed. Values compare with `===` (the HUD's are primitives).
+ */
+export class HudDelta {
+  private sent = new Map<string, unknown>();
+  diff<V>(patch: Record<string, V>): Record<string, V> | null {
+    let out: Record<string, V> | null = null;
+    for (const k of Object.keys(patch)) {
+      const v = patch[k];
+      if (this.sent.has(k) && this.sent.get(k) === v) continue;
+      this.sent.set(k, v);
+      (out ??= {})[k] = v;
+    }
+    return out;
+  }
+  /** Forget what was sent (a remount publishes everything again). */
+  reset(): void { this.sent.clear(); }
 }

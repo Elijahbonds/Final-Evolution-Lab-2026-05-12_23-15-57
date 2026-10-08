@@ -16,6 +16,13 @@
 
 import assert from 'node:assert';
 import { ChallengeLinkCore, type ChallengePayload } from '../lib/social/challenge-link-core';
+import {
+  challengeCodeFromReturnPath,
+  challengeLoginHref,
+  challengePlayHref,
+  challengeReturnPath,
+  challengeSignupHref,
+} from '../lib/social/challenge-routes';
 
 let passed = 0;
 function check(name: string, fn: () => void) {
@@ -89,6 +96,29 @@ check('identical mint input -> identical path', () => {
   const a = ChallengeLinkCore.mint(input);
   const b = ChallengeLinkCore.mint(input);
   assert.strictEqual(a.path, b.path, 'deterministic encoding');
+});
+
+// 8. signed-in challenge routing preserves the code on the matching play route
+check('signed-in challenge routing preserves code on the matching play route', () => {
+  assert.strictEqual(challengePlayHref('dunkContest', 'abc 123'), '/play/dunk?c=abc%20123');
+  assert.strictEqual(challengePlayHref('brainBrawl', 'BB-7'), '/play/brain-brawl?c=BB-7');
+  assert.strictEqual(challengePlayHref('hoops1v1', 'ONES'), '/play/onevone?c=ONES');
+  assert.strictEqual(challengePlayHref('velocitykart', 'LEGACY'), '/play/velocity-kart?c=LEGACY');
+  assert.strictEqual(challengePlayHref('aeroaces', 'LEGACY'), '/play/aero-aces?c=LEGACY');
+  assert.strictEqual(challengePlayHref('showDown', 'SD'), '/play/showdown?c=SD');
+  assert.strictEqual(challengePlayHref('unknown-mode', 'x'), null);
+  assert.strictEqual(challengePlayHref('storyMode', 'x'), null);
+  assert.strictEqual(challengePlayHref('training', 'x'), null);
+});
+
+// 9. challenge auth handoff
+check('signup and login handoffs keep the challenge return path', () => {
+  assert.strictEqual(challengeReturnPath('abc 123'), '/c/abc%20123');
+  assert.strictEqual(challengeCodeFromReturnPath('/c/abc%20123'), 'abc 123');
+  assert.strictEqual(challengeCodeFromReturnPath('https://evil.example/c/abc'), null);
+  assert.strictEqual(challengeCodeFromReturnPath('//evil.example/c/abc'), null);
+  assert.strictEqual(challengeSignupHref('abc 123'), '/signup?c=abc%20123');
+  assert.strictEqual(challengeLoginHref('abc 123'), '/login?next=%2Fc%2Fabc%2520123');
 });
 
 console.log(`\n\u2705 challenge-link-core: ${passed} checks passed`);

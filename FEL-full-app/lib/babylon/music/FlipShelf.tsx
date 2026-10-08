@@ -16,6 +16,7 @@ import { FEL_SOURCES, type FlipSource } from './Flip';
 import { loadFlipPack, type FlipPackIndex } from './flipPack';
 import { pdSources } from './pdShelf';
 import { OWN_RIGHTS_TICK, UPLOAD_DOORS, closedDoors, tickedUploadNote } from './uploadPrivacy';
+import { PublishFileAsCard } from '@/components/create/publish-as-card';   // CREATE HUB
 
 /** Everything the shelf offers: FEL's pack, then the owner-signed public-domain entries (none today). */
 export function shelfSources(pd: FlipSource[] = pdSources()): FlipSource[] { return [...FEL_SOURCES, ...pd]; }
@@ -40,6 +41,8 @@ export { OWN_RIGHTS_TICK } from './uploadPrivacy';
  */
 export function uploadHint(doors = UPLOAD_DOORS): string {
   const onDevice = closedDoors(doors).filter((d) => d !== 'offDevice').length === 0;
+  // CREATE HUB (owner 2026-10-06): with the off-device door open, sharing goes through FEL's review queue
+  if (onDevice && doors.offDevice) return 'Your own file only. A song with an upload works on this device, and you can submit it as a soundtrack card: FEL reviews it before anyone else hears it.';
   return onDevice
     ? 'Your own file only. A song with an upload stays on this device — your library, the dance floor and your walk-out work here; sharing it online waits until FEL can review uploads.'
     : 'Your own file only. A song with an upload stays on this device (no publish, walk-out or dance floor) until FEL can review uploads online.';
@@ -54,6 +57,7 @@ export function uploadSourceMeta(fileName: string, now: number): { id: string; l
 /** YOUR FILE behind the tick. `style` = the room's button look. */
 export function UploadPicker({ onFile, style }: { onFile: (f: File) => void; style?: React.CSSProperties }) {
   const [ticked, setTicked] = useState(false);
+  const [lastFile, setLastFile] = useState<File | null>(null);   // CREATE HUB: the ticked file, offered as a soundtrack card
   return (
     <span data-qa="upload-picker" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', flexBasis: '100%' }}>
       <label style={{ fontSize: 12, display: 'inline-flex', gap: 6, alignItems: 'center', cursor: 'pointer', minHeight: 36 }}>
@@ -69,10 +73,17 @@ export function UploadPicker({ onFile, style }: { onFile: (f: File) => void; sty
             e.target.value = '';
             if (!f || !ticked) return;
             setTicked(false);   // every upload is its own statement
+            setLastFile(f);
             onFile(f);
           }} />
       </label>
       <span data-qa="upload-hint" style={{ fontSize: 11, opacity: 0.7, flexBasis: '100%' }}>{UPLOAD_HINT}</span>
+      {/* CREATE HUB (owner 2026-10-06): the owner's review queue is the "online review" decision #15 waited for, so the
+          off-device door is open (uploadPrivacy.ts UPLOAD_DOORS) and the file you ticked can be submitted as a track. */}
+      {lastFile && UPLOAD_DOORS.offDevice && (
+        <PublishFileAsCard discipline="music" qa="flip-publish-card" style={style} entry={{ from: 'flipshelf', title: lastFile.name.replace(/\.[^.]+$/, '') }}
+          file={() => lastFile} meta={{ fileName: lastFile.name, mime: lastFile.type || 'audio/mpeg' }}>SUBMIT THIS FILE AS A SOUNDTRACK (FEL REVIEWS IT)</PublishFileAsCard>
+      )}
     </span>
   );
 }

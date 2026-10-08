@@ -18,6 +18,7 @@
 // All of it is pure so the page, the API and the tests agree on one answer.
 
 import { MODE_INFO, VENUES, canonicalModeKey } from '../game-data';
+import { isUnlistedMode } from '../unlisted-modes';
 
 export type OnboardingPath = 'play' | 'body';
 
@@ -39,7 +40,9 @@ export function isPath(v: unknown): v is OnboardingPath {
  *  before the catalogue took the session keys still opens its game. */
 export function isPlayableMode(key: string | null | undefined): boolean {
   const k = canonicalModeKey(key);
-  return Boolean(k && MODE_INFO[k]?.href);
+  // IRON-PARADISE-OUT (2026-10-03): a parked mode (lib/unlisted-modes.ts) is not a first game — a saved pick or a
+  // creator card naming one falls through to the default instead of landing a new athlete on a redirect.
+  return Boolean(k && !isUnlistedMode(k) && MODE_INFO[k]?.href);
 }
 
 /**
@@ -107,7 +110,9 @@ export function artFor(modeKey: string): string | null {
  * there is one, so a scanned card opens on the game it was scanned for.
  */
 export function carouselOrder(firstGame?: string | null): string[] {
-  const keys = Object.keys(MODE_INFO).filter((k) => MODE_INFO[k]?.href);
+  // IRON-PARADISE-OUT (2026-10-03): the carousel offers listed modes only — parked modes keep their MODE_INFO
+  // row but are never offered.
+  const keys = Object.keys(MODE_INFO).filter((k) => MODE_INFO[k]?.href && !isUnlistedMode(k));
   const withArt = keys.filter((k) => artFor(k));
   const without = keys.filter((k) => !artFor(k));
   const ordered = [...withArt, ...without];

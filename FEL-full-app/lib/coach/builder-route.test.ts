@@ -237,6 +237,7 @@ describe('duplicate carries the structure', () => {
   it('a copied program arrives with its sections, key set, supersets, timers, cues and bands', async () => {
     await buildPlan();
     h.user = 'coach-1';
+    h.store.cc = [{ coachId: 'coach-1', clientId: 'client-2', endedAt: null }];   // owner 2026-10-06: a copy goes to a live roster athlete only
     const res = await duplicatePOST(req('/api/coach/programs/duplicate', { programId: PID, clientIds: ['client-2'], startDate: '2026-10-05T00:00:00.000Z' }));
     expect(res.status).toBe(201);
     const { created } = await res.json() as { created: { clientId: string; programId: string }[] };
@@ -244,6 +245,22 @@ describe('duplicate carries the structure', () => {
     const copy = (await load('coach-1', created[0].programId)).json.program.tree;
     expect(copy.clientId).toBe('client-2');
     expect(copy.blocks[0].sessions[0].exercises.map(rx)).toEqual(src);
+  });
+});
+
+describe('duplicate copies onto the live roster only (owner-approved 2026-10-06, safety)', () => {
+  it('an id off the roster — a real account, an ended athlete, or no account at all — is skipped alike, and nothing is written for it', async () => {
+    h.user = 'coach-1';
+    h.store.user = [{ id: 'client-2' }, { id: 'stranger' }, { id: 'former' }];
+    h.store.cc = [{ coachId: 'coach-1', clientId: 'client-2', endedAt: null }, { coachId: 'coach-1', clientId: 'former', endedAt: new Date('2026-09-01') }, { coachId: 'coach-2', clientId: 'stranger', endedAt: null }];
+    const before = h.store.program.length;
+    const res = await duplicatePOST(req('/api/coach/programs/duplicate', { programId: PID, clientIds: ['client-2', 'stranger', 'former', 'no-such-user'] }));
+    expect(res.status).toBe(201);
+    const out = await res.json() as { created: { clientId: string }[]; skipped: string[] };
+    expect(out.created.map((c) => c.clientId)).toEqual(['client-2']);
+    expect(out.skipped.sort()).toEqual(['former', 'no-such-user', 'stranger']);
+    expect(h.store.program.length).toBe(before + 1);
+    expect(h.store.program.some((p) => ['stranger', 'former', 'no-such-user'].includes(p.clientId))).toBe(false);
   });
 });
 

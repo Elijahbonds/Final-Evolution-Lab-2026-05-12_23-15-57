@@ -83,6 +83,8 @@ export interface FollowConfig {
 
 /** The air cam's full offset (setAir(1)): metres further back, up, and round to the side for a three-quarter view. */
 export const AIR_CAM = { back: 2.2, up: 1.3, side: 2.4 };
+/** How fast the air cam's side swings over when a mode asks for the other side (per second; see setAir). */
+export const AIR_SIDE_EASE = 3;
 
 /**
  * The Hundred's gameplay camera, as a fraction farther than the shoulder (4.0 m) and crowd (6.4 m)
@@ -315,7 +317,11 @@ export class CameraDirector {
   // three-quarter view the moment the wheels leave the ground. `setAir(1)` asks for that framing, `setAir(0)` releases it;
   // the director eases both ways so a small kerb hop never whips the view.
   private airWant = 0; private airK = 0;
-  setAir(k01: number): void { this.airWant = Math.max(0, Math.min(1, k01)); }
+  /** IMPROVE (2026-10-06, skate item 20): which side the three-quarter swing goes — +1 the camera's right (every caller
+   *  before this), −1 its left. Skate's wall ride asks for the wall's OPEN side: on the street wall the right-hand swing
+   *  could put the camera on the wall side, looking through it. Eased, so a change of side swings round, never cuts. */
+  private airSideWant = 1; private airSide = 1;
+  setAir(k01: number, side = 1): void { this.airWant = Math.max(0, Math.min(1, k01)); this.airSideWant = side < 0 ? -1 : 1; }
   get air01(): number { return this.airK; }
 
   /** Current beat scale on the follow distance (1 = no beat). */
@@ -397,6 +403,17 @@ export class CameraDirector {
     const d = this.camera.getDirection(Axis.X); d.y = 0;
     return d.lengthSquared() < 1e-6 ? new Vector3(-1, 0, 0) : d.normalize();
   }
+  /** IMPROVE (2026-10-06, 1v1 #14): forwardFlat into `out` — the same vector, nothing built (a per-frame stick mapping read two new
+   *  vectors a frame through forwardFlat / rightFlat). */
+  forwardFlatToRef(out: Vector3): Vector3 {
+    this.camera.getDirectionToRef(Axis.Z, out); out.y = 0;
+    return out.lengthSquared() < 1e-6 ? out.set(0, 0, -1) : out.normalize();
+  }
+  /** IMPROVE (2026-10-06, 1v1 #14): rightFlat into `out`. */
+  rightFlatToRef(out: Vector3): Vector3 {
+    this.camera.getDirectionToRef(Axis.X, out); out.y = 0;
+    return out.lengthSquared() < 1e-6 ? out.set(-1, 0, 0) : out.normalize();
+  }
 
   constructor(
     private scene: Scene,
@@ -417,25 +434,37 @@ export class CameraDirector {
    */
   public broadcast = 0;
 
-  /** The active preset, blended toward the broadcast framing by `broadcast`. */
+  /** The active preset, blended toward the broadcast framing by `broadcast`, with the mode's tuneFollow overlay on top. */
   private effCfg(): FollowConfig {
     const b = Math.max(0, Math.min(1, this.broadcast));
-    if (b <= 0) return this.cfg;
-    const c = this.cfg;
-    return {
-      ...c,
-      distance: c.distance + 4.0 * b,
-      height: c.height + 6.0 * b,
-      minHeight: c.minHeight + 4.0 * b,
-      lookAhead: c.lookAhead + 6.0 * b,
-      pitchCapDeg: c.pitchCapDeg + 10 * b,
+    const blended = b <= 0 ? this.cfg : {
+      ...this.cfg,
+      distance: this.cfg.distance + 4.0 * b,
+      height: this.cfg.height + 6.0 * b,
+      minHeight: this.cfg.minHeight + 4.0 * b,
+      lookAhead: this.cfg.lookAhead + 6.0 * b,
+      pitchCapDeg: this.cfg.pitchCapDeg + 10 * b,
     };
+    return this.tune ? { ...blended, ...this.tune } : blended;
   }
 
   setPreset(preset: keyof typeof FOLLOW_PRESETS): void {
     this.cfg = FOLLOW_PRESETS[preset] ?? this.cfg;
     this.mode = 'follow';
     this.invalidateBounds();          // a preset change usually means a new venue
+  }
+
+  /**
+   * PER-MODE FOLLOW TUNING (10-phase pass, 2026-10-02): an overlay on the active preset so a mode can own
+   * its chase camera in its own config (racing/kartTune, racing/aeroTune) instead of editing a preset
+   * shared with every other mode. Only the fields given are overlaid — the rest stay the preset's — and
+   * it composes with the broadcast blend (the blend applies to the preset, the overlay on top). Pass
+   * `null` to drop the overlay. Survives setPreset, so re-apply after a preset change if the new preset
+   * should NOT carry it.
+   */
+  private tune: Partial<Pick<FollowConfig, 'distance' | 'height' | 'lag' | 'lookAhead'>> | null = null;
+  tuneFollow(t: Partial<Pick<FollowConfig, 'distance' | 'height' | 'lag' | 'lookAhead'>> | null): void {
+    this.tune = t ? { ...t } : null;
   }
 
   /** Explicit venue bounds — overrides auto-derivation. */
@@ -588,7 +617,8 @@ export class CameraDirector {
     let desired = subject.add(back.scale(dist)).add(new Vector3(0, cfg.height + AIR_CAM.up * this.airK, 0));
     desired.y = Math.max(desired.y, subject.y + cfg.minHeight);
     if (cfg.shoulderOffset) desired = desired.add(this.rightOf(back).scale(cfg.shoulderOffset));
-    if (this.airK > 0.001) desired = desired.add(this.rightOf(back).scale(AIR_CAM.side * this.airK));
+    this.airSide += (this.airSideWant - this.airSide) * Math.min(1, AIR_SIDE_EASE * stepAir);
+    if (this.airK > 0.001) desired = desired.add(this.rightOf(back).scale(AIR_CAM.side * this.airK * this.airSide));
 
     // M69: enforceStandoff is the FINAL link in the chain — nothing can undo the
     // safe distance after it (fixes the karate dojo camera collapsing onto the hero).

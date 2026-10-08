@@ -28,6 +28,7 @@ export type BackdropFamily = 'venice' | 'dojo' | 'alpine' | 'stadium' | 'ocean' 
 export const MOOD_TO_FAMILY: Record<string, BackdropFamily> = {
   goldenHour: 'venice', dojoWarm: 'dojo', alpine: 'alpine',
   nightGame: 'stadium', default: 'park',
+  dusk: 'venice', indoorArena: 'stadium',   // visual-foundation A9.4 (a spec venue's own sky covers this dome anyway)
 };
 
 interface SkySpec {

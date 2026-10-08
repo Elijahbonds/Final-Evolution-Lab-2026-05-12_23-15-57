@@ -67,9 +67,11 @@ function ItemLink({ item, first }: { item: HubItem; first: boolean }) {
 
 export default function LinksPage() {
   const items = visibleHubItems();
+  const main = items.filter((item) => item.section !== 'follow');
+  const follow = items.filter((item) => item.section === 'follow');
   let lastSection: HubItem['section'];
   let disclosurePlaced = false;
-  const lastAffiliate = [...items].reverse().find((item) => item.kind === 'affiliate')?.id;
+  const lastAffiliate = [...main].reverse().find((item) => item.kind === 'affiliate')?.id;
 
   return (
     <main data-links-hub className="min-h-screen bg-[#050505] text-white">
@@ -79,7 +81,7 @@ export default function LinksPage() {
           <h1 className="mt-2 font-display text-[40px] font-black leading-none tracking-tight">Links</h1>
         </header>
         <div className="flex flex-col gap-3">
-          {items.map((item, index) => {
+          {main.map((item, index) => {
             const heading = item.section && item.section !== lastSection ? item.section : null;
             lastSection = item.section;
             const showDisclosure = item.id === lastAffiliate && !disclosurePlaced;
@@ -110,6 +112,27 @@ export default function LinksPage() {
             );
           })}
         </div>
+        {follow.length > 0 ? (
+          <nav aria-label={HUB_SECTION_TITLES.follow} data-follow className="mt-8">
+            <h2 id="follow" className="mb-1 font-display text-[13px] font-bold uppercase tracking-[0.18em] text-white/55">
+              {HUB_SECTION_TITLES.follow}
+            </h2>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+              {follow.map((item) => (
+                <a
+                  key={item.id}
+                  href={item.url!}
+                  target={hubLinkTarget(item) ?? undefined}
+                  rel={hubLinkRel(item) ?? undefined}
+                  data-link={item.id}
+                  className="inline-flex min-h-[44px] items-center text-[14px] font-semibold leading-tight text-white/80"
+                >
+                  <span data-label>{item.label}</span>
+                </a>
+              ))}
+            </div>
+          </nav>
+        ) : null}
       </div>
     </main>
   );

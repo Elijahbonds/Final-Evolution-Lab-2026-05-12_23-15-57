@@ -79,12 +79,8 @@ async function render(path: string): Promise<string> {
   const u = new URL(path, 'http://screen.test');
   const p = u.pathname.replace(/\/$/, '') || '/';
   if (p === '/screen') {
-    // the QR address: a 307 to the screen (app/screen/page.tsx); follow it
     const { default: Entry } = await import('@/app/screen/page');
-    let to = '';
-    try { Entry({ searchParams: Object.fromEntries(u.searchParams) }); } catch (e) { to = String((e as { digest?: string }).digest).split(';')[2]; }
-    expect(to.startsWith('/play/mirror/assess')).toBe(true);
-    return render(to);
+    return renderToStaticMarkup(createElement(Entry));
   }
   if (p === '/screen/privacy') return privacyPage();
   if (p === '/play/mirror/assess') return renderToStaticMarkup(createElement((await import('@/app/play/mirror/assess/page')).default));

@@ -134,6 +134,7 @@ import {
   STAKING_PAUSED, isStakingPaused, stakingPausedDetail, pausedStakeModes, STAKING_PAUSED_CODE, STAKING_PAUSED_STATUS,
 } from './stakingPause';
 import { ARENA_MODES, isArenaMode, isArenaStakeable, arenaStakeableModes } from './arena';
+import { isUnlistedMode } from './unlisted-modes';
 import { scoreCeilingFor } from './arena-score-integrity';
 import { houseBeatFor, houseTap, judgeHouseSet } from './babylon/music/houseBeat';
 import { MUSIC_ATTEMPT_START, MUSIC_ATTEMPT_FINISH } from './arena-music';
@@ -360,7 +361,11 @@ describe('the Arena lobby', () => {
     const body = await (await configGET()).json();
     const keys = body.modes.map((m: Row) => m.key);
     for (const m of PAUSED) expect(keys).not.toContain(m);
-    expect(keys).toEqual(arenaStakeableModes());
+    // IRON-PARADISE-OUT (2026-10-03): the picker is the stakeable list MINUS the parked modes
+    // (lib/unlisted-modes.ts) — a stake on a redirecting /play route is a trap. The paused/dance assertions
+    // below are unchanged.
+    expect(keys).toEqual(arenaStakeableModes().filter((k: string) => !isUnlistedMode(k)));
+    expect(keys).not.toContain('training');
     expect(body.pausedModes.map((p: Row) => p.key).sort()).toEqual(['dance']);
     expect(keys).toContain('music');   // P6: offered again
   });

@@ -1,0 +1,180 @@
+{
+  "topic": "money",
+  "version": 1,
+  "cards": [
+    {
+      "id": "money.compound",
+      "topic": "money",
+      "type": "lesson",
+      "headline": "Compound interest: growth on growth",
+      "lines": [
+        "When interest is added to the balance, the next round of interest is paid on it too.",
+        "At 7% a year, an amount roughly doubles in about 10 years.",
+        "Time matters as much as the rate: the longer it runs, the steeper the curve."
+      ],
+      "visual": { "kind": "bars", "items": [{ "label": "Start", "value": 100 }, { "label": "10 years", "value": 197 }, { "label": "20 years", "value": 387 }, { "label": "30 years", "value": 761 }], "caption": "100 growing at 7% a year" },
+      "source": "The compound-interest formula A = P(1 + r)^t, as in any introductory finance text."
+    },
+    {
+      "id": "money.rule-of-72",
+      "topic": "money",
+      "type": "lesson",
+      "headline": "The Rule of 72",
+      "lines": [
+        "Divide 72 by a yearly growth rate to estimate how many years it takes to double.",
+        "At 6% that's about 12 years; at 9%, about 8.",
+        "It works for debt too: an unpaid balance at 24% a year can double in about 3 years."
+      ],
+      "visual": { "kind": "stat", "value": "72 ÷ rate", "caption": "≈ years to double" },
+      "source": "The Rule of 72, a standard approximation in introductory finance texts."
+    },
+    {
+      "id": "money.inflation",
+      "topic": "money",
+      "type": "lesson",
+      "headline": "Inflation shrinks what money buys",
+      "lines": [
+        "When prices rise across the economy, each unit of money buys a little less.",
+        "At 3% inflation, prices double in about 24 years (72 ÷ 3).",
+        "A 'real' return is the headline rate minus inflation."
+      ],
+      "visual": { "kind": "stat", "value": "3% a year", "caption": "prices double in about 24 years" },
+      "source": "Mankiw, 'Principles of Economics', chapters on inflation."
+    },
+    {
+      "id": "money.diversification",
+      "topic": "money",
+      "type": "lesson",
+      "headline": "Not every egg in one basket",
+      "lines": [
+        "Diversification spreads money across many investments, so one failure hurts less.",
+        "It reduces the risk tied to a single company — but not the ups and downs of the whole market."
+      ],
+      "visual": { "kind": "compare", "left": { "label": "One company", "text": "One failure can sink it" }, "right": { "label": "Many companies", "text": "One failure is a dent" } },
+      "source": "Markowitz (1952), 'Portfolio Selection', Journal of Finance; Bodie, Kane & Marcus, 'Investments'."
+    },
+    {
+      "id": "money.opportunity-cost",
+      "topic": "money",
+      "type": "lesson",
+      "headline": "Opportunity cost: the road not taken",
+      "lines": [
+        "Every choice costs the best alternative you give up.",
+        "Time has an opportunity cost too: an hour on one thing is an hour not spent on another.",
+        "Comparing options, not just prices, leads to better decisions."
+      ],
+      "visual": { "kind": "motif", "motif": "coin" },
+      "source": "Mankiw, 'Principles of Economics', the Ten Principles of Economics."
+    },
+    {
+      "id": "money.q-compound",
+      "topic": "money",
+      "type": "quiz",
+      "question": "You put 100 in an account paying 10% a year, compounded yearly. How much is there after 2 years?",
+      "options": ["110", "120", "121", "200"],
+      "answer": 2,
+      "why": "Year 1: 100 becomes 110. Year 2: 10% of 110 is 11, so 121. The extra 1 is interest on interest.",
+      "source": "Compound-interest arithmetic."
+    },
+    {
+      "id": "money.q-rule-of-72",
+      "topic": "money",
+      "type": "quiz",
+      "question": "Using the Rule of 72, about how long does money take to double at 8% a year?",
+      "options": ["About 4 years", "About 9 years", "About 15 years", "About 72 years"],
+      "answer": 1,
+      "why": "72 ÷ 8 = 9. It's an approximation, but a close one at everyday rates.",
+      "source": "The Rule of 72, introductory finance texts."
+    },
+    {
+      "id": "money.q-real-return",
+      "topic": "money",
+      "type": "quiz",
+      "question": "Savings earn 2% a year while prices rise 4% a year. What happens to what the savings can buy?",
+      "options": ["It grows", "It stays the same", "It shrinks"],
+      "answer": 2,
+      "why": "The real return is roughly 2% − 4% = −2%: the number grows, but its buying power falls.",
+      "source": "Mankiw, 'Principles of Economics', real and nominal interest rates."
+    },
+    {
+      "id": "money.q-supply",
+      "topic": "money",
+      "type": "quiz",
+      "question": "A product suddenly becomes scarce while demand stays the same. Its price usually…",
+      "options": ["Rises", "Falls", "Stays exactly the same"],
+      "answer": 0,
+      "why": "Supply and demand: less supply with unchanged demand pushes the price up.",
+      "source": "Mankiw, 'Principles of Economics', supply and demand."
+    },
+    {
+      "id": "money.q-diversify",
+      "topic": "money",
+      "type": "quiz",
+      "question": "What does diversification mainly reduce?",
+      "options": ["Risk from any single investment", "All investment risk", "Fees", "Taxes"],
+      "answer": 0,
+      "why": "Spreading out cuts company-specific risk. Market-wide swings remain.",
+      "source": "Bodie, Kane & Marcus, 'Investments'."
+    },
+    {
+      "id": "money.f-first-coins",
+      "topic": "money",
+      "type": "fact",
+      "headline": "The first coins came from Lydia",
+      "text": "Around the 7th century BCE, the kingdom of Lydia, in today's western Turkey, struck coins from electrum, a natural gold–silver alloy.",
+      "source": "Davies, 'A History of Money from Ancient Times to the Present Day'."
+    },
+    {
+      "id": "money.f-paper-money",
+      "topic": "money",
+      "type": "fact",
+      "headline": "China used paper money a thousand years ago",
+      "text": "Song-dynasty China issued government paper notes in the 11th century, centuries before paper money was common in Europe.",
+      "visual": { "kind": "timeline", "points": [{ "at": "c.600 BCE", "label": "Lydian coins" }, { "at": "1000s", "label": "Song paper notes" }, { "at": "1661", "label": "Banknotes in Sweden" }] },
+      "source": "Davies, 'A History of Money'; von Glahn, 'Fountain of Fortune' (1996)."
+    },
+    {
+      "id": "money.f-central-banks",
+      "topic": "money",
+      "type": "fact",
+      "headline": "Central banks raise rates to cool inflation",
+      "text": "Higher interest rates make borrowing costlier, which slows spending and, with a delay, slows price rises.",
+      "source": "Mankiw, 'Principles of Economics', monetary policy."
+    },
+    {
+      "id": "money.f-gresham",
+      "topic": "money",
+      "type": "fact",
+      "headline": "Gresham's law: bad money drives out good",
+      "text": "When two coins have the same face value but different metal content, people hoard the better one and spend the worse.",
+      "source": "Named after Sir Thomas Gresham (16th century); standard economic history texts."
+    },
+    {
+      "id": "money.d-prices",
+      "topic": "money",
+      "type": "deeper",
+      "headline": "How a market price forms",
+      "steps": [
+        { "headline": "1 · Demand", "lines": ["Demand is how much people want to buy at each price.", "Usually, as the price falls, people buy more."], "visual": { "kind": "motif", "motif": "coin" } },
+        { "headline": "2 · Supply", "lines": ["Supply is how much sellers offer at each price.", "Usually, a higher price brings more supply, because producing pays better."] },
+        { "headline": "3 · Equilibrium", "lines": ["The price settles where the amount wanted meets the amount offered.", "Above it, unsold goods pile up; below it, shortages appear."], "visual": { "kind": "compare", "left": { "label": "Price too high", "text": "Surplus" }, "right": { "label": "Price too low", "text": "Shortage" } } },
+        { "headline": "4 · Shifts", "lines": ["When demand or supply shifts, the price moves.", "A bad harvest cuts supply and raises prices; a new craze raises demand and prices."] }
+      ],
+      "source": "Mankiw, 'Principles of Economics', the market forces of supply and demand."
+    },
+    {
+      "id": "money.recap",
+      "topic": "money",
+      "type": "recap",
+      "headline": "Money: the takeaways",
+      "points": [
+        "Compounding is growth on growth.",
+        "72 ÷ rate ≈ years to double.",
+        "Inflation shrinks buying power.",
+        "Diversifying reduces single-company risk.",
+        "Every choice has an opportunity cost."
+      ],
+      "source": "Summary of this topic's cards."
+    }
+  ]
+}

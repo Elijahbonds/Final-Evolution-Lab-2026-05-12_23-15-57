@@ -23,7 +23,8 @@
 //     negatives at 80 ms (those four added) and 4 at 200 ms (FIGHT.md §9). The flags stand on that.
 //   • Duel stays off: its blade / staff plane rule gets 260 of the 321 labelled straights / hooks / uppercuts on the right
 //     plane at 30 fps (81 %; 98 % of the 265 read — FIGHT.md §4's confusion; the cut line asks 90 %), and a clean blow on an unguarded fighter resolves as a whiff in Duel and Showdown alike
-//     (DefenseSystem.applyDefenseOutcome maps 'none' to 'whiff' — pre-existing, the pad's too). The Hundred stays off: its
+//     (DefenseSystem.applyDefenseOutcome mapped 'none' to 'whiff' — pre-existing, the pad's too; fixed IMPROVE 2026-10-06:
+//     out of reach is 'outOfRange' now and an undefended 'none' lands). The Hundred stays off: its
 //     shop (the plan's L6 for it) was not reached by the probe. Both keep READY's "coming".
 export const BODY_FIGHT = {
   karate_vs: true,

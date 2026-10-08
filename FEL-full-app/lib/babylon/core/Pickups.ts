@@ -141,6 +141,19 @@ export class CoinField {
     return this.coins.reduce((n, c) => n + (c.taken ? 0 : 1), 0);
   }
 
+  /**
+   * Empty the field for a fresh pattern, keeping the master mesh and its material (IMPROVE 2026-10-06). Carnival Coin Storm
+   * lays a new pattern every time one is cleared, and disposing the field to do it rebuilt the master cylinder, its PBR
+   * material and its instance buffer each wave. `collected` restarts too, exactly as a new field's would — unless
+   * `keepCollected` is set: Football Rush re-lays its coins every drive and reports the session's total.
+   */
+  clear(opts: { keepCollected?: boolean } = {}): void {
+    this.coins = [];
+    if (!opts.keepCollected) this.collected = 0;
+    this.buf = null;                    // the layout changed; rebuilt (and the master re-enabled) on the next update
+    this.master?.setEnabled(false);     // nothing to draw until the next pattern is placed
+  }
+
   dispose(): void {
     this.master?.material?.dispose();
     this.master?.dispose();

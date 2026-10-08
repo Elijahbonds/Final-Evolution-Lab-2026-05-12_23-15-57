@@ -136,8 +136,12 @@ describe('2. the import graph: no self-report module is anywhere under PRQ, the 
     });
   }
   it('the recovery path is small and exactly what it says (the engine, the filters and the set-log helpers)', () => {
+    // AGE-HELPERS-CONSOLIDATE (2026-10-04, option (a)) added lib/age/ageRules.ts: a new, pure, import-free leaf
+    // (no lib/health/**, no breath-log module, no self-report import of any kind) that lib/coach/taxonomy.ts's
+    // youthRules now delegates its `> 18` threshold line to. Flagged here as required by this repo's test-change
+    // rule: this widens the allow-list, not a self-report leak — the module has zero imports of its own.
     expect(importGraph('lib/prq-recovery.ts')).toEqual([
-      'lib/coach/recoverySources.ts', 'lib/coach/setLog.ts', 'lib/coach/structure.ts', 'lib/coach/taxonomy.ts', 'lib/prq-engine.ts', 'lib/prq-recovery.ts',
+      'lib/age/ageRules.ts', 'lib/coach/recoverySources.ts', 'lib/coach/setLog.ts', 'lib/coach/structure.ts', 'lib/coach/taxonomy.ts', 'lib/prq-engine.ts', 'lib/prq-recovery.ts',
     ]);
   });
 });

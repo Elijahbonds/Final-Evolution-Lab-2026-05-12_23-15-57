@@ -27,6 +27,7 @@ import { TRAITS } from './traits';
 import { ceilingFor } from './ceilings';
 import { HOT_ZONES, ZONE_STATES, ZONE_POINT_CAP, zonePointsSpent } from './hotZones';
 import { MECHANICS, slotGate } from './mechanics';
+import { ANIMATIONS, gateForChoice } from './animations';
 import { VITALS, RETIRED_VITALS, isLegacyVital } from './vitals';
 import { APPEARANCE } from './appearance';
 import { BODY } from './body';
@@ -54,6 +55,8 @@ export interface CreatorBuild {
   hotZones?: Record<string, string>;
   /** slot id → chosen set, or null for an empty optional slot. */
   mechanics?: Record<string, string | null>;
+  /** Animation package label, or null for an empty optional slot. The label maps to a clip that already ships. */
+  animations?: Record<string, string | null>;
   /** trait id → tier index (0-based). Absent = unequipped. */
   traits: Record<string, number>;
   tendencies?: Record<string, number>;
@@ -177,6 +180,30 @@ export function resolve(build: CreatorBuild): Resolution {
         kind: 'violation', rowId: id, section: 'mechanics',
         message: `${row.label} needs ${need?.label ?? gate.attribute} ${gate.min}; you have ${have}.`,
       });
+    }
+  }
+
+  // ANIMATION PACKAGES. Same shape as a mechanics slot, plus the per-choice gate (a Windmill asks for more
+  // Vertical than the slot's floor). Empty optional packages are fine. Nothing here checks a balance.
+  for (const [id, value] of Object.entries(build.animations ?? {})) {
+    const row = ANIMATIONS.rows.find((r) => r.id === id);
+    if (!row) { issues.push({ kind: 'warning', rowId: id, section: 'animations', message: `Unknown package "${id}" — kept, not editable here.` }); continue; }
+    if (value === null || value === undefined) continue;
+    if (row.kind === 'slot' && !row.options.includes(String(value))) {
+      issues.push({ kind: 'violation', rowId: id, section: 'animations', message: `"${value}" is not a package we ship.` });
+      continue;
+    }
+    const gates = [slotGate(row), gateForChoice(typeof value === 'string' ? value : null)];
+    for (const gate of gates) {
+      if (!gate) continue;
+      const have = Math.round(build.attributes?.[gate.attribute] ?? 0);
+      if (have < gate.min) {
+        const need = attrById.get(gate.attribute);
+        issues.push({
+          kind: 'violation', rowId: id, section: 'animations',
+          message: `${row.label} needs ${need?.label ?? gate.attribute} ${gate.min}; you have ${have}.`,
+        });
+      }
     }
   }
 

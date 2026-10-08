@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BASELINE_ANGLE, approachAngle, approachBonus, takeoffFor, rangeBonus, rangeLabel, STANDING_M, FREE_THROW_M, MAX_RANGE_BONUS, BEYOND_CAP, takeoffTell, ONE_FOOT_MIN_SPEED } from './DunkApproach';
+import { DUNK_CONFIG } from '../modes/modeConfigs';
 
 describe('free-approach dunk', () => {
   it('GATHER takes the two-foot at any speed; without it the run decides, and a walk can never one-foot', () => {
@@ -37,6 +38,20 @@ describe('free-approach dunk', () => {
     expect(approachAngle(0, -6, 0, 0)).toBeCloseTo(0);
     expect(approachAngle(3, -3, 0, 0)).toBeCloseTo(Math.PI / 4);
     expect(approachAngle(-3, -3, 0, 0)).toBeCloseTo(-Math.PI / 4);
+  });
+  it('FIX (2026-10-06): reads the same on DunkMode\'s own runway, where the dunker stands at +z of the rim — a straight run is HEAD-ON', () => {
+    // the mode's numbers (modeConfigs DUNK_CONFIG): rim z −10.28, take-off line −7.5, start −1.2 — the depth was negative, so every
+    // take-off came out near 180° and read BASELINE
+    const rimZ = DUNK_CONFIG.rimZ;
+    for (const z of [DUNK_CONFIG.gatherZ, -5.5, DUNK_CONFIG.startZ]) {
+      expect(approachAngle(0, z, 0, rimZ)).toBeCloseTo(0);
+      expect(approachBonus(approachAngle(0, z, 0, rimZ), 'one').label).toBe('HEAD-ON · ONE-FOOT');
+    }
+    expect(approachAngle(3, rimZ + 3, 0, rimZ)).toBeCloseTo(Math.PI / 4);
+    expect(approachAngle(-3, rimZ + 3, 0, rimZ)).toBeCloseTo(-Math.PI / 4);
+    expect(approachBonus(approachAngle(2.2, DUNK_CONFIG.gatherZ, 0, rimZ), 'one').label).toBe('BASELINE · ONE-FOOT');
+    // mirrored courts agree
+    for (const [x, d] of [[0, 3], [1, 3], [2.5, 2.8]] as const) expect(approachAngle(x, rimZ + d, 0, rimZ)).toBeCloseTo(approachAngle(x, -d, 0, 0));
   });
   it('a running approach takes off one-foot; a gather takes off two', () => {
     expect(takeoffFor(6.2)).toBe('one'); expect(takeoffFor(2.0)).toBe('two');

@@ -21,7 +21,6 @@
 
 import {
   CAMPAIGN,
-  TOTAL_NODE_COUNT,
   getNodeById,
   getZoneById,
   type StoryNode,
@@ -30,6 +29,32 @@ import {
 } from './story-data';
 import { sessionModeFor } from './mp/match-core';
 import { storyGoalLabel, storyModeLabel } from './story-yardstick';
+import { isUnlistedMode } from './unlisted-modes';
+
+// ---------------------------------------------------------------------------
+// Parked modes (IRON-PARADISE-OUT, 2026-10-03)
+// ---------------------------------------------------------------------------
+//
+// Story mode is PARKED on the modes it shares with a parked game: a zone played on an unlisted mode
+// (lib/unlisted-modes.ts — gymDome, played on 'training' / Iron Paradise, today) is hidden from the ladder.
+// lib/story-data.ts is NOT edited: the zone, its nodes and its badge stay authored exactly where they were, and
+// removing the list entry brings the zone back. What changes is only how the ladder reads the campaign:
+//   · the hidden zone is absent from the campaign payload (the map never draws it, its nodes are never
+//     recommended, and isNodePlayable reports its nodes locked);
+//   · the NEXT zone still unlocks — a `requiresZone` that names a hidden zone counts as satisfied, so the
+//     ladder skips the parked zone instead of dead-ending behind it;
+//   · completion % and the node totals count the visible ladder, so a parked zone is not a permanent
+//     missing 4 nodes at the top of the map.
+
+/** A zone the ladder skips because its game is parked. */
+export function isHiddenStoryZone(zone: StoryZone): boolean {
+  return isUnlistedMode(zone.mode) || isUnlistedMode(sessionModeFor(zone.mode));
+}
+
+/** The campaign as players climb it: CAMPAIGN.zones minus the parked zones. */
+export function visibleStoryZones(): StoryZone[] {
+  return CAMPAIGN.zones.filter((z) => !isHiddenStoryZone(z));
+}
 
 // ---------------------------------------------------------------------------
 // Inputs
@@ -127,7 +152,8 @@ export function evaluateZoneUnlock(
 
   if (requiresZone !== null) {
     const prev = getZoneById(requiresZone);
-    if (!isZoneCleared(prev, input.completedNodeIds)) {
+    // IRON-PARADISE-OUT: a required zone the ladder has skipped counts as satisfied — the next zone still unlocks.
+    if (!isHiddenStoryZone(prev) && !isZoneCleared(prev, input.completedNodeIds)) {
       lockReasons.push('previous-zone');
     }
   }
@@ -144,7 +170,9 @@ export function evaluateZoneUnlock(
 export function zoneUnlockLabel(zone: StoryZone): string {
   const parts: string[] = [];
   if (zone.unlock.requiresZone !== null) {
-    parts.push(`Clear ${getZoneById(zone.unlock.requiresZone).title}`);
+    // IRON-PARADISE-OUT: never name a skipped zone as the way through — its requirement is already satisfied.
+    const prev = getZoneById(zone.unlock.requiresZone);
+    if (!isHiddenStoryZone(prev)) parts.push(`Clear ${prev.title}`);
   }
   if (zone.unlock.prqGate !== undefined) {
     parts.push(`PRQ ${zone.unlock.prqGate}+`);
@@ -211,7 +239,8 @@ function evaluateNode(
 // ---------------------------------------------------------------------------
 
 export function evaluateCampaign(input: ProgressionInput): CampaignStatus {
-  const zones: ZoneStatus[] = CAMPAIGN.zones.map((zone) => {
+  const ladder = visibleStoryZones();
+  const zones: ZoneStatus[] = ladder.map((zone) => {
     const { unlocked, lockReasons } = evaluateZoneUnlock(zone, input);
     const cleared = isZoneCleared(zone, input.completedNodeIds);
     const nodes = [...zone.rail, zone.boss].map((node) =>
@@ -240,8 +269,10 @@ export function evaluateCampaign(input: ProgressionInput): CampaignStatus {
   });
 
   const completedNodes = zones.reduce((sum, z) => sum + z.completedCount, 0);
+  // IRON-PARADISE-OUT: totals are the visible ladder's, so a parked zone is neither required nor counted.
+  const totalNodes = zones.reduce((sum, z) => sum + z.totalCount, 0);
   const completionPct =
-    Math.round((completedNodes / TOTAL_NODE_COUNT) * 1000) / 10;
+    totalNodes > 0 ? Math.round((completedNodes / totalNodes) * 1000) / 10 : 0;
 
   const badgesEarned = zones
     .filter((z) => z.cleared)
@@ -259,7 +290,7 @@ export function evaluateCampaign(input: ProgressionInput): CampaignStatus {
       tagline: CAMPAIGN.tagline,
     },
     zones,
-    totalNodes: TOTAL_NODE_COUNT,
+    totalNodes,
     completedNodes,
     completionPct,
     badgesEarned,

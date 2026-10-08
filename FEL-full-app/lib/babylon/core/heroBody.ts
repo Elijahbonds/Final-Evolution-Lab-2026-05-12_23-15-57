@@ -48,12 +48,26 @@ export function bodyTypeOf(v: unknown): BodyType {
   return v === 'female' || v === 'Female' ? 'female' : DEFAULT_BODY_TYPE;
 }
 
+/** Does this account own a scan body? The server's question (the allowlist never leaves it). */
+export function ownsScan(email: string | null | undefined, owners: Set<string>): boolean {
+  return !!email && owners.has(email.trim().toLowerCase());
+}
+
 /**
  * The decision. `email` is the signed-in account's (null for a guest); `frame` is the saved creator frame
  * (`AthleteBuild.frame`), or null when the player has never saved one.
+ *
+ * `preferred` (IMPROVE (2026-10-06), CREATOR-PLAN phase 4a) is the ACTIVE SLOT's body (lib/creator/look/slots.ts), null
+ * when no slot is active. A slot can choose the kit body even on the scan owner's account (his Gojo is not his scan);
+ * `'scan'` is honoured ONLY for an account that owns one — anyone else's `'scan'` is the frame's kit body, as if unset.
  */
-export function decideHeroBody(email: string | null | undefined, owners: Set<string>, frame: Record<string, unknown> | null): HeroBodyKind {
-  if (email && owners.has(email.trim().toLowerCase())) return 'scan';
+export function decideHeroBody(
+  email: string | null | undefined, owners: Set<string>, frame: Record<string, unknown> | null,
+  preferred: 'male' | 'female' | 'scan' | null = null,
+): HeroBodyKind {
+  if (preferred === 'male') return 'kit-male';
+  if (preferred === 'female') return 'kit-female';
+  if (ownsScan(email, owners)) return 'scan';
   return bodyTypeOf(frame?.bodyType) === 'female' ? 'kit-female' : 'kit-male';
 }
 

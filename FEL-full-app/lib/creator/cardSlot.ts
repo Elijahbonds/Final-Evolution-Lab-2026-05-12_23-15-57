@@ -50,6 +50,17 @@ const SYSTEM_ROWS: Record<string, ButtonRow[]> = {
   bigair: [{ input: 'D-PAD ← →', action: 'ALTERNATE STRIDES', group: 'system' }],
   sprint: [{ input: 'D-PAD ← →', action: 'ALTERNATE STRIDES', group: 'system' }],
   skateboard: [{ input: 'R-STICK FLICK', action: 'FLIP TRICK', group: 'system' }],
+  // ADVENTURE A4 (2026-10-06): the shoulders, triggers and d-pad the plan's control table puts beside the face verbs
+  adventure: [
+    { input: 'HOLD B', action: 'SPRINT · CRUISE', group: 'system' },
+    { input: 'R1', action: 'LOCK ON', group: 'system' },
+    { input: 'L1', action: 'GUARD · PARRY', group: 'system' },
+    { input: 'R2', action: 'CAST', group: 'system' },
+    { input: 'L2', action: 'SLOW-TIME', group: 'system' },
+    { input: 'D-PAD ▲', action: 'PARTNER', group: 'system' },
+    { input: 'D-PAD ▼', action: 'FUSE · RIDE', group: 'system' },
+    { input: 'D-PAD ◀ ▶', action: 'SPELL SLOT', group: 'system' },
+  ],
 };
 
 /** The read-only button map for a mode — what the start screen shows under the card slot. */

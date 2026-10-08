@@ -22,6 +22,10 @@ describe('the budget follows the tier', () => {
     expect(DESKTOP_BUDGET.drawCalls).toBeGreaterThan(MOBILE_BUDGET.drawCalls);
   });
 
+  it('the high tier (TV / desktop-class GPU) shares the desktop ceiling — its extras are fill rate, not draws', () => {
+    expect(budgetForTier('high')).toBe(DESKTOP_BUDGET);
+  });
+
   it('an unknown tier is treated as MOBILE — the tighter of the two', () => {
     // guessing wrong in the safe direction: a false warning costs a glance, a missed one ships a slow build
     expect(budgetForTier(undefined)).toBe(MOBILE_BUDGET);

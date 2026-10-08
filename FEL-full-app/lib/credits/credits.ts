@@ -417,7 +417,7 @@ export const CREDITS: Credit[] = [
   {
     id: 'fonts',
     section: 'type',
-    title: 'Barlow Condensed, IBM Plex Sans and JetBrains Mono',
+    title: 'Barlow Condensed, IBM Plex Sans, JetBrains Mono and Chakra Petch',
     // HOTFIX (2026-09-24): served from our own origin, so the browser never asks Google for them.
     // FONT-LOCAL (2026-09-30): the files are committed in app/fonts and loaded by next/font/local (no build-time fetch).
     by: 'Google Fonts families, self-hosted from files in app/fonts by next/font/local',
@@ -427,7 +427,7 @@ export const CREDITS: Credit[] = [
     status: 'open',
     recordedIn: ['app/layout.tsx', 'app/fonts/README.md'],
     evidence: [
-      'github.com/google/fonts: all three families sit in its ofl/ folder (ofl/barlowcondensed, ofl/ibmplexsans, ofl/jetbrainsmono), the SIL Open Font License 1.1 set',
+      'github.com/google/fonts: all four families sit in its ofl/ folder (ofl/barlowcondensed, ofl/ibmplexsans, ofl/jetbrainsmono, ofl/chakrapetch), the SIL Open Font License 1.1 set',
       'Upstream: github.com/IBM/plex LICENSE.txt and github.com/JetBrains/JetBrainsMono OFL.txt are the SIL Open Font License 1.1',
     ],
     covers: [],

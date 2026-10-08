@@ -22,3 +22,18 @@ export function kicksBoard(
     { name: names[1], score: goals(theirs), line: kickPips(theirs, regulation) },
   ];
 }
+
+/** IMPROVE (2026-10-06, Penalty #12): the breakaway's tricks on the results card — what the mode tracked (brkStats) and
+ *  used to drop at ctx.end. Only the ones that happened; '' when none did. */
+export const BREAKAWAY_STAT_WORDS: readonly (readonly [key: string, one: string, many: string])[] = [
+  ['rainbows', 'RAINBOW', 'RAINBOWS'], ['banks', 'BANK', 'BANKS'], ['curlers', 'CURLER', 'CURLERS'],
+  ['overdrives', 'OVERDRIVE', 'OVERDRIVES'], ['parries', 'PARRY', 'PARRIES'],
+];
+export function breakawayLine(stats: Readonly<Record<string, unknown>>): string {
+  const parts: string[] = [];
+  for (const [k, one, many] of BREAKAWAY_STAT_WORDS) {
+    const n = Math.floor(Number(stats[k] ?? 0));
+    if (n > 0) parts.push(`${n} ${n === 1 ? one : many}`);
+  }
+  return parts.join(' · ');
+}

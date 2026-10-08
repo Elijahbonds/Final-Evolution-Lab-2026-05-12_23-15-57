@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
+import ModesPage from '@/app/modes/page';
 import { MODE_INFO } from './game-data';
 import {
   HIDDEN_FROM_MODE_MENU,
@@ -10,6 +13,7 @@ import {
   modeMenuMetaFor,
   visibleModeEntries,
 } from './mode-menu';
+import { FAMILIES } from './nav/families';
 
 describe('mode menu contract', () => {
   it('has copy and styling metadata for every visible mode tile', () => {
@@ -22,6 +26,14 @@ describe('mode menu contract', () => {
       expect(visible.has(key), `${key} should be reachable elsewhere, not listed as a game mode`).toBe(false);
       expect(HIDDEN_FROM_MODE_MENU.has(key)).toBe(true);
     }
+  });
+
+  it('does not hide any mode that appears on the Play shelf', () => {
+    const visible = new Set(visibleModeEntries().map(([key]) => key));
+    const hiddenShelfModes = FAMILIES
+      .flatMap((family) => family.modes)
+      .filter((key) => !visible.has(key));
+    expect(hiddenShelfModes).toEqual([]);
   });
 
   it('does not fall back for any visible mode', () => {
@@ -48,5 +60,18 @@ describe('mode menu contract', () => {
         `${key} (${info.name}) points at missing route ${info.href}`
       ).toBe(true);
     }
+  });
+
+  it('/modes is a real all-modes index, not a redirect back to Play', () => {
+    const html = renderToStaticMarkup(createElement(ModesPage));
+    expect(html).toContain('All live modes');
+    expect(html).toContain('Brain Brawl');
+    expect(html).toContain('Tiebreak Blitz');
+    // IRON-PARADISE-OUT (#150): training stays unlisted. The catalogue reads visibleModeEntries(),
+    // which already drops parked modes, so Iron Paradise must not reappear on /modes.
+    expect(html).not.toContain('Iron Paradise');
+    expect(html).toContain('Neuro-Mechanic Mirror');
+    expect(html).not.toContain('Marketplace');
+    expect(html).not.toContain('FEL Kitchens');
   });
 });

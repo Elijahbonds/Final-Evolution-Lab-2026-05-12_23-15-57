@@ -107,3 +107,20 @@ describe('heroBody — every player body file ships whole, parseable, and under 
     expect(hits).toEqual(['lib/babylon/core/heroBody.ts']);
   });
 });
+
+// CREATOR-PLAN phase 4a (2026-10-06): the active slot's body is the preference; 'scan' only for an account that owns one.
+describe('heroBody — a slot chooses the body, within what the account owns', () => {
+  const owners = parseOwnerEmails('owner@example.com');
+  it('the scan owner\'s kit-body slot is the kit body; his scan slot, or no slot, the scan', () => {
+    expect(decideHeroBody('owner@example.com', owners, null, 'male')).toBe('kit-male');
+    expect(decideHeroBody('owner@example.com', owners, null, 'female')).toBe('kit-female');
+    expect(decideHeroBody('owner@example.com', owners, null, 'scan')).toBe('scan');
+    expect(decideHeroBody('owner@example.com', owners, null, null)).toBe('scan');
+  });
+  it('anyone else\'s scan preference is ignored (the frame\'s kit body); a guest is the neutral kit', () => {
+    expect(decideHeroBody('someone@else.com', owners, { bodyType: 'female' }, 'scan')).toBe('kit-female');
+    expect(decideHeroBody('someone@else.com', owners, null, 'scan')).toBe('kit-male');
+    expect(decideHeroBody(null, owners, null, 'scan')).toBe('kit-male');
+    expect(decideHeroBody('someone@else.com', owners, { bodyType: 'male' }, 'female')).toBe('kit-female');
+  });
+});

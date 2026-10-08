@@ -6,7 +6,9 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import type { GameProps, GameResult } from './game-shell';
+import { useBabylonPlaytestBridge } from './use-babylon-playtest-bridge';
 import { BootSplash } from './boot-splash';
+import { surfaceBootError } from './boot-error';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
@@ -26,6 +28,37 @@ const canvasOwner = new WeakMap<HTMLCanvasElement, object>();
 
 type Hud = Record<string, HudValue>;
 
+/** IMPROVE (2026-10-06): the stride's grade, as a colour on the metronome's target ring. */
+const BEAT_COLOR: Record<string, string> = { perfect: '#ffd75e', good: '#00E5FF', first: '#00E5FF', off: '#94a3b8', stumble: '#f87171' };
+
+/**
+ * IMPROVE (2026-10-06): THE METRONOME. The target is one stride every targetIntervalMs (200 ms for a thumb), and nothing
+ * on screen showed the beat. After every stride an outer ring closes onto the fixed target ring over exactly that beat:
+ * tap the next foot (shown in the middle) as they meet. The target ring takes the last stride's grade colour. Driven by
+ * the mode's `beat` counter (one HUD push a stride) and the Web Animations API, so it costs no React render per frame.
+ */
+function SprintMetronome({ seq, ms, foot, grade, call }: { seq: number; ms: number; foot: string; grade: string; call: string }) {
+  const ringRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const el = ringRef.current;
+    if (!el || !(ms > 0) || typeof el.animate !== 'function') return;
+    const a = el.animate([{ transform: 'scale(2.2)', opacity: 0.25 }, { transform: 'scale(1)', opacity: 1, offset: 1 / 1.4 }, { transform: 'scale(0.8)', opacity: 0 }],
+      { duration: ms * 1.4, easing: 'linear', fill: 'forwards' });   // meets the target at ms (1 / 1.4 of the way), then fades through it
+    return () => a.cancel();
+  }, [seq, ms]);
+  const color = BEAT_COLOR[grade] ?? '#ffffff';
+  return (
+    <div className="pointer-events-none absolute bottom-6 left-1/2 z-20 flex -translate-x-1/2 flex-col items-center gap-1 font-mono">
+      <div className="relative h-14 w-14">
+        <div className="absolute inset-0 rounded-full border-2" style={{ borderColor: color }} />
+        <div ref={ringRef} className="absolute inset-0 rounded-full border-2 border-white" style={{ opacity: 0 }} />
+        <div className="absolute inset-0 flex items-center justify-center text-sm font-bold text-white">{foot === 'L' ? '←' : foot === 'R' ? '→' : ''}</div>
+      </div>
+      <div className="h-4 text-[10px] font-bold tracking-wider" style={{ color }}>{call || grade.toUpperCase()}</div>
+    </div>
+  );
+}
+
 export function makeSprintHost(modeKey: string, title: string) {
   function SprintBabylon({ onEnd }: GameProps) {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -42,6 +75,7 @@ export function makeSprintHost(modeKey: string, title: string) {
     const [countdown, setCountdown] = useState<number | null>(null);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [hud, setHud] = useState<Hud>({});
+    useBabylonPlaytestBridge(modeKey, () => ({ phase, countdown, loadError, hud }), busRef.current);
 
     useEffect(() => {
       const canvas = canvasRef.current;
@@ -68,7 +102,7 @@ export function makeSprintHost(modeKey: string, title: string) {
           setCountdown(typeof d === 'number' ? d : null);
           if (p === 'error') setLoadError(typeof d === 'string' ? d : 'load failed');
         },
-        onHud: (h) => { if (!disposed) setHud((prev) => ({ ...prev, ...h })); },
+        onHud: (u) => { if (!disposed) setHud((prev) => ({ ...prev, ...u })); },
         resultSink: async (r: SessionResult) => {
           if (endedRef.current) return;
           endedRef.current = true;
@@ -91,7 +125,7 @@ export function makeSprintHost(modeKey: string, title: string) {
         if (disposed) { if (canvasOwner.get(canvas) === token) s(); return; }
         stop = s;
       })
-        .catch((e) => { if (!disposed) setLoadError(String(e?.message ?? e)); });
+        .catch((e) => surfaceBootError(e, { disposed, setPhase, setLoadError }));
       }, 0);
 
       return () => {
@@ -116,10 +150,34 @@ export function makeSprintHost(modeKey: string, title: string) {
             <div className="text-white/60">
               speed {String(hud.speed ?? 0)} m/s · top {String(hud.top ?? 0)} · rival {String(hud.rival ?? '')}
             </div>
+            {/* IMPROVE (2026-10-06): the gap to the pacer and to the sub-13 pace light (the green bar) — the numbers you race */}
+            {typeof hud.gap === 'string' && hud.gap && (
+              <div className="mt-1 text-sm font-bold">
+                <span className={hud.gap.startsWith('+') ? 'text-[#86efac]' : 'text-[#fca5a5]'}>PACER {hud.gap}</span>
+                {typeof hud.sub13 === 'string' && hud.sub13 && (
+                  <span className={`ml-3 ${hud.sub13.startsWith('+') ? 'text-[#4ade80]' : 'text-white/50'}`}>SUB-13 {hud.sub13}</span>
+                )}
+              </div>
+            )}
+            {/* IMPROVE (2026-10-06): the last called split (30 / 60 m) against the personal best (− is ahead) */}
+            {typeof hud.split === 'string' && hud.split && <div className="text-[#93c5fd]">{hud.split}</div>}
+            {/* IMPROVE (2026-10-06): false starts were counted and never shown; the rule beside the count */}
+            {Number(hud.falseStarts) > 0 && (
+              <div className="text-[#fca5a5]">false starts {String(hud.falseStarts)} · {String(hud.falseStartRule ?? '')}</div>
+            )}
             {typeof hud.banner === 'string' && hud.banner && (
               <div className="mt-2 text-[#00E5FF]">{hud.banner}</div>
             )}
           </div>
+        )}
+
+        {/* IMPROVE (2026-10-06): the hint the mode always sent — the controls, explained on screen */}
+        {phase === 'playing' && typeof hud.hint === 'string' && hud.hint && (
+          <div className="pointer-events-none absolute right-4 top-4 z-20 max-w-[45%] text-right font-mono text-[11px] text-white/70">{hud.hint}</div>
+        )}
+        {phase === 'playing' && Number(hud.beat) > 0 && (
+          <SprintMetronome seq={Number(hud.beat)} ms={Number(hud.beatMs) || 200} foot={String(hud.beatFoot ?? '')}
+            grade={String(hud.beatGrade ?? '')} call={String(hud.beatCall ?? '')} />
         )}
 
         <BootSplash

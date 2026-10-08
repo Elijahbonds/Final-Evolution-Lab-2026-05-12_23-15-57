@@ -80,6 +80,7 @@ describe('ceilings — the stepper', () => {
   it('tells the player how to raise it', () => {
     expect(ceilingNote(row('vertical'), { power: 50 })).toContain('power');
     expect(ceilingNote(row('vertical'), { power: 50 })).toContain('CEILING');
+    expect(ceilingNote(row('vertical'), { power: 50 })).toContain('train to raise');
   });
 });
 

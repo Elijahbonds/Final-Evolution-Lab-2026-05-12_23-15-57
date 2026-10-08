@@ -22,6 +22,8 @@ export interface BeatOpts extends LoopOpts {
    *  holdEnd): a ONE-WAY clip (a crouch into a load) that must stay loaded. Looped instead, it snapped back to its first
    *  frame every cycle; settled, it stood the body back up. The held beat stays `busy`, so a `loop()` does not cut it. */
   holdEnd?: boolean;
+  /** Start the beat this fraction into the clip (HOOPS-10PHASE-2: the 3PT jumper enters at its rise — the held set is the load). */
+  from01?: number;
 }
 
 export class BeatOwner {
@@ -46,7 +48,7 @@ export class BeatOwner {
     const tok = ++this.token;
     this.shot = clip;
     this.animator.play(clip, {
-      loop: false, fadeSec: o.fadeSec ?? 0.1, speedRatio: o.speedRatio ?? 1, restart: true,
+      loop: false, fadeSec: o.fadeSec ?? 0.1, speedRatio: o.speedRatio ?? 1, restart: true, from01: o.from01,
       onEnd: () => {
         if (this.token !== tok) return;   // cut by a newer beat / settle — Babylon raises the end from stop()
         // parked on its last frame, still the body's. Called from INSIDE the clip's end callback: CharacterAnimator.freezeAtEnd

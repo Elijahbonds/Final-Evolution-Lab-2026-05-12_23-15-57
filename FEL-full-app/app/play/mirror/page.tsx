@@ -1,12 +1,14 @@
 import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
 import { authOptions } from '@/lib/auth';
+import { loginPath } from '@/lib/auth/safeNext';
 import { prisma } from '@/lib/db';
 import { youthGateFor } from '@/lib/mirror/screenCorrectives';
 import { isHardStopped, latestIntake, needsIntake } from '@/lib/health/intake';
 import { canSaveScanNumbers, logGateFailure } from '@/lib/privacy/scanSaveGate';
 import { canWriteHealthData } from '@/lib/privacy/healthWriteGate';
 import { MirrorHarness } from './_components/mirror-harness';
+import { DEFAULT_MIRROR_TAB, tabFromParam } from '@/lib/mirror/patternParam';
 import { HealthIntakeGate } from './_components/health-intake-gate';
 import { UNKNOWN_LOCAL_STATUS, type LocalIntakeStatus } from './_components/intake-refusal';
 
@@ -26,9 +28,19 @@ async function gateOrFalse(userId: string | undefined, gate: (userId: string) =>
 // Neuro-Mechanic Mirror (v1). Client-side biomechanical coaching overlay gated to
 // a single movement pattern (split-stance press/row). Camera + pose run entirely
 // in the browser; nothing is uploaded. See lib/babylon/nexus/neuro-mirror/.
-export default async function MirrorPage() {
+// MIRROR-MOVES P2 (2026-10-07): `?pattern=<tab>` opens that tab (lib/mirror/patternParam.ts) — the Form Check and the
+// Playbook's "Check it on camera" links. Read here, on the server, and handed to the harness as its first tab; signed out,
+// the login round-trip keeps it (only a known tab is carried).
+// (`props` is required for Next's PageProps check — an optional one types as `| undefined`, which the build rejects — and read
+// with `?.` so a bare MirrorPage() call, as the tests make, still renders the default tab.)
+export default async function MirrorPage(props: { searchParams?: { pattern?: string | string[] } }) {
+  const initialPattern = tabFromParam(props?.searchParams?.pattern);
   const session = await getServerSession(authOptions);
-  if (!session) redirect('/login');
+  if (!session) {
+    // a known tab rides along in ?next= (patternParam.ts names only the Mirror's own tabs, so nothing unknown is carried)
+    if (initialPattern !== DEFAULT_MIRROR_TAB) redirect(loginPath(`/play/mirror?pattern=${initialPattern}`));
+    redirect(loginPath('/play/mirror'));
+  }
   // YOUTH RULES (MIRROR-COACH P3 review, 2026-09-26; PLAN item 9, owner decisions #6, #20): the screen's written
   // corrective blocks are off under 18 or with no birth year on file. A read that fails is no birth year — youth rules.
   const userId = (session.user as { id?: string } | undefined)?.id;
@@ -63,7 +75,7 @@ export default async function MirrorPage() {
   return (
     <div className="min-h-screen bg-[#050505] pb-20">
       <HealthIntakeGate canWriteHealth={canWriteHealth} localStatus={localStatus}>
-        <MirrorHarness youth={youthGateFor(user?.dobYear)} canSaveScan={canSaveScan} />
+        <MirrorHarness youth={youthGateFor(user?.dobYear)} initialPattern={initialPattern} canSaveScan={canSaveScan} />
       </HealthIntakeGate>
     </div>
   );

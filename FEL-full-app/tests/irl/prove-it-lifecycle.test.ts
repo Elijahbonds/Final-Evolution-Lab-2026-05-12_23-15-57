@@ -95,7 +95,7 @@ function mountPage() {
   h.effects.length = 0;
   const tree = ProveIt();
   const cleanups = h.effects.map((fx) => fx()).filter((c): c is () => void => typeof c === 'function');
-  const gate = find(tree, (el) => el.props?.cta === 'SET UP THE CAMERA');
+  const gate = find(tree, (el) => el.props?.cta === 'START');
   const video = find(tree, (el) => el.type === 'video');
   if (!gate || !video) throw new Error('the consent gate or the <video> is missing from the first paint');
   return {
@@ -122,7 +122,7 @@ beforeEach(() => {
 afterEach(() => { vi.unstubAllGlobals(); });
 
 /**
- * Tap SET UP THE CAMERA and wait until the model is actually downloading. The page's promise comes back boxed: an
+ * Tap START and wait until the model is actually downloading. The page's promise comes back boxed: an
  * async function returning it bare would wait for it, and it cannot settle until the test lands the model.
  */
 async function startLoading(page: ReturnType<typeof mountPage>): Promise<{ started: Promise<void> }> {

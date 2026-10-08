@@ -9,6 +9,7 @@
 import { describe, expect, it } from 'vitest';
 import { getNodeById } from './story-data';
 import { evaluateCampaign, judgeStorySession, storySessionMode } from './progression';
+import { isUnlistedMode } from './unlisted-modes';
 
 const node = (id: string) => {
   const n = getNodeById(id);
@@ -91,6 +92,8 @@ describe('judgeStorySession', () => {
     expect(storySessionMode(node('dojo.r1'))).toBe('karateEndless');
     expect(storySessionMode(node('skateBowl.r1'))).toBe('skateboarding');
     expect(storySessionMode(node('gymDome.r1'))).toBe('training');
+    // IRON-PARADISE-OUT (2026-10-03): that mapping is exactly why the zone is parked — 'training' is unlisted.
+    expect(isUnlistedMode(storySessionMode(node('gymDome.r1')))).toBe(true);
     expect(storySessionMode(node('labHub.boss'))).toBe('freerun');
   });
 
@@ -107,7 +110,10 @@ describe('the map payload says what each node asks, in words', () => {
 
   it('zones carry the mode\'s player-facing name, not the route id', () => {
     expect(zone('blacktop')).toMatchObject({ mode: 'onevone', modeLabel: 'Ones' });
-    expect(zone('gymDome').modeLabel).toBe('Iron Paradise');
+    // IRON-PARADISE-OUT (2026-10-03): 'Iron Paradise' is UNLISTED — the gymDome zone it named is parked out of
+    // the ladder, so the payload no longer carries it. lib/story-data.ts keeps the zone (nothing deleted).
+    expect(status.zones.some((z) => z.id === 'gymDome')).toBe(false);
+    expect(isUnlistedMode('training')).toBe(true);
     expect(zone('labHub').modeLabel).toBe('Free Run');
     for (const z of status.zones) expect(z.modeLabel, z.id).not.toBe(z.mode);
   });

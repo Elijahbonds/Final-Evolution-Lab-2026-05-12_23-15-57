@@ -1078,7 +1078,8 @@ exports.Prisma.ProgramMessageScalarFieldEnum = {
   programId: 'programId',
   authorId: 'authorId',
   body: 'body',
-  createdAt: 'createdAt'
+  createdAt: 'createdAt',
+  readAt: 'readAt'
 };
 
 exports.Prisma.FacilitatorProfileScalarFieldEnum = {
@@ -1220,6 +1221,19 @@ exports.Prisma.HealthConsentScalarFieldEnum = {
   revokedAt: 'revokedAt'
 };
 
+exports.Prisma.ScanSaveOptInScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  scope: 'scope',
+  granted: 'granted',
+  grantedAt: 'grantedAt',
+  revokedAt: 'revokedAt',
+  consentTextVersion: 'consentTextVersion',
+  coachShares: 'coachShares',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
 exports.Prisma.ReadinessCheckInScalarFieldEnum = {
   id: 'id',
   userId: 'userId',
@@ -1275,6 +1289,154 @@ exports.Prisma.CoachClientScalarFieldEnum = {
   via: 'via',
   endedAt: 'endedAt',
   createdAt: 'createdAt'
+};
+
+exports.Prisma.CoachAvailabilityScalarFieldEnum = {
+  coachId: 'coachId',
+  clientId: 'clientId',
+  status: 'status',
+  returnBy: 'returnBy',
+  setAt: 'setAt'
+};
+
+exports.Prisma.InstructorScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  slug: 'slug',
+  displayName: 'displayName',
+  headline: 'headline',
+  bio: 'bio',
+  certifications: 'certifications',
+  specialties: 'specialties',
+  affiliationLine: 'affiliationLine',
+  creatorCardId: 'creatorCardId',
+  timeZone: 'timeZone',
+  weeklyHours: 'weeklyHours',
+  blackoutDates: 'blackoutDates',
+  bufferMinutes: 'bufferMinutes',
+  minNoticeHours: 'minNoticeHours',
+  maxDaysAhead: 'maxDaysAhead',
+  reviewSlaHours: 'reviewSlaHours',
+  clientFullRefundHours: 'clientFullRefundHours',
+  refundBusinessDays: 'refundBusinessDays',
+  businessMailingAddress: 'businessMailingAddress',
+  published: 'published',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.ProgramAccessScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  instructorId: 'instructorId',
+  listingId: 'listingId',
+  lane: 'lane',
+  billing: 'billing',
+  scope: 'scope',
+  beneficiary: 'beneficiary',
+  status: 'status',
+  priceCents: 'priceCents',
+  platformFeeCents: 'platformFeeCents',
+  stripeFeeCents: 'stripeFeeCents',
+  reviewCredits: 'reviewCredits',
+  lastCreditInvoiceId: 'lastCreditInvoiceId',
+  stripeCheckoutId: 'stripeCheckoutId',
+  stripeSubscriptionId: 'stripeSubscriptionId',
+  stripePaymentIntentId: 'stripePaymentIntentId',
+  accessUntil: 'accessUntil',
+  cancelAtPeriodEnd: 'cancelAtPeriodEnd',
+  coachingProgramId: 'coachingProgramId',
+  startedAt: 'startedAt',
+  nextRescreenAt: 'nextRescreenAt',
+  unlockCodeHash: 'unlockCodeHash',
+  deviceTokenHash: 'deviceTokenHash',
+  codeActive: 'codeActive',
+  redeemedAt: 'redeemedAt',
+  reissueCount: 'reissueCount',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.BookingScalarFieldEnum = {
+  id: 'id',
+  kind: 'kind',
+  instructorId: 'instructorId',
+  coachUserId: 'coachUserId',
+  clientUserId: 'clientUserId',
+  listingId: 'listingId',
+  status: 'status',
+  durationMin: 'durationMin',
+  priceCents: 'priceCents',
+  platformFeeCents: 'platformFeeCents',
+  stripeFeeCents: 'stripeFeeCents',
+  refundCents: 'refundCents',
+  stripeCheckoutId: 'stripeCheckoutId',
+  stripePaymentIntentId: 'stripePaymentIntentId',
+  holdExpiresAt: 'holdExpiresAt',
+  startsAt: 'startsAt',
+  endsAt: 'endsAt',
+  slotLock: 'slotLock',
+  clientTimeZone: 'clientTimeZone',
+  clientNote: 'clientNote',
+  reschedulesUsed: 'reschedulesUsed',
+  connectionFailedAt: 'connectionFailedAt',
+  failureCreditOpen: 'failureCreditOpen',
+  shareWithCoach: 'shareWithCoach',
+  goal: 'goal',
+  painYes: 'painYes',
+  reviewNote: 'reviewNote',
+  clipPaths: 'clipPaths',
+  clipConsentAt: 'clipConsentAt',
+  consentTextVersion: 'consentTextVersion',
+  submittedAt: 'submittedAt',
+  dueAt: 'dueAt',
+  replyText: 'replyText',
+  replyClipPath: 'replyClipPath',
+  attachedDrillIds: 'attachedDrillIds',
+  deliveredAt: 'deliveredAt',
+  originalClipDeleteAt: 'originalClipDeleteAt',
+  originalsDeletedAt: 'originalsDeletedAt',
+  cancelledAt: 'cancelledAt',
+  cancelledBy: 'cancelledBy',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.CallSignalScalarFieldEnum = {
+  id: 'id',
+  bookingId: 'bookingId',
+  fromRole: 'fromRole',
+  epoch: 'epoch',
+  kind: 'kind',
+  payload: 'payload',
+  createdAt: 'createdAt',
+  expiresAt: 'expiresAt'
+};
+
+exports.Prisma.CoachStoreReferralScalarFieldEnum = {
+  id: 'id',
+  paymentKey: 'paymentKey',
+  referrerUserId: 'referrerUserId',
+  buyerUserId: 'buyerUserId',
+  coachUserId: 'coachUserId',
+  sourceKind: 'sourceKind',
+  sourceId: 'sourceId',
+  grossCents: 'grossCents',
+  platformFeeCents: 'platformFeeCents',
+  shareOfFee: 'shareOfFee',
+  cutCents: 'cutCents',
+  renewalIndex: 'renewalIndex',
+  status: 'status',
+  holdUntil: 'holdUntil',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.AdventureSaveScalarFieldEnum = {
+  userId: 'userId',
+  version: 'version',
+  doc: 'doc',
+  updatedAt: 'updatedAt'
 };
 
 exports.Prisma.SortOrder = {
@@ -1556,11 +1718,19 @@ exports.Prisma.ModelName = {
   HealthIntake: 'HealthIntake',
   PainCheckIn: 'PainCheckIn',
   HealthConsent: 'HealthConsent',
+  ScanSaveOptIn: 'ScanSaveOptIn',
   ReadinessCheckIn: 'ReadinessCheckIn',
   BreathLog: 'BreathLog',
   ShareLink: 'ShareLink',
   CoachInvite: 'CoachInvite',
-  CoachClient: 'CoachClient'
+  CoachClient: 'CoachClient',
+  CoachAvailability: 'CoachAvailability',
+  Instructor: 'Instructor',
+  ProgramAccess: 'ProgramAccess',
+  Booking: 'Booking',
+  CallSignal: 'CallSignal',
+  CoachStoreReferral: 'CoachStoreReferral',
+  AdventureSave: 'AdventureSave'
 };
 
 /**

@@ -27,6 +27,7 @@
 
 import { useSyncExternalStore } from 'react';
 import { sessionStore, type SessionView } from '@/lib/babylon/core/sessionStore';
+import { ControlsPanel } from './controls-panel';
 
 export const PAUSED_HEADLINE = 'PAUSED — TAP TO RESUME';
 /** The camera sees you: the hold resumes (the ring fills with it). Also the READY line, under TAP TO START. */
@@ -100,7 +101,10 @@ export function BodyReadyLine({ className }: { className?: string }) {
   return line && <HandsUpLine line={line} progress={view.handsUp01} className={className} />;
 }
 
-export function PausedLayer({ onResume }: { onResume: () => void }) {
+// CONTROLS SCREEN (console-view lane, 2026-10-06; owner: "pausing shows the same controls screen again"): given the
+// mode, the pause carries the READY card's CONTROLS panel under its line — spans only, no chooser (it is inside this
+// button), so a tap anywhere still resumes. Without a mode it is exactly the old screen.
+export function PausedLayer({ onResume, modeId, hint }: { onResume: () => void; modeId?: string; hint?: string }) {
   const view = useSyncExternalStore(sessionStore.subscribe, sessionStore.view, sessionStore.view);
   const line = pausedLine(view);
   return (
@@ -108,6 +112,7 @@ export function PausedLayer({ onResume }: { onResume: () => void }) {
       <span className="flex flex-col items-center gap-3 text-center">
         <span className="fel-heading text-3xl font-bold text-white">{PAUSED_HEADLINE}</span>
         {line && <HandsUpLine line={line} progress={view.handsUp01} />}
+        {modeId && <ControlsPanel modeId={modeId} hint={hint} chooser={false} className="max-h-[60vh]" />}
       </span>
     </button>
   );

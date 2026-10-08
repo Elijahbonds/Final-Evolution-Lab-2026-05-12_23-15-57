@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import {
-  flightOf, freshBlitz, NORMAL_FEEL, postedScore, scriptedCueRun, skipGap, TARGET, windowOpenFrac,
+  flightOf, freshBlitz, NORMAL_FEEL, postedScore, scriptedCueRun, skipGap, SKIP_LOCK_SEC, TARGET, windowOpenFrac,
 } from './TiebreakBlitz';
 
 const host = readFileSync(path.resolve(__dirname, '../../../components/games/tiebreak-game.tsx'), 'utf8');
@@ -20,7 +20,8 @@ function cueBatch(errorSec: number) {
   for (let seed = 1; seed <= 40; seed++) {
     const run = scriptedCueRun(seed, errorSec);
     runs.push(run);
-    if (run.myPts === TARGET && run.myPts > run.aiPts) wins++;
+    // IMPROVE (2026-10-06) #10: win by two — 8-6 is a win too
+    if (run.myPts >= TARGET && run.myPts > run.aiPts) wins++;
   }
   return { wins, runs };
 }
@@ -35,7 +36,10 @@ describe('Tiebreak Blitz — the point is the window, not the clock', () => {
   it('a press during the result beat skips the hold', () => {
     const s = freshBlitz();
     s.awaiting = false;
+    // IMPROVE (2026-10-06) #9: not in the first SKIP_LOCK_SEC — that press was a swing at the ball that just went past
     s.gap = NORMAL_FEEL.gapSec;
+    expect(skipGap(s)).toBe(false);
+    s.gap = NORMAL_FEEL.gapSec - SKIP_LOCK_SEC - 0.01;
     expect(skipGap(s)).toBe(true);
     expect(s.gap).toBe(0);
     expect(skipGap(s)).toBe(false);
@@ -52,7 +56,9 @@ describe('Tiebreak Blitz — the point is the window, not the clock', () => {
   });
 
   it('±60ms wins about half to two thirds, ±90ms wins fewer, and neither sweeps', () => {
-    for (const [error, lo, hi] of [[0.06, 20, 28], [0.09, 6, 14]] as const) {
+    // IMPROVE (2026-10-06) #10: win by two separates the sides more at 6-6 — measured over 1000 seeds, ±60ms 29.1 → 28.2 /40,
+    // ±90ms 8.0 → 5.0 /40. The ±90ms floor moves 6 → 3 with it; ±60ms keeps its band.
+    for (const [error, lo, hi] of [[0.06, 20, 28], [0.09, 3, 14]] as const) {
       const { wins, runs } = cueBatch(error);
       const label = `±${Math.round(error * 1000)}ms`;
       expect(wins, `${label} wins ${wins}/40`).toBeGreaterThanOrEqual(lo);
@@ -60,6 +66,7 @@ describe('Tiebreak Blitz — the point is the window, not the clock', () => {
       for (const run of runs) {
         expect(run.over).toBe(true);
         expect(run.myPts >= TARGET || run.aiPts >= TARGET).toBe(true);
+        expect(Math.abs(run.myPts - run.aiPts) >= 2 || Math.max(run.myPts, run.aiPts) === 12, 'won by two, or at the cap').toBe(true);
         expect(run.aiPts).toBeGreaterThan(0);
         expect(run.myPts).toBeGreaterThan(0);
         expect(run.myPts === TARGET && run.aiPts === 0).toBe(false);

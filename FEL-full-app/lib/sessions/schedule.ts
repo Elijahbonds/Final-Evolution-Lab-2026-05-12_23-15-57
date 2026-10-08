@@ -34,7 +34,7 @@ export interface SessionSlot {
 }
 
 /** Returns the PT wall-clock parts for a given instant. */
-function ptParts(d: Date): { y: number; m: number; day: number; weekday: number; hour: number; minute: number } {
+export function ptParts(d: Date): { y: number; m: number; day: number; weekday: number; hour: number; minute: number } {
   const fmt = new Intl.DateTimeFormat('en-US', {
     timeZone: GROUP_CONFIG.timeZone, year: 'numeric', month: '2-digit', day: '2-digit',
     hour: '2-digit', minute: '2-digit', hour12: false, weekday: 'short',
@@ -51,7 +51,7 @@ function ptParts(d: Date): { y: number; m: number; day: number; weekday: number;
 }
 
 /** Find the UTC instant whose PT wall-clock is the given y/m/d hh:mm. */
-function ptWallClockToUtc(y: number, m: number, day: number, hour: number, minute: number): Date {
+export function ptWallClockToUtc(y: number, m: number, day: number, hour: number, minute: number): Date {
   // Guess UTC then correct by the offset PT reports at that instant (handles DST).
   let guess = new Date(Date.UTC(y, m - 1, day, hour, minute));
   for (let i = 0; i < 3; i++) {

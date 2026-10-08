@@ -66,6 +66,26 @@ export interface KartKerb {
   radius: number;
 }
 
+/**
+ * IMPROVE (2026-10-06), velocitykart #8: A SHORTCUT — the risk/reward line. A straight sand path across the inside of a
+ * run of bends, from one distance on the lap to a later one: shorter than the road, narrower than it, and loose (the
+ * kart slides on it when it turns). Leaving it is the grass. It is not a cheat route round the lap logic: any gate whose
+ * span it crosses has its radius widened so the path's crossing counts (measured at build, pinned by the test).
+ */
+export interface KartShortcut {
+  /** Metres along the lap where the path leaves the road, and where it rejoins. */
+  from: number;
+  to: number;
+  /** The path's two ends ON the racing line (y is the road's height there). */
+  a: Vector3;
+  b: Vector3;
+  /** Half the path's width, metres. */
+  halfWidth: number;
+  /** Straight length of the path, and the metres it saves against the road between its ends. */
+  length: number;
+  saved: number;
+}
+
 export interface KartCircuit {
   course: Course;
   line: RacingLine;
@@ -81,6 +101,10 @@ export interface KartCircuit {
   elevation: { climb: number; drop: number; low: number; high: number };
   /** Road surface height, and how far off the line before it is no longer road. */
   surfaceAt: (x: number, z: number) => number;
+  /** IMPROVE (2026-10-06), velocitykart #8: the alternate routes, if the course has any. */
+  shortcuts: KartShortcut[];
+  /** IMPROVE (2026-10-06), velocitykart #12: which variant of the course this is (2-lap unmirrored is the default). */
+  variant: KartVariant;
 }
 
 interface KartSpec {
@@ -102,7 +126,12 @@ interface KartSpec {
   /** Fractions of the lap where the road launches. */
   ramps: { at: number; size: RampSize }[];
   obstacles?: { at: number; lateral: number; kind: KartObstacle['kind'] }[];
+  /** IMPROVE (2026-10-06), velocitykart #8: sand-path shortcuts, as fractions of the lap where they leave and rejoin. */
+  shortcuts?: { from: number; to: number; halfWidth?: number }[];
 }
+
+/** The sand path's half-width (the road is 8–10). Narrow is the risk: off it is the grass. */
+export const SHORTCUT_HALF_WIDTH = 4;
 
 const RAMP_SHAPE: Record<RampSize, { pitch: number; run: number; gap: number }> = {
   kicker: { pitch: 9, run: 12, gap: 26 },   // a hop; keeps the nose down, lands on the road
@@ -135,6 +164,12 @@ const SPECS: KartSpec[] = [
       { at: 0.72, lateral: 7, kind: 'cone' }, { at: 0.735, lateral: 5.5, kind: 'cone' }, { at: 0.75, lateral: 4, kind: 'cone' },
       { at: 0.17, lateral: 8, kind: 'puddle' },
     ],
+    // IMPROVE (2026-10-06), velocitykart #8: THE BEACH CUT — straight through the boardwalk esses on the sand instead of
+    // round them (716 m → 838 m: 108 m of path against 122 m of road). Found by searching every course for a chord that
+    // saves ≥ 10 m, keeps both rejoin angles ≤ 40° and stays clear of every other part of the lap; this is the one on a
+    // flat course (the others with a candidate are rooftops, an orbit dock or a mountain, where a straight path has no
+    // ground under it). The three cones at 0.72–0.75 already sit on the inside of the road here: they mark its mouth.
+    shortcuts: [{ from: 0.682, to: 0.798 }],
   },
   {
     // TWO STRAIGHTS UNDER THE LIGHTS. The ends stay 82 m arcs — the measured fix for the original hexagon, whose
@@ -322,7 +357,91 @@ function buildKerbs(line: RacingLine, step = 6): KartKerb[] {
   return out.filter((k) => k.to - k.from >= 8);
 }
 
-export function buildKartCircuit(spec: KartSpec): KartCircuit {
+// ── IMPROVE (2026-10-06), velocitykart #12: GRAND PRIX LENGTH AND MIRROR ─────────────────────────────────────────
+//
+// Every course was a fixed two laps one way round. A GP is the same course for three laps, and a mirrored course is the
+// same course reflected left to right (x → −x): the order of the corners is kept and every turn goes the other way, so
+// seven tracks are fourteen without a single new asset. A mirrored obstacle keeps its world spot by flipping its side.
+
+export interface KartVariant { laps: 2 | 3; mirror: boolean }
+export const KART_VARIANT_DEFAULT: KartVariant = { laps: 2, mirror: false };
+/** A Grand Prix: one lap more than the standard two. */
+export const KART_GP_LAPS = 3;
+/** '' for the standard race (so its ghosts and cup rows keep their old keys), else 'gp', 'm' or 'gp-m'. */
+export function variantKey(v: KartVariant): string {
+  return [v.laps === KART_GP_LAPS ? 'gp' : '', v.mirror ? 'm' : ''].filter(Boolean).join('-');
+}
+/** Read a variant from loose input (a query string's values, a stored JSON); anything unknown is the default. */
+export function parseVariant(laps: unknown, mirror: unknown): KartVariant {
+  const l = Number(laps) === KART_GP_LAPS ? KART_GP_LAPS : 2;
+  return { laps: l, mirror: mirror === true || mirror === '1' || mirror === 'true' || mirror === 1 };
+}
+
+/** The spec of a variant: its points mirrored and its laps set. Pure. */
+export function variantSpec(spec: KartSpec, v: KartVariant): KartSpec {
+  if (!v.mirror && v.laps === spec.laps) return spec;
+  return {
+    ...spec,
+    laps: v.laps,
+    pts: v.mirror ? spec.pts.map(([x, z, y]) => [-x, z, y] as [number, number, number]) : spec.pts,
+    obstacles: v.mirror ? spec.obstacles?.map((o) => ({ ...o, lateral: -o.lateral })) : spec.obstacles,
+  };
+}
+
+export const VARIANT_STORE_KEY = 'fel-kart-variant';
+/** `?laps=3&mirror=1` wins (the splash reloads with them), then the remembered pick, then the default. */
+export function readKartVariant(): KartVariant {
+  try {
+    if (typeof window !== 'undefined') {
+      const q = new URLSearchParams(window.location.search);
+      if (q.has('laps') || q.has('mirror')) return parseVariant(q.get('laps'), q.get('mirror'));
+      const raw = window.localStorage.getItem(VARIANT_STORE_KEY);
+      if (raw) { const j = JSON.parse(raw) as { laps?: unknown; mirror?: unknown }; return parseVariant(j.laps, j.mirror); }
+    }
+  } catch { /* private mode: the default */ }
+  return { ...KART_VARIANT_DEFAULT };
+}
+export function writeKartVariant(v: KartVariant): void {
+  try { window.localStorage.setItem(VARIANT_STORE_KEY, JSON.stringify(v)); } catch { /* convenience only */ }
+}
+
+/** Where a path segment a→b crosses a gate's plane, and how far that is from the gate's centre (null = it does not). */
+function crossingOffset(a: Vector3, b: Vector3, gate: Gate): number | null {
+  const n = gate.through;
+  const da = (a.x - gate.at.x) * n.x + (a.z - gate.at.z) * n.z;
+  const db = (b.x - gate.at.x) * n.x + (b.z - gate.at.z) * n.z;
+  if (!(da < 0 && db >= 0)) return null;
+  const t = -da / (db - da);
+  return Math.hypot(a.x + (b.x - a.x) * t - gate.at.x, a.y + (b.y - a.y) * t - gate.at.y, a.z + (b.z - a.z) * t - gate.at.z);
+}
+
+/** Is (x, z) on a shortcut's path? Returns where along it (0..1), the side offset and the surface height there. */
+export function shortcutAt(circuit: Pick<KartCircuit, 'shortcuts'>, x: number, z: number, margin = 0): { sc: KartShortcut; u: number; lateral: number; y: number } | null {
+  for (const sc of circuit.shortcuts) {
+    const dx = sc.b.x - sc.a.x, dz = sc.b.z - sc.a.z, l2 = dx * dx + dz * dz;
+    if (l2 < 1e-6) continue;
+    const u = ((x - sc.a.x) * dx + (z - sc.a.z) * dz) / l2;
+    if (u < 0 || u > 1) continue;
+    const lateral = ((x - sc.a.x) * dz - (z - sc.a.z) * dx) / Math.sqrt(l2);
+    if (Math.abs(lateral) > sc.halfWidth + margin) continue;
+    return { sc, u, lateral, y: sc.a.y + (sc.b.y - sc.a.y) * u };
+  }
+  return null;
+}
+/** Scenery keeps off the shortcuts: false where (x, z) is within `margin` of a path. */
+export function clearOfShortcuts(circuit: Pick<KartCircuit, 'shortcuts'>, x: number, z: number, margin = 3): boolean {
+  return shortcutAt(circuit, x, z, margin) === null;
+}
+
+/** The road's height read off a fix already taken (racingLine.locate / lineWindow.locateNear) — `surfaceAt` without the
+ *  second full scan of the lap (velocitykart #13). Same rule: the line's height on the road, falling away past it. */
+export function surfaceFromFix(fix: { lateral: number; point: Vector3 }, halfWidth: number): number {
+  const off = Math.abs(fix.lateral) - halfWidth;
+  return off <= 0 ? fix.point.y : fix.point.y - Math.min(8, off * 0.52);
+}
+
+export function buildKartCircuit(spec: KartSpec, variant: KartVariant = { laps: spec.laps === KART_GP_LAPS ? KART_GP_LAPS : 2, mirror: false }): KartCircuit {
+  spec = variantSpec(spec, variant);
   if (spec.declaredMinRadius < HOLDABLE_RADIUS && !spec.slideNote) {
     throw new Error(
       `${spec.id} declares a ${spec.declaredMinRadius} m corner, inside the ${Math.round(HOLDABLE_RADIUS)} m the ` +
@@ -361,8 +480,23 @@ export function buildKartCircuit(spec: KartSpec): KartCircuit {
     return off <= 0 ? at.point.y : at.point.y - Math.min(8, off * 0.52);
   };
 
+  const shortcuts: KartShortcut[] = (spec.shortcuts ?? []).map(({ from, to, halfWidth }) => {
+    const a = pointAlong(line, from * L).pos, b = pointAlong(line, to * L).pos;
+    const length = Math.hypot(b.x - a.x, b.z - a.z);
+    return { from: from * L, to: to * L, a, b, halfWidth: halfWidth ?? SHORTCUT_HALF_WIDTH, length, saved: (to - from) * L - length };
+  });
+  // a gate the path's span covers counts the path's crossing too (2 m inside its widened radius)
+  for (const sc of shortcuts) {
+    for (const g of gates) {
+      const off = crossingOffset(sc.a, sc.b, g);
+      if (off !== null && off + 2 > g.radius) g.radius = off + 2;
+    }
+  }
+
+  // a variant says so on the title card (the id stays the course's: the venue, the picker and the light rig are its own)
+  const tag = [variant.mirror ? 'MIRROR' : '', spec.laps === KART_GP_LAPS ? 'GP' : ''].filter(Boolean).join(' · ');
   const course: Course = {
-    id: spec.id, name: spec.name, sub: spec.sub, kind: 'kart',
+    id: spec.id, name: tag ? `${spec.name} · ${tag}` : spec.name, sub: spec.sub, kind: 'kart',
     venue: spec.venue, mood: spec.mood, tint: spec.tint, ready: true,
     gates, loop: spec.loop, laps: spec.laps,
     // THE DENSE LINE, published on the course so that everything downstream measures against the curve the
@@ -385,6 +519,8 @@ export function buildKartCircuit(spec: KartSpec): KartCircuit {
     ramps, obstacles, kerbs: buildKerbs(line),
     elevation: elevationProfile(line),
     surfaceAt,
+    shortcuts,
+    variant: { laps: spec.laps === KART_GP_LAPS ? KART_GP_LAPS : 2, mirror: variant.mirror },
   };
 }
 
@@ -397,4 +533,17 @@ export function kartCircuitById(id: string): KartCircuit | null {
   return kartCircuits().find((c) => c.course.id === id) ?? null;
 }
 export const KART_CIRCUIT_IDS = SPECS.map((s) => s.id);
+
+/** IMPROVE (2026-10-06), velocitykart #12: a course in a GP / mirrored variant, built once per variant. The standard
+ *  variant is the published circuit itself. Same course id: the venue, the picker and the light rig are the course's. */
+const variants = new Map<string, KartCircuit>();
+export function kartCircuitVariant(id: string, v: KartVariant): KartCircuit | null {
+  const key = variantKey(v);
+  if (!key) return kartCircuitById(id);
+  const spec = SPECS.find((s) => s.id === id);
+  if (!spec) return null;
+  let c = variants.get(`${id}|${key}`);
+  if (!c) { c = buildKartCircuit(spec, v); variants.set(`${id}|${key}`, c); }
+  return c;
+}
 export const KART_SPECS_FOR_TEST: readonly KartSpec[] = SPECS;

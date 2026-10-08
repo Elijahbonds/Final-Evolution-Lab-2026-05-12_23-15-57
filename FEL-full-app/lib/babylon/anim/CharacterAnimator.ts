@@ -26,6 +26,10 @@ export interface PlayOpts {
   onEnd?: () => void;
   /** Force a restart even if this exact clip is already current+playing. */
   restart?: boolean;
+  /** HOOPS-10PHASE-2 (2026-10-03): start the playhead this fraction into the clip (one-shots, positive speed). The 3PT
+   *  jumper's capture opens with its own dip/load — but the shooter is already HELD in the gather's loaded pose, so
+   *  replaying the load read as a second shot; the beat starts at the rise. The clip still runs to its natural end. */
+  from01?: number;
 }
 
 export class CharacterAnimator {
@@ -132,7 +136,9 @@ export class CharacterAnimator {
     next.speedRatio = Math.abs(finalSpeed) * this.timeScale;
     this.requested.set(next, Math.abs(finalSpeed));
     // negative speed = play from end (Babylon supports goToFrame + negative ratio)
-    next.start(loop, Math.abs(finalSpeed) * this.timeScale, finalSpeed < 0 ? next.to : next.from,
+    const from01 = Math.min(1, Math.max(0, opts.from01 ?? 0));
+    next.start(loop, Math.abs(finalSpeed) * this.timeScale,
+               finalSpeed < 0 ? next.to : from01 > 0 ? next.from + from01 * (next.to - next.from) : next.from,
                finalSpeed < 0 ? next.from : next.to, false);
     next.setWeightForAllAnimatables(0);
 

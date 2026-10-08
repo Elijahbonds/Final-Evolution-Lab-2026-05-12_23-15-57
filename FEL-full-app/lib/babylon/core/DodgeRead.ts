@@ -89,6 +89,21 @@ export function dodgeReward(secToImpact: number | null): DodgeReward {
   };
 }
 
+/**
+ * IMPROVE (2026-10-06): THE DASH READ, measured. Karate VS and Mixed paid a dash whose i-frames ate a swing with
+ * `dodgeReward(0)` — zero seconds to impact, so every such whiff was PERFECT, including a dash thrown before the rival
+ * had even started swinging (a mashed dash that he walked his strike into). The read is the same one the roll makes:
+ * seconds from the moment the DASH STARTED to the impact — and a dash already running when the swing began is no read
+ * of that swing at all (null: nothing was coming when it started).
+ *
+ * All three times on one clock (ms). Returns the `secToImpact` to hand to dodgeReward.
+ */
+export function dashSecToImpact(dashStartMs: number, swingStartMs: number, impactMs: number): number | null {
+  if (![dashStartMs, swingStartMs, impactMs].every(Number.isFinite)) return null;
+  if (dashStartMs < swingStartMs) return null;          // the dash was already going: he swung into it, it did not read him
+  return (impactMs - dashStartMs) / 1000;
+}
+
 /** The counter window, counted down by the mode. Seconds; frame-independent because dt is seconds. */
 export function tickCounter(counterLeft: number, dt: number): number {
   if (!(dt > 0)) return counterLeft;

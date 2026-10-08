@@ -165,9 +165,15 @@ export class PeerLink {
     else this.sendSafe(msg);
   }
 
-  /** Lobby/control — reliable channel, must arrive. */
-  sendSafe(msg: LinkMessage): void {
-    if (this.safe?.readyState === 'open') this.safe.send(JSON.stringify(msg));
+  /**
+   * Lobby/control — reliable channel, must arrive. MULTIPLAYER (2026-10-06): says whether it went — 'connected' is
+   * reported when EITHER channel opens, so a message sent in that gap was dropped without a word, and a sender that
+   * remembers what it sent (the party room's per-phone view) never sent it again.
+   */
+  sendSafe(msg: LinkMessage): boolean {
+    if (this.safe?.readyState !== 'open') return false;
+    this.safe.send(JSON.stringify(msg));
+    return true;
   }
 
   close(): void {

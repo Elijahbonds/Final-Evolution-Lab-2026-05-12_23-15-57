@@ -11,7 +11,7 @@ export interface HubItem {
   url: string | null;
   kind: HubKind;
   /** Section heading. The books section is the /books redirect target (#books). */
-  section?: 'books' | 'merch';
+  section?: 'books' | 'merch' | 'follow';
   /** Checkout code, shown with a copy button. */
   code?: string;
 }
@@ -21,6 +21,7 @@ export const AFFILIATE_DISCLOSURE = 'Paid link: I earn a commission if you buy.'
 export const HUB_SECTION_TITLES = {
   books: 'Books',
   merch: 'Merch',
+  follow: 'Follow',
 } as const;
 
 export const LINKS_TITLE = 'Final Evolution · Links';
@@ -39,8 +40,14 @@ export const HUB_ITEMS: readonly HubItem[] = [
     kind: 'external',
     section: 'books',
   },
+  {
+    id: 'all-books',
+    label: 'All Books',
+    url: 'https://www.amazon.com/Elijah-Bonds/e/B0H63J1Q7B',
+    kind: 'external',
+    section: 'books',
+  },
   { id: 'millions', label: 'MILLIONS', url: 'https://millions.co/elijah-bonds-basketball', kind: 'external', section: 'merch' },
-  { id: 'fanarch', label: 'Fanarch', url: 'https://fanarch.com/collections/elijah-bonds', kind: 'external', section: 'merch' },
   {
     id: 'pjf',
     label: 'PJF Performance Band',
@@ -55,6 +62,10 @@ export const HUB_ITEMS: readonly HubItem[] = [
     code: 'EBondJmp',
   },
   { id: 'contact', label: 'Contact', url: 'mailto:FinalEvolution.us@gmail.com', kind: 'email' },
+  { id: 'ig-elijah', label: 'Instagram @elijahbonds', url: 'https://www.instagram.com/elijahbonds', kind: 'external', section: 'follow' },
+  { id: 'ig-fel', label: 'Instagram @finalevolutionllc', url: 'https://www.instagram.com/finalevolutionllc', kind: 'external', section: 'follow' },
+  { id: 'youtube', label: 'YouTube', url: 'https://www.youtube.com/channel/UCP_ziu1PO1DGWfpmIP3kEng', kind: 'external', section: 'follow' },
+  { id: 'linkedin', label: 'LinkedIn', url: 'https://www.linkedin.com/in/elijah-bonds-771aa1228', kind: 'external', section: 'follow' },
 ];
 
 /** Items the page renders. A null url stays in the config and stays off the page. */

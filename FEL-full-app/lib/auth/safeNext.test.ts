@@ -1,6 +1,24 @@
 // S-16: login ?next= is a same-origin path, or it is ignored.
 import { describe, expect, it } from 'vitest';
-import { loginDestination, safeLoginNext } from './safeNext';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { join, relative } from 'node:path';
+import { loginDestination, loginPath, safeLoginNext, safePostSignInDestination } from './safeNext';
+
+const root = join(__dirname, '../..');
+
+function appEntries(dir: string): string[] {
+  const out: string[] = [];
+  for (const entry of readdirSync(dir)) {
+    const full = join(dir, entry);
+    if (statSync(full).isDirectory()) {
+      if (entry === 'api') continue;
+      out.push(...appEntries(full));
+    } else if (entry === 'page.tsx' || entry === 'layout.tsx') {
+      out.push(full);
+    }
+  }
+  return out;
+}
 
 describe('safeLoginNext', () => {
   it('?next=/play/mirror lands there', () => {
@@ -11,6 +29,11 @@ describe('safeLoginNext', () => {
   it('keeps a same-origin query and hash', () => {
     expect(safeLoginNext('/play/mirror?step=1')).toBe('/play/mirror?step=1');
     expect(safeLoginNext('/account#data')).toBe('/account#data');
+    expect(safeLoginNext('/play/calibrate?return=%2Fplay%2Fdance')).toBe('/play/calibrate?return=%2Fplay%2Fdance');
+    expect(safeLoginNext('/c/abc%20123')).toBe('/c/abc%20123');
+    expect(loginPath('/account#data')).toBe('/login?next=%2Faccount%23data');
+    expect(loginPath('/play/mirror?step=1')).toBe('/login?next=%2Fplay%2Fmirror%3Fstep%3D1');
+    expect(loginPath('/play/karate')).toBe('/login?next=%2Fplay%2Fkarate');
   });
 
   it('?next=https://evil.example and //evil.example are ignored', () => {
@@ -24,11 +47,31 @@ describe('safeLoginNext', () => {
   });
 
   it('refuses protocol-relative tricks: backslash, tab, encoded slashes, a scheme', () => {
-    expect(safeLoginNext('/\\evil.example')).toBeNull();
-    expect(safeLoginNext('/\t/evil.example')).toBeNull();
-    expect(safeLoginNext('/%2F%2Fevil.example')).toBeNull();
-    expect(safeLoginNext('javascript:alert(1)')).toBeNull();
-    expect(safeLoginNext('javascript:alert(1)')).toBeNull();
+    const refused = [
+      '/\\evil.example',
+      '/\t/evil.example',
+      '/\n/evil.example',
+      '/%2F%2Fevil.example',
+      '/%2f%2fevil.example',
+      '/%252F%252Fevil.example',
+      '/%252f%252fevil.example',
+      '/%2Fevil.example',
+      '/%5C%5Cevil.example',
+      '/%5c/evil.example',
+      '/%09/evil.example',
+      '/%00/evil.example',
+      '/play/../%2F%2Fevil.example',
+      '///evil.example',
+      'javascript:alert(1)',
+      'data:text/html,hi',
+      'https:evil.example',
+      '\\evil.example',
+      '/play\\evil',
+    ];
+    for (const raw of refused) {
+      expect(safeLoginNext(raw), raw).toBeNull();
+      expect(loginPath(raw), raw).toBe('/login');
+    }
   });
 
   it('refuses a path that is not absolute-on-this-origin, and non-strings', () => {
@@ -41,5 +84,107 @@ describe('safeLoginNext', () => {
     expect(safeLoginNext(['/play/mirror'])).toBeNull();
     expect(safeLoginNext('/' + 'a'.repeat(600))).toBeNull();
     expect(loginDestination(undefined, '/play/dunk')).toBe('/play/dunk');
+    expect(loginPath('https://evil.example')).toBe('/login');
+    expect(loginDestination('/%252F%252Fevil.example', '/play')).toBe('/play');
+  });
+});
+
+// AGE-RESET-LOGIN-NEXT (audit 2.10, 2026-10-03): the court-session login walls send ?next= so signing in at a court
+// returns you where you were. These pin both halves: the pages pass it, and the sanitizer honours exactly those paths.
+describe('the login walls that send ?next= (audit 2.10)', () => {
+  const ROUTES: [string, string][] = [
+    ['app/play/dunkduel/page.tsx', '/play/dunkduel'],
+    ['app/play/irl/page.tsx', '/play/irl'],
+    ['app/play/dunk/page.tsx', '/play/dunk'],
+    ['app/play/mirror/page.tsx', '/play/mirror'],
+    ['app/coach/page.tsx', '/coach'],
+  ];
+
+  it('each route\'s next path is a safe same-origin path (no "//", no scheme)', () => {
+    for (const [, p] of ROUTES) expect(safeLoginNext(p), p).toBe(p);
+  });
+
+  it('each page redirects to /login with its own path in ?next=', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    for (const [file, p] of ROUTES) {
+      const src = readFileSync(join(__dirname, '../../', file), 'utf8');
+      expect(src, file).toContain(`redirect(loginPath('${p}'))`);
+    }
+  });
+});
+
+// LOGIN-LOOP-FIX (2026-10-04): a regression test for the sign-in redirect loop. The bug was never about
+// safeLoginNext refusing an unsafe path — it already did that — it was that a *safe*, same-origin ?next= could
+// still point straight back at /login (bare, or nested as next=/login?next=/login), and a caller trusting
+// loginDestination blind would send a just-signed-in athlete right back to logged-out. These pin the stronger
+// guarantee: whatever the input, the post-sign-in target is never /login and never a /login?next= URL.
+describe('safePostSignInDestination never returns the login page itself', () => {
+  it('next pointing straight at /login falls back', () => {
+    expect(safePostSignInDestination('/login', '/play/dunk')).toBe('/play/dunk');
+    expect(safePostSignInDestination('/login?foo=1', '/play/dunk')).toBe('/play/dunk');
+    expect(safePostSignInDestination('/login/', '/play/dunk')).toBe('/play/dunk');
+  });
+
+  it('next nesting another /login?next=... falls back (never returns a /login?next= URL)', () => {
+    expect(safePostSignInDestination('/login?next=%2Flogin', '/play/dunk')).toBe('/play/dunk');
+    expect(safePostSignInDestination('/login?next=%2Fplay%2Fdunk', '/play/dunk')).toBe('/play/dunk');
+  });
+
+  it('absolute/external next is ignored, same as loginDestination, and never equals the login page', () => {
+    expect(safePostSignInDestination('https://evil.example', '/play/dunk')).toBe('/play/dunk');
+    expect(safePostSignInDestination('//evil.example', '/play/dunk')).toBe('/play/dunk');
+  });
+
+  it('missing next falls back to the default destination', () => {
+    expect(safePostSignInDestination(undefined, '/play/dunk')).toBe('/play/dunk');
+    expect(safePostSignInDestination(null, '/coach/session')).toBe('/coach/session');
+  });
+
+  it('a safe next that is not /login wins, exactly like loginDestination', () => {
+    expect(safePostSignInDestination('/coach/session', '/play/dunk')).toBe('/coach/session');
+    expect(safePostSignInDestination('/play/mirror?step=1', '/play/dunk')).toBe('/play/mirror?step=1');
+  });
+
+  it('the loginPathValue parameter is honoured rather than a hardcoded literal', () => {
+    expect(safePostSignInDestination('/signin', '/play/dunk', '/signin')).toBe('/play/dunk');
+    expect(safePostSignInDestination('/login', '/play/dunk', '/signin')).toBe('/login');
+  });
+
+  it('never, for any input in this file\'s own fixtures, resolves to the login page', () => {
+    const fallback = '/play/dunk';
+    const inputs = [undefined, null, '', '/login', '/login/', '/login?x=1', '/login?next=%2Flogin', '/play/mirror',
+      'https://evil.example', '//evil.example', '/%252F%252Fevil.example'];
+    for (const raw of inputs) {
+      const dest = safePostSignInDestination(raw, fallback);
+      expect(dest, JSON.stringify(raw)).not.toBe('/login');
+      expect(dest, JSON.stringify(raw)).not.toMatch(/^\/login(?:[/?#]|$)/);
+    }
+  });
+});
+
+describe('every protected page returns through loginPath', () => {
+  it('no page or layout sends a signed-out visitor to a bare /login', () => {
+    const bare: string[] = [];
+    const loginWalls: string[] = [];
+    for (const file of appEntries(join(root, 'app'))) {
+      const rel = relative(root, file);
+      const src = readFileSync(file, 'utf8');
+      if (/redirect\(\s*['"`]\/login['"`]\s*\)/.test(src)) bare.push(rel);
+      if (/redirect\(\s*(?:['"`]\/login|loginPath\()/.test(src)) {
+        loginWalls.push(rel);
+        expect(src, rel).toContain('loginPath(');
+      }
+    }
+    expect(bare).toEqual([]);
+    expect(loginWalls.length).toBeGreaterThan(20);
+    expect(loginWalls).toEqual(expect.arrayContaining([
+      'app/play/brain-brawl/page.tsx',
+      'app/play/dunk/page.tsx',
+      'app/coach/page.tsx',
+      'app/workout/page.tsx',
+      'app/age/page.tsx',
+      'app/studio/layout.tsx',
+    ]));
   });
 });

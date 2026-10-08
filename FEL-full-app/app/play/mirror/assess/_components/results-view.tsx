@@ -16,17 +16,17 @@
 // UNDER 18, OR "RATHER NOT SAY": never these cards. Their results never reach this address (nothing is kept for them:
 // lib/screen/store.ts), so this is only a guard: a kid's age gets the kid view, their number and nothing else.
 import Link from 'next/link';
-import { Play } from 'lucide-react';
 import { priorities, type CheckBand, type ScreenSummary } from '@/lib/screen/checks';
 import { BAND_WORDS, cueOf, checkById, GRADED_CHECKS, type BandWord, type CheckId } from '@/lib/screen/PROPOSED-thresholds';
 import { isKid, type AgeBand } from '@/lib/screen/age';
 import { PRIVACY_PATH } from '@/lib/screen/routes';
 import {
-  DEMO_COMING, DISCLAIMER, DONE_CLEAR, KINDLE_BOOK_LABEL, KINDLE_BOOK_URL, NOTHING_TO_RANK, PRIVACY_LINK, SCREENSHOT_LINE,
+  DISCLAIMER, DONE_CLEAR, KINDLE_BOOK_LABEL, KINDLE_BOOK_URL, NOTHING_TO_RANK, PRIVACY_LINK, SCREENSHOT_LINE,
   SCREEN_TEST_NAMES, WIN_LINE,
 } from '@/lib/screen/copy';
 import { BandChip, EarlyTag, PreviewLabel, StopLine, primaryBtn, quietBtn, BAND_COLOUR, UNREAD_WORD } from './screen-ui';
 import { KidResults } from './kid-results';
+import { DrillDemo } from './drill-demo';   // EDU-LINKS (2026-10-07): the demo slot, filled with the 3D ExerciseDemo
 
 type TestId = keyof typeof SCREEN_TEST_NAMES;
 /** The checks the start card lists, in check order (A3-3). */
@@ -54,15 +54,17 @@ export function checkCards(s: ScreenSummary): CheckCard[] {
 /** A row's plain name without the check it belongs to: "Knees cave in (overhead squat)" → "Knees cave in". */
 const rowName = (id: CheckId): string => checkById(id).name.replace(/\s*\([^)]*\)$/, '');
 
-export function ResultsView({ summary, age, onClear, onRunAgain }: {
+export function ResultsView({ summary, age, onClear, onRunAgain, trainWithElijahHref = null }: {
   summary: ScreenSummary; age: AgeBand | null; onClear: () => void; onRunAgain: () => void;
+  /** Set by the server only for a verified adult while the coach store is on. Hidden for a kid answer. */
+  trainWithElijahHref?: string | null;
 }) {
   const s = summary;
   if (isKid(age)) return <KidResults jumpIn={s.jumpBestIn} lastIn={null} onRunAgain={onRunAgain} />;
   return (
     <div data-screen-results className="space-y-3">
       <div className="space-y-2">
-        <p data-disclaimer className="text-[15px] font-bold leading-snug text-white">{DISCLAIMER}</p>
+        <p data-disclaimer className="text-[16px] font-bold leading-snug text-white">{DISCLAIMER}</p>
         <StopLine />
         <PreviewLabel />
       </div>
@@ -73,30 +75,30 @@ export function ResultsView({ summary, age, onClear, onRunAgain }: {
           <p className="mt-1.5 text-[18px] font-black leading-snug">{WIN_LINE}</p>
         </section>
       ) : !s.priorities.length ? (
-        <section data-no-pick className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-[14px] leading-snug text-white/80">
+        <section data-no-pick className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-[16px] leading-snug text-white/80">
           {NOTHING_TO_RANK}
         </section>
       ) : null}
 
       <section>
-        <h2 className="px-1 text-[13px] font-bold uppercase tracking-[0.14em] text-white/60">Your checks</h2>
+        <h2 className="px-1 text-[16px] font-bold uppercase tracking-[0.14em] text-white/60">Your checks</h2>
         <ul data-check-cards className="mt-2 space-y-2">
           {checkCards(s).map(({ test, band, row, top }) => {
             const word = band ?? 'unread';
             const pad = top ? 'p-3.5' : 'px-3.5 py-2.5';
-            const cueText = top ? 'text-[14px] text-white/85' : 'text-[13px] text-white/75';
+            const cueText = top ? 'text-[16px] text-white/85' : 'text-[16px] text-white/75';
             return (
               <li key={test} data-check-card={test} data-priority={top ? test : undefined} aria-label={`${SCREEN_TEST_NAMES[test]}: ${word === 'unread' ? 'not read' : word}`}
                 className={`rounded-2xl border border-white/10 bg-white/[0.03] ${pad}`} style={{ borderLeft: `4px solid ${BAND_COLOUR[word]}` }}>
-                {top ? <p data-top-priority className="text-[11px] font-bold uppercase tracking-[0.14em] text-white/55">Top priority</p> : null}
-                <p className={top ? 'text-[16px] font-black leading-snug' : 'text-[14.5px] font-bold leading-snug'}>{SCREEN_TEST_NAMES[test]}</p>
+                {top ? <p data-top-priority className="text-[16px] font-bold uppercase tracking-[0.14em] text-white/55">Top priority</p> : null}
+                <p className={top ? 'text-[16px] font-black leading-snug' : 'text-[16px] font-bold leading-snug'}>{SCREEN_TEST_NAMES[test]}</p>
                 <div className="mt-0.5"><BandChip band={band} /></div>
                 {row ? (
                   <>
-                    <p data-check-row={row.id} className="mt-1 text-[13.5px] font-bold leading-snug text-white/90">
+                    <p data-check-row={row.id} className="mt-1 text-[16px] font-bold leading-snug text-white/90">
                       {rowName(row.id)}
                       {row.sides ? (
-                        <span className="ml-2 text-[12.5px] font-normal text-white/60">
+                        <span className="ml-2 text-[16px] font-normal text-white/60">
                           Left: <SideWord band={row.sides.left} /> · Right: <SideWord band={row.sides.right} />
                         </span>
                       ) : null}
@@ -105,8 +107,8 @@ export function ResultsView({ summary, age, onClear, onRunAgain }: {
                   </>
                 ) : null}
                 {top ? (
-                  <div data-demo-slot className="mt-2 flex items-center gap-2 rounded-xl border border-dashed border-white/20 px-3 py-2 text-[12.5px] text-white/60">
-                    <Play aria-hidden className="h-4 w-4" /> {DEMO_COMING}
+                  <div data-demo-slot className="mt-2">
+                    <DrillDemo test={test} drill={row ? cueOf(row.id) : SCREEN_TEST_NAMES[test]} />
                   </div>
                 ) : null}
               </li>
@@ -117,8 +119,8 @@ export function ResultsView({ summary, age, onClear, onRunAgain }: {
 
       {s.jumpBestIn !== null ? (
         <section data-personal-best className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3">
-          <p className="text-[14px] text-white/80">Your best jump: <b className="text-[18px] text-white">{s.jumpBestIn} in</b></p>
-          <p className="text-[12.5px] text-white/55">A personal best to beat next time.</p>
+          <p className="text-[16px] text-white/80">Your best jump: <b className="text-[18px] text-white">{s.jumpBestIn} in</b></p>
+          <p className="text-[16px] text-white/55">A personal best to beat next time.</p>
         </section>
       ) : null}
 
@@ -126,8 +128,13 @@ export function ResultsView({ summary, age, onClear, onRunAgain }: {
         {/* the one next step: a plain link (never next/link: no prefetch), a new tab, the address byte for byte */}
         <a href={KINDLE_BOOK_URL} target="_blank" rel="noopener noreferrer" data-cta="book" className={primaryBtn}>{KINDLE_BOOK_LABEL}</a>
       </div>
-      <p data-screenshot-line className="pt-1 text-center text-[13px] text-white/70">{SCREENSHOT_LINE}</p>
-      <p className="text-center text-[12.5px] text-white/60">
+      {trainWithElijahHref && !isKid(age) ? (
+        <p className="text-center text-[16px]">
+          <a href={trainWithElijahHref} data-train-with-elijah>Train with Elijah</a>
+        </p>
+      ) : null}
+      <p data-screenshot-line className="pt-1 text-center text-[16px] text-white/70">{SCREENSHOT_LINE}</p>
+      <p className="text-center text-[16px] text-white/60">
         <Link href={PRIVACY_PATH} prefetch={false} data-privacy-link className="underline">{PRIVACY_LINK}</Link>
       </p>
       <button type="button" onClick={onClear} data-done-clear className={quietBtn}>{DONE_CLEAR}</button>

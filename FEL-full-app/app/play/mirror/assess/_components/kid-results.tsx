@@ -17,14 +17,14 @@ export function KidResults({ jumpIn, lastIn, onRunAgain }: { jumpIn: number | nu
   return (
     <div data-kid-results className="space-y-3">
       <div className="space-y-1">
-        <p data-disclaimer className="text-[15px] font-bold leading-snug text-white">{DISCLAIMER}</p>
-        <p data-stop-line className="text-[13px] text-white/70">{STOP_LINE}</p>
+        <p data-disclaimer className="text-[16px] font-bold leading-snug text-white">{DISCLAIMER}</p>
+        <p data-stop-line className="text-[16px] text-white/70">{STOP_LINE}</p>
       </div>
       {jumpIn !== null ? (
         <section data-kid-number className="rounded-3xl border border-white/15 bg-white/[0.04] p-5 text-center">
           <p className="text-[16px] text-white/80">{KID_JUMP}: <b data-kid-jump className="text-[32px] font-black text-white">{jumpIn} in</b></p>
           {change ? <p data-kid-change className="mt-1 text-[16px] font-bold text-white/85">{jumpChangeLine(change)}</p> : null}
-          <p data-kid-save-line className="mt-3 text-[14px] leading-snug text-white/75">{KID_SAVE_LINE}</p>
+          <p data-kid-save-line className="mt-3 text-[16px] leading-snug text-white/75">{KID_SAVE_LINE}</p>
         </section>
       ) : (
         <section data-kid-no-jump className="rounded-3xl border border-white/15 bg-white/[0.04] p-5 text-center">
@@ -32,7 +32,7 @@ export function KidResults({ jumpIn, lastIn, onRunAgain }: { jumpIn: number | nu
         </section>
       )}
       <button type="button" data-primary data-run-again onClick={onRunAgain} className={primaryBtn}>{RUN_IT_AGAIN}</button>
-      <p className="text-center text-[12.5px] text-white/60">
+      <p className="text-center text-[16px] text-white/60">
         <Link href={PRIVACY_PATH} prefetch={false} data-privacy-link className="underline">{PRIVACY_LINK}</Link>
       </p>
     </div>

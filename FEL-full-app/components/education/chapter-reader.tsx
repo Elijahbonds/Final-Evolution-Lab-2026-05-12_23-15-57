@@ -11,7 +11,13 @@ import Link from 'next/link';
 import { ArrowLeft, ArrowRight, Check, Gem, Lightbulb, Play } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Chapter } from '@/lib/education/course';
-import { chapterProgress, lessonId } from '@/lib/education/course';
+import { chapterProgress, lessonId, nextChapterHref } from '@/lib/education/course';
+// EDU-LINKS (2026-10-07), Mirror & coaching plan Phase 5: "Next chapter" opens the next chapter, a lesson that teaches a
+// Mirror movement links to the camera, and the chapter check (owner decision 6: shards at 80%) sits under the recap.
+import { movementForLesson } from '@/lib/education/lessonMovement';
+import { CameraLink } from './camera-link';
+import { DrillsLink } from '@/components/drills/drills-link';
+import { ChapterCheck } from './chapter-check';
 
 export function ChapterReader({ chapter, filmFor }: { chapter: Chapter; filmFor?: Record<string, string> }) {
   const [done, setDone] = useState<Set<string>>(new Set());
@@ -39,6 +45,8 @@ export function ChapterReader({ chapter, filmFor }: { chapter: Chapter; filmFor?
   const isDone = done.has(id);
   const progress = useMemo(() => chapterProgress(chapter, done), [chapter, done]);
   const film = lesson ? filmFor?.[lesson.key] : undefined;
+  const movement = id ? movementForLesson(id) : null;
+  const next = nextChapterHref(chapter.number);
 
   const complete = useCallback(async () => {
     if (!lesson || busy || isDone) { setI((n) => Math.min(chapter.lessons.length - 1, n + 1)); return; }
@@ -51,11 +59,14 @@ export function ChapterReader({ chapter, filmFor }: { chapter: Chapter; filmFor?
       });
       const j = await res.json().catch(() => ({}));
       if (Array.isArray(j?.done)) setDone(new Set(j.done));
-      if (j?.awarded > 0) toast.success(`Chapter done — ${j.awarded} shards.`);
+      if (j?.awarded > 0) toast.success(`Chapter done — ${j.awarded + (j.bonus > 0 ? j.bonus : 0)} shards.`);
+      else if (j?.chapterComplete && j?.payPath === 'check') toast.success('Chapter read. The chapter check is below.');
       else if (j?.chapterComplete) toast.success('Chapter done.');
       setI((n) => Math.min(chapter.lessons.length - 1, n + 1));
     } catch {
-      toast.error('Could not save that — your place is kept locally.');
+      // EDU-LINKS (2026-10-07): this promised the place was saved on the device, and nothing saved it — the lesson was
+      // not kept anywhere, so a reload lost it. Say what happened instead.
+      toast.error('Could not save that lesson. Check your connection and tap it again.');
     } finally {
       setBusy(false);
     }
@@ -149,6 +160,11 @@ export function ChapterReader({ chapter, filmFor }: { chapter: Chapter; filmFor?
             <p className="mt-2 text-[13.5px] leading-relaxed text-white/70">{lesson.note}</p>
           </aside>
         )}
+
+        {/* Learn it, then check it on camera (lib/education/lessonMovement.ts). */}
+        {movement && <div className="mt-6"><CameraLink movement={movement} /></div>}
+        {/* …and run its drill on camera (lib/drills/playbookLinks.ts; Mirror & coaching Phase 6) */}
+        {id && <DrillsLink lessonId={id} />}
       </article>
 
       <div className="mt-5 flex items-center gap-3">
@@ -180,25 +196,34 @@ export function ChapterReader({ chapter, filmFor }: { chapter: Chapter; filmFor?
         </button>
       </div>
 
-      {chapter.remember.length > 0 && progress.done === progress.total && (
-        <section className="mt-8 rounded-2xl border border-[#00FF9D]/25 bg-[#00FF9D]/[0.04] p-5">
-          <h3 className="fel-heading text-[15px] font-bold text-white">What to remember</h3>
-          <ul className="mt-3 space-y-2">
-            {chapter.remember.map((r, n) => (
-              <li key={n} className="flex gap-2.5 text-[13.5px] leading-relaxed text-white/70">
-                <span className="mt-[9px] h-1 w-1 shrink-0 rounded-full bg-[#00FF9D]" />
-                {r}
-              </li>
-            ))}
-          </ul>
+      {progress.total > 0 && progress.done === progress.total && (
+        <section data-chapter-done className="mt-8 rounded-2xl border border-[#00FF9D]/25 bg-[#00FF9D]/[0.04] p-5">
+          {chapter.remember.length > 0 && (
+            <>
+              <h3 className="fel-heading text-[15px] font-bold text-white">What to remember</h3>
+              <ul className="mt-3 space-y-2">
+                {chapter.remember.map((r, n) => (
+                  <li key={n} className="flex gap-2.5 text-[13.5px] leading-relaxed text-white/70">
+                    <span className="mt-[9px] h-1 w-1 shrink-0 rounded-full bg-[#00FF9D]" />
+                    {r}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+          {/* EDU-LINKS (2026-10-07): this went to the course index from every chapter. It opens the next one now, and the
+              index after the last; and it shows on a chapter with no recap (5 and 8 have none), which it never did. */}
           <Link
-            href="/education/playbook"
+            href={next}
+            data-next-chapter={next}
             className="mt-4 inline-flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-[#00FF9D]"
           >
-            <Play className="h-3 w-3" /> Next chapter
+            <Play className="h-3 w-3" /> {next === '/education/playbook' ? 'All chapters' : 'Next chapter'}
           </Link>
         </section>
       )}
+
+      {progress.total > 0 && progress.done === progress.total && <ChapterCheck chapter={chapter.number} />}
     </>
   );
 }

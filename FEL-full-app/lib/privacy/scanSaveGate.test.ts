@@ -16,7 +16,7 @@ vi.mock('./scanSaveOptIn', async (importOriginal) => {
 import { scanSaveOptIn } from './scanSaveOptIn';
 import { SCAN_SAVE_REFUSED, SCAN_SAVE_ROUTES, canSaveScanNumbers, refuseScanSave, verifiedAdult } from './scanSaveGate';
 import {
-  OPTED_IN_ADULT, REFUSED_SCAN_CASES, THIS_YEAR, argsOf, callsOn, newSpyDb, seedAcceptedGuardian, seedUser, spyPrisma, writesOf,
+  OPTED_IN_ADULT, REFUSED_SCAN_CASES, THIS_YEAR, argsOf, callsOn, newSpyDb, refusedGateReads, seedAcceptedGuardian, seedUser, spyPrisma, writesOf,
 } from '@/tests/helpers/writeSpyDb';
 
 const optIn = vi.mocked(scanSaveOptIn);
@@ -84,7 +84,7 @@ describe('canSaveScanNumbers: verified 18+ from the DATABASE, and opted in', () 
     expect(getServerSession).not.toHaveBeenCalled();
   });
 
-  it('the real opt-in reader answers false for everyone today, so an adult who has not opted in is refused', async () => {
+  it('the real opt-in reader answers false when no grant is stored, so an adult who has not opted in is refused', async () => {
     const db = newSpyDb();
     seedUser(db, UID, 1990);
     expect(await realOptIn(spyPrisma(db), UID)).toBe(false);
@@ -97,7 +97,7 @@ describe('canSaveScanNumbers: verified 18+ from the DATABASE, and opted in', () 
       const db = newSpyDb();
       c.seed(db, UID);
       expect(await canSaveScanNumbers(spyPrisma(db), UID), c.id).toBe(false);
-      expect(db.calls.map((x) => x.op), c.id).toEqual(['user.findUnique']);
+      expect(db.calls.map((x) => x.op), c.id).toEqual(refusedGateReads(c.id));
       expect(writesOf(db), c.id).toEqual([]);
     }
   });
@@ -185,7 +185,7 @@ describe('the refusal', () => {
 
 describe('SCAN_SAVE_ROUTES is GAP 1\'s table', () => {
   it('names 1a–1h once each, every file exists, and a routed row names its holder', () => {
-    expect(SCAN_SAVE_ROUTES.map((r) => r.id)).toEqual(['1a', '1b', '1c', '1d', '1e', '1f', '1g', '1h']);
+    expect(SCAN_SAVE_ROUTES.map((r) => r.id)).toEqual(['1a', '1b', '1c', '1d', '1e', '1f', '1g', '1h', '1i', '1j']);
     for (const r of SCAN_SAVE_ROUTES) {
       expect(() => readFileSync(join(__dirname, '../..', r.file)), r.file).not.toThrow();
       if (r.status === 'routed') expect(r.holder, r.id).toBeTruthy();
@@ -197,8 +197,13 @@ describe('SCAN_SAVE_ROUTES is GAP 1\'s table', () => {
 
 const ROOT = join(__dirname, '../..');
 const GATE_FILES = ['lib/privacy/scanSaveGate.ts', 'lib/privacy/scanSaveOptIn.ts', 'lib/privacy/healthWriteGate.ts', 'lib/privacy/verifiedAdult.ts'];
-/** Tables and columns already on production: User, plus the MIRROR-COACH p5/p6 tables (prisma/pending/2026-09-29-*). */
-const PROD_SAFE_MODELS = ['user', 'healthIntake', 'healthConsent', 'painCheckIn', 'readinessCheckIn'];
+/**
+ * User, the MIRROR-COACH p5/p6 tables, and ScanSaveOptIn.
+ * assumption: naming scanSaveOptIn is safe because its reader catches a missing table and returns false
+ * (prisma/pending/2026-10-04-adult-optin-ab04.sql). That replaces the old "don't name a table that isn't on
+ * production yet" proxy for this one model. A thrown read is still a refusal, not a 500.
+ */
+const PROD_SAFE_MODELS = ['user', 'healthIntake', 'healthConsent', 'painCheckIn', 'readinessCheckIn', 'scanSaveOptIn'];
 const ACCESS = /\b(?:db|prisma|tx|client)\s*(?:\.\s*([A-Za-z_]\w*)|\[\s*['"](\w+)['"]\s*\])/g;
 const PICK = /Pick<\s*Prisma\.(?:TransactionClient|PrismaClient)\s*,\s*([^>]+)>/g;
 
@@ -216,7 +221,7 @@ describe('static: the gate reads only what production already has, and imports n
     expect(modelsReferenced("prisma['ageRecord'].findMany()")).toEqual(['ageRecord']);
   });
 
-  it.each(GATE_FILES)('%s references only User and the p5/p6 tables, never GuardianConsent', (file) => {
+  it.each(GATE_FILES)('%s references only the production-safe models, never GuardianConsent', (file) => {
     const src = readFileSync(join(ROOT, file), 'utf8');
     for (const model of modelsReferenced(src)) expect(PROD_SAFE_MODELS, `${file} reads ${model}`).toContain(model);
     expect(src).not.toMatch(/\.\s*guardianConsent\b|'guardianConsent'|faceScanConsent/);

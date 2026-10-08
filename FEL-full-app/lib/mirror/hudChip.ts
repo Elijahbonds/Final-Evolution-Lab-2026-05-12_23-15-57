@@ -8,8 +8,11 @@ import { screenFor, type ScreenId } from './screen';
 import type { RunnerPhase } from './screenRunner';
 import type { SquatStage } from './squatStage';
 import type { LungeStage } from './lungeStage';
+import type { MirrorTab } from './patternParam';
+import type { SideRepStageName } from './sideRepStage';
 
-export type MirrorPattern = 'pressRow' | 'jump' | 'squat' | 'lunge' | 'screen';
+/** Every tab (MIRROR-MOVES P2: the one list, patternParam.ts — the hinge and the push-up added). */
+export type MirrorPattern = MirrorTab;
 
 export interface ChipInput {
   pattern: MirrorPattern;
@@ -22,6 +25,14 @@ export interface ChipInput {
   lungeStage: LungeStage;
   /** Screen: the runner's latest state (null before its first tick). */
   runner: { screen: ScreenId; phase: RunnerPhase; stationIndex: number } | null;
+  /** MIRROR-MOVES P2: the hinge's and the push-up's session stage (sideRepStage.ts). Absent reads as setup. */
+  hingeStage?: SideRepStageName;
+  pushupStage?: SideRepStageName;
+}
+
+/** A side-on set's chip (MIRROR-MOVES P2): what the athlete is waiting on, then the stage. */
+export function sideRepChip(stage: SideRepStageName = 'setup'): string {
+  return stage === 'setup' ? 'Get side-on' : stage;
 }
 
 const JUMP: Record<string, string> = { ready: 'Jump when ready', airborne: 'Airborne', calibrating: 'Stand still' };
@@ -55,6 +66,8 @@ export function chipLabel(c: ChipInput): string {
     squat: () => c.squatStage,
     lunge: () => lungeChip(c.lungeStage),
     screen: () => screenChip(c.runner),
+    hinge: () => sideRepChip(c.hingeStage),
+    pushup: () => sideRepChip(c.pushupStage),
   };
   return by[c.pattern]();
 }

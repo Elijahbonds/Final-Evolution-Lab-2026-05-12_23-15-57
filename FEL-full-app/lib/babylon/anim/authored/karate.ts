@@ -7,6 +7,7 @@
 // guard never actually came up.
 import type { Scene, Skeleton, AnimationGroup } from '@babylonjs/core';
 import { buildPoseClip } from '../poseClip';
+import { gaitKnees } from '../gait';
 type V3 = [number, number, number];
 
 const GUARD = { Left: [-0.18, 1.32, 0.30] as V3, Right: [0.16, 1.28, 0.24] as V3 };   // fists up in front of the chin
@@ -30,19 +31,23 @@ export function buildKnockdown(scene: Scene, sk: Skeleton): AnimationGroup | nul
 /** The GUARD STEP — a fighter's loco (MODE-STICK-FACE family, 2026-09-07). Every combat mode moved the fighter on the
  *  shared 'run' (arms pumping at the hips: a jogger, not a fighter). This keeps the fists at the chin (GUARD — the same
  *  targets the hit react returns to) over a short stepping cadence, so closing, circling and retreating all read as a
- *  fighter who is READY. Thigh ±26°, knee 12 + 14: a step, not a sprint. */
+ *  fighter who is READY. Thigh ±26°, knee 12 + 14: a step, not a sprint. (MOVEMENT POLISH 2026-10-06: ±12°, 12 + 10 — see below.) */
+export const GUARD_STEP_THIGH = 12, GUARD_STEP_KNEE = 10;
 export function buildGuardStep(scene: Scene, sk: Skeleton): AnimationGroup | null {
   const T = 0.6, N = 8; const keys = [];
   for (let k = 0; k <= N; k++) {
     const phi = (2 * Math.PI * k) / N, s = Math.sin(phi);
-    const kneeL = 12 + 14 * (1 - Math.cos(phi)), kneeR = 12 + 14 * (1 - Math.cos(phi + Math.PI));
+    const { L: kneeL, R: kneeR } = gaitKnees(phi, 12, GUARD_STEP_KNEE);   // MOVEMENT POLISH (2026-10-06): the knee folds on the forward swing (gait.ts)
     keys.push({
       t: (T * k) / N,
       bones: {
         Hips: [0, 4 * s, 0] as [number, number, number], Spine: [4, 0, 0] as [number, number, number],
-        LeftUpLeg: [-26 * s, 0, 4] as [number, number, number], RightUpLeg: [26 * s, 0, -4] as [number, number, number],
+        // MOVEMENT POLISH (2026-10-06), TUNED: thigh ±26° → ±12°, knee fold 14 → 10. With the knee on the right half of the cycle (gait.ts)
+        // the ±26° step covers 3.1 m/s at rate 1 (the stride sweep, _movement-probe `calib`) — and the guard step only plays up to
+        // GUARD_STEP_CEILING, 1.11 m/s, where even the slowest rate (0.55) would sweep the feet at 1.7 m/s. ±12° covers 1.2 m/s (COMBAT_STRIDE).
+        LeftUpLeg: [-GUARD_STEP_THIGH * s, 0, 4] as [number, number, number], RightUpLeg: [GUARD_STEP_THIGH * s, 0, -4] as [number, number, number],
         LeftLeg: [kneeL, 0, 0] as [number, number, number], RightLeg: [kneeR, 0, 0] as [number, number, number],
-        LeftFoot: [-kneeL * 0.4 + 8 * s, 0, 0] as [number, number, number], RightFoot: [-kneeR * 0.4 - 8 * s, 0, 0] as [number, number, number],
+        LeftFoot: [-kneeL * 0.4 + 0.3 * GUARD_STEP_THIGH * s, 0, 0] as [number, number, number], RightFoot: [-kneeR * 0.4 - 0.3 * GUARD_STEP_THIGH * s, 0, 0] as [number, number, number],
       },
       hands: { Left: [GUARD.Left[0], GUARD.Left[1] + 0.02 * Math.abs(s), GUARD.Left[2]] as V3, Right: [GUARD.Right[0], GUARD.Right[1] + 0.02 * Math.abs(s), GUARD.Right[2]] as V3 },
     });

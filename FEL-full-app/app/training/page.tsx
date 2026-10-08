@@ -2,6 +2,7 @@ import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { authOptions } from '@/lib/auth';
+import { loginPath } from '@/lib/auth/safeNext';
 import { prisma } from '@/lib/db';
 import { TrainingClientView } from '@/components/training/TrainingDashboard';
 
@@ -21,7 +22,7 @@ export const dynamic = 'force-dynamic';
 export default async function TrainingPage() {
   const session = await getServerSession(authOptions);
   const me = (session?.user as { id?: string } | undefined)?.id;
-  if (!me) redirect('/login?next=%2Ftraining');
+  if (!me) redirect(loginPath('/training'));
 
   const [coachLink, programCount] = await Promise.all([
     prisma.coachClient.findFirst({

@@ -7,9 +7,11 @@
 // lives in lib/babylon/* cores; nothing game-specific is duplicated here.
 
 import { readCourtLocation } from '@/lib/babylon/nexus/courtLocations';
+import { courtArtSkin } from '@/lib/modes/art/apply-art-card';
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import type { GameProps, GameResult } from './game-shell';
 import { BootSplash } from './boot-splash';
+import { surfaceBootError } from './boot-error';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue, type HudScoreCard } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
@@ -19,6 +21,9 @@ import { controllerConfigFor } from '@/lib/controller-link/schemas/registry';
 import { toInputBus } from '@/lib/controller-link/modeBridge';
 import { hnode, hnum } from './hud-format';
 import { DunkPoster } from './dunk-poster';
+import { DunkBeatStrip } from './dunk-beat-strip';
+import { DunkFieldBoard } from './dunk-field-board';
+import { decodeTakeoff, ZONE_HEX } from '@/lib/babylon/core/DunkTakeoffRead';
 import { MicCaption, MicToggle } from './mic-caption';
 import type { HudPoster } from '@/lib/babylon/core/ModeHarness';
 
@@ -116,6 +121,7 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
       runMode(MODES.dunk, {
         canvas,
         location: readCourtLocation(),   // court location pick (docs/SPEC-COURT-LOCATIONS.md)
+        applySkin: courtArtSkin,   // PIPELINES (2026-10-06): the player's court art card, a centre-court decal
         input: bus,
         continuous: continuousRef.current,
         cardSink,
@@ -131,7 +137,7 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
           if (disposed) { s(); return; }
           stop = s;
         })
-        .catch((e) => console.error('[FEL-DUNK] boot failed', e));
+        .catch((e) => surfaceBootError(e, { disposed, label: '[FEL-DUNK] boot failed', setPhase, setLoadError }));
     }, 0);
 
     return () => {
@@ -168,6 +174,24 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
     emit({ t: 'button', btn: 'A', pressed: false });
   }, [emit]);
 
+  // dunk-next phase 4: the SKIP chip on the rival's turn is a finger on B — the mode owns the skip (DunkMode.skipRivalDunk)
+  const tapSkip = useCallback(() => {
+    emit({ t: 'button', btn: 'B', pressed: true });
+    emit({ t: 'button', btn: 'B', pressed: false });
+  }, [emit]);
+
+  // dunk-next phase 6: the CHALLENGE chip on the practice runway is a finger on L1 — the mode picks the next set piece (cycleChallenge)
+  const tapChallenge = useCallback(() => {
+    emit({ t: 'button', btn: 'L1', pressed: true });
+    emit({ t: 'button', btn: 'L1', pressed: false });
+  }, [emit]);
+
+  // dunk-next phase 8: the RUN IT BACK chip on a retryable miss is a finger on A — the mode owns the retry and its rules (DunkMode.runItBack)
+  const tapRunBack = useCallback(() => {
+    emit({ t: 'button', btn: 'A', pressed: true });
+    emit({ t: 'button', btn: 'A', pressed: false });
+  }, [emit]);
+
   const tapStart = useCallback(() => {
     // READY gate + pause both advance on any button press.
     emit({ t: 'button', btn: 'START', pressed: true });
@@ -197,7 +221,11 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
             {hnode(hud.score, 0)} <span className="text-white/50">vs</span> {hnode(hud.rivalScore, 0)}
           </span>
           {hud.round != null && (
-            <span className="fel-panel px-2 py-1 text-[var(--fel-cyan)]">RD {hnode(hud.round)}</span>
+            <span className="fel-panel px-2 py-1 text-[var(--fel-cyan)]">{/^\d/.test(String(hud.round)) ? 'RD ' : ''}{hnode(hud.round)}</span>
+          )}
+          {/* dunk-next phase 3: the dunk-off's own two cards — never added to the night's totals beside them */}
+          {typeof hud.dunkOff === 'string' && hud.dunkOff && (
+            <span className="fel-panel px-2 py-1 font-bold text-[var(--fel-gold)]">{hud.dunkOff}</span>
           )}
           {hud.dunkNum != null && (
             <span className="fel-panel px-2 py-1 text-white/70">DUNK {hnode(hud.dunkNum)}</span>
@@ -293,6 +321,37 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
         </div>
       )}
 
+      {/* dunk-next phase 5: THE FIELD — four dunkers, the cut line, the final (core/DunkField); the night card shows the full board */}
+      {typeof hud.field === 'string' && hud.field && phase === 'playing' && !card && !judging && (
+        <div className="pointer-events-none absolute left-3 top-[15%]">
+          <DunkFieldBoard value={hud.field} compact />
+        </div>
+      )}
+
+      {/* dunk-next phase 4: SKIP the rival's dunk straight to his card (B on a pad, K on a keyboard, this chip on a phone) */}
+      {hud.rivalSkip === true && phase === 'playing' && !card && (
+        <button type="button" onClick={tapSkip} data-fel-dunk-skip
+          className="fel-panel pointer-events-auto absolute right-3 top-[9%] inline-flex items-center gap-2 px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-white">
+          SKIP TO HIS CARD <span className="text-white/45">B ▸▸</span>
+        </button>
+      )}
+
+      {/* dunk-next phase 8: RUN IT BACK on a retryable miss (A or RUN on a pad / keyboard, this chip on a phone) — the attempt is already spent */}
+      {hud.runBack === true && phase === 'playing' && !card && (
+        <button type="button" onClick={tapRunBack} data-fel-dunk-runback
+          className="fel-panel pointer-events-auto absolute right-3 top-[9%] inline-flex items-center gap-2 px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--fel-cyan)]">
+          RUN IT BACK <span className="text-white/45">A ▸</span>
+        </button>
+      )}
+
+      {/* dunk-next phase 6: the practice runway's CHALLENGE — the set piece, its target and your best (L1 on a pad, Q on a keyboard, a tap here) */}
+      {typeof hud.challenge === 'string' && hud.challenge && phase === 'playing' && !card && (
+        <button type="button" onClick={tapChallenge} data-fel-dunk-challenge
+          className="fel-panel pointer-events-auto absolute right-3 top-[9%] inline-flex items-center gap-2 px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--fel-gold)]">
+          {hud.challenge} <span className="text-white/45">L1 ▸</span>
+        </button>
+      )}
+
       {/* DUNK MOTION phase 12 — THE SHOW: the broadcast bug while the triple cut plays (a tap skips it), the announcer's lower third,
           and the poster of a big make, kept until the next attempt. */}
       {typeof hud.cut === 'string' && hud.cut && (
@@ -326,6 +385,28 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
         </div>
       )}
 
+      {/* dunk-next phase 7 — THE TAKE-OFF READ: on the run, the foot and where he would leave the floor going up NOW, in the judges' own
+          words and the floor mark's colour (the stripe gold, the elbow cyan, the paint white). The beat strip takes this spot in the air. */}
+      {(() => {
+        const t = decodeTakeoff(hud.takeoff);
+        if (!t || phase !== 'playing' || judging || (typeof hud.beats === 'string' && hud.beats)) return null;
+        return (
+          <div className="pointer-events-none absolute inset-x-0 flex justify-center px-3" style={{ bottom: 'calc(clamp(2.5rem, calc((640px - 100vw) * 999), 17.5rem) + 2.6rem)' }}>
+            <span className="fel-panel inline-flex items-center gap-2 px-3 py-1 font-mono text-[11px] font-bold uppercase tracking-[0.14em]" style={{ color: ZONE_HEX[t.zone] }} data-fel-takeoff={t.zone}>
+              <span className="text-white/45">TAKE-OFF</span>{t.chip}
+            </span>
+          </div>
+        );
+      })()}
+
+      {/* dunk-next phase 1 — THE BEAT STRIP: RISE · HANG · PRE · SLAM, the tricks under their beats, PERFECT FLIGHT. Above the hint, out of
+          the way of the rim; it stands aside for the triple cut and the judges. */}
+      {typeof hud.beats === 'string' && hud.beats && phase === 'playing' && !judging && !(typeof hud.cut === 'string' && hud.cut) && (
+        <div className="pointer-events-none absolute inset-x-0 flex justify-center px-3" style={{ bottom: 'calc(clamp(2.5rem, calc((640px - 100vw) * 999), 17.5rem) + 2.6rem)' }}>
+          <DunkBeatStrip value={hud.beats} />
+        </div>
+      )}
+
       {typeof hud.hint === 'string' && hud.hint && phase === 'playing' && (
         <div className="pointer-events-none absolute inset-x-0 px-3 text-center" style={{ bottom: 'clamp(2.5rem, calc((640px - 100vw) * 999), 17.5rem)' }}>
           <span className="fel-panel px-3 py-1.5 font-mono text-[11px] text-white/80">{hud.hint}</span>
@@ -343,11 +424,23 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
               Night {hnum(hud.nightNum) || 1} · Flight Night
             </p>
             <h2 className={`fel-heading mt-1 text-3xl font-black ${card === 'WON' ? 'text-[var(--fel-gold)]' : 'text-white'}`}>
-              {card === 'WON' ? 'YOU TOOK THE CARD' : 'RIVAL TOOK THE CARD'}
+              {card === 'WON' ? 'YOU TOOK THE CARD' : typeof hud.nightField === 'string' && hud.nightField.startsWith('CUT') ? 'CUT AT THE LINE' : 'RIVAL TOOK THE CARD'}
             </h2>
+            {/* dunk-next phase 5: how the field went — the champion, the final, or where the cut fell */}
+            {typeof hud.nightField === 'string' && hud.nightField ? (
+              <p className="mt-1 font-mono text-[11px] font-bold uppercase text-[var(--fel-gold)]">{hud.nightField}</p>
+            ) : null}
             <p className="mt-2 font-mono text-sm text-white/70">
               YOU {hnode(hud.score, 0)} <span className="text-white/35">·</span> RIVAL {hnode(hud.rivalScore, 0)}
             </p>
+            {typeof hud.nightDunkOff === 'string' && hud.nightDunkOff ? (
+              <p className="mt-1 font-mono text-[11px] font-bold uppercase text-[var(--fel-gold)]">{hud.nightDunkOff}</p>
+            ) : null}
+            {typeof hud.field === 'string' && hud.field ? <div className="mt-2 text-left"><DunkFieldBoard value={hud.field} /></div> : null}
+            {/* dunk-next phase 6: what a won night just opened on this device, or the next thing to chase */}
+            {typeof hud.nightUnlock === 'string' && hud.nightUnlock ? (
+              <p className={`mt-2 font-mono text-[10px] font-bold uppercase tracking-wide ${hud.nightUnlock.startsWith('UNLOCKED') ? 'text-[var(--fel-gold)]' : 'text-white/45'}`}>{hud.nightUnlock}</p>
+            ) : null}
             <p className="mt-1 font-mono text-[11px] text-white/45">
               {hnum(hud.nightMakes)} dunked · {hnum(hud.nightMisses)} missed
               {hnum(hud.nightBest) > 1 ? ` · best run ${hnum(hud.nightBest)}` : ''}

@@ -20,7 +20,7 @@ vi.mock('@/lib/privacy/scanSaveOptIn', async (importOriginal) => {
 import { NextRequest } from 'next/server';
 import { PATCH, POST } from '@/app/api/mirror/screen/route';
 import { scanSaveOptIn } from '@/lib/privacy/scanSaveOptIn';
-import { OPTED_IN_ADULT, REFUSED_SCAN_CASES, callsOn, newSpyDb, spyPrisma, writesOf, type AgeCase, type Row, type SpyDb } from '@/tests/helpers/writeSpyDb';
+import { OPTED_IN_ADULT, REFUSED_SCAN_CASES, callsOn, newSpyDb, refusedGateReads, spyPrisma, writesOf, type AgeCase, type Row, type SpyDb } from '@/tests/helpers/writeSpyDb';
 
 const UID = 'athlete-screen-1';
 const optIn = vi.mocked(scanSaveOptIn);
@@ -76,7 +76,7 @@ describe('1a POST /api/mirror/screen', () => {
     expect(await post(SCREEN)).toEqual(REFUSED);
     expect(writesOf(db)).toEqual([]);
     expect(h.grants).toEqual([]);
-    expect(db.calls.map((x) => x.op)).toEqual(['user.findUnique']);
+    expect(db.calls.map((x) => x.op)).toEqual(refusedGateReads(c.id));
     expect(callsOn(db, 'guardianConsent')).toEqual([]);
   });
 

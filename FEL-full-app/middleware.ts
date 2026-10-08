@@ -6,9 +6,9 @@ export const SCREEN_PERMISSIONS_POLICY = 'camera=(self), microphone=()';
 
 /**
  * Open with no session. Middleware must never send these to /login.
- * /links is the Instagram bio page; /books only redirects there.
+ * /links is the Instagram bio page. /books and /elijah only redirect there.
  */
-export const PUBLIC_ROUTE_ALLOWLIST = ['/links', '/books'] as const;
+export const PUBLIC_ROUTE_ALLOWLIST = ['/links', '/books', '/elijah'] as const;
 
 export function isPublicRoute(pathname: string): boolean {
   const path = pathname.length > 1 ? pathname.replace(/\/+$/, '') : pathname;
@@ -64,5 +64,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/links', '/books', '/screen', '/screen/:path*', '/play/mirror/assess', '/play/mirror/assess/:path*'],
+  matcher: ['/links', '/books', '/elijah', '/screen', '/screen/:path*', '/play/mirror/assess', '/play/mirror/assess/:path*'],
 };

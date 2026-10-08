@@ -18,8 +18,11 @@
 //   checkout that 400s for a US customer.
 //
 // Every method here must ALSO be enabled in the Stripe Dashboard. Listing one that is switched off
-// makes the session fail, so the list stays conservative and the Dashboard is the wider net: pass
-// `STRIPE_PM_AUTO=1` to omit the list entirely and let Dashboard settings decide.
+// makes the session fail, and a pinned list can never show a method added later — so the DEFAULT is
+// to pin nothing: Checkout Sessions omit `payment_method_types` and Stripe's automatic payment
+// methods show whatever the Dashboard has enabled (card, Link, Cash App, Afterpay/Clearpay, Klarna,
+// Affirm, Apple Pay / Google Pay, PayPal). The fixed lists below now exist only as the explicit
+// opt-out: set `STRIPE_PM_PIN=1` to pin them again (e.g. while a Dashboard is being cleaned up).
 
 export type StripeMode = 'subscription' | 'payment';
 
@@ -32,12 +35,13 @@ const ONE_TIME: readonly string[] = ['card', 'link', 'cashapp', 'afterpay_clearp
 /**
  * The payment_method_types for a Checkout Session, or undefined to defer to the Dashboard.
  *
- * Returning undefined is a real option, not a fallback: with STRIPE_PM_AUTO set, methods can be
- * switched on and off in Stripe without a deploy, which is usually what a shop wants.
+ * undefined is the default, not a fallback: with no `payment_method_types` on the session, Stripe
+ * offers every method the Dashboard has enabled, so methods can be switched on and off in Stripe
+ * without a deploy. `STRIPE_PM_PIN=1` is the explicit opt-in to the fixed lists.
  */
 export function paymentMethodsFor(mode: StripeMode): string[] | undefined {
-  if (process.env.STRIPE_PM_AUTO === '1') return undefined;
-  return [...(mode === 'subscription' ? RECURRING : ONE_TIME)];
+  if (process.env.STRIPE_PM_PIN === '1') return [...(mode === 'subscription' ? RECURRING : ONE_TIME)];
+  return undefined;
 }
 
 /** Methods that cannot be offered through Stripe at all, with the reason. For honest UI copy. */
