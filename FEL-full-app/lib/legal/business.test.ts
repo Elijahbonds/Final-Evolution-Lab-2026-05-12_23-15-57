@@ -20,7 +20,10 @@ describe('the one business address', () => {
     expect(addressRejected(BUSINESS_MAILING_ADDRESS)).toBeNull();
   });
 
-  it('is the only non-test source carrying the literal text "Business mailing address"', () => {
+  // STORE-TERMS-4 (FE PM 5:24 AM PT Oct 8): the approved store terms Part B (lib/store-terms/text-b.ts, frozen) has the
+  // heading "2.7 Business mailing address", so it is the ONE other allowed carrier of that phrase. It never carries
+  // the address itself: only the {BUSINESS_ADDRESS} token, which the page fills from lib/legal/business.ts.
+  it('is the only non-test source carrying the literal text "Business mailing address" (plus the store terms Part B heading)', () => {
     const files = (dir: string): string[] =>
       readdirSync(dir).flatMap((name) => {
         const p = join(dir, name);
@@ -33,6 +36,16 @@ describe('the one business address', () => {
         if (/business mailing address/i.test(readFileSync(file, 'utf8'))) carriers.push(file);
       }
     }
-    expect(carriers).toEqual([expect.stringMatching(/lib[/\\]legal[/\\]business\.ts$/)]);
+    expect([...carriers].map((f) => f.split('\\').join('/')).sort()).toEqual(['lib/legal/business.ts', 'lib/store-terms/text-b.ts']);
+  });
+
+  it('the store terms Part B (lib/store-terms/text-b.ts) has exactly 2 {BUSINESS_ADDRESS} tokens and no written-out address', async () => {
+    const { addressRejected } = await import('@/lib/coach-store/address');
+    const src = readFileSync(join('lib', 'store-terms', 'text-b.ts'), 'utf8');
+    expect(src.split('{BUSINESS_ADDRESS}').length - 1).toBe(2);
+    // The same street-address rule as above finds no street address anywhere in the file, and there is no ZIP code.
+    expect(addressRejected(src)).toBeNull();
+    expect(src).not.toMatch(/\b\d{5}(?:-\d{4})?\b/);
+    expect(src).not.toContain(BUSINESS_MAILING_ADDRESS);
   });
 });
