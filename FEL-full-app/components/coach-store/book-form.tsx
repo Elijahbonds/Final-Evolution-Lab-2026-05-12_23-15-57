@@ -30,6 +30,7 @@ export function BookForm({
   const [painYes, setPainYes] = useState<boolean | null>(null);
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
+  const [closedNotice, setClosedNotice] = useState('');
   const [authError, setAuthError] = useState<'sign_in' | 'adults_only' | null>(null);
   const [bundleView, setBundleView] = useState<AlreadyOwnedBundleView | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
@@ -37,9 +38,11 @@ export function BookForm({
   const [partAuth, setPartAuth] = useState<Record<string, 'sign_in' | 'adults_only'>>({});
 
   // STORE-SIGNIN-RETURN: 401 -> "Sign in to continue" (next= carries listing + slot); 403 adults_only -> plain copy.
-  const authOrMessage = (res: Response, json: { error?: string; message?: string }): 'sign_in' | 'adults_only' | string => {
+  const authOrMessage = (res: Response, json: { error?: string; message?: string }): 'sign_in' | 'adults_only' | 'store_closed' | string => {
     if (res.status === 401 || json.error === 'unauthorized') return 'sign_in';
     if (res.status === 403 && json.error === 'adults_only') return 'adults_only';
+    // STORE-READY B2: a closed store is a friendly "Checkout opens soon." notice, never the red error text.
+    if (res.status === 409 && json.error === 'store_closed') return 'store_closed';
     return json.message || json.error || 'Could not start checkout';
   };
 
@@ -55,6 +58,7 @@ export function BookForm({
 
   const submit = async () => {
     setError('');
+    setClosedNotice('');
     setAuthError(null);
     setBundleView(null);
     const beneficiary = currentBeneficiary();
@@ -76,6 +80,7 @@ export function BookForm({
       if (parsed) { setBundleView(parsed); return; }
       const outcome = authOrMessage(res, json);
       if (outcome === 'sign_in' || outcome === 'adults_only') setAuthError(outcome);
+      else if (outcome === 'store_closed') setClosedNotice('Checkout opens soon.');
       else setError(outcome);
       return;
     }
@@ -185,7 +190,9 @@ export function BookForm({
           auth={partAuth}
           renderAuth={(_part, which) => authBlock(which)}
         />
-      ) : authError ? authBlock(authError) : error ? <p className="text-sm text-red-300">{error}</p> : null}
+      ) : authError ? authBlock(authError) : closedNotice ? (
+        <p className="rounded-xl border border-white/20 p-3 text-sm text-white/80" role="status">{closedNotice}</p>
+      ) : error ? <p className="text-sm text-red-300">{error}</p> : null}
       <button type="button" className="rounded-xl bg-cyan-300 px-4 py-2 text-sm font-bold text-black" onClick={submit}>{continueLabel}</button>
     </div>
   );

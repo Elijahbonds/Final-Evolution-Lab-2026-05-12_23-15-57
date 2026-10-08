@@ -6,6 +6,7 @@ import { isCoachStoreEnabled } from '@/lib/flags';
 import { DUNK_WEEKS } from '@/lib/coach-store/dunkProgram';
 import { drillsForTeen } from '@/lib/coach-store/teen';
 import { isMissingTable, logStoreUnavailable } from '@/lib/coach-store/gate';
+import { programAccessOpen } from '@/lib/coach-store/access';
 import { getProgramLibrarySeed, type ProgramLibraryVideoEntry } from '@/lib/coach-store/programLibrarySeed';
 import { storePriceByKey } from '@/lib/coach-store/storePrices';
 
@@ -40,6 +41,16 @@ export default async function ProgramPlayerPage({ params }: { params: { accessId
   try {
     const access = await prisma.programAccess.findUnique({ where: { id: params.accessId } });
     if (!access || access.userId !== userId) notFound();
+    // STORE-READY B4 (F20): an unpaid, refunded, expired, paused or cancelled row — or one past accessUntil —
+    // shows nothing. The owner check above stays; this is the paywall on the content itself.
+    if (!programAccessOpen(access, new Date())) {
+      return (
+        <main className="mx-auto max-w-xl px-4 py-8 text-white">
+          <h1 className="text-2xl font-black">Your program</h1>
+          <p className="mt-2 text-sm text-white/70">This program isn&apos;t active.</p>
+        </main>
+      );
+    }
     const isTeen = access.beneficiary === 'teen';
     const showDunkWeeks = access.scope === 'lane' && access.lane === 'dunking';
     const showCourse = access.scope === 'product' && access.lane === 'signature-dunk-course';

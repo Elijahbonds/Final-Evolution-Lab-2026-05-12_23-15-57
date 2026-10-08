@@ -38,6 +38,7 @@ import { unlockProLane } from '@/lib/season/season-service';
 export type VerifyCheckoutResult =
   | { ok: true; status: 'fulfilled'; product: string; fulfilment: Record<string, unknown> }
   | { ok: true; status: 'pending'; product: string | null }
+  | { ok: true; status: 'refund_due'; product: string | null; rowId?: string }
   | { ok: false; status: number; error: string };
 
 /** The ledger/wallet key EVERY fulfilment of a Checkout Session runs under — this verify
@@ -95,7 +96,10 @@ export async function verifyCheckoutSession(userId: string, sessionId: string): 
   // coach-store webhook's own checkout handler.
   const coachMeta = coachStoreSessionMeta(session);
   if (coachMeta?.rowId) {
-    await fulfilCoachStoreCheckout(session, coachMeta, idempotencyKey);
+    const outcome = await fulfilCoachStoreCheckout(session, coachMeta, idempotencyKey);
+    if (outcome === 'refund_due') {
+      return { ok: true, status: 'refund_due', product, rowId: coachMeta.rowId };
+    }
     return { ok: true, status: 'fulfilled', product, fulfilment: { kind: 'coach_store', rowId: coachMeta.rowId } };
   }
 

@@ -7,28 +7,32 @@ import { prisma } from '@/lib/db';
 import { getStripe } from '@/lib/stripe';
 import { purchasesEnabledFromEnv } from '@/lib/wallet/purchases';
 import { getShardPack, shardPackTotal } from '@/lib/shard-packs';
+import { storeClosed } from '@/lib/coach-store/gate';
+import { siteOrigin } from '@/lib/stripe/site-origin';
 
 /**
  * POST /api/v1/wallet/shard-checkout
  * Body: { pack_id }
  * Returns: { url } — redirect to Stripe Checkout for a SHARD pack (M25).
  *
- * The ONLY real-money product family. The shard amount is SERVER-OWNED (from
- * lib/shard-packs) and travels in session + payment_intent metadata so the
- * webhook can mint shards WITHOUT a pre-registered Stripe price id, and so a
- * refund (charge.refunded) can debit the same amount.
+ * The shard amount is SERVER-OWNED (from lib/shard-packs) and travels in
+ * session + payment_intent metadata so the webhook can mint shards WITHOUT a
+ * pre-registered Stripe price id, and so a refund (charge.refunded) can debit
+ * the same amount.
  *
- * If Stripe is not configured (no STRIPE_SECRET_KEY), returns 503 so the store
- * UI can show "purchases coming soon" while earned-shard spending still works.
+ * STORE-READY B10: while the live-key fence is off, this route refuses with 409
+ * store_closed (never 503) BEFORE any body read, Stripe call or DB write; the
+ * store UI shows "purchases coming soon" while earned-shard spending still works.
  */
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   const playerId = (session?.user as any)?.id as string | undefined;
   if (!playerId) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
-  if (!purchasesEnabledFromEnv()) {
-    return NextResponse.json({ error: 'not_configured' }, { status: 503 });
-  }
+  // STORE-READY B10: no key -> payments_not_set_up; key but VIRTUAL_PURCHASES_ENABLED off ->
+  // virtual_purchases_off. Both are 409 store_closed, never 503, before anything else runs.
+  if (!(process.env.STRIPE_SECRET_KEY ?? '').trim()) return storeClosed('payments_not_set_up');
+  if (!purchasesEnabledFromEnv()) return storeClosed('virtual_purchases_off');
 
   let body: any;
   try {
@@ -41,7 +45,9 @@ export async function POST(req: NextRequest) {
   if (!pack) return NextResponse.json({ error: 'unknown_pack' }, { status: 404 });
 
   const totalShards = shardPackTotal(pack);
-  const origin = req.headers.get('origin') || process.env.NEXTAUTH_URL || '';
+  // STORE-READY B3/B10: Stripe URLs come from the server constant NEXTAUTH_URL, never the Origin header.
+  const origin = siteOrigin();
+  if (!origin) return storeClosed('site_url_not_set');
   const stripe = getStripe();
 
   try {

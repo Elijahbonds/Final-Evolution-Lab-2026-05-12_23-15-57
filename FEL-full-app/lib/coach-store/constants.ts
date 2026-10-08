@@ -55,3 +55,6 @@ export const SELLER_OF_RECORD = 'Final Evolution LLC';
 export const GOALS = ['Dunk', 'Vertical', 'Posture', 'Coming back from injury'] as const;
 
 export const PAYMENTS_NOT_SET_UP = 'payments not set up';
+
+/** STORE-READY B2: the friendly answer the buy button shows whenever checkout is closed (409 store_closed). */
+export const STORE_CLOSED_MESSAGE = 'Checkout opens soon.';

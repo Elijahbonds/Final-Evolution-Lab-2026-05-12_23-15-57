@@ -21,6 +21,7 @@ export type VerifyCheckoutState =
   | { state: 'idle' | 'verifying' }
   | { state: 'fulfilled'; product: string }
   | { state: 'pending'; product: string | null }
+  | { state: 'refund_due'; product: string | null }
   | { state: 'error'; error: string };
 
 export async function postVerifyCheckoutSession(sessionId: string): Promise<VerifyCheckoutState> {
@@ -33,6 +34,7 @@ export async function postVerifyCheckoutSession(sessionId: string): Promise<Veri
     const json = await res.json().catch(() => ({}));
     if (!res.ok) return { state: 'error', error: typeof json?.error === 'string' ? json.error : `http_${res.status}` };
     if (json?.status === 'pending') return { state: 'pending', product: typeof json?.product === 'string' ? json.product : null };
+    if (json?.status === 'refund_due') return { state: 'refund_due', product: typeof json?.product === 'string' ? json.product : null };
     return { state: 'fulfilled', product: typeof json?.product === 'string' ? json.product : '' };
   } catch {
     return { state: 'error', error: 'network' };

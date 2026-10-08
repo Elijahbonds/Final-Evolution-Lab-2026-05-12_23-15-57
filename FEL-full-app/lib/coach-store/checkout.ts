@@ -8,7 +8,7 @@ import { attachListingMatches, type PartListingMatch } from './bundleParts';
 import { isAllowlistedCoach } from './coaches';
 import * as bundlePolicy from './bundlePolicy';
 import { missingBundleParts, ownedBundleParts, productsGrantedBy } from './entitlement';
-import { isMissingTable, logStoreUnavailable, reviewsCanBeSold } from './gate';
+import { isMissingTable, logStoreUnavailable, reviewsCanBeSold, storeClosed } from './gate';
 import { itemKeyFor, parseManifest, priceOk, programComingSoon, type CoachManifest } from './manifest';
 import { checkoutExpiresAtUnix, holdExpiresAt } from './policy';
 import { shareWithCoachAllowed } from './rescreen';
@@ -56,10 +56,11 @@ async function customerId(userId: string, stripe: Stripe): Promise<string> {
 export async function startCheckout(userId: string, body: CheckoutBody, origin: string): Promise<NextResponse> {
   const paymentsOff = !process.env.COACH_STORE_PAYMENTS_ENABLED || !['1', 'true', 'on', 'yes'].includes((process.env.COACH_STORE_PAYMENTS_ENABLED ?? '').toLowerCase());
   if (paymentsOff) {
-    return NextResponse.json({ error: 'payments_not_set_up', message: 'payments not set up' }, { status: 503 });
+    return storeClosed('payments_off');
   }
   const gate = stripeTestGate();
-  if (!gate.ok) return NextResponse.json({ error: gate.error, message: gate.message }, { status: gate.status });
+  // STORE-READY B2: a not-ok gate is 409 store_closed BEFORE getStripe() can throw for a missing key.
+  if (!gate.ok) return storeClosed(gate.reason);
   if (!(await isVerifiedAdult(prisma, userId))) {
     return NextResponse.json({ error: 'adults_only' }, { status: 403 });
   }
@@ -252,6 +253,9 @@ async function bookTime(
       success_url: `${origin}/coach/thanks?row=${booking.id}&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/coach/${instructor.slug}`,
       metadata: meta(userId, booking.id, manifest.kind, 'self', referrerUserId),
+      // STORE-READY B8: the payment intent carries the same metadata so a Dashboard refund/dispute can be
+      // mapped back to this booking by its payment_intent.
+      payment_intent_data: { metadata: meta(userId, booking.id, manifest.kind, 'self', referrerUserId) },
     }, { idempotencyKey: `coach-store:checkout:${booking.id}` });
     await prisma.booking.update({ where: { id: booking.id }, data: { stripeCheckoutId: session.id } });
     return NextResponse.json({ url: session.url, rowId: booking.id });
@@ -292,6 +296,39 @@ async function buyAccess(
   });
   if (existing && (existing.status === 'ACTIVE' || existing.status === 'PAST_DUE')) {
     return NextResponse.json({ error: 'already_owned' }, { status: 409 });
+  }
+  // STORE-READY B5 (F21): retrying a purchase within 24 h must not 500. Before any row write, resolve the
+  // existing row's Stripe checkout session: still open at the SAME price -> hand back that URL untouched; the
+  // price changed -> expire it and fall through to a fresh session under a NEW idempotency key; already paid ->
+  // fulfil it and answer 409 already_owned. A Stripe outage answers 502 with nothing written.
+  if (existing?.stripeCheckoutId) {
+    let prior: Stripe.Checkout.Session | null = null;
+    try {
+      prior = await stripe.checkout.sessions.retrieve(existing.stripeCheckoutId);
+    } catch (err) {
+      const e = err as { code?: string; statusCode?: number; type?: string };
+      if (e?.code === 'resource_missing' || e?.statusCode === 404 || e?.type === 'StripeInvalidRequestError') {
+        prior = null; // a session Stripe no longer has is as good as expired
+      } else {
+        console.error('[coach-store] re-buy session check failed');
+        return NextResponse.json({ error: 'stripe_unavailable' }, { status: 502 });
+      }
+    }
+    if (prior) {
+      const { isPaidSession } = await import('@/lib/stripe/verify-checkout');
+      if (prior.status === 'open' && prior.payment_status !== 'paid' && !isPaidSession(prior)) {
+        if (existing.priceCents === listing.priceUsd && prior.url) {
+          return NextResponse.json({ url: prior.url, rowId: existing.id });
+        }
+        try { await stripe.checkout.sessions.expire(prior.id); } catch { /* already closed */ }
+      } else if (isPaidSession(prior)) {
+        const { fulfilCoachStoreCheckout, coachStoreSessionMeta } = await import('./webhook');
+        const { verifyIdempotencyKey } = await import('@/lib/stripe/verify-checkout');
+        const meta = coachStoreSessionMeta(prior) ?? { product: 'COACH_STORE', userId, rowId: existing.id, kind: manifest.kind, beneficiary };
+        await fulfilCoachStoreCheckout(prior, meta, verifyIdempotencyKey(prior.id));
+        return NextResponse.json({ error: 'already_owned' }, { status: 409 });
+      }
+    }
   }
   // Double-charge guards (./bundlePolicy). A single product (program/course/series) the buyer already owns via
   // another active/past-due listing (e.g. the bundle) is always 409 already_owned. The bundle, under the default
@@ -360,8 +397,12 @@ async function buyAccess(
     success_url: `${origin}/coach/thanks?row=${row.id}&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${origin}/coach/${instructor?.slug ?? 'elijahbonds'}`,
     metadata: metaData,
-    ...(manifest.kind === 'membership' ? { subscription_data: { metadata: metaData } } : {}),
-  }, { idempotencyKey: `coach-store:checkout:${row.id}` });
+    // STORE-READY B8: the payment intent carries the same metadata so a Dashboard refund/dispute maps back to
+    // this row by its payment_intent (payment-mode sessions only; a subscription bills through its invoice).
+    ...(manifest.kind === 'membership' ? { subscription_data: { metadata: metaData } } : { payment_intent_data: { metadata: metaData } }),
+    // STORE-READY B5: a re-buy creates a NEW session, so the idempotency key must be new too — reusing the old
+    // row's key is why a retry within 24 h 500'd (Stripe rejects a reused key with a different payload).
+  }, { idempotencyKey: `coach-store:checkout:${row.id}:${now.getTime()}` });
   await prisma.programAccess.update({ where: { id: row.id }, data: { stripeCheckoutId: session.id } });
   await prisma.order.create({
     data: {
