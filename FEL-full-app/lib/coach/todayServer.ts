@@ -138,8 +138,9 @@ function lastTimeFor(p: any, exercises: readonly TodayExercise[]): Record<string
       if (!l.completedAt || !logHasWork(l)) continue;
       const did = l.servedExerciseId ?? catalogueOf.get(l.sessionExerciseId);
       if (!did) continue;
-      // progressSeries groups by `exerciseName`; the catalogue id is the key here (see above)
-      rows.push({ exerciseName: did, completedAt: l.completedAt, actualLoad: l.actualLoad, actualReps: l.actualReps, rpe: l.rpe, actualSets: l.actualSets });
+      // progressSeries groups by `exerciseName`; the catalogue id is the key here (see above). savedAt/id are the
+      // keys its completedAt tie-break sorts on (loop.ts progressSeries), so the newest-saved log wins in any order.
+      rows.push({ exerciseName: did, completedAt: l.completedAt, actualLoad: l.actualLoad, actualReps: l.actualReps, rpe: l.rpe, actualSets: l.actualSets, savedAt: l.createdAt, id: l.id });
     }
   }
   const series = progressSeries(rows);

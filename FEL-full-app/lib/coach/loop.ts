@@ -167,8 +167,10 @@ export function mergeSpecUpdate(row: Partial<CleanExerciseSpec> & { exerciseId: 
 /**
  * `actualSets` (MIRROR-PROGRESS, 2026-10-07): optional — the set count Today's "last time" line reads. A row built without
  * it (every caller before) reads as before.
+ * MIRROR-TZ (2026-10-08): `savedAt` (the log row's own createdAt) and `id` — the keys progressSeries breaks a completedAt
+ * tie with (see the sort below). Optional; a row without either keeps its input order on a full tie.
  */
-export interface LogRow { exerciseName: string; completedAt: string | Date | null; actualLoad: string | null; actualReps: string | null; rpe: number | null; actualSets?: number | null }
+export interface LogRow { exerciseName: string; completedAt: string | Date | null; actualLoad: string | null; actualReps: string | null; rpe: number | null; actualSets?: number | null; savedAt?: string | Date | null; id?: string | null }
 /**
  * MIRROR-PROGRESS (2026-10-07): + `sets`, and the log's own reps and load text — the chart reads the leading numbers, the
  * "last time: 3×8 @ 60 kg" line (lastTimeLine below) needs every set's reps and the load's unit.
@@ -184,17 +186,27 @@ export function leadingNumber(s: string | null): number | null {
 
 /** Per-exercise time series for the progress chart, oldest first, completed logs only. */
 export function progressSeries(logs: LogRow[]): Record<string, ProgressPoint[]> {
-  const out: Record<string, ProgressPoint[]> = {};
+  const out: Record<string, { p: ProgressPoint; savedAt: number; id: string }[]> = {};
   for (const l of logs) {
     if (!l.completedAt) continue;
     const at = typeof l.completedAt === 'string' ? l.completedAt : l.completedAt.toISOString();
+    const saved = l.savedAt instanceof Date ? l.savedAt.getTime() : typeof l.savedAt === 'string' ? Date.parse(l.savedAt) : 0;
     (out[l.exerciseName] ??= []).push({
-      at, load: leadingNumber(l.actualLoad), reps: leadingNumber(l.actualReps), rpe: l.rpe,
-      sets: l.actualSets ?? null, repsText: l.actualReps, loadText: l.actualLoad,
+      p: {
+        at, load: leadingNumber(l.actualLoad), reps: leadingNumber(l.actualReps), rpe: l.rpe,
+        sets: l.actualSets ?? null, repsText: l.actualReps, loadText: l.actualLoad,
+      },
+      savedAt: Number.isFinite(saved) ? saved : 0, id: l.id ?? '',
     });
   }
-  for (const k of Object.keys(out)) out[k].sort((a, b) => a.at.localeCompare(b.at));
-  return out;
+  // A completedAt tie (two saves in one millisecond) goes to the later-SAVED log: its own createdAt first (missing or
+  // unparseable reads as 0), then its id (Prisma's cuid grows in insert order within one server process — the last
+  // step, never the main rule); a full tie keeps input order (the sort is stable). updatedAt is never used — a coach
+  // comment rewrites it later. The keys ride beside each point so ProgressPoint's shape is unchanged.
+  for (const k of Object.keys(out)) {
+    out[k].sort((a, b) => a.p.at.localeCompare(b.p.at) || a.savedAt - b.savedAt || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  }
+  return Object.fromEntries(Object.entries(out).map(([k, v]) => [k, v.map((x) => x.p)]));
 }
 
 // ── "last time" (MIRROR-PROGRESS, plan Phase 4, 2026-10-07) ─────────────────────────────────────────────────────────
