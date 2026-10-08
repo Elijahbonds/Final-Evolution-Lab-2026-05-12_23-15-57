@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { BundleMissingParts } from './bundle-missing-parts';
 import { parseAlreadyOwned, partCheckoutBody, type AlreadyOwnedBundleView, type BundlePartWithListing } from '@/lib/coach-store/bundleParts';
+import { STORE_TERMS_VERSION } from '@/lib/store-terms';
 import { coachBookReturnPath, coachSignInHref, isSlotValue } from '@/lib/coach-store/signInReturn';
 
 export function BookForm({
@@ -36,6 +37,13 @@ export function BookForm({
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [partErrors, setPartErrors] = useState<Record<string, string>>({});
   const [partAuth, setPartAuth] = useState<Record<string, 'sign_in' | 'adults_only'>>({});
+  const [termsAgreed, setTermsAgreed] = useState(false);
+  const [termsNotice, setTermsNotice] = useState('');
+
+  const termsNoticeFor = (json: { version?: unknown }): string =>
+    json.version === STORE_TERMS_VERSION
+      ? 'Please tick the box to agree to the store terms.'
+      : 'The store terms were updated. Reload the page and tick the box again.';
 
   // STORE-SIGNIN-RETURN: 401 -> "Sign in to continue" (next= carries listing + slot); 403 adults_only -> plain copy.
   const authOrMessage = (res: Response, json: { error?: string; message?: string }): 'sign_in' | 'adults_only' | 'store_closed' | string => {
@@ -57,8 +65,10 @@ export function BookForm({
   const currentBeneficiary = (): 'self' | 'teen' => (kind === 'membership' ? (audience === 'teen' ? 'teen' : 'self') : who);
 
   const submit = async () => {
+    if (!termsAgreed) return;
     setError('');
     setClosedNotice('');
+    setTermsNotice('');
     setAuthError(null);
     setBundleView(null);
     const beneficiary = currentBeneficiary();
@@ -72,12 +82,15 @@ export function BookForm({
         goal: kind === 'video_review' ? goal : undefined,
         painYes: kind === 'video_review' ? painYes : undefined,
         note: kind === 'video_review' ? note : undefined,
+        termsAccepted: true,
+        termsVersion: STORE_TERMS_VERSION,
       }),
     });
     const json = await res.json().catch(() => ({}));
     if (!res.ok) {
       const parsed = json.error === 'already_owned' ? parseAlreadyOwned(json) : null;
       if (parsed) { setBundleView(parsed); return; }
+      if (res.status === 409 && json.error === 'terms_required') { setTermsNotice(termsNoticeFor(json)); return; }
       const outcome = authOrMessage(res, json);
       if (outcome === 'sign_in' || outcome === 'adults_only') setAuthError(outcome);
       else if (outcome === 'store_closed') setClosedNotice('Checkout opens soon.');
@@ -89,7 +102,9 @@ export function BookForm({
   };
 
   const buyPart = async (part: BundlePartWithListing) => {
+    if (!termsAgreed) return;
     if (!part.listingId) return;
+    setTermsNotice('');
     setPartErrors((prev) => { const next = { ...prev }; delete next[part.key]; return next; });
     setPartAuth((prev) => { const next = { ...prev }; delete next[part.key]; return next; });
     setBusyKey(part.key);
@@ -97,10 +112,11 @@ export function BookForm({
       const res = await fetch('/api/coach-store/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(partCheckoutBody(part, currentBeneficiary())),
+        body: JSON.stringify({ ...partCheckoutBody(part, currentBeneficiary()), termsAccepted: true, termsVersion: STORE_TERMS_VERSION }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
+        if (res.status === 409 && json.error === 'terms_required') { setTermsNotice(termsNoticeFor(json)); return; }
         const outcome = authOrMessage(res, json);
         if (outcome === 'sign_in' || outcome === 'adults_only') setPartAuth((prev) => ({ ...prev, [part.key]: outcome }));
         else setPartErrors((prev) => ({ ...prev, [part.key]: outcome }));
@@ -180,8 +196,17 @@ export function BookForm({
           <p className="text-sm text-white/60">Your original clip is deleted 30 days after your review.</p>
         </>
       ) : null}
+      <label className="flex items-start gap-2 text-sm">
+        <input type="checkbox" checked={termsAgreed} onChange={(e) => setTermsAgreed(e.target.checked)} />
+        <span>
+          I agree to the{' '}
+          <a className="font-bold text-cyan-300 underline" href="/store-terms" target="_blank" rel="noopener noreferrer">Coach Store Terms of Service and Refund &amp; Cancellation Policy</a>.
+        </span>
+      </label>
+      {termsNotice ? <p className="rounded-xl border border-white/20 p-3 text-sm text-white/80" role="status">{termsNotice}</p> : null}
       {bundleView ? (
         <BundleMissingParts
+          termsAgreed={termsAgreed}
           owned={bundleView.ownedParts}
           missing={bundleView.missing}
           onBuy={buyPart}
@@ -193,7 +218,7 @@ export function BookForm({
       ) : authError ? authBlock(authError) : closedNotice ? (
         <p className="rounded-xl border border-white/20 p-3 text-sm text-white/80" role="status">{closedNotice}</p>
       ) : error ? <p className="text-sm text-red-300">{error}</p> : null}
-      <button type="button" className="rounded-xl bg-cyan-300 px-4 py-2 text-sm font-bold text-black" onClick={submit}>{continueLabel}</button>
+      <button type="button" className="rounded-xl bg-cyan-300 px-4 py-2 text-sm font-bold text-black disabled:opacity-60" disabled={!termsAgreed} onClick={submit}>{continueLabel}</button>
     </div>
   );
 }
