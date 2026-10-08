@@ -14,7 +14,7 @@ export function generateMetadata({ params }: { params: { slug: string; lane: str
   return {
     title: `${title} · Final Evolution`,
     description: 'A coaching program from Final Evolution.',
-    robots: { index: true, follow: true },
+    robots: { index: params.lane === 'dunking', follow: true },
     openGraph: { images: ['/og-image.png'], title },
   };
 }
