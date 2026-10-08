@@ -43,6 +43,13 @@ const NOT_NAVIGABLE: Record<string, string> = {
   '/screen/program/[lane]': 'Quick Screen result lane, generated from lib/screen/routes.ts and sessionStorage state',
   '/program': 'a bought program or a teen unlock, opened from the receipt, noindex',
   '/session': 'a paid live call, opened from the booking confirmation, noindex',
+  // NESTED ROUTES (2026-10-08, PR #105 brought up to the release): the walker now sees every page route, not only the
+  // top level, and these five release routes have no in-app link. Each is named with the reason found in the code.
+  '/coach/thanks': 'Stripe Checkout success_url (lib/coach-store/checkout.ts), flag-gated by COACH_STORE_ENABLED, noindex',
+  '/live/schedule': 'LIVE-PAGE-FLAGOFF: 404s while isLiveStreamScheduleEnabled() is off; it needs a link the day the owner turns it on',
+  '/story/rail': 'Story is parked (drafts-keep-7, #153): the standalone Nexus rail is deliberately unlinked from /story',
+  '/story/boss': 'Story is parked (drafts-keep-7, #153): the standalone Vertigo boss is deliberately unlinked from /story',
+  '/coach/review/[bookingId]': 'KNOWN GAP (found 2026-10-08): the coach-store video review studio; /coach/dashboard lists bookings without linking it. Flag-gated by COACH_STORE_ENABLED',
 };
 
 function appRoutes(): string[] {
