@@ -6,7 +6,7 @@ import { prisma } from '@/lib/db';
 import { isUnreachable } from '@/lib/db/errors';
 import { AUTH_SERVICE_UNAVAILABLE } from '@/lib/auth-errors';
 import { claimBookEntitlements } from '@/lib/books/bookEntitlements';
-import { prismaBookStore } from '@/lib/books/bookStore';
+import { bookTablesReady, prismaBookStore } from '@/lib/books/bookStore';
 
 export const authOptions: NextAuthOptions = {
   // @next-auth/prisma-adapter is typed against a client generated into node_modules/.prisma. Ours is generated into
@@ -83,7 +83,9 @@ export const authOptions: NextAuthOptions = {
         token.profileId = (user as any).profileId ?? null;
         token.role = (user as any).role ?? 'player';
         // Guest book purchases are stored on the checkout email. Claim them once, at sign-in.
-        if (user.email) {
+        // MERGE (2026-10-09): skipped (no query, no log line) until the book tables exist, see
+        // prisma/pending/2026-10-09-book-shop.sql.
+        if (user.email && bookTablesReady()) {
           try {
             await claimBookEntitlements(prismaBookStore(), user.id, user.email);
           } catch (err) {

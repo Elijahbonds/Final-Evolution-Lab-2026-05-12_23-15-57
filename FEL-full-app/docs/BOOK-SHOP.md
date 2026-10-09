@@ -37,19 +37,21 @@ The service account needs permission to sign URLs for that bucket (`iam.serviceA
 
 ## Database
 
-Two tables, in `prisma/schema.prisma`:
+Two tables, **pending** (2026-10-09): `prisma/pending/2026-10-09-book-shop.sql`. They were Prisma models in this
+branch's first commit; when the release was merged in (919 commits later) the regenerated `public/_prisma` client could
+not be merged, so the models moved to a pending SQL file, the release's convention for schema the owner has not
+applied. The SQL file carries the matching model blocks.
 
 - `BookEntitlement` — one row per email + offer (`ebook`, `audiobook`, or `bundle`). `userId` is filled when that email logs in.
-- `BookFulfillmentEvent` — Stripe event id. A second delivery of the same event does not create a second purchase. A refund stored before the purchase arrives is applied when the purchase is written.
+- `BookFulfillmentEvent` — what the shop has already handled: `stripe-session:<cs_id>` for a purchase (the same key
+  the receipt page and both webhooks use, so one payment is one grant), or the Stripe event id for a refund. A refund
+  stored before the purchase arrives is applied when the purchase is written.
 
-Apply the schema to the **dev** database only when you mean to:
-
-```bash
-cd FEL-full-app
-npx prisma db push
-```
-
-Do not point `DATABASE_URL` at production for this. This branch does not run `db push` and does not deploy.
+Until the tables exist, `lib/books/bookStore.ts` finds no delegate on the generated client: `bookTablesReady()` is
+false, every store call throws `BookTablesNotReady`, sign-in skips the claim, My Library shows "unavailable", and the
+free sample still signs. The owner's step, in order: apply the SQL, add the two models (and `User.bookEntitlements`)
+to `prisma/schema.prisma`, regenerate `public/_prisma` on Linux. No agent runs `prisma db push` or regenerates the
+client.
 
 Guest checkout is allowed. On the next sign-in, `lib/auth.ts` claims rows whose email matches the account. My Library and the download route claim again, so a purchase still shows up if the sign-in claim failed.
 
@@ -156,7 +158,7 @@ Do these in order. This branch does not perform them.
 1. Confirm KDP Select for all seven titles. Flip `kdpSelect` only when the ebook may be sold on the site.
 2. Replace example prices. Set `priceIsExample: false` on the offers you are actually charging.
 3. Upload EPUB, PDF, and MP3s to the private paths above. Play chapter 1 and the last chapter.
-4. `prisma db push` against the database this server uses.
+4. Apply `prisma/pending/2026-10-09-book-shop.sql`, add the models, regenerate `public/_prisma` (the owner's step; see Database).
 5. Test-mode webhook endpoint, test key, one purchase, receipt page, My Library, a chapter, an EPUB download, then a refund that removes access.
 6. Decide tax (Stripe Tax on, or off and filed yourself).
 7. Add digital-goods refund language to the Terms page if it is not already there. The shop links to `/terms`.
