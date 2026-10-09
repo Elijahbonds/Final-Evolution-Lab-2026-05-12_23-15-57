@@ -40,11 +40,16 @@ export const vehicleLodUrl = (kind: VehicleKind, id: string): string | null => {
  * The modes steer +Z (`forwardOf`, kart `heading`). This is the only place a mesh axis is corrected.
  *
  * Measured after Babylon's glTF import (the loader root is a 180° yaw plus a Z mirror, so these are not the file axes):
- *  - Every kart's nose sits on −X. +π/2 puts it on +Z (the wheel-in-front frame check from when the bodies landed).
+ *  - Every kart's nose (the low fairing, the steering wheel above it, the front bumper) sits on +X, and its rear wing and seat
+ *    back on −X. −π/2 puts the nose on +Z. KART FACING (2026-10-08, owner: "the kart is facing backwards"): this was +π/2 from
+ *    the day the bodies landed (0582fd30, "the kart's wheel sat in front of the driver at π/2"), which put the NOSE on −Z: every
+ *    kart, the player's and the field's, drove rear wing first, and the body's own steering wheel sat behind the driver's hands.
+ *    The frame check that signed π/2 off read the PRIMITIVE wheel the driver holds, which stays hidden under the body. Measured
+ *    off the five GLBs (kartFacing.test.ts): the steering wheel's cluster and the nose fairing land at +Z, the wing at −Z.
  *  - Every plane's propeller sits on +X and the wings run along Z (trainer, darter, kestrel, bastion, rival — same bake).
  *    π spun that propeller onto −X, so the nose stayed sideways to the velocity. −π/2 brings it to +Z.
  */
-const KART_NOSE_YAW = Math.PI / 2;
+const KART_NOSE_YAW = -Math.PI / 2;
 const PLANE_NOSE_YAW = -Math.PI / 2;
 export const VEHICLE_FORWARD_YAW: Record<VehicleKind, Readonly<Record<string, number>>> = {
   kart: { runabout: KART_NOSE_YAW, slipstream: KART_NOSE_YAW, tailspin: KART_NOSE_YAW, anvil: KART_NOSE_YAW, rival: KART_NOSE_YAW },
@@ -54,6 +59,32 @@ export const VEHICLE_FORWARD_YAW: Record<VehicleKind, Readonly<Record<string, nu
 /** The yaw for this garage id. An unknown id wears the rival body's axis — `dressVehicle` loads that mesh too. */
 export function vehicleForwardYaw(kind: VehicleKind, id: string): number {
   return VEHICLE_FORWARD_YAW[kind][id] ?? VEHICLE_FORWARD_YAW[kind].rival;
+}
+
+/**
+ * KART FACING (2026-10-08, owner: "the model doesn't drive with his hands"): THE BAKED KART'S OWN COCKPIT, in the vehicle root's
+ * frame once the body is mounted at `vehicleForwardYaw` (y above the body's floor, z forward).
+ *
+ * The driver's pose and the steering grip were authored around the PRIMITIVE kart's wheel (VelocityKartMode KART_WHEEL: centre 0.64 m
+ * up, z −0.02, top leaning 22° back). That wheel is hidden the moment the Meshy body arrives, and the body's own wheel is somewhere
+ * else: measured off the five GLBs (one bake, one cockpit), its rim is centred 0.695 m up at z +0.215, ~0.165 m in radius, its top
+ * leaning 40° FORWARD (the column rises from the nose toward the driver). So the hands held an invisible ring ~22 cm behind the
+ * visible one. And at the seat the authored pose puts the shoulders, that rim is out of reach (shoulder to rim 0.56 m against the
+ * hero's 0.45 m arm at DRIVER_SCALE), so the driver sits `hipsZ` into the bucket, which still leaves him inside the body's seat.
+ */
+export interface KartCockpit {
+  /** The steering wheel's rim: centre height above the body floor and z, radius, and the mode's tilt convention (hub x = 90° − tiltDeg; negative leans the top forward). */
+  wheel: { y: number; z: number; radius: number; tiltDeg: number };
+  /** Where the driver's hip joint sits (z, the vehicle root's frame) so the posed arms reach that rim with the elbows still bent. */
+  hipsZ: number;
+  /** Where on the rim the hands hold, degrees from its top (90 = quarter to three). */
+  gripClockDeg: number;
+}
+const BAKE_COCKPIT: KartCockpit = { wheel: { y: 0.695, z: 0.215, radius: 0.165, tiltDeg: -40 }, hipsZ: -0.15, gripClockDeg: 95 };
+export const KART_COCKPIT: Readonly<Record<string, KartCockpit>> = { runabout: BAKE_COCKPIT, slipstream: BAKE_COCKPIT, tailspin: BAKE_COCKPIT, anvil: BAKE_COCKPIT, rival: BAKE_COCKPIT };
+/** The cockpit this garage id's baked body wears. An unknown id wears the rival body, like `vehicleForwardYaw`. */
+export function kartCockpit(id: string): KartCockpit {
+  return KART_COCKPIT[id] ?? KART_COCKPIT.rival;
 }
 
 const containers = new WeakMap<Scene, Map<string, Promise<AssetContainer | null>>>();

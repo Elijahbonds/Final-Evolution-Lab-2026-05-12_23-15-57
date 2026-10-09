@@ -23,13 +23,33 @@ export interface SteerGripOpts {
   centreTol?: number;
   /** 0..1 how hard the hands hold the rim. Default 1. */
   weight?: number;
+  /**
+   * KART FACING (2026-10-08): put each hand ON a rim rather than where the pose left it. Without this the grip records the posed hand
+   * wherever it is, which is right only while the wheel is the one the pose was authored around. A wheel moved under the hands (the
+   * Meshy body's own wheel is ~22 cm ahead of the primitive's) needs the hands carried to it: each hand's grip point is the rim point
+   * `clockDeg` from the top of the rim (world up, projected into the wheel's plane) on that hand's own side. The rim is the circle of
+   * `radius` in the wheel node's local XZ plane (a torus's plane), centred on the node. Opt-in; the default is the recorded pose.
+   */
+  rim?: { radius: number; clockDeg: number };
+}
+
+/** The grip point on a rim, in the wheel's local frame: `clockDeg` from the rim's top, on the side `towards` lies (wheel-local). Pure. */
+export function rimGripPoint(wheelWorld: Matrix, radius: number, clockDeg: number, towards: Vector3): Vector3 {
+  const inv = wheelWorld.clone().invert();
+  // world up, in the wheel's frame, with its normal (local Y) part removed: the rim's top
+  const up = Vector3.TransformNormal(Vector3.Up(), inv); up.y = 0;
+  const top = up.lengthSquared() > 1e-10 ? up.normalize() : new Vector3(0, 0, -1);
+  const side = new Vector3(top.z, 0, -top.x);                       // in-plane, perpendicular to top
+  if (side.x * towards.x + side.z * towards.z < 0) side.scaleInPlace(-1);
+  const c = clockDeg * Math.PI / 180;
+  return top.scale(Math.cos(c) * radius).addInPlace(side.scale(Math.sin(c) * radius));
 }
 
 export interface SteerGripHandle {
   /** True once each hand's grip on the rim is recorded. */
   readonly gripped: boolean;
-  /** Re-record the grip on the next settled, centred frame (a re-seat, a teleport of the pose). */
-  regrip(): void;
+  /** Re-record the grip on the next settled, centred frame (a re-seat, a teleport of the pose); `rim` replaces the rim it holds (the wheel changed). */
+  regrip(rim?: SteerGripOpts['rim']): void;
   dispose(): void;
 }
 
@@ -43,6 +63,7 @@ export function bendPole(shoulder: Vector3, elbow: Vector3, hand: Vector3, fallb
 export function mountSteerGrip(scene: Scene, skeleton: Skeleton, wheel: TransformNode, opts: SteerGripOpts = {}): SteerGripHandle {
   const arms = { Left: armChain(skeleton, 'Left'), Right: armChain(skeleton, 'Right') };
   const settle = opts.settleFrames ?? 3, tol = opts.centreTol ?? 0.02, weight = opts.weight ?? 1;
+  let rim = opts.rim;
   let frames = 0;
   let grip: { Left: Vector3; Right: Vector3 } | null = null;
   const inv = new Matrix(), target = new Vector3(), down = new Vector3(0, -1, 0);
@@ -53,9 +74,19 @@ export function mountSteerGrip(scene: Scene, skeleton: Skeleton, wheel: Transfor
     if (!arms.Left || !arms.Right) return;
     wheel.computeWorldMatrix(true);
     if (!grip) {
+      // KART FACING (2026-10-08): a frame only counts toward the settle once the scene's animations can actually have run. Babylon
+      // does not start its animation clock while the scene is still loading (Scene._animate returns early while `_pendingData` is
+      // non-empty and the clock has never started) but still fires this observable — and in the live mode the kart body, the field's
+      // bodies and the venue props are all loading when the driver sits down. So the grip recorded the BIND pose: the hands out at
+      // shoulder height in a T, and every frame after that the arms were reached back out to it (the owner's "doesn't drive with
+      // his hands"). NullEngine tests load nothing in parallel, which is why it never showed there.
+      // The clock's own start (`_animationTimeLast`, set by the first _animate that runs): once set it runs for good, whatever loads
+      // after. Counting on "nothing pending" instead held the grip off for as long as the venue props streamed in.
+      if (!scene.animationsEnabled || !scene._animationTimeLast) return;
       if (++frames < settle || !centred()) return;
       wheel.getWorldMatrix().invertToRef(inv);
       grip = { Left: Vector3.TransformCoordinates(pos(arms.Left.hand), inv), Right: Vector3.TransformCoordinates(pos(arms.Right.hand), inv) };
+      if (rim) grip = { Left: rimGripPoint(wheel.getWorldMatrix(), rim.radius, rim.clockDeg, grip.Left), Right: rimGripPoint(wheel.getWorldMatrix(), rim.radius, rim.clockDeg, grip.Right) };
       return;
     }
     for (const side of ['Left', 'Right'] as const) {
@@ -66,7 +97,7 @@ export function mountSteerGrip(scene: Scene, skeleton: Skeleton, wheel: Transfor
   });
   return {
     get gripped() { return grip !== null; },
-    regrip() { grip = null; frames = 0; },
+    regrip(next) { grip = null; frames = 0; if (next) rim = next; },
     dispose() { if (obs) scene.onAfterAnimationsObservable.remove(obs); },
   };
 }
