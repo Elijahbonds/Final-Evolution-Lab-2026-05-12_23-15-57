@@ -3,13 +3,14 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { bookStripeSecret, bookWebhookSecret } from '@/lib/books/bookCheckout';
-import { recordBookCheckout, revokeBookCharge } from '@/lib/books/bookFulfill';
+import { recordPaidBookSession, revokeBookCharge } from '@/lib/books/bookFulfill';
 import { prismaBookStore } from '@/lib/books/bookStore';
 
 /**
  * POST /api/books/webhook
  * Stripe signature, not a session. Subscribe this endpoint to
- * checkout.session.completed and charge.refunded in test mode.
+ * checkout.session.completed, checkout.session.async_payment_succeeded and
+ * charge.refunded in test mode.
  * The shared /api/stripe/webhook also delegates book events here so a single
  * existing endpoint still records the purchase.
  */
@@ -34,8 +35,10 @@ export async function POST(req: NextRequest) {
 
   const store = prismaBookStore();
   try {
-    if (event.type === 'checkout.session.completed') {
-      const result = await recordBookCheckout(event.id, event.data.object as Stripe.Checkout.Session, store);
+    // MERGE (2026-10-09), SEC-F4 (#200): keyed on the Checkout Session, not event.id, so this endpoint, the
+    // shared /api/stripe/webhook, the /press receipt page and a redelivery all grant once.
+    if (event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded') {
+      const result = await recordPaidBookSession(event.data.object as Stripe.Checkout.Session, store);
       return NextResponse.json({ received: true, ...result });
     }
     if (event.type === 'charge.refunded') {

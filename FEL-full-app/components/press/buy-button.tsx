@@ -26,7 +26,12 @@ export function BuyButton({
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok || typeof body?.url !== 'string') {
-        setError(typeof body?.error === 'string' ? body.error : 'Checkout is not available yet.');
+        // MERGE (2026-10-09): a closed store answers 409 { error: 'store_closed', message } (STORE-READY B2);
+        // show its friendly message, never the 'store_closed' code.
+        const message = body?.error === 'store_closed' && typeof body?.message === 'string'
+          ? body.message
+          : typeof body?.error === 'string' ? body.error : 'Checkout is not available yet.';
+        setError(message);
         setBusy(false);
         return;
       }

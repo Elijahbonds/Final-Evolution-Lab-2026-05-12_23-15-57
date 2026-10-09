@@ -31,7 +31,8 @@ Set these on the server. Do not commit the values.
 | `FIREBASE_PRIVATE_KEY` | PEM private key. Newlines may be written as `\n`. |
 | `BOOK_SIGNED_URL_TTL_SECONDS` | Lifetime of a download/stream URL. Default 600, maximum 3600. |
 | `NEXTAUTH_SECRET` | Already required by login. Also signs the short-lived receipt grant that lets a guest play on the receipt page. |
-| `NEXTAUTH_URL` | Public origin used when the checkout request has no `Origin` header. |
+| `NEXTAUTH_URL` | The site origin Stripe sends the buyer back to (`siteOrigin()`, STORE-READY B3). The request's `Origin` header is never used; unset closes checkout (`site_url_not_set`). |
+| `VIRTUAL_PURCHASES_ENABLED` | The release's B10 fence (default off: "no real-money product outside the coach store"). Book checkout answers 409 `store_closed` / `virtual_purchases_off` until it is on. Owner question: keep books behind this fence or give them their own switch. |
 
 The service account needs permission to sign URLs for that bucket (`iam.serviceAccounts.signBlob` is not required when the private key is present; the process signs locally). It does not need to make objects public.
 
@@ -61,11 +62,19 @@ A refund (`charge.refunded`) sets the row to `REVOKED`. Revoked rows do not get 
 
 1. In the Stripe Dashboard, switch to **Test mode**.
 2. Use the test secret as `STRIPE_BOOKS_SECRET_KEY`.
-3. Developers → Webhooks → Add endpoint:
+3. The receipt page fulfils on its own (MERGE 2026-10-09, the release's SEC-F4 NO-WEBHOOK rule, #200): it retrieves
+   the Checkout Session from Stripe on the server and grants what that session proves (paid, `product: BOOK`, the
+   buyer's own email). A webhook is still worth adding for buyers who close the tab before the redirect, and it is
+   the only path for refunds:
    - URL: `https://<host>/api/books/webhook`
-   - Events: `checkout.session.completed`, `charge.refunded`
+   - Events: `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `charge.refunded`
    - Put that endpoint's signing secret in `STRIPE_BOOKS_WEBHOOK_SECRET`.
-4. The existing `/api/stripe/webhook` also records a Checkout Session whose metadata `product` is `BOOK`, and it tries to revoke book rows on `charge.refunded`. Prefer the book endpoint: a failure there returns 500 so Stripe retries. The shared endpoint returns 500 for a book checkout that fails to record, and ignores a refund that matches no book purchase.
+4. The existing `/api/stripe/webhook` also records a Checkout Session whose metadata `product` is `BOOK`, and once the
+   book tables exist it tries to revoke book rows on `charge.refunded`. Every path keys a purchase on the Checkout
+   Session (`stripe-session:<cs_id>`), so webhook + receipt + a redelivery grant once. A failure on either endpoint
+   returns 500 so Stripe retries; the shared endpoint ignores a refund that matches no book purchase.
+5. Every closed answer is a 409 `store_closed` with a reason (`payments_not_set_up`, `live_mode_off`,
+   `virtual_purchases_off`, `site_url_not_set`), as the rest of the release's store (STORE-READY B2).
 
 Optional Price ids: create a Product and a one-time Price in test mode, and set `stripePriceId` on the offer in the catalog. Until that field is set, Checkout uses `price_data` and the catalog's `priceCents`. The script below does the creating.
 
