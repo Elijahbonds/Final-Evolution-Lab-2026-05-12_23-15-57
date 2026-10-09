@@ -5,8 +5,6 @@ import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/db';
 import { isUnreachable } from '@/lib/db/errors';
 import { AUTH_SERVICE_UNAVAILABLE } from '@/lib/auth-errors';
-import { claimBookEntitlements } from '@/lib/books/bookEntitlements';
-import { bookTablesReady, prismaBookStore } from '@/lib/books/bookStore';
 
 export const authOptions: NextAuthOptions = {
   // @next-auth/prisma-adapter is typed against a client generated into node_modules/.prisma. Ours is generated into
@@ -82,16 +80,6 @@ export const authOptions: NextAuthOptions = {
         token.sub = user.id;
         token.profileId = (user as any).profileId ?? null;
         token.role = (user as any).role ?? 'player';
-        // Guest book purchases are stored on the checkout email. Claim them once, at sign-in.
-        // MERGE (2026-10-09): skipped (no query, no log line) until the book tables exist, see
-        // prisma/pending/2026-10-09-book-shop.sql.
-        if (user.email && bookTablesReady()) {
-          try {
-            await claimBookEntitlements(prismaBookStore(), user.id, user.email);
-          } catch (err) {
-            console.error('[auth] book entitlement claim skipped', err);
-          }
-        }
       }
       // Ship pass 2 (2026-09-03): the admin routes read session.user.role, but the
       // session never carried it — every /api/admin/* answered 401 to everyone.
