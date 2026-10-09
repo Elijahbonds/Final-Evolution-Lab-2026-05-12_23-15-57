@@ -37,6 +37,48 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
   }
 
+  // Book sales (Final Evolution Press, PR #17). Handled before the coach-store and ledger dispatch: a guest book
+  // purchase has no userId. MERGE (2026-10-09), ported to SEC-F4 (#200): a purchase is keyed on the Checkout
+  // Session (recordPaidBookSession), the same key the /press receipt page fulfils under, so webhook + receipt +
+  // redelivery grant once. A failure returns 500 so Stripe retries.
+  const bookSession = event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded'
+    ? (event.data.object as Stripe.Checkout.Session)
+    : null;
+  if (bookSession?.metadata?.product === 'BOOK') {
+    try {
+      const { recordPaidBookSession } = await import('@/lib/books/bookFulfill');
+      const { prismaBookStore } = await import('@/lib/books/bookStore');
+      const result = await recordPaidBookSession(bookSession, prismaBookStore());
+      return NextResponse.json({ received: true, ...result });
+    } catch (err) {
+      console.error('[stripe-webhook] book fulfillment failed', err instanceof Error ? err.message : err);
+      return NextResponse.json({ error: 'book fulfillment failed' }, { status: 500 });
+    }
+  }
+  // A refund may be a book's. Only asked once the book tables exist (prisma/pending/2026-10-09-book-shop.sql):
+  // before that no book was ever granted, and a refund for any other product (the coach store's B9 mapping)
+  // must never 500 here.
+  if (event.type === 'charge.refunded') {
+    const { bookTablesReady, prismaBookStore } = await import('@/lib/books/bookStore');
+    if (bookTablesReady()) {
+      try {
+        const { revokeBookCharge } = await import('@/lib/books/bookFulfill');
+        const result = await revokeBookCharge(event.id, event.data.object as Stripe.Charge, prismaBookStore());
+        if (!('ignored' in result && result.ignored)) {
+          return NextResponse.json({ received: true, ...result });
+        }
+      } catch (err) {
+        const code = typeof err === 'object' && err && 'code' in err ? (err as { code?: string }).code : '';
+        if (code === 'P2021') {
+          console.error('[stripe-webhook] book tables are not in the database yet');
+        } else {
+          console.error('[stripe-webhook] book refund failed', err instanceof Error ? err.message : err);
+          return NextResponse.json({ error: 'book fulfillment failed' }, { status: 500 });
+        }
+      }
+    }
+  }
+
   // Idempotency: check if we already processed this event
   const eventIdempotencyKey = `stripe-event:${event.id}`;
   const alreadyProcessed = await prisma.ledgerTransaction.findUnique({

@@ -41,7 +41,7 @@ export const TABS: TabDef[] = [
     id: 'profile', label: 'Profile', href: '/profile', icon: UserRound, accent: '#FFD700',
     owns: [
       '/profile', '/cards', '/card', '/closet', '/wallet', '/store', '/shop', '/market', '/creator', '/sessions',
-      '/account', '/settings', '/create', '/guidance', '/signature', '/support',
+      '/account', '/settings', '/create', '/guidance', '/signature', '/support', '/press',
     ],
   },
 ];
