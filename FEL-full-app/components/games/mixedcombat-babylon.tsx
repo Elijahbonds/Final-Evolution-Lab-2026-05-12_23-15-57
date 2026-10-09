@@ -13,6 +13,7 @@ import { MODES } from '@/lib/babylon/modes/registry';
 import { mergeHud } from '@/lib/babylon/core/hudMerge';   // IMPROVE (2026-10-06): an unchanged HUD patch is not a render
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode, hnum } from './hud-format';
+import { CombatHudBand } from './combat-hud-band';   // QA P1-09: the banner line sits below the HUD, above the juice overlay
 
 type Hud = Record<string, HudValue>;
 
@@ -107,13 +108,21 @@ export default function MixedCombatBabylon({ onEnd }: GameProps) {
   }, [emit]);
 
   const showHud = phase === 'playing';
+  // Edge danger — the ring-out is the signature, so the warning must be on the bezel, pulsing, the moment a back nears
+  // the rim. In the HUD band's banner line (QA P1-09): at top-22% it sat on the stacked HP / GUARD chips of a short stage.
+  const edgeAlert = typeof hud.edge === 'string' && hud.edge ? (
+    <span className={`fel-heading animate-pulse text-xl font-black drop-shadow ${hud.edge === 'EDGE BEHIND YOU' ? 'text-[#FF3366]' : 'text-[#00FF9D]'}`}>
+      {hud.edge === 'EDGE BEHIND YOU' ? '⚠ EDGE BEHIND YOU ⚠' : 'RIVAL ON THE EDGE — PRESS!'}
+    </span>
+  ) : null;
 
   return (
     <div className="relative aspect-[16/10] w-full overflow-hidden rounded-xl border border-white/10 bg-black">
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full touch-none" />
 
       {showHud && (
-        <div className="pointer-events-none absolute inset-x-0 top-0 flex justify-between px-4 py-3 text-sm font-mono text-white">
+        <CombatHudBand banner={typeof hud.banner === 'string' ? hud.banner : ''} alert={edgeAlert}>
+        <div className="flex justify-between px-4 py-3 text-sm font-mono text-white">
           <div className="flex flex-col gap-1">
             <span className="fel-panel px-2 py-0.5 text-cyan-300">HP {hnum(hud.hp, 100)}</span>
             <span className="fel-panel px-2 py-0.5 text-yellow-400">GUARD {hnum(hud.guard, 100)}</span>
@@ -132,27 +141,10 @@ export default function MixedCombatBabylon({ onEnd }: GameProps) {
             <span className="fel-panel px-2 py-0.5 text-purple-400">FOE CHI {hnum(hud.foeChi, 0)}</span>
           </div>
         </div>
+        </CombatHudBand>
       )}
 
-      {typeof hud.banner === 'string' && hud.banner && phase === 'playing' && (
-        <div className="pointer-events-none absolute inset-x-0 top-1/3 text-center">
-          <span className="fel-heading text-3xl font-bold text-[var(--fel-cyan)] drop-shadow">{hud.banner}</span>
-        </div>
-      )}
 
-      {/* Edge danger — the ring-out is the signature, so the warning must be
-          on the bezel, pulsing, the moment a back nears the rim. */}
-      {typeof hud.edge === 'string' && hud.edge && phase === 'playing' && (
-        <div className="pointer-events-none absolute inset-x-0 top-[22%] text-center">
-          <span
-            className={`fel-heading animate-pulse text-xl font-black drop-shadow ${
-              hud.edge === 'EDGE BEHIND YOU' ? 'text-[#FF3366]' : 'text-[#00FF9D]'
-            }`}
-          >
-            {hud.edge === 'EDGE BEHIND YOU' ? '⚠ EDGE BEHIND YOU ⚠' : 'RIVAL ON THE EDGE — PRESS!'}
-          </span>
-        </div>
-      )}
 
       {/* The mode's own instructions (loadout pick, fight grammar). The mode
           published these every phase and no bezel ever drew them — trap:

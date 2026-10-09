@@ -85,7 +85,9 @@ export const PLACE_LOOKS: Record<string, PlaceLook[]> = {
     // THE STAGE IS A REAL BOWL (owner, 2026-09-18: "2 soccer stadiums… swap with the one underneath that we can see in the
     // forefront"): the home place drops the ocean backdrop and the beach prop set, so the stadium standing around the pitch
     // is what you see behind the goal.
-    { ...home('Global Pitch', 'THE STADIUM AT NIGHT', '#2E7D46'), backdrop: 'stadium', propSet: null },
+    // QA P1-17 (2026-09-27): this said THE STADIUM AT NIGHT over the venue spec's dusk sky and the Breakaway glass — the
+    // copy says what renders ([DECISION-EJ] default: the copy moves, not the lighting)
+    { ...home('Global Pitch', 'THE STADIUM AT DUSK · GLASS DOWN THE SIDES', '#2E7D46'), backdrop: 'stadium', propSet: null },
     { id: 'street-cage', name: 'Street Cage', sub: 'A CAGED PITCH UNDER THE STREETLIGHTS', tint: '#22d3ee', sky: NEON, backdrop: 'city', ground: { color: '#2f6a3a', line: '#bfe9ff' }, propSet: null, props: [lamp(-14, -24, '#22d3ee'), lamp(14, -24, '#22d3ee'), lamp(-14, 24, '#f472b6'), lamp(14, 24, '#f472b6')] },
     { id: 'beach-pitch', name: 'Beach Pitch', sub: 'GRASS BY THE WATER · A DAWN SHOOTOUT', tint: '#ffd166', sky: DAWN, backdrop: 'beach', propSet: 'beach-court', props: [palm(-30, -36), palm(30, -36)] },
   ],

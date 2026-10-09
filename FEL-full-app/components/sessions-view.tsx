@@ -21,6 +21,32 @@ export const BOOKING_REFUSED: Record<string, string> = {
   slot_taken: 'Someone just booked that private slot. Pick another time.',
 };
 
+/**
+ * QA P1-24 (2026-09-27): every Book button was live at 0 shards and the refusal came back only after the press (a 409
+ * toast). A slot the wallet cannot pay for says so on the button: disabled, "Need N more shards", with the way to earn
+ * them. An unknown balance (the wallet read failed) leaves it pressable; the server's check stays either way.
+ */
+export function bookState(price: number, balance: number | null): { short: number; disabled: boolean } {
+  const short = balance === null ? 0 : Math.max(0, price - balance);
+  return { short, disabled: short > 0 };
+}
+
+export function BookButton({ price, balance, isBooked, busy, color, textColor, onBook }: {
+  price: number; balance: number | null; isBooked: boolean; busy: boolean; color: string; textColor: string; onBook: () => void;
+}) {
+  const { short, disabled } = bookState(price, balance);
+  return (
+    <>
+      <button onClick={onBook} disabled={isBooked || busy || (disabled && !isBooked)} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl py-2 text-sm font-bold transition disabled:opacity-70" style={{ backgroundColor: isBooked ? 'rgba(0,255,157,0.15)' : short > 0 ? 'rgba(255,255,255,0.08)' : color, color: isBooked ? '#00FF9D' : short > 0 ? 'rgba(255,255,255,0.6)' : textColor }}>
+        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : isBooked ? <><Check className="h-4 w-4" /> Booked</> : short > 0 ? <>Need {short} more shard{short === 1 ? '' : 's'}</> : <><Sparkles className="h-4 w-4" /> Book · {price} shards</>}
+      </button>
+      {!isBooked && short > 0 && (
+        <a href="/wallet" className="mt-1.5 block text-center text-[11px] text-cyan-300 underline">How to earn shards</a>
+      )}
+    </>
+  );
+}
+
 export function SessionsView() {
   const [group, setGroup] = useState<GroupSlot[]>([]);
   const [priv, setPriv] = useState<PrivSlot[]>([]);
@@ -29,6 +55,7 @@ export function SessionsView() {
   const [hosting, setHosting] = useState<HostingSlot[]>([]);
   const [loading, setLoading] = useState(true);
   const [booking, setBooking] = useState<string | null>(null);
+  const [shards, setShards] = useState<number | null>(null);
   const [coachStore, setCoachStore] = useState(false);
   const [coaches, setCoaches] = useState<{ id: string; name: string }[]>([]);
   const [shareCoach, setShareCoach] = useState('');
@@ -36,6 +63,8 @@ export function SessionsView() {
   const [sharedIds, setSharedIds] = useState<string[]>([]);
 
   const load = async () => {
+    // the wallet's shard balance, for the Book buttons (QA P1-24); a failed read leaves it unknown
+    fetch('/api/v1/wallet').then((r) => (r.ok ? r.json() : null)).then((w) => setShards(typeof w?.shards === 'number' ? w.shards : null)).catch(() => setShards(null));
     try {
       const res = await fetch('/api/v1/sessions');
       const j = await res.json();
@@ -155,9 +184,7 @@ export function SessionsView() {
                 <div className="flex items-center gap-2 text-sm font-bold text-white"><Dumbbell className="h-4 w-4 text-red-400" /> {s.label}</div>
                 <div className="text-xs text-white/40">Hosted by {s.host} · up to {s.capacity} athletes</div>
                 {shareBox(s.sessionKey)}
-                <button onClick={() => book('group_workout', s.sessionKey)} disabled={isBooked || booking === s.sessionKey} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl py-2 text-sm font-bold transition disabled:opacity-70" style={{ backgroundColor: isBooked ? 'rgba(0,255,157,0.15)' : '#00E5FF', color: isBooked ? '#00FF9D' : '#050505' }}>
-                  {booking === s.sessionKey ? <Loader2 className="h-4 w-4 animate-spin" /> : isBooked ? <><Check className="h-4 w-4" /> Booked</> : <><Sparkles className="h-4 w-4" /> Book · {s.shards} shards</>}
-                </button>
+                <BookButton price={s.shards} balance={shards} isBooked={isBooked} busy={booking === s.sessionKey} color="#00E5FF" textColor="#050505" onBook={() => book('group_workout', s.sessionKey)} />
               </motion.div>
             );
           })}
@@ -181,9 +208,7 @@ export function SessionsView() {
                   <div className="text-sm font-bold text-white">{s.label}</div>
                   <div className="text-xs text-white/40">Direct session with Elijah Bonds</div>
                   {shareBox(s.sessionKey)}
-                  <button onClick={() => book('private_1on1', s.sessionKey)} disabled={isBooked || booking === s.sessionKey} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl py-2 text-sm font-bold transition disabled:opacity-70" style={{ backgroundColor: isBooked ? 'rgba(0,255,157,0.15)' : '#A855F7', color: isBooked ? '#00FF9D' : '#fff' }}>
-                    {booking === s.sessionKey ? <Loader2 className="h-4 w-4 animate-spin" /> : isBooked ? <><Check className="h-4 w-4" /> Booked</> : <><Sparkles className="h-4 w-4" /> Book · {s.shards} shards</>}
-                  </button>
+                  <BookButton price={s.shards} balance={shards} isBooked={isBooked} busy={booking === s.sessionKey} color="#A855F7" textColor="#fff" onBook={() => book('private_1on1', s.sessionKey)} />
                 </motion.div>
               );
             })}

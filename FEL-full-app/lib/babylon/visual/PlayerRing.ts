@@ -7,9 +7,15 @@
 // the root; the puck follows the root each frame at a camera-relative offset; the glyph is drawn once, the arc only when it changes.
 import { Color3, DynamicTexture, Mesh, MeshBuilder, StandardMaterial, TransformNode, Vector3, type Scene } from '@babylonjs/core';
 
-export type RingIcon = 'basketball' | 'music' | 'camera' | 'controller' | 'dance' | 'art' | 'pen' | 'chef' | 'fashion';
+// QA P1-01 (2026-09-27): the sports have their own glyphs. Every sport used to share the basketball, so a fighter's or a
+// skater's ring carried a 🏀 into Storm Duel, Ring's Edge and Venice Lines.
+export type RingIcon = 'basketball' | 'music' | 'camera' | 'controller' | 'dance' | 'art' | 'pen' | 'chef' | 'fashion'
+  | 'martial' | 'skate' | 'snow' | 'surf' | 'golf' | 'soccer' | 'tennis' | 'volleyball' | 'football' | 'baseball';
 /** The glyph per icon — emoji, which every platform's canvas draws (no font to ship). */
-export const RING_GLYPH: Record<RingIcon, string> = { basketball: '🏀', music: '♪', camera: '🎥', controller: '🎮', dance: '💃', art: '🎨', pen: '✍', chef: '🍳', fashion: '👕' };
+export const RING_GLYPH: Record<RingIcon, string> = {
+  basketball: '🏀', music: '♪', camera: '🎥', controller: '🎮', dance: '💃', art: '🎨', pen: '✍', chef: '🍳', fashion: '👕',
+  martial: '🥋', skate: '🛹', snow: '🏂', surf: '🏄', golf: '⛳', soccer: '⚽', tennis: '🎾', volleyball: '🏐', football: '🏈', baseball: '⚾',
+};
 
 export interface PlayerRingHandle { set(stamina01: number): void; setIcon(icon: RingIcon): void; /** GC-7: hide the ring and glyph during play — boost reads on the HUD bar instead. */ setPlayVisible(on: boolean): void; dispose(): void }
 

@@ -330,6 +330,20 @@ function buildWheel(scene: Scene): WheelParts {
 /** Three raked rows each side of the wheel, in the frame's upper corners between the wheel and the edges. */
 export const GALLERY = { x0: 3.5, x1: 8.6, rows: [{ z: -5.6, top: 1.2 }, { z: -6.5, top: 1.8 }, { z: -7.4, top: 2.4 }] };
 
+/**
+ * QA P1-11 (2026-09-27): the gallery fascia read "RAIN BRAWL". The title was drawn at a fixed 56 px, centred in each half
+ * of a 1024 px texture, and a machine without Arial Black (the QA box) fell back to a wider face whose "BRAIN BRAWL" ran
+ * past the texture's left edge. The font is fitted to the half now: the largest size up to `px` whose measured width is at
+ * most `share` of `maxW`. Returns the CSS font string it set.
+ */
+export function fitTitleFont(g: Pick<CanvasRenderingContext2D, 'font' | 'measureText'>, text: string, maxW: number, px = 56, share = 0.9): string {
+  const face = '"Arial Black", Impact, system-ui, sans-serif';
+  g.font = `900 ${px}px ${face}`;
+  const w = g.measureText(text).width;
+  if (w > maxW * share) g.font = `900 ${Math.max(10, Math.floor((px * maxW * share) / w))}px ${face}`;
+  return g.font;
+}
+
 function buildGalleries(scene: Scene): Vector3[][] {
   const fascia = painted(scene, 'bb_gallery_fascia', 1024, 256, (g, w, h) => {
     g.fillStyle = '#0d0926'; g.fillRect(0, 0, w, h);
@@ -337,7 +351,7 @@ function buildGalleries(scene: Scene): Vector3[][] {
     const lg = g.createLinearGradient(0, 0, w, 0);
     CATEGORIES.forEach((cat, i) => lg.addColorStop(i / 4, CATEGORY_COLOR[cat]));
     g.fillStyle = lg; g.fillRect(0, h * 0.12, w, 12); g.fillRect(0, h * 0.82, w, 6);
-    g.font = '900 56px "Arial Black", Impact, system-ui, sans-serif'; g.fillStyle = 'rgba(255,255,255,0.85)'; g.textBaseline = 'middle'; g.textAlign = 'center';
+    fitTitleFont(g, 'BRAIN BRAWL', w / 2); g.fillStyle = 'rgba(255,255,255,0.85)'; g.textBaseline = 'middle'; g.textAlign = 'center';
     for (const x of [w * 0.25, w * 0.75]) g.fillText('BRAIN BRAWL', x, h * 0.5);
   });
   const glowFascia = painted(scene, 'bb_gallery_fascia_glow', 1024, 256, (g, w, h) => {
@@ -345,7 +359,7 @@ function buildGalleries(scene: Scene): Vector3[][] {
     const lg = g.createLinearGradient(0, 0, w, 0);
     CATEGORIES.forEach((cat, i) => lg.addColorStop(i / 4, CATEGORY_COLOR[cat]));
     g.fillStyle = lg; g.fillRect(0, h * 0.12, w, 12); g.fillRect(0, h * 0.82, w, 6);
-    g.font = '900 56px "Arial Black", Impact, system-ui, sans-serif'; g.fillStyle = 'rgba(255,255,255,0.7)'; g.textBaseline = 'middle'; g.textAlign = 'center';
+    fitTitleFont(g, 'BRAIN BRAWL', w / 2); g.fillStyle = 'rgba(255,255,255,0.7)'; g.textBaseline = 'middle'; g.textAlign = 'center';
     for (const x of [w * 0.25, w * 0.75]) g.fillText('BRAIN BRAWL', x, h * 0.5);
   });
   const carpet = painted(scene, 'bb_gallery_carpet', 256, 256, (g, w, h) => {

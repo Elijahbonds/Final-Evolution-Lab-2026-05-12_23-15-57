@@ -12,7 +12,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { HostLobby } from '@/components/controller-link/host-lobby';
-import { controllerConfigFor } from '@/lib/controller-link/schemas/registry';
+import { controllerConfigFor, MODE_CONTROLLERS } from '@/lib/controller-link/schemas/registry';
 import { HostPresence, presenceSummary, type PresenceReport } from '@/lib/controller-link/presence';
 import { toInputBus } from '@/lib/controller-link/modeBridge';
 import { runMode, InputBus, type FelInput, type HudValue, type ModePhase, type SessionResult } from '@/lib/babylon';
@@ -22,9 +22,39 @@ import { PadChips } from '@/lib/babylon/ui/PadChips';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import type { ControlEvent } from '@/lib/controller-link/types';
 
-export function HostStage({ modeId }: { modeId: string }) {
+/**
+ * QA P1-26 (2026-09-27): /host only ever offered Downtown — the page defaults ?mode= to threepoint and the stage had no
+ * picker, so a TV could not choose another game without typing a URL with a remote. The start panel lists every mode the
+ * controller link has a layout for (the registry), minus The Flip, whose big screen is the Academy's own room.
+ */
+export function hostModes(): { modeId: string; title: string }[] {
+  // merge with lane/finish-release (2026-10-08): the stage now runs the mode itself (MODES), so a layout with no playable
+  // TV mode would only lead to "No playable TV mode" — the chooser lists the modes that have both
+  return Object.values(MODE_CONTROLLERS)
+    .filter((c) => c.modeId !== 'music_flip' && !!MODES[c.modeId])
+    .map((c) => ({ modeId: c.modeId, title: c.title }));
+}
+
+export function HostStage({ modeId: initialModeId }: { modeId: string }) {
+  const [modeId, setModeId] = useState(initialModeId);
   const config = useMemo(() => controllerConfigFor(modeId), [modeId]);
   const def = useMemo(() => MODES[modeId] ?? null, [modeId]);
+  const choose = useCallback((id: string) => {
+    setModeId(id);
+    // ?mode= still names it, so a reload (or a bookmark on the TV) opens the same game
+    try { const u = new URL(window.location.href); u.searchParams.set('mode', id); window.history.replaceState(null, '', u.toString()); } catch { /* no window: a test */ }
+  }, []);
+  const modes = useMemo(() => hostModes(), []);
+  const chooser = (
+    <div data-host-modes style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center', margin: '0 0 18px' }}>
+      {modes.map((m) => (
+        <button key={m.modeId} type="button" data-mode={m.modeId} aria-pressed={m.modeId === modeId} onClick={() => choose(m.modeId)}
+          style={{ padding: '8px 12px', borderRadius: 10, border: `1px solid ${m.modeId === modeId ? '#00E5FF' : '#26304a'}`, background: m.modeId === modeId ? '#00E5FF22' : 'transparent', color: m.modeId === modeId ? '#00E5FF' : '#cfd6e4', cursor: 'pointer', font: '600 13px system-ui' }}>
+          {m.title}
+        </button>
+      ))}
+    </div>
+  );
   const [started, setStarted] = useState(false);
   const [phase, setPhase] = useState<ModePhase>('loading');
   const [countdown, setCountdown] = useState<number | null>(null);
@@ -137,13 +167,19 @@ export function HostStage({ modeId }: { modeId: string }) {
 
   if (!config) {
     return <main style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: '#05070c', color: '#cfd6e4' }}>
-      <p style={{ font: '400 15px system-ui' }}>No controller layout for “{modeId}”.</p>
+      <div style={{ textAlign: 'center', maxWidth: 640 }}>
+        <p style={{ font: '400 15px system-ui' }}>No controller layout for “{modeId}”. Pick a game:</p>
+        {chooser}
+      </div>
     </main>;
   }
 
   if (!def) {
     return <main style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: '#05070c', color: '#cfd6e4' }}>
-      <p style={{ font: '400 15px system-ui' }}>No playable TV mode for “{modeId}”.</p>
+      <div style={{ textAlign: 'center', maxWidth: 640 }}>
+        <p style={{ font: '400 15px system-ui' }}>No playable TV mode for “{modeId}”. Pick a game:</p>
+        {chooser}
+      </div>
     </main>;
   }
 
@@ -157,6 +193,7 @@ export function HostStage({ modeId }: { modeId: string }) {
           <p style={{ margin: '0 0 18px', color: '#8A94A6', font: '400 14px/1.5 system-ui' }}>
             This screen shows the game. Everyone plays on their phone — up to {config.maxPlayers}.
           </p>
+          {chooser}
           <button
             onClick={start}
             style={{ padding: '14px 28px', borderRadius: 12, border: 'none', background: '#00E5FF', color: '#04202a', cursor: 'pointer', font: '700 16px system-ui', letterSpacing: 1 }}

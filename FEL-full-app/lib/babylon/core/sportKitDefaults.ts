@@ -25,8 +25,13 @@ const COMBAT: SportKit = { tops: 'top_lab', shorts: 'shorts_court', shoes: 'shoe
 const BOARD: SportKit = { tops: 'top_lab', shorts: 'shorts_court', shoes: 'shoes_flight' };
 const COURT: SportKit = { tops: 'top_bonds', shorts: 'shorts_court', shoes: 'shoes_evo' };
 const FIELD: SportKit = { tops: 'top_bonds', shorts: 'shorts_court', shoes: 'shoes_flight' };
-// owner approval 2026-09-05 ("skinning of the rigs"): the Meshy baseball jersey, fitted and skinned in Blender, ships as a kit pack
-const BASEBALL: SportKit = { tops: 'top_baseball', shorts: 'shorts_court', shoes: 'shoes_flight' };
+// owner approval 2026-09-05 ("skinning of the rigs"): the Meshy baseball jersey, fitted and skinned in Blender, ships as a kit pack.
+// QA P1-04 (2026-09-27): in the batting stance that jersey tears — skin through the back and shoulder, shards past the hip
+// (lane capture of /dev/mode/derby). Until its skinning is fixed (routed: a garment job), the derby's DEFAULT top is the
+// plain tee the body carries natively (captured in the same stance: no tear). The jersey stays in the catalogue: a Closet
+// pick still wins.
+export const BASEBALL_JERSEY = 'top_baseball';
+const BASEBALL: SportKit = { tops: 'top_lab', shorts: 'shorts_court', shoes: 'shoes_flight' };
 const FOOTBALL: SportKit = { tops: 'top_football', shorts: 'shorts_court', shoes: 'shoes_flight' };   // the Meshy football jersey (kit pack)
 
 /** Every mode without its own row wears this — the court fit, the body's most complete read. */

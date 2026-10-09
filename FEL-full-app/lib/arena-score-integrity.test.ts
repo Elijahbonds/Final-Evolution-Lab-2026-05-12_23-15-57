@@ -1192,7 +1192,11 @@ describe('drift guards — the numbers mirrored out of mode files still match th
     expect(c).toContain('charge = 0; cooldown = 0.5;');
     expect(c).toContain("if (e.t === 'button' && e.pressed && !striking && (e.btn === 'A' || e.btn === 'B' || e.btn === 'Y')) {");
     expect(num(c, /const TRIO_BONUS = (\d+);/, 'TRIO_BONUS')).toBe(m.strikeStormTrioBonus);
-    expect(c).toContain('to.scale(13 + p * 7)');
+    // QA A1-01(b): the old speed (13 + p*7) fell short of the goal line at every power, even dead centre (measured against
+    // the real Flight sim — carnivalEvents.hotShot.physics.test.ts); HOT_SHOT_BASE_MPS / HOT_SHOT_POWER_MPS replace it,
+    // and the full-power speed is what the ceiling mirrors (hotShotMaxSpeed). A short shot is a miss (IMPROVE 2026-10-06).
+    expect(c).toContain('to.scale(HOT_SHOT_BASE_MPS + p * HOT_SHOT_POWER_MPS)');
+    expect(num(c, /export const HOT_SHOT_BASE_MPS = (\d+);/, 'HOT_SHOT_BASE_MPS') + num(c, /export const HOT_SHOT_POWER_MPS = (\d+);/, 'HOT_SHOT_POWER_MPS')).toBe(m.hotShotMaxSpeed);
     expect(c).toContain('if (ball.position.z >= 10.9) {');
     expect(c).toContain('.scaleInPlace(6);');
     expect(c).toContain('coins.line(new Vector3(-8, 0.4, -8), new Vector3(8, 0.4, 8), 7);');

@@ -43,6 +43,18 @@ const COMPACT_SCALE = 0.85;
 const COMPACT_LEFT: React.CSSProperties = { ...SAFE_LEFT, transform: `scale(${COMPACT_SCALE})`, transformOrigin: 'bottom left' };
 const COMPACT_RIGHT: React.CSSProperties = { ...SAFE_RIGHT, transform: `scale(${COMPACT_SCALE})`, transformOrigin: 'bottom right' };
 
+/**
+ * QA P1-10 (2026-09-27): the deck lives inside the mode's 16:10 stage (overflow hidden). A 390-wide phone's stage is ~234 px
+ * tall and the right column (boost, diamond, stick) is ~306 px, so its top buttons were cut off; sideways and on a desktop
+ * the stage runs past the bottom of the screen, and the bottom-anchored deck went with it. Pure: how far to LIFT a column
+ * (the stage below the viewport) and how much to SCALE it (to fit what is visible of the stage), margins kept.
+ */
+export function fitDeck(stage: { top: number; bottom: number }, viewportH: number, columnH: number, margin = 12): { lift: number; scale: number } {
+  const visBottom = Math.min(stage.bottom, viewportH);
+  const room = Math.max(0, visBottom - Math.max(stage.top, 0) - 2 * margin);
+  return { lift: Math.max(0, stage.bottom - visBottom), scale: columnH > 0 ? Math.min(1, room / columnH) : 1 };
+}
+
 /** Any touch input at all: a touchscreen laptop keeps its deck; a mouse-and-keyboard machine or a TV browser does not. */
 function hasTouch(): boolean {
   try {
@@ -56,16 +68,30 @@ export function TouchOverlay(props: { bus: InputBus; modeId: string; visible: bo
   // lib/ui/consoleView.ts) — stacked, the right side was 318 px of a 390 px screen, a wall up the edge of the picture.
   // A screen with no touch at all (a laptop or console browser on a TV) draws no deck: nothing can press it ('none').
   const [deck, setDeck] = useState<TouchDeckLayout>(() => touchDeckLayout(window.innerWidth, window.innerHeight, hasTouch()));
+  // QA P1-10: each column is lifted and scaled into the visible stage (fitDeck), on top of the layout above
+  const root = useRef<HTMLDivElement>(null), colL = useRef<HTMLDivElement>(null), colR = useRef<HTMLDivElement>(null);
+  const [fit, setFit] = useState({ lift: 0, l: 1, r: 1 });
 
   useEffect(() => {
-    const onR = () => setDeck(touchDeckLayout(window.innerWidth, window.innerHeight, hasTouch()));
+    const onR = () => {
+      setDeck(touchDeckLayout(window.innerWidth, window.innerHeight, hasTouch()));
+      const stage = root.current?.parentElement?.getBoundingClientRect();
+      if (!stage) return;
+      const l = fitDeck(stage, window.innerHeight, colL.current?.offsetHeight ?? 0), r = fitDeck(stage, window.innerHeight, colR.current?.offsetHeight ?? 0);
+      setFit((f) => (f.lift === l.lift && f.l === l.scale && f.r === r.scale ? f : { lift: l.lift, l: l.scale, r: r.scale }));
+    };
+    onR();
     window.addEventListener('resize', onR);
-    return () => window.removeEventListener('resize', onR);
-  }, []);
+    window.addEventListener('scroll', onR, { passive: true });
+    return () => { window.removeEventListener('resize', onR); window.removeEventListener('scroll', onR); };
+  }, [props.visible, deck]);
   const landscape = deck !== 'portrait';
   const compact = deck === 'compact';
 
   if (!props.visible || props.bus.gamepadActive || deck === 'none') return null;
+  const lifted = (side: React.CSSProperties, k: number, origin: string): React.CSSProperties =>
+    ({ ...side, bottom: `calc(max(0.75rem, env(safe-area-inset-bottom)) + ${fit.lift}px)`, transform: `scale(${k})`, transformOrigin: origin });
+  const cs = compact ? COMPACT_SCALE : 1;
 
   // CALL FOR THE BALL (Elijah item 2): a mode can retitle (never re-emit) a slot per frame — e.g. 3v3's PASS
   // becomes BALL! off the ball. The emit, hold and hollow-socket rules are untouched; only label/color move.
@@ -75,17 +101,17 @@ export function TouchOverlay(props: { bus: InputBus; modeId: string; visible: bo
     : cfg.buttons) as [VerbButton, VerbButton, VerbButton, VerbButton];
 
   return (
-    <div data-touch-deck className={landscape
+    <div ref={root} data-touch-deck className={landscape
       ? 'pointer-events-none absolute inset-0 z-30'
       : 'pointer-events-none absolute inset-x-0 bottom-0 z-30 h-[44vh] bg-gradient-to-t from-black/85 to-transparent'}>
       {/* compact: the stick in the corner and the d-pad inboard of it (row-reverse keeps the DOM order) */}
-      <div className={`pointer-events-auto absolute bottom-3 left-3 flex gap-2 ${compact ? 'flex-row-reverse items-end' : 'flex-col items-center'}`} style={compact ? COMPACT_LEFT : SAFE_LEFT}>
+      <div ref={colL} className={`pointer-events-auto absolute bottom-3 left-3 flex gap-2 ${compact ? 'flex-row-reverse items-end' : 'flex-col items-center'}`} style={lifted(compact ? COMPACT_LEFT : SAFE_LEFT, cs * fit.l, 'bottom left')}>
         <DPad bus={props.bus} />
         <AnalogStick bus={props.bus} side="L" label="MOVE" />
       </div>
       {compact ? (
         // compact: the diamond in the corner with the boost pill over it, the right stick inboard of the diamond
-        <div className="pointer-events-auto absolute bottom-3 right-3 flex flex-row items-end gap-2" style={COMPACT_RIGHT}>
+        <div ref={colR} className="pointer-events-auto absolute bottom-3 right-3 flex flex-row items-end gap-2" style={lifted(COMPACT_RIGHT, cs * fit.r, 'bottom right')}>
           {cfg.rStick === null ? <HollowStick /> : <AnalogStick bus={props.bus} side="R" label={cfg.rStick} />}
           <div className="flex flex-col items-center gap-2">
             {cfg.boost && <BoostPill bus={props.bus} />}
@@ -93,7 +119,7 @@ export function TouchOverlay(props: { bus: InputBus; modeId: string; visible: bo
           </div>
         </div>
       ) : (
-        <div className="pointer-events-auto absolute bottom-3 right-3 flex flex-col items-center gap-2" style={SAFE_RIGHT}>
+        <div ref={colR} className="pointer-events-auto absolute bottom-3 right-3 flex flex-col items-center gap-2" style={lifted(SAFE_RIGHT, fit.r, 'bottom right')}>
           {cfg.boost && <BoostPill bus={props.bus} />}
           <ButtonDiamond bus={props.bus} buttons={buttons} />
           {cfg.rStick === null ? <HollowStick /> : <AnalogStick bus={props.bus} side="R" label={cfg.rStick} />}

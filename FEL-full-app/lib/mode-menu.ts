@@ -42,7 +42,7 @@ export const MODE_MENU_META: Record<string, ModeMenuMeta> = {
   tennis: { icon: CircleDot, color: '#00FF9D', desc: 'Rally-based match play vs adaptive AI. First to 5 points takes the match.' },
   brainBrawl: { icon: Brain, color: '#A855F7', desc: 'Spin the category wheel and answer under pressure. 120 seconds on the clock.' },
   skateboarding: { icon: Zap, color: '#00E5FF', desc: 'Shred the Venice park. Time your ollies, chain grabs and grinds for a high score run.' },
-  soccer: { icon: Goal, color: '#00FF9D', desc: 'Twelve yards under stadium lights. Pick your corner, beat the keeper, five rounds.' },
+  soccer: { icon: Goal, color: '#00FF9D', desc: 'Twelve yards in the stadium at dusk. Pick your corner, beat the keeper, five rounds.' },
   baseball: { icon: CircleDollarSign, color: '#FFD700', desc: 'Moonshot Derby at Catalina Ballpark. Read the pitch, time the swing, clear the wall.' },
   snowboarding: { icon: Snowflake, color: '#00E5FF', desc: 'Gate-crashing descent down the mountain. Carve every gate at speed without wiping out.' },
   surfing: { icon: Waves, color: '#00FF9D', desc: 'Ride the break. Balance the line, pump for speed, and stick tricks on the lip.' },
