@@ -6,12 +6,13 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { installedTsxCli, isDirectRun, suiteCommand } from '../../scripts/ci-suite';
+import { DB_SUITES, installedTsxCli, isDirectRun, suiteCommand } from '../../scripts/ci-suite';
 
 const require = createRequire(import.meta.url);
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const sourcePath = path.join(root, 'scripts', 'ci-suite.ts');
 const source = fs.readFileSync(sourcePath, 'utf8');
+const standingSource = fs.readFileSync(path.join(root, 'scripts', 'standing-suite.ts'), 'utf8');
 
 describe('ci-suite runner', () => {
   it('contains no yarn spawn and no bare npx tsx that could download', () => {
@@ -50,5 +51,17 @@ describe('ci-suite runner', () => {
     expect(out).toContain('suite(s) discovered');
     expect(out).toContain('smokeTest.ts');
     expect(out).toContain('mode-list-check.ts');
+  });
+
+  it('exports the DB suite list for direct runners that must share the same gate', () => {
+    expect(DB_SUITES.has('wallet-tests.ts')).toBe(true);
+    expect(DB_SUITES.has('ledger-invariants.ts')).toBe(true);
+    expect(source).toMatch(/export const DB_SUITES = new Set/);
+  });
+
+  it('standing-suite uses the ci-suite DB gate instead of false-reding without Postgres', () => {
+    expect(standingSource).toMatch(/import \{ DB_SUITES, suiteCommand \} from '\.\/ci-suite'/);
+    expect(standingSource).toMatch(/!hasDb && DB_SUITES\.has\(file\)/);
+    expect(standingSource).toMatch(/SKIPPED \(DB\)/);
   });
 });

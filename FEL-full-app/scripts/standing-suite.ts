@@ -18,7 +18,7 @@
 
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
-import { suiteCommand } from './ci-suite';
+import { DB_SUITES, suiteCommand } from './ci-suite';
 
 const ROOT = path.resolve(__dirname, '..');
 const suites = [
@@ -86,14 +86,27 @@ const suites = [
 ];
 
 let failed = 0;
-const results: { name: string; ok: boolean; error?: string }[] = [];
+let skipped = 0;
+const hasDb = Boolean(process.env.DATABASE_URL);
+const results: { name: string; ok: boolean; skipped?: boolean; error?: string }[] = [];
 
 for (const suite of suites) {
+  const file = path.basename(suite.script);
+  if (!hasDb && DB_SUITES.has(file)) {
+    skipped++;
+    results.push({ name: suite.name, ok: true, skipped: true });
+    console.log(`\n${'='.repeat(60)}`);
+    console.log(`SKIP: ${suite.name}`);
+    console.log('='.repeat(60));
+    console.log(`DATABASE_URL is unset; ${file} is a DB suite. Run npm run test:ci with a provisioned database for the full gate.`);
+    continue;
+  }
+
   console.log(`\n${'='.repeat(60)}`);
   console.log(`SUITE: ${suite.name}`);
   console.log('='.repeat(60));
   try {
-    const [command, args] = suiteCommand(path.basename(suite.script));
+    const [command, args] = suiteCommand(file);
     execFileSync(command, args, {
       cwd: ROOT,
       stdio: 'inherit',
@@ -112,8 +125,9 @@ console.log(`\n${'='.repeat(60)}`);
 console.log('STANDING SUITE SUMMARY');
 console.log('='.repeat(60));
 for (const r of results) {
-  console.log(`  ${r.ok ? '\u2713' : '\u274c'} ${r.name}${r.ok ? '' : ' \u2014 FAILED'}`);
+  console.log(`  ${r.skipped ? '-' : r.ok ? '\u2713' : '\u274c'} ${r.name}${r.skipped ? ' — SKIPPED (DB)' : r.ok ? '' : ' \u2014 FAILED'}`);
 }
+if (skipped > 0) console.log(`\nSkipped ${skipped} DB suite(s); provide DATABASE_URL and run npm run test:ci for the full DB gate.`);
 console.log(`\n${failed === 0 ? '\u2705 ALL SUITES GREEN' : `\u274c ${failed} SUITE(S) FAILED`}`);
 
 if (failed > 0) process.exit(1);
