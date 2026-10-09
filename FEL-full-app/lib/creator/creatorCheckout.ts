@@ -2,18 +2,24 @@
  * Stripe Checkout for one bookable service slot.
  *
  * Test mode only, through the book shop's own guard: the creator platform uses the same Stripe client and
- * key (`STRIPE_BOOKS_SECRET_KEY`, falling back to `STRIPE_SECRET_KEY`) and `assertStripeTestKey` refuses
+ * key (`STRIPE_BOOKS_SECRET_KEY`, falling back to `STRIPE_SECRET_KEY`) and `bookCheckoutGate` refuses
  * anything that is not `sk_test_` before a hold is taken or Stripe is called.
  *
  * Order matters: key check → catalog → slot validation (server-generated slots only) → Firestore hold in a
  * transaction (fails if any cell is taken) → Checkout Session. If Stripe fails, the hold is released.
  * The price comes from the catalog, never from the request.
+ *
+ * MERGE (2026-10-09), the release's store rules through the book shop's bookCheckoutGate: a closed store is a 409
+ * store_closed with a reason (STORE-READY B2, was 503 test_mode_only), VIRTUAL_PURCHASES_ENABLED (B10) closes it by
+ * default, and Stripe's return URLs come from siteOrigin() (B3), never the request's Origin header.
  */
 
 import 'server-only';
 import { randomUUID } from 'crypto';
 import type Stripe from 'stripe';
-import { assertStripeTestKey, bookStripeSecret, getBookStripe } from '@/lib/books/bookCheckout';
+import { bookCheckoutGate, getBookStripe } from '@/lib/books/bookCheckout';
+import type { StoreClosedReason } from '@/lib/coach-store/stripeMode';
+import { STORE_CLOSED_MESSAGE } from '@/lib/coach-store/constants';
 import { isValidEmail, normalizeEmail } from '@/lib/marketing/funnel';
 import { paymentMethodsFor } from '@/lib/stripe-payment-methods';
 import { getBookableService, type CreatorProfile, type CreatorService } from './creatorCatalog';
@@ -26,7 +32,7 @@ export const CHECKOUT_TTL_SECONDS = 31 * 60;
 export const HOLD_GRACE_MS = 30 * 60_000;
 
 export class CreatorCheckoutError extends Error {
-  constructor(message: string, readonly status: number, readonly code: string) {
+  constructor(message: string, readonly status: number, readonly code: string, readonly reason?: StoreClosedReason) {
     super(message);
     this.name = 'CreatorCheckoutError';
   }
@@ -99,7 +105,6 @@ export interface StripeCheckoutClient {
 export interface StartServiceCheckoutInput {
   serviceId: unknown;
   slotStart: unknown;
-  origin: string;
   email?: unknown;
 }
 
@@ -117,23 +122,15 @@ export async function startServiceCheckout(
   deps: StartServiceCheckoutDeps,
 ): Promise<{ url: string; bookingId: string; sessionId: string }> {
   const env = deps.env ?? process.env;
-  try {
-    assertStripeTestKey(bookStripeSecret(env));
-  } catch {
-    throw new CreatorCheckoutError(
-      'Booking checkout is test-mode only. It uses the book shop\'s Stripe key (STRIPE_BOOKS_SECRET_KEY), which must be an sk_test_ key. Live keys are refused.',
-      503,
-      'test_mode_only',
-    );
-  }
+  const gate = bookCheckoutGate(env);
+  if (!gate.ok) throw new CreatorCheckoutError(STORE_CLOSED_MESSAGE, 409, 'store_closed', gate.reason);
 
   const serviceId = typeof input.serviceId === 'string' ? input.serviceId.slice(0, 120) : '';
   const found = getBookableService(serviceId);
   if (!found) throw new CreatorCheckoutError('Unknown service.', 404, 'unknown_service');
   const { profile, service } = found;
 
-  const origin = input.origin.replace(/\/$/, '');
-  if (!/^https?:\/\//.test(origin)) throw new CreatorCheckoutError('Checkout has no public origin configured.', 500, 'not_configured');
+  const origin = gate.origin;
 
   const now = deps.now ?? new Date();
   const slot = validateSlot(profile, service, input.slotStart, now);

@@ -3,6 +3,8 @@ import { assertStripeTestKey, bookStripeSecret, getBookStripe } from '@/lib/book
 import { getBookableService } from '@/lib/creator/creatorCatalog';
 import { formatSlot } from '@/lib/creator/creatorSlots';
 import { currentViewer } from '@/lib/creator/creatorViewer';
+import { confirmServiceSession } from '@/lib/creator/creatorWebhook';
+import { creatorStoreFromEnv } from '@/lib/creator/creatorStore.firestore';
 import { CreatorFrame, SectionTitle } from '@/components/creator-platform/creator-frame';
 
 export const dynamic = 'force-dynamic';
@@ -10,13 +12,18 @@ export const metadata = { title: 'Booking received — Final Evolution Team' };
 
 /**
  * Stripe Checkout returns here. The page reads the session from Stripe (test key only) to show what was
- * booked. The booking itself is confirmed by the webhook, not by this page.
+ * booked.
+ *
+ * MERGE (2026-10-09), SEC-F4 NO-WEBHOOK (#200): the page also CONFIRMS the booking from the session the server just
+ * retrieved (paid, product SERVICE, test mode, the booking named in the session's own metadata), through the same
+ * confirmServiceSession the webhook uses, keyed on the session: webhook + this page + a reload confirm once.
  */
 export default async function BookingSuccessPage({ searchParams }: { searchParams: { session_id?: string } }) {
   const viewer = await currentViewer();
   const sessionId = searchParams.session_id?.slice(0, 200) || '';
 
   let paid = false;
+  let confirmed = false;
   let serviceId = '';
   let slotStart = '';
   let lookupError: string | null = null;
@@ -27,9 +34,19 @@ export default async function BookingSuccessPage({ searchParams }: { searchParam
       if (checkout.metadata?.product !== 'SERVICE') {
         lookupError = 'That payment is not a booking.';
       } else {
-        paid = checkout.payment_status === 'paid' || checkout.payment_status === 'no_payment_required';
+        // 'paid' only, as the release's isPaidSession.
+        paid = checkout.payment_status === 'paid' && checkout.status !== 'expired';
         serviceId = checkout.metadata?.serviceId ?? '';
         slotStart = checkout.metadata?.slotStart ?? '';
+        const store = paid && !checkout.livemode ? creatorStoreFromEnv() : null;
+        if (store) {
+          try {
+            const result = await confirmServiceSession(checkout, store);
+            confirmed = 'outcome' in result ? result.outcome === 'CONFIRMED' : 'deduped' in result;
+          } catch (err) {
+            console.error('[bookings/success] confirm', err instanceof Error ? err.message : err);
+          }
+        }
       }
     } catch (err) {
       console.error('[bookings/success]', err instanceof Error ? err.message : err);
@@ -55,7 +72,9 @@ export default async function BookingSuccessPage({ searchParams }: { searchParam
               {when ? ` · ${when.day}, ${when.time}` : ''}
             </p>
             <p className="mt-2 text-sm text-white/60">
-              {paid
+              {paid && confirmed
+                ? 'Payment received. Your booking is confirmed.'
+                : paid
                 ? 'Payment received. The booking is confirmed as soon as Stripe notifies us, usually within seconds.'
                 : 'Payment is still processing. The booking is confirmed when Stripe reports it paid.'}
             </p>

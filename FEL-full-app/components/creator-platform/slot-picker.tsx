@@ -58,7 +58,10 @@ export function SlotPicker({ serviceId, timeZone }: { serviceId: string; timeZon
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok || typeof body?.url !== 'string') {
-        setError(typeof body?.error === 'string' ? body.error : 'Checkout is not available yet.');
+        // MERGE (2026-10-09): a closed store is 409 { error: 'store_closed', message } (STORE-READY B2).
+        setError(body?.error === 'store_closed' && typeof body?.message === 'string'
+          ? body.message
+          : typeof body?.error === 'string' ? body.error : 'Checkout is not available yet.');
         setBusy(false);
         return;
       }

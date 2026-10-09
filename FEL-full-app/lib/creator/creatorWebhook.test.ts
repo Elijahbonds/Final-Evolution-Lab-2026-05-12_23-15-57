@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { startServiceCheckout } from './creatorCheckout';
-import { handleCreatorEvent, type CreatorEvent } from './creatorWebhook';
+import { confirmServiceSession, handleCreatorEvent, type CreatorEvent, type SessionLike } from './creatorWebhook';
 import { memoryCreatorStore } from './creatorStore';
 import { notifyBooking } from './notify';
 
@@ -15,11 +15,12 @@ async function booked() {
   const db = memoryCreatorStore();
   const create = vi.fn(async () => ({ id: 'cs_test_1', url: 'https://checkout.stripe.test/cs_test_1' }));
   await startServiceCheckout(
-    { serviceId: 'elijah-bonds:session-60', slotStart: SLOT, origin: 'http://localhost:3000' },
+    { serviceId: 'elijah-bonds:session-60', slotStart: SLOT },
     {
       store: db.store,
       stripe: () => ({ checkout: { sessions: { create } } }),
-      env: { STRIPE_BOOKS_SECRET_KEY: 'sk_test_1' } as unknown as NodeJS.ProcessEnv,
+      // test changed (2026-10-09): + VIRTUAL_PURCHASES_ENABLED and NEXTAUTH_URL, the release's B10 fence and B3 origin.
+      env: { STRIPE_BOOKS_SECRET_KEY: 'sk_test_1', VIRTUAL_PURCHASES_ENABLED: '1', NEXTAUTH_URL: 'http://localhost:3000' } as unknown as NodeJS.ProcessEnv,
       now: NOW,
       newId: () => 'bk_1',
       paymentMethodTypes: ['card'],
@@ -78,7 +79,9 @@ describe('creator webhook', () => {
     const again = await handleCreatorEvent(completed(), db.store, NOW);
     expect(again).toEqual({ ok: true, deduped: true });
     expect([...db.bookings.values()]).toEqual(before);
-    expect(db.events.filter((e) => e.eventId === 'evt_done')).toHaveLength(1);
+    // test changed (2026-10-09): was eventId 'evt_done'. A paid completion is remembered under its SESSION key now
+    // (SEC-F4 #200: one payment, one grant across webhook, success page and redelivery).
+    expect(db.events.filter((e) => e.eventId === 'stripe-session:cs_test_1')).toHaveLength(1);
 
     await handleCreatorEvent(refunded(), db.store, NOW);
     const replayRefund = await handleCreatorEvent(refunded(), db.store, NOW);
@@ -146,13 +149,32 @@ describe('creator webhook', () => {
     const later = new Date(NOW.getTime() + 2 * 60 * 60_000);
     const create = vi.fn(async () => ({ id: 'cs_test_2', url: 'https://checkout.stripe.test/cs_test_2' }));
     await startServiceCheckout(
-      { serviceId: 'elijah-bonds:session-60', slotStart: SLOT, origin: 'http://localhost:3000' },
-      { store: db.store, stripe: () => ({ checkout: { sessions: { create } } }), env: { STRIPE_BOOKS_SECRET_KEY: 'sk_test_1' } as unknown as NodeJS.ProcessEnv, now: later, newId: () => 'bk_2', paymentMethodTypes: ['card'] },
+      { serviceId: 'elijah-bonds:session-60', slotStart: SLOT },
+      { store: db.store, stripe: () => ({ checkout: { sessions: { create } } }), env: { STRIPE_BOOKS_SECRET_KEY: 'sk_test_1', VIRTUAL_PURCHASES_ENABLED: '1', NEXTAUTH_URL: 'http://localhost:3000' } as unknown as NodeJS.ProcessEnv, now: later, newId: () => 'bk_2', paymentMethodTypes: ['card'] },
     );
     const result = await handleCreatorEvent(completed(), db.store, later);
     expect(result).toMatchObject({ outcome: 'CONFLICT' });
     expect(db.bookings.get('bk_1')?.status).toBe('CONFLICT');
     expect([...db.holds.values()].every((h) => h.bookingId === 'bk_2')).toBe(true);
+  });
+
+  it('webhook, a redelivery under a new event id and the success page confirm once (keyed on the session)', async () => {
+    const db = await booked();
+    const session = completed().data.object as SessionLike;
+    expect(await handleCreatorEvent(completed('evt_a'), db.store, NOW)).toMatchObject({ outcome: 'CONFIRMED' });
+    expect(await handleCreatorEvent(completed('evt_b'), db.store, NOW)).toEqual({ ok: true, deduped: true });
+    expect(await confirmServiceSession(session, db.store, NOW)).toEqual({ ok: true, deduped: true });
+    expect(notifyBooking).toHaveBeenCalledTimes(1);
+  });
+
+  it('the success page alone confirms a paid session (no webhook), and an unpaid visit does not block it', async () => {
+    const db = await booked();
+    const paid = completed().data.object as SessionLike;
+    expect(await confirmServiceSession({ ...paid, payment_status: 'unpaid' }, db.store, NOW)).toMatchObject({ reason: 'unpaid' });
+    expect(await confirmServiceSession({ ...paid, payment_status: 'no_payment_required' }, db.store, NOW)).toMatchObject({ reason: 'unpaid' });
+    expect(db.bookings.get('bk_1')?.status).toBe('HOLD');
+    expect(await confirmServiceSession(paid, db.store, NOW)).toMatchObject({ outcome: 'CONFIRMED' });
+    expect(db.bookings.get('bk_1')?.status).toBe('CONFIRMED');
   });
 
   it('the route verifies the creator signing secret', () => {

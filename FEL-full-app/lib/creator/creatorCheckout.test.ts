@@ -5,7 +5,9 @@ import { memoryCreatorStore } from './creatorStore';
 
 const NOW = new Date('2026-10-05T12:00:00Z');
 const SLOT = '2026-10-06T23:00:00.000Z';
-const TEST_ENV = { STRIPE_BOOKS_SECRET_KEY: 'sk_test_123' } as unknown as NodeJS.ProcessEnv;
+// test changed (2026-10-09): the env gained VIRTUAL_PURCHASES_ENABLED and NEXTAUTH_URL. Checkout now runs the book
+// shop's bookCheckoutGate (the release's B10 fence and B3 server origin), so an env without them is a closed store.
+const TEST_ENV = { STRIPE_BOOKS_SECRET_KEY: 'sk_test_123', VIRTUAL_PURCHASES_ENABLED: '1', NEXTAUTH_URL: 'http://localhost:3000' } as unknown as NodeJS.ProcessEnv;
 
 function fakeStripe() {
   let n = 0;
@@ -28,21 +30,25 @@ function deps(db = memoryCreatorStore(), stripe = fakeStripe(), env = TEST_ENV) 
 const input = (over: Record<string, unknown> = {}) => ({
   serviceId: 'elijah-bonds:session-60',
   slotStart: SLOT,
-  origin: 'http://localhost:3000',
   ...over,
 });
 
 describe('creator checkout', () => {
   it('refuses a live key before holding a slot or calling Stripe', async () => {
-    for (const env of [
-      { STRIPE_BOOKS_SECRET_KEY: 'sk_live_123' },
-      { STRIPE_SECRET_KEY: 'sk_live_456' },
-      {},
-    ]) {
+    // test changed (2026-10-09): was { status: 503, code: 'test_mode_only' }. A closed store is a 409 store_closed with
+    // a reason now (STORE-READY B2), and the B10 fence and the server origin close it too (last three rows).
+    const fence = { VIRTUAL_PURCHASES_ENABLED: '1', NEXTAUTH_URL: 'http://localhost:3000' };
+    for (const [env, reason] of [
+      [{ ...fence, STRIPE_BOOKS_SECRET_KEY: 'sk_live_123' }, 'live_mode_off'],
+      [{ ...fence, STRIPE_SECRET_KEY: 'sk_live_456' }, 'live_mode_off'],
+      [{ ...fence }, 'payments_not_set_up'],
+      [{ STRIPE_BOOKS_SECRET_KEY: 'sk_test_1', NEXTAUTH_URL: 'http://localhost:3000' }, 'virtual_purchases_off'],
+      [{ STRIPE_BOOKS_SECRET_KEY: 'sk_test_1', VIRTUAL_PURCHASES_ENABLED: '1' }, 'site_url_not_set'],
+    ] as const) {
       const t = deps(undefined, undefined, env as unknown as NodeJS.ProcessEnv);
       const err = await startServiceCheckout(input(), t.deps).catch((e) => e);
       expect(err).toBeInstanceOf(CreatorCheckoutError);
-      expect(err).toMatchObject({ status: 503, code: 'test_mode_only' });
+      expect(err).toMatchObject({ status: 409, code: 'store_closed', reason });
       expect(t.stripe.create).not.toHaveBeenCalled();
       expect(t.db.bookings.size).toBe(0);
       expect(t.db.holds.size).toBe(0);
@@ -112,9 +118,20 @@ describe('creator checkout', () => {
     await expect(startServiceCheckout(input(), { ...t.deps, store: null })).rejects.toMatchObject({ status: 503, code: 'store_not_configured' });
   });
 
-  it('the route asserts test mode before it can create a session', () => {
+  it('the route runs the store gate before it can create a session, and never reads the Origin header', () => {
+    // test changed (2026-10-09): was assertStripeTestKey( before startServiceCheckout(; the gate replaced it (it
+    // refuses a non-sk_test_ key itself, pinned in the first test).
     const src = readFileSync('app/api/creator/checkout/route.ts', 'utf8');
-    expect(src).toContain('assertStripeTestKey(');
-    expect(src.indexOf('assertStripeTestKey(')).toBeLessThan(src.indexOf('startServiceCheckout('));
+    expect(src).toContain('bookCheckoutGate()');
+    expect(src.indexOf('bookCheckoutGate()')).toBeLessThan(src.indexOf('startServiceCheckout('));
+    expect(src).not.toContain("req.headers.get('origin')");
+  });
+
+  it('builds Stripe return URLs from NEXTAUTH_URL, not anything the caller sends', async () => {
+    const t = deps(undefined, undefined, { ...TEST_ENV, NEXTAUTH_URL: 'https://fel.example/' } as unknown as NodeJS.ProcessEnv);
+    await startServiceCheckout(input({ origin: 'https://evil.example' }), t.deps);
+    const [params] = t.stripe.create.mock.calls[0] as unknown as [Record<string, any>];
+    expect(params.success_url).toBe('https://fel.example/bookings/success?session_id={CHECKOUT_SESSION_ID}');
+    expect(params.cancel_url.startsWith('https://fel.example/team/')).toBe(true);
   });
 });

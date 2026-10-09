@@ -23,12 +23,12 @@ Nothing here is live. Every rate, price, stat and open hour is an **EXAMPLE**. B
 | `/team` | Approved profiles only. |
 | `/team/[slug]` | Photo, bio, specialty, reels, links, merch, services with "starting at" rates, "Request a quote". Unknown or unapproved slug → 404. The payout block ("Get paid: coming soon") shows only to the profile owner (`ownerEmails`) or an `admin`/`owner` session. |
 | `/team/[slug]/book/[serviceId]` | Slot picker for one service, then Checkout. |
-| `/bookings/success` | Stripe returns here. Reads the session (test key only) and shows what was booked. The webhook confirms the booking, not this page. |
+| `/bookings/success` | Stripe returns here. Reads the session (test key only), shows what was booked, and CONFIRMS a paid booking itself through `confirmServiceSession` (MERGE 2026-10-09, the release's SEC-F4 NO-WEBHOOK rule, #200), keyed on the session like the webhook, so both confirm once. |
 | `/media-kit` | Bio, highlights, audience stats (fixture, "Example data" badge), past partners, packages and rates, "Inquire". |
 | `/work-with-us` | Inquiry form. `?profile=<slug>` and `?source=media-kit` are recorded on the inquiry. |
 | `GET /api/creator/slots?service=<id>` | Future free slots for an approved service. Times only. |
 | `POST /api/creator/checkout` | `{ serviceId, slotStart, email? }`. Test-key guard, server-side slot check, Firestore hold in a transaction, Checkout Session (`metadata.product = 'SERVICE'`, `price_data` from the catalog, `expires_at` 31 minutes). Guest checkout allowed. 409 if the slot is taken. |
-| `POST /api/creator/webhook` | Stripe signature with `STRIPE_CREATOR_WEBHOOK_SECRET`. Handles `checkout.session.completed`, `checkout.session.expired`, `charge.refunded`. Idempotent by event id. |
+| `POST /api/creator/webhook` | Stripe signature with `STRIPE_CREATOR_WEBHOOK_SECRET`. Handles `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.expired`, `charge.refunded`. A paid completion is keyed on the Checkout Session (`stripe-session:<cs_id>`); expiry and refunds by event id. |
 | `POST /api/creator/inquiry` | Validated with zod, honeypot field `website`, per-IP rate limit (5 per 10 minutes). 201 / 400 / 429. No auto-reply. |
 
 A **Team** door is on the Profile tab (`lib/nav/doors.ts`).
@@ -41,6 +41,7 @@ Set these on the server. Do not commit values. `.env.example` lists them empty.
 |---|---|
 | `STRIPE_BOOKS_SECRET_KEY` | Shared with the book shop. Must be `sk_test_...`; anything else is refused before a hold or a Stripe call. |
 | `STRIPE_CREATOR_WEBHOOK_SECRET` | Signing secret of the `/api/creator/webhook` endpoint. No fallback to the other webhook secrets. |
+| `VIRTUAL_PURCHASES_ENABLED`, `NEXTAUTH_URL` | MERGE (2026-10-09): booking checkout runs the book shop's `bookCheckoutGate`, so it answers 409 `store_closed` (STORE-READY B2, was 503 `test_mode_only`) until the B10 fence is on and the site URL is set; Stripe's return URLs come from `NEXTAUTH_URL` (B3), never the request's `Origin` header. |
 | `PRINTFUL_ENABLED` | `1` to put Printful in dry-run mode. Needs `PRINTFUL_API_TOKEN` too. Default off. |
 | `PRINTFUL_API_TOKEN` | Printful token. Read only to decide the mode; this build never sends it anywhere. |
 | `STRIPE_CONNECT_ENABLED` | `1` makes `createOnboardingLink()` throw "not implemented" instead of returning `CONNECT_DISABLED`. No Connect call either way. |
@@ -102,7 +103,7 @@ The shared `/api/stripe/webhook` ignores `SERVICE` sessions (they carry no `user
 
 1. Dashboard → **Test mode**.
 2. `STRIPE_BOOKS_SECRET_KEY` = the test secret (shared with the book shop).
-3. Developers → Webhooks → Add endpoint `https://<host>/api/creator/webhook` with `checkout.session.completed`, `checkout.session.expired`, `charge.refunded`. Put its signing secret in `STRIPE_CREATOR_WEBHOOK_SECRET`.
+3. Developers → Webhooks → Add endpoint `https://<host>/api/creator/webhook` with `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.expired`, `charge.refunded`. Put its signing secret in `STRIPE_CREATOR_WEBHOOK_SECRET`.
 4. Book a slot with card `4242 4242 4242 4242`, then refund it from the Dashboard and check that the slot shows as open again.
 
 ## Merch and fulfillment
