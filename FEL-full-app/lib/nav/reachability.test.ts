@@ -38,6 +38,7 @@ const NOT_NAVIGABLE: Record<string, string> = {
   '/settings': 'alias of /account; app/settings/page.tsx redirects there, and the consent screen links /account',
   '/program': 'a bought program or a teen unlock, opened from the receipt, noindex',
   '/session': 'a paid live call, opened from the booking confirmation, noindex',
+  '/bookings': 'Stripe Checkout returns here after a service booking (success_url)',
 };
 
 function topLevelRoutes(): string[] {
