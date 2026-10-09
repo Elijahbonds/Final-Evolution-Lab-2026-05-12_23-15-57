@@ -13,11 +13,26 @@ describe('proofLineFor', () => {
   it('field and board modes read their own counters', () => {
     expect(proofLineFor('football', { score: 110, won: true, stats: { yards: 24, evades: 0, trucks: 1 } })).toBe('24 YDS · 0 EVADES · 1 TRUCKS');
     expect(proofLineFor('snowboarding', { score: 340, won: false, stats: { gatesHit: 9, elapsed: 61 } })).toBe('9 GATES · 61s · 340 PTS');
+    // GATE-CRASHER-POLISH-2 (GC-11): the time bonus left the card's title for this line
+    expect(proofLineFor('snowboarding', { score: 3226, won: true, stats: { gatesHit: 27, elapsed: 64, timeBonus: 260 } })).toBe('27 GATES · 64s · +260 TIME · 3226 PTS');
+    expect(proofLineFor('snowboarding', { score: 900, won: false, stats: { gatesHit: 9, elapsed: 95, timeBonus: 0 } })).toBe('9 GATES · 95s · 900 PTS');
     expect(proofLineFor('karateEndless', { score: 850, won: false, stats: { wave: 6, kos: 31 } })).toBe('WAVE 6 · 31 KOS');
   });
   it('ball games fall back to the score pair', () => {
     expect(proofLineFor('hoops1v1', { score: 12, won: true, stats: { foeScore: 9 } })).toBe('12–9 · WON');
+    // IMPROVE (2026-10-06, 1v1 #4): the box score rides the line when the run sent one
+    expect(proofLineFor('hoops1v1', { score: 11, won: true, stats: { foeScore: 7, fgm: 5, fga: 9, threes: 1, steals: 2, blocks: 0, ankles: 1 } }))
+      .toBe('11–7 · WON · FG 5/9 · 3PT 1 · STL 2 · ANKLES 1');
+    // IMPROVE (2026-10-06, 3v3 #9): the 3v3's box score (assists and overdrives its own); without one, the line is as it was
+    expect(proofLineFor('hoops3v3', { score: 21, opponentScore: 17, won: true, stats: { foeScore: 17, assists: 3, fgm: 8, fga: 15, threes: 2, steals: 1, blocks: 0, overdrives: 1 } }))
+      .toBe('21–17 · WON · FG 8/15 · 3PT 2 · AST 3 · STL 1 · OVERDRIVE 1');
+    expect(proofLineFor('hoops3v3', { score: 14, opponentScore: 21, won: false, stats: { foeScore: 21, assists: 0 } })).toBe('14–21 · LOST');
     expect(proofLineFor('tennis', { score: 6, opponentScore: 4, won: true })).toBe('6–4 · WON');
+    // IMPROVE (2026-10-06) Tennis #12: the cage's match rides the line, only what happened, singular / plural
+    expect(proofLineFor('tennis', { score: 3, opponentScore: 1, won: true, stats: { wallRuns: 2, smashes: 1, meteors: 0, liveSaves: 3 } }))
+      .toBe('3–1 · WON · 2 WALL RUNS · 1 SMASH · 3 LIVE SAVES');
+    expect(proofLineFor('tennis', { score: 2, opponentScore: 6, won: false, stats: { smashes: 2, meteors: 1 } })).toBe('2–6 · LOST · 2 SMASHES · 1 METEOR');
+    expect(proofLineFor('volleyball', { score: 25, opponentScore: 20, won: true, stats: { wallRuns: 2 } })).toBe('25–20 · WON');
   });
   it('returns null for a mode it does not know or stats it cannot read', () => {
     expect(proofLineFor('nope_mode', { score: 1, won: true })).toBeNull();

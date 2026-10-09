@@ -19,9 +19,9 @@
 // DRAG_SLOP_PX, a drag moves the marker by the pointer's travel, a still release is a TAP (select + the + SLICE point),
 // a cancel before the slop is nothing, the grab distance is at most a third of the slice under the pointer, and on touch
 // only the selected pad's markers can be grabbed. And ZOOM (`zoom`): the selected slice ± a margin fills the canvas.
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
-  fullView, gestureEnd, gestureMove, gestureStart, grabAt, padAt, peaks, pointerKind, pxOfSample, zoomView,
+  fullView, gestureEnd, gestureMove, gestureStart, grabAt, padAt, peaks, pointerKind, pxOfSample, waveformLiveLine, waveformSpeech, zoomView,
   type Edge, type Region, type WaveGesture, type WaveView,
 } from '../chopEdit';
 
@@ -79,6 +79,17 @@ export default function Waveform({ mono, regions, selected, cursor, onSelect, on
     [zoom, selRegion?.start, selRegion?.end, len, width, rate],   // eslint-disable-line react-hooks/exhaustive-deps
   );
   const pk = useMemo(() => (mono && mono.length ? peaks(mono, width, view.from, view.to) : null), [mono, width, view.from, view.to]);
+  // MUSIC-SUITE P10 (2026-09-29): the canvas in words (chopEdit.waveformSpeech) — P5 left a screen reader with only the
+  // label: where each slice sits, and what a nudge did, were pixels. Described (aria-describedby) and the selected
+  // pad's line announced politely when it changes.
+  const srId = useId();
+  const speech = useMemo(() => waveformSpeech(regions, selected, rate, len), [regions, selected, rate, len]);
+  // MUSIC-SUITE P10 FIX (2026-09-29): the live region speaks a drag once, at its end (chopEdit.waveformLiveLine) — it
+  // changed on every pointermove (FlipPad rebuilds `regions` per move), queueing dozens of screen-reader announcements.
+  const [dragging, setDragging] = useState(false);
+  const heldLine = useRef(speech.selected);
+  const liveLine = waveformLiveLine(heldLine.current, speech.selected, dragging);
+  if (!dragging) heldLine.current = speech.selected;
   const xOf = useCallback((s: number): number => (len ? pxOfSample(view, s) : 0), [len, view]);
 
   useEffect(() => {
@@ -142,6 +153,9 @@ export default function Waveform({ mono, regions, selected, cursor, onSelect, on
         ref={canvasRef}
         data-qa="flip-waveform"
         tabIndex={0}
+        role="application"
+        aria-roledescription="chop waveform"
+        aria-describedby={`${srId}-sel ${srId}-all`}
         aria-label="Waveform of the bank's source. Tap a slice to select and hear it; then drag one of its markers to move that cut. Arrow keys move the selected pad's start by 5 ms, with Shift 50 ms, with Alt its end."
         style={{ width: '100%', height, display: 'block', borderRadius: 10, touchAction: 'pan-y', cursor: hoverEdge ? 'ew-resize' : 'pointer', outlineOffset: 2 }}
         onPointerDown={(e) => {
@@ -158,7 +172,7 @@ export default function Waveform({ mono, regions, selected, cursor, onSelect, on
             const { x, v } = at(e);
             const r = gestureMove(p.g, v, x);
             p.g = r.g;
-            if (r.move) onEdge(r.move.pad, r.move.edge, r.move.at, 'move');
+            if (r.move) { if (!dragging) setDragging(true); onEdge(r.move.pad, r.move.edge, r.move.at, 'move'); }
             return;
           }
           if (e.pointerType === 'mouse' && len) { const { x, v } = at(e); setHoverEdge(!!grabAt(regions, v, x, 'mouse', selected)); }
@@ -167,6 +181,7 @@ export default function Waveform({ mono, regions, selected, cursor, onSelect, on
           const p = press.current;
           if (!p || p.id !== e.pointerId) return;
           press.current = null;
+          if (dragging) setDragging(false);   // MUSIC-SUITE P10 FIX: the drag's end is what the live region speaks
           e.currentTarget.releasePointerCapture?.(e.pointerId);
           const { x, v } = at(e);
           const r = gestureEnd(p.g, v, x, false);
@@ -181,6 +196,7 @@ export default function Waveform({ mono, regions, selected, cursor, onSelect, on
           const p = press.current;
           if (!p || p.id !== e.pointerId) return;
           press.current = null;
+          if (dragging) setDragging(false);
           const { x, v } = at(e);
           const r = gestureEnd(p.g, v, x, true);   // before the slop: nothing; a drag keeps where it got to
           if (r.end) onEdge(r.end.pad, r.end.edge, r.end.at, 'end');
@@ -192,6 +208,16 @@ export default function Waveform({ mono, regions, selected, cursor, onSelect, on
           onNudge(e.altKey ? 'end' : 'start', e.key === 'ArrowLeft' ? -1 : 1, e.shiftKey);
         }}
       />
+      {/* MUSIC-SUITE P10: the waveform in words (visually hidden; read by a screen reader, never drawn) */}
+      <div style={SR_ONLY}>
+        <p id={`${srId}-sel`} data-qa="flip-waveform-selected" aria-live="polite">{liveLine}</p>
+        <p id={`${srId}-all`} data-qa="flip-waveform-slices">{speech.all}</p>
+      </div>
     </div>
   );
 }
+
+/** Visually hidden, still read (the usual clip pattern). */
+const SR_ONLY: React.CSSProperties = {
+  position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0, 0, 0, 0)', whiteSpace: 'nowrap', border: 0,
+};

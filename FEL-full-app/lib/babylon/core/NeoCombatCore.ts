@@ -13,7 +13,7 @@
 //   DropDirector   — the in-wave pickup loop: shards (the perk currency) most KOs, a chi orb every fourth, a health
 //                    orb when you are hurt (with a pity counter so a bad streak cannot starve you).
 //   Perks          — four perks that each change the run (toughness / reach / chi / movement), bought with the shards
-//                    picked up THIS run — run-local, never the wallet.
+//                    picked up THIS run — run-local, never the wallet. A second tier of each (NEO_PERKS_TIER2, 2026-10-06).
 
 // ── Player vitals ───────────────────────────────────────────────────────────
 export const VITALS = {
@@ -214,12 +214,25 @@ export interface PerkState {
   speedMult: number; dodgeMult: number; iframeBonus: number;
 }
 export const BASE_PERKS: PerkState = { maxHp: VITALS.maxHp, reach: 1, arcDeg: 0, chiMult: 1, burstRadius: 0, speedMult: 1, dodgeMult: 1, iframeBonus: 0 };
-export interface NeoPerk { id: string; label: string; blurb: string; cost: number }
+/** `requires`: a TIER — offered in its parent's slot once the parent is owned (IMPROVE 2026-10-06). */
+export interface NeoPerk { id: string; label: string; blurb: string; cost: number; requires?: string }
 export const NEO_PERKS: NeoPerk[] = [
   { id: 'iron',  label: 'IRON BODY',   blurb: '+40 MAX HP · FULL HEAL',       cost: 6 },
   { id: 'hands', label: 'HEAVY HANDS', blurb: '+25% REACH · WIDER ARCS',      cost: 8 },
   { id: 'flow',  label: 'CHI FLOW',    blurb: 'CHI ×1.5 · BURST +1.5 M',      cost: 8 },
   { id: 'quick', label: 'QUICKSILVER', blurb: '+15% SPEED · LONGER DODGE',    cost: 6 },
+];
+/**
+ * IMPROVE (2026-10-06, owner pick #20: replay value). Four perks and the shop skipped itself once they were owned — a
+ * long run had nothing to spend on after wave 4 or so. A SECOND TIER of each, offered in the same slot once tier I is
+ * owned, smaller than tier I and dearer (TUNED: the owner's eye on the prices). The Hundred builds its shop with both;
+ * `new PerkShop()` alone is still the four.
+ */
+export const NEO_PERKS_TIER2: NeoPerk[] = [
+  { id: 'iron2',  label: 'IRON BODY II',   blurb: '+30 MAX HP · FULL HEAL',     cost: 10, requires: 'iron' },
+  { id: 'hands2', label: 'HEAVY HANDS II', blurb: '+15% REACH · WIDER ARCS',    cost: 12, requires: 'hands' },
+  { id: 'flow2',  label: 'CHI FLOW II',    blurb: 'CHI ×1.25 · BURST +1 M',     cost: 12, requires: 'flow' },
+  { id: 'quick2', label: 'QUICKSILVER II', blurb: '+8% SPEED · LONGER DODGE',   cost: 10, requires: 'quick' },
 ];
 
 export function applyPerk(s: PerkState, id: string): PerkState {
@@ -228,6 +241,10 @@ export function applyPerk(s: PerkState, id: string): PerkState {
     case 'hands': return { ...s, reach: s.reach * 1.25, arcDeg: s.arcDeg + 20 };
     case 'flow':  return { ...s, chiMult: s.chiMult * 1.5, burstRadius: s.burstRadius + 1.5 };
     case 'quick': return { ...s, speedMult: s.speedMult * 1.15, dodgeMult: s.dodgeMult * 1.2, iframeBonus: s.iframeBonus + 0.1 };
+    case 'iron2':  return { ...s, maxHp: s.maxHp + 30 };
+    case 'hands2': return { ...s, reach: s.reach * 1.15, arcDeg: s.arcDeg + 15 };
+    case 'flow2':  return { ...s, chiMult: s.chiMult * 1.25, burstRadius: s.burstRadius + 1 };
+    case 'quick2': return { ...s, speedMult: s.speedMult * 1.08, dodgeMult: s.dodgeMult * 1.1, iframeBonus: s.iframeBonus + 0.05 };
     default: return s;
   }
 }
@@ -238,12 +255,30 @@ export class PerkShop {
   sel = 0;
   readonly owned = new Set<string>();
   constructor(readonly catalog: NeoPerk[] = NEO_PERKS) {}
-  get selected(): NeoPerk { return this.catalog[this.sel]; }
-  move(d: -1 | 1): void { this.sel = (this.sel + d + this.catalog.length) % this.catalog.length; }
+  /** What the shop shows: one slot per tier-I perk, holding the first tier of its line not yet owned (or the last, owned).
+   *  With no tiers in the catalog this is the catalog itself. */
+  get offers(): NeoPerk[] {
+    const out: NeoPerk[] = [];
+    for (const root of this.catalog) {
+      if (root.requires) continue;
+      let p = root;
+      for (;;) {
+        if (!this.owned.has(p.id)) break;
+        const next = this.catalog.find((q) => q.requires === p.id);
+        if (!next) break;
+        p = next;
+      }
+      out.push(p);
+    }
+    return out;
+  }
+  get selected(): NeoPerk { const o = this.offers; return o[((this.sel % o.length) + o.length) % o.length]; }
+  move(d: -1 | 1): void { const n = this.offers.length; this.sel = (this.sel + d + n) % n; }
   /** Buy the selected perk with `shards`. The caller subtracts `cost` on ok. */
   buy(shards: number): BuyResult {
     const p = this.selected;
     if (this.owned.has(p.id)) return { ok: false, id: p.id, cost: p.cost, reason: 'OWNED' };
+    if (p.requires && !this.owned.has(p.requires)) return { ok: false, id: p.id, cost: p.cost, reason: 'LOCKED' };
     if (shards < p.cost) return { ok: false, id: p.id, cost: p.cost, reason: `NEED ${p.cost - shards} MORE` };
     this.owned.add(p.id);
     return { ok: true, id: p.id, cost: p.cost };
@@ -253,7 +288,8 @@ export class PerkShop {
   state(): PerkState { let s = BASE_PERKS; for (const p of this.catalog) if (this.owned.has(p.id)) s = applyPerk(s, p.id); return s; }
   /** The HUD line: `▶` marks the cursor, `✓` an owned perk. Joined by ' · ' (the bezel splits on it). */
   hudLine(): string {
-    return this.catalog.map((p, i) => `${i === this.sel ? '▶ ' : ''}${this.owned.has(p.id) ? '✓ ' : ''}${p.label} ${p.cost}◆`).join(' · ');
+    const sel = this.selected;
+    return this.offers.map((p) => `${p === sel ? '▶ ' : ''}${this.owned.has(p.id) ? '✓ ' : ''}${p.label} ${p.cost}◆`).join(' · ');
   }
 }
 

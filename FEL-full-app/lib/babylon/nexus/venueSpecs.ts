@@ -372,7 +372,10 @@ export const VENUE_SPECS: Record<string, NexusWebSpec> = {
       { kind: 'lamp', position: [-9, 0, -6], color: '#E0B0FF' },
     ],
     actors: [{ id: 'you', role: 'player', position: [0, 0, 4], facing: Math.PI, color: '#BF5AF2' }],
-    camera: { alpha: -Math.PI / 2, beta: 1.08, radius: 16, target: [0, 1.4, -1], fov: 0.9 },
+    // WHO-SCENE-IT (W6): alpha −π/2 put this camera behind the wall at z −12 (the framing guard warns, and the
+    // venue reads as a flat wall). +π/2 stands it on the same side as the target, the side the floor is watched from.
+    // Only this venue's camera — the sweep in WhoSceneItMode is separate, and no shared preset is touched.
+    camera: { alpha: Math.PI / 2, beta: 1.08, radius: 16, target: [0, 1.4, -1], fov: 0.9 },
   },
 
   // ── mind & meta ─────────────────────────────────────────────────────────
@@ -400,7 +403,7 @@ export const VENUE_SPECS: Record<string, NexusWebSpec> = {
   },
 
   who_scene_it: {
-    modeId: 'who_scene_it', name: 'Who Scene It', venue: 'Scene Vault',
+    modeId: 'who_scene_it', name: 'Spot the Scene', venue: 'Scene Vault',
     environment: dusk('#FFB35C', '#140A05', '#2E1A0E', '#FFD9A0', 0.5),
     ground: { kind: 'stage', size: [20, 20], color: '#241408', lineColor: '#FFB35C', markings: 'none' },
     props: [
@@ -509,13 +512,29 @@ VENUE_SPECS.dance = {
     grade: { exposure: 1.22, contrast: 1.45, vignette: 0.5 },
   },
   ground: { kind: 'stage', size: [20, 20], color: '#1C1030', lineColor: '#FF2D95', markings: 'none' },
+  // MUSIC-SUITE P8 FIX (2026-09-29): the wall/banner ("today's stand-in for the LED wall" — MESHY-PROMPTS.md) and two
+  // of the four lamps used to sit at NEGATIVE z (-12 / -11.6 / -6), on the SAME side as `AUDIENCE` (DanceMode.ts,
+  // (0, 1.7, -6)) — the direction the dancer performs TOWARD and, since this pass, the side the new front-audience
+  // stage camera (stageCamera.ts) stands on to frame the dancer's face. A camera standing ON that side and looking
+  // BACK across the stage at the dancer can never also see scenery placed FURTHER out on its own side: the wall and
+  // banner sat behind the camera's own operating band (stageCamera's minDistanceM..maxDistanceM = 3.2-8 m) the entire
+  // time, and two of the four lamps were behind it whenever the shot pulled past ~6 m (a streak widen). This was
+  // never a bug in the camera math (stageCamera.test.ts's own "sits ON THE AUDIENCE SIDE... not behind" contract is
+  // exactly what decision #8 asked for) — it is these props having been authored for the OLD over-the-shoulder
+  // camera, which followed the dancer's FACING and therefore sat on the opposite (+z) side looking the other way
+  // (the same "banner sits on the back wall... facing the court where the gameplay camera lives" convention
+  // NexusWebScene.ts's own banner comment describes for every other venue). Moved to POSITIVE z — behind the dancer
+  // as the NEW camera sees it, past the crowd tier rather than in front of it (14/14.6 m, clear of the crowd tier's
+  // own 11 m so the banner does not clip into the stand) — so the beat bus's pulse on them (beatBus.ts, DanceMode.ts's
+  // collectPulsables/pulseStage) is something the player can actually see. Verified against the live camera geometry
+  // in stageCamera.venueGeometry.test.ts, not just the abstract unit tests above it.
   props: [
     { kind: 'podium', position: [0, 0, 0], scale: 1.4, color: '#FF2D95' },
-    { kind: 'wall', position: [0, 0, -12], color: '#0B0418' },
-    { kind: 'banner', position: [0, 0, -11.6], color: '#00E5FF' },
+    { kind: 'wall', position: [0, 0, 14.6], color: '#0B0418' },
+    { kind: 'banner', position: [0, 0, 14], color: '#00E5FF' },
     { kind: 'crowdTier', position: [0, 0, 11], rotationY: Math.PI },
-    { kind: 'lamp', position: [7, 0, -6], color: '#FF2D95' },
-    { kind: 'lamp', position: [-7, 0, -6], color: '#00E5FF' },
+    { kind: 'lamp', position: [7, 0, 13], color: '#FF2D95' },
+    { kind: 'lamp', position: [-7, 0, 13], color: '#00E5FF' },
     { kind: 'lamp', position: [9, 0, 5], color: '#FFD60A' },
     { kind: 'lamp', position: [-9, 0, 5], color: '#7B5CFF' },
   ],

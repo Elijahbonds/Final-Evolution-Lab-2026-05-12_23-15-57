@@ -2,14 +2,15 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import { denyUnlessCoachOrAdmin } from '@/lib/admin/requireAdmin';
 
 export const dynamic = 'force-dynamic';
 
-/* GET — list all categories */
+/* GET — list all categories. Coach or admin. Players use /api/coach/catalogue. */
 export async function GET() {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const denied = await denyUnlessCoachOrAdmin();
+    if (denied) return denied;
 
     const categories = await prisma.exerciseCategory.findMany({
       orderBy: { sortOrder: 'asc' },

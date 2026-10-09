@@ -84,8 +84,9 @@ describe('the camera starts only through the READY choice (Z-P4-6)', () => {
     const files = sourceFiles(ROOT, ['components', 'app', 'lib'], fs, path).filter((f) => !/\.test\.tsx?$/.test(f));
     const starters = files.filter((f) => /sharedPoseSource\(\)\s*\.start\(|\bsource\.start\(/.test(read(f))).sort();
     expect(starters).toEqual([path.join('lib', 'input', 'poseSource.ts'), path.join('lib', 'move', 'bodyPlay.ts')].sort());
-    // poseSource's own is the probe hook (behind the feed's gate)
-    expect(read('lib/input/poseSource.ts')).toMatch(/feedHookAllowed\([\s\S]*start: \(opts\?: PoseSourceStartOptions\) => sharedPoseSource\(\)\.start\(opts\)/);
+    // poseSource's own is the probe hook (behind the agent-run gate in production)
+    expect(read('lib/input/poseSource.ts')).toMatch(/registerProdHookSync\(installBodyHook, removeBodyHook\)/);
+    expect(read('lib/input/poseSource.ts')).toMatch(/start: \(opts\?: PoseSourceStartOptions\) => sharedPoseSource\(\)\.start\(opts\)/);
   });
 });
 
@@ -111,5 +112,115 @@ describe('around the check', () => {
     expect(control).toContain('onClick={(e) => { e.currentTarget.blur(); bodyPlay.again(); }}');
     expect(control).toMatch(/onClick=\{\(e\) => \{ e\.currentTarget\.blur\(\); bodyPlay\.end\(/);
     expect(read('components/games/body-play.tsx')).toContain('aria-label="Move your self-view" onClick={(e) => { e.currentTarget.blur(); next(); }}');
+  });
+});
+
+// MOVEMENT PLAY P8 (2026-09-26): the board games' READY stance line — after "All set", the stance asked for (with its ring),
+// then REGULAR / GOOFY measured, or the square fallback (lib/move/rideStance, drawn from the session's stance view); the
+// probe reads data-fel-body-stance. Nothing about the stance is stored or sent.
+describe('the READY stance line (P8)', () => {
+  it('the panel draws it from the session only once the check is ready, and marks the stance for the probe', () => {
+    const src = read('components/games/body-play.tsx');
+    expect(src).toContain('const stance = stanceLine(session.stance);');
+    expect(src).toContain('data-fel-body-stance={ready && stance ? stance.id : undefined}');
+    expect(src).toContain('{ready && stance?.ring != null && <HoldRing progress={stance.ring} />}');
+    expect(src).toContain('{ready ? stance?.text ?? READY_LINE : space.say.text}');
+    const words = read('lib/move/rideStance.ts');
+    expect(words).not.toMatch(NETWORK);
+    expect(words).not.toMatch(/localStorage|sessionStorage|indexedDB/);
+  });
+});
+
+// BODY-PLAY-WORKS: the same rule on every body-play path, in every mode. The camera picture, a canvas of it, and the
+// pose numbers are not fetch, beacon or socket arguments. The model and the wasm are named only as our own /pose files.
+const PIXEL = /\.toDataURL\s*\(|\.toBlob\s*\(|captureStream\s*\(|sendBeacon\s*\(|\bnew\s+WebSocket\b|\bRTCPeerConnection\b/;
+const CARRY = /(?:\bfetch\s*\(|sendBeacon\s*\(|\.send\s*\()[^;\n]{0,240}(?:toDataURL|toBlob|getImageData|captureStream|canvas|MediaStream|video\/|image\/)/;
+const CDN = /jsdelivr|googleapis|gstatic|unpkg|cdnjs|https?:\/\//i;
+
+function walkTs(dir: string): string[] {
+  const out: string[] = [];
+  const abs = path.join(ROOT, dir);
+  if (!fs.existsSync(abs)) return out;
+  for (const e of fs.readdirSync(abs, { withFileTypes: true })) {
+    if (e.name === 'node_modules' || e.name.startsWith('.')) continue;
+    const rel = path.join(dir, e.name);
+    if (e.isDirectory()) out.push(...walkTs(rel));
+    else if (/\.tsx?$/.test(e.name) && !e.name.includes('.test.')) out.push(rel);
+  }
+  return out;
+}
+
+/** Every mode's own file, from the registry's imports, so a new mode cannot skip this scan. */
+function modeFiles(): string[] {
+  const src = fs.readFileSync(path.join(ROOT, 'lib/babylon/modes/registry.ts'), 'utf8');
+  const files = new Set<string>();
+  for (const m of src.matchAll(/from '\.\/([^']+)'/g)) files.add(path.join('lib/babylon/modes', `${m[1]}.ts`));
+  return [...files].sort();
+}
+
+const PIPELINE = [
+  ...walkTs('lib/pose'),
+  ...walkTs('lib/move'),
+  ...walkTs('lib/input'),
+  ...walkTs('components/dev/pose-recorder'),
+  ...walkTs('lib/babylon/combat').filter((f) => /bodyFight|body-fight/i.test(f) || f.endsWith('bodyFight.ts') || f.includes('bodyFight')),
+  'components/games/body-play.tsx',
+  'components/games/body-control.tsx',
+  'lib/babylon/core/BodySession.ts',
+  'lib/babylon/core/bodySeam.ts',
+  'lib/babylon/core/rideBody.ts',
+  'lib/babylon/nexus/neuro-mirror/pose/mediapipe-adapter.ts',
+].filter((f, i, a) => a.indexOf(f) === i).sort();
+
+describe('every body-play path keeps the picture on the device', () => {
+  it('the scan reaches the pose pipeline, the recorder, and every registered mode', () => {
+    for (const f of ['lib/pose/PoseService.ts', 'lib/pose/assets.ts', 'lib/pose/BodyReader.ts', 'lib/move/bodyPlay.ts',
+      'lib/input/poseSource.ts', 'components/games/body-play.tsx', 'lib/babylon/nexus/neuro-mirror/pose/mediapipe-adapter.ts']) {
+      expect(PIPELINE, f).toContain(f);
+    }
+    const modes = modeFiles();
+    expect(modes.length).toBeGreaterThan(20);
+    expect(modes).toContain(path.join('lib/babylon/modes', 'DunkMode.ts'));
+    expect(modes).toContain(path.join('lib/babylon/modes', 'KarateVSMode.ts'));
+    expect(modes).toContain(path.join('lib/babylon/modes', 'SkateRunMode.ts'));
+    expect(modes).toContain(path.join('lib/babylon/modes', 'OneVOneMode.ts'));
+    for (const f of modes) expect(fs.existsSync(path.join(ROOT, f)), f).toBe(true);
+  });
+
+  it.each(PIPELINE)('%s sends no picture', (rel) => {
+    const src = read(rel);
+    expect(src.length).toBeGreaterThan(40);
+    expect(src, rel).not.toMatch(PIXEL);
+    expect(src, rel).not.toMatch(CARRY);
+    expect(src, rel).not.toMatch(CDN);
+    // assets.ts HEAD-probes our own /pose URL and sends no body. Every other file sends nothing at all.
+    if (rel === 'lib/pose/assets.ts') {
+      expect(src).toMatch(/fetch\(url, \{ method: 'HEAD' \}\)/);
+      expect(src).not.toMatch(/\bbody\s*:/);
+      return;
+    }
+    expect(src, rel).not.toMatch(NETWORK);
+  });
+
+  it('no mode file exports a picture or hands one to the network', () => {
+    for (const rel of modeFiles()) {
+      const src = read(rel);
+      expect(src, rel).not.toMatch(PIXEL);
+      expect(src, rel).not.toMatch(CARRY);
+      expect(src, rel).not.toMatch(CDN);
+    }
+  });
+
+  it('the model and the wasm are named only as our own /pose files', () => {
+    const assets = read('lib/pose/assets.ts');
+    expect(assets).toContain("LOCAL_WASM_BASE = '/pose/wasm'");
+    expect(assets).toContain('/pose/models/pose_landmarker_${m}.task');
+    expect(assets).toContain('return LOCAL_WASM_BASE');
+    expect(assets).toContain('return localModelUrl(m)');
+    expect(assets).not.toMatch(CDN);
+    const adapter = read('lib/babylon/nexus/neuro-mirror/pose/mediapipe-adapter.ts');
+    expect(adapter).toContain('this.assets.wasmBase()');
+    expect(adapter).toContain('this.assets.poseModel(this.model)');
+    expect(adapter).not.toMatch(CDN);
   });
 });

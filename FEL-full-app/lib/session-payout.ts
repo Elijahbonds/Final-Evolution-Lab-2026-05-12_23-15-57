@@ -70,7 +70,7 @@
  */
 
 import { canonicalModeKey, MODE_INFO } from '@/lib/game-data';
-import { scoreCeilingFor, killSwitchOn, SCORE_CEILINGS } from '@/lib/arena-score-integrity';
+import { scoreCeilingFor, killSwitchOn, SCORE_CEILINGS, sessionRulesMax } from '@/lib/arena-score-integrity';
 import { performSetMax } from '@/lib/babylon/music/performSet';
 
 /**
@@ -119,12 +119,17 @@ export function sessionShards(score: number, won: boolean): number {
  * 60 s, each perfect on a streak, 9,400 points → 14,150 XP, 473 shards). The two music rooms are left out: their rows
  * bound the longest chart an exported song can hold (dance, 79,680) and a quadratic combo over 512 notes (music, 2,647,100)
  * rather than a game's own clock or target — counting them would set the ceiling at 119,570 or 3,970,700 XP, which is no
- * ceiling. So an endless run pays, at most, what a flawless training minute pays; a strong real run of The Hundred (the
+ * ceiling. IMPROVE (2026-10-06): Big Air is left out too — its row now counts the banked line bonus (33,260: every snow air
+ * trick named in every air, a bound of the trick table, not of a clock or target), and counting it would set this at 49,940
+ * XP / 1,666 shards. So an endless run pays, at most, what a flawless training minute pays; a strong real run of The Hundred (the
  * 4,000 "strong run" of lib/babylon/core/scoreScale.ts:64-66 → 6,010 XP) is under it and pays exactly what it did.
  * assumption: the finite modes outside the Arena table (sprint, volleyball, the racers, showdown...) have no derived
  * maximum; none of them counts in thousands the way training does.
  */
 export const ENDLESS_SESSION_CEILING = { xp: 14_150, shards: 473 } as const;
+
+/** ECONOMY-CAPS C1: per-run XP/shard ceiling for every paying session (see lib/economy-caps.ts). */
+export const PER_RUN_SESSION_CAP = { xp: 14_150, shards: 100 } as const;
 
 /** The ceiling's basis is a flawless training MINUTE: an endless session pays at most that minute's pay per minute. */
 export const ENDLESS_CEILING_BASIS_SEC = 60;
@@ -146,7 +151,7 @@ export function endlessCeilingFor(durationSec: number, won: boolean): { xp: numb
 /** Where ENDLESS_SESSION_CEILING comes from, in a phrase (for logs and the phase report). */
 export const ENDLESS_CEILING_BASIS =
   'a flawless Iron Paradise win (training 9,400 → 14,150 XP, 473 shards): the best-paying finite rules-mode maximum in '
-  + 'lib/arena-score-integrity.ts SCORE_CEILINGS, the music rooms left out';
+  + 'lib/arena-score-integrity.ts SCORE_CEILINGS, the music rooms and big air left out';
 
 /**
  * The modes whose runs have no end of their own, with the code that says so. Everything not listed here is a scored game
@@ -394,7 +399,7 @@ export function sessionScoreCap(mode: string, stats: RoomStats | null, durationS
   const c = scoreCeilingFor(m);
   if (!c || c.kind !== 'rules') return null;
   if ((opts.killSwitch ?? killSwitchOn()) && c.swapsUnderKillSwitch) return null;
-  return c.max;
+  return sessionRulesMax(m, c);   // owner 2026-10-06: the 1v1's win-by-2 option posts up to 17; the stake row stays 13
 }
 
 export interface SessionPayout {
@@ -406,18 +411,55 @@ export interface SessionPayout {
   capped: boolean;
 }
 
+// ---------------------------------------------------------------------------
+// 3b. The finite pay cap (ECONOMY-SESSIONS-HARDEN follow-up, 2026-09-29)
+// ---------------------------------------------------------------------------
+
+/**
+ * Skateboarding and surfing are FINITE runs (RUN_SEC 90) whose scores are held only by a derived per-run bound
+ * (lib/sessions/modeScoreRules.ts derivedBounds: 435,544,000 and 5,866,322 — their combos grow with the square of the chain,
+ * so the honest maximum is enormous), and a finite mode has no payout ceiling: a forged run inside the bound paid
+ * XP = 1.5 × score, up to ~653M XP a skate run (more than the int4 xp column holds after three).
+ *
+ * DECISION (the owner's user, 2026-09-29, after the owner shipped the bound "as is" in PR #27): they are PAID at most what
+ * a score of FINITE_PAY_HEADROOM × the best run ever seen would pay. The run's score is recorded as sent — this caps the
+ * PAY, like the endless ceiling, and says so (`capped`); it is not the clamp the hardening forbids (a score is never
+ * rewritten). The endless ceiling was the alternative and was refused: it cut an honest 80,832 skate run from ~121K XP
+ * to ~14K.
+ *
+ * The best runs are BOT runs (the rc gauntlet's masher, the mechanics probe's MASH driver): what the game awards to
+ * relentless input, above deliberate play (the same probe's deliberate surf scored 1,530), so honest play sits well under
+ * the cap. A strong measured human run can replace either row.
+ */
+export const FINITE_PAY_HEADROOM = 4;
+export const FINITE_PAY_BASIS: Readonly<Record<string, { bestScore: number; source: string }>> = {
+  skateboarding: { bestScore: 80_832, source: '~/Claude/outbox/finish-release/gauntlet-rc7.log:6 (rc :3096 masher, 90 s of game time at qaSpeed 4)' },
+  surfing: { bestScore: 14_213, source: '~/Claude/outbox/finish-release/mechanics/mechanics-run1.json (surf MASH driver at 31 s, not yet ended; deliberate 1,530)' },
+};
+
+/** The score whose payout is the most this mode's run may be paid, or null (no finite pay cap). */
+export function finitePayCapScore(mode: string): number | null {
+  const b = FINITE_PAY_BASIS[canonicalModeKey(mode)];
+  return b ? b.bestScore * FINITE_PAY_HEADROOM : null;
+}
+
 /**
  * What the session pays: the old formula, and for an endless run at most ENDLESS_SESSION_CEILING — prorated by the
  * session's length when `durationSec` is given (P2 FIX PASS E, endlessCeilingFor). Without it, the flat ceiling.
  * MUSIC-SUITE P3: a CREATION session pays CREATION_PAYOUT (nothing) whatever else it says — the endless floor
  * (endlessCeilingFor pays at least a no-score session's 10 XP / 1 shard) is for a set that was PLAYED, not a save.
+ * `payCapScore` (finitePayCapScore): XP and shards are at most what that score would pay.
  */
-export function sessionPayout(o: { score: number; won: boolean; endless: boolean; durationSec?: number; kind?: SessionKind }): SessionPayout {
+export function sessionPayout(o: { score: number; won: boolean; endless: boolean; durationSec?: number; kind?: SessionKind; payCapScore?: number | null }): SessionPayout {
   if (o.kind === 'creation') return { ...CREATION_PAYOUT };
   const xpRaw = sessionXp(o.score, o.won), shardsRaw = sessionShards(o.score, o.won);
   const cap = o.durationSec === undefined ? ENDLESS_SESSION_CEILING : endlessCeilingFor(o.durationSec, o.won);
-  const xp = o.endless ? Math.min(xpRaw, cap.xp) : xpRaw;
-  const shards = o.endless ? Math.min(shardsRaw, cap.shards) : shardsRaw;
+  let xp = o.endless ? Math.min(xpRaw, cap.xp) : xpRaw;
+  let shards = o.endless ? Math.min(shardsRaw, cap.shards) : shardsRaw;
+  if (typeof o.payCapScore === 'number' && Number.isFinite(o.payCapScore)) {
+    xp = Math.min(xp, sessionXp(o.payCapScore, o.won));
+    shards = Math.min(shards, sessionShards(o.payCapScore, o.won));
+  }
   return { xp, shards, winCredits: o.won ? SESSION_WIN_LC : 0, capped: xp < xpRaw || shards < shardsRaw };
 }
 

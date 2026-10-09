@@ -180,3 +180,13 @@ export function chapterReward(chapterNumber: number, alreadyPaid: ReadonlySet<nu
   const last = alreadyPaid.size + 1 === CHAPTERS.length;
   return CHAPTER_SHARDS + (last ? COURSE_BONUS_SHARDS : 0);
 }
+
+/**
+ * Where "Next chapter" goes (EDU-LINKS, 2026-10-07): chapter n+1, or the course index after the last chapter. It went to
+ * the index from every chapter, so finishing chapter 3 meant finding chapter 4 again yourself.
+ */
+export function nextChapterHref(n: number): string {
+  const i = CHAPTERS.findIndex((c) => c.number === n);
+  const next = i >= 0 ? CHAPTERS[i + 1] : undefined;
+  return next ? `/education/playbook/${next.number}` : '/education/playbook';
+}

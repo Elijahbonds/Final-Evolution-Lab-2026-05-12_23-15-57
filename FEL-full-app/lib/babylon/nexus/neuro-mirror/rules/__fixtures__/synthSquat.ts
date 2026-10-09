@@ -27,6 +27,12 @@ export interface SquatShape {
    * knee read on a turned squat.
    */
   turnDeg?: number;
+  /**
+   * Both ankles rise this far off the floor at the bottom (m; MIRROR-COACH P4, 2026-09-25) — a real heel lift, for
+   * squat-audit.test.ts's heel-persistence tests. 0 (the default) leaves the feet exactly where restPose puts them,
+   * unchanged from before this field existed.
+   */
+  heelLift?: number;
 }
 
 /** One squat frame at depth `d` (0..1). */
@@ -42,6 +48,11 @@ export function squatJoints(d: number, shape: SquatShape = {}): Joints {
   // the knees travel forward over the toes, and sideways by the shift (outward is +X for the left, −X for the right)
   j.LeftLeg = move(j.LeftLeg, -0.04 * d, 0.22 * d, (shape.shiftL ?? 0) * d);
   j.RightLeg = move(j.RightLeg, -0.04 * d, 0.22 * d, -(shape.shiftR ?? 0) * d);
+  // both ankles lift straight up — the audit reads this off the same joint it calls the "heel" (squat-audit.ts ankleY)
+  if (shape.heelLift) {
+    j.LeftFoot = move(j.LeftFoot, shape.heelLift * d, 0);
+    j.RightFoot = move(j.RightFoot, shape.heelLift * d, 0);
+  }
   return shape.turnDeg ? turn(j, shape.turnDeg) : j;
 }
 

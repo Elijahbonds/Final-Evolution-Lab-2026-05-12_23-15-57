@@ -7,7 +7,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import QRCode from 'qrcode';
 import { HostSession } from '@/lib/controller-link/host';
 import { joinUrl } from '@/lib/controller-link/codes';
-import type { ControlEvent, LinkState, LobbyPeer, ModeControllerConfig, PeerId } from '@/lib/controller-link/types';
+import type { ControlEvent, LinkState, LobbyPeer, ModeControllerConfig, PeerId, RoomState } from '@/lib/controller-link/types';
 import type { FelInput, InputBus, PadInfo } from '@/lib/babylon/core/InputBus';
 import { linkErrorText } from '@/lib/controller-link/transport/signaling';
 import { USB_TITLE, USB_STEPS, PHONE_TITLE, PHONE_STEPS, usbStatusLine, typeInstead } from '@/lib/controller-link/connectHelp';
@@ -35,6 +35,12 @@ export interface HostLobbyProps {
    * Read through onPads only — the lobby never polls a gamepad itself.
    */
   bus?: InputBus | null;
+  /**
+   * MUSIC-SUITE P6 phone-replay (2026-09-26): the room's live state for the phones (HostSession.sendState — sent on each
+   * change, and to a phone whose link comes up). Only a config with `roomState: true` sends it; every other host passes
+   * nothing, and nothing is sent.
+   */
+  roomState?: RoomState | null;
 }
 
 /** How long the "P1 … connected" line stays beside the badge after a pad joins mid-play. */
@@ -46,7 +52,7 @@ function loopbackHost(): boolean {
   return /^(localhost|127\.\d+\.\d+\.\d+|\[::1\])$/i.test(window.location.hostname);
 }
 
-export function HostLobby({ config, onInput, collapsed, onPeers, onPadInput, lazy = false, anchor = 'right-4 top-4', bus = null }: HostLobbyProps) {
+export function HostLobby({ config, onInput, collapsed, onPeers, onPadInput, lazy = false, anchor = 'right-4 top-4', bus = null, roomState = null }: HostLobbyProps) {
   // Owner call 2026-09-05: on desktop the pairing panel is a badge until a phone joins or the player taps it — the
   // panel used to sit open beside play on every three-point load. A connected peer opens it on its own.
   // null = automatic (open while a phone is connected and play is not live); true / false = the player's own choice.
@@ -98,6 +104,9 @@ export function HostLobby({ config, onInput, collapsed, onPeers, onPadInput, laz
   peersRef.current = onPeers;
   const padRef = useRef(onPadInput);
   padRef.current = onPadInput;
+  // MUSIC-SUITE P6 phone-replay: the latest room state, for a session made after it was set (a retry, a lazy arm)
+  const roomStateRef = useRef(roomState);
+  roomStateRef.current = roomState;
 
   useEffect(() => {
     if (!armed) return;
@@ -110,6 +119,7 @@ export function HostLobby({ config, onInput, collapsed, onPeers, onPadInput, laz
       onState: setState,
     });
     sessionRef.current = session;
+    if (roomStateRef.current) session.sendState(roomStateRef.current);
 
     session.start()
       .then((c) => { if (!disposed) setCode(c); })
@@ -117,6 +127,8 @@ export function HostLobby({ config, onInput, collapsed, onPeers, onPadInput, laz
 
     return () => { disposed = true; session.dispose(); };
   }, [config, armed, attempt]);
+  // …and each change after (the session drops an unchanged one; a config without `roomState: true` refuses it)
+  useEffect(() => { if (roomState) sessionRef.current?.sendState(roomState); }, [roomState]);
 
   useEffect(() => {
     if (!code) return;
@@ -131,10 +143,11 @@ export function HostLobby({ config, onInput, collapsed, onPeers, onPadInput, laz
   const retry = () => { setError(null); setCode(''); setQr(null); setAttempt((a) => a + 1); };
   const openPanel = () => { if (error) retry(); setArmed(true); setOpen(true); };
 
+  const hideRoomChip = process.env.NODE_ENV === 'production';
   const showPanel = open ?? (connected.length > 0 && !collapsed);
   if (!showPanel) {
     // The USB line sits under the badge until play starts: plugging a pad in needs no tap at all, only a button press.
-    const usbLine = bus && (!collapsed || (justJoined && pads.length > 0)) ? (
+    const usbLine = bus && (!collapsed || (justJoined && pads.length > 0) || pads.length > 0) ? (
       <span
         data-testid="usb-connect-hint"
         className={`rounded-full px-3 py-0.5 text-[10px] ${pads.length ? 'text-[#22d3ee]' : 'text-white/70'}`}
@@ -143,6 +156,13 @@ export function HostLobby({ config, onInput, collapsed, onPeers, onPadInput, laz
         {usbStatusLine(pads)}
       </span>
     ) : null;
+    // HOOPS-TO-75 HP-2: a connected pad replaces the CONNECT badge; HP-3: no room code chip in prod
+    if (pads.length > 0) {
+      return usbLine ? <Stack anchor={anchor}>{usbLine}</Stack> : null;
+    }
+    if (hideRoomChip) {
+      return usbLine ? <Stack anchor={anchor}>{usbLine}</Stack> : null;
+    }
     if (error) {
       return (
         <Stack anchor={anchor}>

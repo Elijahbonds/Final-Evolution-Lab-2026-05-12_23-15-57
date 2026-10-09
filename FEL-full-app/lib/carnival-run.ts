@@ -135,7 +135,13 @@ export function clearCarnivalRun(): void {
   if (typeof window !== 'undefined') window.sessionStorage.removeItem(STORAGE_KEY);
 }
 
+/** The night's own title. Stop 1 used to borrow it, so the lineup and the night said the same name. */
+export const CARNIVAL_NIGHT_NAME = 'Game Night';
+/** The native stop — the court the night is played on — named apart from the night. */
+export const CARNIVAL_NATIVE_STOP_NAME = 'Court Carnival';
+
 export function carnivalStopLabel(stop: CarnivalStop): string {
+  if (stop === 'carnival') return CARNIVAL_NATIVE_STOP_NAME;
   return MODE_INFO[stop]?.name ?? stop;
 }
 

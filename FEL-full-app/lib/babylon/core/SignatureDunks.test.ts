@@ -124,11 +124,14 @@ describe('every trick in the table can actually be thrown', () => {
 });
 
 describe('credit means credit', () => {
-  it('a real person is named only where the dunk is really theirs; this contest owns the rest', () => {
-    const people = ['Elijah Bonds', 'Jordan Kilganon', 'Guy Dupuy', 'Team Flight Brothers', 'Jus Fly', 'Taurian Fontenette'];   // phase 10b: the cartwheel eastbay is Jus Fly's; the 720 was first thrown by Fontenette (AND1, 2006)
+  it('no real person is named anywhere in the signature book — every dunk is the contest\'s own (owner, HOOPS-MOTION round 1)', () => {
+    // The `by` credit used to name the dunker who threw it first (Jus Fly, Fontenette, Kilganon, Dupuy,
+    // Team Flight Brothers). The homage moved into the code comments; the player-facing credit is the
+    // in-fiction crew. The only name allowed is the owner's own avatar and the FLIGHT NIGHT label.
+    const allowed = new Set(['Elijah Bonds', 'FLIGHT NIGHT']);
     for (const sig of SIGNATURE_DUNKS) {
       expect(sig.by.length, sig.name).toBeGreaterThan(0);
-      if (!people.includes(sig.by)) expect(sig.by, sig.name).toBe('FLIGHT NIGHT');
+      expect(allowed.has(sig.by), `${sig.name} credits a real person: ${sig.by}`).toBe(true);
     }
   });
   it('the whirlwind is a 360 TAP — not a 360 windmill, which is its own press', () => {
@@ -160,15 +163,16 @@ describe('credit means credit', () => {
   });
 });
 
-// DUNK MOTION phase 10b (owner, 2026-09-24): Jus Fly's cartwheel and the 720, credited to the people who threw them first.
+// DUNK MOTION phase 10b (owner, 2026-09-24): the cartwheel and the 720. The dunks are homages to the ones
+// thrown first (the credit lives in these comments); the in-game credit is FLIGHT NIGHT, never a real name.
 describe('the phase 10b names', () => {
-  it('the cartwheel + eastbay is THE CARTWHEEL EASTBAY, and it is Jus Fly\'s', () => {
+  it('the cartwheel + eastbay is THE CARTWHEEL EASTBAY, credited to FLIGHT NIGHT', () => {
     const sig = signatureFor(['cartwheel'], ['eastbay']);
-    expect(sig?.name).toBe('THE CARTWHEEL EASTBAY'); expect(sig?.by).toBe('Jus Fly');
+    expect(sig?.name).toBe('THE CARTWHEEL EASTBAY'); expect(sig?.by).toBe('FLIGHT NIGHT');
     expect(signatureFor(['handspring'], ['eastbay'])).toBeNull();   // the back handspring is a different runway move
   });
-  it('two turns is THE 720, credited to Taurian Fontenette; one is still just a 360', () => {
-    expect(signatureFor([], ['spin720'])?.by).toBe('Taurian Fontenette');
+  it('two turns is THE 720, credited to FLIGHT NIGHT; one is still just a 360', () => {
+    expect(signatureFor([], ['spin720'])?.by).toBe('FLIGHT NIGHT');
     expect(signatureFor([], ['spin360'])).toBeNull();
   });
 });

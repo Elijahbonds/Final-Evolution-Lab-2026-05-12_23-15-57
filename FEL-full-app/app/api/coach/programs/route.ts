@@ -5,6 +5,7 @@ import { currentUserId, bad } from '@/lib/camp/server';
 import { TREE_INCLUDE, toTree, isCertifiedCoach } from '@/lib/coach/server';
 import { nextSession, accessRole } from '@/lib/coach/loop';
 import { validateProgramCreate } from '@/lib/coach/programs';
+import { rosterLookupWhere, NOT_ON_ROSTER } from '@/lib/coach/rosterLookup';
 
 /** GET /api/coach/programs — programs I coach and programs I am the client of, as trees with completion and plan status. */
 export async function GET() {
@@ -36,10 +37,14 @@ export async function POST(req: NextRequest) {
   if (!valid.ok) return bad(valid.error);
   const spec = valid.program;
 
-  const client = spec.clientLookup.includes('@')
-    ? await prisma.user.findFirst({ where: { email: { equals: spec.clientLookup, mode: 'insensitive' } }, select: { id: true, name: true, email: true } })
-    : await prisma.user.findUnique({ where: { id: spec.clientLookup }, select: { id: true, name: true, email: true } });
-  if (!client) return bad('client_not_found', 404);
+  // owner-approved 2026-10-06 (safety): only an athlete on this coach's LIVE roster, by email or id, in one query — an
+  // email that is not on it gets the same 404 whether or not it has an account (lib/coach/rosterLookup.ts)
+  const link = await prisma.coachClient.findFirst({
+    where: rosterLookupWhere(userId, spec.clientLookup),
+    select: { client: { select: { id: true, name: true, email: true } } },
+  });
+  const client = link?.client ?? null;
+  if (!client) return bad(NOT_ON_ROSTER, 404);
   if (client.id === userId) return bad('cannot_coach_self');
 
   const created = await prisma.coachingProgram.create({

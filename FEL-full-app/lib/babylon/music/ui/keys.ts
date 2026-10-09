@@ -7,9 +7,9 @@
 // no way to light a step without the mouse, no key map (P1, outbox musicsuite/understand-wf_3a55346f-032.json).
 //
 // The map (KEY_HELP is what the '?' panel shows — the same table the tests check):
-//   Space            play / stop (STUDIO, BUILD; a focused button keeps its own Space — P4 FIX PASS) — P2's PERFORM keeps
-//                    Space for its TAP, so in PERFORM this map never takes it; during the timing check Space / J / Enter
-//                    are the TAP
+//   Space            play / stop (STUDIO, BUILD; a focused button keeps its own Space — P4 FIX PASS) — PERFORM keeps Space
+//                    (P2: its TAP; MUSIC-SUITE P6: its PAUSE — the lanes are H J K L / the arrows, performInput.ts), so in
+//                    PERFORM this map never takes it; during the timing check Space / J / Enter are the TAP
 //   ← → ↑ ↓          move the step cursor (⇧ ← → jumps a beat, 4 steps) while the GRID has the focus; the cursor's page
 //                    follows on a phone grid
 //   Enter            light / clear the step under the cursor (the grid focused)
@@ -186,7 +186,11 @@ export const KEY_HELP: readonly { keys: string; does: string; where: 'STUDIO' | 
   { keys: '⌥ ↑ ↓', does: 'the cursor step’s note up / down the scale (bass, lead, Flip rows)', where: 'STUDIO' },
   { keys: 'B', does: 'recording booth: arm the mic → record → stop the take', where: 'STUDIO' },
   { keys: '⌘Z · ⇧⌘Z', does: 'undo · redo (Ctrl+Z · Ctrl+Y on Windows)', where: 'STUDIO' },
-  { keys: 'Space · J', does: 'TAP (the timing check, and a PERFORM set)', where: 'PERFORM' },
+  // MUSIC-SUITE P6 (2026-09-25): PERFORM plays four lanes (performInput.ts) — P2's one-lane TAP on Space / J is gone from the
+  // set (a tap with no lane took any note); Space / J / Enter are still the TIMING CHECK's tap on the studio floor
+  { keys: 'H J K L · ← ↓ ↑ →', does: 'PERFORM\'s four lanes: KICK · SNARE · HATS · FLIP (a pad: X A Y B or the D-pad)', where: 'PERFORM' },
+  { keys: 'Space', does: 'PERFORM: pause / resume a free-play set (an Arena set runs to its end)', where: 'PERFORM' },
+  { keys: 'Space · J · Enter', does: 'TAP during CHECK MY TIMING', where: 'STUDIO' },
   { keys: '1-4 · Q-R · A-F · Z-V', does: 'the 16 pads — on the FLIP tab only', where: 'FLIP' },
   { keys: '?', does: 'this key map · Esc closes it', where: 'ANY' },
 ];

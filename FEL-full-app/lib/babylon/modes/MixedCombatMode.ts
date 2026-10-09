@@ -22,11 +22,10 @@
 
 import { EvadeMoves } from '../core/EvadeMoves';
 import { FOCUS, FocusMeter, WALL_RUN, wallRunAvailableOn, startWallRunOn, wallRunOnAt, wallRunOnSide, startWallKick, wallKickAt, kickHits, type WallRunOn, type WallKickState } from '../core/MatrixFocus';   // MATRIX FOCUS (2026-09-18): bullet time held on the right trigger
-import { readCombatArena, arenasFor, arenaClamp, knockTo, offEdge, insideBy, hazardAt, describeArena, ROPES, type CombatArena, type ArenaWall } from '../combat/arenas';   // COMBAT ARENAS (2026-09-18)
+import { readCombatArena, arenasFor, arenaClamp, knockTo, offEdge, insideBy, hazardAt, describeArena, crowdRing, CROWD_GAP, CROWD_PHASE, ROPES, type CombatArena, type ArenaWall } from '../combat/arenas';   // COMBAT ARENAS (2026-09-18)
 import { buildArena, type ArenaHandle } from '../combat/arenaBuild';
 import { mountVenue } from '../core/NexusVenue';
-import { dodgeReward, tickCounter, counterMult } from '../core/DodgeRead';
-import { nerve, standingOf } from '../core/Nerve';
+import { dodgeReward, dashSecToImpact, tickCounter, counterMult } from '../core/DodgeRead';
 import { MeshBuilder, StandardMaterial, Color3, Vector3 } from '@babylonjs/core';
 import type { AbstractMesh } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
@@ -45,14 +44,22 @@ import {
   FighterState, RivalFightBrain, resolveStrike, applyHit,
   KARATE_ATTACKS, STAFF_ATTACKS, SPECIAL_ATTACK, CHI_MAX, GUARD_MAX, PARRY_STAGGER_SEC,
   STEP_CHI_GAIN, STEP_EVADE_M, PARRY_WINDOW_MS, type AttackDef,
+  guardPressMs, rivalDifficulty, rivalPower, applyRivalPower, poweredAttack, RIVAL_POWER_BASE, type RivalPower,
 } from '../core/FightCore';
+import { KnockSlides, makeChestOf } from '../core/FightKit';   // IMPROVE (2026-10-06): the shared knock slide + scratch chest points
+import { readTier } from '../core/Difficulty';   // IMPROVE (2026-10-06): the OPPONENT pick
+import { GameTimers, BannerSlot } from '../core/ModeClock';   // IMPROVE (2026-10-06): hit beats, the round-over beat and banners on the game clock
+import { dragonLicensed, fallStep, neutralRollDir, onlookerSpots, RIVAL_POWER_BY_LOADOUT } from './mixedRules';   // IMPROVE (2026-10-06)
+import { mixedScore } from '../core/MixedScore';   // IMPROVE (2026-10-06): the result, with its ring-out bonus
+import type { VenueHandle } from '../core/NexusVenue';
+import { threatLandsIn } from '../core/RivalCombatBrain';
 import { StringBook, attackFromMove, STRIKE_TIMING, DASH_ATTACK_SEC, type StickDir, type StrikeBtn } from '../core/HordeDynamics';   // STORM COMBOS (2026-09-17): the book of strings
-import { XButtonReader, DASH, LAUNCH_AIR_SEC, launchHeight } from '../core/StormCombat';   // STORM: X = dash / double = chakra dash / hold = guard; launchers put him in the air
+import { XButtonReader, DASH, LAUNCH_AIR_SEC, launchHeight, stormDashReady } from '../core/StormCombat';   // STORM: X = dash / double = chakra dash / hold = guard; launchers put him in the air
 import { mountPlayerRing, type PlayerRingHandle } from '../visual/PlayerRing';   // PLAYER RING (owner): who you are, and the gauge at your feet
 import { readPlayerIcon } from '../visual/playerIcon';
 import { SoundKit } from '../audio/SoundKit';
 import {
-  BASELINE_RATINGS, ratingsFrom, routeFor, routeHitStopMs, routeShake, damageScale, hasFightMove, cancelWindowSec,
+  BASELINE_RATINGS, ratingsFrom, ratingsForBand, routeFor, routeHitStopMs, routeShake, damageScale, cancelWindowSec,
   type FightRatings, type RouteStrike,
 } from '../core/FighterStyle';   // the same routes and the same PRQ gate as Karate VS — one vocabulary
 import { EffectsKit } from '../visual/EffectsKit';
@@ -81,7 +88,7 @@ type Phase = 'loadout' | 'fighting' | 'roundOver' | 'matchOver';
 type Loadout = 'fists' | 'staff';
 const ROUNDS_TO_WIN = 2;
 /** What the rival fights at in a level match. Nerve moves it from here as the rounds go. */
-const BASE_RIVAL_DIFFICULTY = 0.6;
+const BASE_RIVAL_DIFFICULTY = 0.68;
 const MOVE_SPEED = 3.3;
 const SLOWMO_SEC = 0.5;
 const SLOWMO_SCALE = 0.3;
@@ -104,6 +111,14 @@ const WEIGHT_OF: Record<'jab' | 'kick' | 'heavy', StrikeWeight> = { jab: 'light'
 const LOADOUT_LABEL: Record<Loadout, string> = { fists: 'FISTS — fast & close', staff: 'STAFF — long & heavy' };
 
 const BUDGET_SEC: Record<Phase, number> = { loadout: 12, fighting: 120, roundOver: 5, matchOver: 999 };
+/** IMPROVE (2026-10-06): the pause after a round's verdict, on the game clock (it was a 2400 ms setTimeout that a pause did
+ *  not hold and a dispose did not cancel — it called enterLoadout on disposed rigs). */
+const ROUND_OVER_SEC = 2.4;
+/** The fight-phase controls line: ONE static string. IMPROVE (2026-10-06): it names the DRAGON now (mixedRules). */
+const MIXED_HINT = 'Knock them past the glowing edge for a RING OUT · side-step verticals (A/Y), punish steppers with the sweep (B) · tap GUARD at the last instant to parry · full CHI + Y = the DRAGON';
+const LOADOUT_HINT = 'D-PAD or STICK up/down — pick FISTS or STAFF (rival takes the other) · any attack button to lock in';
+/** IMPROVE (2026-10-06): one shared zero for the velocity defaults (it was a new Vector3 per call). Never written. */
+const ZERO: Readonly<Vector3> = Vector3.Zero();
 /** MOVEMENT PLAY P7: a body strike handed to swing(): its move, its onset on the page clock, what the body threw. */
 interface BodyStrikeArg { move: HordeMove; onsetPage: number; body: string }
 
@@ -111,9 +126,12 @@ export const MixedCombatMode: ModeDefinition = (() => {
   let player: SpawnedCharacter, rival: SpawnedCharacter;
   let meState: FighterState, foeState: FighterState;
   let brain: RivalFightBrain;
+  /** COMBAT DIFFICULTY (2026-10-06): the rival's power for this round (rivalPower; set in startRound). */
+  let foePower: RivalPower = rivalPower(1, null);
   let phase: Phase = 'loadout';
   let phaseSec = 0;
   let round = 1, myWins = 0, foeWins = 0;
+  let ringOutWins = 0;   // IMPROVE (2026-10-06): rounds I won by a ring-out (the result pays them, core/MixedScore)
   /** PRQ gates the vocabulary (FighterStyle), shared with Karate VS so a route means the same thing in both. */
   let myRatings: FightRatings = { ...BASELINE_RATINGS };
   const foeRatings: FightRatings = { ...BASELINE_RATINGS };
@@ -132,7 +150,26 @@ export const MixedCombatMode: ModeDefinition = (() => {
   // his swing's hit beat via foeTimers) while I keep FOCUS.heroScale; a read refills it, my hits inside it land harder.
   const focus = new FocusMeter();
   let focusHeld = false, focusHud = -1, focusHudOn = false;
-  const foeTimers: { left: number; fn: () => void }[] = [];
+  const foeTimers = new GameTimers();   // IMPROVE (2026-10-06): the shared helper; cleared at round start and dispose
+  // IMPROVE (2026-10-06): NOTHING WAITS ON THE WALL CLOCK. My hit beat was a setTimeout (it ignored pause, hit-stop and the
+  // slow-mo while the rival's waited on foeTimers), the round-over beat was a setTimeout that outlived dispose, and every
+  // banner started its own setTimeout that cleared whatever banner was up by then. My beats run on my clock, the round
+  // beat and the banners on the mode's clock (`clock`, the dt update() is handed, every phase).
+  const meTimers = new GameTimers();
+  const bannerSlot = new BannerSlot();
+  let clock = 0;
+  function banner(ctx: ModeContext, text: string, sec: number): void { ctx.setHud({ banner: bannerSlot.show(text, sec, clock) }); }
+  /** IMPROVE (2026-10-06): what the per-frame HUD trickle last pushed — guard, the edge call, DRAGON READY — so an
+   *  unchanged value is not pushed every frame (#18). */
+  let guardHud = -1, foeGuardHud = -1, edgeHud: string | null = null, dragonHud = false;
+  /** IMPROVE (2026-10-06): each rig's clock = Matrix Focus's scale × the parry slow-mo's (#10). The slow-mo scaled only
+   *  the mode's dt, so the fighters crept while their clips ran at full speed. Called when either changes. */
+  let slowmoOn = false;
+  function applyTimeScales(): void {
+    slowmoOn = slowmoSec > 0;
+    const k = slowmoOn ? SLOWMO_SCALE : 1;
+    rival?.animator.setTimeScale(focus.worldScale * k); player?.animator.setTimeScale(focus.heroScale * k);
+  }
   // THE ARENA (2026-09-18): picked on the splash (combat/arenas.ts), re-read at load. The Pit is the octagon with the drop
   // this mode was built around; the others have walls to run inside Focus, ropes that throw a shoved body back, or fire.
   let arena: CombatArena = arenasFor('mixedcombat')[0];
@@ -140,14 +177,14 @@ export const MixedCombatMode: ModeDefinition = (() => {
   let wallRun: WallRunOn<ArenaWall> | null = null, wallKick: WallKickState | null = null, wallKickY0 = 0, hazardTickAt = 0;
   const matrixStats = { wallRuns: 0, wallKicks: 0, kickHits: 0 };
   function tryWallRun(ctx: ModeContext): boolean {
-    const pos = player.root.position, v = lastMyVel ?? Vector3.Zero();
+    const pos = player.root.position, v = lastMyVel ?? ZERO;
     const hd = v.length() >= 0.3 ? { x: v.x, z: v.z } : { x: -Math.sin(player.root.rotation.y), z: -Math.cos(player.root.rotation.y) };   // stopped on the wall with the rival in front: the wall is BEHIND (lock-on faces the rival)
     const hit = wallRunAvailableOn({ x: pos.x, z: pos.z }, hd, arena.walls);
     if (!hit) { if (process.env.NODE_ENV === 'development') console.info(`[MATRIX] wall run refused at (${pos.x.toFixed(2)}, ${pos.z.toFixed(2)}) heading (${hd.x.toFixed(2)}, ${hd.z.toFixed(2)}) vel ${v.length().toFixed(2)}`); return false; }
     wallRun = startWallRunOn(hit, hd); matrixStats.wallRuns++;
     endStrike(true); meState.releaseBlock();
     SoundKit.play('whoosh', { pitch: 1.1, volume: 0.45 });
-    ctx.setHud({ banner: 'WALL RUN' }); setTimeout(() => ctx.setHud({ banner: '' }), 500);
+    banner(ctx, 'WALL RUN', 0.5);
     ctx.momentum.report({ kind: 'near_miss', weight: 10 });
     console.info(`[MATRIX] mixed wall run on the ${wallRun.wall.label} dir ${wallRun.dir}`);
     return true;
@@ -161,7 +198,7 @@ export const MixedCombatMode: ModeDefinition = (() => {
     matrixStats.wallKicks++;
     meAnim.strike = { weight: 'heavy', clip: myAttacks().kick.clip, until: now() + 900 }; striking = true;
     SoundKit.play('whoosh', { pitch: 0.8, volume: 0.6 });
-    ctx.setHud({ banner: 'WALL KICK' }); setTimeout(() => ctx.setHud({ banner: '' }), 600);
+    banner(ctx, 'WALL KICK', 0.6);
     console.info('[MATRIX] mixed wall kick');
   }
   /** The wall run and the kick own the body while they last. Returns true when they do. */
@@ -185,7 +222,7 @@ export const MixedCombatMode: ModeDefinition = (() => {
         ctx.juice.hitStop(70); ctx.feel?.impact?.(0.6); ctx.juice.shake(0.08, 120);
         EffectsKit.burst(ctx.scene, rp.add(new Vector3(0, 1.1, 0)), 'sparks');
         beatDown(false, WALL_RUN.kickStunSec + GET_UP_SEC);
-        ctx.setHud({ foeHp: foeState.hp, banner: 'WALL KICK!' }); setTimeout(() => ctx.setHud({ banner: '' }), 700);
+        ctx.setHud({ foeHp: foeState.hp }); banner(ctx, 'WALL KICK!', 0.7);
         console.info('[MATRIX] mixed wall kick hit');
         knockback(ctx, rival, player.root.position, 2.4, () => { if (offRing(rival.root.position)) { ringOut(ctx, false); return; } if (foeState.hp <= 0) endRound(ctx, true); });
       }
@@ -212,12 +249,12 @@ export const MixedCombatMode: ModeDefinition = (() => {
   function onFocusStart(ctx: ModeContext): void {
     ctx.juice.tint('rgba(16, 70, 34, 0.75)'); ctx.camDirector.pulse(0.45, 0.35);
     SoundKit.play('powerUp', { pitch: 0.55, volume: 0.5 });
-    ctx.setHud({ banner: 'FOCUS' }); setTimeout(() => ctx.setHud({ banner: '' }), 500);
+    banner(ctx, 'FOCUS', 0.5);
     console.info(`[MATRIX] mixed focus on at ${Math.round(focus.value)}`);
   }
   function onFocusEnd(ctx: ModeContext, dry: boolean): void {
     ctx.juice.tint(null); SoundKit.play('whoosh', { pitch: 0.6, volume: 0.4 });
-    if (dry) { ctx.setHud({ banner: 'FOCUS DRAINED' }); setTimeout(() => ctx.setHud({ banner: '' }), 600); }
+    if (dry) banner(ctx, 'FOCUS DRAINED', 0.6);
     console.info(`[MATRIX] mixed focus off (${dry ? 'dry' : 'released'}) after ${focus.heldSec.toFixed(2)} s`);
   }
   let meAnim: FighterAnim, foeAnim: FighterAnim;
@@ -225,7 +262,7 @@ export const MixedCombatMode: ModeDefinition = (() => {
   // here than in Karate VS — a bo is held in front of the CHEST, and the chest was wherever the last clip left it.
   let mePosture: { layer: PostureLayer; dispose(): void } | null = null, foePosture: { layer: PostureLayer; dispose(): void } | null = null;
   const meBio: CombatPostureInput = { ...COMBAT_INPUT_IDLE }, foeBio: CombatPostureInput = { ...COMBAT_INPUT_IDLE };
-  const chestOf = (c: SpawnedCharacter): Vector3 => c.root.position.add(new Vector3(0, 1.32, 0));
+  const chestOf = makeChestOf();   // IMPROVE (2026-10-06): one scratch point per target, no per-frame Vector3s
   // DYNAMIC POSTURE for the footwork — the same layer and the same allowlist as Karate VS, so a circling body leans
   // the same way in both. The ring-out matters here: a fighter backing toward the edge should LOOK like it.
   const meMotion = new BodyMotion();
@@ -252,6 +289,7 @@ export const MixedCombatMode: ModeDefinition = (() => {
     console.info('[MC-JUICE] match punch');
   }
   let fallVictim: 'me' | 'foe' | null = null;
+  let fallBody: SpawnedCharacter | null = null;   // IMPROVE (2026-10-06): the body dropping into the pit (update() steps it)
   let myStaff: AbstractMesh | null = null, foeStaff: AbstractMesh | null = null;
   let stickX = 0, stickY = 0;
   // ROLL, JUMP AND THE DODGE READ (2026-09-14). EvadeMoves rather than CombatMovement: this mode writes
@@ -259,6 +297,8 @@ export const MixedCombatMode: ModeDefinition = (() => {
   const meEvade = new EvadeMoves();
   let ctx0!: ModeContext;   // STORM: the context the stick read needs (set every update)
   let lastMyVel: Vector3 | null = null, lastFoeVel: Vector3 | null = null;   // FREE RUN: last frame's travel, for the facing
+  // IMPROVE (2026-10-06): the per-frame velocities and the fall camera's target live in scratch vectors (#19)
+  const moveVelS = new Vector3(), myDashVelS = new Vector3(), foeVelS = new Vector3(), fallCamS = new Vector3();
   const FREE_RUN_M = 3.4;
   // STORM (2026-09-17): the string book (every press is its own link), the X reader, the dash and the launched body
   const book = new StringBook(); const xBtn = new XButtonReader();
@@ -280,8 +320,10 @@ export const MixedCombatMode: ModeDefinition = (() => {
   let meCounter = 0;
   /** When the rival's in-flight strike would connect (game clock); null when nothing is incoming. */
   let foeImpactAt: number | null = null;
+  let lastFoeRange = 1.8;
   let lookX = 0, lookY = 0;   // R stick → camera look (MODE-STICK-FACE family, 2026-09-07)
   let gallery: Onlookers | null = null;
+  let modeVenue: VenueHandle | null = null;   // IMPROVE (2026-10-06): the mounted venue, disposed with the mode (#17 — the handle was dropped)
 
   const foeLoadout = (): Loadout => (myLoadout === 'fists' ? 'staff' : 'fists');
   const myAttacks = (): Record<'jab' | 'kick' | 'heavy', AttackDef> =>
@@ -294,32 +336,64 @@ export const MixedCombatMode: ModeDefinition = (() => {
   // The octagon, its rim and the pit under it are the shared arena builder's now (combat/arenaBuild.ts): the Pit is one
   // of this mode's arenas, and the others are rooms with walls, ropes or fire rather than a drop.
 
+  // IMPROVE (2026-10-06): ONE staff per fighter for the whole match and ONE material for both. A new mesh and a new
+  // StandardMaterial were made every round, and dispose() took the mesh and left the material in the scene (#16).
+  let staffMat: StandardMaterial | null = null;
   function makeStaff(ctx: ModeContext, char: SpawnedCharacter, name: string): AbstractMesh | null {
     const hand = boneNode(char.skeleton, 'RightHand');
     if (!hand) return null;
     const staff = MeshBuilder.CreateCylinder(name, { height: 1.9, diameter: 0.05 }, ctx.scene);
-    const m = new StandardMaterial(`${name}_m`, ctx.scene);
-    m.diffuseColor = Color3.FromHexString('#5a3d22');
-    m.specularColor = Color3.Black();
-    staff.material = m;
+    if (!staffMat) {
+      staffMat = new StandardMaterial('mc_staff_m', ctx.scene);
+      staffMat.diffuseColor = Color3.FromHexString('#5a3d22');
+      staffMat.specularColor = Color3.Black();
+    }
+    staff.material = staffMat;
     staff.parent = hand;
     staff.position.set(0, 0.1, 0);
     staff.rotation.set(Math.PI / 2, 0, 0);
+    staff.isPickable = false;
+    staff.setEnabled(false);
     return staff;
+  }
+  /** IMPROVE (2026-10-06): the staff in the hand of whoever has it — shown WHILE the loadout is picked (#12: the props only
+   *  appeared at round start), and every time the pick changes. */
+  function showLoadoutProps(): void {
+    myStaff?.setEnabled(myLoadout === 'staff');
+    foeStaff?.setEnabled(foeLoadout() === 'staff');
+  }
+  /** THE START-UP SCREEN'S PICK. This mode fights with fists or a staff; the blade and the gauntlet are not its weapons, so
+   *  anything else falls back to fists rather than mismatching a prop with a moveset. */
+  const startPick = (): Loadout => (readWeapon().id === 'staff' ? 'staff' : 'fists');
+  /** IMPROVE (2026-10-06): the start-up pick SEEDS the loadout (at load, and once more on the first frame of play — the
+   *  picker is still offered on the READY screen after load); after that the loadout phase's own pick stands. */
+  let startPickSeeded = false;
+  function setLoadout(ctx: ModeContext, l: Loadout): void {
+    if (l === myLoadout) return;
+    myLoadout = l;
+    showLoadoutProps();
+    ctx.setHud({ loadout: LOADOUT_LABEL[myLoadout] });
   }
 
   function applyLoadouts(ctx: ModeContext): void {
-    myStaff?.dispose(); myStaff = null;
-    foeStaff?.dispose(); foeStaff = null;
-    // THE START-UP SCREEN'S PICK. This mode fights with fists or a staff; the blade and the gauntlet are not
-    // its weapons, so anything else falls back to fists rather than mismatching a prop with a moveset.
-    myLoadout = readWeapon().id === 'staff' ? 'staff' : 'fists';
+    // IMPROVE (2026-10-06): the loadout is NOT re-read here any more (#1). It re-read the start-up screen at every round
+    // start, so the d-pad / stick pick made in the loadout phase was thrown away the moment it was locked in.
     // weapon first, then style — see combat/loadout.ts for why that order is the rule
     myStyled = styleAttacks(myLoadout === 'staff' ? STAFF_ATTACKS : KARATE_ATTACKS,
                             blendTraits(readBlend()), MIN_STARTUP_SEC * 1000);
-    if (myLoadout === 'staff') myStaff = makeStaff(ctx, player, 'mc_staff_me');
-    if (foeLoadout() === 'staff') foeStaff = makeStaff(ctx, rival, 'mc_staff_foe');
+    showLoadoutProps();
     brain = new RivalFightBrain(BASE_RIVAL_DIFFICULTY, foeAttacks());
+    // IMPROVE (2026-10-06): the brain is REBUILT here every round (the foe's loadout may change), and startRound set the
+    // round ramp on the old one just before — so neither the ramp nor endRound's NERVE ever reached a fight. Everything
+    // the rival is told now goes onto the brain it fights with: the round, the standing, the OPPONENT pick (PRO = the
+    // tuned 0.68), the DRAGON licence, and the ring's edge (it circles away from the drop).
+    brain.setRound(round);
+    const shift = brain.setStanding(foeWins, myWins, ROUNDS_TO_WIN);
+    if (shift.label) console.info(`[MIX-NERVE] ${shift.label} (rounds ${foeWins}-${myWins})`);
+    brain.setDifficulty(rivalDifficulty(BASE_RIVAL_DIFFICULTY, readTier()));
+    brain.setCanSpecial(dragonLicensed(foeRatings));   // IMPROVE (2026-10-06): the pit licenses the DRAGON at full chi (#5/#6)
+    brain.setEdge((x, z) => insideBy({ x, z }, arena.shape));
+    knock.clear();
   }
 
   const downNow = (f: FighterAnim | undefined): boolean => !!f && (f.out || f.falling || now() < f.downUntil);
@@ -343,6 +417,7 @@ export const MixedCombatMode: ModeDefinition = (() => {
   function tryDash(ctx: ModeContext, homing: boolean): void {
     if (!meState.controllable || !meEvade.canAct || phase !== 'fighting') return;
     if (meDash && !(homing && !meDash.homing)) return;   // a running dash refuses a second tap — unless the tap makes it the CHAKRA dash (the double tap lands mid-burst by definition)
+    if (!stormDashReady(lastDashSec, now() / 1000, homing)) return;   // IMPROVE (2026-10-06): the Storm dash's cooldown (DASH.cooldownSec)
     if (striking) { const st = animOf(true).strike; if (st && st.cancelFrom !== undefined && now() < st.cancelFrom) return; endStrike(true); }
     const toFoe = rival.root.position.subtract(player.root.position); toFoe.y = 0;
     const stick = Math.hypot(stickX, stickY) > 0.25 ? ctx.camDirector.forwardFlat().scale(-stickY).addInPlace(ctx.camDirector.rightFlat().scale(stickX)) : null;
@@ -352,7 +427,10 @@ export const MixedCombatMode: ModeDefinition = (() => {
     SoundKit.play('whoosh', { pitch: homing ? 1.35 : 1.2, volume: 0.45 }); if (homing) ctx.camDirector.pulse(0.25, 0.3);
     console.info(`[MC-STORM] ${homing ? 'chakra dash' : 'dash'}`);
   }
-  function endStrike(mine: boolean): void { if (mine) striking = false; else foeStriking = false; animOf(mine).strike = null; }
+  function endStrike(mine: boolean): void { if (mine) { striking = false; myImpactAt = null; } else { foeStriking = false; foeImpactAt = null; } animOf(mine).strike = null; }
+  /** IMPROVE (2026-10-06): when MY swing connects (page ms) — the rival's parry is timed to it, and past it my swing is a
+   *  recovery the rival can punish. null = not swinging. */
+  let myImpactAt: number | null = null;
   function beatHit(mine: boolean, weight: StrikeWeight): void {
     const f = animOf(mine); f.hitBy = weight; f.hitUntil = now() + (weight === 'finisher' ? LAUNCH_SEC : REACT_SEC) * 1000;
     f.tree.clearBeat(...REACT_STATES);   // a second hit inside the first react re-fires it
@@ -361,14 +439,15 @@ export const MixedCombatMode: ModeDefinition = (() => {
   function beatDown(mine: boolean, staggerSec: number): void { const f = animOf(mine); f.downUntil = now() + (staggerSec - GET_UP_SEC) * 1000; f.tree.clearBeat('knockdown'); endStrike(mine); }
   function beatParry(mine: boolean): void { const f = animOf(mine); f.parryUntil = now() + PARRY_SEC * 1000; f.tree.clearBeat('parry_flash'); }
   function beatGuardImpact(mine: boolean): void { const f = animOf(mine); f.impactUntil = now() + IMPACT_SEC * 1000; f.tree.clearBeat('guard_impact'); }
-  function treeInput(f: FighterAnim, s: FighterState, speed01: number, weapon: boolean, mine: boolean, vel: Vector3): CombatAnimInput {
+  function treeInput(f: FighterAnim, s: FighterState, speed01: number, weapon: boolean, mine: boolean, vel: Readonly<Vector3>): CombatAnimInput {
     const t = now();
     if (f.strike && t > f.strike.until) endStrike(f === meAnim);   // a strike the tree never settled (safety, never measured)
     const me = mine ? player : rival, foe = mine ? rival : player;
     // G2 — a ring fighter travels SIDEWAYS (the whole 8-way spacing game is lateral): the feet now match the travel
     const strafe = strafeAxis(vel, me.root.rotation.y);
-    const toFoe = foe.root.position.subtract(me.root.position); toFoe.y = 0;
-    const closing = toFoe.lengthSquared() > 1e-6 ? Vector3.Dot(vel, toFoe.normalize()) : 0;
+    // IMPROVE (2026-10-06): plain numbers (#19) — `toFoe` was a new Vector3 per fighter per frame
+    const tx = foe.root.position.x - me.root.position.x, tz = foe.root.position.z - me.root.position.z, tl = Math.hypot(tx, tz);
+    const closing = tl > 1e-3 ? (vel.x * tx + vel.z * tz) / tl : 0;
     const moving = s.controllable && !s.blockHeld ? speed01 : 0;
     const bio = mine ? meBio : foeBio;
     bio.speed01 = moving; bio.strafe = strafe; bio.approach = combatApproach(closing);
@@ -386,9 +465,10 @@ export const MixedCombatMode: ModeDefinition = (() => {
     };
   }
   /** Once per frame, both fighters, every phase (a ring-out victim falls, the loser holds the floor, the winner celebrates). */
-  function animate(mySpeed01: number, foeSpeed01: number, myVel = Vector3.Zero(), foeVel = Vector3.Zero()): void {
+  function animate(dt: number, mySpeed01: number, foeSpeed01: number, myVel: Readonly<Vector3> = ZERO, foeVel: Readonly<Vector3> = ZERO): void {
     if (!meAnim || !foeAnim) return;
-    const dt = 1 / 60;
+    // IMPROVE (2026-10-06): the posture trackers on the frame's real dt (#14) — a fixed 1/60 made the lean and the
+    // acceleration wrong at 30 or 120 fps (BodyMotion skips a frozen, hit-stop frame itself)
     if (player) meMotion.update(myVel.x, myVel.z, player.root.rotation.y, dt);
     if (rival) foeMotion.update(foeVel.x, foeVel.z, rival.root.rotation.y, dt);
     meAnim.tree.update(treeInput(meAnim, meState, mySpeed01, myLoadout === 'staff', true, myVel));
@@ -402,24 +482,18 @@ export const MixedCombatMode: ModeDefinition = (() => {
 
   /** G3: constant SPEED, so the distance sets the duration — a jab's 0.4 m shove and the special's ring-out shove used
    *  to take the same 180 ms, which is why the DRAGON read as a teleport rather than as the thing that ends rounds. */
-  const KNOCKBACK_SPEED = 9;
+  // IMPROVE (2026-10-06): the slide itself is the shared KnockSlides (core/FightKit) — ticked on the ROOM clock in update(),
+  // one per body (a second blow replaces a running slide; the newer blow's onDone owns the ring-out check), cleared at a
+  // round reset. onDone still runs when the body settles, so the ring-out reads the slide's end exactly as before.
+  const knock = new KnockSlides();
   function knockback(ctx: ModeContext, char: SpawnedCharacter, fromPos: Vector3, meters: number, onDone: () => void): void {
     const dir = char.root.position.subtract(fromPos); dir.y = 0;
     if (dir.lengthSquared() < 1e-4) { onDone(); return; }
     dir.normalize();
-    const from = char.root.position.clone();
-    const kt = knockTo(from, from.add(dir.scale(meters)), arena);   // a DROP edge is live; a wall stops it; the ROPES throw it back
-    const to = new Vector3(kt.x, from.y, kt.z);
-    if (kt.rebound) { const mine = char === player; beatDown(mine, ROPES.stunSec + GET_UP_SEC); SoundKit.play('impact', { pitch: 1.4, volume: 0.4 }); ctx.setHud({ banner: mine ? 'YOU HIT THE ROPES!' : 'OFF THE ROPES!' }); setTimeout(() => ctx.setHud({ banner: '' }), 500); console.info('[ARENA] mixed off the ropes'); }
-    const ms = Math.max(80, (Vector3.Distance(from, to) / KNOCKBACK_SPEED) * 1000);
-    const t0 = now();
-    const obs = ctx.scene.onBeforeRenderObservable.add(() => {
-      const u = Math.min(1, (now() - t0) / ms);
-      const k = 1 - (1 - u) * (1 - u);
-      char.root.position.x = from.x + (to.x - from.x) * k;
-      char.root.position.z = from.z + (to.z - from.z) * k;
-      if (u >= 1) { ctx.scene.onBeforeRenderObservable.remove(obs); onDone(); }
-    });
+    const from = char.root.position;
+    const kt = knockTo(from, { x: from.x + dir.x * meters, z: from.z + dir.z * meters }, arena);   // a DROP edge is live; a wall stops it; the ROPES throw it back
+    if (kt.rebound) { const mine = char === player; beatDown(mine, ROPES.stunSec + GET_UP_SEC); SoundKit.play('impact', { pitch: 1.4, volume: 0.4 }); banner(ctx, mine ? 'YOU HIT THE ROPES!' : 'OFF THE ROPES!', 0.5); console.info('[ARENA] mixed off the ropes'); }
+    knock.start(char.root.position, kt.x, kt.z, onDone);
   }
 
   function ringOut(ctx: ModeContext, victimIsMe: boolean): void {
@@ -436,12 +510,10 @@ export const MixedCombatMode: ModeDefinition = (() => {
     SoundKit.play('crowdGroan', { volume: 0.6 });
     endStrike(victimIsMe); animOf(victimIsMe).falling = true;   // the tree plays the fall, then holds the floor
     gallery?.cheer(1);
-    const fall = ctx.scene.onBeforeRenderObservable.add(() => {
-      victim.root.position.y -= 0.14;
-      if (victim.root.position.y < -5.5) ctx.scene.onBeforeRenderObservable.remove(fall);
-    });
-    ctx.setHud({ banner: victimIsMe ? 'RING OUT — YOU FELL!' : 'RING OUT!' });
-    endRound(ctx, !victimIsMe, true);
+    // IMPROVE (2026-10-06): the drop is stepped in update() on the game clock (mixedRules.fallStep, 8.4 m/s) — it was
+    // 0.14 m per RENDER on a render observer, so a 120 Hz screen fell twice as fast and the observer outlived a dispose
+    fallBody = victim;
+    endRound(ctx, !victimIsMe, true);   // its banner says RING OUT
   }
 
   /** One swing, either direction. */
@@ -461,12 +533,14 @@ export const MixedCombatMode: ModeDefinition = (() => {
 
     const set = mine ? myAttacks() : foeAttacks();
     // the finisher is EARNED as well as charged — full chi is the cost, force is the licence
-    const special = !body && key === 'heavy' && atkState.chi >= CHI_MAX && hasFightMove('dragon', mine ? myRatings : foeRatings);
+    // IMPROVE (2026-10-06): in the pit, full chi IS the licence (mixedRules.dragonLicensed) — force 78 kept it from nearly everyone
+    const special = !body && key === 'heavy' && atkState.chi >= CHI_MAX && dragonLicensed(mine ? myRatings : foeRatings);
     const baseAtk = set[key];
     // STORM COMBOS: MY presses read the book — the sequence, the stick and the situation (a launched body: air links; a dash just thrown: the rush) pick the link
     const move = mine && body ? book.pressMove(body.move, BTN_OF[key], body.onsetPage / 1000)   // P7: the body's own move, timed onset to onset
       : mine && !special ? book.press(BTN_OF[key], stickDirToFoe(), now() / 1000, { air: foeLaunchedSec > 0, afterDash: now() / 1000 - lastDashSec < DASH_ATTACK_SEC, airborne: meEvade.airborne, close: Vector3.Distance(player.root.position, rival.root.position) < 1.35 }) : null;
-    const atk: AttackDef = special ? SPECIAL_ATTACK : move ? attackFromMove(move, baseAtk) : baseAtk;
+    const atk0: AttackDef = special ? SPECIAL_ATTACK : move ? attackFromMove(move, baseAtk) : baseAtk;
+    const atk = mine ? atk0 : poweredAttack(atk0, foePower);   // COMBAT DIFFICULTY (2026-10-06): the rival's blow carries its power
     if (mine) striking = true; else foeStriking = true;
     // Commit to the line at swing start — the impact check measures the
     // defender's offset from THIS facing, not from wherever the mesh has
@@ -474,23 +548,25 @@ export const MixedCombatMode: ModeDefinition = (() => {
     const committedYaw = atkChar.root.rotation.y;
     if (special) {
       atkState.chi = 0;
-      ctx.setHud({ ...(mine ? { chi: 0 } : { foeChi: 0 }), banner: mine ? 'DRAGON!' : 'RIVAL DRAGON!' });
+      ctx.setHud(mine ? { chi: 0 } : { foeChi: 0 });
+      banner(ctx, mine ? 'DRAGON!' : 'RIVAL DRAGON!', 0.7);
       SoundKit.play('powerUp', { pitch: 0.7 });
-      setTimeout(() => ctx.setHud({ banner: '' }), 700);
     }
     SoundKit.play('whoosh', { pitch: special ? 0.8 : 1.05 });
     if (move) console.info(`[MC-STORM] link ${move.id} (${move.clip}) weight ${move.weight}${move.air ? ' AIR' : ''}${move.launch ? ' LAUNCH' : ''}${move.slam ? ' SLAM' : ''} string ${book.history.length}${body ? ` body ${body.body} age ${Math.round(now() - body.onsetPage)}` : ''}`);
     if (move && body && book.history.length === 1) stringLabels.length = 0;   // P7: a body strike that starts a string starts its call (a lapsed string's links are not this one's)
-    if (move) { stringLabels.push(move.label); if (move.ender || book.history.length === 0) { const call = stringLabels.join(' → '); stringLabels.length = 0; if (call.includes('→')) { ctx.setHud({ banner: `COMBO: ${call}` }); setTimeout(() => ctx.setHud({ banner: '' }), 900); } } }   // STORM: the string is CALLED when it ends — button presses in sequence are a combo you can read
+    if (move) { stringLabels.push(move.label); if (move.ender || book.history.length === 0) { const call = stringLabels.join(' → '); stringLabels.length = 0; if (call.includes('→')) banner(ctx, `COMBO: ${call}`, 0.9); } }   // STORM: the string is CALLED when it ends — button presses in sequence are a combo you can read
     // P7: a body strike's hit beat is its contact frame, never under the wind-up floor; its cancel point runs from its onset
     const hitDelay = body && move ? hitDelayMs(atk.startupMs, contactMsOf(move), now() - body.onsetPage) : atk.startupMs;
+    if (mine) myImpactAt = now() + hitDelay;   // IMPROVE (2026-10-06)
+    const swungAt = now();   // IMPROVE (2026-10-06): the dash read is measured against the swing's start
     if (body && move) { const d = Vector3.Distance(player.root.position, rival.root.position), lunge = bodyLunge(d, atk.range); if (lunge > 0) { const v = rival.root.position.subtract(player.root.position); v.y = 0; bodyShift = { v: v.normalize().scale(lunge / 0.15), left: 0.15 }; } }
     animOf(mine).strike = { weight: special ? 'finisher' : move ? move.weight : WEIGHT_OF[key], clip: atk.clip, speed: move?.speed, cancelFrom: move ? (body ? bodyCancelAt(now() + hitDelay, body.onsetPage, move) : now() + (STRIKE_TIMING[move.weight].cancelAt / move.speed) * 1000) : undefined, until: now() + STRIKE_MAX_SEC * 1000 };   // the tree plays it; its settle ends the swing
 
     // the dodge window is read against when THIS strike would connect -- see DodgeRead
     // MATRIX FOCUS: the rival's swing lands on the ROOM clock (inside Focus it takes 1/worldScale longer in real time, and the
     // dodge read is told so); mine stays on the wall clock
-    if (!mine) foeImpactAt = now() + atk.startupMs / focus.worldScale;
+    if (!mine) { lastFoeRange = atk.range; foeImpactAt = now() + atk.startupMs / focus.worldScale; }
     const onHitBeat = (impactAt?: number) => {
       if (phase !== 'fighting' || falling) { endStrike(mine); return; }
       // P7: the rival's fist on a BODY player waits for the body's frames to cover the impact (DefenseLedger)
@@ -507,8 +583,9 @@ export const MixedCombatMode: ModeDefinition = (() => {
       if (!mine && outcome === 'whiff' && meDashIframeSec > 0) {
         // phase 6 — THE DASH READ: his swing went through where I was. That is the same read the roll's perfect dodge is
         // (DodgeRead), so it pays the same: the counter window, Focus, the beat. Measured before: the whiff was silent.
-        const r = dodgeReward(0);
-        if (r.perfect) { meCounter = r.counterSec; focus.gain(FOCUS.dodgeGain); ctx.juice.slowMo(0.45, Math.round(r.slowMoSec * 1000)); ctx.feel?.impact?.(0.3); ctx.setHud({ banner: 'PERFECT DODGE' }); setTimeout(() => ctx.setHud({ banner: '' }), 600); console.info('[MC-DEF] perfect dodge (dash)'); }
+        // IMPROVE (2026-10-06): measured from the dash's START against this swing (was dodgeReward(0): always perfect)
+        const r = dodgeReward(dashSecToImpact(lastDashSec * 1000, swungAt, impactAt ?? now()));
+        if (r.perfect) { meCounter = r.counterSec; focus.gain(FOCUS.dodgeGain); ctx.juice.slowMo(0.45, Math.round(r.slowMoSec * 1000)); ctx.feel?.impact?.(0.3); banner(ctx, 'PERFECT DODGE', 0.6); console.info('[MC-DEF] perfect dodge (dash)'); }
       }   // STORM: the dash's / the roll's i-frames
       switch (outcome) {
         case 'whiff': break;
@@ -518,11 +595,8 @@ export const MixedCombatMode: ModeDefinition = (() => {
           // told why the swing missed, so the lesson lands in one read.
           defState.chi = Math.min(CHI_MAX, defState.chi + STEP_CHI_GAIN);
           SoundKit.play('whoosh', { pitch: 1.5, volume: 0.35 });
-          ctx.setHud({
-            banner: mine ? 'STEPPED! — verticals lose to movement' : 'STEPPED IT! — press the advantage',
-            ...(mine ? { foeChi: Math.round(defState.chi) } : { chi: Math.round(defState.chi) }),
-          });
-          setTimeout(() => ctx.setHud({ banner: '' }), 900);
+          ctx.setHud(mine ? { foeChi: Math.round(defState.chi) } : { chi: Math.round(defState.chi) });
+          banner(ctx, mine ? 'STEPPED! — verticals lose to movement' : 'STEPPED IT! — press the advantage', 0.9);
           break;
         }
         case 'parried': {
@@ -533,8 +607,8 @@ export const MixedCombatMode: ModeDefinition = (() => {
           ctx.juice.shake(0.05, 80);
           EffectsKit.burst(ctx.scene, defChar.root.position.add(new Vector3(0, 1.3, 0)), 'sparks');
           beatHit(mine, 'light'); beatParry(!mine);   // the attacker flinches (staggered), the defender's guard flicks
-          ctx.setHud({ banner: mine ? 'PARRIED!' : 'PERFECT PARRY!', ...(mine ? { foeChi: Math.round(defState.chi) } : { chi: Math.round(defState.chi) }) });
-          setTimeout(() => ctx.setHud({ banner: '' }), 700);
+          ctx.setHud(mine ? { foeChi: Math.round(defState.chi) } : { chi: Math.round(defState.chi) });
+          banner(ctx, mine ? 'PARRIED!' : 'PERFECT PARRY!', 0.7);
           break;
         }
         case 'blocked': {
@@ -542,6 +616,7 @@ export const MixedCombatMode: ModeDefinition = (() => {
           EffectsKit.burst(ctx.scene, defChar.root.position.add(new Vector3(0, 1.1, 0)), 'dust');
           beatGuardImpact(!mine);
           ctx.setHud(mine ? { foeGuard: Math.round(defState.guard) } : { guard: Math.round(defState.guard) });
+          if (mine) foeGuardHud = Math.round(defState.guard); else guardHud = Math.round(defState.guard);   // IMPROVE (2026-10-06): the trickle's memo
           break;
         }
         case 'guardBreak': {
@@ -554,12 +629,18 @@ export const MixedCombatMode: ModeDefinition = (() => {
           EffectsKit.burst(ctx.scene, defChar.root.position.add(new Vector3(0, 1.2, 0)), 'glitch');
           beatDown(!mine, defState.staggerSec);   // knock down → floor → get up inside the stagger
           gallery?.cheer(0.6);
-          ctx.setHud({ banner: mine ? 'GUARD BREAK!' : 'YOUR GUARD SHATTERED!', ...(mine ? { foeGuard: 0 } : { guard: 0 }) });
-          setTimeout(() => ctx.setHud({ banner: '' }), 900);
+          ctx.setHud(mine ? { foeGuard: 0 } : { guard: 0 });
+          if (mine) foeGuardHud = 0; else guardHud = 0;   // IMPROVE (2026-10-06): the trickle's memo
+          banner(ctx, mine ? 'GUARD BREAK!' : 'YOUR GUARD SHATTERED!', 0.9);
           break;
         }
         case 'hit': {
-          applyHit(atkState, defState, atk);
+          // IMPROVE (2026-10-06): A PERFECT DODGE IS AN OPENING, and this is where it is spent (Karate VS's rule): the counter
+          // window multiplies the punish and then closes. Bounded at 1.5x by DodgeRead. meCounter was set and never read.
+          const counter = mine ? counterMult(meCounter) : 1;
+          const base = applyHit(atkState, defState, atk);
+          let counterBanner = false;
+          if (counter > 1) { meCounter = 0; defState.hp = Math.max(0, defState.hp - (Math.round(base * counter) - base)); counterBanner = true; console.info(`[MC-DEF] counter x${counter.toFixed(2)}`); }
           if (mine && focus.active) defState.hp = Math.max(0, defState.hp - Math.round(atk.dmg * (FOCUS.damageMult - 1)));   // MATRIX: a Focus strike lands harder
           if (mine) focus.gain(FOCUS.hitGain);
           ctx.feel?.impact?.(special ? 0.6 : 0.3);   // ONE thud per connect (the impact SFX that doubled it is gone)
@@ -580,6 +661,7 @@ export const MixedCombatMode: ModeDefinition = (() => {
           const hud: Record<string, HudValue> = mine
             ? { foeHp: defState.hp, chi: Math.round(atkState.chi) }
             : { hp: defState.hp, foeChi: Math.round(atkState.chi) };
+          let said = '';   // IMPROVE (2026-10-06): the banner goes through the one slot
           if (route) {
             const bonus = Math.max(1, Math.round(atk.dmg * (route.payoff - 1) * damageScale(ratings)));
             defState.hp = Math.max(0, defState.hp - bonus);
@@ -594,13 +676,13 @@ export const MixedCombatMode: ModeDefinition = (() => {
             if (route.ender !== 'stun') beatHit(!mine, 'finisher');
             landed.length = 0;
             if (mine) hud.foeHp = defState.hp; else hud.hp = defState.hp;
-            hud.banner = mine ? `${route.label}!` : `RIVAL ${route.label}!`;
+            said = mine ? `${route.label}!` : `RIVAL ${route.label}!`;
             console.info(`[MC-ROUTE] ${route.label} fx${route.fx} bonus ${bonus} mine ${mine}`);
           } else if (atkState.combo >= 2) {
-            hud.banner = mine ? `COMBO x${atkState.combo}` : `RIVAL COMBO x${atkState.combo}`;
-          }
+            said = mine ? `COMBO x${atkState.combo}` : `RIVAL COMBO x${atkState.combo}`;
+          } else if (counterBanner) said = 'COUNTER!';
           ctx.setHud(hud);
-          if (route || atkState.combo >= 2) setTimeout(() => ctx.setHud({ banner: '' }), route ? 900 : 700);
+          if (said) banner(ctx, said, route ? 0.9 : 0.7);
           // knockback resolves BEFORE the KO check — the edge is always live
           knockback(ctx, defChar, atkChar.root.position, atk.knockback, () => {
             if (offRing(defChar.root.position)) { ringOut(ctx, defChar === player); return; }
@@ -610,7 +692,8 @@ export const MixedCombatMode: ModeDefinition = (() => {
         }
       }
     };
-    if (mine) setTimeout(onHitBeat, hitDelay); else foeTimers.push({ left: atk.startupMs / 1000, fn: onHitBeat });
+    // IMPROVE (2026-10-06): my beat on MY clock (Focus's hero scale, the slow-mo, hit-stop, a pause), as the rival's is on his
+    if (mine) meTimers.after(hitDelay / 1000, () => onHitBeat()); else foeTimers.after(atk.startupMs / 1000, () => onHitBeat());
   }
 
   /** P7: the rival's hit on a BODY player, resolved at its impact against the body's state then (see KarateVSMode). A slip's
@@ -619,7 +702,7 @@ export const MixedCombatMode: ModeDefinition = (() => {
     const bd = bodyDefenseAt(ledger, impactAt);
     if (bd.d === 'evaded' && dist <= atk.range && meState.controllable) {
       const r = dodgeReward(Math.max(0, (impactAt - bd.evadeOnset!) / 1000));
-      if (r.perfect) { meCounter = r.counterSec; focus.gain(FOCUS.dodgeGain); ctx0.juice.slowMo(0.45, Math.round(r.slowMoSec * 1000)); ctx0.setHud({ banner: 'PERFECT DODGE' }); setTimeout(() => ctx0.setHud({ banner: '' }), 600); }
+      if (r.perfect) { meCounter = r.counterSec; focus.gain(FOCUS.dodgeGain); ctx0.juice.slowMo(0.45, Math.round(r.slowMoSec * 1000)); banner(ctx0, 'PERFECT DODGE', 0.6); }
       console.info('[MC-DEF] body slip — whiff');
       return atk.line === 'vertical' && lateral > STEP_EVADE_M ? 'stepped' : 'whiff';
     }
@@ -691,41 +774,45 @@ export const MixedCombatMode: ModeDefinition = (() => {
     // exactly the way it fought round one -- the constant-opponent problem RivalNerve solved for the dunk
     // contest and nowhere else in the game. Nerve keeps the invariant: pressing when behind is paid for in
     // errors, so losing a round is never strictly better than winning one.
-    {
-      const sit = standingOf(foeWins, myWins, ROUNDS_TO_WIN, Math.min(1, Math.max(myWins, foeWins) / ROUNDS_TO_WIN));
-      const shift = nerve(sit);
-      brain.setNerve(shift.aggression, shift.mistake);
-      if (shift.label) console.info(`[MIX-NERVE] ${shift.label} (rounds ${foeWins}-${myWins})`);
-    }
+    // (IMPROVE 2026-10-06: NERVE is applied at ROUND START now, on the brain the round is fought with — applyLoadouts)
     SoundKit.play(playerWon ? 'crowdCheer' : 'crowdGroan');
     if (playerWon) roundWinBeat(ctx);
     endStrike(true); endStrike(false);
     if (!wasRingOut) animOf(!playerWon).out = true;                  // KO: knockdown, then the floor until the loadout (a ring-out victim is already falling)
     animOf(playerWon).celebrateUntil = now() + CELEBRATE_SEC * 1000;
-    ctx.setHud({
-      wins: myWins, foeWins,
-      banner: playerWon ? `ROUND ${round} — YOU` : `ROUND ${round} — RIVAL`,
-    });
-    setTimeout(() => {
-      ctx.setHud({ banner: '' });
-      if (myWins >= ROUNDS_TO_WIN || foeWins >= ROUNDS_TO_WIN) {
-        setPhase('matchOver');
-        const won = myWins > foeWins;
-        SoundKit.play('whistle');
-        if (won) { matchPunch(ctx); EffectsKit.burst(ctx.scene, player.root.position.add(new Vector3(0, 2, 0)), 'confetti'); }
-        ctx.end(won ? 'MATCH_WON' : 'MATCH_LOST', myWins * 100 - foeWins * 40, { rounds: round, foeWins });
-        return;
-      }
-      round++;
-      enterLoadout(ctx);
-    }, 2400);
+    if (playerWon && wasRingOut) ringOutWins++;   // IMPROVE (2026-10-06): the result pays it (#13)
+    // the parry slow-mo ends with the round (IMPROVE 2026-10-06: it now slows the rigs too, so it must not outlive the fight)
+    slowmoSec = 0; applyTimeScales();
+    ctx.setHud({ wins: myWins, foeWins });
+    // IMPROVE (2026-10-06): a ring-out's own call was overwritten by this banner on the same frame — it is part of it now
+    banner(ctx, wasRingOut
+      ? (playerWon ? `RING OUT! — ROUND ${round} — YOU` : `RING OUT — YOU FELL! — ROUND ${round} — RIVAL`)
+      : (playerWon ? `ROUND ${round} — YOU` : `ROUND ${round} — RIVAL`), Infinity);
+    // the next beat is afterRound(), ROUND_OVER_SEC later on the game clock (update())
+  }
+
+  /** IMPROVE (2026-10-06): the round-over beat's end — the match result, or the next round's loadout. Was a setTimeout. */
+  function afterRound(ctx: ModeContext): void {
+    bannerSlot.clear(); ctx.setHud({ banner: '' });
+    if (myWins >= ROUNDS_TO_WIN || foeWins >= ROUNDS_TO_WIN) {
+      setPhase('matchOver');
+      const won = myWins > foeWins;
+      SoundKit.play('whistle');
+      if (won) { matchPunch(ctx); EffectsKit.burst(ctx.scene, player.root.position.add(new Vector3(0, 2, 0)), 'confetti'); }
+      // IMPROVE (2026-10-06): the result is myWins * 100 - foeWins * 40 as before, plus a ring-out bonus per round won by one
+      // (core/MixedScore; lib/arena-score-integrity imports its maximum)
+      ctx.end(won ? 'MATCH_WON' : 'MATCH_LOST', mixedScore({ myWins, foeWins, ringOutWins }), { rounds: round, foeWins, ringOutWins });
+      return;
+    }
+    round++;
+    enterLoadout(ctx);
   }
 
   function enterLoadout(ctx: ModeContext): void {
     // recover any fallen fighter before the next round (untrack first so
     // re-tracking never duplicates a groundLock entry)
     falling = false;
-    fallVictim = null;
+    fallVictim = null; fallBody = null;
     ctx.heroRef.current = player.root;
     player.root.position.set(0, 0, 2.2);
     rival.root.position.set(0, 0, -2.2);
@@ -735,25 +822,30 @@ export const MixedCombatMode: ModeDefinition = (() => {
     ctx.groundLock?.track(rival.root, rival.skeleton);
     resetAnim(meAnim); resetAnim(foeAnim);
     setPhase('loadout');
-    ctx.setHud({
-      banner: '', loadout: LOADOUT_LABEL[myLoadout],
-      hint: 'D-PAD or STICK up/down — pick FISTS or STAFF (rival takes the other) · any attack button to lock in',
-    });
+    showLoadoutProps();   // IMPROVE (2026-10-06): the pick is SEEN on both fighters while it is made (#12)
+    bannerSlot.clear();
+    ctx.setHud({ banner: '', loadout: LOADOUT_LABEL[myLoadout], hint: LOADOUT_HINT });
   }
 
   function startRound(ctx: ModeContext): void {
+    // COMBAT DIFFICULTY (2026-10-06): the rival's POWER for the pick (hp, damage, guard — FightCore.rivalPower), on before
+    // resetRound fills the HP. Mixed keeps the brain's sidestep: this is the one mode whose line grammar it answers.
+    foePower = rivalPower(RIVAL_POWER_BASE.mixedcombat * RIVAL_POWER_BY_LOADOUT[myLoadout], readTier());   // the pick's matchup (mixedRules)
+    applyRivalPower(foeState, foePower);
     meState.resetRound(); foeState.resetRound(); book.reset(); xBtn.reset(); padBlock.reset(); queuedKey = null; meDash = null; meDashIframeSec = 0; meDashUntil = 0; foeLaunchedSec = 0; rival.root.position.y = 0;   // STORM
     deferred.clear(); ledger.reset(); bodyShift = null;   // P7
+    meTimers.clear(); foeTimers.clear(); meCounter = 0;   // IMPROVE (2026-10-06): no beat or counter window from the last round
     applyLoadouts(ctx);
     player.root.rotation.y = Math.atan2(rival.root.position.x - player.root.position.x, rival.root.position.z - player.root.position.z);
     rival.root.rotation.y = wrapYaw(player.root.rotation.y + Math.PI);   // a ROUND START is a cut, not a turn
-    striking = false; foeStriking = false; slowmoSec = 0; falling = false;
+    striking = false; foeStriking = false; slowmoSec = 0; falling = false; applyTimeScales();
     setPhase('fighting');
+    guardHud = 100; foeGuardHud = 100; edgeHud = null; dragonHud = meState.chi >= CHI_MAX;   // IMPROVE (2026-10-06): the trickle's memos
     ctx.setHud({
       hp: meState.hp, foeHp: foeState.hp, guard: 100, foeGuard: 100,
       chi: Math.round(meState.chi), foeChi: Math.round(foeState.chi),
-      round: `${round}`, wins: myWins, foeWins, loadout: LOADOUT_LABEL[myLoadout],
-      hint: 'Knock them past the glowing edge for a RING OUT · side-step verticals (A/Y), punish steppers with the sweep (B) · tap GUARD at the last instant to parry',
+      round: `${round}`, wins: myWins, foeWins, loadout: LOADOUT_LABEL[myLoadout], edge: null, dragonReady: dragonHud,
+      hint: MIXED_HINT,
     });
   }
 
@@ -765,7 +857,7 @@ export const MixedCombatMode: ModeDefinition = (() => {
     async load(ctx: ModeContext) {
       arena = readCombatArena('mixedcombat');
       console.info(`[ARENA] mixedcombat · ${describeArena(arena)}`);
-      mountVenue(ctx, 'karate_h2h', { keepGameplayCamera: true, arena });
+      modeVenue?.dispose(); modeVenue = mountVenue(ctx, 'karate_h2h', { keepGameplayCamera: true, arena });
       arenaHandle?.dispose(); arenaHandle = buildArena(ctx.scene, arena);
       player = await CharacterLibrary.spawn(ctx.scene, CFG.heroUrl, {
         position: new Vector3(0, 0, 2.2), yawRad: Math.PI, startClip: IDLE_CLIP,   // BIOMECH-WAVE2 G1/G3: spawned facing each other (the round start used to snap both bodies 180°)
@@ -785,7 +877,7 @@ export const MixedCombatMode: ModeDefinition = (() => {
       foeAnim = newFighterAnim(new CombatAnimTree(rival.animator));
       meAnim.tree.onSettle = (st) => { if (st.startsWith('strike_')) endStrike(true); };
       // phase 6 seam: when does the rival's swing land? (−1 = nothing in flight) — the probe's perfect-dodge / parry driver reads it
-      (ctx.scene.metadata ??= {}).fight = { landsIn: () => (foeImpactAt === null ? -1 : Math.max(0, (foeImpactAt - now()) / 1000)) };
+      (ctx.scene.metadata ??= {}).fight = { landsIn: () => threatLandsIn(Vector3.Distance(player.root.position, rival.root.position), lastFoeRange, foeImpactAt === null ? null : (foeImpactAt - now()) / 1000) };
       foeAnim.tree.onSettle = (st) => { if (st.startsWith('strike_')) endStrike(false); };
       mePosture?.dispose(); foePosture?.dispose();
       mePosture = mountPostureLayer(ctx.scene, player.skeleton, player.root, () => feedFor(meBio, () => rival, meMotion, 1 - meState.guard / GUARD_MAX), 'MC-PP');
@@ -797,8 +889,15 @@ export const MixedCombatMode: ModeDefinition = (() => {
 
       meState = new FighterState(100);
       foeState = new FighterState(100);
-      round = 1; myWins = 0; foeWins = 0; myLoadout = 'fists'; matchLatch = false; heavyAt = 0;
+      round = 1; myWins = 0; foeWins = 0; ringOutWins = 0; matchLatch = false; heavyAt = 0;
+      // IMPROVE (2026-10-06): the start-up pick seeds the loadout here (and once more on the first frame of play)
+      myLoadout = startPick(); startPickSeeded = false;
+      clock = 0; meTimers.clear(); foeTimers.clear(); bannerSlot.clear(); fallBody = null; knock.clear();
+      // IMPROVE (2026-10-06): both staffs made ONCE, hidden until a loadout puts one in a hand (#12, #16)
+      myStaff?.dispose(); foeStaff?.dispose();
+      myStaff = makeStaff(ctx, player, 'mc_staff_me'); foeStaff = makeStaff(ctx, rival, 'mc_staff_foe');
       myLanded = []; foeLanded = [];
+      myRatings = ratingsForBand(ctx.prqBand);   // IMPROVE (2026-10-06): the PRQ band earns the vocabulary (a guest = the baseline); `?fight=` overrides
       if (typeof window !== 'undefined') {
         const v = Number(new URLSearchParams(window.location.search).get('fight'));
         if (Number.isFinite(v) && v > 0) {
@@ -812,12 +911,11 @@ export const MixedCombatMode: ModeDefinition = (() => {
       EffectsKit.ambient(ctx.scene, 'park');
       // L4 — a pit fight is WATCHED. A ring of onlookers on the apron,
       // outside the braziers, answering the big moments.
-      gallery = new Onlookers(ctx.scene,
-        Array.from({ length: 14 }, (_, i) => {
-          const a = (i / 14) * Math.PI * 2;
-          const gr = (arena.shape.kind === 'disc' ? arena.shape.radius : Math.max(arena.shape.halfX, arena.shape.halfZ)) + 4.2;
-          return new Vector3(Math.cos(a) * gr, 0, Math.sin(a) * gr);
-        }));
+      // IMPROVE (2026-10-06): the ring is combat/arenas crowdRing — the same radius + 4.2 (max half-extent on a box), never
+      // nearer a box's corner than CROWD_CORNER_CLEAR, and the same fourteen spots (phase π/2 is the old cos/sin ring)
+      // IMPROVE (2026-10-06): a phone gets PHONE_ONLOOKERS of them (every fourth spot) — each is a full animated rig (~6 draws
+      // and a skeleton); a desktop keeps the seven Onlookers spreads over the fourteen spots
+      gallery = new Onlookers(ctx.scene, onlookerSpots(crowdRing(arena, CROWD_GAP.mixedcombat, 14, CROWD_PHASE.mixedcombat), ctx.scene.metadata?.felTier === 'mobile').map((p) => new Vector3(p.x, 0, p.z)));
       ctx.heroRef.current = player.root;
       ctx.objectiveRef.current = rival.root.position;
       ctx.camDirector.snapTo(player.root.position, rival.root.position);
@@ -836,9 +934,9 @@ export const MixedCombatMode: ModeDefinition = (() => {
 
       if (phase === 'loadout') {
         if (e.t === 'dpad' && e.pressed) {
-          myLoadout = e.dir === 'down' ? 'staff' : 'fists';
+          startPickSeeded = true;   // IMPROVE (2026-10-06): a pick made here is never overwritten by the start-up screen's
+          setLoadout(ctx, e.dir === 'down' ? 'staff' : 'fists');
           SoundKit.play('uiTick');
-          ctx.setHud({ loadout: LOADOUT_LABEL[myLoadout] });
         }
         // Controller Link phones send d-pad as left-stick ('move' idiom), so
         // the loadout pick has to live on the stick too or phone players are
@@ -846,10 +944,10 @@ export const MixedCombatMode: ModeDefinition = (() => {
         // bus maps S to +1 and W to −1.
         if (e.t === 'stick' && e.side === 'L' && Math.abs(e.y) > 0.6) {
           const pick: Loadout = e.y > 0 ? 'staff' : 'fists';
+          startPickSeeded = true;
           if (pick !== myLoadout) {
-            myLoadout = pick;
+            setLoadout(ctx, pick);
             SoundKit.play('uiTick');
-            ctx.setHud({ loadout: LOADOUT_LABEL[myLoadout] });
           }
         }
         if (e.t === 'button' && e.pressed && (e.btn === 'A' || e.btn === 'B' || e.btn === 'Y')) {
@@ -882,11 +980,15 @@ export const MixedCombatMode: ModeDefinition = (() => {
         if (e.btn === 'L1' && wallRun) wallKickOff(ctx);   // MATRIX: the kick off the wall
         else if (e.btn === 'L1' && meState.controllable && focus.active && !wallKick && phase === 'fighting' && tryWallRun(ctx)) { /* MATRIX: up onto the wall */ }
         else if (e.btn === 'L1' && meState.controllable && !wallKick) {
+          // IMPROVE (2026-10-06): the neutral roll goes AWAY from the rival, as the note above says (#8). It rolled along the
+          // camera's forward, and the fight camera looks at the rival from behind the player: that was INTO him.
           const dir = Math.hypot(stickX, stickY) > 0.2
             ? ctx.camDirector.forwardFlat().scale(-stickY).addInPlace(ctx.camDirector.rightFlat().scale(stickX))
-            : ctx.camDirector.forwardFlat().scale(1);
+            : neutralRollDir(player.root.position, rival.root.position, ctx.camDirector.forwardFlat());
           if (meEvade.roll(dir.x, dir.z)) {
-            const secTo = foeImpactAt === null ? null : (foeImpactAt - now()) / 1000;
+            const secRaw = foeImpactAt === null ? null : (foeImpactAt - now()) / 1000;
+            const secGate = threatLandsIn(Vector3.Distance(player.root.position, rival.root.position), lastFoeRange, secRaw);
+            const secTo = secGate < 0 ? null : secGate;
             const r = dodgeReward(secTo);
             if (r.perfect) {
               focus.gain(FOCUS.dodgeGain);   // MATRIX: a read refills Focus
@@ -895,8 +997,7 @@ export const MixedCombatMode: ModeDefinition = (() => {
               ctx.feel?.impact?.(0.3);
               ctx.momentum.report({ kind: 'near_miss', weight: 14 });
               SoundKit.play('powerUp', { volume: 0.5, pitch: 1.3 });
-              ctx.setHud({ banner: r.label ?? '' });
-              setTimeout(() => ctx.setHud({ banner: '' }), 800);
+              banner(ctx, r.label ?? '', 0.8);
             } else {
               SoundKit.play('whoosh', { pitch: 1.2, volume: 0.35 });
             }
@@ -911,14 +1012,23 @@ export const MixedCombatMode: ModeDefinition = (() => {
 
     update(ctx: ModeContext, dt: number) {
       ctx0 = ctx;
+      clock += dt;   // IMPROVE (2026-10-06): the mode's clock (banners, the round-over beat)
+      { const b = bannerSlot.tick(clock); if (b !== null) ctx.setHud({ banner: b }); }
       { const bv = ctx.body?.(); if (bv) bodyLedgerFrame(bv, now()); deferred.flush(ledger, now()); }   // P7: the body's deferred hits
       phaseSec += dt;
       gallery?.update(dt);
+      // IMPROVE (2026-10-06): the start-up screen's pick, once more on the first frame of play (it is offered on the READY
+      // screen after load) — unless a pick was already made in the loadout phase
+      if (!startPickSeeded) { startPickSeeded = true; if (phase === 'loadout' && round === 1) setLoadout(ctx, startPick()); }
+      // IMPROVE (2026-10-06): a ring-out victim drops on the game clock (#9) — 8.4 m/s whatever the screen's refresh rate
+      if (fallBody) { const f = fallStep(fallBody.root.position.y, dt); fallBody.root.position.y = f.y; if (!f.falling) fallBody = null; }
+      // IMPROVE (2026-10-06): the round-over beat on the game clock (it was a 2400 ms setTimeout)
+      if (phase === 'roundOver' && phaseSec >= ROUND_OVER_SEC) { afterRound(ctx); return; }
       if (phaseSec > BUDGET_SEC[phase]) {
         console.warn(`[FEL-WATCHDOG] mixedcombat stuck in "${phase}" — auto-advancing`);
         if (phase === 'fighting') endRound(ctx, meState.hp >= foeState.hp);
         else if (phase === 'loadout') startRound(ctx);
-        else if (phase === 'roundOver') enterLoadout(ctx);
+        else if (phase === 'roundOver') afterRound(ctx);
         return;
       }
       if (phase !== 'fighting' || falling) {
@@ -928,23 +1038,27 @@ export const MixedCombatMode: ModeDefinition = (() => {
         // (both measured as FEL-FRAME findings). Hold on the SURVIVOR at ring
         // level, looking at the edge the victim went over.
         const onTheRing = (fallVictim === 'me' ? rival : player).root.position;
-        const wentOver = (fallVictim === 'me' ? player : rival).root.position.clone();
+        const wentOver = fallCamS.copyFrom((fallVictim === 'me' ? player : rival).root.position);   // IMPROVE (2026-10-06): scratch, not a clone a frame
         wentOver.y = Math.max(0, wentOver.y);
-        ctx.camDirector.update(onTheRing, Vector3.Zero(), wentOver);
-        animate(0, 0);   // the trees still run: the victim falls / the loser holds the floor / the winner celebrates
+        ctx.camDirector.update(onTheRing, ZERO as Vector3, wentOver);
+        knock.tick(dt);   // IMPROVE (2026-10-06): a KO's slide still finishes between rounds
+        animate(dt, 0, 0);   // the trees still run: the victim falls / the loser holds the floor / the winner celebrates
         return;
       }
 
+      // scoped slow-mo (parry payoff) — scales this mode's clock, and (IMPROVE 2026-10-06) both rigs' clocks
       slowmoSec = Math.max(0, slowmoSec - dt);
       const sdt = slowmoSec > 0 ? dt * SLOWMO_SCALE : dt;
       // MATRIX FOCUS: the trigger holds bullet time — the rival on the room's clock, me on mine (a clock per rig)
       const wasFocus = focus.active;
       if (focusHeld && !focus.active) { if (focus.start()) onFocusStart(ctx); } else if (!focusHeld && focus.active) focus.stop();
       if (focus.tick(dt)) onFocusEnd(ctx, true); else if (wasFocus && !focus.active) onFocusEnd(ctx, false);
-      if (wasFocus !== focus.active) { rival.animator.setTimeScale(focus.worldScale); player.animator.setTimeScale(focus.heroScale); }
+      if (wasFocus !== focus.active || slowmoOn !== slowmoSec > 0) applyTimeScales();
       { const fv = Math.round(focus.value); if (fv !== focusHud || focus.active !== focusHudOn) { focusHud = fv; focusHudOn = focus.active; ctx.setHud({ focus: fv, focusOn: focus.active }); } }
       const sdtRoom = sdt * focus.worldScale, sdtHero = sdt * focus.heroScale;
-      for (let i = foeTimers.length - 1; i >= 0; i--) { foeTimers[i].left -= sdtRoom; if (foeTimers[i].left <= 0) { const t = foeTimers.splice(i, 1)[0]; t.fn(); } }
+      knock.tick(sdtRoom);   // IMPROVE (2026-10-06): knockback on the room clock
+      meTimers.tick(sdtHero); foeTimers.tick(sdtRoom);   // IMPROVE (2026-10-06): both fighters' hit beats on the game clock
+      if (phase !== 'fighting' || falling) { animate(dt, 0, 0); return; }   // a beat just ended the round
       meState.tick(sdtHero); foeState.tick(sdtRoom);
       // a route must not complete across two unrelated exchanges
       if (meState.combo === 0 && myLanded.length) myLanded = [];
@@ -955,39 +1069,44 @@ export const MixedCombatMode: ModeDefinition = (() => {
       // MODE-STICK-FACE (2026-09-07): CAMERA-relative — up = the camera's flat forward (the rival, whom the fight camera
       // looks at from behind the player), right = screen right. The world-axis read walked up-stick AWAY from the rival
       // (Δscreen −3.4 m toward the camera) and mirrored X whenever the camera had swung. No axis is flipped.
-      const moveVel = ctx.camDirector.forwardFlat().scale(-stickY * MOVE_SPEED).addInPlace(ctx.camDirector.rightFlat().scale(stickX * MOVE_SPEED));
-      lastMyVel = meDash ? meDash.dir.scale(DASH.speed) : moveVel;   // FREE RUN
+      // IMPROVE (2026-10-06): into scratch vectors (#19) — the stick velocity and the dash's were new Vector3s every frame
+      // (forwardFlat / rightFlat still allocate inside CameraDirector, which is not this mode's file)
+      const cf = ctx.camDirector.forwardFlat(), cr = ctx.camDirector.rightFlat();
+      const moveVel = moveVelS.set((cf.x * -stickY + cr.x * stickX) * MOVE_SPEED, 0, (cf.z * -stickY + cr.z * stickX) * MOVE_SPEED);
+      lastMyVel = meDash ? myDashVelS.copyFrom(meDash.dir).scaleInPlace(DASH.speed) : moveVel;   // FREE RUN
       const rollVel = meEvade.update(sdtHero);
       meCounter = tickCounter(meCounter, sdtHero);
       let mySpeed01 = rollVel ? 0 : moveVel.length() / MOVE_SPEED;   // the INTENT, striking or not: a strike that runs out under a held stick settles straight into the guard step
+      const pp = player.root.position;
       if (wallRun || wallKick) { /* MATRIX: the wall owns the body */ }
       else if (meDash) {   // STORM: the dash owns the body (and takes the ring check — a dash off the edge is a ring-out)
-        if (meDash.homing) { const toFoe = rival.root.position.subtract(player.root.position); toFoe.y = 0; if (toFoe.length() <= DASH.homingStopM) meDash.left = 0; else meDash.dir = toFoe.normalize(); }
-        player.root.position.addInPlace(meDash.dir.scale((meDash.homing ? DASH.homingSpeed : DASH.speed) * sdtHero)); arenaClamp(player.root.position, arena);
-        if (offRing(player.root.position)) { ringOut(ctx, true); animate(0, 0); return; }
+        if (meDash.homing) { const tx = rival.root.position.x - pp.x, tz = rival.root.position.z - pp.z, d = Math.hypot(tx, tz); if (d <= DASH.homingStopM) meDash.left = 0; else meDash.dir.set(tx / d, 0, tz / d); }
+        const sp = (meDash.homing ? DASH.homingSpeed : DASH.speed) * sdtHero;
+        pp.addInPlaceFromFloats(meDash.dir.x * sp, 0, meDash.dir.z * sp); arenaClamp(pp, arena);
+        if (offRing(pp)) { ringOut(ctx, true); animate(dt, 0, 0); return; }
         meDash.left -= sdtHero; if (meDash.left <= 0) meDash = null;
         mySpeed01 = 1;
       } else if (rollVel) {
         // the roll owns the body AND takes the same ring check the walk does -- see the input branch
-        player.root.position.addInPlace(rollVel.scale(sdtHero)); arenaClamp(player.root.position, arena);
-        if (offRing(player.root.position)) { ringOut(ctx, true); animate(0, 0); return; }
+        pp.addInPlaceFromFloats(rollVel.x * sdtHero, rollVel.y * sdtHero, rollVel.z * sdtHero); arenaClamp(pp, arena);
+        if (offRing(pp)) { ringOut(ctx, true); animate(dt, 0, 0); return; }
       } else if (meState.controllable && !striking && !meState.blockHeld) {
-        const vel = moveVel;
-        player.root.position.addInPlace(vel.scale(sdtHero)); arenaClamp(player.root.position, arena);
-        if (offRing(player.root.position)) { ringOut(ctx, true); animate(0, 0); return; }
+        pp.addInPlaceFromFloats(moveVel.x * sdtHero, 0, moveVel.z * sdtHero); arenaClamp(pp, arena);
+        if (offRing(pp)) { ringOut(ctx, true); animate(dt, 0, 0); return; }
       }
       // P7 AUTO-SPACING: a body player has no stick — a strike out of range closes a little, a step in / out / across moves
       // the fighter; a stick past its dead zone always wins (and the ring edge still rings him out)
       if (bodyShift) {
         if (Math.hypot(stickX, stickY) > 0.35 || !meState.controllable) bodyShift = null;
         else {
-          const step = Math.min(sdtHero, bodyShift.left); player.root.position.addInPlace(bodyShift.v.scale(step)); arenaClamp(player.root.position, arena);
+          const step = Math.min(sdtHero, bodyShift.left); pp.addInPlaceFromFloats(bodyShift.v.x * step, bodyShift.v.y * step, bodyShift.v.z * step); arenaClamp(pp, arena);
           bodyShift.left -= step; if (bodyShift.left <= 0) bodyShift = null;
-          if (offRing(player.root.position)) { bodyShift = null; ringOut(ctx, true); animate(0, 0); return; }
+          if (offRing(pp)) { bodyShift = null; ringOut(ctx, true); animate(dt, 0, 0); return; }
         }
       }
       if (!tickMatrix(ctx, sdtHero)) player.root.position.y = meEvade.height;   // the arc is EvadeMoves'; nothing here integrates gravity — unless the wall run / kick owns the body (MATRIX)
       arenaHandle?.tick(dt); if (arena.hazards.length) tickHazards(ctx, sdtRoom);
+      if (phase !== 'fighting' || falling) { animate(dt, 0, 0); return; }   // IMPROVE (2026-10-06): a wall kick or the fire just ended the round
 
       ring?.set(meState.guard / GUARD_MAX);   // PLAYER RING: the guard gauge
       meDashIframeSec = Math.max(0, meDashIframeSec - sdtHero);   // STORM ticks
@@ -1000,20 +1119,25 @@ export const MixedCombatMode: ModeDefinition = (() => {
       // rival AI (its brain uses its own loadout's ranges); it never
       // voluntarily steps off — clamp ITS walk to the ring, so only
       // knockback can send it over
-      const action = brain.decide(sdtRoom, rival.root.position, player.root.position, foeState, striking);
-      if (action.block && !foeState.blockHeld) foeState.pressBlock(now());
+      // IMPROVE (2026-10-06): the rival reads my openings — a dash, a roll, my swing past its impact (its recovery)
+      const meOpen = !!meDash || meEvade.rolling || (striking && myImpactAt !== null && now() > myImpactAt);
+      const action = brain.decide(sdtRoom, rival.root.position, player.root.position, foeState, striking, meOpen);
+      // IMPROVE (2026-10-06): the brain says block or parry; the press is stamped for it (a held block no longer parries a jab by accident)
+      if (action.block && !foeState.blockHeld) foeState.pressBlock(guardPressMs(now(), action.guard, myImpactAt !== null ? myImpactAt - now() : null));
       if (!action.block && foeState.blockHeld) foeState.releaseBlock();
+      // (the action is read in full before swing(): decide() rewrites one shared object)
+      const amx = action.moveX, amy = action.moveY;
       if (action.attack) swing(ctx, false, action.attack);
-      let foeSpeed01 = Math.min(1, Math.hypot(action.moveX, action.moveY));   // the brain's INTENT, striking or not — the strike's settle lands on the step, not a one-frame stance
-      const foeVel = new Vector3(action.moveX, 0, -action.moveY).scale(MOVE_SPEED * 0.9);
+      let foeSpeed01 = Math.min(1, Math.hypot(amx, amy));   // the brain's INTENT, striking or not — the strike's settle lands on the step, not a one-frame stance
+      const foeVel = foeVelS.set(amx * MOVE_SPEED * 0.9, 0, -amy * MOVE_SPEED * 0.9);   // IMPROVE (2026-10-06): scratch
       lastFoeVel = foeVel;   // FREE RUN
       if (foeState.controllable && !foeStriking && !foeState.blockHeld) {
-        const vel = foeVel;
-        const before = rival.root.position.clone();
-        rival.root.position.addInPlace(vel.scale(sdtRoom));
-        arenaClamp(rival.root.position, arena);
-        if (arena.edge === 'drop' && insideBy(rival.root.position, arena.shape) < 0.3) { const q = { x: rival.root.position.x, z: rival.root.position.z }; const inb = insideBy(q, arena.shape); if (arena.shape.kind === 'disc') { const r = Math.hypot(q.x, q.z) || 1; rival.root.position.x *= (arena.shape.radius - 0.3) / r; rival.root.position.z *= (arena.shape.radius - 0.3) / r; } else { rival.root.position.x = Math.max(-(arena.shape.halfX - 0.3), Math.min(arena.shape.halfX - 0.3, q.x)); rival.root.position.z = Math.max(-(arena.shape.halfZ - 0.3), Math.min(arena.shape.halfZ - 0.3, q.z)); } void inb; }   // it never voluntarily steps off — only knockback can send it over
-        foeSpeed01 = sdtRoom > 0 && Vector3.Distance(before, rival.root.position) / sdtRoom < 0.3 ? 0 : vel.length() / MOVE_SPEED;   // the step only while the body moves
+        const rp = rival.root.position;
+        const bx = rp.x, bz = rp.z;   // IMPROVE (2026-10-06): two numbers, not a clone a frame
+        rp.addInPlaceFromFloats(foeVel.x * sdtRoom, 0, foeVel.z * sdtRoom);
+        arenaClamp(rp, arena);
+        if (arena.edge === 'drop' && insideBy(rp, arena.shape) < 0.3) { if (arena.shape.kind === 'disc') { const r = Math.hypot(rp.x, rp.z) || 1; rp.x *= (arena.shape.radius - 0.3) / r; rp.z *= (arena.shape.radius - 0.3) / r; } else { rp.x = Math.max(-(arena.shape.halfX - 0.3), Math.min(arena.shape.halfX - 0.3, rp.x)); rp.z = Math.max(-(arena.shape.halfZ - 0.3), Math.min(arena.shape.halfZ - 0.3, rp.z)); } }   // it never voluntarily steps off — only knockback can send it over
+        foeSpeed01 = sdtRoom > 0 && Math.hypot(rp.x - bx, rp.z - bz) / sdtRoom < 0.3 ? 0 : foeVel.length() / MOVE_SPEED;   // the step only while the body moves
       }
 
       faceEachOther(dt);
@@ -1023,16 +1147,27 @@ export const MixedCombatMode: ModeDefinition = (() => {
       // design and camera; the bezel is where we can afford it.
       const myIn = insideBy(player.root.position, arena.shape), foeIn = insideBy(rival.root.position, arena.shape);
       const edge = arena.edge !== 'drop' ? null : myIn < 1.6 ? 'EDGE BEHIND YOU' : foeIn < 1.6 ? 'RIVAL ON THE EDGE' : null;
-      ctx.setHud({ guard: Math.round(meState.guard), foeGuard: Math.round(foeState.guard), edge });
+      // IMPROVE (2026-10-06): the trickle pushes only what CHANGED (#18) — it was three fields every frame
+      {
+        const g = Math.round(meState.guard), fg = Math.round(foeState.guard);
+        if (g !== guardHud || fg !== foeGuardHud || edge !== edgeHud) { guardHud = g; foeGuardHud = fg; edgeHud = edge; ctx.setHud({ guard: g, foeGuard: fg, edge }); }
+        // DRAGON READY (#6): the full bar is called once, the moment it fills; the host lights the CHI line while it lasts
+        const ready = meState.chi >= CHI_MAX;
+        if (ready !== dragonHud) { dragonHud = ready; ctx.setHud({ dragonReady: ready }); if (ready) { banner(ctx, 'DRAGON READY — Y', 0.9); SoundKit.play('powerUp', { pitch: 1.1, volume: 0.35 }); } }
+      }
       ctx.camDirector.look(lookX, lookY, dt);
       ctx.camDirector.update(player.root.position, moveVel, rival.root.position);
-      animate(mySpeed01, foeSpeed01, moveVel, foeVel);
+      animate(dt, mySpeed01, foeSpeed01, moveVel, foeVel);
     },
 
     dispose() {
+      // IMPROVE (2026-10-06): nothing outlives the mode (#20) — the hit beats, the round beat (game clock now), the banner,
+      // the knock slides and the fall are dropped; the staffs' one material and the venue go with them (#16, #17)
+      meTimers.clear(); foeTimers.clear(); bannerSlot.clear(); knock.clear(); fallBody = null; queuedKey = null; meDash = null;
       mePosture?.dispose(); mePosture = null; foePosture?.dispose(); foePosture = null;
-      myStaff?.dispose(); foeStaff?.dispose();
+      myStaff?.dispose(); foeStaff?.dispose(); myStaff = null; foeStaff = null; staffMat?.dispose(); staffMat = null;
       gallery?.dispose(); gallery = null; arenaHandle?.dispose(); arenaHandle = null; wallRun = null; wallKick = null;
+      modeVenue?.dispose(); modeVenue = null;
       ring?.dispose(); ring = null;
       player?.dispose(); rival?.dispose(); SoundKit.stopAmbient();
     },
@@ -1042,3 +1177,4 @@ export const MixedCombatMode: ModeDefinition = (() => {
 // HUD CONTRACT (bare values — bezel decorates): hp/foeHp, guard/foeGuard,
 // chi/foeChi, round, wins/foeWins, loadout (string), banner, hint,
 // edge ('EDGE BEHIND YOU' | 'RIVAL ON THE EDGE' | null).
+// IMPROVE (2026-10-06): dragonReady (boolean: my bar is full — Y throws the DRAGON).

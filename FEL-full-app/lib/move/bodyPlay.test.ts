@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 import { createBodyPlay, LUMA_EVERY_MS, type BodyPlayDeps } from './bodyPlay';
 import { SpaceCheck, SAFETY_NOTE, type LumaSample } from './spaceCheck';
 import { BODY_PLAY_KEY_PREFIX } from './bodyPlayChoice';
-import { sessionStore, type SessionWriter } from '@/lib/babylon/core/sessionStore';
+import { sessionStore, stanceOnMount, type SessionWriter } from '@/lib/babylon/core/sessionStore';
 import { bodySeamFor } from '@/lib/babylon/core/bodySeam';
 import type { PoseSourceSnapshot, PoseSourceState } from '@/lib/input/poseSource';
 import type { PoseStatus } from '@/lib/pose/PoseService';
@@ -11,6 +11,7 @@ import type { ModePhase } from '@/lib/babylon/core/ModeHarness';
 import { synthesize, restPose, moveJoints, type Joints } from '@/lib/pose/synth';
 import { spaceSession, script, hold } from '@/lib/pose/streamKit';
 import type { PoseFrame } from '@/lib/pose/landmarks';
+import { bodyPlayNeedsGrownUp, type BodyPlayAge } from './bodyPlayGrownUp';
 
 // MOVEMENT PLAY P4 (2026-09-25): the READY screen's body play, with the page taken out — a source, a camera service,
 // storage and a voice that record what they are asked, and the real sessionStore (the harness's writer moves the
@@ -22,7 +23,7 @@ const PLAY = { distance: 3.6, heightM: 1.2 };
 const frames = (seed = 11, clip = spaceSession()) => synthesize(clip, { camera: PLAY, seed }).frames;
 const later = (fs: PoseFrame[], t0: number) => fs.map((f) => ({ ...f, t: f.t + t0, arrive: (f.arrive ?? f.t) + t0 }));
 
-function rig(o: { start?: boolean; bank?: string[] } = {}) {
+function rig(o: { start?: boolean; bank?: string[]; age?: BodyPlayAge } = {}) {
   const calls: string[] = [];
   const store = new Map<string, string>();
   const frameCbs = new Set<(f: PoseFrame) => void>();
@@ -65,6 +66,8 @@ function rig(o: { start?: boolean; bank?: string[] } = {}) {
     pauseGame: () => { calls.push('pause'); writer?.setPhase('paused'); },
     onPageHidden: (fn) => { hiddenCbs.add(fn); },
     now: () => clock,
+    // An adult, unless the test names another age. The grown-up step is bodyPlayGrownUp.test.ts.
+    needsGrownUp: () => bodyPlayNeedsGrownUp(o.age ?? { band: '18+' }, new Date('2026-10-01')),
   };
   const bp = createBodyPlay(deps);
   /** Frames through the camera service, the clock following their arrival. */
@@ -410,12 +413,70 @@ describe('the probe hook', () => {
     return win.__FEL_SPACE__ as Record<string, unknown> | undefined;
   }
 
-  it('__FEL_SPACE__ stays behind the feed\'s gate: development, or a production build on this machine with ?agent=1', async () => {
+  it('__FEL_SPACE__ stays behind the feed\'s gate: development, or production loopback with the server agent-run marker', async () => {
     expect(await load('production', 'finalevolution.us')).toBeUndefined();
-    expect(await load('production', 'finalevolution.us', '?agent=1')).toBeUndefined();
+    expect(await load('production', 'finalevolution.us', '?agent=1')).toBeUndefined();   // a query anyone can type
     expect(await load('production', 'localhost')).toBeUndefined();
-    expect(Object.keys((await load('production', 'localhost', '?agent=1')) ?? {}).sort())
+    expect(await load('production', 'localhost', '?agent=1')).toBeUndefined();             // ?agent=1 alone never arms hooks
+    vi.resetModules();
+    env.NODE_ENV = 'production';
+    const kept = new Map<string, string>();
+    const win: Record<string, unknown> = {
+      location: { hostname: 'localhost', search: '?agent=1' },
+      sessionStorage: { getItem: (k: string) => kept.get(k) ?? null, setItem: (k: string, v: string) => { kept.set(k, v); }, removeItem: (k: string) => { kept.delete(k); } },
+    };
+    g.window = win;
+    const hooks = await import('@/lib/agentRunHooks');
+    hooks.setAgentRunHooksAllowed(true);
+    await import('./bodyPlay');
+    expect(Object.keys((win.__FEL_SPACE__ as Record<string, unknown> | undefined) ?? {}).sort())
       .toEqual(['again', 'begin', 'end', 'handOver', 'session', 'shortcut', 'view']);
     expect(typeof (await load('development', 'fel.example'))?.shortcut).toBe('function');
+  });
+});
+
+// MOVEMENT PLAY P8 (2026-09-26, PLAN-P8 R-F1): a board game's READY asks for the stance after "All set". The harness writes
+// the session's stance view at mount for a row that steers with the carve; the check keeps `ready` through the turn into
+// the stance only while that view is there (SpaceCheck.setStanceGame, set on every frame the check steps).
+describe('the stance game (P8): the flag follows the session', () => {
+  const R0 = restPose();
+  const rotY = (j: Joints, deg: number): Joints => {
+    const a = (deg * Math.PI) / 180, c = Math.cos(a), s = Math.sin(a);
+    return Object.fromEntries(Object.entries(j).map(([k, p]) => [k, [c * p[0] + s * p[2], p[1], -s * p[0] + c * p[2]]])) as Joints;
+  };
+  /** A 45° turn over 0.5 s, then held 2 s (a regular rider turning into the stance). */
+  const turn = (t0: number) => later(synthesize({ fps: 30, frames: Array.from({ length: 76 }, (_, i) => rotY(R0, 45 * Math.min(1, i / 15))) }, { camera: PLAY, seed: 5 }).frames, t0);
+
+  it('a carve row (the stance written at mount): the turn keeps the rulers — no re-centre, still set', async () => {
+    // (the harness's mount: the card, and the stance ask for a carve row — stanceOnMount)
+    writer?.unmount();
+    const seam = bodySeamFor({ modeId: 'skateboard' });
+    writer = sessionStore.mount({ ...seam.card, stance: stanceOnMount(seam.profile) });
+    writer.setPhase('ready');
+    expect(sessionStore.view().stance).toEqual({ kind: null, lead: null, hold01: 0 });
+    const r = rig();
+    await r.bp.begin('skateboard');
+    const fs = frames();
+    r.push(fs);
+    expect(r.bp.view().stage).toBe('set');
+    r.push(turn(fs.at(-1)!.t + 33));
+    expect(r.calls.filter((c) => c === 'recalibrate')).toEqual([]);
+    expect(r.cals).toHaveLength(1);
+    expect(r.bp.view().stage).toBe('set');
+    expect(r.bp.view().space!.stage).toBe('ready');
+  });
+
+  it('no stance view (the same turn in a game that has none): the check drops back and the source is re-centred, as P4', async () => {
+    for (const key of ['skateboard', 'dunk']) {
+      game(key);   // (no setStance: a skateboard mounted without it is the P4 check)
+      const r = rig();
+      await r.bp.begin(key);
+      const fs = frames();
+      r.push(fs);
+      expect(r.bp.view().stage, key).toBe('set');
+      r.push(turn(fs.at(-1)!.t + 33));
+      expect(r.calls.filter((c) => c === 'recalibrate').length, key).toBeGreaterThan(0);
+      expect(r.bp.view().stage, key).toBe('checking');
+    }
   });
 });

@@ -242,6 +242,59 @@ export const COACH_MOMENTS: readonly { id: string; say: string; maxWords: number
   { id: 'coach.space.ready', say: 'All set: raise both hands to start.', maxWords: 10, n: 2 },
 ];
 
+/**
+ * MUSIC-SUITE P8 (2026-09-25), "a stage that performs": STOOP (the Cypher's block-party MC, /play/dance,
+ * lib/babylon/modes/DanceMode.ts) and PROFESSOR OKTA (the Groove Academy's mentor, /play/music,
+ * lib/babylon/music/StudioMode.tsx). Neither is hoops — their scripts live beside the cast's own (script/stoop.ts,
+ * script/okta.ts, read+picked directly, not through CAST/MicDirector/ModeMic — the same "own contract" shape as
+ * BRAINBRAWL-RESIDUAL's bb_host) — but the moment table is the one place every voice's word limits live
+ * (scriptRules.maxWordsFor), so these two rooms' moments are added here, flat like COACH_MOMENTS (no MC/side tiers:
+ * one host, one line at a time). ADDITIVE ONLY: nothing above this comment changes for a single hoops moment.
+ */
+export const DANCE_MOMENTS: readonly { id: string; say: string; maxWords: number; n: number }[] = [
+  { id: 'dance.open', say: 'The Cypher opens: the circle is waiting, step in when the beat drops.', maxWords: 24, n: 4 },
+  { id: 'dance.walkout', say: 'The player walks out to the floor to start a run (any track).', maxWords: 14, n: 4 },
+  { id: 'dance.countin', say: 'Said right as the count-in starts (before the clicks): VERY short.', maxWords: 8, n: 4 },
+  { id: 'dance.streak', say: 'A clean streak on the beat (an 8+ combo).', maxWords: 10, n: 4 },
+  { id: 'dance.instrument', say: 'A new instrument just joined the band (the player earned it dancing clean).', maxWords: 10, n: 4 },
+  { id: 'dance.missstreak', say: 'A few misses in a row: encouraging, never mocking.', maxWords: 10, n: 4 },
+  { id: 'dance.freestyle', say: 'A freestyle bar opens (no judged steps): show the block something new. (P9: charts/freestyle bars land after movement play\'s gated dance commit — the moment and lines ship now, unwired.)', maxWords: 14, n: 4 },
+  { id: 'dance.callbar', say: 'A call bar is coming: match the move on the beat. (P9, as above.)', maxWords: 12, n: 4 },
+  { id: 'dance.newdancer', say: 'A first-ever visit to the Cypher for this player (device-local, once).', maxWords: 10, n: 4 },
+  { id: 'dance.topgrade', say: 'The run graded S (clean top to bottom).', maxWords: 16, n: 4 },
+  { id: 'dance.lowgrade', say: 'The run graded D: encouraging, invites another try.', maxWords: 16, n: 4 },
+  { id: 'dance.ownsong', say: 'The player is dancing to THEIR OWN exported song (YourSongBand), first beat of play.', maxWords: 18, n: 4 },
+  { id: 'dance.callresponse', say: 'A call-and-response hype opener at the first beat of play (when not dancing to your own song).', maxWords: 14, n: 4 },
+];
+export const ACADEMY_MOMENTS: readonly { id: string; say: string; maxWords: number; n: number }[] = [
+  { id: 'academy.firstvisit', say: 'The player\'s first-ever visit to the Groove Academy (device-local, once).', maxWords: 22, n: 4 },
+  { id: 'academy.firstbeat', say: 'The player\'s first-ever step placed on the grid (device-local, once).', maxWords: 14, n: 4 },
+  { id: 'academy.firstperform', say: 'The player\'s first-ever time entering PERFORM (device-local, once).', maxWords: 16, n: 4 },
+  { id: 'academy.fliplesson', say: 'CHOP THE FEL THEME opens (the Flip tab\'s first-visit lesson card, once per player).', maxWords: 18, n: 4 },
+  { id: 'academy.published', say: 'A song is published to the Academy library (every publish, not only the first).', maxWords: 16, n: 4 },
+];
+
+/**
+ * VOICEOVER (2026-10-06): the PAGES' lines, in the Coach's voice. The Mirror coach, the Quick Screen and Prove It build
+ * their lines in code and used to speak every one with the browser's voice; lib/babylon/audio/voice/speakNatural.ts now
+ * plays a rendered take instead whenever the Coach's bank has a line with the same text (or a `match` that equals the page's
+ * string, where the spoken words differ: digits are spelled out). These are those lines' moments, so the script rules
+ * (word limits, clean language) hold them too. `n: 0`: nothing is owed — the pages fall back to the browser voice for any
+ * line not recorded yet. The lines themselves are in tools/voice/script/coach.csv (the production script).
+ */
+export const PAGE_MOMENTS: readonly { id: string; say: string; maxWords: number; n: number }[] = [
+  { id: 'page.mirror.cue', say: 'The Mirror coach\'s form cue for a fault it read (lib/babylon/nexus/neuro-mirror/rules/cue-engine.ts): the cue, the escalation, the regression, the "there it is" confirm.', maxWords: 24, n: 0 },
+  { id: 'page.mirror.framing', say: 'The Mirror\'s framing fix: get the whole body in the shot, square to the camera (lib/mirror/framing.ts, squatStage.ts).', maxWords: 24, n: 0 },
+  { id: 'page.mirror.jump', say: 'The Mirror\'s jump read: not counted (the camera lost the feet), or the fixed half of the progress line.', maxWords: 20, n: 0 },
+  { id: 'page.mirror.screen', say: 'The Mirror\'s movement screen: each station\'s own instruction, the turn, moving on, the retest, done (lib/mirror/screen.ts, screenRunner.ts).', maxWords: 28, n: 0 },
+  { id: 'page.assess', say: 'The Quick Screen (app/play/mirror/assess): hold, the countdown, go, the turn, the calibration fixes and each move\'s setup (lib/assess/runner.ts, protocol.ts, calibration.ts).', maxWords: 40, n: 0 },
+  { id: 'page.proveit', say: 'Prove It (app/play/dunkduel): the go cue and "Next up!" (the athlete\'s name is shown on screen, never spoken).', maxWords: 6, n: 0 },
+];
+
 /** Every moment id any cast member can be asked for. */
-export const ALL_MOMENT_IDS: readonly string[] = [...MOMENTS.map((m) => m.id), ...CROWD_MOMENTS.map((m) => m.id), ...PLAYER_MOMENTS.map((m) => m.id), ...COACH_MOMENTS.map((m) => m.id), 'name'];
+export const ALL_MOMENT_IDS: readonly string[] = [
+  ...MOMENTS.map((m) => m.id), ...CROWD_MOMENTS.map((m) => m.id), ...PLAYER_MOMENTS.map((m) => m.id),
+  ...COACH_MOMENTS.map((m) => m.id), ...DANCE_MOMENTS.map((m) => m.id), ...ACADEMY_MOMENTS.map((m) => m.id),
+  ...PAGE_MOMENTS.map((m) => m.id), 'name',
+];
 export const momentSpec = (id: string): MomentSpec | undefined => MOMENTS.find((m) => m.id === id);

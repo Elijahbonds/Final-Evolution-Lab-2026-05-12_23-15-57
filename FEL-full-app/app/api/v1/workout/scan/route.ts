@@ -4,8 +4,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-import { analyzeMovement, defaultMetrics, type MovementMetrics } from '@/lib/workout/movement-screen';
+import { analyzeMovement, defaultMetrics, scanRouteKind, type MovementMetrics } from '@/lib/workout/movement-screen';
 import { buildAvatarSpec } from '@/lib/workout/avatar-builder';
+import { canSaveScanNumbers, refuseScanSave } from '@/lib/privacy/scanSaveGate';
 
 /**
  * POST /api/v1/workout/scan  — FREE system scan for everyone.
@@ -19,7 +20,12 @@ export async function POST(req: NextRequest) {
 
   let body: any;
   try { body = await req.json(); } catch { body = {}; }
-  const kind = typeof body?.kind === 'string' ? body.kind : 'movement_screen';
+  // MIRROR-COACH P3 review (2026-09-26): only the kinds this route owns (lib/workout/movement-screen.ts SCAN_ROUTE_KINDS).
+  // It stored any posted kind, so a client could write a 'mirror_screen' row marked gradedBy: 'server' past the regrade.
+  const kind = scanRouteKind(body?.kind);
+  if (!kind) return NextResponse.json({ error: 'kind_not_allowed' }, { status: 400 });
+  // TEEN-WRITE-BLOCK (FE PM 23:05 PT): a scan is kept only for a verified 18+ account that opted in (today nobody); GET and DELETE unchanged.
+  if (!(await canSaveScanNumbers(prisma, userId))) return refuseScanSave();
   const metrics: MovementMetrics = { ...defaultMetrics(), ...(body?.metrics ?? {}) };
 
   const analysis = analyzeMovement(metrics);

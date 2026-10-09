@@ -58,6 +58,15 @@
 //   * A SOLO NOBODY CAN SEE. anySolo counted every stored strip, drawn or not: a solo left on TAKES after its last take was
 //     deleted closed every row's gate — PLAY and PUBLISH silent, no lit S anywhere to press. scopeSolo(mixer, liveIds) keeps
 //     only the solos of strips that can sound (the rows drawn, TAKES while there are takes); the room hands the engine that.
+//
+// MUSIC-SUITE P6 (2026-09-25), "the band builds" (owner decision #11): PERFORM starts your song thin and brings each part in
+// as you stay on its lane (performSet.ts PerformBand). A part's level rides on its strip's GATE: gate = (mute / solo open ?
+// 1 : 0) × the strip's BAND level (setBand; 1 when no band is set — every render, and the room outside PERFORM). No new
+// node, so the chain every render builds is unchanged (the live-vs-render chain test still walks the same nodes), and a
+// part comes in or drops out on the live desk's glide (setTargetAtTime, RAMP_TC: an 8 ms time constant — no click). The
+// SOURCES still start for a part that is out (AudioEngine.hears() does not know the band), so its hits still reach
+// PERFORM's lanes and a part rejoins on the very next hit, not the next bar. A muted or soloed-out row stays silent
+// whatever the band says (the band is a level under the gate, never a way round it).
 
 /** The master bus level — live and in every render (P2's MASTER_GAIN, AudioEngine.ts then). */
 export const MASTER_GAIN = 0.8;
@@ -121,6 +130,16 @@ export function gateOpen(mixer: Pick<MixerState, 'channels'> | null | undefined,
   return !anySolo(mixer) || c.solo;
 }
 /** The gate value (0 or 1) for each id. */
+/**
+ * MUSIC-SUITE P6: a strip's gate with the band folded in — 0 when the desk closes it (mute / solo), else the band's level
+ * for it (0..1; a strip the band does not name, or no band at all, = 1).
+ */
+export function bandGate(mixer: Pick<MixerState, 'channels'> | null | undefined, band: Readonly<Record<string, number>> | null | undefined, id: string): number {
+  if (!gateOpen(mixer, id)) return 0;
+  const v = band ? band[id] : undefined;
+  return typeof v === 'number' && Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 1;
+}
+
 export function gateGains(mixer: Pick<MixerState, 'channels'> | null | undefined, ids: Iterable<string>): Record<string, 0 | 1> {
   const out: Record<string, 0 | 1> = {};
   for (const id of ids) out[id] = gateOpen(mixer, id) ? 1 : 0;
@@ -334,6 +353,12 @@ export interface MixGraph {
   /** Apply a mixer: every strip's fader / pan / gate / sends and the master fader, at once. */
   setMixer(m: MixerState): void;
   readonly mixer: MixerState;
+  /**
+   * MUSIC-SUITE P6: the BAND — each strip's level under its gate while PERFORM builds the song (bandGate), gliding on the
+   * live desk; null = every strip at 1 (no band). Renders never set one.
+   */
+  setBand(levels: Readonly<Record<string, number>> | null): void;
+  readonly band: Readonly<Record<string, number>> | null;
   /** MASTER: the glue compressor and shelves in front of the limiter, or not. */
   setPolish(on: boolean): void;
   readonly polished: boolean;
@@ -352,6 +377,8 @@ export interface MixGraph {
 export function buildMixGraph(ctx: BaseAudioContext, project: { mixer?: MixerState | null; polish?: boolean } = {}, opts: { live?: boolean } = {}): MixGraph {
   let mixer: MixerState = project.mixer ?? DEFAULT_MIXER;
   let polished = project.polish === true;
+  /** MUSIC-SUITE P6: the band's levels by strip id (null = none: every gate is the desk's alone). */
+  let band: Readonly<Record<string, number>> | null = null;
   const live = opts.live === true;
   /** The last value each param was sent to (a glide's TARGET — `.value` still reads mid-glide, so it is no guide). */
   const targets = new WeakMap<AudioParam, number>();
@@ -422,7 +449,7 @@ export function buildMixGraph(ctx: BaseAudioContext, project: { mixer?: MixerSta
     const c = channelMix(mixer, s.id);
     put(s.fader.gain, c.gain, glide);
     put(s.pan.pan, c.pan, glide);
-    put(s.gate.gain, gateOpen(mixer, s.id) ? 1 : 0, glide);
+    put(s.gate.gain, bandGate(mixer, band, s.id), glide);   // MUSIC-SUITE P6: × the band's level (1 with no band)
     put(s.sendA.gain, c.sendA, glide);
     put(s.sendB.gain, c.sendB, glide);
   };
@@ -466,6 +493,11 @@ export function buildMixGraph(ctx: BaseAudioContext, project: { mixer?: MixerSta
       mixer = m;
       put(bus.gain, MASTER_GAIN * num(m.master, 1, 0, MASTER_FADER_MAX), true);
       for (const s of strips.values()) applyStrip(s);
+    },
+    get band() { return band; },
+    setBand(levels: Readonly<Record<string, number>> | null): void {
+      band = levels;
+      for (const s of strips.values()) put(s.gate.gain, bandGate(mixer, band, s.id), true);
     },
     get polished() { return polished; },
     setPolish(on: boolean): void {

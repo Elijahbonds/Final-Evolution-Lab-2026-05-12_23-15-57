@@ -70,10 +70,17 @@ Two data channels:
 | Channel | Config | Carries |
 |---|---|---|
 | `fel-input` | unordered, `maxRetransmits: 0` | gameplay input |
-| `fel-control` | ordered, reliable | lobby, slot assignment, hello |
+| `fel-control` | ordered, reliable | lobby, slot assignment, hello, room state (opt-in) |
 
 Input is deliberately **unreliable**. For a timing mechanic a late input is worse
 than a lost one, and re-sending a stale tilt sample actively hurts.
+
+**Room state (opt-in, MUSIC-SUITE P6, 2026-09-26).** A config with `roomState: true`
+may send the phone its live state — `{ type: 'state', state: { lit, chips } }`: which
+of the mode's own buttons are lit, and a few short status chips. `HostSession.sendState`
+refuses for any other config, sends only a change, and re-sends the latest when a
+phone's link comes up; the page draws it only for an opted-in config. Rules and
+bounds: `roomState.ts`. Today only the Academy's `music_flip` / `music_perform` opt in.
 
 ---
 

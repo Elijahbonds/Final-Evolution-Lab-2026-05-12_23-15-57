@@ -113,10 +113,13 @@ export function callLanded(s: Stakes, landedTrickIds: readonly string[], made: b
  * what failing it costs, which makes the most interesting decision in the mode a guess the first several
  * times." A risk you cannot price is not a decision, it is a dare. The numbers were always here.
  */
-export function callPreview(trickLabel: string): string {
+export function callPreview(trickLabel: string, input?: string): string {
   const up = Math.round((CALL_BONUS - 1) * 100);
   const down = Math.round((1 - CALL_MISS_SCALE) * 100);
-  return `CALLING ${trickLabel} · LAND IT +${up}% · MISS IT −${down}%`;
+  // IMPROVE (2026-10-06): AND HOW TO THROW IT. The price alone left a call you could not execute unless you already knew the
+  // trick's direction + button; `input` (the mode's words for it, e.g. "D-PAD UP + A") rides along when the mode has it.
+  const how = input ? ` (${input} IN THE AIR)` : '';
+  return `CALLING ${trickLabel}${how} · LAND IT +${up}% · MISS IT −${down}%`;
 }
 
 /** The bezel's attempt chip: "1 OF 3", and the called trick when there is one. */

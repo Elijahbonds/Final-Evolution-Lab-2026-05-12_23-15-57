@@ -16,6 +16,8 @@
 //
 // Pure: no Babylon, no fetch. The fetch lives in playerIdentity.resolveIdentity.
 
+import { clampCosmetic } from './playFrame';
+
 export type HeroBodyKind = 'scan' | 'kit-male' | 'kit-female';
 export type BodyType = 'male' | 'female';
 
@@ -46,21 +48,37 @@ export function bodyTypeOf(v: unknown): BodyType {
   return v === 'female' || v === 'Female' ? 'female' : DEFAULT_BODY_TYPE;
 }
 
+/** Does this account own a scan body? The server's question (the allowlist never leaves it). */
+export function ownsScan(email: string | null | undefined, owners: Set<string>): boolean {
+  return !!email && owners.has(email.trim().toLowerCase());
+}
+
 /**
  * The decision. `email` is the signed-in account's (null for a guest); `frame` is the saved creator frame
  * (`AthleteBuild.frame`), or null when the player has never saved one.
+ *
+ * `preferred` (IMPROVE (2026-10-06), CREATOR-PLAN phase 4a) is the ACTIVE SLOT's body (lib/creator/look/slots.ts), null
+ * when no slot is active. A slot can choose the kit body even on the scan owner's account (his Gojo is not his scan);
+ * `'scan'` is honoured ONLY for an account that owns one — anyone else's `'scan'` is the frame's kit body, as if unset.
  */
-export function decideHeroBody(email: string | null | undefined, owners: Set<string>, frame: Record<string, unknown> | null): HeroBodyKind {
-  if (email && owners.has(email.trim().toLowerCase())) return 'scan';
+export function decideHeroBody(
+  email: string | null | undefined, owners: Set<string>, frame: Record<string, unknown> | null,
+  preferred: 'male' | 'female' | 'scan' | null = null,
+): HeroBodyKind {
+  if (preferred === 'male') return 'kit-male';
+  if (preferred === 'female') return 'kit-female';
+  if (ownsScan(email, owners)) return 'scan';
   return bodyTypeOf(frame?.bodyType) === 'female' ? 'kit-female' : 'kit-male';
 }
 
-/** The creator frame's three scales (percent on the rows) as the multipliers applyIdentity takes; null when unset. */
-export function proportionsFromFrame(frame: Record<string, unknown> | null): { heightScale: number; buildScale: number; reachScale: number } | null {
+/** The creator frame's scales (percent on the rows) as the multipliers applyIdentity takes; null when unset. REACH-FREEZE
+ *  (2026-09-29): height and build clamp to the cosmetic range (a save made at the old 88–118 % loads, clamped), and reach is 1
+ *  whatever the frame carries — a saved reachScale is ignored, never migrated. */
+export function proportionsFromFrame(frame: Record<string, unknown> | null): { heightScale: number; buildScale: number; reachScale: 1 } | null {
   if (!frame) return null;
   const pct = (k: string) => {
     const v = frame[k];
     return typeof v === 'number' && Number.isFinite(v) && v > 0 ? v / 100 : 1;
   };
-  return { heightScale: pct('heightScale'), buildScale: pct('buildScale'), reachScale: pct('reachScale') };
+  return { heightScale: clampCosmetic(pct('heightScale'), 'height'), buildScale: clampCosmetic(pct('buildScale'), 'build'), reachScale: 1 };
 }

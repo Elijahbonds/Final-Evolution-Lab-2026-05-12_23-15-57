@@ -52,14 +52,44 @@
 // athlete who cannot go deeper still finishes the set, and the review says the depth was shallow instead of pretending
 // the reps were full ones.
 import type { SquatFault, SquatFrameResult, SquatPhase } from '@/lib/babylon/nexus/neuro-mirror/rules/squat-audit';
+import { pacerCycleSec, type PacerSpec } from '@/lib/breath/pacer';
 
 export type SquatStage = 'breathe' | 'check' | 'work' | 'review';
 
 export const SQUAT_CHECK_REPS = 3;
 export const SQUAT_WORK_REPS = 8;
-/** inhale 4 s · hold 2 s · exhale 6 s, per the book's cadence (the pacer in mirror-harness.tsx animates the same). */
+/** inhale 4 s · hold 2 s · exhale 6 s, BREATH_CYCLES times — SQUAT_BREATH_PACER below is the one place those numbers live. */
 export const BREATH_CYCLES = 3;
-export const BREATH_CYCLE_MS = 12_000;
+
+/**
+ * The breathe-first stage's pacer, as the one pacer's spec (lib/breath/pacer.ts) — MIRROR-COACH P7, 2026-09-29.
+ * The count is unchanged: in 4, hold 2, out 6, BREATH_CYCLES breaths, from the stage's first frame (0 on the stage's
+ * clock). What changed is who draws it: the harness used to show a CSS ring looping every 12 s from the moment the div
+ * mounted (app/globals.css .fel-breath), beside this stage's own pose clock, with no count. It now draws this spec with
+ * the shared pacer (components/breath/Pacer.tsx) at breathElapsedSec — the same clock stepSquatSession ends the stage
+ * on, so the last breath out ends on the frame the check begins. lib/breath/pacer.test.ts holds the spec to BREATH_CYCLE_MS
+ * and steps a 30 fps session to show the pacer ends on the very frame the stage hands over.
+ */
+export const SQUAT_BREATH_PACER: PacerSpec = { from: 0, inSec: 4, holdSec: 2, outSec: 6, rounds: BREATH_CYCLES };
+
+/**
+ * One breath of the stage, in ms — DERIVED from SQUAT_BREATH_PACER (MIRROR-COACH P7 FIX, 2026-09-29, review). It was a
+ * second hand-typed 12_000 beside the spec, which stepSquatSession ends the stage on, held to the spec only by a test;
+ * and the harness's stage line hard-coded "4s · hold 2s · out slow 6s" beside the ring drawing the spec. Changing the
+ * spec's seconds would have left the stage's length and its words disagreeing with its ring. Now the spec is the one
+ * source: this constant, the stage's end and squatBreathLine all read it.
+ */
+export const BREATH_CYCLE_MS = pacerCycleSec(SQUAT_BREATH_PACER) * 1000;
+
+/** The breathe stage's direction under the picture, from the spec (the harness renders it after "Breathe first."). */
+export const squatBreathLine = (s: PacerSpec = SQUAT_BREATH_PACER): string =>
+  `In through the nose ${s.inSec}s${s.holdSec > 0 ? ` · hold ${s.holdSec}s` : ''} · out slow ${s.outSec}s, ${s.rounds} cycles.`;
+
+/** Seconds into the breathe stage on the pose clock at `nowMs` (0 before its first frame). */
+export function breathElapsedSec(state: Pick<SquatSessionState, 'breatheStartMs'>, nowMs: number): number {
+  if (state.breatheStartMs === null || !Number.isFinite(nowMs)) return 0;
+  return Math.max(0, (nowMs - state.breatheStartMs) / 1000);
+}
 
 export interface SquatSessionState {
   stage: SquatStage;
@@ -141,7 +171,11 @@ export interface SquatStep {
   stageChanged: boolean;
   /** The check's findings grew on this frame. */
   findingsChanged: boolean;
-  /** The faults to hand the cue engine on this frame (work set only, and only when something faulted), else null. */
+  /**
+   * The faults to hand the cue engine on this frame: work set only, with a body in frame — [] on a clean frame (MIRROR-COACH
+   * P9 fix: it was null unless something faulted, so the coach never saw the athlete fix a fault and "There it is. Own
+   * it." could only land on another fault's frame) — else null.
+   */
   cueFaults: SquatFault[] | null;
   /** Say SQUARE_UP_LINE on this frame: the stage that just ended was read off square the whole way (once a session). */
   squareUp: boolean;
@@ -223,7 +257,7 @@ export function stepSquatSession(prev: Readonly<SquatSessionState>, input: Squat
       const grown = [...findings, ...frameFaults.filter((f) => !findings.includes(f))];
       if (grown.length !== findings.length) { findings = [...new Set(grown)]; findingsChanged = true; }
     }
-    if (stage === 'work' && input.faults.length) cueFaults = [...input.faults];
+    if (stage === 'work' && input.present) cueFaults = [...input.faults];
     // the work set remembers what each rep did, so the review can say whether a cued fault was still there at the end
     const fresh = stage === 'work' && input.present ? frameFaults.filter((f, i, all) => !repFaults.includes(f) && all.indexOf(f) === i) : [];
     if (fresh.length) repFaults = [...repFaults, ...fresh];
@@ -268,8 +302,12 @@ export function stepSquatSession(prev: Readonly<SquatSessionState>, input: Squat
  * overlay painted "KNEES OUT" during the breath and the movement check too, correcting the athlete during the very
  * measurement the review's "did the correction hold" is judged against.
  */
-export function paintableFaults<F extends string>(stage: SquatStage, cueable: readonly F[]): F[] {
-  return stage === 'work' ? [...cueable] : [];
+export function paintableFaults<F extends string>(stage: SquatStage, cueable: readonly F[], shownThisRep?: (f: F) => boolean): F[] {
+  // MIRROR-COACH P9 fix (2026-09-30, code review): the fade quieted only the voice, and the painter still flagged a
+  // fault on every rep whatever its schedule (a fault faded to 'summaryOnly' was painted red on every frame). The fade's
+  // reason — feedback that never thins out is what the athlete leans on — is the same for the picture, so the painter
+  // takes the voice's rule (the harness passes CueEngine.isVoiceable): painted on the reps the coach may speak on.
+  return stage === 'work' ? cueable.filter((f) => !shownThisRep || shownThisRep(f)) : [];
 }
 
 // ── the knee record ────────────────────────────────────────────────────────────────────────────────────────────────

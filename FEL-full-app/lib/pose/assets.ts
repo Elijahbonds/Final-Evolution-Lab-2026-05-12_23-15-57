@@ -2,8 +2,11 @@
 //
 // Owner decision: serve them ourselves, no third-party requests. public/pose/ holds a copy of the tasks-vision wasm
 // (from node_modules, the same version the JS bundle is built from) and the two pose models; public/pose/README.md has
-// their source, version, sizes and license. The CDN stays only as the fallback for a deploy where our copy is missing
-// (a 404 or 410, nothing else), so a stale deploy falls back to today's behaviour instead of breaking the camera.
+// their source, version, sizes and license.
+//
+// SCREEN-FIX-2 (2026-09-29, Cyber F3): NO CDN FALLBACK OF ANY KIND. The resolver always answers our own copy; a missing
+// or failing file is a model that did not load (the camera card's retry), never a request to another origin. The HEAD
+// probe (headProbe, AssetProbe, the constructor's probe) is no longer consulted; it stays so no caller has to change.
 //
 // Pure apart from headProbe (a fetch). The pose adapter and face scan both resolve through here.
 
@@ -14,7 +17,6 @@
 export const VISION_VERSION = '0.10.35';
 
 export const LOCAL_WASM_BASE = '/pose/wasm';
-export const CDN_WASM_BASE = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${VISION_VERSION}/wasm`;
 
 /**
  * FilesetResolver loads `vision_wasm_internal.{js,wasm}`, or the `_nosimd_` pair on a browser without wasm SIMD. Both
@@ -32,8 +34,6 @@ export type PoseModel = 'lite' | 'full';
 export const POSE_MODEL_BYTES: Record<PoseModel, number> = { lite: 5_777_746, full: 9_398_198 };
 
 export const localModelUrl = (m: PoseModel) => `/pose/models/pose_landmarker_${m}.task`;
-export const cdnModelUrl = (m: PoseModel) =>
-  `https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_${m}/float16/1/pose_landmarker_${m}.task`;
 /** What recordings and stats call the model, since lite and full landmarks differ. */
 export const poseModelName = (m: PoseModel) => `pose_landmarker_${m}/float16/1`;
 
@@ -59,7 +59,7 @@ export const headProbe: AssetProbe = async (url) => {
   }
 };
 
-/** Our copy unless the server says it is missing, then the CDN. Each URL is probed once per page. */
+/** Our copy, always: a missing file fails as a model that did not load (SCREEN-FIX-2, see the header). */
 export class AssetResolver {
   private readonly seen = new Map<string, Promise<boolean>>();
   constructor(private readonly probe: AssetProbe = headProbe) {}
@@ -71,14 +71,13 @@ export class AssetResolver {
     return p;
   }
 
-  /** The folder FilesetResolver.forVisionTasks() takes. Probed on the SIMD loader, the file every current browser asks for. */
+  /** The folder FilesetResolver.forVisionTasks() takes. */
   async wasmBase(): Promise<string> {
-    return (await this.has(`${LOCAL_WASM_BASE}/${LOCAL_WASM_FILES[0]}`)) ? LOCAL_WASM_BASE : CDN_WASM_BASE;
+    return LOCAL_WASM_BASE;
   }
 
   async poseModel(m: PoseModel): Promise<string> {
-    const local = localModelUrl(m);
-    return (await this.has(local)) ? local : cdnModelUrl(m);
+    return localModelUrl(m);
   }
 }
 

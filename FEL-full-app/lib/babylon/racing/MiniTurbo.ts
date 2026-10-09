@@ -27,10 +27,19 @@ export function tierFor(held: number): MiniTier {
   return held >= MINI_TIERS[2] ? 3 : held >= MINI_TIERS[1] ? 2 : held >= MINI_TIERS[0] ? 1 : 0;
 }
 
-export function stepMini(s: MiniState, drifting: boolean, quality: number, dt: number): MiniStep {
-  if (!drifting) {
+export function stepMini(s: MiniState, drifting: boolean, quality: number, dt: number, driftHeld?: boolean): MiniStep {
+  // The button is the release. When the caller omits it, the slide ending is
+  // still the release — existing tests and any mode that has not opted in
+  // keep that. Velocity Kart passes the drift button: physics ending while
+  // the button is held does not fire, and letting go does.
+  const charging = driftHeld === undefined ? drifting : driftHeld && drifting;
+  const release = driftHeld === undefined ? !drifting : !driftHeld;
+  if (release) {
     const released = s.sliding && s.tier > 0 ? s.tier : null;
     return { state: noMini(), tierUp: null, released };
+  }
+  if (!charging) {
+    return { state: s, tierUp: null, released: null };
   }
   const held = s.held + (quality >= MINI_CLEAN ? Math.max(0, dt) : 0);
   const tier = tierFor(held);

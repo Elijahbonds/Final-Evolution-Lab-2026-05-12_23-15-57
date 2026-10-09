@@ -84,7 +84,7 @@ export const MP_MODES: { key: string; label: string }[] = [
   { key: 'karate', label: 'The Hundred' },
   { key: 'mixedcombat', label: 'Mixed Rules' },
   { key: 'dunkduel', label: 'Prove It' },
-  { key: 'who-scene-it', label: 'Who Scene It' },
+  { key: 'who-scene-it', label: 'Spot the Scene' },
 ];
 
 // Challenge key → the `mode` a GameSession is stored under (the GameShell prop). Measured 2026-09-04: twelve of the

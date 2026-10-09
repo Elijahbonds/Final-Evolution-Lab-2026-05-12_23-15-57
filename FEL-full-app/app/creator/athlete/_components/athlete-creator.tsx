@@ -9,10 +9,14 @@
 // SECTIONS WITHOUT ROWS SAY SO. A creator that opens a blank "Ink" page has told the player it is broken;
 // one that says "not built yet" has told them the truth, and the truth is cheaper to trust.
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import CreatorEditor from '@/components/creator/editor/creator-editor';
-import { bindPreview } from '@/lib/creator/editor/previewBinding';
+import { bindPreview, bindFace } from '@/lib/creator/editor/previewBinding';
+import { clipForChoice } from '@/lib/creator/schema/animations';
+import { LookConsent } from '@/components/creator/look-consent';
+import { creatorDeviceLook, overlayDeviceLook, readConsent, readLocalLook, writeConsent, writeLocalLook, type StoredConsent } from '@/lib/creator/localLook';
+import { athleteSaveRequest, decideLookHold } from '@/lib/creator/lookPrivacy';
 
 // The preview pulls Babylon in; it must not be in the page's first bundle, and it cannot render on the
 // server at all.
@@ -20,6 +24,7 @@ const CreatorPreview = dynamic(() => import('@/components/creator/editor/creator
 import { SIDEBAR } from '@/lib/creator/schema/sections';
 import { resolve, LOOK_SECTIONS, type CreatorBuild, type Issue } from '@/lib/creator/schema/resolve';
 import { emptyAthleteProfile, exportProfile, importProfile } from '@/lib/creator/schema/athleteProfile';
+import { normalizeVitals } from '@/lib/creator/schema/vitals';
 import type { RowValue } from '@/lib/creator/editor/rowState';
 import type { PrqAxisId } from '@/lib/creator/schema/types';
 
@@ -27,11 +32,13 @@ interface Props {
   /** The athlete's measured axes, resolved server-side. Null for someone with no scan — never a penalty. */
   axes: Partial<Record<PrqAxisId, number>> | null;
   profileId: string;
+  /** Verified 18+. Anyone else keeps the look on this device. */
+  adult?: boolean;
 }
 
 type Values = Record<string, Record<string, RowValue>>;
 
-export default function AthleteCreator({ axes, profileId }: Props) {
+export default function AthleteCreator({ axes, profileId, adult = false }: Props) {
   const [openKey, setOpenKey] = useState<string>('attributes');
   const [values, setValues] = useState<Values>({});
   const [note, setNote] = useState<string>('');
@@ -42,6 +49,10 @@ export default function AthleteCreator({ axes, profileId }: Props) {
   /** What the save came back with — a confirmation, a refusal, or the server's own list of violations. */
   const [saveNote, setSaveNote] = useState<string>('');
   const [serverIssues, setServerIssues] = useState<Issue[]>([]);
+  const [poseClip, setPoseClip] = useState<string | null>(null);
+  const [consent, setConsent] = useState<StoredConsent>({ saveLookNumbers: false, modelTraining: false });
+  const [isAdult, setIsAdult] = useState(adult);
+  const ready = useRef(false);
 
   const entry = SIDEBAR.find((s) => s.key === openKey) ?? SIDEBAR[6];
 
@@ -52,6 +63,7 @@ export default function AthleteCreator({ axes, profileId }: Props) {
     traits: numeric(values.traits),
     hotZones: strings(values.hotZones),
     mechanics: nullableStrings(values.mechanics),
+    animations: nullableStrings(values.animations),
     // The cosmetic sections go in under one key, the way the resolver walks them — the shell does not
     // name Vitals or Gear individually, so a new one appears here without this file being edited.
     look: Object.fromEntries(Object.keys(LOOK_SECTIONS).map((k) => [k, values[k] ?? {}])),
@@ -74,19 +86,38 @@ export default function AthleteCreator({ axes, profileId }: Props) {
         if (!r.ok) return;                       // 401 guest, 503 un-pushed schema: start on defaults
         const body = await r.json();
         if (dead || !body?.values) return;
-        setValues(body.values as Values);
-        if (typeof body.plate === 'string') setPlate(body.plate);
+        const savedConsent = readConsent();
+        const serverAdult = body.adult === true;
+        setIsAdult(serverAdult);
+        setConsent(savedConsent);
+        const hold = decideLookHold(serverAdult, savedConsent.saveLookNumbers, savedConsent.modelTraining);
+        const local = readLocalLook();
+        const filled = overlayDeviceLook(body.values as Values, typeof body.plate === 'string' ? body.plate : '', local, hold);
+        const nextValues: Values = {};
+        for (const [section, rows] of Object.entries(filled.values)) if (rows) nextValues[section] = rows;
+        setValues(nextValues);
+        setPlate(filled.plate);
+        ready.current = true;
       } catch { /* offline: the editor still works, it just starts empty */ }
     })();
     return () => { dead = true; };
   }, []);
+
+  // Under 18 the server never keeps the face. Write it here so a refresh before Finalize still has it.
+  useEffect(() => {
+    if (!ready.current) return;
+    writeLocalLook(creatorDeviceLook(values, plate, readLocalLook(), bindFace(values.appearance)));
+  }, [values, plate]);
 
   const doSave = useCallback(async () => {
     setSaving(true); setSaveNote(''); setServerIssues([]);
     try {
       const r = await fetch('/api/v1/creator/athlete', {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ values, plate }),
+        body: JSON.stringify(athleteSaveRequest({
+          adult: isAdult, values, plate,
+          saveLookNumbers: consent.saveLookNumbers, modelTraining: consent.modelTraining,
+        })),
       });
       const body = await r.json().catch(() => ({}));
       if (r.status === 422) {
@@ -110,17 +141,22 @@ export default function AthleteCreator({ axes, profileId }: Props) {
     } finally {
       setSaving(false);
     }
-  }, [values, plate]);
+    writeLocalLook(creatorDeviceLook(values, plate, readLocalLook(), bindFace(values.appearance)));
+  }, [values, plate, consent, isAdult]);
 
   const onChange = useCallback((section: string, rowId: string, next: RowValue) => {
     setValues((v) => ({ ...v, [section]: { ...(v[section] ?? {}), [rowId]: next } }));
+    if (section === 'animations' && typeof next === 'string') {
+      const clip = clipForChoice(next);
+      if (clip) setPoseClip(clip);
+    }
   }, []);
 
   const doExport = useCallback(() => {
     const p = emptyAthleteProfile(profileId, new Date().toISOString());
     p.attributes = build.attributes; p.tendencies = build.tendencies ?? {};
     p.traits = build.traits; p.hot_zones = build.hotZones ?? {};
-    p.mechanics = build.mechanics ?? {}; p.prq = axes;
+    p.mechanics = build.mechanics ?? {}; p.animations = build.animations ?? {}; p.prq = axes;
     p.vitals = values.vitals ?? {}; p.appearance = values.appearance ?? {}; p.body = values.body ?? {};
     // Accessories rides in `gear`: the profile has no separate field for it, both sections are wearable
     // slots keyed by row id, and the ids are unique across the two — so the merge is lossless and the
@@ -145,7 +181,8 @@ export default function AthleteCreator({ axes, profileId }: Props) {
       traits: r.profile.traits as Record<string, RowValue>,
       hotZones: r.profile.hot_zones as Record<string, RowValue>,
       mechanics: r.profile.mechanics as Record<string, RowValue>,
-      vitals: r.profile.vitals as Record<string, RowValue>,
+      animations: (r.profile.animations ?? {}) as Record<string, RowValue>,
+      vitals: normalizeVitals(r.profile.vitals) as Record<string, RowValue>,   // REACH-FREEZE: an old file's Height/Build clamped, no Reach
       appearance: r.profile.appearance as Record<string, RowValue>,
       body: r.profile.body as Record<string, RowValue>,
       // Split back out by asking each table which ids are its own, rather than by remembering the merge.
@@ -187,17 +224,28 @@ export default function AthleteCreator({ axes, profileId }: Props) {
           <input id="plate" value={plate} onChange={(e) => setPlate(e.target.value)} placeholder="SURNAME"
             maxLength={12} className="w-40 rounded-lg bg-black/40 px-2 py-1 font-mono text-xs uppercase text-white placeholder:text-white/25" />
           <span className="font-mono text-[10px] text-white/35">{binding.jersey.name || '—'} · #{binding.jersey.number}</span>
+          <LookConsent adult={isAdult} consent={consent} onChange={(next) => { setConsent(next); writeConsent(next); }} />
         </div>
 
       <main className="min-h-[70vh] flex-1 rounded-2xl bg-white/[0.02]">
         {entry.table ? (
           <CreatorEditor
+            key={entry.key}
             table={entry.table}
             values={values[entry.key] ?? {}}
             onChange={(rowId, next) => onChange(entry.key, rowId, next)}
             axes={axes}
             issues={resolution.issues.filter((i) => i.section === entry.key)}
-            preview={<CreatorPreview binding={binding} />}
+            meters={[
+              `${resolution.budgets.attributePointsSpent} attribute points spent of ${resolution.budgets.attributePointsCap}`,
+              `${resolution.budgets.traitPointsSpent} trait points spent of ${resolution.budgets.traitPointsCap}`,
+            ]}
+            onFocus={(rowId) => {
+              if (entry.key !== 'animations') return;
+              const clip = clipForChoice(values.animations?.[rowId] as string | null);
+              if (clip) setPoseClip(clip);
+            }}
+            preview={<CreatorPreview binding={binding} poseClip={poseClip} />}
           />
         ) : entry.key === 'export' ? (
           <div className="p-4">

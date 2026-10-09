@@ -28,6 +28,28 @@ jobs:
         working-directory: FEL-full-app
     steps:
       - uses: actions/checkout@v4
+      # MERGE TRAIN (owner, 2026-10-01): a PR against lane/finish-release goes red once it is 24h behind the
+      # lane tip, so a stale branch surfaces before review instead of rotting green. Warning-only on the
+      # event where the base SHA is unavailable. Needs history to measure 'behind'.
+      - name: Staleness — a PR 24h behind the lane tip flags red
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch --no-tags origin lane/finish-release "$GITHUB_BASE_REF" 2>/dev/null || true
+          BASE="${{ github.event.pull_request.base.sha }}"
+          if ! git cat-file -e "$BASE" 2>/dev/null; then
+            echo "::warning::base SHA not fetched; staleness not measured"
+            exit 0
+          fi
+          BEHIND=$(git rev-list --count HEAD..origin/lane/finish-release 2>/dev/null || echo 0)
+          TIP_TS=$(git log -1 --format=%ct origin/lane/finish-release 2>/dev/null || echo 0)
+          BASE_TS=$(git log -1 --format=%ct "$BASE" 2>/dev/null || echo "$TIP_TS")
+          AGE_H=$(( (TIP_TS - BASE_TS) / 3600 ))
+          echo "behind=$BEHIND base_age_hours=$AGE_H"
+          echo "behind=$BEHIND base_age_hours=$AGE_H" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$BEHIND" -gt 0 ] && [ "$AGE_H" -ge 24 ]; then
+            echo "::error::This branch is $BEHIND commit(s) behind lane/finish-release and its base is ${AGE_H}h old (≥24h). Merge origin/lane/finish-release (or rebase if never pushed) to pick up the lane before review."
+            exit 1
+          fi
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -38,7 +60,8 @@ jobs:
       # regenerates it in the cloud). npm ci's postinstall has just regenerated it from the committed schema copy, so the third
       # check in lib/db/prismaSchemaSync.test.ts only ever saw a fresh client and could not fail. If regenerating changed the
       # committed client's schema, the commit is missing the regenerated client. Only schema.prisma is compared: index.js and
-      # edge.js embed the absolute output path, which differs per machine; schema.prisma is Prisma's formatted copy of the
+      # edge.js record the generating machine's native binaryTarget (darwin-arm64 on the Macs that commit it, debian here;
+      # their paths are repo-relative since scripts/prisma-generate.mjs, #59); schema.prisma is Prisma's formatted copy of the
       # schema and regenerates byte-identically (measured locally on 6.7.0).
       - name: generated Prisma client is committed in sync
         run: git diff --exit-code -- public/_prisma/client/schema.prisma
@@ -50,9 +73,14 @@ jobs:
       # The copy is regenerated from the source: if that changed a committed file, the commit is missing it.
       - name: deploy Prisma schema is committed in sync
         run: git diff --exit-code -- public/_prisma/schema.prisma
-      - run: npx prisma generate
+      # npm run prisma:generate = prisma generate + scripts/prisma-generate.mjs (keeps the generated paths repo-relative).
+      - run: npm run prisma:generate
       - name: type-check
         run: npx tsc --noEmit
+      - name: lint
+        run: npm run lint
+      - name: mode list matches registry
+        run: npx tsx scripts/mode-list-check.ts
       - name: unit tests
         run: npx vitest run
       # THE HEADLESS SUITES. Until 2026-09-16 these ran nowhere: CI was tsc + vitest +

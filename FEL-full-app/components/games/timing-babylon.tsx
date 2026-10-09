@@ -8,14 +8,33 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import type { GameProps, GameResult } from './game-shell';
+import { useBabylonPlaytestBridge } from './use-babylon-playtest-bridge';
 import { BootSplash } from './boot-splash';
+import { surfaceBootError } from './boot-error';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode } from './hud-format';
-import { timingWon } from './timing-won';
+import { timingMaxCombo } from './timing-combo';
+import { timingGameResult } from '@/lib/sessions/gameResultFromSession';
 import { CUE_LOOKAHEAD_SEC, CUE_LINGER_SEC, type HudCue } from '@/lib/babylon/core/danceTracks';
 import { ACCURACY_CENTER as GOLF_ACC_CENTER, ACCURACY_HALF as GOLF_ACC_HALF } from '@/lib/babylon/core/golfHud';
+import { breakawayLine } from '@/lib/babylon/core/penaltyHud';   // IMPROVE (2026-10-06, Penalty #12)
+// MUSIC-SUITE P7 (2026-09-29), room-mix-ux: the Cypher's instrument chips (replacing the MIX bar) and its paused-
+// screen MIX sliders. Dance-only — gated below on hud.instruments / modeKey==='dance', so every other timing sport
+// this host also drives (tennis, derby, penalty, golf, volleyball) renders exactly as before.
+import { decodeInstrumentChips } from '@/lib/babylon/dance/ui/InstrumentChips';
+import { VolumeMixer } from '@/lib/audio/ui/VolumeMixer';
+// MUSIC-SUITE P8 (2026-09-25): Stoop's caption — the same shared caption layer THE MIC's hoops modes already draw
+// with (mic-caption.tsx's <MicCaption>, reading hud.mic/hud.micWho); DanceMode.ts is the only mode this host also
+// drives that ever sets those two fields, so gating on modeKey === 'dance' is a formality (MicCaption already
+// renders nothing for an empty `text`), kept for the same reason every other dance-only block here is gated.
+import { MicCaption } from './mic-caption';
+// IMPROVE (2026-10-06, the Cypher's #8): GO AGAIN in place for dance — the room runs `continuous` (its finish reports a
+// card and the stage stays up) and the shell's REPLAY goes back to its pick screen (DanceMode.replayDance) instead of
+// rebooting the engine. Dance only: every other timing sport this host drives ends and remounts exactly as before.
+import { useReplayInPlace } from './replay-in-place';
+import { replayDance } from '@/lib/babylon/modes/DanceMode';
 /** GOLF UPGRADE: the meter's carry lines arrive as '0,6,12,…' (eleven tenths). */
 const ticksOf = (v: unknown): number[] => (typeof v === 'string' && v ? v.split(',').map(Number) : []);
 
@@ -34,7 +53,7 @@ type Hud = Record<string, HudValue>;
 export interface TimingHostOpts {
   /** Registry key: 'tennis' | 'derby' | 'penalty' | 'golf'. */
   modeKey: string;
-  /** One-line control hint shown on the TAP TO START overlay. */
+  /** One-line control hint shown on the CONTROLS panel (READY and pause) when the mode writes none of its own. */
   hint: string;
   /** Label on the big swing button (e.g. SWING / STRIKE / KICK). */
   swingLabel: string;
@@ -50,10 +69,13 @@ export function makeTimingHost(opts: TimingHostOpts) {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const busRef = useRef<InputBus | null>(null);
     const endedRef = useRef(false);
+    const onEndRef = useRef(onEnd);
+    onEndRef.current = onEnd;
     const [phase, setPhase] = useState<ModePhase>('loading');
     const [countdown, setCountdown] = useState<number | null>(null);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [hud, setHud] = useState<Hud>({});
+    useBabylonPlaytestBridge(modeKey, () => ({ phase, countdown, loadError, hud }), busRef.current);
 
     useEffect(() => {
       const canvas = canvasRef.current;
@@ -70,24 +92,20 @@ export function makeTimingHost(opts: TimingHostOpts) {
         // `hits/rounds CLEAN` — an outcome and stats none of these five modes send — so no run here was ever a win.
         const st = r.stats ?? {};
         const n = (k: string, d = 0) => Number(st[k] ?? d);
-        // HOTFIX (2026-09-24): the verdict is a pure function now (./timing-won) — three Story bosses complete on it.
-        const won = timingWon(r.outcome, st);
+        const base = timingGameResult(r, { headline: '', modeKey });
+        const won = base.won;
         const headline = modeKey === 'tennis' ? `${won ? 'MATCH WON' : 'MATCH LOST'} · ${r.score} GAMES · ${n('style')} STYLE${st.rackets !== undefined ? ` · ${n('rackets')} RACKETS LEFT` : ''}`
           : modeKey === 'volleyball' ? `${won ? 'SET WON' : 'SET LOST'} · ${r.score} PTS · ${n('style')} STYLE`
           : modeKey === 'golf' ? `${won ? 'CARD IN — UNDER PAR' : 'CARD IN'} · ${n('overPar') > 0 ? '+' : ''}${n('overPar')} · ${n('holes')} HOLES · ${n('pickUps')} PICK-UPS`
-          : modeKey === 'derby' ? `${won ? 'DERBY CHAMPION' : 'DERBY OVER'} · ${n('homers')} HOMERS · ${n('outs')} OUTS · ${Math.round(n('longestFt'))} FT`
-          : modeKey === 'penalty' ? `${won ? 'SHOOTOUT WON' : 'SHOOTOUT LOST'} · ${n('goals')}–${n('themGoals')} · ${n('stylePts')} STYLE`
+          // IMPROVE (2026-10-06, Derby #2): the derby ends WIN / LOSS against the rival's round (the mode's `beatRival`); the
+          // posted `won` (timingWon: three homers, the Story's Diamond goal) is unchanged
+          : modeKey === 'derby' ? `${st.beatRival !== undefined ? (n('beatRival') ? 'BEAT THE RIVAL' : 'RIVAL TAKES IT') : won ? 'DERBY CHAMPION' : 'DERBY OVER'} · ${n('homers')}–${n('rivalHomers')} HR · ${n('outs')} OUTS · ${Math.round(n('longestFt'))} FT`
+          // IMPROVE (2026-10-06, Penalty #12): and the breakaway's tricks, when there were any (penaltyHud.breakawayLine)
+          : modeKey === 'penalty' ? `${won ? 'SHOOTOUT WON' : 'SHOOTOUT LOST'} · ${n('goals')}–${n('themGoals')} · ${n('stylePts')} STYLE${breakawayLine(st) ? ` · ${breakawayLine(st)}` : ''}`
+          // IMPROVE (2026-10-06): the Cypher's card names a full combo (#6) and the run's STYLE (#10 / #13)
+          : modeKey === 'dance' && n('rounds') ? `${n('fullCombo') ? 'FULL COMBO · ' : ''}${n('hits')}/${n('rounds')} CLEAN · ${r.score} PTS${n('style') ? ` · ${n('style')} STYLE` : ''}`
           : (n('rounds') ? `${n('hits')}/${n('rounds')} CLEAN · ${r.score} PTS` : `${r.score} PTS`);
-        const result: GameResult = {
-          score: r.score,
-          stats: r.stats, outcome: r.outcome,   // pass 5 phase 3: the proof line reads these
-          opponentScore: modeKey === 'penalty' ? n('themGoals') : 0,
-          won,
-          duration: r.durationSec,
-          headline,
-          maxCombo: n('hits'),
-        };
-        onEnd(result);
+        onEndRef.current({ ...base, headline, maxCombo: timingMaxCombo(st) });
       };
 
       const def = MODES[modeKey];
@@ -112,12 +130,14 @@ export function makeTimingHost(opts: TimingHostOpts) {
           },
           onHud: (u) => setHud((prev) => ({ ...prev, ...u })),
           resultSink,
+          // IMPROVE (#8): dance reports through card() and keeps its stage for REPLAY; the same sink takes either
+          ...(modeKey === 'dance' ? { continuous: true, cardSink: resultSink } : {}),
         })
           .then((s) => {
             if (disposed) { s(); return; }
             stop = s;
           })
-          .catch((e) => console.error(`[${tag}] boot failed`, e));
+          .catch((e) => surfaceBootError(e, { disposed, label: `[${tag}] boot failed`, setPhase, setLoadError }));
       }, 0);
 
       return () => {
@@ -126,11 +146,21 @@ export function makeTimingHost(opts: TimingHostOpts) {
         stop?.();
         busRef.current = null;
       };
-    }, [onEnd]);
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- G7: the stage is owned by the mount; callbacks are read through refs.
+    }, []);
 
     const emit = useCallback((e: Parameters<InputBus['emit']>[0]) => {
       busRef.current?.emit(e);
     }, []);
+
+    // IMPROVE (#8): REPLAY on the shell's end card goes back to the Cypher's pick screen on this stage. Any other mode's
+    // restart answers false, which is the shell's "remount as before".
+    const restart = useCallback((): boolean => {
+      const ok = modeKey === 'dance' && replayDance();
+      if (ok) endedRef.current = false;
+      return ok;
+    }, []);
+    useReplayInPlace(restart);
 
     const tapStart = useCallback(() => {
       emit({ t: 'button', btn: 'START', pressed: true });
@@ -152,6 +182,10 @@ export function makeTimingHost(opts: TimingHostOpts) {
               <span className="h-2 w-20 overflow-hidden rounded-full bg-black/50"><span className={`block h-full rounded-full transition-[width] duration-150 ${Number(hud.flow) >= 70 ? 'bg-[#fbbf24]' : 'bg-[var(--fel-cyan)]/80'}`} style={{ width: `${Math.max(0, Math.min(100, Number(hud.flow)))}%` }} /></span>
               {typeof hud.kinetic === 'string' && hud.kinetic ? <span className="text-[10px] font-bold text-[#fbbf24]">{hud.kinetic}</span> : null}
             </span>
+          )}
+          {/* IMPROVE (2026-10-06): volleyball's block cooldown as a ready chip — it only showed as a refusal after the press. Key-gated. */}
+          {typeof hud.blockReady === 'string' && hud.blockReady && (
+            <span className={`fel-panel px-3 py-1 text-[10px] font-bold tracking-wider ${hud.blockReady === 'READY' ? 'text-[#7CFFB2]' : 'text-white/50'}`}>B BLOCK {hud.blockReady}</span>
           )}
           {/* M42 E20: numeric score gets " PTS"; string scores (e.g. "2 GOALS") render as-is */}
           <span className="rounded-md bg-black/50 px-3 py-1 text-white">{typeof hud.score === 'number' ? `${hud.score} PTS` : hnode(hud.score, '0 PTS')}</span>
@@ -194,6 +228,30 @@ export function makeTimingHost(opts: TimingHostOpts) {
                 )}
               </span>
             )}
+          </div>
+        )}
+
+        {/* MUSIC-SUITE P7 (2026-09-29), room-mix-ux: THE INSTRUMENT CHIPS — replaces the one MIX bar above for the
+            Cypher only (DanceMode.ts stopped publishing hud.energy/energyLabel; every other timing sport is
+            untouched by this block). One chip per instrument the CURRENT SONG calls for: gold + filled once earned,
+            dim while ducked, and marked FEL when the chart has no move in that category this run (contract (a)'s
+            "FEL's band filling missing parts" — the fill itself is a separate, bigger task; this only has to be able
+            to SHOW that state the day it lands). Sits where the MIX bar sat (left-4 top-14), well clear of the cue
+            lane below at bottom-[34%] — the HUD area movement play's P9 body cue lane needs stays free. */}
+        {typeof hud.instruments === 'string' && hud.instruments && (
+          <div className="pointer-events-none absolute left-4 top-14 flex max-w-[220px] flex-wrap gap-1.5">
+            {decodeInstrumentChips(hud.instruments).map((c) => (
+              <span
+                key={c.id}
+                className={`rounded-full px-2 py-0.5 font-mono text-[10px] font-bold tracking-wider transition-colors duration-200 ${
+                  c.state === 'earned' ? 'bg-[var(--fel-gold)] text-black'
+                    : c.state === 'fel' ? 'border border-white/20 text-white/35'
+                    : 'bg-black/50 text-white/50'
+                }`}
+              >
+                {c.label}{c.state === 'fel' ? ' · FEL' : ''}
+              </span>
+            ))}
           </div>
         )}
 
@@ -467,6 +525,7 @@ export function makeTimingHost(opts: TimingHostOpts) {
 
         <BootSplash
           modeId={modeKey}
+          controls={opts.hint}   // CONTROLS SCREEN (2026-10-06): the host's control line, on the READY card and the pause
           title={modeKey.replace(/_/g, ' ').toUpperCase()}
           phase={phase}
           detail={phase === 'error' ? (loadError ?? undefined) : (countdown ?? undefined)}
@@ -474,9 +533,24 @@ export function makeTimingHost(opts: TimingHostOpts) {
           onRetry={tapStart}
         />
 
+        {/* MUSIC-SUITE P7 (2026-09-29), room-mix-ux: "reachable from the dance room's pause menu" — boot-splash.tsx
+            is a held file (movement play owns it) and draws the PAUSED screen with no slot for extra content, so this
+            sits ON TOP of it instead: rendered after BootSplash, it paints over the paused backdrop rather than under
+            it, and its own controls (the sliders) capture the click before PausedLayer's full-screen "any click
+            resumes" button ever sees it. Dance only — every other timing sport pauses exactly as it did before. */}
+        {modeKey === 'dance' && phase === 'paused' && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-8 flex justify-center px-4">
+            <div className="fel-panel pointer-events-auto w-full max-w-xs rounded-xl p-3">
+              <VolumeMixer heading="MIX — this device" />
+            </div>
+          </div>
+        )}
+
         {busRef.current && (
           <TouchOverlay bus={busRef.current} modeId={modeKey} visible={phase === 'playing' || phase === 'countdown'} />
         )}
+
+        {modeKey === 'dance' && <MicCaption text={hud.mic} who={hud.micWho} className="bottom-[10%]" />}
       </div>
     );
   }

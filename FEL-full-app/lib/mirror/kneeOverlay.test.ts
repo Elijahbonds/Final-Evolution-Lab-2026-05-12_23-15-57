@@ -45,6 +45,18 @@ describe('kneeArrows', () => {
     expect(a.find((x) => x.knee === 26)!.dir).toBe(-1);
   });
 
+  // MIRROR-COACH P4 review (2026-09-25): a one-sided cave used to paint both knees — the caller now says which
+  // side(s) actually cave, and kneeArrows only draws those.
+  it('sides filters the arrows: only the side(s) asked for, both when omitted', () => {
+    const f = bottomOf(filmSquat({ shiftL: -0.06 }));   // left knee caving, right clean
+    const L = f.landmarks;
+    expect(kneeArrows(L, W, H).map((a) => a.knee).sort()).toEqual([25, 26]);              // omitted: both, unchanged
+    expect(kneeArrows(L, W, H, { left: true, right: false }).map((a) => a.knee)).toEqual([25]);
+    expect(kneeArrows(L, W, H, { left: false, right: true }).map((a) => a.knee)).toEqual([26]);
+    expect(kneeArrows(L, W, H, { left: false, right: false })).toEqual([]);
+    expect(kneeArrows(L, W, H, { left: true, right: true }).map((a) => a.knee).sort()).toEqual([25, 26]);
+  });
+
   it('no hips, no arrows; a knee the model cannot see gets none', () => {
     expect(kneeArrows([], W, H)).toEqual([]);
     const f = bottomOf(filmSquat({ shiftL: -0.06, shiftR: -0.06 }));
@@ -58,12 +70,18 @@ describe('kneeArrows', () => {
   });
 });
 
-describe('the harness paints these arrows, only for a cueable knee fault', () => {
+describe('the harness paints these arrows, only for a cueable knee fault, only on the side(s) actually caving', () => {
   // the code, not the comments (the comments quote the band line this replaced)
   const h = stripComments(readFileSync(new URL('../../app/play/mirror/_components/mirror-harness.tsx', import.meta.url), 'utf8'));
-  it('paintSkeleton draws kneeArrows behind VALGUS_CUE_VERIFIED and the cueable faults', () => {
-    expect(h).toMatch(/if \(VALGUS_CUE_VERIFIED && faults\.includes\('kneeValgus'\)\) \{\s*const arrows = kneeArrows\(pose\.landmarks, W, H\);/);
-    expect(h).toContain('paintSkeleton(pose, p, paintableFaults(was, cueableFaults(squat.faults)))');
+  it('paintSkeleton draws kneeArrows behind VALGUS_CUE_VERIFIED and the cueable faults, filtered to the caving side(s)', () => {
+    expect(h).toMatch(/if \(VALGUS_CUE_VERIFIED && faults\.includes\('kneeValgus'\)\) \{/);
+    expect(h).toMatch(/const arrows = kneeArrows\(pose\.landmarks, W, H, sides\);/);
+    // MIRROR-COACH P4 review (2026-09-25): a one-sided cave used to paint both knees; `sides` is built from valgusBySide
+    // against the same warn line the audit itself faults on, so only the caving knee gets an arrow.
+    expect(h).toMatch(/valgusBySide\.left >= SQUAT_THRESHOLDS\.valgusWarn/);
+    expect(h).toMatch(/valgusBySide\.right >= SQUAT_THRESHOLDS\.valgusWarn/);
+    // (MIRROR-COACH P9 fix: the painter also takes the voice's fade — CueEngine.isVoiceable — so a faded fault is not painted)
+    expect(h).toContain('paintSkeleton(pose, p, paintableFaults(was, cueableFaults(squat.faults), (f) => cueEngineRef.current.isVoiceable(f as FaultId)), squat.valgusBySide)');
     expect(h).not.toMatch(/\bband\b/i);
   });
 });

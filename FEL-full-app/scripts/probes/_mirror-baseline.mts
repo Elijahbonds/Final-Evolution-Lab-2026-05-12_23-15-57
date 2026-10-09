@@ -1,3 +1,8 @@
+// MIRROR-COACH P8 FIX (2026-09-30) — RETIRED FOR P8+ TREES. This probe recorded P1's baseline, when /workout's sale was
+// paused (it waits for PLAN_SALE_PAUSED on the page, and reads /dev/mirror-coach-p1?check=purchase as NOT_ON_SALE).
+// P8 relaunched the sale (owner decision #24): the page no longer shows that line, so run against a P8+ tree these
+// waits time out. It is kept unchanged below as the record of the P1 run; lib/workout/relaunch-route.test.ts and
+// components/workout-view.test.tsx are the relaunch's proofs.
 // MIRROR-COACH P1 (2026-09-25) — the baseline harness: what the Mirror, the coach loop and /workout say TODAY, measured,
 // so phases 2-10 have a number to beat and a before to show.
 //

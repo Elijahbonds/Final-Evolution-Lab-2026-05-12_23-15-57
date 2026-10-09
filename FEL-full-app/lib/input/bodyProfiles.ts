@@ -21,16 +21,27 @@
 // Pure data: no DOM, no Babylon.
 import type { BodyEventKind } from '@/lib/pose/BodyReader';
 import type { CardLine } from '@/lib/babylon/core/sessionStore';
+import { RIDE_ROWS } from './rideProfiles';   // MOVEMENT PLAY P8: the boards' and the racers' rows
 
-export type FaceButton = 'A' | 'B' | 'X' | 'Y';                      // P3 binds only A and B
-export const FREE_VERBS = ['STEER', 'RUN', 'STRIDE'] as const;       // controls the touch deck doesn't label
+export type FaceButton = 'A' | 'B' | 'X' | 'Y';                      // P3 binds only A and B (P8: X as the kart's DRIFT hold)
+// MOVEMENT PLAY P8: CLIMB (the plane's wings), TRIM (surf's crouch rhythm), SPRINT (Free Run's high knees on an RT the deck
+// never labels)
+export const FREE_VERBS = ['STEER', 'RUN', 'STRIDE', 'CLIMB', 'TRIM', 'SPRINT'] as const;   // controls the touch deck doesn't label
 export type FreeVerb = (typeof FREE_VERBS)[number];
 export type BodyBinding =
   | { from: 'lean'; to: 'Lx'; verb: FreeVerb }
-  | { from: 'cadence'; to: 'Ly'; verb: FreeVerb }                    // forward = −y
+  | { from: 'cadence'; to: 'Ly'; verb: FreeVerb; minHz?: number; fullHz?: number }   // forward = −y (P8: a mode's own band)
   | { from: 'squat'; to: 'RT' | 'LT'; verb: string }                 // = MODE_VERBS label of the slot emitting that trigger
   | { from: 'takeoff' | 'punch' | 'kick'; to: FaceButton; verb: string }   // = MODE_VERBS label of that slot
-  | { from: 'step'; to: 'dpadByFoot'; verb: FreeVerb };               // foot L → ◀, R → ▶ (pulses)
+  | { from: 'step'; to: 'dpadByFoot'; verb: FreeVerb }                // foot L → ◀, R → ▶ (pulses)
+  // MOVEMENT PLAY P8 (lib/pose/rideReader, lib/input/rideProfiles): the stance's toe / heel lean, the wheel's tilt, the
+  // wings' bank on x; surf's crouch rhythm and the wings' height on y; gripping the wheel, spreading the wings or high
+  // knees on a trigger; a hop into a turned wheel HELD on a button (the kart's drift). A verb the mode reads itself (the
+  // grab, the spin, the push) is on its card through ModeBodySpec.lines, never a binding here
+  | { from: 'carve' | 'wheel' | 'wingBank'; to: 'Lx'; verb: FreeVerb }
+  | { from: 'trim' | 'wingPitch'; to: 'Ly'; verb: FreeVerb }
+  | { from: 'grip' | 'spread' | 'highKnees'; to: 'RT' | 'LT'; verb: string }
+  | { from: 'hopTurn'; to: FaceButton; verb: string };
 
 export interface BodyProfile {
   key: string;                    // registry key (MODES, MODE_VERBS)
@@ -61,8 +72,13 @@ export interface ModeBodySpec {
   lines?: readonly CardLine[];
 }
 
-export const MOVE_LABEL: Record<BodyBinding['from'], string> =
-  { lean: 'Lean', cadence: 'Run in place', squat: 'Crouch', takeoff: 'Jump', punch: 'Punch', kick: 'Kick', step: 'Run in place' };
+export const MOVE_LABEL: Record<BodyBinding['from'], string> = {
+  lean: 'Lean', cadence: 'Run in place', squat: 'Crouch', takeoff: 'Jump', punch: 'Punch', kick: 'Kick', step: 'Run in place',
+  // MOVEMENT PLAY P8
+  carve: 'Lean on your toes / heels', trim: 'Crouch and stand, in rhythm', wheel: 'Turn the wheel', wingBank: 'Tilt your wings',
+  wingPitch: 'Raise / lower your wings', grip: 'Grip the wheel', spread: 'Spread your wings', highKnees: 'High knees',
+  hopTurn: 'Hop into the turn',
+};
 
 type Row = Omit<BodyProfile, 'motion'>;
 const row = (r: Row): BodyProfile => ({ ...r, motion: 'merge' });
@@ -77,6 +93,11 @@ const ROWS: readonly BodyProfile[] = [
   none('dunkduel', 'dunkduel', 'dunk', 'P5', true),
   // ── hoops (P6). The 3PT release is told ~330 ms late against a timed bar; in 1v1 / 3v3 a dip would be the turbo and a
   //    jump a pass or a block. P6 merges a BodyControlSource into the hoops ControlSource instead.
+  //    HOOPS BODY (2026-10-07, Mirror & coaching Phase 7): P6 LANDED. These three rows stay SESSION-ONLY on purpose: the floor
+  //    presses nothing in a hoops game, ever — no turbo from a dip, no pass from a jump, no shot from a stray hop. The modes
+  //    read the body themselves (their onBody, so `drives` is true and READY offers body play): the 3PT through
+  //    lib/move/hoopsBody (THREE_BODY: the jump starts the shot, the release is graded against the body's own apex), 1v1 and
+  //    3v3 through lib/move/bodyControlSource (COURT_BODY: a BodyControlSource merged into the hero's ControlSource).
   none('threepoint', 'threepoint', 'hoops', 'P6', true),
   none('onevone', 'onevone', 'hoops', 'P6', true),
   none('threevthree', 'threevthree', 'hoops', 'P6', true),
@@ -146,6 +167,7 @@ const ROWS: readonly BodyProfile[] = [
   // ── no plan phase yet (L)
   none('football', 'football', 'later', 'L', false),
   none('tennis', 'tennis', 'later', 'L', false),
+  none('tiebreak', 'tiebreak', 'later', 'L', false),
   none('golf', 'golf', 'later', 'L', false),
   none('derby', 'baseball', 'later', 'L', false),
   none('penalty', 'soccer', 'later', 'L', false),
@@ -157,9 +179,16 @@ const ROWS: readonly BodyProfile[] = [
   none('brainbrawl', 'brainbrawl', 'quiz', null, false),
 ];
 
+/** MOVEMENT PLAY P8 (2026-09-26): the boards' and the racers' P3 rows above (the eight `later: 'P8'`) are each P8 row's CUT
+ *  LINE. The rows that play — the stance's carve, surf's trim, Free Run's own band and high knees, the kart's wheel and the
+ *  plane's wings behind the ride switch — are lib/input/rideProfiles' RIDE_ROWS, which replace them key for key in
+ *  BODY_PROFILES. Big air and sprint keep their P3 rows: their modes claim the step. */
+export const P3_RIDE_ROWS: readonly BodyProfile[] = ROWS.filter((p) => p.later === 'P8');
+const TABLE: readonly BodyProfile[] = ROWS.map((p) => RIDE_ROWS.find((r) => r.key === p.key) ?? p);
+
 /** Every mode's row, by def.modeId (four differ from their registry key: karate-vs, snowboard, baseball, soccer). */
 export const BODY_PROFILES: Readonly<Record<string /* modeId */, BodyProfile>> = Object.freeze(
-  Object.fromEntries(ROWS.map((p) => [p.modeId, p])),
+  Object.fromEntries(TABLE.map((p) => [p.modeId, p])),
 );
 
 /** A mode no row names (a new one, a test's): session-only, no plan phase yet. */

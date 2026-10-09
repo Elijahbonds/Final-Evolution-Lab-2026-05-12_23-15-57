@@ -13,26 +13,37 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import type { GameProps, GameResult } from './game-shell';
+import { useBabylonPlaytestBridge } from './use-babylon-playtest-bridge';
 import { BootSplash } from './boot-splash';
+import { surfaceBootError } from './boot-error';
 import { BoostGauge } from './boost-hud';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
-import { hnode } from './hud-format';
+import { gameResultFromSession } from '@/lib/sessions/gameResultFromSession';
+import { hnode, hnum } from './hud-format';
+import { RaceCourseMap, THREAT_POS, THREAT_ARROW } from './race-course-map';
 
 type Hud = Record<string, HudValue>;
 
 /** The balloon colours (AeroItems.BALLOON_COLOR), for the item box. */
 const ITEM_COLOR: Record<string, string> = { missile: '#ff4b4b', boost: '#3aa0ff', shield: '#ffd75e', mine: '#4fdc6a' };
 
+/** IMPROVE (2026-10-06) #3 #6: the missile warning's placement and the course strip are shared with the kart's host
+ *  (race-course-map.tsx) — one drawing of each for both racing modes. */
+const CourseMap = RaceCourseMap;
+
 export default function AeroAcesBabylon({ onEnd }: GameProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const busRef = useRef<InputBus | null>(null);
   const endedRef = useRef(false);
+  const onEndRef = useRef(onEnd);
+  onEndRef.current = onEnd;
   const [phase, setPhase] = useState<ModePhase>('loading');
   const [countdown, setCountdown] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [hud, setHud] = useState<Hud>({});
+  useBabylonPlaytestBridge('aeroaces', () => ({ phase, countdown, loadError, hud }), busRef.current);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -47,11 +58,10 @@ export default function AeroAcesBabylon({ onEnd }: GameProps) {
       endedRef.current = true;
       const t = Number(r.stats?.seconds ?? r.stats?.timeSec ?? 0);
       const place = Number(r.stats?.place ?? 0);
-      onEnd({
-        score: r.score, stats: r.stats, outcome: r.outcome, opponentScore: 0,
-        won: r.outcome === 'WIN', duration: r.durationSec,
+      onEndRef.current(gameResultFromSession(r, {
+        won: r.outcome === 'WIN',
         headline: place > 0 ? `${place === 1 ? '1ST' : place === 2 ? '2ND' : place === 3 ? '3RD' : `${place}TH`} PLACE${t > 0 ? ` · ${t.toFixed(1)}s` : ''}` : 'FLIGHT COMPLETE',
-      } satisfies GameResult);
+      }));
     };
 
     const startTimer = setTimeout(() => {
@@ -66,11 +76,12 @@ export default function AeroAcesBabylon({ onEnd }: GameProps) {
         onHud: (u) => setHud((prev) => ({ ...prev, ...u })),
         resultSink,
       }).then((s) => { if (disposed) { s(); return; } stop = s; })
-        .catch((e) => console.error('[FEL-AERO] boot failed', e));
+        .catch((e) => surfaceBootError(e, { disposed, label: '[FEL-AERO] boot failed', setPhase, setLoadError }));
     }, 0);
 
     return () => { disposed = true; clearTimeout(startTimer); stop?.(); busRef.current = null; };
-  }, [onEnd]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- G7: the stage is owned by the mount; callbacks are read through refs.
+  }, []);
 
   const emit = useCallback((e: Parameters<InputBus['emit']>[0]) => { busRef.current?.emit(e); }, []);
   const tapStart = useCallback(() => emit({ t: 'button', btn: 'START', pressed: true }), [emit]);
@@ -91,6 +102,10 @@ export default function AeroAcesBabylon({ onEnd }: GameProps) {
         <div className="flex flex-col items-center gap-1">
           <span className="fel-panel px-4 py-1.5 fel-stat text-xl text-white">{Number(hud.time ?? 0).toFixed(1)}s</span>
           <span className="fel-panel px-3 py-0.5 text-xs font-bold text-white/85">LAP {hnode(hud.lap, '—')}</span>
+          {/* IMPROVE (2026-10-06) #1: the delta to your best race on this circuit — green ahead, red behind */}
+          {typeof hud.pb === 'string' && hud.pb
+            ? <span className={`fel-panel px-2 py-0.5 text-[10px] font-bold ${hud.pb.includes('−') ? 'text-[#86efac]' : 'text-[#fca5a5]'}`}>{hud.pb}</span>
+            : null}
         </div>
         <div className="flex items-start gap-2">
           <div className="fel-panel px-3 py-1.5 text-center">
@@ -108,6 +123,30 @@ export default function AeroAcesBabylon({ onEnd }: GameProps) {
           </div>
         </div>
       </div>
+
+      {/* IMPROVE (2026-10-06) #5: the numbers the mode always sent and nothing drew — speed, the next ring, the shield's
+          seconds and the slipstream's charge */}
+      <div className="pointer-events-none absolute right-3 top-[5.5rem] flex flex-col items-end gap-1 font-mono">
+        {hnum(hud.shield) > 0 ? <span className="fel-panel px-2 py-0.5 text-xs font-bold text-[#ffd75e]">SHIELD {hnum(hud.shield)}s</span> : null}
+        {hnum(hud.draft) > 0 ? (
+          <div className="fel-panel w-28 px-2 py-1">
+            <div className="text-[9px] tracking-wider text-[#a5f3fc]">SLIPSTREAM</div>
+            <div className="mt-0.5 h-1.5 w-full overflow-hidden rounded bg-white/10"><div className="h-full bg-[#22d3ee]" style={{ width: `${Math.min(100, hnum(hud.draft))}%` }} /></div>
+          </div>
+        ) : null}
+        <div className="fel-panel px-3 py-1 text-right">
+          <div className="fel-stat text-lg text-white">{hnum(hud.speed)}<span className="text-[10px] text-white/50"> KM/H</span></div>
+          {hnum(hud.toGate) > 0 ? <div className="text-[10px] text-[#7dd3fc]">RING {hnum(hud.toGate)} m</div> : null}
+        </div>
+      </div>
+      <CourseMap hud={hud} />
+      {typeof hud.threat === 'string' && hud.threat && (
+        <div className={`pointer-events-none absolute flex ${THREAT_POS[String(hud.threatSide)] ?? THREAT_POS.BEHIND}`}>
+          <span className={`fel-panel px-3 py-1 font-mono text-sm font-bold ${hud.threatRoll ? 'animate-pulse text-[#86efac]' : 'text-[#ff4b4b]'}`}>
+            {THREAT_ARROW[String(hud.threatSide)] ?? '▼'} {hud.threat}{hud.threatRoll ? ' — B' : ''}
+          </span>
+        </div>
+      )}
 
       <BoostGauge hud={hud} className="absolute inset-x-0 bottom-28" />
       {typeof hud.hint === 'string' && hud.hint && phase === 'playing' && (

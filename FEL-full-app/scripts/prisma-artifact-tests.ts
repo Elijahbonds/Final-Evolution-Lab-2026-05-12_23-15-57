@@ -79,4 +79,19 @@ ok('the artifact is marked generated, so 43MB of churn stays out of reviews', ()
     `expected .gitattributes to mark the generated client, got "${attrs}"`);
 });
 
+ok('the COMMITTED client is path-independent: no absolute checkout path in its generator config (PRISMA-PATH)', () => {
+  // Reads the committed blob (HEAD), not the working file: CI runs a bare `npx prisma generate` before this suite,
+  // which writes its own checkout's absolute paths into the working copy. What must never be committed again is a
+  // path like /Users/…/wt-mirror/FEL-full-app/… — it dirtied every other worktree's tree on its next generate.
+  // scripts/prisma-generate.mjs (postinstall, build, `npm run prisma:generate`) writes these two fields relative.
+  for (const rel of ['public/_prisma/client/index.js', 'public/_prisma/client/edge.js']) {
+    if (!tracked.has(rel)) continue;
+    const js = execFileSync('git', ['show', `HEAD:./${rel}`], { cwd: appDir, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+    const abs = /"(sourceFilePath|value)": "(\/|[A-Za-z]:\\\\)[^"]*_prisma[^"]*"/.exec(js);
+    assert.ok(!abs, `${rel} is committed with an absolute path (${abs?.[0]}). Regenerate with \`npm run prisma:generate\` ` +
+      '(or run `node scripts/prisma-generate.mjs --normalize-only` after a bare `prisma generate`) and commit that.');
+    assert.ok(js.includes('"sourceFilePath": "public/_prisma/schema.prisma"'), `${rel}: expected the repo-relative schema path`);
+  }
+});
+
 console.log(`\n✅ prisma-artifact-tests: ${pass} checks green — ${tracked.size} files tracked, engine included`);

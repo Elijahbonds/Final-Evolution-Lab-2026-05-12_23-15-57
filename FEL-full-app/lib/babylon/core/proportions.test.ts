@@ -29,22 +29,29 @@ function measure(p: { heightScale?: number; buildScale?: number; reachScale?: nu
   };
 }
 
-describe('applyProportions — height is height, build is girth, reach is arm length', () => {
+describe('applyProportions — height is height, build is girth, and the arm keeps its length (REACH-FREEZE)', () => {
   it('a heavier build widens the body without making it taller or its head bigger', () => {
-    const slim = measure({ buildScale: 0.9 }), heavy = measure({ buildScale: 1.12 });
+    // REACH-FREEZE: the ends of the cosmetic build range (94–108 %); 0.9 and 1.12 now clamp to them
+    const slim = measure({ buildScale: 0.94 }), heavy = measure({ buildScale: 1.08 });
     expect(Math.abs(heavy.head - slim.head)).toBeLessThan(0.01);
     expect(Math.abs(heavy.headToNeck - slim.headToNeck) / slim.headToNeck).toBeLessThan(0.15);   // girth only, never a longer neck
-    expect(heavy.hipWidth / slim.hipWidth).toBeCloseTo(1.12 / 0.9, 1);
+    expect(heavy.hipWidth / slim.hipWidth).toBeCloseTo(1.08 / 0.94, 1);
   });
 
   it('height scales the whole body', () => {
-    const std = measure({}), tall = measure({ heightScale: 1.1 });
-    expect(tall.head / std.head).toBeCloseTo(1.1, 2);
+    const std = measure({}), tall = measure({ heightScale: 1.04 });   // REACH-FREEZE: the top of the cosmetic height range (1.1 now clamps to it)
+    expect(tall.head / std.head).toBeCloseTo(1.04, 2);
   });
 
-  it('reach lengthens the arm by exactly the scale, once (not squared down the chain)', () => {
+  it('REACH-FREEZE: a saved reach never lengthens the arm (spec Decision 1)', () => {
     const std = measure({}), long = measure({ reachScale: 1.1 });
-    expect(long.arm / std.arm).toBeCloseTo(1.1, 2);
+    expect(long.arm / std.arm).toBeCloseTo(1, 6);
+  });
+
+  it('clamps an old save to the cosmetic range (REACH-FREEZE, TUNE-EJ)', () => {
+    const std = measure({}), old = measure({ heightScale: 1.14 }), top = measure({ heightScale: 1.04 });
+    expect(old.head).toBeCloseTo(top.head, 6);
+    expect(old.head / std.head).toBeCloseTo(1.04, 2);
   });
 
   it('is ABSOLUTE: applying again from the same base does not drift', () => {

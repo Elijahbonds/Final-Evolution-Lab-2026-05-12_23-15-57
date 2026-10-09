@@ -208,6 +208,24 @@ export function readWeapon(): ArsenalEntry {
   return list[0] ?? ARSENAL[0];
 }
 
+/**
+ * IMPROVE (2026-10-06): the weapon the player explicitly PICKED — `?weapon=` or the start-up screen's remembered pick —
+ * or null when nothing was picked. readWeapon() falls back to the first ready weapon, so a mode cannot tell its default
+ * from a choice; Duel skips its own in-round weapon phase only when this names one.
+ */
+export function weaponPicked(): string | null {
+  const list = readyWeapons();
+  try {
+    if (typeof window !== 'undefined') {
+      const q = new URLSearchParams(window.location.search).get('weapon');
+      if (list.some((w) => w.id === q)) return q;
+      const s = window.localStorage.getItem(WEAPON_KEY);
+      if (list.some((w) => w.id === s)) return s;
+    }
+  } catch { /* private mode: nothing picked */ }
+  return null;
+}
+
 export function writeWeapon(id: string): void {
   try { window.localStorage.setItem(WEAPON_KEY, id); } catch { /* convenience only */ }
 }

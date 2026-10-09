@@ -684,8 +684,9 @@ export function createStudioLibrary(deps: StudioLibraryDeps) {
     },
 
     /**
-     * COMPAT — the pre-P3 synchronous publish, kept for the P1 baseline sim (scripts/music/baseline-sim.ts:715), which
-     * counts publishes until one throws. The room uses `publishWithAudio`. The row is written synchronously (it throws
+     * COMPAT — the pre-P3 synchronous publish. It was kept for the P1 baseline sim, which counted publishes until one
+     * threw; MUSIC-SUITE P10 (2026-09-29) moved the sim onto the room's `publishWithAudio`, so only the tests that pin the
+     * pre-P3 record shape (StudioLibrary.test, uploadPrivacy.test) still call this. The room uses `publishWithAudio`. The row is written synchronously (it throws
      * on failure, as before); the data URL plays from memory while its audio is copied into the store in the
      * background, and a failed copy is reported through `problems()`.
      */
@@ -853,15 +854,22 @@ export function createStudioLibrary(deps: StudioLibraryDeps) {
     /**
      * Make a song the walk-out. Its mixdown is copied into the walk-out's own localStorage keys FIRST (DunkMode reads
      * them synchronously through `get`), then the WalkOut record is written. Re-choosing the same song keeps its plays.
+     *
+     * MUSIC-SUITE P7 (2026-09-29): `opts.loopAudio` — a fresh, tail-wrapped `opts.bars`-bar loop (loopRender.ts), already
+     * rendered by the caller (StudioMode.tsx: this file stays free of Web Audio, same as ever). This is what the SET AS MY
+     * WALK-OUT button actually renders now: the 2-bar PUBLISH preview `dataUrlOf` would otherwise hand back (StudioLibrary
+     * v3's own header: "the room renders two bars for a publish") looped raw, with a click every couple of seconds where the
+     * room/slap sends' own decay got cut off. `opts.loopAudio` absent = the pre-P7 behaviour (the published mixdown's own
+     * bytes) — every existing caller (tests; a re-render pipeline that has not run yet) keeps working exactly as it did.
      */
-    async setWalkOut(id: string, opts: { bars?: number } = {}): Promise<WalkOutResult> {
+    async setWalkOut(id: string, opts: { bars?: number; loopAudio?: Blob } = {}): Promise<WalkOutResult> {
       const e = view().find((x) => x.id === id);
       if (!e) return { ok: false, reason: 'missing', line: MISSING_LINE };
       // MUSIC-SUITE P5 (2026-09-25), decision #15: a song with an upload was never the walk-out. MUSIC-SUITE P5 FIX PASS:
       // the walk-out plays on this device only (DunkMode reads it from localStorage; the "crowd" is the game's), so the door
       // is open unless the switch shuts it (UPLOAD_DOORS.walkOut) — then `get` also lets go of one chosen before P5.
       if (!doors.walkOut && tracksHaveUpload(e.sequencer?.tracks ?? [])) return { ok: false, reason: 'upload-private', line: WALKOUT_UPLOAD_LINE };
-      const url = await dataUrlOf(e);
+      const url = opts.loopAudio ? await blobToDataUrl(opts.loopAudio) : await dataUrlOf(e);
       if (!url) return { ok: false, reason: 'no-audio', line: e.audio === 'visit' ? VISIT_AUDIO_GONE_LINE : NO_AUDIO_LINE };
       let wo: WalkOut;
       try {
@@ -972,3 +980,16 @@ export const StudioLibrary = createStudioLibrary({
   store: () => libraryStore ?? (typeof window === 'undefined' ? null : defaultStore),
   autoMigrate: true,
 });
+
+/**
+ * MUSIC-SUITE P7 ("your beat"): a take's (or a Flip chop's) raw bytes, by its own AudioRef key — from the SAME device
+ * store this file's audio already lives in (line ~920 above: 'fel-studio', table `audio`, shared, never player-scoped).
+ * A reference, never a copy: dance/yourSong.ts resolves a song's takes through this when the Cypher renders them, so
+ * sending a song to the dance floor never duplicates the booth's bytes. Null when they are gone (recorded on another
+ * device, or swept) — the caller leaves that part out rather than fail the render.
+ */
+export async function readDeviceAudio(key: string): Promise<Blob | null> {
+  const store = libraryStore ?? (typeof window === 'undefined' ? null : defaultStore);
+  if (!store) return null;
+  try { return await store.get(key); } catch { return null; }
+}

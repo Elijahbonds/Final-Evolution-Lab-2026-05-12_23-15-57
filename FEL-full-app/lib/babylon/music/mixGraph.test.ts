@@ -140,7 +140,15 @@ describe('ONE builder: live play and the render wire every hit the same way (PHA
       eng.start();
       for (let k = 1; k * TICK < LEAD + STEPS * BASE + 0.2; k++) { ctx.currentTime = k * TICK; fake.tick(); }
       eng.stop();
-      const live = ctx.starts.filter((s) => s.at < LEAD + STEPS * BASE - 1e-9).map((s) => wiring(s, LEAD)).sort();
+      // MUSIC-SUITE P7 FIX (2026-09-29): AudioEngine now splices one more gain stage after the ceiling, LIVE ONLY
+      // (this.deviceVol, AudioEngine.ts's own comment — the on-device MUSIC volume, tested on its own in
+      // AudioEngine.deviceVolume.test.ts) — a deliberate divergence from the render's chain, which must stay
+      // untouched by a device setting. At its default (nothing saved: busGain(1, 1) = 1, this test's own
+      // context) it is an identity gain(1); stripped here so this test can still hold its one real claim — the
+      // REST of the chain, every hit's own path from its source to the ceiling, is bit-for-bit the same live and
+      // rendered.
+      const live = ctx.starts.filter((s) => s.at < LEAD + STEPS * BASE - 1e-9)
+        .map((s) => wiring(s, LEAD).replaceAll(' → ceiling → gain(1) → out', ' → ceiling → out')).sort();
       // the render of the same bar
       const before = FakeOfflineAudioContext.created.length;
       await eng.renderMixdown(1);

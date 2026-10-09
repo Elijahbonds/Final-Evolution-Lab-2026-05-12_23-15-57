@@ -49,7 +49,7 @@ export async function createRoom(modeId: string, hostId: string): Promise<string
 
 export async function lookupRoom(
   code: string,
-): Promise<{ code: string; modeId: string; peers: { peerId: string; name: string }[] } | null> {
+): Promise<{ code: string; modeId: string; players?: number } | null> {
   const res = await fetch(`/api/controller-link/rooms?code=${encodeURIComponent(code)}`);
   if (!res.ok) return null;
   return res.json();
@@ -74,7 +74,7 @@ export function pollSignals(
   code: string,
   self: string,
   onMessage: (m: SignalMessage) => void,
-  onPeers?: (peers: { peerId: string; name: string }[]) => void,
+  onPeers?: (peers: { name: string }[]) => void,
 ): () => void {
   let after = 0;
   let stopped = false;

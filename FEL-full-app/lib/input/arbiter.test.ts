@@ -222,3 +222,28 @@ describe('BodyArbiter — current() and reset()', () => {
     expect(a.body(btn('A', false), false)).toEqual([]);   // a release for a press from before is not sent
   });
 });
+
+// MOVEMENT PLAY P8 (2026-09-26, the review): the boards must know whose x an L stick carries — the event's tag cannot say it
+// per axis (a thumb owning y delivers the body's x untagged; a body's y change delivers the thumb's x tagged)
+describe('BodyArbiter — lxFromBody (P8)', () => {
+  it('the body\'s x under a thumb that owns y; the thumb\'s x under a body that writes y; nobody\'s at rest', () => {
+    const { a } = arb();
+    expect(a.lxFromBody()).toBe(false);
+    a.external(stickL(0, -1), true);                                  // the thumb holds y
+    a.body(bodyL(0.6, 0), true);                                      // the body carves
+    const e = a.external(stickL(0.05, -0.9), true);
+    expect(e).toStrictEqual({ t: 'stick', side: 'L', x: 0.6, y: -0.9 });   // untagged: the thumb owns y …
+    expect(a.lxFromBody()).toBe(true);                                // … and the x is the body's
+    const { a: b } = arb();
+    b.external(stickL(0.8, 0), true);                                 // the thumb steers
+    const out = b.body(bodyL(0, 0.5), true);                          // the body writes y only
+    expect(out).toStrictEqual([{ t: 'stick', side: 'L', x: 0.8, y: 0.5, src: 'body' }]);   // tagged …
+    expect(b.lxFromBody()).toBe(false);                               // … and the x is the thumb's
+    b.body(bodyL(0.3, 0.5), true);
+    expect(b.lxFromBody()).toBe(false);                               // a thumb past AXIS_OWN owns x whatever the body does
+    b.external(stickL(AXIS_OWN / 2, 0), true);
+    expect(b.lxFromBody()).toBe(true);
+    b.reset();
+    expect(b.lxFromBody()).toBe(false);
+  });
+});

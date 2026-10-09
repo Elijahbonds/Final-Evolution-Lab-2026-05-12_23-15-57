@@ -300,13 +300,15 @@ describe('the kits the account owns', () => {
     const store = { getItem: (k: string) => mem.get(k) ?? null, setItem: (k: string, v: string) => { mem.set(k, v); }, removeItem: (k: string) => { mem.delete(k); } };
     expect(readKitCache(store, 'u_ana')).toEqual(['street']);             // the old shared cache is never adopted
     writeKitCache(store, ['street', 'neon', 'dust'], 'u_ana');
-    expect(mem.has(KIT_CACHE_KEY)).toBe(false);                           // and it is dropped on the first keyed write
+    // MUSIC-SUITE P6: no longer dropped on the first keyed write — it is the only record of a kit the room gave away
+    // before 4b766804, and the grandfather claim removes it once claimed (kitGrandfather.test.ts). Still never adopted:
+    expect(mem.get(KIT_CACHE_KEY)).toBe('["street","neon","dust"]');
     expect(readKitCache(store, 'u_ana')).toEqual(['street', 'neon', 'dust']);
     expect(readKitCache(store, 'u_ben')).toEqual(['street']);              // Ben, same device: only the free kit
     expect(readKitCache(store, null)).toEqual(['street']);                 // a room that doesn't know who is playing
     expect(readKitCache(store, '')).toEqual(['street']);
     writeKitCache(store, ['neon'], undefined);                             // …writes nothing
-    expect([...mem.keys()]).toEqual([kitCacheKey('u_ana')]);
+    expect([...mem.keys()]).toEqual([KIT_CACHE_KEY, kitCacheKey('u_ana')]);
   });
 });
 

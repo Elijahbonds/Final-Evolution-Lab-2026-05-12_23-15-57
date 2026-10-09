@@ -8,6 +8,8 @@ import { MODE_INFO } from '@/lib/game-data';
 import { arenaModeKey } from '@/lib/arena';
 import { parseCard } from '@/lib/mp/dunkCard';
 import { isStakingPaused, STAKING_PAUSED } from '@/lib/stakingPause';
+import { expiredOutcomeOf, isExpired, reclaimOnRead, type ExpiredOutcome } from '@/lib/arena-reclaim';
+import { MUSIC_ATTEMPT_START, MUSIC_ATTEMPT_FINISH } from '@/lib/arena-music';
 
 function label(userId: string | null | undefined, users: Record<string, string>) {
   if (!userId) return null;
@@ -19,11 +21,20 @@ function label(userId: string | null | undefined, users: Record<string, string>)
  * Returns { open, mine } for the Arena lobby.
  *   open = joinable WAITING LC duels created by others
  *   mine = the caller's recent duels (any status), newest first
+ *   reclaimed = how many of the caller's duels this read reclaimed (MUSIC-SUITE P6: the lobby refreshes the wallet)
  */
 export async function GET() {
   const session = await getServerSession(authOptions);
   const userId = (session?.user as any)?.id;
   if (!userId) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+
+  // MUSIC-SUITE P6 (2026-09-26, owner decision #30: stale duels, all modes, "run on read + a scheduled route"): before
+  // the lobby reads, the caller's own duels past expiresAt are reclaimed — a posted duel nobody accepted refunds its
+  // creator, an accepted one nobody played refunds both, one only one side played settles to that side as a forfeit
+  // (lib/arena-reclaim.ts). Bounded (RECLAIM_ON_READ_BATCH), and never in the lobby's way: a failure is null and a slow
+  // sweep is not waited for past RECLAIM_ON_READ_BUDGET_MS. Until now nothing read expiresAt, and those stakes sat locked.
+  const now = new Date();
+  const reclaim = await reclaimOnRead(prisma as any, userId, { now });
 
   // MUSIC-SUITE P1 (2026-09-25): a posted duel on a paused mode can no longer be joined, so its creator's CANCEL is the
   // only way its stake comes back — and MY DUELS shows only the 25 most recently updated duels. A WAITING duel's
@@ -31,8 +42,10 @@ export async function GET() {
   // paused WAITING duels are fetched on their own and always listed.
   const pausedKeys = Array.from(new Set([...Array.from(STAKING_PAUSED), 'musicAcademy']));
   const [openRaw, mineRecent, mineStranded] = await Promise.all([
+    // MUSIC-SUITE P6: a posted duel past its expiry is not an open challenge — /api/arena/join refuses it (409 EXPIRED)
+    // and the next sweep refunds its creator.
     prisma.competitionMatch.findMany({
-      where: { currency: 'LC', status: 'WAITING', player1Id: { not: userId } },
+      where: { currency: 'LC', status: 'WAITING', player1Id: { not: userId }, expiresAt: { gt: now } },
       orderBy: { createdAt: 'desc' },
       take: 40,
     }),
@@ -73,7 +86,7 @@ export async function GET() {
   // MUSIC-SUITE P1 (2026-09-25, owner decision #9: "pause staking both now"): a WAITING duel on a paused mode can no
   // longer be accepted (/api/arena/join refuses it), so it is not advertised as an OPEN CHALLENGE. Its creator still
   // sees it under MY DUELS, flagged stakingPaused, with the CANCEL that refunds it.
-  const open = openRaw.filter((m) => !isStakingPaused(m.mode)).map((m) => ({
+  const open = openRaw.filter((m) => !isStakingPaused(m.mode) && !isExpired(m.expiresAt, now)).map((m) => ({
     id: m.id,
     ...modeMeta(m.mode),
     feeLc: m.entryFeeCents,
@@ -85,13 +98,28 @@ export async function GET() {
   // THE CARDS (2026-09-13). The duel rows carry two integers; what each player threw lives in the
   // SCORE_SUBMITTED events, which already have a JSON payload — so this is one extra query for the whole
   // list rather than a schema change or an N+1. A duel with no events keeps exactly the shape it had.
+  // MUSIC-SUITE P6: the same query reads the REFUNDED / SETTLED events a reclaim writes, so a duel that expired says so
+  // on its row ('expired — refunded', 'won by forfeit') instead of a bare 'Refunded' / 'Settled'.
   const cardsByMatch = new Map<string, { p1?: unknown; p2?: unknown }>();
+  const expiredByMatch = new Map<string, ExpiredOutcome>();
+  // MUSIC-SUITE P6 FIX PASS: the caller's own music attempt per duel ('started' / 'finished'), so a row whose one attempt
+  // is used says so (and that PLAY posts it) instead of a plain 'Live — play your round'
+  const attemptByMatch = new Map<string, 'started' | 'finished'>();
   try {
     const evs = await prisma.matchEvent.findMany({
-      where: { matchId: { in: mineRaw.map((m) => m.id) }, eventType: 'SCORE_SUBMITTED' },
+      where: { matchId: { in: mineRaw.map((m) => m.id) }, eventType: { in: ['SCORE_SUBMITTED', 'REFUNDED', 'SETTLED', MUSIC_ATTEMPT_START, MUSIC_ATTEMPT_FINISH] } },
       orderBy: { seq: 'asc' },
     });
     for (const e of evs) {
+      if (e.eventType === MUSIC_ATTEMPT_START || e.eventType === MUSIC_ATTEMPT_FINISH) {
+        if (e.userId === userId) attemptByMatch.set(e.matchId, e.eventType === MUSIC_ATTEMPT_FINISH || attemptByMatch.get(e.matchId) === 'finished' ? 'finished' : 'started');
+        continue;
+      }
+      if (e.eventType === 'REFUNDED' || e.eventType === 'SETTLED') {
+        const outcome = expiredOutcomeOf(e, userId);
+        if (outcome) expiredByMatch.set(e.matchId, outcome);
+        continue;
+      }
       const payload = (typeof e.payload === 'string' ? JSON.parse(e.payload) : e.payload) as { player?: string; card?: unknown } | null;
       if (!payload?.card) continue;
       const parsed = parseCard(payload.card);
@@ -141,8 +169,17 @@ export async function GET() {
       // MUSIC-SUITE P1: a duel on a paused mode. An ACTIVE one still plays and settles; a WAITING one can only be
       // cancelled (and refunded), because nobody can join it — the lobby says so on the row.
       stakingPaused: isStakingPaused(m.mode),
+      // MUSIC-SUITE P6 (owner decision #30): when the duel lapses, and — once a reclaim closed it — how: 'refunded' (nobody
+      // played, every stake back), 'won_by_forfeit' / 'lost_by_forfeit' (one side played). `pastExpiry` is an open duel
+      // whose deadline passed and that this read did not get to: it cannot be played (submit-score 409 EXPIRED), and the
+      // next sweep settles it.
+      expiresAt: m.expiresAt ?? null,
+      expired: expiredByMatch.get(m.id) ?? null,
+      pastExpiry: ['ACTIVE', 'WAITING'].includes(m.status) && isExpired(m.expiresAt, now),
+      musicAttempt: attemptByMatch.get(m.id) ?? null,
     };
   });
 
-  return NextResponse.json({ open, mine });
+  const reclaimed = reclaim ? reclaim.voided + reclaim.forfeits + (reclaim.settled ?? 0) : 0;
+  return NextResponse.json({ open, mine, reclaimed });
 }

@@ -25,7 +25,7 @@ const Snowboard3D = dynamicImport(() => import('@/components/games/board-snow-3d
 
 const SnowboardBabylon = dynamicImport(
   () => import('@/components/games/board-babylon').then((m) => ({
-    default: m.makeBoardHost({ modeKey: 'snowboard_slalom', tag: 'FEL-SNOW', tricks: ['SPIN', 'GRAB', 'FLIP'], hint: 'Steer · hold PUMP · JUMP off kickers · catch the LIFT CABLE · dodge the YETI' }),
+    default: m.makeBoardHost({ modeKey: 'snowboard_slalom', tag: 'FEL-SNOW', title: 'GATE CRASHER', tricks: ['SPIN', 'GRAB', 'FLIP'], hint: 'Carve between the poles · TUCK for speed · JUMP rocks and kickers · catch the LIFT CABLE · dodge the YETI' }),
   })),
   {
     ssr: false,

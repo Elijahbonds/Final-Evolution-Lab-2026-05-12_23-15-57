@@ -20,7 +20,8 @@
  *   - P1 revised a plan only when its buyer opened it. #22 includes the plans nobody opened: scripts/workout/revise-all
  *     -plans.ts runs this same revision over every WorkoutPlan row (dry run first; the main session runs it at deploy).
  *   - #23: no refund. The note says what changed and that the new training plans are free for them when they ship (no
- *     date: P8 has none).
+ *     date: P8 has none). MIRROR-COACH P8 (2026-09-29): they shipped; the note now says they are here, one of each free
+ *     (plan-sale.ts RELAUNCH_FREE_LINE, lib/workout/pastBuyer.ts).
  *
  * What stays from P1:
  *   - Surgical, not a regeneration from scratch: each depth drop is replaced in its slot; every other exercise, every
@@ -44,6 +45,7 @@ import type { Prisma, PrismaClient } from '@/public/_prisma/client';
 import { NO_FLIGHT_FALLBACK, PLAN_POOLS, isDepthDrop, landingOf, poolOf, swapInWeek, type PlanExercise } from './plan-generator';
 import type { Pillar } from './movement-screen';
 import { RELAUNCH_FREE_LINE } from './plan-sale';
+import { gapExceedsEighteenYears } from '@/lib/age/ageRules';
 
 /**
  * P1's mark (2026-09-25) on a week whose early depth drops it swapped, or whose later ones it held. Still recognised:
@@ -59,11 +61,15 @@ export const PLAN_REVISION_YOUTH = 'youth-no-jumps-2026-09-25';
  * The in-app notes. FEL's draft wording, for the owner to approve: decisions #3 and #22 asked for "an in-app note" and
  * gave no words. #23 (MIRROR-COACH P2, 2026-09-25): no refund, so none is offered; the corrected plan, and free access
  * to the relaunched plans "when they ship" — no date, because P8 has none (plan-sale.ts RELAUNCH_FREE_LINE).
+ * MIRROR-COACH P8 (2026-09-29): the relaunch shipped them, and the line they end with says so. Both notes are worked out
+ * on read from the plan's marks, never stored, so every revised plan carries the new line from the deploy on.
  */
+// MIRROR-COACH P8 FIX (2026-09-30, code review): "Nothing to do." closed the note right after "pick yours", which
+// contradicted it; it now says the PLAN needs nothing, before the free line.
 export const PLAN_REVISED_NOTE =
-  `We changed your plan: every depth drop, in every week, is swapped for a move with a softer landing or none. ${RELAUNCH_FREE_LINE} Nothing to do.`;
+  `We changed your plan: every depth drop, in every week, is swapped for a move with a softer landing or none. This plan needs nothing from you. ${RELAUNCH_FREE_LINE}`;
 export const PLAN_REVISED_NOTE_YOUTH =
-  `We changed your plan: it no longer includes depth drops or jumps unless a coach assigns them. ${RELAUNCH_FREE_LINE} Nothing to do.`;
+  `We changed your plan: it no longer includes depth drops or jumps unless a coach assigns them. This plan needs nothing from you. ${RELAUNCH_FREE_LINE}`;
 
 /**
  * P1's held mark and the line the page showed beside it. MIRROR-COACH P2: no revision makes the mark any more, and the
@@ -85,7 +91,9 @@ export type PlanAudience = 'adult' | 'youth';
  */
 export function planAudience(dobYear: number | null | undefined, now: Date = new Date()): PlanAudience {
   if (typeof dobYear !== 'number' || !Number.isFinite(dobYear) || dobYear < 1900) return 'youth';
-  return now.getFullYear() - dobYear > 18 ? 'adult' : 'youth';
+  // AGE-HELPERS-CONSOLIDATE (2026-10-04, option (a)): threshold line shared via lib/age/ageRules.ts
+  // (STRICT, `> 18`, rule); this file's own unknown/invalid-year guard above is unchanged.
+  return gapExceedsEighteenYears(dobYear, now) ? 'adult' : 'youth';
 }
 
 /** A jump, bound, hop, skip, depth drop or landing drill: anything with a flight phase and a landing. */

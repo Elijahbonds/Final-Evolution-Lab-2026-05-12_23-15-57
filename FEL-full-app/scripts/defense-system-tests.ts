@@ -18,7 +18,7 @@ import assert from 'node:assert';
 import { Vector3 } from '@babylonjs/core';
 import {
   DefenseController, applyDefenseOutcome, GUARD_IMPACT_WINDOW_MS,
-  GUARD_IMPACT_STAGGER_SEC, SUBSTITUTION_CHI_COST, SUBSTITUTION_COOLDOWN_SEC,
+  GUARD_IMPACT_STAGGER_SEC, GUARD_IMPACT_RECOVERY_SEC, SUBSTITUTION_CHI_COST, SUBSTITUTION_COOLDOWN_SEC,
 } from '../lib/babylon/core/DefenseSystem';
 import { FighterState, KARATE_ATTACKS, PARRY_WINDOW_MS } from '../lib/babylon/core/FightCore';
 
@@ -26,15 +26,35 @@ let pass = 0;
 const ok = (n: string, fn: () => void) => { fn(); pass++; console.log(`  ✓ ${n}`); };
 const NOW = 10_000;
 
+/** The test owns the clock. `inImpactRecovery` reads `performance.now()` instead of taking a time, so pin
+ *  that to `ms` for the length of `fn` and restore the real clock after, even on a throw. Unpinned, the
+ *  check compared NOW with the process's own uptime and failed whenever the run took over 10.5 s (a
+ *  loaded ci-suite). */
+function atClock<T>(ms: number, fn: () => T): T {
+  const own = Object.getOwnPropertyDescriptor(performance, 'now');
+  Object.defineProperty(performance, 'now', { value: () => ms, configurable: true, writable: true });
+  try {
+    assert.equal(performance.now(), ms, 'the fake clock pins performance.now()');
+    return fn();
+  } finally {
+    if (own) Object.defineProperty(performance, 'now', own);
+    else delete (performance as { now?: unknown }).now;
+  }
+}
+
 console.log('\nA. four distinct answers to the same heavy');
 ok('none / block / parry / guard-impact are all different', () => {
   const atk = KARATE_ATTACKS.heavy;
   const fresh = () => ({ atk: new FighterState(), def: new FighterState(), dc: new DefenseController() });
 
-  // 1. no defense
+  // 1. no defense — IMPROVE (2026-10-06): an undefended blow in range LANDS ('none' → 'hit'); it used to be mapped to
+  //    'whiff', which made every clean hit in Showdown and Duel a miss. Out of reach is its own answer now.
   let s = fresh();
   assert.equal(s.dc.resolve(atk, 1.5, false, NOW), 'none');
-  assert.equal(applyDefenseOutcome('none', s.atk, s.def, atk), 'whiff');
+  assert.equal(applyDefenseOutcome('none', s.atk, s.def, atk), 'hit');
+  assert.equal(s.dc.resolve(atk, atk.range + 0.01, false, NOW), 'outOfRange');
+  assert.equal(s.dc.resolve(atk, atk.range + 0.01, true, NOW), 'outOfRange', 'a guard does not matter to a swing that cannot reach');
+  assert.equal(applyDefenseOutcome('outOfRange', s.atk, s.def, atk), 'whiff');
 
   // 2. hold block (chips guard)
   s = fresh();
@@ -71,8 +91,13 @@ ok('flick without timing is NOT an impact; timing without flick is a parry', () 
 });
 ok('whiffed impact leaves you open (self recovery)', () => {
   const dc = new DefenseController();
+  const RECOVERY_MS = GUARD_IMPACT_RECOVERY_SEC * 1000;
+  atClock(NOW, () => assert.ok(!dc.inImpactRecovery, 'no recovery before a whiff'));
   dc.whiffImpact(NOW);
-  assert.ok(dc.inImpactRecovery);
+  atClock(NOW, () => assert.ok(dc.inImpactRecovery));
+  // the window is GUARD_IMPACT_RECOVERY_SEC long, from both sides
+  atClock(NOW + RECOVERY_MS - 1, () => assert.ok(dc.inImpactRecovery, 'still open 1 ms before recovery ends'));
+  atClock(NOW + RECOVERY_MS + 1, () => assert.ok(!dc.inImpactRecovery, 'recovered 1 ms after it ends'));
 });
 
 console.log('\nC. substitution');

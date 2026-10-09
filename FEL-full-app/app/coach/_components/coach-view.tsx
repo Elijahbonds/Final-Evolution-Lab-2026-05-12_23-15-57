@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { MessageSquare, BookOpen, Video, CalendarCheck, Users, Send } from 'lucide-react';
 import { CoachChat } from './coach-chat';
 import { ExerciseCatalogue } from './exercise-catalogue';
@@ -37,6 +38,9 @@ export function CoachView() {
 
   return (
     <main className="mx-auto max-w-[900px] px-4 py-4">
+      <Link href="/coach/session" className="mb-4 flex min-h-12 items-center justify-center rounded-xl bg-[#FF2D95] px-4 text-base font-bold text-black">
+        Court session
+      </Link>
       {/* Tab switcher */}
       <div className="flex gap-1 rounded-xl bg-[#0f0f13] p-1 mb-4 border border-white/6">
         {tabs.map((t) => {

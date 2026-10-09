@@ -41,13 +41,14 @@ import { duckFixture } from '@/lib/pose/baseline';
 import { restPose, moveJoints, synthesize, type GroundTruth, type Joints, type PoseFixture, type V3 } from '@/lib/pose/synth';
 import type { PoseFrame } from '@/lib/pose/landmarks';
 import type { BodyEvent } from '@/lib/pose/BodyReader';
-import { BODY_PROFILES, type BodyProfile } from './bodyProfiles';
+import { BODY_PROFILES, P3_RIDE_ROWS, type BodyProfile } from './bodyProfiles';
 import { CROUCH_DEAD, CROUCH_FULL, PEAK_HOLD_MS, STEP_SWING_MS } from './bodyFloor';
 import { STRIDE_ZERO_MS } from '@/lib/pose/bodyChannels';
 import { isWakeInput } from '@/lib/babylon/core/StartWake';
 import { START_HOLD_MS, LOST_PAUSE_MS } from '@/lib/babylon/core/BodySession';
 import type { FelInput } from '@/lib/babylon/core/InputBus';
 import type { ModePhase } from '@/lib/babylon/core/ModeHarness';
+import { ENABLED_BABYLON_MODES } from '@/lib/babylon/modes/registry';
 
 // ── the streams ──────────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -323,8 +324,16 @@ function hopPulses(p: BodyProfile, s: Stream, r: SeamReplay) {
 
 // ── THE GATE: every profile on every stream ──────────────────────────────────────────────────────────────────────
 
+// MOVEMENT PLAY P8 (2026-09-26): the P3 rows the boards and the racers had (P3_RIDE_ROWS, each P8 row's cut line) that the
+// table no longer carries, graded on the same oracle under their own keys (big air's and sprint's ARE the table's: their
+// modes claim the step); the P8 rows' ride controls (the carve, the wheel, the wings, the trim) have their own gate,
+// lib/pose/rideGate.test.ts, on the streams they exist for.
+const P3_GATE: BodyProfile[] = P3_RIDE_ROWS.filter((p) => p.bindings.length && BODY_PROFILES[p.modeId] !== p).map((p) => ({ ...p, key: `${p.key}_p3` }));
+/** A trim binding (P8 surf): its y is the crouch's rhythm, so a duck moves it (never x) */
+const trimOf = (p: BodyProfile) => p.bindings.some((b) => b.from === 'trim');
+
 describe('THE GATE — every profile, every stream (the oracle derived from the bindings)', () => {
-  it.each(PROFILES.map((p) => [p.key, p] as const))('%s', (_key, p) => {
+  it.each([...PROFILES, ...P3_GATE].map((p) => [p.key, p] as const))('%s', (_key, p) => {
     for (const s of streams()) {
       const tag = `${p.key} on ${s.name}`;
       const r = play(p, s, 'playing');
@@ -407,7 +416,9 @@ describe('THE GATE — every profile, every stream (the oracle derived from the 
         if (!hop) expect(mine.length, jt).toBe(0);
         const still: Win = [j.takeoff, j.landing + 250];
         const sticks = bus.filter((x) => x.e.t === 'stick' && inWin(x.t, still));
-        if (!s.runUp) expect(sticks.map((x) => x.t), `${jt}: the stick never moves in a jump`).toEqual([]);
+        // (P8 surf: the gather's extend into the pop is a trim stroke, told as the feet leave — y moves there, x never)
+        if (!s.runUp && trimOf(p)) for (const x of sticks) expect((x.e as { x: number }).x, `${jt}: x held (trim: y is the pump's)`).toBe(stateAt(bus, x.seq).x);
+        else if (!s.runUp) expect(sticks.map((x) => x.t), `${jt}: the stick never moves in a jump`).toEqual([]);
         else for (const x of sticks) expect((x.e as { y: number }).y, `${jt}: y held (run-up: x exempt)`).toBe(stateAt(bus, x.seq).y);
         if (!s.runUp) {
           expect(stateAt(bus, bus.find((x) => x.t >= wins[i][0])?.seq ?? Infinity).x, `${jt}: x ≡ 0 in place`).toBe(0);
@@ -434,18 +445,19 @@ describe('THE GATE — every profile, every stream (the oracle derived from the 
         const w: Win = [s.dip.from - 100, s.dip.stand + 300];
         const dt = `${tag}: DIP`;
         expect(bus.filter((x) => isPress(x.e) && inWin(x.t, w)).length, `${dt}: no press`).toBe(0);
-        for (const x of bus.filter((y) => y.e.t === 'stick' && inWin(y.t, w))) expect([(x.e as { x: number }).x, (x.e as { y: number }).y], dt).toEqual([0, 0]);
+        for (const x of bus.filter((y) => y.e.t === 'stick' && inWin(y.t, w))) expect([(x.e as { x: number }).x, trimOf(p) ? 0 : (x.e as { y: number }).y], dt).toEqual([0, 0]);
         const standSeq = r.steps.find((st) => st.t >= s.dip!.stand + 550)?.seq ?? Infinity;
         expect(stateAt(bus, standSeq), `${dt}: the trigger let go within 550 ms of standing`).toMatchObject({ rt: 0, lt: 0 });
-        if (s.dip.cm === 10) expect(bus, `${dt}: a 10 cm duck is silent`).toEqual([]);
-        if (!trig) expect(bus, `${dt}: nothing without a crouch binding`).toEqual([]);
+        const quiet = bus.filter((x) => !(trimOf(p) && x.e.t === 'stick' && (x.e as { x: number }).x === 0));   // P8: the trim's strokes aside
+        if (s.dip.cm === 10) expect(quiet, `${dt}: a 10 cm duck is silent`).toEqual([]);
+        if (!trig) expect(quiet, `${dt}: nothing without a crouch binding`).toEqual([]);
       }
     }
   });
 
-  it('covers what it claims: 28 profiles, 78 streams — 12 fixtures twice, 9 ducks, 45 scripts on three seeds', () => {
+  it('covers what it claims: one profile per enabled mode, 78 streams — 12 fixtures twice, 9 ducks, 45 scripts on three seeds', () => {
     const s = streams();
-    expect(PROFILES).toHaveLength(28);
+    expect(PROFILES).toHaveLength(ENABLED_BABYLON_MODES.size);
     expect(s.map((x) => x.kind).reduce<Record<string, number>>((a, k) => ({ ...a, [k]: (a[k] ?? 0) + 1 }), {})).toEqual({ fixture: 12, shipped: 12, duck: 9, script: 45 });
     const jumps = s.filter((x) => x.kind !== 'shipped').flatMap((x) => x.jumps.filter((j) => !j.dangling && j.takeoff >= x.t0 + SPLICE_MS));
     expect(jumps.length).toBeGreaterThanOrEqual(14 + 18 + 9);   // the fixtures' 14, the 18 scripted jumps, 9 in the dropout streams
@@ -456,7 +468,9 @@ describe('THE GATE — every profile, every stream (the oracle derived from the 
 
 // ── the session ──────────────────────────────────────────────────────────────────────────────────────────────────
 
-const SKATE = BODY_PROFILES.skateboard, DUNK = BODY_PROFILES.dunk;
+// MOVEMENT PLAY P8: the session rows ride the P3 skate row (a lean the scripted side step makes: the P8 carve is translation-
+// free by design, and the session does not care which source moved the stick)
+const SKATE = P3_GATE.find((p) => p.modeId === 'skateboard')!, DUNK = BODY_PROFILES.dunk;
 /** The last tracked frame before a dropout of a stream: its packet (read.t capture ms, arrivedAt page ms). */
 function lastSeenBefore(s: Stream, from: number): StreamPacket {
   const p = s.packets.filter((x) => x.read.tracking && x.read.t < from);
@@ -707,6 +721,8 @@ describe('what the body does press', () => {
   });
 
   it('Sprint and Big Air on run_in_place: one d-pad pulse per step the reader read, ◀ for the left foot, ▶ for the right', () => {
+    // (MOVEMENT PLAY P8: the table row, and the modes' cut line — both modes claim the step and grade it themselves,
+    // rideBody.gate.test G8, which takes it off the floor)
     const s = stream('run_in_place');
     const steps = s.packets.flatMap((p) => p.events.filter((e): e is Extract<BodyEvent, { kind: 'step' }> => e.kind === 'step'));
     expect(steps.length).toBeGreaterThanOrEqual(8);

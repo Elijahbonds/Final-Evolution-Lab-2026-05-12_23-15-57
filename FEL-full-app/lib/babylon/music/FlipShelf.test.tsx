@@ -52,8 +52,15 @@ describe('YOUR FILE needs the tick first', () => {
 });
 
 describe('what the shelf offers', () => {
-  it('FEL\'s pack, and public-domain entries only once the owner signs them (none today)', () => {
-    expect(shelfSources()).toEqual(FEL_SOURCES);
+  // MUSIC-SUITE P7 (2026-09-29): owner decision #37 signed six real public-domain entries onto the real shelf
+  // (lib/babylon/music/pdShelf.ts, PD_SHELF), so shelfSources() with no arguments now carries FEL's pack plus those
+  // six, not FEL_SOURCES alone. The rest of this test still drives shelfSources() with an EXPLICIT fixture array
+  // (pdSources([signed, ...])), so it is unaffected by whatever is really signed.
+  it('FEL\'s pack, plus the public-domain entries the owner has signed', () => {
+    const real = shelfSources();
+    expect(real.slice(0, FEL_SOURCES.length)).toEqual(FEL_SOURCES);
+    expect(real.length).toBe(FEL_SOURCES.length + 6);
+    expect(real.slice(FEL_SOURCES.length).every((s) => s.kind === 'public-domain' && s.group === 'public-domain')).toBe(true);
     const signed: PdEntry = {
       id: 'x_1917', title: 'A 1917 record', performer: 'A band', year: 1917, sourceUrl: 'https://www.loc.gov/item/jukebox-example/',
       whyFree: 'A US recording published in 1917, public domain since 2022; the tune is traditional.', ownerSignedAt: '2026-09-27T10:00:00Z',

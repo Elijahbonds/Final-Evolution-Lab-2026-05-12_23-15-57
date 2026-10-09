@@ -2,7 +2,10 @@ import { describe, it, expect } from 'vitest';
 import {
   verbsFor, stepSpeed, gradeDrop, speedAfterLanding, trickPoints, trickCompletes, FREERUN_TRICKS, TIERS, tierById,
   timeBonus, runGrade, RUN_MAX, VAULT_GATE, SPRINT_GATE, ROLL_WINDOW_S,
+  trickRotationComplete, trickProgress, trickTotalRad, TRICK_AROUND, steerAlpha, AIR_STEER_K, SURF_STEER_K, groundTurnRate, GROUND_TURN_RATE,
+  WALK_MAX, SLIDE_SEC, SLIDE_HOLD_MAX_SEC, slideEnds,
 } from './FreeRunCore';
+import { RUNNER_TURN_RATE } from './RunPosture';
 import { coursePieces, courseLength, checkpoints, respawnFor, overGap, routeAt } from '../modes/freeRunCourse';
 import { SKETCHY_SCORE_MULT } from './LandingSystem';
 
@@ -103,5 +106,69 @@ describe('FreeRun — the course', () => {
     expect(overGap(p, 0, gap.z + gap.d)).toBe(false);
     expect(routeAt(6.5, 3.6)).toBe('high');
     expect(routeAt(0, 0)).toBe('low');
+  });
+});
+
+// IMPROVE (2026-10-06): the owner-picked Free Run items that are pure rules
+describe('FreeRun — a trick is judged on the rotation it spun (item 1)', () => {
+  it('85 % of the turn is around; less is a bail, whatever the airtime', () => {
+    const t = FREERUN_TRICKS.front;
+    expect(trickTotalRad(t)).toBeCloseTo(2 * Math.PI, 9);
+    expect(trickTotalRad(FREERUN_TRICKS.spin)).toBeCloseTo(3 * Math.PI, 9);
+    expect(trickTotalRad(FREERUN_TRICKS.back)).toBeCloseTo(2 * Math.PI, 9);   // a negative turn is still a whole turn
+    expect(trickRotationComplete(t, trickTotalRad(t) * TRICK_AROUND)).toBe(true);
+    expect(trickRotationComplete(t, trickTotalRad(t) * (TRICK_AROUND - 0.01))).toBe(false);
+    // the late flip: plenty of air (a long drop) but thrown just before touchdown — half round is a bail now
+    expect(trickCompletes(t, 1.2)).toBe(true);
+    expect(trickRotationComplete(t, Math.PI)).toBe(false);
+  });
+  it('a trick thrown at take-off grades as it always did: the spin rate makes 85 % of the turn = 85 % of its airSec', () => {
+    for (const t of Object.values(FREERUN_TRICKS)) {
+      const rate = Math.abs(t.turns * 2 * Math.PI / t.airSec);
+      for (const air of [t.airSec * 0.5, t.airSec * 0.84, t.airSec * 0.86, t.airSec * 2]) {
+        const spun = Math.min(trickTotalRad(t), rate * air);   // the mode holds the spin at one rotation
+        expect(trickRotationComplete(t, spun), `${t.id} at ${air}`).toBe(trickCompletes(t, air));
+      }
+    }
+  });
+  it('the progress read-out is clamped 0..1', () => {
+    expect(trickProgress(FREERUN_TRICKS.side, -1)).toBe(0);
+    expect(trickProgress(FREERUN_TRICKS.side, 99)).toBe(1);
+  });
+});
+
+describe('FreeRun — steering is frame-rate independent (item 11)', () => {
+  it('at 60 fps the rates are the old per-frame lerps', () => {
+    expect(steerAlpha(AIR_STEER_K, 1 / 60)).toBeCloseTo(0.04, 9);
+    expect(steerAlpha(SURF_STEER_K, 1 / 60)).toBeCloseTo(0.12, 9);
+  });
+  it('one second of steer is the same at 30, 60 and 144 fps (a per-frame lerp was ~2.4× harder at 144)', () => {
+    const remaining = (k: number, hz: number) => { let r = 1; for (let i = 0; i < hz; i++) r *= 1 - steerAlpha(k, 1 / hz); return r; };
+    for (const k of [AIR_STEER_K, SURF_STEER_K]) for (const hz of [30, 144]) expect(remaining(k, hz)).toBeCloseTo(remaining(k, 60), 9);
+    expect(steerAlpha(AIR_STEER_K, 0)).toBe(0);
+  });
+});
+
+describe('FreeRun — the ground heading turns at the body rate at speed (item 12)', () => {
+  it('a walk still pivots; a run turns at the runner turn rate', () => {
+    expect(groundTurnRate(0)).toBe(Infinity);
+    expect(groundTurnRate(WALK_MAX)).toBe(Infinity);
+    expect(groundTurnRate(WALK_MAX + 0.01)).toBe(GROUND_TURN_RATE);
+    expect(groundTurnRate(RUN_MAX)).toBe(GROUND_TURN_RATE);
+    expect(GROUND_TURN_RATE).toBe(RUNNER_TURN_RATE);   // the velocity and the mesh come round together
+  });
+});
+
+describe('FreeRun — the LT slide hold (item 3)', () => {
+  it('a tap (B, or LT let go) is the SLIDE_SEC slide it always was', () => {
+    expect(slideEnds(SLIDE_SEC - 0.01, false, false)).toBe(false);
+    expect(slideEnds(SLIDE_SEC, false, false)).toBe(true);
+    expect(slideEnds(SLIDE_SEC, true, false)).toBe(true);
+    expect(slideEnds(0.1, true, false)).toBe(false);   // letting go early never cuts it short of the tap (a bar under it)
+  });
+  it('LT held carries it on to SLIDE_HOLD_MAX_SEC; a B slide cannot be held by a stray LT', () => {
+    expect(slideEnds(SLIDE_SEC + 0.3, true, true)).toBe(false);
+    expect(slideEnds(SLIDE_HOLD_MAX_SEC, true, true)).toBe(true);
+    expect(slideEnds(SLIDE_SEC + 0.3, false, true)).toBe(true);
   });
 });

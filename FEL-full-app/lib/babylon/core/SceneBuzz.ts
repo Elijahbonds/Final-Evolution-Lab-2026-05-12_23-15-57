@@ -8,7 +8,7 @@
 // QuizCore's scoreAnswer). Wrong = that player is out for the question and the other players may still answer (a steal)
 // with whatever clock is left. Everyone wrong, or the clock: nobody scores and streaks reset for those who missed.
 
-import { scoreAnswer, type QuizConfig, type QuizPack, type QuizQuestion } from './QuizCore';
+import { scoreAnswer, type QuizConfig, type QuizOption, type QuizPack, type QuizQuestion } from './QuizCore';
 
 export interface SceneCategory {
   id: 'courts' | 'combat' | 'outdoors' | 'stages';
@@ -25,9 +25,20 @@ export const SCENE_CATEGORIES: readonly SceneCategory[] = [
   { id: 'stages', name: 'STAGES', venueIds: ['gymnastics', 'dance', 'brain_brawl', 'who_scene_it', 'market_browse'], color: '#C58BFF' },
 ];
 
+/**
+ * IMPROVE (2026-10-06, #11): a question may name a venue WITH a combat arena's look over it — `karate_h2h@cage` is the
+ * dojo spec dressed as the Neon Cage (NexusVenue.applyArena). The part before `@` is the VENUE_SPECS key (its category);
+ * the part after is a combat/arenas.ts id. A plain id has no arena.
+ */
+export function splitSceneVenue(id: string): { venueId: string; arenaId: string | null } {
+  const at = id.indexOf('@');
+  return at < 0 ? { venueId: id, arenaId: null } : { venueId: id.slice(0, at), arenaId: id.slice(at + 1) || null };
+}
+
 export function categoryOf(venueId: string | undefined): SceneCategory | null {
   if (!venueId) return null;
-  return SCENE_CATEGORIES.find((c) => c.venueIds.includes(venueId)) ?? null;
+  const base = splitSceneVenue(venueId).venueId;
+  return SCENE_CATEGORIES.find((c) => c.venueIds.includes(base)) ?? null;
 }
 
 export interface SceneRound {
@@ -51,18 +62,88 @@ function shuffled<T>(items: readonly T[], rnd: () => number): T[] {
   return out;
 }
 
+export interface BuildRoundsOptions {
+  /** IMPROVE (#9): easy to hard — questions by `difficulty` inside each round, rounds by their mean difficulty. */
+  ramp?: boolean;
+  /** IMPROVE (#10): draw the wrong answers per play (varyDistractors) instead of the three the author wrote. */
+  vary?: boolean;
+}
+
 /** One round per category that has questions, `perCategory` questions each, categories and questions shuffled by seed.
- *  Options are shuffled too, so the right answer is not always the first card. */
-export function buildRounds(pack: QuizPack, seed: number, perCategory = 2): SceneRound[] {
+ *  Options are shuffled too, so the right answer is not always the first card. `opts` is off by default, so a caller
+ *  that passes nothing (the Arena's ceiling check) draws exactly what it always drew. */
+export function buildRounds(pack: QuizPack, seed: number, perCategory = 2, opts: BuildRoundsOptions = {}): SceneRound[] {
   const rnd = mulberry32(seed);
   const rounds: SceneRound[] = [];
   for (const cat of shuffled(SCENE_CATEGORIES, rnd)) {
     const pool = pack.questions.filter((q) => categoryOf(q.sceneVenueId)?.id === cat.id);
     if (pool.length === 0) continue;
-    const picked = shuffled(pool, rnd).slice(0, perCategory).map((q) => ({ ...q, options: shuffled(q.options, rnd) }));
+    const picked = shuffled(pool, rnd).slice(0, perCategory).map((q) => {
+      const options = opts.vary ? varyDistractors(q, categoryAnswers(pack, cat.id), rnd) : q.options;
+      return { ...q, options: shuffled(options, rnd) };
+    });
     rounds.push({ category: cat, questions: picked });
   }
-  return rounds;
+  return opts.ramp ? rampRounds(rounds) : rounds;
+}
+
+const meanDifficulty = (r: SceneRound): number => r.questions.reduce((s, q) => s + q.difficulty, 0) / Math.max(1, r.questions.length);
+
+/**
+ * IMPROVE (2026-10-06, #9): every question carries a `difficulty` and the draw never looked at it, so a match could open
+ * on the Neuro Arena (3) and close on the skatepark (1). Easy to hard: inside a round by difficulty, and the rounds by their
+ * mean. Both sorts are stable, so the seeded shuffle still decides between equals — a replay is not the same order.
+ */
+export function rampRounds(rounds: readonly SceneRound[]): SceneRound[] {
+  return rounds
+    .map((r) => ({ ...r, questions: [...r.questions].sort((a, b) => a.difficulty - b.difficulty) }))
+    .map((r, i) => ({ r, i, d: meanDifficulty(r) }))
+    .sort((a, b) => a.d - b.d || a.i - b.i)
+    .map((x) => x.r);
+}
+
+/** The right answers of a category's questions — the pool #10 draws plausible wrong answers from (a court for a court). */
+export function categoryAnswers(pack: QuizPack, categoryId: SceneCategory['id']): QuizOption[] {
+  const seen = new Set<string>();
+  const out: QuizOption[] = [];
+  for (const q of pack.questions) {
+    if (categoryOf(q.sceneVenueId)?.id !== categoryId) continue;
+    const right = q.options.find((o) => o.id === q.answer);
+    if (right && !seen.has(right.label)) { seen.add(right.label); out.push(right); }
+  }
+  return out;
+}
+
+/**
+ * IMPROVE (2026-10-06, #10): each question's three wrong answers were fixed, so a returning player learned the option SET
+ * ("the one with Carnival Court in it is Venice") instead of the place. Now one of the author's distractors always stays
+ * (they were picked to be confusable) and the other two are drawn from the author's rest plus the category's other right
+ * answers, so a court question is still asked against courts. The right option is untouched; ids stay unique. A question
+ * whose pool cannot fill three keeps the author's set.
+ */
+export function varyDistractors(q: QuizQuestion, pool: readonly QuizOption[], rnd: () => number): QuizOption[] {
+  const right = q.options.find((o) => o.id === q.answer);
+  if (!right) return q.options;
+  const authored = q.options.filter((o) => o.id !== q.answer);
+  const want = authored.length;
+  const [keep, ...restAuthored] = shuffled(authored, rnd);
+  if (!keep) return q.options;
+  const labels = new Set([right.label, keep.label]);
+  const candidates: QuizOption[] = [];
+  for (const o of [...restAuthored, ...pool]) {
+    if (labels.has(o.label)) continue;
+    labels.add(o.label);
+    candidates.push(o);
+  }
+  if (candidates.length < want - 1) return q.options;
+  const ids = new Set([right.id, keep.id]);
+  const drawn = shuffled(candidates, rnd).slice(0, want - 1).map((o) => {
+    let id = o.id;
+    for (let n = 2; ids.has(id); n++) id = `${o.id}_${n}`;
+    ids.add(id);
+    return id === o.id ? o : { ...o, id };
+  });
+  return [right, keep, ...drawn];
 }
 
 export interface BuzzPlayer {

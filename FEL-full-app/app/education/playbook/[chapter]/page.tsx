@@ -3,6 +3,7 @@ import { notFound, redirect } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { authOptions } from '@/lib/auth';
+import { loginPath } from '@/lib/auth/safeNext';
 import { TabPage } from '@/components/shell/tab-page';
 import { ChapterReader } from '@/components/education/chapter-reader';
 import { CHAPTERS, chapterByNumber } from '@/lib/education/course';
@@ -19,7 +20,7 @@ export default async function ChapterPage({ params }: { params: { chapter: strin
   const n = Number(params?.chapter);
   const chapter = Number.isFinite(n) ? chapterByNumber(n) : null;
   if (!chapter) notFound();
-  if (!session) redirect(`/login?next=%2Feducation%2Fplaybook%2F${chapter.number}`);
+  if (!session) redirect(loginPath(`/education/playbook/${chapter.number}`));
 
   // A drill shows its film when one has been ingested; otherwise the steps carry it on their own.
   const filmFor = Object.fromEntries(

@@ -90,6 +90,8 @@ async function main() {
     'dunk-game-3d.tsx': 'dunk',
     'one-v-one-3d.tsx': 'onevone',
     'basketball-3d.tsx': 'basketball',
+    'baseball-3d.tsx': 'baseball',
+    'golf-3d.tsx': 'golf',
     'karate-3d.tsx': 'karate',
     'karate-versus-3d.tsx': 'karateVs',
     'soccer-3d.tsx': 'soccer',
@@ -102,6 +104,54 @@ async function main() {
       assert.ok(src.includes(`registerFelMode('${id}'`), `${file} must registerFelMode('${id}')`);
       assert.ok(src.includes(`unregisterFelMode('${id}')`), `${file} must unregisterFelMode('${id}')`);
       assert.ok(/getState:/.test(src) && /sendInput:/.test(src), `${file} bridge needs getState + sendInput`);
+    }
+  });
+
+  const babylonWired: Record<string, string> = {
+    'aero-aces-babylon.tsx': 'aeroaces',
+    'air-session-babylon.tsx': 'modeKey',
+    'board-babylon.tsx': 'modeKey',
+    'brainbrawl-babylon.tsx': 'brainbrawl',
+    'duel-babylon.tsx': 'duel',
+    'football-babylon.tsx': 'football',
+    'freerun-babylon.tsx': 'freerun',
+    'karate-babylon.tsx': 'karate',
+    'karate-vs-babylon.tsx': 'karate_vs',
+    'mixedcombat-babylon.tsx': 'mixedcombat',
+    'sprint-babylon.tsx': 'modeKey',
+    'timing-babylon.tsx': 'modeKey',
+    'velocity-kart-babylon.tsx': 'velocitykart',
+    'who-scene-it-babylon.tsx': 'who_scene_it',
+  };
+  const babylonSkipped = [
+    'basketball-babylon.tsx',
+    'carnival-babylon.tsx',
+    'dunk-babylon.tsx',
+    'dunkduel-babylon.tsx',
+    'showdown-babylon.tsx',
+    'three-point-babylon.tsx',
+    'three-v-three-babylon.tsx',
+  ];
+  check(`non-hoops Babylon hosts register with the playtest bridge (${Object.keys(babylonWired).length})`, () => {
+    const gamesDir = path.join(ROOT, 'components', 'games');
+    const actual = fs.readdirSync(gamesDir).filter((f) => f.endsWith('-babylon.tsx')).sort();
+    const expected = [...Object.keys(babylonWired), ...babylonSkipped].sort();
+    assert.deepStrictEqual(actual, expected, 'babylon host manifest must list every *-babylon.tsx file');
+
+    const bridgeSrc = fs.readFileSync(path.join(gamesDir, 'use-babylon-playtest-bridge.ts'), 'utf8');
+    assert.ok(bridgeSrc.includes('registerFelMode(modeId'), 'Babylon playtest bridge must register modes');
+    assert.ok(bridgeSrc.includes('unregisterFelMode(modeId'), 'Babylon playtest bridge must unregister modes');
+    assert.ok(bridgeSrc.includes('emitPlaytestInput'), 'Babylon playtest bridge must route sendInput to InputBus');
+
+    for (const [file, id] of Object.entries(babylonWired)) {
+      const src = fs.readFileSync(path.join(gamesDir, file), 'utf8');
+      const call = id === 'modeKey' ? 'useBabylonPlaytestBridge(modeKey' : `useBabylonPlaytestBridge('${id}'`;
+      assert.ok(src.includes("use-babylon-playtest-bridge"), `${file} must import the Babylon playtest bridge`);
+      assert.ok(src.includes(call), `${file} must call ${call}`);
+    }
+    for (const file of babylonSkipped) {
+      const src = fs.readFileSync(path.join(gamesDir, file), 'utf8');
+      assert.ok(!src.includes('use-babylon-playtest-bridge'), `${file} stays off this lane's playtest bridge`);
     }
   });
 

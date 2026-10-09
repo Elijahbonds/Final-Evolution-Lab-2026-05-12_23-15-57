@@ -5,9 +5,12 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { getStripe, STRIPE_PRODUCTS, COSMETIC_SKUS } from '@/lib/stripe';
-import { STUDIO_CREDIT_PACKS } from '@/lib/studio-plan';
-import { isStudioCreatorEnabled } from '@/lib/flags';
+import { isStudioCreatorEnabled, isVirtualPurchasesEnabled } from '@/lib/flags';
 import { paymentMethodsFor } from '@/lib/stripe-payment-methods';   // Cash App / BNPL / PayPal where each is actually supported
+import { stripeTestGate } from '@/lib/coach-store/stripeMode';
+import { storeClosed } from '@/lib/coach-store/gate';
+import { siteOrigin } from '@/lib/stripe/site-origin';
+import { ensureStripeCustomer, createStudioCreditsCheckout } from '@/lib/stripe/product-checkout';
 import { previewPurchase } from '@/lib/store/coachListing';
 import { loadSharedProfile } from '@/lib/profile/profileServer';
 import { PLATFORM_PROTOCOLS } from '@/lib/profile/protocol';
@@ -28,7 +31,20 @@ export async function POST(req: NextRequest) {
 
   if (!product) return NextResponse.json({ error: 'product required' }, { status: 400 });
 
-  const origin = req.headers.get('origin') || process.env.NEXTAUTH_URL || '';
+  // STORE-READY B2: no key at all is 409 store_closed BEFORE getStripe() can throw (it used to 500
+  // unhandled). This route's own LIVE-key fence is B10's flag (below) — stripeTestGate's
+  // live-mode-off arm belongs to the COACH store (COACH_STORE_LIVE), not to these products.
+  const gate = stripeTestGate();
+  if (!gate.ok && gate.reason === 'payments_not_set_up') return storeClosed(gate.reason);
+  // STORE-READY B10: while the live-key fence is off EVERY product this route sells (FEL Pro weekly/
+  // monthly, STUDIO_CREATOR, FEL Coach, FEL Facility, the legacy coach block, cosmetics, studio
+  // credits, marketplace — and anything unknown) is 409 store_closed, before getStripe()/customer
+  // creation. Only the coach store (its own checkout path) sells real money at launch.
+  if (!isVirtualPurchasesEnabled()) return storeClosed('virtual_purchases_off');
+  // STORE-READY B3: Stripe URLs come from the server constant NEXTAUTH_URL, never the Origin header.
+  const site = siteOrigin();
+  if (!site) return storeClosed('site_url_not_set');
+  const origin: string = site;
   const stripe = getStripe();
 
   try {
@@ -40,15 +56,8 @@ export async function POST(req: NextRequest) {
 
   async function handleCheckout(): Promise<NextResponse> {
 
-  // Ensure Stripe customer exists
-  let stripeCustomer = await prisma.stripeCustomer.findUnique({ where: { userId } });
-  if (!stripeCustomer) {
-    const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
-    const cust = await stripe.customers.create({ email: user?.email ?? undefined, metadata: { userId } });
-    stripeCustomer = await prisma.stripeCustomer.create({
-      data: { userId, stripeCustomerId: cust.id },
-    });
-  }
+  // Ensure Stripe customer exists (shared with the studio credits POST via lib/stripe/product-checkout).
+  const stripeCustomerId = await ensureStripeCustomer(stripe, userId);
 
   // --- Subscription product ---
   if (product === 'FEL_PRO' || product === 'FEL_PRO_MONTHLY' || product === 'STUDIO_CREATOR'
@@ -66,7 +75,7 @@ export async function POST(req: NextRequest) {
     if (existing) return NextResponse.json({ error: 'Already subscribed' }, { status: 409 });
 
     const checkoutSession = await stripe.checkout.sessions.create({
-      customer: stripeCustomer.stripeCustomerId,
+      customer: stripeCustomerId,
       mode: 'subscription',
       payment_method_types: paymentMethodsFor('subscription') as never,
       line_items: [{
@@ -136,7 +145,7 @@ export async function POST(req: NextRequest) {
 
     // price from the listing, in cents, never from the caller
     const checkoutSession = await stripe.checkout.sessions.create({
-      customer: stripeCustomer.stripeCustomerId,
+      customer: stripeCustomerId,
       mode: 'payment',
       payment_method_types: paymentMethodsFor('payment') as never,
       line_items: [{
@@ -171,7 +180,7 @@ export async function POST(req: NextRequest) {
     }
     const sku = COSMETIC_SKUS[itemKey];
     const checkoutSession = await stripe.checkout.sessions.create({
-      customer: stripeCustomer.stripeCustomerId,
+      customer: stripeCustomerId,
       mode: 'payment',
       payment_method_types: paymentMethodsFor('payment') as never,
       line_items: [{
@@ -194,27 +203,11 @@ export async function POST(req: NextRequest) {
     if (!isStudioCreatorEnabled()) {
       return NextResponse.json({ error: 'feature_disabled' }, { status: 403 });
     }
-    if (!itemKey || !STUDIO_CREDIT_PACKS[itemKey]) {
-      return NextResponse.json({ error: 'Invalid credit pack' }, { status: 400 });
-    }
-    const pack = STUDIO_CREDIT_PACKS[itemKey];
-    const checkoutSession = await stripe.checkout.sessions.create({
-      customer: stripeCustomer.stripeCustomerId,
-      mode: 'payment',
-      payment_method_types: paymentMethodsFor('payment') as never,
-      line_items: [{
-        price_data: {
-          currency: 'usd',
-          product_data: { name: pack.label, description: `${pack.credits} NEXUS Studio build credits` },
-          unit_amount: pack.priceUsdCents,
-        },
-        quantity: 1,
-      }],
-      metadata: { userId, product: 'STUDIO_CREDITS', itemKey, credits: String(pack.credits) },
-      success_url: `${origin}/studio?credits=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${origin}/studio?credits=cancel`,
-    });
-    return NextResponse.json({ url: checkoutSession.url });
+    // B10: the session itself lives in lib/stripe/product-checkout, shared in-process with
+    // app/api/studio/credits POST — identical line item, metadata, mode and URLs.
+    const result = await createStudioCreditsCheckout({ stripe, userId, itemKey: itemKey ?? '', origin });
+    if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status });
+    return NextResponse.json({ url: result.url });
   }
 
   // --- Marketplace listing ---
@@ -235,7 +228,7 @@ export async function POST(req: NextRequest) {
     if (alreadyBought) return NextResponse.json({ error: 'Already purchased' }, { status: 409 });
 
     const checkoutSession = await stripe.checkout.sessions.create({
-      customer: stripeCustomer.stripeCustomerId,
+      customer: stripeCustomerId,
       mode: 'payment',
       payment_method_types: paymentMethodsFor('payment') as never,
       line_items: [{

@@ -10,6 +10,8 @@
  * Roles map to models by config so providers can be swapped.
  */
 
+import { abacusEnabled, AiDisabledError } from '@/lib/abacus/killSwitch';
+
 // ── Model role mapping ────────────────────────────────────────────
 
 export type CellRole = 'architect' | 'builder' | 'critic' | 'summarizer';
@@ -138,6 +140,8 @@ export async function callLLM(opts: {
   jsonMode?: boolean;
   maxTokens?: number;
 }): Promise<Response> {
+  // ABACUS-KILL: no request leaves while the switch is off (lib/abacus/killSwitch.ts).
+  if (!abacusEnabled()) throw new AiDisabledError('callLLM');
   const model = getModelForRole(opts.role);
   const body: Record<string, any> = {
     model,
@@ -250,6 +254,7 @@ export async function completeText(opts: {
   jsonMode?: boolean;
   maxTokens?: number;
 }): Promise<string> {
+  if (!abacusEnabled()) throw new AiDisabledError('completeText');
   const model = getModelForRole(opts.role);
   const body: Record<string, any> = {
     model,

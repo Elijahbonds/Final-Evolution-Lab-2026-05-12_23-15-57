@@ -3,7 +3,9 @@
 // HOTFIX (2026-09-24): the juice never asked. JuiceKit's hitStop, slowMo and flash, the harness's camera shake, the
 // rig's exposure flash and the impact pulse all fired the same way for everybody, and none of them read
 // `prefers-reduced-motion` — in movement play the player is moving their whole body while the screen flashes. The
-// page's own CSS already honoured the OS setting (fel-rise, fel-breath, the CTA); the games were the part that didn't.
+// page's own CSS already honoured the OS setting (fel-rise, the Mirror's old fel-breath ring, the CTA); the games were
+// the part that didn't. (MIRROR-COACH P7, 2026-09-29: that CSS ring is gone — every breath ring is now
+// components/breath/Pacer.tsx, which reads the answer below.)
 //
 // THE RULE: the OS setting is the default, and the app can override it either way (a player who wants calm without
 // changing their phone, or one whose phone says "reduce" but wants the full show). Stored like the app's other client
