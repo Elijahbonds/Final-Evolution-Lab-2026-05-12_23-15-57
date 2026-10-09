@@ -25,7 +25,7 @@ import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrar
 import { DEFAULT_HERO_URL } from '../core/athleteRoster';
 import { buildPoseClip, REF_HIPS_Y } from '../anim/poseClip';
 import { seatedKeys, driverLean, WHEEL_RADIUS, STEER_LOCK_RAD } from '../anim/authored/seated';
-import { mountSteerGrip } from '../anim/SteerGrip';
+import { mountSteerGrip, type SteerGripHandle } from '../anim/SteerGrip';
 import type { AnimationGroup } from '@babylonjs/core';
 import { VenueKit } from '../visual/VenueKit';
 import { SoundKit } from '../audio/SoundKit';
@@ -76,7 +76,7 @@ import {
 import { readKart } from '../racing/garage';
 import { KART_TUNE } from '../racing/kartTune';   // 10-phase pass, phase 3: the mode's speed feel in one config
 import { spawnKartDrive, stepKartDrive, type KartDrive } from '../racing/RivalDriver';   // 10-phase pass, phase 5: the field drives the same model
-import { dressVehicle } from '../racing/vehicleBody';   // models pass phase 5: the Meshy kart bodies over the primitives
+import { dressVehicle, kartCockpit, type KartCockpit } from '../racing/vehicleBody';   // models pass phase 5: the Meshy kart bodies over the primitives
 import { fitVehicleLight, vehicleEnvFor, VEHICLE_ENV_BASE, type VehicleLightHandle } from '../racing/vehicleLight';   // 10-phase pass, phase 7
 import { SpeedLines, DustEmitter, SparkEmitter } from '../racing/speedFx';   // 10-phase pass, phase 8 (+ IMPROVE #15: the sparks)
 import { ExhaustPuffs, bobAmp, bobFreq, frontWheelAngle, rivalSteer, wheelAngle, wrapPi } from '../racing/vehicleMotion';   // 10-phase pass, phase 9
@@ -107,6 +107,9 @@ let state: KartState | null = null;
 let driver: SpawnedCharacter | null = null;
 let seated: AnimationGroup | null = null;
 let steerWheel: Mesh | null = null;
+/** KART FACING (2026-10-08): the hands' grip, and the dressed body's cockpit once it has arrived (fitCockpit seats the driver in it). */
+let steerGrip: SteerGripHandle | null = null;
+let bodyCockpit: KartCockpit | null = null;
 let venueRoot: TransformNode | null = null;
 let worldGround: Mesh | null = null;
 let trackside: TracksideHandle | null = null;
@@ -362,6 +365,24 @@ const KART_RIDE_Y = 0.08 - KART_GROUND_Y;
 const KART_HIPS = { y: -0.08, z: -0.30 };
 /** The wheel, at the height and reach the posed hands MEASURED out to on the live rig. */
 const KART_WHEEL = { y: 0.28, z: -0.02, tiltDeg: 22 };
+
+/**
+ * KART FACING (2026-10-08, owner: "the model doesn't drive with his hands"): seat the driver in the DRESSED body's cockpit.
+ *
+ * The pose and the grip were built around the primitive kart's wheel (KART_WHEEL), and that wheel is hidden the moment the Meshy body
+ * arrives — the body's own wheel is ~22 cm further forward, taller, and leans the other way (vehicleBody KART_COCKPIT). So the hands
+ * held a ring nobody could see. Once the body is on (and the driver seated, in either order): the hidden steering hub moves onto the
+ * body's wheel, the driver slides into the bucket far enough for the arms to reach it, and the grip is re-recorded ON that rim. The
+ * wheel keeps turning under the hands exactly as before (the hub's child is the same ring), so the steer damping is unchanged.
+ */
+function fitCockpit(): void {
+  const c = bodyCockpit, wheel = steerWheel, hub = steerWheel?.parent as TransformNode | null | undefined;
+  if (!c || !wheel || !hub || !driver || !steerGrip) return;
+  hub.position.set(0, KART_GROUND_Y + c.wheel.y, c.wheel.z);
+  hub.rotation.x = (90 - c.wheel.tiltDeg) * Math.PI / 180;
+  driver.root.position.z = c.hipsZ;
+  steerGrip.regrip({ radius: c.wheel.radius, clockDeg: c.gripClockDeg });
+}
 
 function buildKart(ctx: ModeContext): TransformNode {
   const rig = new TransformNode('kart', ctx.scene);
@@ -1198,6 +1219,7 @@ return {
       vehicleLight?.include(h.root.getChildMeshes());
       for (const m of prims) if (m !== steerWheel && !m.isDisposed()) m.dispose();
       kartWheels = [];
+      bodyCockpit = kartCockpit(kartId); fitCockpit();   // KART FACING: the hands go to the wheel you can see
     }); }
 
     state = spawnKart(course.start.at, course.start.heading);
@@ -1241,7 +1263,8 @@ return {
       // INTEGRATION (2026-10-06): inside the seated branch. The one-line hook had split `if (seatClip)` from its `else`,
       // so the warning fired on a missing wheel instead of a missing seat, and a STANDING driver (no seat clip) had his
       // arms reached to the wheel. The grip records the seated pose's hands, so it only means anything once seated.
-      if (steerWheel) mountSteerGrip(ctx.scene, driver.skeleton, steerWheel);
+      if (steerWheel) steerGrip = mountSteerGrip(ctx.scene, driver.skeleton, steerWheel);
+      fitCockpit();   // KART FACING: the body may have arrived before the driver did
     }
     else console.warn('[FEL-KART] seated pose could not be built — the driver stands');
 
@@ -1819,7 +1842,7 @@ return {
     // is a scene-level AnimationGroup and has to be stopped and released on its own
     seated?.stop(); seated?.dispose(); seated = null;
     driver?.dispose(); driver = null;
-    steerWheel = null;
+    steerWheel = null; steerGrip?.dispose(); steerGrip = null; bodyCockpit = null;
     venueRoot?.dispose(); venueRoot = null; worldGround?.dispose(); worldGround = null; trackside?.dispose(); trackside = null; clouds?.dispose(); clouds = null;
     vehicleLight?.dispose(); vehicleLight = null;
     speedLines?.dispose(); speedLines = null; dustFx?.dispose(); dustFx = null;
