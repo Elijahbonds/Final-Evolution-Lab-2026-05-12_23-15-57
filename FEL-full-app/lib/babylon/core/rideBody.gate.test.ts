@@ -453,7 +453,7 @@ describe('G10 PAD UNCHANGED', () => {
     // every pop clears wasGrounded, so update never stamps the pop's own take-off as a roll-off (the body coyote's guard)
     expect(s.match(/poppedAt = (?:performance\.now\(\)|now); wasGrounded = false;/g)?.length).toBe(3);
     expect(s).toMatch(/if \(!bodySynced\) \{ rideIntents\.sync\(ctx\.body\?\.\(\) \?\? null\); bodySynced = true; \}\n\s*bodyVerbs\(ctx\);/);
-    expect(s).toMatch(/air\.update\(dt, stickFromBody \? 0 : stickX, 0\)/);
+    expect(s).toMatch(/air\.update\(dt, stickFromBody(?: \|\| caughtSpin)? \? 0 : stickX, 0\)/);   // the body gate stays; a caught named spin also holds the pad's (SKATE-SCORE §2, owner-approved)
     expect(s).toMatch(/if \(e\.btn === 'X' && rig\.rider\.grounded && !grindCh && !manualCh\) \{\n\s*if \(move\.push\(\)\)/);
     expect(s).toMatch(/rideIntents\.poll\(ctx\.body\?\.\(\) \?\? null,/);
   });
