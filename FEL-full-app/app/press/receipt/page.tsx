@@ -1,10 +1,12 @@
 import Link from 'next/link';
+import type Stripe from 'stripe';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { formatLabel, getBook, getOffer } from '@/lib/books/bookCatalog';
 import { assertStripeTestKey, bookStripeSecret, getBookStripe } from '@/lib/books/bookCheckout';
 import { mintReaderGrant, normalizeBookEmail } from '@/lib/books/bookEntitlements';
 import { prismaBookStore } from '@/lib/books/bookStore';
+import { recordPaidBookSession } from '@/lib/books/bookFulfill';
 import { PressFrame } from '@/components/press/press-frame';
 import { AudioPlayer } from '@/components/press/audio-player';
 import { DownloadButton } from '@/components/press/download-button';
@@ -38,10 +40,13 @@ export default async function ReceiptPage({ searchParams }: { searchParams: { se
   let amount: number | null = null;
   let currency = 'usd';
   let lookupError: string | null = null;
+  let checkoutForGrant: Stripe.Checkout.Session | null = null;
   try {
     assertStripeTestKey(bookStripeSecret());
     const checkout = await getBookStripe().checkout.sessions.retrieve(sessionId);
-    paid = checkout.payment_status === 'paid' || checkout.payment_status === 'no_payment_required';
+    // MERGE (2026-10-09): 'paid' only, as the release's isPaidSession (a $0 session is a misconfiguration).
+    paid = checkout.payment_status === 'paid' && checkout.status !== 'expired';
+    checkoutForGrant = checkout;
     email = normalizeBookEmail(checkout.customer_details?.email || checkout.customer_email || '');
     offerId = checkout.metadata?.offerId || '';
     amount = checkout.amount_total;
@@ -50,6 +55,18 @@ export default async function ReceiptPage({ searchParams }: { searchParams: { se
   } catch (err) {
     console.error('[press/receipt]', err instanceof Error ? err.message : err);
     lookupError = 'Checkout could not be confirmed from here. If you were charged, the receipt email from Stripe is the record.';
+  }
+
+  // MERGE (2026-10-09), SEC-F4 NO-WEBHOOK (#200): this page fulfils the purchase itself from what the SERVER just
+  // retrieved from Stripe (paid, product BOOK, the session's own buyer email), so a shop with no webhook configured
+  // still grants. It runs under the session key the webhooks use: webhook + this page + a reload grant once. The
+  // grant goes to the session's buyer, never to the visitor, so the session id is a lookup key and nothing more.
+  if (paid && checkoutForGrant && !lookupError) {
+    try {
+      await recordPaidBookSession(checkoutForGrant, prismaBookStore());
+    } catch (err) {
+      console.error('[press/receipt] fulfil', err instanceof Error ? err.message : err);
+    }
   }
 
   const offer = getOffer(offerId);

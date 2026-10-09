@@ -126,11 +126,14 @@ describe('haptics: a buzz where the phone has one, the truth where it does not',
   });
 });
 
-describe('the hints are opt-in: only the Flip asks', () => {
-  it('no mode but music_flip sets a hint (every other controller renders as it did)', () => {
+describe('the hints are opt-in: only the Academy\'s two phone pages ask', () => {
+  // MUSIC-SUITE P6 (2026-09-25): + music_perform (PERFORM's four lanes buzz; its PAUSE row is compact; no velocity — a lane
+  // is hit or not). Every other controller still sets none.
+  it('no mode but music_flip and music_perform sets a hint (every other controller renders as it did)', () => {
     for (const [id, c] of Object.entries(MODE_CONTROLLERS)) {
       const h = hintsOf(c.schemas);
       if (id === 'music_flip') expect(h).toEqual({ haptics: true, velocity: true, compact: true });
+      else if (id === 'music_perform') expect(h).toEqual({ haptics: true, compact: true });
       else expect(hasHints(h), id).toBe(false);
     }
   });

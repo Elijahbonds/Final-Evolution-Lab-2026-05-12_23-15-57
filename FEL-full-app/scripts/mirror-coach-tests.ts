@@ -151,18 +151,35 @@ function runSquat(audit: SquatAudit, fault: SquatPose, t0 = 700): SquatFault[] {
   const h = readFileSync(new URL('../app/play/mirror/_components/mirror-harness.tsx', import.meta.url), 'utf8');
   // Matched on the pattern title map rather than one literal tuple, and case-insensitively on the stage copy:
   // the guided flow is the contract, the exact shouting is not.
-  ok(/squat:\s*'Corrective Squat'/.test(h), 'the picker offers the guided corrective squat');
+  // MIRROR-COACH P4 lane 1 (registry-and-lunge, 2026-09-25): the title now reads from the pattern-audit registry
+  // (lib/mirror/patterns.ts MIRROR_PATTERNS, squat entry one) rather than a literal string in the harness itself —
+  // checked at the SOURCE (squatPattern.ts's own label) rather than re-asserting a copy of it here.
+  const squatPatternSrc = readFileSync(new URL('../lib/mirror/squatPattern.ts', import.meta.url), 'utf8');
+  ok(/squat:\s*SQUAT_PATTERN\.label/.test(h) && /label:\s*'Corrective Squat'/.test(squatPatternSrc),
+    'the picker offers the guided corrective squat (its title comes from the pattern registry, entry one)');
   ok(h.includes("patternRef.current === 'squat'"), 'the squat pattern runs its own analysis');
   ok(h.includes("analysis: patternRef.current === 'squat' ? 'squat' : 'zones'"), 'the compositor is routed by pattern');
   ok(h.includes('cueEngineRef.current.decide('), 'measured faults feed the cue engine');
   ok(h.includes('speak(evt.text)'), 'cues are voiced (on-device speechSynthesis)');
   ok(/breathe first/i.test(h), 'the session breathes before it moves (the Blueprint)');
-  ok(h.includes('fel-breath'), 'the pacer animates the breath cadence');
+  // MIRROR-COACH P7 (2026-09-29): the check used to be h.includes('fel-breath') — the CSS loop the stage drew. The stage
+  // now draws the ONE pacer (components/breath/Pacer.tsx) with the squat's own spec on the stage's pose clock, so the
+  // check names both halves: the shared component, fed SQUAT_BREATH_PACER at breathElapsedSec. Not relaxed: the old
+  // string would still pass on a page that drew a ring on no clock at all; this one fails if either half goes.
+  // MIRROR-FIRST P1 (2026-10-07), test changed: the pacer's seconds moved from a setState per pose frame into the harness's
+  // frame view (painted at HUD_HZ, use-mirror-camera.ts useFrameView), so the write reads `hud.set({ breathSec: … })`. The
+  // check still fails if the seconds stop coming from breathElapsedSec on the stage's pose clock, or the pacer stops
+  // reading them.
+  ok(/<BreathPacer[^>]*spec=\{SQUAT_BREATH_PACER\}[^>]*elapsedSec=\{breathSec\}/.test(h) && h.includes('hud.set({ breathSec: breathElapsedSec(step.state, now) })'),
+    'the pacer animates the breath cadence (the one pacer, on the stage\'s pose clock)');
   // The negative checks read the CODE, not the comments that explain what was removed.
   const code = h.replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
   // MIRROR-COACH P1 (2026-09-25): there is no band, and an unverified knee read is never painted as a correction
   ok(!/MY BAND|band pulls/i.test(code), 'no overlay claims a band');
-  ok(h.includes('paintSkeleton(pose, p, paintableFaults(was, cueableFaults(squat.faults)))'), 'the knee overlay only paints a CUEABLE knee fault');
+  // MIRROR-COACH P4 review (2026-09-25): a 4th argument (squat.valgusBySide) now rides along, so the overlay can paint
+  // only the side actually caving (kneeOverlay.ts's own `sides` filter) instead of both knees for a one-sided cave.
+  // (MIRROR-COACH P9 fix, 2026-09-30: the painter also takes the voice's fade — CueEngine.isVoiceable)
+  ok(h.includes('paintSkeleton(pose, p, paintableFaults(was, cueableFaults(squat.faults), (f) => cueEngineRef.current.isVoiceable(f as FaultId)), squat.valgusBySide)'), 'the knee overlay only paints a CUEABLE knee fault, on the side actually caving — and only on a rep the fade lets it be cued');
   ok(/VALGUS_CUE_VERIFIED && faults\.includes\('kneeValgus'\)/.test(h), 'the knee overlay is behind VALGUS_CUE_VERIFIED');
   // MIRROR-COACH P1 review (2026-09-25): "Recording" on a live camera page reads as the video being recorded, and
   // nothing is — the row says the knee is MEASURED, and no knee copy the athlete sees says "record".
@@ -178,13 +195,34 @@ function runSquat(audit: SquatAudit, fault: SquatPose, t0 = 700): SquatFault[] {
   ok(!/setSquatStage\(\(/.test(code), 'no setSquatStage((…) => …) updater (it counted reps and fired cues as side effects)');
   // the screen: the runner follows the picker, the post carries the variant that ran, and nothing ungraded is scored
   ok(h.includes('new ScreenRunner(screenIdRef.current)'), 'the screen runner is built from the picker\'s CURRENT value');
-  ok(h.includes('submitScreen(runner.results, runner.screen)'), 'the screen posts the variant the runner ran');
+  // MIRROR-COACH P3 (2026-09-26): …with every grade beside the results, for the server's regrade (stationGraders.ts)
+  ok(h.includes('submitScreen(runner.results, runner.screen, runner.grades)'), 'the screen posts the variant the runner ran, with its grades');
+  // MIRROR-COACH P3 follow-up (2026-09-28): End posts what the screen read so far (it posted nothing unless complete); the
+  // turn reminder is spoken (a line is said when it OR its reminder count changes); the panel counts checks the server's
+  // way and says the score with its count, the unread checks listed as not read (owner decision #31)
+  // (its review, 2026-09-28: the post is marked ended — not paid unless every camera station was attempted — and the
+  // cards are drawn from what End posted)
+  ok(/const endSession = useCallback\(\(\) => \{[\s\S]{0,300}?runnerRef\.current\.readSoFar\(\);[\s\S]{0,120}?if \(soFar\.grades\.length\) \{[\s\S]{0,160}?void submitScreen\(soFar\.results, soFar\.screen, soFar\.grades, \{ ended: true \}\);/.test(h),
+    'End posts the screen read so far (readSoFar), marked ended, through the same submitScreen');
+  ok(h.includes('spokenKey(st) !== lastSaidRef.current') && h.includes('lastSaidRef.current = spokenKey(st);'), 'the spaced turn reminder is spoken (spokenKey), not only a changed line');
+  ok(h.includes('value={`${screenSummary.readCount ?? 0} of ${screenSummary.totalCount ?? 0}`}') && !/runner\?\.results\.length/.test(code),
+    'the panel\'s checks-read figure is the summary\'s readCount (the server\'s readableCameraChecks), not the results counted');
+  ok(h.includes('cameraChecksRead(runner.screen, runner.results).readCount'), 'the stage\'s "Checks read" counts the same way');
+  ok(h.includes('{scoreLine(screenSummary)}') && h.includes('notReadLines(screenSummary).map('), 'the score is said with its count and the unread checks are listed as not read');
   ok(!/provisional/.test(code), 'an ungraded screen is not sent as provisional (that earned a retry prompt)');
-  ok(h.includes('screenSummary.graded ?') && h.includes('{NOT_GRADED_LINE}'), 'an ungraded screen shows the not-graded line, not a score');
+  // MIRROR-COACH P3 review (2026-09-26): the ungraded branch shows the summary's own line — NOT_READ_LINE when the camera
+  // tried and read nothing, NOT_GRADED_LINE when there were no grades — never a score
+  ok(h.includes('screenSummary.graded ?') && h.includes('{screenSummary.headline || NOT_GRADED_LINE}'), 'an ungraded screen shows the not-graded / not-read line, not a score');
   // P1 review: the ungraded branch showed ONLY that line, so "it could not be saved" was never seen (every screen is ungraded)
-  ok(/\{NOT_GRADED_LINE\}<\/p>\s*\{screenMessage && screenMessage !== NOT_GRADED_LINE/.test(h), 'an ungraded screen still says when it could not be saved');
+  ok(/\{screenSummary\.headline \|\| NOT_GRADED_LINE\}<\/p>\s*\{screenMessage && screenMessage !== \(screenSummary\.headline \|\| NOT_GRADED_LINE\)/.test(h), 'an ungraded screen still says when it could not be saved');
+  // P3 review: the camera's aspect is re-read every frame (a phone turned after Start), and the youth gate reaches the card
+  ok(/onFrame:[\s\S]{0,2000}?runnerRef\.current\.setAspect\(v\.videoWidth \/ v\.videoHeight\);\s*const st = runnerRef\.current\.tick\(/.test(h), 'the aspect is re-read on every frame, before the runner ticks');
+  ok(h.includes('<ScreenNextSteps screen={runner.screen} grades={endedWith?.grades ?? runner.grades} youth={youth} />'), 'the next-steps card gets the youth gate (and, after End, the grades End posted)');
   ok(h.includes('{screenSummary.headline}'), 'a graded screen shows its headline (a partial one says it is not clear)');
-  ok(h.includes('if (!res.ok) { setScreenMessage(SCREEN_NOT_SAVED); return; }'), 'a refused screen post says it was not saved');
+  // MIRROR-COACH P3 (2026-09-25): a refused post says the server's own line on a 422 (the screen could not be checked)
+  // and "not saved" otherwise — and either way the answers card is told there is no saved screen to answer onto
+  ok(/if \(!res\.ok\) \{[\s\S]{0,400}?setScreenMessage\([^)]*SCREEN_NOT_SAVED\);[\s\S]{0,80}?setSavedScreenId\('unsaved'\);[\s\S]{0,20}?return;/.test(h),
+    'a refused screen post says it was not saved');
   ok(!/Weight stays centered|Heels lifting \(dorsiflexion limit\)/.test(code), 'one spelling (centred), and no cause the camera cannot see');
   ok(h.includes('label="Movement flags"') && !h.includes('label="Red flags"'), 'movement faults are "Movement flags", not "Red flags"');
   ok(/>Review\.?</i.test(h) || /squatStage === 'review'/.test(h), 'the session ends in a review, not a stopwatch');

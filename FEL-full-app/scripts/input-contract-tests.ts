@@ -33,6 +33,48 @@ const PLAY = path.join(ROOT, 'app', 'play');
 let passed = 0;
 function check(name: string, fn: () => void) { fn(); passed++; console.log('  \u2713 ' + name); }
 const read = (p: string) => fs.readFileSync(p, 'utf8');
+const relPlay = (p: string) => path.relative(PLAY, p);
+
+const SHELL_EXEMPT_ROUTES: Record<string, string> = {
+  calibrate: 'timing calibration utility; it does not record a play session',
+  'map-preview': 'auth-gated map preview, not a playable mode',
+  mirror: 'Train-owned pose screen; mirror-coach owns its camera/session contract',
+  // MULTIPLAYER (2026-10-06): the party room hosts several games on one screen as FREE PLAY — it mounts each game's own
+  // component for a couch session and records no play session, pays nothing, stakes nothing (components/party).
+  party: 'party room: free-play couch host for several games; records no session, so no GameShell',
+  // ADVENTURE C (2026-10-07): the unlisted offline bot Battle Royale prototype. It records no session and pays nothing until
+  // the owner decides BR rewards (plan open decision 7); its own stage shows the controls, the HUD and the end screen.
+  'adventure-br': 'unlisted offline bot BR prototype: records no session, pays nothing (no session-route row yet), so no GameShell',
+  // ADVENTURE PHASE B (2026-10-07): the story, unlisted. Its progress is the Adventure's own save (device first); it posts
+  // no account session yet because /api/sessions refuses a mode outside the catalogue, and listing it would unhide it.
+  adventure: 'unlisted story mode: progress lives in the Adventure save; no account session until the owner lists it',
+  // DRILLS (2026-10-07, Mirror & coaching Phase 6): the Playbook drills on the camera. Not a game: no score is posted, no
+  // session recorded, nothing paid; it runs body play's space check and the drill engine (lib/drills) on its own page.
+  drills: 'Train-owned camera drills (lib/drills): records no play session and pays nothing, so no GameShell',
+};
+
+const LOADER_BYPASS_ROUTES: Record<string, string> = {
+  // Prove It is the real-life camera contest. The Babylon loader stays available for /dev/mode/dunkduel, while
+  // /play/dunkduel deliberately mounts the on-device pose tracker and pays only the played floor server-side.
+  dunkduel: 'IRL Prove It route mounts its camera tracker instead of the legacy Babylon loader',
+  // IRON-PARADISE-OUT: /play/training is a temporary redirect to /train. The loader file stays; the page does not mount it.
+  training: 'Iron Paradise is parked; /play/training redirects to /train and does not mount its loader',
+};
+
+function routeUsesLoader(route: string): boolean {
+  const routeDir = path.join(PLAY, route);
+  const candidates = [path.join(routeDir, 'page.tsx')];
+  const componentsDir = path.join(routeDir, '_components');
+  if (fs.existsSync(componentsDir)) {
+    for (const name of fs.readdirSync(componentsDir)) {
+      if (name.endsWith('.tsx') && name !== 'loader.tsx') candidates.push(path.join(componentsDir, name));
+    }
+  }
+  return candidates.some((file) => {
+    if (!fs.existsSync(file)) return false;
+    return /from ['"]\.\/(?:_components\/)?loader['"]/.test(read(file));
+  });
+}
 
 // ---- 1. every /play/<mode> loader mounts GameShell ----------------------
 const loaders = fs
@@ -46,7 +88,47 @@ check(`found play-mode loaders (${loaders.length})`, () => {
 
 check('every play-mode loader mounts <GameShell> (no mode opts out)', () => {
   const missing = loaders.filter((p) => !/GameShell/.test(read(p)));
-  assert.strictEqual(missing.length, 0, `loaders without GameShell: ${missing.map((p) => path.relative(PLAY, p)).join(', ')}`);
+  assert.strictEqual(missing.length, 0, `loaders without GameShell: ${missing.map(relPlay).join(', ')}`);
+});
+
+const routeDirs = fs
+  .readdirSync(PLAY, { withFileTypes: true })
+  .filter((d) => d.isDirectory() && fs.existsSync(path.join(PLAY, d.name, 'page.tsx')))
+  .map((d) => d.name)
+  .sort();
+
+check('every top-level play route has a GameShell loader or an explicit reviewed exemption', () => {
+  const withoutLoader = routeDirs.filter((route) => {
+    if (route in SHELL_EXEMPT_ROUTES) return false;
+    return !fs.existsSync(path.join(PLAY, route, '_components', 'loader.tsx'));
+  });
+  assert.strictEqual(
+    withoutLoader.length,
+    0,
+    `routes without loader or exemption: ${withoutLoader.join(', ')}`,
+  );
+  for (const [route, reason] of Object.entries(SHELL_EXEMPT_ROUTES)) {
+    assert.ok(routeDirs.includes(route), `loader exemption is stale; route gone: ${route}`);
+    assert.ok(reason.length > 20, `loader exemption needs a real reason: ${route}`);
+  }
+});
+
+check('every route with a loader actually imports it, unless the bypass is explicit', () => {
+  const bypassed = loaders
+    .map((loader) => path.basename(path.dirname(path.dirname(loader))))
+    .filter((route) => {
+      if (route in LOADER_BYPASS_ROUTES) return false;
+      return !routeUsesLoader(route);
+    });
+  assert.strictEqual(
+    bypassed.length,
+    0,
+    `routes with dead loaders or direct mounts: ${bypassed.join(', ')}`,
+  );
+  for (const [route, reason] of Object.entries(LOADER_BYPASS_ROUTES)) {
+    assert.ok(fs.existsSync(path.join(PLAY, route, 'page.tsx')), `loader bypass is stale; route gone: ${route}`);
+    assert.ok(reason.length > 20, `loader bypass needs a real reason: ${route}`);
+  }
 });
 
 // ---- 2. GameShell mounts BOTH gamepad poller and touch controller -------
@@ -56,6 +138,17 @@ check('GameShell mounts the PhysicalGamepadPoller (physical controller)', () => 
 });
 check('GameShell mounts the VirtualController (on-screen touch pad)', () => {
   assert.ok(/VirtualController/.test(shell), 'GameShell must render the touch controller');
+});
+check('Babylon-owned input suppresses the legacy touch deck', () => {
+  assert.ok(/const babylonOwnsInput = isBabylon\(mode\) \|\| !!ownControls/.test(shell), 'GameShell must compute one input owner for Babylon hosts');
+  assert.ok(/!babylonOwnsInput && !streamOn && <VirtualController/.test(shell), 'VirtualController must be gated on babylonOwnsInput, not only ownControls');
+});
+check('offline profile state is an error card, not error plus spinner', () => {
+  assert.ok(/!\s*unreachable \? \(/.test(shell), 'GameShell loading spinner must be suppressed when the server is unreachable');
+});
+check('signed-in challenge links are settled from the finished GameShell run', () => {
+  assert.ok(/searchParams\.get\('c'\)/.test(shell), 'GameShell must read /play/<mode>?c=<code>');
+  assert.ok(/\/api\/challenge\/\$\{encodeURIComponent\(challengeCode\)\}\/attempt/.test(shell), 'GameShell must post the finished score to the challenge attempt endpoint');
 });
 
 // ---- 3. touch + gamepad collapse onto the SAME keyboard events ----------

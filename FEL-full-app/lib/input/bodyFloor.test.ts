@@ -5,12 +5,15 @@ import { describe, it, expect } from 'vitest';
 import {
   BodyFloor, CROUCH_DEAD, FLOOR_RELEASE_MS, HOP_CLEAR_MS, LEAN_OFF_SW, LEAN_ON_SW, OVERHEAD_STRIKE_MS, PEAK_HOLD_MS, PULSE_MS, STEP_SWING_MS, quantise,
 } from './bodyFloor';
-import { BODY_PROFILES, sessionOnly, type BodyProfile } from './bodyProfiles';
+import { BODY_PROFILES, P3_RIDE_ROWS, sessionOnly, type BodyProfile } from './bodyProfiles';
 import type { BodyOut, BodyPacket } from '@/lib/babylon/core/InputBus';
 import type { BodyEvent, BodyRead, WristRead } from '@/lib/pose/BodyReader';
 import type { BodyChannels } from '@/lib/pose/bodyChannels';
 
-const SKATE = BODY_PROFILES.skateboard, FREERUN = BODY_PROFILES.freerun, SPRINT = BODY_PROFILES.sprint, VS = BODY_PROFILES['karate-vs'];
+// MOVEMENT PLAY P8 (2026-09-26): the P3 rows — the lean, the cadence on the shared band, the step d-pad — which the floor
+// keeps for each P8 row's cut line (bodyProfiles' P3_RIDE_ROWS). The P8 rows' own kinds: bodyFloor.ride.test.ts.
+const P3 = Object.fromEntries(P3_RIDE_ROWS.map((p) => [p.key, p]));
+const SKATE = P3.skateboard, FREERUN = P3.freerun, SPRINT = P3.sprint, VS = BODY_PROFILES['karate-vs'];
 /** A crouch with no hop (no P3 row has one; a P5+ mode that claims the take-off would). */
 const CROUCH_ONLY: BodyProfile = { ...SKATE, key: 'crouch_only', modeId: 'crouch_only', bindings: [{ from: 'squat', to: 'RT', verb: 'PUMP' }] };
 

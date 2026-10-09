@@ -43,7 +43,17 @@ const gauntletPlay = read('scripts/gauntlet-play.sh');
 const gameData = read('lib/game-data.ts');
 const locks = new Set(readdirSync('docs/concept-lock').map((f) => f.replace(/\.md$/, '')));
 const testScripts = readdirSync('scripts').filter((f) => /-tests\.ts$/.test(f));
-const routeMap: Record<string, string> = { karate_vs: 'karate-vs', penalty: 'soccer', derby: 'baseball', snowboard_slalom: 'snowboard', bigair: 'big-air', dunkduel: 'dunkduel' };
+const routeMap: Record<string, string> = {
+  karate_vs: 'karate-vs',
+  penalty: 'soccer',
+  derby: 'baseball',
+  snowboard_slalom: 'snowboard',
+  bigair: 'big-air',
+  aeroaces: 'aero-aces',
+  velocitykart: 'velocity-kart',
+  who_scene_it: 'who-scene-it',
+  brainbrawl: 'brain-brawl',
+};
 const lockName: Record<string, string> = { karate: 'karate-endless', karate_vs: 'karate-vs', derby: 'baseball', penalty: 'soccer', snowboard_slalom: 'snowboard' };
 const camName: Record<string, string> = { karate_vs: 'karate-vs', derby: 'baseball', penalty: 'soccer', snowboard_slalom: 'snowboard' };
 

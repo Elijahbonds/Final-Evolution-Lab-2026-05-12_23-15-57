@@ -7,9 +7,16 @@
  * can only flip when the flag flips. Pure: no React, no network — unit-tested in purchases.test.ts.
  */
 
-/** Real-money checkout exists only when Stripe is configured. The server reads process.env; the client asks /api/v1/wallet/config. */
+/**
+ * Real-money checkout exists only when Stripe is configured AND the B10 live-key fence
+ * (VIRTUAL_PURCHASES_ENABLED) is on. Default OFF: no real-money product outside the coach store
+ * sells at launch (FE PM 4:33 PM PT Oct 7). The flag read honours the PASSED env — the server
+ * reads process.env; the client asks /api/v1/wallet/config.
+ */
 export function purchasesEnabledFromEnv(env: Record<string, string | undefined> = process.env): boolean {
-  return Boolean(env.STRIPE_SECRET_KEY);
+  if (!Boolean(env.STRIPE_SECRET_KEY)) return false;
+  const v = (env.VIRTUAL_PURCHASES_ENABLED ?? '').trim().toLowerCase();
+  return v === '1' || v === 'true' || v === 'on' || v === 'yes';
 }
 
 /** `null` = the client has not heard from the server yet — copy must stay neutral, never promise a sale or deny one. */

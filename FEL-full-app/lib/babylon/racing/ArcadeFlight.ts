@@ -31,29 +31,60 @@ export interface ArcadeTune {
   minSpeed: number;
   /** m/s² toward the target speed. */
   accel: number;
+  /**
+   * LAUNCH SHOVE (10-phase pass, 2026-10-02): while accelerating, the rate is
+   * `accel × (1 + accelLaunch × (1 − speed/top))` — eager off the mark, exactly the old flat rate at the
+   * top end, so the top speed and the time it takes to SETTLE there are unchanged. Braking is unaffected.
+   */
+  accelLaunch: number;
   /** m/s² while braking. */
   brakeDecel: number;
   /** Yaw rate at full stick, rad/s. */
   turnRate: number;
   /** Turn multiplier while braking. */
   brakeTurn: number;
+  /**
+   * How fast the yaw RATE follows the stick, in (rad/s) per second — a RATE LIMIT, not a lag (10-phase
+   * pass, 2026-10-02). The yaw used to snap to the stick's demand in a single frame: a full-deflection
+   * flick was an instant full-rate turn, which read as a snap and amplified body-play noise. A rate limit
+   * reaches a SMALL demand at once — a 10° wing still turns inside the body-play gate's 900 ms, where an
+   * exponential ease fast enough to pass (8/s) left 17 ms of margin — while a full flick takes
+   * turnRate/this to arrive, which is where the roll-into-the-turn lives. 8/s² is full rate in ~0.19 s.
+   */
+  yawSlew: number;
   /** The most the stick can ask the nose to climb / dive, radians. */
   maxPitch: number;
   /** How quickly the nose follows the stick (1/s). */
   pitchEase: number;
   /** Visual bank at full stick, radians. */
   maxBank: number;
+  /** How quickly the bank follows the turn (1/s). */
+  bankEase: number;
+  /**
+   * Coordinated-turn back-pressure, radians at a full-rate turn: a hard bank holds a touch of nose-up,
+   * the way a banked plane holds its altitude. Hands off it vanishes with the turn, so auto-level is
+   * untouched.
+   */
+  turnPitch: number;
   /** m/s of top speed per banana. */
   bananaSpeed: number;
   /** Bananas that count. */
   bananaCap: number;
+  /**
+   * The course edge's price (10-phase pass, phase 4): the fraction of the INTO-wall speed a wallTurn
+   * scrubs. The turn-back itself is free — this is only what the scrape costs. 0.35 has been the value
+   * since the edge was authored; it is a tune number now so a plane can be made more or less forgiving
+   * without editing the model.
+   */
+  wallScrub: number;
 }
 
 /** DKR scale: laps of ~1 km flown in 30–40 s, low through canyons and under arches. */
 export const ARCADE_TRAINER: ArcadeTune = {
-  top: 32, coast: 22, minSpeed: 14, accel: 11, brakeDecel: 16,
-  turnRate: 1.55, brakeTurn: 1.65, maxPitch: 0.55, pitchEase: 4.5, maxBank: 0.85,
-  bananaSpeed: 0.55, bananaCap: 10,
+  top: 32, coast: 22, minSpeed: 14, accel: 11, accelLaunch: 0.3, brakeDecel: 16,
+  turnRate: 1.55, brakeTurn: 1.65, yawSlew: 8, maxPitch: 0.55, pitchEase: 4.5, maxBank: 0.85,
+  bankEase: 6, turnPitch: 0.06,
+  bananaSpeed: 0.55, bananaCap: 10, wallScrub: 0.35,
 };
 
 /**
@@ -92,6 +123,8 @@ export interface ArcadeState {
   stuntHeading: number;
   /** Spun out by a hit: no control, speed bleeding. */
   spinT: number;
+  /** Applied yaw rate after the ease, rad/s — what the plane is actually turning at. */
+  yawAt: number;
 }
 
 export interface ArcadeInput {
@@ -122,7 +155,7 @@ export const KNIFE_SEC = 0.7;
 export const KNIFE_SLIP = 9;
 
 export function spawnArcade(at: Vector3, heading: number, tune: ArcadeTune = ARCADE_TRAINER): ArcadeState {
-  return { pos: at.clone(), heading, pitch: 0, roll: 0, speed: tune.coast, stunt: null, stuntT: 0, stuntHeading: heading, spinT: 0 };
+  return { pos: at.clone(), heading, pitch: 0, roll: 0, speed: tune.coast, stunt: null, stuntT: 0, stuntHeading: heading, spinT: 0, yawAt: 0 };
 }
 
 export function forwardOf(s: { heading: number; pitch: number }): Vector3 {
@@ -140,6 +173,7 @@ export function topFor(input: ArcadeInput, tune: ArcadeTune): number {
 export function startStunt(s: ArcadeState, stunt: Stunt): boolean {
   if (s.stunt || s.spinT > 0) return false;
   s.stunt = stunt; s.stuntT = 0; s.stuntHeading = s.heading;
+  s.yawAt = 0;                    // the stunt flies its own arc; the turn ease restarts from level
   return true;
 }
 
@@ -152,7 +186,7 @@ export function dodging(s: ArcadeState): boolean {
 
 /** Knocked into a spin by a missile / mine. */
 export function spinOut(s: ArcadeState): void {
-  s.spinT = SPIN_SEC; s.stunt = null; s.stuntT = 0;
+  s.spinT = SPIN_SEC; s.stunt = null; s.stuntT = 0; s.yawAt = 0;
 }
 
 const ease = (cur: number, want: number, rate: number, dt: number): number => cur + (want - cur) * Math.min(1, rate * dt);
@@ -173,7 +207,10 @@ export function stepArcade(
   let want = input.gas > 0.1 ? tune.coast + (top - tune.coast) * Math.min(1, input.gas) : tune.coast;
   if (input.boostK > 0.05) want = Math.max(want, top);
   if (input.brake > 0.1) want = tune.minSpeed;
-  const rate = input.brake > 0.1 && s.speed > want ? tune.brakeDecel : tune.accel;
+  // the launch shove: eager off the mark, exactly the flat rate at the top end (see tune.accelLaunch);
+  // it only ever pushes FORWARD — settling down to the coast speed is the old rate, unchanged
+  const launch = s.speed < want ? 1 + tune.accelLaunch * (1 - Math.max(0, Math.min(1, s.speed / top))) : 1;
+  const rate = input.brake > 0.1 && s.speed > want ? tune.brakeDecel : tune.accel * launch;
   if (s.speed < want) s.speed = Math.min(want, s.speed + rate * dt);
   else s.speed = Math.max(want, s.speed - rate * dt * (s.speed > top ? 1.5 : 1));
   s.speed = Math.max(tune.minSpeed, s.speed);
@@ -219,11 +256,19 @@ export function stepArcade(
     if (k >= 1) { s.stunt = null; s.heading = wrap(s.stuntHeading + Math.PI); s.pitch = 0; s.roll = Math.PI; }
     return clampAltitude(s, floorAt, ceiling, clearance, tune);
   } else {
-    // ── steer: yaw; brake tightens it; the bank follows the stick ──
+    // ── steer: yaw; brake tightens it; the bank follows the TURN ──
     const steer = Math.max(-1, Math.min(1, input.steer));
     const turn = tune.turnRate * (input.brake > 0.1 ? tune.brakeTurn : 1);
-    s.heading = wrap(s.heading + steer * turn * dt);
-    let bankWant = steer * tune.maxBank;
+    // the yaw rate is RATE-LIMITED toward the stick's demand (10-phase pass): an instant full-rate turn
+    // read as a snap, and a body-play wing reads at 15–30 Hz with noise. The clamp lands exactly on the
+    // demand, so a centred stick centres the turn exactly. The plane rolls into the turn, not pivots.
+    const yawWant = steer * turn;
+    const maxYawStep = tune.yawSlew * dt;
+    s.yawAt += Math.max(-maxYawStep, Math.min(maxYawStep, yawWant - s.yawAt));
+    s.heading = wrap(s.heading + s.yawAt * dt);
+    // the bank shows the turn BEING MADE, not the stick position: a brake-turn at half stick banks harder
+    // than a cruise turn at full, which is the DKR tight-turn read. Stunts override below.
+    let bankWant = Math.max(-1, Math.min(1, s.yawAt / tune.turnRate)) * tune.maxBank;
     if (s.stunt === 'knife_edge') {
       // ── KNIFE EDGE: hold it on its side. No reversal, no height change — what it buys is a narrow profile, and
       // what it costs is line: the plane slips toward the low wing the whole time, so threading a gap on its side
@@ -248,10 +293,13 @@ export function stepArcade(
       s.pos.addInPlace(side.scale(v * dt));
       if (k >= 1) { s.stunt = null; s.roll = 0; }
     } else {
-      s.roll = ease(wrap(s.roll), bankWant, 6, dt);
+      s.roll = ease(wrap(s.roll), bankWant, tune.bankEase, dt);
     }
-    // ── climb / dive: the nose follows the stick, and levels when released ──
-    s.pitch = ease(s.pitch, Math.max(-1, Math.min(1, input.climb)) * tune.maxPitch, tune.pitchEase, dt);
+    // ── climb / dive: the nose follows the stick, and levels when released. A hard turn holds a touch of
+    // back-pressure (turnPitch) — the coordinated-turn read — and it vanishes with the turn, so hands-off
+    // auto-level is exactly what it was. ──
+    const coord = Math.abs(Math.max(-1, Math.min(1, s.yawAt / tune.turnRate)));
+    s.pitch = ease(s.pitch, Math.max(-1, Math.min(1, input.climb)) * tune.maxPitch + coord * tune.turnPitch, tune.pitchEase, dt);
   }
 
   s.pos.addInPlace(forwardOf(s).scale(s.speed * dt));
@@ -274,7 +322,7 @@ function clampAltitude(s: ArcadeState, floorAt: (x: number, z: number) => number
  * THE COURSE EDGE is a wall that turns the plane back (the same lesson as the board fence — WALLS + SPEED, 2026-09-15:
  * a clamp that leaves the vehicle aimed at the wall pins it there). `nx, nz` points back into the course.
  */
-export function wallTurn(s: ArcadeState, nx: number, nz: number): boolean {
+export function wallTurn(s: ArcadeState, nx: number, nz: number, scrub = 0.35): boolean {
   const l = Math.hypot(nx, nz); if (!(l > 0)) return false;
   nx /= l; nz /= l;
   const fx = Math.sin(s.heading), fz = Math.cos(s.heading);
@@ -282,6 +330,6 @@ export function wallTurn(s: ArcadeState, nx: number, nz: number): boolean {
   if (into <= 0.02) return false;
   const dx = fx + into * nx + 0.35 * nx, dz = fz + into * nz + 0.35 * nz;
   s.heading = Math.atan2(dx, dz);
-  s.speed = Math.max(0, s.speed * (1 - 0.35 * into));
+  s.speed = Math.max(0, s.speed * (1 - scrub * into));
   return true;
 }

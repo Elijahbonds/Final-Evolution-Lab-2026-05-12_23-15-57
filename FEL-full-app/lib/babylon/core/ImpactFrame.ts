@@ -45,6 +45,43 @@ export const IMPACT_VIGNETTE_GAIN = 1.75;
 /** Fraction of the venue's exposure removed at full strength. Small: this is a dip, not a blackout. */
 export const IMPACT_EXPOSURE_DIP = 0.14;
 
+// SPEED-VIGNETTE (racing HUD pass, PLAN-RACING-10PHASE's "perimeter speed vignette"): the frame closes in as
+// a speed mode nears its top speed. The mode opts in by reporting its fraction (ctx.feel.speedVignette01);
+// the harness composes it with the impact pulse so the two never fight over the pipeline.
+//
+// THE WINDOW (owner-approved 2026-09-30, a tuned feel number — flag it): the vignette stays shut until
+// VIGNETTE_ON (0.85 of top speed), then closes smoothly to VIGNETTE_GAIN at full speed. Below the window the
+// frame is the venue's own; the mode's job is only to report how fast it is going.
+export const SPEED_VIGNETTE_ON = 0.85;
+/** Vignette weight multiplier at full speed. Kept under the impact gain so a hit still reads over the speed. */
+export const SPEED_VIGNETTE_GAIN = 1.5;
+/** Under reduced motion the vignette's motion is capped to this fraction of the full close (a flash cousin). */
+export const SPEED_VIGNETTE_REDUCED_CAP = 0.5;
+
+/**
+ * The speed vignette's own level for a reported speed fraction. Pure, so the window is pinned by a test
+ * without a GPU. Returns 0 below the window, ramping to 1 at full speed.
+ */
+export function speedVignetteLevel(speed01: number): number {
+  if (!Number.isFinite(speed01)) return 0;                          // a lying mode gets the resting frame, not NaN
+  const s = Math.max(0, Math.min(1, speed01));
+  if (s <= SPEED_VIGNETTE_ON) return 0;
+  return (s - SPEED_VIGNETTE_ON) / (1 - SPEED_VIGNETTE_ON);
+}
+
+/**
+ * Compose the impact pulse and the speed vignette over the venue's resting grade. Impact wins the frame
+ * (it is the moment); speed only ever adds what impact is not already using. Exposure is impact's alone —
+ * speed narrows the edges, it does not dip the brightness mid-race.
+ */
+export function composeFrameGrade(base: Grade, impactLevel: number, speedLevel: number): Grade {
+  const g = impactGrade(impactLevel, base);
+  const sv = Math.max(0, Math.min(1, speedLevel));
+  if (sv <= 0) return g;
+  const speedVignette = base.vignette * (1 + (SPEED_VIGNETTE_GAIN - 1) * sv);
+  return { vignette: Math.max(g.vignette, speedVignette), exposure: g.exposure };
+}
+
 export interface ImpactFrameState {
   /** 0 = the frame is at rest. 1 = the hardest hit this mode can report. */
   level: number;

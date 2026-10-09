@@ -40,7 +40,9 @@ describe('heroBody — the scan is the owner\'s body only; everyone else wears t
   });
 
   it('reads the frame\'s percent scales as multipliers, 1 for anything unset or junk', () => {
-    expect(proportionsFromFrame({ heightScale: 110, buildScale: 92, reachScale: 'x' })).toEqual({ heightScale: 1.1, buildScale: 0.92, reachScale: 1 });
+    expect(proportionsFromFrame({ heightScale: 102, buildScale: 96, reachScale: 'x' })).toEqual({ heightScale: 1.02, buildScale: 0.96, reachScale: 1 });
+    // REACH-FREEZE: an old save clamps to the cosmetic range, and a saved reach is ignored
+    expect(proportionsFromFrame({ heightScale: 110, buildScale: 92, reachScale: 110 })).toEqual({ heightScale: 1.04, buildScale: 0.94, reachScale: 1 });
     expect(proportionsFromFrame(null)).toBeNull();
     expect(bodyTypeOf('Female')).toBe('female');
     expect(bodyTypeOf(42)).toBe('male');
@@ -103,5 +105,22 @@ describe('heroBody — every player body file ships whole, parseable, and under 
     };
     for (const d of ['lib', 'components', 'app']) walk(join(ROOT, d));
     expect(hits).toEqual(['lib/babylon/core/heroBody.ts']);
+  });
+});
+
+// CREATOR-PLAN phase 4a (2026-10-06): the active slot's body is the preference; 'scan' only for an account that owns one.
+describe('heroBody — a slot chooses the body, within what the account owns', () => {
+  const owners = parseOwnerEmails('owner@example.com');
+  it('the scan owner\'s kit-body slot is the kit body; his scan slot, or no slot, the scan', () => {
+    expect(decideHeroBody('owner@example.com', owners, null, 'male')).toBe('kit-male');
+    expect(decideHeroBody('owner@example.com', owners, null, 'female')).toBe('kit-female');
+    expect(decideHeroBody('owner@example.com', owners, null, 'scan')).toBe('scan');
+    expect(decideHeroBody('owner@example.com', owners, null, null)).toBe('scan');
+  });
+  it('anyone else\'s scan preference is ignored (the frame\'s kit body); a guest is the neutral kit', () => {
+    expect(decideHeroBody('someone@else.com', owners, { bodyType: 'female' }, 'scan')).toBe('kit-female');
+    expect(decideHeroBody('someone@else.com', owners, null, 'scan')).toBe('kit-male');
+    expect(decideHeroBody(null, owners, null, 'scan')).toBe('kit-male');
+    expect(decideHeroBody('someone@else.com', owners, { bodyType: 'male' }, 'female')).toBe('kit-female');
   });
 });

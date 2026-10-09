@@ -54,6 +54,18 @@ const IDX = {
 
 /** A whole body should fill this much of the frame: enough pixels to measure, enough room to squat without leaving. */
 export const FILL_MIN = 0.45, FILL_MAX = 0.92;
+/**
+ * Below this, the hips have dropped close enough to the knees — against the TORSO length, which a squat or a lunge
+ * barely shortens — that the body is genuinely crouching, not standing far away (MIRROR-COACH P4 baseline F6,
+ * 2026-09-25). See `crouched` in checkFraming for why the ratio is against the torso rather than the frame or the
+ * body's own fill: both of those shrink with real distance too, which would silently let a body that really is too
+ * far away read as "crouching" instead. Measured on lib/mirror/fixtures/squat_clean.json (120 frames): the hip-to-knee
+ * gap over the torso length falls from ~0.86 standing to 0.229 at the bottom; 0.5 sits well clear of both, and on the
+ * fixture set it suppresses exactly the crouch-caused tooFar reads (32 of the squat's 40) and none of the genuinely
+ * far ones (the other 8), nor any frame of the lunge, hinge, push-up, single-leg or seated-rotation fixtures (their
+ * hip-to-knee ratio never drops under it — hinge and push-up barely bend the knee at all).
+ */
+export const CROUCH_MAX_KNEE_GAP = 0.5;
 /** Off this far from the middle and a squat will drift out of shot. */
 export const CENTRE_TOLERANCE = 0.18;
 /** Below this the landmarks are guesses, not positions. */
@@ -99,6 +111,12 @@ const SAY: Record<FramingIssue, string> = {
   dim: 'More light, or a plainer background — I am losing track of you.',
 };
 
+/** The one line said for an issue (the front view's line for 'turned'). Read-only: lib/mirror/screenRunner.ts names the
+ *  fix a stalled station asked for most (MIRROR-COACH P3 follow-up review, 2026-09-28). */
+export function framingLine(issue: FramingIssue): string {
+  return SAY[issue];
+}
+
 /** What a side station says when the athlete is not side-on yet. */
 export const SIDE_TURNED = 'Turn side-on to the camera.';
 
@@ -137,11 +155,26 @@ export function checkFraming(frame: FramingFrame, view: FramingView = 'front'): 
   const hipSpan = Math.abs((get(IDX.leftHip)?.x ?? 0) - (get(IDX.rightHip)?.x ?? 0));
   const width = sideWidth(frame);
 
+  /**
+   * MIRROR-COACH P4 baseline F6 (2026-09-25) — A CROUCHED BODY READ AS "TOO FAR". bodyFill is head-to-ANKLE height,
+   * which a deep squat or lunge shrinks in the image just by folding up — the hips drop toward the knees, pulling the
+   * head down with them, with the camera never moving. The bottom of a squat read 'tooFar' on 40 of 120 fixture frames
+   * this way, telling someone mid-rep to come forward. The torso (shoulder-to-hip) barely shortens in a squat or a
+   * lunge, so the hip-to-knee gap AGAINST the torso length tells crouched apart from far away: it collapses toward 0
+   * crouching, whatever the distance, and stays open at any distance for a body that is simply standing small in
+   * frame — which must still be read as too far. See CROUCH_MAX_KNEE_GAP for the measurement behind the line.
+   */
+  const hipMidY = ((get(IDX.leftHip)?.y ?? 0) + (get(IDX.rightHip)?.y ?? 0)) / 2;
+  const kneeMidY = ((get(IDX.leftKnee)?.y ?? 0) + (get(IDX.rightKnee)?.y ?? 0)) / 2;
+  const shoulderMidY = ((get(IDX.leftShoulder)?.y ?? 0) + (get(IDX.rightShoulder)?.y ?? 0)) / 2;
+  const torsoLen = Math.max(1e-3, hipMidY - shoulderMidY);
+  const crouched = (kneeMidY - hipMidY) / torsoLen <= CROUCH_MAX_KNEE_GAP;
+
   const issues: FramingIssue[] = [];
   if (head.y < 0.03) issues.push('cutOffTop');
   if (ankleY > 0.97 || !seen(get(IDX.leftAnkle)) || !seen(get(IDX.rightAnkle))) issues.push('cutOffBottom');
   if (bodyFill > FILL_MAX) issues.push('tooClose');
-  if (bodyFill < FILL_MIN) issues.push('tooFar');
+  if (bodyFill < FILL_MIN && !crouched) issues.push('tooFar');
   if (Math.abs(hipMidX - 0.5) > CENTRE_TOLERANCE) issues.push('offCentre');
   // square-on: the shoulders read wider than the hips (front and back keep this test). Side-on is read from the width
   // against the torso (SIDE_WIDTH_MAX): collapsed shoulders are side-on whatever the hips do, so a side-on body is

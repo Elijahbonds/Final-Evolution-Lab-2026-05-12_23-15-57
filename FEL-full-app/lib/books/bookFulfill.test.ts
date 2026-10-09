@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { hasBookAccess } from './bookEntitlements';
 import {
+  bookSessionKey,
   recordBookCheckout,
+  recordPaidBookSession,
   revokeBookCharge,
   type BookEntitlementWrite,
   type BookFulfillStore,
@@ -99,7 +101,50 @@ describe('book webhook idempotency', () => {
     expect(db.upserts()).toBe(0);
     const other = await recordBookCheckout('evt_other', session({ metadata: { product: 'COSMETIC' } }), db.store);
     expect(other).toMatchObject({ ignored: true, reason: 'not-a-book' });
-    expect(db.events).toHaveLength(1);
+    // test changed (2026-10-09): was toHaveLength(1), the unpaid event remembered. Purchases are keyed on the
+    // session now (#200), and a remembered unpaid session would dedupe away the grant when it is paid later.
+    expect(db.events).toHaveLength(0);
+  });
+
+  it('grants only payment_status paid, as the release isPaidSession (no $0, no missing status, no expired)', async () => {
+    const db = memory();
+    for (const over of [{ payment_status: 'no_payment_required' }, { payment_status: null }, { payment_status: undefined }, { status: 'expired' }]) {
+      const res = await recordBookCheckout('k', session(over), db.store);
+      expect(res).toMatchObject({ ignored: true, reason: 'unpaid' });
+    }
+    expect(db.upserts()).toBe(0);
+  });
+});
+
+describe('one payment, one grant (SEC-F4 #200: keyed on the Checkout Session)', () => {
+  it('webhook, a redelivered webhook (new event id) and the receipt page grant once', async () => {
+    const db = memory();
+    const webhook = await recordPaidBookSession(session(), db.store);
+    const redelivered = await recordPaidBookSession(session(), db.store);
+    const receipt = await recordPaidBookSession(session(), db.store);
+    expect(webhook).toEqual({ ok: true, granted: true });
+    expect(redelivered).toEqual({ ok: true, deduped: true });
+    expect(receipt).toEqual({ ok: true, deduped: true });
+    expect(db.upserts()).toBe(1);
+    expect(db.events.map((e) => e.eventId)).toEqual(['stripe-session:cs_test_1']);
+  });
+
+  it('an unpaid visit to the receipt does not block the grant when the same session is paid later', async () => {
+    const db = memory();
+    expect(await recordPaidBookSession(session({ payment_status: 'unpaid' }), db.store)).toMatchObject({ reason: 'unpaid' });
+    expect(await recordPaidBookSession(session(), db.store)).toEqual({ ok: true, granted: true });
+    expect(hasBookAccess([...db.rows.values()], 'blueprint', 'ebook')).toBe(true);
+  });
+
+  it('a refund still revokes a session-keyed grant', async () => {
+    const db = memory();
+    await recordPaidBookSession(session(), db.store);
+    expect(await revokeBookCharge('evt_refund', { payment_intent: 'pi_1' }, db.store)).toEqual({ ok: true, revoked: 1 });
+    expect(hasBookAccess([...db.rows.values()], 'blueprint', 'ebook')).toBe(false);
+  });
+
+  it('bookSessionKey is the stripe-session:<id> key', () => {
+    expect(bookSessionKey('cs_test_1')).toBe('stripe-session:cs_test_1');
   });
 
   it('refuses a paid book event that has no email', async () => {

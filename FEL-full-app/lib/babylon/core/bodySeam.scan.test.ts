@@ -58,7 +58,8 @@ describe('the harness reads the body (plan §4.4)', () => {
   it('builds the seam with bodySeamFor, and nothing by hand (Z3, Z5: the row and `drives` are decided there, and tested there)', () => {
     // the step-3 review: `const drives = true` (a dunk paused for a pad player's body walking off) or every mode on
     // skateboard's row (the body pressing POP in a quiz) passed every test while the harness built these itself
-    expect(harness).toMatch(/const seam = bodySeamFor\(def\);\s*const store = sessionStore\.mount\(seam\.card\);/);
+    // (MOVEMENT PLAY P8: the mount's snapshot carries a board game's stance ask — sessionStore.stanceOnMount reads the row)
+    expect(harness).toMatch(/const seam = bodySeamFor\(def\);\s*const store = sessionStore\.mount\(\{ \.\.\.seam\.card, stance: stanceOnMount\(seam\.profile\) \}\);/);
     expect(harness).toMatch(/const \{ claimed, floor, session, evidence \} = seam;/);
     for (const byHand of [/new BodyFloor\(/, /new BodySession\(/, /new EvidenceCounter\(/, /resolveBodyProfile\(/, /cardLines\(/, /\.bindings\b/]) {
       expect(harness).not.toMatch(byHand);
@@ -106,7 +107,9 @@ describe('the harness reads the body (plan §4.4)', () => {
 
   it('releaseBody() comes before every setPhase(\'paused\'): the mode sees its axes at 0 while it is still playing', () => {
     const pauses = [...harness.matchAll(/setPhase\('paused'\)/g)];
-    expect(pauses.length).toBe(2);                     // the START press, and the body-lost / stalled pause
+    // the START press, the body-lost / stalled pause, and (PERF-GUARD, 2026-10-06) the page going hidden
+    expect(pauses.length).toBe(3);
+    expect(harness).toContain("onHidden: () => { if (phase === 'playing') { releaseBody(); setPhase('paused'); store.setPause('input'); } },");
     for (const m of pauses) {
       const before = harness.slice(Math.max(0, m.index! - 40), m.index);
       expect(before, harness.slice(m.index! - 120, m.index! + 40)).toMatch(/releaseBody\(\); $/);
@@ -131,7 +134,7 @@ describe('the harness reads the body (plan §4.4)', () => {
     expect(apply).toMatch(/if \(it === 'wake' && phase === 'ready'\) \{ firstInput\(\); wake\('body'\); \}/);
     expect(apply).toMatch(/if \(it === 'resume' && phase === 'paused'\) resume\(null\);/);
     // M43's unlock + ambient bed is one function, and every input still runs it first
-    expect(fnBody(harness, 'firstInput')).toMatch(/SoundKit\.unlock\(\);[\s\S]*SoundKit\.startAmbient\(bed\);/);
+    expect(fnBody(harness, 'firstInput')).toMatch(/SoundKit\.unlock\(\);[\s\S]*SoundKit\.startVenueAmbient\(bed\);/);   // AMBIENT FIX (2026-10-06): the bed defers to a mode-owned one
     expect(harness).toMatch(/unsub = input\.on\(\(e\) => \{\s*firstInput\(\);/);
     // the play evidence is counted from every source, after the wake latch, before the mode sees the event
     expect(harness).toMatch(/if \(!wakeLatch\.pass\(e, now\)\) return;\s*const c = evidence\.count\(e, now\);\s*if \(c\) \{ store\.count\(c\); session\.noteInput\(c, now\); \}/);

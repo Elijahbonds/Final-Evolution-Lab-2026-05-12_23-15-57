@@ -208,7 +208,7 @@ export default function WhoSceneItGame({ grade, prq, onEnd, gamepad }: GameProps
       <div className="relative w-full overflow-hidden rounded-xl border border-white/10 bg-[#0F0A1C] p-4 sm:p-6" style={{ minHeight: 420 }}>
         {!started ? (
           <div className="flex min-h-[380px] flex-col items-center justify-center gap-4 text-center">
-            <h2 className="fel-heading text-4xl text-white">WHO SCENE IT</h2>
+            <h2 className="fel-heading text-4xl text-white">SPOT THE SCENE</h2>
             <p className="max-w-md text-sm text-gray-300">
               Rapid-fire recall across every category — {TOTAL_Q} questions, {qTotalTime} seconds each. Answer fast for speed points, chain streaks for a multiplier up to x3. Score {WIN_SCORE}+ to win.
             </p>

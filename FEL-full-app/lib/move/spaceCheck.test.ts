@@ -905,3 +905,99 @@ describe('the self-view overlay', () => {
     expect(box.y0).toBeLessThan(f.image[NOSE].y);
   });
 });
+
+// MOVEMENT PLAY P8 (2026-09-26, PLAN-P8 R-F1): a board game asks for the stance after "All set" — side-on, 20–75° off
+// square. The first build's READY host dropped back to the framing on the turn ('turned' settles, and any settled issue
+// in a later stage starts over), so the rulers the stance is taken with were gone and the stance could never be taken.
+describe('the stance game (P8): READY holds through the turn into the stance', () => {
+  /** From the rest pose, a turn of `deg` over 0.5 s (+ = the left shoulder away: a regular rider), then held `sec`. */
+  const turnInto = (deg: number, sec = 2.5, fps = 30): JointClip => ({
+    fps, frames: Array.from({ length: Math.round((0.5 + sec) * fps) + 1 }, (_, i) => rotY(R0, deg * Math.min(1, (i / fps) / 0.5))),
+  });
+  const readyCheck = (stance: boolean) => {
+    const frames = shoot(session());
+    const c = new SpaceCheck();
+    c.setStanceGame(stance);
+    expect(run(frames, c).at(-1)!.ready).toBe(true);
+    return { c, t0: frames.at(-1)!.t + 33 };
+  };
+
+  it.each([20, 45, 60, 75, -45, -60])('a stance game at READY keeps ready through a %s° turn (the rulers kept, the READY line said)', (deg) => {
+    const { c, t0 } = readyCheck(true);
+    const states = run(after(shoot(turnInto(deg), PLAY, { seed: 5 }), t0), c);
+    expect(states.every((s) => s.ready && s.stage === 'ready'), `${deg}°`).toBe(true);
+    expect(states.every((s) => s.calibration !== null)).toBe(true);
+    expect(new Set(states.map((s) => s.instruction.id))).toEqual(new Set(['coach.space.ready']));
+    // (and the facing rule did see the turn — it is the stance, left out of the worst issue, not a missed read)
+    if (Math.abs(deg) >= 45) { expect(states.at(-1)!.check.issues).toContain('turned'); expect(states.at(-1)!.issue).toBeNull(); }
+  });
+
+  // review fix (2026-09-26): the first exemption skipped the drop for ANY settled 'turned' at READY — the back to the lens
+  // too, and every issue ranked below 'turned' (a player with no room to side-step started the game)
+  it.each([90, 120, 160, -120])('the back to the lens (%s°) is no stance: the check drops back to the framing, as P4\'s does', (deg) => {
+    const { c, t0 } = readyCheck(true);
+    const states = run(after(shoot(turnInto(deg), PLAY, { seed: 5 }), t0), c);
+    expect(states.at(-1)!.ready, `${deg}°`).toBe(false);
+    expect(states.at(-1)!.stage).toBe('frame');
+    expect(states.at(-1)!.issue).toBe('turned');
+  });
+  it.each([45, 60, -45])('turned into the stance at %s° but with no room to side-step (1.2 m toward the lead side): the room still counts', (deg) => {
+    const { c, t0 } = readyCheck(true);
+    // the turn and a slow walk 1.2 m toward the side the turn opens to (a regular turn: the player's right, image left)
+    // together, over a second, then held
+    const clip: JointClip = { fps: 30, frames: Array.from({ length: Math.round(3 * 30) + 1 }, (_, i) => {
+      const u = Math.min(1, (i / 30) / 1);
+      return moveJoints(rotY(R0, deg * u), [-1.2 * Math.sign(deg) * u, 0, 0]);
+    }) };
+    const states = run(after(shoot(clip, PLAY, { seed: 5 }), t0), c);
+    const last = states.at(-1)!;
+    expect(last.check.issues, `${deg}°`).toEqual(expect.arrayContaining(['turned', deg > 0 ? 'moveLeft' : 'moveRight']));
+    expect(last.ready, `${deg}°`).toBe(false);
+    expect(last.stage).toBe('frame');
+  });
+
+  it('every other game drops back on the same turn, as P4 does (the flag off is the check to the byte)', () => {
+    for (const deg of [45, 60, -60]) {
+      const { c, t0 } = readyCheck(false);
+      const states = run(after(shoot(turnInto(deg), PLAY, { seed: 5 }), t0), c);
+      expect(states.at(-1)!.ready, `${deg}°`).toBe(false);
+      expect(states.at(-1)!.stage).toBe('frame');
+      expect(states.at(-1)!.calibration).toBeNull();
+    }
+    // …and the same stream with the flag off reads the same states as a check that never heard of it
+    const frames = [...shoot(session()), ...after(shoot(turnInto(60), PLAY, { seed: 5 }), shoot(session()).at(-1)!.t + 33)];
+    const a = new SpaceCheck(), b = new SpaceCheck();
+    b.setStanceGame(false);
+    expect(JSON.stringify(run(frames, b))).toBe(JSON.stringify(run(frames, a)));
+  });
+
+  it('a stance game still starts over when the body walks out, and when someone else takes the picture', () => {
+    {
+      const { c, t0 } = readyCheck(true);
+      run(after(shoot(turnInto(45, 1)), t0), c);
+      let s: SpaceState | null = null;
+      for (let k = 1; k <= 15; k++) s = c.push({ t: t0 + 1600 + k * 33, present: false, image: [] });
+      expect(s!.stage).toBe('frame');
+      expect(s!.calibration).toBeNull();
+    }
+    {
+      const { c, t0 } = readyCheck(true);
+      const turnFrames = after(shoot(turnInto(45, 1)), t0);
+      expect(run(turnFrames, c).at(-1)!.ready).toBe(true);
+      // someone else, half a metre to the side, the very next frame (the tracker jumps to them)
+      const other = run(after(shoot(hold(2, moveJoints(R0, [0.5, 0, 0])), PLAY, { seed: 5 }), turnFrames.at(-1)!.t + 33), c);
+      const s0 = other.find((s) => s.check.worst !== 'noBody')!;
+      expect(s0.issue).toBe('swap');
+      expect(s0.stage).toBe('frame');
+      expect(s0.calibration).toBeNull();
+    }
+  });
+
+  it('before ready the facing rule is P4\'s, stance game or not: a player turned side-on is told to face the camera', () => {
+    const c = new SpaceCheck();
+    c.setStanceGame(true);
+    const states = run(shoot(hold(3, rotY(R0, 60))), c);
+    expect(states.some((s) => s.ready)).toBe(false);
+    expect(states.at(-1)!.issue).toBe('turned');
+  });
+});

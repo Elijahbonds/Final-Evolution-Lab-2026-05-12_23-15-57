@@ -27,7 +27,7 @@
 // (and the wasm and model download) only when a camera actually starts.
 
 import { publishBodyToLive, type BodyPacket } from '../babylon/core/InputBus';
-import { agentEnabled } from '../babylon/core/AgentBridge';
+import { agentRunHooksAllowed, registerProdHookSync } from '@/lib/agentRunHooks';
 import { BodyReader, type BodyRead } from '../pose/BodyReader';
 import type { Calibration } from '../pose/calibrate';
 import { ChannelReader, type BodyChannels } from '../pose/bodyChannels';
@@ -68,7 +68,8 @@ export interface PoseSourceStartOptions { autoCalibrate?: boolean }
 export class PoseSource {
   private active = false;
   private reader = new BodyReader({ autoCalibrate: false });
-  private readonly channels = new ChannelReader();
+  // MOVEMENT PLAY P8 (2026-09-26): the channels' ride read takes the reader's calibration (its lens pitch) every frame
+  private readonly channels = new ChannelReader({ calibration: () => this.reader.calibration });
   /** A packet has gone out since the last final one: a stop or a re-centre must tell the running mode to let go. */
   private published = false;
   /** The capture time of the last frame read (the final packet's read carries it). */
@@ -173,7 +174,7 @@ export class PoseSource {
   private onFrame = (f: PoseFrame): void => {
     if (!this.active) return;
     const { read, events } = this.reader.read(f);
-    const channels = this.channels.step(read, events);
+    const channels = this.channels.step(read, events, f);   // MOVEMENT PLAY P8: the frame, for the ride read
     this.lastT = read.t;
     this.published = true;
     try {
@@ -275,10 +276,23 @@ declare global {
   interface Window { __FEL_BODY__?: BodyHook }
 }
 
-if (typeof window !== 'undefined' && feedHookAllowed(process.env.NODE_ENV, agentEnabled(), window.location.hostname)) {
+function installBodyHook(): void {
+  if (typeof window === 'undefined') return;
   window.__FEL_BODY__ = {
     start: (opts?: PoseSourceStartOptions) => sharedPoseSource().start(opts),
     stop: () => sharedPoseSource().stop(),
     snapshot: () => sharedPoseSource().snapshot,
   };
+}
+function removeBodyHook(): void {
+  if (typeof window === 'undefined') return;
+  delete window.__FEL_BODY__;
+}
+if (typeof window !== 'undefined') {
+  if (process.env.NODE_ENV === 'development') {
+    if (feedHookAllowed(process.env.NODE_ENV, true, window.location.hostname)) installBodyHook();
+  } else {
+    registerProdHookSync(installBodyHook, removeBodyHook);
+    if (agentRunHooksAllowed() && feedHookAllowed(process.env.NODE_ENV, true, window.location.hostname)) installBodyHook();
+  }
 }

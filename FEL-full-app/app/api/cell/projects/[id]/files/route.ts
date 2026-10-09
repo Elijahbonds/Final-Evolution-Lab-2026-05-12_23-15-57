@@ -5,6 +5,7 @@ import { prisma } from '@/lib/db';
 import { completeText, FILE_BUILDER_SYSTEM, type BuildPlan } from '@/lib/cell-engine';
 import { parseFileOps, bundleFiles } from '@/lib/cell-files';
 import { applyOps, loadFiles, summarizeFiles } from '@/lib/cell-build';
+import { abacusEnabled, aiComingSoonResponse, AiDisabledError } from '@/lib/abacus/killSwitch';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
@@ -34,6 +35,8 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
  *   { action: 'regenerate', path }  — rebuild ONE file with the builder model.
  */
 export async function POST(req: Request, { params }: { params: { id: string } }) {
+  // ABACUS-KILL: before the session, the body or any database read or write (lib/abacus/killSwitch.ts).
+  if (!abacusEnabled()) return aiComingSoonResponse('studio');
   const session = await getServerSession(authOptions);
   const userId = (session?.user as any)?.id;
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -82,6 +85,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     });
     return NextResponse.json({ ok: true, changed });
   } catch (e: any) {
+    if (e instanceof AiDisabledError) return aiComingSoonResponse('studio');
     return NextResponse.json({ error: e?.message || 'Regenerate failed' }, { status: 500 });
   }
 }

@@ -1,8 +1,9 @@
-// MUSIC-SUITE P5 (2026-09-25), "The Flip, for real" — the PUBLIC-DOMAIN SHELF: the mechanism, with no entries.
+// MUSIC-SUITE P5 (2026-09-25), "The Flip, for real" — the PUBLIC-DOMAIN SHELF: the mechanism.
 //
 // Owner decisions #15 and #28: the Flip may offer public-domain recordings, each one signed off by the owner, and phase 5
 // writes the candidate list (outbox musicsuite/p5/PD-CANDIDATES.md) — nothing is downloaded before the owner ticks it.
-// So this shelf ships EMPTY. An entry appears in the FLIP tab only when:
+// This shelf shipped EMPTY through P5 and P6; MUSIC-SUITE P7 (2026-09-29) fills PD_SHELF with owner decision #37's six
+// (below). An entry appears in the FLIP tab only when:
 //   · it is complete — who performed it, the year it was published, where the recording is archived (an https URL), and
 //     WHY it is free in plain words (whyFree: the rationale a player or a rights holder can read);
 //   · it is old enough: a US sound recording published before 1925 (PD_LAST_YEAR = 1924). The Music Modernization Act
@@ -39,11 +40,88 @@ export const PD_LAST_YEAR = 1924;
 export const PD_AUDIO_BASE = '/audio/pd/';
 
 /**
- * THE SHELF. Empty until the owner signs an entry from outbox musicsuite/p5/PD-CANDIDATES.md (decision #28: nothing is
- * downloaded before that). To add one: copy its fields from the candidate list, put the owner's sign-off time in
- * ownerSignedAt, and put the file at public/audio/pd/<id>.mp3.
+ * THE SHELF. MUSIC-SUITE P7 (2026-09-29): the six entries of owner decision #37 (musicsuite/DECISIONS-2.md, signed
+ * 2026-09-26T00:00:00Z) — "THE 6 WITH CONFIRMED SOURCES" from the candidate table (outbox musicsuite/p5/PD-CANDIDATES.md).
+ * Each file was downloaded from the exact page decision #37 names, the three checks (transfer from the original disc,
+ * the archive's terms, the matrix/take) were confirmed, and the full record — including where each check was read and,
+ * for the three Library of Congress items, exactly how the file was reached — is public/audio/pd/PROVENANCE.json.
+ * (Only these six: the other four PD-CANDIDATES.md rows were never ticked and stay undownloaded.)
  */
-export const PD_SHELF: readonly PdEntry[] = [];
+export const PD_SHELF: readonly PdEntry[] = [
+  {
+    id: 'odjb_livery_stable_1917',
+    title: 'Livery Stable Blues',
+    performer: 'Original Dixieland Jass Band',
+    year: 1917,
+    sourceUrl: 'https://www.loc.gov/item/jukebox-186254/',
+    whyFree:
+      "A US recording published in 1917, public domain since 2022 under the Music Modernization Act; the tune has " +
+      "been public domain for decades. Confirmed on the item page: a transfer of the original Victor 18255 disc " +
+      "(Matrix/Take B-19331/1), free to reuse per the National Jukebox's own notice.",
+    ownerSignedAt: '2026-09-26T00:00:00Z',
+  },
+  {
+    id: 'europe_castle_house_rag_1914',
+    title: 'The Castles in Europe (Castle House Rag)',
+    performer: "Europe's Society Orchestra (James Reese Europe)",
+    year: 1914,
+    sourceUrl: 'https://www.loc.gov/item/jukebox-134538/',
+    whyFree:
+      "A US recording published in 1914, public domain since 2022 under the Music Modernization Act; James Reese " +
+      "Europe's 1914 composition is long out of copyright. Confirmed on the item page: a transfer of the original " +
+      "Victor 35372 disc (Matrix/Take C-14433/3), free to reuse per the National Jukebox's own notice.",
+    ownerSignedAt: '2026-09-26T00:00:00Z',
+  },
+  {
+    id: 'fisk_swing_low_1909',
+    title: 'Swing Low, Sweet Chariot',
+    performer: 'Fisk University Jubilee Quartet',
+    year: 1909,
+    sourceUrl: 'https://www.loc.gov/item/jukebox-128141/',
+    whyFree:
+      "A US recording published in 1909, public domain since 2022 under the Music Modernization Act; the song is a " +
+      "traditional spiritual with no composer's copyright. Confirmed on the item page: a transfer of the original " +
+      "Victor 16453 disc (Matrix/Take B-8420/3), free to reuse per the National Jukebox's own notice.",
+    ownerSignedAt: '2026-09-26T00:00:00Z',
+  },
+  {
+    id: 'mamie_smith_crazy_blues_1920',
+    title: 'Crazy Blues',
+    performer: 'Mamie Smith & Her Jazz Hounds',
+    year: 1920,
+    sourceUrl: 'https://archive.org/details/MamieSmithHerJazzHounds',
+    whyFree:
+      "A US recording published in 1920, public domain since 2022 under the Music Modernization Act; Perry " +
+      "Bradford's 1920 song is long out of copyright. Confirmed on the item: an archive.org 78rpm-disc transfer " +
+      "(OKeh 4169, take C), no restrictive terms recorded.",
+    ownerSignedAt: '2026-09-26T00:00:00Z',
+  },
+  {
+    id: 'bessie_smith_downhearted_1923',
+    title: 'Down Hearted Blues',
+    performer: 'Bessie Smith',
+    year: 1923,
+    sourceUrl: 'https://commons.wikimedia.org/wiki/File:Bessie_Smith_-_Downhearted_Blues_(1923).ogg',
+    whyFree:
+      "A US recording published in 1923, public domain since 2024 under the Music Modernization Act; the 1922 " +
+      "Hunter/Austin song has been public domain since 2018. Confirmed on the file page: Wikimedia Commons' own " +
+      "public-domain licence tags on its 78rpm-disc transfer (Columbia, recorded 1923-02-16).",
+    ownerSignedAt: '2026-09-26T00:00:00Z',
+  },
+  {
+    id: 'whiteman_rhapsody_1924',
+    title: 'Rhapsody in Blue, Part 1',
+    performer: 'Paul Whiteman and His Concert Orchestra, George Gershwin (piano)',
+    year: 1924,
+    sourceUrl: 'https://publicdomainreview.org/collection/rhapsody-in-blue-paul-whiteman-and-george-gershwin-original-1924-recording/',
+    whyFree:
+      "A US recording published in 1924, public domain since 2025 under the Music Modernization Act; Gershwin's " +
+      "1924 composition has been public domain since 2020. Confirmed via the Public Domain Review's own download " +
+      "link to an archive.org transfer of the acoustic Victor 78rpm disc, Part 1 (loc.gov streams the same " +
+      "recording but offers no download).",
+    ownerSignedAt: '2026-09-26T00:00:00Z',
+  },
+];
 
 const ID = /^[a-z0-9_]{3,48}$/;
 const ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})$/;

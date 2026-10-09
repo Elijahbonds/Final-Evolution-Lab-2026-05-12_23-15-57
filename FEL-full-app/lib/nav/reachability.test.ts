@@ -27,6 +27,7 @@ const NOT_NAVIGABLE: Record<string, string> = {
   '/c': 'a scanned creator card, entered by its code',
   '/card': "somebody else's creator card, opened from a shared link or a QR code",
   '/p': 'a public profile, entered by its handle',
+  '/links': 'the public bio links page, opened from social profiles, not from inside the app',
   '/controller': 'joined by code from a phone, never by a link on the phone',
   '/admin': 'shown in the rail to an admin only',
   '/game-surface.css': 'not a route',
@@ -34,6 +35,9 @@ const NOT_NAVIGABLE: Record<string, string> = {
   '/train': 'a tab',
   '/profile': 'a tab',
   '/studio': 'HOLD — not shipped, deliberately unlinked',
+  '/settings': 'alias of /account; app/settings/page.tsx redirects there, and the consent screen links /account',
+  '/program': 'a bought program or a teen unlock, opened from the receipt, noindex',
+  '/session': 'a paid live call, opened from the booking confirmation, noindex',
   '/bookings': 'Stripe Checkout returns here after a service booking (success_url)',
 };
 

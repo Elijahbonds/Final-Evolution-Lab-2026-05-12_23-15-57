@@ -83,6 +83,11 @@ export const MEASUREMENTS: readonly Measurement[] = [
     note: 'Knee-to-wall. This is the ankle compliance the depth drop gate reads.',
   },
   {
+    // TUNE(elijah): Mirror Assess T2 (lib/assess, 2026-09-28), spec §4 T2 [TUNE-EJ]; unsigned in lib/assess/thresholds.ts
+    key: 'ankleDorsiflexionDeg', axis: 'flexibility', unit: 'deg', floor: 30, ceiling: 45,
+    note: 'Knee-to-wall read by the camera: shin angle from vertical with the heel down, worse side. 30° is restricted; 45° is free.',
+  },
+  {
     key: 'sitAndReach', axis: 'flexibility', unit: 'cm', floor: -10, ceiling: 30,
     note: 'Negative values are real here, which is why floor is below zero.',
   },

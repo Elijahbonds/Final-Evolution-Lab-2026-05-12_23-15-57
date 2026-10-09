@@ -79,13 +79,14 @@ describe('appearance points at the closet rather than restating it', () => {
 describe('vitals map onto the scales the rig actually applies', () => {
   it('can express every body a movement scan can produce', () => {
     // Sweep the scan wide — well past anything a real athlete produces — and the editor must still be
-    // able to represent the result. A creator that cannot show you the body your scan gave you is worse
-    // than one with no scan at all.
+    // able to represent the result. REACH-FREEZE (2026-09-29): a scan never sets a body's size any more, so
+    // every result is the standard frame — 100 on the Height and Build rows, and reach (no row) at 1.
     for (let jump = 10; jump <= 110; jump += 5) {
       for (let depth = 40; depth <= 140; depth += 10) {
         for (let cad = 120; cad <= 220; cad += 10) {
           const spec = buildAvatarSpec({ jumpHeightCm: jump, depthDeg: depth, asymmetryPct: 0, valgusL: 0, valgusR: 0, cadenceSpm: cad, trunkLeanDeg: 0 });
-          for (const [id, v] of [['heightScale', spec.heightScale], ['buildScale', spec.buildScale], ['reachScale', spec.reachScale]] as const) {
+          expect([spec.heightScale, spec.buildScale, spec.reachScale], `jump ${jump} depth ${depth} cadence ${cad}`).toEqual([1, 1, 1]);
+          for (const [id, v] of [['heightScale', spec.heightScale], ['buildScale', spec.buildScale]] as const) {
             const row = VITALS.rows.find((r) => r.id === id) as RatedRow;
             const pct = Math.round(v * 100);
             expect(pct, `${id} ${v}`).toBeGreaterThanOrEqual(row.min);
@@ -128,7 +129,7 @@ describe('body offers only bodies that ship', () => {
     expect(r.options).toContain(DEFAULT_AVATAR.archetype);
   });
 
-  it('names the three stances the movement scan can produce', () => {
+  it('names the three stances; a movement scan no longer picks one (REACH-FREEZE: it is always athletic)', () => {
     const r = BODY.rows.find((x) => x.id === 'stance') as SlotRow;
     const seen = new Set<string>();
     for (let jump = 10; jump <= 110; jump += 5) {
@@ -136,8 +137,9 @@ describe('body offers only bodies that ship', () => {
         seen.add(buildAvatarSpec({ jumpHeightCm: jump, depthDeg: depth, asymmetryPct: 0, valgusL: 0, valgusR: 0, cadenceSpm: 170, trunkLeanDeg: 0 }).stance);
       }
     }
+    expect([...seen]).toEqual(['athletic']);   // before: 'athletic', 'tall' and 'compact' came from the jump and the squat depth
     for (const s of seen) expect(r.options, `scan produced stance "${s}"`).toContain(s);
-    expect([...r.options]).toEqual([...STANCES]);
+    expect([...r.options]).toEqual([...STANCES]);   // tall and compact stay: the player picks them on the Stance row
   });
 
   it('never lets a body be empty — everyone has one', () => {

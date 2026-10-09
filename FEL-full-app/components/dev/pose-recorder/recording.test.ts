@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
-  TAKES, buildTakesFile, measureFps, shortUserAgent, takesFileName, toRecordedFrame, type RecordedTake,
+  CAPTURE_TAKE_SPECS, TAKES, buildTakesFile, captureDownloadName, captureMetaOf, measureFps, nextRun, shortUserAgent, takesFileName, toRecordedFrame,
+  type RecordedTake,
 } from './recording';
+import { CAPTURE_TAKES } from '@/lib/pose/captureProtocol';
+import { poseTakeProblems } from '@/lib/pose/recordingsGuard';
+import { ingestTakesFile } from '@/lib/mirror/fixtures/capture/format';
 
 const lm = (x: number) => ({ x, y: 0.5, z: -0.123456, visibility: 0.98765 });
 
@@ -62,5 +66,65 @@ describe('pose recorder file', () => {
     expect(space.prompt).toMatch(/play spot/);
     expect(space.prompt).toMatch(/both arms overhead for 2 seconds/);
     expect(space.seconds).toBeGreaterThanOrEqual(8);
+  });
+});
+
+// MIRROR PHASE 3: the Mirror capture set (owner + 2 adults, 2 phones, numbers only, never video, no minors).
+describe('the Mirror capture set', () => {
+  const take = (id: string, highRate = false): RecordedTake => ({
+    id, label: id, prompt: '', recordedAt: '', device: 'x', video: { width: 480, height: 640 }, clock: 'capture',
+    detectFps: 30, inferMs: 9, goT: 3000, endT: 6000, ...(highRate ? { highRate: true } : {}),
+    frames: [{ t: 0, present: true, image: Array.from({ length: 33 }, () => ({ x: 0.5, y: 0.5, z: 0, v: 0.9 })) }],
+  });
+  const choice = { person: 'P2', device: 'iphone', adult: true, consent: true };
+
+  it('walks the protocol\'s takes in order; the jump takes ask for 60 fps', () => {
+    expect(CAPTURE_TAKE_SPECS.map((s) => s.id)).toEqual(CAPTURE_TAKES.map((t) => t.id));
+    expect(CAPTURE_TAKE_SPECS.filter((s) => s.highRate).map((s) => s.id)).toEqual(CAPTURE_TAKES.filter((t) => t.movement === 'jump').map((t) => t.id));
+    for (const s of CAPTURE_TAKE_SPECS) expect(s.label).toMatch(/: /);
+  });
+
+  it('"Record all remaining" stops where the phones move to the floor, and again where they come back up', () => {
+    const first = nextRun(CAPTURE_TAKE_SPECS, () => false);
+    expect(first.at(-1)).toBe('hinge.walkIn');
+    const done = new Set(first);
+    const floor = nextRun(CAPTURE_TAKE_SPECS, (id) => done.has(id));
+    expect(floor).toEqual(CAPTURE_TAKES.filter((t) => t.movement === 'pushup').map((t) => t.id));
+    floor.forEach((id) => done.add(id));
+    expect(nextRun(CAPTURE_TAKE_SPECS, (id) => done.has(id))[0]).toBe('t1.front.good');
+    expect(nextRun(TAKES, () => false)).toEqual(TAKES.map((t) => t.id));   // the movement-play set has no floor takes
+  });
+
+  it('will not save without an alias, a phone and both statements', () => {
+    expect(captureMetaOf(choice)).toEqual({ protocol: 'mirror-capture-1', person: 'P2', device: 'iphone', adult: true, consent: true });
+    expect(captureMetaOf({ ...choice, person: '' })).toBeNull();
+    expect(captureMetaOf({ ...choice, person: 'Jordan' })).toBeNull();
+    expect(captureMetaOf({ ...choice, device: '' })).toBeNull();
+    expect(captureMetaOf({ ...choice, consent: false })).toBeNull();
+  });
+
+  it('a minor: without "everyone is 18 or over" ticked, nothing is saved', () => {
+    expect(captureMetaOf({ ...choice, adult: false })).toBeNull();
+  });
+
+  it('the file is an owner capture of adults, drops the free-text notes, and the ingest takes it', () => {
+    const meta = captureMetaOf(choice)!;
+    const file = buildTakesFile({ 'jump.good': take('jump.good', true), 'stand.front': take('stand.front') },
+      { device: 'Safari 18.0 · iOS', model: 'pose_landmarker_lite/float16/1', notes: 'with Jordan in the kitchen', savedAt: new Date(0), capture: meta });
+    expect(file).toMatchObject({ origin: 'owner-capture', child: false, capture: meta, notes: '' });
+    expect(file.takes.map((t) => t.id)).toEqual(['stand.front', 'jump.good']);
+    expect(file.takes[1].highRate).toBe(true);
+    expect(poseTakeProblems(file)).toEqual([]);
+    const r = ingestTakesFile(JSON.parse(JSON.stringify(file)), captureDownloadName(meta, new Date(2026, 9, 9, 15, 30)));
+    expect(r.problems).toEqual([]);
+    expect(JSON.stringify(r.fixture)).not.toMatch(/Jordan|kitchen/);
+    expect(captureDownloadName(meta, new Date(2026, 9, 9, 15, 30))).toBe('fel-capture-P2-iphone-2026-10-09-1530.json');
+  });
+
+  it('the movement-play set is unchanged: no capture block, the notes kept', () => {
+    const file = buildTakesFile({ still: take('still') }, { device: 'x', model: 'm', notes: 'orthodox', savedAt: new Date(0) });
+    expect(file).not.toHaveProperty('capture');
+    expect(file).not.toHaveProperty('origin');
+    expect(file.notes).toBe('orthodox');
   });
 });

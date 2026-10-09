@@ -1,6 +1,13 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { BookCheckoutError, assertStripeTestKey, buildBookCheckoutParams, checkoutParamsForOffer } from './bookCheckout';
+import {
+  BookCheckoutError,
+  assertStripeTestKey,
+  bookCheckoutGate,
+  bookSharesPlatformStripeAccount,
+  buildBookCheckoutParams,
+  checkoutParamsForOffer,
+} from './bookCheckout';
 import { getBook, getOffer } from './bookCatalog';
 
 describe('book checkout', () => {
@@ -76,11 +83,43 @@ describe('book checkout', () => {
     expect(params.payment_method_types).toBeUndefined();
   });
 
-  it('the checkout route asserts test mode before it can create a session', () => {
+  it('the checkout route runs the gate before it can create a session', () => {
+    // test changed (2026-10-09): was toContain('assertStripeTestKey('). The route now asks bookCheckoutGate(), which
+    // refuses a non-sk_test_ key itself (pinned below) as a 409 store_closed, and getBookStripe still asserts.
     const src = readFileSync('app/api/books/checkout/route.ts', 'utf8');
-    expect(src).toContain('assertStripeTestKey(');
+    const gateAt = src.indexOf('bookCheckoutGate()');
+    expect(gateAt).toBeGreaterThan(0);
+    expect(src.indexOf('getBookStripe()')).toBeGreaterThan(gateAt);
+    expect(src).not.toContain("req.headers.get('origin')");
     const download = readFileSync('app/api/books/download/route.ts', 'utf8');
     expect(download).toContain('issueBookFile(');
     expect(download).not.toContain('firebasestorage.googleapis.com');
+  });
+});
+
+describe('book checkout gate (the release store rules: B2 store_closed, B3 server origin, B10 fence)', () => {
+  const open = { STRIPE_BOOKS_SECRET_KEY: 'sk_test_b', VIRTUAL_PURCHASES_ENABLED: '1', NEXTAUTH_URL: 'https://fel.example/' } as NodeJS.ProcessEnv;
+
+  it('opens only with a test key, the B10 fence on, and a configured site URL', () => {
+    expect(bookCheckoutGate(open)).toEqual({ ok: true, key: 'sk_test_b', origin: 'https://fel.example' });
+  });
+
+  it('answers a store_closed reason for each missing piece, in order', () => {
+    expect(bookCheckoutGate({} as NodeJS.ProcessEnv)).toEqual({ ok: false, reason: 'payments_not_set_up' });
+    expect(bookCheckoutGate({ ...open, STRIPE_BOOKS_SECRET_KEY: 'sk_live_x' })).toEqual({ ok: false, reason: 'live_mode_off' });
+    expect(bookCheckoutGate({ ...open, STRIPE_BOOKS_SECRET_KEY: 'rk_test_x' })).toEqual({ ok: false, reason: 'live_mode_off' });
+    expect(bookCheckoutGate({ ...open, VIRTUAL_PURCHASES_ENABLED: '' })).toEqual({ ok: false, reason: 'virtual_purchases_off' });
+    expect(bookCheckoutGate({ ...open, NEXTAUTH_URL: ' ' })).toEqual({ ok: false, reason: 'site_url_not_set' });
+  });
+
+  it('a live platform key never opens books, even with the coach store live', () => {
+    const env = { STRIPE_SECRET_KEY: 'sk_live_p', COACH_STORE_LIVE: '1', VIRTUAL_PURCHASES_ENABLED: '1', NEXTAUTH_URL: 'https://x' } as NodeJS.ProcessEnv;
+    expect(bookCheckoutGate(env)).toEqual({ ok: false, reason: 'live_mode_off' });
+  });
+
+  it('reuses the platform StripeCustomer only when books charge through the platform account', () => {
+    expect(bookSharesPlatformStripeAccount({ STRIPE_SECRET_KEY: 'sk_test_p' } as NodeJS.ProcessEnv)).toBe(true);
+    expect(bookSharesPlatformStripeAccount({ STRIPE_SECRET_KEY: 'sk_test_p', STRIPE_BOOKS_SECRET_KEY: 'sk_test_p' } as NodeJS.ProcessEnv)).toBe(true);
+    expect(bookSharesPlatformStripeAccount({ STRIPE_SECRET_KEY: 'sk_test_p', STRIPE_BOOKS_SECRET_KEY: 'sk_test_b' } as NodeJS.ProcessEnv)).toBe(false);
   });
 });

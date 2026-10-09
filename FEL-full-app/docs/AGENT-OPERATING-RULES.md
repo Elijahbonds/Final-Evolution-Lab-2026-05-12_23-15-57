@@ -22,3 +22,26 @@ Rules adopted as written, from now on:
 - Neuro-Mechanic Mirror outputs are labelled "estimated engagement", never clinical measurement.
 - Say "assumption:" when guessing. Never add a dependency without asking. Never mark a mode shipped without the written benchmark comparison.
 - Scope drift: "That's scope drift — current mode is X. Confirm the switch?"
+
+---
+
+## Escalation: what an agent decides, and what it brings to the owner (owner, 2026-09-28)
+
+Asked because these rules had never said, and because nothing loaded them: there was no `CLAUDE.md` in the repo for
+860 commits, so every session started without this file. `/CLAUDE.md` now auto-loads and carries the short version.
+
+| Question | Owner's answer |
+|---|---|
+| Uncovered decision, owner away | **Do everything reversible; stop before anything irreversible.** Don't idle on a question you can work around. |
+| Push rights | **Lane branch only.** Merging a lane to `main` is the owner's, every time — green gate or not. |
+| Extra always-ask categories (feel numbers, deploy files, test relaxations, guard tightening) | **None.** They are reversible commits on a lane, so they proceed — but they must be **flagged** in the commit body and the closing report. |
+| Agent has evidence an instruction breaks something | **Stop, show the evidence, propose the alternative that serves the intent.** The owner decides. Don't comply into a known breakage; don't argue past the evidence. |
+
+Why this shape works: `main` is the deploy branch, and the owner owns the merge. So every agent commit is reviewable
+before it can reach production *by construction* — which is what makes "proceed and flag" safe for reversible work
+and leaves only the genuinely one-way acts (a push to `main`, a deploy, a force-push, a deletion, a live migration,
+anything outward-facing, a new dependency) needing a person.
+
+What "flagged" has to mean, or the freedom above stops being safe: a tuned feel number, a relaxed assertion, a guard
+tightened until the owner's own content fails, and any `assumption:` are all findable in the commit body and said
+again in the closing report. A change the owner has to read the diff to discover was not flagged.

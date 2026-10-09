@@ -53,6 +53,9 @@ export const REASON = {
   // The movement course (lib/education/course.ts). Finishing a chapter of the Playbook is a milestone, which is
   // what shards are for -- earned, never purchasable.
   EDU_CHAPTER_COMPLETE: 'EDU_CHAPTER_COMPLETE', // shards
+  // EDU-LINKS (2026-10-07): the course bonus for finishing the whole book (COURSE_BONUS_SHARDS), once per account
+  // (lib/education/rewards.ts keys it playbook:course:<userId>). Server-granted only, never an event a client can name.
+  EDU_COURSE_COMPLETE: 'EDU_COURSE_COMPLETE', // shards
   MOVEMENT_SCREEN_COMPLETED: 'MOVEMENT_SCREEN_COMPLETED', // shards — one graded screen
   // Phase 6 — async multiplayer settlement. Both players earn coins for
   // playing a resolved match; the winner earns shards. Server-granted only.
@@ -68,6 +71,11 @@ export const REASON = {
   // Owner decision 2026-09-24: a purchase that took a balance and delivered nothing is paid back, in its own currency,
   // the next time the wallet is read (lib/wallet/dead-buys.ts). Not an earn: it never counts against a daily cap.
   DEAD_BUY_REFUND: 'DEAD_BUY_REFUND',
+  // MUSIC-SUITE P6 (2026-09-25), owner decision #23: a Music Room kit the room handed out for free before the shards seam
+  // was closed (4b766804, 2026-09-20) is granted to the account once, on a zero-delta row under this reason
+  // (lib/wallet/kit-grandfather.ts). Not a purchase and not an earn: no balance moves, the dead-buy sweep never reads it
+  // (dead-buys.ts DEAD_BUY_REASONS), and the owned-kits read counts it as backing the kit (dead-buys.ts backedEntitlements).
+  KIT_GRANDFATHER_2026_09: 'KIT_GRANDFATHER_2026_09',
 } as const;
 
 export type ReasonCode = (typeof REASON)[keyof typeof REASON];
@@ -88,6 +96,17 @@ export const EVENT_REASON: Record<string, ReasonCode> = {
   sceneit_freeuse_identified: REASON.SCENEIT_FREEUSE_IDENTIFIED,
 };
 
+// DAILY-KEY-HOTFIX (2026-09-28): the event types paid at most once per player per America/Los_Angeles calendar day.
+// earn() keys them itself (lib/wallet/dailyKey.ts dailyKey) and ignores the client's idempotency_key: the client built
+// that key, and any new string paid the daily reward again (eye a1a1c5f9 5b; production at 3a0f4edf).
+// DERIVED from EVENT_REASON, not listed: an event type named daily_* or paying a DAILY_* reason is one, so a daily
+// added to EVENT_REASON later is keyed per day without anyone remembering this set.
+export const DAILY_EVENT_TYPES: ReadonlySet<string> = new Set(
+  Object.entries(EVENT_REASON)
+    .filter(([eventType, reasonCode]) => eventType.startsWith('daily_') || reasonCode.startsWith('DAILY_'))
+    .map(([eventType]) => eventType),
+);
+
 // Reasons whose currency is shards — asserted at multiple layers so a purchase
 // path can NEVER mint shards (permanent design constraint, §1).
 export const SHARD_REASONS: ReadonlySet<string> = new Set([
@@ -99,6 +118,7 @@ export const SHARD_REASONS: ReadonlySet<string> = new Set([
   REASON.REFERRAL_BONUS,
   REASON.MP_MATCH_WON,
   REASON.EDU_CHAPTER_COMPLETE,
+  REASON.EDU_COURSE_COMPLETE,
 ]);
 
 // ---------------------------------------------------------------------------
@@ -166,6 +186,16 @@ export const DEFAULT_REWARD_RULES: Record<string, RewardRuleConfig> = {
     // Matches CHAPTER_SHARDS in lib/education/course.ts, which a test keeps in step. The AMOUNT LIVES HERE, not
     // in the request -- a client saying it finished a chapter is a claim, and the server prices it.
     baseAmount: 15, scaleNum: 0, minGrant: 15, maxGrant: 15, // TUNE(elijah)
+    perMinuteCap: 0, perDayCurrencyCap: 0, active: true,
+  },
+  // EDU-LINKS (2026-10-07), Mirror & coaching plan Phase 5: finishing the whole Playbook. Matches COURSE_BONUS_SHARDS in
+  // lib/education/course.ts (course.test.ts keeps them in step). ITS CAP: maxGrant is one bonus, and the idempotency key
+  // names only the account (playbook:course:<userId>), so it pays once per account, ever. grantServerReward does not
+  // read the per-minute or per-day caps (only earn() does), so they stay 0 rather than promise a limit nothing enforces;
+  // a day cap here would also count the tenth chapter's own 15 shards paid in the same request and trim the bonus.
+  [REASON.EDU_COURSE_COMPLETE]: {
+    reasonCode: REASON.EDU_COURSE_COMPLETE, currency: 'shards', formula: 'flat',
+    baseAmount: 50, scaleNum: 0, minGrant: 50, maxGrant: 50, // TUNE(elijah) — COURSE_BONUS_SHARDS, priced 2026-09-20
     perMinuteCap: 0, perDayCurrencyCap: 0, active: true,
   },
   // THE MOVEMENT SCREEN (owner, 2026-09-19: shards for a completed scan, body scan first). Server-granted and

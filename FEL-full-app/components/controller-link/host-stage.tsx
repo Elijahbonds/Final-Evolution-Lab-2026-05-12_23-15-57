@@ -11,60 +11,92 @@
 // broken while being entirely correct.
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import QRCode from 'qrcode';
-import { HostSession } from '@/lib/controller-link/host';
-import { joinUrl } from '@/lib/controller-link/codes';
+import { HostLobby } from '@/components/controller-link/host-lobby';
 import { controllerConfigFor } from '@/lib/controller-link/schemas/registry';
 import { HostPresence, presenceSummary, type PresenceReport } from '@/lib/controller-link/presence';
-import { readDisplaySetting, writeDisplaySetting, displayBanner, MIRROR_FACTOR, type DisplaySetting } from '@/lib/controller-link/tvMode';
-import { LinkDebugOverlay } from './link-debug-overlay';
-import { linkErrorText } from '@/lib/controller-link/transport/signaling';
-import { PHONE_STEPS, typeInstead } from '@/lib/controller-link/connectHelp';
-import type { LobbyPeer } from '@/lib/controller-link/types';
+import { toInputBus } from '@/lib/controller-link/modeBridge';
+import { runMode, InputBus, type FelInput, type HudValue, type ModePhase, type SessionResult } from '@/lib/babylon';
+import { MODES } from '@/lib/babylon/modes/registry';
+import { BootSplash } from '@/components/games/boot-splash';
+import { PadChips } from '@/lib/babylon/ui/PadChips';
+import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
+import type { ControlEvent } from '@/lib/controller-link/types';
 
 export function HostStage({ modeId }: { modeId: string }) {
   const config = useMemo(() => controllerConfigFor(modeId), [modeId]);
+  const def = useMemo(() => MODES[modeId] ?? null, [modeId]);
   const [started, setStarted] = useState(false);
-  const [code, setCode] = useState('');
-  const [qr, setQr] = useState<string | null>(null);
-  const [peers, setPeers] = useState<LobbyPeer[]>([]);
+  const [phase, setPhase] = useState<ModePhase>('loading');
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [hud, setHud] = useState<Record<string, HudValue>>({});
+  const [result, setResult] = useState<SessionResult | null>(null);
   const [presence, setPresence] = useState<PresenceReport | null>(null);
-  const [display, setDisplay] = useState<DisplaySetting>({ mode: 'direct', factor: 1, chosen: false });
-  const [showDebug, setShowDebug] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [attempt, setAttempt] = useState(0);   // a failed room retries on a tap, not a reload
-  const sessionRef = useRef<HostSession | null>(null);
+  const [bus, setBus] = useState<InputBus | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const busRef = useRef<InputBus | null>(null);
+  const linkSink = useRef<{ bus: InputBus; sink: ReturnType<typeof toInputBus> } | null>(null);
   const presenceRef = useRef(new HostPresence());
   const stageRef = useRef<HTMLDivElement | null>(null);
 
-  // the guess needs the browser, so it is read after mount rather than during render
   useEffect(() => {
-    setDisplay(readDisplaySetting({
-      userAgent: navigator.userAgent,
-      touchPoints: navigator.maxTouchPoints,
-      width: window.innerWidth,
-      height: window.innerHeight,
-    }));
-  }, []);
+    if (!started || !def) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
 
-  useEffect(() => {
-    if (!started || !config) return;
+    const input = new InputBus();
+    busRef.current = input;
+    setBus(input);
+    setPhase('loading');
+    setCountdown(null);
+    setLoadError(null);
+    setHud({});
+    setResult(null);
+
     let disposed = false;
-    const session = new HostSession({
-      config,
-      onInput: () => { /* the schema layer: the mounted mode's own bridge consumes these */ },
-      onPadInput: () => { /* the binary relay: likewise, once a mode is mounted on this stage */ },
-      onLobby: setPeers,
-    });
-    sessionRef.current = session;
-    session.start().then((c) => { if (!disposed) setCode(c); }).catch((e) => { if (!disposed) setError(linkErrorText(e)); });
-    return () => { disposed = true; session.dispose(); sessionRef.current = null; };
-  }, [started, config, attempt]);
+    let stop: (() => void) | null = null;
+    const startTimer = setTimeout(() => {
+      if (disposed) return;
+      runMode(def, {
+        canvas,
+        input,
+        onPhase: (p, detail) => {
+          if (disposed) return;
+          setPhase(p);
+          setCountdown(typeof detail === 'number' ? detail : null);
+          if (p === 'error') setLoadError(typeof detail === 'string' ? detail : 'Failed to load the arena.');
+        },
+        onHud: (next) => {
+          if (!disposed) setHud((prev) => ({ ...prev, ...next }));
+        },
+        resultSink: async (next) => {
+          if (!disposed) setResult(next);
+        },
+        cardSink: async (next) => {
+          if (!disposed) setResult(next);
+        },
+      }).then((dispose) => {
+        if (disposed) dispose();
+        else stop = dispose;
+      }).catch((e) => {
+        if (!disposed) {
+          setPhase('error');
+          setLoadError(String((e as Error)?.message ?? e));
+        }
+      });
+    }, 0);
 
-  useEffect(() => {
-    if (!code) return;
-    QRCode.toDataURL(joinUrl(code), { margin: 1, width: 420 }).then(setQr).catch(() => setQr(null));
-  }, [code]);
+    return () => {
+      disposed = true;
+      clearTimeout(startTimer);
+      stop?.();
+      if (busRef.current === input) {
+        busRef.current = null;
+        linkSink.current = null;
+      }
+      setBus((current) => (current === input ? null : current));
+    };
+  }, [started, def]);
 
   // release the wake lock and leave fullscreen when the stage goes away
   useEffect(() => () => { void presenceRef.current.exit(); }, []);
@@ -81,10 +113,23 @@ export function HostStage({ modeId }: { modeId: string }) {
     void presenceRef.current.enter(stageRef.current).then(setPresence).catch(() => {});
   }, []);
 
-  const setMode = useCallback((mode: 'direct' | 'mirrored') => {
-    writeDisplaySetting(mode, mode === 'mirrored' ? MIRROR_FACTOR : 1);
-    setDisplay(readDisplaySetting());
+  const tapStart = useCallback(() => {
+    busRef.current?.emit({ t: 'button', btn: 'START', pressed: true });
   }, []);
+
+  const onControllerInput = useCallback((ev: ControlEvent) => {
+    const input = busRef.current;
+    if (!input) return;
+    if (linkSink.current?.bus !== input) linkSink.current = { bus: input, sink: toInputBus(input) };
+    linkSink.current.sink(ev);
+  }, []);
+
+  const onPhonePad = useCallback((e: FelInput, slot: number) => {
+    const input = busRef.current;
+    if (!input) return;
+    if (config && config.maxPlayers > 1) input.emitSlot(slot, e);
+    else input.emit(e);
+  }, [config]);
 
   const panel: React.CSSProperties = {
     background: 'rgba(8,10,16,0.82)', border: '1px solid #26304a', borderRadius: 14, padding: '18px 20px',
@@ -96,8 +141,16 @@ export function HostStage({ modeId }: { modeId: string }) {
     </main>;
   }
 
+  if (!def) {
+    return <main style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: '#05070c', color: '#cfd6e4' }}>
+      <p style={{ font: '400 15px system-ui' }}>No playable TV mode for “{modeId}”.</p>
+    </main>;
+  }
+
+  const showTouchOverlay = started && bus && (phase === 'playing' || phase === 'countdown');
+
   return (
-    <main ref={stageRef} style={{ minHeight: '100vh', background: '#05070c', color: '#eef2f8', display: 'grid', placeItems: 'center', padding: 24 }}>
+    <main ref={stageRef} style={{ minHeight: '100vh', background: '#05070c', color: '#eef2f8', display: 'grid', placeItems: 'center', padding: started ? 0 : 24 }}>
       {!started ? (
         <div style={{ ...panel, textAlign: 'center', maxWidth: 520 }}>
           <h1 style={{ margin: '0 0 6px', font: '700 26px system-ui', letterSpacing: 1 }}>{config.title.toUpperCase()}</h1>
@@ -113,53 +166,45 @@ export function HostStage({ modeId }: { modeId: string }) {
           </p>
         </div>
       ) : (
-        <div style={{ display: 'grid', gap: 18, justifyItems: 'center' }}>
-          <div style={{ ...panel, display: 'grid', gap: 12, justifyItems: 'center' }}>
-            <h2 style={{ margin: 0, font: '700 20px system-ui', letterSpacing: 1 }}>JOIN ON YOUR PHONE</h2>
-            {qr && <img src={qr} data-testid="host-stage-qr" alt={`QR code to join — scan with your phone camera (code ${code})`} width={260} height={260} style={{ borderRadius: 10, background: '#fff', padding: 8 }} />}
-            <p style={{ margin: 0, font: '700 34px ui-monospace, monospace', letterSpacing: 8 }}>{code || '······'}</p>
-            <ol data-testid="qr-connect-help" style={{ margin: 0, padding: '0 0 0 20px', color: '#cfd6e4', font: '400 14px/1.6 system-ui', textAlign: 'left' }}>
-              {PHONE_STEPS.map((s) => <li key={s}>{s}</li>)}
-            </ol>
-            <p style={{ margin: 0, color: '#8A94A6', font: '400 13px system-ui' }}>{code ? typeInstead(joinUrl(code)) : joinUrl('XXXXXX')}</p>
-            {error && (
-              <p style={{ margin: 0, color: '#ffd75e', font: '400 13px system-ui' }}>
-                Phone link offline — {error}.{' '}
-                <button onClick={() => { setError(null); setCode(''); setQr(null); setAttempt((a) => a + 1); }}
-                  style={{ marginLeft: 6, padding: '4px 10px', borderRadius: 8, border: '1px solid #ffd75e88', background: 'transparent', color: '#ffd75e', cursor: 'pointer', font: '700 12px system-ui' }}>RETRY</button>
-              </p>
-            )}
+        <div className="relative h-screen w-screen overflow-hidden bg-black">
+          <canvas ref={canvasRef} data-testid="host-stage-canvas" className="absolute inset-0 h-full w-full touch-none" />
+
+          <BootSplash
+            modeId={def.modeId}
+            title={config.title.toUpperCase()}
+            phase={phase}
+            detail={phase === 'error' ? (loadError ?? undefined) : (countdown ?? undefined)}
+            onStart={tapStart}
+            onRetry={tapStart}
+          />
+
+          <HostLobby
+            config={config}
+            onInput={onControllerInput}
+            onPadInput={onPhonePad}
+            collapsed={phase === 'playing'}
+            lazy={false}
+            anchor="right-4 top-4"
+            bus={bus}
+          />
+          {bus && <PadChips bus={bus} className="left-4 top-4" />}
+          {showTouchOverlay && <TouchOverlay bus={bus} modeId={modeId} visible />}
+
+          <div data-testid="host-stage-status" className="pointer-events-none absolute inset-x-0 bottom-4 z-30 flex flex-col items-center gap-2 px-4 font-mono text-xs text-white/60">
+            {typeof hud.banner === 'string' && hud.banner ? (
+              <span className="rounded-lg border border-[#00E5FF]/25 bg-black/65 px-4 py-1 text-base font-bold tracking-[0.12em] text-[#00E5FF]">{hud.banner}</span>
+            ) : null}
+            {result ? (
+              <span className="rounded bg-black/65 px-3 py-1 text-[#ffd75e]">
+                COMPLETE · {result.outcome.toUpperCase()} · SCORE {Math.round(result.score)}
+              </span>
+            ) : null}
+            <span>
+              {presence ? presenceSummary(presence) : ''}
+              {presence?.notes.length ? ` · ${presence.notes.join(' ')}` : ''}
+            </span>
           </div>
-
-          <div style={{ ...panel, display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', justifyContent: 'center' }}>
-            <span style={{ font: '400 13px system-ui', color: '#8A94A6' }}>{displayBanner(display)}</span>
-            <button onClick={() => setMode(display.mode === 'mirrored' ? 'direct' : 'mirrored')}
-              style={{ padding: '7px 14px', borderRadius: 9, border: '1px solid #33384a', background: 'transparent', color: '#cfd6e4', cursor: 'pointer', font: '600 12px system-ui' }}>
-              {display.mode === 'mirrored' ? 'TURN OFF TV MODE' : 'TURN ON TV MODE'}
-            </button>
-            <button onClick={() => setShowDebug((v) => !v)}
-              style={{ padding: '7px 14px', borderRadius: 9, border: '1px solid #33384a', background: 'transparent', color: '#8A94A6', cursor: 'pointer', font: '600 12px system-ui' }}>
-              {showDebug ? 'HIDE LINK STATS' : 'LINK STATS'}
-            </button>
-          </div>
-
-          <p style={{ margin: 0, color: '#6b7280', font: '400 12px/1.5 system-ui', maxWidth: 520, textAlign: 'center' }}>
-            {presence ? presenceSummary(presence) : ''}
-            {presence?.notes.length ? ` · ${presence.notes.join(' ')}` : ''}
-          </p>
-
-          <p style={{ margin: 0, color: '#8A94A6', font: '400 13px system-ui' }}>
-            {peers.filter((p) => p.connected).length} of {config.maxPlayers} connected
-          </p>
         </div>
-      )}
-
-      {showDebug && sessionRef.current && (
-        <LinkDebugOverlay
-          stats={() => sessionRef.current!.padStats()}
-          peers={peers}
-          onClose={() => setShowDebug(false)}
-        />
       )}
     </main>
   );

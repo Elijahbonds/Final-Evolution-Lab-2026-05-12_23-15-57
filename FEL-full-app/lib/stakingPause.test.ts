@@ -8,8 +8,15 @@
 // network): a NEW stake or challenge on music or dance is refused before anything is written, on every route that can
 // open one; every other mode still opens exactly as before; and a duel or challenge that ALREADY EXISTS on a paused mode
 // still finishes — it takes its score, settles, pays or refunds a tie, and a posted duel nobody can now join is refunded
-// by its creator's CANCEL. (Nothing expires an Arena duel today — expiresAt is written and never read — so there is no
-// expiry path to keep working; see outbox/finish-release/musicsuite/p1/STAKING-PAUSE.md.)
+// by its creator's CANCEL. (Nothing expired an Arena duel when this was written — expiresAt was written and never read —
+// so there was no expiry path to keep working; see outbox/finish-release/musicsuite/p1/STAKING-PAUSE.md. MUSIC-SUITE P6,
+// 2026-09-26, owner decision #30: now the reclaim sweep reads it, in every mode, the paused ones too — a refund or a
+// forfeit payout is not a new stake. lib/arena-reclaim.test.ts proves a paused dance duel reclaims like any other.)
+//
+// MUSIC-SUITE P6 (2026-09-26): music's fairness phase landed and its line left the list — an Arena music set is the
+// duel's house beat, one recorded attempt, a server-rejudged score and a new ceiling (lib/babylon/music/houseBeat.ts,
+// lib/arena-music.ts). Dance stays paused until phase 9, so the pause is proven here on dance alone; music is proven
+// OPEN (a duel, a quick match, the lobby), and an existing music duel settles only on its rejudged set.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -22,7 +29,7 @@ const OTHER = 'someone-else';
 const h = vi.hoisted(() => ({
   matches: [] as Row[],
   created: [] as Row[],
-  events: [] as Array<{ type: string; payload: Row }>,
+  events: [] as Array<{ matchId?: string; userId?: string | null; type: string; payload: Row }>,
   locks: [] as Row[],
   refunds: [] as Row[],
   payouts: [] as Row[],
@@ -53,6 +60,12 @@ const tx = {
     findMany: async () => [],      // no past duels: a music ghost draws off the baseline
   },
   gameSession: { findMany: async () => [] },   // no past sessions: a dance ghost draws off the baseline
+  // MUSIC-SUITE P6: a music duel's attempt events (lib/arena-music.ts readMusicAttempt)
+  matchEvent: {
+    findMany: async ({ where }: Row) => h.events
+      .filter((e) => e.matchId === where.matchId && e.userId === where.userId && where.eventType.in.includes(e.type))
+      .map((e) => ({ eventType: e.type, payload: JSON.stringify(e.payload), createdAt: new Date(0) })),
+  },
 };
 
 vi.mock('next-auth', () => ({ getServerSession: vi.fn(async () => ({ user: { id: USER, name: 'You' } })) }));
@@ -99,7 +112,7 @@ vi.mock('@/lib/arena', async (importOriginal) => ({
   arenaLockEntry: vi.fn(async (_db: unknown, o: Row) => { h.locks.push(o); return 0; }),
   arenaPayWinner: vi.fn(async (_db: unknown, o: Row) => { h.payouts.push(o); return { payout: 90, rake: 10 }; }),
   arenaRefund: vi.fn(async (_db: unknown, o: Row) => { h.refunds.push(o); return 0; }),
-  appendMatchEvent: vi.fn(async (_db: unknown, _id: string, type: string, _u: unknown, payload: Row = {}) => { h.events.push({ type, payload }); }),
+  appendMatchEvent: vi.fn(async (_db: unknown, matchId: string, type: string, userId: string | null, payload: Row = {}) => { h.events.push({ matchId, userId, type, payload }); }),
 }));
 // The dark engine: eligibility and escrow have their own tests; here the gate order is what matters.
 vi.mock('@/lib/competition', async (importOriginal) => ({
@@ -121,7 +134,10 @@ import {
   STAKING_PAUSED, isStakingPaused, stakingPausedDetail, pausedStakeModes, STAKING_PAUSED_CODE, STAKING_PAUSED_STATUS,
 } from './stakingPause';
 import { ARENA_MODES, isArenaMode, isArenaStakeable, arenaStakeableModes } from './arena';
+import { isUnlistedMode } from './unlisted-modes';
 import { scoreCeilingFor } from './arena-score-integrity';
+import { houseBeatFor, houseTap, judgeHouseSet } from './babylon/music/houseBeat';
+import { MUSIC_ATTEMPT_START, MUSIC_ATTEMPT_FINISH } from './arena-music';
 import { MP_MODES, MP_CHALLENGE_MODES, MP_PAUSED_MODES, isMpChallengeOpen, isValidMpMode, sessionModeFor, mpModeLabel } from './mp/match-core';
 import { POST as createPOST } from '../app/api/arena/create/route';
 import { POST as quickPOST } from '../app/api/arena/quick-match/route';
@@ -142,7 +158,15 @@ const duel = (over: Row = {}): Row => ({
   seed: 'seed-before-the-pause', player1Id: USER, player2Id: HOUSE, player1Score: null, player2Score: null, winnerId: null,
   createdAt: new Date('2026-09-24T00:00:00Z'), updatedAt: new Date('2026-09-24T00:00:00Z'), ...over,
 });
-const PAUSED = ['music', 'dance'] as const;
+const PAUSED = ['dance'] as const;   // MUSIC-SUITE P6: music left the list
+
+/** MUSIC-SUITE P6: `userId` plays their one attempt in music duel `matchId` (every other note dead on); its rejudged score. */
+function played(matchId: string, userId: string): number {
+  const beat = houseBeatFor(matchId);
+  const taps = beat.notes.filter((_, i) => i % 2 === 0).map((n) => houseTap(n.lane, n.t));
+  h.events.push({ matchId, userId, type: MUSIC_ATTEMPT_START, payload: {} }, { matchId, userId, type: MUSIC_ATTEMPT_FINISH, payload: { taps } });
+  return judgeHouseSet(beat, taps).score;
+}
 
 beforeEach(() => {
   h.matches = []; h.created = []; h.events = []; h.locks = []; h.refunds = []; h.payouts = []; h.houseCalls = 0;
@@ -150,14 +174,15 @@ beforeEach(() => {
 });
 
 describe('the one list (lib/stakingPause.ts)', () => {
-  it('pauses exactly music and dance, the owner\'s decision #9 of 2026-09-25', () => {
-    expect([...STAKING_PAUSED].sort()).toEqual(['dance', 'music']);
+  it('pauses exactly dance now: music came back with MUSIC-SUITE phase 6 (owner decisions #9 and #12)', () => {
+    expect([...STAKING_PAUSED].sort()).toEqual(['dance']);
     for (const m of PAUSED) expect(isStakingPaused(m), m).toBe(true);
+    expect(isStakingPaused('music')).toBe(false);
   });
 
   it('reads the old spelling a stored duel or an old client carries, and pauses nothing else', () => {
-    expect(isStakingPaused('musicAcademy')).toBe(true);
-    for (const m of ['threePoint', 'dunkContest', 'hoops1v1', 'karateVersus', 'brainBrawl', 'training', '', null, undefined]) {
+    expect(isStakingPaused('musicAcademy')).toBe(false);   // P6: music's old key is open with it
+    for (const m of ['music', 'threePoint', 'dunkContest', 'hoops1v1', 'karateVersus', 'brainBrawl', 'training', '', null, undefined]) {
       expect(isStakingPaused(m as string), String(m)).toBe(false);
     }
   });
@@ -181,7 +206,7 @@ describe('the one list (lib/stakingPause.ts)', () => {
     expect(stakingPausedDetail('musicAcademy')).toContain('Groove Academy');
     expect(stakingPausedDetail('music')).toMatch(/Free play is open/);
     expect(stakingPausedDetail('music')).toMatch(/still plays and settles/);
-    expect(pausedStakeModes().map((p) => p.name).sort()).toEqual(['Groove Academy', 'The Cypher']);
+    expect(pausedStakeModes().map((p) => p.name).sort()).toEqual(['The Cypher']);
     expect(STAKING_PAUSED_CODE).toBe('STAKING_PAUSED');
     expect(STAKING_PAUSED_STATUS).toBe(409);
   });
@@ -200,8 +225,8 @@ describe('the one list (lib/stakingPause.ts)', () => {
   });
 });
 
-describe('the Arena refuses a NEW stake on music or dance, and nothing is written', () => {
-  for (const mode of [...PAUSED, 'musicAcademy']) {
+describe('the Arena refuses a NEW stake on dance, and nothing is written', () => {
+  for (const mode of PAUSED) {
     it(`POST DUEL on "${mode}": 409 STAKING_PAUSED, no row, no event, no Lab Credits locked`, async () => {
       const res = await createPOST(post({ mode, feeLc: 50 }));
       expect(res.status).toBe(409);
@@ -239,8 +264,8 @@ describe('the Arena refuses a NEW stake on music or dance, and nothing is writte
   });
 });
 
-describe('every other mode stakes exactly as before', () => {
-  for (const mode of ['threePoint', 'hoops1v1', 'karateVersus']) {
+describe('every other mode stakes exactly as before — music again too (P6)', () => {
+  for (const mode of ['threePoint', 'hoops1v1', 'karateVersus', 'music']) {
     it(`POST DUEL and QUICK MATCH on "${mode}" open, and lock the stake`, async () => {
       const a = await createPOST(post({ mode, feeLc: 50 }));
       expect(a.status).toBe(200);
@@ -251,6 +276,22 @@ describe('every other mode stakes exactly as before', () => {
       expect(h.locks).toHaveLength(3);   // the poster; then the quick matcher and the house
     });
   }
+
+  it('P6: an old client posting "musicAcademy" opens a music duel and a music quick match, stored under "music"', async () => {
+    const a = await createPOST(post({ mode: 'musicAcademy', feeLc: 50 }));
+    const b = await quickPOST(post({ mode: 'musicAcademy', feeLc: 50 }));
+    expect([a.status, b.status]).toEqual([200, 200]);
+    expect(h.created.map((m) => m.mode)).toEqual(['music', 'music']);
+    expect(h.locks).toHaveLength(3);
+  });
+
+  it('P6: ACCEPT on a posted music duel joins and locks the joiner\'s stake', async () => {
+    h.matches = [duel({ mode: 'music', status: 'WAITING', matchType: 'SCORE_DUEL', player1Id: OTHER, player2Id: null })];
+    const res = await joinPOST(post({ matchId: 'd-1' }));
+    expect(res.status).toBe(200);
+    expect(h.locks).toEqual([expect.objectContaining({ userId: USER, feeLc: 50 })]);
+    expect(h.matches[0]).toMatchObject({ status: 'ACTIVE', player2Id: USER });
+  });
 
   it('ACCEPT on a threePoint duel still joins and locks the joiner\'s stake', async () => {
     h.matches = [duel({ mode: 'threePoint', status: 'WAITING', matchType: 'SCORE_DUEL', player1Id: OTHER, player2Id: null })];
@@ -274,9 +315,13 @@ describe('a duel that already exists on a paused mode still finishes', () => {
     expect(['SETTLED', 'VOIDED']).toContain(h.matches[0].status);
   });
 
-  it('a human music duel settles to its winner', async () => {
+  // MUSIC-SUITE P6: a music duel (open again, no longer paused) settles on the player's rejudged attempt
+  it('a human music duel settles to its winner — on the set the server rejudged', async () => {
     h.matches = [duel({ id: 'm-1', mode: 'music', matchType: 'SCORE_DUEL', player2Id: OTHER, player2Score: 1000 })];
-    const res = await submitPOST(post({ matchId: 'm-1', score: 2000 }));
+    h.events.push({ matchId: 'm-1', userId: OTHER, type: MUSIC_ATTEMPT_START, payload: {} });   // (P6 fix pass: a house-beat score)
+    const score = played('m-1', USER);
+    expect(score).toBeGreaterThan(1000);
+    const res = await submitPOST(post({ matchId: 'm-1', score }));
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ settled: true, result: 'p1', iWon: true, winnerId: USER });
     expect(h.payouts).toEqual([expect.objectContaining({ winnerId: USER, feeLc: 50 })]);
@@ -284,8 +329,10 @@ describe('a duel that already exists on a paused mode still finishes', () => {
   });
 
   it('a tied music duel stored under the old key refunds both entries', async () => {
-    h.matches = [duel({ id: 'm-2', mode: 'musicAcademy', matchType: 'SCORE_DUEL', player2Id: OTHER, player2Score: 1500 })];
-    const res = await submitPOST(post({ matchId: 'm-2', score: 1500 }));
+    const score = played('m-2', USER);
+    h.events.push({ matchId: 'm-2', userId: OTHER, type: MUSIC_ATTEMPT_START, payload: {} });
+    h.matches = [duel({ id: 'm-2', mode: 'musicAcademy', matchType: 'SCORE_DUEL', player2Id: OTHER, player2Score: score })];
+    const res = await submitPOST(post({ matchId: 'm-2', score }));
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ settled: true, result: 'tie' });
     expect(h.refunds.map((r) => r.userId).sort()).toEqual([OTHER, USER].sort());
@@ -314,8 +361,13 @@ describe('the Arena lobby', () => {
     const body = await (await configGET()).json();
     const keys = body.modes.map((m: Row) => m.key);
     for (const m of PAUSED) expect(keys).not.toContain(m);
-    expect(keys).toEqual(arenaStakeableModes());
-    expect(body.pausedModes.map((p: Row) => p.key).sort()).toEqual(['dance', 'music']);
+    // IRON-PARADISE-OUT (2026-10-03): the picker is the stakeable list MINUS the parked modes
+    // (lib/unlisted-modes.ts) — a stake on a redirecting /play route is a trap. The paused/dance assertions
+    // below are unchanged.
+    expect(keys).toEqual(arenaStakeableModes().filter((k: string) => !isUnlistedMode(k)));
+    expect(keys).not.toContain('training');
+    expect(body.pausedModes.map((p: Row) => p.key).sort()).toEqual(['dance']);
+    expect(keys).toContain('music');   // P6: offered again
   });
 
   it('does not advertise a paused duel nobody can accept, and keeps mine with its PLAY link and a paused flag', async () => {
@@ -327,10 +379,10 @@ describe('the Arena lobby', () => {
       duel({ id: 'mine-waiting', mode: 'music', status: 'WAITING', matchType: 'SCORE_DUEL', player2Id: null }),
     ];
     const body = await (await listGET()).json();
-    expect(body.open.map((d: Row) => d.id)).toEqual(['open-3pt']);
+    expect(body.open.map((d: Row) => d.id)).toEqual(['open-music-old', 'open-3pt']);   // P6: a music duel can be accepted again
     const mine = Object.fromEntries(body.mine.map((d: Row) => [d.id, d]));
     expect(mine['mine-dance']).toMatchObject({ mode: 'dance', href: '/play/dance', status: 'ACTIVE', stakingPaused: true });
-    expect(mine['mine-waiting']).toMatchObject({ mode: 'music', href: '/play/music', status: 'WAITING', stakingPaused: true });
+    expect(mine['mine-waiting']).toMatchObject({ mode: 'music', href: '/play/music', status: 'WAITING', stakingPaused: false });
   });
 
   // P1 review hole: MY DUELS keeps only the 25 most recently updated duels, and a paused WAITING duel (which nobody can
@@ -400,7 +452,7 @@ describe('friend challenges (/multiplayer)', () => {
 });
 
 describe('the dark real-money engine reads the same list', () => {
-  it('create refuses music and dance before the eligibility lookup; a bounded unpaused mode gets past the gate', async () => {
+  it('create refuses dance before the eligibility lookup; a bounded unpaused mode gets past the gate', async () => {
     for (const mode of PAUSED) {
       const res = await compCreatePOST(post({ mode, matchType: 'SCORE_DUEL', entryFeeCents: 500 }));
       expect(res.status, mode).toBe(409);
@@ -414,6 +466,25 @@ describe('the dark real-money engine reads the same list', () => {
     expect(h.userLookups).toBe(1);
     expect(h.created.map((m) => m.mode)).toEqual(['skateboard']);
     expect(h.escrowLocks).toHaveLength(1);
+  });
+
+  // MUSIC-SUITE P6 FIX PASS (2026-09-26): the pause WAS this engine's only guard for music. Unpaused, music reached create
+  // and join again — and this engine's submit-score cannot rejudge (SCORE_NOT_REJUDGED, lib/arena-score-integrity.ts), with
+  // no expiry on an H2H match: both escrows locked for good. A REJUDGED_STAKE_MODES mode is refused before any escrow.
+  it('P6 fix pass: music (either key) is refused at create and join — NOT_STAKEABLE_HERE, before any escrow or lookup', async () => {
+    expect(isStakingPaused('music')).toBe(false);
+    for (const mode of ['music', 'musicAcademy']) {
+      const res = await compCreatePOST(post({ mode, matchType: 'SCORE_DUEL', entryFeeCents: 500 }));
+      expect(res.status, mode).toBe(400);
+      expect((await res.json()).error).toBe('NOT_STAKEABLE_HERE');
+    }
+    expect(h.userLookups).toBe(0);
+    expect(h.created).toEqual([]);
+    h.matches = [duel({ id: 'c-music', mode: 'music', currency: 'USD', status: 'WAITING', matchType: 'SCORE_DUEL', player1Id: OTHER, player2Id: null })];
+    const bad = await compJoinPOST(post({ matchId: 'c-music' }));
+    expect(bad.status).toBe(400);
+    expect(h.escrowLocks).toEqual([]);
+    expect(h.matches[0]).toMatchObject({ status: 'WAITING', player2Id: null });
   });
 
   it('join refuses a paused-mode match before the escrow lock, and still joins another mode', async () => {

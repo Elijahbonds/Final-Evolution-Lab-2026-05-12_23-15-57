@@ -89,15 +89,20 @@ export class Reticle {
 }
 
 // ── Power meter (PLACE) ────────────────────────────────────────────────────
+/** The meter wave's angular speed (rad/s): 0→1→0 in ~1.85 s. */
+export const POWER_METER_RATE = 3.4;
 export class PowerMeter {
   active = false;
   private t = 0;
   value = 0;                                              // 0..1, oscillates
+  /** IMPROVE (2026-10-06, Golf #7): the wave's angular speed (rad/s), opt-in per swing. Default is the one every meter
+   *  ran at, so no caller changes; golf slows it on the green, where pace is the whole putt. */
+  rate = POWER_METER_RATE;
   start(): void { this.active = true; this.t = 0; }
   update(dt: number): void {
     if (!this.active) return;
     this.t += dt;
-    this.value = (Math.sin(this.t * 3.4 - Math.PI / 2) + 1) / 2;   // 0→1→0 wave
+    this.value = (Math.sin(this.t * this.rate - Math.PI / 2) + 1) / 2;   // 0→1→0 wave
   }
   stop(): number { this.active = false; return this.value; }
 }
@@ -107,6 +112,17 @@ export class PowerMeter {
 export function swingQuality(ballZ: number, contactZ: number, speed: number, windowSec: number): number {
   const dt = Math.abs(ballZ - contactZ) / Math.max(speed, 0.1);
   return Math.max(0, 1 - dt / (windowSec / 2));
+}
+
+/**
+ * Signed contact: early (ball still short of the contact point) pulls,
+ * late pushes the other way, perfect is the middle. The stick does not
+ * pick this — swing timing does.
+ */
+export function swingSide(ballZ: number, contactZ: number, speed: number, windowSec = 0.3): number {
+  const signed = (ballZ - contactZ) / Math.max(speed, 0.1);
+  const half = Math.max(0.05, windowSec / 2);
+  return Math.max(-1, Math.min(1, signed / half));
 }
 
 // ── Ball flight ────────────────────────────────────────────────────────────
@@ -123,7 +139,9 @@ export class Flight {
   step(dt: number): boolean {
     if (!this.active) return false;
     this.vel.y += this.g * dt;
-    this.ball.position.addInPlace(this.vel.scale(dt));
+    // IMPROVE (2026-10-06): in place. `vel.scale(dt)` allocated a Vector3 every frame of every flight (Hot Shot, Derby,
+    // Golf); scaleAndAddToRef is the same arithmetic (position += vel × dt, per axis) with nothing allocated.
+    this.vel.scaleAndAddToRef(dt, this.ball.position);
     if (this.ball.position.y <= 0.05 && this.vel.y < 0) {
       this.ball.position.y = 0.05;
       this.active = false;
@@ -233,7 +251,10 @@ export function buildBallparkOutfield(scene: Scene): AbstractMesh[] {
 /** The goal's regulation frame — the shot maths uses these numbers, so the MESH is fitted to them, never the other way. */
 const GOAL_FIT = { width: 7.42, height: 2.44, depth: 2.0, z: 11 } as const;
 
-export function buildGoal(scene: Scene): AbstractMesh[] {
+/** `alive` (IMPROVE 2026-10-06): asked when the Meshy goal lands. A caller that tears its goal down before the async load
+ *  finishes (Carnival Hot Shot ends after 15 s) says so, and the late model is dropped instead of appearing in the next
+ *  event. Omitted, only a disposed scene drops it (the old behaviour). */
+export function buildGoal(scene: Scene, alive: () => boolean = () => true): AbstractMesh[] {
   const parts: AbstractMesh[] = [];
   const white = mat(scene, '#f4f6f8');
   const bars: AbstractMesh[] = [];
@@ -252,6 +273,7 @@ export function buildGoal(scene: Scene): AbstractMesh[] {
   // The model's own proportions are not regulation, so it is fitted per axis to GOAL_FIT; a net does not show the stretch.
   void spawnMeshyProp(scene, 'goal', null, 'goal_meshy').then((root) => {
     if (!root || scene.isDisposed) return;
+    if (!alive()) { root.dispose(); return; }   // the materials are the cached container's: left alone
     const { min, max } = root.getHierarchyBoundingVectors(true);
     const ex = Math.max(0.01, max.x - min.x), ey = Math.max(0.01, max.y - min.y), ez = Math.max(0.01, max.z - min.z);
     root.scaling.set(GOAL_FIT.width / ex, GOAL_FIT.height / ey, GOAL_FIT.depth / ez);

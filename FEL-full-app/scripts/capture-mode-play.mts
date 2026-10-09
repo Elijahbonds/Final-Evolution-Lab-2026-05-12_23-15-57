@@ -34,9 +34,14 @@ const OUT = process.env.OUT_DIR ?? 'docs/shots/play';
 const NAME = process.env.NAME ?? 'play';
 mkdirSync(OUT, { recursive: true });
 
+// ANGLE backend per platform: metal on the owner's Mac, SwiftShader (software Vulkan) elsewhere —
+// headless Linux has no GPU, and Chrome ≥128 needs --enable-unsafe-swiftshader to allow the fallback.
+const GL_ARGS = process.platform === 'darwin'
+  ? ['--use-gl=angle', '--use-angle=metal', '--enable-webgl', '--ignore-gpu-blocklist']
+  : ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--enable-webgl', '--ignore-gpu-blocklist'];
 const b = await chromium.launch({
   executablePath: chromiumExe(),
-  args: ['--use-gl=angle', '--use-angle=metal', '--enable-webgl', '--ignore-gpu-blocklist'],
+  args: GL_ARGS,
 });
 // TIER=mobile: a phone-shaped, touch-capable context so detectQualityTier picks
 // the mobile tier (touch points + coarse pointer + viewport) while the same

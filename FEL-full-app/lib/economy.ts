@@ -15,6 +15,7 @@
 
 import { Prisma, type PrismaClient } from '@/public/_prisma/client';
 import { postLc } from '@/lib/ledger';
+import { ptDay } from '@/lib/wallet/dailyKey';
 
 // ---------------------------------------------------------------------------
 // Config
@@ -106,7 +107,9 @@ export function buildDedupeKey(event: EarnEvent): string {
     case 'session_win':
       return `session:${event.sessionId}`;
     case 'daily_streak':
-      return `streak:${utcDateKey(event.now ?? new Date())}`;
+      // DAILY-KEY-HOTFIX (2026-09-28, FE PM ruling): the America/Los_Angeles day, as the wallet's daily reward is keyed
+      // (lib/wallet/dailyKey.ts). It was the UTC day, so a new "day" began at 5 pm Pacific.
+      return `streak:${ptDay(event.now ?? new Date())}`;
     case 'story_node':
       return `story:${event.nodeId}`;
   }

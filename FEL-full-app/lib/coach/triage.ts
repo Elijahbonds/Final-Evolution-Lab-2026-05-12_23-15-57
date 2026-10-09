@@ -63,7 +63,8 @@ export interface AthleteRow {
   lastCoachedAt?: string | null;
   /**
    * ISO of the last GRADED Mirror movement screen (WorkoutScan kind mirror_screen that readStoredScreen reads; the
-   * caller passes graded ones only — MIRROR-COACH P2 review); null = none, undefined = not read.
+   * caller passes graded ones only — MIRROR-COACH P2 review; server-graded and not provisional since P3,
+   * lib/coach/attention.ts isScanEquivalentScreen); null = none, undefined = not read.
    */
   lastScreenAt?: string | null;
 }
@@ -97,8 +98,13 @@ export const OFF_BASELINE_DROP = 8;
 /** Composite at or above this, trending up, means there is headroom to use. */
 export const PROGRESSION_COMPOSITE = 70;
 
-/** What stale-scan asks the coach to do. A System Scan only, until the Mirror screen is graded (P3). */
-export const STALE_SCAN_ACTION = 'Ask for a System Scan — there is nothing current to program from.';
+/**
+ * What stale-scan asks the coach to do. The P2 review took "or a Mirror screen" out because no screen could be graded
+ * yet; MIRROR-COACH P3 (2026-09-26) puts it back with the graders — a server-graded screen that read at least three
+ * camera checks now counts as current data (lib/coach/attention.ts isScanEquivalentScreen), so asking for one gives the
+ * coach something to program from.
+ */
+export const STALE_SCAN_ACTION = 'Ask for a System Scan or a Mirror movement screen — there is nothing current to program from.';
 
 const DAY = 86_400_000;
 
@@ -170,8 +176,7 @@ export function flagsFor(row: AthleteRow, now: number = Date.now()): TriageFlag[
       ...base, kind: 'stale-scan', positive: false,
       urgency: 55,
       observed: `${onFile.parts.join('; ')}.`,
-      // P2 review: not "or a Mirror screen" — no Mirror screen is graded until the P3 graders land, so asking for one
-      // cannot give the coach anything to program from yet. P3 puts it back with the graders.
+      // P2 review took "or a Mirror screen" out (nothing could grade one); MIRROR-COACH P3 put it back with the graders.
       action: STALE_SCAN_ACTION,
     });
   }

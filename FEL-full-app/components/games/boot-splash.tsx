@@ -14,7 +14,11 @@ import { venueThumb } from '@/lib/babylon/ui/venueThumbs';
 import { CardSlot } from './card-slot';
 import { MotionSetting } from '@/components/settings/motion-setting';
 import { PausedLayer } from './paused-layer';
+import { LearnWhileYouWait } from '@/components/learn/learn-while-you-wait';   // KNOWLEDGE-FEED v1: one card while the arena loads
+import { useSoundtrackStage } from '@/components/soundtrack/soundtrack-stage';
+import { ControlsPanel } from './controls-panel';
 import { BodyPlayReady, BodyPlayReadyLine, BodyPlayLayer } from './body-play';
+import { PlayAsSwitcher } from '@/components/closet/play-as-switcher';   // CREATOR-PLAN phase 4a: "Play as …" a saved character
 import { BASKETBALL_MODE_IDS, COURT_LOCATIONS, readCourtLocation, readyCourtLocations, writeCourtLocation, type CourtLocationId } from '@/lib/babylon/nexus/courtLocations';
 import { BALL_SKINS, readBallSkin, readyBallSkins, writeBallSkin, type BallSkinId } from '@/lib/babylon/nexus/ballSkins';
 import { readyVenues, readBoardVenue, writeBoardVenue, type BoardDiscipline } from '@/lib/babylon/nexus/boardVenues';
@@ -22,12 +26,17 @@ import { readyWeathers, readWeather, writeWeather, WEATHER_FAMILY_OF, type Weath
 import { readyMusicStages, readMusicStage, writeMusicStage, type MusicStageId } from '@/lib/babylon/music/musicStage';
 import { skinsFor, readBoardSkin, writeBoardSkin } from '@/lib/babylon/nexus/boardSkins';
 import { readyCourses, readCourse, writeCourse } from '@/lib/babylon/core/RaceCourse';
+import { readKartVariant, writeKartVariant, KART_GP_LAPS, type KartVariant } from '@/lib/babylon/racing/kartCircuits';
 import { readyVehicles, readVehicle, writeVehicle, type RaceKind } from '@/lib/babylon/racing/garage';
 import { readyWeapons, readWeapon, writeWeapon } from '@/lib/babylon/combat/arsenal';
 import { arenasFor, readCombatArena, writeCombatArena, COMBAT_MODE_IDS, type CombatModeId } from '@/lib/babylon/combat/arenas';
 import { COURT_LAYOUTS, COURT_LAYOUT_MODES, readCourtLayout, writeCourtLayout, type CourtLayoutId } from '@/lib/babylon/nexus/courtLayout';   // COURT LAYOUT (2026-09-18): the 3v3's chokepoint
+import { SET_LENGTH_MODES, setLengthsFor, setLengthLabel, readSetLength, writeSetLength, setLengthLocked, type SetLengthId } from '@/lib/babylon/nexus/setLength';   // IMPROVE (2026-10-06): volleyball's short set, tennis's quick match
 import { looksFor, readPlaceLook, writePlaceLook } from '@/lib/babylon/nexus/placeLooks';
 import { tierList, readTier, writeTier, profileFor, type Tier } from '@/lib/babylon/core/Difficulty';
+import { OneVOneWinBy2 } from './onevone-win-by-2';   // owner 2026-10-06: the 1v1's win-by-2 pick
+import { ThreePointOptions } from './three-point-options';   // IMPROVE (2026-10-06): 3PT #5 #6 #8
+import { PartyInvite } from '@/components/party/party-invite';   // MULTIPLAYER: the start screen's door to the party room
 import {
   readySchools, readBlend, writeBlend, blendName, schoolById, blendTraits, STYLE_TRAIT_KEYS,
   type StyleBlend,
@@ -68,7 +77,7 @@ const STYLE_MODES = new Set(['karate', 'karate-vs', 'duel', 'showdown', 'mixedco
  * Not every mode: a time trial, a routine and a quiz have nobody to be difficult. Offering a tier where
  * nothing reads it is the hollow-picker failure the pickerReach test exists to catch.
  */
-const TIER_MODES = new Set(['velocitykart', 'aeroaces', 'football']);
+const TIER_MODES = new Set(['velocitykart', 'aeroaces', 'football', 'onevone', 'threevthree', 'karate-vs', 'showdown', 'duel', 'mixedcombat']);   // IMPROVE (2026-10-06): 1v1 reads it (onevoneRules ONEVONE_TIER); 3v3 too (threevthreeRules THREEV_TIER); the four duels read it (rivalDifficulty)
 /** WEATHER (docs/SPEC-WEATHER.md): the outdoor modes that read the pick — pickerReach keeps this honest; WEATHER_FAMILY_OF in nexus/weather names the family. */
 const WEATHER_MODES = new Set(['golf', 'soccer', 'tennis', 'football']);
 // Deliberately SHORT, and it grows as modes are wired rather than ahead of them. The first draft listed
@@ -102,14 +111,20 @@ function Bars({ bars, tint }: { bars: { speed: number; hold: number; edge: numbe
 export interface BootSplashProps {
   modeId: string;
   title: string;
+  /** GATE-CRASHER-MAJOR: what winning IS, one line under the title (a mode publishes it as its `goal` HUD key). */
+  goal?: string;
   phase: ModePhase;
   detail?: number | string;         // countdown number or error message
   onStart: () => void;              // READY tap
   onRetry: () => void;              // error retry
+  /** CONTROLS SCREEN (2026-10-06): the one-line controls a host was built with (the board and timing hosts' `hint`),
+   *  shown on the CONTROLS panel for a mode that writes no static hint of its own. */
+  controls?: string;
 }
 
 /** The splash: the card, and body play beside it (the check over a pause, the corner self-view in play). */
 export function BootSplash(props: BootSplashProps) {
+  useSoundtrackStage(props.phase);   // PIPELINES (2026-10-06): the soundtrack follows every host's phase (loading → bed → end)
   return (
     <>
       <SplashCard {...props} />
@@ -202,6 +217,16 @@ export function SplashCard(props: BootSplashProps) {
     if (!race || id === ride) return;
     writeVehicle(race, id); setRide(id);
   };
+  // IMPROVE (2026-10-06), velocitykart #12: the kart's RACE — the standard two laps, a three-lap GRAND PRIX, and the
+  // course MIRRORED. The geometry is built at mount, so a change reloads with it in the query, exactly like the map.
+  const [kartRace, setKartRace] = useState<KartVariant | null>(null);
+  useEffect(() => { if (race === 'kart') setKartRace(readKartVariant()); }, [race]);
+  const pickKartRace = (v: KartVariant) => {
+    if (!kartRace || (v.laps === kartRace.laps && v.mirror === kartRace.mirror)) return;
+    writeKartVariant(v); setKartRace(v);
+    const u = new URL(window.location.href); u.searchParams.set('laps', String(v.laps)); u.searchParams.set('mirror', v.mirror ? '1' : '0');
+    window.location.assign(u.toString());
+  };
 
   // THE FIGHT PICKS (2026-09-13). A weapon for the weapon modes, a fighting style — and a blend of two — for
   // the karate ones. Neither reloads: the moveset and the style multipliers are read when the mode loads.
@@ -252,6 +277,20 @@ export function SplashCard(props: BootSplashProps) {
     const u = new URL(window.location.href); u.searchParams.set('court', id); u.searchParams.delete('choke'); window.location.assign(u.toString());
   };
 
+  // SET LENGTH (IMPROVE 2026-10-06): volleyball's set to 25, or a short set to 15 — and tennis's first to 6, or a quick
+  // match to 3. Reloads like the court layout — the scorer is built at load. Not offered on a scored run (story / arena /
+  // challenge), which always plays the full length.
+  const [setLenLocked, setSetLenLocked] = useState(true);
+  useEffect(() => { setSetLenLocked(setLengthLocked()); }, []);
+  const hasSetLen = SET_LENGTH_MODES.includes(props.modeId) && !setLenLocked;
+  const [setLenId, setSetLenId] = useState<SetLengthId>('full');
+  useEffect(() => { if (hasSetLen) setSetLenId(readSetLength(props.modeId)); }, [hasSetLen, props.modeId]);
+  const pickSetLen = (id: SetLengthId) => {
+    if (id === setLenId) return;
+    writeSetLength(props.modeId, id);
+    const u = new URL(window.location.href); u.searchParams.set('set', setLengthsFor(props.modeId).find((l) => l.id === id)?.param ?? id); window.location.assign(u.toString());
+  };
+
   // DIFFICULTY (2026-09-13). Phase 0 measured four modes with no tiering at all and four more each inventing
   // their own; this is the one picker, reading the one shared ladder.
   const hasTiers = TIER_MODES.has(props.modeId);
@@ -272,11 +311,14 @@ export function SplashCard(props: BootSplashProps) {
   // copy straight after this splash (BACKLOG B16). PausedLayer keeps that copy's classes, so it stacks where they did.
   // Step 5 (2026-09-26): Brain Brawl's own copy is gone, and with it the check that drew nothing here for it (the two
   // stacked were 84% black with the headline doubled — the step-4a review); pausedLayer.scan.test holds the two together.
-  if (props.phase === 'paused') return <PausedLayer onResume={props.onStart} />;
+  if (props.phase === 'paused') return <PausedLayer onResume={props.onStart} modeId={props.modeId} hint={props.controls} />;
   if (props.phase === 'playing' || props.phase === 'ended') return null;
 
   return (
-    <div className="absolute inset-0 z-40 overflow-hidden"
+    // data-fel-fullbleed: in console view the HUD keeps to the title-safe frame, but this card's art is the whole screen
+    // (app/game-surface.css). data-splash-column / data-splash-pickers: a sideways screen lays the card out in two
+    // columns — title and START on the left, the pickers on the right — instead of one column taller than the screen.
+    <div data-fel-fullbleed className="absolute inset-0 z-40 overflow-hidden"
       // SHARED-START-UNSTICK: on READY the whole card is the start button. A press that misses the pill (a thumb on
       // the art, a click in the corner) used to do nothing, and a player reads a card that ignores them as a hang.
       // The pickers are buttons and keep their own clicks; everything else starts on pointer DOWN, so a hold starts too.
@@ -298,9 +340,17 @@ export function SplashCard(props: BootSplashProps) {
           setting; this is the override, reachable before the first flash (a guest never sees the Profile tab). In the
           corner, out of the picker column. */}
       {(props.phase === 'ready' || props.phase === 'loading') && <MotionSetting compact className="absolute left-3 top-3 z-10" />}
-      <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 px-6 text-center">
+      {/* CONTROLS SCREEN (2026-10-06): the column scrolls (safe-centred) rather than clip when a portrait card holds the
+          controls and three pickers: START stays at the top of what shows, and no picker is cut off out of reach */}
+      <div data-splash-column className="absolute inset-0 flex flex-col items-center justify-center gap-4 overflow-y-auto px-6 py-4 text-center [justify-content:safe_center] [scrollbar-width:none]">
+        {/* data-splash-main: display: contents everywhere but a sideways screen, where it is the left column — title,
+            START and the CONTROLS panel, which gives up its height (its lines scroll) before START leaves the screen */}
+        <div data-splash-main className="contents">
         <p className="text-[11px] font-black tracking-[0.4em]" style={{ color: v.tint }}>{v.sub}</p>
         <h1 className="text-4xl font-black tracking-wide text-white drop-shadow-lg">{props.title}</h1>
+        {props.goal && (props.phase === 'ready' || props.phase === 'loading') && (
+          <p className="max-w-md text-[12px] font-bold tracking-[0.18em] text-white/85">{props.goal}</p>
+        )}
 
         {props.phase === 'loading' && (
           <div className="w-56">
@@ -310,6 +360,7 @@ export function SplashCard(props: BootSplashProps) {
             <p className="mt-2 text-[11px] tracking-widest text-white/60">LOADING ARENA…</p>
           </div>
         )}
+        {props.phase === 'loading' && <LearnWhileYouWait compact className="mt-1" />}
 
         {props.phase === 'ready' && (
           <button
@@ -333,7 +384,21 @@ export function SplashCard(props: BootSplashProps) {
         {/* MOVEMENT PLAY P4 (2026-09-25): "Play with your body" (the games the body drives), "coming", or nothing; once
             chosen, the space check over this card. */}
         {props.phase === 'ready' && <BodyPlayReady tint={v.tint} onStart={props.onStart} />}
+        {/* CREATOR-PLAN phase 4a (2026-10-06): switch to another saved character (renders nothing for a guest or one character) */}
+        {props.phase === 'ready' && <PlayAsSwitcher tint={v.tint} />}
+        {/* MULTIPLAYER (2026-10-06): a game friends can play together says so, and opens the party room with it picked */}
+        {props.phase === 'ready' && <PartyInvite modeId={props.modeId} />}
+        {/* CONTROLS SCREEN (console-view lane, 2026-10-06). Owner: "take off that wall of text when the game starts, maybe
+            have that show as a beginning screen for the controls." The mode's button map for the device in use, and its
+            own words — which the harness now keeps off the play screen (lib/babylon/ui/staticControls.ts). The pause
+            shows the same panel (PausedLayer). It replaces the card slot's collapsed BUTTONS line. */}
+        {(props.phase === 'ready' || props.phase === 'loading') && (
+          <ControlsPanel modeId={props.modeId} hint={props.controls} className="max-h-[26vh] shrink-0 sm:max-h-[38vh]" />
+        )}
+        </div>
 
+        {/* display: contents everywhere but a sideways screen, so the column above is unchanged in portrait */}
+        <div data-splash-pickers className="contents">
         {isCourt && (props.phase === 'ready' || props.phase === 'loading') && readyCourtLocations().length > 1 && (
           <div className="mt-3 flex flex-col items-center gap-1.5">
             <p className="text-[9px] font-black tracking-[0.3em] text-white/45">LOCATION</p>
@@ -454,6 +519,22 @@ export function SplashCard(props: BootSplashProps) {
             <p className="max-w-[24rem] text-[9px] leading-tight tracking-wide text-white/40">{COURT_LAYOUTS.find((l) => l.id === courtId)?.sub ?? ''}</p>
           </div>
         )}
+        {hasSetLen && (props.phase === 'ready' || props.phase === 'loading') && (
+          <div className="mt-3 flex flex-col items-center gap-1.5">
+            <p className="text-[9px] font-black tracking-[0.3em] text-white/45">{setLengthLabel(props.modeId)}</p>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {setLengthsFor(props.modeId).map((l) => (
+                <button key={l.id} type="button" onClick={() => pickSetLen(l.id)} title={l.sub}
+                  aria-label={`${l.name} — ${l.sub}`} aria-pressed={l.id === setLenId}
+                  className={`rounded-full border px-3 py-1 text-[10px] font-black tracking-wider transition ${l.id === setLenId ? 'text-black' : 'text-white/80 hover:bg-white/10'}`}
+                  style={l.id === setLenId ? { background: l.tint, borderColor: l.tint } : { borderColor: `${l.tint}88` }}>
+                  {l.name.toUpperCase()}
+                </button>
+              ))}
+            </div>
+            <p className="max-w-[24rem] text-[9px] leading-tight tracking-wide text-white/40">{setLengthsFor(props.modeId).find((l) => l.id === setLenId)?.sub ?? ''}</p>
+          </div>
+        )}
         {disc && (props.phase === 'ready' || props.phase === 'loading') && skinsFor(disc).length > 1 && (
           <div className="mt-2 flex flex-col items-center gap-1.5">
             <p className="text-[9px] font-black tracking-[0.3em] text-white/45">DECK</p>
@@ -507,6 +588,24 @@ export function SplashCard(props: BootSplashProps) {
             <p className="max-w-[24rem] text-[9px] leading-tight tracking-wide text-white/40">
               {readyCourses(race).find((c) => c.id === map)?.sub ?? ''}
             </p>
+          </div>
+        )}
+
+        {race === 'kart' && kartRace && (props.phase === 'ready' || props.phase === 'loading') && (
+          <div className="mt-2 flex flex-col items-center gap-1.5">
+            <p className="text-[9px] font-black tracking-[0.3em] text-white/45">RACE</p>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {([['2 LAPS', 2], ['GRAND PRIX · 3 LAPS', KART_GP_LAPS]] as const).map(([label, laps]) => (
+                <button key={laps} type="button" onClick={() => pickKartRace({ ...kartRace, laps })} aria-pressed={kartRace.laps === laps}
+                  className={`rounded-full border border-white/40 px-3 py-1 text-[10px] font-black tracking-wider transition ${kartRace.laps === laps ? 'bg-white text-black' : 'text-white/80 hover:bg-white/10'}`}>
+                  {label}
+                </button>
+              ))}
+              <button type="button" onClick={() => pickKartRace({ ...kartRace, mirror: !kartRace.mirror })} aria-pressed={kartRace.mirror}
+                className={`rounded-full border border-white/40 px-3 py-1 text-[10px] font-black tracking-wider transition ${kartRace.mirror ? 'bg-white text-black' : 'text-white/80 hover:bg-white/10'}`}>
+                MIRROR
+              </button>
+            </div>
           </div>
         )}
 
@@ -633,9 +732,16 @@ export function SplashCard(props: BootSplashProps) {
           </div>
         )}
 
+        {/* 1v1 WIN BY 2 (owner 2026-10-06): a player option, off by default; it draws nothing on a staked / head-to-head run */}
+        {props.modeId === 'onevone' && (props.phase === 'ready' || props.phase === 'loading') && <OneVOneWinBy2 />}
+        {/* 3PT OPTIONS (IMPROVE 2026-10-06 #5 #6 #8): the shot input, and — never on a staked / head-to-head run — the practice rack
+            and the money rack */}
+        {props.modeId === 'threepoint' && (props.phase === 'ready' || props.phase === 'loading') && <ThreePointOptions />}
+
         {/* CARD SLOT (FINISH-RELEASE, 2026-09-15): the creator card beside the setting and the items, on every mode —
             and the button map it carries, so a player can read what every press does before the first one. */}
         {(props.phase === 'ready' || props.phase === 'loading') && <CardSlot modeId={props.modeId} />}
+        </div>
 
         {props.phase === 'countdown' && (
           <div key={String(props.detail)} className="fel-count text-8xl font-black text-white">

@@ -2,15 +2,13 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getStripe } from '@/lib/stripe';
-import { PLATFORM_TAKE_RATE } from '@/lib/stripe';
-import { splitPayment } from '@/lib/store/split';
 import { prisma } from '@/lib/db';
 import {
   ledgerSubscriptionPayment,
-  ledgerCosmeticPurchase,
-  ledgerMarketplaceSale,
 } from '@/lib/stripe-helpers';
-import { ledgerStudioCreditsGrant } from '@/lib/studio-credits';
+import { fulfilCheckoutSession } from '@/lib/stripe/checkout-fulfil';
+import { verifyIdempotencyKey } from '@/lib/stripe/verify-checkout';
+import { coachStoreMeta, fulfilCoachStore } from '@/lib/coach-store/webhook';
 import type Stripe from 'stripe';
 
 /**
@@ -19,12 +17,13 @@ import type Stripe from 'stripe';
  * Replay-safe: uses event.id as idempotency key for ledger.
  */
 export async function POST(req: NextRequest) {
-  const stripe = getStripe();
+  const key = (process.env.STRIPE_SECRET_KEY ?? '').trim();
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-  if (!webhookSecret) {
-    console.error('[stripe-webhook] STRIPE_WEBHOOK_SECRET not set');
-    return NextResponse.json({ error: 'Webhook secret not configured' }, { status: 500 });
+  if (!key || !webhookSecret) {
+    console.error('[stripe-webhook] payments not set up');
+    return NextResponse.json({ error: 'payments not set up', message: 'payments not set up' }, { status: 503 });
   }
+  const stripe = getStripe();
 
   const rawBody = await req.text();
   const sig = req.headers.get('stripe-signature');
@@ -38,40 +37,44 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
   }
 
-  // Book sales (guest checkout has no userId, so they must be handled before the
-  // userId requirement below). A failure returns 500 so Stripe retries. The
-  // book tables dedupe on the event id.
-  const bookProduct = event.type === 'checkout.session.completed'
-    ? (event.data.object as Stripe.Checkout.Session).metadata?.product
+  // Book sales (Final Evolution Press, PR #17). Handled before the coach-store and ledger dispatch: a guest book
+  // purchase has no userId. MERGE (2026-10-09), ported to SEC-F4 (#200): a purchase is keyed on the Checkout
+  // Session (recordPaidBookSession), the same key the /press receipt page fulfils under, so webhook + receipt +
+  // redelivery grant once. A failure returns 500 so Stripe retries.
+  const bookSession = event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded'
+    ? (event.data.object as Stripe.Checkout.Session)
     : null;
-  if (bookProduct === 'BOOK') {
+  if (bookSession?.metadata?.product === 'BOOK') {
     try {
-      const { recordBookCheckout } = await import('@/lib/books/bookFulfill');
+      const { recordPaidBookSession } = await import('@/lib/books/bookFulfill');
       const { prismaBookStore } = await import('@/lib/books/bookStore');
-      const result = await recordBookCheckout(event.id, event.data.object as Stripe.Checkout.Session, prismaBookStore());
+      const result = await recordPaidBookSession(bookSession, prismaBookStore());
       return NextResponse.json({ received: true, ...result });
     } catch (err) {
       console.error('[stripe-webhook] book fulfillment failed', err instanceof Error ? err.message : err);
       return NextResponse.json({ error: 'book fulfillment failed' }, { status: 500 });
     }
   }
+  // A refund may be a book's. Only asked once the book tables exist (prisma/pending/2026-10-09-book-shop.sql):
+  // before that no book was ever granted, and a refund for any other product (the coach store's B9 mapping)
+  // must never 500 here.
   if (event.type === 'charge.refunded') {
-    try {
-      const { revokeBookCharge } = await import('@/lib/books/bookFulfill');
-      const { prismaBookStore } = await import('@/lib/books/bookStore');
-      const result = await revokeBookCharge(event.id, event.data.object as Stripe.Charge, prismaBookStore());
-      if (!('ignored' in result && result.ignored)) {
-        return NextResponse.json({ received: true, ...result });
-      }
-    } catch (err) {
-      // The book tables are new. Until they are pushed, a refund for some other
-      // product must not start failing the shared webhook.
-      const code = typeof err === 'object' && err && 'code' in err ? (err as { code?: string }).code : '';
-      if (code === 'P2021') {
-        console.error('[stripe-webhook] book tables are not in the database yet');
-      } else {
-        console.error('[stripe-webhook] book refund failed', err instanceof Error ? err.message : err);
-        return NextResponse.json({ error: 'book fulfillment failed' }, { status: 500 });
+    const { bookTablesReady, prismaBookStore } = await import('@/lib/books/bookStore');
+    if (bookTablesReady()) {
+      try {
+        const { revokeBookCharge } = await import('@/lib/books/bookFulfill');
+        const result = await revokeBookCharge(event.id, event.data.object as Stripe.Charge, prismaBookStore());
+        if (!('ignored' in result && result.ignored)) {
+          return NextResponse.json({ received: true, ...result });
+        }
+      } catch (err) {
+        const code = typeof err === 'object' && err && 'code' in err ? (err as { code?: string }).code : '';
+        if (code === 'P2021') {
+          console.error('[stripe-webhook] book tables are not in the database yet');
+        } else {
+          console.error('[stripe-webhook] book refund failed', err instanceof Error ? err.message : err);
+          return NextResponse.json({ error: 'book fulfillment failed' }, { status: 500 });
+        }
       }
     }
   }
@@ -89,7 +92,10 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    switch (event.type) {
+    if (coachStoreMeta(event)) {
+      // Coach-store fulfilment ignores event.livemode. Other products keep the switch below.
+      await fulfilCoachStore(event, eventIdempotencyKey);
+    } else switch (event.type) {
       case 'checkout.session.completed':
         await handleCheckoutCompleted(event, eventIdempotencyKey);
         break;
@@ -110,8 +116,7 @@ export async function POST(req: NextRequest) {
     }
   } catch (err: any) {
     console.error(`[stripe-webhook] Error handling ${event.type}:`, err.message);
-    // Return 200 to prevent Stripe retries on business-logic errors
-    // (duplicate processing, etc). Only 5xx for infra failures.
+    return NextResponse.json({ error: 'handler_failed' }, { status: 500 });
   }
 
   return NextResponse.json({ received: true });
@@ -121,222 +126,17 @@ export async function POST(req: NextRequest) {
 // Event handlers
 // ---------------------------------------------------------------------------
 
-async function handleCheckoutCompleted(event: Stripe.Event, idempotencyKey: string) {
+// The grants themselves live in lib/stripe/checkout-fulfil.ts so the
+// server-verified success path (app/api/stripe/verify-session) fulfils through
+// the SAME code as this webhook (SEC-F4 NO-WEBHOOK). SEC-F4 follow-up 1: the
+// fulfilment key is the CHECKOUT SESSION id, not this event's id — the same key
+// verify-session uses, so webhook + verify (or a redelivered event, which is a
+// NEW event id for the SAME session) grants once. The pre-dispatch dedupe above
+// still runs on the event id: that one answers Stripe's retry with `deduped`,
+// this one makes the grant itself one-per-payment.
+async function handleCheckoutCompleted(event: Stripe.Event, _eventIdempotencyKey: string) {
   const session = event.data.object as Stripe.Checkout.Session;
-  const meta = session.metadata || {};
-  const userId = meta.userId;
-  if (!userId) { console.warn('[webhook] checkout.session.completed missing userId'); return; }
-
-  const product = meta.product;
-
-  if (product === 'FEL_PRO' || product === 'STUDIO_CREATOR') {
-    // Subscription — the subscription object is created by Stripe.
-    // We'll get details from invoice.paid for the ledger entry.
-    // Here we just create the Order record.
-    await prisma.order.upsert({
-      where: { stripeSessionId: session.id },
-      update: { status: 'PAID' },
-      create: {
-        userId,
-        stripeSessionId: session.id,
-        type: 'SUBSCRIPTION',
-        amount: session.amount_total ?? 0,
-        status: 'PAID',
-        metadata: meta,
-      },
-    });
-
-    // Create Subscription record from the stripe subscription
-    if (session.subscription) {
-      const subId = typeof session.subscription === 'string' ? session.subscription : session.subscription.id;
-      const stripe = getStripe();
-      const stripeSub = await stripe.subscriptions.retrieve(subId);
-      await prisma.subscription.upsert({
-        where: { stripeSubscriptionId: subId },
-        update: {
-          status: 'ACTIVE',
-          stripePriceId: stripeSub.items.data[0]?.price?.id ?? '',
-          currentPeriodEnd: new Date((stripeSub as any).current_period_end * 1000),
-        },
-        create: {
-          userId,
-          stripeSubscriptionId: subId,
-          stripePriceId: stripeSub.items.data[0]?.price?.id ?? '',
-          product: product as any,
-          status: 'ACTIVE',
-          currentPeriodEnd: new Date((stripeSub as any).current_period_end * 1000),
-        },
-      });
-    }
-    return;
-  }
-
-  if (product === 'COSMETIC') {
-    const itemKey = meta.itemKey ?? '';
-    await prisma.$transaction(async (tx: any) => {
-      await tx.order.upsert({
-        where: { stripeSessionId: session.id },
-        update: { status: 'PAID' },
-        create: {
-          userId,
-          stripeSessionId: session.id,
-          type: 'COSMETIC',
-          amount: session.amount_total ?? 0,
-          status: 'PAID',
-          itemKey,
-          metadata: meta,
-        },
-      });
-      // Ledger: EXTERNAL → PLATFORM_REVENUE
-      await ledgerCosmeticPurchase(tx, {
-        userId,
-        amountCents: session.amount_total ?? 0,
-        idempotencyKey,
-        metadata: { stripeSessionId: session.id, itemKey },
-      });
-    });
-    return;
-  }
-
-  if (product === 'STUDIO_CREDITS') {
-    const itemKey = meta.itemKey ?? '';
-    const credits = Number(meta.credits ?? 0) || 0;
-    const totalCents = session.amount_total ?? 0;
-    await prisma.$transaction(async (tx: any) => {
-      await tx.order.upsert({
-        where: { stripeSessionId: session.id },
-        update: { status: 'PAID' },
-        create: {
-          userId,
-          stripeSessionId: session.id,
-          type: 'COSMETIC', // one-time purchase family
-          amount: totalCents,
-          status: 'PAID',
-          itemKey,
-          metadata: meta,
-        },
-      });
-      // Real USD revenue recognized now (EXTERNAL → PLATFORM_REVENUE).
-      await ledgerCosmeticPurchase(tx, {
-        userId,
-        amountCents: totalCents,
-        idempotencyKey,
-        metadata: { stripeSessionId: session.id, itemKey, kind: 'STUDIO_CREDITS' },
-      });
-      // Grant the prepaid virtual credits on the isolated STUDIO_CREDIT book.
-      if (credits > 0) {
-        await ledgerStudioCreditsGrant(tx, {
-          userId,
-          credits,
-          idempotencyKey: `${idempotencyKey}:grant`,
-          metadata: { stripeSessionId: session.id, itemKey, credits },
-        });
-      }
-    });
-    return;
-  }
-
-  // A coach's training block. Separate from MARKETPLACE because the rate is different and the split is
-  // computed rather than rounded: coaching takes PLATFORM_TAKE (30%, lib/marketing/referralTree.ts), where
-  // cosmetics take PLATFORM_TAKE_RATE (15%, lib/stripe.ts). Two near-identically-named constants for two
-  // genuinely different products — importing the wrong one here would silently underpay a coach by half.
-  if (product === 'COACH_PROGRAM') {
-    const listingId = meta.listingId ?? '';
-    const coachId = meta.coachId ?? '';
-    const totalCents = session.amount_total ?? 0;
-    if (!listingId || !coachId || totalCents <= 0) {
-      console.error('coach program webhook missing metadata', { listingId, coachId, totalCents });
-      return;
-    }
-
-    const split = splitPayment(
-      { id: session.id, payerId: userId, amountCents: totalCents, kind: 'program_purchase', recurring: false },
-      [],
-    );
-    // a one-off block is not a QUALIFYING_KIND, so the tree pays nothing and the whole take stays with the
-    // platform. Asserted rather than assumed: if that boundary ever moves, this ledger call would quietly
-    // book commission money as platform revenue.
-    if (split.commissionCents !== 0) {
-      console.error('unexpected commission on a program purchase', session.id);
-      return;
-    }
-
-    await prisma.$transaction(async (tx: any) => {
-      const order = await tx.order.upsert({
-        where: { stripeSessionId: session.id },
-        update: { status: 'PAID' },
-        create: {
-          userId,
-          stripeSessionId: session.id,
-          type: 'MARKETPLACE',
-          amount: totalCents,
-          status: 'PAID',
-          itemKey: listingId,
-          metadata: meta,
-        },
-      });
-      const { transactionId } = await ledgerMarketplaceSale(tx, {
-        buyerId: userId,
-        creatorId: coachId,
-        totalCents: split.grossCents,
-        platformCutCents: split.platformCents,     // coach receives gross - platform, which is split.coachCents
-        idempotencyKey,
-        metadata: { stripeSessionId: session.id, listingId, coachId, kind: 'coach_program' },
-      });
-      // the entitlement. Unique on (buyer, listing), so a replayed webhook updates rather than duplicates.
-      await tx.marketplacePurchase.upsert({
-        where: { buyerId_listingId: { buyerId: userId, listingId } },
-        update: { orderId: order.id, ledgerTxId: transactionId },
-        create: { buyerId: userId, listingId, orderId: order.id, ledgerTxId: transactionId },
-      });
-    });
-    return;
-  }
-
-  if (product === 'MARKETPLACE') {
-    const listingId = meta.listingId ?? '';
-    const creatorId = meta.creatorId ?? '';
-    const itemKey = meta.itemKey ?? '';
-    const totalCents = session.amount_total ?? 0;
-    const platformCutCents = Math.round(totalCents * PLATFORM_TAKE_RATE);
-
-    await prisma.$transaction(async (tx: any) => {
-      const order = await tx.order.upsert({
-        where: { stripeSessionId: session.id },
-        update: { status: 'PAID' },
-        create: {
-          userId,
-          stripeSessionId: session.id,
-          type: 'MARKETPLACE',
-          amount: totalCents,
-          status: 'PAID',
-          itemKey,
-          metadata: meta,
-        },
-      });
-      // Ledger: EXTERNAL → PLATFORM_REVENUE + CREATOR_ACCRUAL
-      const { transactionId } = await ledgerMarketplaceSale(tx, {
-        buyerId: userId,
-        creatorId,
-        totalCents,
-        platformCutCents,
-        idempotencyKey,
-        metadata: { stripeSessionId: session.id, listingId, creatorId },
-      });
-      // Record the purchase unlock
-      await tx.marketplacePurchase.upsert({
-        where: { buyerId_listingId: { buyerId: userId, listingId } },
-        update: { orderId: order.id, ledgerTxId: transactionId },
-        create: {
-          buyerId: userId,
-          listingId,
-          orderId: order.id,
-          ledgerTxId: transactionId,
-        },
-      });
-    });
-    return;
-  }
+  await fulfilCheckoutSession(session, verifyIdempotencyKey(session.id));
 }
 
 async function handleInvoicePaid(event: Stripe.Event, idempotencyKey: string) {

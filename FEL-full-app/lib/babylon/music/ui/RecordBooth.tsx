@@ -28,7 +28,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   BOOTH_COUNT_INS, BOOTH_LENGTHS, BOOTH_LOOPS, BoothMic, DEFAULT_BOOTH_LOOP, MAX_TAKE_SEC, barSec, clampRegion, engineTakeList,
-  levels, meterFill, muteRecordingSlot, pickTake, pickedTakeIds, takeGroups, takeSilence, takeSlot, takeStartBar, takeStartFrame, toDb, watchBarLine,
+  levels, meterFrame, muteRecordingSlot, pickTake, pickedTakeIds, takeGroups, takeSilence, takeSlot, takeStartBar, takeStartFrame, toDb, watchBarLine,
   wavFromPcm, type BarClock, type BoothLatency, type BoothRegion,
 } from '../takeCapture';
 import type { EngineTake } from '../AudioEngine';
@@ -559,11 +559,14 @@ function InputMeter({ micRef }: { micRef: React.MutableRefObject<BoothMic | null
       const mic = micRef.current;
       const peak = mic ? Math.max(mic.level.peak, 0) : 0;
       const held = mic ? mic.takePeak() : 0;
-      shown = Math.max(meterFill(peak), shown * 0.9);                       // fast up, eased down
+      // MUSIC-SUITE P10 (2026-09-29): the bar (fast up, eased down) and its number from ONE value (takeCapture meterFrame) —
+      // the number was the newest block's raw peak, so a frame showed the bar at 89 % beside "−90 dB" (P4's open item)
+      const m = meterFrame(shown, peak);
+      shown = m.fill;
       if (held >= 0.98) clipUntil = performance.now() + 1000;
       if (barRef.current) barRef.current.style.width = `${Math.round(shown * 100)}%`;
       if (clipRef.current) clipRef.current.style.opacity = performance.now() < clipUntil ? '1' : '0.15';
-      if (dbRef.current) dbRef.current.textContent = `${toDb(peak).toFixed(0)} dB`;
+      if (dbRef.current && dbRef.current.textContent !== m.label) dbRef.current.textContent = m.label;
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
@@ -574,7 +577,7 @@ function InputMeter({ micRef }: { micRef: React.MutableRefObject<BoothMic | null
       <span style={{ width: 120, height: 10, borderRadius: 5, background: '#241736', overflow: 'hidden', display: 'inline-block' }}>
         <div ref={barRef} style={{ height: '100%', width: '0%', background: 'linear-gradient(90deg,#22c55e,#eab308 75%,#ef4444)' }} />
       </span>
-      <span ref={dbRef} style={{ fontSize: 11, width: 44, opacity: 0.8 }}>−90 dB</span>
+      <span ref={dbRef} data-qa="input-meter-db" style={{ fontSize: 11, width: 44, opacity: 0.8 }}>−∞ dB</span>
       <span ref={clipRef} title="clip" style={{ fontSize: 10, fontWeight: 800, color: '#ff5c5c', opacity: 0.15 }}>CLIP</span>
     </span>
   );

@@ -12,18 +12,25 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, type LucideIcon } from 'lucide-react';
 import { FAMILIES, type Family } from '@/lib/nav/families';
 import { MODE_INFO } from '@/lib/game-data';
+import { modeMenuMetaFor } from '@/lib/mode-menu';
+import { isUnlistedMode } from '@/lib/unlisted-modes';
+import { PartyBadge } from '@/components/party/party-badge';   // MULTIPLAYER: "2 PLAYERS" on the games friends can play together
 
-type ModeRow = { key: string; name: string; venue: string; href: string };
+type ModeRow = { key: string; name: string; venue: string; href: string; desc: string; color: string; Icon: LucideIcon };
 
 function modesOf(f: Family): ModeRow[] {
   const info = MODE_INFO as Record<string, { name?: string; venue?: string; href?: string } | undefined>;
   return f.modes
+    // IRON-PARADISE-OUT (2026-10-03): a parked mode (lib/unlisted-modes.ts) never renders as a shelf row.
+    .filter((key) => !isUnlistedMode(key))
     .map((key) => {
       const m = info[key];
-      return m ? { key, name: m.name ?? key, venue: m.venue ?? '', href: m.href ?? '/' } : null;
+      if (!m) return null;
+      const meta = modeMenuMetaFor(key);
+      return { key, name: m.name ?? key, venue: m.venue ?? '', href: m.href ?? '/', desc: meta.desc, color: meta.color, Icon: meta.icon };
     })
     .filter((x): x is ModeRow => x !== null);
 }
@@ -97,28 +104,42 @@ export function PlayShelf({ initialFamily }: { initialFamily?: string }) {
             >
               <div className="min-h-0">
                 <ul className="mt-2 grid gap-2 pl-2 sm:grid-cols-2 lg:grid-cols-3">
-                  {modes.map((m) => (
-                    <li key={m.key}>
-                      <Link
-                        href={m.href}
-                        className="flex items-center gap-3 rounded-xl border border-white/8 bg-white/[0.02] px-4 py-3
-                                   transition-all duration-200 hover:bg-white/[0.05]"
-                        style={{ boxShadow: 'none' }}
-                        onMouseEnter={(e) => { e.currentTarget.style.borderColor = `${f.accent}55`; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; }}
-                      >
-                        <span aria-hidden className="h-8 w-[3px] shrink-0 rounded-full" style={{ background: f.accent }} />
-                        <span className="min-w-0">
-                          <span className="block truncate text-[14px] font-semibold leading-tight text-white">{m.name}</span>
-                          {m.venue && venueDistinguishes && (
-                            <span className="mt-0.5 block truncate font-mono text-[10.5px] uppercase tracking-wider text-white/35">
-                              {m.venue}
-                            </span>
-                          )}
-                        </span>
-                      </Link>
-                    </li>
-                  ))}
+                  {modes.map((m) => {
+                    const Icon = m.Icon;
+                    return (
+                      <li key={m.key}>
+                        <Link
+                          href={m.href}
+                          className="flex items-start gap-3 rounded-xl border border-white/8 bg-white/[0.02] px-4 py-3
+                                     transition-all duration-200 hover:bg-white/[0.05]"
+                          style={{ boxShadow: 'none' }}
+                          onMouseEnter={(e) => { e.currentTarget.style.borderColor = `${m.color}66`; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; }}
+                        >
+                          <span
+                            aria-hidden
+                            className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border"
+                            style={{
+                              borderColor: `${m.color}55`,
+                              background: `linear-gradient(135deg, ${m.color}22, rgba(255,255,255,0.03))`,
+                              color: m.color,
+                            }}
+                          >
+                            <Icon className="h-4 w-4" />
+                          </span>
+                          <span className="min-w-0">
+                            <span className="block truncate text-[14px] font-semibold leading-tight text-white">{m.name} <PartyBadge modeKey={m.key} className="ml-1" /></span>
+                            <span className="mt-1 block line-clamp-2 text-[11.5px] leading-snug text-white/50">{m.desc}</span>
+                            {m.venue && venueDistinguishes && (
+                              <span className="mt-1.5 block truncate font-mono text-[10.5px] uppercase tracking-wider text-white/35">
+                                {m.venue}
+                              </span>
+                            )}
+                          </span>
+                        </Link>
+                      </li>
+                    );
+                  })}
                 </ul>
               </div>
             </div>

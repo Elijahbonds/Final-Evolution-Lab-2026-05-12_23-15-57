@@ -26,6 +26,10 @@
  *      from its attempts, checks every attempt against what its own judges could have given it, and refuses a score
  *      that is not the card's total.
  *
+ *   3. MUSIC-SUITE P6 (2026-09-26): A MUSIC SCORE IS THE SERVER'S OWN. An Arena music set is played on the duel's house
+ *      beat and its taps are recorded (lib/arena-music.ts); the route rejudges them with the room's judge and passes the
+ *      result in as `rejudged`, and a posted score that is not exactly it is refused (REJUDGED_STAKE_MODES).
+ *
  * Constants that live in pure modules are IMPORTED, so a tuning change moves the ceiling with it. Constants that live
  * inside a Babylon mode file (which a server route must not import) are MIRRORED below with the file they come from;
  * the test reads those files and fails the moment one drifts.
@@ -44,7 +48,7 @@ import { WHO_SCENE_IT, scoreAnswer } from '@/lib/babylon/core/QuizCore';
 import { SCENE_CATEGORIES } from '@/lib/babylon/core/SceneBuzz';
 import { JUDGE_WINDOWS, DANCE_LIBRARY } from '@/lib/babylon/core/DanceCore';
 import { MAX_SONG_BARS } from '@/lib/babylon/music/Song';
-import { performSetMax, PERFORM_SET_BARS, PERFORM_SET_NOTES } from '@/lib/babylon/music/performSet';
+import { HOUSE_SET_MAX, HOUSE_SET_BARS, HOUSE_SET_NOTES } from '@/lib/babylon/music/houseBeat';
 import { EVENTS_PER_NIGHT } from '@/lib/babylon/core/CarnivalNight';
 import { REPEAT_NO_MULT } from '@/lib/babylon/core/ComboChain';
 import { SKATE_TRICKS, SNOW_TRICKS, SURF_TRICKS, basePts } from '@/lib/babylon/core/BoardTricks';
@@ -53,6 +57,8 @@ import { FREEFLOW } from '@/lib/babylon/core/Freeflow';
 import { GUNSLING, SLINGSHOT, STIFF, BLOCK, LANES } from '@/lib/babylon/core/KickoffReturn';
 import { parseCard, type DunkCard } from '@/lib/mp/dunkCard';
 import { canonicalModeKey } from '@/lib/game-data';
+import { versusScoreMax } from '@/lib/babylon/core/VersusScore';
+import { mixedScoreMax } from '@/lib/babylon/core/MixedScore';
 
 // ---------------------------------------------------------------------------
 // Constants mirrored from Babylon mode files (the test holds each one to its source).
@@ -64,19 +70,26 @@ export const MIRRORED = {
   dunkRounds: 2, dunksPerRound: 2,
   /** lib/babylon/modes/OneVOneMode.ts TARGET_SCORE; lib/babylon/modes/ThreeVThreeMode.ts TARGET_SCORE. */
   onevoneTarget: 11, threevthreeTarget: 21,
+  /** lib/babylon/modes/onevoneRules.ts WIN_BY_2_CAP — the 1v1's win-by-2 option (a player pick, never on a staked run) ends
+   *  at this whatever the margin. Only the SESSION ceiling reads it (SESSION_RULES_CEILINGS); the stake row stays first to 11. */
+  onevoneWinBy2Cap: 15,
   /** Both hoops modes: a jumper is 2 or 3, a dunk 2 — no bucket is worth more than 3. */
   bucketMax: 3,
   /** lib/babylon/modes/ThreePointMode.ts — RACKS, BALLS_PER_RACK; the last ball of a rack is the money ball, worth 2. */
   threePointRacks: 5, threePointBallsPerRack: 5, threePointMoneyWorth: 2,
+  /** lib/babylon/modes/threePointRules.ts moneyBall — the MONEY RACK option (IMPROVE 2026-10-06, 3PT #5: a player pick on the
+   *  READY screen, never on a staked or head-to-head run): this many racks have every ball a money ball. Only the SESSION
+   *  ceiling reads it (SESSION_RULES_CEILINGS); the stake row stays the 2009 format's 30. */
+  threePointMoneyRacks: 1,
   /** lib/babylon/modes/precisionModes.ts GolfMode — TOTAL holes, GOLF_PAR, CLUTCH_MULT, a holed ball pays max(20, 120 − rel × 40). */
-  golfHoles: 3, golfPar: [3, 4, 3] as readonly number[], clutchMult: 1.5, holeBasePts: 120, holePerStroke: 40,
+  golfHoles: 5, golfPar: [3, 4, 4, 3, 5] as readonly number[], clutchMult: 1.5, holeBasePts: 120, holePerStroke: 40,
   /** precisionModes.ts DerbyMode — TOTAL pitches; a homer pays round(q × (80 + launch × 60) × clutch), q ≤ 1, launch ≤ 0.9. */
-  derbyPitches: 20, derbyHomerBase: 80, derbyLaunchPts: 60, derbyLaunchMax: 0.9,
+  derbyPitches: 30, derbyOutsCap: 15, derbyHomerBase: 80, derbyLaunchPts: 60, derbyLaunchMax: 0.9,
   /** precisionModes.ts PenaltyMode — SD_CAP sudden-death kicks, MAX_FEINTS × FEINT_STYLE_PTS, a goal is 20; the
    *  breakaway pays a shot kind up to 15 (+5 kinetic) and +5 a wall run. */
   penaltySdCap: 5, maxFeints: 2, feintStylePts: 8, goalPts: 20, shotStyleMax: 15, kineticStylePts: 5, wallRunStylePts: 5,
-  /** lib/babylon/modes/NetSportMode.ts — `new TennisScore(4)`: the match is the first to four games. */
-  tennisGames: 4,
+  /** lib/babylon/modes/NetSportMode.ts — `new TennisScore(6)`: the match is the first to six games. */
+  tennisGames: 6,
   /** components/games/tiebreak-game.tsx — TARGET 7; score = myPts × 120 + bestRally × 30; the AI misses with
    *  probability 0.16 + 0.05 × rally, which is certain from the rally where that reaches 1. */
   tiebreakTarget: 7, tiebreakPointPts: 120, tiebreakRallyPts: 30, tiebreakMissBase: 0.16, tiebreakMissPerRally: 0.05,
@@ -84,7 +97,8 @@ export const MIRRORED = {
   brainBrawlMaxRounds: 15,
   /** lib/babylon/modes/WhoSceneItMode.ts QUESTIONS_PER_CATEGORY. */
   whoSceneItPerCategory: 2,
-  /** KarateVSMode.ts / MixedCombatMode.ts — ROUNDS_TO_WIN; the result is myWins × 100 − foeWins × 40. */
+  /** KarateVSMode.ts / MixedCombatMode.ts — ROUNDS_TO_WIN; the result is myWins × 100 − foeWins × 40 (Karate VS adds its
+   *  capped bonuses on top: core/VersusScore, imported; Mixed Combat a ring-out bonus per round won: core/MixedScore). */
   versusRoundsToWin: 2, versusWinPts: 100,
   /** lib/babylon/core/DanceCore.ts hit(): a caught step pays its window's points + combo × 5. */
   danceComboPts: 5,
@@ -104,8 +118,14 @@ export const MIRRORED = {
   boardCoreTrickPts: [50, 120, 120, 140, 90] as readonly number[],
   /** SurfBreakMode — RUN_SEC, WAVE_MOVE_LOCK_SEC, FLOW_MAX (a wave move pays + flow / 4), BARREL_HOLD_SEC, BARREL_BONUS. */
   surfRunSec: 90, surfWaveMoveLockSec: 0.55, surfFlowMax: 200, surfBarrelHoldSec: 1.5, surfBarrelBonus: 250,
+  /** IMPROVE (2026-10-06, surf items 14 / 18 / 20) — modes/surfBreak: the named X grabs' points (SURF_GRABS, basePts), the near
+   *  miss (NEAR_MISS_PTS, one per NEAR_MISS_COOLDOWN_SEC at most), and the biggest swell's worth (SWELL_WORTH_MAX), which a wave
+   *  move is multiplied by. */
+  surfGrabPts: [104, 120] as readonly number[], surfNearMissPts: 50, surfNearMissCooldownSec: 2, surfWorthMax: 1.8,
   /** SnowboardSlalomMode — rideWorlds SLALOM_GATES at 100 a gate, YETI_CLEAR_PTS once a run, the time bonus (60 − t) × 10. */
   slalomGates: 30, slalomGatePts: 100, yetiClearPts: 150, snowTimeBonusMax: 600,
+  /** IMPROVE (2026-10-06, snow item 5): gateCrasher GATE_STREAK_MAX — the most a gate's streak bonus pays on top of its 100. */
+  slalomStreakMax: 50,
   /** FreeRunMode RUN_CAP_PAR × FreeRunCore's longest par (ROOKIE 55 s); FREERUN_TRICKS' best (SIDE FLIP 200) × the best
    *  LAUNCH_MULT (1.5); the biggest verb link (PARRY-VAULT 110); the move keys a combo can hold (17 verbs + 5 tricks);
    *  timeBonus 25 a second under par; the biggest routeBonus (TRACEUR 650). */
@@ -114,12 +134,13 @@ export const MIRRORED = {
   /** KarateEndlessMode — a wave's bodies (OnslaughtCore waveSpec, the desktop budget 20); the end card pays kos × 100 + wave × 50 + flow. */
   karateWaveMax: 20, karateKoPts: 100, karateWavePts: 50,
   /** FootballRushMode — DRIVES; the biggest single award (a truck in a breakaway, TRUCK_PTS 30 × 2); a TD pays
-   *  (100 + evades × 10) × 1.5 in a breakaway; a style chain pays STYLE_CHAIN_PTS × (types − 1) for each of 7 evade types. */
-  footballDrives: 3, footballAwardMax: 60, footballTdBase: 100, footballTdPerEvade: 10, footballTdMult: 1.5,
+   *  (100 + evades × 10) × 1.5 in a breakaway; a style chain pays STYLE_CHAIN_PTS × (types − 1) for each of 7 evade types.
+   *  (Since IMPROVE 2026-10-06 a TD counts only THIS drive's evades; the bound keeps the session's count — an over-estimate.) */
+  footballDrives: 5, footballAwardMax: 60, footballTdBase: 100, footballTdPerEvade: 10, footballTdMult: 1.5,
   footballStylePts: 25, footballStyleTypes: 7,
   /** carnivalEvents — each event's clock, its points per unit, and what paces it. */
   slamRushSec: 20, slamRushPpu: 12, slamRushCooldownSec: 0.5,
-  strikeStormSec: 15, strikeStormPpu: 8,
+  strikeStormSec: 15, strikeStormPpu: 8, strikeStormTrioBonus: 1,   // IMPROVE (2026-10-06): +1 hit per GO / TRICK / POWER trio
   trickGauntletSec: 20, trickGauntletPpu: 0.4,
   hotShotSec: 15, hotShotPpu: 15, hotShotGoalZ: 10.9, hotShotMaxSpeed: 20,
   coinStormSec: 15, coinStormPpu: 6, coinStormSpeed: 6, coinStormMagnet: 1.1, coinStormSpacing: 3.77,
@@ -182,12 +203,32 @@ export function firstToCeiling(target: number, maxPerScore: number): number {
 }
 
 /** Big Air: most turns a boosted launch can spin before touchdown. The test RUNS the real big-air core at full boost with
- *  the spin started at take-off and holds this above what it measures (≈ 4.7 turns). */
+ *  the spin started at take-off and holds this above what it measures (≈ 4.75 turns). IMPROVE (2026-10-06, Big Air items
+ *  2 / 8 / 10): the core now lands on a hill (a 2 m lip; a full boost overshoots the landing onto the flat, capped at
+ *  sketchy) and pays a repeated rotation less — both only LOWER what an attempt can pay, so the rotation part stands unchanged. */
 export const BIG_AIR_MAX_TURNS = 5;
+/** IMPROVE (2026-10-06, owner-approved "Big Air ceiling counts the line bonus"): the most one landing's named line can pay.
+ *  AirSessionMode names a trick from the snow table at most once an air (S.named is de-duplicated by id) and scores each at
+ *  scoreTrick(t, landed01) — basePts × landed01², so a stuck/clean landing pays every named trick's basePts in full. The
+ *  largest line is every snow air trick named in one air. */
+export function bigAirLineMax(): number {
+  return airPts(SNOW_TRICKS).reduce((a, b) => a + b, 0);
+}
+/** The whole banked line bonus a session can post. AirSessionMode runs ONE ComboChain (scope 'air') for the session and
+ *  banks it only when the session ends; the Nth link pays N× (ComboChain's multiplier is its link count), a landing is at
+ *  most one link, and a repeated line only pays less. So attemptsPerRound landings, each the largest line and each a fresh
+ *  one: lineMax × (1 + 2 + … + attemptsPerRound). */
+export function bigAirLineBonusMax(): number {
+  const n = BIG_AIR_TUNING.attemptsPerRound;
+  return bigAirLineMax() * (n * (n + 1)) / 2;
+}
+/** Rotation points (the core's score) + the banked line bonus — the one total AirSessionMode posts (RESULTS-TRUTH WA-5).
+ *  IMPROVE (2026-10-06): it counted the rotation points alone (8,000), so a legitimate top session (~14,000 measured with the
+ *  line) was refused as a stake. */
 export function bigAirCeiling(): number {
   const t = BIG_AIR_TUNING;
   const perAttempt = Math.round((t.basePoints + BIG_AIR_MAX_TURNS * t.pointsPerRotation) * Math.max(...Object.values(t.gradePoints)));
-  return t.attemptsPerRound * perAttempt;
+  return t.attemptsPerRound * perAttempt + bigAirLineBonusMax();
 }
 
 /** Golf: a hole in one on every hole (the last one clutch), both rings, and the bank ride. */
@@ -319,19 +360,24 @@ export function skateBound(): number {
  *  never pass REPEAT_NO_MULT × the distinct moves the machine can be handed. */
 const trickMachineMultCap = (moves: number): number => REPEAT_NO_MULT * moves;
 
-/** The Break: a landing every BOARD_EVENT_SEC for the session (surf's airs or boardCore's grab, whichever pays most), a
- *  wave move every WAVE_MOVE_LOCK_SEC at full flow, and a barrel every BARREL_HOLD_SEC. */
+/** The Break: a landing every BOARD_EVENT_SEC for the session (surf's airs, its named grabs or boardCore's grab, whichever
+ *  pays most), a wave move every WAVE_MOVE_LOCK_SEC at full flow on the biggest swell, a near miss every cooldown, and a
+ *  barrel every BARREL_HOLD_SEC. IMPROVE (2026-10-06, surf item 15): a wave move and a near miss are LINKS in the TrickMachine's
+ *  chain now (TrickMachine.link) — the multiplier cap counts them, and each can pay at most its points × that cap in all
+ *  (a wave move's own points at once, the chain's share on top). */
 export function surfBound(): number {
   const m = MIRRORED;
+  const multCap = trickMachineMultCap(SURF_TRICKS.length + m.boardCoreTrickPts.length + m.surfGrabPts.length + 1);   // + NEAR MISS
   const airs = chainRunBound({
     sec: m.surfRunSec, eventSec: BOARD_EVENT_SEC,
-    perEvent: Math.max(maxOf(airPts(SURF_TRICKS)), maxOf(m.boardCoreTrickPts)),
-    multCap: trickMachineMultCap(SURF_TRICKS.length + m.boardCoreTrickPts.length),
+    perEvent: Math.max(maxOf(airPts(SURF_TRICKS)), maxOf(m.boardCoreTrickPts), maxOf(m.surfGrabPts)),
+    multCap,
   });
   const waveMoves = (Math.floor(m.surfRunSec / m.surfWaveMoveLockSec) + 1)
-    * (maxOf(SURF_TRICKS.filter((t) => t.kind !== 'air').map(basePts)) + Math.round(m.surfFlowMax / 4));
+    * Math.ceil((maxOf(SURF_TRICKS.filter((t) => t.kind !== 'air').map(basePts)) + Math.round(m.surfFlowMax / 4)) * m.surfWorthMax) * multCap;
+  const nearMisses = (Math.floor(m.surfRunSec / m.surfNearMissCooldownSec) + 1) * m.surfNearMissPts * multCap;
   const barrels = Math.floor(m.surfRunSec / m.surfBarrelHoldSec) * m.surfBarrelBonus;
-  return airs + waveMoves + barrels;
+  return airs + waveMoves + nearMisses + barrels;
 }
 
 /** Gate Crasher: no clock (a rider can stall on the slope), so UNTIMED_RUN_SEC of a landing or a rail every
@@ -342,7 +388,7 @@ export function snowBound(): number {
     sec: UNTIMED_RUN_SEC, eventSec: BOARD_EVENT_SEC,
     perEvent: Math.max(maxOf(airPts(SNOW_TRICKS)), maxOf(m.boardCoreTrickPts), m.boardRailMax),
     multCap: trickMachineMultCap(SNOW_TRICKS.length + m.boardCoreTrickPts.length + 1),   // + the GRIND link
-    flat: m.slalomGates * m.slalomGatePts + m.yetiClearPts + m.snowTimeBonusMax,
+    flat: m.slalomGates * (m.slalomGatePts + m.slalomStreakMax) + m.yetiClearPts + m.snowTimeBonusMax,
   });
 }
 
@@ -392,7 +438,8 @@ export function carnivalEventBounds(): Record<string, number> {
   const coins = 2 * (Math.floor((m.coinStormSec * m.coinStormSpeed * Math.SQRT2) / coinReach) + 1);
   return {
     slam_rush: (Math.floor(m.slamRushSec / m.slamRushCooldownSec) + 1) * m.slamRushPpu,
-    strike_storm: (m.strikeStormSec * MAX_FRAME_HZ + 1) * m.strikeStormPpu,
+    // a hit every frame, and every third of them closes a three-button trio (its bonus on top)
+    strike_storm: (() => { const hits = m.strikeStormSec * MAX_FRAME_HZ + 1; return (hits + Math.floor(hits / 3) * m.strikeStormTrioBonus) * m.strikeStormPpu; })(),
     trick_gauntlet: Math.round(gauntletRaw * m.trickGauntletPpu),
     hot_shot: (Math.floor(m.hotShotSec / (m.hotShotGoalZ / m.hotShotMaxSpeed)) + 1) * m.hotShotPpu,
     coin_storm: coins * m.coinStormPpu,
@@ -449,8 +496,8 @@ export const SCORE_CEILINGS: Readonly<Record<string, ScoreCeiling>> = {
   },
   bigAir: {
     max: bigAirCeiling(), kind: 'rules', swapsUnderKillSwitch: true,
-    why: `${BIG_AIR_TUNING.attemptsPerRound} hits, each at most ${BIG_AIR_MAX_TURNS} turns stuck`,
-    basis: `BIG_AIR_TUNING attemptsPerRound × round((basePoints + ${BIG_AIR_MAX_TURNS} turns × pointsPerRotation) × gradePoints.stuck); ${BIG_AIR_MAX_TURNS} turns is above the full-boost air the core allows (measured by the test)`,
+    why: `${BIG_AIR_TUNING.attemptsPerRound} hits, each at most ${BIG_AIR_MAX_TURNS} turns stuck, each naming every snow air trick in a fresh line`,
+    basis: `BIG_AIR_TUNING attemptsPerRound × round((basePoints + ${BIG_AIR_MAX_TURNS} turns × pointsPerRotation) × gradePoints.stuck); ${BIG_AIR_MAX_TURNS} turns is above the full-boost air the core allows (measured by the test) + the banked line: Σ SNOW_TRICKS airs' basePts × (1 + … + attemptsPerRound), ComboChain's Nth link paying N×`,
   },
   golf: {
     max: golfCeiling(), kind: 'rules', swapsUnderKillSwitch: true,
@@ -487,15 +534,19 @@ export const SCORE_CEILINGS: Readonly<Record<string, ScoreCeiling>> = {
     why: `${SCENE_CATEGORIES.length * m.whoSceneItPerCategory} questions, all instant, the streak maxed`,
     basis: 'SCENE_CATEGORIES × QUESTIONS_PER_CATEGORY questions, each scoreAnswer(WHO_SCENE_IT, correct, full clock, streak)',
   },
+  // IMPROVE (2026-10-06): the Storm Duel's result adds the HP kept in each round won, the perfect dodges and the routes, each
+  // capped (lib/babylon/core/VersusScore.ts, a pure module imported here) — 200 → 300. A ceiling only goes up.
   karateVersus: {
-    max: m.versusRoundsToWin * m.versusWinPts, kind: 'rules', swapsUnderKillSwitch: true,
-    why: `the match ends at ${m.versusRoundsToWin} round wins`,
-    basis: 'KarateVSMode myWins × 100 − foeWins × 40, myWins ≤ ROUNDS_TO_WIN',
+    max: versusScoreMax(m.versusRoundsToWin), kind: 'rules', swapsUnderKillSwitch: true,
+    why: `the match ends at ${m.versusRoundsToWin} round wins; a sweep at full HP with every bonus capped`,
+    basis: 'VersusScore: myWins × 100 − foeWins × 40 + Σ 25 × HP share per round won + min(dodges, 10) × 2 + min(routes, 6) × 5',
   },
+  // IMPROVE (2026-10-06): a round WON by a ring-out pays 25 on top (lib/babylon/core/MixedScore.ts, a pure module imported
+  // here) — 200 → 250. A ceiling only goes up.
   mixedcombat: {
-    max: m.versusRoundsToWin * m.versusWinPts, kind: 'rules', swapsUnderKillSwitch: false,
-    why: `the match ends at ${m.versusRoundsToWin} round wins`,
-    basis: 'MixedCombatMode myWins × 100 − foeWins × 40, myWins ≤ ROUNDS_TO_WIN',
+    max: mixedScoreMax(m.versusRoundsToWin), kind: 'rules', swapsUnderKillSwitch: false,
+    why: `the match ends at ${m.versusRoundsToWin} round wins; a sweep, every round a ring-out`,
+    basis: 'mixedScore: myWins × 100 − foeWins × 40 + 25 × min(ring-out wins, myWins), myWins ≤ ROUNDS_TO_WIN',
   },
   dance: {
     max: danceCeiling(), kind: 'rules', swapsUnderKillSwitch: false,
@@ -512,10 +563,15 @@ export const SCORE_CEILINGS: Readonly<Record<string, ScoreCeiling>> = {
   // Only an Arena set has an end (owner, 2026-09-24: "Cap only Arena sets"): a duel launches the Academy with ?arena=,
   // and that run's PERFORM set is `new PerformSet({ arena: true })`. Free play runs until END SET and is never staked, and
   // its sessions never set a staked rival either: a music rival is banded on past Arena scores (RIVAL_FROM_DUEL_SCORES).
+  // MUSIC-SUITE P6 (2026-09-26, owner decision #12): an Arena set is played on the duel's HOUSE BEAT
+  // (lib/babylon/music/houseBeat.ts), not the player's grid, and every house beat charts exactly HOUSE_SET_NOTES = 192
+  // notes — so the ceiling is that set's maximum, 378,300, not performSetMax() = 2,647,100 (all 512 steps a note, a set no
+  // real beat plays). The score is also REJUDGED (REJUDGED_STAKE_MODES below): it must equal what the server's
+  // judgeHouseSet makes of the attempt's recorded taps.
   music: {
-    max: performSetMax(), kind: 'rules', swapsUnderKillSwitch: false,
-    why: `a ${PERFORM_SET_BARS}-bar Arena set, every one of its ${PERFORM_SET_NOTES} notes hit PERFECT in one combo`,
-    basis: 'performSet PERFORM_SET_NOTES (PERFORM_SET_BARS × 16 steps, every step a note), each performHitPoints(PERFECT, combo) = 100 × (1 + floor(combo / 5)); an Arena set ends itself after its last note',
+    max: HOUSE_SET_MAX, kind: 'rules', swapsUnderKillSwitch: false,
+    why: `a ${HOUSE_SET_BARS}-bar Arena set on the duel's house beat, every one of its ${HOUSE_SET_NOTES} notes hit PERFECT in one combo`,
+    basis: 'houseBeat HOUSE_SET_NOTES (HOUSE_BAR_NOTES: 48 charted notes per 8-bar pass × 4 passes, the same for every seed), each performHitPoints(PERFECT, combo) = 100 × (1 + floor(combo / 5)) = performSetMax(192); the server rejudges the recorded taps (judgeHouseSet) and the score must equal it',
   },
   // ── bound: the rules set no maximum (see the header) ──────────────────────────────────────────────────────────────
   skateboarding: {
@@ -525,13 +581,13 @@ export const SCORE_CEILINGS: Readonly<Record<string, ScoreCeiling>> = {
   },
   surfing: {
     max: bound(surfBound()), kind: 'bound', swapsUnderKillSwitch: true,
-    why: `${BOUND_MARGIN}× a flawless ${m.surfRunSec}-second session: a landing every ${BOARD_EVENT_SEC} s, every wave move and every barrel`,
-    basis: 'chainRunBound(RUN_SEC 90, BOARD_EVENT_SEC, the best air, TrickMachine\'s multiplier cap) + a wave move each WAVE_MOVE_LOCK_SEC at FLOW_MAX + a barrel each BARREL_HOLD_SEC, × BOUND_MARGIN',
+    why: `${BOUND_MARGIN}× a flawless ${m.surfRunSec}-second session: a landing every ${BOARD_EVENT_SEC} s, every wave move, near miss and barrel`,
+    basis: 'chainRunBound(RUN_SEC 90, BOARD_EVENT_SEC, the best air or grab, TrickMachine\'s multiplier cap) + a wave move each WAVE_MOVE_LOCK_SEC at FLOW_MAX on the biggest swell + a near miss each cooldown (both chain links: × the cap) + a barrel each BARREL_HOLD_SEC, × BOUND_MARGIN',
   },
   snowboarding: {
     max: bound(snowBound()), kind: 'bound', swapsUnderKillSwitch: true,
     why: `${BOUND_MARGIN}× a flawless ${untimedMin}-minute run: a landing or a rail every ${BOARD_EVENT_SEC} s, every gate`,
-    basis: 'no clock (the run ends at the last gate, and a rider can stall on the slope): chainRunBound(UNTIMED_RUN_SEC, BOARD_EVENT_SEC, the biggest trick or rail, TrickMachine\'s multiplier cap) + gates + yeti + the time bonus, × BOUND_MARGIN',
+    basis: 'no clock (the run ends at the last gate, and a rider can stall on the slope): chainRunBound(UNTIMED_RUN_SEC, BOARD_EVENT_SEC, the biggest trick or rail, TrickMachine\'s multiplier cap) + gates at their streak\'s most + yeti + the time bonus, × BOUND_MARGIN',
   },
   freerun: {
     max: bound(freerunBound()), kind: 'bound', swapsUnderKillSwitch: false,
@@ -568,6 +624,34 @@ export const STAKE_MODE_ALIASES: Readonly<Record<string, string>> = {
 
 const own = (o: object, k: string): boolean => Object.prototype.hasOwnProperty.call(o, k);
 
+/**
+ * OWNER DECISION 2026-10-06 (the moderate option): a mode whose PLAYER OPTIONS can run a longer game than the staked one.
+ * (IMPROVE 2026-10-06: the 3-Point Contest's money rack is the second such option — same rule, same split.)
+ * The 1v1's win-by-2 is a pick on its READY screen, off by default, and never offered on a staked or head-to-head run
+ * (onevoneRules.winBy2Offered: no `?arena=`, `?mp=` or `?c=`), so an Arena stake is still held to the first-to-11 row
+ * above (13) while a session — practice, story, the paid run — may post what a won win-by-2 game can: one short of the
+ * cap plus the biggest bucket. Read only through sessionRulesMax (lib/sessions/modeScoreRules rulesMaxFor and
+ * lib/session-payout sessionScoreCap); checkStakeScore never reads it.
+ */
+export const SESSION_RULES_CEILINGS: Readonly<Record<string, { max: number; basis: string }>> = {
+  hoops1v1: {
+    max: firstToCeiling(m.onevoneWinBy2Cap, m.bucketMax),
+    basis: `onevoneRules WIN_BY_2_CAP ${m.onevoneWinBy2Cap} (the win-by-2 option): ${m.onevoneWinBy2Cap - 1} + a ${m.bucketMax}`,
+  },
+  // IMPROVE (2026-10-06, 3PT #5): the money-rack option — a player pick, off by default, never offered on `?arena=` / `?mp=` /
+  // `?c=` (threePointRules.optionsOffered), so the stake row above stays 30 while a session may post a perfect money-rack run
+  threePoint: {
+    max: m.threePointRacks * ((m.threePointBallsPerRack - 1) + m.threePointMoneyWorth) + m.threePointMoneyRacks * (m.threePointBallsPerRack - 1) * (m.threePointMoneyWorth - 1),
+    basis: `ThreePointMode with the money rack (threePointRules.perfectRun): ${m.threePointRacks} racks × (4 + a ${m.threePointMoneyWorth}) + ${m.threePointMoneyRacks} rack's other 4 balls worth ${m.threePointMoneyWorth}`,
+  },
+};
+
+/** A session's rules maximum for a 'rules' row: the stake row's max, or the longer game a player option allows. */
+export function sessionRulesMax(mode: string, c: ScoreCeiling): number {
+  const key = canonicalStakeMode(String(mode ?? ''));
+  return own(SESSION_RULES_CEILINGS, key) ? Math.max(c.max, SESSION_RULES_CEILINGS[key].max) : c.max;
+}
+
 export function canonicalStakeMode(mode: string): string {
   if (own(SCORE_CEILINGS, mode)) return mode;
   if (own(STAKE_MODE_ALIASES, mode)) return STAKE_MODE_ALIASES[mode];   // own keys only: '__proto__' is not a mode
@@ -601,6 +685,8 @@ export type StakeRefusal =
   | 'SCORE_INVALID'
   | 'NO_SCORE_CEILING'
   | 'SCORE_ABOVE_CEILING'
+  | 'SCORE_NOT_REJUDGED'
+  | 'SCORE_MISMATCH'
   | 'CARD_TOO_MANY_ATTEMPTS'
   | 'CARD_ATTEMPT_INVALID'
   | 'CARD_TOTAL_MISMATCH'
@@ -666,11 +752,33 @@ export function checkDunkCard(score: number, raw: unknown): { ok: true; card: Du
 }
 
 /**
+ * MUSIC-SUITE P6 (2026-09-26): modes whose staked score is not the client's number but the server's own REJUDGE of a
+ * recorded attempt — music: /api/arena/submit-score reads the player's attempt (lib/arena-music.ts), runs judgeHouseSet
+ * on its taps and passes the result as `rejudged`. A route that has no rejudge to pass (the dark competition engine's
+ * submit-score, which knows no attempts) is refused: a music score it cannot check is never settled.
+ */
+export const REJUDGED_STAKE_MODES: ReadonlySet<string> = new Set(['music']);
+
+/** Is this mode (any spelling a row or a client carries) one whose stake only the Arena can settle? */
+export function isRejudgedStakeMode(mode: string | null | undefined): boolean {
+  return REJUDGED_STAKE_MODES.has(canonicalStakeMode(String(mode ?? '')));
+}
+/**
+ * MUSIC-SUITE P6 FIX PASS (2026-09-26): the dark real-money engine's refusal for a REJUDGED_STAKE_MODES mode — at create
+ * and join, before any escrow is locked (its submit-score cannot rejudge, so such a match could never settle).
+ */
+export const NOT_STAKEABLE_HERE = {
+  code: 'NOT_STAKEABLE_HERE',
+  detail: (mode: string | null | undefined): string => `A ${canonicalStakeMode(String(mode ?? ''))} stake is settled only in the Arena, from a recorded attempt — it can't be staked here.`,
+} as const;
+
+/**
  * Everything a staked score must pass before it is written. `killSwitch` is NEXT_PUBLIC_DISABLE_3D: with it on, a mode
  * whose route mounts a fallback game on another scale is not held to the table (the ceiling describes the Babylon game);
- * the result says whether the ceiling applied so the route can log it.
+ * the result says whether the ceiling applied so the route can log it. `rejudged`: the server's own score for the run,
+ * required for a REJUDGED_STAKE_MODES mode (the posted score must equal it) and ignored for every other mode.
  */
-export function checkStakeScore(input: { mode: string; score: unknown; card?: unknown; killSwitch?: boolean }): StakeCheck {
+export function checkStakeScore(input: { mode: string; score: unknown; card?: unknown; killSwitch?: boolean; rejudged?: number }): StakeCheck {
   const { score } = input;
   if (typeof score !== 'number' || !Number.isInteger(score) || score < 0) {
     return { ok: false, code: 'SCORE_INVALID', detail: 'score must be a non-negative integer' };
@@ -683,6 +791,15 @@ export function checkStakeScore(input: { mode: string; score: unknown; card?: un
   const ceilingApplied = !(input.killSwitch && ceiling.swapsUnderKillSwitch);
   if (ceilingApplied && score > ceiling.max) {
     return { ok: false, code: 'SCORE_ABOVE_CEILING', detail: aboveCeilingDetail(score, ceiling) };
+  }
+  if (REJUDGED_STAKE_MODES.has(key)) {
+    const r = input.rejudged;
+    if (typeof r !== 'number' || !Number.isInteger(r) || r < 0) {
+      return { ok: false, code: 'SCORE_NOT_REJUDGED', detail: `A ${key} score counts only from its recorded attempt, and this one could not be checked. ${NOT_RECORDED}` };
+    }
+    if (score !== r) {
+      return { ok: false, code: 'SCORE_MISMATCH', detail: `The score (${score}) is not what your recorded set scores (${r}). ${NOT_RECORDED}` };
+    }
   }
   let card: DunkCard | null = null;
   if (key === 'dunkContest') {

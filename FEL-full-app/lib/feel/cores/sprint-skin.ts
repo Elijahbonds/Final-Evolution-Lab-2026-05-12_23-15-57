@@ -11,12 +11,20 @@
 
 import { SprintCore, type SprintSkin } from './sprint-core';
 import { SensoryBus } from '../index';
-import { SPRINT_TUNING, SPRINT_SENSORY } from './sprint-constants';
+import { SPRINT_TUNING, SPRINT_SENSORY, SPRINT_SET_JITTER_MS } from './sprint-constants';
 
 export interface SprintSkinOpts {
   onSensory?: SprintSkin['onSensory'];
   onPhase?: SprintSkin['onPhase'];
   onFinish?: SprintSkin['onFinish'];
+  /** IMPROVE (2026-10-06): a SET hold per gate (randomSetHoldMs); omitted = the fixed setMs, as before. */
+  setHoldMs?: SprintSkin['setHoldMs'];
+}
+
+/** IMPROVE (2026-10-06): one SET hold, uniform in [setMs, setMs + SPRINT_SET_JITTER_MS]. `rng` returns [0, 1). */
+export function randomSetHoldMs(rng: () => number = Math.random): number {
+  const r = rng();
+  return SPRINT_TUNING.setMs + Math.max(0, Math.min(1, Number.isFinite(r) ? r : 0)) * SPRINT_SET_JITTER_MS;
 }
 
 /** Build the sprint SprintSkin. */
@@ -27,6 +35,7 @@ export function makeSprintSkin(opts: SprintSkinOpts = {}): SprintSkin {
     onSensory: opts.onSensory,
     onPhase: opts.onPhase,
     onFinish: opts.onFinish,
+    setHoldMs: opts.setHoldMs,
   };
 }
 
@@ -35,4 +44,4 @@ export function makeSprintRace(bus?: SensoryBus, opts: SprintSkinOpts = {}): Spr
   return new SprintCore(makeSprintSkin(opts), bus);
 }
 
-export { SPRINT_TUNING, SPRINT_SENSORY } from './sprint-constants';
+export { SPRINT_TUNING, SPRINT_SENSORY, SPRINT_SET_JITTER_MS } from './sprint-constants';

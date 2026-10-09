@@ -8,6 +8,7 @@ import { isRealMoneyCompetitionEnabled, FEATURE_DISABLED } from '@/lib/flags';
 import { checkCompetitionEligibility, appendMatchEvent } from '@/lib/competition';
 import { ledgerEscrowLock } from '@/lib/stripe-helpers';
 import { isStakingPaused, stakingPausedDetail, STAKING_PAUSED_STATUS } from '@/lib/stakingPause';
+import { isRejudgedStakeMode, NOT_STAKEABLE_HERE } from '@/lib/arena-score-integrity';
 
 /**
  * POST /api/competition/join
@@ -46,6 +47,9 @@ export async function POST(req: NextRequest) {
       // MUSIC-SUITE P1 (2026-09-25, owner decision #9): joining locks a NEW stake, so a paused mode is refused here too,
       // before the escrow lock (lib/stakingPause.ts). Dark engine; a creator's escrow is refunded by /api/competition/void.
       if (isStakingPaused(match.mode)) throw Object.assign(new Error(stakingPausedDetail(match.mode)), { httpStatus: STAKING_PAUSED_STATUS });
+      // MUSIC-SUITE P6 FIX PASS (2026-09-26): a mode this engine cannot settle (its score is the Arena's rejudge of a
+      // recorded attempt) locks no escrow — see competition/create
+      if (isRejudgedStakeMode(match.mode)) throw Object.assign(new Error(NOT_STAKEABLE_HERE.detail(match.mode)), { httpStatus: 400 });
 
       // Lock player 2's entry fee
       await ledgerEscrowLock(tx, {

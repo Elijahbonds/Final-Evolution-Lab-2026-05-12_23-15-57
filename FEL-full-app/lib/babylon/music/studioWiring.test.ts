@@ -74,7 +74,8 @@ describe('the room keeps its work in the project (source pins)', () => {
   });
 
   it('StudioMode: SongPanel stays mounted off the STUDIO tab; FlipPad restores from the project (and stays FLIP-only)', () => {
-    expect(studio).toContain("<div data-qa=\"song-panel\" style={view === 'studio' ? undefined : { display: 'none' }}>");
+    // (MUSIC-SUITE P6: and off screen in an Arena run, whose room is its one set)
+    expect(studio).toContain("<div data-qa=\"song-panel\" style={view === 'studio' && !arenaStage ? undefined : { display: 'none' }}>");
     expect(studio).toMatch(/<SongPanel key=\{room\.generation\}/);
     expect(studio).toMatch(/\{view === 'flip' && \(\s*<>[\s\S]*?<FlipPad /);   // P2's pin: the pad keys never fire on STUDIO
     expect(studio).toContain('flip={project.flip} onFlipChange={flipChange} loadSource={loadFlipSource}');
@@ -101,10 +102,21 @@ describe('the room keeps its work in the project (source pins)', () => {
     // song panel is not mounted — and the song it sends is decided per tier (DanceExport.danceSongAtTier)
     // MUSIC-SUITE P4 (grid-ui): …and the song's key rides on the card ('Your song · Am · …')
     // MUSIC-SUITE P4 FIX PASS: the key in words (keyCardText) — the Cypher's chip upper-cases the blurb
-    expect(studio).toContain('exportSongToDance({ id: project.id, name: project.title, bpm, steps: STEPS, ...danceSong, key: keyCardText(project.key) })');
+    // MUSIC-SUITE P7 ("your beat" item 1): + swing, kit and songKey — the project's own, never a fresh default
+    // (songKey is the RAW key for a FEL-filled row's note; `key` stays the display string the card already used)
+    expect(studio).toContain('id: project.id, name: project.title, bpm, steps: STEPS, ...danceSong, key: keyCardText(project.key),');
+    expect(studio).toContain('swing, kit, songKey: project.key, takes: danceTakes,');
     expect(songPanel).not.toContain('exportSongToDance');
     expect(studio + songPanel).not.toContain("'My Track'");
     expect(songPanel).not.toMatch(/useRef\(`s\$\{Date\.now\(\)/);
+  });
+
+  it("the dance export is refused for a device-private song by DanceExport's own rule, not uploadDoorOpen('danceFloor', …)", () => {
+    // MUSIC-SUITE P7 ("your beat" contract item 4): the export now renders real audio, so a song with an upload can no
+    // longer go to the dance floor, whatever UPLOAD_DOORS.danceFloor says (kept true for a hypothetically audio-free
+    // reading; library and walk-out still read the door table).
+    expect(studio).toContain('const danceOpen = danceFloorOpenFor(privacy);');
+    expect(studio).not.toContain("uploadDoorOpen('danceFloor'");
   });
 
   it('the streak post is on only inside GameShell (the one host with ReplayInPlaceContext); /dev/music has none', () => {
@@ -168,7 +180,8 @@ describe('what you hear is what you see, song mode, undo, tier gates (source pin
     expect(studio).toContain('const rows = visibleRows(gridTracks, caps);');
     expect(studio).toContain('kit={rows.kit.map(gridRow)} flip={rows.flip.map(gridRow)}');
     expect(stepGrid).toContain("section('flip-grid', flip, kit.length)");
-    expect(studio).toContain('useEffect(() => { engineRef.current?.setAudible(shownIds); }, [shownIds]);');
+    // (MUSIC-SUITE P6: every row of the Arena's house beat sounds while it plays — houseLoaded)
+    expect(studio).toContain('useEffect(() => { engineRef.current?.setAudible(houseLoaded ? null : shownIds); }, [shownIds, houseLoaded]);');
     expect(studio).toContain('eng.setAudible(shownIdsRef.current);');                   // the engine's first bar too
     // by row id, not by drawn index: a click with no stroke toggles through toggleCell; a stroke paints by row id too
     expect(studio).toContain('onToggle={(row, step) => toggleCell(row, step)}');
@@ -181,7 +194,9 @@ describe('what you hear is what you see, song mode, undo, tier gates (source pin
     expect(songPanel).toContain('engine.setState({ bpm, steps, tracks: snapshotTracks(sec.tracks), swing: sw });');
     // MUSIC-SUITE P3 FIX PASS: the rule is studioEdit.playbackSource (tested by behaviour in studioEdit.test.ts)
     expect(studio).toMatch(/const src = playbackSource\(\{ preview: previewing, songMode, tracks, swing \}\);\s*if \(src\.tracks\) eng\.setState\(\{ bpm, steps: STEPS, tracks: src\.tracks, swing: src\.swing \}\);/);
-    expect(studio).toContain('}, [bpm, tracks, swing, songMode, previewing]);');
+    // (MUSIC-SUITE P6: the grid stands down while an Arena set's house beat plays, and comes back after it)
+    expect(studio).toContain('if (!eng || houseLoadedRef.current) return;');
+    expect(studio).toContain('}, [bpm, tracks, swing, songMode, previewing, houseLoaded]);');
     // and while song mode hides the working grid, the two buttons that snapshot it hold (they saved the hidden grid)
     expect(songPanel).toMatch(/const saveSection = \(\) => \{\s*if \(gridHidden\) \{ say\(HIDDEN_GRID_LINE\); return; \}/);
     expect(songPanel).toMatch(/const updateFromGrid = \(s: ProjectSection\): void => \{\s*if \(gridHidden\) \{ say\(HIDDEN_GRID_LINE\); return; \}/);
@@ -233,7 +248,9 @@ describe('what you hear is what you see, song mode, undo, tier gates (source pin
 
   it('the kits cache is keyed to the player, and both loaders pass one', () => {
     expect(code('app/play/music/page.tsx')).toContain('<MusicLoader playerId={');
-    expect(code('app/play/music/_components/loader.tsx')).toContain('gameProps={{ spendShards, readOwnedKits, arenaSet, playerId }}');
+    // INTEGRATION (2026-10-06): lane/create-hub appends StudioMode's onPublish (the Creator Card hook) to the same props.
+    expect(code('app/play/music/_components/loader.tsx'))
+      .toMatch(/gameProps=\{\{ spendShards, readOwnedKits, arenaSet, playerId(?:, onPublish)? \}\}/);
     expect(code('app/dev/music/loader.tsx')).toContain('playerId={playerId}');
   });
 });
@@ -277,7 +294,8 @@ describe('the P3 fix pass wiring (source pins)', () => {
   it('the kit is PLAYED from the owned list, never written into the project by a fallback; MASTER follows the project', () => {
     expect(studio).not.toMatch(/\bsetKit\(/);
     expect(studio).toContain('const want = shop.owned.includes(kit) ? kit : DEFAULT_KIT;');
-    expect(studio).toContain('useEffect(() => { engineRef.current?.masterPolish(polished); }, [polished, ready]);');
+    // (MUSIC-SUITE P6: MASTER off under the Arena's house beat — both duelists hear it the same)
+    expect(studio).toContain('useEffect(() => { engineRef.current?.masterPolish(houseLoaded ? false : polished); }, [polished, ready, houseLoaded]);');
     expect(studio).toContain('polish: r.polished }).then((id) => {');
   });
 
@@ -326,12 +344,15 @@ describe('the P4 fix pass wiring (source pins)', () => {
     expect(room).toMatch(/onPointerDownCapture=\{\(\) => \{ keysSuspended\.current = false;\s*\}\}/);
   });
   it('PERFORM starts on the press with no count-in and no metronome (decision #13)', () => {
-    expect(room).toContain("if (countIn && transport.countIn > 0 && mode !== 'perform' && modeRef.current !== 'perform') eng.countIn(transport.countIn); else eng.start();");
+    // (MUSIC-SUITE P6 FIX PASS: a paused PERFORM set resumes at the top of its bar — the else branch grew)
+    expect(room).toContain("if (countIn && transport.countIn > 0 && mode !== 'perform' && modeRef.current !== 'perform') eng.countIn(transport.countIn);");
+    expect(room).toMatch(/eng\.countIn\(transport\.countIn\);\s*else if \(performing && perfResumeBarRef\.current !== null\) \{ eng\.startAt\(perfResumeBarRef\.current\);[\s\S]{0,260}eng\.start\(\);/);
     expect(room).toContain("engineRef.current?.setMetronome(transport.metronome && mode !== 'perform');");
   });
   it('the desk the engine plays is scoped to what can sound; the grid\'s M / S badges read the same desk', () => {
     expect(room).toContain('const deskHeard = useMemo(() => scopeSolo(mixerOf(project), liveStripIds), [project.mixer, liveStripIds]);');
-    expect(room).toContain('useEffect(() => { engineRef.current?.setMixer(deskHeard); }, [deskHeard, ready]);');
+    // (MUSIC-SUITE P6: a flat desk under the Arena's house beat — the player's mutes and solos never reach a staked beat)
+    expect(room).toContain('useEffect(() => { engineRef.current?.setMixer(houseLoaded ? DEFAULT_MIXER : deskHeard); }, [deskHeard, ready, houseLoaded]);');
     expect(room).toContain("silent: c.mute ? 'mute' : anySolo(deskHeard) && !c.solo ? 'solo' : null,");
   });
   it('the mixer shows at every tier; its faders are THE STUDIO\'s (decision #4)', () => {
@@ -352,5 +373,80 @@ describe('the P4 fix pass wiring (source pins)', () => {
     expect(rec).not.toContain('gatedBuffer');
     expect(rec).toContain('engine.countInBefore?.(startBar, countIn);');
     expect(rec).toContain('const toPlay = useMemo(() => muteRecordingSlot(engineList, takes, recordingSlot), [engineList, takes, recordingSlot]);');
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+// MUSIC-SUITE P6 FIX PASS (2026-09-26): the room's wiring for the review's findings. The rules are pure and tested where
+// they live (performSet.test.ts pause / foundation / band map / chord, phonePad.test.ts, arenaAttempt.test.ts,
+// houseBeat.test.ts houseStepLanes); these pins hold the room to calling them.
+// ════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+describe('P6 fix pass: the room calls the fixed rules', () => {
+  const room = code('lib/babylon/music/StudioMode.tsx');
+  const fnBody = (name: string): string => {
+    const i = room.indexOf(name);
+    expect(i, name).toBeGreaterThan(-1);
+    return room.slice(i, i + 2600);
+  };
+
+  it('PAUSE: the set is paused (no MISS for what it had offered) at the bar it stopped in, and resumes there', () => {
+    expect(room).toMatch(/perfResumeBarRef\.current = eng\.currentBar;\s*setRef\.current\.pause\(eng\.context\.currentTime, eng\.stepsIntoBar\);\s*\}\s*eng\.stop\(\);/);
+  });
+
+  it('the band is on the desk only while a free-play set runs on STUDIO (performBandLive), re-decided on mode / view / transport', () => {
+    expect(room).toContain('if (!performBandLive({ mode: modeRef.current, running: eng.isRunning, view: viewRef.current, arena: arenaSet })) {');
+    expect(room).toContain("eng.mixGraph.setBand(performBandMap(projectRef.current.tracks.map((t) => t.sampleId), set.band.levels(), { takesId: TAKES_CHANNEL, flipHasNotes }));");
+    expect(room).toContain('useEffect(() => { if (!houseLoadedRef.current) bandToDeskRef.current(setRef.current, true); }, [mode, view, playing]);');
+    // enterPerform no longer thins the desk before PLAY: it only clears it (not live) — and the set is on the song's foundation
+    expect(fnBody('const enterPerform = useCallback')).toContain('setRef.current = freshPerformSet();');
+    expect(room).toContain('performFoundationFor(performLanesWithNotes(perfSongRows()))');
+  });
+
+  it('PERFORM disarms ARM REC, a phone pad is a lane tap only where taps are judged, and the phone\'s REC is refused in PERFORM', () => {
+    expect(fnBody('const enterPerform = useCallback')).toContain('setFlipRecArm(false);');
+    expect(room).toContain("const how = role === 'lane' ? 'lane' : trigger ? (trigger(cmd.pad, hit), 'flippad') : playPhonePad(cmd.pad, hit);");
+    expect(room).toContain("perform: modeRef.current === 'perform' });");
+    expect(room).toContain("else if (fx === 'rec-refused')");
+  });
+
+  it('a phone can pair from PERFORM and from the Arena panel (the badge shows where it was asked for)', () => {
+    expect(room).toContain('data-qa="arena-pair-phone"');
+    expect(room).toContain('data-qa="perform-pair-phone"');
+    expect(room).toContain("phoneBadgeShown(view, phones, phonePairAsked && mode === 'perform')");
+  });
+
+  it('START resumes the audio clock inside the press, BEFORE its first await (Safari / iOS)', () => {
+    const body = fnBody('const startArenaSet = async');
+    const resume = body.indexOf('eng.context.resume()');
+    const firstAwait = body.indexOf('await ');
+    expect(resume).toBeGreaterThan(-1);
+    expect(resume).toBeLessThan(firstAwait);
+    expect(room).toMatch(/onStart=\{\(\) => \{\s*const ctx = engineRef\.current\?\.context;\s*if \(ctx && ctx\.state === 'suspended'\) void ctx\.resume\(\);/);
+  });
+
+  it('START and FINISH go through arenaAttempt (attemptId, retries, used → submitted now, kept until sent)', () => {
+    const start = fnBody('const startArenaSet = async');
+    expect(start).toContain("postAttempt({ matchId: arenaMatchId, phase: 'start', attemptId: attemptIdRef.current })");
+    expect(start).toContain("if (v.kind === 'used') { await settleUsedAttemptRef.current(v); return; }");
+    expect(start).not.toContain('nothing was used');
+    const send = fnBody('sendArenaFinishRef.current = async');
+    expect(send.indexOf('saveArenaFinish(')).toBeLessThan(send.indexOf("phase: 'finish'"));
+    expect(send).toMatch(/if \(v\.kind === 'unsent'\) \{[\s\S]*?return;\s*\}/);
+    // the card (onEnd) only through endArena, which only runs once the Arena has the set or the attempt was already used
+    const finish = fnBody('finishArenaRef.current = () =>');
+    expect(finish.slice(0, finish.indexOf('// ── MUSIC-SUITE P6 phone-replay'))).not.toContain('onEnd?.(');
+    expect(fnBody('settleUsedAttemptRef.current = async')).toContain("endArenaRef.current(judgeHouseSet(house, []), 'Your one attempt was used and left after START: it scores 0, and that goes in now.'");
+    expect(room).toContain('data-qa="arena-send-again"');
+  });
+
+  it('the Arena records at most HOUSE_MAX_TAPS, and a pad\'s START / Space begins the attempt', () => {
+    expect(room).toContain("if (arenaTapsRef.current.length >= HOUSE_MAX_TAPS) { flashLaneRef.current(lane, 'FULL'); return; }");
+    expect(room).toContain("if (fx === 'arena-start') { void startArenaSetRef.current(); return; }");
+  });
+
+  it('the chart feed is houseStepLanes, and the lanes show the HEARD step\'s bar', () => {
+    expect(room).toContain('({ missed } = set.chartStep(s, t, now, houseStepLanes(house, i)));');
+    expect(room).toContain('perfBarQueueRef.current.push(set.bar);');
+    expect(room).toMatch(/const heardBar = perfBarQueueRef\.current\.shift\(\);\s*if \(heardBar !== undefined\) setPerfBar\(heardBar\);/);
   });
 });

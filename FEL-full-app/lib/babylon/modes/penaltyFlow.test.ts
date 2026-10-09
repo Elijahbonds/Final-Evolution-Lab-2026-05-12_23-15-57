@@ -19,6 +19,8 @@ import type { FelInput } from '../core/InputBus';
 
 /** Every clip a body was asked to play, by body. */
 const plays: Record<string, string[]> = {};
+/** IMPROVE (2026-10-06, Penalty #1): the weather's ticks (read lazily by the mocks below). */
+const weatherTicks = { kit: 0, fx: 0 };
 
 vi.mock('../visual/VenueKit', () => ({
   VenueKit: {
@@ -35,12 +37,12 @@ vi.mock('../nexus/placeLooks', () => ({ readPlaceLook: () => null }));
 vi.mock('../visual/EffectsKit', () => ({ EffectsKit: { ambient: () => undefined, burst: () => undefined } }));
 vi.mock('../visual/Onlookers', () => ({ Onlookers: class { update(): void {} cheer(): void {} dispose(): void {} } }));
 vi.mock('../visual/AimArrow', () => ({ mountAimArrow: () => ({ dispose: () => undefined }) }));
-vi.mock('../premium/WeatherFx', () => ({ mountWeatherFx: () => ({ dispose: () => undefined }) }));
+vi.mock('../premium/WeatherFx', () => ({ mountWeatherFx: () => ({ update: () => { weatherTicks.fx++; }, dispose: () => undefined }) }));
 vi.mock('../nexus/weather', () => ({ readWeather: () => null }));
 vi.mock('../core/WeatherKit', async (orig) => ({
   ...(await orig<typeof import('../core/WeatherKit')>()),
   // a still night: no wind to bend the kicks this test reads
-  WeatherKit: class { static fromPick() { return new this(); } flightWind() { return { x: 0, z: 0 }; } describe() { return 'CLEAR'; } },
+  WeatherKit: class { static fromPick() { return new this(); } flightWind() { return { x: 0, z: 0 }; } describe() { return 'CLEAR'; } update(): void { weatherTicks.kit++; } },
 }));
 vi.mock('../core/FrameGuard', () => ({ assertSpawned: () => undefined }));
 vi.mock('../anim/PostureLayer', () => ({ mountPostureLayer: () => ({ dispose: () => undefined }) }));
@@ -70,7 +72,7 @@ vi.mock('./aimSwingCore', async (orig) => {
 import { PenaltyMode } from './precisionModes';
 
 type Hud = Record<string, unknown>;
-const press = (btn: 'A'): FelInput => ({ t: 'button', btn, pressed: true });
+const press = (btn: 'A' | 'Y'): FelInput => ({ t: 'button', btn, pressed: true });
 const dpad = (dir: 'left' | 'right'): FelInput => ({ t: 'dpad', dir, pressed: true });
 
 let engine: NullEngine;
@@ -111,7 +113,7 @@ beforeEach(async () => {
   vi.spyOn(Math, 'random').mockReturnValue(0.99);   // he reads it wrong, and never parries
   engine = new NullEngine();
   scene = new Scene(engine);
-  hud.length = 0; callouts.length = 0; ended = null;
+  hud.length = 0; callouts.length = 0; ended = null; weatherTicks.kit = 0; weatherTicks.fx = 0;
   for (const k of Object.keys(plays)) delete plays[k];
 });
 afterEach(() => {
@@ -180,5 +182,122 @@ describe('penalty: the result beat after their kick', () => {
     expect((plays.me ?? []).slice(before).filter((c) => c.startsWith('keeperDive'))).toEqual([]);
     frames(ctx, 1.4);                                 // the beat ends and kick two begins
     expect(last('round')).toBe('KICK 2/5');
+  });
+});
+
+// ── IMPROVE (2026-10-06, docs/IMPROVEMENTS-2026-10-05.md § Penalty) ─────────────────────────────────────────────────────
+describe('penalty: the weather runs (#1)', () => {
+  it('ticks the weather and its effects every frame', async () => {
+    const ctx = fakeCtx();
+    await PenaltyMode.load(ctx);
+    frames(ctx, 0.5);
+    expect(weatherTicks.kit).toBe(30);
+    expect(weatherTicks.fx).toBe(30);
+  });
+});
+
+describe('penalty: dispose ends it (#10)', () => {
+  it('no beat scheduled before dispose runs after it', async () => {
+    const ctx = fakeCtx();
+    await scoreKickOne(ctx);                          // their kick is 1.2 s away
+    PenaltyMode.dispose?.();
+    const at = hud.length;
+    vi.advanceTimersByTime(5000);
+    expect(hud.slice(at).some((h) => String(h.dive ?? '').startsWith('THEIR KICK'))).toBe(false);
+  });
+});
+
+describe('penalty: A skips a result beat (#9)', () => {
+  it('after your kick, once it has been read; and after theirs', async () => {
+    const ctx = fakeCtx();
+    await scoreKickOne(ctx);
+    frames(ctx, 0.4);
+    expect(String(last('dive'))).not.toMatch(/^THEIR KICK/);
+    PenaltyMode.onInput!(ctx, press('A'));
+    expect(String(last('dive'))).toMatch(/^THEIR KICK/);   // 0.4 s, not 1.2
+    const kicksThem = String(last('kicksThem'));
+    for (let i = 0; i < 400 && String(last('kicksThem')) === kicksThem; i++) frames(ctx, 1 / 60);
+    frames(ctx, 0.4);
+    expect(last('round')).toBe('KICK 1/5');
+    PenaltyMode.onInput!(ctx, press('A'));
+    expect(last('round')).toBe('KICK 2/5');           // 0.4 s, not 1.3
+  });
+});
+
+describe('penalty: classic pens (#3)', () => {
+  it('Y at the top of the kick takes it from the spot — the ring, the power wave, a goal — and the pick holds', async () => {
+    const ctx = fakeCtx();
+    await PenaltyMode.load(ctx);
+    PenaltyMode.onInput!(ctx, press('Y'));
+    expect(String(last('hint'))).toMatch(/^CLASSIC PENS/);
+    frames(ctx, 1 / 60);
+    expect(ring().isEnabled(false)).toBe(true);       // the ring aims this kick
+    PenaltyMode.onInput!(ctx, press('A'));
+    expect(callouts).toContain('POWER — KICK AT THE TOP');
+    frames(ctx, 0.45);
+    PenaltyMode.onInput!(ctx, press('A'));            // the kick, off the wave
+    for (let i = 0; i < 300 && last('kicksYou') === '· · · · ·'; i++) frames(ctx, 1 / 60);
+    expect(last('goals')).toBe(1);
+    expect(last('kicksYou')).toBe('● · · · ·');
+    frames(ctx, 1.25);
+    const kicksThem = String(last('kicksThem'));
+    for (let i = 0; i < 400 && String(last('kicksThem')) === kicksThem; i++) frames(ctx, 1 / 60);
+    frames(ctx, 1.4);
+    expect(last('round')).toBe('KICK 2/5');
+    expect(String(last('hint'))).toMatch(/^CLASSIC PENS/);   // the pick holds
+    PenaltyMode.onInput!(ctx, press('Y'));
+    expect(String(last('hint'))).toMatch(/BREAKAWAY — 11 s/);   // and Y takes it back
+  });
+  it('Y late in a breakaway is refused, not a fresh clock', async () => {
+    const ctx = fakeCtx();
+    await PenaltyMode.load(ctx);
+    frames(ctx, 2.1);                                 // past the first 2 s of the clock
+    PenaltyMode.onInput!(ctx, press('Y'));
+    expect(callouts).toContain('Y SWITCHES AT THE START OF A KICK');
+    expect(String(last('hint'))).not.toMatch(/^CLASSIC PENS/);
+  });
+});
+
+describe('penalty: the result card gets the breakaway (#12)', () => {
+  it('a whole shootout driven on A ends with the breakaway stats', async () => {
+    const ctx = fakeCtx();
+    await PenaltyMode.load(ctx);
+    for (let i = 0; i < 600 && !ended; i++) { PenaltyMode.onInput!(ctx, press('A')); frames(ctx, 0.4); }
+    expect(ended).not.toBeNull();
+    const stats = (ended as unknown[])[2] as Record<string, number>;
+    for (const k of ['shots', 'wallRuns', 'banks', 'rainbows', 'curlers', 'overdrives', 'parries']) expect(typeof stats[k], k).toBe('number');
+    expect(stats.shots).toBeGreaterThanOrEqual(5);
+    expect(stats.goals).toBe(stats.shots);           // Math.random 0.99: every kick reads wrong and goes in
+  });
+});
+
+// ── owner decision 2026-10-06, "Stick aims" ──────────────────────────────────────────────────────────────────────────
+describe('penalty: the stick held at the strike aims the breakaway shot', () => {
+  /** Strike on the first frame (the ball on the dribble's 0.9 m) with the stick held, and read where it was judged. */
+  async function strikeWithStick(x: number, y: number): Promise<{ aimX: number; ballX: number }> {
+    const info = vi.spyOn(console, 'info');
+    const ctx = fakeCtx();
+    await PenaltyMode.load(ctx);
+    PenaltyMode.onInput!(ctx, { t: 'stick', side: 'L', x, y });
+    PenaltyMode.onInput!(ctx, press('A'));
+    for (let i = 0; i < 300 && last('clock') !== 0; i++) frames(ctx, 1 / 60);
+    const lines = info.mock.calls.map((c) => String(c[0]));
+    const read = lines.find((l) => l.startsWith('[BREAK] keeper read'))!;
+    const judged = lines.find((l) => l.startsWith('[BREAK] judge'))!;
+    return { aimX: Number(/aim (-?[\d.]+)/.exec(read)![1]), ballX: Number(/ball x (-?[\d.]+)/.exec(judged)![1]) };
+  }
+  it('◀ the left corner, ▶ the right, neither the middle — off the same 0.9 m dribble', async () => {
+    const left = await strikeWithStick(-0.9, 0);
+    PenaltyMode.dispose?.();
+    const mid = await strikeWithStick(0, 0);
+    PenaltyMode.dispose?.();
+    const right = await strikeWithStick(0.9, 0);
+    expect(left.aimX).toBe(-3);
+    expect(mid.aimX).toBe(0);
+    expect(right.aimX).toBe(3);
+    expect(left.ballX).toBeLessThan(-2);               // it went there, not to x ≈ −0.1 every time
+    expect(Math.abs(mid.ballX)).toBeLessThan(0.5);
+    expect(right.ballX).toBeGreaterThan(2);
+    expect(last('goals')).toBe(1);                     // Math.random 0.99: he misread it
   });
 });

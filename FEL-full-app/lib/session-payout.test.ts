@@ -34,8 +34,13 @@ function musicSet(o: Record<string, unknown> = {}) {
 }
 
 describe('the endless ceiling is derived, not guessed', () => {
-  it('equals what the best-paying finite rules game pays for a flawless win (the music rooms left out)', () => {
-    const finite = Object.entries(SCORE_CEILINGS).filter(([mode, c]) => c.kind === 'rules' && mode !== 'music' && mode !== 'dance');
+  // IMPROVE (2026-10-06) test changed: Big Air is left out with the music rooms. Its row now counts the banked line bonus
+  // (owner-approved: 8,000 → 33,260), which bounds every snow air trick named in every air — a bound of the trick table,
+  // like the music rows' longest chart, not a game's own clock or target. Counted, it would move this ceiling from 14,150 XP
+  // / 473 shards to 49,940 / 1,666 for EVERY endless mode (and 3.5× the per-second proration), an economy change nobody
+  // asked for. OWNER CALL if that is wanted instead.
+  it('equals what the best-paying finite rules game pays for a flawless win (the music rooms and big air left out)', () => {
+    const finite = Object.entries(SCORE_CEILINGS).filter(([mode, c]) => c.kind === 'rules' && mode !== 'music' && mode !== 'dance' && mode !== 'bigAir');
     expect(finite.length).toBeGreaterThan(10);
     const xp = Math.max(...finite.map(([, c]) => sessionXp(c.max, true)));
     const shards = Math.max(...finite.map(([, c]) => sessionShards(c.max, true)));
@@ -47,7 +52,9 @@ describe('the endless ceiling is derived, not guessed', () => {
 
   it('counting the music rooms would have been no ceiling at all', () => {
     expect(sessionXp(SCORE_CEILINGS.dance.max, true)).toBeGreaterThan(8 * ENDLESS_SESSION_CEILING.xp);
-    expect(sessionXp(SCORE_CEILINGS.music.max, true)).toBeGreaterThan(250 * ENDLESS_SESSION_CEILING.xp);
+    // MUSIC-SUITE P6 (2026-09-26): the Arena music ceiling is the house beat's 378,300 now (was performSetMax() =
+    // 2,647,100, over 250×) — a perfect house set still pays 40× the endless ceiling
+    expect(sessionXp(SCORE_CEILINGS.music.max, true)).toBeGreaterThan(40 * ENDLESS_SESSION_CEILING.xp);
   });
 
   it('the payout formula is the route\'s old one, unchanged below the ceiling', () => {
@@ -337,7 +344,8 @@ describe('the server mirrors the room (lib/babylon/music/performSet.ts)', () => 
 describe('the shell sends `stats` (2026-09-26), and the rules say so', () => {
   it('ROOM_STATS_FORWARDED matches what components/games/game-shell.tsx actually posts — flip the two together', () => {
     const shell = readFileSync(join(process.cwd(), 'components/games/game-shell.tsx'), 'utf8');
-    const body = shell.slice(shell.indexOf("fetch('/api/sessions'"), shell.indexOf("fetch('/api/sessions'") + 900);
+    const at = shell.indexOf("fetch('/api/sessions'");
+    const body = shell.slice(at, shell.indexOf('.then((r) =>', at));   // the session POST, up to its answer
     expect(body).toContain('maxCombo: res?.maxCombo');                                     // found the session POST
     expect(/\bstats\s*:/.test(body)).toBe(ROOM_STATS_FORWARDED);
   });
@@ -380,6 +388,9 @@ describe('P2 fix pass: a score is never paid above what the run could score', ()
     expect(sessionScoreCap('training', null, 60, { killSwitch: false })).toBe(SCORE_CEILINGS.training.max);   // 9,400
     expect(sessionScoreCap('dance', null, 60, { killSwitch: false })).toBe(SCORE_CEILINGS.dance.max);
     expect(sessionScoreCap('dunkContest', null, 60, { killSwitch: false })).toBe(SCORE_CEILINGS.dunkContest.max);
+    // owner 2026-10-06: the 1v1's win-by-2 option (never on a staked run) posts up to 17; the stake row stays 13
+    expect(sessionScoreCap('hoops1v1', null, 60, { killSwitch: false })).toBe(17);
+    expect(SCORE_CEILINGS.hoops1v1.max).toBe(13);
     expect(sessionScoreCap('dunkContest', null, 60, { killSwitch: true })).toBeNull();     // the 2D game is on another scale
     expect(sessionScoreCap('skateboarding', null, 60, { killSwitch: false })).toBeNull();  // a 'bound', not a rules maximum
     expect(sessionScoreCap('karateEndless', null, 60, { killSwitch: false })).toBeNull();
@@ -560,5 +571,53 @@ describe('MUSIC-SUITE P3 FIX PASS: when a creation that did not count may count'
     const at = creationNextDueAt(p, now, { counted: false, due: false })!;
     expect(streakStep(p, at - 1, 'creation').due).toBe(false);
     expect(streakStep(p, at, 'creation').due).toBe(true);
+  });
+});
+
+// ── ECONOMY-SESSIONS-HARDEN follow-up (2026-09-29): the finite pay cap ─────────────────────────────────────────────────
+describe('skateboarding and surfing are paid at most what 4 × their best run seen would pay', async () => {
+  const sp = await import('./session-payout');
+  const { finitePayCapScore, FINITE_PAY_BASIS, FINITE_PAY_HEADROOM, sessionPayout: pay, sessionXp: xpOf, sessionShards: shardsOf } = sp;
+  const { MODE_SCORE_RULES } = await import('./sessions/modeScoreRules');
+
+  it('the caps: 4 × 80,832 and 4 × 14,213; no other mode has one', () => {
+    expect(FINITE_PAY_HEADROOM).toBe(4);
+    expect(finitePayCapScore('skateboarding')).toBe(323_328);
+    expect(finitePayCapScore('surfing')).toBe(56_852);
+    for (const m of ['snowboarding', 'dunkContest', 'music', 'karateEndless', 'freerun', 'notAMode']) expect(finitePayCapScore(m), m).toBeNull();
+    expect(Object.keys(FINITE_PAY_BASIS).sort()).toEqual(['skateboarding', 'surfing']);
+  });
+
+  it('a forged run inside the score-rule bound pays the cap, not 1.5 × the bound (~653M XP)', () => {
+    const payCap = finitePayCapScore('skateboarding')!;
+    const forged = pay({ score: payCap + 1_000_000, won: true, endless: false, durationSec: 90, payCapScore: payCap });
+    expect(forged).toMatchObject({ xp: xpOf(323_328, true), shards: shardsOf(323_328, true), capped: true });
+    expect(forged.xp).toBe(485_042);
+    expect(xpOf(payCap + 1_000_000, true)).toBeGreaterThan(xpOf(323_328, true));
+    expect(MODE_SCORE_RULES.skateboarding.maxScore).toBeLessThan(payCap);
+    const surfCap = finitePayCapScore('surfing')!;
+    const surf = pay({ score: surfCap + 1_000_000, won: false, endless: false, durationSec: 90, payCapScore: surfCap });
+    expect(surf).toMatchObject({ xp: xpOf(56_852, false), capped: true });
+    expect(MODE_SCORE_RULES.surfing.maxScore).toBeLessThan(surfCap);
+  });
+
+  it('the honest runs are paid in full (the endless ceiling would have cut 80,832 to ~14K XP)', () => {
+    const honest = pay({ score: 80_832, won: true, endless: false, durationSec: 90, payCapScore: finitePayCapScore('skateboarding') });
+    expect(honest).toMatchObject({ xp: xpOf(80_832, true), capped: false });
+    expect(honest.xp).toBe(121_298);
+    expect(pay({ score: 1_530, won: false, endless: false, durationSec: 90, payCapScore: finitePayCapScore('surfing') })).toMatchObject({ capped: false });
+    // and no cap means exactly the old formula
+    expect(pay({ score: 80_832, won: true, endless: false, durationSec: 90 })).toEqual(pay({ score: 80_832, won: true, endless: false, durationSec: 90, payCapScore: null }));
+  });
+
+  it('where the captures are on this machine, both cited files hold the cited score', () => {
+    const outbox = join(process.env.HOME ?? '', 'Claude', 'outbox');
+    let present = false;
+    try { present = statSync(outbox).isDirectory(); } catch { /* CI: the captures live on the owner's machine */ }
+    if (!present) return;
+    for (const b of Object.values(FINITE_PAY_BASIS)) {
+      const file = b.source.split(' ')[0].replace('~/Claude/outbox/', '').replace(/:\d+$/, '');
+      expect(readFileSync(join(outbox, file), 'utf8'), b.source).toContain(String(b.bestScore));
+    }
   });
 });

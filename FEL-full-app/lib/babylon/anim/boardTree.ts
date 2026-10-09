@@ -121,7 +121,9 @@ export class BoardAnimTree {
   /** A one-shot that ran out while its trigger still held; re-armed when the trigger drops. */
   private spent: BoardAnimState | null = null;
   private token = 0;
-  constructor(private animator: CharacterAnimator) {}
+  /** `clips`: a discipline's own clip for a state (GATE-CRASHER-POLISH-2: the snowboard's `snow_bail` — a wipeout down in the
+   *  snow — in place of the skateboard's bail). Every other state, and every other board, plays CLIP_FOR. */
+  constructor(private animator: CharacterAnimator, private clips: Partial<Record<BoardAnimState, string>> = {}) {}
   update(input: BoardAnimInput): BoardAnimState {
     let c = chooseBoardClip(input, this.current);
     if (this.spent && c.state !== this.spent) this.spent = null;
@@ -140,7 +142,8 @@ export class BoardAnimTree {
       const after = AFTER_ONESHOT[st] ?? 'idle';
       this.enter({ state: after, ...CLIP_FOR[after] });
     };
-    this.animator.play(c.clip, onEnd ? { loop: c.loop, fadeSec: c.fadeSec, onEnd } : { loop: c.loop, fadeSec: c.fadeSec });
+    const clip = this.clips[st] ?? c.clip;
+    this.animator.play(clip, onEnd ? { loop: c.loop, fadeSec: c.fadeSec, onEnd } : { loop: c.loop, fadeSec: c.fadeSec });
     this.current = st;
   }
   /** The mode's beat window closed: forget the beat state so the next update re-chooses (a no-op if already moved on). */

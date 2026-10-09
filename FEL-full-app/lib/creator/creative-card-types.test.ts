@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DISCIPLINES, DISCIPLINE_META, NEEDS_REVIEW, isDiscipline, validateArtPayload } from './creative-card-types';
+import { DISCIPLINES, DISCIPLINE_META, NEEDS_REVIEW, isDiscipline, rightsRecordFor, validateArtPayload } from './creative-card-types';
 
 describe('disciplines', () => {
   it('nine disciplines, every one with hub metadata, the guard rejects strangers', () => {
@@ -35,7 +35,9 @@ describe('payload validation', () => {
     expect(validateArtPayload({ kind: 'writing', text: 'x'.repeat(4001) }).ok).toBe(false);
   });
   it('the existing five still validate, unknown kinds fail', () => {
-    expect(validateArtPayload({ kind: 'music', stemUrls: ['https://cdn/x.wav'], bpm: 92 }).ok).toBe(true);
+    // test changed (CREATE HUB phase 1, owner 2026-10-06): a card with media now needs its rights record, so the v1 music
+    // fixture carries one; without it the same payload is refused (creative-card-types.v2.test.ts).
+    expect(validateArtPayload({ kind: 'music', stemUrls: ['https://cdn/x.wav'], bpm: 92, rights: rightsRecordFor('music') }).ok).toBe(true);
     expect(validateArtPayload({ kind: 'music', stemUrls: [], bpm: 10 }).ok).toBe(false);
     expect(validateArtPayload({ kind: 'acting', sceneId: 's', performanceUrl: 'ftp://x' }).ok).toBe(false);
     expect(validateArtPayload({ kind: 'nope' }).ok).toBe(false); expect(validateArtPayload(null).ok).toBe(false);

@@ -3,9 +3,11 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { Gem, Shirt, Store, CalendarDays, PersonStanding } from 'lucide-react';
 import { authOptions } from '@/lib/auth';
+import { loginPath } from '@/lib/auth/safeNext';
 import { prisma } from '@/lib/db';
 import { readWallet } from '@/lib/wallet/wallet-service';
 import { prqScore, prqGrade } from '@/lib/prq';
+import { recoveryAsOf } from '@/lib/prq-recovery';
 import { gameVitals, ownedFromEntitlements } from '@/lib/cards/boosts';
 import { TabPage } from '@/components/shell/tab-page';
 import { DoorsRow } from '@/components/shell/doors-row';
@@ -26,7 +28,7 @@ export const dynamic = 'force-dynamic';
 export default async function ProfilePage() {
   const session = await getServerSession(authOptions);
   const me = (session?.user as { id?: string } | undefined)?.id;
-  if (!session) redirect('/login?next=%2Fprofile');
+  if (!session) redirect(loginPath('/profile'));
 
   const [profile, entitlements, wallet] = await Promise.all([
     me ? prisma.playerProfile.findUnique({ where: { userId: me } }).catch(() => null) : null,
@@ -36,7 +38,9 @@ export default async function ProfilePage() {
     me ? readWallet(prisma, me).catch(() => null) : null,
   ]);
 
-  const base = prqScore(profile as unknown as Record<string, number> | null);
+  // MIRROR-COACH P9 fix (2026-09-30): recovery as of now (its half-life runs only inside a settle; this page reads the
+  // row directly, so an idle player saw last month's recovery here — lib/prq-recovery.ts recoveryAsOf, pure, no write)
+  const base = prqScore((profile ? recoveryAsOf(profile) : null) as unknown as Record<string, number> | null);
   const owned = ownedFromEntitlements(entitlements.map((e) => e.skuId));
   const vitals = gameVitals(base, owned);
   // The grade an athlete IS graded at is the measured one. The lift is shown beside it, labelled, never folded in.

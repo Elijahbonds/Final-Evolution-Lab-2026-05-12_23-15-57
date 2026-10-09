@@ -30,6 +30,9 @@ import { FreeRunMode } from './FreeRunMode';    // A+ mission #10: free-running 
 import { SprintMode } from './SprintMode';
 import { WhoSceneItMode } from './WhoSceneItMode';   // lane 3 W1 — the live venue quiz
 import { BrainBrawlMode } from './BrainBrawlMode';   // A+ mission #11 — the trivia deck as a party mode
+import { TiebreakMode } from './TiebreakMode';
+import { AdventureMode } from './AdventureMode';   // ADVENTURE A4 (2026-10-06): the dev test yard — registered, NOT enabled
+import { AdventureBRMode } from './AdventureBRMode';   // ADVENTURE C (2026-10-07): the bot BR — registered, NOT enabled (/play/adventure-br, unlisted)
 
 export const MODES: Record<string, ModeDefinition> = {
   // P3–P4 proof mode — shipped and playtested FIRST
@@ -87,6 +90,13 @@ export const MODES: Record<string, ModeDefinition> = {
   // enabled set now (see the note beside it there), and the comment outlived the decision by long enough to say
   // the opposite of the code. Every registered mode is enabled today.
   brainbrawl: BrainBrawlMode,
+  // Tiebreak's live route builds a grade-specific definition, but the mode still
+  // belongs in the central roster so /dev/mode and drift checks can exercise it.
+  tiebreak: TiebreakMode,
+  // ADVENTURE A4 (2026-10-06, docs/ADVENTURE-PLAN.md): the Adventure's integration sandbox, mounted by /dev/adventure and
+  // /dev/mode/adventure. Deliberately NOT in ENABLED_BABYLON_MODES: no public route or picker serves it until Phase B.
+  adventure: AdventureMode,
+  adventure_br: AdventureBRMode,   // ADVENTURE C (2026-10-07): the bot Battle Royale; NOT enabled (unlisted route)
 };
 
 /** Modes proven safe to serve on Babylon right now (dunk = the gate; karate +
@@ -130,4 +140,5 @@ export const ENABLED_BABYLON_MODES = new Set<string>([
   // Brain Brawl was registered in MODES but never in ENABLED, so its Babylon mode was unreachable while the
   // route quietly rendered the 2D version instead.
   'brainbrawl',
+  'tiebreak',
 ]);

@@ -16,6 +16,9 @@ import { Animation, AnimationGroup, Quaternion, Vector3 } from '@babylonjs/core'
 import type { Scene, Skeleton, TransformNode } from '@babylonjs/core';
 import { boneNode } from '../boneLookup';
 import { bindFrame } from '../bindFrame';
+import { smoothByDefault, smoothQuatKeys, hoopsMotionModeOf, type Q4 } from '../smoothKeys';
+import { SMOOTH_FPS } from '../poseClip';
+import { gaitKnees } from '../gait';
 
 const FPS = 30, D2R = Math.PI / 180;
 type Pose = Record<string, Quaternion>;
@@ -42,7 +45,8 @@ function locomotion(duration: number, thighDeg: number, kneeBase: number, kneeAm
   const keys: ClipKey[] = []; const N = 8;
   for (let k = 0; k <= N; k++) {
     const t = (duration * k) / N, phi = (2 * Math.PI * k) / N, s = Math.sin(phi);
-    const kneeL = kneeBase + kneeAmp * (1 - Math.cos(phi)), kneeR = kneeBase + kneeAmp * (1 - Math.cos(phi + Math.PI));
+    // MOVEMENT POLISH (2026-10-06): the knee folds on the FORWARD swing — it folded on the back sweep, and the gait moonwalked (gait.ts)
+    const { L: kneeL, R: kneeR } = gaitKnees(phi, kneeBase, kneeAmp);
     keys.push({ t, pose: {
       ...armsDown,
       Spine: qAxis('x', 5), Spine2: qAxis('z', sway * s), Hips: qAxis('y', sway * 1.4 * s), Head: qAxis('x', -4),
@@ -129,7 +133,14 @@ function buildDeltaClip(scene: Scene, sk: Skeleton, name: string, duration: numb
   for (const bone of bones) {
     const node: TransformNode | null = boneNode(sk, bone); if (!node) continue;
     const anim = new Animation(`${name}.${bone}.rotq`, 'rotationQuaternion', FPS, Animation.ANIMATIONTYPE_QUATERNION, Animation.ANIMATIONLOOPMODE_CYCLE);
-    anim.setKeys(keys.map((k) => ({ frame: k.t * FPS, value: bf.keyedQ(node, k.pose[bone] ?? Quaternion.Identity()) })));
+    const vals = keys.map((k) => ({ t: k.t, q: bf.keyedQ(node, k.pose[bone] ?? Quaternion.Identity()) }));
+    // HOOPS MOTION phase 3c (plan §3 "Smoothing"): the walk is a joint-space cubic between its keys (smoothKeys), periodic across the
+    // loop's seam — Babylon's constant-speed slerp from key to key broke every joint's velocity eight times a cycle
+    const pre = smoothByDefault(name, hoopsMotionModeOf(scene.metadata as { felModeId?: string; felCarnivalEvent?: string } | null | undefined));   // (a hoops mode's bodies; the carnival's Slam Rush only)
+    if (pre != null) {
+      const dense = smoothQuatKeys(vals.map((v) => ({ t: v.t, q: [v.q.x, v.q.y, v.q.z, v.q.w] as Q4 })), { fps: SMOOTH_FPS, duration, prefilter: pre, periodic: true });
+      anim.setKeys(dense.map((k) => ({ frame: k.t * FPS, value: new Quaternion(k.q[0], k.q[1], k.q[2], k.q[3]) })));
+    } else anim.setKeys(vals.map((v) => ({ frame: v.t * FPS, value: v.q })));
     group.addTargetedAnimation(anim, node); added++;
   }
   group.normalize(0, duration * FPS);

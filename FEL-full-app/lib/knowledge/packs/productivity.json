@@ -1,0 +1,179 @@
+{
+  "topic": "productivity",
+  "version": 1,
+  "cards": [
+    {
+      "id": "productivity.pomodoro",
+      "topic": "productivity",
+      "type": "lesson",
+      "headline": "The Pomodoro Technique",
+      "lines": [
+        "A popular method suggests 25 focused minutes of work, then a 5-minute break.",
+        "After four rounds, take a longer break.",
+        "Francesco Cirillo devised it in the late 1980s, named after a tomato-shaped kitchen timer."
+      ],
+      "visual": { "kind": "cycle", "steps": ["25 min focus", "5 min break", "Repeat ×4", "Long break"] },
+      "source": "Cirillo, 'The Pomodoro Technique' (2018 edition)."
+    },
+    {
+      "id": "productivity.urgent-important",
+      "topic": "productivity",
+      "type": "lesson",
+      "headline": "Urgent isn't the same as important",
+      "lines": [
+        "Sort tasks with two questions: is it urgent? Is it important?",
+        "Important-but-not-urgent work — planning, learning, health — is the easiest to neglect.",
+        "A popular method suggests it's often the work that matters most, so it deserves a slot in the day."
+      ],
+      "visual": { "kind": "compare", "left": { "label": "Urgent", "text": "Demands attention now" }, "right": { "label": "Important", "text": "Moves your goals forward" } },
+      "source": "Covey, 'The 7 Habits of Highly Effective People' (1989), the Time Management Matrix."
+    },
+    {
+      "id": "productivity.if-then",
+      "topic": "productivity",
+      "type": "lesson",
+      "headline": "If–then plans",
+      "lines": [
+        "'When it's 6 pm, I'll practise for 10 minutes' beats 'I'll practise more.'",
+        "Psychologist Peter Gollwitzer called these implementation intentions.",
+        "A review of 94 studies found they reliably improve follow-through."
+      ],
+      "visual": { "kind": "compare", "left": { "label": "Vague goal", "text": "I want to practise" }, "right": { "label": "If–then plan", "text": "At 6 pm, I practise" } },
+      "source": "Gollwitzer & Sheeran (2006), Advances in Experimental Social Psychology."
+    },
+    {
+      "id": "productivity.task-switching",
+      "topic": "productivity",
+      "type": "lesson",
+      "headline": "Multitasking is really task-switching",
+      "lines": [
+        "For demanding tasks, the brain mostly switches between them rather than doing both at once.",
+        "Every switch costs time and raises errors.",
+        "Batch similar tasks, and silence notifications while you focus."
+      ],
+      "visual": { "kind": "compare", "left": { "label": "Switching", "text": "Time lost at every change" }, "right": { "label": "Batching", "text": "One thing at a time" } },
+      "source": "Rubinstein, Meyer & Evans (2001), J Exp Psychol: Human Perception and Performance; Monsell (2003), Trends Cogn Sci."
+    },
+    {
+      "id": "productivity.two-minute",
+      "topic": "productivity",
+      "type": "lesson",
+      "headline": "The two-minute rule",
+      "lines": [
+        "A popular method suggests: if a task takes less than two minutes, do it now.",
+        "Its author, David Allen, argues that noting it down to come back to later costs more than just doing it."
+      ],
+      "visual": { "kind": "stat", "value": "< 2 min", "caption": "do it now" },
+      "source": "Allen, 'Getting Things Done' (2001)."
+    },
+    {
+      "id": "productivity.q-pomodoro",
+      "topic": "productivity",
+      "type": "quiz",
+      "question": "A standard Pomodoro is…",
+      "options": ["5 minutes of work", "25 minutes of focused work", "2 hours of deep work", "As long as you like"],
+      "answer": 1,
+      "why": "25 minutes of focus, then a short break. The method's author says the timer makes starting easier.",
+      "source": "Cirillo, 'The Pomodoro Technique'."
+    },
+    {
+      "id": "productivity.q-switch-cost",
+      "topic": "productivity",
+      "type": "quiz",
+      "question": "Why does switching between demanding tasks slow you down?",
+      "options": ["The mind reloads each task's rules at every switch", "The brain tires instantly", "It doesn't — switching is faster"],
+      "answer": 0,
+      "why": "Experiments measure a 'switch cost' in time and errors as the mind reconfigures for each task.",
+      "source": "Monsell (2003), 'Task Switching', Trends in Cognitive Sciences."
+    },
+    {
+      "id": "productivity.q-parkinson",
+      "topic": "productivity",
+      "type": "quiz",
+      "question": "'Work expands to fill the time available for its completion' is known as…",
+      "options": ["Murphy's law", "Parkinson's law", "Moore's law", "The Pareto principle"],
+      "answer": 1,
+      "why": "C. Northcote Parkinson wrote it in The Economist in 1955. Shorter, set deadlines can counter it.",
+      "source": "Parkinson, 'Parkinson's Law', The Economist (19 November 1955)."
+    },
+    {
+      "id": "productivity.q-if-then",
+      "topic": "productivity",
+      "type": "quiz",
+      "question": "Which of these is an implementation intention?",
+      "options": ["I'll get fitter this year", "After dinner, I'll walk for 15 minutes", "Exercise is important to me"],
+      "answer": 1,
+      "why": "It names a specific cue (after dinner) and a specific action, which makes follow-through more automatic.",
+      "source": "Gollwitzer (1999), 'Implementation Intentions', American Psychologist."
+    },
+    {
+      "id": "productivity.q-matrix",
+      "topic": "productivity",
+      "type": "quiz",
+      "question": "In Covey's urgent/important matrix, which kind of task does he say is easiest to neglect but often most valuable?",
+      "options": ["Urgent and important", "Important but not urgent", "Urgent but not important", "Neither"],
+      "answer": 1,
+      "why": "A popular method suggests that planning, learning and health rarely shout for attention, so they get crowded out unless scheduled.",
+      "source": "Covey, 'The 7 Habits of Highly Effective People' (1989)."
+    },
+    {
+      "id": "productivity.f-pareto",
+      "topic": "productivity",
+      "type": "fact",
+      "headline": "The 80/20 rule is named after an economist",
+      "text": "Vilfredo Pareto showed in the 1890s that income and wealth were very unevenly spread; Joseph Juran later named the '80/20' principle after him. Real splits are rarely exactly 80/20.",
+      "source": "Pareto, 'Cours d'économie politique' (1896–97), on the distribution of income; Juran, 'Quality Control Handbook' (1951), who named the principle."
+    },
+    {
+      "id": "productivity.f-plan-it",
+      "topic": "productivity",
+      "type": "fact",
+      "headline": "A plan quiets an unfinished task",
+      "text": "In experiments, making a specific plan for an unfinished goal reduced intrusive thoughts about it — even before the goal was done.",
+      "source": "Masicampo & Baumeister (2011), Journal of Personality and Social Psychology."
+    },
+    {
+      "id": "productivity.f-interruptions",
+      "topic": "productivity",
+      "type": "fact",
+      "headline": "Tiny interruptions cost more than they take",
+      "text": "In one study, interruptions of about three seconds were enough to roughly double error rates on a step-by-step task.",
+      "source": "Altmann, Trafton & Hambrick (2014), Journal of Experimental Psychology: General."
+    },
+    {
+      "id": "productivity.f-breaks",
+      "topic": "productivity",
+      "type": "fact",
+      "headline": "Brief breaks can protect focus",
+      "text": "In a vigilance experiment, people given two brief diversions kept their performance up, while those who worked straight through declined.",
+      "source": "Ariga & Lleras (2011), 'Brief and Rare Mental Breaks Keep You Focused', Cognition."
+    },
+    {
+      "id": "productivity.d-habit",
+      "topic": "productivity",
+      "type": "deeper",
+      "headline": "Building a habit that sticks",
+      "steps": [
+        { "headline": "1 · Make it obvious", "lines": ["A popular method, James Clear's 'Atomic Habits', suggests putting the cue in sight: shoes by the door, a book on the pillow.", "Habits start with a reliable trigger."], "visual": { "kind": "motif", "motif": "clock" } },
+        { "headline": "2 · Make it small", "lines": ["Start so small you can't say no: one push-up, one page.", "Showing up matters more than size at first."] },
+        { "headline": "3 · Stack it", "lines": ["Attach the new habit to an old one: 'After I brush my teeth, I'll stretch.'", "The old habit becomes the cue."] },
+        { "headline": "4 · Give it time", "lines": ["In one study, a new habit took a median of 66 days to become automatic, with wide variation.", "Missing a single day didn't derail it."], "visual": { "kind": "stat", "value": "66 days", "caption": "median time to automatic (Lally, 2010)" } }
+      ],
+      "source": "Step names after Clear, 'Atomic Habits' (2018); Lally et al. (2010), European Journal of Social Psychology; Fogg, 'Tiny Habits' (2019)."
+    },
+    {
+      "id": "productivity.recap",
+      "topic": "productivity",
+      "type": "recap",
+      "headline": "Productivity: the takeaways",
+      "points": [
+        "25 minutes on, 5 off: the Pomodoro.",
+        "Covey's matrix: schedule the important-but-not-urgent.",
+        "If–then plans boost follow-through.",
+        "Switching tasks has a cost.",
+        "Under two minutes? A popular rule says do it now."
+      ],
+      "source": "Summary of this topic's cards."
+    }
+  ]
+}

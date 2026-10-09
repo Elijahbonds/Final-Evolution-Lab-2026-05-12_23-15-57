@@ -1,9 +1,19 @@
 /**
  * Turn a paid Stripe Checkout into one entitlement row, and a refund into a revocation.
  *
- * Idempotent on the Stripe event id. A second delivery of the same event does
+ * Idempotent on the key it is given. A second delivery of the same key does
  * not write a second row. A refund remembered before the purchase arrives is
  * applied when the purchase is written, so the grant cannot land ACTIVE.
+ *
+ * MERGE (2026-10-09), ported to the release's SEC-F4 rules (#200):
+ * - ONE PAYMENT, ONE GRANT: a purchase is keyed on the Checkout Session
+ *   (`stripe-session:<cs_id>`, bookSessionKey), the same key the release's
+ *   verifyIdempotencyKey uses, not on the Stripe event id. A redelivered
+ *   webhook is a NEW event id for the SAME session; the receipt page (no
+ *   webhook needed) and both webhooks all fulfil through recordPaidBookSession.
+ * - PAID MEANS PAID: only `payment_status: 'paid'` grants, as the release's
+ *   isPaidSession. `no_payment_required` and a missing status no longer do
+ *   (nothing in the catalog is free, so a $0 session is a misconfiguration).
  */
 
 import { getOffer } from './bookCatalog';
@@ -12,6 +22,7 @@ import { isValidEmail, normalizeEmail } from '@/lib/marketing/funnel';
 export interface PaidBookSession {
   id: string;
   payment_status?: string | null;
+  status?: string | null;
   amount_total?: number | null;
   currency?: string | null;
   customer_email?: string | null;
@@ -65,6 +76,16 @@ export function paymentIntentId(value: unknown): string | null {
   return null;
 }
 
+/** The fulfilment key for one Checkout Session. Equal to lib/stripe/verify-checkout's verifyIdempotencyKey (pinned by test). */
+export function bookSessionKey(sessionId: string): string {
+  return `stripe-session:${sessionId}`;
+}
+
+/** Fulfil one paid book session under its session key: the receipt page and both webhooks call this. */
+export function recordPaidBookSession(session: PaidBookSession, store: BookFulfillStore): Promise<FulfillResult> {
+  return recordBookCheckout(bookSessionKey(session.id), session, store);
+}
+
 export async function recordBookCheckout(
   eventId: string,
   session: PaidBookSession,
@@ -76,9 +97,9 @@ export async function recordBookCheckout(
   const offer = getOffer(session.metadata.offerId ?? '');
   if (!offer) throw new Error(`unknown book offer ${session.metadata.offerId ?? ''}`);
 
-  const paid = session.payment_status ?? 'paid';
-  if (paid !== 'paid' && paid !== 'no_payment_required') {
-    await store.rememberEvent(eventId, 'checkout.session.completed', paymentIntentId(session.payment_intent));
+  if (session.payment_status !== 'paid' || session.status === 'expired') {
+    // Not remembered: the key is the SESSION now, and a delayed method (Klarna, Cash App, … under the release's
+    // automatic payment methods) pays the same session later. Remembering it here would dedupe that grant away.
     return { ok: true, ignored: true, reason: 'unpaid' };
   }
 

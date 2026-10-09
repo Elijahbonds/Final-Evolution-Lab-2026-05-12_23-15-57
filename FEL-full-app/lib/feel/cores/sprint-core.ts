@@ -19,7 +19,15 @@
  */
 
 import { RhythmCadence, SensoryBus } from '../index';
-import type { SensoryEvent } from '../index';
+import type { SensoryEvent, CadenceQuality } from '../index';
+
+/**
+ * MOVEMENT PLAY P8 (2026-09-26): a stride graded somewhere else. A body running in place is graded on the camera's capture
+ * clock against a body's cadence (lib/babylon/core/rideBody BodyStride) — a thumb's 5 taps a second is not a jog's 3 —
+ * and a step CAPTURED before the gun is a false start even when it arrives after it (`early`). Omitted, the core grades
+ * the tap itself on its own clock, exactly as before (the pad path is unchanged).
+ */
+export interface SprintStepOpts { quality?: CadenceQuality; early?: boolean }
 
 export type SprintPhase = 'Ready' | 'Set' | 'Go' | 'Run' | 'Finish';
 
@@ -52,6 +60,12 @@ export interface SprintSkin {
   onSensory?: (e: SensoryEvent) => void;
   onPhase?: (phase: SprintPhase, prev: SprintPhase) => void;
   onFinish?: (timeS: number, topSpeed: number) => void;
+  /**
+   * IMPROVE (2026-10-06): the SET hold, drawn each time the gate enters SET. Omitted, it is `tuning.setMs` every time,
+   * exactly as before (the 2D surface, the tests and the pad-equivalence fixture never pass it); the Babylon sprint
+   * passes a random hold so the gun cannot be timed from memory. A non-finite or negative answer falls back to setMs.
+   */
+  setHoldMs?: () => number;
 }
 
 function clamp(v: number, min: number, max: number): number {
@@ -85,11 +99,22 @@ export class SprintCore {
   private _falseStarts = 0;
   private _lastStep = '';
   private _finishTimeS: number | null = null;
+  /** IMPROVE (2026-10-06): this SET's hold (ms), drawn on entering SET. */
+  private _setHoldMs: number;
+  /** IMPROVE (2026-10-06): the last pad stride's signed timing error (ms, + = late / too slow); null when ungraded. */
+  private _lastErrMs: number | null = null;
+  /**
+   * IMPROVE (2026-10-06): `state` built once per change. The getter built a fresh object on every read and the mode
+   * read it several times a frame; tick() and step() — the only writers — drop it. A cached snapshot is never mutated
+   * (a change builds a new one), so a reference taken before a step still reads the old values.
+   */
+  private _state: SprintState | null = null;
 
   constructor(skin: SprintSkin, bus?: SensoryBus) {
     this.skin = skin;
     this.bus = bus ?? null;
     const t = skin.tuning;
+    this._setHoldMs = t.setMs;
     // Cadence reads THIS core's fixed-step clock so scoring is deterministic.
     this.cadence = new RhythmCadence({
       targetIntervalMs: t.targetIntervalMs,
@@ -110,13 +135,25 @@ export class SprintCore {
     const prev = this.phase;
     this.phase = next;
     this._timeInStateS = 0;
+    if (next === 'Set') {
+      const hold = this.skin.setHoldMs?.();
+      this._setHoldMs = typeof hold === 'number' && Number.isFinite(hold) && hold >= 0 ? hold : this.skin.tuning.setMs;
+    }
     if (next === 'Go') this._emit(this.skin.sensory?.gun);
     this.skin.onPhase?.(next, prev);
   }
 
-  /** Feed an alternating footstrike tap. */
-  step(side: 'L' | 'R'): void {
-    if (this.phase === 'Ready' || this.phase === 'Set') {
+  /** Feed an alternating footstrike tap (MOVEMENT PLAY P8: or a body stride graded elsewhere, `opts`). */
+  step(side: 'L' | 'R', opts?: SprintStepOpts): void {
+    // the cache is dropped before AND after: a phase callback fired mid-step may read `state` (it gets the fields as they
+    // stand, as it always did), and must not leave that mid-step snapshot cached for the caller.
+    this._state = null;
+    try { this._step(side, opts); } finally { this._state = null; }
+  }
+
+  private _step(side: 'L' | 'R', opts?: SprintStepOpts): void {
+    this._lastErrMs = null;
+    if (this.phase === 'Ready' || this.phase === 'Set' || (opts?.early && (this.phase === 'Go' || this.phase === 'Run'))) {
       // REAL false start — back to the blocks.
       this._falseStarts += 1;
       this._lastStep = 'FALSE START';
@@ -129,7 +166,9 @@ export class SprintCore {
     if (this.phase === 'Go') this._setPhase('Run');
 
     const k = this.skin.tuning;
-    const quality = this.cadence.tap(side);
+    const quality = opts?.quality ?? this.cadence.tap(side);
+    if (!opts?.quality) this._lastErrMs = this.cadence.lastErrorMs;
+    if (opts?.quality && opts.quality !== 'first') this.cadence.stats[opts.quality]++;   // the stats count a body's strides too
     if (quality === 'fault') {
       this._speed *= k.stumblePenalty;
       this._lastStep = 'STUMBLE';
@@ -147,6 +186,11 @@ export class SprintCore {
 
   /** Advance the fixed-step clock by dtMs. */
   tick(dtMs: number): void {
+    this._state = null;
+    try { this._tick(dtMs); } finally { this._state = null; }
+  }
+
+  private _tick(dtMs: number): void {
     const dt = dtMs / 1000;
     this._clockMs += dtMs;
     this._timeInStateS += dt;
@@ -157,7 +201,7 @@ export class SprintCore {
         if (this._timeInStateS * 1000 >= k.readyMs) this._setPhase('Set');
         break;
       case 'Set':
-        if (this._timeInStateS * 1000 >= k.setMs) this._setPhase('Go');
+        if (this._timeInStateS * 1000 >= this._setHoldMs) this._setPhase('Go');
         break;
       case 'Go':
       case 'Run': {
@@ -180,7 +224,7 @@ export class SprintCore {
   }
 
   get state(): SprintState {
-    return {
+    return this._state ??= {
       phase: this.phase,
       timeS: Math.round(this._raceClockS * 100) / 100,
       distanceM: Math.min(this.skin.tuning.raceDistanceM, Math.round(-this._z * 10) / 10),
@@ -191,6 +235,13 @@ export class SprintCore {
       finishTimeS: this._finishTimeS,
     };
   }
+
+  /** IMPROVE (2026-10-06): the last pad stride's timing error, signed (ms): + late (go faster), − early (go slower). Null
+   *  for a first stride, a stumble, a false start or a stride graded elsewhere (a body's). */
+  get lastErrorMs(): number | null { return this._lastErrMs; }
+
+  /** IMPROVE (2026-10-06): the hold this SET was given (ms) — setMs unless the skin draws one. */
+  get setHoldMs(): number { return this._setHoldMs; }
 
   get cadenceStats() {
     return { ...this.cadence.stats };

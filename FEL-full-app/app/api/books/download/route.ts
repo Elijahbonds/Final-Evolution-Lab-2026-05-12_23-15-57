@@ -6,7 +6,7 @@ import { authOptions } from '@/lib/auth';
 import { clientKeyFromHeaders, rateLimit } from '@/lib/rate-limit';
 import { issueBookFile } from '@/lib/books/bookDelivery';
 import { claimBookEntitlements, normalizeBookEmail, readReaderGrant } from '@/lib/books/bookEntitlements';
-import { prismaBookStore } from '@/lib/books/bookStore';
+import { BookTablesNotReady, prismaBookStore } from '@/lib/books/bookStore';
 import { bookStorageConfig, signGcsV4, signedUrlTtl } from '@/lib/books/bookStorage';
 
 /**
@@ -50,8 +50,14 @@ export async function POST(req: NextRequest) {
       if (userId && email) await claimBookEntitlements(store, userId, email);
       entitlements = await store.listActive({ userId, email });
     } catch (err) {
-      console.error('[books-download] entitlement lookup failed', err);
-      return NextResponse.json({ error: 'Library is unavailable right now.' }, { status: 503 });
+      // MERGE (2026-10-09): before the pending book tables exist nobody owns anything, but the free sample
+      // still signs, signed in or not. Any other failure is still a 503.
+      if (err instanceof BookTablesNotReady) {
+        entitlements = [];
+      } else {
+        console.error('[books-download] entitlement lookup failed', err);
+        return NextResponse.json({ error: 'Library is unavailable right now.' }, { status: 503 });
+      }
     }
   }
 

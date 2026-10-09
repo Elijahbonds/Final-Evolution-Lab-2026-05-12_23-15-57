@@ -237,6 +237,7 @@ describe('duplicate carries the structure', () => {
   it('a copied program arrives with its sections, key set, supersets, timers, cues and bands', async () => {
     await buildPlan();
     h.user = 'coach-1';
+    h.store.cc = [{ coachId: 'coach-1', clientId: 'client-2', endedAt: null }];   // owner 2026-10-06: a copy goes to a live roster athlete only
     const res = await duplicatePOST(req('/api/coach/programs/duplicate', { programId: PID, clientIds: ['client-2'], startDate: '2026-10-05T00:00:00.000Z' }));
     expect(res.status).toBe(201);
     const { created } = await res.json() as { created: { clientId: string; programId: string }[] };
@@ -244,6 +245,22 @@ describe('duplicate carries the structure', () => {
     const copy = (await load('coach-1', created[0].programId)).json.program.tree;
     expect(copy.clientId).toBe('client-2');
     expect(copy.blocks[0].sessions[0].exercises.map(rx)).toEqual(src);
+  });
+});
+
+describe('duplicate copies onto the live roster only (owner-approved 2026-10-06, safety)', () => {
+  it('an id off the roster — a real account, an ended athlete, or no account at all — is skipped alike, and nothing is written for it', async () => {
+    h.user = 'coach-1';
+    h.store.user = [{ id: 'client-2' }, { id: 'stranger' }, { id: 'former' }];
+    h.store.cc = [{ coachId: 'coach-1', clientId: 'client-2', endedAt: null }, { coachId: 'coach-1', clientId: 'former', endedAt: new Date('2026-09-01') }, { coachId: 'coach-2', clientId: 'stranger', endedAt: null }];
+    const before = h.store.program.length;
+    const res = await duplicatePOST(req('/api/coach/programs/duplicate', { programId: PID, clientIds: ['client-2', 'stranger', 'former', 'no-such-user'] }));
+    expect(res.status).toBe(201);
+    const out = await res.json() as { created: { clientId: string }[]; skipped: string[] };
+    expect(out.created.map((c) => c.clientId)).toEqual(['client-2']);
+    expect(out.skipped.sort()).toEqual(['former', 'no-such-user', 'stranger']);
+    expect(h.store.program.length).toBe(before + 1);
+    expect(h.store.program.some((p) => ['stranger', 'former', 'no-such-user'].includes(p.clientId))).toBe(false);
   });
 });
 
@@ -281,5 +298,32 @@ describe('the youth gate on adults-only bands', () => {
     // a row saved with Full throttle before the gate: other edits still save (Today drops the band for a youth client)
     h.store.se[0].effortBand = 'full';
     expect((await build({ action: 'update', sessionExerciseId: id, sets: 4 })).status).toBe(200);
+  });
+});
+
+// MIRROR-COACH P3 review (2026-09-26), owner decisions #6 and #20: no pin-and-stretch under 18 (and no birth year is youth
+// rules). The Mirror draft's one-tap add comes through this path, and a coach's "Calf pin and stretch" could reach a
+// youth client's Prep for a heel-line flag.
+describe('the youth gate on pin rows', () => {
+  beforeEach(() => {
+    h.store.pe.push({ id: 'pe-pin', coachId: 'coach-1', name: 'Calf pin and stretch', category: 'mobility' });
+  });
+
+  it('a pin row is refused for a client with no birth year or under 18, and allowed for an adult', async () => {
+    const add = () => build({ action: 'add', sessionId: SID, exerciseId: 'pe-pin', section: 'prep' });
+    expect(await add()).toEqual({ status: 400, json: { error: 'pin_not_for_youth' } });              // no birth year
+    h.store.user = [{ id: 'client-1', dobYear: new Date().getFullYear() - 15 }];
+    expect((await add()).json).toEqual({ error: 'pin_not_for_youth' });
+    h.store.user = [{ id: 'client-1', dobYear: 1990 }];
+    expect((await add()).status).toBe(200);
+    // a row that does not pin is fine for a youth client
+    h.store.user = [];
+    expect((await build({ action: 'add', sessionId: SID, exerciseId: 'pe-row', section: 'prep' })).status).toBe(200);
+  });
+
+  it('an edit that swaps a youth client\'s exercise for a pin row is refused', async () => {
+    await build({ action: 'add', sessionId: SID, exerciseId: 'pe-row', section: 'prep' });
+    const id = h.store.se[0].id;
+    expect((await build({ action: 'update', sessionExerciseId: id, exerciseId: 'pe-pin' })).json).toEqual({ error: 'pin_not_for_youth' });
   });
 });

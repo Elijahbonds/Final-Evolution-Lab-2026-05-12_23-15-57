@@ -130,6 +130,36 @@ describe('the witness: the replaced rule was backwards on this stream', () => {
   });
 });
 
+// MIRROR-COACH P4 review (2026-09-25) — THE FALSE HEEL CUE (painfree/p2/REPORT.md row 2, deferred here). Unlike every
+// other fault, heelRise used to fire on the FIRST frame over heelRiseWarnPx, calibrated the standing ankle line from
+// ONE settle frame, and was never gated on the body being square — so it fired on a jittered, perfectly flat-heeled,
+// square squat and, once cue-engine.ts held the coach's voice down for HOLD_DOWN_MS, could take the mic from a real,
+// active knee fault.
+describe('the heel-rise read is calibrated over a window, held, and gated on square (MIRROR-COACH P4)', () => {
+  const flaggedSquats = (shape: SquatShape) => {
+    let n = 0;
+    for (let seed = 1; seed <= 20; seed++) {
+      const a = new SquatAudit();
+      if (filmSquat(shape, { seed }).map((f) => a.evaluate(f)).some((r) => r.faults.includes('heelRise'))) n++;
+    }
+    return n;
+  };
+
+  it('a flat-heeled, square squat under jitter is never flagged (measured before: 7 of 20 fired)', () => {
+    expect(flaggedSquats({})).toBe(0);
+  });
+
+  it('a real heel lift is still caught, clean and under jitter (10 cm, well past the warn line)', () => {
+    const a = new SquatAudit();
+    expect(filmSquat({ heelLift: 0.1 }).map((f) => a.evaluate(f)).some((r) => r.faults.includes('heelRise'))).toBe(true);
+    expect(flaggedSquats({ heelLift: 0.1 })).toBe(20);
+  });
+
+  it('a heel lift off square is not read either way (the same cost the knee gate pays: quiet, never a wrong cue)', () => {
+    expect(flaggedSquats({ heelLift: 0.1, turnDeg: 8 })).toBe(0);
+  });
+});
+
 describe('armFall is a sideways read (what a front camera can see)', () => {
   // MIRROR-COACH P1 (2026-09-25): the copy called this "arms falling forward"; the audit compares the shoulder
   // midpoint's x with its standing line. Film both, and let the audit say which one it sees.

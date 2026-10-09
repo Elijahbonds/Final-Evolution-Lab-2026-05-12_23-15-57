@@ -8,16 +8,21 @@
 // settle.
 //
 // The HUD is a kart's: speed in km/h (m/s reads wrong on a vehicle), the boost you are holding, the drift
-// you are banking, the lap and the clock.
+// you are banking, the lap and the clock — and (IMPROVE 2026-10-06) the PB delta, the cup, the way back to the road,
+// the shield, the slipstream, the shell coming for you and the course map.
 
 import { BoostGauge } from '@/components/games/boost-hud';
 import { useEffect, useRef, useState, useCallback } from 'react';
 import type { GameProps, GameResult } from './game-shell';
+import { useBabylonPlaytestBridge } from './use-babylon-playtest-bridge';
 import { BootSplash } from './boot-splash';
+import { surfaceBootError } from './boot-error';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
-import { hnode } from './hud-format';
+import { hnode, hnum } from './hud-format';
+import { RaceCourseMap, ThreatWarning } from './race-course-map';
+import { gameResultFromSession } from '@/lib/sessions/gameResultFromSession';
 
 type Hud = Record<string, HudValue>;
 
@@ -27,10 +32,13 @@ export default function VelocityKartBabylon({ onEnd }: GameProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const busRef = useRef<InputBus | null>(null);
   const endedRef = useRef(false);
+  const onEndRef = useRef(onEnd);
+  onEndRef.current = onEnd;
   const [phase, setPhase] = useState<ModePhase>('loading');
   const [countdown, setCountdown] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [hud, setHud] = useState<Hud>({});
+  useBabylonPlaytestBridge('velocitykart', () => ({ phase, countdown, loadError, hud }), busRef.current);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -48,12 +56,11 @@ export default function VelocityKartBabylon({ onEnd }: GameProps) {
       const t = Number(r.stats?.seconds ?? r.stats?.timeSec ?? 0);
       const place = Number(r.stats?.place ?? 0), field = Number(r.stats?.field ?? 0), medal = ['none', 'bronze', 'silver', 'gold'][Number(r.stats?.medal ?? 0)] ?? 'none';
       const ord = place === 1 ? '1ST' : place === 2 ? '2ND' : place === 3 ? '3RD' : `${place}TH`;
-      onEnd({
-        score: r.score, stats: r.stats, outcome: r.outcome, opponentScore: 0,
-        won: r.outcome === 'win', duration: r.durationSec,
+      onEndRef.current(gameResultFromSession(r, {
+        won: r.outcome === 'win',
         headline: r.outcome === 'dnf' ? `DNF · ${ord} OF ${field}`
           : place > 0 ? `${ord} OF ${field} · ${t.toFixed(1)}s${medal !== 'none' ? ` · ${medal.toUpperCase()}` : ''}` : `RACE COMPLETE · ${t.toFixed(1)}s`,
-      } satisfies GameResult);
+      }));
     };
 
     const startTimer = setTimeout(() => {
@@ -68,11 +75,12 @@ export default function VelocityKartBabylon({ onEnd }: GameProps) {
         onHud: (u) => setHud((prev) => ({ ...prev, ...u })),
         resultSink,
       }).then((s) => { if (disposed) { s(); return; } stop = s; })
-        .catch((e) => console.error('[FEL-KART] boot failed', e));
+        .catch((e) => surfaceBootError(e, { disposed, label: '[FEL-KART] boot failed', setPhase, setLoadError }));
     }, 0);
 
     return () => { disposed = true; clearTimeout(startTimer); stop?.(); busRef.current = null; };
-  }, [onEnd]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- G7: the stage is owned by the mount; callbacks are read through refs.
+  }, []);
 
   const emit = useCallback((e: Parameters<InputBus['emit']>[0]) => { busRef.current?.emit(e); }, []);
   const tapStart = useCallback(() => emit({ t: 'button', btn: 'START', pressed: true }), [emit]);
@@ -97,6 +105,13 @@ export default function VelocityKartBabylon({ onEnd }: GameProps) {
           {hud.pos ? <span className="fel-panel px-3 py-0.5 text-xs font-bold text-[var(--fel-gold)]">{String(hud.pos)}</span> : null}
           {/* RACING PASS phase 5: the gap — seconds to the kart ahead, or the lead */}
           {hud.gap ? <span className={`fel-panel px-2 py-0.5 text-[10px] font-bold ${String(hud.gap).startsWith('LEAD') ? 'text-[#86efac]' : 'text-white/80'}`}>{String(hud.gap)}</span> : null}
+          {/* IMPROVE (2026-10-06) #2: the ghost's delta (green ahead, red behind), the PB being chased and the cup — the mode
+              computed all three every frame and nothing drew them */}
+          {typeof hud.delta === 'string' && hud.delta && hud.delta !== '—'
+            ? <span className={`fel-panel px-2 py-0.5 text-[10px] font-bold ${hud.delta.startsWith('−') ? 'text-[#86efac]' : 'text-[#fca5a5]'}`}>PB {hud.delta}</span>
+            : null}
+          {typeof hud.chasing === 'string' && hud.chasing ? <span className="text-[9px] font-bold tracking-wider text-white/55">{hud.chasing}</span> : null}
+          {typeof hud.cup === 'string' && hud.cup ? <span className="max-w-[14rem] truncate text-[9px] tracking-wide text-[#fde68a]/80">{hud.cup}</span> : null}
         </div>
         <div className="fel-panel px-3 py-1.5 text-right">
           <div className="text-[10px] tracking-wider text-white/60">LAP {hnode(hud.lap, '—')}</div>
@@ -104,6 +119,27 @@ export default function VelocityKartBabylon({ onEnd }: GameProps) {
           <div className="mt-1 text-sm font-bold" style={{ color: KART_ITEM_COLOR[String(hud.itemKind ?? '')] ?? 'rgba(255,255,255,0.35)' }}>{hud.item ? String(hud.item) : 'NO ITEM'}</div>
         </div>
       </div>
+
+      {/* IMPROVE (2026-10-06) #2: the shield's seconds and the slipstream's charge, under the item box */}
+      <div className="pointer-events-none absolute right-3 top-[5.5rem] flex flex-col items-end gap-1 font-mono">
+        {hnum(hud.shield) > 0 ? <span className="fel-panel px-2 py-0.5 text-xs font-bold text-[#ffd75e]">SHIELD {hnum(hud.shield)}s</span> : null}
+        {hnum(hud.draft) > 0 ? (
+          <div className="fel-panel w-28 px-2 py-1">
+            <div className="text-[9px] tracking-wider text-[#a5f3fc]">SLIPSTREAM</div>
+            <div className="mt-0.5 h-1.5 w-full overflow-hidden rounded bg-white/10"><div className="h-full bg-[#22d3ee]" style={{ width: `${Math.min(100, hnum(hud.draft))}%` }} /></div>
+          </div>
+        ) : null}
+      </div>
+      {/* IMPROVE (2026-10-06) #9: the minimap — the lap's outline, the shortcut, the field, the next gate and you */}
+      <RaceCourseMap hud={hud} className="left-3 top-[6.5rem]" />
+      {/* IMPROVE (2026-10-06) #6: the shell coming for you, on the edge it comes from; HOP NOW — X when the hop clears it */}
+      <ThreatWarning words={hud.threat} side={hud.threatSide} now={!!hud.threatHop} action="X" />
+      {/* IMPROVE (2026-10-06) #2: off the road, the way back (the mode sent it and nothing drew it) */}
+      {typeof hud.trackCue === 'string' && hud.trackCue && phase === 'playing' && (
+        <div className="pointer-events-none absolute inset-x-0 top-[44%] text-center">
+          <span className="fel-panel px-3 py-1 font-mono text-xs font-bold text-[#fca5a5]">{hud.trackCue}</span>
+        </div>
+      )}
 
       <BoostGauge hud={hud} className="absolute inset-x-0 bottom-28" />
       {typeof hud.hint === 'string' && hud.hint && phase === 'playing' && (

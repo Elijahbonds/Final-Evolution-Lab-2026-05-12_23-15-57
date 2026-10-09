@@ -117,6 +117,7 @@ import { GET as inviteGET } from '@/app/api/coach/invite/route';
 import { CATALOGUE_POST, filesMatching, whoMounts } from '@/scripts/probes/_import-graph';
 import { MIRROR_SCREEN_KIND, scoreScreen } from '@/lib/mirror/screen';
 import { storedScreen } from '@/lib/mirror/screenStore';
+import { serverRow } from '@/lib/mirror/fixtures/storedRows';
 
 const ROOT = resolve(process.cwd());   // vitest runs from the app root (FEL-full-app)
 const DAY = 86_400_000;
@@ -174,11 +175,13 @@ function seed(opts: { games: number; screenYesterday?: boolean; gradedScreenYest
   program.clientSessions = clientSessions;
   // a Mirror screen that ran yesterday and graded nothing — the row app/api/mirror/screen stores for every screen today
   // …and, as a control (MIRROR-COACH P2 review, 2026-09-26), one that graded a check — what P3's graders will store
-  const gradedResults = [{ checkId: 'heelLine', grade: 'stable', source: 'camera' }] as Parameters<typeof scoreScreen>[1];
+  // (P3 review, 2026-09-26: three checks from more than one station — the screen bar — with the server's evidence)
+  const gradedResults = (['heelLine', 'hipLevel', 'headFloat'] as const).map((checkId) => ({ checkId, grade: 'stable', source: 'camera' })) as Parameters<typeof scoreScreen>[1];
   const screen = opts.screenYesterday
     ? [{ id: 'scan1', userId: 'client-1', kind: MIRROR_SCREEN_KIND, createdAt: ago(1), metrics: storedScreen('screen-1', 'modified', [], scoreScreen('modified', [])) }]
     : opts.gradedScreenYesterday
-      ? [{ id: 'scan1', userId: 'client-1', kind: MIRROR_SCREEN_KIND, createdAt: ago(1), metrics: storedScreen('screen-1', 'modified', gradedResults, scoreScreen('modified', gradedResults)) }]
+      // (MIRROR-COACH P3, 2026-09-26: as the screen route stores it — server-graded, not provisional; lib/coach/attention.ts)
+      ? [{ id: 'scan1', userId: 'client-1', kind: MIRROR_SCREEN_KIND, createdAt: ago(1), metrics: serverRow('screen-1', 'modified', gradedResults) }]
       : [];
   m.db = {
     coachingProgram: [program],
@@ -307,7 +310,7 @@ describe('BASELINE 2: the attention board counts coached work, with games as a s
     expect(ungraded.triage.flags).toEqual([expect.objectContaining({
       kind: 'stale-scan',
       observed: 'No PRQ System Scan on file; no graded Mirror screen; last coached work 15 days ago.',
-      action: 'Ask for a System Scan — there is nothing current to program from.',
+      action: 'Ask for a System Scan or a Mirror movement screen — there is nothing current to program from.',   // P3: the screen grades
     })]);
 
     seed({ games: 0, gradedScreenYesterday: true, coachedDaysBack: 14 });
@@ -327,7 +330,7 @@ describe('BASELINE 2: the attention board counts coached work, with games as a s
     expect(unscreened.triage.flags).toEqual([expect.objectContaining({
       kind: 'stale-scan',
       observed: 'No PRQ System Scan on file; no graded Mirror screen; last coached work 15 days ago.',
-      action: 'Ask for a System Scan — there is nothing current to program from.',
+      action: 'Ask for a System Scan or a Mirror movement screen — there is nothing current to program from.',   // P3: the screen grades
     })]);
     expect(unscreened.drift[0]).toMatchObject({ state: 'stalled', games: 3, note: 'No coached session for 15 days. Still playing: 3 games in the last two weeks.' });
   });

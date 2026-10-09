@@ -10,14 +10,16 @@
 // mode cheap.
 
 import { readCourtLocation } from '@/lib/babylon/nexus/courtLocations';
+import { courtArtSkin } from '@/lib/modes/art/apply-art-card';
 import { freshOrder, syncLobby, slotDrives, recordTurn, turnBanner, MAX_SHOOTERS, type ShootoutOrder } from '@/lib/controller-link/shootoutTurns';
 import type { LobbyPeer } from '@/lib/controller-link/types';
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import type { GameProps, GameResult } from './game-shell';
 import { BootSplash } from './boot-splash';
+import { surfaceBootError } from './boot-error';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
-import { rackPips, SHOT_TARGET, PERFECT_BAND, GOOD_BAND } from '@/lib/babylon/core/shootoutHud';
+import { rackPips, SHOT_TARGET, GOOD_BAND } from '@/lib/babylon/core/shootoutHud';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { PadChips } from '@/lib/babylon/ui/PadChips';
 import { HostLobby } from '@/components/controller-link/host-lobby';
@@ -25,6 +27,7 @@ import { controllerConfigFor } from '@/lib/controller-link/schemas/registry';
 import { toInputBus } from '@/lib/controller-link/modeBridge';
 import { hnum } from './hud-format';
 import { MicCaption, MicToggle } from './mic-caption';   // THE MIC (2026-09-24)
+import { ThreePointOptions } from './three-point-options';   // IMPROVE (2026-10-06) #8: the shot input on the pause screen
 
 // Which harness currently owns a given canvas. React mounts effects twice in
 // dev: effect A starts an async runMode(), its cleanup fires before A has even
@@ -45,6 +48,8 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const busRef = useRef<InputBus | null>(null);
   const endedRef = useRef(false);
+  const onEndRef = useRef(onEnd);
+  onEndRef.current = onEnd;
   const [phase, setPhase] = useState<ModePhase>('loading');
   // the running order lives in a ref AND state: the input callback reads it every frame (ref) while the
   // banner renders from it (state)
@@ -53,9 +58,8 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
   const [countdown, setCountdown] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [hud, setHud] = useState<Hud>({});
-  // THE MIC's caption lives apart from the hud: the mode pushes its WHOLE hud every frame and this host replaces it (setHud(h)),
-  // while the mic sends only { mic, micWho } — merged into the hud, a caption would blank the scoreboard for a frame and the
-  // next frame's hud would wipe the caption
+  // THE MIC's caption lives apart from the hud (the mic sends only { mic, micWho }). IMPROVE (2026-10-06) #10: the mode sends
+  // only the keys that changed now, and this host MERGES them into the hud (it replaced the whole hud every frame)
   const [micLine, setMicLine] = useState<{ text: HudValue; who: HudValue }>({ text: '', who: '' });
   const [busReady, setBusReady] = useState(false);
 
@@ -80,13 +84,18 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
         if (!next.done) return;      // the next phone is up; the host remounts for their turn
       }
       endedRef.current = true;
-      onEnd({
-        score: Number(r.stats?.points ?? r.score ?? 0),
+      const pts = Number(r.stats?.points ?? r.score ?? 0);
+      const rivalPts = Number(r.stats?.rivalScore ?? 0);
+      const won = r.outcome === 'win';
+      onEndRef.current({
+        score: pts,
         stats: r.stats, outcome: r.outcome,   // pass 5 phase 3: the proof line reads these
-        opponentScore: 0,
-        won: r.outcome === 'win',
+        opponentScore: rivalPts,
+        won,
         duration: r.durationSec,
-        headline: r.outcome === 'win' ? 'RANGE UNLOCKED' : 'SHOOTOUT COMPLETE',
+        headline: won
+          ? `RANGE UNLOCKED · ${pts} PTS${rivalPts > 0 ? ` vs ${rivalPts}` : ''}`
+          : `SHOOTOUT COMPLETE · ${pts} PTS${rivalPts > 0 ? ` vs ${rivalPts}` : ''}`,
       } satisfies GameResult);
     };
 
@@ -101,6 +110,7 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
     runMode(MODES.threepoint, {
       canvas,
       location: readCourtLocation(),   // court location pick (docs/SPEC-COURT-LOCATIONS.md)
+      applySkin: courtArtSkin,   // PIPELINES (2026-10-06): the player's court art card, a centre-court decal
       input: bus,
       onPhase: (p, detail) => {
         if (disposed) return;
@@ -110,14 +120,14 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
       },
       onHud: (h) => {
         if (disposed) return;
-        if (!('mic' in h) && !('micWho' in h)) { setHud(h); return; }
+        if (!('mic' in h) && !('micWho' in h)) { setHud((prev) => ({ ...prev, ...h })); return; }
         const { mic, micWho, ...rest } = h;
         setMicLine((m) => ({ text: 'mic' in h ? mic : m.text, who: 'micWho' in h ? micWho : m.who }));
-        if (Object.keys(rest).length) setHud(rest);
+        if (Object.keys(rest).length) setHud((prev) => ({ ...prev, ...rest }));
       },
       resultSink,
     }).then((s) => { if (disposed) s(); else stop = s; })
-      .catch((e) => { if (!disposed) setLoadError(String(e?.message ?? e)); });
+      .catch((e) => surfaceBootError(e, { disposed, setPhase, setLoadError }));
     }, 0);
 
     return () => { disposed = true; clearTimeout(startTimer); stop?.(); };
@@ -161,7 +171,7 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
   void MAX_SHOOTERS;
 
   return (
-    <div className="relative aspect-[16/10] w-full overflow-hidden rounded-xl border border-white/10 bg-black">
+    <div className="relative h-[calc(100dvh-3.25rem)] w-full overflow-hidden rounded-none border-0 bg-transparent">
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full touch-none" />
 
       {/* Whose turn it is, on the TV, whenever more than one phone is in the room. */}
@@ -191,6 +201,7 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
           onPeers={onPeers}
           onPadInput={onPhonePad}
           collapsed={phase === 'playing'}
+          lazy={process.env.NODE_ENV === 'production'}
           bus={busRef.current}
         />
       )}
@@ -203,7 +214,10 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
         <div className="pointer-events-none absolute inset-x-0 top-3 z-20 flex flex-col items-center gap-1.5 font-mono text-white">
           <div className="flex items-end gap-5">
             <div className="fel-panel px-5 py-1.5 text-5xl font-black leading-none text-[#ffd75e]">{hnum(hud.score)}</div>
-            <div className={`fel-panel px-4 py-2 text-3xl font-bold leading-none ${Number(hud.clock) <= 10 ? 'text-[#ff2d78]' : 'text-white'}`}>{hnum(hud.clock)}s</div>
+            {/* IMPROVE (2026-10-06) #6: the practice rack has no clock (the mode sends clock: null) */}
+            {typeof hud.clock === 'number'
+              ? <div className={`fel-panel px-4 py-2 text-3xl font-bold leading-none ${hud.clock <= 10 ? 'text-[#ff2d78]' : 'text-white'}`}>{hnum(hud.clock)}s</div>
+              : <div className="fel-panel px-4 py-2 text-xl font-bold leading-none text-white/70">NO CLOCK</div>}
           </div>
           <div className="flex items-center gap-2 text-[11px] tracking-widest">
             <span className="fel-panel px-2 py-0.5 text-white/70">{String(hud.round ?? 'QUALIFYING')}</span>
@@ -214,15 +228,22 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
           </div>
           {typeof hud.rackIdx === 'number' && typeof hud.ballIdx === 'number' && (
             <div className="flex items-center gap-3">
-              {rackPips(hud.rackIdx, hud.ballIdx).map((row, r) => (
-                <div key={r} className="flex items-center gap-1 rounded bg-black/45 px-1.5 py-1">
-                  {row.map((p, b) => (
-                    <span
-                      key={b}
-                      className={`inline-block rounded-full ${p.money ? 'h-3 w-3' : 'h-2.5 w-2.5'} ${p.state === 'next' ? 'animate-pulse ring-2 ring-white' : ''}`}
-                      style={{ background: p.state === 'taken' ? 'rgba(255,255,255,0.18)' : p.money ? '#ffd75e' : '#e8742c', opacity: p.state === 'ahead' ? 0.85 : 1 }}
-                    />
-                  ))}
+              {rackPips(hud.rackIdx, hud.ballIdx, undefined, undefined, typeof hud.moneyRack === 'number' ? hud.moneyRack : -1).map((row, r) => (
+                <div key={r} className="flex items-start gap-1 rounded bg-black/45 px-1.5 py-1">
+                  {row.map((p, b) => {
+                    // IMPROVE (2026-10-06) #4: what each release was, under its ball — the run's timing bias at a glance
+                    const grade = typeof hud.relPips === 'string' ? hud.relPips[r * 5 + b] : '.';
+                    const tick = PIP_TICK[grade ?? '.'];
+                    return (
+                      <span key={b} className="flex flex-col items-center gap-0.5">
+                        <span
+                          className={`inline-block rounded-full ${p.money ? 'h-3 w-3' : 'h-2.5 w-2.5'} ${p.state === 'next' ? 'animate-pulse ring-2 ring-white' : ''}`}
+                          style={{ background: p.state === 'taken' ? 'rgba(255,255,255,0.18)' : p.money ? '#ffd75e' : '#e8742c', opacity: p.state === 'ahead' ? 0.85 : 1 }}
+                        />
+                        <span className="inline-block h-[3px] w-2.5 rounded-full" title={tick?.label} style={{ background: tick?.color ?? 'transparent' }} />
+                      </span>
+                    );
+                  })}
                 </div>
               ))}
             </div>
@@ -235,6 +256,16 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
           {typeof hud.need === 'number' && (
             <div className="fel-panel px-3 py-1 text-sm font-bold text-[#ff2d78]">NEED {hnum(hud.need)} TO WIN</div>
           )}
+          {/* IMPROVE (2026-10-06) #3: qualifying's number — projected from the field's form, the way the final shows NEED */}
+          {typeof hud.cut === 'number' && (
+            <div className="fel-panel px-3 py-1 text-sm font-bold text-[#22d3ee]">CUT ≈ {hnum(hud.cut)} · TOP 3 ADVANCE</div>
+          )}
+          {/* IMPROVE (2026-10-06) #4: the key to the ticks under the pips (only once a ball has been shot) */}
+          {typeof hud.relPips === 'string' && /[EGPL]/.test(hud.relPips) && (
+            <div className="flex gap-2 text-[9px] tracking-widest text-white/50">
+              {(['E', 'P', 'G', 'L'] as const).map((k) => <span key={k} style={{ color: PIP_TICK[k]?.color }}>{PIP_TICK[k]?.label}</span>)}
+            </div>
+          )}
         </div>
       )}
 
@@ -244,7 +275,13 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
           {typeof hud.banner === 'string' && hud.banner && (
             <div className={`fel-heading fel-panel px-5 py-1.5 text-3xl font-black ${hud.banner.startsWith('MISS') ? 'text-white/70' : 'text-[#00E5FF]'}`}>{hud.banner}</div>
           )}
-          {typeof hud.meter === 'number' && <ReleaseBar t={hud.meter} />}
+          {typeof hud.meter === 'number' && (
+            <ReleaseBar
+              t={hud.meter}
+              green={typeof hud.meterGreen === 'number' ? hud.meterGreen : SHOT_TARGET}
+              half={typeof hud.meterHalf === 'number' ? hud.meterHalf : GOOD_BAND}
+            />
+          )}
         </div>
       )}
 
@@ -260,15 +297,25 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
 
       {phase === 'playing' && Array.isArray(hud.board) && (
         <div className="pointer-events-none absolute right-4 top-4 z-20 rounded-lg border border-white/15 bg-black/60 px-3 py-2 font-mono text-xs text-white backdrop-blur-sm">
-          {(hud.board as { name: string; score: number | string; line: string }[]).map((r) => (
+          {(hud.board as { name: string; score: number | string; line: string; form?: string }[]).map((r) => (
             <div key={r.name} className={`flex items-baseline gap-3 py-0.5 ${r.name === 'YOU' ? 'text-[#ffd75e]' : ''}`}>
               <span className="w-16 truncate">{r.name}</span>
+              {/* IMPROVE (2026-10-06) #7: the rival's form — the reveal runs coldest first, so the HOT cards land last */}
+              <span className={`w-8 text-[9px] font-bold tracking-wider ${r.form === 'HOT' ? 'text-[#ff6a00]' : 'text-[#7cc6ff]'}`}>{r.form ?? ''}</span>
               <span className="w-8 text-right text-base font-bold">{r.score}</span>
               <span className={`text-[10px] tracking-wider ${
                 r.line === 'CHAMPION' ? 'text-[#ffd75e]' : r.line === 'ADVANCES' ? 'text-[#22d3ee]' : 'text-white/40'
               }`}>{r.line}</span>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* IMPROVE (2026-10-06) #8: the shot input can be switched on the pause screen (from the next ball) — over the splash's pause
+          layer, catching only its own taps (the layer's tap is the resume) */}
+      {phase === 'paused' && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-10 z-[31] flex justify-center px-4">
+          <div className="pointer-events-auto rounded-xl bg-black/60 px-4 py-2"><ThreePointOptions variant="pause" /></div>
         </div>
       )}
 
@@ -279,10 +326,18 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
   );
 }
 
-/** The timing bar the whole mode hangs on — the GOOD and PERFECT bands drawn from the mode's own constants. */
-function ReleaseBar({ t }: { t: number }) {
-  const good = { left: `${(SHOT_TARGET - GOOD_BAND) * 100}%`, width: `${GOOD_BAND * 200}%` };
-  const perfect = { left: `${(SHOT_TARGET - PERFECT_BAND) * 100}%`, width: `${PERFECT_BAND * 200}%` };
+/** IMPROVE (2026-10-06) #4: the release-history ticks (threePointRules.pipFor): early short, late long, the green between. */
+const PIP_TICK: Record<string, { color: string; label: string } | undefined> = {
+  E: { color: '#5b8def', label: 'EARLY' }, G: { color: '#22d3ee', label: 'GOOD' }, P: { color: '#ffd75e', label: 'PERFECT' }, L: { color: '#ff5d5d', label: 'LATE' },
+};
+
+/** The timing bar the whole mode hangs on — GOOD and PERFECT bands drawn from the shared ShotMeter's OWN window
+ *  (HOOPS-10PHASE-2 phase 2: the mode reports its live green centre/half-width over HUD now, so the host draws
+ *  the SAME window it is graded against, however distance or TV mode widened it). */
+function ReleaseBar({ t, green, half }: { t: number; green: number; half: number }) {
+  const perfectHalf = half * 0.35;   // BasketballCore.ShotMeter.release(): perfect is the inner 0.35 of the good window
+  const good = { left: `${(green - half) * 100}%`, width: `${half * 200}%` };
+  const perfect = { left: `${(green - perfectHalf) * 100}%`, width: `${perfectHalf * 200}%` };
   return (
     <div className="relative h-5 w-[min(520px,70vw)] overflow-hidden rounded-md border border-white/20 bg-black/55">
       <div className="absolute inset-y-0 bg-[#22d3ee]/35" style={good} />

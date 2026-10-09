@@ -411,6 +411,8 @@ export interface TrackPaint {
   /** the rubber's colour (PLACE LOOKS: the beach track is blue) */
   color?: string;
   finishZ: number;
+  /** IMPROVE (2026-10-06): rubber-grain specks; default 1800 (the whole 138 m strip's). A smaller patch passes its share. */
+  speckles?: number;
 }
 
 /** A tartan straight: rubber grain, white lane lines, the start and finish lines, lane numbers at the start, 10 m ticks. */
@@ -421,7 +423,7 @@ export function paintTrack(ctx: Ctx, W: number, H: number, o: TrackPaint): void 
   const Y = (z: number) => (cz + sd / 2 - z) * pxm;
   const r = placeRng(31);
   ctx.fillStyle = o.color ?? '#a8432f'; ctx.fillRect(0, 0, W, H);
-  for (let i = 0; i < 1800; i++) { ctx.fillStyle = r() < 0.5 ? 'rgba(0,0,0,0.12)' : 'rgba(255,220,200,0.08)'; ctx.fillRect(r() * W, r() * H, 2, 2); }
+  for (let i = 0, n = o.speckles ?? 1800; i < n; i++) { ctx.fillStyle = r() < 0.5 ? 'rgba(0,0,0,0.12)' : 'rgba(255,220,200,0.08)'; ctx.fillRect(r() * W, r() * H, 2, 2); }
   // wear down the lane centres where the spikes land
   for (let l = 0; l < o.laneEdges.length - 1; l++) {
     const mid = (o.laneEdges[l] + o.laneEdges[l + 1]) / 2;
@@ -447,4 +449,39 @@ export function paintTrack(ctx: Ctx, W: number, H: number, o: TrackPaint): void 
       ctx.save(); ctx.translate(X(mid), Y(z)); ctx.rotate(Math.PI); ctx.fillText(String(lanes - l), 0, 0); ctx.restore();
     }
   }
+}
+
+export interface TrackTilePaint {
+  /** the strip's width (m) and its centre x */
+  width: number;
+  centerX: number;
+  /** lane boundary x positions, world metres, ascending */
+  laneEdges: number[];
+  /** the rubber's colour */
+  color?: string;
+  /** rubber-grain specks in the tile; default 138 (paintTrack's density over one 10 m tile) */
+  speckles?: number;
+}
+
+/**
+ * IMPROVE (2026-10-06): ONE 10 m TILE of the tartan straight — rubber grain, the lane wear, the white lane lines, and the
+ * 10 m tick marks across the middle row (canvas H / 2). The whole straight was one ~256 × 3333 px canvas painted on the
+ * CPU and uploaded (≈4.5 MB with its mips); repeated down the strip, a 256² tile carries everything that repeats, and the
+ * start and finish (lines, lane numbers) are painted on two small patches over it (VenueKit.buildTrack).
+ */
+export function paintTrackTile(ctx: Ctx, W: number, H: number, o: TrackTilePaint): void {
+  const pxm = W / o.width;
+  const X = (x: number) => (x - o.centerX + o.width / 2) * pxm;
+  const r = placeRng(31);
+  ctx.fillStyle = o.color ?? '#a8432f'; ctx.fillRect(0, 0, W, H);
+  for (let i = 0, n = o.speckles ?? 138; i < n; i++) { ctx.fillStyle = r() < 0.5 ? 'rgba(0,0,0,0.12)' : 'rgba(255,220,200,0.08)'; ctx.fillRect(r() * W, r() * H, 2, 2); }
+  for (let l = 0; l < o.laneEdges.length - 1; l++) {
+    const mid = (o.laneEdges[l] + o.laneEdges[l + 1]) / 2;
+    const g = ctx.createLinearGradient(X(mid - 0.5), 0, X(mid + 0.5), 0); if (!g) break;
+    g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(0.5, 'rgba(0,0,0,0.10)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g; ctx.fillRect(X(mid - 0.5), 0, pxm, H);
+  }
+  ctx.fillStyle = '#f5f3ec';
+  for (const e of o.laneEdges) ctx.fillRect(X(e) - 0.03 * pxm, 0, Math.max(2, 0.06 * pxm), H);
+  for (const e of o.laneEdges) ctx.fillRect(X(e) - 0.15 * pxm, H / 2 - 0.03 * pxm, 0.3 * pxm, 0.06 * pxm);
 }

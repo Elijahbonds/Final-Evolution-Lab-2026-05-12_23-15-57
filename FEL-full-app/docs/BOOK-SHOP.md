@@ -31,25 +31,28 @@ Set these on the server. Do not commit the values.
 | `FIREBASE_PRIVATE_KEY` | PEM private key. Newlines may be written as `\n`. |
 | `BOOK_SIGNED_URL_TTL_SECONDS` | Lifetime of a download/stream URL. Default 600, maximum 3600. |
 | `NEXTAUTH_SECRET` | Already required by login. Also signs the short-lived receipt grant that lets a guest play on the receipt page. |
-| `NEXTAUTH_URL` | Public origin used when the checkout request has no `Origin` header. |
+| `NEXTAUTH_URL` | The site origin Stripe sends the buyer back to (`siteOrigin()`, STORE-READY B3). The request's `Origin` header is never used; unset closes checkout (`site_url_not_set`). |
+| `VIRTUAL_PURCHASES_ENABLED` | The release's B10 fence (default off: "no real-money product outside the coach store"). Book checkout answers 409 `store_closed` / `virtual_purchases_off` until it is on. Owner question: keep books behind this fence or give them their own switch. |
 
 The service account needs permission to sign URLs for that bucket (`iam.serviceAccounts.signBlob` is not required when the private key is present; the process signs locally). It does not need to make objects public.
 
 ## Database
 
-Two tables, in `prisma/schema.prisma`:
+Two tables, **pending** (2026-10-09): `prisma/pending/2026-10-09-book-shop.sql`. They were Prisma models in this
+branch's first commit; when the release was merged in (919 commits later) the regenerated `public/_prisma` client could
+not be merged, so the models moved to a pending SQL file, the release's convention for schema the owner has not
+applied. The SQL file carries the matching model blocks.
 
 - `BookEntitlement` — one row per email + offer (`ebook`, `audiobook`, or `bundle`). `userId` is filled when that email logs in.
-- `BookFulfillmentEvent` — Stripe event id. A second delivery of the same event does not create a second purchase. A refund stored before the purchase arrives is applied when the purchase is written.
+- `BookFulfillmentEvent` — what the shop has already handled: `stripe-session:<cs_id>` for a purchase (the same key
+  the receipt page and both webhooks use, so one payment is one grant), or the Stripe event id for a refund. A refund
+  stored before the purchase arrives is applied when the purchase is written.
 
-Apply the schema to the **dev** database only when you mean to:
-
-```bash
-cd FEL-full-app
-npx prisma db push
-```
-
-Do not point `DATABASE_URL` at production for this. This branch does not run `db push` and does not deploy.
+Until the tables exist, `lib/books/bookStore.ts` finds no delegate on the generated client: `bookTablesReady()` is
+false, every store call throws `BookTablesNotReady`, sign-in skips the claim, My Library shows "unavailable", and the
+free sample still signs. The owner's step, in order: apply the SQL, add the two models (and `User.bookEntitlements`)
+to `prisma/schema.prisma`, regenerate `public/_prisma` on Linux. No agent runs `prisma db push` or regenerates the
+client.
 
 Guest checkout is allowed. On the next sign-in, `lib/auth.ts` claims rows whose email matches the account. My Library and the download route claim again, so a purchase still shows up if the sign-in claim failed.
 
@@ -59,13 +62,49 @@ A refund (`charge.refunded`) sets the row to `REVOKED`. Revoked rows do not get 
 
 1. In the Stripe Dashboard, switch to **Test mode**.
 2. Use the test secret as `STRIPE_BOOKS_SECRET_KEY`.
-3. Developers → Webhooks → Add endpoint:
+3. The receipt page fulfils on its own (MERGE 2026-10-09, the release's SEC-F4 NO-WEBHOOK rule, #200): it retrieves
+   the Checkout Session from Stripe on the server and grants what that session proves (paid, `product: BOOK`, the
+   buyer's own email). A webhook is still worth adding for buyers who close the tab before the redirect, and it is
+   the only path for refunds:
    - URL: `https://<host>/api/books/webhook`
-   - Events: `checkout.session.completed`, `charge.refunded`
+   - Events: `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `charge.refunded`
    - Put that endpoint's signing secret in `STRIPE_BOOKS_WEBHOOK_SECRET`.
-4. The existing `/api/stripe/webhook` also records a Checkout Session whose metadata `product` is `BOOK`, and it tries to revoke book rows on `charge.refunded`. Prefer the book endpoint: a failure there returns 500 so Stripe retries. The shared endpoint returns 500 for a book checkout that fails to record, and ignores a refund that matches no book purchase.
+4. The existing `/api/stripe/webhook` also records a Checkout Session whose metadata `product` is `BOOK`, and once the
+   book tables exist it tries to revoke book rows on `charge.refunded`. Every path keys a purchase on the Checkout
+   Session (`stripe-session:<cs_id>`), so webhook + receipt + a redelivery grant once. A failure on either endpoint
+   returns 500 so Stripe retries; the shared endpoint ignores a refund that matches no book purchase.
+5. Every closed answer is a 409 `store_closed` with a reason (`payments_not_set_up`, `live_mode_off`,
+   `virtual_purchases_off`, `site_url_not_set`), as the rest of the release's store (STORE-READY B2).
 
-Optional Price ids: create a Product and a one-time Price in test mode, and set `stripePriceId` on the offer in the catalog. Until that field is set, Checkout uses `price_data` and the catalog's `priceCents`.
+Optional Price ids: create a Product and a one-time Price in test mode, and set `stripePriceId` on the offer in the catalog. Until that field is set, Checkout uses `price_data` and the catalog's `priceCents`. The script below does the creating.
+
+### Creating test products
+
+`scripts/stripe-create-test-products.mjs` creates one Product and one Price per row of `scripts/stripe-prices.example.json`. That file lists every offer the catalog sells directly, at the catalog's **EXAMPLE** cents. The KDP-blocked ebooks and bundles are left out. The script refuses any key that is not `sk_test_`, and it refuses a row that disagrees with the catalog (amount, format, EXAMPLE flag, or direct sale).
+
+1. Export the test key in your own shell. Do not put it in a file in the repo.
+
+   ```bash
+   export STRIPE_BOOKS_SECRET_KEY=sk_test_...
+   ```
+
+2. Dry run from `FEL-full-app/`. It prints the plan and makes no Stripe calls. Without `--allow-example` it refuses every EXAMPLE row and exits 1.
+
+   ```bash
+   node scripts/stripe-create-test-products.mjs --allow-example
+   ```
+
+3. Create them in test mode:
+
+   ```bash
+   node scripts/stripe-create-test-products.mjs --apply --allow-example
+   ```
+
+   It finds a Product by `metadata.offerId` and a Price by lookup key `fel_book_<offerId>`, so running it again creates nothing new. If an amount changed, it creates a new Price and moves the lookup key to it.
+
+4. Paste each `price_...` from the printed `offerId -> priceId` table into `stripePriceId` on that offer in `lib/books/bookCatalog.ts`.
+
+Needs Node 22.18 or newer, because it imports the TypeScript catalog directly. Node prints a `MODULE_TYPELESS_PACKAGE_JSON` warning when it does; that warning is harmless. On an older Node, run it with `npx tsx` instead. When real prices are decided, change `priceCents` and `priceIsExample` in the catalog, copy the example file, set the new cents and `"EXAMPLE": false`, and pass it with `--file <path> --apply`. `npm test -- lib/books` checks that the example file still matches the catalog.
 
 Stripe Tax: activate Tax in the Dashboard (origin address, registrations), then set `STRIPE_BOOKS_TAX=1`. The session collects a billing address and sets `automatic_tax: { enabled: true }`.
 
@@ -128,7 +167,7 @@ Do these in order. This branch does not perform them.
 1. Confirm KDP Select for all seven titles. Flip `kdpSelect` only when the ebook may be sold on the site.
 2. Replace example prices. Set `priceIsExample: false` on the offers you are actually charging.
 3. Upload EPUB, PDF, and MP3s to the private paths above. Play chapter 1 and the last chapter.
-4. `prisma db push` against the database this server uses.
+4. Apply `prisma/pending/2026-10-09-book-shop.sql`, add the models, regenerate `public/_prisma` (the owner's step; see Database).
 5. Test-mode webhook endpoint, test key, one purchase, receipt page, My Library, a chapter, an EPUB download, then a refund that removes access.
 6. Decide tax (Stripe Tax on, or off and filed yourself).
 7. Add digital-goods refund language to the Terms page if it is not already there. The shop links to `/terms`.

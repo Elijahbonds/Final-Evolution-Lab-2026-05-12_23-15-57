@@ -2,7 +2,7 @@
 // contact + MLB Home Run Derby presentation). Contact grading (the PCI) lives in the mode; these are the derby's counters:
 // homers, outs, distance in feet, the longest shot, and the rival's line.
 
-export const OUTS_CAP = 10;
+export const OUTS_CAP = 15;   // FIELD-DEPTH W4: ten outs on twenty pitches ended too fast
 
 /** A swing that is not a homer is an out. The round ends at OUTS_CAP outs or when the pitches run out. */
 export interface DerbyTally { homers: number; outs: number; longestFt: number; totalFt: number }

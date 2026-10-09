@@ -1,24 +1,23 @@
 // FoodScan — the scan-your-plate UI (M60). Photo (camera on mobile via
 // capture attr, file picker on desktop) + 5-second plate tagging + the
-// transparent goal-relative score with its reward breakdown. Honest flow
+// transparent goal-relative score as feedback. NO CURRENCY (owner-approved
+// 2026-10-06): a plate pays no coins, XP or Shards (NutritionScore.ts says
+// why). Not mounted anywhere (lib/nav/modules.test.ts lists it). Honest flow
 // per NutritionScore.ts: nothing pretends to see the photo until the
 // VISION SEAM is wired; the photo is kept as the proof-of-plate record.
 
 import React, { useState } from 'react';
 import {
-  scorePlate, FoodScanLimits, TAG_LABEL,
+  scorePlate, TAG_LABEL,
   type Goal, type PlateTag, type PlateScore,
 } from './NutritionScore';
 
 export default function FoodScan({
   goal = 'maintain',
   trainedToday = false,
-  onReward,
 }: {
   goal?: Goal;
   trainedToday?: boolean;
-  /** ECONOMY SEAM — grant the earned coins/xp/shards to the real wallet. */
-  onReward?: (r: { coins: number; xp: number; shards: number }) => void;
 }) {
   const [photo, setPhoto] = useState<string | null>(null);
   const [tags, setTags] = useState<PlateTag[]>([]);
@@ -37,11 +36,7 @@ export default function FoodScan({
 
   const judge = (): void => {
     if (!photo || tags.length === 0) return;
-    const scored = FoodScanLimits.applyCaps(scorePlate(tags, { goal, trainedToday }));
-    setResult(scored);
-    if (scored.coins + scored.xp + scored.shards > 0) {
-      onReward?.({ coins: scored.coins, xp: scored.xp, shards: scored.shards });
-    }
+    setResult(scorePlate(tags, { goal, trainedToday }));
   };
 
   const S: Record<string, React.CSSProperties> = {
@@ -60,7 +55,7 @@ export default function FoodScan({
     <div style={S.root}>
       <div style={S.h1}>SCAN YOUR PLATE</div>
       <div style={{ fontSize: 12, opacity: 0.75 }}>
-        judged against YOUR goal ({goal}{trainedToday ? ' · trained today' : ''}) · {FoodScanLimits.remainingToday()} scored scans left today
+        judged against YOUR goal ({goal}{trainedToday ? ' · trained today' : ''}) · feedback only, no rewards
       </div>
 
       <div style={S.row}>
@@ -95,11 +90,6 @@ export default function FoodScan({
             {result.score}
           </div>
           <div style={{ fontStyle: 'italic', marginTop: 2 }}>{result.verdictLine}</div>
-          <div style={{ ...S.row, fontSize: 14 }}>
-            <span>+{result.coins} coins</span>
-            <span>+{result.xp} XP</span>
-            {result.shards > 0 && <span style={{ color: '#7ee2a0' }}>+{result.shards} ◈ Shards</span>}
-          </div>
           <div style={S.row}>
             <button style={S.chip} onClick={() => { setPhoto(null); setResult(null); setTags([]); }}>SCAN ANOTHER</button>
           </div>

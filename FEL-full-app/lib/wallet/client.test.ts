@@ -32,6 +32,30 @@ describe('wallet client — the grant a report was paid', () => {
     }
   });
 
+  it('ECONOMY-SESSIONS-HARDEN: a REPLAYED key is nothing new — zero on the card, zero in the HUD event, still a 2xx', async () => {
+    // the eye at 46a8dc6a: the wallet chip's daily_first_session, re-sent from a fresh browser, answered "granted 100 coins"
+    // with the balance unchanged — the original grant of a key already in the ledger, which a display must not show as +100
+    const seen: unknown[] = [];
+    vi.stubGlobal('window', { dispatchEvent: (e: CustomEvent) => { seen.push(e.detail); return true; } });
+    vi.stubGlobal('CustomEvent', class { constructor(public type: string, public init: { detail: unknown }) {} get detail() { return this.init.detail; } });
+    const replay = { ...earned({ coins: 100 }), replayed: true };
+    vi.stubGlobal('fetch', respond(200, replay));
+    expect(await reportEarnGrant({ idempotency_key: 'daily_first_session:2026-09-28:u1', event_type: 'daily_first_session', payload: { day: '2026-09-28' } })).toEqual({ coins: 0, shards: 0, capped: false });
+    expect(seen).toEqual([{ granted: { coins: 0, shards: 0 }, balances, capped: false }]);
+    vi.stubGlobal('fetch', respond(200, replay));
+    expect(await reportEarn({ idempotency_key: 'daily_first_session:2026-09-28:u1', event_type: 'daily_first_session', payload: {} })).toBe(true);   // the chip marks the day done
+    // PM note (QA acceptance #5): the server now answers an already-claimed daily with granted 0 — nothing to show either way
+    seen.length = 0;
+    vi.stubGlobal('fetch', respond(200, { ...earned({ coins: 0 }), replayed: true, already_claimed: true }));
+    expect(await reportEarnGrant({ idempotency_key: 'daily_first_session:2026-09-28:u1', event_type: 'daily_first_session', payload: {} })).toEqual({ coins: 0, shards: 0, capped: false });
+    expect(seen).toEqual([{ granted: { coins: 0, shards: 0 }, balances, capped: false }]);
+    // the first, real grant still shows
+    seen.length = 0;
+    vi.stubGlobal('fetch', respond(200, { ...earned({ coins: 100 }), replayed: false }));
+    expect(await reportEarnGrant({ idempotency_key: 'daily_first_session:2026-09-29:u1', event_type: 'daily_first_session', payload: {} })).toEqual({ coins: 100, shards: 0, capped: false });
+    expect(seen).toEqual([{ granted: { coins: 100, shards: 0 }, balances, capped: false }]);
+  });
+
   it('a cap is not a refusal: it says so, with the coins the cap left (MODE_SESSION_COMPLETED is 2 a minute)', async () => {
     vi.stubGlobal('fetch', respond(200, earned({ capped: true })));
     expect(await reportEarnGrant(report)).toEqual({ coins: 0, shards: 0, capped: true });
@@ -60,10 +84,23 @@ describe('wallet client — the grant a report was paid', () => {
 
 describe('the shell\'s coins tile (components/games/game-shell.tsx)', () => {
   const shell = stripComments(fs.readFileSync(path.resolve(__dirname, '../../components/games/game-shell.tsx'), 'utf8'));
+  const card = stripComments(fs.readFileSync(path.resolve(__dirname, '../../components/games/end-screen/end-screen.tsx'), 'utf8'));
+  const reveal = stripComments(fs.readFileSync(path.resolve(__dirname, '../../components/games/end-screen/reveal.ts'), 'utf8'));
   it('no tile for a refused earn or a zero grant nothing capped; a capped coin earn says so instead of "+0"', () => {
-    expect(shell).toContain('if (coins > 0 || capped) setRecapCoins({ coins, capped });');
-    expect(shell).toContain('const capped = Boolean(gs[0]?.capped);');
-    expect(shell).toContain('{recapCoins.coins > 0 && <span');
-    expect(shell).toContain("'Wallet coin limit reached for now'");
+    // ECONOMY-CAPS F-P1: hide +0 tiles on paid cards; coins tile only when coins > 0
+    // test changed (2026-10-06, owner decision on the end-screen lane): the owner chose to SHOW the limit — a cap that cut
+    // a run's coins to nothing is now a "Coin limit reached today" tile (never a "+0"); a zero grant nothing capped is
+    // still no tile at all
+    expect(shell).toContain('if (mine() && j?.paid === true)');
+    expect(shell).toContain('const capped = Boolean(j?.coinsCapped);');
+    expect(shell).toContain('const coins = Number.isFinite(j?.coins) ? Number(j.coins) : 0;');
+    // END SCREEN (2026-10-06): the tiles moved into components/games/end-screen; the shell hands the card recapCoins as it
+    // holds them, and the card keeps the rule (end-screen.test.tsx renders the zero / capped cases)
+    expect(shell).toContain('coins={recapCoins}');
+    expect(card).toContain('{coins && coins.coins > 0 && <RewardTile');
+    expect(card).toContain('{recap.xp > 0 && <RewardTile');
+    expect(reveal).toContain("if (d.coins && (d.coins.coins > 0 || d.coins.capped)) out.push('coins');");
+    expect(card).toContain('const coinLimit = Boolean(coins && coins.coins <= 0 && coins.capped);');
+    expect(card).toContain('Coin limit reached today');
   });
 });

@@ -118,9 +118,12 @@ check('every active Babylon mode mounts a world (venue or terrain) and ambient',
     assert.ok(src.includes(`VenueKit.${fn}`), `${m} missing VenueKit.${fn}`);
     assert.ok(src.includes('EffectsKit.ambient('), `${m} missing EffectsKit.ambient`);
   }
-  // precision modes (tennis/golf/baseball/soccer) share aimSwingCore + a field each
+  // precision modes (golf/baseball/soccer) share aimSwingCore + a field each
+  // IMPROVE (2026-10-06, Golf #20): 'tennis' left this list with the dead precision TennisMode it was reading (the live
+  // tennis is NetSportMode, which mounts its court through mountVenue — checked below).
   const precision = read('lib/babylon/modes/precisionModes.ts');
-  for (const fld of ['tennis', 'golf', 'ballpark', 'pitch']) {
+  assert.ok(read('lib/babylon/modes/NetSportMode.ts').includes('venue = mountVenue(ctx, o.venueId'), 'NetSportMode (tennis / volleyball) missing its venue mount');
+  for (const fld of ['golf', 'ballpark', 'pitch']) {
     assert.ok(precision.includes(`VenueKit.buildField(ctx.scene, '${fld}')`), `precisionModes missing buildField('${fld}')`);
   }
   assert.ok(precision.includes('EffectsKit.ambient('), 'precisionModes missing EffectsKit.ambient');
