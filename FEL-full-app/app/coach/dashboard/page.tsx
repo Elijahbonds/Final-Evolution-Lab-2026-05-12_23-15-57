@@ -8,6 +8,7 @@ import { isCoachStoreEnabled } from '@/lib/flags';
 import { isAllowlistedCoach } from '@/lib/coach-store/coaches';
 import { isMissingTable, logStoreUnavailable } from '@/lib/coach-store/gate';
 import { reviewUrgency } from '@/lib/coach-store/reviews';
+import { reviewHref, reviewStudioOpen } from '@/lib/coach-store/reviewLink';
 import { PAIN_LINE } from '@/lib/coach-store/constants';
 import { SyncWithStripe } from '@/components/coach-store/sync-stripe';
 
@@ -43,6 +44,7 @@ export default async function DashboardPage() {
             {b.kind} · {b.status}
             {b.painYes ? <span className="ml-2 rounded bg-red-500/30 px-2">Pain — {PAIN_LINE}</span> : null}
             {b.dueAt ? <span className="ml-2">{reviewUrgency(b.dueAt, now)}</span> : null}
+            {reviewStudioOpen(b) ? <Link className="ml-2 underline" href={reviewHref(b.id)}>Open review</Link> : null}
           </li>
         ))}
       </ul>
