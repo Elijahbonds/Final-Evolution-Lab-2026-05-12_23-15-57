@@ -20,6 +20,26 @@ export const MIGRATED: Record<string, { keys: string[]; modeId: string }> = {
     modeId: '{modeKey}',
     keys: 'airLeft airMax balance balanceKind banner chainLink coach coins combo comboLine flow gates goal goalList goals heat hint momentum par pocket pocketHi pocketLo pot score speed split swell target time tube tubeMark tubeOk wallCue waves'.split(' '),
   },
+  'karate-babylon.tsx': {
+    modeId: '"karate"',
+    keys: 'banner chi coins flowDrop flowMeter flowMult flowReady focus focusOn hits hp kos partnerHp perks revive timeLeft wave'.split(' '),
+  },
+  'karate-vs-babylon.tsx': {
+    modeId: '"karate_vs"',
+    keys: 'banner chi focus focusOn foeChi foeGuard foeHp foeWins guard hp round timeLeft wins'.split(' '),
+  },
+  'showdown-babylon.tsx': {
+    modeId: '"showdown"',
+    keys: 'assist banner chi foeChi foeGuard foeHp foeWins guard hp loadout round wins'.split(' '),
+  },
+  'duel-babylon.tsx': {
+    modeId: '"duel"',
+    keys: 'banner edge foeChi foeGuard foeHp foeWins guard hint hp round timeLeft wins'.split(' '),
+  },
+  'mixedcombat-babylon.tsx': {
+    modeId: '"mixedcombat"',
+    keys: 'banner chi dragonReady edge focus focusOn foeChi foeGuard foeHp foeWins guard hint hp loadout round wins'.split(' '),
+  },
   'football-babylon.tsx': {
     modeId: '"football"',
     keys: 'ballOn banner board boardTitle breakaway breakawayFill breakawayTicks down drive evades fieldLen firstDown hint lane los par prompts score slingshot target toGo truckCool truckReady weather yards'.split(' '),
@@ -31,7 +51,7 @@ export const MIGRATED: Record<string, { keys: string[]; modeId: string }> = {
 };
 
 /** Shared HUD pieces a migrated host draws through, held to the same rules. */
-const PIECES = ['timing-prompt.tsx'];
+const PIECES = ['timing-prompt.tsx', 'combat-hud-band.tsx'];
 
 const keyRead = (src: string, k: string) => new RegExp(`hud\\.${k}\\b|hud\\[['"]${k}['"]\\]`).test(src);
 

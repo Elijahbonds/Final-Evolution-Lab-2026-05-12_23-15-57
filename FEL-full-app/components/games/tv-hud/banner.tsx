@@ -22,12 +22,12 @@ export const LINE_CLAMP_STYLE: CSSProperties = {
 };
 export const PHONE_THUMB_GAP_CLASS = '[@media(orientation:landscape)_and_(max-height:520px)]:max-w-[44%]';
 
-export function HudBanner({ text, tone = 'score', size = 'banner', className = 'top-1/3', plate = true, flow = false, children }: {
+export function HudBanner({ text, tone = 'score', size = 'banner', className, plate = true, flow = false, children }: {
   /** The call. Empty / not a string: nothing renders. */
   text?: unknown;
   tone?: HudTone;
   size?: HudSize;
-  /** The vertical slot, as the host always placed it. */
+  /** The vertical slot, as the host always placed it (default top-1/3; none in flow). */
   className?: string;
   plate?: boolean;
   /** In the flow of its parent (a call under a scorebug) instead of a full-width layer of its own. */
@@ -39,7 +39,7 @@ export function HudBanner({ text, tone = 'score', size = 'banner', className = '
   const call = typeof text === 'string' ? text : typeof text === 'number' ? String(text) : '';
   const m = hudEnter(reduced);
   return (
-    <div data-hud-banner className={flow ? `flex flex-col items-center text-center ${className}` : `pointer-events-none absolute inset-x-0 ${className} flex flex-col items-center px-4 text-center`}>
+    <div data-hud-banner className={flow ? `flex flex-col items-center text-center ${className ?? ''}` : `pointer-events-none absolute inset-x-0 ${className ?? 'top-1/3'} flex flex-col items-center px-4 text-center`}>
       <AnimatePresence initial={!reduced}>
         {call && (
           <motion.span
