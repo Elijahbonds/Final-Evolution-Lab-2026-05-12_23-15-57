@@ -6,7 +6,9 @@ import { useEffect, useRef, useState } from 'react';
 import { Crown, LogOut, MoreHorizontal, UserCheck, UserX, X } from 'lucide-react';
 import { partyClient } from '@/lib/party/social/client';
 import { isHost, type PartyMember, type PartyState } from '@/lib/party/social/state';
+import { REPORT_REASONS } from '@/server/netd/src/partyRules';
 import { Avatar, InviteBlock } from './party-bits';
+import { ChatSection } from './party-chat';
 
 export function PartyPanel({ s, onClose }: { s: PartyState; onClose: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -68,6 +70,7 @@ export function PartyPanel({ s, onClose }: { s: PartyState; onClose: () => void 
           ) : null}
 
           <Members s={s} host={host} />
+          <ChatSection s={s} />
         </div>
 
         <footer className="border-t border-white/10 px-4 py-3">
@@ -96,6 +99,7 @@ function Members({ s, host }: { s: PartyState; host: boolean }) {
 
 function MemberRow({ m, you, host, speaking, conn }: { m: PartyMember; you: boolean; host: boolean; speaking: boolean; conn?: string }) {
   const [open, setOpen] = useState(false);
+  const [reporting, setReporting] = useState(false);
   const c = partyClient();
   const muted = false;
   const voiceLine = !m.voice ? null : m.deafened ? 'Deafened' : m.muted ? 'Mic muted' : conn === 'failed' ? "Voice couldn't connect" : speaking ? 'Speaking' : 'In voice';
@@ -123,8 +127,23 @@ function MemberRow({ m, you, host, speaking, conn }: { m: PartyMember; you: bool
       </div>
       {open && !you ? (
         <div className="mt-2 flex flex-wrap gap-1.5">
+          <button type="button" data-testid="party-block" className="rounded-md border border-white/20 px-2 py-1 text-xs" onClick={() => { c.block(m); setOpen(false); }}>Block</button>
+          <button type="button" data-testid="party-report" className="rounded-md border border-white/20 px-2 py-1 text-xs" aria-expanded={reporting} onClick={() => setReporting((r) => !r)}>Report</button>
           {host ? <button type="button" className="rounded-md border border-white/20 px-2 py-1 text-xs" onClick={() => { c.makeHost(m.peer); setOpen(false); }}>Make host</button> : null}
           {host ? <button type="button" data-testid="party-kick" className="rounded-md border border-rose-400/40 px-2 py-1 text-xs text-rose-300" onClick={() => { c.kick(m.peer); setOpen(false); }}>Remove from party</button> : null}
+        </div>
+      ) : null}
+      {reporting && !you ? (
+        <div className="mt-2 rounded-md bg-black/30 p-2" role="group" aria-label={`Report ${m.name}`}>
+          <p className="mb-1 text-xs text-white/60">Why are you reporting {m.name}? They won&apos;t be told. Reporting also blocks them for you.</p>
+          <div className="flex flex-wrap gap-1.5">
+            {REPORT_REASONS.map((r) => (
+              <button key={r.id} type="button" className="rounded-md border border-white/20 px-2 py-1 text-xs"
+                onClick={() => { c.report(m.peer, r.id); c.block(m); setReporting(false); setOpen(false); }}>
+                {r.label}
+              </button>
+            ))}
+          </div>
         </div>
       ) : null}
     </li>

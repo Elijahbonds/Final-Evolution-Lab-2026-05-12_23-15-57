@@ -107,6 +107,19 @@ export const EMOTES: readonly Emote[] = [
 export const quickLine = (id: unknown): QuickLine | null => QUICK_CHAT.find((q) => q.id === id) ?? null;
 export const emoteById = (id: unknown): Emote | null => EMOTES.find((e) => e.id === id) ?? null;
 
+// ── reports ─────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+/** Why a member may report someone. Fixed ids: nothing typed rides along with a report. */
+export const REPORT_REASONS: readonly { id: string; label: string }[] = [
+  { id: 'harassment', label: 'Bullying or harassment' },
+  { id: 'hate', label: 'Hate or slurs' },
+  { id: 'sexual', label: 'Sexual talk' },
+  { id: 'threat', label: 'Threats or danger' },
+  { id: 'cheating', label: 'Cheating' },
+  { id: 'other', label: 'Something else' },
+];
+export const REPORT_REASON_IDS = REPORT_REASONS.map((r) => r.id);
+
 // ── "Start together": the modes a party can be pulled into ───────────────────────────────────────────────────────────
 
 /**

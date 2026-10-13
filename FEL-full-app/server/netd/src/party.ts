@@ -21,7 +21,7 @@
 
 import {
   PARTY_MAX, RESUME_GRACE_MS, KNOCK_MAX, KNOCK_TTL_MS, START_COUNTDOWN_MS,
-  cleanPartyName, cleanChatText, quickLine, emoteById, onlineMode, takeToken, freshBucket,
+  cleanPartyName, cleanChatText, quickLine, emoteById, onlineMode, takeToken, freshBucket, REPORT_REASON_IDS,
   type Bucket, type RateKind,
 } from './partyRules.js';
 
@@ -315,8 +315,6 @@ export function handle(p: Party, peer: string, msg: Record<string, unknown>, now
   }
 }
 
-/** Why a member may report someone. Fixed ids: nothing typed rides along with a report. */
-export const REPORT_REASONS = ['harassment', 'hate', 'sexual', 'threat', 'cheating', 'other'] as const;
 
 /** What the socket shell lends the state machine: the report sealer (ticket.ts sealSlip, or null with no secret). */
 export interface PartyEnv { seal: ((slip: { reporterUid: string | null; reportedUid: string | null; reportedName: string; code: string; reason: string; at: number }) => string) | null }
@@ -363,7 +361,7 @@ function handleMore(p: Party, me: Member, isHost: boolean, msg: Record<string, u
       if (limited(me, 'control', now)) return err(peer, 'slow_down');
       const target = typeof msg.peer === 'string' ? p.members.get(msg.peer) : undefined;
       if (!target || target.peer === peer) return err(peer, 'no_such_member');
-      const reason = (REPORT_REASONS as readonly string[]).includes(msg.reason as string) ? (msg.reason as string) : 'other';
+      const reason = (REPORT_REASON_IDS as readonly string[]).includes(msg.reason as string) ? (msg.reason as string) : 'other';
       const slip = env.seal ? env.seal({ reporterUid: me.uid, reportedUid: target.uid, reportedName: target.name, code: p.code, reason, at: now }) : null;
       return { out: [{ to: [peer], msg: { t: 'p_report_slip', peer: target.peer, slip } }], close: [] };
     }

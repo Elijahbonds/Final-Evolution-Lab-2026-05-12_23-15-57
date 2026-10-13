@@ -13,7 +13,7 @@ import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { usePathname } from 'next/navigation';
 import { Users } from 'lucide-react';
 import { partyClient } from '@/lib/party/social/client';
-import { inParty, type PartyState } from '@/lib/party/social/state';
+import { captionText, inParty, type PartyState } from '@/lib/party/social/state';
 import { dockPlace, type DockPlace } from '@/lib/party/social/tuck';
 import { activityLine } from '@/lib/party/social/activity';
 import { recallPlayerName } from '@/lib/party/playerName';
@@ -48,6 +48,19 @@ export function PartyDock() {
   const place: DockPlace = dockPlace(phase, quick, inParty(s));
   // a game starting under the panel closes it: the play screen is the HUD alone
   useEffect(() => { if (place === 'hidden') setOpen(false); }, [place]);
+  // a report: netd handed back a sealed slip; carry it to the app (stored once the pending SQL is applied)
+  useEffect(() => {
+    const r = s.reportSlip;
+    if (!r) return;
+    const c = partyClient();
+    c.patch({ reportSlip: null });
+    if (!r.slip) { c.patch({ notice: 'Thanks — they are blocked for you. Reports are not switched on here yet.' }); return; }
+    void fetch('/api/party/report', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ slip: r.slip }) })
+      .then((res) => res.json().catch(() => ({})))
+      .then((j: { stored?: boolean }) => c.patch({ notice: j.stored ? 'Report sent. Thanks — they are blocked for you.' : 'Thanks — they are blocked for you. Reports are not switched on here yet.' }))
+      .catch(() => c.patch({ notice: "Couldn't send the report — they are still blocked for you." }));
+  }, [s.reportSlip]);
+
   // the /party hub opens the panel by event (it lives in the page, the panel lives here)
   useEffect(() => {
     const onOpen = () => setOpen(true);
@@ -59,6 +72,7 @@ export function PartyDock() {
     <>
       {place !== 'hidden' ? <PartyBar s={s} place={place} onOpen={() => setOpen(true)} /> : null}
       {open && place !== 'hidden' ? <PartyPanel s={s} onClose={close} /> : null}
+      {!quick && inParty(s) ? <Captions s={s} show={place !== 'hidden' && !open} /> : null}
     </>
   );
 }
@@ -90,5 +104,31 @@ function PartyBar({ s, place, onOpen }: { s: PartyState; place: DockPlace; onOpe
         </button>
       </div>
     </div>
+  );
+}
+
+/**
+ * CAPTIONS (accessibility): every quick-chat line and emote, in words, for a moment — and always to a screen reader
+ * (an aria-live region, which draws nothing). While a game is playing nothing is DRAWN (the HUD rule) but the words are
+ * still announced.
+ */
+function Captions({ s, show }: { s: PartyState; show: boolean }) {
+  const [visible, setVisible] = useState<string | null>(null);
+  const key = s.caption?.key ?? null;
+  useEffect(() => {
+    if (!s.caption) return;
+    setVisible(captionText(s.caption));
+    const t = setTimeout(() => setVisible(null), 4000);
+    return () => clearTimeout(t);
+  }, [key]);   // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <>
+      <div className="sr-only" aria-live="polite" data-testid="party-caption-sr">{s.caption ? captionText(s.caption) : ''}</div>
+      {show && visible ? (
+        <div aria-hidden data-testid="party-caption" className="pointer-events-none fixed bottom-[calc(env(safe-area-inset-bottom)+122px)] left-3 z-40 max-w-[min(320px,calc(100vw-24px))] rounded-lg bg-black/80 px-3 py-1.5 text-sm text-white shadow md:bottom-16">
+          {s.caption?.glyph ? <span className="mr-1">{s.caption.glyph}</span> : null}{visible}
+        </div>
+      ) : null}
+    </>
   );
 }
