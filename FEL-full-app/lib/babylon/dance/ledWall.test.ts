@@ -1,14 +1,15 @@
 // The Cypher's LED wall (vis-party, 2026-10-13): what each cell shows is a pure function of the song's beat/bar position, so the
 // wall is on the song's clock; reduced flashing holds a pattern for a whole bar; the mesh carries the name the foundation's glow
 // include list matches.
-import { beforeAll, describe, expect, it } from 'vitest';
-import { FreeCamera, NullEngine, Scene, Vector3 } from '@babylonjs/core';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { DynamicTexture, FreeCamera, NullEngine, Scene, Vector3 } from '@babylonjs/core';
 import {
   LED_COLS, LED_ROWS, ledCardText, ledCell, ledColors, ledFrameKey, ledKindAt, mountLedWall, hash01, type LedKind, type LedState,
 } from './ledWall';
 
 const painted: string[] = [];
 const transforms: number[][] = [];
+const updates: boolean[] = [];
 const ctx2d = new Proxy({}, {
   get: (_t, k) => {
     if (k === 'createLinearGradient' || k === 'createRadialGradient') return () => ({ addColorStop() {} });
@@ -110,12 +111,15 @@ describe('the LED wall: the mesh', () => {
     expect(painted).toContain('MIDNIGHT RUN');
     w.dispose();
   });
-  it('reads forwards from the stage camera on the −z side (painted mirrored: a negative uScale clamps to a flat colour) and is emissive over a black albedo', () => {
+  it('reads upright and forwards from the stage camera: painted as-is, uploaded inverted in y, no u flip (each wrong turn was seen on a frame)', () => {
     const w = mountLedWall(scene, { at: [0, 4, 14], width: 15, height: 3.3, small: false, track: 'A' });
-    transforms.length = 0;
+    transforms.length = 0; updates.length = 0;
+    const orig = DynamicTexture.prototype.update;
+    const spy = vi.spyOn(DynamicTexture.prototype, 'update').mockImplementation(function (this: DynamicTexture, invertY?: boolean, ...rest: unknown[]) { updates.push(!!invertY); return (orig as (...a: unknown[]) => void).call(this, invertY, ...rest); });
     w.update(st(5, 0.1));
-    expect(transforms[0]).toEqual([-1, 0, 0, 1, 768, 0]);          // the canvas is flipped in x for the paint…
-    expect(transforms[transforms.length - 1]).toEqual([1, 0, 0, 1, 0, 0]);   // …and put back
+    spy.mockRestore();
+    expect(transforms).toEqual([]);                                  // the canvas is not mirrored
+    expect(updates).toEqual([true]);                                 // DynamicTexture.update(invertY = true)
     const m = w.mesh.material as unknown as { unlit: boolean; emissiveTexture: { uScale: number }; albedoColor: { r: number; g: number; b: number } };
     expect(m.emissiveTexture.uScale).toBe(1);
     expect(m.unlit).toBeFalsy();
