@@ -179,3 +179,162 @@ describe('the swing trail', () => {
     expect(scene.getMeshByName('fel_decal_trail_racket')).toBeNull();
   });
 });
+
+// ── the derby's board and fireworks ──────────────────────────────────────────────────────────────────────
+import { boardLine, buildJumbotron, paintJumbotron, JUMBO_H, JUMBO_W } from './Jumbotron';
+import { FireworkShow, fireworkPlan } from './Fireworks';
+
+describe('the jumbotron', () => {
+  it('reads the tally and the last ball, and paints a card only when there is one', () => {
+    expect(boardLine(3, 1, 5)).toBe('HR 3  ·  OUTS 1/5');
+    const texts: string[] = [];
+    const g = { createLinearGradient: () => ({ addColorStop() {} }), fillRect() {}, fillText: (t: string) => { texts.push(t); }, set fillStyle(_v: string) {}, set font(_v: string) {}, set textAlign(_v: string) {}, set textBaseline(_v: string) {} };
+    paintJumbotron(g as unknown as CanvasRenderingContext2D, { title: 'HOME RUN DERBY', board: 'HR 1', card: ['EXIT VELO 99 MPH', 'LAUNCH 27°', 'DISTANCE 410 FT'], homer: true });
+    expect(texts).toContain('EXIT VELO 99 MPH'); expect(texts).toContain('DISTANCE 410 FT');
+    texts.length = 0;
+    paintJumbotron(g as unknown as CanvasRenderingContext2D, { title: 'T', board: 'B', card: null, homer: false });
+    expect(texts.join('|')).toContain('STEP UP TO THE PLATE');
+    expect(JUMBO_W / JUMBO_H).toBeGreaterThan(2);
+  });
+  it('builds a screen and a frame behind it, and disposes', () => {
+    const { scene } = rig();
+    const j = buildJumbotron(scene, { x: 0, y: 12, z: 40 }, Math.PI);
+    const screen = scene.getMeshByName('court_jumbotron_screen')!, frame = scene.getMeshByName('court_jumbotron_frame')!;
+    expect(screen.isPickable).toBe(false);
+    // yaw π: the face looks toward −z (the plate); the frame stands behind it, farther from the plate
+    expect(frame.position.z).toBeLessThan(screen.position.z + 1e-9 + 0.3);
+    j.show({ title: 'x', board: 'y', card: null, homer: false });
+    j.dispose();
+    expect(scene.meshes.some((m) => m.name.startsWith('court_jumbotron'))).toBe(false);
+  });
+});
+
+describe('the fireworks', () => {
+  it('a plan is deterministic, ordered, bounded and clear of the ground', () => {
+    const a = fireworkPlan({ x: 3, z: 40 }, 6, 2), b = fireworkPlan({ x: 3, z: 40 }, 6, 2);
+    expect(a).toEqual(b); expect(a.length).toBe(6);
+    expect(a.map((s) => s.delay)).toEqual([...a.map((s) => s.delay)].sort((x, y) => x - y));
+    for (const s of a) { expect(s.y).toBeGreaterThanOrEqual(14); expect(s.y).toBeLessThanOrEqual(24); expect(Math.abs(s.x - 3)).toBeLessThanOrEqual(16); expect(s.delay).toBeLessThan(1.8); }
+    expect(fireworkPlan({ x: 0, z: 0 }, 6, 3)).not.toEqual(fireworkPlan({ x: 0, z: 0 }, 6, 4));
+  });
+  it('the show fires each shell once, when its time comes, on the mode’s own clock', () => {
+    const { scene } = rig();
+    const show = new FireworkShow(scene);
+    show.launch(fireworkPlan({ x: 0, z: 40 }, 5));
+    expect(show.live).toBe(5);
+    show.update(0.05); expect(show.live).toBe(5);       // nothing is due yet
+    for (let i = 0; i < 40; i++) show.update(0.05);
+    expect(show.live).toBe(0);
+    show.launch(fireworkPlan({ x: 0, z: 40 }, 3)); show.clear(); expect(show.live).toBe(0);
+  });
+});
+
+// ── the penalty's net and flares ──────────────────────────────────────────────────────────────────────────
+import { buildGoalNet, netAlpha, netPush, NET_LIFE_SEC } from './GoalNet';
+import { FlareShow, flareBurn, flareSpots, FLARE_SEC } from './Flares';
+
+describe('the goal net', () => {
+  it('bulges back most where the ball struck, never pulls forward, and is gone when its life is up', () => {
+    const at = netPush(0, 0, 0.1, 1);
+    expect(at).toBeGreaterThan(0.5); expect(at).toBeLessThan(1.3);
+    expect(netPush(2.5, 0, 0.1, 1)).toBeLessThan(at * 0.2);
+    for (let t = 0; t < NET_LIFE_SEC; t += 0.05) for (const dx of [-2, 0, 1.5]) expect(netPush(dx, 0.4, t, 1)).toBeGreaterThanOrEqual(0);
+    expect(netPush(0, 0, NET_LIFE_SEC, 1)).toBe(0); expect(netPush(0, 0, 0.2, 0)).toBe(0); expect(netPush(0, 0, -1, 1)).toBe(0);
+  });
+  it('a harder strike pushes further', () => { expect(netPush(0, 0, 0.1, 1)).toBeGreaterThan(netPush(0, 0, 0.1, 0.4)); });
+  it('the sheet fades in fast and out slowly, and is invisible outside its life', () => {
+    expect(netAlpha(0)).toBe(0); expect(netAlpha(0.1)).toBe(1); expect(netAlpha(1)).toBe(1);
+    expect(netAlpha(NET_LIFE_SEC - 0.25)).toBeCloseTo(0.5, 6); expect(netAlpha(NET_LIFE_SEC)).toBe(0);
+  });
+  it('is invisible until struck, moves its vertices back while live, and puts them home when done', () => {
+    const { scene, frame } = rig();
+    const n = buildGoalNet(scene, { halfW: 3.66, height: 2.44, z: 11 });
+    const mesh = scene.getMeshByName('court_goal_net')!;
+    expect(mesh.isVisible).toBe(false); expect(mesh.isPickable).toBe(false);
+    const rest = Array.from(mesh.getVerticesData('position')!);
+    n.hit(1, 1.2, 1); n.update(0.1);
+    expect(mesh.isVisible).toBe(true); expect(n.live).toBe(true);
+    const pos = Array.from(mesh.getVerticesData('position')!);
+    let maxZ = 0; for (let k = 2; k < pos.length; k += 3) maxZ = Math.max(maxZ, pos[k] - rest[k]);
+    expect(maxZ).toBeGreaterThan(0.4);
+    for (let i = 0; i < 80; i++) n.update(1 / 30);
+    expect(n.live).toBe(false); expect(mesh.isVisible).toBe(false);
+    expect(Array.from(mesh.getVerticesData('position')!)).toEqual(rest);
+    frame(1); n.dispose();
+    expect(scene.getMeshByName('court_goal_net')).toBeNull();
+  });
+});
+
+describe('the flares', () => {
+  it('flare up fast, burn, die away, and are nothing outside their life', () => {
+    expect(flareBurn(0)).toBe(0); expect(flareBurn(0.25)).toBe(1); expect(flareBurn(FLARE_SEC / 2)).toBe(1);
+    expect(flareBurn(FLARE_SEC - 0.4)).toBeCloseTo(0.5, 6); expect(flareBurn(FLARE_SEC)).toBe(0); expect(flareBurn(-1)).toBe(0);
+  });
+  it('stand behind the goal, spread across it; a phone lights one', () => {
+    const d = flareSpots(11, 3.66, false), p = flareSpots(11, 3.66, true);
+    expect(d.length).toBe(3); expect(p.length).toBe(1);
+    for (const s of d) expect(s.z).toBeGreaterThan(11 + 5);
+    expect(new Set(d.map((s) => s.x)).size).toBe(3);
+  });
+  it('lights, burns for its length on the mode’s clock and goes out; disposes its systems', () => {
+    const { scene } = rig();
+    const f = new FlareShow(scene, flareSpots(11, 3.66, false));
+    expect(f.live).toBe(false);
+    f.ignite(); expect(f.live).toBe(true);
+    const sys = scene.particleSystems.filter((p) => p.name.startsWith('fx_flare_'));
+    expect(sys.length).toBe(6);
+    f.update(0.5); expect(sys[0].emitRate).toBeGreaterThan(0);
+    for (let i = 0; i < 100; i++) f.update(0.05);
+    expect(f.live).toBe(false); expect(sys.every((p) => p.emitRate === 0)).toBe(true);
+    f.dispose();
+    expect(scene.particleSystems.some((p) => p.name.startsWith('fx_flare_'))).toBe(false);
+    const g = new FlareShow(scene, flareSpots(11, 3.66, true), false);
+    expect(scene.particleSystems.filter((p) => p.name.startsWith('fx_flare_')).length).toBe(1);
+    g.dispose();
+  });
+});
+
+// ── the gridiron ─────────────────────────────────────────────────────────────────────────────────────────
+import { footballTowers, pylonSpots, firstDownVisible, pyroBurn, PYRO_SEC, mountFootballFx } from './FootballFx';
+
+describe('the gridiron', () => {
+  it('four towers outside the stands (two on a phone), each facing the field', () => {
+    const t = footballTowers(22, 40, false);
+    expect(t.length).toBe(4);
+    for (const s of t) { expect(Math.abs(s.x)).toBeGreaterThan(22 + 4); expect(Math.sin(s.yaw) * -s.x).toBeGreaterThan(0); }   // the bank faces inward
+    expect(footballTowers(22, 40, true).length).toBe(2);
+  });
+  it('pylons stand at the goal line and the end line, a hand outside the sideline', () => {
+    const p = pylonSpots(20.8, 40, 45);
+    expect(p.length).toBe(4); expect(p.map((s) => s.z).sort()).toEqual([40, 40, 45, 45]);
+    for (const s of p) expect(Math.abs(s.x)).toBeGreaterThan(20.8);
+  });
+  it('the yellow line is for a line to gain on the field, not at or past the goal line', () => {
+    expect(firstDownVisible(30, 40)).toBe(true); expect(firstDownVisible(39.8, 40)).toBe(false); expect(firstDownVisible(44, 40)).toBe(false);
+  });
+  it('the jets kick in at once, burn, and die in the last stretch', () => {
+    expect(pyroBurn(-1)).toBe(0); expect(pyroBurn(0.12)).toBe(1); expect(pyroBurn(PYRO_SEC / 2)).toBe(1); expect(pyroBurn(PYRO_SEC - 0.35)).toBeCloseTo(0.5, 6); expect(pyroBurn(PYRO_SEC)).toBe(0);
+  });
+  it('mounts the lines, the pylons, the towers and the jets; moves the lines; goes off when the show is over; disposes clean', () => {
+    const { scene } = rig();
+    const before = scene.meshes.length;
+    const f = mountFootballFx(scene, { phone: false, fieldHalfW: 20.8, goalZ: 40, endZ: 45 });
+    expect(scene.getMeshByName('fel_decal_downline_los')).toBeTruthy(); expect(scene.getMeshByName('court_pylon_3')).toBeTruthy();
+    expect(f.meshes.filter((m) => /^flood_court_tower_\d$/.test(m.name)).length).toBe(4);
+    f.update(1 / 60, { los: 12, firstDown: 21 });
+    expect(scene.getMeshByName('fel_decal_downline_los')!.position.z).toBe(12);
+    expect(scene.getMeshByName('fel_decal_downline_first')!.isVisible).toBe(true);
+    f.update(1 / 60, { los: 35, firstDown: 44 });
+    expect(scene.getMeshByName('fel_decal_downline_first')!.isVisible).toBe(false);
+    f.touchdown();
+    const jets = scene.particleSystems.filter((p) => p.name.startsWith('fx_pyro_'));
+    expect(jets.length).toBe(4);
+    f.update(0.3, { los: 0, firstDown: 9 }); expect(jets[0].emitRate).toBeGreaterThan(0);
+    for (let i = 0; i < 60; i++) f.update(0.05, { los: 0, firstDown: 9 });
+    expect(jets.every((j) => j.emitRate === 0)).toBe(true);
+    f.cut({ x: 1, z: 5 }, 0.3); f.tackle({ x: 1, z: 5 }); f.truck({ x: 1, z: 5 });   // no decal pool on this scene: nothing may throw
+    f.dispose();
+    expect(scene.meshes.length).toBe(before);
+    expect(scene.particleSystems.some((p) => p.name.startsWith('fx_pyro_'))).toBe(false);
+  });
+});

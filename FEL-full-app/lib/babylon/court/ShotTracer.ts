@@ -67,7 +67,7 @@ export function ribbonEdges(pts: readonly V3[], cam: V3, base: number, grow: num
     let sx = ty * cz - tz * cy, sy = tz * cx - tx * cz, sz = tx * cy - ty * cx;
     const sl = Math.hypot(sx, sy, sz);
     if (sl < 1e-6) { sx = 1; sy = 0; sz = 0; } else { sx /= sl; sy /= sl; sz /= sl; }
-    const w = base * (1 + dist * grow);
+    const w = base + dist * grow;
     left.push({ x: p.x - sx * w, y: p.y - sy * w, z: p.z - sz * w });
     right.push({ x: p.x + sx * w, y: p.y + sy * w, z: p.z + sz * w });
   }
@@ -93,8 +93,8 @@ export class ShotTracer {
   private readonly obs;
 
   constructor(private readonly scene: Scene, private readonly opts: TracerOpts = {}) {
-    this.width = opts.width ?? 0.07;
-    this.grow = opts.grow ?? 0.012;
+    this.width = opts.width ?? 0.012;
+    this.grow = opts.grow ?? 0.0035;
     const c = Color3.FromHexString(opts.color ?? '#fff1b0');
     this.mat = new StandardMaterial(`${opts.name ?? 'fel_decal_tracer'}_m`, scene);
     this.mat.disableLighting = true; this.mat.emissiveColor = c; this.mat.diffuseColor = Color3.Black(); this.mat.specularColor = Color3.Black();

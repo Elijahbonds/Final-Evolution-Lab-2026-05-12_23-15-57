@@ -12,8 +12,9 @@
 //   court_tower_mast_<i>    the mast and the frame — same reason, a receiver only
 // Three draws a tower. Visual only.
 
-import { Color3, DynamicTexture, MeshBuilder, PBRMaterial, StandardMaterial, Texture } from '@babylonjs/core';
+import { Color3, MeshBuilder, PBRMaterial, StandardMaterial, Texture } from '@babylonjs/core';
 import type { Mesh, Scene } from '@babylonjs/core';
+import { makeTexture } from './texture';
 
 export interface TowerSpot { x: number; z: number; /** yaw the lamp bank faces (towards the pitch centre) */ yaw: number }
 export interface TowerOpts {
@@ -51,12 +52,11 @@ export interface TowersHandle { meshes: readonly Mesh[]; dispose(): void }
 export function buildFloodTowers(scene: Scene, spots: readonly TowerSpot[], opts: TowerOpts = {}): TowersHandle {
   const H = opts.height ?? 16, bank = opts.bank ?? { w: 5.2, h: 2.4 };
   const made: Mesh[] = [];
-  const tex = new DynamicTexture('flood_court_tower_tex', { width: 256, height: 128 }, scene, true);
-  try { paintLampBank(tex.getContext() as unknown as CanvasRenderingContext2D, 256, 128, 6, 3); tex.update(false); } catch { /* headless: a plain lit bank */ }
-  tex.wrapU = Texture.CLAMP_ADDRESSMODE; tex.wrapV = Texture.CLAMP_ADDRESSMODE;
+  const tex = makeTexture(scene, 'flood_court_tower_tex', 256, 128, (g) => paintLampBank(g, 256, 128, 6, 3));   // null headless: a plain lit bank
+  if (tex) { tex.wrapU = Texture.CLAMP_ADDRESSMODE; tex.wrapV = Texture.CLAMP_ADDRESSMODE; }
   const lamp = new StandardMaterial('flood_court_tower_m', scene);
   lamp.disableLighting = true; lamp.diffuseColor = Color3.Black(); lamp.specularColor = Color3.Black();
-  lamp.emissiveColor = Color3.FromHexString(opts.color ?? '#fff3d6'); lamp.emissiveTexture = tex;
+  lamp.emissiveColor = Color3.FromHexString(opts.color ?? '#fff3d6'); if (tex) lamp.emissiveTexture = tex;
   const steel = new PBRMaterial('court_tower_steel_m', scene);
   steel.albedoColor = Color3.FromHexString('#7b828c'); steel.metallic = 0.7; steel.roughness = 0.5;
   (opts.max != null ? spots.slice(0, opts.max) : spots).forEach((s, i) => {
@@ -71,5 +71,5 @@ export function buildFloodTowers(scene: Scene, spots: readonly TowerSpot[], opts
     face.position.x += fx * 0.24; face.position.z += fz * 0.24; face.position.y -= 0.07;
     for (const m of [mast, frame, face]) { m.isPickable = false; m.receiveShadows = true; m.freezeWorldMatrix(); made.push(m); }
   });
-  return { meshes: made, dispose() { for (const m of made) m.dispose(); lamp.dispose(); steel.dispose(); tex.dispose(); } };
+  return { meshes: made, dispose() { for (const m of made) m.dispose(); lamp.dispose(); steel.dispose(); tex?.dispose(); } };
 }

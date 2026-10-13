@@ -4,8 +4,9 @@
 //
 // Visual only; nothing reads it back. Named `fel_decal_readout` (never a shadow caster, never mirrored).
 
-import { Color3, DynamicTexture, Mesh, MeshBuilder, StandardMaterial, Vector3 } from '@babylonjs/core';
+import { Color3, Mesh, MeshBuilder, StandardMaterial, Vector3 } from '@babylonjs/core';
 import type { Scene } from '@babylonjs/core';
+import { makeTexture, repaint } from './texture';
 import { readoutScale } from './flightRead';
 
 export const READOUT_W = 512, READOUT_LINE_H = 54, READOUT_MAX_LINES = 3;
@@ -28,19 +29,19 @@ export interface ReadoutHandle {
 
 export function mountReadout(scene: Scene, name = 'fel_decal_readout'): ReadoutHandle {
   const H = READOUT_LINE_H * READOUT_MAX_LINES + 24;
-  const tex = new DynamicTexture(`${name}_tex`, { width: READOUT_W, height: H }, scene, false);
-  tex.hasAlpha = true;
+  const tex = makeTexture(scene, `${name}_tex`, READOUT_W, H, undefined, false);
+  if (tex) tex.hasAlpha = true;
   const mat = new StandardMaterial(`${name}_m`, scene);
   mat.disableLighting = true; mat.emissiveColor = Color3.White(); mat.diffuseColor = Color3.Black(); mat.specularColor = Color3.Black();
-  mat.emissiveTexture = tex; mat.opacityTexture = tex; mat.backFaceCulling = false;
+  if (tex) { mat.emissiveTexture = tex; mat.opacityTexture = tex; }
+  mat.backFaceCulling = false;
   const plane = MeshBuilder.CreatePlane(name, { width: 1, height: H / READOUT_W }, scene);
   plane.material = mat; plane.billboardMode = Mesh.BILLBOARDMODE_ALL; plane.isPickable = false; plane.receiveShadows = false;
   plane.isVisible = false; plane.alwaysSelectAsActiveMesh = true;
   let age = Infinity, hold = READOUT_HOLD_SEC;
   const at = new Vector3();
 
-  const paint = (lines: readonly string[], color: string): void => {
-    const g = tex.getContext() as unknown as CanvasRenderingContext2D;
+  const paint = (lines: readonly string[], color: string): void => repaint(tex, (g) => {
     g.clearRect(0, 0, READOUT_W, H);
     const rows = Math.min(READOUT_MAX_LINES, lines.length);
     const h = rows * READOUT_LINE_H + 16, y0 = (H - h) / 2;
@@ -54,8 +55,7 @@ export function mountReadout(scene: Scene, name = 'fel_decal_readout'): ReadoutH
       g.fillStyle = i === 0 ? '#ffffff' : '#d7e3f3';
       g.fillText(lines[i], 30, y0 + 8 + READOUT_LINE_H * (i + 0.5), READOUT_W - 48);
     }
-    tex.update(false);
-  };
+  });
 
   const obs = scene.onBeforeRenderObservable.add(() => {
     if (!plane.isVisible) return;
@@ -78,6 +78,6 @@ export function mountReadout(scene: Scene, name = 'fel_decal_readout'): ReadoutH
     },
     hide() { plane.isVisible = false; age = Infinity; },
     get visible() { return plane.isVisible; },
-    dispose() { scene.onBeforeRenderObservable.remove(obs); plane.dispose(); mat.dispose(); tex.dispose(); },
+    dispose() { scene.onBeforeRenderObservable.remove(obs); plane.dispose(); mat.dispose(); tex?.dispose(); },
   };
 }

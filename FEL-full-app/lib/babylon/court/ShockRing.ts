@@ -4,8 +4,10 @@
 // soft-edged rings lying on the floor: `fire(at, …)` takes an idle one (or the oldest), then it grows to its radius while it
 // fades, over its life. Additive, unlit, never a shadow caster, no allocation per fire. Visual only.
 
-import { Color3, DynamicTexture, Engine, MeshBuilder, StandardMaterial } from '@babylonjs/core';
-import type { Mesh, Scene } from '@babylonjs/core';
+import { Color3, Engine, MeshBuilder, StandardMaterial } from '@babylonjs/core';
+import type { DynamicTexture, Scene } from '@babylonjs/core';
+import { makeTexture } from './texture';
+import { Mesh } from '@babylonjs/core';
 
 export const RING_POOL = 5;
 export const RING_LIFE_SEC = 0.55;
@@ -19,21 +21,22 @@ export function ringAt(age: number, life: number): { grow: number; alpha: number
 
 export interface ShockRingHandle {
   /** A ring at (x, z), on the floor at height y, running out to `radius` metres. */
-  fire(at: { x: number; y?: number; z: number }, opts?: { radius?: number; color?: string; life?: number }): void;
+  /** `upright` turns the ring to face the camera (a ring round a glove or a fist) instead of lying on the floor. */
+  fire(at: { x: number; y?: number; z: number }, opts?: { radius?: number; color?: string; life?: number; upright?: boolean }): void;
   /** Rings in flight (probes and tests). */
   live(): number;
   dispose(): void;
 }
 
-function ringTexture(scene: Scene): DynamicTexture {
+function ringTexture(scene: Scene): DynamicTexture | null {
   const S = 128;
-  const t = new DynamicTexture('fel_decal_shockring_tex', { width: S, height: S }, scene, true);
-  const g = t.getContext() as unknown as CanvasRenderingContext2D;
-  g.clearRect(0, 0, S, S);
-  const gr = g.createRadialGradient(S / 2, S / 2, S * 0.28, S / 2, S / 2, S / 2);
-  gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(0.7, 'rgba(255,255,255,0.9)'); gr.addColorStop(0.86, 'rgba(255,255,255,0.35)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
-  g.fillStyle = gr; g.fillRect(0, 0, S, S);
-  t.update(false); t.hasAlpha = true;
+  const t = makeTexture(scene, 'fel_decal_shockring_tex', S, S, (g) => {
+    g.clearRect(0, 0, S, S);
+    const gr = g.createRadialGradient(S / 2, S / 2, S * 0.28, S / 2, S / 2, S / 2);
+    gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(0.7, 'rgba(255,255,255,0.9)'); gr.addColorStop(0.86, 'rgba(255,255,255,0.35)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, S, S);
+  });
+  if (t) t.hasAlpha = true;
   return t;
 }
 
@@ -44,7 +47,8 @@ export function mountShockRings(scene: Scene): ShockRingHandle {
     const mesh = MeshBuilder.CreateGround(`fel_decal_shockring_${i}`, { width: 1, height: 1 }, scene);
     const mat = new StandardMaterial(`fel_decal_shockring_${i}_m`, scene);
     mat.disableLighting = true; mat.emissiveColor = Color3.White(); mat.diffuseColor = Color3.Black(); mat.specularColor = Color3.Black();
-    mat.emissiveTexture = tex; mat.opacityTexture = tex; mat.alphaMode = Engine.ALPHA_ADD; mat.backFaceCulling = false; mat.zOffset = -3;
+    if (tex) { mat.emissiveTexture = tex; mat.opacityTexture = tex; }
+    mat.alphaMode = Engine.ALPHA_ADD; mat.backFaceCulling = false; mat.zOffset = -3;
     mesh.material = mat; mesh.isPickable = false; mesh.receiveShadows = false; mesh.isVisible = false; mesh.alwaysSelectAsActiveMesh = true;
     rings.push({ mesh, mat, age: 0, life: RING_LIFE_SEC, radius: 1, busy: false });
   }
@@ -66,9 +70,10 @@ export function mountShockRings(scene: Scene): ShockRingHandle {
       if (!r) { cursor = (cursor + 1) % rings.length; r = rings[cursor]; }
       r.busy = true; r.age = 0; r.life = opts.life ?? RING_LIFE_SEC; r.radius = opts.radius ?? 1.4;
       r.mat.emissiveColor = Color3.FromHexString(opts.color ?? '#ffe2a0');
+      r.mesh.billboardMode = opts.upright ? Mesh.BILLBOARDMODE_ALL : Mesh.BILLBOARDMODE_NONE;
       r.mesh.position.set(at.x, (at.y ?? 0) + 0.03, at.z); r.mesh.scaling.set(0.3, 1, 0.3); r.mat.alpha = 0.9; r.mesh.isVisible = true;
     },
     live() { return rings.filter((r) => r.busy).length; },
-    dispose() { scene.onBeforeRenderObservable.remove(obs); for (const r of rings) { r.mesh.dispose(); r.mat.dispose(); } tex.dispose(); },
+    dispose() { scene.onBeforeRenderObservable.remove(obs); for (const r of rings) { r.mesh.dispose(); r.mat.dispose(); } tex?.dispose(); },
   };
 }

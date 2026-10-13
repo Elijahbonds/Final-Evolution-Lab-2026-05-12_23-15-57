@@ -47,3 +47,17 @@ export function mountSwingTrail(scene: Scene, tip: TransformNode, o: SwingTrailO
     dispose() { if (gone) return; gone = true; trail.dispose(); mat.dispose(); },
   };
 }
+
+/**
+ * A tip node that rides `ext` metres past a hand along the forearm's line (a racket's head, a club's), updated after every
+ * animation writer so it is where the body was drawn. The hand and forearm are the rig's bone nodes (the mode finds them).
+ */
+export function followTip(scene: Scene, hand: TransformNode, fore: TransformNode, ext: number, name: string): { tip: TransformNode; dispose(): void } {
+  const tip = new TransformNode(`fel_decal_tip_${name}`, scene);
+  const obs = scene.onAfterAnimationsObservable.add(() => {
+    const h = hand.getAbsolutePosition(), f = fore.getAbsolutePosition();
+    const dx = h.x - f.x, dy = h.y - f.y, dz = h.z - f.z, l = Math.hypot(dx, dy, dz) || 1;
+    tip.position.set(h.x + dx / l * ext, h.y + dy / l * ext, h.z + dz / l * ext);
+  });
+  return { tip, dispose() { scene.onAfterAnimationsObservable.remove(obs); tip.dispose(); } };
+}
