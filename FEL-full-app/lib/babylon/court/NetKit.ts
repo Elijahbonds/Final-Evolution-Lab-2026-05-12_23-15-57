@@ -45,7 +45,7 @@ export function netSwing(age: number, strength: number): number {
 /** Pure: how hard the ball brushed the net as it crossed: 0 (clear by a hand) .. 1 (on the tape). `clear` = ball height − net height. */
 export function brushStrength(clear: number): number {
   const c = Math.abs(clear);
-  return c >= 0.45 ? 0 : Math.max(0, 1 - c / 0.45);
+  return Math.max(0, 1 - c / 0.45);
 }
 
 export interface NetHandle {

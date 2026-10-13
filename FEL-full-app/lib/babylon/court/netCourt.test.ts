@@ -132,6 +132,7 @@ describe('the stadium boards', () => {
     const { scene } = rig();
     const h = buildStadiumDressing(scene, 6.7, 13.6, { x: 8.4, z: 0 });
     expect(h.meshes.filter((m) => /^court_ad_panel_(far|left|right)$/.test(m.name)).length).toBe(3);   // never the end the camera stands behind
+    expect(h.meshes.some((m) => /court_ad_panel_near/.test(m.name))).toBe(false);
     expect(scene.getMeshByName('court_umpire_chair')).toBeTruthy();
     h.dispose();
     expect(scene.meshes.some((m) => /court_ad_panel|court_ad|court_umpire/.test(m.name))).toBe(false);

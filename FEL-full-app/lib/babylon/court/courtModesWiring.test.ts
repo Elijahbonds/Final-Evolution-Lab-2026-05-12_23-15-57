@@ -36,6 +36,9 @@ describe('the broadcast opt-ins', () => {
 describe('a timed start waits for the intro (it never plays a serve, a pitch or a shot clock for a player who is watching a crane)', () => {
   it('net sports: the first serve', () => { expect(net).toMatch(/if \(!ctx\.camDirector\.inIntro\) restSec -= dt;/); });
   it('derby: the first pitch', () => { expect(derby).toMatch(/if \(throwIn > 0 && !ctx\.camDirector\.inIntro\)/); });
+  it('penalty: both kick FX calls say whether the kick decides the shootout (a deciding kick is never replayed)', () => {
+    expect((pen.match(/kickFx\(ctx, \w+, [\w.]+, shootoutState\(goals, themGoals, round, themKicks\)\.phase === 'decided'\)/g) ?? []).length).toBe(2);
+  });
   it('penalty: the breakaway’s shot clock', () => { expect(pen).toMatch(/if \(!ctx\.camDirector\.inIntro\) brk\.clock -= dt;/); });
 });
 

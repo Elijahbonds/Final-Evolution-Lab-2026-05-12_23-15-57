@@ -268,7 +268,7 @@ describe('the goal net', () => {
 describe('the flares', () => {
   it('flare up fast, burn, die away, and are nothing outside their life', () => {
     expect(flareBurn(0)).toBe(0); expect(flareBurn(0.25)).toBe(1); expect(flareBurn(FLARE_SEC / 2)).toBe(1);
-    expect(flareBurn(FLARE_SEC - 0.4)).toBeCloseTo(0.5, 6); expect(flareBurn(FLARE_SEC)).toBe(0); expect(flareBurn(-1)).toBe(0);
+    expect(flareBurn(FLARE_SEC - 0.4)).toBeCloseTo(0.5, 6); expect(flareBurn(FLARE_SEC)).toBe(0); expect(flareBurn(-1)).toBe(0); expect(flareBurn(FLARE_SEC + 1)).toBe(0); expect(flareBurn(60)).toBe(0);
   });
   it('stand behind the goal, spread across it; a phone lights one', () => {
     const d = flareSpots(11, 3.66, false), p = flareSpots(11, 3.66, true);
