@@ -20,7 +20,7 @@ export function Avatar({ name, pub, speaking = false, size = 32, dim = false }: 
     <span
       aria-hidden
       data-speaking={speaking ? '1' : '0'}
-      className={`relative inline-flex shrink-0 items-center justify-center rounded-full font-mono font-black text-black transition-shadow ${dim ? 'opacity-40' : ''}`}
+      className={`relative inline-flex shrink-0 items-center justify-center rounded-full font-mono font-black text-black ${dim ? 'opacity-40' : ''}`}
       style={{
         width: size, height: size, fontSize: size * 0.36, background: memberColor(pub),
         boxShadow: speaking ? '0 0 0 2px #050505, 0 0 0 4px #00FF9D' : 'none',

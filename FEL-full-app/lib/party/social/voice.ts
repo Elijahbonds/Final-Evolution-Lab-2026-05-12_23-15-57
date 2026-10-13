@@ -411,8 +411,9 @@ export class VoiceMesh {
       if (n.speaking && heard) anyRemote = true;
     }
     if (changed) this.set({ speaking });
-    if (anyRemote) {
-      // the game's music and crowd step back under a friend's voice (the same duck the voiceover lane uses)
+    if (anyRemote && SoundKit.audioRunning) {
+      // the game's music and crowd step back under a friend's voice (the same duck the voiceover lane uses). Only when
+      // the game's audio is already running: voice never builds the game's audio graph on its own.
       const g = SoundKit.graph();
       if (g) SoundKit.duckForVoice(g.ctx.currentTime, g.ctx.currentTime + 0.4);
     }

@@ -10,6 +10,7 @@ import { REPORT_REASONS } from '@/server/netd/src/partyRules';
 import { Avatar, InviteBlock } from './party-bits';
 import { ChatSection } from './party-chat';
 import { VoiceSection, useVoice } from './party-voice';
+import { StartSection } from './party-start';
 
 export function PartyPanel({ s, onClose }: { s: PartyState; onClose: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -72,6 +73,7 @@ export function PartyPanel({ s, onClose }: { s: PartyState; onClose: () => void 
 
           <Members s={s} host={host} />
           <VoiceSection s={s} />
+          <StartSection s={s} />
           <ChatSection s={s} />
         </div>
 

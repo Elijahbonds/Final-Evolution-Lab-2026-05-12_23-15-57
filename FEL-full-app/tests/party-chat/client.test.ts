@@ -211,3 +211,33 @@ describe('small pieces', () => {
     expect(activityLine(null, '/play/dunk')).toBe('Picking a game');
   });
 });
+
+describe('no feedback loops', () => {
+  it('a p_state does not make the page send p_status again unless the server has it wrong', async () => {
+    const c = new PartyClient(io(), 'ws://netd/party');
+    const ws = await joined(c);
+    c.setActivity('Playing Downtown');
+    const sent = () => ws.sent.filter((m) => m.t === 'p_status').length;
+    expect(sent()).toBe(1);
+    const state = (activity: string | null) => ({ t: 'p_state', code: 'ABC234', you: 'm1', host: 'm1', members: [{ peer: 'm1', name: 'ANA', pub: 'pa', activity }], me: { text: true, voice: true } });
+    ws.frame(state('Playing Downtown'));
+    ws.frame(state('Playing Downtown'));
+    expect(sent()).toBe(1);
+    ws.frame(state(null));   // a resume: the server forgot
+    expect(sent()).toBe(2);
+  });
+});
+
+describe('a quiet party still resumes', () => {
+  it('the ping keeps the stored token fresh, so a reload after minutes of quiet rejoins', async () => {
+    const c = new PartyClient(io(), 'ws://netd/party');
+    await joined(c);
+    for (let i = 0; i < 10; i++) {   // ten pings, 20 s apart: 200 s with no state change
+      clock += 20_000;
+      const ping = timers.find((t) => t.ms === 20_000)!;
+      timers = timers.filter((t) => t !== ping);
+      ping.fn();
+    }
+    expect(loadStoredParty(clock)).toMatchObject({ code: 'ABC234', resume: 'res-1' });
+  });
+});

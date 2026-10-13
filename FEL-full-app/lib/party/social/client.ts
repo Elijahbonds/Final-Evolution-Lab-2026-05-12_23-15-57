@@ -74,7 +74,11 @@ export class PartyClient {
 
   constructor(private io: PartyIo = browserIo(), private url: string | null = partySocketUrl()) {
     this.state = { ...EMPTY_PARTY, status: url ? 'idle' : 'unavailable' };
-    if (typeof window !== 'undefined') this.blocks = loadBlocks();
+    if (typeof window !== 'undefined') {
+      this.blocks = loadBlocks();
+      // a reload or a tab switch: the token is fresh at the moment the page goes away
+      if (typeof window.addEventListener === 'function') window.addEventListener('pagehide', () => this.touchStored());
+    }
   }
 
   // ── the external store React reads (useSyncExternalStore) ──
@@ -168,7 +172,10 @@ export class PartyClient {
     this.set(applyFrame(this.state, f, this.blockedPubs(), this.io.now()));
     if (f.t === 'p_state') {
       this.syncBlocks();
-      if (this.activity) this.send({ t: 'p_status', activity: this.activity });
+      // re-state what this page is doing only when the server's copy differs (a resume, a new party): sending it on
+      // every p_state would loop — p_status makes the server send everyone a fresh p_state
+      const mine = this.state.members.find((m) => m.peer === this.state.you);
+      if (mine && (mine.activity ?? null) !== this.activity) this.send({ t: 'p_status', activity: this.activity });
       if (this.resume && this.state.code) storeParty({ code: this.state.code, resume: this.resume, at: this.io.now() });
     }
     if (ended) this.teardown();
@@ -192,8 +199,15 @@ export class PartyClient {
 
   private startPing(): void {
     this.stopPing();
-    const beat = () => { this.send({ t: 'p_ping' }); this.ping = this.io.setTimeout(beat, PING_MS); };
+    // the stored token's clock is "last known alive", not "last change": a quiet party must still resume after a reload
+    const beat = () => { this.send({ t: 'p_ping' }); this.touchStored(); this.ping = this.io.setTimeout(beat, PING_MS); };
     this.ping = this.io.setTimeout(beat, PING_MS);
+  }
+  /** Mark the stored party token alive now (a ping, a page hide). */
+  touchStored(): void {
+    if (this.resume && this.state.code && (this.state.status === 'live' || this.state.status === 'waiting')) {
+      storeParty({ code: this.state.code, resume: this.resume, at: this.io.now() });
+    }
   }
   private stopPing(): void { if (this.ping) this.io.clearTimeout(this.ping); this.ping = null; }
 

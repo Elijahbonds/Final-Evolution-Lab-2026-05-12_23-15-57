@@ -26,13 +26,47 @@ async function frameTimes(p: Page, ctx: BrowserContext, ms: number): Promise<{ f
       const f = (t: number) => { d.push(t - last); last = t; if (t < end) requestAnimationFrame(f); else resolve(); };
       requestAnimationFrame(f);
     });
-    const s = d.slice(5).sort((a, b) => a - b);
-    const q = (x: number) => s[Math.min(s.length - 1, Math.floor(s.length * x))];
+    const s = d.slice(Math.min(5, Math.floor(d.length / 4))).sort((a, b) => a - b);
+    const q = (x: number) => (s.length ? s[Math.min(s.length - 1, Math.floor(s.length * x))] : 0);
     return { frames: s.length, p50: +q(0.5).toFixed(1), p95: +q(0.95).toFixed(1), over33: s.filter((x) => x > 33.4).length };
   }, ms);
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
   await cdp.detach();
   return out;
+}
+
+/** Main-thread work per second (CDP Performance: TaskDuration, ScriptDuration) plus rAF frame times, 4x CPU throttle. */
+async function mainThread(p: Page, ctx: BrowserContext, ms: number): Promise<{ taskMsPerS: number; scriptMsPerS: number; frames: number; p50: number; p95: number; over33: number }> {
+  const cdp = await ctx.newCDPSession(p);
+  await cdp.send('Performance.enable');
+  await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+  const read = async () => Object.fromEntries(((await cdp.send('Performance.getMetrics')) as { metrics: { name: string; value: number }[] }).metrics.map((m) => [m.name, m.value]));
+  const a = await read();
+  if (process.env.PROFILE) { await cdp.send('Profiler.enable'); await cdp.send('Profiler.start'); }
+  const f = await p.evaluate(async (ms) => {
+    const d: number[] = [];
+    let last = performance.now();
+    const end = last + ms;
+    await new Promise<void>((resolve) => {
+      const step = (t: number) => { d.push(t - last); last = t; if (t < end) requestAnimationFrame(step); else resolve(); };
+      requestAnimationFrame(step);
+    });
+    const s = d.slice(Math.min(5, Math.floor(d.length / 4))).sort((x, y) => x - y);
+    const q = (x: number) => (s.length ? s[Math.min(s.length - 1, Math.floor(s.length * x))] : 0);
+    return { frames: s.length, p50: +q(0.5).toFixed(1), p95: +q(0.95).toFixed(1), over33: s.filter((x) => x > 33.4).length };
+  }, ms);
+  const b = await read();
+  if (process.env.PROFILE) {
+    const { profile } = await cdp.send('Profiler.stop') as { profile: { nodes: { id: number; callFrame: { functionName: string; url: string; lineNumber: number }; hitCount?: number }[] } };
+    const top = profile.nodes.filter((n) => (n.hitCount ?? 0) > 0 && !/^\((idle|program|garbage collector)\)$/.test(n.callFrame.functionName))
+      .sort((x, y) => (y.hitCount ?? 0) - (x.hitCount ?? 0)).slice(0, 12)
+      .map((n) => `${n.hitCount} ${n.callFrame.functionName || '(anon)'} ${n.callFrame.url.split('/').slice(-2).join('/')}:${n.callFrame.lineNumber}`);
+    console.log('PROFILE', JSON.stringify(top, null, 1));
+  }
+  await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
+  await cdp.detach();
+  const per = (k: string) => +(((b[k] - a[k]) * 1000) / (ms / 1000)).toFixed(1);
+  return { taskMsPerS: per('TaskDuration'), scriptMsPerS: per('ScriptDuration'), ...f };
 }
 
 export default async function more(c: Ctx): Promise<void> {
@@ -94,16 +128,40 @@ export default async function more(c: Ctx): Promise<void> {
       await bo.page.waitForTimeout(1500);
       ok('frames.bar-hidden-while-playing', (await bo.page.locator('[data-testid=party-bar]').count()) === 0);
       await shot(bo.page, '09-bo-phone-playing-hud-only');
-      on = await frameTimes(bo.page, bo.ctx, 10_000);
+      on = await frameTimes(bo.page, bo.ctx, 15_000);
     }
     const voiceStillUp = await bo.page.locator('audio[data-party-voice]').count();
     // voice OFF: a fresh load, voice not joined
     await bo.page.goto(`${BASE}/dev/mode/${mode}`, { waitUntil: 'domcontentloaded', timeout: 240_000 });
     const playingOff = await startGame();
     let off = { frames: 0, p50: 0, p95: 0, over33: 0 };
-    if (playingOff) { await bo.page.waitForTimeout(1500); off = await frameTimes(bo.page, bo.ctx, 10_000); }
-    ok('frames.measured', voiceUp && playingOn && playingOff && voiceStillUp > 0, { mode, voiceOn: on, voiceOff: off, voiceStillUp });
-    ok('frames.voice-cost-p50-ms', true, +(on.p50 - off.p50).toFixed(1));
+    if (playingOff) { await bo.page.waitForTimeout(1500); off = await frameTimes(bo.page, bo.ctx, 15_000); }
+    ok('frames.voice-survives-into-a-game', voiceUp && playingOn && voiceStillUp > 0, { voiceUp, playingOn, voiceStillUp });
+    // On this box the game itself renders on SwiftShader (software GL) under a shared CPU: a frame takes seconds, so a
+    // game-page A/B is noise. Recorded for honesty, not judged:
+    ok('frames.game-page-swiftshader-info', true, { mode, voiceOn: on, voiceOff: off, playingOff });
+  }
+
+  if (STAGES.includes('cost')) {
+    // THE MEASUREMENT: what voice adds to the main thread, phone profile (390×844 isMobile, 4x CPU throttle), on a page
+    // with nothing else running — voice OFF, then voice ON (connected to Ana, fake mic tone playing both ways).
+    await bo.page.goto(`${BASE}/party`, { waitUntil: 'domcontentloaded', timeout: 240_000 });
+    await bo.page.locator('[data-testid=party-bar]').waitFor({ timeout: 120_000 });
+    await bo.page.waitForTimeout(3000);
+    const quiet = await mainThread(bo.page, bo.ctx, 15_000);
+    await openPanel(bo.page);
+    await bo.page.click('[data-testid=party-voice-join]');
+    await bo.page.waitForSelector('[data-testid=party-member][data-name=ANA][data-voice-link=connected]', { timeout: 30_000 }).catch(() => {});
+    await closePanel(bo.page);
+    await bo.page.waitForTimeout(3000);
+    const voiced = await mainThread(bo.page, bo.ctx, 15_000);
+    // and off again (the box is shared: a second "off" shows the noise floor)
+    await openPanel(bo.page);
+    await bo.page.click('[data-testid=party-voice-leave]');
+    await closePanel(bo.page);
+    await bo.page.waitForTimeout(3000);
+    const quiet2 = await mainThread(bo.page, bo.ctx, 15_000);
+    ok('frames.voice-main-thread-cost', true, { voiceOff: quiet, voiceOn: voiced, voiceOffAgain: quiet2 });
     await bo.page.goto(`${BASE}/party`, { waitUntil: 'domcontentloaded', timeout: 240_000 });
     await bo.page.locator('[data-testid=party-bar]').waitFor({ timeout: 120_000 });
   }
@@ -119,8 +177,9 @@ export default async function more(c: Ctx): Promise<void> {
     ok('start.countdown-says-joining', /Joining 1v1 Streetball/.test(label) && /Cancel/i.test(label), label.replace(/\s+/g, ' '));
     await shot(bo.page, '10-bo-phone-joining');
     if (ty) {
-      await ty.page.click('[data-testid=party-start-cancel]');   // a decliner stays in the party
-      ok('start.decliner-can-cancel', true);
+      // 1v1 seats two: the third member is told plainly that they stay in the party
+      const tyCard = await ty.page.locator('[data-testid=party-start-countdown]').innerText();
+      ok('start.no-seat-stays-in-party', /staying in the party/.test(tyCard), tyCard.replace(/\s+/g, ' '));
     }
     await Promise.all([ana.page.waitForURL(/\/play\/onevone\?net=/, { timeout: 30_000 }), bo.page.waitForURL(/\/play\/onevone\?net=/, { timeout: 30_000 })]);
     const ra = new URL(ana.page.url()).searchParams.get('net');
@@ -143,6 +202,22 @@ export default async function more(c: Ctx): Promise<void> {
     await ana.page.waitForFunction(() => document.querySelectorAll('[data-testid=party-member]').length >= 3, null, { timeout: 30_000 }).catch(() => {});
     ok('start.still-in-party-after', (await members(ana.page)).length === (ty ? 3 : 2), await members(ana.page));
     await shot(ana.page, '12-ana-back-in-party');
+    // Bo comes back too (a client navigation back)
+    await bo.page.goBack({ waitUntil: 'domcontentloaded' });
+    await bo.page.locator('[data-testid=party-bar]').waitFor({ timeout: 60_000 });
+    if (ty) {
+      // a DECLINER: Ana starts again; Bo cancels → Bo stays, his seat passes to Ty; then Ana stops it for everyone
+      await ana.page.click('[data-testid=party-start-go]');
+      await bo.page.waitForSelector('[data-testid=party-start-cancel]', { timeout: 10_000 });
+      await bo.page.click('[data-testid=party-start-cancel]');
+      const boOut = await bo.page.waitForFunction(() => document.querySelector('[data-testid=party-start-countdown]')?.textContent?.includes('sitting this one out'), null, { timeout: 5000 }).then(() => true).catch(() => false);
+      const tyIn = await ty.page.waitForSelector('[data-testid=party-start-cancel]', { timeout: 5000 }).then(() => true).catch(() => false);
+      ok('start.decliner-stays-and-seat-passes', boOut && tyIn, { boOut, tyIn });
+      await ana.page.click('[data-testid=party-start-stop]');
+      const gone = await ty.page.waitForSelector('[data-testid=party-start-countdown]', { state: 'detached', timeout: 5000 }).then(() => true).catch(() => false);
+      await c.sleep(6000);
+      ok('start.host-can-stop-it', gone && /\/party/.test(ty.page.url()) && !/onevone/.test(bo.page.url()), { gone, ty: ty.page.url(), bo: bo.page.url() });
+    }
     await closePanel(ana.page);
   }
 

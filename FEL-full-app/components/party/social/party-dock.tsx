@@ -13,6 +13,7 @@ import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { usePathname } from 'next/navigation';
 import { Mic, MicOff, Users } from 'lucide-react';
 import { partyClient } from '@/lib/party/social/client';
+import { voiceMesh } from '@/lib/party/social/voice';
 import { captionText, inParty, type PartyState } from '@/lib/party/social/state';
 import { dockPlace, type DockPlace } from '@/lib/party/social/tuck';
 import { activityLine } from '@/lib/party/social/activity';
@@ -23,6 +24,7 @@ import { useParty } from './use-party';
 import { Avatar } from './party-bits';
 import { PartyPanel } from './party-panel';
 import { TalkButton, useVoice } from './party-voice';
+import { StartCountdown } from './party-start';
 
 export function PartyDock() {
   const pathname = usePathname() || '/';
@@ -34,9 +36,9 @@ export function PartyDock() {
   const [open, setOpen] = useState(false);
   const close = useCallback(() => setOpen(false), []);
 
-  // the voice mesh listens from the start (a friend's offer must be answered even with the panel closed)
-  const voice = useVoice();
-  void voice;
+  // the voice mesh listens from the start (a friend's offer must be answered even with the panel closed) — created
+  // here without subscribing, so a speaking flip re-renders the bar, not the whole dock
+  useEffect(() => { voiceMesh(partyClient()); }, []);
 
   // a full reload: rejoin the stored party (never on the Quick Screen, which sends nothing before the age question)
   useEffect(() => {
@@ -78,6 +80,8 @@ export function PartyDock() {
       {place !== 'hidden' ? <PartyBar s={s} place={place} onOpen={() => setOpen(true)} /> : null}
       {open && place !== 'hidden' ? <PartyPanel s={s} onClose={close} /> : null}
       {!quick && inParty(s) ? <Captions s={s} show={place !== 'hidden' && !open} /> : null}
+      {/* the host's "Start together": shown over anything, a game included — it is the one thing the host may ask of you */}
+      {!quick && s.start ? <StartCountdown s={s} /> : null}
     </>
   );
 }

@@ -45,6 +45,7 @@ async function person(sub: string, name: string, phone = false): Promise<{ ctx: 
     ? { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, permissions: ['microphone'] }
     : { viewport: { width: 1280, height: 800 }, permissions: ['microphone'] });
   await ctx.addCookies([{ name: '__session', value: token, domain: 'localhost', path: '/', httpOnly: true, sameSite: 'Lax' }]);
+  await ctx.addInitScript({ content: 'window.__name = window.__name || function (f) { return f; };' });   // tsx's helper, inside page.evaluate bodies
   const page = await ctx.newPage();
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(`${name}: ${e.message.slice(0, 200)}`));
@@ -130,6 +131,7 @@ try {
     await ty.page.click('[data-testid=party-join]');
     await ty.page.locator('[data-testid=party-waiting]').waitFor({ timeout: 60_000 });
     ok('teen.knocks', true);
+    await openPanel(ana.page);
     await ana.page.locator('[data-testid=party-knock] button').first().click();
     await ty.page.locator('[data-testid=party-code]').first().waitFor({ timeout: 15_000 });
     await openPanel(ty.page);
