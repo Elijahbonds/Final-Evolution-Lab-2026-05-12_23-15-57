@@ -38,7 +38,11 @@ import { canonicalModeKey, MODE_INFO } from './game-data';
 // /api/arena/music-attempt, a score the server rejudges from the recorded taps (lib/arena-music.ts, submit-score), the
 // house-beat ceiling (lib/arena-score-integrity.ts) and a rival banded only on rejudged sets (lib/arena-rivals.ts).
 export const STAKING_PAUSED: ReadonlySet<string> = new Set<string>([
-  'dance', // owner #9, 2026-09-25 — returns with MUSIC-SUITE phase 9 (same house song for both, accuracy score, own songs free play only)
+  // owner #9, 2026-09-25. STILL OFF (owner, 2026-10-13, closing PR #46): dance staking comes back only after a real-DB proof of
+  // its fairness work (same house song for both, accuracy score, own songs free play only, the server's re-judge). That code
+  // was in #46 (houseSong.ts, arenaDance.ts, ARENA_STAKE_CEILINGS, the music-attempt route) and is NOT in this tree; it was
+  // proven on a fake Prisma only. Do not delete this line without that proof.
+  'dance',
 ]);
 
 /** Is a NEW stake or challenge on this mode refused right now? Takes any spelling a stored row or an old client may use. */
