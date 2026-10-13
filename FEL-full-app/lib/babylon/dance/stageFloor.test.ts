@@ -43,6 +43,13 @@ describe('the dance floor tiles', () => {
 describe('the dance floor: the mesh', () => {
   let scene: Scene;
   beforeAll(() => { scene = new Scene(new NullEngine()); new FreeCamera('c', new Vector3(0, 1, -3), scene); });
+  it('is unlit (the painted colours, no venue-light sheen) and drawn over the deck\'s top', () => {
+    const f = mountStageFloor(scene, { radius: 2, y: 0.7, small: true });
+    const m = f.mesh.material as unknown as { unlit: boolean; zOffset: number };
+    expect(m.unlit).toBe(true);
+    expect(m.zOffset).toBeLessThan(0);
+    f.dispose();
+  });
   it('is one disc on the deck, repainting only when the step changes, and disposes clean', () => {
     const before = scene.meshes.length;
     const f = mountStageFloor(scene, { radius: 2, y: 0.7, small: false });

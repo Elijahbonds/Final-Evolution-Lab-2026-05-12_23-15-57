@@ -135,6 +135,11 @@ export function mountLedWall(scene: Scene, o: LedWallOptions): LedWallHandle {
   const mesh = MeshBuilder.CreatePlane('dance_screen_panel', { width: o.width, height: o.height }, scene);
   mesh.position.set(o.at[0], o.at[1], o.at[2]);
   mesh.isPickable = false;
+  // An emissive texture over a black albedo. (Measured 2026-10-13: an UNLIT albedo texture over-exposed to a white wash under the
+  // rig's bloom, and with a flipped u it drew black; the emissive path renders the painted colours and flips cleanly.) The plane's
+  // front looks down +z from behind; the stage camera is on the −z side, so the picture is painted mirrored (paint() flips the canvas)
+  // to read forwards. (A negative uScale was tried first: a dynamic texture clamps, so the flipped coordinates sampled one edge
+  // texel and the whole panel drew a flat colour.)
   const mat = new PBRMaterial('dance_screen_mat', scene);
   mat.albedoColor = Color3.Black();
   mat.emissiveTexture = tex;
@@ -146,6 +151,7 @@ export function mountLedWall(scene: Scene, o: LedWallOptions): LedWallHandle {
   const font = (px: number): string => `900 ${px}px "Arial Black", Impact, system-ui, sans-serif`;
 
   function paint(s: LedState): void {
+    g.setTransform(-1, 0, 0, 1, W, 0);   // mirrored in x: see the material's note
     const kind = ledKindAt(s.barIndex);
     const [c0, c1] = ledColors(s.barIndex);
     g.fillStyle = '#04010a'; g.fillRect(0, 0, W, H);
@@ -172,6 +178,7 @@ export function mountLedWall(scene: Scene, o: LedWallOptions): LedWallHandle {
       g.fillStyle = '#ffffff'; g.fillText(text, W / 2, H / 2 + px * 0.04);
       g.shadowBlur = 0;
     }
+    g.setTransform(1, 0, 0, 1, 0, 0);
     tex.update(false);
   }
 

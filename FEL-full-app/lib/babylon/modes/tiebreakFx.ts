@@ -41,7 +41,7 @@ export interface RestGrade { exposure: number; vignette: number }
  *  how much the heartbeat tightens the vignette on top, at its peak. (The pulse rides the VIGNETTE, not the exposure: the rig's
  *  flash beat — a momentum tier, a made shot — owns the pipeline's exposure while it decays, and a per-frame exposure write
  *  from a mode would cancel it. The dimming goes through the rig's owned rest, which the flash returns to.) */
-export const TENSION = { dim: 0.08, vignette: 0.9, pulse: 0.35 };
+export const TENSION = { dim: 0.1, vignette: 1.5, pulse: 0.5 };
 
 /** The resting grade at tension `level`: the rig's own grade dimmed and tightened. `base` is never modified. Writes `out`. Pure. */
 export function tensionRest(base: RestGrade, level: number, out: RestGrade): RestGrade {

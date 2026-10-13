@@ -1,5 +1,7 @@
 // Tiebreak's tension and ball trail (vis-party, 2026-10-13).
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { TARGET, TIEBREAK_MAX_PTS, matchCall } from '../core/TiebreakBlitz';
 import { TRAIL_LOOK } from '../visual/EffectsKit';
 import {
@@ -69,8 +71,12 @@ describe('tension: the heartbeat and the grade', () => {
   it('no pulse below "set point" even with flashes allowed (a faint lean-in, not a heartbeat)', () => {
     for (let t = 0; t < 4; t += 0.05) expect(tensionPulse(0.12, t, true)).toBe(0);
   });
-  it('the pulse is on the vignette and small: the vignette\'s swing is a fraction of its resting weight', () => {
-    expect(TENSION.pulse).toBeLessThan(0.5);
+  it('the mode applies the pulse through TENSION.pulse (one number, not a copy of it)', () => {
+    const src = readFileSync(join(process.cwd(), 'lib/babylon/modes/TiebreakMode.ts'), 'utf8');
+    expect(src).toContain('pressedGrade.vignette + TENSION.pulse * tensionPulse(tension, tNow, flashesOk)');
+  });
+  it('the pulse is on the vignette and small: the heartbeat never swings it more than half of what the pressed look already tightened', () => {
+    expect(TENSION.pulse).toBeLessThanOrEqual(TENSION.vignette / 2);
   });
 });
 

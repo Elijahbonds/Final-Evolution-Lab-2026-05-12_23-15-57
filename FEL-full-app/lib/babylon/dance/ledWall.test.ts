@@ -8,11 +8,13 @@ import {
 } from './ledWall';
 
 const painted: string[] = [];
+const transforms: number[][] = [];
 const ctx2d = new Proxy({}, {
   get: (_t, k) => {
     if (k === 'createLinearGradient' || k === 'createRadialGradient') return () => ({ addColorStop() {} });
     if (k === 'measureText') return () => ({ width: 100 });
     if (k === 'fillText') return (t: string) => { painted.push(t); };
+    if (k === 'setTransform') return (...a: number[]) => { transforms.push(a); };
     return () => {};
   },
   set: () => true,
@@ -92,7 +94,7 @@ describe('the LED wall: colours, text, repaint key', () => {
 describe('the LED wall: the mesh', () => {
   let scene: Scene;
   beforeAll(() => { scene = new Scene(new NullEngine()); new FreeCamera('c', new Vector3(0, 1, -3), scene); });
-  it('is an emissive plane kept OUT of the glow include list (a halo would be drawn over the dancer in front of it), repainting only on a new key', async () => {
+  it('is an emissive screen plane kept OUT of the glow include list (a halo would be drawn over the dancer in front of it), repainting only on a new key', async () => {
     const { glowCandidate } = await import('../scene/EmissiveGlow');
     const w = mountLedWall(scene, { at: [0, 4, 14], width: 15, height: 3.3, small: false, track: 'WINDWARD CIRCLE', player: 'ELI' });
     expect(glowCandidate(w.mesh.name, w.mesh.material!.name, 1, true)).toBe(false);
@@ -106,6 +108,18 @@ describe('the LED wall: the mesh', () => {
     painted.length = 0;
     w.update(st(0, 0, 12, false));                                      // bar 12 → the third line of the card cycle
     expect(painted).toContain('MIDNIGHT RUN');
+    w.dispose();
+  });
+  it('reads forwards from the stage camera on the −z side (painted mirrored: a negative uScale clamps to a flat colour) and is emissive over a black albedo', () => {
+    const w = mountLedWall(scene, { at: [0, 4, 14], width: 15, height: 3.3, small: false, track: 'A' });
+    transforms.length = 0;
+    w.update(st(5, 0.1));
+    expect(transforms[0]).toEqual([-1, 0, 0, 1, 768, 0]);          // the canvas is flipped in x for the paint…
+    expect(transforms[transforms.length - 1]).toEqual([1, 0, 0, 1, 0, 0]);   // …and put back
+    const m = w.mesh.material as unknown as { unlit: boolean; emissiveTexture: { uScale: number }; albedoColor: { r: number; g: number; b: number } };
+    expect(m.emissiveTexture.uScale).toBe(1);
+    expect(m.unlit).toBeFalsy();
+    expect(m.albedoColor.r + m.albedoColor.g + m.albedoColor.b).toBe(0);
     w.dispose();
   });
   it('a small (phone) wall is half the texture size', () => {

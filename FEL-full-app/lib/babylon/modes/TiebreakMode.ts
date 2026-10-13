@@ -33,7 +33,7 @@ import { EffectsKit, applyTrail, type TrailLevel } from '../visual/EffectsKit';
 import { dressBall } from '../visual/meshyProps';
 import { buildTrophy, trophyRise, TROPHY_AT, TROPHY_RISE_SEC, type TrophyHandle } from '../party/trophy';
 import { motionPolicy } from '@/lib/a11y/reducedMotion';
-import { tensionLevel, tensionPulse, tensionRest, trailFor, type RestGrade } from './tiebreakFx';
+import { TENSION, tensionLevel, tensionPulse, tensionRest, trailFor, type RestGrade } from './tiebreakFx';
 
 export interface TiebreakModeOpts {
   reactBase: number;
@@ -232,7 +232,7 @@ export function makeTiebreakMode(opts: TiebreakModeOpts): ModeDefinition {
       lights.rest.exposure = pressedGrade.exposure; lights.rest.vignette = pressedGrade.vignette;
       lights.pipeline.imageProcessing.exposure = pressedGrade.exposure;
     }
-    if (tension > 0) lights.pipeline.imageProcessing.vignetteWeight = pressedGrade.vignette + 0.35 * tensionPulse(tension, tNow, flashesOk);
+    if (tension > 0) lights.pipeline.imageProcessing.vignetteWeight = pressedGrade.vignette + TENSION.pulse * tensionPulse(tension, tNow, flashesOk);
   }
 
   function stopTrophyLoop(): void {

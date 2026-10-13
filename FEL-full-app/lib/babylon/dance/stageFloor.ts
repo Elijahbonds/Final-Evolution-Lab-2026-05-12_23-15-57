@@ -2,7 +2,7 @@
 //
 // The podium the dancer stands on was one flat pink cylinder: the biggest object in the frame and the least alive. A glossy,
 // reflecting deck (MirrorTexture / SSR, VISUAL-PASS-PLAN A9.7 second half) is the foundation's wave-2 work; this is the
-// stand-in that needs none of it — a disc of emissive TILES laid on the deck's top, chasing to the beat the way a club floor
+// stand-in that needs none of it — a disc of lit TILES laid on the deck's top, chasing to the beat the way a club floor
 // does. What each tile shows is a pure function of the song's beat/bar position (`floorTile`), so it is on the song's clock like
 // the wall and the heads; reduced flashing holds it for the whole bar and dims the contrast.
 //
@@ -46,8 +46,8 @@ export interface StageFloorHandle {
   dispose(): void;
 }
 
-/** TUNED (new): the tiles' emissive gain — the deck's own pink stays underneath, so the tiles only need to light it. */
-export const FLOOR_GAIN = 0.7;
+/** TUNED (new): the tiles' gain. */
+export const FLOOR_GAIN = 0.9;
 
 export function mountStageFloor(scene: Scene, o: { radius: number; y: number; small: boolean }): StageFloorHandle {
   const px = o.small ? 16 : 32, N = FLOOR_TILES, W = N * px;
@@ -57,11 +57,11 @@ export function mountStageFloor(scene: Scene, o: { radius: number; y: number; sm
   mesh.rotation.x = Math.PI / 2;   // facing up
   mesh.position.y = o.y;
   mesh.isPickable = false;
+  // unlit and painted into the albedo (see ledWall.ts): the tiles are the colours they are painted, with no venue-light sheen on the dark ones
   const mat = new PBRMaterial('dance_floor_mat', scene);
-  mat.albedoColor = Color3.Black();
-  mat.emissiveTexture = tex;
-  mat.emissiveColor = new Color3(FLOOR_GAIN, FLOOR_GAIN, FLOOR_GAIN);
-  mat.roughness = 0.9; mat.metallic = 0;
+  mat.unlit = true;
+  mat.albedoTexture = tex;
+  mat.albedoColor = new Color3(FLOOR_GAIN, FLOOR_GAIN, FLOOR_GAIN);
   mat.zOffset = -2;                // coplanar-ish with the deck's top: drawn over it, never z-fighting it
   mesh.material = mat;
   let last = '';
