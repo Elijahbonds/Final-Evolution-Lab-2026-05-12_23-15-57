@@ -13,6 +13,7 @@ import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } 
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode } from './hud-format';
+import { HudBanner, HudChip, HudFrame, HudLine, HudMeter, HudPips, HudPlate, HudText, ScoreValue, Scorebug } from './tv-hud';
 import { gameResultFromSession } from '@/lib/sessions/gameResultFromSession';
 
 type Hud = Record<string, HudValue>;
@@ -69,91 +70,79 @@ export default function FreeRunBabylon({ onEnd }: GameProps) {
     <div className="relative aspect-[16/10] w-full overflow-hidden rounded-xl border border-white/10 bg-black">
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full touch-none" />
 
+      {/* TV HUD (A9.13, lane/tv-hud): every readout on the shared system — same keys, same gates, same slots. */}
+      <HudFrame>
       {/* top bar: banked + pot on the left, the clock + checkpoint centre, tier + route right */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between px-4 py-3 font-mono">
+      <div className="absolute inset-x-0 top-0 flex items-start justify-between px-4 py-3">
         {/* RIVALS (owner brief 2026-09-18): the rank and the gap to the leader, top-left */}
         {hud.place ? (
-          <div className="fel-panel px-3 py-1.5">
-            <div className="text-[10px] tracking-wider text-white/60">PLACE</div>
-            <div className="fel-stat text-2xl text-[var(--fel-gold)]">{String(hud.place)}</div>
-            <div className={`text-[10px] font-bold ${hud.delta === 'LEADING' ? 'text-[#86efac]' : 'text-white/70'}`}>{String(hud.delta ?? '')}{Number(hud.draft) >= 100 ? ' · SLINGSHOT READY' : Number(hud.draft) > 0 ? ` · DRAFT ${hnode(hud.draft, 0)}%` : ''}</div>
-          </div>
+          <HudPlate className="px-3 py-1.5">
+            <HudText as="div" size="caption" alpha={0.6}>PLACE</HudText>
+            <ScoreValue value={String(hud.place)} tone="score" />
+            <HudText as="div" size="caption" tone={hud.delta === 'LEADING' ? 'good' : 'text'} alpha={hud.delta === 'LEADING' ? 1 : 0.7} style={{ fontWeight: 800 }}>{String(hud.delta ?? '')}{Number(hud.draft) >= 100 ? ' · SLINGSHOT READY' : Number(hud.draft) > 0 ? ` · DRAFT ${hnode(hud.draft, 0)}%` : ''}</HudText>
+          </HudPlate>
         ) : null}
-        <div className="fel-panel px-3 py-1.5">
-          <div className="text-[10px] tracking-wider text-white/60">BANKED</div>
-          <div className="fel-stat text-2xl text-[var(--fel-gold)]">{hnode(hud.banked, 0)}</div>
+        <HudPlate className="px-3 py-1.5">
+          <HudText as="div" size="caption" alpha={0.6}>BANKED</HudText>
+          <ScoreValue value={hnode(hud.banked, 0)} tone="score" />
           {Number(hud.pot) > 0 && (
-            <div className="mt-0.5 text-sm text-[#22d3ee]">+{hnode(hud.pot, 0)} <span className="text-white/60">{hnode(hud.combo, '')}</span></div>
+            <HudText as="div" size="value" tone="you" className="mt-0.5">+{hnode(hud.pot, 0)} <HudText size="value" alpha={0.6}>{hnode(hud.combo, '')}</HudText></HudText>
           )}
-        </div>
+        </HudPlate>
         <div className="flex flex-col items-center gap-1">
-          <span className="fel-panel px-4 py-1.5 fel-stat text-2xl text-white">{Number(hud.time ?? 0).toFixed(1)}s</span>
-          <span className="fel-panel px-2 py-0.5 text-[10px] tracking-wider text-white/70">CHECKPOINT {hnode(hud.checkpoint, '0/2')}</span>
+          <Scorebug><ScoreValue value={`${Number(hud.time ?? 0).toFixed(1)}s`} pop={false} /></Scorebug>
+          <HudChip alpha={0.7} size="caption">CHECKPOINT {hnode(hud.checkpoint, '0/2')}</HudChip>
           {/* IMPROVE (2026-10-06): the last checkpoint's split against the personal best (− is ahead) */}
           {typeof hud.pbSplit === 'string' && hud.pbSplit && phase === 'playing' ? (
-            <span className={`fel-panel px-2 py-0.5 text-[10px] font-bold tracking-wider ${hud.pbSplit.includes('−') ? 'text-[#86efac]' : 'text-[#fca5a5]'}`}>{hud.pbSplit}</span>
+            <HudChip tone={hud.pbSplit.includes('−') ? 'good' : 'danger'} size="caption" style={{ fontWeight: 800 }}>{hud.pbSplit}</HudChip>
           ) : null}
         </div>
-        <div className="fel-panel px-3 py-1.5 text-right">
-          <div className="text-[10px] tracking-wider text-white/60">{hnode(hud.tier, 'ROOKIE')}{hud.track ? ` · ${String(hud.track).toUpperCase()}` : ''}</div>
-          <div className={`text-sm font-bold ${hud.lane === 'HIGH' ? 'text-[#3FB8B0]' : hud.lane === 'LOW' ? 'text-[#f59e0b]' : 'text-white/80'}`}>{hud.lane ? `${String(hud.lane)} LANE` : hnode(hud.route, 'LOW LINE')}</div>
-        </div>
+        <HudPlate className="px-3 py-1.5 text-right">
+          <HudText as="div" size="caption" alpha={0.6}>{hnode(hud.tier, 'ROOKIE')}{hud.track ? ` · ${String(hud.track).toUpperCase()}` : ''}</HudText>
+          <HudText as="div" size="value" tone={hud.lane === 'HIGH' ? 'info' : hud.lane === 'LOW' ? 'heat' : 'text'} alpha={hud.lane === 'HIGH' || hud.lane === 'LOW' ? 1 : 0.8}>{hud.lane ? `${String(hud.lane)} LANE` : hnode(hud.route, 'LOW LINE')}</HudText>
+        </HudPlate>
       </div>
 
       {/* speed + the verbs the speed unlocks */}
       {phase === 'playing' && typeof hud.speed === 'number' && (
-        <div className="pointer-events-none absolute left-4 top-24 flex flex-col gap-1 font-mono">
-          <div className="text-[10px] tracking-wider text-white/60">SPEED {speed.toFixed(1)} m/s</div>
-          <div className="h-2 w-40 overflow-hidden rounded-full bg-black/50">
-            <div className="h-full rounded-full transition-[width] duration-100" style={{ width: `${Math.min(100, (speed / speedMax) * 100)}%`, background: speed >= 5.2 ? '#ff6a00' : speed >= 2.6 ? '#22d3ee' : '#ffffff80' }} />
-          </div>
+        <div className="absolute left-4 top-24 flex flex-col items-start gap-1">
+          <HudMeter label={`SPEED ${speed.toFixed(1)} m/s`} labelAlpha={0.6} value={speed} max={speedMax} width="10rem" height="bar"
+            tone={speed >= 5.2 ? 'heat' : speed >= 2.6 ? 'you' : 'text'} fillAlpha={speed >= 2.6 ? 1 : 0.5} />
           {/* FLOW (owner brief 2026-09-18): the tier pips buy top speed and spend as a landing burst; KINETIC is the overdrive (Y) */}
           {typeof hud.flow === 'number' && (
             <div className="mt-1 flex items-center gap-1.5">
-              <span className="text-[10px] tracking-wider text-white/60">FLOW</span>
-              {[1, 2, 3].map((t) => <span key={t} className="inline-block h-2 w-5 rounded-sm" style={{ background: Number(hud.flow) >= t ? ['#22d3ee', '#22d3ee', '#a78bfa', '#fbbf24'][t] : 'rgba(255,255,255,0.15)' }} />)}
-              <span className="h-1.5 w-16 overflow-hidden rounded-full bg-black/50"><span className="block h-full rounded-full bg-[#22d3ee]/70 transition-[width] duration-150" style={{ width: `${Math.max(0, Math.min(100, Number(hud.flowFrac ?? 0)))}%` }} /></span>
+              <HudText size="caption" alpha={0.6}>FLOW</HudText>
+              <HudPips count={Math.floor(Number(hud.flow))} of={3} tones={['you', 'power', 'score']} />
+              <HudMeter value={Number(hud.flowFrac ?? 0)} max={100} tone="you" fillAlpha={0.7} height="thin" width="4rem" />
             </div>
           )}
           {typeof hud.kinetic === 'number' && (
-            <div className="mt-0.5 flex items-center gap-1.5">
-              <span className="text-[10px] tracking-wider text-white/60">KINETIC</span>
-              <span className="h-2 w-28 overflow-hidden rounded-full bg-black/50"><span className={`block h-full rounded-full transition-[width] duration-150 ${Number(hud.kinetic) >= 100 ? 'bg-[#fbbf24]' : Number(hud.kinetic) >= 50 ? 'bg-[#fde68a]/80' : 'bg-white/40'}`} style={{ width: `${Math.max(0, Math.min(100, Number(hud.kinetic)))}%` }} /></span>
-              {Number(hud.kinetic) >= 100 ? <span className="text-[10px] font-bold text-[#fbbf24]">SLAM READY</span> : Number(hud.kinetic) >= 50 ? <span className="text-[10px] font-bold text-[#fde68a]">BURST</span> : null}
-            </div>
+            <HudMeter className="mt-0.5" layout="inline" label="KINETIC" labelAlpha={0.6} value={Number(hud.kinetic)} max={100} width="7rem"
+              tone={Number(hud.kinetic) >= 50 ? 'score' : 'text'} fillAlpha={Number(hud.kinetic) >= 100 ? 1 : Number(hud.kinetic) >= 50 ? 0.6 : 0.4}
+              status={Number(hud.kinetic) >= 100 ? 'SLAM READY' : Number(hud.kinetic) >= 50 ? 'BURST' : undefined} statusTone="score" />
           )}
           {/* IMPROVE (2026-10-06): the trick's rotation — green once it is round far enough to land */}
           {Number(hud.trickPct) > 0 && (
-            <div className="mt-0.5 flex items-center gap-1.5">
-              <span className="text-[10px] tracking-wider text-white/60">TRICK</span>
-              <span className="h-2 w-28 overflow-hidden rounded-full bg-black/50"><span className={`block h-full rounded-full ${Number(hud.trickAround) ? 'bg-[#86efac]' : 'bg-[#f472b6]'}`} style={{ width: `${Math.max(0, Math.min(100, Number(hud.trickPct)))}%` }} /></span>
-              {Number(hud.trickAround) ? <span className="text-[10px] font-bold text-[#86efac]">LAND IT</span> : null}
-            </div>
+            <HudMeter className="mt-0.5" layout="inline" label="TRICK" labelAlpha={0.6} value={Number(hud.trickPct)} max={100} width="7rem"
+              tone={Number(hud.trickAround) ? 'good' : 'danger'} status={Number(hud.trickAround) ? 'LAND IT' : undefined} statusTone="good" />
           )}
           {/* IMPROVE (2026-10-06): a speed gate ahead — what it needs against your speed, from 15 m out */}
           {typeof hud.gateReq === 'string' && hud.gateReq && (
-            <div className={`rounded px-2 py-0.5 text-[10px] font-bold tracking-wider ${Number(hud.gateReady) ? 'bg-[#34d399]/25 text-[#34d399]' : 'bg-[#f87171]/25 text-[#f87171]'}`}>{hud.gateReq}</div>
+            <HudChip plate={false} fill={0.25} tone={Number(hud.gateReady) ? 'good' : 'danger'} size="caption" className="rounded" style={{ fontWeight: 800 }}>{hud.gateReq}</HudChip>
           )}
           {typeof hud.verbs === 'string' && hud.verbs && (
             <div className="flex flex-wrap gap-1">
-              {hud.verbs.split(' · ').map((v) => (
-                <span key={v} className={`rounded px-2 py-0.5 text-[10px] font-bold tracking-wider ${v === 'WALL RUN' || v === 'CAT LEAP' || v === 'WALL KICK' ? 'bg-[#ff6a00]/25 text-[#ff6a00]' : 'bg-black/50 text-white/85'}`}>{v}</span>
-              ))}
+              {hud.verbs.split(' · ').map((v) => (v === 'WALL RUN' || v === 'CAT LEAP' || v === 'WALL KICK'
+                ? <HudChip key={v} plate={false} fill={0.25} tone="heat" size="caption" className="rounded" style={{ fontWeight: 800 }}>{v}</HudChip>
+                : <HudChip key={v} plate={false} alpha={0.85} size="caption" className="rounded" style={{ fontWeight: 800, background: 'rgba(0, 0, 0, 0.5)' }}>{v}</HudChip>))}
             </div>
           )}
         </div>
       )}
 
-      {typeof hud.hint === 'string' && hud.hint && phase === 'playing' && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-16 text-center">
-          <span className="fel-panel px-3 py-1 font-mono text-[10px] text-white/70">{hud.hint}</span>
-        </div>
-      )}
-      {typeof hud.banner === 'string' && hud.banner && (
-        <div className="pointer-events-none absolute inset-x-0 top-1/3 text-center">
-          <span className="fel-heading fel-panel px-4 py-2 text-2xl font-bold text-[var(--fel-gold)]">{hud.banner}</span>
-        </div>
-      )}
+      {phase === 'playing' && <HudLine text={typeof hud.hint === 'string' ? hud.hint : ''} className="bottom-16" size="caption" alpha={0.7} />}
+      <HudBanner text={typeof hud.banner === 'string' ? hud.banner : ''} tone="score" />
+      </HudFrame>
 
       <BootSplash modeId="freerun" title="FREE RUN" phase={phase} detail={phase === 'error' ? (loadError ?? undefined) : (countdown ?? undefined)} onStart={tapStart} onRetry={tapStart} />
       {(phase === 'playing' || phase === 'countdown') && busRef.current && <TouchOverlay bus={busRef.current} modeId="freerun" visible />}

@@ -13,7 +13,8 @@ import { MODES } from '@/lib/babylon/modes/registry';
 import { mergeHud } from '@/lib/babylon/core/hudMerge';   // IMPROVE (2026-10-06): an unchanged HUD patch is not a render
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode, hnum } from './hud-format';
-import { CombatHudBand } from './combat-hud-band';   // QA P1-09: the banner line sits below the HUD, above the juice overlay
+import { HudFrame, HudLine, HudText } from './tv-hud';
+import { CombatEdgeCall, CombatHudBand, CombatRound, CombatStat } from './combat-hud-band';   // QA P1-09: the banner line sits below the HUD, above the juice overlay
 
 type Hud = Record<string, HudValue>;
 
@@ -111,34 +112,34 @@ export default function MixedCombatBabylon({ onEnd }: GameProps) {
   // Edge danger — the ring-out is the signature, so the warning must be on the bezel, pulsing, the moment a back nears
   // the rim. In the HUD band's banner line (QA P1-09): at top-22% it sat on the stacked HP / GUARD chips of a short stage.
   const edgeAlert = typeof hud.edge === 'string' && hud.edge ? (
-    <span className={`fel-heading animate-pulse text-xl font-black drop-shadow ${hud.edge === 'EDGE BEHIND YOU' ? 'text-[#FF3366]' : 'text-[#00FF9D]'}`}>
+    <CombatEdgeCall tone={hud.edge === 'EDGE BEHIND YOU' ? 'danger' : 'good'}>
       {hud.edge === 'EDGE BEHIND YOU' ? '⚠ EDGE BEHIND YOU ⚠' : 'RIVAL ON THE EDGE — PRESS!'}
-    </span>
+    </CombatEdgeCall>
   ) : null;
 
   return (
     <div className="relative aspect-[16/10] w-full overflow-hidden rounded-xl border border-white/10 bg-black">
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full touch-none" />
 
+      {/* TV HUD (A9.13, lane/tv-hud): the fight readouts on the shared system — same keys, same band, same corners. */}
+      <HudFrame>
       {showHud && (
         <CombatHudBand banner={typeof hud.banner === 'string' ? hud.banner : ''} alert={edgeAlert}>
-        <div className="flex justify-between px-4 py-3 text-sm font-mono text-white">
-          <div className="flex flex-col gap-1">
-            <span className="fel-panel px-2 py-0.5 text-cyan-300">HP {hnum(hud.hp, 100)}</span>
-            <span className="fel-panel px-2 py-0.5 text-yellow-400">GUARD {hnum(hud.guard, 100)}</span>
+        <div className="flex justify-between px-4 py-3">
+          <div className="flex flex-col items-start gap-1">
+            <CombatStat label="HP" value={hnum(hud.hp, 100)} tone="you" />
+            <CombatStat label="GUARD" value={hnum(hud.guard, 100)} tone="them" />
             {/* IMPROVE (2026-10-06): a full bar is the DRAGON in this mode (mixedRules.dragonLicensed) — the line says so */}
-            <span className={`fel-panel px-2 py-0.5 ${hud.dragonReady ? 'text-[#FFD700] shadow-[0_0_8px_#FFD700]' : 'text-purple-400'}`}>CHI {hnum(hud.chi, 0)}{hud.dragonReady ? ' · DRAGON' : ''}</span>
-            {hud.focus != null && <span className={`fel-panel px-2 py-0.5 ${hud.focusOn ? 'text-[#39FF6A] shadow-[0_0_8px_#39FF6A]' : 'text-emerald-500'}`} title="FOCUS — hold R2">FOCUS {hnum(hud.focus, 0)}</span>}
+            <CombatStat label="CHI" value={`${hnum(hud.chi, 0)}${hud.dragonReady ? ' · DRAGON' : ''}`} tone={hud.dragonReady ? 'score' : 'power'} glow={Boolean(hud.dragonReady)} />
+            {hud.focus != null && <CombatStat label="FOCUS" value={hnum(hud.focus, 0)} tone="good" glow={Boolean(hud.focusOn)} title="FOCUS — hold R2" />}
           </div>
-          <div className="text-center">
-            <span className="fel-heading text-xl font-black">ROUND {hnode(hud.round, 1)}</span>
-            <div className="text-xs mt-1">{hnode(hud.wins, 0)} – {hnode(hud.foeWins, 0)}</div>
-            {typeof hud.loadout === 'string' && hud.loadout && <div className="text-xs text-cyan-300">{hud.loadout}</div>}
-          </div>
-          <div className="flex flex-col gap-1 items-end">
-            <span className="fel-panel px-2 py-0.5 text-red-400">FOE HP {hnum(hud.foeHp, 100)}</span>
-            <span className="fel-panel px-2 py-0.5 text-yellow-400">FOE GUARD {hnum(hud.foeGuard, 100)}</span>
-            <span className="fel-panel px-2 py-0.5 text-purple-400">FOE CHI {hnum(hud.foeChi, 0)}</span>
+          <CombatRound round={hnode(hud.round, 1)} wins={hnode(hud.wins, 0)} foeWins={hnode(hud.foeWins, 0)}>
+            {typeof hud.loadout === 'string' && hud.loadout && <HudText size="label" tone="you">{hud.loadout}</HudText>}
+          </CombatRound>
+          <div className="flex flex-col items-end gap-1">
+            <CombatStat label="FOE HP" value={hnum(hud.foeHp, 100)} tone="danger" />
+            <CombatStat label="FOE GUARD" value={hnum(hud.foeGuard, 100)} tone="them" />
+            <CombatStat label="FOE CHI" value={hnum(hud.foeChi, 0)} tone="power" />
           </div>
         </div>
         </CombatHudBand>
@@ -149,11 +150,10 @@ export default function MixedCombatBabylon({ onEnd }: GameProps) {
       {/* The mode's own instructions (loadout pick, fight grammar). The mode
           published these every phase and no bezel ever drew them — trap:
           "published is not rendered". */}
-      {typeof hud.hint === 'string' && hud.hint && (phase === 'playing' || phase === 'countdown') && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-[13%] flex justify-center">
-          <span className="fel-panel max-w-lg px-3 py-1 text-center text-[11px] text-white/80">{hud.hint}</span>
-        </div>
+      {(phase === 'playing' || phase === 'countdown') && (
+        <HudLine text={typeof hud.hint === 'string' ? hud.hint : ''} className="bottom-[13%]" size="label" alpha={0.8} maxWidthClass="max-w-lg" />
       )}
+      </HudFrame>
 
       <BootSplash
         modeId="mixedcombat"
