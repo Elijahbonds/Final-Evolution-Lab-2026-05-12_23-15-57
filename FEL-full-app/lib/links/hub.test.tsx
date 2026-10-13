@@ -1,4 +1,4 @@
-// The public bio page: one config, no session, /books → /links#books.
+// The public bio page: one config, no session, /books → /press (the book shop; owner 2026-10-13, was /links#books).
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { createElement } from 'react';
@@ -14,6 +14,7 @@ vi.mock('next/navigation', async (orig) => ({
 
 import Page, { metadata } from '@/app/links/page';
 import { GET as booksGet } from '@/app/books/route';
+import { copyPlainText } from '@/app/links/copy-code';
 import { GET as elijahGet } from '@/app/elijah/route';
 import { config, isPublicRoute, middleware, PUBLIC_ROUTE_ALLOWLIST } from '../../middleware';
 import {
@@ -101,6 +102,51 @@ describe('the rendered page', () => {
   });
 });
 
+describe('copy code behavior', () => {
+  it('reports success when the async clipboard accepts the code', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    const ok = await copyPlainText(
+      'EBondJmp',
+      undefined,
+      { clipboard: { writeText } } as unknown as Navigator,
+    );
+
+    expect(ok).toBe(true);
+    expect(writeText).toHaveBeenCalledWith('EBondJmp');
+  });
+
+  it('reports blocked when both clipboard paths fail', async () => {
+    const remove = vi.fn();
+    const select = vi.fn();
+    const area = {
+      value: '',
+      setAttribute: vi.fn(),
+      style: {} as CSSStyleDeclaration,
+      select,
+      remove,
+    } as unknown as HTMLTextAreaElement;
+    const appendChild = vi.fn();
+    const execCommand = vi.fn(() => false);
+    const doc = {
+      body: { appendChild },
+      createElement: vi.fn(() => area),
+      execCommand,
+    } as unknown as Document;
+
+    const ok = await copyPlainText(
+      'EBondJmp',
+      doc,
+      { clipboard: { writeText: vi.fn().mockRejectedValue(new Error('blocked')) } } as unknown as Navigator,
+    );
+
+    expect(ok).toBe(false);
+    expect(appendChild).toHaveBeenCalledWith(area);
+    expect(select).toHaveBeenCalled();
+    expect(execCommand).toHaveBeenCalledWith('copy');
+    expect(remove).toHaveBeenCalled();
+  });
+});
+
 describe('share tags', () => {
   it('sets Open Graph and Twitter cards to the local share image', () => {
     expect(metadata.openGraph && 'images' in metadata.openGraph && metadata.openGraph.images).toBeTruthy();
@@ -129,13 +175,14 @@ describe('GET /links and /books without a session', () => {
     }
   });
 
-  it('GET /books redirects to /links#books and GET /links renders', () => {
+  // test changed (2026-10-13, owner answer on PR #17): /books now points at /press, the book shop. It used to
+  // assert the redirect went to /links#books. The old assertion was the old decision, not a defect.
+  it('GET /books redirects to /press and GET /links renders', () => {
     const books = booksGet();
     expect(books.status).toBeGreaterThanOrEqual(300);
     expect(books.status).toBeLessThan(400);
     const location = books.headers.get('location') ?? '';
-    expect(location).toContain('/links');
-    expect(location).toContain('#books');
+    expect(location).toBe('/press');
     expect(location).not.toMatch(/\/login/);
     expect(() => html()).not.toThrow();
   });

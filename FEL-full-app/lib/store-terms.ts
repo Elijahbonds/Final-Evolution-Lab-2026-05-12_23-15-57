@@ -14,11 +14,13 @@ import { STORE_TERMS_TEXT_B } from './store-terms/text-b';
 // unable to say which text anyone saw. Change the version, the text and the fingerprint (lib/store-terms.test.ts)
 // together. LEGAL-COPY-2 will LATER insert the audiobooks section and renumber, which is why the sections below
 // carry stable word-based ids and the text stays swappable by version.
-export const STORE_TERMS_VERSION = 'store-terms-2026-10-04';
+// LEGAL-COPY-2 (2026-10-12; Elijah, 10:07 AM PT Oct 8, yes to LEGAL-COPY-2 defaults): §2.7 Audiobooks, §4.6, the quick-view and price rows, §1 audiobook line, route fix; mailing address renumbered to §2.8 and still hidden.
+export const STORE_TERMS_VERSION = 'store-terms-2026-10-12';
 
 /** The FIXED whole-text sha256 of each approved store-terms version (given by the approved brief; never recomputed from the text). */
 export const STORE_TERMS_FINGERPRINTS: Record<string, string> = {
   'store-terms-2026-10-04': 'cdfda044a8b927caa04ada91414fc028a28ea2d02deb6ca042ebae38f18169a6',
+  'store-terms-2026-10-12': 'fcc646da4fa9d7aefc762bfed28c39b4a42311b08e4d167454e470798b210b0d',
 };
 
 /** One section of the store terms: a stable, word-based anchor id and its markdown body. */
@@ -41,7 +43,7 @@ export function storeTermsText(sections: readonly StoreTermsSection[] = STORE_TE
 /**
  * The literal token the approved text prints where the company's mailing address goes (it appears in the
  * contact section here and in the mailing-address section in Part B). The real address is NEVER typed in
- * this repo; the page substitutes BUSINESS_MAILING_ADDRESS (lib/legal/business.ts) at render time.
+ * this repo; the page substitutes REAL_MAILING_ADDRESS (lib/legal/business.ts) at render time.
  */
 export const BUSINESS_ADDRESS_TOKEN = '{BUSINESS_ADDRESS}';
 
