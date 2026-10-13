@@ -126,7 +126,7 @@ export default function DunkDuelBabylon({ onEnd }: GameProps) {
             )}
             {/* charge meter — the loaded jump, while it loads */}
             {typeof hud.charge === 'number' && hud.charge > 0 && (
-              <HudMeter className="mx-auto mt-1 items-center" height="thin" width="9rem" value={hud.charge} max={100} tone="you" />
+              <HudMeter className="mx-auto mt-1 items-center" height="thin" width="9rem" value={hud.charge} max={100} tone="you" fillStyle={{ transition: 'none' }} />
             )}
           </div>
           <div className="flex flex-col items-end gap-1">

@@ -140,7 +140,7 @@ export default function CarnivalBabylon({ onEnd }: GameProps) {
         <div className="absolute inset-x-0 bottom-36 flex justify-center">
           <HudMeter
             height="strip" width="220px" framed
-            value={Math.max(0, Math.min(1, hud.charge))} max={1} tone="you" fillAlpha={0.8}
+            value={Math.max(0, Math.min(1, hud.charge))} max={1} tone="you" fillAlpha={0.8} fillStyle={{ transition: 'none' }}
             segments={typeof hud.chargeLo === 'number' && typeof hud.chargeHi === 'number'
               ? [{ from: Math.max(0, hud.chargeLo), to: Math.max(0, Math.min(1, hud.chargeHi)), tone: 'score', alpha: 0.45 }]
               : undefined}

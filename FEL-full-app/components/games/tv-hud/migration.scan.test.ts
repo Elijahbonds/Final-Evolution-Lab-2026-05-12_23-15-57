@@ -101,10 +101,19 @@ export const MIGRATED: Record<string, {
     modeId: '"dunkduel"',
     keys: 'activePlayer banner charge dunkNum hint judgeReveal mic micWho p1Score p2Score prop slamPulse style'.split(' '),
   },
+  'basketball-babylon.tsx': {
+    modeId: '"onevone"',
+    keys: 'banner foeScore hint mic micWho score shotMeterGreen shotMeterT shotPips winBy2'.split(' '),
+  },
+  'three-v-three-babylon.tsx': {
+    modeId: '"threevthree"',
+    allowHex: ['#fbbf24'],   // the touch deck's BALL! slot colour: TouchOverlay takes a hex string and tints with it (call-for-ball-tests pins the override)
+    keys: 'ast banner court foeScore hint mic micWho onBall overdrive passPreview score shotMeterGreen shotMeterT synergy time'.split(' '),
+  },
 };
 
-/** Shared HUD pieces a migrated host draws through, held to the same rules. (boost-hud: the racing hosts' and the boards' boost meter; judge-cards: the dunk and dunk-duel judges' row.) */
-const PIECES = ['timing-prompt.tsx', 'combat-hud-band.tsx', 'boost-hud.tsx', 'judge-cards.tsx'];
+/** Shared HUD pieces a migrated host draws through, held to the same rules. (boost-hud: the racing hosts' and the boards' boost meter; judge-cards: the dunk and dunk-duel judges' row; hoops-shot-meter: the 1v1 and 3v3 release bar.) */
+const PIECES = ['timing-prompt.tsx', 'combat-hud-band.tsx', 'boost-hud.tsx', 'judge-cards.tsx', 'hoops-shot-meter.tsx'];
 
 const keyRead = (src: string, k: string) => new RegExp(`hud\\.${k}\\b|hud\\[['"]${k}['"]\\]`).test(src);
 
