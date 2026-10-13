@@ -75,6 +75,50 @@ describe('the replay director', () => {
     expect(rd.playing).toBe(false);
     expect(scene.metadata?.felCinematic ?? 0).toBe(0);
   });
+  it('a vehicle (turned by Euler rotation) replays its pitch and roll as recorded, and gets all three back', async () => {
+    const { scene, cam, runner, frame } = rig();
+    const rd = new ReplayDirector(scene, cam, [runner]);
+    // a plane banking: roll sweeps 0 → 1.2 rad over 2 s while it flies on, then the live moment holds at roll 1.2 / pitch 0.3
+    for (let i = 0; i < 120; i++) { runner.position.z = i * 0.2; runner.rotation.set(0.3 * (i / 119), 0.4, 1.2 * (i / 119)); frame(); }
+    const live = runner.rotation.clone();
+    const done = rd.play({ lastSeconds: 2 });
+    const rolls: number[] = [];
+    for (let i = 0; i < 2 / REPLAY_SPEED * 60 + 20 && rd.playing; i++) { frame(); rolls.push(runner.rotation.z); }
+    await done;
+    expect(Math.min(...rolls)).toBeLessThan(0.5);        // it was not left banked at the live 1.2 for the whole replay
+    expect(rolls[rolls.length - 3]).toBeGreaterThan(rolls[3]);   // and it rolls the way it did
+    expect(runner.rotation.equalsWithEpsilon(live, 1e-9)).toBe(true);   // pitch (x), yaw (y) and roll (z) all put back
+    rd.dispose();
+  });
+  it('vis-race: `focus` points the cameras at another recorded body (the victim of a kill, not the shooter)', async () => {
+    const { scene, cam, runner, frame } = rig();
+    const rival = new TransformNode('rival', scene);
+    const rd = new ReplayDirector(scene, cam, [runner, rival]);
+    for (let i = 0; i < 120; i++) { runner.position.set(0, 0, i * 0.2); rival.position.set(40, 0, 30 + i * 0.2); frame(); }
+    const done = rd.play({ lastSeconds: 2, focus: 1 });
+    let near = Infinity;
+    for (let i = 0; i < 400 && rd.playing; i++) { frame(); near = Math.min(near, cam.position.subtract(rival.position).length()); }
+    await done;
+    expect(near).toBeLessThan(12);   // the cut stood around the rival (40 m from the runner), not the runner
+    const done2 = rd.play({ lastSeconds: 2 });
+    let nearRunner = Infinity;
+    for (let i = 0; i < 400 && rd.playing; i++) { frame(); nearRunner = Math.min(nearRunner, cam.position.subtract(runner.position).length()); }
+    await done2;
+    expect(nearRunner).toBeLessThan(12);   // and with no focus it is still the first body
+    rd.dispose();
+  });
+  it('a loop wraps the short way round (a pitch crossing ±π does not spin the body the long way)', async () => {
+    const { scene, cam, runner, frame } = rig();
+    const rd = new ReplayDirector(scene, cam, [runner]);
+    for (let i = 0; i < 100; i++) { runner.position.z = i * 0.2; runner.rotation.x = 3.0 + i * 0.01 - (i > 50 ? 2 * Math.PI : 0); frame(); }   // 3.0 → 3.5 rad, written wrapped past π
+    const done = rd.play({ lastSeconds: 1.5 });
+    const xs: number[] = [];
+    for (let i = 0; i < 200 && rd.playing; i++) { frame(); xs.push(runner.rotation.x); }
+    await done;
+    const turn = (a: number, b: number): number => Math.abs(Math.atan2(Math.sin(b - a), Math.cos(b - a)));   // the angle between two orientations, mod 2π
+    for (let i = 1; i < xs.length - 2; i++) expect(turn(xs[i - 1], xs[i])).toBeLessThan(0.2);   // never a half-turn between frames
+    rd.dispose();
+  });
   it('does not record over itself while playing', () => {
     const { scene, cam, runner, frame } = rig();
     const rd = new ReplayDirector(scene, cam, [runner]);

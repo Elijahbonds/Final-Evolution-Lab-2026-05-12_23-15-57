@@ -209,6 +209,10 @@ export interface ModeDefinition {
    *  pose read per body 30 times a second, so only a mode that replays pays it. Mounting it also mounts the replays' depth of
    *  field (desktop/high) at load, so its shaders never compile mid-game. */
   replay?: boolean;
+  /** vis-race (wave 2): the bodies a replay records, when they are not skinned characters — a race's vehicles (the player's
+   *  first: it is the shot's subject), whose rivals are plain nodes `characterRoots` cannot find. Read once, after load().
+   *  Absent: the hero and the skinned characters nearest it (every other replay mode). */
+  replayBodies?(ctx: ModeContext): TransformNode[];
   load(ctx: ModeContext): Promise<void>;        // spawn venue + characters
   onInput(ctx: ModeContext, e: FelInput): void;
   update(ctx: ModeContext, dt: number): void;   // called only while 'playing'
@@ -605,7 +609,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
       // would build the grid from an empty scene and do nothing.
       iblShadows = mountIblShadows(scene, camera);
       // A9.12: the replay recorder on the bodies load() spawned, and the replays' depth of field mounted now (no mid-game compile)
-      replay?.dispose(); replay = def.replay ? new ReplayDirector(scene, camera, characterRoots(scene, heroRef.current), [], mountReplayDof(scene, lights.pipeline, tier)) : null;
+      replay?.dispose(); replay = def.replay ? new ReplayDirector(scene, camera, def.replayBodies?.(ctx).filter((n) => !n.isDisposed()) ?? characterRoots(scene, heroRef.current), [], mountReplayDof(scene, lights.pipeline, tier)) : null;
       setPhase('ready');
       // M67: pre-warm every material now, on the loading→ready boundary, so a
       // first-visibility shader compile never hitches mid-play. Dev-only work.

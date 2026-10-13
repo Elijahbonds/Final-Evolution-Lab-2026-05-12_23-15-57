@@ -15,14 +15,16 @@ import type { Mesh, Observer, Scene } from '@babylonjs/core';
 import type { QualityTier } from '../scene/QualityTier';
 import { sceneModeId, wave2Look } from '../scene/lookPolicy';
 
-export type DecalKind = 'scuff' | 'foot';
-export const DECAL_KINDS: readonly DecalKind[] = ['scuff', 'foot'];
+export type DecalKind = 'scuff' | 'foot' | 'tyre';
+export const DECAL_KINDS: readonly DecalKind[] = ['scuff', 'foot', 'tyre'];
 /** Live marks per kind, per tier. */
 export function decalCap(tier: QualityTier): number { return tier === 'mobile' ? 24 : 64; }
 /** Seconds a mark lasts (fully visible for the first 60 %, then fading). */
 export function decalLife(tier: QualityTier): number { return tier === 'mobile' ? 8 : 18; }
 /** Default footprint of each kind, metres (width, length). */
-export const DECAL_SIZE: Record<DecalKind, [number, number]> = { scuff: [0.5, 1.1], foot: [0.13, 0.3] };
+/** `tyre` (vis-race, wave 2): a pair of rubber streaks the width of a kart's rear track (1.32 m between tyre centres), 2.2 m long,
+ *  stamped end to end along a slide or a burnout. */
+export const DECAL_SIZE: Record<DecalKind, [number, number]> = { scuff: [0.5, 1.1], foot: [0.13, 0.3], tyre: [1.62, 2.2] };
 
 /** Pure: a mark's opacity `age` seconds into a `life`-second life. */
 export function decalAlpha(age: number, life: number): number {
@@ -39,7 +41,19 @@ function paint(scene: Scene, kind: DecalKind): DynamicTexture {
   const tex = new DynamicTexture(`fel_decal_${kind}`, { width: S, height: S }, scene, true);
   const g = tex.getContext() as unknown as CanvasRenderingContext2D;
   g.clearRect(0, 0, S, S);
-  if (kind === 'scuff') {
+  if (kind === 'tyre') {
+    // two tyre tracks: dark rubber, ragged edges, a faint tread pattern, and the ends faded so stamps laid end to end read as
+    // one unbroken streak (the pair sits at u = 0.093 and 0.907 of a 1.62 m quad: 1.32 m apart, a kart's rear tyres)
+    for (const cx of [S * 0.093, S * 0.907]) {
+      const gr = g.createLinearGradient(0, 0, 0, S);
+      gr.addColorStop(0, 'rgba(10,9,8,0)'); gr.addColorStop(0.18, 'rgba(10,9,8,0.55)'); gr.addColorStop(0.82, 'rgba(10,9,8,0.55)'); gr.addColorStop(1, 'rgba(10,9,8,0)');
+      g.fillStyle = gr; g.fillRect(cx - 11, 0, 22, S);
+      g.fillStyle = gr; g.globalAlpha = 0.35; g.fillRect(cx - 15, 8, 4, S - 16); g.fillRect(cx + 11, 8, 4, S - 16); g.globalAlpha = 1;   // the soft shoulders
+      g.globalCompositeOperation = 'destination-out'; g.fillStyle = 'rgba(0,0,0,0.3)';
+      for (let y = 6; y < S; y += 10) g.fillRect(cx - 9, y, 18, 3);   // tread bars
+      g.globalCompositeOperation = 'source-over';
+    }
+  } else if (kind === 'scuff') {
     // a dragged smear: a soft dark streak, ragged at the ends
     for (let i = 0; i < 14; i++) {
       const x = S * (0.35 + 0.3 * Math.sin(i * 1.7)), w = 6 + (i % 4) * 3;
