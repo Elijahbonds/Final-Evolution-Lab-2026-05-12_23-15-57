@@ -415,6 +415,7 @@ export function mountBackdrop(scene: Scene, family: BackdropFamily, mood?: Venue
   domeMat.specularColor = Color3.Black();
   domeMat.disableLighting = true;
   dome.material = domeMat;
+  (dome.metadata ??= {}).felBake = baked ?? null;   // vis-foundation-2 A9.11: which photograph (SkyDome.ts reads it through the washed copies)
   dome.isPickable = false;
   dome.applyFog = false;
   meshes.push(dome);

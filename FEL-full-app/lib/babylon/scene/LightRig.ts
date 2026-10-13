@@ -14,6 +14,8 @@ import { mountKickerLight, type KickerHandle } from './KickerLight';
 import { mountEmissiveGlow, type GlowHandle } from './EmissiveGlow';
 import { captureVenueReflection, type VenueReflectionHandle } from './VenueReflection';
 import { mountFixtureLights, type FixtureLightsHandle } from './FixtureLights';
+import { mountSkyDome, type SkyDomeHandle } from './SkyDome';
+import { mountAtmosphere, type AtmosphereHandle } from './Atmosphere';
 import { mountEnvironmentIBL } from './EnvironmentIBL';
 import { motionPolicy } from '../../a11y/reducedMotion';
 
@@ -50,6 +52,9 @@ export interface LightRigHandle {
   shadowCache: ShadowCacheHandle | null;
   /** A9.5 second half (vis-foundation-2): the fixtures' clustered lights, mounted by captureVenue on desktop/high. */
   readonly fixtureLights: FixtureLightsHandle | null;
+  /** A9.11 (vis-foundation-2): the live sky on the domes (desktop/high) and the procedural worlds' haze (every tier). */
+  readonly sky: SkyDomeHandle | null;
+  readonly atmosphere: AtmosphereHandle | null;
   dispose(): void;
 }
 
@@ -220,6 +225,8 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
   const glow = T.glow ? mountEmissiveGlow(scene, tier, mood) : null;
   let venueProbe: VenueReflectionHandle | null = null;
   let fixtureLights: FixtureLightsHandle | null = null;
+  let sky: SkyDomeHandle | null = null;
+  let atmosphere: AtmosphereHandle | null = null;
 
   liftBlackMaterials(scene);
 
@@ -236,6 +243,11 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
       // A9.5 second half: the fixtures light the place (desktop/high; mounted once here, at the load→ready boundary, so the
       // materials' one recompile for the new light happens behind the splash)
       if (!legacy && tier !== 'mobile' && !lookFeatureOff('fixtures')) { fixtureLights?.dispose(); fixtureLights = mountFixtureLights(scene, tier, mood, at ?? null); }
+      // A9.11: the sky on the domes the venue left (desktop/high), and air over a world nobody else fogs (every tier)
+      if (!legacy) {
+        sky?.dispose(); sky = mountSkyDome(scene, mood, tier, lookFeatureOff('sky'));
+        atmosphere?.dispose(); atmosphere = mountAtmosphere(scene, mood, lookFeatureOff('air'));
+      }
       if (!T.venueProbe) return false;
       const where = at?.clone() ?? null;
       scene.executeWhenReady(() => {
@@ -247,6 +259,8 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
     },
     get venueProbe() { return venueProbe; },
     get fixtureLights() { return fixtureLights; },
+    get sky() { return sky; },
+    get atmosphere() { return atmosphere; },
     flashBeat() {
       // HOTFIX (2026-09-24): reduced motion — no exposure flash (a made three, a momentum tier, the storm's lightning:
       // the thunder still rolls, the sky just does not strobe)
@@ -272,6 +286,7 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
       glow?.dispose();
       venueProbe?.dispose();
       fixtureLights?.dispose();
+      sky?.dispose(); atmosphere?.dispose();
       hemi.dispose(); sun.dispose(); shadows.dispose(); pipeline.dispose();
       disposeEnv();
     },
