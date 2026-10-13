@@ -19,8 +19,11 @@ const TEXT_BY_VERSION: Record<string, string> = {
   '2026-10-07-draft': 'e1c40c0b8dd666d8',  // + §6: the Mirror's "vs your last 3" kept on the device only, never sent, forgettable (mirror-progress)
   '2026-10-07': '1817114b5ef24ce7',        // LEGAL-COPY: Terms §2 18+, Terms §9 + Privacy §11 Contact, Privacy §10 store, §4/§5/§7 fixes; first non-draft label; draft banners removed on the owner's sign-off (follow-up 1)
   '2026-10-12': '774adfd3055f3cfa',        // LEGAL-COPY-2: Terms §7 written; the Mail line and the privacy write-to clause print only once an address is set
-  '2026-10-13': 'e9481336114ac8d5',        // CREATOR-PLATFORM: §1 gains the Work-with-us inquiry bullet (name, email, message; kept 12 months; no IP address)
-  '2026-10-13b': '8e6119890721e059',        // PARTY-PRIVACY: §2 gains the Parties bullet (party name, nothing recorded, voice 18+, block on the device, reports kept 12 months)
+  '2026-10-13': 'ec0c2d7e6df23ad0',  // BUSINESS-ADDRESS: the #2012 business mailbox fills the Mail lines and the privacy write-to clause
+  // '2026-10-13' as the lane's CREATOR-PLATFORM text alone (e9481336114ac8d5) never shipped: the label was taken by the
+  // address-only text that ships from PR #222 (LANE-SYNC, FE PM 10:19 PM PT Oct 12).
+  '2026-10-14': 'd0dd0d8daf1d3367',  // LANE-SYNC: CREATOR-PLATFORM §1 Work-with-us bullet + BUSINESS-ADDRESS #2012 mailbox together
+  '2026-10-14b': '6d4d960aced45bf7',  // PARTY-PRIVACY: §2 gains the Parties bullet (party name, nothing recorded, voice 18+, block on the device, reports kept 12 months)
 };
 
 describe('the policy version', () => {
@@ -51,7 +54,7 @@ describe('the policy version', () => {
   // test changed (2026-10-13, owner-approved Parties line, this lane): was toBe('2026-10-13'). The version moves with
   // the text; 2026-10-13 is now an earlier version and keeps its fingerprint above.
   it('is the final, non-draft label', () => {
-    expect(CURRENT_POLICY_VERSION).toBe('2026-10-13b');
+    expect(CURRENT_POLICY_VERSION).toBe('2026-10-14b');
     expect(CURRENT_POLICY_VERSION).not.toBe('2026-10-13');
     expect(CURRENT_POLICY_VERSION).not.toBe('2026-10-12');
     expect(CURRENT_POLICY_VERSION).not.toBe('2026-10-07');
@@ -324,13 +327,14 @@ describe('terms of service, buying is 18+ (LEGAL-COPY)', () => {
 // placeholder in its place. tests/legal/address-set.test.tsx proves the set case.
 describe('legal contact block, one business address (LEGAL-COPY)', () => {
   for (const [name, content, contact] of [['Terms', TERMS_CONTENT, '## 9. Contact'], ['Privacy', PRIVACY_CONTENT, '## 11. Contact']] as const) {
-    it(`${name} ends with a ${contact} section carrying the legal name and contact email, and no Mail line while the address is unset`, () => {
+    it(`${name} ends with a ${contact} section carrying the legal name, contact email and the business Mail line`, () => {
       expect(content).toContain(contact);
       const section = content.slice(content.indexOf(contact));
       expect(section).toContain(BUSINESS_LEGAL_NAME);
       expect(section).toContain(BUSINESS_CONTACT_EMAIL);
-      expect(isMailingAddressSet(REAL_MAILING_ADDRESS)).toBe(false);
-      expect(section).not.toContain('Mail:');
+      expect(isMailingAddressSet(REAL_MAILING_ADDRESS)).toBe(true);
+      expect(section).toContain('Mail: 18543 Devonshire St #2012, Northridge, CA 91324');
+      expect(section).not.toMatch(/granada hills/i);
       expect(section).not.toContain('[');
     });
   }

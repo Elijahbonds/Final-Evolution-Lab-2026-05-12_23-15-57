@@ -28,6 +28,7 @@ import {
   DANCE_LIBRARY, DancePerformance, generateRoutine, beatDuration, JUDGE_WINDOWS, type DanceStep, type DanceClip,
 } from '@/lib/babylon/core/DanceCore';
 import { allTracks, stepsFor, gradeFor, type DanceTrack } from '@/lib/babylon/core/danceTracks';
+import { chartStepsFor } from '@/lib/babylon/dance/chart';
 import { StemBand, CATEGORY_STEM } from '@/lib/babylon/audio/StemBand';
 import { exportSongToDance } from '@/lib/babylon/music/DanceExport';
 import { MAX_SONG_BARS, barStartSec, renderLengthSec, type Section, type SongChain } from '@/lib/babylon/music/Song';
@@ -169,7 +170,11 @@ function danceSection() {
   const tracks = allTracks().map((t) => {
     const mine = stepsFor(t);
     const steps = mine ?? generateRoutine({ bars: t.bars, difficulty: t.difficulty, seed: t.seed });
-    return chartReport(t, steps, mine ? (t.song ? 'stepsForSong (its own section map)' : 'exported') : 'generateRoutine(bars, difficulty, seed) fallback — unreachable for a shipped track');
+    // MUSIC-SUITE P9 re-land (2026-10-13): a shipped track plays its AUTHORED chart (dance/chart.ts: its moves are the steps;
+    // its accents, doubles and freestyle slots are STYLE taps and not in this report), stepsForSong only if the chart failed
+    // validation (chartStepsFor logs that loudly)
+    const src = t.song ? (chartStepsFor(t.song) ? 'authored chart (dance/charts, moves only)' : 'stepsForSong fallback (chart invalid)') : 'exported';
+    return chartReport(t, steps, mine ? src : 'generateRoutine(bars, difficulty, seed) fallback — unreachable for a shipped track');
   });
 
   // THE 64-BAR EXPORT. SongPanel ids a song `s${Date.now()}` per mount (SongPanel.tsx:25), and the export's seed is

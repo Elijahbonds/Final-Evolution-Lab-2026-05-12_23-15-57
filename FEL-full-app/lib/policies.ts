@@ -60,14 +60,20 @@ const WRITE_TO = isMailingAddressSet(REAL_MAILING_ADDRESS) ? `, or write to ${BU
 // bullet for the Work-with-us inquiry form (name, email and message, with the other fields the form asks for; kept 12 months,
 // then deleted; no IP address). The inquiry table is pending SQL (prisma/pending/2026-10-13-creator-inquiry.sql) and its
 // retention is INQUIRY_RETENTION_DAYS in lib/creator/inquiryStore.ts. 2026-10-12 is the text without this bullet.
+// BUSINESS-ADDRESS (FE PM 9:00 PM PT Oct 12): bumped for the contact detail only. REAL_MAILING_ADDRESS is set, so the
+// Terms §9 and Privacy §11 Mail lines and the Privacy §10 write-to clause now print it. A contact-detail update: no
+// re-acceptance; new signups record the new version. 2026-10-12 is the text without the address.
+// LANE-SYNC (FE PM 10:19 PM PT Oct 12): both changes above used the label 2026-10-13 on different branches. The address-only
+// text (PR #222, deployed on top of bb7a2bd2) keeps 2026-10-13; the combined text here (Privacy §1 Work-with-us bullet + the
+// #2012 address) is 2026-10-14. Contact/notice update only: no re-acceptance; new signups record the new version.
 // PARTY-PRIVACY (2026-10-13; owner decision "add the party privacy sentence ... with a version bump", retention 12 months for
-// party reports and creator inquiries): bumped again, §2 only — one bullet, Parties: the party name members see, that party
-// messages, quick chat, emotes and voice are never recorded or stored, voice for verified adults only, block kept on the
-// device, and a report kept (who, which party, when, why; no conversation) for 12 months, then deleted. The report table is
-// pending SQL (prisma/pending/2026-10-13-party-report.sql) and its retention is PARTY_REPORT_RETENTION_DAYS in
-// lib/party/social/reports.ts. The sentence is the party-chat lane's drafted paragraph plus the retention sentence.
-// 2026-10-13 is the text without this bullet.
-export const CURRENT_POLICY_VERSION = '2026-10-13b';
+// party reports and creator inquiries): §2 gains one bullet, Parties: the party name members see, that party messages, quick
+// chat, emotes and voice are never recorded or stored, voice for verified adults only, block kept on the device, and a report
+// kept (who, which party, when, why; no conversation) for 12 months, then deleted. The report table is pending SQL
+// (prisma/pending/2026-10-13-party-report.sql); its retention is PARTY_REPORT_RETENTION_DAYS in lib/party/social/reports.ts.
+// Stacked on the LANE-SYNC text above: 2026-10-14 is the text without this bullet. (The lane first called it 2026-10-13b on a
+// branch; that label never shipped.)
+export const CURRENT_POLICY_VERSION = '2026-10-14b';
 
 export const TERMS_CONTENT = `
 # Terms of Service
