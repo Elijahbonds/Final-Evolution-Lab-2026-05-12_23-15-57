@@ -17,6 +17,8 @@ import { resolveModeMood } from '../scene/moodResolver';   // A9.4: mood follows
 import { InputBus, type FelInput, type BodyPacket } from './InputBus';
 import { CameraDirector, type FOLLOW_PRESETS } from './CameraDirector';
 import { mountLetterbox } from '../visual/Letterbox';   // vis-foundation-2 A9.12: the cinematic bars
+import { mountSweat } from './skinShading';   // vis-foundation-2 A9.14: the hero's skin shines as they work
+import { wave2Look } from '../scene/lookPolicy';
 import type { IntroKind } from '../scene/broadcastShots';
 import { ReplayDirector, characterRoots, mountReplayDof, type ReplayPlayOpts } from '../scene/ReplayDirector';   // A9.12
 import { buildResult, type ResultSink, type SessionResult } from './sessionResult';
@@ -324,6 +326,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
   const input = opts.input ?? new InputBus();
   const camDirector = new CameraDirector(scene, camera, def.camPreset);
   const letterbox = mountLetterbox(scene, opts.canvas, () => camDirector.cinematic01);   // A9.12: the intro's and the replays' bars
+  const sweat = wave2Look(def.modeId) ? mountSweat(scene, () => heroRef.current, () => phase === 'playing') : null;   // A9.14
 
   // M67: dev-only frame-budget monitor. mount() is a no-op in production, so
   // the overlay and its per-frame bookkeeping cost nothing for real players.
@@ -936,6 +939,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     unink();              // M59
     backdrop.dispose();   // M61
     letterbox.dispose();  // A9.12
+    sweat?.dispose();     // A9.14
     iblShadows?.dispose();
     replay?.dispose();   // A9.12
     ssao?.dispose();
