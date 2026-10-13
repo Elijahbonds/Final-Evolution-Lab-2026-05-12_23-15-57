@@ -41,6 +41,7 @@ import { keepOutOfShadows } from '../party/shadowOpt';
 import { EffectsKit } from '../visual/EffectsKit';
 import { specFor } from '../nexus/venueSpecs';
 import { motionPolicy } from '@/lib/a11y/reducedMotion';
+import { SPEED_VIGNETTE_ON } from '../core/ImpactFrame';
 import { WHIP_SEC, pipelineGrade, pushFov, questionGrade, stepGrade, whipYaw, type GradeLike } from './whoSceneItFx';
 import { refuse } from '../core/Refusal';
 // PIPELINES (2026-10-06): the pick screen lists approved community packs, credited, with play counts.
@@ -170,6 +171,7 @@ export function makeWhoSceneItMode(): ModeDefinition {
   const gradeNow: GradeLike = { exposure: 1, contrast: 1, vignette: 0 };
   let gradeTo: GradeLike = { exposure: 1, contrast: 1, vignette: 0 };
   let gradeSettled = true;
+  let paintFrames = 0;                               // frames left to ask the harness to repaint the rest after it settled
   let phase: Phase = 'pick';
   let pickT = 0;
   let clock = WHO_SCENE_IT.timeLimit;
@@ -555,15 +557,21 @@ export function makeWhoSceneItMode(): ModeDefinition {
 
     update(ctx: ModeContext, dt: number): void {
       podiumGlow?.tick(dt);
-      // vis-party: ease the grade to this venue's. The flare (flashBeat) owns the pipeline's exposure while it decays, so the
-      // exposure is written only once it has had its time; the owned rest follows throughout (the flare returns to it).
+      // vis-party: ease the grade to this venue's. The rig owns the grade, so the mode moves only the rig's OWN rest (exposure and
+      // vignette) and the contrast (nothing composes it); the harness paints the rest when a mode reports a speed-vignette fraction
+      // (ctx.feel.speedVignette01 — a mode never writes the pipeline's vignette itself, speedVignetteRollout.test holds that). The
+      // report is held back while the whip's flare decays (the flash beat owns the exposure then) and resumes after it.
       if (!gradeSettled) {
         gradeSettled = !stepGrade(gradeNow, gradeTo, dt);
-        const lights = ctx.lights, ip = lights.pipeline.imageProcessing;
+        const lights = ctx.lights;
         lights.rest.exposure = gradeNow.exposure; lights.rest.vignette = gradeNow.vignette;
-        ip.contrast = gradeNow.contrast; ip.vignetteWeight = gradeNow.vignette;
-        if (whipAge > WHIP_SEC + 0.3) ip.exposure = gradeNow.exposure;
+        lights.pipeline.imageProcessing.contrast = gradeNow.contrast;
+        paintFrames = 3;
       }
+      const flaring = whipAge < WHIP_SEC;
+      if (flaring) ctx.feel.speedVignette01(0);
+      else if (!gradeSettled || paintFrames > 0) { if (gradeSettled) paintFrames--; ctx.feel.speedVignette01(SPEED_VIGNETTE_ON + 1e-4); }
+      else ctx.feel.speedVignette01(0);
       // #3: verdict poses land once the buzz has had its beat
       if (verdicts.length) {
         for (const v of verdicts) v.t -= dt;

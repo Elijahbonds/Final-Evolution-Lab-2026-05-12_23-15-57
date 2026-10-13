@@ -179,7 +179,7 @@ export function mountLedWall(scene: Scene, o: LedWallOptions): LedWallHandle {
       g.shadowBlur = 0;
     }
     g.setTransform(1, 0, 0, 1, 0, 0);
-    tex.update(false);
+    tex.update(true);   // invertY: a plane's v runs up, a canvas's y runs down (update(false) drew the screen upside down)
   }
 
   return {

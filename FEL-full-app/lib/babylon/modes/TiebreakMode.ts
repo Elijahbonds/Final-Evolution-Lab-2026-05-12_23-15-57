@@ -33,7 +33,8 @@ import { EffectsKit, applyTrail, type TrailLevel } from '../visual/EffectsKit';
 import { dressBall } from '../visual/meshyProps';
 import { buildTrophy, trophyRise, TROPHY_AT, TROPHY_RISE_SEC, type TrophyHandle } from '../party/trophy';
 import { motionPolicy } from '@/lib/a11y/reducedMotion';
-import { TENSION, tensionLevel, tensionPulse, tensionRest, trailFor, type RestGrade } from './tiebreakFx';
+import { tensionLevel, tensionPulse, tensionRest, trailFor, type RestGrade } from './tiebreakFx';
+import { SPEED_VIGNETTE_ON } from '../core/ImpactFrame';
 
 export interface TiebreakModeOpts {
   reactBase: number;
@@ -100,7 +101,8 @@ export function makeTiebreakMode(opts: TiebreakModeOpts): ModeDefinition {
   let trophyObs: Observer<Scene> | null = null;
   let trophyScene: Scene | null = null;
   let tNow = 0;                                      // seconds into the match (the heart's clock)
-  let tension = 0;                                   // 0..1, tensionLevel's last answer
+  let tension = 0;                                   // 0..1, tensionLevel's last answer (from set point up, else 0)
+  let paintFrames = 0;                               // frames left to ask the harness to repaint the rest grade after it moved
   let flashesOk = true;                              // !reduced flashing, read once per load
   let calmMotion = false;                            // reduced motion: no sparks, no dust, no trophy confetti
   let baseGrade: RestGrade = { exposure: 1, vignette: 0 };
@@ -220,19 +222,25 @@ export function makeTiebreakMode(opts: TiebreakModeOpts): ModeDefinition {
     });
   }
 
-  /** vis-party: the tension grade. The level follows the scoreboard's own call; the pressed look goes through the rig's owned rest
-   *  (set when the level moves — the rig's flash beat returns to it), the heartbeat rides the vignette every frame. */
+  /** vis-party: the tension grade, through the harness's OWN hook. The level follows the scoreboard's call and only counts from set
+   *  point up (the faint lean-in below it was not worth a grade). The pressed look is the rig's owned rest (exposure dimmed, vignette
+   *  tightened); the heartbeat is reported as a speed-vignette fraction (ctx.feel.speedVignette01), which the harness composes over
+   *  that rest and paints every frame — a mode never writes the pipeline's vignette itself (speedVignetteRollout.test holds that),
+   *  and reduced motion caps the harness's own level. While it paints, the rig's flash beat (a momentum tier) is repainted over:
+   *  routed, see the lane report. */
   function tickTension(ctx: ModeContext, dt: number): void {
     tNow += dt;
     const level = tensionLevel(state.myPts, state.aiPts, state.warmup);
-    const lights = ctx.lights;
-    if (level !== tension) {
-      tension = level;
-      tensionRest(baseGrade, level, pressedGrade);
-      lights.rest.exposure = pressedGrade.exposure; lights.rest.vignette = pressedGrade.vignette;
-      lights.pipeline.imageProcessing.exposure = pressedGrade.exposure;
+    const g = level >= 0.5 ? level : 0;
+    if (g !== tension) {
+      tension = g;
+      tensionRest(baseGrade, g, pressedGrade);
+      ctx.lights.rest.exposure = pressedGrade.exposure; ctx.lights.rest.vignette = pressedGrade.vignette;
+      paintFrames = 3;   // the harness paints the rest again for a few frames (a release must reach the pipeline too)
     }
-    if (tension > 0) lights.pipeline.imageProcessing.vignetteWeight = pressedGrade.vignette + TENSION.pulse * tensionPulse(tension, tNow, flashesOk);
+    if (g > 0) ctx.feel.speedVignette01(SPEED_VIGNETTE_ON + Math.max(1e-4, tensionPulse(g, tNow, flashesOk) * (1 - SPEED_VIGNETTE_ON)));
+    else if (paintFrames > 0) { paintFrames--; ctx.feel.speedVignette01(SPEED_VIGNETTE_ON + 1e-4); }
+    else ctx.feel.speedVignette01(0);
   }
 
   function stopTrophyLoop(): void {
@@ -269,7 +277,7 @@ export function makeTiebreakMode(opts: TiebreakModeOpts): ModeDefinition {
     if (tension > 0) {
       tension = 0;
       ctx.lights.rest.exposure = baseGrade.exposure; ctx.lights.rest.vignette = baseGrade.vignette;
-      ctx.lights.pipeline.imageProcessing.exposure = baseGrade.exposure; ctx.lights.pipeline.imageProcessing.vignetteWeight = baseGrade.vignette;
+      ctx.feel.speedVignette01(SPEED_VIGNETTE_ON + 1e-4);   // one more harness repaint of the (released) rest; harmless after
     }
     if (won) raiseTrophy(ctx);
     hud(ctx);

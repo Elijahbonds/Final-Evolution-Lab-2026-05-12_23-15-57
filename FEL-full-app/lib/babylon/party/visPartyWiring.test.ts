@@ -92,6 +92,7 @@ describe('Tiebreak is dressed', () => {
   });
   it('the grade follows the scoreboard\'s call and the cup rises on a win only', () => {
     expect(s).toContain('tensionLevel(state.myPts, state.aiPts, state.warmup)');
+    expect(s).toContain('ctx.feel.speedVignette01(');
     expect(s).toContain('if (won) raiseTrophy(ctx);');
   });
   it('the rally itself is untouched: the window, the flight and the AI are not imported from the new modules', () => {

@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { TARGET, TIEBREAK_MAX_PTS, matchCall } from '../core/TiebreakBlitz';
 import { TRAIL_LOOK } from '../visual/EffectsKit';
+import { SPEED_VIGNETTE_ON, speedVignetteLevel } from '../core/ImpactFrame';
 import {
   HEART_BPM, TENSION, heartRate, heartbeat, tensionLevel, tensionPulse, tensionRest, trailFor,
 } from './tiebreakFx';
@@ -71,12 +72,16 @@ describe('tension: the heartbeat and the grade', () => {
   it('no pulse below "set point" even with flashes allowed (a faint lean-in, not a heartbeat)', () => {
     for (let t = 0; t < 4; t += 0.05) expect(tensionPulse(0.12, t, true)).toBe(0);
   });
-  it('the mode applies the pulse through TENSION.pulse (one number, not a copy of it)', () => {
+  it('the mode reports the heartbeat to the harness (speedVignette01) and never writes the pipeline vignette itself', () => {
     const src = readFileSync(join(process.cwd(), 'lib/babylon/modes/TiebreakMode.ts'), 'utf8');
-    expect(src).toContain('pressedGrade.vignette + TENSION.pulse * tensionPulse(tension, tNow, flashesOk)');
+    expect(src).toContain('ctx.feel.speedVignette01(SPEED_VIGNETTE_ON + Math.max(1e-4, tensionPulse(g, tNow, flashesOk) * (1 - SPEED_VIGNETTE_ON)))');
+    expect(src).not.toMatch(/vignetteWeight\s*=|imageProcessing\.vignette/);
   });
-  it('the pulse is on the vignette and small: the heartbeat never swings it more than half of what the pressed look already tightened', () => {
-    expect(TENSION.pulse).toBeLessThanOrEqual(TENSION.vignette / 2);
+  it('the heartbeat is a fraction the harness maps back to exactly the pulse (its window starts at SPEED_VIGNETTE_ON)', () => {
+    for (const pulse of [0, 0.3, 0.7, 1]) {
+      const reported = SPEED_VIGNETTE_ON + Math.max(1e-4, pulse * (1 - SPEED_VIGNETTE_ON));
+      expect(speedVignetteLevel(reported)).toBeCloseTo(Math.max(1e-4 / (1 - SPEED_VIGNETTE_ON), pulse), 6);
+    }
   });
 });
 
