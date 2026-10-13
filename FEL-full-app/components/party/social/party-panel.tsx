@@ -15,10 +15,12 @@ import { StartSection } from './party-start';
 export function PartyPanel({ s, onClose }: { s: PartyState; onClose: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
+    // focus moves into the panel, Escape closes it, and focus goes back to what opened it (the bar)
+    const back = document.activeElement as HTMLElement | null;
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);
     ref.current?.focus();
-    return () => window.removeEventListener('keydown', onKey);
+    return () => { window.removeEventListener('keydown', onKey); if (back?.isConnected) back.focus(); };
   }, [onClose]);
   const host = isHost(s);
   const c = partyClient();
@@ -75,6 +77,7 @@ export function PartyPanel({ s, onClose }: { s: PartyState; onClose: () => void 
           <VoiceSection s={s} />
           <StartSection s={s} />
           <ChatSection s={s} />
+          <BlockedList />
         </div>
 
         <footer className="border-t border-white/10 px-4 py-3">
@@ -154,5 +157,27 @@ function MemberRow({ m, you, host, speaking, conn }: { m: PartyMember; you: bool
         </div>
       ) : null}
     </li>
+  );
+}
+
+/** The people this device has blocked (remembered across parties), with Unblock. */
+function BlockedList() {
+  const c = partyClient();
+  const [list, setList] = useState(() => c.blockList());
+  if (!list.length) return null;
+  return (
+    <details className="rounded-lg bg-white/[0.03] px-3 py-2 text-sm" data-testid="party-blocked">
+      <summary className="cursor-pointer font-mono text-[10px] tracking-[0.25em] text-white/45">BLOCKED ({list.length})</summary>
+      <ul className="mt-2 space-y-1">
+        {list.map((b) => (
+          <li key={b.pub} className="flex items-center justify-between">
+            <span>{b.name}</span>
+            <button type="button" className="rounded-md border border-white/20 px-2 py-0.5 text-xs" aria-label={`Unblock ${b.name}`}
+              onClick={() => { c.unblock(b.pub); setList(c.blockList()); }}>Unblock</button>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-1 text-[11px] text-white/40">Blocked accounts can&apos;t message you or talk to you in any party (a guest only for this party).</p>
+    </details>
   );
 }

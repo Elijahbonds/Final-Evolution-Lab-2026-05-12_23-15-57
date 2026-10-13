@@ -97,7 +97,9 @@ function PartyBar({ s, place, onOpen }: { s: PartyState; place: DockPlace; onOpe
       data-place={place}
       className={tucked
         ? 'fixed left-1/2 top-[max(0.5rem,env(safe-area-inset-top))] z-[60] -translate-x-1/2'
-        : 'fixed bottom-[calc(env(safe-area-inset-bottom)+76px)] left-3 z-40 md:bottom-4'}
+        // phone: one row above the tab bar AND the soundtrack chip (bottom-right, same height) — side by side they collide
+        // at 390 px; desktop: the bottom-left corner
+        : 'fixed bottom-[calc(env(safe-area-inset-bottom)+126px)] left-3 z-40 md:bottom-4'}
     >
       <div className="flex items-center gap-1 rounded-full border border-white/15 bg-[#0b0e13]/90 p-1 pr-1.5 shadow-lg backdrop-blur">
         <button
@@ -143,7 +145,7 @@ function Captions({ s, show }: { s: PartyState; show: boolean }) {
     <>
       <div className="sr-only" aria-live="polite" data-testid="party-caption-sr">{s.caption ? captionText(s.caption) : ''}</div>
       {show && visible ? (
-        <div aria-hidden data-testid="party-caption" className="pointer-events-none fixed bottom-[calc(env(safe-area-inset-bottom)+122px)] left-3 z-40 max-w-[min(320px,calc(100vw-24px))] rounded-lg bg-black/80 px-3 py-1.5 text-sm text-white shadow md:bottom-16">
+        <div aria-hidden data-testid="party-caption" className="pointer-events-none fixed bottom-[calc(env(safe-area-inset-bottom)+172px)] left-3 z-40 max-w-[min(320px,calc(100vw-24px))] rounded-lg bg-black/80 px-3 py-1.5 text-sm text-white shadow md:bottom-16">
           {s.caption?.glyph ? <span className="mr-1">{s.caption.glyph}</span> : null}{visible}
         </div>
       ) : null}

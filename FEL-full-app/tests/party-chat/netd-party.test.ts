@@ -191,6 +191,24 @@ describe('teens: invite-only, presets only, never voice — enforced by the serv
     expect(got(s2, t.peer, 'p_sig')).toEqual([]);
   });
 
+  it('defence in depth: even if a teen were somehow flagged in voice, nobody can signal them', () => {
+    const p = createParty('ABC234', T0);
+    const a = join(p, adult('ANA')); const t = join(p, teen('TY'));
+    handle(p, a.peer, { t: 'p_admit', peer: t.peer }, T0, rand);
+    handle(p, a.peer, { t: 'p_voice', on: true }, T0, rand);
+    p.members.get(t.peer)!.voice = true;   // a state bug, simulated
+    expect(got(handle(p, a.peer, { t: 'p_sig', to: t.peer, data: { kind: 'offer', sdp: 'x' } }, T0, rand), t.peer, 'p_sig')).toEqual([]);
+    expect(got(handle(p, t.peer, { t: 'p_sig', to: a.peer, data: { kind: 'offer', sdp: 'x' } }, T0, rand), a.peer, 'p_sig')).toEqual([]);
+  });
+  it('a resumed member whose new ticket says teen loses voice', () => {
+    const p = createParty('ABC234', T0);
+    const a = join(p, adult('ANA'));
+    handle(p, a.peer, { t: 'p_voice', on: true }, T0, rand);
+    disconnect(p, a.peer, T0 + 1);
+    connect(p, { claims: { ...adult('ANA'), adult: false }, resume: a.resume }, T0 + 2, rand);
+    expect(p.members.get(a.peer)).toMatchObject({ adult: false, voice: false });
+  });
+
   it('a party with a teen in it is invite-only: newcomers knock and the host lets them in', () => {
     const p = createParty('ABC234', T0);
     const t = join(p, teen('TY'));                       // a teen's own party

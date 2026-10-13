@@ -116,6 +116,16 @@ try {
     ok('chat.quick-and-emote', (await feedText(ana.page)).includes('GG!') && sr.includes('BO'), { sr });
     await shot(ana.page, '04-ana-chat');
     await shot(bo.page, '05-bo-phone-chat');
+    await closePanel(bo.page);
+    await bo.page.waitForTimeout(800);
+    await shot(bo.page, '05b-bo-phone-bar');
+    const [barBox, dockBox] = await Promise.all([
+      bo.page.locator('[data-testid=party-bar]').boundingBox(),
+      bo.page.locator('text=/FEL House|Now playing/i').first().boundingBox().catch(() => null),
+    ]);
+    const overlap = !!(barBox && dockBox && barBox.x < dockBox.x + dockBox.width && dockBox.x < barBox.x + barBox.width && barBox.y < dockBox.y + dockBox.height && dockBox.y < barBox.y + barBox.height);
+    ok('phone.bar-clear-of-soundtrack-chip', !overlap, { barBox, dockBox });
+    await openPanel(bo.page);
   }
 
   // ── TEEN: knocks, let in, presets only; his typed text never reaches the room (real ticket, real DB age) ──

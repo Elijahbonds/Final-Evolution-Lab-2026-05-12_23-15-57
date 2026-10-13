@@ -97,6 +97,15 @@ test('create, join by code, chat between adults, a teen refused free text', asyn
   await new Promise((r) => setTimeout(r, 200));
   assert.ok(![...host.frames, ...guest.frames].some((f) => JSON.stringify(f).includes('meet me')));
 
+  // and voice: refused for the teen, through the real socket
+  kid.send({ t: 'p_voice', on: true });
+  assert.equal((await kid.next('p_error')).code, 'voice_adults_only');
+  host.send({ t: 'p_voice', on: true });
+  kid.send({ t: 'p_sig', to: hw.you, data: { kind: 'offer', sdp: 'v=0' } });
+  assert.equal((await kid.next('p_error')).code, 'voice_adults_only');
+  await new Promise((r) => setTimeout(r, 200));
+  assert.ok(!host.frames.some((f) => f.t === 'p_sig'));
+
   for (const c of [host, guest, kid]) c.ws.close();
 });
 

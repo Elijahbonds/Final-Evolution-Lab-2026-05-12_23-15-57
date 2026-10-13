@@ -129,6 +129,12 @@ export default async function more(c: Ctx): Promise<void> {
       ok('frames.bar-hidden-while-playing', (await bo.page.locator('[data-testid=party-bar]').count()) === 0);
       await shot(bo.page, '09-bo-phone-playing-hud-only');
       on = await frameTimes(bo.page, bo.ctx, 15_000);
+      // the pause menu: the bar tucks in at the top (Escape = START = pause, InputBus)
+      await bo.page.keyboard.press('Escape');
+      const paused = await bo.page.waitForFunction(() => /DEV · \S+ · paused/.test(document.body.innerText), null, { timeout: 30_000 }).then(() => true).catch(() => false);
+      const place = paused ? await bo.page.locator('[data-testid=party-bar]').getAttribute('data-place', { timeout: 10_000 }).catch(() => null) : null;
+      ok('frames.tucked-into-the-pause-menu', paused && place === 'tucked', { paused, place });
+      await shot(bo.page, '09b-bo-phone-paused-tucked');
     }
     const voiceStillUp = await bo.page.locator('audio[data-party-voice]').count();
     // voice OFF: a fresh load, voice not joined
