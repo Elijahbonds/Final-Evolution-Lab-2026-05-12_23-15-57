@@ -59,7 +59,11 @@ export function signGcsV4(input: GcsSignInput): string {
   const day = stamp.slice(0, 8);
   const scope = `${day}/auto/storage/goog4_request`;
   const credential = `${input.clientEmail}/${scope}`;
-  const disposition = `${input.disposition}; filename="${safeDownloadName(input.downloadName)}"`;
+  // `inline` is the streaming disposition (owner 2026-10-13: audiobooks are stream only, no download), so it carries no
+  // filename: a "Save as" has no suggested name. Only an `attachment` (a real download) names its file.
+  const disposition = input.disposition === 'inline'
+    ? 'inline'
+    : `attachment; filename="${safeDownloadName(input.downloadName)}"`;
 
   const pairs: Array<[string, string]> = [
     ['X-Goog-Algorithm', 'GOOG4-RSA-SHA256'],

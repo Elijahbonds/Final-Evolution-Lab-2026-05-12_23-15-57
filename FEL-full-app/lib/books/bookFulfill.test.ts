@@ -2,13 +2,23 @@ import { describe, expect, it } from 'vitest';
 import { hasBookAccess } from './bookEntitlements';
 import {
   bookSessionKey,
-  recordBookCheckout,
-  recordPaidBookSession,
+  recordBookCheckout as recordBookCheckoutReal,
+  recordPaidBookSession as recordPaidBookSessionReal,
   revokeBookCharge,
   type BookEntitlementWrite,
   type BookFulfillStore,
   type PaidBookSession,
 } from './bookFulfill';
+
+import { CLOSED_POLICY, EBOOK_ENABLED_POLICY } from './bookTerms.fixture';
+
+// test changed (2026-10-13): these idempotency / refund tests use an EBOOK offer fixture. The live terms now cover
+// audiobooks only (bookTerms.ts), so they run under a fixture policy that sells every format; their assertions are
+// untouched. The terms rule itself is pinned in the last describe block.
+const recordBookCheckout = (id: string, s: PaidBookSession, store: BookFulfillStore) =>
+  recordBookCheckoutReal(id, s, store, EBOOK_ENABLED_POLICY);
+const recordPaidBookSession = (s: PaidBookSession, store: BookFulfillStore) =>
+  recordPaidBookSessionReal(s, store, EBOOK_ENABLED_POLICY);
 
 interface EventRow { eventId: string; type: string; paymentIntentId: string | null }
 
@@ -172,5 +182,39 @@ describe('one payment, one grant (SEC-F4 #200: keyed on the Checkout Session)', 
     const row = [...db.rows.values()][0];
     expect(row.status).toBe('REVOKED');
     expect(hasBookAccess([...db.rows.values()], 'blueprint', 'ebook')).toBe(false);
+  });
+});
+
+describe('fulfilment obeys the store terms (lib/books/bookTerms.ts), fail closed', () => {
+  it('under the live terms an ebook or bundle session is not granted, and is not remembered', async () => {
+    for (const offerId of ['blueprint:ebook', 'blueprint:bundle']) {
+      const db = memory();
+      const result = await recordBookCheckoutReal('evt_x', session({ metadata: { product: 'BOOK', offerId } }), db.store);
+      expect(result).toEqual({ ok: true, ignored: true, reason: 'format_not_offered' });
+      expect(db.upserts()).toBe(0);
+      expect(db.events).toHaveLength(0);
+    }
+  });
+
+  it('the audiobook is still granted under the live terms', async () => {
+    const db = memory();
+    const result = await recordPaidBookSessionReal(session({ metadata: { product: 'BOOK', offerId: 'blueprint:audiobook' } }), db.store);
+    expect(result).toEqual({ ok: true, granted: true });
+    expect(db.upserts()).toBe(1);
+  });
+
+  it('a session ignored today grants when a later terms version covers the format (not remembered, so a replay works)', async () => {
+    const db = memory();
+    const s = session();
+    await recordPaidBookSessionReal(s, db.store);
+    expect(db.upserts()).toBe(0);
+    const later = await recordPaidBookSessionReal(s, db.store, EBOOK_ENABLED_POLICY);
+    expect(later).toEqual({ ok: true, granted: true });
+  });
+
+  it('an unlisted terms version grants nothing at all', async () => {
+    const db = memory();
+    const result = await recordPaidBookSessionReal(session({ metadata: { product: 'BOOK', offerId: 'blueprint:audiobook' } }), db.store, CLOSED_POLICY);
+    expect(result).toMatchObject({ ignored: true, reason: 'format_not_offered' });
   });
 });

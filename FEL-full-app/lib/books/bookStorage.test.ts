@@ -54,6 +54,23 @@ describe('private book storage signatures', () => {
     expect(verifySignedGet(url)).toBe(true);
   });
 
+  it('an inline (streaming) URL carries no filename; only an attachment names its file', () => {
+    const base = {
+      bucket: 'final-evolution-lab.firebasestorage.app',
+      clientEmail: 'signer@test.iam.gserviceaccount.com',
+      privateKey,
+      ttlSeconds: 600,
+      now,
+      downloadName: 'chapter-1.mp3',
+    };
+    const inline = signGcsV4({ ...base, objectPath: 'books/blueprint/audio/01-chapter-1.mp3', contentType: 'audio/mpeg', disposition: 'inline' });
+    const disposition = new URL(inline).searchParams.get('response-content-disposition');
+    expect(disposition).toBe('inline');
+    expect(inline).not.toMatch(/attachment|filename/);
+    const attach = signGcsV4({ ...base, objectPath: 'books/blueprint/ebook/book.epub', contentType: 'application/epub+zip', disposition: 'attachment', downloadName: 'book.epub' });
+    expect(new URL(attach).searchParams.get('response-content-disposition')).toBe('attachment; filename="book.epub"');
+  });
+
   it('refuses to sign anything outside books/ and clamps a long lifetime', () => {
     expect(() => signGcsV4({
       bucket: 'final-evolution-lab.firebasestorage.app',

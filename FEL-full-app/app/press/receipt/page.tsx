@@ -3,13 +3,13 @@ import type Stripe from 'stripe';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { formatLabel, getBook, getOffer } from '@/lib/books/bookCatalog';
+import { bookFormatAllowed } from '@/lib/books/bookTerms';
 import { assertStripeTestKey, bookStripeSecret, getBookStripe } from '@/lib/books/bookCheckout';
 import { mintReaderGrant, normalizeBookEmail } from '@/lib/books/bookEntitlements';
 import { prismaBookStore } from '@/lib/books/bookStore';
 import { recordPaidBookSession } from '@/lib/books/bookFulfill';
 import { PressFrame } from '@/components/press/press-frame';
 import { AudioPlayer } from '@/components/press/audio-player';
-import { DownloadButton } from '@/components/press/download-button';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Receipt — Final Evolution Press' };
@@ -83,11 +83,8 @@ export default async function ReceiptPage({ searchParams }: { searchParams: { se
 
   const secret = process.env.NEXTAUTH_SECRET || '';
   const grant = entitled && email && secret ? mintReaderGrant(secret, email) : null;
-  const chapters = book && offer && (offer.format === 'audiobook' || offer.format === 'bundle')
+  const chapters = book && offer && bookFormatAllowed('audiobook') && (offer.format === 'audiobook' || offer.format === 'bundle')
     ? book.files.filter((f) => f.kind === 'mp3').map((file) => ({ id: file.id, label: file.label, canPlay: entitled }))
-    : [];
-  const downloads = book && entitled && (offer?.format === 'ebook' || offer?.format === 'bundle')
-    ? book.files.filter((f) => f.kind !== 'mp3')
     : [];
 
   return (
@@ -125,13 +122,6 @@ export default async function ReceiptPage({ searchParams }: { searchParams: { se
       {grant && book && chapters.length > 0 ? (
         <div className="mt-6">
           <AudioPlayer bookSlug={book.slug} bookTitle={book.title} chapters={chapters} grant={grant} />
-        </div>
-      ) : null}
-      {grant && book && downloads.length > 0 ? (
-        <div className="mt-4 flex flex-wrap gap-2">
-          {downloads.map((file) => (
-            <DownloadButton key={file.id} bookSlug={book.slug} fileId={file.id} label={`Download ${file.label}`} grant={grant} />
-          ))}
         </div>
       ) : null}
     </PressFrame>

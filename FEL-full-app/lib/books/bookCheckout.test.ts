@@ -11,6 +11,7 @@ import {
 } from './bookCheckout';
 import { getBook, getOffer } from './bookCatalog';
 import { STORE_TERMS_VERSION } from '@/lib/store-terms';
+import { CLOSED_POLICY, EBOOK_ENABLED_POLICY } from './bookTerms.fixture';
 
 describe('book checkout', () => {
   it('refuses a live key and accepts a test key', () => {
@@ -26,6 +27,7 @@ describe('book checkout', () => {
       customerEmail: 'buyer@example.com',
       taxEnabled: false,
       paymentMethodTypes: ['card'],
+      policy: EBOOK_ENABLED_POLICY,
     });
     const item = params.line_items?.[0];
     expect(item && 'price_data' in item && item.price_data?.unit_amount).toBe(999);
@@ -61,6 +63,7 @@ describe('book checkout', () => {
       origin: 'http://localhost:3000',
       taxEnabled: false,
       paymentMethodTypes: ['card'],
+      policy: EBOOK_ENABLED_POLICY,
     })).toThrow(BookCheckoutError);
     const audio = buildBookCheckoutParams({
       offerId: 'art-of-dunking:audiobook',
@@ -80,9 +83,28 @@ describe('book checkout', () => {
       origin: 'http://localhost:3000',
       taxEnabled: false,
       paymentMethodTypes: undefined,
+      policy: EBOOK_ENABLED_POLICY,
     });
     expect(params.line_items?.[0]).toEqual({ price: 'price_test_123', quantity: 1 });
     expect(params.payment_method_types).toBeUndefined();
+  });
+
+  it('the terms rule: audiobook sells, ebook and bundle are refused with format_not_offered, a closed policy sells nothing', () => {
+    const args = { origin: 'http://localhost:3000', taxEnabled: false, paymentMethodTypes: ['card'] };
+    expect(buildBookCheckoutParams({ ...args, offerId: 'blueprint:audiobook' }).metadata?.format).toBe('audiobook');
+    for (const offerId of ['blueprint:ebook', 'blueprint:bundle']) {
+      try {
+        buildBookCheckoutParams({ ...args, offerId });
+        throw new Error(`${offerId} should have been refused`);
+      } catch (err) {
+        expect(err).toBeInstanceOf(BookCheckoutError);
+        expect((err as BookCheckoutError).code).toBe('format_not_offered');
+        expect((err as BookCheckoutError).status).toBe(409);
+      }
+    }
+    // switching it on later is one row in bookTerms.ts: an ebook-enabled policy sells them (KDP Select still applies)
+    expect(buildBookCheckoutParams({ ...args, offerId: 'blueprint:bundle', policy: EBOOK_ENABLED_POLICY }).metadata?.format).toBe('bundle');
+    expect(() => buildBookCheckoutParams({ ...args, offerId: 'blueprint:audiobook', policy: CLOSED_POLICY })).toThrow(/stream only/);
   });
 
   it('the checkout route runs the gate before it can create a session', () => {
