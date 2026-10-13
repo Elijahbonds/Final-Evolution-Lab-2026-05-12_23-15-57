@@ -68,7 +68,7 @@ async function runScript(argv: string[], opts: { key?: string; stripe?: ReturnTy
   const createStripe = vi.fn(async () => opts.stripe?.client);
   const code = await run({
     argv,
-    env: { STRIPE_BOOKS_SECRET_KEY: opts.key ?? TEST_KEY },
+    env: { STRIPE_SECRET_KEY: opts.key ?? TEST_KEY },
     catalog,
     readRows: () => opts.rows ?? priceFile.rows,
     createStripe,
@@ -109,7 +109,7 @@ describe('stripe-create-test-products', () => {
       const stripe = fakeStripe();
       const result = await runScript(['--apply', '--allow-example'], { key, stripe });
       expect(result.code).toBe(1);
-      expect(result.err).toMatch(/STRIPE_BOOKS_SECRET_KEY/);
+      expect(result.err).toMatch(/STRIPE_SECRET_KEY/);
       expect(result.createStripe).not.toHaveBeenCalled();
       expect(stripe.calls).toEqual([]);
     }

@@ -12,6 +12,7 @@ import { formatLabel, getBook, getOffer, type BookOffer, type BookTitle } from '
 import { paymentMethodsFor } from '@/lib/stripe-payment-methods';
 import { siteOrigin } from '@/lib/stripe/site-origin';
 import type { StoreClosedReason } from '@/lib/coach-store/stripeMode';
+import { STORE_TERMS_VERSION } from '@/lib/store-terms';
 
 // Same pin as lib/stripe.ts. The SDK's enum lags the account's version string.
 const API_VERSION = '2025-04-30.basil' as never;
@@ -19,10 +20,19 @@ const API_VERSION = '2025-04-30.basil' as never;
 let bookStripe: Stripe | null = null;
 let bookStripeKey: string | null = null;
 
+/**
+ * Owner decision 2026-10-13: books are sold through the PLATFORM Stripe account, the same one the coach store uses.
+ * There is no separate STRIPE_BOOKS_SECRET_KEY any more (it only existed to point at a second account).
+ */
 export function bookStripeSecret(env: NodeJS.ProcessEnv = process.env): string {
-  return env.STRIPE_BOOKS_SECRET_KEY || env.STRIPE_SECRET_KEY || '';
+  return env.STRIPE_SECRET_KEY || '';
 }
 
+/**
+ * The signing secret of the book webhook endpoint. STRIPE_BOOKS_WEBHOOK_SECRET is kept as an optional override because
+ * a Stripe webhook endpoint has its own signing secret even inside one account; it falls back to the platform's
+ * STRIPE_WEBHOOK_SECRET. (The shared /api/stripe/webhook already records book sales, so one endpoint is enough.)
+ */
 export function bookWebhookSecret(env: NodeJS.ProcessEnv = process.env): string {
   return env.STRIPE_BOOKS_WEBHOOK_SECRET || env.STRIPE_WEBHOOK_SECRET || '';
 }
@@ -30,19 +40,24 @@ export function bookWebhookSecret(env: NodeJS.ProcessEnv = process.env): string 
 /** Live keys (`sk_live_`) are refused. Book checkout cannot charge a real card from this route. */
 export function assertStripeTestKey(key: string): void {
   if (!key.startsWith('sk_test_')) {
-    throw new Error('Book checkout is test-mode only. Set STRIPE_BOOKS_SECRET_KEY to an sk_test_ key. Live keys are refused.');
+    throw new Error('Book checkout is test-mode only. Set STRIPE_SECRET_KEY to an sk_test_ key. Live keys are refused.');
   }
 }
 
 /**
- * May book checkout open, and where does Stripe send the buyer back? MERGE (2026-10-09), the release's store rules:
+ * May book checkout open, and where does Stripe send the buyer back? The release's store rules plus the owner's
+ * answers of 2026-10-13:
+ *   - BOOK_STORE_ENABLED off         -> store_closed book_store_off (the books' own switch; default OFF, fail closed:
+ *                                       anything but 1/true/on/yes is off)
  *   - no key                         -> store_closed payments_not_set_up (B2: 409, never 503)
  *   - a key that is not sk_test_     -> store_closed live_mode_off (books stay test-only; COACH_STORE_LIVE is the
  *                                       coach store's switch and is NOT read here)
  *   - VIRTUAL_PURCHASES_ENABLED off  -> store_closed virtual_purchases_off (B10, FE PM Oct 7: no real-money product
- *                                       outside the coach store sells until it has an 18+ check and a refund path)
+ *                                       outside the coach store sells until it has an 18+ check and a refund path).
+ *                                       KEPT on top of BOOK_STORE_ENABLED: books are a real-money product outside the
+ *                                       coach store, so the release-wide fence still applies; going live needs both.
  *   - NEXTAUTH_URL unset             -> store_closed site_url_not_set (B3: never the request's Origin header)
- * assumption: books sit behind the existing B10 fence until the owner names their own switch (owner question).
+ * The sign-in, terms and 18+ checks come after this gate, in the route (they need the session and the body).
  */
 export type BookCheckoutGate =
   | { ok: true; key: string; origin: string }
@@ -54,7 +69,14 @@ function virtualPurchasesOn(env: NodeJS.ProcessEnv): boolean {
   return v === '1' || v === 'true' || v === 'on' || v === 'yes';
 }
 
+/** BOOK_STORE_ENABLED: the books' own switch. Default OFF; unset, empty or anything unrecognised is off. */
+export function bookStoreEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  const v = (env.BOOK_STORE_ENABLED ?? '').trim().toLowerCase();
+  return v === '1' || v === 'true' || v === 'on' || v === 'yes';
+}
+
 export function bookCheckoutGate(env: NodeJS.ProcessEnv = process.env): BookCheckoutGate {
+  if (!bookStoreEnabled(env)) return { ok: false, reason: 'book_store_off' };
   const key = bookStripeSecret(env).trim();
   if (!key) return { ok: false, reason: 'payments_not_set_up' };
   if (!key.startsWith('sk_test_')) return { ok: false, reason: 'live_mode_off' };
@@ -62,12 +84,6 @@ export function bookCheckoutGate(env: NodeJS.ProcessEnv = process.env): BookChec
   const origin = siteOrigin(env);
   if (!origin) return { ok: false, reason: 'site_url_not_set' };
   return { ok: true, key, origin };
-}
-
-/** True when book checkout charges through the platform's own Stripe account (no separate STRIPE_BOOKS_SECRET_KEY). */
-export function bookSharesPlatformStripeAccount(env: NodeJS.ProcessEnv = process.env): boolean {
-  const books = (env.STRIPE_BOOKS_SECRET_KEY ?? '').trim();
-  return !books || books === (env.STRIPE_SECRET_KEY ?? '').trim();
 }
 
 export function stripeTaxEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
@@ -139,6 +155,9 @@ export function checkoutParamsForOffer(input: CheckoutBuildInput): Stripe.Checko
       offerId: input.offer.id,
       bookSlug: input.book.slug,
       format: input.offer.format,
+      // The store terms version the buyer ticked at checkout, saved on the Stripe session like the coach store does
+      // (lib/coach-store/checkout.ts meta()), so a Dashboard refund or dispute can say which text was accepted.
+      terms_version: STORE_TERMS_VERSION,
     },
     success_url: `${origin}/press/receipt?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${origin}/press/${input.book.slug}?checkout=cancel`,

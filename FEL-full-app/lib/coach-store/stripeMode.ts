@@ -19,6 +19,7 @@ export type StoreClosedReason =
   | 'live_mode_off'
   | 'site_url_not_set'
   | 'virtual_purchases_off'
+  | 'book_store_off'
   | 'deposits_off'
   | 'price_not_set';
 

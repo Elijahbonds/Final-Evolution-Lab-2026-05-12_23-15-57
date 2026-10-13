@@ -10,7 +10,7 @@ export interface HubItem {
   /** Hidden when null. */
   url: string | null;
   kind: HubKind;
-  /** Section heading. The books section is the /books redirect target (#books). */
+  /** Section heading. The books section anchor is #books (/books no longer redirects here; it goes to /press). */
   section?: 'books' | 'merch' | 'follow';
   /** Checkout code, shown with a copy button. */
   code?: string;

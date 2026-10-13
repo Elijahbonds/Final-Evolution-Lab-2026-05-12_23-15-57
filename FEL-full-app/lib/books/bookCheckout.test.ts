@@ -4,11 +4,13 @@ import {
   BookCheckoutError,
   assertStripeTestKey,
   bookCheckoutGate,
-  bookSharesPlatformStripeAccount,
+  bookStoreEnabled,
+  bookStripeSecret,
   buildBookCheckoutParams,
   checkoutParamsForOffer,
 } from './bookCheckout';
 import { getBook, getOffer } from './bookCatalog';
+import { STORE_TERMS_VERSION } from '@/lib/store-terms';
 
 describe('book checkout', () => {
   it('refuses a live key and accepts a test key', () => {
@@ -27,7 +29,7 @@ describe('book checkout', () => {
     });
     const item = params.line_items?.[0];
     expect(item && 'price_data' in item && item.price_data?.unit_amount).toBe(999);
-    expect(params.metadata).toMatchObject({ product: 'BOOK', offerId: 'blueprint:ebook', format: 'ebook' });
+    expect(params.metadata).toMatchObject({ product: 'BOOK', offerId: 'blueprint:ebook', format: 'ebook', terms_version: STORE_TERMS_VERSION });
     expect(params.success_url).toBe('http://localhost:3000/press/receipt?session_id={CHECKOUT_SESSION_ID}');
     expect(params.automatic_tax).toBeUndefined();
     expect(params.customer_creation).toBe('always');
@@ -97,29 +99,58 @@ describe('book checkout', () => {
   });
 });
 
-describe('book checkout gate (the release store rules: B2 store_closed, B3 server origin, B10 fence)', () => {
-  const open = { STRIPE_BOOKS_SECRET_KEY: 'sk_test_b', VIRTUAL_PURCHASES_ENABLED: '1', NEXTAUTH_URL: 'https://fel.example/' } as NodeJS.ProcessEnv;
+describe('book checkout gate (the release store rules: B2 store_closed, B3 server origin, B10 fence; owner 2026-10-13: BOOK_STORE_ENABLED, platform key)', () => {
+  // test changed (2026-10-13, owner answer on PR #17): the gate's key now comes from the PLATFORM STRIPE_SECRET_KEY
+  // (STRIPE_BOOKS_SECRET_KEY is gone) and it also needs BOOK_STORE_ENABLED. The old `open` env set the former and
+  // not the latter, so it can no longer open the gate; the assertions themselves are unchanged in meaning.
+  const open = {
+    BOOK_STORE_ENABLED: '1',
+    STRIPE_SECRET_KEY: 'sk_test_b',
+    VIRTUAL_PURCHASES_ENABLED: '1',
+    NEXTAUTH_URL: 'https://fel.example/',
+  } as NodeJS.ProcessEnv;
 
-  it('opens only with a test key, the B10 fence on, and a configured site URL', () => {
+  it('opens only with BOOK_STORE_ENABLED, a test key, the B10 fence on, and a configured site URL', () => {
     expect(bookCheckoutGate(open)).toEqual({ ok: true, key: 'sk_test_b', origin: 'https://fel.example' });
   });
 
   it('answers a store_closed reason for each missing piece, in order', () => {
-    expect(bookCheckoutGate({} as NodeJS.ProcessEnv)).toEqual({ ok: false, reason: 'payments_not_set_up' });
-    expect(bookCheckoutGate({ ...open, STRIPE_BOOKS_SECRET_KEY: 'sk_live_x' })).toEqual({ ok: false, reason: 'live_mode_off' });
-    expect(bookCheckoutGate({ ...open, STRIPE_BOOKS_SECRET_KEY: 'rk_test_x' })).toEqual({ ok: false, reason: 'live_mode_off' });
+    expect(bookCheckoutGate({} as NodeJS.ProcessEnv)).toEqual({ ok: false, reason: 'book_store_off' });
+    expect(bookCheckoutGate({ ...open, STRIPE_SECRET_KEY: '' })).toEqual({ ok: false, reason: 'payments_not_set_up' });
+    expect(bookCheckoutGate({ ...open, STRIPE_SECRET_KEY: 'sk_live_x' })).toEqual({ ok: false, reason: 'live_mode_off' });
+    expect(bookCheckoutGate({ ...open, STRIPE_SECRET_KEY: 'rk_test_x' })).toEqual({ ok: false, reason: 'live_mode_off' });
     expect(bookCheckoutGate({ ...open, VIRTUAL_PURCHASES_ENABLED: '' })).toEqual({ ok: false, reason: 'virtual_purchases_off' });
     expect(bookCheckoutGate({ ...open, NEXTAUTH_URL: ' ' })).toEqual({ ok: false, reason: 'site_url_not_set' });
   });
 
+  it('BOOK_STORE_ENABLED defaults off and fails closed on anything that is not an explicit on', () => {
+    for (const v of [undefined, '', ' ', '0', 'false', 'off', 'no', 'enabled', '2', 'y']) {
+      const env = { ...open, BOOK_STORE_ENABLED: v } as NodeJS.ProcessEnv;
+      expect(bookStoreEnabled(env), String(v)).toBe(false);
+      expect(bookCheckoutGate(env), String(v)).toEqual({ ok: false, reason: 'book_store_off' });
+    }
+    for (const v of ['1', 'true', 'TRUE', 'on', 'Yes', ' 1 ']) {
+      expect(bookStoreEnabled({ BOOK_STORE_ENABLED: v } as NodeJS.ProcessEnv), v).toBe(true);
+    }
+  });
+
+  it('keeps the B10 fence on top of BOOK_STORE_ENABLED: the book switch alone does not open checkout', () => {
+    const env = { ...open, VIRTUAL_PURCHASES_ENABLED: undefined } as NodeJS.ProcessEnv;
+    expect(bookCheckoutGate(env)).toEqual({ ok: false, reason: 'virtual_purchases_off' });
+  });
+
   it('a live platform key never opens books, even with the coach store live', () => {
-    const env = { STRIPE_SECRET_KEY: 'sk_live_p', COACH_STORE_LIVE: '1', VIRTUAL_PURCHASES_ENABLED: '1', NEXTAUTH_URL: 'https://x' } as NodeJS.ProcessEnv;
+    const env = { ...open, STRIPE_SECRET_KEY: 'sk_live_p', COACH_STORE_LIVE: '1' } as NodeJS.ProcessEnv;
     expect(bookCheckoutGate(env)).toEqual({ ok: false, reason: 'live_mode_off' });
   });
 
-  it('reuses the platform StripeCustomer only when books charge through the platform account', () => {
-    expect(bookSharesPlatformStripeAccount({ STRIPE_SECRET_KEY: 'sk_test_p' } as NodeJS.ProcessEnv)).toBe(true);
-    expect(bookSharesPlatformStripeAccount({ STRIPE_SECRET_KEY: 'sk_test_p', STRIPE_BOOKS_SECRET_KEY: 'sk_test_p' } as NodeJS.ProcessEnv)).toBe(true);
-    expect(bookSharesPlatformStripeAccount({ STRIPE_SECRET_KEY: 'sk_test_p', STRIPE_BOOKS_SECRET_KEY: 'sk_test_b' } as NodeJS.ProcessEnv)).toBe(false);
+  it('charges the platform Stripe account: STRIPE_SECRET_KEY is the only key read; STRIPE_BOOKS_SECRET_KEY is ignored', () => {
+    expect(bookStripeSecret({ STRIPE_SECRET_KEY: 'sk_test_p' } as NodeJS.ProcessEnv)).toBe('sk_test_p');
+    expect(bookStripeSecret({ STRIPE_BOOKS_SECRET_KEY: 'sk_test_b' } as NodeJS.ProcessEnv)).toBe('');
+    expect(bookStripeSecret({ STRIPE_SECRET_KEY: 'sk_test_p', STRIPE_BOOKS_SECRET_KEY: 'sk_test_b' } as NodeJS.ProcessEnv)).toBe('sk_test_p');
+    expect(bookCheckoutGate({ ...open, STRIPE_SECRET_KEY: '', STRIPE_BOOKS_SECRET_KEY: 'sk_test_b' } as NodeJS.ProcessEnv)).toEqual({
+      ok: false,
+      reason: 'payments_not_set_up',
+    });
   });
 });

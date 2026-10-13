@@ -6,15 +6,47 @@ Direct ebook and audiobook sales on FEL. The pages live at `/press` (catalog), `
 
 Nothing here is live. Prices in `lib/books/bookCatalog.ts` are **EXAMPLE** placeholders. Checkout refuses a live Stripe key (`sk_live_`). No book files are in the repo. This document does not contain secrets.
 
+## Owner answers, 2026-10-13 (PR #17)
+
+The shop merges **dark** and stays closed until the owner turns it on. Who can buy, and how, follows the coach store:
+
+1. **Sign in plus verified adult (18+).** `POST /api/books/checkout` answers `401 unauthorized` with no session and
+   `403 adults_only` when `isVerifiedAdult` (`lib/coach-store/adult.ts`, unknown age counts as not an adult) is false.
+   **There is no guest checkout.** The buttons explain both (a sign-in link, a "confirm your birth year" link to `/age`).
+2. **Store terms gate.** The buyer ticks the store terms; the request carries `termsAccepted: true` and
+   `termsVersion: STORE_TERMS_VERSION`. Anything else is `409 terms_required` (body `{ error, version }`) before any
+   Stripe call. The terms version is recorded on the Stripe Checkout Session metadata as `terms_version`, the same
+   place the coach store records it (`lib/coach-store/checkout.ts`). No database column: the book tables are still
+   pending SQL.
+3. **Own switch: `BOOK_STORE_ENABLED`.** Default **off**, fail closed (unset, empty or anything but `1`/`true`/`on`/`yes`
+   is off): checkout answers `409 store_closed` / `book_store_off`. `VIRTUAL_PURCHASES_ENABLED` (the release's B10
+   fence, "no real-money product outside the coach store") is **kept** on top of it, because books are a real-money
+   product outside the coach store, so going live needs both switches. Fulfilment, the receipt page and refunds are
+   never behind either switch (a buyer who has paid must not be stranded).
+4. **Platform Stripe account.** Books charge the same Stripe account as the coach store (`STRIPE_SECRET_KEY`), **test
+   mode only**: `sk_test_` is the only key accepted. The separate `STRIPE_BOOKS_SECRET_KEY` (it only existed to point
+   at a second account) is gone, and the saved platform `StripeCustomer` is always reused.
+5. **`/books` redirects to `/press`** (it went to `/links#books`).
+6. **The SQL stays pending.** `prisma/pending/2026-10-09-book-shop.sql` is not applied, `prisma/schema.prisma` is not
+   touched, and no prisma command is run. Until the tables exist the shop is dark and fails closed (see Database).
+
+> **Go-live is blocked on LEGAL-COPY-2 (an audiobooks/books section in the store terms).** State on 2026-10-13, after
+> merging `lane/finish-release` (LEGAL-COPY-2 merged there as `store-terms-2026-10-12`): the store terms now carry
+> **audiobooks only** (§1, §2.7, §4.6): 18+, stream only, **no download**, 14-day refund, one per person, a refund ends the
+> license. They do **not** cover **ebooks or the bundle** (the approved "block C" was held back for EBOOK-1). The shop
+> today sells audiobooks with a download and sells ebooks and bundles, so the terms and the shop disagree. Resolve that
+> (terms for ebooks and bundles, and download rights, or limit the shop to what the terms say) before anyone turns
+> `BOOK_STORE_ENABLED` on. The checkout tick links to `/store-terms`, so the text the buyer ticks is the text above.
+
 ## What Elijah has to decide
 
 1. **Prices.** Replace `priceCents` on each offer and set `priceIsExample` to `false` when the number is real. Do not price a direct ebook below the Kindle list price unless Amazon price-matching is acceptable.
 2. **KDP Select.** Five titles are flagged `kdpSelect: true` from a public Amazon check on 2026-09-26 (Building In The Loop, Architecture Of Raising Humans, Vibe Coders Handbook, Neuro Mechanic Playbook, Art of Dunking). Their ebook and bundle buttons stay off. Audiobooks are unaffected. Confirm each title in KDP Bookshelf, then set `kdpSelect` to `false` only after the ebook may be sold outside KDP. Blueprint and Unfair Advantages are flagged off; confirm those too.
-3. **Which Stripe account** receives book revenue, and that it is the account behind `STRIPE_BOOKS_SECRET_KEY`.
-4. **Tax.** Leave `STRIPE_BOOKS_TAX` unset until Stripe Tax is activated on that account. Turning the flag on without Tax configured makes Checkout session creation fail.
+3. ~~Which Stripe account~~ Decided 2026-10-13: the platform account (`STRIPE_SECRET_KEY`), test mode only.
+4. **Tax.** Leave `STRIPE_BOOKS_TAX` unset until Stripe Tax is activated on the platform account. Turning the flag on without Tax configured makes Checkout session creation fail.
 5. **Chapter lists** for the five titles whose audio masters are not inventoried. Blueprint is opening + 20 chapters + close. Art of Dunking is opening + 12 chapters + close. The others are placeholders (`chaptersArePlaceholder: true`).
 6. **Descriptions.** Every book says `Description placeholder.` Replace them in the catalog. Do not invent them in a later code change without the real copy.
-7. **Go-live** is a separate change: remove the `sk_test_` refusal in `assertStripeTestKey`, use live keys, and only after a test purchase and a refund have been done. This branch does not do that, and it does not deploy.
+7. **Go-live** is a separate change: remove the `sk_test_` refusal in `assertStripeTestKey`, use live keys, and only after a test purchase and a refund have been done, and after the terms question above is settled. This branch does not do that, and it does not deploy.
 
 ## Environment
 
@@ -22,8 +54,10 @@ Set these on the server. Do not commit the values.
 
 | Variable | Purpose |
 |---|---|
-| `STRIPE_BOOKS_SECRET_KEY` | Test secret (`sk_test_...`). Falls back to `STRIPE_SECRET_KEY`, which is then refused if it is a live key. |
-| `STRIPE_BOOKS_WEBHOOK_SECRET` | Signing secret for the book endpoint. Falls back to `STRIPE_WEBHOOK_SECRET`. |
+| `BOOK_STORE_ENABLED` | The books' own switch. **Default off, fail closed.** `1`/`true`/`on`/`yes` turns it on; anything else is `409 store_closed` / `book_store_off`. |
+| `STRIPE_SECRET_KEY` | The platform's Stripe key, shared with the coach store. Book checkout accepts only an `sk_test_` key; a live key answers `409 store_closed` / `live_mode_off`. (There is no `STRIPE_BOOKS_SECRET_KEY` any more.) |
+| `STRIPE_WEBHOOK_SECRET` | The platform webhook signing secret (`/api/stripe/webhook` records book sales and refunds). |
+| `STRIPE_BOOKS_WEBHOOK_SECRET` | Optional. The signing secret of a separate `/api/books/webhook` endpoint (an endpoint has its own secret even inside one account). Falls back to `STRIPE_WEBHOOK_SECRET`. |
 | `STRIPE_BOOKS_TAX` | `1` to set `automatic_tax.enabled` and require a billing address on the Checkout Session. |
 | `FIREBASE_STORAGE_BUCKET` | Defaults to `final-evolution-lab.firebasestorage.app`. |
 | `FIREBASE_SERVICE_ACCOUNT_JSON` | Service-account JSON, one line. Or set the next two instead. |
@@ -32,7 +66,7 @@ Set these on the server. Do not commit the values.
 | `BOOK_SIGNED_URL_TTL_SECONDS` | Lifetime of a download/stream URL. Default 600, maximum 3600. |
 | `NEXTAUTH_SECRET` | Already required by login. Also signs the short-lived receipt grant that lets a guest play on the receipt page. |
 | `NEXTAUTH_URL` | The site origin Stripe sends the buyer back to (`siteOrigin()`, STORE-READY B3). The request's `Origin` header is never used; unset closes checkout (`site_url_not_set`). |
-| `VIRTUAL_PURCHASES_ENABLED` | The release's B10 fence (default off: "no real-money product outside the coach store"). Book checkout answers 409 `store_closed` / `virtual_purchases_off` until it is on. Owner question: keep books behind this fence or give them their own switch. |
+| `VIRTUAL_PURCHASES_ENABLED` | The release's B10 fence (default off: "no real-money product outside the coach store"). Kept for books alongside `BOOK_STORE_ENABLED`: checkout answers 409 `store_closed` / `virtual_purchases_off` until it is on too. |
 
 The service account needs permission to sign URLs for that bucket (`iam.serviceAccounts.signBlob` is not required when the private key is present; the process signs locally). It does not need to make objects public.
 
@@ -54,27 +88,28 @@ free sample still signs. The owner's step, in order: apply the SQL, add the two 
 to `prisma/schema.prisma`, regenerate `public/_prisma` on Linux. No agent runs `prisma db push` or regenerates the
 client.
 
-Guest checkout is allowed. My Library and the download route claim rows whose email matches the signed-in account, and every ownership check also matches by email, so an unclaimed row still counts. (MERGE 2026-10-09: the extra claim at sign-in in `lib/auth.ts` was removed. It was redundant, and it pulled the whole book catalog, with its partner and affiliate links, into every page that imports `authOptions`, including the Quick Screen, whose guard `lib/screen/offsite.test.ts` allows no off-site address.)
+There is no guest checkout (owner, 2026-10-13), but an entitlement row is still keyed by email: My Library and the download route claim rows whose email matches the signed-in account, and every ownership check also matches by email, so an unclaimed row still counts. (MERGE 2026-10-09: the extra claim at sign-in in `lib/auth.ts` was removed. It was redundant, and it pulled the whole book catalog, with its partner and affiliate links, into every page that imports `authOptions`, including the Quick Screen, whose guard `lib/screen/offsite.test.ts` allows no off-site address.)
 
 A refund (`charge.refunded`) sets the row to `REVOKED`. Revoked rows do not get signed URLs.
 
 ## Stripe, test mode
 
 1. In the Stripe Dashboard, switch to **Test mode**.
-2. Use the test secret as `STRIPE_BOOKS_SECRET_KEY`.
+2. Use the test secret as `STRIPE_SECRET_KEY` (the platform key; books refuse anything that is not `sk_test_`), and turn on `BOOK_STORE_ENABLED` and `VIRTUAL_PURCHASES_ENABLED`.
 3. The receipt page fulfils on its own (MERGE 2026-10-09, the release's SEC-F4 NO-WEBHOOK rule, #200): it retrieves
    the Checkout Session from Stripe on the server and grants what that session proves (paid, `product: BOOK`, the
    buyer's own email). A webhook is still worth adding for buyers who close the tab before the redirect, and it is
    the only path for refunds:
    - URL: `https://<host>/api/books/webhook`
    - Events: `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `charge.refunded`
-   - Put that endpoint's signing secret in `STRIPE_BOOKS_WEBHOOK_SECRET`.
+   - Put that endpoint's signing secret in `STRIPE_BOOKS_WEBHOOK_SECRET` (or reuse the shared `/api/stripe/webhook` and `STRIPE_WEBHOOK_SECRET`).
 4. The existing `/api/stripe/webhook` also records a Checkout Session whose metadata `product` is `BOOK`, and once the
    book tables exist it tries to revoke book rows on `charge.refunded`. Every path keys a purchase on the Checkout
    Session (`stripe-session:<cs_id>`), so webhook + receipt + a redelivery grant once. A failure on either endpoint
    returns 500 so Stripe retries; the shared endpoint ignores a refund that matches no book purchase.
-5. Every closed answer is a 409 `store_closed` with a reason (`payments_not_set_up`, `live_mode_off`,
-   `virtual_purchases_off`, `site_url_not_set`), as the rest of the release's store (STORE-READY B2).
+5. Every closed answer is a 409 `store_closed` with a reason (`book_store_off`, `payments_not_set_up`, `live_mode_off`,
+   `virtual_purchases_off`, `site_url_not_set`), as the rest of the release's store (STORE-READY B2). After the store
+   is open, checkout answers `401 unauthorized`, `409 terms_required`, `403 adults_only`, in that order.
 
 Optional Price ids: create a Product and a one-time Price in test mode, and set `stripePriceId` on the offer in the catalog. Until that field is set, Checkout uses `price_data` and the catalog's `priceCents`. The script below does the creating.
 
@@ -85,7 +120,7 @@ Optional Price ids: create a Product and a one-time Price in test mode, and set 
 1. Export the test key in your own shell. Do not put it in a file in the repo.
 
    ```bash
-   export STRIPE_BOOKS_SECRET_KEY=sk_test_...
+   export STRIPE_SECRET_KEY=sk_test_...
    ```
 
 2. Dry run from `FEL-full-app/`. It prints the plan and makes no Stripe calls. Without `--allow-example` it refuses every EXAMPLE row and exits 1.
@@ -170,5 +205,8 @@ Do these in order. This branch does not perform them.
 4. Apply `prisma/pending/2026-10-09-book-shop.sql`, add the models, regenerate `public/_prisma` (the owner's step; see Database).
 5. Test-mode webhook endpoint, test key, one purchase, receipt page, My Library, a chapter, an EPUB download, then a refund that removes access.
 6. Decide tax (Stripe Tax on, or off and filed yourself).
-7. Add digital-goods refund language to the Terms page if it is not already there. The shop links to `/terms`.
-8. Only then replace the test-mode guard and the test keys, with an explicit go-ahead. Do not deploy from this branch as part of that step unless that go-ahead includes deploy.
+7. **LEGAL-COPY-2 / store terms.** Audiobook terms are in `store-terms-2026-10-12`; ebook and bundle terms are not, and the
+   audiobook terms say stream-only (no download). Settle that against what the shop sells before go-live (see the note
+   at the top). The buy buttons link to `/store-terms`; the shop footer also links `/terms`.
+8. Turn on `BOOK_STORE_ENABLED` and `VIRTUAL_PURCHASES_ENABLED` together, only with the owner's go-ahead.
+9. Only then replace the test-mode guard and the test keys, with an explicit go-ahead. Do not deploy from this branch as part of that step unless that go-ahead includes deploy.

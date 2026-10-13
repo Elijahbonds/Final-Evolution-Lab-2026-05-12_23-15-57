@@ -1,4 +1,4 @@
-// The public bio page: one config, no session, /books → /links#books.
+// The public bio page: one config, no session, /books → /press (the book shop; owner 2026-10-13, was /links#books).
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { createElement } from 'react';
@@ -129,13 +129,14 @@ describe('GET /links and /books without a session', () => {
     }
   });
 
-  it('GET /books redirects to /links#books and GET /links renders', () => {
+  // test changed (2026-10-13, owner answer on PR #17): /books now points at /press, the book shop. It used to
+  // assert the redirect went to /links#books. The old assertion was the old decision, not a defect.
+  it('GET /books redirects to /press and GET /links renders', () => {
     const books = booksGet();
     expect(books.status).toBeGreaterThanOrEqual(300);
     expect(books.status).toBeLessThan(400);
     const location = books.headers.get('location') ?? '';
-    expect(location).toContain('/links');
-    expect(location).toContain('#books');
+    expect(location).toBe('/press');
     expect(location).not.toMatch(/\/login/);
     expect(() => html()).not.toThrow();
   });

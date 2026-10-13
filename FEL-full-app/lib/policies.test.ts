@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { CURRENT_POLICY_VERSION, PRIVACY_CONTENT, TERMS_CONTENT } from './policies';
-import { BUSINESS_CONTACT_EMAIL, BUSINESS_LEGAL_NAME, BUSINESS_MAILING_ADDRESS } from './legal/business';
+import { BUSINESS_CONTACT_EMAIL, BUSINESS_LEGAL_NAME, REAL_MAILING_ADDRESS, isMailingAddressSet } from './legal/business';
 
 // CONTEXT (2026-09-24): the camera section went in under the version that signups had been recording for the text
 // without it, so User.policyVersion could no longer say which text anyone accepted. The version has to move with the
@@ -18,6 +18,7 @@ const TEXT_BY_VERSION: Record<string, string> = {
   '2026-10-01-draft': '18b88eec085ba82b',  // §6: body-tracking files from our own servers only (no jsDelivr / Google fallback)
   '2026-10-07-draft': 'e1c40c0b8dd666d8',  // + §6: the Mirror's "vs your last 3" kept on the device only, never sent, forgettable (mirror-progress)
   '2026-10-07': '1817114b5ef24ce7',        // LEGAL-COPY: Terms §2 18+, Terms §9 + Privacy §11 Contact, Privacy §10 store, §4/§5/§7 fixes; first non-draft label; draft banners removed on the owner's sign-off (follow-up 1)
+  '2026-10-12': '774adfd3055f3cfa',        // LEGAL-COPY-2: Terms §7 written; the Mail line and the privacy write-to clause print only once an address is set
 };
 
 describe('the policy version', () => {
@@ -44,7 +45,8 @@ describe('the policy version', () => {
   // LEGAL-COPY (2026-10-07): the label is final (not a draft), it is the single source, and every prior version's
   // fingerprint stays so an old text still resolves.
   it('is the final, non-draft label', () => {
-    expect(CURRENT_POLICY_VERSION).toBe('2026-10-07');
+    expect(CURRENT_POLICY_VERSION).toBe('2026-10-12');
+    expect(CURRENT_POLICY_VERSION).not.toBe('2026-10-07');
     expect(CURRENT_POLICY_VERSION).not.toBe('2026-10-07-draft');
     expect(CURRENT_POLICY_VERSION).not.toMatch(/-draft$/);
   });
@@ -60,7 +62,7 @@ describe('the policy version', () => {
   });
 
   it('keeps every earlier version fingerprint (the record of what each signup accepted)', () => {
-    for (const v of ['2026-09-24-draft', '2026-09-25-draft', '2026-09-29-draft', '2026-09-29b-draft', '2026-09-29c-draft', '2026-09-30-draft', '2026-10-01-draft', '2026-10-07-draft']) {
+    for (const v of ['2026-09-24-draft', '2026-09-25-draft', '2026-09-29-draft', '2026-09-29b-draft', '2026-09-29c-draft', '2026-09-30-draft', '2026-10-01-draft', '2026-10-07-draft', '2026-10-07']) {
       expect(TEXT_BY_VERSION).toHaveProperty(v);
     }
   });
@@ -228,8 +230,9 @@ describe('privacy policy, the space check', () => {
 
 // LEGAL-COPY (2026-10-07; Research & Advisor verbatim; FE PM Oct 7 2:39/2:45 PM PT): /terms 18+, a /privacy section on
 // what the store keeps about buyers, one business address, and the final version label. The store block is compared to a
-// literal copied from the brief with only its two allowed changes (the §10 heading and ${BUSINESS_MAILING_ADDRESS} for
-// {BUSINESS_ADDRESS}), so the text cannot drift from what was approved.
+// literal copied from the brief with only its two allowed changes (the §10 heading and the write-to clause for
+// {BUSINESS_ADDRESS}), so the text cannot drift from what was approved. LEGAL-COPY-2 (FE PM 10:11 AM PT Oct 8): the
+// placeholder constant is gone, so the clause carries REAL_MAILING_ADDRESS once it is set and is left out while it is unset.
 const STORE_SECTION = `## 10. When You Buy From the Store
 
 This section covers the Final Evolution coach store: programs, memberships, live 1:1 sessions and video reviews sold by Final Evolution LLC. The rest of this Policy still applies. Only adults 18 and over can buy, book or join a session, based on the birth year given when the account was created.
@@ -248,7 +251,7 @@ This section covers the Final Evolution coach store: programs, memberships, live
 
 **Teens and children.** The store is for adults. A teen aged 13 to 17 can use a program only when a parent or legal guardian buys it on their own adult account. The teen gets an unlock code, and no teen account is created. For a teen purchase we keep the parent's order, a scrambled (hashed) copy of the code, a scrambled copy of a random device token and the date the code was used. We do not collect the teen's name, age, scores, images or video, and the teen's progress stays on the teen's phone. Children under 13 cannot use the store.
 
-**Your rights.** You can ask to see the store information we hold about you, get a copy of it, correct it or delete it. Email FinalEvolution.us@gmail.com from the email address on your account, or write to Final Evolution LLC, ${BUSINESS_MAILING_ADDRESS}. We may ask you to confirm it is you, and we will answer within 45 days. We will not charge you or treat you differently for asking. Records the law requires us to keep, such as tax records, are kept until that period ends. Stripe keeps its own payment records under its own policy.
+**Your rights.** You can ask to see the store information we hold about you, get a copy of it, correct it or delete it. Email FinalEvolution.us@gmail.com from the email address on your account${isMailingAddressSet(REAL_MAILING_ADDRESS) ? `, or write to Final Evolution LLC, ${REAL_MAILING_ADDRESS.trim()}` : ''}. We may ask you to confirm it is you, and we will answer within 45 days. We will not charge you or treat you differently for asking. Records the law requires us to keep, such as tax records, are kept until that period ends. Stripe keeps its own payment records under its own policy.
 
 **California residents.** If you live in California, the rights above are yours: to know what we collect and why, to see it, to correct it, to delete it, and not to be treated differently for using these rights. We do not sell or share your personal information, as California law uses those words.`;
 
@@ -309,16 +312,56 @@ describe('terms of service, buying is 18+ (LEGAL-COPY)', () => {
   });
 });
 
+// LEGAL-COPY-2 (FE PM 10:11 AM PT Oct 8): while no address is set the Mail line is left out at the source, with no
+// placeholder in its place. tests/legal/address-set.test.tsx proves the set case.
 describe('legal contact block, one business address (LEGAL-COPY)', () => {
   for (const [name, content, contact] of [['Terms', TERMS_CONTENT, '## 9. Contact'], ['Privacy', PRIVACY_CONTENT, '## 11. Contact']] as const) {
-    it(`${name} ends with a ${contact} section carrying the legal name, contact email and Mail line (interpolated)`, () => {
+    it(`${name} ends with a ${contact} section carrying the legal name and contact email, and no Mail line while the address is unset`, () => {
       expect(content).toContain(contact);
       const section = content.slice(content.indexOf(contact));
       expect(section).toContain(BUSINESS_LEGAL_NAME);
       expect(section).toContain(BUSINESS_CONTACT_EMAIL);
-      expect(section).toContain(`Mail: ${BUSINESS_MAILING_ADDRESS}`);
+      expect(isMailingAddressSet(REAL_MAILING_ADDRESS)).toBe(false);
+      expect(section).not.toContain('Mail:');
+      expect(section).not.toContain('[');
     });
   }
+});
+
+// LEGAL-COPY-2 (2026-10-12; Elijah, 10:07 AM PT Oct 8, yes to the LEGAL-COPY-2 defaults, "finish it"): Terms §7 is
+// written. The cap is the greater of 12 months' payments or US$100, California law, Los Angeles County courts with
+// small claims open, a parent agrees for a teen, and no arbitration or class-action waiver.
+describe('terms §7 (LEGAL-COPY-2)', () => {
+  const start = TERMS_CONTENT.indexOf('## 7.');
+  const section = TERMS_CONTENT.slice(start, TERMS_CONTENT.indexOf('## 8.', start));
+
+  it('is the written section, with no placeholder', () => {
+    expect(start).toBeGreaterThan(-1);
+    expect(section.split('\n')[0]).toBe('## 7. Limitation of Liability and Disputes');
+    expect(section).not.toContain('[To be completed');
+    expect(section).not.toContain('[');
+  });
+
+  it('carries the approved defaults', () => {
+    expect(section).toContain('California law');
+    expect(section).toContain('Los Angeles County');
+    expect(section).toContain('small claims');
+    expect(section).toContain('US$100');
+    expect(section).toContain('the greater of what you paid us in the 12 months before the claim');
+    expect(section).toContain('your parent or guardian agrees to this section for you');
+  });
+
+  it('has no arbitration clause and no class-action waiver', () => {
+    expect(section).not.toMatch(/arbitration/i);
+    expect(section).not.toMatch(/class action|class-action/i);
+  });
+
+  it('is written the way the page renderer reads it: one line per paragraph, no underscores', () => {
+    expect(section).not.toContain('_');
+    const paragraphs = section.split('\n\n').slice(1).map((p) => p.trim()).filter(Boolean);
+    expect(paragraphs.length).toBeGreaterThan(0);
+    for (const p of paragraphs) expect(p).not.toContain('\n');
+  });
 });
 
 describe('privacy policy, the Research & Advisor code-vs-policy fixes (LEGAL-COPY req 5)', () => {

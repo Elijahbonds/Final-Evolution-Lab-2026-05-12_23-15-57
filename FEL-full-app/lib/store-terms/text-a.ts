@@ -4,6 +4,9 @@
  * The text is Research's COACH-STORE-TOS-REFUND-FINAL.md, version store-terms-2026-10-04 (Oct 4 2026),
  * reproduced VERBATIM — not edited, fixed, reflowed, retitled or "improved" (not the /book/<listingId>
  * path, not the dates, not the numbering). FE PM 5:51 PM PT Oct 7. STORE-TERMS-2 appends Part B.
+ * The text is now store-terms-2026-10-12 (LEGAL-COPY-2: Elijah, 10:07 AM PT Oct 8, yes to LEGAL-COPY-2
+ * defaults): the approved paste block B adds §4.6 Audiobooks, the §1 audiobook line, the audiobook price
+ * row and the short-version mention, and fixes the booking route (PM 5:57 PM PT Oct 7, wording only).
  *
  * Each section's markdown is the exact lines of that section joined with '\n' plus one trailing
  * '\n', so storeTermsText() (lib/store-terms.ts) reproduces the source text byte-for-byte. Section ids
@@ -23,8 +26,8 @@ export const STORE_TERMS_TEXT_A: StoreTermsSection[] = [
     markdown:
       "# Final Evolution Lab Coach Store: Terms of Service and Refund & Cancellation Policy\n" +
       "\n" +
-      "**Version:** store-terms-2026-10-04\n" +
-      "**Last updated:** October 4, 2026\n" +
+      "**Version:** store-terms-2026-10-12\n" +
+      "**Last updated:** October 12, 2026\n" +
       "\n" +
       "---\n",
   },
@@ -33,7 +36,7 @@ export const STORE_TERMS_TEXT_A: StoreTermsSection[] = [
     markdown:
       "## The short version (plain language)\n" +
       "\n" +
-      "These terms cover everything you buy in the Final Evolution Lab coach store at go.finalevolutiongroup.com: training programs, memberships, video reviews and live 1:1 online sessions. The seller is Final Evolution LLC, a California company, and Elijah Bonds is the coach. This is fitness coaching, not medical care. Jumping and plyometric training can cause injury, so check with a doctor before you start and stop if anything hurts. Results vary, and we don't promise any number of inches. Paid services are for adults. Teens 13–17 can use programs only when a parent or guardian buys them, and a teen's progress stays on the teen's phone. Children under 13 can't use the store. Memberships renew monthly until you cancel, and you can cancel online at any time with one click. Each product has its own refund rule (Part 2). Payments go through Stripe, and we never see your card number. Live sessions aren't recorded unless both of you agree. Questions: **FinalEvolution.us@gmail.com** · **(424) 415-8330**.\n" +
+      "These terms cover everything you buy in the Final Evolution Lab coach store at go.finalevolutiongroup.com: training programs, memberships, video reviews and live 1:1 online sessions, plus audiobooks. The seller is Final Evolution LLC, a California company, and Elijah Bonds is the coach. This is fitness coaching, not medical care. Jumping and plyometric training can cause injury, so check with a doctor before you start and stop if anything hurts. Results vary, and we don't promise any number of inches. Paid services are for adults. Teens 13–17 can use programs only when a parent or guardian buys them, and a teen's progress stays on the teen's phone. Children under 13 can't use the store. Memberships renew monthly until you cancel, and you can cancel online at any time with one click. Each product has its own refund rule (Part 2). Payments go through Stripe, and we never see your card number. Live sessions aren't recorded unless both of you agree. Questions: **FinalEvolution.us@gmail.com** · **(424) 415-8330**.\n" +
       "\n" +
       "---\n",
   },
@@ -51,7 +54,8 @@ export const STORE_TERMS_TEXT_A: StoreTermsSection[] = [
       "- **\"Seller\"** means the business named as the seller on your checkout page and your receipt. **Final Evolution LLC is the Seller for every listing in the store.**\n" +
       "- **\"Coach\"** means the person who delivers the coaching on a listing. That's **Elijah Bonds**: Pro Dunker, NASM Certified Corrective Exercise Specialist (CES), NASM Performance Enhancement Specialist (PES), and author of *The Neuro-Mechanic's Blueprint*.\n" +
       "- **\"Coaching Services\"** means anything bought in the store: programs, memberships, async video reviews and live 1:1 sessions.\n" +
-      "- The store pages are the coach page (`/coach/elijahbonds`) and booking pages (`/book/<listingId>`).\n" +
+      "- Audiobooks sold in the store are covered by these terms too, but they aren’t Coaching Services.\n" +
+      "- The store pages are the coach page (`/coach/elijahbonds`) and booking pages (`/coach/<slug>/book/<listingId>`).\n" +
       "- These store terms add to the general Final Evolution Lab [Terms of Service](/terms) and [Privacy Policy](/privacy). If they conflict, these store terms control for store purchases.\n" +
       "- When you check the box at checkout, you agree to these terms. We save the version you agreed to with your purchase.\n",
   },
@@ -84,6 +88,7 @@ export const STORE_TERMS_TEXT_A: StoreTermsSection[] = [
       "  | Async video review | $45 | one-time |\n" +
       "  | Live 1:1 online session, 30 minutes | $65 | one-time, booked by time slot |\n" +
       "  | Live 1:1 online session, 60 minutes | $120 | one-time, booked by time slot |\n" +
+      "  | Audiobooks | price shown on each listing | one-time |\n" +
       "\n" +
       "- **Payment** is handled by **Stripe** through Stripe Checkout. Stripe collects your card details directly. **FEL never sees or stores your full card number.** Stripe's own terms and privacy policy also apply to the payment.\n" +
       "- **Taxes.** If sales tax applies to your purchase, it's shown at checkout.\n" +
@@ -149,6 +154,17 @@ export const STORE_TERMS_TEXT_A: StoreTermsSection[] = [
       "- **Connection problems:** if the call can't connect, the room offers a **free reschedule** or a switch to an **async video review**. See Part 2, §2.5 for refunds.\n" +
       "- **Peer-to-peer video:** where possible, the video goes directly between your device and the coach's device. Like any direct call, each side's device can see the other's network (IP) address.\n" +
       "- **Recording:** §8. **Conduct in the room:** §9.\n",
+  },
+  {
+    id: "audiobooks",
+    markdown:
+      "### 4.6 Audiobooks (one-time digital purchase)\n" +
+      "\n" +
+      "Each audiobook is a one-time purchase for verified adults (18+). Audiobooks aren’t sold for teens, and no unlock code comes with them.\n" +
+      "\n" +
+      "You get a personal, non-transferable license to stream the audiobook in the app on your own account, for as long as the Site offers it. If we stop offering an audiobook within 12 months of your purchase, you get a prorated refund.\n" +
+      "\n" +
+      "Audiobooks stream only. There’s no download, and you may not copy, share or resell them. They aren’t part of any membership. Refunds are in Part 2, §2.7.\n",
   },
   {
     id: "not-medical-advice",
