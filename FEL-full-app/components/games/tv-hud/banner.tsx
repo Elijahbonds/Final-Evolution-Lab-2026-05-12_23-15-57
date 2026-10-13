@@ -71,7 +71,7 @@ export function HudBanner({ text, tone = 'score', size = 'banner', className = '
   );
 }
 
-export function HudLine({ text, children, tone = 'text', alpha = HUD_TEXT_ALPHA.muted, size = 'body', className = 'bottom-16', clamp = true, strong = false, edge, data }: {
+export function HudLine({ text, children, tone = 'text', alpha = HUD_TEXT_ALPHA.muted, size = 'body', className = 'bottom-16', clamp = true, strong = false, edge, data, maxWidthClass = 'max-w-[min(92%,980px)]' }: {
   text?: unknown;
   children?: ReactNode;
   tone?: HudTone;
@@ -84,13 +84,15 @@ export function HudLine({ text, children, tone = 'text', alpha = HUD_TEXT_ALPHA.
   edge?: HudTone;
   /** data-* attributes for the line's layer (a host's test hook, e.g. { prompt: 'tell' } → data-prompt). */
   data?: Record<string, string>;
+  /** The line's width cap (a host that kept its line narrower, e.g. max-w-[70%]). */
+  maxWidthClass?: string;
 }) {
   const body = children ?? (typeof text === 'string' ? text : '');
   if (body === '' || body == null) return null;
   return (
     <div data-hud-line {...Object.fromEntries(Object.entries(data ?? {}).map(([k, v]) => [`data-${k}`, v]))} className={`pointer-events-none absolute inset-x-0 ${className} flex justify-center px-4 text-center`}>
       <span
-        className={`max-w-[min(92%,980px)] ${PHONE_THUMB_GAP_CLASS}`}
+        className={`${maxWidthClass} ${PHONE_THUMB_GAP_CLASS}`}
         style={{
           ...hudType(size),
           ...(strong ? { fontWeight: 800 } : {}),

@@ -16,6 +16,10 @@ const read = (f: string) => readFileSync(path.resolve(__dirname, '..', f), 'utf8
 
 /** host file → the HUD keys it read at the base, and the modeId attribute its splash and touch overlay are bound with. */
 export const MIGRATED: Record<string, { keys: string[]; modeId: string }> = {
+  'board-babylon.tsx': {
+    modeId: '{modeKey}',
+    keys: 'airLeft airMax balance balanceKind banner chainLink coach coins combo comboLine flow gates goal goalList goals heat hint momentum par pocket pocketHi pocketLo pot score speed split swell target time tube tubeMark tubeOk wallCue waves'.split(' '),
+  },
   'football-babylon.tsx': {
     modeId: '"football"',
     keys: 'ballOn banner board boardTitle breakaway breakawayFill breakawayTicks down drive evades fieldLen firstDown hint lane los par prompts score slingshot target toGo truckCool truckReady weather yards'.split(' '),
