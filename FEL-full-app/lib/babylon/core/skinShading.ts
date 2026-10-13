@@ -11,7 +11,7 @@
 // only thing this keys on. Procedural (StandardMaterial) spawns are ignored.
 
 import { Color3, DynamicTexture, PBRMaterial } from '@babylonjs/core';
-import type { AbstractMesh, Scene } from '@babylonjs/core';
+import type { AbstractMesh, Observer, Scene, TransformNode } from '@babylonjs/core';
 import type { QualityTier } from '../scene/QualityTier';
 import { applyFabric } from './fabric';
 
@@ -89,8 +89,8 @@ export function applySkinShading(meshes: AbstractMesh[], scene: Scene, tier: Qua
     const name = mat.name.toLowerCase();
     if (name.startsWith('skin')) {
       mat.metallic = 0;
-      mat.roughness = 0.58;
-      mat.specularIntensity = 0.7;
+      mat.roughness = SKIN_DRY.roughness;
+      mat.specularIntensity = SKIN_DRY.specular;
       // Subsurface approximation: translucency lets the sun bleed through thin
       // parts (ears, fingers, nose) with a warm blood tint. Cheap — no prepass
       // scattering, which is the part that costs a full-screen blur.
@@ -137,4 +137,58 @@ export function applySkinShading(meshes: AbstractMesh[], scene: Scene, tier: Qua
     }
   }
   return out;
+}
+
+// ── SWEAT (vis-foundation-2 A9.14, 2026-10-13) ───────────────────────────────────────────────────────────────────────────
+// A body that has been working shines: the skin's roughness falls and its specular rises as sweat builds, and a rest dries
+// it again. The plan asked for "roughness driven by stamina"; no shared stamina channel exists across the modes, so the
+// effort is read off the body itself — how fast the hero has been moving (assumption, flagged). Uniform-only: the skin
+// material's own roughness and specular intensity, never a define, so nothing recompiles.
+
+export const SKIN_DRY = { roughness: 0.58, specular: 0.7 } as const;
+export const SKIN_SWEAT = { roughness: 0.34, specular: 1.05 } as const;
+/** Seconds of flat-out effort to soak; seconds of rest to dry. */
+export const SWEAT_RISE_S = 45, SWEAT_FALL_S = 120;
+/** The speed (m/s) that counts as full effort. */
+export const SWEAT_FULL_SPEED = 6.5;
+
+/** Pure: sweat after `dt` seconds at `effort01` — rises toward the effort, decays slower than it builds. */
+export function sweatStep(prev: number, effort01: number, dt: number): number {
+  const e = Math.max(0, Math.min(1, effort01));
+  const s = Math.max(0, Math.min(1, prev));
+  return e > s ? Math.min(e, s + (dt / SWEAT_RISE_S) * (0.4 + e)) : Math.max(e * 0.5, s - dt / SWEAT_FALL_S);
+}
+
+/** Write a sweat level onto the shaded skin materials under `root` (the materials applySkinShading tuned). Returns how many. */
+export function setSkinSweat(root: TransformNode, k01: number): number {
+  const k = Math.max(0, Math.min(1, k01));
+  const seen = new Set<PBRMaterial>();
+  for (const m of root.getChildMeshes(false)) {
+    const mat = m.material;
+    if (!(mat instanceof PBRMaterial) || seen.has(mat) || !mat.metadata?.felShaded || !mat.name.toLowerCase().startsWith('skin')) continue;
+    seen.add(mat);
+    mat.roughness = SKIN_DRY.roughness + (SKIN_SWEAT.roughness - SKIN_DRY.roughness) * k;
+    mat.specularIntensity = SKIN_DRY.specular + (SKIN_SWEAT.specular - SKIN_DRY.specular) * k;
+  }
+  return seen.size;
+}
+
+export interface SweatHandle { readonly level: number; dispose(): void }
+
+/** Track the hero's effort while `live()` (the harness: phase 'playing') and sweat their skin to match. */
+export function mountSweat(scene: Scene, hero: () => TransformNode | null, live: () => boolean): SweatHandle {
+  let level = 0, written = -1, last: { x: number; z: number } | null = null, acc = 0, dist = 0;
+  const obs: Observer<Scene> = scene.onBeforeRenderObservable.add(() => {
+    const h = hero(); if (!h || !live()) { last = null; return; }
+    let root: TransformNode = h; while (root.parent) root = root.parent as TransformNode;
+    const p = root.position;
+    if (last) dist += Math.hypot(p.x - last.x, p.z - last.z);
+    last = { x: p.x, z: p.z };
+    acc += Math.min(0.1, scene.getEngine().getDeltaTime() / 1000);
+    if (acc < 0.5) return;   // sample twice a second: an average speed, not a frame's jitter
+    const speed = dist / acc; dist = 0;
+    level = sweatStep(level, speed / SWEAT_FULL_SPEED, acc); acc = 0;
+    if (Math.abs(level - written) > 0.02) { written = level; setSkinSweat(root, level); }
+  });
+  return { get level() { return level; }, dispose() { scene.onBeforeRenderObservable.remove(obs); } };
 }

@@ -640,6 +640,34 @@ Notes for the per-mode passes, from the shadow cache's per-frame lists:
   take at the foundation level.
 - **Every mode with bursts**: look at a grind (sparks), a planted cut (dust) and a win (confetti) on screen — the new looks
   were tested headless, not judged by eye.
-- Still not built: broadcast kit (A9.12), TV HUD styling (A9.13), procedural sky (A9.11), material detail (A9.14),
-  clustered lights (A9.5 part 2), SSR/mirror floors (A9.7 part 2), FSR for 4K.
+- Still not built after phase 2: TV HUD styling (A9.13), FSR for 4K. The rest is wave 1 below.
+
+## Foundation status after wave 1 (vis-foundation-2, 2026-10-13)
+
+Every system below mounts from the rig (`LightRig.captureVenue`, after `load()`) or the harness, so a mode gets it without
+a mode file; `scene/lookPolicy.ts` HOLDS the hoops modes out of all of them this wave (owner: hoops off-limits). `?lookoff=`
+(fixtures, sky, air, mirror) switches one off for a one-build A/B.
+
+- **A9.12 broadcast kit.** `CameraDirector.establish('walkIn' | 'establish')`: a crane over the venue, a cut to a low shot
+  on the player, then the play camera — which keeps running underneath, so the hand-over frame is exactly the follow's; the
+  first input skips it. A mode opts in with `intro: 'walkIn'` on its definition. `visual/Letterbox.ts`: DOM bars (no post
+  pass) for the intro and the replays. `scene/ReplayDirector.ts`: the shared replay (bodies recorded as drawn, played from
+  `broadcastShots`' angles at half speed); a mode opts in with `replay: true` and calls `ctx.highlight({ lastSeconds })` at
+  its moment — the harness holds `update()` while it plays. Its depth of field is switched on at mount at a no-blur lens and
+  only eased during a replay (no mid-game compile; the depth pass refreshes only during a replay). Proving mode: Football Rush.
+- **A9.5 second half — fixture lights.** `scene/FixtureLights.ts`: lamp heads, floods, lanterns and bulbs get clustered
+  point / spot lights (one ClusteredLightContainer), sized by the illuminance they land; desktop/high. Patches a Babylon 9.23
+  clustered-sheen shader bug (every cloth material vanished under a clustered light). Proving mode: volleyball Night Beach.
+- **A9.11 sky & air.** `scene/SkyDome.ts`: a GLSL plugin on the photo domes — the open sky de-blocked, drifting clouds, the
+  mood's sun glow, a horizon haze band; desktop/high. `scene/Atmosphere.ts`: a gentle EXP2 haze in a horizon colour over the
+  procedural worlds nobody else fogs (every tier). Not built: VLS sun shafts (the sun is rarely in a play frame; the pass
+  re-renders the occluders) — and higher-resolution domes stay [ART].
+- **A9.14 material detail.** The floor grain's detail map carries relief (normal + roughness), puddles grow on WeatherFx's
+  wet grounds in the rain (`visual/WetSurface.ts`), and the hero's skin shines with effort (`skinShading.mountSweat`). A
+  shared ground-decal pool (`visual/GroundDecals.ts`, `scene.metadata.felDecals.stamp('scuff' | 'foot', …)`): no mode stamps
+  yet — the mode lanes wire their pivots and cuts in wave 2.
+- **Glow occlusion.** The skinned bodies are drawn black into the glow target, so a fixture's halo no longer paints over a
+  body standing in front of it. A skinned glow include for chi rims (vis-combat's ask) is wave 2.
+- **A9.7 second half — glossy floors.** `scene/GlossyFloor.ts`: a planar MirrorTexture on the dance and Brain Brawl stages and
+  any wooden-court place (the Gym); desktop/high.
 
