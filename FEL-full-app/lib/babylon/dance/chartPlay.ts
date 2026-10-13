@@ -6,6 +6,8 @@
 //   #11 LEVEL   — EASY / NORMAL / HARD, thinning or filling the chart per run (NORMAL is the chart, untouched);
 //   #12 MATCH   — an opt-in mode where each move family has its own face button (A/B/X/Y), so reading the lane matters;
 //   #13 HOLD    — a freeze is held through its beats and released on the beat (judged, bonus only).
+// MUSIC-SUITE P9 re-land (2026-10-13): a song with an AUTHORED chart (chart.ts) brings its own GROOVE beats — the chart's
+// accents, doubles and freestyle slots, on eighths and sixteenths too (styleTap / styleTapAt) — in place of the computed ones.
 // GROOVE and HOLD pay STYLE, a separate tally: the Arena-staked score stays DanceCore's (lib/arena-score-integrity.ts
 // danceCeiling: PERFECT + combo per step), so neither can move what a staked run is worth.
 
@@ -135,6 +137,39 @@ export function grooveTap(beats: readonly number[], beatPos: number, windowBeats
     if (beats[mid] < b) lo = mid + 1; else hi = mid - 1;
   }
   return null;
+}
+
+/**
+ * The STYLE tap a press at `beatPos` (chart beats, fractional) takes: the nearest of `beats` (sorted, any fraction —
+ * an authored chart's accents sit on eighths and sixteenths, dance/chart.ts) within `windowBeats`, not already taken;
+ * null when none. grooveTap's rule for beats that are not whole numbers; the same answer wherever the beats are whole
+ * and the window is under half a beat. MUSIC-SUITE P9 re-land (2026-10-13).
+ */
+export function styleTap(beats: readonly number[], beatPos: number, windowBeats: number, taken: ReadonlySet<number>): number | null {
+  if (!Number.isFinite(beatPos) || beats.length === 0) return null;
+  let lo = 0, hi = beats.length;   // lower bound: the first beat at or after beatPos
+  while (lo < hi) { const mid = (lo + hi) >> 1; if (beats[mid] < beatPos) lo = mid + 1; else hi = mid; }
+  let best: number | null = null;
+  for (const i of [lo - 1, lo]) {
+    const b = beats[i];
+    if (b === undefined || taken.has(b)) continue;
+    const d = Math.abs(beatPos - b);
+    if (d <= windowBeats && (best === null || d < Math.abs(beatPos - best))) best = b;
+  }
+  return best;
+}
+
+/**
+ * A press at `heardNow` is a STYLE tap when it lands on one of `beats` (styleTap) AND is not a press for a step: a press
+ * the judge would take for a step (pressTarget over `upcoming`) is always the step's. Returns the beat it takes, or null.
+ * This is what DanceMode.pressAt asks first; a STYLE tap never reaches DancePerformance, so it costs nothing and cannot
+ * touch the combo or the score.
+ */
+export function styleTapAt<T extends { time: number; step: DanceStep }>(
+  beats: readonly number[], upcoming: readonly T[], heardNow: number, beatPos: number, windowBeats: number, taken: ReadonlySet<number>,
+): number | null {
+  const g = styleTap(beats, beatPos, windowBeats, taken);
+  return g !== null && !pressTarget(upcoming, heardNow) ? g : null;
 }
 
 /** The index of the first groove beat at or after `beatPos` (for the lane's look-ahead). */

@@ -1,6 +1,6 @@
 # Final Evolution Press — book shop
 
-Direct ebook and audiobook sales on FEL. The pages live at `/press` (catalog), `/press/[slug]` (one book), `/press/library` (purchases), and `/press/receipt` (after Checkout).
+Direct sales of stream-only audiobooks on FEL (ebooks and bundles are held for EBOOK-1, see "The shop matches the store terms"). The pages live at `/press` (catalog), `/press/[slug]` (one book), `/press/library` (My Library), and `/press/receipt` (after Checkout).
 
 `/shop` is already the in-app Lab Credits card shelf. This shop does not replace it.
 
@@ -30,13 +30,63 @@ The shop merges **dark** and stays closed until the owner turns it on. Who can b
 6. **The SQL stays pending.** `prisma/pending/2026-10-09-book-shop.sql` is not applied, `prisma/schema.prisma` is not
    touched, and no prisma command is run. Until the tables exist the shop is dark and fails closed (see Database).
 
-> **Go-live is blocked on LEGAL-COPY-2 (an audiobooks/books section in the store terms).** State on 2026-10-13, after
-> merging `lane/finish-release` (LEGAL-COPY-2 merged there as `store-terms-2026-10-12`): the store terms now carry
-> **audiobooks only** (§1, §2.7, §4.6): 18+, stream only, **no download**, 14-day refund, one per person, a refund ends the
-> license. They do **not** cover **ebooks or the bundle** (the approved "block C" was held back for EBOOK-1). The shop
-> today sells audiobooks with a download and sells ebooks and bundles, so the terms and the shop disagree. Resolve that
-> (terms for ebooks and bundles, and download rights, or limit the shop to what the terms say) before anyone turns
-> `BOOK_STORE_ENABLED` on. The checkout tick links to `/store-terms`, so the text the buyer ticks is the text above.
+## The shop matches the store terms (owner, 2026-10-13)
+
+The live store terms, `store-terms-2026-10-12` (LEGAL-COPY-2), cover **audiobooks only** (§1, §2.7, §4.6): 18+, stream
+only, **no download**, 14-day refund, one per person, a refund ends the license. They do **not** cover **ebooks or the
+bundle** (the approved "block C" is held for EBOOK-1). So the shop sells what the terms say and nothing else:
+
+- **Sold:** the audiobook, as a stream. The free sample chapter also streams.
+- **Hidden and refused, fail closed:** ebooks, the bundle, and every download path (EPUB/PDF files, and any audiobook
+  download). The UI does not draw them, and the API refuses them:
+  `POST /api/books/checkout` answers `409 format_not_offered` (before any Stripe customer is made);
+  `POST /api/books/download` signs no EPUB/PDF, whatever the buyer owns; fulfilment
+  (`recordBookCheckout`, used by the receipt page and both webhooks) ignores a paid ebook/bundle session
+  (`ignored: format_not_offered`) and does not remember it, so a replay grants once a later terms version covers it.
+- **One rule, one place:** `lib/books/bookTerms.ts`. `BOOK_TERMS_POLICIES` maps a store terms version to
+  `{ formats, downloads }`. Every surface above asks that file. **A terms version that is not listed offers nothing and
+  delivers nothing**, so when `STORE_TERMS_VERSION` next moves the shop shuts until someone reads the new text and adds
+  its row (`bookTerms.test.ts` fails first and says so).
+- **Switching ebooks on later (EBOOK-1):** publish the terms version that covers them, then add its row with
+  `formats: ['audiobook', 'ebook', 'bundle'], downloads: true`. The KDP Select flags (`directSale`) still apply on
+  top. The ebook and download code paths are kept and tested under a fixture policy (`tests/helpers/bookTermsPolicies.ts`).
+- Not changed by this: `BOOK_STORE_ENABLED`, `VIRTUAL_PURCHASES_ENABLED`, the 18+ gate and the terms tick. The legal
+  copy is untouched.
+- `scripts/stripe-prices.example.json` still lists the ebook and bundle test products (it mirrors the catalog, and
+  creating a Stripe test Product sells nothing). Checkout will not sell them.
+
+## Listening: the stream-only player (owner, 2026-10-13)
+
+Before this there was a player but no stream-only route: `POST /api/books/download` signed every file, audio included,
+and the player, a Download button and the receipt all used it. Now:
+
+- **Where:** `/press/library` is the Listen page (chapter list + player), behind sign-in, 18+ and an entitlement, and
+  the same two switches as checkout. The book page (`/press/[slug]`) carries the same player for the free sample and
+  for owners.
+- **The door:** `POST /api/books/stream` `{ bookSlug, fileId }`. In order: shop switched off
+  (`BOOK_STORE_ENABLED` / `VIRTUAL_PURCHASES_ENABLED`) -> `409 store_closed`; signed out -> `401`; not a verified
+  adult -> `403 adults_only`; no audiobook entitlement -> `403`; book tables missing -> `503 Library is unavailable
+  right now.` (the library page shows the same line). Then it signs ONE URL for ONE chapter: V4 signed URL on the
+  private bucket (`signGcsV4`), `response-content-disposition=inline` with **no filename**, lifetime at most
+  **300 s** (`STREAM_URL_TTL_SECONDS`), `Cache-Control: no-store`. The path comes from the catalog, never the request.
+- **Downloads are closed:** `POST /api/books/download` is for ebook files only and answers `403` for everything
+  while no terms version covers ebooks and downloads. No route returns an attachment URL today.
+- **The player** (`components/press/audio-player.tsx`, rules in `lib/books/bookPlayer.ts`): a plain `<audio>` with
+  `controlsList="nodownload"`, no context menu, no download link or button, no URL in the page before Play (each play
+  asks the stream route). Chapter list, play/pause (native), back/forward 15 s, speed (1 / 1.25 / 1.5 / 2), and the
+  place is saved on this device (localStorage, `bookResume.ts`). An expired URL is replaced on the next play (the
+  player refreshes 20 s early) and on a playback error (at most every 10 s), and resumes at the same second.
+- **The free sample** is the one public chapter: it streams with no sign-in, no age check and with the switches off,
+  as it did before (assumption: a sample is not a sale). Every other chapter needs all of the above.
+- **Honest limit:** a browser that plays audio has the audio. Nothing here can technically stop a determined person
+  from saving what their own browser streams (devtools, a screen recorder, a captured URL during its 5 minutes).
+  "Stream only" is meant in the terms' sense: **no download is offered** and none is handed out, the URLs are
+  short-lived and tied to a signed-in verified adult who owns the book, and the files stay private in the bucket.
+- **Receipt page:** it no longer embeds a player or mints a guest listening grant (there is no guest checkout); it
+  links to My Library. `mintReaderGrant` / `readReaderGrant` in `bookEntitlements.ts` are now unused by any route and
+  can go in a later cleanup.
+- Decision to confirm: listening is behind `BOOK_STORE_ENABLED`, like checkout. If the owner ever switches the shop
+  off after sales, paid buyers cannot stream until it is back on (fulfilment, the receipt and refunds still work).
 
 ## What Elijah has to decide
 
@@ -63,7 +113,7 @@ Set these on the server. Do not commit the values.
 | `FIREBASE_SERVICE_ACCOUNT_JSON` | Service-account JSON, one line. Or set the next two instead. |
 | `FIREBASE_CLIENT_EMAIL` | Service account email, if you are not using the JSON blob. |
 | `FIREBASE_PRIVATE_KEY` | PEM private key. Newlines may be written as `\n`. |
-| `BOOK_SIGNED_URL_TTL_SECONDS` | Lifetime of a download/stream URL. Default 600, maximum 3600. |
+| `BOOK_SIGNED_URL_TTL_SECONDS` | Lifetime of an ebook download URL (closed today). Default 600, maximum 3600. A stream URL is capped at 300 s whatever this says. |
 | `NEXTAUTH_SECRET` | Already required by login. Also signs the short-lived receipt grant that lets a guest play on the receipt page. |
 | `NEXTAUTH_URL` | The site origin Stripe sends the buyer back to (`siteOrigin()`, STORE-READY B3). The request's `Origin` header is never used; unset closes checkout (`site_url_not_set`). |
 | `VIRTUAL_PURCHASES_ENABLED` | The release's B10 fence (default off: "no real-money product outside the coach store"). Kept for books alongside `BOOK_STORE_ENABLED`: checkout answers 409 `store_closed` / `virtual_purchases_off` until it is on too. |
@@ -199,14 +249,14 @@ After a catalog edit, `npm test -- lib/books` checks that prices are still marke
 
 Do these in order. This branch does not perform them.
 
-1. Confirm KDP Select for all seven titles. Flip `kdpSelect` only when the ebook may be sold on the site.
+1. (Held for EBOOK-1.) Confirm KDP Select for all seven titles. Flip `kdpSelect` only when the ebook may be sold on the site.
 2. Replace example prices. Set `priceIsExample: false` on the offers you are actually charging.
 3. Upload EPUB, PDF, and MP3s to the private paths above. Play chapter 1 and the last chapter.
 4. Apply `prisma/pending/2026-10-09-book-shop.sql`, add the models, regenerate `public/_prisma` (the owner's step; see Database).
-5. Test-mode webhook endpoint, test key, one purchase, receipt page, My Library, a chapter, an EPUB download, then a refund that removes access.
+5. Test-mode webhook endpoint, test key, one purchase, receipt page, My Library, a chapter, then a refund that removes access.
 6. Decide tax (Stripe Tax on, or off and filed yourself).
-7. **LEGAL-COPY-2 / store terms.** Audiobook terms are in `store-terms-2026-10-12`; ebook and bundle terms are not, and the
-   audiobook terms say stream-only (no download). Settle that against what the shop sells before go-live (see the note
-   at the top). The buy buttons link to `/store-terms`; the shop footer also links `/terms`.
+7. **Store terms.** Done in code (see "The shop matches the store terms"): the shop sells stream-only audiobooks, which
+   is what `store-terms-2026-10-12` covers. Ebooks and the bundle stay off until an EBOOK-1 terms version exists. The buy
+   buttons link to `/store-terms`; the shop footer also links `/terms`.
 8. Turn on `BOOK_STORE_ENABLED` and `VIRTUAL_PURCHASES_ENABLED` together, only with the owner's go-ahead.
 9. Only then replace the test-mode guard and the test keys, with an explicit go-ahead. Do not deploy from this branch as part of that step unless that go-ahead includes deploy.

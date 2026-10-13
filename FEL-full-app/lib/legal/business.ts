@@ -9,8 +9,12 @@ import { SCREEN_CONTACT_EMAIL } from '../screen/copy';
 /** The legal entity. Public prose is "Final Evolution"; the LLC form appears only in legal lines. */
 export const BUSINESS_LEGAL_NAME = 'Final Evolution LLC';
 
-/** The real business mailing address, or null while none is set. While null, every legal page drops the line that would print it. Never a home or street address; set it only with the real business mailbox in its own change. */
-export const REAL_MAILING_ADDRESS: string | null = null;
+/**
+ * The real business mailing address, or null while none is set. While null, every legal page drops the line that would
+ * print it. BUSINESS-ADDRESS (FE PM 9:00 PM PT Oct 12; USPS Form 1583 approved by Elijah): the company's mailbox, #2012.
+ * Never a home address. lib/legal/business.test.ts pins this exact value.
+ */
+export const REAL_MAILING_ADDRESS: string | null = '18543 Devonshire St #2012, Northridge, CA 91324';
 
 /** True only for a non-empty (after trim) string. */
 export function isMailingAddressSet(address: string | null | undefined): address is string {

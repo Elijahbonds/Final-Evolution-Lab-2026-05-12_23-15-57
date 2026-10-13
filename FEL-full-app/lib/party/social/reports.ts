@@ -9,8 +9,18 @@
 // What a report holds: who reported whom (account ids, from netd's sealed slip — never from the request), the party
 // code, a fixed reason id, and when. NO MESSAGE CONTENT: party chat is never stored anywhere, so there is none to
 // attach. Raw parameterised SQL ($1…), because the committed Prisma client does not know the table.
+//
+// RETENTION (owner, 2026-10-13: "12 months for party reports AND creator inquiries, with automatic deletion"): a report
+// is deleted PARTY_REPORT_RETENTION_DAYS after it was filed. Same pattern as the creator inquiries
+// (lib/creator/inquiryStore.ts): the delete runs on every successful save, best effort, and it is a no-op while the
+// table does not exist (the same probe). This repo has no scheduler, so a quiet stretch with no new report leaves an old
+// one until the next report or until the owner runs the statement in the SQL file by hand; a scheduled job is the owner's
+// call. lib/policies.ts tells the player the same period, and lib/party/social/reports.test.ts pins both numbers.
 import { randomUUID } from 'node:crypto';
 import { pendingProbe, type RawDb } from '@/lib/coach/pendingSchema';
+
+/** How long a party report is kept before it is deleted. The privacy policy (lib/policies.ts) says "12 months". */
+export const PARTY_REPORT_RETENTION_DAYS = 365;
 import type { ReportSlip } from '@/server/netd/src/ticket';
 
 const PROBE_SQL =
@@ -19,8 +29,28 @@ const INSERT_SQL =
   `INSERT INTO "PartyReport" ("id", "reporterId", "reportedId", "reportedName", "partyCode", "reason", "reportedAt") ` +
   `VALUES ($1, $2, $3, $4, $5, $6, $7)`;
 
+// createdAt is `TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP`, so the cutoff is built from CURRENT_TIMESTAMP too: both sides go
+// through the same session-time-zone conversion and agree whatever the zone. (CreatorInquiry's explicit UTC insert is why
+// its purge says AT TIME ZONE 'UTC'.) The "PartyReport_createdAt_idx" index in the pending SQL serves this range delete.
+export const PURGE_SQL = `DELETE FROM "PartyReport" WHERE "createdAt" < (CURRENT_TIMESTAMP - make_interval(days => $1::int))`;
+
 const probe = pendingProbe('party_report', PROBE_SQL);
 export function resetPartyReportProbe(): void { probe.reset(); }
+
+/**
+ * Delete reports older than the retention period. A NO-OP while the table does not exist (the probe), so it is safe on
+ * production before the pending SQL is applied. Never throws; resolves true when the delete ran.
+ */
+export async function purgeExpiredPartyReports(db: RawDb, now: number = Date.now()): Promise<boolean> {
+  if (!(await probe.ready(db, now))) return false;
+  try {
+    await db.$executeRawUnsafe(PURGE_SQL, PARTY_REPORT_RETENTION_DAYS);
+    return true;
+  } catch (e) {
+    probe.fail('party_report_purge_failed', e, now);
+    return false;
+  }
+}
 
 export type ReportOutcome = 'stored' | 'not_available' | 'failed';
 
@@ -30,9 +60,12 @@ export async function storePartyReport(db: RawDb, slip: ReportSlip, now: number 
   try {
     await db.$executeRawUnsafe(INSERT_SQL, randomUUID(), slip.reporterUid, slip.reportedUid, slip.reportedName.slice(0, 12),
       slip.code.slice(0, 6), slip.reason.slice(0, 16), new Date(slip.at));
-    return 'stored';
   } catch (e) {
     probe.fail('party_report_insert_failed', e, now);
     return 'failed';
   }
+  // Retention: delete what is past its period. Best effort; the report above is already saved.
+  await purgeExpiredPartyReports(db, now);
+  return 'stored';
 }
+
