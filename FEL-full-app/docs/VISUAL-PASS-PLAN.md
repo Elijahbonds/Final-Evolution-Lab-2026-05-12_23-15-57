@@ -714,10 +714,19 @@ freerun's world), `event` (big air's gate, towers and booth), `palette` (freerun
   snow thrown off the lip at take-off and powder at the landing.
 - **Freerun.** The runner's colour language (`visual/runnerPalette`): what the verbs act on (vault, bar, spring, rail, anchor,
   ledge) is runner red with an emissive floor, the slab and walls keep 42 % of their colour, and the verbs' surfaces get red outline
-  edges (desktop/high); the tracks' authored hues are not changed, only toned. A world beyond the slab per track
-  (`visual/freeRunDressing`: AC units, neon billboards, antenna bulbs; pipes, valves, overgrowth; containers, gantry cranes;
+  edges (desktop/high); the tracks' authored hues are not changed, only toned. A world beside the slab per track,
+  standing on a yard deck 5 m below it (there is nothing past the 20 m slab but the far-off world, so props at its height hung in
+  the air; the deck has no collider) (`visual/freeRunDressing`: AC units, neon billboards, antenna bulbs; pipes, valves, overgrowth; containers, gantry cranes;
   columns, a statue), the camera's `SpeedLines` above 80 % of top speed, grind sparks, a ring off a slam or a big landing
   (`visual/ShockRing`).
+- **Findings worth the next lane's time.** (1) `core/ModeHarness` mounts the replay depth of field (`mountReplayDof`) on every
+  `replay: true` mode, and on desktop it flattens the whole frame (a snow piste's contrast measured 221.9 vs 6.4 with it off); the
+  five modes here set `replayDof: false` (new optional `ModeDefinition` field) and the replay itself is unchanged; Football Rush
+  and any other replay mode likely have it too: routed. (2) A StandardMaterial ADDS its `emissiveColor` to its emissive
+  texture, it does not scale it: a sign written as `emissive (0.9, 0.95, 1)` plus a dark painted texture is a pale wash
+  (measured: 15/255 at 0.1, 200/255 at 0.9 over the same dark pixel). `visual/unlit.settleEmissive` takes the colour to black
+  when a texture is present. `DynamicTexture.update(false)` skips the Y flip: painted text comes out upside down.
+  (3) `liftBlackMaterials` lifts any texture-less material under 0.04 to grey, which an unlit black diffuse is: `unlitDiffuse()`.
 - **Deferred to wave 3 / needs art:** a moving chairlift with chairs and flags waving; a pier and a lifeguard tower for the surf
   breaks (`venuePropSets` is shared, and the tower is [ART]); a wet sheen after a duck-dive (`mountSweat` owns the skin level);
   puddle reflections and a concrete detail map at the Warehouse (`GlossyFloor` is a named-floor list); a night session with

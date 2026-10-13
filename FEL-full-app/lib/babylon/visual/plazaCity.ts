@@ -2,8 +2,8 @@
 // banners, moving traffic in the distance." The plaza ends at its fence and then there is a photograph. This stands a city in
 // the gap: a ring of towers with lit windows past the fence, and a road round the plaza with cars on it that never stop.
 //   · THE SKYLINE — 30 boxes on a ring 44–84 m past the plaza's edge, 14–50 m tall, in four dusk blues. Four merged meshes (one per
-//     tint) sharing one window texture (a painted facade: most windows dark, some warm, a few cool), so the whole skyline is
-//     four draws; the windows are emissive, so the city is lit at midday too (the plaza is a hard-light place — it is the glass).
+//     tint) each with its own painted facade (most windows dark, some warm, a few cool), so the whole skyline is
+//     four draws; the faces are unlit (drawn as painted), so the city is the same at midday as at dusk.
 //   · THE ROAD — a dark strip round the plaza with a dashed line, one mesh per side pair (two draws).
 //   · THE TRAFFIC — twelve cars, ONE thin-instanced box, driving the road's two lanes at 7–12 m/s and wrapping at the ends; the
 //     only per-frame work is writing twelve matrices.
@@ -46,7 +46,8 @@ export function carAt(i: number, t: number, bound: number, len: number): { x: nu
 
 export interface CityHandle { readonly towers: number; readonly cars: number; update(dt: number): void; dispose(): void }
 
-const TINTS = ['#0e141e', '#141c29', '#1b2535', '#222e42'];   // dusk silhouettes: dark faces, the lit windows are the picture
+const TINTS = ['#0c121c', '#111a28', '#172233', '#1d2a3e'];   // dusk silhouettes: dark faces, the lit windows are the picture
+const LIFT = ['#1d2a40', '#243551', '#2c4163', '#365078'];       // each face is a little lighter at the top
 
 export function mountPlazaCity(scene: Scene, bound: number, tier: string | null | undefined): CityHandle {
   const phone = tier === 'mobile';
@@ -55,20 +56,27 @@ export function mountPlazaCity(scene: Scene, bound: number, tier: string | null 
   const owned: { dispose(): void }[] = [];
   const meshes: AbstractMesh[] = [];
 
-  // the facade: a grid of windows, most dark, some warm, a few cool — one texture for every tower
-  let tex: DynamicTexture | null = null;
-  try {
-    tex = new DynamicTexture('plaza_city_tex', { width: 256, height: 512 }, scene, true);
-    const g = tex.getContext() as unknown as CanvasRenderingContext2D;
-    g.fillStyle = '#04070d'; g.fillRect(0, 0, 256, 512);
-    const rand = rng(77);
-    for (let y = 8; y < 504; y += 16) for (let x = 8; x < 248; x += 16) {
-      const r = rand();
-      g.fillStyle = r < 0.62 ? '#0a1018' : r < 0.9 ? '#ffd9a0' : '#bfe6ff';
-      g.fillRect(x, y, 9, 10);
-    }
-    tex.update(true); tex.uScale = 0.5; tex.vScale = 0.45; owned.push(tex);   // a face is ~7 columns by ~13 floors of windows, not a haze of dots
-  } catch { tex = null; }
+  // the facade: a painted wall, one per tint — a grid of windows (most dark, some warm, a few cool) on a face that is a little
+  // lighter at the top. Unlit (PBR `unlit`): the plaza's lighting is a hard sun and an arena's worth of IBL, which turned every
+  // dark face to the same pale slate (measured: albedo 0.05 rendered ~0.4); a skyline at dusk is a flat dark shape with lit windows,
+  // so the picture is painted and drawn as it is. Fog still takes it.
+  const facade = (k: number): DynamicTexture | null => {
+    try {
+      const tex = new DynamicTexture(`plaza_city_tex_${k}`, { width: 256, height: 512 }, scene, true);
+      const g = tex.getContext() as unknown as CanvasRenderingContext2D;
+      const gr = g.createLinearGradient(0, 512, 0, 0);
+      gr.addColorStop(0, TINTS[k]); gr.addColorStop(1, LIFT[k]);
+      g.fillStyle = gr; g.fillRect(0, 0, 256, 512);
+      const rand = rng(77 + k);
+      for (let y = 8; y < 504; y += 16) for (let x = 8; x < 248; x += 16) {
+        const r = rand();
+        g.fillStyle = r < 0.62 ? '#0a1018' : r < 0.9 ? '#ffd9a0' : '#bfe6ff';
+        g.fillRect(x, y, 9, 10);
+      }
+      tex.update(true); tex.uScale = 0.5; tex.vScale = 0.45; owned.push(tex);   // a face is ~7 columns by ~13 floors of windows, not a haze of dots
+      return tex;
+    } catch { return null; }
+  };
 
   for (let k = 0; k < TINTS.length; k++) {
     const parts: Mesh[] = [];
@@ -79,8 +87,9 @@ export function mountPlazaCity(scene: Scene, bound: number, tier: string | null 
     }
     if (!parts.length) continue;
     const m = new PBRMaterial(`plaza_city_m_${k}`, scene);
-    m.albedoColor = Color3.FromHexString(TINTS[k]); m.metallic = 0.05; m.roughness = 0.75;
-    if (tex) { m.emissiveTexture = tex; m.emissiveColor = new Color3(0.9, 0.9, 0.9); }
+    m.unlit = true;
+    const tex = facade(k);
+    if (tex) { m.albedoTexture = tex; m.albedoColor = Color3.White(); } else m.albedoColor = Color3.FromHexString(LIFT[k]);
     owned.push(m);
     for (const p of parts) p.computeWorldMatrix(true);
     const one = parts.length === 1 ? parts[0] : Mesh.MergeMeshes(parts, true, true);
