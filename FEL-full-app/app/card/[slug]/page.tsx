@@ -17,6 +17,8 @@ import { CreatorTracks } from '@/components/soundtrack/creator-tracks';
 import { SignatureMoves } from '@/components/create/signature-moves';
 
 export const dynamic = 'force-dynamic';
+// CARD-SAFE-1: no ISR or stale copy of a card page.
+export const revalidate = 0;
 
 export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
   const card = await getPublicCard(prisma, String(params?.slug ?? '').toLowerCase());

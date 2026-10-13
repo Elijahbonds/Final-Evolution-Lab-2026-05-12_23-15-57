@@ -17,6 +17,7 @@
  */
 
 import { getOffer } from './bookCatalog';
+import { bookFormatAllowed, currentBookPolicy, type BookTermsPolicy } from './bookTerms';
 import { isValidEmail, normalizeEmail } from '@/lib/marketing/funnel';
 
 export interface PaidBookSession {
@@ -82,20 +83,33 @@ export function bookSessionKey(sessionId: string): string {
 }
 
 /** Fulfil one paid book session under its session key: the receipt page and both webhooks call this. */
-export function recordPaidBookSession(session: PaidBookSession, store: BookFulfillStore): Promise<FulfillResult> {
-  return recordBookCheckout(bookSessionKey(session.id), session, store);
+export function recordPaidBookSession(
+  session: PaidBookSession,
+  store: BookFulfillStore,
+  policy?: BookTermsPolicy,
+): Promise<FulfillResult> {
+  return recordBookCheckout(bookSessionKey(session.id), session, store, policy);
 }
 
 export async function recordBookCheckout(
   eventId: string,
   session: PaidBookSession,
   store: BookFulfillStore,
+  policy: BookTermsPolicy = currentBookPolicy(),
 ): Promise<FulfillResult> {
   if (session.metadata?.product !== 'BOOK') return { ok: true, ignored: true, reason: 'not-a-book' };
   if (await store.hasEvent(eventId)) return { ok: true, deduped: true };
 
   const offer = getOffer(session.metadata.offerId ?? '');
   if (!offer) throw new Error(`unknown book offer ${session.metadata.offerId ?? ''}`);
+
+  // The terms rule (lib/books/bookTerms.ts, owner 2026-10-13): a format the current store terms do not cover (ebook,
+  // bundle) is not granted, fail closed. Not remembered, so once an EBOOK-1 terms version covers it a replay of the
+  // same session grants it. Checkout refuses these formats now, so this only catches a session opened earlier.
+  if (!bookFormatAllowed(offer.format, policy)) {
+    console.warn(`[books-fulfil] ${eventId}: format ${offer.format} is not covered by ${policy.termsVersion}; not granted`);
+    return { ok: true, ignored: true, reason: 'format_not_offered' };
+  }
 
   if (session.payment_status !== 'paid' || session.status === 'expired') {
     // Not remembered: the key is the SESSION now, and a delayed method (Klarna, Cash App, … under the release's

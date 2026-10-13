@@ -48,7 +48,7 @@ interface Balances { coins: number; shards: number }
 // (owner decision #3, lib/workout/plan-sale.ts). It was never personal either: every buyer got the same plan.
 export const WHERE_TO_SPEND: { href: string; place: string; what: string; currency: 'coins' | 'shards' }[] = [
   { href: '/closet', place: 'Closet', what: 'Wearables for your athlete', currency: 'coins' },
-  { href: '/profile', place: 'Profile', what: 'Creator boost cards', currency: 'shards' },
+  { href: '/profile', place: 'Profile', what: 'Creator cards', currency: 'shards' },
   { href: '/sessions', place: 'Sessions', what: 'Group workouts and private 1-on-1s', currency: 'shards' },
   { href: '/play/music', place: 'Music Room', what: 'Sound kits and the Cell foundation', currency: 'shards' },
 ];
