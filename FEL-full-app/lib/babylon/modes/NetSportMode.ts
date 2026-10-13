@@ -23,7 +23,8 @@ import { WeatherKit } from '../core/WeatherKit';
 import { readWeather } from '../nexus/weather';
 import { mountWeatherFx, type WeatherFxHandle } from '../premium/WeatherFx';
 import { ballKindFor, dressBall } from '../visual/meshyProps';
-import type { AbstractMesh, Scene } from '@babylonjs/core';
+import type { AbstractMesh, Camera, Scene, TransformNode } from '@babylonjs/core';
+import { mountOcean } from '../visual/OceanSurface';   // VIS-COURT: the living sea behind the beach court
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { neverBindPose } from '../anim/importSanitizer';
 import { installSafePlay } from '../anim/clipRegistry';
@@ -54,6 +55,12 @@ import {
   serverAfter, ANSWER_READ_SEC, answeredWith, earlyPress, zoneHold, aiShotWeights, pickShot, ringDt, ringKey,
 } from '../core/TennisPlay';
 import type { ParticleSystem } from '@babylonjs/core';
+// VIS-COURT (wave 2, 2026-10-13): the net sports' dressing, surface reaction, net, swing trails and highlight pacing — visual only
+// (court/NetCourtFx reads positions and events and draws; nothing in it is a rule). The replay's pacing is court/highlights.
+import { mountNetCourtFx, type NetCourtFx, type ContactKind } from '../court/NetCourtFx';
+import { HighlightPacer, winnerReason } from '../court/highlights';
+import { boneNode } from '../anim/boneLookup';
+import { motionPolicy } from '../../a11y/reducedMotion';
 
 /** Seconds before the blocker can commit to the net again. */
 const BLOCK_COOLDOWN_SEC = 7;
@@ -114,10 +121,24 @@ let sandGrain: HTMLCanvasElement | null = null;
 function paintSand(g: CanvasRenderingContext2D): void {
   if (sandGrain) { g.drawImage(sandGrain, 0, 0); return; }
   g.fillStyle = '#c7ab76'; g.fillRect(0, 0, 1024, 1024);   // SCORECARD VISUALS: a shade down — the goldenHour sand washed the frame out
-  g.strokeStyle = 'rgba(255,255,255,0.10)'; g.lineWidth = 3;
-  for (let i = 0; i < 70; i++) { const y = (i / 70) * 1024; g.beginPath(); g.moveTo(0, y); for (let x = 0; x <= 1024; x += 24) g.lineTo(x, y + Math.sin(x * 0.02 + i * 0.9) * 6); g.stroke(); }
+  // VIS-COURT (wave 2): sand is not planks. Seventy long, evenly spaced strokes read, from the intro's crane, as the boards of a
+  // deck. Sand is soft drifts (broad, low-contrast, uneven), short wind ripples that start and stop, and grain — so: eighty
+  // elliptical drifts light and dark, three hundred short ripple arcs, and the speckle. Seeded, so the beach is the same each load.
+  let seed = 90210; const rnd = (): number => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+  for (let i = 0; i < 80; i++) {
+    const x = rnd() * 1024, y = rnd() * 1024, rx = 40 + rnd() * 140, ry = 12 + rnd() * 40, light = rnd() < 0.5;
+    const gr = g.createRadialGradient(x, y, 1, x, y, rx);
+    gr.addColorStop(0, light ? 'rgba(255,240,205,0.13)' : 'rgba(110,84,50,0.12)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+    g.save(); g.translate(x, y); g.scale(1, ry / rx); g.translate(-x, -y); g.fillStyle = gr; g.fillRect(x - rx, y - rx, rx * 2, rx * 2); g.restore();
+  }
+  g.lineWidth = 2;
+  for (let i = 0; i < 300; i++) {
+    const x = rnd() * 1024, y = rnd() * 1024, len = 24 + rnd() * 90;
+    g.strokeStyle = rnd() < 0.5 ? 'rgba(255,248,225,0.09)' : 'rgba(120,92,56,0.09)';
+    g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo(x + len * 0.5, y + (rnd() - 0.5) * 8, x + len, y + (rnd() - 0.5) * 6); g.stroke();
+  }
   g.fillStyle = 'rgba(120,95,60,0.14)';
-  for (let i = 0; i < 900; i++) g.fillRect(Math.random() * 1024, Math.random() * 1024, 2, 2);
+  for (let i = 0; i < 1400; i++) g.fillRect(rnd() * 1024, rnd() * 1024, 2, 2);
   try {
     if (typeof document === 'undefined' || !g.canvas) return;   // headless: nothing to cache into
     const c = document.createElement('canvas'); c.width = 1024; c.height = 1024;
@@ -129,17 +150,20 @@ function paintSand(g: CanvasRenderingContext2D): void {
 /** ARENA-10PHASE P5 (2026-09-07): the beach the Beach Pro court sits on. Sand out to ±100 m (tiled ripple grain), the sea
  *  past the far baseline with a foam line where it meets the sand — so the prop set's shops, bus, palms and rocks all
  *  stand on ground, and the reverse angles have somewhere to look. */
-function buildBeach(scene: Scene): { dispose(): void } {
-  const sand = MeshBuilder.CreateGround('beach_sand', { width: 220, height: 220 }, scene);
-  sand.position.y = -0.02; sand.isPickable = false; sand.receiveShadows = true;
+function buildBeach(scene: Scene, ocean?: { night: boolean } | null): { dispose(): void; update(dt: number, camera: Camera): void } {
+  // VIS-COURT: with the living sea (desktop and high: visual/OceanSurface, the surf's water) the sand stops at the foam line and
+  // the sea starts there; without it (phones) the flat sea plane and the full plate stand as they did
+  const SHORE_Z = -48.5, sandD = ocean ? 110 - SHORE_Z : 220;
+  const sand = MeshBuilder.CreateGround('beach_sand', { width: 220, height: sandD }, scene);
+  sand.position.y = -0.02; if (ocean) sand.position.z = (110 + SHORE_Z) / 2; sand.isPickable = false; sand.receiveShadows = true;
   const tex = new DynamicTexture('beach_sand_tex', { width: 1024, height: 1024 }, scene, false);
   paintSand(tex.getContext() as unknown as CanvasRenderingContext2D);
-  tex.update(); tex.uScale = 7; tex.vScale = 7;
+  tex.update(); tex.uScale = 7; tex.vScale = ocean ? 7 * sandD / 220 : 7;
   const sandM = new PBRMaterial('beach_sand_mat', scene);
   sandM.albedoTexture = tex; sandM.metallic = 0; sandM.roughness = 0.95; sandM.environmentIntensity = 0.6;
   sand.material = sandM;
   const sea = MeshBuilder.CreateGround('beach_sea', { width: 220, height: 140 }, scene);
-  sea.position.set(0, 0.01, -118); sea.isPickable = false;
+  sea.position.set(0, 0.01, -118); sea.isPickable = false; if (ocean) sea.setEnabled(false);
   const seaM = new PBRMaterial('beach_sea_mat', scene);
   seaM.albedoColor = Color3.FromHexString('#2a8fbd'); seaM.metallic = 0.1; seaM.roughness = 0.25; seaM.emissiveColor = Color3.FromHexString('#0f4f70').scale(0.25);
   sea.material = seaM;
@@ -155,33 +179,13 @@ function buildBeach(scene: Scene): { dispose(): void } {
   for (const m of [sand, sea, foam]) m.freezeWorldMatrix();
   let alive = true;
   scene.executeWhenReady(() => { if (alive) for (const mat of [sandM, seaM, foamM]) mat.freeze(); });
-  return { dispose() { alive = false; sand.dispose(); sea.dispose(); foam.dispose(); tex.dispose(); sandM.dispose(); seaM.dispose(); foamM.dispose(); } };
-}
-
-/**
- * A NET YOU CAN SEE (SCORECARD VISUALS, 2026-09-15). The venue's `net` prop is a translucent white panel, and on bright
- * sand it vanished: the rc10 frame review could barely find the net the whole rally is played over. Two posts, a dark
- * mesh band hanging under a white tape at the height RallyCore plays to, spanning the court and a little past it.
- */
-function buildReadableNet(scene: Scene, cfg: { halfWidth: number; netHeight: number }): { dispose(): void } {
-  const span = cfg.halfWidth * 2 + 1.6, top = cfg.netHeight, band = Math.min(1, top * 0.42);
-  const post = new PBRMaterial('rally_net_post_mat', scene);
-  post.albedoColor = Color3.FromHexString('#e8e2d0'); post.metallic = 0.6; post.roughness = 0.35;
-  const mesh = new PBRMaterial('rally_net_band_mat', scene);
-  mesh.albedoColor = Color3.FromHexString('#1b2433'); mesh.metallic = 0; mesh.roughness = 0.9; mesh.alpha = 0.82;
-  const tape = new PBRMaterial('rally_net_tape_mat', scene);
-  tape.albedoColor = Color3.White(); tape.emissiveColor = Color3.White().scale(0.25); tape.metallic = 0; tape.roughness = 0.6;
-  const made: Mesh[] = [];
-  for (const sx of [-1, 1]) {
-    const p = MeshBuilder.CreateCylinder('rally_net_post', { diameter: 0.1, height: top + 0.15, tessellation: 12 }, scene);
-    p.position.set(sx * span / 2, (top + 0.15) / 2, 0); p.material = post; made.push(p);
-  }
-  const b = MeshBuilder.CreateBox('rally_net_band', { width: span, height: band, depth: 0.02 }, scene);
-  b.position.set(0, top - band / 2, 0); b.material = mesh; made.push(b);
-  const t = MeshBuilder.CreateBox('rally_net_tape', { width: span, height: 0.07, depth: 0.03 }, scene);
-  t.position.set(0, top - 0.035, 0); t.material = tape; made.push(t);
-  for (const m of made) { m.isPickable = false; m.receiveShadows = true; m.freezeWorldMatrix(); }
-  return { dispose() { for (const m of made) m.dispose(); post.dispose(); mesh.dispose(); tape.dispose(); } };
+  const sea3 = ocean ? mountOcean(scene, ocean.night
+    ? { deep: '#0b2c48', foam: '#bfe6ff', horizon: '#1d3552', shoreZ: SHORE_Z, swell: 0.5, fade: [140, 800] }
+    : { deep: '#1d86b3', foam: '#f6fdff', horizon: '#9fd3e6', shoreZ: SHORE_Z, swell: 0.55, fade: [140, 800] }) : null;
+  return {
+    update(dt, camera) { sea3?.update(dt, camera); },
+    dispose() { alive = false; sea3?.dispose(); sand.dispose(); sea.dispose(); foam.dispose(); tex.dispose(); sandM.dispose(); seaM.dispose(); foamM.dispose(); },
+  };
 }
 
 /**
@@ -212,8 +216,9 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
   let me: SpawnedCharacter, foe: SpawnedCharacter;
   let ball: AbstractMesh;
   let venue: VenueHandle | null = null;
-  let beach: { dispose(): void } | null = null;      // P5
-  let readableNet: { dispose(): void } | null = null;
+  let beach: { dispose(): void; update(dt: number, camera: Camera): void } | null = null;      // P5
+  let fx: NetCourtFx | null = null;                 // VIS-COURT: the dressing, the net, the surface's reaction, the swing trails
+  const pacer = new HighlightPacer();               // VIS-COURT: how often a winner is replayed
   /** The three-touch sport. Volleyball-only behaviour below is gated on this, so tennis plays exactly as it did. */
   const VOLLEY = o.cfg.touchesPerSide > 1;
 
@@ -461,6 +466,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
 
   /** Award a point to `side` (0 = hero) and set up the next serve. */
   function awardPoint(ctx: ModeContext, side: 0 | 1, why: string): void {
+    if (ball) fx?.landing(ball.position.x, ball.position.z, true);   // VIS-COURT: where the point ended, the court answers
     resetRally(ctx);
     if (VOLLEY) server = nextServer(side);         // IMPROVE #3: rally scoring — the winner serves
     if (o.cage) { if (side === 0) style += stylePts(mult); cageStats.rallies++; if (mult > 1 && side === 0) why = `${why} · x${mult}`; mult = 1; aerialNow = null; incomingMeteor = false; ctx.setHud({ mult: 1, style }); }   // PARKOUR TENNIS
@@ -520,6 +526,10 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       flash(ctx, `${why} — ${side === 0 ? o.hudLabels.you : o.hudLabels.them}`, 1100);
     }
     restSec = 1.4;
+    // VIS-COURT: a winner is replayed from the broadcast angles (skippable; the harness holds update() while it plays) — never the
+    // point that ends the match (returned above: the end card is what the player is waiting for), and not in reduced motion
+    if (pacer.offer(winnerReason(why, side === 0), { reduced: !motionPolicy().travel })) void ctx.highlight?.({ lastSeconds: 3.4 });
+    else pacer.tick();
   }
 
   /** A+ P0: the GAME win — hit-stop + shake + gold flash + the GAME! pop, latched once. No slowMo. The score SFX + YOU WIN banner stay. */
@@ -604,6 +614,13 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
 
   let pendingFault: RallyFault | null = null;
 
+  /** VIS-COURT: a contact's look — the dust, the ring, the squash, the streak. `q` is the grade the rally already made. */
+  function touchFx(at: Vector3, feet: Vector3, q: SwingQuality, kind: ContactKind): void {
+    fx?.contact({ x: at.x, y: at.y, z: at.z }, { x: feet.x, z: feet.z }, q, kind, ball);
+    // tennis: the ball has no bounce in this sim — a mark goes down a stride short of the strike, where the ball would have come down
+    if (!VOLLEY && kind === 'swing') fx?.landing(at.x, at.z - Math.sign(at.z || 1) * 1.4, false);
+  }
+
   /** The timing meter's bands for a window `durationSec` long (the HUD draws the meter only with bands). */
   function publishBands(ctx: ModeContext, durationSec: number): void {
     const b = meterBandsFor(durationSec);
@@ -660,6 +677,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     console.info(`[NET-SERVE] ${q}${auto ? ' (auto)' : ''} toss ${tossT.toFixed(3)}`);
     // Tennis #3: the stick aims the serve and the timing bends it (a dropped toss's weak serve is not bent)
     launch(ctx, from, -1, VOLLEY ? attackAim(ctx) : aimFor(attackAim(ctx), auto ? 0 : tossT - TOSS_SEC), q);
+    touchFx(from, me.root.position, q, 'serve');
   }
 
   /** The opponent's serve, struck at the toss's contact point. Mostly a good ball; now and then a perfect or a weak one. */
@@ -672,6 +690,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     sinceOppStrike = 0;                              // the split step is timed against the serve as well
     SoundKit.play('uiTick', { pitch: 0.9, volume: 0.35 });
     launch(ctx, from, 1, aiTargetX(foot.x, o.cfg.halfWidth, 0.6) / o.cfg.halfWidth, q);
+    touchFx(from, foe.root.position, q, 'serve');
   }
 
   /** One frame of the toss (both sports): the ball rides the server's hand up and down; the opponent strikes on the beat. */
@@ -843,6 +862,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       ? (o.cage && (q === 'perfect' || q === 'good') && Math.random() < 0.25 ? (Math.random() < 0.5 ? 1 : -1) : aiTargetX(foot.x, o.cfg.halfWidth, commit) / o.cfg.halfWidth)   // PARKOUR TENNIS: the opponent banks off the glass too
       : (Math.random() - 0.5) * 1.6;                 // a self-pass is not aimed at the opponent
     launch(ctx, ball.getAbsolutePosition(), aiCrosses ? 1 : -1, aiIntent, q, aiIsVolley ? aiTouch : undefined, aiShot, aiZone);
+    touchFx(ball.getAbsolutePosition(), (setterTakes && foeSetter ? foeSetter : foe).root.position, q, aiIsVolley ? (aiTouch === 'bump' ? 'dig' : aiTouch === 'set' ? 'set' : 'spike') : 'swing');
     // IMPROVE #9: their setter runs to where their bump comes down, and goes home once the set is away
     if (VOLLEY && foeSetter) {
       if (aiTouch === 'bump' && shot) foeSetterAt.set(shot.to.x, 0, shot.to.z);
@@ -919,6 +939,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     if (!stuffed && (q === 'good' || q === 'perfect')) {
       meTree.clearBeat('block'); meBlock = true;
       EffectsKit.burst(ctx.scene, at, 'sparks');
+      touchFx(at, me.root.position, q, 'block');   // VIS-COURT
       showShot(ctx, 'BLOCK · TOUCH', 500);
       SoundKit.play('uiTick', { pitch: 1.2, volume: 0.45 });
       rally.cross();
@@ -933,6 +954,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     // A stuff: straight back down on their side, and the point.
     meTree.clearBeat('block'); meBlock = true;
     EffectsKit.burst(ctx.scene, at, 'sparks');
+    touchFx(at, me.root.position, 'perfect', 'block');   // VIS-COURT: a stuff is the hardest contact on the court
     ctx.juice.scorePop(at, 'STUFF!', '#00E5FF');
     ctx.feel.impact(0.5);          // A+ P0: ONE thud — feel.impact plays its own; the second impact SFX that stacked on it is gone
     ctx.juice.shake(0.16, 140);
@@ -1117,6 +1139,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     const away = launch(ctx, swingPos, crosses ? -1 : 1, isVolley ? (touchKind === 'spike' ? attackAim(ctx) : aimX) : aimFor(0, dt), q,
       isVolley ? touchKind : undefined,
       isVolley ? undefined : pendingShot, zone);
+    if (away) touchFx(swingPos, me.root.position, q, aerial ? 'spike' : isVolley ? (touchKind === 'bump' ? 'dig' : touchKind === 'set' ? 'set' : 'spike') : 'swing');   // VIS-COURT
     // IMPROVE #13: a set the player plays themselves takes their call too; a spike remembers whether its set was quick
     if (isVolley && away && touchKind === 'set') playCalledSet(ctx);
     if (isVolley && touchKind === 'spike') { quickSpike = away && quickSet; quickSet = false; }
@@ -1143,11 +1166,17 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     modeId: o.modeId,
     mood: 'goldenHour',
     camPreset: 'net',   // see CameraDirector: 'hoops' is an isolation cam and a running net player outruns it
+    intro: 'walkIn',    // VIS-COURT: the broadcast intro — a crane over the court, then a shot on the player (the first serve waits for it)
+    replay: true,       // VIS-COURT: the winning rally, replayed (ctx.highlight in awardPoint)
+    replayCast: () => ({ bodies: [me?.root, foe?.root, setter?.root, foeSetter?.root].filter((r): r is NonNullable<typeof r> => !!r), loose: ball ? [ball] : [] }),
 
     async load(ctx: ModeContext) {
       venue = mountVenue(ctx, o.venueId, { keepGameplayCamera: true, look: readPlaceLook(o.venueId) });   // PLACE: the splash's pick (tennis / volleyball)   // M104 gap: tennis and volleyball rendered through the venue orbit camera — the hero sat at 44 px, cut off at the frame's bottom
-      if (o.beach) beach = buildBeach(ctx.scene);   // P5: sand to the horizon, the sea past the far baseline
-      if (o.cfg.touchesPerSide > 1) readableNet = buildReadableNet(ctx.scene, o.cfg);   // volleyball: a net you can see
+      // VIS-COURT: the Gym is a room, not a beach (the sand plate and the sea stood under it) — the hall replaces the beach there
+      const placeId = readPlaceLook(o.venueId)?.id;
+      try { fx = mountNetCourtFx(ctx.scene, { modeId: o.modeId, placeId, cfg: o.cfg, cage: !!o.cage, tier: ctx.lights.tier }); } catch (e) { console.warn('[FEL-COURT] court fx unavailable — the rally plays without it:', e); fx = null; }   // a picture never costs the mode its load
+      if (process.env.NODE_ENV === 'development') (ctx.scene.metadata ??= {}).felCourt = { fx, highlight: (opts?: Parameters<NonNullable<ModeContext['highlight']>>[0]) => ctx.highlight?.(opts) };   // the capture driver stages contacts and replays through it
+      if (o.beach && !fx?.indoors) beach = buildBeach(ctx.scene, ctx.lights.tier === 'mobile' ? null : { night: placeId === 'night-beach' });   // P5: sand to the horizon, the sea past the far baseline (VIS-COURT: alive on desktop)
       // phase 6: a QA seam for BOTH nets (the cage's was tennis-only, so no driver could play volleyball — it never swung)
       (ctx.scene.metadata ??= {}).net = {
         state: () => ({ awaitingHuman, flightT, shot: shot ? { toX: shot.to.x, toZ: shot.to.z, duration: shot.duration } : null, footX: foot.x, foeX: foeFoot.x,
@@ -1180,13 +1209,22 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       ctx.groundLock?.track(foe.root, foe.skeleton);
       foeTree = new NetAnimTree(foe.animator, clips);
       foeTree.onSettle = (st) => { if (st === 'swing') foeSwing = false; else if (st === 'serve') foeServe = false; };
+      // VIS-COURT: each racket arm's swing draws a streak (the right hand, extended along the forearm)
+      const arm = (c: SpawnedCharacter): { hand: TransformNode; fore: TransformNode } | null => {
+        try {
+          const hand = boneNode(c.skeleton, 'RightHand'), fore = boneNode(c.skeleton, 'RightForeArm');
+          return hand && fore ? { hand, fore } : null;
+        } catch { return null; }   // a body with no skeleton to read (a stub): no streak, no harm
+      };
+      fx?.bindTrails(arm(me), arm(foe));
       // IMPROVE (2026-10-06): a second load of this mode (the same definition) found netAlive still false from the last
       // dispose and threw its setter away the moment it spawned
       netAlive = true;
+      const setterSpawns: Promise<void>[] = [];   // VIS-COURT: awaited below, so the replay's recorder finds both setters (it reads the cast once, after load)
       if (o.cfg.touchesPerSide > 1) {
         setterHome.set(2.6, 0, o.cfg.halfLength * 0.55);
         setterAt.copyFrom(setterHome);
-        void CharacterLibrary.spawn(ctx.scene, o.heroUrl, {
+        setterSpawns.push(CharacterLibrary.spawn(ctx.scene, o.heroUrl, {
           position: setterHome.clone(), yawRad: Math.PI, tint: '#7CFFB2', startClip: clips.ready,
         }).then((c) => {
           if (!netAlive) { c.dispose(); return; }
@@ -1194,12 +1232,12 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
           neverBindPose(c.animator, clips.ready);
           installSafePlay(c.animator, `${o.modeId}-setter`);
           ctx.groundLock?.track(c.root, c.skeleton);
-        });
+        }));
         // IMPROVE #9: THEIR setter, mirrored on their side — one opponent body bumped, set and spiked while the player
         // had a helper, which did not read as volleyball
         foeSetterHome.set(-2.6, 0, -o.cfg.halfLength * 0.55);
         foeSetterAt.copyFrom(foeSetterHome);
-        void CharacterLibrary.spawn(ctx.scene, o.heroUrl, {
+        setterSpawns.push(CharacterLibrary.spawn(ctx.scene, o.heroUrl, {
           position: foeSetterHome.clone(), tint: '#ff8fb8', startClip: clips.ready,
         }).then((c) => {
           if (!netAlive) { c.dispose(); return; }
@@ -1207,13 +1245,14 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
           neverBindPose(c.animator, clips.ready);
           installSafePlay(c.animator, `${o.modeId}-foe-setter`);
           ctx.groundLock?.track(c.root, c.skeleton);
-        });
+        }));
       }
       meSwing = meServe = meBlock = foeSwing = foeServe = false; serveFrom = null; foeFoot.x = 0; rallyFlow = 0;
       server = 0; serveBy = 0; tossT = 0; tossMisses = 0; foeServeCued = false; aimRX = 0;
       setCall = 'high'; quickSet = false; quickSpike = false; blockCooldown = 0; meterQ = -1; meterIncoming = ''; blockShown = '';
       if (o.cfg.touchesPerSide > 1) ctx.setHud({ flow: 0 });
 
+      await Promise.all(setterSpawns);   // VIS-COURT: the setters are in before the replay's recorder takes its cast
       // Real characters are in — drop the venue's placeholder bodies, or every
       // player is on the court twice.
       venue?.hidePlaceholders();
@@ -1347,6 +1386,8 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     update(ctx: ModeContext, dt: number) {
       if (ended) return;
       weather.update(dt); weatherFx?.update(dt);
+      beach?.update(dt, ctx.camera);   // VIS-COURT: the sea's swell
+      if (fx && me && foe) fx.update(dt, { hero: me.root.position, foe: foe.root.position, heroSwing: meSwing || swingingNow, foeSwing, ball: shot && !serveFrom && ball ? ball.position : null });
       // WII READ: the landing ring — where the shot you are holding (the stick's aim, the button's shot, a perfect swing)
       // would drop on the far court, live while the ball is coming to you
       if (landing) {
@@ -1431,7 +1472,9 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       // and the rest skipped update() — so the hop every cheer is for never played. (Tennis and volleyball both.)
       crowd?.update(dt);
       if (restSec > 0) {
-        restSec -= dt;
+        // VIS-COURT: the broadcast intro holds the first serve (the toss is a timed press: left to run it would play the
+        // serve for a player who is watching the crane). It ends on its own, or on the first input.
+        if (!ctx.camDirector.inIntro) restSec -= dt;
         if (restSec <= 0) serve(ctx);
         return;
       }
@@ -1543,7 +1586,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       for (const g of glassMeshes) g.dispose(); glassMeshes = []; glassMat?.dispose(); glassMat = null;   // PARKOUR TENNIS
       if (shotTimer) { clearTimeout(shotTimer); shotTimer = null; }   // Tennis #8: the chip's clear does not outlive the match
       crowd?.dispose(); crowd = null;
-      beach?.dispose(); beach = null; readableNet?.dispose(); readableNet = null;   // P5
+      beach?.dispose(); beach = null; fx?.dispose(); fx = null;   // P5 / VIS-COURT
       trail = null;   // the scene owns the system; the handle must not outlive the match
       venue?.dispose(); venue = null;
       posture?.dispose(); posture = null;

@@ -194,7 +194,18 @@ export function buildGolfGreen(scene: Scene, holePos: Vector3): AbstractMesh[] {
   const flag = MeshBuilder.CreatePlane('flag', { width: 0.7, height: 0.45 }, scene);
   flag.position.set(holePos.x + 0.36, 1.9, holePos.z);
   flag.material = mat(scene, '#e23c50', 1, LIT);
-  return [green, hole, pole, flag];
+  // VIS-COURT (wave 2): the cup has a lip — a pale rim round the dark hole — and the green a fringe, a ring of longer, darker
+  // cut round the putting surface, so the green reads as a place cut into the fairway rather than a disc laid on it. Pure dressing
+  // (the hole's radius, the green's, and every rule that reads them are untouched).
+  const lip = MeshBuilder.CreateTorus('hole_lip', { diameter: 0.4, thickness: 0.05, tessellation: 20 }, scene);
+  lip.position.set(holePos.x, 0.035, holePos.z); lip.scaling.y = 0.5;
+  lip.material = mat(scene, '#efe9d6', 1, 0.9);
+  const fringe = MeshBuilder.CreateDisc('green_fringe', { radius: 6.9 }, scene);
+  fringe.rotation.x = Math.PI / 2;
+  fringe.position.set(holePos.x, 0.011, holePos.z);
+  fringe.material = mat(scene, '#2c8a45', 1, LIT);
+  for (const m of [lip, fringe]) m.isPickable = false;
+  return [green, hole, pole, flag, lip, fringe];
 }
 
 export function buildPlateAndMound(scene: Scene): AbstractMesh[] {
