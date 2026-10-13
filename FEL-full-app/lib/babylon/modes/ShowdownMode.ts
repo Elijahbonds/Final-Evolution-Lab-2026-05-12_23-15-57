@@ -40,6 +40,8 @@ import { VenueKit } from '../visual/VenueKit';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';
 import { readCombatArena, arenasFor, arenaClamp, knockTo, hazardAt, describeArena, showdownGateDist, SHOWDOWN_GATE, type CombatArena } from '../combat/arenas';   // phase 7: the arena decides
 import { buildArena, type ArenaHandle } from '../combat/arenaBuild';
+import { mountCombatFx, hitKindOf, auraLevel, type CombatFx } from '../combat/combatFx';   // VISUAL PASS (2026-10-13): the hit language, the chakra aura, the partner's blink-in, the slam's cracks
+import { mountPresentation, type Presentation } from '../combat/presentation';   // the ultimate's grade swing, speed lines, the impact frame
 import { readPlaceLook } from '../nexus/placeLooks';
 import { FighterState, KARATE_ATTACKS, CHI_MAX, PARRY_WINDOW_MS, guardPressMs, rivalDifficulty, rivalPower, applyRivalPower, RIVAL_POWER_BASE, type RivalPower } from '../core/FightCore';
 import { KnockSlides, makeChestOf } from '../core/FightKit';   // IMPROVE (2026-10-06): the shared knock slide + scratch chest points
@@ -211,6 +213,7 @@ export const ShowdownMode: ModeDefinition = (() => {
   /** COMBAT DIFFICULTY (2026-10-06): the rival's power for this round (rivalPower; set in roundStartRival). */
   let foePower: RivalPower = rivalPower(1, null);
   let arena: CombatArena = arenasFor('showdown')[0]; let arenaHandle: ArenaHandle | null = null;   // phase 7
+  let fx: CombatFx | null = null, pres: Presentation | null = null;   // VISUAL PASS: pooled hit sparks / rings / auras; the whole-screen beats
   // MOVEMENT PLAY P7: the body's fight read (see KarateVSMode: the same seam) — the strikes through the book and the
   // StrikeController's elapsed start, the rival's hits on a body player resolved at impact against the ledger
   // the READY screen's spin / jump kick opt-in, read when a kick is told: the toggle is offered after load (READY, or the
@@ -292,13 +295,13 @@ export const ShowdownMode: ModeDefinition = (() => {
       case 'whiff': break;
       case 'blocked':
         SoundKit.play('impact', { pitch: 0.7, volume: 0.3 });
-        EffectsKit.burst(ctx.scene, defChar.root.position.add(new Vector3(0, 1.1, 0)), 'dust');
+        if (fx) fx.hit(defChar.root.position.add(new Vector3(0, 1.1, 0)), atkChar.root.position, 'guard'); else EffectsKit.burst(ctx.scene, defChar.root.position.add(new Vector3(0, 1.1, 0)), 'dust');
         break;
       case 'guardBreak':
         ctx.feel?.impact?.(0.55);   // ONE thud (the impact SFX that stacked on it is gone)
         ctx.juice.shake(0.08, 120);
         console.info('[SD-JUICE] guard break');
-        EffectsKit.burst(ctx.scene, defChar.root.position.add(new Vector3(0, 1.2, 0)), 'glitch');
+        if (fx) fx.hit(defChar.root.position.add(new Vector3(0, 1.2, 0)), atkChar.root.position, 'break'); else EffectsKit.burst(ctx.scene, defChar.root.position.add(new Vector3(0, 1.2, 0)), 'glitch');
         banner(ctx, mine ? 'GUARD BREAK!' : 'YOUR GUARD SHATTERED!');
         break;
       case 'parried':
@@ -306,6 +309,7 @@ export const ShowdownMode: ModeDefinition = (() => {
         if (!mine) focus.gain(FOCUS.dodgeGain);   // phase 8: a read refills Focus
         SoundKit.play('impact', { pitch: 1.6, volume: 0.5 });   // the parry ping is the one sound; the feel thud is gone
         ctx.juice.shake(0.05, 80);
+        fx?.hit(defChar.root.position.add(new Vector3(0, 1.3, 0)), atkChar.root.position, 'parry');   // VISUAL PASS: a ring — the answer to a swing
         (mine ? foeChakra : chakra).gain('parry');
         banner(ctx, mine ? 'PARRIED!' : 'PERFECT PARRY!');
         break;
@@ -315,7 +319,7 @@ export const ShowdownMode: ModeDefinition = (() => {
         SoundKit.play('impact', { pitch: 1.9, volume: 0.6 });   // the GI stinger is the one sound; the feel thud is replaced by the latched hit-stop + shake
         heavyPunch(ctx, 'guard impact');
         (mine ? foeChakra : chakra).gain('guardImpact');
-        EffectsKit.burst(ctx.scene, defChar.root.position.add(new Vector3(0, 1.4, 0)), 'sparks');
+        if (fx) fx.hit(defChar.root.position.add(new Vector3(0, 1.4, 0)), atkChar.root.position, 'parry'); else EffectsKit.burst(ctx.scene, defChar.root.position.add(new Vector3(0, 1.4, 0)), 'sparks');
         ctx.camDirector.pulse(0.4, 0.4);
         banner(ctx, mine ? 'GUARD IMPACTED — PUNISH!' : 'GUARD IMPACT! PUNISH THEM!');
         break;
@@ -331,7 +335,8 @@ export const ShowdownMode: ModeDefinition = (() => {
         hitReact(!mine, w, SHOWDOWN.reactSec);
         ctx.feel?.impact?.(w === 'heavy' ? 0.55 : 0.3);   // ONE thud per connect (the impact SFX that doubled it is gone)
         if (w === 'heavy' || w === 'finisher') { heavyPunch(ctx, w); console.info(mine ? '[SD-JUICE] heavy landed' : '[SD-JUICE] heavy taken'); } else { ctx.juice.hitStop(HIT_STOP_MS[w]); console.info(mine ? '[SD-JUICE] hit' : '[SD-JUICE] taken'); }   // phase 5: every connect holds for its weight
-        EffectsKit.burst(ctx.scene, defChar.root.position.add(new Vector3(0, 1.2, 0)), w === 'heavy' ? 'glitch' : 'sparks');
+        if (fx) fx.hit(defChar.root.position.add(new Vector3(0, 1.2, 0)), atkChar.root.position, hitKindOf(w)); else EffectsKit.burst(ctx.scene, defChar.root.position.add(new Vector3(0, 1.2, 0)), w === 'heavy' ? 'glitch' : 'sparks');
+        if (fx && (w === 'finisher' || (mine && move.slam))) fx.slam(defChar.root.position, w === 'finisher' ? 1.2 : 0.9, '#ffb070');   // VISUAL PASS: a slam cracks the floor — a shockwave, a crack that stays a few seconds, debris
         // phase 5: the knock slide (constant speed, ease-out) instead of a velocity impulse the movement damped in a frame
         knockSlide(ctx, defChar, atkChar.root.position, move.atk.knockback, ropeClamp(ctx, defChar, mine));
         if (mine && move.launch) { foeLaunchedSec = LAUNCH_AIR_SEC; console.info('[SD-STORM] LAUNCHED — air string open'); }
@@ -459,7 +464,9 @@ export const ShowdownMode: ModeDefinition = (() => {
     meDef.spendSubstitution(now());
     meSubstituted = now() + 400;
     const spot = DefenseController.substitutionSpot(rival.root.position, rival.root.rotation.y);
+    const fromSpot = player.root.position.clone();
     player.root.position.copyFrom(spot);
+    fx?.blink(fromSpot, spot, '#cfe8ff');   // VISUAL PASS: the body flicker leaves an afterimage trail
     arenaClamp(player.root.position, arena); if (!modeVenue?.constrain(player.root.position)) { player.root.position.x = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, player.root.position.x)); player.root.position.z = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, player.root.position.z)); }   // phase 3: the dojo floor, not a 24 m box
     mbus.report({ kind: 'steal', weight: 14 });
     SoundKit.play('whoosh', { pitch: 1.8, volume: 0.6 });
@@ -512,6 +519,10 @@ export const ShowdownMode: ModeDefinition = (() => {
     ctx.camDirector.setFixed(mid.add(new Vector3(7, 2.2, 7)), 1.2);
     meAnim.clearBeat('ultimate'); foeAnim.clearBeat('ultimate');
     banner(ctx, by === 'me' ? 'ULTIMATE — RISING DRAGON FLASH' : 'RIVAL ULTIMATE — CRIMSON TIDE BREAKER', SHOWDOWN.ultCutSec * 1000 + 300);
+    // VISUAL PASS: the anime ultimate — the grade swings (gold for yours, crimson for the rival's), speed lines fan out, one negative frame
+    pres?.grade(by === 'me' ? 'gold' : 'crimson', SHOWDOWN.ultCutSec);
+    pres?.speedLines(by === 'me' ? '255,214,120' : '255,110,120', Math.round(SHOWDOWN.ultCutSec * 1000));
+    pres?.impactFrame();
     console.info(`[SD-STORM] ultimate (${by})`);
   }
 
@@ -536,7 +547,8 @@ export const ShowdownMode: ModeDefinition = (() => {
       hitReact(!mine, 'finisher', SHOWDOWN.ultReactSec);
       ctx.feel?.impact?.(0.9);   // ONE thud — the ultimate's own; the impact SFX that doubled it is gone
       heavyPunch(ctx, mine ? 'ultimate' : 'rival ultimate');
-      EffectsKit.burst(ctx.scene, defC.root.position.add(new Vector3(0, 1.3, 0)), 'glitch');
+      if (fx) { fx.hit(defC.root.position.add(new Vector3(0, 1.3, 0)), atkC.root.position, 'special', mine ? '#ffd36b' : '#ff4d5e'); fx.slam(defC.root.position, 1.6, mine ? '#ffd36b' : '#ff6a4d'); } else EffectsKit.burst(ctx.scene, defC.root.position.add(new Vector3(0, 1.3, 0)), 'glitch');
+      pres?.impactFrame();
       // IMPROVE (2026-10-06): the launch is a knock slide AWAY from the attacker (it was a 12 m/s velocity toward −Z that
       // nothing integrated while he lay staggered); driven into the north gate, it shatters it
       knockSlide(ctx, defC, atkC.root.position, SHOWDOWN.ultLaunchM, ropeClamp(ctx, defC, mine), SHOWDOWN.ultLaunchMps);
@@ -557,8 +569,10 @@ export const ShowdownMode: ModeDefinition = (() => {
     if (!s) { banner(ctx, 'NO ASSIST', 500); return; }
     assistTimer = ASSIST_COOLDOWN_SEC;
     assistActive = 1.2;
+    const blinkFrom = player.root.position.clone();
     s.root.position.set(rival.root.position.x + 2.5, 0, rival.root.position.z);
     arenaClamp(s.root.position, arena);
+    fx?.blink(blinkFrom, s.root.position, '#7dd3fc');   // VISUAL PASS: the partner's blink-in — a smoke puff at both ends and an afterimage trail between
     s.root.rotation.y = yawTo(s.root.position, rival.root.position);
     s.root.setEnabled(true);
     s.animator.play('karate_punch_heavy', {});
@@ -573,7 +587,7 @@ export const ShowdownMode: ModeDefinition = (() => {
         meState.combo += 1; meState.comboTimer = 1.1;   // assist EXTENDS your combo
         chakra.gain('hitLanded');
         SoundKit.play('impact', { pitch: 1.2, volume: 0.4 });
-        EffectsKit.burst(ctx.scene, rival.root.position.add(new Vector3(0, 1.2, 0)), 'sparks');
+        if (fx) fx.hit(rival.root.position.add(new Vector3(0, 1.2, 0)), s.root.position, 'medium', '#7dd3fc'); else EffectsKit.burst(ctx.scene, rival.root.position.add(new Vector3(0, 1.2, 0)), 'sparks');
         ctx.setHud({ foeHp: foeState.hp, combo: meState.combo });
         banner(ctx, 'ASSIST!', 600);
         if (foeState.hp <= 0) endRound(ctx, true);
@@ -721,6 +735,7 @@ export const ShowdownMode: ModeDefinition = (() => {
       ctxRef = ctx;   // P7
       modeVenue = mountVenue(ctx, 'karate_h2h', { keepGameplayCamera: true, arena, look: readPlaceLook('showdown') });   // PLACE: the splash's pick
       arenaHandle?.dispose(); arenaHandle = buildArena(ctx.scene, arena);
+      fx?.dispose(); fx = mountCombatFx(ctx.scene); pres?.dispose(); pres = mountPresentation(ctx.scene, ctx.lights?.pipeline);
       if (!modeVenue) VenueKit.buildDojo(ctx.scene);
       player = await CharacterLibrary.spawn(ctx.scene, CFG.heroUrl, {
         position: new Vector3(0, 0, 4), startClip: 'karate_idle_stance', modeId: 'showdown-me',
@@ -894,7 +909,14 @@ export const ShowdownMode: ModeDefinition = (() => {
       { const fv = Math.round(focus.value); if (fv !== focusHud || focus.active !== focusHudOn) { focusHud = fv; focusHudOn = focus.active; ctx.setHud({ focus: fv, focusOn: focus.active }); } }
       const sdtRoom = dt * focus.worldScale, sdtHero = dt * focus.heroScale;
       knock.tick(sdtRoom);   // IMPROVE (2026-10-06): knockback on the room clock, every phase (a KO's slide finishes)
-      arenaHandle?.tick(dt);
+      arenaHandle?.tick(dt); fx?.tick(dt);
+      // VISUAL PASS: the chakra aura scales with the meter (a hint from 30%, half strength at the brim, a full column when the ultimate is ready)
+      if (fx) {
+        if (phase === 'fighting') {
+          fx.aura('me', player.root, chakra.full ? 1 : Math.min(1, auraLevel(chakra.value, CHAKRA.max, 0.3) * 2), '#3ec6ff');
+          fx.aura('foe', rival.root, foeChakra.full ? 1 : Math.min(1, auraLevel(foeChakra.value, CHAKRA.max, 0.3) * 2), '#ff4d5e');
+        } else if (phase !== 'ultimate') fx.clearAuras();
+      }
       if (arena.hazards.length && phase === 'fighting') burnTick(ctx, dt);   // phase 7 (IMPROVE 2026-10-06: felt, and it ends a round)
       if (foeLaunchedSec > 0) { foeLaunchedSec = Math.max(0, foeLaunchedSec - dt); rival.root.position.y = launchHeight(1 - foeLaunchedSec / LAUNCH_AIR_SEC); if (foeLaunchedSec === 0) rival.root.position.y = 0; }   // phase 5
       if (!padGuard.held && xBtn.guardHeld(now() / 1000) && meState.controllable) { padGuard.press(now()); if (!guardUp) { guardUp = true; meDef.pressBlock(now(), false); meState.pressBlock(now()); SoundKit.play('impact', { pitch: 1.3, volume: 0.18 }); } }   // phase 3: the hold is the guard (P7: the pad's, apart from a body guard already up)
@@ -1021,7 +1043,9 @@ export const ShowdownMode: ModeDefinition = (() => {
         if (decision.spend === 'substitution' && foeChakra.spend(SUBSTITUTION_CHI_COST)) {
           foeDef.spendSubstitution(now());   // IMPROVE (2026-10-06): the rival's substitution has the player's cooldown and punish window
           const spot = DefenseController.substitutionSpot(player.root.position, player.root.rotation.y);
+          const foeFrom = rival.root.position.clone();
           rival.root.position.copyFrom(spot);
+          fx?.blink(foeFrom, spot, '#ff9aa6');
           // IMPROVE (2026-10-06): seen and heard, like the player's — it was a silent teleport — and the swing it read finds nobody
           foeSubstituted = now() + SHOWDOWN.subWhiffMs;
           SoundKit.play('whoosh', { pitch: 1.8, volume: 0.6 });
@@ -1061,6 +1085,7 @@ export const ShowdownMode: ModeDefinition = (() => {
       // IMPROVE (2026-10-06): nothing waits on a disposed rig — the timers, the slides and the banner go with the mode
       timers.clear(); knock.clear(); bannerSlot.clear(); foeUlt.clear(); charging = false;
       modeVenue?.dispose?.(); modeVenue = null; arenaHandle?.dispose(); arenaHandle = null;
+      fx?.dispose(); fx = null; pres?.dispose(); pres = null;
       support?.dispose(); support = null;
       wallMesh?.dispose(false, true); wallMesh = null;   // IMPROVE (2026-10-06): the gate's material with it
       mePosture?.dispose(); foePosture?.dispose(); mePosture = null; foePosture = null;

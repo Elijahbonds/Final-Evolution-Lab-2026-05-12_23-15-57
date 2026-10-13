@@ -24,6 +24,9 @@ import { EvadeMoves } from '../core/EvadeMoves';
 import { FOCUS, FocusMeter, WALL_RUN, wallRunAvailableOn, startWallRunOn, wallRunOnAt, wallRunOnSide, startWallKick, wallKickAt, kickHits, type WallRunOn, type WallKickState } from '../core/MatrixFocus';   // MATRIX FOCUS (2026-09-18): bullet time held on the right trigger
 import { readCombatArena, arenasFor, arenaClamp, knockTo, offEdge, insideBy, hazardAt, describeArena, crowdRing, CROWD_GAP, CROWD_PHASE, ROPES, type CombatArena, type ArenaWall } from '../combat/arenas';   // COMBAT ARENAS (2026-09-18)
 import { buildArena, type ArenaHandle } from '../combat/arenaBuild';
+import { mountCombatFx, hitKindOf, auraLevel, type CombatFx } from '../combat/combatFx';   // VISUAL PASS (2026-10-13): the hit language, the chi aura, the ring-out plume
+import { mountPresentation, type Presentation } from '../combat/presentation';
+import { mountWeaponTrail, type WeaponTrail } from '../combat/weaponTrail';   // the streak a staff leaves, in each fighter's colour   // the DRAGON's grade swing, speed lines, the impact frame
 import { mountVenue } from '../core/NexusVenue';
 import { dodgeReward, dashSecToImpact, tickCounter, counterMult } from '../core/DodgeRead';
 import { MeshBuilder, StandardMaterial, Color3, Vector3 } from '@babylonjs/core';
@@ -174,6 +177,8 @@ export const MixedCombatMode: ModeDefinition = (() => {
   // this mode was built around; the others have walls to run inside Focus, ropes that throw a shoved body back, or fire.
   let arena: CombatArena = arenasFor('mixedcombat')[0];
   let arenaHandle: ArenaHandle | null = null;
+  let myTrail: WeaponTrail | null = null, foeTrail: WeaponTrail | null = null;
+  let fx: CombatFx | null = null, pres: Presentation | null = null;   // VISUAL PASS: pooled hit sparks / rings / auras; the whole-screen beats
   let wallRun: WallRunOn<ArenaWall> | null = null, wallKick: WallKickState | null = null, wallKickY0 = 0, hazardTickAt = 0;
   const matrixStats = { wallRuns: 0, wallKicks: 0, kickHits: 0 };
   function tryWallRun(ctx: ModeContext): boolean {
@@ -220,7 +225,7 @@ export const MixedCombatMode: ModeDefinition = (() => {
         wallKick.hit.add(0); matrixStats.kickHits++;
         foeState.hp = Math.max(0, foeState.hp - WALL_RUN.kickDamage); focus.gain(FOCUS.hitGain);
         ctx.juice.hitStop(70); ctx.feel?.impact?.(0.6); ctx.juice.shake(0.08, 120);
-        EffectsKit.burst(ctx.scene, rp.add(new Vector3(0, 1.1, 0)), 'sparks');
+        fx?.hit(rp.add(new Vector3(0, 1.1, 0)), player.root.position, 'heavy');
         beatDown(false, WALL_RUN.kickStunSec + GET_UP_SEC);
         ctx.setHud({ foeHp: foeState.hp }); banner(ctx, 'WALL KICK!', 0.7);
         console.info('[MATRIX] mixed wall kick hit');
@@ -283,6 +288,13 @@ export const MixedCombatMode: ModeDefinition = (() => {
     console.info(`[MC-JUICE] heavy punch (${tag})`);
   }
   function roundWinBeat(ctx: ModeContext): void { ctx.juice.shake(0.08, 140); ctx.juice.flash('#fff6dd', 90); console.info('[MC-JUICE] round win'); }
+  /** VISUAL PASS: the DRAGON's super beat — the grade swings gold (crimson when the rival lands it), anime speed lines fan out and one
+   *  negative frame cuts in. Gated by reduced motion; changes no number and not the camera. */
+  function dragonBeat(mine: boolean): void {
+    pres?.grade(mine ? 'gold' : 'crimson', 0.55);
+    pres?.speedLines(mine ? '255,214,120' : '255,120,130', 560);
+    pres?.impactFrame();
+  }
   function matchPunch(ctx: ModeContext): void {
     if (matchLatch) return; matchLatch = true;
     ctx.juice.hitStop(60); ctx.juice.shake(0.14, 160); ctx.juice.flash('#FFD700', 140);
@@ -510,6 +522,11 @@ export const MixedCombatMode: ModeDefinition = (() => {
     SoundKit.play('crowdGroan', { volume: 0.6 });
     endStrike(victimIsMe); animOf(victimIsMe).falling = true;   // the tree plays the fall, then holds the floor
     gallery?.cheer(1);
+    // VISUAL PASS: a ring-out is a SPECTACLE — a dust plume off the edge where the body left, and the fall in slow motion (the fall itself
+    // is stepped on the game clock below, so this slows the animation only, never the result or its timing)
+    fx?.puff(victim.root.position.clone().addInPlaceFromFloats(0, 0.2, 0), 2.1);
+    fx?.hit(victim.root.position.clone().addInPlaceFromFloats(0, 0.8, 0), survivor.root.position, 'heavy');
+    ctx.juice.slowMo(0.5, 700);
     // IMPROVE (2026-10-06): the drop is stepped in update() on the game clock (mixedRules.fallStep, 8.4 m/s) — it was
     // 0.14 m per RENDER on a render observer, so a 120 Hz screen fell twice as fast and the observer outlived a dispose
     fallBody = victim;
@@ -605,7 +622,7 @@ export const MixedCombatMode: ModeDefinition = (() => {
           slowmoSec = SLOWMO_SEC;
           SoundKit.play('impact', { pitch: 1.6, volume: 0.5 });   // the parry ping is the one sound; the feel thud that doubled it is gone
           ctx.juice.shake(0.05, 80);
-          EffectsKit.burst(ctx.scene, defChar.root.position.add(new Vector3(0, 1.3, 0)), 'sparks');
+          fx?.hit(defChar.root.position.add(new Vector3(0, 1.3, 0)), atkChar.root.position, 'parry');   // a ring: the answer to a swing
           beatHit(mine, 'light'); beatParry(!mine);   // the attacker flinches (staggered), the defender's guard flicks
           ctx.setHud(mine ? { foeChi: Math.round(defState.chi) } : { chi: Math.round(defState.chi) });
           banner(ctx, mine ? 'PARRIED!' : 'PERFECT PARRY!', 0.7);
@@ -613,7 +630,7 @@ export const MixedCombatMode: ModeDefinition = (() => {
         }
         case 'blocked': {
           SoundKit.play('impact', { pitch: 0.7, volume: 0.3 });
-          EffectsKit.burst(ctx.scene, defChar.root.position.add(new Vector3(0, 1.1, 0)), 'dust');
+          if (fx) fx.hit(defChar.root.position.add(new Vector3(0, 1.1, 0)), atkChar.root.position, 'guard'); else EffectsKit.burst(ctx.scene, defChar.root.position.add(new Vector3(0, 1.1, 0)), 'dust');
           beatGuardImpact(!mine);
           ctx.setHud(mine ? { foeGuard: Math.round(defState.guard) } : { guard: Math.round(defState.guard) });
           if (mine) foeGuardHud = Math.round(defState.guard); else guardHud = Math.round(defState.guard);   // IMPROVE (2026-10-06): the trickle's memo
@@ -626,7 +643,7 @@ export const MixedCombatMode: ModeDefinition = (() => {
           ctx.momentum.report({ kind: mine ? 'clean_hit' : 'blunder', weight: mine ? 14 : -10 });
           ctx.juice.shake(0.08, 120);
           console.info('[MC-JUICE] guard break');
-          EffectsKit.burst(ctx.scene, defChar.root.position.add(new Vector3(0, 1.2, 0)), 'glitch');
+          if (fx) fx.hit(defChar.root.position.add(new Vector3(0, 1.2, 0)), atkChar.root.position, 'break'); else EffectsKit.burst(ctx.scene, defChar.root.position.add(new Vector3(0, 1.2, 0)), 'glitch');
           beatDown(!mine, defState.staggerSec);   // knock down → floor → get up inside the stagger
           gallery?.cheer(0.6);
           ctx.setHud(mine ? { foeGuard: 0 } : { guard: 0 });
@@ -646,7 +663,8 @@ export const MixedCombatMode: ModeDefinition = (() => {
           ctx.feel?.impact?.(special ? 0.6 : 0.3);   // ONE thud per connect (the impact SFX that doubled it is gone)
           ctx.momentum.report(mine ? { kind: 'clean_hit', weight: special ? 16 : 9 } : { kind: 'blunder', weight: -8 });
           if (special || key === 'heavy') { heavyPunch(ctx, special ? 'special' : 'heavy'); console.info(mine ? '[MC-JUICE] heavy landed' : '[MC-JUICE] heavy taken'); } else { ctx.juice.hitStop(key === 'kick' ? 45 : 28); console.info(mine ? '[MC-JUICE] hit' : '[MC-JUICE] taken'); }   // phase 5: every connect holds for its weight (the horde's rule)
-          EffectsKit.burst(ctx.scene, defChar.root.position.add(new Vector3(0, 1.2, 0)), special ? 'glitch' : 'sparks');
+          if (fx) fx.hit(defChar.root.position.add(new Vector3(0, 1.2, 0)), atkChar.root.position, hitKindOf(key, special), special ? (mine ? '#ffd36b' : '#ff4d5e') : undefined); else EffectsKit.burst(ctx.scene, defChar.root.position.add(new Vector3(0, 1.2, 0)), special ? 'glitch' : 'sparks');
+          if (special) dragonBeat(mine);   // the DRAGON lands: a grade swing, speed lines, one negative frame
           beatHit(!mine, mine && move?.slam ? 'finisher' : mine && move?.launch ? 'heavy' : special ? 'finisher' : WEIGHT_OF[key]);
           if (mine && move?.launch) { foeLaunchedSec = LAUNCH_AIR_SEC; console.info('[MC-STORM] LAUNCHED — air string open'); } else if (mine && move?.air && !move.slam) foeLaunchedSec = Math.max(foeLaunchedSec, 0.5); else if (mine && move?.slam) foeLaunchedSec = 0;   // STORM   // the DRAGON launches (knockdown → floor → get up)
           // THE SAME ROUTES AS KARATE VS. A combo was a counter here too, so jab-jab-jab and jab-kick-heavy
@@ -671,7 +689,7 @@ export const MixedCombatMode: ModeDefinition = (() => {
             ctx.feel?.impact?.(route.fx === 3 ? 0.7 : 0.45);
             // a completed ROUTE is the mode's signature play -- it is what earns ON FIRE here
             if (mine) ctx.momentum.report({ kind: 'chain', weight: route.fx === 3 ? 26 : 14 });
-            EffectsKit.burst(ctx.scene, defChar.root.position.add(new Vector3(0, 1.3, 0)), route.fx === 3 ? 'glitch' : 'sparks');
+            if (fx) fx.hit(defChar.root.position.add(new Vector3(0, 1.3, 0)), atkChar.root.position, route.fx === 3 ? 'special' : 'heavy'); else EffectsKit.burst(ctx.scene, defChar.root.position.add(new Vector3(0, 1.3, 0)), route.fx === 3 ? 'glitch' : 'sparks');
             SoundKit.play('impact', { pitch: route.fx === 3 ? 0.72 : 0.9, volume: 0.65 });
             if (route.ender !== 'stun') beatHit(!mine, 'finisher');
             landed.length = 0;
@@ -859,6 +877,7 @@ export const MixedCombatMode: ModeDefinition = (() => {
       console.info(`[ARENA] mixedcombat · ${describeArena(arena)}`);
       modeVenue?.dispose(); modeVenue = mountVenue(ctx, 'karate_h2h', { keepGameplayCamera: true, arena });
       arenaHandle?.dispose(); arenaHandle = buildArena(ctx.scene, arena);
+      fx?.dispose(); fx = mountCombatFx(ctx.scene); pres?.dispose(); pres = mountPresentation(ctx.scene, ctx.lights?.pipeline);
       player = await CharacterLibrary.spawn(ctx.scene, CFG.heroUrl, {
         position: new Vector3(0, 0, 2.2), yawRad: Math.PI, startClip: IDLE_CLIP,   // BIOMECH-WAVE2 G1/G3: spawned facing each other (the round start used to snap both bodies 180°)
       });
@@ -896,6 +915,10 @@ export const MixedCombatMode: ModeDefinition = (() => {
       // IMPROVE (2026-10-06): both staffs made ONCE, hidden until a loadout puts one in a hand (#12, #16)
       myStaff?.dispose(); foeStaff?.dispose();
       myStaff = makeStaff(ctx, player, 'mc_staff_me'); foeStaff = makeStaff(ctx, rival, 'mc_staff_foe');
+      // VISUAL PASS: a staff streaks while it swings (the player's blue, the rival's red); drawn only for the fighter carrying it
+      myTrail?.dispose(); foeTrail?.dispose();
+      myTrail = myStaff ? mountWeaponTrail(ctx.scene, myStaff as never, 'staff', '#5ad1ff', 0.95) : null;
+      foeTrail = foeStaff ? mountWeaponTrail(ctx.scene, foeStaff as never, 'staff', '#ff6b7a', 0.95) : null;
       myLanded = []; foeLanded = [];
       myRatings = ratingsForBand(ctx.prqBand);   // IMPROVE (2026-10-06): the PRQ band earns the vocabulary (a guest = the baseline); `?fight=` overrides
       if (typeof window !== 'undefined') {
@@ -1017,6 +1040,8 @@ export const MixedCombatMode: ModeDefinition = (() => {
       { const bv = ctx.body?.(); if (bv) bodyLedgerFrame(bv, now()); deferred.flush(ledger, now()); }   // P7: the body's deferred hits
       phaseSec += dt;
       gallery?.update(dt);
+      fx?.tick(dt); arenaHandle?.tick(dt);   // VISUAL PASS: the hit FX and the arena's flames / flicker run in every phase (the arena ticked only in the fight)
+      myTrail?.driveSwinging(dt, striking && myLoadout === 'staff'); foeTrail?.driveSwinging(dt, foeStriking && foeLoadout() === 'staff');   // VISUAL PASS: the staff's streak
       // IMPROVE (2026-10-06): the start-up screen's pick, once more on the first frame of play (it is offered on the READY
       // screen after load) — unless a pick was already made in the loadout phase
       if (!startPickSeeded) { startPickSeeded = true; if (phase === 'loadout' && round === 1) setLoadout(ctx, startPick()); }
@@ -1058,8 +1083,9 @@ export const MixedCombatMode: ModeDefinition = (() => {
       const sdtRoom = sdt * focus.worldScale, sdtHero = sdt * focus.heroScale;
       knock.tick(sdtRoom);   // IMPROVE (2026-10-06): knockback on the room clock
       meTimers.tick(sdtHero); foeTimers.tick(sdtRoom);   // IMPROVE (2026-10-06): both fighters' hit beats on the game clock
-      if (phase !== 'fighting' || falling) { animate(dt, 0, 0); return; }   // a beat just ended the round
+      if (phase !== 'fighting' || falling) { fx?.clearAuras(); animate(dt, 0, 0); return; }   // a beat just ended the round
       meState.tick(sdtHero); foeState.tick(sdtRoom);
+      if (fx) { fx.aura('me', player.root, auraLevel(meState.chi, CHI_MAX), '#ffd36b'); fx.aura('foe', rival.root, auraLevel(foeState.chi, CHI_MAX), '#ff4d5e'); }   // VISUAL PASS: the full-chi aura (DRAGON ready)
       // a route must not complete across two unrelated exchanges
       if (meState.combo === 0 && myLanded.length) myLanded = [];
       if (foeState.combo === 0 && foeLanded.length) foeLanded = [];
@@ -1105,7 +1131,7 @@ export const MixedCombatMode: ModeDefinition = (() => {
         }
       }
       if (!tickMatrix(ctx, sdtHero)) player.root.position.y = meEvade.height;   // the arc is EvadeMoves'; nothing here integrates gravity — unless the wall run / kick owns the body (MATRIX)
-      arenaHandle?.tick(dt); if (arena.hazards.length) tickHazards(ctx, sdtRoom);
+      if (arena.hazards.length) tickHazards(ctx, sdtRoom);
       if (phase !== 'fighting' || falling) { animate(dt, 0, 0); return; }   // IMPROVE (2026-10-06): a wall kick or the fire just ended the round
 
       ring?.set(meState.guard / GUARD_MAX);   // PLAYER RING: the guard gauge
@@ -1167,6 +1193,7 @@ export const MixedCombatMode: ModeDefinition = (() => {
       mePosture?.dispose(); mePosture = null; foePosture?.dispose(); foePosture = null;
       myStaff?.dispose(); foeStaff?.dispose(); myStaff = null; foeStaff = null; staffMat?.dispose(); staffMat = null;
       gallery?.dispose(); gallery = null; arenaHandle?.dispose(); arenaHandle = null; wallRun = null; wallKick = null;
+      fx?.dispose(); fx = null; pres?.dispose(); pres = null; myTrail?.dispose(); myTrail = null; foeTrail?.dispose(); foeTrail = null;
       modeVenue?.dispose(); modeVenue = null;
       ring?.dispose(); ring = null;
       player?.dispose(); rival?.dispose(); SoundKit.stopAmbient();
