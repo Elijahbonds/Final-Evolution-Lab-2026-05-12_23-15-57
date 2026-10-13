@@ -55,6 +55,39 @@ bundle** (the approved "block C" is held for EBOOK-1). So the shop sells what th
 - `scripts/stripe-prices.example.json` still lists the ebook and bundle test products (it mirrors the catalog, and
   creating a Stripe test Product sells nothing). Checkout will not sell them.
 
+## Listening: the stream-only player (owner, 2026-10-13)
+
+Before this there was a player but no stream-only route: `POST /api/books/download` signed every file, audio included,
+and the player, a Download button and the receipt all used it. Now:
+
+- **Where:** `/press/library` is the Listen page (chapter list + player), behind sign-in, 18+ and an entitlement, and
+  the same two switches as checkout. The book page (`/press/[slug]`) carries the same player for the free sample and
+  for owners.
+- **The door:** `POST /api/books/stream` `{ bookSlug, fileId }`. In order: shop switched off
+  (`BOOK_STORE_ENABLED` / `VIRTUAL_PURCHASES_ENABLED`) -> `409 store_closed`; signed out -> `401`; not a verified
+  adult -> `403 adults_only`; no audiobook entitlement -> `403`; book tables missing -> `503 Library is unavailable
+  right now.` (the library page shows the same line). Then it signs ONE URL for ONE chapter: V4 signed URL on the
+  private bucket (`signGcsV4`), `response-content-disposition=inline` with **no filename**, lifetime at most
+  **300 s** (`STREAM_URL_TTL_SECONDS`), `Cache-Control: no-store`. The path comes from the catalog, never the request.
+- **Downloads are closed:** `POST /api/books/download` is for ebook files only and answers `403` for everything
+  while no terms version covers ebooks and downloads. No route returns an attachment URL today.
+- **The player** (`components/press/audio-player.tsx`, rules in `lib/books/bookPlayer.ts`): a plain `<audio>` with
+  `controlsList="nodownload"`, no context menu, no download link or button, no URL in the page before Play (each play
+  asks the stream route). Chapter list, play/pause (native), back/forward 15 s, speed (1 / 1.25 / 1.5 / 2), and the
+  place is saved on this device (localStorage, `bookResume.ts`). An expired URL is replaced on the next play (the
+  player refreshes 20 s early) and on a playback error (at most every 10 s), and resumes at the same second.
+- **The free sample** is the one public chapter: it streams with no sign-in, no age check and with the switches off,
+  as it did before (assumption: a sample is not a sale). Every other chapter needs all of the above.
+- **Honest limit:** a browser that plays audio has the audio. Nothing here can technically stop a determined person
+  from saving what their own browser streams (devtools, a screen recorder, a captured URL during its 5 minutes).
+  "Stream only" is meant in the terms' sense: **no download is offered** and none is handed out, the URLs are
+  short-lived and tied to a signed-in verified adult who owns the book, and the files stay private in the bucket.
+- **Receipt page:** it no longer embeds a player or mints a guest listening grant (there is no guest checkout); it
+  links to My Library. `mintReaderGrant` / `readReaderGrant` in `bookEntitlements.ts` are now unused by any route and
+  can go in a later cleanup.
+- Decision to confirm: listening is behind `BOOK_STORE_ENABLED`, like checkout. If the owner ever switches the shop
+  off after sales, paid buyers cannot stream until it is back on (fulfilment, the receipt and refunds still work).
+
 ## What Elijah has to decide
 
 1. **Prices.** Replace `priceCents` on each offer and set `priceIsExample` to `false` when the number is real. Do not price a direct ebook below the Kindle list price unless Amazon price-matching is acceptable.
@@ -80,7 +113,7 @@ Set these on the server. Do not commit the values.
 | `FIREBASE_SERVICE_ACCOUNT_JSON` | Service-account JSON, one line. Or set the next two instead. |
 | `FIREBASE_CLIENT_EMAIL` | Service account email, if you are not using the JSON blob. |
 | `FIREBASE_PRIVATE_KEY` | PEM private key. Newlines may be written as `\n`. |
-| `BOOK_SIGNED_URL_TTL_SECONDS` | Lifetime of a download/stream URL. Default 600, maximum 3600. |
+| `BOOK_SIGNED_URL_TTL_SECONDS` | Lifetime of an ebook download URL (closed today). Default 600, maximum 3600. A stream URL is capped at 300 s whatever this says. |
 | `NEXTAUTH_SECRET` | Already required by login. Also signs the short-lived receipt grant that lets a guest play on the receipt page. |
 | `NEXTAUTH_URL` | The site origin Stripe sends the buyer back to (`siteOrigin()`, STORE-READY B3). The request's `Origin` header is never used; unset closes checkout (`site_url_not_set`). |
 | `VIRTUAL_PURCHASES_ENABLED` | The release's B10 fence (default off: "no real-money product outside the coach store"). Kept for books alongside `BOOK_STORE_ENABLED`: checkout answers 409 `store_closed` / `virtual_purchases_off` until it is on too. |

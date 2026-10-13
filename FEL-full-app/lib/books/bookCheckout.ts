@@ -65,7 +65,7 @@ export type BookCheckoutGate =
   | { ok: false; reason: StoreClosedReason };
 
 /** lib/flags.ts isVirtualPurchasesEnabled's parse, read from the PASSED env so the gate is testable. */
-function virtualPurchasesOn(env: NodeJS.ProcessEnv): boolean {
+export function virtualPurchasesOn(env: NodeJS.ProcessEnv): boolean {
   const v = (env.VIRTUAL_PURCHASES_ENABLED ?? '').trim().toLowerCase();
   return v === '1' || v === 'true' || v === 'on' || v === 'yes';
 }

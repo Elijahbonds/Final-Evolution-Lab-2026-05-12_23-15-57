@@ -116,7 +116,7 @@ describe('book checkout', () => {
     expect(src.indexOf('getBookStripe()')).toBeGreaterThan(gateAt);
     expect(src).not.toContain("req.headers.get('origin')");
     const download = readFileSync('app/api/books/download/route.ts', 'utf8');
-    expect(download).toContain('issueBookFile(');
+    expect(download).toContain('issueBookDownload(');
     expect(download).not.toContain('firebasestorage.googleapis.com');
   });
 });

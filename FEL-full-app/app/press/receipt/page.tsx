@@ -3,13 +3,11 @@ import type Stripe from 'stripe';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { formatLabel, getBook, getOffer } from '@/lib/books/bookCatalog';
-import { bookFormatAllowed } from '@/lib/books/bookTerms';
 import { assertStripeTestKey, bookStripeSecret, getBookStripe } from '@/lib/books/bookCheckout';
-import { mintReaderGrant, normalizeBookEmail } from '@/lib/books/bookEntitlements';
+import { normalizeBookEmail } from '@/lib/books/bookEntitlements';
 import { prismaBookStore } from '@/lib/books/bookStore';
 import { recordPaidBookSession } from '@/lib/books/bookFulfill';
 import { PressFrame } from '@/components/press/press-frame';
-import { AudioPlayer } from '@/components/press/audio-player';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Receipt — Final Evolution Press' };
@@ -81,12 +79,6 @@ export default async function ReceiptPage({ searchParams }: { searchParams: { se
     }
   }
 
-  const secret = process.env.NEXTAUTH_SECRET || '';
-  const grant = entitled && email && secret ? mintReaderGrant(secret, email) : null;
-  const chapters = book && offer && bookFormatAllowed('audiobook') && (offer.format === 'audiobook' || offer.format === 'bundle')
-    ? book.files.filter((f) => f.kind === 'mp3').map((file) => ({ id: file.id, label: file.label, canPlay: entitled }))
-    : [];
-
   return (
     <PressFrame signedIn={signedIn}>
       <h2 className="fel-heading mt-8 text-4xl">Receipt</h2>
@@ -104,12 +96,12 @@ export default async function ReceiptPage({ searchParams }: { searchParams: { se
           {email ? <p className="mt-2 text-sm text-white/55">Receipt email: {email}</p> : null}
           <p className="mt-3 text-sm text-white/60">
             {entitled
-              ? 'The book is on this email. Log in with it and it stays in My Library.'
+              ? 'The audiobook is on this email. Log in with it and listen in My Library. Audiobooks are stream only, with no download.'
               : 'Stripe has the payment. The library updates when the webhook lands — refresh in a moment.'}
           </p>
           <div className="mt-4 flex flex-wrap gap-3">
             <Link href={signedIn ? '/press/library' : '/login'} className="rounded-md bg-[#F5C518] px-4 py-2 text-sm font-semibold text-black">
-              {signedIn ? 'My Library' : 'Log in to My Library'}
+              {signedIn ? 'Listen in My Library' : 'Log in to listen'}
             </Link>
             {book ? <Link href={`/press/${book.slug}`} className="self-center text-sm text-white/60 hover:text-white">Back to the book</Link> : null}
           </div>
@@ -119,11 +111,6 @@ export default async function ReceiptPage({ searchParams }: { searchParams: { se
         <p className="mt-4 text-sm text-white/60">This checkout is not paid yet.</p>
       ) : null}
 
-      {grant && book && chapters.length > 0 ? (
-        <div className="mt-6">
-          <AudioPlayer bookSlug={book.slug} bookTitle={book.title} chapters={chapters} grant={grant} />
-        </div>
-      ) : null}
     </PressFrame>
   );
 }
