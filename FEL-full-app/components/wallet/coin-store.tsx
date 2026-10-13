@@ -60,7 +60,7 @@ function usd(cents: number): string {
 export function CoinStore() {
   const [balances, setBalances] = useState<Balances>({ coins: 0, shards: 0 });
   // FEATURES-UX-SHOP (2026-09-08): ONE purchases truth (lib/wallet/purchases.ts) — this store said "shard packs are sold
-  // separately" while /shop/shards showed COMING SOON with every Buy disabled. Both now read the same flag and the same copy.
+  // separately" while /shop/shards showed a disabled placeholder on every Buy. Both now read the same flag and the same copy.
   const purchasesEnabled = usePurchasesEnabled();
   const copy = shardSaleCopy(purchasesEnabled);
   const [busy, setBusy] = useState<string | null>(null);
@@ -88,7 +88,7 @@ export function CoinStore() {
         body: JSON.stringify({ pack_id: packId }),
       });
       if (res.status === 503) {
-        toast.info('Coin purchases are coming soon', { description: 'Real-money checkout is not enabled yet on this site.' });
+        toast.info('Coin purchases are not available', { description: 'Real-money checkout is turned off on this site.' });
         return;
       }
       const d = await res.json();
@@ -136,7 +136,8 @@ export function CoinStore() {
         </div>
       </div>
 
-      {/* Coin packs */}
+      {/* Coin packs. NP-1: hidden while real-money checkout is off (never labelled). */}
+      {purchasesEnabled !== false && (
       <section>
         <div className="mb-3 flex items-center gap-2">
           <ShoppingCart className="h-4 w-4 text-[#00E5FF]" />
@@ -165,20 +166,19 @@ export function CoinStore() {
                 </div>
                 <div className="text-sm font-semibold text-white">{pack.label}</div>
                 <div className="mb-3 mt-0.5 flex-1 text-xs text-white/50">{pack.blurb}</div>
-                {/* P10: one truth — while checkout is not configured the badge says COMING SOON and the button agrees (it used to
-                    read $4.99 and only fail after the click) */}
                 <button
                   onClick={() => buyPack(pack.id)}
-                  disabled={busy === pack.id || purchasesEnabled === false}
+                  disabled={busy === pack.id}
                   className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#FFD700] px-3 py-2 text-sm font-bold text-black transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {busy === pack.id ? <Loader2 className="h-4 w-4 animate-spin" /> : purchasesEnabled === false ? `${usd(pack.priceUsdCents)} · coming soon` : usd(pack.priceUsdCents)}
+                  {busy === pack.id ? <Loader2 className="h-4 w-4 animate-spin" /> : usd(pack.priceUsdCents)}
                 </button>
               </motion.div>
             );
           })}
         </div>
       </section>
+      )}
 
       {/* Spend Your Balance: where each thing is sold and delivered (see WHERE_TO_SPEND) */}
       <section>

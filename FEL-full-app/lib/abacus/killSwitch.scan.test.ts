@@ -66,7 +66,6 @@ describe('the switch never reaches a client bundle', () => {
     for (const f of [
       'app/coach/_components/coach-chat.tsx',
       'components/studio/studio-shell.tsx',
-      'components/ai-coming-soon.tsx',
       'lib/abacus/aiStatus.ts',
       'lib/abacus/useAiStatus.ts',
     ]) expect(clientRel.has(f), f).toBe(true);
