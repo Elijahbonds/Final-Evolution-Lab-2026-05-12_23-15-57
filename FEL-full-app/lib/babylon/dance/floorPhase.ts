@@ -6,8 +6,8 @@
 // until the next step. When the move being left is down on the floor, the body goes from lying to standing in 120 ms.
 // The generated charts rarely did that (floorPhase.test.ts: 3 switches across the six songs, all a baby freeze looping
 // on its second cycle); an authored chart (dance/chart.ts) starts the next move where the chart wants it, and the
-// windmill and the six-step are 8-beat moves: 55 switches across the six shipped charts (warmup 1, cypher 7, goldenhour
-// 10, battle 11, canals 11, evolution 15) happen mid-floor. moveFadeSec gives a switch made while the running move is on the floor a
+// windmill and the six-step are 8-beat moves: 38 switches across the six shipped charts (warmup 1, cypher 6, goldenhour
+// 4, battle 9, canals 9, evolution 9, once the scored-step cap has thinned them) happen mid-floor. moveFadeSec gives a switch made while the running move is on the floor a
 // RISE: a crossfade of RISE_FADE_BEATS instead. A switch made standing keeps 0.12 s, byte for byte.
 //
 // THE TABLE: for each move that goes to the floor, the beat (from the clip's start) the body is DOWN by and the beat its

@@ -63,7 +63,7 @@ describe('where the charts cut a floor move', () => {
   it('the generated steps barely did (a baby freeze looping on its second cycle); the authored charts do, per song (a new cut fails here and gets named)', () => {
     expect(Object.fromEntries(FEL_SONGS.map((s) => [s.id, floorCuts(stepsForSong(s))]))).toEqual({ warmup: 0, cypher: 0, goldenhour: 1, battle: 0, canals: 1, evolution: 1 });
     const cuts = Object.fromEntries(FEL_SONGS.map((s) => [s.id, floorCuts(chartStepsFor(s)!)]));
-    expect(cuts).toEqual({ warmup: 1, cypher: 7, goldenhour: 10, battle: 11, canals: 11, evolution: 15 });
+    expect(cuts).toEqual({ warmup: 1, cypher: 6, goldenhour: 4, battle: 9, canals: 9, evolution: 9 });
   });
 });
 
