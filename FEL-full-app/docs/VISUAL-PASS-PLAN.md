@@ -686,8 +686,10 @@ freerun's world), `event` (big air's gate, towers and booth), `palette` (freerun
   1.9 m off the line, 1.5 rad lens; not in the default cut) then a profile and a low angle; snow — a banked line, from a
   drone-follow's follow / side / high; surf — the barrel and banked lines, from the water's level; big air — a stuck or clean
   landing worth 5.5+ on the judges' read plus the line, attempts 1 to N−1; freerun — a banked line, when the finish is not near.
-  Not replayed: a deck's own flip and bank (the director records the bodies' bones and roots, not a mesh's local rotation; a
-  routed follow-up to `ReplayDirector`, which must also null the board's `rotationQuaternion` afterwards).
+  The deck's own flip and bank are replayed too: `ReplayDirector.track(node)` (opt-in, `ctx.trackReplay(node)` from a mode's
+  load()) records a node's local pose with every frame and hands it back as the mode wrote it (Euler, the quaternion nulled again).
+  The filmer is kept over the floor (`resolveAngle`, with `bounds` in the play options) and has its own near plane (the play
+  cameras clip at 1 m, which cut the floor out from under an ankle-high lens).
 - **Intros.** `walkIn` on skateboard (no clock until the first push), surf (the board trims itself in), bigair (no clock in the
   run-up) and freerun (opted in from `begin()`: the 4 s start grace is longer than the 3.7 s intro). Not snowboard_slalom: the
   rider is already sliding when play starts, and an intro would cost the first gates.
@@ -730,4 +732,4 @@ freerun's world), `event` (big air's gate, towers and booth), `palette` (freerun
 - **Deferred to wave 3 / needs art:** a moving chairlift with chairs and flags waving; a pier and a lifeguard tower for the surf
   breaks (`venuePropSets` is shared, and the tower is [ART]); a wet sheen after a duck-dive (`mountSweat` owns the skin level);
   puddle reflections and a concrete detail map at the Warehouse (`GlossyFloor` is a named-floor list); a night session with
-  floodlights for big air; the deck's flip in replays (above); landmark buildings and bespoke course modules are [ART].
+  floodlights for big air; landmark buildings and bespoke course modules are [ART].
