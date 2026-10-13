@@ -6,6 +6,8 @@ import { getOrCreateProfile } from '@/lib/profile-service';
 import { prqScore, prqGrade } from '@/lib/prq';
 import { ROSTER } from '@/lib/game-data';
 import { prisma } from '@/lib/db';
+import { computeTraceablePrq } from '@/lib/prq-entries';
+import { prqDisplay } from '@/lib/prq-display';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,16 +24,21 @@ export async function GET() {
     // WHAT THE HEADER NEEDS TO SHOW THE RIGHT DOORS (2026-09-19). The coach product and the athlete's training
     // screen were reachable only by typing the URL, because nothing in the app knew whether you were a coach or
     // whether anybody was coaching you. Two booleans, read where the session already is.
-    const [facilitator, coachedBy, coachesAnyone] = await Promise.all([
+    // QA P0-01: `prq`/`grade` above are the SEEDED profile attributes the modes' difficulty reads; a badge prints only
+    // `prqDisplay`, which comes from measurements (null score and "PRQ —" when nothing is measured).
+    const [facilitator, coachedBy, coachesAnyone, traceable] = await Promise.all([
       prisma.facilitatorProfile.findUnique({ where: { userId }, select: { certificationStatus: true } }).catch(() => null),
       prisma.coachClient.findFirst({ where: { clientId: userId, endedAt: null }, select: { id: true } }).catch(() => null),
       prisma.coachClient.findFirst({ where: { coachId: userId, endedAt: null }, select: { id: true } }).catch(() => null),
+      computeTraceablePrq(prisma, userId).catch(() => null),
     ]);
+    const display = prqDisplay(traceable);
     const isCoach = facilitator?.certificationStatus === 'certified' || !!coachesAnyone;
     const hasCoach = !!coachedBy;
     return NextResponse.json({
       profile, wallet: { coins: wallet.coins, shards: wallet.shards, lc: wallet.lc },
       prq: score, grade: prqGrade(score), role, isCoach, hasCoach,
+      prqDisplay: display, prqMeasured: display.measured, prqTotal: display.total,
     });
   } catch (e) {
     console.error('profile error', e);

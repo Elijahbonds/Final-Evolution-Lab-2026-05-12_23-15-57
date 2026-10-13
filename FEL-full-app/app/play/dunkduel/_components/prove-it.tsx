@@ -15,6 +15,7 @@ import { Camera, CameraOff, Pause, Play, RotateCcw, SwitchCamera, Trophy, Volume
 import { MediaPipePoseAdapter, onVideoFrames, type VideoFrameTick } from '@/lib/babylon/nexus/neuro-mirror/pose/mediapipe-adapter';
 import { DunkTracker, scoreIrlDunk, refusalLine, type DunkMetrics, type DunkRefusal } from '@/lib/irl/dunkTracker';
 import { judgeDunk, type JudgeScore } from '@/lib/babylon/core/JudgePanel';
+import { cameraHelp, cameraHelpText } from '@/lib/camera/cameraHelp';   // QA P1-23: the camera-off copy says what to do
 import { clipWasSaved, downloadBlob } from '@/lib/capture/shareClip';
 import { verifiedAdult } from '@/lib/privacy/verifiedAdult';
 import {
@@ -271,11 +272,11 @@ export default function ProveIt({
       if (!ok || stale()) return;
       setStage('prop-phone');
     } catch (e) {
-      if (stale()) return;
-      stopAll();
-      setError(e instanceof DOMException && e.name === 'NotAllowedError'
-        ? 'Camera access was denied. Prove It measures your dunk through the camera — allow it to play.'
-        : 'No usable camera on this device. Prove It needs to see you.');
+      if (stale()) return;   // left or restarted meanwhile: stopAll() already freed this attempt
+      stopAll();             // a camera that opened but would not play must not stay on behind "no camera"
+      // QA P1-23: the failure's own steps (lib/camera/cameraHelp), after what Prove It needs the camera for
+      const insecure = typeof window !== 'undefined' && !window.isSecureContext;
+      setError(`Prove It measures your dunk through the camera. ${cameraHelpText(cameraHelp(e, { secure: !insecure }))}`);
       setStage('camera-off');
     }
   }, [dunksEach, levels, openCamera, rows, serverVerified, stopAll]);
