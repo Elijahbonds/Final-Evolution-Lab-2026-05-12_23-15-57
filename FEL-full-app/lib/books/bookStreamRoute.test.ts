@@ -1,6 +1,7 @@
 // Owner 2026-10-13 (store-terms-2026-10-12: audiobooks, stream only, no download):
 // POST /api/books/stream mints ONE short-lived inline URL per play, for an entitled, signed-in, verified-adult
-// buyer while the shop is switched on. No route ever returns a download or attachment URL.
+// buyer. Owner 2026-10-13: listening is NOT behind BOOK_STORE_ENABLED / VIRTUAL_PURCHASES_ENABLED, so a paid buyer keeps
+// streaming with the shop off (selling stays closed: bookCheckoutRoute.test.ts). No route ever returns a download or attachment URL.
 // next-auth, prisma and the entitlement store are mocked; the gate, the delivery rule, the real signer and the routes are real.
 import { generateKeyPairSync } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -122,23 +123,54 @@ describe('POST /api/books/stream: the happy path', () => {
 });
 
 describe('POST /api/books/stream: refusals (fail closed)', () => {
-  it.each([undefined, '', '0', 'false', 'nope'])('BOOK_STORE_ENABLED=%s -> 409 store_closed, nothing else runs', async (v) => {
+  it.each([undefined, '', '0', 'false', 'nope'])('BOOK_STORE_ENABLED=%s: the shop is off, an entitled adult still streams', async (v) => {
     if (v === undefined) delete process.env.BOOK_STORE_ENABLED;
     else process.env.BOOK_STORE_ENABLED = v;
     const r = await stream(CHAPTER);
-    expect(r.status).toBe(409);
-    expect(r.json).toMatchObject({ error: 'store_closed', reason: 'book_store_off' });
-    expect(h.adultCalls).toEqual([]);
-    expect(h.listCalls).toBe(0);
-    expect(r.json.url).toBeUndefined();
+    expect(r.status).toBe(200);
+    expect(new URL(r.json.url).searchParams.get('response-content-disposition')).toBe('inline');
+    expect(h.adultCalls).toEqual(['buyer-1']);   // the adult check still ran
+    expect(h.listCalls).toBe(1);                  // and so did the entitlement check
   });
 
-  it('the B10 fence is required too: VIRTUAL_PURCHASES_ENABLED off -> 409 virtual_purchases_off', async () => {
+  it('VIRTUAL_PURCHASES_ENABLED off (the B10 fence): an entitled adult still streams', async () => {
     delete process.env.VIRTUAL_PURCHASES_ENABLED;
     const r = await stream(CHAPTER);
-    expect(r.status).toBe(409);
-    expect(r.json).toMatchObject({ error: 'store_closed', reason: 'virtual_purchases_off' });
-    expect(r.json.url).toBeUndefined();
+    expect(r.status).toBe(200);
+    expect(r.json.url).toBeDefined();
+  });
+
+  describe('with BOTH switches off, every other check still refuses', () => {
+    beforeEach(() => {
+      delete process.env.BOOK_STORE_ENABLED;
+      delete process.env.VIRTUAL_PURCHASES_ENABLED;
+    });
+    it('signed out -> 401', async () => {
+      h.session = null;
+      const r = await stream(CHAPTER);
+      expect(r.status).toBe(401);
+      expect(r.json.url).toBeUndefined();
+      expect(h.listCalls).toBe(0);
+    });
+    it('under 18 / unknown age -> 403 adults_only, entitlements never read', async () => {
+      h.isAdult = false;
+      const r = await stream(CHAPTER);
+      expect(r.status).toBe(403);
+      expect(r.json).toEqual({ error: 'adults_only' });
+      expect(h.listCalls).toBe(0);
+    });
+    it('not entitled -> 403', async () => {
+      h.rows = [];
+      const r = await stream(CHAPTER);
+      expect(r.status).toBe(403);
+      expect(r.json.url).toBeUndefined();
+    });
+    it('book tables missing -> 503 "Library is unavailable right now." (fail closed)', async () => {
+      h.tablesReady = false;
+      const r = await stream(CHAPTER);
+      expect(r.status).toBe(503);
+      expect(r.json).toEqual({ error: 'Library is unavailable right now.' });
+    });
   });
 
   it('signed out -> 401, no age lookup, no URL', async () => {
