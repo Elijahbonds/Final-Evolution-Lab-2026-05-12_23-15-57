@@ -20,6 +20,7 @@ const TEXT_BY_VERSION: Record<string, string> = {
   '2026-10-07': '1817114b5ef24ce7',        // LEGAL-COPY: Terms §2 18+, Terms §9 + Privacy §11 Contact, Privacy §10 store, §4/§5/§7 fixes; first non-draft label; draft banners removed on the owner's sign-off (follow-up 1)
   '2026-10-12': '774adfd3055f3cfa',        // LEGAL-COPY-2: Terms §7 written; the Mail line and the privacy write-to clause print only once an address is set
   '2026-10-13': 'e9481336114ac8d5',        // CREATOR-PLATFORM: §1 gains the Work-with-us inquiry bullet (name, email, message; kept 12 months; no IP address)
+  '2026-10-13b': '8e6119890721e059',        // PARTY-PRIVACY: §2 gains the Parties bullet (party name, nothing recorded, voice 18+, block on the device, reports kept 12 months)
 };
 
 describe('the policy version', () => {
@@ -47,8 +48,11 @@ describe('the policy version', () => {
   // fingerprint stays so an old text still resolves.
   // test changed (2026-10-13, owner-approved privacy line on PR #18): was toBe('2026-10-12'). The version moves with
   // the text; 2026-10-12 is now an earlier version and keeps its fingerprint below.
+  // test changed (2026-10-13, owner-approved Parties line, this lane): was toBe('2026-10-13'). The version moves with
+  // the text; 2026-10-13 is now an earlier version and keeps its fingerprint above.
   it('is the final, non-draft label', () => {
-    expect(CURRENT_POLICY_VERSION).toBe('2026-10-13');
+    expect(CURRENT_POLICY_VERSION).toBe('2026-10-13b');
+    expect(CURRENT_POLICY_VERSION).not.toBe('2026-10-13');
     expect(CURRENT_POLICY_VERSION).not.toBe('2026-10-12');
     expect(CURRENT_POLICY_VERSION).not.toBe('2026-10-07');
     expect(CURRENT_POLICY_VERSION).not.toBe('2026-10-07-draft');
@@ -66,7 +70,7 @@ describe('the policy version', () => {
   });
 
   it('keeps every earlier version fingerprint (the record of what each signup accepted)', () => {
-    for (const v of ['2026-09-24-draft', '2026-09-25-draft', '2026-09-29-draft', '2026-09-29b-draft', '2026-09-29c-draft', '2026-09-30-draft', '2026-10-01-draft', '2026-10-07-draft', '2026-10-07', '2026-10-12']) {
+    for (const v of ['2026-09-24-draft', '2026-09-25-draft', '2026-09-29-draft', '2026-09-29b-draft', '2026-09-29c-draft', '2026-09-30-draft', '2026-10-01-draft', '2026-10-07-draft', '2026-10-07', '2026-10-12', '2026-10-13']) {
       expect(TEXT_BY_VERSION).toHaveProperty(v);
     }
   });
@@ -422,5 +426,51 @@ describe('privacy policy, Work-with-us inquiries (CREATOR-PLATFORM)', () => {
     for (const bullet of ['- **Account data:**', '- **Performance data (PRQ):**', '- **Game session data:**', '- **Coach chat inputs:**']) {
       expect(section).toContain(bullet);
     }
+  });
+});
+
+// PARTY-PRIVACY (2026-10-13; owner decision: "add the party privacy sentence ... with a version bump"; retention 12 months
+// for party reports AND creator inquiries, with automatic deletion): §2 lists how data is used, and the Parties bullet is
+// the party-chat lane's drafted sentence plus the retention sentence. The numbers in the text are the numbers the code
+// enforces, so both constants are pinned here against the words.
+describe('privacy policy, Parties (PARTY-PRIVACY)', () => {
+  const section = PRIVACY_CONTENT.slice(PRIVACY_CONTENT.indexOf('## 2. How We Use Your Data'), PRIVACY_CONTENT.indexOf('## 3.'));
+  const line = section.split('\n').find((l) => l.startsWith('- **Parties.**')) ?? '';
+
+  it('is one bullet in §2, after the existing uses, and leaves them as they were', () => {
+    expect(line).not.toBe('');
+    expect(section).toContain('- To operate and improve the Service.');
+    expect(section).toContain('- Coach chat inputs are processed by AI models to generate responses.');
+    expect(section.indexOf('- **Parties.**')).toBeGreaterThan(section.indexOf('- Coach chat inputs'));
+    expect(PRIVACY_CONTENT.indexOf('- **Parties.**')).toBe(PRIVACY_CONTENT.lastIndexOf('- **Parties.**'));
+  });
+
+  it('carries the drafted sentences: party name, nothing recorded, voice for adults, block on the device, a report keeps no conversation', () => {
+    expect(line).toContain('the other members see the party name you choose (never your account name or email)');
+    expect(line).toContain('are never recorded or stored');
+    expect(line).toContain('Voice is peer-to-peer and only between verified adults (18+)');
+    expect(line).toContain('their parties are invite-only');
+    expect(line).toContain('If you block someone, we remember that on your device.');
+    expect(line).toContain('we keep the report — who reported whom, in which party, when and why — but no conversation, because none is kept.');
+  });
+
+  it('says party reports are kept 12 months, then deleted, and PARTY_REPORT_RETENTION_DAYS is that period', async () => {
+    const { PARTY_REPORT_RETENTION_DAYS } = await import('./party/social/reports');
+    expect(PARTY_REPORT_RETENTION_DAYS).toBe(365);
+    expect(line).toContain('We keep a report for 12 months, then delete it.');
+  });
+
+  it('says creator inquiries are kept 12 months too, and INQUIRY_RETENTION_DAYS is the same period as the party reports', async () => {
+    const { INQUIRY_RETENTION_DAYS } = await import('./creator/inquiryStore');
+    const { PARTY_REPORT_RETENTION_DAYS } = await import('./party/social/reports');
+    expect(PRIVACY_CONTENT).toContain('We keep it for 12 months, then delete it.');
+    expect(INQUIRY_RETENTION_DAYS).toBe(365);
+    expect(INQUIRY_RETENTION_DAYS).toBe(PARTY_REPORT_RETENTION_DAYS);
+  });
+
+  it('is written the way the page renderer reads it: one line, no underscores or backticks', () => {
+    expect(line).not.toContain('_');
+    expect(line).not.toContain('`');
+    expect(line).not.toContain('\n');
   });
 });

@@ -60,7 +60,14 @@ const WRITE_TO = isMailingAddressSet(REAL_MAILING_ADDRESS) ? `, or write to ${BU
 // bullet for the Work-with-us inquiry form (name, email and message, with the other fields the form asks for; kept 12 months,
 // then deleted; no IP address). The inquiry table is pending SQL (prisma/pending/2026-10-13-creator-inquiry.sql) and its
 // retention is INQUIRY_RETENTION_DAYS in lib/creator/inquiryStore.ts. 2026-10-12 is the text without this bullet.
-export const CURRENT_POLICY_VERSION = '2026-10-13';
+// PARTY-PRIVACY (2026-10-13; owner decision "add the party privacy sentence ... with a version bump", retention 12 months for
+// party reports and creator inquiries): bumped again, §2 only — one bullet, Parties: the party name members see, that party
+// messages, quick chat, emotes and voice are never recorded or stored, voice for verified adults only, block kept on the
+// device, and a report kept (who, which party, when, why; no conversation) for 12 months, then deleted. The report table is
+// pending SQL (prisma/pending/2026-10-13-party-report.sql) and its retention is PARTY_REPORT_RETENTION_DAYS in
+// lib/party/social/reports.ts. The sentence is the party-chat lane's drafted paragraph plus the retention sentence.
+// 2026-10-13 is the text without this bullet.
+export const CURRENT_POLICY_VERSION = '2026-10-13b';
 
 export const TERMS_CONTENT = `
 # Terms of Service
@@ -155,6 +162,7 @@ export const PRIVACY_CONTENT = `
 - To operate and improve the Service.
 - To compute your Player Readiness Quotient (PRQ).
 - Coach chat inputs are processed by AI models to generate responses.
+- **Parties.** When you join a party, the other members see the party name you choose (never your account name or email) and what you are playing. Party messages, quick chat, emotes and voice go live between the members and are never recorded or stored — not by us, and not on your device beyond the open page. Voice is peer-to-peer and only between verified adults (18+); accounts under 18, or whose age we don't know, can use preset quick chat and emotes only, and their parties are invite-only. If you block someone, we remember that on your device. If you report someone, we keep the report — who reported whom, in which party, when and why — but no conversation, because none is kept. We keep a report for 12 months, then delete it.
 
 ## 3. AI-Generated Content
 
