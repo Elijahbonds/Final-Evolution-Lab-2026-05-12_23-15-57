@@ -110,6 +110,10 @@ export const MIGRATED: Record<string, {
     allowHex: ['#fbbf24'],   // the touch deck's BALL! slot colour: TouchOverlay takes a hex string and tints with it (call-for-ball-tests pins the override)
     keys: 'ast banner court foeScore hint mic micWho onBall overdrive passPreview score shotMeterGreen shotMeterT synergy time'.split(' '),
   },
+  'three-point-babylon.tsx': {
+    modeId: '"threepoint"',
+    keys: 'ball ballIdx banner board clock cut heat left meter meterGreen meterHalf money moneyRack need rack rackIdx relPips round score streak'.split(' '),
+  },
 };
 
 /** Shared HUD pieces a migrated host draws through, held to the same rules. (boost-hud: the racing hosts' and the boards' boost meter; judge-cards: the dunk and dunk-duel judges' row; hoops-shot-meter: the 1v1 and 3v3 release bar.) */
