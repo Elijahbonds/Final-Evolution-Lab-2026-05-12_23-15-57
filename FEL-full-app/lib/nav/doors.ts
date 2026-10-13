@@ -31,6 +31,7 @@ export const DOORS: Door[] = [
 
   // PROFILE — what you own, what you have done, what you make.
   { href: '/press', label: 'Books', tab: 'profile' },
+  { href: '/account/bookings', label: 'Bookings', tab: 'profile' },   // OWNER-FOLLOWUPS (2026-10-13): paid reviews and calls, after the thanks page
   { href: '/team', label: 'Team', tab: 'profile' },
   { href: '/cards', label: 'Card collection', tab: 'profile' },
   { href: '/account', label: 'Account', tab: 'profile' },

@@ -5,6 +5,7 @@ import { Gem, Shirt, Store, CalendarDays, PersonStanding } from 'lucide-react';
 import { authOptions } from '@/lib/auth';
 import { loginPath } from '@/lib/auth/safeNext';
 import { prisma } from '@/lib/db';
+import { isCoachStoreEnabled } from '@/lib/flags';
 import { readWallet } from '@/lib/wallet/wallet-service';
 import { prqScore, prqGrade } from '@/lib/prq';
 import { recoveryAsOf } from '@/lib/prq-recovery';
@@ -121,7 +122,7 @@ export default async function ProfilePage() {
       <div className="mt-8"><ReferralCard /></div>
       {/* HOTFIX (2026-09-24): reduced motion — the device decides by default; this is the override, both ways */}
       <div className="mt-8"><MotionSetting /></div>
-      <DoorsRow tab="profile" />
+      <DoorsRow tab="profile" hide={isCoachStoreEnabled() ? [] : ['/account/bookings']} />
     </TabPage>
   );
 }
