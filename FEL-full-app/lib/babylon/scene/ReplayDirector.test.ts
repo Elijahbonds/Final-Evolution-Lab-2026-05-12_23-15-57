@@ -80,6 +80,7 @@ describe('the replay director', () => {
     const rd = new ReplayDirector(scene, cam, [runner]);
     // a plane banking: roll sweeps 0 → 1.2 rad over 2 s while it flies on, then the live moment holds at roll 1.2 / pitch 0.3
     for (let i = 0; i < 120; i++) { runner.position.z = i * 0.2; runner.rotation.set(0.3 * (i / 119), 0.4, 1.2 * (i / 119)); frame(); }
+    runner.rotation.set(0.9, 0.4, -0.7);   // the live moment is not the last recorded frame: a tumble that began since
     const live = runner.rotation.clone();
     const done = rd.play({ lastSeconds: 2 });
     const rolls: number[] = [];
