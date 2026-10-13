@@ -1131,7 +1131,10 @@ export const DanceMode: ModeDefinition = (() => {
     stoopCaptionUntil = 0; stoopSpeakingUntil = 0; missStreak = 0;
     resetImproveRun();
     body?.loop(SPORT_CLIP.idle, { fadeSec: 0.3 });
-    applyStageCamera(ctx, 0, 0, 0);
+    // MUSIC-SUITE P10 FIX re-landed 2026-10-13 (#46): a HARD CUT to the neutral shot. The pick branch of update() returns before
+    // any applyStageCamera call, so a glide (one 0.1 lerp step here) left the repick screen on the song's last camera
+    // frame — a streak-widened ~7 m shot, mid-sway, or 0.89 m high after a freeze — until the next count-in.
+    applyStageCamera(ctx, 0, 0, 0, true);
     ctx.setHud({ cues: [], nextStepIn: null, instruments: '', hint: '', mic: '', micWho: '' });
     showPick(ctx);
     speakStoopNow(ctx, 'dance.open');
