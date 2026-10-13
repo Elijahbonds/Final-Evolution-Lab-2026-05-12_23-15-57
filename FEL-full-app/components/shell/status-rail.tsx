@@ -16,12 +16,14 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { signOut, useSession } from 'next-auth/react';
-import { BarChart3, LogOut, Zap } from 'lucide-react';
+import { BarChart3, BookOpen, LogOut, Zap } from 'lucide-react';
 import { WALLET_REFRESH_EVENT } from '@/components/wallet-chip';
 import { DualWalletChip } from '@/components/dual-wallet-chip';
+import { readPrqDisplay, type PrqDisplay } from '@/lib/prq-display';
 import { TabBar, chromeHiddenFor } from '@/components/shell/tab-bar';
 
-interface RailData { prq: number; gradeLabel: string; gradeColor: string; isAdmin: boolean }
+// QA P0-01: the chip prints the MEASURED PRQ (lib/prq-display) — `prq` on the profile body is the seeded gameplay number.
+interface RailData { prq: PrqDisplay; isAdmin: boolean }
 
 export function StatusRail() {
   const pathname = usePathname() || '/';
@@ -35,12 +37,7 @@ export function StatusRail() {
         .then((r) => (r?.ok ? r.json() : null))
         .then((j) => {
           if (!j?.profile) return;
-          setData({
-            prq: j?.prq ?? 0,
-            gradeLabel: j?.grade?.label ?? 'READY',
-            gradeColor: j?.grade?.color ?? '#00FF9D',
-            isAdmin: j?.role === 'admin',
-          });
+          setData({ prq: readPrqDisplay(j), isAdmin: j?.role === 'admin' });
         })
         .catch(() => {});
     };
@@ -74,24 +71,34 @@ export function StatusRail() {
             <>
               <Link
                 href="/profile"
+                title={data.prq.badge}
                 className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 font-mono text-[11px] font-bold"
-                style={{ borderColor: `${data.gradeColor}33`, color: data.gradeColor, background: `${data.gradeColor}0D` }}
+                style={{ borderColor: `${data.prq.color}33`, color: data.prq.color, background: `${data.prq.color}0D` }}
               >
                 <Zap className="h-3.5 w-3.5" />
-                {Math.round(data.prq)}
-                <span className="hidden sm:inline">· {data.gradeLabel}</span>
+                {data.prq.score === null ? '—' : Math.round(data.prq.score)}
+                <span className="hidden sm:inline">· {data.prq.status}</span>
               </Link>
               <Link href="/store" aria-label="Open the store" className="transition-transform active:scale-95">
                 <DualWalletChip />
               </Link>
               {data.isAdmin && (
-                <Link
-                  href="/admin/metrics"
-                  aria-label="Growth metrics"
-                  className="hidden rounded-lg border border-white/10 p-1.5 text-white/45 transition-colors hover:text-white sm:inline-flex"
-                >
-                  <BarChart3 className="h-4 w-4" />
-                </Link>
+                <>
+                  <Link
+                    href="/admin/metrics"
+                    aria-label="Growth metrics"
+                    className="hidden rounded-lg border border-white/10 p-1.5 text-white/45 transition-colors hover:text-white sm:inline-flex"
+                  >
+                    <BarChart3 className="h-4 w-4" />
+                  </Link>
+                  <Link
+                    href="/coach/admin"
+                    aria-label="Exercise knowledge-base admin"
+                    className="hidden rounded-lg border border-white/10 p-1.5 text-white/45 transition-colors hover:text-white sm:inline-flex"
+                  >
+                    <BookOpen className="h-4 w-4" />
+                  </Link>
+                </>
               )}
             </>
           ) : (

@@ -31,7 +31,7 @@ export interface TabDef {
 export const TABS: TabDef[] = [
   {
     id: 'play', label: 'Play', href: '/play', icon: Gamepad2, accent: '#00E5FF',
-    owns: ['/play', '/modes', '/arena', '/multiplayer', '/ladder', '/story', '/try', '/venues', '/host', '/join'],
+    owns: ['/play', '/modes', '/arena', '/multiplayer', '/ladder', '/story', '/try', '/venues', '/host', '/join', '/party'],
   },
   {
     id: 'train', label: 'Train', href: '/train', icon: Dumbbell, accent: '#00FF9D',
@@ -41,7 +41,7 @@ export const TABS: TabDef[] = [
     id: 'profile', label: 'Profile', href: '/profile', icon: UserRound, accent: '#FFD700',
     owns: [
       '/profile', '/cards', '/card', '/closet', '/wallet', '/store', '/shop', '/market', '/creator', '/sessions',
-      '/account', '/settings', '/create', '/guidance', '/signature', '/support',
+      '/account', '/settings', '/create', '/guidance', '/signature', '/support', '/press', '/team',
     ],
   },
 ];
@@ -64,7 +64,10 @@ export function tabForPath(pathname: string): TabDef | null {
  * this rule is how you end up with a header over a game.
  */
 export function chromeHiddenFor(pathname: string): boolean {
-  return pathname.startsWith('/play/') || pathname.startsWith('/dev/');
+  return pathname.startsWith('/play/')
+    || pathname.startsWith('/dev/')
+    || pathname === '/story/boss'
+    || pathname === '/story/rail';
 }
 
 /**

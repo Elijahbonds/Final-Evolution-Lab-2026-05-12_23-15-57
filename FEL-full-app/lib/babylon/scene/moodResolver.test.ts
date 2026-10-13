@@ -22,7 +22,7 @@ describe('mood follows the place (A9.4)', () => {
     expect(resolveModeMood('karate-vs', 'dojoWarm', picks('cage'), false).mood).toBe('nightGame');
     expect(resolveModeMood('mixedcombat', 'goldenHour', picks('pit'), false).mood).toBe('dusk');
     expect(resolveModeMood('showdown', 'dojoWarm', picks('foundry', 'night-dojo'), false).mood).toBe('dusk');   // the arena wins, as in mountVenue
-    expect(resolveModeMood('duel', 'dojoWarm', picks('cliff'), false).mood).toBe('overcast');
+    expect(resolveModeMood('duel', 'dojoWarm', picks('cliff'), false).mood).toBe('goldenHour');   // test changed: owner chose goldenHour (2026-10-13), not nightGame (#229); was 'overcast' before #228
     expect(resolveModeMood('karate', 'dojoWarm', picks('gauntlet'), false).mood).toBe('dojoWarm');
   });
   it('the net sports, football, derby, penalty, dance and the quiz follow their place look', () => {

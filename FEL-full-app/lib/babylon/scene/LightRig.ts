@@ -8,11 +8,16 @@ import {
 import type { AbstractMesh, PBRMaterial, StandardMaterial } from '@babylonjs/core';
 import { MOODS, type VenueMood, type MoodCurves } from './moods';
 import { tierRigSettings, legacyRig, legacyMobilePost, type QualityTier } from './QualityTier';
-import { isLegacyLook, readShadowCacheParam, readMobilePostParam } from './graphicsSetting';
+import { isLegacyLook, readShadowCacheParam, readMobilePostParam, lookFeatureOff } from './graphicsSetting';
 import { mountShadowCache, shadowCacheWanted, gpuCanCopyShadowMap, type ShadowCacheHandle } from './ShadowCache';
 import { mountKickerLight, type KickerHandle } from './KickerLight';
 import { mountEmissiveGlow, type GlowHandle } from './EmissiveGlow';
 import { captureVenueReflection, type VenueReflectionHandle } from './VenueReflection';
+import { mountFixtureLights, type FixtureLightsHandle } from './FixtureLights';
+import { mountSkyDome, type SkyDomeHandle } from './SkyDome';
+import { mountAtmosphere, type AtmosphereHandle } from './Atmosphere';
+import { mountGlossyFloor, type GlossyFloorHandle } from './GlossyFloor';
+import { mountSceneDecals, type GroundDecalsHandle } from '../visual/GroundDecals';
 import { mountEnvironmentIBL } from './EnvironmentIBL';
 import { motionPolicy } from '../../a11y/reducedMotion';
 
@@ -47,6 +52,15 @@ export interface LightRigHandle {
   /** A9.10: the cached static shadows (ShadowCache.ts) — the phones' single map; null elsewhere. Armed by
    *  captureVenue (the harness calls it once load() is done). Its setRefreshEvery is the perf governor's shadow lever. */
   shadowCache: ShadowCacheHandle | null;
+  /** A9.5 second half (vis-foundation-2): the fixtures' clustered lights, mounted by captureVenue on desktop/high. */
+  readonly fixtureLights: FixtureLightsHandle | null;
+  /** A9.11 (vis-foundation-2): the live sky on the domes (desktop/high) and the procedural worlds' haze (every tier). */
+  readonly sky: SkyDomeHandle | null;
+  readonly atmosphere: AtmosphereHandle | null;
+  /** A9.7 second half (vis-foundation-2): the named glossy floor's planar mirror (desktop/high). */
+  readonly glossyFloor: GlossyFloorHandle | null;
+  /** A9.14 (vis-foundation-2): the shared ground-decal pool, also on scene.metadata.felDecals for the modes to stamp. */
+  readonly decals: GroundDecalsHandle | null;
   dispose(): void;
 }
 
@@ -141,7 +155,9 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
   // the dunk named them: 24 phone-flash discs, the 5 shot-meter planes, the player ring and its glyph tag, the 4 gulls —
   // 35 draws into the shadow map every frame, for a camera flash throwing a shadow (it is light), a gauge shadowing the
   // court and a ring shadowing the floor it lies on.
-  const NEVER_CAST = /^(vb_|bk_|nexus_sky|sky|fel_ground|venue_props_|phone_flash_|shot_meter|player_ring|player_tag|gull_\d)|_contact$|_gull_|nexus_venue_map/i;
+  // vis-foundation-2: + ProxyMesh, the clustered-light container's own tile-pass plane (FixtureLights), and the ground
+  // decals (GroundDecals: marks lying on the floor) — not scenery
+  const NEVER_CAST = /^(vb_|bk_|nexus_sky|sky|fel_ground|fel_decal_|venue_props_|phone_flash_|shot_meter|player_ring|player_tag|gull_\d|ProxyMesh$)|_contact$|_gull_|nexus_venue_map/i;
   // FOLIAGE DOES NOT CAST (2026-09-12). Measured on 1v1 with SceneInstrumentation: 377 shadow
   // casters against 150 active meshes, and 377 x 3 cascades accounts for essentially all 1136 draw
   // calls — the draw budget IS the shadow pass. Grouping the casters by name showed the bulk is
@@ -215,6 +231,11 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
   // builds the venue, so every fixture's glow shader compiles during the load and never mid-play
   const glow = T.glow ? mountEmissiveGlow(scene, tier, mood) : null;
   let venueProbe: VenueReflectionHandle | null = null;
+  let fixtureLights: FixtureLightsHandle | null = null;
+  let sky: SkyDomeHandle | null = null;
+  let atmosphere: AtmosphereHandle | null = null;
+  let glossyFloor: GlossyFloorHandle | null = null;
+  let decals: GroundDecalsHandle | null = null;
 
   liftBlackMaterials(scene);
 
@@ -228,6 +249,17 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
     },
     captureVenue(at) {
       shadowCache?.arm();   // load() is done: the venue's casters are in — watch, then bake the still ones once
+      // A9.5 second half: the fixtures light the place (desktop/high; mounted once here, at the load→ready boundary, so the
+      // materials' one recompile for the new light happens behind the splash)
+      if (!legacy && tier !== 'mobile' && !lookFeatureOff('fixtures')) { fixtureLights?.dispose(); fixtureLights = mountFixtureLights(scene, tier, mood, at ?? null); }
+      // A9.11: the sky on the domes the venue left (desktop/high), and air over a world nobody else fogs (every tier)
+      if (!legacy) {
+        sky?.dispose(); sky = mountSkyDome(scene, mood, tier, lookFeatureOff('sky'));
+        atmosphere?.dispose(); atmosphere = mountAtmosphere(scene, mood, lookFeatureOff('air'));
+        // A9.7 second half: the gym's / the stage's floor reflects the players (before the probe: a mirrored floor keeps it)
+        glossyFloor?.dispose(); glossyFloor = mountGlossyFloor(scene, tier, at ?? null, lookFeatureOff('mirror'));
+        decals?.dispose(); decals = mountSceneDecals(scene, tier);   // A9.14: scuffs and footprints for the modes to stamp
+      }
       if (!T.venueProbe) return false;
       const where = at?.clone() ?? null;
       scene.executeWhenReady(() => {
@@ -238,6 +270,11 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
       return true;
     },
     get venueProbe() { return venueProbe; },
+    get fixtureLights() { return fixtureLights; },
+    get sky() { return sky; },
+    get atmosphere() { return atmosphere; },
+    get glossyFloor() { return glossyFloor; },
+    get decals() { return decals; },
     flashBeat() {
       // HOTFIX (2026-09-24): reduced motion — no exposure flash (a made three, a momentum tier, the storm's lightning:
       // the thunder still rolls, the sky just does not strobe)
@@ -262,6 +299,8 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
       kicker?.dispose();
       glow?.dispose();
       venueProbe?.dispose();
+      fixtureLights?.dispose();
+      sky?.dispose(); atmosphere?.dispose(); glossyFloor?.dispose(); decals?.dispose();
       hemi.dispose(); sun.dispose(); shadows.dispose(); pipeline.dispose();
       disposeEnv();
     },

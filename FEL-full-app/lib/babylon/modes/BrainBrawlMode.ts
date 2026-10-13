@@ -68,6 +68,7 @@ import { buildStage, SEATS, HOST_AT, HOST_CENTRE, WHEEL, type StageHandle } from
 import { BB_HOST, SEAT_LINES, hostLines, pickFrom, spinLines, type HostMoment, type SeatBeat } from '../party/brainBrawlLines';
 import { plantFeet, type PodiumFeet } from '../party/podiumFeet';
 import { EffectsKit } from '../visual/EffectsKit';
+import { motionPolicy } from '@/lib/a11y/reducedMotion';   // vis-party
 import { HAPTIC, padRumble } from '../premium/Haptics';
 // IMPROVE (2026-10-06): the owner-picked pass — its pure rules (brainBrawlPlay) and the two core helpers it added
 import { soloTier, scoreParts, type ChallengeKind } from '../core/BrainBrawlCore';
@@ -86,6 +87,11 @@ import { roundKindFrom, REVIEW_BEST_KEY, type ReviewChallenge } from '../core/Br
 import { loadReviewSet } from './brainBrawlReview';
 
 type Phase = 'pick' | 'spin' | 'howto' | 'expose' | 'answer' | 'result' | 'done';
+
+/** QA P2-05 (2026-09-27): a first visit read "best 0" — a personal best nobody set. No best yet says "first run". */
+export function bestLine(best: number): string {
+  return best > 0 ? `best ${best}` : 'first run';
+}
 const MAX_ROUNDS = 15;
 /** The spin, then the LANDING beat: the wheel stopped, the category named — before the card goes up. */
 // Feel: the wheel and the verdict used to hold 2.2 + 0.7 and 3.2 s (skip at 0.9). A night of five claims
@@ -463,7 +469,7 @@ export const BrainBrawlMode: ModeDefinition = (() => {
     const opt = (n: number, label: string) => (S.players === n ? `▸ ${label} ◂` : `  ${label}  `);
     ctx.setHud({
       banner: `${opt(1, '1P SOLO')}   ${opt(2, '2P DUEL')}`,
-      hint: `A starts ${S.players > 1 ? 'the duel · P1 faces, P2 arrows' : `solo · five categories · best ${S.best}`} · ◀ ▶ choose`,
+      hint: `A starts ${S.players > 1 ? 'the duel · P1 faces, P2 arrows' : `solo · five categories · ${bestLine(S.best)}`} · ◀ ▶ choose`,
       players: S.players, prompt: '', display: '', board: null, boardTitle: '', phase: 'pick',
     });
   }
@@ -524,6 +530,8 @@ export const BrainBrawlMode: ModeDefinition = (() => {
     SoundKit.play('uiTick', { pitch: 1.35, volume: 0.7 });
     ctx.juice.flash(CATEGORY_COLOR[cat], 110, 0.45);
     S.stage?.flash(CATEGORY_COLOR[cat], 1);
+    // vis-party: the pin throws a burst of sparks in the landed category's colour (the wheel's landing beat had a flash and a tick)
+    if (motionPolicy().flash) EffectsKit.burst(ctx.scene, new Vector3(WHEEL.x, WHEEL.y + WHEEL.r + 0.2, WHEEL.z + 0.4), 'sparks', 1.4, CATEGORY_COLOR[cat]);
     hud(ctx, S, { banner: cat, hint: S.claims[cat] !== null && seatsIn(S) > 1 ? `held by ${names(S)[S.claims[cat]!]} — take it` : '' });
     host(S, `land.${cat}` as HostMoment);
   }
@@ -664,7 +672,7 @@ export const BrainBrawlMode: ModeDefinition = (() => {
       if (cpuOn(S)) { act(S, 1, outcome === 'win' || newBest ? 'party_lose' : 'idle_stand', { loop: true, fadeSec: 0.25 }); light(S, 1, 'dim'); }
       host(S, newBest ? 'best' : 'solo.done', 'present');
       const out = S.x.strikes >= SOLO_STRIKES ? `OUT · ${SOLO_STRIKES} STRIKES · ${p1}` : `COMPOSITE · ${p1}`;   // IMPROVE #4
-      hud(ctx, S, { ...clear, banner: newBest ? `NEW BEST · ${p1}` : out, board: boardRows(S.claims, S.scores, names(S)), boardTitle: `${claimed} / 5 CLAIMED · best ${S.best}`, hint: '' });
+      hud(ctx, S, { ...clear, banner: newBest ? `NEW BEST · ${p1}` : out, board: boardRows(S.claims, S.scores, names(S)), boardTitle: `${claimed} / 5 CLAIMED${S.best > 0 ? ` · ${bestLine(S.best)}` : ''}`, hint: '' });
     }
     SoundKit.play('whistle'); if (outcome === 'win') { SoundKit.play('crowdCheer'); for (const cr of S.crowd) cr.cheer(1); }
     const stats = { players: S.players, p2score: p2, claims: claimedBy(S.claims, 0).length, p2claims: claimedBy(S.claims, 1).length, rounds: S.round, best: S.best, cpu: cpuOn(S) ? 1 : 0, strikes: S.players === 1 ? S.x.strikes : 0 };
@@ -1012,7 +1020,7 @@ export const BrainBrawlMode: ModeDefinition = (() => {
       // propSetFor('brain_brawl') is null.)
       for (const n of S.venue?.built.root.getChildTransformNodes(true) ?? []) if (/^prop_(wall|banner)_/.test(n.name)) n.setEnabled(false);
       // the set, built to the camera's shot (BrainBrawlStage): the LED wall, the deck, the wheel, the podiums, the galleries
-      S.stage = buildStage(ctx.scene, SEAT_COLOR);
+      S.stage = buildStage(ctx.scene, SEAT_COLOR, ctx.lights.tier, ctx.lights.shadows);   // vis-party: the tier and the shadow rig, for the moving heads
       S.wheel = S.stage.wheel;
       S.anchor = new TransformNode('bb_anchor', ctx.scene); S.anchor.position.copyFrom(CAM_ANCHOR);
       // the 'court' preset and its snap, on Brain Brawl's own subject and objective (POLISH-2 N7: the whole podium in the shot)

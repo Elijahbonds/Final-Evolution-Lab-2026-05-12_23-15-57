@@ -5,6 +5,7 @@
 // Everything on screen comes from /api/ladder/enter (GET), /api/ladder/results (GET) and /api/profile.
 import { useEffect, useState } from 'react';
 import { Trophy, TrendingUp, Medal, Loader2 } from 'lucide-react';
+import { readPrqDisplay, type PrqDisplay } from '@/lib/prq-display';
 
 interface Entry { userId?: string; name?: string; bestScore: number; rank?: number; isMe?: boolean }
 interface Season { id: string; weekStart: string; weekEnd?: string; mode: string; prizePool: number; finalized?: boolean }
@@ -13,7 +14,7 @@ interface Past { id: string; weekStart: string; mode: string; prizePool: number;
 export function LadderView() {
   const [current, setCurrent] = useState<{ season: Season | null; entries: Entry[] } | null>(null);
   const [past, setPast] = useState<Past[]>([]);
-  const [prq, setPrq] = useState<{ prq: number; grade?: { label?: string; color?: string } } | null>(null);
+  const [prq, setPrq] = useState<PrqDisplay | null>(null);   // QA P0-01: the measured PRQ, never the seeded profile number
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
 
   useEffect(() => {
@@ -26,7 +27,7 @@ export function LadderView() {
       if (!live) return;
       setCurrent({ season: cur?.season ?? null, entries: (cur?.entries ?? []).map((e: Entry, i: number) => ({ ...e, rank: i + 1 })) });
       setPast(res?.seasons ?? []);
-      setPrq(prof ? { prq: prof.prq ?? 0, grade: prof.grade } : null);
+      setPrq(prof ? readPrqDisplay(prof) : null);
       setState('ready');
     }).catch(() => { if (live) setState('error'); });
     return () => { live = false; };
@@ -38,8 +39,8 @@ export function LadderView() {
       <div className="mb-6 flex items-baseline justify-between gap-4">
         <h1 className="fel-heading text-3xl font-bold">MASTERY LADDER</h1>
         {prq && (
-          <div className="flex items-center gap-2 font-mono text-sm" style={{ color: prq.grade?.color ?? '#00FF9D' }}>
-            <TrendingUp className="h-4 w-4" /> PRQ {Math.round(prq.prq)} · {prq.grade?.label ?? 'READY'}
+          <div className="flex items-center gap-2 font-mono text-sm" style={{ color: prq.color }}>
+            <TrendingUp className="h-4 w-4" /> {prq.badge}
           </div>
         )}
       </div>

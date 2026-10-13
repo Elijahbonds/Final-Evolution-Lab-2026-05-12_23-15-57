@@ -10,6 +10,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import {
   createRoom, join, leave, touch, reap, isCollectable, tickAt, ackMap, type Room,
 } from './room.js';   // Node ESM resolves real paths: the extension is required at runtime
+import { acceptParty, partyHealth, sweepParties } from './partyServer.js';
 
 const PORT = Number(process.env.PORT ?? 8080);
 const TICK_MS = 1000 / 30;
@@ -31,7 +32,8 @@ function broadcast(room: Room, msg: unknown, except?: WebSocket): void {
 
 const http = createServer((req, res) => {
   // Cloud Run health check; also handy for "is netd up" from the app
-  if (req.url === '/healthz') { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ ok: true, rooms: rooms.size, peers: sockets.size })); return; }
+  // PARTY-CHAT (2026-10-13): `features` names what this build speaks; the app's party checks it on its socket instead
+  if (req.url === '/healthz') { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ ok: true, rooms: rooms.size, peers: sockets.size, ...partyHealth() })); return; }
   res.writeHead(404); res.end();
 });
 
@@ -39,6 +41,10 @@ const wss = new WebSocketServer({ server: http });
 
 wss.on('connection', (ws, req) => {
   const url = new URL(req.url ?? '/', 'http://x');
+  // PARTY-CHAT (2026-10-13): the PSN-style party lives on its own path (partyServer.ts). ADDITIVE: a match room is
+  // still `/?room=&peer=&mode=`, unchanged. An OLD netd answers `/party` with "room and peer required" and closes —
+  // which is exactly how the app tells it needs a server update.
+  if (url.pathname === '/party') { acceptParty(ws); return; }
   const roomId = url.searchParams.get('room');
   const peerId = url.searchParams.get('peer');
   const mode = url.searchParams.get('mode') ?? 'unknown';
@@ -93,6 +99,7 @@ setInterval(() => {
     for (const id of dropped) broadcast(room, { t: 'peer_leave', peer: id, authority: room.authority, authorityChanged, reason: 'timeout' });
     if (isCollectable(room, now)) rooms.delete(room.id);
   }
+  sweepParties(now);
 }, REAP_EVERY_MS);
 
 http.listen(PORT, () => console.log(`[fel-netd] listening on ${PORT}`));

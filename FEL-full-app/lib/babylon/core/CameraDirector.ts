@@ -55,6 +55,8 @@ import { Axis, Ray, TargetCamera, Vector3 } from '@babylonjs/core';
 import type { Scene, AbstractMesh } from '@babylonjs/core';
 import { enforceStandoff } from './CameraStandoff';   // M69: last-guard standoff
 import { reportDiag } from './diag';
+import { INTRO, introLetterbox, introPose, orbitBlend, smoothstep, type IntroKind } from '../scene/broadcastShots';   // vis-foundation-2 A9.12
+import { motionPolicy } from '../../a11y/reducedMotion';
 
 export type CamMode = 'follow' | 'fixed';
 
@@ -88,9 +90,11 @@ export const AIR_SIDE_EASE = 3;
 
 /**
  * The Hundred's gameplay camera, as a fraction farther than the shoulder (4.0 m) and crowd (6.4 m)
- * distances it shipped with. Owner 2026-10-01: zoom out a little, about 15–20%. One constant, both shots.
+ * distances it shipped with. Owner 2026-10-01: zoom out a little, about 15–20% (1.18). Owner 2026-10-08, after playing that:
+ * "camera is still wonky and needs to zoom out a little" — CAM-FIXES 2026-10-13: 1.18 -> 1.34 (shoulder 4.72 -> 5.36 m, crowd
+ * 7.55 -> 8.58 m), with the crowd shot now continuous (HundredCamera) and pulled back further on a narrow screen. One constant, both shots.
  */
-export const HUNDRED_CAM_PULL = 1.18;
+export const HUNDRED_CAM_PULL = 1.34;
 
 export const FOLLOW_PRESETS: Record<string, FollowConfig> = {
   // SCORECARD VISUALS (2026-09-15): golf played on 'court', which is a fitTwo preset — with the PIN as the second subject
@@ -462,8 +466,8 @@ export class CameraDirector {
    * `null` to drop the overlay. Survives setPreset, so re-apply after a preset change if the new preset
    * should NOT carry it.
    */
-  private tune: Partial<Pick<FollowConfig, 'distance' | 'height' | 'lag' | 'lookAhead'>> | null = null;
-  tuneFollow(t: Partial<Pick<FollowConfig, 'distance' | 'height' | 'lag' | 'lookAhead'>> | null): void {
+  private tune: Partial<Pick<FollowConfig, 'distance' | 'height' | 'lag' | 'lookAhead' | 'pitchCapDeg' | 'pitchFloorDeg'>> | null = null;
+  tuneFollow(t: Partial<Pick<FollowConfig, 'distance' | 'height' | 'lag' | 'lookAhead' | 'pitchCapDeg' | 'pitchFloorDeg'>> | null): void {   // CAM-FIXES: + the pitch window (Karate Endless's continuous crowd shot)
     this.tune = t ? { ...t } : null;
   }
 
@@ -471,6 +475,23 @@ export class CameraDirector {
   setBounds(b: CamBounds | null): void {
     this.bounds = b;
     this.boundsExplicit = b !== null;
+    this.boundsTried = true;
+  }
+
+  /**
+   * CAM-FIXES (2026-10-13): WIDEN the camera's roaming box without replacing it. `mountVenue` hands the director an EXPLICIT box
+   * (setBounds), and an explicit box ignores invalidateBounds() — so a mode that adds an invisible venue_box_* mesh to
+   * make room for its camera (3-Point's corner racks) got nothing from it in the real mount: only the unit test, which never calls
+   * setBounds, saw the box. This unions `b` into whatever box is in force (derived or explicit; the Y floor stays) and keeps
+   * the result explicit, so the next invalidateBounds (a preset change) cannot throw it away.
+   */
+  extendBounds(b: Pick<CamBounds, 'minX' | 'maxX' | 'minZ' | 'maxZ'>): void {
+    if (!this.boundsTried) this.deriveBounds();
+    const cur = this.bounds;
+    this.bounds = cur
+      ? { ...cur, minX: Math.min(cur.minX, b.minX), maxX: Math.max(cur.maxX, b.maxX), minZ: Math.min(cur.minZ, b.minZ), maxZ: Math.max(cur.maxZ, b.maxZ) }
+      : { minX: b.minX, maxX: b.maxX, minZ: b.minZ, maxZ: b.maxZ, minY: 0 };
+    this.boundsExplicit = true;
     this.boundsTried = true;
   }
 
@@ -565,6 +586,8 @@ export class CameraDirector {
     if (cfg.shoulderOffset) desired = desired.add(this.rightOf(back).scale(cfg.shoulderOffset));
     this.camera.position = enforceStandoff(subject, this.clampToBounds(this.resolveOcclusion(subject, desired))).pos;
     this.aim(subject, objective);
+    // an intro on screen keeps running, but the play camera it hands back to is the snapped one (A9.12)
+    if (this.intro) this.intro.play = { pos: this.camera.position.clone(), target: this.camera.getTarget().clone(), fov: this.camera.fov };
   }
 
   /** perpendicular-right of a flattened direction vector */
@@ -575,8 +598,77 @@ export class CameraDirector {
   /** The FOV the camera was authored with, captured once. Dynamic FOV is expressed as a
    *  delta from this so repeated updates cannot drift the lens wider every frame. */
   private baseFov: number | null = null;
+  /** CAM-FIXES (2026-10-13): a mode that owns its lens (Karate Endless opens it on a narrow screen) sets the authored FOV here, so the
+   *  dynamic-FOV restore above eases toward the NEW lens instead of fighting it back to the old one. A cut, not an ease: a rotate or a
+   *  resize is one. */
+  setBaseFov(fov: number): void { this.baseFov = fov; this.camera.fov = fov; }
+
+  // ── BROADCAST INTRO (vis-foundation-2 A9.12, 2026-10-13) ──
+  // A televised game opens on the venue: a high crane that comes down toward the player, a cut to a low shot on the player
+  // (the walk-in), then the game camera. `establish()` arms that for the start of play. THE PLAY CAMERA IS NOT TOUCHED: it
+  // keeps running underneath on its own state (its position is put back before every follow step and taken again after),
+  // so when the intro ends — or a press skips it — the frame is exactly where the follow would have had it. Cinematic
+  // framing only; FOLLOW_PRESETS and every follow number are unchanged. Reduced motion (travel off): no intro at all.
+  private intro: { kind: IntroKind; t: number; back: Vector3 | null; play: { pos: Vector3; target: Vector3; fov: number } | null; skip: number; last: { pos: Vector3; target: Vector3; fov: number } | null } | null = null;
+  /** Arm the intro for the next update(). False (nothing armed) under reduced motion. */
+  establish(kind: IntroKind = 'walkIn'): boolean {
+    if (!motionPolicy().travel) return false;
+    this.intro = { kind, t: 0, back: null, play: null, skip: -1, last: null };
+    return true;
+  }
+  /** An intro is on screen. */
+  get inIntro(): boolean { return this.intro !== null; }
+  /** How closed the letterbox should be for the intro (0..1) — the harness's Letterbox reads it. */
+  get cinematic01(): number {
+    const it = this.intro;
+    if (!it) return 0;
+    const k = introLetterbox(it.kind, it.t);
+    return it.skip >= 0 ? k * (1 - smoothstep(it.skip / INTRO.skipSec)) : k;
+  }
+  /** A press during the intro: ease into the play camera now (INTRO.skipSec, round the player — never through them). */
+  skipIntro(): void { if (this.intro && this.intro.skip < 0) this.intro.skip = 0; }
+  /** Drop the intro on the spot (a reset, a cut the mode makes itself); the camera is left where the play camera wants it. */
+  endIntro(): void {
+    const it = this.intro; this.intro = null;
+    if (it?.play) { this.camera.position.copyFrom(it.play.pos); this.camera.setTarget(it.play.target); this.camera.fov = it.play.fov; }
+  }
 
   update(subject: Vector3, velocity: Vector3, objective: Vector3 | null): void {
+    const it = this.intro;
+    if (!it || this.suspended) { this.updatePlay(subject, velocity, objective); return; }
+    // the play camera runs underneath, on its own state
+    if (it.play) { this.camera.position.copyFrom(it.play.pos); this.camera.setTarget(it.play.target); this.camera.fov = it.play.fov; }
+    else { const b = this.camera.position.subtract(subject); b.y = 0; it.back = b.lengthSquared() > 1e-4 ? b.normalize() : new Vector3(0, 0, -1); }
+    this.updatePlay(subject, velocity, objective);
+    const play = { pos: this.camera.position.clone(), target: this.camera.getTarget().clone(), fov: this.camera.fov };
+    it.play = play;
+    const dt = Math.min(0.1, this.scene.getEngine().getDeltaTime() / 1000);
+    it.t += dt;
+    const pose = introPose(it.kind, it.t, subject, it.back ?? new Vector3(0, 0, -1));
+    if (pose === 'play') { this.intro = null; return; }   // the follow just wrote the frame: a clean cut to play
+    let pos = new Vector3(pose.pos.x, pose.pos.y, pose.pos.z);
+    const target = new Vector3(pose.target.x, pose.target.y, pose.target.z);
+    // the crane stays inside the venue; the player shot stays out of the walls (the play camera's own guards)
+    pos = it.t < INTRO.craneSec ? this.clampToBounds(pos) : this.clampToBounds(this.resolveOcclusion(subject, pos));
+    let fov = pose.fov ?? play.fov;
+    let tgt = target;
+    if (it.skip >= 0) {
+      if (!it.last) it.last = { pos: pos.clone(), target: tgt.clone(), fov };
+      it.skip += dt;
+      const k = smoothstep(it.skip / INTRO.skipSec);
+      if (k >= 1) { this.intro = null; return; }
+      const o = orbitBlend(it.last.pos, play.pos, subject, k);
+      pos = new Vector3(o.x, o.y, o.z);
+      tgt = Vector3.Lerp(it.last.target, play.target, k);
+      fov = it.last.fov + (play.fov - it.last.fov) * k;
+    }
+    this.camera.position.copyFrom(pos);
+    this.camera.setTarget(tgt);
+    this.camera.fov = fov;
+  }
+
+  /** The play camera (the follow / fixed framing every mode was tuned on). `update` wraps it for the intro. */
+  private updatePlay(subject: Vector3, velocity: Vector3, objective: Vector3 | null): void {
     if (this.suspended) return;
     this.beatT = Math.max(0, this.beatT - this.scene.getEngine().getDeltaTime() / 1000);
 

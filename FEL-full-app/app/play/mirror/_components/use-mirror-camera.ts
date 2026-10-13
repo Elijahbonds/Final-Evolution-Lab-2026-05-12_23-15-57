@@ -30,7 +30,7 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from '
 // engine loads on demand through loadMirror().
 import type { MirrorMountOpts, MirrorRuntime, SessionSummary } from '@/lib/babylon/nexus/neuro-mirror/render/overlay-compositor';
 import {
-  FrameView, HUD_HZ, MirrorWakeLock, PoseClock, cameraErrorLine, mergeSummaries,
+  FrameView, HUD_HZ, MirrorWakeLock, PoseClock, mirrorStartErrorText, mergeSummaries,
   type WakeLockApiLike, type WakeLockState,
 } from '@/lib/mirror/liveCamera';
 
@@ -153,7 +153,7 @@ export function useMirrorCamera(hooks: MirrorCameraHooks = {}) {
       console.error('[FEL-MIRROR] start failed', e);
       // MIRROR-FIRST P1: a failed start lets go of the camera too (a dead 3D overlay used to leave the light on)
       release();
-      setError(cameraErrorLine(e));
+      setError(mirrorStartErrorText(e, typeof window === 'undefined' || window.isSecureContext !== false));
       setStatus('error');
     }
   }, [release, setStatus]);

@@ -748,6 +748,8 @@ export const FootballRushMode: ModeDefinition = (() => {
 
   return {
     modeId: 'football', mood: 'nightGame', camPreset: 'gridiron',   // WA-24: runner sat inside defenders; gridiron pulls back
+    intro: 'walkIn',   // vis-foundation-2 A9.12: the broadcast intro (crane, then the runner) — the presentation kit's proving mode
+    replay: true,      // vis-foundation-2 A9.12: record the bodies for the touchdown replay (ctx.highlight below)
 
     async load(ctx: ModeContext) {
       tier = readProfile();
@@ -1164,6 +1166,7 @@ export const FootballRushMode: ModeDefinition = (() => {
           SoundKit.play('whistle');
           return ctx.end('DRIVES_DONE', score, endStats());
         }
+        void ctx.highlight?.({ lastSeconds: 2.6, objective: new Vector3(0, 0, FIELD_LENGTH + 4) });   // vis-foundation-2 A9.12: the run, replayed (skippable)
         const next = drive + 1;
         // IMPROVE (2026-10-06) #5: the next drive waits out the spike on the mode clock (a pause holds the spike too)
         timers.later(clock, TD_HOLD_SEC, () => { if (ended) return; drive = next; newDrive(ctx, `TOUCHDOWN! · DRIVE ${next}/${DRIVES}`); }, 'drive');

@@ -59,6 +59,9 @@ import { VenueKit } from '../visual/VenueKit';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';
 import { readCombatArena, arenasFor, arenaClamp, offEdge, insideBy, describeArena, type CombatArena, knockTo } from '../combat/arenas';   // COMBAT ARENAS (2026-09-18)
 import { buildArena, type ArenaHandle } from '../combat/arenaBuild';
+import { mountCombatFx, hitKindOf, auraLevel, type CombatFx } from '../combat/combatFx';   // VISUAL PASS (2026-10-13): the hit language, the chi aura, the ring-out plume
+import { mountPresentation, type Presentation } from '../combat/presentation';   // the critical edge's grade swing, speed lines, the impact frame
+import { mountWeaponTrail, type WeaponTrail } from '../combat/weaponTrail';   // the streak a blade / staff leaves, in each fighter's colour
 import { readBlend, blendTraits } from '../combat/schools';
 import { styleMoveset } from '../combat/loadout';
 import { roundCall, UltimateArm } from './showdownRules';   // IMPROVE (2026-10-06): Showdown's round call and its one-swing ultimate arm
@@ -222,6 +225,8 @@ export const DuelMode: ModeDefinition = (() => {
   const bannerSlot = new BannerSlot();
   let arena: CombatArena = arenasFor('duel')[0];
   let arenaHandle: ArenaHandle | null = null;
+  let fx: CombatFx | null = null, pres: Presentation | null = null;   // VISUAL PASS: pooled hit sparks / rings / auras; the whole-screen beats
+  let myTrail: WeaponTrail | null = null, foeTrail: WeaponTrail | null = null;
   /** IMPROVE (2026-10-06): metres inside the picked arena's edge at (x, z), through one scratch point (the brain probes it
    *  every frame; a `{ x, z }` per call was garbage). */
   const edgeP = { x: 0, z: 0 };
@@ -443,7 +448,7 @@ export const DuelMode: ModeDefinition = (() => {
       case 'whiff': break;
       case 'blocked':
         SoundKit.play('impact', { pitch: 0.7, volume: 0.3 });
-        EffectsKit.burst(ctx.scene, defChar.root.position.add(new Vector3(0, 1.1, 0)), 'dust');
+        if (fx) fx.hit(defChar.root.position.add(new Vector3(0, 1.1, 0)), atkChar.root.position, 'guard'); else EffectsKit.burst(ctx.scene, defChar.root.position.add(new Vector3(0, 1.1, 0)), 'dust');
         break;
       case 'guardBreak':
         ctx.feel?.impact?.(0.55);   // ONE thud (the impact SFX that stacked on it is gone)
@@ -451,6 +456,7 @@ export const DuelMode: ModeDefinition = (() => {
         ctx.momentum.report({ kind: mine ? 'clean_hit' : 'blunder', weight: mine ? 14 : -10 });
         ctx.juice.shake(0.08, 120);
         console.info('[DUEL-JUICE] guard break');
+        fx?.hit(defChar.root.position.add(new Vector3(0, 1.2, 0)), atkChar.root.position, 'break');   // VISUAL PASS: a shatter — cyan, big, a ring
         banner(ctx, mine ? 'GUARD BREAK!' : 'GUARD SHATTERED!');
         break;
       case 'parried':
@@ -460,6 +466,7 @@ export const DuelMode: ModeDefinition = (() => {
         // A PARRY IS THE NEAR MISS. Reach decides this fight, so reading a swing and answering it is the
         // skill the mode is about -- and it was worth nothing to the meter.
         ctx.momentum.report({ kind: mine ? 'near_miss' : 'blunder', weight: mine ? 12 : -6 });
+        fx?.hit(defChar.root.position.add(new Vector3(0, 1.3, 0)), atkChar.root.position, 'parry');   // VISUAL PASS: the clash — a ring and a star, where steel meets
         banner(ctx, mine ? 'PARRIED!' : 'PERFECT PARRY!');
         break;
       case 'guardImpacted':
@@ -469,7 +476,7 @@ export const DuelMode: ModeDefinition = (() => {
         SoundKit.play('impact', { pitch: 2.1, volume: 0.7 });   // the GI stinger is the one sound; the feel thud is replaced by the latched hit-stop + shake
         SoundKit.play('uiTick', { pitch: 1.8, volume: 0.5 });
         heavyPunch(ctx, 'guard impact');
-        EffectsKit.burst(ctx.scene, defChar.root.position.add(new Vector3(0, 1.4, 0)), 'glitch');
+        if (fx) fx.hit(defChar.root.position.add(new Vector3(0, 1.4, 0)), atkChar.root.position, 'parry'); else EffectsKit.burst(ctx.scene, defChar.root.position.add(new Vector3(0, 1.4, 0)), 'glitch');
         ctx.camDirector.pulse(0.5, 0.45);
         banner(ctx, mine ? 'GUARD IMPACTED — PUNISH THEM!' : 'GUARD IMPACT! FREE HIT!');
         break;
@@ -487,6 +494,10 @@ export const DuelMode: ModeDefinition = (() => {
         ctx.feel?.impact?.(w === 'heavy' ? 0.55 : 0.3);   // ONE thud per connect (the impact SFX that doubled it is gone)
         ctx.momentum.report(mine ? { kind: 'clean_hit', weight: w === 'heavy' || w === 'finisher' ? 16 : 9 } : { kind: 'blunder', weight: -8 });
         if (w === 'heavy' || w === 'finisher' || ult) { heavyPunch(ctx, ult ? 'critical edge' : w); console.info(mine ? '[DUEL-JUICE] heavy landed' : '[DUEL-JUICE] heavy taken'); } else { ctx.juice.hitStop(HIT_STOP_MS[w]); console.info(mine ? '[DUEL-JUICE] hit' : '[DUEL-JUICE] taken'); }   // phase 5
+        // VISUAL PASS: every connect has a hit read now (it had none here): weight → the star / streak / ring table; the critical edge is a super
+        if (fx) fx.hit(defChar.root.position.add(new Vector3(0, 1.2, 0)), atkChar.root.position, hitKindOf(w, ult), ult ? '#ff4d5e' : undefined);
+        if (fx && w === 'finisher' && move.slam) fx.slam(defChar.root.position, 1, '#ffb070');
+        if (ult) { pres?.grade('crimson', 0.55); pres?.speedLines('255,110,120', 560); pres?.impactFrame(); }
         if (ult) { ctx.juice.flash('#ff3344', 120); ctx.camDirector.pulse(0.5, 0.45); banner(ctx, 'CRITICAL EDGE!', 900); console.info('[DL-STORM] rival critical edge landed'); }
         // phase 5: the knock slide drives the ring-out game — a drop edge lets the slide run past the rim (knockTo only clamps
         // to walls / pillars there), and checkRingOut reads the position every frame
@@ -513,8 +524,10 @@ export const DuelMode: ModeDefinition = (() => {
     foeState.chi -= SUBSTITUTION_CHI_COST;
     foeDef.spendSubstitution(now());
     foeState.stunSec = 0; foeState.staggerSec = 0;
+    const fromSpot = rival.root.position.clone();
     knock.cancel(rival.root.position);
     rival.root.position.set(spot.x, rival.root.position.y, spot.z);
+    fx?.blink(fromSpot, rival.root.position, '#ff9aa6');   // VISUAL PASS: the afterimage trail of the escape
     foeSubstituted = now() + DUEL.subWhiffMs;
     SoundKit.play('whoosh', { pitch: 1.8, volume: 0.6 });
     EffectsKit.burst(ctx.scene, new Vector3(spot.x, rival.root.position.y + 1.2, spot.z), 'glitch');
@@ -553,6 +566,11 @@ export const DuelMode: ModeDefinition = (() => {
     rivalWonLast = !playerWon;
     SoundKit.play(playerWon ? 'crowdCheer' : 'crowdGroan');
     if (playerWon) roundWinBeat(ctx);
+    if (how === 'ringout') {   // VISUAL PASS: a ring-out is a SPECTACLE — a dust plume off the rim where the body left, the fall in slow motion (animation only)
+      const v = (playerWon ? rival : player).root.position;
+      fx?.puff(v.clone().addInPlaceFromFloats(0, 0.2, 0), 2.1);
+      ctx.juice.slowMo(0.5, 700);
+    }
     meOut = !playerWon; foeOut = playerWon;
     meMove.vel.setAll(0); foeMove.vel.setAll(0); foeUlt.clear();
     banner(ctx, `${label} — ROUND ${round}`, DUEL.roundOverSec * 1000);
@@ -647,6 +665,9 @@ export const DuelMode: ModeDefinition = (() => {
     foeProp?.dispose(); foeProp = null;
     if (player) myProp = equipWeapon(ctx.scene, player.skeleton, weaponById(myWeapon), 'duel_weapon_me');
     if (rival) foeProp = equipWeapon(ctx.scene, rival.skeleton, weaponById(foeWeapon), 'duel_weapon_foe');
+    // VISUAL PASS: each weapon streaks in its fighter's colour (the player's blue, the rival's red); a fist leaves none
+    myTrail?.dispose(); myTrail = myProp ? mountWeaponTrail(ctx.scene, myProp, myWeapon, '#5ad1ff') : null;
+    foeTrail?.dispose(); foeTrail = foeProp ? mountWeaponTrail(ctx.scene, foeProp, foeWeapon, '#ff6b7a') : null;
   }
 
   // ── IMPROVE (2026-10-06): the posture feed, built once (it was a closure recreated every frame), on plain numbers ──
@@ -800,6 +821,7 @@ export const DuelMode: ModeDefinition = (() => {
       // IMPROVE (2026-10-06): the hidden `duel_disc` cylinder this used to keep under it "for the probes" is gone — nothing
       // read it, it was never shown, and its material was never disposed.
       arenaHandle?.dispose(); arenaHandle = buildArena(ctx.scene, arena, { lift: DISC_LIFT });
+      fx?.dispose(); fx = mountCombatFx(ctx.scene); pres?.dispose(); pres = mountPresentation(ctx.scene, ctx.lights?.pipeline);
 
       // 'karate_idle_stance' is a deliberate CLIP_ALIASES entry (guard @ 0.8x
       // — a slower, more grounded ready-stance pace than plain SPORT_CLIP.
@@ -942,6 +964,8 @@ export const DuelMode: ModeDefinition = (() => {
       { const fv = Math.round(focus.value); if (fv !== focusHud || focus.active !== focusHudOn) { focusHud = fv; focusHudOn = focus.active; ctx.setHud({ focus: fv, focusOn: focus.active }); } }
       const sdtRoom = dt * focus.worldScale, sdtHero = dt * focus.heroScale;
       knock.tick(sdtRoom);   // IMPROVE (2026-10-06): knockback on the room clock, every phase (a KO's slide finishes)
+      fx?.tick(dt); arenaHandle?.tick(dt);   // VISUAL PASS: the hit FX, and the arena's flames / flicker / rope glow (the Duel never ticked its arena)
+      myTrail?.drive(dt, meStrike?.current?.phase ?? null, meStrike?.current?.secToActive); foeTrail?.drive(dt, foeStrike?.current?.phase ?? null, foeStrike?.current?.secToActive);   // VISUAL PASS: the weapon streaks
       // phase 5 (IMPROVE 2026-10-06: the landing is ON the raised platform, DISC_LIFT — it was y 0, 12 cm inside it)
       if (foeLaunchedSec > 0) { foeLaunchedSec = Math.max(0, foeLaunchedSec - dt); rival.root.position.y = DISC_LIFT + launchHeight(1 - foeLaunchedSec / LAUNCH_AIR_SEC); if (foeLaunchedSec === 0) rival.root.position.y = DISC_LIFT; }
       if (!padGuard.held && xBtn.guardHeld(now() / 1000) && meState.controllable) { padGuard.press(now()); if (!guardUp) { guardUp = true; meDef.pressBlock(now(), false); meState.pressBlock(now()); SoundKit.play('impact', { pitch: 1.3, volume: 0.18 }); } }   // phase 3: the hold is the guard (P7: the pad's, apart from a body guard already up)
@@ -954,6 +978,7 @@ export const DuelMode: ModeDefinition = (() => {
       }
       tickBeats(dt);   // IMPROVE (2026-10-06): each fighter's reaction and guard flashes on its own timer
       if (phase !== 'fighting') {
+        fx?.clearAuras();
         // the weapon pick, READY and the verdict: nobody acts; the trees still run — the KO'd body holds the floor and the
         // winner celebrates (IMPROVE 2026-10-06)
         animate(dt); pushHud(ctx); camera(ctx, dt);
@@ -961,6 +986,7 @@ export const DuelMode: ModeDefinition = (() => {
       }
 
       meState.tick(sdtHero); foeState.tick(sdtRoom);   // phase 8: a clock per rig
+      if (fx) { fx.aura('me', player.root, auraLevel(meState.chi, CHI_MAX), '#ffd36b'); fx.aura('foe', rival.root, auraLevel(foeState.chi, CHI_MAX), '#ff4d5e'); }   // VISUAL PASS: the full-chi aura (the critical edge is ready)
 
       // 8-way movement (both fighters orbit the disc)
       if (meState.controllable && !meStrike.busy && !meDef.blocking) {
@@ -1007,6 +1033,7 @@ export const DuelMode: ModeDefinition = (() => {
       knock.clear(); bannerSlot.clear(); foeUlt.clear();
       modeVenue?.dispose?.(); modeVenue = null;
       arenaHandle?.dispose(); arenaHandle = null;
+      fx?.dispose(); fx = null; pres?.dispose(); pres = null; myTrail?.dispose(); myTrail = null; foeTrail?.dispose(); foeTrail = null;
       // the props are parented to a hand bone, so disposing the character takes them — but they are also
       // rebuilt on every weapon change, and a stale one left behind would ride the next round's rig
       myProp?.dispose(); myProp = null;

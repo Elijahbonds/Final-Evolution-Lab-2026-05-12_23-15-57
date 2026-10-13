@@ -63,10 +63,13 @@ import { EvadeMoves } from '../core/EvadeMoves';
 import { FOCUS, FocusMeter, WALL_RUN, wallRunAvailableOn, startWallRunOn, wallRunOnAt, wallRunOnSide, startWallKick, wallKickAt, kickHits, type WallRunOn, type WallKickState } from '../core/MatrixFocus';   // MATRIX FOCUS (2026-09-18)
 import { readCombatArena, arenasFor, arenaClamp, knockTo, hazardAt, spawnRadius, describeArena, insideBy, crowdRing, CROWD_GAP, CROWD_PHASE, ROPES, type CombatArena, type ArenaWall } from '../combat/arenas';   // COMBAT ARENAS (2026-09-18)
 import { buildArena, type ArenaHandle } from '../combat/arenaBuild';
+import { mountCombatFx, hitKindOf, auraLevel, uncastShadow, type CombatFx } from '../combat/combatFx';   // VISUAL PASS (2026-10-13): the hit language, the chi aura, the agents' arrival ring
+import { mountPresentation, type Presentation } from '../combat/presentation';   // the chi burst's grade swing, speed lines, the impact frame
 import { HORDE_WINDOW_SEC } from '../core/DodgeRead';
-import { Color3, Matrix, Mesh, MeshBuilder, PBRMaterial, StandardMaterial, Vector3, type Material } from '@babylonjs/core';
+import { Color3, Matrix, Mesh, MeshBuilder, PBRMaterial, StandardMaterial, Vector3, type Material, type TargetCamera } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { Mob, MobPool, STEERING_PRESETS } from '../core/MobSteering';
+import { HundredCamera, limitCameraStep, type Foe as CamFoe } from '../core/HundredCamera';   // CAM-FIXES (2026-10-13): the damped, continuous crowd shot
 // BIOMECH-WAVE2 (2026-09-09) — the game-wide bar on the gauntlet (SPEC-FEL-BIOMECH-GAMEWIDE G1–G6). Two findings:
 //   G1/G4  a strike SNAPPED the fighter onto the nearest agent in one frame (`player.root.rotation.y = atan2(to)` at
 //          the top of `strike()`, up to 180° in a single frame with the swing clip already crossfading in) — the exact
@@ -301,6 +304,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
   // shape is the clamp, its walls are what the wall run takes, its edge decides whether a shove stops, bounces or falls.
   let arena: CombatArena = arenasFor('karate')[0];
   let arenaHandle: ArenaHandle | null = null;
+  let fx: CombatFx | null = null, pres: Presentation | null = null;   // VISUAL PASS: pooled hit sparks / rings / auras; the whole-screen beats
   let hazardTickAt = -1e9;
   const heroVel = new Vector3();
   const matrixStats = { wallRuns: 0, wallKicks: 0, kickHits: 0, focusStrikes: 0 };
@@ -449,7 +453,12 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     flowBanner(ctx, `TAKEDOWN ×${fe.count}`, 1000);
     return true;
   }
-  let camCrowd = false;                             // H8: surrounded → the crowd preset
+  // CAM-FIXES (2026-10-13): H8's discrete 'surrounded -> fightCrowd' preset flip is gone — the camera is one continuous, damped shot
+  // (core/HundredCamera): crowd01 eases up and down, the facing and the aim are smoothed, a narrow screen pulls back. Its scratch:
+  const hundredCam = new HundredCamera();
+  const camFoes: CamFoe[] = [];
+  const camFacing = new Vector3(0, 0, 1), camFocus = new Vector3(), camBefore = new Vector3();
+  let camBaseFov = -1;
   let xHoldSec = -1, iframeSec = 0;
   let lastXTapSec = -1e9, lastDashSec = -1e9;   // STORM: the double tap, and the rush out of a dash
   let stickX = 0, stickY = 0;
@@ -578,6 +587,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     const targetScale = char.root.scaling.clone();
     char.root.scaling.scaleInPlace(0.001);
     if (!lightFx) {
+      fx?.ring(pos, 1.5, '#22d3ee', 0.45);   // VISUAL PASS: a cyan shockwave on the floor where the agent materialises, under the glitch pop
       EffectsKit.burst(ctx.scene, pos.add(new Vector3(0, 1, 0)), 'glitch');
       SoundKit.play('powerUp', { pitch: 1.6, volume: 0.25 });
     }
@@ -725,7 +735,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
         : MeshBuilder.CreateBox(`ke_pick_${kind}`, { size: 0.28 }, ctx.scene);
       mesh.material = sharedMat(ctx, PICKUP_STYLE[kind].hex);
       if (kind === 'shard') mesh.rotation.x = Math.PI / 2;   // a standing disc
-      mesh.isPickable = false;
+      mesh.isPickable = false; uncastShadow(ctx.scene, mesh);   // VISUAL PASS: a pickup throws no shadow (it was drawn into the shadow map every frame)
     }
     mesh.setEnabled(true); mesh.isVisible = true;
     mesh.position.copyFromFloats(at.x, 0.45, at.z); clampDisc(mesh.position);
@@ -780,6 +790,8 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     const origin = player.root.position.clone();
     EffectsKit.burst(ctx.scene, origin.add(new Vector3(0, 1.1, 0)), 'glitch');
     EffectsKit.burst(ctx.scene, origin.add(new Vector3(0, 0.4, 0)), 'sparks');
+    // VISUAL PASS: the chi burst is the Hundred's super — a gold shockwave, speed lines, the grade swings gold, one negative frame
+    fx?.slam(origin, 1.5, '#ffd36b'); pres?.grade('gold', 0.45); pres?.speedLines('255,214,120', 480); pres?.impactFrame();
     striking = true; strikeSeq++; strikeMove = MOVES.typhoon; strikeStartedAt = gameSec; strikeHitDone = true;
     myStrike = { weight: 'finisher', clip: STRIKES.Y.clip, until: now() + STRIKE_MAX_SEC * 1000 };   // the tree plays it; its settle ends the swing
     for (const e of liveBodies()) {
@@ -1137,7 +1149,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     if (mesh && mesh.getScene() !== ctx.scene) { mesh.dispose(); mesh = null; }
     if (!mesh) {
       mesh = MeshBuilder.CreateTorus(`ke_shock_${shockRings.length}`, { diameter: 1, thickness: 0.06, tessellation: 40 }, ctx.scene);
-      mesh.material = sharedMat(ctx, '#9FF6FF'); mesh.isPickable = false;
+      mesh.material = sharedMat(ctx, '#9FF6FF'); mesh.isPickable = false; uncastShadow(ctx.scene, mesh);
     }
     mesh.setEnabled(true); mesh.visibility = 1; mesh.scaling.setAll(0.001);
     mesh.position.copyFromFloats(at.x, 0.08, at.z);
@@ -1300,7 +1312,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     if (focus.active && !ally) { t.hp = Math.max(0, hpBefore - Math.round((hpBefore - t.hp) * FOCUS.damageMult)); matrixStats.focusStrikes++; }   // MATRIX: a Focus strike hits harder
     if (!ally) { focus.gain(FOCUS.hitGain); gainChi(ctx, 8); }
     ctx.feel?.impact?.(launch ? 0.55 : 0.35);
-    EffectsKit.burst(ctx.scene, t.mob.char.root.position.add(new Vector3(0, 1.1, 0)), 'sparks');
+    if (fx) fx.hit(t.mob.char.root.position.add(new Vector3(0, 1.1, 0)), src, hitKindOf(weight)); else EffectsKit.burst(ctx.scene, t.mob.char.root.position.add(new Vector3(0, 1.1, 0)), 'sparks');
     if (launch) EffectsKit.burst(ctx.scene, t.mob.char.root.position.add(new Vector3(0, 0.2, 0)), 'dust');
     t.hitAt = gameSec;
     if (t.hp <= 0) { if (!ally) focus.gain(FOCUS.koGain); ko(ctx, t); return; }
@@ -1394,7 +1406,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     if (!e.bar) {
       const bar = MeshBuilder.CreatePlane(`mook_bar_${Math.random().toString(36).slice(2, 8)}`, { width: BAR_W, height: 0.055 }, ctx.scene);
       bar.billboardMode = Mesh.BILLBOARDMODE_ALL;
-      bar.isPickable = false;
+      bar.isPickable = false; uncastShadow(ctx.scene, bar);   // VISUAL PASS: a health bar casts no shadow (it was drawn into the shadow map every frame)
       bar.renderingGroupId = 1;                      // over the bodies, never inside one
       e.bar = bar; e.barK = -1;
     }
@@ -1597,7 +1609,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     gainChi(ctx, 4);
     ctx.feel?.impact?.(e.brain.strike === 'kick' ? 0.55 : 0.4);
     ctx.momentum.report({ kind: 'blunder', weight: -10 });   // taking one cools the run
-    EffectsKit.burst(ctx.scene, player.root.position.add(new Vector3(0, 1.2, 0)), 'sparks');
+    if (fx) fx.hit(player.root.position.add(new Vector3(0, 1.2, 0)), e.mob.char.root.position, e.brain.strike === 'kick' ? 'medium' : 'light', '#ff6a5a'); else EffectsKit.burst(ctx.scene, player.root.position.add(new Vector3(0, 1.2, 0)), 'sparks');   // VISUAL PASS: a blow TAKEN reads red
     shove(e, VITALS.knockbackM);
     publishHp(ctx);
     if (outcome === 'down') downPlayer(ctx);
@@ -1803,7 +1815,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
         if (!e.cue) {
           const cue = MeshBuilder.CreatePlane(`threat_cue_${e.mob.char.root.uniqueId}`, { width: 0.28, height: 0.28 }, ctx.scene);
           cue.billboardMode = Mesh.BILLBOARDMODE_ALL;
-          cue.isPickable = false;
+          cue.isPickable = false; uncastShadow(ctx.scene, cue);
           cue.material = sharedMat(ctx, '#ff3355');
           e.cue = cue;
         }
@@ -1822,7 +1834,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       if (off && !e.carried) {
         if (!e.arrow) {
           const arrow = MeshBuilder.CreateCylinder(`threat_arrow_${e.mob.char.root.uniqueId}`, { diameterTop: 0, diameterBottom: 0.22, height: 0.42, tessellation: 6 }, ctx.scene);
-          arrow.isPickable = false;
+          arrow.isPickable = false; uncastShadow(ctx.scene, arrow);
           arrow.material = sharedMat(ctx, '#ffcc33');
           e.arrow = arrow;
         }
@@ -1879,6 +1891,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       console.info(`[ARENA] karate · ${describeArena(arena)}`);
       karateVenue = mountVenue(ctx, 'karate_endless', { keepGameplayCamera: true, arena });
       arenaHandle?.dispose(); arenaHandle = buildArena(ctx.scene, arena);
+      fx?.dispose(); fx = mountCombatFx(ctx.scene); pres?.dispose(); pres = mountPresentation(ctx.scene, ctx.lights?.pipeline);
       // L4 — the Shadow Gauntlet is a gauntlet, and a gauntlet has an audience.
       // Ringed OUTSIDE the fighting area and inside the mat, so nobody stands
       // anywhere the fight can reach. Instanced silhouettes, never rigs: this
@@ -1980,6 +1993,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       book.reset(); queue.clear(); carry = null; gameSec = 0; strikeSeq = 0; strikeMove = null; strikeHitDone = true; landed = []; shopOpen = false;
       deferred.clear(); ledger.reset(); bodyQueued = null; ctxRef = ctx;   // P7
       striking = false; blocking = false; dodging = false; xHoldSec = -1; iframeSec = 0; lastXTapSec = -1e9; lastDashSec = -1e9; endSlowMo(ctx); padBlock.reset();
+      hundredCam.reset(); camBaseFov = -1;   // CAM-FIXES: the declared cut — the first frame starts at the fighter, nothing eased from before
       ctx.camDirector.snapTo(player.root.position, player.root.position.add(facingVec()));
       karateVenue?.hidePlaceholders();  // M74
       SoundKit.startAmbient('dojo');
@@ -2234,13 +2248,25 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       // look-ahead target, which is exactly the desired effect here — the
       // camera looks slightly down the direction you're facing.
       crowd?.update(dt);
-      // surrounded by three or more inside the crowd-clear radius: the camera
-      // pulls back and up so the horde is the shot (preset change on the
-      // transition only — setPreset re-derives the venue bounds)
-      const surroundedNow = crowdAround(player.root.position) >= CROWDCLEAR_MIN_SURROUNDED;   // (IMPROVE 2026-10-06: no map a frame)
-      if (surroundedNow !== camCrowd) { camCrowd = surroundedNow; ctx.camDirector.setPreset(camCrowd ? 'fightCrowd' : 'fightShoulder'); }
+      fx?.tick(dt); fx?.aura('me', player.root, auraLevel(chi, 100, 0.6), '#ffd36b');   // VISUAL PASS: the hit FX; the chi aura swells toward the burst (a column when it is ready)
+      // CAM-FIXES: ONE continuous shot, no preset flip. Every live foe (not the one in your hands) shapes how far the camera stands;
+      // the facing and the aim it follows are smoothed (HundredCamera), so a KO or a turn on a dime can no longer move the frame in one step.
+      camFoes.length = 0;
+      for (const e of enemies) if (e.hp > 0 && !e.carried) camFoes.push(e.mob.char.root.position);
+      const eng = ctx.scene.getEngine();
+      if (camBaseFov < 0) camBaseFov = ctx.scene.activeCamera ? ctx.scene.activeCamera.fov : 0.8;   // the lens the harness authored, read once
+      const shot = hundredCam.update(dtReal, player.root.position, { x: Math.sin(player.root.rotation.y), z: Math.cos(player.root.rotation.y) }, camFoes, eng.getRenderWidth() / Math.max(1, eng.getRenderHeight()), camBaseFov);
+      if (Math.abs(shot.fov - (ctx.scene.activeCamera?.fov ?? shot.fov)) > 0.002) ctx.camDirector.setBaseFov(shot.fov);   // a rotate / resize: one cut of the lens
+      ctx.camDirector.tuneFollow({ distance: shot.distance, height: shot.height, lag: shot.lag, pitchCapDeg: shot.pitchCapDeg, pitchFloorDeg: shot.pitchFloorDeg });
+      camFacing.set(shot.facing.x, 0, shot.facing.z);   // unit, as the director's facing-follow contract needs
+      camFocus.set(shot.focus.x, 0, shot.focus.z);
       ctx.camDirector.look(lookX, lookY, dtReal);
-      ctx.camDirector.update(player.root.position, facingVec(), nearestTo('me')?.mob.char.root.position ?? null);
+      const cam = ctx.scene.activeCamera as TargetCamera | null;
+      if (cam) camBefore.copyFrom(cam.position);
+      ctx.camDirector.update(player.root.position, camFacing, camFocus);
+      // no hard snaps except the declared cuts (load, a respawn, FrameGuard's recenter — all of which move the camera BETWEEN these two reads):
+      // whatever the director's occlusion probe did at a wall, the camera moves at most MAX_CAM_STEP a frame
+      if (cam && limitCameraStep(camBefore, cam.position, dtReal)) cam.setTarget(cam.getTarget());
       animate(mySpeed01, Math.min(1, pVel.length() / 2.6));
       publishTelemetry(ctx);
     },
@@ -2263,7 +2289,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       pickupShelf.shard = []; pickupShelf.chi = []; pickupShelf.health = []; shockShelf.length = 0;
       for (const m of sharedMats.values()) m.dispose(); sharedMats.clear();
       for (const m of kitMats.values()) m.dispose(); kitMats.clear();
-      crowd?.dispose(); crowd = null; arenaHandle?.dispose(); arenaHandle = null; karateVenue?.dispose(); karateVenue = null; player?.dispose(); partner?.dispose(); pool?.dispose(); playerSlot?.dispose(); partnerSlot?.dispose(); SoundKit.stopAmbient();
+      crowd?.dispose(); crowd = null; arenaHandle?.dispose(); arenaHandle = null; fx?.dispose(); fx = null; pres?.dispose(); pres = null; karateVenue?.dispose(); karateVenue = null; player?.dispose(); partner?.dispose(); pool?.dispose(); playerSlot?.dispose(); partnerSlot?.dispose(); SoundKit.stopAmbient();
     },
   };
 })();

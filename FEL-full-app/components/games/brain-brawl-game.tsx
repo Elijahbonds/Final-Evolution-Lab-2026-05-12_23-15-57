@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { GameProps } from '@/components/games/game-shell';
+import { prqDisplay } from '@/lib/prq-display';   // QA P0-01: the badge prints the measured PRQ
 import { QUIZ_CATEGORIES, QUIZ_BANK, type QuizQuestion } from '@/lib/quiz-data';
 import { SessionRecorder } from '@/lib/game-systems';
 import { QuizCore } from '@/lib/feel/quiz-core';
@@ -15,7 +16,7 @@ const DIFF_POINTS: Record<string, number> = { hard: 30, medium: 20, easy: 10 }; 
 
 type Phase = 'intro' | 'spin' | 'question' | 'reveal' | 'done';
 
-export default function BrainBrawlGame({ grade, prq, onEnd, gamepad }: GameProps) {
+export default function BrainBrawlGame({ grade, prqDisplay: shownPrq, onEnd, gamepad }: GameProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [phase, setPhase] = useState<Phase>('intro');
   const [score, setScore] = useState(0);
@@ -244,7 +245,7 @@ export default function BrainBrawlGame({ grade, prq, onEnd, gamepad }: GameProps
           <div className="text-[10px] uppercase tracking-wider text-white/40">Accuracy</div>
         </div>
         <div className="hidden text-right sm:block">
-          <div className="font-mono text-xs" style={{ color: grade?.color }}>PRQ {Math.round(prq)} · {grade?.label}</div>
+          <div className="font-mono text-xs" style={{ color: (shownPrq ?? prqDisplay(null)).color }}>{(shownPrq ?? prqDisplay(null)).badge}</div>
           <div className="font-mono text-[10px] text-white/40">DIFF: {difficulty().toUpperCase()}</div>
         </div>
       </div>

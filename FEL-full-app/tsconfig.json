@@ -51,6 +51,7 @@
     "lib/babylon/modes/ModeAuditRegistry.ts",
     "lib/babylon/modes/DunkMode.audit.ts",
     "server/netd/dist",
-    "server/netd/src/index.ts"
+    "server/netd/src/index.ts",
+    "server/netd/src/partyServer.ts"
   ]
 }

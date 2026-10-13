@@ -13,9 +13,13 @@
 //
 // Note the trade-off of an include list: meshes outside it do not occlude the halo, so a lamp behind a wall still glows
 // at its edge. The fixtures here stand on poles and gantries in the open, which is why the list is the right call.
+// BODIES DO OCCLUDE (vis-foundation-2, routed from vis-combat 2026-10-13): a fighter standing in front of a lantern had the
+// halo drawn straight over them. The skinned bodies are now in the list too, drawn BLACK into the glow target with depth,
+// so a lamp behind a body is hidden behind it there and only the blur's edge spills onto the silhouette (as a lens does).
+// The cost is the bodies' draws into the glow's reduced-size target, on the tiers that run the glow at all.
 
 import { GlowLayer } from '@babylonjs/core';
-import type { AbstractMesh, Material, Observer, Scene } from '@babylonjs/core';
+import type { AbstractMesh, Color4, Material, Observer, Scene, Texture } from '@babylonjs/core';
 import type { VenueMood } from './moods';
 import type { QualityTier } from './QualityTier';
 
@@ -37,6 +41,11 @@ export function glowCandidate(meshName: string, materialName: string | null | un
   return named && (hasEmissiveTexture || emissiveLuma >= GLOW_MIN_EMISSIVE);
 }
 
+/** Pure: does this mesh block the halo — a body (skinned), and not itself a fixture? */
+export function glowOccluder(meshName: string, hasSkeleton: boolean): boolean {
+  return hasSkeleton && !GLOW_MESH.test(meshName);
+}
+
 function emissionOf(mat: Material | null): { luma: number; tex: boolean } {
   const m = mat as unknown as { emissiveColor?: { r: number; g: number; b: number }; emissiveTexture?: unknown } | null;
   const c = m?.emissiveColor;
@@ -47,6 +56,8 @@ export interface GlowHandle {
   layer: GlowLayer;
   /** The fixtures it draws. */
   readonly meshes: readonly AbstractMesh[];
+  /** The bodies drawn black into the halo's target (they hide the fixtures behind them). */
+  readonly occluders: readonly AbstractMesh[];
   dispose(): void;
 }
 
@@ -66,9 +77,25 @@ export function mountEmissiveGlow(scene: Scene, tier: QualityTier, mood: VenueMo
   layer.intensity = GLOW_INTENSITY[mood] ?? 0.6;
   layer.isEnabled = false;   // an empty include list means "everything" — off until the first fixture
   const meshes: AbstractMesh[] = [];
+  const occluders: AbstractMesh[] = [];
+  const occluding = new WeakSet<AbstractMesh>();
   const seen = new WeakSet<AbstractMesh>();
+  // the occluders draw black and with no emissive texture; every fixture keeps exactly the colour the default path gives it
+  layer.customEmissiveTextureSelector = (mesh, _sub, material): Texture => (occluding.has(mesh as AbstractMesh) ? null : (material as unknown as { emissiveTexture?: Texture | null } | null)?.emissiveTexture ?? null) as Texture;
+  layer.customEmissiveColorSelector = (mesh, _sub, material, result: Color4): void => {
+    if (occluding.has(mesh as AbstractMesh)) { result.set(0, 0, 0, 1); return; }
+    const m = material as unknown as { emissiveColor?: { r: number; g: number; b: number }; emissiveTexture?: { level: number } | null; emissiveIntensity?: number; alpha: number } | null;
+    const k = (m?.emissiveTexture?.level ?? 1) * (m?.emissiveIntensity ?? 1);
+    if (m?.emissiveColor) result.set(m.emissiveColor.r * k, m.emissiveColor.g * k, m.emissiveColor.b * k, m.alpha);
+    else result.set(0, 0, 0, 1);
+  };
   const consider = (m: AbstractMesh): void => {
     if (seen.has(m) || m.isDisposed()) return;
+    if (glowOccluder(m.name, !!m.skeleton)) {
+      seen.add(m); occluding.add(m); occluders.push(m);
+      layer.addIncludedOnlyMesh(m as never);   // an include list with only bodies stays disabled (isEnabled follows the fixtures)
+      return;
+    }
     const e = emissionOf(m.material);
     if (!glowCandidate(m.name, m.material?.name, e.luma, e.tex)) return;
     seen.add(m);
@@ -80,6 +107,8 @@ export function mountEmissiveGlow(scene: Scene, tier: QualityTier, mood: VenueMo
   // Babylon announces a new mesh on the next macrotask, by which time the builders have assigned its material
   const added: Observer<AbstractMesh> = scene.onNewMeshAddedObservable.add((m) => consider(m));
   const removed: Observer<AbstractMesh> = scene.onMeshRemovedObservable.add((m) => {
+    const o = occluders.indexOf(m);
+    if (o >= 0) { occluders.splice(o, 1); layer.removeIncludedOnlyMesh(m as never); return; }
     const i = meshes.indexOf(m);
     if (i < 0) return;
     meshes.splice(i, 1);
@@ -89,6 +118,7 @@ export function mountEmissiveGlow(scene: Scene, tier: QualityTier, mood: VenueMo
   return {
     layer,
     get meshes() { return meshes; },
+    get occluders() { return occluders; },
     dispose() {
       scene.onNewMeshAddedObservable.remove(added);
       scene.onMeshRemovedObservable.remove(removed);

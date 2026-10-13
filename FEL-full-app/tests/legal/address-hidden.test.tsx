@@ -57,13 +57,13 @@ describe('no mailing address set', () => {
     const html = await render(PrivacyPage);
     expect(html).toContain('from the email address on your account. We may ask you to confirm it is you');
     expect(html).toContain('Final Evolution LLC');
-    expect(html).toContain('Policy version: 2026-10-13');
+    expect(html).toContain('Policy version: 2026-10-14b');
   });
 
   it('/terms keeps its Contact section and version', async () => {
     const html = await render(TermsPage);
     expect(html).toContain('Final Evolution LLC');
-    expect(html).toContain('Policy version: 2026-10-13');
+    expect(html).toContain('Policy version: 2026-10-14b');
   });
 
   it('/store-terms drops only the mailing-address section', async () => {

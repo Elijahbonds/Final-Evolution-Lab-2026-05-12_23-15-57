@@ -38,9 +38,15 @@ const UA = 'AgeScreenTest/1.0';
 // the applied table, at e8be09a9; COACH-AI Phase 8 prisma/pending/2026-10-07-coach-ai-{1,2}-*.sql (pending SQL only) at
 // 377a4c09 — all of them together first at the integration-3 merge of lane/finish-release).
 // SCHEMA-SYNC-198 (ProgramMessage.readAt, CoachAvailability matching #198's SQL) at 4eecc830.
+// BOOK-SHOP (PR #17) prisma/pending/2026-10-09-book-shop.sql (pending SQL only, owner applies) at 5a5c7121.
 // AGE-SCREEN originally pinned the pre-age-screen tip so that PR could not smuggle a schema change; every
 // intentional schema PR must bump this to the commit that contains its prisma/ files, or CI stays red.
-const PARENT = '4eecc83015a4433d73b4a2da50971a67f9456ce1';
+// CREATOR-PLATFORM (PR #18) prisma/pending/2026-10-13-creator-inquiry.sql (pending SQL only, owner applies) at 5a2755a4.
+// PARTY-CHAT P2 prisma/pending/2026-10-13-party-report.sql (pending SQL only; schema.prisma untouched) at be3f5207;
+// pinned at the lane/party-chat merge of lane/finish-release, the first commit carrying all three pending files.
+// PARTY-PRIVACY (this lane) prisma/pending/2026-10-13-party-report.sql RETENTION comment only (12 months, with the delete
+// statement; pending SQL only, no column or index added) at 521c52c1.
+const PARENT = '521c52c1466eef149872a469b631e31572b318f2';
 
 /** Resolve a diff base for the schema-ban check when CI's checkout is shallow. */
 function resolvePrismaDiffBase(): string {

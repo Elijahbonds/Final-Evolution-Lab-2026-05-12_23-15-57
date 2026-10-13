@@ -24,11 +24,13 @@ export const COMBAT_MODE_OF: Readonly<Record<string, CombatModeId>> = {
 
 /**
  * Arena refinements over `arenas.ts` look.mood, where the arena's own sky is a time no mood existed for until now. The
- * arena's mood stays the default; these two had a dusk/ember sky lit as goldenHour.
+ * arena's mood stays the default; the Pit and the Foundry had a dusk/ember sky lit as goldenHour, the Cliffside Shrine an
+ * overcast light under a sunset dome.
  */
 export const ARENA_MOOD: Readonly<Record<string, VenueMood>> = {
   pit: 'dusk',       // duskSky: violet over orange — "A RAISED OCTAGON"
   foundry: 'dusk',   // emberSky: the furnace glow, not a beach sunset
+  cliff: 'goldenHour', // owner 2026-10-13: golden hour, matching the sunset sky photo as shot (was 'overcast' under the sunset dome, then 'nightGame' in #229)
 };
 
 /** def.modeId → the key its PLACE LOOK is picked under (placeLooks.ts, the splash's mode id). Showdown is not here: its
