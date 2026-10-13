@@ -9,13 +9,6 @@ import { SCREEN_CONTACT_EMAIL } from '../screen/copy';
 /** The legal entity. Public prose is "Final Evolution"; the LLC form appears only in legal lines. */
 export const BUSINESS_LEGAL_NAME = 'Final Evolution LLC';
 
-/**
- * Internal marker the policy texts (lib/policies.ts) carry where the mailing address goes. It is never shown to a
- * user: the legal pages swap it for REAL_MAILING_ADDRESS or drop the line at render time. The value stays fixed
- * because the policy fingerprint (lib/policies.test.ts) covers it.
- */
-export const BUSINESS_MAILING_ADDRESS = '[Business mailing address – pending]';
-
 /** The real business mailing address, or null while none is set. While null, every legal page drops the line that would print it. Never a home or street address; set it only with the real business mailbox in its own change. */
 export const REAL_MAILING_ADDRESS: string | null = null;
 

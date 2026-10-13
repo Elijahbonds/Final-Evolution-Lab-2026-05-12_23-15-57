@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { BUSINESS_MAILING_ADDRESS } from '@/lib/legal/business';
 import { escapeHtml } from '@/lib/store-terms/render';
 
 vi.mock('next-auth', () => ({ getServerSession: vi.fn(async () => null) }));
@@ -47,8 +46,8 @@ describe('mailing address set', () => {
   ] as const) {
     it(`${name} has no placeholder, token or "pending"`, async () => {
       const html = await render(page);
-      expect(html).not.toContain(BUSINESS_MAILING_ADDRESS);
-      expect(html).not.toContain(escapeHtml(BUSINESS_MAILING_ADDRESS));
+      expect(html).not.toContain('[Business mailing address');
+      expect(html).not.toContain(escapeHtml('[Business mailing address'));
       expect(html).not.toContain('{BUSINESS_ADDRESS}');
       expect(html).not.toMatch(/pending/i);
     });
