@@ -92,10 +92,19 @@ export const MIGRATED: Record<string, {
     modeId: '"velocitykart"',
     keys: 'banner chasing cup delta draft drift gap hint item itemKind lap mini pos shield speed threat threatHop threatSide time trackCue'.split(' '),
   },
+  // lane/hud-hoops: the hoops hosts (keys frozen from the base aeb65c98, the hold-lift round's head; modeId as each host binds its splash and touch deck)
+  'carnival-babylon.tsx': {
+    modeId: '"carnival"',
+    keys: 'banner blurb board boardTitle charge chargeHi chargeLo eventNum hint mic micWho p1name p2name rivalLive rivalScore score time turnLabel'.split(' '),
+  },
+  'dunkduel-babylon.tsx': {
+    modeId: '"dunkduel"',
+    keys: 'activePlayer banner charge dunkNum hint judgeReveal mic micWho p1Score p2Score prop slamPulse style'.split(' '),
+  },
 };
 
-/** Shared HUD pieces a migrated host draws through, held to the same rules. (boost-hud: the racing hosts' and the boards' boost meter.) */
-const PIECES = ['timing-prompt.tsx', 'combat-hud-band.tsx', 'boost-hud.tsx'];
+/** Shared HUD pieces a migrated host draws through, held to the same rules. (boost-hud: the racing hosts' and the boards' boost meter; judge-cards: the dunk and dunk-duel judges' row.) */
+const PIECES = ['timing-prompt.tsx', 'combat-hud-band.tsx', 'boost-hud.tsx', 'judge-cards.tsx'];
 
 const keyRead = (src: string, k: string) => new RegExp(`hud\\.${k}\\b|hud\\[['"]${k}['"]\\]`).test(src);
 
