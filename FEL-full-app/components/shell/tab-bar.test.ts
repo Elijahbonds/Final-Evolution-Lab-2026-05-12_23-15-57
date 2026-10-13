@@ -64,6 +64,11 @@ describe('where the shell hides itself', () => {
     expect(chromeHiddenFor('/play/hoops1v1')).toBe(true);
   });
 
+  it('gets out of the way of the standalone story games', () => {
+    expect(chromeHiddenFor('/story/rail')).toBe(true);
+    expect(chromeHiddenFor('/story/boss')).toBe(true);
+  });
+
   it('gets out of the way of the dev views', () => {
     expect(chromeHiddenFor('/dev/mode/karate')).toBe(true);
     expect(chromeHiddenFor('/dev/shelf/cards')).toBe(true);

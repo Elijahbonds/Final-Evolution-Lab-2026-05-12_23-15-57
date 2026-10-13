@@ -64,7 +64,10 @@ export function tabForPath(pathname: string): TabDef | null {
  * this rule is how you end up with a header over a game.
  */
 export function chromeHiddenFor(pathname: string): boolean {
-  return pathname.startsWith('/play/') || pathname.startsWith('/dev/');
+  return pathname.startsWith('/play/')
+    || pathname.startsWith('/dev/')
+    || pathname === '/story/boss'
+    || pathname === '/story/rail';
 }
 
 /**

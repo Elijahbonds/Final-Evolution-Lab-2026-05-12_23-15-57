@@ -6,6 +6,9 @@
  * reflowed, retitled or "improved". FE PM 5:51 PM PT Oct 7; copied in by AM (FE PM 3:37 AM PT Oct 8),
  * generated from the same approved section data as Part A. The business mailing address is the
  * {BUSINESS_ADDRESS} token, rendered from lib/legal/business.ts; never typed here.
+ * The text is now store-terms-2026-10-12 (LEGAL-COPY-2: Elijah, 10:07 AM PT Oct 8, yes to LEGAL-COPY-2
+ * defaults) and Part 2 is now §§2.1-2.8: the approved paste block B adds the audiobook quick-view row and
+ * §2.7 Audiobooks, and the business mailing address section is renumbered to §2.8.
  *
  * Each section's markdown is the exact lines of that section joined with '\n' plus one trailing
  * '\n', so storeTermsText() (lib/store-terms.ts) over [...STORE_TERMS_TEXT_A, ...STORE_TERMS_TEXT_B]
@@ -35,6 +38,7 @@ export const STORE_TERMS_TEXT_B: StoreTermsSection[] = [
       "| Product | Rule |\n" +
       "|---|---|\n" +
       "| 8-week program ($79) | Full refund within **14 days** of purchase |\n" +
+      "| Audiobooks (one-time) | Full refund within **14 days** of purchase; one refund per audiobook |\n" +
       "| Membership ($29.99/mo) | Cancel anytime online; access to end of the paid month; **no partial-month refunds**; first charge refundable within 7 days if no review credit used |\n" +
       "| Teen Membership ($14.99/mo) | Same as Membership; the parent cancels |\n" +
       "| Async review ($45) | Full refund before you upload; full refund if not delivered within **7 days** of upload |\n" +
@@ -133,9 +137,22 @@ export const STORE_TERMS_TEXT_B: StoreTermsSection[] = [
       "- **Changes:** a change to this policy doesn't affect a session already booked or a purchase already made. Membership changes follow §2.2.\n",
   },
   {
+    id: "refund-audiobooks",
+    markdown:
+      "## 2.7 Audiobooks (one-time)\n" +
+      "\n" +
+      "You get a **full refund if you ask within 14 days of purchase**, no questions asked. After 14 days, purchases are final, except where Terms §13 or the law says otherwise.\n" +
+      "\n" +
+      "**One refund per person per audiobook.** If you buy the same audiobook again after a refund, that purchase can’t be refunded.\n" +
+      "\n" +
+      "A refund ends your license to the audiobook, and it stops playing on your account. While a chargeback or payment dispute is open, we may pause access, and we restore it if the dispute is resolved in your favor or withdrawn (Terms §12).\n" +
+      "\n" +
+      "Audiobooks stream in the app on your own account. They can’t be downloaded, and they aren’t included in the FEL Membership or the Teen Membership.\n",
+  },
+  {
     id: "mailing-address",
     markdown:
-      "## 2.7 Business mailing address\n" +
+      "## 2.8 Business mailing address\n" +
       "You can also send cancellation requests and notices by mail to:\n" +
       "{BUSINESS_ADDRESS}\n",
   },
