@@ -16,5 +16,7 @@ export async function POST(req: Request) {
   const published = Boolean(body?.published);
   const card = await setPublished(prisma, userId, published);
   if (!card) return NextResponse.json({ error: 'no_card' }, { status: 404 });
+  // CARD-SAFE-1: under-18 (or unknown-age) accounts cannot publish a card.
+  if (card === 'adults_only') return NextResponse.json({ error: 'adults_only' }, { status: 403 });
   return NextResponse.json({ ok: true, card });
 }
