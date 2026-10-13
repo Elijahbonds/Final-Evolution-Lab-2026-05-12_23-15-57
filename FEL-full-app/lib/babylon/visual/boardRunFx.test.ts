@@ -1,10 +1,10 @@
 // vis-board (wave 2) — freerun's and big air's pieces: the world around the slab, the runner's palette, the ring, the event around the kicker.
 import { describe, expect, it } from 'vitest';
-import { FreeCamera, NullEngine, Scene, TransformNode, Vector3 } from '@babylonjs/core';
+import { Color3, FreeCamera, MeshBuilder, NullEngine, RawTexture, Scene, StandardMaterial, TransformNode, Vector3 } from '@babylonjs/core';
 import { FREERUN_TRACKS } from '../nexus/freeRunTracks';
 import { trackPieces } from '../modes/freeRunCourse';
 import { tierById } from '../core/FreeRunCore';
-import { SLAB_EDGE, TRACK_KINDS, dressingSpots, footprint, mountFreeRunDressing } from './freeRunDressing';
+import { SLAB_EDGE, TRACK_KINDS, YARD_DROP, YARD_INNER, dressingSpots, footprint, mountFreeRunDressing } from './freeRunDressing';
 import { EDGE_KINDS, KEEP_SATURATION, MARKER_KINDS, RED_KINDS, RUNNER_RED, chroma, desaturate, runnerLook } from './runnerPalette';
 import { RING_POOL, RING_SEC, ShockRing, ringState } from './ShockRing';
 import { eventLayout, fireworksWorthy, judgeSpread, mountBigAirEvent, scoreColor } from './bigAirDressing';
@@ -47,9 +47,30 @@ describe('the world around the slab', () => {
   });
 });
 
+describe('the props stand on something', () => {
+  for (const track of FREERUN_TRACKS) {
+    it(`${track.id}: a yard deck below the slab, every prop on it and none below it, and the deck clear of the course`, () => {
+      const sc = scene();
+      const h = mountFreeRunDressing(sc, track.id, trackPieces(track, tierById(1)), 'desktop');
+      const yard = sc.meshes.find((m) => m.name === 'fr_dress_yard')!;
+      expect(yard).toBeTruthy();
+      const yb = yard.getBoundingInfo().boundingBox;
+      expect(yb.maximumWorld.y).toBeCloseTo(-YARD_DROP, 2);                                     // its top is the floor the props stand on
+      expect(yb.minimumWorld.x).toBeLessThan(-YARD_INNER); expect(yb.maximumWorld.x).toBeGreaterThan(YARD_INNER);
+      for (const m of sc.meshes) {
+        if (!/^(fr_dress_|neon_sign_|lantern_mast_)/.test(m.name) || m === yard) continue;
+        m.computeWorldMatrix(true);
+        expect(m.getBoundingInfo().boundingBox.minimumWorld.y, m.name).toBeGreaterThanOrEqual(-YARD_DROP - 0.35);   // nothing hangs below its floor (a moss ball sinks a hair)
+      }
+      expect(YARD_INNER).toBeGreaterThan(SLAB_EDGE);                                           // the slab's edge is bare: the deck never reaches the course
+      h.dispose();
+    });
+  }
+});
+
 describe("the runner's colour language", () => {
   it('the verbs\' pieces are runner red with an emissive floor; the quiet world keeps a fraction of its colour; markers are untouched', () => {
-    for (const k of RED_KINDS) { const l = runnerLook(k, '#33aa99'); expect(l.hex, k).toBe(RUNNER_RED); expect(l.red).toBe(true); expect(l.emissive).toBeGreaterThan(0.2); expect(l.edges).toBe(true); }
+    for (const k of RED_KINDS) { const l = runnerLook(k, '#33aa99'); expect(l.hex, k).toBe(RUNNER_RED); expect(l.red).toBe(true); expect(l.emissive).toBeGreaterThanOrEqual(0.2); expect(l.edges).toBe(true); }
     for (const k of MARKER_KINDS) { const l = runnerLook(k, '#33aa99'); expect(l.hex, k).toBe('#33aa99'); expect(l.edges).toBe(false); }
     const quiet = runnerLook('ground', '#2a2440');
     expect(chroma(quiet.hex)).toBeLessThan(chroma('#2a2440'));
@@ -149,5 +170,54 @@ describe('the spin trails', () => {
     t.setActive(false); expect(t.active).toBe(false);
     t.dispose();
     expect(sc.meshes.filter((m) => m.name.startsWith('spin_trail_'))).toHaveLength(0);
+  });
+});
+
+// ── the unlit pieces survive LightRig.liftBlackMaterials (a black diffuse is lifted to a grey that washes an emissive out) ──
+import { liftBlackMaterials } from '../scene/LightRig';
+import { GateFlash } from './GateFlash';
+import { buildSlopeLamps } from './slopeLamps';
+import { mountWarehouseDressing } from './warehouseDressing';
+import { UNLIT_DIFFUSE_LEVEL, settleEmissive, unlitDiffuse } from './unlit';
+describe('unlit surfaces are not lifted to grey', () => {
+  it('the lift threshold is 0.04 and the unlit diffuse sits just over it', () => {
+    expect(UNLIT_DIFFUSE_LEVEL).toBeGreaterThan(0.04);
+    expect(UNLIT_DIFFUSE_LEVEL).toBeLessThan(0.06);
+    expect(unlitDiffuse()).not.toBe(unlitDiffuse());   // each material owns its colour
+  });
+  it('after the lift runs, every emissive-only material of the lane is as it was built', () => {
+    const sc = scene();
+    const gate = new GateFlash(sc);
+    const ring = new ShockRing(sc);
+    const trail = new SpinTrail(sc, new TransformNode('b', sc));
+    const lamps = buildSlopeLamps(sc, [new Vector3(0, 0, 20), new Vector3(0, -1, 40)], 20, 'desktop');
+    const wh = mountWarehouseDressing(sc, 48, 'desktop');
+    const ev = mountBigAirEvent(sc, BIG_AIR_HILL, BIG_AIR_TUNING.launchZ, () => undefined);
+    const track = FREERUN_TRACKS[0];
+    const dress = mountFreeRunDressing(sc, track.id, trackPieces(track, tierById(1)), 'desktop');
+    const before = sc.materials.filter((m) => /^(led_|lampHead|wh_shaft|gate_flash|fr_shock|spin_trail|ba_banner|ba_judge|neon_sign|lantern_mast)/.test(m.name)).map((m) => [m.name, (m as unknown as { diffuseColor?: { r: number } }).diffuseColor?.r]);
+    expect(before.length).toBeGreaterThan(8);
+    const fixed = liftBlackMaterials(sc);
+    const after = sc.materials.filter((m) => /^(led_|lampHead|wh_shaft|gate_flash|fr_shock|spin_trail|ba_banner|ba_judge|neon_sign|lantern_mast)/.test(m.name)).map((m) => [m.name, (m as unknown as { diffuseColor?: { r: number } }).diffuseColor?.r]);
+    expect(after).toEqual(before);
+    expect(fixed).toBe(0);
+    gate.dispose(); ring.dispose(); trail.dispose(); wh.dispose(); ev.dispose(); dress.dispose(); void lamps;
+  });
+  it('an emissive texture is shown on its own: the colour added to it is taken to black (the shader ADDS it, it does not scale)', () => {
+    const sc = scene();
+    const m = new StandardMaterial('with_tex', sc);
+    m.emissiveColor = new Color3(0.9, 0.95, 1);
+    expect(settleEmissive(m).emissiveColor.r).toBeCloseTo(0.9, 5);                 // no texture: the colour IS the emission, left alone
+    m.emissiveTexture = RawTexture.CreateRGBATexture(new Uint8Array([5, 8, 15, 255]), 1, 1, sc);
+    settleEmissive(m);
+    expect(m.emissiveColor.r + m.emissiveColor.g + m.emissiveColor.b).toBe(0);
+  });
+  it('and the lift DOES grey a plain black diffuse (the control: the guard measures something)', () => {
+    const sc = scene();
+    const m = new StandardMaterial('control', sc);
+    m.diffuseColor = new Color3(0, 0, 0);
+    const box = MeshBuilder.CreateBox('ctl', {}, sc); box.material = m;
+    expect(liftBlackMaterials(sc)).toBeGreaterThan(0);
+    expect(m.diffuseColor.r).toBeGreaterThan(0.2);
   });
 });

@@ -20,6 +20,7 @@ import type { AirHill } from '../../feel/cores/air-hill';
 import { hillSurface } from '../../feel/cores/air-hill';
 import { EffectsKit } from './EffectsKit';
 import { lookFeatureOff } from '../scene/graphicsSetting';   // vis-board: ?lookoff=… switches one feature off for a one-build A/B
+import { settleEmissive, unlitDiffuse } from './unlit';
 
 /** Pure: the three judges' scores around the panel's read — a fixed spread that averages back to `read` (held to 0..10). */
 export function judgeSpread(read: number, attempt: number): [number, number, number] {
@@ -108,9 +109,9 @@ export function mountBigAirEvent(scene: Scene, hill: AirHill, launchZ: number, b
     const gate = Mesh.MergeMeshes(legs, true, true);
     if (gate) { gate.name = 'ba_gate'; gate.material = steel; keep(gate); }
     const led = MeshBuilder.CreatePlane('bigair_gate_led', { width: L.gate.half * 2 - 0.5, height: 1.1 }, scene);
-    led.position.set(0, 4.95, L.gate.z + 0.3); led.rotation.y = Math.PI;   // faces +z, toward the camera behind the rider
+    led.position.set(0, 4.95, L.gate.z + 0.3); led.rotation.y = Math.PI;   // faces +z, toward the camera behind the rider (the run goes −z)
     const ledM = new StandardMaterial('led_bigair_gate', scene);
-    ledM.disableLighting = true; ledM.diffuseColor = Color3.Black(); ledM.specularColor = Color3.Black(); ledM.emissiveColor = new Color3(0.9, 0.95, 1);
+    ledM.disableLighting = true; ledM.diffuseColor = unlitDiffuse(); ledM.specularColor = Color3.Black(); ledM.emissiveColor = new Color3(0.9, 0.95, 1);
     const p = panelTexture(scene, 'ba_gate_led_tex', 1024, 128);
     if (p) {
       const { g, tex } = p;
@@ -119,8 +120,8 @@ export function mountBigAirEvent(scene: Scene, hill: AirHill, launchZ: number, b
       g.fillStyle = '#ffd75e'; g.font = 'bold 82px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('BIG AIR  ·  DROP IN', 512, 66);
       // the LED matrix: a dot grid laid over the text
       g.fillStyle = 'rgba(0,0,0,0.5)'; for (let y = 0; y < 128; y += 6) g.fillRect(0, y, 1024, 2);
-      tex.update(false);
-      ledM.emissiveTexture = tex; owned.push(tex);
+      tex.update(true);
+      ledM.emissiveTexture = tex; settleEmissive(ledM); owned.push(tex);
     }
     led.material = ledM; owned.push(ledM);
     keep(led);
@@ -129,7 +130,7 @@ export function mountBigAirEvent(scene: Scene, hill: AirHill, launchZ: number, b
   // ── the scaffold towers and their banner wraps ──
   const bannerTex = panelTexture(scene, 'ba_banner_tex', 512, 192);
   const bannerM = new StandardMaterial('ba_banner_m', scene);
-  bannerM.disableLighting = true; bannerM.diffuseColor = Color3.Black(); bannerM.specularColor = Color3.Black(); bannerM.emissiveColor = new Color3(0.85, 0.88, 0.92); bannerM.backFaceCulling = false;
+  bannerM.disableLighting = true; bannerM.diffuseColor = unlitDiffuse(); bannerM.specularColor = Color3.Black(); bannerM.emissiveColor = new Color3(0.85, 0.88, 0.92); bannerM.backFaceCulling = false;
   if (bannerTex) {
     const { g, tex } = bannerTex;
     const gr = g.createLinearGradient(0, 0, 512, 192); gr.addColorStop(0, '#0a2a6a'); gr.addColorStop(1, '#1f6feb');
@@ -137,7 +138,7 @@ export function mountBigAirEvent(scene: Scene, hill: AirHill, launchZ: number, b
     g.fillStyle = '#ffd75e'; g.fillRect(0, 150, 512, 14); g.fillStyle = '#ffffff'; g.fillRect(0, 168, 512, 6);
     g.fillStyle = '#ffffff'; g.font = 'bold 104px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('FEL', 256, 62);
     g.font = 'bold 54px sans-serif'; g.fillStyle = '#ffd75e'; g.fillText('BIG AIR', 256, 122);
-    tex.update(false); bannerM.emissiveTexture = tex; owned.push(tex);
+    tex.update(true); bannerM.emissiveTexture = tex; settleEmissive(bannerM); owned.push(tex);
   }
   owned.push(bannerM);
   for (const t of L.towers) {
@@ -178,7 +179,7 @@ export function mountBigAirEvent(scene: Scene, hill: AirHill, launchZ: number, b
     const glass = MeshBuilder.CreatePlane('ba_booth_glass', { width: 3.4, height: 1.0 }, scene);
     glass.position.set(bx, 1.7, bz + 1.62); glass.rotation.y = Math.PI;
     const gm = new StandardMaterial('ba_glass_m', scene);
-    gm.diffuseColor = Color3.Black(); gm.specularColor = new Color3(0.4, 0.4, 0.4); gm.emissiveColor = new Color3(0.08, 0.14, 0.22); gm.alpha = 0.85; gm.backFaceCulling = false;
+    gm.diffuseColor = unlitDiffuse(); gm.specularColor = new Color3(0.4, 0.4, 0.4); gm.emissiveColor = new Color3(0.08, 0.14, 0.22); gm.alpha = 0.85; gm.backFaceCulling = false;
     glass.material = gm; owned.push(gm); keep(glass);
     // three score panels on posts, raised above the roof so the camera reads them over the landing
     [-1.55, 0, 1.55].forEach((dx, i) => {
@@ -187,9 +188,9 @@ export function mountBigAirEvent(scene: Scene, hill: AirHill, launchZ: number, b
       const mesh = MeshBuilder.CreatePlane(`ba_judge_panel_${i}`, { width: 1.35, height: 0.95 }, scene);
       mesh.position.set(bx + dx, 4.65, bz + 1.5); mesh.rotation.y = Math.PI;
       const mat = new StandardMaterial(`ba_judge_m_${i}`, scene);
-      mat.disableLighting = true; mat.diffuseColor = Color3.Black(); mat.specularColor = Color3.Black(); mat.emissiveColor = new Color3(0.9, 0.92, 0.95); mat.backFaceCulling = false;
+      mat.disableLighting = true; mat.diffuseColor = unlitDiffuse(); mat.specularColor = Color3.Black(); mat.emissiveColor = new Color3(0.9, 0.92, 0.95); mat.backFaceCulling = false;
       const p = panelTexture(scene, `ba_judge_tex_${i}`, 256, 180);
-      if (p) { mat.emissiveTexture = p.tex; owned.push(p.tex); }
+      if (p) { mat.emissiveTexture = p.tex; settleEmissive(mat); owned.push(p.tex); }
       mesh.material = mat; owned.push(mat); keep(mesh);
       mesh.scaling.y = 0.0001;   // down until the first reveal: a blank card edge-on
       panels.push({ mesh, mat, tex: p?.tex ?? null, g: p?.g ?? null, t: 9, delay: i * 0.14, show: false });
@@ -202,7 +203,7 @@ export function mountBigAirEvent(scene: Scene, hill: AirHill, launchZ: number, b
     g.strokeStyle = color; g.lineWidth = 8; g.strokeRect(6, 6, 244, 168);
     g.fillStyle = '#9fb3c8'; g.font = 'bold 26px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(label, 128, 30);
     g.fillStyle = color; g.font = 'bold 96px sans-serif'; g.fillText(text, 128, 104);
-    p.tex.update(false);
+    p.tex.update(true);
   };
 
   // ── the fireworks ──

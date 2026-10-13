@@ -6,6 +6,7 @@
 
 import { Color3, Engine, MeshBuilder, StandardMaterial } from '@babylonjs/core';
 import type { Mesh, Scene } from '@babylonjs/core';
+import { unlitDiffuse } from './unlit';
 
 export const RING_SEC = 0.55;
 export const RING_POOL = 3;
@@ -28,7 +29,7 @@ export class ShockRing {
     for (let i = 0; i < RING_POOL; i++) {
       const mesh = MeshBuilder.CreateTorus(`fr_shock_${i}`, { diameter: 2, thickness: 0.1, tessellation: 36 }, scene);
       const mat = new StandardMaterial(`fr_shock_m_${i}`, scene);
-      mat.disableLighting = true; mat.diffuseColor = Color3.Black(); mat.specularColor = Color3.Black(); mat.alphaMode = Engine.ALPHA_ADD; mat.disableDepthWrite = true; mat.alpha = 0;
+      mat.disableLighting = true; mat.diffuseColor = unlitDiffuse(); mat.specularColor = Color3.Black(); mat.alphaMode = Engine.ALPHA_ADD; mat.disableDepthWrite = true; mat.alpha = 0;
       mesh.material = mat; mesh.isPickable = false; mesh.receiveShadows = false; mesh.setEnabled(false); mesh.scaling.y = 0.4;
       this.slots.push({ mesh, mat, age: RING_SEC, reach: 1 });
     }

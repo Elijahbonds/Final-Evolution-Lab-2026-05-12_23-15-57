@@ -12,6 +12,7 @@
 
 import { Color3, Matrix, MeshBuilder, PBRMaterial, StandardMaterial, Vector3 } from '@babylonjs/core';
 import type { AbstractMesh, Scene } from '@babylonjs/core';
+import { unlitDiffuse } from './unlit';
 
 /** Lamp height above the snow under it, metres. */
 export const LAMP_H = 6.4;
@@ -50,7 +51,7 @@ export function buildSlopeLamps(scene: Scene, markers: readonly Vector3[], half:
   pole.thinInstanceSetBuffer('matrix', new Float32Array(buf), 16, true);
   made.push(pole);
   const head = new StandardMaterial('lampHead_slope', scene);
-  head.emissiveColor = new Color3(0.82, 0.92, 1); head.diffuseColor = Color3.Black(); head.specularColor = Color3.Black(); head.disableLighting = true;
+  head.emissiveColor = new Color3(0.82, 0.92, 1); head.diffuseColor = unlitDiffuse(); head.specularColor = Color3.Black(); head.disableLighting = true;
   spots.forEach((s, i) => {
     const h = MeshBuilder.CreateBox(`lhead_slope_${i}`, { width: 1.1, height: 0.22, depth: 0.7 }, scene);
     // the head hangs over the groom: tilted a little toward the middle of the run

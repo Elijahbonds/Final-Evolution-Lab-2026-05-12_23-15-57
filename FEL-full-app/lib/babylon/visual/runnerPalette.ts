@@ -43,7 +43,7 @@ export interface RunnerLook { hex: string; /** the emissive floor a marker keeps
 /** Pure: the look of a course piece of `kind` whose authored colour is `hex`. */
 export function runnerLook(kind: string, hex: string): RunnerLook {
   if (MARKER_KINDS.has(kind)) return { hex, emissive: null, red: false, edges: false };
-  if (RED_KINDS.has(kind)) return { hex: RUNNER_RED, emissive: 0.35, red: true, edges: true };
+  if (RED_KINDS.has(kind)) return { hex: RUNNER_RED, emissive: 0.2, red: true, edges: true };
   return { hex: desaturate(hex, KEEP_SATURATION), emissive: null, red: false, edges: EDGE_KINDS.has(kind) };
 }
 

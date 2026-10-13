@@ -1,7 +1,7 @@
 // THE CITY BEHIND THE PLAZA (vis-board, visual wave 2, 2026-10-13) — Part B skateboard, City Plaza: "skyline silhouettes, planters,
 // banners, moving traffic in the distance." The plaza ends at its fence and then there is a photograph. This stands a city in
 // the gap: a ring of towers with lit windows past the fence, and a road round the plaza with cars on it that never stop.
-//   · THE SKYLINE — 30 boxes on a ring 36–70 m past the plaza's edge, 18–72 m tall, in four dusk blues. Four merged meshes (one per
+//   · THE SKYLINE — 30 boxes on a ring 44–84 m past the plaza's edge, 14–50 m tall, in four dusk blues. Four merged meshes (one per
 //     tint) sharing one window texture (a painted facade: most windows dark, some warm, a few cool), so the whole skyline is
 //     four draws; the windows are emissive, so the city is lit at midday too (the plaza is a hard-light place — it is the glass).
 //   · THE ROAD — a dark strip round the plaza with a dashed line, one mesh per side pair (two draws).
@@ -21,15 +21,15 @@ function rng(seed: number): () => number {
   return () => { t += 0x6D2B79F5; let r = Math.imul(t ^ (t >>> 15), 1 | t); r ^= r + Math.imul(r ^ (r >>> 7), 61 | r); return ((r ^ (r >>> 14)) >>> 0) / 4294967296; };
 }
 
-/** Pure: the ring of towers — `count` of them spread round the plaza (half-extent `bound`), 36–70 m past its edge, 18–72 m tall. */
+/** Pure: the ring of towers — `count` of them spread round the plaza (half-extent `bound`), 44–84 m past its edge, 14–50 m tall. */
 export function skylineSpots(bound: number, count: number): Tower[] {
   const rand = rng(1217 + Math.round(bound));
   const out: Tower[] = [];
   const n = Math.max(1, Math.floor(count));
   for (let i = 0; i < n; i++) {
     const a = ((i + rand() * 0.6) / n) * Math.PI * 2;
-    const r = bound * 1.41 + 36 + rand() * 34;   // past the corners of the square plaza, then 36–70 m
-    out.push({ x: Math.sin(a) * r, z: Math.cos(a) * r, w: 10 + rand() * 18, d: 10 + rand() * 18, h: 18 + rand() * 54, tint: i % 4 });
+    const r = bound * 1.41 + 44 + rand() * 40;   // past the corners of the square plaza, then 44–84 m
+    out.push({ x: Math.sin(a) * r, z: Math.cos(a) * r, w: 10 + rand() * 18, d: 10 + rand() * 18, h: 14 + rand() * 36, tint: i % 4 });
   }
   return out;
 }
@@ -46,7 +46,7 @@ export function carAt(i: number, t: number, bound: number, len: number): { x: nu
 
 export interface CityHandle { readonly towers: number; readonly cars: number; update(dt: number): void; dispose(): void }
 
-const TINTS = ['#1b2536', '#243247', '#2f3d52', '#38485f'];
+const TINTS = ['#0e141e', '#141c29', '#1b2535', '#222e42'];   // dusk silhouettes: dark faces, the lit windows are the picture
 
 export function mountPlazaCity(scene: Scene, bound: number, tier: string | null | undefined): CityHandle {
   const phone = tier === 'mobile';
@@ -67,7 +67,7 @@ export function mountPlazaCity(scene: Scene, bound: number, tier: string | null 
       g.fillStyle = r < 0.62 ? '#0a1018' : r < 0.9 ? '#ffd9a0' : '#bfe6ff';
       g.fillRect(x, y, 9, 10);
     }
-    tex.update(true); tex.uScale = 2; tex.vScale = 3; owned.push(tex);
+    tex.update(true); tex.uScale = 0.5; tex.vScale = 0.45; owned.push(tex);   // a face is ~7 columns by ~13 floors of windows, not a haze of dots
   } catch { tex = null; }
 
   for (let k = 0; k < TINTS.length; k++) {
@@ -79,7 +79,7 @@ export function mountPlazaCity(scene: Scene, bound: number, tier: string | null 
     }
     if (!parts.length) continue;
     const m = new PBRMaterial(`plaza_city_m_${k}`, scene);
-    m.albedoColor = Color3.FromHexString(TINTS[k]); m.metallic = 0.2; m.roughness = 0.55;
+    m.albedoColor = Color3.FromHexString(TINTS[k]); m.metallic = 0.05; m.roughness = 0.75;
     if (tex) { m.emissiveTexture = tex; m.emissiveColor = new Color3(0.9, 0.9, 0.9); }
     owned.push(m);
     for (const p of parts) p.computeWorldMatrix(true);

@@ -7,6 +7,7 @@
 
 import { Color3, DynamicTexture, Engine, MeshBuilder, StandardMaterial } from '@babylonjs/core';
 import type { Mesh, Scene } from '@babylonjs/core';
+import { unlitDiffuse } from './unlit';
 
 export const FLASH_SEC = 0.42;
 export const FLASH_POOL = 4;
@@ -43,7 +44,7 @@ export class GateFlash {
     for (let i = 0; i < FLASH_POOL; i++) {
       const mesh = MeshBuilder.CreatePlane(`gate_flash_${i}`, { width: 1, height: FLASH_HEIGHT }, scene);
       const mat = new StandardMaterial(`gate_flash_m_${i}`, scene);
-      mat.disableLighting = true; mat.diffuseColor = Color3.Black(); mat.specularColor = Color3.Black(); mat.backFaceCulling = false;
+      mat.disableLighting = true; mat.diffuseColor = unlitDiffuse(); mat.specularColor = Color3.Black(); mat.backFaceCulling = false;
       if (this.tex) mat.opacityTexture = this.tex;
       mat.alphaMode = Engine.ALPHA_ADD; mat.disableDepthWrite = true; mat.alpha = 0;
       mesh.material = mat; mesh.isPickable = false; mesh.setEnabled(false); mesh.receiveShadows = false;

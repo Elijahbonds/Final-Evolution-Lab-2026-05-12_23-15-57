@@ -93,3 +93,20 @@ describe('the lane stays out of the held modes and the tuned numbers', () => {
     }
   });
 });
+
+describe('every StandardMaterial that carries an emissive texture settles its emissive colour', () => {
+  // A headless scene cannot paint a texture, so a unit test of the material would pass with the texture null. The source says it:
+  // each `.emissiveTexture = <painted>` in these files is followed, on the same statement or the next, by settleEmissive(<that material>).
+  for (const f of ['lib/babylon/visual/bigAirDressing.ts', 'lib/babylon/visual/freeRunDressing.ts']) {
+    it(f, () => {
+      const src = read(f);
+      const sites = [...src.matchAll(/(\w+)\.emissiveTexture = [\w.]+;([^\n]*)/g)];
+      expect(sites.length).toBeGreaterThan(0);
+      for (const m of sites) expect(m[0], `${f}: ${m[0]}`).toContain(`settleEmissive(${m[1]})`);
+    });
+  }
+  it('the check sees a missing call (mutation control)', () => {
+    const sites = [...'ledM.emissiveTexture = tex; owned.push(tex);'.matchAll(/(\w+)\.emissiveTexture = [\w.]+;([^\n]*)/g)];
+    expect(sites[0][0]).not.toContain('settleEmissive(ledM)');
+  });
+});

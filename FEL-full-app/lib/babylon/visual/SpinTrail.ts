@@ -9,6 +9,7 @@
 import { Color3, Engine, StandardMaterial, TransformNode, TrailMesh } from '@babylonjs/core';
 import type { Scene } from '@babylonjs/core';
 import { motionPolicy } from '../../a11y/reducedMotion';
+import { unlitDiffuse } from './unlit';
 
 export const TRAIL_LENGTH = 34;
 export const TIP_OFFSET_M = 0.44;
@@ -26,7 +27,7 @@ export class SpinTrail {
   constructor(scene: Scene, board: TransformNode, colorHex = '#7dd3fc') {
     this.mat = new StandardMaterial('spin_trail_m', scene);
     const c = Color3.FromHexString(colorHex);
-    this.mat.emissiveColor = c; this.mat.diffuseColor = Color3.Black(); this.mat.specularColor = Color3.Black(); this.mat.disableLighting = true;
+    this.mat.emissiveColor = c; this.mat.diffuseColor = unlitDiffuse(); this.mat.specularColor = Color3.Black(); this.mat.disableLighting = true;
     this.mat.alpha = 0.55; this.mat.alphaMode = Engine.ALPHA_ADD; this.mat.backFaceCulling = false; this.mat.disableDepthWrite = true;
     for (const sign of [1, -1]) {
       const tip = new TransformNode(`spin_trail_tip_${sign > 0 ? 'nose' : 'tail'}`, scene);

@@ -16,6 +16,7 @@
 import { Color3, Color4, DynamicTexture, Engine, FresnelParameters, MeshBuilder, ParticleSystem, PBRMaterial, StandardMaterial, Vector3 } from '@babylonjs/core';
 import type { AbstractMesh, Scene } from '@babylonjs/core';
 import { lookFeatureOff } from '../scene/graphicsSetting';   // vis-board: ?lookoff=… switches one feature off for a one-build A/B
+import { unlitDiffuse } from './unlit';
 
 /** The sodium lamp's colour: low-pressure vapour is a saturated amber. */
 export const SODIUM = { r: 1, g: 0.62, b: 0.2 } as const;
@@ -69,11 +70,11 @@ export function mountWarehouseDressing(scene: Scene, bound: number, tier: string
   steel.albedoColor = new Color3(0.1, 0.1, 0.12); steel.metallic = 0.7; steel.roughness = 0.5; owned.push(steel);
   // the lamp head: an emissive the glow layer and the fixture lights both read (material name lampHead_*, mesh name lhead_*)
   const head = new StandardMaterial('lampHead_warehouse', scene);
-  head.emissiveColor = new Color3(SODIUM.r, SODIUM.g, SODIUM.b); head.diffuseColor = Color3.Black(); head.specularColor = Color3.Black(); head.disableLighting = true;
+  head.emissiveColor = new Color3(SODIUM.r, SODIUM.g, SODIUM.b); head.diffuseColor = unlitDiffuse(); head.specularColor = Color3.Black(); head.disableLighting = true;
   owned.push(head);
   const shaftTex = shaftTexture(scene);
   const shaftM = new StandardMaterial('wh_shaft_m', scene);
-  shaftM.emissiveColor = new Color3(SODIUM.r, SODIUM.g * 0.85, SODIUM.b * 0.6); shaftM.diffuseColor = Color3.Black(); shaftM.specularColor = Color3.Black();
+  shaftM.emissiveColor = new Color3(SODIUM.r, SODIUM.g * 0.85, SODIUM.b * 0.6); shaftM.diffuseColor = unlitDiffuse(); shaftM.specularColor = Color3.Black();
   shaftM.disableLighting = true; if (shaftTex) shaftM.opacityTexture = shaftTex; shaftM.alpha = shaftTex ? 0.16 : 0.05; shaftM.backFaceCulling = false;
   shaftM.alphaMode = Engine.ALPHA_ADD; shaftM.disableDepthWrite = true;
   // a shaft of light has no edge: opaque where the cone faces the eye, gone where its skin turns away

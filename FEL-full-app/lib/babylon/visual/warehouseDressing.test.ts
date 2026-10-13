@@ -51,10 +51,10 @@ describe('mounted', () => {
 // ── City Plaza's skyline and traffic (plazaCity.ts) ──
 import { carAt, mountPlazaCity, skylineSpots } from './plazaCity';
 describe('the city behind the plaza', () => {
-  it('towers on a ring past the fence: every one clear of the plaza, 18–72 m tall, in order round the compass', () => {
+  it('towers on a ring past the fence: every one clear of the plaza, 14–50 m tall, in order round the compass', () => {
     const t = skylineSpots(62, 30);
     expect(t).toHaveLength(30);
-    for (const b of t) { expect(Math.max(Math.abs(b.x), Math.abs(b.z))).toBeGreaterThan(62 + 20); expect(b.h).toBeGreaterThanOrEqual(18); expect(b.h).toBeLessThanOrEqual(72); }
+    for (const b of t) { expect(Math.max(Math.abs(b.x), Math.abs(b.z))).toBeGreaterThan(62 + 20); expect(b.h).toBeGreaterThanOrEqual(14); expect(b.h).toBeLessThanOrEqual(50); }
     expect(skylineSpots(62, 30)).toEqual(t);                                           // the same city every build
     expect(skylineSpots(62, 15)).toHaveLength(15);
   });

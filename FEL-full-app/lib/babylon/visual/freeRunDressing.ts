@@ -2,7 +2,7 @@
 // billboards (signTexture), neon; Dam: pipes and overgrowth; Terminal: containers; Temple: columns and statue." The audit's own
 // verdict on the mode: "coloured PBR boxes (graybox) ... no crowd, no props, no ambient FX".
 //
-// This is the code half of that list: kit-bashed from primitives (no new art), placed OUTSIDE the slab the runner uses — the
+// This is the code half of that list: kit-bashed from primitives (no new art), placed OUTSIDE the slab the runner uses, on a yard deck below it (YARD_DROP) — the
 // course (a 20 m slab, three lanes, x −10 … +10) is untouched, so no collider, route or tuned number changes. Per track:
 //   neon-rooftop      AC units and fan housings, billboards on legs with neon signs (named `neon_sign_*`: the shared glow layer
 //                     draws their halo), antenna masts with red warning bulbs (`lantern_mast_*`: a small light each, desktop)
@@ -16,6 +16,7 @@
 import { Color3, DynamicTexture, Mesh, MeshBuilder, PBRMaterial, StandardMaterial, Vector3 } from '@babylonjs/core';
 import type { AbstractMesh, Scene } from '@babylonjs/core';
 import { lookFeatureOff } from '../scene/graphicsSetting';   // vis-board: ?lookoff=… switches one feature off for a one-build A/B
+import { settleEmissive, unlitDiffuse } from './unlit';
 
 export interface CoursePiece { kind: string; x: number; y: number; z: number; w: number; h: number; d: number }
 export type DressKind = 'ac' | 'billboard' | 'mast' | 'pipe' | 'valve' | 'block' | 'overgrowth' | 'container' | 'crane' | 'column' | 'broken' | 'statue';
@@ -24,6 +25,13 @@ export interface DressSpot { kind: DressKind; x: number; z: number; yaw: number;
 /** The runner's slab is 20 m wide; props stand past this. */
 export const SLAB_EDGE = 10;
 export const PROP_MARGIN = 3;
+/** The yard the props stand on: a deck either side of the course, YARD_DROP below the slab's top. Beyond the slab there is nothing
+ *  but the far-off world, so a prop built at the slab's height hung in the air; this gives it a floor, and gives the runner
+ *  the read of a course running along a ledge, with the track's world laid out below. Cosmetic: no collider, nothing to land on. */
+export const YARD_DROP = 5;
+export const YARD_INNER = SLAB_EDGE + 1.5;
+export const YARD_OUTER = 38;
+const YARD_HEX: Record<string, string> = { 'neon-rooftop': '#121724', 'hydro-dam': '#3a443e', 'freight-terminal': '#2b2e34', 'sunken-temple': '#4f4636' };
 
 /** Which prop kinds a track gets, in the weights they are drawn at. */
 export const TRACK_KINDS: Record<string, readonly [DressKind, number][]> = {
@@ -123,7 +131,7 @@ export function mountFreeRunDressing(scene: Scene, trackId: string, pieces: read
     g.fillStyle = s.color; g.font = 'bold 92px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.shadowColor = s.color; g.shadowBlur = 26; g.fillText(s.text, 256, 100);
   })) : [];
   for (const t of tex) if (t) owned.push(t);
-  const base = -0.45;   // the slab's top is y 0 − a little: props stand on the ground the slab stands on
+  const base = -YARD_DROP;   // props stand on the yard deck below the slab, not in the air beside it
 
   spots.forEach((s, n) => {
     const x = s.x, z = s.z, k = s.scale, side = Math.sign(x) || 1;
@@ -149,8 +157,8 @@ export function mountFreeRunDressing(scene: Scene, trackId: string, pieces: read
         sign.rotation.y = side > 0 ? Math.PI / 2 : -Math.PI / 2;
         sign.position.set(x - side * 0.2, base + 5.2 * k, z);
         const m = new StandardMaterial(`neon_sign_m_${n}`, scene);
-        m.disableLighting = true; m.diffuseColor = Color3.Black(); m.specularColor = Color3.Black(); m.emissiveColor = new Color3(0.95, 0.95, 1); m.backFaceCulling = false;
-        const t = tex[s.variant % tex.length]; if (t) m.emissiveTexture = t; else m.emissiveColor = Color3.FromHexString(SIGNS[s.variant % SIGNS.length].color);
+        m.disableLighting = true; m.diffuseColor = unlitDiffuse(); m.specularColor = Color3.Black(); m.emissiveColor = new Color3(0.95, 0.95, 1); m.backFaceCulling = false;
+        const t = tex[s.variant % tex.length]; if (t) { m.emissiveTexture = t; settleEmissive(m); } else m.emissiveColor = Color3.FromHexString(SIGNS[s.variant % SIGNS.length].color);
         sign.material = m; owned.push(m); sign.isPickable = false; singles.push(sign);
         break;
       }
@@ -158,7 +166,7 @@ export function mountFreeRunDressing(scene: Scene, trackId: string, pieces: read
         add('mast', '#2b303c', place(MeshBuilder.CreateCylinder('fr_mast', { diameter: 0.22, height: 9 * k, tessellation: 6 }, scene), 0, 4.5 * k, 0), 0, 0.5, 0.6);
         const bulb = MeshBuilder.CreateSphere(`lantern_mast_${n}`, { diameter: 0.42, segments: 6 }, scene);
         bulb.position.set(x, base + 9.1 * k, z);
-        const bm = new StandardMaterial(`lantern_mast_m_${n}`, scene); bm.disableLighting = true; bm.diffuseColor = Color3.Black(); bm.specularColor = Color3.Black(); bm.emissiveColor = new Color3(1, 0.17, 0.33);
+        const bm = new StandardMaterial(`lantern_mast_m_${n}`, scene); bm.disableLighting = true; bm.diffuseColor = unlitDiffuse(); bm.specularColor = Color3.Black(); bm.emissiveColor = new Color3(1, 0.17, 0.33);
         bulb.material = bm; owned.push(bm); bulb.isPickable = false; singles.push(bulb);
         break;
       }
@@ -229,6 +237,15 @@ export function mountFreeRunDressing(scene: Scene, trackId: string, pieces: read
       }
     }
   });
+
+  if (spots.length) {   // the yard: one deck each side, long enough to hold every prop and the view past the finish
+    const zLo = Math.min(...pieces.map((p) => p.z - p.d / 2)) - 24, zHi = Math.max(...pieces.map((p) => p.z + p.d / 2)) + 30;
+    for (const side of [-1, 1]) {
+      const deck = MeshBuilder.CreateBox('fr_yard', { width: YARD_OUTER - YARD_INNER, height: 1.4, depth: zHi - zLo }, scene);
+      deck.position.set(side * (YARD_INNER + YARD_OUTER) / 2, base - 0.7, (zLo + zHi) / 2);
+      add('yard', YARD_HEX[trackId] ?? '#4b4f55', deck, 0.01, 0.92, 0);
+    }
+  }
 
   const merged: Mesh[] = [];
   for (const [key, g] of groups) {

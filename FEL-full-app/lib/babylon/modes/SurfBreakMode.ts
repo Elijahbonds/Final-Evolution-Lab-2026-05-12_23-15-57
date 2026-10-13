@@ -379,6 +379,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
     ctx.juice.shake(0.08, 140);
     console.info('[SURF-JUICE] barrel bank');
     EffectsKit.burst(ctx.scene, rig.char.root.position.add(new Vector3(0, 1.2, 0)), 'net');
+    spray?.splash(rig.char.root.position.add(new Vector3(0, 0.5, 2.2)), 1.1);   // vis-board (wave 2): the barrel spits — a curtain of spray out of the tube's mouth as the rider exits
     ctx.setHud({ score: tricks.score });
     bannerFlash(ctx, `BARRELED! +${BARREL_BONUS}`, 900, BANNER_PRIO.news);
     replayMoment(ctx, 'barrel', BARREL_BONUS + Math.round(barrelSec * 40), Math.min(4, barrelSec + 0.6));   // vis-board: the barrel, from inside the water's level
