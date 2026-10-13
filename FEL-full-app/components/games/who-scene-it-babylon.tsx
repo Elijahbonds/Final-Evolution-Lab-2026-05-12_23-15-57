@@ -13,6 +13,7 @@ import { surfaceBootError } from './boot-error';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { hnode } from './hud-format';
+import { HudBanner, HudChip, HudFrame, HudPlate, HudText, ScoreCell, ScoreValue, Scorebug, hudColor, hudType, type HudTone } from './tv-hud';
 import { PausedLayer, BodyReadyLine } from './paused-layer';
 import { ControlsPanel } from './controls-panel';
 import { whoSceneItStageBox } from '@/lib/babylon/modes/whoSceneItFrame';
@@ -22,9 +23,9 @@ import { useReplayInPlace } from './replay-in-place';
 type Hud = Record<string, HudValue>;
 // IMPROVE (#14): P2's arrow is its card's corner turned 45° clockwise — ▲ top-left, ▶ top-right, ◀ bottom-left, ▼ bottom-right
 // (WhoSceneItMode's DPAD). ◀ used to pick the bottom-RIGHT card.
-const OPTS: { key: 'optA' | 'optB' | 'optX' | 'optY'; btn: 'A' | 'B' | 'X' | 'Y'; face: string; dpad: string; color: string }[] = [
-  { key: 'optA', btn: 'A', face: 'A', dpad: '\u25b2', color: '#22d3ee' }, { key: 'optB', btn: 'B', face: 'B', dpad: '\u25b6', color: '#f43f5e' },
-  { key: 'optX', btn: 'X', face: 'C', dpad: '\u25c0', color: '#a855f7' }, { key: 'optY', btn: 'Y', face: 'D', dpad: '\u25bc', color: '#facc15' },
+const OPTS: { key: 'optA' | 'optB' | 'optX' | 'optY'; btn: 'A' | 'B' | 'X' | 'Y'; face: string; dpad: string; tone: HudTone }[] = [
+  { key: 'optA', btn: 'A', face: 'A', dpad: '\u25b2', tone: 'you' }, { key: 'optB', btn: 'B', face: 'B', dpad: '\u25b6', tone: 'danger' },
+  { key: 'optX', btn: 'X', face: 'C', dpad: '\u25c0', tone: 'power' }, { key: 'optY', btn: 'Y', face: 'D', dpad: '\u25bc', tone: 'them' },
 ];
 /** The between-rounds scoreboard rows the mode publishes (HudScoreCard shape). */
 const isBoard = (v: unknown): v is { name: string; score: number | string; line: string }[] =>
@@ -104,106 +105,112 @@ export default function WhoSceneItBabylon({ onEnd }: GameProps) {
     <div className="relative mx-auto w-full overflow-hidden rounded-xl border border-white/10 bg-black" style={{ width: box.width, height: box.height, maxWidth: '100%' }}>
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full touch-none" />
 
+      {/* TV HUD (A9.13, lane/tv-hud): the readouts in the shared frame; the question card and the between-rounds screens
+          keep their own layers (they carry the tap targets) and draw with the same palette and 10-foot scale. */}
+      <HudFrame>
       {/* top bar: pack · question · clock · score */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-2 px-4 py-3 font-mono text-xs">
+      <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-2 px-4 py-3">
         <div className="flex items-center gap-2">
-          <span className="fel-panel px-2 py-1 text-[var(--fel-cyan)]">{hnode(hud.pack, '')}</span>
-          {hud.question != null && <span className="fel-panel px-2 py-1 text-white/70">{hnode(hud.question)}</span>}
+          <HudChip tone="you">{hnode(hud.pack, '')}</HudChip>
+          {hud.question != null && <HudChip alpha={0.7}>{hnode(hud.question)}</HudChip>}
           {/* A+ mission #2: the round's category, in its colour, and the round count — Mario Party reads the category first */}
           {typeof hud.category === 'string' && hud.category && (
-            <span className="fel-panel px-2.5 py-1 text-[13px] font-black tracking-wider" style={{ color: typeof hud.categoryColor === 'string' && hud.categoryColor ? hud.categoryColor : '#fff' }}>{hud.category}</span>
+            <HudChip size="value" style={{ color: typeof hud.categoryColor === 'string' && hud.categoryColor ? hud.categoryColor : hudColor('text') }}>
+              <span style={{ color: typeof hud.categoryColor === 'string' && hud.categoryColor ? hud.categoryColor : hudColor('text'), fontWeight: 800 }}>{hud.category}</span>
+            </HudChip>
           )}
-          {typeof hud.roundLabel === 'string' && hud.roundLabel && <span className="fel-panel px-2 py-1 text-white/60">{hud.roundLabel}</span>}
+          {typeof hud.roundLabel === 'string' && hud.roundLabel && <HudChip alpha={0.6}>{hud.roundLabel}</HudChip>}
         </div>
         <div className="flex items-center gap-2">
           {typeof hud.clock === 'number' && (
-            <span className={`fel-panel px-3 py-1 text-lg ${hud.clock <= 3 ? 'text-[var(--fel-red)]' : 'text-white'}`}>{hud.clock}s</span>
+            <Scorebug><ScoreValue value={`${hud.clock}s`} size="stat" tone={hud.clock <= 3 ? 'danger' : 'text'} pop={false} /></Scorebug>
           )}
           {Number(hud.players) === 2 ? (
             <>
-              <span className="fel-panel fel-stat px-3 py-1 text-lg"><span className="mr-1 text-[10px] text-[#22d3ee]">P1</span>{hnode(hud.score, 0)}</span>
-              <span className="fel-panel fel-stat px-3 py-1 text-lg"><span className="mr-1 text-[10px] text-[#facc15]">{p2name}</span>{hnode(hud.p2score, 0)}</span>
+              <Scorebug accent="you"><ScoreCell inline label="P1" labelTone="you" value={hnode(hud.score, 0)} size="stat" /></Scorebug>
+              <Scorebug accent="them"><ScoreCell inline label={p2name} labelTone="them" value={hnode(hud.p2score, 0)} size="stat" /></Scorebug>
             </>
           ) : (
-            <span className="fel-panel fel-stat px-3 py-1 text-lg">{hnode(hud.score, 0)}</span>
+            <Scorebug><ScoreValue value={hnode(hud.score, 0)} size="stat" /></Scorebug>
           )}
-          {Number(hud.streak) > 1 && <span className="fel-panel px-2 py-1 text-[var(--fel-gold)]">x{hnode(hud.streak)}</span>}
+          {Number(hud.streak) > 1 && <HudChip tone="score" size="value">x{hnode(hud.streak)}</HudChip>}
         </div>
       </div>
+      </HudFrame>
 
       {/* the question card + four answers (also the pad's A B X Y) */}
       {phase === 'playing' && typeof hud.prompt === 'string' && hud.prompt && (
-        <div className="absolute inset-x-0 bottom-3 flex flex-col items-center gap-2 px-3">
-          <div className="fel-panel max-w-[720px] px-5 py-2.5 text-center text-lg font-bold text-white md:text-xl">{hud.prompt}</div>
+        <div className="absolute inset-x-0 bottom-3 flex flex-col items-center gap-2 px-3 font-display">
+          <HudPlate className="max-w-[720px] px-5 py-2.5 text-center"><HudText size="stat">{hud.prompt}</HudText></HudPlate>
           <div className="grid w-full max-w-[720px] grid-cols-2 gap-2">
             {OPTS.map((o, i) => {
               // #2: green for the right card, red for a wrong pick, each pick tagged with its seat; the rest dim
               const right = marked && i === answerIdx;
               const pickedBy = [0, 1].filter((seat) => picks[seat] === i);
               const wrongPick = marked && !right && pickedBy.length > 0;
-              const border = right ? '#22c55e' : wrongPick ? '#ef4444' : `${o.color}66`;
+              const border = right ? hudColor('good') : wrongPick ? hudColor('danger') : hudColor(o.tone, 0.4);
               return (
                 // #5: the cards stay live during the reveal — a tap moves on once the answer has had its beat (the mode decides)
                 <button key={o.key} onPointerDown={(e) => { e.preventDefault(); emit({ t: 'button', btn: o.btn, pressed: true }); }}
-                  className={`fel-panel flex items-center gap-2 rounded-xl px-4 py-4 text-left text-base text-white md:text-lg ${revealing && !right && !wrongPick ? 'opacity-50' : ''}`}
-                  style={{ borderColor: border, borderWidth: right || wrongPick ? 2 : undefined, background: right ? 'rgba(34,197,94,0.22)' : wrongPick ? 'rgba(239,68,68,0.18)' : undefined }}>
-                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full font-mono text-[13px] font-bold text-black" style={{ background: o.color }}>{o.face}</span>
+                  className={`fel-panel flex items-center gap-2 rounded-xl px-4 py-4 text-left text-white ${revealing && !right && !wrongPick ? 'opacity-50' : ''}`}
+                  style={{ ...hudType('stat'), fontWeight: 700, borderColor: border, borderWidth: right || wrongPick ? 2 : undefined, background: right ? hudColor('good', 0.22) : wrongPick ? hudColor('danger', 0.18) : undefined }}>
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full" style={{ ...hudType('value'), background: hudColor(o.tone), color: hudColor('ink') }}>{o.face}</span>
                   <span className="truncate">{hnode(hud[o.key], '')}</span>
                   {marked && pickedBy.map((seat) => (
-                    <span key={seat} className="shrink-0 rounded px-1.5 font-mono text-[11px] font-bold text-black" style={{ background: seat === 0 ? '#22d3ee' : '#facc15' }}>{seat === 0 ? 'P1' : p2name}</span>
+                    <span key={seat} className="shrink-0 rounded px-1.5" style={{ ...hudType('label'), background: hudColor(seat === 0 ? 'you' : 'them'), color: hudColor('ink') }}>{seat === 0 ? 'P1' : p2name}</span>
                   ))}
-                  {twoHumans && <span className="ml-auto shrink-0 font-mono text-sm text-white/55">{o.dpad}</span>}
+                  {twoHumans && <HudText size="value" alpha={0.55} className="ml-auto shrink-0">{o.dpad}</HudText>}
                 </button>
               );
             })}
           </div>
           <div className="flex items-center gap-2">
-            {hud.lockedP1 === true && <span className="fel-panel px-2 py-1 font-mono text-[11px] text-[#22d3ee]">P1 OUT</span>}
-            {typeof hud.banner === 'string' && hud.banner && <div className="fel-panel px-3 py-1 font-mono text-sm font-bold text-[var(--fel-gold)]">{hud.banner}</div>}
-            {hud.lockedP2 === true && <span className="fel-panel px-2 py-1 font-mono text-[11px] text-[#facc15]">{p2name} OUT</span>}
+            {hud.lockedP1 === true && <HudChip tone="you">P1 OUT</HudChip>}
+            {typeof hud.banner === 'string' && hud.banner && <HudChip tone="score" size="value">{hud.banner}</HudChip>}
+            {hud.lockedP2 === true && <HudChip tone="them">{p2name} OUT</HudChip>}
           </div>
-          {revealing && <div className="fel-panel max-w-[560px] px-3 py-1 text-center font-mono text-[11px] text-white/70">{hud.reveal as string}</div>}
+          {revealing && <HudPlate className="max-w-[560px] px-3 py-1 text-center"><HudText size="label" alpha={0.7}>{hud.reveal as string}</HudText></HudPlate>}
         </div>
       )}
 
       {/* A+ mission #2: the player-count screen and the between-rounds scoreboard — both live where the card is not */}
       {phase === 'playing' && !(typeof hud.prompt === 'string' && hud.prompt) && (
-        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 text-center">
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 text-center font-display">
           {recap ? (
             // IMPROVE (#15): the places the match asked — who took each and how fast — before the result card
-            <div className="pointer-events-auto fel-panel w-full max-w-[560px] px-5 py-4">
-              <div className="fel-heading text-2xl font-black text-white">THE VENUES</div>
-              {typeof hud.recapTitle === 'string' && hud.recapTitle && <div className="mt-1 font-mono text-xs text-[var(--fel-gold)]">{hud.recapTitle}</div>}
+            <HudPlate className="pointer-events-auto w-full max-w-[560px] px-5 py-4">
+              <HudText as="div" size="score">THE VENUES</HudText>
+              {typeof hud.recapTitle === 'string' && hud.recapTitle && <HudText as="div" size="label" tone="score" className="mt-1">{hud.recapTitle}</HudText>}
               <div className="mt-3 grid gap-1.5">
                 {recap.map((r, i) => (
                   <div key={`${r.name}-${i}`} className="flex items-center justify-between gap-3 rounded-lg bg-black/40 px-3 py-1.5">
-                    <span className="truncate text-left text-sm font-bold text-white">{r.name}</span>
-                    <span className="shrink-0 font-mono text-xs text-white/60">{r.line}</span>
-                    <span className="fel-stat w-12 shrink-0 text-right text-base">{r.score}</span>
+                    <HudText size="value" className="truncate text-left">{r.name}</HudText>
+                    <HudText size="label" alpha={0.6} className="shrink-0">{r.line}</HudText>
+                    <ScoreValue value={r.score} size="value" pop={false} className="w-12 shrink-0 text-right" />
                   </div>
                 ))}
               </div>
               <button type="button" onPointerDown={(e) => { e.preventDefault(); emit({ t: 'button', btn: 'A', pressed: true }); }} onPointerUp={() => emit({ t: 'button', btn: 'A', pressed: false })}
                 className="mt-3 rounded-xl bg-[var(--fel-cyan)] px-6 py-2 font-bold text-black">CONTINUE</button>
-            </div>
+            </HudPlate>
           ) : isBoard(hud.board) && typeof hud.boardTitle === 'string' && hud.boardTitle ? (
-            <div className="fel-panel w-full max-w-[520px] px-5 py-4">
-              <div className="fel-heading text-2xl font-black text-white">SCOREBOARD</div>
+            <HudPlate className="w-full max-w-[520px] px-5 py-4">
+              <HudText as="div" size="score">SCOREBOARD</HudText>
               <div className="mt-3 grid gap-2">
                 {hud.board.map((r, i) => (
                   <div key={r.name} className="flex items-center justify-between gap-3 rounded-lg bg-black/40 px-3 py-2">
-                    <span className="font-mono text-sm font-bold" style={{ color: i === 0 ? '#22d3ee' : '#facc15' }}>{r.name}</span>
-                    <span className="truncate font-mono text-xs text-white/60">{r.line}</span>
-                    <span className="fel-stat text-xl">{r.score}</span>
+                    <HudText size="value" tone={i === 0 ? 'you' : 'them'}>{r.name}</HudText>
+                    <HudText size="label" alpha={0.6} className="truncate">{r.line}</HudText>
+                    <ScoreValue value={r.score} size="stat" />
                   </div>
                 ))}
               </div>
-              <div className="mt-3 font-mono text-xs text-[var(--fel-gold)]">{hud.boardTitle}</div>
-            </div>
+              <HudText as="div" size="label" tone="score" className="mt-3">{hud.boardTitle}</HudText>
+            </HudPlate>
           ) : typeof hud.banner === 'string' && hud.banner ? (
             <>
-              <div className="fel-heading fel-panel px-6 py-3 text-3xl font-black text-white">{hud.banner}</div>
-              {typeof hud.hint === 'string' && hud.hint && <div className="fel-panel px-3 py-1 font-mono text-xs text-white/70">{hud.hint}</div>}
+              <HudBanner flow text={hud.banner} tone="text" size="hero" />
+              {typeof hud.hint === 'string' && hud.hint && <HudChip alpha={0.7} size="body">{hud.hint}</HudChip>}
               {/* PHONE CONTROLS (FINISH-RELEASE, 2026-09-15): the player-count screen said "any face button starts" and a phone
                   has no face buttons — the only way in was waiting out the pick timer, and a second player could never be added.
                   The pad's own verbs, as taps: ◀ ▶ change the count (the d-pad), PLAY is the A button. */}

@@ -15,7 +15,20 @@ import path from 'node:path';
 const read = (f: string) => readFileSync(path.resolve(__dirname, '..', f), 'utf8');
 
 /** host file → the HUD keys it read at the base, and the modeId attribute its splash and touch overlay are bound with. */
-export const MIGRATED: Record<string, { keys: string[]; modeId: string }> = {
+export const MIGRATED: Record<string, {
+  keys: string[];
+  modeId: string;
+  /** The host's own start / pause layers (default: BootSplash + TouchOverlay). A host with no BootSplash draws its own. */
+  controls?: string[];
+  /** Where the HUD ends and the host's own READY / error gates begin (those are a splash, not HUD, and are not migrated). */
+  hudEnd?: string;
+}> = {
+  'who-scene-it-babylon.tsx': {
+    modeId: '"who_scene_it"',
+    controls: ['<PausedLayer'],
+    hudEnd: '{/* ready / countdown / error gates */}',
+    keys: 'answerIdx banner board boardTitle category categoryColor clock hint humans lockedP1 lockedP2 p2name p2score pack pickP1 pickP2 players prompt question recap recapTitle reveal roundLabel score streak'.split(' '),
+  },
   'air-session-babylon.tsx': {
     modeId: '{modeKey}',
     keys: 'attempt bandHiK bandLoK banner best coach combo dialTol dialTurns hint judge nextFoot note phase score sheet speedK stomp'.split(' '),
@@ -71,12 +84,15 @@ describe.each(Object.entries(MIGRATED))('%s on the TV HUD', (file, spec) => {
     expect(lost).toEqual([]);
   });
 
+  const controls = spec.controls ?? ['<BootSplash', '<TouchOverlay'];
+  const hud = spec.hudEnd ? src.slice(0, src.indexOf(spec.hudEnd)) : src;
+
   it('keeps its READY / pause card and its touch overlay, for the same mode', () => {
-    expect(src).toMatch(/<BootSplash\b/);
-    expect(src).toMatch(/<TouchOverlay\b/);
-    const binds = [...src.matchAll(/<(?:BootSplash|TouchOverlay)\b[^>]*?\bmodeId=(\{[\w.]+\}|"[\w-]+")/g)].map((m) => m[1]);
-    expect(binds.length).toBeGreaterThanOrEqual(2);
+    for (const c of controls) expect(src).toContain(c);
+    const binds = [...src.matchAll(/<(?:BootSplash|TouchOverlay|PausedLayer)\b[^>]*?\bmodeId=(\{[\w.]+\}|"[\w-]+")/g)].map((m) => m[1]);
+    expect(binds.length).toBeGreaterThanOrEqual(controls.length);
     for (const b of binds) expect(b).toBe(spec.modeId);
+    if (spec.hudEnd) expect(src.indexOf(spec.hudEnd)).toBeGreaterThan(-1);
   });
 
   it('draws its HUD inside the frame, and the splash, pause and touch deck outside it', () => {
@@ -84,16 +100,16 @@ describe.each(Object.entries(MIGRATED))('%s on the TV HUD', (file, spec) => {
     const open = src.indexOf('<HudFrame>'), close = src.indexOf('</HudFrame>');
     expect(open).toBeGreaterThan(-1);
     expect(close).toBeGreaterThan(open);
-    for (const tag of ['<BootSplash', '<TouchOverlay']) {
+    for (const tag of controls) {
       const at = src.indexOf(tag);
       expect(at < open || at > close, `${tag} must stay the host's direct child`).toBe(true);
     }
   });
 
   it('no sub-floor text, no raw hex colour, no mono face: the scale and the palette replaced them', () => {
-    expect(src).not.toMatch(/text-\[(9|10|11)px\]/);
-    expect(src).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
-    expect(src).not.toMatch(/\bfont-mono\b/);
+    expect(hud).not.toMatch(/text-\[(9|10|11)px\]/);
+    expect(hud).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
+    expect(hud).not.toMatch(/\bfont-mono\b/);
   });
 });
 
