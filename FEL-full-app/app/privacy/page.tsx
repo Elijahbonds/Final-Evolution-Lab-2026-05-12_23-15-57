@@ -2,7 +2,6 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { PublicTopBar, PublicLegalFooter } from '@/components/public-chrome';
 import { PRIVACY_CONTENT, CURRENT_POLICY_VERSION } from '@/lib/policies';
-import { BUSINESS_MAILING_ADDRESS, REAL_MAILING_ADDRESS, renderMailingAddress } from '@/lib/legal/business';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,7 +18,7 @@ export default async function PrivacyPage() {
             prose-p:text-white/70 prose-li:text-white/70
             prose-blockquote:border-[#A855F7]/40 prose-blockquote:text-[#A855F7]/80
             prose-strong:text-white prose-em:text-white/50">
-            <div dangerouslySetInnerHTML={{ __html: simpleMarkdown(renderMailingAddress(PRIVACY_CONTENT, BUSINESS_MAILING_ADDRESS, REAL_MAILING_ADDRESS)) }} />
+            <div dangerouslySetInnerHTML={{ __html: simpleMarkdown(PRIVACY_CONTENT) }} />
           </div>
           <div className="mt-4 text-center text-[10px] text-white/30">
             Policy version: {CURRENT_POLICY_VERSION}

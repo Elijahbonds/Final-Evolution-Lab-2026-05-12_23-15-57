@@ -7,7 +7,6 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { STORE_TERMS_SECTIONS, STORE_TERMS_VERSION } from '@/lib/store-terms';
-import { BUSINESS_MAILING_ADDRESS } from '@/lib/legal/business';
 import { anchorId, escapeHtml, renderSection, renderStoreTerms } from '@/lib/store-terms/render';
 
 // The page is an async server component reading the session; mock the session + chrome so the render is
@@ -33,7 +32,7 @@ describe('(e) the /store-terms page', () => {
     expect(html).toContain('REFUND');
     // No address is set, so the address line is hidden: no token, no placeholder, no "pending".
     expect(html).not.toContain('{BUSINESS_ADDRESS}');
-    expect(html).not.toContain(escapeHtml(BUSINESS_MAILING_ADDRESS));
+    expect(html).not.toContain(escapeHtml('[Business mailing address'));
     expect(html).not.toMatch(/pending/i);
     expect(html).toContain(`Store terms version: ${STORE_TERMS_VERSION}`);
   });
