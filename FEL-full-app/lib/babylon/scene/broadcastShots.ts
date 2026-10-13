@@ -122,9 +122,9 @@ export function replayShot(angle: ReplayAngle, focus: V3, heading: V3, objective
   const toward = (a: V3, b: V3 | null, k: number): V3 => (b ? v(lerp(a.x, b.x, k), lerp(a.y, b.y, k), lerp(a.z, b.z, k)) : a);
   switch (angle) {
     case 'low':
-      return { pos: v(focus.x - f.x * 3.2 + right.x * 3.6, focus.y + 0.55, focus.z - f.z * 3.2 + right.z * 3.6), target: toward(chest, objective, 0.25), fov: 0.85 };
+      return { pos: v(focus.x - f.x * 3.2 + right.x * 3.6, focus.y + 0.55, focus.z - f.z * 3.2 + right.z * 3.6), target: toward(chest, objective, 0.1), fov: 0.85 };
     case 'side':
-      return { pos: v(focus.x + right.x * 6.5, focus.y + 1.3, focus.z + right.z * 6.5), target: toward(chest, objective, 0.2), fov: 0.7 };
+      return { pos: v(focus.x + right.x * 6.5, focus.y + 1.3, focus.z + right.z * 6.5), target: toward(chest, objective, 0.06), fov: 0.7 };   // a far objective pulled the runner to the frame's edge at 0.2
     case 'tight': {
       const d = yawDir(f, 0.5 * side);
       return { pos: v(focus.x + d.x * 3.4, focus.y + 1.45, focus.z + d.z * 3.4), target: v(focus.x, focus.y + 1.35, focus.z), fov: 0.42 };
@@ -148,7 +148,10 @@ export function replayCut(sec: number, angles: readonly ReplayAngle[] = ['low', 
 /** The lens a replay shoots on: focus on the subject (mm, as Babylon's DOF takes it), a fast lens for a soft background.
  *  `k` 0..1 eases it in from the no-blur lens the pipeline mounts with (DOF_REST) — never a toggle (a toggle compiles). */
 export const DOF_REST = { fStop: 32, focalLength: 1 } as const;
-export const DOF_REPLAY = { fStop: 2.0, focalLength: 85 } as const;
+// A long, fast lens. Measured on Football Rush: Babylon's circle of confusion is aperture × focal ÷ (focus − focal) × the
+// relative depth error, and it only reads as blur near 1 — 85 mm f/2 and 135 mm f/1.4 left the stands 30 m back barely soft.
+// 180 mm f/1: at a 5 m focus the runner (±0.3 m) stays sharp (CoC ~0.1), a defender 3 m behind softens (~0.7), the stands go.
+export const DOF_REPLAY = { fStop: 1.0, focalLength: 180 } as const;
 export function replayLens(k: number, focusMetres: number): { fStop: number; focalLength: number; focusDistance: number } {
   const t = Math.max(0, Math.min(1, k));
   return {
