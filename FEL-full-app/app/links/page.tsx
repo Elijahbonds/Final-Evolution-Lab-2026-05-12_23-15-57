@@ -15,7 +15,7 @@ import {
 
 /**
  * /links — the public bio page. No session, no database, no 3D, no tracking.
- * /books redirects here at #books. lib/links/hub.test.tsx pins the list.
+ * /books used to redirect here at #books; it now goes to /press (owner, 2026-10-13). The #books section stays. lib/links/hub.test.tsx pins the list.
  */
 export const metadata: Metadata = {
   title: LINKS_TITLE,
