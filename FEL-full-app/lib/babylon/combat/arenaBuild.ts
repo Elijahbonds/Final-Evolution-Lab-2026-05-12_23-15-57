@@ -17,7 +17,7 @@ import {
 } from '@babylonjs/core';
 import type { AbstractMesh, LinesMesh, ShadowGenerator } from '@babylonjs/core';
 import type { CombatArena } from './arenas';
-import { paintDot, paintFlame, paintLightPool, type Ctx } from './fxPaint';
+import { paintDot, paintFlame, paintGate, paintLightPool, type Ctx } from './fxPaint';
 import {
   FLOOR_HAS_EMISSIVE, WALL_HAS_EMISSIVE, WALL_TILE_M, floorStyleOf, paintFloor, paintWall, wallStyleOf, type FloorStyle, type WallStyle,
 } from './arenaPaint';
@@ -140,6 +140,7 @@ export function buildArena(scene: Scene, arena: CombatArena, opts: ArenaBuildOpt
 
   // ── walls: a painted slab per segment, or a translucent rope panel for a cage ──
   let wallMat: PBRMaterial | StandardMaterial;
+  let wallAlbedo: DynamicTexture | null = null;   // the pillars wear the same plate (a foundry's pillars are steel too)
   if (ropesArena) {
     wallMat = glow(scene, `arena_${arena.id}_ropes_m`, arena.look.wallColor, 0.28);
     ropes.push(wallMat as StandardMaterial);
@@ -148,7 +149,7 @@ export function buildArena(scene: Scene, arena: CombatArena, opts: ArenaBuildOpt
     // the tile: albedo painted from the arena's own wall colour; vents / the lit board ride an emissive texture
     const albedo = paintedTexture(scene, `arena_${arena.id}_wall_t`, 512, 512, (c) => { paintWall(c, 512, wallStyle, arena.look.wallColor, A); }, true);
     albedo.hasAlpha = false; owned.push(albedo);
-    pm.albedoTexture = albedo;
+    pm.albedoTexture = albedo; wallAlbedo = albedo;
     if (WALL_HAS_EMISSIVE.has(wallStyle)) {
       const em = paintedTexture(scene, `arena_${arena.id}_wall_e`, 512, 512, (c) => { paintWall(c, 512, wallStyle, arena.look.wallColor, A, true); }, true);
       em.hasAlpha = false; owned.push(em);
@@ -200,7 +201,8 @@ export function buildArena(scene: Scene, arena: CombatArena, opts: ArenaBuildOpt
   }
 
   // ── pillars ──
-  const pillarMat = pbr(scene, `arena_${arena.id}_pillar_m`, arena.look.wallColor, 0.8, 0.1);
+  const pillarMat = pbr(scene, `arena_${arena.id}_pillar_m`, wallAlbedo ? '#ffffff' : arena.look.wallColor, 0.8, 0.1);
+  if (wallAlbedo) pillarMat.albedoTexture = wallAlbedo;   // three plates round a pillar, the hazard band at its foot (no vents: the emissive stays on the wall)
   owned.push(pillarMat);
   arena.pillars.forEach((p, i) => {
     const m = MeshBuilder.CreateCylinder(`wall_arena_${arena.id}_pillar_${i}`, { height: p.h, diameter: p.r * 2, tessellation: 12 }, scene);
@@ -298,10 +300,11 @@ export function buildArena(scene: Scene, arena: CombatArena, opts: ArenaBuildOpt
         f.emitter = at; f.minEmitBox = new Vector3(-h.r * 0.62, 0, -h.r * 0.62); f.maxEmitBox = new Vector3(h.r * 0.62, 0.05, h.r * 0.62);
         f.direction1 = new Vector3(-0.12, 1, -0.12); f.direction2 = new Vector3(0.12, 1, 0.12);
         f.minEmitPower = 0.5; f.maxEmitPower = 1.1; f.minLifeTime = 0.5; f.maxLifeTime = 0.95;
-        f.minSize = 0.55; f.maxSize = 1.05; f.minScaleX = 0.7; f.maxScaleX = 0.95; f.minScaleY = 1.35; f.maxScaleY = 1.8;
+        // (Babylon's size gradient is absolute — see combatFx.ts — so the gradient below is the curve and the scale is the metres)
+        f.minScaleX = 0.6; f.maxScaleX = 0.85; f.minScaleY = 1.3; f.maxScaleY = 1.75;
         f.emitRate = mobile ? 16 : 34;
         f.addColorGradient(0, new Color4(1, 0.93, 0.62, 0.0)); f.addColorGradient(0.12, new Color4(1, 0.82, 0.38, 0.85)); f.addColorGradient(0.5, new Color4(1, 0.45, 0.1, 0.65)); f.addColorGradient(1, new Color4(0.55, 0.1, 0.03, 0));
-        f.addSizeGradient(0, 0.7); f.addSizeGradient(0.35, 1); f.addSizeGradient(1, 0.35);
+        f.addSizeGradient(0, 0.55); f.addSizeGradient(0.35, 0.85); f.addSizeGradient(1, 0.3);
         f.minAngularSpeed = -0.6; f.maxAngularSpeed = 0.6;
         f.start(); systems.push(f);
         // embers: tiny hot motes that climb, drift and die
@@ -310,9 +313,9 @@ export function buildArena(scene: Scene, arena: CombatArena, opts: ArenaBuildOpt
         e.emitter = at; e.minEmitBox = new Vector3(-h.r * 0.5, 0.1, -h.r * 0.5); e.maxEmitBox = new Vector3(h.r * 0.5, 0.2, h.r * 0.5);
         e.direction1 = new Vector3(-0.5, 1, -0.5); e.direction2 = new Vector3(0.5, 1.6, 0.5);
         e.minEmitPower = 0.8; e.maxEmitPower = 2.2; e.minLifeTime = 0.9; e.maxLifeTime = 1.9; e.gravity = new Vector3(0.25, 0.2, 0);
-        e.minSize = 0.03; e.maxSize = 0.07; e.emitRate = mobile ? 3 : 7;
+        e.emitRate = mobile ? 3 : 7;
         e.color1 = new Color4(1, 0.7, 0.25, 1); e.color2 = new Color4(1, 0.45, 0.12, 1); e.colorDead = new Color4(0.6, 0.1, 0.02, 0);
-        e.addSizeGradient(0, 1); e.addSizeGradient(1, 0.2);
+        e.addSizeGradient(0, 0.075); e.addSizeGradient(1, 0.015);   // absolute metres: a hot mote, shrinking to a speck
         e.start(); systems.push(e);
       } else {
         // shock: a few jagged bolts re-rolled ten times a second, white-blue, jumping from the middle to the rim
@@ -397,6 +400,17 @@ export function buildArena(scene: Scene, arena: CombatArena, opts: ArenaBuildOpt
       root.dispose();
     },
   };
+}
+
+/**
+ * The Showdown's destructible gate, as a lit timber-and-iron door in the arena's accent (it was one flat brown). The material owns
+ * its texture: `mesh.dispose(false, true)` (the mode's shatter and dispose) takes both.
+ */
+export function gateMaterial(scene: Scene, arena: CombatArena): PBRMaterial {
+  const m = pbr(scene, `arena_${arena.id}_gate_m`, '#ffffff', 0.78);
+  const tex = paintedTexture(scene, `arena_${arena.id}_gate_t`, 384, 512, (c) => paintGate(c, 384, 512, arena.look.accent));
+  tex.hasAlpha = false; m.albedoTexture = tex;
+  return m;
 }
 
 /** Spawn positions for a two-fighter round: facing each other across the arena's short axis, inside it. */

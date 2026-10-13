@@ -1,12 +1,12 @@
 // The combat sprites are pure functions over a 2-D context: hold what each one draws (lane/vis-combat, 2026-10-13).
 import { describe, expect, it } from 'vitest';
-import { paintAuraColumn, paintCrack, paintDot, paintFlame, paintLightPool, paintRing, paintScorch, paintSmoke, paintSpeedLines, paintStar, rng } from './fxPaint';
+import { paintAuraColumn, paintCrack, paintDot, paintFlame, paintGate, paintLightPool, paintRing, paintScorch, paintSmoke, paintSpeedLines, paintStar, rng } from './fxPaint';
 import { allFinite, recordingCtx } from './canvasShim.test-helper';
 
 const painters: Array<[string, (c: ReturnType<typeof recordingCtx>) => void]> = [
   ['dot', (c) => paintDot(c, 32)], ['star', (c) => paintStar(c, 128)], ['ring', (c) => paintRing(c, 128)], ['smoke', (c) => paintSmoke(c, 128)],
   ['flame', (c) => paintFlame(c, 64, 128)], ['crack', (c) => paintCrack(c, 256)], ['scorch', (c) => paintScorch(c, 128)],
-  ['aura', (c) => paintAuraColumn(c, 256, 256)], ['pool', (c) => paintLightPool(c, 128)], ['speed', (c) => paintSpeedLines(c, 640, 360)],
+  ['aura', (c) => paintAuraColumn(c, 256, 256)], ['gate', (c) => paintGate(c, 384, 512)], ['pool', (c) => paintLightPool(c, 128)], ['speed', (c) => paintSpeedLines(c, 640, 360)],
 ];
 
 describe('the combat sprites', () => {

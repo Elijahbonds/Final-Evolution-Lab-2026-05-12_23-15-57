@@ -3,7 +3,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { FreeCamera, NullEngine, Scene, Vector3 } from '@babylonjs/core';
 import { COMBAT_ARENAS } from './arenas';
 import {
-  LANTERN_EVERY_M, LANTERN_HEX, RIG_CANS, buildArena, fireSpots, lanternSpots, poolSpots, wantsLanterns, wantsOverheadRig,
+  LANTERN_EVERY_M, LANTERN_HEX, RIG_CANS, buildArena, fireSpots, gateMaterial, lanternSpots, poolSpots, wantsLanterns, wantsOverheadRig,
 } from './arenaBuild';
 import { floorStyleOf, wallStyleOf } from './arenaPaint';
 import { installOffscreenShim } from './canvasShim.test-helper';
@@ -92,6 +92,18 @@ describe('buildArena on a null engine', () => {
     h.dispose();
   });
 
+  it('the foundry\'s pillars wear the same riveted plate as its walls (three plates round, the hazard band at the foot)', () => {
+    const a = arena('foundry'), h = buildArena(scene, a);
+    const wall = scene.materials.find((m) => m.name === 'arena_foundry_wall_m') as { albedoTexture?: unknown };
+    const pillar = scene.materials.find((m) => m.name === 'arena_foundry_pillar_m') as { albedoTexture?: unknown };
+    expect(wall.albedoTexture).toBeTruthy();
+    expect(pillar.albedoTexture).toBe(wall.albedoTexture);
+    h.dispose();
+    const d = buildArena(scene, arena('dojo'));   // an arena without pillars builds none, and its walls stay its own
+    expect(scene.meshes.filter((m) => m.name.includes('_pillar_')).length).toBe(0);
+    d.dispose();
+  });
+
   it('the cage is ropes: a neon rail material, padded corner posts, no painted slab', () => {
     const a = arena('cage'), h = buildArena(scene, a);
     expect(scene.materials.some((m) => m.name === 'neon_arena_cage_rail_m')).toBe(true);
@@ -116,6 +128,15 @@ describe('buildArena on a null engine', () => {
     const cap = (s: Scene) => s.particleSystems.find((p) => p.name.includes('flames'))!.getCapacity();
     expect(cap(phone)).toBeLessThan(cap(scene));
     fp.dispose(); fd.dispose();
+  });
+
+  it('the Showdown gate is a lit timber door in the arena\'s accent that owns its texture', () => {
+    const a = arena('dojo'), m = gateMaterial(scene, a);
+    expect(m.albedoTexture).toBeTruthy();
+    expect(m.name).toBe('arena_dojo_gate_m');
+    const tex = m.albedoTexture!;
+    m.dispose(false, true);
+    expect(tex.isDisposed?.() ?? true).toBe(true);
   });
 
   it('the duel stands its arena on a lift: the overlay and the lanterns lift with it', () => {

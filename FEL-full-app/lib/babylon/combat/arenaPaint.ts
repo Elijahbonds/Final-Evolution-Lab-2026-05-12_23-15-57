@@ -191,7 +191,7 @@ export function paintWallBillboard(ctx: Ctx, size: number, base: string, accent:
   ctx.fillStyle = g; ctx.fillRect(m, m, S - 2 * m, S - 2 * m);
   ctx.fillStyle = 'rgba(0,0,0,0.5)';
   for (let y = m; y < S - m; y += 6) ctx.fillRect(m, y, S - 2 * m, 2);        // scanlines
-  ctx.fillStyle = 'rgba(255,255,255,0.9)';
+  ctx.fillStyle = shade(accent, 1.55, 0.85);   // the ad's bars: a pale tint of the board, not paper white (white clipped to a flat bright block)
   for (let k = 0; k < 4; k++) ctx.fillRect(m + (S - 2 * m) * (0.1 + k * 0.22), S * 0.44, (S - 2 * m) * 0.12, S * 0.12);  // a bar chart's worth of ad
   ctx.restore();
 }
@@ -261,8 +261,12 @@ export function paintFloor(ctx: Ctx, style: FloorStyle, p: FloorPaint, emissive 
     // the centre mark: a ring and a tomoe of three commas
     ctx.strokeStyle = ink; ctx.lineWidth = m * 0.01; ctx.beginPath(); ctx.arc(cx, cy, m * 0.15, 0, Math.PI * 2); ctx.stroke();
     ctx.strokeStyle = ink2; ctx.beginPath(); ctx.arc(cx, cy, m * 0.185, 0, Math.PI * 2); ctx.stroke();
-    ctx.fillStyle = rgba(accent, 0.34);
-    for (let k = 0; k < 3; k++) { const a = (k / 3) * Math.PI * 2 - Math.PI / 2; ctx.beginPath(); ctx.arc(cx + Math.cos(a) * m * 0.075, cy + Math.sin(a) * m * 0.075, m * 0.04, 0, Math.PI * 2); ctx.fill(); }
+    ctx.fillStyle = ink;   // three small ink commas round the middle (a tomoe), each ringed in the accent
+    for (let k = 0; k < 3; k++) {
+      const a = (k / 3) * Math.PI * 2 - Math.PI / 2, x = cx + Math.cos(a) * m * 0.085, y = cy + Math.sin(a) * m * 0.085;
+      ctx.beginPath(); ctx.arc(x, y, m * 0.017, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = rgba(accent, 0.5); ctx.lineWidth = m * 0.004; ctx.beginPath(); ctx.arc(x, y, m * 0.027, 0, Math.PI * 2); ctx.stroke();
+    }
     // two centre-line ticks (where the fighters spawn), so the floor has a composition
     ctx.strokeStyle = ink2; ctx.lineWidth = m * 0.006;
     for (const s of [-1, 1]) { ctx.beginPath(); ctx.moveTo(cx - m * 0.05, cy + s * m * 0.3); ctx.lineTo(cx + m * 0.05, cy + s * m * 0.3); ctx.stroke(); }

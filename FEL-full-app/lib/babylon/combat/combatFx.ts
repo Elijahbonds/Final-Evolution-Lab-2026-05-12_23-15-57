@@ -47,13 +47,13 @@ export interface HitLook {
  * pale chip); a guard BREAK is cyan, big and shattering. Colour carries the read before the shape does.
  */
 export const HIT_LOOK: Record<HitKind, HitLook> = {
-  light:   { star: 0.55, ring: 0,   streaks: 8,  speed: 4.5, life: 0.20, colors: ['#fff6d2', '#ffd36b'], dust: 0 },
-  medium:  { star: 0.8,  ring: 0,   streaks: 12, speed: 5.5, life: 0.24, colors: ['#ffecb8', '#ff9a3d'], dust: 0.3 },
-  heavy:   { star: 1.15, ring: 1.3, streaks: 18, speed: 7,   life: 0.28, colors: ['#fff0c0', '#ff6a1f'], dust: 0.7 },
-  special: { star: 1.65, ring: 2.1, streaks: 28, speed: 9,   life: 0.34, colors: ['#ffffff', '#ff4d8a'], dust: 1 },
-  parry:   { star: 0.7,  ring: 1.7, streaks: 10, speed: 6,   life: 0.26, colors: ['#f0fdff', '#4cc9ff'], dust: 0 },
-  guard:   { star: 0.35, ring: 0.8, streaks: 6,  speed: 3.2, life: 0.18, colors: ['#e2eeff', '#8fa8d8'], dust: 0.3 },
-  break:   { star: 1.35, ring: 1.8, streaks: 22, speed: 8,   life: 0.32, colors: ['#f0fdff', '#22d3ee'], dust: 0.5 },
+  light:   { star: 0.7, ring: 0,   streaks: 8,  speed: 4.5, life: 0.20, colors: ['#fff6d2', '#ffd36b'], dust: 0 },
+  medium:  { star: 1.0,  ring: 0,   streaks: 12, speed: 5.5, life: 0.24, colors: ['#ffecb8', '#ff9a3d'], dust: 0.3 },
+  heavy:   { star: 1.4,  ring: 1.3, streaks: 18, speed: 7,   life: 0.28, colors: ['#fff0c0', '#ff6a1f'], dust: 0.7 },
+  special: { star: 1.95, ring: 2.1, streaks: 28, speed: 9,   life: 0.34, colors: ['#ffffff', '#ff4d8a'], dust: 1 },
+  parry:   { star: 0.85, ring: 1.7, streaks: 10, speed: 6,   life: 0.26, colors: ['#f0fdff', '#4cc9ff'], dust: 0 },
+  guard:   { star: 0.45, ring: 0.8, streaks: 6,  speed: 3.2, life: 0.18, colors: ['#e2eeff', '#8fa8d8'], dust: 0.3 },
+  break:   { star: 1.6,  ring: 1.8, streaks: 22, speed: 8,   life: 0.32, colors: ['#f0fdff', '#22d3ee'], dust: 0.5 },
 };
 
 /** Phones draw about half the sparks and fewer motes: fill is what a phone has least of. */
@@ -71,7 +71,7 @@ export function auraLook(level: number, tier: FxTier): { on: boolean; height: nu
   const l = Math.max(0, Math.min(1, Number.isFinite(level) ? level : 0));
   if (l < 0.04) return { on: false, height: 0, radius: 0, alpha: 0, motes: 0, pool: 0 };
   const k = TIER_SCALE[tier];
-  return { on: true, height: 1.9 + l * 0.9, radius: 0.5 + l * 0.18, alpha: 0.16 + l * 0.5, motes: Math.round((4 + l * 26) * (tier === 'mobile' ? 0.4 : k)), pool: 0.18 + l * 0.42 };
+  return { on: true, height: 2.15 + l * 0.55, radius: 0.4 + l * 0.1, alpha: 0.2 + l * 0.5, motes: Math.round((4 + l * 26) * (tier === 'mobile' ? 0.4 : k)), pool: 0.16 + l * 0.3 };
 }
 
 /** A strike's weight (any mode's spelling: a karate key, a move weight) → the hit look. `special` = a super / DRAGON / finisher. */
@@ -102,6 +102,8 @@ export interface CombatFx {
   hit(at: Vector3, from: { x: number; z: number } | null, kind: HitKind, tint?: string): void;
   /** A heavy body-slam on the floor at `at`: shockwave, crack, debris, dust. */
   slam(at: Vector3, strength?: number, tint?: string): void;
+  /** Chunks thrown up from `at` (a gate breaking, a wall giving way): `amount` scales the count; `tint` the colour (default timber-brown). */
+  debris(at: Vector3, amount?: number, tint?: string): void;
   /** A flat shockwave ring on the floor at `at` (its y is the floor): `radius` m across at the end, `life` s. */
   ring(at: Vector3, radius: number, tint?: string, life?: number): void;
   /** A soft smoke puff. */
@@ -156,6 +158,9 @@ function uncast(scene: Scene, mesh: AbstractMesh): void {
   for (const l of scene.lights) { try { (l.getShadowGenerator() as ShadowGenerator | null)?.removeShadowCaster(mesh, true); } catch { /* no generator */ } }
 }
 
+// BABYLON'S SIZE GRADIENT IS ABSOLUTE: with `addSizeGradient` the particle's size is the gradient's factor (minSize / maxSize are ignored),
+// and `scale` multiplies it. So every system below uses its gradient as a SHAPE (a curve between 0 and 1) and carries the physical size
+// in `minScaleX..maxScaleY`, set per hit. (Measured the hard way: sizes written into the gradient made one streak a metre long.)
 function sys(scene: Scene, name: string, capacity: number, tex: Texture, additive: boolean): ParticleSystem {
   const ps = new ParticleSystem(name, capacity, scene);
   ps.particleTexture = tex;
@@ -176,6 +181,14 @@ const c4 = (hex: string, a = 1): Color4 => { const c = Color3.FromHexString(hex)
 function nextOf<T>(pool: T[], cursor: { i: number }): T { const s = pool[cursor.i % pool.length]; cursor.i++; return s; }
 
 const TWO_PI = Math.PI * 2;
+
+function applyAuraColour(a: { hex: string; colMat: StandardMaterial; poolMat: StandardMaterial; motes: ParticleSystem }, color: string): void {
+  a.hex = color; const c = Color3.FromHexString(color);
+  a.colMat.emissiveColor = c; a.poolMat.emissiveColor = c;
+  a.motes.color1 = new Color4(c.r, c.g, c.b, 0.9);
+  a.motes.color2 = new Color4(Math.min(1, c.r * 1.2 + 0.2), Math.min(1, c.g * 1.2 + 0.2), Math.min(1, c.b * 1.2 + 0.2), 0.8);
+  a.motes.colorDead = new Color4(c.r, c.g, c.b, 0);
+}
 
 interface GroundRing { mesh: Mesh; mat: StandardMaterial; t: number; life: number; r0: number; r1: number; a: number }
 interface Crack { mesh: Mesh; mat: StandardMaterial; t: number; life: number }
@@ -204,7 +217,6 @@ export function mountCombatFx(scene: Scene, opts: { tier?: FxTier } = {}): Comba
     stars.push(s);
     const k = own(sys(scene, `cfx_streak_${i}`, 48, dot, true));
     k.billboardMode = ParticleSystem.BILLBOARDMODE_STRETCHED;
-    k.minScaleX = 0.35; k.maxScaleX = 0.5; k.minScaleY = 2.4; k.maxScaleY = 3.6;
     k.gravity = new Vector3(0, -7, 0);
     k.addSizeGradient(0, 1); k.addSizeGradient(1, 0.15);
     streaks.push(k);
@@ -285,11 +297,12 @@ export function mountCombatFx(scene: Scene, opts: { tier?: FxTier } = {}): Comba
     motes.minEmitBox = new Vector3(-0.42, 0, -0.42); motes.maxEmitBox = new Vector3(0.42, 0.25, 0.42);
     motes.direction1 = new Vector3(-0.08, 1, -0.08); motes.direction2 = new Vector3(0.08, 1.5, 0.08);
     motes.minEmitPower = 0.7; motes.maxEmitPower = 1.6; motes.minLifeTime = 0.7; motes.maxLifeTime = 1.2;
-    motes.minSize = 0.05; motes.maxSize = 0.12; motes.addSizeGradient(0, 1); motes.addSizeGradient(1, 0.1);
+    motes.minScaleX = motes.minScaleY = 0.05; motes.maxScaleX = motes.maxScaleY = 0.12; motes.addSizeGradient(0, 1); motes.addSizeGradient(1, 0.1);
     motes.gravity = new Vector3(0, 0.4, 0);
     motes.manualEmitCount = -1;   // a steady stream, not a manual burst
     motes.stop();   // started only while the aura is on (an idle emitter costs nothing but is not free)
-    const a: Aura = { key, root, col, colMat, pool, poolMat, motes, moteAt, level: 0, target: 0, hex: '#ffd36b', t: 0 };
+    const a: Aura = { key, root, col, colMat, pool, poolMat, motes, moteAt, level: 0, target: 0, hex: '', t: 0 };
+    applyAuraColour(a, '#ffd36b');   // gold until a mode says otherwise
     owned.push({ dispose: () => { col.dispose(false, true); pool.dispose(false, true); motes.dispose(); poolMat.dispose(); colMat.dispose(); } });
     return a;
   };
@@ -313,7 +326,7 @@ export function mountCombatFx(scene: Scene, opts: { tier?: FxTier } = {}): Comba
       const s = nextOf(stars, cur.star);
       (s.emitter as Vector3).copyFrom(at);
       s.color1 = hot; s.color2 = body; s.colorDead = new Color4(body.r, body.g, body.b, 0);
-      s.minSize = L.star * 0.85; s.maxSize = L.star;
+      s.minScaleX = s.minScaleY = L.star * 0.85; s.maxScaleX = s.maxScaleY = L.star;   // (the gradient is the shape; the scale is the metres)
       s.manualEmitCount = 1;
       // the streaks fly along the blow (a cone round the direction away from the attacker), with a lift
       const k = nextOf(streaks, cur.streak);
@@ -326,13 +339,14 @@ export function mountCombatFx(scene: Scene, opts: { tier?: FxTier } = {}): Comba
       k.color1 = hot; k.color2 = body; k.colorDead = new Color4(body.r, body.g, body.b, 0);
       k.minEmitPower = L.speed * 0.55; k.maxEmitPower = L.speed;
       k.minLifeTime = L.life * 0.6; k.maxLifeTime = L.life;
-      k.minSize = 0.045 + L.star * 0.02; k.maxSize = 0.07 + L.star * 0.035;
+      k.minScaleX = 0.03 + 0.02 * L.star; k.maxScaleX = 0.045 + 0.03 * L.star;   // width, metres
+      k.minScaleY = 0.2 + 0.17 * L.star; k.maxScaleY = 0.3 + 0.25 * L.star;      // length along the flight, metres
       k.manualEmitCount = budgeted(plan.streaks);
       if (plan.ring) {
         const r = nextOf(rings, cur.ring);
         (r.emitter as Vector3).copyFrom(at);
         r.color1 = hot; r.color2 = body; r.colorDead = new Color4(body.r, body.g, body.b, 0);
-        r.minSize = L.ring * 0.9; r.maxSize = L.ring;
+        r.minScaleX = r.minScaleY = L.ring * 0.9; r.maxScaleX = r.maxScaleY = L.ring;
         r.manualEmitCount = 1;
       }
       if (plan.dust > 0.2 && tier !== 'mobile') {
@@ -340,7 +354,7 @@ export function mountCombatFx(scene: Scene, opts: { tier?: FxTier } = {}): Comba
         tmpA.copyFrom(at); tmpA.y = Math.max(0.1, at.y - 0.9);   // dust lifts off the floor under the blow, not off the body
         (d.emitter as Vector3).copyFrom(tmpA);
         d.color1 = c4('#d8cfc2', 0.5); d.color2 = c4('#b9ae9f', 0.4); d.colorDead = c4('#b9ae9f', 0);
-        d.minSize = 0.25 * (0.5 + plan.dust); d.maxSize = 0.5 * (0.5 + plan.dust);
+        d.minScaleX = d.minScaleY = 0.25 * (0.5 + plan.dust); d.maxScaleX = d.maxScaleY = 0.5 * (0.5 + plan.dust);
         d.manualEmitCount = budgeted(Math.round(5 + plan.dust * 6));
       }
     },
@@ -366,6 +380,14 @@ export function mountCombatFx(scene: Scene, opts: { tier?: FxTier } = {}): Comba
       fx.puff(tmpA.set(at.x, at.y + 0.15, at.z), 1.2 * k);
     },
 
+    debris(at, amount = 1, tint) {
+      const d = nextOf(chunks, cur.chunk);
+      (d.emitter as Vector3).copyFrom(at);
+      const c = tint ?? '#6b5a48';
+      d.color1 = c4(c); d.color2 = c4(c).scale(0.55) as Color4; d.colorDead = c4(c, 0);
+      d.manualEmitCount = budgeted(Math.round((tier === 'mobile' ? 8 : 16) * Math.max(0.5, Math.min(2, amount))));
+    },
+
     ring(at, radius, tint, life = 0.45) {
       const g = groundRings[ringCursor++ % groundRings.length];
       g.mesh.position.set(at.x, at.y + 0.04, at.z); g.mat.emissiveColor = Color3.FromHexString(tint ?? '#ffffff');
@@ -378,7 +400,7 @@ export function mountCombatFx(scene: Scene, opts: { tier?: FxTier } = {}): Comba
       (d.emitter as Vector3).copyFrom(at);
       const base = tint ?? '#e4ddd0';
       d.color1 = c4(base, 0.55); d.color2 = c4(base, 0.4); d.colorDead = c4(base, 0);
-      d.minSize = 0.35 * scale; d.maxSize = 0.7 * scale;
+      d.minScaleX = d.minScaleY = 0.35 * scale; d.maxScaleX = d.maxScaleY = 0.7 * scale;
       d.manualEmitCount = budgeted(Math.round((tier === 'mobile' ? 6 : 11) * Math.min(2, scale)));
     },
 
@@ -400,11 +422,7 @@ export function mountCombatFx(scene: Scene, opts: { tier?: FxTier } = {}): Comba
       if (!a) { if (level < 0.04) return; a = mkAura(key, root); auras.set(key, a); }   // (a key the modes do not use is built on demand)
       if (a.root !== root) { a.root = root; a.col.parent = root; a.pool.parent = root; }
       a.target = Math.max(0, Math.min(1, level));
-      if (color && color !== a.hex) {
-        a.hex = color; const c = Color3.FromHexString(color);
-        a.colMat.emissiveColor = c; a.poolMat.emissiveColor = c;
-        a.motes.color1 = new Color4(c.r, c.g, c.b, 0.9); a.motes.color2 = new Color4(Math.min(1, c.r * 1.2 + 0.2), Math.min(1, c.g * 1.2 + 0.2), Math.min(1, c.b * 1.2 + 0.2), 0.8); a.motes.colorDead = new Color4(c.r, c.g, c.b, 0);
-      }
+      if (color && color !== a.hex) applyAuraColour(a, color);
     },
 
     clearAuras() { for (const a of auras.values()) a.target = 0; },
@@ -433,7 +451,8 @@ export function mountCombatFx(scene: Scene, opts: { tier?: FxTier } = {}): Comba
         if (!a.col.isEnabled()) { a.col.setEnabled(true); a.pool.setEnabled(true); a.motes.start(); }
         const pulse = 1 + Math.sin(a.t * 9) * 0.05;
         a.col.scaling.set(L.radius * 2 * pulse, L.height, L.radius * 2 * pulse); a.col.position.y = L.height / 2;
-        a.col.rotation.y = a.t * 1.4;
+        a.col.rotation.y = a.t * 1.1;
+        (a.colMat.opacityTexture as Texture).uOffset = a.t * 0.35;   // the ribbons drift sideways through the column as it turns: it flows, it is not a tube
         a.colMat.alpha = L.alpha * (0.85 + Math.sin(a.t * 13) * 0.15);
         a.pool.scaling.set(2.6 + a.level * 0.8, 1, 2.6 + a.level * 0.8); a.poolMat.alpha = L.pool * (0.85 + Math.sin(a.t * 7) * 0.15);
         a.root.computeWorldMatrix(false); a.moteAt.copyFrom(a.root.getAbsolutePosition());

@@ -73,6 +73,22 @@ describe('the mount', () => {
     fx.dispose();
   });
 
+  // Babylon's size gradient is ABSOLUTE metres (minSize / maxSize are ignored once one exists): the gradients here are shapes in 0..1 and
+  // the metres live in the scale. A gradient with metres in it made a spark a metre long on first sight.
+  it('sizes are carried by the scale, and every size gradient is a 0..1 curve', () => {
+    const fx = mountCombatFx(scene);
+    for (const ps of scene.particleSystems.filter((p) => p.name.startsWith('cfx_'))) {
+      for (const g of ps.getSizeGradients() ?? []) expect(g.factor1, `${ps.name} gradient ${g.gradient}`).toBeLessThanOrEqual(1.7);
+    }
+    fx.hit(new Vector3(0, 1, 0), { x: 0, z: 1 }, 'special');
+    const star = scene.particleSystems.filter((p) => p.name.startsWith('cfx_star_')).find((p) => p.manualEmitCount === 1)!;
+    expect(star.maxScaleX).toBeCloseTo(HIT_LOOK.special.star, 5); expect(star.maxScaleY).toBeCloseTo(HIT_LOOK.special.star, 5);
+    const k = scene.particleSystems.filter((p) => p.name.startsWith('cfx_streak_')).find((p) => p.manualEmitCount > 0)!;
+    expect(k.maxScaleY).toBeGreaterThan(0.2); expect(k.maxScaleY).toBeLessThan(1);     // a streak is a fraction of a metre long
+    expect(k.maxScaleX).toBeLessThan(0.15);                                            // and thin
+    fx.dispose();
+  });
+
   it('a parry draws a ring and a plain jab does not', () => {
     const fx = mountCombatFx(scene);
     const rings = scene.particleSystems.filter((p) => p.name.startsWith('cfx_ringp_'));
@@ -147,6 +163,16 @@ describe('the mount', () => {
     const k = scene.particleSystems.filter((p) => p.name.startsWith('cfx_streak_')).find((p) => p.manualEmitCount > 0)!;
     expect(k.manualEmitCount).toBeGreaterThanOrEqual(4);
     scene.metadata = {};
+    fx.dispose();
+  });
+
+  it('debris throws chunks from where a thing broke, and a tint recolours them', () => {
+    const fx = mountCombatFx(scene);
+    fx.debris(new Vector3(1, 1.3, -5), 1.6, '#00aaff');
+    const d = scene.particleSystems.filter((p) => p.name.startsWith('cfx_chunk_')).find((p) => p.manualEmitCount > 0)!;
+    expect(d.manualEmitCount).toBeGreaterThan(10);
+    expect((d.emitter as Vector3).z).toBeCloseTo(-5, 5);
+    expect(d.color1.b).toBeCloseTo(1, 5);
     fx.dispose();
   });
 

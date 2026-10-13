@@ -31,7 +31,7 @@ import { strafeAxis, lockOnYaw, yawTo, wrapYaw } from '../core/Biomech';
 import { COMBAT_TURN_RATE } from '../core/CombatPosture';
 import { GameTimers, BannerSlot } from '../core/ModeClock';   // IMPROVE (2026-10-06): beats, banners and the assist's hit on the game clock
 import { SHOWDOWN, attackerChakraGain, ultimateReaches, ultLungeStep, burnVerdict, roundCall, launchReachesGate, UltimateArm } from './showdownRules';
-import { MeshBuilder, StandardMaterial, Color3, Vector3 } from '@babylonjs/core';
+import { MeshBuilder, Vector3 } from '@babylonjs/core';
 import type { AbstractMesh } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { neverBindPose } from '../anim/importSanitizer';
@@ -39,7 +39,7 @@ import { installSafePlay } from '../anim/clipRegistry';
 import { VenueKit } from '../visual/VenueKit';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';
 import { readCombatArena, arenasFor, arenaClamp, knockTo, hazardAt, describeArena, showdownGateDist, SHOWDOWN_GATE, type CombatArena } from '../combat/arenas';   // phase 7: the arena decides
-import { buildArena, type ArenaHandle } from '../combat/arenaBuild';
+import { buildArena, gateMaterial, type ArenaHandle } from '../combat/arenaBuild';
 import { mountCombatFx, hitKindOf, auraLevel, type CombatFx } from '../combat/combatFx';   // VISUAL PASS (2026-10-13): the hit language, the chakra aura, the partner's blink-in, the slam's cracks
 import { mountPresentation, type Presentation } from '../combat/presentation';   // the ultimate's grade swing, speed lines, the impact frame
 import { readPlaceLook } from '../nexus/placeLooks';
@@ -502,6 +502,8 @@ export const ShowdownMode: ModeDefinition = (() => {
     for (let i = 0; i < 3; i++) {
       EffectsKit.burst(ctx.scene, new Vector3(0, 1 + i * 0.5, gateZ), 'glitch');
     }
+    // VISUAL PASS: the gate breaks into timber — chunks thrown inward, a dust plume, a heavy flash at the splintering
+    fx?.debris(new Vector3(0, 1.3, gateZ + 0.3), 1.6); fx?.puff(new Vector3(0, 0.6, gateZ + 0.4), 2.2); fx?.hit(new Vector3(0, 1.3, gateZ + 0.2), { x: 0, z: gateZ - 2 }, 'heavy', '#ffb070');
     ctx.camDirector.pulse(1, 0.7);
     banner(ctx, 'THE GATE SHATTERS!', 1200);
     mbus.report({ kind: 'highlight_dunk', weight: 22 });
@@ -762,9 +764,7 @@ export const ShowdownMode: ModeDefinition = (() => {
       gateZ = -showdownGateDist(arena);
       wallMesh = MeshBuilder.CreateBox('shatter_gate', { width: 3, height: 2.6, depth: 0.3 }, ctx.scene);
       wallMesh.position.set(0, 1.3, gateZ);
-      const wm = new StandardMaterial('gateMat', ctx.scene);
-      wm.diffuseColor = new Color3(0.55, 0.4, 0.25);
-      wallMesh.material = wm;   // IMPROVE (2026-10-06): disposed with the gate (shatter or dispose) — it leaked before
+      wallMesh.material = gateMaterial(ctx.scene, arena);   // VISUAL PASS: a lit timber-and-iron door in the arena's accent (it was a flat brown box)   // IMPROVE (2026-10-06): disposed with the gate (shatter or dispose) — it leaked before
 
       meState = new FighterState(100); foeState = new FighterState(100);
       // ONE MOVESET OBJECT WAS HANDED TO BOTH FIGHTERS. StrikeController holds what it is given, so the two

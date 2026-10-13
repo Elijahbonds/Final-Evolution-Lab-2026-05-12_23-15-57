@@ -86,7 +86,9 @@ export function paintFlame(ctx: Ctx, w: number, h: number): void {
     ctx.bezierCurveTo(cx + bw * 1.2, bot, cx + bw * 0.4, bot, cx, bot);
     ctx.closePath(); ctx.fill();
   };
+  ctx.shadowColor = 'rgba(255,255,255,0.85)'; ctx.shadowBlur = Math.max(4, w * 0.16);   // soft edges: a flame has no outline
   tongue(1, 0.55, w * 0.04); tongue(0.78, 0.7, -w * 0.02); tongue(0.5, 0.95, 0);
+  ctx.shadowBlur = 0; ctx.shadowColor = 'rgba(0,0,0,0)';
 }
 
 /** A ground crack: jagged lines out from the middle, dark with a hot seam, on transparent. Used flat on the floor. */
@@ -130,32 +132,49 @@ export function paintScorch(ctx: Ctx, size: number, seed = 9): void {
 }
 
 /**
- * The aura column: bright at the feet, thinning upward, with vertical streaks of energy and a bright edge on both sides
- * (a cylinder seen from the side is brightest at its silhouette). Wraps horizontally, so it scrolls.
+ * The aura column: a hot glow at the feet, then tall ribbons of energy that break up as they rise — NOT a sheet (a uniform
+ * alpha reads as a glass tube round the fighter). Streaks of every width, brightest at the base and gone by two-thirds of the
+ * height; between them the column is nearly clear. Wraps horizontally, so it can turn.
  */
 export function paintAuraColumn(ctx: Ctx, w: number, h: number, seed = 21): void {
   const r = rng(seed);
   ctx.clearRect(0, 0, w, h);
-  const base = ctx.createLinearGradient(0, h, 0, 0);
-  base.addColorStop(0, 'rgba(255,255,255,0.95)'); base.addColorStop(0.35, 'rgba(255,255,255,0.4)'); base.addColorStop(1, 'rgba(255,255,255,0)');
-  ctx.fillStyle = base; ctx.fillRect(0, 0, w, h);
-  // streaks: tall thin bright ribbons that break the column into flames of energy
-  for (let i = 0; i < 26; i++) {
-    const x = r() * w, sw = 2 + r() * 7, top = h * (0.05 + r() * 0.5);
+  // the base: a low glow near the feet that fades to nothing by 40% of the height
+  const base = ctx.createLinearGradient(0, h, 0, h * 0.55);
+  base.addColorStop(0, 'rgba(255,255,255,0.5)'); base.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = base; ctx.fillRect(0, h * 0.55, w, h * 0.45);
+  // ribbons
+  for (let i = 0; i < 44; i++) {
+    const x = r() * w, sw = 1.5 + r() * r() * 11, top = h * (0.1 + r() * 0.6), a = 0.4 + r() * 0.6;
     const g = ctx.createLinearGradient(0, h, 0, top);
-    g.addColorStop(0, 'rgba(255,255,255,0.9)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+    g.addColorStop(0, `rgba(255,255,255,${a})`); g.addColorStop(0.6, `rgba(255,255,255,${a * 0.45})`); g.addColorStop(1, 'rgba(255,255,255,0)');
     ctx.fillStyle = g; ctx.fillRect(x, top, sw, h - top);
     if (x + sw > w) ctx.fillRect(x - w, top, sw, h - top);   // wrap, so the seam does not show
   }
-  // darker gaps between: knock the base back where there is no streak, a little, so the column is not a solid sheet
-  ctx.globalCompositeOperation = 'destination-out';
-  for (let i = 0; i < 14; i++) {
-    const x = r() * w, gw = 6 + r() * 14;
-    const g = ctx.createLinearGradient(0, 0, 0, h);
-    g.addColorStop(0, 'rgba(0,0,0,0.5)'); g.addColorStop(1, 'rgba(0,0,0,0.12)');
-    ctx.fillStyle = g; ctx.fillRect(x, 0, gw, h);
-  }
+  // soft side-edges on each ribbon: knock the very top off so nothing ends in a hard line
+  const fade = ctx.createLinearGradient(0, 0, 0, h * 0.3);
+  fade.addColorStop(0, 'rgba(0,0,0,1)'); fade.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.globalCompositeOperation = 'destination-out'; ctx.fillStyle = fade; ctx.fillRect(0, 0, w, h * 0.3);
   ctx.globalCompositeOperation = 'source-over';
+}
+
+/** A timber gate: vertical planks, two iron straps with rivets, a hinge at each side — the Showdown's destructible north gate. */
+export function paintGate(ctx: Ctx, w: number, h: number, accent = '#ff7b3d'): void {
+  const r = rng(808), planks = 6, pw = w / planks;
+  ctx.clearRect(0, 0, w, h);
+  for (let k = 0; k < planks; k++) {
+    const v = 0.82 + r() * 0.3, base = `rgb(${Math.round(94 * v)},${Math.round(64 * v)},${Math.round(40 * v)})`;
+    ctx.fillStyle = base; ctx.fillRect(k * pw, 0, pw, h);
+    ctx.strokeStyle = 'rgba(30,18,10,0.45)'; ctx.lineWidth = 1;
+    for (let i = 0; i < 14; i++) { const x = k * pw + r() * pw; ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x + (r() - 0.5) * 6, h); ctx.stroke(); }   // grain
+    ctx.fillStyle = 'rgba(12,8,5,0.7)'; ctx.fillRect(k * pw + pw - 2, 0, 2, h);   // the seam
+  }
+  for (const y of [h * 0.2, h * 0.76]) {   // iron straps
+    ctx.fillStyle = '#23262c'; ctx.fillRect(0, y, w, h * 0.07);
+    ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fillRect(0, y, w, 2);
+    for (let k = 0; k < planks; k++) { ctx.fillStyle = '#6b7080'; ctx.beginPath(); ctx.arc(k * pw + pw / 2, y + h * 0.035, 3.2, 0, Math.PI * 2); ctx.fill(); }
+  }
+  ctx.strokeStyle = accent; ctx.globalAlpha = 0.55; ctx.lineWidth = 5; ctx.strokeRect(3, 3, w - 6, h - 6); ctx.globalAlpha = 1;
 }
 
 /** A broad soft pool of light for the floor: additive, round, brightest in the middle. */
