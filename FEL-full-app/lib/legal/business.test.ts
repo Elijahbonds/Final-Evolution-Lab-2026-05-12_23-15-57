@@ -11,11 +11,11 @@ import { BUSINESS_CONTACT_EMAIL, BUSINESS_LEGAL_NAME, REAL_MAILING_ADDRESS } fro
 describe('the one business address', () => {
   // LEGAL-COPY-2 (FE PM 10:11 AM PT Oct 8): the placeholder constant is gone. No address is set, and nothing stands in
   // for one: no marker, token, placeholder or substitute address.
-  it('has no placeholder and no address while unset', () => {
+  it('has no placeholder, and carries only the approved business mailbox', () => {
     expect(BUSINESS_LEGAL_NAME).toBe('Final Evolution LLC');
     expect(BUSINESS_CONTACT_EMAIL).toBe('FinalEvolution.us@gmail.com');
     expect('BUSINESS_MAILING_ADDRESS' in mod).toBe(false);
-    expect(REAL_MAILING_ADDRESS).toBeNull();
+    expect(REAL_MAILING_ADDRESS).toBe('18543 Devonshire St #2012, Northridge, CA 91324');
     const src = readFileSync(join('lib', 'legal', 'business.ts'), 'utf8');
     expect(src).not.toContain('[Business mailing address');
     expect(src).not.toMatch(/pending/i);
@@ -23,11 +23,22 @@ describe('the one business address', () => {
     expect(src).not.toContain('"[');
   });
 
-  it('is a business address, never a home/street address (passes addressRejected)', async () => {
-    // Imported here only: the address module is a coach-store/money file, fine for a test to read.
+  // BUSINESS-ADDRESS (FE PM 9:00 PM PT Oct 12): the one allowed address is the approved #2012 business mailbox (USPS
+  // Form 1583), pinned exactly. Anything else, including any home address, fails here. The coach-store street rule
+  // (lib/coach-store/address.ts) is unchanged and still refuses every other street address.
+  it('is exactly the approved #2012 business mailbox, never a home address', async () => {
+    const approved = '18543 Devonshire St #2012, Northridge, CA 91324';
+    expect(REAL_MAILING_ADDRESS).toBe(approved);
+    expect(REAL_MAILING_ADDRESS).toContain('#2012');
+    expect(REAL_MAILING_ADDRESS).not.toMatch(/granada hills/i);
+    const src = readFileSync(join('lib', 'legal', 'business.ts'), 'utf8');
+    expect(src).not.toMatch(/granada hills/i);
+    // Outside the one pinned value, the source still carries no street address.
     const { addressRejected } = await import('@/lib/coach-store/address');
-    // LEGAL-COPY-2: the constant is gone, so the same rule runs over the whole source; REAL_MAILING_ADDRESS is still null.
-    expect(addressRejected(readFileSync(join('lib', 'legal', 'business.ts'), 'utf8'))).toBeNull();
+    expect(src.split(approved).length - 1).toBe(1);
+    expect(addressRejected(src.split(approved).join(''))).toBeNull();
+    // The rule itself still refuses the street part on its own: only the pinned literal is let through.
+    expect(addressRejected('18543 Devonshire St')).toBe('street_address');
   });
 
   // STORE-TERMS-4 (FE PM 5:24 AM PT Oct 8): the approved store terms Part B (lib/store-terms/text-b.ts, frozen) has the

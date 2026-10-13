@@ -19,8 +19,8 @@ describe('renderMailingAddress', () => {
     expect(out).not.toContain('@@');
   });
 
-  it('has no real address today', () => {
-    expect(REAL_MAILING_ADDRESS).toBeNull();
-    expect(isMailingAddressSet(REAL_MAILING_ADDRESS)).toBe(false);
+  it('carries the approved #2012 business mailbox (BUSINESS-ADDRESS)', () => {
+    expect(REAL_MAILING_ADDRESS).toBe('18543 Devonshire St #2012, Northridge, CA 91324');
+    expect(isMailingAddressSet(REAL_MAILING_ADDRESS)).toBe(true);
   });
 });

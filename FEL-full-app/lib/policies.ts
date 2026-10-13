@@ -60,7 +60,13 @@ const WRITE_TO = isMailingAddressSet(REAL_MAILING_ADDRESS) ? `, or write to ${BU
 // bullet for the Work-with-us inquiry form (name, email and message, with the other fields the form asks for; kept 12 months,
 // then deleted; no IP address). The inquiry table is pending SQL (prisma/pending/2026-10-13-creator-inquiry.sql) and its
 // retention is INQUIRY_RETENTION_DAYS in lib/creator/inquiryStore.ts. 2026-10-12 is the text without this bullet.
-export const CURRENT_POLICY_VERSION = '2026-10-13';
+// BUSINESS-ADDRESS (FE PM 9:00 PM PT Oct 12): bumped for the contact detail only. REAL_MAILING_ADDRESS is set, so the
+// Terms §9 and Privacy §11 Mail lines and the Privacy §10 write-to clause now print it. A contact-detail update: no
+// re-acceptance; new signups record the new version. 2026-10-12 is the text without the address.
+// LANE-SYNC (FE PM 10:19 PM PT Oct 12): both changes above used the label 2026-10-13 on different branches. The address-only
+// text (PR #222, deployed on top of bb7a2bd2) keeps 2026-10-13; the combined text here (Privacy §1 Work-with-us bullet + the
+// #2012 address) is 2026-10-14. Contact/notice update only: no re-acceptance; new signups record the new version.
+export const CURRENT_POLICY_VERSION = '2026-10-14';
 
 export const TERMS_CONTENT = `
 # Terms of Service

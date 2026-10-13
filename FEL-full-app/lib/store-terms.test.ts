@@ -204,11 +204,13 @@ describe('LEGAL-COPY-2 store-terms lines, no placeholder', () => {
 // LEGAL-COPY-2: what /store-terms renders while no address is set, built exactly as app/store-terms/page.tsx builds it.
 describe('LEGAL-COPY-2 store terms rendered while the address is unset', () => {
   it('shows no placeholder, token or mail line, drops §2.8, and carries both audiobook sections', () => {
-    const addressSet = isMailingAddressSet(REAL_MAILING_ADDRESS);
+    // BUSINESS-ADDRESS: the real address is now set, so the unset case is built with null explicitly.
+    const unset: string | null = null;
+    const addressSet = isMailingAddressSet(unset);
     expect(addressSet).toBe(false);
     const sections = STORE_TERMS_SECTIONS.filter((s) => addressSet || s.id !== 'mailing-address').map((s) => ({
       ...s,
-      markdown: renderMailingAddress(s.markdown, BUSINESS_ADDRESS_TOKEN, REAL_MAILING_ADDRESS),
+      markdown: renderMailingAddress(s.markdown, BUSINESS_ADDRESS_TOKEN, unset),
     }));
     const html = renderStoreTerms(sections);
     expect(html).not.toContain('[');
@@ -219,5 +221,24 @@ describe('LEGAL-COPY-2 store terms rendered while the address is unset', () => {
     expect(html).not.toContain('<section id="mailing-address">');
     expect(html).toContain('<section id="refund-audiobooks">');
     expect(html).toContain('<section id="audiobooks">');
+  });
+});
+
+// BUSINESS-ADDRESS (FE PM 9:00 PM PT Oct 12): what /store-terms renders with the real #2012 mailbox set, built exactly
+// as app/store-terms/page.tsx builds it. The approved text and its fingerprints are unchanged; only the token is filled.
+describe('BUSINESS-ADDRESS store terms rendered with the address set', () => {
+  it('keeps §2.8, fills both tokens with the #2012 mailbox, and leaves no token or placeholder', () => {
+    expect(REAL_MAILING_ADDRESS).toBe('18543 Devonshire St #2012, Northridge, CA 91324');
+    const addressSet = isMailingAddressSet(REAL_MAILING_ADDRESS);
+    const sections = STORE_TERMS_SECTIONS.filter((s) => addressSet || s.id !== 'mailing-address').map((s) => ({
+      ...s,
+      markdown: renderMailingAddress(s.markdown, BUSINESS_ADDRESS_TOKEN, REAL_MAILING_ADDRESS),
+    }));
+    const html = renderStoreTerms(sections);
+    expect(html).toContain('<section id="mailing-address">');
+    expect(html.split('18543 Devonshire St #2012').length - 1).toBe(2);
+    expect(html).not.toContain('{BUSINESS_ADDRESS}');
+    expect(html).not.toMatch(/granada hills/i);
+    expect(html).not.toMatch(/pending/i);
   });
 });
