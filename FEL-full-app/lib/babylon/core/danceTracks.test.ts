@@ -8,6 +8,7 @@ import { DANCE_LIBRARY, DancePerformance, generateRoutine, beatDuration } from '
 import { kitPattern } from '../audio/KitPulse';
 import { FEL_SONGS, secPerBar } from '../dance/felSongs';
 import { CATEGORY_STEM } from '../audio/StemBand';
+import { chartStepsFor } from '../dance/chart';
 
 describe('dance tracks (A+ mission #1)', () => {
   // MUSIC-SUITE P7 (2026-09-29): the three procedurally-random charts are now the six FEL house songs
@@ -174,8 +175,15 @@ describe('stepsForSong (the six FEL songs)', () => {
     }
   });
 
-  it('stepsFor(track) answers stepsForSong for every shipped track (no exported track present in node)', () => {
-    for (const t of DANCE_TRACKS) expect(stepsFor(t)).toEqual(stepsForSong(t.song!));
+  // test changed (2026-10-13, MUSIC-SUITE P9 re-land): this said stepsFor(track) answers stepsForSong. That was right while the
+  // generated steps were the charts; a shipped track now plays its AUTHORED chart (dance/chart.ts) and stepsForSong is the
+  // fallback for a song whose chart is missing or invalid (chart.test.ts holds the fallback). The old assertion would have
+  // pinned the generated steps as the thing a player dances, which is exactly what this change replaces.
+  it('stepsFor(track) answers the authored chart for every shipped track (no exported track present in node)', () => {
+    for (const t of DANCE_TRACKS) {
+      expect(stepsFor(t)).toEqual(chartStepsFor(t.song!));
+      expect(stepsFor(t)).not.toEqual(stepsForSong(t.song!));
+    }
   });
 
   it('earnableStemsAtBar reads the section a bar falls in, minus bed', () => {

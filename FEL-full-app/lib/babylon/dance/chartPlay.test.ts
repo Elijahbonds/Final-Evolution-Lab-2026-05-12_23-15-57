@@ -8,7 +8,7 @@ import { KEY_SPACE_DOWN } from '../core/StartWake';
 import { FEL_SONGS } from './felSongs';
 import {
   CLIP_BY_ID, categoryOf, chartForLevel, cycleLevel, parseLevel, EASY_MIN_START_GAP_BEATS, grooveBeats, grooveTap,
-  firstGrooveFrom, GROOVE_CLEAR_BEATS, FAMILY_BUTTON, buttonForStep, matchPress, pressTarget, tapSource, isReleaseOf,
+  firstGrooveFrom, styleTap, styleTapAt, GROOVE_WINDOW_SEC, GROOVE_STYLE, GROOVE_CLEAR_BEATS, FAMILY_BUTTON, buttonForStep, matchPress, pressTarget, tapSource, isReleaseOf,
   judgeRelease, RELEASE_CLEAN_SEC, RELEASE_WINDOW_SEC, comparedRun,
 } from './chartPlay';
 
@@ -171,5 +171,55 @@ describe('#13 freeze holds', () => {
     expect(judgeRelease(-0.5)).toEqual({ call: 'EARLY', style: 0 });
     expect(judgeRelease(0.5)).toEqual({ call: 'LATE', style: 0 });
     expect(judgeRelease(0).style).toBeGreaterThan(judgeRelease(0.15).style);
+  });
+});
+
+describe('MUSIC-SUITE P9 re-land: STYLE taps on an authored chart\'s own beats (accents, doubles, freestyle slots)', () => {
+  it('styleTap takes the nearest untaken beat inside the window — fractions included', () => {
+    const beats = [2, 2.5, 2.75, 4, 6.25];
+    const taken = new Set<number>();
+    expect(styleTap(beats, 2.52, 0.1, taken)).toBe(2.5);
+    expect(styleTap(beats, 2.7, 0.1, taken)).toBe(2.75);
+    expect(styleTap(beats, 2.62, 0.2, taken)).toBe(2.5);                  // both in reach: the nearer
+    expect(styleTap(beats, 2.64, 0.2, taken)).toBe(2.75);
+    expect(styleTap(beats, 3.2, 0.1, taken)).toBeNull();                  // between beats
+    expect(styleTap(beats, 6.3, 0.1, taken)).toBe(6.25);                  // past the first/last beat
+    expect(styleTap(beats, 1.95, 0.1, taken)).toBe(2);
+    expect(styleTap(beats, 9, 0.1, taken)).toBeNull();
+    expect(styleTap([], 2, 0.1, taken)).toBeNull();
+    expect(styleTap(beats, Number.NaN, 0.1, taken)).toBeNull();
+    taken.add(2.5);
+    expect(styleTap(beats, 2.52, 0.1, taken)).toBeNull();                 // taken: a second press at it earns nothing
+    expect(styleTap(beats, 2.62, 0.2, taken)).toBe(2.75);                 // …but the next beat in reach is still there
+  });
+  it('on whole beats it answers exactly as grooveTap did (the window is under half a beat)', () => {
+    const beats = [2, 3, 4];
+    const taken = new Set<number>([3]);
+    for (const [pos, win] of [[3.05, 0.1], [2.98, 0.1], [2.5, 0.1], [6, 0.1], [4.08, 0.1], [2.04, 0.13], [1.9, 0.13]] as const) {
+      expect(styleTap(beats, pos, win, taken), `${pos}`).toBe(grooveTap(beats, pos, win, taken));
+    }
+  });
+  it('styleTapAt: a press the judge would take for a step is the step\'s, never STYLE — and a STYLE tap never reaches the judge', () => {
+    // 120 BPM (0.5 s a beat): a move on beat 4 (2.0 s), a style tap on beat 3.5 (1.75 s, 0.25 s ahead of it) and one on 5.5
+    const steps = [step(0), step(4)];
+    const style = [3.5, 5.5];
+    const perf = new DancePerformance(120);
+    perf.setRoutine(steps);
+    perf.start(0);
+    perf.hit(0);
+    const win = GROOVE_WINDOW_SEC / 0.5;
+    const taken = new Set<number>();
+    const up = (t: number) => perf.upcoming(t, 8);
+    // 1.75 s: 0.25 s before the move — outside MISS_AFTER (0.2): STYLE
+    expect(styleTapAt(style, up(1.75), 1.75, 1.75 / 0.5, win, taken)).toBe(3.5);
+    // 1.83 s (the window's far edge): 0.17 s before the move — inside MISS_AFTER, so it is the MOVE's early press
+    expect(styleTapAt(style, up(1.83), 1.83, 1.83 / 0.5, win, taken)).toBeNull();
+    // 2.75 s: the style tap on 5.5, the move long gone
+    expect(styleTapAt(style, up(2.75), 2.75, 2.75 / 0.5, win, taken)).toBe(5.5);
+    // a STYLE tap never touched the performance: no wild tap, no score, no combo
+    const before = perf.result();
+    expect(perf.score).toBe(before.score);
+    expect(before.counts.MISS).toBe(0);
+    expect(GROOVE_STYLE).toBe(50);
   });
 });

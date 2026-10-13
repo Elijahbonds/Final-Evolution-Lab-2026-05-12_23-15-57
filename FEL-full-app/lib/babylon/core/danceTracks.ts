@@ -17,6 +17,13 @@
 // (CONTRACT (b): "the new songs carry press steps only for now" — phase 9 authors real charts, with body targets,
 // from the same section data).
 //
+// MUSIC-SUITE P9 re-land (2026-10-13, closed PR #46 on today's design): every shipped track now plays its AUTHORED chart
+// (lib/babylon/dance/chart.ts + charts/<song>.json). stepsFor answers the chart's MOVES as the steps and styleBeatsFor its
+// accents, doubles and freestyle slots as STYLE taps: a denser chart pays STYLE, never score, so the score ceiling
+// (arena-score-integrity danceCeiling) does not move. stepsForSong below is UNCHANGED and still exported and callable — it
+// is the fallback for a song whose chart is missing or fails validation (chart.ts logs that loudly), and body routines may
+// lean on it. The DanceTrack shape is unchanged.
+//
 // Seeds are fixed per track ON PURPOSE, for the exported/legacy path (stepsForSong needs no seed argument — it is
 // deterministic from the song's OWN id via a local PRNG, so a retry or a share still hands back the same chart).
 
@@ -28,6 +35,8 @@ import { CATEGORY_STEM } from '../audio/StemBand';
 import { FEL_SONGS, sectionAtBar, type FelSong, type FelSongSection, type FelStem } from '../dance/felSongs';
 // PIPELINES (2026-10-06): approved community songs and routines, and the player's equipped routine (dance/communityDance.ts).
 import { communityCreditLine, communityDanceTracks, communityStepsFor } from '../dance/communityDance';
+// MUSIC-SUITE P9 re-land (2026-10-13): the six songs' authored charts (dance/chart.ts).
+import { chartStepsFor, chartStyleBeatsFor } from '../dance/chart';
 
 export interface DanceTrack {
   id: string;
@@ -135,7 +144,23 @@ export function stepsFor(t: DanceTrack): DanceStep[] | null {
   if (mine && mine.track.id === t.id) return mine.steps;
   const community = communityStepsFor(t);   // PIPELINES: a community song's own chart, a routine looped over its song
   if (community) return community;
-  return t.song ? stepsForSong(t.song) : null;
+  if (!t.song) return null;
+  // MUSIC-SUITE P9 re-land (2026-10-13): a shipped song plays its AUTHORED chart (dance/chart.ts: the chart's MOVES are
+  // the steps). stepsForSong is the fallback for a song with no valid chart, and stays exported and callable.
+  return chartStepsFor(t.song) ?? stepsForSong(t.song);
+}
+
+/**
+ * MUSIC-SUITE P9 re-land (2026-10-13): the STYLE taps of the chart `stepsFor(t)` plays — the song beats of its authored
+ * accents, doubles and freestyle slots (dance/chart.ts) — or null when `t` does not play an authored chart (the
+ * player's export, a community song or routine, a song whose chart failed validation): then the room's computed groove
+ * beats (chartPlay.grooveBeats) apply instead. A denser chart is more STYLE to earn; it adds no step, so it adds no score.
+ */
+export function styleBeatsFor(t: DanceTrack): number[] | null {
+  const mine = readExportedTrack();
+  if (mine && mine.track.id === t.id) return null;
+  if (communityStepsFor(t)) return null;
+  return t.song ? chartStyleBeatsFor(t.song) : null;
 }
 
 // ── MUSIC-SUITE P7: press steps authored from a song's own section map ──────────────────────────────────────────

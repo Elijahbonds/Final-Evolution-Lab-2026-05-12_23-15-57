@@ -66,7 +66,7 @@ import {
   DancePerformance, generateRoutine, beatDuration, MISS_AFTER, type Judgement, type DanceStep,
 } from '../core/DanceCore';
 import {
-  DEFAULT_TRACK_ID, trackById, cycleTrack, trackFromQuery, pickBanner, PICK_TIMEOUT_SEC, stepsFor,
+  DEFAULT_TRACK_ID, trackById, cycleTrack, trackFromQuery, pickBanner, PICK_TIMEOUT_SEC, stepsFor, styleBeatsFor,
   gradeFor, bodySpeedFor, cueLane, CUE_LOOKAHEAD_SEC, CUE_LINGER_SEC, type DanceTrack, type HudCue,
 } from '../core/danceTracks';
 // BIOMECH-WAVE2 (2026-09-09) — the game-wide bar on the stage family (SPEC-FEL-BIOMECH-GAMEWIDE asks dance for "G2 +
@@ -138,11 +138,12 @@ import { stoopJudgeWindows, STOOP_LOOKAHEAD } from '../dance/stoopWindows';
 // danceBests (a device-local best per track).
 import { BannerClock, judgementBanner, offsetSummary, isFullCombo, SectionTally } from '../dance/runFeedback';
 import {
-  CLIP_BY_ID, categoryOf, chartForLevel, cycleLevel, parseLevel, DANCE_LEVELS, grooveBeats, grooveTap, firstGrooveFrom,
+  CLIP_BY_ID, categoryOf, chartForLevel, cycleLevel, parseLevel, DANCE_LEVELS, grooveBeats, styleTapAt, firstGrooveFrom,
   GROOVE_WINDOW_SEC, GROOVE_STYLE, buttonForStep, matchPress, pressTarget, tapSource, isReleaseOf, judgeRelease,
   RELEASE_WINDOW_SEC, RELEASE_TEXT, FAMILY_BUTTON, comparedRun, type DanceLevel, type TapSource,
 } from '../dance/chartPlay';
 import { readBest, recordBest, bestLine } from '../dance/danceBests';
+import { moveFadeSec, STEP_FADE_SEC } from '../dance/floorPhase';
 
 /** Clips are authored at 120 BPM; the animator rescales them per track. */
 const CLIP_REF_BPM = 120;
@@ -363,6 +364,8 @@ export const DanceMode: ModeDefinition = (() => {
   let kit: KitPulse | null = null;
   /** The clip currently dancing, so a judgement can re-speed it. */
   let currentClip: string | null = null;
+  /** The chart step that started the clip now dancing (its clip id and chart beat): floorPhase's crossfade reads it. */
+  let lastStep: { clipId: string; beat: number } | null = null;
   /** ANIM-READABILITY (creative, 2026-09-07): the ONE OWNER of the dancer's clips. Steps used to play as one-shots with
    *  neverBindPose's chain settling them, and the chain fires when a step is CUT too: the previous step's chained idle
    *  played from inside the animator's fade handler 0.05 s after the next step began and replaced it — measured on the
@@ -489,6 +492,7 @@ export const DanceMode: ModeDefinition = (() => {
     sections = new SectionTally(track.song);
     fumbled = new Set(); grooves = []; grooveTaken = new Set(); style = 0;
     tapSrc = null; hold = null; laneAt = -Infinity; countDigit = 0;
+    lastStep = null;
   }
   /** #2: put a transient banner up; the newest banner's hold is the only clear scheduled. */
   function flashBanner(ctx: ModeContext, text: string, holdMs: number, extra: Parameters<ModeContext['setHud']>[0] = {}): void {
@@ -793,7 +797,11 @@ export const DanceMode: ModeDefinition = (() => {
     currentClip = s.mirrored ? `${id}.M` : id;
     // MUSIC-SUITE P8: which category this step is — the stage camera drops low on a 'freeze' (decision #8).
     currentCategory = categoryOf(s);   // IMPROVE (2026-10-06, #18): a Map lookup, not DANCE_LIBRARY.find per step
-    body?.loop(currentClip, { fadeSec: 0.12, speedRatio: clipSpeed() });
+    // MUSIC-SUITE P9 re-land (2026-10-13): a switch made while the move being left is still on the FLOOR rises (floorPhase:
+    // the authored charts start the next move mid-windmill); a switch made standing is the 0.12 s it always was
+    const fade = lastStep ? moveFadeSec(lastStep.clipId, s.beat - lastStep.beat, beatDuration(track.bpm), CLIP_BY_ID.get(lastStep.clipId)?.beats) : STEP_FADE_SEC;
+    lastStep = { clipId: s.clipId, beat: s.beat };
+    body?.loop(currentClip, { fadeSec: fade, speedRatio: clipSpeed() });
     me.animator.setSpeed(currentClip, clipSpeed());   // the same step twice in a row keeps the loop; a GOOD's drag is undone here
   }
 
@@ -1149,7 +1157,10 @@ export const DanceMode: ModeDefinition = (() => {
     // chart as authored. #10: the groove beats are read off the chart actually played.
     const routine = chartForLevel(mine ?? generateRoutine({ bars: track.bars, difficulty: track.difficulty, seed: track.seed }), level);
     resetImproveRun();
-    grooves = grooveBeats(routine);
+    // MUSIC-SUITE P9 re-land (2026-10-13): an authored chart brings its OWN style taps (accents, doubles, freestyle slots —
+    // dance/chart.ts, via styleBeatsFor); any other chart (the export, a community song, a fallback) keeps the computed
+    // groove beats. Either way they pay STYLE only, never a step and never score.
+    grooves = styleBeatsFor(track) ?? grooveBeats(routine);
     perf.setRoutine(routine);
     // MUSIC-SUITE P7 (2026-09-29): which instruments THIS chart calls for, decided once, on the exact array perf
     // just got — before any step fires, so the pick screen's follow-on chip row (instrumentsHud, at 'GO' below) is
@@ -1223,7 +1234,8 @@ export const DanceMode: ModeDefinition = (() => {
 
   /**
    * IMPROVE (2026-10-06): one press, on the heard clock, on its way to the judge. In order:
-   *   #10 a press on a GROOVE beat (a whole beat in a long gap, no step within reach) is STYLE, not a wild tap — it costs
+   *   #10 a press on a GROOVE beat (a whole beat in a long gap, no step within reach — or, on a song with an authored
+   *       chart, one of that chart's own accents, doubles and freestyle slots) is STYLE, not a wild tap — it costs
    *       nothing and never touches the combo or the score;
    *   #12 in MATCH mode a press at a step with the wrong face button fumbles that step: it is not judged, further presses
    *       at it are ignored, and it expires as a MISS (one wrong button cannot be mashed into a right one);
@@ -1233,8 +1245,8 @@ export const DanceMode: ModeDefinition = (() => {
     const near = grooves.length || matchMode ? perf.upcoming(heardNow, STOOP_LOOKAHEAD) : null;
     if (phase === 'playing' && grooves.length && near) {
       const bd = beatDuration(track.bpm);
-      const g = grooveTap(grooves, (heardNow - startAt) / bd, GROOVE_WINDOW_SEC / bd, grooveTaken);
-      if (g !== null && !pressTarget(near, heardNow)) {
+      const g = styleTapAt(grooves, near, heardNow, (heardNow - startAt) / bd, GROOVE_WINDOW_SEC / bd, grooveTaken);
+      if (g !== null) {
         grooveTaken.add(g);
         style += GROOVE_STYLE;
         ctx.juice.scorePop(me.root.position.add(new Vector3(0, 2.1, 0)), 'GROOVE', '#e9d5ff');
