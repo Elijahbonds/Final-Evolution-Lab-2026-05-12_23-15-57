@@ -78,6 +78,27 @@ describe('the replay director', () => {
     expect(deck.rotationQuaternion).toBeNull();
     rd.dispose();
   });
+  it('the filmer is kept over the floor: it takes the other side of the line, falls back when neither fits, and is as it was with no bounds', async () => {
+    const run = async (bounds: { minX: number; maxX: number; minZ: number; maxZ: number } | undefined) => {
+      const { scene, cam, runner, frame } = rig();
+      const rd = new ReplayDirector(scene, cam, [runner]);
+      for (let i = 0; i < 150; i++) { runner.position.set(29.2, 0, -15 + i * 0.2); frame(); }   // along the +x edge of a 30 m slab, heading +z
+      const done = rd.play({ lastSeconds: 2, angles: ['filmer', 'side'], side: -1, bounds });   // side −1: the filmer asks to stand at +x, off the slab
+      const seen = new Set<string>(); let maxCamX = -Infinity;
+      for (let i = 0; i < 2 / REPLAY_SPEED * 60 + 20 && rd.playing; i++) { frame(); if (rd.angleNow) seen.add(rd.angleNow); if (rd.angleNow === 'filmer') maxCamX = Math.max(maxCamX, cam.position.x); }
+      await done; rd.dispose();
+      return { seen, maxCamX };
+    };
+    const bounded = await run({ minX: -30, maxX: 30, minZ: -40, maxZ: 40 });
+    expect(bounded.seen.has('filmer')).toBe(true);                    // the other side of the line is over the slab: still a filmer shot
+    expect(bounded.maxCamX).toBeLessThan(29.2);                       // from inside it, not past the edge
+    const cornered = await run({ minX: 28, maxX: 30.5, minZ: -40, maxZ: 40 });
+    expect(cornered.seen.has('filmer')).toBe(false);                  // neither side fits a 2.5 m strip: passed over
+    expect(cornered.seen.has('follow')).toBe(true);
+    const free = await run(undefined);
+    expect(free.seen.has('filmer')).toBe(true);                       // control: without bounds the lens is where it was asked, past the edge
+    expect(free.maxCamX).toBeGreaterThan(30);
+  });
   it('a skip ends it on the spot; a pause freezes it (and a skip while paused is ignored)', async () => {
     const { scene, cam, runner, frame } = rig();
     const rd = new ReplayDirector(scene, cam, [runner]);

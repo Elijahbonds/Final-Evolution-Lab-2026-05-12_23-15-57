@@ -28,7 +28,7 @@
 import { Quaternion, RenderTargetTexture, Vector3 } from '@babylonjs/core';
 import type { AbstractMesh, DefaultRenderingPipeline, Observer, Scene, TargetCamera, TransformNode } from '@babylonjs/core';
 import { replayWindow } from './replayWindow';
-import { DOF_REST, replayCut, replayLens, replayShot, type ReplayAngle } from './broadcastShots';
+import { DOF_REST, replayCut, replayLens, replayShot, resolveAngle, type ReplayAngle, type ShotBounds } from './broadcastShots';
 import type { QualityTier } from './QualityTier';
 
 export const REPLAY_WINDOW_S = 5;
@@ -122,6 +122,8 @@ export interface ReplayPlayOpts {
   objective?: Vector3 | null;
   /** +1 / −1: which side of the action the profile angles take. */
   side?: number;
+  /** The floor a camera may stand over (vis-board): the filmer's spot is validated against it per segment, and falls back to the next angle. */
+  bounds?: ShotBounds | null;
   /** A paused game freezes the replay (the harness passes its phase). */
   paused?: () => boolean;
 }
@@ -223,6 +225,14 @@ export class ReplayDirector {
     const t0 = frames[0].t, dur = Math.max(0.2, frames[frames.length - 1].t - t0);
     const angles = opts.angles?.length ? opts.angles : replayCut(dur);
     const seg = dur / angles.length;
+    // each segment's angle, validated against the floor once (against the subject's whole path through it): the filmer falls back
+    const fi0 = Math.min(this.focusIndex, this.bodies.length - 1);
+    const shots = angles.map((a, s) => {
+      const from = t0 + s * seg, to = from + seg;
+      const foci = frames.filter((f) => f.t >= from - 1e-6 && f.t <= to + 1e-6).map((f) => ({ x: f.bodies[fi0].p.x, y: f.bodies[fi0].p.y, z: f.bodies[fi0].p.z }));
+      const h = frames[frames.length - 1].bodies[fi0].p.subtract(frames[0].bodies[fi0].p);
+      return resolveAngle(a, foci, { x: h.x, y: h.y, z: h.z }, opts.objective ? { x: opts.objective.x, y: opts.objective.y, z: opts.objective.z } : null, opts.side ?? 1, opts.bounds ?? null);
+    });
     const fi = Math.min(this.focusIndex, this.bodies.length - 1);
     // the live moment, put back at the end
     const live = {
@@ -265,9 +275,9 @@ export class ReplayDirector {
         a.loose.forEach((pa, i) => this.loose[i].setAbsolutePosition(Vector3.Lerp(pa, b.loose[i], k)));
         // the cut: one angle per segment, a slow push-in within it
         const s = Math.min(angles.length - 1, Math.floor(Math.min(rt, dur - 1e-6) / seg));
-        this.angleNow = angles[s];
+        this.angleNow = shots[s].angle;
         const focus = Vector3.Lerp(a.bodies[fi].p, b.bodies[fi].p, k);
-        const shot = replayShot(angles[s], focus, heading, opts.objective ?? null, opts.side ?? 1);
+        const shot = replayShot(shots[s].angle, focus, heading, opts.objective ?? null, shots[s].side);
         const into = (rt - s * seg) / seg;
         const push = 1 - 0.07 * into;
         const tg = new Vector3(shot.target.x, shot.target.y, shot.target.z);

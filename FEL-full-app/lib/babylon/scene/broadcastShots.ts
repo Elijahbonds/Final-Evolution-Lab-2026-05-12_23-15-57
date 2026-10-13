@@ -142,6 +142,33 @@ export function replayShot(angle: ReplayAngle, focus: V3, heading: V3, objective
   }
 }
 
+// ── WHERE A CAMERA MAY STAND (vis-board, wave 2) ─────────────────────────────────────────────────────────────────────
+// The filmer stands an arm's length off the line, at ankle height: with the rider near the edge of the slab that spot is past the
+// floor and the frame fills with the dome underneath. A mode that knows its floor passes `bounds`; the director asks `resolveAngle`
+// for each cut segment ONCE (against where the subject is through the whole segment, so the camera never swaps sides mid-shot).
+/** The floor a camera may stand over: world x/z extents. */
+export interface ShotBounds { minX: number; maxX: number; minZ: number; maxZ: number }
+/** How far inside the bounds the filmer's lens must be (it is a wide lens: the floor's edge is in frame well before the camera is on it). */
+export const FILMER_MARGIN = 1.0;
+const inside = (p: V3, b: ShotBounds, m: number): boolean => p.x >= b.minX + m && p.x <= b.maxX - m && p.z >= b.minZ + m && p.z <= b.maxZ - m;
+/** Angles tried, in order, when the filmer has no valid spot: a profile, a low angle, then from behind. */
+export const FILMER_FALLBACKS: readonly ReplayAngle[] = ['side', 'low', 'follow'];
+
+/**
+ * Pure: the angle (and side) to shoot a segment from. Only the filmer is checked: it takes its side, then the other side of the
+ * line, then the first of `fallbacks` (default FILMER_FALLBACKS) whose camera stays over the floor for every sample of the
+ * subject's position through the segment; failing all of those, 'follow' (behind the subject, over ground it just crossed).
+ * Every other angle, and a call without bounds, is returned as asked.
+ */
+export function resolveAngle(angle: ReplayAngle, foci: readonly V3[], heading: V3, objective: V3 | null, side: number, bounds?: ShotBounds | null, fallbacks: readonly ReplayAngle[] = FILMER_FALLBACKS): { angle: ReplayAngle; side: number } {
+  if (angle !== 'filmer' || !bounds || !foci.length) return { angle, side };
+  const ok = (a: ReplayAngle, sd: number): boolean => foci.every((f) => inside(replayShot(a, f, heading, objective, sd).pos, bounds, FILMER_MARGIN));
+  if (ok('filmer', side)) return { angle, side };
+  if (ok('filmer', -side)) return { angle, side: -side };
+  for (const a of fallbacks) if (a !== 'filmer' && ok(a, side)) return { angle: a, side };
+  return { angle: 'follow', side };
+}
+
 /** The angles a replay of `sec` seconds is cut into: one angle per ~1.2 s of source, two at least, three at most. */
 export function replayCut(sec: number, angles: readonly ReplayAngle[] = ['low', 'side', 'tight']): ReplayAngle[] {
   const n = Math.max(2, Math.min(3, Math.round(sec / 1.2), angles.length));

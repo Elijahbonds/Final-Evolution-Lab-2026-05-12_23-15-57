@@ -1,7 +1,7 @@
 // vis-foundation-2 A9.12 — the broadcast kit's framing maths: the intro, the replay angles, the replay lens.
 import { describe, expect, it } from 'vitest';
 import {
-  CRANE, DOF_REPLAY, DOF_REST, INTRO, REPLAY_ANGLES, introLetterbox, introPose, introSec, orbitBlend, replayCut, replayLens, replayShot,
+  CRANE, DOF_REPLAY, DOF_REST, FILMER_FALLBACKS, FILMER_MARGIN, INTRO, REPLAY_ANGLES, introLetterbox, introPose, introSec, orbitBlend, replayCut, replayLens, replayShot, resolveAngle,
   type ShotPose, type V3,
 } from './broadcastShots';
 
@@ -57,6 +57,41 @@ describe('orbitBlend', () => {
   });
 });
 
+describe('where the filmer may stand (vis-board, wave 2 fix)', () => {
+  const B = { minX: -30, maxX: 30, minZ: -30, maxZ: 30 };
+  const heading: V3 = { x: 0, y: 0, z: 6 };
+  it('mid-slab: the filmer is kept, on the side asked for', () => {
+    expect(resolveAngle('filmer', [{ x: 0, y: 0, z: 0 }], heading, null, 1, B)).toEqual({ angle: 'filmer', side: 1 });
+    expect(resolveAngle('filmer', [{ x: 0, y: 0, z: 0 }], heading, null, -1, B)).toEqual({ angle: 'filmer', side: -1 });
+  });
+  it('at the edge on its own side: takes the other side of the line', () => {
+    // heading +z: side +1 puts the camera at −x, side −1 at +x
+    const probe = replayShot('filmer', { x: 29, y: 0, z: 0 }, heading, null, -1).pos.x;
+    expect(probe).toBeGreaterThan(B.maxX - FILMER_MARGIN);                               // control: the asked-for spot really is off the slab
+    expect(resolveAngle('filmer', [{ x: 29, y: 0, z: 0 }], heading, null, -1, B)).toEqual({ angle: 'filmer', side: 1 });
+  });
+  it('the whole path through the segment counts, not just where it starts', () => {
+    const path = [{ x: 0, y: 0, z: 0 }, { x: 29, y: 0, z: 0 }];
+    expect(resolveAngle('filmer', [path[0]], heading, null, -1, B)).toEqual({ angle: 'filmer', side: -1 });   // the start alone is fine on the asked side
+    expect(resolveAngle('filmer', path, heading, null, -1, B)).toEqual({ angle: 'filmer', side: 1 });         // the end is not
+  });
+  it('no filmer spot valid on either side: the next angle that stays over the slab, else from behind', () => {
+    const both = [{ x: 29.5, y: 0, z: 0 }, { x: -29.5, y: 0, z: 0 }];                  // each side of the line is off the slab for one of them
+    expect(resolveAngle('filmer', both, heading, null, 1, B)).toEqual({ angle: 'follow', side: 1 });
+    // a fallback that fits is taken, in the order given
+    const narrow = { minX: -8, maxX: 8, minZ: -30, maxZ: 30 };
+    const edge = [{ x: 0, y: 0, z: 0 }];
+    // the floor is a strip at x 2..5 (usable 3..4): the filmer (±1.9 m) fits on neither side, 'side' (6.5 m off) does not fit, 'low' (3.6 m, at +x for side −1) does
+    expect(resolveAngle('filmer', edge, heading, null, -1, { minX: 2, maxX: 5, minZ: -30, maxZ: 30 }, ['side', 'low'])).toEqual({ angle: 'low', side: -1 });
+    expect(resolveAngle('filmer', edge, heading, null, 1, narrow, ['side'])).toEqual({ angle: 'filmer', side: 1 });
+    expect(FILMER_FALLBACKS as readonly string[]).not.toContain('filmer');
+  });
+  it('every other angle, no bounds, and no samples are left as asked', () => {
+    expect(resolveAngle('side', [{ x: 29, y: 0, z: 0 }], heading, null, 1, B)).toEqual({ angle: 'side', side: 1 });
+    expect(resolveAngle('filmer', [{ x: 29, y: 0, z: 0 }], heading, null, -1)).toEqual({ angle: 'filmer', side: -1 });
+    expect(resolveAngle('filmer', [], heading, null, 1, B)).toEqual({ angle: 'filmer', side: 1 });
+  });
+});
 describe('the replay angles', () => {
   const focus: V3 = { x: 0, y: 0, z: 10 }, heading: V3 = { x: 0, y: 0, z: 6 };
   it('every angle frames the subject from a readable distance, with a finite lens', () => {

@@ -1484,7 +1484,7 @@ export const SkateRunMode: ModeDefinition = (() => {
             // vis-board (wave 2): the run's best line is replayed — a filmer's low fisheye, a profile, then low behind. Only a HUGE
             // bank that beats every one already shown, never in the last seconds (the end card's), skippable by any press.
             const plan = replayGate.consider(RUN_SEC - timeLeft, { kind: 'combo', weight: banked, floor: BIG_BANK_PTS, sec: 3 }, timeLeft);
-            if (plan) { console.info(`[SKATE-REPLAY] best line ${banked} (${plan.lastSeconds.toFixed(1)} s)`); void ctx.highlight?.({ lastSeconds: plan.lastSeconds, angles: ['filmer', 'side', 'low'] }); }
+            if (plan) { console.info(`[SKATE-REPLAY] best line ${banked} (${plan.lastSeconds.toFixed(1)} s)`); void ctx.highlight?.({ lastSeconds: plan.lastSeconds, angles: ['filmer', 'side', 'low'], bounds: { minX: -world.bound, maxX: world.bound, minZ: -world.bound, maxZ: world.bound } });   // the filmer stays over the slab (falls back to the next angle at an edge) }
           }
           settleT = 0;
         }
