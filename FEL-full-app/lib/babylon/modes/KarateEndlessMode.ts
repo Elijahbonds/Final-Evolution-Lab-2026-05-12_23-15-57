@@ -64,9 +64,10 @@ import { FOCUS, FocusMeter, WALL_RUN, wallRunAvailableOn, startWallRunOn, wallRu
 import { readCombatArena, arenasFor, arenaClamp, knockTo, hazardAt, spawnRadius, describeArena, insideBy, crowdRing, CROWD_GAP, CROWD_PHASE, ROPES, type CombatArena, type ArenaWall } from '../combat/arenas';   // COMBAT ARENAS (2026-09-18)
 import { buildArena, type ArenaHandle } from '../combat/arenaBuild';
 import { HORDE_WINDOW_SEC } from '../core/DodgeRead';
-import { Color3, Matrix, Mesh, MeshBuilder, PBRMaterial, StandardMaterial, Vector3, type Material } from '@babylonjs/core';
+import { Color3, Matrix, Mesh, MeshBuilder, PBRMaterial, StandardMaterial, Vector3, type Material, type TargetCamera } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { Mob, MobPool, STEERING_PRESETS } from '../core/MobSteering';
+import { HundredCamera, limitCameraStep, type Foe as CamFoe } from '../core/HundredCamera';   // CAM-FIXES (2026-10-13): the damped, continuous crowd shot
 // BIOMECH-WAVE2 (2026-09-09) — the game-wide bar on the gauntlet (SPEC-FEL-BIOMECH-GAMEWIDE G1–G6). Two findings:
 //   G1/G4  a strike SNAPPED the fighter onto the nearest agent in one frame (`player.root.rotation.y = atan2(to)` at
 //          the top of `strike()`, up to 180° in a single frame with the swing clip already crossfading in) — the exact
@@ -449,7 +450,12 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     flowBanner(ctx, `TAKEDOWN ×${fe.count}`, 1000);
     return true;
   }
-  let camCrowd = false;                             // H8: surrounded → the crowd preset
+  // CAM-FIXES (2026-10-13): H8's discrete 'surrounded -> fightCrowd' preset flip is gone — the camera is one continuous, damped shot
+  // (core/HundredCamera): crowd01 eases up and down, the facing and the aim are smoothed, a narrow screen pulls back. Its scratch:
+  const hundredCam = new HundredCamera();
+  const camFoes: CamFoe[] = [];
+  const camFacing = new Vector3(0, 0, 1), camFocus = new Vector3(), camBefore = new Vector3();
+  let camBaseFov = -1;
   let xHoldSec = -1, iframeSec = 0;
   let lastXTapSec = -1e9, lastDashSec = -1e9;   // STORM: the double tap, and the rush out of a dash
   let stickX = 0, stickY = 0;
@@ -1980,6 +1986,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       book.reset(); queue.clear(); carry = null; gameSec = 0; strikeSeq = 0; strikeMove = null; strikeHitDone = true; landed = []; shopOpen = false;
       deferred.clear(); ledger.reset(); bodyQueued = null; ctxRef = ctx;   // P7
       striking = false; blocking = false; dodging = false; xHoldSec = -1; iframeSec = 0; lastXTapSec = -1e9; lastDashSec = -1e9; endSlowMo(ctx); padBlock.reset();
+      hundredCam.reset(); camBaseFov = -1;   // CAM-FIXES: the declared cut — the first frame starts at the fighter, nothing eased from before
       ctx.camDirector.snapTo(player.root.position, player.root.position.add(facingVec()));
       karateVenue?.hidePlaceholders();  // M74
       SoundKit.startAmbient('dojo');
@@ -2234,13 +2241,24 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       // look-ahead target, which is exactly the desired effect here — the
       // camera looks slightly down the direction you're facing.
       crowd?.update(dt);
-      // surrounded by three or more inside the crowd-clear radius: the camera
-      // pulls back and up so the horde is the shot (preset change on the
-      // transition only — setPreset re-derives the venue bounds)
-      const surroundedNow = crowdAround(player.root.position) >= CROWDCLEAR_MIN_SURROUNDED;   // (IMPROVE 2026-10-06: no map a frame)
-      if (surroundedNow !== camCrowd) { camCrowd = surroundedNow; ctx.camDirector.setPreset(camCrowd ? 'fightCrowd' : 'fightShoulder'); }
+      // CAM-FIXES: ONE continuous shot, no preset flip. Every live foe (not the one in your hands) shapes how far the camera stands;
+      // the facing and the aim it follows are smoothed (HundredCamera), so a KO or a turn on a dime can no longer move the frame in one step.
+      camFoes.length = 0;
+      for (const e of enemies) if (e.hp > 0 && !e.carried) camFoes.push(e.mob.char.root.position);
+      const eng = ctx.scene.getEngine();
+      if (camBaseFov < 0) camBaseFov = ctx.scene.activeCamera ? ctx.scene.activeCamera.fov : 0.8;   // the lens the harness authored, read once
+      const shot = hundredCam.update(dtReal, player.root.position, { x: Math.sin(player.root.rotation.y), z: Math.cos(player.root.rotation.y) }, camFoes, eng.getRenderWidth() / Math.max(1, eng.getRenderHeight()), camBaseFov);
+      if (Math.abs(shot.fov - (ctx.scene.activeCamera?.fov ?? shot.fov)) > 0.002) ctx.camDirector.setBaseFov(shot.fov);   // a rotate / resize: one cut of the lens
+      ctx.camDirector.tuneFollow({ distance: shot.distance, height: shot.height, lag: shot.lag, pitchCapDeg: shot.pitchCapDeg, pitchFloorDeg: shot.pitchFloorDeg });
+      camFacing.set(shot.facing.x, 0, shot.facing.z);   // unit, as the director's facing-follow contract needs
+      camFocus.set(shot.focus.x, 0, shot.focus.z);
       ctx.camDirector.look(lookX, lookY, dtReal);
-      ctx.camDirector.update(player.root.position, facingVec(), nearestTo('me')?.mob.char.root.position ?? null);
+      const cam = ctx.scene.activeCamera as TargetCamera | null;
+      if (cam) camBefore.copyFrom(cam.position);
+      ctx.camDirector.update(player.root.position, camFacing, camFocus);
+      // no hard snaps except the declared cuts (load, a respawn, FrameGuard's recenter — all of which move the camera BETWEEN these two reads):
+      // whatever the director's occlusion probe did at a wall, the camera moves at most MAX_CAM_STEP a frame
+      if (cam && limitCameraStep(camBefore, cam.position, dtReal)) cam.setTarget(cam.getTarget());
       animate(mySpeed01, Math.min(1, pVel.length() / 2.6));
       publishTelemetry(ctx);
     },
