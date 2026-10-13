@@ -347,7 +347,7 @@ export class Agent {
 
 // ── SHARED BITS ─────────────────────────────────────────────────────────────────────────────────────────────────────
 export interface RoundStat { won: boolean; how: 'ko' | 'ringout' | 'time'; secs: number; myHp: number; foeHp: number }
-export interface MatchResult { won: boolean; myWins: number; foeWins: number; rounds: RoundStat[] }
+export interface MatchResult { won: boolean; myWins: number; foeWins: number; rounds: RoundStat[]; /** Karate VS: how many times the rival broke out of a string (core/ComboBreaker) */ breaks?: number }
 export interface MatchCfg {
   mode: SimMode; tier: SimTier; profile: ProfileId; seed: number;
   weapon?: SimWeapon; arenaId?: string;
@@ -421,6 +421,12 @@ class KMatch {
   private foeDash: { dx: number; dz: number; left: number } | null = null;
   private meCounter = 0; private slowmo = 0;
   private foeLaunched = 0;
+  /** Karate VS (2026-10-13): the rival's combo break (KarateVSMode.comboBreak) — the string, the substitution's bookkeeping, the whiff beat */
+  private breaker = new ComboBreaker();
+  private mySwingObj: object | null = null;
+  private foeSub = new DefenseController();
+  private foeSubstituted = 0;
+  private breaks = 0;
   private roundOver: null | { won: boolean; how: RoundStat['how'] } = null;
   private xDownAt = -1; private lastTapAt = -1e9;
   private foeSwingId = 0; private foeImpactAt: number | null = null; private foeRange = 1.8; private foeSwingEnd = 0;
@@ -454,7 +460,7 @@ class KMatch {
       if (r.won) myWins++; else foeWins++;
       round++;
     }
-    return { won: myWins > foeWins, myWins, foeWins, rounds };
+    return { won: myWins > foeWins, myWins, foeWins, rounds, ...(this.mode === 'kvs' ? { breaks: this.breaks } : {}) };
   }
 
   private diff(): number { return this.cfg.difficulty ?? rivalDifficulty(BASE_DIFF[this.mode], this.cfg.tier); }
@@ -468,6 +474,7 @@ class KMatch {
     this.knock.clear(); this.meT.clear(); this.foeT.clear(); this.book.reset(); this.queued = null; this.meDash = null; this.meDashIframe = 0;
     this.foeDash = null; this.meCounter = 0; this.slowmo = 0; this.foeLaunched = 0; this.roundOver = null; this.xDownAt = -1;
     this.foeImpactAt = null; this.agent.reset();
+    this.breaker.reset(); this.mySwingObj = null; this.foeSub = new DefenseController(); this.foeSubstituted = 0;
     if (this.mirror) { const b = new RivalFightBrain(BASE_DIFF[this.mode], KARATE_ATTACKS); b.setRound(round); b.setStanding(myWins, foeWins, 2); b.setDifficulty(this.diff()); b.setCanSpecial(this.mode === 'mixed' ? dragonLicensed(BASELINE_RATINGS) : hasFightMove('dragon', BASELINE_RATINGS)); b.setEdge((x, z) => insideBy({ x, z }, this.arena.shape)); this.mirrorBrain = b; }
     if (this.mode === 'kvs') {
       const b = this.brainC!;
@@ -527,7 +534,7 @@ class KMatch {
     const hitDelay = atk.startupMs;
     const swungAt = this.now;
     const committedYaw = A.yaw;
-    if (mine) { A.impactAt = this.now + hitDelay; A.cancelFrom = move ? this.now + (STRIKE_TIMING[move.weight].cancelAt / move.speed) * 1000 : null; A.strikeEnd = this.now + this.swingSec(true, key, move, special) * 1000; this.mySwingSeq++; }
+    if (mine) { A.impactAt = this.now + hitDelay; A.cancelFrom = move ? this.now + (STRIKE_TIMING[move.weight].cancelAt / move.speed) * 1000 : null; A.strikeEnd = this.now + this.swingSec(true, key, move, special) * 1000; this.mySwingSeq++; this.mySwingObj = {}; }
     else { this.foeSwingId++; this.foeRange = atk.range; this.foeImpactAt = this.now + atk.startupMs / this.focus.worldScale; A.strikeEnd = this.foeT.t + this.swingSec(false, key, null, special); A.impactAt = this.foeImpactAt; }
     const seq = this.mySwingSeq;
     const onHit = (): void => {
@@ -538,6 +545,7 @@ class KMatch {
       if (this.mode === 'mixed') { const tx = D.p.x - A.p.x, tz = D.p.z - A.p.z; lateral = Math.abs(tx * -Math.cos(committedYaw) + tz * Math.sin(committedYaw)); }
       let out = resolveStrike(atk, d, D.st, this.now, lateral);
       if (!mine && (this.meDashIframe > 0 || this.evade.rollIFrames)) out = 'whiff';
+      if (mine && this.mode === 'kvs' && this.now < this.foeSubstituted) out = 'whiff';   // the rival's substitution beat: my swing in flight finds nobody
       if (!mine && out === 'whiff' && this.meDashIframe > 0) {
         const r = dodgeReward(dashSecToImpact(this.lastDashSec * 1000, swungAt, this.now));
         if (r.perfect) { this.meCounter = r.counterSec; this.focus.gain(FOCUS.dodgeGain); }
@@ -551,9 +559,11 @@ class KMatch {
           break;
         case 'guardBreak': this.endStrike(!mine); break;
         case 'hit': {
-          const counter = mine ? counterMult(this.meCounter) : 1;
+          const counter = mine ? (this.mode === 'kvs' ? Math.max(counterMult(this.meCounter), this.foeSub.counterMult(this.now)) : counterMult(this.meCounter)) : 1;
           const base = applyHit(A.st, D.st, atk);
           if (this.mode === 'kvs') {
+            if (mine) D.st.chi = Math.min(CHI_MAX, D.st.chi + (CHI.gains.hitTaken ?? 0));   // KarateVSMode: a blow taken builds the RIVAL's chi
+
             const dealt = Math.round(base * counter * (mine && this.focus.active ? FOCUS.damageMult : 1));
             if (mine && counter > 1) this.meCounter = 0;
             if (counter > 1) D.st.hp = Math.max(0, D.st.hp - (dealt - base));
@@ -584,6 +594,7 @@ class KMatch {
             this.knock.start(D.p, kt.x, kt.z, this.mode === 'mixed' ? done : undefined);
           } else if (this.mode === 'mixed') done();
           if (this.mode === 'kvs' && D.st.hp <= 0) this.end(mine, 'ko');
+          else if (this.mode === 'kvs' && mine && !this.mirror) this.breakK();
           break;
         }
         default: break;
@@ -592,8 +603,25 @@ class KMatch {
     if (mine) this.meT.after(hitDelay / 1000, onHit); else this.foeT.after(atk.startupMs / 1000, onHit);
   }
 
+  /** Karate VS: the rival's combo break (KarateVSMode.comboBreak) */
+  private breakK(): void {
+    const fs = this.foe.st;
+    if (!this.breaker.hit(this.now / 1000, this.cfg.tier, fs.chi >= SUBSTITUTION_CHI_COST)) return;
+    fs.chi = Math.max(0, fs.chi - SUBSTITUTION_CHI_COST);
+    this.foeSub.spendSubstitution(this.now);
+    fs.stunSec = 0; fs.staggerSec = 0;
+    this.knock.cancel(this.foe.p);
+    this.foeLaunched = 0;
+    const spot = DefenseController.substitutionSpot(new Vector3(this.me.p.x, 0, this.me.p.z), yawTo(this.me.p, this.foe.p));
+    this.foe.p.x = spot.x; this.foe.p.z = spot.z; arenaClamp(this.foe.p, this.arena);
+    this.foeSubstituted = this.now + DUEL.subWhiffMs;
+    this.brainC!.openCounter(COMBO_BREAK.counterSec);
+    this.breaks++;
+  }
+
   private endStrike(mine: boolean): void {
     const f = mine ? this.me : this.foe;
+    if (mine) this.mySwingObj = null;
     f.striking = false; f.impactAt = null; f.cancelFrom = null;
     if (!mine) this.foeImpactAt = null;
   }
@@ -624,6 +652,7 @@ class KMatch {
     this.meT.tick(sdtHero); this.foeT.tick(sdtRoom);
     if (this.roundOver) return;
     me.st.tick(sdtHero); foe.st.tick(sdtRoom);
+    if (this.mode === 'kvs') this.breaker.track(DT, this.mySwingObj);   // the links of my string (KarateVSMode)
     if (me.st.combo === 0 && me.landed.length) me.landed = [];
     if (foe.st.combo === 0 && foe.landed.length) foe.landed = [];
     // swings settle (the tree's settle)
