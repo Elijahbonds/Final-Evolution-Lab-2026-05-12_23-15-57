@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 // CARD-SAFE-2: the purchase route refuses any payload that tries to carry a stat, before touching the wallet.
-const spend = vi.fn();
+const { spend } = vi.hoisted(() => ({ spend: vi.fn() }));
 vi.mock('next-auth', () => ({ getServerSession: vi.fn(async () => ({ user: { id: 'p1' } })) }));
 vi.mock('@/lib/auth', () => ({ authOptions: {} }));
 vi.mock('@/lib/db', () => ({ prisma: { playerEntitlement: { findMany: vi.fn(async () => []) } } }));
