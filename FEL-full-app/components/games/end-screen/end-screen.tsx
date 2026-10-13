@@ -48,6 +48,8 @@ import { useCountUp } from './use-count-up';
 import { SeasonCard } from './season-card';
 import { ArenaCard, CarnivalCard, ChallengeCard, MpCard, StoryRewardCard } from './outcome-cards';
 import { Confetti } from './confetti';
+import { claimLines } from './claim';
+import { ClaimBar } from './claim-bar';
 
 const fmt = (v: number) => Math.round(v).toLocaleString('en-US');
 
@@ -333,6 +335,9 @@ export function EndScreen(props: EndScreenProps) {
       : { label: 'See carnival results', Icon: PartyPopper, act: () => onNavigate('/play/carnival/recap'), gold: true }
     : { label: 'Play again', Icon: RotateCcw, act: onReplay };
   const showTeaser = Boolean(pick) && !carnivalRun;
+  // THE CLAIM (owner, 2026-10-13): reveal-only — claim.ts. Nothing is granted or requested; it confirms the numbers above.
+  const claim = useMemo(() => claimLines(recap, coins), [recap, coins]);
+  const [claimBurst, setClaimBurst] = useState(false);
   const tilesShown = recap && !recap.noPlay && !recap.unpaid;
   // (a coins limit that cut the earn to nothing is a tile too — "Coin limit reached today", owner decision 2026-10-06)
   const coinLimit = Boolean(coins && coins.coins <= 0 && coins.capped);
@@ -360,6 +365,7 @@ export function EndScreen(props: EndScreenProps) {
     >
       {confettiWin && <Confetti />}
       {confettiGold && <Confetti key="gold" gold />}
+      {claimBurst && !instant && <Confetti key="claim" gold />}
       <div className="flex h-full w-full items-center justify-center">
         <motion.section
           ref={rootRef}
@@ -530,6 +536,11 @@ export function EndScreen(props: EndScreenProps) {
                       <LevelCard fill={lvl} gained={recap.xp} active={shown('level')} instant={fast} ms={msOf('level')} onLevelUp={() => fx.cue('levelUp')} />
                     </Beat>
                   )}
+                  <ClaimBar
+                    lines={claim} ready={revealDone(rv, steps.length)} focused={focusId === 'claim'} instant={instant}
+                    canPress={armed}
+                    onClaim={() => { fx.cue('record'); setClaimBurst(true); setFocusId('primary'); }}
+                  />
                 </>
               )}
 
