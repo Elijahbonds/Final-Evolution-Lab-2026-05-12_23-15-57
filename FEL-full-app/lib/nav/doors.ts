@@ -29,6 +29,7 @@ export const DOORS: Door[] = [
   { href: '/coach', label: 'Coaching', tab: 'train' },
 
   // PROFILE — what you own, what you have done, what you make.
+  { href: '/press', label: 'Books', tab: 'profile' },
   { href: '/cards', label: 'Card collection', tab: 'profile' },
   { href: '/account', label: 'Account', tab: 'profile' },
   { href: '/market', label: 'Marketplace', tab: 'profile' },

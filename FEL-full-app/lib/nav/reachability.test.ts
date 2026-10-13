@@ -46,6 +46,7 @@ const NOT_NAVIGABLE: Record<string, string> = {
   // NESTED ROUTES (2026-10-08, PR #105 brought up to the release): the walker now sees every page route, not only the
   // top level, and these release routes have no in-app link. (/coach/review/[bookingId] was a fifth, a KNOWN GAP;
   // 2026-10-13 linked it from /coach/dashboard and the buyer's thanks page through lib/coach-store/reviewLink.ts.) Each is named with the reason found in the code.
+  '/press/receipt': 'Stripe Checkout success_url for a book purchase (lib/books/bookCheckout.ts), where Stripe sends the buyer back; BOOK_STORE_ENABLED keeps checkout closed, so nothing opens it yet',
   '/coach/thanks': 'Stripe Checkout success_url (lib/coach-store/checkout.ts), flag-gated by COACH_STORE_ENABLED, noindex',
   '/live/schedule': 'LIVE-PAGE-FLAGOFF: 404s while isLiveStreamScheduleEnabled() is off; it needs a link the day the owner turns it on',
   '/story/rail': 'Story is parked (drafts-keep-7, #153): the standalone Nexus rail is deliberately unlinked from /story',
