@@ -41,7 +41,8 @@ const UA = 'AgeScreenTest/1.0';
 // BOOK-SHOP (PR #17) prisma/pending/2026-10-09-book-shop.sql (pending SQL only, owner applies) at 5a5c7121.
 // AGE-SCREEN originally pinned the pre-age-screen tip so that PR could not smuggle a schema change; every
 // intentional schema PR must bump this to the commit that contains its prisma/ files, or CI stays red.
-const PARENT = '5a5c71216cb20e42f5f87ae3e544af95e6be7d62';
+// CREATOR-PLATFORM (PR #18) prisma/pending/2026-10-13-creator-inquiry.sql (pending SQL only, owner applies) at 5a2755a4.
+const PARENT = '5a2755a412fc31d11278fa56e53c712103ac4943';
 
 /** Resolve a diff base for the schema-ban check when CI's checkout is shallow. */
 function resolvePrismaDiffBase(): string {
