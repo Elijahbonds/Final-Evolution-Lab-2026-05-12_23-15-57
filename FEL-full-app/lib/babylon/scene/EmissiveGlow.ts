@@ -19,7 +19,7 @@
 // The cost is the bodies' draws into the glow's reduced-size target, on the tiers that run the glow at all.
 
 import { GlowLayer } from '@babylonjs/core';
-import type { AbstractMesh, BaseTexture, Color4, Material, Observer, Scene } from '@babylonjs/core';
+import type { AbstractMesh, Color4, Material, Observer, Scene, Texture } from '@babylonjs/core';
 import type { VenueMood } from './moods';
 import type { QualityTier } from './QualityTier';
 
@@ -81,7 +81,7 @@ export function mountEmissiveGlow(scene: Scene, tier: QualityTier, mood: VenueMo
   const occluding = new WeakSet<AbstractMesh>();
   const seen = new WeakSet<AbstractMesh>();
   // the occluders draw black and with no emissive texture; every fixture keeps exactly the colour the default path gives it
-  layer.customEmissiveTextureSelector = (mesh, _sub, material): BaseTexture => (occluding.has(mesh as AbstractMesh) ? null : (material as unknown as { emissiveTexture?: BaseTexture | null } | null)?.emissiveTexture ?? null) as BaseTexture;
+  layer.customEmissiveTextureSelector = (mesh, _sub, material): Texture => (occluding.has(mesh as AbstractMesh) ? null : (material as unknown as { emissiveTexture?: Texture | null } | null)?.emissiveTexture ?? null) as Texture;
   layer.customEmissiveColorSelector = (mesh, _sub, material, result: Color4): void => {
     if (occluding.has(mesh as AbstractMesh)) { result.set(0, 0, 0, 1); return; }
     const m = material as unknown as { emissiveColor?: { r: number; g: number; b: number }; emissiveTexture?: { level: number } | null; emissiveIntensity?: number; alpha: number } | null;
