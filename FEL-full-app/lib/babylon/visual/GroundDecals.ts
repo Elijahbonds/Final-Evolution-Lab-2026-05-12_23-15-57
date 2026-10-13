@@ -42,15 +42,22 @@ function paint(scene: Scene, kind: DecalKind): DynamicTexture {
   const g = tex.getContext() as unknown as CanvasRenderingContext2D;
   g.clearRect(0, 0, S, S);
   if (kind === 'tyre') {
-    // two tyre tracks: dark rubber, ragged edges, a faint tread pattern, and the ends faded so stamps laid end to end read as
+    // two tyre tracks: dark rubber, ragged edges, and the ends faded so stamps laid end to end read as
     // one unbroken streak (the pair sits at u = 0.093 and 0.907 of a 1.62 m quad: 1.32 m apart, a kart's rear tyres)
     for (const cx of [S * 0.093, S * 0.907]) {
+      // a pale rubber-dust shoulder either side (a skid on dark asphalt reads by its edge: the core alone is black on near-black)
+      const sh = g.createLinearGradient(0, 0, 0, S);
+      sh.addColorStop(0, 'rgba(150,140,128,0)'); sh.addColorStop(0.2, 'rgba(150,140,128,0.12)'); sh.addColorStop(0.8, 'rgba(150,140,128,0.12)'); sh.addColorStop(1, 'rgba(150,140,128,0)');
+      g.fillStyle = sh; g.fillRect(cx - 17, 0, 34, S);
       const gr = g.createLinearGradient(0, 0, 0, S);
-      gr.addColorStop(0, 'rgba(10,9,8,0)'); gr.addColorStop(0.18, 'rgba(10,9,8,0.55)'); gr.addColorStop(0.82, 'rgba(10,9,8,0.55)'); gr.addColorStop(1, 'rgba(10,9,8,0)');
-      g.fillStyle = gr; g.fillRect(cx - 11, 0, 22, S);
-      g.fillStyle = gr; g.globalAlpha = 0.35; g.fillRect(cx - 15, 8, 4, S - 16); g.fillRect(cx + 11, 8, 4, S - 16); g.globalAlpha = 1;   // the soft shoulders
-      g.globalCompositeOperation = 'destination-out'; g.fillStyle = 'rgba(0,0,0,0.3)';
-      for (let y = 6; y < S; y += 10) g.fillRect(cx - 9, y, 18, 3);   // tread bars
+      gr.addColorStop(0, 'rgba(6,5,5,0)'); gr.addColorStop(0.18, 'rgba(6,5,5,0.85)'); gr.addColorStop(0.82, 'rgba(6,5,5,0.85)'); gr.addColorStop(1, 'rgba(6,5,5,0)');
+      g.fillStyle = gr; g.fillRect(cx - 10, 0, 20, S);
+      // rubber laid down unevenly: ragged notches out of the core (no regular tread ladder — it read as a tank track)
+      g.globalCompositeOperation = 'destination-out';
+      for (let i = 0; i < 38; i++) {
+        const y = (i * 37) % S, w = 3 + ((i * 7) % 6), x = cx - 10 + ((i * 13) % 17);
+        g.fillStyle = `rgba(0,0,0,${0.18 + ((i * 5) % 4) * 0.08})`; g.fillRect(x, y, w, 2 + (i % 4));
+      }
       g.globalCompositeOperation = 'source-over';
     }
   } else if (kind === 'scuff') {
