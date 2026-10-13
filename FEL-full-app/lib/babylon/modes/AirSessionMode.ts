@@ -54,6 +54,15 @@ import { grabTrickFor } from '../core/rideTricks';
 import type { BodyView } from '../core/ModeHarness';
 import type { BodyEvent } from '@/lib/pose/BodyReader';
 import { HudDelta } from './rideHud';   // IMPROVE (2026-10-06, big air item 16): publish only what changed
+// vis-board (wave 2): the event around the kicker, the spin's ribbons, the snow's glint, a night-clear alpine sky, the replay of the best air
+import { ReplayGate } from './boardMoments';
+import { landingMarks } from './boardMarks';
+import { stampMarks } from '../visual/boardStamp';
+import { SpinTrail } from '../visual/SpinTrail';
+import { mountBigAirEvent, fireworksWorthy, type BigAirEventHandle } from '../visual/bigAirDressing';
+import { applySnowSparkle, type SparkleHandle } from '../visual/SnowSparkle';
+import { upgradeAlpineSky, type AlpineSkyHandle } from '../premium/AlpineSky';
+import type { IntroKind } from '../scene/broadcastShots';
 
 export interface AirSessionModeOpts {
   modeId: string;
@@ -73,6 +82,9 @@ export interface AirSessionModeOpts {
    *  built as the kicker and the landing from the same table. Unset = the old 0.5 m launch box. */
   hill?: AirHill;
   launchZ?: number;
+  /** vis-board (wave 2): the broadcast treatment — an intro (the crane, then the rider), replays of the session's best air, the event
+   *  built around the kicker, the spin's ribbons and the snow's glint. Off for a skin that does not ask (every field is optional). */
+  broadcast?: { intro?: IntroKind; replay?: boolean; event?: boolean; sparkle?: boolean; sky?: boolean; trails?: boolean };
 }
 
 const GRADE_LABEL: Record<TrickGrade, string> = {
@@ -115,6 +127,12 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
   let boostHeld = false;
   let baseFov: number | null = null;
   // MOVEMENT PLAY P8: the body's run-up grader, its air verbs, and the spin the game will plant (turns; null = none running)
+  // vis-board (wave 2): the replay gate (the session's best air; never the last attempt), the event, the ribbons, the sky, the glint
+  const replayGate = new ReplayGate();
+  let event: BigAirEventHandle | null = null, trail: SpinTrail | null = null, alpineSky: AlpineSkyHandle | null = null, sparkle: SparkleHandle | null = null;
+  let prevPhaseVis: string | null = null, sessionT = 0;
+  /** A judge read this big, plus the line's points, is a highlight at all (a plain landed spin never is). */
+  const REPLAY_AIR_PTS = 550;
   const stride = new BodyStride();
   const rideIntents = new RideIntents();
   let plantAt: number | null = null;
@@ -298,6 +316,8 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
     modeId: opts.modeId,
     mood: opts.mood,
     camPreset: 'runner',
+    intro: opts.broadcast?.intro,
+    replay: opts.broadcast?.replay,
     // MOVEMENT PLAY P8: the steps are the mode's — the run-up in 'Run', ignored anywhere else (never the spin's direction).
     // The claim takes the P3 row's step → d-pad off the floor (dropping it is the cut line); the card says the run-up, the
     // spin and the grab this mode reads itself
@@ -320,6 +340,11 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
       reset();
 
       opts.buildVenue(ctx.scene);
+      // vis-board (wave 2): the snow glints and goes blue in the shade; the sky is the slalom's (4096, mountains, the horizon at the horizon)
+      const tierNow = (ctx.scene.metadata as { felTier?: string } | null)?.felTier;
+      sparkle?.dispose(); sparkle = null;
+      alpineSky?.dispose(); alpineSky = opts.broadcast?.sky ? upgradeAlpineSky(ctx.scene, { mood: opts.mood, snow: '#e3ebf4', hi: tierNow !== 'mobile' }) : null;
+      replayGate.reset(); prevPhaseVis = null; sessionT = 0;
       propsGone = false;
       if (opts.propSet) void mountVenueProps(ctx.scene, opts.propSet, undefined, { snapToGround: true }).then((h) => { if (propsGone) h?.dispose(); else props = h; });   // ship pass 4 · P9: on the ground under them
 
@@ -334,6 +359,7 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
         const line = VenueKit.paint(ctx.scene, `${opts.modeId}_hillLine`, '#1f6feb', 0.35);
         const built = buildAirHill(ctx.scene, opts.hill, opts.launchZ, snow, line);
         hillMeshes = built.all; launchPad = built.kicker;
+        if (opts.broadcast?.sparkle) sparkle = applySnowSparkle(ctx.scene, [ctx.scene.getMeshByName('venue_ground')?.material, snow], opts.mood, tierNow);   // vis-board: the run-in's snow and the hill's
         const surf = hillSurface(opts.hill, opts.launchZ);
         objective.set(0, opts.hill.lipY, opts.launchZ);
         const mid = (surf.sweetFromZ + surf.bottomZ) / 2;
@@ -394,6 +420,8 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
       // rodeo's off-axis tilt — mounted after the posture layer (the hand is the last word). The core owns the spin (yaw).
       trickLayer?.dispose();
       trickLayer = new BoardTrickLayer(ctx.scene, athlete.skeleton, athlete.root, board, { bodySpin: false });
+      trail?.dispose(); trail = opts.broadcast?.trails ? new SpinTrail(ctx.scene, board) : null;   // vis-board: the spin's two ribbons
+      event?.dispose(); event = opts.broadcast?.event && opts.hill && opts.launchZ !== undefined ? mountBigAirEvent(ctx.scene, opts.hill, opts.launchZ) : null;   // vis-board: the gate, the towers, the booth
 
       // Frame the athlete against the thing they are running at.
       ctx.objectiveRef.current = objective;
@@ -446,6 +474,19 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
         stickLeft = null; landedAtMs = performance.now(); lastStomp = null;
         if (S.note) console.info(`[AIR-CALL] ${S.note}`);
         gallery?.cheer(grade === 'stuck' ? 1 : grade === 'clean' ? 0.6 : grade === 'sketchy' ? 0.3 : 0.15);
+        // vis-board (wave 2): the landing in the snow (the roll-out, or the skid of a crash), the powder, the judges' cards, the fireworks over
+        // the booth for a landed double — and the session's best air, replayed (never the last attempt's: the end card is next)
+        if (athlete) {
+          const at = athlete.root.position;
+          stampMarks(ctx.scene, landingMarks({ x: at.x, z: at.z }, Math.PI, grade === 'crash' ? 'bail' : grade === 'sketchy' ? 'sketchy' : 'clean', core ? core.state.speed / BIG_AIR_TUNING.maxRunSpeed : 0.8, 0.8), 'snow', Math.max(0, at.y), core ? -core.surface.pitch(at.z) : 0);
+          EffectsKit.burst(ctx.scene, at.add(new Vector3(0, 0.2, 0)), 'dust', grade === 'crash' ? 1.6 : 1.1, '#f2f7ff');
+        }
+        event?.reveal(judge, core?.state.attempts.length ?? 0);
+        if (fireworksWorthy(rotations, grade)) event?.fireworks();
+        if (opts.broadcast?.replay && (grade === 'stuck' || grade === 'clean') && (core?.state.attempts.length ?? 0) < opts.attempts) {
+          const plan = replayGate.consider(sessionT, { kind: 'air', weight: judge * 100 + linePts, floor: REPLAY_AIR_PTS, sec: 3.2 });
+          if (plan) { console.info(`[AIR-REPLAY] best air ${Math.round(judge * 100 + linePts)} (${plan.lastSeconds.toFixed(1)} s)`); void ctx.highlight?.({ lastSeconds: plan.lastSeconds, angles: ['side', 'tight', 'high'] }); }
+        }
         SoundKit.play(grade === 'crash' ? 'miss' : 'score');
         ctx.juice.scorePop(
           athlete ? athlete.root.position.add(new Vector3(0, 2.2, 0)) : Vector3.Zero(),
@@ -556,6 +597,14 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
       const bev = boost.update(dt, boostHeld, core.state.phase === 'Run');
       core.boostK = boost.k;
       const st = core.step(dt, dt);
+      // vis-board (wave 2): the lip throws snow as the board leaves it; the ribbons run through a trick in the air; a new run-up
+      // wipes the judges' cards; the event's own clock (the cards' flip, the fireworks) is the mode's
+      sessionT += dt;
+      if (prevPhaseVis === 'Run' && st.phase === 'Air') EffectsKit.burst(ctx.scene, athlete.root.position.add(new Vector3(0, 0.15, 0.4)), 'dust', 1.3, '#f2f7ff');
+      if (st.phase === 'Run' && prevPhaseVis !== null && prevPhaseVis !== 'Run') event?.clear();
+      prevPhaseVis = st.phase;
+      trail?.setActive(st.phase === 'Air' && (core.airTrick.spinning || Math.abs(core.airTrick.rotation) > 0.05 || S.named.length > 0 || grabThisAir));
+      event?.update(dt);
       // MOVEMENT PLAY P8: the body's air verbs, and the planted spin — the game plants it at the half turn it aimed for; a new
       // attempt's run-up grades its first stride as a first (not against the last attempt's last step)
       if (st.phase === 'Run' && bodyPhase !== null && bodyPhase !== 'Run') stride.reset();
@@ -671,6 +720,7 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
       boostFx?.dispose(); boostFx = null; boostPads?.dispose(); boostPads = null;
       baseFov = null;
       trickLayer?.dispose(); trickLayer = null;
+      trail?.dispose(); trail = null; event?.dispose(); event = null; alpineSky?.dispose(); alpineSky = null; sparkle?.dispose(); sparkle = null;   // vis-board
       stompRing?.dispose(); stompRing = null; ringMats = null;
       SoundKit.stopAmbient();   // IMPROVE (2026-10-06, item 14)
       core = null;
@@ -692,4 +742,7 @@ export const BigAirMode: ModeDefinition = makeAirSessionMode({
     winScore: 900,                                    //TUNE(elijah)
     launchLabel: 'KICKER',
     hill: BIG_AIR_HILL, launchZ: BIG_AIR_TUNING.launchZ,   // IMPROVE (2026-10-06, items 1 / 2): the core's own jump, built
+    // vis-board (wave 2): an intro (no clock runs in the run-up: the rider waits for the first stride), the session's best air replayed,
+    // the event around the kicker, the spin's ribbons, the snow's glint and the slalom's sky
+    broadcast: { intro: 'walkIn', replay: true, event: true, sparkle: true, sky: true, trails: true },
 });

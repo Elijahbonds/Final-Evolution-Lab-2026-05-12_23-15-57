@@ -106,8 +106,11 @@ export function introLetterbox(kind: IntroKind, t: number): number {
  *   tight  — a close three-quarter in front of the subject, long lens (the reaction / the face)
  *   high   — a high wide crane, the tactical view
  *   follow — behind the subject at the play camera's height, a touch further back (the "as it happened" view)
+ *   filmer — (vis-board, wave 2) the skate video's operator: ankle-high, an arm's length off the line, an extreme wide lens
+ *            (the fisheye) pointing up the board — a mode asks for it by name; it is not in the default cut
  */
-export type ReplayAngle = 'low' | 'side' | 'tight' | 'high' | 'follow';
+export type ReplayAngle = 'low' | 'side' | 'tight' | 'high' | 'follow' | 'filmer';
+/** The five standard angles (every one a readable distance on a normal lens); 'filmer' is the deliberate exception, asked for by name. */
 export const REPLAY_ANGLES: readonly ReplayAngle[] = ['low', 'side', 'tight', 'high', 'follow'];
 
 /**
@@ -131,6 +134,8 @@ export function replayShot(angle: ReplayAngle, focus: V3, heading: V3, objective
     }
     case 'high':
       return { pos: v(focus.x - f.x * 9 + right.x * 7, focus.y + 11, focus.z - f.z * 9 + right.z * 7), target: toward(chest, objective, 0.35), fov: 0.8 };
+    case 'filmer':
+      return { pos: v(focus.x - f.x * 1.1 + right.x * 1.9, focus.y + 0.3, focus.z - f.z * 1.1 + right.z * 1.9), target: v(focus.x + f.x * 0.6, focus.y + 0.95, focus.z + f.z * 0.6), fov: 1.5 };
     case 'follow':
     default:
       return { pos: v(focus.x - f.x * 7.5, focus.y + 3.2, focus.z - f.z * 7.5), target: v(focus.x + f.x * 2, focus.y + 1.1, focus.z + f.z * 2) };

@@ -94,3 +94,19 @@ describe('the replay lens', () => {
     expect(replayLens(0.5, 0.1).focusDistance).toBe(500);
   });
 });
+
+describe("the filmer angle (vis-board, wave 2)", () => {
+  const focus: V3 = { x: 0, y: 0, z: 10 }, heading: V3 = { x: 0, y: 0, z: 6 };
+  it('is ankle-high, close, beside the line and on an extreme wide lens — and is not one of the standard cut', () => {
+    const s = replayShot('filmer', focus, heading);
+    expect(s.pos.y).toBeLessThan(0.5);
+    expect(Math.abs(s.pos.x - focus.x)).toBeGreaterThan(1.5);
+    expect(Math.hypot(s.pos.x - focus.x, s.pos.z - focus.z)).toBeLessThan(3);
+    expect(s.fov).toBeGreaterThan(1.2);
+    expect(REPLAY_ANGLES as readonly string[]).not.toContain('filmer');
+    expect(replayCut(3.6)).not.toContain('filmer');
+  });
+  it('side −1 takes the other side of the line, like the profile does', () => {
+    expect(replayShot('filmer', focus, heading, null, -1).pos.x).toBeCloseTo(-replayShot('filmer', focus, heading, null, 1).pos.x, 6);
+  });
+});
