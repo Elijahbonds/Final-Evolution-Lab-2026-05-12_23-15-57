@@ -56,7 +56,10 @@ const WRITE_TO = isMailingAddressSet(REAL_MAILING_ADDRESS) ? `, or write to ${BU
 // teen line). FE PM 10:11 AM PT Oct 8: the mailing-address placeholder literal is gone from lib/legal/business.ts; the
 // Mail lines and the privacy "write to" clause print only once REAL_MAILING_ADDRESS is set, and setting it is its own
 // change with its own version bump. 2026-10-07 is the text without these.
-export const CURRENT_POLICY_VERSION = '2026-10-12';
+// BUSINESS-ADDRESS (FE PM 9:00 PM PT Oct 12): bumped for the contact detail only. REAL_MAILING_ADDRESS is set, so the
+// Terms §9 and Privacy §11 Mail lines and the Privacy §10 write-to clause now print it. A contact-detail update: no
+// re-acceptance; new signups record the new version. 2026-10-12 is the text without the address.
+export const CURRENT_POLICY_VERSION = '2026-10-13';
 
 export const TERMS_CONTENT = `
 # Terms of Service

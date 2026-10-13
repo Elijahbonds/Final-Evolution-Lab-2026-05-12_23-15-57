@@ -19,6 +19,7 @@ const TEXT_BY_VERSION: Record<string, string> = {
   '2026-10-07-draft': 'e1c40c0b8dd666d8',  // + §6: the Mirror's "vs your last 3" kept on the device only, never sent, forgettable (mirror-progress)
   '2026-10-07': '1817114b5ef24ce7',        // LEGAL-COPY: Terms §2 18+, Terms §9 + Privacy §11 Contact, Privacy §10 store, §4/§5/§7 fixes; first non-draft label; draft banners removed on the owner's sign-off (follow-up 1)
   '2026-10-12': '774adfd3055f3cfa',        // LEGAL-COPY-2: Terms §7 written; the Mail line and the privacy write-to clause print only once an address is set
+  '2026-10-13': 'ec0c2d7e6df23ad0',  // BUSINESS-ADDRESS: the #2012 business mailbox fills the Mail lines and the privacy write-to clause
 };
 
 describe('the policy version', () => {
@@ -45,7 +46,8 @@ describe('the policy version', () => {
   // LEGAL-COPY (2026-10-07): the label is final (not a draft), it is the single source, and every prior version's
   // fingerprint stays so an old text still resolves.
   it('is the final, non-draft label', () => {
-    expect(CURRENT_POLICY_VERSION).toBe('2026-10-12');
+    expect(CURRENT_POLICY_VERSION).toBe('2026-10-13');
+    expect(CURRENT_POLICY_VERSION).not.toBe('2026-10-12');
     expect(CURRENT_POLICY_VERSION).not.toBe('2026-10-07');
     expect(CURRENT_POLICY_VERSION).not.toBe('2026-10-07-draft');
     expect(CURRENT_POLICY_VERSION).not.toMatch(/-draft$/);
@@ -62,7 +64,7 @@ describe('the policy version', () => {
   });
 
   it('keeps every earlier version fingerprint (the record of what each signup accepted)', () => {
-    for (const v of ['2026-09-24-draft', '2026-09-25-draft', '2026-09-29-draft', '2026-09-29b-draft', '2026-09-29c-draft', '2026-09-30-draft', '2026-10-01-draft', '2026-10-07-draft', '2026-10-07']) {
+    for (const v of ['2026-09-24-draft', '2026-09-25-draft', '2026-09-29-draft', '2026-09-29b-draft', '2026-09-29c-draft', '2026-09-30-draft', '2026-10-01-draft', '2026-10-07-draft', '2026-10-07', '2026-10-12']) {
       expect(TEXT_BY_VERSION).toHaveProperty(v);
     }
   });
@@ -316,13 +318,14 @@ describe('terms of service, buying is 18+ (LEGAL-COPY)', () => {
 // placeholder in its place. tests/legal/address-set.test.tsx proves the set case.
 describe('legal contact block, one business address (LEGAL-COPY)', () => {
   for (const [name, content, contact] of [['Terms', TERMS_CONTENT, '## 9. Contact'], ['Privacy', PRIVACY_CONTENT, '## 11. Contact']] as const) {
-    it(`${name} ends with a ${contact} section carrying the legal name and contact email, and no Mail line while the address is unset`, () => {
+    it(`${name} ends with a ${contact} section carrying the legal name, contact email and the business Mail line`, () => {
       expect(content).toContain(contact);
       const section = content.slice(content.indexOf(contact));
       expect(section).toContain(BUSINESS_LEGAL_NAME);
       expect(section).toContain(BUSINESS_CONTACT_EMAIL);
-      expect(isMailingAddressSet(REAL_MAILING_ADDRESS)).toBe(false);
-      expect(section).not.toContain('Mail:');
+      expect(isMailingAddressSet(REAL_MAILING_ADDRESS)).toBe(true);
+      expect(section).toContain('Mail: 18543 Devonshire St #2012, Northridge, CA 91324');
+      expect(section).not.toMatch(/granada hills/i);
       expect(section).not.toContain('[');
     });
   }
