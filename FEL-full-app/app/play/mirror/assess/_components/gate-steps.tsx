@@ -14,7 +14,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import {
   AGE_OPTIONS, AGE_QUESTION, CAMERA_INFO_BUTTON, CAMERA_INFO_LINES, CAMERA_INFO_TITLE, DISCLAIMER, FULL_SCREEN_BUTTON,
-  GROWN_UP_BODY, GROWN_UP_CHECKBOX, GROWN_UP_TITLE, JUMP_ONLY_BUTTON, MORE_CHECKS_LINE, PAIN_QUESTION, PAIN_STOP,
+  GROWN_UP_BODY, GROWN_UP_CHECKBOX, GROWN_UP_TITLE, JUMP_ONLY_BUTTON, PAIN_QUESTION, PAIN_STOP,
   PRIVACY_LINK, SCREEN_TEST_NAMES, TAKEOFF_OPTIONS, TAKEOFF_QUESTION,
 } from '@/lib/screen/copy';
 import type { AgeBand } from '@/lib/screen/age';
@@ -47,7 +47,6 @@ export function StartStep({ onJump, onFull, jumpHref, fullHref }: {
       <ul data-start-checks className="mt-2 space-y-1 text-[16px] text-white/75">
         {PROTOCOL.filter((t) => !t.notBuilt).map((t) => <li key={t.id}>{testName(t)}{t.sided ? ', each side' : ''}</li>)}
       </ul>
-      <p data-more-checks className="mt-1 text-[16px] text-white/60">{MORE_CHECKS_LINE}</p>
       <p className="mt-3 text-[16px] leading-snug text-white/60">
         Everything runs on this device. The picture never leaves it, and nothing is sent anywhere.{' '}
         <Link href={PRIVACY_PATH} prefetch={false} data-privacy-link className="underline">{PRIVACY_LINK}</Link>

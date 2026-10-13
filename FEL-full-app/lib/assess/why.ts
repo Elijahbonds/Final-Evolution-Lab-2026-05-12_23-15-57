@@ -7,8 +7,8 @@
 // this file can produce.
 //
 // OWNER DEFAULT Q7 (lane brief, 2026-09-28): a reason may end with a "Fix:" hint, but every drill named there is a
-// PLACEHOLDER until Elijah approves the §7.2 library — written "[PLACEHOLDER DRILL] Knee-to-wall rocks" on screen and
-// flagged `placeholder: true` in data — and no dose is ever shown.
+// PLACEHOLDER until Elijah approves the §7.2 library — flagged `placeholder: true` in data (the on-screen tag is gone,
+// MIRROR-NO-PLACEHOLDER 2026-10-13: the drill shows by name) — and no dose is ever shown.
 //
 // Cross-test links (spec §6) connect findings instead of listing them; only the rules whose tests the Quick Screen
 // runs (T1, T2, T3, T5) are here. The T7 rule waits for T7.
@@ -17,7 +17,7 @@
 import type { Side, TestId } from './protocol';
 import { sideLabel } from './protocol';
 import { bandOf, th } from './thresholds';
-import { PLACEHOLDER_TAG, PR20_DRILLS, type DrillHint } from '@/lib/screen/PROPOSED-thresholds';
+import { PR20_DRILLS, type DrillHint } from '@/lib/screen/PROPOSED-thresholds';
 import type { MetricResult, TestResult } from './scoring';
 
 export type { DrillHint };
@@ -43,7 +43,6 @@ export interface WhyContext {
   takeoffLeg?: Side | null;
 }
 
-export { PLACEHOLDER_TAG };
 
 /** The §7.2 draft library, by finding (lib/screen/PROPOSED-thresholds.ts PR20_DRILLS): names only, all placeholders. */
 export const DRILLS = PR20_DRILLS;
@@ -222,7 +221,7 @@ export function metricReason(m: MetricResult, testId: TestId, ctx: WhyContext = 
 export function reasonsFor(test: TestResult & { t2?: { rejected: { side: Side; rep: number; heelLiftPct: number }[]; lrDiffDeg: number | null } }, ctx: WhyContext = {}): Reason[] {
   const id = test.id;
   if (test.status === 'painStop') return [{ testId: id, kind: 'status', text: `${TEST_NAME[id]}: 0/3, pain reported. ${PAIN_REFERRAL}`, numbers: [0] }];
-  if (test.status === 'notBuilt') return [{ testId: id, kind: 'status', text: `${TEST_NAME[id]}: Full screen: coming later.`, numbers: [] }];
+  if (test.status === 'notBuilt') return [];   // MIRROR-NO-PLACEHOLDER: an unbuilt test is hidden, not promised
   if (test.status === 'skipped') return [{ testId: id, kind: 'status', text: `${TEST_NAME[id]}: skipped.`, numbers: [] }];
   if (test.status === 'notScored') {
     const pct = Math.round(test.confidence * 100);

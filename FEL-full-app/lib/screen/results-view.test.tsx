@@ -18,7 +18,7 @@ import { BAND_WORDS, GRADED_CHECKS, THRESHOLDS_VERSION } from './PROPOSED-thresh
 import { AGE_BANDS, type AgeBand } from './age';
 import {
   DISCLAIMER, DONE_CLEAR, EARLY_VERSION, KINDLE_BOOK_LABEL, KINDLE_BOOK_URL, NOT_SAVED_TITLE, NOTHING_TO_RANK, PARENT_TITLE,
-  PROGRAM_COMING, SCREENSHOT_LINE, SCREEN_TEST_NAMES, STOP_LINE, WIN_LINE,
+  SCREENSHOT_LINE, SCREEN_TEST_NAMES, STOP_LINE, WIN_LINE,
 } from './copy';
 
 const cal = syntheticCalibration();
@@ -313,7 +313,6 @@ describe('the lane page (A3-4, A4-3; S-7, S-9, Cyber 3)', () => {
     expect(t).toContain('Your top flag: knees cave in (overhead squat), so start with Correctives.');
     expect(t).toContain('Band lateral walks, clamshells, goblet squat with knees pushed out');
     expect(h.slice(at('data-sample-drill')).split('</section>')[0]).toContain(EARLY_VERSION);
-    expect(t).not.toContain(PROGRAM_COMING);
     expect(t).not.toMatch(/coming soon/i);
     expect(t).toContain('Back to my results');
     expect(h).toMatch(/href="\/play\/mirror\/assess\/results"/);
