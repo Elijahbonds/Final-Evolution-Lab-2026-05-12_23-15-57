@@ -187,7 +187,7 @@ export default async function more(c: Ctx): Promise<void> {
       const tyCard = await ty.page.locator('[data-testid=party-start-countdown]').innerText();
       ok('start.no-seat-stays-in-party', /staying in the party/.test(tyCard), tyCard.replace(/\s+/g, ' '));
     }
-    await Promise.all([ana.page.waitForURL(/\/play\/onevone\?net=/, { timeout: 30_000 }), bo.page.waitForURL(/\/play\/onevone\?net=/, { timeout: 30_000 })]);
+    await Promise.all([ana.page.waitForURL(/\/play\/onevone\?net=/, { timeout: 30_000, waitUntil: 'commit' }), bo.page.waitForURL(/\/play\/onevone\?net=/, { timeout: 30_000, waitUntil: 'commit' })]);
     const ra = new URL(ana.page.url()).searchParams.get('net');
     const rb = new URL(bo.page.url()).searchParams.get('net');
     ok('start.same-match-room', !!ra && ra === rb, { ra, rb });
