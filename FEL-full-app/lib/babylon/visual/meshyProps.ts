@@ -86,11 +86,12 @@ import { readBoardSkin } from '../nexus/boardSkins';
 
 const BALL_KEY: Record<BallKind, MeshyPropKey | null> = { basketball: 'ball-basketball', soccer: 'ball-soccer', tennis: 'ball-tennis', volleyball: null };
 
-/** The Meshy ball for a mode's ball diameter — soccer 0.22, basketball 0.24, tennis ≤ 0.07; anything else keeps its sphere. */
+/** The Meshy ball for a mode's ball diameter — soccer 0.22, basketball 0.24, tennis 0.055–0.07; anything else keeps its
+ *  sphere. QA P1-02 (2026-09-27): "≤ 0.07" also took the golf ball (0.043) for a tennis ball — a golf ball is no ball scan. */
 export function ballKindFor(diameter: number): BallKind | null {
   if (Math.abs(diameter - 0.24) < 0.005) return 'basketball';
   if (Math.abs(diameter - 0.22) < 0.005) return 'soccer';
-  if (diameter <= 0.07) return 'tennis';
+  if (diameter >= 0.055 && diameter <= 0.07) return 'tennis';
   return null;
 }
 

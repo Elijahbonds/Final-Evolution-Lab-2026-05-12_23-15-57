@@ -373,6 +373,11 @@ export function readCombatArena(mode: CombatModeId): CombatArena {
   return first;
 }
 
+/** QA P1-16: the Duel's header names its arena. `picked` null = the mode's default (what a server render can know). */
+export function duelVenueName(picked: CombatArena | null = readCombatArena('duel')): string {
+  return (picked ?? arenasFor('duel')[0])?.name ?? 'The Arena';
+}
+
 export function writeCombatArena(mode: CombatModeId, id: string): void {
   try { window.localStorage.setItem(ARENA_KEY_PREFIX + mode, id); } catch { /* convenience only */ }
 }
