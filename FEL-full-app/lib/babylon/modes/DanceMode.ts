@@ -51,7 +51,7 @@ import { neverBindPose } from '../anim/importSanitizer';
 import { BeatOwner } from '../anim/beatOwner';
 import { installSafePlay, SPORT_CLIP } from '../anim/clipRegistry';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';
-import { readPlaceLook } from '../nexus/placeLooks';
+import { isHomeLook, readPlaceLook } from '../nexus/placeLooks';
 import { registerDanceClips, resolveDanceClip, danceRootTracks } from '../anim/danceClips';
 import { MoveRootLayer } from '../anim/MoveRootLayer';
 import { registerMirroredClips } from '../anim/mirrored-clips';
@@ -117,7 +117,12 @@ import { DUNK_CONFIG as SHARED_CFG } from './modeConfigs';
 // a browser. `motionPolicy` is the SAME global "reduce flashing" switch JuiceKit's own flash already reads
 // (lib/a11y/reducedMotion.ts) — PLAN phase 8 rule (c) wires it into the beat bus's rate limiter too, not just JuiceKit's.
 import { BeatBus, beatBob } from '../dance/beatBus';
-import { stageCameraFrame, type Vec2 } from '../dance/stageCamera';
+import { DEFAULT_STAGE_CAMERA, stageCameraFrame, type Vec2 } from '../dance/stageCamera';
+import { applyCut, cutShotFor, isCutFrame, type CutFrame } from '../dance/beatCut';   // vis-party: the downbeat cut at a high combo
+// vis-party (2026-10-13), VISUAL-PASS-PLAN Part B (dance): the LED wall, the moving heads, the club crowd and the milestone jets
+// (dance/stageDressing.ts). Visual only — nothing there reads or writes a score, a window or a judgement.
+import { mountDanceStage, type DanceStageHandle } from '../dance/stageDressing';
+import { recallPlayerName } from '@/lib/party/playerName';
 import { motionPolicy } from '@/lib/a11y/reducedMotion';
 // MUSIC-SUITE P8 (2026-09-25), "…and Stoop on the mic": the Cypher's own block-party MC — NOT THE MIC's hoops cast
 // (lib/babylon/audio/mic/cast.ts / MicDirector / ModeMic — court-scoped, a booth two voices share), the same "own
@@ -381,6 +386,8 @@ export const DanceMode: ModeDefinition = (() => {
    *  to the locked-in track's tempo the instant the count-in arms `startAt` (update()) — same moment the judge, the
    *  band and the kit itself all learn it. */
   let beatBus: BeatBus | null = null;
+  /** vis-party: the dressed stage (LED wall, moving heads, club crowd, jets) — built in load(), freed in dispose(). */
+  let dressing: DanceStageHandle | null = null;
   /** The DANCE_LIBRARY category of the step currently playing (set in playStep, beside currentClip) — 'freeze' drops
    *  the stage camera low. Not reset on a MISS: a stumbled freeze still reads as "was a freeze" for the shot. */
   let currentCategory: string | null = null;
@@ -481,12 +488,16 @@ export const DanceMode: ModeDefinition = (() => {
   let countDigit = 0;
   /** #16: applyStageCamera's position, reused every frame. */
   const camPos = new Vector3();
+  /** vis-party: the beat cut's reused frame, and the last bar a cut was judged on (reset with the room: -1 = none yet). */
+  const cutFrame: CutFrame = { x: 0, z: 0, heightM: 0, targetAddM: 0 };
+  let lastCutBar = -1;
   const LEVEL_KEY = 'fel:dance:level';
   const MATCH_KEY = 'fel:dance:match';
   function readPref(key: string): string | null { try { return typeof localStorage === 'undefined' ? null : localStorage.getItem(key); } catch { return null; } }
   function writePref(key: string, v: string): void { try { localStorage.setItem(key, v); } catch { /* storage blocked */ } }
   /** Per-run state of this pass, cleared on every lock-in (beginCountIn) and every load. */
   function resetImproveRun(): void {
+    lastCutBar = -1;   // vis-party: the beat cut starts a run on the neutral shot
     banner.cancel();
     offsetSumMs = 0; offsetHits = 0;
     sections = new SectionTally(track.song);
@@ -677,7 +688,7 @@ export const DanceMode: ModeDefinition = (() => {
    *  same "every channel degrades silently" rule lib/feel/sensory-bus.ts documents for itself. */
   function collectPulsables(v: VenueHandle | null): { mat: PBRMaterial; base: Color3 }[] {
     const nodes: TransformNode[] = [
-      ...(v?.beatProps?.lamps ?? []), ...(v?.beatProps?.banners ?? []), ...(v?.beatProps?.podium ?? []),
+      ...(v?.beatProps?.lamps ?? []), ...(v?.beatProps?.podium ?? []),   // vis-party: the banner is the LED wall's now (stageDressing), no longer pulsed
     ];
     const out: { mat: PBRMaterial; base: Color3 }[] = [];
     for (const n of nodes) {
@@ -728,7 +739,7 @@ export const DanceMode: ModeDefinition = (() => {
    * camera clipping a person, but the overall FRAMING once it's nudged (does the shot still read as intended right
    * at the band edge?) has not been checked against a live capture — flag for the owner's eye once one is possible.
    */
-  function applyStageCamera(ctx: ModeContext, beatPhase: number, streak: number, cheerGlow: number, snap = false): void {
+  function applyStageCamera(ctx: ModeContext, beatPhase: number, streak: number, cheerGlow: number, snap = false, bar = -1): void {
     const engine = ctx.scene.getEngine();
     const cam = ctx.scene.activeCamera as { fov?: number } | null;
     const aspect = engine.getRenderWidth() / Math.max(1, engine.getRenderHeight());
@@ -739,10 +750,19 @@ export const DanceMode: ModeDefinition = (() => {
       aspect, fovRad,
       beatPhase, freeze: currentCategory === 'freeze', streak, stillCamera: stillCam,
     });
-    const groundOffset = clearOnlookersRing(frame.groundOffset);
+    // vis-party (2026-10-13), TUNED camera (dance/beatCut.ts): at a high combo the shot HARD-CUTS on each downbeat to another angle on
+    // the dancer (low from one side, high from the other, wide) and holds it for the bar. The shot orbits the neutral offset first;
+    // the onlookers' ring is then cleared on the result, so no shot can graze a body. No cut in the count-in, the menu or under the
+    // still-camera setting; never a judged thing.
+    const cutBar = Math.floor(bar);
+    const shot = cutShotFor(cutBar, streak, stillCam);
+    const cutNow = isCutFrame(lastCutBar, cutBar, streak, stillCam);
+    lastCutBar = cutBar;
+    const cf = applyCut(shot, frame.groundOffset.x, frame.groundOffset.z, frame.heightM, DEFAULT_STAGE_CAMERA.maxDistanceM, cutFrame);
+    const groundOffset = clearOnlookersRing({ x: cf.x, z: cf.z });
     // IMPROVE (2026-10-06, #16): one reused Vector3, not a new one per frame (setFixed copies what it is handed)
-    camPos.set(me.root.position.x + groundOffset.x, frame.heightM, me.root.position.z + groundOffset.z);
-    ctx.camDirector.setFixed(camPos, frame.targetHeight, snap);
+    camPos.set(me.root.position.x + groundOffset.x, cf.heightM, me.root.position.z + groundOffset.z);
+    ctx.camDirector.setFixed(camPos, frame.targetHeight + cf.targetAddM, snap || cutNow);
     // MUSIC-SUITE P10 (2026-09-29): THE STAGE CAMERA NEVER MOVED. setFixed only STORES the shot (CameraDirector.ts:481-486
     // — it moves the camera itself on `snap` alone); the glide toward it and the aim both live in CameraDirector.update's
     // fixed branch (:540-546), and every mode that owns a camera calls that itself each frame (ThreePointMode.ts:1123,
@@ -921,6 +941,7 @@ export const DanceMode: ModeDefinition = (() => {
     if (label !== 'MISS' && combo > 0 && combo % 8 === 0) {
       ctx.juice.callout(`${combo} ON THE BEAT`, '#f0abfc', 700);
       crowd?.cheer(Math.min(1, combo / 16));
+      dressing?.milestone('streak');   // vis-party: CO2 jets + confetti
       if (beatBus?.cheer('streak', cheerAt, Math.min(1.2, combo / 16)).flash) ctx.juice.flash('#facc15', 90, 0.6);
       queueStoop('dance.streak');   // MUSIC-SUITE P8
     }
@@ -929,6 +950,7 @@ export const DanceMode: ModeDefinition = (() => {
     if (instrumentJoined) queueStoop('dance.instrument');
     if (joinBanner) {
       crowd?.cheer(0.6);
+      dressing?.milestone('join');   // vis-party
       if (beatBus?.cheer('join', cheerAt, 1).flash) ctx.juice.flash('#f0abfc', 110);
     }
   }
@@ -974,6 +996,7 @@ export const DanceMode: ModeDefinition = (() => {
     // rate-limited/reduce-flashing-gated flash as every other cheer in this room, plus the crowd's own reaction.
     if (grade === 'S') {
       crowd?.cheer(1);
+      dressing?.milestone('gradeS');   // vis-party
       if (beatBus?.cheer('gradeS', resultAt, 1.5).flash) ctx.juice.flash('#fde047', 160, 1);
     }
     // IMPROVE (2026-10-06): the results say more than counts. #6 a clean run (no MISS) is called out — the crowd goes
@@ -1093,6 +1116,7 @@ export const DanceMode: ModeDefinition = (() => {
 
   function movePick(ctx: ModeContext, dir: 1 | -1): void {
     track = cycleTrack(track.id, dir);
+    dressing?.setTrack(track.name);   // vis-party: the LED wall's song card
     // MUSIC-SUITE P2 (2026-09-25): the auto-start is for a viewer who never touches anything, not a player choosing:
     // P1 measured it starting the default 6.07–6.28 s after wake while d-pad presses at +2, +4 and +5.5 s browsed.
     pickSec = pickTimer(pickSec, { type: 'browse' }, PICK_TIMEOUT_SEC).sec;
@@ -1336,11 +1360,28 @@ export const DanceMode: ModeDefinition = (() => {
       // (below) now puts the SAME director in 'fixed' mode with a front, audience-side framing instead of an
       // over-shoulder chase — see that function's own doc for why `setFixed` is the right call for a subject that
       // never runs anywhere.
-      venue = mountVenue(ctx, 'dance', { keepGameplayCamera: true, look: readPlaceLook('dance') });
+      // vis-party (2026-10-13): the Studio (home) look carried the spec's 'neon' dome, which is a Venice skatepark at sunset
+      // (public/backdrops/baked/neon.jpg — the bake is mis-named, [ART]: a real night dome). Behind a night club that read as a
+      // beach party. The home look takes the magenta-and-ember dusk dome the other night modes already use; a picked place
+      // (Neon Club, Rooftop Dusk) keeps its own. assumption: the owner's eye decides the dome — one word to put back.
+      const authoredLook = readPlaceLook('dance');
+      const danceLook = authoredLook && isHomeLook(authoredLook) ? { ...authoredLook, backdrop: 'city' as const } : authoredLook;
+      venue = mountVenue(ctx, 'dance', { keepGameplayCamera: true, look: danceLook });
       // MUSIC-SUITE P8: the lamp/banner/podium materials this venue built, for the beat bus to pulse — see
       // collectPulsables's doc. Gathered right after the mount; buildProp() builds these synchronously, no
       // load-order race with the CC0 kit props (which DO load async, elsewhere in NexusVenue.ts).
       pulsables = collectPulsables(venue);
+      // vis-party (2026-10-13): the LED wall, the moving heads, the club crowd — see dance/stageDressing.ts. assumption: the party
+      // name on the wall is the device-local one the PSN party feature already shows on a TV (lib/party/playerName), else none.
+      dressing?.dispose();
+      {
+        const motion0 = motionPolicy();
+        dressing = mountDanceStage({
+          scene: ctx.scene, lights: ctx.lights, banners: venue?.beatProps?.banners ?? [],
+          track: trackById(DEFAULT_TRACK_ID).name, player: recallPlayerName(),
+          calmLights: !motion0.flash, calmMotion: motion0.reduced,
+        });
+      }
       // SCORECARD VISUALS (2026-09-15): a cypher IS the circle of people around the dancer, and the frame review found a
       // lone body on a lit disc in a dark room. The ring watches the floor (the same Onlookers the dojo and the courts use).
       crowd?.dispose(); crowd = null;
@@ -1454,6 +1495,7 @@ export const DanceMode: ModeDefinition = (() => {
       // count-in clicks are audible the moment the player locks a track in.
       const deepLink = typeof window !== 'undefined' ? trackFromQuery(window.location.search) : null;
       track = deepLink ?? trackById(DEFAULT_TRACK_ID);
+      dressing?.setTrack(track.name);   // vis-party
       kit = audioCtx && bus ? new KitPulse(audioCtx, bus, track.bpm, kitPattern(track.id)) : null;
       kit?.setClock((sec) => clock.audio(sec));
       void kit?.load().catch(() => 0);
@@ -1532,6 +1574,7 @@ export const DanceMode: ModeDefinition = (() => {
 
     update(ctx: ModeContext, dt: number) {
       crowd?.update(dt);
+      if (phase === 'pick' || ended) dressing?.idle(dt);   // vis-party: the menu and the results have no song — the club idles on the wall clock
       if (ended) return;
       // IMPROVE (2026-10-06, #2): the banner's one clear time (flashBanner) — the newest banner's, never an older one's
       if (banner.due(performance.now())) ctx.setHud({ banner: phase === 'pick' ? pickLine() : '' });   // the pick line comes back
@@ -1616,7 +1659,8 @@ export const DanceMode: ModeDefinition = (() => {
           // even though `beatBus.retune()` (a few lines up) already has the count-in's own beat grid live. Reads off
           // the SAME bus/clock the post-count-in code below does, so nothing about the beat math is duplicated here.
           const bp = beatBus?.phase(heard) ?? { beatIndex: 0, beatPhase: 0, barIndex: 0, barPhase: 0 };
-          applyStageCamera(ctx, bp.beatPhase, perf.combo, beatBus?.cheerPulse(heard) ?? 0);
+          applyStageCamera(ctx, bp.beatPhase, perf.combo, beatBus?.cheerPulse(heard) ?? 0, false, bp.barIndex);
+          dressing?.update(bp, beatBus?.cheerPulse(heard) ?? 0, perf.combo);   // vis-party: the count-in's own grid
           return;
         }
         phase = 'playing';
@@ -1662,7 +1706,8 @@ export const DanceMode: ModeDefinition = (() => {
       // camera and the stage dressing freeze with everything else — decision #8 + PLAN phase 8 item 1.
       {
         const bp = beatBus?.phase(heard) ?? { beatIndex: 0, beatPhase: 0, barIndex: 0, barPhase: 0 };
-        applyStageCamera(ctx, bp.beatPhase, perf.combo, beatBus?.cheerPulse(heard) ?? 0);
+        applyStageCamera(ctx, bp.beatPhase, perf.combo, beatBus?.cheerPulse(heard) ?? 0, false, bp.barIndex);
+        dressing?.update(bp, beatBus?.cheerPulse(heard) ?? 0, perf.combo);   // vis-party: the same heard clock as the lamps
       }
 
       // THE CUE — the next move and when it lands. Without it the judging
@@ -1713,6 +1758,7 @@ export const DanceMode: ModeDefinition = (() => {
       // MUSIC-SUITE P8: the beat bus and the stage pulsables go with the room — a stale material reference held past
       // its venue's dispose would throw the next time pulseStage touched it.
       beatBus?.dispose(); beatBus = null;
+      dressing?.dispose(); dressing = null;
       pulsables = [];
       currentCategory = null;
       // IMPROVE (2026-10-06): REPLAY has no stage to come back to (#8), and nothing of this pass outlives the room

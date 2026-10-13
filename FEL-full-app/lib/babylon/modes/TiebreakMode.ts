@@ -7,7 +7,7 @@
 // flies out before his comes back (#8), the ball bounces and casts a blob (#14 #15), the crowd builds with the rally
 // (#16), warm-up balls come before 0-0 (#17), and the ball, ring and blob are unlit, frozen and disposed with their
 // materials (#18–#20). The flight is drawn by TiebreakFlight (pure); the rules never read it.
-import { Color3, Mesh, MeshBuilder, StandardMaterial, type AnimationGroup, type Scene, type TransformNode, Vector3 } from '@babylonjs/core';
+import { Color3, Mesh, MeshBuilder, StandardMaterial, type AnimationGroup, type Observer, type ParticleSystem, type Scene, type TransformNode, Vector3 } from '@babylonjs/core';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';
@@ -26,6 +26,15 @@ import {
   RETURN_OUT_SEC, TARGET, type BlitzFeel, type BlitzState, type Side, NORMAL_FEEL, aiNetsIt, gradeReactBase,
 } from '../core/TiebreakBlitz';
 import { BOUNCE_AT, FAR_Z, NEAR_Z, incomingPoint, outgoingPoint, shadowScale, type Pt } from '../core/TiebreakFlight';
+// vis-party (2026-10-13), VISUAL-PASS-PLAN Part B (tiebreak): a Meshy ball with a trail and a spark on contact, the hit-window ring
+// as a glowing fixture, a tension grade on set point / win-by-two / sudden death, and a trophy for a won match. Visual only: the
+// window, the flight, the AI and the points are TiebreakBlitz / TiebreakFlight's and nothing here writes to them.
+import { EffectsKit, applyTrail, type TrailLevel } from '../visual/EffectsKit';
+import { dressBall } from '../visual/meshyProps';
+import { buildTrophy, trophyRise, TROPHY_AT, TROPHY_RISE_SEC, type TrophyHandle } from '../party/trophy';
+import { motionPolicy } from '@/lib/a11y/reducedMotion';
+import { tensionLevel, tensionPulse, tensionRest, trailFor, type RestGrade } from './tiebreakFx';
+import { SPEED_VIGNETTE_ON } from '../core/ImpactFrame';
 
 export interface TiebreakModeOpts {
   reactBase: number;
@@ -85,6 +94,20 @@ export function makeTiebreakMode(opts: TiebreakModeOpts): ModeDefinition {
   let ball: Mesh | null = null;
   let ring: Mesh | null = null;
   let shadow: Mesh | null = null;
+  // vis-party state
+  let trail: ParticleSystem | null = null;
+  let trailLevel: TrailLevel = 'off';
+  let trophy: TrophyHandle | null = null;
+  let trophyObs: Observer<Scene> | null = null;
+  let trophyScene: Scene | null = null;
+  let tNow = 0;                                      // seconds into the match (the heart's clock)
+  let tension = 0;                                   // 0..1, tensionLevel's last answer (from set point up, else 0)
+  let paintFrames = 0;                               // frames left to ask the harness to repaint the rest grade after it moved
+  let flashesOk = true;                              // !reduced flashing, read once per load
+  let calmMotion = false;                            // reduced motion: no sparks, no dust, no trophy confetti
+  let baseGrade: RestGrade = { exposure: 1, vignette: 0 };
+  const pressedGrade: RestGrade = { exposure: 1, vignette: 0 };
+  const fxAt = new Vector3();
   let ended = false;
   let banner = '';
   let bannerT = 0;
@@ -115,7 +138,11 @@ export function makeTiebreakMode(opts: TiebreakModeOpts): ModeDefinition {
       incomingPoint(s.incoming, p, at);
     }
     ball.position.set(at.x, at.y, at.z);
-    ball.isVisible = s.awaiting;
+    ball.setEnabled(s.awaiting);   // vis-party: setEnabled, not isVisible — the Meshy skin rides the sphere as a child, and a hidden parent leaves its children drawn
+    if (trail) {
+      const lv = trailFor(s.awaiting, goingOut(s));
+      if (lv !== trailLevel) { trailLevel = lv; applyTrail(trail, lv, '#D4FF00'); }
+    }
     // #1 #2: the ring rides the ball, faces the camera (billboard) and closes from RING_WIDE to 1× by the window's open
     const incoming = s.awaiting && s.ballT >= 0;
     ring.isVisible = incoming;
@@ -195,11 +222,64 @@ export function makeTiebreakMode(opts: TiebreakModeOpts): ModeDefinition {
     });
   }
 
+  /** vis-party: the tension grade, through the harness's OWN hook. The level follows the scoreboard's call and only counts from set
+   *  point up (the faint lean-in below it was not worth a grade). The pressed look is the rig's owned rest (exposure dimmed, vignette
+   *  tightened); the heartbeat is reported as a speed-vignette fraction (ctx.feel.speedVignette01), which the harness composes over
+   *  that rest and paints every frame — a mode never writes the pipeline's vignette itself (speedVignetteRollout.test holds that),
+   *  and reduced motion caps the harness's own level. While it paints, the rig's flash beat (a momentum tier) is repainted over:
+   *  routed, see the lane report. */
+  function tickTension(ctx: ModeContext, dt: number): void {
+    tNow += dt;
+    const level = tensionLevel(state.myPts, state.aiPts, state.warmup);
+    const g = level >= 0.5 ? level : 0;
+    if (g !== tension) {
+      tension = g;
+      tensionRest(baseGrade, g, pressedGrade);
+      ctx.lights.rest.exposure = pressedGrade.exposure; ctx.lights.rest.vignette = pressedGrade.vignette;
+      paintFrames = 3;   // the harness paints the rest again for a few frames (a release must reach the pipeline too)
+    }
+    if (g > 0) ctx.feel.speedVignette01(SPEED_VIGNETTE_ON + Math.max(1e-4, tensionPulse(g, tNow, flashesOk) * (1 - SPEED_VIGNETTE_ON)));
+    else if (paintFrames > 0) { paintFrames--; ctx.feel.speedVignette01(SPEED_VIGNETTE_ON + 1e-4); }
+    else ctx.feel.speedVignette01(0);
+  }
+
+  function stopTrophyLoop(): void {
+    if (trophyObs && trophyScene) trophyScene.onBeforeRenderObservable.remove(trophyObs);
+    trophyObs = null; trophyScene = null;
+  }
+
+  /** vis-party: a won match raises a cup on the court, with a burst of sparks and confetti over it. Runs on the render loop (the
+   *  mode's own update has stopped), for a few seconds, then stands. */
+  function raiseTrophy(ctx: ModeContext): void {
+    if (trophy) return;
+    trophy = buildTrophy(ctx.scene);
+    let age = 0;
+    const scene = ctx.scene;
+    trophyScene = scene;
+    trophyObs = scene.onBeforeRenderObservable.add(() => {
+      age += scene.getEngine().getDeltaTime() / 1000;
+      trophy?.setRise(trophyRise(age));
+      if (age >= TROPHY_RISE_SEC) { stopTrophyLoop(); trophy?.setRise(1); }
+    });
+    if (!calmMotion) {
+      fxAt.set(TROPHY_AT.x, 1.7, TROPHY_AT.z);
+      EffectsKit.burst(scene, fxAt, 'confetti', 1.6);
+      if (flashesOk) EffectsKit.burst(scene, fxAt, 'sparks', 1.5, '#f2c14e');
+    }
+  }
+
   function finish(ctx: ModeContext): void {
     if (ended) return;
     ended = true;
     writeWarmed();
     const won = state.myPts > state.aiPts;
+    // vis-party: the pressed grade lets go — the end card and the trophy are lit as the rig lit the court
+    if (tension > 0) {
+      tension = 0;
+      ctx.lights.rest.exposure = baseGrade.exposure; ctx.lights.rest.vignette = baseGrade.vignette;
+      ctx.feel.speedVignette01(SPEED_VIGNETTE_ON + 1e-4);   // one more harness repaint of the (released) rest; harmless after
+    }
+    if (won) raiseTrophy(ctx);
     hud(ctx);
     ctx.end(won ? 'win' : 'complete', postedScore(state.myPts, state.bestRally), {
       myPts: state.myPts, aiPts: state.aiPts, bestRally: state.bestRally,
@@ -234,6 +314,7 @@ export function makeTiebreakMode(opts: TiebreakModeOpts): ModeDefinition {
       // #13: a tap on the hands for every clean return; #16: the crowd bed rises with the rally (MomentumBus → crowdLevel)
       HAPTIC.tap(); padRumble(0.22, 60);
       ctx.momentum.report({ kind: 'chain' });
+      spark(ctx, hitFrom, 0.7);   // vis-party: a small spark at the racket
     } else if (result === 'point-me') {
       const long = before + 1 >= CHEER_RALLY;
       say(long ? 'WINNER DOWN THE LINE' : 'AI NETS IT');
@@ -242,6 +323,7 @@ export function makeTiebreakMode(opts: TiebreakModeOpts): ModeDefinition {
       playerSwing(dir);
       // #13: hit-stop, shake and a buzz on a point won; #16: a long rally won brings the crowd up
       ctx.feel.impact(long ? 0.4 : 0.25);
+      spark(ctx, hitFrom, long ? 1.4 : 1.0);   // vis-party
       if (long) { SoundKit.play('crowdCheer', { volume: 0.5 }); ctx.momentum.report({ kind: 'clean_run' }); }
     } else {
       // #7: the swing you chose is on screen — a misread swings to the wrong side, an early swing goes before the ball
@@ -253,6 +335,13 @@ export function makeTiebreakMode(opts: TiebreakModeOpts): ModeDefinition {
     placeBall(state);
     hud(ctx);
     if (state.over) finish(ctx);
+  }
+
+  /** vis-party: a spark of the ball's colour at `p`. Skipped under reduced motion (a flash of light is a flash). */
+  function spark(ctx: ModeContext, p: Pt, k: number): void {
+    if (!flashesOk) return;
+    fxAt.set(p.x, p.y, p.z);
+    EffectsKit.burst(ctx.scene, fxAt, 'sparks', k, '#D4FF00');
   }
 
   /** #12: the miss, with the timing — "TOO EARLY · 70 ms". `incoming` is the ball's side read before the swing, so a swing
@@ -299,9 +388,20 @@ export function makeTiebreakMode(opts: TiebreakModeOpts): ModeDefinition {
       ball = MeshBuilder.CreateSphere('tb_ball', { diameter: 0.14, segments: 12 }, ctx.scene);
       ball.material = unlitMarker(ctx.scene, 'tb_ball_m', '#D4FF00');
       ball.isPickable = false;
+      // vis-party: the Meshy tennis ball rides the sphere (the sphere itself goes invisible); a missing scan leaves the marker.
+      // The trail rides the ball and is off until the ball is in play (placeBall) — a trail at a resting ball would be a blob.
+      void dressBall(ball, 'tennis').catch(() => false);
+      trail = EffectsKit.ballTrail(ctx.scene, ball, '#D4FF00');
+      applyTrail(trail, 'off', '#D4FF00');
+      trailLevel = 'off';
+      const motion = motionPolicy();
+      flashesOk = motion.flash; calmMotion = motion.reduced;
+      baseGrade = { exposure: ctx.lights.rest.exposure, vignette: ctx.lights.rest.vignette };
+      tNow = 0; tension = 0;
 
       // #2: built flat (XZ) by MeshBuilder; stood up into XY and billboarded so it always faces the camera as a ring
-      ring = MeshBuilder.CreateTorus('tb_window', { diameter: RING_D, thickness: 0.03, tessellation: 24 }, ctx.scene);
+      // vis-party: named `…_neon` so the foundation's glow layer (scene/EmissiveGlow.ts, include list by name) gives the cue a halo
+      ring = MeshBuilder.CreateTorus('tb_window_neon', { diameter: RING_D, thickness: 0.03, tessellation: 24 }, ctx.scene);
       ring.rotation.x = Math.PI / 2;
       ring.bakeCurrentTransformIntoVertices();
       ring.billboardMode = Mesh.BILLBOARDMODE_ALL;
@@ -334,6 +434,7 @@ export function makeTiebreakMode(opts: TiebreakModeOpts): ModeDefinition {
 
     update(ctx: ModeContext, dt: number): void {
       if (ended) return;
+      tickTension(ctx, dt);
       if (bannerT > 0) bannerT -= dt;
       if (bannerT <= 0 && banner) { banner = ''; hitAt = -1; hud(ctx); }
       const warm = state.warmup > 0;
@@ -376,6 +477,8 @@ export function makeTiebreakMode(opts: TiebreakModeOpts): ModeDefinition {
 
     dispose(): void {
       // #20: the ball, ring and blob take their materials with them (the default dispose leaves them in the scene)
+      stopTrophyLoop(); trophy?.dispose(); trophy = null;
+      trail?.dispose(); trail = null;   // vis-party: the trail's system goes with the mode (it rides the ball)
       ball?.dispose(false, true);
       ring?.dispose(false, true);
       shadow?.dispose(false, true);
