@@ -36,6 +36,7 @@ import { planRivalKick, gradeDive, resolveSaveRead, type DiveSign, type KeeperCa
 // the habit read said in the breakaway, the honest hint, the skippable result beat.
 import { readPensStyle, writePensStyle, PENS_SWITCH_SEC, habitRead, breakawayReadProb, breakawayHint, CLASSIC_HINT, ResultBeat, type PensStyle } from '../core/PenaltyLoop';
 import type { AbstractMesh, Material, Observer, ParticleSystem, Scene } from '@babylonjs/core';
+import { TransformNode } from '@babylonjs/core';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import type { SpawnedCharacter } from '../core/CharacterLibrary';
@@ -55,6 +56,22 @@ import { mountVenue, type VenueHandle } from '../core/NexusVenue';
 import { readPlaceLook } from '../nexus/placeLooks';
 import { EffectsKit } from '../visual/EffectsKit';
 import { Onlookers } from '../visual/Onlookers';
+// VIS-COURT (wave 2, 2026-10-13): the golf, derby and penalty visuals — a shot tracer with its readout, the flag as cloth, a putting
+// grid, the tee's sign, the replays and their pacing. Every one is fed positions and numbers this file already has; none is read back.
+import { ShotTracer } from '../court/ShotTracer';
+import { mountReadout, type ReadoutHandle } from '../court/Readout';
+import { apexOf, flatDist } from '../court/flightRead';
+import { makeCloth, mountPuttGrid, buildTee, type ClothHandle, type PuttGridHandle, type TeeHandle } from '../court/GolfDressing';
+import { HighlightPacer } from '../court/highlights';
+import { buildJumbotron, boardLine, type JumbotronHandle } from '../court/Jumbotron';
+import { FireworkShow, fireworkPlan } from '../court/Fireworks';
+import { mountSwingTrail, type SwingTrailHandle } from '../court/SwingTrail';
+import { exitRead, M_TO_FT } from '../court/flightRead';
+import { stampDecal } from '../court/decals';
+import { buildGoalNet, type GoalNetHandle } from '../court/GoalNet';
+import { FlareShow, flareSpots } from '../court/Flares';
+import { mountShockRings, type ShockRingHandle } from '../court/ShockRing';
+import { motionPolicy } from '../../a11y/reducedMotion';
 import { mountPostureLayer } from '../anim/PostureLayer';
 import { fieldPose, batWindow, keeperWindow, strikerWindow } from '../core/FieldPosture';
 import { keeperReadProb, rivalConverts, shootoutState, REGULATION_KICKS } from '../core/ShootoutCore';
@@ -200,6 +217,11 @@ export const GolfMode: ModeDefinition = (() => {
   const later = (fn: () => void, ms: number) => timers.later(() => { if (!ended) fn(); }, ms);
   /** IMPROVE (2026-10-06, Golf #8): the ball's tracer (a shot's flight and roll-out, stopped at rest) and its own white. */
   let trail: ParticleSystem | null = null;
+  /** VIS-COURT: the broadcast tracer (a lit ribbon on the flight to its first touch) and the card that reads the carry and the apex. */
+  let tracer: ShotTracer | null = null, readout: ReadoutHandle | null = null;
+  /** VIS-COURT: the pin's flag as cloth, the putting grid, the tee's sign, the replay's pacing. */
+  let cloth: ClothHandle | null = null, puttGrid: PuttGridHandle | null = null, tee: TeeHandle | null = null, clothT = 0;
+  const golfPacer = new HighlightPacer();
   /** IMPROVE (2026-10-06, Golf #6 / #8 / #15): the mode's own materials, made once per load and disposed with the mode —
    *  the park's four and the wind flag's were made again every hole and never disposed. */
   let mats: { pad: PBRMaterial; ring: PBRMaterial; fan: PBRMaterial; bank: PBRMaterial; flag: PBRMaterial; ball: PBRMaterial } | null = null;
@@ -256,6 +278,7 @@ export const GolfMode: ModeDefinition = (() => {
   function golfMats(ctx: ModeContext): NonNullable<typeof mats> {
     if (mats) return mats;
     const flagMat = VenueKit.paint(ctx.scene, 'golf_wind_flag_m', '#ffcf3a', 0.18, 0.7);
+    flagMat.backFaceCulling = false;   // VIS-COURT: the flag is cloth now, seen from both sides
     flagMat.albedoColor = flagMat.albedoColor.scale(0.42);   // the green's LIT divisor (aimSwingCore): under this rig an unscaled pick clips pale
     mats = {
       pad: VenueKit.paint(ctx.scene, 'gp_pad_mat', '#22d3ee', 0.3, 0.5), ring: VenueKit.paint(ctx.scene, 'gp_ring_mat', '#9ad7ff', 0.45, 0.4),
@@ -305,12 +328,13 @@ export const GolfMode: ModeDefinition = (() => {
     // about its own middle and lay across the wind, so even when seen it pointed the wrong way).
     for (const f of furniture) if (f.name === 'flag') f.setEnabled(false);
     flag?.dispose();
-    const flagBox = MeshBuilder.CreateBox('pinFlag', { width: 0.7, height: 0.34, depth: 0.03 }, ctx.scene);
-    flagBox.bakeTransformIntoVertices(Matrix.Translation(0.35, 0, 0));   // the box's origin at its pole edge: it turns on the pole
-    flag = flagBox;
+    cloth?.dispose();
+    cloth = makeCloth(ctx.scene, 'pinFlag', 0.7, 0.34, 6, 2);   // VIS-COURT: cloth, its pole edge at the mesh's origin: it turns on the pole as the box did
+    flag = cloth.mesh;
     flag.position.set(holePos.x, 1.85, holePos.z);
     flag.material = golfMats(ctx).flag; flag.isPickable = false;
     ball.position.set(LOOP_TEE.x, 0.05, LOOP_TEE.z);
+    puttGrid?.at(holePos.x, holePos.z); tee?.setHole(round, TOTAL, parOf(round), Math.hypot(holePos.x - LOOP_TEE.x, holePos.z - LOOP_TEE.z));   // VIS-COURT
     meAnim.loop(SPORT_CLIP.golfAddress, { fadeSec: 0.3 });
     strikeIn = 0; pendingStrike = null;
     // HOLE PREVIEW — fly the camera to the green, look back at the tee.
@@ -492,7 +516,7 @@ export const GolfMode: ModeDefinition = (() => {
       ctx.feel?.impact?.(0.25 + pwr * 0.35);   // the contact feel, ON the contact (A+ P0 weight unchanged)
       sim.wind.copyFrom(wind); sim.wet01 = weather.wet01(); sim.airDensity = weather.airDensityMult();
       prevBallPos.copyFrom(ball.position); apexY = 0; sim.launch(ball.position.clone(), vel, spin); flightSec = 0;
-      if (c !== PUTTER) trail?.start();   // IMPROVE #8: the tracer runs from the strike to the rest (a putt rolls at your feet)
+      if (c !== PUTTER) { trail?.start(); tracer?.start(ball.position); readout?.hide(); }   // IMPROVE #8: the tracer runs from the strike to the rest (a putt rolls at your feet); VIS-COURT: and the broadcast tracer
     };
     if (strikeIn <= 0) { pendingStrike(); pendingStrike = null; }
     ctx.setHud({
@@ -560,7 +584,12 @@ export const GolfMode: ModeDefinition = (() => {
   }
 
   return {
-    modeId: 'golf', mood: 'alpine', camPreset: 'links',
+    // VIS-COURT: 'daylight' — the Coastal Links ran the ALPINE mood (exposure 0.92, a cold sun; audit A3). The rig's mood resolver has
+    // given it daylight since wave 1; the declared mood now says the same, so the legacy look and the resolver agree.
+    modeId: 'golf', mood: 'daylight', camPreset: 'links',
+    intro: 'establish',   // VIS-COURT: the broadcast crane over the course (the hole's own flyover has already shown the green); any input skips it
+    replay: true,         // VIS-COURT: a birdie or better, replayed (never the card-closing hole)
+    replayCast: () => ({ bodies: me ? [me.root] : [], loose: ball ? [ball] : [] }),
 
     async load(ctx: ModeContext) {
       golfVenue = mountVenue(ctx, 'golf_loop', { keepGameplayCamera: true, look: readPlaceLook('golf') });   // PLACE: the splash's pick
@@ -578,6 +607,10 @@ export const GolfMode: ModeDefinition = (() => {
       timers.clear(); mats = null; ended = false;
       ball.material = golfMats(ctx).ball; ball.isPickable = false;
       trail = EffectsKit.ballTrail(ctx.scene, ball, '#fff4cf'); trail.stop();
+      tracer?.dispose(); tracer = new ShotTracer(ctx.scene, { color: '#fff1b0' });   // VIS-COURT
+      readout?.dispose(); readout = mountReadout(ctx.scene);
+      puttGrid?.dispose(); puttGrid = mountPuttGrid(ctx.scene, 6);
+      tee?.dispose(); tee = buildTee(ctx.scene, LOOP_TEE);
       banners = new BannerChannel(timers, (text) => ctx.setHud({ banner: text }));
       seed = loopSeed();   // IMPROVE #2: a new course each play (the weather's seed is the same clock)
       sim = new GolfBallSim(ball);
@@ -694,6 +727,7 @@ export const GolfMode: ModeDefinition = (() => {
       if (ended) return;
       meter.update(dt);
       weather.update(dt); weatherFx?.update(dt);
+      clothT += dt; cloth?.update(clothT); puttGrid?.drive(dt, phase === 'aim' && onGreen());   // VIS-COURT
       if (phase === 'preview') {
         previewSec += dt;
         if (previewSec >= PREVIEW_SEC) backToTee(ctx);
@@ -767,6 +801,16 @@ export const GolfMode: ModeDefinition = (() => {
         }
         prevBallPos.copyFrom(ball.position); apexY = Math.max(apexY, ball.position.y);
         sim.tryHole(holePos.x, holePos.z);
+        if (tracer?.active) {   // VIS-COURT: the line follows the flight to its first touch (or to where it stopped), then the card reads it
+          tracer.push(ball.position);
+          const cp = sim.carryPoint, over = !sim.ball.active;
+          if (cp || over) {
+            const at = cp ?? ball.position;
+            tracer.finish(at);
+            const ap = apexOf(tracer.path.pts, lie.y);
+            readout?.show({ x: at.x, y: at.y + 2.4, z: at.z }, [`CARRY ${Math.max(0, Math.round(flatDist(lie, at)))} m`, `APEX ${Math.max(0, Math.round(ap?.height ?? 0))} m`]);
+          }
+        }
         if (sim.ball.active && flightSec > 25) sim.ball.stop();   // a ball that never settles is settled (a guard, not a rule)
         const flying = sim.ball.active;
         ctx.camDirector.update(ball.position, sim.ball.vel, holePos);
@@ -857,13 +901,19 @@ export const GolfMode: ModeDefinition = (() => {
             board: holeBoard(holeResults, TOTAL), boardTitle: round >= TOTAL ? 'CARD IN' : `NEXT — HOLE ${round + 1} · PAR ${parOf(round + 1)}`,
           });
           settling = true;
-          later(() => {
+          // VIS-COURT: a birdie or better is replayed from the broadcast angles (skippable). The next hole waits for it — nextShot()
+          // teleports the golfer and the ball, and a replay puts every body back where it found it — and never the card-closing hole:
+          // the end card is what the player is waiting for. A hole that is not replayed waits exactly as long as it did.
+          const replayed = golfPacer.offer(rel < 0, { final: round >= TOTAL, reduced: !motionPolicy().travel }) ? ctx.highlight?.({ lastSeconds: 3.4, objective: holePos.clone() }) : undefined;
+          if (!replayed) golfPacer.tick();
+          const closeHole = (): void => { later(() => {
             ctx.setHud({ banner: '', board: null, boardTitle: '' });
             if (round >= TOTAL) {
               ended = true; SoundKit.play('whistle');
               console.info(`[GOLF-END] card in ${overPar > 0 ? '+' : ''}${overPar} pickUps ${pickUps} pts ${pts}`); ctx.end('CARD_IN', pts, { holes: TOTAL, overPar, pickUps });
             } else nextShot(ctx);
-          }, 2600);   // long enough to read the card
+          }, replayed ? 1800 : 2600); };   // long enough to read the card
+          if (replayed) void replayed.then(closeHole); else closeHole();
         }
         return;
       }
@@ -875,6 +925,7 @@ export const GolfMode: ModeDefinition = (() => {
       ended = true; timers.clear(); banners = null; tickJob = null;
       golfVenue?.dispose?.(); golfVenue = null; gallery?.dispose(); gallery = null; flag?.dispose(); flag = null; me?.dispose();
       clearFurniture(); trail?.dispose(); trail = null; ball?.dispose(); arrow?.dispose(); arrow = null; weatherFx?.dispose(); weatherFx = null;
+      tracer?.dispose(); tracer = null; readout?.dispose(); readout = null; cloth?.dispose(); cloth = null; puttGrid?.dispose(); puttGrid = null; tee?.dispose(); tee = null;   // VIS-COURT
       if (mats) for (const m of Object.values(mats)) m.dispose();   // IMPROVE #15: the mode's own materials go with it
       mats = null;
       SoundKit.stopAmbient();
@@ -943,6 +994,11 @@ export const DerbyMode: ModeDefinition = (() => {
   /** The pitch is a beat: the ball leaves the hand on the release key, not at the wind-up. */
   let throwIn = 0; let pendingThrow: (() => void) | null = null;
   let bat: AbstractMesh | null = null;
+  /** VIS-COURT: the bat's streak, the home run's tracer / card / board / fireworks, the replay's focus and its pacing. */
+  let batTip: TransformNode | null = null, batTrail: SwingTrailHandle | null = null;
+  let hrTracer: ShotTracer | null = null, hrReadout: ReadoutHandle | null = null, jumbo: JumbotronHandle | null = null, shells: FireworkShow | null = null;
+  let focusProxy: TransformNode | null = null, launchVel: { x: number; y: number; z: number } | null = null, cardPending = false, replayWanted = false;
+  const derbyPacer = new HighlightPacer();
   /** ANIM-SURGICAL: seconds since the swing started (null = loaded), and the per-frame bat placement. */
   let batSwingSec: number | null = null;
   let batObs: Observer<Scene> | null = null;
@@ -1181,6 +1237,17 @@ export const DerbyMode: ModeDefinition = (() => {
     ctx.setHud({ score: pts, homers: tally.homers, outs: tally.outs, longest: tally.longestFt, rivalHomers: rivalSoFar(), distance: homer ? distanceLine(distFt, tally.longestFt) : '', targets: `${park.targetsHit}/${TARGETS.length}`, mult: multiplier > 1 ? `x${multiplier} NEXT` : '' });
     bannerCh?.flash(banner, 900);
     console.info(`[PARK] ${verdict} ${lastDetail} +${gained}${homer ? ` ${distFt} ft` : ''}`);
+    // VIS-COURT: a home run is a moment — the Statcast card on the board and over the ball, a show over the wall, and (not the round's
+    // last, not in reduced motion, not every one) a replay once the ball has come down. Readings of the flight the game flew.
+    if (homer && launchVel) {
+      const r = exitRead(launchVel, distFt);
+      cardPending = false;
+      jumbo?.show({ title: 'HOME RUN DERBY', board: boardLine(tally.homers, tally.outs, OUTS_CAP), card: r.lines, homer: true });
+      hrReadout?.show({ x: ball.position.x, y: ball.position.y + 3, z: ball.position.z }, r.lines);
+      shells?.launch(fireworkPlan({ x: ball.position.x, z: ball.position.z }, ctx.lights.tier === 'mobile' ? 3 : 6, round));
+      replayWanted = !roundOver && derbyPacer.offer(true, { final: round >= TOTAL, reduced: !motionPolicy().travel });
+      if (!replayWanted) derbyPacer.tick();
+    } else derbyPacer.tick();
     if (roundOver) endDerby(ctx, round, 700);
   }
 
@@ -1260,6 +1327,9 @@ export const DerbyMode: ModeDefinition = (() => {
 
   return {
     modeId: 'baseball', mood: 'goldenHour', camPreset: 'court',
+    intro: 'walkIn',   // VIS-COURT: the broadcast intro — a crane over the park, then a shot on the batter; the first pitch waits for it
+    replay: true,      // VIS-COURT: a home run, replayed from the broadcast angles, following the ball (a proxy body is the replay's focus)
+    replayCast: () => ({ bodies: [focusProxy, me?.root, pitcher?.root].filter((r): r is TransformNode => !!r), loose: ball ? [ball] : [] }),
 
     async load(ctx: ModeContext) {
       derbyVenue = mountVenue(ctx, 'derby', { keepGameplayCamera: true, look: readPlaceLook('derby') });   // PLACE
@@ -1303,6 +1373,9 @@ export const DerbyMode: ModeDefinition = (() => {
           bm.diffuseColor = Color3.FromHexString('#c9a06a'); bm.specularColor = Color3.Black();
           bat.material = bm;
           bat.rotationQuaternion = new Quaternion();
+          // VIS-COURT: the barrel's end (the cylinder's +y is the barrel along the swing's line) carries the streak
+          batTip = new TransformNode('derby_bat_tip', ctx.scene); batTip.parent = bat; batTip.position.set(0, BAT_LEN / 2, 0);
+          batTrail?.dispose(); batTrail = mountSwingTrail(ctx.scene, batTip, { color: '#fff4d0', width: 0.14, length: 20, alpha: 0.7, name: 'bat' });
           const batRef = bat, meRef = me;
           // IMPROVE (2026-10-06, Derby #13): the placement runs every frame, so it writes into these — it allocated ~8
           // Vector3s a frame (clone, subtract, add, new Vector3, toEulerAngles, Vector3.Up()).
@@ -1367,6 +1440,19 @@ export const DerbyMode: ModeDefinition = (() => {
           state: () => ({ round, seed, incoming, throwIn, swung, ended, ballZ: ball.position.z, ballY: ball.position.y, pciX: pci.pos.x, pciY: pci.pos.y, pitchAtX: pitchAt.x, pitchAtY: pitchAt.y, flow, flowAtSwing, multiplier, ...park, homers: tally.homers, outs: tally.outs, pts, lastVerdict, lastDetail, settledRound, hitPending: !!hit && !hit.settled, fielders: fielders.map((f) => ({ x: f.char.root.position.x, z: f.char.root.position.z, y: f.y, run: f.run ? f.run.mode : null })) }),
         };
       }
+      if (process.env.NODE_ENV === 'development') {   // the capture driver's seam: stage a real home-run flight (the wall still decides it) and a replay
+        (ctx.scene.metadata ??= {}).felCourt = {
+          highlight: (o?: Parameters<NonNullable<ModeContext['highlight']>>[0]) => ctx.highlight?.(o),
+          fakeHomer: (vx = 0, vy = 17, vz = 34) => {
+            incoming = false; swung = true; pendingThrow = null; throwIn = 0;
+            ball.position.set(-0.4, 1.0, 0.3);
+            hit = { q: 0.92, launch: 0.5, cover: 1, clutch: false, distPts: 100, cross: null, rob: null, settled: false };
+            flight.launch(ball.position, new Vector3(vx, vy, vz));
+            launchVel = { x: flight.vel.x, y: flight.vel.y, z: flight.vel.z }; cardPending = true; hrTracer?.start(ball.position); hrReadout?.hide();
+            ctx.heroRef.current = ball; ctx.camDirector.mode = 'follow'; trail?.start();
+          },
+        };
+      }
       throwIn = 0; pendingThrow = null;
       pci = new Reticle(ctx.scene, new Vector3(0, 1.1, 0.2), { x: ZONE_HALF.x, y: ZONE_HALF.y });
       // HOTFIX (2026-09-24): the PCI ring used to draw edge-on, a glowing cyan stick beside the fists, a second 'bat' (the eye's
@@ -1377,6 +1463,13 @@ export const DerbyMode: ModeDefinition = (() => {
       // A lit white that holds its white on the grass (golf's ball paint), and a tracer from the bat to where it lands.
       ball.material = VenueKit.paint(ctx.scene, 'derby_ball_m', '#f7f7f2', 0.45, 0.35); ball.isPickable = false;
       trail = EffectsKit.ballTrail(ctx.scene, ball, '#fff4cf'); trail.stop();
+      // VIS-COURT: the home run's line, the card that rides it, the video board over the wall, the sky show, and the replay's focus (the ball)
+      hrTracer?.dispose(); hrTracer = new ShotTracer(ctx.scene, { color: '#ffe9a8', name: 'fel_decal_tracer_hr' });
+      hrReadout?.dispose(); hrReadout = mountReadout(ctx.scene, 'fel_decal_readout_hr');
+      jumbo?.dispose(); jumbo = buildJumbotron(ctx.scene, { x: -22, y: 13.5, z: 50 }, Math.atan2(-22, 50), 10);
+      shells = new FireworkShow(ctx.scene);
+      focusProxy?.dispose(); focusProxy = new TransformNode('derby_replay_focus', ctx.scene);
+      launchVel = null; cardPending = false; replayWanted = false;
       // #8: the contact cue — a ring around the PCI that closes onto it as the ball comes into the ±0.15 s window and
       // turns green while a swing would connect (the window was invisible; tennis and volleyball draw their bands).
       cueRing = MeshBuilder.CreateTorus('derby_cue', { diameter: 0.62, thickness: 0.035, tessellation: 32 }, ctx.scene);
@@ -1418,6 +1511,7 @@ export const DerbyMode: ModeDefinition = (() => {
       timers.clear(); bannerCh = new BannerChannel(timers, (text) => ctx.setHud({ banner: text }));
       SoundKit.startAmbient('stadium');
       tally = freshDerby(); rivalTarget = 3 + Math.floor(Math.random() * 6);   // a rival round of 3–8 homers
+      jumbo?.show({ title: 'HOME RUN DERBY', board: boardLine(0, 0, OUTS_CAP), card: null, homer: false });   // VIS-COURT
       ctx.setHud({ score: 0 });
       pitch(ctx);
     },
@@ -1442,6 +1536,7 @@ export const DerbyMode: ModeDefinition = (() => {
       if (e.t === 'button' && e.btn === 'A' && e.pressed && (!incoming || swung)) refuse(ctx, swung && incoming ? 'ONE SWING A PITCH' : 'WAIT FOR THE PITCH');
       if (e.t === 'button' && e.btn === 'A' && e.pressed && incoming && !swung) {
         swung = true;
+        stampDecal(ctx.scene, 'scuff', me.root.position.x, me.root.position.z, 0.6, 0.55);   // VIS-COURT: the back foot digs in (cleat scuffs at the plate)
         SoundKit.play('whoosh');
         meAnim.beat(SPORT_CLIP.derbySwing, { fadeSec: 0.06 });
         batSwingSec = 0;   // ANIM-SURGICAL: the bat's line runs on the swing's own clock
@@ -1479,6 +1574,7 @@ export const DerbyMode: ModeDefinition = (() => {
         const side = swingSide(ball.position.z, 0.3, pitchSpeed, 0.3);
         const vx = hitLateral(side, stickX);
         flight.launch(ball.position, new Vector3(vx, (18 * launch * q + 4) * ks.exitMult, (16 + q * 18) * ks.exitMult));
+        launchVel = { x: flight.vel.x, y: flight.vel.y, z: flight.vel.z }; cardPending = true; hrTracer?.start(ball.position); hrReadout?.hide();   // VIS-COURT
         const distPts = Math.round(q * (80 + launch * 60) * (clutch ? CLUTCH_MULT : 1));
         const cross = predictWallCross({ x: flight.vel.x, y: flight.vel.y, z: flight.vel.z }, { x: ball.position.x, y: ball.position.y, z: ball.position.z });
         let rob: Rob = null;
@@ -1497,7 +1593,7 @@ export const DerbyMode: ModeDefinition = (() => {
       timers.tick(dt);   // QA P0-04: the bag runs on this clock — before the ended check: the end itself is a beat
       if (batSwingSec != null) { batSwingSec += dt; if (batSwingSec > BAT_SWING_SEC + BAT_RECOVER_SEC) batSwingSec = null; }
       if (ended) return;
-      if (throwIn > 0) {
+      if (throwIn > 0 && !ctx.camDirector.inIntro) {   // VIS-COURT: the broadcast intro holds the first pitch (the player cannot swing at what they cannot see)
         // the wind-up: the ball leaves the hand on the release key
         throwIn -= dt;
         if (throwIn <= 0 && pendingThrow) { pendingThrow(); pendingThrow = null; }
@@ -1523,6 +1619,15 @@ export const DerbyMode: ModeDefinition = (() => {
       if (hopT >= 0) { hopT += dt; const u = Math.min(1, hopT / 0.45); me.root.position.y = Math.sin(u * Math.PI) * 0.5; if (u >= 1) { hopT = -1; me.root.position.y = 0; } }
       tickFielders(dt); tickToken(ctx, dt);
       const flying = flight.step(dt);
+      // VIS-COURT: the home run's line, the replay's focus, the sky show and the bat's streak ride the same frame
+      if (hrTracer?.active) { hrTracer.push(ball.position); if (!flying) hrTracer.finish(ball.position); }
+      focusProxy?.position.copyFrom(ball.position); shells?.update(dt);
+      batTrail?.drive(dt, batSwingSec != null && batSwingSec <= BAT_SWING_SEC + 0.04);
+      if (cardPending && !flying && launchVel) {   // a ball that stayed in play: the board reads how far it went
+        cardPending = false;
+        const r = exitRead(launchVel, Math.hypot(ball.position.x, ball.position.z) * M_TO_FT);
+        jumbo?.show({ title: 'HOME RUN DERBY', board: boardLine(tally.homers, tally.outs, OUTS_CAP), card: r.lines, homer: false });
+      }
       if (hit && !hit.settled) {   // the wall decides
         const r = Math.hypot(ball.position.x, ball.position.z);
         if (r >= PARK.wallR) { const actual = { bearingDeg: bearingOf(ball.position.x, ball.position.z), h: ball.position.y }; settleHit(ctx, verdictFor(actual, targetHit(actual, TARGETS, targetsHit), hit.rob)); }
@@ -1557,6 +1662,7 @@ export const DerbyMode: ModeDefinition = (() => {
       if (!flying && !incoming && !pending) {
         if (round >= TOTAL) { endDerby(ctx, TOTAL, 0); return; }
         pending = true; trickDone = false;   // #12: the set — the next pitch's warm-up is open from here
+        if (replayWanted) { replayWanted = false; void ctx.highlight?.({ lastSeconds: 3.8, objective: ball.position.clone() }); }   // VIS-COURT: the home run, replayed (the mode's clock — and so this timer — holds while it plays)
         timers.later(() => { pending = false; if (!ended) pitch(ctx); }, 800);
       }
       // During the PITCH the fixed swing camera aims at where the pitch is
@@ -1572,7 +1678,7 @@ export const DerbyMode: ModeDefinition = (() => {
 
     // IMPROVE (2026-10-06, Derby #9): ended = true and every pending timer cleared — the next pitch's setTimeout checked
     // only `!ended`, which dispose never set, so a pitch could be thrown into a torn-down scene.
-    dispose() { ended = true; pending = false; timers.clear(); bannerCh = null; trail?.dispose(); trail = null; cueRing?.dispose(); cueRing = null; cueMat?.dispose(); cueMat = null; tokenMat?.dispose(); tokenMat = null; for (const m of targetMats) m.dispose(true, true); targetMats = []; pci?.dispose(); for (const f of fielders) f.char.dispose(); fielders = []; token?.mesh.dispose(); token = null; targetMeshes.clear(); batPosture?.dispose(); batPosture = null; pitchPosture?.dispose(); pitchPosture = null; derbyVenue?.dispose?.(); derbyVenue = null; gallery?.dispose(); gallery = null; if (batObs) { bat?.getScene().onBeforeRenderObservable.remove(batObs); batObs = null; } batSwingSec = null; bat?.dispose(); bat = null; me?.dispose(); pitcher?.dispose(); furniture.forEach((f) => f.dispose()); ball?.dispose(); SoundKit.stopAmbient(); },
+    dispose() { ended = true; pending = false; timers.clear(); bannerCh = null; batTrail?.dispose(); batTrail = null; batTip?.dispose(); batTip = null; hrTracer?.dispose(); hrTracer = null; hrReadout?.dispose(); hrReadout = null; jumbo?.dispose(); jumbo = null; shells?.clear(); shells = null; focusProxy?.dispose(); focusProxy = null; trail?.dispose(); trail = null; cueRing?.dispose(); cueRing = null; cueMat?.dispose(); cueMat = null; tokenMat?.dispose(); tokenMat = null; for (const m of targetMats) m.dispose(true, true); targetMats = []; pci?.dispose(); for (const f of fielders) f.char.dispose(); fielders = []; token?.mesh.dispose(); token = null; targetMeshes.clear(); batPosture?.dispose(); batPosture = null; pitchPosture?.dispose(); pitchPosture = null; derbyVenue?.dispose?.(); derbyVenue = null; gallery?.dispose(); gallery = null; if (batObs) { bat?.getScene().onBeforeRenderObservable.remove(batObs); batObs = null; } batSwingSec = null; bat?.dispose(); bat = null; me?.dispose(); pitcher?.dispose(); furniture.forEach((f) => f.dispose()); ball?.dispose(); SoundKit.stopAmbient(); },
   };
 })();
 
@@ -1669,6 +1775,20 @@ export const PenaltyMode: ModeDefinition = (() => {
     if (flightSec > 5) pball.stop();
   }
   let goalLatch = false;               // A+ P0 juice: the goal's ONE punch per kick
+  /** VIS-COURT: the net that takes the ball, the flares behind it, the contact ring, the replay's focus (the ball) and its pacing. */
+  let goalNet: GoalNetHandle | null = null, flares: FlareShow | null = null, penRings: ShockRingHandle | null = null, penProxy: TransformNode | null = null;
+  const penPacer = new HighlightPacer();
+  /** VIS-COURT: the moment a kick is decided — the net, the flares, the glove's ring, and (not a deciding kick, not every one) the replay. */
+  function kickFx(ctx: ModeContext, scored: boolean, saved: boolean, deciding: boolean): void {
+    if (scored) { goalNet?.hit(ball.position.x, Math.max(0.2, ball.position.y), Math.min(1, Math.hypot(pball.vel.x, pball.vel.y, pball.vel.z) / 22 + 0.35)); flares?.ignite(); }
+    if (saved) { penRings?.fire({ x: ball.position.x, y: Math.max(0.4, ball.position.y), z: ball.position.z }, { radius: 1.2, color: '#9fe8ff', upright: true, life: 0.5 }); EffectsKit.burst(ctx.scene, ball.position.clone(), 'sparks', 1.6, '#bfeaff'); }
+    if (pacerOffer(scored || saved, deciding)) void ctx.highlight?.({ lastSeconds: 3.6, objective: new Vector3(0, 0, PEN_GOAL.z) });
+  }
+  function pacerOffer(worthy: boolean, deciding: boolean): boolean {
+    const yes = penPacer.offer(worthy, { final: deciding, reduced: !motionPolicy().travel });
+    if (!yes) penPacer.tick();
+    return yes;
+  }
   let phase: 'aim' | 'power' | 'flight' | 'keep' | 'break' = 'aim';
   let keeperTargetX = 0, ended = false;
   // THE KEEPER ROUND (owner decision 2026-09-03): on their kick you are the
@@ -1787,6 +1907,7 @@ export const PenaltyMode: ModeDefinition = (() => {
     pendingKick = () => {
       SoundKit.play('whoosh'); ctx.feel?.impact?.(0.3 + prof.power01 * 0.3);
       keeperDiveSign = keeperTargetX > keeper.root.position.x ? 1 : -1; if (kind !== 'rainbow') { dive(keeperAnim, keeperDiveSign); keeperDove = true; }
+      stampDecal(ctx.scene, 'scuff', from.x, from.z, me.root.rotation.y, 0.8);   // VIS-COURT: the plant foot digs the turf
       pball.launch(new Vector3(from.x, from.y, from.z), vel, spin);
     };
     phase = 'flight';
@@ -1795,7 +1916,8 @@ export const PenaltyMode: ModeDefinition = (() => {
   }
   /** The run: the clock, the body with momentum, the glass, the slide, the rainbow's arc, the ball at the feet, the keeper. */
   function tickBreak(ctx: ModeContext, dt: number): void {
-    brk.clock -= dt; brk.slideCool = Math.max(0, brk.slideCool - dt); brk.keeperCool = Math.max(0, brk.keeperCool - dt);
+    if (!ctx.camDirector.inIntro) brk.clock -= dt;   // VIS-COURT: the broadcast intro holds the shot clock (the player cannot run what they cannot see)
+    brk.slideCool = Math.max(0, brk.slideCool - dt); brk.keeperCool = Math.max(0, brk.keeperCool - dt);
     if (brk.clock <= 0) { pball.stop(); brkStats.clocks++; console.info('[BREAK] clock'); resolveKick(ctx, 'wide', 'CLOCK — NO SHOT'); return; }
     const held = brk.vaultT >= 0;
     if (brk.slideSec >= 0) { brk.slideSec += dt; if (brk.slideSec >= BREAK.slideSec) { brk.slideSec = -1; brk.slideCool = BREAK.slideCool; meAnim.loop(SPORT_CLIP.moveLoop, { fadeSec: 0.2 }); } }
@@ -1902,6 +2024,7 @@ export const PenaltyMode: ModeDefinition = (() => {
     resultBeat.hold(gameT, 1200, () => { if (!ended) startKeeperRound(ctx); });
     phase = 'aim'; brk.on = false; brk.counterLive = false; ctx.setHud({ clock: 0, flow: -1, kinetic: '' }); me.root.position.y = 0;
     betweenKicks = true;   // HOTFIX (2026-09-24): the result beat takes no kick input (onInput)
+    kickFx(ctx, scored, saved, shootoutState(goals, themGoals, round, themKicks).phase === 'decided');   // VIS-COURT: last, so a replay puts every body back as this frame left it
   }
 
   function kickLabel(): string {
@@ -2013,6 +2136,9 @@ export const PenaltyMode: ModeDefinition = (() => {
 
   return {
     modeId: 'soccer', mood: 'nightGame', camPreset: 'court',
+    intro: 'walkIn',   // VIS-COURT: the broadcast intro — a crane over the stadium, then a shot on the kicker; the shot clock waits for it
+    replay: true,      // VIS-COURT: a goal or a save, replayed from the broadcast angles, following the ball
+    replayCast: () => ({ bodies: [penProxy, me?.root, keeper?.root].filter((r): r is TransformNode => !!r), loose: ball ? [ball] : [] }),
 
     async load(ctx: ModeContext) {
       penaltyVenue = mountVenue(ctx, 'penalty', { keepGameplayCamera: true, look: readPlaceLook('penalty') });   // PLACE
@@ -2020,6 +2146,11 @@ export const PenaltyMode: ModeDefinition = (() => {
       EffectsKit.ambient(ctx.scene, 'park');
       furniture = buildGoal(ctx.scene);
       buildGlass(ctx);   // BREAKAWAY: the side glass
+      // VIS-COURT: the net that takes the ball (invisible until struck), the flares in the stand behind it, the contact ring
+      goalNet?.dispose(); goalNet = buildGoalNet(ctx.scene, { halfW: PEN_GOAL.halfW, height: PEN_GOAL.barY, z: PEN_GOAL.z });
+      flares?.dispose(); flares = new FlareShow(ctx.scene, flareSpots(PEN_GOAL.z, PEN_GOAL.halfW, ctx.lights.tier === 'mobile'), ctx.lights.tier !== 'mobile');
+      penRings?.dispose(); penRings = mountShockRings(ctx.scene);
+      penProxy?.dispose(); penProxy = new TransformNode('penalty_replay_focus', ctx.scene);
       // Phase 6: the penalty spot is a real mark under the ball, and the
       // shootout is played in front of a bank of crowd behind the goal —
       // in frame the whole time, because the camera sits behind the kicker.
@@ -2095,6 +2226,12 @@ export const PenaltyMode: ModeDefinition = (() => {
         (ctx.scene.metadata ??= {}).soccer = {   // BREAKAWAY probes
           state: () => ({ phase, clock: brk.clock, flow: brk.flow, wall: brk.wall, counterLive: brk.counterLive, struck: brk.struck, x: me.root.position.x, y: me.root.position.y, z: me.root.position.z, vx: brk.run.vx, vz: brk.run.vz, keeperX: keeper.root.position.x, keeperZ: keeper.root.position.z, keeperSliding: !!brk.keeperSlide, rainbowReady: phase === 'break' && brk.vaultT < 0 && rainbowRead(me2(), vel2(), { x: keeper.root.position.x, z: keeper.root.position.z }), slideSec: brk.slideSec, ...brkStats, goals, themGoals, round, ended, ballActive: pball.active, ballZ: ball.position.z }),
           diveNow: (side: -1 | 1) => { if (phase === 'keep' && keepPlan && keepDiveAt == null) { keepCall = side; keepDiveAt = gameT; dive(meAnim, side); meDove = true; meDiveSign = side; } },
+        };
+      }
+      if (process.env.NODE_ENV === 'development') {   // the capture driver's seam: decide the kick in front of the net, as the flight would
+        (ctx.scene.metadata ??= {}).felCourt = {
+          highlight: (o?: Parameters<NonNullable<ModeContext['highlight']>>[0]) => ctx.highlight?.(o),
+          kick: (outcome: 'goal' | 'saved', x = 1.9, y = 1.1) => { pball.stop(); ball.position.set(x, y, PEN_GOAL.z - 0.1); keeper.root.position.x = outcome === 'saved' ? x - 0.4 : -x; resolveKick(ctx, outcome); },
         };
       }
       nextKick(ctx);
@@ -2182,6 +2319,7 @@ export const PenaltyMode: ModeDefinition = (() => {
             ctx.feel?.impact?.(0.3 + p * 0.3);   // the contact feel, ON the contact (A+ P0 weight unchanged)
             keeperDiveSign = keeperTargetX > 0 ? 1 : -1;
             dive(keeperAnim, keeperDiveSign); keeperDove = true;   // the keeper commits as the boot lands
+            stampDecal(ctx.scene, 'scuff', SPOT.x, SPOT.z, 0, 0.9);   // VIS-COURT: the penalty spot takes the plant foot
             pball.launch(ball.position.clone(), vel, spin);
           };
           ctx.setHud({ power: Math.round(p * 100), kickPower: null, hint: '', kickShape: chip ? 'CHIP' : curl ? `CURL ${curl < 0 ? '◀' : '▶'}` : kickZone(p) });
@@ -2196,6 +2334,7 @@ export const PenaltyMode: ModeDefinition = (() => {
       // IMPROVE (2026-10-06, Penalty #1): the weather runs, as golf's does — the rain follows the camera, a storm flashes and
       // thunders, wet turf soaks, the gusts breathe. (The ball's wind is still WeatherKit.flightWind, the capped base.)
       weather.update(dt); weatherFx?.update(dt);
+      goalNet?.update(dt); flares?.update(dt); if (ball) penProxy?.position.copyFrom(ball.position);   // VIS-COURT
       meter.update(dt);
       syncReticle();
       if (phase === 'power') ctx.setHud({ power: Math.round(meter.value * 100), kickPower: Math.round(meter.value * 100), kickZones: METER_ZONES.map((z) => `${z.to}:${z.label}`).join(','), kickShape: stickY < -0.5 ? 'CHIP' : Math.abs(stickX) > 0.3 ? `CURL ${stickX < 0 ? '◀' : '▶'}` : kickZone(meter.value) });
@@ -2291,6 +2430,7 @@ export const PenaltyMode: ModeDefinition = (() => {
               frameKind = null; flightSec = 0;
               // IMPROVE (2026-10-06, Penalty #5 / #6): the plan's pace (was 0.72 every kick), and the Panenka chipped
               const k = launchKick({ x: SPOT.x, y: 0.11, z: SPOT.z + 0.3 }, { x: plan.aimX, y: Math.max(0.3, plan.aimY) }, plan.power01, { curl: plan.aimX > 1.5 ? 0.4 : plan.aimX < -1.5 ? -0.4 : 0, chip: plan.chip });
+              stampDecal(ctx.scene, 'scuff', SPOT.x, SPOT.z, 0, 0.9);   // VIS-COURT
               pball.launch(ball.position.clone(), k.vel, k.spin);
             };
           }
@@ -2332,6 +2472,7 @@ export const PenaltyMode: ModeDefinition = (() => {
             });
             keepPlan = null;
             resultBeat.hold(gameT, 1300, () => afterTheirKick(ctx));   // IMPROVE (2026-10-06, Penalty #9 / #10): A skips it; dispose clears it
+            kickFx(ctx, theyScore, r.saved, shootoutState(goals, themGoals, round, themKicks).phase === 'decided');   // VIS-COURT: their goal bulges the net too; your save is the star
           }
         }
         // the fixed camera only re-aims inside update(): without this it sat
@@ -2345,6 +2486,6 @@ export const PenaltyMode: ModeDefinition = (() => {
 
     // IMPROVE (2026-10-06, Penalty #10 / #13): ended, and every pending timer cleared — startKeeperRound / afterTheirKick /
     // the rise checked only `!ended`, which dispose never set; and the weather's particles and light restorers go with it.
-    dispose() { ended = true; timers.clear(); resultBeat.cancel(); bannerCh = null; weatherFx?.dispose(); weatherFx = null; strikerPosture?.dispose(); strikerPosture = null; keeperPosture?.dispose(); keeperPosture = null; penaltyVenue?.dispose?.(); penaltyVenue = null; gallery?.dispose(); gallery = null; me?.dispose(); keeper?.dispose(); furniture.forEach((f) => f.dispose()); ball?.dispose(); reticle?.dispose(); SoundKit.stopAmbient(); },
+    dispose() { ended = true; timers.clear(); resultBeat.cancel(); bannerCh = null; goalNet?.dispose(); goalNet = null; flares?.dispose(); flares = null; penRings?.dispose(); penRings = null; penProxy?.dispose(); penProxy = null; weatherFx?.dispose(); weatherFx = null; strikerPosture?.dispose(); strikerPosture = null; keeperPosture?.dispose(); keeperPosture = null; penaltyVenue?.dispose?.(); penaltyVenue = null; gallery?.dispose(); gallery = null; me?.dispose(); keeper?.dispose(); furniture.forEach((f) => f.dispose()); ball?.dispose(); reticle?.dispose(); SoundKit.stopAmbient(); },
   };
 })();
