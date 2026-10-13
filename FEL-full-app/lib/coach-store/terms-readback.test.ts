@@ -183,7 +183,8 @@ afterEach(() => {
 
 describe('STORE-TERMS (h) read-back', () => {
   it('1. termsVersionStatus classifies current / stale / missing and never throws', () => {
-    expect(termsVersionStatus({ terms_version: 'store-terms-2026-10-04' })).toBe('current');
+    expect(termsVersionStatus({ terms_version: 'store-terms-2026-10-12' })).toBe('current');
+    expect(termsVersionStatus({ terms_version: 'store-terms-2026-10-04' })).toBe('stale');
     expect(termsVersionStatus({ terms_version: 'store-terms-2000-01-01' })).toBe('stale');
     for (const m of [{}, { terms_version: '' }, { terms_version: 5 }, null, undefined, 'x', 42]) {
       expect(termsVersionStatus(m)).toBe('missing');

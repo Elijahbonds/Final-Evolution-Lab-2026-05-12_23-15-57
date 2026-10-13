@@ -4,7 +4,9 @@
  * The text is final per the owner's sign-off on 2026-10-07 and carries no draft banner.
  */
 
-import { BUSINESS_CONTACT_EMAIL, BUSINESS_LEGAL_NAME, BUSINESS_MAILING_ADDRESS } from './legal/business';
+import { BUSINESS_CONTACT_EMAIL, BUSINESS_LEGAL_NAME, REAL_MAILING_ADDRESS, isMailingAddressSet } from './legal/business';
+const MAIL_LINE = isMailingAddressSet(REAL_MAILING_ADDRESS) ? `\nMail: ${REAL_MAILING_ADDRESS.trim()}` : '';
+const WRITE_TO = isMailingAddressSet(REAL_MAILING_ADDRESS) ? `, or write to ${BUSINESS_LEGAL_NAME}, ${REAL_MAILING_ADDRESS.trim()}` : '';
 
 // CONTEXT (2026-09-24): bumped from '2026-07-15-draft' with the camera section (Privacy §6). The version is what a
 // signup records as the text it accepted (auth-form → /api/signup → User.policyVersion), so a text change that keeps
@@ -49,7 +51,16 @@ import { BUSINESS_CONTACT_EMAIL, BUSINESS_LEGAL_NAME, BUSINESS_MAILING_ADDRESS }
 // stale "(see §7)" is gone. 2026-10-07-draft is the text without these. A bump re-prompts no one: nothing reads a stored
 // version back, so existing consent records stay as each person accepted them. The draft banners were removed in the
 // same version on the owner's sign-off (Elijah, 3:00 PM PT Oct 7, "yes to privacy").
-export const CURRENT_POLICY_VERSION = '2026-10-07';
+// LEGAL-COPY-2 (2026-10-12; Elijah, 10:07 AM PT Oct 8, yes to LEGAL-COPY-2 defaults, "finish it"): bumped again. Terms §7
+// written (liability cap, exercise risk, governing law, LA County courts, small claims; no arbitration, no class waiver;
+// teen line). FE PM 10:11 AM PT Oct 8: the mailing-address placeholder literal is gone from lib/legal/business.ts; the
+// Mail lines and the privacy "write to" clause print only once REAL_MAILING_ADDRESS is set, and setting it is its own
+// change with its own version bump. 2026-10-07 is the text without these.
+// CREATOR-PLATFORM (PR #18, 2026-10-13; owner decision "Add a privacy-policy line for inquiries"): bumped again, §1 only — one
+// bullet for the Work-with-us inquiry form (name, email and message, with the other fields the form asks for; kept 12 months,
+// then deleted; no IP address). The inquiry table is pending SQL (prisma/pending/2026-10-13-creator-inquiry.sql) and its
+// retention is INQUIRY_RETENTION_DAYS in lib/creator/inquiryStore.ts. 2026-10-12 is the text without this bullet.
+export const CURRENT_POLICY_VERSION = '2026-10-13';
 
 export const TERMS_CONTENT = `
 # Terms of Service
@@ -88,9 +99,31 @@ the Service; harass other users; or violate applicable law.
 
 We may suspend or terminate your account for violations of these Terms.
 
-## 7. Limitation of Liability
+## 7. Limitation of Liability and Disputes
 
-_[To be completed by legal counsel.]_
+**As is.** The Service is provided “as is” and “as available.” We work to keep it running and accurate, but we can’t promise it will always be available, error-free or right for you. To the extent the law allows, we disclaim implied warranties, including merchantability and fitness for a particular purpose.
+
+**Movement and exercise.** The Service includes a movement screen, drills, training plans and games that ask you to move, jump and land. Physical activity can cause injury. You decide whether to do it and how hard to go. Use a safe space, warm up, and stop if anything hurts. Check with a doctor before you start if you have an injury, a health condition or any doubt. Nothing in the Service is medical advice, a diagnosis or treatment, and camera reads are estimates.
+
+**Virtual items.** Lab Credits and other virtual items have no cash value (§3). To the extent the law allows, we aren’t liable for lost progress, scores or virtual items.
+
+**Cap.** To the extent the law allows, our total liability to you for all claims about the Service is limited to the greater of what you paid us in the 12 months before the claim or US$100. For anything bought in the coach store, the store terms’ own limits apply.
+
+**No indirect damages.** To the extent the law allows, we aren’t liable for indirect, incidental, special, consequential or punitive damages, such as lost profits, lost data, lost scholarships or lost opportunities.
+
+**Who this protects.** These limits cover Final Evolution LLC and its owners, coaches and contractors.
+
+**What this doesn’t limit.** None of this limits liability for fraud, willful injury, gross negligence or violation of law, or anything else the law doesn’t allow us to limit. It also doesn’t limit any right you have under California law that can’t be waived.
+
+**Teens.** If you’re 13 to 17, your parent or guardian agrees to this section for you.
+
+**Governing law.** California law governs these Terms, without regard to conflict-of-law rules.
+
+**Talk to us first.** Before filing a claim, email ${BUSINESS_CONTACT_EMAIL} with a short description. We’ll both try in good faith to resolve it within 30 days.
+
+**Where disputes go.** Disputes go to the state or federal courts in Los Angeles County, California. Either side may use small claims court if the claim qualifies.
+
+**Your other options.** Nothing here stops you from contacting a government consumer-protection agency.
 
 ## 8. Changes
 
@@ -99,8 +132,7 @@ We may update these Terms. Continued use after changes constitutes acceptance.
 ## 9. Contact
 
 ${BUSINESS_LEGAL_NAME}
-${BUSINESS_CONTACT_EMAIL}
-Mail: ${BUSINESS_MAILING_ADDRESS}
+${BUSINESS_CONTACT_EMAIL}${MAIL_LINE}
 `;
 
 export const PRIVACY_CONTENT = `
@@ -116,6 +148,7 @@ export const PRIVACY_CONTENT = `
   are stored with every value.
 - **Game session data:** mode, score, duration, win/loss.
 - **Coach chat inputs:** messages sent to the AI coach.
+- **Work-with-us inquiries:** if you send an inquiry through Work with us, we store your name, email and message, with the brand, budget range, dates and what you need that you tell us, only to reply to you. We keep it for 12 months, then delete it. We do not store your IP address.
 
 ## 2. How We Use Your Data
 
@@ -192,13 +225,12 @@ This section covers the Final Evolution coach store: programs, memberships, live
 
 **Teens and children.** The store is for adults. A teen aged 13 to 17 can use a program only when a parent or legal guardian buys it on their own adult account. The teen gets an unlock code, and no teen account is created. For a teen purchase we keep the parent's order, a scrambled (hashed) copy of the code, a scrambled copy of a random device token and the date the code was used. We do not collect the teen's name, age, scores, images or video, and the teen's progress stays on the teen's phone. Children under 13 cannot use the store.
 
-**Your rights.** You can ask to see the store information we hold about you, get a copy of it, correct it or delete it. Email FinalEvolution.us@gmail.com from the email address on your account, or write to Final Evolution LLC, ${BUSINESS_MAILING_ADDRESS}. We may ask you to confirm it is you, and we will answer within 45 days. We will not charge you or treat you differently for asking. Records the law requires us to keep, such as tax records, are kept until that period ends. Stripe keeps its own payment records under its own policy.
+**Your rights.** You can ask to see the store information we hold about you, get a copy of it, correct it or delete it. Email FinalEvolution.us@gmail.com from the email address on your account${WRITE_TO}. We may ask you to confirm it is you, and we will answer within 45 days. We will not charge you or treat you differently for asking. Records the law requires us to keep, such as tax records, are kept until that period ends. Stripe keeps its own payment records under its own policy.
 
 **California residents.** If you live in California, the rights above are yours: to know what we collect and why, to see it, to correct it, to delete it, and not to be treated differently for using these rights. We do not sell or share your personal information, as California law uses those words.
 
 ## 11. Contact
 
 ${BUSINESS_LEGAL_NAME}
-${BUSINESS_CONTACT_EMAIL}
-Mail: ${BUSINESS_MAILING_ADDRESS}
+${BUSINESS_CONTACT_EMAIL}${MAIL_LINE}
 `;

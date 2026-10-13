@@ -1,0 +1,16 @@
+{
+  "_warning": "EXAMPLE PRICES. NOT DECIDED. Elijah sets real prices.",
+  "rows": [
+    { "offerId": "blueprint:ebook", "bookSlug": "blueprint", "format": "ebook", "unitAmountCents": 999, "currency": "usd", "EXAMPLE": true },
+    { "offerId": "blueprint:audiobook", "bookSlug": "blueprint", "format": "audiobook", "unitAmountCents": 1499, "currency": "usd", "EXAMPLE": true },
+    { "offerId": "blueprint:bundle", "bookSlug": "blueprint", "format": "bundle", "unitAmountCents": 1999, "currency": "usd", "EXAMPLE": true },
+    { "offerId": "unfair-advantages:ebook", "bookSlug": "unfair-advantages", "format": "ebook", "unitAmountCents": 999, "currency": "usd", "EXAMPLE": true },
+    { "offerId": "unfair-advantages:audiobook", "bookSlug": "unfair-advantages", "format": "audiobook", "unitAmountCents": 1499, "currency": "usd", "EXAMPLE": true },
+    { "offerId": "unfair-advantages:bundle", "bookSlug": "unfair-advantages", "format": "bundle", "unitAmountCents": 1999, "currency": "usd", "EXAMPLE": true },
+    { "offerId": "building-in-the-loop:audiobook", "bookSlug": "building-in-the-loop", "format": "audiobook", "unitAmountCents": 1499, "currency": "usd", "EXAMPLE": true },
+    { "offerId": "architecture-of-raising-humans:audiobook", "bookSlug": "architecture-of-raising-humans", "format": "audiobook", "unitAmountCents": 1499, "currency": "usd", "EXAMPLE": true },
+    { "offerId": "vibe-coders-handbook:audiobook", "bookSlug": "vibe-coders-handbook", "format": "audiobook", "unitAmountCents": 1499, "currency": "usd", "EXAMPLE": true },
+    { "offerId": "neuro-mechanic-playbook:audiobook", "bookSlug": "neuro-mechanic-playbook", "format": "audiobook", "unitAmountCents": 1499, "currency": "usd", "EXAMPLE": true },
+    { "offerId": "art-of-dunking:audiobook", "bookSlug": "art-of-dunking", "format": "audiobook", "unitAmountCents": 1499, "currency": "usd", "EXAMPLE": true }
+  ]
+}
