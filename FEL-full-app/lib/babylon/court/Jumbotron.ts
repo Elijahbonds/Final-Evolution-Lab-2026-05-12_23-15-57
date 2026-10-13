@@ -49,7 +49,7 @@ export function paintJumbotron(g: CanvasRenderingContext2D, s: JumboState): void
 export function buildJumbotron(scene: Scene, at: { x: number; y: number; z: number }, yaw: number, width = 9): JumbotronHandle {
   const tex = makeTexture(scene, 'court_jumbotron_tex', JUMBO_W, JUMBO_H);
   const mat = new StandardMaterial('court_jumbotron_m', scene);
-  mat.disableLighting = true; mat.diffuseColor = Color3.Black(); mat.specularColor = Color3.Black(); mat.emissiveColor = Color3.White().scale(0.9); if (tex) mat.emissiveTexture = tex;
+  mat.disableLighting = true; mat.fogEnabled = false; mat.diffuseColor = Color3.Black(); mat.specularColor = Color3.Black(); mat.emissiveColor = Color3.White().scale(0.9); if (tex) mat.emissiveTexture = tex;
   const h = width * JUMBO_H / JUMBO_W;
   const screen = MeshBuilder.CreatePlane('court_jumbotron_screen', { width, height: h }, scene);
   screen.position.set(at.x, at.y, at.z); screen.rotation.y = yaw; screen.material = mat; screen.isPickable = false; screen.receiveShadows = false;

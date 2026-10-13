@@ -23,7 +23,7 @@ describe('the broadcast opt-ins', () => {
     expect(net).toMatch(/intro: 'walkIn'/); expect(net).toMatch(/replay: true/); expect(net).toMatch(/replayCast:/);
     expect(golf).toMatch(/intro: 'establish'/); expect(golf).toMatch(/replay: true/); expect(golf).toMatch(/replayCast:/);
     expect(derby).toMatch(/intro: 'walkIn'/); expect(derby).toMatch(/replay: true/); expect(derby).toMatch(/replayCast:/);
-    expect(pen).toMatch(/intro: 'walkIn'/); expect(pen).toMatch(/replay: true/); expect(pen).toMatch(/replayCast:/);
+    expect(pen).not.toMatch(/\n\s+intro: '/); expect(pen).toMatch(/replay: true/); expect(pen).toMatch(/replayCast:/);
     expect(fb).toMatch(/intro: 'walkIn'/); expect(fb).toMatch(/replay: true/);   // football's own, from the foundation
   });
   it('the harness reads the cast only for a mode that asked for replays, once, after load', () => {

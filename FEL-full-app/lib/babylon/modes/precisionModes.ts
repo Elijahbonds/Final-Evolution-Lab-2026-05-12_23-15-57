@@ -2134,7 +2134,8 @@ export const PenaltyMode: ModeDefinition = (() => {
 
   return {
     modeId: 'soccer', mood: 'nightGame', camPreset: 'court',
-    intro: 'walkIn',   // VIS-COURT: the broadcast intro — a crane over the stadium, then a shot on the kicker; the shot clock waits for it
+    // VIS-COURT: no broadcast intro here (measured): the crane over this venue's scan passes through its red drape and shows the
+    // shell's rim (wave 3: a per-venue crane). The shot clock still waits on camDirector.inIntro, should one be set.
     replay: true,      // VIS-COURT: a goal or a save, replayed from the broadcast angles, following the ball
     replayCast: () => ({ bodies: [penProxy, me?.root, keeper?.root].filter((r): r is TransformNode => !!r), loose: ball ? [ball] : [] }),
 
