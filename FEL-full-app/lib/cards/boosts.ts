@@ -45,6 +45,7 @@ export interface BoostCard {
   id: string;
   creator: string;
   title: string;
+  /** CARD-SAFE-2 (Cyber): describes the frame only. Never a performance, data or stat promise. */
   blurb: string;
   costShards: number;
   accent: string;
@@ -57,37 +58,37 @@ export interface BoostCard {
 export const BOOST_CARDS: BoostCard[] = [
   {
     id: 'bonds-bounce', creator: 'Elijah Bonds', title: 'Bonds Bounce Blueprint',
-    blurb: 'The vertical jump architecture.', costShards: 750, accent: '#F27D26',
+    blurb: 'Cosmetic card frame in orange, with a link to Elijah Bonds on Instagram.', costShards: 750, accent: '#F27D26',
     tagline: 'Invented the kick-up on a trampoline. Landed it on a ten-foot rim.',
     links: [{ type: 'instagram', label: 'Instagram', url: 'https://www.instagram.com/elijahbonds/' }],
   },
   {
     id: 'amir-signature', creator: 'Amir Smith', title: 'Amir Smith Signature',
-    blurb: 'Signature handle and finish package.', costShards: 800, accent: '#00E5FF',
+    blurb: 'Cosmetic card frame in cyan, named for Amir Smith.', costShards: 800, accent: '#00E5FF',
     tagline: 'The handle is the whole move. The finish is just the receipt.',
     links: [],
   },
   {
     id: 'flight-lab-pro', creator: 'Flight Lab', title: 'Flight Lab Pro Card',
-    blurb: 'Contest-grade hang and body control.', costShards: 600, accent: '#A855F7',
+    blurb: 'Cosmetic card frame in purple, named for Flight Lab.', costShards: 600, accent: '#A855F7',
     tagline: 'Everything above the rim is practice for everything below it.',
     links: [],
   },
   {
     id: 'coach-v-elite', creator: 'Coach V', title: 'Coach V Elite Card',
-    blurb: "Coach V's elite movement data.", costShards: 500, accent: '#FFD700',
+    blurb: 'Cosmetic card frame in gold, named for Coach V.', costShards: 500, accent: '#FFD700',
     tagline: 'Assess, correct, load, perform. In that order, every time.',
     links: [],
   },
   {
     id: 'neural-max', creator: 'Neural Max', title: 'Neural Max Override',
-    blurb: 'Reaction and drive, tuned up.', costShards: 400, accent: '#00FF9D',
+    blurb: 'Cosmetic card frame in green, named for Neural Max.', costShards: 400, accent: '#00FF9D',
     tagline: 'The gap between seeing it and doing it is the only gap that matters.',
     links: [],
   },
   {
     id: 'directors-cut', creator: 'Director Stella', title: "Director's Cut Monologue",
-    blurb: 'Performance package for the Read.', costShards: 550, accent: '#FF3366',
+    blurb: 'Cosmetic card frame in pink, with a link to Director Stella on IMDb.', costShards: 550, accent: '#FF3366',
     tagline: 'Play the beat, not the line.',
     links: [{ type: 'imdb', label: 'IMDb', url: 'https://www.imdb.com/' }],
   },

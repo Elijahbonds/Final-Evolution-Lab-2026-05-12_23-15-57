@@ -74,6 +74,16 @@ describe('cosmetic only (CARD-SAFE-2)', () => {
     }
   });
 
+  it('blurbs describe the frame only, and the store never calls them boost cards (Cyber, CARD-SAFE-2)', () => {
+    for (const c of BOOST_CARDS) {
+      expect(c.blurb).toMatch(/^Cosmetic card frame/);
+      expect(c.blurb).not.toMatch(/vertical|jump|data|performance|drive|tuned|handle|hang|body control|elite|package/i);
+    }
+    const store = readFileSync('components/wallet/coin-store.tsx', 'utf8');
+    expect(store).toContain("what: 'Creator cards'");
+    expect(store).not.toMatch(/boost cards/i);
+  });
+
   it('rejects a stat-bearing card', () => {
     expect(() => assertCosmeticCard({ id: 'x', boost: { prq: 10 } })).toThrow(/stat_modifier_rejected: boost/);
     expect(() => assertCosmeticCard({ id: 'x', prq: 5, vertical: 3 })).toThrow(/prq,vertical/);
