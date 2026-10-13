@@ -79,11 +79,14 @@ export async function upsertMyCard(db: Db, userId: string, userName: string | nu
   if (input.highlights !== undefined) extra.highlights = input.highlights;
 
   if (existing) {
+    // CARD-SAFE-1: an update never publishes, and a card that is public while its owner is not a verified adult
+    // (from User.dobYear only) is taken down on the next write.
+    const takeDown = existing.published && !(await canPublishCard(db, userId)) ? { published: false } : {};
     return db.creatorCard.update({
       where: { id: existing.id },
       data: {
         displayName, tagline: tagline || null, signatureMove: signatureMove || null,
-        mode, accent, avatarUrl, ...extra,
+        mode, accent, avatarUrl, ...extra, ...takeDown,
         prq: stats.prq, topScore: stats.topScore, wins: stats.wins, rarity,
       },
     });
