@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import { VerifyCheckoutSession } from '@/components/stripe/verify-checkout-session';
+import { reviewHref, reviewStudioOpen } from '@/lib/coach-store/reviewLink';
 
 export function ThanksPoll({ rowId, sessionId }: { rowId: string; sessionId?: string | null }) {
   const [status, setStatus] = useState('waiting');
   const [programOpen, setProgramOpen] = useState(false);
   const [isAccess, setIsAccess] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
   const [code, setCode] = useState<string | null>(null);
   const [ics, setIcs] = useState<string | null>(null);
   // STORE-READY B6: the verify call says refund_due, or the polled row is REFUND_DUE — either shows the same line.
@@ -27,6 +29,8 @@ export function ThanksPoll({ rowId, sessionId }: { rowId: string; sessionId?: st
         setProgramOpen(json.programOpen === true);
       }
       if (typeof json.ics === 'string') setIcs(json.ics);
+      // A paid video review sends the buyer on to upload clips; until paid, no link.
+      setReviewOpen(typeof json.kind === 'string' && typeof json.status === 'string' && reviewStudioOpen({ kind: json.kind, status: json.status }));
     };
     tick();
     const id = setInterval(tick, 2000);
@@ -57,6 +61,7 @@ export function ThanksPoll({ rowId, sessionId }: { rowId: string; sessionId?: st
       {code ? <p className="mt-4 text-sm">Teen code (shown once here): {code}. Progress stays on the phone that redeems it.</p> : null}
       {/* STORE-READY B4: only an open program access row links to the player; unpaid/expired/refunded rows do not. */}
       {isAccess && programOpen ? <a className="mt-4 block text-sm underline" href={`/program/${rowId}`}>Open your program</a> : null}
+      {reviewOpen ? <a className="mt-4 block text-sm underline" href={reviewHref(rowId)}>Upload your clips</a> : null}
       <a className="mt-4 inline-block text-sm underline" href={`/api/coach-store/receipt/${rowId}`}>Download receipt</a>
       {ics ? <button type="button" className="mt-3 block text-sm underline" onClick={downloadIcs}>Add to calendar</button> : null}
     </div>
