@@ -62,7 +62,7 @@ export function hudColor(tone: HudTone, alpha = 1): string {
 }
 
 /** Text alphas for the body colour: secondary and tertiary reads (labels, units, the "·" between). */
-export const HUD_TEXT_ALPHA = { muted: 0.78, faint: 0.55 } as const;
+export const HUD_TEXT_ALPHA = { muted: 0.8, faint: 0.62 } as const;
 
 /** The plate every HUD readout sits on: dark glass, a hairline edge, legible over snow, sun and floodlit grass. */
 export const HUD_PLATE = {

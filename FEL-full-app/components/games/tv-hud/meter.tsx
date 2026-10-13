@@ -15,7 +15,7 @@ export interface MeterTick { at: number; major?: boolean; label?: ReactNode; lab
 export interface MeterMarker { at: number; tone?: HudTone; width?: number; glow?: boolean; label?: ReactNode; labelTone?: HudTone; labelSize?: HudSize }
 
 /** The thicknesses the hosts used (design px): a hairline gauge, the common bar, a thick bar, and the swing meters. */
-export const METER_HEIGHT = { thin: 6, bar: 8, thick: 10, tall: 24, swing: 28 } as const;
+export const METER_HEIGHT = { thin: 6, bar: 8, thick: 10, strip: 16, tall: 24, swing: 28 } as const;
 export type MeterHeight = keyof typeof METER_HEIGHT;
 
 const pc = (f: number) => `${Math.round(clamp01(f) * 10000) / 100}%`;
