@@ -87,7 +87,6 @@ export function CampPaywall({ body }: { body: CampPaywallBody }) {
       <p className="flex items-center gap-2 text-sm font-bold text-amber-200"><Lock className="h-4 w-4" /> {body.feature ?? 'Camp'} is part of FEL Coach</p>
       {body.message && <p className="mt-2 text-sm text-white/80">{body.message}</p>}
       {body.free && <p className="mt-2 text-xs text-white/60">{body.free}</p>}
-      <span className="mt-4 inline-flex rounded-lg border border-amber-300/40 px-3 py-1.5 text-xs font-bold text-amber-200">FEL Coach · coming soon</span>
     </section>
   );
 }

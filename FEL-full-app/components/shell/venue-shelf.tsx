@@ -14,7 +14,7 @@ import { useEffect, useState } from 'react';
 import type React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Lock, Play } from 'lucide-react';
+import { Play } from 'lucide-react';
 import { VENUES } from '@/lib/game-data';
 import { venueCardModes } from '@/lib/venueModes';
 import { modeKeyForHref } from '@/lib/mode-routes';
@@ -32,8 +32,8 @@ export function VenueShelf({ heading = 'Venues' }: { heading?: string | null } =
     return () => { live = false; };
   }, []);
 
+  // NP-1: only playable venues are shown; unbuilt ones are hidden, never labelled.
   const live = VENUES.filter((v) => v.playable).length;
-  const soon = VENUES.length - live;
 
   return (
     <section className={heading ? 'mt-12' : ''}>
@@ -41,17 +41,17 @@ export function VenueShelf({ heading = 'Venues' }: { heading?: string | null } =
         <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="fel-heading text-[19px] font-bold text-white">{heading}</h2>
           <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-white/30">
-            {live} live{soon > 0 && ` · ${soon} coming`}
+            {live} live
           </span>
         </div>
       ) : (
         <p className="mb-4 font-mono text-[10px] uppercase tracking-[0.16em] text-white/30">
-          {live} live{soon > 0 && ` · ${soon} coming`}
+          {live} live
         </p>
       )}
 
       <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {VENUES.map((venue, i) => {
+        {VENUES.filter((v) => v.playable).map((venue, i) => {
           const key = modeKeyForHref(venue.href);
           const tier = key ? mastery[key]?.tierIndex ?? 0 : 0;
           const card = (
@@ -79,14 +79,6 @@ export function VenueShelf({ heading = 'Venues' }: { heading?: string | null } =
                   </div>
                 )}
                 <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-[#050505]/20 to-transparent" />
-                {!venue.playable && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/55 backdrop-blur-[2px]">
-                    <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-black/60 px-2.5 py-1.5
-                                     font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-white/60">
-                      <Lock className="h-3 w-3" /> Coming soon
-                    </span>
-                  </div>
-                )}
                 {venue.playable && (
                   <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-md bg-black/70 px-2 py-0.5
                                    font-mono text-[9.5px] font-bold uppercase tracking-[0.12em] text-[#00FF9D] ring-1 ring-[#00FF9D]/40">

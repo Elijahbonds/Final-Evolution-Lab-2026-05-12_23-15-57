@@ -51,6 +51,8 @@ export default async function CoachStorePage({ params }: { params: { slug: strin
           {cards.map(({ listing, manifest }) => {
             const soon = manifest.kind === 'program' && manifest.lane !== 'dunking';
             const reviewClosed = manifest.kind === 'video_review' && !reviewsCanBeSold();
+            // NP-1: an unbuilt or closed listing is hidden, never labelled.
+            if (soon || reviewClosed) return null;
             const href = manifest.kind === 'program'
               ? `/coach/${instructor.slug}/programs/${manifest.lane}`
               : `/coach/${instructor.slug}/book/${listing.id}`;
@@ -59,9 +61,7 @@ export default async function CoachStorePage({ params }: { params: { slug: strin
                 <h2 className="font-bold">{listing.title}</h2>
                 <p className="text-sm text-white/60">{listing.description}</p>
                 <p className="mt-2 text-sm font-bold">{listingPriceLabel(listing.priceUsd, manifest)}</p>
-                {soon || reviewClosed ? <p className="mt-2 text-sm">Coming soon</p> : (
-                  <Link href={href} className="mt-3 inline-block rounded-xl bg-cyan-300 px-3 py-2 text-sm font-bold text-black">View</Link>
-                )}
+                <Link href={href} className="mt-3 inline-block rounded-xl bg-cyan-300 px-3 py-2 text-sm font-bold text-black">View</Link>
               </li>
             );
           })}

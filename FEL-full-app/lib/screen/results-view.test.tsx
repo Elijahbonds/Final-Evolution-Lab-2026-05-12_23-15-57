@@ -199,7 +199,9 @@ describe('item 4 and L5 (retest 1): 18 or older get EXACTLY ONE next step, the K
   it('Build my Dunk Program appears only when the lane is given a dunk href', () => {
     const plain = renderToStaticMarkup(createElement(LaneBody, { lane: 'dunking', s: FLAGGED }));
     expect(plain).not.toContain('Build my Dunk Program');
-    expect(plain).toContain('data-coming-soon');
+    // NP-1: no "coming soon" block in its place.
+    expect(plain).not.toContain('data-coming-soon');
+    expect(text(plain)).not.toMatch(/coming soon/i);
     const linked = renderToStaticMarkup(createElement(LaneBody, { lane: 'dunking', s: FLAGGED, dunkHref: '/coach/elijah/programs/dunking' }));
     expect(linked).toContain('Build my Dunk Program');
     const other = renderToStaticMarkup(createElement(LaneBody, { lane: 'posture', s: FLAGGED, dunkHref: '/coach/elijah/programs/dunking' }));
@@ -298,19 +300,21 @@ describe('the lane page (A3-4, A4-3; S-7, S-9, Cyber 3)', () => {
   const view = (age: AgeBand | null, s: ScreenSummary | null = FLAGGED) =>
     renderToStaticMarkup(createElement(ProgramLaneView, { lane: 'correctives', state: { s, age } }));
 
-  it('in order: the lane header card, the top flag line, the drill marked "Early version", "coming soon", then Back', () => {
+  // NP-1: was '... the drill marked "Early version", "coming soon", then Back'. The "coming soon" block is gone.
+  it('in order: the lane header card, the top flag line, the drill marked "Early version", then Back; no "coming soon"', () => {
     const h = lane(FLAGGED);
     const at = (s: string) => h.indexOf(s);
     expect(at('data-lane-header')).toBeGreaterThan(0);
     expect(at('data-lane-header')).toBeLessThan(at('data-top-flag'));
     expect(at('data-top-flag')).toBeLessThan(at('data-sample-drill'));
-    expect(at('data-sample-drill')).toBeLessThan(at('data-coming-soon'));
-    expect(at('data-coming-soon')).toBeLessThan(at('data-back-to-results'));
+    expect(at('data-sample-drill')).toBeLessThan(at('data-back-to-results'));
+    expect(h).not.toContain('data-coming-soon');
     const t = text(h);
     expect(t).toContain('Your top flag: knees cave in (overhead squat), so start with Correctives.');
     expect(t).toContain('Band lateral walks, clamshells, goblet squat with knees pushed out');
     expect(h.slice(at('data-sample-drill')).split('</section>')[0]).toContain(EARLY_VERSION);
-    expect(t).toContain(PROGRAM_COMING);
+    expect(t).not.toContain(PROGRAM_COMING);
+    expect(t).not.toMatch(/coming soon/i);
     expect(t).toContain('Back to my results');
     expect(h).toMatch(/href="\/play\/mirror\/assess\/results"/);
     expect(t).not.toMatch(/PROPOSED|preview/i);

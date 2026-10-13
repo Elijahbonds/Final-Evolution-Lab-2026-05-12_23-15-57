@@ -23,11 +23,13 @@ describe('B2 book-form: 409 store_closed is a friendly "Checkout opens soon." no
     expect(src).toContain("return 'store_closed'");
   });
 
-  it('the closed branch sets the neutral "Checkout opens soon." notice, not the red error (source)', () => {
-    expect(src).toContain("else if (outcome === 'store_closed') setClosedNotice('Checkout opens soon.')");
+  // NP-1 (Elijah rule): was "Checkout opens soon." — no "soon" text; the notice says plainly that booking is unavailable.
+  it('the closed branch sets the neutral "Booking is not available right now." notice, not the red error (source)', () => {
+    expect(src).toContain("else if (outcome === 'store_closed') setClosedNotice('Booking is not available right now.')");
+    expect(src).not.toMatch(/opens soon|coming soon/i);
     // The notice renders in a neutral <p role="status">, NOT the red error class and NOT the error state.
     expect(src).toMatch(/closedNotice \? \([\s\S]*?role="status"[\s\S]*?\{closedNotice\}/);
-    expect(src).toContain('Checkout opens soon.');
+    expect(src).toContain('Booking is not available right now.');
     // The red error paragraph is only for the real error branch.
     expect(src).toContain('error ? <p className="text-sm text-red-300">{error}</p> : null');
   });

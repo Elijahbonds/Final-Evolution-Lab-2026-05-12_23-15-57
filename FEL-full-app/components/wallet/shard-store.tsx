@@ -24,7 +24,7 @@ export function ShardStore() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [balance, setBalance] = useState<number | null>(null);
   // ARENA-10PHASE P10: no STRIPE key means no checkout, and the buttons say so up front instead of a live "Buy" that toasts
-  // "coming soon" after the click. FEATURES-UX-SHOP: the flag AND the copy come from lib/wallet/purchases.ts — the same words
+  // a placeholder after the click. FEATURES-UX-SHOP: the flag AND the copy come from lib/wallet/purchases.ts — the same words
   // the coin store, the wallet page and the header chip use.
   const purchasesEnabled = usePurchasesEnabled();
   const copy = shardSaleCopy(purchasesEnabled);
@@ -81,7 +81,7 @@ export function ShardStore() {
         body: JSON.stringify({ pack_id: pack.id }),
       });
       if (r.status === 503) {
-        toast('Purchases coming soon', { description: 'The shard store is not open just yet. Check back shortly.' });
+        toast('Purchases are not available', { description: 'Shards are earned in play.' });
         return;
       }
       if (r.status === 401) {
@@ -121,6 +121,8 @@ export function ShardStore() {
         </div>
       </div>
 
+      {/* NP-1: the packs are hidden while real-money checkout is off (never labelled). */}
+      {purchasesEnabled !== false && (
       <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
         {SHARD_PACKS.map((pack) => {
           const total = shardPackTotal(pack);
@@ -150,7 +152,7 @@ export function ShardStore() {
                 <span className="text-lg font-bold text-white">{usd(pack.usdCents)}</span>
                 <button
                   onClick={() => buy(pack)}
-                  disabled={busy || purchasesEnabled === false}
+                  disabled={busy}
                   className="inline-flex items-center gap-2 rounded-lg bg-[#C79BFF] px-4 py-2 text-sm font-bold text-[#0a0416] transition hover:bg-[#d6b3ff] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Gem className="h-4 w-4" />}
@@ -161,6 +163,7 @@ export function ShardStore() {
           );
         })}
       </div>
+      )}
 
       {/* Age gate + refund policy (required store copy). */}
       <div className="mt-8 space-y-3 rounded-2xl border border-white/10 bg-white/[0.02] p-5 text-xs leading-relaxed text-white/50">

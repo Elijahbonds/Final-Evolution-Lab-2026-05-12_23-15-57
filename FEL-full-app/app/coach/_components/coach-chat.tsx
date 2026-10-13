@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Send, Loader2, Sparkles, RotateCcw } from 'lucide-react';
 import { AiDisclosure } from '@/components/ai-disclosure';
-import { AiComingSoon } from '@/components/ai-coming-soon';
 import { isComingSoonResponse } from '@/lib/abacus/aiStatus';
 import { useAiStatus } from '@/lib/abacus/useAiStatus';
 // COACH-AI Phase 8 (2026-10-07): the reply is read line by line across chunks (plan item #11), only the last turns
@@ -143,13 +142,8 @@ export function CoachChat() {
     );
   }
 
-  if (ai === 'coming_soon') {
-    return (
-      <div className="flex flex-col h-[calc(100vh-220px)] min-h-[400px]">
-        <AiComingSoon feature="coach" className="h-full" />
-      </div>
-    );
-  }
+  // NP-1: while the AI coach is off, nothing is shown (hidden, never labelled).
+  if (ai === 'coming_soon') return null;
 
   return (
     <div className="flex flex-col h-[calc(100vh-220px)] min-h-[400px]">

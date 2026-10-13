@@ -36,7 +36,6 @@ import {
 } from 'lucide-react';
 import hljs from 'highlight.js/lib/common';
 import { AiDisclosure } from '@/components/ai-disclosure';
-import { AiComingSoon } from '@/components/ai-coming-soon';
 import { isComingSoonResponse } from '@/lib/abacus/aiStatus';
 import { useAiStatus } from '@/lib/abacus/useAiStatus';
 
@@ -266,9 +265,8 @@ export function StudioShell() {
   if (ai === 'available') return <StudioWorkspace onComingSoon={markComingSoon} />;
   return (
     <div className="flex h-screen items-center justify-center bg-[#050505] text-white">
-      {ai === 'coming_soon' ? (
-        <AiComingSoon feature="studio" />
-      ) : (
+      {/* NP-1: while the Studio AI is off, nothing is shown (hidden, never labelled). */}
+      {ai === 'coming_soon' ? null : (
         <Loader2 className="h-6 w-6 animate-spin text-white/40" aria-label="Loading" />
       )}
     </div>

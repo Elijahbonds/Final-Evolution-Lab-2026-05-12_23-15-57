@@ -1,8 +1,8 @@
 /**
  * lib/wallet/purchases.ts — ONE truth for "can real money be spent here?".
  *
- * FEATURES-UX-SHOP (2026-09-08): /store said "shard packs are sold separately" while /shop/shards showed COMING SOON
- * with every Buy disabled — two pages reading two different truths. Every surface that mentions buying coins or
+ * FEATURES-UX-SHOP (2026-09-08): /store said "shard packs are sold separately" while /shop/shards showed a disabled
+ * placeholder on every Buy — two pages reading two different truths. Every surface that mentions buying coins or
  * shards now derives its copy from the same flag (Stripe configured or not) through the helpers below, so the copy
  * can only flip when the flag flips. Pure: no React, no network — unit-tested in purchases.test.ts.
  */
@@ -56,12 +56,13 @@ export function shardSaleCopy(enabled: PurchasesState): ShardSaleCopy {
   }
   if (enabled === false) {
     return {
-      coinStoreShards: 'Top up coins, spend on unlocks. Shard packs are not on sale yet — shards are earned in play (see the Shard Store).',
-      shardStoreIntro: `${SHARD_ROLE} Shard packs are not on sale yet: for now shards are earned in play and by converting coins in your wallet.`,
-      walletShardButton: 'Shard Store · coming soon',
-      chipShardsTitle: 'Shards — premium currency, earned in play (shard packs coming soon)',
-      badge: 'Coming soon',
-      shardBuyLabel: 'Coming soon',
+      // NP-1: while real-money packs are off they are hidden, never given a placeholder label.
+      coinStoreShards: 'Top up coins, spend on unlocks. Shards are earned in play (see the Shard Store).',
+      shardStoreIntro: `${SHARD_ROLE} Shards are earned in play and by converting coins in your wallet.`,
+      walletShardButton: 'Shard Store',
+      chipShardsTitle: 'Shards — premium currency, earned in play',
+      badge: '',
+      shardBuyLabel: '', // never shown: the packs are hidden while purchases are off
     };
   }
   return {

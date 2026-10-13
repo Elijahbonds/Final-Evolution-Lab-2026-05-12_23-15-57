@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { MessageSquare, BookOpen, Video, CalendarCheck, Users, Send } from 'lucide-react';
 import { CoachChat } from './coach-chat';
+import { useAiStatus } from '@/lib/abacus/useAiStatus';
 import { ExerciseCatalogue } from './exercise-catalogue';
 import { FormFeedback } from './form-feedback';
 import { TodayView } from './today-view';
@@ -34,7 +35,10 @@ export function CoachView() {
   // the compose screen's live preview must stamp the same "· Certified" the server will, so the identity
   // comes from the server rather than being assembled in the browser
   useEffect(() => { fetch('/api/share/me').then((r) => r.ok ? r.json() : null).then((j) => j && setMe(j)).catch(() => {}); }, []);
-  const tabs = TABS.filter((t) => !COACH_ONLY.includes(t.key) || coach);
+  // NP-1: the Coach (AI chat) tab only exists while the AI coach is available; otherwise it is removed, not labelled.
+  const [coachAi] = useAiStatus('coach');
+  const chatOn = coachAi === 'available';
+  const tabs = TABS.filter((t) => (!COACH_ONLY.includes(t.key) || coach) && (t.key !== 'chat' || chatOn));
 
   return (
     <main className="mx-auto max-w-[900px] px-4 py-4">
@@ -69,7 +73,7 @@ export function CoachView() {
       {tab === 'send' && (me
         ? <SendView me={me} />
         : <div className="py-16 text-center text-sm text-white/40">Loading your details…</div>)}
-      {tab === 'chat' && <CoachChat />}
+      {tab === 'chat' && chatOn && <CoachChat />}
       {/* MIRROR-COACH P2: a coach's Exercises tab also holds their prescribable catalogue + "Add to my catalogue" */}
       {tab === 'catalogue' && <ExerciseCatalogue coach={coach} />}
       {tab === 'form' && <FormFeedback />}

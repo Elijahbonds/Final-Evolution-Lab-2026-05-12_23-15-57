@@ -49,7 +49,7 @@ export function BookForm({
   const authOrMessage = (res: Response, json: { error?: string; message?: string }): 'sign_in' | 'adults_only' | 'store_closed' | string => {
     if (res.status === 401 || json.error === 'unauthorized') return 'sign_in';
     if (res.status === 403 && json.error === 'adults_only') return 'adults_only';
-    // STORE-READY B2: a closed store is a friendly "Checkout opens soon." notice, never the red error text.
+    // STORE-READY B2: a closed store is a neutral notice (NP-1: "Booking is not available right now.", no "soon" text), never the red error text.
     if (res.status === 409 && json.error === 'store_closed') return 'store_closed';
     return json.message || json.error || 'Could not start checkout';
   };
@@ -93,7 +93,7 @@ export function BookForm({
       if (res.status === 409 && json.error === 'terms_required') { setTermsNotice(termsNoticeFor(json)); return; }
       const outcome = authOrMessage(res, json);
       if (outcome === 'sign_in' || outcome === 'adults_only') setAuthError(outcome);
-      else if (outcome === 'store_closed') setClosedNotice('Checkout opens soon.');
+      else if (outcome === 'store_closed') setClosedNotice('Booking is not available right now.');
       else setError(outcome);
       return;
     }

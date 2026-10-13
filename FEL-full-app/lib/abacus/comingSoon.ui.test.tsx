@@ -34,11 +34,11 @@ const starters = (tree: any) =>
   findAll(tree, (el) => el.type === 'button' && el.props['data-test-ignore'] === 'sends-chat-message');
 
 describe('the Coach tab', () => {
-  it('coming_soon: renders the coming-soon panel instead of the chat, and requests nothing', () => {
+  it('coming_soon: the chat is hidden (renders nothing, no placeholder label) and requests nothing', () => {
     ai.state = 'coming_soon';
     const html = renderToStaticMarkup(createElement(CoachChat));
-    expect(html).toContain('data-ai-coming-soon="coach"');
-    expect(html).toContain(AI_COMING_SOON_MESSAGE.coach);
+    expect(html).toBe('');
+    expect(html).not.toMatch(/coming soon/i);
     expect(html).not.toContain('Ask Coach Bonds anything');
     expect(html).not.toContain('<textarea');
     expect(fetchSpy).not.toHaveBeenCalled();
@@ -66,11 +66,11 @@ describe('the Coach tab', () => {
 });
 
 describe('the Studio', () => {
-  it('coming_soon: only the panel renders; the workspace (and its project fetches) never mounts', () => {
+  it('coming_soon: nothing renders (no placeholder label); the workspace (and its project fetches) never mounts', () => {
     ai.state = 'coming_soon';
     const html = renderToStaticMarkup(createElement(StudioShell));
-    expect(html).toContain('data-ai-coming-soon="studio"');
-    expect(html).toContain('coming soon');
+    expect(html).not.toContain('data-ai-coming-soon');
+    expect(html).not.toMatch(/coming soon/i);
     expect(html).not.toContain('NEXUS STUDIO');
     expect(html).not.toContain('<textarea');
     expect(fetchSpy).not.toHaveBeenCalled();
