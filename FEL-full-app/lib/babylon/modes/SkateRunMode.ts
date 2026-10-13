@@ -64,6 +64,11 @@ import { Onlookers } from '../visual/Onlookers';
 import { SoundKit } from '../audio/SoundKit';
 import { refuse } from '../core/Refusal';
 import { EffectsKit } from '../visual/EffectsKit';
+import { ReplayGate } from './boardMoments';   // vis-board (wave 2): which moment earns the replay
+import { CarveMarker, landingMarks } from './boardMarks';   // vis-board: what a landing and a carve leave on the floor
+import { stampMarks } from '../visual/boardStamp';
+import { mountPlazaCity, type CityHandle } from '../visual/plazaCity';   // vis-board: City Plaza's skyline and traffic
+import { mountWarehouseDressing, type DressingHandle } from '../visual/warehouseDressing';   // vis-board: the Warehouse's sodium lamps, shafts and haze
 import { CoinField } from '../core/Pickups';
 import { RIDE_CONFIG as CFG } from './modeConfigs';
 import { mountVenueProps, type VenuePropsHandle } from '../visual/VenueProps';
@@ -138,6 +143,14 @@ export const SkateRunMode: ModeDefinition = (() => {
   let airEntryYaw = 0;
   /** Has the camera been snapped since play actually began? */
   let snappedForPlay = false;
+  // vis-board (wave 2): the run's best banked combo is replayed (skippable, never near the buzzer); wheels leave marks on the slab
+  const replayGate = new ReplayGate();
+  const carveMarks = new CarveMarker(0.8, 4.5, 0.3);
+  let grindSparkT = 0;
+  let venueDressing: DressingHandle | null = null;
+  let plazaCity: CityHandle | null = null;
+  /** The flat slab: a ground mark is a flat quad, so it is only laid where the floor is (a bank would bury half of it). */
+  const FLAT_FLOOR_Y = 0.12;
   /** A point 8 m ahead along the rider's facing — the snap's objective, so "behind" means behind the rider. */
   const aheadOfRider = (): Vector3 => rig.char.root.position.add(new Vector3(Math.sin(rig.char.root.rotation.y), 0, Math.cos(rig.char.root.rotation.y)).scale(8));
   let coins: CoinField;
@@ -625,6 +638,9 @@ export const SkateRunMode: ModeDefinition = (() => {
   return {
     modeId: 'skateboard', camPreset: 'board',
     hideRingInPlay: true,
+    intro: 'walkIn',   // vis-board (wave 2): the crane over the park, then the rider; the first input skips it
+    replayDof: false,  // vis-board: the DOF mount flattens the frame (core/ModeHarness.replayDof)
+    replay: true,      // vis-board (wave 2): the best banked combo, replayed from a filmer's angle (ctx.highlight at the bank)
     // MOVEMENT PLAY P8: the step is the mode's — a kick-push with the back foot is the PUSH (the row binds no step); the card
     // says the floor's lines, then the grab, the spin and the push this mode reads itself
     body: { claims: ['step'], lines: rideLines('skateboard', ['step']) },
@@ -654,6 +670,8 @@ export const SkateRunMode: ModeDefinition = (() => {
       const venue = readBoardVenue('skate');
       world = buildSkatepark(ctx.scene, venue);
       console.info(`[SKATE-VENUE] ${venue.name} · bound ${venue.bound} · ${venue.mood}`);
+      plazaCity?.dispose(); plazaCity = venue.id === 'city-plaza' ? mountPlazaCity(ctx.scene, world.bound, (ctx.scene.metadata as { felTier?: string } | null)?.felTier) : null;   // vis-board: a city behind the fence, traffic on the road
+      venueDressing?.dispose(); venueDressing = venue.id === 'warehouse' ? mountWarehouseDressing(ctx.scene, world.bound, (ctx.scene.metadata as { felTier?: string } | null)?.felTier) : null;   // vis-board: the room's own light
       propsGone = false; void mountVenueProps(ctx.scene, 'skatepark', undefined, { spread: world.bound / 36 }).then((h) => { if (propsGone) h?.dispose(); else props = h; });
       // GATE 0 is the rider's own spawn: buildRig loads the hero through CharacterLibrary.spawn, whose load gates the rig
       // (gateContainerRig: the 22-bone FEL spec, AGENT-OPERATING-RULES). IMPROVE (2026-10-06, item 1): the throwaway
@@ -712,6 +730,7 @@ export const SkateRunMode: ModeDefinition = (() => {
         });
       }
       boardSync = new BoardSync(rig.board, rig.char.root);
+      ctx.trackReplay?.(rig.board);   // vis-board: a trick replay shows the deck flip (the director records the deck's local pose)
       walls = plazaWalls(world.bound); lips = plazaLips(world.bound); wallRide = null; lipStall = null;   // WALL RIDES + LIP TRICKS
       {
         const lf = boneNode(rig.char.skeleton, 'LeftFoot'), rf = boneNode(rig.char.skeleton, 'RightFoot');
@@ -747,6 +766,7 @@ export const SkateRunMode: ModeDefinition = (() => {
       // the side for the first frames and, on a portrait phone (aspect 0.46),
       // lost the rider until the follow swung round (mobile capture, ~1 run in 2)
       ctx.camDirector.snapTo(rig.char.root.position, aheadOfRider());
+      replayGate.reset(); carveMarks.reset(); grindSparkT = 0;
       timeLeft = RUN_SEC; ended = false; fenceHit = false; wallRide = null; lipStall = null; xHeld = false; plantAskedAt = -1; wallCue = ''; stickX = 0; stickY = 0; pump = 0; pumpReleased = 0; pumpReleasedAt = -1; pushing = false; settleT = 0; airEntryYaw = 0; snappedForPlay = false;
       landingBeatT = 0; bailBeatT = 0; bailLatch = false; lastLanding = 'none';
       slowT = 0; slowCool = 0; slowCount = 0; popBeatT = 0; crouchAt = -1; boardPitch = 0; lastGroundY = 0;
@@ -965,6 +985,7 @@ export const SkateRunMode: ModeDefinition = (() => {
       if (slowT > 0) slowT = Math.max(0, slowT - dtRaw);
       const dt = slowT > 0 ? dtRaw * SLOW_SCALE : dtRaw;
       trickLayer?.begin();   // TRICK POSE: take back last frame's trick offsets before this frame's writes
+      plazaCity?.update(dtRaw);   // vis-board: the traffic drives on (real time: a spectacle's slow-mo does not slow the city)
       if (banners.tick(dtRaw * 1000)) ctx.setHud({ banner: banners.text });   // IMPROVE (item 17): the banner's one clock (real time, as the timers were)
       const prevLeft = timeLeft;
       timeLeft -= dtRaw;
@@ -1125,6 +1146,10 @@ export const SkateRunMode: ModeDefinition = (() => {
         const chainPts = res.chain.reduce((sum, t) => sum + t.basePts, 0);
         bailLatch = false;                       // A+ P0: a fresh touchdown gets one bail punch at most
         landed.touchdown(res.grade, res.chain.length);   // phase 10 + SK-3: the card counts what LANDED, never a bail's chain
+        if (rig.char.root.position.y < FLAT_FLOOR_Y) {   // vis-board: the wheels' mark where the board came down (the flat slab only)
+          const at = rig.char.root.position;
+          stampMarks(ctx.scene, landingMarks({ x: at.x, z: at.z }, move.yaw, res.grade === 'bail' ? 'bail' : res.grade, move.speed01, air.state.airtime / 1.4), 'concrete', 0);
+        }
         console.info(`[SKATE-LAND] touchdown ${res.grade} (${res.chain.length} tricks)`);   // A+ P0 probe: the punch counts are checked against this
         if (res.grade === 'clean') {
           if (chainPts > 0) combo.add(res.chain.map((t) => t.label).join(' → '), chainPts, 'air');
@@ -1180,7 +1205,7 @@ export const SkateRunMode: ModeDefinition = (() => {
         const lean: 'LEFT' | 'RIGHT' = save.wobble > 0 ? 'LEFT' : 'RIGHT';
         if (lean !== saveLean) { saveLean = lean; ctx.setHud({ saveDir: lean }); ctx.juice.callout(lean === 'LEFT' ? 'LEAN ◀' : 'LEAN ▶', '#fde047', 320); }
         if (save.saved) { landed.saveResolved(true); console.info('[SKATE-LAND] save held'); bannerFlash(ctx, 'SAVED IT!', 700, BANNER_PRIO.beat); mbus.report({ kind: 'big_make' }); save = null; saveLean = null; ctx.setHud({ saveDir: '' }); }   // SK-3: a saved landing's tricks count now
-        else if (save.failed) { landed.saveResolved(false); console.info('[SKATE-LAND] save failed'); combo.bail(); bannerFlash(ctx, 'BAILED', 900, BANNER_PRIO.beat); bailBeatT = BAIL_BEAT_SEC; move.vel.scaleInPlace(0.15); bailPunch(ctx); save = null; saveLean = null; ctx.setHud({ saveDir: '' }); }   // A+ P0: the failed save is a bail too
+        else if (save.failed) { landed.saveResolved(false); console.info('[SKATE-LAND] save failed'); if (rig.char.root.position.y < FLAT_FLOOR_Y) stampMarks(ctx.scene, landingMarks({ x: rig.char.root.position.x, z: rig.char.root.position.z }, move.yaw, 'bail', move.speed01, 0.3), 'concrete', 0); combo.bail(); bannerFlash(ctx, 'BAILED', 900, BANNER_PRIO.beat); bailBeatT = BAIL_BEAT_SEC; move.vel.scaleInPlace(0.15); bailPunch(ctx); save = null; saveLean = null; ctx.setHud({ saveDir: '' }); }   // A+ P0: the failed save is a bail too
       }
 
       // grind catch: airborne near a rail
@@ -1326,6 +1351,15 @@ export const SkateRunMode: ModeDefinition = (() => {
         deckLift.x += (want.x - deckLift.x) * k; deckLift.y += (want.y - deckLift.y) * k; deckLift.z += (want.z - deckLift.z) * k;
       }
       boardSync.update(move.balance.lean, !rig.rider.grounded, boardPitch, deckLift);
+      // vis-board (wave 2): a hard carve draws a line of wheel marks on the slab; a grind throws sparks off the bar (additive, stretched)
+      if (rig.rider.grounded && rig.char.root.position.y < FLAT_FLOOR_Y && bailBeatT <= 0 && !rig.rider.grinding && !manualCh?.active) {
+        const m = carveMarks.step(rig.char.root.position.x, rig.char.root.position.z, move.yaw, move.speed, Math.min(1, Math.abs(stickX) * 1.2), true);
+        if (m) stampMarks(ctx.scene, [m], 'concrete', 0);
+      } else carveMarks.reset();
+      if (rig.rider.grinding) {
+        grindSparkT -= dt;
+        if (grindSparkT <= 0) { grindSparkT = 0.07; EffectsKit.burst(ctx.scene, rig.char.root.position.add(new Vector3(0, 0.1, 0)), 'sparks', 0.55); }
+      } else grindSparkT = 0;
       trickLayer?.apply(dt, air.state.airborne && !rig.rider.grounded);   // TRICK POSE: the deck's flip / shuv / grab tweak
       // the AIR CAM: up, back and round to three-quarters while a real air is on (not a kerb flicker), so the trick under
       // the rider is in the picture
@@ -1447,6 +1481,10 @@ export const SkateRunMode: ModeDefinition = (() => {
               bannerFlash(ctx, `GOAL: ${g.label}`, 1200, BANNER_PRIO.news);
               SoundKit.play('crowdCheer', { volume: 0.6 });
             }
+            // vis-board (wave 2): the run's best line is replayed — a filmer's low fisheye, a profile, then low behind. Only a HUGE
+            // bank that beats every one already shown, never in the last seconds (the end card's), skippable by any press.
+            const plan = replayGate.consider(RUN_SEC - timeLeft, { kind: 'combo', weight: banked, floor: BIG_BANK_PTS, sec: 3 }, timeLeft);
+            if (plan) { console.info(`[SKATE-REPLAY] best line ${banked} (${plan.lastSeconds.toFixed(1)} s)`); void ctx.highlight?.({ lastSeconds: plan.lastSeconds, angles: ['filmer', 'side', 'low'], bounds: { minX: -world.bound, maxX: world.bound, minZ: -world.bound, maxZ: world.bound } }); }   // the filmer stays over the slab (falls back to the next angle at an edge)
           }
           settleT = 0;
         }
@@ -1509,6 +1547,6 @@ export const SkateRunMode: ModeDefinition = (() => {
       ctx.camera.fov = stepSpeedFov(ctx.camera.fov, baseFov * (boostFx?.fovMult(boost) ?? 1), Math.hypot(rig.rider.vel.x, rig.rider.vel.z), SKATE_TUNING.maxSpeed, dt);   // the momentum ceiling, not the Rider's clearance cap (BOARD-SPEED)
     },
 
-    dispose() { banners.clear(); trickLayer?.dispose(); trickLayer = null; boostFx?.dispose(); boostFx = null; boostPads?.dispose(); boostPads = null; posture?.dispose(); posture = null; propsGone = true; props?.dispose(); props = null; rig?.dispose(); world?.dispose(); coins?.dispose(); patrolRail?.dispose(); crowd?.dispose(); SoundKit.stopAmbient(); },
+    dispose() { venueDressing?.dispose(); venueDressing = null; plazaCity?.dispose(); plazaCity = null; banners.clear(); trickLayer?.dispose(); trickLayer = null; boostFx?.dispose(); boostFx = null; boostPads?.dispose(); boostPads = null; posture?.dispose(); posture = null; propsGone = true; props?.dispose(); props = null; rig?.dispose(); world?.dispose(); coins?.dispose(); patrolRail?.dispose(); crowd?.dispose(); SoundKit.stopAmbient(); },
   };
 })();

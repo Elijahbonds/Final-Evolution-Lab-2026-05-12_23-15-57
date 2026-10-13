@@ -155,6 +155,9 @@ export interface ModeContext {
   /** vis-foundation-2 A9.12: play a broadcast replay of the last seconds (a mode with `replay: true`). The harness holds the
    *  mode's update() until it ends; any press skips it; a pause freezes it. Resolves at once when the mode did not opt in. */
   highlight?(opts?: ReplayPlayOpts): Promise<void>;
+  /** vis-board (wave 2): call from load() to have a replay record and play back this node's LOCAL pose too (a skateboard's deck,
+   *  which flips about its own node under the rider's root). Ignored when the mode did not opt in to replays. */
+  trackReplay?(node: TransformNode): void;
   end(outcome: string, score: number, stats: Record<string, number>, detail?: unknown): void;
   /** TRY-ONBOARD (G1/G7): the host asked for a CONTINUOUS night. A mode that would
    *  otherwise finish its card must offer GO AGAIN in-mode — report through card()
@@ -209,6 +212,11 @@ export interface ModeDefinition {
    *  pose read per body 30 times a second, so only a mode that replays pays it. Mounting it also mounts the replays' depth of
    *  field (desktop/high) at load, so its shaders never compile mid-game. */
   replay?: boolean;
+  /** vis-board (wave 2): false = this mode's replays run WITHOUT the depth of field. Mounting DOF at load (see `replay`) puts a depth-of-field
+   *  pass in the post chain for the whole session; measured on the snow run (desktop, 1080p, same camera and moment, `?nodof=1` vs not) it
+   *  flattens the frame — on the piste's foreground the mean luma goes 222 → 198 and the groom texture's std 6.3 → 2.6 (its stripes and soft
+   *  shadows are gone) — so a mode whose ground is mostly white or whose look is in its surfaces opts out. The replay is otherwise the same (letterbox, angles, half speed). Default: DOF on. */
+  replayDof?: boolean;
   /** vis-race (wave 2): the bodies a replay records, when they are not skinned characters — a race's vehicles (the player's
    *  first: it is the shot's subject), whose rivals are plain nodes `characterRoots` cannot find. Read once, after load().
    *  Absent: the hero and the skinned characters nearest it (every other replay mode). */
@@ -354,6 +362,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
   let unsub: (() => void) | null = null;
   let frameGuard: FrameGuard | null = null;
   let iblShadows: IblShadowsHandle | null = null;
+  const replayTrack: TransformNode[] = [];   // vis-board: nodes a mode asked ctx.trackReplay to record (registered when the director is built, after load())
   let replay: ReplayDirector | null = null;   // A9.12: a mode that asked for replays (def.replay)
   let replayHold = false;                     // a replay is on screen: the mode's update() waits
   const setPhase = (p: ModePhase, detail?: number | string) => {
@@ -503,6 +512,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     scene, camera, camDirector, input, lights, juice,
     feel, momentum, heroRef, objectiveRef, groundLock, agent: agentHooks,
     phase: () => phase,
+    trackReplay: (node) => { if (!replayTrack.includes(node)) replayTrack.push(node); },
     highlight: async (o) => {
       if (!replay || replay.playing || phase !== 'playing') return;
       replayHold = true;
@@ -600,6 +610,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
       setPhase('error', 'Load timed out — check your connection and retry.');
     }, LOAD_WATCHDOG_MS);
     try {
+      replayTrack.length = 0;
       await def.load(ctx);
       clearTimeout(watchdog);
       if (timedOut) return false;                  // late resolve after watchdog: stay on error
@@ -617,7 +628,9 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
       replay?.dispose(); const cast = def.replay ? def.replayCast?.(ctx) : undefined;   // vis-court: a mode may name its own cast and its loose ball
       // vis-race: a race names its vehicles (replayBodies); otherwise vis-court's cast; otherwise the hero and nearest characters.
       const raceBodies = def.replay ? def.replayBodies?.(ctx).filter((n) => !n.isDisposed()) : undefined;
-      replay = def.replay ? new ReplayDirector(scene, camera, raceBodies?.length ? raceBodies : cast?.bodies?.length ? cast.bodies : characterRoots(scene, heroRef.current), cast?.loose ?? [], mountReplayDof(scene, lights.pipeline, tier)) : null;
+      // vis-board: replayDof === false runs the replay without depth of field (a white or surface-led look it would flatten).
+      replay = def.replay ? new ReplayDirector(scene, camera, raceBodies?.length ? raceBodies : cast?.bodies?.length ? cast.bodies : characterRoots(scene, heroRef.current), cast?.loose ?? [], (def.replayDof === false ? null : mountReplayDof(scene, lights.pipeline, tier))) : null;
+      for (const n of replayTrack) replay?.track(n);
       setPhase('ready');
       // M67: pre-warm every material now, on the loading→ready boundary, so a
       // first-visibility shader compile never hitches mid-play. Dev-only work.

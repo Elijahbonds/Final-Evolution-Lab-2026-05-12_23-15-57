@@ -15,10 +15,13 @@
 // New in the RideWorld contract: `obstacles` (position+radius list — empty
 // where a world has none). Modes shipped alongside consume it.
 
+import { applySnowSparkle } from '../visual/SnowSparkle';   // vis-board (wave 2)
+import { buildSlopeLamps } from '../visual/slopeLamps';
 import { VenueKit } from '../visual/VenueKit';
 import { Color3, DynamicTexture, Mesh, MeshBuilder, StandardMaterial, PBRMaterial, TransformNode, Vector3, Matrix, Material, Quaternion } from '@babylonjs/core';
 import type { AbstractMesh, Camera, Scene } from '@babylonjs/core';
-import { mountOcean, oceanShade } from '../visual/OceanSurface';   // SURF OCEAN: the living sea
+import { mountOcean, oceanShade, oceanLightFor } from '../visual/OceanSurface';
+import { MOODS } from '../scene/moods';   // SURF OCEAN: the living sea
 import type { GrindLine } from '../core/GroundRide';
 import { SKATE_VENUES, SNOW_VENUES, SURF_VENUES, rideOf, type BoardVenue } from '../nexus/boardVenues';
 import { applyFloorDetailToMesh } from '../visual/groundTextures';
@@ -664,6 +667,8 @@ export function buildSlopeRun(scene: Scene, venue: BoardVenue = SNOW_VENUES[0]):
     field.material = offM;
     all.push(field);
   }
+  // vis-board (wave 2): the groom and the off-piste glint under the sun and go blue in the shade (desktop / high; visual/SnowSparkle)
+  applySnowSparkle(scene, [pisteM, offM], venue.mood, (scene.metadata as { felTier?: string } | null | undefined)?.felTier);
 
   const onPiste = (x: number, dist: number): Vector3 =>
     new Vector3(x, -Math.sin(PITCH) * dist, Math.cos(PITCH) * dist);
@@ -683,6 +688,8 @@ export function buildSlopeRun(scene: Scene, venue: BoardVenue = SNOW_VENUES[0]):
   // the run starts fair rather than with an immediate cut across the hill.
   for (let i = 0; i < SLALOM_GATES; i++) markers.push(onPiste(slalomGateX(i), slalomGateDist(i)));
   const gates = buildSlalomGates(scene, all, markers, PITCH);
+  // vis-board (wave 2): the Night Park is lit — a lamp pole either side of the groom every few gates (named for the shared glow + fixture lights)
+  if (venue.id === 'night-park') for (const m of buildSlopeLamps(scene, markers, HALF, (scene.metadata as { felTier?: string } | null | undefined)?.felTier)) all.push(m);
 
   // THE TREELINE — scenery, off-piste, and a VENUE NUMBER. The pines were teal once (they took the Kenney kit's
   // palette); they are a real conifer green mixed toward the venue's edge colour now, so the night park's trees go
@@ -1459,6 +1466,8 @@ export function buildSurfBreak(scene: Scene, pocket: { min: number; max: number 
   const oceanOpts = {
     deep: mixHex(P.ground, P.structure, 0.55), foam: mixHex(P.line, '#ffffff', 0.6), horizon: mixHex(P.backdrop, '#dfe9ee', 0.35),
     shoreZ: SHORE_Z - SHORE_DEPTH / 2 + SHORE_OVERLAP, swell: (venue.ride?.waveHeight ?? 1),
+    // vis-board (wave 2): the sun's path on the water and its light through the thin crest (desktop / high)
+    light: oceanLightFor(venue.mood, MOODS[venue.mood].sunDir, MOODS[venue.mood].sun, (scene.metadata as { felTier?: string } | null | undefined)?.felTier),
   };
   const ocean = mountOcean(scene, oceanOpts);
   all.push(ocean.near, ocean.far);

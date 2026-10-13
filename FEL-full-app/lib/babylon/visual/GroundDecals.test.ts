@@ -1,7 +1,7 @@
 // vis-foundation-2 A9.14 (routed from vis-combat) — the shared ground-decal pool.
 import { describe, expect, it } from 'vitest';
 import { FreeCamera, NullEngine, Scene, Vector3 } from '@babylonjs/core';
-import { DECAL_KINDS, DECAL_SIZE, decalAlpha, decalCap, decalLife, mountGroundDecals, mountSceneDecals, nextSlot } from './GroundDecals';
+import { CARVE_TINT, DECAL_KINDS, DECAL_SIZE, decalAlpha, decalCap, decalLife, mountGroundDecals, mountSceneDecals, nextSlot } from './GroundDecals';
 
 function rig(modeId = 'karate') {
   const engine = new NullEngine();
@@ -41,6 +41,23 @@ describe('the pool', () => {
     expect(d.live('foot')).toBe(0);
     d.dispose();
     expect(scene.meshes.some((m) => m.name.startsWith('fel_decal_'))).toBe(false);
+  });
+  it('a carve mark takes a tint and lies on a slope: the instance colour and the pitch reach the buffers', () => {
+    const { scene } = rig();
+    const d = mountGroundDecals(scene, 'desktop');
+    d.stamp('carve', 2, 3, 0.4, { y: 1, pitch: 0.2, tint: CARVE_TINT.snow });
+    expect(d.peek('carve')!.rgb.map((v) => +v.toFixed(2))).toEqual([...CARVE_TINT.snow].map((v) => +v.toFixed(2)));
+    d.stamp('carve', 4, 3, 0.4);
+    expect(d.live('carve')).toBe(2);
+    const first = d.peek('carve')!;   // (the second stamp is the newest: untinted, level)
+    expect(first.rgb).toEqual([1, 1, 1]);
+    expect(first.normalY).toBeCloseTo(1, 5);
+    d.stamp('carve', 6, 3, 0, { pitch: 0.3, tint: CARVE_TINT.concrete });
+    const t = d.peek('carve')!;
+    expect(t.rgb.map((v) => +v.toFixed(2))).toEqual([...CARVE_TINT.concrete].map((v) => +v.toFixed(2)));
+    expect(t.normalY).toBeCloseTo(Math.cos(0.3), 4);                                   // tipped onto the slope
+    expect(d.peek('foot')).toBeNull();
+    d.dispose();
   });
   it('vis-race: a tyre mark is its own kind, the width of a kart\'s rear track, and rides the same pool', () => {
     const { scene } = rig('velocitykart');

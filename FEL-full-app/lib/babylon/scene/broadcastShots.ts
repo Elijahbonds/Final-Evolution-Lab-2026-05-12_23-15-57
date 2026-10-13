@@ -11,7 +11,8 @@
 // shots are cinematic framing only, and every one of them ends by handing the frame back to the play camera unchanged.
 
 export interface V3 { x: number; y: number; z: number }
-export interface ShotPose { pos: V3; target: V3; /** vertical FOV, radians; undefined = leave the lens alone */ fov?: number }
+export interface ShotPose { pos: V3; target: V3; /** vertical FOV, radians; undefined = leave the lens alone */ fov?: number;
+  /** near clip plane, metres; undefined = leave it alone. The play cameras clip at 1 m: a lens an ankle's height off the floor loses the floor under it (a band of the dome shows through). */ minZ?: number }
 
 const v = (x: number, y: number, z: number): V3 => ({ x, y, z });
 const lerp = (a: number, b: number, k: number): number => a + (b - a) * k;
@@ -106,8 +107,11 @@ export function introLetterbox(kind: IntroKind, t: number): number {
  *   tight  — a close three-quarter in front of the subject, long lens (the reaction / the face)
  *   high   — a high wide crane, the tactical view
  *   follow — behind the subject at the play camera's height, a touch further back (the "as it happened" view)
+ *   filmer — (vis-board, wave 2) the skate video's operator: ankle-high, an arm's length off the line, an extreme wide lens
+ *            (the fisheye) pointing up the board — a mode asks for it by name; it is not in the default cut
  */
-export type ReplayAngle = 'low' | 'side' | 'tight' | 'high' | 'follow';
+export type ReplayAngle = 'low' | 'side' | 'tight' | 'high' | 'follow' | 'filmer';
+/** The five standard angles (every one a readable distance on a normal lens); 'filmer' is the deliberate exception, asked for by name. */
 export const REPLAY_ANGLES: readonly ReplayAngle[] = ['low', 'side', 'tight', 'high', 'follow'];
 
 /**
@@ -131,10 +135,41 @@ export function replayShot(angle: ReplayAngle, focus: V3, heading: V3, objective
     }
     case 'high':
       return { pos: v(focus.x - f.x * 9 + right.x * 7, focus.y + 11, focus.z - f.z * 9 + right.z * 7), target: toward(chest, objective, 0.35), fov: 0.8 };
+    case 'filmer':
+      return { pos: v(focus.x - f.x * 1.1 + right.x * 1.9, focus.y + 0.3, focus.z - f.z * 1.1 + right.z * 1.9), target: v(focus.x + f.x * 0.6, focus.y + 0.95, focus.z + f.z * 0.6), fov: 1.5, minZ: FILMER_MIN_Z };
     case 'follow':
     default:
       return { pos: v(focus.x - f.x * 7.5, focus.y + 3.2, focus.z - f.z * 7.5), target: v(focus.x + f.x * 2, focus.y + 1.1, focus.z + f.z * 2) };
   }
+}
+
+// ── WHERE A CAMERA MAY STAND (vis-board, wave 2) ─────────────────────────────────────────────────────────────────────
+// The filmer stands an arm's length off the line, at ankle height: with the rider near the edge of the slab that spot is past the
+// floor and the frame fills with the dome underneath. A mode that knows its floor passes `bounds`; the director asks `resolveAngle`
+// for each cut segment ONCE (against where the subject is through the whole segment, so the camera never swaps sides mid-shot).
+/** The filmer's near plane: close enough that the floor under an ankle-high lens is not clipped away. */
+export const FILMER_MIN_Z = 0.12;
+/** The floor a camera may stand over: world x/z extents. */
+export interface ShotBounds { minX: number; maxX: number; minZ: number; maxZ: number }
+/** How far inside the bounds the filmer's lens must be (it is a wide lens: the floor's edge is in frame well before the camera is on it). */
+export const FILMER_MARGIN = 1.0;
+const inside = (p: V3, b: ShotBounds, m: number): boolean => p.x >= b.minX + m && p.x <= b.maxX - m && p.z >= b.minZ + m && p.z <= b.maxZ - m;
+/** Angles tried, in order, when the filmer has no valid spot: a profile, a low angle, then from behind. */
+export const FILMER_FALLBACKS: readonly ReplayAngle[] = ['side', 'low', 'follow'];
+
+/**
+ * Pure: the angle (and side) to shoot a segment from. Only the filmer is checked: it takes its side, then the other side of the
+ * line, then the first of `fallbacks` (default FILMER_FALLBACKS) whose camera stays over the floor for every sample of the
+ * subject's position through the segment; failing all of those, 'follow' (behind the subject, over ground it just crossed).
+ * Every other angle, and a call without bounds, is returned as asked.
+ */
+export function resolveAngle(angle: ReplayAngle, foci: readonly V3[], heading: V3, objective: V3 | null, side: number, bounds?: ShotBounds | null, fallbacks: readonly ReplayAngle[] = FILMER_FALLBACKS): { angle: ReplayAngle; side: number } {
+  if (angle !== 'filmer' || !bounds || !foci.length) return { angle, side };
+  const ok = (a: ReplayAngle, sd: number): boolean => foci.every((f) => inside(replayShot(a, f, heading, objective, sd).pos, bounds, FILMER_MARGIN));
+  if (ok('filmer', side)) return { angle, side };
+  if (ok('filmer', -side)) return { angle, side: -side };
+  for (const a of fallbacks) if (a !== 'filmer' && ok(a, side)) return { angle: a, side };
+  return { angle: 'follow', side };
 }
 
 /** The angles a replay of `sec` seconds is cut into: one angle per ~1.2 s of source, two at least, three at most. */

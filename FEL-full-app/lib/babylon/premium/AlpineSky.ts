@@ -32,7 +32,12 @@ export const ALPINE_SKY_SCALE = 3;
 export interface AlpineSkyHandle { readonly width: number; dispose(): void }
 
 /** Recompose the harness's dome for the alpine run. Null when there is no dome (a venue sky already owns the scene). */
-export function upgradeAlpineSky(scene: Scene, opts: { mood: VenueMood; snow: string; hi: boolean }): AlpineSkyHandle | null {
+/**
+ * vis-board (wave 2): `night` darkens the recomposed sky to a night over the mountains — a deep navy over the sky and the peaks (the
+ * snow below the horizon is the groom's own and keeps its colour), a few hundred stars high up, a cold glow at the treeline. The Night
+ * Park read as a bright blue afternoon with floodlights in it; the floods now sit in a night.
+ */
+export function upgradeAlpineSky(scene: Scene, opts: { mood: VenueMood; snow: string; hi: boolean; night?: boolean }): AlpineSkyHandle | null {
   const dome = scene.getMeshByName('bk_dome') as Mesh | null;
   const mat = dome?.material as StandardMaterial | null | undefined;
   if (!dome || !mat) return null;
@@ -55,12 +60,28 @@ export function upgradeAlpineSky(scene: Scene, opts: { mood: VenueMood; snow: st
     gr.addColorStop(0, snowCss(0)); gr.addColorStop(0.04, snowCss(1)); gr.addColorStop(1, snowCss(1, 0.9));
     g.fillStyle = gr; g.fillRect(0, hy - 24, W, H - hy + 24);
   };
+  /** The night: laid over the sky's rows only (0 … the horizon), after the photograph and the wash, before the snow goes back on. */
+  const paintNight = () => {
+    if (!opts.night) return;
+    const gr = g.createLinearGradient(0, 0, 0, hy);
+    gr.addColorStop(0, 'rgba(3,6,18,0.93)'); gr.addColorStop(0.6, 'rgba(8,14,34,0.86)'); gr.addColorStop(1, 'rgba(30,44,84,0.72)');
+    g.fillStyle = gr; g.fillRect(0, 0, W, hy);
+    // stars, a seeded few hundred, thinning toward the horizon
+    let seed = 91;
+    const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+    for (let i = 0; i < 420; i++) {
+      const y = Math.pow(rnd(), 1.6) * hy * 0.78, x = rnd() * W, r = 0.6 + rnd() * (opts.hi ? 1.5 : 0.9);
+      g.globalAlpha = 0.35 + rnd() * 0.6; g.fillStyle = rnd() > 0.8 ? '#ffd9b0' : '#dfe9ff';
+      g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill();
+    }
+    g.globalAlpha = 1;
+  };
   // the instant look while the photograph loads (and its fallback): an alpine sky over snow
   {
     const gr = g.createLinearGradient(0, 0, 0, hy);
     gr.addColorStop(0, '#1d5fc4'); gr.addColorStop(0.7, '#5f9be0'); gr.addColorStop(1, '#cfe0f4');
     g.fillStyle = gr; g.fillRect(0, 0, W, hy);
-    paintSnow(); paintWash();
+    paintSnow(); paintWash(); paintNight();
   }
   tex.update(false);
   const prev = mat.emissiveTexture;
@@ -93,7 +114,7 @@ export function upgradeAlpineSky(scene: Scene, opts: { mood: VenueMood; snow: st
       g.save(); g.translate(W, 0); g.scale(-1, 1);
       g.drawImage(img, 0, 0, img.naturalWidth, PHOTO_CROP_ROWS, 0, top, half, bandH);
       g.restore();
-      paintSnow(); paintWash();
+      paintSnow(); paintWash(); paintNight();
       tex.update(false);
       console.info(`[FEL-SKY] alpine dome ${W}x${H} from ${ALPINE_PHOTO} (${img.naturalWidth}px source)`);
     };

@@ -671,3 +671,65 @@ a mode file; `scene/lookPolicy.ts` HOLDS the hoops modes out of all of them this
 - **A9.7 second half — glossy floors.** `scene/GlossyFloor.ts`: a planar MirrorTexture on the dance and Brain Brawl stages and
   any wooden-court place (the Gym); desktop/high.
 
+
+## Wave 2 status — the board sports and runs (vis-board, 2026-10-13)
+
+Part B for skateboard, snowboard_slalom, surf, bigair and freerun, built on the wave-1 systems above. `?lookoff=` takes four
+more names on these modes for a one-build A/B: `sparkle` (the snow's glint), `dress` (the warehouse lamps, the plaza's city,
+freerun's world), `event` (big air's gate, towers and booth), `palette` (freerun's red).
+
+- **Replays.** Every one of the five modes opts in (`replay: true`) and reaches `ctx.highlight` only through
+  `modes/boardMoments.ReplayGate`: the run's BEST moment so far (it must beat every one already shown and clear the mode's own
+  floor), at most three a run, 18 live seconds apart, never in the last stretch of a timed run (a replay plays at half speed, so
+  the gate wants twice its window plus 14 s) and never for the event that ends the run (the finish line, the last attempt).
+  The moments: skate — a HUGE banked combo, from a filmer's fisheye (a new `filmer` angle in `scene/broadcastShots`, ankle-high,
+  1.9 m off the line, 1.5 rad lens; not in the default cut) then a profile and a low angle; snow — a banked line, from a
+  drone-follow's follow / side / high; surf — the barrel and banked lines, from the water's level; big air — a stuck or clean
+  landing worth 5.5+ on the judges' read plus the line, attempts 1 to N−1; freerun — a banked line, when the finish is not near.
+  The deck's own flip and bank are replayed too: `ReplayDirector.track(node)` (opt-in, `ctx.trackReplay(node)` from a mode's
+  load()) records a node's local pose with every frame and hands it back as the mode wrote it (Euler, the quaternion nulled again).
+  The filmer is kept over the floor (`resolveAngle`, with `bounds` in the play options) and has its own near plane (the play
+  cameras clip at 1 m, which cut the floor out from under an ankle-high lens).
+- **Intros.** `walkIn` on skateboard (no clock until the first push), surf (the board trims itself in), bigair (no clock in the
+  run-up) and freerun (opted in from `begin()`: the 4 s start grace is longer than the 3.7 s intro). Not snowboard_slalom: the
+  rider is already sliding when play starts, and an intro would cost the first gates.
+- **Ground decals.** `GroundDecals` gets a `carve` kind (a pair of grooves, tinted at the stamp: `CARVE_TINT.concrete` /
+  `.snow`), a `pitch` option for a slope and `peek()`. `modes/boardMarks` plans the marks (a clean landing rolls out, a sketchy one
+  drags, a bail slides and leaves two prints; a hard carve lays a mark every 0.8 m) and `visual/boardStamp` lays them. Skate: the
+  flat slab only (a flat quad on a bank is half buried); snow: landings and wipeouts tipped onto the piste (the carve line is
+  `SnowSpray`'s own); big air: the landing; freerun: every landing.
+- **Skateboard.** The Warehouse's sodium lamps (named `lhead_*`: the glow layer and a clustered light each), light shafts
+  (additive, fresnel-soft cones), a dust haze and a steel gantry (`visual/warehouseDressing`); City Plaza's skyline of lit towers
+  and twelve cars on a road round the fence (`visual/plazaCity`); grind sparks (there were none); wheel marks.
+- **Snowboard.** `visual/SnowSparkle`: a GLSL plugin on the piste and off-piste PBR (a crystal per 4 cm cell, lit when its own
+  normal mirrors the sun into the eye; the shade pulled toward the sky's blue; desktop/high). The Night Park is a night (a
+  starred sky over the recomposed mountains; `AlpineSky` `night`) with a pole of lamps every fourth gate (`visual/slopeLamps`).
+  `visual/GateFlash`: a wall of light in the gate as it is crossed (green; red for a miss) and the pole on the rider's side snaps.
+  Confetti off the arch's towers at the finish.
+- **Surf.** The sun on the water (`OceanSurface` `light`, opt-in; racing's harbor mounts it unchanged): a glitter path on the
+  chop and the green-gold light through the thin crest of the rideable face. A foam wake behind the board (`SurfSpray`; a fifth
+  as thick on a phone: the surf row of `mobileBudget.json`).
+- **Big air.** Its sky was the harness's mirrored 1024 px mountains (upside-down treeline over the run); it takes the slalom's
+  `AlpineSky` now, and the snow's glint. `visual/bigAirDressing`: a start gate with an LED panel (`bigair_gate_led`), two scaffold
+  towers with banner wraps at the kicker, a judges' booth by the landing whose three cards flip to the judges' scores after
+  each landing, fireworks over it for a landed double. `visual/SpinTrail`: two ribbons off the board's tips through a trick;
+  snow thrown off the lip at take-off and powder at the landing.
+- **Freerun.** The runner's colour language (`visual/runnerPalette`): what the verbs act on (vault, bar, spring, rail, anchor,
+  ledge) is runner red with an emissive floor, the slab and walls keep 42 % of their colour, and the verbs' surfaces get red outline
+  edges (desktop/high); the tracks' authored hues are not changed, only toned. A world beside the slab per track,
+  standing on a yard deck 5 m below it (there is nothing past the 20 m slab but the far-off world, so props at its height hung in
+  the air; the deck has no collider) (`visual/freeRunDressing`: AC units, neon billboards, antenna bulbs; pipes, valves, overgrowth; containers, gantry cranes;
+  columns, a statue), the camera's `SpeedLines` above 80 % of top speed, grind sparks, a ring off a slam or a big landing
+  (`visual/ShockRing`).
+- **Findings worth the next lane's time.** (1) `core/ModeHarness` mounts the replay depth of field (`mountReplayDof`) on every
+  `replay: true` mode, and on desktop it flattens the whole frame (a snow piste's contrast measured 221.9 vs 6.4 with it off); the
+  five modes here set `replayDof: false` (new optional `ModeDefinition` field) and the replay itself is unchanged; Football Rush
+  and any other replay mode likely have it too: routed. (2) A StandardMaterial ADDS its `emissiveColor` to its emissive
+  texture, it does not scale it: a sign written as `emissive (0.9, 0.95, 1)` plus a dark painted texture is a pale wash
+  (measured: 15/255 at 0.1, 200/255 at 0.9 over the same dark pixel). `visual/unlit.settleEmissive` takes the colour to black
+  when a texture is present. `DynamicTexture.update(false)` skips the Y flip: painted text comes out upside down.
+  (3) `liftBlackMaterials` lifts any texture-less material under 0.04 to grey, which an unlit black diffuse is: `unlitDiffuse()`.
+- **Deferred to wave 3 / needs art:** a moving chairlift with chairs and flags waving; a pier and a lifeguard tower for the surf
+  breaks (`venuePropSets` is shared, and the tower is [ART]); a wet sheen after a duck-dive (`mountSweat` owns the skin level);
+  puddle reflections and a concrete detail map at the Warehouse (`GlossyFloor` is a named-floor list); a night session with
+  floodlights for big air; landmark buildings and bespoke course modules are [ART].

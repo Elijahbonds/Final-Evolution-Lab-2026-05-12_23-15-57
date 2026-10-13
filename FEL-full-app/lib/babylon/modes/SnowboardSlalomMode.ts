@@ -41,6 +41,10 @@ import { assertSpawned } from '../core/FrameGuard';
 import { SoundKit } from '../audio/SoundKit';
 import { refuse } from '../core/Refusal';   // MECHANICS PASS: a press that cannot act is answered
 import { EffectsKit } from '../visual/EffectsKit';
+import { ReplayGate } from './boardMoments';   // vis-board (wave 2): which banked line earns the replay
+import { landingMarks } from './boardMarks';
+import { stampMarks } from '../visual/boardStamp';   // vis-board: the landing's mark in the snow
+import { GateFlash } from '../visual/GateFlash';   // vis-board: the gate's flash
 import { Onlookers } from '../visual/Onlookers';
 import { RIDE_CONFIG as CFG } from './modeConfigs';
 import { mountVenueProps, type VenuePropsHandle } from '../visual/VenueProps';
@@ -69,9 +73,11 @@ import { HudDelta } from './rideHud';
 import { GhostRecorder, ghostAtTime, deltaMs, loadGhost, saveIfFaster, type Ghost } from '../racing/ghost';
 import { SnowGhost } from '../premium/SnowGhost';
 import {
-  gateStreakBonus, runTimeSec, paceSplitSec, splitLabel, GATE_MISS_PENALTY_SEC, GRAB_HOLD_FROM_SEC, GRAB_HOLD_PER_SEC, GRAB_HOLD_MAX, YETI_WARN_SEC,
+  GATE_HALF_WIDTH, gateStreakBonus, runTimeSec, paceSplitSec, splitLabel, GATE_MISS_PENALTY_SEC, GRAB_HOLD_FROM_SEC, GRAB_HOLD_PER_SEC, GRAB_HOLD_MAX, YETI_WARN_SEC,
 } from './gateCrasher';
 
+/** vis-board: a banked line this big (points) is a highlight at all; a plain landing never is. */
+const REPLAY_LINE_PTS = 250;
 const YETI_SPAWN_GATE = 5;                 // bursts out after this gate clears
 const YETI_CHASE_SEC = 8;
 const YETI_CLEAR_PTS = 150;
@@ -203,6 +209,16 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
   // verdict is judged on, and the win said once when it is secured.
   let wipeT = -1, wipeSide = 1;
   let spray: SnowSpray | null = null;
+  // vis-board (wave 2): the run's best banked line is replayed (a drone-follow cut, skippable, never near the end); the snow keeps the landings
+  const replayGate = new ReplayGate();
+  let gateFlash: GateFlash | null = null;
+  let sceneRef: ModeContext['scene'] | null = null;
+  /** The snow mark under the rider: a landing's roll-out or a fall's skid, tipped onto the piste's pitch. */
+  function markSnow(grade: 'clean' | 'sketchy' | 'bail'): void {
+    if (!sceneRef || !rig) return;
+    const at = rig.char.root.position;
+    stampMarks(sceneRef, landingMarks({ x: at.x, z: at.z }, move.yaw, grade, move.speed01, 0.35), 'snow', at.y, pitch);
+  }
   let prevX = 0, prevZ = 0;
   let crashSaid = false, goalSaid = false;
   let scrapeLatch = 0;
@@ -283,6 +299,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
     bailBeatT = BAIL_BEAT_SEC;
     wipeT = 0; wipeSide = side >= 0 ? 1 : -1;
     spray?.burst(rig.char.root.position.add(new Vector3(0, 0.3, 0)), 1);
+    markSnow('bail');   // vis-board: the skid he left
   }
   function wipePunch(ctx: ModeContext): void {
     if (elapsed < wipeLatchUntil) return;
@@ -501,6 +518,12 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
       console.info(`[SNOW-GHOST] ${run && bestGhost === run ? 'kept' : 'not faster'} ${runT.toFixed(1)} s on ${ghostCourse}`);
     }
     ghostBody?.place(null);
+    // vis-board (wave 2): the finish is a moment — confetti off both towers of the arch and the banner cut (the end card follows at once)
+    if (why === 'finish' && world.finish) {
+      const f = world.finish, half = world.bound - 0.2;
+      for (const side of [-1, 1]) EffectsKit.burst(ctx.scene, new Vector3(side * half, f.y + 5.4, f.z), 'confetti', 1.4);
+      ctx.juice.callout('FINISH!', '#fde047', 1200);
+    }
     // phase 10 — GATE CRASHER: the title is the win condition. Half the gates or better (15 of 30) is the crash; fewer is
     // a finished run. Before this the run ended 'FINISHED' whatever happened and the card said 0 COINS.
     const target = crashTarget(world.markers.length);
@@ -515,6 +538,8 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
   return {
     modeId: 'snowboard', camPreset: 'descent',
     hideRingInPlay: true,
+    replayDof: false,   // vis-board: the DOF mount flattens the white piste (core/ModeHarness.replayDof)
+    replay: true,   // vis-board (wave 2): the best banked line, replayed (ctx.highlight at the bank). No intro: the rider is already sliding when play starts
     // MOVEMENT PLAY P8: the card — the floor's lines, then the grab and the spin this mode reads itself
     body: { lines: rideLines('snowboard') },
     // The LIGHT is the venue's. A getter, because the harness reads this at mount — after the splash has written the
@@ -543,7 +568,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
       if (ringHidden) ((ctx.scene.metadata ??= {}) as { felPlayerRingMode?: boolean }).felPlayerRingMode = true;
       world = buildSlopeRun(ctx.scene, venue);
       // GC-3: the dome recomposed at the camera's resolution from the source photograph, riding the camera
-      sky?.dispose(); sky = upgradeAlpineSky(ctx.scene, { mood: venue.mood, snow: venue.palette.ground, hi: !touchOnly(ctx) });
+      sky?.dispose(); sky = upgradeAlpineSky(ctx.scene, { mood: venue.mood, snow: venue.palette.ground, hi: !touchOnly(ctx), night: venue.id === 'night-park' });   // vis-board: the Night Park is a night
       // GC-4: the Kenney kit's rocks over the rock solids (the painted spheres are the look until they land, and the fallback)
       rockProps?.dispose(); rockProps = null; propsGone = false;
       {
@@ -594,6 +619,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
           // SCORECARD FEEL (2026-09-15): a landed trick pops at the rider — the run measured 4.5 juice beats a minute
           ctx.juice.scorePop(rig.char.root.position.add(new Vector3(0, 2.1, 0)), b === 'land' ? 'STOMPED' : 'SKETCHY', b === 'land' ? '#a7f3d0' : '#fcd34d');
           spray?.burst(rig.char.root.position, b === 'land' ? 0.35 : 0.55);   // GATE-CRASHER-MAJOR: the snow takes the landing
+          markSnow(b === 'land' ? 'clean' : 'sketchy');   // vis-board: and keeps the roll-out
         } else startWipe(rig.char.root.rotation.z >= 0 ? 1 : -1);   // a trick not finished before the snow is a wipeout
       } });
       animTree = new BoardAnimTree(rig.char.animator, { bail: 'snow_bail' });   // POLISH-2: the snowboard's own wipeout, down in the snow
@@ -613,6 +639,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
         return { pose: angled, legs, aim: at, eyes: at, window };
       }, 'SNOW-PP');
       trickLayer?.dispose();
+      ctx.trackReplay?.(rig.board);   // vis-board: a replay shows the board's flip and bank
       trickLayer = new BoardTrickLayer(ctx.scene, rig.char.skeleton, rig.char.root, rig.board);   // after the posture layer: the grab hand is the last word
       bailBeatT = 0; landBeatT = 0; airT = 0; edgeHit = false;
       {
@@ -656,6 +683,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
       ghostBody?.dispose(); ghostBody = new SnowGhost(ctx.scene);
       console.info(`[SNOW-GHOST] ${bestGhost ? `best ${(bestGhost.timeMs / 1000).toFixed(1)} s` : 'no best run yet'} on ${ghostCourse}`);
       wipeLatchUntil = 0; finishLatch = false;
+      replayGate.reset(); sceneRef = ctx.scene; gateFlash?.dispose(); gateFlash = new GateFlash(ctx.scene);
       wipeT = -1; crashSaid = false; goalSaid = false; scrapeLatch = 0; lastRamp = null; lastRampT = 0;
       bankRoll = 0; stillSec = 0; lastNudgeAt = -1e9; bodyHud = null; xRefused = false; lastTrickNote = ''; bodyGrabbing = false;   // POLISH-2
       prevX = rig.char.root.position.x; prevZ = rig.char.root.position.z;
@@ -977,6 +1005,8 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
           if (verdict.brush) { world.gates?.brush(nextGate, Math.sign(verdict.dx) || 1); SoundKit.play('impact', { pitch: 1.9, volume: 0.22 }); }
           if (verdict.hit) {
             world.gates?.set(nextGate, 'hit');
+            gateFlash?.fire(gate.x, gate.y, gate.z, GATE_HALF_WIDTH * 2, '#34d399');   // vis-board: the gate's flash, and the pole on his side snaps
+            if (!verdict.brush) world.gates?.brush(nextGate, Math.sign(verdict.dx) || 1);
             gatesHit++;
             tricks.score += 100;
             gateStreak++;
@@ -1007,6 +1037,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
             }
           } else {
             world.gates?.set(nextGate, 'miss');
+            gateFlash?.fire(gate.x, gate.y, gate.z, GATE_HALF_WIDTH * 2, '#f87171');
             SoundKit.play('miss', { volume: 0.3 });
             if (gateStreak >= 3) ctx.juice.callout(`STREAK OVER — ${gateStreak}`, '#94a3b8', 700);
             gateStreak = 0;
@@ -1029,7 +1060,17 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
         }
       }
 
+      const scoreBefore = tricks.score;
       const trickBanner = tricks.update(dt);
+      {
+        // vis-board (wave 2): a banked line is the moment — the best of the run is replayed from a drone-follow's angles
+        const gained = tricks.score - scoreBefore;
+        if (gained > 0) {
+          const toFinish = (finishZ() - rig.char.root.position.z) / Math.max(8, move.speed);   // seconds to the arch at this pace: nothing replays near it
+          const plan = replayGate.consider(elapsed, { kind: 'line', weight: gained, floor: REPLAY_LINE_PTS, sec: 3.2 }, toFinish);
+          if (plan) { console.info(`[SNOW-REPLAY] best line +${gained} (${plan.lastSeconds.toFixed(1)} s)`); void ctx.highlight?.({ lastSeconds: plan.lastSeconds, angles: ['follow', 'side', 'high'] }); }
+        }
+      }
       // (GC-12: the body's grab, held through the air, lets go on the snow — graded above, so the whole hold was paid)
       if (bodyGrabbing && rig.rider.grounded) { bodyGrabbing = false; tricks.endGrab(); if (!tricks.grabHeld) trickLayer?.release(); }
       if (trickBanner) trickCall(ctx, trickBanner, 900);   // IMPROVE (item 11): a landing never wipes the gate's read
@@ -1089,6 +1130,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
         grounded: rig.rider.grounded && !rig.rider.grinding,
       }, dt);
       world.gates?.update(dt);
+      gateFlash?.update(dt);
       shadow?.update(rig.char.root.position, true, rig.rider.lastHit);   // POLISH-2 (GC-6): on the snow under him, soft and faint with height (item 16: the Rider's ray)
       // POLISH-2 (GC-13): the HUD's words follow who is playing — a body the camera sees, or a pad / keys / touch
       {
@@ -1154,7 +1196,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
 
     dispose() {
       trickLayer?.dispose(); trickLayer = null;
-      spray?.dispose(); spray = null;
+      spray?.dispose(); spray = null; gateFlash?.dispose(); gateFlash = null; sceneRef = null;
       ghostBody?.dispose(); ghostBody = null; ghostRec = null; banners.clear();   // IMPROVE (items 10 / 11)
       shadow?.dispose(); shadow = null; sky?.dispose(); sky = null; outfit?.dispose(); outfit = null;   // POLISH-2
       rockProps?.dispose(); rockProps = null;

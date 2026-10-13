@@ -3,7 +3,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { FreeCamera, MeshBuilder, NullEngine, Scene, TransformNode, Vector3 } from '@babylonjs/core';
 import { REPLAY_SPEED, ReplayDirector, characterRoots, mountReplayDof, type ReplayDofHandle } from './ReplayDirector';
-import { DOF_REPLAY, DOF_REST } from './broadcastShots';
+import { DOF_REPLAY, DOF_REST, FILMER_MIN_Z } from './broadcastShots';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -49,6 +49,68 @@ describe('the replay director', () => {
     expect(cam.position.equalsWithEpsilon(liveCam, 1e-9)).toBe(true);
     expect(lens[lens.length - 1]).toBe(0);
     expect(dof.live).toHaveBeenLastCalledWith(false);
+    rd.dispose();
+  });
+  it('a tracked deck\'s local flip is recorded and plays back, then the deck is handed back as the mode wrote it (Euler, no leftover quaternion)', async () => {
+    const { scene, cam, runner, frame } = rig();
+    const deck = new TransformNode('deck', scene); deck.parent = runner; deck.position.y = 0.03;
+    const loose = new TransformNode('untracked_deck', scene); loose.parent = runner;
+    const rd = new ReplayDirector(scene, cam, [runner]);
+    rd.track(deck); rd.track(deck);
+    expect(rd.trackedCount).toBe(1);                                  // idempotent
+    // a 3 s run in which the deck rolls a full turn about its own z (Euler, as BoardSync / BoardTrickLayer write it)
+    for (let i = 0; i < 180; i++) { runner.position.z = i * 0.1; deck.rotation.z = (i / 179) * Math.PI * 2 * 0.98; loose.rotation.z = deck.rotation.z; frame(); }
+    const liveRoll = deck.rotation.z;
+    const done = rd.play({ lastSeconds: 2.5 });
+    const rolls = new Set<number>(); let untrackedQ = false;
+    for (let i = 0; i < 2.5 / REPLAY_SPEED * 60 + 20 && rd.playing; i++) {
+      frame();
+      const q = deck.rotationQuaternion; if (q) rolls.add(Math.round(Math.atan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y * q.y + q.z * q.z)) * 10));
+      if (loose.rotationQuaternion) untrackedQ = true;
+    }
+    await done;
+    expect(rolls.size).toBeGreaterThan(8);                            // the flip was drawn, frame by frame, not a held pose
+    expect(untrackedQ).toBe(false);                                   // control: a node nobody asked for is left alone
+    expect(deck.rotationQuaternion).toBeNull();                       // handed back as Euler: a leftover quaternion would freeze `rotation`
+    expect(deck.rotation.z).toBeCloseTo(liveRoll, 9);
+    expect(deck.position.y).toBeCloseTo(0.03, 9);
+    deck.rotation.z = 1; frame();
+    expect(deck.rotationQuaternion).toBeNull();
+    rd.dispose();
+  });
+  it('the filmer is kept over the floor: it takes the other side of the line, falls back when neither fits, and is as it was with no bounds', async () => {
+    const run = async (bounds: { minX: number; maxX: number; minZ: number; maxZ: number } | undefined) => {
+      const { scene, cam, runner, frame } = rig();
+      const rd = new ReplayDirector(scene, cam, [runner]);
+      for (let i = 0; i < 150; i++) { runner.position.set(29.2, 0, -15 + i * 0.2); frame(); }   // along the +x edge of a 30 m slab, heading +z
+      const done = rd.play({ lastSeconds: 2, angles: ['filmer', 'side'], side: -1, bounds });   // side −1: the filmer asks to stand at +x, off the slab
+      const seen = new Set<string>(); let maxCamX = -Infinity;
+      for (let i = 0; i < 2 / REPLAY_SPEED * 60 + 20 && rd.playing; i++) { frame(); if (rd.angleNow) seen.add(rd.angleNow); if (rd.angleNow === 'filmer') maxCamX = Math.max(maxCamX, cam.position.x); }
+      await done; rd.dispose();
+      return { seen, maxCamX };
+    };
+    const bounded = await run({ minX: -30, maxX: 30, minZ: -40, maxZ: 40 });
+    expect(bounded.seen.has('filmer')).toBe(true);                    // the other side of the line is over the slab: still a filmer shot
+    expect(bounded.maxCamX).toBeLessThan(29.2);                       // from inside it, not past the edge
+    const cornered = await run({ minX: 28, maxX: 30.5, minZ: -40, maxZ: 40 });
+    expect(cornered.seen.has('filmer')).toBe(false);                  // neither side fits a 2.5 m strip: passed over
+    expect(cornered.seen.has('follow')).toBe(true);
+    const free = await run(undefined);
+    expect(free.seen.has('filmer')).toBe(true);                       // control: without bounds the lens is where it was asked, past the edge
+    expect(free.maxCamX).toBeGreaterThan(30);
+  });
+  it('the filmer shot pulls the near plane in, the other angles and the live moment keep the play camera\'s', async () => {
+    const { scene, cam, runner, frame } = rig();
+    cam.minZ = 1;
+    const rd = new ReplayDirector(scene, cam, [runner]);
+    for (let i = 0; i < 150; i++) { runner.position.set(0, 0, i * 0.1); frame(); }
+    const done = rd.play({ lastSeconds: 2, angles: ['filmer', 'side'] });
+    const byAngle = new Map<string, Set<number>>();
+    for (let i = 0; i < 2 / REPLAY_SPEED * 60 + 20 && rd.playing; i++) { frame(); if (rd.angleNow) { const set = byAngle.get(rd.angleNow) ?? new Set<number>(); set.add(cam.minZ); byAngle.set(rd.angleNow, set); } }
+    await done;
+    expect([...byAngle.get('filmer')!]).toEqual([FILMER_MIN_Z]);
+    expect([...byAngle.get('side')!]).toEqual([1]);
+    expect(cam.minZ).toBe(1);                                         // handed back
     rd.dispose();
   });
   it('a skip ends it on the spot; a pause freezes it (and a skip while paused is ignored)', async () => {
