@@ -53,6 +53,15 @@ export function readShadowCacheParam(): string | null { return query('shadowcach
 /** `?mobilepost=0` for one load: the phones' post chain as it was before phase 2 (QualityTier.legacyMobilePost). */
 export function readMobilePostParam(): string | null { return query('mobilepost'); }
 
+/**
+ * `?lookoff=fixtures,sky,…` for one load: switch named wave-2 look features off (vis-foundation-2, 2026-10-13) — the A/B
+ * for a before/after pair on one build, the way ?shadowcache=0 is for the cache. Never stored.
+ */
+export function lookFeatureOff(name: string): boolean {
+  const v = query('lookoff');
+  return !!v && v.split(',').map((x) => x.trim()).includes(name);
+}
+
 /** `?look=legacy`: the shared look as it shipped before the visual-foundation pass (screenshots, the owner's A/B). */
 export function isLegacyLook(): boolean { return query('look') === 'legacy'; }
 
