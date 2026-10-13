@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { AnimatePresence } from 'framer-motion';
 import { Maximize2, Minimize2, ArrowLeft, Loader2 } from 'lucide-react';
 import type { PrqGrade } from '@/lib/prq';
+import { readPrqDisplay, type PrqDisplay } from '@/lib/prq-display';
 import { PhysicalGamepadPoller } from '@/lib/gamepad-bridge';
 import { getScheme } from '@/lib/input-schemes';
 import { isBabylon } from '@/components/three/flags';
@@ -20,6 +21,8 @@ import { GameCaptureHud } from '@/components/capture/game-capture-hud';
 import { LearnWhileYouWait } from '@/components/learn/learn-while-you-wait';
 import type { SessionTallies } from '@/lib/game-systems';
 import { sessionStore, markRun, countedSince } from '@/lib/babylon/core/sessionStore';
+import { agentPlayEvidence } from '@/lib/babylon/core/AgentBridge';
+import { isPlayedRun } from './played-evidence';
 import { arenaRefusal, storyRefusal, type Refusal } from './end-card-refusal';
 import { EndScreen } from './end-screen/end-screen';
 import type { EndGoals } from './end-screen/types';
@@ -52,6 +55,8 @@ export interface GameResult {
 export interface GameProps {
   grade: PrqGrade;
   prq: number;
+  /** QA P0-01: what a badge may print (measured PRQ only). `prq`/`grade` above are for difficulty, never for display. */
+  prqDisplay?: PrqDisplay;
   onEnd: (result: GameResult) => void;
   /** Gamepad state polled every frame by GameShell — games can read it. */
   gamepad?: import('@/lib/canvas-juice').GamepadState;
@@ -141,7 +146,9 @@ function GameShellInner({
   // ECONOMY-SESSIONS-HARDEN: an agent or playtest run is started as one, so the server records it and pays nothing
   const agentRun = searchParams.get('agent') === '1';
   const playtestRun = searchParams.get('playtest') === '1';
-  const [profile, setProfile] = useState<{ prq: number; grade: PrqGrade } | null>(null);
+  // QA P0-01: `display` is what the header badge prints (the measured PRQ, lib/prq-display); prq / grade stay the modes'
+  // difficulty inputs.
+  const [profile, setProfile] = useState<{ prq: number; grade: PrqGrade; display: PrqDisplay } | null>(null);
   // Ship pass 2, Phase 4: the profile request failing (offline, server down)
   // used to leave the shell empty and silent — no game, no message. Measured
   // with a blocked /api/** on /play/onevone: "HUB ONES Venice Beach Court" and
@@ -256,7 +263,7 @@ function GameShellInner({
       .then((j) => {
         if (!live) return;
         if (j?.grade) {
-          setProfile({ prq: j?.prq ?? 50, grade: j.grade });
+          setProfile({ prq: j?.prq ?? 50, grade: j.grade, display: readPrqDisplay(j) });
         } else {
           router.replace('/login');
         }
@@ -297,7 +304,16 @@ function GameShellInner({
           // the only thing that makes a music set an Arena set there (route.ts verifiedMusicDuel)
           stats: res?.stats,
           ...(arenaMatchId ? { arenaMatchId } : {}),
-          played: inputCount.current >= 3 || countedSince(sessionStore.record(), runMark.current) >= 3,
+          // QA A1-02: a continuously-held stick or trigger (smooth steering, holding one direction) can cross
+          // sessionStore's evidence threshold once and never again — hoops3v3 (agent-driven) and Gate Crasher /
+          // snowboarding (real keyboard/pad) both posted played:false on a finished, fully-played run this way.
+          // isPlayedRun (played-evidence.ts) adds one more, mechanism-independent check: a real non-zero score
+          // could not have come from the idle session `played` exists to catch. See that file for the full story.
+          played: isPlayedRun(res, {
+            windowEvents: inputCount.current,
+            harnessEvidence: countedSince(sessionStore.record(), runMark.current),
+            agentEvidence: agentPlayEvidence(),
+          }),
           // HOOPS BODY (P10): the body's form read for this run — null for a minor or an unknown age (formForPost); the route
           // bounds it (formSummary.boundFormSummary) and writes it only for a verified, opted-in 18+ account
           ...(() => { let st: Storage | null = null; try { st = sessionStorage; } catch { /* none */ }
@@ -650,9 +666,9 @@ function GameShellInner({
           {profile && (
             <span
               className="ml-auto rounded-md border px-2.5 py-1 font-mono text-xs"
-              style={{ borderColor: `${profile.grade?.color}55`, color: profile.grade?.color }}
+              style={{ borderColor: `${profile.display.color}55`, color: profile.display.color }}
             >
-              PRQ {Math.round(profile.prq)} · {profile.grade?.label}
+              {profile.display.badge}
             </span>
           )}
           {/* BODY CONTROL, for every mode at once. It is an input device, not a mode feature — poseControl maps
@@ -718,7 +734,7 @@ function GameShellInner({
         )}
         {profile ? (
           <ReplayInPlaceContext.Provider value={registerReplay}>
-            <Game key={gameKey} grade={profile.grade} prq={profile.prq} onEnd={handleEnd} {...(gameProps ?? {})} />
+            <Game key={gameKey} grade={profile.grade} prq={profile.prq} prqDisplay={profile.display} onEnd={handleEnd} {...(gameProps ?? {})} />
           </ReplayInPlaceContext.Provider>
         ) : !unreachable ? (
           <div className="flex h-[60vh] items-center justify-center">

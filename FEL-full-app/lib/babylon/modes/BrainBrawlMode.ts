@@ -86,6 +86,11 @@ import { roundKindFrom, REVIEW_BEST_KEY, type ReviewChallenge } from '../core/Br
 import { loadReviewSet } from './brainBrawlReview';
 
 type Phase = 'pick' | 'spin' | 'howto' | 'expose' | 'answer' | 'result' | 'done';
+
+/** QA P2-05 (2026-09-27): a first visit read "best 0" — a personal best nobody set. No best yet says "first run". */
+export function bestLine(best: number): string {
+  return best > 0 ? `best ${best}` : 'first run';
+}
 const MAX_ROUNDS = 15;
 /** The spin, then the LANDING beat: the wheel stopped, the category named — before the card goes up. */
 // Feel: the wheel and the verdict used to hold 2.2 + 0.7 and 3.2 s (skip at 0.9). A night of five claims
@@ -463,7 +468,7 @@ export const BrainBrawlMode: ModeDefinition = (() => {
     const opt = (n: number, label: string) => (S.players === n ? `▸ ${label} ◂` : `  ${label}  `);
     ctx.setHud({
       banner: `${opt(1, '1P SOLO')}   ${opt(2, '2P DUEL')}`,
-      hint: `A starts ${S.players > 1 ? 'the duel · P1 faces, P2 arrows' : `solo · five categories · best ${S.best}`} · ◀ ▶ choose`,
+      hint: `A starts ${S.players > 1 ? 'the duel · P1 faces, P2 arrows' : `solo · five categories · ${bestLine(S.best)}`} · ◀ ▶ choose`,
       players: S.players, prompt: '', display: '', board: null, boardTitle: '', phase: 'pick',
     });
   }
@@ -664,7 +669,7 @@ export const BrainBrawlMode: ModeDefinition = (() => {
       if (cpuOn(S)) { act(S, 1, outcome === 'win' || newBest ? 'party_lose' : 'idle_stand', { loop: true, fadeSec: 0.25 }); light(S, 1, 'dim'); }
       host(S, newBest ? 'best' : 'solo.done', 'present');
       const out = S.x.strikes >= SOLO_STRIKES ? `OUT · ${SOLO_STRIKES} STRIKES · ${p1}` : `COMPOSITE · ${p1}`;   // IMPROVE #4
-      hud(ctx, S, { ...clear, banner: newBest ? `NEW BEST · ${p1}` : out, board: boardRows(S.claims, S.scores, names(S)), boardTitle: `${claimed} / 5 CLAIMED · best ${S.best}`, hint: '' });
+      hud(ctx, S, { ...clear, banner: newBest ? `NEW BEST · ${p1}` : out, board: boardRows(S.claims, S.scores, names(S)), boardTitle: `${claimed} / 5 CLAIMED${S.best > 0 ? ` · ${bestLine(S.best)}` : ''}`, hint: '' });
     }
     SoundKit.play('whistle'); if (outcome === 'win') { SoundKit.play('crowdCheer'); for (const cr of S.crowd) cr.cheer(1); }
     const stats = { players: S.players, p2score: p2, claims: claimedBy(S.claims, 0).length, p2claims: claimedBy(S.claims, 1).length, rounds: S.round, best: S.best, cpu: cpuOn(S) ? 1 : 0, strikes: S.players === 1 ? S.x.strikes : 0 };
