@@ -19,6 +19,7 @@ const TEXT_BY_VERSION: Record<string, string> = {
   '2026-10-07-draft': 'e1c40c0b8dd666d8',  // + §6: the Mirror's "vs your last 3" kept on the device only, never sent, forgettable (mirror-progress)
   '2026-10-07': '1817114b5ef24ce7',        // LEGAL-COPY: Terms §2 18+, Terms §9 + Privacy §11 Contact, Privacy §10 store, §4/§5/§7 fixes; first non-draft label; draft banners removed on the owner's sign-off (follow-up 1)
   '2026-10-12': '774adfd3055f3cfa',        // LEGAL-COPY-2: Terms §7 written; the Mail line and the privacy write-to clause print only once an address is set
+  '2026-10-13': 'e9481336114ac8d5',        // CREATOR-PLATFORM: §1 gains the Work-with-us inquiry bullet (name, email, message; kept 12 months; no IP address)
 };
 
 describe('the policy version', () => {
@@ -44,8 +45,11 @@ describe('the policy version', () => {
 
   // LEGAL-COPY (2026-10-07): the label is final (not a draft), it is the single source, and every prior version's
   // fingerprint stays so an old text still resolves.
+  // test changed (2026-10-13, owner-approved privacy line on PR #18): was toBe('2026-10-12'). The version moves with
+  // the text; 2026-10-12 is now an earlier version and keeps its fingerprint below.
   it('is the final, non-draft label', () => {
-    expect(CURRENT_POLICY_VERSION).toBe('2026-10-12');
+    expect(CURRENT_POLICY_VERSION).toBe('2026-10-13');
+    expect(CURRENT_POLICY_VERSION).not.toBe('2026-10-12');
     expect(CURRENT_POLICY_VERSION).not.toBe('2026-10-07');
     expect(CURRENT_POLICY_VERSION).not.toBe('2026-10-07-draft');
     expect(CURRENT_POLICY_VERSION).not.toMatch(/-draft$/);
@@ -62,7 +66,7 @@ describe('the policy version', () => {
   });
 
   it('keeps every earlier version fingerprint (the record of what each signup accepted)', () => {
-    for (const v of ['2026-09-24-draft', '2026-09-25-draft', '2026-09-29-draft', '2026-09-29b-draft', '2026-09-29c-draft', '2026-09-30-draft', '2026-10-01-draft', '2026-10-07-draft', '2026-10-07']) {
+    for (const v of ['2026-09-24-draft', '2026-09-25-draft', '2026-09-29-draft', '2026-09-29b-draft', '2026-09-29c-draft', '2026-09-30-draft', '2026-10-01-draft', '2026-10-07-draft', '2026-10-07', '2026-10-12']) {
       expect(TEXT_BY_VERSION).toHaveProperty(v);
     }
   });
@@ -391,5 +395,32 @@ describe('the support page shows the one business contact email (LEGAL-COPY req 
     const src = readFileSync(new URL('../app/support/page.tsx', import.meta.url), 'utf8');
     expect(src).not.toContain('finalevolutionlab.com');
     expect(src).toMatch(/import\s*\{\s*BUSINESS_CONTACT_EMAIL\s*\}\s*from\s*['"]@\/lib\/legal\/business['"]/);
+  });
+});
+
+// CREATOR-PLATFORM (PR #18, 2026-10-13; owner decision "Add a privacy-policy line for inquiries", with a version bump): §1 says
+// what the Work-with-us form stores, for how long, and that no IP address is kept. The table is pending SQL, and the code
+// deletes expired rows after INQUIRY_RETENTION_DAYS (lib/creator/inquiryStore.ts), so the line has to match that number.
+describe('privacy policy, Work-with-us inquiries (CREATOR-PLATFORM)', () => {
+  const section = PRIVACY_CONTENT.slice(PRIVACY_CONTENT.indexOf('## 1. Data We Collect'), PRIVACY_CONTENT.indexOf('## 2.'));
+  const line = section.split('\n').find((l) => l.startsWith('- **Work-with-us inquiries:**')) ?? '';
+
+  it('is a one-line bullet in §1 that names name, email and message', () => {
+    expect(line).not.toBe('');
+    expect(line).toContain('your name, email and message');
+    expect(line).toContain('only to reply to you');
+  });
+
+  it('states the retention that the code enforces, and that no IP address is stored', async () => {
+    const { INQUIRY_RETENTION_DAYS } = await import('./creator/inquiryStore');
+    expect(INQUIRY_RETENTION_DAYS).toBe(365);
+    expect(line).toContain('We keep it for 12 months, then delete it.');
+    expect(line).toContain('We do not store your IP address.');
+  });
+
+  it('keeps the rest of §1 as it was', () => {
+    for (const bullet of ['- **Account data:**', '- **Performance data (PRQ):**', '- **Game session data:**', '- **Coach chat inputs:**']) {
+      expect(section).toContain(bullet);
+    }
   });
 });

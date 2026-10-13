@@ -2,17 +2,20 @@
  * "Work with us" inquiries.
  *
  * Order: per-IP rate limit (429) → honeypot (a filled `website` field gets a 201 and is dropped, so a bot
- * learns nothing) → zod validation (400) → write `inquiries/{id}` with status NEW (201). No auto-reply.
+ * learns nothing) → zod validation (400) → save to Postgres (201). No auto-reply.
  *
- * The IP is never stored. `ipHash` is an HMAC with CREATOR_IP_SALT; without a salt it is null rather than
- * an unsalted hash anyone could reverse over the IPv4 space.
+ * Storage is the CreatorInquiry table, which is pending SQL (prisma/pending/2026-10-13-creator-inquiry.sql, see
+ * ./inquiryStore.ts). Until the owner applies it, a valid inquiry is NOT stored and the answer is 503
+ * `inquiries_unavailable` with an honest message. The IP is never stored (owner, 2026-10-13: the salted IP hash is
+ * gone; the rate limit only keeps the IP in memory).
  */
 
-import { createHmac } from 'crypto';
 import { z } from 'zod';
 import { rateLimit, type RateLimitResult } from '@/lib/rate-limit';
 import { getApprovedProfile } from './creatorCatalog';
-import type { CreatorInquiryStore, InquiryRecord } from './creatorStore';
+import type { InquiryRecord, SaveInquiryResult } from './inquiryStore';
+
+export const INQUIRIES_UNAVAILABLE_MESSAGE = 'Inquiries are unavailable right now. Please try again later.';
 
 export const BUDGET_RANGES = [
   { value: 'under-1k', label: 'Under $1,000' },
@@ -46,11 +49,6 @@ export const inquirySchema = z.object({
 
 export type InquiryInput = z.input<typeof inquirySchema>;
 
-export function hashIp(ip: string, salt: string | undefined): string | null {
-  if (!salt || !ip) return null;
-  return createHmac('sha256', salt).update(ip).digest('hex');
-}
-
 export interface InquiryResponse {
   status: 201 | 400 | 429 | 500 | 503;
   body: Record<string, unknown>;
@@ -58,14 +56,12 @@ export interface InquiryResponse {
 }
 
 export interface SubmitInquiryDeps {
-  store: CreatorInquiryStore | null;
-  env?: NodeJS.ProcessEnv;
-  now?: Date;
+  /** Saves one validated inquiry. The route passes the Postgres store (./inquiryStore.ts saveInquiry). */
+  save: (record: InquiryRecord) => Promise<SaveInquiryResult>;
   limit?: (key: string) => RateLimitResult;
 }
 
 export async function submitInquiry(body: unknown, ip: string, deps: SubmitInquiryDeps): Promise<InquiryResponse> {
-  const env = deps.env ?? process.env;
   const limit = deps.limit ?? ((key: string) => rateLimit(key, INQUIRY_LIMIT, INQUIRY_WINDOW_MS));
   const limited = limit(`creator-inquiry:${ip}`);
   if (!limited.ok) {
@@ -92,8 +88,6 @@ export async function submitInquiry(body: unknown, ip: string, deps: SubmitInqui
     };
   }
 
-  if (!deps.store) return { status: 503, body: { error: 'Inquiries are not open on this server yet.' } };
-
   const data = parsed.data;
   const record: InquiryRecord = {
     brand: data.brand,
@@ -103,16 +97,16 @@ export async function submitInquiry(body: unknown, ip: string, deps: SubmitInqui
     dates: data.dates,
     deliverables: data.deliverables,
     message: data.message,
-    consent: true,
     profileSlug: data.profile && getApprovedProfile(data.profile) ? data.profile : null,
-    status: 'NEW',
     source: data.source,
-    ipHash: hashIp(ip, env.CREATOR_IP_SALT),
-    createdAt: (deps.now ?? new Date()).toISOString(),
   };
   try {
-    const { id } = await deps.store.createInquiry(record);
-    return { status: 201, body: { ok: true, id } };
+    const saved = await deps.save(record);
+    if (saved.ok) return { status: 201, body: { ok: true, id: saved.id } };
+    if (saved.reason === 'unavailable') {
+      return { status: 503, body: { error: 'inquiries_unavailable', message: INQUIRIES_UNAVAILABLE_MESSAGE } };
+    }
+    return { status: 500, body: { error: 'Could not save the inquiry. Try again.' } };
   } catch (err) {
     console.error('[creator-inquiry]', err instanceof Error ? err.message : err);
     return { status: 500, body: { error: 'Could not save the inquiry. Try again.' } };

@@ -43,7 +43,6 @@ const NOT_NAVIGABLE: Record<string, string> = {
   '/screen/program/[lane]': 'Quick Screen result lane, generated from lib/screen/routes.ts and sessionStorage state',
   '/program': 'a bought program or a teen unlock, opened from the receipt, noindex',
   '/session': 'a paid live call, opened from the booking confirmation, noindex',
-  '/bookings': 'Stripe Checkout returns here after a service booking (success_url)',
   // NESTED ROUTES (2026-10-08, PR #105 brought up to the release): the walker now sees every page route, not only the
   // top level, and these five release routes have no in-app link. Each is named with the reason found in the code.
   '/coach/thanks': 'Stripe Checkout success_url (lib/coach-store/checkout.ts), flag-gated by COACH_STORE_ENABLED, noindex',

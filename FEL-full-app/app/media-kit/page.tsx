@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import { formatUsd } from '@/lib/books/bookCatalog';
-import { MEDIA_KIT, mediaKitProfile } from '@/lib/creator/creatorCatalog';
-import { getInstagramStats } from '@/lib/creator/instagram';
+import { AUDIENCE_STATS, MEDIA_KIT, mediaKitProfile } from '@/lib/creator/creatorCatalog';
 import { currentViewer } from '@/lib/creator/creatorViewer';
 import { CreatorFrame, ExampleBadge, ProfilePhoto, SectionTitle } from '@/components/creator-platform/creator-frame';
 
@@ -11,7 +10,7 @@ export const metadata = { title: 'Media kit — Final Evolution Lab' };
 export default async function MediaKitPage() {
   const viewer = await currentViewer();
   const profile = mediaKitProfile();
-  const audience = await getInstagramStats();
+  const audience = AUDIENCE_STATS;
 
   return (
     <CreatorFrame
@@ -52,7 +51,7 @@ export default async function MediaKitPage() {
           ))}
         </div>
         {audience.isExample ? (
-          <p className="mt-2 text-[11px] text-white/35">Fixture numbers. Instagram is not connected, so these are not real stats.</p>
+          <p className="mt-2 text-[11px] text-white/35">Fixture numbers, not real stats.</p>
         ) : null}
       </section>
 

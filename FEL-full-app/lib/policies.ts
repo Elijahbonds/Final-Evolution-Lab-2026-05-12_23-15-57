@@ -56,7 +56,11 @@ const WRITE_TO = isMailingAddressSet(REAL_MAILING_ADDRESS) ? `, or write to ${BU
 // teen line). FE PM 10:11 AM PT Oct 8: the mailing-address placeholder literal is gone from lib/legal/business.ts; the
 // Mail lines and the privacy "write to" clause print only once REAL_MAILING_ADDRESS is set, and setting it is its own
 // change with its own version bump. 2026-10-07 is the text without these.
-export const CURRENT_POLICY_VERSION = '2026-10-12';
+// CREATOR-PLATFORM (PR #18, 2026-10-13; owner decision "Add a privacy-policy line for inquiries"): bumped again, §1 only — one
+// bullet for the Work-with-us inquiry form (name, email and message, with the other fields the form asks for; kept 12 months,
+// then deleted; no IP address). The inquiry table is pending SQL (prisma/pending/2026-10-13-creator-inquiry.sql) and its
+// retention is INQUIRY_RETENTION_DAYS in lib/creator/inquiryStore.ts. 2026-10-12 is the text without this bullet.
+export const CURRENT_POLICY_VERSION = '2026-10-13';
 
 export const TERMS_CONTENT = `
 # Terms of Service
@@ -144,6 +148,7 @@ export const PRIVACY_CONTENT = `
   are stored with every value.
 - **Game session data:** mode, score, duration, win/loss.
 - **Coach chat inputs:** messages sent to the AI coach.
+- **Work-with-us inquiries:** if you send an inquiry through Work with us, we store your name, email and message, with the brand, budget range, dates and what you need that you tell us, only to reply to you. We keep it for 12 months, then delete it. We do not store your IP address.
 
 ## 2. How We Use Your Data
 

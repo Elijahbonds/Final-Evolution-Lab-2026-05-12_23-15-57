@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { PublicTopBar } from '@/components/public-chrome';
 import { EXAMPLE_RATE_NOTE } from '@/lib/creator/creatorCatalog';
 
-/** Shared chrome for /team, /media-kit, /work-with-us and /bookings. Same look as the Press frame. */
+/** Shared chrome for /team, /media-kit and /work-with-us. Same look as the Press frame. */
 export function CreatorFrame({
   signedIn,
   title,
@@ -18,7 +18,7 @@ export function CreatorFrame({
     <div className="min-h-screen bg-[#070707] pb-24 text-white">
       {signedIn ? null : <PublicTopBar />}
       <p className="bg-[#3a1214] px-4 py-2 text-center text-[11px] leading-relaxed text-[#ffb4b4]">
-        {EXAMPLE_RATE_NOTE} Booking checkout is Stripe test mode and does not charge a live card.
+        {EXAMPLE_RATE_NOTE}
       </p>
       <main className="mx-auto max-w-5xl px-4 py-8">
         <header className="flex flex-wrap items-end justify-between gap-4">

@@ -42,7 +42,7 @@ export function InquiryForm({ budgets, profile, source }: { budgets: readonly Op
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
         setStatus('error');
-        setMessage(typeof body?.error === 'string' ? body.error : 'Could not send that.');
+        setMessage(typeof body?.message === 'string' ? body.message : typeof body?.error === 'string' ? body.error : 'Could not send that.');
         if (Array.isArray(body?.issues)) setIssues(body.issues as Issue[]);
         return;
       }

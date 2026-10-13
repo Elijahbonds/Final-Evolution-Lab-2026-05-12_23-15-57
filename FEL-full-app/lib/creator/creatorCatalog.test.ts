@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+  AUDIENCE_STATS,
   MEDIA_KIT,
   PROFILES,
-  approvedProducts,
   approvedProfiles,
   approvedServices,
+  coachStoreBookHref,
   getApprovedProfile,
-  getBookableService,
 } from './creatorCatalog';
 
 describe('creator catalog', () => {
@@ -18,29 +18,38 @@ describe('creator catalog', () => {
     expect(getApprovedProfile('nobody')).toBeUndefined();
   });
 
-  it('cannot book a service on an unapproved profile', () => {
-    expect(getBookableService('elijah-bonds:session-60')?.service.durationMinutes).toBe(60);
-    expect(getBookableService('example-teammate:session-60')).toBeUndefined();
-  });
-
-  it('marks every price and rate as an example, and invents no bio', () => {
+  it('invents no bio, marks every stat and media-kit rate as an example', () => {
     for (const p of PROFILES) {
       expect(p.bio).toBe('Bio placeholder.');
-      for (const s of p.services) expect(s.priceIsExample, s.id).toBe(true);
-      for (const prod of p.products) expect(prod.priceIsExample, prod.id).toBe(true);
       for (const stat of p.stats) expect(stat.isExample).toBe(true);
-      expect(p.hoursAreExample).toBe(true);
     }
     for (const pkg of MEDIA_KIT.packages) expect(pkg.priceIsExample, pkg.id).toBe(true);
     expect(MEDIA_KIT.partnersConfirmed).toBe(false);
+    expect(AUDIENCE_STATS.isExample).toBe(true);
   });
 
-  it('gives every product a fulfillment provider and hides unapproved ones', () => {
+  it('lists services as information only: no price, no slot, nothing to buy here', () => {
     const profile = getApprovedProfile('elijah-bonds')!;
-    for (const p of profile.products) expect(['printful', 'printify', 'manual']).toContain(p.provider);
-    const shown = approvedProducts(profile).map((p) => p.id);
-    expect(shown).toEqual(['fel-hoodie-m', 'fel-hoodie-w', 'fel-tee', 'fel-hat', 'fel-joggers']);
-    expect(shown).not.toContain('signed-basketball');
     expect(approvedServices(profile).length).toBeGreaterThan(0);
+    for (const s of PROFILES.flatMap((p) => p.services)) {
+      expect(Object.keys(s).sort()).toEqual(['approved', 'description', 'durationMinutes', 'id', 'name', 'profileSlug']);
+    }
+    for (const p of PROFILES) {
+      expect(p).not.toHaveProperty('weeklyHours');
+      expect(p).not.toHaveProperty('products');
+      expect(p).not.toHaveProperty('ownerEmails');
+    }
+  });
+});
+
+describe('Book buttons go to the existing coach store (adults-only), not a booking engine of our own', () => {
+  it('an approved profile in the coach store links to /coach/<slug>', () => {
+    expect(coachStoreBookHref(getApprovedProfile('elijah-bonds')!)).toBe('/coach/elijahbonds');
+  });
+
+  it('a profile that is unapproved, or not in the coach store, gets no Book link', () => {
+    expect(coachStoreBookHref(PROFILES.find((p) => p.slug === 'example-teammate')!)).toBeNull();
+    const notInStore = { ...getApprovedProfile('elijah-bonds')!, coachStoreSlug: null };
+    expect(coachStoreBookHref(notInStore)).toBeNull();
   });
 });
