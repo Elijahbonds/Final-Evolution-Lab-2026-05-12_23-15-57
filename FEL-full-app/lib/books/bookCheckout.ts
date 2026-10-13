@@ -13,6 +13,7 @@ import { paymentMethodsFor } from '@/lib/stripe-payment-methods';
 import { siteOrigin } from '@/lib/stripe/site-origin';
 import type { StoreClosedReason } from '@/lib/coach-store/stripeMode';
 import { STORE_TERMS_VERSION } from '@/lib/store-terms';
+import { bookFormatAllowed, bookOfferAllowed, currentBookPolicy, type BookTermsPolicy } from './bookTerms';
 
 // Same pin as lib/stripe.ts. The SDK's enum lags the account's version string.
 const API_VERSION = '2025-04-30.basil' as never;
@@ -64,7 +65,7 @@ export type BookCheckoutGate =
   | { ok: false; reason: StoreClosedReason };
 
 /** lib/flags.ts isVirtualPurchasesEnabled's parse, read from the PASSED env so the gate is testable. */
-function virtualPurchasesOn(env: NodeJS.ProcessEnv): boolean {
+export function virtualPurchasesOn(env: NodeJS.ProcessEnv): boolean {
   const v = (env.VIRTUAL_PURCHASES_ENABLED ?? '').trim().toLowerCase();
   return v === '1' || v === 'true' || v === 'on' || v === 'yes';
 }
@@ -107,6 +108,22 @@ export class BookCheckoutError extends Error {
   }
 }
 
+/** Shown when the current store terms do not cover the format asked for (owner 2026-10-13: audiobooks only). */
+export const FORMAT_NOT_OFFERED_MESSAGE = 'This format is not for sale here yet. Audiobooks are stream only.';
+
+/**
+ * The terms rule for checkout (lib/books/bookTerms.ts): an offer whose format the current store terms do not cover
+ * (ebook, bundle) is refused with a 409 `format_not_offered`. Fail closed: an unknown offer is refused too. The route
+ * calls this BEFORE it creates a Stripe customer, and checkoutParamsForOffer calls it again.
+ */
+export function assertOfferSellable(offerId: string, policy: BookTermsPolicy = currentBookPolicy()): void {
+  const offer = getOffer(offerId);
+  if (!offer) throw new BookCheckoutError('Unknown book.', 404, 'unknown_offer');
+  if (!bookFormatAllowed(offer.format, policy)) {
+    throw new BookCheckoutError(FORMAT_NOT_OFFERED_MESSAGE, 409, 'format_not_offered');
+  }
+}
+
 export interface CheckoutBuildInput {
   offer: BookOffer;
   book: BookTitle;
@@ -115,10 +132,15 @@ export interface CheckoutBuildInput {
   customerEmail?: string | null;
   taxEnabled: boolean;
   paymentMethodTypes: string[] | undefined;
+  /** Tests only: the terms policy to apply. Production always uses the live STORE_TERMS_VERSION's row. */
+  policy?: BookTermsPolicy;
 }
 
 export function checkoutParamsForOffer(input: CheckoutBuildInput): Stripe.Checkout.SessionCreateParams {
-  if (!input.offer.directSale) {
+  if (!bookFormatAllowed(input.offer.format, input.policy ?? currentBookPolicy())) {
+    throw new BookCheckoutError(FORMAT_NOT_OFFERED_MESSAGE, 409, 'format_not_offered');
+  }
+  if (!bookOfferAllowed(input.offer, input.policy ?? currentBookPolicy())) {
     throw new BookCheckoutError(
       input.offer.directSaleNote || 'This format is not for sale here.',
       409,
@@ -190,6 +212,7 @@ export function buildBookCheckoutParams(input: {
   customerEmail?: string | null;
   taxEnabled: boolean;
   paymentMethodTypes?: string[] | undefined;
+  policy?: BookTermsPolicy;
 }): Stripe.Checkout.SessionCreateParams {
   const offer = getOffer(input.offerId);
   if (!offer) throw new BookCheckoutError('Unknown book.', 404, 'unknown_offer');
@@ -203,5 +226,6 @@ export function buildBookCheckoutParams(input: {
     customerEmail: input.customerEmail,
     taxEnabled: input.taxEnabled,
     paymentMethodTypes: input.paymentMethodTypes === undefined ? paymentMethodsFor('payment') : input.paymentMethodTypes,
+    policy: input.policy,
   });
 }

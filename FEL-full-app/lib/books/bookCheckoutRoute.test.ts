@@ -54,7 +54,7 @@ import { STORE_TERMS_VERSION } from '@/lib/store-terms';
 const ENV_KEYS = ['BOOK_STORE_ENABLED', 'VIRTUAL_PURCHASES_ENABLED', 'STRIPE_SECRET_KEY', 'STRIPE_BOOKS_SECRET_KEY', 'NEXTAUTH_URL'] as const;
 const SAVED: Record<string, string | undefined> = {};
 
-const GOOD_BODY = { offerId: 'blueprint:ebook', termsAccepted: true, termsVersion: STORE_TERMS_VERSION };
+const GOOD_BODY = { offerId: 'blueprint:audiobook', termsAccepted: true, termsVersion: STORE_TERMS_VERSION };
 
 function post(body: unknown): NextRequest {
   return new NextRequest('http://localhost/api/books/checkout', {
@@ -152,10 +152,10 @@ describe('book checkout: signed in, no guest checkout', () => {
 
 describe('book checkout: the store terms gate (termsAccepted + STORE_TERMS_VERSION)', () => {
   const cases: Array<[string, Record<string, unknown>]> = [
-    ['no tick at all', { offerId: 'blueprint:ebook' }],
+    ['no tick at all', { offerId: 'blueprint:audiobook' }],
     ['termsAccepted false', { ...GOOD_BODY, termsAccepted: false }],
     ['termsAccepted "true" (a string)', { ...GOOD_BODY, termsAccepted: 'true' }],
-    ['no version', { offerId: 'blueprint:ebook', termsAccepted: true }],
+    ['no version', { offerId: 'blueprint:audiobook', termsAccepted: true }],
     ['an old version', { ...GOOD_BODY, termsVersion: 'store-terms-2026-10-04' }],
   ];
   it.each(cases)('%s -> 409 terms_required naming the current version, before any Stripe call', async (_name, body) => {
@@ -179,6 +179,35 @@ describe('book checkout: verified adults only (the coach store\'s isVerifiedAdul
   });
 });
 
+describe('book checkout: the store terms allow-list (lib/books/bookTerms.ts), audiobooks only', () => {
+  // owner 2026-10-13: store-terms-2026-10-12 covers audiobooks only; ebooks and the bundle are hidden and refused
+  // until an EBOOK-1 terms version exists. Refused before any Stripe customer or session is created.
+  it.each(['blueprint:ebook', 'blueprint:bundle', 'unfair-advantages:ebook', 'unfair-advantages:bundle'])(
+    '%s -> 409 format_not_offered, no Stripe customer, no session',
+    async (offerId) => {
+      h.stripeCustomer = null;
+      const r = await call({ ...GOOD_BODY, offerId });
+      expect(r.status).toBe(409);
+      expect(r.json).toMatchObject({ code: 'format_not_offered' });
+      expect(h.customersCreate).toEqual([]);
+      expect(h.sessionsCreate).toEqual([]);
+    },
+  );
+
+  it('an unknown offer is 404 before any Stripe call', async () => {
+    h.stripeCustomer = null;
+    const r = await call({ ...GOOD_BODY, offerId: 'nope:audiobook' });
+    expect(r.status).toBe(404);
+    expect(h.customersCreate).toEqual([]);
+    expect(h.sessionsCreate).toEqual([]);
+  });
+
+  it('the audiobook is still sold', async () => {
+    const r = await call(GOOD_BODY);
+    expect(r.status).toBe(200);
+  });
+});
+
 describe('book checkout: the happy path', () => {
   it('a signed-in verified adult who ticked the current terms gets a session; terms_version rides on it', async () => {
     const r = await call(GOOD_BODY);
@@ -187,7 +216,7 @@ describe('book checkout: the happy path', () => {
     expect(h.adultCalls).toEqual(['buyer-1']);
     expect(h.sessionsCreate).toHaveLength(1);
     const params = h.sessionsCreate[0];
-    expect(params.metadata).toMatchObject({ product: 'BOOK', offerId: 'blueprint:ebook', terms_version: STORE_TERMS_VERSION });
+    expect(params.metadata).toMatchObject({ product: 'BOOK', offerId: 'blueprint:audiobook', terms_version: STORE_TERMS_VERSION });
     // the platform StripeCustomer is reused, and the return URL comes from NEXTAUTH_URL, not the request's Origin
     expect(params.customer).toBe('cus_saved');
     expect(params.success_url).toBe('https://fel.example/press/receipt?session_id={CHECKOUT_SESSION_ID}');

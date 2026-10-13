@@ -44,7 +44,9 @@ const UA = 'AgeScreenTest/1.0';
 // CREATOR-PLATFORM (PR #18) prisma/pending/2026-10-13-creator-inquiry.sql (pending SQL only, owner applies) at 5a2755a4.
 // PARTY-CHAT P2 prisma/pending/2026-10-13-party-report.sql (pending SQL only; schema.prisma untouched) at be3f5207;
 // pinned at the lane/party-chat merge of lane/finish-release, the first commit carrying all three pending files.
-const PARENT = '55efd05dd838d1f6aa694ecabc06cbbbfd3d3bcd';
+// PARTY-PRIVACY (this lane) prisma/pending/2026-10-13-party-report.sql RETENTION comment only (12 months, with the delete
+// statement; pending SQL only, no column or index added) at 521c52c1.
+const PARENT = '521c52c1466eef149872a469b631e31572b318f2';
 
 /** Resolve a diff base for the schema-ban check when CI's checkout is shallow. */
 function resolvePrismaDiffBase(): string {

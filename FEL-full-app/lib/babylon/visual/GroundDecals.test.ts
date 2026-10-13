@@ -1,0 +1,53 @@
+// vis-foundation-2 A9.14 (routed from vis-combat) — the shared ground-decal pool.
+import { describe, expect, it } from 'vitest';
+import { FreeCamera, NullEngine, Scene, Vector3 } from '@babylonjs/core';
+import { decalAlpha, decalCap, decalLife, mountGroundDecals, mountSceneDecals, nextSlot } from './GroundDecals';
+
+function rig(modeId = 'karate') {
+  const engine = new NullEngine();
+  (engine as unknown as { getDeltaTime: () => number }).getDeltaTime = () => 1000 / 60;
+  const scene = new Scene(engine);
+  new FreeCamera('cam', new Vector3(0, 3, -6), scene);
+  (scene.metadata ??= {}).felModeId = modeId;
+  return { scene, frame: (n: number) => { for (let i = 0; i < n; i++) scene.render(); } };
+}
+
+describe('decal life', () => {
+  it('fully there for most of its life, then fading to nothing', () => {
+    expect(decalAlpha(0, 10)).toBe(1);
+    expect(decalAlpha(5.9, 10)).toBe(1);
+    expect(decalAlpha(8, 10)).toBeCloseTo(0.5, 6);
+    expect(decalAlpha(10, 10)).toBe(0);
+    expect(decalAlpha(-1, 10)).toBe(0);
+  });
+  it('the ring buffer wraps; phones hold fewer marks for less time', () => {
+    expect(nextSlot(-1, 4)).toBe(0); expect(nextSlot(3, 4)).toBe(0);
+    expect(decalCap('mobile')).toBeLessThan(decalCap('desktop'));
+    expect(decalLife('mobile')).toBeLessThan(decalLife('high'));
+  });
+});
+
+describe('the pool', () => {
+  it('one mesh per kind however many marks; full pools reuse the oldest; marks fade out', () => {
+    const { scene, frame } = rig();
+    const d = mountGroundDecals(scene, 'mobile');
+    for (let i = 0; i < decalCap('mobile') + 10; i++) d.stamp('foot', i * 0.3, 0, 0.2);
+    d.stamp('scuff', 0, 1, 1);
+    const meshes = scene.meshes.filter((m) => m.name.startsWith('fel_decal_'));
+    expect(meshes.map((m) => m.name).sort()).toEqual(['fel_decal_foot', 'fel_decal_scuff']);
+    expect(d.live('foot')).toBe(decalCap('mobile'));
+    expect(meshes.every((m) => !m.isPickable)).toBe(true);
+    frame(Math.ceil(decalLife('mobile') * 60) + 5);
+    expect(d.live('foot')).toBe(0);
+    d.dispose();
+    expect(scene.meshes.some((m) => m.name.startsWith('fel_decal_'))).toBe(false);
+  });
+  it('the rig puts it on the scene for the modes; never on a held hoops mode', () => {
+    const a = rig('karate');
+    const h = mountSceneDecals(a.scene, 'desktop')!;
+    expect(a.scene.metadata.felDecals).toBeTruthy();
+    h.dispose();
+    expect(a.scene.metadata.felDecals).toBeUndefined();
+    expect(mountSceneDecals(rig('dunk').scene, 'desktop')).toBeNull();
+  });
+});

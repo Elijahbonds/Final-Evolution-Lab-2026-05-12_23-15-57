@@ -18,6 +18,8 @@ import { mpModeLabel } from '@/lib/mp/match-core';
 export function CardEditor() {
   const [card, setCard] = useState<CreatorCardData | null>(null);
   const [published, setPublished] = useState(false);
+  // CARD-SAFE-1: fail closed. The publish control shows only when GET /api/v1/card says this account may publish.
+  const [canPublish, setCanPublish] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -51,7 +53,7 @@ export function CardEditor() {
   useEffect(() => {
     fetch('/api/v1/card')
       .then((r) => (r.ok ? r.json() : null))
-      .then((d) => { if (d?.card) { hydrate(d.card); setPublished(Boolean(d.card.published)); } })
+      .then((d) => { setCanPublish(d?.canPublish === true); if (d?.card) { hydrate(d.card); setPublished(Boolean(d.card.published)); } })
       .catch(() => {})
       .finally(() => setLoading(false));
     fetch('/api/v1/card/highlights').then((r) => (r.ok ? r.json() : null)).then((d) => setCandidates(d?.candidates ?? [])).catch(() => {});
@@ -168,12 +170,12 @@ export function CardEditor() {
           <button onClick={save} disabled={busy} className="inline-flex items-center gap-2 rounded-xl bg-[#A855F7] px-5 py-3 font-bold text-white transition-transform hover:scale-[1.03] disabled:opacity-50">
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Save card
           </button>
-          <button onClick={togglePublish} disabled={busy || !card} className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/[0.04] px-5 py-3 font-semibold text-white transition-colors hover:border-white/30 disabled:opacity-50">
+          {canPublish || published ? <button onClick={togglePublish} disabled={busy || !card} className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/[0.04] px-5 py-3 font-semibold text-white transition-colors hover:border-white/30 disabled:opacity-50">
             {published ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}{published ? 'Unpublish' : 'Publish'}
-          </button>
+          </button> : null}
         </div>
 
-        {card && published && (
+        {card && published && canPublish && (
           <div className="mt-4 rounded-xl border border-white/10 bg-black/30 p-3">
             <div className="flex items-center gap-2 text-xs text-white/60"><Share2 className="h-3.5 w-3.5" /> Public link</div>
             <div className="mt-2 flex gap-2">

@@ -5,6 +5,7 @@ import { Gem, Shirt, Store, CalendarDays, PersonStanding } from 'lucide-react';
 import { authOptions } from '@/lib/auth';
 import { loginPath } from '@/lib/auth/safeNext';
 import { prisma } from '@/lib/db';
+import { isCoachStoreEnabled } from '@/lib/flags';
 import { readWallet } from '@/lib/wallet/wallet-service';
 import { prqScore, prqGrade } from '@/lib/prq';
 import { recoveryAsOf } from '@/lib/prq-recovery';
@@ -43,7 +44,7 @@ export default async function ProfilePage() {
   const base = prqScore((profile ? recoveryAsOf(profile) : null) as unknown as Record<string, number> | null);
   const owned = ownedFromEntitlements(entitlements.map((e) => e.skuId));
   const vitals = gameVitals(base, owned);
-  // The grade an athlete IS graded at is the measured one. The lift is shown beside it, labelled, never folded in.
+  // The grade an athlete IS graded at is the measured one. CARD-SAFE-2: cards are cosmetic, so there is no lift to show.
   const grade = prqGrade(vitals.base);
   const shards = wallet?.shards ?? 0;
 
@@ -74,13 +75,6 @@ export default async function ProfilePage() {
               {grade.label}
             </p>
           </div>
-          {vitals.lift > 0 && (
-            <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-right">
-              <p className="font-mono text-[9px] uppercase tracking-[0.14em] text-white/35">In game</p>
-              <p className="fel-heading text-[20px] font-black leading-none text-white">{Math.round(vitals.boosted)}</p>
-              <p className="mt-0.5 font-mono text-[9px] text-[#A855F7]">+{vitals.lift} from cards</p>
-            </div>
-          )}
         </div>
       }
     >
@@ -121,7 +115,7 @@ export default async function ProfilePage() {
       <div className="mt-8"><ReferralCard /></div>
       {/* HOTFIX (2026-09-24): reduced motion — the device decides by default; this is the override, both ways */}
       <div className="mt-8"><MotionSetting /></div>
-      <DoorsRow tab="profile" />
+      <DoorsRow tab="profile" hide={isCoachStoreEnabled() ? [] : ['/account/bookings']} />
     </TabPage>
   );
 }
