@@ -1,9 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import fs from 'node:fs';
 import path from 'node:path';
-import { Certify } from './camp-view';
+import { Certify, CampGate, loadCamp, type CampLoad } from './camp-view';
 
 // HOTFIX (2026-09-24): the Certify tab reads its paper, and each module's attempt gate, from GET
 // /api/v1/camp/assess. A server render is its first paint: pin that a resting module says why and
@@ -75,6 +75,66 @@ describe('Certify, first paint', () => {
 
   it('shows no questions until a module is opened', () => {
     expect(render()).not.toContain('A prompt?');
+  });
+});
+
+// QA P0-05 (2026-09-27): GET /api/v1/camp/assess and /plans answer 402 for an account without FEL Coach, on purpose
+// (lib/camp/server.ts requirePaidFacilitator). The page read the 402 as "not loaded yet" and Certify spun on Loading…
+// forever. The bodies below are the server's own (lib/pro-guard b2bPaywall).
+describe('Camp, the first load: paywall, error, or the page', () => {
+  const PAYWALL = {
+    error: 'pro_required', feature: 'Camp mentees, plans and assessments', tier: 'coach',
+    message: 'Camp mentees, plans and assessments is part of FEL Coach ($39/month).', weeklyUsd: 5,
+    checkout: { weekly: '/api/stripe/checkout?product=FEL_COACH', monthly: '/api/stripe/checkout?product=FEL_COACH' },
+    free: 'Your own training, the Mirror and every game mode stay free. Consent records and credential revocation are never gated.',
+  };
+  function serve(answers: Record<string, { status: number; body: unknown }>) {
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      const a = answers[url] ?? { status: 200, body: {} };
+      return new Response(typeof a.body === 'string' ? a.body : JSON.stringify(a.body), { status: a.status });
+    }));
+  }
+  const gated = (l: CampLoad) => renderToStaticMarkup(createElement(CampGate, { gate: l.gate, error: l.assess ? null : l.error, onRetry: () => {} }, createElement(Certify, { state: l.assess, onDone: async () => {} })));
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  it('402: the paywall from the body — what is gated, what stays free — and no spinner, no checkout link', async () => {
+    serve({ '/api/v1/camp/assess': { status: 402, body: PAYWALL }, '/api/v1/camp/plans': { status: 402, body: PAYWALL } });
+    const l = await loadCamp();
+    expect(l.gate?.error).toBe('pro_required');
+    expect(l.error).toBeNull();
+    const m = gated(l);
+    expect(m).toContain('data-testid="camp-paywall"');
+    expect(m).toContain('Camp mentees, plans and assessments is part of FEL Coach ($39/month).');
+    expect(m).toContain('every game mode stay free');
+    expect(m).not.toContain('Loading…');
+    expect(m).not.toMatch(/stripe|checkout|href=/);
+  });
+
+  it('500: an error line and Retry, not a spinner', async () => {
+    serve({ '/api/v1/camp/assess': { status: 500, body: { error: 'boom' } } });
+    const l = await loadCamp();
+    expect(l.gate).toBeNull();
+    expect(l.error).toBe('Camp could not load (error 500).');
+    const m = gated(l);
+    expect(m).toContain('data-testid="camp-error"');
+    expect(m).toMatch(/<button[^>]*>Retry<\/button>/);
+    expect(m).not.toContain('Loading…');
+  });
+
+  it('offline: the same error line, saying so', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('offline'); }));
+    const l = await loadCamp();
+    expect(l.error).toBe('Camp could not load (no connection).');
+  });
+
+  it('200: Certify renders as today', async () => {
+    serve({ '/api/v1/camp/assess': { status: 200, body: state }, '/api/v1/camp/plans': { status: 200, body: { plans: [] } }, '/api/auth/session': { status: 200, body: { user: { id: 'u1' } } } });
+    const l = await loadCamp();
+    expect(l.gate).toBeNull();
+    expect(l.error).toBeNull();
+    expect(l.me).toBe('u1');
+    const m = gated(l);
+    expect(m).toBe(render());
   });
 });
 
