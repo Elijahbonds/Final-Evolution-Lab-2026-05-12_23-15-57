@@ -16,6 +16,8 @@ import type { VenueMood } from '../scene/moods';
 import { resolveModeMood } from '../scene/moodResolver';   // A9.4: mood follows the place
 import { InputBus, type FelInput, type BodyPacket } from './InputBus';
 import { CameraDirector, type FOLLOW_PRESETS } from './CameraDirector';
+import { mountLetterbox } from '../visual/Letterbox';   // vis-foundation-2 A9.12: the cinematic bars
+import type { IntroKind } from '../scene/broadcastShots';
 import { buildResult, type ResultSink, type SessionResult } from './sessionResult';
 import { JuiceKit } from '../premium/JuiceKit';
 import { motionPolicy } from '../../a11y/reducedMotion';   // HOTFIX (2026-09-24): the impact frame asks too
@@ -194,6 +196,9 @@ export interface ModeDefinition {
   ownsCrowd?: boolean;
   /** GC-7: hide the harness player ring and glyph during play — off by default so stamina arc stays on other modes. */
   hideRingInPlay?: boolean;
+  /** vis-foundation-2 A9.12: open play on the broadcast intro — a crane over the venue, then (walkIn) a shot on the player,
+   *  then the play camera. Skipped by the first input; never under reduced motion. Off when absent. */
+  intro?: IntroKind;
   load(ctx: ModeContext): Promise<void>;        // spawn venue + characters
   onInput(ctx: ModeContext, e: FelInput): void;
   update(ctx: ModeContext, dt: number): void;   // called only while 'playing'
@@ -310,6 +315,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
   const unink = autoInk(scene, inkStyleFor(def.modeId));   // A9.6: the anime line for the party modes, a distance-true contour for the sports
   const input = opts.input ?? new InputBus();
   const camDirector = new CameraDirector(scene, camera, def.camPreset);
+  const letterbox = mountLetterbox(scene, opts.canvas, () => camDirector.cinematic01);   // A9.12: the intro's and the replays' bars
 
   // M67: dev-only frame-budget monitor. mount() is a no-op in production, so
   // the overlay and its per-frame bookkeeping cost nothing for real players.
@@ -680,6 +686,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
       // is driving: only a body that is playing may pause the game by walking off (Z5).
       const c = evidence.count(e, now);
       if (c) { store.count(c); session.noteInput(c, now); }
+      if (c && camDirector.inIntro) camDirector.skipIntro();   // A9.12: the player's first input hands the frame to the play camera
       if (e.t === 'button' && e.pressed) buffer.press(e.btn);   // M37 input-buffer
       if (qa) {
         if (e.t === 'button' && e.pressed) qa.press(e.btn);
@@ -730,6 +737,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     if (phase !== 'ready') return;
     startedAt = performance.now();
     setPhase('playing');
+    if (def.intro) camDirector.establish(def.intro);   // A9.12: the broadcast intro over the first seconds of play (skippable)
     // CREATOR CARD (2026-09-13): one canonical record, one writer. Every mode's session is recorded HERE
     // rather than in each mode, which is the mission's rule ("No mode may persist its own parallel
     // profile") enforced by there being exactly one call site. A discipline id is the mode id — nothing
@@ -905,6 +913,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     clearReady();         // M67
     unink();              // M59
     backdrop.dispose();   // M61
+    letterbox.dispose();  // A9.12
     iblShadows?.dispose();
     ssao?.dispose();
     lights.dispose();

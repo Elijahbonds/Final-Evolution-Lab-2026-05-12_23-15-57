@@ -748,6 +748,7 @@ export const FootballRushMode: ModeDefinition = (() => {
 
   return {
     modeId: 'football', mood: 'nightGame', camPreset: 'gridiron',   // WA-24: runner sat inside defenders; gridiron pulls back
+    intro: 'walkIn',   // vis-foundation-2 A9.12: the broadcast intro (crane, then the runner) — the presentation kit's proving mode
 
     async load(ctx: ModeContext) {
       tier = readProfile();
