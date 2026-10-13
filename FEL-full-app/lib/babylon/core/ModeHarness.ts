@@ -209,6 +209,10 @@ export interface ModeDefinition {
    *  pose read per body 30 times a second, so only a mode that replays pays it. Mounting it also mounts the replays' depth of
    *  field (desktop/high) at load, so its shaders never compile mid-game. */
   replay?: boolean;
+  /** vis-race (wave 2): the bodies a replay records, when they are not skinned characters — a race's vehicles (the player's
+   *  first: it is the shot's subject), whose rivals are plain nodes `characterRoots` cannot find. Read once, after load().
+   *  Absent: the hero and the skinned characters nearest it (every other replay mode). */
+  replayBodies?(ctx: ModeContext): TransformNode[];
   /** vis-court (wave 2): who a replay records, for a mode whose action is not the hero's nearest five bodies. `bodies` replaces
    *  the default (the hero, then the nearest skinned characters, six at most) — the opponent at the far end of a court is not
    *  among the nearest; `loose` are the meshes that fly free of any body (a ball), recorded by world position. Read once, after
@@ -611,7 +615,9 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
       iblShadows = mountIblShadows(scene, camera);
       // A9.12: the replay recorder on the bodies load() spawned, and the replays' depth of field mounted now (no mid-game compile)
       replay?.dispose(); const cast = def.replay ? def.replayCast?.(ctx) : undefined;   // vis-court: a mode may name its own cast and its loose ball
-      replay = def.replay ? new ReplayDirector(scene, camera, cast?.bodies?.length ? cast.bodies : characterRoots(scene, heroRef.current), cast?.loose ?? [], mountReplayDof(scene, lights.pipeline, tier)) : null;
+      // vis-race: a race names its vehicles (replayBodies); otherwise vis-court's cast; otherwise the hero and nearest characters.
+      const raceBodies = def.replay ? def.replayBodies?.(ctx).filter((n) => !n.isDisposed()) : undefined;
+      replay = def.replay ? new ReplayDirector(scene, camera, raceBodies?.length ? raceBodies : cast?.bodies?.length ? cast.bodies : characterRoots(scene, heroRef.current), cast?.loose ?? [], mountReplayDof(scene, lights.pipeline, tier)) : null;
       setPhase('ready');
       // M67: pre-warm every material now, on the loading→ready boundary, so a
       // first-visibility shader compile never hitches mid-play. Dev-only work.

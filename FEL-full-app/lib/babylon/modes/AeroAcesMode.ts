@@ -76,6 +76,12 @@ import { buildAeroWorld, type AeroWorld } from '../racing/aeroWorlds';
 import { buildToyPlane, blurProp, Scarf, brighter, type ToyPlane } from '../racing/toyPlane';
 import { aeroHudWords, RideHudSwitch, setRingGlyph } from './rideHud';   // GC-13 / 10-phase pass, phase 10: the HUD says the rider's words
 import { resolveRaceIdentity } from '../racing/raceLook';   // PR #138: a minor's look is the device's, and never uploaded
+// VIS-RACE (visual wave 2): the broadcast intro on the grid (where the first-visit flyover is not already the intro), the replay of
+// a dogfight KILL (the player's missile or mine), and the podium's confetti. Presentation only: the model, the field, the items and
+// the play camera are untouched.
+import { KILL, ReplayCue, ReplayPacer } from '../racing/raceMoments';
+import { MISSILE_HIT_RADIUS, MINE_HIT_RADIUS } from '../racing/AeroItems';
+import { motionPolicy } from '@/lib/a11y/reducedMotion';
 import { fitVehicleLight, type VehicleLightHandle } from '../racing/vehicleLight';   // 10-phase pass, phase 7
 import { SpeedLines, WingtipTrails } from '../racing/speedFx';   // 10-phase pass, phase 8
 import { AeroPickups } from '../racing/aeroPickups';
@@ -257,6 +263,12 @@ export function makeAeroAcesMode(): ModeDefinition {
   // IMPROVE (2026-10-06) #11: THE FLYOVER — the countdown starts with one sweep round the circuit, so the first lap of an
   // unseen 3D course is not guesswork. Once per circuit per page session; A or X skips it.
   const fly = { on: false, t: 0 };
+  // VIS-RACE: the kill replay — a hit by the player's own missile or mine arms it; it plays `settleSec` later (so its last frames
+  // show the victim tumbling), through the pacer (rarely, never in the last stretch, never in reduced motion)
+  const replayPacer = new ReplayPacer();
+  const killCue = new ReplayCue(replayPacer);
+  let killVictim = 0;      // the racer id (1.. = rivals) the cameras follow
+  let replayDue = false;
   function endFlyover(ctx: ModeContext): void {
     if (!fly.on) return;
     fly.on = false;
@@ -474,6 +486,12 @@ export function makeAeroAcesMode(): ModeDefinition {
     const podium = place <= 3;
     SoundKit.play(race.finished ? (podium ? 'crowdCheer' : 'score') : 'miss');
     ctx.juice.hitStop(90);
+    // VIS-RACE: the flag — confetti over the plane for a podium finish (a win throws two bursts)
+    if (race.finished && podium && flight && !motionPolicy().reduced) {
+      const over = flight.pos.add(new Vector3(0, 2.5, 0));
+      EffectsKit.burst(ctx.scene, over, 'confetti', place === 1 ? 2 : 1.3);
+      if (place === 1) EffectsKit.burst(ctx.scene, over.add(new Vector3(0, 0.6, 0)), 'sparks', 1.4, '#fde68a');
+    }
     // IMPROVE (2026-10-06) #1: a finished race is a ghost; the faster one keeps the circuit
     let newPb = false, pbDelta: number | null = null;
     const prevBest = ghostBest;
@@ -507,9 +525,15 @@ export function makeAeroAcesMode(): ModeDefinition {
     // GC-7. After mood/camPreset: pickerReach's modesById() only recognises a modeId whose next property
     // is mood or camPreset (see VelocityKartMode).
     hideRingInPlay: true,
+    // VIS-RACE (visual wave 2): the broadcast intro on the grid — unless the first-visit FLYOVER is the intro (it is the authored one
+    // and runs once per circuit per page session; a getter, read when play wakes). A replay of a dogfight kill, shot on the victim.
+    get intro(): ModeDefinition['intro'] { return fly.on ? undefined : 'walkIn'; },
+    replay: true,
+    replayBodies: () => (player ? [player.root, ...rivalPlanes.map((p) => p.root)] : []),
 
     async load(ctx: ModeContext): Promise<void> {
       baseFov = null;
+      replayPacer.reset(); killCue.cancel(); replayDue = false; killVictim = 0;   // VIS-RACE
       hudSwitch.reset();   // GC-13: a remount starts on the pad's words until a body plays
       Object.assign(S, {
         input: { steer: 0, climb: 0, gas: 0, brake: 0, boostK: 0, bananas: 0 }, held: null, bananas: 0, shieldT: 0, zipT: 0,
@@ -985,8 +1009,16 @@ export function makeAeroAcesMode(): ModeDefinition {
       const nres = stepMines(mines, targets, dt);
       for (const id of [...mres.hit, ...nres.hit]) {
         if (id === PLAYER_ID) hitPlayer(ctx, mres.hit.includes(id) ? 'MISSILE' : 'MINE');
-        else hitRival(ctx, id - 1, true);
+        else {
+          hitRival(ctx, id - 1, true);
+          // VIS-RACE: was it the PLAYER's missile or mine? (hitRival's byPlayer is true for any shooter; the spent shot knows its owner)
+          const at = racerPos(id);
+          const mine = at && (mres.spent.some((m) => m.owner === PLAYER_ID && m.life <= 0 && Vector3.Distance(m.pos, at) <= MISSILE_HIT_RADIUS + 1)
+            || nres.spent.some((m) => m.owner === PLAYER_ID && m.life <= 0 && Vector3.Distance(m.pos, at) <= MINE_HIT_RADIUS + 1));
+          if (mine && killCue.arm(race.time, raceProgress(pDist, circuit.line.length, circuit.course.laps), motionPolicy().reduced, KILL.settleSec)) killVictim = id;
+        }
       }
+      if (killCue.step(race.time, raceProgress(pDist, circuit.line.length, circuit.course.laps), motionPolicy().reduced, true)) replayDue = true;
       for (const id of [...mres.absorbed, ...nres.absorbed]) {
         const p = racerPos(id);
         if (p) EffectsKit.burst(ctx.scene, p.clone(), 'glitch');
@@ -1066,6 +1098,13 @@ export function makeAeroAcesMode(): ModeDefinition {
       ctx.camera.fov = stepSpeedFov(ctx.camera.fov, baseFov * (boostFx?.fovMult(boost) ?? 1), flight.speed, tune.top * 1.4, dt, AERO_TUNE.fov);
       // SPEED-VIGNETTE (racing HUD pass): same opt-in as the kart — report the fraction, the harness frames it.
       ctx.feel.speedVignette01(flight.speed / (tune.top * 1.4));
+      // VIS-RACE: the kill's replay goes LAST among the scene's writes (pushHud only sets the HUD) — the harness holds update() from here and puts the frame back exactly as this call left
+      // it. The continuous emitters are told to stop first (the mode is held; they would stream at the replay's cameras)
+      if (replayDue) {
+        replayDue = false;
+        speedLines?.update(0); wingtipFx?.update(0, 0);
+        void ctx.highlight?.({ lastSeconds: KILL.replayLastSec, angles: ['side', 'low', 'tight'], focus: killVictim });
+      }
       pushHud(ctx, dt);
     },
 
