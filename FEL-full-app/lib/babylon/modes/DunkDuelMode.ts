@@ -74,6 +74,8 @@ import type { PlayOpts } from '../anim/CharacterAnimator';
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit } from '../visual/EffectsKit';
 import { HoopJuice } from '../visual/HoopJuice';
+import { mountRimFx, type RimFxHandle } from '../hoops/RimFx';   // vis-hoops-dunk: the rim's light on a make (visual only)
+import { tierFromAccuracy } from '../hoops/hoopsLook';
 import { applyVeniceDunkLookPass } from '../visual/veniceSurroundVisibility';
 import { VenueKit } from '../visual/VenueKit';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';
@@ -146,6 +148,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
   let settleLatch = false;                    // juice soft #3
   let settleArmed = false, settleArmAt = 0;   // A+ P4 (P10 mirror): the settle waits for feet-down, not the flush frame
   let hoopJuice: HoopJuice | null = null;     // juice LOOK: rim spring, net squash, hoop flash on the make
+  let rimFx: RimFxHandle | null = null;       // vis-hoops-dunk: the ring of light, the sparks and the net's glow on a make
   let phase: Phase = 'handoff';
   let phaseSec = 0;
   let activeIdx: 0 | 1 = 0;                       // whose turn
@@ -628,6 +631,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
     fovRelease(); trailFlash();   // juice soft #4, #5
     armSettle();                  // A+ P4: the settle fires at feet-down, not on this frame
     hoopJuice?.punch();           // juice LOOK #1–#3 (make only)
+    rimFx?.make(tierFromAccuracy(qteAccuracy));   // vis-hoops-dunk: the iron lights up, by how clean the slam was (visual only)
     contactAt = performance.now() / 1000;   // IMPROVE (2026-10-06) #12: the iron, on the recorder's clock — the triple cut centres on it
   }
 
@@ -887,6 +891,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
       ambient?.dispose(); ambient = EffectsKit.ambient(ctx.scene, 'venice');   // IMPROVE (2026-10-06) #14: kept, so dispose() takes the gulls
       trail?.dispose(); trail = EffectsKit.ballTrail(ctx.scene, ball); setTrail('soft');
       hoopJuice?.dispose(); hoopJuice = new HoopJuice(ctx.scene, rim);
+      rimFx?.dispose(); rimFx = mountRimFx(ctx.scene, rim, (ctx.scene.metadata as { felTier?: string } | null)?.felTier);   // vis-hoops-dunk
       mic?.dispose(); mic = new ModeMic(ctx, { groups: ['dunk', 'names'], court: ctx.location }); micOpened = false; micFiller = false;   // THE MIC
       if (process.env.NODE_ENV === 'development') { const dev = (window as unknown as { __FEL_DEV__?: { hoopJuiceUsed?: unknown } }).__FEL_DEV__; if (dev) dev.hoopJuiceUsed = hoopJuice.used; }   // OOM-HYGIENE: the handle is gone once the harness is disposed (a load that resolves after an unmount)
       // Court locations (docs/SPEC-COURT-LOCATIONS.md): the Venice look (golden sky, surround palms) is Venice's own —
@@ -980,6 +985,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
     update(ctx: ModeContext, dt: number) {
       runLater(ctx, dt);   // IMPROVE (2026-10-06) #11: the mode's own beats (they hold while paused: update() does not run then)
       meter3d?.update(dt);   // IMPROVE (2026-10-06) #7
+      rimFx?.update(dt);   // vis-hoops-dunk
       fovTick(dt); if (!cutting) settleTick(ctx);
       // A+ P5: the fov pinch starts on the APPROACH — inside 3.6 m (horizontal) of the rim during the run, not at takeoff
       if ((phase === 'approach' || phase === 'charge') && !fovOn && Math.hypot(active().root.position.x - rim.x, active().root.position.z - rim.z) <= 3.6) fovGather(ctx);
@@ -1176,6 +1182,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
       for (const r of rings) r.dispose(); rings = [];
       if (p1) postureOf.delete(p1); if (p2) postureOf.delete(p2);
       hoopJuice?.dispose(); hoopJuice = null;
+      rimFx?.dispose(); rimFx = null;   // vis-hoops-dunk
       mic?.dispose(); mic = null;   // THE MIC stops with the mode
       modeVenue?.dispose?.(); modeVenue = null;
       if (ikScene && handIkObs) ikScene.onAfterAnimationsObservable.remove(handIkObs);   // A+ P8 H1

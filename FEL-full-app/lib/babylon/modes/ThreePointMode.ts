@@ -78,6 +78,8 @@ import { THREE_CORNER_R, THREE_TOP_R, threePointRadius } from '../core/Basketbal
 import { SoundKit } from '../audio/SoundKit';
 import { ModeMic } from '../audio/mic/ModeMic';   // THE MIC (2026-09-24): the court's MC, the sidekick and the crowd call the shootout
 import type { MicEvent } from '../audio/mic/MicDirector';
+import { mountRimFx, type RimFxHandle } from '../hoops/RimFx';   // vis-hoops-dunk: the rim's light on a make, the fire on a streak (visual only)
+import { tierFromShot } from '../hoops/hoopsLook';
 import { HoopJuice } from '../visual/HoopJuice';   // A+ P0 CONTACT-lite: the hoop answers a make (shared with Dunk / 1v1 / 3v3; Meshy never scaled)
 import { mountShotMeter3D, type ShotMeter3DHandle } from '../visual/ShotMeter3D';   // THE SHOT METER (owner, 2026-09-18): the bar beside the shooter's head
 import type { ModeContext, ModeDefinition, HudValue } from '../core/ModeHarness';
@@ -460,6 +462,7 @@ let disposeCount = 0;
 // ── A+ P0 CONTACT-lite (PM brief THREEPOINT-A-PLUS-P0, 2026-09-06) ────────────────────────────────────────────
 // The release names the result (scorePop / feel.impact / score SFX stay where they were); the RIM answers when the ball
 // arrives — a soft shake + HoopJuice on a make, a clank on a miss. No hang slowMo, no dunk hit-stop, no FOV stack.
+let rimFx: RimFxHandle | null = null;   // vis-hoops-dunk
 let hoopJuice: HoopJuice | null = null;   // juice-only ring + net + material clones at RIM; no meshy_hoop_* transform is touched
 let landing: { perfect: boolean; money: boolean } = { perfect: false, money: false };   // what the release decided, for the landing beat (one landing beat per ball: Flight.contact)
 // ── THE MIC (owner, 2026-09-24: "add a MC announcer on the mic at the events so it has better commentary and audio") ──────
@@ -966,6 +969,7 @@ function contactMake(ctx: ModeContext, f: Flight): void {
   if (big && player && S.phase === 'flight' && !pick) beats?.beat(SPORT_CLIP.scoreCelebrate, { fadeSec: 0.12 });   // settles into the loop (WATCH_IDLE, set with the set)
   if (big) ctx.juice.flash(f.money ? '#ffd75e' : '#fff6dd', 90);
   hoopJuice?.punch(true);   // RIM PLAY: escalates over a rattle's graze
+  rimFx?.make(tierFromShot({ perfect: f.perfect, money: f.money })); rimFx?.streak(S.streak, FIRE_STREAK);   // vis-hoops-dunk: the iron lights up, and burns on a streak (visual only; reads the streak, never writes it)
   // THE NET ANSWERS (suite pass, 2026-09-16): 1v1, 3v3 and the dunk contest burst the net on a make; the shootout —
   // the mode that is nothing but makes — did not. Sparks on the money ball and the perfect release.
   EffectsKit.burst(ctx.scene, RIM, 'net');
@@ -979,6 +983,7 @@ function missClank(ctx: ModeContext, f: Flight): void {
   f.contact = true;
   ctx.feel.impact(0.4);
   SoundKit.play('impact', { pitch: 1.35, volume: 0.45 });
+  rimFx?.streak(S.streak, FIRE_STREAK);   // vis-hoops-dunk: a miss ends the burn when the ball gets to the iron
   console.info('[3PT-JUICE] miss clank');
 }
 
@@ -1524,6 +1529,7 @@ export const ThreePointMode: ModeDefinition = {
 
     meter3d?.dispose(); meter3d = mountShotMeter3D(ctx.scene);
     hoopJuice?.dispose(); hoopJuice = new HoopJuice(ctx.scene, RIM);   // A+ P0: once per load, at the rim the arc lands on
+    rimFx?.dispose(); rimFx = mountRimFx(ctx.scene, RIM, (ctx.scene.metadata as { felTier?: string } | null)?.felTier);   // vis-hoops-dunk
     if (process.env.NODE_ENV === 'development') { const dev = (window as unknown as { __FEL_DEV__?: { hoopJuiceUsed?: unknown } }).__FEL_DEV__; if (dev) dev.hoopJuiceUsed = hoopJuice.used; }
 
     S.from.copyFrom(RACK_POS[0]);
@@ -1584,6 +1590,8 @@ export const ThreePointMode: ModeDefinition = {
 
   update(ctx: ModeContext, dt: number): void {
     meter3d?.update(dt);
+    rimFx?.update(dt);   // vis-hoops-dunk
+    if (rimFx && flights.every((f) => f.state === 'idle')) rimFx.streak(S.streak, FIRE_STREAK);   // nothing in the air: the rim's fire follows the streak (a new run, a cold spell); landings set it below
     micTick(ctx);   // THE MIC: its clock runs on every frame (the board's calls, the caption's expiry)
     if (S.phase === 'done' || !player || !ball || !flights.length) return;
     if (!S.optsRead) readRunOptions(ctx);   // IMPROVE (2026-10-06) #5 #6: the READY screen's picks, on the run's first frame
@@ -1742,6 +1750,7 @@ export const ThreePointMode: ModeDefinition = {
     camBoundsMesh?.dispose(); camBoundsMesh = null;
     mic?.dispose(); mic = null; micLanding = null;   // THE MIC stops with the mode
     hoopJuice?.dispose(); hoopJuice = null;   // A+ P0: restores any hoop material the punch swapped
+    rimFx?.dispose(); rimFx = null;   // vis-hoops-dunk
     meter3d?.dispose(); meter3d = null;
     posture?.dispose(); posture = null;        // BIOMECH-HOOPS-WAVE1
     carry?.dispose(); carry = null;   // HOOPS MOTION phase 3

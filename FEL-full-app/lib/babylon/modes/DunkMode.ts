@@ -123,6 +123,8 @@ import {
   DUNK_LAND_ABSORB_CLIP, CELEB_BLEND_SEC, pickLiveCelebration, holdEndMs, celebStartMs, clipFor, type RotCelebId,
 } from '../core/DunkLandCelebrate';
 import { PhoneFlashes } from '../visual/PhoneFlashes';
+import { mountRimFx, type RimFxHandle } from '../hoops/RimFx';   // vis-hoops-dunk: the rim's light on a make (visual only)
+import { tierFromAccuracy } from '../hoops/hoopsLook';
 import { ModeMic } from '../audio/mic/ModeMic';   // THE MIC (2026-09-24): the court's MC, the sidekick, the crowd and the rivals, on the mic
 import { dunkStingers } from '../audio/mic/names';
 import { DUNK_RIVAL_VOICES } from '../audio/mic/cast';   // DUNK MOTION phase 11: the rival's pad decides like a player
@@ -452,6 +454,7 @@ export const DunkMode: ModeDefinition = (() => {
   let settleLatch = false;                    // juice soft #3
   let settleArmed = false, settleArmAt = 0;   // A+ P4: the settle waits for feet-down, not the flush frame
   let hoopJuice: HoopJuice | null = null;     // juice LOOK: rim spring, net squash, hoop flash on the make
+  let rimFx: RimFxHandle | null = null;       // vis-hoops-dunk: the ring of light, the sparks and the net's glow on a make
   // THE SLAM METER (owner, 2026-09-18: "put a shot meter … make it trigger on layups and dunks"): the bar beside the
   // dunker's head rides the CLIP clock with the slam window drawn green — the same window slamNow grades by. The span
   // runs a little past the window's close so the green sits near the top the way a jumper's does.
@@ -1358,6 +1361,7 @@ export const DunkMode: ModeDefinition = (() => {
       EffectsKit.ambient(ctx.scene, 'venice');
       trail?.dispose(); trail = EffectsKit.ballTrail(ctx.scene, ball); trailKey = ''; trailOn = true; setTrail('soft');   // IMPROVE (2026-10-06): a reload never stacks a second trail
       hoopJuice?.dispose(); hoopJuice = new HoopJuice(ctx.scene, rim);
+      rimFx?.dispose(); rimFx = mountRimFx(ctx.scene, rim, (ctx.scene.metadata as { felTier?: string } | null)?.felTier);   // vis-hoops-dunk
       phoneFlashes?.dispose(); phoneFlashes = new PhoneFlashes(ctx.scene, new Vector3(rim.x, 0, rim.z + 5));   // DUNK MOTION phase 12
       mic?.dispose(); mic = new ModeMic(ctx, { groups: ['dunk', 'names'], court: ctx.location, players: { ...DUNK_RIVAL_VOICES } }); micOpened = false; micFiller = false;
       meter3d?.dispose(); meter3d = mountShotMeter3D(ctx.scene);
@@ -1714,6 +1718,7 @@ export const DunkMode: ModeDefinition = (() => {
       micTick(ctx);
       if (phase === 'approach' && runHeld > 0.02) beginRun(ctx);
       meter3d?.update(dt);
+      rimFx?.update(dt);   // vis-hoops-dunk
       ctx0 = ctx;
       fovTick(dt); settleTick(ctx);
       // A+ P5: the fov pinch starts on the APPROACH — inside 3.6 m (horizontal) of the rim during the run, not at takeoff
@@ -2463,6 +2468,7 @@ export const DunkMode: ModeDefinition = (() => {
       cancelLiveCeleb();
       skyRoot?.dispose(); skyRoot = null;   // THE SKY TIER
       hoopJuice?.dispose(); hoopJuice = null;
+      rimFx?.dispose(); rimFx = null;   // vis-hoops-dunk
       phoneFlashes?.dispose(); phoneFlashes = null;
       mic?.dispose(); mic = null;   // THE MIC stops with the mode
       meter3d?.dispose(); meter3d = null;
@@ -4008,6 +4014,7 @@ export const DunkMode: ModeDefinition = (() => {
     fovRelease(); trailFlash();   // juice soft #4, #5: CONTACT restores the fov and cuts the trail with a flash
     armSettle();                  // A+ P4: the settle fires at feet-down, not on this frame
     hoopJuice?.punch();           // juice LOOK #1–#3: the hoop answers the make (never on a miss — this is the flush frame)
+    rimFx?.make(tierFromAccuracy(qteAccuracy, aHeld));   // vis-hoops-dunk: the iron lights up, by how clean the slam was (visual only)
     // DUNK MOTION phase 12: the gap ends on the iron — the roar comes in over the thud — and the glass answers how hard it was
     soundGapUntil = 0;
     SoundKit.play('crowdCheer', { volume: 0.45 + 0.4 * qteAccuracy });
