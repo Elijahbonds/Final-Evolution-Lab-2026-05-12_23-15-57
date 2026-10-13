@@ -142,7 +142,9 @@ export const MIRRORED = {
   slamRushSec: 20, slamRushPpu: 12, slamRushCooldownSec: 0.5,
   strikeStormSec: 15, strikeStormPpu: 8, strikeStormTrioBonus: 1,   // IMPROVE (2026-10-06): +1 hit per GO / TRICK / POWER trio
   trickGauntletSec: 20, trickGauntletPpu: 0.4,
-  hotShotSec: 15, hotShotPpu: 15, hotShotGoalZ: 10.9, hotShotMaxSpeed: 20,
+  // QA A1-01(b): Hot Shot launches at HOT_SHOT_BASE_MPS + p × HOT_SHOT_POWER_MPS (26 + 10) — the old 13 + p × 7 fell short of
+  // the line at every power — so the full-power flight the ceiling paces by is 36 m/s, not 20 (owner sign-off: PR #19).
+  hotShotSec: 15, hotShotPpu: 15, hotShotGoalZ: 10.9, hotShotMaxSpeed: 36,
   coinStormSec: 15, coinStormPpu: 6, coinStormSpeed: 6, coinStormMagnet: 1.1, coinStormSpacing: 3.77,
   counterStrikeSec: 15, counterStrikePpu: 14, counterStrikeCycleSec: 0.4 + 0.65 + 0.6,
 } as const;

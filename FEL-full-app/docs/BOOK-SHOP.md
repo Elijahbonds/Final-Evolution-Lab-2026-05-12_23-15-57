@@ -54,7 +54,7 @@ free sample still signs. The owner's step, in order: apply the SQL, add the two 
 to `prisma/schema.prisma`, regenerate `public/_prisma` on Linux. No agent runs `prisma db push` or regenerates the
 client.
 
-Guest checkout is allowed. On the next sign-in, `lib/auth.ts` claims rows whose email matches the account. My Library and the download route claim again, so a purchase still shows up if the sign-in claim failed.
+Guest checkout is allowed. My Library and the download route claim rows whose email matches the signed-in account, and every ownership check also matches by email, so an unclaimed row still counts. (MERGE 2026-10-09: the extra claim at sign-in in `lib/auth.ts` was removed. It was redundant, and it pulled the whole book catalog, with its partner and affiliate links, into every page that imports `authOptions`, including the Quick Screen, whose guard `lib/screen/offsite.test.ts` allows no off-site address.)
 
 A refund (`charge.refunded`) sets the row to `REVOKED`. Revoked rows do not get signed URLs.
 

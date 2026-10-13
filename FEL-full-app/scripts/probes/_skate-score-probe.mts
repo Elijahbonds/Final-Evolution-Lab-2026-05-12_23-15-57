@@ -130,10 +130,12 @@ async function padRun(): Promise<Record<string, unknown>> {
     for (let i = 0; i < 80; i++) { const s = await skate(p); if (s && !s.grounded && s.height < 0.3 && s.airtime > 0.35) break; await p.waitForTimeout(12); }
     for (const [x, y] of [[0, -1], [0.72, -0.72], [1, 0], [0, 0]]) { await stick(p, 'R', x, y); await p.waitForTimeout(18); }
   };
-  const all: [string, () => Promise<void>][] = [['bs180', bs180], ['indy', indy], ['xgrab', xgrab], ['japan', japan], ['lateFlip', lateFlip]];
+  // SK-2 follow-up: a CHARGED pop (RT held) and right + B, the stick held right to the ground — the caught spin must hold the yaw
+  const bs180c = async () => { await emit(p, { t: 'trigger', side: 'R', value: 1 }); await p.waitForTimeout(500); await press(p, 'A'); await emit(p, { t: 'trigger', side: 'R', value: 0 }); await p.waitForTimeout(80); await stick(p, 'L', 1, 0); await p.waitForTimeout(40); await press(p, 'B'); await p.waitForTimeout(400); await shot('bs180c-air'); await waitGround(p, 3500); await stick(p, 'L', 0, 0); };
+  const all: [string, () => Promise<void>][] = [['bs180', bs180], ['indy', indy], ['xgrab', xgrab], ['japan', japan], ['lateFlip', lateFlip], ['bs180c', bs180c]];
   // ORDER=indy,xgrab — qa-fixes A1-06's repro (a push / pop / grab driver whose card said 0 TRICKS): grabs only
   const pick = (process.env.ORDER ?? '').split(',').filter(Boolean);
-  const order = pick.length ? all.filter(([n]) => pick.includes(n)) : all;
+  const order = pick.length ? all.filter(([n]) => pick.includes(n)) : all.filter(([n]) => n !== 'bs180c');   // bs180c only when asked (ORDER=bs180c)
   // the buzzer: 90 s from TAP TO START; the lines repeat until the clock is nearly out, then the rider rolls to the end
   const t0 = Date.now();
   for (let i = 0; Date.now() - t0 < 70000; i++) { const [n, fn] = order[i % order.length]; await move(n, fn); }
