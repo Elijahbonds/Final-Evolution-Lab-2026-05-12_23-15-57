@@ -37,16 +37,18 @@ import { MODES } from '@/lib/babylon/modes/registry';
 import { replayBrainBrawl } from '@/lib/babylon/modes/BrainBrawlMode';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode, hnum } from './hud-format';
+import { HudChip, HudFrame, HudText, ScoreCell, ScoreDivider, ScoreValue, Scorebug, hudColor, hudType, type HudTone } from './tv-hud';
 import { useReplayInPlace } from './replay-in-place';
 import { CATEGORIES, CATEGORY_COLOR, type Category } from '@/lib/babylon/core/BrainBrawlCore';
 
 type Hud = Record<string, HudValue>;
 // IMPROVE (2026-10-06, #13): P2's arrow is the option's corner of the 2×2 grid — ◀ is C (bottom left), ▼ is D (bottom right)
 const OPTS = [
-  { key: 'optA', face: 'A', btn: 'A', dpad: '▲', color: '#22d3ee' }, { key: 'optB', face: 'B', btn: 'B', dpad: '▶', color: '#f43f5e' },
-  { key: 'optX', face: 'C', btn: 'X', dpad: '◀', color: '#a855f7' }, { key: 'optY', face: 'D', btn: 'Y', dpad: '▼', color: '#facc15' },
-] as const;
-const SEAT = ['#22d3ee', '#facc15'];
+  { key: 'optA', face: 'A', btn: 'A', dpad: '▲', tone: 'you' }, { key: 'optB', face: 'B', btn: 'B', dpad: '▶', tone: 'danger' },
+  { key: 'optX', face: 'C', btn: 'X', dpad: '◀', tone: 'power' }, { key: 'optY', face: 'D', btn: 'Y', dpad: '▼', tone: 'them' },
+] as const satisfies readonly { key: string; face: string; btn: string; dpad: string; tone: HudTone }[];
+/** The seats' colours (TV HUD palette: P1 you, P2 them). */
+const SEAT = [hudColor('you'), hudColor('them')];
 
 /**
  * QA P1-25 (2026-09-27): Enter did not leave the PLAYERS pick. InputBus maps no Enter key (and is the input seam, not
@@ -56,6 +58,7 @@ const SEAT = ['#22d3ee', '#facc15'];
 export function lobbyKeyPress(key: string): { t: 'button'; btn: 'A'; pressed: boolean }[] | null {
   return key === 'Enter' ? [{ t: 'button', btn: 'A', pressed: true }, { t: 'button', btn: 'A', pressed: false }] : null;
 }
+// The host character's own colour (a character identity, like CATEGORY_COLOR — not a HUD tone; the TV HUD scan allows it by name).
 const HOST_COLOR = '#b9b2ff';
 const HOST_LINE_MS = 2600;
 const isBoard = (v: unknown): v is { name: string; score: number | string; line: string }[] =>
@@ -70,7 +73,7 @@ const anchorOf = (v: unknown): [number, number] | null => {
 function OptionText({ text }: { text: string }) {
   if (!text.includes(' / ')) return <span className="line-clamp-2 min-w-0 break-words leading-tight">{text}</span>;   // two lines, never an ellipsis on a phone
   return (
-    <span className="grid min-w-0 gap-0 font-mono text-[11px] leading-[1.05] tracking-[0.2em] sm:text-sm">
+    <span className="grid min-w-0 gap-0 font-mono text-xs leading-[1.05] tracking-[0.2em] sm:text-sm">
       {text.split(' / ').map((row, i) => <span key={i} className="whitespace-pre">{row}</span>)}
     </span>
   );
@@ -84,7 +87,7 @@ function SequenceRow({ line, color }: { line: string; color: string }) {
     <div data-bb="sequence" className={`flex max-w-full flex-nowrap items-center justify-center gap-1 sm:gap-1.5 ${size}`}>
       {tokens.map((t, i) => (
         <span key={i} className="grid min-w-[1.6em] place-items-center rounded-md px-1 py-0.5 font-mono font-bold leading-none sm:px-1.5 sm:py-1"
-          style={t === '?' ? { background: color, color: '#111' } : { background: 'rgba(255,255,255,0.08)', color: '#fff' }}>{t}</span>
+          style={t === '?' ? { background: color, color: hudColor('ink') } : { background: 'rgba(255,255,255,0.08)', color: hudColor('text') }}>{t}</span>
       ))}
     </div>
   );
@@ -105,12 +108,12 @@ function Bubble({ id, text, anchor, color, who, place = 'above' }: { id: string;
     <AnimatePresence>
       {text && anchor && (
         <motion.div key={who} data-bb-bubble={who} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, transition: { duration: 0.16 } }}
-          className="pointer-events-none absolute z-10 font-mono"
+          className="pointer-events-none absolute z-10 font-display"
           style={{ left: `${Math.max(left ? 30 : 20, Math.min(left ? 94 : 80, anchor[0]))}%`, top: `${Math.max(16, anchor[1])}%` }}>   {/* never off the stage's edge */}
           <div className={`relative ${left ? '-translate-x-full -translate-y-1/2' : '-translate-x-1/2 -translate-y-full'}`}>
             <motion.div key={id} initial={{ opacity: 0.3, scale: 0.78 }} animate={{ opacity: 1, scale: 1 }} transition={{ type: 'spring', stiffness: 560, damping: 26 }}
-              className={`w-max max-w-[130px] rounded-2xl border-2 bg-white px-2.5 py-1 text-center text-[11px] font-black leading-tight text-[#120c2c] shadow-lg sm:max-w-[300px] sm:px-3 sm:py-1.5 sm:text-sm ${left ? 'origin-right' : 'origin-bottom'}`} style={{ borderColor: color }}>
-              <span className="mr-1 text-[9px] font-bold tracking-wider" style={{ color }}>{who}</span>{text}
+              className={`w-max max-w-[130px] rounded-2xl border-2 bg-white px-2.5 py-1 text-center font-black leading-tight shadow-lg sm:max-w-[300px] sm:px-3 sm:py-1.5 ${left ? 'origin-right' : 'origin-bottom'}`} style={{ ...hudType('label'), color: 'rgb(18, 12, 44)', borderColor: color }}>
+              <span className="mr-1 font-bold tracking-wider" style={{ ...hudType('caption'), color }}>{who}</span>{text}
             </motion.div>
             {left
               ? <div className="absolute left-full top-1/2 h-0 w-0 -translate-y-1/2 border-y-[8px] border-l-[10px] border-y-transparent" style={{ borderLeftColor: color }} />
@@ -122,7 +125,7 @@ function Bubble({ id, text, anchor, color, who, place = 'above' }: { id: string;
   );
 }
 
-const POP_TONE: Record<string, string> = { correct: '#4ade80', wrong: '#ff5c5c', timeout: '#e2e8f0' };
+const POP_TONE: Record<string, string> = { correct: hudColor('good'), wrong: hudColor('danger'), timeout: hudColor('text') };
 
 /**
  * A seat's score pop (POLISH-2 R1): "+94" / "WRONG" / "TIME" beside the podium, on its outboard side. The shared 3D pop it replaces
@@ -130,19 +133,19 @@ const POP_TONE: Record<string, string> = { correct: '#4ade80', wrong: '#ff5c5c',
  * bright text on a dark plate with the verdict's colour round it.
  */
 function ScorePop({ id, text, tone, anchor, sub = '' }: { id: string; text: string; tone: string; anchor: [number, number] | null; sub?: string }) {
-  const color = POP_TONE[tone] ?? '#ffffff';
+  const color = POP_TONE[tone] ?? hudColor('text');
   return (
     <AnimatePresence>
       {text && anchor && (
         <motion.div key={id} data-bb-pop={tone} initial={{ opacity: 0, scale: 0.4, y: 16 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, y: -16, transition: { duration: 0.3 } }}
           transition={{ type: 'spring', stiffness: 460, damping: 17 }}
-          className="pointer-events-none absolute z-20 font-mono"
+          className="pointer-events-none absolute z-20 font-display"
           style={{ left: `${Math.max(7, Math.min(93, anchor[0]))}%`, top: `${Math.max(14, Math.min(90, anchor[1]))}%` }}>
-          <div className="-translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-xl border-2 bg-[#0a0618]/90 px-2.5 py-0.5 text-2xl font-black leading-none tracking-tight shadow-lg sm:px-3 sm:py-1 sm:text-4xl"
-            style={{ color, borderColor: color, textShadow: `0 0 14px ${color}99, 0 2px 0 #000` }}>
+          <div className="-translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-xl border-2 px-2.5 py-0.5 text-2xl font-black leading-none tracking-tight shadow-lg sm:px-3 sm:py-1 sm:text-4xl"
+            style={{ color, borderColor: color, background: 'rgba(10, 6, 24, 0.9)', textShadow: `0 0 14px ${color}, 0 2px 0 rgb(0, 0, 0)` }}>
             {text}
             {/* IMPROVE (2026-10-06, #7): what the points were made of — "100 + 50 speed" — so answering fast is seen to pay */}
-            {sub && <div data-bb-pop-sub className="mt-0.5 text-center text-[10px] font-bold tracking-wide text-white/85 sm:text-xs" style={{ textShadow: 'none' }}>{sub}</div>}
+            {sub && <div data-bb-pop-sub className="mt-0.5 text-center font-bold tracking-wide" style={{ ...hudType('caption'), color: hudColor('text', 0.85), textShadow: 'none' }}>{sub}</div>}
           </div>
         </motion.div>
       )}
@@ -168,9 +171,9 @@ function PromptText({ text }: { text: string }) {
 }
 
 const VERDICT_PILL: Record<string, { label: (gain: number) => string; color: string }> = {
-  correct: { label: (g) => `+${g}`, color: '#4ade80' },
-  wrong: { label: () => 'WRONG', color: '#f87171' },
-  timeout: { label: () => 'TIME', color: '#94a3b8' },
+  correct: { label: (g) => `+${g}`, color: hudColor('good') },
+  wrong: { label: () => 'WRONG', color: hudColor('danger') },
+  timeout: { label: () => 'TIME', color: hudColor('text', 0.6) },
 };
 
 export default function BrainBrawlBabylon({ onEnd }: GameProps) {
@@ -254,7 +257,7 @@ export default function BrainBrawlBabylon({ onEnd }: GameProps) {
   const picks = [hnum(hud.pickP1, -1), hnum(hud.pickP2, -1)];
   const showPick = (seat: number) => picks[seat] >= 0 && (revealed || (!duel && seat === 0));
   const clockFrac = typeof hud.clockFrac === 'number' ? hud.clockFrac : null;
-  const catColor = typeof hud.categoryColor === 'string' && hud.categoryColor ? hud.categoryColor : '#ffffff';
+  const catColor = typeof hud.categoryColor === 'string' && hud.categoryColor ? hud.categoryColor : hudColor('text');
   const sequence = display.length === 1 && display[0].trim().endsWith('?');
   const dense = display.length >= 5;   // a 5- or 6-row grid (tier 2–3 counts) must still fit under the wheel
   const cardUp = phase === 'playing' && typeof hud.prompt === 'string' && !!hud.prompt;
@@ -265,32 +268,36 @@ export default function BrainBrawlBabylon({ onEnd }: GameProps) {
     <div className="relative aspect-[16/10] w-full overflow-hidden rounded-xl border border-white/10 bg-black">
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full touch-none" />
 
+      {/* TV HUD (A9.13, lane/tv-hud): the readouts in the shared frame; the room (bubbles, pops) and the challenge card keep
+          their own layers — the card carries the tap targets — and draw with the palette and the 10-foot scale. The character
+          grids (a memory grid, a shape row, a sequence) keep the mono face: their columns line up by it. */}
+      <HudFrame>
       {/* top bar: scores + claims strip + clock */}
-      <div data-bb="topbar" className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-2 px-2 py-2 font-mono sm:px-4 sm:py-3">
-        <div className="fel-panel px-2 py-1 text-sm sm:px-3 sm:py-1.5">
-          <span className="text-[10px] tracking-wider text-[#22d3ee]">{seatName(0)}</span> <span className="fel-stat text-base sm:text-xl">{hnode(hud.score, 0)}</span>
-          {twoP && <><span className="mx-2 text-white/40">·</span><span className="text-[10px] tracking-wider text-[#facc15]">{seatName(1)}</span> <span className="fel-stat text-base sm:text-xl">{hnode(hud.p2score, 0)}</span></>}
-          {/* IMPROVE #4: a solo night's strikes */}{typeof hud.strikes === 'string' && hud.strikes && hud.roundKind !== 'review' && <span data-bb="strikes" className="ml-2 text-xs font-bold tracking-widest text-[#ff5c5c] sm:text-sm">{hud.strikes}</span>}
-        </div>
+      <div data-bb="topbar" className="absolute inset-x-0 top-0 flex items-start justify-between gap-2 px-2 py-2 sm:px-4 sm:py-3">
+        <Scorebug>
+          <ScoreCell inline label={seatName(0)} labelTone="you" value={hnode(hud.score, 0)} size="stat" />
+          {twoP && <><ScoreDivider /><ScoreCell inline label={seatName(1)} labelTone="them" value={hnode(hud.p2score, 0)} size="stat" /></>}
+          {/* IMPROVE #4: a solo night's strikes */}{typeof hud.strikes === 'string' && hud.strikes && hud.roundKind !== 'review' && <HudText data-hud="strikes" size="body" tone="danger" className="ml-2" style={{ fontWeight: 800, letterSpacing: '0.2em' }}><span data-bb="strikes">{hud.strikes}</span></HudText>}
+        </Scorebug>
         {/* KNOWLEDGE-FEED v2: the REVIEW round (?round=review) has no claims — its strip is the question count */}
         {hud.roundKind === 'review' && (
-          <div data-bb="review-strip" className="fel-panel px-3 py-1 font-mono text-[11px] font-bold tracking-widest text-[#C58BFF] sm:text-xs">
-            REVIEW · {hnode(hud.reviewOf, '')} · {hnode(hud.reviewRight, 0)} RIGHT
-          </div>
+          <HudChip data-hud="review-strip" tone="power" size="body" style={{ fontWeight: 800, letterSpacing: '0.15em' }}>
+            <span data-bb="review-strip">REVIEW · {hnode(hud.reviewOf, '')} · {hnode(hud.reviewRight, 0)} RIGHT</span>
+          </HudChip>
         )}
         {hud.roundKind !== 'review' && (
         <div data-bb="claims" className="flex max-w-[58%] flex-col items-center gap-1">
-          <span className="font-mono text-[11px] font-bold tracking-widest text-white sm:text-xs">
+          <HudText size="body" style={{ fontWeight: 800, letterSpacing: '0.15em' }}>
             {CATEGORIES.filter((c) => claims[c] === '0' || claims[c] === '1').length}/5 CLAIMED
             {Number(hud.streak) > 1 ? ` · STREAK ×${hnode(hud.streak)}` : ''}
-          </span>
+          </HudText>
           <div className="flex flex-wrap items-center justify-center gap-1 sm:gap-1.5">
             {CATEGORIES.map((c: Category) => {
               const holder = claims[c];
               const mine = holder === '0', theirs = holder === '1';
               const held = mine || theirs;
               return (
-                <span key={c} className="rounded-md px-2 py-1 text-[11px] font-bold tracking-wide sm:px-2.5 sm:py-1.5 sm:text-xs" style={{ background: held ? CATEGORY_COLOR[c] : 'rgba(0,0,0,0.55)', color: held ? '#111' : CATEGORY_COLOR[c], outline: hud.category === c ? '2px solid #fff' : '1px solid rgba(255,255,255,0.18)' }}>
+                <span key={c} className="rounded-md px-2 py-1 font-bold tracking-wide sm:px-2.5 sm:py-1.5" style={{ ...hudType('body'), background: held ? CATEGORY_COLOR[c] : 'rgba(0,0,0,0.55)', color: held ? hudColor('ink') : CATEGORY_COLOR[c], textShadow: held ? 'none' : undefined, outline: hud.category === c ? `2px solid ${hudColor('text')}` : '1px solid rgba(255,255,255,0.18)' }}>
                   {held ? '✓ ' : ''}{c}{twoP && held ? ` ${seatName(mine ? 0 : 1)}` : ''}
                 </span>
               );
@@ -298,8 +305,9 @@ export default function BrainBrawlBabylon({ onEnd }: GameProps) {
           </div>
         </div>
         )}
-        {typeof hud.clock === 'number' && <span className={`fel-panel px-2 py-0.5 fel-stat text-lg sm:px-3 sm:py-1 sm:text-2xl ${hud.clock <= 3 ? 'text-[#ff2d78]' : 'text-white'}`}>{hud.clock}s</span>}
+        {typeof hud.clock === 'number' && <Scorebug><ScoreValue value={`${hud.clock}s`} tone={hud.clock <= 3 ? 'danger' : 'text'} pop={false} /></Scorebug>}
       </div>
+      </HudFrame>
 
       {/* the room talking: the contestants over their podiums, the host over his head while the card is not in front of him */}
       {phase === 'playing' && (
@@ -315,25 +323,25 @@ export default function BrainBrawlBabylon({ onEnd }: GameProps) {
 
       {/* the challenge card — the centre column under the wheel, up through the question, the answer window AND the reveal */}
       {cardUp && (
-        <div data-bb="card" className="absolute inset-x-0 bottom-1.5 flex flex-col items-center px-2 font-mono sm:bottom-2 sm:px-3">
+        <div data-bb="card" className="absolute inset-x-0 bottom-1.5 flex flex-col items-center px-2 font-display sm:bottom-2 sm:px-3">
           {/* between the lecterns (at ~18 % and ~82 % of the width) and under the wheel's rim (~44 % down): 40 % wide on a stage */}
-          <div className="flex w-full max-w-[620px] flex-col items-center gap-1 rounded-2xl bg-[#07051a]/75 p-1 sm:w-[40%] sm:min-w-[400px] sm:gap-1.5 sm:p-1.5">
+          <div className="flex w-full max-w-[620px] flex-col items-center gap-1 rounded-2xl p-1 sm:w-[40%] sm:min-w-[400px] sm:gap-1.5 sm:p-1.5" style={{ background: 'rgba(7, 5, 26, 0.75)' }}>
             {revealed && banner && <div data-bb="banner" className="fel-heading fel-panel px-4 py-1 text-center text-base font-black text-white sm:text-xl">{banner}</div>}
             <div className="fel-panel flex w-full items-center gap-2 px-3 py-1 sm:px-4">
-              <span className="shrink-0 text-[10px] font-bold tracking-widest sm:text-[11px]" style={{ color: catColor }}>{hud.roundKind === 'review' ? <>REVIEW · {hnode(hud.reviewOf, '')}</> : <>{hnode(hud.category, '')} · TIER {hnode(hud.tier, 1)}</>}</span>
+              <span className="shrink-0 font-bold tracking-widest" style={{ ...hudType('caption'), color: catColor }}>{hud.roundKind === 'review' ? <>REVIEW · {hnode(hud.reviewOf, '')}</> : <>{hnode(hud.category, '')} · TIER {hnode(hud.tier, 1)}</>}</span>
               {/* the host's call while the card is up — the WHOLE line, wrapped when it is long (POLISH-2 N3: it was cut to "That is a
                   no, I am afrai…") */}
-              <span data-bb="host-line" className="min-w-0 flex-1 whitespace-normal break-words text-center text-[10px] leading-tight sm:text-[11px]" style={{ color: HOST_COLOR }}>{hostSay ? `🎙 ${hostSay}` : ''}</span>
+              <span data-bb="host-line" className="min-w-0 flex-1 whitespace-normal break-words text-center leading-tight" style={{ ...hudType('caption'), color: HOST_COLOR }}>{hostSay ? `🎙 ${hostSay}` : ''}</span>
               {/* the clock as a bar: it drains in step with the number, red in the last third */}
               <span className="h-1.5 w-14 shrink-0 overflow-hidden rounded-full bg-white/10 sm:w-20">
-                {clockFrac !== null && <span className="block h-full rounded-full transition-[width] duration-300 ease-linear" style={{ width: `${Math.round(clockFrac * 100)}%`, background: clockFrac < 0.34 ? '#ff2d78' : '#22d3ee' }} />}
+                {clockFrac !== null && <span className="block h-full rounded-full transition-[width] duration-300 ease-linear" style={{ width: `${Math.round(clockFrac * 100)}%`, background: hudColor(clockFrac < 0.34 ? 'danger' : 'you') }} />}
               </span>
             </div>
             <div data-bb="prompt" className="fel-panel max-w-full px-4 py-1 text-center text-sm font-bold text-white sm:px-5 sm:py-1.5 sm:text-base"><PromptText text={String(hud.prompt)} /></div>
             {display.length > 0 && !revealed && (
               sequence
                 ? <div className="fel-panel max-w-full px-3 py-2 sm:px-4"><SequenceRow line={display[0]} color={catColor} /></div>
-                : <div data-bb="display" className={`fel-panel max-w-full px-4 py-1.5 text-center text-white whitespace-pre sm:px-6 sm:py-2 ${dense ? 'text-xs leading-[1.2] tracking-[0.12em] sm:text-sm' : 'text-lg leading-snug tracking-[0.15em] sm:text-xl'}`}>{display.join('\n')}</div>
+                : <div data-bb="display" className={`fel-panel max-w-full px-4 py-1.5 text-center font-mono text-white whitespace-pre sm:px-6 sm:py-2 ${dense ? 'text-xs leading-[1.2] tracking-[0.12em] sm:text-sm' : 'text-lg leading-snug tracking-[0.15em] sm:text-xl'}`}>{display.join('\n')}</div>
             )}
             {typeof hud.optA === 'string' && hud.optA && (
               <div className="grid w-full grid-cols-2 gap-1.5">
@@ -343,17 +351,17 @@ export default function BrainBrawlBabylon({ onEnd }: GameProps) {
                   const seats = [0, 1].filter((s) => showPick(s) && picks[s] === idx);
                   const wrongPick = revealed && !isAnswer && seats.length > 0;
                   const state = isAnswer ? 'correct' : wrongPick ? 'wrong-pick' : seats.length ? 'picked' : revealed ? 'dim' : 'idle';
-                  const ring = isAnswer ? '#4ade80' : wrongPick ? '#f87171' : seats.length ? '#ffffff' : `${o.color}66`;
+                  const ring = isAnswer ? hudColor('good') : wrongPick ? hudColor('danger') : seats.length ? hudColor('text') : hudColor(o.tone, 0.4);
                   return (
                     <button key={o.key} data-bb-opt={state} onPointerDown={(e) => { e.preventDefault(); emit({ t: 'button', btn: o.btn, pressed: true }); }}
                       className={`fel-panel flex min-w-0 items-center gap-2 rounded-xl px-2 py-1.5 text-left text-xs text-white transition-opacity duration-200 sm:gap-2.5 sm:px-3 sm:py-2 sm:text-base ${state === 'dim' ? 'opacity-40' : ''}`}
                       style={{ borderColor: ring, borderWidth: state === 'idle' ? undefined : 2, background: isAnswer ? 'rgba(22,78,44,0.92)' : wrongPick ? 'rgba(90,24,32,0.92)' : 'rgba(12,10,32,0.9)' }}>
-                      <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full font-mono text-[11px] font-bold text-black sm:h-7 sm:w-7 sm:text-[12px]" style={{ background: o.color }}>{o.face}</span>
+                      <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full font-bold sm:h-7 sm:w-7" style={{ ...hudType('body'), background: hudColor(o.tone), color: hudColor('ink') }}>{o.face}</span>
                       <OptionText text={String(hnode(hud[o.key], ''))} />
                       <span className="ml-auto flex shrink-0 items-center gap-1">
-                        {seats.map((s) => <span key={s} className="rounded px-1 text-[10px] font-bold text-black" style={{ background: SEAT[s] }}>{seatName(s)}</span>)}
-                        {isAnswer && <span className="text-base font-black text-[#4ade80] sm:text-xl">✓</span>}
-                        {wrongPick && <span className="text-base font-black text-[#f87171] sm:text-xl">✗</span>}
+                        {seats.map((s) => <span key={s} className="rounded px-1 font-bold" style={{ ...hudType('caption'), background: SEAT[s], color: hudColor('ink') }}>{seatName(s)}</span>)}
+                        {isAnswer && <span className="text-base font-black sm:text-xl" style={{ color: hudColor('good') }}>✓</span>}
+                        {wrongPick && <span className="text-base font-black sm:text-xl" style={{ color: hudColor('danger') }}>✗</span>}
                         {duel && !revealed && <span className="text-sm text-white/55">{o.dpad}</span>}
                       </span>
                     </button>
@@ -362,20 +370,20 @@ export default function BrainBrawlBabylon({ onEnd }: GameProps) {
               </div>
             )}
             {revealed && typeof hud.why === 'string' && hud.why && (
-              <div data-bb="why" className="fel-panel w-full px-3 py-1 text-center text-[11px] leading-snug text-white/85 sm:text-xs">{hud.why}</div>
+              <div data-bb="why" className="fel-panel w-full px-3 py-1 text-center leading-snug" style={{ ...hudType('label'), fontWeight: 600, color: hudColor('text', 0.85) }}>{hud.why}</div>
             )}
             <div className="flex min-h-[18px] items-center gap-2">
-              {!revealed && hud.answeredP1 === true && <span className="fel-panel px-2 py-0.5 text-[11px] text-[#22d3ee]">{duel ? 'P1 LOCKED' : 'LOCKED'}</span>}
-              {!revealed && hud.answeredP2 === true && <span className="fel-panel px-2 py-0.5 text-[11px] text-[#facc15]">{seatName(1)} LOCKED</span>}
+              {!revealed && hud.answeredP1 === true && <HudChip tone="you">{duel ? 'P1 LOCKED' : 'LOCKED'}</HudChip>}
+              {!revealed && hud.answeredP2 === true && <HudChip tone="them">{seatName(1)} LOCKED</HudChip>}
               {revealed && ['verdictP1', 'verdictP2'].map((k, s) => {
                 const v = typeof hud[k] === 'string' ? (hud[k] as string) : '';
                 const pill = VERDICT_PILL[v]; if (!pill) return null;
-                return <span key={k} data-bb-verdict={v} className="fel-panel px-2 py-0.5 text-[11px] font-bold" style={{ color: pill.color }}>{twoP ? `${seatName(s)} ` : ''}{pill.label(hnum(hud[s ? 'gainP2' : 'gainP1'], 0))}</span>;
+                return <span key={k} data-bb-verdict={v} className="fel-panel px-2 py-0.5 font-bold" style={{ ...hudType('label'), color: pill.color }}>{twoP ? `${seatName(s)} ` : ''}{pill.label(hnum(hud[s ? 'gainP2' : 'gainP1'], 0))}</span>;
               })}
-              {typeof hud.hint === 'string' && hud.hint && !revealed && <span className="fel-panel px-3 py-0.5 text-[11px] text-white/70">{hud.hint}</span>}
+              {typeof hud.hint === 'string' && hud.hint && !revealed && <HudChip alpha={0.7}>{hud.hint}</HudChip>}
               {/* IMPROVE #8: a new fastest right answer on this device, for the category or the kind */}
-              {revealed && typeof hud.fastBest === 'string' && hud.fastBest && <span data-bb="fast-best" className="fel-panel px-2 py-0.5 text-[11px] font-bold text-[var(--fel-gold)]">{hud.fastBest}</span>}
-              {revealed && <span className="fel-panel px-3 py-0.5 text-[11px] text-white/60">A · next</span>}
+              {revealed && typeof hud.fastBest === 'string' && hud.fastBest && <span data-bb="fast-best" className="fel-panel px-2 py-0.5 font-bold" style={{ ...hudType('label'), color: hudColor('score') }}>{hud.fastBest}</span>}
+              {revealed && <HudChip alpha={0.6}>A · next</HudChip>}
             </div>
           </div>
         </div>
@@ -383,35 +391,35 @@ export default function BrainBrawlBabylon({ onEnd }: GameProps) {
 
       {/* banner: under the wheel's rim, over the host's head (the spin, the landing, the pick, the finish) — the reveal's rides the card */}
       {banner && !revealed && (
-        <div data-bb="banner" className="pointer-events-none absolute inset-x-0 top-[45%] flex flex-col items-center gap-2 px-4 text-center font-mono">
+        <div data-bb="banner" className="pointer-events-none absolute inset-x-0 top-[45%] flex flex-col items-center gap-2 px-4 text-center font-display">
           <span className="fel-heading fel-panel whitespace-pre px-5 py-1.5 text-xl font-black text-white sm:px-6 sm:py-2 sm:text-3xl" style={{ color: hud.phase === 'spin' && typeof hud.categoryColor === 'string' && hud.categoryColor ? hud.categoryColor : undefined }}>{banner}</span>
-          {!cardUp && typeof hud.hint === 'string' && hud.hint && <span className="fel-panel px-3 py-1 text-xs text-white/70">{hud.hint}</span>}
+          {!cardUp && typeof hud.hint === 'string' && hud.hint && <HudChip alpha={0.7} size="body">{hud.hint}</HudChip>}
           {/* IMPROVE (2026-10-06, #10): the duel's handicap, on the pick */}
-          {hud.phase === 'pick' && duel && typeof hud.handicap === 'string' && hud.handicap && <span data-bb="handicap" className="fel-panel px-3 py-1 text-xs font-bold tracking-wider text-[var(--fel-gold)]">{hud.handicap}</span>}
+          {hud.phase === 'pick' && duel && typeof hud.handicap === 'string' && hud.handicap && <span data-bb="handicap" className="fel-panel px-3 py-1 font-bold tracking-wider" style={{ ...hudType('body'), color: hudColor('score') }}>{hud.handicap}</span>}
         </div>
       )}
       {/* IMPROVE (2026-10-06, #9): the first time a kind of card comes up on this device, what it asks — before its clock starts */}
       {phase === 'playing' && hud.phase === 'howto' && typeof hud.howTo === 'string' && hud.howTo && (
-        <div data-bb="howto" className="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center px-3 font-mono">
+        <div data-bb="howto" className="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center px-3 font-display">
           <div className="fel-panel w-full max-w-[520px] px-4 py-3 text-center">
-            <div className="text-[11px] font-black tracking-widest sm:text-xs" style={{ color: catColor }}>{hnode(hud.howToTitle, 'NEW')}</div>
+            <div className="font-black tracking-widest" style={{ ...hudType('body'), color: catColor }}>{hnode(hud.howToTitle, 'NEW')}</div>
             <div className="mt-1 whitespace-pre-wrap text-sm font-bold leading-snug text-white sm:text-base">{hud.howTo}</div>
           </div>
         </div>
       )}
       {phase === 'playing' && hud.phase === 'done' && isBoard(hud.board) && typeof hud.boardTitle === 'string' && hud.boardTitle && (
-        <div className="pointer-events-none absolute inset-x-0 top-[56%] flex justify-center px-4 font-mono">
+        <div className="pointer-events-none absolute inset-x-0 top-[56%] flex justify-center px-4 font-display">
           <div className="fel-panel w-full max-w-[420px] px-5 py-3">
             <div className="grid gap-1.5">
               {hud.board.map((r, i) => (
                 <div key={r.name} className="flex items-center justify-between gap-3 rounded-lg bg-black/40 px-3 py-1.5">
-                  <span className="text-sm font-bold" style={{ color: i === 0 ? '#22d3ee' : '#facc15' }}>{r.name}</span>
-                  <span className="truncate text-[11px] text-white/70">{r.line}</span>
-                  <span className="fel-stat text-lg">{r.score}</span>
+                  <HudText size="value" tone={i === 0 ? 'you' : 'them'}>{r.name}</HudText>
+                  <HudText size="label" alpha={0.7} className="truncate">{r.line}</HudText>
+                  <ScoreValue value={r.score} size="stat" pop={false} />
                 </div>
               ))}
             </div>
-            <div className="mt-2 text-center text-[11px] text-[var(--fel-gold)]">{hud.boardTitle}</div>
+            <HudText as="div" size="label" tone="score" className="mt-2 text-center">{hud.boardTitle}</HudText>
           </div>
         </div>
       )}

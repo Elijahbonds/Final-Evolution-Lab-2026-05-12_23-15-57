@@ -17,6 +17,9 @@ import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } 
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode } from './hud-format';
+import {
+  HUD_TEXT_ALPHA, HudBanner, HudChip, HudFrame, HudMeter, HudPlate, HudText, ScoreCell, ScoreDivider, ScoreValue, Scorebug, hudColor, hudType,
+} from './tv-hud';
 import { timingMaxCombo } from './timing-combo';
 import { timingGameResult } from '@/lib/sessions/gameResultFromSession';
 import { CUE_LOOKAHEAD_SEC, CUE_LINGER_SEC, type HudCue } from '@/lib/babylon/core/danceTracks';
@@ -168,39 +171,49 @@ export function makeTimingHost(opts: TimingHostOpts) {
       emit({ t: 'button', btn: 'START', pressed: true });
     }, [emit]);
 
+    const flow = typeof hud.flow === 'number' ? Number(hud.flow) : -1;
+    const clock = typeof hud.clock === 'number' ? Number(hud.clock) : 0;
     return (
       <div className="relative aspect-[16/10] w-full overflow-hidden rounded-xl border border-white/10 bg-black">
         <canvas ref={canvasRef} className="absolute inset-0 h-full w-full touch-none" />
 
+        {/* TV HUD (A9.13, lane/tv-hud): every readout below is drawn with the shared system (components/games/tv-hud) —
+            one palette, the 10-foot type scale, the display face for numbers, framer-motion calls — in the same slots,
+            from the same keys, gated exactly as before. */}
+        <HudFrame>
         {/* HUD bezel */}
-        <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-3 px-4 py-3 font-mono text-xs">
+        <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-3 px-4 py-3">
           {/* M42 E20: render the mode's own round label as-is (RD/SHOT/KICK/PITCH) — no dup prefix */}
-          <span className="fel-panel px-3 py-1 text-[var(--fel-cyan)]">{hnode(hud.round, '—')}</span>
+          <HudChip tone="you" size="value">{hnode(hud.round, '—')}</HudChip>
           {/* BREAKAWAY (owner brief 2026-09-18): the shot clock and the FLOW gauge (wall runs, rebounds, slides, a fast dribble) that sets the shot's power */}
-          {typeof hud.clock === 'number' && Number(hud.clock) > 0 && <span className={`fel-panel px-3 py-1 font-bold ${Number(hud.clock) <= 3 ? 'text-[#ff2d78]' : 'text-white'}`}>⏱ {hud.clock}s</span>}
-          {typeof hud.flow === 'number' && Number(hud.flow) >= 0 && (
-            <span className="fel-panel flex items-center gap-2 px-3 py-1">
-              <span className="text-[10px] tracking-wider text-white/60">FLOW</span>
-              <span className="h-2 w-20 overflow-hidden rounded-full bg-black/50"><span className={`block h-full rounded-full transition-[width] duration-150 ${Number(hud.flow) >= 70 ? 'bg-[#fbbf24]' : 'bg-[var(--fel-cyan)]/80'}`} style={{ width: `${Math.max(0, Math.min(100, Number(hud.flow)))}%` }} /></span>
-              {typeof hud.kinetic === 'string' && hud.kinetic ? <span className="text-[10px] font-bold text-[#fbbf24]">{hud.kinetic}</span> : null}
-            </span>
+          {typeof hud.clock === 'number' && clock > 0 && <HudChip tone={clock <= 3 ? 'danger' : 'text'} size="value">⏱ {hud.clock}s</HudChip>}
+          {typeof hud.flow === 'number' && flow >= 0 && (
+            <HudPlate as="span" className="flex items-center px-[0.75em] py-[0.3em]">
+              <HudMeter layout="inline" label="FLOW" value={flow} max={100} tone={flow >= 70 ? 'score' : 'you'} fillAlpha={flow >= 70 ? 1 : 0.8} width="5rem"
+                status={typeof hud.kinetic === 'string' && hud.kinetic ? hud.kinetic : undefined} statusTone="score" />
+            </HudPlate>
           )}
           {/* IMPROVE (2026-10-06): volleyball's block cooldown as a ready chip — it only showed as a refusal after the press. Key-gated. */}
           {typeof hud.blockReady === 'string' && hud.blockReady && (
-            <span className={`fel-panel px-3 py-1 text-[10px] font-bold tracking-wider ${hud.blockReady === 'READY' ? 'text-[#7CFFB2]' : 'text-white/50'}`}>B BLOCK {hud.blockReady}</span>
+            <HudChip tone={hud.blockReady === 'READY' ? 'good' : 'text'} alpha={hud.blockReady === 'READY' ? 1 : HUD_TEXT_ALPHA.faint} glow={hud.blockReady === 'READY'}>B BLOCK {hud.blockReady}</HudChip>
           )}
           {/* M42 E20: numeric score gets " PTS"; string scores (e.g. "2 GOALS") render as-is */}
-          <span className="rounded-md bg-black/50 px-3 py-1 text-white">{typeof hud.score === 'number' ? `${hud.score} PTS` : hnode(hud.score, '0 PTS')}</span>
+          <Scorebug>
+            {typeof hud.score === 'number'
+              ? <ScoreCell inline value={hud.score} size="stat" label={null} />
+              : <ScoreValue value={hnode(hud.score, '0 PTS')} size="value" pop={false} />}
+            {typeof hud.score === 'number' && <HudText size="caption" alpha={HUD_TEXT_ALPHA.muted}>PTS</HudText>}
+          </Scorebug>
           {/* combo — the rhythm family's core readout (The Cypher publishes it
               every judgement; the bezel never drew it) */}
           {typeof hud.combo === 'number' && hud.combo >= 2 && (
-            <span className="fel-panel px-3 py-1 font-bold text-[var(--fel-gold)]">×{hud.combo}</span>
+            <HudChip tone="score" size="value"><ScoreValue value={`×${hud.combo}`} size="value" tone="score" /></HudChip>
           )}
           {/* the beat, visible: pops at each step, fades through the bar */}
           {typeof hud.beatPulse === 'number' && (
             <span
-              className="mt-1.5 inline-block h-3 w-3 rounded-full bg-[var(--fel-gold)]"
-              style={{ opacity: 0.25 + hud.beatPulse * 0.75, transform: `scale(${0.7 + hud.beatPulse * 0.45})` }}
+              className="mt-1.5 inline-block h-3 w-3 rounded-full"
+              style={{ background: hudColor('score'), opacity: 0.25 + hud.beatPulse * 0.75, transform: `scale(${0.7 + hud.beatPulse * 0.45})` }}
             />
           )}
         </div>
@@ -211,24 +224,16 @@ export function makeTimingHost(opts: TimingHostOpts) {
             Rendered only when the mode publishes it, so the modes without an
             energy economy are unchanged. */}
         {hud.energy != null && (
-          <div className="pointer-events-none absolute left-4 top-14 flex flex-col gap-1">
-            <span className="font-mono text-[10px] tracking-wider text-[var(--fel-gold)]">{typeof hud.energyLabel === 'string' ? hud.energyLabel : 'ENERGY'}</span>
-            <div className="h-2 w-28 overflow-hidden rounded-full bg-black/50">
-              <div
-                className="h-full rounded-full transition-[width] duration-200"
-                style={{
-                  width: `${Math.max(0, Math.min(100, Number(hud.energy)))}%`,
-                  background: Number(hud.energy) >= 100 ? 'var(--fel-gold)' : 'var(--fel-cyan)',
-                }}
-              />
-            </div>
+          <div className="absolute left-4 top-14 flex flex-col gap-1">
+            <HudMeter label={typeof hud.energyLabel === 'string' ? hud.energyLabel : 'ENERGY'} labelTone="score" value={Number(hud.energy)} max={100}
+              tone={Number(hud.energy) >= 100 ? 'score' : 'you'} glow={Number(hud.energy) >= 100} width="7rem" />
             {typeof hud.rackets === 'string' && (
-              <span className="font-mono text-[10px] text-white/70">
+              <HudText size="caption" alpha={HUD_TEXT_ALPHA.muted}>
                 RACKETS {hud.rackets}
                 {typeof hud.foeRackets === 'string' && (
-                  <span className="text-white/40"> · THEM {hud.foeRackets}</span>
+                  <HudText size="caption" alpha={HUD_TEXT_ALPHA.faint}> · THEM {hud.foeRackets}</HudText>
                 )}
-              </span>
+              </HudText>
             )}
           </div>
         )}
@@ -241,18 +246,20 @@ export function makeTimingHost(opts: TimingHostOpts) {
             to SHOW that state the day it lands). Sits where the MIX bar sat (left-4 top-14), well clear of the cue
             lane below at bottom-[34%] — the HUD area movement play's P9 body cue lane needs stays free. */}
         {typeof hud.instruments === 'string' && hud.instruments && (
-          <div className="pointer-events-none absolute left-4 top-14 flex max-w-[220px] flex-wrap gap-1.5">
+          <div className="absolute left-4 top-14 flex max-w-[220px] flex-wrap gap-1.5">
             {decodeInstrumentChips(hud.instruments).map((c) => (
-              <span
+              <HudChip
                 key={c.id}
-                className={`rounded-full px-2 py-0.5 font-mono text-[10px] font-bold tracking-wider transition-colors duration-200 ${
-                  c.state === 'earned' ? 'bg-[var(--fel-gold)] text-black'
-                    : c.state === 'fel' ? 'border border-white/20 text-white/35'
-                    : 'bg-black/50 text-white/50'
-                }`}
+                plate={c.state !== 'earned'}
+                fill={c.state === 'earned' ? 1 : undefined}
+                tone={c.state === 'earned' ? 'score' : 'text'}
+                className="rounded-full transition-colors duration-200"
+                style={c.state === 'fel' ? { background: 'transparent', boxShadow: 'none', border: `1px solid ${hudColor('text', 0.2)}` } : undefined}
               >
-                {c.label}{c.state === 'fel' ? ' · FEL' : ''}
-              </span>
+                <HudText size="caption" tone={c.state === 'earned' ? 'ink' : 'text'} alpha={c.state === 'earned' ? 1 : c.state === 'fel' ? 0.5 : HUD_TEXT_ALPHA.faint} style={{ fontWeight: 800, textShadow: 'none' }}>
+                  {c.label}{c.state === 'fel' ? ' · FEL' : ''}
+                </HudText>
+              </HudChip>
             ))}
           </div>
         )}
@@ -261,178 +268,198 @@ export function makeTimingHost(opts: TimingHostOpts) {
             are unchanged: the lie panel (club · pin · wind with a bearing arrow), the hole chip, the drawn three-press
             swing meter (the band from the mode's own constants), and the scorecard between holes. */}
         {typeof hud.club === 'string' && hud.club && (
-          <div className="pointer-events-none absolute right-4 top-14 flex flex-col items-end gap-1 font-mono">
-            <div className="fel-panel px-3 py-1.5 text-right">
-              <div className="text-lg font-black text-white">{hud.club}</div>
-              <div className="text-[11px] text-white/70">PIN {hnode(hud.pin, '—')}{typeof hud.aimCarry === 'number' ? <span> · FULL SWING {hud.aimCarry}m</span> : null}</div>
-            </div>
+          <div className="absolute right-4 top-14 flex flex-col items-end gap-1">
+            <HudPlate className="px-3 py-1.5 text-right">
+              <HudText as="div" size="stat">{hud.club}</HudText>
+              <HudText as="div" size="label" alpha={HUD_TEXT_ALPHA.muted}>PIN {hnode(hud.pin, '—')}{typeof hud.aimCarry === 'number' ? <span> · FULL SWING {hud.aimCarry}m</span> : null}</HudText>
+            </HudPlate>
             {typeof hud.weather === 'string' && hud.weather && (
-              <div className="fel-panel px-3 py-1 text-[11px] font-bold tracking-wider text-white/85">{hud.weather}</div>
+              <HudChip alpha={0.85}>{hud.weather}</HudChip>
             )}
-            <div className="fel-panel flex items-center gap-2 px-3 py-1.5">
+            <HudPlate className="flex items-center gap-2 px-3 py-1.5">
               <span
-                className="inline-block text-xl leading-none text-[var(--fel-cyan)]"
-                style={{ transform: `rotate(${typeof hud.windDeg === 'number' ? hud.windDeg : 0}deg)` }}
+                className="inline-block leading-none"
+                style={{ ...hudType('stat'), color: hudColor('you'), transform: `rotate(${typeof hud.windDeg === 'number' ? hud.windDeg : 0}deg)` }}
               >↑</span>
-              <span className="text-[11px] text-white/85">WIND {hnode(hud.wind, '—')}{typeof hud.windWord === 'string' && hud.windWord ? ` · ${hud.windWord}` : ''}</span>
-            </div>
+              <HudText size="label" alpha={0.85}>WIND {hnode(hud.wind, '—')}{typeof hud.windWord === 'string' && hud.windWord ? ` · ${hud.windWord}` : ''}</HudText>
+            </HudPlate>
             {/* PARKOUR GOLF (owner brief 2026-09-18): the launch pad, the flicks left in the air, the rings taken this hole */}
             {(typeof hud.flicks === 'number' || (typeof hud.pad === 'string' && hud.pad) || typeof hud.rings === 'number') && (
-              <div className="fel-panel flex items-center gap-2 px-3 py-1 text-[11px]">
-                {typeof hud.pad === 'string' && hud.pad ? <span className="rounded bg-[var(--fel-gold)]/25 px-1.5 py-0.5 font-bold text-[var(--fel-gold)]">{hud.pad}</span> : null}
-                {typeof hud.flicks === 'number' ? <span className="text-white/85">FLICKS {'◆'.repeat(Math.max(0, Number(hud.flicks)))}{'◇'.repeat(Math.max(0, 2 - Number(hud.flicks)))}</span> : null}
-                {typeof hud.rings === 'number' ? <span className="text-[#9ad7ff]">RINGS {hud.rings}/2</span> : null}
-              </div>
+              <HudPlate className="flex items-center gap-2 px-3 py-1">
+                {typeof hud.pad === 'string' && hud.pad ? <HudChip plate={false} fill={0.25} tone="score" className="rounded">{hud.pad}</HudChip> : null}
+                {typeof hud.flicks === 'number' ? <HudText size="label" alpha={0.85}>FLICKS {'◆'.repeat(Math.max(0, Number(hud.flicks)))}{'◇'.repeat(Math.max(0, 2 - Number(hud.flicks)))}</HudText> : null}
+                {typeof hud.rings === 'number' ? <HudText size="label" tone="info">RINGS {hud.rings}/2</HudText> : null}
+              </HudPlate>
             )}
           </div>
         )}
         {typeof hud.hole === 'number' && (
-          <div className="pointer-events-none absolute inset-x-0 top-12 flex justify-center font-mono text-[12px] tracking-wider">
-            <span className="fel-panel px-3 py-1 text-white/85">
-              HOLE {hud.hole}{typeof hud.holes === 'number' ? ` / ${hud.holes}` : ''} · PAR {hnode(hud.par, '—')} · STROKE {hnode(hud.strokes, 0)} · <span className="font-bold text-[var(--fel-gold)]">{hnode(hud.card, 'E')}</span>
-            </span>
+          <div className="absolute inset-x-0 top-12 flex justify-center">
+            <Scorebug>
+              <HudText size="body" alpha={0.85}>HOLE {hud.hole}{typeof hud.holes === 'number' ? ` / ${hud.holes}` : ''}</HudText>
+              <ScoreDivider />
+              <HudText size="body" alpha={0.85}>PAR {hnode(hud.par, '—')}</HudText>
+              <ScoreDivider />
+              <HudText size="body" alpha={0.85}>STROKE {hnode(hud.strokes, 0)}</HudText>
+              <ScoreDivider />
+              <ScoreValue value={hnode(hud.card, 'E')} size="value" tone="score" />
+            </Scorebug>
           </div>
         )}
         {typeof hud.meterT === 'number' && (
-          <div className="pointer-events-none absolute inset-x-0 bottom-28 flex flex-col items-center gap-1 font-mono">
-            <span className={`fel-panel px-3 py-0.5 text-[11px] font-bold tracking-widest ${hud.swingPhase === 'accuracy' ? 'text-[var(--fel-gold)]' : 'text-[var(--fel-cyan)]'}`}>
+          <div className="absolute inset-x-0 bottom-28 flex flex-col items-center gap-1">
+            <HudChip tone={hud.swingPhase === 'accuracy' ? 'score' : 'you'}>
               {hud.swingPhase === 'accuracy' ? 'ACCURACY — strike in the band' : 'POWER — press at the top'}
-            </span>
+            </HudChip>
             {/* GOLF UPGRADE (Wii Sports meter): LINES every tenth, taller at the quarters, with the CARRY each tenth buys
                 written above them, and the carry at the marker under it — the player gauges "70 %" as "43 m". */}
-            <div className="relative mt-4 h-7 w-[min(520px,70vw)] rounded-md border border-white/20 bg-black/55">
-              <div className="absolute inset-y-0 bg-[var(--fel-gold)]/70" style={{ left: `${(GOLF_ACC_CENTER - GOLF_ACC_HALF) * 100}%`, width: `${GOLF_ACC_HALF * 200}%` }} />
-              {Array.from({ length: 11 }, (_, i) => (
-                <div key={i} className={`absolute bottom-0 w-px ${i % 5 === 0 ? 'h-full bg-white/70' : 'h-1/2 bg-white/35'}`} style={{ left: `${i * 10}%` }} />
-              ))}
-              {ticksOf(hud.meterTicks).map((c, i) => (i === 2 || i === 5 || i === 8 || i === 10)
-                ? <span key={`t${i}`} className="absolute -top-4 -translate-x-1/2 text-[9px] font-bold text-white/65" style={{ left: `${i * 10}%` }}>{c}m</span>
-                : null)}
-              {typeof hud.powerLock === 'number' && (
-                <div className="absolute inset-y-0 w-[3px] bg-[var(--fel-cyan)]" style={{ left: `${hud.powerLock}%` }} />
-              )}
-              <div className="absolute inset-y-0 w-[4px] -translate-x-1/2 bg-white shadow-[0_0_8px_#fff]" style={{ left: `${hud.meterT * 100}%` }} />
-              {typeof hud.meterCarry === 'number' && (
-                <span className="absolute -bottom-5 -translate-x-1/2 text-[11px] font-black text-[var(--fel-cyan)]" style={{ left: `${(hud.swingPhase === 'accuracy' && typeof hud.powerLock === 'number' ? hud.powerLock / 100 : hud.meterT) * 100}%` }}>{hud.meterCarry} m</span>
-              )}
-            </div>
+            <HudMeter
+              className="mt-4"
+              height="swing"
+              width="min(520px, 70vw)"
+              framed
+              round
+              segments={[{ from: GOLF_ACC_CENTER - GOLF_ACC_HALF, to: GOLF_ACC_CENTER + GOLF_ACC_HALF, tone: 'score', alpha: 0.7 }]}
+              ticks={Array.from({ length: 11 }, (_, i) => {
+                const c = ticksOf(hud.meterTicks)[i];
+                return { at: i / 10, major: i % 5 === 0, label: (i === 2 || i === 5 || i === 8 || i === 10) && c !== undefined ? `${c}m` : undefined };
+              })}
+              markers={[
+                ...(typeof hud.powerLock === 'number' ? [{ at: hud.powerLock / 100, tone: 'you' as const, width: 3 }] : []),
+                { at: hud.meterT, tone: 'text' as const, width: 4, glow: true },
+                ...(typeof hud.meterCarry === 'number' ? [{
+                  at: hud.swingPhase === 'accuracy' && typeof hud.powerLock === 'number' ? hud.powerLock / 100 : hud.meterT,
+                  width: 0, label: `${hud.meterCarry} m`, labelTone: 'you' as const,
+                }] : []),
+              ]}
+            />
           </div>
         )}
         {isBoard(hud.board) && typeof hud.boardTitle === 'string' && hud.boardTitle && (
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-4">
-            <div className="fel-panel w-full max-w-[440px] px-5 py-4 font-mono">
-              <div className="fel-heading text-2xl font-black text-white">SCORECARD</div>
+          <div className="absolute inset-0 flex items-center justify-center px-4">
+            <HudPlate className="w-full max-w-[440px] px-5 py-4">
+              <HudText as="div" size="score">SCORECARD</HudText>
               <div className="mt-3 grid gap-1.5">
                 {hud.board.map((r) => (
-                  <div key={r.name} className={`flex items-center justify-between gap-3 rounded-lg px-3 py-1.5 ${r.name === 'CARD' ? 'bg-[var(--fel-gold)]/15' : 'bg-black/40'}`}>
-                    <span className="text-sm font-bold text-white/90">{r.name}</span>
-                    <span className="truncate text-[11px] text-white/60">{r.line}</span>
-                    <span className="fel-stat text-lg">{r.score}</span>
+                  <div key={r.name} className="flex items-center justify-between gap-3 rounded-lg px-3 py-1.5" style={{ background: r.name === 'CARD' ? hudColor('score', 0.15) : 'rgba(0, 0, 0, 0.4)' }}>
+                    <HudText size="value" alpha={0.9}>{r.name}</HudText>
+                    <HudText size="label" alpha={HUD_TEXT_ALPHA.faint} className="truncate">{r.line}</HudText>
+                    <ScoreValue value={r.score} size="stat" pop={false} />
                   </div>
                 ))}
               </div>
-              <div className="mt-3 text-[11px] text-[var(--fel-gold)]">{hud.boardTitle}</div>
-            </div>
+              <HudText as="div" size="label" tone="score" className="mt-3">{hud.boardTitle}</HudText>
+            </HudPlate>
           </div>
         )}
 
         {/* DERBY (A+ mission #7, MLB Home Run Derby presentation): homers · outs · longest, the rival's total ticking, the
             pitch label, and the distance flash on a homer. Key-gated on `outs`. */}
         {typeof hud.outs === 'number' && (
-          <div className="pointer-events-none absolute inset-x-0 top-12 flex flex-col items-center gap-1.5 font-mono">
-            <div className="fel-panel flex items-center gap-3 px-4 py-1.5">
-              <span className="text-[11px] tracking-wider text-[#22d3ee]">HR</span>
-              <span className="fel-stat text-2xl">{hnode(hud.homers, 0)}</span>
-              <span className="text-white/40">·</span>
-              <span className="text-[11px] tracking-wider text-white/70">OUTS</span>
-              <span className={`fel-stat text-2xl ${Number(hud.outs) >= Number(hud.outsCap ?? 10) - 1 ? 'text-[#ff2d78]' : ''}`}>{hnode(hud.outs, 0)}<span className="text-sm text-white/40">/{hnode(hud.outsCap, 10)}</span></span>
-              {Number(hud.longest) > 0 && <span className="ml-2 rounded bg-black/40 px-2 py-0.5 text-[11px] text-[var(--fel-gold)]">LONGEST {hnode(hud.longest, 0)} FT</span>}
-              <span className="ml-2 text-[11px] tracking-wider text-[#facc15]">RIVAL <span className="fel-stat text-lg">{hnode(hud.rivalHomers, 0)}</span></span>
-              {typeof hud.pitch === 'string' && hud.pitch && <span className="ml-2 rounded bg-black/40 px-2 py-0.5 text-[11px] text-white/80">{hud.pitch}</span>}
+          <div className="absolute inset-x-0 top-12 flex flex-col items-center gap-1.5">
+            <Scorebug>
+              <ScoreCell inline label="HR" labelTone="you" value={hnode(hud.homers, 0)} />
+              <ScoreDivider />
+              <span className="inline-flex items-baseline gap-[0.35em]">
+                <HudText size="caption" alpha={HUD_TEXT_ALPHA.muted}>OUTS</HudText>
+                <ScoreValue value={hnode(hud.outs, 0)} tone={Number(hud.outs) >= Number(hud.outsCap ?? 10) - 1 ? 'danger' : 'text'} />
+                <HudText size="value" alpha={HUD_TEXT_ALPHA.faint}>/{hnode(hud.outsCap, 10)}</HudText>
+              </span>
+              {Number(hud.longest) > 0 && <HudChip plate={false} tone="score" className="ml-2 rounded" style={{ background: 'rgba(0, 0, 0, 0.4)' }}>LONGEST {hnode(hud.longest, 0)} FT</HudChip>}
+              <span className="ml-2 inline-flex items-baseline gap-[0.35em]">
+                <HudText size="caption" tone="them">RIVAL</HudText>
+                <ScoreValue value={hnode(hud.rivalHomers, 0)} size="stat" />
+              </span>
+              {typeof hud.pitch === 'string' && hud.pitch && <HudChip plate={false} alpha={0.8} className="ml-2 rounded" style={{ background: 'rgba(0, 0, 0, 0.4)' }}>{hud.pitch}</HudChip>}
               {/* PARKOUR DERBY (owner brief 2026-09-18): the wall targets taken, and a multiplier waiting on the next hit */}
-              {typeof hud.targets === 'string' && hud.targets && <span className="ml-2 rounded bg-[#ff2d78]/20 px-2 py-0.5 text-[11px] text-[#ff9ac2]">TARGETS {hud.targets}</span>}
-              {typeof hud.mult === 'string' && hud.mult && <span className="ml-2 rounded bg-[var(--fel-gold)]/25 px-2 py-0.5 text-[11px] font-bold text-[var(--fel-gold)]">{hud.mult}</span>}
-            </div>
-            {typeof hud.distance === 'string' && hud.distance && (
-              <span className="fel-heading fel-panel px-4 py-1 text-2xl font-black text-[var(--fel-gold)]">{hud.distance}</span>
-            )}
+              {typeof hud.targets === 'string' && hud.targets && <HudChip plate={false} fill={0.2} tone="danger" className="ml-2 rounded">TARGETS {hud.targets}</HudChip>}
+              {typeof hud.mult === 'string' && hud.mult && <HudChip plate={false} fill={0.25} tone="score" className="ml-2 rounded">{hud.mult}</HudChip>}
+            </Scorebug>
+            <HudBanner flow text={typeof hud.distance === 'string' ? hud.distance : ''} tone="score" />
           </div>
         )}
 
         {/* PENALTY (A+ mission #8, FIFA shootout read): the kicks board both sides, the feint counter, the two-press power
             bar and the DIVE prompt on their kick. Key-gated on `kicksYou`. */}
         {typeof hud.kicksYou === 'string' && (
-          <div className="pointer-events-none absolute inset-x-0 top-12 flex flex-col items-center gap-1.5 font-mono">
-            <div className="fel-panel grid grid-cols-[auto_auto_auto] items-center gap-x-3 gap-y-1 px-4 py-1.5">
-              <span className="text-[11px] tracking-wider text-[#22d3ee]">YOU</span><span className="fel-stat text-xl">{hnode(hud.goals, 0)}</span><span className="text-lg tracking-[0.3em] text-white">{hud.kicksYou}</span>
-              <span className="text-[11px] tracking-wider text-[#facc15]">THEM</span><span className="fel-stat text-xl">{hnode(hud.themGoals, 0)}</span><span className="text-lg tracking-[0.3em] text-white">{hnode(hud.kicksThem, '')}</span>
-            </div>
-            {Number(hud.feints) > 0 && <span className="fel-panel px-3 py-0.5 text-[11px] font-bold text-[var(--fel-gold)]">FEINTS {hnode(hud.feints, 0)} / 2 · style banked on a goal</span>}
+          <div className="absolute inset-x-0 top-12 flex flex-col items-center gap-1.5">
+            <HudPlate className="grid grid-cols-[auto_auto_auto] items-center gap-x-3 gap-y-1 px-4 py-1.5">
+              <HudText size="label" tone="you">YOU</HudText><ScoreValue value={hnode(hud.goals, 0)} size="stat" /><HudText size="stat" style={{ letterSpacing: '0.3em' }}>{hud.kicksYou}</HudText>
+              <HudText size="label" tone="them">THEM</HudText><ScoreValue value={hnode(hud.themGoals, 0)} size="stat" /><HudText size="stat" style={{ letterSpacing: '0.3em' }}>{hnode(hud.kicksThem, '')}</HudText>
+            </HudPlate>
+            {Number(hud.feints) > 0 && <HudChip tone="score">FEINTS {hnode(hud.feints, 0)} / 2 · style banked on a goal</HudChip>}
           </div>
         )}
-        {typeof hud.kickPower === 'number' && (
-          <div className="pointer-events-none absolute inset-x-0 bottom-28 flex flex-col items-center gap-1 font-mono">
-            <span className="fel-panel px-3 py-0.5 text-[11px] font-bold tracking-widest text-[var(--fel-cyan)]">POWER — KICK again to strike{typeof hud.kickShape === 'string' && hud.kickShape ? ` · ${hud.kickShape}` : ''}</span>
-            {/* SOCCER UPGRADE (PES bar): ZONES with lines — soft, driven, top bins, and OVER (the ball clears the bar) */}
-            <div className="relative mt-4 h-7 w-[min(520px,70vw)] rounded-md border border-white/20 bg-black/55">
-              {(() => { const zones = typeof hud.kickZones === 'string' && hud.kickZones ? hud.kickZones.split(',').map((z) => { const [to, label] = z.split(':'); return { to: Number(to), label }; }) : [{ to: 0.55, label: '' }, { to: 0.85, label: 'DRIVEN' }, { to: 1, label: '' }];
-                let from = 0; return zones.map((z, i) => { const el = (
-                  <div key={i} className={`absolute inset-y-0 ${z.label === 'OVER' ? 'bg-[#ff2d78]/45' : z.label === 'TOP BINS' ? 'bg-[var(--fel-gold)]/60' : z.label === 'DRIVEN' ? 'bg-[var(--fel-cyan)]/25' : 'bg-white/5'}`} style={{ left: `${from * 100}%`, width: `${(z.to - from) * 100}%` }}>
-                    <span className="absolute -top-4 left-1/2 -translate-x-1/2 whitespace-nowrap text-[9px] font-bold text-white/65">{z.label}</span>
-                    <div className="absolute inset-y-0 right-0 w-px bg-white/70" />
-                  </div>); from = z.to; return el; }); })()}
-              <div className="absolute inset-y-0 w-[4px] -translate-x-1/2 bg-white shadow-[0_0_8px_#fff]" style={{ left: `${Math.max(0, Math.min(100, hud.kickPower))}%` }} />
+        {typeof hud.kickPower === 'number' && (() => {
+          const zones = typeof hud.kickZones === 'string' && hud.kickZones
+            ? hud.kickZones.split(',').map((z) => { const [to, label] = z.split(':'); return { to: Number(to), label }; })
+            : [{ to: 0.55, label: '' }, { to: 0.85, label: 'DRIVEN' }, { to: 1, label: '' }];
+          let from = 0;
+          const segs = zones.map((z) => {
+            const s = {
+              from, to: z.to, label: z.label, edge: true,
+              ...(z.label === 'OVER' ? { tone: 'danger' as const, alpha: 0.45 } : z.label === 'TOP BINS' ? { tone: 'score' as const, alpha: 0.6 } : z.label === 'DRIVEN' ? { tone: 'you' as const, alpha: 0.25 } : { alpha: 0.05 }),
+            };
+            from = z.to;
+            return s;
+          });
+          return (
+            <div className="absolute inset-x-0 bottom-28 flex flex-col items-center gap-1">
+              <HudChip tone="you">POWER — KICK again to strike{typeof hud.kickShape === 'string' && hud.kickShape ? ` · ${hud.kickShape}` : ''}</HudChip>
+              {/* SOCCER UPGRADE (PES bar): ZONES with lines — soft, driven, top bins, and OVER (the ball clears the bar) */}
+              <HudMeter className="mt-4" height="swing" width="min(520px, 70vw)" framed segments={segs}
+                markers={[{ at: Math.max(0, Math.min(100, hud.kickPower)) / 100, tone: 'text', width: 4, glow: true }]} />
             </div>
-          </div>
-        )}
+          );
+        })()}
         {/* TENNIS UPGRADE (Wii timing): the swing window as a meter with its bands — the mode publishes the ramp (contact at
             the right edge) and where OK / GOOD / PERFECT begin for this flight. Key-gated on the bands. */}
         {typeof hud.shotMeterT === 'number' && hud.shotMeterT > 0 && typeof hud.shotMeterBands === 'string' && hud.shotMeterBands && (() => {
-          const [ok, good, perfect] = hud.shotMeterBands.split(',').map(Number); const pc = (v: number) => `${Math.max(0, Math.min(1, v)) * 100}%`;
+          const [ok, good, perfect] = hud.shotMeterBands.split(',').map(Number);
           return (
-            <div className="pointer-events-none absolute inset-x-0 bottom-28 flex flex-col items-center gap-1 font-mono">
-              <span className="fel-panel px-3 py-0.5 text-[11px] font-bold tracking-widest text-[var(--fel-cyan)]">SWING — in the gold at the edge</span>
-              <div className="relative h-6 w-[min(520px,70vw)] rounded-md border border-white/20 bg-black/55">
-                <div className="absolute inset-y-0 bg-white/15" style={{ left: pc(ok), right: 0 }} />
-                <div className="absolute inset-y-0 bg-[var(--fel-cyan)]/30" style={{ left: pc(good), right: 0 }} />
-                <div className="absolute inset-y-0 bg-[var(--fel-gold)]/70" style={{ left: pc(perfect), right: 0 }} />
-                {[ok, good, perfect].map((v, i) => <div key={i} className="absolute inset-y-0 w-px bg-white/70" style={{ left: pc(v) }} />)}
-                <span className="absolute -top-4 -translate-x-1/2 text-[9px] font-bold text-white/60" style={{ left: pc(ok) }}>EARLY</span>
-                <span className="absolute -top-4 -translate-x-1/2 text-[9px] font-bold text-[var(--fel-gold)]" style={{ left: pc(perfect) }}>PERFECT</span>
-                <div className="absolute inset-y-0 w-[4px] -translate-x-1/2 bg-white shadow-[0_0_8px_#fff]" style={{ left: pc(hud.shotMeterT) }} />
-              </div>
+            <div className="absolute inset-x-0 bottom-28 flex flex-col items-center gap-1">
+              <HudChip tone="you">SWING — in the gold at the edge</HudChip>
+              <HudMeter
+                className="mt-4"
+                height="tall"
+                width="min(520px, 70vw)"
+                framed
+                segments={[{ from: ok, to: 1, alpha: 0.15 }, { from: good, to: 1, tone: 'you', alpha: 0.3 }, { from: perfect, to: 1, tone: 'score', alpha: 0.7 }]}
+                ticks={[
+                  { at: ok, label: 'EARLY', labelAlpha: 0.6 },
+                  { at: good },
+                  { at: perfect, label: 'PERFECT', labelTone: 'score' },
+                ]}
+                markers={[{ at: hud.shotMeterT, tone: 'text', width: 4, glow: true }]}
+              />
             </div>
           );
         })()}
         {/* WEATHER chip for the modes without the golf lie panel (which carries its own) */}
         {typeof hud.weather === 'string' && hud.weather && !(typeof hud.club === 'string' && hud.club) && (
-          <div className="pointer-events-none absolute right-4 top-14 font-mono">
-            <span className="fel-panel px-3 py-1 text-[11px] font-bold tracking-wider text-white/85">{hud.weather}</span>
+          <div className="absolute right-4 top-14">
+            <HudChip alpha={0.85}>{hud.weather}</HudChip>
           </div>
         )}
-        {typeof hud.dive === 'string' && hud.dive && (
-          <div className="pointer-events-none absolute inset-x-0 top-1/4 flex justify-center font-mono">
-            <span className="fel-heading fel-panel px-5 py-2 text-2xl font-black text-[#7CFFB2]">{hud.dive}</span>
-          </div>
-        )}
+        <HudBanner text={typeof hud.dive === 'string' ? hud.dive : ''} tone="good" className="top-1/4" />
 
         {/* TENNIS (A+ mission #6, Mario Tennis feel + Wii size): the scoreboard chip — games both sides, the umpire's
             call, the streak — and the TELL on the incoming ball with the answer that beats it. Key-gated. */}
         {typeof hud.call === 'string' && hud.call && (
-          <div className="pointer-events-none absolute inset-x-0 top-12 flex justify-center font-mono">
-            <div className="fel-panel flex items-center gap-3 px-4 py-1.5">
-              <span className="text-[11px] tracking-wider text-[#22d3ee]">{hnode(hud.you, 'YOU')}</span>
-              <span className="fel-stat text-2xl">{hnode(hud.score, 0)}</span>
-              <span className="text-white/40">–</span>
-              <span className="fel-stat text-2xl">{hnode(hud.foeScore, 0)}</span>
-              <span className="text-[11px] tracking-wider text-[#facc15]">{hnode(hud.them, 'THEM')}</span>
-              <span className="ml-2 rounded bg-black/40 px-2 py-0.5 text-sm font-bold text-[var(--fel-gold)]">{hud.call}</span>
-              {Number(hud.streak) >= 2 && <span className="text-[11px] font-bold text-[#ff6a00]">{hnode(hud.streak, 0)} STRAIGHT</span>}
+          <div className="absolute inset-x-0 top-12 flex justify-center">
+            <Scorebug>
+              <HudText size="label" tone="you">{hnode(hud.you, 'YOU')}</HudText>
+              <ScoreValue value={hnode(hud.score, 0)} />
+              <ScoreDivider>–</ScoreDivider>
+              <ScoreValue value={hnode(hud.foeScore, 0)} />
+              <HudText size="label" tone="them">{hnode(hud.them, 'THEM')}</HudText>
+              <HudChip plate={false} tone="score" size="value" className="ml-2 rounded" style={{ background: 'rgba(0, 0, 0, 0.4)' }}>{hud.call}</HudChip>
+              {Number(hud.streak) >= 2 && <HudText size="label" tone="heat">{hnode(hud.streak, 0)} STRAIGHT</HudText>}
               {/* PARKOUR TENNIS (owner brief 2026-09-18): the rally's multiplier (the glass, the wall run, the aerials) and the style it has paid */}
-              {Number(hud.mult) >= 2 && <span className="rounded bg-[#9ad7ff]/20 px-2 py-0.5 text-[11px] font-bold text-[#9ad7ff]">x{Number(hud.mult)} RALLY</span>}
-              {Number(hud.style) > 0 && <span className="text-[11px] text-white/70">STYLE {Number(hud.style)}</span>}
-              {typeof hud.aerial === 'string' && hud.aerial && <span className="rounded bg-[var(--fel-gold)]/25 px-2 py-0.5 text-[11px] font-bold text-[var(--fel-gold)]">{hud.aerial}</span>}
-            </div>
+              {Number(hud.mult) >= 2 && <HudChip plate={false} fill={0.2} tone="info" className="rounded">x{Number(hud.mult)} RALLY</HudChip>}
+              {Number(hud.style) > 0 && <HudText size="label" alpha={HUD_TEXT_ALPHA.muted}>STYLE {Number(hud.style)}</HudText>}
+              {typeof hud.aerial === 'string' && hud.aerial && <HudChip plate={false} fill={0.25} tone="score" className="rounded">{hud.aerial}</HudChip>}
+            </Scorebug>
           </div>
         )}
 
@@ -441,7 +468,7 @@ export function makeTimingHost(opts: TimingHostOpts) {
             + name readable from a couch. Rendered only when a mode publishes
             `cues`, so every other timing sport is unchanged. */}
         {isCueLane(hud.cues) && hud.cues.length > 0 && (
-          <div className="pointer-events-none absolute inset-x-6 bottom-[34%] h-16">
+          <div className="absolute inset-x-6 bottom-[34%] h-16">
             {/* QA P2-03: a plate under the lane (≥ 3:1 for every family colour on any stage), the hit ring lit on the beat */}
             <div data-lane-plate className="absolute -inset-x-3 -inset-y-2 rounded-2xl" style={{ background: `rgba(0,0,0,${LANE_PLATE_ALPHA})` }} />
             <div className="absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-white/30" />
@@ -457,19 +484,22 @@ export function makeTimingHost(opts: TimingHostOpts) {
               return (
                 <div
                   key={i}
-                  className="absolute top-1/2 flex h-12 w-12 items-center justify-center rounded-full font-mono text-sm font-bold text-black"
+                  className="absolute top-1/2 flex h-12 w-12 items-center justify-center rounded-full"
                   style={{
+                    ...hudType('value'),
+                    color: hudColor('ink'),
+                    textShadow: 'none',
                     left: `${x}%`,
                     background: c.color,
                     opacity: c.in < -0.05 ? PASSED_CUE_OPACITY : 1,
                     transform: `translate(-50%, -50%) scale(${hot ? 1.18 : 1})`,
-                    boxShadow: hot ? `0 0 0 2px #fff, 0 0 18px ${c.color}` : '0 0 0 2px rgba(255,255,255,0.9), 0 2px 6px rgba(0,0,0,0.5)',
+                    boxShadow: hot ? `0 0 0 2px ${hudColor('text')}, 0 0 18px ${c.color}` : '0 0 0 2px rgba(255,255,255,0.9), 0 2px 6px rgba(0,0,0,0.5)',
                   }}
                 >
                   {c.glyph}
-                  <span className="absolute top-full mt-1.5 whitespace-nowrap rounded bg-black/65 px-1.5 py-0.5 font-mono text-[10px] font-bold tracking-wider text-white">
-                    {c.mirrored ? '\u25c1 ' : ''}{c.name.toUpperCase()}
-                  </span>
+                  <HudText size="caption" className="absolute top-full mt-1.5 whitespace-nowrap rounded px-1.5 py-0.5" style={{ fontWeight: 700, background: 'rgba(0, 0, 0, 0.65)' }}>
+                    {c.mirrored ? '◁ ' : ''}{c.name.toUpperCase()}
+                  </HudText>
                 </div>
               );
             })}
@@ -482,11 +512,8 @@ export function makeTimingHost(opts: TimingHostOpts) {
             0.35 s) share ONE slot under the meters — they used to sit at their own offsets and stack in a rally. */}
         <TimingPrompt hud={hud} />
 
-        {typeof hud.banner === 'string' && hud.banner && (
-          <div className="pointer-events-none absolute inset-x-0 top-1/3 text-center">
-            <span className="fel-heading fel-panel px-4 py-2 text-2xl font-bold text-[var(--fel-emerald)]">{hud.banner}</span>
-          </div>
-        )}
+        <HudBanner text={typeof hud.banner === 'string' ? hud.banner : ''} tone="good" />
+        </HudFrame>
 
         <BootSplash
           modeId={modeKey}

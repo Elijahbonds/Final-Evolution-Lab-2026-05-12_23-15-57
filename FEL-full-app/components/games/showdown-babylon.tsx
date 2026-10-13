@@ -15,7 +15,8 @@ import { MODES } from '@/lib/babylon/modes/registry';
 import { mergeHud } from '@/lib/babylon/core/hudMerge';   // IMPROVE (2026-10-06): an unchanged HUD patch is not a render
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode, hnum } from './hud-format';
-import { CombatHudBand } from './combat-hud-band';   // QA P1-09: the banner line sits below the HUD, above the juice overlay
+import { HudFrame, HudText } from './tv-hud';
+import { CombatHudBand, CombatRound, CombatStat } from './combat-hud-band';   // QA P1-09: the banner line sits below the HUD, above the juice overlay
 
 type Hud = Record<string, HudValue>;
 
@@ -96,30 +97,30 @@ export default function ShowdownBabylon({ onEnd }: GameProps) {
     <div className="relative aspect-[16/10] w-full overflow-hidden rounded-xl border border-white/10 bg-black">
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full touch-none" />
 
+      {/* TV HUD (A9.13, lane/tv-hud): the fight readouts on the shared system — same keys, same band, same corners. */}
       {showHud && (
+        <HudFrame>
         <CombatHudBand banner={typeof hud.banner === 'string' ? hud.banner : ''}>
-        <div className="flex justify-between px-4 py-3 text-sm font-mono text-white">
-          <div className="flex flex-col gap-1">
-            <span className="fel-panel px-2 py-0.5 text-cyan-300">HP {hnum(hud.hp, 100)}</span>
-            <span className="fel-panel px-2 py-0.5 text-yellow-400">GUARD {hnum(hud.guard, 100)}</span>
-            <span className="fel-panel px-2 py-0.5 text-purple-400">CHI {hnum(hud.chi, 0)}</span>
+        <div className="flex justify-between px-4 py-3">
+          <div className="flex flex-col items-start gap-1">
+            <CombatStat label="HP" value={hnum(hud.hp, 100)} tone="you" />
+            <CombatStat label="GUARD" value={hnum(hud.guard, 100)} tone="them" />
+            <CombatStat label="CHI" value={hnum(hud.chi, 0)} tone="power" />
             {/* IMPROVE (2026-10-06): the assist's cooldown — the mode sent it every frame and nothing drew it */}
-            <span className="fel-panel px-2 py-0.5 text-sky-300">ASSIST {hnode(hud.assist, 'READY')}</span>
+            <CombatStat label="ASSIST" value={hnode(hud.assist, 'READY')} tone="info" />
           </div>
-          <div className="text-center">
-            <span className="fel-heading text-xl font-black">ROUND {hnode(hud.round, 1)}</span>
-            <div className="text-xs mt-1">{hnode(hud.wins, 0)} – {hnode(hud.foeWins, 0)}</div>
-            {typeof hud.loadout === 'string' && hud.loadout && <div className="text-xs text-cyan-300">{hud.loadout}</div>}
-          </div>
-          <div className="flex flex-col gap-1 items-end">
-            <span className="fel-panel px-2 py-0.5 text-red-400">FOE HP {hnum(hud.foeHp, 100)}</span>
-            <span className="fel-panel px-2 py-0.5 text-yellow-400">FOE GUARD {hnum(hud.foeGuard, 100)}</span>
-            <span className="fel-panel px-2 py-0.5 text-purple-400">FOE CHI {hnum(hud.foeChi, 0)}</span>
+          <CombatRound round={hnode(hud.round, 1)} wins={hnode(hud.wins, 0)} foeWins={hnode(hud.foeWins, 0)}>
+            {typeof hud.loadout === 'string' && hud.loadout && <HudText size="label" tone="you">{hud.loadout}</HudText>}
+          </CombatRound>
+          <div className="flex flex-col items-end gap-1">
+            <CombatStat label="FOE HP" value={hnum(hud.foeHp, 100)} tone="danger" />
+            <CombatStat label="FOE GUARD" value={hnum(hud.foeGuard, 100)} tone="them" />
+            <CombatStat label="FOE CHI" value={hnum(hud.foeChi, 0)} tone="power" />
           </div>
         </div>
         </CombatHudBand>
+        </HudFrame>
       )}
-
 
       <BootSplash
         modeId="showdown"

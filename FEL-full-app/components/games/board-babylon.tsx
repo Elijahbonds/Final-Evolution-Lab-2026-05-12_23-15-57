@@ -16,6 +16,7 @@ import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } 
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode } from './hud-format';
+import { HUD_TEXT_ALPHA, HudBanner, HudChip, HudFrame, HudLine, HudMeter, HudText, ScoreValue, Scorebug, type HudTone } from './tv-hud';
 import { getActiveSkin } from '@/lib/modes/art/active-skin';
 import { applyArtCardToSurface } from '@/lib/modes/art/apply-art-card';
 import { boardGameResult, boardHeadline, boardSportWon } from '@/lib/sessions/gameResultFromSession';
@@ -36,17 +37,9 @@ export interface BoardHostOpts {
   title?: string;
 }
 
-/** A labelled 0..max bar. Board sports live on their meters. */
-function Meter({ label, value, max, color }: { label: string; value: number; max: number; color: string }) {
-  const pct = Math.max(0, Math.min(100, (value / max) * 100));
-  return (
-    <div className="flex flex-col items-end gap-0.5">
-      <span className="font-mono text-[10px] tracking-wider" style={{ color }}>{label}</span>
-      <div className="h-1.5 w-24 overflow-hidden rounded-full bg-white/15">
-        <div className="h-full transition-[width] duration-200" style={{ width: `${pct}%`, background: color }} />
-      </div>
-    </div>
-  );
+/** A labelled 0..max bar. Board sports live on their meters. (TV HUD: the shared HudMeter, label in the bar's tone.) */
+function Meter({ label, value, max, tone }: { label: string; value: number; max: number; tone: HudTone }) {
+  return <HudMeter className="items-end" label={label} labelTone={tone} value={value} max={max} tone={tone} height="thin" width="6rem" />;
 }
 
 /**
@@ -57,16 +50,15 @@ function BalanceNeedle({ value, label }: { value: number; label: string }) {
   const v = Math.max(-100, Math.min(100, value));
   const danger = Math.abs(v) > 70;
   return (
-    <div className="flex flex-col items-center gap-0.5">
-      <span className={`font-mono text-[10px] tracking-wider ${danger ? 'text-[var(--fel-red)]' : 'text-white/70'}`}>{label || 'BALANCE'}</span>
-      <div className="relative h-2 w-40 rounded-full bg-white/15">
-        <div className="absolute inset-y-0 left-1/2 w-px bg-white/50" />
-        <div
-          className="absolute top-1/2 h-3.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-sm"
-          style={{ left: `${50 + v / 2}%`, background: danger ? 'var(--fel-red)' : 'var(--fel-gold)' }}
-        />
-      </div>
-    </div>
+    <HudMeter
+      className="items-center"
+      label={label || 'BALANCE'}
+      labelTone={danger ? 'danger' : undefined}
+      labelAlpha={danger ? 1 : 0.7}
+      height="bar" width="10rem"
+      ticks={[{ at: 0.5, major: true }]}
+      markers={[{ at: (50 + v / 2) / 100, tone: danger ? 'danger' : 'score', width: 6 }]}
+    />
   );
 }
 
@@ -78,13 +70,15 @@ function PocketBar({ pos, lo, hi }: { pos: number; lo: number; hi: number }) {
   const at = Math.max(0, Math.min(100, pos));
   const inside = at >= lo && at <= hi;
   return (
-    <div className="flex flex-col items-end gap-0.5">
-      <span className={`font-mono text-[10px] tracking-wider ${inside ? 'text-[var(--fel-cyan)]' : 'text-white/60'}`}>LIP · POCKET · FLAT</span>
-      <div className="relative h-1.5 w-24 rounded-full bg-white/15">
-        <div className="absolute inset-y-0 rounded-full bg-[var(--fel-cyan)]/35" style={{ left: `${lo}%`, width: `${Math.max(0, hi - lo)}%` }} />
-        <div className={`absolute top-1/2 h-3 w-1 -translate-x-1/2 -translate-y-1/2 rounded-sm ${inside ? 'bg-[var(--fel-cyan)]' : 'bg-white'}`} style={{ left: `${at}%` }} />
-      </div>
-    </div>
+    <HudMeter
+      className="items-end"
+      label="LIP · POCKET · FLAT"
+      labelTone={inside ? 'you' : undefined}
+      labelAlpha={inside ? 1 : 0.6}
+      height="thin" width="6rem"
+      segments={[{ from: lo / 100, to: Math.max(lo, hi) / 100, tone: 'you', alpha: 0.35 }]}
+      markers={[{ at: at / 100, tone: inside ? 'you' : 'text', width: 4 }]}
+    />
   );
 }
 
@@ -93,17 +87,16 @@ function PocketBar({ pos, lo, hi }: { pos: number; lo: number; hi: number }) {
  * while the rider is working the tube enough to bank, grey (with the ask) while he is not. Drawn while a mode publishes `tube`.
  */
 function TubeMeter({ sec, mark, ok }: { sec: number; mark: number; ok: boolean }) {
-  const max = mark * 2;
-  const pct = Math.max(0, Math.min(100, (sec / max) * 100));
-  const color = ok ? 'var(--fel-gold)' : 'rgba(255,255,255,0.55)';
   return (
-    <div className="flex flex-col items-end gap-0.5">
-      <span className="font-mono text-[10px] tracking-wider" style={{ color }}>{ok ? `TUBE ${sec.toFixed(1)}s` : `TUBE ${sec.toFixed(1)}s · TRIM OR DRIVE`}</span>
-      <div className="relative h-1.5 w-24 rounded-full bg-white/15">
-        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: color }} />
-        <div className="absolute -top-0.5 h-2.5 w-px bg-white" style={{ left: '50%' }} />
-      </div>
-    </div>
+    <HudMeter
+      className="items-end"
+      label={ok ? `TUBE ${sec.toFixed(1)}s` : `TUBE ${sec.toFixed(1)}s · TRIM OR DRIVE`}
+      labelTone={ok ? 'score' : undefined}
+      labelAlpha={ok ? 1 : 0.55}
+      value={sec} max={mark * 2} tone={ok ? 'score' : 'text'} fillAlpha={ok ? 1 : 0.55}
+      height="thin" width="6rem"
+      ticks={[{ at: 0.5, major: true }]}
+    />
   );
 }
 
@@ -218,6 +211,9 @@ export function makeBoardHost(opts: BoardHostOpts) {
       <div className="relative aspect-[16/10] w-full overflow-hidden rounded-xl border border-white/10 bg-black">
         <canvas ref={canvasRef} className="absolute inset-0 h-full w-full touch-none" />
 
+        {/* TV HUD (A9.13, lane/tv-hud): the shared system (components/games/tv-hud) draws every readout — same keys,
+            same gates, same slots. */}
+        <HudFrame>
         {/* HUD bezel.
             This rendered exactly four things -- time, coins, score, banner --
             while the three modes publish combo, pot, momentum, goals, flow,
@@ -234,64 +230,62 @@ export function makeBoardHost(opts: BoardHostOpts) {
             Driven by what the mode actually publishes rather than by modeKey,
             so a mode gets its readout by setting a HUD key and nothing here
             needs to know which sport it is. */}
-        <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-3 px-4 py-3 font-mono text-xs">
-          <div className="flex items-center gap-2">
-            <span className="fel-panel px-3 py-1 text-[var(--fel-cyan)]">
+        <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-3 px-4 py-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <HudChip tone="you" size="value">
               {Math.max(0, Number(hud.time ?? 0))}s
               {/* GATE-CRASHER-POLISH-2 (GC-F1): the par the time bonus counts from, beside the clock (a mode that publishes one) */}
-              {hud.par != null && <span className={Number(hud.time ?? 0) > Number(hud.par) ? 'text-[var(--fel-gold)]' : 'text-white/70'}> · PAR {hnode(hud.par)}</span>}
-            </span>
+              {hud.par != null && <HudText size="label" tone={Number(hud.time ?? 0) > Number(hud.par) ? 'score' : 'text'} alpha={Number(hud.time ?? 0) > Number(hud.par) ? 1 : 0.7}> · PAR {hnode(hud.par)}</HudText>}
+            </HudChip>
             {hud.coins != null && (
-              <span className="fel-panel px-3 py-1 text-[var(--fel-gold)]">◈ {hnode(hud.coins, 0)}</span>
+              <HudChip tone="score" size="value">◈ {hnode(hud.coins, 0)}</HudChip>
             )}
             {hud.gates != null && (
-              <span className="fel-panel px-3 py-1 text-white/80">GATES {hnode(hud.gates)}</span>
+              <HudChip label="GATES" alpha={0.85} size="value">{hnode(hud.gates)}</HudChip>
             )}
             {/* GATE-CRASHER-MAJOR: the win, in the bezel — the target before it is reached, the verdict after */}
             {typeof hud.target === 'string' && hud.target && (
-              <span className={`fel-panel px-3 py-1 font-bold ${hud.target.includes('✓') ? 'text-[var(--fel-emerald)]' : 'text-[var(--fel-gold)]'}`}>{hud.target}</span>
+              <HudChip tone={hud.target.includes('✓') ? 'good' : 'score'} size="value">{hud.target}</HudChip>
             )}
             {hud.goals != null && (
-              <span className="fel-panel px-3 py-1 text-white/80">GOALS {hnode(hud.goals)}</span>
+              <HudChip label="GOALS" alpha={0.85} size="value">{hnode(hud.goals)}</HudChip>
             )}
             {/* IMPROVE (2026-10-06, snow item 12): the pace — the speed, and the split at the last gate against par (and the best run) */}
             {typeof hud.speed === 'number' && (
-              <span className="fel-panel px-3 py-1 text-white/80">{hud.speed} KM/H</span>
+              <HudChip alpha={0.85} size="value">{hud.speed} KM/H</HudChip>
             )}
             {typeof hud.split === 'string' && hud.split && (
-              <span className={`fel-panel px-3 py-1 font-bold ${hud.split.includes('+') ? 'text-[var(--fel-gold)]' : 'text-[var(--fel-emerald)]'}`}>{hud.split}</span>
+              <HudChip tone={hud.split.includes('+') ? 'score' : 'good'} size="value">{hud.split}</HudChip>
             )}
             {/* IMPROVE (2026-10-06, surf items 9 / 20): the judged heat (best three waves) and the swell being ridden */}
             {typeof hud.heat === 'number' && (
-              <span className="fel-panel px-3 py-1 text-white/80">HEAT {hud.heat.toFixed(1)} · {hnode(hud.waves, 0)} WAVES</span>
+              <HudChip alpha={0.85} size="value">HEAT {hud.heat.toFixed(1)} · {hnode(hud.waves, 0)} WAVES</HudChip>
             )}
             {typeof hud.swell === 'string' && hud.swell && (
-              <span className="fel-panel px-3 py-1 font-bold text-[var(--fel-cyan)]">{hud.swell}</span>
+              <HudChip tone="you" size="value">{hud.swell}</HudChip>
             )}
           </div>
-          <span className="rounded-md bg-black/50 px-3 py-1 text-lg font-bold text-white">{hnode(hud.score, 0)}</span>
+          <Scorebug><ScoreValue value={hnode(hud.score, 0)} size="stat" pop={false} /></Scorebug>
         </div>
 
         {/* THE COMBO TICKER — the pot you stand to lose. Only while one is open. */}
         {typeof hud.combo === 'string' && hud.combo && (
-          <div className="pointer-events-none absolute inset-x-0 top-14 flex flex-col items-center">
-            <span className="fel-heading text-3xl font-black text-[var(--fel-gold)] drop-shadow">
-              {hnode(hud.pot, 0)}
-            </span>
-            <span className="font-mono text-sm font-bold text-[var(--fel-gold)]">{hnode(hud.combo)}</span>
+          <div className="absolute inset-x-0 top-14 flex flex-col items-center">
+            <ScoreValue value={hnode(hud.pot, 0)} size="hero" tone="score" />
+            <HudText size="value" tone="score">{hnode(hud.combo)}</HudText>
             {/* IMPROVE (2026-10-06, item 10): the THPS line — the links by name, and what the pot is waiting on */}
             {typeof hud.comboLine === 'string' && hud.comboLine && (
-              <span className="max-w-[80%] truncate font-mono text-xs font-bold text-white/90 drop-shadow">{hud.comboLine}</span>
+              <HudText size="body" alpha={0.9} className="max-w-[80%] truncate" style={{ fontWeight: 700 }}>{hud.comboLine}</HudText>
             )}
             {typeof hud.chainLink === 'string' && hud.chainLink && (
-              <span className="font-mono text-[10px] tracking-wider text-white/60">{hud.chainLink}</span>
+              <HudText size="caption" alpha={0.6}>{hud.chainLink}</HudText>
             )}
           </div>
         )}
 
         {/* IMPROVE (2026-10-06, item 9): the balance needle while a grind or a manual rides one */}
         {typeof hud.balance === 'number' && (
-          <div className="pointer-events-none absolute inset-x-0 bottom-[32%] flex justify-center">
+          <div className="absolute inset-x-0 bottom-[32%] flex justify-center">
             <BalanceNeedle value={hud.balance} label={typeof hud.balanceKind === 'string' ? hud.balanceKind : ''} />
           </div>
         )}
@@ -300,12 +294,12 @@ export function makeBoardHost(opts: BoardHostOpts) {
         <BoostGauge hud={hud} className="absolute inset-x-0 bottom-24" />
 
         {/* Meters. Each appears only if its mode publishes it. */}
-        <div className="pointer-events-none absolute right-4 top-24 flex flex-col items-end gap-1.5">
-          {hud.flow != null && <Meter label="FLOW" value={Number(hud.flow)} max={200} color="var(--fel-cyan)" />}
-          {hud.momentum != null && <Meter label="MOMENTUM" value={Number(hud.momentum)} max={100} color="var(--fel-red)" />}
+        <div className="absolute right-4 top-24 flex flex-col items-end gap-1.5">
+          {hud.flow != null && <Meter label="FLOW" value={Number(hud.flow)} max={200} tone="you" />}
+          {hud.momentum != null && <Meter label="MOMENTUM" value={Number(hud.momentum)} max={100} tone="danger" />}
           {/* IMPROVE (2026-10-06, snow item 9): the air left, while the rider is in it */}
           {typeof hud.airLeft === 'number' && (
-            <Meter label={`AIR ${hud.airLeft.toFixed(1)}s`} value={hud.airLeft} max={Number(hud.airMax ?? 1.2) || 1.2} color="var(--fel-cyan)" />
+            <Meter label={`AIR ${hud.airLeft.toFixed(1)}s`} value={hud.airLeft} max={Number(hud.airMax ?? 1.2) || 1.2} tone="you" />
           )}
           {/* IMPROVE (2026-10-06, surf items 12 / 13): where the rider is on the face, and the tube while one is ridden */}
           {typeof hud.pocket === 'number' && (
@@ -317,44 +311,30 @@ export function makeBoardHost(opts: BoardHostOpts) {
         {/* The objectives, NAMED. The bezel showed "GOALS 0/4" and nothing else,
             so the player was chasing four targets they had never been told. */}
         {typeof hud.goalList === 'string' && hud.goalList && (
-          <div className="pointer-events-none absolute bottom-4 left-4 flex flex-col items-start gap-0.5">
+          <div className="absolute bottom-4 left-4 flex flex-col items-start gap-0.5">
             {hud.goalList.split(' · ').map((g) => (
-              <span
-                key={g}
-                className={`font-mono text-[10px] ${g.startsWith('✓') ? 'text-[var(--fel-gold)]' : 'text-white/55'}`}
-              >
+              <HudText key={g} size="caption" tone={g.startsWith('✓') ? 'score' : 'text'} alpha={g.startsWith('✓') ? 1 : HUD_TEXT_ALPHA.faint}>
                 {g}
-              </span>
+              </HudText>
             ))}
           </div>
         )}
 
-        {typeof hud.banner === 'string' && hud.banner && (
-          <div className="pointer-events-none absolute inset-x-0 top-1/3 text-center">
-            <span className="fel-heading fel-panel px-4 py-2 text-2xl font-bold text-[var(--fel-emerald)]">{hud.banner}</span>
-          </div>
-        )}
+        <HudBanner text={typeof hud.banner === 'string' ? hud.banner : ''} tone="good" />
 
         {/* ASSET-POLISH (2026-10-05): what the wall in reach takes (skate's kick plant and wall ride), said while it can */}
-        {typeof hud.wallCue === 'string' && hud.wallCue && (
-          <div className="pointer-events-none absolute inset-x-0 bottom-[22%] text-center">
-            <span className="fel-panel px-3 py-1 font-mono text-sm font-bold text-[var(--fel-cyan)]">{hud.wallCue}</span>
-          </div>
-        )}
+        <HudLine text={typeof hud.wallCue === 'string' ? hud.wallCue : ''} className="bottom-[22%]" size="value" tone="you" alpha={1} strong />
 
         {/* IMPROVE (2026-10-06, surf item 19): a lesson the mode is giving right now (surf's first wave: climb, drop, pump) */}
-        {phase === 'playing' && typeof hud.coach === 'string' && hud.coach && (
-          <div className="pointer-events-none absolute inset-x-0 bottom-[30%] text-center">
-            <span className="fel-panel px-3 py-1 font-mono text-sm font-bold text-[var(--fel-cyan)]">{hud.coach}</span>
-          </div>
+        {phase === 'playing' && (
+          <HudLine text={typeof hud.coach === 'string' ? hud.coach : ''} className="bottom-[30%]" size="value" tone="you" alpha={1} strong />
         )}
 
         {/* IMPROVE (2026-10-06, item 18): the mode's control hint, for the first seconds of play */}
         {hintUp && hintText && (
-          <div className="pointer-events-none absolute inset-x-0 bottom-14 flex justify-center px-4">
-            <span className="fel-panel max-w-[70%] px-3 py-1 text-center font-mono text-[11px] text-white/80">{hintText}</span>
-          </div>
+          <HudLine text={hintText} className="bottom-14" size="label" alpha={0.8} maxWidthClass="max-w-[70%]" />
         )}
+        </HudFrame>
 
         <BootSplash
           modeId={modeKey}
