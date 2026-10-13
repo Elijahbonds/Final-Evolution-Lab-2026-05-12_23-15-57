@@ -7,7 +7,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
-    "dev": "tsx src/index.ts"
+    "dev": "tsx src/index.ts",
+    "test": "node --import tsx --test test/*.test.ts"
   },
   "dependencies": { "ws": "^8.18.0" },
   "devDependencies": { "@types/ws": "^8.5.12", "typescript": "5.9.3", "tsx": "^4.19.0" }
