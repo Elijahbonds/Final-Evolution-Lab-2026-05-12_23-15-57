@@ -1098,14 +1098,14 @@ export function makeAeroAcesMode(): ModeDefinition {
       ctx.camera.fov = stepSpeedFov(ctx.camera.fov, baseFov * (boostFx?.fovMult(boost) ?? 1), flight.speed, tune.top * 1.4, dt, AERO_TUNE.fov);
       // SPEED-VIGNETTE (racing HUD pass): same opt-in as the kart — report the fraction, the harness frames it.
       ctx.feel.speedVignette01(flight.speed / (tune.top * 1.4));
-      pushHud(ctx, dt);
-      // VIS-RACE: the kill's replay goes LAST — the harness holds update() from here and puts the frame back exactly as this call left
+      // VIS-RACE: the kill's replay goes LAST among the scene's writes (pushHud only sets the HUD) — the harness holds update() from here and puts the frame back exactly as this call left
       // it. The continuous emitters are told to stop first (the mode is held; they would stream at the replay's cameras)
       if (replayDue) {
         replayDue = false;
         speedLines?.update(0); wingtipFx?.update(0, 0);
         void ctx.highlight?.({ lastSeconds: KILL.replayLastSec, angles: ['side', 'low', 'tight'], focus: killVictim });
       }
+      pushHud(ctx, dt);
     },
 
     dispose(): void {
