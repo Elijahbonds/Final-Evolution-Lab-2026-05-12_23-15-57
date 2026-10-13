@@ -33,6 +33,8 @@ import { fileURLToPath } from 'node:url';
 
 const APP = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const CLIENT = join(APP, 'public', '_prisma', 'client');
+/** PRISMA-PUBLIC step 1: the parallel client (prisma/schema.prisma's clientLib generator), normalized the same way. */
+export const LIB_CLIENT = join(APP, 'lib', 'generated', 'prisma');
 const TEXT = /\.(js|mjs|cjs|ts|json|prisma)$/;
 
 /** Strip the app root from every text file of the generated client. Returns the files it changed. */
@@ -54,7 +56,7 @@ export function normalizeClientPaths(clientDir = CLIENT, appRoot = APP) {
   for (const name of ['index.js', 'edge.js']) {
     const file = join(clientDir, name);
     if (!existsSync(file)) continue;
-    const bad = /"(sourceFilePath|value)": "(\/|[A-Za-z]:\\\\)[^"]*_prisma[^"]*"/.exec(readFileSync(file, 'utf8'));
+    const bad = /"(sourceFilePath|value)": "(\/|[A-Za-z]:\\\\)[^"]*(_prisma|generated\/prisma)[^"]*"/.exec(readFileSync(file, 'utf8'));
     if (bad) throw new Error(`[prisma-generate] ${name} still has an absolute path: ${bad[0]}`);
   }
   return changed;
@@ -67,6 +69,6 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     const r = spawnSync(process.execPath, [prismaCli, 'generate', ...args], { cwd: APP, stdio: 'inherit' });
     if (r.status !== 0) process.exit(r.status ?? 1);
   }
-  const changed = normalizeClientPaths();
+  const changed = [...normalizeClientPaths(), ...normalizeClientPaths(LIB_CLIENT)];
   console.log(`[prisma-generate] client paths made relative${changed.length ? `: ${changed.join(', ')}` : ' (already relative)'}`);
 }

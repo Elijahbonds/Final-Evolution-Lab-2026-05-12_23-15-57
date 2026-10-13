@@ -65,6 +65,9 @@ jobs:
       # schema and regenerates byte-identically (measured locally on 6.7.0).
       - name: generated Prisma client is committed in sync
         run: git diff --exit-code -- public/_prisma/client/schema.prisma
+      # PRISMA-PUBLIC step 1: the parallel client under lib/generated/prisma is held to the same rule.
+      - name: parallel generated Prisma client is committed in sync
+        run: git diff --exit-code -- lib/generated/prisma/schema.prisma
       - name: sync deploy Prisma schema
         run: node scripts/copy-prisma-schema.mjs
       # HOTFIX (2026-09-24): the hosting packager ships public/_prisma/schema.prisma AS COMMITTED, so a schema change

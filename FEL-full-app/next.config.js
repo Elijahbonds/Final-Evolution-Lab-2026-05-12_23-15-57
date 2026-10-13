@@ -1,5 +1,24 @@
 const path = require('path');
 
+const fs = require('fs');
+
+// PRISMA-PUBLIC step 1 (PR A): the packager ships .next/ but not lib/, so the parallel client's engine has to ride in
+// the dist dir. Copy the debian engine + schema into <distDir>/prisma-engine on the server build. Nothing loads it
+// yet; step 2 sets PRISMA_QUERY_ENGINE_LIBRARY to it. A missing client (no generate yet) is a no-op, not a failed build.
+const PRISMA_ENGINE_FILES = ['libquery_engine-debian-openssl-3.0.x.so.node', 'schema.prisma'];
+function copyPrismaEngine(distDir = process.env.NEXT_DIST_DIR || '.next') {
+  const from = path.join(__dirname, 'lib', 'generated', 'prisma');
+  const to = path.join(__dirname, distDir, 'prisma-engine');
+  const copied = [];
+  for (const f of PRISMA_ENGINE_FILES) {
+    if (!fs.existsSync(path.join(from, f))) continue;
+    fs.mkdirSync(to, { recursive: true });
+    fs.cpSync(path.join(from, f), path.join(to, f));
+    copied.push(f);
+  }
+  return copied;
+}
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   distDir: process.env.NEXT_DIST_DIR || '.next',
@@ -15,7 +34,7 @@ const nextConfig = {
     // build instead of depending on a generate step that never runs there.
     outputFileTracingIncludes: {
       '/**/*': [
-        './node_modules/.prisma/client/**/*',
+        './lib/generated/prisma/**/*',   // PRISMA-PUBLIC step 1: was ./node_modules/.prisma/client (the cloud install wipes it)
         './prisma/schema.prisma',
       ],
     },
@@ -51,6 +70,7 @@ const nextConfig = {
   // Crashes are reported to our own /api/telemetry/crash. lib/build-config.test.ts fails if an injection like it
   // comes back.
   webpack: (config, { isServer }) => {
+    if (isServer) copyPrismaEngine();
     if (!isServer) {
       config.output.filename = 'static/chunks/[name]-[contenthash:8].js';
       config.output.chunkFilename = 'static/chunks/[contenthash:16].js';
@@ -60,3 +80,5 @@ const nextConfig = {
 };
 
 module.exports = nextConfig;
+module.exports.copyPrismaEngine = copyPrismaEngine;
+module.exports.PRISMA_ENGINE_FILES = PRISMA_ENGINE_FILES;

@@ -26,6 +26,7 @@ const config = [
       'public/loaders/**',
       'public/pose/wasm/**',
       'public/_prisma/**',
+      'lib/generated/**',   // PRISMA-PUBLIC step 1: the parallel generated client
       'scripts/**',
       'server/netd/dist/**',
       'tests/**',
