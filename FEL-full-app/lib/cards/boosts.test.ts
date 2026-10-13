@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  BOOST_CARDS, BOOST_PRQ_CAP, BOOST_SKU_PREFIX, boostIdFromSku, boostSkuId, cardById, gameVitals,
+  BOOST_CARDS, BOOST_SKU_PREFIX, STAT_MODIFIER_KEYS, assertCosmeticCard, statModifierKeys, boostIdFromSku, boostSkuId, cardById, gameVitals,
   measuredPrq, ownedFromEntitlements, purchaseCheck,
 } from './boosts';
 import { CATALOG, getSku } from '../wallet/catalog';
@@ -34,37 +34,71 @@ describe('the catalogue', () => {
   });
 });
 
-describe('the game-side number', () => {
+// CARD-SAFE-2 (FE PM Oct 12): cards are cosmetic. Was: owned cards lifted the game-side PRQ (capped at +25). Shards are
+// sold for money, so that was pay-to-win; the lift is gone and these pin that it stays gone.
+describe('the game-side number (CARD-SAFE-2: no pay-to-win)', () => {
   it('is the measured number when nothing is owned', () => {
     expect(gameVitals(60, [])).toEqual({ base: 60, boosted: 60, lift: 0 });
   });
 
-  it('lifts by the owned card', () => {
-    const v = gameVitals(50, ['neural-max']); // +8
-    expect(v.base).toBe(50);
-    expect(v.boosted).toBe(58);
-    expect(v.lift).toBe(8);
+  it('owning any card, or all six, changes nothing', () => {
+    for (const c of BOOST_CARDS) expect(gameVitals(50, [c.id])).toEqual({ base: 50, boosted: 50, lift: 0 });
+    expect(gameVitals(50, BOOST_CARDS.map((c) => c.id))).toEqual({ base: 50, boosted: 50, lift: 0 });
   });
 
-  it('caps the lift however many cards are owned', () => {
-    const all = BOOST_CARDS.map((c) => c.id);
-    const raw = BOOST_CARDS.reduce((s, c) => s + c.boost.prq, 0);
-    expect(raw).toBeGreaterThan(BOOST_PRQ_CAP); // the cap has to actually bite
-    expect(gameVitals(50, all).lift).toBe(BOOST_PRQ_CAP);
-  });
-
-  it('ignores an id that is not a card, so a made-up one cannot become points', () => {
+  it('a made-up id changes nothing either', () => {
     expect(gameVitals(50, ['not-a-card', 'neither-is-this']).lift).toBe(0);
   });
 
-  it('does not pay twice for the same card listed twice', () => {
-    expect(gameVitals(50, ['neural-max', 'neural-max']).lift).toBe(8);
-  });
-
   it('never leaves 0–100 at either end', () => {
-    expect(gameVitals(98, ['coach-v-elite']).boosted).toBe(100);
+    expect(gameVitals(98, ['coach-v-elite']).boosted).toBe(98);
     expect(gameVitals(-40, []).base).toBe(0);
     expect(gameVitals(500, []).boosted).toBe(100);
+  });
+});
+
+describe('cosmetic only (CARD-SAFE-2)', () => {
+  it('no card carries a stat: no boost, PRQ, vertical, efficiency, neural or readiness field', () => {
+    for (const c of BOOST_CARDS) {
+      expect(statModifierKeys(c)).toEqual([]);
+      expect(() => assertCosmeticCard(c)).not.toThrow();
+    }
+  });
+
+  it('keeps all six names (incl. Amir Smith), taglines, accents and links', () => {
+    expect(BOOST_CARDS.map((c) => c.creator)).toEqual(['Elijah Bonds', 'Amir Smith', 'Flight Lab', 'Coach V', 'Neural Max', 'Director Stella']);
+    for (const c of BOOST_CARDS) {
+      expect(c.title.length).toBeGreaterThan(0);
+      expect(c.tagline.length).toBeGreaterThan(0);
+      expect(c.accent).toMatch(/^#[0-9A-F]{6}$/i);
+    }
+  });
+
+  it('blurbs describe the frame only, and the store never calls them boost cards (Cyber, CARD-SAFE-2)', () => {
+    for (const c of BOOST_CARDS) {
+      expect(c.blurb).toMatch(/^Cosmetic card frame/);
+      expect(c.blurb).not.toMatch(/vertical|jump|data|performance|drive|tuned|handle|hang|body control|elite|package/i);
+    }
+    const store = readFileSync('components/wallet/coin-store.tsx', 'utf8');
+    expect(store).toContain("what: 'Creator cards'");
+    expect(store).not.toMatch(/boost cards/i);
+  });
+
+  it('rejects a stat-bearing card', () => {
+    expect(() => assertCosmeticCard({ id: 'x', boost: { prq: 10 } })).toThrow(/stat_modifier_rejected: boost/);
+    expect(() => assertCosmeticCard({ id: 'x', prq: 5, vertical: 3 })).toThrow(/prq,vertical/);
+    expect(STAT_MODIFIER_KEYS).toEqual(expect.arrayContaining(['boost', 'prq', 'vertical', 'neural', 'damage']));
+  });
+
+  it('no file outside the catalogue reads a card stat, and the shelf shows no stat numbers', () => {
+    const shelf = readFileSync('components/cards/boost-shelf.tsx', 'utf8');
+    expect(shelf).not.toMatch(/\.boost\./);
+    expect(shelf).not.toContain('BOOST_PRQ_CAP');
+    expect(shelf).toContain('Cosmetic');
+    expect(shelf).not.toMatch(/never sold for money|coming soon/i);
+    for (const f of ['app/profile/page.tsx', 'app/dev/shelf/cards/page.tsx']) {
+      expect(readFileSync(f, 'utf8')).not.toContain('from cards');
+    }
   });
 });
 
@@ -80,10 +114,10 @@ describe('the measurement number', () => {
     expect(measuredPrq.length).toBe(1);
   });
 
-  it('is what a boosted athlete still measures at', () => {
+  it('a card owner measures and plays at the same number (CARD-SAFE-2)', () => {
     const v = gameVitals(60, ['coach-v-elite']);
-    expect(v.boosted).toBe(75);
-    expect(measuredPrq(v.base)).toBe(60); // the meal Rx sees 60, the fight sees 75
+    expect(v.boosted).toBe(60);
+    expect(measuredPrq(v.base)).toBe(60);
   });
 });
 
