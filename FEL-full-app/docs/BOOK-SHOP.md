@@ -60,11 +60,10 @@ bundle** (the approved "block C" is held for EBOOK-1). So the shop sells what th
 Before this there was a player but no stream-only route: `POST /api/books/download` signed every file, audio included,
 and the player, a Download button and the receipt all used it. Now:
 
-- **Where:** `/press/library` is the Listen page (chapter list + player), behind sign-in, 18+ and an entitlement, and
-  the same two switches as checkout. The book page (`/press/[slug]`) carries the same player for the free sample and
+- **Where:** `/press/library` is the Listen page (chapter list + player), behind sign-in, 18+ and an entitlement. It is
+  **not** behind the shop switches (owner, 2026-10-13, see "Listening survives the shop switch" below). The book page (`/press/[slug]`) carries the same player for the free sample and
   for owners.
-- **The door:** `POST /api/books/stream` `{ bookSlug, fileId }`. In order: shop switched off
-  (`BOOK_STORE_ENABLED` / `VIRTUAL_PURCHASES_ENABLED`) -> `409 store_closed`; signed out -> `401`; not a verified
+- **The door:** `POST /api/books/stream` `{ bookSlug, fileId }`. In order: signed out -> `401`; not a verified
   adult -> `403 adults_only`; no audiobook entitlement -> `403`; book tables missing -> `503 Library is unavailable
   right now.` (the library page shows the same line). Then it signs ONE URL for ONE chapter: V4 signed URL on the
   private bucket (`signGcsV4`), `response-content-disposition=inline` with **no filename**, lifetime at most
@@ -76,8 +75,8 @@ and the player, a Download button and the receipt all used it. Now:
   asks the stream route). Chapter list, play/pause (native), back/forward 15 s, speed (1 / 1.25 / 1.5 / 2), and the
   place is saved on this device (localStorage, `bookResume.ts`). An expired URL is replaced on the next play (the
   player refreshes 20 s early) and on a playback error (at most every 10 s), and resumes at the same second.
-- **The free sample** is the one public chapter: it streams with no sign-in, no age check and with the switches off,
-  as it did before (assumption: a sample is not a sale). Every other chapter needs all of the above.
+- **The free sample** is the one public chapter: it streams with no sign-in and no age check, as it did before
+  (assumption: a sample is not a sale). Every other chapter needs all of the above.
 - **Honest limit:** a browser that plays audio has the audio. Nothing here can technically stop a determined person
   from saving what their own browser streams (devtools, a screen recorder, a captured URL during its 5 minutes).
   "Stream only" is meant in the terms' sense: **no download is offered** and none is handed out, the URLs are
@@ -85,8 +84,29 @@ and the player, a Download button and the receipt all used it. Now:
 - **Receipt page:** it no longer embeds a player or mints a guest listening grant (there is no guest checkout); it
   links to My Library. `mintReaderGrant` / `readReaderGrant` in `bookEntitlements.ts` are now unused by any route and
   can go in a later cleanup.
-- Decision to confirm: listening is behind `BOOK_STORE_ENABLED`, like checkout. If the owner ever switches the shop
-  off after sales, paid buyers cannot stream until it is back on (fulfilment, the receipt and refunds still work).
+
+### Listening survives the shop switch (owner, 2026-10-13)
+
+Paid buyers always keep what they own. `BOOK_STORE_ENABLED` and `VIRTUAL_PURCHASES_ENABLED` close **selling** only:
+
+| Surface | Shop switches off |
+|---|---|
+| `POST /api/books/checkout` | refused, `409 store_closed` (unchanged) |
+| `POST /api/books/stream` (an owned audiobook chapter) | **works** for a signed-in verified adult who owns it. The route no longer reads the switches |
+| `/press/library` (Listen) | **shows owned books** and the player. The page no longer reads the switches |
+| Free sample chapter | streams with no sign-in, as before |
+| Fulfilment, receipt page, refunds | never behind the switches, as before |
+
+What stays exactly as it was, switches or not: sign in (`401`), the verified-adult check (`403 adults_only`, unknown age
+is not an adult), the entitlement check (`403`), and the missing-table case, which fails closed with `503 Library is
+unavailable right now.` (no table, no proof of ownership, no URL). `lib/books/bookShop.ts` (`bookShopClosedReason`) is
+no longer called by either listening door; `bookShopListening.test.tsx` fails if one of them imports it again.
+
+Tests: `lib/books/bookStreamRoute.test.ts` (an entitled adult streams with each switch off; signed out, under 18, not
+entitled and missing tables are still refused with both off), `lib/books/bookShopListening.test.tsx` (the library page
+with the shop off), and `lib/books/bookCheckoutRoute.test.ts` (checkout still `409` while the shop is off).
+`test changed:` the stream tests that expected `409 store_closed` for a closed shop now expect `200` for an entitled adult;
+the owner reversed that rule.
 
 ## What Elijah has to decide
 
@@ -104,7 +124,7 @@ Set these on the server. Do not commit the values.
 
 | Variable | Purpose |
 |---|---|
-| `BOOK_STORE_ENABLED` | The books' own switch. **Default off, fail closed.** `1`/`true`/`on`/`yes` turns it on; anything else is `409 store_closed` / `book_store_off`. |
+| `BOOK_STORE_ENABLED` | The books' own switch for **selling**. **Default off, fail closed.** `1`/`true`/`on`/`yes` turns it on; anything else is `409 store_closed` / `book_store_off` at checkout. It does not gate listening: owners keep streaming. |
 | `STRIPE_SECRET_KEY` | The platform's Stripe key, shared with the coach store. Book checkout accepts only an `sk_test_` key; a live key answers `409 store_closed` / `live_mode_off`. (There is no `STRIPE_BOOKS_SECRET_KEY` any more.) |
 | `STRIPE_WEBHOOK_SECRET` | The platform webhook signing secret (`/api/stripe/webhook` records book sales and refunds). |
 | `STRIPE_BOOKS_WEBHOOK_SECRET` | Optional. The signing secret of a separate `/api/books/webhook` endpoint (an endpoint has its own secret even inside one account). Falls back to `STRIPE_WEBHOOK_SECRET`. |

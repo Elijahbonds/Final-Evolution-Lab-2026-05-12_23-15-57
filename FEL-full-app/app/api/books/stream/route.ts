@@ -8,11 +8,9 @@ import { clientKeyFromHeaders, rateLimit } from '@/lib/rate-limit';
 import { getBookFile } from '@/lib/books/bookCatalog';
 import { issueBookStream } from '@/lib/books/bookDelivery';
 import { claimBookEntitlements, normalizeBookEmail } from '@/lib/books/bookEntitlements';
-import { bookShopClosedReason } from '@/lib/books/bookShop';
 import { BookTablesNotReady, prismaBookStore } from '@/lib/books/bookStore';
 import { bookStorageConfig, signGcsV4 } from '@/lib/books/bookStorage';
 import { isVerifiedAdult } from '@/lib/coach-store/adult';
-import { storeClosed } from '@/lib/coach-store/gate';
 
 const NO_STORE = { 'Cache-Control': 'no-store' } as const;
 
@@ -23,13 +21,15 @@ const NO_STORE = { 'Cache-Control': 'no-store' } as const;
  * ONE chapter, per play, with `Content-Disposition: inline` and no filename (issueBookStream). It never returns a
  * file, an attachment or a download URL, and the page source never holds a URL before Play.
  *
- * Same order as the rest of the shop (lib/books/bookCheckoutRoute.test.ts):
- *   1. shop switched off (BOOK_STORE_ENABLED / VIRTUAL_PURCHASES_ENABLED) -> 409 store_closed
- *   2. not signed in   -> 401 unauthorized (no guest listening)
- *   3. not a verified adult (isVerifiedAdult; unknown age is not an adult) -> 403 adults_only
- *   4. not an owner of the audiobook -> 403; book tables not set up -> 503 "Library is unavailable right now."
- * The catalog's free sample chapter is the one exception: it is not a sale, so it streams without a sign-in, an age
- * check or the switches (as it did before this route existed).
+ * LISTENING IS NOT BEHIND THE SHOP SWITCHES (owner, 2026-10-13): a paid buyer keeps streaming what they own when
+ * BOOK_STORE_ENABLED / VIRTUAL_PURCHASES_ENABLED are off. Those switches close SELLING (checkout) only. This route
+ * never reads them. The checks, in order:
+ *   1. not signed in   -> 401 unauthorized (no guest listening)
+ *   2. not a verified adult (isVerifiedAdult; unknown age is not an adult) -> 403 adults_only
+ *   3. not an owner of the audiobook -> 403; book tables not set up -> 503 "Library is unavailable right now."
+ *      (fail closed: no table, no proof of ownership, no URL)
+ * The catalog's free sample chapter is the one exception: it is not a sale, so it streams without a sign-in or an age
+ * check (as it did before this route existed).
  * The terms rule (lib/books/bookTerms.ts) is checked inside issueBookStream.
  */
 export async function POST(req: NextRequest) {
@@ -50,9 +50,6 @@ export async function POST(req: NextRequest) {
   let entitlements: { bookSlug: string; format: string; status: string }[] = [];
 
   if (!isSample) {
-    const closed = bookShopClosedReason();
-    if (closed) return storeClosed(closed);
-
     let userId: string | null = null;
     let email: string | null = null;
     try {
