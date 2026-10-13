@@ -107,7 +107,7 @@ import { NightMemory, dunkElements, originalityLine, freshTip, SHOWPIECE, type D
 import { spinBody, spinProgress } from '../core/DunkSpinBody';
 import { emptyCard, addAttempt, forWire, nightReport } from '@/lib/mp/dunkCard';
 import {
-  judgeDunk, ScoreReveal, CrowdEnergy, BAND_TOTAL, JUDGE_COUNT,
+  judgeDunk, ScoreReveal, CrowdEnergy, BAND_TOTAL, JUDGE_COUNT, REVEAL_ORDER,
   PERFECT_TOTAL, perJudgeAvg, type JudgeScore,
 } from '../core/JudgePanel';
 import { MomentumBus } from '../core/MomentumBus';
@@ -125,6 +125,10 @@ import {
 import { PhoneFlashes } from '../visual/PhoneFlashes';
 import { mountRimFx, type RimFxHandle } from '../hoops/RimFx';   // vis-hoops-dunk: the rim's light on a make (visual only)
 import { tierFromAccuracy } from '../hoops/hoopsLook';
+import { mountJudgesTable, type JudgesTableHandle } from '../hoops/JudgesTable';   // vis-hoops-dunk: the five judges' cards, in the court
+import { setCinematic } from '../hoops/cinematic';
+import { DUNK_COURT } from '../hoops/courtLayout';
+import { landMarks, plantMarks, stampCourt } from '../hoops/courtMarks';
 import { ModeMic } from '../audio/mic/ModeMic';   // THE MIC (2026-09-24): the court's MC, the sidekick, the crowd and the rivals, on the mic
 import { dunkStingers } from '../audio/mic/names';
 import { DUNK_RIVAL_VOICES } from '../audio/mic/cast';   // DUNK MOTION phase 11: the rival's pad decides like a player
@@ -455,6 +459,7 @@ export const DunkMode: ModeDefinition = (() => {
   let settleArmed = false, settleArmAt = 0;   // A+ P4: the settle waits for feet-down, not the flush frame
   let hoopJuice: HoopJuice | null = null;     // juice LOOK: rim spring, net squash, hoop flash on the make
   let rimFx: RimFxHandle | null = null;       // vis-hoops-dunk: the ring of light, the sparks and the net's glow on a make
+  let judgesTable: JudgesTableHandle | null = null;   // vis-hoops-dunk: the judges' table, its cards flip as the panel reveals them
   // THE SLAM METER (owner, 2026-09-18: "put a shot meter … make it trigger on layups and dunks"): the bar beside the
   // dunker's head rides the CLIP clock with the slam window drawn green — the same window slamNow grades by. The span
   // runs a little past the window's close so the green sits near the top the way a jumper's does.
@@ -1362,6 +1367,8 @@ export const DunkMode: ModeDefinition = (() => {
       trail?.dispose(); trail = EffectsKit.ballTrail(ctx.scene, ball); trailKey = ''; trailOn = true; setTrail('soft');   // IMPROVE (2026-10-06): a reload never stacks a second trail
       hoopJuice?.dispose(); hoopJuice = new HoopJuice(ctx.scene, rim);
       rimFx?.dispose(); rimFx = mountRimFx(ctx.scene, rim, (ctx.scene.metadata as { felTier?: string } | null)?.felTier);   // vis-hoops-dunk
+      judgesTable?.dispose(); judgesTable = mountJudgesTable(ctx.scene, DUNK_COURT.judgesAt, DUNK_COURT.judgesFace, JUDGE_COUNT);   // vis-hoops-dunk
+      (ctx.scene.metadata ??= {}).felHoops = { rimFx, judgesTable, probe: () => ({ phase, clipTime, turn }) };   // for the rig's probes (read only)
       phoneFlashes?.dispose(); phoneFlashes = new PhoneFlashes(ctx.scene, new Vector3(rim.x, 0, rim.z + 5));   // DUNK MOTION phase 12
       mic?.dispose(); mic = new ModeMic(ctx, { groups: ['dunk', 'names'], court: ctx.location, players: { ...DUNK_RIVAL_VOICES } }); micOpened = false; micFiller = false;
       meter3d?.dispose(); meter3d = mountShotMeter3D(ctx.scene);
@@ -1718,7 +1725,7 @@ export const DunkMode: ModeDefinition = (() => {
       micTick(ctx);
       if (phase === 'approach' && runHeld > 0.02) beginRun(ctx);
       meter3d?.update(dt);
-      rimFx?.update(dt);   // vis-hoops-dunk
+      rimFx?.update(dt); judgesTable?.update(dt);   // vis-hoops-dunk
       ctx0 = ctx;
       fovTick(dt); settleTick(ctx);
       // A+ P5: the fov pinch starts on the APPROACH — inside 3.6 m (horizontal) of the rim during the run, not at takeoff
@@ -2323,12 +2330,14 @@ export const DunkMode: ModeDefinition = (() => {
       if (phase === 'judging') {
         for (const beat of reveal.update(dt * (revealHold ? REVEAL_HOLD_SPEED : 1))) {   // IMPROVE (2026-10-06): A held hurries the judges
           if (beat.kind === 'confer') {
+            judgesTable?.clear();   // vis-hoops-dunk: the last dunk's cards come down
             ctx.setHud({ hint: 'THE JUDGES CONFER…' });
             mic?.say({ moment: 'dunk.judges', priority: 2 });
             SoundKit.play('uiTick', { pitch: 0.7, volume: 0.3 });
           } else if (beat.kind === 'card' && beat.judge) {
             revealed = [...revealed, beat.judge];
             ctx.setHud({ judgeReveal: revealed });
+            judgesTable?.flip(Math.max(0, REVEAL_ORDER.indexOf(beat.judge.name)), beat.judge.name, beat.judge.score);   // vis-hoops-dunk: the same card, on the table
             SoundKit.play('uiTick', { pitch: 1 + beat.judge.score * 0.06, volume: 0.5 });
             ctx.feel?.impact?.(0.12);
           } else if (beat.kind === 'drum') {
@@ -2468,7 +2477,7 @@ export const DunkMode: ModeDefinition = (() => {
       cancelLiveCeleb();
       skyRoot?.dispose(); skyRoot = null;   // THE SKY TIER
       hoopJuice?.dispose(); hoopJuice = null;
-      rimFx?.dispose(); rimFx = null;   // vis-hoops-dunk
+      rimFx?.dispose(); rimFx = null; judgesTable?.dispose(); judgesTable = null;   // vis-hoops-dunk
       phoneFlashes?.dispose(); phoneFlashes = null;
       mic?.dispose(); mic = null;   // THE MIC stops with the mode
       meter3d?.dispose(); meter3d = null;
@@ -2854,6 +2863,7 @@ export const DunkMode: ModeDefinition = (() => {
     teachHint = ''; ctx.setHud({ hint: '' });
     mic?.hold(4);   // THE MIC: nothing from the booth through the flight — the rhythm ticks are the player's (released on the iron)
     setPhase('cinematic'); setWin('takeoff');
+    stampCourt(ctx.scene, plantMarks(player.root.position, player.root.rotation.y, launchSpeed01));   // vis-hoops-dunk: the plant foot's scuff (visual only)
     { const f = readDisplaySetting().factor; if (f !== tvFactor) console.info(`[DUNK] TV MODE slam window x${f.toFixed(2)}`); tvFactor = f; }
     guestFactor = turn === 'player' ? guestSlamFactor(playerJumps++) : 1;   // IMPROVE (2026-10-06): a guest's first jumps (see slamWindowBase)
     if (guestFactor !== 1) console.info(`[DUNK] first jumps: slam window x${guestFactor.toFixed(2)}`);
@@ -3952,6 +3962,7 @@ export const DunkMode: ModeDefinition = (() => {
     const dust = landingDustScale(apexFor());
     ctx.juice.shake(0.03 + dust * 0.03, 110);
     EffectsKit.burst(ctx.scene, player.root.position.clone(), 'dust', dust);
+    stampCourt(ctx.scene, landMarks(player.root.position, player.root.rotation.y, (dust - 0.6) / 1.2));   // vis-hoops-dunk: the feet's scuff on the sealed court (the shared decal pool; visual only)
     console.info(`[JUICE-SOFT] land settle (apex ${apexFor().toFixed(2)} → dust x${dust.toFixed(2)})`);
   }
   /** #4 FOV gather: the active camera's fov eases −10% over the gather into the hang and back on CONTACT or land. Only
@@ -4375,7 +4386,7 @@ export const DunkMode: ModeDefinition = (() => {
     // IMPROVE (2026-10-06): THE CUT IS ON. `cutting` was declared and reset but never set, so the old re-fly block kept re-firing the
     // run and launch clips under the recorded pose for the whole cut — blended every frame for nothing (the pose is the frame's last
     // writer), with those clips' end events firing mid-cut. The recorded pose owns the body now, as the flag always said.
-    cutting = true;
+    cutting = true; setCinematic(ctx.scene, 1);   // vis-hoops-dunk: the broadcast's bars over the cut (DOM, eased by the harness)
     const cutDone = replay.playCuts(rim, contactSec, TRIPLE_CUT, {
       freezeSec: big ? POSTER_SEC : 0,
       onCut: (i, c) => { ctx.setHud({ cut: `REPLAY ${i + 1}/${TRIPLE_CUT.length} · ${c.label}` }); if (i > 0) SoundKit.play('whoosh', { pitch: 1.6 + i * 0.2, volume: 0.25 }); },
@@ -4386,7 +4397,7 @@ export const DunkMode: ModeDefinition = (() => {
     const gen = modeGen;
     await Promise.race([cutDone, pausableDelay((tripleCutSec() + (big ? POSTER_SEC : 0)) * 1000 + 1200, harnessPaused)]);   // IMPROVE (2026-10-06): the net does not run through a pause
     if (!alive(gen)) return;   // IMPROVE (2026-10-06): left mid-replay — nothing below may touch the disposed scene
-    replay.stop(); cutting = false; replaying = false;
+    replay.stop(); cutting = false; replaying = false; setCinematic(ctx.scene, 0);
     ctx.camDirector.suspended = false;
     ctx.setHud({ cut: '' });
     airHeld = false; cancelLiveCeleb(); celebFace = null;   // DUNK-LAND-CELEBRATE: the celebration already played live — after the cut he stands in idle

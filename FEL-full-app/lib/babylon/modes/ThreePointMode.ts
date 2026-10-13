@@ -80,6 +80,8 @@ import { ModeMic } from '../audio/mic/ModeMic';   // THE MIC (2026-09-24): the c
 import type { MicEvent } from '../audio/mic/MicDirector';
 import { mountRimFx, type RimFxHandle } from '../hoops/RimFx';   // vis-hoops-dunk: the rim's light on a make, the fire on a streak (visual only)
 import { tierFromShot } from '../hoops/hoopsLook';
+import { landMarks, shotMarks, stampCourt } from '../hoops/courtMarks';   // vis-hoops-dunk: the court keeps the shooter's feet (visual only)
+import { mountShootoutDressing, type ShootoutDressingHandle } from '../hoops/shootoutDressing';   // vis-hoops-dunk: the lit racks and the 3D scoreboard
 import { HoopJuice } from '../visual/HoopJuice';   // A+ P0 CONTACT-lite: the hoop answers a make (shared with Dunk / 1v1 / 3v3; Meshy never scaled)
 import { mountShotMeter3D, type ShotMeter3DHandle } from '../visual/ShotMeter3D';   // THE SHOT METER (owner, 2026-09-18): the bar beside the shooter's head
 import type { ModeContext, ModeDefinition, HudValue } from '../core/ModeHarness';
@@ -463,6 +465,7 @@ let disposeCount = 0;
 // The release names the result (scorePop / feel.impact / score SFX stay where they were); the RIM answers when the ball
 // arrives — a soft shake + HoopJuice on a make, a clank on a miss. No hang slowMo, no dunk hit-stop, no FOV stack.
 let rimFx: RimFxHandle | null = null;   // vis-hoops-dunk
+let dressing: ShootoutDressingHandle | null = null;   // vis-hoops-dunk: the racks' LED trim and aprons, the scoreboard
 let hoopJuice: HoopJuice | null = null;   // juice-only ring + net + material clones at RIM; no meshy_hoop_* transform is touched
 let landing: { perfect: boolean; money: boolean } = { perfect: false, money: false };   // what the release decided, for the landing beat (one landing beat per ball: Flight.contact)
 // ── THE MIC (owner, 2026-09-24: "add a MC announcer on the mic at the events so it has better commentary and audio") ──────
@@ -592,6 +595,12 @@ function restyleRacks(): void {
   if (!rackSkin) return;
   rackSkin.restyle();
   for (const row of rackBalls) for (const bm of row) if (!(pick && pick.mesh === bm)) freezeTree(bm);
+}
+
+/** vis-hoops-dunk: what the set's scoreboard and racks are told — the numbers the HUD already shows (read only). */
+function dressState(): Parameters<ShootoutDressingHandle['update']>[0] {
+  const practice = S.round === 'practice';
+  return { score: S.pts, rack: S.rack, racks: RACKS, clock: practice ? null : S.clock, streak: S.streak, fireAt: FIRE_STREAK, moneyRack: !practice && S.moneyRack !== NO_MONEY_RACK, moneyRackIdx: practice ? -1 : S.moneyRack };
 }
 
 /** Reset only the per-run shooting state, keeping contest standings. */
@@ -883,6 +892,7 @@ function bodyTick(ctx: ModeContext): void {
 function fire(ctx: ModeContext, power?: number): void {
   if (S.phase !== 'shoot' || S.fired || !player || !ball || !flights.length) return;
   S.fired = true;
+  stampCourt(ctx.scene, shotMarks(player.root.position, player.root.rotation.y));   // vis-hoops-dunk: the set feet
 
   const quality = shotMeter.release();
   shotErr = shotMeter.t - shotMeter.greenCenter01;   // the SIGN is the feedback: early is short, late is long
@@ -1527,6 +1537,7 @@ export const ThreePointMode: ModeDefinition = {
         rackSkin = skin; restyleRacks();
       });
 
+    dressing?.dispose(); dressing = mountShootoutDressing(ctx.scene, rackMeshes.filter((m) => /^rack_\d+$/.test(m.name)).map((m) => m.position.clone()), RIM, dressState());   // vis-hoops-dunk (display only)
     meter3d?.dispose(); meter3d = mountShotMeter3D(ctx.scene);
     hoopJuice?.dispose(); hoopJuice = new HoopJuice(ctx.scene, RIM);   // A+ P0: once per load, at the rim the arc lands on
     rimFx?.dispose(); rimFx = mountRimFx(ctx.scene, RIM, (ctx.scene.metadata as { felTier?: string } | null)?.felTier);   // vis-hoops-dunk
@@ -1591,6 +1602,7 @@ export const ThreePointMode: ModeDefinition = {
   update(ctx: ModeContext, dt: number): void {
     meter3d?.update(dt);
     rimFx?.update(dt);   // vis-hoops-dunk
+    dressing?.update(dressState());   // vis-hoops-dunk: the board reads what the HUD reads
     if (rimFx && flights.every((f) => f.state === 'idle')) rimFx.streak(S.streak, FIRE_STREAK);   // nothing in the air: the rim's fire follows the streak (a new run, a cold spell); landings set it below
     micTick(ctx);   // THE MIC: its clock runs on every frame (the board's calls, the caption's expiry)
     if (S.phase === 'done' || !player || !ball || !flights.length) return;
@@ -1667,6 +1679,7 @@ export const ThreePointMode: ModeDefinition = {
       const travel = yawOfVel({ x: target.x - S.from.x, z: target.z - S.from.z }, 0.05);
       if (k < 1 && travel !== null) player.root.rotation.y = slewYaw(player.root.rotation.y, travel, FACE_RATE, dt);
       if (S.moveT >= 1) {
+        stampCourt(ctx.scene, landMarks(player.root.position, player.root.rotation.y, 0.35));   // vis-hoops-dunk: the jog's stop scuffs the court
         S.phase = 'shoot';
         S.fired = false;
         beginShootPhase();   // in range from this frame (see advanceBall)
@@ -1751,6 +1764,7 @@ export const ThreePointMode: ModeDefinition = {
     mic?.dispose(); mic = null; micLanding = null;   // THE MIC stops with the mode
     hoopJuice?.dispose(); hoopJuice = null;   // A+ P0: restores any hoop material the punch swapped
     rimFx?.dispose(); rimFx = null;   // vis-hoops-dunk
+    dressing?.dispose(); dressing = null;
     meter3d?.dispose(); meter3d = null;
     posture?.dispose(); posture = null;        // BIOMECH-HOOPS-WAVE1
     carry?.dispose(); carry = null;   // HOOPS MOTION phase 3

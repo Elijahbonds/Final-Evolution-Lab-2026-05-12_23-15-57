@@ -82,6 +82,7 @@ describe('RimFx', () => {
     expect(s.meshes.length).toBe(before.meshes);
     expect(s.particleSystems.filter((p) => p.name === 'hoops_flame').length).toBe(0);
     expect(s.materials.some((m) => m.name === 'hoops_netglow_m')).toBe(false);
+    expect(s.textures.some((t) => t.name === 'hoops_flame')).toBe(false);
     h.make('big'); h.update(0.1); h.streak(3, 3);   // a late call into a disposed handle is a no-op, not a throw
   });
 });

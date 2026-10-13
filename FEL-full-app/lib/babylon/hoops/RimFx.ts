@@ -71,7 +71,7 @@ export function mountRimFx(scene: Scene, rim: Vector3, tier: string | undefined)
   try {
     const ps = new ParticleSystem('hoops_flame', FLAME_CAP, scene);
     const tex = flameTexture(scene);
-    if (tex) ps.particleTexture = tex;
+    if (tex) { ps.particleTexture = tex; owned.push(tex); }   // (cached by name on the scene; taken down with the flames)
     ps.blendMode = ParticleSystem.BLENDMODE_ADD;
     ps.emitter = new Vector3(rim.x, rim.y + 0.02, rim.z);
     ps.createCylinderEmitter(RIM_R * 0.92, 0.02, 0, 0);

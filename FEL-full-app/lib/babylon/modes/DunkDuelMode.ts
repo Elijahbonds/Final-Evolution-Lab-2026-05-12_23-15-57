@@ -76,6 +76,11 @@ import { EffectsKit } from '../visual/EffectsKit';
 import { HoopJuice } from '../visual/HoopJuice';
 import { mountRimFx, type RimFxHandle } from '../hoops/RimFx';   // vis-hoops-dunk: the rim's light on a make (visual only)
 import { tierFromAccuracy } from '../hoops/hoopsLook';
+import { mountDuelDressing, type DuelDressingHandle } from '../hoops/duelDressing';   // vis-hoops-dunk: the score tower and the judges' table
+import { setCinematic } from '../hoops/cinematic';
+import { phonesFor, tintKicker } from '../hoops/duelAccents';
+import { PhoneFlashes } from '../visual/PhoneFlashes';
+import { landMarks, plantMarks, stampCourt } from '../hoops/courtMarks';
 import { applyVeniceDunkLookPass } from '../visual/veniceSurroundVisibility';
 import { VenueKit } from '../visual/VenueKit';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';
@@ -83,7 +88,7 @@ import { applyOceanCourt } from '../visual/CourtSurface';
 import { DUNK_CONFIG as CFG } from './modeConfigs';
 
 let modeVenue: VenueHandle | null = null;   // ship pass 4: the mounted venue spec, disposed with the mode
-import { judgeDunk, BAND_TOTAL, ScoreReveal, MIN_TOTAL, PERFECT_TOTAL, type JudgeScore } from '../core/JudgePanel';  // Phase 7: shared judges (IMPROVE 2026-10-06 #6: and their staged reveal)
+import { judgeDunk, BAND_TOTAL, ScoreReveal, MIN_TOTAL, PERFECT_TOTAL, JUDGE_COUNT, REVEAL_ORDER, type JudgeScore } from '../core/JudgePanel';  // Phase 7: shared judges (IMPROVE 2026-10-06 #6: and their staged reveal)
 import { ModeMic } from '../audio/mic/ModeMic';   // THE MIC (2026-09-24): the court's MC, the sidekick and the crowd, on the mic
 import { dunkStingers } from '../audio/mic/names';
 
@@ -149,6 +154,8 @@ export const DunkDuelMode: ModeDefinition = (() => {
   let settleArmed = false, settleArmAt = 0;   // A+ P4 (P10 mirror): the settle waits for feet-down, not the flush frame
   let hoopJuice: HoopJuice | null = null;     // juice LOOK: rim spring, net squash, hoop flash on the make
   let rimFx: RimFxHandle | null = null;       // vis-hoops-dunk: the ring of light, the sparks and the net's glow on a make
+  let dressing: DuelDressingHandle | null = null;   // vis-hoops-dunk: the 3D score tower and the judges' table
+  let phones: PhoneFlashes | null = null;           // vis-hoops-dunk: the stands' phones, by the make and the gap between the duellists
   let phase: Phase = 'handoff';
   let phaseSec = 0;
   let activeIdx: 0 | 1 = 0;                       // whose turn
@@ -284,6 +291,10 @@ export const DunkDuelMode: ModeDefinition = (() => {
   }
   /** IMPROVE (2026-10-06) #4 #5: the duel as the pure rules read it. */
   const duelState = (): DuelState => ({ dunksEach, attempts: attemptNum, totals, off: offScores });
+  /** vis-hoops-dunk: what the 3D tower says — both totals, whose turn it is, which dunk of the match (read only). */
+  const towerState = (): { p1: number; p2: number; up: 0 | 1; dunk: string; names: [string, string]; colors: [string, string] } => ({
+    p1: totals[0], p2: totals[1], up: activeIdx, dunk: inDunkOff ? 'DUNK-OFF' : `DUNK ${Math.min(dunksEach, attemptNum[activeIdx] + 1)}/${dunksEach}`, names: ['P1', 'P2'], colors: [P_HEX[0], P_HEX[1]],
+  });
   /** The hand-off's count line: the dunk of the match length, or the dunk-off round — and the number, on the deciding dunk. */
   function dunkNumLine(): string {
     const st = duelState();
@@ -348,6 +359,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
     // the camera AND FrameGuard follow whose turn it is — before this, P2's
     // whole game was framed against P1 idling on the bench spot
     ctx.heroRef.current = active().root;
+    tintKicker(ctx.lights, P_HEX[activeIdx]);   // vis-hoops-dunk: the rim light takes the colour of whoever has the floor
     ctx.camDirector.snapTo(active().root.position, rim);
     // IMPROVE (2026-10-06) #12: the recorder rides whoever has the device — a fresh buffer each hand-off (only this flight is replayed)
     replay?.dispose();
@@ -394,6 +406,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
   function launchDunk(ctx: ModeContext, cause: LaunchCause = 'auto'): void {
     if (phase === 'cinematic') return;
     setPhase('cinematic');
+    stampCourt(ctx.scene, plantMarks(active().root.position, active().root.rotation.y, launchSpeed01));   // vis-hoops-dunk: the plant foot's scuff (visual only)
     clipTime = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; slamPress.clear(); ebState.inLeftHand = hand('RightHand') === 'LeftHand'; rimCamCut = false; hangSlowMoLatch = false; contactLatch = false;
     settleLatch = false; settleArmed = false; setTrail('soft');   // A+ P5/P6: no gather at takeoff, the runway trail stays soft through it
     airHeld = false; dropToFloor = false;   // A+ P8
@@ -585,6 +598,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
     fovRelease();   // A+ P5: a miss restores the fov at the land
     ctx.juice.shake(0.05, 110);
     EffectsKit.burst(ctx.scene, active().root.position.clone(), 'dust');
+    stampCourt(ctx.scene, landMarks(active().root.position, active().root.rotation.y, 0.5));   // vis-hoops-dunk: the feet's scuff on the sealed court (visual only)
     console.info('[JUICE-SOFT] land settle');
   }
   /** #4 FOV gather: the active camera's fov eases −10% over the gather into the hang and back on CONTACT or land. Only
@@ -673,6 +687,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
       // the contest's eruption band (45 of 50): this was `>= 27`, the THREE-judge band, and five judges never card under 30 —
       // every make got the full cheer and confetti, so a 31 landed like a 50
       if (dunkTotal >= BAND_TOTAL.eruption) { SoundKit.play('crowdCheer'); EffectsKit.burst(ctx.scene, active().root.position.add(new Vector3(0, 1.8, 0)), 'confetti'); }
+      phones?.burst(phonesFor(dunkTotal, BAND_TOTAL, Math.abs(totals[0] - totals[1])), 1.8);   // vis-hoops-dunk: the stands' phones, louder the bigger the make and the wider the gap (visual only)
     } else {
       after(0.26, () => SoundKit.play('crowdGroan', { volume: 0.35 }));   // A+ P2: the clank was the one hit; the crowd groans a breath later, quietly (IMPROVE 2026-10-06 #11: on the mode's clock)
     }
@@ -705,14 +720,14 @@ export const DunkDuelMode: ModeDefinition = (() => {
     const gen = modeGen, rec = replay;
     const paused = (): boolean => typeof ctx.phase === 'function' && ctx.phase() === 'paused';
     if (rec) {
-      cutting = true; ctx.camDirector.suspended = true;
+      cutting = true; ctx.camDirector.suspended = true; setCinematic(ctx.scene, 1);   // vis-hoops-dunk: the broadcast's bars over the cut
       const cutDone = rec.playCuts(rim, contactAt, TRIPLE_CUT, {
         onCut: (i, c) => { ctx.setHud({ hint: `REPLAY ${i + 1}/${TRIPLE_CUT.length} · ${c.label} — A skips` }); if (i > 0) SoundKit.play('whoosh', { pitch: 1.6 + i * 0.2, volume: 0.25 }); },
         paused,
       });
       await Promise.race([cutDone, pausableDelay(tripleCutSec() * 1000 + 1200, paused)]);   // the net does not run through a pause
       if (gen !== modeGen) return;   // left mid-replay: nothing below may touch the disposed scene (#13)
-      rec.stop(); cutting = false; ctx.camDirector.suspended = false;
+      rec.stop(); cutting = false; ctx.camDirector.suspended = false; setCinematic(ctx.scene, 0);
       ctx.setHud({ hint: '' });
       dropToFloor = true;   // the cut hands the root back where it was at the iron — the fall to feet-down resumes from there
     }
@@ -725,11 +740,13 @@ export const DunkDuelMode: ModeDefinition = (() => {
   function revealTick(ctx: ModeContext, dt: number): void {
     for (const beat of reveal.update(dt)) {
       if (beat.kind === 'confer') {
+        dressing?.judges.clear();   // vis-hoops-dunk: the last dunk's cards come down
         ctx.setHud({ hint: 'THE JUDGES CONFER…' });
         SoundKit.play('uiTick', { pitch: 0.7, volume: 0.3 });
       } else if (beat.kind === 'card' && beat.judge) {
         revealed = [...revealed, beat.judge];
         ctx.setHud({ judgeReveal: revealed });
+        dressing?.judges.flip(Math.max(0, REVEAL_ORDER.indexOf(beat.judge.name)), beat.judge.name, beat.judge.score);   // vis-hoops-dunk: the same card, on the table
         SoundKit.play('uiTick', { pitch: 1 + beat.judge.score * 0.06, volume: 0.5 });
       } else if (beat.kind === 'drum') {
         ctx.setHud({ hint: "PRIME'S CARD…" });
@@ -832,6 +849,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
 
   const def: ModeDefinition = {
     modeId: 'dunkduel', mood: 'goldenHour', camPreset: 'court',
+    intro: 'walkIn',   // vis-hoops-dunk: the broadcast opens on the court (the first hand-off card has no clock; the first press skips it)
     body: DUNK_BODY,
     onBody(ctx: ModeContext, ev: BodyEvent, _view: BodyView): boolean {
       if (phase !== 'approach' && phase !== 'charge' && phase !== 'cinematic') return false;
@@ -892,6 +910,9 @@ export const DunkDuelMode: ModeDefinition = (() => {
       trail?.dispose(); trail = EffectsKit.ballTrail(ctx.scene, ball); setTrail('soft');
       hoopJuice?.dispose(); hoopJuice = new HoopJuice(ctx.scene, rim);
       rimFx?.dispose(); rimFx = mountRimFx(ctx.scene, rim, (ctx.scene.metadata as { felTier?: string } | null)?.felTier);   // vis-hoops-dunk
+      dressing?.dispose(); dressing = mountDuelDressing(ctx.scene, towerState(), JUDGE_COUNT);   // vis-hoops-dunk (display only)
+      phones?.dispose(); phones = new PhoneFlashes(ctx.scene, new Vector3(rim.x, 0, rim.z + 5));
+      (ctx.scene.metadata ??= {}).felHoops = { rimFx, dressing, probe: () => ({ phase, clipTime, turn: activeIdx }) };   // for the rig's probes (read only)
       mic?.dispose(); mic = new ModeMic(ctx, { groups: ['dunk', 'names'], court: ctx.location }); micOpened = false; micFiller = false;   // THE MIC
       if (process.env.NODE_ENV === 'development') { const dev = (window as unknown as { __FEL_DEV__?: { hoopJuiceUsed?: unknown } }).__FEL_DEV__; if (dev) dev.hoopJuiceUsed = hoopJuice.used; }   // OOM-HYGIENE: the handle is gone once the harness is disposed (a load that resolves after an unmount)
       // Court locations (docs/SPEC-COURT-LOCATIONS.md): the Venice look (golden sky, surround palms) is Venice's own —
@@ -985,7 +1006,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
     update(ctx: ModeContext, dt: number) {
       runLater(ctx, dt);   // IMPROVE (2026-10-06) #11: the mode's own beats (they hold while paused: update() does not run then)
       meter3d?.update(dt);   // IMPROVE (2026-10-06) #7
-      rimFx?.update(dt);   // vis-hoops-dunk
+      rimFx?.update(dt); dressing?.judges.update(dt); dressing?.update(towerState());   // vis-hoops-dunk
       fovTick(dt); if (!cutting) settleTick(ctx);
       // A+ P5: the fov pinch starts on the APPROACH — inside 3.6 m (horizontal) of the rim during the run, not at takeoff
       if ((phase === 'approach' || phase === 'charge') && !fovOn && Math.hypot(active().root.position.x - rim.x, active().root.position.z - rim.z) <= 3.6) fovGather(ctx);
@@ -1182,7 +1203,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
       for (const r of rings) r.dispose(); rings = [];
       if (p1) postureOf.delete(p1); if (p2) postureOf.delete(p2);
       hoopJuice?.dispose(); hoopJuice = null;
-      rimFx?.dispose(); rimFx = null;   // vis-hoops-dunk
+      rimFx?.dispose(); rimFx = null; dressing?.dispose(); dressing = null; phones?.dispose(); phones = null;   // vis-hoops-dunk
       mic?.dispose(); mic = null;   // THE MIC stops with the mode
       modeVenue?.dispose?.(); modeVenue = null;
       if (ikScene && handIkObs) ikScene.onAfterAnimationsObservable.remove(handIkObs);   // A+ P8 H1
