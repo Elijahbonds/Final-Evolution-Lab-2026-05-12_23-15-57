@@ -1,7 +1,7 @@
 // vis-foundation-2 A9.14 (routed from vis-combat) — the shared ground-decal pool.
 import { describe, expect, it } from 'vitest';
 import { FreeCamera, NullEngine, Scene, Vector3 } from '@babylonjs/core';
-import { CARVE_TINT, decalAlpha, decalCap, decalLife, mountGroundDecals, mountSceneDecals, nextSlot } from './GroundDecals';
+import { CARVE_TINT, DECAL_KINDS, DECAL_SIZE, decalAlpha, decalCap, decalLife, mountGroundDecals, mountSceneDecals, nextSlot } from './GroundDecals';
 
 function rig(modeId = 'karate') {
   const engine = new NullEngine();
@@ -57,6 +57,17 @@ describe('the pool', () => {
     expect(t.rgb.map((v) => +v.toFixed(2))).toEqual([...CARVE_TINT.concrete].map((v) => +v.toFixed(2)));
     expect(t.normalY).toBeCloseTo(Math.cos(0.3), 4);                                   // tipped onto the slope
     expect(d.peek('foot')).toBeNull();
+    d.dispose();
+  });
+  it('vis-race: a tyre mark is its own kind, the width of a kart\'s rear track, and rides the same pool', () => {
+    const { scene } = rig('velocitykart');
+    expect(DECAL_KINDS).toContain('tyre');
+    expect(DECAL_SIZE.tyre[0]).toBeGreaterThan(1.32);   // wide enough that the pair sits at the rear tyres (1.32 m apart)
+    expect(DECAL_SIZE.tyre[1]).toBeGreaterThan(DECAL_SIZE.tyre[0]);
+    const d = mountGroundDecals(scene, 'desktop');
+    for (let i = 0; i < 5; i++) d.stamp('tyre', 0, i * 1.6, 0);
+    expect(d.live('tyre')).toBe(5);
+    expect(scene.meshes.filter((m) => m.name === 'fel_decal_tyre')).toHaveLength(1);   // one mesh (thin instances), however many marks
     d.dispose();
   });
   it('the rig puts it on the scene for the modes; never on a held hoops mode', () => {

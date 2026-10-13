@@ -99,6 +99,12 @@ const ALLOWED: Record<string, Allowed> = {
     kind: 'draw-only', why: 'the derby bat is drawn through the fists; contact = swingQuality(ball z) × PCI coverage',
     proof: [/const timing = swingQuality\(ball\.position\.z,/, /const off = Math\.hypot\(pci\.pos\.x - ball\.position\.x, pci\.pos\.y - ball\.position\.y\)/],
   },
+  // VIS-COURT: the racket arm's swing streak is bound to the right hand and forearm bones (drawing only); a swing's grade is the
+  // press's timing against the flight (gradeSwing(dt)) and the AI's is a roll against its skill — neither reads a hand
+  'lib/babylon/modes/NetSportMode.ts': {
+    kind: 'draw-only', why: 'the swing streak is bound to the hand bone for drawing; the grade is gradeSwing(dt), the AI grade a skill roll',
+    proof: [/const timing = gradeSwing\(dt\)/, /fx\?\.bindTrails\(arm\(me\), arm\(foe\)\)/, /roll > skill \? 'miss'/],
+  },
 };
 
 const OUTCOME_LAYER = ['lib/babylon/modes', 'lib/babylon/core', 'lib/babylon/combat', 'lib/babylon/nexus', 'lib/babylon/racing', 'lib/combat', 'components/games'];

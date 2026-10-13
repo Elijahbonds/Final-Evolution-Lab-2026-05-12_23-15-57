@@ -5,7 +5,7 @@ import type { HudCue } from './danceTracks';
 import { Scene, TargetCamera, Vector3, SceneInstrumentation, Ray } from '@babylonjs/core';
 import { FloatingOriginCurrentScene } from '@babylonjs/core/Materials/floatingOriginMatrixOverrides';
 import { createEngine } from './createEngine';
-import type { TransformNode } from '@babylonjs/core';
+import type { AbstractMesh, TransformNode } from '@babylonjs/core';
 import { mountPlayerRing, modeOwnsPlayerRing, type PlayerRingHandle } from '../visual/PlayerRing';   // PLAYER RING (all modes, 2026-09-17)
 import { readPlayerIcon } from '../visual/playerIcon';
 import { cachedIdentity } from './playerIdentity';
@@ -217,6 +217,15 @@ export interface ModeDefinition {
    *  flattens the frame — on the piste's foreground the mean luma goes 222 → 198 and the groom texture's std 6.3 → 2.6 (its stripes and soft
    *  shadows are gone) — so a mode whose ground is mostly white or whose look is in its surfaces opts out. The replay is otherwise the same (letterbox, angles, half speed). Default: DOF on. */
   replayDof?: boolean;
+  /** vis-race (wave 2): the bodies a replay records, when they are not skinned characters — a race's vehicles (the player's
+   *  first: it is the shot's subject), whose rivals are plain nodes `characterRoots` cannot find. Read once, after load().
+   *  Absent: the hero and the skinned characters nearest it (every other replay mode). */
+  replayBodies?(ctx: ModeContext): TransformNode[];
+  /** vis-court (wave 2): who a replay records, for a mode whose action is not the hero's nearest five bodies. `bodies` replaces
+   *  the default (the hero, then the nearest skinned characters, six at most) — the opponent at the far end of a court is not
+   *  among the nearest; `loose` are the meshes that fly free of any body (a ball), recorded by world position. Read once, after
+   *  load(). Only consulted when `replay` is on. */
+  replayCast?(ctx: ModeContext): { bodies?: TransformNode[]; loose?: AbstractMesh[] };
   load(ctx: ModeContext): Promise<void>;        // spawn venue + characters
   onInput(ctx: ModeContext, e: FelInput): void;
   update(ctx: ModeContext, dt: number): void;   // called only while 'playing'
@@ -616,7 +625,11 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
       // would build the grid from an empty scene and do nothing.
       iblShadows = mountIblShadows(scene, camera);
       // A9.12: the replay recorder on the bodies load() spawned, and the replays' depth of field mounted now (no mid-game compile)
-      replay?.dispose(); replay = def.replay ? new ReplayDirector(scene, camera, characterRoots(scene, heroRef.current), [], (def.replayDof === false ? null : mountReplayDof(scene, lights.pipeline, tier))) : null;
+      replay?.dispose(); const cast = def.replay ? def.replayCast?.(ctx) : undefined;   // vis-court: a mode may name its own cast and its loose ball
+      // vis-race: a race names its vehicles (replayBodies); otherwise vis-court's cast; otherwise the hero and nearest characters.
+      const raceBodies = def.replay ? def.replayBodies?.(ctx).filter((n) => !n.isDisposed()) : undefined;
+      // vis-board: replayDof === false runs the replay without depth of field (a white or surface-led look it would flatten).
+      replay = def.replay ? new ReplayDirector(scene, camera, raceBodies?.length ? raceBodies : cast?.bodies?.length ? cast.bodies : characterRoots(scene, heroRef.current), cast?.loose ?? [], (def.replayDof === false ? null : mountReplayDof(scene, lights.pipeline, tier))) : null;
       for (const n of replayTrack) replay?.track(n);
       setPhase('ready');
       // M67: pre-warm every material now, on the loading→ready boundary, so a

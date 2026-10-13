@@ -15,14 +15,16 @@ import type { Mesh, Observer, Scene } from '@babylonjs/core';
 import type { QualityTier } from '../scene/QualityTier';
 import { sceneModeId, wave2Look } from '../scene/lookPolicy';
 
-export type DecalKind = 'scuff' | 'foot' | 'carve';
-export const DECAL_KINDS: readonly DecalKind[] = ['scuff', 'foot', 'carve'];
+export type DecalKind = 'scuff' | 'foot' | 'carve' | 'tyre';
+export const DECAL_KINDS: readonly DecalKind[] = ['scuff', 'foot', 'carve', 'tyre'];
 /** Live marks per kind, per tier. */
 export function decalCap(tier: QualityTier): number { return tier === 'mobile' ? 24 : 64; }
 /** Seconds a mark lasts (fully visible for the first 60 %, then fading). */
 export function decalLife(tier: QualityTier): number { return tier === 'mobile' ? 8 : 18; }
 /** Default footprint of each kind, metres (width, length). */
-export const DECAL_SIZE: Record<DecalKind, [number, number]> = { scuff: [0.5, 1.1], foot: [0.13, 0.3], carve: [0.46, 1.6] };
+/** `tyre` (vis-race, wave 2): a pair of rubber streaks the width of a kart's rear track (1.32 m between tyre centres), 2.2 m long,
+ *  stamped end to end along a slide or a burnout. */
+export const DECAL_SIZE: Record<DecalKind, [number, number]> = { scuff: [0.5, 1.1], foot: [0.13, 0.3], carve: [0.46, 1.6], tyre: [1.62, 2.2] };
 /** vis-board (wave 2): the colour a `carve` mark takes on a surface — the texture is a neutral grey and the instance colour tints
  *  it: a wheel's rubber on concrete, an edge's groove in snow. The other kinds paint their own colour and take no tint. */
 export const CARVE_TINT = { concrete: [0.2, 0.18, 0.16], snow: [0.5, 0.64, 0.9] } as const satisfies Record<string, readonly [number, number, number]>;
@@ -42,7 +44,26 @@ function paint(scene: Scene, kind: DecalKind): DynamicTexture {
   const tex = new DynamicTexture(`fel_decal_${kind}`, { width: S, height: S }, scene, true);
   const g = tex.getContext() as unknown as CanvasRenderingContext2D;
   g.clearRect(0, 0, S, S);
-  if (kind === 'scuff') {
+  if (kind === 'tyre') {
+    // two tyre tracks: dark rubber, ragged edges, and the ends faded so stamps laid end to end read as
+    // one unbroken streak (the pair sits at u = 0.093 and 0.907 of a 1.62 m quad: 1.32 m apart, a kart's rear tyres)
+    for (const cx of [S * 0.093, S * 0.907]) {
+      // a pale rubber-dust shoulder either side (a skid on dark asphalt reads by its edge: the core alone is black on near-black)
+      const sh = g.createLinearGradient(0, 0, 0, S);
+      sh.addColorStop(0, 'rgba(150,140,128,0)'); sh.addColorStop(0.2, 'rgba(150,140,128,0.12)'); sh.addColorStop(0.8, 'rgba(150,140,128,0.12)'); sh.addColorStop(1, 'rgba(150,140,128,0)');
+      g.fillStyle = sh; g.fillRect(cx - 17, 0, 34, S);
+      const gr = g.createLinearGradient(0, 0, 0, S);
+      gr.addColorStop(0, 'rgba(6,5,5,0)'); gr.addColorStop(0.18, 'rgba(6,5,5,0.85)'); gr.addColorStop(0.82, 'rgba(6,5,5,0.85)'); gr.addColorStop(1, 'rgba(6,5,5,0)');
+      g.fillStyle = gr; g.fillRect(cx - 10, 0, 20, S);
+      // rubber laid down unevenly: ragged notches out of the core (no regular tread ladder — it read as a tank track)
+      g.globalCompositeOperation = 'destination-out';
+      for (let i = 0; i < 38; i++) {
+        const y = (i * 37) % S, w = 3 + ((i * 7) % 6), x = cx - 10 + ((i * 13) % 17);
+        g.fillStyle = `rgba(0,0,0,${0.18 + ((i * 5) % 4) * 0.08})`; g.fillRect(x, y, w, 2 + (i % 4));
+      }
+      g.globalCompositeOperation = 'source-over';
+    }
+  } else if (kind === 'scuff') {
     // a dragged smear: a soft dark streak, ragged at the ends
     for (let i = 0; i < 14; i++) {
       const x = S * (0.35 + 0.3 * Math.sin(i * 1.7)), w = 6 + (i % 4) * 3;

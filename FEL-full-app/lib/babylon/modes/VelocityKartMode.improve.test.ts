@@ -45,7 +45,8 @@ describe('VelocityKartMode wiring (IMPROVE 2026-10-06)', () => {
 
   it('#6 the incoming shell is computed each frame and drawn on its side with the hop cue', () => {
     expect(FIELD).toMatch(/threat = S\.done \? null : incomingThreat\(missiles, PLAYER_ID, state\.pos, state\.heading, state\.speed\)/);
-    expect(HOST).toMatch(/<ThreatWarning words=\{hud\.threat\} side=\{hud\.threatSide\} now=\{!!hud\.threatHop\}/);
+    // vis-race phase 2: the host draws the warning itself on the TV HUD (it was <ThreatWarning words side now/>, whose sub-floor mono text is not the shared system's)
+    expect(HOST).toMatch(/typeof hud\.threat === 'string' && hud\.threat[\s\S]*THREAT_POS\[String\(hud\.threatSide\)\][\s\S]*hud\.threatHop \? ' — X' : ''/);
   });
 
   it('#7 X on the ground hops, and a hopping kart\'s hit point is lifted clear', () => {

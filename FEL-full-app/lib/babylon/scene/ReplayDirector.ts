@@ -37,7 +37,9 @@ export const REPLAY_SPEED = 0.5;
 /** Seconds of lens ease in and out of a replay. */
 export const DOF_EASE_S = 0.35;
 
-interface BodyFrame { p: Vector3; q: Quaternion | null; y: number; pose: Float32Array | null }
+// x / z (vis-race, wave 2): the Euler pitch and roll of a body that is turned by `rotation` rather than a quaternion — a kart's
+// body roll, a plane's bank and loop — so a replay of a vehicle banks and pitches as it did (y was all it kept before).
+interface BodyFrame { p: Vector3; q: Quaternion | null; y: number; x: number; z: number; pose: Float32Array | null }
 interface Frame { t: number; bodies: BodyFrame[]; loose: Vector3[]; /** the tracked transforms' local pose, 7 floats each (position, quaternion) */ tr: Float32Array | null }
 
 export interface ReplayDofHandle {
@@ -126,6 +128,9 @@ export interface ReplayPlayOpts {
   bounds?: ShotBounds | null;
   /** A paused game freezes the replay (the harness passes its phase). */
   paused?: () => boolean;
+  /** Which recorded body the cameras follow (an index into the bodies the director was built with); default: the director's own
+   *  (the first). vis-race: a dogfight kill is shot on the VICTIM, not on the pilot who fired. */
+  focus?: number;
 }
 
 export class ReplayDirector {
@@ -177,7 +182,7 @@ export class ReplayDirector {
     const now = performance.now() / 1000;
     this.buf.push({
       t: now,
-      bodies: this.bodies.map((b, i) => ({ p: b.position.clone(), q: b.rotationQuaternion?.clone() ?? null, y: b.rotation.y, pose: this.poseSample(i) })),
+      bodies: this.bodies.map((b, i) => ({ p: b.position.clone(), q: b.rotationQuaternion?.clone() ?? null, y: b.rotation.y, x: b.rotation.x, z: b.rotation.z, pose: this.poseSample(i) })),
       loose: this.loose.map((m) => m.getAbsolutePosition().clone()),
       tr: this.trackSample(),
     });
@@ -226,18 +231,18 @@ export class ReplayDirector {
     const angles = opts.angles?.length ? opts.angles : replayCut(dur);
     const seg = dur / angles.length;
     // each segment's angle, validated against the floor once (against the subject's whole path through it): the filmer falls back
-    const fi0 = Math.min(this.focusIndex, this.bodies.length - 1);
+    const fi0 = Math.max(0, Math.min(opts.focus ?? this.focusIndex, this.bodies.length - 1));   // vis-race: opts.focus picks the subject
     const shots = angles.map((a, s) => {
       const from = t0 + s * seg, to = from + seg;
       const foci = frames.filter((f) => f.t >= from - 1e-6 && f.t <= to + 1e-6).map((f) => ({ x: f.bodies[fi0].p.x, y: f.bodies[fi0].p.y, z: f.bodies[fi0].p.z }));
       const h = frames[frames.length - 1].bodies[fi0].p.subtract(frames[0].bodies[fi0].p);
       return resolveAngle(a, foci, { x: h.x, y: h.y, z: h.z }, opts.objective ? { x: opts.objective.x, y: opts.objective.y, z: opts.objective.z } : null, opts.side ?? 1, opts.bounds ?? null);
     });
-    const fi = Math.min(this.focusIndex, this.bodies.length - 1);
+    const fi = fi0;
     // the live moment, put back at the end
     const live = {
       cam: this.camera.position.clone(), target: this.camera.getTarget().clone(), fov: this.camera.fov, minZ: this.camera.minZ,
-      bodies: this.bodies.map((b) => ({ p: b.position.clone(), q: b.rotationQuaternion?.clone() ?? null, y: b.rotation.y })),
+      bodies: this.bodies.map((b) => ({ p: b.position.clone(), q: b.rotationQuaternion?.clone() ?? null, y: b.rotation.y, x: b.rotation.x, z: b.rotation.z })),
       loose: this.loose.map((m) => ({ parent: m.parent, local: m.position.clone(), world: m.getAbsolutePosition().clone() })),
     };
     const liveTracked = this.tracked.map((n) => ({ p: n.position.clone(), q: n.rotationQuaternion?.clone() ?? null, r: n.rotation.clone() }));
@@ -270,7 +275,11 @@ export class ReplayDirector {
           const bb = b.bodies[i], body = this.bodies[i];
           body.position.copyFrom(Vector3.Lerp(ba.p, bb.p, k));
           if (ba.q && bb.q) body.rotationQuaternion = Quaternion.Slerp(ba.q, bb.q, k);
-          else { const d = Math.atan2(Math.sin(bb.y - ba.y), Math.cos(bb.y - ba.y)); body.rotation.y = ba.y + d * k; }
+          else {
+            const arc = (a: number, b2: number): number => Math.atan2(Math.sin(b2 - a), Math.cos(b2 - a));   // the short way round (a loop wraps)
+            body.rotation.y = ba.y + arc(ba.y, bb.y) * k;
+            body.rotation.x = ba.x + arc(ba.x, bb.x) * k; body.rotation.z = ba.z + arc(ba.z, bb.z) * k;
+          }
         });
         a.loose.forEach((pa, i) => this.loose[i].setAbsolutePosition(Vector3.Lerp(pa, b.loose[i], k)));
         // the cut: one angle per segment, a slow push-in within it
@@ -296,7 +305,7 @@ export class ReplayDirector {
         this.scene.onBeforeRenderObservable.remove(obs); this.scene.onAfterAnimationsObservable.remove(poseObs);
         this.bodies.forEach((b, i) => {
           const l = live.bodies[i]; b.position.copyFrom(l.p);
-          if (l.q) b.rotationQuaternion = l.q; else { b.rotationQuaternion = null; b.rotation.y = l.y; }
+          if (l.q) b.rotationQuaternion = l.q; else { b.rotationQuaternion = null; b.rotation.set(l.x, l.y, l.z); }
         });
         livePoses.forEach((lp, i) => { if (lp) this.applyPose(i, lp, lp, 0); });
         this.tracked.forEach((n, i) => {   // as the mode wrote it: Euler unless it had a quaternion (a leftover one would freeze `rotation`)
