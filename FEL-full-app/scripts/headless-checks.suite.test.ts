@@ -55,7 +55,7 @@ const SUITES: { script: string; guards: string }[] = [
   { script: 'penalty-depth-tests.ts', guards: 'penalty depth — the keeper reads your history, sudden death can end you' },
   { script: 'football-rush-tests.ts', guards: 'football — the pre-snap is real, a phone can join and steer, the bezel renders the drive' },
   { script: 'air-session-depth-tests.ts', guards: 'air sessions — the bezel renders the cadence, the crowd answers the grade' },
-  { script: 'carnival-depth-tests.ts', guards: 'carnival — the rival reacts, one engine per canvas, no retired stops in the lineup' },
+  { script: 'carnival-depth-tests.ts', guards: 'carnival — the rival reacts, one engine per canvas, every lineup stop is live' },
   { script: 'arena-quickmatch-tests.ts', guards: 'arena — quick-match draws are deterministic and skill-banded, the house book balances, the roster is covered' },
   { script: 'mixedcombat-depth-tests.ts', guards: 'mixed combat — verticals can be stepped, sweeps catch steppers, the bezel warns about the edge, phones can join' },
   { script: 'dunkduel-depth-tests.ts', guards: 'dunk duel — judges remember each player, the run-up buys air, the chair kills the dunk, the reveal renders' },
