@@ -32,7 +32,7 @@ export function sampleRootTrack(track: RootTrack, t: number): { q: Quaternion; h
 export class MoveRootLayer {
   private tracks = new Map<string, RootTrack>();
   private groups = new Map<string, AnimationGroup>();
-  private saved: { q: Nullable<Quaternion>; pos: Vector3 } | null = null;
+  private saved: { q: Nullable<Quaternion>; rot: Vector3; pos: Vector3 } | null = null;
   private hipsH: number;
   private afterAnim: Nullable<Observer<Scene>>;
   private afterRender: Nullable<Observer<Scene>>;
@@ -80,7 +80,7 @@ export class MoveRootLayer {
     const { q, h } = sampleRootTrack(best.track, best.t);
     const qTrack = best.w >= 0.999 ? q : Quaternion.Slerp(Quaternion.Identity(), q, best.w);
     const root = this.root;
-    this.saved = { q: root.rotationQuaternion ? root.rotationQuaternion.clone() : null, pos: root.position.clone() };
+    this.saved = { q: root.rotationQuaternion ? root.rotationQuaternion.clone() : null, rot: root.rotation.clone(), pos: root.position.clone() };
     const base = root.rotationQuaternion ? root.rotationQuaternion.clone() : Quaternion.FromEulerAngles(root.rotation.x, root.rotation.y, root.rotation.z);
     const turned = base.multiply(qTrack);   // the track is in the body's own frame: applied inside the mode's facing
     root.rotationQuaternion = turned;
@@ -93,9 +93,20 @@ export class MoveRootLayer {
     root.computeWorldMatrix(true);
   }
 
+  /**
+   * Give the root back exactly as the mode left it. Re-landed 2026-10-13 from closed PR #46 (MUSIC-SUITE P9 FIX): a root
+   * turned by EULER angles (no rotationQuaternion — CharacterLibrary.spawn sets `root.rotation = (0, yawRad, 0)`, the
+   * Cypher's yaw π) lost its yaw for good the first time a captured move played. Babylon's rotationQuaternion setter zeroes
+   * `rotation` whenever a quaternion is assigned (apply() assigns `turned`), and this put back only the quaternion (null),
+   * so the Euler yaw it had wiped stayed 0: the dancer turned his back on the audience after the first windmill or
+   * six-step and danced the rest of the song that way (measured live in #46: root yaw 180 deg before the windmill, 0 after).
+   * Now the Euler rotation is saved and put back when the root had no quaternion; a quaternion-driven root is unchanged
+   * (the same quaternion goes back and the Euler is not touched). The karate styles share this layer.
+   */
   private restore(): void {
     if (!this.saved) return;
     this.root.rotationQuaternion = this.saved.q;
+    if (!this.saved.q) this.root.rotation.copyFrom(this.saved.rot);
     this.root.position.copyFrom(this.saved.pos);
     this.saved = null;
   }

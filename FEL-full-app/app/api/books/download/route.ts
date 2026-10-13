@@ -4,7 +4,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { clientKeyFromHeaders, rateLimit } from '@/lib/rate-limit';
-import { issueBookFile } from '@/lib/books/bookDelivery';
+import { FORMAT_NOT_OFFERED_ERROR, issueBookDownload } from '@/lib/books/bookDelivery';
+import { bookDownloadsAllowed } from '@/lib/books/bookTerms';
 import { claimBookEntitlements, normalizeBookEmail, readReaderGrant } from '@/lib/books/bookEntitlements';
 import { BookTablesNotReady, prismaBookStore } from '@/lib/books/bookStore';
 import { bookStorageConfig, signGcsV4, signedUrlTtl } from '@/lib/books/bookStorage';
@@ -12,8 +13,12 @@ import { bookStorageConfig, signGcsV4, signedUrlTtl } from '@/lib/books/bookStor
 /**
  * POST /api/books/download
  * Body: { bookSlug, fileId, grant? }
+ * EBOOK DOWNLOADS ONLY (EPUB/PDF as an attachment). Closed today, fail closed: store-terms-2026-10-12 covers
+ * audiobooks, stream only, no download (lib/books/bookTerms.ts), so this answers 403 for every file before it looks
+ * anyone up. Audiobooks never come through here: they stream from POST /api/books/stream. It opens only when a
+ * terms version covers ebooks AND downloads (EBOOK-1).
  * A logged-in owner, a receipt grant, or a catalog sample. The signer runs
- * only after issueBookFile allows the file. Paths come from the catalog.
+ * only after issueBookDownload allows the file. Paths come from the catalog.
  */
 export async function POST(req: NextRequest) {
   const ip = clientKeyFromHeaders(req.headers);
@@ -23,6 +28,10 @@ export async function POST(req: NextRequest) {
       { error: 'Too many requests. Try again later.' },
       { status: 429, headers: { 'Retry-After': String(limited.retryAfterSec) } },
     );
+  }
+
+  if (!bookDownloadsAllowed()) {
+    return NextResponse.json({ error: FORMAT_NOT_OFFERED_ERROR }, { status: 403, headers: { 'Cache-Control': 'no-store' } });
   }
 
   const body = await req.json().catch(() => ({}));
@@ -63,7 +72,7 @@ export async function POST(req: NextRequest) {
 
   let result;
   try {
-    result = await issueBookFile(
+    result = await issueBookDownload(
       { bookSlug, fileId, entitlements },
       {
         ttlSeconds: signedUrlTtl(),

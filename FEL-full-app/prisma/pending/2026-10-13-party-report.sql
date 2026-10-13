@@ -35,7 +35,12 @@
 --   5. Then the client, as the other pending files describe (copy-prisma-schema, prisma:generate, the schema-sync and
 --      prisma-artifact tests), committed together.
 --
--- RETENTION (assumption: owner to confirm): reports are kept until reviewed; nothing deletes them automatically.
+-- RETENTION (owner, 2026-10-13: 12 months, with automatic deletion; lib/policies.ts tells the player the same): a report is
+-- deleted 365 days after it was filed. lib/party/social/reports.ts runs the statement below after every saved report (the
+-- creator inquiries' pattern), and is a no-op until this table exists. There is no scheduler in this repo, so on a quiet
+-- stretch an old report waits for the next report; to clear it sooner run this by hand, or from a scheduled job if you
+-- add one. "createdAt" is already indexed below ("PartyReport_createdAt_idx"), so no column or index was added:
+--     DELETE FROM "PartyReport" WHERE "createdAt" < (CURRENT_TIMESTAMP - make_interval(days => 365));
 -- ROLLBACK (loses the reports): DROP TABLE "PartyReport";
 
 -- CreateTable

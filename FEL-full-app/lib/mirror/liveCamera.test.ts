@@ -3,10 +3,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { SessionSummary } from '@/lib/babylon/nexus/neuro-mirror/render/overlay-compositor';
 import {
-  FrameView, HUD_HZ, IN_SHOT_HOLD_MS, InShotLine, MirrorWakeLock, NOMINAL_FRAME_MS, PoseClock, cameraErrorLine,
+  FrameView, HUD_HZ, IN_SHOT_HOLD_MS, InShotLine, MirrorWakeLock, NOMINAL_FRAME_MS, PoseClock, mirrorStartErrorText,
   mergeSummaries, wakeLockLine, type WakeSentinelLike,
 } from './liveCamera';
 import { framingLine } from './framing';
+import { cameraHelp, cameraHelpText } from '@/lib/camera/cameraHelp';
 
 /** A clock and a timer queue the test advances by hand. */
 function fakeClock() {
@@ -235,12 +236,15 @@ describe('mergeSummaries: one session across a pause', () => {
   });
 });
 
-describe('the camera errors say which problem it is', () => {
-  it('denied, missing, and a dead overlay are three lines', () => {
-    expect(cameraErrorLine({ name: 'NotAllowedError' })).toMatch(/permission denied/);
-    for (const name of ['NotFoundError', 'OverconstrainedError', 'NotReadableError']) expect(cameraErrorLine({ name })).toMatch(/unavailable/);
-    expect(cameraErrorLine(new Error('webgl'))).toMatch(/3D renderer/);
-    expect(cameraErrorLine(null)).toMatch(/3D renderer/);
+describe('the camera errors say which problem it is, and what to do about it', () => {
+  it('denied, missing, busy, insecure each get their own help text; a dead overlay stays its own line', () => {
+    expect(mirrorStartErrorText({ name: 'NotAllowedError' })).toBe(cameraHelpText(cameraHelp({ name: 'NotAllowedError' })));
+    expect(mirrorStartErrorText({ name: 'NotAllowedError' })).toMatch(/^Camera access is blocked\. 1\) .*allow the camera for this site/);
+    for (const name of ['NotFoundError', 'OverconstrainedError']) expect(mirrorStartErrorText({ name })).toMatch(/^No camera found\. 1\) Plug in a camera/);
+    expect(mirrorStartErrorText({ name: 'NotReadableError' })).toMatch(/^The camera is in use\. 1\) Close other apps/);
+    expect(mirrorStartErrorText(new TypeError('no mediaDevices'), false)).toMatch(/^The camera needs a secure page\. 1\) Open FEL at an address that starts with https:\/\//);
+    expect(mirrorStartErrorText(new Error('webgl'))).toMatch(/3D renderer/);
+    expect(mirrorStartErrorText(null)).toMatch(/3D renderer/);
   });
 });
 

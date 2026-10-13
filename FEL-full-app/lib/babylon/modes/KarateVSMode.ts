@@ -55,6 +55,10 @@ import {
   guardPressMs, rivalDifficulty, rivalPower, applyRivalPower, poweredAttack, RIVAL_POWER_BASE, type RivalPower,
 } from '../core/FightCore';
 import { KnockSlides, makeChestOf } from '../core/FightKit';   // IMPROVE (2026-10-06): the shared knock slide + scratch chest points
+import { ComboBreaker, COMBO_BREAK } from '../core/ComboBreaker';   // COMBAT DIFFICULTY (2026-10-06 Showdown / Duel; Karate VS 2026-10-13): the rival escapes a long mashed string
+import { DefenseController, SUBSTITUTION_CHI_COST } from '../core/DefenseSystem';   // the substitution the break pays: its chi, its read-and-punish window
+import { CHI } from '../core/ResourceMeter';
+import { DUEL } from './duelRules';   // subWhiffMs: the beat a swing in flight finds nobody (Showdown's and Duel's 400 ms)
 import { readTier } from '../core/Difficulty';   // IMPROVE (2026-10-06): the OPPONENT pick
 import { threatLandsIn, RivalCombatBrain, type RivalResource } from '../core/RivalCombatBrain';   // IMPROVE (2026-10-06): the shared rival (it dashes now)
 import { GameTimers, BannerSlot } from '../core/ModeClock';   // IMPROVE (2026-10-06): hit beats and banners on the game clock
@@ -179,6 +183,12 @@ export const KarateVSMode: ModeDefinition = (() => {
   /** The strikes each fighter has LANDED inside the current combo window — a route reads this tail. */
   let myLanded: RouteStrike[] = [], foeLanded: RouteStrike[] = [];
   let striking = false, foeStriking = false;
+  /** COMBAT DIFFICULTY (2026-10-13, the #19 follow-up): the rival escapes a long mashed string (core/ComboBreaker — Showdown's and
+   *  Duel's, same rules and numbers). `foeSub` is only the substitution's bookkeeping (its cooldown and the 0.6 s read-and-punish
+   *  window, DefenseController.spendSubstitution / counterMult); `foeSubstituted` is the beat my swing in flight finds nobody. */
+  const breaker = new ComboBreaker();
+  let foeSub = new DefenseController();
+  let foeSubstituted = 0;
   let slowmoSec = 0;
   // MATRIX FOCUS (owner 2026-09-18): held on the right trigger — the rival runs at FOCUS.worldScale (his animator, his brain,
   // his swing's hit beat via foeTimers) while I keep FOCUS.heroScale; a read refills it, my hits inside it land harder.
@@ -408,6 +418,28 @@ export const KarateVSMode: ModeDefinition = (() => {
     SoundKit.play('whoosh', { pitch: homing ? 1.35 : 1.2, volume: 0.45 }); if (homing) ctx.camDirector.pulse(0.25, 0.3);
     console.info(`[KVS-STORM] ${homing ? 'chakra dash' : 'dash'}`);
   }
+  /** COMBAT DIFFICULTY (2026-10-13): THE BREAK — the rival's substitution out of a combo (ShowdownMode / DuelMode.comboBreak, the same
+   *  rules): its chi pays the substitution, the stun is gone, it is behind you, your swing in flight finds nobody for DUEL.subWhiffMs
+   *  and it stays open to a COUNTER for the substitution's SUBSTITUTION_VULN_SEC. Called loudly so a masher learns why. */
+  function comboBreak(ctx: ModeContext): void {
+    foeState.chi = Math.max(0, foeState.chi - SUBSTITUTION_CHI_COST);
+    foeSub.spendSubstitution(now());
+    foeState.stunSec = 0; foeState.staggerSec = 0;
+    knock.cancel(rival.root.position);
+    foeLaunchedSec = 0; rival.root.position.y = 0;   // (an air string is over: it lands where it reappears)
+    const spot = DefenseController.substitutionSpot(player.root.position, player.root.rotation.y);
+    rival.root.position.x = spot.x; rival.root.position.z = spot.z;
+    arenaClamp(rival.root.position, arena);
+    foeSubstituted = now() + DUEL.subWhiffMs;
+    SoundKit.play('whoosh', { pitch: 1.8, volume: 0.6 });
+    EffectsKit.burst(ctx.scene, rival.root.position.add(new Vector3(0, 1.2, 0)), 'glitch');
+    ctx.juice.flash('#ff3344', 110);
+    ctx.camDirector.pulse(0.45, 0.35);
+    ctx.setHud({ foeChi: Math.round(foeState.chi) });
+    banner(ctx, 'BREAK! — THE RIVAL ESCAPED YOUR STRING', 0.9);
+    brain.openCounter(COMBO_BREAK.counterSec);   // it escapes AND strikes back
+    console.info('[KVS-STORM] rival combo break');
+  }
   function endStrike(mine: boolean): void { if (mine) { striking = false; myImpactAt = null; } else { foeStriking = false; foeImpactAt = null; } animOf(mine).strike = null; }
   /** IMPROVE (2026-10-06): when MY swing connects (page ms) — the rival's parry is timed to it, and past it my swing is a
    *  recovery the rival can punish. null = not swinging. */
@@ -525,6 +557,8 @@ export const KarateVSMode: ModeDefinition = (() => {
       if (!mine) foeImpactAt = null;   // it landed or it did not; either way nothing is incoming now
       let outcome = impactAt !== undefined ? bodyOutcome(atk, dist, impactAt) : resolveStrike(atk, dist, defState, now());
       if (!mine && (meDashIframeSec > 0 || meEvade.rollIFrames)) outcome = 'whiff';
+      // COMBAT DIFFICULTY (2026-10-13): the rival's substitution beat — my swing in flight finds nobody (Showdown's / Duel's rule)
+      if (mine && now() < foeSubstituted) { outcome = 'whiff'; banner(ctx, 'THEY SUBSTITUTED!', 0.5); }
       if (!mine && outcome === 'whiff' && meDashIframeSec > 0) {
         // phase 6 — THE DASH READ: his swing went through where I was. That is the same read the roll's perfect dodge is
         // (DodgeRead), so it pays the same: the counter window, Focus, the beat. Measured before: the whiff was silent.
@@ -573,9 +607,14 @@ export const KarateVSMode: ModeDefinition = (() => {
         case 'hit': {
           // A PERFECT DODGE IS AN OPENING, and this is where it is spent: the counter window multiplies the
           // punish and then closes. Bounded at 1.5x by DodgeRead -- an opening, never an execute.
-          const counter = mine ? counterMult(meCounter) : 1;
+          // (the substitution a combo break spent leaves the rival open for SUBSTITUTION_VULN_SEC: DefenseController.counterMult)
+          const counter = mine ? Math.max(counterMult(meCounter), foeSub.counterMult(now())) : 1;
           if (mine && counter > 1) { meCounter = 0; banner(ctx, 'COUNTER!', 0.7); }
           const base = applyHit(atkState, defState, atk);
+          // COMBAT DIFFICULTY (2026-10-13), TUNED: a blow TAKEN builds the RIVAL's chi (ResourceMeter CHI.gains.hitTaken, Duel's 5) —
+          // the stun-locked rival's way to afford the substitution out of a mashed string (ComboBreaker). The rival's only: MY chi
+          // is the DRAGON's charge here, and being hit has never filled it.
+          if (mine) defState.chi = Math.min(CHI_MAX, defState.chi + (CHI.gains.hitTaken ?? 0));
           const dealt = Math.round(base * counter * (mine && focus.active ? FOCUS.damageMult : 1));   // MATRIX: a Focus strike lands harder
           if (mine) focus.gain(FOCUS.hitGain);
           if (counter > 1) defState.hp = Math.max(0, defState.hp - (dealt - base));
@@ -600,7 +639,7 @@ export const KarateVSMode: ModeDefinition = (() => {
           if (mine && move?.launch) { foeLaunchedSec = LAUNCH_AIR_SEC; console.info('[KVS-STORM] LAUNCHED — air string open'); } else if (mine && move?.air && !move.slam) foeLaunchedSec = Math.max(foeLaunchedSec, 0.5); else if (mine && move?.slam) foeLaunchedSec = 0;   // STORM: the launcher puts him up, air links keep him there, the spike brings him down   // the DRAGON launches (knockdown → floor → get up)
           knockback(ctx, defChar, atkChar.root.position, atk.knockback);
           const hud: Record<string, HudValue> = mine
-            ? { foeHp: defState.hp, chi: Math.round(atkState.chi) }
+            ? { foeHp: defState.hp, chi: Math.round(atkState.chi), foeChi: Math.round(defState.chi) }
             : { hp: defState.hp, foeChi: Math.round(atkState.chi) };
           let bannerText = '';
           if (route) {
@@ -629,6 +668,8 @@ export const KarateVSMode: ModeDefinition = (() => {
           ctx.setHud(hud);
           if (bannerText) banner(ctx, bannerText, route ? 0.9 : 0.7);
           if (defState.hp <= 0) endRound(ctx, mine);
+          // COMBAT DIFFICULTY (2026-10-13): a rival stun-locked by a long mashed chain substitutes out of it (ComboBreaker)
+          else if (mine && breaker.hit(now() / 1000, readTier(), defState.chi >= SUBSTITUTION_CHI_COST)) comboBreak(ctx);
           break;
         }
       }
@@ -784,6 +825,7 @@ export const KarateVSMode: ModeDefinition = (() => {
       knock.clear();
       // the rival's dash, and the beats still waiting from the last round (IMPROVE 2026-10-06: never cleared before)
       foeDash = null; foeTimers.clear(); meTimers.clear();
+      breaker.reset(); foeSub = new DefenseController(); foeSubstituted = 0;   // COMBAT DIFFICULTY (2026-10-13): a new round, a new string
       foeResource.max = hasFightMove('dragon', foeRatings) ? CHI_MAX : Infinity;
     }
     meState.resetRound(); foeState.resetRound(); book.reset(); xBtn.reset(); padBlock.reset(); queuedKey = null; meDash = null; meDashIframeSec = 0; meDashUntil = 0; foeLaunchedSec = 0; rival.root.position.y = 0;   // STORM
@@ -991,6 +1033,7 @@ export const KarateVSMode: ModeDefinition = (() => {
       if (phase !== 'fighting') return;   // a beat just ended the round
 
       meState.tick(sdtHero); foeState.tick(sdtRoom);
+      breaker.track(dt, animOf(true).strike);   // COMBAT DIFFICULTY (2026-10-13): the links of my string (ComboBreaker; each swing is its own strike object)
       // A route must not complete across two unrelated exchanges: when FightCore closes the combo window it
       // zeroes `combo`, so the landed sequence is dropped on the same beat.
       if (meState.combo === 0 && myLanded.length) myLanded = [];

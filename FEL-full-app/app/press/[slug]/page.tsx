@@ -2,14 +2,14 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { fileNeedsFormat, getBook, kindleUrl } from '@/lib/books/bookCatalog';
+import { getBook } from '@/lib/books/bookCatalog';
+import { bookFormatAllowed } from '@/lib/books/bookTerms';
 import { hasBookAccess, normalizeBookEmail } from '@/lib/books/bookEntitlements';
 import { prismaBookStore } from '@/lib/books/bookStore';
 import { PressFrame } from '@/components/press/press-frame';
 import { BookCover } from '@/components/press/book-cover';
 import { KindleLink, OfferCard } from '@/components/press/offer-card';
 import { AudioPlayer } from '@/components/press/audio-player';
-import { DownloadButton } from '@/components/press/download-button';
 
 export const dynamic = 'force-dynamic';
 
@@ -54,8 +54,7 @@ export default async function BookPage({
     label: file.label,
     canPlay: Boolean(file.sample) || hasBookAccess(owned, book.slug, 'audiobook'),
   }));
-  const downloads = book.files.filter((f) => f.kind !== 'mp3' && (f.sample || hasBookAccess(owned, book.slug, fileNeedsFormat(f.kind))));
-  const amazon = kindleUrl(book);
+  const offers = book.offers.filter((o) => bookFormatAllowed(o.format));
 
   return (
     <PressFrame signedIn={signedIn}>
@@ -75,20 +74,14 @@ export default async function BookPage({
           {book.track ? <p className="text-[11px] uppercase tracking-[0.16em] text-white/45">{book.track}</p> : null}
           <h2 className="fel-heading text-4xl text-white">{book.title}</h2>
           <p className="mt-2 text-sm text-white/60">{book.description}</p>
-          {book.kdpSelect ? (
-            <p className="mt-3 text-xs text-white/50">
-              The ebook is in Kindle Unlimited, so the direct ebook and the bundle stay off. The audiobook can be bought here.
-              {amazon ? <> <a className="text-[#F5C518] hover:underline" href={amazon} target="_blank" rel="noopener noreferrer">Kindle page</a>.</> : null}
-            </p>
-          ) : null}
           {book.chaptersArePlaceholder ? (
             <p className="mt-2 text-[11px] text-white/35">Chapter list is a placeholder until the audio masters are uploaded.</p>
           ) : null}
         </div>
       </div>
 
-      <div className="mt-6 grid gap-3 sm:grid-cols-3">
-        {book.offers.map((offer) => (
+      <div className="mt-6 grid max-w-xs gap-3">
+        {offers.map((offer) => (
           <OfferCard key={offer.id} book={book} offer={offer} prominent />
         ))}
       </div>
@@ -96,23 +89,8 @@ export default async function BookPage({
         <KindleLink book={book} />
       </div>
 
-      <div className="mt-8 grid gap-4 lg:grid-cols-2">
+      <div className="mt-8">
         <AudioPlayer bookSlug={book.slug} bookTitle={book.title} chapters={chapters} />
-        <div className="rounded-xl border border-white/10 bg-[#101010] p-4">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#F5C518]">Ebook files</p>
-          {downloads.length === 0 ? (
-            <p className="mt-2 text-sm text-white/50">EPUB and PDF unlock after you buy the ebook or the bundle.</p>
-          ) : (
-            <div className="mt-3 flex flex-wrap gap-2">
-              {downloads.map((file) => (
-                <DownloadButton key={file.id} bookSlug={book.slug} fileId={file.id} label={`Download ${file.label}`} />
-              ))}
-            </div>
-          )}
-          <p className="mt-4 text-[11px] text-white/35">
-            Files are private. A download link lasts a few minutes and only works if you own the format.
-          </p>
-        </div>
       </div>
     </PressFrame>
   );
