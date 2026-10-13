@@ -53,6 +53,7 @@ import { VenueKit } from '../visual/VenueKit';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';
 import { readPlaceLook } from '../nexus/placeLooks';
 import { Onlookers } from '../visual/Onlookers';
+import { mountFootballFx, type FootballFxHandle } from '../court/FootballFx';   // VIS-COURT (wave 2): towers, down lines, pylons, pyro, turf — visual only, reads the line of scrimmage and the events below
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import { FOOTBALL_CONFIG as CFG } from './modeConfigs';
@@ -74,6 +75,7 @@ import {
 } from './footballRushRules';
 
 let rushVenue: VenueHandle | null = null;   // ship pass 4: the mounted venue spec, disposed with the mode
+let courtFx: FootballFxHandle | null = null;   // VIS-COURT: the gridiron's broadcast dressing
 
 // MAP-SIZE FIX: VenueKit.buildGridiron widened from 22m to 44m to match a
 // real field's sideline-to-sideline width — this clamp has to widen with it
@@ -588,6 +590,7 @@ export const FootballRushMode: ModeDefinition = (() => {
   function tackledBy(ctx: ModeContext, mob: Mob, how: string): boolean {
     tackleWeight(ctx);
     EffectsKit.burst(ctx.scene, runner.root.position.add(new Vector3(0, TURF_Y, 0)), 'dust');
+    courtFx?.tackle({ x: runner.root.position.x, z: runner.root.position.z });   // VIS-COURT: turf chunks, a scuff and a ring of dust
     downed = true; move = null; cutSec = 0; vault = null; lane = 'turf'; runner.root.position.y = 0; launchSec = 0; hopSec = 0;
     timers.clear('pursuit');   // IMPROVE (2026-10-06) #5: a release still pending from this play never fires into the next
     animTree?.clearBeat('tackled');
@@ -832,6 +835,8 @@ export const FootballRushMode: ModeDefinition = (() => {
         ...[0, 1, 2, 3, 4, 5, 6, 7].map((i) => new Vector3(-21.5, 0, 4 + i * 4)),
         ...[0, 1, 2, 3, 4, 5, 6, 7].map((i) => new Vector3(21.5, 0, 6 + i * 4)),
       ]);
+      courtFx?.dispose(); courtFx = mountFootballFx(ctx.scene, { phone: ctx.lights.tier === 'mobile', fieldHalfW: 21, goalZ: FIELD_LENGTH, endZ: FIELD_LENGTH + 5 });   // VIS-COURT
+      if (process.env.NODE_ENV === 'development') (ctx.scene.metadata ??= {}).felCourt = courtFx;   // the capture driver stages a cut, a tackle, a truck and a touchdown through it
       newDrive(ctx, 'TAKE THE FIELD');
       ctx.setHud({ score: 0, yards: 0, evades: 0, hint: 'Juke, spin, hurdle — or HOLD TRUCK and run THROUGH them', weather: weather.describe() });
     },
@@ -917,6 +922,7 @@ export const FootballRushMode: ModeDefinition = (() => {
         dodging = true;
         iframeSec = d.iframes;
         lastDodgeType = e.btn === 'B' ? 'spin' : e.btn === 'A' ? 'hurdle' : 'juke';
+        if (lane === 'turf' && !vault) courtFx?.cut({ x: runner.root.position.x, z: runner.root.position.z }, runner.root.rotation.y);   // VIS-COURT: the plant foot tears the turf
         SoundKit.play('whoosh', { pitch: 1.15 });
         // the tree plays it (its settle ends the dodge); A = the hurdle, which has no lateral cut and rides the
         // 'stiffArm' slot's own clip through moveClip
@@ -944,6 +950,7 @@ export const FootballRushMode: ModeDefinition = (() => {
       timers.tick(clock);
       if (ended) return;
       tickBanner(ctx);
+      courtFx?.update(dt, { los: lineOfScrimmage, firstDown: lineOfScrimmage + toGo * YARD });   // VIS-COURT: the scrimmage line and the line to gain, laid on the turf
 
       // HIT-CAM: when a stack closes on the runner, pull up and back for half a second so
       // the hit reads as a hit rather than something that happened behind the shoulder.
@@ -1115,6 +1122,7 @@ export const FootballRushMode: ModeDefinition = (() => {
           mob.onContactResolved();
           mob.char.animator.play(SPORT_CLIP.footballTackled, {});
           truckPunch(ctx);   // A+ P0: hit-stop + shake + ONE low thud, once per window (replaces feel.impact + a second impact SFX)
+          courtFx?.truck({ x: mob.char.root.position.x, z: mob.char.root.position.z });   // VIS-COURT
           EffectsKit.burst(ctx.scene, mob.char.root.position.add(new Vector3(0, TURF_Y, 0)), 'dust');   // turf at his feet (ANIM-SURGICAL)
           flash(ctx, 'TRUCKED!', 600);
           gallery?.cheer(0.6);
@@ -1155,6 +1163,7 @@ export const FootballRushMode: ModeDefinition = (() => {
         tdPending = true; celebrateUntil = performance.now() + TD_HOLD_SEC * 1000; move = null; cutSec = 0; vault = null; lane = 'turf'; runner.root.position.y = 0; launchSec = 0; hopSec = 0;
         animTree?.clearBeat('celebrate');
         tdPunch(ctx);   // A+ P0: hit-stop + shake + gold flash + ONE slam, once per drive (replaces the bare feel.impact)
+        courtFx?.touchdown();   // VIS-COURT: four jets of gold sparks at the pylons
         SoundKit.play('score');
         SoundKit.play('crowdCheer');
         EffectsKit.burst(ctx.scene, runner.root.position.add(new Vector3(0, 1.8, 0)), 'confetti');
@@ -1180,6 +1189,7 @@ export const FootballRushMode: ModeDefinition = (() => {
 
     dispose() {
       posture?.dispose(); posture = null; animTree = null;
+      courtFx?.dispose(); courtFx = null;   // VIS-COURT
       rushVenue?.dispose?.(); rushVenue = null;
       gallery?.dispose(); gallery = null;
       lineArrow?.dispose(); lineArrow = null; pursuit?.dispose(); pursuit = null; weatherFx?.dispose(); weatherFx = null;
