@@ -10,9 +10,12 @@ describe('which tab owns a path', () => {
   it('lights the obvious ones', () => {
     expect(tabForPath('/play')?.id).toBe('play');
     expect(tabForPath('/modes')?.id).toBe('play');
+    expect(tabForPath('/venues')?.id).toBe('play');
+    expect(tabForPath('/host')?.id).toBe('play');
     expect(tabForPath('/train')?.id).toBe('train');
     expect(tabForPath('/coach')?.id).toBe('train');
     expect(tabForPath('/kitchens')?.id).toBe('train');
+    expect(tabForPath('/live')?.id).toBe('train');
     expect(tabForPath('/profile')?.id).toBe('profile');
     expect(tabForPath('/wallet')?.id).toBe('profile');
     expect(tabForPath('/account')?.id).toBe('profile');
