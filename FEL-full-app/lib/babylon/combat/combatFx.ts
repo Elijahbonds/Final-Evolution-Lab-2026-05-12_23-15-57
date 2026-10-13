@@ -125,7 +125,7 @@ function canvasTex(scene: Scene, name: string, w: number, h: number, paint: (c: 
   if (hit) return hit as DynamicTexture;
   const tex = new DynamicTexture(name, { width: w, height: h }, scene, true);
   paint(tex.getContext() as unknown as Ctx);
-  tex.update(false);
+  tex.update(true);   // (invertY: the canvas's top is the texture's top — the aura's glow stands at the FEET only this way up)
   tex.hasAlpha = true;
   if (wrap) { tex.wrapU = Texture.WRAP_ADDRESSMODE; tex.wrapV = Texture.CLAMP_ADDRESSMODE; }
   return tex;

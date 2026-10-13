@@ -279,11 +279,11 @@ export function paintFloor(ctx: Ctx, style: FloorStyle, p: FloorPaint, emissive 
     ctx.strokeStyle = ink; ctx.lineWidth = m * 0.012; ctx.beginPath(); ctx.arc(cx, cy, m * 0.46, 0, Math.PI * 2); ctx.stroke();
     ctx.strokeStyle = ink2; ctx.lineWidth = m * 0.006; ctx.beginPath(); ctx.arc(cx, cy, m * 0.43, 0, Math.PI * 2); ctx.stroke();
     ctx.beginPath(); ctx.arc(cx, cy, m * 0.28, 0, Math.PI * 2); ctx.stroke();
-    ctx.strokeStyle = rgba(accent, green ? 0.5 : 0.42); ctx.lineWidth = m * 0.01; ctx.beginPath(); ctx.arc(cx, cy, m * 0.13, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = rgba(accent, green ? 0.42 : 0.3); ctx.lineWidth = m * 0.008; ctx.beginPath(); ctx.arc(cx, cy, m * 0.13, 0, Math.PI * 2); ctx.stroke();
     // 36 ticks round the rim (every ninth is long) and an eight-point star in the middle
     ctx.strokeStyle = ink; ctx.lineWidth = m * 0.005;
     for (let k = 0; k < 36; k++) { const a = (k / 36) * Math.PI * 2, long = k % 9 === 0, r0 = m * (long ? 0.395 : 0.41), r1 = m * 0.428; ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0); ctx.lineTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1); ctx.stroke(); }
-    ctx.strokeStyle = rgba(accent, 0.45); ctx.lineWidth = m * 0.007;
+    ctx.strokeStyle = rgba(accent, green ? 0.38 : 0.26); ctx.lineWidth = m * 0.006;
     ctx.beginPath(); for (let k = 0; k < 16; k++) { const a = (k / 16) * Math.PI * 2, rr = k % 2 ? m * 0.06 : m * 0.15; const x = cx + Math.cos(a) * rr, y = cy + Math.sin(a) * rr; if (k === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); } ctx.closePath(); ctx.stroke();
     if (green) { // cracked paving: a few hairlines from the middle
       ctx.strokeStyle = 'rgba(25,32,28,0.5)'; ctx.lineWidth = m * 0.004;

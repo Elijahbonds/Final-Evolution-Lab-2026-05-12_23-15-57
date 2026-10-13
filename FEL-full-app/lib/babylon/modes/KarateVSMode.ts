@@ -322,11 +322,10 @@ export const KarateVSMode: ModeDefinition = (() => {
   function roundWinBeat(ctx: ModeContext): void { ctx.juice.shake(0.08, 140); ctx.juice.flash('#fff6dd', 90); console.info('[KVS-JUICE] round win'); }
   /** VISUAL PASS: the DRAGON's super beat — the colour grade swings to gold (crimson when the rival lands it), anime speed lines
    *  fan out, and one negative frame cuts in. All three are gated by reduced motion; none changes a number or the camera. */
-  function dragonBeat(ctx: ModeContext, mine: boolean): void {
+  function dragonBeat(mine: boolean): void {
     pres?.grade(mine ? 'gold' : 'crimson', 0.55);
     pres?.speedLines(mine ? '255,214,120' : '255,120,130', 560);
     pres?.impactFrame();
-    void ctx;
   }
   function matchPunch(ctx: ModeContext): void {
     if (matchLatch) return; matchLatch = true;
@@ -648,7 +647,7 @@ export const KarateVSMode: ModeDefinition = (() => {
           ctx.momentum.report(mine ? { kind: 'clean_hit', weight: special ? 16 : 9 } : { kind: 'blunder', weight: -8 });
           if (special || key === 'heavy') { heavyPunch(ctx, special ? 'dragon' : 'heavy'); console.info(mine ? '[KVS-JUICE] heavy landed' : '[KVS-JUICE] heavy taken'); } else { ctx.juice.hitStop(key === 'kick' ? 45 : 28); console.info(mine ? '[KVS-JUICE] hit' : '[KVS-JUICE] taken'); }   // phase 5: every connect holds for its weight (the horde's rule)
           if (fx) fx.hit(defChar.root.position.add(new Vector3(0, 1.2, 0)), atkChar.root.position, hitKindOf(key, special), special ? (mine ? '#ffd36b' : '#ff4d5e') : undefined); else EffectsKit.burst(ctx.scene, defChar.root.position.add(new Vector3(0, 1.2, 0)), special ? 'glitch' : 'sparks');
-          if (special) dragonBeat(ctx, mine);   // the DRAGON lands: a grade swing, speed lines, one negative frame
+          if (special) dragonBeat(mine);   // the DRAGON lands: a grade swing, speed lines, one negative frame
           beatHit(!mine, mine && move?.slam ? 'finisher' : mine && move?.launch ? 'heavy' : special ? 'finisher' : WEIGHT_OF[key]);
           if (mine && move?.launch) { foeLaunchedSec = LAUNCH_AIR_SEC; console.info('[KVS-STORM] LAUNCHED — air string open'); } else if (mine && move?.air && !move.slam) foeLaunchedSec = Math.max(foeLaunchedSec, 0.5); else if (mine && move?.slam) foeLaunchedSec = 0;   // STORM: the launcher puts him up, air links keep him there, the spike brings him down   // the DRAGON launches (knockdown → floor → get up)
           knockback(ctx, defChar, atkChar.root.position, atk.knockback);
