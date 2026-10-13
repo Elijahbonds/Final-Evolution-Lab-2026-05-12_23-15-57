@@ -15,6 +15,12 @@
 // so between replays its target is told not to refresh (the no-blur lens does not read it); a replay turns it back on.
 // Desktop and high only — phones get the replay and the bars, not the blur.
 //
+// TRACKED TRANSFORMS (vis-board, wave 2): a body's root and bones are not everything a mode draws — a skateboard's deck flips about
+// its own node (a child of the rider's root, written by the mode as Euler angles every frame). `track(node)` records such a
+// node's LOCAL position and rotation with every frame and plays it back like a bone; when the replay ends the node is put back —
+// position, and rotation as the mode wrote it (Euler, with the quaternion nulled again if it had none: a node that keeps a
+// leftover rotationQuaternion ignores `rotation`, which froze the deck). Opt-in: nothing is tracked unless a mode asks.
+//
 // The mode stays in charge of WHEN: `play()` returns a promise, the harness holds the mode's update() while it runs
 // (ModeContext.highlight), any press skips it, a pause freezes it, and when it ends every recorded root, the loose meshes
 // and the camera (position, target, lens) are put back exactly as they were — the game resumes from the live moment.
@@ -32,7 +38,7 @@ export const REPLAY_SPEED = 0.5;
 export const DOF_EASE_S = 0.35;
 
 interface BodyFrame { p: Vector3; q: Quaternion | null; y: number; pose: Float32Array | null }
-interface Frame { t: number; bodies: BodyFrame[]; loose: Vector3[] }
+interface Frame { t: number; bodies: BodyFrame[]; loose: Vector3[]; /** the tracked transforms' local pose, 7 floats each (position, quaternion) */ tr: Float32Array | null }
 
 export interface ReplayDofHandle {
   /** Ease toward the replay lens (k 0..1) focused `focusMetres` away; k = 0 is the no-blur rest lens. */
@@ -127,6 +133,7 @@ export class ReplayDirector {
   private poseNodes: TransformNode[][];
   private finishActive: (() => void) | null = null;
   private _playing = false;
+  private tracked: TransformNode[] = [];
   /** Which angle is on screen (−1: none) — probes read it. */
   angleNow: ReplayAngle | null = null;
 
@@ -143,6 +150,20 @@ export class ReplayDirector {
   }
 
   get playing(): boolean { return this._playing; }
+
+  /** Record this node's local pose too (a deck, a prop on a body) and play it back. Idempotent. Not while a replay plays. */
+  track(node: TransformNode): void { if (!this._playing && !this.tracked.includes(node)) this.tracked.push(node); }
+  get trackedCount(): number { return this.tracked.length; }
+
+  private trackSample(): Float32Array | null {
+    if (!this.tracked.length) return null;
+    const out = new Float32Array(this.tracked.length * 7);
+    this.tracked.forEach((n, k) => {
+      const q = n.rotationQuaternion ?? Quaternion.FromEulerVector(n.rotation);
+      out.set([n.position.x, n.position.y, n.position.z, q.x, q.y, q.z, q.w], k * 7);
+    });
+    return out;
+  }
   /** Seconds currently held. */
   get recordedSec(): number { return this.buf.length > 1 ? this.buf[this.buf.length - 1].t - this.buf[0].t : 0; }
 
@@ -156,6 +177,7 @@ export class ReplayDirector {
       t: now,
       bodies: this.bodies.map((b, i) => ({ p: b.position.clone(), q: b.rotationQuaternion?.clone() ?? null, y: b.rotation.y, pose: this.poseSample(i) })),
       loose: this.loose.map((m) => m.getAbsolutePosition().clone()),
+      tr: this.trackSample(),
     });
     while (this.buf.length && this.buf[0].t < now - REPLAY_WINDOW_S) this.buf.shift();
   }
@@ -181,6 +203,17 @@ export class ReplayDirector {
     });
   }
 
+  private readonly _qc = new Quaternion(); private readonly _qd = new Quaternion();
+  private applyTracked(a: Float32Array | null, b: Float32Array | null, k: number): void {
+    if (!a || !b || a.length !== this.tracked.length * 7 || b.length !== a.length) return;
+    this.tracked.forEach((n, j) => {
+      const o = j * 7;
+      n.position.set(a[o] + (b[o] - a[o]) * k, a[o + 1] + (b[o + 1] - a[o + 1]) * k, a[o + 2] + (b[o + 2] - a[o + 2]) * k);
+      this._qc.set(a[o + 3], a[o + 4], a[o + 5], a[o + 6]); this._qd.set(b[o + 3], b[o + 4], b[o + 5], b[o + 6]);
+      (n.rotationQuaternion ??= new Quaternion()); Quaternion.SlerpToRef(this._qc, this._qd, k, n.rotationQuaternion);
+    });
+  }
+
   /** Play the highlight. Resolves when it ends or is skipped (a press, `stop()`); nothing recorded → resolves at once. */
   play(opts: ReplayPlayOpts = {}): Promise<void> {
     if (this._playing || this.buf.length < REPLAY_RATE_HZ / 2) return Promise.resolve();
@@ -197,6 +230,7 @@ export class ReplayDirector {
       bodies: this.bodies.map((b) => ({ p: b.position.clone(), q: b.rotationQuaternion?.clone() ?? null, y: b.rotation.y })),
       loose: this.loose.map((m) => ({ parent: m.parent, local: m.position.clone(), world: m.getAbsolutePosition().clone() })),
     };
+    const liveTracked = this.tracked.map((n) => ({ p: n.position.clone(), q: n.rotationQuaternion?.clone() ?? null, r: n.rotation.clone() }));
     const livePoses = this.bodies.map((_, i) => this.poseSample(i));   // a bone no clip drives keeps what the replay left otherwise
     const heading = frames[frames.length - 1].bodies[fi].p.subtract(frames[0].bodies[fi].p);
     this._playing = true;
@@ -213,6 +247,7 @@ export class ReplayDirector {
       // the recorded pose is the frame's last word (after the clips and every layer on the animations' observable)
       const poseObs = this.scene.onAfterAnimationsObservable.add(() => {
         cur.a.bodies.forEach((ba, i) => { const bb = cur.b.bodies[i]; if (ba.pose && bb.pose) this.applyPose(i, ba.pose, bb.pose, cur.k); });
+        this.applyTracked(cur.a.tr, cur.b.tr, cur.k);
       });
       const obs = this.scene.onBeforeRenderObservable.add(() => {
         const dt = Math.min(0.1, this.scene.getEngine().getDeltaTime() / 1000);
@@ -253,6 +288,11 @@ export class ReplayDirector {
           if (l.q) b.rotationQuaternion = l.q; else { b.rotationQuaternion = null; b.rotation.y = l.y; }
         });
         livePoses.forEach((lp, i) => { if (lp) this.applyPose(i, lp, lp, 0); });
+        this.tracked.forEach((n, i) => {   // as the mode wrote it: Euler unless it had a quaternion (a leftover one would freeze `rotation`)
+          const l = liveTracked[i]; if (!l) return;
+          n.position.copyFrom(l.p);
+          if (l.q) n.rotationQuaternion = l.q; else { n.rotationQuaternion = null; n.rotation.copyFrom(l.r); }
+        });
         this.loose.forEach((m, i) => { const l = live.loose[i]; if (l.parent) m.position.copyFrom(l.local); else m.setAbsolutePosition(l.world); });
         this.camera.position.copyFrom(live.cam); this.camera.setTarget(live.target); this.camera.fov = live.fov;
         this.dof?.set(0, 10); this.dof?.live(false);

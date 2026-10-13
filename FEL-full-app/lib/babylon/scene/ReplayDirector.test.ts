@@ -51,6 +51,33 @@ describe('the replay director', () => {
     expect(dof.live).toHaveBeenLastCalledWith(false);
     rd.dispose();
   });
+  it('a tracked deck\'s local flip is recorded and plays back, then the deck is handed back as the mode wrote it (Euler, no leftover quaternion)', async () => {
+    const { scene, cam, runner, frame } = rig();
+    const deck = new TransformNode('deck', scene); deck.parent = runner; deck.position.y = 0.03;
+    const loose = new TransformNode('untracked_deck', scene); loose.parent = runner;
+    const rd = new ReplayDirector(scene, cam, [runner]);
+    rd.track(deck); rd.track(deck);
+    expect(rd.trackedCount).toBe(1);                                  // idempotent
+    // a 3 s run in which the deck rolls a full turn about its own z (Euler, as BoardSync / BoardTrickLayer write it)
+    for (let i = 0; i < 180; i++) { runner.position.z = i * 0.1; deck.rotation.z = (i / 179) * Math.PI * 2 * 0.98; loose.rotation.z = deck.rotation.z; frame(); }
+    const liveRoll = deck.rotation.z;
+    const done = rd.play({ lastSeconds: 2.5 });
+    const rolls = new Set<number>(); let untrackedQ = false;
+    for (let i = 0; i < 2.5 / REPLAY_SPEED * 60 + 20 && rd.playing; i++) {
+      frame();
+      const q = deck.rotationQuaternion; if (q) rolls.add(Math.round(Math.atan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y * q.y + q.z * q.z)) * 10));
+      if (loose.rotationQuaternion) untrackedQ = true;
+    }
+    await done;
+    expect(rolls.size).toBeGreaterThan(8);                            // the flip was drawn, frame by frame, not a held pose
+    expect(untrackedQ).toBe(false);                                   // control: a node nobody asked for is left alone
+    expect(deck.rotationQuaternion).toBeNull();                       // handed back as Euler: a leftover quaternion would freeze `rotation`
+    expect(deck.rotation.z).toBeCloseTo(liveRoll, 9);
+    expect(deck.position.y).toBeCloseTo(0.03, 9);
+    deck.rotation.z = 1; frame();
+    expect(deck.rotationQuaternion).toBeNull();
+    rd.dispose();
+  });
   it('a skip ends it on the spot; a pause freezes it (and a skip while paused is ignored)', async () => {
     const { scene, cam, runner, frame } = rig();
     const rd = new ReplayDirector(scene, cam, [runner]);

@@ -511,6 +511,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
         return { pose: angled, legs, aim: at, eyes: at, window };
       }, 'SURF-PP');
       trickLayer?.dispose();
+      ctx.trackReplay?.(rig.board);   // vis-board: a replay shows the board's flip and bank
       trickLayer = new BoardTrickLayer(ctx.scene, rig.char.skeleton, rig.char.root, rig.board);   // after the posture layer: the grab hand is the last word
       if (process.env.NODE_ENV === 'development') {
         const dev = (window as unknown as { __FEL_DEV__?: { boardPosture?: unknown } }).__FEL_DEV__;

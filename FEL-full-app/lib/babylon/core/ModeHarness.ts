@@ -155,6 +155,9 @@ export interface ModeContext {
   /** vis-foundation-2 A9.12: play a broadcast replay of the last seconds (a mode with `replay: true`). The harness holds the
    *  mode's update() until it ends; any press skips it; a pause freezes it. Resolves at once when the mode did not opt in. */
   highlight?(opts?: ReplayPlayOpts): Promise<void>;
+  /** vis-board (wave 2): call from load() to have a replay record and play back this node's LOCAL pose too (a skateboard's deck,
+   *  which flips about its own node under the rider's root). Ignored when the mode did not opt in to replays. */
+  trackReplay?(node: TransformNode): void;
   end(outcome: string, score: number, stats: Record<string, number>, detail?: unknown): void;
   /** TRY-ONBOARD (G1/G7): the host asked for a CONTINUOUS night. A mode that would
    *  otherwise finish its card must offer GO AGAIN in-mode — report through card()
@@ -350,6 +353,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
   let unsub: (() => void) | null = null;
   let frameGuard: FrameGuard | null = null;
   let iblShadows: IblShadowsHandle | null = null;
+  const replayTrack: TransformNode[] = [];   // vis-board: nodes a mode asked ctx.trackReplay to record (registered when the director is built, after load())
   let replay: ReplayDirector | null = null;   // A9.12: a mode that asked for replays (def.replay)
   let replayHold = false;                     // a replay is on screen: the mode's update() waits
   const setPhase = (p: ModePhase, detail?: number | string) => {
@@ -499,6 +503,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     scene, camera, camDirector, input, lights, juice,
     feel, momentum, heroRef, objectiveRef, groundLock, agent: agentHooks,
     phase: () => phase,
+    trackReplay: (node) => { if (!replayTrack.includes(node)) replayTrack.push(node); },
     highlight: async (o) => {
       if (!replay || replay.playing || phase !== 'playing') return;
       replayHold = true;
@@ -596,6 +601,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
       setPhase('error', 'Load timed out — check your connection and retry.');
     }, LOAD_WATCHDOG_MS);
     try {
+      replayTrack.length = 0;
       await def.load(ctx);
       clearTimeout(watchdog);
       if (timedOut) return false;                  // late resolve after watchdog: stay on error
@@ -611,6 +617,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
       iblShadows = mountIblShadows(scene, camera);
       // A9.12: the replay recorder on the bodies load() spawned, and the replays' depth of field mounted now (no mid-game compile)
       replay?.dispose(); replay = def.replay ? new ReplayDirector(scene, camera, characterRoots(scene, heroRef.current), [], (def.replayDof === false ? null : mountReplayDof(scene, lights.pipeline, tier))) : null;
+      for (const n of replayTrack) replay?.track(n);
       setPhase('ready');
       // M67: pre-warm every material now, on the loading→ready boundary, so a
       // first-visibility shader compile never hitches mid-play. Dev-only work.

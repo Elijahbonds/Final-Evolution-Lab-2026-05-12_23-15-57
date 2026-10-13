@@ -730,6 +730,7 @@ export const SkateRunMode: ModeDefinition = (() => {
         });
       }
       boardSync = new BoardSync(rig.board, rig.char.root);
+      ctx.trackReplay?.(rig.board);   // vis-board: a trick replay shows the deck flip (the director records the deck's local pose)
       walls = plazaWalls(world.bound); lips = plazaLips(world.bound); wallRide = null; lipStall = null;   // WALL RIDES + LIP TRICKS
       {
         const lf = boneNode(rig.char.skeleton, 'LeftFoot'), rf = boneNode(rig.char.skeleton, 'RightFoot');

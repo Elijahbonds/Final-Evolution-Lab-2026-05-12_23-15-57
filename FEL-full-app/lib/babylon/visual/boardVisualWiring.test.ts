@@ -110,3 +110,14 @@ describe('every StandardMaterial that carries an emissive texture settles its em
     expect(sites[0][0]).not.toContain('settleEmissive(ledM)');
   });
 });
+
+describe('the four board modes register their deck for the replay (a trick replay shows the flip)', () => {
+  for (const f of ['SkateRunMode', 'SnowboardSlalomMode', 'SurfBreakMode', 'AirSessionMode']) {
+    it(f, () => { expect(read(`lib/babylon/modes/${f}.ts`)).toMatch(/ctx\.trackReplay\?\.\((?:rig\.)?board\)/); });
+  }
+  it('and the harness hands every registered node to the director it builds after load()', () => {
+    const src = read('lib/babylon/core/ModeHarness.ts');
+    expect(src).toMatch(/trackReplay: \(node\) =>/);
+    expect(src).toMatch(/for \(const n of replayTrack\) replay\?\.track\(n\)/);
+  });
+});

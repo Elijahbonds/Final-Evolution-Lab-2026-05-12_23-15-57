@@ -420,6 +420,7 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
       // IMPROVE (2026-10-06, item 7): the board family's trick layer — the grabbing hand on the right edge, the cork's and the
       // rodeo's off-axis tilt — mounted after the posture layer (the hand is the last word). The core owns the spin (yaw).
       trickLayer?.dispose();
+      ctx.trackReplay?.(board);   // vis-board: a replay shows the board's flip
       trickLayer = new BoardTrickLayer(ctx.scene, athlete.skeleton, athlete.root, board, { bodySpin: false });
       trail?.dispose(); trail = opts.broadcast?.trails ? new SpinTrail(ctx.scene, board) : null;   // vis-board: the spin's two ribbons
       event?.dispose(); event = opts.broadcast?.event && opts.hill && opts.launchZ !== undefined ? mountBigAirEvent(ctx.scene, opts.hill, opts.launchZ) : null;   // vis-board: the gate, the towers, the booth
