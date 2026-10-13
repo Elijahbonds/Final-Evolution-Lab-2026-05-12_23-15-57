@@ -12,6 +12,7 @@
  */
 
 import { useRef, useState } from 'react';
+import { useAiStatus } from '@/lib/abacus/useAiStatus';
 import { AnimatePresence, motion } from 'framer-motion';
 import Link from 'next/link';
 import { X, Send, Loader2, Sparkles, Maximize2 } from 'lucide-react';
@@ -21,6 +22,7 @@ interface Msg { id: string; role: 'user' | 'cell'; content: string }
 export const CELL_STUDIO_HREF = '/create';
 
 export function CellOrb() {
+  const [studioAi] = useAiStatus('studio');
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState('');
@@ -67,6 +69,9 @@ export function CellOrb() {
       setMessages((prev) => prev.map((m) => (m.id === aid && !m.content ? { ...m, content: 'CELL is offline right now. Try the Creator Studio.' } : m)));
     } finally { setBusy(false); }
   };
+
+  // NP-1: CELL (and its link into the Studio) is removed entirely while the Studio AI is off, never labelled.
+  if (studioAi !== 'available') return null;
 
   return (
     <>
