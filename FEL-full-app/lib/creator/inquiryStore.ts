@@ -7,8 +7,8 @@
 //
 // What is stored, and for how long: brand, contact name, email, budget range, dates, what they need, the message, which
 // page it came from, and when. No IP address and no IP hash. An inquiry is deleted INQUIRY_RETENTION_DAYS after it was
-// sent; the delete runs on every save, so an idle form keeps nothing past that either way on its next use, and the
-// owner can also run it by hand (see the SQL file). lib/policies.ts states the same period to the visitor.
+// sent; the delete runs on every save and again once a day (POST /api/cron/retention), so an idle form keeps nothing
+// past that either way, and the owner can also run it by hand (see the SQL file). lib/policies.ts states the same period to the visitor.
 import { randomUUID } from 'node:crypto';
 import { logPendingFailure, pendingProbe, type RawDb } from '@/lib/coach/pendingSchema';
 
@@ -53,6 +53,25 @@ export const INSERT_SQL =
   `VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'NEW', (NOW() AT TIME ZONE 'UTC'))`;
 
 export const PURGE_SQL = `DELETE FROM "CreatorInquiry" WHERE "createdAt" < ((NOW() AT TIME ZONE 'UTC') - make_interval(days => $1::int))`;
+
+/** What one purge did: `purged` (with the count), `unavailable` (no table yet), or `failed` (a real error). */
+export type InquiryPurgeResult = { state: 'purged'; deleted: number } | { state: 'unavailable' } | { state: 'failed' };
+
+/**
+ * Delete inquiries older than INQUIRY_RETENTION_DAYS and say how many. The daily retention job
+ * (app/api/cron/retention) calls it; saveInquiry's own best-effort delete stays. Never throws, a no-op while the table
+ * does not exist, idempotent.
+ */
+export async function purgeExpiredInquiries(db: RawDb, now: number = Date.now()): Promise<InquiryPurgeResult> {
+  if (!(await probe.ready(db, now))) return { state: 'unavailable' };
+  try {
+    const deleted = await db.$executeRawUnsafe(PURGE_SQL, INQUIRY_RETENTION_DAYS);
+    return { state: 'purged', deleted: typeof deleted === 'number' && deleted > 0 ? deleted : 0 };
+  } catch (e) {
+    probe.fail('creator_inquiry_purge_failed', e, now);
+    return { state: (await probe.ready(db, now)) ? 'failed' : 'unavailable' };
+  }
+}
 
 /** Save one inquiry. Resolves `unavailable` when the table is not there, `failed` on any other database error. */
 export async function saveInquiry(db: RawDb, record: InquiryRecord, now: number = Date.now()): Promise<SaveInquiryResult> {

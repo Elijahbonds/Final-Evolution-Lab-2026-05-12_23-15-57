@@ -82,6 +82,13 @@ import { SpeedLines, DustEmitter, SparkEmitter } from '../racing/speedFx';   // 
 import { ExhaustPuffs, bobAmp, bobFreq, frontWheelAngle, rivalSteer, wheelAngle, wrapPi } from '../racing/vehicleMotion';   // 10-phase pass, phase 9
 import { kartHudWords, RideHudSwitch, setRingGlyph } from './rideHud';   // GC-13 / 10-phase pass, phase 10: the HUD says the rider's words
 import { resolveRaceIdentity } from '../racing/raceLook';   // PR #138: a minor's look is the device's, and never uploaded
+// VIS-RACE (visual wave 2): the broadcast intro over the grid, the start lights that count it down, tyre marks (the shared
+// ground decals), the big-overtake replay, and the finish's confetti. Presentation only: none of it touches the model, the clock,
+// the field or the play camera.
+import { OVERTAKE, OvertakeWatch, TyreTrail, rearAxle } from '../racing/raceMoments';
+import { stampDecal } from '../racing/raceStamp';
+import { buildStartLights, GREEN_HOLD_SEC, type StartLightsHandle } from '../racing/startLights';
+import { motionPolicy } from '@/lib/a11y/reducedMotion';
 
 /** A kart is small; a full-size body swamps it. */
 const DRIVER_SCALE = 0.92;
@@ -209,6 +216,12 @@ const S = {
   stuckT: 0,
 };
 let boost = new BoostKit();
+// VIS-RACE: the start lights, the tyre streak, the overtake watch and the clock since GO (null until the lights go green)
+let startLights: StartLightsHandle | null = null;
+const tyreTrail = new TyreTrail();
+const overtake = new OvertakeWatch();
+let goAge: number | null = null;
+let replayDue = false;
 let boostFx: BoostFx | null = null;
 let boostPads: BoostPads | null = null;
 let ramps: Mesh[] = [];
@@ -361,6 +374,8 @@ function pointOn(dist: number): { pos: Vector3; tangent: Vector3 } {
 const KART_GROUND_Y = -0.36;
 /** Root height that puts KART_GROUND_Y on the road slab's top face (0.04 centre + 0.04 half-height). */
 const KART_RIDE_Y = 0.08 - KART_GROUND_Y;
+/** VIS-RACE: the road slab's top above the line's height (buildRoad: a 0.08 m slab centred 0.04 above it) — where a tyre mark lies. */
+const ROAD_TOP = 0.08;
 /** Where the driver's hip joint lands: reclined into the pan, 0.28 m off the tarmac, behind the wheel. */
 const KART_HIPS = { y: -0.08, z: -0.30 };
 /** The wheel, at the height and reach the posed hands MEASURED out to on the live rig. */
@@ -1063,6 +1078,7 @@ function startBeat(ctx: ModeContext, outcome: StartOutcome): void {
     S.burnT = BURNOUT_SEC; say('BURNOUT — TOO EARLY', 1.1, BANNER_PRIO.event);
     SoundKit.play('squeak', { pitch: 0.7, volume: 0.5 }); ctx.juice.shake(0.05, 120);
     if (state) EffectsKit.burst(ctx.scene, state.pos.clone(), 'dust', 2);
+    if (state) { const r = rearAxle(state.pos.x, state.pos.z, state.heading, 0.76); stampDecal(ctx.scene, 'tyre', r.x, r.z, state.heading, 1, state.pos.y + ROAD_TOP); }   // VIS-RACE: the rears' burnout, on the grid
   } else say('GO!', 0.8, BANNER_PRIO.event);
   console.info(`[RACE] start ${outcome}`);
 }
@@ -1098,6 +1114,12 @@ function finish(ctx: ModeContext): void {
   const beatIt = race.finished && hadGhost != null && bestGhost != null && bestGhost.timeMs < hadGhost.timeMs;
   SoundKit.play(medal === 'none' ? 'miss' : 'score');
   ctx.juice.hitStop(90);
+  // VIS-RACE: the flag — confetti over the kart for a podium finish (a win throws two bursts)
+  if (race.finished && place <= 3 && kart && !motionPolicy().reduced) {
+    const over = kart.position.add(new Vector3(0, 2.4, 0));
+    EffectsKit.burst(ctx.scene, over, 'confetti', place === 1 ? 2 : 1.3);
+    if (place === 1) EffectsKit.burst(ctx.scene, over.add(new Vector3(0, 0.6, 0)), 'sparks', 1.4, '#fde68a');
+  }
   // the result says WHERE you placed as well as the clock's medal, and a race you did not finish says so
   const placeTag = rivals.length ? `${ordinal(place)} · ` : '';
   // A NEW PERSONAL BEST OUTRANKS THE MEDAL on a course you have already golded — the medal stopped being news
@@ -1130,6 +1152,12 @@ return {
   // GC-7. After mood/camPreset, not before: pickerReach's modesById() only recognises a modeId whose next
   // property is mood or camPreset, and flag-first here made the mode invisible to that guard.
   hideRingInPlay: true,
+  // VIS-RACE (visual wave 2): the broadcast intro over the grid (it overlaps the 3-2-1, which keeps its clock and its rocket window;
+  // a throttle press skips it), and a replay of a BIG overtake — the lead taken, or two places in four seconds — at most twice a
+  // race, never in the last stretch. replayBodies: the player's kart first (the shot's subject), then the field.
+  intro: 'walkIn',
+  replay: true,
+  replayBodies: () => (kart ? [kart, ...rivalKarts] : []),
 
   async load(ctx: ModeContext): Promise<void> {
     // module-scope state outlives a mount: a remount must re-read the preset's fov, not the last run's.
@@ -1141,6 +1169,7 @@ return {
     S.held = null; S.shieldT = 0; S.zipT = 0; S.spinT = 0; S.events = { bumps: 0, punts: 0, punted: 0, nearMisses: 0, fired: 0, hits: 0, picked: 0, slingshots: 0, minis: 0 };
     S.draft = noDraft(); S.draftSaid = false; S.mini = noMini();
     S.start = newStart(); S.burnT = 0; S.wrongT = 0; S.stuckT = 0;
+    tyreTrail.reset(); overtake.reset(); goAge = null; replayDue = false;   // VIS-RACE
     missiles = []; mines = []; for (const b of balloons) b.respawn = 0;
     lastPlace = 0; driftCallT = 0; offRoadTick = 0; offRoadSaid = false;   // a remount must not inherit last race's place (it would read as an overtake on frame one)
     // IMPROVE (2026-10-06): the pass's own state starts clean on every mount
@@ -1186,6 +1215,7 @@ return {
       // racing kit round the circuit (grandstands, tents, banner towers, flags, barrier walls, light posts)
       detailRoot?.dispose(); detailRoot = new TransformNode(`kart_detail_${circuit.course.id}`, ctx.scene);
       buildChevrons(ctx.scene, circuit).parent = detailRoot; buildGantry(ctx.scene, circuit).parent = detailRoot;
+      startLights?.dispose(); startLights = buildStartLights(ctx.scene, circuit.line, circuit.halfWidth, detailRoot);   // VIS-RACE: the countdown's three lamps
       // THE SETTING (owner, 2026-09-18): the mountain courses stand in a real forest on the relief; the night courses
       // read their road by edge lights (the orbit station was a black frame to the render watchdog without them)
       if (course.venue === 'slope') buildForest(ctx.scene, circuit, worldHeightFn(course), course.mood === 'alpine' ? '#2f5a3e' : '#3b6a4a').parent = detailRoot;
@@ -1478,6 +1508,7 @@ return {
         // revving on the grid: the rear-wheel dust emitter at its drift rate (IMPROVE #15 — it was ~8 fresh dust bursts a
         // second, each its own ParticleSystem)
         dustFx?.update(S.input.throttle >= 0.5 ? 'drift' : 'off');
+        startLights?.set(S.start.beat, null);   // VIS-RACE: one red lamp a beat
         banner.tick(dt);
         ctx.camDirector.look(S.lookX, S.lookY, dt);
         ctx.camDirector.update(kart.position, Vector3.Zero(), null);
@@ -1485,7 +1516,9 @@ return {
         return;
       }
       startBeat(ctx, S.start.outcome ?? 'normal');
+      goAge = 0;   // VIS-RACE: green
     }
+    if (goAge !== null) { goAge += dt; startLights?.set(0, goAge); if (goAge > GREEN_HOLD_SEC + 0.2) goAge = null; }
 
     prevPos.copyFrom(state.pos);
     // AIRBORNE COUNTS AS ON-ROAD. Off-track costs grip and top speed, and a kart over a rooftop gap is off the
@@ -1707,6 +1740,8 @@ return {
       if (lastPlace > 0 && place < lastPlace) { ctx.momentum.report({ kind: 'overtake', weight: 13 * (lastPlace - place) }); boost.earn('nearMiss', lastPlace - place); ctx.juice.scorePop(kart.position.add(new Vector3(0, 1.6, 0)), `P${place}`, '#86efac'); SoundKit.play('swish', { pitch: 1.3, volume: 0.4 }); }
       else if (lastPlace > 0 && place > lastPlace) ctx.juice.callout(`DOWN TO P${place}`, '#fca5a5', 600);
       lastPlace = place;
+      // VIS-RACE: a BIG overtake (the lead, or two places in four seconds) is replayed — asked for here, played at the end of this frame
+      if (overtake.step(place, race.time, line ? Math.min(1, playerDist / Math.max(1, line.lapLength * course.laps)) : 0, motionPolicy().reduced)) replayDue = true;
     }
     if (line) tickField(ctx, dt);   // RACE CONTACT + ITEMS: the rivals steer, bump, spin, pick up and fire
     // the BODY points where the nose does while the kart travels at the slip angle — that difference is the
@@ -1722,6 +1757,11 @@ return {
     bodyRoll += (rollWant - bodyRoll) * Math.min(1, 9 * dt);
     bodyPitch += (pitchWant - bodyPitch) * Math.min(1, 7 * dt);
     kart.rotation.set(bodyPitch, state.heading + (S.spinT > 0 ? S.spinT * 11 : 0), bodyRoll);   // a shell or a punt spins the body; the travel carries on
+    // VIS-RACE: a slide, a burnout or a spin-out lays rubber behind the rear axle, along the way the kart is GOING (the travel, not the nose)
+    {
+      const ra = rearAxle(state.pos.x, state.pos.z, state.heading, 0.76), tv = travelOf(state);
+      for (const t of tyreTrail.step(ra.x, ra.z, tv.x, tv.z, onRoad && !S.air.airborne && state.speed > 2 && (state.drifting || S.burnT > 0 || S.spinT > 0))) stampDecal(ctx.scene, 'tyre', t.x, t.z, t.yaw, 1, state.pos.y + ROAD_TOP);
+    }
     // phase 9: the wheels. Spin is the odometer over each tyre's own radius (the fat rears turn slower);
     // the fronts yaw with the APPLIED steer — what the tyres are doing, not what the thumbs asked; and
     // the wheel y counters the body's bob so the tyres stay on the road. On a wheel mesh Babylon composes
@@ -1829,10 +1869,18 @@ return {
     // the owner-approved window (≥0.85), composed with the impact pulse. Opt-in, harness-owned.
     ctx.feel.speedVignette01(state.speed / kartSpec.vMax);
     pushHud(ctx, dt);
+    // VIS-RACE: the replay goes LAST — the harness holds update() from here and puts the frame back exactly as this call left it. The
+    // continuous emitters are told to stop first (the mode is held, so they would stream at the replay's cameras for its whole length)
+    if (replayDue) {
+      replayDue = false;
+      speedLines?.update(0); dustFx?.update('off'); sparks?.update(0);
+      void ctx.highlight?.({ lastSeconds: OVERTAKE.replayLastSec, angles: ['low', 'side', 'high'] });
+    }
   },
 
   dispose(): void {
     boostFx?.dispose(); boostFx = null; boostPads?.dispose(); boostPads = null;
+    startLights?.dispose(); startLights = null; replayDue = false; goAge = null;   // VIS-RACE
     crowd?.dispose?.(); crowd = null;
     kart?.dispose(); kart = null;
     for (const m of marks) m.dispose();

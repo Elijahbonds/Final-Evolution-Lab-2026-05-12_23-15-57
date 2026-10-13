@@ -13,9 +13,8 @@
 // RETENTION (owner, 2026-10-13: "12 months for party reports AND creator inquiries, with automatic deletion"): a report
 // is deleted PARTY_REPORT_RETENTION_DAYS after it was filed. Same pattern as the creator inquiries
 // (lib/creator/inquiryStore.ts): the delete runs on every successful save, best effort, and it is a no-op while the
-// table does not exist (the same probe). This repo has no scheduler, so a quiet stretch with no new report leaves an old
-// one until the next report or until the owner runs the statement in the SQL file by hand; a scheduled job is the owner's
-// call. lib/policies.ts tells the player the same period, and lib/party/social/reports.test.ts pins both numbers.
+// table does not exist (the same probe). A quiet stretch with no new report is covered by the DAILY cleanup
+// (POST /api/cron/retention, lib/retention/retentionJob.ts; owner, 2026-10-13), which runs this same purge. lib/policies.ts tells the player the same period, and lib/party/social/reports.test.ts pins both numbers.
 import { randomUUID } from 'node:crypto';
 import { pendingProbe, type RawDb } from '@/lib/coach/pendingSchema';
 
@@ -37,19 +36,30 @@ export const PURGE_SQL = `DELETE FROM "PartyReport" WHERE "createdAt" < (CURRENT
 const probe = pendingProbe('party_report', PROBE_SQL);
 export function resetPartyReportProbe(): void { probe.reset(); }
 
+/** What one purge did. `unavailable`: the table is not there (the pending SQL is not applied). `failed`: a real error. */
+export type PurgeResult = { state: 'purged'; deleted: number } | { state: 'unavailable' } | { state: 'failed' };
+
+/**
+ * The purge with its count (the daily retention job, app/api/cron/retention, reports counts and nothing else). Never
+ * throws. A NO-OP while the table does not exist (the probe): `unavailable`, nothing deleted.
+ */
+export async function purgeExpiredPartyReportsCounted(db: RawDb, now: number = Date.now()): Promise<PurgeResult> {
+  if (!(await probe.ready(db, now))) return { state: 'unavailable' };
+  try {
+    const deleted = await db.$executeRawUnsafe(PURGE_SQL, PARTY_REPORT_RETENTION_DAYS);
+    return { state: 'purged', deleted: typeof deleted === 'number' && deleted > 0 ? deleted : 0 };
+  } catch (e) {
+    probe.fail('party_report_purge_failed', e, now);
+    return { state: (await probe.ready(db, now)) ? 'failed' : 'unavailable' };
+  }
+}
+
 /**
  * Delete reports older than the retention period. A NO-OP while the table does not exist (the probe), so it is safe on
  * production before the pending SQL is applied. Never throws; resolves true when the delete ran.
  */
 export async function purgeExpiredPartyReports(db: RawDb, now: number = Date.now()): Promise<boolean> {
-  if (!(await probe.ready(db, now))) return false;
-  try {
-    await db.$executeRawUnsafe(PURGE_SQL, PARTY_REPORT_RETENTION_DAYS);
-    return true;
-  } catch (e) {
-    probe.fail('party_report_purge_failed', e, now);
-    return false;
-  }
+  return (await purgeExpiredPartyReportsCounted(db, now)).state === 'purged';
 }
 
 export type ReportOutcome = 'stored' | 'not_available' | 'failed';

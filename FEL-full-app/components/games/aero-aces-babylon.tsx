@@ -23,11 +23,12 @@ import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { gameResultFromSession } from '@/lib/sessions/gameResultFromSession';
 import { hnode, hnum } from './hud-format';
 import { RaceCourseMap, THREAT_POS, THREAT_ARROW } from './race-course-map';
+import { HudBanner, HudChip, HudFrame, HudLine, HudMeter, HudPlate, HudText, ScoreValue, hudColor, type HudTone } from './tv-hud';
 
 type Hud = Record<string, HudValue>;
 
-/** The balloon colours (AeroItems.BALLOON_COLOR), for the item box. */
-const ITEM_COLOR: Record<string, string> = { missile: '#ff4b4b', boost: '#3aa0ff', shield: '#ffd75e', mine: '#4fdc6a' };
+/** The balloon colours (AeroItems.BALLOON_COLOR), for the item box, as palette tones (TV HUD: one palette). */
+const ITEM_TONE: Record<string, HudTone> = { missile: 'danger', boost: 'you', shield: 'score', mine: 'good' };
 
 /** IMPROVE (2026-10-06) #3 #6: the missile warning's placement and the course strip are shared with the kart's host
  *  (race-course-map.tsx) — one drawing of each for both racing modes. */
@@ -90,75 +91,69 @@ export default function AeroAcesBabylon({ onEnd }: GameProps) {
     <div className="relative aspect-[16/10] w-full overflow-hidden rounded-xl border border-white/10 bg-black">
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full touch-none" />
 
+      {/* TV HUD (A9.13, lane/vis-race phase 2): every readout on the shared system — same keys, same gates, same slots. */}
+      <HudFrame>
       {/* AERO ACES like Diddy Kong Racing (2026-09-15): PLACE and LAP are the race; the ITEM slot and BANANAS are what you
           carry into it. The item box takes the balloon's colour so a glance says what FIRE will do. */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between px-4 py-3 font-mono">
-        <div className="fel-panel px-3 py-1.5">
-          <div className="text-[10px] tracking-wider text-white/60">PLACE</div>
-          <div className="fel-stat text-3xl text-[var(--fel-gold)]">{hnode(hud.pos, '—')}</div>
+      <div className="absolute inset-x-0 top-0 flex items-start justify-between px-4 py-3">
+        <HudPlate className="px-3 py-1.5">
+          <HudText as="div" size="caption" alpha={0.6}>PLACE</HudText>
+          <ScoreValue value={hnode(hud.pos, '—')} size="hero" tone="score" />
           {/* RACING PASS phase 5: the gap — seconds to the plane ahead, or the lead */}
-          {hud.gap ? <div className={`text-[10px] font-bold ${String(hud.gap).startsWith('LEAD') ? 'text-[#86efac]' : 'text-white/80'}`}>{String(hud.gap)}</div> : null}
-        </div>
+          {hud.gap ? <HudText as="div" size="caption" tone={String(hud.gap).startsWith('LEAD') ? 'good' : 'text'} alpha={String(hud.gap).startsWith('LEAD') ? 1 : 0.8} style={{ fontWeight: 800 }}>{String(hud.gap)}</HudText> : null}
+        </HudPlate>
         <div className="flex flex-col items-center gap-1">
-          <span className="fel-panel px-4 py-1.5 fel-stat text-xl text-white">{Number(hud.time ?? 0).toFixed(1)}s</span>
-          <span className="fel-panel px-3 py-0.5 text-xs font-bold text-white/85">LAP {hnode(hud.lap, '—')}</span>
+          <HudPlate className="px-4 py-1.5"><ScoreValue value={`${Number(hud.time ?? 0).toFixed(1)}s`} size="stat" pop={false} /></HudPlate>
+          <HudChip size="label" style={{ fontWeight: 800 }} alpha={0.85}>LAP {hnode(hud.lap, '—')}</HudChip>
           {/* IMPROVE (2026-10-06) #1: the delta to your best race on this circuit — green ahead, red behind */}
           {typeof hud.pb === 'string' && hud.pb
-            ? <span className={`fel-panel px-2 py-0.5 text-[10px] font-bold ${hud.pb.includes('−') ? 'text-[#86efac]' : 'text-[#fca5a5]'}`}>{hud.pb}</span>
+            ? <HudChip size="caption" tone={hud.pb.includes('−') ? 'good' : 'danger'} style={{ fontWeight: 800 }}>{hud.pb}</HudChip>
             : null}
         </div>
         <div className="flex items-start gap-2">
-          <div className="fel-panel px-3 py-1.5 text-center">
-            <div className="text-[10px] tracking-wider text-white/60">BANANAS</div>
-            <div className="fel-stat text-2xl text-[#ffd83a]">{Number(hud.bananas ?? 0)}<span className="text-sm text-white/50">/10</span></div>
-          </div>
-          <div
-            className="fel-panel flex h-[60px] w-[88px] flex-col items-center justify-center rounded-lg border-2 px-2 text-center"
-            style={{ borderColor: ITEM_COLOR[String(hud.itemKind ?? '')] ?? 'rgba(255,255,255,0.15)' }}
+          <HudPlate className="px-3 py-1.5 text-center">
+            <HudText as="div" size="caption" alpha={0.6}>BANANAS</HudText>
+            <ScoreValue value={Number(hud.bananas ?? 0)} size="score" tone="score" /><HudText size="value" alpha={0.5}>/10</HudText>
+          </HudPlate>
+          <HudPlate
+            className="flex min-h-[60px] min-w-[88px] flex-col items-center justify-center px-2 text-center"
+            style={{ borderRadius: 10, border: `2px solid ${hud.itemKind && ITEM_TONE[String(hud.itemKind)] ? hudColor(ITEM_TONE[String(hud.itemKind)], 1) : hudColor('text', 0.15)}` }}
           >
-            <div className="text-[10px] tracking-wider text-white/60">ITEM</div>
-            <div className="text-sm font-bold" style={{ color: ITEM_COLOR[String(hud.itemKind ?? '')] ?? 'rgba(255,255,255,0.35)' }}>
+            <HudText as="div" size="caption" alpha={0.6}>ITEM</HudText>
+            <HudText as="div" size="value" tone={ITEM_TONE[String(hud.itemKind ?? '')] ?? 'text'} alpha={ITEM_TONE[String(hud.itemKind ?? '')] ? 1 : 0.35} style={{ fontWeight: 800 }}>
               {hud.item ? String(hud.item) : 'NONE'}
-            </div>
-          </div>
+            </HudText>
+          </HudPlate>
         </div>
       </div>
 
       {/* IMPROVE (2026-10-06) #5: the numbers the mode always sent and nothing drew — speed, the next ring, the shield's
           seconds and the slipstream's charge */}
-      <div className="pointer-events-none absolute right-3 top-[5.5rem] flex flex-col items-end gap-1 font-mono">
-        {hnum(hud.shield) > 0 ? <span className="fel-panel px-2 py-0.5 text-xs font-bold text-[#ffd75e]">SHIELD {hnum(hud.shield)}s</span> : null}
+      <div className="absolute right-3 top-[5.5rem] flex flex-col items-end gap-1">
+        {hnum(hud.shield) > 0 ? <HudChip tone="score" size="label" style={{ fontWeight: 800 }}>SHIELD {hnum(hud.shield)}s</HudChip> : null}
         {hnum(hud.draft) > 0 ? (
-          <div className="fel-panel w-28 px-2 py-1">
-            <div className="text-[9px] tracking-wider text-[#a5f3fc]">SLIPSTREAM</div>
-            <div className="mt-0.5 h-1.5 w-full overflow-hidden rounded bg-white/10"><div className="h-full bg-[#22d3ee]" style={{ width: `${Math.min(100, hnum(hud.draft))}%` }} /></div>
-          </div>
+          <HudPlate className="w-28 px-2 py-1">
+            <HudMeter label="SLIPSTREAM" labelTone="info" value={Math.min(100, hnum(hud.draft))} max={100} tone="you" width="100%" height="thin" />
+          </HudPlate>
         ) : null}
-        <div className="fel-panel px-3 py-1 text-right">
-          <div className="fel-stat text-lg text-white">{hnum(hud.speed)}<span className="text-[10px] text-white/50"> KM/H</span></div>
-          {hnum(hud.toGate) > 0 ? <div className="text-[10px] text-[#7dd3fc]">RING {hnum(hud.toGate)} m</div> : null}
-        </div>
+        <HudPlate className="px-3 py-1 text-right">
+          <ScoreValue value={hnum(hud.speed)} size="stat" pop={false} /><HudText size="caption" alpha={0.5}> KM/H</HudText>
+          {hnum(hud.toGate) > 0 ? <HudText as="div" size="caption" tone="info">RING {hnum(hud.toGate)} m</HudText> : null}
+        </HudPlate>
       </div>
       <CourseMap hud={hud} />
       {typeof hud.threat === 'string' && hud.threat && (
-        <div className={`pointer-events-none absolute flex ${THREAT_POS[String(hud.threatSide)] ?? THREAT_POS.BEHIND}`}>
-          <span className={`fel-panel px-3 py-1 font-mono text-sm font-bold ${hud.threatRoll ? 'animate-pulse text-[#86efac]' : 'text-[#ff4b4b]'}`}>
+        <div className={`absolute flex ${THREAT_POS[String(hud.threatSide)] ?? THREAT_POS.BEHIND}`}>
+          <HudChip className={hud.threatRoll ? 'animate-pulse' : ''} tone={hud.threatRoll ? 'good' : 'danger'} size="value" style={{ fontWeight: 800 }}>
             {THREAT_ARROW[String(hud.threatSide)] ?? '▼'} {hud.threat}{hud.threatRoll ? ' — B' : ''}
-          </span>
+          </HudChip>
         </div>
       )}
 
       <BoostGauge hud={hud} className="absolute inset-x-0 bottom-28" />
-      {typeof hud.hint === 'string' && hud.hint && phase === 'playing' && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-16 text-center">
-          <span className="fel-panel px-3 py-1 font-mono text-[10px] text-white/70">{hud.hint}</span>
-        </div>
-      )}
-      {typeof hud.banner === 'string' && hud.banner && (
-        <div className="pointer-events-none absolute inset-x-0 top-1/3 text-center">
-          <span className="fel-heading fel-panel px-4 py-2 text-2xl font-bold text-[var(--fel-gold)]">{hud.banner}</span>
-        </div>
-      )}
+      {phase === 'playing' && <HudLine text={typeof hud.hint === 'string' ? hud.hint : ''} className="bottom-16" size="caption" alpha={0.7} />}
+      <HudBanner text={typeof hud.banner === 'string' ? hud.banner : ''} tone="score" />
+      </HudFrame>
 
       <BootSplash
         modeId="aeroaces" title="AERO ACES" phase={phase}

@@ -4,7 +4,6 @@ import { authOptions } from '@/lib/auth';
 import { getBook } from '@/lib/books/bookCatalog';
 import { bookFormatAllowed } from '@/lib/books/bookTerms';
 import { claimBookEntitlements, hasBookAccess, normalizeBookEmail, type OwnedOffer } from '@/lib/books/bookEntitlements';
-import { bookShopClosedReason } from '@/lib/books/bookShop';
 import { prismaBookStore } from '@/lib/books/bookStore';
 import { prisma } from '@/lib/db';
 import { isVerifiedAdult } from '@/lib/coach-store/adult';
@@ -46,17 +45,8 @@ export default async function LibraryPage() {
     );
   }
 
-  // Listening sits behind the same switches and the same 18+ check as the stream route (app/api/books/stream).
-  if (bookShopClosedReason()) {
-    return (
-      <PressFrame signedIn>
-        <section className="mt-8">
-          <h2 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#F5C518]">My Library</h2>
-          <p className="mt-4 text-sm text-white/60" role="status">{UNAVAILABLE}</p>
-        </section>
-      </PressFrame>
-    );
-  }
+  // Listening is NOT behind the shop switches (owner, 2026-10-13): a paid buyer keeps their books with the shop off.
+  // It keeps the same 18+ check and the same entitlement check as the stream route (app/api/books/stream).
   let adult = false;
   try {
     adult = await isVerifiedAdult(prisma, userId);

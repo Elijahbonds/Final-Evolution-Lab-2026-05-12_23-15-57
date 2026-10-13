@@ -21,12 +21,16 @@ import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } 
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode, hnum } from './hud-format';
-import { RaceCourseMap, ThreatWarning } from './race-course-map';
+import { RaceCourseMap, THREAT_POS, THREAT_ARROW } from './race-course-map';
+import { HudBanner, HudChip, HudFrame, HudLine, HudMeter, HudPlate, HudText, ScoreValue, type HudTone } from './tv-hud';
 import { gameResultFromSession } from '@/lib/sessions/gameResultFromSession';
 
 type Hud = Record<string, HudValue>;
 
-const KART_ITEM_COLOR: Record<string, string> = { missile: '#ff4b4b', boost: '#3aa0ff', shield: '#ffd75e', mine: '#4fdc6a' };
+/** The item's balloon colour, as a palette tone (TV HUD: one palette). */
+const KART_ITEM_TONE: Record<string, HudTone> = { missile: 'danger', boost: 'you', shield: 'score', mine: 'good' };
+/** The mini-turbo tiers' spark colours (racing pass phase 8): blue, sky, orange, purple — as palette tones. */
+const MINI_TONE: HudTone[] = ['you', 'info', 'heat', 'power'];
 
 export default function VelocityKartBabylon({ onEnd }: GameProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -89,69 +93,69 @@ export default function VelocityKartBabylon({ onEnd }: GameProps) {
     <div className="relative aspect-[16/10] w-full overflow-hidden rounded-xl border border-white/10 bg-black">
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full touch-none" />
 
-      <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between px-4 py-3 font-mono">
-        <div className="fel-panel px-3 py-1.5">
-          <div className="text-[10px] tracking-wider text-white/60">KM/H</div>
-          <div className="fel-stat text-2xl text-[var(--fel-gold)]">{hnode(hud.speed, 0)}</div>
+      {/* TV HUD (A9.13, lane/vis-race phase 2): every readout on the shared system — same keys, same gates, same slots. */}
+      <HudFrame>
+      <div className="absolute inset-x-0 top-0 flex items-start justify-between px-4 py-3">
+        <HudPlate className="px-3 py-1.5">
+          <HudText as="div" size="caption" alpha={0.6}>KM/H</HudText>
+          <ScoreValue value={hnode(hud.speed, 0)} tone="score" pop={false} />
           {Number(hud.drift) > 0 && (
             // RACING PASS phase 8: the drift reads its MINI-TURBO tier — the spark colour the release will pay
-            <div className="mt-0.5 text-sm font-bold" style={{ color: ['#22d3ee', '#38bdf8', '#fb923c', '#c084fc'][Number(hud.mini) || 0] }}>
+            <HudText as="div" size="value" tone={MINI_TONE[Number(hud.mini) || 0]} className="mt-0.5" style={{ fontWeight: 800 }}>
               {['DRIFT', 'MINI', 'SUPER', 'ULTRA'][Number(hud.mini) || 0]} {hnode(hud.drift, 0)}%
-            </div>
+            </HudText>
           )}
-        </div>
+        </HudPlate>
         <div className="flex flex-col items-center gap-1">
-          <span className="fel-panel px-4 py-1.5 fel-stat text-2xl text-white">{Number(hud.time ?? 0).toFixed(1)}s</span>
-          {hud.pos ? <span className="fel-panel px-3 py-0.5 text-xs font-bold text-[var(--fel-gold)]">{String(hud.pos)}</span> : null}
+          <HudPlate className="px-4 py-1.5"><ScoreValue value={`${Number(hud.time ?? 0).toFixed(1)}s`} pop={false} /></HudPlate>
+          {hud.pos ? <HudChip tone="score" size="label" style={{ fontWeight: 800 }}>{String(hud.pos)}</HudChip> : null}
           {/* RACING PASS phase 5: the gap — seconds to the kart ahead, or the lead */}
-          {hud.gap ? <span className={`fel-panel px-2 py-0.5 text-[10px] font-bold ${String(hud.gap).startsWith('LEAD') ? 'text-[#86efac]' : 'text-white/80'}`}>{String(hud.gap)}</span> : null}
+          {hud.gap ? <HudChip size="caption" tone={String(hud.gap).startsWith('LEAD') ? 'good' : 'text'} alpha={String(hud.gap).startsWith('LEAD') ? 1 : 0.8} style={{ fontWeight: 800 }}>{String(hud.gap)}</HudChip> : null}
           {/* IMPROVE (2026-10-06) #2: the ghost's delta (green ahead, red behind), the PB being chased and the cup — the mode
               computed all three every frame and nothing drew them */}
           {typeof hud.delta === 'string' && hud.delta && hud.delta !== '—'
-            ? <span className={`fel-panel px-2 py-0.5 text-[10px] font-bold ${hud.delta.startsWith('−') ? 'text-[#86efac]' : 'text-[#fca5a5]'}`}>PB {hud.delta}</span>
+            ? <HudChip size="caption" tone={hud.delta.startsWith('−') ? 'good' : 'danger'} style={{ fontWeight: 800 }}>PB {hud.delta}</HudChip>
             : null}
-          {typeof hud.chasing === 'string' && hud.chasing ? <span className="text-[9px] font-bold tracking-wider text-white/55">{hud.chasing}</span> : null}
-          {typeof hud.cup === 'string' && hud.cup ? <span className="max-w-[14rem] truncate text-[9px] tracking-wide text-[#fde68a]/80">{hud.cup}</span> : null}
+          {typeof hud.chasing === 'string' && hud.chasing ? <HudChip size="caption" alpha={0.8} className="max-w-[14rem] truncate" style={{ fontWeight: 800, letterSpacing: '0.1em' }}>{hud.chasing}</HudChip> : null}
+          {typeof hud.cup === 'string' && hud.cup ? <HudChip size="caption" tone="score" alpha={0.9} className="max-w-[14rem] truncate">{hud.cup}</HudChip> : null}
         </div>
-        <div className="fel-panel px-3 py-1.5 text-right">
-          <div className="text-[10px] tracking-wider text-white/60">LAP {hnode(hud.lap, '—')}</div>
+        <HudPlate className="px-3 py-1.5 text-right">
+          <HudText as="div" size="caption" alpha={0.6}>LAP {hnode(hud.lap, '—')}</HudText>
           {/* ITEMS (2026-09-18): what the last balloon gave you; A fires it */}
-          <div className="mt-1 text-sm font-bold" style={{ color: KART_ITEM_COLOR[String(hud.itemKind ?? '')] ?? 'rgba(255,255,255,0.35)' }}>{hud.item ? String(hud.item) : 'NO ITEM'}</div>
-        </div>
+          <HudText as="div" size="value" className="mt-1" tone={KART_ITEM_TONE[String(hud.itemKind ?? '')] ?? 'text'} alpha={KART_ITEM_TONE[String(hud.itemKind ?? '')] ? 1 : 0.35} style={{ fontWeight: 800 }}>{hud.item ? String(hud.item) : 'NO ITEM'}</HudText>
+        </HudPlate>
       </div>
 
       {/* IMPROVE (2026-10-06) #2: the shield's seconds and the slipstream's charge, under the item box */}
-      <div className="pointer-events-none absolute right-3 top-[5.5rem] flex flex-col items-end gap-1 font-mono">
-        {hnum(hud.shield) > 0 ? <span className="fel-panel px-2 py-0.5 text-xs font-bold text-[#ffd75e]">SHIELD {hnum(hud.shield)}s</span> : null}
+      <div className="absolute right-3 top-[5.5rem] flex flex-col items-end gap-1">
+        {hnum(hud.shield) > 0 ? <HudChip tone="score" size="label" style={{ fontWeight: 800 }}>SHIELD {hnum(hud.shield)}s</HudChip> : null}
         {hnum(hud.draft) > 0 ? (
-          <div className="fel-panel w-28 px-2 py-1">
-            <div className="text-[9px] tracking-wider text-[#a5f3fc]">SLIPSTREAM</div>
-            <div className="mt-0.5 h-1.5 w-full overflow-hidden rounded bg-white/10"><div className="h-full bg-[#22d3ee]" style={{ width: `${Math.min(100, hnum(hud.draft))}%` }} /></div>
-          </div>
+          <HudPlate className="w-28 px-2 py-1">
+            <HudMeter label="SLIPSTREAM" labelTone="info" value={Math.min(100, hnum(hud.draft))} max={100} tone="you" width="100%" height="thin" />
+          </HudPlate>
         ) : null}
       </div>
       {/* IMPROVE (2026-10-06) #9: the minimap — the lap's outline, the shortcut, the field, the next gate and you */}
       <RaceCourseMap hud={hud} className="left-3 top-[6.5rem]" />
       {/* IMPROVE (2026-10-06) #6: the shell coming for you, on the edge it comes from; HOP NOW — X when the hop clears it */}
-      <ThreatWarning words={hud.threat} side={hud.threatSide} now={!!hud.threatHop} action="X" />
+      {typeof hud.threat === 'string' && hud.threat && (
+        <div className={`absolute flex ${THREAT_POS[String(hud.threatSide)] ?? THREAT_POS.BEHIND}`}>
+          <HudChip className={hud.threatHop ? 'animate-pulse' : ''} tone={hud.threatHop ? 'good' : 'danger'} size="value" style={{ fontWeight: 800 }}>
+            {THREAT_ARROW[String(hud.threatSide)] ?? '▼'} {hud.threat}{hud.threatHop ? ' — X' : ''}
+          </HudChip>
+        </div>
+      )}
       {/* IMPROVE (2026-10-06) #2: off the road, the way back (the mode sent it and nothing drew it) */}
       {typeof hud.trackCue === 'string' && hud.trackCue && phase === 'playing' && (
-        <div className="pointer-events-none absolute inset-x-0 top-[44%] text-center">
-          <span className="fel-panel px-3 py-1 font-mono text-xs font-bold text-[#fca5a5]">{hud.trackCue}</span>
+        <div className="absolute inset-x-0 top-[44%] text-center">
+          <HudChip tone="danger" size="body" style={{ fontWeight: 800 }}>{hud.trackCue}</HudChip>
         </div>
       )}
 
       <BoostGauge hud={hud} className="absolute inset-x-0 bottom-28" />
-      {typeof hud.hint === 'string' && hud.hint && phase === 'playing' && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-16 text-center">
-          <span className="fel-panel px-3 py-1 font-mono text-[10px] text-white/70">{hud.hint}</span>
-        </div>
-      )}
-      {typeof hud.banner === 'string' && hud.banner && (
-        <div className="pointer-events-none absolute inset-x-0 top-1/3 text-center">
-          <span className="fel-heading fel-panel px-4 py-2 text-2xl font-bold text-[var(--fel-gold)]">{hud.banner}</span>
-        </div>
-      )}
+      {phase === 'playing' && <HudLine text={typeof hud.hint === 'string' ? hud.hint : ''} className="bottom-16" size="caption" alpha={0.7} />}
+      <HudBanner text={typeof hud.banner === 'string' ? hud.banner : ''} tone="score" />
+      </HudFrame>
 
       <BootSplash
         modeId="velocitykart" title="VELOCITY KART" phase={phase}
