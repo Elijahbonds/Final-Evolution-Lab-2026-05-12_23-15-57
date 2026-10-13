@@ -7,7 +7,7 @@
 // text-[9px]/[10px]/[11px], `font-display` used 0 times, and a hex palette of up to 15 colours per host.
 //
 // HOW THE SIZES WORK WITH CONSOLE VIEW. GameShell already scales every host's HUD with the screen's HEIGHT
-// (lib/ui/consoleView.ts: CSS `zoom: var(--fel-hud-zoom)`, 1 on a phone, HUD_ZOOM_MAX = 2.25 at 1080 px) and draws it
+// (lib/ui/consoleView.ts: CSS `zoom` by the stage's --fel-hud-zoom, 1 on a phone, HUD_ZOOM_MAX = 2.25 at 1080 px) and draws it
 // inside a 5 % title-safe frame on a TV. So a HUD size here is a DESIGN pixel that the zoom multiplies. A plain 10 px
 // caption drew at 22.5 px on a 1080p TV — under the 10-foot floor of 24 px — while the same 10 px is right on a phone.
 // Each step below is therefore `phone px + (zoom - 1) × growth`: exactly today's size on a phone (zoom 1, so a phone
@@ -17,7 +17,7 @@ import { HUD_ZOOM_MAX, TV_SAFE } from '@/lib/ui/consoleView';
 // ── Palette ──────────────────────────────────────────────────────────────────────────────────────────────────────────
 
 /**
- * THE palette. Every colour a migrated host draws comes from here (a scan test holds them to it). The first seven match
+ * THE palette. Every colour a migrated host draws comes from here (a scan test holds them to it). The first eight match
  * app/theme.css's --fel-* tokens exactly (a test reads that file), so the HUD and the app speak one colour language;
  * `them` and `info` are the two reads the hosts needed that the theme has no token for (the rival's side, and a quiet
  * secondary read such as a rally multiplier or rings).
@@ -37,6 +37,8 @@ export const HUD_RGB = {
   power: [168, 85, 247],
   /** Body text. --fel-text */
   text: [242, 245, 249],
+  /** Text on a lit (solid-tone) chip. --fel-bg */
+  ink: [5, 5, 5],
   /** The rival / away side (yellow, kept apart from the score's gold). */
   them: [250, 204, 21],
   /** A quiet secondary read (sky). */
@@ -49,7 +51,7 @@ export const HUD_TONES = Object.keys(HUD_RGB) as HudTone[];
 /** The theme token each palette entry mirrors (null: HUD-only). */
 export const HUD_THEME_VAR: Record<HudTone, string | null> = {
   you: '--fel-cyan', score: '--fel-gold', good: '--fel-emerald', danger: '--fel-crimson', heat: '--fel-ember',
-  power: '--fel-violet', text: '--fel-text', them: null, info: null,
+  power: '--fel-violet', text: '--fel-text', ink: '--fel-bg', them: null, info: null,
 };
 
 /** A tone as a CSS colour, at an alpha (1 = solid). rgba() rather than color-mix() so an older TV browser draws it. */

@@ -11,7 +11,7 @@ import type { CSSProperties, ReactNode } from 'react';
 import { HUD_TEXT_ALPHA, clamp01, hudColor, hudType, meterPct, type HudSize, type HudTone } from './tokens';
 
 export interface MeterSegment { from: number; to: number; tone?: HudTone; alpha?: number; label?: ReactNode; labelTone?: HudTone; edge?: boolean }
-export interface MeterTick { at: number; major?: boolean; label?: ReactNode }
+export interface MeterTick { at: number; major?: boolean; label?: ReactNode; labelTone?: HudTone; labelAlpha?: number; line?: boolean }
 export interface MeterMarker { at: number; tone?: HudTone; width?: number; glow?: boolean; label?: ReactNode; labelTone?: HudTone; labelSize?: HudSize }
 
 /** The thicknesses the hosts used (design px): a hairline gauge, the common bar, a thick bar, and the swing meters. */
@@ -92,11 +92,11 @@ export function HudMeter({
         />
       )}
       {ticks?.map((t, i) => (
-        <div key={`t${i}`} className="absolute bottom-0 w-px" style={{ left: pc(t.at), height: t.major === false ? '50%' : '100%', background: t.major === false ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.7)' }}>
-          {t.label != null && t.label !== '' && (
-            <span className="absolute bottom-full left-0 mb-[2px] -translate-x-1/2 whitespace-nowrap" style={{ ...hudType('caption'), color: hudColor('text', 0.7) }}>{t.label}</span>
-          )}
-        </div>
+        <div key={`t${i}`} className="absolute bottom-0 w-px" style={{ left: pc(t.at), height: t.major === false ? '50%' : '100%', background: t.line === false ? 'transparent' : t.major === false ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.7)' }} />
+      ))}
+      {ticks?.map((t, i) => t.label != null && t.label !== '' && (
+        // anchored to the BAR's top, not the tick line: a minor tick is half height, and its caption sat inside the bar
+        <span key={`tl${i}`} className="absolute bottom-full mb-[2px] -translate-x-1/2 whitespace-nowrap" style={{ left: pc(t.at), ...hudType('caption'), color: t.labelTone ? hudColor(t.labelTone, t.labelAlpha ?? 1) : hudColor('text', t.labelAlpha ?? 0.7) }}>{t.label}</span>
       ))}
       {markers?.map((m, i) => (
         <div

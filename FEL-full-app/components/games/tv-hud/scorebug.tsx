@@ -151,7 +151,9 @@ export function ScoreDivider({ children = '·' }: { children?: ReactNode }) {
 
 /**
  * The scorebug: one plate, its cells in a row. The host places it (a corner, top-centre); the bug never positions
- * itself, so a migrated host keeps every readout where it was.
+ * itself, so a migrated host keeps every readout where it was. On a screen too narrow for the row (a portrait phone)
+ * the cells wrap to a second row inside the host instead of running off its edge — measured before: the tennis bug's
+ * YOU and AERIAL ran off both sides of a 390 px phone.
  */
 export function Scorebug({ children, className = '', accent, title, ...rest }: {
   children: ReactNode;
@@ -161,7 +163,7 @@ export function Scorebug({ children, className = '', accent, title, ...rest }: {
   'data-hud'?: string;
 }) {
   return (
-    <HudPlate data-hud={rest['data-hud'] ?? 'scorebug'} accent={accent} title={title} className={`inline-flex items-center gap-[0.6em] px-[0.8em] py-[0.3em] ${className}`}>
+    <HudPlate data-hud={rest['data-hud'] ?? 'scorebug'} accent={accent} title={title} className={`inline-flex max-w-full flex-wrap items-center justify-center gap-x-[0.6em] gap-y-[0.1em] px-[0.8em] py-[0.3em] [&>*]:shrink-0 [&>*]:whitespace-nowrap ${className}`}>
       {children}
     </HudPlate>
   );

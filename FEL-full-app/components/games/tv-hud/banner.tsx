@@ -22,7 +22,7 @@ export const LINE_CLAMP_STYLE: CSSProperties = {
 };
 export const PHONE_THUMB_GAP_CLASS = '[@media(orientation:landscape)_and_(max-height:520px)]:max-w-[44%]';
 
-export function HudBanner({ text, tone = 'score', size = 'banner', className = 'top-1/3', plate = true, children }: {
+export function HudBanner({ text, tone = 'score', size = 'banner', className = 'top-1/3', plate = true, flow = false, children }: {
   /** The call. Empty / not a string: nothing renders. */
   text?: unknown;
   tone?: HudTone;
@@ -30,6 +30,8 @@ export function HudBanner({ text, tone = 'score', size = 'banner', className = '
   /** The vertical slot, as the host always placed it. */
   className?: string;
   plate?: boolean;
+  /** In the flow of its parent (a call under a scorebug) instead of a full-width layer of its own. */
+  flow?: boolean;
   /** Extra content under the call (rare). */
   children?: ReactNode;
 }) {
@@ -37,7 +39,7 @@ export function HudBanner({ text, tone = 'score', size = 'banner', className = '
   const call = typeof text === 'string' ? text : typeof text === 'number' ? String(text) : '';
   const m = hudEnter(reduced);
   return (
-    <div data-hud-banner className={`pointer-events-none absolute inset-x-0 flex flex-col items-center px-4 text-center ${className}`}>
+    <div data-hud-banner className={flow ? `flex flex-col items-center text-center ${className}` : `pointer-events-none absolute inset-x-0 ${className} flex flex-col items-center px-4 text-center`}>
       <AnimatePresence initial={!reduced}>
         {call && (
           <motion.span
@@ -69,7 +71,7 @@ export function HudBanner({ text, tone = 'score', size = 'banner', className = '
   );
 }
 
-export function HudLine({ text, children, tone = 'text', alpha = HUD_TEXT_ALPHA.muted, size = 'body', className = 'bottom-16', clamp = true, strong = false }: {
+export function HudLine({ text, children, tone = 'text', alpha = HUD_TEXT_ALPHA.muted, size = 'body', className = 'bottom-16', clamp = true, strong = false, edge, data }: {
   text?: unknown;
   children?: ReactNode;
   tone?: HudTone;
@@ -78,11 +80,15 @@ export function HudLine({ text, children, tone = 'text', alpha = HUD_TEXT_ALPHA.
   className?: string;
   clamp?: boolean;
   strong?: boolean;
+  /** Edge the plate in a tone (a gold "now" line). */
+  edge?: HudTone;
+  /** data-* attributes for the line's layer (a host's test hook, e.g. { prompt: 'tell' } → data-prompt). */
+  data?: Record<string, string>;
 }) {
   const body = children ?? (typeof text === 'string' ? text : '');
   if (body === '' || body == null) return null;
   return (
-    <div data-hud-line className={`pointer-events-none absolute inset-x-0 flex justify-center px-4 text-center ${className}`}>
+    <div data-hud-line {...Object.fromEntries(Object.entries(data ?? {}).map(([k, v]) => [`data-${k}`, v]))} className={`pointer-events-none absolute inset-x-0 ${className} flex justify-center px-4 text-center`}>
       <span
         className={`max-w-[min(92%,980px)] ${PHONE_THUMB_GAP_CLASS}`}
         style={{
@@ -90,7 +96,7 @@ export function HudLine({ text, children, tone = 'text', alpha = HUD_TEXT_ALPHA.
           ...(strong ? { fontWeight: 800 } : {}),
           color: hudColor(tone, alpha),
           background: HUD_PLATE.background,
-          border: HUD_PLATE.border,
+          border: edge ? `1px solid ${hudColor(edge, 0.6)}` : HUD_PLATE.border,
           borderRadius: HUD_PLATE.radius,
           padding: '0.2em 0.75em',
           ...(clamp ? LINE_CLAMP_STYLE : {}),
