@@ -87,11 +87,6 @@ export const JUMP_MEANING = 'A personal best to beat next time.';
 /** Shown while the pose model and its runtime load, which starts only after Start. */
 export const COACH_READY = 'Getting the camera coach ready…';
 
-/**
- * Under the list: the checks still to come. It used to be built from the engine's NOT_BUILT_LINE, which rendered as
- * "More checks: full screen: coming later." (the double colon, S-7).
- */
-export const MORE_CHECKS_LINE = 'More checks are coming later, in the full screen.';
 
 /** "PROPOSED · preview" in plain words (S-7). The PROPOSED file keeps its own label; the screen shows these. */
 export const EARLY_VERSION = 'Early version';
@@ -136,7 +131,6 @@ export const NOT_SAVED_TITLE = 'Your results aren\'t saved. Run the screen again
 export const NOT_SAVED_BODY = 'Results live only in this tab, and only until you clear them. Nothing was sent anywhere.';
 export const RUN_AGAIN = 'Run the screen again';
 export const BACK_TO_RESULTS = 'Back to my results';
-export const PROGRAM_COMING = 'Dunk Program coming soon';
 /** EDU-LINKS (2026-10-07), owner decision "drill demos: reuse the 3D ExerciseDemo": the slot that said "Demo coming (20–30 s)"
  *  opens the 3D demo (app/play/mirror/assess/_components/drill-demo.tsx). */
 export const DEMO_WATCH = 'Watch the demo';

@@ -122,9 +122,9 @@ export const DRAFT_CUES = {
  * The Quick Screen shows the draft's cue for a check; this library is the fallback only where the draft is silent
  * (lateral shift), and still feeds PR #20's per-metric reasons.
  */
-export const PLACEHOLDER_TAG = '[PLACEHOLDER DRILL]';
 export interface DrillHint { label: string; drill: string; placeholder: true }
-const drill = (name: string): DrillHint => ({ label: `${PLACEHOLDER_TAG} ${name}`, drill: name, placeholder: true });
+// MIRROR-NO-PLACEHOLDER (2026-10-13): the on-screen tag is gone — the drill shows by name; `placeholder` stays in data.
+const drill = (name: string): DrillHint => ({ label: name, drill: name, placeholder: true });
 export const PR20_DRILLS = {
   ankle: [drill('Knee-to-wall rocks'), drill('Slant-board calf raises')],
   arms: [drill('Wall slides with exhale'), drill('Half-kneeling thoracic rotation')],

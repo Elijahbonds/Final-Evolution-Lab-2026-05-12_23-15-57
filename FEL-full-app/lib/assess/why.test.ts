@@ -9,7 +9,7 @@ import { gradeT2 } from './graders/t2-dorsiflexion';
 import { gradeT3 } from './graders/t3-single-leg-squat';
 import { gradeT5 } from './graders/t5-cmj';
 import type { TestResult } from './scoring';
-import { DRILLS, PAIN_REFERRAL, PLACEHOLDER_TAG, crossLinks, fixedStrings, reasonsFor, topFindings } from './why';
+import { DRILLS, PAIN_REFERRAL, crossLinks, fixedStrings, reasonsFor, topFindings } from './why';
 
 /**
  * assessment.test.ts's STILL_FORBIDDEN (the line the owner did not move), program.test.ts's words that turn coaching
@@ -96,16 +96,17 @@ describe('every displayed score has a reason with a measured number in it', () =
 });
 
 describe('drill hints are placeholders, with no doses (owner default Q7)', () => {
-  it('every hint is tagged and flagged', () => {
+  it('every hint is flagged in data, and shows by name with no on-screen tag (MIRROR-NO-PLACEHOLDER)', () => {
     const hints = [...Object.values(DRILLS).flat(), ...TESTS.flatMap((t) => reasonsFor(t)).flatMap((r) => r.fix ?? [])];
     expect(hints.length).toBeGreaterThan(10);
     for (const h of hints) {
       expect(h.placeholder).toBe(true);
-      expect(h.label.startsWith(`${PLACEHOLDER_TAG} `)).toBe(true);
+      expect(h.label).toBe(h.drill);
+      expect(h.label).not.toMatch(/PLACEHOLDER/i);
       expect(h.label).not.toMatch(/\d\s*[×x]\s*\d|\bsets?\b|\d+\s*s\b|per side|\/side/i);
     }
     for (const r of TESTS.flatMap((t) => reasonsFor(t))) {
-      if (r.fix) expect(r.text).toContain(`Fix: ${PLACEHOLDER_TAG}`);
+      if (r.fix) expect(r.text).not.toMatch(/PLACEHOLDER/i);
     }
   });
 
@@ -149,5 +150,10 @@ describe('cross-test links connect findings (spec §6)', () => {
     expect(top.some((r) => /Right \(your jumping leg\)|right \(your jumping leg\)/.test(r.text))).toBe(true);
     const firstNonLink = top.find((r) => r.kind !== 'link')!;
     expect(firstNonLink.side).toBe('right');
+  });
+});
+describe('MIRROR-NO-PLACEHOLDER (2026-10-13)', () => {
+  it('an unbuilt test gives no row at all: hidden until it is real', () => {
+    expect(reasonsFor({ ...TESTS[0], status: 'notBuilt' } as Parameters<typeof reasonsFor>[0])).toEqual([]);
   });
 });
