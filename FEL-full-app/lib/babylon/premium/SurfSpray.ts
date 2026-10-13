@@ -31,12 +31,24 @@ export interface SprayFrame {
   yaw?: number;
 }
 
-/** vis-board (wave 2), pure: the foam wake's emission, particles a second — none in the air or at a crawl, then rising with speed
- *  and with how hard the rail is set (a carve digs a wider, whiter trail). */
+/** Board speeds (m/s) between which the wake fades in: nothing at or under WAKE_FADE_FROM, all of it from WAKE_FADE_TO. A board that is
+ *  barely moving churns up no foam: the blobs a standing board laid round itself read as a white disc. */
+export const WAKE_FADE_FROM = 2;
+export const WAKE_FADE_TO = 6;
+/** vis-board, pure: how much of the wake a board at `speed` leaves (0 at rest, a smooth rise to 1). */
+export function wakeFade(speed: number): number {
+  if (!(speed > WAKE_FADE_FROM)) return 0;
+  const t = Math.min(1, (speed - WAKE_FADE_FROM) / (WAKE_FADE_TO - WAKE_FADE_FROM));
+  return t * t * (3 - 2 * t);
+}
+
+/** vis-board (wave 2), pure: the foam wake's emission, particles a second — none in the air or at rest, fading in with speed (wakeFade),
+ *  then rising with speed and with how hard the rail is set (a carve digs a wider, whiter trail). */
 export function wakeRate(speed: number, carve: number, grounded: boolean, lite = false): number {
-  if (!grounded || !(speed > 1.5)) return 0;
+  const fade = wakeFade(speed);
+  if (!grounded || fade <= 0) return 0;
   const sp = Math.max(0, Math.min(1, speed / 12)), cv = Math.max(0, Math.min(1, carve));
-  const full = 26 + 80 * sp + 90 * cv * sp;
+  const full = (26 + 80 * sp + 90 * cv * sp) * fade;
   return Math.round(lite ? full * 0.22 : full);   // a phone's trail is a fifth as thick (the surf row of mobileBudget.json holds 53 live particles)
 }
 
