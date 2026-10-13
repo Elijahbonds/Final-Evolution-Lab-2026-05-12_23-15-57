@@ -16,6 +16,8 @@ import { mergeHud } from '@/lib/babylon/core/hudMerge';   // IMPROVE (2026-10-06
 import { clockText } from '@/lib/babylon/core/HundredPacing';   // IMPROVE (2026-10-06, #17): the run's clock to the 180 s cap
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode } from './hud-format';
+import { HudBanner, HudChip, HudFrame, HudLine, HudMeter, HudText, ScoreValue, hudColor } from './tv-hud';
+import { CombatEdgeCall } from './combat-hud-band';
 import { gameResultFromSession } from '@/lib/sessions/gameResultFromSession';
 
 type Hud = Record<string, HudValue>;
@@ -118,47 +120,37 @@ export default function KarateBabylon({ onEnd }: GameProps) {
     <div className="relative aspect-[16/10] w-full overflow-hidden rounded-xl border border-white/10 bg-black">
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full touch-none" />
 
+      {/* TV HUD (A9.13, lane/tv-hud): every readout on the shared system — same keys, same gates, same slots. */}
+      <HudFrame>
       {/* HUD bezel */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-3 px-4 py-3">
+      <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-3 px-4 py-3">
         <div className="min-w-[7rem] space-y-1">
-          {hp !== null && (
-            <div className="h-2 w-full overflow-hidden rounded-full bg-black/50">
-              <div className="h-full rounded-full bg-[#FF3366] transition-all" style={{ width: `${Math.max(0, Math.min(100, hp))}%` }} />
-            </div>
-          )}
-          <div className="h-1.5 w-full overflow-hidden rounded-full bg-black/50">
-            <div className="h-full rounded-full bg-[#00E5FF] transition-all" style={{ width: `${Math.max(0, Math.min(100, chi))}%` }} />
-          </div>
+          {hp !== null && <HudMeter value={hp} max={100} tone="danger" height="bar" width="100%" />}
+          <HudMeter value={chi} max={100} tone="you" height="thin" width="100%" />
           {focus !== null && (
-            <div className={`h-1.5 w-full overflow-hidden rounded-full bg-black/50 ${focusOn ? 'ring-1 ring-[#39FF6A]/80' : ''}`} title="FOCUS — hold R2">
-              <div className={`h-full rounded-full transition-all ${focusOn ? 'bg-[#39FF6A] shadow-[0_0_8px_#39FF6A]' : 'bg-[#2E9E52]'}`} style={{ width: `${Math.max(0, Math.min(100, focus))}%` }} />
-            </div>
+            <HudMeter value={focus} max={100} tone="good" fillAlpha={focusOn ? 1 : 0.6} glow={focusOn} height="thin" width="100%" title="FOCUS — hold R2" />
           )}
         </div>
-        <span className="fel-panel px-3 py-1 font-mono text-xs text-[var(--fel-gold)]">
+        <HudChip tone="score" size="label">
           WAVE {hnode(hud.wave, 1)} · {hnode(hud.kos, 0)} KO
-          {hud.coins != null && <> · <span className="text-white">{hnode(hud.coins, 0)}c</span></>}
+          {hud.coins != null && <> · <span style={{ color: hudColor('text') }}>{hnode(hud.coins, 0)}c</span></>}
           {/* IMPROVE (2026-10-06, #17): the time left on the run's 180 s cap — red in the last 30 s, which the mode also calls */}
-          {hud.timeLeft != null && <> · <span className={Number(hud.timeLeft) <= 30 ? 'text-[#FF3366]' : 'text-white'} data-testid="hundred-clock">{clockText(Number(hud.timeLeft))}</span></>}
-        </span>
+          {hud.timeLeft != null && <> · <span style={{ color: hudColor(Number(hud.timeLeft) <= 30 ? 'danger' : 'text'), fontVariantNumeric: 'tabular-nums' }} data-testid="hundred-clock">{clockText(Number(hud.timeLeft))}</span></>}
+        </HudChip>
       </div>
 
       {/* FREEFLOW (THE HUNDRED, 2026-09-15): the flow count, its multiplier, the drop clock draining under it, the meter a
           takedown spends, and the call when one is ready. A number that breaks on a miss has to be seen to be played. */}
       {Number(hud.hits) > 1 && (
-        <div className="pointer-events-none absolute right-4 top-14 flex flex-col items-end gap-1 font-mono" data-testid="freeflow">
+        <div className="absolute right-4 top-14 flex flex-col items-end gap-1" data-testid="freeflow">
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-black text-[#00E5FF] drop-shadow">{hnode(hud.hits, 0)}</span>
-            <span className="text-xs font-black tracking-widest text-white/80">FLOW</span>
-            {Number(hud.flowMult) > 1 && <span className="rounded bg-[var(--fel-gold)] px-1.5 text-xs font-black text-black">×{String(hud.flowMult)}</span>}
+            <ScoreValue value={hnode(hud.hits, 0)} size="hero" tone="you" />
+            <HudText size="label" alpha={0.8} style={{ fontWeight: 800, letterSpacing: '0.15em' }}>FLOW</HudText>
+            {Number(hud.flowMult) > 1 && <HudChip plate={false} fill={1} tone="score" className="rounded"><HudText size="label" tone="ink" style={{ fontWeight: 800, textShadow: 'none' }}>×{String(hud.flowMult)}</HudText></HudChip>}
           </div>
-          <div className="h-1 w-28 overflow-hidden rounded-full bg-black/50">
-            <div className="h-full bg-white/80" style={{ width: `${Math.max(0, Math.min(100, Number(hud.flowDrop ?? 100)))}%` }} />
-          </div>
-          <div className="h-1.5 w-28 overflow-hidden rounded-full bg-black/50">
-            <div className="h-full bg-[#A855F7]" style={{ width: `${Math.max(0, Math.min(100, Number(hud.flowMeter ?? 0)))}%` }} />
-          </div>
-          {hud.flowReady === true && <span className="animate-pulse text-[11px] font-black tracking-widest text-[#A855F7]">TAKEDOWN · L1</span>}
+          <HudMeter value={Number(hud.flowDrop ?? 100)} max={100} tone="text" fillAlpha={0.8} height="thin" width="7rem" round={false} />
+          <HudMeter value={Number(hud.flowMeter ?? 0)} max={100} tone="power" height="thin" width="7rem" round={false} />
+          {hud.flowReady === true && <CombatEdgeCall tone="power" size="label">TAKEDOWN · L1</CombatEdgeCall>}
         </div>
       )}
 
@@ -166,23 +158,13 @@ export default function KarateBabylon({ onEnd }: GameProps) {
           hp, chi, wave, kos and banner only — so in a down-and-revive co-op mode
           you could not see your partner failing. */}
       {hud.partnerHp != null && (
-        <div className="pointer-events-none absolute left-4 top-14 min-w-[5rem]">
-          <span className="font-mono text-[10px] text-white/60">ALLY</span>
-          <div className="h-1.5 w-full overflow-hidden rounded-full bg-black/50">
-            <div
-              className="h-full rounded-full bg-[#7CFFB2] transition-all"
-              style={{ width: `${Math.max(0, Math.min(100, Number(hud.partnerHp)))}%` }}
-            />
-          </div>
+        <div className="absolute left-4 top-14 min-w-[5rem]">
+          <HudMeter label="ALLY" labelAlpha={0.6} value={Number(hud.partnerHp)} max={100} tone="good" height="thin" width="100%" />
         </div>
       )}
 
       {/* REVIVE prompt — also published and never shown. */}
-      {typeof hud.revive === 'string' && hud.revive && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-24 text-center">
-          <span className="fel-panel px-4 py-2 font-mono text-sm font-bold text-[#7CFFB2]">{hud.revive}</span>
-        </div>
-      )}
+      <HudLine text={typeof hud.revive === 'string' ? hud.revive : ''} className="bottom-24" size="value" tone="good" alpha={1} strong />
 
       {/* THE PERK SHOP. This is the Zombies half of the benchmark and it was
           unusable: the mode publishes `coins` and a formatted `perks` list, the
@@ -190,23 +172,20 @@ export default function KarateBabylon({ onEnd }: GameProps) {
           fight", and the screen showed neither the perks nor the money. A points
           economy whose points are invisible is not an economy. */}
       {typeof hud.perks === 'string' && hud.perks && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-10 flex flex-col items-center gap-1 px-4">
+        <div className="absolute inset-x-0 bottom-10 flex flex-col items-center gap-1 px-4">
           <div className="flex flex-wrap justify-center gap-1.5">
             {hud.perks.split(' · ').map((p) => (
-              <span key={p} className="fel-panel px-2.5 py-1 font-mono text-[11px] text-white/85">{p}</span>
+              <HudChip key={p} alpha={0.85}>{p}</HudChip>
             ))}
           </div>
-          <span className="font-mono text-[11px] text-[var(--fel-gold)]">
+          <HudText size="label" tone="score">
             BALANCE {hnode(hud.coins, 0)}c
-          </span>
+          </HudText>
         </div>
       )}
 
-      {typeof hud.banner === 'string' && hud.banner && (
-        <div className="pointer-events-none absolute inset-x-0 top-1/3 text-center">
-          <span className="fel-heading fel-panel px-4 py-2 text-2xl font-bold text-[var(--fel-emerald)]">{hud.banner}</span>
-        </div>
-      )}
+      <HudBanner text={typeof hud.banner === 'string' ? hud.banner : ''} tone="good" />
+      </HudFrame>
 
       <BootSplash
         modeId="karate"

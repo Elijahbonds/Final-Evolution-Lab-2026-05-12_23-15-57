@@ -6,6 +6,7 @@
 // the SPIKE tell were all up at once and overlapped. The prompts share one slot now, under the meters: the most urgent
 // one shows, never a stack. Pure pick + a small view.
 import type { HudValue } from '@/lib/babylon';
+import { HudLine } from './tv-hud';
 
 type Hud = Record<string, HudValue>;
 export interface Prompt { kind: 'tell' | 'contact' | 'shot' | 'step'; text: string; gold: boolean }
@@ -30,9 +31,8 @@ export function pickPrompt(hud: Hud): Prompt | null {
 export function TimingPrompt({ hud }: { hud: Hud }) {
   const p = pickPrompt(hud);
   if (!p) return null;
+  // TV HUD (A9.13): the shared line — the 10-foot scale, the palette, the two-line clamp — in the same slot.
   return (
-    <div data-prompt={p.kind} className="pointer-events-none absolute inset-x-0 bottom-16 flex justify-center px-4 text-center">
-      <span className={`fel-panel px-4 py-1.5 font-mono text-[12px] font-bold ${p.gold ? 'border-[var(--fel-gold)]/60 text-[var(--fel-gold)]' : 'text-white/85'}`}>{p.text}</span>
-    </div>
+    <HudLine data={{ prompt: p.kind }} className="bottom-16" text={p.text} strong tone={p.gold ? 'score' : 'text'} alpha={p.gold ? 1 : 0.85} edge={p.gold ? 'score' : undefined} />
   );
 }
