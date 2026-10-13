@@ -97,7 +97,7 @@ describe('mountFixtureLights on a scene', () => {
     const s = new Scene(new NullEngine());
     lamp(s);
     expect(mountFixtureLights(s, 'mobile', 'nightGame', null)).toBeNull();
-    (s.metadata ??= {}).felModeId = 'dunk';
+    (s.metadata ??= {}).felModeId = 'onevone';   // a held hoops mode (vis-hoops-court's) — dunk is lifted
     expect(mountFixtureLights(s, 'high', 'nightGame', null)).toBeNull();
     s.metadata.felModeId = 'volleyball';
     const before = s.lights.length;
@@ -108,12 +108,13 @@ describe('mountFixtureLights on a scene', () => {
     expect(fixtureLightsWanted('desktop', 'volleyball')).toBe(true);
     expect(fixtureLightsWanted('high', null)).toBe(true);
     expect(fixtureLightsWanted('mobile', 'volleyball')).toBe(false);
-    expect(fixtureLightsWanted('high', 'dunk')).toBe(false);
+    expect(fixtureLightsWanted('high', 'onevone')).toBe(false);   // a mode still held (vis-hoops-court's)
+    expect(fixtureLightsWanted('high', 'dunk')).toBe(true);       // vis-hoops-dunk lifted its hold
     expect(fixtureLightsWanted('high', 'volleyball', true)).toBe(false);
   });
-  it('the hoops modes are held this wave; everything else takes the look', () => {
-    for (const m of ['dunk', 'dunkduel', 'onevone', 'threevthree', 'threepoint', 'carnival']) expect(wave2Look(m), m).toBe(false);
-    for (const m of ['football', 'volleyball', 'karate', 'dance', 'golf', null]) expect(wave2Look(m), String(m)).toBe(true);
-    expect(WAVE2_HELD_MODES.size).toBeGreaterThanOrEqual(6);
+  it('the court hoops modes stay held until their lane lifts them; dunk, dunkduel and threepoint (vis-hoops-dunk) and everything else take the look', () => {
+    for (const m of ['onevone', 'threevthree', 'carnival']) expect(wave2Look(m), m).toBe(false);
+    for (const m of ['dunk', 'dunkduel', 'threepoint', 'football', 'volleyball', 'karate', 'dance', 'golf', null]) expect(wave2Look(m), String(m)).toBe(true);
+    expect(WAVE2_HELD_MODES.size).toBeGreaterThanOrEqual(3);
   });
 });
