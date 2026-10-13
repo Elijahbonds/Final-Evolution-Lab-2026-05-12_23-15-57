@@ -11,7 +11,9 @@
 // keep a rival down as long as a masher does); counting LINKS did: of the blows that landed, a decent player's came on
 // link 5 or later 2–4 % of the time, a masher's 33–36 %. A book string is three presses (HordeDynamics STRING_MAX), so
 // minLinks 5 leaves a link of grace. ROOKIE rarely breaks, ELITE reliably; a cooldown, and the substitution's cost.
-// Karate VS and Mixed do not use it: their chains are 1–2 hits for every player measured.
+// Mixed does not use it: its chains are 1–2 hits for every player measured. Karate VS joined it on 2026-10-13 (the owner's call, the #19
+// follow-up; QA A1-03 had found the RIVAL SENSEI stun-lockable): the same rules and the same numbers, measured on the harness (the
+// masher is broken out of ~1.5 times a match at PRO, a decent player ~0.04, and the decent player's PRO win rate stays 61 %).
 //
 // Pure: no scene, no clock of its own — the mode hands it the frame, the swing in flight, the time and the tier.
 

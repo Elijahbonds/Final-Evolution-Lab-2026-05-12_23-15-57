@@ -21,6 +21,7 @@
 // Nothing here sends or stores anything.
 import type { SessionSummary } from '@/lib/babylon/nexus/neuro-mirror/render/overlay-compositor';
 import { framingLine, type FramingCheck, type FramingIssue } from './framing';
+import { cameraHelp, cameraHelpText, isCameraError } from '@/lib/camera/cameraHelp';
 
 /** How often the stage repaints its per-frame readouts. TUNE(elijah): 10 Hz reads as live for a count and a phase word,
  *  and leaves a mid-range phone's frame budget to the pose model. */
@@ -261,14 +262,13 @@ export function mergeSummaries(a: SessionSummary | null, b: SessionSummary | nul
 // ── the camera's honest errors ───────────────────────────────────────────────────────────────────────────────────
 
 /** A denied camera, a missing camera and a dead 3D overlay are three different problems (measured: a WebGL-less
- *  environment hit the overlay path and the page blamed the camera). Moved unchanged from mirror-harness.tsx. */
-export function cameraErrorLine(e: unknown): string {
-  const name = (e as { name?: unknown } | null)?.name;
-  return name === 'NotAllowedError'
-    ? 'Camera permission denied. Allow camera access and try again.'
-    : name === 'NotFoundError' || name === 'OverconstrainedError' || name === 'NotReadableError'
-      ? 'Camera unavailable in this browser/environment.'
-      : 'The coaching overlay failed to start (3D renderer). Try a WebGL-capable browser.';
+ *  environment hit the overlay path and the page blamed the camera). A camera's own failure (or a page that is not a
+ *  secure context, which cannot open one at all) says what to DO about it: lib/camera/cameraHelp's title and steps as one
+ *  paragraph (QA #19 follow-up, replaces the one-line `cameraErrorLine`); a renderer failure stays its own line. */
+export function mirrorStartErrorText(e: unknown, secure = true): string {
+  return !secure || isCameraError(e)
+    ? cameraHelpText(cameraHelp(e, { secure }))
+    : 'The coaching overlay failed to start (3D renderer). Try a WebGL-capable browser.';
 }
 
 // ── InShotLine ───────────────────────────────────────────────────────────────────────────────────────────────────

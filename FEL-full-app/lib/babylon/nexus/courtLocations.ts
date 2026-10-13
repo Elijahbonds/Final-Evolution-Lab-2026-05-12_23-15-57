@@ -128,7 +128,7 @@ export function writeCourtLocation(id: CourtLocationId): void {
 // the way the dojo's do, over the whole court. Everything is procedural — no assets.
 
 /** Stylised trees: a trunk and a cluster of canopy heads. Shared by Blossom Park (pinks) and Canopy Court (greens). */
-function plantTrees(scene: Scene, holder: TransformNode, tag: string, spots: Array<[number, number, number]>, heads: string[], trunkHex: string, seed0: number): void {
+export function plantTrees(scene: Scene, holder: TransformNode, tag: string, spots: Array<[number, number, number]>, heads: string[], trunkHex: string, seed0: number): void {
   const trunkMat = new PBRMaterial(`loc_${tag}_trunk`, scene);
   trunkMat.albedoColor = Color3.FromHexString(trunkHex); trunkMat.metallic = 0; trunkMat.roughness = 0.95;
   const headMats = heads.map((hex, i) => {
@@ -157,7 +157,7 @@ function plantTrees(scene: Scene, holder: TransformNode, tag: string, spots: Arr
 
 /** Ring positions for the DUNK camera (behind the player, 0.9 rad, looking down −z): both sides just outside the court
  *  (x ±11) and a taller row behind the far crowd tier (z −20…−25). */
-const COURT_TREE_SPOTS: Array<[number, number, number]> = [
+export const COURT_TREE_SPOTS: Array<[number, number, number]> = [
   [-11, -3, 0.9], [11, -2, 1.0], [-11.5, -8, 1.0], [11.5, -7.5, 0.9], [-11, -13, 0.95], [11, -12.5, 1.05],
   [-12, -21, 1.25], [-4.5, -23, 1.15], [4, -22, 1.3], [12, -21, 1.2], [-8, -25, 1.1], [8.5, -25, 1.15],
   [-11, 4, 0.85], [11, 5, 0.9],

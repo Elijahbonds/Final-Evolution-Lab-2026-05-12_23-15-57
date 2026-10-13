@@ -1,4 +1,5 @@
-// The Hundred's gameplay camera sits 18% farther back than the 4.0 m / 6.4 m shots it shipped with.
+// The Hundred's gameplay camera sits 34% farther back than the 4.0 m / 6.4 m shots it shipped with (was 18%: CAM-FIXES, owner 2026-10-08
+// "camera is still wonky and needs to zoom out a little").
 // The fighter and the nearest attacker stay inside the frame on a desktop, a phone in portrait, and a phone in landscape.
 import { afterEach, describe, expect, it } from 'vitest';
 import { Matrix, NullEngine, Scene, TargetCamera, Vector3 } from '@babylonjs/core';
@@ -45,12 +46,15 @@ afterEach(() => {
 });
 
 describe('The Hundred camera', () => {
-  it('pins the pull-back at 18% on the shoulder shot and the surrounded shot', () => {
-    expect(HUNDRED_CAM_PULL).toBe(1.18);
+  it('pins the pull-back at 34% on the shoulder shot and the surrounded shot', () => {
+    // test changed (CAM-FIXES 2026-10-13): this pinned 1.18 and a 15-20 % window. The owner played that and asked for more ("still wonky,
+    // needs to zoom out a little"), so the pin moves to the new number — 1.34, a window of 30-38 % — rather than the number being held
+    // at the old one. The pin is still a pin: a drift either way fails it.
+    expect(HUNDRED_CAM_PULL).toBe(1.34);
     expect(FOLLOW_PRESETS.fightShoulder.distance).toBeCloseTo(SHOULDER_WAS * HUNDRED_CAM_PULL, 5);
     expect(FOLLOW_PRESETS.fightCrowd.distance).toBeCloseTo(CROWD_WAS * HUNDRED_CAM_PULL, 5);
-    expect(FOLLOW_PRESETS.fightShoulder.distance).toBeGreaterThan(SHOULDER_WAS * 1.15);
-    expect(FOLLOW_PRESETS.fightShoulder.distance).toBeLessThan(SHOULDER_WAS * 1.20);
+    expect(FOLLOW_PRESETS.fightShoulder.distance).toBeGreaterThan(SHOULDER_WAS * 1.30);
+    expect(FOLLOW_PRESETS.fightShoulder.distance).toBeLessThan(SHOULDER_WAS * 1.38);
   });
 
   it('keeps the fighter and the nearest attacker inside the frame', () => {

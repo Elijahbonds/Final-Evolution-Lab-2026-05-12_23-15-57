@@ -192,7 +192,36 @@ describe('the combo breaker (core/ComboBreaker)', () => {
       expect(s).toMatch(/if \(outcome === 'hit'\) .*hitTaken/);   // a blow taken builds the meter that pays for it
     });
   }
-  it('Karate VS and Mixed have no such chain (1–2 hit chains for every player measured) and do not use it', () => {
-    for (const f of ['KarateVSMode.ts', 'MixedCombatMode.ts']) expect(modeSrc(f)).not.toContain('ComboBreaker');
+  // test changed (2026-10-13, the #19 follow-up): this pinned "Karate VS and Mixed have no such chain (1–2 hit chains for every
+  // player measured) and do not use it". The owner has now asked for the breaker in Karate VS (QA A1-03 found the RIVAL SENSEI
+  // stun-lockable there), so the VS half of that assertion was the decision this change reverses, not a regression. Mixed
+  // still does not use it, and still asserts so.
+  it('Mixed has no such chain and does not use it', () => {
+    expect(modeSrc('MixedCombatMode.ts')).not.toContain('ComboBreaker');
+  });
+  it('KarateVSMode.ts: tracks my string, breaks on a landed blow, pays and plays it — the same rules and numbers as Showdown / Duel', () => {
+    const s = modeSrc('KarateVSMode.ts');
+    expect(s).toContain("import { ComboBreaker, COMBO_BREAK } from '../core/ComboBreaker';");
+    expect(s).toContain('breaker.track(dt, animOf(true).strike);');   // each swing is its own strike object: a new one is a link
+    expect(s).toMatch(/breaker\.hit\(now\(\) \/ 1000, readTier\(\), defState\.chi >= SUBSTITUTION_CHI_COST\)/);   // the substitution's 25 chi
+    expect(s).toContain("banner(ctx, 'BREAK! — THE RIVAL ESCAPED YOUR STRING', 0.9);");
+    expect(s).toContain("ctx.juice.flash('#ff3344', 110);");
+    expect(s).toContain('brain.openCounter(COMBO_BREAK.counterSec);');
+    expect(s).toContain('foeSubstituted = now() + DUEL.subWhiffMs;');
+    expect(s).toContain('foeSub.spendSubstitution(now());');
+    expect(s).toContain("console.info('[KVS-STORM] rival combo break');");
+    expect(s).toContain('breaker.reset();');
+    expect(s).toMatch(/if \(mine\) defState\.chi = Math\.min\(CHI_MAX, defState\.chi \+ \(CHI\.gains\.hitTaken \?\? 0\)\);/);   // a blow taken builds the RIVAL's meter that pays for it
+    expect(COMBO_BREAK).toEqual({ idleGapSec: 0.25, minLinks: 5, cooldownSec: 5, counterSec: 0.6, chance: { rookie: 0.15, pro: 0.6, elite: 0.95 } });   // not re-tuned for VS
+  });
+  it('in the Karate VS harness a masher is broken out of, a decent player almost never is (the rival escapes a MASHED string)', () => {
+    const per = (profile: 'masher' | 'decent'): number => {
+      let b = 0;
+      for (let seed = 1; seed <= 40; seed++) b += runMatch({ mode: 'kvs', tier: 'pro', profile, seed }).breaks ?? 0;
+      return b / 40;
+    };
+    const masher = per('masher'), decent = per('decent');
+    expect(masher).toBeGreaterThan(0.5);        // measured 1.5 breaks a match at PRO
+    expect(decent).toBeLessThan(masher / 4);    // measured 0.04
   });
 });

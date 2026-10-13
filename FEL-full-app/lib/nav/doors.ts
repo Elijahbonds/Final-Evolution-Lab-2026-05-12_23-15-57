@@ -18,6 +18,7 @@ export const DOORS: Door[] = [
   { href: '/story', label: 'Story', tab: 'play' },
   { href: '/host', label: 'Big screen', tab: 'play' },
   { href: '/join', label: 'Join a game', tab: 'play' },   // MULTIPLAYER (2026-10-06): type the code on a friend's TV
+  { href: '/party', label: 'Party', tab: 'play' },   // PARTY-CHAT (2026-10-13): the PSN-style party — chat, voice, play together
   { href: '/modes', label: 'All modes', tab: 'play' },
 
   // TRAIN — the coaching business, the credentials, the classes, the gym.
