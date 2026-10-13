@@ -20,7 +20,7 @@
 // The trade-off rule is the garage's rule: no weapon may beat another at everything, and arsenal.test.ts
 // holds it.
 
-import { Color3, MeshBuilder, StandardMaterial, Vector3 } from '@babylonjs/core';
+import { Color3, MeshBuilder, PBRMaterial, Vector3 } from '@babylonjs/core';
 import type { Mesh, Scene, Skeleton, TransformNode } from '@babylonjs/core';
 import { boneNode } from '../anim/boneLookup';
 import { KARATE_ATTACKS, STAFF_ATTACKS, type AttackDef } from '../core/FightCore';
@@ -53,12 +53,23 @@ export interface ArsenalEntry {
   ready: boolean;
 }
 
-/** A plain lit prop. StandardMaterial is fine here: combat venues are dojo-lit, not the racing sun. */
-function prop(scene: Scene, name: string, mesh: Mesh, hex: string): Mesh {
-  const mat = new StandardMaterial(`${name}Mat`, scene);
-  mat.diffuseColor = Color3.FromHexString(hex);
-  mat.specularColor = Color3.FromHexString('#3a3a42');
-  mesh.material = mat;
+/**
+ * A lit prop in the arena's PBR light (visual pass, 2026-10-13): metal reads as metal and wood as wood. It was a diffuse
+ * StandardMaterial with a grey specular: a blade the colour of paper. `metal` 0 is wood / cloth / leather, 1 is steel.
+ */
+function prop(scene: Scene, name: string, mesh: Mesh, hex: string, metal = 0, rough = 0.6): Mesh {
+  mesh.material = metalMat(scene, `${name}Mat`, hex, metal, rough);
+  return mesh;
+}
+function metalMat(scene: Scene, name: string, hex: string, metal: number, rough: number): PBRMaterial {
+  const m = new PBRMaterial(name, scene);
+  m.albedoColor = Color3.FromHexString(hex); m.metallic = metal; m.roughness = rough; m.environmentIntensity = 0.9;
+  return m;
+}
+/** A fitting on a prop (a guard, a cap, a wrap): a child mesh that rides with it and goes with it when it is disposed. */
+function fitting(scene: Scene, parent: Mesh, name: string, mesh: Mesh, hex: string, metal: number, rough: number, y: number): Mesh {
+  mesh.name = name; mesh.material = metalMat(scene, `${name}Mat`, hex, metal, rough);
+  mesh.parent = parent; mesh.position.y = y; mesh.isPickable = false;
   return mesh;
 }
 
@@ -112,16 +123,27 @@ export const ARSENAL: readonly ArsenalEntry[] = [
     tint: '#c9d6e8', ready: true, reach: 2.0, jabReach: 1.9,
     moveset: () => bladeMoveset(),
     bars: { reach: 0.5, speed: 0.85, power: 0.55 },
-    buildProp: (scene) => prop(scene, 'blade',
-      MeshBuilder.CreateBox('blade', { width: 0.05, height: 0.95, depth: 0.012 }, scene), '#cfd8e6'),
+    buildProp: (scene) => {
+      const blade = prop(scene, 'blade', MeshBuilder.CreateBox('blade', { width: 0.05, height: 0.95, depth: 0.012 }, scene), '#d6dfec', 1, 0.2);
+      // a crossguard, a wrapped grip and a pommel at the hilt end (the end in the hand): a blade, not a ruler
+      fitting(scene, blade, 'blade_guard', MeshBuilder.CreateBox('g', { width: 0.2, height: 0.035, depth: 0.045 }, scene), '#6e7585', 0.9, 0.35, -0.44);
+      fitting(scene, blade, 'blade_grip', MeshBuilder.CreateCylinder('g', { height: 0.14, diameter: 0.034, tessellation: 8 }, scene), '#2a1d16', 0, 0.8, -0.53);
+      fitting(scene, blade, 'blade_pommel', MeshBuilder.CreateSphere('g', { diameter: 0.06, segments: 6 }, scene), '#8a93a3', 0.9, 0.3, -0.61);
+      return blade;
+    },
   },
   {
     id: 'staff', name: 'STAFF', sub: 'A metre more reach, and slow enough to be punished for it.',
     tint: '#c89b5a', ready: true, reach: 2.8, jabReach: 2.6,
     moveset: () => staffMoveset(STAFF_ATTACKS),
     bars: { reach: 0.95, speed: 0.35, power: 0.7 },
-    buildProp: (scene) => prop(scene, 'staff',
-      MeshBuilder.CreateCylinder('staff', { height: 1.8, diameter: 0.05 }, scene), '#8a5f38'),
+    buildProp: (scene) => {
+      const staff = prop(scene, 'staff', MeshBuilder.CreateCylinder('staff', { height: 1.8, diameter: 0.05 }, scene), '#8a5f38', 0, 0.55);
+      // iron-shod ends and a leather wrap where it is gripped
+      for (const [n, y] of [['staff_cap_a', 0.88], ['staff_cap_b', -0.88]] as const) fitting(scene, staff, n, MeshBuilder.CreateCylinder('g', { height: 0.1, diameter: 0.068, tessellation: 10 }, scene), '#7b8494', 0.9, 0.35, y);
+      fitting(scene, staff, 'staff_wrap', MeshBuilder.CreateCylinder('g', { height: 0.22, diameter: 0.062, tessellation: 10 }, scene), '#2b2019', 0, 0.85, 0);
+      return staff;
+    },
   },
   {
     id: 'gauntlet', name: 'GAUNTLET', sub: 'Breaks a guard in two hits. Slowest thing in the arsenal.',
@@ -129,7 +151,7 @@ export const ARSENAL: readonly ArsenalEntry[] = [
     moveset: gauntletMoveset,
     bars: { reach: 0.3, speed: 0.28, power: 0.95 },
     buildProp: (scene) => prop(scene, 'gauntlet',
-      MeshBuilder.CreateBox('gauntlet', { width: 0.13, height: 0.15, depth: 0.19 }, scene), '#6d7789'),
+      MeshBuilder.CreateBox('gauntlet', { width: 0.13, height: 0.15, depth: 0.19 }, scene), '#7b8699', 0.85, 0.35),
   },
 ];
 

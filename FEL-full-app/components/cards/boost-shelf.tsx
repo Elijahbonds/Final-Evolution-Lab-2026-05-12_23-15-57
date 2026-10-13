@@ -10,17 +10,7 @@
 import { useState } from 'react';
 import { Check, Gem, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { BOOST_CARDS, BOOST_PRQ_CAP, purchaseCheck, type BoostCard } from '@/lib/cards/boosts';
-
-function Stat({ label, value, accent }: { label: string; value: number; accent: string }) {
-  if (!value) return null;
-  return (
-    <span className="inline-flex items-baseline gap-1 rounded-md px-1.5 py-0.5" style={{ background: `${accent}10` }}>
-      <span className="font-mono text-[11px] font-bold" style={{ color: accent }}>+{value}</span>
-      <span className="font-mono text-[9px] uppercase tracking-[0.1em] text-white/35">{label}</span>
-    </span>
-  );
-}
+import { BOOST_CARDS, purchaseCheck, type BoostCard } from '@/lib/cards/boosts';
 
 export function BoostShelf({ shards, owned }: { shards: number; owned: string[] }) {
   const [have, setHave] = useState<string[]>(owned);
@@ -59,8 +49,8 @@ export function BoostShelf({ shards, owned }: { shards: number; owned: string[] 
         <div>
           <h2 className="fel-heading text-[19px] font-bold text-white">Creator cards</h2>
           <p className="mt-1 text-[12.5px] text-white/40">
-            Earned with shards, never sold for money. They lift what you bring into a game — never what a screen
-            measures or what you are told to eat.
+            Cosmetic cards: a card frame and links to the creator&apos;s own work. They never change a rating, PRQ,
+            vertical or any game stat.
           </p>
         </div>
         <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.03] px-2.5 py-1.5">
@@ -109,13 +99,7 @@ export function BoostShelf({ shards, owned }: { shards: number; owned: string[] 
 
               <p className="mt-2 text-[12.5px] italic leading-relaxed text-white/45">“{c.tagline}”</p>
 
-              <div className="mt-3 flex flex-wrap gap-1.5">
-                <Stat label="PRQ" value={c.boost.prq} accent={c.accent} />
-                <Stat label="Vert" value={c.boost.vertical} accent={c.accent} />
-                <Stat label="Eff" value={c.boost.efficiency} accent={c.accent} />
-                <Stat label="Neural" value={c.boost.neural} accent={c.accent} />
-                <Stat label="Ready" value={c.boost.readiness} accent={c.accent} />
-              </div>
+              <p className="mt-3 font-mono text-[10px] uppercase tracking-[0.14em] text-white/35">Cosmetic · no stat effect</p>
 
               <div className="mt-auto pt-4">
                 {mine ? (
@@ -152,9 +136,6 @@ export function BoostShelf({ shards, owned }: { shards: number; owned: string[] 
         })}
       </ul>
 
-      <p className="mt-3 font-mono text-[10px] uppercase tracking-[0.14em] text-white/25">
-        Game lift caps at +{BOOST_PRQ_CAP} PRQ, however many you own
-      </p>
     </section>
   );
 }

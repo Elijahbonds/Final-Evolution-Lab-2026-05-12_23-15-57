@@ -2,10 +2,10 @@ import Link from 'next/link';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { BOOKS, featuredBook, PARTNERS } from '@/lib/books/bookCatalog';
+import { bookFormatAllowed } from '@/lib/books/bookTerms';
 import { PressFrame } from '@/components/press/press-frame';
 import { BookCover } from '@/components/press/book-cover';
 import { CatalogCard, KindleLink, OfferCard } from '@/components/press/offer-card';
-import { BuyButton } from '@/components/press/buy-button';
 import { JoinForm } from '@/components/press/join-form';
 
 export const dynamic = 'force-dynamic';
@@ -23,7 +23,7 @@ async function signedIn(): Promise<boolean> {
 export default async function PressPage() {
   const session = await signedIn();
   const featured = featuredBook();
-  const bundle = featured.offers.find((o) => o.format === 'bundle');
+  const featuredOffers = featured.offers.filter((o) => bookFormatAllowed(o.format));
 
   return (
     <PressFrame signedIn={session}>
@@ -41,13 +41,12 @@ export default async function PressPage() {
               <Link href={`/press/${featured.slug}`}>{featured.title}</Link>
             </h3>
             <p className="mt-2 text-sm text-white/55">{featured.description}</p>
-            <div className="mt-4 grid gap-3 sm:grid-cols-3">
-              {featured.offers.map((offer) => (
+            <div className="mt-4 grid max-w-xs gap-3">
+              {featuredOffers.map((offer) => (
                 <OfferCard key={offer.id} book={featured} offer={offer} prominent />
               ))}
             </div>
             <div className="mt-4 flex flex-wrap items-center gap-3">
-              {bundle?.directSale ? <BuyButton offerId={bundle.id} label="Buy bundle" prominent /> : null}
               <Link href={`/press/${featured.slug}#sample`} className="rounded-md border border-white/15 px-3 py-2 text-xs font-semibold text-white/80 hover:border-white/40">
                 Free sample chapter
               </Link>
@@ -74,7 +73,7 @@ export default async function PressPage() {
         <div className="mt-3 rounded-2xl border border-white/10 bg-[#101010] p-5">
           <p className="text-sm text-white/70">
             {session
-              ? 'Your purchases are in My Library: chapter player, EPUB, and PDF.'
+              ? 'Your audiobooks are in My Library: stream them here. Audiobooks are stream only, with no download.'
               : 'Log in with the email you check out with. Purchases made as a guest are waiting on that address.'}
           </p>
           <Link href="/press/library" className="mt-3 inline-block rounded-md bg-[#F5C518] px-4 py-2 text-sm font-semibold text-black">

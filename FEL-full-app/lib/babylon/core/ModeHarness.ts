@@ -16,6 +16,11 @@ import type { VenueMood } from '../scene/moods';
 import { resolveModeMood } from '../scene/moodResolver';   // A9.4: mood follows the place
 import { InputBus, type FelInput, type BodyPacket } from './InputBus';
 import { CameraDirector, type FOLLOW_PRESETS } from './CameraDirector';
+import { mountLetterbox } from '../visual/Letterbox';   // vis-foundation-2 A9.12: the cinematic bars
+import { mountSweat } from './skinShading';   // vis-foundation-2 A9.14: the hero's skin shines as they work
+import { wave2Look } from '../scene/lookPolicy';
+import type { IntroKind } from '../scene/broadcastShots';
+import { ReplayDirector, characterRoots, mountReplayDof, type ReplayPlayOpts } from '../scene/ReplayDirector';   // A9.12
 import { buildResult, type ResultSink, type SessionResult } from './sessionResult';
 import { JuiceKit } from '../premium/JuiceKit';
 import { motionPolicy } from '../../a11y/reducedMotion';   // HOTFIX (2026-09-24): the impact frame asks too
@@ -147,6 +152,9 @@ export interface ModeContext {
   agent: { control?: AgentControlSource; getScore?: () => number };
   /** current phase — modes may read, never write */
   phase(): ModePhase;
+  /** vis-foundation-2 A9.12: play a broadcast replay of the last seconds (a mode with `replay: true`). The harness holds the
+   *  mode's update() until it ends; any press skips it; a pause freezes it. Resolves at once when the mode did not opt in. */
+  highlight?(opts?: ReplayPlayOpts): Promise<void>;
   end(outcome: string, score: number, stats: Record<string, number>, detail?: unknown): void;
   /** TRY-ONBOARD (G1/G7): the host asked for a CONTINUOUS night. A mode that would
    *  otherwise finish its card must offer GO AGAIN in-mode — report through card()
@@ -194,6 +202,13 @@ export interface ModeDefinition {
   ownsCrowd?: boolean;
   /** GC-7: hide the harness player ring and glyph during play — off by default so stamina arc stays on other modes. */
   hideRingInPlay?: boolean;
+  /** vis-foundation-2 A9.12: open play on the broadcast intro — a crane over the venue, then (walkIn) a shot on the player,
+   *  then the play camera. Skipped by the first input; never under reduced motion. Off when absent. */
+  intro?: IntroKind;
+  /** vis-foundation-2 A9.12: record the bodies for broadcast replays (ctx.highlight). Off when absent: recording costs a
+   *  pose read per body 30 times a second, so only a mode that replays pays it. Mounting it also mounts the replays' depth of
+   *  field (desktop/high) at load, so its shaders never compile mid-game. */
+  replay?: boolean;
   load(ctx: ModeContext): Promise<void>;        // spawn venue + characters
   onInput(ctx: ModeContext, e: FelInput): void;
   update(ctx: ModeContext, dt: number): void;   // called only while 'playing'
@@ -310,6 +325,8 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
   const unink = autoInk(scene, inkStyleFor(def.modeId));   // A9.6: the anime line for the party modes, a distance-true contour for the sports
   const input = opts.input ?? new InputBus();
   const camDirector = new CameraDirector(scene, camera, def.camPreset);
+  const letterbox = mountLetterbox(scene, opts.canvas, () => camDirector.cinematic01);   // A9.12: the intro's and the replays' bars
+  const sweat = wave2Look(def.modeId) ? mountSweat(scene, () => heroRef.current, () => phase === 'playing') : null;   // A9.14
 
   // M67: dev-only frame-budget monitor. mount() is a no-op in production, so
   // the overlay and its per-frame bookkeeping cost nothing for real players.
@@ -328,6 +345,8 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
   let unsub: (() => void) | null = null;
   let frameGuard: FrameGuard | null = null;
   let iblShadows: IblShadowsHandle | null = null;
+  let replay: ReplayDirector | null = null;   // A9.12: a mode that asked for replays (def.replay)
+  let replayHold = false;                     // a replay is on screen: the mode's update() waits
   const setPhase = (p: ModePhase, detail?: number | string) => {
     phase = p;
     // M37: hero-off-screen watchdog runs only during live play.
@@ -475,6 +494,11 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     scene, camera, camDirector, input, lights, juice,
     feel, momentum, heroRef, objectiveRef, groundLock, agent: agentHooks,
     phase: () => phase,
+    highlight: async (o) => {
+      if (!replay || replay.playing || phase !== 'playing') return;
+      replayHold = true;
+      try { await replay.play({ ...o, paused: () => phase === 'paused' }); } finally { replayHold = false; }
+    },
     end(outcome, score, stats, detail) {
       if (phase === 'ended') return;
       if (qa) qaResult = { outcome, score };
@@ -580,6 +604,8 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
       // snapshots the geometry present when it runs, so mounting any earlier
       // would build the grid from an empty scene and do nothing.
       iblShadows = mountIblShadows(scene, camera);
+      // A9.12: the replay recorder on the bodies load() spawned, and the replays' depth of field mounted now (no mid-game compile)
+      replay?.dispose(); replay = def.replay ? new ReplayDirector(scene, camera, characterRoots(scene, heroRef.current), [], mountReplayDof(scene, lights.pipeline, tier)) : null;
       setPhase('ready');
       // M67: pre-warm every material now, on the loading→ready boundary, so a
       // first-visibility shader compile never hitches mid-play. Dev-only work.
@@ -672,6 +698,9 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     // the mode never saw (a d-pad) is written down too, so the resume can latch its release
     if (phase === 'paused') { pauseLedger.drop(e); return; }
     if (phase === 'playing' && e.t === 'button' && e.btn === 'SELECT' && e.pressed) { camDirector.toggle(); return; }
+    // A9.12: a press during a replay skips it and is the replay's, not the mode's — latched like a waking press, so its
+    // release never reaches the mode unpaired; releases and sticks still reach the mode (a key let go during a replay is let go)
+    if (phase === 'playing' && replayHold && e.t === 'button' && e.pressed) { replay?.skip(); wakeLatch.wake(e, performance.now(), true); return; }
     if (phase === 'playing') {
       const now = performance.now();
       if (!wakeLatch.pass(e, now)) return;
@@ -680,6 +709,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
       // is driving: only a body that is playing may pause the game by walking off (Z5).
       const c = evidence.count(e, now);
       if (c) { store.count(c); session.noteInput(c, now); }
+      if (c && camDirector.inIntro) camDirector.skipIntro();   // A9.12: the player's first input hands the frame to the play camera
       if (e.t === 'button' && e.pressed) buffer.press(e.btn);   // M37 input-buffer
       if (qa) {
         if (e.t === 'button' && e.pressed) qa.press(e.btn);
@@ -730,6 +760,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     if (phase !== 'ready') return;
     startedAt = performance.now();
     setPhase('playing');
+    if (def.intro) camDirector.establish(def.intro);   // A9.12: the broadcast intro over the first seconds of play (skippable)
     // CREATOR CARD (2026-09-13): one canonical record, one writer. Every mode's session is recorded HERE
     // rather than in each mode, which is the mission's rule ("No mode may persist its own parallel
     // profile") enforced by there being exactly one call site. A discipline id is the mode id — nothing
@@ -845,7 +876,9 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     for (const e of floor.tick(bodyNow)) input.emitBody(e);
     // M37 hit-stop: dt scales to 0 during an impact freeze, then eases back.
     (ctx.scene.metadata ??= {}).felTimeScale = timeScale();   // HOOPS MOTION phase 3b: the hit-stop's scale this frame, read by the motion probe (a frozen frame is not a body's acceleration)
-    if (phase === 'playing') {
+    if (phase === 'playing' && replayHold) {
+      // A9.12: a replay is on screen — the mode is held where it was (its clock, its camera, its bodies) until it ends
+    } else if (phase === 'playing') {
       if (qa) qaSampleAnim();
       def.update(ctx, dt * timeScale());
       // RELEASE GAUNTLET fast-forward (?agent=1&qaSpeed=N only): N-1 extra updates a frame, so a QA run reaches the
@@ -905,7 +938,10 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     clearReady();         // M67
     unink();              // M59
     backdrop.dispose();   // M61
+    letterbox.dispose();  // A9.12
+    sweat?.dispose();     // A9.14
     iblShadows?.dispose();
+    replay?.dispose();   // A9.12
     ssao?.dispose();
     lights.dispose();
     scene.dispose();

@@ -5,8 +5,8 @@ vi.mock('./EnvironmentIBL', () => ({ mountEnvironmentIBL: () => () => {} }));   
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { Color3, MeshBuilder, NullEngine, PBRMaterial, Scene } from '@babylonjs/core';
-import { GLOW_INTENSITY, glowCandidate, glowOptions, mountEmissiveGlow } from './EmissiveGlow';
+import { Color3, Color4, MeshBuilder, NullEngine, PBRMaterial, Scene, Skeleton } from '@babylonjs/core';
+import { GLOW_INTENSITY, glowCandidate, glowOccluder, glowOptions, mountEmissiveGlow } from './EmissiveGlow';
 import { mountLightRig } from './LightRig';
 import { MOODS } from './moods';
 
@@ -72,6 +72,30 @@ describe('the glow layer on a scene', () => {
     expect(mountLightRig(new Scene(new NullEngine()), 'dojoWarm', 'mobile').glow).toBeNull();
     vi.stubGlobal('window', { location: { search: '?look=legacy' } });
     expect(mountLightRig(new Scene(new NullEngine()), 'dojoWarm', 'high').glow).toBeNull();
+  });
+  it('bodies block the halo: drawn black into the glow target, and never enable the layer on their own', async () => {
+    expect(glowOccluder('Human.body', true)).toBe(true);
+    expect(glowOccluder('lantern_8_8', true)).toBe(false);   // a skinned fixture is still a fixture
+    expect(glowOccluder('banner', false)).toBe(false);
+    const s = new Scene(new NullEngine());
+    const g = mountEmissiveGlow(s, 'high', 'dojoWarm')!;
+    const body = MeshBuilder.CreateBox('Human.body', {}, s);
+    const skin = new PBRMaterial('skin', s); skin.emissiveColor = new Color3(0.3, 0.2, 0.2); body.material = skin;
+    body.skeleton = new Skeleton('rig', 'rig', s);
+    await settle();
+    expect(g.occluders).toEqual([body]);
+    expect(g.layer.isEnabled).toBe(false);   // no fixture yet: an include list of bodies alone must not light the layer
+    const lamp = fixture(s, 'lhead', 'lampHead', 1.4);
+    await settle();
+    expect(g.layer.isEnabled).toBe(true);
+    const out = new Color4();
+    g.layer.customEmissiveColorSelector(body as never, null as never, skin, out);
+    expect([out.r, out.g, out.b]).toEqual([0, 0, 0]);
+    g.layer.customEmissiveColorSelector(lamp as never, null as never, lamp.material!, out);
+    expect(out.r).toBeCloseTo(1.4, 6);   // a fixture glows exactly as the default path would draw it
+    body.dispose();
+    expect(g.occluders.length).toBe(0);
+    g.dispose();
   });
   it('the high tier renders a bigger, multisampled halo than desktop', () => {
     expect(glowOptions('high').mainTextureRatio).toBeGreaterThan(glowOptions('desktop').mainTextureRatio);

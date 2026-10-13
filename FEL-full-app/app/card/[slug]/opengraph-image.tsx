@@ -8,9 +8,14 @@ import { RARITY_META, safeAccent, rarityLabel, type CardRarity } from '@/lib/cre
 export const runtime = 'nodejs';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
+// CARD-SAFE-1: rendered per request and never cached, so a card that stops being public stops previewing at once.
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export default async function Image({ params }: { params: { slug: string } }) {
   const card = await getPublicCard(prisma, String(params?.slug ?? '').toLowerCase());
+  // CARD-SAFE-1: a minor's, unknown-age, ownerless or missing card gets the same plain 404, never a preview image.
+  if (!card) return new Response('Not found', { status: 404, headers: { 'Cache-Control': 'no-store' } });
   const accent = safeAccent(card?.accent);
   const rarity = (card && ['common', 'rare', 'epic', 'legendary'].includes(card.rarity) ? card.rarity : 'common') as CardRarity;
   const ring = RARITY_META[rarity].ring;

@@ -4,6 +4,7 @@
 // damp streaks), concrete (slab seams, aggregate), asphalt (dark grain, faint patch lines).
 import { Color3, DynamicTexture, PBRMaterial, Texture } from '@babylonjs/core';
 import type { AbstractMesh, Scene, TransformNode } from '@babylonjs/core';
+import { sceneModeId, wave2Look } from '../scene/lookPolicy';
 
 export type GroundKind = 'grass' | 'sand' | 'concrete' | 'asphalt';
 /** metres one tile of the texture covers */
@@ -140,19 +141,56 @@ export function groundDetailTexture(scene: Scene, kind: GroundKind, size = 512):
   // headless (NullEngine) canvases hand back no pixels — keep the untouched grain rather than dying (skate headless suite, 2026-09-06)
   const img = ctx.getImageData?.(0, 0, size, size); const d = img?.data;
   if (!d) { tex.update(false); tex.wrapU = Texture.WRAP_ADDRESSMODE; tex.wrapV = Texture.WRAP_ADDRESSMODE; map.set(kind, tex); return tex; }
-  let sum = 0;
-  for (let i = 0; i < d.length; i += 4) sum += 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
-  const mean = sum / (d.length / 4) || 128;
-  for (let i = 0; i < d.length; i += 4) {
-    const l = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
-    d[i] = Math.max(0, Math.min(255, Math.round(128 + (l - mean) * 1.6)));   // luminance around neutral, contrast up
-    d[i + 1] = 128; d[i + 2] = 128; d[i + 3] = 128;                          // flat normal, neutral roughness
-  }
+  encodeDetail(d, size, DETAIL_RELIEF[kind]);
   ctx.putImageData(img, 0, 0);
   tex.update(false);
   tex.wrapU = Texture.WRAP_ADDRESSMODE; tex.wrapV = Texture.WRAP_ADDRESSMODE; tex.anisotropicFilteringLevel = 8;
   map.set(kind, tex);
   return tex;
+}
+
+/**
+ * How much relief the grain carries (vis-foundation-2 A9.14): the grain's own luminance read as a height field. Grass
+ * blades and asphalt aggregate stand up; a sand ripple and a concrete slab barely. `normal` scales the slopes into the
+ * detail normal; `rough` how far the roughness swings with the grain (a dark speck of aggregate is rougher, a pale
+ * polished patch smoother).
+ */
+export const DETAIL_RELIEF: Record<GroundKind, { normal: number; rough: number }> = {
+  grass: { normal: 2.2, rough: 0.5 }, sand: { normal: 1.4, rough: 0.35 }, concrete: { normal: 1.0, rough: 0.6 }, asphalt: { normal: 2.0, rough: 0.7 },
+};
+/** The detail map's bump and roughness levels on a floor, where the wave-2 look reaches (Babylon's detail map: R albedo,
+ *  G normal y, B roughness, A normal x; 0.5 = no change). */
+export const DETAIL_LEVELS: Record<GroundKind, { bump: number; rough: number }> = {
+  grass: { bump: 0.55, rough: 0.5 }, sand: { bump: 0.4, rough: 0.4 }, concrete: { bump: 0.3, rough: 0.5 }, asphalt: { bump: 0.5, rough: 0.6 },
+};
+
+/** Pure: the floor's detail bump / roughness levels — the relief where the wave-2 look reaches, none on a held mode. */
+export function detailLevelsFor(kind: GroundKind, modeId: string | null): { bump: number; rough: number } {
+  return wave2Look(modeId) ? DETAIL_LEVELS[kind] : { bump: 0, rough: 0 };
+}
+
+/**
+ * Pure: encode an RGBA grain (in place) as a Babylon detail map. R: luminance around neutral, contrast up (as before);
+ * A / G: the tangent-space normal from the luminance's slopes (wrapping, so the tile stays seamless); B: roughness swinging
+ * with the grain. Before 2026-10-13 the three were flat (128) and the floors' detail bump and roughness levels were 0.
+ */
+export function encodeDetail(d: Uint8ClampedArray | number[], size: number, relief: { normal: number; rough: number }): void {
+  const n = size * size;
+  const lum = new Float32Array(n);
+  let sum = 0;
+  for (let i = 0; i < n; i++) { const l = 0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2]; lum[i] = l; sum += l; }
+  const mean = sum / n || 128;
+  const L = (x: number, y: number): number => lum[((y + size) % size) * size + ((x + size) % size)] / 255;
+  const c = (v: number): number => Math.max(0, Math.min(255, Math.round(v)));
+  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+    const i = y * size + x, o = i * 4;
+    const dx = (L(x + 1, y) - L(x - 1, y)) * relief.normal, dy = (L(x, y + 1) - L(x, y - 1)) * relief.normal;
+    const len = Math.hypot(dx, dy, 1);
+    d[o] = c(128 + (lum[i] - mean) * 1.6);                        // luminance around neutral, contrast up
+    d[o + 3] = c((-dx / len * 0.5 + 0.5) * 255);                  // normal x
+    d[o + 1] = c((-dy / len * 0.5 + 0.5) * 255);                  // normal y
+    d[o + 2] = c(128 - (lum[i] - mean) * relief.rough);           // darker grain is rougher
+  }
 }
 
 /** Layer the grain over a built venue floor (`venue_ground` under `root`, PBR material). No-op for kinds without a grain. */
@@ -180,8 +218,11 @@ function applyDetail(scene: Scene, ground: AbstractMesh, mat: PBRMaterial, detai
   mat.detailMap.isEnabled = true;
   mat.detailMap.texture = tex;
   mat.detailMap.diffuseBlendLevel = detail.blend;
-  mat.detailMap.bumpLevel = 0;
-  mat.detailMap.roughnessBlendLevel = 0;
+  // A9.14 (vis-foundation-2): the grain has relief now — on the modes the wave-2 look reaches (lookPolicy); the held hoops
+  // floors keep the albedo-only grain they shipped with
+  const lv = detailLevelsFor(detail.kind, sceneModeId(scene));
+  mat.detailMap.bumpLevel = lv.bump;
+  mat.detailMap.roughnessBlendLevel = lv.rough;
   ground.onDisposeObservable.add(() => tex.dispose());
   return true;
 }

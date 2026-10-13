@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { rateLimit, clientKeyFromHeaders } from '@/lib/rate-limit';
-import { getMyCard, upsertMyCard } from '@/lib/creator/card-service';
+import { canPublishCard, getMyCard, upsertMyCard } from '@/lib/creator/card-service';
 import { isValidMpMode } from '@/lib/mp/match-core';
 import { isValidAccent } from '@/lib/creator/card-core';
 import { normalizeHighlights, normalizeVisibility } from '@/lib/creator/card-stats';
@@ -17,7 +17,9 @@ export async function GET() {
   const userId = (session?.user as any)?.id as string | undefined;
   if (!userId) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   const card = await getMyCard(prisma, userId);
-  return NextResponse.json({ ok: true, card: card ?? null });
+  // CARD-SAFE-1: the editor shows the publish control only when the server says this account may publish.
+  const canPublish = await canPublishCard(prisma, userId);
+  return NextResponse.json({ ok: true, card: card ?? null, canPublish });
 }
 
 /** POST /api/v1/card — create/update the caller's card (cosmetic fields only). */
