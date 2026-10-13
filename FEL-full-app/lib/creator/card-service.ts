@@ -10,6 +10,7 @@
 import 'server-only';
 import { PrismaClient } from '@/public/_prisma/client';
 import { computeTraceablePrq } from '@/lib/prq-entries';
+import { isVerifiedAdult } from '@/lib/coach-store/adult';
 import {
   deriveRarity, slugCandidate, safeAccent, clampCardText, isValidSlug,
   type CardRarity,
@@ -104,13 +105,23 @@ export async function getMyCard(db: Db, userId: string) {
   return db.creatorCard.findFirst({ where: { ownerId: userId } });
 }
 
+/**
+ * CARD-SAFE-1 (FE PM Oct 12): may this account have a public card? Only a verified adult, by the same check the 18+
+ * gate already uses (isVerifiedAdult -> canWriteHealthData). Under 18, or an unknown age, has no public presence.
+ */
+export async function canPublishCard(db: Db, userId: string): Promise<boolean> {
+  return isVerifiedAdult(db, userId);
+}
+
+/** Toggle visibility. Publishing is refused ('adults_only') for anyone who is not a verified adult; unpublishing always works. */
 export async function setPublished(db: Db, userId: string, published: boolean) {
   const existing = await db.creatorCard.findFirst({ where: { ownerId: userId }, select: { id: true } });
   if (!existing) return null;
+  if (published && !(await canPublishCard(db, userId))) return 'adults_only' as const;
   return db.creatorCard.update({ where: { id: existing.id }, data: { published } });
 }
 
-/** Public read by slug. Only published cards are visible; bumps the view count. */
+/** Public read by slug. Only published cards of verified-adult owners are visible; bumps the view count. */
 export async function getPublicCard(db: Db, slug: string) {
   const card = await db.creatorCard.findUnique({
     where: { slug },
@@ -119,6 +130,8 @@ export async function getPublicCard(db: Db, slug: string) {
     include: { owner: { select: { profile: { select: { avatarKey: true, cosmeticAssetId: true } } } } },
   });
   if (!card || !card.published) return null;
+  // CARD-SAFE-1: no public presence for an under-18 (or unknown-age) owner, whatever the published flag says.
+  if (!(await canPublishCard(db, card.ownerId))) return null;
   // Best-effort view increment — never block the render on it.
   db.creatorCard.update({ where: { id: card.id }, data: { views: { increment: 1 } } }).catch(() => {});
   return card;
