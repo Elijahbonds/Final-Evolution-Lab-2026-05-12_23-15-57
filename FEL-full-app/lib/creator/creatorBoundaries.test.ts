@@ -80,4 +80,16 @@ describe('creator platform boundaries (PR #18 slimmed down, owner 2026-10-13)', 
     expect(index).toContain('coachStoreBookHref(profile)');
     expect(readFileSync('lib/creator/creatorCatalog.ts', 'utf8')).toContain('`/coach/${profile.coachStoreSlug}`');
   });
+
+  it('/work-with-us shows the form only when the inquiry table exists, and says "unavailable" otherwise', () => {
+    const page = readFileSync('app/work-with-us/page.tsx', 'utf8');
+    const probeAt = page.indexOf('inquiriesReady(');
+    const gateAt = page.indexOf('{open ? (');
+    const formAt = page.indexOf('<InquiryForm');
+    expect(probeAt).toBeGreaterThan(-1);
+    expect(gateAt).toBeGreaterThan(probeAt);
+    expect(formAt).toBeGreaterThan(gateAt);
+    expect(page).toContain('INQUIRIES_UNAVAILABLE_MESSAGE');
+    expect(page).not.toMatch(/\{true \? \(/);
+  });
 });
