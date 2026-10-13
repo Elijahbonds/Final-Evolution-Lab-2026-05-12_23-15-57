@@ -11,6 +11,7 @@ import { Providers } from '@/components/providers'
 import { Toaster } from '@/components/ui/sonner'
 import { ChunkLoadErrorHandler } from '@/components/chunk-load-error-handler'
 import { SoundtrackDock } from '@/components/soundtrack/soundtrack-dock'
+import { PartyDock } from '@/components/party/social/party-dock'
 
 export const dynamic = 'force-dynamic'
 
@@ -113,6 +114,9 @@ export default function RootLayout({
           {/* IMPORTANT: Do not remove — handles chunk loading race conditions in the dev server */}
           <ChunkLoadErrorHandler />
         </Providers>
+        {/* PSN-STYLE PARTY (owner, 2026-10-09): outside <Providers> so nothing ever remounts it — the party and its voice
+            carry on across every page and into every game. Renders nothing when you are not in a party. */}
+        <PartyDock />
       </body>
     </html>
   )

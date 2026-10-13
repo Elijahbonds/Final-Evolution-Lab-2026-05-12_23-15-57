@@ -42,7 +42,9 @@ const UA = 'AgeScreenTest/1.0';
 // AGE-SCREEN originally pinned the pre-age-screen tip so that PR could not smuggle a schema change; every
 // intentional schema PR must bump this to the commit that contains its prisma/ files, or CI stays red.
 // CREATOR-PLATFORM (PR #18) prisma/pending/2026-10-13-creator-inquiry.sql (pending SQL only, owner applies) at 5a2755a4.
-const PARENT = '5a2755a412fc31d11278fa56e53c712103ac4943';
+// PARTY-CHAT P2 prisma/pending/2026-10-13-party-report.sql (pending SQL only; schema.prisma untouched) at be3f5207;
+// pinned at the lane/party-chat merge of lane/finish-release, the first commit carrying all three pending files.
+const PARENT = '55efd05dd838d1f6aa694ecabc06cbbbfd3d3bcd';
 
 /** Resolve a diff base for the schema-ban check when CI's checkout is shallow. */
 function resolvePrismaDiffBase(): string {
