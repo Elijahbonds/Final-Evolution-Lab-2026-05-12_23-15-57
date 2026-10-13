@@ -9,6 +9,7 @@ import { isHost, type PartyMember, type PartyState } from '@/lib/party/social/st
 import { REPORT_REASONS } from '@/server/netd/src/partyRules';
 import { Avatar, InviteBlock } from './party-bits';
 import { ChatSection } from './party-chat';
+import { VoiceSection, useVoice } from './party-voice';
 
 export function PartyPanel({ s, onClose }: { s: PartyState; onClose: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -70,6 +71,7 @@ export function PartyPanel({ s, onClose }: { s: PartyState; onClose: () => void 
           ) : null}
 
           <Members s={s} host={host} />
+          <VoiceSection s={s} />
           <ChatSection s={s} />
         </div>
 
@@ -85,12 +87,13 @@ export function PartyPanel({ s, onClose }: { s: PartyState; onClose: () => void 
 }
 
 function Members({ s, host }: { s: PartyState; host: boolean }) {
+  const voice = useVoice();
   return (
     <section aria-label="Members" className="space-y-1.5">
       <h3 className="font-mono text-[10px] tracking-[0.25em] text-white/45">IN THE PARTY</h3>
       <ul className="space-y-1.5">
         {s.members.map((m) => (
-          <MemberRow key={m.peer} m={m} you={m.peer === s.you} host={host} speaking={false} />
+          <MemberRow key={m.peer} m={m} you={m.peer === s.you} host={host} speaking={!!voice.speaking[m.peer]} conn={voice.peers[m.peer]} />
         ))}
       </ul>
     </section>
@@ -101,11 +104,12 @@ function MemberRow({ m, you, host, speaking, conn }: { m: PartyMember; you: bool
   const [open, setOpen] = useState(false);
   const [reporting, setReporting] = useState(false);
   const c = partyClient();
-  const muted = false;
+  const voice = useVoice();
+  const muted = voice.mutedPubs.includes(m.pub);
   const voiceLine = !m.voice ? null : m.deafened ? 'Deafened' : m.muted ? 'Mic muted' : conn === 'failed' ? "Voice couldn't connect" : speaking ? 'Speaking' : 'In voice';
   const label = [m.name, you ? '(you)' : '', m.host ? 'host' : '', m.connected ? '' : 'reconnecting', m.activity ?? '', voiceLine ?? ''].filter(Boolean).join(', ');
   return (
-    <li className="rounded-lg bg-white/[0.04] px-3 py-2" data-testid="party-member" data-name={m.name} aria-label={label}>
+    <li className="rounded-lg bg-white/[0.04] px-3 py-2" data-testid="party-member" data-name={m.name} data-voice-link={conn ?? ''} aria-label={label}>
       <div className="flex items-center gap-2.5">
         <Avatar name={m.name} pub={m.pub} speaking={speaking} dim={!m.connected} />
         <div className="min-w-0 flex-1">
@@ -127,6 +131,7 @@ function MemberRow({ m, you, host, speaking, conn }: { m: PartyMember; you: bool
       </div>
       {open && !you ? (
         <div className="mt-2 flex flex-wrap gap-1.5">
+          <button type="button" data-testid="party-mute-for-me" className="rounded-md border border-white/20 px-2 py-1 text-xs" aria-pressed={muted} onClick={() => voice.toggleMutePub(m.pub)}>{muted ? 'Unmute' : 'Mute'} for me</button>
           <button type="button" data-testid="party-block" className="rounded-md border border-white/20 px-2 py-1 text-xs" onClick={() => { c.block(m); setOpen(false); }}>Block</button>
           <button type="button" data-testid="party-report" className="rounded-md border border-white/20 px-2 py-1 text-xs" aria-expanded={reporting} onClick={() => setReporting((r) => !r)}>Report</button>
           {host ? <button type="button" className="rounded-md border border-white/20 px-2 py-1 text-xs" onClick={() => { c.makeHost(m.peer); setOpen(false); }}>Make host</button> : null}

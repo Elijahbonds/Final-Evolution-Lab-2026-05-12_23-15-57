@@ -200,7 +200,9 @@ export function disconnect(p: Party, peer: string, now: number): Effects {
   const m = p.members.get(peer);
   if (!m) return none();
   if (!m.admitted) { p.members.delete(peer); return { out: broadcastState(p), close: [] }; }
-  m.connected = false; m.goneAt = now; m.voice = false;
+  // voice is NOT switched off: the audio is peer-to-peer and outlives a signaling blip; the page re-states its voice
+  // when it resumes, and p_left ends it everywhere if the grace runs out
+  m.connected = false; m.goneAt = now;
   return { out: broadcastState(p), close: [] };
 }
 

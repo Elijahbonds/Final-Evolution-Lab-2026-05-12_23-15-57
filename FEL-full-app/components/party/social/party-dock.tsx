@@ -11,7 +11,7 @@
 //   - It tells the party what this page is doing ("Playing Downtown").
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { usePathname } from 'next/navigation';
-import { Users } from 'lucide-react';
+import { Mic, MicOff, Users } from 'lucide-react';
 import { partyClient } from '@/lib/party/social/client';
 import { captionText, inParty, type PartyState } from '@/lib/party/social/state';
 import { dockPlace, type DockPlace } from '@/lib/party/social/tuck';
@@ -22,6 +22,7 @@ import { isQuickScreenPath } from '@/lib/screen/routes';
 import { useParty } from './use-party';
 import { Avatar } from './party-bits';
 import { PartyPanel } from './party-panel';
+import { TalkButton, useVoice } from './party-voice';
 
 export function PartyDock() {
   const pathname = usePathname() || '/';
@@ -32,6 +33,10 @@ export function PartyDock() {
   const quick = isQuickScreenPath(pathname);
   const [open, setOpen] = useState(false);
   const close = useCallback(() => setOpen(false), []);
+
+  // the voice mesh listens from the start (a friend's offer must be answered even with the panel closed)
+  const voice = useVoice();
+  void voice;
 
   // a full reload: rejoin the stored party (never on the Quick Screen, which sends nothing before the age question)
   useEffect(() => {
@@ -79,6 +84,7 @@ export function PartyDock() {
 
 function PartyBar({ s, place, onOpen }: { s: PartyState; place: DockPlace; onOpen: () => void }) {
   const tucked = place === 'tucked';
+  const v = useVoice();
   const others = s.members.filter((m) => m.peer !== s.you);
   const status = s.status === 'waiting' ? 'Waiting for the host…' : s.status === 'reconnecting' ? 'Reconnecting…' : `${s.members.length} in party`;
   return (
@@ -97,11 +103,19 @@ function PartyBar({ s, place, onOpen }: { s: PartyState; place: DockPlace; onOpe
           className="flex items-center gap-1.5 rounded-full py-0.5 pl-1 pr-2 hover:bg-white/10"
         >
           <span className="flex -space-x-2">
-            {s.members.slice(0, 6).map((m) => <Avatar key={m.peer} name={m.name} pub={m.pub} size={tucked ? 22 : 26} dim={!m.connected} />)}
+            {s.members.slice(0, 6).map((m) => <Avatar key={m.peer} name={m.name} pub={m.pub} size={tucked ? 22 : 26} dim={!m.connected} speaking={!!v.speaking[m.peer]} />)}
             {!s.members.length ? <Users className="h-5 w-5 text-white/70" /> : null}
           </span>
           <span className="whitespace-nowrap font-mono text-[11px] font-bold text-white/80">{status}</span>
         </button>
+        {v.joined ? (
+          <button type="button" data-testid="party-bar-mute" aria-pressed={v.muted} aria-label={v.muted ? 'Unmute your microphone' : 'Mute your microphone'}
+            onClick={() => v.setMuted(!v.muted)}
+            className={`rounded-full p-1.5 ${v.muted ? 'bg-rose-500/20 text-rose-300' : 'text-[#00FF9D] hover:bg-white/10'}`}>
+            {v.muted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+          </button>
+        ) : null}
+        {v.joined && v.ptt && !v.muted ? <TalkButton v={v} compact /> : null}
       </div>
     </div>
   );
