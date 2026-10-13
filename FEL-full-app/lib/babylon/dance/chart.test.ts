@@ -128,19 +128,18 @@ describe('DENSITY PAYS AS STYLE: a chart\'s steps are its moves, every other pre
         const old = OLD_COUNTS[s.id as keyof typeof OLD_COUNTS];
         expect(chartStepsFor(s)!.length).toBe(Math.min(st.authoredMoves, old));
         expect(st.demoted).toBe(Math.max(0, st.authoredMoves - old));
+        expect(chartStepsFor(s)!.length).toBe(old);          // every song has at least its old count authored: none is short
       });
-      it(`${s.id}: a flawless run scores exactly what the generated chart scored${s.id === 'warmup' ? ' — except WARMUP, authored with 25 moves against 26 (−4.5 %: 9,125 against 9,555)' : ''}`, () => {
-        const authored = flawless(chartStepsFor(s)!, s.bpm).score;
-        const generated = flawless(stepsForSong(s), s.bpm).score;
-        if (s.id === 'warmup') {
-          expect(authored).toBe(9_125);
-          expect(generated).toBe(9_555);
-          expect(authored).toBeLessThan(generated);
-        } else {
-          expect(authored).toBe(generated);
-        }
+      it(`${s.id}: a flawless run scores exactly what the generated chart scored`, () => {
+        expect(flawless(chartStepsFor(s)!, s.bpm).score).toBe(flawless(stepsForSong(s), s.bpm).score);
       });
     }
+    it('the flawless scores, pinned: pay is unchanged on all six songs, WARMUP included (26 scored moves, one promoted from an accent)', () => {
+      expect(Object.fromEntries(FEL_SONGS.map((s) => [s.id, flawless(chartStepsFor(s)!, s.bpm).score]))).toEqual({
+        warmup: 9_555, cypher: 10_875, goldenhour: 12_240, battle: 15_105, canals: 16_605, evolution: 19_740,
+      });
+      expect(chartStats(chartFor('warmup')!, song('warmup')).authoredMoves).toBe(26);   // no demotion needed: the chart HAS its 26
+    });
     it('the moves beyond the cap are STYLE taps, not dropped, and are spread across the whole song', () => {
       for (const s of FEL_SONGS) {
         const plan = planChart(chartFor(s.id)!, s);

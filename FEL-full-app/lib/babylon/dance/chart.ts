@@ -21,10 +21,11 @@
 // steps the generated chart had (SCORED_STEP_CAP: 26 / 29 / 32 / 38 / 41 / 47), so a flawless run scores exactly what it
 // always did and pay is unchanged. The authored chart has more moves than that on five songs; the moves beyond the cap
 // become STYLE taps (selectScored picks them spread evenly across the song, keeping the first and last move, every break
-// freeze and a caller of every instrument, and never one that would sit in the 290 ms before a scored move). WARMUP has
-// 25 authored moves against a cap of 26, keeps all 25, and so scores 5 % under today's on a flawless run.
+// freeze and a caller of every instrument, and never one that would sit in the 290 ms before a scored move). WARMUP was
+// authored with 25 moves against a cap of 26; its late-hook accent on beat 5 (phrase hookAw) is a wave now, so it has exactly
+// 26 and every song's flawless score equals the generated chart's.
 // chart.test.ts holds all of it: the cap table is stepsForSong's counts, scored = min(authored, cap), the flawless score
-// equals the generated chart's (WARMUP excepted, pinned), and every shipped chart's steps sit under the ceiling's.
+// equals the generated chart's on all six songs (pinned), and every shipped chart's steps sit under the ceiling's.
 //
 // WHAT #46 DID DIFFERENTLY, AND WHAT STAYS TODAY'S (owner, 2026-10-13: "current design wins"):
 //   · #46 made a freeze a PRESS HOLD that paid score (DanceCore pressHoldBeats, a "hold" key on the note). Today a freeze
@@ -298,8 +299,8 @@ export function styleBeatsFromPresses(style: readonly ChartPress[]): number[] {
  * unchanged"). Each song's scored steps are at most this many — the number of steps danceTracks.stepsForSong generates for
  * it (chart.test.ts pins each to stepsForSong(song).length). The authored chart has more moves than that on five of the six
  * songs; the moves beyond the cap are not dropped, they become STYLE taps (the density rule). A song whose chart has FEWER
- * moves than its cap keeps them all: WARMUP is authored with 25 against 26, so its flawless score is 5 % under today's
- * (9,125 against 9,555) — not padded up to 26.
+ * moves than its cap keeps them all and would score under today's; WARMUP was that song (25 against 26) until one of its
+ * accents was promoted to a move (owner, 2026-10-13), so now every song has at least its cap and scores exactly today's.
  * It lives here, as a table, because chart.ts cannot import danceTracks (danceTracks imports chart). A song with no entry
  * is uncapped.
  */
