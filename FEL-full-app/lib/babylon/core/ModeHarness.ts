@@ -209,6 +209,11 @@ export interface ModeDefinition {
    *  pose read per body 30 times a second, so only a mode that replays pays it. Mounting it also mounts the replays' depth of
    *  field (desktop/high) at load, so its shaders never compile mid-game. */
   replay?: boolean;
+  /** vis-board (wave 2): false = this mode's replays run WITHOUT the depth of field. Mounting DOF at load (see `replay`) puts a depth-of-field
+   *  pass in the post chain for the whole session; measured on the snow run (desktop, 1080p, same camera and moment, `?nodof=1` vs not) it
+   *  flattens the frame — on the piste's foreground the mean luma goes 222 → 198 and the groom texture's std 6.3 → 2.6 (its stripes and soft
+   *  shadows are gone) — so a mode whose ground is mostly white or whose look is in its surfaces opts out. The replay is otherwise the same (letterbox, angles, half speed). Default: DOF on. */
+  replayDof?: boolean;
   load(ctx: ModeContext): Promise<void>;        // spawn venue + characters
   onInput(ctx: ModeContext, e: FelInput): void;
   update(ctx: ModeContext, dt: number): void;   // called only while 'playing'
@@ -605,7 +610,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
       // would build the grid from an empty scene and do nothing.
       iblShadows = mountIblShadows(scene, camera);
       // A9.12: the replay recorder on the bodies load() spawned, and the replays' depth of field mounted now (no mid-game compile)
-      replay?.dispose(); replay = def.replay ? new ReplayDirector(scene, camera, characterRoots(scene, heroRef.current), [], mountReplayDof(scene, lights.pipeline, tier)) : null;
+      replay?.dispose(); replay = def.replay ? new ReplayDirector(scene, camera, characterRoots(scene, heroRef.current), [], (def.replayDof === false ? null : mountReplayDof(scene, lights.pipeline, tier))) : null;
       setPhase('ready');
       // M67: pre-warm every material now, on the loading→ready boundary, so a
       // first-visibility shader compile never hitches mid-play. Dev-only work.

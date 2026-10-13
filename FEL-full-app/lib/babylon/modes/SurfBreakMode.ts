@@ -452,6 +452,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
     modeId: 'surf', camPreset: 'surf',
     hideRingInPlay: true,
     intro: 'walkIn',   // vis-board (wave 2): a crane over the break, then the surfer on the face; the first input skips it (the board trims itself in until then)
+    replayDof: false,  // vis-board: the DOF mount flattens the frame (core/ModeHarness.replayDof)
     replay: true,      // vis-board (wave 2): the best barrel or banked line, replayed from the water (ctx.highlight)
     // MOVEMENT PLAY P8: the card — the floor's lines, then the grab, the cutback and the spin this mode reads itself
     body: { lines: rideLines('surf') },

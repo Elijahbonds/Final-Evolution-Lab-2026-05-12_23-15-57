@@ -538,6 +538,7 @@ export const SnowboardSlalomMode: ModeDefinition = (() => {
   return {
     modeId: 'snowboard', camPreset: 'descent',
     hideRingInPlay: true,
+    replayDof: false,   // vis-board: the DOF mount flattens the white piste (core/ModeHarness.replayDof)
     replay: true,   // vis-board (wave 2): the best banked line, replayed (ctx.highlight at the bank). No intro: the rider is already sliding when play starts
     // MOVEMENT PLAY P8: the card — the floor's lines, then the grab and the spin this mode reads itself
     body: { lines: rideLines('snowboard') },

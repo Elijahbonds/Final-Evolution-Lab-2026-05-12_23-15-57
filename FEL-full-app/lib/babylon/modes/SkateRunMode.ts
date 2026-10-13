@@ -639,6 +639,7 @@ export const SkateRunMode: ModeDefinition = (() => {
     modeId: 'skateboard', camPreset: 'board',
     hideRingInPlay: true,
     intro: 'walkIn',   // vis-board (wave 2): the crane over the park, then the rider; the first input skips it
+    replayDof: false,  // vis-board: the DOF mount flattens the frame (core/ModeHarness.replayDof)
     replay: true,      // vis-board (wave 2): the best banked combo, replayed from a filmer's angle (ctx.highlight at the bank)
     // MOVEMENT PLAY P8: the step is the mode's — a kick-push with the back foot is the PUSH (the row binds no step); the card
     // says the floor's lines, then the grab, the spin and the push this mode reads itself

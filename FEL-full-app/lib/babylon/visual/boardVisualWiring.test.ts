@@ -70,6 +70,18 @@ describe('every replaying board mode gates it', () => {
   });
 });
 
+describe('replays run without the depth of field on the board modes (it flattens the frame)', () => {
+  it('the harness honours replayDof: false', () => {
+    const h = read('lib/babylon/core/ModeHarness.ts');
+    expect(h).toMatch(/replayDof\?: boolean/);
+    expect(h).toMatch(/def\.replayDof === false \? null : mountReplayDof\(/);
+  });
+  for (const f of ['SkateRunMode', 'SnowboardSlalomMode', 'SurfBreakMode', 'FreeRunMode']) {
+    it(`${f} opts out`, () => { expect(read(`lib/babylon/modes/${f}.ts`)).toMatch(/replayDof: false,/); });
+  }
+  it('big air opts out whenever it replays', () => { expect(read('lib/babylon/modes/AirSessionMode.ts')).toMatch(/replayDof: opts\.broadcast\?\.replay \? false : undefined/); });
+});
+
 describe('the lane stays out of the held modes and the tuned numbers', () => {
   it('no visual file names a hoops mode', () => {
     for (const f of VISUAL_FILES) expect(read(f), f).not.toMatch(/'(?:dunk|dunkduel|onevone|threevthree|threepoint|carnival|basketball)'/);

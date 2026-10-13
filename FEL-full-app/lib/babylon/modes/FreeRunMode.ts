@@ -711,6 +711,7 @@ export const FreeRunMode: ModeDefinition = (() => {
   return {
     modeId: 'freerun', camPreset: 'runner',
     hideRingInPlay: true,
+    replayDof: false,   // vis-board: the DOF mount flattens the frame (core/ModeHarness.replayDof)
     replay: true,   // vis-board (wave 2): the run's best banked line, replayed mid-run (ctx.highlight at the bank) — never the finish
     // PLACE LOOKS (2026-09-18): the light and the sky are the place's — getters, because the harness reads both at mount
     get mood() { return readPlaceLook('freerun')?.world?.mood ?? 'nightGame'; },

@@ -318,6 +318,7 @@ export function makeAirSessionMode(opts: AirSessionModeOpts): ModeDefinition {
     camPreset: 'runner',
     intro: opts.broadcast?.intro,
     replay: opts.broadcast?.replay,
+    replayDof: opts.broadcast?.replay ? false : undefined,   // vis-board: the DOF mount flattens the white snow (core/ModeHarness.replayDof)
     // MOVEMENT PLAY P8: the steps are the mode's — the run-up in 'Run', ignored anywhere else (never the spin's direction).
     // The claim takes the P3 row's step → d-pad off the floor (dropping it is the cut line); the card says the run-up, the
     // spin and the grab this mode reads itself
