@@ -33,6 +33,15 @@ import { BuzzMatch, buildRounds as drawSceneRounds, MAX_PLAYERS, splitSceneVenue
 import { WHO_SCENE_IT_PACK } from '../content/quizPacks';
 import { SoundKit } from '../audio/SoundKit';
 import { Contestants, podiums } from '../party/Contestants';
+// vis-party (2026-10-13), VISUAL-PASS-PLAN Part B (who_scene_it): lit podiums, a whip-pan into each venue, a push-in on a right
+// answer, confetti at the winner's podium and each venue's own grade. Visual only — the rules, the clock, the points and the
+// sweep's radius / height / speed (TUNED) are untouched; the whip only adds a yaw offset that settles to nothing.
+import { mountQuizPodiums, type QuizPodiumsHandle } from '../party/quizPodiums';
+import { keepOutOfShadows } from '../party/shadowOpt';
+import { EffectsKit } from '../visual/EffectsKit';
+import { specFor } from '../nexus/venueSpecs';
+import { motionPolicy } from '@/lib/a11y/reducedMotion';
+import { WHIP_SEC, pipelineGrade, pushFov, questionGrade, stepGrade, whipYaw, type GradeLike } from './whoSceneItFx';
 import { refuse } from '../core/Refusal';
 // PIPELINES (2026-10-06): the pick screen lists approved community packs, credited, with play counts.
 import { cycleChoice, fetchScenePacks, noteScenePackStart, packLabel, packPickLine, sceneChoices, type SceneChoice } from '@/lib/pipelines/scenePicker';
@@ -151,6 +160,16 @@ export function makeWhoSceneItMode(): ModeDefinition {
   let shownKey = '';
   let baseFov = 0;                                   // #8: the camera's own lens; the zoom is a share of it
   let liveCtx: ModeContext | null = null;            // #16
+  // vis-party state
+  let podiumGlow: QuizPodiumsHandle | null = null;
+  let whipAge = WHIP_SEC;                            // seconds since a venue was shown (settled = WHIP_SEC and past)
+  let revealAge = 0;                                 // seconds into the answer card
+  let revealCorrect = false;                         // the reveal is a right answer's (the push-in)
+  let calmMotion = false;                            // reduced motion: no whip, no confetti
+  let restGrade: GradeLike = { exposure: 1, contrast: 1, vignette: 0 };   // the rig's own grade, taken at load
+  const gradeNow: GradeLike = { exposure: 1, contrast: 1, vignette: 0 };
+  let gradeTo: GradeLike = { exposure: 1, contrast: 1, vignette: 0 };
+  let gradeSettled = true;
   let phase: Phase = 'pick';
   let pickT = 0;
   let clock = WHO_SCENE_IT.timeLimit;
@@ -213,6 +232,12 @@ export function makeWhoSceneItMode(): ModeDefinition {
     venue?.hidePlaceholders();
     const env = envs.get(shownKey);
     if (env) applySceneEnv(ctx.scene, env);          // #1: this venue's sky and fog, not the last one built
+    // vis-party: a venue shown after the first arrives with a whip-pan under a bloom flare (the cut is hidden in it), and brings
+    // its own grade (the lights rig owns the grade since A9.3, so the venue's own look no longer reached the screen)
+    if (prev && prev !== shownKey && !calmMotion) { whipAge = 0; ctx.lights.flashBeat(); }
+    const vg = specFor(splitSceneVenue(shownKey).venueId)?.environment.grade;
+    gradeTo = questionGrade(restGrade, vg ? pipelineGrade(vg) : null);
+    gradeSettled = false;
     // #17: the venue just left behind goes off the shelf when nothing later in the match asks about it
     if (prev && prev !== shownKey && prev !== VAULT && !(match && venueNeededFrom(match.rounds, match.roundIndex, match.questionIndex, prev, VAULT))) {
       shelf.drop(prev); envs.delete(prev);
@@ -264,8 +289,9 @@ export function makeWhoSceneItMode(): ModeDefinition {
   }
 
   function layoutCast(): void {
-    if (!cast) return;
     const spots = podiums(seatCount(), PODIUM_AT);
+    podiumGlow?.place(Array.from({ length: MAX_PLAYERS }, (_, i) => (spots[i] ? { x: spots[i].at.x, z: spots[i].at.z, yaw: spots[i].yaw } : null)));
+    if (!cast) return;
     for (let i = 0; i < MAX_PLAYERS; i++) {
       const body = cast.at(i);
       if (!body) continue;
@@ -304,6 +330,7 @@ export function makeWhoSceneItMode(): ModeDefinition {
   /** A question opens: no picks, no answer shown, the rival's plan, and the lens tight on the floor (#8). */
   function openQuestion(ctx: ModeContext): void {
     picks = [-1, -1]; answerIdx = -1;
+    for (let i = 0; i < MAX_PLAYERS; i++) podiumGlow?.setState(i, 'armed');   // vis-party: every ring back to its seat colour
     rivalPlan = cpuSeated() ? armRival(WHO_SCENE_IT, Math.random) : null;
     if (baseFov > 0) ctx.camera.fov = baseFov * SCENE_ZOOM.start;
   }
@@ -339,18 +366,24 @@ export function makeWhoSceneItMode(): ModeDefinition {
       const p = match.players[r.player];
       bestStreak[r.player] = Math.max(bestStreak[r.player], p.streak);
       SoundKit.play('score', { pitch: 1 + Math.min(0.5, p.streak * 0.08) }); ctx.juice.flash('#fff6dd', 90);
+      // vis-party: the winner's podium lights green and throws confetti over its head; the lens pushes in on the reveal
+      podiumGlow?.setState(r.player, 'right');
+      const spot = podiums(seatCount(), PODIUM_AT)[r.player];
+      if (spot && !calmMotion) EffectsKit.burst(ctx.scene, new Vector3(spot.at.x, 2.4, spot.at.z), 'confetti', 1.1);
+      revealCorrect = true;
       // #13: a right answer is felt too — a light double pulse, not the wrong answer's thud (a CPU's right answer is not yours)
       if (r.player < players) { HAPTIC.perfect(); padRumble(0.3, 90); }
       recap.push({ venue: right, by: match.players[r.player].name, sec: WHO_SCENE_IT.timeLimit - clock, points: r.points });
       hud(ctx, { banner: `${name(r.player)}CORRECT +${r.points}${p.streak > 1 ? ` · streak x${r.multiplier.toFixed(2)}` : ''}`, reveal: q.explain ?? `It's ${right}.` });
     } else {
-      if (by !== null) queueVerdict(by, false);
+      if (by !== null) { queueVerdict(by, false); podiumGlow?.setState(by, 'wrong'); }   // vis-party: the buzzer light goes red
+      revealCorrect = false;
       SoundKit.play(r.timeout ? 'whistle' : 'miss'); ctx.feel.impact(0.25);
       recap.push({ venue: right, by: null, sec: null, points: 0 });
       const who = by !== null && choice !== null ? `${name(by)}WRONG` : 'TIME';
       hud(ctx, { banner: `${who} — it was ${right}`, reveal: q.explain ?? '' });
     }
-    revealT = REVEAL_S;
+    revealT = REVEAL_S; revealAge = 0;
     bannerLeft = 0;
   }
 
@@ -360,9 +393,11 @@ export function makeWhoSceneItMode(): ModeDefinition {
     if (r === null) return;      // a locked-out seat's press does nothing — and no longer slaps the buzzer either
     picks[player] = choice;
     buzzPose(player);            // the buzz is visible now; the verdict follows it after VERDICT_BEAT_S
+    podiumGlow?.setState(player, 'buzzed');   // vis-party: the ring goes white-hot on the buzz
     if (r === 'wrong') {
       // out for this question; the other player can steal with the clock that is left
       queueVerdict(player, false);   // IMPROVE (#4): the locked-out player flinches, so the room sees who is out
+      podiumGlow?.setState(player, 'out');   // vis-party: …and the ring goes grey
       SoundKit.play('miss', { volume: 0.7 }); ctx.feel.impact(0.15);
       bannerLeft = 0;                 // the opening banner's clear must not wipe the steal call
       const other = match.players[1 - player]?.name ?? '';
@@ -479,6 +514,14 @@ export function makeWhoSceneItMode(): ModeDefinition {
       baseFov = ctx.camera.fov;
       picks = [-1, -1]; answerIdx = -1; verdicts = []; recap = []; pendingEnd = null; endAge = 0; bannerLeft = 0; rivalPlan = null;
       liveCtx = ctx; liveRestarts.add(restart);
+      // vis-party: the podiums, the rig's own grade (what each venue's blends toward) and the motion setting, read once per load
+      calmMotion = motionPolicy().reduced;
+      restGrade = { exposure: ctx.lights.rest.exposure, contrast: ctx.lights.pipeline.imageProcessing.contrast, vignette: ctx.lights.rest.vignette };
+      Object.assign(gradeNow, restGrade); gradeTo = { ...restGrade }; gradeSettled = true; whipAge = WHIP_SEC;
+      podiumGlow?.dispose();
+      podiumGlow = mountQuizPodiums(ctx.scene, ['#22d3ee', '#f472b6']);
+      keepOutOfShadows(ctx.lights.shadows, podiumGlow.meshes);
+      layoutCast();
       castGen++; castPending = false;
       ensureCast(ctx);
       clock = WHO_SCENE_IT.timeLimit;
@@ -511,6 +554,16 @@ export function makeWhoSceneItMode(): ModeDefinition {
     },
 
     update(ctx: ModeContext, dt: number): void {
+      podiumGlow?.tick(dt);
+      // vis-party: ease the grade to this venue's. The flare (flashBeat) owns the pipeline's exposure while it decays, so the
+      // exposure is written only once it has had its time; the owned rest follows throughout (the flare returns to it).
+      if (!gradeSettled) {
+        gradeSettled = !stepGrade(gradeNow, gradeTo, dt);
+        const lights = ctx.lights, ip = lights.pipeline.imageProcessing;
+        lights.rest.exposure = gradeNow.exposure; lights.rest.vignette = gradeNow.vignette;
+        ip.contrast = gradeNow.contrast; ip.vignetteWeight = gradeNow.vignette;
+        if (whipAge > WHIP_SEC + 0.3) ip.exposure = gradeNow.exposure;
+      }
       // #3: verdict poses land once the buzz has had its beat
       if (verdicts.length) {
         for (const v of verdicts) v.t -= dt;
@@ -524,17 +577,20 @@ export function makeWhoSceneItMode(): ModeDefinition {
       }
       // the camera sweeps the mounted venue — a slow orbit at eye-plus height, always looking at the floor's centre
       sweepT += dt * WHO_SCENE_SWEEP.speed;
-      ctx.camera.position.set(Math.sin(sweepT) * WHO_SCENE_SWEEP.radius, WHO_SCENE_SWEEP.height, Math.cos(sweepT) * WHO_SCENE_SWEEP.radius);
+      whipAge += dt;
+      const yaw = sweepT + whipYaw(whipAge, calmMotion);   // vis-party: the whip-pan's offset, settled to 0 after WHIP_SEC
+      ctx.camera.position.set(Math.sin(yaw) * WHO_SCENE_SWEEP.radius, WHO_SCENE_SWEEP.height, Math.cos(yaw) * WHO_SCENE_SWEEP.radius);
       ctx.camera.setTarget(SWEEP_TARGET);
       // #8: a question opens tight on the floor and widens as the clock drains; everything else eases back to the full lens
       if (baseFov > 0) {
-        const share = phase === 'play' && revealT <= 0 ? zoomShare(WHO_SCENE_IT.timeLimit - clock, WHO_SCENE_IT.timeLimit) : 1;
+        // vis-party: a right answer's reveal pushes the lens in a touch (whoSceneItFx.pushFov); every other beat is as before
+        const share = phase === 'play' ? (revealT <= 0 ? zoomShare(WHO_SCENE_IT.timeLimit - clock, WHO_SCENE_IT.timeLimit) : pushFov(revealAge, revealCorrect)) : 1;
         ctx.camera.fov += (baseFov * share - ctx.camera.fov) * Math.min(1, dt * 8);
       }
       // #6: the pick screen only starts itself for a viewer with no pad
       if (phase === 'pick') { pickT += dt; if (pickAutoStarts(pickT >= PICK_TIMEOUT_S, ctx.input.pads().length)) begin(ctx); return; }
       if (phase === 'board') { boardT -= dt; if (boardT <= 0) startQuestion(ctx); return; }
-      if (revealT > 0) { revealT -= dt; if (revealT <= 0) advance(ctx); return; }
+      if (revealT > 0) { revealT -= dt; revealAge += dt; if (revealT <= 0) advance(ctx); return; }
       if (bannerLeft > 0) { bannerLeft -= dt; if (bannerLeft <= 0) hud(ctx, { banner: '' }); }   // #20
       const before = clock;
       clock -= dt;
@@ -554,6 +610,7 @@ export function makeWhoSceneItMode(): ModeDefinition {
 
     dispose(): void {
       unseat?.(); unseat = null; shelf.dispose(); venue = null; anchor?.dispose(); anchor = null; match = null;
+      podiumGlow?.dispose(); podiumGlow = null;   // vis-party
       // IMPROVE (#18/#16/#20): a spawn still in flight is disposed when it lands; REPLAY forgets this stage; no timer outlives it
       castGen++; castPending = false; cast?.dispose(); cast = null;
       liveRestarts.delete(restart); liveCtx = null;
