@@ -102,6 +102,8 @@ export interface HeadsOptions {
   pools?: boolean;
   /** Two stacked cones per beam for a soft edge (desktop+); the phones draw one. Default true. */
   soft?: boolean;
+  /** Scales every beam's and pool's alpha (a busy set wants fewer, fainter beams). Default 1. */
+  intensity?: number;
   /** Mesh-name prefix, e.g. 'dance_head'. A fixture's name contains `neon`, so the GlowLayer's include list takes the can. */
   name: string;
 }
@@ -165,6 +167,7 @@ export function mountMovingHeads(scene: Scene, o: HeadsOptions): HeadHandle {
   const pool = o.pools ? poolTexture(scene) : null;
   const n = Math.max(0, Math.min(o.count, o.specs.length));
   const radius = o.floorRadius ?? 1.1;
+  const gain = Math.max(0, o.intensity ?? 1);
   const layers = o.soft === false ? BEAM_LAYERS.slice(0, 1) : BEAM_LAYERS;
   const cones: Mesh[][] = [], pools: Mesh[] = [], cans: Mesh[] = [];
   const beamMats: PBRMaterial[][] = [], poolMats: PBRMaterial[] = [], canMats: PBRMaterial[] = [];
@@ -217,11 +220,11 @@ export function mountMovingHeads(scene: Scene, o: HeadsOptions): HeadHandle {
           Quaternion.FromUnitVectorsToRef(DOWN, _dir, cone.rotationQuaternion!);
           cone.position.copyFrom(_mid);
           cone.scaling.y = len;
-          beamMats[i][k].alpha = layers[k].alpha * level;
+          beamMats[i][k].alpha = layers[k].alpha * level * gain;
         }
         if (pool) {
           pools[i].position.set(t.x, fy + 0.01, t.z);
-          poolMats[i].alpha = 0.32 * level;
+          poolMats[i].alpha = 0.32 * level * gain;
         }
         canBase[i].scaleToRef(1.2 * (0.5 + level), canMats[i].emissiveColor);
       }

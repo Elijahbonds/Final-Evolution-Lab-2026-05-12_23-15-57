@@ -27,6 +27,12 @@ import {
 } from '@babylonjs/core';
 import { CATEGORIES, CATEGORY_COLOR, type Category } from '../core/BrainBrawlCore';
 import { PODIUM_TOP_M, PODIUM_AHEAD_M } from '../anim/authored/party';
+// vis-party (2026-10-13): TV game-show lighting — the moving heads (party/movingHeads.ts) on this stage's truss, and the "reduce
+// flashing" switch they and the wall's wash obey.
+import { mountMovingHeads, headCountFor, type HeadHandle, type HeadPhase, type HeadSpec } from './movingHeads';
+import { keepOutOfShadows } from './shadowOpt';
+import { motionPolicy } from '@/lib/a11y/reducedMotion';
+import type { ShadowGenerator } from '@babylonjs/core';
 
 /** The wheel: centre, radius, and a small tilt so its face points at the camera below it. */
 export const WHEEL = { x: 0, y: 4.85, z: -4.6, r: 1.45, tilt: 0.09 };
@@ -305,7 +311,8 @@ function buildWheel(scene: Scene): WheelParts {
     bulbSets[k % 2].push(b);
   }
   const bulbMats = [0, 1].map((s) => material(scene, `bb_bulb_mat_${s}`, { color: '#fff3c4', emissive: '#ffe7a3', glow: 1, roughness: 0.2 })) as [PBRMaterial, PBRMaterial];
-  bulbSets.forEach((set, s) => { const m = Mesh.MergeMeshes(set, true, true); if (m) { m.name = `bb_bulbs_${s}`; m.parent = root; m.material = bulbMats[s]; } });
+  bulbSets.forEach((set, s) => { const m = Mesh.MergeMeshes(set, true, true); if (m) { m.name = `bb_bulb_set_${s}`;   // vis-party: named for the foundation's glow include list (GLOW_MESH `bb_bulb_`) — the chasing bulbs now halo
+     m.parent = root; m.material = bulbMats[s]; } });
   // pegs between the wedges (what the flapper hits) and the wedge markers the probes measure
   const pegs: Mesh[] = [];
   for (let i = 0; i < 5; i++) {
@@ -444,7 +451,7 @@ function buildLectern(scene: Scene, seat: number, color: string): Lectern {
   const crown = MeshBuilder.CreateCylinder(`bb_lectern_top_${seat}`, { height: 0.035, diameter: 0.72, tessellation: 32 }, scene);
   crown.parent = root; crown.position.y = H + 0.018; crown.scaling.z = (depthTop + 0.04) / 0.72; crown.material = crownMat;
   const ringMat = material(scene, `bb_lectern_frontmat_${seat}`, { color: '#000000', emissive: color, glow: 0.3, roughness: 0.4 });
-  const ring = MeshBuilder.CreateTorus(`bb_lectern_ring_${seat}`, { diameter: 0.6, thickness: 0.03, tessellation: 40 }, scene);
+  const ring = MeshBuilder.CreateTorus(`bb_lectern_neon_ring_${seat}`, { diameter: 0.6, thickness: 0.03, tessellation: 40 }, scene);
   ring.parent = root; ring.position.y = H * 0.84; ring.scaling.z = depthTop / 0.6; ring.material = ringMat;
   // the buzzer dome where the slap lands (party_buzz: the right hand at +0.12 m, PODIUM_AHEAD_M forward)
   const buzzMat = material(scene, `bb_buzzer_mat_${seat}`, { color: '#b3122a', emissive: '#ff2d55', glow: 0.35, roughness: 0.2, metallic: 0.1 });
@@ -514,7 +521,23 @@ export interface StageHandle {
   /** IMPROVE (2026-10-06, #19): freeze the materials of the set that never change. Call once the harness has finished with
    *  the scene's materials (it lifts near-black albedos right AFTER load — a material frozen before that keeps the old value). */
   freezeStatic(): void;
+  /** vis-party: the truss's moving heads (null when none were built). */
+  heads: HeadHandle | null;
 }
+
+/** The truss: cans above the top of the frame, either side of the wheel, sweeping the deck and the podiums. */
+export const BB_HEADS: readonly HeadSpec[] = [
+  { at: [-7.5, 9.8, -6.5], color: '#8b7bff' },
+  { at: [7.5, 9.8, -6.5], color: '#22d3ee' },
+  { at: [-3.2, 10.2, -7.6], color: '#f472b6' },
+  { at: [3.2, 10.2, -7.6], color: '#facc15' },
+  { at: [-10, 9.4, -4.5], color: '#22d3ee' },
+  { at: [10, 9.4, -4.5], color: '#8b7bff' },
+];
+/** What the heads sweep: the deck in front of the wheel and the podiums. */
+export const BB_FLOOR = { cx: 0, cz: -1.2, halfX: 5.5, halfZ: 3 };
+/** TUNED (new): the heads' tempo off the song — an idle show, and the wheel in motion. */
+export const BB_BPM = { idle: 92, spin: 140 };
 
 /**
  * IMPROVE (2026-10-06, #19): what of the set never moves or changes. The world matrices freeze at build: the LED wall, its
@@ -531,7 +554,7 @@ const STATIC_MESH = /^(bb_wall_|bb_deck$|bb_gallery_|bb_wheel_(column|plinth|mar
  */
 const STATIC_MAT = /^(bb_wall_header_mat|bb_gallery_fascia_mat|bb_chrome|bb_gold|bb_stand|bb_pin_mat|bb_wheel_face_mat|bb_riser_mat_\d|bb_lectern_mat_\d)$/;
 
-export function buildStage(scene: Scene, seatColors: readonly string[]): StageHandle {
+export function buildStage(scene: Scene, seatColors: readonly string[], tier?: string, shadows?: ShadowGenerator | null): StageHandle {
   const wall = buildWall(scene);
   buildDeck(scene);
   const w = buildWheel(scene);
@@ -548,7 +571,16 @@ export function buildStage(scene: Scene, seatColors: readonly string[]): StageHa
   const baseGlow = wall.mats.map((m) => m.emissiveColor.clone());
   for (const m of scene.meshes) if (STATIC_MESH.test(m.name)) m.freezeWorldMatrix();
   let frozen = false;
+  // vis-party: the moving heads, steady (no beat bob) when the player asked for no flashing
+  const policy = motionPolicy();   // read once: a fresh media query per frame is too dear
+  const calm = !policy.flash;
+  const heads = tier ? mountMovingHeads(scene, {
+    name: 'bb_head', specs: BB_HEADS, floor: BB_FLOOR, count: headCountFor(tier), floorRadius: 1.1, pools: tier !== 'mobile', soft: tier !== 'mobile', intensity: 0.7,   // the wall behind is already the busiest thing in the frame
+  }) : null;
+  if (heads) keepOutOfShadows(shadows, heads.root.getChildMeshes());
+  let beats = 0;
   return {
+    heads,
     wheel: w.root, lecterns, crowd,
     flash(hexColor, k = 1) { wash = k; washColor = hex(hexColor); },
     freezeStatic() {
@@ -579,6 +611,13 @@ export function buildStage(scene: Scene, seatColors: readonly string[]): StageHa
       flapA = Math.max(-0.6, Math.min(0.6, flapA));
       w.flap.rotation.z = -flapA;
       for (const b of beams) b.visibility = 0.85 + Math.sin(t * 0.7 + b.position.x) * 0.15;
+      if (heads) {
+        // the show's tempo: it picks up with the wheel, and the heads converge on the deck when the wall washes (a claim, a landing)
+        beats += dt * ((spinSpeed > 0.3 ? BB_BPM.spin : BB_BPM.idle) / 60);
+        const bi = Math.floor(beats), bars = beats / 4;
+        const ph: HeadPhase = { beatIndex: bi, beatPhase: beats - bi, barIndex: Math.floor(bars), barPhase: bars - Math.floor(bars) };
+        heads.update(ph, Math.min(1, wash), Math.min(1, wash), calm);
+      }
       return ticked;
     },
   };

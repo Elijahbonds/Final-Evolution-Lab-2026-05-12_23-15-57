@@ -120,6 +120,14 @@ describe('moving heads: the meshes', () => {
     expect(scene.getMeshByName('tst_p_pool_0')!.position.y).toBeCloseTo(0.73, 5);
     h.dispose();
   });
+  it('intensity scales every beam and pool alpha, and a quieter set is never brighter than the default', () => {
+    const loud = mountMovingHeads(scene, { name: 'tst_i1', specs, floor, count: 1, pools: true });
+    const quiet = mountMovingHeads(scene, { name: 'tst_i2', specs, floor, count: 1, pools: true, intensity: 0.5 });
+    loud.update(ph(0, 0.3), 0, 0, true); quiet.update(ph(0, 0.3), 0, 0, true);
+    const alphaOf = (name: string): number => (scene.getMeshByName(name)!.material as unknown as { alpha: number }).alpha;
+    for (const part of ['beam_0_0', 'beam_0_1', 'pool_0']) expect(alphaOf(`tst_i2_${part}`)).toBeCloseTo(alphaOf(`tst_i1_${part}`) * 0.5, 9);
+    loud.dispose(); quiet.dispose();
+  });
   it('dispose takes every mesh and material with it', () => {
     const before = scene.meshes.length, mats = scene.materials.length;
     const h = mountMovingHeads(scene, { name: 'tst_d', specs, floor, count: 3, pools: true });

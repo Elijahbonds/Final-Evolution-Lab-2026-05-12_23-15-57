@@ -68,6 +68,7 @@ import { buildStage, SEATS, HOST_AT, HOST_CENTRE, WHEEL, type StageHandle } from
 import { BB_HOST, SEAT_LINES, hostLines, pickFrom, spinLines, type HostMoment, type SeatBeat } from '../party/brainBrawlLines';
 import { plantFeet, type PodiumFeet } from '../party/podiumFeet';
 import { EffectsKit } from '../visual/EffectsKit';
+import { motionPolicy } from '@/lib/a11y/reducedMotion';   // vis-party
 import { HAPTIC, padRumble } from '../premium/Haptics';
 // IMPROVE (2026-10-06): the owner-picked pass — its pure rules (brainBrawlPlay) and the two core helpers it added
 import { soloTier, scoreParts, type ChallengeKind } from '../core/BrainBrawlCore';
@@ -529,6 +530,8 @@ export const BrainBrawlMode: ModeDefinition = (() => {
     SoundKit.play('uiTick', { pitch: 1.35, volume: 0.7 });
     ctx.juice.flash(CATEGORY_COLOR[cat], 110, 0.45);
     S.stage?.flash(CATEGORY_COLOR[cat], 1);
+    // vis-party: the pin throws a burst of sparks in the landed category's colour (the wheel's landing beat had a flash and a tick)
+    if (motionPolicy().flash) EffectsKit.burst(ctx.scene, new Vector3(WHEEL.x, WHEEL.y + WHEEL.r + 0.2, WHEEL.z + 0.4), 'sparks', 1.4, CATEGORY_COLOR[cat]);
     hud(ctx, S, { banner: cat, hint: S.claims[cat] !== null && seatsIn(S) > 1 ? `held by ${names(S)[S.claims[cat]!]} — take it` : '' });
     host(S, `land.${cat}` as HostMoment);
   }
@@ -1017,7 +1020,7 @@ export const BrainBrawlMode: ModeDefinition = (() => {
       // propSetFor('brain_brawl') is null.)
       for (const n of S.venue?.built.root.getChildTransformNodes(true) ?? []) if (/^prop_(wall|banner)_/.test(n.name)) n.setEnabled(false);
       // the set, built to the camera's shot (BrainBrawlStage): the LED wall, the deck, the wheel, the podiums, the galleries
-      S.stage = buildStage(ctx.scene, SEAT_COLOR);
+      S.stage = buildStage(ctx.scene, SEAT_COLOR, ctx.lights.tier, ctx.lights.shadows);   // vis-party: the tier and the shadow rig, for the moving heads
       S.wheel = S.stage.wheel;
       S.anchor = new TransformNode('bb_anchor', ctx.scene); S.anchor.position.copyFrom(CAM_ANCHOR);
       // the 'court' preset and its snap, on Brain Brawl's own subject and objective (POLISH-2 N7: the whole podium in the shot)
