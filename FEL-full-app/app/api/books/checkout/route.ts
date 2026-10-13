@@ -8,22 +8,25 @@ import { clientKeyFromHeaders, rateLimit } from '@/lib/rate-limit';
 import {
   BookCheckoutError,
   bookCheckoutGate,
-  bookSharesPlatformStripeAccount,
   buildBookCheckoutParams,
   getBookStripe,
   stripeTaxEnabled,
 } from '@/lib/books/bookCheckout';
+import { isVerifiedAdult } from '@/lib/coach-store/adult';
 import { storeClosed } from '@/lib/coach-store/gate';
+import { STORE_TERMS_VERSION } from '@/lib/store-terms';
 
 /**
  * POST /api/books/checkout
- * Body: { offerId: string, idempotencyKey?: string }
- * Guest checkout is allowed. A signed-in buyer is attached by email.
- * Test mode only — assertStripeTestKey refuses sk_live_ before Stripe is called.
+ * Body: { offerId: string, termsAccepted: true, termsVersion: STORE_TERMS_VERSION, idempotencyKey?: string }
  *
- * MERGE (2026-10-09), ported to the release's store rules: every "cannot sell" answer is a 409 store_closed
- * (STORE-READY B2, was 503 test_mode_only); the B10 live-key fence VIRTUAL_PURCHASES_ENABLED (default OFF, "no
- * real-money product outside the coach store") closes book checkout too; Stripe's success/cancel URLs come from
+ * Owner answers 2026-10-13, the coach store's rules, in the coach store's order (lib/coach-store/checkout.ts):
+ *   1. closed store      -> 409 store_closed (BOOK_STORE_ENABLED off by default, no sk_test_ key, the B10 fence, no
+ *                           NEXTAUTH_URL). Books charge the PLATFORM Stripe account, test keys only.
+ *   2. not signed in     -> 401 unauthorized. There is no guest checkout.
+ *   3. no terms tick, or not the current STORE_TERMS_VERSION -> 409 terms_required { version }, before any Stripe call.
+ *   4. not a verified adult (isVerifiedAdult, unknown age counts as not adult) -> 403 adults_only.
+ * Only then is a customer attached and a Checkout Session created. Stripe's success/cancel URLs come from
  * siteOrigin() (B3), never the request's Origin header. See bookCheckoutGate.
  */
 export async function POST(req: NextRequest) {
@@ -40,32 +43,45 @@ export async function POST(req: NextRequest) {
   if (!gate.ok) return storeClosed(gate.reason);
   const origin = gate.origin;
 
+  let userId: string | undefined;
+  let customerEmail: string | null = null;
+  try {
+    const session = await getServerSession(authOptions);
+    userId = (session?.user as { id?: string } | undefined)?.id || undefined;
+    customerEmail = session?.user?.email ?? null;
+  } catch (err) {
+    console.error('[books-checkout] session lookup failed', err);
+  }
+  if (!userId) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+
   const body = await req.json().catch(() => ({}));
+  // The server is the terms gate (same check as the coach store): a missing tick OR a version that is not the
+  // current one is a 409 terms_required BEFORE any Stripe call. The 409 body names the current version.
+  if (body?.termsAccepted !== true || body?.termsVersion !== STORE_TERMS_VERSION) {
+    return NextResponse.json({ error: 'terms_required', version: STORE_TERMS_VERSION }, { status: 409 });
+  }
+  if (!(await isVerifiedAdult(prisma, userId))) {
+    return NextResponse.json({ error: 'adults_only' }, { status: 403 });
+  }
+
   const offerId = typeof body?.offerId === 'string' ? body.offerId.slice(0, 120) : '';
   const idempotencyKey = typeof body?.idempotencyKey === 'string' && /^[A-Za-z0-9_-]{8,80}$/.test(body.idempotencyKey)
     ? `book:${offerId}:${body.idempotencyKey}`
     : undefined;
 
   let customerId: string | null = null;
-  let customerEmail: string | null = null;
   try {
-    const session = await getServerSession(authOptions);
-    customerEmail = session?.user?.email ?? null;
-    const userId = (session?.user as { id?: string } | undefined)?.id;
-    // A saved StripeCustomer belongs to the platform account (STRIPE_SECRET_KEY). Reusing it on a separate book
-    // account (STRIPE_BOOKS_SECRET_KEY) would name a customer that account does not have and the session would fail.
-    if (userId && bookSharesPlatformStripeAccount()) {
-      const existing = await prisma.stripeCustomer.findUnique({ where: { userId } });
-      customerId = existing?.stripeCustomerId ?? null;
-      if (!customerId && customerEmail) {
-        const cust = await getBookStripe().customers.create({ email: customerEmail, metadata: { userId } });
-        try {
-          const created = await prisma.stripeCustomer.create({ data: { userId, stripeCustomerId: cust.id } });
-          customerId = created.stripeCustomerId;
-        } catch {
-          const again = await prisma.stripeCustomer.findUnique({ where: { userId } });
-          customerId = again?.stripeCustomerId ?? cust.id;
-        }
+    // The platform StripeCustomer (the coach store's) is the same Stripe account the books charge.
+    const existing = await prisma.stripeCustomer.findUnique({ where: { userId } });
+    customerId = existing?.stripeCustomerId ?? null;
+    if (!customerId && customerEmail) {
+      const cust = await getBookStripe().customers.create({ email: customerEmail, metadata: { userId } });
+      try {
+        const created = await prisma.stripeCustomer.create({ data: { userId, stripeCustomerId: cust.id } });
+        customerId = created.stripeCustomerId;
+      } catch {
+        const again = await prisma.stripeCustomer.findUnique({ where: { userId } });
+        customerId = again?.stripeCustomerId ?? cust.id;
       }
     }
   } catch (err) {

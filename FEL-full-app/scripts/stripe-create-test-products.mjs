@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Create the book shop's Stripe Products and Prices in TEST mode, one per row of a price file.
 //
-//   export STRIPE_BOOKS_SECRET_KEY=sk_test_...     (your own shell; never commit it)
+//   export STRIPE_SECRET_KEY=sk_test_...     (your own shell; never commit it)
 //   node scripts/stripe-create-test-products.mjs --allow-example            dry run: prints the plan, no Stripe calls
 //   node scripts/stripe-create-test-products.mjs --apply --allow-example    finds or creates each Product and Price
 //   node scripts/stripe-create-test-products.mjs --file <prices.json> --apply   a price file with real (non-EXAMPLE) rows
@@ -43,8 +43,8 @@ export function parseArgs(argv) {
 
 /** Null when the key is a Stripe test secret key; otherwise the reason it is refused. */
 export function testKeyProblem(key) {
-  if (!key) return 'STRIPE_BOOKS_SECRET_KEY is not set. Export an sk_test_ key in your own shell.';
-  if (!key.startsWith('sk_test_')) return 'STRIPE_BOOKS_SECRET_KEY is not an sk_test_ key. This script is test-mode only; live keys are refused.';
+  if (!key) return 'STRIPE_SECRET_KEY is not set. Export an sk_test_ key in your own shell.';
+  if (!key.startsWith('sk_test_')) return 'STRIPE_SECRET_KEY is not an sk_test_ key. This script is test-mode only; live keys are refused.';
   return null;
 }
 
@@ -200,7 +200,7 @@ export async function run({
     return 0;
   }
 
-  const key = env.STRIPE_BOOKS_SECRET_KEY ?? '';
+  const key = env.STRIPE_SECRET_KEY ?? '';
   const problem = testKeyProblem(key);
   if (problem) {
     error(problem);
