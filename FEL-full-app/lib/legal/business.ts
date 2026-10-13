@@ -38,3 +38,6 @@ export function renderMailingAddress(markdown: string, marker: string, address: 
  * every surface already shares) rather than typed here, so this file never forks it.
  */
 export const BUSINESS_CONTACT_EMAIL = SCREEN_CONTACT_EMAIL;
+
+/** The store's support phone (call or text), the same number the approved store terms print. COACH-THANKS. */
+export const BUSINESS_CONTACT_PHONE = '(424) 415-8330';
