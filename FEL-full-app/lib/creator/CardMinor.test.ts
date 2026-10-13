@@ -36,6 +36,20 @@ describe('CARD-SAFE-1 minor lock', () => {
     expect(await getPublicCard(fakeDb(null), 'kid')).toBeNull();
   });
 
+  // PM (11:26 PM PT Oct 12): no birth year on file is treated as a minor.
+  it('no birth year on file: publish is refused and canPublish is false (treated as a minor)', async () => {
+    const db = fakeDb(null, false);
+    expect(await canPublishCard(db, 'u1')).toBe(false);
+    expect(await setPublished(db, 'u1', true)).toBe('adults_only');
+    expect(db.creatorCard.update).not.toHaveBeenCalled();
+  });
+
+  it('owner row missing: the public card stays hidden', async () => {
+    const db = fakeDb(null);
+    db.user.findUnique = vi.fn(async () => null);
+    expect(await getPublicCard(db, 'kid')).toBeNull();
+  });
+
   it('an adult owner\'s published card is unaffected', async () => {
     const db = fakeDb(year - 30);
     const card = await getPublicCard(db, 'kid');
