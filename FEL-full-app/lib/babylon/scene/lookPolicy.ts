@@ -7,8 +7,12 @@
 
 /** The hoops family (Part B's dunk, dunkduel, onevone, threevthree, threepoint, carnival) and their older aliases. */
 export const WAVE2_HELD_MODES: ReadonlySet<string> = new Set([
-  'dunk', 'dunkduel', 'onevone', 'threevthree', 'threepoint', 'carnival', 'basketball', 'hoops1v1', 'hoops3v3', 'basketball_h2h', 'basketball_dunk',
+  'dunk', 'dunkduel', 'threepoint', 'basketball_h2h', 'basketball_dunk',
 ]);
+// vis-hoops-court (owner 2026-10-14, "Go on hoops"): onevone, threevthree and carnival (and the older names 'basketball', 'hoops1v1',
+// 'hoops3v3' for 1v1 and 3v3) left this set; the dunk lane lifts its own. Fixture lights, the sky and air, the glossy floor, the decals,
+// the wet surface and the sweat now reach those three. A system that looked wrong on one of them is held per mode, with its reason,
+// in WAVE2_HELD_SYSTEMS below (none yet).
 
 /** Pure: does this mode take the wave-2 shared look? An unknown mode (a preview, a test scene) does. */
 export function wave2Look(modeId: string | null | undefined): boolean {
