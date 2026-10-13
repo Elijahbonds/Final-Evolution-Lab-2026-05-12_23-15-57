@@ -1,4 +1,4 @@
-import { hasMove } from './HandleSystem';
+import { hasMove, fallbackMove, MOVE_HANDLE, type HandleMove } from './HandleSystem';
 // StickHandle — the RIGHT STICK as the dribble stick (owner, 2026-09-17: "a flip of the right stick should trigger something
 // with the character … reference the old 2K17 dribble system with the ability to momentum and momentum spam, momentum
 // behind the back, pausin', steezo roll").
@@ -33,6 +33,25 @@ export const STICK = {
 /** A sweep that resolves inside this of a flick was the same gesture: the flick was the rotation's entry sample. */
 export const FLICK_RETRACT_SEC = 0.3;
 
+/** H1 HOOPS-STICK-MOVES (hoops-input-rightstick.md §1, H-01): a push too slow for the flick clock still throws its move
+ *  when the stick comes back home within RESOLVE_SEC, aimed by the excursion's PEAK sample (never the release direction). */
+export const RESOLVE_SEC = 0.35;
+/** H-01: an excursion that has not flicked becomes a hold only after this (> RESOLVE_SEC, so a resolving push is never
+ *  stolen by the hold). After a fast flick the "pause after the cross" keeps STICK.holdSec. */
+export const HOLD_UNFLICKED_SEC = 0.38;
+/** H-03: PAUSIN' releases quietly (no explode) when the stick stays parked this long — a resting thumb can't freeze you. */
+export const PAUSE_MAX_SEC = 1.5;
+/** H-04: a gesture buffered during a spin / gather / finish lives at most this long from capture… */
+export const BUSY_BUFFER_MAX_MS = 700;
+/** …and for this long after the lock clears (the phase 5 window, same number the modes declare). */
+export const BUFFER_AFTER_CLEAR_MS = 220;
+/** H-04, pure: is a buffered gesture still live? `lockClearedAtMs` is null while the lock is still on (it does not age then). */
+export function bufferLive(capturedAtMs: number, lockClearedAtMs: number | null, nowMs: number): boolean {
+  if (nowMs - capturedAtMs > BUSY_BUFFER_MAX_MS) return false;
+  if (lockClearedAtMs === null) return true;
+  return nowMs - lockClearedAtMs <= BUFFER_AFTER_CLEAR_MS;
+}
+
 export class StickHandleReader {
   private mag = 0; private ang = 0;
   private homeAt = 0;            // when the stick was last home
@@ -41,6 +60,10 @@ export class StickHandleReader {
   private flicked = false;       // this excursion already flicked
   private held = false;          // a hold has been emitted for this excursion
   private sweepStartAng = 0; private sweepTurn = 0; private sweepAt = -1; private swept = false;
+  private peakMag = 0; private peakX = 0; private peakY = 0;   // H-01: the excursion's peak
+  private lastX = 0; private lastY = 0;                        // H-03: the last sample, for tick()
+  /** H-01: an excursion whose peak stayed under the flick ring and never held — the eye counts these misses. */
+  rejects = 0;
 
   /** Feed one raw sample; returns the gestures it completes (usually none). `now` in seconds. */
   feed(x: number, y: number, now: number): StickGesture[] {
@@ -50,11 +73,21 @@ export class StickHandleReader {
     if (home) {
       if (!this.wasHome) {
         if (this.held) out.push({ kind: 'release', heldSec: now - this.outAt });
+        else if (!this.flicked && !this.swept) {
+          // H-01, the slow path: the push came back home — resolve it from its peak, inside RESOLVE_SEC
+          if (this.peakMag >= STICK.flick && now - this.outAt <= RESOLVE_SEC) {
+            const px = this.peakX, py = this.peakY;
+            const dir: StickDir = Math.abs(px) >= Math.abs(py) ? (px > 0 ? 'right' : 'left') : (py > 0 ? 'down' : 'up');
+            out.push({ kind: 'flick', dir, dir8: dir8Of(px, py), x: px, y: py });
+          } else if (this.peakMag > STICK.centre) { this.rejects++; }
+        }
         this.held = false; this.flicked = false; this.swept = false; this.sweepAt = -1;
       }
+      this.peakMag = 0;
       this.homeAt = now; this.wasHome = true; this.outAt = -1;
     } else {
-      if (this.wasHome) { this.outAt = now; this.sweepStartAng = ang; this.sweepTurn = 0; this.sweepAt = now; this.wasHome = false; }
+      if (this.wasHome) { this.outAt = now; this.sweepStartAng = ang; this.sweepTurn = 0; this.sweepAt = now; this.wasHome = false; this.peakMag = 0; }
+      if (mag > this.peakMag) { this.peakMag = mag; this.peakX = x; this.peakY = y; }
       else {
         // the sweep: accumulate the signed turn around the ring while past the hold ring
         if (mag >= STICK.hold && this.mag >= STICK.hold) {
@@ -72,12 +105,26 @@ export class StickHandleReader {
         out.push({ kind: 'flick', dir, dir8: dir8Of(x, y), x, y });
       }
       // the hold: parked past the hold ring for a beat (a flick that stays out becomes a hold too — the pause after the cross)
-      if (!this.held && !this.swept && mag >= STICK.hold && now - this.outAt >= STICK.holdSec) { this.held = true; out.push({ kind: 'hold', x, y }); }
+      const h = this.holdCheck(mag, x, y, now); if (h) out.push(h);
     }
-    this.mag = mag; this.ang = ang;
+    this.mag = mag; this.ang = ang; this.lastX = x; this.lastY = y;
     return out;
   }
-  reset(): void { this.mag = 0; this.wasHome = true; this.outAt = -1; this.flicked = false; this.held = false; this.swept = false; this.sweepAt = -1; }
+  /** The hold clock: HOLD_UNFLICKED_SEC for an excursion that has not flicked (H-01), STICK.holdSec after a fast flick. */
+  private holdCheck(mag: number, x: number, y: number, now: number): StickGesture | null {
+    if (this.held || this.swept || this.wasHome || mag < STICK.hold) return null;
+    const need = this.flicked ? STICK.holdSec : HOLD_UNFLICKED_SEC;
+    if (now - this.outAt < need) return null;
+    this.held = true;
+    return { kind: 'hold', x, y };
+  }
+  /** H-03: re-run the hold check on the last sample with no new input (pads and the touch stick only emit on change, so
+   *  a still thumb never reached the hold clock). At most one hold per excursion. Pure. */
+  tick(now: number): StickGesture[] {
+    const h = this.holdCheck(this.mag, this.lastX, this.lastY, now);
+    return h ? [h] : [];
+  }
+  reset(): void { this.mag = 0; this.wasHome = true; this.outAt = -1; this.flicked = false; this.held = false; this.swept = false; this.sweepAt = -1; this.peakMag = 0; this.lastX = 0; this.lastY = 0; }
 }
 
 /** The eight ways: a diagonal is anything more than DIAG_MIN off both axes (a flick at 45° ± 22.5°). */
@@ -185,4 +232,19 @@ export const STEPBACK_WINDOW_SEC = 0.6;
 export const PAUSIN = { range: 4.2, minSpeed: 2.2, minTurbo: 0.08 } as const;
 export function pausinWanted(r: { sprint: boolean; dist: number; speed: number; turbo01: number }): boolean {
   return r.sprint && r.turbo01 >= PAUSIN.minTurbo && r.dist <= PAUSIN.range && r.speed >= PAUSIN.minSpeed;
+}
+
+/** H1 H-02: the HandleSystem name of a stick move ('snatchback' is 'snatch_back'; size-up has no rating and is free). */
+const STICK_TO_HANDLE: Partial<Record<StickMove, HandleMove>> = {
+  momentum_cross: 'momentum_cross', momentum_btb: 'momentum_btb', crossover: 'crossover', hesi: 'hesi', in_and_out: 'in_and_out',
+  between_legs: 'between_legs', behind_back: 'behind_back', steezo_roll: 'steezo_roll', stepback: 'stepback', snatchback: 'snatch_back', spin: 'spin',
+};
+const HANDLE_TO_STICK: Partial<Record<HandleMove, StickMove>> = Object.fromEntries(Object.entries(STICK_TO_HANDLE).map(([k, v]) => [v, k])) as Partial<Record<HandleMove, StickMove>>;
+/** H-02: the stick move the handle actually owns — the gesture's own move, or its fallback (never a dead stick). The stick
+ *  spin is ungated (H-21). `need` is the rating of the move asked for, for the refuse chip. */
+export function ownedStickMove(move: StickMove, handle: number): { move: StickMove; locked: boolean; need: number } {
+  const hm = STICK_TO_HANDLE[move];
+  if (!hm || move === 'spin' || hasMove(hm, handle)) return { move, locked: false, need: hm ? MOVE_HANDLE[hm] : 0 };
+  const fb = fallbackMove(hm, handle);
+  return { move: HANDLE_TO_STICK[fb] ?? 'crossover', locked: true, need: MOVE_HANDLE[hm] };
 }

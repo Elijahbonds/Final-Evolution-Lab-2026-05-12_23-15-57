@@ -586,4 +586,20 @@ export function movesTheBody(move: HandleMove): boolean {
  *  own pace. Pure — the modes hand it to the tree's beat and to the tree's crossover state. */
 export const MOVE_RATE_TURBO = 1.35, MOVE_RATE_BASE = 1.0;
 export function moveRate(turbo: boolean): number { return turbo ? MOVE_RATE_TURBO : MOVE_RATE_BASE; }
-export function moveFadeSec(turbo: boolean): number { return turbo ? 0.045 : 0.07; }
+export function moveFadeSec(turbo: boolean): number { return turbo ? 0.08 : 0.12; }   // H1 H-05: 0.07/0.045 popped the hand swap on the 30 fps rigs
+
+/**
+ * H1 H-02 (hoops-input-rightstick.md §1): the move a stick input falls back to when the handle does not own it yet.
+ * The stick never goes dead — a gesture you have not earned throws the nearest thing you have. Walks the chain until
+ * the handle owns the move. `spin` is terminal: the stick's spin is ungated (H-21, it calls startSpin directly).
+ */
+export const FALLBACK_MOVE: Readonly<Partial<Record<HandleMove, HandleMove>>> = {
+  behind_back: 'crossover', between_legs: 'crossover', double_cross: 'crossover', shammgod: 'crossover', off_the_head: 'crossover',
+  steezo_roll: 'spin', snatch_back: 'stepback', momentum_btb: 'momentum_cross', momentum_cross: 'crossover',
+  yoyo: 'in_and_out', slip_slide: 'in_and_out', in_and_out: 'hesi',
+};
+export function fallbackMove(move: HandleMove, handle: number): HandleMove {
+  let m = move;
+  for (let i = 0; i < 6 && !hasMove(m, handle) && m !== 'spin'; i++) m = FALLBACK_MOVE[m] ?? 'crossover';
+  return m;
+}

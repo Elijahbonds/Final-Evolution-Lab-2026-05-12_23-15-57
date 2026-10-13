@@ -91,8 +91,8 @@ const CLIP_FOR: Record<BasketballAnimState, { clip: string; loop: boolean; fadeS
   speed_dribble:   { clip: 'bball_dribble_jog', loop: true, fadeSec: 0.14 },    // DRIBBLE GEARS: the jog (78_10), paced by the jog reference
   walk_dribble:    { clip: 'bball_dribble_walk', loop: true, fadeSec: 0.16 },   // the walking dribble (06_01) — a slowed run used to play here
   sprint_dribble:  { clip: 'bball_dribble_run', loop: true, fadeSec: 0.12 },    // the sprint (78_06), its own pace
-  crossover:       { clip: 'bball_crossover_left', loop: false, fadeSec: 0.08 },
-  crossover_right: { clip: 'bball_crossover_right', loop: false, fadeSec: 0.08 },
+  crossover:       { clip: 'bball_crossover_left', loop: false, fadeSec: 0.12 },   // H1 H-05
+  crossover_right: { clip: 'bball_crossover_right', loop: false, fadeSec: 0.12 },
   protect:         { clip: 'bball_defend_stance', loop: true, fadeSec: 0.2 },
   // ANIM CLEAN-UP (owner, 2026-09-18: "fix the off arm while running"). The DRIVE — a sprint at the rim with the ball —
   // played the plain run: both arms pumping while the ball-carry IK dragged the ball arm back to the bounce beside the
