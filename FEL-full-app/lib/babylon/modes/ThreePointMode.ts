@@ -67,6 +67,7 @@ import { boneNode } from '../anim/boneLookup';   // POLISH: the rack pick aims a
 import { mountPlayerRing, type PlayerRingHandle } from '../visual/PlayerRing';   // PLAYER RING (2026-09-17): stamina at the feet, the creator glyph over the head
 import { readPlayerIcon } from '../visual/playerIcon';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';
+import { collectFadeLeaves, updateFade, type FadeLeaf, type Pt } from './threePointOcclusion';   // CAM-FIXES: the trees the corner camera stands in
 import { applyOceanCourt } from '../visual/CourtSurface';
 import { ShotArc, followThroughFor, ShotMeter, SHOT_QUALITY_PCT, distanceContest01, type ShotQuality } from '../core/BasketballCore';
 import { BallSim } from '../core/BallPhysics';
@@ -86,6 +87,7 @@ import {
   perfectRun, runOptions, readPracticePick, readMoneyRackPick,
 } from './threePointRules';   // IMPROVE (2026-10-06): the owner-picked items' pure rules
 import type { FelInput } from '../core/InputBus';
+import type { CameraDirector } from '../core/CameraDirector';
 import type { BodyView } from '../core/ModeHarness';
 import type { BodyEvent } from '@/lib/pose/BodyReader';
 import { BodyShot, THREE_BODY, meterTFor, BODY_SHOT_MAX_MS, HELD_ERR_MS, type ShotVerdict } from '@/lib/move/hoopsBody';   // HOOPS BODY (2026-10-07): the shot on the body's clock
@@ -105,9 +107,42 @@ let modeVenue: VenueHandle | null = null;   // ship pass 4: the mounted venue sp
 // without moving the painted floor, without touching gameplay bounds, and without altering the
 // 'hoops' preset or the per-frame follow math racks 2-5 ease through during the jog.
 let camBoundsMesh: Mesh | null = null;
+// CAM-FIXES: location decor (Blossom / Canopy trees) that fades while it is between the camera and the rim or the shooter. See threePointOcclusion.ts.
+let fadeLeaves: FadeLeaf[] = [];
+let fadeFrames = 0;   // frames since load: the decor is collected on the first, and looked for once more on the 90th if the venue mount was still building it
+const fadeFocus: Pt[] = [{ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 0 }];
+function updateFadeLeaves(ctx: ModeContext, dt: number): void {
+  if (fadeFrames === 0 || (fadeFrames === 90 && fadeLeaves.length === 0)) fadeLeaves = collectFadeLeaves(ctx.scene.meshes);
+  fadeFrames++;
+  if (fadeLeaves.length === 0) return;
+  const cam = ctx.scene.activeCamera; if (!cam || !player) return;
+  const p = player.root.position;
+  fadeFocus[0].x = RIM.x; fadeFocus[0].y = RIM.y + 0.1; fadeFocus[0].z = RIM.z;   // the ring
+  fadeFocus[1].x = p.x; fadeFocus[1].y = p.y + 1.3; fadeFocus[1].z = p.z;          // the shooter's chest
+  updateFade(fadeLeaves, cam.position, fadeFocus, dt);
+}
 /** Exported so the rim-in-frame regression test builds the IDENTICAL box the mode mounts, not a guess at it. */
 export const CAM_BOUNDS_SIZE = { width: 34, height: 6, depth: 30 } as const;
 export const CAM_BOUNDS_CENTER = new Vector3(0, 3, 7);
+/**
+ * CAM-FIXES (2026-10-13, owner playtest: "can't see the hoop when shooting from the corners"): the box above, as the plain XZ rectangle the
+ * director clamps against. MEASURED on the running rig (scratch cam-fixes, Playwright, stepped 60 Hz): the box MESH never reached the
+ * real camera. mountVenue hands CameraDirector an EXPLICIT box (setBounds) and an explicit box ignores invalidateBounds() — so the
+ * 'venue_box_3pt_cam_bounds' mesh was only ever seen by its own unit test. In Venice the baked map's box happens to be wide enough
+ * (camera at x 11.8 on a corner rack); in Blossom Park / Canopy / Rooftop / Orbit the box is the 16 m ground, the camera is pinned at
+ * x 6.8 and the rim is 0.44 of a screen off-frame on a portrait phone (100 % of the frames at both corner racks). This rectangle goes
+ * to CameraDirector.extendBounds, which unions it into whatever box is in force.
+ */
+export const CAM_BOUNDS_RECT = {
+  minX: CAM_BOUNDS_CENTER.x - CAM_BOUNDS_SIZE.width / 2, maxX: CAM_BOUNDS_CENTER.x + CAM_BOUNDS_SIZE.width / 2,
+  minZ: CAM_BOUNDS_CENTER.z - CAM_BOUNDS_SIZE.depth / 2, maxZ: CAM_BOUNDS_CENTER.z + CAM_BOUNDS_SIZE.depth / 2,
+} as const;
+
+/** What load() does for the corner racks' camera, as one call so the unit test can run the same code the mode runs. */
+export function widenCamBounds(dir: Pick<CameraDirector, 'invalidateBounds' | 'extendBounds'>): void {
+  dir.invalidateBounds();               // the mesh above, for a venue with no explicit box (the VenueKit fallback)
+  dir.extendBounds(CAM_BOUNDS_RECT);    // …and the rectangle, for the one with (every mountVenue)
+}
 
 // ── EXACT tuned constants (verbatim from the proven 2D/R3F shootout) ──
 const RACKS = 5;
@@ -1499,12 +1534,13 @@ export const ThreePointMode: ModeDefinition = {
     // opposite the rim. Invisible, unpickable (never an occlusion hit or a wall), disposed with
     // the mode. Sized past every rack's natural camera vantage (checked against the geometry
     // probe up to x +/-13m, z 15.2m) with headroom for CameraDirector's own 1.2m bounds margin.
+    fadeLeaves = []; fadeFrames = 0;   // CAM-FIXES: a fresh load looks for its own trees
     camBoundsMesh?.dispose();
     camBoundsMesh = MeshBuilder.CreateBox('venue_box_3pt_cam_bounds', CAM_BOUNDS_SIZE, ctx.scene);
     camBoundsMesh.position.copyFrom(CAM_BOUNDS_CENTER);
     camBoundsMesh.isVisible = false;
     camBoundsMesh.isPickable = false;
-    ctx.camDirector.invalidateBounds();
+    widenCamBounds(ctx.camDirector);   // CAM-FIXES: the mesh above is ignored under an explicit (mountVenue) box; the rectangle is not
 
     // ModeHarness constructs the CameraDirector but does NOT drive it — each
     // mode owns its own framing. Without these calls the camera stays at its
@@ -1689,6 +1725,7 @@ export const ThreePointMode: ModeDefinition = {
     }
     ctx.camDirector.look(S.lookX, S.lookY, dt);
     ctx.camDirector.update(player.root.position, S.vel, RIM);
+    updateFadeLeaves(ctx, dt);   // CAM-FIXES: after the camera has moved, so this frame's line is the one drawn
 
     pushHud(ctx);
   },
@@ -1701,6 +1738,7 @@ export const ThreePointMode: ModeDefinition = {
     // and a StrictMode / Fast Refresh remount's stale teardown used to dispose the live court and the camera's roaming box.
     if (disposeCount < loadCount) return;
     modeVenue?.dispose?.(); modeVenue = null;
+    fadeLeaves = []; fadeFrames = 0;   // the trees go with the venue
     camBoundsMesh?.dispose(); camBoundsMesh = null;
     mic?.dispose(); mic = null; micLanding = null;   // THE MIC stops with the mode
     hoopJuice?.dispose(); hoopJuice = null;   // A+ P0: restores any hoop material the punch swapped

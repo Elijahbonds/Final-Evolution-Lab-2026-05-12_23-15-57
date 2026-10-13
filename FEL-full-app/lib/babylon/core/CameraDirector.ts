@@ -474,6 +474,23 @@ export class CameraDirector {
     this.boundsTried = true;
   }
 
+  /**
+   * CAM-FIXES (2026-10-13): WIDEN the camera's roaming box without replacing it. `mountVenue` hands the director an EXPLICIT box
+   * (setBounds), and an explicit box ignores invalidateBounds() — so a mode that adds an invisible venue_box_* mesh to
+   * make room for its camera (3-Point's corner racks) got nothing from it in the real mount: only the unit test, which never calls
+   * setBounds, saw the box. This unions `b` into whatever box is in force (derived or explicit; the Y floor stays) and keeps
+   * the result explicit, so the next invalidateBounds (a preset change) cannot throw it away.
+   */
+  extendBounds(b: Pick<CamBounds, 'minX' | 'maxX' | 'minZ' | 'maxZ'>): void {
+    if (!this.boundsTried) this.deriveBounds();
+    const cur = this.bounds;
+    this.bounds = cur
+      ? { ...cur, minX: Math.min(cur.minX, b.minX), maxX: Math.max(cur.maxX, b.maxX), minZ: Math.min(cur.minZ, b.minZ), maxZ: Math.max(cur.maxZ, b.maxZ) }
+      : { minX: b.minX, maxX: b.maxX, minZ: b.minZ, maxZ: b.maxZ, minY: 0 };
+    this.boundsExplicit = true;
+    this.boundsTried = true;
+  }
+
   /** Force a re-derive on the next frame (call after swapping venues). */
   invalidateBounds(): void {
     if (this.boundsExplicit) return;
