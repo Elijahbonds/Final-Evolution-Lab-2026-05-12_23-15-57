@@ -127,9 +127,10 @@ describe('P3 M2 the player renders that list', () => {
     expect(html).not.toContain('youtu.be');
   });
 
-  it("(h) an ACTIVE 'all' row shows the coming-soon line; a 'lane' row does not", async () => {
+  // NP-1 (Elijah rule): was "an ACTIVE 'all' row shows the coming-soon line". No row shows any "coming soon" line now.
+  it("(h) neither an ACTIVE 'all' row nor a 'lane' row shows a coming-soon line", async () => {
     const all = await renderPage({ ...membership, scope: 'all', lane: 'adult' });
-    expect(all.html).toContain('Re-screen trend board and plans that adjust: coming soon.');
+    expect(all.html).not.toMatch(/coming soon/i);
     expect(all.html).toContain('Re-screens sit on days 14, 28, 42 and 56.');
     const lane = await renderPage({ ...membership, scope: 'lane', lane: 'dunking', billing: 'one_time' });
     expect(lane.html).not.toContain('Re-screen trend board and plans that adjust: coming soon.');

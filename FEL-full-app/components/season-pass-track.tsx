@@ -6,12 +6,12 @@
  * M13 Step 2 — HUB season pass track. Shows the active season, the athlete's
  * tier progress, and the FREE / PRO lanes. The PRO lane is cosmetic-only and
  * gated behind the SEASON_PASS_PURCHASE flag (proPurchasable) — when dark it
- * shows a "coming soon" state instead of a buy button (owner owns pricing).
+ * shows no buy control at all (NP-1: hidden, never labelled; owner owns pricing).
  */
 
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Crown, Lock, Gift, Star, Target, Check } from 'lucide-react';
+import { Crown, Gift, Star, Target, Check } from 'lucide-react';
 import { goalRemaining, readGoalStates } from '@/lib/goals/daily-goals';
 import { QUEST_SEASON_XP } from '@/lib/season/season-pass-core';
 
@@ -192,9 +192,9 @@ export function SeasonPassTrack() {
             Rare + legendary cosmetics each tier. Purely cosmetic — never pay-to-win.
             {!state.hasPro && ' Unlocking back-fills every tier you have already climbed.'}
           </p>
-          {!state.hasPro && (
+          {!state.hasPro && state.proPurchasable && (
             <div className="mt-3">
-              {state.proPurchasable ? (
+              {(
                 <button
                   onClick={buyPro}
                   disabled={busy !== null}
@@ -202,10 +202,6 @@ export function SeasonPassTrack() {
                 >
                   {busy === 'buy' ? 'OPENING CHECKOUT…' : 'UNLOCK PRO LANE'}
                 </button>
-              ) : (
-                <span className="flex items-center justify-center gap-1.5 rounded-md border border-white/15 py-2 text-xs font-bold text-white/50">
-                  <Lock className="h-3.5 w-3.5" /> COMING SOON
-                </span>
               )}
             </div>
           )}

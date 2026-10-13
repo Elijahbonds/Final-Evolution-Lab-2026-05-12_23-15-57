@@ -128,7 +128,6 @@ function FacePreview({ face, accent }: { face: FaceConfig; accent: string }) {
 }
 
 /** IMPROVE (2026-10-06): options with no 3D effect yet say so (faceMorphs.faceOptionRenders), instead of pretending. */
-const SOON = '3D coming soon — shows in the sketch only';
 
 const PASTE_ERRORS: Record<DecodeError, string> = {
   empty: 'Paste a share code first.',
@@ -1000,7 +999,6 @@ function Group({ title, soon = false, children }: { title: string; soon?: boolea
     <div>
       <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-white/80">
         <Palette className="h-3.5 w-3.5 text-cyan-400" /> {title}
-        {soon && <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] font-normal text-white/45" title={SOON}>3D coming soon</span>}
       </h3>
       {children}
     </div>

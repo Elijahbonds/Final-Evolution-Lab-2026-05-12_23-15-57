@@ -91,7 +91,6 @@ export default async function ProgramPlayerPage({ params }: { params: { accessId
       <main className="mx-auto max-w-xl px-4 py-8 text-white">
         <h1 className="text-2xl font-black">Your program</h1>
         <p className="mt-2 text-sm text-white/70">{isTeen ? 'Your progress stays on this phone.' : 'Re-screens sit on days 14, 28, 42 and 56.'}</p>
-        {access.scope === 'all' ? <p className="mt-2 text-sm text-white/70">Re-screen trend board and plans that adjust: coming soon.</p> : null}
         {keys.length === 0 ? <p className="mt-4 text-sm">Nothing to show yet.</p> : null}
         {showDunkWeeks ? DUNK_WEEKS.map((week) => (
           <section key={week.week} className="mt-4">

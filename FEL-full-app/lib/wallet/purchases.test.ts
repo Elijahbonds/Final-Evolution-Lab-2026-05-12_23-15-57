@@ -17,12 +17,12 @@ describe('purchases truth', () => {
     expect(purchasesEnabledFromEnv({ STRIPE_SECRET_KEY: 'sk_test_x', VIRTUAL_PURCHASES_ENABLED: 'false' })).toBe(false);
   });
 
-  it('never says "sold" while purchases are off, never says "coming soon" while they are on', () => {
+  it('never says "sold" while purchases are off, and never says "coming soon" at all (NP-1)', () => {
     const off = shardSaleCopy(false);
-    for (const s of Object.values(off)) expect(s.toLowerCase()).not.toMatch(/\bsold\b|\bbuy\b/);
-    expect(off.badge).toBe('Coming soon');
-    expect(off.shardBuyLabel).toBe('Coming soon');
-    expect(off.coinStoreShards).toMatch(/not on sale yet/);
+    for (const s of Object.values(off)) expect(s.toLowerCase()).not.toMatch(/\bsold\b|\bbuy\b|coming soon|not on sale|\byet\b/);
+    expect(off.badge).toBe('');
+    expect(off.shardBuyLabel).toBe('');
+    expect(off.coinStoreShards).toMatch(/earned in play/);
 
     const on = shardSaleCopy(true);
     for (const s of Object.values(on)) expect(s.toLowerCase()).not.toMatch(/coming soon|not on sale/);

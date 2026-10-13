@@ -40,6 +40,17 @@ import { slewYaw, settleAngle, wrapYaw } from '../core/Biomech';
 import { SoundKit } from '../audio/SoundKit';
 import { refuse } from '../core/Refusal';   // MECHANICS PASS: a press that cannot act is answered
 import { EffectsKit } from '../visual/EffectsKit';
+// vis-board (wave 2): the replay of the run's best line, what a landing leaves, the speed in the air, the slam's ring, the world around
+// the slab, and the runner's colour language (interactables red, the rest quiet)
+import { ReplayGate } from './boardMoments';
+import { landingMarks } from './boardMarks';
+import { stampMarks } from '../visual/boardStamp';
+import { SpeedLines } from '../racing/speedFx';
+import { ShockRing } from '../visual/ShockRing';
+import { mountFreeRunDressing, type DressHandle } from '../visual/freeRunDressing';
+import { runnerLook, RUNNER_RED, EDGE_KINDS } from '../visual/runnerPalette';
+import { Color4 } from '@babylonjs/core';
+import { lookFeatureOff } from '../scene/graphicsSetting';   // ?lookoff=palette,dress,… : one-build A/B
 import { assertSpawned } from '../core/FrameGuard';
 import { initPhysics } from '../core/Physics';
 import { ComboChain } from '../core/ComboChain';
@@ -146,6 +157,8 @@ interface St {
   gateReqShown: string;
   /** The personal best for this track and tier (loaded at begin), and this run's clock at each checkpoint (ms). */
   pb: FreeRunPb | null; gateTimes: number[];
+  /** vis-board (wave 2): presentation only — the replay gate, the speed lines, the ring, the dressing, the grind's spark clock. */
+  vis: { gate: ReplayGate; lines: SpeedLines | null; ring: ShockRing | null; dress: DressHandle | null; sparkT: number };
 }
 const states = new WeakMap<Scene, St>();
 const live = new Set<St>();
@@ -156,6 +169,8 @@ const PBR_ALBEDO_SCALE = 0.42;
 // so the vault box, the wall and the bar each own a colour against it.
 const MAT: Record<string, string> = { ground: '#6E6A66', vault: '#D99A3C', wall: '#C4603F', ledge: '#3FB8B0', roof: '#3FB8B0', bar: '#F2C230', start: '#3DDC97', finish: '#F4C542', checkpoint: '#4FD1E8', gap: '#000000', rail: '#e5e7eb', spring: '#34d399', gate: '#f87171', anchor: '#fde68a', hazard: '#b45309', slope: '#5a5e66' };
 const SPRING_V = 8.8, GRIND_MIN = 4.5, SURF_TOP = 1.6, KICK_M = 1.6;
+/** vis-board: a banked line this big (points) is a highlight at all. */
+const REPLAY_BANK_PTS = 300;
 
 // IMPROVE (2026-10-06): the fov baseline and the coyote timer moved into St (per scene). Scratch vectors for the
 // per-frame physics step, the probe and the camera: temporaries, written and read inside one call, never kept.
@@ -223,15 +238,18 @@ export const FreeRunMode: ModeDefinition = (() => {
       if (!m) {
         // PLACE: the track's palette over the authored one. IMPROVE (2026-10-06): read off the TRACK, which the pick screen
         // can now change — the place look is the track the splash picked, so a run that keeps it paints exactly as before
-        const hex = S.track.world.colors[kind] ?? readPlaceLook('freerun')?.world?.colors[kind] ?? MAT[kind] ?? '#888888';
+        const authored = S.track.world.colors[kind] ?? readPlaceLook('freerun')?.world?.colors[kind] ?? MAT[kind] ?? '#888888';
+        // vis-board (wave 2): the runner's colour language — what the verbs act on is runner red, the world they run on is quiet
+        const look = lookFeatureOff('palette') ? { hex: authored, emissive: null, red: false, edges: false } : runnerLook(kind, authored);
+        const hex = look.hex;
         // the gates and ledges read as markers, so they keep a real emissive floor; surfaces do not
-        m = VenueKit.paint(ctx.scene, `fr_mat_${kind}`, hex, GLOW.has(kind) ? 0.3 : 0.05, ROUGH[kind] ?? 0.7);
+        m = VenueKit.paint(ctx.scene, `fr_mat_${kind}`, hex, look.emissive ?? (GLOW.has(kind) ? 0.3 : 0.05), ROUGH[kind] ?? 0.7);
         // AND THE PALETTE ITSELF WAS AUTHORED FOR THE WRONG MATERIAL MODEL. These hexes were picked against
         // StandardMaterial's linear multiply; the same values as PBR albedo, under this rig's exposure,
         // land far lighter — the `#8E8A84` ground measured 0.556 albedo and read as white concrete-paper.
         // Surfaces are pulled down so they sit where the author meant them to; the markers keep their value
         // because a marker is supposed to be brighter than the thing it is stuck to.
-        if (!GLOW.has(kind)) m.albedoColor = m.albedoColor.scale(PBR_ALBEDO_SCALE);
+        if (!GLOW.has(kind) && !look.red) m.albedoColor = m.albedoColor.scale(PBR_ALBEDO_SCALE);
         mats.set(kind, m); S.mats.push(m);
       }
       return m;
@@ -272,11 +290,28 @@ export const FreeRunMode: ModeDefinition = (() => {
       if (!merged) { target.dispose(); continue; }
       merged.material = matFor(kind); merged.isPickable = false;
       merged.metadata = { freerunMerged: kind };
+      // vis-board: the red outline of the pieces the verbs use (desktop / high — the edge pass is a second draw per mesh)
+      if (EDGE_KINDS.has(kind) && (ctx.scene.metadata as { felTier?: string } | null)?.felTier !== 'mobile') {
+        merged.enableEdgesRendering(0.93); merged.edgesWidth = 5; merged.edgesColor = Color4.FromHexString(`${RUNNER_RED}ff`);
+      }
       merged.freezeWorldMatrix();
       for (const m of list) m.isVisible = false;
       S.merged.push(merged);
     }
     for (const m of S.meshes) if (MERGE_KINDS.has((m.metadata as { freerun?: string } | null)?.freerun ?? '')) m.freezeWorldMatrix();
+    // vis-board (wave 2): the track's world beyond the slab — AC units and neon, pipes and growth, containers, columns (rebuilt with the track)
+    S.vis.dress?.dispose();
+    S.vis.dress = mountFreeRunDressing(ctx.scene, S.track.id, S.pieces, (ctx.scene.metadata as { felTier?: string } | null)?.felTier, S.track.world.colors);
+  }
+
+  /** vis-board (wave 2): the run's best banked line is replayed from the runner's level (skippable; never when the finish is near — the end card's). */
+  function replayBest(ctx: ModeContext, S: St, banked: number): void {
+    if (!(banked > 0) || !S.hero || S.finished) return;
+    const toFinish = (S.idx.finishZ - S.hero.root.position.z) / Math.max(6, S.speed);
+    const plan = S.vis.gate.consider(S.runSec, { kind: 'combo', weight: banked, floor: REPLAY_BANK_PTS, sec: 3 }, toFinish);
+    if (!plan) return;
+    console.info(`[FR-REPLAY] best line ${banked} (${plan.lastSeconds.toFixed(1)} s)`);
+    void ctx.highlight?.({ lastSeconds: plan.lastSeconds, angles: ['low', 'side', 'follow'] });
   }
 
   function hud(ctx: ModeContext, S: St, extra: Record<string, HudValue> = {}): void {
@@ -415,7 +450,7 @@ export const FreeRunMode: ModeDefinition = (() => {
   function overdrive(ctx: ModeContext, S: St): boolean {
     if (S.state !== 'air' && S.kinetic.spendSlam()) {
       S.stats.slams++; S.combo.add('SLAM', 90, 'air');
-      EffectsKit.burst(ctx.scene, S.hero!.root.position, 'dust', 3); ctx.juice.shake(0.18, 220); ctx.juice.hitStop(50); ctx.feel?.impact?.(0.6); SoundKit.play('thud', { pitch: 0.6, volume: 0.8 });
+      EffectsKit.burst(ctx.scene, S.hero!.root.position, 'dust', 3); S.vis.ring?.fire(S.hero!.root.position.x, S.hero!.root.position.y, S.hero!.root.position.z, KINETIC.slamRadius, RUNNER_RED); ctx.juice.shake(0.18, 220); ctx.juice.hitStop(50); ctx.feel?.impact?.(0.6); SoundKit.play('thud', { pitch: 0.6, volume: 0.8 });
       for (const v of slamVictims({ x: S.hero!.root.position.x, z: S.hero!.root.position.z }, S.rivals, KINETIC.slamRadius)) { stumble(v); S.race.slamHits++; say(ctx, `SLAM DROPPED ${v.name}`, 600); }
       say(ctx, 'GROUND SLAM'); return true;
     }
@@ -562,6 +597,12 @@ export const FreeRunMode: ModeDefinition = (() => {
       if (landing === 'sketchy') flash(ctx, 'HARD LANDING — roll next time', 700);
     }
     EffectsKit.burst(ctx.scene, S.hero!.root.position, 'dust');
+    {
+      // vis-board (wave 2): what the landing leaves — the roll-out's wheel-less scuff (a bail's skid and prints), and on a big drop or a fall the ring
+      const hp = S.hero!.root.position;
+      stampMarks(ctx.scene, landingMarks({ x: hp.x, z: hp.z }, S.hero!.root.rotation.y, landing === 'bail' ? 'bail' : landing === 'sketchy' ? 'sketchy' : 'clean', S.speed / RUN_MAX, drop / 6), 'concrete', hp.y);
+      if (landing === 'bail' || drop >= 2.4) S.vis.ring?.fire(hp.x, hp.y, hp.z, 2.4 + Math.min(4, drop * 0.7), landing === 'bail' ? '#ff7a6b' : RUNNER_RED);
+    }
     S.trick = null; trickHud(ctx, S);
     if (landing === 'bail') S.aBufferAt = -9;   // a bail eats the buffered press
     hud(ctx, S);
@@ -662,6 +703,7 @@ export const FreeRunMode: ModeDefinition = (() => {
     buildCourse(ctx, S);   // a no-op when the pick screen already built this track and tier (IMPROVE 2026-10-06)
     S.pb = loadPb(S.track.id, S.tier.id); S.gateTimes = [];
     behindRunner(ctx, S);
+    ctx.camDirector.establish('walkIn');   // vis-board (wave 2): the crane over the course, then the runner — inside the 4 s the clock waits at the line; the first input skips it
     ctx.setHud({ banner: '', hint: 'stick RUNS · RT SPRINT · A JUMP / VAULT / REBOUND / WALL RUN · LT or B SLIDE · X FLIP / KICK · Y OVERDRIVE · LB GRAPPLE · R-stick TRICKS' });
     hud(ctx, S);
   }
@@ -669,6 +711,8 @@ export const FreeRunMode: ModeDefinition = (() => {
   return {
     modeId: 'freerun', camPreset: 'runner',
     hideRingInPlay: true,
+    replayDof: false,   // vis-board: the DOF mount flattens the frame (core/ModeHarness.replayDof)
+    replay: true,   // vis-board (wave 2): the run's best banked line, replayed mid-run (ctx.highlight at the bank) — never the finish
     // PLACE LOOKS (2026-09-18): the light and the sky are the place's — getters, because the harness reads both at mount
     get mood() { return readPlaceLook('freerun')?.world?.mood ?? 'nightGame'; },
     get backdrop() { return readPlaceLook('freerun')?.world?.backdrop ?? MOOD_TO_FAMILY[readPlaceLook('freerun')?.world?.mood ?? 'nightGame']; },
@@ -700,6 +744,7 @@ export const FreeRunMode: ModeDefinition = (() => {
         builtKey: '', mats: [], merged: [], idx: indexCourse([]), courseRead: { overGap: () => false, obstacleAhead: () => false, finishZ: 0 },
         bannerUntil: null, aBufferAt: -9, slideByLt: false, trickPctShown: 0, trickAroundSaid: false, gateReqShown: '',
         pb: null, gateTimes: [],
+        vis: { gate: new ReplayGate(), lines: null, ring: null, dress: null, sparkT: 0 },
       };
       states.set(ctx.scene, S); live.add(S);
 
@@ -744,6 +789,7 @@ export const FreeRunMode: ModeDefinition = (() => {
       if (S.scene.isDisposed) return;
       S.cc = new PhysicsCharacterController(new Vector3(0, CAPSULE_H / 2 + 0.05, 3), { capsuleHeight: CAPSULE_H, capsuleRadius: CAPSULE_R }, ctx.scene);
       buildCourse(ctx, S);                                      // the pick screen shows the course
+      S.vis.ring = new ShockRing(ctx.scene); S.vis.lines = new SpeedLines(ctx.scene, ctx.camera, '#fff1e6');   // vis-board (wave 2)
       ctx.heroRef.current = S.hero.root; ctx.objectiveRef.current = null;
       ctx.camDirector.setPreset('runner');
       ctx.camDirector.snapTo(S.hero.root.position, S.hero.root.position.add(new Vector3(0, 0, 8)));
@@ -940,7 +986,12 @@ export const FreeRunMode: ModeDefinition = (() => {
       if (S.dashSec > 0) S.dashSec = Math.max(0, S.dashSec - dt);
       S.flow.tick(dt, S.state === 'ground' && S.speed < 1);
       if (S.state === 'wallrun') S.flow.add(FLOW.wallRunPerSec * dt);
-      if (S.state === 'grind') S.flow.add(FLOW.grindPerSec * dt);
+      if (S.state === 'grind') {
+        S.flow.add(FLOW.grindPerSec * dt);
+        // vis-board (wave 2): the rail throws sparks off the board's wheels-less deck — additive, stretched, every 70 ms
+        S.vis.sparkT -= dt;
+        if (S.vis.sparkT <= 0) { S.vis.sparkT = 0.07; EffectsKit.burst(ctx.scene, S.hero!.root.position.add(new Vector3(0, 0.12, 0)), 'sparks', 0.55); }
+      } else S.vis.sparkT = 0;
       if (S.state === 'surf') S.flow.add(FLOW.surfPerSec * dt);
       // G1: the body TURNS onto the heading. A traceur turns fast, but never in one frame — and a trick owns the yaw
       // while it is spinning (the mode integrates it below), so the slew stands aside for it.
@@ -1020,7 +1071,7 @@ export const FreeRunMode: ModeDefinition = (() => {
           if (!supported && S.vy < -1.2) { S.state = 'air'; S.airStartY = root.position.y; S.airSec = 0; S.launch = 'drop'; S.trick = null; S.rollAt = null; }   // a drop off an edge: no take-off, the air hold
           else { S.groundSec += dt; }
           // touching down without a linked move banks the line
-          if (S.groundSec >= BANK_AFTER_SEC && S.combo.pot > 0) { const b = S.combo.bank(); flash(ctx, `BANKED +${b}`, 800); SoundKit.play('score', { volume: 0.5 }); softBeat(ctx, 'bank'); hud(ctx, S); }
+          if (S.groundSec >= BANK_AFTER_SEC && S.combo.pot > 0) { const b = S.combo.bank(); flash(ctx, `BANKED +${b}`, 800); SoundKit.play('score', { volume: 0.5 }); softBeat(ctx, 'bank'); hud(ctx, S); replayBest(ctx, S, b); }
         }
       }
       cc.integrate(dt, support, V_ZERO);
@@ -1091,6 +1142,8 @@ export const FreeRunMode: ModeDefinition = (() => {
       // and a real air (not a hop) swings to the three-quarter air cam so a flip reads side-on — only on the move: standing
       // still the director has no velocity to be behind, takes "behind" from where it already is, and the side offset then
       // compounds frame on frame into an orbit (measured: a standing jump carried the camera round to the runner's side).
+      S.vis.lines?.update(S.finished || S.phase !== 'run' ? 0 : S.speed / RUN_MAX);   // vis-board: streaks past the lens in the top fifth of the speed
+      S.vis.ring?.update(dt);
       ctx.camDirector.setAir(S.state === 'air' && S.airSec > 0.25 && S.speed > 3 ? 1 : 0);
       ctx.camDirector.update(root.position, TMP_CAM.set(S.heading.x * S.speed, 0, S.heading.z * S.speed), null);
       const c = ctx.scene.activeCamera;
@@ -1100,7 +1153,7 @@ export const FreeRunMode: ModeDefinition = (() => {
 
     dispose() {
       setTimeout(() => {
-        for (const S of live) if (S.scene.isDisposed) { S.posture?.dispose(); S.posture = null; live.delete(S); }
+        for (const S of live) if (S.scene.isDisposed) { S.posture?.dispose(); S.posture = null; S.vis.dress = null; S.vis.ring = null; S.vis.lines = null; live.delete(S); }   // (the scene took the meshes and systems with it)
         if (live.size === 0) SoundKit.stopAmbient();
       }, 0);
     },

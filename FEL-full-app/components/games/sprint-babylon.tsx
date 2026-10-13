@@ -12,6 +12,7 @@ import { surfaceBootError } from './boot-error';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
+import { HudBanner, HudChip, HudFrame, HudPlate, HudText, ScoreValue, hudColor, type HudTone } from './tv-hud';
 
 // Which harness currently owns a given canvas. React mounts effects twice in
 // dev: effect A starts an async runMode(), its cleanup fires before A has even
@@ -28,8 +29,8 @@ const canvasOwner = new WeakMap<HTMLCanvasElement, object>();
 
 type Hud = Record<string, HudValue>;
 
-/** IMPROVE (2026-10-06): the stride's grade, as a colour on the metronome's target ring. */
-const BEAT_COLOR: Record<string, string> = { perfect: '#ffd75e', good: '#00E5FF', first: '#00E5FF', off: '#94a3b8', stumble: '#f87171' };
+/** IMPROVE (2026-10-06): the stride's grade, as a palette tone on the metronome's target ring (TV HUD: one palette). */
+const BEAT_TONE: Record<string, HudTone> = { perfect: 'score', good: 'you', first: 'you', off: 'info', stumble: 'danger' };
 
 /**
  * IMPROVE (2026-10-06): THE METRONOME. The target is one stride every targetIntervalMs (200 ms for a thumb), and nothing
@@ -46,15 +47,16 @@ function SprintMetronome({ seq, ms, foot, grade, call }: { seq: number; ms: numb
       { duration: ms * 1.4, easing: 'linear', fill: 'forwards' });   // meets the target at ms (1 / 1.4 of the way), then fades through it
     return () => a.cancel();
   }, [seq, ms]);
-  const color = BEAT_COLOR[grade] ?? '#ffffff';
+  const tone = BEAT_TONE[grade] ?? 'text';
+  const color = hudColor(tone);
   return (
-    <div className="pointer-events-none absolute bottom-6 left-1/2 z-20 flex -translate-x-1/2 flex-col items-center gap-1 font-mono">
+    <div className="pointer-events-none absolute bottom-6 left-1/2 z-20 flex -translate-x-1/2 flex-col items-center gap-1">
       <div className="relative h-14 w-14">
         <div className="absolute inset-0 rounded-full border-2" style={{ borderColor: color }} />
-        <div ref={ringRef} className="absolute inset-0 rounded-full border-2 border-white" style={{ opacity: 0 }} />
-        <div className="absolute inset-0 flex items-center justify-center text-sm font-bold text-white">{foot === 'L' ? '←' : foot === 'R' ? '→' : ''}</div>
+        <div ref={ringRef} className="absolute inset-0 rounded-full border-2" style={{ opacity: 0, borderColor: hudColor('text') }} />
+        <div className="absolute inset-0 flex items-center justify-center"><HudText size="value" style={{ fontWeight: 800 }}>{foot === 'L' ? '←' : foot === 'R' ? '→' : ''}</HudText></div>
       </div>
-      <div className="h-4 text-[10px] font-bold tracking-wider" style={{ color }}>{call || grade.toUpperCase()}</div>
+      <HudText as="div" size="caption" tone={tone} className="h-4" style={{ fontWeight: 800, letterSpacing: '0.1em' }}>{call || grade.toUpperCase()}</HudText>
     </div>
   );
 }
@@ -143,42 +145,47 @@ export function makeSprintHost(modeKey: string, title: string) {
       <div className="relative aspect-[16/10] w-full overflow-hidden rounded-xl border border-white/10 bg-black">
         <canvas ref={canvasRef} className="absolute inset-0 h-full w-full touch-none" />
 
-        {phase === 'playing' && (
-          <div className="pointer-events-none absolute left-4 top-4 z-20 font-mono text-xs text-white">
-            <div className="text-2xl font-bold text-[#ffd75e]">{String(hud.clock ?? 0)}s</div>
-            <div className="text-white/60">{String(hud.distance ?? '')} · {String(hud.phase ?? '')}</div>
-            <div className="text-white/60">
-              speed {String(hud.speed ?? 0)} m/s · top {String(hud.top ?? 0)} · rival {String(hud.rival ?? '')}
+        {/* TV HUD (A9.13, lane/vis-race phase 2): every readout on the shared system — same keys, same gates, same slots. */}
+        <HudFrame>
+          {phase === 'playing' && (
+            <div className="absolute left-4 top-4 z-20 flex flex-col items-start gap-1">
+              <HudPlate className="px-3 py-1.5">
+                <ScoreValue value={`${String(hud.clock ?? 0)}s`} tone="score" pop={false} />
+                <HudText as="div" size="caption" alpha={0.6}>{String(hud.distance ?? '')} · {String(hud.phase ?? '')}</HudText>
+                <HudText as="div" size="caption" alpha={0.6}>
+                  speed {String(hud.speed ?? 0)} m/s · top {String(hud.top ?? 0)} · rival {String(hud.rival ?? '')}
+                </HudText>
+              </HudPlate>
+              {/* IMPROVE (2026-10-06): the gap to the pacer and to the sub-13 pace light (the green bar) — the numbers you race */}
+              {typeof hud.gap === 'string' && hud.gap && (
+                <div className="flex items-center gap-3">
+                  <HudChip tone={hud.gap.startsWith('+') ? 'good' : 'danger'} size="value" style={{ fontWeight: 800 }}>PACER {hud.gap}</HudChip>
+                  {typeof hud.sub13 === 'string' && hud.sub13 && (
+                    <HudChip tone={hud.sub13.startsWith('+') ? 'good' : 'text'} alpha={hud.sub13.startsWith('+') ? 1 : 0.5} size="value" style={{ fontWeight: 800 }}>SUB-13 {hud.sub13}</HudChip>
+                  )}
+                </div>
+              )}
+              {/* IMPROVE (2026-10-06): the last called split (30 / 60 m) against the personal best (− is ahead) */}
+              {typeof hud.split === 'string' && hud.split && <HudChip tone="info" size="body">{hud.split}</HudChip>}
+              {/* IMPROVE (2026-10-06): false starts were counted and never shown; the rule beside the count */}
+              {Number(hud.falseStarts) > 0 && (
+                <HudChip tone="danger" size="body">false starts {String(hud.falseStarts)} · {String(hud.falseStartRule ?? '')}</HudChip>
+              )}
             </div>
-            {/* IMPROVE (2026-10-06): the gap to the pacer and to the sub-13 pace light (the green bar) — the numbers you race */}
-            {typeof hud.gap === 'string' && hud.gap && (
-              <div className="mt-1 text-sm font-bold">
-                <span className={hud.gap.startsWith('+') ? 'text-[#86efac]' : 'text-[#fca5a5]'}>PACER {hud.gap}</span>
-                {typeof hud.sub13 === 'string' && hud.sub13 && (
-                  <span className={`ml-3 ${hud.sub13.startsWith('+') ? 'text-[#4ade80]' : 'text-white/50'}`}>SUB-13 {hud.sub13}</span>
-                )}
-              </div>
-            )}
-            {/* IMPROVE (2026-10-06): the last called split (30 / 60 m) against the personal best (− is ahead) */}
-            {typeof hud.split === 'string' && hud.split && <div className="text-[#93c5fd]">{hud.split}</div>}
-            {/* IMPROVE (2026-10-06): false starts were counted and never shown; the rule beside the count */}
-            {Number(hud.falseStarts) > 0 && (
-              <div className="text-[#fca5a5]">false starts {String(hud.falseStarts)} · {String(hud.falseStartRule ?? '')}</div>
-            )}
-            {typeof hud.banner === 'string' && hud.banner && (
-              <div className="mt-2 text-[#00E5FF]">{hud.banner}</div>
-            )}
-          </div>
-        )}
+          )}
+          <HudBanner text={typeof hud.banner === 'string' ? hud.banner : ''} tone="you" />
 
-        {/* IMPROVE (2026-10-06): the hint the mode always sent — the controls, explained on screen */}
-        {phase === 'playing' && typeof hud.hint === 'string' && hud.hint && (
-          <div className="pointer-events-none absolute right-4 top-4 z-20 max-w-[45%] text-right font-mono text-[11px] text-white/70">{hud.hint}</div>
-        )}
-        {phase === 'playing' && Number(hud.beat) > 0 && (
-          <SprintMetronome seq={Number(hud.beat)} ms={Number(hud.beatMs) || 200} foot={String(hud.beatFoot ?? '')}
-            grade={String(hud.beatGrade ?? '')} call={String(hud.beatCall ?? '')} />
-        )}
+          {/* IMPROVE (2026-10-06): the hint the mode always sent — the controls, explained on screen */}
+          {phase === 'playing' && typeof hud.hint === 'string' && hud.hint && (
+            <HudPlate className="absolute right-4 top-4 z-20 max-w-[45%] px-2 py-1 text-right">
+              <HudText size="caption" alpha={0.8}>{hud.hint}</HudText>
+            </HudPlate>
+          )}
+          {phase === 'playing' && Number(hud.beat) > 0 && (
+            <SprintMetronome seq={Number(hud.beat)} ms={Number(hud.beatMs) || 200} foot={String(hud.beatFoot ?? '')}
+              grade={String(hud.beatGrade ?? '')} call={String(hud.beatCall ?? '')} />
+          )}
+        </HudFrame>
 
         <BootSplash
           modeId={modeKey}

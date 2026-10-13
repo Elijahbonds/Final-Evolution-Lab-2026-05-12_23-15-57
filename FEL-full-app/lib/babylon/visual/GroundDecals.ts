@@ -15,14 +15,19 @@ import type { Mesh, Observer, Scene } from '@babylonjs/core';
 import type { QualityTier } from '../scene/QualityTier';
 import { sceneModeId, wave2Look } from '../scene/lookPolicy';
 
-export type DecalKind = 'scuff' | 'foot';
-export const DECAL_KINDS: readonly DecalKind[] = ['scuff', 'foot'];
+export type DecalKind = 'scuff' | 'foot' | 'carve' | 'tyre';
+export const DECAL_KINDS: readonly DecalKind[] = ['scuff', 'foot', 'carve', 'tyre'];
 /** Live marks per kind, per tier. */
 export function decalCap(tier: QualityTier): number { return tier === 'mobile' ? 24 : 64; }
 /** Seconds a mark lasts (fully visible for the first 60 %, then fading). */
 export function decalLife(tier: QualityTier): number { return tier === 'mobile' ? 8 : 18; }
 /** Default footprint of each kind, metres (width, length). */
-export const DECAL_SIZE: Record<DecalKind, [number, number]> = { scuff: [0.5, 1.1], foot: [0.13, 0.3] };
+/** `tyre` (vis-race, wave 2): a pair of rubber streaks the width of a kart's rear track (1.32 m between tyre centres), 2.2 m long,
+ *  stamped end to end along a slide or a burnout. */
+export const DECAL_SIZE: Record<DecalKind, [number, number]> = { scuff: [0.5, 1.1], foot: [0.13, 0.3], carve: [0.46, 1.6], tyre: [1.62, 2.2] };
+/** vis-board (wave 2): the colour a `carve` mark takes on a surface — the texture is a neutral grey and the instance colour tints
+ *  it: a wheel's rubber on concrete, an edge's groove in snow. The other kinds paint their own colour and take no tint. */
+export const CARVE_TINT = { concrete: [0.2, 0.18, 0.16], snow: [0.5, 0.64, 0.9] } as const satisfies Record<string, readonly [number, number, number]>;
 
 /** Pure: a mark's opacity `age` seconds into a `life`-second life. */
 export function decalAlpha(age: number, life: number): number {
@@ -39,13 +44,40 @@ function paint(scene: Scene, kind: DecalKind): DynamicTexture {
   const tex = new DynamicTexture(`fel_decal_${kind}`, { width: S, height: S }, scene, true);
   const g = tex.getContext() as unknown as CanvasRenderingContext2D;
   g.clearRect(0, 0, S, S);
-  if (kind === 'scuff') {
+  if (kind === 'tyre') {
+    // two tyre tracks: dark rubber, ragged edges, and the ends faded so stamps laid end to end read as
+    // one unbroken streak (the pair sits at u = 0.093 and 0.907 of a 1.62 m quad: 1.32 m apart, a kart's rear tyres)
+    for (const cx of [S * 0.093, S * 0.907]) {
+      // a pale rubber-dust shoulder either side (a skid on dark asphalt reads by its edge: the core alone is black on near-black)
+      const sh = g.createLinearGradient(0, 0, 0, S);
+      sh.addColorStop(0, 'rgba(150,140,128,0)'); sh.addColorStop(0.2, 'rgba(150,140,128,0.12)'); sh.addColorStop(0.8, 'rgba(150,140,128,0.12)'); sh.addColorStop(1, 'rgba(150,140,128,0)');
+      g.fillStyle = sh; g.fillRect(cx - 17, 0, 34, S);
+      const gr = g.createLinearGradient(0, 0, 0, S);
+      gr.addColorStop(0, 'rgba(6,5,5,0)'); gr.addColorStop(0.18, 'rgba(6,5,5,0.85)'); gr.addColorStop(0.82, 'rgba(6,5,5,0.85)'); gr.addColorStop(1, 'rgba(6,5,5,0)');
+      g.fillStyle = gr; g.fillRect(cx - 10, 0, 20, S);
+      // rubber laid down unevenly: ragged notches out of the core (no regular tread ladder — it read as a tank track)
+      g.globalCompositeOperation = 'destination-out';
+      for (let i = 0; i < 38; i++) {
+        const y = (i * 37) % S, w = 3 + ((i * 7) % 6), x = cx - 10 + ((i * 13) % 17);
+        g.fillStyle = `rgba(0,0,0,${0.18 + ((i * 5) % 4) * 0.08})`; g.fillRect(x, y, w, 2 + (i % 4));
+      }
+      g.globalCompositeOperation = 'source-over';
+    }
+  } else if (kind === 'scuff') {
     // a dragged smear: a soft dark streak, ragged at the ends
     for (let i = 0; i < 14; i++) {
       const x = S * (0.35 + 0.3 * Math.sin(i * 1.7)), w = 6 + (i % 4) * 3;
       const gr = g.createLinearGradient(0, 8, 0, S - 8);
       gr.addColorStop(0, 'rgba(20,16,12,0)'); gr.addColorStop(0.25, 'rgba(20,16,12,0.22)'); gr.addColorStop(0.8, 'rgba(20,16,12,0.3)'); gr.addColorStop(1, 'rgba(20,16,12,0)');
       g.fillStyle = gr; g.fillRect(x, 8 + (i % 3) * 4, w, S - 20);
+    }
+  } else if (kind === 'carve') {
+    // a pair of grooves — a wheel pair's or an edge's line, ragged where it starts and where it lifts. Neutral grey: the stamp tints it.
+    for (const cx of [S * 0.3, S * 0.7]) {
+      const gr = g.createLinearGradient(0, 4, 0, S - 4);
+      gr.addColorStop(0, 'rgba(200,200,200,0)'); gr.addColorStop(0.12, 'rgba(200,200,200,0.55)'); gr.addColorStop(0.85, 'rgba(200,200,200,0.5)'); gr.addColorStop(1, 'rgba(200,200,200,0)');
+      g.fillStyle = gr; g.fillRect(cx - 5, 4, 10, S - 8);
+      g.fillStyle = 'rgba(200,200,200,0.14)'; g.fillRect(cx - 9, 10, 18, S - 24);   // the soft shoulder either side of the line
     }
   } else {
     // a shoe print: the sole and the heel, with tread bars
@@ -62,10 +94,13 @@ function paint(scene: Scene, kind: DecalKind): DynamicTexture {
 }
 
 export interface GroundDecalsHandle {
-  /** Leave a mark at (x, z) on the floor at height `y`, turned `yaw` radians, scaled ×`scale`. */
-  stamp(kind: DecalKind, x: number, z: number, yaw?: number, opts?: { y?: number; scale?: number }): void;
+  /** Leave a mark at (x, z) on the floor at height `y`, turned `yaw` radians, scaled ×`scale`. `pitch` tips it onto a slope (a
+   *  piste's rise, radians about the mark's own x axis); `tint` colours a `carve` mark (CARVE_TINT). */
+  stamp(kind: DecalKind, x: number, z: number, yaw?: number, opts?: { y?: number; scale?: number; pitch?: number; tint?: readonly [number, number, number] }): void;
   /** Live marks of a kind (for probes and tests). */
   live(kind: DecalKind): number;
+  /** The newest mark of a kind, for probes and tests: its instance colour and how far its face tips from level (1 = flat). */
+  peek(kind: DecalKind): { rgb: [number, number, number]; normalY: number } | null;
   dispose(): void;
 }
 
@@ -116,13 +151,20 @@ export function mountGroundDecals(scene: Scene, tier: QualityTier): GroundDecals
       p.cursor = nextSlot(p.cursor, cap);
       const [w, l] = DECAL_SIZE[kind]; const k = opts.scale ?? 1;
       s.set(w * k, 1, l * k); t.set(x, (opts.y ?? 0) + 0.012, z);
-      Quaternion.RotationYawPitchRollToRef(yaw, 0, 0, q);
+      Quaternion.RotationYawPitchRollToRef(yaw, opts.pitch ?? 0, 0, q);
       Matrix.ComposeToRef(s, q, t, tmp);
       tmp.copyToArray(p.mats, p.cursor * 16);
-      p.cols.set([1, 1, 1, 1], p.cursor * 4);
+      const tn = opts.tint;
+      p.cols.set([tn?.[0] ?? 1, tn?.[1] ?? 1, tn?.[2] ?? 1, 1], p.cursor * 4);
       p.born[p.cursor] = clock;
       p.count = Math.min(cap, p.count + 1);
       p.mesh.thinInstanceBufferUpdated('matrix'); p.mesh.thinInstanceBufferUpdated('color');
+    },
+    peek(kind) {
+      const p = pools.get(kind);
+      if (!p || p.cursor < 0) return null;
+      const c = p.cursor;
+      return { rgb: [p.cols[c * 4], p.cols[c * 4 + 1], p.cols[c * 4 + 2]], normalY: p.mats[c * 16 + 5] };   // the matrix's local-y column, y term: the face's tilt
     },
     live(kind) { const p = pools.get(kind); if (!p) return 0; let n = 0; for (let i = 0; i < cap; i++) if (decalAlpha(clock - p.born[i], life) > 0) n++; return n; },
     dispose() {

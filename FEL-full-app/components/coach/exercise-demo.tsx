@@ -118,7 +118,7 @@ export function ExerciseDemo({ exercise }: { exercise: ExerciseDemoData }) {
           </div>
           {!hasVideo && (
             <p className="mt-3 text-center text-[11px] text-white/40">
-              Coach demo video coming soon — follow the cues below.
+              Follow the cues below.
             </p>
           )}
         </div>

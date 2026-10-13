@@ -17,7 +17,7 @@
 // code, so the material simply renders as plain PBR water there rather than failing to compile.
 
 import {
-  Color3, MaterialPluginBase, MeshBuilder, PBRMaterial, ShaderLanguage,
+  Color3, MaterialPluginBase, MeshBuilder, PBRMaterial, ShaderLanguage, Vector3,
 } from '@babylonjs/core';
 import type { AbstractEngine, Camera, Material, Mesh, Nullable, Scene, SubMesh, UniformBuffer } from '@babylonjs/core';
 
@@ -38,6 +38,31 @@ export interface OceanOptions {
   waves?: OceanWave[];
   /** Horizon fade from → to (m from the eye). */
   fade?: [number, number];
+  /** vis-board (wave 2): the sun on the water — a glitter path and light through thin water at the crest. Off when absent. */
+  light?: OceanLight;
+}
+
+/**
+ * vis-board (wave 2): the sun's two gifts to water. `sun` is the unit direction TOWARD the sun. GLITTER: the chop-bent normals
+ * mirror the sun into the eye in a path of sparkles (`glitter` is its gain; 0 = none). SUBSURFACE: where the wave face is thin —
+ * the metres just ahead of the crest, on a surface that paints bands (the rideable face) — water transmits the low sun as a
+ * green-gold glow (`sss` is its gain; 0 = none). Opt-in per mount: a mode that passes nothing compiles the shader it always did.
+ */
+export interface OceanLight { sun: [number, number, number]; color: string; glitter: number; sss: number; sssColor: string }
+
+/** vis-board (wave 2), pure: how much glitter and crest transmission each mood's sun gives. A low gold sun draws the longest
+ *  path and lights the crest through; a flat overcast sky gives a whisper; a night, none. */
+export const OCEAN_SUN_GAIN: Record<string, { glitter: number; sss: number }> = {
+  goldenHour: { glitter: 1.5, sss: 0.9 }, daylight: { glitter: 1.0, sss: 0.7 }, alpine: { glitter: 0.9, sss: 0.6 }, dusk: { glitter: 0.5, sss: 0.45 },
+  overcast: { glitter: 0.22, sss: 0.3 }, nightGame: { glitter: 0.12, sss: 0.15 }, dojoWarm: { glitter: 0.3, sss: 0.3 }, indoorArena: { glitter: 0, sss: 0 },
+};
+/** The sun's light on the sea for a mood (the direction the light TRAVELS, as the moods store it), or undefined on a phone —
+ *  the glitter is per-pixel noise over the biggest surface on screen, and the phone's frame has no room for it. */
+export function oceanLightFor(mood: string, sunDir: readonly [number, number, number], sunHex: string, tier: string | null | undefined): OceanLight | undefined {
+  if (tier !== 'desktop' && tier !== 'high') return undefined;
+  const g = OCEAN_SUN_GAIN[mood] ?? OCEAN_SUN_GAIN.daylight;
+  if (g.glitter <= 0 && g.sss <= 0) return undefined;
+  return { sun: [-sunDir[0], -sunDir[1], -sunDir[2]], color: sunHex, glitter: g.glitter, sss: g.sss, sssColor: mood === 'goldenHour' || mood === 'dusk' ? '#ffb86b' : '#6fe6a8' };
 }
 
 /** The default set: a long groundswell running at the beach, a crossing mid swell, and two short wind chops. Amplitude is
@@ -51,6 +76,13 @@ export const DEFAULT_OCEAN_WAVES: OceanWave[] = [
 ];
 
 const PLUGIN = 'FELOcean';
+
+function lightOf(l: OceanLight | undefined): OceanPlugin['light'] {
+  if (!l) return null;
+  const d = new Vector3(l.sun[0], l.sun[1], l.sun[2]);
+  if (d.lengthSquared() < 1e-6) return null;
+  return { sun: d.normalize(), color: Color3.FromHexString(l.color).toLinearSpace(), glitter: Math.max(0, l.glitter), sss: Math.max(0, l.sss), sssColor: Color3.FromHexString(l.sssColor).toLinearSpace() };
+}
 
 /**
  * IMPROVE (2026-10-06, surf item 5): a band of colour painted INTO a surface's shading, by the mesh's own LOCAL z — the surf
@@ -70,16 +102,18 @@ class OceanPlugin extends MaterialPluginBase {
   foam = new Color3(0.9, 0.95, 1);
   horizon = new Color3(0.7, 0.8, 0.9);
   fadeFrom = 280; fadeTo = 2600;
+  /** vis-board (wave 2): the sun's glitter and crest transmission (undefined = the shader without them). */
+  light: { sun: Vector3; color: Color3; glitter: number; sss: number; sssColor: Color3 } | null = null;
   private _enabled = false;
   /** IMPROVE (2026-10-06, surf item 5): up to two bands (A, B) painted by local z; set before the plugin is enabled. */
   bands: { from: number; to: number; mix: number; soft: number; chop: number; color: Color3 }[] = [];
 
-  constructor(material: Material) { super(material, PLUGIN, 250, { FEL_OCEAN: false, FEL_OCEAN_BAND: false }); }
+  constructor(material: Material) { super(material, PLUGIN, 250, { FEL_OCEAN: false, FEL_OCEAN_BAND: false, FEL_OCEAN_LIGHT: false }); }
 
   get isEnabled(): boolean { return this._enabled; }
   set isEnabled(v: boolean) { if (this._enabled === v) return; this._enabled = v; this.markAllDefinesAsDirty(); this._enable(v); }
 
-  prepareDefines(defines: Record<string, unknown>): void { defines.FEL_OCEAN = this._enabled; defines.FEL_OCEAN_BAND = this._enabled && this.bands.length > 0; }
+  prepareDefines(defines: Record<string, unknown>): void { defines.FEL_OCEAN = this._enabled; defines.FEL_OCEAN_BAND = this._enabled && this.bands.length > 0; defines.FEL_OCEAN_LIGHT = this._enabled && !!this.light && (this.light.glitter > 0 || this.light.sss > 0); }
   getClassName(): string { return 'OceanPlugin'; }
 
   getUniforms(lang?: ShaderLanguage): { ubo: { name: string; size: number; type: string }[]; vertex?: string; fragment?: string } {
@@ -100,6 +134,9 @@ class OceanPlugin extends MaterialPluginBase {
       { name: 'felBandAColor', size: 3, type: 'vec3' },
       { name: 'felBandBColor', size: 3, type: 'vec3' },
       { name: 'felBandChop', size: 2, type: 'vec2' },
+      { name: 'felOceanSun', size: 4, type: 'vec4' },
+      { name: 'felOceanSunColor', size: 4, type: 'vec4' },
+      { name: 'felOceanSss', size: 3, type: 'vec3' },
     ];
     if (lang === ShaderLanguage.WGSL) return { ubo };
     const decl = `
@@ -108,6 +145,7 @@ class OceanPlugin extends MaterialPluginBase {
         uniform vec4 felOceanW1; uniform vec4 felOceanW2; uniform vec4 felOceanW3; uniform vec4 felOceanW4;
         uniform vec3 felOceanFoam; uniform vec3 felOceanHorizon; uniform vec2 felOceanFade;
         uniform vec4 felBandA; uniform vec4 felBandB; uniform vec3 felBandAColor; uniform vec3 felBandBColor; uniform vec2 felBandChop;
+        uniform vec4 felOceanSun; uniform vec4 felOceanSunColor; uniform vec3 felOceanSss;
       #endif`;
     return { ubo, vertex: decl, fragment: decl };
   }
@@ -130,6 +168,10 @@ class OceanPlugin extends MaterialPluginBase {
     ubo.updateColor3('felBandAColor', b(0).color);
     ubo.updateColor3('felBandBColor', b(1).color);
     ubo.updateFloat2('felBandChop', b(0).chop, b(1).chop);
+    const L = this.light;
+    ubo.updateFloat4('felOceanSun', L?.sun.x ?? 0, L?.sun.y ?? 1, L?.sun.z ?? 0, L?.glitter ?? 0);
+    ubo.updateFloat4('felOceanSunColor', L?.color.r ?? 1, L?.color.g ?? 1, L?.color.b ?? 1, L?.sss ?? 0);
+    ubo.updateColor3('felOceanSss', L?.sssColor ?? this.foam);
   }
 
   getCustomCode(shaderType: string, lang?: ShaderLanguage): Nullable<Record<string, string>> {
@@ -240,6 +282,23 @@ class OceanPlugin extends MaterialPluginBase {
             // the sea meets the sky: fade into the horizon colour with distance, so there is no edge to find
             float d = length(vPositionW.xz - vEyePosition.xz);
             float h = smoothstep(felOceanFade.x, felOceanFade.y, d);
+            #ifdef FEL_OCEAN_LIGHT
+            {
+              // vis-board: the sun on the water. GLITTER — the chop-bent normal mirrors the sun into the eye (a path of sparkles that
+              // twinkles with the chop's own scroll, thinning with distance so far water never shimmers)
+              vec3 felV = normalize(vEyePosition.xyz - vPositionW);
+              vec3 felR = reflect(-felV, normalW);
+              float felG = pow(max(dot(felR, felOceanSun.xyz), 0.0), 190.0);
+              float felTw = felNoise(vPositionW.xz * 3.4 + felOceanTime * vec2(0.9, -0.6));
+              finalColor.rgb += felOceanSunColor.rgb * felG * (0.35 + 1.65 * felTw) * felOceanSun.w * (1.0 - smoothstep(70.0, 420.0, d));
+              #ifdef FEL_OCEAN_BAND
+                // SUBSURFACE — thin water just ahead of the crest transmits the sun (strongest looking toward it)
+                float felThin = 1.0 - smoothstep(0.2, 4.4, max(vFelLocalZ, 0.0));
+                float felBack = pow(max(dot(-felV, felOceanSun.xyz), 0.0), 1.5);
+                finalColor.rgb += felOceanSss * felThin * (0.3 + 0.7 * felBack) * felOceanSunColor.a * step(-0.5, vFelLocalZ);
+              #endif
+            }
+            #endif
             finalColor.rgb = mix(finalColor.rgb, felOceanHorizon, h);
           }
           #endif`,
@@ -265,9 +324,10 @@ const NEAR_SIZE = 480, NEAR_SUB = 240, FAR_SIZE = 12000;
  * The sea's shading on any PBR surface — the rideable wave ribbon borrows it (amp 0: no displacement, its own normals) so the
  * face you ride is the same water as the sea around it: the same chop in its reflections, the same horizon fade.
  */
-export function oceanShade(mat: PBRMaterial, o: Pick<OceanOptions, 'foam' | 'horizon' | 'shoreZ' | 'fade'> & { bands?: OceanBand[] }): { setTime(t: number): void } {
+export function oceanShade(mat: PBRMaterial, o: Pick<OceanOptions, 'foam' | 'horizon' | 'shoreZ' | 'fade' | 'light'> & { bands?: OceanBand[] }): { setTime(t: number): void } {
   const plugin = new OceanPlugin(mat);
   plugin.amp = 0;
+  plugin.light = lightOf(o.light);
   // IMPROVE (2026-10-06, surf item 5): the colours go in as the strips they replace had them (an albedo straight from hex)
   plugin.bands = (o.bands ?? []).slice(0, 2).map((b) => ({
     from: Math.min(b.from, b.to), to: Math.max(b.from, b.to), mix: Math.max(0, Math.min(1, b.mix)),
@@ -293,6 +353,7 @@ export function mountOcean(scene: Scene, o: OceanOptions): OceanHandle {
     mat.backFaceCulling = true;
     const plugin = new OceanPlugin(mat);
     plugin.waves = waves;
+    plugin.light = lightOf(o.light);
     plugin.amp = amp * swell;
     plugin.shoreZ = o.shoreZ;
     plugin.foam = Color3.FromHexString(o.foam).toLinearSpace();

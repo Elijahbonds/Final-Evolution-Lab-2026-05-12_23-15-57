@@ -33,6 +33,12 @@ import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import { locoPick } from '../anim/LocoBus';   // SHARED-ANIM-BUS: one loco pick + stride rate for every on-foot body
 import { stepFinishGrace } from '../racing/RaceField';   // MECHANICS PASS: the race ends for everyone
+// VIS-RACE (visual wave 2): the start line and the finish dressed (blocks, starter, boards, a timer gantry, Night Meet floods), the
+// broadcast intro over the blocks, and the runners' footfalls on the tartan (dust and prints, from the pool of ground decals)
+import { buildSprintDressing, type SprintDressingHandle } from '../racing/sprintDressing';
+import { stepPlants, type PlantState } from '../racing/raceMoments';
+import { stampDecal } from '../racing/raceStamp';
+import { EffectsKit } from '../visual/EffectsKit';
 // MOVEMENT PLAY P8 (2026-09-26): running in place IS the race — each told step graded on the camera's capture clock against a
 // body's cadence (a thumb's 5 taps a second is not a jog's 3), the reaction timed on the same clock, a step captured before
 // the gun a false start even when it arrives after it, and the chest dipped at the tape the DIP
@@ -54,6 +60,10 @@ const RUNOUT_SEC = 2.0, RUNOUT_DECEL = 6;          //TUNE(elijah)
 const SPRINT_FOV_GAIN = 1.12;                     //TUNE(elijah)
 /** The runner's lane (x) — where the pace light and the PB marker run. */
 const RUNNER_X = -0.7;
+/** The rival's lane (x). */
+const RIVAL_X = 0.9;
+/** VIS-RACE: the drive phase — footfall dust kicks up for this many metres off the blocks, then the runners are on the top of the track. */
+const DRIVE_DUST_M = 18;
 
 /**
  * Built as a factory so every harness instance closes over its OWN state.
@@ -81,6 +91,10 @@ let finishMat: StandardMaterial | null = null;
 let paceLight: Mesh | null = null;
 let pbMarker: Mesh | null = null;
 const markerMats: PBRMaterial[] = [];
+/** VIS-RACE: the start line and finish dressing, and where each runner's next foot lands (metres down the straight). */
+let dressing: SprintDressingHandle | null = null;
+let plantsRunner: PlantState = { nextM: 0.5, i: 0 };
+let plantsRival: PlantState = { nextM: 0.5, i: 0 };
 /** IMPROVE (2026-10-06): the camera's velocity, one scratch vector (was a new Vector3 every frame). */
 const camVel = new Vector3();
 
@@ -138,6 +152,7 @@ const reset = (): void => {
   S.beatSeq = 0; S.beatGrade = ''; S.beatFoot = ''; S.beatMs = 0; S.beatCall = '';
   S.atM = []; S.prevM = 0; S.prevMs = 0; S.pb = null; S.split = '';
   S.baseFov = null; S.fov = null; S.hudKey = null; S.hudAge = 0;
+  plantsRunner = { nextM: 0.5, i: 0 }; plantsRival = { nextM: 0.5, i: 0 };   // VIS-RACE
 };
 
 const say = (t: string, sec = 0.9): void => { S.banner = t; S.bannerT = sec; };
@@ -215,6 +230,7 @@ function finish(ctx: ModeContext, timeS: number, rawS: number): void {
   const beat = S.rivalDist < RACE_DIST && timeS < RIVAL_TIME_S;
   const won = timeS <= WIN_TIME && beat;
   S.won = won;
+  dressing?.setClock(timeS, true);   // VIS-RACE: the gantry shows the official time (dip and false-start penalties in)
   finishBeat(ctx, won);
   // PB SPLITS: the tape is the last mark (the core's clock at the line), then the run is kept if it is the best
   if (core) trackMarks(ctx, core.state.distanceM, rawS * 1000);
@@ -258,6 +274,9 @@ return {
   get mood() { return readPlaceLook('sprint')?.world?.mood ?? 'daylight'; },
   get backdrop() { return readPlaceLook('sprint')?.world?.backdrop ?? MOOD_TO_FAMILY[readPlaceLook('sprint')?.world?.mood ?? 'daylight']; },
   camPreset: 'runner',
+  // VIS-RACE (visual wave 2): the broadcast intro — a crane over the straight, then the runner on the blocks. The core's start
+  // sequence waits for it (see update), a press skips it, and the press that skips it is not a stride.
+  intro: 'walkIn',
 
   async load(ctx: ModeContext): Promise<void> {
     reset();
@@ -300,6 +319,9 @@ return {
     paceLight = strip('sprint_pace_light', '#4ade80');
     pbMarker = strip('sprint_pb_marker', '#60a5fa');
     S.pb = loadSprintPb(RACE_DIST);
+    // VIS-RACE (visual wave 2): blocks, a starter, distance boards, the finish gantry and its timer, Night Meet's floods
+    dressing?.dispose();
+    dressing = buildSprintDressing(ctx.scene, RACE_DIST, { laneX: [RUNNER_X, RIVAL_X], mood: readPlaceLook('sprint')?.world?.mood ?? 'daylight' });
 
     // IMPROVE (2026-10-06): the two bodies spawn together (CharacterLibrary caches the container per URL).
     [runner, rival] = await Promise.all([
@@ -333,7 +355,7 @@ return {
       onSensory: playSensory,
       onPhase: (phase) => {
         if (phase === 'Set') say('SET', 1.0);
-        else if (phase === 'Go') { say('GO!', 0.8); S.goAt = performance.now(); }
+        else if (phase === 'Go') { say('GO!', 0.8); S.goAt = performance.now(); dressing?.fireGun(); leaveBlocks(ctx); }   // VIS-RACE: the gun's flash and smoke, the blocks' scuffs
         else if (phase === 'Ready') S.goAt = null;   // MOVEMENT PLAY P8: back to the blocks (a false start)
       },
       onFinish: (rawS) => {
@@ -358,6 +380,7 @@ return {
   onInput(ctx: ModeContext, e: FelInput): void {
     if (e.t === 'stick' && e.side === 'R') { S.lookX = e.x; S.lookY = e.y; return; }   // MODE-STICK-FACE: R stick → the director's look orbit
     if (S.done || !core) return;
+    if (ctx.camDirector.inIntro) return;   // VIS-RACE: the press that skips the broadcast intro is the intro's, not a stride (a false start in READY)
     // RACING PASS phase 3: the face buttons, the shoulders, the clicks and the triggers answered NOTHING — 13 % of the
     // masher's presses were silent, the only silent presses in the racing suite. The race is the d-pad; every other press
     // now says so (a trigger once per squeeze — the bus re-emits a held trigger every frame).
@@ -387,6 +410,7 @@ return {
   body: { claims: ['step'], lines: rideLines('sprint', ['step']) },
   onBody(ctx: ModeContext, ev: BodyEvent, view: BodyView): boolean {
     if (ev.kind !== 'step' || S.done || !core || core.state.phase === 'Finish') return false;
+    if (ctx.camDirector.inIntro) return false;   // VIS-RACE: no stride is graded under the broadcast intro
     const q = stride.grade(ev, view);
     if (!q) return false;
     // captured before the gun: a false start whenever it arrives (the core's Ready / Set handle the rest)
@@ -402,6 +426,9 @@ return {
   update(ctx: ModeContext, dt: number): void {
     if (!core || !runner || !rival || !finishLine) return;
     if (S.done) { if (S.runout !== null) runOut(ctx, dt); return; }   // IMPROVE (2026-10-06): the run-out after the tape
+    // VIS-RACE: the start sequence (READY → SET → the gun) begins when the broadcast intro ends — the crane and the shot on the
+    // runner play over the blocks, and the gun is never fired at a camera that is not looking. Its timings are the core's, unchanged.
+    if (ctx.camDirector.inIntro) { follow(ctx, dt, 0); pushHud(ctx, dt); return; }
     // MOVEMENT PLAY P8: the chest dipped at the tape (a body's dip earlier than the window is never refused out loud)
     for (const it of rideIntents.poll(ctx.body?.() ?? null, { airborne: false })) {
       if (it.kind === 'dip' && (core.state.phase === 'Run' || core.state.phase === 'Go')) {
@@ -422,12 +449,33 @@ return {
     finishMat?.dispose(); finishMat = null;
     paceLight?.dispose(); paceLight = null;
     pbMarker?.dispose(); pbMarker = null;
+    dressing?.dispose(); dressing = null;   // VIS-RACE
     for (const m of markerMats) m.dispose();
     markerMats.length = 0;
     S.pendingEnd = null; S.runout = null;   // a result held by the run-out is not sent from a torn-down mode
     core = null;
   },
 };
+
+/** VIS-RACE: the gun has gone — each runner's blocks leave a scuff, and the first footfalls start from the line. */
+function leaveBlocks(ctx: Ctx): void {
+  for (const x of [RUNNER_X, RIVAL_X]) stampDecal(ctx.scene, 'scuff', x, 0.45, Math.PI, 0.7);
+}
+
+/** VIS-RACE: where the feet land — a print on the tartan (the shared ground decals) for each, and through the drive phase the
+ *  dust a spiked foot kicks up. The runner's feet by the core's distance and speed; the pacer's by its own curve. */
+function footfalls(ctx: Ctx, racing: boolean, dist: number, speed: number): void {
+  if (!racing || !runner || !rival) return;
+  const plant = (st: PlantState, m: number, v: number, x: number): void => {
+    for (const p of stepPlants(st, m, v)) {
+      const fx = x + (p.foot === 'L' ? 0.11 : -0.11);
+      stampDecal(ctx.scene, 'foot', fx, -p.m, Math.PI, 1);
+      if (p.m < DRIVE_DUST_M) EffectsKit.burst(ctx.scene, new Vector3(fx, 0.04, -p.m), 'dust', 0.3, '#cdbba6');
+    }
+  };
+  plant(plantsRunner, dist, speed, RUNNER_X);
+  plant(plantsRival, S.rivalDist, pacerSpeed(S.rivalT, RIVAL_TIME_S, RACE_DIST), RIVAL_X);
+}
 
 /** The dip at the tape (the d-pad's UP and a body's chest alike). */
 function dipAtTape(ctx: Ctx, left: number): void {
@@ -544,6 +592,8 @@ function updateRace(ctx: Ctx, dt: number): void {
       }
     }
     placeMarkers(st.phase === 'Go' || st.phase === 'Run');
+    footfalls(ctx, st.phase === 'Go' || st.phase === 'Run', st.distanceM, st.speed);
+    dressing?.setClock(st.phase === 'Go' || st.phase === 'Run' ? st.timeS : null);   // VIS-RACE: the gantry counts the race clock
 
     if (S.bannerT > 0) { S.bannerT -= dt; if (S.bannerT <= 0) S.banner = ''; }
 

@@ -79,10 +79,23 @@ export const MIGRATED: Record<string, {
     modeId: '{modeKey}',
     keys: 'aerial aimCarry banner beatPulse blockReady board boardTitle call card clock club combo cues distance dive energy energyLabel feints flicks flow foeRackets foeScore goals hole holes homers instruments kickPower kickShape kickZones kicksThem kicksYou kinetic longest meterCarry meterT meterTicks mic micWho mult outs outsCap pad par pin pitch powerLock rackets rings rivalHomers round score shotMeterBands shotMeterT streak strokes style swingPhase targets them themGoals weather wind windDeg windWord you'.split(' '),
   },
+  // lane/vis-race phase 2: the racing hosts (keys frozen from the same base, 8ee1b5be; modeId as each host binds its splash and touch deck)
+  'sprint-babylon.tsx': {
+    modeId: '{modeKey}',
+    keys: 'banner beat beatCall beatFoot beatGrade beatMs clock distance falseStartRule falseStarts gap hint phase rival speed split sub13 top'.split(' '),
+  },
+  'aero-aces-babylon.tsx': {
+    modeId: '"aeroaces"',
+    keys: 'bananas banner draft gap hint item itemKind lap pb pos shield speed threat threatRoll threatSide time toGate'.split(' '),
+  },
+  'velocity-kart-babylon.tsx': {
+    modeId: '"velocitykart"',
+    keys: 'banner chasing cup delta draft drift gap hint item itemKind lap mini pos shield speed threat threatHop threatSide time trackCue'.split(' '),
+  },
 };
 
-/** Shared HUD pieces a migrated host draws through, held to the same rules. */
-const PIECES = ['timing-prompt.tsx', 'combat-hud-band.tsx'];
+/** Shared HUD pieces a migrated host draws through, held to the same rules. (boost-hud: the racing hosts' and the boards' boost meter.) */
+const PIECES = ['timing-prompt.tsx', 'combat-hud-band.tsx', 'boost-hud.tsx'];
 
 const keyRead = (src: string, k: string) => new RegExp(`hud\\.${k}\\b|hud\\[['"]${k}['"]\\]`).test(src);
 

@@ -23,6 +23,8 @@ export default async function ProgramProductPage({ params }: { params: { slug: s
   if (!isCoachStoreEnabled()) notFound();
   if (!['dunking', 'correctives', 'posture'].includes(params.lane)) notFound();
   const coming = params.lane !== 'dunking';
+  // NP-1: an unbuilt program lane is not a page at all (hidden, never labelled).
+  if (coming) notFound();
   let listing: { id: string; priceUsd: number; manifest: string } | null = null;
   if (!coming) {
     const instructor = await prisma.instructor.findUnique({ where: { slug: params.slug } });
@@ -38,7 +40,7 @@ export default async function ProgramProductPage({ params }: { params: { slug: s
   return (
     <main className="mx-auto max-w-3xl px-4 py-8 text-white">
       <h1 className="text-3xl font-black">{params.lane === 'dunking' ? 'Dunking & Plyometrics' : params.lane === 'posture' ? 'Static & Dynamic Posture' : 'Correctives'}</h1>
-      {coming ? <p className="mt-4">Coming soon. No checkout on this program yet.</p> : (
+      {coming ? null : (
         <>
           <p className="mt-3 text-sm text-white/70">Eight weeks. Lifetime access once bought. Re-screens on days 14, 28, 42 and 56. {DUNK_PROGRAM_STATUS}.</p>
           <p className="mt-2 text-sm text-white/60">Your original clip is deleted 30 days after your review, on the video-review product. This program does not upload video.</p>

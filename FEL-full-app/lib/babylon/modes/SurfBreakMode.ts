@@ -37,6 +37,7 @@ import { refuse } from '../core/Refusal';            // MECHANICS PASS: a press 
 import { BOARD_PACE } from '../core/BoardMovement';   // WALLS + SPEED (2026-09-15): the shared +35% board pace
 import { REPEAT_DECAY } from '../core/ComboChain';   // the same THPS repeat decay the skate and free-run chains use
 import { SurfSpray } from '../premium/SurfSpray';   // SURF OCEAN: crest mist, rail spray, splashes
+import { ReplayGate } from './boardMoments';   // vis-board (wave 2): which moment earns the replay
 // MOVEMENT PLAY P8 (2026-09-26): the body's grab in the air, a quarter-turn on the face (the CUTBACK) or in the air (a spin)
 import { RideIntents, rideOf, rideLines, type RideIntent } from '../core/rideBody';
 import { spinTrickFor } from '../core/rideTricks';
@@ -54,6 +55,8 @@ import {
 } from './surfBreak';
 
 const RUN_SEC = 90;
+/** vis-board: a banked line this big (points) is a highlight at all; a barrel is worth its bonus plus the time held in it. */
+const REPLAY_LINE_PTS = 250;
 /** phase 10: the score that wins a session without a barrel */
 const SURF_WIN_SCORE = 800;
 /** How fast a cutback comes around. ~0.4s to complete the turn. */
@@ -99,6 +102,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
   // repeat list clears, the last ride is judged, the set is called and its worth multiplies the wave moves.
   let swellSeq: () => number = () => 0;
   let swellSeen = 0, swellsRidden = 0;
+  const replayGate = new ReplayGate();   // vis-board (wave 2)
   let worth = 1;
   /** When the ride being judged started (a respawn or a new swell starts the next). */
   let rideStartT = 0;
@@ -337,6 +341,14 @@ export const SurfBreakMode: ModeDefinition = (() => {
     }
   }
 
+  /** vis-board (wave 2): offer a moment to the replay gate (the session's best, never near the horn) and play it, skippably. */
+  function replayMoment(ctx: ModeContext, kind: string, weight: number, sec: number): void {
+    const plan = replayGate.consider(t, { kind, weight, floor: REPLAY_LINE_PTS, sec }, timeLeft);
+    if (!plan) return;
+    console.info(`[SURF-REPLAY] best ${kind} ${weight} (${plan.lastSeconds.toFixed(1)} s)`);
+    void ctx.highlight?.({ lastSeconds: plan.lastSeconds, angles: ['low', 'side', 'follow'] });
+  }
+
   function bankBarrel(ctx: ModeContext): void {
     // (IMPROVE 2026-10-06, item 13: the rule, pure and tested — surfBreak.barrelVerdict — and drawn while it runs: tubeRead)
     const verdict = barrelVerdict(barrelSec, barrelWorked, BARREL_HOLD_SEC, BARREL_WORK_SHARE);
@@ -367,8 +379,10 @@ export const SurfBreakMode: ModeDefinition = (() => {
     ctx.juice.shake(0.08, 140);
     console.info('[SURF-JUICE] barrel bank');
     EffectsKit.burst(ctx.scene, rig.char.root.position.add(new Vector3(0, 1.2, 0)), 'net');
+    spray?.splash(rig.char.root.position.add(new Vector3(0, 0.5, 2.2)), 1.1);   // vis-board (wave 2): the barrel spits — a curtain of spray out of the tube's mouth as the rider exits
     ctx.setHud({ score: tricks.score });
     bannerFlash(ctx, `BARRELED! +${BARREL_BONUS}`, 900, BANNER_PRIO.news);
+    replayMoment(ctx, 'barrel', BARREL_BONUS + Math.round(barrelSec * 40), Math.min(4, barrelSec + 0.6));   // vis-board: the barrel, from inside the water's level
     barrelSec = 0; inBarrel = false;
   }
 
@@ -438,6 +452,9 @@ export const SurfBreakMode: ModeDefinition = (() => {
   return {
     modeId: 'surf', camPreset: 'surf',
     hideRingInPlay: true,
+    intro: 'walkIn',   // vis-board (wave 2): a crane over the break, then the surfer on the face; the first input skips it (the board trims itself in until then)
+    replayDof: false,  // vis-board: the DOF mount flattens the frame (core/ModeHarness.replayDof)
+    replay: true,      // vis-board (wave 2): the best barrel or banked line, replayed from the water (ctx.highlight)
     // MOVEMENT PLAY P8: the card — the floor's lines, then the grab, the cutback and the spin this mode reads itself
     body: { lines: rideLines('surf') },
     // Per-venue light and horizon, read at mount (see SkateRunMode). This is also what finally mounts the painted
@@ -468,7 +485,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
       buoyMeshes = built.buoys;
       for (const m of buoyMeshes) { m.overlayColor = new Color3(1, 0.25, 0.2); m.overlayAlpha = 0.55; m.renderOverlay = false; }
       updateSea = built.updateSea;
-      spray?.dispose(); spray = new SurfSpray(ctx.scene);
+      spray?.dispose(); spray = new SurfSpray(ctx.scene, undefined, (ctx.scene.metadata as { felTier?: string } | null)?.felTier === 'mobile');   // vis-board: a phone's foam wake is lighter
       propsGone = false; void mountVenueProps(ctx.scene, 'surf-break').then((h) => { if (propsGone) h?.dispose(); else props = h; });
       // IMPROVE (2026-10-06, item 3): the Gate-0 "validation" spawn is gone — a whole hero body loaded at y −1000, its bone count
       // compared with an empty if, and disposed: a full character load for nothing (skate's item 1). The rider is the real
@@ -494,11 +511,13 @@ export const SurfBreakMode: ModeDefinition = (() => {
         return { pose: angled, legs, aim: at, eyes: at, window };
       }, 'SURF-PP');
       trickLayer?.dispose();
+      ctx.trackReplay?.(rig.board);   // vis-board: a replay shows the board's flip and bank
       trickLayer = new BoardTrickLayer(ctx.scene, rig.char.skeleton, rig.char.root, rig.board);   // after the posture layer: the grab hand is the last word
       if (process.env.NODE_ENV === 'development') {
         const dev = (window as unknown as { __FEL_DEV__?: { boardPosture?: unknown } }).__FEL_DEV__;
         if (dev) dev.boardPosture = { me: () => posture?.layer.get() ?? null, bio: () => ({ ...bio }), aim: () => { const la = lookAhead(rig.char.root.position, rig.char.root.rotation.y, 7, 1.5); return la; } };   // BIOMECH-WAVE2 probes
       }
+      replayGate.reset();
       bailBeatT = 0; landBeatT = 0; airT = 0; cutbackUntil = 0; rel = 0; stickY = 0; rideLean = 0;
       pumpBoost = 0; pumpSign = 0; pumpAt = -9; pumps = 0;
       rideIntents.reset(); bodySynced = false; Object.assign(bodyStats, { grabs: 0, spins: 0, cutbacks: 0, last: '' });   // MOVEMENT PLAY P8
@@ -782,8 +801,11 @@ export const SurfBreakMode: ModeDefinition = (() => {
         // IMPROVE (2026-10-06, item 19): the first wave's lesson — climb, drop, pump — one prompt at a time, advanced by doing it
         { const c = coach.update(dt, stickY, pumps); if (c !== null) pushHud(ctx, { coach: c }); }
 
+        const scoreBefore = tricks.score;
         const banner = tricks.update(dt);
         if (banner) bannerFlash(ctx, banner, 900);
+        // vis-board (wave 2): a banked line is a moment — the best of the session is replayed from the water's level
+        if (tricks.score > scoreBefore) replayMoment(ctx, 'line', tricks.score - scoreBefore, 3.2);
         // Clamp AT the water's edge, not 5m inside it. The rider used to stop
         // against nothing while the ocean visibly continued past him.
         const edge = world.bound - 1;   // the break's own width, so the clamp and the water's edge are one number
@@ -831,6 +853,7 @@ export const SurfBreakMode: ModeDefinition = (() => {
           lip, rider: rig.char.root.position, speed: rig.rider.vel.length(),
           carve: carving ? 1 : Math.min(1, yawRate / 2.2 + Math.abs(rideLean) * 0.5),
           carveSide: -Math.sign(yaw - lastYaw || rideLean || 1), hollow: barrelActive(t), grounded: rig.rider.grounded && !wipedOut,
+          yaw,   // vis-board (wave 2): the foam wake lies behind the heading
         });
       }
       pushHud(ctx, { time: Math.ceil(timeLeft), ...boostKit.hud() });   // IMPROVE (item 2): only what moved

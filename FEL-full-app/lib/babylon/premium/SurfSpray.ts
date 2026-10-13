@@ -27,6 +27,29 @@ export interface SprayFrame {
   hollow: boolean;
   /** The rider is on the face (a board in the air throws nothing). */
   grounded: boolean;
+  /** vis-board (wave 2): the board's heading (radians about +y, 0 = +z) — the foam wake lies behind it. */
+  yaw?: number;
+}
+
+/** Board speeds (m/s) between which the wake fades in: nothing at or under WAKE_FADE_FROM, all of it from WAKE_FADE_TO. A board that is
+ *  barely moving churns up no foam: the blobs a standing board laid round itself read as a white disc. */
+export const WAKE_FADE_FROM = 2;
+export const WAKE_FADE_TO = 6;
+/** vis-board, pure: how much of the wake a board at `speed` leaves (0 at rest, a smooth rise to 1). */
+export function wakeFade(speed: number): number {
+  if (!(speed > WAKE_FADE_FROM)) return 0;
+  const t = Math.min(1, (speed - WAKE_FADE_FROM) / (WAKE_FADE_TO - WAKE_FADE_FROM));
+  return t * t * (3 - 2 * t);
+}
+
+/** vis-board (wave 2), pure: the foam wake's emission, particles a second — none in the air or at rest, fading in with speed (wakeFade),
+ *  then rising with speed and with how hard the rail is set (a carve digs a wider, whiter trail). */
+export function wakeRate(speed: number, carve: number, grounded: boolean, lite = false): number {
+  const fade = wakeFade(speed);
+  if (!grounded || fade <= 0) return 0;
+  const sp = Math.max(0, Math.min(1, speed / 12)), cv = Math.max(0, Math.min(1, carve));
+  const full = (14 + 46 * sp + 60 * cv * sp) * fade;
+  return Math.round(lite ? full * 0.22 : full);   // a phone's trail is a fifth as thick (the surf row of mobileBudget.json holds 53 live particles)
 }
 
 function dropletTexture(scene: Scene): DynamicTexture {
@@ -46,11 +69,14 @@ export class SurfSpray {
   private crest: ParticleSystem;
   private rail: ParticleSystem;
   private splashSys: ParticleSystem;
+  private wake: ParticleSystem;
+  private wakeAt = new Vector3();
   private crestAt = new Vector3();
   private railAt = new Vector3();
   private splashAt = new Vector3();
 
-  constructor(scene: Scene, private tint = new Color4(0.95, 0.98, 1, 0.6)) {
+  /** `lite`: a phone — the foam wake is a fifth as thick and lives half as long (the particle budget's row for this mode). */
+  constructor(scene: Scene, private tint = new Color4(0.95, 0.98, 1, 0.6), private lite = false) {
     this.tex = dropletTexture(scene);
     const make = (name: string, cap: number): ParticleSystem => {
       const ps = new ParticleSystem(name, cap, scene);
@@ -88,6 +114,19 @@ export class SurfSpray {
     this.splashSys.minLifeTime = 0.5; this.splashSys.maxLifeTime = 1.1;
     this.splashSys.minSize = 0.1; this.splashSys.maxSize = 0.36;
     this.splashSys.manualEmitCount = 0;
+    // foam wake (vis-board, wave 2): the white the board churns up and leaves behind it — soft blobs that spread and thin over ~2 s,
+    // laid at the water under the board, left where they were made (the trail is the path the board took)
+    this.wake = make('surfFoamWake', 520);
+    this.wake.emitter = this.wakeAt;
+    this.wake.minEmitBox = new Vector3(-0.2, 0, -0.22); this.wake.maxEmitBox = new Vector3(0.2, 0.05, 0.22);   // a stream off the tail, not a ring round the board
+    this.wake.color1 = new Color4(0.97, 1, 1, 0.3); this.wake.color2 = new Color4(0.88, 0.97, 0.98, 0.2);   // thin: 130 of them overlapping read as a white disc at 0.5
+    this.wake.colorDead = new Color4(0.9, 0.98, 1, 0);
+    this.wake.minLifeTime = lite ? 0.8 : 1.5; this.wake.maxLifeTime = lite ? 1.3 : 2.6;
+    this.wake.minSize = 0.16; this.wake.maxSize = 0.34;
+    this.wake.addSizeGradient(0, 0.5, 0.7); this.wake.addSizeGradient(1, 1.2, 1.6);   // it spreads as it thins
+    this.wake.gravity = new Vector3(0, 0, 0);
+    this.wake.minEmitPower = 0.5; this.wake.maxEmitPower = 1.3;   // thrown back: the blobs travel away along the heading and a trail forms
+    this.wake.direction1 = new Vector3(-0.5, 0.03, -0.5); this.wake.direction2 = new Vector3(0.5, 0.12, 0.5);
   }
 
   /** Every frame, from the mode. */
@@ -98,6 +137,11 @@ export class SurfSpray {
     const carve = f.grounded ? Math.max(0, Math.min(1, f.carve)) : 0;
     const speed01 = Math.max(0, Math.min(1, f.speed / 12));
     this.rail.emitRate = Math.round(carve * carve * 520 * (0.35 + 0.65 * speed01) + (f.grounded ? speed01 * 25 : 0));
+    // the wake is laid at the board's feet at the water, thrown a little back along the heading
+    const yaw = f.yaw ?? 0, fx = Math.sin(yaw), fz = Math.cos(yaw);
+    this.wakeAt.set(f.rider.x - fx * 0.9, f.rider.y + 0.02, f.rider.z - fz * 0.9);
+    this.wake.emitRate = wakeRate(f.speed, carve, f.grounded, this.lite);
+    this.wake.direction1.set(-fx * 1.0 - 0.18, 0.03, -fz * 1.0 - 0.18); this.wake.direction2.set(-fx * 0.45 + 0.18, 0.1, -fz * 0.45 + 0.18);
     const side = f.carveSide >= 0 ? 1 : -1;
     this.rail.direction1 = new Vector3(side * 1.2, 1.4, -0.8);
     this.rail.direction2 = new Vector3(side * 2.6, 3.2, 0.6);
@@ -110,5 +154,5 @@ export class SurfSpray {
     this.splashSys.manualEmitCount = Math.round(60 + 240 * Math.max(0, Math.min(1.5, size)));
   }
 
-  dispose(): void { this.crest.dispose(); this.rail.dispose(); this.splashSys.dispose(); this.tex.dispose(); }
+  dispose(): void { this.crest.dispose(); this.rail.dispose(); this.splashSys.dispose(); this.wake.dispose(); this.tex.dispose(); }
 }
