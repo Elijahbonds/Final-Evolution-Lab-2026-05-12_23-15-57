@@ -46,7 +46,7 @@ type Hud = Record<string, HudValue>;
 const OPTS = [
   { key: 'optA', face: 'A', btn: 'A', dpad: '▲', tone: 'you' }, { key: 'optB', face: 'B', btn: 'B', dpad: '▶', tone: 'danger' },
   { key: 'optX', face: 'C', btn: 'X', dpad: '◀', tone: 'power' }, { key: 'optY', face: 'D', btn: 'Y', dpad: '▼', tone: 'them' },
-] as const satisfies readonly { tone: HudTone }[];
+] as const satisfies readonly { key: string; face: string; btn: string; dpad: string; tone: HudTone }[];
 /** The seats' colours (TV HUD palette: P1 you, P2 them). */
 const SEAT = [hudColor('you'), hudColor('them')];
 
