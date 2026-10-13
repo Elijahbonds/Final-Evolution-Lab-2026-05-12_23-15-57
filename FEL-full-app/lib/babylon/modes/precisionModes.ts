@@ -584,9 +584,7 @@ export const GolfMode: ModeDefinition = (() => {
   }
 
   return {
-    // VIS-COURT: 'daylight' — the Coastal Links ran the ALPINE mood (exposure 0.92, a cold sun; audit A3). The rig's mood resolver has
-    // given it daylight since wave 1; the declared mood now says the same, so the legacy look and the resolver agree.
-    modeId: 'golf', mood: 'daylight', camPreset: 'links',
+    modeId: 'golf', mood: 'alpine', camPreset: 'links',
     intro: 'establish',   // VIS-COURT: the broadcast crane over the course (the hole's own flyover has already shown the green); any input skips it
     replay: true,         // VIS-COURT: a birdie or better, replayed (never the card-closing hole)
     replayCast: () => ({ bodies: me ? [me.root] : [], loose: ball ? [ball] : [] }),
