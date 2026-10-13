@@ -16,6 +16,7 @@ import { captureVenueReflection, type VenueReflectionHandle } from './VenueRefle
 import { mountFixtureLights, type FixtureLightsHandle } from './FixtureLights';
 import { mountSkyDome, type SkyDomeHandle } from './SkyDome';
 import { mountAtmosphere, type AtmosphereHandle } from './Atmosphere';
+import { mountGlossyFloor, type GlossyFloorHandle } from './GlossyFloor';
 import { mountEnvironmentIBL } from './EnvironmentIBL';
 import { motionPolicy } from '../../a11y/reducedMotion';
 
@@ -55,6 +56,8 @@ export interface LightRigHandle {
   /** A9.11 (vis-foundation-2): the live sky on the domes (desktop/high) and the procedural worlds' haze (every tier). */
   readonly sky: SkyDomeHandle | null;
   readonly atmosphere: AtmosphereHandle | null;
+  /** A9.7 second half (vis-foundation-2): the named glossy floor's planar mirror (desktop/high). */
+  readonly glossyFloor: GlossyFloorHandle | null;
   dispose(): void;
 }
 
@@ -227,6 +230,7 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
   let fixtureLights: FixtureLightsHandle | null = null;
   let sky: SkyDomeHandle | null = null;
   let atmosphere: AtmosphereHandle | null = null;
+  let glossyFloor: GlossyFloorHandle | null = null;
 
   liftBlackMaterials(scene);
 
@@ -247,6 +251,8 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
       if (!legacy) {
         sky?.dispose(); sky = mountSkyDome(scene, mood, tier, lookFeatureOff('sky'));
         atmosphere?.dispose(); atmosphere = mountAtmosphere(scene, mood, lookFeatureOff('air'));
+        // A9.7 second half: the gym's / the stage's floor reflects the players (before the probe: a mirrored floor keeps it)
+        glossyFloor?.dispose(); glossyFloor = mountGlossyFloor(scene, tier, at ?? null, lookFeatureOff('mirror'));
       }
       if (!T.venueProbe) return false;
       const where = at?.clone() ?? null;
@@ -261,6 +267,7 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
     get fixtureLights() { return fixtureLights; },
     get sky() { return sky; },
     get atmosphere() { return atmosphere; },
+    get glossyFloor() { return glossyFloor; },
     flashBeat() {
       // HOTFIX (2026-09-24): reduced motion — no exposure flash (a made three, a momentum tier, the storm's lightning:
       // the thunder still rolls, the sky just does not strobe)
@@ -286,7 +293,7 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
       glow?.dispose();
       venueProbe?.dispose();
       fixtureLights?.dispose();
-      sky?.dispose(); atmosphere?.dispose();
+      sky?.dispose(); atmosphere?.dispose(); glossyFloor?.dispose();
       hemi.dispose(); sun.dispose(); shadows.dispose(); pipeline.dispose();
       disposeEnv();
     },
