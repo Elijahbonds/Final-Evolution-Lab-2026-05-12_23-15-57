@@ -5,7 +5,7 @@ import {
   FLOOR_HAS_EMISSIVE, FLOOR_STYLE_OF, WALL_HAS_EMISSIVE, WALL_STYLE_OF, WALL_TILE_M, floorStyleOf, paintFloor, paintWall, rgba, shade, wallStyleOf,
   type FloorStyle, type WallStyle,
 } from './arenaPaint';
-import { allFinite, recordingCtx } from './canvasShim.test-helper';
+import { allFinite, recordingCtx } from '../../../tests/helpers/canvasShim';
 
 describe('arena wall and floor styles', () => {
   it('every combat arena names a wall style and a floor style', () => {

@@ -6,7 +6,7 @@ import {
   LANTERN_EVERY_M, LANTERN_HEX, RIG_CANS, buildArena, fireSpots, gateMaterial, lanternSpots, poolSpots, wantsLanterns, wantsOverheadRig,
 } from './arenaBuild';
 import { floorStyleOf, wallStyleOf } from './arenaPaint';
-import { installOffscreenShim } from './canvasShim.test-helper';
+import { installOffscreenShim } from '../../../tests/helpers/canvasShim';
 
 installOffscreenShim();
 const arena = (id: string) => COMBAT_ARENAS.find((a) => a.id === id)!;

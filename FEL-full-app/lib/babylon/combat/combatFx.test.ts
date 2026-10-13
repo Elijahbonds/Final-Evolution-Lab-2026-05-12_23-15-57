@@ -2,7 +2,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { FreeCamera, MeshBuilder, NullEngine, Scene, TransformNode, Vector3 } from '@babylonjs/core';
 import { HIT_KINDS, HIT_LOOK, TIER_SCALE, auraLook, mountCombatFx, planHit, type HitKind } from './combatFx';
-import { installOffscreenShim } from './canvasShim.test-helper';
+import { installOffscreenShim } from '../../../tests/helpers/canvasShim';
 
 installOffscreenShim();
 
