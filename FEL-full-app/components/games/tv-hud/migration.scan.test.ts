@@ -93,6 +93,11 @@ export const MIGRATED: Record<string, {
     keys: 'banner chasing cup delta draft drift gap hint item itemKind lap mini pos shield speed threat threatHop threatSide time trackCue'.split(' '),
   },
   // lane/hud-hoops: the hoops hosts (keys frozen from the base aeb65c98, the hold-lift round's head; modeId as each host binds its splash and touch deck)
+  'dunk-babylon.tsx': {
+    modeId: '"dunk"',
+    // (HostLobby and PadChips are the host's, outside the frame; the QR lobby's anchor is pinned by consoleView.scan)
+    keys: 'banner bannerHigh beats breakdown call challenge cut dunkNum dunkOff field hint hype judgeReveal mic micWho nightBest nightCard nightDunkOff nightField nightMakes nightMisses nightNum nightUnlock poster prop rivalName rivalScore rivalSkip round runBack score slamBeat slamPulse slamTiming specials style takeoff walkOut walkOutNow'.split(' '),
+  },
   'carnival-babylon.tsx': {
     modeId: '"carnival"',
     keys: 'banner blurb board boardTitle charge chargeHi chargeLo eventNum hint mic micWho p1name p2name rivalLive rivalScore score time turnLabel'.split(' '),
@@ -116,8 +121,8 @@ export const MIGRATED: Record<string, {
   },
 };
 
-/** Shared HUD pieces a migrated host draws through, held to the same rules. (boost-hud: the racing hosts' and the boards' boost meter; judge-cards: the dunk and dunk-duel judges' row; hoops-shot-meter: the 1v1 and 3v3 release bar.) */
-const PIECES = ['timing-prompt.tsx', 'combat-hud-band.tsx', 'boost-hud.tsx', 'judge-cards.tsx', 'hoops-shot-meter.tsx'];
+/** Shared HUD pieces a migrated host draws through, held to the same rules. (boost-hud: the racing hosts' and the boards' boost meter; judge-cards: the dunk and dunk-duel judges' row; hoops-shot-meter: the 1v1 and 3v3 release bar; dunk-beat-strip and dunk-field-board: the dunk host's own readouts; mic-caption: the MC's line and its switch, drawn by all six hoops hosts.) */
+const PIECES = ['timing-prompt.tsx', 'combat-hud-band.tsx', 'boost-hud.tsx', 'judge-cards.tsx', 'hoops-shot-meter.tsx', 'dunk-beat-strip.tsx', 'dunk-field-board.tsx', 'mic-caption.tsx'];
 
 const keyRead = (src: string, k: string) => new RegExp(`hud\\.${k}\\b|hud\\[['"]${k}['"]\\]`).test(src);
 
