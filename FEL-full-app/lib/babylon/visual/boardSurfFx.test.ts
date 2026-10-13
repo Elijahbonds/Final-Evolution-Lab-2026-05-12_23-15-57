@@ -28,8 +28,8 @@ describe('the wake fades out with the board\'s speed (a standing board lays no f
     for (const lite of [false, true]) for (const carve of [0, 1]) expect(wakeRate(0, carve, true, lite)).toBe(0);
     expect(wakeRate(1.6, 1, true)).toBe(0);                          // the old rule started 26 particles a second here
     expect(wakeRate(3, 0, true)).toBeLessThan(wakeRate(6, 0, true) * 0.35);
-    expect(wakeRate(6, 0, true)).toBe(Math.round(26 + 80 * 0.5));
-    expect(wakeRate(12, 1, true)).toBe(26 + 80 + 90);
+    expect(wakeRate(6, 0, true)).toBe(Math.round(14 + 46 * 0.5));
+    expect(wakeRate(12, 1, true)).toBe(14 + 46 + 60);
   });
 });
 

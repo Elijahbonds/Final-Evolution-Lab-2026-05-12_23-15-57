@@ -11,7 +11,8 @@
 // shots are cinematic framing only, and every one of them ends by handing the frame back to the play camera unchanged.
 
 export interface V3 { x: number; y: number; z: number }
-export interface ShotPose { pos: V3; target: V3; /** vertical FOV, radians; undefined = leave the lens alone */ fov?: number }
+export interface ShotPose { pos: V3; target: V3; /** vertical FOV, radians; undefined = leave the lens alone */ fov?: number;
+  /** near clip plane, metres; undefined = leave it alone. The play cameras clip at 1 m: a lens an ankle's height off the floor loses the floor under it (a band of the dome shows through). */ minZ?: number }
 
 const v = (x: number, y: number, z: number): V3 => ({ x, y, z });
 const lerp = (a: number, b: number, k: number): number => a + (b - a) * k;
@@ -135,7 +136,7 @@ export function replayShot(angle: ReplayAngle, focus: V3, heading: V3, objective
     case 'high':
       return { pos: v(focus.x - f.x * 9 + right.x * 7, focus.y + 11, focus.z - f.z * 9 + right.z * 7), target: toward(chest, objective, 0.35), fov: 0.8 };
     case 'filmer':
-      return { pos: v(focus.x - f.x * 1.1 + right.x * 1.9, focus.y + 0.3, focus.z - f.z * 1.1 + right.z * 1.9), target: v(focus.x + f.x * 0.6, focus.y + 0.95, focus.z + f.z * 0.6), fov: 1.5 };
+      return { pos: v(focus.x - f.x * 1.1 + right.x * 1.9, focus.y + 0.3, focus.z - f.z * 1.1 + right.z * 1.9), target: v(focus.x + f.x * 0.6, focus.y + 0.95, focus.z + f.z * 0.6), fov: 1.5, minZ: FILMER_MIN_Z };
     case 'follow':
     default:
       return { pos: v(focus.x - f.x * 7.5, focus.y + 3.2, focus.z - f.z * 7.5), target: v(focus.x + f.x * 2, focus.y + 1.1, focus.z + f.z * 2) };
@@ -146,6 +147,8 @@ export function replayShot(angle: ReplayAngle, focus: V3, heading: V3, objective
 // The filmer stands an arm's length off the line, at ankle height: with the rider near the edge of the slab that spot is past the
 // floor and the frame fills with the dome underneath. A mode that knows its floor passes `bounds`; the director asks `resolveAngle`
 // for each cut segment ONCE (against where the subject is through the whole segment, so the camera never swaps sides mid-shot).
+/** The filmer's near plane: close enough that the floor under an ankle-high lens is not clipped away. */
+export const FILMER_MIN_Z = 0.12;
 /** The floor a camera may stand over: world x/z extents. */
 export interface ShotBounds { minX: number; maxX: number; minZ: number; maxZ: number }
 /** How far inside the bounds the filmer's lens must be (it is a wide lens: the floor's edge is in frame well before the camera is on it). */

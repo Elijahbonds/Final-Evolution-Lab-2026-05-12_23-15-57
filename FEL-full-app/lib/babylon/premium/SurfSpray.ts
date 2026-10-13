@@ -48,7 +48,7 @@ export function wakeRate(speed: number, carve: number, grounded: boolean, lite =
   const fade = wakeFade(speed);
   if (!grounded || fade <= 0) return 0;
   const sp = Math.max(0, Math.min(1, speed / 12)), cv = Math.max(0, Math.min(1, carve));
-  const full = (26 + 80 * sp + 90 * cv * sp) * fade;
+  const full = (14 + 46 * sp + 60 * cv * sp) * fade;
   return Math.round(lite ? full * 0.22 : full);   // a phone's trail is a fifth as thick (the surf row of mobileBudget.json holds 53 live particles)
 }
 
@@ -118,14 +118,14 @@ export class SurfSpray {
     // laid at the water under the board, left where they were made (the trail is the path the board took)
     this.wake = make('surfFoamWake', 520);
     this.wake.emitter = this.wakeAt;
-    this.wake.minEmitBox = new Vector3(-0.28, 0, -0.35); this.wake.maxEmitBox = new Vector3(0.28, 0.05, 0.35);
-    this.wake.color1 = new Color4(0.97, 1, 1, 0.5); this.wake.color2 = new Color4(0.88, 0.97, 0.98, 0.34);
+    this.wake.minEmitBox = new Vector3(-0.2, 0, -0.22); this.wake.maxEmitBox = new Vector3(0.2, 0.05, 0.22);   // a stream off the tail, not a ring round the board
+    this.wake.color1 = new Color4(0.97, 1, 1, 0.3); this.wake.color2 = new Color4(0.88, 0.97, 0.98, 0.2);   // thin: 130 of them overlapping read as a white disc at 0.5
     this.wake.colorDead = new Color4(0.9, 0.98, 1, 0);
     this.wake.minLifeTime = lite ? 0.8 : 1.5; this.wake.maxLifeTime = lite ? 1.3 : 2.6;
-    this.wake.minSize = 0.22; this.wake.maxSize = 0.46;
-    this.wake.addSizeGradient(0, 0.5, 0.7); this.wake.addSizeGradient(1, 1.5, 2.0);   // it spreads as it thins
+    this.wake.minSize = 0.16; this.wake.maxSize = 0.34;
+    this.wake.addSizeGradient(0, 0.5, 0.7); this.wake.addSizeGradient(1, 1.2, 1.6);   // it spreads as it thins
     this.wake.gravity = new Vector3(0, 0, 0);
-    this.wake.minEmitPower = 0.1; this.wake.maxEmitPower = 0.55;
+    this.wake.minEmitPower = 0.5; this.wake.maxEmitPower = 1.3;   // thrown back: the blobs travel away along the heading and a trail forms
     this.wake.direction1 = new Vector3(-0.5, 0.03, -0.5); this.wake.direction2 = new Vector3(0.5, 0.12, 0.5);
   }
 
@@ -139,9 +139,9 @@ export class SurfSpray {
     this.rail.emitRate = Math.round(carve * carve * 520 * (0.35 + 0.65 * speed01) + (f.grounded ? speed01 * 25 : 0));
     // the wake is laid at the board's feet at the water, thrown a little back along the heading
     const yaw = f.yaw ?? 0, fx = Math.sin(yaw), fz = Math.cos(yaw);
-    this.wakeAt.set(f.rider.x - fx * 0.5, f.rider.y + 0.02, f.rider.z - fz * 0.5);
+    this.wakeAt.set(f.rider.x - fx * 0.9, f.rider.y + 0.02, f.rider.z - fz * 0.9);
     this.wake.emitRate = wakeRate(f.speed, carve, f.grounded, this.lite);
-    this.wake.direction1.set(-fx * 0.9 - 0.4, 0.03, -fz * 0.9 - 0.4); this.wake.direction2.set(-fx * 0.2 + 0.4, 0.12, -fz * 0.2 + 0.4);
+    this.wake.direction1.set(-fx * 1.0 - 0.18, 0.03, -fz * 1.0 - 0.18); this.wake.direction2.set(-fx * 0.45 + 0.18, 0.1, -fz * 0.45 + 0.18);
     const side = f.carveSide >= 0 ? 1 : -1;
     this.rail.direction1 = new Vector3(side * 1.2, 1.4, -0.8);
     this.rail.direction2 = new Vector3(side * 2.6, 3.2, 0.6);

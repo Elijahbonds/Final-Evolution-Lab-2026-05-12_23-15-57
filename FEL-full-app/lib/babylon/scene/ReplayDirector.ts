@@ -236,7 +236,7 @@ export class ReplayDirector {
     const fi = Math.min(this.focusIndex, this.bodies.length - 1);
     // the live moment, put back at the end
     const live = {
-      cam: this.camera.position.clone(), target: this.camera.getTarget().clone(), fov: this.camera.fov,
+      cam: this.camera.position.clone(), target: this.camera.getTarget().clone(), fov: this.camera.fov, minZ: this.camera.minZ,
       bodies: this.bodies.map((b) => ({ p: b.position.clone(), q: b.rotationQuaternion?.clone() ?? null, y: b.rotation.y })),
       loose: this.loose.map((m) => ({ parent: m.parent, local: m.position.clone(), world: m.getAbsolutePosition().clone() })),
     };
@@ -284,6 +284,7 @@ export class ReplayDirector {
         this.camera.position.set(tg.x + (shot.pos.x - tg.x) * push, tg.y + (shot.pos.y - tg.y) * push, tg.z + (shot.pos.z - tg.z) * push);
         this.camera.setTarget(tg);
         if (shot.fov) this.camera.fov = shot.fov;
+        this.camera.minZ = shot.minZ ?? live.minZ;   // the filmer's ankle-high lens needs a near plane under the floor's distance
         // the lens: in over DOF_EASE_S, out over the last DOF_EASE_S of the replay
         const want = rt < dur - DOF_EASE_S * REPLAY_SPEED ? 1 : 0;
         lens += (want - lens) * Math.min(1, dt / DOF_EASE_S * 3);
@@ -304,7 +305,7 @@ export class ReplayDirector {
           if (l.q) n.rotationQuaternion = l.q; else { n.rotationQuaternion = null; n.rotation.copyFrom(l.r); }
         });
         this.loose.forEach((m, i) => { const l = live.loose[i]; if (l.parent) m.position.copyFrom(l.local); else m.setAbsolutePosition(l.world); });
-        this.camera.position.copyFrom(live.cam); this.camera.setTarget(live.target); this.camera.fov = live.fov;
+        this.camera.position.copyFrom(live.cam); this.camera.setTarget(live.target); this.camera.fov = live.fov; this.camera.minZ = live.minZ;
         this.dof?.set(0, 10); this.dof?.live(false);
         if (this.scene.metadata) this.scene.metadata.felCinematic = 0;
         this._playing = false; this.angleNow = null; this.finishActive = null;

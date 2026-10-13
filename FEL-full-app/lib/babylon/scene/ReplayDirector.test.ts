@@ -3,7 +3,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { FreeCamera, MeshBuilder, NullEngine, Scene, TransformNode, Vector3 } from '@babylonjs/core';
 import { REPLAY_SPEED, ReplayDirector, characterRoots, mountReplayDof, type ReplayDofHandle } from './ReplayDirector';
-import { DOF_REPLAY, DOF_REST } from './broadcastShots';
+import { DOF_REPLAY, DOF_REST, FILMER_MIN_Z } from './broadcastShots';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -98,6 +98,20 @@ describe('the replay director', () => {
     const free = await run(undefined);
     expect(free.seen.has('filmer')).toBe(true);                       // control: without bounds the lens is where it was asked, past the edge
     expect(free.maxCamX).toBeGreaterThan(30);
+  });
+  it('the filmer shot pulls the near plane in, the other angles and the live moment keep the play camera\'s', async () => {
+    const { scene, cam, runner, frame } = rig();
+    cam.minZ = 1;
+    const rd = new ReplayDirector(scene, cam, [runner]);
+    for (let i = 0; i < 150; i++) { runner.position.set(0, 0, i * 0.1); frame(); }
+    const done = rd.play({ lastSeconds: 2, angles: ['filmer', 'side'] });
+    const byAngle = new Map<string, Set<number>>();
+    for (let i = 0; i < 2 / REPLAY_SPEED * 60 + 20 && rd.playing; i++) { frame(); if (rd.angleNow) { const set = byAngle.get(rd.angleNow) ?? new Set<number>(); set.add(cam.minZ); byAngle.set(rd.angleNow, set); } }
+    await done;
+    expect([...byAngle.get('filmer')!]).toEqual([FILMER_MIN_Z]);
+    expect([...byAngle.get('side')!]).toEqual([1]);
+    expect(cam.minZ).toBe(1);                                         // handed back
+    rd.dispose();
   });
   it('a skip ends it on the spot; a pause freezes it (and a skip while paused is ignored)', async () => {
     const { scene, cam, runner, frame } = rig();

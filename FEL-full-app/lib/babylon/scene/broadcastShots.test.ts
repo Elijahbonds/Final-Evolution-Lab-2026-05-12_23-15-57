@@ -1,7 +1,7 @@
 // vis-foundation-2 A9.12 — the broadcast kit's framing maths: the intro, the replay angles, the replay lens.
 import { describe, expect, it } from 'vitest';
 import {
-  CRANE, DOF_REPLAY, DOF_REST, FILMER_FALLBACKS, FILMER_MARGIN, INTRO, REPLAY_ANGLES, introLetterbox, introPose, introSec, orbitBlend, replayCut, replayLens, replayShot, resolveAngle,
+  CRANE, DOF_REPLAY, DOF_REST, FILMER_FALLBACKS, FILMER_MARGIN, FILMER_MIN_Z, INTRO, REPLAY_ANGLES, introLetterbox, introPose, introSec, orbitBlend, replayCut, replayLens, replayShot, resolveAngle,
   type ShotPose, type V3,
 } from './broadcastShots';
 
@@ -57,6 +57,15 @@ describe('orbitBlend', () => {
   });
 });
 
+describe('the filmer\'s near plane', () => {
+  it('is far closer than the play camera\'s 1 m (the floor under an ankle-high lens is not clipped); no other angle asks for one', () => {
+    const f: V3 = { x: 0, y: 0, z: 0 }, h: V3 = { x: 0, y: 0, z: 1 };
+    const s = replayShot('filmer', f, h);
+    expect(s.minZ).toBe(FILMER_MIN_Z); expect(FILMER_MIN_Z).toBeLessThan(0.3);
+    expect(s.pos.y).toBeGreaterThan(FILMER_MIN_Z);                                     // the lens is above the floor by more than its near plane
+    for (const a of REPLAY_ANGLES) expect(replayShot(a, f, h).minZ, a).toBeUndefined();
+  });
+});
 describe('where the filmer may stand (vis-board, wave 2 fix)', () => {
   const B = { minX: -30, maxX: 30, minZ: -30, maxZ: 30 };
   const heading: V3 = { x: 0, y: 0, z: 6 };
