@@ -15,8 +15,8 @@
 // (visual/ParticleBudget) and the tier the harness recorded on the scene; the sprites are procedural (fxPaint.ts).
 // Everything pooled is built once at mount and warmed there, so the first hit of a match never compiles a shader.
 
-import { Color3, Color4, DynamicTexture, Mesh, MeshBuilder, ParticleSystem, StandardMaterial, Texture, Vector3 } from '@babylonjs/core';
-import type { AbstractMesh, Scene, ShadowGenerator, TransformNode } from '@babylonjs/core';
+import { Color3, Color4, DynamicTexture, Mesh, MeshBuilder, ParticleSystem, StandardMaterial, Texture, TransformNode, Vector3 } from '@babylonjs/core';
+import type { AbstractMesh, Scene, ShadowGenerator } from '@babylonjs/core';
 import { fitBurst, liveParticles, particleBudget, particleBudgetScale } from '../visual/ParticleBudget';
 import { paintAuraColumn, paintCrack, paintDot, paintLightPool, paintRing, paintSmoke, paintStar, type Ctx } from './fxPaint';
 
@@ -294,6 +294,17 @@ export function mountCombatFx(scene: Scene, opts: { tier?: FxTier } = {}): Comba
     return a;
   };
 
+  // The two auras every mode uses are built NOW, docked on a scratch node and switched off, and every pooled material is compiled
+  // now (forceCompilation on its mesh): the first full-chi aura or first slam of a match must not stall the frame it appears on.
+  const dock = new TransformNode('cfx_dock', scene); own(dock);
+  for (const key of ['me', 'foe']) auras.set(key, mkAura(key, dock));
+  const warm = (mat: { forceCompilation?: (m: AbstractMesh, cb?: () => void) => void } | null | undefined, mesh: AbstractMesh | undefined): void => {
+    if (!mat || !mesh) return;
+    try { mat.forceCompilation?.(mesh); } catch { /* a headless engine has nothing to compile */ }
+  };
+  warm(groundRings[0].mat, groundRings[0].mesh); warm(cracks[0].mat, cracks[0].mesh);
+  for (const a of auras.values()) { warm(a.colMat, a.col); warm(a.poolMat, a.pool); try { a.motes.isReady(); } catch { /* headless */ } }
+
   const fx: CombatFx = {
     hit(at, from, kind, tint) {
       const L = HIT_LOOK[kind], plan = planHit(kind, tier);
@@ -386,7 +397,7 @@ export function mountCombatFx(scene: Scene, opts: { tier?: FxTier } = {}): Comba
 
     aura(key, root, level, color) {
       let a = auras.get(key);
-      if (!a) { if (level < 0.04) return; a = mkAura(key, root); auras.set(key, a); }
+      if (!a) { if (level < 0.04) return; a = mkAura(key, root); auras.set(key, a); }   // (a key the modes do not use is built on demand)
       if (a.root !== root) { a.root = root; a.col.parent = root; a.pool.parent = root; }
       a.target = Math.max(0, Math.min(1, level));
       if (color && color !== a.hex) {

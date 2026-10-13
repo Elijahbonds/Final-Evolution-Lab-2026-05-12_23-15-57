@@ -62,7 +62,7 @@ describe('the mount', () => {
 
   it('builds its pools up front, and a hit emits into them', () => {
     const n0 = scene.particleSystems.length, fx = mountCombatFx(scene);
-    expect(scene.particleSystems.length - n0).toBeGreaterThanOrEqual(12);
+    expect(scene.particleSystems.length - n0).toBeGreaterThanOrEqual(16);
     const stars = scene.particleSystems.filter((p) => p.name.startsWith('cfx_star_')), streaks = scene.particleSystems.filter((p) => p.name.startsWith('cfx_streak_'));
     fx.hit(new Vector3(0, 1.2, 0), { x: 0, z: 2 }, 'heavy');
     expect(stars.some((s) => s.manualEmitCount === 1)).toBe(true);
@@ -112,10 +112,19 @@ describe('the mount', () => {
     fx.dispose();
   });
 
-  it('an aura builds on the first call, swells on tick, parents to the fighter and goes dark when told', () => {
+  it('the two auras the modes use are built at mount (warm), docked and dark; one a mode never uses is built on demand', () => {
     const fx = mountCombatFx(scene), root = new TransformNode('fighter', scene);
-    fx.aura('me', root, 0, '#ffd36b');
-    expect(scene.meshes.some((m) => m.name === 'cfx_aura_me')).toBe(false);     // nothing built for a zero meter
+    const me = scene.meshes.find((m) => m.name === 'cfx_aura_me')!;
+    expect(me).toBeTruthy(); expect(me.isEnabled()).toBe(false); expect(me.parent).not.toBe(root);
+    fx.aura('spare', root, 0, '#ffd36b');
+    expect(scene.meshes.some((m) => m.name === 'cfx_aura_spare')).toBe(false);     // nothing built for a zero meter
+    fx.aura('spare', root, 0.5, '#ffd36b');
+    expect(scene.meshes.some((m) => m.name === 'cfx_aura_spare')).toBe(true);
+    fx.dispose();
+  });
+
+  it('an aura swells on tick, parents to the fighter and goes dark when told', () => {
+    const fx = mountCombatFx(scene), root = new TransformNode('fighter', scene);
     fx.aura('me', root, 0.8, '#ffd36b');
     const col = scene.meshes.find((m) => m.name === 'cfx_aura_me')!;
     expect(col.parent).toBe(root);
