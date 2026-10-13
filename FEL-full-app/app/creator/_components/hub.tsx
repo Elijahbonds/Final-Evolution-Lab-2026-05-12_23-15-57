@@ -41,7 +41,7 @@ export function CreatorHub() {
         </p>
 
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {DISCIPLINES.map((d) => {
+          {DISCIPLINES.filter((d) => d.href).map((d) => {
             const Icon = d.icon;
             const inner = (
               <div
@@ -64,7 +64,7 @@ export function CreatorHub() {
                 </div>
                 <p className="mt-2 flex-1 text-sm text-white/50">{d.tagline}</p>
                 <div className="mt-4 inline-flex items-center gap-1 text-sm font-semibold" style={{ color: d.href ? d.color : 'rgba(255,255,255,0.35)' }}>
-                  {d.href ? <>Enter <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" /></> : 'Coming soon'}
+                  {d.href ? <>Enter <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" /></> : null}
                 </div>
               </div>
             );

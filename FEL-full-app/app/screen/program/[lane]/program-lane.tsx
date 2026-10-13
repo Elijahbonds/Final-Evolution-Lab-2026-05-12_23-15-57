@@ -2,7 +2,7 @@
 
 // The lane page (SCREEN-SHIP A3-4, A4-3; SCREEN-FIX), in this order: (1) the lane's header card, in the results' card
 // style; (2) "Your top flag: <flag>, so start with <Lane>" (or the win line on a clean screen); (3) one free sample
-// drill, its cue marked "Early version"; (4) "Dunk Program coming soon"; then a visible "Back to my results".
+// drill, its cue marked "Early version"; (4) on the dunking lane only, the "Build my Dunk Program" link (NP-1: no placeholder block); then a visible "Back to my results".
 //
 // SAVES NOTHING and SENDS NOTHING: no email box, no form, no fetch, no localStorage, IndexedDB or cookie. The
 // flag is read from this tab's sessionStorage; the URL carries only the lane. A tab without a result shows "Your results
@@ -24,7 +24,7 @@ import { linksAllowed, strictestAge, type AgeBand } from '@/lib/screen/age';
 import { readAge, recall, tabStorage } from '@/lib/screen/store';
 import type { ScreenSummary } from '@/lib/screen/checks';
 import { RESULTS_PATH, programPath } from '@/lib/screen/routes';
-import { BACK_TO_RESULTS, DISCLAIMER, NO_PICK_LINE, PROGRAM_COMING, WIN_LINE } from '@/lib/screen/copy';
+import { BACK_TO_RESULTS, DISCLAIMER, NO_PICK_LINE, WIN_LINE } from '@/lib/screen/copy';
 import { NotSavedCard } from '@/app/play/mirror/assess/_components/not-saved';
 import { BandChip, EarlyTag, ParentCard, PreviewLabel, ScreenFrame, StepCard, StopLine, quietBtn } from '@/app/play/mirror/assess/_components/screen-ui';
 
@@ -102,11 +102,12 @@ export function LaneBody({ lane, s, dunkHref = null }: { lane: LaneSlug; s: Scre
         <p className="mt-1 text-[16px] leading-snug">{drill.cue}<EarlyTag /></p>
         <div className="mt-2"><PreviewLabel /></div>
       </section>
-      <section data-coming-soon className="rounded-2xl border border-dashed border-white/20 p-4">
-        <p className="text-[16px] font-black">{PROGRAM_COMING}</p>
-        <p className="mt-1 text-[16px] text-white/60">A full plan built from your screen. Nothing is saved or sent from this page.</p>
-        {dunkHref && lane === 'dunking' ? <a href={dunkHref} data-build-dunk>Build my Dunk Program</a> : null}
-      </section>
+      {/* NP-1: no placeholder block. The Dunk Program link shows only where it is built (the dunking lane). */}
+      {dunkHref && lane === 'dunking' ? (
+        <section data-build-dunk-section className="rounded-2xl border border-white/20 p-4">
+          <a href={dunkHref} data-build-dunk>Build my Dunk Program</a>
+        </section>
+      ) : null}
       <Link href={RESULTS_PATH} prefetch={false} data-back-to-results className={quietBtn}>{BACK_TO_RESULTS}</Link>
     </div>
   );
