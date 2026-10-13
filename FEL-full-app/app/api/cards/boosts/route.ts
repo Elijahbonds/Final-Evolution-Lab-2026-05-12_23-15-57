@@ -5,7 +5,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { spend, readWallet, WalletError } from '@/lib/wallet/wallet-service';
-import { boostSkuId, cardById, ownedFromEntitlements, purchaseCheck } from '@/lib/cards/boosts';
+import { boostSkuId, cardById, ownedFromEntitlements, purchaseCheck, statModifierKeys } from '@/lib/cards/boosts';
 
 /**
  * The creator boost cards a player owns, and buying one.
@@ -43,6 +43,11 @@ export async function POST(req: NextRequest) {
 
   let body: unknown;
   try { body = await req.json(); } catch { return NextResponse.json({ error: 'invalid_json' }, { status: 400 }); }
+  // CARD-SAFE-2: cards are cosmetic. A payload that tries to carry a stat (on the body or on a nested card) is refused.
+  const nested = (body as { card?: unknown })?.card;
+  if (statModifierKeys(body).length || statModifierKeys(nested).length) {
+    return NextResponse.json({ error: 'stat_modifier_rejected' }, { status: 400 });
+  }
   const cardId = typeof (body as { card_id?: unknown })?.card_id === 'string' ? (body as { card_id: string }).card_id : '';
 
   const card = cardById(cardId);

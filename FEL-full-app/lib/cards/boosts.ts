@@ -16,13 +16,27 @@
 // measured and `boosted` is earned-plus-bought, and the functions that feed measurement only ever take `base`.
 // ────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 
-export interface BoostMetrics {
-  /** Points added to the PRQ shown in GAME surfaces. Never to the measured one. */
-  prq: number;
-  vertical: number;
-  efficiency: number;
-  neural: number;
-  readiness: number;
+// CARD-SAFE-2 (FE PM Oct 12; CREATOR-CARD-UPGRADE-SPEC fix #2): NO PAY-TO-WIN. Shards can be bought with real money
+// (lib/shard-packs.ts), so a card bought with shards must not change any rating, PRQ, vertical or fight stat. The
+// six cards keep their names, art, taglines and links (Elijah 10:42 PM PT Oct 12: named people consent) and are
+// cosmetic only: a frame and links to the creator's own work. Nobody bought one, so there is no refund path.
+
+/** Every key that would make a card change a number. A card (or gear item) carrying any of them is rejected. */
+export const STAT_MODIFIER_KEYS = [
+  'boost', 'boosts', 'stats', 'stat', 'modifier', 'modifiers', 'statModifier', 'statModifiers',
+  'prq', 'vertical', 'efficiency', 'neural', 'readiness', 'power', 'speed', 'damage', 'attack', 'defense', 'health',
+] as const;
+
+/** The stat-bearing keys present on a card/gear payload (empty for a cosmetic one). */
+export function statModifierKeys(payload: unknown): string[] {
+  if (!payload || typeof payload !== 'object') return [];
+  return Object.keys(payload as Record<string, unknown>).filter((k) => (STAT_MODIFIER_KEYS as readonly string[]).includes(k));
+}
+
+/** Throws if a card carries any stat modifier. Run over the catalogue at load, so a stat-bearing card cannot ship. */
+export function assertCosmeticCard(card: unknown): void {
+  const bad = statModifierKeys(card);
+  if (bad.length) throw new Error(`stat_modifier_rejected: ${bad.join(',')}`);
 }
 
 export interface CreatorLink { type: 'masterclass' | 'website' | 'youtube' | 'instagram' | 'spotify' | 'gallery' | 'imdb'; label: string; url: string }
@@ -34,65 +48,55 @@ export interface BoostCard {
   blurb: string;
   costShards: number;
   accent: string;
-  boost: BoostMetrics;
   /** The creator's own words, shown on the card's face. */
   tagline: string;
   links: CreatorLink[];
 }
 
-const M = (o: Partial<BoostMetrics>): BoostMetrics =>
-  ({ prq: 0, vertical: 0, efficiency: 0, neural: 0, readiness: 0, ...o });
-
-/** The first-party catalogue, prices and boosts carried across from the iOS cards. */
+/** The first-party catalogue: names, prices, art and links carried across from the iOS cards. Cosmetic only. */
 export const BOOST_CARDS: BoostCard[] = [
   {
     id: 'bonds-bounce', creator: 'Elijah Bonds', title: 'Bonds Bounce Blueprint',
     blurb: 'The vertical jump architecture.', costShards: 750, accent: '#F27D26',
-    boost: M({ prq: 12, vertical: 25, efficiency: 8 }),
     tagline: 'Invented the kick-up on a trampoline. Landed it on a ten-foot rim.',
     links: [{ type: 'instagram', label: 'Instagram', url: 'https://www.instagram.com/elijahbonds/' }],
   },
   {
     id: 'amir-signature', creator: 'Amir Smith', title: 'Amir Smith Signature',
     blurb: 'Signature handle and finish package.', costShards: 800, accent: '#00E5FF',
-    boost: M({ prq: 14, efficiency: 12, neural: 10 }),
     tagline: 'The handle is the whole move. The finish is just the receipt.',
     links: [],
   },
   {
     id: 'flight-lab-pro', creator: 'Flight Lab', title: 'Flight Lab Pro Card',
     blurb: 'Contest-grade hang and body control.', costShards: 600, accent: '#A855F7',
-    boost: M({ prq: 10, vertical: 18, readiness: 6 }),
     tagline: 'Everything above the rim is practice for everything below it.',
     links: [],
   },
   {
     id: 'coach-v-elite', creator: 'Coach V', title: 'Coach V Elite Card',
     blurb: "Coach V's elite movement data.", costShards: 500, accent: '#FFD700',
-    boost: M({ prq: 15, vertical: 20, neural: 10, readiness: 5 }),
     tagline: 'Assess, correct, load, perform. In that order, every time.',
     links: [],
   },
   {
     id: 'neural-max', creator: 'Neural Max', title: 'Neural Max Override',
     blurb: 'Reaction and drive, tuned up.', costShards: 400, accent: '#00FF9D',
-    boost: M({ prq: 8, neural: 22, readiness: 8 }),
     tagline: 'The gap between seeing it and doing it is the only gap that matters.',
     links: [],
   },
   {
     id: 'directors-cut', creator: 'Director Stella', title: "Director's Cut Monologue",
     blurb: 'Performance package for the Read.', costShards: 550, accent: '#FF3366',
-    boost: M({ prq: 9, efficiency: 10, neural: 14 }),
     tagline: 'Play the beat, not the line.',
     links: [{ type: 'imdb', label: 'IMDb', url: 'https://www.imdb.com/' }],
   },
 ];
 
+for (const c of BOOST_CARDS) assertCosmeticCard(c);
+
 // -- Buying one ---------------------------------------------------------------------------------------------------
-// A boost card is bought with SHARDS, which are earned and are never sold for money (prisma/schema.prisma: "shards
-// = low-volume prestige currency, milestone-earned, NEVER purchasable"). So the lift below is earned twice over --
-// once as shards, once as the choice of which card to spend them on. That is why the game side may have it at all.
+// A card is bought with SHARDS. Shard packs are sold for money, which is exactly why a card carries no stat at all.
 //
 // The purchase itself is not reimplemented here. The wallet already owns a server-priced, atomic, idempotent spend
 // that grants a PlayerEntitlement row (lib/wallet/wallet-service.ts). These three functions are the only bridge: a
@@ -120,30 +124,23 @@ export function cardById(id: string): BoostCard | null {
   return BOOST_CARDS.find((c) => c.id === id) ?? null;
 }
 
-/** However many cards somebody owns, the game-side PRQ lift is capped. A wallet is not a ladder. */
-export const BOOST_PRQ_CAP = 25;
 
 export interface Vitals {
   /** What was MEASURED. Never contains a bought point. */
   base: number;
-  /** What the GAMES use: measured plus owned boosts, capped. */
+  /** What the games use. CARD-SAFE-2: always the measured number; owning cards changes nothing. */
   boosted: number;
-  /** The lift, for showing the two apart on screen. */
-  lift: number;
+  /** Always 0 (CARD-SAFE-2: cards are cosmetic). Kept so existing readers get an honest zero. */
+  lift: 0;
 }
 
 /**
- * The game-side number. `ownedIds` is whatever the player has bought; unknown ids are ignored rather than trusted,
- * because the list arrives from a client and a made-up id must not become points.
+ * The game-side number. CARD-SAFE-2: owned cards are cosmetic, so this is the measured number, whatever is owned.
+ * `ownedIds` is accepted and ignored so no caller can turn a card into points.
  */
-export function gameVitals(basePrq: number, ownedIds: readonly string[]): Vitals {
+export function gameVitals(basePrq: number, _ownedIds: readonly string[] = []): Vitals {
   const base = Math.max(0, Math.min(100, basePrq));
-  const raw = [...new Set(ownedIds)]
-    .map(cardById)
-    .filter((c): c is BoostCard => c !== null)
-    .reduce((sum, c) => sum + c.boost.prq, 0);
-  const lift = Math.min(BOOST_PRQ_CAP, raw);
-  return { base, boosted: Math.max(0, Math.min(100, base + lift)), lift };
+  return { base, boosted: base, lift: 0 };
 }
 
 /**
