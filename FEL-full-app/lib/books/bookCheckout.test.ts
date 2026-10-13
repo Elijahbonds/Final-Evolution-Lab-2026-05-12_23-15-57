@@ -11,7 +11,7 @@ import {
 } from './bookCheckout';
 import { getBook, getOffer } from './bookCatalog';
 import { STORE_TERMS_VERSION } from '@/lib/store-terms';
-import { CLOSED_POLICY, EBOOK_ENABLED_POLICY } from './bookTerms.fixture';
+import { CLOSED_POLICY, EBOOK_ENABLED_POLICY } from '@/tests/helpers/bookTermsPolicies';
 
 describe('book checkout', () => {
   it('refuses a live key and accepts a test key', () => {

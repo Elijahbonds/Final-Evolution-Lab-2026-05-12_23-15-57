@@ -11,7 +11,7 @@ import {
   bookPolicyFor,
   currentBookPolicy,
 } from './bookTerms';
-import { CLOSED_POLICY, EBOOK_ENABLED_POLICY } from './bookTerms.fixture';
+import { CLOSED_POLICY, EBOOK_ENABLED_POLICY } from '@/tests/helpers/bookTermsPolicies';
 
 describe('the book terms allow-list (one rule, one place)', () => {
   it('the live store terms version has a row, so the shop cannot silently close or open on a terms bump', () => {

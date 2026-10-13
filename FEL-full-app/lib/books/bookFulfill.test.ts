@@ -10,7 +10,7 @@ import {
   type PaidBookSession,
 } from './bookFulfill';
 
-import { CLOSED_POLICY, EBOOK_ENABLED_POLICY } from './bookTerms.fixture';
+import { CLOSED_POLICY, EBOOK_ENABLED_POLICY } from '@/tests/helpers/bookTermsPolicies';
 
 // test changed (2026-10-13): these idempotency / refund tests use an EBOOK offer fixture. The live terms now cover
 // audiobooks only (bookTerms.ts), so they run under a fixture policy that sells every format; their assertions are

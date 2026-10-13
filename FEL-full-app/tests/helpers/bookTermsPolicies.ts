@@ -3,7 +3,7 @@
  * The tests that pin generic checkout / fulfilment / delivery behaviour (idempotency, refunds, signing) run against it
  * so those code paths stay covered while the live policy is audiobooks only. Never import this from app code.
  */
-import { bookPolicyFor, type BookTermsPolicy } from './bookTerms';
+import { bookPolicyFor, type BookTermsPolicy } from '@/lib/books/bookTerms';
 
 export const EBOOK_ENABLED_POLICY: BookTermsPolicy = {
   termsVersion: 'store-terms-test-ebook-1',

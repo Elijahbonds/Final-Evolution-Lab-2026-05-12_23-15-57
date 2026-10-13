@@ -49,7 +49,7 @@ bundle** (the approved "block C" is held for EBOOK-1). So the shop sells what th
   its row (`bookTerms.test.ts` fails first and says so).
 - **Switching ebooks on later (EBOOK-1):** publish the terms version that covers them, then add its row with
   `formats: ['audiobook', 'ebook', 'bundle'], downloads: true`. The KDP Select flags (`directSale`) still apply on
-  top. The ebook and download code paths are kept and tested under a fixture policy (`bookTerms.fixture.ts`).
+  top. The ebook and download code paths are kept and tested under a fixture policy (`tests/helpers/bookTermsPolicies.ts`).
 - Not changed by this: `BOOK_STORE_ENABLED`, `VIRTUAL_PURCHASES_ENABLED`, the 18+ gate and the terms tick. The legal
   copy is untouched.
 - `scripts/stripe-prices.example.json` still lists the ebook and bundle test products (it mirrors the catalog, and

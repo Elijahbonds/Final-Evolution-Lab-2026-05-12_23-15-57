@@ -7,7 +7,7 @@ import {
   issueBookStream,
   type SignRequest,
 } from './bookDelivery';
-import { CLOSED_POLICY, EBOOK_ENABLED_POLICY } from './bookTerms.fixture';
+import { CLOSED_POLICY, EBOOK_ENABLED_POLICY } from '@/tests/helpers/bookTermsPolicies';
 
 function signer() {
   const calls: SignRequest[] = [];
