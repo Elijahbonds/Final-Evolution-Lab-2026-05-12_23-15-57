@@ -99,8 +99,9 @@ Paid buyers always keep what they own. `BOOK_STORE_ENABLED` and `VIRTUAL_PURCHAS
 
 What stays exactly as it was, switches or not: sign in (`401`), the verified-adult check (`403 adults_only`, unknown age
 is not an adult), the entitlement check (`403`), and the missing-table case, which fails closed with `503 Library is
-unavailable right now.` (no table, no proof of ownership, no URL). `lib/books/bookShop.ts` (`bookShopClosedReason`) is
-no longer called by either listening door; `bookShopListening.test.tsx` fails if one of them imports it again.
+unavailable right now.` (no table, no proof of ownership, no URL). The listening-only gate
+`lib/books/bookShop.ts` (`bookShopClosedReason`) had no caller left and was removed (`lib/nav/modules.test.ts` flags
+unused modules); `bookShopListening.test.tsx` fails if either listening door reads the switches again.
 
 Tests: `lib/books/bookStreamRoute.test.ts` (an entitled adult streams with each switch off; signed out, under 18, not
 entitled and missing tables are still refused with both off), `lib/books/bookShopListening.test.tsx` (the library page
