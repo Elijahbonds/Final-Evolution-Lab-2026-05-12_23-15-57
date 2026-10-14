@@ -30,6 +30,13 @@ import { readCombatArena, arenasFor, arenaClamp, knockTo, hazardAt, describeAren
 import { buildArena, type ArenaHandle } from '../combat/arenaBuild';
 import { mountCombatFx, hitKindOf, auraLevel, type CombatFx } from '../combat/combatFx';   // VISUAL PASS (2026-10-13): the hit language, the chi aura
 import { mountPresentation, type Presentation } from '../combat/presentation';   // the dragon's grade swing, speed lines, the impact frame
+import { mountCinemaRig, type CinemaRig } from '../combat/cinemaRig';   // WAVE 3 (lane/w3-present): a cinematic camera laid over the play camera's frame (the play camera is untouched)
+import { fightIntroAt, FIGHT_INTRO, FIGHT_INTRO_SEC, WALK_SPEED01, type Ground } from '../combat/fightShots';   // the fight intro's walk-in and shots
+import { DragonCutter } from '../combat/dragonCutter';   // the DRAGON's own camera
+import { KoReplayCue, playKoReplay } from '../combat/koReplay';   // KO replays (never the match-deciding one)
+import { motionPolicy } from '@/lib/a11y/reducedMotion';
+import { blendName } from '../combat/schools';
+import { TIER_PROFILES } from '../core/Difficulty';
 import { dodgeReward, dashSecToImpact, tickCounter, counterMult } from '../core/DodgeRead';
 import { Vector3 } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
@@ -97,7 +104,7 @@ let modeVenue: VenueHandle | null = null;   // ship pass 4: the mounted venue sp
 let crowd: Onlookers | null = null;         // Pass 7 phase 6: a ring of onlookers on the gravel, as the endless gauntlet has
 
 // IMPROVE (2026-10-06): 'ready' — the round-start beat (ROUND n … FIGHT!) before control returns
-type Phase = 'intro' | 'ready' | 'fighting' | 'roundOver' | 'matchOver';
+type Phase = 'intro' | 'walkIn' | 'ready' | 'fighting' | 'roundOver' | 'matchOver';
 const ROUNDS_TO_WIN = 2;
 /** What the rival fights at in a level match. Nerve moves it from here as the rounds go. */
 const BASE_RIVAL_DIFFICULTY = 0.72;
@@ -138,6 +145,8 @@ const ROUND_SEC = 120;
 /** IMPROVE (2026-10-06), TUNED: the round-start beat — "ROUND n" for READY_SEC, then FIGHT! and control. It used to hand
  *  control back the frame the KO pause ended. */
 const READY_SEC = 0.9;
+/** WAVE 3: how long the slam text stays in the HUD keys (the host's own timer takes it off the screen a beat sooner). */
+const SLAM_SEC = 1.2;
 /** The KO / round-result pause before the next round (was a 2200 ms setTimeout; the game clock now). */
 const ROUND_OVER_SEC = 2.2;
 /** IMPROVE (2026-10-06), TUNED (new): what a rival dash costs from its chi bar (Duel's rival pays the same 12). */
@@ -147,7 +156,7 @@ const KVS_PHONE_ONLOOKERS = 4;
 /** IMPROVE (2026-10-06): the controls, all of them (dash, roll, jump, Focus and the wall run were missing), in one
  *  static line. The DRAGON needs a body that can throw it (FighterStyle force ≥ 78 — an ELITE scan or ?fight=). */
 export const KVS_HINT = 'A jab · B kick · Y heavy · hold X guard, press it at the last instant to parry · tap X dash, double-tap chakra dash · L1 roll · R1 jump · hold R2 Focus (L1 into a wall: wall run) · full chi + an ELITE body: HEAVY becomes the DRAGON';
-const BUDGET_SEC: Record<Phase, number> = { intro: 4, ready: 3, fighting: ROUND_SEC, roundOver: 4, matchOver: 999 };
+const BUDGET_SEC: Record<Phase, number> = { intro: 4, walkIn: FIGHT_INTRO_SEC + 3, ready: 3, fighting: ROUND_SEC, roundOver: 4, matchOver: 999 };
 /** IMPROVE (2026-10-06): one read-only zero for the default velocities (was a fresh Vector3.Zero() per call). */
 const ZERO: Readonly<Vector3> = Vector3.Zero();
 /** MOVEMENT PLAY P7: a body strike handed to swing(): its move, its onset on the page clock, what the body threw. */
@@ -173,6 +182,9 @@ export const KarateVSMode: ModeDefinition = (() => {
   let timeHud = -1, guardHud = -1, foeGuardHud = -1;
   /** Show a banner for `sec` (Infinity: until the next one). The one place a banner is set or cleared. */
   function banner(ctx: ModeContext, text: string, sec: number): void { ctx.setHud({ banner: bannerSlot.show(text, sec, clock) }); }
+  /** WAVE 3: the fighting-game SLAM text (ROUND 2 / FIGHT! / K.O.) — the host draws it big and centred for a beat. A counter, so the same call twice re-fires. */
+  function slam(ctx: ModeContext, text: string): void { slamLeft = SLAM_SEC; ctx.setHud({ slam: text, slamSeq: ++slamSeq }); }
+  const roundCall = (): string => (round === 1 ? 'ROUND 1' : round === ROUNDS_TO_WIN * 2 - 1 ? 'FINAL ROUND' : `ROUND ${round}`);
   /** The player's strikes with their chosen school applied. The rival keeps the unstyled table. */
   let myAttacks: Record<'jab' | 'kick' | 'heavy', AttackDef> = KARATE_ATTACKS;
   let phase: Phase = 'intro';
@@ -202,6 +214,14 @@ export const KarateVSMode: ModeDefinition = (() => {
   let arena: CombatArena = arenasFor('karate_vs')[0];
   let arenaHandle: ArenaHandle | null = null;
   let fx: CombatFx | null = null, pres: Presentation | null = null;   // VISUAL PASS: pooled hit sparks / rings / auras; the whole-screen beats
+  // WAVE 3 (lane/w3-present): the fight's cinematics. A cinematic camera is laid OVER the play camera's frame (combat/cinemaRig) — the
+  // follow runs underneath untouched, so the stick mapping and the hand-back are the play camera's own.
+  let cin: CinemaRig | null = null;
+  const dragon = new DragonCutter(); let dragonBy: 'me' | 'foe' = 'me', dragonSide = 1;
+  let introT = 0, introPlayed = false, introBeat = '', slamSeq = 0, slamLeft = 0;
+  const MARK_ME: Ground = { x: 0, z: 2.2 }, MARK_FOE: Ground = { x: 0, z: -2.2 };   // the round-start marks (startRound)
+  const LIVE0 = { pos: { x: 0, y: 1.6, z: 8 }, target: { x: 0, y: 1.2, z: 0 }, fov: 0.8 };   // positions only are read off the intro here; the shot has the real live frame
+  const koCue = new KoReplayCue();
   let wallRun: WallRunOn<ArenaWall> | null = null, wallKick: WallKickState | null = null, wallKickY0 = 0, hazardTickAt = 0;
   const matrixStats = { wallRuns: 0, wallKicks: 0, kickHits: 0 };
   /** L1 inside Focus, running INTO a wall: up onto it and along it. */
@@ -550,6 +570,7 @@ export const KarateVSMode: ModeDefinition = (() => {
     // the wind-up floor; its cancel point runs from its onset, after that beat
     const hitDelay = body && move ? hitDelayMs(atk.startupMs, contactMsOf(move), now() - body.onsetPage) : atk.startupMs;
     if (mine) myImpactAt = now() + hitDelay;   // IMPROVE (2026-10-06)
+    if (special && mine) dragonStart(true, hitDelay / 1000);   // WAVE 3: the DRAGON's wind-up gets its own low camera
     const swungAt = now();   // IMPROVE (2026-10-06): the dash read is measured against the swing's start
     if (body && move) { const d = Vector3.Distance(player.root.position, rival.root.position), lunge = bodyLunge(d, atk.range); if (lunge > 0) { const v = rival.root.position.subtract(player.root.position); v.y = 0; bodyShift = { v: v.normalize().scale(lunge / 0.15), left: 0.15 }; } }
     animOf(mine).strike = { weight: special ? 'finisher' : move ? move.weight : WEIGHT_OF[key], clip: atk.clip, speed: move?.speed, cancelFrom: move ? (body ? bodyCancelAt(now() + hitDelay, body.onsetPage, move) : now() + (STRIKE_TIMING[move.weight].cancelAt / move.speed) * 1000) : undefined, until: now() + STRIKE_MAX_SEC * 1000 };   // the tree plays it; its settle ends the swing
@@ -561,6 +582,7 @@ export const KarateVSMode: ModeDefinition = (() => {
     // dodge read is told so); mine stays on the wall clock
     if (!mine) { lastFoeRange = atk.range; foeImpactAt = now() + atk.startupMs / focus.worldScale; }
     const onHitBeat = (impactAt?: number) => {
+      if (special) { if (phase !== 'fighting') dragon.abort(); else if (mine) dragon.blow(); else dragonStart(false, 0); }   // WAVE 3: the blow lands — the cut moves to its impact beat (the rival's cuts in here)
       if (phase !== 'fighting') { endStrike(mine); return; }
       // P7: the rival's fist on a BODY player waits for the body's frames to cover the impact (DefenseLedger), then resolves
       // against the body's guard and slips AT the impact — at most bodyFight.DEFER_CAP_MS late. A pad player: never.
@@ -790,6 +812,10 @@ export const KarateVSMode: ModeDefinition = (() => {
     animOf(playerWon).celebrateUntil = now() + CELEBRATE_SEC * 1000;
     ctx.setHud({ wins: myWins, foeWins });
     banner(ctx, `${why ? `${why} — ` : ''}${playerWon ? `ROUND ${round} — YOU` : `ROUND ${round} — RIVAL SENSEI`}`, Infinity);
+    // WAVE 3: K.O. (or TIME) slammed on screen; a swing still winding up is cut off; a KO that is not the match's last is offered a replay
+    slam(ctx, why === 'TIME' ? 'TIME!' : 'K.O.');
+    if (!dragon.landed) dragon.abort();
+    koCue.arm({ kind: why === 'TIME' ? 'time' : why ? 'hazard' : 'ko', decidesMatch: myWins >= ROUNDS_TO_WIN || foeWins >= ROUNDS_TO_WIN, victim: playerWon ? 1 : 0 }, motionPolicy().reduced);
     // (the next round, or the match's end, comes off the GAME clock in update() after ROUND_OVER_SEC — IMPROVE 2026-10-06:
     // it was a 2.2 s setTimeout that ran on through a pause and fired startRound on a disposed rig)
   }
@@ -850,7 +876,14 @@ export const KarateVSMode: ModeDefinition = (() => {
     rival.root.rotation.y = wrapYaw(player.root.rotation.y + Math.PI);   // a ROUND START is a cut, not a turn: they are placed facing each other
     resetAnim(meAnim); resetAnim(foeAnim);
     striking = false; foeStriking = false; slowmoSec = 0; applyTimeScales();
-    // IMPROVE (2026-10-06): THE ROUND-START BEAT — "ROUND n" while they square up, then FIGHT! and control (update())
+    koCue.cancel(); dragon.cancel(); cin?.cancel();   // WAVE 3: a new round starts on the play camera
+    // WAVE 3: the first round of a match opens on the fighting-game intro (a walk-in, the name plates); then the same round-start beat
+    if (round === 1 && !introPlayed && cin && motionPolicy().travel) { beginWalkIn(ctx); return; }
+    readyBeat(ctx);
+  }
+
+  /** IMPROVE (2026-10-06): THE ROUND-START BEAT — "ROUND n" while they square up, then FIGHT! and control (update()). */
+  function readyBeat(ctx: ModeContext): void {
     setPhase('ready');
     guardHud = 100; foeGuardHud = 100; timeHud = ROUND_SEC;
     ctx.setHud({
@@ -859,19 +892,70 @@ export const KarateVSMode: ModeDefinition = (() => {
       hint: KVS_HINT,
     });
     banner(ctx, round === 1 ? 'BEST OF 3 — ROUND 1' : round === ROUNDS_TO_WIN * 2 - 1 ? `FINAL ROUND` : `ROUND ${round}`, Infinity);
+    slam(ctx, roundCall());
     SoundKit.play('whoosh', { pitch: 0.7, volume: 0.35 });
+  }
+
+  // ── WAVE 3: THE FIGHT INTRO (round 1) — a walk-in on a low camera for each fighter, a name plate each, then a wide two-shot that eases
+  // into the play camera; combat/fightShots owns where the camera stands. Skippable by any press; none under reduced motion. The round
+  // card (ROUND 1, READY_SEC) and FIGHT! follow it exactly as before — only the time before them is new (FIGHT_INTRO_SEC, round 1).
+  function beginWalkIn(ctx: ModeContext): void {
+    introPlayed = true; introT = 0; introBeat = '';
+    setPhase('walkIn');
+    banner(ctx, '', 0);
+    ctx.setHud({
+      intro: 'foe', foeName: 'RIVAL SENSEI', foeSub: (TIER_PROFILES[readTier()]?.name ?? 'PRO').toUpperCase(),
+      meName: 'YOU', meSub: blendName(readBlend()).toUpperCase(),
+    });
+    SoundKit.play('whoosh', { pitch: 0.55, volume: 0.3 });
+    cin?.play((live) => { const f = fightIntroAt(introT, MARK_ME, MARK_FOE, live); return { shot: f.shot, letterbox: f.letterbox }; }, () => ({ x: 0, y: 0, z: 0 }));
+    tickWalkIn(ctx, 0);
+  }
+  function tickWalkIn(ctx: ModeContext, dt: number): void {
+    introT += dt;
+    const f = fightIntroAt(introT, MARK_ME, MARK_FOE, LIVE0);
+    player.root.position.set(f.mePos.x, 0, f.mePos.z); rival.root.position.set(f.foePos.x, 0, f.foePos.z);
+    const beat = f.plate ?? (introT >= FIGHT_INTRO.foeSec + FIGHT_INTRO.meSec ? 'wide' : '');
+    if (beat !== introBeat) { introBeat = beat; ctx.setHud({ intro: beat }); }
+    fx?.clearAuras(); knock.tick(dt); faceEachOther(dt);
+    // they walk toward each other: the tree's walk loop, stride matched to the speed
+    const dz = MARK_FOE.z - MARK_ME.z, dn = Math.abs(dz) || 1;
+    animate(dt, f.meMps > 0 ? WALK_SPEED01 : 0, f.foeMps > 0 ? WALK_SPEED01 : 0, myDashVelS.set(0, 0, (dz / dn) * f.meMps), foeVelS.set(0, 0, (-dz / dn) * f.foeMps));
+    if (introT >= FIGHT_INTRO_SEC || phaseSec > BUDGET_SEC.walkIn) endWalkIn(ctx, false);
+  }
+  function endWalkIn(ctx: ModeContext, skipped: boolean): void {
+    player.root.position.set(MARK_ME.x, 0, MARK_ME.z); rival.root.position.set(MARK_FOE.x, 0, MARK_FOE.z);
+    if (skipped) cin?.stop(); else cin?.cancel();
+    introBeat = ''; ctx.setHud({ intro: '' });
+    readyBeat(ctx);
+  }
+
+  // ── WAVE 3: THE DRAGON CUT — the super move's own camera (combat/dragonCutter). MY dragon cuts in at the wind-up and holds for the
+  // blow; the RIVAL's cuts in at the blow only (the wind-up is the telegraph the player reads on the play camera). Never under reduced motion.
+  function dragonStart(mine: boolean, windupSec: number): void {
+    if (!cin || !motionPolicy().travel) return;
+    dragonBy = mine ? 'me' : 'foe'; dragonSide = -dragonSide;
+    dragon.start(windupSec, dragonSide, !mine);
+    cin.play((live) => {
+      const a = (dragonBy === 'me' ? player : rival).root.position, d = (dragonBy === 'me' ? rival : player).root.position;
+      return dragon.frame({ x: a.x, z: a.z }, { x: d.x, z: d.z }, live);
+    }, () => ({ x: (player.root.position.x + rival.root.position.x) / 2, y: 0, z: (player.root.position.z + rival.root.position.z) / 2 }));
   }
 
   /** IMPROVE (2026-10-06): the beat is over — the fight is on. */
   function fight(ctx: ModeContext): void {
     setPhase('fighting');
     banner(ctx, 'FIGHT!', 0.6);
+    slam(ctx, 'FIGHT!');
     SoundKit.play('whistle', { volume: 0.5 });
     ctx.feel?.impact?.(0.25);
   }
 
   return {
     modeId: 'karate-vs', mood: 'dojoWarm', camPreset: 'fight',
+    // WAVE 3: a KO that is not the match's last replays once (combat/koReplay); the cast is the two fighters (not the onlookers)
+    replay: true,
+    replayCast: () => ({ bodies: [player.root, rival.root] }),
     // MOVEMENT PLAY P7: the body's own strikes, guard, slips and steps (the cut line's switch: bodyFightFlags)
     ...(BODY_FIGHT.karate_vs ? { body: { claims: FIGHT_CLAIMS, lines: FIGHT_CARD_LINES }, onBody: onBodyEvent } : {}),
 
@@ -883,6 +967,8 @@ export const KarateVSMode: ModeDefinition = (() => {
       if (!modeVenue) VenueKit.buildDojo(ctx.scene);
       arenaHandle?.dispose(); arenaHandle = buildArena(ctx.scene, arena);
       fx?.dispose(); fx = mountCombatFx(ctx.scene); pres?.dispose(); pres = mountPresentation(ctx.scene, ctx.lights?.pipeline);
+      cin?.dispose(); cin = mountCinemaRig(ctx.scene, ctx.camera);   // WAVE 3: the cinematic camera layer
+      dragon.cancel(); koCue.reset(); introPlayed = false; introT = 0; introBeat = '';
       // outside the arena's walls. IMPROVE (2026-10-06): the ring was max(halfX, halfZ) + 2.6 — at ARENA_SCALE the Foundry's
       // corner reached past it; combat/arenas crowdRing keeps it clear of a box's corner too, and arenas.test holds it
       // IMPROVE (2026-10-06): a phone gets KVS_PHONE_ONLOOKERS of them (every fourth spot of the same ring) — each is a full
@@ -963,6 +1049,7 @@ export const KarateVSMode: ModeDefinition = (() => {
       if (e.src !== 'body' && ((e.t === 'button' && e.pressed) || (e.t === 'stick' && Math.hypot(e.x, e.y) > 0.35))) drive.pad(now());
       if (e.t === 'trigger' && e.side === 'R') focusHeld = e.value > 0.35;   // MATRIX FOCUS
       if (e.t === 'stick' && e.side === 'R') { lookX = e.x; lookY = e.y; }   // MODE-STICK-FACE: R stick → the director's look orbit
+      if (phase === 'walkIn') { if (e.t === 'button' && e.pressed && e.btn !== 'START') endWalkIn(ctx, true); return; }   // WAVE 3: any press skips the intro (and is not a strike)
       if (phase !== 'fighting' || !meState.controllable) return;
 
       if (e.t === 'button' && e.pressed) {
@@ -1018,10 +1105,14 @@ export const KarateVSMode: ModeDefinition = (() => {
       { const bv = ctx.body?.(); if (bv) bodyLedgerFrame(bv, now()); deferred.flush(ledger, now()); }   // P7: the body's deferred hits
       crowd?.update(dt);
       fx?.tick(dt); arenaHandle?.tick(dt);   // VISUAL PASS: the hit FX and the arena's flames / flicker run in every phase (the arena ticked only in the fight)
+      if (slamLeft > 0) { slamLeft -= dt; if (slamLeft <= 0) ctx.setHud({ slam: '' }); }   // WAVE 3
+      if (dragon.step(dt) === 'aborted') cin?.stop();   // WAVE 3: the DRAGON's camera, on the mode's clock (a cut whose blow never came eases out)
       // IMPROVE (2026-10-06): the phase beats on the game clock — round 1 on the first frame of play, FIGHT! after the
       // round-start beat, the next round after the KO pause (setTimeouts before: a pause did not hold them, a dispose did
       // not cancel them)
       if (phase === 'intro') { startRound(ctx); return; }
+      if (phase === 'walkIn') { tickWalkIn(ctx, dt); return; }   // WAVE 3: the fight intro (round 1)
+      if (phase === 'roundOver' && !dragon.active && !cin?.active) { const plan = koCue.step(dt); if (plan) { cin?.cancel(); dragon.cancel(); playKoReplay(ctx, plan); } }   // WAVE 3: a KO replay, a beat after the fall
       if (phase === 'ready' && phaseSec >= READY_SEC) fight(ctx);
       else if (phase === 'roundOver' && phaseSec >= ROUND_OVER_SEC) { afterRound(ctx); return; }
       if (phaseSec > BUDGET_SEC[phase]) {
@@ -1156,6 +1247,7 @@ export const KarateVSMode: ModeDefinition = (() => {
       crowd?.dispose(); crowd = null;
       modeVenue?.dispose?.(); modeVenue = null; arenaHandle?.dispose(); arenaHandle = null; wallRun = null; wallKick = null;
       fx?.dispose(); fx = null; pres?.dispose(); pres = null;
+      cin?.dispose(); cin = null; dragon.cancel(); koCue.reset();   // WAVE 3
       ring?.dispose(); ring = null;
       // IMPROVE (2026-10-06): nothing outlives the mode — the hit beats waiting on either clock, the slides, the banner
       meTimers.clear(); foeTimers.clear(); knock.clear(); bannerSlot.clear(); foeDash = null; meDash = null; queuedKey = null;

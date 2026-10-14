@@ -26,6 +26,8 @@ import { readCombatArena, arenasFor, arenaClamp, knockTo, offEdge, insideBy, haz
 import { buildArena, type ArenaHandle } from '../combat/arenaBuild';
 import { mountCombatFx, hitKindOf, auraLevel, type CombatFx } from '../combat/combatFx';   // VISUAL PASS (2026-10-13): the hit language, the chi aura, the ring-out plume
 import { mountPresentation, type Presentation } from '../combat/presentation';
+import { KoReplayCue, playKoReplay } from '../combat/koReplay';   // WAVE 3 (lane/w3-present): KO / ring-out replays — never the match-deciding one
+import { motionPolicy } from '@/lib/a11y/reducedMotion';
 import { mountWeaponTrail, type WeaponTrail } from '../combat/weaponTrail';   // the streak a staff leaves, in each fighter's colour   // the DRAGON's grade swing, speed lines, the impact frame
 import { mountVenue } from '../core/NexusVenue';
 import { dodgeReward, dashSecToImpact, tickCounter, counterMult } from '../core/DodgeRead';
@@ -179,6 +181,8 @@ export const MixedCombatMode: ModeDefinition = (() => {
   let arenaHandle: ArenaHandle | null = null;
   let myTrail: WeaponTrail | null = null, foeTrail: WeaponTrail | null = null;
   let fx: CombatFx | null = null, pres: Presentation | null = null;   // VISUAL PASS: pooled hit sparks / rings / auras; the whole-screen beats
+  const koCue = new KoReplayCue();   // WAVE 3: a round's KO or ring-out plays back once, a beat after the fall
+  let burnedKo = false;   // WAVE 3: the round ended in a fire pit, not a blow (no replay)
   let wallRun: WallRunOn<ArenaWall> | null = null, wallKick: WallKickState | null = null, wallKickY0 = 0, hazardTickAt = 0;
   const matrixStats = { wallRuns: 0, wallKicks: 0, kickHits: 0 };
   function tryWallRun(ctx: ModeContext): boolean {
@@ -248,7 +252,7 @@ export const MixedCombatMode: ModeDefinition = (() => {
       EffectsKit.burst(ctx.scene, c.root.position.add(new Vector3(0, 0.6, 0)), 'sparks');
       ctx.setHud(mine ? { hp: st.hp } : { foeHp: st.hp });
       console.info(`[ARENA] ${mine ? 'you' : 'rival'} in the ${h.label}`);
-      if (st.hp <= 0) { ctx.setHud({ banner: mine ? 'BURNED!' : 'RIVAL BURNED!' }); endRound(ctx, !mine); }
+      if (st.hp <= 0) { ctx.setHud({ banner: mine ? 'BURNED!' : 'RIVAL BURNED!' }); burnedKo = true; endRound(ctx, !mine); }
     }
   }
   function onFocusStart(ctx: ModeContext): void {
@@ -799,6 +803,9 @@ export const MixedCombatMode: ModeDefinition = (() => {
     if (!wasRingOut) animOf(!playerWon).out = true;                  // KO: knockdown, then the floor until the loadout (a ring-out victim is already falling)
     animOf(playerWon).celebrateUntil = now() + CELEBRATE_SEC * 1000;
     if (playerWon && wasRingOut) ringOutWins++;   // IMPROVE (2026-10-06): the result pays it (#13)
+    // WAVE 3: what ended the round — a ring-out, a blow (the loser at 0 HP), a fire pit or the bell — and whether it was the match's last (it goes to the end card)
+    koCue.arm({ kind: wasRingOut ? 'ringout' : burnedKo ? 'hazard' : (playerWon ? foeState.hp : meState.hp) <= 0 ? 'ko' : 'time', decidesMatch: myWins >= ROUNDS_TO_WIN || foeWins >= ROUNDS_TO_WIN, victim: playerWon ? 1 : 0 }, motionPolicy().reduced);
+    burnedKo = false;
     // the parry slow-mo ends with the round (IMPROVE 2026-10-06: it now slows the rigs too, so it must not outlive the fight)
     slowmoSec = 0; applyTimeScales();
     ctx.setHud({ wins: myWins, foeWins });
@@ -827,6 +834,7 @@ export const MixedCombatMode: ModeDefinition = (() => {
   }
 
   function enterLoadout(ctx: ModeContext): void {
+    koCue.cancel();
     // recover any fallen fighter before the next round (untrack first so
     // re-tracking never duplicates a groundLock entry)
     falling = false;
@@ -869,6 +877,8 @@ export const MixedCombatMode: ModeDefinition = (() => {
 
   return {
     modeId: 'mixedcombat', mood: 'goldenHour', camPreset: 'fight',
+    replay: true,   // WAVE 3: KO and ring-out replays, from [player, rival]
+    replayCast: () => ({ bodies: [player.root, rival.root] }),
     // MOVEMENT PLAY P7: the body's own strikes, guard, slips and steps — this settles P3 decision 5 (bodyFightFlags)
     ...(BODY_FIGHT.mixedcombat ? { body: { claims: FIGHT_CLAIMS, lines: FIGHT_CARD_LINES }, onBody: onBodyEvent } : {}),
 
@@ -908,7 +918,7 @@ export const MixedCombatMode: ModeDefinition = (() => {
 
       meState = new FighterState(100);
       foeState = new FighterState(100);
-      round = 1; myWins = 0; foeWins = 0; ringOutWins = 0; matchLatch = false; heavyAt = 0;
+      koCue.reset(); burnedKo = false; round = 1; myWins = 0; foeWins = 0; ringOutWins = 0; matchLatch = false; heavyAt = 0;
       // IMPROVE (2026-10-06): the start-up pick seeds the loadout here (and once more on the first frame of play)
       myLoadout = startPick(); startPickSeeded = false;
       clock = 0; meTimers.clear(); foeTimers.clear(); bannerSlot.clear(); fallBody = null; knock.clear();
@@ -1049,6 +1059,7 @@ export const MixedCombatMode: ModeDefinition = (() => {
       if (fallBody) { const f = fallStep(fallBody.root.position.y, dt); fallBody.root.position.y = f.y; if (!f.falling) fallBody = null; }
       // IMPROVE (2026-10-06): the round-over beat on the game clock (it was a 2400 ms setTimeout)
       if (phase === 'roundOver' && phaseSec >= ROUND_OVER_SEC) { afterRound(ctx); return; }
+      if (phase === 'roundOver') { const plan = koCue.step(dt); if (plan) playKoReplay(ctx, plan); }   // WAVE 3: the replay, a beat after the fall (the ring-out's drop is on the recording by then)
       if (phaseSec > BUDGET_SEC[phase]) {
         console.warn(`[FEL-WATCHDOG] mixedcombat stuck in "${phase}" — auto-advancing`);
         if (phase === 'fighting') endRound(ctx, meState.hp >= foeState.hp);
@@ -1193,7 +1204,7 @@ export const MixedCombatMode: ModeDefinition = (() => {
       mePosture?.dispose(); mePosture = null; foePosture?.dispose(); foePosture = null;
       myStaff?.dispose(); foeStaff?.dispose(); myStaff = null; foeStaff = null; staffMat?.dispose(); staffMat = null;
       gallery?.dispose(); gallery = null; arenaHandle?.dispose(); arenaHandle = null; wallRun = null; wallKick = null;
-      fx?.dispose(); fx = null; pres?.dispose(); pres = null; myTrail?.dispose(); myTrail = null; foeTrail?.dispose(); foeTrail = null;
+      fx?.dispose(); fx = null; pres?.dispose(); pres = null; koCue.reset(); myTrail?.dispose(); myTrail = null; foeTrail?.dispose(); foeTrail = null;
       modeVenue?.dispose(); modeVenue = null;
       ring?.dispose(); ring = null;
       player?.dispose(); rival?.dispose(); SoundKit.stopAmbient();
