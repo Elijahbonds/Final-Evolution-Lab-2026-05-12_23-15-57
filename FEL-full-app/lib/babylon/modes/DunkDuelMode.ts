@@ -41,7 +41,8 @@ import { readPlayerIcon } from '../visual/playerIcon';
 import { dressBall } from '../visual/meshyProps';   // IMPROVE (2026-10-06) #10: the duel ball is a basketball
 import { mountShotMeter3D, type ShotMeter3DHandle } from '../visual/ShotMeter3D';   // IMPROVE (2026-10-06) #7: the contest's slam meter
 import { DunkReplayRecorder, pausableDelay } from '../scene/DunkReplayCam';   // IMPROVE (2026-10-06) #12: the make, replayed
-import { TRIPLE_CUT, tripleCutSec } from '../core/DunkCuts';
+import { motionPolicy } from '@/lib/a11y/reducedMotion';   // WAVE 3: the orbit angle is camera travel
+import { showCuts, cutsSec } from '../core/DunkCuts';
 import { DunkFlight, DUNK_TRICKS, cueOf, cueVerdict, cueFireAt, CUE_BEAT_LABEL, type DunkTrick } from '../core/DunkSystem';   // IMPROVE (2026-10-06) #8: air tricks
 import { trickInput } from '../core/DunkAssist';
 import type { AmbientHandle } from '../visual/EffectsKit';
@@ -724,11 +725,12 @@ export const DunkDuelMode: ModeDefinition = (() => {
     const paused = (): boolean => typeof ctx.phase === 'function' && ctx.phase() === 'paused';
     if (rec) {
       cutting = true; ctx.camDirector.suspended = true; setCinematic(ctx.scene, 1);   // vis-hoops-dunk: the broadcast's bars over the cut
-      const cutDone = rec.playCuts(rim, contactAt, TRIPLE_CUT, {
-        onCut: (i, c) => { ctx.setHud({ hint: `REPLAY ${i + 1}/${TRIPLE_CUT.length} · ${c.label} — A skips` }); if (i > 0) SoundKit.play('whoosh', { pitch: 1.6 + i * 0.2, volume: 0.25 }); },
+      const cuts = showCuts(motionPolicy().travel);   // the tuned triple, then (wave 3) the orbit round the rim; reduced motion keeps the triple
+      const cutDone = rec.playCuts(rim, contactAt, cuts, {
+        onCut: (i, c) => { ctx.setHud({ hint: `REPLAY ${i + 1}/${cuts.length} · ${c.label} — A skips` }); if (i > 0) SoundKit.play('whoosh', { pitch: 1.6 + i * 0.2, volume: 0.25 }); },
         paused,
       });
-      await Promise.race([cutDone, pausableDelay(tripleCutSec() * 1000 + 1200, paused)]);   // the net does not run through a pause
+      await Promise.race([cutDone, pausableDelay(cutsSec(cuts) * 1000 + 1200, paused)]);   // the net does not run through a pause
       if (gen !== modeGen) return;   // left mid-replay: nothing below may touch the disposed scene (#13)
       rec.stop(); cutting = false; ctx.camDirector.suspended = false; setCinematic(ctx.scene, 0);
       ctx.setHud({ hint: '' });

@@ -63,6 +63,9 @@ import { EvadeMoves } from '../core/EvadeMoves';
 import { FOCUS, FocusMeter, WALL_RUN, wallRunAvailableOn, startWallRunOn, wallRunOnAt, wallRunOnSide, startWallKick, wallKickAt, kickHits, type WallRunOn, type WallKickState } from '../core/MatrixFocus';   // MATRIX FOCUS (2026-09-18)
 import { readCombatArena, arenasFor, arenaClamp, knockTo, hazardAt, spawnRadius, describeArena, insideBy, crowdRing, CROWD_GAP, CROWD_PHASE, ROPES, type CombatArena, type ArenaWall } from '../combat/arenas';   // COMBAT ARENAS (2026-09-18)
 import { buildArena, type ArenaHandle } from '../combat/arenaBuild';
+import { mountCinemaRig, type CinemaRig } from '../combat/cinemaRig';   // WAVE 3 (lane/w3-present): the 100th-KO finisher is a cinematic camera laid OVER the Hundred camera's frame (which is untouched)
+import { finisherAt, bearingAbout } from '../combat/fightShots';
+import { motionPolicy } from '@/lib/a11y/reducedMotion';
 import { mountCombatFx, hitKindOf, auraLevel, uncastShadow, type CombatFx } from '../combat/combatFx';   // VISUAL PASS (2026-10-13): the hit language, the chi aura, the agents' arrival ring
 import { mountPresentation, type Presentation } from '../combat/presentation';   // the chi burst's grade swing, speed lines, the impact frame
 import { HORDE_WINDOW_SEC } from '../core/DodgeRead';
@@ -305,6 +308,12 @@ export const KarateEndlessMode: ModeDefinition = (() => {
   let arena: CombatArena = arenasFor('karate')[0];
   let arenaHandle: ArenaHandle | null = null;
   let fx: CombatFx | null = null, pres: Presentation | null = null;   // VISUAL PASS: pooled hit sparks / rings / auras; the whole-screen beats
+  // WAVE 3: THE HUNDREDTH KO — a finisher camera (combat/fightShots.finisherAt): a slow orbit round the fighter and the body that fell. It is an
+  // overlay on the render (combat/cinemaRig), so the Hundred camera (CAM-FIXES / HundredCamera, #220) keeps running underneath, unedited, and the
+  // frame after the last cinematic one is its own. Once a run, at the 100th KO, never under reduced motion.
+  const HUNDREDTH_KO = 100;
+  let cin: CinemaRig | null = null;
+  let finDone = false, finT = 0, finFallen = { x: 0, z: 0 }, finBearing = 0;
   let hazardTickAt = -1e9;
   const heroVel = new Vector3();
   const matrixStats = { wallRuns: 0, wallKicks: 0, kickHits: 0, focusStrikes: 0 };
@@ -1429,6 +1438,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     enemies = enemies.filter((x) => x !== e);
     nearFrame = -1; enemyLastPos.delete(e);
     kos++; totalKos++;
+    if (totalKos === HUNDREDTH_KO && !finDone) hundredth(ctx, e.mob.char.root.position);   // WAVE 3
     e.mob.down();                                               // the owner: knockdown → the floor hold
     pool.remove(e.mob);                                         // IMPROVE (2026-10-06): a corpse is not steered or separated
     allyHunters.delete(e.mob);
@@ -1456,6 +1466,20 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       for (let i = 0; i < DROPS.waveClearShards; i++) { const a = (i / DROPS.waveClearShards) * Math.PI * 2; dropPickup(ctx, at.add(new Vector3(Math.sin(a) * 0.7, 0, Math.cos(a) * 0.7)), 'shard'); }
       setTimeout(() => { ctx.setHud({ banner: '' }); openShop(ctx); }, CFG.waveClearBeatMs);
     }
+  }
+
+  /** WAVE 3: the 100th KO — the finisher camera, the existing 'finisher' slow-mo beat (its tuned 0.5 s: nothing new), a gold grade swing, a call. */
+  function hundredth(ctx: ModeContext, fallenAt: Vector3): void {
+    finDone = true;
+    ctx.juice.callout('THE HUNDREDTH', '#ffd36b', 1600);
+    pres?.grade('gold', 0.5);
+    if (!cin || !motionPolicy().travel) return;
+    matrix(ctx, 'finisher');
+    finT = 0; finFallen = { x: fallenAt.x, z: fallenAt.z };
+    const cam = ctx.scene.activeCamera;
+    finBearing = cam ? bearingAbout(cam.position, { x: player.root.position.x, z: player.root.position.z }) : 0;
+    cin.play((live) => finisherAt(finT, { me: { x: player.root.position.x, z: player.root.position.z }, fallen: finFallen, startBearing: finBearing, spin: 1 }, live),
+      () => ({ x: player.root.position.x, y: 0, z: player.root.position.z }));
   }
 
   // ── the agents' attack cycle (EnemyBrain steps on the GAME clock — the slow-mo slows the telegraph, that is the point) ──
@@ -1893,6 +1917,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       karateVenue = mountVenue(ctx, 'karate_endless', { keepGameplayCamera: true, arena });
       arenaHandle?.dispose(); arenaHandle = buildArena(ctx.scene, arena);
       fx?.dispose(); fx = mountCombatFx(ctx.scene); pres?.dispose(); pres = mountPresentation(ctx.scene, ctx.lights?.pipeline);
+      cin?.dispose(); cin = mountCinemaRig(ctx.scene, ctx.camera);   // WAVE 3: the finisher's camera layer
       // L4 — the Shadow Gauntlet is a gauntlet, and a gauntlet has an audience.
       // Ringed OUTSIDE the fighting area and inside the mat, so nobody stands
       // anywhere the fight can reach. Instanced silhouettes, never rigs: this
@@ -1915,6 +1940,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       ctx.heroRef.current = player.root;
       youRing?.dispose(); youRing = null;
       ring?.dispose(); ring = mountPlayerRing(ctx.scene, player.root, { color: '#38bdf8', icon: readPlayerIcon() });   // PLAYER RING: the hp gauge at the feet, the glyph beside it
+      if (process.env.NODE_ENV === 'development') (ctx.scene.metadata ??= {}).endlessProbe = { hundredth: () => hundredth(ctx, player.root.position.add(new Vector3(1.2, 0, 1.6))) };   // WAVE 3: the proof rig calls the 100th-KO finisher without playing 100 KOs (dev builds only)
 
       partner = await CharacterLibrary.spawn(ctx.scene, CFG.heroUrl, { position: new Vector3(1.6, 0, 0.8), tint: '#22d3ee', startClip: IDLE_CLIP });
       neverBindPose(partner.animator, IDLE_CLIP);
@@ -1976,6 +2002,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       };
       pool = new MobPool({ everyFrame: true, targetOf: huntTarget });
       wave = 0; totalKos = 0; chi = 0; enemies = []; pickups = []; tweens = []; shards = 0; shop.owned.clear(); shop.sel = 0;
+      finDone = false; finT = 0; cin?.cancel();   // WAVE 3
       landed = []; lastLandAt = -Infinity;
       // `?fight=` sets the ratings so the earned routes and the chi burst can be driven and measured; without a
       // PRQ scan plumbed into the modes a fighter is a baseline body. Same seam as Karate VS and Mixed Combat.
@@ -2249,6 +2276,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       // look-ahead target, which is exactly the desired effect here — the
       // camera looks slightly down the direction you're facing.
       crowd?.update(dt);
+      if (cin?.active) finT += dtReal;   // WAVE 3: the finisher runs on the real clock (the slow-mo it calls for does not stretch the camera)
       fx?.tick(dt); fx?.aura('me', player.root, auraLevel(chi, 100, 0.6), '#ffd36b');   // VISUAL PASS: the hit FX; the chi aura swells toward the burst (a column when it is ready)
       // CAM-FIXES: ONE continuous shot, no preset flip. Every live foe (not the one in your hands) shapes how far the camera stands;
       // the facing and the aim it follows are smoothed (HundredCamera), so a KO or a turn on a dime can no longer move the frame in one step.
@@ -2290,6 +2318,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       pickupShelf.shard = []; pickupShelf.chi = []; pickupShelf.health = []; shockShelf.length = 0;
       for (const m of sharedMats.values()) m.dispose(); sharedMats.clear();
       for (const m of kitMats.values()) m.dispose(); kitMats.clear();
+      cin?.dispose(); cin = null;   // WAVE 3
       crowd?.dispose(); crowd = null; arenaHandle?.dispose(); arenaHandle = null; fx?.dispose(); fx = null; pres?.dispose(); pres = null; karateVenue?.dispose(); karateVenue = null; player?.dispose(); partner?.dispose(); pool?.dispose(); playerSlot?.dispose(); partnerSlot?.dispose(); SoundKit.stopAmbient();
     },
   };

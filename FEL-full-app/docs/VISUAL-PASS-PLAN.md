@@ -853,6 +853,42 @@ per mode. The glossy floor does not mount on onevone / threevthree / carnival: t
   crane in 3v3's dead balls (both touch the play camera), VLS sun shafts. A scorebug, a "GAME POINT" lower third and 3v3's clock bug are
   HUD: routed to lane/hud-hoops. [ART]: bespoke streetball props, detailed carnival rides, more crowd body variety.
 
+## Wave 3 status — presentation: combat cinematics, replays, sprint photo finish, HUD leftovers, the dunk's fourth angle (w3-present, 2026-10-14)
+
+Everything here is presentation only: no play-camera call, speed, timing window, difficulty, score, judging or pay changed (`combat/wave3.wiring.test.ts`
+holds the director-call counts and that the new modules import nothing that scores). The new cameras are OVERLAYS, not director states.
+
+- **The cinema rig** (`combat/cinemaRig.ts`). A cinematic is drawn over the frame the play camera already made: on `scene.onBeforeRender` (insertFirst, so
+  the harness's shake rides on it) the rig reads the play camera's pose and writes the cinematic one; on `onAfterRender` it puts the play camera's own pose
+  back. The mode reads the camera next frame and finds exactly what its director wrote, so the stick mapping (read off the camera's own forward), the
+  Hundred camera's damping and FrameGuard are untouched, and a cut ends with nothing to hand back. Bars: `scene.metadata.felCinematic` (the foundation's
+  letterbox). Reduced motion (`motionPolicy().travel`) skips every cut.
+- **Karate VS.** A fighting-game intro before ROUND 1 of a match (`combat/fightShots.fightIntroAt`): the rival walks in on a low front three-quarter with his name
+  plate, then the player, then a wide two-shot that eases into the play camera round the ring; any press skips. Plates carry the opponent pick and the fighting
+  style, never a profile name. Slam text (ROUND n / FINAL ROUND / FIGHT! / K.O. / TIME!) as HUD keys `slam` / `slamSeq` drawn by `components/games/fight-presentation.tsx`.
+  The DRAGON cut (`combat/dragonCutter`): a low wind-up angle, a profile at the blow (told when it lands, so a hit-stop or Focus cannot desync it), an ease out;
+  the RIVAL's DRAGON cuts in at the blow only (its wind-up is the telegraph the player reads on the play camera).
+- **Karate Endless.** The 100th KO (once a run) fires the existing `finisher` slow-mo beat, a gold grade swing, a "THE HUNDREDTH" call and a 3.2 s orbit round the
+  fighter and the fallen body (`fightShots.finisherAt`) over the Hundred camera, which is untouched.
+- **KO and ring-out replays** (`combat/koReplay`): Karate VS, Showdown, Duel and Mixed. A real KO or ring-out replays once, 0.9 s (1.2 s for a ring-out) after the
+  fall, from the victim's side, from the two fighters only; never the match-deciding round, never the bell or a fire pit, at most 2 a match, never under reduced
+  motion. The harness holds `update()` while it plays and the host steps its stat band aside and tags the shot REPLAY.
+- **Sprint.** The photo finish: the frame drawn at the tape (read off the canvas the dunk poster's way) with the finish line over the real line and a timing ruler
+  (`racing/photoFinish`: winner on the line, loser to the right by the margin, "YOU BY 0.56 s") on the raw crossing times; the host holds the result 2.6 s for it, any
+  press or tap skips. The d-pad now skips a replay (shared: `core/ModeHarness.ts`, one line). A mid-race overtake replay is NOT enabled: measured on the real core
+  (cadences 200-400 ms) every winnable run passes the pacer at 2-5 s, the pacer's window is 10 s .. 88 % (8.8-12.5 s) less a 0.7 s settle, and the only pass after 10 s
+  (cadence ~258 ms, 11.48 s) settles at 12.18 s, past an 88 % mark at 11.80 s.
+- **HUD leftovers** (`components/games/**`). The dunk host's hint, take-off chip, beat strip, MC lower third and call are one bottom column (flex-col-reverse), so none
+  can cross another (measured overlap at 1080p was 12-18 kpx per pair, now none at 1080p, 720p, 390x844 and 844x390); the three-point standings join the score stack on a
+  phone (390 px: 5 overlaps, now none) and sit below the rack plates from 1024 px (1080p: LEFT chip and 5th rack, now none); `tv-hud/lower-third.tsx` (`HudLowerThird`) is the
+  broadcast lower third, used for the dunk duel's "PLAYER n · DUNK 4/6" name card and the shootout's "PENALTY 3 OF 5"; `race-course-map`, `dunk-poster` and
+  `three-point-options` are on the TV HUD tokens (they are in the migration scan's PIECES).
+- **Dunk.** A fourth orbit angle on the made dunk's replay (`core/DunkCuts.ORBIT_CUT`, `cutCamera(..., progress)`): the camera sweeps 146 degrees round the rim at
+  3.4 m, 1.0 s, after the tuned triple (unchanged) and before the poster; reduced motion keeps the triple.
+- **Deferred / [ART].** Landscape phones (844x390): the three-point corner standings still touch the 5th rack and the LEFT chip (about 2.5 kpx), and the MC caption
+  sits under the NEED / CUT chips (3 kpx). A sprint overtake replay needs a pacing rule that is not "10 s .. 88 %" (a 100 m race is 10-13 s long). A true slit-scan
+  (a side-on finish camera) needs a second camera drawn each frame for the last metres: not built; the print is the frame the race camera drew.
+
 ## Wave 3 status — atmosphere and surfaces (w3-atmos, 2026-10-14)
 
 The deferred atmosphere and surface items from waves 1 and 2. Everything below is presentation only: no tuned number moved. `scene/**` and

@@ -725,7 +725,10 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     if (phase === 'playing' && e.t === 'button' && e.btn === 'SELECT' && e.pressed) { camDirector.toggle(); return; }
     // A9.12: a press during a replay skips it and is the replay's, not the mode's — latched like a waking press, so its
     // release never reaches the mode unpaired; releases and sticks still reach the mode (a key let go during a replay is let go)
-    if (phase === 'playing' && replayHold && e.t === 'button' && e.pressed) { replay?.skip(); wakeLatch.wake(e, performance.now(), true); return; }
+    // WAVE 3 (lane/w3-present): a D-PAD press skips it too. The sprint is played on the d-pad alone and a masher presses nothing else, so a
+    // replay (a mid-race overtake) that only a button could skip would have been unskippable for the one player who most needs it to be
+    // skippable. The latch keys a d-pad press as `d:<dir>` already, so its release is swallowed unpaired like a button's.
+    if (phase === 'playing' && replayHold && (e.t === 'button' || e.t === 'dpad') && e.pressed) { replay?.skip(); wakeLatch.wake(e, performance.now(), true); return; }
     if (phase === 'playing') {
       const now = performance.now();
       if (!wakeLatch.pass(e, now)) return;
