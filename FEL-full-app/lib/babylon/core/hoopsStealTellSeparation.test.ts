@@ -15,9 +15,10 @@ import { resolveBodyContact } from './HoopsMoves';
 const ONE = readFileSync(join(__dirname, '../modes/OneVOneMode.ts'), 'utf8');
 const THREE = readFileSync(join(__dirname, '../modes/ThreeVThreeMode.ts'), 'utf8');
 
+/** mulberry32: a plain LCG's consecutive draws are correlated enough to skew a rate by ~13 % on one seed (measured). */
 function seeded(seed: number): () => number {
-  let s = seed >>> 0;
-  return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 2 ** 32; };
+  let a = seed >>> 0;
+  return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 }
 const HOOP = new Vector3(0, 0, 0);
 
@@ -37,7 +38,9 @@ describe('K-ST1: the AI poke is a per-second rate (aggression × 1.2 /s at 30, 6
   for (const a of [0.45, 0.5, 0.55, 0.65, 0.7, 0.85]) {
     it(`aggression ${a}`, () => {
       for (const dt of [1 / 30, 1 / 60, 1 / 144]) {
-        const r = stealRate(a, dt, self, handler);
+        // 5 seeds × 600 s: one 600 s run at aggression 0.5 is ~360 events (σ ≈ 5 %), so a ±10 % bar on ONE seed fails ~5 % of
+        // the 18 cells by chance (measured: a 2σ cell). The bar stays ±10 %; the sample is what makes it a test of the rate.
+        const r = [1, 2, 3, 4, 5].reduce((m, sd) => m + stealRate(a, dt, self, handler, 600, sd), 0) / 5;
         expect(Math.abs(r - a * STEAL_RATE_PER_SEC) / (a * STEAL_RATE_PER_SEC)).toBeLessThanOrEqual(0.10);
       }
     });
@@ -50,14 +53,14 @@ describe('MEASURED, flagged (not tuned): does the AI poke still open with the bo
   it('a standing handler: the deny point is arm\'s length off him, so a defender at the standoff can poke', () => {
     const handler = new Vector3(0, 0, 6);
     const self = new Vector3(0, 0, 6 - BODY_STANDOFF);
-    const r = stealRate(0.7, 1 / 60, self, handler, 120);
+    const r = [1, 2, 3, 4, 5].reduce((m, sd) => m + stealRate(0.7, 1 / 60, self, handler, 600, sd), 0) / 5;
     console.info(`[K-ST-MEASURE] standing handler, defender at ${BODY_STANDOFF} m: ${r.toFixed(3)} steal intents/s (expected ${(0.7 * STEAL_RATE_PER_SEC).toFixed(2)})`);
     expect(r).toBeGreaterThan(0);
   });
   it('a moving handler: reported (the contain lever drops the deny point toward the rim)', () => {
     const brain = new DefenderBrain(0.7, null, seeded(3));
     const self = new Vector3(0, 0, 6 - BODY_STANDOFF);
-    let n = 0; const dt = 1 / 60, sec = 120;
+    let n = 0; const dt = 1 / 60, sec = 600;
     for (let i = 0; i < sec / dt; i++) {
       const x = Math.sin(i * dt * 3) * 0.05;   // a handler swaying ~3 m/s at the standoff
       const h = new Vector3(x * 20, 0, 6);
