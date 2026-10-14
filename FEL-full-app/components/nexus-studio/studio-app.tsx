@@ -1,7 +1,7 @@
 'use client';
 
 // NEXUS STUDIO (docs/NEXUS-STUDIO.md): the editor inside FEL. Four tracks, phased — the venue / level editor (built),
-// the AI game builder (CELL, the existing StudioShell, unchanged), the character / look editor and visual scripting
+// the AI game builder (CELL: venue edits as Studio commands, beside the existing StudioShell, unchanged), the character / look editor and visual scripting
 // (planned; their panels say what they will reuse). /studio is flag-gated and unlinked (lib/nav/reachability.test.ts).
 
 import { useRef, useState } from 'react';
@@ -15,6 +15,7 @@ import { targetOf } from '@/lib/nexus-studio/targets';
 import { studioLoadAllowed } from '@/lib/nexus-studio/runtime';
 import { useStudio, type SaveState } from './use-studio';
 import { VenueEditor } from './venue-editor';
+import { AiVenuePanel } from './ai-venue-panel';
 import { C, ToolButton } from './ui';
 
 export type Track = 'venue' | 'ai' | 'characters' | 'scripts';
@@ -106,7 +107,15 @@ export function NexusStudioApp() {
         </div>
       )}
       {track === 'venue' && <VenueEditor studio={studio} />}
-      {track === 'ai' && <div className="relative min-h-0 flex-1 overflow-hidden"><StudioShell /></div>}
+      {track === 'ai' && (
+        <div className="grid min-h-0 flex-1 grid-cols-[minmax(320px,420px)_1fr]">
+          <aside className="min-h-0 overflow-y-auto border-r" style={{ borderColor: C.line, background: C.surface }}>
+            <AiVenuePanel studio={studio} onApplied={() => { setTrack('venue'); setMessage(`CELL’s edits are in “${venue?.name ?? 'the venue'}” as one step — Undo takes them back.`); }} />
+          </aside>
+          {/* CELL's game-file builder, unchanged (its file holds the ABACUS guard lines) */}
+          <div className="relative min-h-0 overflow-hidden"><StudioShell /></div>
+        </div>
+      )}
       {track === 'characters' && <PlannedTrack title="Characters (track 3)" lines={[
         'A Studio character is a Closet look: the Closet Studio (lib/creator/look, the stage rig, the on-model handles) is the editor, and its share code is what a project keeps.',
         'Next: cast a venue — who stands where (the target mode’s rival, the crowd’s body variety), applied through playerIdentity as the Closet already does.',
