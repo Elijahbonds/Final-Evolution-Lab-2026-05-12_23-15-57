@@ -118,7 +118,8 @@ import { emptyUnlocks, loadUnlocks, saveUnlocks, refOpen, needLine, nextUnlockLi
 import { newField, bookCard, cutField, cutTiebreak, placeOf, highlightSituation, simFinal, encodeField, fieldTotal, nightFormat, cardDunks, PLAYER_ID, FIELD_SIZE, FINALISTS, type FieldDunker, type NightFormat } from '../core/DunkField';   // dunk-next phase 5: the four-dunker night (casual nights only: owner 2026-10-06)
 import { rollRivalAttempt, simRivalDunk, DEFAULT_RIVAL_RUNUP, type RivalAttempt, type RivalRunUp, type RivalDunkResult, type RivalJudgeContext } from '../core/DunkRivalSim';   // dunk-next phase 4: a rival's dunk, judged without flying it
 import { beatsCrossed, gradeTrickPress, flightFlow, encodeBeatStrip, BEAT_ORDER, BEAT_TOL_SEC, BEAT_TICK_PITCH, BEAT_TICK_VOLUME, type BeatGrade, type BeatMark, type SlamZone } from '../core/DunkBeats';   // dunk-next phase 1: the flight is a four-beat bar
-import { TRIPLE_CUT, POSTER_SEC, tripleCutSec, announcerCall, CELEBRATIONS, CELEB_BY_DPAD, seedOf, type CelebId } from '../core/DunkCuts';   // DUNK MOTION phase 12: the made dunk's show
+import { motionPolicy } from '@/lib/a11y/reducedMotion';   // WAVE 3: the orbit angle is camera travel
+import { showCuts, cutsSec, POSTER_SEC, announcerCall, CELEBRATIONS, CELEB_BY_DPAD, seedOf, type CelebId } from '../core/DunkCuts';   // DUNK MOTION phase 12: the made dunk's show
 import {
   DUNK_LAND_ABSORB_CLIP, CELEB_BLEND_SEC, pickLiveCelebration, holdEndMs, celebStartMs, clipFor, type RotCelebId,
 } from '../core/DunkLandCelebrate';
@@ -4387,15 +4388,16 @@ export const DunkMode: ModeDefinition = (() => {
     // run and launch clips under the recorded pose for the whole cut — blended every frame for nothing (the pose is the frame's last
     // writer), with those clips' end events firing mid-cut. The recorded pose owns the body now, as the flag always said.
     cutting = true; setCinematic(ctx.scene, 1);   // vis-hoops-dunk: the broadcast's bars over the cut (DOM, eased by the harness)
-    const cutDone = replay.playCuts(rim, contactSec, TRIPLE_CUT, {
+    const cuts = showCuts(motionPolicy().travel);   // the tuned triple, then (wave 3) the orbit round the rim; reduced motion keeps the triple
+    const cutDone = replay.playCuts(rim, contactSec, cuts, {
       freezeSec: big ? POSTER_SEC : 0,
-      onCut: (i, c) => { ctx.setHud({ cut: `REPLAY ${i + 1}/${TRIPLE_CUT.length} · ${c.label}` }); if (i > 0) SoundKit.play('whoosh', { pitch: 1.6 + i * 0.2, volume: 0.25 }); },
+      onCut: (i, c) => { ctx.setHud({ cut: `REPLAY ${i + 1}/${cuts.length} · ${c.label}` }); if (i > 0) SoundKit.play('whoosh', { pitch: 1.6 + i * 0.2, volume: 0.25 }); },
       onFreeze: () => { ctx.setHud({ cut: 'THE POSTER' }); if (turn === 'player') capturePoster(ctx, { title: theName, by: signature?.by ?? '', total: dunkTotal }); },
       paused: harnessPaused,   // IMPROVE (2026-10-06): the cut holds while the game is paused
     }).then(() => { replaying = false; cutting = false; replayAir = false; player.root.rotationQuaternion = null; dropToFloor = true; console.info('[HANDS] triple cut end'); });
     ctx.camDirector.suspended = true;
     const gen = modeGen;
-    await Promise.race([cutDone, pausableDelay((tripleCutSec() + (big ? POSTER_SEC : 0)) * 1000 + 1200, harnessPaused)]);   // IMPROVE (2026-10-06): the net does not run through a pause
+    await Promise.race([cutDone, pausableDelay((cutsSec(cuts) + (big ? POSTER_SEC : 0)) * 1000 + 1200, harnessPaused)]);   // IMPROVE (2026-10-06): the net does not run through a pause
     if (!alive(gen)) return;   // IMPROVE (2026-10-06): left mid-replay — nothing below may touch the disposed scene
     replay.stop(); cutting = false; replaying = false; setCinematic(ctx.scene, 0);
     ctx.camDirector.suspended = false;
