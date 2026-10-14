@@ -35,7 +35,6 @@ import {
   recordCarnivalResult, clearCarnivalRun,
 } from '@/lib/carnival-run';
 
-
 export interface GameResult {
   score: number;
   opponentScore?: number;
@@ -241,9 +240,9 @@ function GameShellInner({
     return () => { active = false; cancelAnimationFrame(raf); poller.setScheme(null); };
   }, [scheme, gameKey, babylonOwnsInput]);
 
+  useEffect(() => { runLive.current = result === null; }, [result]);
   const lazyRun = useRef(lazyRunFor(mode));
   lazyRun.current = lazyRunFor(mode);
-  useEffect(() => { runLive.current = result === null; }, [result]);
   useEffect(() => {
     inputCount.current = 0;
     runMark.current = markRun(sessionStore.record());
