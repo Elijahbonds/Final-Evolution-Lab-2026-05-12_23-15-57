@@ -82,6 +82,12 @@ export interface DanceStageHandle {
   /** One frame off the song (the pick and results screens): the stage idles on the wall clock. */
   idle(dt: number): void;
   setTrack(name: string): void;
+  /**
+   * lane/dance-extras (2026-10-14): a FREESTYLE section is on (dance/freestyle.ts) — the LED wall holds the word FREESTYLE over its
+   * pattern until it is off, and the entry fires the confetti and the jets once (the same rate-limited, reduced-motion-gated burst as a
+   * milestone). Visual only: nothing here reads or writes a score, a window or a step.
+   */
+  freestyle(on: boolean): void;
   /** Jets and confetti. Returns whether it fired (rate-limited; not at all under reduced motion). */
   milestone(kind: DanceMilestone): boolean;
   readonly wall: LedWallHandle;
@@ -112,6 +118,15 @@ export function mountDanceStage(o: DanceStageOptions): DanceStageHandle {
     floor.update({ beatIndex: p.beatIndex, beatPhase: p.beatPhase, barIndex: p.barIndex, calm: o.calmLights });
   };
   frame(idlePhase(0), 0, 0);   // the first frame is already dressed
+  const milestone = (kind: DanceMilestone): boolean => {
+    clockT = performance.now() / 1000;
+    if (o.calmMotion || !milestoneDue(lastMilestone, clockT)) return false;
+    lastMilestone = clockT;
+    const k = kind === 'gradeS' ? 1.6 : kind === 'streak' ? 1.2 : 0.9;
+    for (const j of JET_AT) EffectsKit.burst(o.scene, new Vector3(j[0], j[1], j[2]), 'dust', k, '#e4f3ff');   // CO2: a white-blue gust off the deck
+    EffectsKit.burst(o.scene, new Vector3(CONFETTI_AT[0], CONFETTI_AT[1], CONFETTI_AT[2]), 'confetti', k);
+    return true;
+  };
   return {
     update(p, cheer, combo) { frame(p, cheer, combo); },
     idle(dt) {
@@ -121,15 +136,11 @@ export function mountDanceStage(o: DanceStageOptions): DanceStageHandle {
       frame({ ...p, barIndex: -1 }, 0, 0);
     },
     setTrack(name) { wall.setTrack(name); },
-    milestone(kind) {
-      clockT = performance.now() / 1000;
-      if (o.calmMotion || !milestoneDue(lastMilestone, clockT)) return false;
-      lastMilestone = clockT;
-      const k = kind === 'gradeS' ? 1.6 : kind === 'streak' ? 1.2 : 0.9;
-      for (const j of JET_AT) EffectsKit.burst(o.scene, new Vector3(j[0], j[1], j[2]), 'dust', k, '#e4f3ff');   // CO2: a white-blue gust off the deck
-      EffectsKit.burst(o.scene, new Vector3(CONFETTI_AT[0], CONFETTI_AT[1], CONFETTI_AT[2]), 'confetti', k);
-      return true;
+    freestyle(on) {
+      wall.setOverride(on ? 'FREESTYLE' : null);
+      if (on) milestone('join');
     },
+    milestone,
     wall, heads, crowd, floor,
     dispose() { wall.dispose(); heads.dispose(); crowd.dispose(); floor.dispose(); },
   };

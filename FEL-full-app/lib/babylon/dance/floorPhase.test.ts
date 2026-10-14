@@ -5,12 +5,13 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { DANCE_LIBRARY, beatDuration } from '../core/DanceCore';
 import { stepsForSong } from '../core/danceTracks';
-import { DANCE_CAPTURES } from '../anim/danceClips';
+import { DANCE_CAPTURES, MOVE_CAPTURES } from '../anim/danceClips';
+import { CAPTURED_MOVES, danceMove } from './moves';
 import { FEL_SONGS } from './felSongs';
 import { chartStepsFor } from './chart';
 import { FLOOR_PHASE, RISE_FADE_BEATS, STEP_FADE_SEC, floorPhaseOf, moveFadeSec, onFloor } from './floorPhase';
 
-const beatsOf = (id: string): number => DANCE_LIBRARY.find((c) => c.id === id)!.beats;
+const beatsOf = (id: string): number => danceMove(id)!.beats;   // lane/dance-extras: the whole vocabulary (a chart may opt in to a captured move)
 const read = (rel: string): string => readFileSync(join(process.cwd(), rel), 'utf8');
 
 /** Where a chart switches move while the move being left is on the floor. */
@@ -24,7 +25,11 @@ describe('the table is the clips\' own drop and rise', () => {
   it('the captured pair (windmill, six step): down at ¾, rise at the clip\'s length − 1 — danceClips.ts composeCapturedStep', () => {
     for (const id of Object.keys(DANCE_CAPTURES)) expect(FLOOR_PHASE[id], id).toEqual({ down: 0.75, rise: beatsOf(id) - 1 });
     const clips = read('lib/babylon/anim/danceClips.ts');
-    expect(clips).toContain('const T = beats(def.beats), tIn = beats(0.75), tOut = T - beats(1);');
+    // test changed (lane/dance-extras, 2026-10-14): composeCapturedStep now serves the captured moves too, so its drop and rise come from the
+    // step's capture PLAN; the pair's plan is the same ¾ in / 1 out, pinned on the next line, and danceClips.captures.test.ts holds the
+    // pair's composed keys byte for byte
+    expect(clips).toContain('const T = beats(n), tIn = beats(plan.inBeats), tOut = T - beats(plan.outBeats);');
+    expect(clips).toContain("if (rec) return { clip: rec, kind: 'cycle', inBeats: 0.75, outBeats: 1 };");
   });
   it('the procedural baby freeze: STAND, the freeze at ½, held to 1½, STAND at 2', () => {
     const clips = read('lib/babylon/anim/danceClips.ts');
@@ -32,9 +37,16 @@ describe('the table is the clips\' own drop and rise', () => {
     expect(FLOOR_PHASE.dance_freeze_baby).toEqual({ down: 0.5, rise: 1.5 });
     expect(beatsOf('dance_freeze_baby')).toBe(2);
   });
+  it('the captured floor moves: down at the capture plan\'s drop, rise at its step\'s end minus the plan\'s rise (danceClips.ts MOVE_CAPTURES)', () => {
+    for (const id of ['dance_freeze_side', 'dance_power_headstand', 'dance_power_helicopter']) {
+      expect(FLOOR_PHASE[id], id).toEqual({ down: MOVE_CAPTURES[id].inBeats, rise: beatsOf(id) - MOVE_CAPTURES[id].outBeats });
+    }
+  });
   it('the floor and freeze families are in it; no standing move is', () => {
-    for (const id of Object.keys(FLOOR_PHASE)) expect(['freeze', 'power', 'footwork']).toContain(DANCE_LIBRARY.find((c) => c.id === id)!.category);
-    for (const c of DANCE_LIBRARY.filter((x) => !(x.id in FLOOR_PHASE))) expect(floorPhaseOf(c.id), c.id).toBeNull();
+    // test changed (lane/dance-extras, 2026-10-14): the table now also holds the three captured FLOOR moves, which are not DANCE_LIBRARY rows,
+    // so the family of each row is read through danceMove (the same objects for the library's rows) and no standing move of EITHER list is in it
+    for (const id of Object.keys(FLOOR_PHASE)) expect(['freeze', 'power', 'footwork']).toContain(danceMove(id)!.category);
+    for (const c of [...DANCE_LIBRARY, ...CAPTURED_MOVES].filter((x) => !(x.id in FLOOR_PHASE))) expect(floorPhaseOf(c.id), c.id).toBeNull();
     expect(floorPhaseOf('dance_freeze_baby.M')).toEqual(FLOOR_PHASE.dance_freeze_baby);   // a mirror is the same move
     expect(floorPhaseOf(null)).toBeNull();
   });
@@ -63,7 +75,10 @@ describe('where the charts cut a floor move', () => {
   it('the generated steps barely did (a baby freeze looping on its second cycle); the authored charts do, per song (a new cut fails here and gets named)', () => {
     expect(Object.fromEntries(FEL_SONGS.map((s) => [s.id, floorCuts(stepsForSong(s))]))).toEqual({ warmup: 0, cypher: 0, goldenhour: 1, battle: 0, canals: 1, evolution: 1 });
     const cuts = Object.fromEntries(FEL_SONGS.map((s) => [s.id, floorCuts(chartStepsFor(s)!)]));
-    expect(cuts).toEqual({ warmup: 2, cypher: 6, goldenhour: 4, battle: 9, canals: 9, evolution: 9 });
+    // test changed (lane/dance-extras, 2026-10-14): evolution 9 → 8. Its second hook now opts in to the CAPTURED helicopter (chart phrase ehBc),
+    // a 4-beat move that is back on its feet (rise at beat 3) before the next step, where the 8-beat windmill it stood in for was cut mid-floor
+    // (it is on the floor from beat ¾ to 7): one fewer switch made while the body is down. The other five songs are untouched.
+    expect(cuts).toEqual({ warmup: 2, cypher: 6, goldenhour: 4, battle: 9, canals: 9, evolution: 8 });
   });
 });
 

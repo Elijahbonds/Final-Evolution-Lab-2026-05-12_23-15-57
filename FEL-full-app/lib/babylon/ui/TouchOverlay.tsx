@@ -20,6 +20,9 @@ import React, { useEffect, useRef, useState } from 'react';
 import type { InputBus } from '../core/InputBus';
 import { MODE_VERBS, type VerbButton } from './modeVerbs';
 import { touchDeckLayout, type TouchDeckLayout } from '@/lib/ui/consoleView';
+// THE CYPHER'S PAD (lane/dance-extras, 2026-10-14): dance draws its own thumb pairs in place of the generic rig below — the
+// same overlay (bus, safe-area, fit), the same verbs (MODE_VERBS.dance); see lib/babylon/dance/ui/padModel.ts (what each button is) and padStore.ts (what the room tells it).
+import { DancePad } from '@/lib/babylon/dance/ui/DancePad';
 
 // setPointerCapture throws NotFoundError if the browser has already dropped
 // the pointer session by the time the handler runs (seen on some mobile
@@ -92,6 +95,11 @@ export function TouchOverlay(props: { bus: InputBus; modeId: string; visible: bo
   const lifted = (side: React.CSSProperties, k: number, origin: string): React.CSSProperties =>
     ({ ...side, bottom: `calc(max(0.75rem, env(safe-area-inset-bottom)) + ${fit.lift}px)`, transform: `scale(${k})`, transformOrigin: origin });
   const cs = compact ? COMPACT_SCALE : 1;
+
+  if (props.modeId === 'dance') {
+    return <DancePad bus={props.bus} deck={deck === 'compact' ? 'compact' : deck === 'landscape' ? 'landscape' : 'portrait'}
+      fit={{ lift: fit.lift, left: fit.l, right: fit.r }} leftRef={colL} rightRef={colR} />;
+  }
 
   // CALL FOR THE BALL (Elijah item 2): a mode can retitle (never re-emit) a slot per frame — e.g. 3v3's PASS
   // becomes BALL! off the ball. The emit, hold and hollow-socket rules are untouched; only label/color move.
