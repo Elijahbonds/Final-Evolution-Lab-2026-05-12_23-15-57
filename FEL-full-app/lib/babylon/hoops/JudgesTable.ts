@@ -59,7 +59,7 @@ export function mountJudgesTable(scene: Scene, at: { x: number; z: number }, tow
   const steel = new PBRMaterial('jt_steel', scene);
   steel.albedoColor = Color3.FromHexString('#2b3138'); steel.metallic = 0.6; steel.roughness = 0.5; owned.push(steel);
 
-  const GAP = 0.86;
+  const GAP = 0.72;
   const W = GAP * n + 0.4;
   // the table is three meshes (the top, the cloth, the steel: the legs and the card posts merged), so with the cards it is n + 3 draws —
   // a phone's budget counts every mesh
@@ -74,7 +74,7 @@ export function mountJudgesTable(scene: Scene, at: { x: number; z: number }, tow
   for (let i = 0; i < n; i++) {
     const lx = (i - (n - 1) / 2) * GAP;
     const post = MeshBuilder.CreateBox('jt_post', { width: 0.05, height: 0.62, depth: 0.05 }, scene); place(post, lx, 1.1, -0.1); steelParts.push(post);
-    const mesh = MeshBuilder.CreatePlane(`jt_card_${i}`, { width: 0.74, height: 0.56 }, scene);
+    const mesh = MeshBuilder.CreatePlane(`jt_card_${i}`, { width: 0.64, height: 0.5 }, scene);
     place(mesh, lx, 1.62, -0.14);
     const mat = new StandardMaterial(`jt_card_m_${i}`, scene);
     mat.disableLighting = true; mat.diffuseColor = unlitDiffuse(); mat.specularColor = Color3.Black(); mat.emissiveColor = new Color3(0.9, 0.92, 0.95); mat.backFaceCulling = false;

@@ -6,7 +6,7 @@ export const DUNK_COURT = {
   startZ: -1.2, rimZ: -10.28,
   /** The judges' table: behind the baseline on the tent side, in front of the shops, its cards turned to the runway — so it faces the play
    *  camera and the rim-side camera of the judging beat (measured: at the sideline it was a slab on the play frame's edge and out of the
-   *  judging shot). The tent stands at x -12.9..-6.9, z -14.1..-8.1; the table clears it. */
-  judgesAt: { x: -4.4, z: -12.4 },
-  judgesFace: { x: -4.4, z: 2 },
+   *  judging shot). The tent stands at x -12.9..-6.9, z -14.1..-8.1 and the hoop's backboard spans x ±0.9; the table (3.9 m long) sits between them. */
+  judgesAt: { x: -3.2, z: -12.4 },
+  judgesFace: { x: -3.2, z: 2 },
 } as const;
