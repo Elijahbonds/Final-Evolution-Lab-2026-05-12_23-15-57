@@ -73,6 +73,14 @@ export function cueFlash(kind: FlashKind): void {
   }
 }
 
+/**
+ * The pulses not yet sounded (id above `lastId`), oldest first: one tone per pulse id, never twice. The HUD's only sound
+ * source for flashes and reps — a counted rep is one 'captured' pulse (one tone), each countdown beat its own pulse.
+ */
+export function cuesDue(lastId: number, cues: readonly { id: number; kind: FlashKind }[] | undefined): { id: number; kind: FlashKind }[] {
+  return (cues ?? []).filter((c) => c.id > lastId);
+}
+
 export function cueRep(mark: RepMark): void {
   if (mark === 'notRead') { cueFlash('retry'); return; }
   cueFlash('captured');
