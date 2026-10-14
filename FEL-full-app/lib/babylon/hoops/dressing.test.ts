@@ -85,6 +85,7 @@ describe('the judges\' table', () => {
     expect(flipScale(0)).toBeLessThan(0.01);
     expect(flipScale(-1)).toBeLessThan(0.01);
     expect(flipScale(FLIP_SEC)).toBeCloseTo(1 + FLIP_OVERSHOOT, 5);
+    expect(flipScale(FLIP_SEC)).toBeGreaterThan(1.05);   // it overshoots by a hair (a flip, not a fade) — pinned by a literal, not by the constant
     expect(flipScale(FLIP_SEC + 5)).toBe(1);
     let prev = 0; for (let t = 0; t <= FLIP_SEC; t += 0.01) { const v = flipScale(t); expect(v).toBeGreaterThanOrEqual(prev - 1e-9); prev = v; }
   });

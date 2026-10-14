@@ -39,12 +39,13 @@ describe('RimFx', () => {
   });
   it('a big make has an echo ring a beat behind; a soft one does not', () => {
     const s = rig(); const h = mountRimFx(s, RIM, 'desktop');
-    h.make('soft'); for (let i = 0; i < 20; i++) h.update(1 / 60);
+    h.make('soft'); for (let i = 0; i < 12; i++) h.update(1 / 60);
     const soft = s.meshes.filter((m) => m.name.startsWith('fr_shock_') && m.isEnabled()).length;
+    for (let i = 0; i < 60; i++) h.update(1 / 60);   // let it die: the next count is the next make's alone
     h.make('big'); for (let i = 0; i < 12; i++) h.update(1 / 60);
     const big = s.meshes.filter((m) => m.name.startsWith('fr_shock_') && m.isEnabled()).length;
-    expect(soft).toBeLessThanOrEqual(1);
-    expect(big).toBeGreaterThanOrEqual(2);
+    expect(soft).toBe(1);
+    expect(big).toBe(2);
     h.dispose();
   });
   it('the streak lights the fire: embers one short, flames at the streak, out when it breaks; the sock holds while it burns', () => {

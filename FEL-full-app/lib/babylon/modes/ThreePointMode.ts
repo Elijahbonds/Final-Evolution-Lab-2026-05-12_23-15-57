@@ -990,7 +990,7 @@ function contactMake(ctx: ModeContext, f: Flight): void {
   // held while it plays). Skippable by any press; ReplayDirector puts every body, the ball and the camera back where they were.
   if (f.money && !f.endsRun && !f.quiet && S.round !== 'practice') {
     const plan = replayGate.consider(GAME_LEN - S.clock, { kind: 'money', weight: S.streak, floor: FIRE_STREAK, sec: 2.2 }, S.clock);
-    if (plan) void ctx.highlight?.({ lastSeconds: plan.lastSeconds });
+    if (plan) void ctx.highlight?.({ lastSeconds: plan.lastSeconds, angles: ['tight', 'high'], objective: RIM });   // (a long lens, then from above: the default side and low cuts look back at the venue's signs from behind)
   }
   // THE NET ANSWERS (suite pass, 2026-09-16): 1v1, 3v3 and the dunk contest burst the net on a make; the shootout —
   // the mode that is nothing but makes — did not. Sparks on the money ball and the perfect release.
