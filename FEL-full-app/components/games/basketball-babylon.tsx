@@ -15,11 +15,15 @@ import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } 
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode } from './hud-format';
+import { HUD_TEXT_ALPHA, HudBanner, HudChip, HudFrame, HudLine, HudPlate, HudText, ScoreValue, Scorebug, hudColor, type HudTone } from './tv-hud';
+import { HoopsShotMeter } from './hoops-shot-meter';
 import { MicCaption, MicToggle } from './mic-caption';   // THE MIC (2026-09-24): what the court's MC just said, and the switch for the voice
 import { pipBias } from '@/lib/babylon/modes/onevoneRules';   // IMPROVE (2026-10-06) #10
 
-/** IMPROVE (2026-10-06) #10: a release pip's colour — the world meter's verdict colours (ShotMeter3D VERDICT_HEX). */
-const PIP_HEX: Record<string, string> = { p: '#39ff88', g: '#8cff5c', e: '#ffb340', l: '#ffb340', b: '#ff4b4b' };
+/** IMPROVE (2026-10-06) #10: a release pip's colour — the world meter's verdicts (ShotMeter3D) on the HUD palette: perfect and good
+ *  green (perfect solid, good a step softer), early and late amber, way late red. */
+const PIP_TONE: Record<string, [HudTone, number]> = { p: ['good', 1], g: ['good', 0.6], e: ['heat', 1], l: ['heat', 1], b: ['danger', 1] };
+const pipColor = (c: string): string => { const [tone, alpha] = PIP_TONE[c] ?? ['text', 1]; return hudColor(tone, alpha); };
 
 type Hud = Record<string, HudValue>;
 
@@ -108,56 +112,44 @@ export default function BasketballBabylon({ onEnd }: GameProps) {
     <div className="relative h-[calc(100dvh-3.25rem)] w-full overflow-hidden rounded-none border-0 bg-transparent">
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full touch-none" />
 
+      {/* TV HUD (A9.13, lane/hud-hoops): the 1v1's readouts on the shared system — same keys, same gates, same slots. */}
+      <HudFrame>
       {/* HUD bezel */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-between px-4 py-3">
-        <span className="fel-panel fel-stat px-3 py-1 text-lg">
-          {hnode(hud.score, 0)} – {hnode(hud.foeScore, 0)}
-        </span>
+      <div className="absolute inset-x-0 top-0 flex items-center justify-between px-4 py-3">
+        <Scorebug>
+          <ScoreValue value={hnode(hud.score, 0)} size="stat" />
+          <HudText size="stat" alpha={HUD_TEXT_ALPHA.faint}>–</HudText>
+          <ScoreValue value={hnode(hud.foeScore, 0)} size="stat" />
+        </Scorebug>
         <span className="flex flex-col items-end gap-1">
-          <span className="fel-panel px-3 py-1 font-mono text-xs text-[var(--fel-gold)]">{hud.winBy2 === true ? 'TO 11 · WIN BY 2' : 'TO 11'}</span>
+          <HudChip tone="score" size="body">{hud.winBy2 === true ? 'TO 11 · WIN BY 2' : 'TO 11'}</HudChip>
           {/* IMPROVE (2026-10-06) #10: the last five releases, oldest first — green in the window, amber early / late, red way late —
               and the lean once there are three to read, so a player can see their timing bias */}
           {phase === 'playing' && typeof hud.shotPips === 'string' && hud.shotPips && (
-            <span className="fel-panel flex items-center gap-1 px-2 py-1" aria-label={`last releases: ${hud.shotPips}`}>
+            <HudPlate as="span" className="flex items-center gap-1 px-2 py-1" title={`last releases: ${hud.shotPips}`}>
               {hud.shotPips.split('').map((c, i) => (
-                <span key={i} className="inline-block h-2 w-2 rounded-full" style={{ background: PIP_HEX[c] ?? '#ffffff' }} />
+                <span key={i} className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: pipColor(c) }} />
               ))}
-              {pipBias(hud.shotPips) && <span className="ml-1 font-mono text-[9px] text-white/70">{pipBias(hud.shotPips)}</span>}
-            </span>
+              {pipBias(hud.shotPips) && <HudText size="caption" alpha={0.7} className="ml-1">{pipBias(hud.shotPips)}</HudText>}
+            </HudPlate>
           )}
         </span>
       </div>
 
       {/* shot meter */}
-      {meter !== null && phase === 'playing' && (() => {
-        // THE SHOT METER (owner, 2026-09-18): the bar carries the GREEN release window the mode publishes
-        // (`shotMeterGreen` = "center,half" in 0..1) and a marker on the fill — the 3D bar beside the shooter's head
-        // (visual/ShotMeter3D) shows the same numbers in the world
-        const g = typeof hud.shotMeterGreen === 'string' ? hud.shotMeterGreen.split(',').map(Number) : null;
-        const green = g && g.length === 2 && g.every((v) => Number.isFinite(v)) ? { left: (g[0] - g[1]) * 100, width: g[1] * 200 } : null;
-        return (
-          <div className="pointer-events-none absolute inset-x-0 bottom-24 flex justify-center">
-            <div className="relative h-3 w-64 overflow-hidden rounded-full bg-black/55 ring-1 ring-white/30">
-              {green && <div className="absolute inset-y-0 bg-[#39ff88]/70" style={{ left: `${green.left}%`, width: `${green.width}%` }} />}
-              <div className="h-full bg-[var(--fel-cyan)]/90" style={{ width: `${meter * 100}%` }} />
-              <div className="absolute inset-y-0 w-[3px] -translate-x-1/2 bg-white shadow-[0_0_6px_#fff]" style={{ left: `${meter * 100}%` }} />
-            </div>
-          </div>
-        );
-      })()}
-
-      {typeof hud.banner === 'string' && hud.banner && phase === 'playing' && (
-        <div className="pointer-events-none absolute inset-x-0 top-1/3 text-center">
-          <span className="fel-heading text-3xl font-bold text-[var(--fel-cyan)] drop-shadow">{hud.banner}</span>
+      {meter !== null && phase === 'playing' && (
+        <div className="absolute inset-x-0 bottom-24 flex justify-center">
+          <HoopsShotMeter t={meter} green={hud.shotMeterGreen} />
         </div>
       )}
+
+      {phase === 'playing' && <HudBanner text={typeof hud.banner === 'string' ? hud.banner : ''} tone="you" plate={false} className="top-1/3" />}
       {/* IMPROVE (2026-10-06) #1: ONE line for the state you are in (the mode's hint — it used to be every control at once, and
           this host never drew it) */}
       {typeof hud.hint === 'string' && hud.hint && phase === 'playing' && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-16 px-3 text-center">
-          <span className="fel-panel px-3 py-1 font-mono text-[10px] text-white/75">{hud.hint}</span>
-        </div>
+        <HudLine text={hud.hint} size="caption" alpha={0.75} className="bottom-16" />
       )}
+      </HudFrame>
       {phase === 'playing' && <MicCaption text={hud.mic} who={hud.micWho} />}
       {phase === 'playing' && <MicToggle />}
 

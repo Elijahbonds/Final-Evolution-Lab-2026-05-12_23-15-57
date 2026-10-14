@@ -75,9 +75,10 @@ describe('S-7: plain words', () => {
   it('the double colon is gone: no line on the start card says "X: y: z"', () => {
     const h = renderToStaticMarkup(createElement(StartStep, { onJump: () => {}, onFull: () => {} }));
     const lines = h.split(/<\/?(?:p|li|h2|button|section|div)[^>]*>/).map((x) => text(x).trim()).filter(Boolean);
-    expect(lines).toContain(COPY.MORE_CHECKS_LINE);
+    expect(h).not.toContain('data-more-checks');   // MIRROR-NO-PLACEHOLDER: no promise of checks to come
     for (const l of lines) expect(l.match(/:/g)?.length ?? 0, l).toBeLessThan(2);
-    expect(text(h)).not.toMatch(/full screen: coming later/i);
+    expect(text(h)).not.toMatch(/coming later|coming soon/i);
+    for (const hidden of ['Hip hinge', 'Drop landing', 'Hop & stick', 'Single-leg hop']) expect(text(h)).not.toContain(hidden);   // T4/T6/T7 hidden until built
   });
 });
 

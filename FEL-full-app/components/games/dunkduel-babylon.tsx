@@ -13,6 +13,8 @@ import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue, t
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode, hnum } from './hud-format';
+import { HUD_TEXT_ALPHA, HudBanner, HudChip, HudFrame, HudMeter, HudPlate, HudText } from './tv-hud';
+import { JudgeCards } from './judge-cards';
 import { MicCaption, MicToggle } from './mic-caption';
 
 type Hud = Record<string, HudValue>;
@@ -103,69 +105,53 @@ export default function DunkDuelBabylon({ onEnd }: GameProps) {
     <div className="relative aspect-[16/10] w-full overflow-hidden rounded-xl border border-white/10 bg-black">
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full touch-none" />
 
+      {/* TV HUD (A9.13, lane/hud-hoops): the duel's readouts on the shared system — same keys, same gates, same slots. */}
+      <HudFrame>
       {showHud && (
-        <div className="pointer-events-none absolute inset-x-0 top-0 flex justify-between px-4 py-3 text-sm font-mono text-white">
+        <div className="absolute inset-x-0 top-0 flex justify-between px-4 py-3">
           <div className="flex flex-col gap-1">
-            <span className="fel-panel px-2 py-0.5 text-cyan-300">P1: {hnum(hud.p1Score, 0)}</span>
+            <HudChip tone="you" size="value" className="self-start">P1: {hnum(hud.p1Score, 0)}</HudChip>
           </div>
           <div className="text-center">
-            <span className="fel-heading text-xl font-black">{hnode(hud.activePlayer, 'P1')}</span>
-            <div className="text-[11px] text-white/60">
-              DUNK {hnode(hud.dunkNum, '1/2')} · {hnode(hud.style, 'POWER')} · {hnode(hud.prop, 'NO PROP')}
+            <HudText size="stat" className="uppercase">{hnode(hud.activePlayer, 'P1')}</HudText>
+            <div>
+              <HudText size="label" alpha={HUD_TEXT_ALPHA.faint}>
+                DUNK {hnode(hud.dunkNum, '1/2')} · {hnode(hud.style, 'POWER')} · {hnode(hud.prop, 'NO PROP')}
+              </HudText>
             </div>
-            {typeof hud.hint === 'string' && hud.hint && <div className="text-xs text-gray-300 mt-1 max-w-xs">{hud.hint}</div>}
+            {typeof hud.hint === 'string' && hud.hint && (
+              <HudPlate className="mx-auto mt-1 max-w-xs px-2 py-0.5">
+                <HudText size="body" alpha={0.85}>{hud.hint}</HudText>
+              </HudPlate>
+            )}
             {/* charge meter — the loaded jump, while it loads */}
             {typeof hud.charge === 'number' && hud.charge > 0 && (
-              <div className="mx-auto mt-1 h-1.5 w-36 overflow-hidden rounded bg-white/10">
-                <div
-                  className="h-full bg-[var(--fel-cyan)] transition-none"
-                  style={{ width: `${Math.min(100, hud.charge)}%` }}
-                />
-              </div>
+              <HudMeter className="mx-auto mt-1 items-center" height="thin" width="9rem" value={hud.charge} max={100} tone="you" fillStyle={{ transition: 'none' }} />
             )}
           </div>
-          <div className="flex flex-col gap-1 items-end">
-            <span className="fel-panel px-2 py-0.5 text-pink-400">P2: {hnum(hud.p2Score, 0)}</span>
+          <div className="flex flex-col items-end gap-1">
+            <HudChip tone="them" size="value">P2: {hnum(hud.p2Score, 0)}</HudChip>
           </div>
         </div>
       )}
 
-      {/* SLAM pulse — the QTE window, impossible to miss */}
+      {/* SLAM pulse — the QTE window, impossible to miss (the ping stills under reduced motion) */}
       {hud.slamPulse === true && phase === 'playing' && (
-        <div className="pointer-events-none absolute inset-x-0 top-[30%] text-center">
-          <span className="fel-heading animate-ping text-4xl font-black text-[var(--fel-gold)] drop-shadow">SLAM!</span>
+        <div className="absolute inset-x-0 top-[30%] text-center">
+          <HudText size="hero" tone="score" className="inline-block animate-ping motion-reduce:animate-none">SLAM!</HudText>
         </div>
       )}
 
       {/* the judges' cards — the contest's moment of truth (same staged
           reveal as Dunk Contest's bezel) */}
       {Array.isArray(hud.judgeReveal) && (hud.judgeReveal as HudScoreCard[]).length > 0 && (
-        <div className="pointer-events-none absolute inset-x-0 top-[20%] flex flex-col items-center gap-2">
-          <div className="flex items-end justify-center gap-1.5">
-            {(hud.judgeReveal as HudScoreCard[]).map((j) => (
-              <div key={j.name} className="fel-panel flex flex-col items-center px-2.5 py-1">
-                <span className="font-mono text-[9px] uppercase tracking-wider text-[var(--fel-cyan)]">{j.name}</span>
-                <span className="text-2xl font-black leading-none text-[var(--fel-gold)]">{j.score}</span>
-              </div>
-            ))}
-            <div className="fel-panel ml-1 flex flex-col items-center border-[var(--fel-gold)]/40 px-3 py-1">
-              <span className="font-mono text-[9px] uppercase tracking-wider text-white/50">total</span>
-              <span className="text-2xl font-black leading-none text-white">
-                {(hud.judgeReveal as HudScoreCard[]).reduce((s, j) => s + Number(j.score), 0)}
-              </span>
-            </div>
-          </div>
-          <span className="fel-panel max-w-[85%] truncate px-3 py-1 font-mono text-[11px] text-white/70">
-            {(hud.judgeReveal as HudScoreCard[])[(hud.judgeReveal as HudScoreCard[]).length - 1].line}
-          </span>
+        <div className="absolute inset-x-0 top-[20%] flex flex-col items-center gap-2">
+          <JudgeCards cards={hud.judgeReveal as HudScoreCard[]} />
         </div>
       )}
 
-      {typeof hud.banner === 'string' && hud.banner && phase === 'playing' && (
-        <div className="pointer-events-none absolute inset-x-0 top-1/3 text-center">
-          <span className="fel-heading text-3xl font-bold text-[var(--fel-cyan)] drop-shadow">{hud.banner}</span>
-        </div>
-      )}
+      {phase === 'playing' && <HudBanner text={typeof hud.banner === 'string' ? hud.banner : ''} tone="you" plate={false} className="top-1/3" />}
+      </HudFrame>
 
       {/* THE MIC (2026-09-24): what the court's MC just said, and the switch for the voice */}
       {phase === 'playing' && <MicCaption text={hud.mic} who={hud.micWho} />}
