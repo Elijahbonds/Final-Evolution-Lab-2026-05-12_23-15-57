@@ -213,6 +213,61 @@ describe('the ledger: who is baked, who is drawn per frame', () => {
     expect(w.movers.has(palm)).toBe(true);
   });
 
+  /** A caster as Babylon serves it: getWorldMatrix() is the matrix cached at the last render until a render (or a forced
+   *  recompute) brings it up to date — a re-park between two frames reads stale for one look. */
+  function staleCaster(name: string) {
+    const live = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1, 0, 1]);
+    const cached = { updateFlag: 0, m: new Float32Array(live) };
+    let enabled = true;
+    const sync = () => { if (cached.m.some((v, i) => v !== live[i])) { cached.m.set(live); cached.updateFlag++; } };
+    return {
+      name, isVisible: true, isEnabled: () => enabled, isDisposed: () => false,
+      getWorldMatrix: () => cached, computeWorldMatrix: (force?: boolean) => { if (force) sync(); return cached; },
+      /** the scene's render: every cached matrix catches up */
+      render: sync,
+      /** re-parked at identity (VenueProps): the live transform changes, the cache does not until a render */
+      repark() { live[13] = 0; },
+      enable(v: boolean) { enabled = v; },
+    };
+  }
+
+  it('the look at which a caster is shown reads its pose as it is: a stale cached matrix is not a second pose', () => {
+    const pier = staleCaster('pier_deck');
+    pier.enable(false);
+    const l = new CasterLedger(); l.arm([pier]);
+    pier.render(); expect(l.frame()).toBe('');
+    pier.repark(); pier.enable(true);              // re-parked and shown between two frames
+    expect(l.frame()).toBe('toggled');             // read fresh on the show: (0, 0, 0), the placement
+    pier.render();
+    expect(l.frame()).toBe('');                    // the render catches the cache up to the same pose: no motion
+    expect(l.isStatic(pier)).toBe(true);
+    // the warm-up, first sighting already shown (imported and re-parked between two frames)
+    const sail = staleCaster('sail_hull');
+    sail.repark();
+    const w = new WarmupWatch();
+    for (let i = 0; i < 6; i++) { w.frame([sail], i * 17); sail.render(); }
+    expect(w.movers.size).toBe(0);
+  });
+
+  it('a late caster whose thin buffer is set while it waits to settle restarts its settle, and is not demoted once settled', () => {
+    const storage: { instancesCount: number; matrixBuffer: { isUpdatable(): boolean } | null } = { instancesCount: 0, matrixBuffer: null };
+    const lamp = caster('lightPostModern', { _thinInstanceDataStorage: storage });
+    const l = new CasterLedger(); l.arm([]);
+    l.add(lamp);
+    for (let i = 1; i <= 30; i++) l.frame(i * 16.7);
+    Object.assign(lamp, { hasThinInstances: true });
+    storage.matrixBuffer = { isUpdatable: () => false }; storage.instancesCount = 13;   // the re-park gives it its copies
+    const t0 = 31 * 16.7;
+    expect(l.frame(t0)).toBe('');
+    for (let i = 1; i < Math.floor(SETTLE_MS / 16.7) - 2; i++) expect(l.frame(t0 + i * 16.7)).toBe('');   // the settle restarted
+    expect(l.isStatic(lamp)).toBe(false);
+    let settledAt = -1;
+    for (let i = 0; i < 60 && settledAt < 0; i++) if (l.frame(t0 + SETTLE_MS + i * 16.7) === 'settled') settledAt = i;
+    expect(settledAt).toBeGreaterThanOrEqual(0);
+    for (let i = 0; i < 100; i++) expect(l.frame(t0 + SETTLE_MS * 2 + i * 16.7)).toBe('');   // and it stays baked
+    expect(l.isStatic(lamp)).toBe(true);
+  });
+
   it('the warm-up names what moved while it watched', () => {
     const a = caster('a'), b = caster('b');
     const w = new WarmupWatch();

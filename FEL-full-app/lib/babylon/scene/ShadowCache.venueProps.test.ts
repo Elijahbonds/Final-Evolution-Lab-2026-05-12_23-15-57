@@ -30,6 +30,8 @@ const glb = (url: string): string | null => {
 const copier: MapCopier = { ready: () => true, save: () => true, restore: () => true, lost() {}, dispose() {} };
 /** The kits held back: the venue's far dressing (the pier and the boats) — the set resolves only when they land. */
 const SLOW = /\/venice\/$/;
+/** …and the heaviest (the Meshy bus and car): case (c) lets the far kits import while the set still waits on these. */
+const LAST = /\/meshy\/$/;
 const SET = 'venice-court-meshy';
 
 afterEach(() => { vi.restoreAllMocks(); });
@@ -49,15 +51,17 @@ function stage() {
   const sc = mountShadowCache(scene, gen, sun, { copier, now: () => clockMs });
   const frames = (n: number) => { for (let i = 0; i < n; i++) { clockMs += 16.7; scene.render(); } };
   // the loader, real, with the far kits held until release()
-  let release!: () => void;
-  const gate = new Promise<void>((ok) => { release = ok; });
-  const fast: Promise<unknown>[] = [];
+  let openFar!: () => void, openLast!: () => void;
+  const far = new Promise<void>((ok) => { openFar = ok; }), last = new Promise<void>((ok) => { openLast = ok; });
+  const release = () => { openFar(); openLast(); };
+  const fast: Promise<unknown>[] = [], farLoads: Promise<unknown>[] = [];
   const realI = SceneLoader.ImportMeshAsync.bind(SceneLoader);
   vi.spyOn(SceneLoader, 'ImportMeshAsync').mockImplementation(((names: string, root: string, file: string, sc2: Scene) => {
     const d = glb(`${root}${file}`);
     if (!d) return Promise.reject(new Error(`missing ${root}${file}`));
     const load = () => realI(names, '', d, sc2, undefined, '.glb');
-    if (SLOW.test(root)) return gate.then(load);
+    if (SLOW.test(root)) { const p = far.then(load); farLoads.push(p); return p; }
+    if (LAST.test(root)) return last.then(load);
     const p = load(); fast.push(p); return p;
   }) as never);
   /** Mount the set; resolves once the fast kits have landed (imported, hidden as templates) and the slow ones wait. */
@@ -70,7 +74,9 @@ function stage() {
   const masters = (): Mesh[] => (scene.meshes as Mesh[]).filter((m) => m.hasThinInstances && m.isEnabled());
   /** What the cache draws into the map every frame, by name stem. */
   const perFrame = () => Object.keys(sc.movingByName());
-  return { scene, sc, frames, release, mount, masters, perFrame };
+  /** Case (c): the far kits import now (hidden templates, late casters), the set still waits on the last ones. */
+  const importFar = async () => { openFar(); await Promise.allSettled(farLoads); await new Promise((r) => setTimeout(r, 0)); };
+  return { scene, sc, frames, release, importFar, openLast, mount, masters, perFrame };
 }
 
 const WARM = Math.ceil(WARMUP_MS / 16.7) + 2;
@@ -119,6 +125,27 @@ describe("the shadow cache bakes the venue's props whenever their kits land (3-P
     expect(perFrame()).toEqual([]);
     expect(st.moving).toBe(0);
     expect(st.bakes - bakes).toBeLessThanOrEqual(3);   // placed + settled: a couple of re-bakes, never a thrash
+    expect(st.state).toBe('cached');
+  }, 60000);
+
+  // Measured on the dunk (venice-dunk, forced race): its kits imported AFTER the bake, as late casters, and the set re-parked
+  // seconds later. The late list watched the matrix but not the thin buffer, so a master settled with its old (empty) buffer
+  // on record and the statics' first look read the buffer as motion: 22 per-frame casters, 100 -> 134 draws.
+  it('imported AFTER the bake and re-parked later (the set waiting on a slower kit): settled as statics, not demoted', async () => {
+    const { scene, sc, frames, importFar, openLast, mount, masters, perFrame } = stage();
+    const { done } = await mount();
+    sc.arm();
+    frames(WARM);                    // baked without the far kits
+    await importFar();               // the pier and the boats import: hidden templates, added after the bake
+    expect(scene.meshes.some((m) => m.name.startsWith('pier_'))).toBe(true);
+    frames(10);                      // …the ledger has them as late casters, at their GLB pose, no buffer yet
+    openLast();                      // the bus and the car land: the whole set re-parks, takes its buffers and shows
+    await done;
+    frames(SETTLE * 2);
+    const st = sc.stats();
+    expect(masters().length).toBeGreaterThan(5);
+    expect(perFrame()).toEqual([]);
+    expect(st.moving).toBe(0);
     expect(st.state).toBe('cached');
   }, 60000);
 });

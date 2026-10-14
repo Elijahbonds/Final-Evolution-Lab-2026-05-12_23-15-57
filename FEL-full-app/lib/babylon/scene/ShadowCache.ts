@@ -45,6 +45,8 @@ export interface CasterLike {
   isEnabled(): boolean;
   isDisposed(): boolean;
   getWorldMatrix(): { updateFlag: number; m: ArrayLike<number> };
+  /** Babylon's forced recompute (a Babylon mesh always has it; the ledger's tests' stand-ins need not). */
+  computeWorldMatrix?(force?: boolean): unknown;
   skeleton?: unknown;
   morphTargetManager?: unknown;
   hasThinInstances?: boolean;
@@ -106,6 +108,13 @@ export const POSE_EPSILON = 1e-4;
 
 /** Is the caster drawing into the map? A disabled or invisible caster renders nothing, so it cannot move in it. */
 const shown = (m: CasterLike): boolean => m.isEnabled() && m.isVisible;
+/**
+ * The caster's pose as it IS, for the look at which it is shown. getWorldMatrix() hands back the matrix cached at the last
+ * render until the next one recomputes it — measured: a kit master re-parked at identity still read its GLB pose (0, 1, 0),
+ * update flag unchanged, then (0, 0, 0) a frame later. Read on the show, that stale pose and the true one a look later were
+ * two shown poses, i.e. motion. One forced recompute per show (and per warm-up first look; not per frame) reads the placement whole.
+ */
+const freshPose = (m: CasterLike): { updateFlag: number; m: ArrayLike<number> } => { m.computeWorldMatrix?.(true); return m.getWorldMatrix(); };
 
 /**
  * PLACED WHILE HIDDEN (tp-shadow-fix, 2026-10-14). VenueProps loads each kit GLB asynchronously: the rig's classifier
@@ -190,7 +199,7 @@ export class CasterLedger {
       const on = shown(m);
       if (!on || !e.on) {
         // hidden at one of the two looks: follow the pose, do not judge it (PLACED WHILE HIDDEN); both records update
-        const a = e.pose.moved(m.getWorldMatrix()), b = e.pose.thinMoved(m);
+        const a = e.pose.moved(on && !e.on ? freshPose(m) : m.getWorldMatrix()), b = e.pose.thinMoved(m);
         if (a || b) e.shifted = true;
         if (on === e.on) continue;
         e.on = on;
@@ -211,7 +220,11 @@ export class CasterLedger {
       const m = this.moving[i];
       const e = this.mv.get(m)!;
       if (m.isDisposed()) { this.mv.delete(m); this.moving.splice(i, 1); this.version++; continue; }
-      if (e.pose.moved(m.getWorldMatrix())) { e.still = 0; e.stillSince = now; continue; }
+      // a late caster's copies replaced (its thin buffer set, as VenueProps does on the re-park) are motion like its matrix:
+      // the settle count restarts and the record follows — else it settled on the old buffer, and the statics' first look
+      // read the new one as motion (measured on the dunk, kits imported after the bake: 22 per-frame casters, 100 -> 134 draws)
+      const a = e.pose.moved(m.getWorldMatrix()), b = e.pose.thinMoved(m);
+      if (a || b) { e.still = 0; e.stillSince = now; continue; }
       if (e.mover || movesByConstruction(m)) continue;
       if (++e.still >= SETTLE_FRAMES && now - e.stillSince >= SETTLE_MS) {
         this.mv.delete(m); this.moving.splice(i, 1);
@@ -256,10 +269,11 @@ export class WarmupWatch {
     for (const m of all) {
       const was = this.poses.get(m), on = shown(m), wasOn = this.shown.get(m);
       this.shown.set(m, on);
-      if (!was) { this.poses.set(m, new Pose(m.getWorldMatrix())); continue; }
+      const wm = on && wasOn !== true ? freshPose(m) : m.getWorldMatrix();   // first seen, or shown at this look: its pose as it is
+      if (!was) { this.poses.set(m, new Pose(wm)); continue; }
       // PLACED WHILE HIDDEN: only a caster shown at both looks can have moved in the map (a kit template re-parked and
       // shown between them is being placed); the pose record follows it either way
-      if (was.moved(m.getWorldMatrix()) && judge && on && wasOn) this.movers.add(m);
+      if (was.moved(wm) && judge && on && wasOn) this.movers.add(m);
     }
   }
 }
