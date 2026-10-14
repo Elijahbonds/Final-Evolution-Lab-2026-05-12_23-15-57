@@ -149,6 +149,7 @@ import {
 } from '../dance/chartPlay';
 import { readBest, recordBest, bestLine } from '../dance/danceBests';
 import { moveFadeSec, STEP_FADE_SEC } from '../dance/floorPhase';
+import { padStore } from '../dance/ui/padStore';   // lane/dance-extras: what the phone pad's buttons are for, handed to TouchOverlay's dance pad
 
 /** Clips are authored at 120 BPM; the animator rescales them per track. */
 const CLIP_REF_BPM = 120;
@@ -1101,8 +1102,16 @@ export const DanceMode: ModeDefinition = (() => {
     return `${pickBanner(track)}  ·  ${level.toUpperCase()}${matchMode ? '  ·  MATCH A B X Y' : ''}${best ? `  ·  ${best}` : ''}`;
   }
 
+  /** lane/dance-extras (2026-10-14): what the phone pad's four buttons are for right now (ui/padModel.ts, drawn by
+   *  TouchOverlay's dance branch, handed over by ui/padStore.ts). Display only: it reads state the room already holds and the
+   *  pad sends the same events a gamepad does, so nothing here is read back by the judge. */
+  function publishPad(mode: 'pick' | 'play'): void {
+    padStore.set({ mode: mode === 'pick' ? 'pick' : matchMode ? 'match' : 'any', matchOn: matchMode, free: {} });
+  }
+
   function showPick(ctx: ModeContext): void {
     playPreview(track);
+    publishPad('pick');
     ctx.setHud({
       round: pickRound(),
       banner: pickLine(),
@@ -1133,6 +1142,7 @@ export const DanceMode: ModeDefinition = (() => {
     pickSec = pickTimer(pickSec, { type: 'browse' }, PICK_TIMEOUT_SEC).sec;
     SoundKit.play('uiTick', { pitch: what === 'match' ? 1.4 : what === 'up' ? 1.1 : 1, volume: 0.3 });
     ctx.setHud({ banner: pickLine() });
+    publishPad('pick');
   }
 
   /** IMPROVE (2026-10-06, #8): GO AGAIN in place — a finished run back to the pick screen on the same stage (the engine,
@@ -1240,6 +1250,7 @@ export const DanceMode: ModeDefinition = (() => {
     startAt = 0;
     countArmed = false;
     ctx.setHud({ round: track.name, banner: '4', nextStep: '', nextStepIn: null });
+    publishPad('play');
     console.log(`[FEL-DANCE] track ${track.id} ${track.bpm}bpm ${track.bars} bars d${track.difficulty} · kit voices ${kit?.voices ?? 0}`);
   }
 
@@ -1348,6 +1359,7 @@ export const DanceMode: ModeDefinition = (() => {
     camPreset: 'overShoulder',
 
     async load(ctx: ModeContext) {
+      padStore.reset();   // a fresh room: the phone pad is back to its default until the pick screen says what it is for
       // MUSIC-SUITE P2 FIX PASS (2026-09-25): 'playback' for THIS room (the band through an iPhone's silent switch —
       // assumption, not tried on a device), claimed before SoundKit's context is asked for and given back on dispose.
       // It was set inside SoundKit for every mode, where (assumed) it also stopped the player's own music app.
@@ -1735,6 +1747,7 @@ export const DanceMode: ModeDefinition = (() => {
     },
 
     dispose() {
+      padStore.reset();
       stopPreview();   // MUSIC-SUITE P7 (six-songs): leaving the room is a blur too
       stoopQueue.clear(); VoiceKit.stop('booth', 0.12);   // MUSIC-SUITE P8: Stoop never bleeds into the next room
       releaseSession?.(); releaseSession = null;
