@@ -1005,6 +1005,7 @@ export const KarateVSMode: ModeDefinition = (() => {
 
       meState = new FighterState(100);
       foeState = new FighterState(100);
+      if (process.env.NODE_ENV === 'development') (ctx.scene.metadata ??= {}).kvsProbe = { setChi: (v: number) => { meState.chi = v; }, setFoeHp: (v: number) => { foeState.hp = v; }, phase: () => phase, wins: () => [myWins, foeWins] };   // WAVE 3: the proof rig stages a full DRAGON and a one-hit KO (dev builds only)
       // IMPROVE (2026-10-06): the shared RivalCombatBrain (the RivalFightBrain inside it, plus a chi bar it SPENDS — a dash
       // when it is far out), as Showdown and Duel fight with. Its default moves are KARATE_ATTACKS' three.
       brain = new RivalCombatBrain({ difficulty: BASE_RIVAL_DIFFICULTY, canSpecial: hasFightMove('dragon', foeRatings) });

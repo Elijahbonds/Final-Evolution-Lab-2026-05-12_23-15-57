@@ -88,14 +88,14 @@ describe('the fight intro', () => {
 
 describe('the DRAGON cut', () => {
   const cut = { atk: ME, def: FOE, side: 1, windupSec: 0.55 };
-  it('winds up low on the attacker, profiles both on the blow, then eases into the play camera and ends', () => {
+  it('winds up low over the attacker\'s shoulder (the defender beyond him, never between the lens and him), profiles both on the blow, then eases into the play camera and ends', () => {
     expect(dragonCutSec(cut)).toBeCloseTo(0.55 + DRAGON_CUT.impactSec + DRAGON_CUT.outSec, 9);
     const wind = dragonCutAt(0.1, cut, LIVE).shot;
     const hit = dragonCutAt(0.55 + 0.2, cut, LIVE).shot;
     expect(wind).not.toBe('play'); expect(hit).not.toBe('play');
     if (wind === 'play' || hit === 'play') return;
     expect(wind.pos.y).toBeLessThan(1);                                  // a low angle
-    expect(Math.hypot(wind.pos.x - ME.x, wind.pos.z - ME.z)).toBeLessThan(3.2);   // close on the attacker
+    expect(Math.hypot(wind.pos.x - ME.x, wind.pos.z - ME.z)).toBeLessThan(3.4);   // close on the attacker
     expect(Math.abs(hit.pos.x)).toBeGreaterThan(4.5);                    // the impact shot is a profile off the line between them (the line runs along z)
     expect(dragonCutAt(dragonCutSec(cut), cut, LIVE).shot).toBe('play');
     const end = dragonCutAt(dragonCutSec(cut) - 1e-4, cut, LIVE).shot;
@@ -114,7 +114,16 @@ describe('the DRAGON cut', () => {
   it('a very short windup still gets its beat of low angle', () => {
     expect(dragonCutSec({ windupSec: 0.01 })).toBeCloseTo(DRAGON_CUT.minWindupSec + DRAGON_CUT.impactSec + DRAGON_CUT.outSec, 9);
   });
-  it('the attacker stays in front of the windup lens (the target is the attacker\'s torso)', () => {
+  it('the windup lens stands BEHIND the attacker (away from the defender): the defender is never between the camera and the attacker', () => {
+    for (const side of [1, -1]) for (const t of [0.05, 0.2, 0.45]) {
+      const s = dragonCutAt(t, { ...cut, side }, LIVE).shot;
+      if (s === 'play') throw new Error('playing');
+      const toDef = { x: FOE.x - ME.x, z: FOE.z - ME.z };   // attacker -> defender
+      const camFromAtk = { x: s.pos.x - ME.x, z: s.pos.z - ME.z };
+      expect(camFromAtk.x * toDef.x + camFromAtk.z * toDef.z, `side ${side} t ${t}`).toBeLessThan(0);   // the camera is on the far side of the attacker from the defender
+    }
+  });
+  it('the attacker stays in front of the windup lens', () => {
     const s = dragonCutAt(0.2, cut, LIVE).shot;
     if (s !== 'play') { const dir = flatUnit({ x: s.target.x - s.pos.x, y: 0, z: s.target.z - s.pos.z }); const to = flatUnit({ x: ME.x - s.pos.x, y: 0, z: ME.z - s.pos.z }); expect(dir.x * to.x + dir.z * to.z).toBeGreaterThan(0.8); }
   });

@@ -155,12 +155,13 @@ export function dragonCutAt(t: number, c: DragonCut, live: LivePose): { shot: Sh
   const f = flatUnit(v(c.def.x - c.atk.x, 0, c.def.z - c.atk.z));
   const lb = Math.min(clamp01(t / 0.12), clamp01((total - t) / DRAGON_CUT.outSec));
   if (t < wind) {
-    // low, off the attacker's front shoulder, closing on the torso: the camera is on the side the fist is coming from
+    // low, over the attacker's back shoulder (135 degrees round from his front), closing on him: the fist comes back toward the lens and the
+    // defender stands beyond him in the frame, never between the lens and the attacker (a front-side camera put the defender's shoulder across the shot)
     const u = wind > 0 ? t / wind : 1;
-    const d = yawDir(f, 0.95 * c.side);
-    const r = lerp(2.9, 1.9, smoothstep(u));
+    const d = yawDir(f, 2.35 * c.side);
+    const r = lerp(3.3, 2.5, smoothstep(u));
     return {
-      shot: { pos: v(c.atk.x + d.x * r, lerp(0.55, 0.85, u), c.atk.z + d.z * r), target: v(c.atk.x + f.x * 0.25, 1.25, c.atk.z + f.z * 0.25), fov: lerp(0.66, 0.5, smoothstep(u)) },
+      shot: { pos: v(c.atk.x + d.x * r, lerp(0.5, 0.8, u), c.atk.z + d.z * r), target: v(c.atk.x + f.x * 0.9, 1.2, c.atk.z + f.z * 0.9), fov: lerp(0.7, 0.55, smoothstep(u)) },
       letterbox: lb,
     };
   }
@@ -196,7 +197,8 @@ export function dragonCutAt(t: number, c: DragonCut, live: LivePose): { shot: Sh
  * The 100th KO's camera, seconds. IN: the frame leaves the Hundred camera's pose round the fighter (no cut). ORBIT: a slow
  * half-turn round the fighter and the body that just fell, rising a little. OUT: back into the Hundred camera's frame.
  */
-export const FINISHER = { inSec: 0.35, orbitSec: 2.3, outSec: 0.55, sweepRad: 2.3, r0: 4.8, r1: 3.7, h0: 1.5, h1: 2.3, fov: 0.62 } as const;
+// (proof rig, a wave-1 horde round: at 4.8 m and 1.5 m the lens sat among the pursuers' shoulders; it stands back and up, looking down over the crowd)
+export const FINISHER = { inSec: 0.35, orbitSec: 2.3, outSec: 0.55, sweepRad: 2.3, r0: 5.8, r1: 4.8, h0: 2.8, h1: 3.8, fov: 0.62 } as const;
 export const FINISHER_SEC = FINISHER.inSec + FINISHER.orbitSec + FINISHER.outSec;
 
 export interface FinisherCut {

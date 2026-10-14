@@ -1939,6 +1939,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
       ctx.heroRef.current = player.root;
       youRing?.dispose(); youRing = null;
       ring?.dispose(); ring = mountPlayerRing(ctx.scene, player.root, { color: '#38bdf8', icon: readPlayerIcon() });   // PLAYER RING: the hp gauge at the feet, the glyph beside it
+      if (process.env.NODE_ENV === 'development') (ctx.scene.metadata ??= {}).endlessProbe = { hundredth: () => hundredth(ctx, player.root.position.add(new Vector3(1.2, 0, 1.6))) };   // WAVE 3: the proof rig calls the 100th-KO finisher without playing 100 KOs (dev builds only)
 
       partner = await CharacterLibrary.spawn(ctx.scene, CFG.heroUrl, { position: new Vector3(1.6, 0, 0.8), tint: '#22d3ee', startClip: IDLE_CLIP });
       neverBindPose(partner.animator, IDLE_CLIP);
