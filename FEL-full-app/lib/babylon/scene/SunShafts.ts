@@ -21,7 +21,7 @@
 //
 // Not a gameplay thing; GLSL only (Babylon's own shaders); presentation only.
 
-import { Color3, MeshBuilder, StandardMaterial, Texture, VolumetricLightScatteringPostProcess } from '@babylonjs/core';
+import { Color3, DynamicTexture, MeshBuilder, StandardMaterial, Texture, VolumetricLightScatteringPostProcess } from '@babylonjs/core';
 import type { Camera, DirectionalLight, Mesh, Observer, Scene } from '@babylonjs/core';
 import { MOODS, type VenueMood } from './moods';
 import type { QualityTier } from './QualityTier';
@@ -72,7 +72,7 @@ export function towardLight(dir: { x: number; y: number; z: number }): { x: numb
 }
 
 /** The pass's settings, one table. exposure is the strength of the shafts; the rest are Babylon's own knobs (decay: how far a ray carries). */
-export const SHAFT_LOOK = { ratio: 0.5, samples: 56, exposure: 0.17, decay: 0.965, weight: 0.52, density: 0.92, sunDistance: 150, sunSize: 46 } as const;
+export const SHAFT_LOOK = { ratio: 0.5, samples: 56, exposure: 0.17, decay: 0.965, weight: 0.52, density: 0.92, sunDistance: 150, sunSize: 60 } as const;
 
 export interface SunShaftsHandle { readonly post: VolumetricLightScatteringPostProcess; dispose(): void }
 
@@ -87,7 +87,7 @@ export function mountSunShafts(scene: Scene, tier: QualityTier, mood: VenueMood,
   const sun = scene.getLightByName('fel_sun') as DirectionalLight | null;
   if (!cam || !sun) return null;
   const toward = towardLight(sun.direction);
-  let mesh: Mesh | null = null, mat: StandardMaterial | null = null, post: VolumetricLightScatteringPostProcess;
+  let mesh: Mesh | null = null, mat: StandardMaterial | null = null, tex: DynamicTexture | null = null, post: VolumetricLightScatteringPostProcess;
   try {
     mesh = MeshBuilder.CreatePlane('sky_sun_shaft_disc', { size: 1 }, scene);   // 'sky*': the shadow rig never lists it
     mesh.billboardMode = 7;   // BILLBOARDMODE_ALL
@@ -95,11 +95,18 @@ export function mountSunShafts(scene: Scene, tier: QualityTier, mood: VenueMood,
     mesh.isPickable = false; mesh.receiveShadows = false; mesh.applyFog = false;
     mat = new StandardMaterial('sky_sun_shaft_disc_m', scene);
     mat.disableLighting = true; mat.emissiveColor = Color3.FromHexString(MOODS[mood].sun); mat.diffuseColor = Color3.Black(); mat.specularColor = Color3.Black();
+    // a soft round sun, not the bare plane's hard yellow square (measured on the rig): the shape is the texture's alpha
+    tex = new DynamicTexture('sky_sun_shaft_disc_t', { width: 128, height: 128 }, scene, true);
+    const g = tex.getContext() as unknown as CanvasRenderingContext2D;
+    const gr = g.createRadialGradient(64, 64, 2, 64, 64, 62);
+    gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.35, 'rgba(255,255,255,0.9)'); gr.addColorStop(0.7, 'rgba(255,255,255,0.25)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, 128, 128); tex.update(); tex.hasAlpha = true;
+    mat.opacityTexture = tex; mat.disableDepthWrite = true;
     mesh.material = mat;
     post = new VolumetricLightScatteringPostProcess('fel_sun_shafts', SHAFT_LOOK.ratio, cam, mesh, SHAFT_LOOK.samples, Texture.BILINEAR_SAMPLINGMODE, scene.getEngine(), false);
   } catch (e) {
     console.warn('[FEL-SHAFTS] sun shafts unavailable, continuing without them:', e);
-    mesh?.dispose(); mat?.dispose();
+    mesh?.dispose(); mat?.dispose(); tex?.dispose();
     return null;
   }
   post.exposure = SHAFT_LOOK.exposure; post.decay = SHAFT_LOOK.decay; post.weight = SHAFT_LOOK.weight; post.density = SHAFT_LOOK.density;
@@ -111,6 +118,6 @@ export function mountSunShafts(scene: Scene, tier: QualityTier, mood: VenueMood,
   console.info(`[FEL-SHAFTS] sun shafts mounted (${gate.on ? 'override' : 'measured'}; the sun ${Math.round(Math.asin(Math.max(-1, Math.min(1, toward.y))) * 180 / Math.PI)} degrees up)`);
   return {
     post,
-    dispose() { scene.onBeforeRenderObservable.remove(obs); try { post.dispose(cam); } catch { /* the camera went first */ } mesh?.dispose(); mat?.dispose(); mesh = null; },
+    dispose() { scene.onBeforeRenderObservable.remove(obs); try { post.dispose(cam); } catch { /* the camera went first */ } mesh?.dispose(); mat?.dispose(); tex?.dispose(); mesh = null; },
   };
 }
