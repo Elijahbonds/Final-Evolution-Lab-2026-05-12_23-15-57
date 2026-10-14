@@ -32,9 +32,9 @@ function stealRate(aggr: number, dt: number, self: Vector3, handler: Vector3, se
 }
 
 describe('K-ST1: the AI poke is a per-second rate (aggression × 1.2 /s at 30, 60 and 144 fps)', () => {
-  // the deny point of a standing handler sits at arm's length toward the rim: hold the defender ON it (dist ≈ 0 < 1.1)
+  // the spec's on-ball defender at 0.9 m (the poke aims at the ball since #273's aim fix)
   const handler = new Vector3(0, 0, 6);
-  const self = new Vector3(0, 0, 6 - DefenderBrain.ARMS_LENGTH);
+  const self = new Vector3(0, 0, 6 - 0.9);
   for (const a of [0.45, 0.5, 0.55, 0.65, 0.7, 0.85]) {
     it(`aggression ${a}`, () => {
       for (const dt of [1 / 30, 1 / 60, 1 / 144]) {
@@ -47,17 +47,17 @@ describe('K-ST1: the AI poke is a per-second rate (aggression × 1.2 /s at 30, 6
   }
 });
 
-describe('MEASURED, flagged (not tuned): does the AI poke still open with the bodies held at BODY_STANDOFF?', () => {
-  // The 0.55 capsule makes Havok hold 1.10 m like the kinematic path already does. The poke gate is `dist < 1.1` to the
-  // DENY POINT (not the handler), so it only opens where the deny point lands inside 1.1 m of a defender standing 1.10 m off.
-  it('a standing handler: the deny point is arm\'s length off him, so a defender at the standoff can poke', () => {
+describe('MEASURED (#273 aim fix): the AI poke at BODY_STANDOFF, standing and moving, against aggression × 1.2 /s', () => {
+  // The 0.55 capsule makes Havok hold 1.10 m like the kinematic path already does. Before #273's aim fix the gate read the
+  // DENY POINT and a moving handler was poked at 0.177 /s vs 0.822 standing (21 %). Now it reads the ball + POKE_LEAD_SEC.
+  it('a standing handler, defender at the standoff: the full rate', () => {
     const handler = new Vector3(0, 0, 6);
     const self = new Vector3(0, 0, 6 - BODY_STANDOFF);
     const r = [1, 2, 3, 4, 5].reduce((m, sd) => m + stealRate(0.7, 1 / 60, self, handler, 600, sd), 0) / 5;
     console.info(`[K-ST-MEASURE] standing handler, defender at ${BODY_STANDOFF} m: ${r.toFixed(3)} steal intents/s (expected ${(0.7 * STEAL_RATE_PER_SEC).toFixed(2)})`);
-    expect(r).toBeGreaterThan(0);
+    expect(Math.abs(r - 0.7 * STEAL_RATE_PER_SEC) / (0.7 * STEAL_RATE_PER_SEC)).toBeLessThanOrEqual(0.10);
   });
-  it('a moving handler: reported (the contain lever drops the deny point toward the rim)', () => {
+  it('a moving handler: within 20 % of the expected rate (the poke aims at the led ball, not the drifting deny point)', () => {
     const brain = new DefenderBrain(0.7, null, seeded(3));
     const self = new Vector3(0, 0, 6 - BODY_STANDOFF);
     let n = 0; const dt = 1 / 60, sec = 600;
@@ -66,8 +66,8 @@ describe('MEASURED, flagged (not tuned): does the AI poke still open with the bo
       const h = new Vector3(x * 20, 0, 6);
       if (brain.decide(dt, new Vector3(h.x, 0, self.z), h, HOOP, [], [h]).steal) n += 1;
     }
-    console.info(`[K-ST-MEASURE] moving handler at the standoff: ${(n / sec).toFixed(3)} steal intents/s`);
-    expect(Number.isFinite(n)).toBe(true);
+    console.info(`[K-ST-MEASURE] moving handler at the standoff: ${(n / sec).toFixed(3)} steal intents/s (expected ${(0.7 * STEAL_RATE_PER_SEC).toFixed(2)})`);
+    expect(Math.abs(n / sec - 0.7 * STEAL_RATE_PER_SEC) / (0.7 * STEAL_RATE_PER_SEC)).toBeLessThanOrEqual(0.20);
   });
 });
 

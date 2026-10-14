@@ -313,6 +313,11 @@ export const BODY_STANDOFF = 1.10;
 
 /** T-A (step 4): the on-ball poke intent's rate, per second × aggression — the same at 30, 60 and 144 fps. */
 export const STEAL_RATE_PER_SEC = 1.2;
+/** #273: the poke reaches the ball inside this (planar, defender to the led ball): past BODY_STANDOFF 1.10 so bodies held
+ *  apart can still poke, inside DefenderBrain.ARMS_LENGTH 1.25 so arm's length stays pressure, not a free steal [TUNE]. */
+export const POKE_RANGE = 1.2;
+/** #273: the poke leads a moving ball by this much of the handler's velocity [TUNE]. */
+export const POKE_LEAD_SEC = 0.1;
 
 // ── T-C HOOPS-BODY-SEPARATION (playtest HP-6 "players pass through each other") ─────────────────────────────────────
 /** The interpenetration floor: no frame below it outside a dunk flight [TUNE]. */
@@ -725,6 +730,9 @@ export class DefenderBrain implements AIBehavior {
     const handlerPos = onBall ? (mark ?? foes[0] ?? null) : null;
     const handlerSpeed = handlerPos && this.prevHandler && dt > 1e-4
       ? Vector3.Distance(handlerPos, this.prevHandler) / dt : 0;
+    // #273 (PM): the poke aims at the ball, led by the handler's velocity — not at the deny point (which drifts to the rim)
+    const handlerVel = handlerPos && this.prevHandler && dt > 1e-4
+      ? handlerPos.subtract(this.prevHandler).scaleInPlace(1 / dt) : new Vector3(0, 0, 0);
     if (handlerPos) this.prevHandler = handlerPos.clone();
 
     this.stillSec = onBall && handlerSpeed < 0.5 ? this.stillSec + dt : 0;
@@ -818,8 +826,14 @@ export class DefenderBrain implements AIBehavior {
     // approach 0.6m short of the press point, which parked the defender at
     // ~1.4m — just OUTSIDE poke range (1.1m). Pressure without arrival is a
     // statue with intent. Measured live: never stripped, never stole.
+    // THE POKE'S AIM (#273, PM call 2026-10-14). The gate read `dist` to the DENY POINT, which the contain lever drops toward
+    // the rim on a moving handler: with the bodies held at BODY_STANDOFF it opened ~21 % as often on a moving handler as on a
+    // standing one (measured, 0.177 vs 0.822 /s). A poke reaches for the BALL: its position now plus POKE_LEAD_SEC of the
+    // handler's velocity, inside POKE_RANGE. The per-second rate (STEAL_RATE_PER_SEC) is unchanged.
+    const pokeAim = ball.add(handlerVel.scale(POKE_LEAD_SEC));
+    const pokeDist = distXZ(pokeAim, self);
     const out = steer(to, (dist > 3 || beaten || closingOut) && !fighting, press ? 0.2 : onBall ? 0.6 : 1.4,
-      onBall && dist < 1.1 && this.rng() < 1 - Math.exp(-this.aggression * STEAL_RATE_PER_SEC * dt));   // T-A: a per-SECOND rate (was aggression × 2 % a frame: 2.4× the rate at 144 fps as at 60)
+      onBall && pokeDist < POKE_RANGE && this.rng() < 1 - Math.exp(-this.aggression * STEAL_RATE_PER_SEC * dt));   // T-A: a per-SECOND rate (was aggression × 2 % a frame: 2.4× the rate at 144 fps as at 60)
     if (fighting && this.over) { out.moveX *= 0.7; out.moveY *= 0.7; }   // fighting OVER the screen costs speed (FIGHT_SLOW)
     return out;
   }
