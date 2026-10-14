@@ -908,3 +908,61 @@ The deferred atmosphere and surface items from waves 1 and 2. Everything below i
   Knight arena (combat, chi rims): desktop 585 -> 586 draws, 100 active, texture 267 -> 271 MB (the rim glow's soft texture), phone 124 -> 124, 267 MB both.
   Neon block (kart night, strip lights; `mobileBudget.json` row untouched): desktop 351 -> 351 draws, 55 active, texture 132 -> 129 MB, phone 64 -> 65 draws, 132 -> 129 MB.
   Sun shafts: not mounted by any mode (measured share 0), so no row moves; with `?lookon=sunshafts` the pass adds one full occluder pass at half resolution.
+
+## Wave 3 status — crowds and reactions (w3-crowds, 2026-10-14)
+
+A9.9 built: a shared baked-animation crowd (`lib/babylon/visual/crowd/`) with reactions, rolled out to football, derby, tennis,
+volleyball, 3-Point, dunk, dunkduel, velocitykart and penalty. Presentation only: no speed, timing, camera, difficulty, score or pay
+value changed; `crowdWiring.test.ts` holds the module to importing nothing that scores, judges or tunes, and to only LISTENING to the
+Game-Breaker meter (a type import, `onReport` / `onTierChange`, never `report`).
+
+- **The bodies.** The five unused `public/models/crowd/*.glb` spectators share ONE texture set (byte-identical images) and only its
+  base colour carries anything (the emissive map is black, the normal map flat): the first body keeps its base colour, the other
+  four load with no materials — one 1024² texture for the whole crowd. FINDING / [ART]: the bodies' arms are skinned to the TORSO
+  (forearms and hands carry 0–40 of ~5,000 vertices; skin-transferred with the arms down), so no fan can raise an arm or clap. The
+  vocabulary is legs, hips, spine and head: up off the seat and rocked back (cheer), folded forward head down (groan), a rhythmic
+  rock or knee-bounce (applause), rise / sit down, a jumping stand. Arm cheers need a re-skin.
+- **The bake** (`crowdBake`, `crowdVat`). Ten authored clips (`crowdClips`, pose clips on the 22-joint rig) sampled at 30 fps into a
+  float vertex-animation texture per body (484 rows, ~0.7 MB each) by evaluating the animations directly — Babylon's
+  `VertexAnimationBaker` renders the whole scene once per frame. The shader's frame arithmetic is replicated and tested (each range
+  sits behind a pad row; the offset that starts a one-shot "now"). After the bake the live skeleton is folded to a point: the SSAO's
+  geometry buffer does not know baked animation and would otherwise draw the crowd in its T-pose bind.
+- **Fans and cards** (`crowdStands`, `crowdCards`, `crowdLayout`). A fan is a thin instance: one draw per stand × body, each block with
+  its OWN geometry (a thin instance's extra buffers live on the geometry — two blocks sharing one drew nothing: "no buffer bound to
+  enabled attribute"). Tiers: high 400 fans + 260 cards, desktop 300 + 220, phone cards only (140, no crowd GLB, no float texture).
+  Far rows are CARDS: on desktop a one-time 640×256 snapshot of the baked bodies in four poses (seated, seated cheer, standing,
+  standing cheer), unlit; on a phone a painted 256×128 atlas, lit. Seats are laid from each venue's stands deterministically with gaps,
+  turned toward the play; a venue's CAMERA LINE refuses any seat between the play camera and the play or behind it (tested per venue).
+  Bleachers (`benches: true`) are laid where a venue has no seating (the beach, the 3-Point sand, the tennis and football sidelines).
+- **Out of the passes it has no business in.** Every crowd mesh is named `__crowd_*`, the rig's "not scenery" mark: never a shadow
+  caster, never inked, not a glow occluder, not in a mirror. The governor's 'still' level stops the crowd's clock. (A rig note: the
+  first frame drawn after the capture rig re-enables shadows is the phone shadow cache's re-bake — 3-Point measures 191 there without
+  the crowd and 195 with it; the steady frame is 127 vs 131. Measure a frame later.)
+- **Reactions** (`crowdReact`, `modeCrowd`). `mountModeCrowd(ctx, key)` hears every play a mode reports to `ctx.momentum` (weight ≥ 6:
+  a cheer sized by it; ≤ −6: a groan), stands the crowd for a few seconds when the meter rises to ON FIRE, and rises and applauds when
+  the match ends (`react('finish', 1)` from a mode's own win jumps instead). Football, derby and penalty report nothing to the meter
+  (starting to would change its stings, shake and commentary), so they call `react()` at the touchdown / truck / tackle, the homer /
+  robbed homer, the goal / save. A share of the crowd takes part by strength, staggered in a ripple along each stand; a groan never
+  cuts a cheer off. Reduced motion: a third of the crowd, claps for cheers, nobody stands. The crowd builds 20 frames after the mode's
+  load returns (it would otherwise share load()'s 20 s watchdog), one body a frame.
+- **Per mode.** football: the end-zone stand + both sidelines, in place of the 16 sideline Onlookers. derby: the three spec grandstands
+  behind the wall (the homer's crowd, seen in the flight and the replay) + a bleacher down each baseline in foul ground; the six
+  infield Onlookers stay. tennis: the far grandstand + both sidelines behind the glass, in place of the 8 Onlookers (the near grandstand
+  is behind the play camera and stays painted). volleyball: two bleachers flanking the far end (nobody straight behind the far court:
+  the ball is read against it) + both sidelines, in place of the 8 Onlookers. 3-Point: a bleacher on the far sand behind the lamp post,
+  never behind the rim. dunk / dunkduel: a standing boardwalk crowd either side of the rim's line (|x| ≥ 4); the court's sides stay
+  clear (the hoopbus and the tent are dunk surfaces). velocitykart: people in the circuit's own straight grandstands
+  (`kartCrowdVenue` reads `kartSceneryFor`); the trackside Onlookers stay. penalty: two stands flanking the goal behind its line
+  (QA P1-05's rule, tested on their seats), in place of the 4 Onlookers.
+- **Budgets** (capture rig, same seed and frame 540, before → after; draws / active meshes / texture MB; desktop 1080p, phone 390×844
+  DPR 2 at the steady frame). Desktop: football 489/55/193 → 455/66/198, derby 559/96/189 → 613/121/200, tennis 311/67/142 →
+  257/73/136, volleyball 620/113/203 → 566/119/191, 3-Point 819/139/264 → 820/151/271, dunk 567/143/309 → 589/159/317, dunkduel
+  570/152/251 → 594/169/259, kart 546/72/237 → 556/77/244, penalty 231/49/149 → 195/46/151 (all far under 1600 / 900 / 512; a stand
+  block is one draw, the crowd's textures are ~10 MB). Phone (cards only): football 125 → 116 draws (skinned bodies 19 → 11), derby
+  105 → 110, tennis 79 → 68 (13 → 7), volleyball 110 → 89 (17 → 9), 3-Point 127 → 131, dunk 99 → 104 (texture 255 → 255), dunkduel
+  154 → 106, kart 108 → 112 (texture 236 → 236), penalty 65 → 61 (11 → 7). No `mobileBudget.json` row is raised; replacing Onlookers
+  with cards lowers the phones' skinned-body counts.
+- **Deferred / [ART].** Arm-raising cheers, claps, scarves and flags (the bodies' arm skinning: [ART]); more body variety ([ART]);
+  tennis's near grandstand stays painted (behind the main play camera; the end-change view sees it); the dunk crowd-card strip and the
+  painted stand faces are not animated (cards of our own stand in front of them); derby's glove-reach crowd at the wall on a robbed
+  homer; a phone-flash sync with `PhoneFlashes`; the kart's round grandstands (curved seating) keep their painted look.

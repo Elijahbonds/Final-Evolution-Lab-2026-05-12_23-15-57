@@ -34,6 +34,7 @@
 //      load / release / follow and keeps the eyes on the iron.
 
 import { SPORT_CLIP } from '../anim/clipRegistry';
+import { mountModeCrowd, type ModeCrowd } from '../visual/crowd/modeCrowd';   // w3-crowds (A9.9)
 import { heatLevel, pointsLeft, FIRE_STREAK } from '../core/shootoutHud';
 import { readDisplaySetting, displayBanner } from '@/lib/controller-link/tvMode';
 import { Color3, MeshBuilder, StandardMaterial, Vector3 } from '@babylonjs/core';
@@ -469,6 +470,7 @@ let disposeCount = 0;
 // The release names the result (scorePop / feel.impact / score SFX stay where they were); the RIM answers when the ball
 // arrives — a soft shake + HoopJuice on a make, a clank on a miss. No hang slowMo, no dunk hit-stop, no FOV stack.
 let rimFx: RimFxHandle | null = null;   // vis-hoops-dunk
+let stands: ModeCrowd | null = null;   // w3-crowds (A9.9): the crowd on the far sand
 let halos: BallHalosHandle | null = null;   // vis-hoops-dunk
 const replayGate = new ReplayGate();   // vis-hoops-dunk: which make earns a broadcast replay (reset with each run)
 let dressing: ShootoutDressingHandle | null = null;   // vis-hoops-dunk: the racks' LED trim and aprons, the scoreboard
@@ -1561,6 +1563,7 @@ export const ThreePointMode: ModeDefinition = {
     meter3d?.dispose(); meter3d = mountShotMeter3D(ctx.scene);
     hoopJuice?.dispose(); hoopJuice = new HoopJuice(ctx.scene, RIM);   // A+ P0: once per load, at the rim the arc lands on
     rimFx?.dispose(); rimFx = mountRimFx(ctx.scene, RIM, (ctx.scene.metadata as { felTier?: string } | null)?.felTier);   // vis-hoops-dunk
+    stands?.dispose(); stands = mountModeCrowd(ctx, 'threepoint');   // w3-crowds: a bleacher on the far sand; it hears the makes (ctx.momentum)
     if (process.env.NODE_ENV === 'development') { const dev = (window as unknown as { __FEL_DEV__?: { hoopJuiceUsed?: unknown } }).__FEL_DEV__; if (dev) dev.hoopJuiceUsed = hoopJuice.used; }
 
     S.from.copyFrom(RACK_POS[0]);
@@ -1786,6 +1789,7 @@ export const ThreePointMode: ModeDefinition = {
     mic?.dispose(); mic = null; micLanding = null;   // THE MIC stops with the mode
     hoopJuice?.dispose(); hoopJuice = null;   // A+ P0: restores any hoop material the punch swapped
     rimFx?.dispose(); rimFx = null;   // vis-hoops-dunk
+    stands?.dispose(); stands = null;   // w3-crowds
     halos?.dispose(); halos = null;
     dressing?.dispose(); dressing = null;
     meter3d?.dispose(); meter3d = null;

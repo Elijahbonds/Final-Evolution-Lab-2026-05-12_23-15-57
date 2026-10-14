@@ -12,6 +12,8 @@ import { GOAL } from '../core/PenaltyKick';
 import { TENNIS, VOLLEYBALL } from '../core/RallyCore';
 import { glassX } from '../core/ParkourTennis';
 import { MAX_BODIES } from '../visual/Onlookers';
+import { crowdVenue } from '../visual/crowd/crowdVenues';
+import { layoutSeats } from '../visual/crowd/crowdLayout';
 
 describe('the shootout crowd flanks the goal, never stands in its mouth', () => {
   const spots = penaltyGallerySpots();
@@ -30,8 +32,13 @@ describe('the shootout crowd flanks the goal, never stands in its mouth', () => 
     expect(live).toHaveLength(2 * GALLERY_PER_SIDE);
     expect(live.length).toBeLessThanOrEqual(5);
     for (const p of live) expect(Math.abs(p.x)).toBeGreaterThanOrEqual(GOAL.halfW + GALLERY_CLEAR_M);
-    expect(readFileSync(path.resolve(__dirname, 'precisionModes.ts'), 'utf8'))
-      .toContain('gallery = new Onlookers(ctx.scene, penaltyGallerySpots(GALLERY_PER_SIDE), undefined, undefined, { pauseOffscreen: true });');
+    // test changed (w3-crowds, 2026-10-14): this pinned the Onlookers mount line; the shootout's crowd is the stands now
+    // (crowdVenues PENALTY), so the QA P1-05 rule is held on THEIR seats: flanking the goal, behind the keeper camera.
+    expect(readFileSync(path.resolve(__dirname, 'precisionModes.ts'), 'utf8')).toContain("crowd = mountModeCrowd(ctx, 'penalty');");
+    for (const s of layoutSeats(crowdVenue('penalty')!)) {
+      expect(Math.abs(s.pos[0])).toBeGreaterThanOrEqual(GOAL.halfW + GALLERY_CLEAR_M);
+      expect(s.pos[2]).toBeGreaterThanOrEqual(15.4);
+    }
   });
 });
 
@@ -60,7 +67,9 @@ describe('one rival body per mode', () => {
     expect(penLoad.match(/keeper = await spawnFoe\(/g)).toHaveLength(1);
     const net = src('NetSportMode.ts');
     expect(net.match(/foe = await CharacterLibrary\.spawn\(/g)).toHaveLength(1);
-    // the net sports' only other bodies are the onlookers, at netCrowdSpots
-    expect(net).toContain('const spots = netCrowdSpots(o.cfg, { cage: o.cage, beach: o.beach });');
+    // test changed (w3-crowds, 2026-10-14): the net sports' only other bodies WERE the onlookers at netCrowdSpots; the
+    // stands replaced them (baked-animation instances, no spawned bodies), so the crowd adds no body at all
+    expect(net).not.toMatch(/new Onlookers\(/);
+    expect(net).toMatch(/crowd = mountModeCrowd\(/);
   });
 });

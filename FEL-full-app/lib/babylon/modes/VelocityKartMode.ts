@@ -19,6 +19,8 @@ import { BoostKit } from '../core/BoostKit';          // FINISH-RELEASE: the sha
 import { BoostFx } from '../premium/BoostFx';
 import { BoostPads } from '../visual/BoostPads';
 import { Onlookers } from '../visual/Onlookers';
+import { mountModeCrowd, type ModeCrowd } from '../visual/crowd/modeCrowd';   // w3-crowds (A9.9)
+import { kartCrowdVenue } from '../visual/crowd/crowdVenues';
 import { Color3, DynamicTexture, Mesh,
   MeshBuilder, PBRMaterial, Texture, TransformNode, Vector3, Vector4 } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
@@ -128,6 +130,7 @@ let venueRoot: TransformNode | null = null;
 let worldGround: Mesh | null = null;
 let trackside: TracksideHandle | null = null;
 let crowd: Onlookers | null = null;
+let stands: ModeCrowd | null = null;   // w3-crowds (A9.9): the grandstands' crowd
 let roadTex: DynamicTexture | null = null;
 // THE FIELD (2026-09-13). This mode shipped as a time trial: a clock does not overtake you on the last
 // corner, and Phase 0 recorded it as the one racing mode with no opponent of any kind. The rivals are
@@ -1241,6 +1244,8 @@ return {
       const key = `kart-${circuit.course.id}${vKey ? `-${vKey}` : ''}`; VENUE_PROP_SETS[key] = [...kartSceneryFor(circuit), ...kartSettingFor(circuit)];
       sceneryGone = false; scenery?.dispose(); scenery = null;
       void mountVenueProps(ctx.scene, key, detailRoot, { snapToGround: true }).then((h) => { if (sceneryGone) h?.dispose(); else scenery = h; });
+      // w3-crowds (A9.9): people in the circuit's own grandstands; they hear the overtakes (ctx.momentum) and the finish
+      stands?.dispose(); stands = mountModeCrowd(ctx, 'velocitykart', { venue: kartCrowdVenue(kartSceneryFor(circuit), worldHeightFn(course), [course.start.at.x, 3, course.start.at.z]) });
     }
     console.info(`[RACE-VENUE] ${course.id}: ${trackside.count} trackside instances`);
     // RACING WAS THE LAST FAMILY WITH NOBODY WATCHING. The board modes have had Onlookers since it landed;
@@ -1902,6 +1907,7 @@ return {
     weatherFx?.dispose(); weatherFx = null; weather = null; stripOff?.(); stripOff = null;   // w3-atmos
     startLights?.dispose(); startLights = null; replayDue = false; goAge = null;   // VIS-RACE
     crowd?.dispose?.(); crowd = null;
+    stands?.dispose(); stands = null;   // w3-crowds
     kart?.dispose(); kart = null;
     for (const m of marks) m.dispose();
     for (const r of road) r.dispose();

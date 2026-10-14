@@ -33,6 +33,7 @@
 // idle stance, chest and eyes on the dunker.
 
 import { Color3, Color4, MeshBuilder, Vector3 } from '@babylonjs/core';
+import { mountModeCrowd, type ModeCrowd } from '../visual/crowd/modeCrowd';   // w3-crowds (A9.9)
 import type { AbstractMesh, AnimationGroup, Camera, Observer, ParticleSystem, Scene, TransformNode } from '@babylonjs/core';
 import { tintGarmentSlot, SLOT_KEYS } from '../core/playerIdentity';   // IMPROVE (2026-10-06) #1: P2 wears P2's colour
 import { mountPlayerRing, type PlayerRingHandle } from '../visual/PlayerRing';   // IMPROVE (2026-10-06) #2: a ring per duellist
@@ -154,6 +155,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
   let settleArmed = false, settleArmAt = 0;   // A+ P4 (P10 mirror): the settle waits for feet-down, not the flush frame
   let hoopJuice: HoopJuice | null = null;     // juice LOOK: rim spring, net squash, hoop flash on the make
   let rimFx: RimFxHandle | null = null;       // vis-hoops-dunk: the ring of light, the sparks and the net's glow on a make
+  let stands: ModeCrowd | null = null;       // w3-crowds (A9.9): the boardwalk crowd
   let dressing: DuelDressingHandle | null = null;   // vis-hoops-dunk: the 3D score tower and the judges' table
   let phones: PhoneFlashes | null = null;           // vis-hoops-dunk: the stands' phones, by the make and the gap between the duellists
   let phase: Phase = 'handoff';
@@ -912,6 +914,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
       hoopJuice?.dispose(); hoopJuice = new HoopJuice(ctx.scene, rim);
       rimFx?.dispose(); rimFx = mountRimFx(ctx.scene, rim, (ctx.scene.metadata as { felTier?: string } | null)?.felTier);   // vis-hoops-dunk
       dressing?.dispose(); dressing = mountDuelDressing(ctx.scene, towerState(), JUDGE_COUNT);   // vis-hoops-dunk (display only)
+      stands?.dispose(); stands = mountModeCrowd(ctx, 'dunkduel');   // w3-crowds: the boardwalk crowd; it hears the duel's makes
       phones?.dispose(); phones = new PhoneFlashes(ctx.scene, new Vector3(rim.x, 0, rim.z + 5));
       (ctx.scene.metadata ??= {}).felHoops = { rimFx, dressing, probe: () => ({ phase, clipTime, turn: activeIdx }) };   // for the rig's probes (read only)
       mic?.dispose(); mic = new ModeMic(ctx, { groups: ['dunk', 'names'], court: ctx.location }); micOpened = false; micFiller = false;   // THE MIC
@@ -1205,6 +1208,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
       if (p1) postureOf.delete(p1); if (p2) postureOf.delete(p2);
       hoopJuice?.dispose(); hoopJuice = null;
       rimFx?.dispose(); rimFx = null; dressing?.dispose(); dressing = null; phones?.dispose(); phones = null;   // vis-hoops-dunk
+      stands?.dispose(); stands = null;   // w3-crowds
       mic?.dispose(); mic = null;   // THE MIC stops with the mode
       modeVenue?.dispose?.(); modeVenue = null;
       if (ikScene && handIkObs) ikScene.onAfterAnimationsObservable.remove(handIkObs);   // A+ P8 H1
