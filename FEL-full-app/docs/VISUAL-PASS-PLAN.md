@@ -1002,3 +1002,24 @@ Game-Breaker meter (a type import, `onReport` / `onTierChange`, never `report`).
   tennis's near grandstand stays painted (behind the main play camera; the end-change view sees it); the dunk crowd-card strip and the
   painted stand faces are not animated (cards of our own stand in front of them); derby's glove-reach crowd at the wall on a robbed
   homer; a phone-flash sync with `PhoneFlashes`; the kart's round grandstands (curved seating) keep their painted look.
+
+## Phone perf pass (phone-perf, 2026-10-14)
+
+Owner: "Phone perf pass" — measure every mode on the phone tier, trim the worst five. Rig: `scripts/probes/_perf-sweep.mts` (390×844,
+DPR 3, mobile tier, `?perf=off`, 4× CPU throttle, virtual time) through a production esbuild bundle of the harness (`PAGE=`, `RASTER=4`,
+`SEED=7`), base (`566beb28`) and the lane side by side. The probe was checked against known answers first (+50 meshes → +50 draws per
+pass, a 1024² texture → +5 MB, a fixed burn ×4–5 under the throttle, a known ballast → +17 MB heap). GPU time is not measured
+(SwiftShader); counts are exact; CPU ms are noisy on the shared box.
+
+- **Nothing is near 600 draws / 400 meshes** (worst: 3-Point 260 / 82). The phone limits that bind are texture memory and CPU time.
+- **Texture.** The guest kit body carries every wardrobe option: 15 maps, 95.8 MB on a phone in every mode a guest plays. A phone now
+  uploads glTF model maps at ≤ 1024² and the kit body at the bodies' phone split (skin 1024², the rest 512²) (`scene/phoneTextureCap`).
+  All 31 modes: 5552 → 2991 MB in total, median 188 → 89 MB; dunk 255 → 183, karate 201 → 81, who_scene_it 224 → 153.
+- **Shadow pass.** A phone's map skips accessories, eyes, soles, HUD and hoop-juice overlays (`scene/phoneCasters`): shadow draws per
+  frame median 16 → 6. 3-Point's cache no longer stands down (a third visibility change makes a mover; demotions are not rationed):
+  shadow draws 95 → 11, frame draws 191 → 112.
+- **Allocation.** `CharacterAnimator.clipNames` cached (13 % of the dunk's per-frame garbage).
+- `mobileBudget.json`: dunk / karate / threepoint / threevthree texture rows (and draws where they fell) lowered to lock the wins.
+- **Findings for the owner.** dunk and karate already exceed their activeMeshes and particles budgets on finish-release; the animation
+  layers (PostureLayer, TwoBoneIK, FootPlanting) are the next CPU/GC lever and are rig code (sign-off); production does not pre-warm
+  materials (`warmAll` is dev-only), so phones compile shaders mid-play.
