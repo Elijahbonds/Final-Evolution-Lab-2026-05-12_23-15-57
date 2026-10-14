@@ -19,6 +19,7 @@ import { plantLeg, claimLeg, releaseLeg } from './FootPlanting';
 import type { CharacterAnimator } from './CharacterAnimator';
 import { rateFor, StrideRateFilter, strideRef } from '../core/StrideMatch';
 import { boneNode, findBone } from './boneLookup';
+import { moveFadeSec } from '../core/HandleSystem';   // F4: one turbo crossover fade, the same number doMove uses
 
 // ── Blend tree ─────────────────────────────────────────────────────────────
 export type BasketballAnimState =
@@ -257,7 +258,7 @@ export class BasketballAnimTree {
         this.strideClip = c.loop ? c.clip : null;
         if (r0 !== null) this.strideFilter.set(r0);
         this.animator.play(c.clip, { loop: true, fadeSec: c.fadeSec, speedRatio: r0 ?? 1 });
-      } else { this.strideClip = null; const isMove = c.state === 'crossover' || c.state === 'crossover_right'; this.playBeat(c.clip, { fadeSec: isMove && (input.moveRate ?? 1) > 1 ? c.fadeSec * 0.6 : c.fadeSec, speedRatio: isMove ? input.moveRate ?? 1 : 1 }, c.state); }   // MOVE PACE
+      } else { this.strideClip = null; const isMove = c.state === 'crossover' || c.state === 'crossover_right'; this.playBeat(c.clip, { fadeSec: isMove && (input.moveRate ?? 1) > 1 ? moveFadeSec(true) : c.fadeSec, speedRatio: isMove ? input.moveRate ?? 1 : 1 }, c.state); }   // MOVE PACE
     }
     // STRIDE MATCHING, every frame. The loop is only (re)played on a STATE CHANGE — which is what keeps it stable —
     // so the rate has to be set on the RUNNING animation instead, or a per-frame play() would restart the clip every

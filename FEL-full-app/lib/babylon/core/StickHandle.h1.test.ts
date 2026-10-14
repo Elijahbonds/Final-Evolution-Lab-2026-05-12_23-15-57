@@ -48,3 +48,26 @@ describe('H1 H-02: ownedStickMove', () => {
     expect(ownedStickMove('spin', 0).locked).toBe(false);
   });
 });
+
+describe('F1 (Arena pass): a real-pad sweep with the push still growing is a spin', () => {
+  for (const deg of [180, 220]) it(`${deg}° from down round the right, m .62→.98, 20 ms samples`, () => {
+    const r = new StickHandleReader();
+    const N = 7; const s: [number, number, number][] = [[0, 0, 0]];
+    for (let i = 0; i < N; i++) {
+      const a = Math.PI / 2 - (i / (N - 1)) * (deg * Math.PI / 180);
+      const m = 0.62 + (0.36 * i) / (N - 1);
+      s.push([Math.cos(a) * m, Math.sin(a) * m, 0.02 * (i + 1)]);
+    }
+    s.push([0, 0, 0.02 * (N + 1)]);
+    const g = play(r, s);
+    expect(g.filter((x) => x.kind === 'sweep').length).toBe(1);
+  });
+});
+describe('F2: down-toward is a move, never a dead stick', () => {
+  it('ball right: down-right is the step-back toward the ball side; R2 the snatchback', async () => {
+    const { stickMoveFor } = await import('./StickHandle');
+    const f = { kind: 'flick' as const, dir: 'down' as const, dir8: 'downright' as const, x: 0.7, y: 0.7 };
+    expect(stickMoveFor(f, { speed01: 0.2, pressured: false, sprint: false, hand: 'Right' })).toEqual({ move: 'stepback', side: 'right' });
+    expect(stickMoveFor(f, { speed01: 0.2, pressured: false, sprint: false, hand: 'Right', escape: true })).toEqual({ move: 'snatchback', side: 'right' });
+  });
+});

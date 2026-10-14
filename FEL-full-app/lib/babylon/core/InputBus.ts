@@ -101,7 +101,8 @@ const KEYMAP: Record<string, FelInput> = {
   escape: { t: 'button', btn: 'START', pressed: true },
 };
 // H1 H-19: the keyboard R stick (opt-in via InputBus.keyRStick). 8 is up, the ring around it the diagonals and sides;
-// N and / sweep (counter-clockwise / clockwise). Up is −y like every stick.
+// N and / sweep: N draws down→left→up, clockwise on screen (+y is down), the reader's sign +1, a spin RIGHT;
+// / draws down→right→up, counter-clockwise, sign −1, a spin LEFT (F3). Up is −y like every stick.
 const D = Math.SQRT1_2;
 export const KEY_RSTICK: Readonly<Record<string, readonly [number, number]>> = {
   '8': [0, -1], u: [-D, -D], o: [D, -D], h: [-1, 0], ';': [1, 0], m: [-D, D], ',': [0, 1], '.': [D, D],

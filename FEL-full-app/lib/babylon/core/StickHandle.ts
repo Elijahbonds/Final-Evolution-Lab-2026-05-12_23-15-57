@@ -87,7 +87,6 @@ export class StickHandleReader {
       this.homeAt = now; this.wasHome = true; this.outAt = -1;
     } else {
       if (this.wasHome) { this.outAt = now; this.sweepStartAng = ang; this.sweepTurn = 0; this.sweepAt = now; this.wasHome = false; this.peakMag = 0; }
-      if (mag > this.peakMag) { this.peakMag = mag; this.peakX = x; this.peakY = y; }
       else {
         // the sweep: accumulate the signed turn around the ring while past the hold ring
         if (mag >= STICK.hold && this.mag >= STICK.hold) {
@@ -98,6 +97,8 @@ export class StickHandleReader {
           if (!this.swept && Math.abs(this.sweepTurn) >= STICK.sweepRad) { this.swept = true; this.flicked = true; this.held = true; out.push({ kind: 'sweep', sign: this.sweepTurn > 0 ? 1 : -1 }); }
         }
       }
+      // H-01: the excursion's peak, its OWN statement (F1, Arena pass: it once captured the sweep's `else` above)
+      if (mag > this.peakMag) { this.peakMag = mag; this.peakX = x; this.peakY = y; }
       // the flick: past the ring quickly from home
       if (!this.flicked && !this.swept && mag >= STICK.flick && now - this.outAt <= STICK.flickSec) {
         this.flicked = true;
@@ -198,7 +199,8 @@ export function stickMoveFor(g: StickGesture, r: StickRead): { move: StickMove; 
       if (d8 === 'downleft') return { move: escape ? 'momentum_btb' : 'behind_back', side: away };
       if (d8 === 'down') return { move: escape ? 'snatchback' : 'stepback', side: away };
       if (d8 === 'upright') return { move: 'size_up', side: toward };
-      return null;   // down-toward: no 2K dribble move lives there (the eurostep is a finish, read at the rim)
+      // down-toward (F2, H-02 "never a dead stick"): the step-back to the ball side — R2 makes it the snatchback
+      return { move: escape ? 'snatchback' : 'stepback', side: toward };
     }
     case 'hold': return null;   // a parked stick is PAUSIN' (the mode freezes the dribble on it)
     case 'sweep': return { move: escape ? 'steezo_roll' : 'spin', side: g.sign > 0 ? 'right' : 'left' };
