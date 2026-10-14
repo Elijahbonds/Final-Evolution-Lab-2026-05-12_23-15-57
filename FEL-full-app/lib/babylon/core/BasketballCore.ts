@@ -311,6 +311,47 @@ export class DribbleController {
  */
 export const BODY_STANDOFF = 1.10;
 
+/** T-A (step 4): the on-ball poke intent's rate, per second × aggression — the same at 30, 60 and 144 fps. */
+export const STEAL_RATE_PER_SEC = 1.2;
+
+// ── T-C HOOPS-BODY-SEPARATION (playtest HP-6 "players pass through each other") ─────────────────────────────────────
+/** The interpenetration floor: no frame below it outside a dunk flight [TUNE]. */
+export const BODY_HARD_GAP = 0.90;
+/** The most separation moves a body, per second (0.04 m a frame at 60 fps) [TUNE]. */
+export const SEP_PUSH_MPS = 2.4;
+/** No correction within this of BODY_STANDOFF (kills chatter) [TUNE]. */
+export const SEP_DEADBAND = 0.01;
+/** The most any body moves in one frame from separation, even below the hard gap [TUNE]. */
+export const SEP_POP_MAX = 0.10;
+
+export interface SeparateOpts { gap?: number; hardGap?: number; pushMps?: number; popMax?: number; weightA?: number; weightB?: number }
+export interface Separation { overlap: number; pushA: Vector3; pushB: Vector3; touching: boolean }
+
+/** The push that separates two bodies this frame, on XZ. PURE: it returns the push and never writes, so each path applies
+ *  it its own way (the roots on the kinematic path, a separating velocity on Havok). Inside the deadband: zero. Above the
+ *  hard gap each body moves at most pushMps·dt. Below it the bodies go back to the hard gap this frame, capped at popMax.
+ *  The weights split the push (a planted body takes less). */
+export function separateBodies(a: Vector3, b: Vector3, dt: number, opts: SeparateOpts = {}): Separation {
+  const gap = opts.gap ?? BODY_STANDOFF, hard = opts.hardGap ?? BODY_HARD_GAP;
+  const pushMps = opts.pushMps ?? SEP_PUSH_MPS, popMax = opts.popMax ?? SEP_POP_MAX;
+  const wa = opts.weightA ?? 0.5, wb = opts.weightB ?? 0.5, wsum = Math.max(1e-6, wa + wb);
+  const zero = (): Separation => ({ overlap: 0, pushA: new Vector3(0, 0, 0), pushB: new Vector3(0, 0, 0), touching: false });
+  let dx = b.x - a.x, dz = b.z - a.z;
+  let dist = Math.hypot(dx, dz);
+  if (dist >= gap) return zero();
+  const overlap = gap - dist;
+  if (dist < 1e-6) { dx = 1; dz = 0; dist = 0; } else { dx /= dist; dz /= dist; }
+  if (overlap <= SEP_DEADBAND) return { ...zero(), overlap, touching: true };
+  // the total the pair separates this frame
+  const cap = Math.max(0, pushMps * dt) * 2;
+  let total = Math.min(overlap, cap);
+  if (dist < hard) total = Math.min(Math.max(total, hard - dist), popMax * 2);
+  const ka = total * (wa / wsum), kb = total * (wb / wsum);
+  const capOne = dist < hard ? popMax : Math.max(0, pushMps * dt);
+  const sa = Math.min(ka, capOne), sb = Math.min(kb, capOne);
+  return { overlap, touching: true, pushA: new Vector3(-dx * sa, 0, -dz * sa), pushB: new Vector3(dx * sb, 0, dz * sb) };
+}
+
 export function resolveBodyCollision(a: Vector3, b: Vector3, radius = 0.55): boolean {
   const dx = b.x - a.x, dz = b.z - a.z;
   const distSq = dx * dx + dz * dz;
@@ -775,7 +816,7 @@ export class DefenderBrain implements AIBehavior {
     // ~1.4m — just OUTSIDE poke range (1.1m). Pressure without arrival is a
     // statue with intent. Measured live: never stripped, never stole.
     const out = steer(to, (dist > 3 || beaten || closingOut) && !fighting, press ? 0.2 : onBall ? 0.6 : 1.4,
-      onBall && dist < 1.1 && this.rng() < this.aggression * 0.02);
+      onBall && dist < 1.1 && this.rng() < 1 - Math.exp(-this.aggression * STEAL_RATE_PER_SEC * dt));   // T-A: a per-SECOND rate (was aggression × 2 % a frame: 2.4× the rate at 144 fps as at 60)
     if (fighting && this.over) { out.moveX *= 0.7; out.moveY *= 0.7; }   // fighting OVER the screen costs speed (FIGHT_SLOW)
     return out;
   }

@@ -25,7 +25,7 @@
 //      thresholds, so a sprint into a set defender costs speed and reads as a hit.
 import { Vector3 } from '@babylonjs/core';
 import { classifyContact, type ContactSeverity } from './ContactSystem';
-import { DUNK_PCT, STEPBACK_SEC, STEPBACK_SPEED, LAYUP_STRIDE_SPEED, type ShotStyle, type ShotDrift } from './BasketballCore';
+import { DUNK_PCT, STEPBACK_SEC, STEPBACK_SPEED, LAYUP_STRIDE_SPEED, separateBodies, type ShotStyle, type ShotDrift } from './BasketballCore';
 import { athleteRight, lateralOf, sideAwayFrom, sideOfVector } from '../anim/athleteSide';   // HOOPS MOTION phase 3: the ONE visual-side helper
 
 // ── M1: the gather ──────────────────────────────────────────────────────────
@@ -302,6 +302,9 @@ export interface BodyContactOpts {
    *  per collision (a 300 ms pair cooldown) — applied every frame while two bodies overlap it stopped a sprinter dead
    *  (measured 6.1 → 0.5 m/s). Default true; the mode gates it. */
   exchange?: boolean;
+  /** T-C: cap the positional half — at most this far per body this call (SEP_PUSH_MPS · dt), back to `hardGap` capped at
+   *  `popMax` below it (separateBodies). Omitted: today's instant full correction. */
+  maxPush?: number; hardGap?: number; popMax?: number;
 }
 
 /** Push two bodies apart on XZ if they overlap (resolveBodyCollision's separation) AND exchange momentum along the normal
@@ -314,10 +317,15 @@ export function resolveBodyContact(a: Vector3, b: Vector3, va: Vector3, vb: Vect
   const minDist = radius * 2;
   if (distSq >= minDist * minDist || distSq < 1e-6) return null;
   const dist = Math.sqrt(distSq);
-  const push = (minDist - dist) / 2;
   const nx = dx / dist, nz = dz / dist;
-  a.x -= nx * push; a.z -= nz * push;
-  b.x += nx * push; b.z += nz * push;
+  if (opts.maxPush === undefined) {
+    const push = (minDist - dist) / 2;
+    a.x -= nx * push; a.z -= nz * push;
+    b.x += nx * push; b.z += nz * push;
+  } else {
+    const sep = separateBodies(a, b, 1, { gap: minDist, pushMps: opts.maxPush, hardGap: opts.hardGap, popMax: opts.popMax });
+    a.addInPlace(sep.pushA); b.addInPlace(sep.pushB);
+  }
   const aAlong = va.x * nx + va.z * nz;          // a's speed toward b
   const bAlong = -(vb.x * nx + vb.z * nz);       // b's speed toward a
   const closing = Math.max(0, aAlong + bAlong);

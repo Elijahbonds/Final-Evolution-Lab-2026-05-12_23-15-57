@@ -146,10 +146,10 @@ import { AgentControlSource } from '../core/AgentControlSource';  // M69: intent
 import { agentBridge } from '../core/AgentBridge';
 import {
   DribbleController, ShotMeter, DefenderBrain, contestLevel, clampToHalfCourt, isThree,
-  resolveBodyCollision, classifyShot, ANKLE_BREAK_STUN_SEC,
+  classifyShot, ANKLE_BREAK_STUN_SEC,
   TurboMeter, ShotArc, checkDriveDunk, checkBlock, BLOCK_RANGE, DUNK_PCT,
   STEAL_EXPOSURE_MIN, AttackerBrain, RIVAL_DRIVE_SPEED, DUNK_RANGE, rivalShotPct, handUpContest, distXZ, HAND_UP_SEC, HAND_UP_CONTEST, proximityContest01,
-  SHOT_QUALITY_PCT, followThroughFor, type ShotQuality, type ShotContext, type PostShot, type ShotStyle, BODY_STANDOFF } from '../core/BasketballCore';
+  SHOT_QUALITY_PCT, followThroughFor, type ShotQuality, type ShotContext, type PostShot, type ShotStyle, BODY_STANDOFF, separateBodies } from '../core/BasketballCore';
 import { DribbleStateMachine, syncedShotSpeed, RELEASE_FRAME_01 } from '../core/BallHandling';
 import { releaseFrameOf } from '../anim/opponentMotion';   // HOOPS MOVEMENT: the release frame of the clip that plays
 import { refuse } from '../core/Refusal';   // MECHANICS PASS: a press that cannot act is answered
@@ -177,6 +177,7 @@ import {   // HOOPS-MOVE-KIT-A amendment (D1–D3): the defense contest package
   groundContest, aiBlockChance, bumpExposure, aiBumpStrips, jumpSwats, contestedPct, fatiguePct, alteredApex, aiHandsUp, facingCos,
   AI_BLOCK_JUMP_CHANCE, AI_BLOCK_RANGE,
   contestTag, contestTier, aiShotRead,   // HOOPS-DEPTH S5
+  AI_REACH_COOLDOWN_SEC, AI_REACH_GATE, AI_REACH_STUN_SEC, AI_REACH_TELL_SEC, BUMP_STRIP_WINDOW_SEC, resolveAiReach,   // T-A STEAL-TELL
 } from '../core/HoopsDefense';
 import { BOX_OUT_RANGE } from '../core/HoopsOffball';   // HOOPS-MOVE-KIT-A O2: the rival boxes me out on my shot
 import { MomentumBus } from '../core/MomentumBus';
@@ -269,6 +270,9 @@ const STEAL_RANGE = 1.6;
 /** How long the feet have to be planted before a charge can be drawn — a charge is arriving early, not colliding. */
 /** A reach that ARRIVES on the handler at this speed is a foul; slower than this it is a whiff at thin air. */
 const REACH_FOUL_SPEED = 1.6;
+/** T-C BODY SEPARATION [TUNE] (PM-approved 2026-10-14): the Havok capsule radius of both 1v1 bodies. 0.55 × 2 = BODY_STANDOFF,
+ *  so the solver itself holds the 1.10 m every 1v1 rule assumes (the ContactSystem default 0.38 let them touch at 0.76 m). */
+export const ONEVONE_CAPSULE_RADIUS = 0.55;
 const CHARGE_SET_SEC = 0.18;
 /**
  * Inside this of a planted defender is CONTACT; past it he went round you.
@@ -558,6 +562,10 @@ export const OneVOneMode: ModeDefinition = (() => {
   const foeMover = new AiMover(3.6);
   const devContacts: { t: number; severity: string; closing: number; attacker: string; victim: string; attackerSpeed: number }[] = [];   // dev: the last Havok contact events (probes)
   // ── the DEFENSE contest package (D1–D3) ──
+  // T-A STEAL-TELL: the AI's reach shows before it resolves (a tell the handler can beat), one per AI_REACH_COOLDOWN_SEC
+  let foeReach: { t: number; exposed: boolean; moveMark: number } | null = null;
+  let foeReachCooldown = 0;
+  let meBumpAge = Infinity;   // seconds since a body contact on my carrier (the AI reach's exposure)
   let bumpAge = Infinity;                       // D2: seconds since the last hard body contact with the handler (the strip window)
   let meHandUp = false, foeHandUp = false, foeHandUpLeft = 0;
   let aiReadPending = false;   // HOOPS-DEPTH S5: the AI has not had its read on this shot yet (it was out of range at the gather)   // D3: the grounded hand-up contests (mine held on X; the AI's on my load)
@@ -730,7 +738,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     possessionToken++;
     possession = 'mine'; carrying = true; shooting = false; dunking = false; defPhase = 'over';
     currentShot = null; myJumpAge = Infinity; meStunSec = 0; reachCooldown = 0; goaltendCalled = false; paintSec = 0;
-    threat = { ...THREAT_IDLE }; stickHeld = 0; stickPeak = 0; burstArmed = false; jabEligible = false; spinGather = 0; posterVictim = null; victimSlide = null;
+    threat = { ...THREAT_IDLE }; stickHeld = 0; stickPeak = 0; burstArmed = false; jabEligible = false; spinGather = 0; posterVictim = null; victimSlide = null; foeReach = null;
     meMotion.reset(); foeMotion.reset(); foeMover.stop(); foeFootPlant?.release(); meLayers?.reset(); foeLayers?.reset();   // a check-up moves bodies metres in a frame; that is not acceleration (nor a drag, nor a lean)
     arc.active = false;
     meShotWin = 'none'; foeShotWin = 'none'; dunkFlight = null; dunkFlush = null; meLandSec = 0; meCelebrateSec = 0;   // BIOMECH-HOOPS-WAVE1
@@ -1006,8 +1014,8 @@ export const OneVOneMode: ModeDefinition = (() => {
       try {
         contact = new ContactSystem();
         await contact.init(ctx.scene);
-        contact.addBody('me', me.root);
-        contact.addBody('foe', foe.root);
+        contact.addBody('me', me.root, { radius: ONEVONE_CAPSULE_RADIUS });   // T-C: the solver holds BODY_STANDOFF
+        contact.addBody('foe', foe.root, { radius: ONEVONE_CAPSULE_RADIUS });
       } catch (e) {
         console.warn('[1v1] physics unavailable, kinematic fallback:', e);
         contact = null;
@@ -1182,6 +1190,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       if (foeFloored && foeStunSec === 0) { foeFloored = false; foeAnimTree.beat('karate_get_up'); }
       if (meFloored && meStunSec === 0) { meFloored = false; meAnimTree.beat('karate_get_up'); }   // D1: posterized by the rival, back up
       bumpAge += dt;   // D2: the strip window's clock
+      meBumpAge += dt; foeReachCooldown = Math.max(0, foeReachCooldown - dt);   // T-A
       if (foeBlockJumpAge !== Infinity) { foeBlockJumpAge += dt; if (foeBlockJumpAge >= JUMP_SEC) foeBlockJumpAge = Infinity; }   // D1: the AI's contest jump
       if (victimSlide) { const step = slideStep(victimSlide.left, dt, victimSlide.mps ?? undefined); foe.root.position.addInPlace(victimSlide.dir.scale(step)); victimSlide.left -= step; if (victimSlide.left <= 1e-4) victimSlide = null; }   // DUNK-FANATIC
       if (foeHandUp) { foeHandUpLeft -= dt; if (foeHandUpLeft <= 0) { foeHandUp = false; foeAnimTree.releaseHold(); } }
@@ -1743,9 +1752,39 @@ export const OneVOneMode: ModeDefinition = (() => {
         // ANIM CLEAN-UP (2026-09-18): `!loose` — a make sets carrying for make-it-take-it while the ball is still coming out
         // of the net, and the AI stole THAT ball: "JUMPER +2" then "STRIPPED!" inside 200 ms, the celebrate cut, the ball
         // popping 2.4 m (measured by the lab's smoothness recorder)
-        if (foeStunSec === 0 && carrying && !loose && !shooting && !dunking && !finish && !gather && !sealed && foeIntent.steal && Vector3.Distance(me.root.position, foe.root.position) < 1.6) {
-          stripBall(ctx, 'STRIPPED!');   // D2: the ball goes LOOSE from the hand (it used to warp both bodies to the check)
-          return;
+        // T-A STEAL-TELL (step 4): the AI reach SHOWS for AI_REACH_TELL_SEC before it resolves — move the ball and it misses;
+        // a miss stuns him AI_REACH_STUN_SEC, a reach through a moving body is the reach-in foul; one reach per cooldown.
+        // (It was one roll and the ball was gone: a strip 1.4–3.7 s after the check with no tell, no cooldown, no cost.)
+        const reachEligible = carrying && !loose && !shooting && !dunking && !finish && !gather && !sealed;
+        const reachDist = distXZ(me.root.position, foe.root.position);
+        if (!foeReach && foeStunSec === 0 && foeReachCooldown === 0 && reachEligible && foeIntent.steal && reachDist < 1.6 && roll() < AI_REACH_GATE) {
+          foeReachCooldown = AI_REACH_COOLDOWN_SEC;
+          foeAnimTree.beat('bball_steal_reach', { fadeSec: 0.14 });
+          foeReach = { t: 0, exposed: meBumpAge <= BUMP_STRIP_WINDOW_SEC, moveMark: lastStickMoveAt };
+          console.info(`[1V1-DEF] ai reach tell at ${reachDist.toFixed(2)} m`);
+        } else if (foeReach) {
+          foeReach.t += dt;
+          if (foeReach.t >= AI_REACH_TELL_SEC) {
+            const r = foeReach; foeReach = null;
+            const kind = resolveAiReach({
+              tellSec: r.t, eligible: reachEligible && foeStunSec === 0 && !foeFloored, inRange: reachDist < 1.6,
+              movedDuringTell: lastStickMoveAt > r.moveMark || spin !== null, exposed: r.exposed,
+              onHim: reachDist <= BODY_STANDOFF + 0.25, carrierSpeed: meDribble.vel.length(), foulSpeed: REACH_FOUL_SPEED, roll,
+            });
+            console.info(`[1V1-DEF] ai reach resolve ${kind} after ${r.t.toFixed(2)}s`);
+            if (kind === 'strip') { stripBall(ctx, 'STRIPPED!', true); return; }   // D2: the ball goes LOOSE from the hand
+            if (kind === 'whiff') { foeStunSec = Math.max(foeStunSec, AI_REACH_STUN_SEC); }
+            else {
+              const call = judge('reach_in', { offense: 'me', fouled: 'me' });
+              if (call.whistle) SoundKit.play('whistle');
+              meCarry?.update(0, 0, false);
+              console.info(`[1V1-REF] ${call.id} (their reach on me) → ${call.ball}`);
+              bannerFlash(ctx, `${call.banner} — ${call.ball === 'me' ? 'YOUR BALL' : 'THEIR BALL'}`, 900);
+              micWhistle();   // THE MIC
+              if (call.ball === 'me') resetPositions(); else startDefense(ctx, `${call.banner} — DEFEND!`);
+              return;
+            }
+          }
         }
         // D1: the AI's contest jump, timed to my green
         if (shooting && foeBlockAt >= 0 && shotMeter.t * shotMeter.durationSec >= foeBlockAt) {
@@ -1755,7 +1794,8 @@ export const OneVOneMode: ModeDefinition = (() => {
           console.info('[1V1-DEF] ai block jump');
         }
 
-        if (!contact?.isReady && resolveBodyCollision(me.root.position, foe.root.position) && meDribble.vel.lengthSquared() > 9) {
+        const touching = separate(dt);   // T-C: the one capped separation (both paths); the no-Havok spin-arming read off it
+        if (!contact?.isReady && touching && meDribble.vel.lengthSquared() > 9) {
           SoundKit.play('impact', { pitch: 1.1, volume: 0.15 });
           // HOOPS-MOVE-KIT-B M6 (no-Havok path): I met his body at speed with the ball — the spin is ARMED (the swing of
           // the stick across throws it). Never with the shot trigger already down: a squeeze is a committed shot.
@@ -1952,6 +1992,7 @@ export const OneVOneMode: ModeDefinition = (() => {
           // D2: any hard / foul contact with the handler opens the strip window — mine on defense (the poke connects inside it),
           // the AI's on my possession (a set defender I bump strips on his roll)
           if (c.severity !== 'bump') {
+            if (possession === 'mine' && carrying) meBumpAge = 0;   // T-A: a contact on my carrier exposes the ball to the AI reach
             if (possession === 'defense' && (defPhase === 'check' || defPhase === 'drive')) bumpAge = 0;
             else if (c.severity === 'hard' && possession === 'mine' && carrying && !shooting && !dunking && !finish && !gather && foeStunSec === 0 && !foeFloored
               && c.attacker === 'me' && c.attackerSpeed >= 4.0 && performance.now() - lastBumpStripAt > 2500) {
@@ -2168,7 +2209,7 @@ export const OneVOneMode: ModeDefinition = (() => {
           });
         } else if (defPhase === 'over') unplantFoe();   // (3b review) the play is over: nothing runs his pin's window down here
 
-        if (!contact?.isReady) resolveBodyCollision(me.root.position, foe.root.position);
+        separate(dt);   // T-C: the one capped separation (both paths)
 
         // Ship Pass 6: a two-point fit on a foe within arm's reach put the camera inside a body (sweep frame 2026-09-05);
         // frame a point 1.5 m past the rival toward the rim — never inside a body, and the check at the top is on screen
@@ -2288,7 +2329,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     possessionToken++;
     possession = 'defense'; carrying = false; shooting = false; dunking = false; currentShot = null;
     defPhase = 'check'; attacker.reset(); nerveTheAttacker(); gatherShown = false; stepbackShown = false; goaltendCalled = false; paintSec = 0;
-    threat = { ...THREAT_IDLE }; stickHeld = 0; stickPeak = 0; burstArmed = false; jabEligible = false; spinGather = 0; posterVictim = null; victimSlide = null;
+    threat = { ...THREAT_IDLE }; stickHeld = 0; stickPeak = 0; burstArmed = false; jabEligible = false; spinGather = 0; posterVictim = null; victimSlide = null; foeReach = null;
     meMotion.reset(); foeMotion.reset(); foeMover.stop(); foeFootPlant?.release(); meLayers?.reset(); foeLayers?.reset();   // a check-up moves bodies metres in a frame; that is not acceleration (nor a drag, nor a lean)
     myJumpAge = Infinity; meStunSec = 0; reachCooldown = 0; defContest = 0;
     arc.active = false;
@@ -3503,11 +3544,27 @@ export const OneVOneMode: ModeDefinition = (() => {
   }
   /** D2: the AI takes the ball — knocked LOOSE from my hand toward him, the reach on him, the possession follows once it
    *  settles (it used to warp both bodies to the check on the frame). */
-  function stripBall(ctx: ModeContext, banner: string): void {
+  /** T-C BODY SEPARATION: the one guard on both body paths, once per update, never during a dunk (the flight and the poster
+   *  ride are the dunk lane's). Kinematic: the capped push on the roots. Havok: the push as a separating velocity (shove) —
+   *  never teleport (it zeroes velocity: a stall and a pop). True when the bodies touch (the spin-arming read). */
+  function separate(dt: number): boolean {
+    if (dunking || dt <= 1e-6) return false;
+    const sep = separateBodies(me.root.position, foe.root.position, dt);
+    if (!sep.touching) return false;
+    if (contact?.isReady) { contact.shove('me', sep.pushA.scale(1 / dt)); contact.shove('foe', sep.pushB.scale(1 / dt)); }
+    else {
+      me.root.position.addInPlace(sep.pushA); foe.root.position.addInPlace(sep.pushB);
+      if (possession === 'mine' && carrying && meDribble.vel.lengthSquared() > 9) meBumpAge = 0;   // T-A: a no-Havok body contact on my carrier
+    }
+    return true;
+  }
+
+  /** `shown`: the reach already showed (T-A's tell) — no second beat. */
+  function stripBall(ctx: ModeContext, banner: string, shown = false): void {
     SoundKit.play('impact', { pitch: 1.2, volume: 0.35 });
     swing('turnover');
     ctx.setHud({ momentum });
-    foeAnimTree.beat('bball_steal_reach', { fadeSec: 0.14 });
+    if (!shown) foeAnimTree.beat('bball_steal_reach', { fadeSec: 0.14 });
     meCarry?.update(0, 0, false);
     const from = ballWorld().clone(); releaseBall(ball);
     const toFoe = foe.root.position.subtract(me.root.position); toFoe.y = 0; toFoe.normalize();
