@@ -72,8 +72,8 @@ export const catchMeter = (holdMs: number): number => Math.max(0, Math.min(1, ho
 export function selectBlock(i: BlockInput, gates: BlockGates): BlockType {
   // 1. goaltend before everything (never a catch or a pin)
   if (i.reachable && i.ballY > i.rimY && (i.phase === 'falling' || i.inCylinder)) return 'goaltend';
-  // 2. not reachable, or outside every window → contest
-  if (!i.reachable || !inWindow(i.tPressMs, BLOCK_WINDOWS.contest)) return 'contest';
+  // 2. not reachable, or outside EVERY window → contest (the pin's window runs past the contest window's +150 end)
+  if (!i.reachable || !Object.values(BLOCK_WINDOWS).some((w) => inWindow(i.tPressMs, w))) return 'contest';
   // 3. catch
   if (gates.catch && i.holdMs >= HOLD_MS && inWindow(i.tPressMs, BLOCK_WINDOWS.catch) && i.phase !== 'falling' && !i.behind
     && i.angleDeg <= CATCH_MAX_ANGLE && i.dist <= CATCH_MAX_DIST) return 'catch';

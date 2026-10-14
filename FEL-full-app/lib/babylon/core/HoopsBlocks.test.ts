@@ -24,6 +24,8 @@ const TABLE: [string, BlockInput, BlockGates, string][] = [
   ['not reachable → contest', front({ reachable: false }), ALL, 'contest'],
   ['outside every window (early) → contest', front({ tPressMs: -451 }), ALL, 'contest'],
   ['outside every window (late) → contest', front({ tPressMs: 151 }), ALL, 'contest'],
+  ['pin edge +180 is past the contest window but inside the pin\'s', front({ shot: 'layup', glassDist: 0.4, tPressMs: 180 }), ALL, 'pin'],
+  ['past every window (+181) → contest even for a pin', front({ shot: 'layup', glassDist: 0.4, tPressMs: 181 }), ALL, 'contest'],
   ['catch: held, on time, square, close', front({ tPressMs: -40, holdMs: 220, dist: 1.1, angleDeg: 35 }), ALL, 'catch'],
   ['catch edge −82', front({ tPressMs: -82, holdMs: 300 }), ALL, 'catch'],
   ['catch edge +2', front({ tPressMs: 2, holdMs: 300 }), ALL, 'catch'],
