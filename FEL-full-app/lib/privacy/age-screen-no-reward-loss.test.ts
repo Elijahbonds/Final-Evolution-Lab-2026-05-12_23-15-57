@@ -59,6 +59,23 @@ const tx = {
       const plain = Object.fromEntries(Object.entries(data).filter(([, v]) => typeof v === 'number'));
       return { ...h.profile, ...plain, labCredits: 100 };
     },
+    // STREAK-CLAIM-RACE: the route's streak step (claimPlayStreak) is a write conditional on the row the request read —
+    // matched against h.profile as Postgres would (a Date equal to the row's, or { lt } below it); this fixture streaked
+    // today and has no lastActiveAt, so it matches nothing here
+    updateMany: async ({ where, data }: { where: Row; data: Row }) => {
+      const ms = (v: unknown) => (v === null || v === undefined ? null : new Date(v as Date).getTime());
+      const hit = (['lastStreakAt', 'lastActiveAt'] as const).every((k) => {
+        const w = where[k];
+        if (w === undefined) return true;
+        const row = ms(h.profile[k]);
+        if (w !== null && typeof w === 'object' && !(w instanceof Date)) { const lt = ms((w as Row).lt); return row !== null && lt !== null && row < lt; }
+        return row === ms(w);
+      });
+      if (!hit) return { count: 0 };
+      h.writes.push('lastStreakAt' in where ? 'profile:streak' : 'profile:active');
+      Object.assign(h.profile, data);
+      return { count: 1 };
+    },
   },
   gameSession: { create: async ({ data }: { data: Row }) => { h.writes.push('session'); h.sessions.push(data); return { id: 's1', ...data }; } },
   prqEntry: { findFirst: async () => { h.writes.push('read:camera-prq'); return null; } },
