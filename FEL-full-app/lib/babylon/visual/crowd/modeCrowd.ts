@@ -49,14 +49,17 @@ export function mountModeCrowd(ctx: Pick<ModeContext, 'scene' | 'momentum' | 'ph
   // a venue laid out at runtime (the kart's circuit) is handed in; the others are crowdVenues' tables
   const venue = opts.venue ?? (key === 'velocitykart' ? null : crowdVenue(key, opts.variant));
   if (!venue || venue.stands.length === 0) return null;
-  const crowd = mountCrowd(ctx.scene, venue, { reduced: () => motionPolicy().reduced, ...opts });
-  const offReport = ctx.momentum.onReport((e) => { const r = reactionFor(e); if (r) crowd.react(r.kind, r.strength); });
-  const offTier = ctx.momentum.onTierChange((next, prev) => { const r = reactionForTier(next, prev); if (r) crowd.react(r.kind, r.strength); });
-  const watch = ctx.scene.onBeforeRenderObservable.add(() => {
+  // a crowd is dressing: it must never take a mode down (a context built by a test, a scene that cannot draw it)
+  let crowd: CrowdHandle;
+  try { crowd = mountCrowd(ctx.scene, venue, { reduced: () => motionPolicy().reduced, ...opts }); }
+  catch (e) { console.warn('[FEL-CROWD] not mounted', (e as Error)?.message ?? e); return null; }
+  const offReport = ctx.momentum?.onReport?.((e) => { const r = reactionFor(e); if (r) crowd.react(r.kind, r.strength); }) ?? (() => {});
+  const offTier = ctx.momentum?.onTierChange?.((next, prev) => { const r = reactionForTier(next, prev); if (r) crowd.react(r.kind, r.strength); }) ?? (() => {});
+  const watch = typeof ctx.phase === 'function' ? ctx.scene.onBeforeRenderObservable.add(() => {
     if (ctx.phase() !== 'ended') return;
     crowd.react('finish', 0.5);   // applause; a mode that called react('finish', 1) on its win already has them jumping
     ctx.scene.onBeforeRenderObservable.remove(watch);
-  });
+  }) : null;
   if (process.env.NODE_ENV === 'development') (ctx.scene.metadata ??= {}).felCrowd = crowd;   // the capture rig stages reactions through it
   const dispose = crowd.dispose.bind(crowd);
   return Object.assign(crowd, {

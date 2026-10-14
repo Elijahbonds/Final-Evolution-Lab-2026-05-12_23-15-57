@@ -80,11 +80,14 @@ const TENNIS: CrowdVenue = {
 /**
  * VOLLEYBALL (Beach Pro, Night Beach, the Gym). The court is 9 × 18 (x ±4.5, z ±9) with the beach flags at x ±6.8; the
  * camera stands behind the player's end (z ≈ 10.8) looking −z. The sand has no seating, so this lays beach bleachers:
- * one behind the far baseline and one down each sideline past the flags — in place of the eight Onlookers.
+ * two flanking the far end and one down each sideline past the flags — in place of the eight Onlookers.
  */
 const VOLLEYBALL: CrowdVenue = {
   stands: [
-    { id: 'vb_far', front: [0, 0, -14], yaw: 0, width: 16, rows: 5, step: [0.72, 0.42], posture: 'seated', benches: true },
+    // the far bleachers FLANK the opponents' end: a crowd straight behind the far court is the backdrop the ball and the two
+    // far players are read against (first rig pass: a white ball over a wall of white shirts), so the middle stays sand
+    { id: 'vb_far_w', front: [-7.6, 0, -14.5], yaw: 0.12, width: 7.5, rows: 5, step: [0.72, 0.42], posture: 'seated', benches: true },
+    { id: 'vb_far_e', front: [7.6, 0, -14.5], yaw: -0.12, width: 7.5, rows: 5, step: [0.72, 0.42], posture: 'seated', benches: true },
     { id: 'vb_west', front: [-8.6, 0, -1.5], yaw: PI / 2, width: 15, rows: 4, step: [0.72, 0.42], posture: 'seated', benches: true },
     { id: 'vb_east', front: [8.6, 0, -1.5], yaw: -PI / 2, width: 15, rows: 4, step: [0.72, 0.42], posture: 'seated', benches: true },
   ],

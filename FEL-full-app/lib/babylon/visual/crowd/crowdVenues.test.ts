@@ -66,3 +66,9 @@ describe('derby: the baseline bleachers sit in foul ground', () => {
     }
   });
 });
+
+describe('volleyball: nobody straight behind the far court', () => {
+  it('the far end is left open behind the opponents (|x| ≥ 3.5 past the far baseline)', () => {
+    for (const s of layoutSeats(crowdVenue('volleyball')!)) if (s.pos[2] < -12) expect(Math.abs(s.pos[0]), s.stand).toBeGreaterThanOrEqual(3.5);
+  });
+});
