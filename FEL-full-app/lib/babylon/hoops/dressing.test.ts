@@ -1,9 +1,10 @@
 // vis-hoops-dunk — the set pieces on a NullEngine: the 3D boards, the lit racks, the judges' table. Each mounts what it says,
 // repaints only when what it says changes, and leaves nothing behind.
 import { beforeAll, describe, expect, it } from 'vitest';
-import { FreeCamera, NullEngine, Scene, Vector3 } from '@babylonjs/core';
+import { FreeCamera, MeshBuilder, NullEngine, Scene, Vector3 } from '@babylonjs/core';
 import { installOffscreenShim } from '../../../tests/helpers/canvasShim';
 import { mountBoard3D } from './Board3D';
+import { mountBallHalos } from './BallHalo';
 import { LED_HEX, MONEY_HEX, STAND, apronSize, mountRackDressing, stripHex } from './RackDressing';
 import { FLIP_OVERSHOOT, FLIP_SEC, cardRead, flipScale, mountJudgesTable } from './JudgesTable';
 import { boardSpot, mountShootoutDressing } from './shootoutDressing';
@@ -148,5 +149,24 @@ describe('cinematic bars', () => {
     setCinematic(s, NaN); expect((s.metadata as { felCinematic: number }).felCinematic).toBe(0);
     s.dispose();
     expect(() => setCinematic(s, 1)).not.toThrow();
+  });
+});
+
+describe('the money ball\'s halo', () => {
+  it('a disc turned to the lens rides the ball it is asked to light, off unless asked; one material for all', () => {
+    const s = rig(); const before = baseline(s);
+    const ball = MeshBuilder.CreateSphere('b1', { diameter: 0.24 }, s), ball2 = MeshBuilder.CreateSphere('b2', { diameter: 0.24 }, s);
+    const h = mountBallHalos(s);
+    h.set(ball, false); expect(s.meshes.some((m) => m.name === 'hoops_halo')).toBe(false);   // nothing built for a ball that is not lit
+    h.set(ball, true); h.set(ball2, true);
+    expect(h.lit).toBe(2);
+    const discs = s.meshes.filter((m) => m.name === 'hoops_halo');
+    expect(discs.length).toBe(2); expect(discs[0].parent).toBe(ball); expect(discs[0].material).toBe(discs[1].material);
+    expect(discs.every((d) => !d.isPickable)).toBe(true);
+    h.set(ball, false); expect(h.lit).toBe(1);
+    h.dispose(); h.dispose(); h.set(ball, true);   // safe twice, and a late call from the last load is nothing
+    expect(s.meshes.some((m) => m.name === 'hoops_halo')).toBe(false);
+    ball.dispose(); ball2.dispose();
+    expect(baseline(s)).toEqual(before);
   });
 });

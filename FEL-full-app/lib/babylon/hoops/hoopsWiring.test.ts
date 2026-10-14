@@ -76,3 +76,19 @@ describe('what the modes keep', () => {
     }
   });
 });
+
+describe('what throws a shadow', () => {
+  // LightRig classifies every mesh by name: whatever is not on its NEVER_CAST list becomes a caster, drawn again into every cascade.
+  const src = read('lib/babylon/scene/LightRig.ts');
+  const never = new RegExp(/const NEVER_CAST = \/(.*)\/i;/.exec(src)![1], 'i');
+  it('the hoops set\'s light and flat things never cast (they are light, or lie on the floor)', () => {
+    for (const n of ['hoops_netglow', 'hoops_flame', 'hoops_halo', 'tp_aprons', 'tp_rack0_led', 'tp_rack4_pool', 'tp_board_led', 'dd_tower_led', 'jt_card_3', 'fr_shock_1']) expect(never.test(n), n).toBe(true);
+  });
+  it('its solid pieces (legs, frames, posts, the table) are scenery and do cast', () => {
+    for (const n of ['tp_rack_legs', 'tp_board_frame', 'tp_board_post', 'dd_tower_frame', 'dd_tower_post', 'jt_top', 'jt_front', 'jt_leg', 'jt_post']) expect(never.test(n), n).toBe(false);
+  });
+  it('the names the guard uses are the names the modules build', () => {
+    const built = ['Board3D.ts', 'RackDressing.ts', 'JudgesTable.ts', 'RimFx.ts', 'BallHalo.ts'].map((f) => read(`${HOOPS_DIR}/${f}`)).join('\n');
+    for (const frag of ['hoops_netglow', 'hoops_flame', 'hoops_halo', 'tp_aprons', '_led', '_pool', 'jt_card_', '_frame', '_post', 'jt_top']) expect(built, frag).toContain(frag);
+  });
+});

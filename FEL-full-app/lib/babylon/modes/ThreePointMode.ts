@@ -81,6 +81,7 @@ import type { MicEvent } from '../audio/mic/MicDirector';
 import { mountRimFx, type RimFxHandle } from '../hoops/RimFx';   // vis-hoops-dunk: the rim's light on a make, the fire on a streak (visual only)
 import { tierFromShot } from '../hoops/hoopsLook';
 import { landMarks, shotMarks, stampCourt } from '../hoops/courtMarks';   // vis-hoops-dunk: the court keeps the shooter's feet (visual only)
+import { mountBallHalos, type BallHalosHandle } from '../hoops/BallHalo';   // vis-hoops-dunk: the money ball's glow
 import { mountShootoutDressing, type ShootoutDressingHandle } from '../hoops/shootoutDressing';   // vis-hoops-dunk: the lit racks and the 3D scoreboard
 import { HoopJuice } from '../visual/HoopJuice';   // A+ P0 CONTACT-lite: the hoop answers a make (shared with Dunk / 1v1 / 3v3; Meshy never scaled)
 import { mountShotMeter3D, type ShotMeter3DHandle } from '../visual/ShotMeter3D';   // THE SHOT METER (owner, 2026-09-18): the bar beside the shooter's head
@@ -447,6 +448,7 @@ function dressBall(): void {
   syncRacks();
   const money = isMoneyBall(S.ballIdx);
   for (const p of ballSkin) p.mesh.material = money ? p.money : p.base;   // the Meshy leather, or its gold
+  if (ball) halos?.set(ball, money);   // vis-hoops-dunk: and its glow
   if (!ballMat) return;
   ballMat.diffuseColor = money ? MONEY_COLOR : BALL_COLOR;
   // A touch of emissive so the money ball reads at distance under the venue grade.
@@ -465,6 +467,7 @@ let disposeCount = 0;
 // The release names the result (scorePop / feel.impact / score SFX stay where they were); the RIM answers when the ball
 // arrives — a soft shake + HoopJuice on a make, a clank on a miss. No hang slowMo, no dunk hit-stop, no FOV stack.
 let rimFx: RimFxHandle | null = null;   // vis-hoops-dunk
+let halos: BallHalosHandle | null = null;   // vis-hoops-dunk
 let dressing: ShootoutDressingHandle | null = null;   // vis-hoops-dunk: the racks' LED trim and aprons, the scoreboard
 let hoopJuice: HoopJuice | null = null;   // juice-only ring + net + material clones at RIM; no meshy_hoop_* transform is touched
 let landing: { perfect: boolean; money: boolean } = { perfect: false, money: false };   // what the release decided, for the landing beat (one landing beat per ball: Flight.contact)
@@ -1082,7 +1085,7 @@ function launchFlight(): void {
   f.call = micLanding; micLanding = null;
   f.endsRun = lastBallOfRun(); f.hot = S.streak >= FIRE_STREAK;
   for (const p of f.skin) p.mesh.material = f.money ? p.money : p.base;
-  f.mesh.position.copyFrom(from); f.mesh.rotationQuaternion = null; f.mesh.setEnabled(true);
+  f.mesh.position.copyFrom(from); f.mesh.rotationQuaternion = null; f.mesh.setEnabled(true); halos?.set(f.mesh, f.money);   // (the glow rides the flight of a money ball)
   f.arc.start(from, RIM, f.made, 'jumper', 0, null, pendingPlay); pendingPlay = null;
   trailOn(f.mesh);
   nextUpIn = f.endsRun ? -1 : NEXT_UP_SEC;
@@ -1449,6 +1452,7 @@ export const ThreePointMode: ModeDefinition = {
       sidelinePark(S.phase !== 'standings');   // IMPROVE (2026-10-06) #13: still until a board is up
     })();
 
+    halos?.dispose(); halos = mountBallHalos(ctx.scene);   // vis-hoops-dunk (before the ball: dressBall lights it)
     ball = MeshBuilder.CreateSphere('tp_ball', { diameter: 0.24, segments: 16 }, ctx.scene);
     ballMat = new StandardMaterial('tp_ballMat', ctx.scene);
     ball.material = ballMat;
@@ -1764,6 +1768,7 @@ export const ThreePointMode: ModeDefinition = {
     mic?.dispose(); mic = null; micLanding = null;   // THE MIC stops with the mode
     hoopJuice?.dispose(); hoopJuice = null;   // A+ P0: restores any hoop material the punch swapped
     rimFx?.dispose(); rimFx = null;   // vis-hoops-dunk
+    halos?.dispose(); halos = null;
     dressing?.dispose(); dressing = null;
     meter3d?.dispose(); meter3d = null;
     posture?.dispose(); posture = null;        // BIOMECH-HOOPS-WAVE1

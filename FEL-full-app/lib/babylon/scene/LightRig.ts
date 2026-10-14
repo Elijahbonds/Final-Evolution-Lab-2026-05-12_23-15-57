@@ -157,7 +157,9 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
   // court and a ring shadowing the floor it lies on.
   // vis-foundation-2: + ProxyMesh, the clustered-light container's own tile-pass plane (FixtureLights), and the ground
   // decals (GroundDecals: marks lying on the floor) — not scenery
-  const NEVER_CAST = /^(vb_|bk_|nexus_sky|sky|fel_ground|fel_decal_|venue_props_|phone_flash_|shot_meter|player_ring|player_tag|gull_\d|ProxyMesh$)|_contact$|_gull_|nexus_venue_map/i;
+  // vis-hoops-dunk: + the hoops set's light and cards, which are light or flat (the rim's net glow / flame / halo, the rack's apron and pools
+  // of light, the LED strips, the boards' faces, the judges' cards) and the shock-ring discs — none of them is a thing that throws a shadow
+  const NEVER_CAST = /^(vb_|bk_|nexus_sky|sky|fel_ground|fel_decal_|venue_props_|phone_flash_|shot_meter|player_ring|player_tag|gull_\d|ProxyMesh$|hoops_|tp_aprons|tp_rack\d_(?:led|pool)|tp_board_led|dd_tower_led|jt_card_|fr_shock_)|_contact$|_gull_|nexus_venue_map/i;
   // FOLIAGE DOES NOT CAST (2026-09-12). Measured on 1v1 with SceneInstrumentation: 377 shadow
   // casters against 150 active meshes, and 377 x 3 cascades accounts for essentially all 1136 draw
   // calls — the draw budget IS the shadow pass. Grouping the casters by name showed the bulk is
