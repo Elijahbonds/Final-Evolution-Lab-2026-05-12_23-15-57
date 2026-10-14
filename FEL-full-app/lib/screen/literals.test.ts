@@ -34,7 +34,7 @@ const ALLOWED: Record<string, [string[], string][]> = {
   'lib/assess/prqWrite.ts': [[['32', '1024', '3', '10', '64', '8', '9', '31', '16', '1000', '100', '50', '240', '5000', '7', '21', '8192'], 'record-validation bounds (sizes, key lengths, plausible ranges) and rounding: what the server would accept, not a grade (no server save in this ship)']],
   'lib/assess/thresholds.ts': [],
   'lib/screen/checks.ts': [], 'lib/screen/store.ts': [], 'lib/screen/flow.ts': [], 'lib/screen/copy.ts': [], 'lib/screen/PROPOSED-program-lanes.ts': [],
-  'lib/screen/age.ts': [], 'lib/screen/routes.ts': [],
+  'lib/screen/age.ts': [], 'lib/screen/routes.ts': [], 'lib/screen/week1-dunk.ts': [],
   'lib/screen/kid.ts': [[['10'], 'one decimal of rounding for the change line (as lib/assess/why.ts rounds the jump)']],
   'lib/screen/config.ts': [[['9'], 'a regex character class (a-z0-9)']],
   'lib/screen/ui.ts': [[['16', '3', '0.5', '6', '1200'], 'UI constants: the skeleton\'s One Euro (1, 16, 3), its visibility floor, the tracking-loss window and the Done beat — grade nothing (gate 2)'], [LANDMARKS, 'landmark indices and count'], [['2'], 'PART_RESTART_MAX (SCREEN A): the one auto-retry plus one more restart per part, then the part waits — UI pacing, it grades nothing']],

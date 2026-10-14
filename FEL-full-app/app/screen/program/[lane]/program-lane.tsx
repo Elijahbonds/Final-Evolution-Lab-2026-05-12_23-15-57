@@ -24,6 +24,7 @@ import { linksAllowed, strictestAge, type AgeBand } from '@/lib/screen/age';
 import { readAge, recall, tabStorage } from '@/lib/screen/store';
 import type { ScreenSummary } from '@/lib/screen/checks';
 import { RESULTS_PATH, programPath } from '@/lib/screen/routes';
+import { WEEK1_DUNK_DAYS, WEEK1_END_SET, WEEK1_EXIT, WEEK1_TITLE } from '@/lib/screen/week1-dunk';
 import { BACK_TO_RESULTS, DISCLAIMER, NO_PICK_LINE, WIN_LINE } from '@/lib/screen/copy';
 import { NotSavedCard } from '@/app/play/mirror/assess/_components/not-saved';
 import { BandChip, EarlyTag, ParentCard, PreviewLabel, ScreenFrame, StepCard, StopLine, quietBtn } from '@/app/play/mirror/assess/_components/screen-ui';
@@ -102,6 +103,8 @@ export function LaneBody({ lane, s, dunkHref = null }: { lane: LaneSlug; s: Scre
         <p className="mt-1 text-[16px] leading-snug">{drill.cue}<EarlyTag /></p>
         <div className="mt-2"><PreviewLabel /></div>
       </section>
+      {/* MIRROR step 3: week 1 of the base weeks as day cards, dunking lane only (adults: kids never reach LaneBody) */}
+      {lane === 'dunking' ? <Week1Cards /> : null}
       {/* NP-1: no placeholder block. The Dunk Program link shows only where it is built (the dunking lane). */}
       {dunkHref && lane === 'dunking' ? (
         <section data-build-dunk-section className="rounded-2xl border border-white/20 p-4">
@@ -110,5 +113,30 @@ export function LaneBody({ lane, s, dunkHref = null }: { lane: LaneSlug; s: Scre
       ) : null}
       <Link href={RESULTS_PATH} prefetch={false} data-back-to-results className={quietBtn}>{BACK_TO_RESULTS}</Link>
     </div>
+  );
+}
+
+/** Week 1 of the Dunking & Plyometrics base weeks (lib/screen/week1-dunk.ts): seven day cards, nothing read or saved. */
+export function Week1Cards() {
+  return (
+    <section data-week1 className="space-y-2">
+      <h2 className="px-1 text-[16px] font-bold uppercase tracking-[0.14em] text-white/60">{WEEK1_TITLE}</h2>
+      <ol className="space-y-2">
+        {WEEK1_DUNK_DAYS.map((d) => (
+          <li key={d.day} data-week1-day={d.day} data-week1-kind={d.kind} className="rounded-2xl border border-white/10 bg-white/[0.03] p-3.5">
+            <p className="text-[16px] font-black leading-snug">{d.day} · {d.title}</p>
+            {d.blocks.length ? (
+              <ul className="mt-1 space-y-1">
+                {d.blocks.map((b) => (
+                  <li key={b.name} className="text-[16px] leading-snug text-white/85"><b>{b.name}:</b> {b.what}</li>
+                ))}
+              </ul>
+            ) : null}
+          </li>
+        ))}
+      </ol>
+      <p data-week1-end-set className="px-1 text-[16px] leading-snug text-white/75">{WEEK1_END_SET}</p>
+      <p data-week1-exit className="px-1 text-[16px] leading-snug text-white/75">{WEEK1_EXIT}</p>
+    </section>
   );
 }
