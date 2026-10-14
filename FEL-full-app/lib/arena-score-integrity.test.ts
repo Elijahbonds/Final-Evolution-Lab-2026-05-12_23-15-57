@@ -896,7 +896,7 @@ describe('drift guards — the numbers mirrored out of mode files still match th
     expect(num(src('lib/babylon/modes/onevoneRules.ts'), /export const WIN_BY_2_CAP = (\d+);/, 'WIN_BY_2_CAP')).toBe(MIRRORED.onevoneWinBy2Cap);
     expect(SESSION_RULES_CEILINGS.hoops1v1.max).toBe(firstToCeiling(MIRRORED.onevoneWinBy2Cap, MIRRORED.bucketMax));
     expect(SCORE_CEILINGS.hoops1v1.max).toBe(firstToCeiling(MIRRORED.onevoneTarget, MIRRORED.bucketMax));
-    expect(sessionRulesMax('onevone', SCORE_CEILINGS.hoops1v1)).toBe(17);
+    expect(sessionRulesMax('onevone', SCORE_CEILINGS.hoops1v1)).toBe(15);   // cap 13 − 1 + a three (PM 2026-10-14; was 17 at cap 15)
     expect(sessionRulesMax('hoops3v3', SCORE_CEILINGS.hoops3v3)).toBe(SCORE_CEILINGS.hoops3v3.max);   // no option: the stake row
     expect(Object.keys(SESSION_RULES_CEILINGS)).toEqual(['hoops1v1', 'threePoint']);   // IMPROVE (2026-10-06, 3PT #5): the money rack is the second option
     for (const t of [one, three]) {

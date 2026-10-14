@@ -388,8 +388,9 @@ describe('P2 fix pass: a score is never paid above what the run could score', ()
     expect(sessionScoreCap('training', null, 60, { killSwitch: false })).toBe(SCORE_CEILINGS.training.max);   // 9,400
     expect(sessionScoreCap('dance', null, 60, { killSwitch: false })).toBe(SCORE_CEILINGS.dance.max);
     expect(sessionScoreCap('dunkContest', null, 60, { killSwitch: false })).toBe(SCORE_CEILINGS.dunkContest.max);
-    // owner 2026-10-06: the 1v1's win-by-2 option (never on a staked run) posts up to 17; the stake row stays 13
-    expect(sessionScoreCap('hoops1v1', null, 60, { killSwitch: false })).toBe(17);
+    // owner 2026-10-06: the 1v1's win-by-2 option (never on a staked run) posts up to cap − 1 + a three; the stake row stays 13.
+    // PM 2026-10-14: the cap is 13 per the spec (was 15), so that is 15 (was 17)
+    expect(sessionScoreCap('hoops1v1', null, 60, { killSwitch: false })).toBe(15);
     expect(SCORE_CEILINGS.hoops1v1.max).toBe(13);
     expect(sessionScoreCap('dunkContest', null, 60, { killSwitch: true })).toBeNull();     // the 2D game is on another scale
     expect(sessionScoreCap('skateboarding', null, 60, { killSwitch: false })).toBeNull();  // a 'bound', not a rules maximum

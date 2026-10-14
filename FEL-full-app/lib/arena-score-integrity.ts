@@ -72,7 +72,7 @@ export const MIRRORED = {
   onevoneTarget: 11, threevthreeTarget: 21,
   /** lib/babylon/modes/onevoneRules.ts WIN_BY_2_CAP — the 1v1's win-by-2 option (a player pick, never on a staked run) ends
    *  at this whatever the margin. Only the SESSION ceiling reads it (SESSION_RULES_CEILINGS); the stake row stays first to 11. */
-  onevoneWinBy2Cap: 15,
+  onevoneWinBy2Cap: 13,   // PM 2026-10-14: the spec's cap (was 15)
   /** Both hoops modes: a jumper is 2 or 3, a dunk 2 — no bucket is worth more than 3. */
   bucketMax: 3,
   /** lib/babylon/modes/ThreePointMode.ts — RACKS, BALLS_PER_RACK; the last ball of a rack is the money ball, worth 2. */
