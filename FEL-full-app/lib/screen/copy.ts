@@ -84,6 +84,8 @@ export const JUMP_BUILD_PROGRAM = 'Build my Dunk Program';
 export const JUMP_PLAY_FREE = 'Play free (Brain Brawl)';
 /** Adults only. Height has no band in the register: this is the existing personal-best sentence. */
 export const JUMP_MEANING = 'A personal best to beat next time.';
+/** MIRROR flight-time step: what the number is (an estimate from video) and what it measures. No outside comparisons. */
+export const JUMP_ESTIMATE_LINE = 'An estimate from video: your time in the air, turned into jump height. A slower camera gives a wider range.';
 /** Shown while the pose model and its runtime load, which starts only after Start. */
 export const COACH_READY = 'Getting the camera coach ready…';
 
