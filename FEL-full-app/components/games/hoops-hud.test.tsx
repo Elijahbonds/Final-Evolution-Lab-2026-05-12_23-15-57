@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { createElement as h } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { HoopsShotMeter, shotMeterWindow } from './hoops-shot-meter';
+import { HoopsShotMeter, SHOT_FILL_ALPHA, shotMeterWindow } from './hoops-shot-meter';
 import { JudgeCards } from './judge-cards';
 import { DunkBeatStrip } from './dunk-beat-strip';
 import { DunkFieldBoard } from './dunk-field-board';
@@ -24,13 +24,16 @@ describe('the 1v1 / 3v3 release bar', () => {
     for (const bad of [undefined, null, 5, '', '0.7', '0.7,0.1,0.2', 'a,b', 'NaN,0.1']) expect(shotMeterWindow(bad)).toBeNull();
   });
 
-  it('draws the window and the marker where the mode says, and no fill (the bar the owner has felt)', () => {
+  // test changed (owner, 2026-10-14: "turn both on"): this used to pin NO fill, the bar as it had (unintentionally) shipped.
+  it('draws the window, the marker, and a see-through fill up to the marker', () => {
     const m = html(h(HoopsShotMeter, { t: 0.58, green: '0.7,0.08' }));
     expect(m).toContain('data-hud-meter-marker');
     expect(m).toContain('left:58%');            // the marker sits at the meter's value
     expect(m).toContain('left:62%');            // the green window starts at centre - half
     expect(m).toContain('width:16%');           // ...and is 2 x half wide
-    expect(m).not.toContain('data-hud-meter-fill');
+    expect(m).toContain('data-hud-meter-fill');
+    expect(m).toMatch(/data-hud-meter-fill[^>]*width:58%/);   // the fill runs to the marker
+    expect(SHOT_FILL_ALPHA).toBeLessThanOrEqual(0.5);          // ...and the green window reads through it
   });
 
   it('with no window published it is the marker alone', () => {
@@ -132,4 +135,15 @@ describe('the pieces read no scoring or judging module', () => {
       for (const s of specs) expect(ALLOWED.some((a) => a.test(s)), `${f} imports ${s}`).toBe(true);
     });
   }
+});
+
+describe('the three-point release bar (owner, 2026-10-14: show the GOOD band)', () => {
+  it('draws the GOOD window (green ± half) behind the PERFECT band, from the mode\'s own numbers', () => {
+    const src = readFileSync(path.join(__dirname, 'three-point-babylon.tsx'), 'utf8');
+    const bar = src.slice(src.indexOf('function ReleaseBar'), src.indexOf('function ReleaseBar') + 1500);
+    const good = bar.indexOf("{ from: green - half, to: green + half, tone: 'you', alpha: 0.35 }");
+    const perfect = bar.indexOf("{ from: green - perfectHalf, to: green + perfectHalf, tone: 'score'");
+    expect(good).toBeGreaterThan(-1);
+    expect(perfect).toBeGreaterThan(good);   // GOOD first, so PERFECT paints over it
+  });
 });

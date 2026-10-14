@@ -340,14 +340,13 @@ const PIP_TICK: Record<string, { tone: HudTone; label: string } | undefined> = {
  *  the SAME window it is graded against, however distance or TV mode widened it). */
 function ReleaseBar({ t, green, half }: { t: number; green: number; half: number }) {
   const perfectHalf = half * 0.35;   // BasketballCore.ShotMeter.release(): perfect is the inner 0.35 of the good window
-  // The GOOD band is authored (a cyan class at /35) but never drew: Tailwind has no /35 in its opacity scale and emitted no rule
-  // (measured: 0 matches in the compiled CSS), so the bar the owner has felt shows the PERFECT band and the marker. That is what is
-  // drawn here — showing the wider window would change how the bar reads, and it is the owner's call. To show it, add
-  // { from: green - half, to: green + half, tone: 'you', alpha: 0.35 } ahead of the PERFECT segment.
+  // The GOOD band (owner, 2026-10-14: "turn both on"): authored as a cyan class at /35, it never drew (Tailwind has no /35 in its
+  // opacity scale). It draws now, behind the PERFECT band, at the authored 0.35. The windows are the mode's own; nothing is graded
+  // differently. It only shows the GOOD window that was always there.
   return (
     <HudMeter
       height="strip" width="min(520px, 70vw)" framed
-      segments={[{ from: green - perfectHalf, to: green + perfectHalf, tone: 'score', alpha: 0.8 }]}
+      segments={[{ from: green - half, to: green + half, tone: 'you', alpha: 0.35 }, { from: green - perfectHalf, to: green + perfectHalf, tone: 'score', alpha: 0.8 }]}
       markers={[{ at: t, tone: 'text', width: 4, glow: true }]}
     />
   );
