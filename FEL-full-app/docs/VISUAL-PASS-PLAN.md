@@ -735,6 +735,61 @@ freerun's world), `event` (big air's gate, towers and booth), `palette` (freerun
   floodlights for big air; landmark buildings and bespoke course modules are [ART].
 
 
+## Wave 2 status — the hoops: dunk, dunkduel, threepoint (vis-hoops-dunk, 2026-10-14)
+
+Owner, 2026-10-14: "Go on hoops." Part B for dunk, dunkduel and threepoint, on the wave-1 systems. The other three hoops modes
+(onevone, threevthree, carnival) are vis-hoops-court's and stay held in `scene/lookPolicy.ts`; the hoops HUD hosts are hud-hoops'.
+Everything new is in `lib/babylon/hoops/` (presentation only; `hoopsWiring.test.ts` holds each file there to importing nothing that
+scores, judges, times or tunes) and the three modes carry one-line, read-only hooks. No tuned feel number changed: no input, move,
+dribble, shot timing, meter, release window, difficulty, score, judging, pay or play-camera value.
+
+- **The hold is lifted for these three modes** (`lookPolicy`: dunk, dunkduel, threepoint and the dunk venue spec's id leave the held
+  list). Per system, on the rig (desktop tier, 1080p, same camera and moment before and after; sheets in the lane report):
+  fixture lights mount (2 lamp lights from the 2 lamps the Venice dressing has; at goldenHour's 0.35 gain they barely register: kept,
+  harmless); the live sky mounts on the photo domes (threepoint's pink sunset gets the drifting clouds; the dunk's painted Venice
+  sunset is already the sky the owner tuned and takes the cloud layer faintly); the glossy floor mounts on the Venice court's
+  PBR plane (see below); ground decals are stamped by all three; sweat rides the hero (the harness mounts it for any look mode);
+  wet surfaces need rain, which none of these modes has. Nothing looked wrong enough to keep a system held. The phone tier gets
+  none of fixtures / sky / mirror (as everywhere) and keeps the set pieces.
+- **The make lights the rim** (`RimFx`, all three). A ring of light leaves the iron at rim height (ShockRing fired flat), tinted
+  sparks (EffectsKit, budgeted), and the net's glow; four tiers (soft, sweet, big, money) from the dunk's slam accuracy or the shot's
+  grade. In threepoint the rim burns on a streak: embers one make short of `FIRE_STREAK`, flames and a lit net at it (half the
+  particles on a phone), out when the streak breaks. Reduced motion drops the ring and the net's flare and keeps a steady glow.
+- **dunk.** The judges' table (`JudgesTable`): five cards swing up from edge-on as the panel reveals each judge, in the judge's
+  score, and come down with the next run-up. The triple cut (`DunkReplayCam`, kept as it is: three angles and the poster freeze) asks
+  the foundation's letterbox for its bars. Plant and landing scuffs on the sealed court (the shared decal pool, laid above the paint).
+- **dunkduel.** The 3D score tower (both totals, the colour of whoever has the floor), the judges' table, the same bars on the cut,
+  the rim light's tint following the duellist (the foundation's kicker, a 38 % pull toward P1 cyan / P2 pink), the stands' phones by
+  the make and the gap between the duellists, and the broadcast intro (`walkIn`: the first hand-off card has no clock; the first
+  press skips it).
+- **threepoint.** The racks stand on legs with an LED strip (gold on the money rack) and a printed apron, and on desktop a pool of
+  light on the floor; a 3D scoreboard high behind the hoop (score, rack pips, clock, ON FIRE), named `*_led` so the glow layer
+  haloes it; a soft gold halo on the money ball (hand and flight); the shooter's set feet and the jog's stop on the court; and a
+  replay of a money ball dropped on a hot streak (`replay: true`, the board lane's `ReplayGate`: never the run's last ball, the
+  buzzer's, the practice rack, or inside the gate's tail guard; skippable; the clock is held while it plays). The #220 corner camera
+  and the tree fade are untouched and their tests green.
+- **The Venice court's gloss.** `GlossyFloor.GLOSSY_FLOOR_MESH` names a mode's own floor plane: the street court is a PBR plane
+  (`vb_court_paint`) laid over `venue_ground`, so the mirror goes on that. A sealed court's reflection is a dielectric's (soft
+  shapes of the palms, the bus and the bodies at a grazing angle), not a looking-glass: subtle by physics. `?lookoff=mirror` is the A/B.
+- **Budgets** (rig: 1080p desktop; 390x844 phone tier, DPR 2, same camera and moment before and after; draws are the engine's per
+  frame, with the shadow pass). Desktop idle draws: dunk 481 -> 567 (the mirror's list, the table, the boards), dunkduel 483 -> 580,
+  threepoint 628 -> 810; all far under 1600, active meshes 135 -> 143, 142 -> 152, 123 -> 140. Phone, content alone (shadows off):
+  dunk +7 draws and meshes, dunkduel +9, threepoint +7, texture memory +1 MB at most (dunk 254 -> 255 of 256); `mobileBudget.json`
+  is not raised. FINDING (RESOLVED by lane/tp-shadow-fix): threepoint on a phone showed +48 draws that were NOT content (120 -> 168
+  with the shadow pass on, the venue's palms, tent, pier and lamp posts drawn into the shadow map every frame). It was not the lift: it
+  was a load race in `scene/ShadowCache.ts` (VenueProps re-parks its kit masters once every model has loaded; when that landed after
+  the cache armed, the one-time placement was judged motion), present on finish-release too, measured 2 of 3 runs there. Fixed at the
+  ledger: a caster is judged only while shown, its show reads a fresh matrix, a late caster's thin buffer counts as motion while it
+  settles. Phone rig after the fix: threepoint 127 (120 + the set's 7), every run and with the race forced; dunk 100 with the race
+  forced (was 134); the `mobileBudget.json` row stands.
+- **Deferred to wave 3 / needs art or an owner call.** A "Flight Night" lighting option (a night mood with floodlights: the dunk's
+  goldenHour is the owner's tuned look, so a mood change is theirs); sun shafts (the foundation did not build them); instanced
+  and vertex-animated crowds and a crowd chant (the dunk's crowd is one baked strip, 3-Point's venue has no crowd, and phone flashes
+  over an empty beach would float); the dunk replay's fourth orbiting angle and depth of field (the contest's cut is tuned and
+  already three angles and a poster); a player-turn whip-pan and name-card lower third in the duel (a camera move and a HUD
+  piece: routed to hud-hoops); 3-Point's slow side dolly (the play camera is TUNED). 3-Point's broadcast intro was added after
+  the owner's call (lane/tp-shadow-fix: `walkIn`, the 60 s clock waits for it, a press skips it, none under reduced motion); branded rack models, a bespoke
+  scoreboard and judge-table models are [ART].
 ## Wave 2 status — the hoops courts (vis-hoops-court, 2026-10-14)
 
 Part B for onevone, threevthree and carnival, after the owner's "Go on hoops". The three modes left `scene/lookPolicy.ts`'s hold

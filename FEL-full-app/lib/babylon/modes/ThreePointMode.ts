@@ -67,7 +67,8 @@ import { boneNode } from '../anim/boneLookup';   // POLISH: the rack pick aims a
 import { mountPlayerRing, type PlayerRingHandle } from '../visual/PlayerRing';   // PLAYER RING (2026-09-17): stamina at the feet, the creator glyph over the head
 import { readPlayerIcon } from '../visual/playerIcon';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';
-import { collectFadeLeaves, updateFade, type FadeLeaf, type Pt } from './threePointOcclusion';   // CAM-FIXES: the trees the corner camera stands in
+import { collectFadeLeaves, updateFade, type FadeLeaf, type Pt } from './threePointOcclusion';
+import { THREE_POINT_INTRO, holdForIntro } from './threePointIntro';   // the broadcast intro: the clock waits for it   // CAM-FIXES: the trees the corner camera stands in
 import { applyOceanCourt } from '../visual/CourtSurface';
 import { ShotArc, followThroughFor, ShotMeter, SHOT_QUALITY_PCT, distanceContest01, type ShotQuality } from '../core/BasketballCore';
 import { BallSim } from '../core/BallPhysics';
@@ -78,6 +79,12 @@ import { THREE_CORNER_R, THREE_TOP_R, threePointRadius } from '../core/Basketbal
 import { SoundKit } from '../audio/SoundKit';
 import { ModeMic } from '../audio/mic/ModeMic';   // THE MIC (2026-09-24): the court's MC, the sidekick and the crowd call the shootout
 import type { MicEvent } from '../audio/mic/MicDirector';
+import { mountRimFx, type RimFxHandle } from '../hoops/RimFx';   // vis-hoops-dunk: the rim's light on a make, the fire on a streak (visual only)
+import { tierFromShot } from '../hoops/hoopsLook';
+import { landMarks, shotMarks, stampCourt } from '../hoops/courtMarks';   // vis-hoops-dunk: the court keeps the shooter's feet (visual only)
+import { ReplayGate } from './boardMoments';   // vis-hoops-dunk: the replay's pacing (the board lane's, pure): the run's best, a few a run, never near the end card
+import { mountBallHalos, type BallHalosHandle } from '../hoops/BallHalo';   // vis-hoops-dunk: the money ball's glow
+import { mountShootoutDressing, type ShootoutDressingHandle } from '../hoops/shootoutDressing';   // vis-hoops-dunk: the lit racks and the 3D scoreboard
 import { HoopJuice } from '../visual/HoopJuice';   // A+ P0 CONTACT-lite: the hoop answers a make (shared with Dunk / 1v1 / 3v3; Meshy never scaled)
 import { mountShotMeter3D, type ShotMeter3DHandle } from '../visual/ShotMeter3D';   // THE SHOT METER (owner, 2026-09-18): the bar beside the shooter's head
 import type { ModeContext, ModeDefinition, HudValue } from '../core/ModeHarness';
@@ -443,6 +450,7 @@ function dressBall(): void {
   syncRacks();
   const money = isMoneyBall(S.ballIdx);
   for (const p of ballSkin) p.mesh.material = money ? p.money : p.base;   // the Meshy leather, or its gold
+  if (ball) halos?.set(ball, money);   // vis-hoops-dunk: and its glow
   if (!ballMat) return;
   ballMat.diffuseColor = money ? MONEY_COLOR : BALL_COLOR;
   // A touch of emissive so the money ball reads at distance under the venue grade.
@@ -460,6 +468,10 @@ let disposeCount = 0;
 // ── A+ P0 CONTACT-lite (PM brief THREEPOINT-A-PLUS-P0, 2026-09-06) ────────────────────────────────────────────
 // The release names the result (scorePop / feel.impact / score SFX stay where they were); the RIM answers when the ball
 // arrives — a soft shake + HoopJuice on a make, a clank on a miss. No hang slowMo, no dunk hit-stop, no FOV stack.
+let rimFx: RimFxHandle | null = null;   // vis-hoops-dunk
+let halos: BallHalosHandle | null = null;   // vis-hoops-dunk
+const replayGate = new ReplayGate();   // vis-hoops-dunk: which make earns a broadcast replay (reset with each run)
+let dressing: ShootoutDressingHandle | null = null;   // vis-hoops-dunk: the racks' LED trim and aprons, the scoreboard
 let hoopJuice: HoopJuice | null = null;   // juice-only ring + net + material clones at RIM; no meshy_hoop_* transform is touched
 let landing: { perfect: boolean; money: boolean } = { perfect: false, money: false };   // what the release decided, for the landing beat (one landing beat per ball: Flight.contact)
 // ── THE MIC (owner, 2026-09-24: "add a MC announcer on the mic at the events so it has better commentary and audio") ──────
@@ -542,7 +554,7 @@ const S = {
 
 function resetState(): void {
   S.phase = 'move'; S.rack = 0; S.ballIdx = 0; S.pts = 0; S.streak = 0; S.best = 0;
-  S.clock = GAME_LEN; S.moveT = 0; S.charge = 0; S.fired = false;
+  S.clock = GAME_LEN; S.moveT = 0; S.charge = 0; S.fired = false; replayGate.reset();
   S.from.copyFrom(RACK_POS[0]);
   S.round = 'qualifying';
   S.standingsT = 0;
@@ -591,12 +603,18 @@ function restyleRacks(): void {
   for (const row of rackBalls) for (const bm of row) if (!(pick && pick.mesh === bm)) freezeTree(bm);
 }
 
+/** vis-hoops-dunk: what the set's scoreboard and racks are told — the numbers the HUD already shows (read only). */
+function dressState(): Parameters<ShootoutDressingHandle['update']>[0] {
+  const practice = S.round === 'practice';
+  return { score: S.pts, rack: S.rack, racks: RACKS, clock: practice ? null : S.clock, streak: S.streak, fireAt: FIRE_STREAK, moneyRack: !practice && S.moneyRack !== NO_MONEY_RACK, moneyRackIdx: practice ? -1 : S.moneyRack };
+}
+
 /** Reset only the per-run shooting state, keeping contest standings. */
 function resetRun(): void {
   endFlights();   // IMPROVE (2026-10-06) #1: nothing from the last run is still in the air
   nextUpIn = -1; S.pips = EMPTY_PIPS;   // IMPROVE (2026-10-06) #4: a fresh run's pips
   S.phase = 'move'; S.rack = 0; S.ballIdx = 0; S.pts = 0; S.streak = 0;
-  S.clock = GAME_LEN; S.moveT = 0; S.charge = 0; S.fired = false;
+  S.clock = GAME_LEN; S.moveT = 0; S.charge = 0; S.fired = false; replayGate.reset();   // vis-hoops-dunk: a fresh run's replays
   S.from.copyFrom(RACK_POS[0]);
   shotWin = 'none'; releaseIn = -1; holding = false;
   if (player && ball) { ball.setEnabled(true); attachBallToHand(ball, player.skeleton, hoopsHand(player)); }   // BIOMECH-HOOPS-WAVE1 — HOOPS MOTION phase 3: the right hand as drawn (IMPROVE #1: shown — a release hides it)
@@ -880,6 +898,7 @@ function bodyTick(ctx: ModeContext): void {
 function fire(ctx: ModeContext, power?: number): void {
   if (S.phase !== 'shoot' || S.fired || !player || !ball || !flights.length) return;
   S.fired = true;
+  stampCourt(ctx.scene, shotMarks(player.root.position, player.root.rotation.y));   // vis-hoops-dunk: the set feet
 
   const quality = shotMeter.release();
   shotErr = shotMeter.t - shotMeter.greenCenter01;   // the SIGN is the feedback: early is short, late is long
@@ -966,6 +985,14 @@ function contactMake(ctx: ModeContext, f: Flight): void {
   if (big && player && S.phase === 'flight' && !pick) beats?.beat(SPORT_CLIP.scoreCelebrate, { fadeSec: 0.12 });   // settles into the loop (WATCH_IDLE, set with the set)
   if (big) ctx.juice.flash(f.money ? '#ffd75e' : '#fff6dd', 90);
   hoopJuice?.punch(true);   // RIM PLAY: escalates over a rattle's graze
+  rimFx?.make(tierFromShot({ perfect: f.perfect, money: f.money })); rimFx?.streak(S.streak, FIRE_STREAK);   // vis-hoops-dunk: the iron lights up, and burns on a streak (visual only; reads the streak, never writes it)
+  // vis-hoops-dunk: THE REPLAY — a money ball dropped on a hot streak, once in a while, in the first stretch of a run: never the run's last ball or the
+  // buzzer's (f.endsRun / f.quiet), never the practice rack, never inside the board lane's tail guard (its playback time + 14 s of a clock that is
+  // held while it plays). Skippable by any press; ReplayDirector puts every body, the ball and the camera back where they were.
+  if (f.money && !f.endsRun && !f.quiet && S.round !== 'practice') {
+    const plan = replayGate.consider(GAME_LEN - S.clock, { kind: 'money', weight: S.streak, floor: FIRE_STREAK, sec: 2.2 }, S.clock);
+    if (plan) void ctx.highlight?.({ lastSeconds: plan.lastSeconds, angles: ['tight', 'high'], objective: RIM });   // (a long lens, then from above: the default side and low cuts look back at the venue's signs from behind)
+  }
   // THE NET ANSWERS (suite pass, 2026-09-16): 1v1, 3v3 and the dunk contest burst the net on a make; the shootout —
   // the mode that is nothing but makes — did not. Sparks on the money ball and the perfect release.
   EffectsKit.burst(ctx.scene, RIM, 'net');
@@ -979,6 +1006,7 @@ function missClank(ctx: ModeContext, f: Flight): void {
   f.contact = true;
   ctx.feel.impact(0.4);
   SoundKit.play('impact', { pitch: 1.35, volume: 0.45 });
+  rimFx?.streak(S.streak, FIRE_STREAK);   // vis-hoops-dunk: a miss ends the burn when the ball gets to the iron
   console.info('[3PT-JUICE] miss clank');
 }
 
@@ -1067,7 +1095,7 @@ function launchFlight(): void {
   f.call = micLanding; micLanding = null;
   f.endsRun = lastBallOfRun(); f.hot = S.streak >= FIRE_STREAK;
   for (const p of f.skin) p.mesh.material = f.money ? p.money : p.base;
-  f.mesh.position.copyFrom(from); f.mesh.rotationQuaternion = null; f.mesh.setEnabled(true);
+  f.mesh.position.copyFrom(from); f.mesh.rotationQuaternion = null; f.mesh.setEnabled(true); halos?.set(f.mesh, f.money);   // (the glow rides the flight of a money ball)
   f.arc.start(from, RIM, f.made, 'jumper', 0, null, pendingPlay); pendingPlay = null;
   trailOn(f.mesh);
   nextUpIn = f.endsRun ? -1 : NEXT_UP_SEC;
@@ -1333,10 +1361,15 @@ export const ThreePointMode: ModeDefinition = {
   modeId: 'threepoint',
   mood: 'goldenHour',
   camPreset: 'hoops',
+  replay: true,       // vis-hoops-dunk: the money ball on a hot streak, replayed (ctx.highlight in contactMake, through the board lane's ReplayGate)
+  intro: THREE_POINT_INTRO,   // the broadcast crane over the venue before the first rack (skippable; none under reduced motion)
+  replayDof: false,   // …without the depth of field (the board lane measured it flattening a frame on desktop; the replay is otherwise the same)
+  replayCast: () => ({ bodies: player ? [player.root] : [], loose: [ball, ...flights.map((f) => f.mesh)].filter((m): m is Mesh => !!m) }),   // the shooter, and every ball
   // HOOPS BODY (2026-10-07): the body drives the shot (claims: the jump and the release; the card's lines). The floor presses
   // nothing here (the row binds nothing), so a dip or a stray jump never fires a ball on its own.
   body: THREE_BODY,
   onBody(ctx: ModeContext, ev: BodyEvent, _view: BodyView): boolean {
+    if (ctx.camDirector.inIntro) return false;   // no shot is taken under the broadcast intro
     if (S.phase !== 'shoot' || S.fired) return false;
     const act = bodyShot.see(ev);
     if (act.start) bodyStart(ctx);
@@ -1434,6 +1467,8 @@ export const ThreePointMode: ModeDefinition = {
       sidelinePark(S.phase !== 'standings');   // IMPROVE (2026-10-06) #13: still until a board is up
     })();
 
+    halos?.dispose(); halos = mountBallHalos(ctx.scene);   // vis-hoops-dunk (before the ball: dressBall lights it)
+    (ctx.scene.metadata ??= {}).felHoops = { probe: () => ({ phase: S.phase, t: shotMeter.t, green: shotMeter.greenCenter01, half: shotMeter.greenHalfWidth01, active: shotMeter.active, streak: S.streak, ballIdx: S.ballIdx, money: isMoneyBall(S.ballIdx), fire: rimFx?.fire ?? 0, clock: S.clock }) };   // for the rig's probes (read only)
     ball = MeshBuilder.CreateSphere('tp_ball', { diameter: 0.24, segments: 16 }, ctx.scene);
     ballMat = new StandardMaterial('tp_ballMat', ctx.scene);
     ball.material = ballMat;
@@ -1522,8 +1557,10 @@ export const ThreePointMode: ModeDefinition = {
         rackSkin = skin; restyleRacks();
       });
 
+    dressing?.dispose(); dressing = mountShootoutDressing(ctx.scene, rackMeshes.filter((m) => /^rack_\d+$/.test(m.name)).map((m) => m.position.clone()), RIM, dressState());   // vis-hoops-dunk (display only)
     meter3d?.dispose(); meter3d = mountShotMeter3D(ctx.scene);
     hoopJuice?.dispose(); hoopJuice = new HoopJuice(ctx.scene, RIM);   // A+ P0: once per load, at the rim the arc lands on
+    rimFx?.dispose(); rimFx = mountRimFx(ctx.scene, RIM, (ctx.scene.metadata as { felTier?: string } | null)?.felTier);   // vis-hoops-dunk
     if (process.env.NODE_ENV === 'development') { const dev = (window as unknown as { __FEL_DEV__?: { hoopJuiceUsed?: unknown } }).__FEL_DEV__; if (dev) dev.hoopJuiceUsed = hoopJuice.used; }
 
     S.from.copyFrom(RACK_POS[0]);
@@ -1551,6 +1588,7 @@ export const ThreePointMode: ModeDefinition = {
   },
 
   onInput(ctx: ModeContext, e: FelInput): void {
+    if (ctx.camDirector.inIntro) return;   // the intro's input: the press that skips it (the harness's skipIntro) is never a shot
     if (e.t === 'stick' && e.side === 'R') { S.lookX = e.x; S.lookY = e.y; return; }   // MODE-STICK-FACE: R stick → the director's look orbit
     if (S.phase === 'done') return;
     // IMPROVE (2026-10-06) #2: SKIP THE STANDINGS. The board ignored every press for 0.75 s a card plus a 4 s hold; a press
@@ -1584,9 +1622,13 @@ export const ThreePointMode: ModeDefinition = {
 
   update(ctx: ModeContext, dt: number): void {
     meter3d?.update(dt);
+    rimFx?.update(dt);   // vis-hoops-dunk
+    dressing?.update(dressState());   // vis-hoops-dunk: the board reads what the HUD reads
+    if (rimFx && flights.every((f) => f.state === 'idle')) rimFx.streak(S.streak, FIRE_STREAK);   // nothing in the air: the rim's fire follows the streak (a new run, a cold spell); landings set it below
     micTick(ctx);   // THE MIC: its clock runs on every frame (the board's calls, the caption's expiry)
     if (S.phase === 'done' || !player || !ball || !flights.length) return;
     if (!S.optsRead) readRunOptions(ctx);   // IMPROVE (2026-10-06) #5 #6: the READY screen's picks, on the run's first frame
+    if (holdForIntro(ctx.camDirector, player.root.position, RIM)) { updateFadeLeaves(ctx, dt); pushHud(ctx); return; }   // the intro on screen: the clock and the run wait
     stepFlights(ctx, dt);   // IMPROVE (2026-10-06) #1: every ball in the air lands on its own, in every phase
     if (pick) {   // POLISH: the pick off the rack — eased from the rack to the hand, then attached
       pick.t = Math.min(1, pick.t + dt / PICK_SEC); const k = pick.t * pick.t * (3 - 2 * pick.t);
@@ -1659,6 +1701,7 @@ export const ThreePointMode: ModeDefinition = {
       const travel = yawOfVel({ x: target.x - S.from.x, z: target.z - S.from.z }, 0.05);
       if (k < 1 && travel !== null) player.root.rotation.y = slewYaw(player.root.rotation.y, travel, FACE_RATE, dt);
       if (S.moveT >= 1) {
+        stampCourt(ctx.scene, landMarks(player.root.position, player.root.rotation.y, 0.35));   // vis-hoops-dunk: the jog's stop scuffs the court
         S.phase = 'shoot';
         S.fired = false;
         beginShootPhase();   // in range from this frame (see advanceBall)
@@ -1742,6 +1785,9 @@ export const ThreePointMode: ModeDefinition = {
     camBoundsMesh?.dispose(); camBoundsMesh = null;
     mic?.dispose(); mic = null; micLanding = null;   // THE MIC stops with the mode
     hoopJuice?.dispose(); hoopJuice = null;   // A+ P0: restores any hoop material the punch swapped
+    rimFx?.dispose(); rimFx = null;   // vis-hoops-dunk
+    halos?.dispose(); halos = null;
+    dressing?.dispose(); dressing = null;
     meter3d?.dispose(); meter3d = null;
     posture?.dispose(); posture = null;        // BIOMECH-HOOPS-WAVE1
     carry?.dispose(); carry = null;   // HOOPS MOTION phase 3

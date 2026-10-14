@@ -47,6 +47,7 @@ describe('mountSkyDome', () => {
     const release = holdProbeMode();
     try { expect(skyDomeWanted('high', HELD_PROBE_MODE)).toBe(false); } finally { release(); }
     expect(skyDomeWanted('high', 'onevone')).toBe(true);   // vis-hoops-court lifted its hold
+    expect(skyDomeWanted('high', 'dunk')).toBe(true);      // vis-hoops-dunk lifted its hold (dunk, dunkduel, threepoint)
     expect(skyDomeWanted('high', 'sprint', true)).toBe(false);
   });
   it('plugs into the domes\' own materials (both skies) and comes off again', () => {
@@ -91,6 +92,7 @@ describe('the haze (aerial perspective)', () => {
     expect(atmosphereWanted({ ...base, hasVenueSky: true })).toBe(false);
     const release = holdProbeMode();
     try { expect(atmosphereWanted({ ...base, modeId: HELD_PROBE_MODE })).toBe(false); } finally { release(); }
+    expect(atmosphereWanted({ ...base, modeId: 'threepoint' })).toBe(true);   // vis-hoops-dunk lifted its hold
     expect(atmosphereWanted({ ...base, mood: 'indoorArena' })).toBe(false);
     expect(atmosphereWanted({ ...base, off: true })).toBe(false);
   });

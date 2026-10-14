@@ -81,5 +81,7 @@ describe('the pool', () => {
     try { expect(mountSceneDecals(rig(HELD_PROBE_MODE).scene, 'desktop')).toBeNull(); } finally { release(); }
     const c = mountSceneDecals(rig('onevone').scene, 'desktop');   // vis-hoops-court lifted its hold: the court keeps its scuffs
     expect(c).not.toBeNull(); c?.dispose();
+    const d = mountSceneDecals(rig('dunk').scene, 'desktop');   // vis-hoops-dunk lifted its hold: dunk, dunkduel and threepoint stamp now
+    expect(d).not.toBeNull(); d?.dispose();
   });
 });
