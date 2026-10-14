@@ -1,7 +1,7 @@
 // FEL Pro pricing + payment methods (2026-09-12).
 import { describe, it, expect } from 'vitest';
 import { STRIPE_PRODUCTS } from '../../lib/stripe';
-import { paymentMethodsFor, UNAVAILABLE_METHODS, NOT_ON_SUBSCRIPTION, REMOVED_METHODS } from '../../lib/stripe-payment-methods';
+import { paymentMethodsFor, UNAVAILABLE_METHODS, NOT_ON_SUBSCRIPTION } from '../../lib/stripe-payment-methods';
 import { FEL_PRO_WEEKLY_USD } from '../../lib/progression/upgradeGate';
 
 describe('two cadences, one entitlement', () => {
@@ -61,18 +61,12 @@ describe('payment methods offered are ones Stripe can actually take', () => {
     });
   });
 
-  it('KLARNA-OFF: neither Klarna nor Afterpay/Clearpay is on any pinned list', () => {
+  it('Afterpay is one-time only — Stripe does not support BNPL on subscriptions', () => {
     pin(() => {
-      for (const mode of ['payment', 'subscription'] as const) {
-        const list = paymentMethodsFor(mode) ?? [];
-        expect(list).not.toContain('klarna');
-        expect(list).not.toContain('afterpay_clearpay');
-        expect(list.join(' ')).not.toMatch(/klarna|afterpay|clearpay/i);
-      }
+      expect(paymentMethodsFor('payment')).toContain('afterpay_clearpay');
+      expect(paymentMethodsFor('subscription')).not.toContain('afterpay_clearpay');
     });
-    expect(Object.keys(NOT_ON_SUBSCRIPTION)).not.toContain('klarna');
-    expect(Object.keys(NOT_ON_SUBSCRIPTION)).not.toContain('afterpay_clearpay');
-    expect(REMOVED_METHODS).toEqual(['klarna', 'afterpay_clearpay']);
+    expect(NOT_ON_SUBSCRIPTION.afterpay_clearpay).toBeTruthy();
   });
 
   it('PayPal is offered on the store, kept off the recurring plan', () => {
@@ -101,7 +95,7 @@ describe('payment methods offered are ones Stripe can actually take', () => {
     const prev = process.env.STRIPE_PM_PIN;
     process.env.STRIPE_PM_PIN = '1';
     expect(paymentMethodsFor('subscription')).toEqual(['card', 'link', 'cashapp']);
-    expect(paymentMethodsFor('payment')).toEqual(['card', 'link', 'cashapp', 'paypal']);
+    expect(paymentMethodsFor('payment')).toEqual(['card', 'link', 'cashapp', 'afterpay_clearpay', 'klarna', 'paypal']);
     if (prev === undefined) delete process.env.STRIPE_PM_PIN; else process.env.STRIPE_PM_PIN = prev;
   });
 });
