@@ -17,6 +17,7 @@
 // All additions are animation-independent on purpose (E25/M51-safe).
 
 import { rivalForNight, rivalIntro, takeNextRival, rivalById, type DunkRival } from '../core/DunkRivals';
+import { mountModeCrowd, type ModeCrowd } from '../visual/crowd/modeCrowd';   // w3-crowds (A9.9)
 import { rosterBodyUrl } from '../core/athleteRoster';
 import {
   freshStakes, call as callTrick, spendAttempt, attemptsLeft, canRetry,
@@ -459,6 +460,7 @@ export const DunkMode: ModeDefinition = (() => {
   let settleArmed = false, settleArmAt = 0;   // A+ P4: the settle waits for feet-down, not the flush frame
   let hoopJuice: HoopJuice | null = null;     // juice LOOK: rim spring, net squash, hoop flash on the make
   let rimFx: RimFxHandle | null = null;       // vis-hoops-dunk: the ring of light, the sparks and the net's glow on a make
+  let stands: ModeCrowd | null = null;       // w3-crowds (A9.9): the boardwalk crowd
   let judgesTable: JudgesTableHandle | null = null;   // vis-hoops-dunk: the judges' table, its cards flip as the panel reveals them
   // THE SLAM METER (owner, 2026-09-18: "put a shot meter … make it trigger on layups and dunks"): the bar beside the
   // dunker's head rides the CLIP clock with the slam window drawn green — the same window slamNow grades by. The span
@@ -1368,6 +1370,7 @@ export const DunkMode: ModeDefinition = (() => {
       hoopJuice?.dispose(); hoopJuice = new HoopJuice(ctx.scene, rim);
       rimFx?.dispose(); rimFx = mountRimFx(ctx.scene, rim, (ctx.scene.metadata as { felTier?: string } | null)?.felTier);   // vis-hoops-dunk
       judgesTable?.dispose(); judgesTable = mountJudgesTable(ctx.scene, DUNK_COURT.judgesAt, DUNK_COURT.judgesFace, JUDGE_COUNT);   // vis-hoops-dunk
+      stands?.dispose(); stands = mountModeCrowd(ctx, 'dunk');   // w3-crowds: the boardwalk crowd either side of the rim's line; it hears the dunks
       (ctx.scene.metadata ??= {}).felHoops = { rimFx, judgesTable, probe: () => ({ phase, clipTime, turn }) };   // for the rig's probes (read only)
       phoneFlashes?.dispose(); phoneFlashes = new PhoneFlashes(ctx.scene, new Vector3(rim.x, 0, rim.z + 5));   // DUNK MOTION phase 12
       mic?.dispose(); mic = new ModeMic(ctx, { groups: ['dunk', 'names'], court: ctx.location, players: { ...DUNK_RIVAL_VOICES } }); micOpened = false; micFiller = false;
@@ -2478,6 +2481,7 @@ export const DunkMode: ModeDefinition = (() => {
       skyRoot?.dispose(); skyRoot = null;   // THE SKY TIER
       hoopJuice?.dispose(); hoopJuice = null;
       rimFx?.dispose(); rimFx = null; judgesTable?.dispose(); judgesTable = null;   // vis-hoops-dunk
+      stands?.dispose(); stands = null;   // w3-crowds
       phoneFlashes?.dispose(); phoneFlashes = null;
       mic?.dispose(); mic = null;   // THE MIC stops with the mode
       meter3d?.dispose(); meter3d = null;

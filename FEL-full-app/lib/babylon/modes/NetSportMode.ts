@@ -34,7 +34,7 @@ import { readPlaceLook } from '../nexus/placeLooks';
 import { SoundKit } from '../audio/SoundKit';
 import { refuse } from '../core/Refusal';   // MECHANICS PASS: a press that cannot act is answered
 import { EffectsKit } from '../visual/EffectsKit';
-import { Onlookers } from '../visual/Onlookers';
+import { mountModeCrowd, type ModeCrowd } from '../visual/crowd/modeCrowd';
 import { mountPostureLayer } from '../anim/PostureLayer';
 import { fieldPose, netWindow, fieldBank, NET_REACH_M } from '../core/FieldPosture';
 import {
@@ -228,7 +228,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
 
   // flight state
   let shot: Shot | null = null;
-  let crowd: Onlookers | null = null;
+  let crowd: ModeCrowd | null = null;   // w3-crowds: the stands (they hear the points through ctx.momentum)
   let flightT = 0;                 // 0..1 across the current flight
   let contactArmed = false;        // the receiving side may swing
   let awaitingHuman = false;       // is the ball coming to us?
@@ -484,7 +484,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     // IMPROVE (2026-10-06) Tennis #7 finding: tennis's crowd cheered LOUDER on the opponent's point (`side === 1 ? 1`). Side
     // 1 is the opponent here; HERO_SIDE = 1 is the hero's END (+Z), and the two read alike — the comment above says the
     // home side is the loud one. Both courts now cheer the player's point at full strength.
-    crowd?.cheer(side === 0 ? 1 : 0.35);
+    // w3-crowds: the stands hear this point through the momentum reports below (a won rally cheers, a lost one groans)
 
     // M107 point feedback → ARENA-10PHASE P6: the point's TEXT lives in the banner alone (see flash); the feel hit, the
     // shake and the loss flash stay. The streak still builds tension across a game.
@@ -1265,19 +1265,9 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       trail.stop();
       SoundKit.startAmbient(o.ambient);
       if (o.crowd) {
-        // Down both sidelines, derived from THIS court rather than hardcoded:
-        // volleyball and tennis are very different sizes, and a fixed offset
-        // that clears one sits inside the other. Always outside halfWidth, so
-        // nobody stands anywhere a ball can legally land — and far enough out (QA P1-05, netCrowdSpots) that a
-        // spectator never reads as a player. P5: on the beach, a second bank behind each baseline (spots.ends) — the beach
-        // court's people read as a crowd, not four figures on a sideline ("billboard" bodies, playtest d3d4a93).
-        const spots = netCrowdSpots(o.cfg, { cage: o.cage, beach: o.beach });
-        // IMPROVE (2026-10-06) #14: ONE bank. The ends were a second Onlookers, so the beach court stood 16 skinned bodies
-        // (two MAX_BODIES banks, ~6 draws each) on top of the four players. Onlookers spreads its cap over every spot it
-        // is given, so the 22 spots now share 8 bodies: two down each sideline, two behind each baseline.
-        // IMPROVE (2026-10-06) Tennis #20: the tennis crowd pauses the bodies the camera cannot see (Onlookers' opt-in);
-        // the beach court's bank is left exactly as the volleyball pass tuned it
-        crowd = new Onlookers(ctx.scene, [...spots.sides, ...spots.ends], '#3E5A70', undefined, { pauseOffscreen: !VOLLEY });
+        // w3-crowds (A9.9): the stands — tennis's far grandstand and both sidelines, the beach's bleachers — in place of the
+        // eight Onlookers (netCrowdSpots stays: it is where a sideline body may stand, and its QA P1-05 rule still holds)
+        crowd = mountModeCrowd(ctx, VOLLEY ? 'volleyball' : 'tennis');
       }
 
       rally = new RallyState(o.cfg);
@@ -1468,9 +1458,6 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
 
       if (splittingNow > 0) splittingNow = Math.max(0, splittingNow - dt);
 
-      // IMPROVE (2026-10-06) #8: the crowd steps BEFORE the rest's early return. awardPoint cheers and then rests 1.4 s,
-      // and the rest skipped update() — so the hop every cheer is for never played. (Tennis and volleyball both.)
-      crowd?.update(dt);
       if (restSec > 0) {
         // VIS-COURT: the broadcast intro holds the first serve (the toss is a timed press: left to run it would play the
         // serve for a player who is watching the crane). It ends on its own, or on the first input.

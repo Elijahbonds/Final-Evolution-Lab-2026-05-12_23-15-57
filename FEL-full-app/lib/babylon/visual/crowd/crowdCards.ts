@@ -10,7 +10,7 @@
 //     the scene's own lights (an isolated ortho camera far below the venue; the card material is unlit, so the light is
 //     not counted twice). The card is the 3D crowd's own picture.
 //   · phone — `paintAtlas`: no crowd GLB is ever loaded on a phone (its texture set alone is 21 MB to decode); people are
-//     painted on a 512×256 canvas instead — shirt, trousers, skin, hair, the same four poses — and the material is LIT, so a
+//     painted on a 256×128 canvas instead — shirt, trousers, skin, hair, the same four poses — and the material is LIT, so a
 //     night venue darkens them like everything else.
 // Cells are 1.2 m × 2.4 m of world at the body's true scale, feet on the cell's bottom edge, so a card is that quad.
 //
@@ -114,45 +114,47 @@ const TROUSERS = ['#2b3346', '#3b3f45', '#4a5c7a', '#6b5a44', '#1f2226'];
 const SKIN = ['#f1c7a5', '#d9a07a', '#b8794f', '#8c5a3a', '#5e3b26'];
 const HAIR = ['#1b130e', '#3a2414', '#6b4320', '#c9a15a', '#2a2a2a'];
 
-/** Paint `variants` people in the four poses (phones). Cells 64 × 128 = 1.2 m × 2.4 m. */
+/** Paint `variants` people in the four poses (phones). Cells of CELL_PX × 2·CELL_PX = 1.2 m × 2.4 m: 256 × 128 for four
+ *  people (170 KB with mips — a phone's texture budget is the tightest row in mobileBudget.json). */
+export const PAINT_CELL_PX = 32;
 export function paintAtlas(scene: Scene, variants = 4, seed = 5): CardAtlas {
+  const C = PAINT_CELL_PX, k = C / 64;
   const cols = 8, rows = Math.ceil((variants * CARD_POSES) / cols);
-  const W = cols * 64, H = rows * 128;
+  const W = cols * C, H = rows * C * 2;
   const tex = new DynamicTexture('crowd_card_paint', { width: W, height: H }, scene, true);
   const g = tex.getContext() as unknown as CanvasRenderingContext2D;
   g.clearRect(0, 0, W, H);
-  const PX = 64 / CARD_W;   // pixels a metre
+  const PX = C / CARD_W;   // pixels a metre
   for (let v = 0; v < variants; v++) {
     const shirt = SHIRTS[Math.floor(r01(seed, v * 5) * SHIRTS.length)], legs = TROUSERS[Math.floor(r01(seed, v * 5 + 1) * TROUSERS.length)];
     const skin = SKIN[Math.floor(r01(seed, v * 5 + 2) * SKIN.length)], hair = HAIR[Math.floor(r01(seed, v * 5 + 3) * HAIR.length)];
     for (let p = 0; p < CARD_POSES; p++) {
-      const idx = v * CARD_POSES + p, cx = (idx % cols) * 64 + 32, base = Math.floor(idx / cols) * 128 + 127;
+      const idx = v * CARD_POSES + p, cx = (idx % cols) * C + C / 2, base = Math.floor(idx / cols) * C * 2 + C * 2 - 1;
       const y = (m: number): number => base - m * PX;   // metres above the feet → canvas y
       const standing = p >= 2, up = p % 2 === 1;
-      const hip = standing ? 0.92 : 0.5, sh = standing ? 1.42 : 0.98, head = standing ? 1.6 : 1.16;
+      // "up" is the cheer's picture: these bodies cheer with their legs and spine (crowdClips), so it is up off the seat or
+      // up on the toes, leaning back — the same reach the 3D crowd has
+      const lift = up ? (standing ? 0.12 : 0.22) : 0;
+      const hip = (standing ? 0.92 : 0.5) + lift, sh = (standing ? 1.42 : 0.98) + lift, head = (standing ? 1.6 : 1.16) + lift;
       g.lineCap = 'round';
-      // legs: standing, two columns; seated, the shins and the knees toward the camera
       g.fillStyle = legs;
-      if (standing) { g.fillRect(cx - 9, y(hip), 8, hip * PX); g.fillRect(cx + 1, y(hip), 8, hip * PX); }
-      else { g.fillRect(cx - 10, y(0.5), 9, 0.5 * PX); g.fillRect(cx + 1, y(0.5), 9, 0.5 * PX); g.fillRect(cx - 11, y(0.56), 22, 0.1 * PX); }
-      // torso
+      if (standing) { g.fillRect(cx - 9 * k, y(hip), 8 * k, hip * PX); g.fillRect(cx + 1 * k, y(hip), 8 * k, hip * PX); }
+      else { g.fillRect(cx - 10 * k, y(0.5), 9 * k, 0.5 * PX); g.fillRect(cx + 1 * k, y(0.5), 9 * k, 0.5 * PX); g.fillRect(cx - 11 * k, y(0.56 + lift), 22 * k, 0.1 * PX); }
       g.fillStyle = shirt;
-      roundRect(g, cx - 12, y(sh + 0.02), 24, (sh + 0.02 - hip + 0.04) * PX, 5);
-      // arms
-      g.strokeStyle = shirt; g.lineWidth = 6;
+      roundRect(g, cx - 12 * k, y(sh + 0.02), 24 * k, (sh + 0.02 - hip + 0.04) * PX, 5 * k);
+      g.strokeStyle = shirt; g.lineWidth = 6 * k;
       const arm = (s: number): void => {
-        g.beginPath(); g.moveTo(cx + s * 10, y(sh - 0.04));
-        if (up) { g.lineTo(cx + s * 17, y(sh + 0.28)); g.lineTo(cx + s * 20, y(sh + 0.52)); }
-        else { g.lineTo(cx + s * 14, y(sh - 0.3)); g.lineTo(cx + s * (standing ? 14 : 9), y(standing ? sh - 0.58 : hip + 0.1)); }
+        g.beginPath(); g.moveTo(cx + s * 10 * k, y(sh - 0.04));
+        g.lineTo(cx + s * 14 * k, y(sh - 0.3)); g.lineTo(cx + s * (standing ? 14 : 9) * k, y(standing ? sh - 0.58 : hip + 0.1));
         g.stroke();
         g.fillStyle = skin; g.beginPath();
-        if (up) g.arc(cx + s * 20, y(sh + 0.55), 3.4, 0, Math.PI * 2); else g.arc(cx + s * (standing ? 14 : 9), y(standing ? sh - 0.6 : hip + 0.08), 3.2, 0, Math.PI * 2);
+        g.arc(cx + s * (standing ? 14 : 9) * k, y(standing ? sh - 0.6 : hip + 0.08), 3.2 * k, 0, Math.PI * 2);
         g.fill();
       };
       arm(-1); arm(1);
-      // head and hair
-      g.fillStyle = skin; g.beginPath(); g.arc(cx, y(head), 6.5, 0, Math.PI * 2); g.fill();
-      g.fillStyle = hair; g.beginPath(); g.arc(cx, y(head) - 1.5, 6.6, Math.PI, Math.PI * 2); g.fill();
+      const tilt = up ? -2 * k : 0;   // the head thrown back
+      g.fillStyle = skin; g.beginPath(); g.arc(cx, y(head) + tilt, 6.5 * k, 0, Math.PI * 2); g.fill();
+      g.fillStyle = hair; g.beginPath(); g.arc(cx, y(head) - 1.5 * k + tilt, 6.6 * k, Math.PI, Math.PI * 2); g.fill();
     }
   }
   tex.hasAlpha = true;

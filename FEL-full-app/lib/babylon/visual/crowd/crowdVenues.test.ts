@@ -33,3 +33,27 @@ describe('crowd venues', () => {
     });
   }
 });
+
+describe('velocity kart: the circuit\'s own grandstands', () => {
+  // imported lazily: the circuits are built from the course table
+  it('seats every straight grandstand on every course, well off the road, facing it', async () => {
+    const { kartCircuits } = await import('../../racing/kartCircuits');
+    const { kartSceneryFor } = await import('../../racing/kartDressing');
+    const { locate } = await import('../../racing/racingLine');
+    const { kartCrowdVenue, KART_STAND_MODELS } = await import('./crowdVenues');
+    for (const c of kartCircuits()) {
+      const scenery = kartSceneryFor(c);
+      const v = kartCrowdVenue(scenery);
+      expect(v.stands.length, c.course.id).toBe(scenery.filter((p) => KART_STAND_MODELS.includes(p.model)).length);
+      expect(v.stands.length, c.course.id).toBeGreaterThanOrEqual(2);
+      const seats = layoutSeats(v);
+      expect(seats.length, c.course.id).toBeGreaterThan(10);
+      for (const s of seats) {
+        const at = locate(c.line, s.pos[0], s.pos[2]);
+        expect(Math.abs(at.lateral), `${c.course.id} ${s.stand}`).toBeGreaterThan(c.halfWidth + 10);   // nobody near the tarmac
+      }
+      // a phone: cards only, within the tier
+      expect(splitSeats(seats, 'mobile').fans).toHaveLength(0);
+    }
+  });
+});

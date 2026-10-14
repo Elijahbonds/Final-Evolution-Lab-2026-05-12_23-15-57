@@ -19,6 +19,7 @@ import type { MomentumEvent, MomentumTier } from '../../core/MomentumBus';
 import { motionPolicy } from '../../../a11y/reducedMotion';
 import { mountCrowd, type CrowdHandle, type CrowdOptions } from './crowdStands';
 import { crowdVenue, type CrowdVenueKey } from './crowdVenues';
+import type { CrowdVenue } from './crowdLayout';
 import type { ReactionKind } from './crowdReact';
 
 /** The meter's default weight per kind (MomentumBus.WEIGHT, which is private): only the SIGN and the SIZE matter here. */
@@ -44,9 +45,10 @@ export function reactionForTier(next: MomentumTier, prev: MomentumTier): { kind:
 
 export interface ModeCrowd extends CrowdHandle {}
 
-export function mountModeCrowd(ctx: Pick<ModeContext, 'scene' | 'momentum' | 'phase'>, key: CrowdVenueKey, opts: CrowdOptions & { variant?: string } = {}): ModeCrowd | null {
-  const venue = crowdVenue(key, opts.variant);
-  if (!venue) return null;
+export function mountModeCrowd(ctx: Pick<ModeContext, 'scene' | 'momentum' | 'phase'>, key: CrowdVenueKey | 'velocitykart', opts: CrowdOptions & { variant?: string; venue?: CrowdVenue } = {}): ModeCrowd | null {
+  // a venue laid out at runtime (the kart's circuit) is handed in; the others are crowdVenues' tables
+  const venue = opts.venue ?? (key === 'velocitykart' ? null : crowdVenue(key, opts.variant));
+  if (!venue || venue.stands.length === 0) return null;
   const crowd = mountCrowd(ctx.scene, venue, { reduced: () => motionPolicy().reduced, ...opts });
   const offReport = ctx.momentum.onReport((e) => { const r = reactionFor(e); if (r) crowd.react(r.kind, r.strength); });
   const offTier = ctx.momentum.onTierChange((next, prev) => { const r = reactionForTier(next, prev); if (r) crowd.react(r.kind, r.strength); });
