@@ -17,14 +17,14 @@
 // lib/screen/store.ts), so this is only a guard: a kid's age gets the kid view, their number and nothing else.
 import Link from 'next/link';
 import { priorities, type CheckBand, type ScreenSummary } from '@/lib/screen/checks';
-import { BAND_WORDS, cueOf, checkById, GRADED_CHECKS, type BandWord, type CheckId } from '@/lib/screen/PROPOSED-thresholds';
+import { cueOf, checkById, GRADED_CHECKS, type BandWord, type CheckId } from '@/lib/screen/PROPOSED-thresholds';
 import { isKid, type AgeBand } from '@/lib/screen/age';
 import { PRIVACY_PATH } from '@/lib/screen/routes';
 import {
   DISCLAIMER, DONE_CLEAR, KINDLE_BOOK_LABEL, KINDLE_BOOK_URL, NOTHING_TO_RANK, PRIVACY_LINK, SCREENSHOT_LINE,
   SCREEN_TEST_NAMES, WIN_LINE,
 } from '@/lib/screen/copy';
-import { BandChip, EarlyTag, PreviewLabel, StopLine, primaryBtn, quietBtn, BAND_COLOUR, UNREAD_WORD } from './screen-ui';
+import { BandChip, EarlyTag, PreviewLabel, StopLine, primaryBtn, quietBtn, BAND_COLOUR } from './screen-ui';
 import { KidResults } from './kid-results';
 import { DrillDemo } from './drill-demo';   // EDU-LINKS (2026-10-07): the demo slot, filled with the 3D ExerciseDemo
 
@@ -97,12 +97,8 @@ export function ResultsView({ summary, age, onClear, onRunAgain, trainWithElijah
                   <>
                     <p data-check-row={row.id} className="mt-1 text-[16px] font-bold leading-snug text-white/90">
                       {rowName(row.id)}
-                      {row.sides ? (
-                        <span className="ml-2 text-[16px] font-normal text-white/60">
-                          Left: <SideWord band={row.sides.left} /> · Right: <SideWord band={row.sides.right} />
-                        </span>
-                      ) : null}
                     </p>
+                    {row.sides ? <SideRow left={row.sides.left} right={row.sides.right} /> : null}
                     <p data-cue className={`mt-1 leading-snug ${cueText}`}>Try this: {cueOf(row.id)}<EarlyTag /></p>
                   </>
                 ) : null}
@@ -142,6 +138,16 @@ export function ResultsView({ summary, age, onClear, onRunAgain, trainWithElijah
   );
 }
 
-function SideWord({ band }: { band: BandWord | null }) {
-  return <span data-side-band={band ?? 'unread'} style={{ color: BAND_COLOUR[band ?? 'unread'] }}>{band ? BAND_WORDS[band] : UNREAD_WORD}</span>;
+/** UX advice §4: left and right side by side, each with its own chip (icon + word + colour, never colour alone). No gap chip. */
+function SideRow({ left, right }: { left: BandWord | null; right: BandWord | null }) {
+  return (
+    <div data-side-row className="mt-1.5 grid grid-cols-2 gap-2">
+      {([['left', 'Left', left], ['right', 'Right', right]] as const).map(([key, label, band]) => (
+        <div key={key} data-side={key} data-side-band={band ?? 'unread'} className="rounded-xl border border-white/10 bg-white/[0.02] px-2.5 py-1.5">
+          <p className="text-[16px] font-bold text-white/60">{label}</p>
+          <BandChip band={band} />
+        </div>
+      ))}
+    </div>
+  );
 }
