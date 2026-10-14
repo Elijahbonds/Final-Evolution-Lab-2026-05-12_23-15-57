@@ -79,7 +79,10 @@ describe('mountModeCrowd on a scene', () => {
     const crowd = mountModeCrowd(ctx, 'football', { deferFrames: 0 })!;
     await crowd.ready;
     scene.render();
-    const on = () => crowd.meshes().filter((m) => m.isEnabled() && /^crowd_card_/.test(m.name)).length;
+    const on = () => crowd.meshes().filter((m) => m.isEnabled() && /^__crowd_card_/.test(m.name)).length;
+    // nothing the crowd makes is scenery to the rig: every mesh is '__'-named, so LightRig never registers it as a shadow caster
+    // (late casters toggling their pose meshes stood the phone's shadow cache down: 3-Point 127 → 196 draws on the rig)
+    expect(crowd.meshes().every((m) => m.name.startsWith('__crowd_'))).toBe(true);
     const idle = on();
     expect(idle).toBeGreaterThan(0);
     expect(idle).toBeLessThanOrEqual(4);       // one seated picture per painted person

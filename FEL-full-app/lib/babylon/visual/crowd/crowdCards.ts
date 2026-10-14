@@ -60,7 +60,7 @@ export function snapshotAtlas(scene: Scene, bake: CrowdBake): Promise<CardAtlas>
   };
   const clones: Mesh[] = [];
   bake.bodies.forEach((body, b) => {
-    const m = body.mesh.clone(`crowd_card_src_${b}`, null, true) as Mesh;
+    const m = body.mesh.clone(`__crowd_card_src_${b}`, null, true) as Mesh;
     m.makeGeometryUnique();   // see crowdStands: thin-instance extra buffers live on the geometry
     m.parent = null;
     m.setEnabled(true);

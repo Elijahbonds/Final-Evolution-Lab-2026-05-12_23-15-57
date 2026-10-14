@@ -43,6 +43,14 @@ export interface CrowdOptions {
 /** The crowd starts building this many rendered frames after it is mounted (well after the mode's load has returned). */
 export const DEFER_FRAMES = 20;
 
+/**
+ * Every mesh the crowd makes is named under this prefix. The '__' is the rig's own "not scenery" mark (LightRig skips a
+ * '__' mesh when it registers shadow casters, as the kart's merged parts do): measured on the phone rig, the cards and the
+ * bleachers registered as LATE casters, the cards' pose switches read to the shadow cache as toggles, and its thrash guard
+ * stood the cache down — 3-Point went 127 → 196 draws. Nothing of the crowd is ever a caster now, so the cache never sees it.
+ */
+export const CROWD_MESH = '__crowd_';
+
 /** Resolves after the scene has rendered `n` more frames (or the scene is disposed). */
 export function afterFrames(scene: Scene, n: number): Promise<void> {
   return new Promise((resolve) => {
@@ -113,7 +121,7 @@ export function mountCrowd(scene: Scene, venue: CrowdVenue, opts: CrowdOptions =
     for (const [k, list] of byKey) {
       const [stand, bodyS] = k.split('|');
       const body = b.bodies[Number(bodyS)];
-      const mesh = body.mesh.clone(`crowd_${stand}_${bodyS}`, null, true) as Mesh;
+      const mesh = body.mesh.clone(`${CROWD_MESH}${stand}_${bodyS}`, null, true) as Mesh;
       // its OWN geometry: a thin instance's extra buffers (the VAT numbers) are set on the geometry, so two blocks sharing
       // one would share one settings buffer (and a disposed block would leave the others drawing with none)
       mesh.makeGeometryUnique();
@@ -172,7 +180,7 @@ export function mountCrowd(scene: Scene, venue: CrowdVenue, opts: CrowdOptions =
       cardMeshes[v] = []; cardBufs[v] = []; cardCounts[v] = [0, 0, 0, 0];
       const n = per[v].length;
       for (let pz = 0; pz < CARD_POSES; pz++) {
-        const m = cardQuad(scene, `crowd_card_${v}_${pz}`, a.cell(v, pz as CardPose));
+        const m = cardQuad(scene, `${CROWD_MESH}card_${v}_${pz}`, a.cell(v, pz as CardPose));
         m.material = cardMat;
         m.isPickable = false;
         m.receiveShadows = false;
@@ -266,7 +274,7 @@ export function mountCrowd(scene: Scene, venue: CrowdVenue, opts: CrowdOptions =
       }
     }
     if (!planks.length) return;
-    const box = MeshBuilder.CreateBox('crowd_bleachers', { size: 1 }, scene);
+    const box = MeshBuilder.CreateBox(`${CROWD_MESH}bleachers`, { size: 1 }, scene);
     benchMat = new PBRMaterial('crowd_bleachers_mat', scene);
     benchMat.albedoColor = Color3.FromHexString('#9aa3ad'); benchMat.metallic = 0.55; benchMat.roughness = 0.45;
     box.material = benchMat;
@@ -288,7 +296,7 @@ export function mountCrowd(scene: Scene, venue: CrowdVenue, opts: CrowdOptions =
 
   // ── keeping the crowd out of the passes it has no business in ───────────────────────────────────────────────────
   const quarantine = (): void => {
-    const crowdMeshes = owned.filter((m) => m.name !== 'crowd_bleachers');
+    const crowdMeshes = owned;
     for (const light of scene.lights) {
       const gens = (light as unknown as { getShadowGenerators?(): Map<unknown, { removeShadowCaster(m: AbstractMesh, d?: boolean): unknown; getShadowMap(): { renderList: AbstractMesh[] | null } | null }> | null }).getShadowGenerators?.();
       if (!gens) continue;

@@ -74,6 +74,8 @@ async function buildBake(scene: Scene): Promise<CrowdBake | null> {
       // eslint-disable-next-line no-await-in-loop
       const c = await LoadAssetContainerAsync(url, scene, { pluginOptions: { gltf: { skipMaterials: i > 0 } } });
       gateContainerRig(c, url);
+      // '__' before the meshes reach the scene: never registered as shadow casters (crowdStands.CROWD_MESH)
+      for (const m of c.meshes) m.name = `__crowd_body_${i}_${m.name}`;
       containers.push(c);
       if (scene.isDisposed) throw new Error('scene disposed during the crowd load');
     }
