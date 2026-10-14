@@ -49,7 +49,7 @@ vi.mock('@/lib/auth', () => ({ authOptions: {} }));
 vi.mock('@/lib/db', () => ({ prisma: { user: { findUnique: async () => { h.reads++; return { dobYear: h.dobYear }; } } } }));
 
 describe('GET /api/party/ticket', () => {
-  beforeEach(() => { h.session = null; h.dobYear = null; h.reads = 0; process.env.PARTY_TICKET_SECRET = 'route-secret'; });
+  beforeEach(() => { h.session = null; h.dobYear = null; h.reads = 0; process.env.PARTY_TICKET_SECRET = 'route-secret'; process.env.PARTY_TURN_URLS = 'turn:t.example:3478'; process.env.PARTY_TURN_SECRET = 'turn-secret'; });
   const call = async (q = '?name=ana') => {
     const { GET } = await import('@/app/api/party/ticket/route');
     return (await GET(new Request(`http://x/api/party/ticket${q}`))).json();
@@ -71,7 +71,16 @@ describe('GET /api/party/ticket', () => {
     // …and the original SUBSTRING bar, kept: a birth year or user id embedded in a longer string ('born 1980', 'hi u9') is a
     // leak too. Only the random fields are taken out first (the signed ticket, checked above and below, and the TURN
     // username / credential pair, an expiry + HMAC base64), so the check cannot flake on them and still sees everything else.
-    const redacted = { ...rest, iceServers: (rest.iceServers as Array<Record<string, unknown>>).map(({ username: _u, credential: _c, ...ice }) => ice) };
+    // The TURN pair is not skipped: it is pinned EXACTLY first (QA 2026-10-14) — username "<expiry>:fel", credential the
+    // HMAC-SHA1 of that username under the test's TURN secret (iceServers.ts:21-22) — so it can carry nothing else, and
+    // only then is it left out of the substring scan (its digits / base64 are the only random text in the response).
+    const ice = rest.iceServers as Array<Record<string, unknown>>;
+    const turn = ice.filter((s) => s.username !== undefined || s.credential !== undefined);
+    expect(turn).toHaveLength(1);
+    expect(turn[0].urls).toEqual(['turn:t.example:3478']);
+    expect(turn[0].username).toMatch(/^\d+:fel$/);
+    expect(turn[0].credential).toBe(createHmac('sha1', 'turn-secret').update(String(turn[0].username)).digest('base64'));
+    const redacted = { ...rest, iceServers: ice.map(({ username: _u, credential: _c, ...rest2 }) => rest2) };
     expect(JSON.stringify(redacted)).not.toContain('1980');
     expect(JSON.stringify(redacted)).not.toContain('u9');
     expect(keys(rest)).not.toEqual(expect.arrayContaining(['uid']));
