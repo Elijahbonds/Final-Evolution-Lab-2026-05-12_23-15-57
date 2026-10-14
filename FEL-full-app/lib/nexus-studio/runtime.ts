@@ -5,7 +5,7 @@
 //   kit       → a registered visual/venuePropSets set, mounted by mountVenue through VenueProps (thin instances)
 //   meshy     → visual/meshyProps spawnMeshyProp
 //   fixtures  → lit heads named for scene/FixtureLights' roles, found by the rig's captureVenue (desktop/high)
-//   decals    → visual/GroundDecals' pool, refreshed before a placed mark would fade
+//   decals    → visual/GroundDecals' pool, stamped once with `persist` (a placed mark never fades)
 //   crowd     → visual/crowd mountModeCrowd with the export's stands (it hears the mode's momentum when there is one)
 //   weather   → premium/WeatherFx over core/WeatherKit.fromPick
 //   intro     → the mode's `intro` getter + a director stepper (a mode with a fixed camera never steps the director)
@@ -19,7 +19,7 @@ import type { PlaceLook } from '../babylon/nexus/placeLooks';
 import { VENUE_PROP_SETS, type PropPlacement } from '../babylon/visual/venuePropSets';
 import { propSetFor } from '../babylon/visual/VenueProps';
 import { spawnMeshyProp, type MeshyPropKey } from '../babylon/visual/meshyProps';
-import { mountGroundDecals, decalCap, decalLife } from '../babylon/visual/GroundDecals';
+import { mountGroundDecals, decalCap } from '../babylon/visual/GroundDecals';
 import { mountModeCrowd } from '../babylon/visual/crowd/modeCrowd';
 import type { CrowdVenue } from '../babylon/visual/crowd/crowdLayout';
 import { WeatherKit } from '../babylon/core/WeatherKit';
@@ -164,33 +164,24 @@ export function mountFixtureLayer(scene: Scene, parent: TransformNode | null, it
 }
 
 /**
- * Placed marks. GroundDecals is a transient pool (a mark fades over decalLife); a placed mark must stay, so the layer keeps
- * its OWN pool and re-stamps every mark at half its life — exactly `cap` stamps per kind (unused slots get a zero-size
- * stamp), so each mark always lands in the same slot and is never drawn twice. (Routed: a `persist` stamp option on
- * GroundDecals would make the refresh unnecessary — docs/NEXUS-STUDIO.md §8.)
+ * Placed marks: GroundDecals' pool with `persist` stamps (docs/NEXUS-STUDIO.md §8), so a mark is stamped once, never fades and
+ * a mode's transient marks never take its slot. At most `cap` kept marks per kind (the pool's size): the rest are not drawn.
  */
 export function mountDecalLayer(scene: Scene, tier: QualityTier, items: readonly ExportDecal[]): Layer & { stamped: number; live(): number } {
   if (!items.length) return { stamped: 0, live: () => 0, dispose() {} };
   const pool = mountGroundDecals(scene, tier);
-  const cap = decalCap(tier), life = decalLife(tier);
-  const byKind = new Map<ExportDecal['kind'], ExportDecal[]>();
-  for (const d of items) { const l = byKind.get(d.kind) ?? []; if (l.length < cap) l.push(d); byKind.set(d.kind, l); }
-  const stampAll = (): void => {
-    for (const [kind, list] of byKind) {
-      for (const d of list) pool.stamp(kind, d.at[0], d.at[2], d.yaw, { y: d.at[1], scale: d.scale });
-      for (let i = list.length; i < cap; i++) pool.stamp(kind, 0, 0, 0, { scale: 0 });
-    }
-  };
-  stampAll();
-  let acc = 0;
-  const obs = scene.onBeforeRenderObservable.add(() => {
-    acc += Math.min(0.1, scene.getEngine().getDeltaTime() / 1000);   // the pool's own clock step
-    if (acc >= life * 0.5) { acc = 0; stampAll(); }
-  });
-  let stamped = 0; for (const l of byKind.values()) stamped += l.length;
-  /** Marks on the ground now (each kind's slots, the zero-size fillers included): `cap` per kind while the refresh runs. */
-  const live = (): number => { let n = 0; for (const k of byKind.keys()) n += pool.live(k); return n; };
-  return { stamped, live, dispose() { scene.onBeforeRenderObservable.remove(obs); pool.dispose(); } };
+  const cap = decalCap(tier);
+  const kinds = new Map<ExportDecal['kind'], number>();
+  let stamped = 0;
+  for (const d of items) {
+    const n = kinds.get(d.kind) ?? 0;
+    if (n >= cap) continue;
+    pool.stamp(d.kind, d.at[0], d.at[2], d.yaw, { y: d.at[1], scale: d.scale, persist: true });
+    kinds.set(d.kind, n + 1); stamped++;
+  }
+  /** Marks on the ground now. */
+  const live = (): number => { let n = 0; for (const k of kinds.keys()) n += pool.live(k); return n; };
+  return { stamped, live, dispose() { pool.dispose(); } };
 }
 
 /** The export's stands as a crowd (visual/crowd). `ctx` may carry the mode's momentum and phase: the crowd then reacts. */
