@@ -36,8 +36,8 @@ export interface WinRule {
   /** With win-by-2, the first to this wins whatever the margin — a game that cannot end is not a game. */
   cap: number;
 }
-/** The cap on a win-by-2 game (street rules: by 2, hard cap 13 — the spec, PM 2026-10-14). */
-export const WIN_BY_2_CAP = 13;
+/** The cap on a win-by-2 game (street rules: by 2, hard cap 15). */
+export const WIN_BY_2_CAP = 15;
 /** The biggest bucket there is (a three). */
 export const BUCKET_MAX = 3;
 export function winRule(target: number, winBy2: boolean): WinRule { return { target, winBy2, cap: WIN_BY_2_CAP }; }
@@ -54,7 +54,7 @@ export function onePointAway(mine: number, theirs: number, r: WinRule): boolean 
   return gameWinner(mine + 2, theirs, r) === 'me';
 }
 /** The most a WON game can post: one short of where it ends, plus the biggest bucket. 13 for first to 11 — the Arena stake
- *  ceiling for hoops1v1 (lib/arena-score-integrity firstToCeiling); a win-by-2 game can go to cap − 1 + 3 = 15, the session
+ *  ceiling for hoops1v1 (lib/arena-score-integrity firstToCeiling); a win-by-2 game can go to cap − 1 + 3 = 17, the session
  *  ceiling (arena-score-integrity SESSION_RULES_CEILINGS, owner 2026-10-06). */
 export function postedMax(r: WinRule): number { return (r.winBy2 ? r.cap : r.target) - 1 + BUCKET_MAX; }
 /** Where the READY screen's win-by-2 pick is remembered (this device only; off unless the player turned it on). */

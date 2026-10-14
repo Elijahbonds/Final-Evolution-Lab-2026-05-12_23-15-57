@@ -39,8 +39,8 @@ describe('#3 the win condition', () => {
     expect(gameWinner(12, 11, by2)).toBeNull();
     expect(gameWinner(12, 10, by2)).toBe('me');
     expect(gameWinner(10, 13, by2)).toBe('foe');
-    expect(gameWinner(WIN_BY_2_CAP, WIN_BY_2_CAP - 1, by2)).toBe('me');   // cap 13 (PM 2026-10-14): 13–12 ends it
-    expect(gameWinner(WIN_BY_2_CAP - 1, WIN_BY_2_CAP + 1, by2)).toBe('foe');
+    expect(gameWinner(WIN_BY_2_CAP, 14, by2)).toBe('me');
+    expect(gameWinner(14, WIN_BY_2_CAP + 1, by2)).toBe('foe');
   });
   it('game point is one two away: 9 under first to 11, as the MC always called it', () => {
     expect(onePointAway(9, 0, to11)).toBe(true);
