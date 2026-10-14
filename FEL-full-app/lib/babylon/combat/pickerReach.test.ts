@@ -133,7 +133,7 @@ describe('THE SPLASH ONLY OFFERS WHAT A MODE ACTUALLY READS', () => {
     for (const id of setLiteral(splash, 'TIER_MODES')) {
       const file = byId.get(id);
       if (!file) { offenders.push(undeclared(id)); continue; }
-      if (!reads(file, /readProfile|readTier|profileFor/)) {
+      if (!reads(file, /readProfile|readTier|runTier|profileFor/)) {
         offenders.push(`${id} (${file}): the splash offers a DIFFICULTY picker, nothing reads it`);
       }
     }
@@ -168,7 +168,7 @@ describe('THE PICK IS READ AFTER THE PAGE EXISTS, NEVER WHEN THE REGISTRY IS BUI
   // because Mixed Combat derives the foe's loadout as the opposite of the player's. It looks completely
   // correct in the source. The rule is LEXICAL — a reader must not be evaluated while the factory is being
   // evaluated — so that is what is checked, not where the call happens to sit in the file.
-  const READERS = /\b(readBlend|readWeapon|readCourse|readKart|readPlane|readVehicle|readLoadout|readProfile|readTier|readWeather)\s*\(/;
+  const READERS = /\b(readBlend|readWeapon|readCourse|readKart|readPlane|readVehicle|readLoadout|readProfile|readTier|runTier|readWeather)\s*\(/;
 
   it('NO MODE READS A PICK AT FACTORY TOP LEVEL', () => {
     // "before load()" is the wrong rule and my first version of this test used it: it flagged three readers

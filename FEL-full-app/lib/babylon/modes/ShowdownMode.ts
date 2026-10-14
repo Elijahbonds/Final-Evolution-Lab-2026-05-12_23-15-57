@@ -45,7 +45,7 @@ import { mountPresentation, type Presentation } from '../combat/presentation';  
 import { readPlaceLook } from '../nexus/placeLooks';
 import { FighterState, KARATE_ATTACKS, CHI_MAX, PARRY_WINDOW_MS, guardPressMs, rivalDifficulty, rivalPower, applyRivalPower, RIVAL_POWER_BASE, type RivalPower } from '../core/FightCore';
 import { KnockSlides, makeChestOf } from '../core/FightKit';   // IMPROVE (2026-10-06): the shared knock slide + scratch chest points
-import { readTier } from '../core/Difficulty';   // IMPROVE (2026-10-06): the OPPONENT pick
+import { runTier } from '../core/Difficulty';   // IMPROVE (2026-10-06): the OPPONENT pick — PRO on a staked / head-to-head run (QA #259)
 import { RivalCombatBrain, threatLandsIn } from '../core/RivalCombatBrain';
 import { StrikeController, karateMoveset, bookMoveset, MIN_STARTUP_SEC, type CombatMove } from '../core/StrikeSystem';
 import { StringBook, type StickDir, type StrikeBtn } from '../core/HordeDynamics';   // phase 4: the Storm strings on showdown
@@ -195,11 +195,11 @@ export const ShowdownMode: ModeDefinition = (() => {
   function roundStartRival(): void {
     breaker.reset();
     rivalBrain.setStanding(foeRounds, myRounds, 2);
-    rivalBrain.setDifficulty(rivalDifficulty(0.72, readTier()));
+    rivalBrain.setDifficulty(rivalDifficulty(0.72, runTier()));
     // COMBAT DIFFICULTY (2026-10-06): nothing here reads the line, so a read is a guard, never a sidestep; and the rival's
     // POWER for the pick (hp, damage, guard — FightCore.rivalPower). resetRound has run: the HP is filled here.
     rivalBrain.setStepping(false);
-    foePower = rivalPower(RIVAL_POWER_BASE.showdown, readTier());
+    foePower = rivalPower(RIVAL_POWER_BASE.showdown, runTier());
     applyRivalPower(foeState, foePower); foeState.hp = foeState.maxHp;
     knock.clear();
   }
@@ -347,7 +347,7 @@ export const ShowdownMode: ModeDefinition = (() => {
           : { hp: defState.hp, foeCombo: atkState.combo >= 2 ? atkState.combo : 0 });
         if (defState.hp <= 0) endRound(ctx, mine);
         // COMBAT DIFFICULTY (2026-10-06): a rival stun-locked by a long mashed chain substitutes out of it (ComboBreaker)
-        else if (mine && breaker.hit(now() / 1000, readTier(), foeChakra.value >= SUBSTITUTION_CHI_COST)) comboBreak(ctx);
+        else if (mine && breaker.hit(now() / 1000, runTier(), foeChakra.value >= SUBSTITUTION_CHI_COST)) comboBreak(ctx);
         break;
       }
     }

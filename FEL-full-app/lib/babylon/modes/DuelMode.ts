@@ -33,7 +33,7 @@ import { neverBindPose } from '../anim/importSanitizer';
 import { installSafePlay } from '../anim/clipRegistry';
 import { FighterState, KARATE_ATTACKS, STAFF_ATTACKS, PARRY_WINDOW_MS, CHI_MAX, guardPressMs, rivalDifficulty, rivalPower, applyRivalPower, RIVAL_POWER_BASE, type RivalPower } from '../core/FightCore';
 import { KnockSlides, makeChestOf } from '../core/FightKit';   // IMPROVE (2026-10-06): the shared knock slide + scratch chest points
-import { readTier } from '../core/Difficulty';   // IMPROVE (2026-10-06): the OPPONENT pick
+import { runTier } from '../core/Difficulty';   // IMPROVE (2026-10-06): the OPPONENT pick — PRO on a staked / head-to-head run (QA #259)
 import { BannerSlot } from '../core/ModeClock';   // IMPROVE (2026-10-06): one banner, expiring on the game clock
 import { RivalCombatBrain, threatLandsIn, type RivalResource } from '../core/RivalCombatBrain';
 import {
@@ -270,12 +270,12 @@ export const DuelMode: ModeDefinition = (() => {
   function roundStartRival(): void {
     breaker.reset();
     rivalBrain.setStanding(foeWins, myWins, ROUNDS_TO_WIN);
-    rivalBrain.setDifficulty(rivalDifficulty(0.72, readTier()));
+    rivalBrain.setDifficulty(rivalDifficulty(0.72, runTier()));
     // COMBAT DIFFICULTY (2026-10-06): nothing here reads the line, so a read is a guard, never a sidestep; and the rival's
     // POWER for the pick (hp, damage, guard — FightCore.rivalPower). resetRound has run: the HP is filled here.
     rivalBrain.setStepping(false);
     rivalBrain.setFoeReach(WEAPON_RANGE[myWeapon]);   // the read covers what I hold — a staff poke lands from 2.6 m
-    foePower = rivalPower(RIVAL_POWER_BASE.duel * DUEL.rivalPowerByWeapon[myWeapon], readTier());   // the pick's matchup (duelRules)
+    foePower = rivalPower(RIVAL_POWER_BASE.duel * DUEL.rivalPowerByWeapon[myWeapon], runTier());   // the pick's matchup (duelRules)
     applyRivalPower(foeState, foePower); foeState.hp = foeState.maxHp;
     rivalBrain.setEdge(edgeIn);
     knock.clear();
@@ -512,7 +512,7 @@ export const DuelMode: ModeDefinition = (() => {
           // COMBAT DIFFICULTY (2026-10-06): a rival stun-locked by a long mashed chain substitutes out of it (ComboBreaker) —
           // when it has the chi and a spot with footing (never off the drop)
           const spot = foeState.chi >= SUBSTITUTION_CHI_COST ? safeSubstitutionSpot(player.root.position.x, player.root.position.z, player.root.rotation.y, edgeIn) : null;
-          if (breaker.hit(now() / 1000, readTier(), !!spot) && spot) comboBreak(ctx, spot);
+          if (breaker.hit(now() / 1000, runTier(), !!spot) && spot) comboBreak(ctx, spot);
         }
         break;
       }
