@@ -149,6 +149,30 @@ describe('the ledger: who is baked, who is drawn per frame', () => {
 
   // tp-shadow-fix (2026-10-14): VenueProps' kit masters are hidden templates until the whole set has loaded, then re-parked
   // at identity, given their thin buffer and shown. That placement is not motion (3-Point phone: 120 → 168 draws when it was).
+  it('a static that keeps blinking is a mover: two visibility changes re-bake, the third demotes it for good (phone-perf)', () => {
+    // 3-Point on a phone: the hand ball and the flight balls swap visibility on every shot; each swap was a whole re-bake
+    // until the limiter stood the cache down for the session
+    const ball = caster('tp_ball_flight_0'), rack = caster('rack_0_ball_0'), post = caster('lamp_post');
+    ball.enable(false);
+    const l = new CasterLedger(); l.arm([ball, rack, post]);
+    expect(l.statics).toEqual([ball, rack, post]);
+    ball.enable(true);
+    expect(l.frame()).toBe('toggled');
+    ball.enable(false);
+    expect(l.frame()).toBe('toggled');
+    expect(l.isStatic(ball)).toBe(true);
+    ball.enable(true);                              // the third change: a pattern
+    expect(l.frame()).toBe('moved');
+    expect(l.moving).toEqual([ball]);
+    for (let i = 0; i < 10; i++) { ball.enable(i % 2 === 0); expect(l.frame(i * 17)).toBe(''); }   // free from now on
+    for (let i = 0; i < 400; i++) l.frame(1000 + i * 17);
+    expect(l.isStatic(ball)).toBe(false);           // never settles back
+    rack.enable(false);                             // a rack ball taken once is still scenery
+    expect(l.frame()).toBe('toggled');
+    expect(l.isStatic(rack)).toBe(true);
+    expect(l.isStatic(post)).toBe(true);
+  });
+
   it('a caster placed while hidden (re-parked, then shown) stays static: the bake is redone, it is not demoted', () => {
     const palm = caster('tree_palm'), post = caster('lamp_post');
     palm.enable(false);
@@ -456,19 +480,47 @@ describe('the cache on a scene', () => {
   });
 
   it('re-baking too often stands the cache down: everything renders live again', () => {
-    const { scene, sun, gen, map, post, fence, hero } = rigScene();
+    const { scene, sun, gen, map } = rigScene();
+    // test changed (phone-perf, 2026-10-14): this drove the guard with ONE prop blinking every frame. A blinker is now
+    // demoted to a mover on its third change (MAX_TOGGLES) and costs no further re-bakes — see the next test — so the
+    // guard is driven by what still re-bakes: many different scenery pieces each hidden once, one per frame.
+    const props = Array.from({ length: 12 }, (_, i) => { const b = MeshBuilder.CreateBox(`prop_${i}`, { size: 1 }, scene); b.position.set(i - 6, 0, 3); gen.addShadowCaster(b); return b; });
     const sc = mountShadowCache(scene, gen, sun, { copier: fakeCopier().c, now: clock });
     sc.arm(); frames(scene, WARM);
-    // a static that toggles every frame (a blinking prop)
-    for (let i = 0; i < 12; i++) { post.setEnabled(i % 2 === 0); scene.render(); }
+    for (const p of props) { p.setEnabled(false); scene.render(); }
     expect(sc.stats().state).toBe('off');
     expect(sc.stats().offReason).toMatch(/re-baked too often/);
-    expect(names(map.renderList).sort()).toEqual(['fence', 'hero', 'lamp_post']);
+    expect(names(map.renderList).sort()).toEqual(['fence', 'hero', 'lamp_post', ...props.map((p) => p.name)].sort());
     expect(sun.autoUpdateExtends).toBe(true);
     // a caster added now goes straight to the generator's list
     const ball = MeshBuilder.CreateSphere('ball', {}, scene);
     gen.addShadowCaster(ball);
     expect(names(map.renderList)).toContain('ball');
+  });
+
+  it('a prop blinking every frame no longer stands the cache down: two re-bakes, then it is drawn when shown (phone-perf)', () => {
+    const { scene, sun, gen, map, post } = rigScene();
+    const sc = mountShadowCache(scene, gen, sun, { copier: fakeCopier().c, now: clock });
+    sc.arm(); frames(scene, WARM);
+    const b0 = sc.stats().bakes;
+    for (let i = 0; i < 12; i++) { post.setEnabled(i % 2 === 0); clockMs += 16.7; scene.render(); }
+    expect(sc.stats().state).toBe('cached');
+    expect(sc.stats().bakes - b0).toBe(3);   // shown/hidden twice re-baked; the third change demoted it (one more bake)
+    expect(sc.movingByName()).toHaveProperty('lamp_post');
+    expect(names(map.renderList)).toContain('lamp_post');
+  });
+
+  it('demotions are not rationed: many statics each moving once leave the cache on, with the movers drawn per frame (phone-perf)', () => {
+    const { scene, sun, gen } = rigScene();
+    const props = Array.from({ length: 12 }, (_, i) => { const b = MeshBuilder.CreateBox(`ball_${i}`, { size: 0.3 }, scene); b.position.set(i - 6, 0.2, 3); gen.addShadowCaster(b); return b; });
+    const sc = mountShadowCache(scene, gen, sun, { copier: fakeCopier().c, now: clock });
+    sc.arm(); frames(scene, WARM);
+    const b0 = sc.stats().bakes;
+    for (const p of props) { p.position.y += 0.5; clockMs += 16.7; scene.render(); }
+    expect(sc.stats().state).toBe('cached');
+    expect(sc.stats().bakes - b0).toBe(12);
+    expect(Object.keys(sc.movingByName()).filter((k) => k.startsWith('ball'))).toHaveLength(1);   // one stem, twelve movers
+    expect(sc.stats().moving).toBeGreaterThanOrEqual(12);
   });
 
   it('the perf lever sets the refresh rate the governor already turns; the handle is on scene.metadata', () => {
