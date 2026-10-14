@@ -16,7 +16,8 @@
 //           depth test runs against the restored static depth, so the result is exactly the min of the two — the map
 //           a full re-render would have made. The ESM blur then runs as before.
 //   WATCH   a static caster that moves, is disposed, hidden or shown → the cache is re-baked (a mover becomes a moving
-//           caster for good). A caster added after the bake starts as moving and joins the statics once it has held
+//           caster for good). A caster is only judged for motion while it is SHOWN: one moved while hidden is placed,
+//           not moving (see PLACED WHILE HIDDEN below). A caster added after the bake starts as moving and joins the statics once it has held
 //           still for a while. The light moving, a camera with a different depth range, or a moving caster leaving the
 //           frozen frustum → re-bake. Too many re-bakes in a short window → the cache stands down for the session and
 //           the map renders live, exactly as before (a mode that streams its world is no worse off than today).
@@ -103,7 +104,23 @@ export class Pose {
 /** A tenth of a millimetre in translation, ~0.006° in rotation: a re-set transform recomputes to within float noise. */
 export const POSE_EPSILON = 1e-4;
 
-interface Entry { m: CasterLike; pose: Pose; on: boolean; still: number; stillSince: number; mover: boolean }
+/** Is the caster drawing into the map? A disabled or invisible caster renders nothing, so it cannot move in it. */
+const shown = (m: CasterLike): boolean => m.isEnabled() && m.isVisible;
+
+/**
+ * PLACED WHILE HIDDEN (tp-shadow-fix, 2026-10-14). VenueProps loads each kit GLB asynchronously: the rig's classifier
+ * registers the GLB's meshes as casters the moment they are imported, the loader hides them as templates, and only when
+ * EVERY model of the set has resolved are the masters re-parked at identity, given their thin-instance buffer and shown.
+ * That one-time placement used to be judged as motion. When it landed inside the warm-up (or after the bake) the whole
+ * prop set — palms, light posts, tents, the pier, the boats — became per-frame casters for the session: measured on
+ * 3-Point's phone tier, 120 → 168 draws, 69 → 117 movers, on finish-release and on the hoops lane alike, by load timing.
+ * So a caster is judged only while it is shown at both looks; a pose that changed while it was hidden is a PLACEMENT:
+ * the bake is redone as it is shown ('toggled') and it stays static. A caster placed a second time is a mover
+ * (MAX_PLACEMENTS), so a prop that hides, jumps and reappears again and again costs one extra re-bake, not one per jump.
+ */
+export const MAX_PLACEMENTS = 1;
+
+interface Entry { m: CasterLike; pose: Pose; on: boolean; still: number; stillSince: number; mover: boolean; placed: number; shifted: boolean }
 
 /**
  * How long a late-added caster must hold still before it joins the baked statics: SETTLE_MS of wall time AND at least
@@ -139,7 +156,7 @@ export class CasterLedger {
 
   private put(m: CasterLike, where: 'static' | 'moving', mover: boolean): void {
     this.version++;
-    const e: Entry = { m, pose: new Pose(m.getWorldMatrix(), m), on: m.isEnabled() && m.isVisible, still: 0, stillSince: this.now, mover };
+    const e: Entry = { m, pose: new Pose(m.getWorldMatrix(), m), on: shown(m), still: 0, stillSince: this.now, mover, placed: 0, shifted: false };
     if (where === 'static') { this.st.set(m, e); this.statics.push(m); } else { this.mv.set(m, e); this.moving.push(m); }
   }
 
@@ -170,16 +187,25 @@ export class CasterLedger {
       const m = this.statics[i];
       const e = this.st.get(m)!;
       if (m.isDisposed()) { this.st.delete(m); this.statics.splice(i, 1); this.version++; why ||= 'removed'; continue; }
+      const on = shown(m);
+      if (!on || !e.on) {
+        // hidden at one of the two looks: follow the pose, do not judge it (PLACED WHILE HIDDEN); both records update
+        const a = e.pose.moved(m.getWorldMatrix()), b = e.pose.thinMoved(m);
+        if (a || b) e.shifted = true;
+        if (on === e.on) continue;
+        e.on = on;
+        if (on && e.shifted) {
+          e.shifted = false;
+          if (++e.placed > MAX_PLACEMENTS) { this.demote(i, e, now); why = 'moved'; continue; }
+        }
+        why ||= 'toggled';
+        continue;
+      }
       if (e.pose.moved(m.getWorldMatrix()) || e.pose.thinMoved(m)) {
-        this.st.delete(m); this.statics.splice(i, 1);
-        e.mover = true; e.still = 0; e.stillSince = now;
-        this.mv.set(m, e); this.moving.push(m);
-        this.version++;
+        this.demote(i, e, now);
         why = 'moved';
         continue;
       }
-      const on = m.isEnabled() && m.isVisible;
-      if (on !== e.on) { e.on = on; why ||= 'toggled'; }
     }
     for (let i = this.moving.length - 1; i >= 0; i--) {
       const m = this.moving[i];
@@ -189,13 +215,22 @@ export class CasterLedger {
       if (e.mover || movesByConstruction(m)) continue;
       if (++e.still >= SETTLE_FRAMES && now - e.stillSince >= SETTLE_MS) {
         this.mv.delete(m); this.moving.splice(i, 1);
-        e.on = m.isEnabled() && m.isVisible;
+        e.on = shown(m); e.shifted = false;
         this.st.set(m, e); this.statics.push(m);
         this.version++;
         why ||= 'settled';
       }
     }
     return why;
+  }
+
+  /** statics[i] moved: a mover for good. */
+  private demote(i: number, e: Entry, now: number): void {
+    const m = this.statics[i];
+    this.st.delete(m); this.statics.splice(i, 1);
+    e.mover = true; e.still = 0; e.stillSince = now; e.on = shown(m); e.shifted = false;
+    this.mv.set(m, e); this.moving.push(m);
+    this.version++;
   }
 }
 
@@ -204,6 +239,7 @@ function drop<T>(a: T[], v: T): void { const i = a.indexOf(v); if (i >= 0) a.spl
 /** Watches casters before the first bake: who moved. */
 export class WarmupWatch {
   private poses = new Map<CasterLike, Pose>();
+  private shown = new Map<CasterLike, boolean>();
   readonly movers = new Set<CasterLike>();
   frames = 0;
   private t0 = NaN;
@@ -218,9 +254,12 @@ export class WarmupWatch {
     // first world matrix (measured on a fresh scene: one recompute after the first render), which is not motion
     const judge = this.frames > 2;
     for (const m of all) {
-      const was = this.poses.get(m);
+      const was = this.poses.get(m), on = shown(m), wasOn = this.shown.get(m);
+      this.shown.set(m, on);
       if (!was) { this.poses.set(m, new Pose(m.getWorldMatrix())); continue; }
-      if (was.moved(m.getWorldMatrix()) && judge) this.movers.add(m);
+      // PLACED WHILE HIDDEN: only a caster shown at both looks can have moved in the map (a kit template re-parked and
+      // shown between them is being placed); the pose record follows it either way
+      if (was.moved(m.getWorldMatrix()) && judge && on && wasOn) this.movers.add(m);
     }
   }
 }

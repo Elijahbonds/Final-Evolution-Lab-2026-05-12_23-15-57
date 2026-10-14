@@ -147,6 +147,72 @@ describe('the ledger: who is baked, who is drawn per frame', () => {
     expect(l.remove(post)).toBe(false);
   });
 
+  // tp-shadow-fix (2026-10-14): VenueProps' kit masters are hidden templates until the whole set has loaded, then re-parked
+  // at identity, given their thin buffer and shown. That placement is not motion (3-Point phone: 120 → 168 draws when it was).
+  it('a caster placed while hidden (re-parked, then shown) stays static: the bake is redone, it is not demoted', () => {
+    const palm = caster('tree_palm'), post = caster('lamp_post');
+    palm.enable(false);
+    const l = new CasterLedger(); l.arm([palm, post]);
+    expect(l.statics).toEqual([palm, post]);
+    palm.move();                                    // re-parked while hidden: drawn nowhere, so not judged
+    expect(l.frame()).toBe('');
+    palm.enable(true);                              // shown in its place: the bake must take it, as a static
+    expect(l.frame()).toBe('toggled');
+    expect(l.isStatic(palm)).toBe(true);
+    for (let i = 0; i < 20; i++) expect(l.frame(i * 17)).toBe('');
+    palm.move();                                    // shown, it is judged as before: motion makes a mover
+    expect(l.frame()).toBe('moved');
+    expect(l.moving).toEqual([palm]);
+  });
+
+  it('a placement and the show in one frame are one re-bake; a caster placed a second time is a mover for good', () => {
+    const sign = caster('sign');
+    sign.enable(false);
+    const l = new CasterLedger(); l.arm([sign]);
+    sign.move(); sign.enable(true);
+    expect(l.frame()).toBe('toggled');
+    expect(l.isStatic(sign)).toBe(true);
+    sign.enable(false);
+    expect(l.frame()).toBe('toggled');
+    sign.move(); sign.enable(true);                 // hides, jumps and reappears again: a pattern, not a placement
+    expect(l.frame()).toBe('moved');
+    expect(l.moving).toEqual([sign]);
+    for (let i = 0; i < 400; i++) l.frame(i * 17);
+    expect(l.isStatic(sign)).toBe(false);
+  });
+
+  it('a hidden master given its thin-instance buffer is placed, not moved', () => {
+    const storage: { instancesCount: number; matrixBuffer: { isUpdatable(): boolean } | null } = { instancesCount: 0, matrixBuffer: null };
+    const tent = caster('tent', { hasThinInstances: false, _thinInstanceDataStorage: storage });
+    tent.enable(false);
+    const l = new CasterLedger(); l.arm([tent]);
+    Object.assign(tent, { hasThinInstances: true });
+    storage.matrixBuffer = { isUpdatable: () => false }; storage.instancesCount = 6;
+    tent.enable(true);
+    expect(l.frame()).toBe('toggled');
+    expect(l.isStatic(tent)).toBe(true);
+    tent.enable(false); l.frame();
+    storage.matrixBuffer = { isUpdatable: () => false };   // its copies replaced while hidden again: the second placement
+    tent.enable(true);
+    expect(l.frame()).toBe('moved');
+    expect(l.isStatic(tent)).toBe(false);
+  });
+
+  it('the warm-up judges only casters shown at both looks: a template re-parked and shown between them is placed', () => {
+    const palm = caster('tree_palm'), ball = caster('ball');
+    palm.enable(false);
+    const w = new WarmupWatch();
+    for (let i = 0; i < 3; i++) w.frame([palm, ball], i * 17);
+    palm.move(); palm.enable(true);                 // the kit lands mid-watch
+    ball.move();
+    w.frame([palm, ball], 51);
+    w.frame([palm, ball], 68);
+    expect([...w.movers]).toEqual([ball]);
+    palm.move();                                    // shown at both looks now: motion is motion
+    w.frame([palm, ball], 85);
+    expect(w.movers.has(palm)).toBe(true);
+  });
+
   it('the warm-up names what moved while it watched', () => {
     const a = caster('a'), b = caster('b');
     const w = new WarmupWatch();
