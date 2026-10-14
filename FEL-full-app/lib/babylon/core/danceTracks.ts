@@ -31,6 +31,7 @@ import type { DanceClip, DanceStep, Judgement } from './DanceCore';
 import type { CueZone, Limb, MoveKind } from './bodyTargets';
 import { readExportedTrack } from '../music/DanceExport';
 import { DANCE_LIBRARY, isBodyStep, stepLimb } from './DanceCore';
+import { danceMove } from '../dance/moves';
 import { CATEGORY_STEM } from '../audio/StemBand';
 import { FEL_SONGS, sectionAtBar, type FelSong, type FelSongSection, type FelStem } from '../dance/felSongs';
 // PIPELINES (2026-10-06): approved community songs and routines, and the player's equipped routine (dance/communityDance.ts).
@@ -407,7 +408,7 @@ export function cueLane(
       });
       continue;
     }
-    const clip = DANCE_LIBRARY.find((c) => c.id === u.step.clipId);
+    const clip = danceMove(u.step.clipId);   // lane/dance-extras: the room's whole vocabulary — DANCE_LIBRARY's own row first (a plain press cue is drawn exactly as before), then a captured move, named and coloured by its family
     const family = clip?.category ?? 'transition';
     out.push({
       in: Math.round(dt * 1000) / 1000,

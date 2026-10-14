@@ -13,11 +13,14 @@
 
 import type { FelButton, FelInput } from '../core/InputBus';
 import { DANCE_LIBRARY, MISS_AFTER, type DanceClip, type DanceStep } from '../core/DanceCore';
+import { MOVE_BY_ID } from './moves';
 import { TAP_RELEASE } from '../audio/SongClock';
 import { KEY_SPACE_DOWN } from '../core/StartWake';
 
-/** One id → clip map (DANCE_LIBRARY is eight entries; the room looked clips up with a linear find every frame). */
-export const CLIP_BY_ID: ReadonlyMap<string, DanceClip> = new Map(DANCE_LIBRARY.map((c) => [c.id, c]));
+/** One id → clip map (DANCE_LIBRARY is eight entries; the room looked clips up with a linear find every frame). lane/dance-extras
+ *  (2026-10-14): over the whole vocabulary — DANCE_LIBRARY's own rows first, then the six captured moves (dance/moves.ts) — so a
+ *  chart that opts in to one gets its family's MATCH button, name and instrument from the one lookup every reader shares. */
+export const CLIP_BY_ID: ReadonlyMap<string, DanceClip> = MOVE_BY_ID;
 export const categoryOf = (s: DanceStep): DanceClip['category'] | null => CLIP_BY_ID.get(s.clipId)?.category ?? null;
 
 // ── #11 level ────────────────────────────────────────────────────────────────────────────────────────────────────

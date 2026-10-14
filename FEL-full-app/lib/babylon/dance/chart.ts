@@ -63,7 +63,8 @@
 // runtime a chart that fails is never used silently either: load() logs every problem with console.error once and
 // returns null, and danceTracks.stepsFor falls back to stepsForSong so the room stays playable.
 
-import { DANCE_LIBRARY, MISS_AFTER, type DanceClip, type DanceStep } from '../core/DanceCore';
+import { MISS_AFTER, type DanceClip, type DanceStep } from '../core/DanceCore';
+import { MOVE_BY_ID } from './moves';
 import { GROOVE_WINDOW_SEC } from './chartPlay';
 import { CATEGORY_STEM } from '../audio/StemBand';
 import { songFor, type FelSong, type FelStem, type SectionName, type SongDifficulty } from './felSongs';
@@ -141,7 +142,9 @@ export const CHART_MOVES: Readonly<Record<string, string>> = {
   robot: 'dance_wave_arm',
 };
 
-const CLIP_BY_ID = new Map(DANCE_LIBRARY.map((c) => [c.id, c]));
+/** The whole vocabulary (dance/moves.ts): DANCE_LIBRARY's rows (the same objects) and the six captured moves, which a chart opts in to
+ *  by naming their id — the six short names in CHART_MOVES still answer with the library clip, so no shipped chart changed. */
+const CLIP_BY_ID = MOVE_BY_ID;
 
 /** The clip a chart's move name dances, or null when it names no move. */
 export function moveClip(m: string | undefined): DanceClip | null {
