@@ -35,8 +35,10 @@ export function mountBoard3D<S>(scene: Scene, o: Board3DOpts, paint: (g: CanvasR
   const steel = new PBRMaterial(`${o.name}_steel`, scene);
   steel.albedoColor = Color3.FromHexString('#20262e'); steel.metallic = 0.6; steel.roughness = 0.5; owned.push(steel);
 
+  // the frame and its posts are one merged mesh (one draw): a phone's budget counts every mesh (mobileBudget.json: activeMeshes)
+  const parts: Mesh[] = [];
   const rim = MeshBuilder.CreateBox(`${o.name}_frame`, { width: o.width + 0.28, height: o.height + 0.28, depth: 0.16 }, scene);
-  rim.position.copyFrom(o.at); rim.rotation.y = o.yaw; rim.material = steel; keep(rim);
+  rim.position.copyFrom(o.at); rim.rotation.y = o.yaw; parts.push(rim);
   // the face stands a hair in front of the frame, on the side the board faces
   const dx = Math.sin(o.yaw) * -0.1, dz = Math.cos(o.yaw) * -0.1;
   const panel = MeshBuilder.CreatePlane(`${o.name}_led`, { width: o.width, height: o.height }, scene);
@@ -56,9 +58,11 @@ export function mountBoard3D<S>(scene: Scene, o: Board3DOpts, paint: (g: CanvasR
     for (const s of [-1, 1]) {
       const post = MeshBuilder.CreateBox(`${o.name}_post`, { width: 0.18, height: top, depth: 0.18 }, scene);
       const cx = Math.cos(o.yaw) * s * (o.width / 2 - 0.4), cz = -Math.sin(o.yaw) * s * (o.width / 2 - 0.4);
-      post.position.set(o.at.x + cx, top / 2, o.at.z + cz); post.material = steel; keep(post);
+      post.position.set(o.at.x + cx, top / 2, o.at.z + cz); parts.push(post);
     }
   }
+  const frame = Mesh.MergeMeshes(parts, true, true);
+  if (frame) { frame.name = `${o.name}_frame`; frame.material = steel; keep(frame); }
 
   let last = '', paints = 0;
   return {

@@ -1,7 +1,7 @@
 // vis-hoops-dunk — what the court keeps: the plans (pure) and the stamp into the shared pool (a scene with none takes none).
 import { describe, expect, it } from 'vitest';
 import { NullEngine, Scene } from '@babylonjs/core';
-import { landMarks, plantMarks, shotMarks, stampCourt } from './courtMarks';
+import { COURT_Y, landMarks, plantMarks, shotMarks, stampCourt } from './courtMarks';
 import { DECAL_SIZE } from '../visual/GroundDecals';
 
 describe('plans', () => {
@@ -39,10 +39,12 @@ describe('stampCourt', () => {
     const s = new Scene(new NullEngine());
     const laid: { kind: string; x: number; z: number; y?: number; scale?: number }[] = [];
     (s.metadata ??= {}).felDecals = { stamp: (kind: string, x: number, z: number, _yaw: number, o: { y?: number; scale?: number } = {}) => { laid.push({ kind, x, z, y: o.y, scale: o.scale }); } };
-    expect(stampCourt(s, landMarks({ x: 3, z: -4 }, 0, 1), 0.02)).toBe(3);
+    expect(stampCourt(s, landMarks({ x: 3, z: -4 }, 0, 1), 0.5)).toBe(3);
     expect(laid.map((l) => l.kind)).toEqual(['scuff', 'foot', 'foot']);
-    expect(laid.every((l) => l.y === 0.02)).toBe(true);
+    expect(laid.every((l) => l.y === 0.5)).toBe(true);
     expect(laid[0].x).toBe(3); expect(laid[0].z).toBe(-4);
+    laid.length = 0; stampCourt(s, shotMarks({ x: 0, z: 0 }, 0));
+    expect(laid.every((l) => l.y === COURT_Y)).toBe(true);   // by default: above the street court's paint, not under it
   });
   it('the marks fit the decal pool\'s own sizes (a scuff is at most a couple of metres)', () => {
     for (const m of landMarks({ x: 0, z: 0 }, 0, 1)) expect(DECAL_SIZE[m.kind][1] * m.scale).toBeLessThan(2.5);

@@ -25,7 +25,8 @@ describe('Board3D', () => {
     const b = mountBoard3D<number>(s, { name: 'tb', at: new Vector3(0, 4, 0), yaw: Math.PI, width: 4, height: 2, px: [256, 128], posts: true }, () => { painted++; });
     expect(b.panel.name).toBe('tb_led');
     expect(b.meshes.every((m) => !m.isPickable)).toBe(true);
-    expect(s.meshes.filter((m) => m.name === 'tb_post').length).toBe(2);
+    expect(s.meshes.filter((m) => m.name === 'tb_frame').length).toBe(1);   // the frame and its posts: one draw
+    expect(s.meshes.filter((m) => m.name === 'tb_post').length).toBe(0);
     b.set('a', 1); b.set('a', 1); b.set('b', 2);
     expect(painted).toBe(2); expect(b.paints).toBe(2);
     b.dispose();
@@ -49,6 +50,14 @@ describe('RackDressing', () => {
     for (let i = 0; i < 5; i++) { expect(names).toContain(`tp_rack${i}_led`); expect(names).toContain(`tp_rack${i}_pool`); }
     expect(h.meshes.every((m) => !m.isPickable)).toBe(true);
     h.dispose();
+  });
+  it('a phone gets no pools of light on the floor (its budget counts every mesh)', () => {
+    const s = rig(); const h = mountRackDressing(s, stands, -1, 'mobile');
+    expect(s.meshes.filter((m) => m.name.endsWith('_pool')).length).toBe(0);
+    expect(s.meshes.filter((m) => m.name.endsWith('_led')).length).toBe(5);
+    h.setActive(2); h.setMoneyRack(1);   // the strips still answer
+    h.dispose();
+    expect(s.meshes.some((m) => m.name.startsWith('tp_'))).toBe(false);
   });
   it('the money rack\'s strip goes gold and the rack in play burns brighter than the rest', () => {
     const s = rig(); const h = mountRackDressing(s, stands, 3);
@@ -86,6 +95,7 @@ describe('the judges\' table', () => {
     const s = rig(); const t = mountJudgesTable(s, DUNK_COURT.judgesAt, DUNK_COURT.judgesFace, 5);
     const card = (i: number) => s.getMeshByName(`jt_card_${i}`)!;
     expect(s.meshes.filter((m) => m.name.startsWith('jt_card_')).length).toBe(5);
+    expect(s.meshes.filter((m) => m.name.startsWith('jt_')).length).toBe(5 + 3);   // the cards, and the top, the cloth and the steel: eight draws
     expect(t.up).toBe(0); expect(card(0).scaling.y).toBeLessThan(0.01);
     t.flip(0, 'Silk', 9); t.flip(4, 'Prime', 10);
     expect(t.up).toBe(2);

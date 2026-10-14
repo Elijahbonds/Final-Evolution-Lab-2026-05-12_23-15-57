@@ -4552,6 +4552,7 @@ export const DunkMode: ModeDefinition = (() => {
 
   function resetForNextAttempt(ctx: ModeContext): void {
     ctx.setHud({ bannerHigh: false });
+    judgesTable?.clear();   // vis-hoops-dunk: the last dunk's cards come down with the run-up
     player.root.position.set(0, 0, CFG.startZ);
     player.root.rotation.y = Math.PI;
     player.root.rotation.z = 0; airLean = 0; holdRunSpeed = 0; approachMove.stop();

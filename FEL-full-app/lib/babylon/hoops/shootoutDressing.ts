@@ -27,7 +27,7 @@ export function boardSpot(rim: { x: number; z: number }, arcCentre: { x: number;
 }
 
 export function mountShootoutDressing(scene: Scene, stands: readonly Vector3[], rim: Vector3, initial: ShootoutState): ShootoutDressingHandle {
-  const racks = mountRackDressing(scene, stands);
+  const racks = mountRackDressing(scene, stands, -1, (scene.metadata as { felTier?: string } | null)?.felTier);
   const spot = boardSpot(rim, { x: rim.x, z: rim.z + 7 });
   const board = mountBoard3D<ShootoutBoard>(scene, {
     name: 'tp_board', at: new Vector3(spot.x, spot.y, spot.z), yaw: spot.yaw, width: 6.4, height: 2.4, px: [1024, 384], posts: true,

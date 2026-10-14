@@ -42,8 +42,12 @@ export function shotMarks(at: { x: number; z: number }, yaw: number): Mark[] {
   ];
 }
 
+/** The Venice street court's paint plane stands 2 cm above the ground (CourtSurface: "street court … at y 0.02"); a mark laid at the
+ *  ground's height would sit under the paint. The pool puts a mark 1.2 cm above the y it is given. */
+export const COURT_Y = 0.02;
+
 /** Lay `marks` on the floor at height `y`. Returns how many went down (0 with no pool). */
-export function stampCourt(scene: Scene, marks: readonly Mark[], y = 0): number {
+export function stampCourt(scene: Scene, marks: readonly Mark[], y = COURT_Y): number {
   const d = decalsOf(scene);
   if (!d) return 0;
   for (const m of marks) d.stamp(m.kind, m.x, m.z, m.yaw, { y, scale: m.scale });

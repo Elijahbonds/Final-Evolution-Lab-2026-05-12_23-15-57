@@ -342,6 +342,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
   const firstCard = (): boolean => attemptNum[0] === 0 && attemptNum[1] === 0 && !inDunkOff;
   function enterHandoff(ctx: ModeContext, dunkOffOpens = false): void {
     setPhase('handoff');
+    dressing?.judges.clear();   // vis-hoops-dunk: the last dunk's cards come down with the hand-off
     armedAir = null; airTricks = []; flight.reset(); beatCalled = false; meter3d?.end(null); judgeHold = -1;   // IMPROVE (2026-10-06) #7 #8
     benchAcc = BENCH_TICK_SEC;   // IMPROVE (2026-10-06) #16: the new bench body's feed is filled on its first frame
     style = 'power'; charge = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; rimCamCut = false; hangSlowMoLatch = false; contactLatch = false;

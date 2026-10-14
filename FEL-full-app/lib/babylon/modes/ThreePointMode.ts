@@ -1465,6 +1465,7 @@ export const ThreePointMode: ModeDefinition = {
     })();
 
     halos?.dispose(); halos = mountBallHalos(ctx.scene);   // vis-hoops-dunk (before the ball: dressBall lights it)
+    (ctx.scene.metadata ??= {}).felHoops = { probe: () => ({ phase: S.phase, t: shotMeter.t, green: shotMeter.greenCenter01, half: shotMeter.greenHalfWidth01, active: shotMeter.active, streak: S.streak, ballIdx: S.ballIdx, money: isMoneyBall(S.ballIdx), fire: rimFx?.fire ?? 0, clock: S.clock }) };   // for the rig's probes (read only)
     ball = MeshBuilder.CreateSphere('tp_ball', { diameter: 0.24, segments: 16 }, ctx.scene);
     ballMat = new StandardMaterial('tp_ballMat', ctx.scene);
     ball.material = ballMat;

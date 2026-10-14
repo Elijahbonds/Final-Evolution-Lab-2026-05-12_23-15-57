@@ -60,7 +60,8 @@ function poolTexture(scene: Scene): DynamicTexture | null {
 }
 
 /** `stands` are the stand planks' world positions (the mode's `rack_N` meshes), in rack order. */
-export function mountRackDressing(scene: Scene, stands: readonly Vector3[], moneyRack = -1): RackDressingHandle {
+export function mountRackDressing(scene: Scene, stands: readonly Vector3[], moneyRack = -1, tier?: string): RackDressingHandle {
+  const phone = tier === 'mobile';   // a phone's budget counts every mesh (mobileBudget.json): the pools of light on the floor are the desktop's
   const meshes: Mesh[] = [];
   const owned: { dispose(): void }[] = [];
   const keep = <T extends Mesh>(m: T): T => { m.isPickable = false; m.receiveShadows = false; meshes.push(m); return m; };
@@ -92,15 +93,16 @@ export function mountRackDressing(scene: Scene, stands: readonly Vector3[], mone
   if (apronMesh) { apronMesh.name = 'tp_aprons'; apronMesh.material = apronMat; keep(apronMesh); }
 
   // the LED strips under the planks, and the pools of light they throw on the apron
-  const poolTex = poolTexture(scene);
+  const poolTex = phone ? null : poolTexture(scene);
   if (poolTex) owned.push(poolTex);   // one texture for the five pools, taken down with them
-  const strips: { mesh: Mesh; mat: StandardMaterial; pool: Mesh; poolMat: StandardMaterial }[] = [];
+  const strips: { mesh: Mesh; mat: StandardMaterial; pool: Mesh | null; poolMat: StandardMaterial | null }[] = [];
   stands.forEach((p, i) => {
     const mesh = MeshBuilder.CreateBox(`tp_rack${i}_led`, { width: STAND.w + 0.04, height: 0.035, depth: STAND.d + 0.04 }, scene);
     mesh.position.set(p.x, STAND.y - STAND.h / 2 - 0.02, p.z);
     const mat = new StandardMaterial(`tp_rack${i}_led_m`, scene);
     mat.disableLighting = true; mat.diffuseColor = unlitDiffuse(); mat.specularColor = Color3.Black(); owned.push(mat);
     mesh.material = mat; keep(mesh);
+    if (phone) { strips.push({ mesh, mat, pool: null, poolMat: null }); return; }
     const pool = MeshBuilder.CreateGround(`tp_rack${i}_pool`, { width: A.w * 1.25, height: A.d * 1.25 }, scene);
     pool.position.set(p.x, 0.02, p.z);
     const poolMat = new StandardMaterial(`tp_rack${i}_pool_m`, scene);
@@ -116,6 +118,7 @@ export function mountRackDressing(scene: Scene, stands: readonly Vector3[], mone
       const hex = Color3.FromHexString(stripHex(i, money));
       const lit = active < 0 || i === active;
       s.mat.emissiveColor = hex.scale(lit ? 1 : 0.35);
+      if (!s.poolMat) return;
       s.poolMat.emissiveColor = hex.scale(lit ? 0.55 : 0.12);
       if (!poolTex) s.poolMat.alpha = lit ? 0.22 : 0.06;
     });

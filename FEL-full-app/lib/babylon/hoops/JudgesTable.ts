@@ -61,16 +61,19 @@ export function mountJudgesTable(scene: Scene, at: { x: number; z: number }, tow
 
   const GAP = 0.86;
   const W = GAP * n + 0.4;
+  // the table is three meshes (the top, the cloth, the steel: the legs and the card posts merged), so with the cards it is n + 3 draws —
+  // a phone's budget counts every mesh
   const top = MeshBuilder.CreateBox('jt_top', { width: W, height: 0.07, depth: 1.0 }, scene); place(top, 0, 0.78, 0); top.material = wood; keep(top);
   const front = MeshBuilder.CreateBox('jt_front', { width: W - 0.1, height: 0.74, depth: 0.05 }, scene); place(front, 0, 0.37, -0.45); front.material = cloth; keep(front);
+  const steelParts: Mesh[] = [];
   for (const sx of [-1, 1]) {
-    const leg = MeshBuilder.CreateBox('jt_leg', { width: 0.07, height: 0.78, depth: 0.9 }, scene); place(leg, sx * (W / 2 - 0.08), 0.39, 0); leg.material = steel; keep(leg);
+    const leg = MeshBuilder.CreateBox('jt_leg', { width: 0.07, height: 0.78, depth: 0.9 }, scene); place(leg, sx * (W / 2 - 0.08), 0.39, 0); steelParts.push(leg);
   }
 
   const cards: { mesh: Mesh; mat: StandardMaterial; tex: DynamicTexture | null; g: CanvasRenderingContext2D | null; t: number; show: boolean }[] = [];
   for (let i = 0; i < n; i++) {
     const lx = (i - (n - 1) / 2) * GAP;
-    const post = MeshBuilder.CreateBox('jt_post', { width: 0.05, height: 0.62, depth: 0.05 }, scene); place(post, lx, 1.1, -0.1); post.material = steel; keep(post);
+    const post = MeshBuilder.CreateBox('jt_post', { width: 0.05, height: 0.62, depth: 0.05 }, scene); place(post, lx, 1.1, -0.1); steelParts.push(post);
     const mesh = MeshBuilder.CreatePlane(`jt_card_${i}`, { width: 0.74, height: 0.56 }, scene);
     place(mesh, lx, 1.62, -0.14);
     const mat = new StandardMaterial(`jt_card_m_${i}`, scene);
@@ -85,6 +88,8 @@ export function mountJudgesTable(scene: Scene, at: { x: number; z: number }, tow
     mesh.scaling.y = 0.0001;
     cards.push({ mesh, mat, tex, g, t: 9, show: false });
   }
+  const steelMesh = Mesh.MergeMeshes(steelParts, true, true);
+  if (steelMesh) { steelMesh.name = 'jt_steel'; steelMesh.material = steel; keep(steelMesh); }
 
   return {
     meshes,
