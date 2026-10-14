@@ -564,7 +564,7 @@ export const OneVOneMode: ModeDefinition = (() => {
   const devContacts: { t: number; severity: string; closing: number; attacker: string; victim: string; attackerSpeed: number }[] = [];   // dev: the last Havok contact events (probes)
   // ── the DEFENSE contest package (D1–D3) ──
   // T-A STEAL-TELL: the AI's reach shows before it resolves (a tell the handler can beat), one per AI_REACH_COOLDOWN_SEC
-  let foeReach: { t: number; exposed: boolean; moveMark: number } | null = null;
+  let foeStealReach: { t: number; exposed: boolean; moveMark: number } | null = null;
   let foeReachCooldown = 0;
   let meBumpAge = Infinity;   // seconds since a body contact on my carrier (the AI reach's exposure)
   let bumpAge = Infinity;                       // D2: seconds since the last hard body contact with the handler (the strip window)
@@ -739,7 +739,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     possessionToken++;
     possession = 'mine'; carrying = true; shooting = false; dunking = false; defPhase = 'over';
     currentShot = null; myJumpAge = Infinity; meStunSec = 0; reachCooldown = 0; goaltendCalled = false; paintSec = 0;
-    threat = { ...THREAT_IDLE }; stickHeld = 0; stickPeak = 0; burstArmed = false; jabEligible = false; spinGather = 0; posterVictim = null; victimSlide = null; foeReach = null;
+    threat = { ...THREAT_IDLE }; stickHeld = 0; stickPeak = 0; burstArmed = false; jabEligible = false; spinGather = 0; posterVictim = null; victimSlide = null; foeStealReach = null;
     meMotion.reset(); foeMotion.reset(); foeMover.stop(); foeFootPlant?.release(); meLayers?.reset(); foeLayers?.reset();   // a check-up moves bodies metres in a frame; that is not acceleration (nor a drag, nor a lean)
     arc.active = false;
     meShotWin = 'none'; foeShotWin = 'none'; dunkFlight = null; dunkFlush = null; meLandSec = 0; meCelebrateSec = 0;   // BIOMECH-HOOPS-WAVE1
@@ -1777,15 +1777,15 @@ export const OneVOneMode: ModeDefinition = (() => {
         // (It was one roll and the ball was gone: a strip 1.4–3.7 s after the check with no tell, no cooldown, no cost.)
         const reachEligible = carrying && !loose && !shooting && !dunking && !finish && !gather && !sealed;
         const reachDist = distXZ(me.root.position, foe.root.position);
-        if (!foeReach && foeStunSec === 0 && foeReachCooldown === 0 && reachEligible && foeIntent.steal && reachDist < 1.6 && roll() < AI_REACH_GATE) {
+        if (!foeStealReach && foeStunSec === 0 && foeReachCooldown === 0 && reachEligible && foeIntent.steal && reachDist < 1.6 && roll() < AI_REACH_GATE) {
           foeReachCooldown = AI_REACH_COOLDOWN_SEC;
           foeAnimTree.beat('bball_steal_reach', { fadeSec: 0.14 });
-          foeReach = { t: 0, exposed: meBumpAge <= BUMP_STRIP_WINDOW_SEC, moveMark: lastStickMoveAt };
+          foeStealReach = { t: 0, exposed: meBumpAge <= BUMP_STRIP_WINDOW_SEC, moveMark: lastStickMoveAt };
           console.info(`[1V1-DEF] ai reach tell at ${reachDist.toFixed(2)} m`);
-        } else if (foeReach) {
-          foeReach.t += dt;
-          if (foeReach.t >= AI_REACH_TELL_SEC) {
-            const r = foeReach; foeReach = null;
+        } else if (foeStealReach) {
+          foeStealReach.t += dt;
+          if (foeStealReach.t >= AI_REACH_TELL_SEC) {
+            const r = foeStealReach; foeStealReach = null;
             const kind = resolveAiReach({
               tellSec: r.t, eligible: reachEligible && foeStunSec === 0 && !foeFloored, inRange: reachDist < 1.6,
               movedDuringTell: lastStickMoveAt > r.moveMark || spin !== null, exposed: r.exposed,
@@ -2349,7 +2349,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     possessionToken++;
     possession = 'defense'; carrying = false; shooting = false; dunking = false; currentShot = null;
     defPhase = 'check'; attacker.reset(); nerveTheAttacker(); gatherShown = false; stepbackShown = false; goaltendCalled = false; paintSec = 0;
-    threat = { ...THREAT_IDLE }; stickHeld = 0; stickPeak = 0; burstArmed = false; jabEligible = false; spinGather = 0; posterVictim = null; victimSlide = null; foeReach = null;
+    threat = { ...THREAT_IDLE }; stickHeld = 0; stickPeak = 0; burstArmed = false; jabEligible = false; spinGather = 0; posterVictim = null; victimSlide = null; foeStealReach = null;
     meMotion.reset(); foeMotion.reset(); foeMover.stop(); foeFootPlant?.release(); meLayers?.reset(); foeLayers?.reset();   // a check-up moves bodies metres in a frame; that is not acceleration (nor a drag, nor a lean)
     myJumpAge = Infinity; meStunSec = 0; reachCooldown = 0; defContest = 0;
     arc.active = false;
