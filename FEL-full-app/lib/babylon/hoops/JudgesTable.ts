@@ -53,9 +53,9 @@ export function mountJudgesTable(scene: Scene, at: { x: number; z: number }, tow
   };
 
   const wood = new PBRMaterial('jt_wood', scene);
-  wood.albedoColor = Color3.FromHexString('#5a3b25'); wood.metallic = 0; wood.roughness = 0.7; owned.push(wood);
+  wood.albedoColor = Color3.FromHexString('#a06a3c'); wood.emissiveColor = Color3.FromHexString('#3a2412'); wood.metallic = 0; wood.roughness = 0.7; owned.push(wood);   // (a little self-light: the table faces away from the low sun, and a dark one read as a black slab on the rig)
   const cloth = new StandardMaterial('jt_cloth', scene);
-  cloth.diffuseColor = Color3.FromHexString('#1b2f6b'); cloth.specularColor = Color3.Black(); owned.push(cloth);
+  cloth.diffuseColor = Color3.FromHexString('#2a56c6'); cloth.emissiveColor = Color3.FromHexString('#12306e'); cloth.specularColor = Color3.Black(); owned.push(cloth);
   const steel = new PBRMaterial('jt_steel', scene);
   steel.albedoColor = Color3.FromHexString('#2b3138'); steel.metallic = 0.6; steel.roughness = 0.5; owned.push(steel);
 
