@@ -597,6 +597,7 @@ export const KarateEndlessMode: ModeDefinition = (() => {
     char.root.scaling.scaleInPlace(0.001);
     if (!lightFx) {
       fx?.ring(pos, 1.5, '#22d3ee', 0.45);   // VISUAL PASS: a cyan shockwave on the floor where the agent materialises, under the glitch pop
+      fx?.edge(char.root, '#22d3ee', 0.9);   // w3-atmos: the agent's contour burns cyan as it materialises, then settles (the ink hull, recoloured: no draw)
       EffectsKit.burst(ctx.scene, pos.add(new Vector3(0, 1, 0)), 'glitch');
       SoundKit.play('powerUp', { pitch: 1.6, volume: 0.25 });
     }

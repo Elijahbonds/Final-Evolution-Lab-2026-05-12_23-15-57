@@ -18,6 +18,8 @@ export interface PlaceLook {
   /** The sky and the light. Omitted = the spec's own. */
   sky?: { top: string; bottom: string; fog: string; sun: string; ambient?: number; fogDensity?: number };
   backdrop?: BackdropKind;
+  /** w3-atmos: the painted horizon is the sky, not the baked photograph (NexusWebScene Environment.paintedSky): a night place. */
+  paintedSky?: boolean;
   /** Floor colour / line colour / surface kind. The size and the markings are the spec's — they are the game. */
   ground?: { color?: string; line?: string; kind?: GroundKind };
   /** The CC0 prop dressing set (visual/venuePropSets): a name, or null for none. Omitted = the spec's default. */
@@ -49,12 +51,12 @@ export const PLACE_LOOKS: Record<string, PlaceLook[]> = {
   football: [
     home('Gridiron Sovereign', 'THE STADIUM AT DUSK', '#9fb7ff'),
     { id: 'beach-bowl', name: 'Beach Bowl', sub: 'A GRIDIRON ON THE SAND · PALMS ON THE SIDELINE', tint: '#ffd166', sky: BEACH, backdrop: 'beach', propSet: 'beach-court', props: [palm(-26, -30), palm(26, -30), palm(-28, 30), palm(28, 30)] },
-    { id: 'dome-night', name: 'The Dome', sub: 'UNDER THE LIGHTS · NEON RAFTERS', tint: '#7dd3fc', sky: NEON, backdrop: 'neon', ground: { color: '#1f5a30', line: '#bfe9ff' }, propSet: null, props: [lamp(-24, -28, '#7dd3fc'), lamp(24, -28, '#f472b6'), lamp(-24, 28, '#f472b6'), lamp(24, 28, '#7dd3fc')] },
+    { id: 'dome-night', name: 'The Dome', sub: 'UNDER THE LIGHTS · NEON RAFTERS', tint: '#7dd3fc', sky: NEON, backdrop: 'neon', paintedSky: true, ground: { color: '#1f5a30', line: '#bfe9ff' }, propSet: null, props: [lamp(-24, -28, '#7dd3fc'), lamp(24, -28, '#f472b6'), lamp(-24, 28, '#f472b6'), lamp(24, 28, '#7dd3fc')] },
   ],
   carnival: [
     home('Carnival Court', 'GAME NIGHT ON THE PURPLE COURT', '#FFE66D'),
     { id: 'boardwalk', name: 'Boardwalk', sub: 'VENICE AT SUNSET · THE PIER BEHIND THE HOOP', tint: '#ffb36b', sky: BEACH, backdrop: 'beach', ground: { color: '#3b6bb5', line: '#ffe66d' }, propSet: 'venice-court', props: [palm(-13, -18), palm(13, -18)] },
-    { id: 'neon-block', name: 'Neon Block', sub: 'A ROOFTOP AT NIGHT · THE CITY BELOW', tint: '#f472b6', sky: NEON, backdrop: 'neon', ground: { color: '#2a1140', line: '#22d3ee' }, propSet: 'night-rooftop', props: [lamp(-11, -16, '#22d3ee'), lamp(11, -16, '#f472b6')] },
+    { id: 'neon-block', name: 'Neon Block', sub: 'A ROOFTOP AT NIGHT · THE CITY BELOW', tint: '#f472b6', sky: NEON, backdrop: 'neon', paintedSky: true, ground: { color: '#2a1140', line: '#22d3ee' }, propSet: 'night-rooftop', props: [lamp(-11, -16, '#22d3ee'), lamp(11, -16, '#f472b6')] },
   ],
   tennis: [
     home('Center Court', 'HARDCOURT UNDER A DUSK SKY', '#2B6CB0'),
@@ -93,13 +95,13 @@ export const PLACE_LOOKS: Record<string, PlaceLook[]> = {
   ],
   dance: [
     home('The Studio', 'MIRRORS AND A WOODEN FLOOR', '#ff9d5c'),
-    { id: 'neon-club', name: 'Neon Club', sub: 'THE FLOOR AT MIDNIGHT', tint: '#f472b6', sky: NEON, backdrop: 'neon', ground: { color: '#1a0a2a', line: '#22d3ee' }, propSet: null, props: [lamp(-7, -7, '#22d3ee'), lamp(7, -7, '#f472b6'), lamp(-7, 7, '#f472b6'), lamp(7, 7, '#22d3ee')] },
+    { id: 'neon-club', name: 'Neon Club', sub: 'THE FLOOR AT MIDNIGHT', tint: '#f472b6', sky: NEON, backdrop: 'neon', paintedSky: true, ground: { color: '#1a0a2a', line: '#22d3ee' }, propSet: null, props: [lamp(-7, -7, '#22d3ee'), lamp(7, -7, '#f472b6'), lamp(-7, 7, '#f472b6'), lamp(7, 7, '#22d3ee')] },
     { id: 'rooftop-dusk', name: 'Rooftop Dusk', sub: 'THE CITY BEHIND YOU · THE SUN GOING DOWN', tint: '#ffb36b', sky: EMBER, backdrop: 'city', ground: { color: '#3a3541', line: '#ffb36b' }, propSet: 'night-rooftop' },
   ],
   brainbrawl: [
     home('Neuro Arena', 'THE QUIZ IN THE DARK', '#5E5CE6'),
     { id: 'studio-day', name: 'Daytime Studio', sub: 'A BRIGHT SET · THE AUDIENCE CAN SEE YOU', tint: '#ffd166', sky: { top: '#dfe7f0', bottom: '#f7f3ea', fog: '#eef0f2', sun: '#ffffff', ambient: 0.95, fogDensity: 0.002 }, backdrop: 'city', ground: { color: '#e8e4dc', line: '#333a4a' }, propSet: null },
-    { id: 'arcade-night', name: 'Arcade Night', sub: 'PINK AND CYAN · THE CABINETS HUMMING', tint: '#f472b6', sky: NEON, backdrop: 'neon', ground: { color: '#12082a', line: '#f472b6' }, props: [lamp(-8, -8, '#22d3ee'), lamp(8, -8, '#f472b6'), lamp(-8, 8, '#f472b6'), lamp(8, 8, '#22d3ee')] },
+    { id: 'arcade-night', name: 'Arcade Night', sub: 'PINK AND CYAN · THE CABINETS HUMMING', tint: '#f472b6', sky: NEON, backdrop: 'neon', paintedSky: true, ground: { color: '#12082a', line: '#f472b6' }, props: [lamp(-8, -8, '#22d3ee'), lamp(8, -8, '#f472b6'), lamp(-8, 8, '#f472b6'), lamp(8, 8, '#22d3ee')] },
   ],
   sprint: [
     home('Stadium Straight', 'THE TARTAN UNDER A CLEAR SKY', '#a8432f'),

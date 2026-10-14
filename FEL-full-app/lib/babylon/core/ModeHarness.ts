@@ -30,9 +30,9 @@ import { Shaker, InputBuffer, impact as feelImpact, timeScale } from './gameFeel
 import { MomentumBus } from './MomentumBus';
 import { crowdLevel, tierSting, tierImpact } from './MomentumFx';
 import {
-  kickImpactFrame, decayImpactFrame, IMPACT_FRAME_IDLE,
-  speedVignetteLevel, composeFrameGrade, SPEED_VIGNETTE_REDUCED_CAP,
-  type ImpactFrameState, type Grade,
+  kickImpactFrame, FRAME_GRADE_IDLE, stepFrameGrade,
+  speedVignetteLevel, SPEED_VIGNETTE_REDUCED_CAP,
+  type FrameGradeState, type Grade,
 } from './ImpactFrame';
 import { SoundKit } from '../audio/SoundKit';
 import { enterBed, exitBed } from '@/lib/soundtrack/client';   // PIPELINES (2026-10-06): the in-game soundtrack bed
@@ -472,8 +472,8 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
   // A9.3 (visual-foundation): the rig OWNS the resting grade and this is a live reference to it — re-taken once load() is
   // done (lights.adoptRest below), so a venue no longer overwrites it and a load-time grade (WeatherFx) is kept.
   const restGrade: Grade = lights.rest;
-  let frame: ImpactFrameState = IMPACT_FRAME_IDLE;
-  let framePainted = false;
+  let gradeState: FrameGradeState = FRAME_GRADE_IDLE;   // the impact pulse + whether a non-rest grade is on screen (ImpactFrame.stepFrameGrade)
+  lights.composeFlashInHarness();   // w3-atmos: the rig keeps the flash beat's level; this loop paints it with the impact and speed
   // SPEED-VIGNETTE: the level the mode reports this frame (0 = off). The harness, not the mode, owns the
   // pipeline, so the mode reports and the render loop composes — an impact mid-race still wins the frame.
   let speedVignetteRaw = 0;
@@ -481,7 +481,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     shaker, buffer,
     // HOTFIX (2026-09-24): under reduced motion the frame does not pulse (a whole-frame exposure dip is a flash too); the
     // hit-stop, the sound and the pad buzz inside feelImpact are unchanged, and the Shaker holds still on its own.
-    impact: (s: number) => { qa?.impact(); feelImpact(shaker, s); if (motionPolicy().flash) frame = kickImpactFrame(frame, s); },
+    impact: (s: number) => { qa?.impact(); feelImpact(shaker, s); if (motionPolicy().flash) gradeState = { ...gradeState, frame: kickImpactFrame(gradeState.frame, s) }; },
     // The vignette is a motion cousin: under reduced motion its close is capped, not removed (a driver still
     // reads "I am at the edge"), and never above the cap even at full speed.
     speedVignette01: (f: number) => {
@@ -924,12 +924,15 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     // `speedLevel` is the reported fraction run through the owner-approved window (≥0.85 of top speed), capped
     // under reduced motion. When neither is active the resting grade is written once (framePainted) and left.
     const speedLevel = speedVignetteLevel(speedVignetteRaw) * (motionPolicy().flash ? 1 : SPEED_VIGNETTE_REDUCED_CAP);
-    if (frame.level > 0 || framePainted || speedLevel > 0) {
-      frame = decayImpactFrame(frame, dt);
-      const g = composeFrameGrade(restGrade, frame.level, speedLevel);
-      lights.pipeline.imageProcessing.vignetteWeight = g.vignette;
-      lights.pipeline.imageProcessing.exposure = g.exposure;
-      framePainted = frame.level > 0;
+    // w3-atmos: the rig's flash beat composes into the same write. It used to be written by the rig and repainted over by this
+    // block every frame while a mode reported a speed vignette (or an impact ran), so a flash never showed on a racing mode.
+    {
+      const stepped = stepFrameGrade(gradeState, restGrade, dt, speedLevel, lights.flash01);
+      gradeState = stepped.state;
+      if (stepped.write) {
+        lights.pipeline.imageProcessing.vignetteWeight = stepped.write.vignette;
+        lights.pipeline.imageProcessing.exposure = stepped.write.exposure;
+      }
     }
     // IMPROVE (2026-10-06, 3PT #18): every tick renders, except a paused one inside ~100 ms of the last paused render
     const renderNow = performance.now();

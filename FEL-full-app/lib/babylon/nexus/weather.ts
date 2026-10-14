@@ -44,4 +44,16 @@ export function readWeather(modeId?: string): WeatherPick {
     return v && VALID.has(v) ? (v as WeatherPick) : 'natural';
   } catch { return 'natural'; }
 }
+/**
+ * w3-atmos: the precipitation / fog a mode with NO weather chip honours, from the URL alone (`?weather=rain|storm|fog`): never the
+ * saved pick (that is the golf / tennis / football / penalty chip's, and a Rain chosen there must not rain on a kart race the
+ * player did not pick it for), and never a time of day. Null = the mode's own sky.
+ */
+export function readWeatherUrl(): 'rain' | 'storm' | 'fog' | null {
+  try {
+    if (typeof window === 'undefined') return null;
+    const q = new URLSearchParams(window.location.search).get('weather');
+    return q === 'rain' || q === 'storm' || q === 'fog' ? q : null;
+  } catch { return null; }
+}
 export function writeWeather(pick: WeatherPick): void { try { window.localStorage.setItem(WEATHER_KEY, pick); } catch { /* convenience only */ } }
