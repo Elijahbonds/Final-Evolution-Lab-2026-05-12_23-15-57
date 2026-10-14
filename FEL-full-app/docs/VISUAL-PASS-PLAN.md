@@ -771,8 +771,16 @@ dribble, shot timing, meter, release window, difficulty, score, judging, pay or 
 - **The Venice court's gloss.** `GlossyFloor.GLOSSY_FLOOR_MESH` names a mode's own floor plane: the street court is a PBR plane
   (`vb_court_paint`) laid over `venue_ground`, so the mirror goes on that. A sealed court's reflection is a dielectric's (soft
   shapes of the palms, the bus and the bodies at a grazing angle), not a looking-glass: subtle by physics. `?lookoff=mirror` is the A/B.
-- **Budgets.** See the lane report for the rig's numbers; the phone tier merges what it can (the judges' table is eight draws, a
-  board two, the racks seven; no pools of light on a phone), against `mobileBudget.json` (dunk 81 meshes, threepoint 93).
+- **Budgets** (rig: 1080p desktop; 390x844 phone tier, DPR 2, same camera and moment before and after; draws are the engine's per
+  frame, with the shadow pass). Desktop idle draws: dunk 481 -> 567 (the mirror's list, the table, the boards), dunkduel 483 -> 580,
+  threepoint 628 -> 810; all far under 1600, active meshes 135 -> 143, 142 -> 152, 123 -> 140. Phone, content alone (shadows off):
+  dunk +7 draws and meshes, dunkduel +9, threepoint +7, texture memory +1 MB at most (dunk 254 -> 255 of 256); `mobileBudget.json`
+  is not raised. FINDING: threepoint on a phone also shows +48 draws that are NOT content: with the shadow pass on, 120 -> 168 draws
+  from the commit that only lifts the hold (no set piece yet), because the shadow cache then re-bakes (reason 'settled') with the
+  venue's palms, tent, pier and lamp posts as per-frame casters (117 moving instead of 69). Dunk and duel do not show it. It is a
+  foundation behaviour behind the lifted wave-2 look (one of decals / detail maps / sweat / air), found late, not chased to its
+  cause; 220 measured + 48 would pass the table's 264 only by 4 draws, so it needs the foundation owner's eyes before this merges
+  to a phone build (routed).
 - **Deferred to wave 3 / needs art or an owner call.** A "Flight Night" lighting option (a night mood with floodlights: the dunk's
   goldenHour is the owner's tuned look, so a mood change is theirs); sun shafts (the foundation did not build them); instanced
   and vertex-animated crowds and a crowd chant (the dunk's crowd is one baked strip, 3-Point's venue has no crowd, and phone flashes
