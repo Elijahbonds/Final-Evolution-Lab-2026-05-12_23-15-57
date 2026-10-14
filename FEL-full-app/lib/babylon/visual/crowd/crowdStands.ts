@@ -44,10 +44,12 @@ export interface CrowdOptions {
 export const DEFER_FRAMES = 20;
 
 /**
- * Every mesh the crowd makes is named under this prefix. The '__' is the rig's own "not scenery" mark (LightRig skips a
- * '__' mesh when it registers shadow casters, as the kart's merged parts do): measured on the phone rig, the cards and the
- * bleachers registered as LATE casters, the cards' pose switches read to the shadow cache as toggles, and its thrash guard
- * stood the cache down — 3-Point went 127 → 196 draws. Nothing of the crowd is ever a caster now, so the cache never sees it.
+ * Every mesh the crowd makes is named under this prefix. The '__' is the rig's own "not scenery" mark: LightRig skips a '__'
+ * mesh when it registers shadow casters (as the kart's merged parts do), so no fan, card or bench is ever a caster — not even for
+ * the frames before the quarantine below would take it out — and the phone's shadow cache never has the crowd in its ledger.
+ * (Recorded so it is not re-diagnosed: a 3-Point phone frame of 195 draws, first read as the crowd thrashing the cache, is the
+ * cache's re-bake frame after the capture rig turns shadows back on — the build without the crowd measures 191 on the same frame
+ * and 127 after it; with the crowd, 131.)
  */
 export const CROWD_MESH = '__crowd_';
 

@@ -935,8 +935,9 @@ Game-Breaker meter (a type import, `onReport` / `onTierChange`, never `report`).
   turned toward the play; a venue's CAMERA LINE refuses any seat between the play camera and the play or behind it (tested per venue).
   Bleachers (`benches: true`) are laid where a venue has no seating (the beach, the 3-Point sand, the tennis and football sidelines).
 - **Out of the passes it has no business in.** Every crowd mesh is named `__crowd_*`, the rig's "not scenery" mark: never a shadow
-  caster (measured: late casters toggling their card meshes stood the phone shadow cache down, 3-Point 127 → 196 draws), never inked,
-  not a glow occluder, not in a mirror. The governor's 'still' level stops the crowd's clock.
+  caster, never inked, not a glow occluder, not in a mirror. The governor's 'still' level stops the crowd's clock. (A rig note: the
+  first frame drawn after the capture rig re-enables shadows is the phone shadow cache's re-bake — 3-Point measures 191 there without
+  the crowd and 195 with it; the steady frame is 127 vs 131. Measure a frame later.)
 - **Reactions** (`crowdReact`, `modeCrowd`). `mountModeCrowd(ctx, key)` hears every play a mode reports to `ctx.momentum` (weight ≥ 6:
   a cheer sized by it; ≤ −6: a groan), stands the crowd for a few seconds when the meter rises to ON FIRE, and rises and applauds when
   the match ends (`react('finish', 1)` from a mode's own win jumps instead). Football, derby and penalty report nothing to the meter
@@ -953,6 +954,14 @@ Game-Breaker meter (a type import, `onReport` / `onTierChange`, never `report`).
   clear (the hoopbus and the tent are dunk surfaces). velocitykart: people in the circuit's own straight grandstands
   (`kartCrowdVenue` reads `kartSceneryFor`); the trackside Onlookers stay. penalty: two stands flanking the goal behind its line
   (QA P1-05's rule, tested on their seats), in place of the 4 Onlookers.
+- **Budgets** (capture rig, same seed and frame 540, before → after; draws / active meshes / texture MB; desktop 1080p, phone 390×844
+  DPR 2 at the steady frame). Desktop: football 489/55/193 → 455/66/198, derby 559/96/189 → 613/121/200, tennis 311/67/142 →
+  257/73/136, volleyball 620/113/203 → 566/119/191, 3-Point 819/139/264 → 820/151/271, dunk 567/143/309 → 589/159/317, dunkduel
+  570/152/251 → 594/169/259, kart 546/72/237 → 556/77/244, penalty 231/49/149 → 195/46/151 (all far under 1600 / 900 / 512; a stand
+  block is one draw, the crowd's textures are ~10 MB). Phone (cards only): football 125 → 116 draws (skinned bodies 19 → 11), derby
+  105 → 110, tennis 79 → 68 (13 → 7), volleyball 110 → 89 (17 → 9), 3-Point 127 → 131, dunk 99 → 104 (texture 255 → 255), dunkduel
+  154 → 106, kart 108 → 112 (texture 236 → 236), penalty 65 → 61 (11 → 7). No `mobileBudget.json` row is raised; replacing Onlookers
+  with cards lowers the phones' skinned-body counts.
 - **Deferred / [ART].** Arm-raising cheers, claps, scarves and flags (the bodies' arm skinning: [ART]); more body variety ([ART]);
   tennis's near grandstand stays painted (behind the main play camera; the end-change view sees it); the dunk crowd-card strip and the
   painted stand faces are not animated (cards of our own stand in front of them); derby's glove-reach crowd at the wall on a robbed
