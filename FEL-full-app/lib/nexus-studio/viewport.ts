@@ -76,7 +76,12 @@ export class StudioViewport {
   private dragging = false;
   private lastDraws = 0;
 
-  constructor(private canvas: HTMLCanvasElement | null, private cb: ViewportCallbacks, private engineOverride?: AbstractEngine) {}
+  private venueTimer: ReturnType<typeof setTimeout> | null = null;
+  private venueDebounceMs: number;
+
+  constructor(private canvas: HTMLCanvasElement | null, private cb: ViewportCallbacks, private engineOverride?: AbstractEngine, opts: { venueDebounceMs?: number } = {}) {
+    this.venueDebounceMs = opts.venueDebounceMs ?? (engineOverride ? 0 : 90);
+  }
 
   get scene(): Scene | null { return this.stage?.scene ?? null; }
   get currentStage(): Stage | null { return this.stage; }
@@ -112,7 +117,17 @@ export class StudioViewport {
     const layers = changedLayers(this.exp, exp);
     if (layers === null) return this.load(venue, this.tier);
     this.venue = venue;
-    if (layers.size) { this.stage.realise(exp, layers); }
+    if (layers.size) {
+      // the venue layer is a whole mountVenue (sky, ground, surround, the dressing set): typing a number re-mounts it once
+      // the typing pauses, not on every key; the other layers are cheap and follow at once
+      const now = new Set(layers);
+      if (now.has('venue') && this.venueDebounceMs > 0) {
+        now.delete('venue');
+        if (this.venueTimer) clearTimeout(this.venueTimer);
+        this.venueTimer = setTimeout(() => { this.venueTimer = null; if (this.stage && this.exp) this.stage.realise(this.exp, ['venue']); }, this.venueDebounceMs);
+      }
+      if (now.size) this.stage.realise(exp, now);
+    }
     this.exp = exp;
     this.syncProxies(venue);
     if (this.selected && !this.proxies.has(this.selected)) this.select(null);
@@ -406,6 +421,7 @@ export class StudioViewport {
   // ── teardown ──────────────────────────────────────────────────────────────────────────────────────────────────────
 
   private teardownScene(): void {
+    if (this.venueTimer) { clearTimeout(this.venueTimer); this.venueTimer = null; }
     this.stopPreview(false);
     for (const o of this.observers.splice(0)) o.remove();
     if (this.statsTimer) { clearInterval(this.statsTimer); this.statsTimer = null; }

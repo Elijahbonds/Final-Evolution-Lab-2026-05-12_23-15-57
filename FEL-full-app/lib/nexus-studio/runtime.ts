@@ -222,6 +222,8 @@ export interface StudioModeCtx {
   phase?: () => string;
   camDirector?: { inIntro: boolean; update(subject: Vector3, velocity: Vector3, objective: Vector3 | null): void };
   heroRef?: { current: TransformNode | null };
+  /** The mode's play camera (put back as the mode left it when the intro ends). */
+  camera?: { position: Vector3; fov: number; getTarget(): Vector3; setTarget(t: Vector3): void };
   objectiveRef?: { current: Vector3 | null };
 }
 
@@ -242,14 +244,28 @@ export function mountStudioExtras(ctx: StudioModeCtx, exp: StudioVenueExport, op
     crowd: mountCrowdLayer({ scene, momentum: ctx.momentum, phase: ctx.phase }, exp.crowd),
     weather: mountWeatherLayer(scene, ctx.lights ?? null, exp.weather, family, { tier, keepSky: !!exp.look.sky }),
   };
-  // a mode with a fixed camera (Tiebreak snaps once) never steps its director, so the intro it was given would never run
+  // A mode with a fixed camera (Tiebreak snaps once) never steps its director, so the intro it was given would never run.
+  // The stepper runs it on the frame the mode set up when play began (that subject, that objective), and when the intro
+  // ends puts the mode's own camera back exactly as the mode left it: the play camera is the mode's, not the follow's.
   const zero = Vector3.Zero();
+  let held: { subject: Vector3; objective: Vector3 | null; pos: Vector3; target: Vector3; fov: number } | null = null;
   const stepper = opts.stepIntro && ctx.camDirector && exp.intro !== 'none'
     ? scene.onBeforeRenderObservable.add(() => {
       const d = ctx.camDirector!;
-      if (!d.inIntro) return;
+      const cam = ctx.camera;
+      if (!d.inIntro) {
+        if (held && cam) { cam.position.copyFrom(held.pos); cam.setTarget(held.target); cam.fov = held.fov; }
+        held = null;
+        return;
+      }
       const hero = ctx.heroRef?.current;
-      if (hero) d.update(hero.getAbsolutePosition(), zero, ctx.objectiveRef?.current ?? null);
+      if (!hero) return;
+      if (!held) {
+        held = { subject: hero.getAbsolutePosition().clone(), objective: ctx.objectiveRef?.current?.clone() ?? null,
+          pos: cam?.position.clone() ?? Vector3.Zero(), target: cam?.getTarget().clone() ?? Vector3.Zero(), fov: cam?.fov ?? 0.8 };
+      }
+      d.update(held.subject, zero, held.objective);
+      if (!d.inIntro && cam) { cam.position.copyFrom(held.pos); cam.setTarget(held.target); cam.fov = held.fov; held = null; }
     })
     : null;
   return {

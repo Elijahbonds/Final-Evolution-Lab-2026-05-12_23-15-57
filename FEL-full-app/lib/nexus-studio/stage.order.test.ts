@@ -49,6 +49,13 @@ describe('the stage is the harness\'s look stack', () => {
     for (let i = 1; i < at.length; i++) expect(at[i], `${STACK[i][0]} comes after ${STACK[i - 1][0]} in the stage`).toBeGreaterThan(at[i - 1]);
   });
 
+  it('each look-stack call is made once in the stage (no second rig, backdrop or director slipped in ahead of the first)', () => {
+    const body = stage.slice(stage.indexOf('export async function mountStage('));
+    for (const call of ['createEngine(', 'applyCanvasFit(', 'detectRenderTier(', 'new Scene(', 'mountLightRig(', 'mountSsao(', 'mountBackdrop(', 'autoInk(', 'new CameraDirector(', 'mountLetterbox(']) {
+      expect(body.split(call).length - 1, call).toBe(1);
+    }
+  });
+
   it('the stage\'s load() is the mode\'s: mountVenue with the Studio look, then the runtime layers', () => {
     expect(stage).toMatch(/mountVenue\(ctx, exp\.spec, \{ keepGameplayCamera: true, look: studioLook\(exp\) \}\)/);
     for (const layer of ['mountMeshyLayer', 'mountFixtureLayer', 'mountDecalLayer', 'mountCrowdLayer', 'mountWeatherLayer']) {

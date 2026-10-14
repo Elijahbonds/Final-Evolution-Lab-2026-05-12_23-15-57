@@ -63,6 +63,8 @@ describe('the play-test hand-off', () => {
 
   it('a venue id that is not a plain id reads nothing (no key built from a crafted URL)', () => {
     const kv = memoryKV();
+    const exp = exportVenue(everyKindVenue());
+    kv.data.set(PLAYTEST_PREFIX + '../x', JSON.stringify(exp));   // even with something stored under the crafted key
     expect(readPlaytest(kv, '../x')).toBeNull();
     expect(readPlaytest(kv, 'a'.repeat(65))).toBeNull();
   });

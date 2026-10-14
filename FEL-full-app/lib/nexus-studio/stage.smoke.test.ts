@@ -6,13 +6,13 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../babylon/scene/EnvironmentIBL', () => ({ mountEnvironmentIBL: () => () => {} }));   // a float cube NullEngine cannot build
 
-import { FreeCamera, NullEngine, Scene, Vector3 } from '@babylonjs/core';
+import { FreeCamera, NullEngine, Scene, TransformNode, Vector3 } from '@babylonjs/core';
 import { installOffscreenShim } from '@/tests/helpers/canvasShim';
 import { everyKindVenue } from '@/tests/helpers/nexusStudio';
 import { mountStage, type Stage } from './stage';
 import { StudioViewport, changedLayers } from './viewport';
 import { exportVenue } from './exportVenue';
-import { mountDecalLayer, mountFixtureLayer, fixtureHeadName } from './runtime';
+import { mountDecalLayer, mountFixtureLayer, fixtureHeadName, mountStudioExtras } from './runtime';
 import { findFixtures } from '../babylon/scene/FixtureLights';
 import { decalLife } from '../babylon/visual/GroundDecals';
 import type { StudioTransform, StudioVenue } from './doc';
@@ -188,5 +188,31 @@ describe('the viewport', () => {
     const at = vp.groundAt(st.engine.getRenderWidth() / 2, st.engine.getRenderHeight() / 2);
     expect(at).not.toBeNull();
     expect(at![1]).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe('the intro in a mode whose camera is fixed (Tiebreak)', () => {
+  it('the stepper runs the director on the frame play began, and puts the mode\'s camera back when the intro ends', () => {
+    const scene = new Scene(engine()); made.push(scene);
+    const cam = new FreeCamera('cam', new Vector3(0, 4.4, 15.8), scene);
+    cam.setTarget(new Vector3(0, 1, 0)); cam.fov = 0.8;
+    const hero = new TransformNode('hero', scene); hero.position.set(0, 0, 10);
+    const seen: Array<[number[], number[] | null]> = [];
+    let frames = 0;
+    const director = {
+      get inIntro() { return frames < 5; },
+      update(subject: Vector3, _v: Vector3, objective: Vector3 | null) { seen.push([subject.asArray(), objective?.asArray() ?? null]); cam.position.set(9, 9, 9); frames++; },
+    };
+    const objective = { current: new Vector3(0.4, 0, -10) as Vector3 | null };
+    const exp = { ...exportVenue(everyKindVenue()), meshy: [], fixtures: [], decals: [], crowd: null, weather: 'natural' as const, intro: 'walkIn' as const };
+    const x = mountStudioExtras({ scene, camDirector: director, heroRef: { current: hero }, objectiveRef: objective, camera: cam }, exp, { stepIntro: true });
+    scene.render();                                                          // the first playing frame: the intro starts here
+    hero.position.set(2, 0, 10); objective.current = new Vector3(5, 1, 5);   // the mode moves on during the intro (the ball, the slide)
+    for (let i = 0; i < 7; i++) scene.render();
+    expect(seen).toHaveLength(5);
+    expect(seen.every(([s, o]) => s[0] === 0 && o?.[0] === 0.4)).toBe(true);   // the frame play began on, held
+    expect(cam.position.asArray()).toEqual([0, 4.4, 15.8]);                     // the mode's own camera, back
+    expect(cam.fov).toBe(0.8);
+    x.dispose();
   });
 });
