@@ -22,7 +22,8 @@ import { PlayAsSwitcher } from '@/components/closet/play-as-switcher';   // CREA
 import { BASKETBALL_MODE_IDS, COURT_LOCATIONS, readCourtLocation, readyCourtLocations, writeCourtLocation, type CourtLocationId } from '@/lib/babylon/nexus/courtLocations';
 import { BALL_SKINS, readBallSkin, readyBallSkins, writeBallSkin, type BallSkinId } from '@/lib/babylon/nexus/ballSkins';
 import { readyVenues, readBoardVenue, writeBoardVenue, type BoardDiscipline } from '@/lib/babylon/nexus/boardVenues';
-import { readyWeathers, readWeather, writeWeather, WEATHER_FAMILY_OF, type WeatherPick } from '@/lib/babylon/nexus/weather';
+import { readyWeathers, readWeather, writeWeather, readKartWeather, writeKartRain, WEATHER_FAMILY_OF, type WeatherPick } from '@/lib/babylon/nexus/weather';
+import { hudColor } from './tv-hud/tokens';   // the TV HUD palette: the kart's Rain chip lights in its `info` (sky) tone
 import { readyMusicStages, readMusicStage, writeMusicStage, type MusicStageId } from '@/lib/babylon/music/musicStage';
 import { skinsFor, readBoardSkin, writeBoardSkin } from '@/lib/babylon/nexus/boardSkins';
 import { readyCourses, readCourse, writeCourse } from '@/lib/babylon/core/RaceCourse';
@@ -225,6 +226,20 @@ export function SplashCard(props: BootSplashProps) {
     if (!kartRace || (v.laps === kartRace.laps && v.mirror === kartRace.mirror)) return;
     writeKartVariant(v); setKartRace(v);
     const u = new URL(window.location.href); u.searchParams.set('laps', String(v.laps)); u.searchParams.set('mirror', v.mirror ? '1' : '0');
+    window.location.assign(u.toString());
+  };
+  // w3-followups (owner 2026-10-14 "Add a Rain chip"): the kart's RAIN on/off. Looks and weather only: the road wets, the rain falls, the
+  // air greys - the model, the field and the clock never read it. Remembered per device (fel-kart-rain, not the golf chip's fel-weather),
+  // and the URL still works: ?weather=rain turns it on for that link, and the chip reflects it. Weather dresses the world at load, so a
+  // change reloads with the pick in the query, exactly like MIRROR.
+  const [kartRain, setKartRain] = useState<boolean | null>(null);
+  useEffect(() => { if (race === 'kart') setKartRain(readKartWeather() === 'rain'); }, [race]);
+  const toggleKartRain = () => {
+    if (kartRain === null) return;
+    const on = !kartRain;
+    writeKartRain(on); setKartRain(on);
+    const u = new URL(window.location.href);
+    if (on) u.searchParams.set('weather', 'rain'); else u.searchParams.delete('weather');   // off clears a storm / fog link too: the pick is dry
     window.location.assign(u.toString());
   };
 
@@ -604,6 +619,20 @@ export function SplashCard(props: BootSplashProps) {
               <button type="button" onClick={() => pickKartRace({ ...kartRace, mirror: !kartRace.mirror })} aria-pressed={kartRace.mirror}
                 className={`rounded-full border border-white/40 px-3 py-1 text-[10px] font-black tracking-wider transition ${kartRace.mirror ? 'bg-white text-black' : 'text-white/80 hover:bg-white/10'}`}>
                 MIRROR
+              </button>
+            </div>
+          </div>
+        )}
+
+        {race === 'kart' && kartRain !== null && (props.phase === 'ready' || props.phase === 'loading') && (
+          <div className="mt-2 flex flex-col items-center gap-1.5">
+            <p className="text-[9px] font-black tracking-[0.3em] text-white/45">WEATHER</p>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <button type="button" onClick={toggleKartRain} aria-pressed={kartRain} title="Rain: a wet road and falling rain. Looks only - handling, grip and speed are the same."
+                aria-label={`Rain ${kartRain ? 'on' : 'off'} — looks only, handling is unchanged`}
+                className={`rounded-full border px-3 py-1 text-[10px] font-black tracking-wider transition ${kartRain ? '' : 'text-white/80 hover:bg-white/10'}`}
+                style={kartRain ? { background: hudColor('info'), borderColor: hudColor('info'), color: hudColor('ink') } : { borderColor: hudColor('info', 0.53) }}>
+                RAIN {kartRain ? 'ON' : 'OFF'}
               </button>
             </div>
           </div>
