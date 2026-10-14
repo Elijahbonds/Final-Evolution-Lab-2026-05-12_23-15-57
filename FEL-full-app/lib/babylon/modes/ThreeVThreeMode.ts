@@ -469,6 +469,8 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
   let hintShown = '', hintAt = 0, hintDefence: boolean | null = null;
   /** #3: the OPPONENT pick's knobs for this run (PRO until load reads it). */
   let knobs = THREEV_TIER.pro;
+  /** #3 / NB-1: the OPPONENT pick for this run (PRO on a staked or head-to-head run) — read at load AND at TAP TO START. */
+  const runTier = () => tierForRun(typeof window !== 'undefined' ? window.location.search : '', readTier());
   /** #1: their swing pass in the air (the ball's flight, who threw it, who it is for, and how many swings this possession). */
   const foePass = new PassFlight();
   let foePassTo: Body | null = null, foePassFrom: Body | null = null, foePassTok = -1, foeSwings = 0, foePassAge = 0;
@@ -834,6 +836,16 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     // HOOPS BODY (2026-10-07): the body plays my man through his ControlSource; its claimed events land here
     body: COURT_BODY,
     onBody: (_ctx: ModeContext, ev: BodyEvent, view: BodyView): boolean => bodyCtl?.see(ev, view) ?? false,
+    // NB-1 (HONEST-START): load() ran at page load, before the start screen's OPPONENT pick — this run plays the pick
+    onPlay() {
+      if (myScore !== 0 || foeScore !== 0) return;   // only before the first bucket
+      const tier = runTier();
+      const next = THREEV_TIER[tier] ?? THREEV_TIER.pro;
+      if (next === knobs) return;
+      knobs = next;
+      for (const db of defenderBrains) db.setAggression(knobs.defenderAggression);
+      console.info(`[3V3-RULES] at start: opponent ${tier} (poke ${knobs.defenderAggression}, layup ${knobs.layupPct}, jumper ${knobs.jumperPct}, swing ${knobs.kickChance} ×${knobs.maxPasses})`);
+    },
 
     async load(ctx: ModeContext) {
       // ONE BUS PER MOUNT, OWNED BY THE HARNESS. This mode built its own, which worked and was

@@ -22,6 +22,7 @@ import {
   LAVA_REACH, SKIM_AGL, SURFACE_Y, UNDERLIGHT_REST, cloudBanksFor, fogPulse, insideCloud, lavaGlow, lavaNear, mountAeroAtmos, overLiquid, puffFade, skimRate, underlightFor,
 } from './aeroAtmos';
 import { heatRegistry } from '../scene/HeatHaze';
+import { allCloudSights } from '../../../tests/helpers/aeroCloudSight';
 
 afterEach(() => vi.unstubAllGlobals());
 const device = (reduced: boolean) => vi.stubGlobal('window', {
@@ -62,13 +63,29 @@ describe('puffFade / insideCloud / fogPulse', () => {
     expect(insideCloud(0, 80)).toBe(1); expect(insideCloud(40, 80)).toBe(0); expect(insideCloud(100, 80)).toBe(0);
     expect(insideCloud(20, 80)).toBeGreaterThan(insideCloud(30, 80));
   });
-  it('the air thickens with depth: a white-out at the heart, nothing at the edge', () => {
+  it('the air thickens with depth: a veil at the heart, nothing at the edge', () => {
     expect(fogPulse(0)).toEqual({ densityMul: 1, tint: 0 });
-    expect(fogPulse(1).densityMul).toBeGreaterThan(3.5);
-    expect(fogPulse(1).densityMul).toBeLessThan(4.5);   // ~60 m of sight at the heart of a bank: a veil for a beat, not a blindfold (measured on the caldera at 5.5x: a brown wall)
-    expect(fogPulse(1).tint).toBeGreaterThan(0.5); expect(fogPulse(1).tint).toBeLessThan(0.7);
+    // test changed (owner 2026-10-14 "Soften it", halved): was densityMul in (3.5, 4.5) and tint in (0.5, 0.7) - ~60 m of sight, which sank the
+    // next ring to 4-8 % on three courses (see 'the next ring never disappears' below). Now 2.5x and 0.3: still a visible thickening.
+    expect(fogPulse(1).densityMul).toBeCloseTo(2.5, 6);
+    expect(fogPulse(1).tint).toBeCloseTo(0.3, 6);
     expect(fogPulse(0.5).densityMul).toBeLessThan(fogPulse(1).densityMul);
     expect(fogPulse(9).densityMul).toBe(fogPulse(1).densityMul);
+  });
+});
+
+describe('the cloud fly-through never takes the next ring (owner 2026-10-14: soften it, the clouds still read)', () => {
+  const sights = allCloudSights();
+  it('measures every Aero course, with real cloud on each lap', () => {
+    expect(sights.length).toBe(circuits.length);
+    for (const s of sights) { expect(s.metresInCloud).toBeGreaterThan(200); expect(s.farthestRing).toBeGreaterThan(100); }
+  });
+  it('the next ring keeps at least a quarter of its colour from the deepest cloud, on every course', () => {
+    // 0.25 is the floor: the ring still carries a clear contrast against the haze. Before the halving the worst were 0.04 (caldera), 0.06 (city), 0.08 (canyon).
+    for (const s of sights) expect(s.worstRing.transmittance, `${s.id} at ${s.worstRing.metres.toFixed(0)} m`).toBeGreaterThanOrEqual(0.25);
+  });
+  it('and the clouds still read: the heart of a bank at least halves the open air\'s sight (measured 83-139 m against 245-347 m)', () => {
+    for (const s of sights) expect(s.halfSightAtHeart).toBeLessThan((Math.sqrt(Math.LN2) / s.rho) * 0.5);   // at least a doubling of density
   });
 });
 
