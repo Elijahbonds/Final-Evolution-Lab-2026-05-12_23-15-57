@@ -20,6 +20,7 @@
 
 import { Color3, Mesh, MeshBuilder, PBRMaterial, TransformNode, type Scene, Vector3, Matrix, Quaternion } from '@babylonjs/core';
 import { VenueKit } from '../visual/VenueKit';
+import { ribKerb } from './roadSurface';
 import { clearOfShortcuts, type KartCircuit, type KartObstacle } from './kartCircuits';
 import { locate, pointAlong } from './racingLine';
 import type { PropPlacement } from '../visual/venuePropSets';
@@ -121,6 +122,7 @@ export function buildKerbs(scene: Scene, circuit: KartCircuit): TransformNode {
   const root = new TransformNode(`kart_kerbs_${circuit.course.id}`, scene);
   const red = VenueKit.paint(scene, 'kart_kerb_red', '#c8412f', 0.04, 0.7) as PBRMaterial;
   const white = VenueKit.paint(scene, 'kart_kerb_white', '#e9edf2', 0.04, 0.7) as PBRMaterial;
+  ribKerb(scene, red); ribKerb(scene, white);   // w3-atmos: rumble ribs across each block (a normal map: the blocks, their count and their place are unchanged)
 
   // IMPROVE (2026-10-06), velocitykart (phone pass): the kerb was ~100 separate 14 cm slabs per course — measured headlessly
   // on BOARDWALK LOOP, 96 of the scene's 239 draws and 96 shadow-caster entries. Built as before, then merged into ONE mesh

@@ -90,6 +90,12 @@ export interface Environment {
    *  place. Painted into the sky-dome texture; gated by PREMIUM_DRESSING for
    *  instant rollback. Venues without it keep the plain 2-stop gradient. */
   backdrop?: BackdropKind;
+  /**
+   * w3-atmos: the painted horizon IS the sky - the baked photograph for `backdrop` is not loaded over it. For a place whose
+   * time of day the photograph contradicts: the 'neon' bake (public/backdrops/baked/neon.jpg, mis-named) is the Venice
+   * skatepark at sunset, which put a golden-hour sky behind the Neon Block and the Neon Cage at night.
+   */
+  paintedSky?: boolean;
 }
 
 export interface GroundSpec {
@@ -1175,7 +1181,7 @@ export function buildNexusScene(scene: Scene, spec: NexusWebSpec, canvas?: HTMLC
         tex.update(false);
       };
       img.src = `/backdrops/baked/${env.backdrop}.jpg`;
-    } else if (useBackdrop) {
+    } else if (useBackdrop && !env.paintedSky) {
       const baked = new Texture(
         `/backdrops/baked/${env.backdrop}.jpg`, scene, false, false, Texture.BILINEAR_SAMPLINGMODE,
         () => { m.emissiveTexture = baked; },
