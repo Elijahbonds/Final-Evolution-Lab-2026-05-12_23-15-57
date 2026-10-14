@@ -17,6 +17,8 @@ import { mountFixtureLights, type FixtureLightsHandle } from './FixtureLights';
 import { mountSkyDome, type SkyDomeHandle } from './SkyDome';
 import { mountAtmosphere, type AtmosphereHandle } from './Atmosphere';
 import { mountGlossyFloor, type GlossyFloorHandle } from './GlossyFloor';
+import { mountHeatHaze, type HeatHazeHandle } from './HeatHaze';
+import { mountSunShafts, type SunShaftsHandle } from './SunShafts';
 import { mountSceneDecals, type GroundDecalsHandle } from '../visual/GroundDecals';
 import { mountEnvironmentIBL } from './EnvironmentIBL';
 import { motionPolicy } from '../../a11y/reducedMotion';
@@ -68,6 +70,10 @@ export interface LightRigHandle {
   readonly atmosphere: AtmosphereHandle | null;
   /** A9.7 second half (vis-foundation-2): the named glossy floor's planar mirror (desktop/high). */
   readonly glossyFloor: GlossyFloorHandle | null;
+  /** w3-atmos: the heat-haze pass (HeatHaze.ts) - only when a source (a fire pit, a lava lake) registered itself during load() on a desktop/high tier. */
+  readonly heat: HeatHazeHandle | null;
+  /** w3-atmos: the goldenHour sun shafts (SunShafts.ts) - tv tier, and only for a mode whose measured share of sun-in-frame earned them (none yet; `?lookon=sunshafts` shows them). */
+  readonly sunShafts: SunShaftsHandle | null;
   /** A9.14 (vis-foundation-2): the shared ground-decal pool, also on scene.metadata.felDecals for the modes to stamp. */
   readonly decals: GroundDecalsHandle | null;
   dispose(): void;
@@ -168,7 +174,7 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
   // decals (GroundDecals: marks lying on the floor) — not scenery
   // vis-hoops-dunk: + the hoops set's light and cards, which are light or flat (the rim's net glow / flame / halo, the rack's apron and pools
   // of light, the LED strips, the boards' faces, the judges' cards) and the shock-ring discs — none of them is a thing that throws a shadow
-  const NEVER_CAST = /^(vb_|bk_|nexus_sky|sky|fel_ground|fel_decal_|venue_props_|phone_flash_|shot_meter|player_ring|player_tag|gull_\d|ProxyMesh$|hoops_|tp_aprons|tp_rack\d_(?:led|pool)|tp_board_led|dd_tower_led|jt_card_|fr_shock_)|_contact$|_gull_|nexus_venue_map/i;
+  const NEVER_CAST = /^(vb_|bk_|nexus_sky|sky|fel_ground|fel_decal_|venue_props_|phone_flash_|shot_meter|player_ring|player_tag|gull_\d|ProxyMesh$|hoops_|tp_aprons|tp_rack\d_(?:led|pool)|tp_board_led|dd_tower_led|jt_card_|fr_shock_|aero_fx_|sky_sun_shaft)|_contact$|_gull_|nexus_venue_map/i;
   // FOLIAGE DOES NOT CAST (2026-09-12). Measured on 1v1 with SceneInstrumentation: 377 shadow
   // casters against 150 active meshes, and 377 x 3 cascades accounts for essentially all 1136 draw
   // calls — the draw budget IS the shadow pass. Grouping the casters by name showed the bulk is
@@ -246,6 +252,8 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
   let sky: SkyDomeHandle | null = null;
   let atmosphere: AtmosphereHandle | null = null;
   let glossyFloor: GlossyFloorHandle | null = null;
+  let heat: HeatHazeHandle | null = null;
+  let sunShafts: SunShaftsHandle | null = null;
   let decals: GroundDecalsHandle | null = null;
 
   liftBlackMaterials(scene);
@@ -273,6 +281,9 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
         // A9.7 second half: the gym's / the stage's floor reflects the players (before the probe: a mirrored floor keeps it)
         glossyFloor?.dispose(); glossyFloor = mountGlossyFloor(scene, tier, at ?? null, lookFeatureOff('mirror'));
         decals?.dispose(); decals = mountSceneDecals(scene, tier);   // A9.14: scuffs and footprints for the modes to stamp
+        // w3-atmos: the air over a fire pit / a lava lake (a source registered itself in load(); after it, so the pipeline's own rebuilds are over)
+        heat?.dispose(); heat = mountHeatHaze(scene, tier);
+        sunShafts?.dispose(); sunShafts = mountSunShafts(scene, tier, mood);   // w3-atmos: mounted once, never toggled; null unless this mode earned it
       }
       if (!T.venueProbe) return false;
       const where = at?.clone() ?? null;
@@ -288,6 +299,8 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
     get sky() { return sky; },
     get atmosphere() { return atmosphere; },
     get glossyFloor() { return glossyFloor; },
+    get heat() { return heat; },
+    get sunShafts() { return sunShafts; },
     get decals() { return decals; },
     flashBeat() {
       // HOTFIX (2026-09-24): reduced motion — no exposure flash (a made three, a momentum tier, the storm's lightning:
@@ -316,7 +329,7 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
       glow?.dispose();
       venueProbe?.dispose();
       fixtureLights?.dispose();
-      sky?.dispose(); atmosphere?.dispose(); glossyFloor?.dispose(); decals?.dispose();
+      sky?.dispose(); atmosphere?.dispose(); glossyFloor?.dispose(); decals?.dispose(); heat?.dispose(); sunShafts?.dispose();
       hemi.dispose(); sun.dispose(); shadows.dispose(); pipeline.dispose();
       disposeEnv();
     },
