@@ -26,7 +26,10 @@ import {
 } from '@/lib/screen/copy';
 import { BandChip, EarlyTag, PreviewLabel, StopLine, primaryBtn, quietBtn, BAND_COLOUR, UNREAD_WORD } from './screen-ui';
 import { KidResults } from './kid-results';
-import { DrillDemo } from './drill-demo';   // EDU-LINKS (2026-10-07): the demo slot, filled with the 3D ExerciseDemo
+import { DrillDemo } from './drill-demo';
+import { FaultReplay } from './fault-replay';
+import { pickReplay } from '@/lib/screen/rep-memory';
+import type { FrozenRep } from '@/lib/assess/scoring';   // EDU-LINKS (2026-10-07): the demo slot, filled with the 3D ExerciseDemo
 
 type TestId = keyof typeof SCREEN_TEST_NAMES;
 /** The checks the start card lists, in check order (A3-3). */
@@ -54,8 +57,10 @@ export function checkCards(s: ScreenSummary): CheckCard[] {
 /** A row's plain name without the check it belongs to: "Knees cave in (overhead squat)" → "Knees cave in". */
 const rowName = (id: CheckId): string => checkById(id).name.replace(/\s*\([^)]*\)$/, '');
 
-export function ResultsView({ summary, age, onClear, onRunAgain, trainWithElijahHref = null }: {
+export function ResultsView({ summary, age, onClear, onRunAgain, trainWithElijahHref = null, replay = null }: {
   summary: ScreenSummary; age: AgeBand | null; onClear: () => void; onRunAgain: () => void;
+  /** MIRROR step 2: the frozen worst-rep frames held in page memory (lib/screen/rep-memory.ts); drawn for adults only. */
+  replay?: readonly FrozenRep[] | null;
   /** Set by the server only for a verified adult while the coach store is on. Hidden for a kid answer. */
   trainWithElijahHref?: string | null;
 }) {
@@ -106,6 +111,10 @@ export function ResultsView({ summary, age, onClear, onRunAgain, trainWithElijah
                     <p data-cue className={`mt-1 leading-snug ${cueText}`}>Try this: {cueOf(row.id)}<EarlyTag /></p>
                   </>
                 ) : null}
+                {top ? (() => {
+                  const rep = pickReplay(replay, row);
+                  return rep ? <FaultReplay rep={rep} /> : null;
+                })() : null}
                 {top ? (
                   <div data-demo-slot className="mt-2">
                     <DrillDemo test={test} drill={row ? cueOf(row.id) : SCREEN_TEST_NAMES[test]} />

@@ -202,3 +202,10 @@ export const PRIVACY_POINTS = [
 ] as const;
 export const PRIVACY_CLEARED = 'Cleared. No results from the screen are left in this tab.';
 export const PRIVACY_CONTACT = `Questions? Final Evolution LLC, ${SCREEN_CONTACT_EMAIL}`;
+
+/**
+ * MIRROR step 2 (plan #6, FAULT REPLAY): the caption under the top priority's worst-rep skeleton (adults only).
+ * Screening words only: no measured angle, no injury wording (MIRROR-PLAN-REVIEW §3-4).
+ */
+export const REPLAY_TITLE = 'Your worst rep, as a stick figure';
+export const REPLAY_NOTE = 'The ringed joints and the dashed line show what this check looks at. Drawn from this screen only, never saved, gone when you leave.';
