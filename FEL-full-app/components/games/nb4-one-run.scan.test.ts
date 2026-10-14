@@ -4,14 +4,28 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { sessionStore } from '@/lib/babylon/core/sessionStore';
+import { LAZY_RUN_MODES, lazyRunFor } from '@/lib/sessions/lazyRun';
 
 const SHELL = readFileSync(join(__dirname, 'game-shell.tsx'), 'utf8');
 const HARNESS = readFileSync(join(__dirname, '../../lib/babylon/core/ModeHarness.ts'), 'utf8');
 
 describe('NB-4: a hoops run starts at TAP TO START, not at page load', () => {
   it('the hoops family is lazy; nothing else changes', () => {
-    expect(SHELL).toMatch(/LAZY_RUN_MODES: ReadonlySet<string> = new Set\(\['hoops1v1', 'hoops3v3', 'threePoint'\]\)/);
-    expect(SHELL).toMatch(/lazyRun\.current = LAZY_RUN_MODES\.has\(mode\);/);
+    expect([...LAZY_RUN_MODES].sort()).toEqual(['hoops1v1', 'hoops3v3', 'threePoint']);
+    expect(SHELL).toMatch(/lazyRun\.current = lazyRunFor\(mode\);/);
+    expect(SHELL).not.toMatch(/LAZY_RUN_MODES\.has\(mode\)/);
+  });
+  it('QA risk on #264: lazy only when the 3D engine loads — with NEXT_PUBLIC_DISABLE_3D=1 the run starts at mount (no RUN_MISSING)', () => {
+    const prev = process.env.NEXT_PUBLIC_DISABLE_3D;
+    try {
+      delete process.env.NEXT_PUBLIC_DISABLE_3D;
+      for (const m of ['hoops1v1', 'hoops3v3', 'threePoint']) expect(lazyRunFor(m)).toBe(true);
+      for (const m of ['dunkContest', 'karateEndless', 'nope']) expect(lazyRunFor(m)).toBe(false);
+      process.env.NEXT_PUBLIC_DISABLE_3D = '1';
+      for (const m of ['hoops1v1', 'hoops3v3', 'threePoint']) expect(lazyRunFor(m)).toBe(false);
+    } finally {
+      if (prev === undefined) delete process.env.NEXT_PUBLIC_DISABLE_3D; else process.env.NEXT_PUBLIC_DISABLE_3D = prev;
+    }
   });
   it('a lazy game subscribes and asks for its run when the runId advances; every other game still asks at mount', () => {
     const at = SHELL.indexOf('if (lazyRun.current) {');

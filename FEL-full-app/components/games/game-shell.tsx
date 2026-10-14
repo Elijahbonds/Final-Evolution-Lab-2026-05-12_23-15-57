@@ -11,6 +11,7 @@ import { readPrqDisplay, type PrqDisplay } from '@/lib/prq-display';
 import { PhysicalGamepadPoller } from '@/lib/gamepad-bridge';
 import { getScheme } from '@/lib/input-schemes';
 import { isBabylon } from '@/components/three/flags';
+import { lazyRunFor } from '@/lib/sessions/lazyRun';   // NB-4: a hoops run waits for TAP TO START only when Babylon loads
 import { canFullscreen, isFullscreen, toggleFullscreen } from '@/lib/ui/fullscreen';
 import { consoleLayout, consoleStageVars, type ConsoleLayout } from '@/lib/ui/consoleView';
 import { VirtualController } from './virtual-controller';
@@ -34,9 +35,6 @@ import {
   recordCarnivalResult, clearCarnivalRun,
 } from '@/lib/carnival-run';
 
-/** NB-4: the games whose server run starts at TAP TO START (the shared ModeHarness's beginRun), not at page mount. The
- *  hoops family for now (hoops grade 0d16f5dd); other harness games can join once checked. */
-export const LAZY_RUN_MODES: ReadonlySet<string> = new Set(['hoops1v1', 'hoops3v3', 'threePoint']);
 
 export interface GameResult {
   score: number;
@@ -243,8 +241,8 @@ function GameShellInner({
     return () => { active = false; cancelAnimationFrame(raf); poller.setScheme(null); };
   }, [scheme, gameKey, babylonOwnsInput]);
 
-  const lazyRun = useRef(LAZY_RUN_MODES.has(mode));
-  lazyRun.current = LAZY_RUN_MODES.has(mode);
+  const lazyRun = useRef(lazyRunFor(mode));
+  lazyRun.current = lazyRunFor(mode);
   useEffect(() => { runLive.current = result === null; }, [result]);
   useEffect(() => {
     inputCount.current = 0;
