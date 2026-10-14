@@ -12,6 +12,7 @@ import { cachedIdentity } from './playerIdentity';
 import { mountLightRig, liftBlackMaterials, type LightRigHandle } from '../scene/LightRig';
 import { mountIblShadows, type IblShadowsHandle } from '../scene/IblShadows';
 import { detectRenderTier, mountSsao, tierRigSettings, type SsaoHandle } from '../scene/QualityTier';
+import { installPhoneTextureCap } from '../scene/phoneTextureCap';   // phone-perf: model textures ≤ 1024² on a phone
 import type { VenueMood } from '../scene/moods';
 import { resolveModeMood } from '../scene/moodResolver';   // A9.4: mood follows the place
 import { InputBus, type FelInput, type BodyPacket } from './InputBus';
@@ -311,6 +312,8 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
   const tier = detectRenderTier(opts.canvas, fit, engine);   // visual-foundation: + the GPU, the high tier and the Graphics menu
   const scene = new Scene(engine);
   (scene.metadata ??= {}).felTier = tier;   // read by CharacterLibrary for per-spawn quality
+  // PHONE-PERF (2026-10-14): a phone uploads a glTF model's texture at 1024² at most (phoneTextureCap.ts); desktop untouched
+  installPhoneTextureCap(engine, tier);
   scene.metadata.felModeId = def.modeId;   // read by kit.applyKit for the sport's default kit (owner decision 2026-09-05)
   // PERF-GUARD (owner, 2026-10-06: "cool + smooth"): phones render at a steady 60 or 30 instead of every vsync, the
   // resolution and the cheap effects step down when frames run slow or the phone heats up, and nothing renders behind a
