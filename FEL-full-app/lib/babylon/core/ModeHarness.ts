@@ -225,6 +225,10 @@ export interface ModeDefinition {
   load(ctx: ModeContext): Promise<void>;        // spawn venue + characters
   onInput(ctx: ModeContext, e: FelInput): void;
   update(ctx: ModeContext, dt: number): void;   // called only while 'playing'
+  /** HONEST-START NB-1: called once as READY becomes 'playing' (TAP TO START, a key, a pad, the body). load() runs at page
+   *  load, before the start screen's picks, so a mode re-reads anything the player can still pick there (the OPPONENT
+   *  tier, WIN BY 2) here. Before the first update(). */
+  onPlay?(ctx: ModeContext): void;
   dispose?(): void;
   /** MOVEMENT PLAY P3 (2026-09-24): the mode's own say in its body play (none in P3: every mode runs its table row in
    *  lib/input/bodyProfiles). `claims` takes a move off the floor and hands it to onBody instead (P5+). */
@@ -785,6 +789,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     if (phase !== 'ready') return;
     startedAt = performance.now();
     setPhase('playing');
+    try { def.onPlay?.(ctx); } catch (err) { console.error(`[FEL-MODE] ${def.modeId} onPlay threw:`, err); }   // NB-1: the start screen's picks
     if (def.intro) camDirector.establish(def.intro);   // A9.12: the broadcast intro over the first seconds of play (skippable)
     // CREATOR CARD (2026-09-13): one canonical record, one writer. Every mode's session is recorded HERE
     // rather than in each mode, which is the mission's rule ("No mode may persist its own parallel
