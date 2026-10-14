@@ -60,8 +60,21 @@ describe('GET /api/party/ticket', () => {
     expect(h.reads).toBe(1);
     expect(j.adult).toBe(true);
     expect(j.iceServers.length).toBeGreaterThan(0);
-    expect(JSON.stringify(j)).not.toContain('1980');
-    expect(JSON.stringify(j)).not.toContain('u9');
+    // What this means, checked structurally (a substring test on random base64 / the hashed pub flaked, e.g. CI on #253):
+    // the birth year never leaves the server — not in the response, not in the signed ticket's claims — and outside the
+    // signed ticket (which netd needs, and verifies, to know the uid) the response never echoes the user id.
+    const { ticket, ...rest } = j as { ticket: string } & Record<string, unknown>;
+    const values = (o: unknown): unknown[] => (o && typeof o === 'object' ? Object.values(o).flatMap(values) : [o]);
+    const keys = (o: unknown): string[] => (o && typeof o === 'object' ? Object.entries(o).flatMap(([k, v]) => [k, ...keys(v)]) : []);
+    expect(values(rest)).not.toContain('u9');
+    expect(values(rest).map(String)).not.toContain('1980');
+    expect(keys(rest)).not.toEqual(expect.arrayContaining(['uid']));
+    expect(keys(rest).filter((k) => /dob|birth|user_?id/i.test(k))).toEqual([]);
+    const claims = JSON.parse(Buffer.from(ticket.split('.')[0], 'base64url').toString('utf8')) as Record<string, unknown>;
+    expect(claims.uid).toBe('u9');
+    expect(values(claims).map(String)).not.toContain('1980');
+    expect(Object.keys(claims).filter((k) => /dob|birth|year/i.test(k))).toEqual([]);
+    expect(verifyTicket(ticket, 'route-secret', Date.now())).toMatchObject({ uid: 'u9', adult: true });
   });
   it('a teen gets no ICE servers (no voice is ever offered)', async () => {
     h.session = { user: { id: 'u9' } }; h.dobYear = new Date().getFullYear() - 14;
