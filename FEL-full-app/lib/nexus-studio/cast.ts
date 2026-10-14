@@ -7,16 +7,21 @@
 // DECODED look (the Creator doc, the face presets, the body), so the mode's side is synchronous and re-sanitises it with the
 // Closet's own sanitisers (sanitizeCreatorDoc / sanitizeLookBase / sanitizeFaceSliders).
 //
-// WHAT A CAST NEVER CHANGES: the body's height and build. A share code carries a frame, but the play scale is read by modes for
-// their outcome points (REACH-FREEZE, playFramePoint), so a cast character always plays on the standard frame: `proportions:
-// null`. Presentation only — the face, the skin, the hair, the Creator's parts, paint and clothes, the kit colours.
+// HEIGHT AND BUILD (owner 2026-10-14, "Own height and build"; was `proportions: null` everywhere). A share code carries the
+// character's frame (heightScale / buildScale, clamped to playFrame.COSMETIC_CLAMP by the Closet's sanitiser), and a cast now
+// wears it — VISUAL ONLY. The scoring-fairness review (docs/NEXUS-STUDIO.md §10.5) measured every place a body's scale could reach
+// gameplay in the modes a cast can play; the frame is worn only where that review found the mode's outcomes read none of it
+// (targets.ts `castFrame`), and even there playFrame.playScales still spawns every body at exactly 1.0 in a ranked session or a
+// STANDARD_FRAME_MODES mode. Anywhere else the cast keeps the standard frame (`proportions: null`), with the reason in targets.ts.
+// Never the Closet's Studio/photo `presentation` size (that is the Closet's stage only) and never reach (frozen at 1).
+// The rest is presentation as before — the face, the skin, the hair, the Creator's parts, paint and clothes, the kit colours.
 //
 // Pure (no Babylon): tested in node.
 
 import { decodeSlotCode, MAX_SHARE_CODE_CHARS, type DecodeError } from '@/lib/creator/look/shareCode';
-import { sanitizeCreatorDoc, sanitizeLookBase, type LookBase } from '@/lib/creator/look/sanitize';
+import { sanitizeCreatorDoc, sanitizeLookBase, sanitizeSlotFrame, type LookBase } from '@/lib/creator/look/sanitize';
 import { effectivePalette } from '@/lib/creator/look/palette';
-import type { CreatorDoc } from '@/lib/creator/look/doc';
+import type { CreatorDoc, SlotFrame } from '@/lib/creator/look/doc';
 import { defaultFace, sanitizeFaceSliders, type FaceConfig } from '@/lib/closet/wearable-catalog';
 import type { PlayerIdentity } from '@/lib/babylon/core/playerIdentity';
 import type { StudioCharacter, StudioProject, StudioVenue } from './doc';
@@ -25,7 +30,13 @@ import type { StudioCharacter, StudioProject, StudioVenue } from './doc';
 export const CAST_SLOTS = ['player'] as const;
 export type CastSlot = (typeof CAST_SLOTS)[number];
 
-export interface CastMember { name: string; body: 'male' | 'female'; doc: CreatorDoc; base: LookBase; sliders?: Record<string, number> }
+export interface CastMember {
+  name: string; body: 'male' | 'female'; doc: CreatorDoc; base: LookBase; sliders?: Record<string, number>;
+  /** The character's own height and build (multipliers, inside COSMETIC_CLAMP). Absent: the standard frame. */
+  frame?: SlotFrame;
+}
+/** Which frame a cast wears where it plays: its own (visual only, where the fairness review allows it) or the standard one. */
+export type CastFrame = 'own' | 'standard';
 export type ExportCast = Partial<Record<CastSlot, CastMember>>;
 
 /** The share-code shape (the full decode is decodeSlotCode's): FEL<version>.<base64url>.<checksum>. */
@@ -47,7 +58,8 @@ export async function decodeCharacter(c: Pick<StudioCharacter, 'name' | 'lookCod
   const r = await decodeSlotCode(c.lookCode);
   if (!r.ok) return { ok: false, error: CODE_ERRORS[r.error] };
   const sliders = r.slot?.sliders ? sanitizeFaceSliders(r.slot.sliders) : undefined;
-  return { ok: true, member: { name: c.name, body: r.slot?.body === 'female' ? 'female' : 'male', doc: r.doc, base: r.base, ...(sliders && Object.keys(sliders).length ? { sliders: sliders as Record<string, number> } : {}) } };
+  const frame = sanitizeSlotFrame(r.slot?.frame);
+  return { ok: true, member: { name: c.name, body: r.slot?.body === 'female' ? 'female' : 'male', doc: r.doc, base: r.base, ...(sliders && Object.keys(sliders).length ? { sliders: sliders as Record<string, number> } : {}), ...(frame ? { frame } : {}) } };
 }
 
 /** The decoded cast for a venue (characters that will not decode are left out, never half-applied). */
@@ -71,7 +83,8 @@ export function sanitizeCastMember(raw: unknown): CastMember | null {
   if (!doc) return null;
   const name = typeof x.name === 'string' ? x.name.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, 60) || 'Character' : 'Character';
   const sliders = x.sliders ? sanitizeFaceSliders(x.sliders) : undefined;
-  return { name, body: x.body === 'female' ? 'female' : 'male', doc, base: sanitizeLookBase(x.base), ...(sliders && Object.keys(sliders).length ? { sliders: sliders as Record<string, number> } : {}) };
+  const frame = sanitizeSlotFrame(x.frame);   // clamped to COSMETIC_CLAMP: an export cannot carry a giant
+  return { name, body: x.body === 'female' ? 'female' : 'male', doc, base: sanitizeLookBase(x.base), ...(sliders && Object.keys(sliders).length ? { sliders: sliders as Record<string, number> } : {}), ...(frame ? { frame } : {}) };
 }
 
 export function sanitizeCast(raw: unknown): ExportCast | null {
@@ -86,14 +99,20 @@ export const CAST_BASE_PALETTE = { jersey: '#00E5FF', shorts: '#0b1220', shoes: 
 
 /**
  * A cast member as the PlayerIdentity every spawn dresses through. `custom: true` (it is a chosen look); no worn catalog items
- * (a code never carries ownership); `proportions: null` (the standard frame — see the header).
+ * (a code never carries ownership). `frame: 'own'` wears the character's height and build as `proportions` (reach 1, the
+ * athletic stance) — applyIdentity then clamps them again and playScales zeroes them in a ranked or standard-frame mode;
+ * `'standard'` (the default, for any caller that does not know where the body plays) is `proportions: null` (see the header).
  */
-export function castIdentity(m: CastMember): PlayerIdentity {
+export function castIdentity(m: CastMember, o: { frame?: CastFrame } = {}): PlayerIdentity {
   const face: FaceConfig = { ...defaultFace(), ...m.base, ...(m.sliders ? { sliders: { ...m.sliders } } : {}) };
+  const palette = effectivePalette({ ...CAST_BASE_PALETTE }, m.doc.colours);
+  const frame = o.frame === 'own' ? sanitizeSlotFrame(m.frame) : undefined;
   return {
-    proportions: null,
+    proportions: frame
+      ? { heightScale: frame.heightScale, buildScale: frame.buildScale, reachScale: 1, palette: { skin: face.skinTone, primary: palette.jersey, accent: palette.accent }, stance: 'athletic' }
+      : null,
     face,
-    palette: effectivePalette({ ...CAST_BASE_PALETTE }, m.doc.colours),
+    palette,
     jersey: null,
     wardrobe: { tops: null, shorts: null, shoes: null },
     custom: true,

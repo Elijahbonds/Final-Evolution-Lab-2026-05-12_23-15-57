@@ -5,7 +5,8 @@ import { prisma } from '@/lib/db';
 import { completeText } from '@/lib/cell-engine';
 import { abacusEnabled, aiComingSoonResponse, AiDisabledError } from '@/lib/abacus/killSwitch';
 import { rateLimit } from '@/lib/rate-limit';
-import { readDobYear, verifiedAdult, type GateDb } from '@/lib/privacy/scanSaveGate';
+import { readDobYear, type GateDb } from '@/lib/privacy/scanSaveGate';
+import { AI_BUILDER_AGE_REFUSED, aiBuilderAllowed } from '@/lib/nexus-studio/aiAccess';
 import { AI_LIMITS, aiVenueSystem, aiVenueUser, sanitizeAiEdits } from '@/lib/nexus-studio/aiEdits';
 import { sanitizeVenue } from '@/lib/nexus-studio/doc';
 
@@ -22,8 +23,9 @@ const VENUE_AI_MAX_BODY = 400_000;
  * NEXUS STUDIO track 2 (docs/NEXUS-STUDIO.md §3): CELL answers a creator's venue request with Studio EDITS, not files —
  * the browser compiles them into one command on the Studio's undo stack (lib/nexus-studio/aiEdits.ts). In order, before
  * anything leaves: 1. the ABACUS kill switch (first, before the session or the body); 2. signed in; 3. a rate limit per
- * account; 4. ADULTS ONLY (the database's User.dobYear, the strict rule) — a creator's free text goes to an AI provider;
- * 5. the body: a capped prompt and a venue run through the import sanitiser.
+ * account; 4. TEENS (13–17) AND ADULTS (owner, 2026-10-14: "Teens too") from the database's User.dobYear — under 13 and an
+ * unknown age are refused (lib/nexus-studio/aiAccess.ts has the rule and why); 5. the body: a capped prompt and a venue run
+ * through the import sanitiser.
  * What is sent: the prompt and the venue's settings and placements (venueBrief) — never the account, a character or a look.
  * What comes back is sanitised here AND again in the browser; the model's text itself is never returned or executed.
  * No new environment variable or secret: it runs on CELL's existing key, behind CELL's existing switch.
@@ -40,8 +42,8 @@ export async function POST(req: Request) {
       if (!rl.ok) return NextResponse.json({ error: 'rate_limited' }, { status: 429, headers: { 'Retry-After': String(rl.retryAfterSec) } });
     }
 
-    if (!verifiedAdult(await readDobYear(prisma as unknown as GateDb, userId, 'cell_venue'))) {
-      return NextResponse.json({ error: 'adults_only' }, { status: 403 });
+    if (!aiBuilderAllowed(await readDobYear(prisma as unknown as GateDb, userId, 'cell_venue'))) {
+      return NextResponse.json({ ...AI_BUILDER_AGE_REFUSED }, { status: 403 });
     }
 
     const text = await req.text().catch(() => '');

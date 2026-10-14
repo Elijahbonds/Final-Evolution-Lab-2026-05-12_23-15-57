@@ -31,7 +31,7 @@ import type { IntroKind } from '../babylon/scene/broadcastShots';
 import type { HudValue } from '../babylon/core/ModeHarness';
 import type { ExportCrowd, ExportDecal, ExportFixture, ExportMeshyProp, StudioVenueExport } from './exportVenue';
 import { browserKV, decodeInline, readPlaytest, type KV } from './storage';
-import { targetOf } from './targets';
+import { castFrameFor, targetOf } from './targets';
 import { castIdentity } from './cast';
 import { mountScriptHost, type ScriptHost, type ScriptHostCtx } from './scriptHost';
 import { invalidateIdentity, primeIdentity } from '../babylon/core/playerIdentity';
@@ -295,7 +295,8 @@ export function mountStudioFor(modeKey: string, ctx: StudioModeCtx): StudioExtra
   if (!exp) return null;
   console.info(`[NEXUS-STUDIO] ${modeKey}: "${exp.name}" — ${exp.kit.length} kit props, ${exp.meshy.length} scans, ${exp.fixtures.length} fixtures, ${exp.crowd?.stands.length ?? 0} stands, ${exp.decals.length} decals${exp.cast?.player ? `, cast: ${exp.cast.player.name}` : ''}`);
   const cast = exp.cast?.player ?? null;
-  if (cast) primeIdentity(castIdentity(cast));
+  // the cast's own height and build only where this mode's fairness review allows it (targets.ts castFrame), else the standard frame
+  if (cast) primeIdentity(castIdentity(cast, { frame: castFrameFor(modeKey) }));
   const extras = mountStudioExtras(ctx, exp, { stepIntro: true });
   return {
     layers: extras.layers, scripts: extras.scripts,

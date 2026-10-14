@@ -87,7 +87,7 @@ export function CastSlotField({ project, venue, run }: { project: StudioProject;
   const current = venue.cast?.player ?? '';
   return (
     <div data-testid="cast-slot">
-      <Row label="Player" hint="Who the mode's hero is in this venue: a Closet look (its share code), worn through playerIdentity. Plays on the standard frame.">
+      <Row label="Player" hint="Who the mode's hero is in this venue: a Closet look (its share code), worn through playerIdentity, with its own height and build (visual only: the score never reads the body).">
         <Select label="Player" value={current} options={[{ value: '', label: 'The player’s own look' }, ...project.characters.map((c) => ({ value: c.id, label: c.name }))]} onChange={(id) => run(castCharacter(venue, 'player', id || null))} />
       </Row>
       <AddCharacter compact onAdd={(c) => run(addCharacter(project, c, { venue, slot: 'player' }).cmd)} />

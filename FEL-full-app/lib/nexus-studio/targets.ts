@@ -30,6 +30,13 @@ export interface PlaytestTarget {
   budgetKey: string;
   /** Opens the mode with a Studio venue: dev only (the load path is dev only). */
   route(venueParam: string): string;
+  /**
+   * Track 3 (owner 2026-10-14, "Own height and build"): may a cast wear its own height and build here? Only where the scoring-
+   * fairness review (docs/NEXUS-STUDIO.md §10.5) measured that nothing the mode scores, judges or ends on reads the body's scale —
+   * then the frame is visual only. Otherwise the cast plays on the standard frame and `why` says what reads the scale. A new target
+   * needs its own review before it says 'own'.
+   */
+  castFrame: { frame: 'own'; review: string } | { frame: 'standard'; why: string };
 }
 
 export const PLAYTEST_TARGETS: Record<string, PlaytestTarget> = {
@@ -47,9 +54,19 @@ export const PLAYTEST_TARGETS: Record<string, PlaytestTarget> = {
     budgetKey: 'tennis',
     scoreKeys: { me: 'myPts', them: 'aiPts' },   // TiebreakMode hud()
     route: (v) => `/dev/mode/tiebreak?venue=${encodeURIComponent(v)}`,
+    // Measured (§10.5, castFairness.test.ts): the rally's every outcome is TiebreakBlitz's clock (the window, the side, the AI's
+    // net roll) and TiebreakFlight's fixed path; the bodies' roots only slide to ±1.7 m on fixed z; the camera frames the root at
+    // the preset's fixed height. No bone, mesh or scale is read by a score, a judgement or the end. A scripted rally is
+    // bit-identical for a tall/heavy and a short/light cast.
+    castFrame: { frame: 'own', review: 'docs/NEXUS-STUDIO.md §10.5' },
   },
 };
 
 export const DEFAULT_TARGET = 'tiebreak';
 
 export function targetOf(key: string): PlaytestTarget | null { return PLAYTEST_TARGETS[key] ?? null; }
+
+/** The frame a cast wears in `key`'s mode: 'own' only where that target's fairness review says so; an unknown mode is 'standard'. */
+export function castFrameFor(key: string): 'own' | 'standard' {
+  return Object.prototype.hasOwnProperty.call(PLAYTEST_TARGETS, key) && PLAYTEST_TARGETS[key].castFrame.frame === 'own' ? 'own' : 'standard';
+}

@@ -23,7 +23,7 @@ export const AI_VENUE_EXAMPLES = [
 ] as const;
 
 const ERRORS: Record<string, string> = {
-  adults_only: 'The AI builder is for verified adults.',
+  ai_builder_unavailable: 'The AI builder isn’t available on this account.',
   rate_limited: 'That is a lot of builds in a row — try again in a minute.',
   prompt_too_long: `Keep it under ${AI_LIMITS.prompt} characters.`,
 };

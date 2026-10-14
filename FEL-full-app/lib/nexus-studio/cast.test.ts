@@ -39,11 +39,16 @@ describe('a character is a share code', () => {
 });
 
 describe('the identity a cast player wears (playerIdentity)', () => {
-  it('the look and the kit colours; the standard frame (never the code\'s height or build); no worn items', async () => {
+  // test changed: (owner 2026-10-14, "Own height and build") this asserted a cast NEVER carries the code's frame. Now the decoded
+  // member carries it (clamped) and castIdentity wears it only when asked ('own', where targets.ts allows); the default is still
+  // the standard frame. The fairness proof is castFairness.test.ts.
+  it('the look and the kit colours; the code\'s height and build only when asked for, clamped; no worn items', async () => {
     const r = await decodeCharacter({ name: 'Nova', lookCode: await castCode() });
     if (!r.ok) throw new Error('decode');
+    expect(r.member.frame).toEqual({ heightScale: 1.04, buildScale: 1.08 });   // the code carries 1.06 / 1.1: clamped to COSMETIC_CLAMP
     const id = castIdentity(r.member);
-    expect(id.proportions).toBeNull();   // the code carries 1.06 / 1.1: a cast never changes the play frame
+    expect(id.proportions).toBeNull();   // a caller that does not know where the body plays: the standard frame
+    expect(castIdentity(r.member, { frame: 'own' }).proportions).toMatchObject({ heightScale: 1.04, buildScale: 1.08, reachScale: 1 });
     expect(id.body).toBe('kit-female');
     expect(id.custom).toBe(true);
     expect(id.face.skinTone).toBe('#33AA77');
@@ -110,13 +115,18 @@ describe('the export carries the decoded look; the mode re-sanitises it', () => 
     expect(m.name).toBe('Nova');
     expect(m).not.toHaveProperty('evil');
     expect(m.base.skinTone).toBeUndefined();
+    // the frame an export carries is clamped again on the mode's side (an edited export cannot draw a giant); junk is dropped
+    expect(sanitizeCastMember({ ...r.member, frame: { heightScale: 9, buildScale: 0.01 } })!.frame).toEqual({ heightScale: 1.04, buildScale: 0.94 });
+    expect(sanitizeCastMember({ ...r.member, frame: { heightScale: 'tall' } })!.frame).toBeUndefined();
     const exp = sanitizeVenueExport({ ...exportVenue(everyKindProject().venues[0]), cast: { player: { doc: 42 } } });
     expect(exp?.cast).toBeUndefined();
   });
 });
 
 describe('the mode\'s side: mountStudioFor seats the cast as the session identity before the mode spawns its hero', () => {
-  it('primes castIdentity; dispose forgets it (the next mount resolves the player\'s own look)', async () => {
+  // test changed: (owner 2026-10-14) the primed identity is castIdentity(member, { frame: 'own' }) for Tiebreak (targets.ts castFrame) —
+  // it was castIdentity(member), the standard frame.
+  it('primes castIdentity with the mode\'s frame (Tiebreak: its own); dispose forgets it (the next mount resolves the player\'s own look)', async () => {
     const p = everyKindProject();
     p.venues[0].objects = [];   // a light venue: it rides the inline link
     const r = await decodeCharacter({ name: 'Nova', lookCode: await castCode() });
@@ -129,7 +139,8 @@ describe('the mode\'s side: mountStudioFor seats the cast as the session identit
     expect(cachedIdentity()).toBeNull();
     const extras = mountStudioFor('tiebreak', { scene })!;
     expect(extras).not.toBeNull();
-    expect(cachedIdentity()).toEqual(castIdentity(r.member));
+    expect(cachedIdentity()).toEqual(castIdentity(r.member, { frame: 'own' }));
+    expect(cachedIdentity()?.proportions).toMatchObject({ heightScale: 1.04, buildScale: 1.08 });
     extras.dispose();
     expect(cachedIdentity()).toBeNull();
     scene.dispose();

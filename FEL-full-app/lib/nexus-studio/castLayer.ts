@@ -10,7 +10,7 @@ import { applyIdentity } from '../babylon/core/playerIdentity';
 import { urlForHeroBody } from '../babylon/core/heroBody';
 import { neverBindPose } from '../babylon/anim/importSanitizer';
 import { SPORT_CLIP } from '../babylon/anim/clipRegistry';
-import { castIdentity, type CastMember } from './cast';
+import { castIdentity, type CastFrame, type CastMember } from './cast';
 
 export interface CastLayer {
   /** Resolves to the spawned body (null: nothing cast, the load failed, or the layer was disposed first). */
@@ -18,11 +18,12 @@ export interface CastLayer {
   dispose(): void;
 }
 
-export function mountCastLayer(scene: Scene, member: CastMember | null | undefined, at: readonly number[], yaw: number): CastLayer {
+/** `frame`: what the mode would give it (targets.ts castFrameFor) — the preview shows the height and build the mode will draw. */
+export function mountCastLayer(scene: Scene, member: CastMember | null | undefined, at: readonly number[], yaw: number, frame: CastFrame = 'standard'): CastLayer {
   if (!member) return { ready: Promise.resolve(null), dispose() {} };
   let gone = false;
   let body: SpawnedCharacter | null = null;
-  const id = castIdentity(member);
+  const id = castIdentity(member, { frame });
   const ready = CharacterLibrary.spawn(scene, urlForHeroBody(id.body), {
     identity: false, role: 'player', position: new Vector3(at[0], at[1], at[2]), yawRad: yaw, startClip: SPORT_CLIP.idle,
   }).then((s) => {
