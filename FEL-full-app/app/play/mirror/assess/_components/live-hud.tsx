@@ -8,11 +8,11 @@
 // rejection and retry boxes and the paused card's words all live on the steps where reading is safe (framing /
 // position / the done beats / the mini-result) or are spoken instead. After each test the pain check is a full-screen
 // Yes/No with targets at least a quarter of the screen tall, and it waits for the tap — no timeout, no default.
-import { Check } from 'lucide-react';
+import { Check, Eye, EyeOff } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import type { RunnerView } from '@/lib/assess/runner';
 import { testDef, type Side } from '@/lib/assess/protocol';
-import { SCREEN_TEST_NAMES } from '@/lib/screen/copy';
+import { READ_CLEAR, READ_PARTIAL, SCREEN_TEST_NAMES } from '@/lib/screen/copy';
 import { cueFlash, cueRep, FLASH_COLOUR, FLASH_MS } from '@/lib/screen/realtime-cues';
 
 /** SCREEN A: a rep is up on these steps — voice and colour only, no reading. */
@@ -75,6 +75,15 @@ export function LiveHud({ view, voiceOn = true, onPain, onTakeoff, onStop }: {
         <div data-rep-counter aria-label={`${v.reps.count} of ${v.reps.target} counted`}
           className={`pointer-events-none absolute inset-x-0 top-1 z-[6] text-center font-black leading-none drop-shadow-[0_4px_24px_rgba(0,0,0,0.85)] text-[clamp(160px,40vh,320px)] ${counted ? 'text-[#00FF9D]' : 'text-white'}`}>
           {v.reps.count}<span className="text-white/50"> / </span>{v.reps.target}
+        </div>
+      ) : null}
+
+      {/* reading-quality badge (UX §3): icon + word, two states, never a percentage; while a rep is up only the icon */}
+      {v.readQuality ? (
+        <div data-read-quality={v.readQuality} aria-label={v.readQuality === 'clear' ? READ_CLEAR : READ_PARTIAL}
+          className={`pointer-events-none absolute bottom-3 left-3 z-[6] flex items-center gap-1.5 rounded-full bg-black/70 px-3 py-1 text-[16px] font-bold ${v.readQuality === 'clear' ? 'text-white' : 'text-[#FFB020]'}`}>
+          {v.readQuality === 'clear' ? <Eye aria-hidden className="h-5 w-5" /> : <EyeOff aria-hidden className="h-5 w-5" />}
+          {!noReading ? <span>{v.readQuality === 'clear' ? READ_CLEAR : READ_PARTIAL}</span> : null}
         </div>
       ) : null}
 

@@ -202,3 +202,7 @@ export const PRIVACY_POINTS = [
 ] as const;
 export const PRIVACY_CLEARED = 'Cleared. No results from the screen are left in this tab.';
 export const PRIVACY_CONTACT = `Questions? Final Evolution LLC, ${SCREEN_CONTACT_EMAIL}`;
+
+/** Reading-quality badge (UX advice §3): two states only, never a percentage — there is no validated accuracy number. */
+export const READ_CLEAR = 'Clear read';
+export const READ_PARTIAL = 'Partial read';

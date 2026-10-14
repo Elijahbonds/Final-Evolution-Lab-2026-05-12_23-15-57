@@ -177,6 +177,9 @@ export type RunnerStep =
   | 'framing' | 'pain' | 'takeoff' | 'calibrate' | 'calibrateSide' | 'position' | 'countdown' | 'active' | 'paused'
   | 'partDone' | 'miniResult' | 'painCheck' | 'done' | 'stopped';
 
+/** Steps where the reading-quality badge applies; it reads over the frames of the current step. */
+const READ_STEPS: ReadonlySet<RunnerStep> = new Set<RunnerStep>(['position', 'countdown', 'active']);
+
 export type RepMark = 'clean' | 'fault' | 'notRead';
 
 export interface RunnerView {
@@ -219,6 +222,12 @@ export interface RunnerView {
   retryMessage: string | null;
   /** Hands-free: no tap prompts in the runner. */
   handsFree: boolean;
+  /**
+   * Reading quality over the frames of the current step while a test is set up or running: 'clear' when the mean share of
+   * landmarks at scoring visibility (gate.visibilityScoring) is at least gate.minConfidence, else 'partial'. Null
+   * elsewhere. Two states only: no percentage is ever shown.
+   */
+  readQuality?: 'clear' | 'partial' | null;
 }
 
 /**
@@ -314,6 +323,8 @@ export class AssessRunner {
   private lastT: number | null = null;
   private badSince: number | null = null;
   private lostFrames = 0;
+  private readonly readShares: number[] = [];
+  private readStep: RunnerStep | null = null;
   private donePart: { test: TestId; part: PartId } | null = null;
   private readonly cues = new CueQueue();
   private takeoff: Side | null;
@@ -418,6 +429,12 @@ export class AssessRunner {
     const view: 'front' | 'side' = this.step === 'calibrateSide' ? 'side' : def?.view ?? 'front';
     const framing = checkFraming({ landmarks: frame.image.map((l) => ({ x: l.x, y: l.y, visibility: l.v })), present: frame.present }, view);
     this.lastFraming = framing;
+    if (READ_STEPS.has(this.step)) {
+      if (this.readStep !== this.step) { this.readShares.length = 0; this.readStep = this.step; }
+      const minV = th('gate.visibilityScoring');
+      const n = frame.image.length;
+      this.readShares.push(frame.present && n ? frame.image.filter((l) => (l.v ?? 0) >= minV).length / n : 0);
+    } else { this.readShares.length = 0; this.readStep = null; }
 
     switch (this.step) {
       case 'framing': {
@@ -832,6 +849,8 @@ export class AssessRunner {
       dimWarning: this.dimWarning,
       retryMessage: this.retryMessage,
       handsFree: this.handsFree,
+      readQuality: READ_STEPS.has(this.step) && this.readStep === this.step && this.readShares.length
+        ? (this.readShares.reduce((a, b) => a + b, 0) / this.readShares.length >= th('gate.minConfidence') ? 'clear' : 'partial') : null,
     };
   }
 
