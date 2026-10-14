@@ -15,7 +15,7 @@ import { footClearance, footHeight, fppa, kneeFlexionFront, lateralTrunkLean, pa
 import { bestReps, median, medianRep, segment } from '../reps';
 import {
   asymmetry, confidenceOf, metric, poseHz, scorable, sideResult, weightedScore, worseSide,
-  type FrozenRep, type MetricResult, type SideResult, type TestResult,
+  repClip, type FrozenRep, type MetricResult, type SideResult, type TestResult,
 } from '../scoring';
 import { bandOf, isProvisional, th, type ThresholdId } from '../thresholds';
 import type { GradeContext } from './t1-overhead-squat';
@@ -75,7 +75,14 @@ function gradeSide(raw: readonly PoseFrame[], s: Side, ctx: GradeContext): T3Sid
     const m = metric(t.id, t.label, t.unit, med ? med.value : null, t.thresholdId, bandOf(t.thresholdId), t.weight, { side: s, ...(med ? { rep: reads[med.at].index } : {}) });
     if (m.fault && reads.length) {
       const worst = reads.reduce((a, b) => ((b.metrics.find((x) => x.id === id)!.score ?? 101) < (a.metrics.find((x) => x.id === id)!.score ?? 101) ? b : a));
-      frozen.push({ metric: id, side: s, rep: worst.index, image: frames[worst.frame].image.map((l) => ({ ...l })), aspect });
+      const top = reads.reduce((a, b) => ((b.metrics.find((x) => x.id === id)!.score ?? -1) > (a.metrics.find((x) => x.id === id)!.score ?? -1) ? b : a));
+      const range = (n: number) => reps.find((r) => r.index === n);
+      const wr = range(worst.index), br = range(top.index);
+      frozen.push({
+        metric: id, side: s, rep: worst.index, image: frames[worst.frame].image.map((l) => ({ ...l })), aspect,
+        ...(wr ? { worstClip: repClip(frames, wr.index, wr.start, wr.end) } : {}),
+        ...(br && top !== worst ? { bestClip: repClip(frames, br.index, br.start, br.end) } : {}),
+      });
     }
     return m;
   });

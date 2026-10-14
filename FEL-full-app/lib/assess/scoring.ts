@@ -101,6 +101,21 @@ export interface FrozenRep {
   rep: number;
   image: Lm[];
   aspect: number;
+  /** MIRROR replay follow-up: every frame of the worst rep, and of the best rep for the same metric (page memory only). */
+  worstClip?: RepClip;
+  bestClip?: RepClip;
+}
+
+/** One rep's frames of landmarks, in order: for the results page's play/pause and scrub, never stored or sent. */
+export interface RepClip { rep: number; frames: Lm[][] }
+
+/** Copy frames [start, end] of a capture as a clip (clamped to the capture); undefined when the range is empty. */
+export function repClip(frames: readonly { image: Lm[] }[], rep: number, start: number, end: number): RepClip | undefined {
+  const a = Math.max(0, start), b = Math.min(frames.length - 1, end);
+  if (!(b >= a)) return undefined;
+  const out: Lm[][] = [];
+  for (let i = a; i <= b; i++) out.push(frames[i].image.map((l) => ({ ...l })));
+  return { rep, frames: out };
 }
 
 export interface SideResult {

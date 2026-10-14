@@ -20,7 +20,7 @@ import type { FrontCalibration } from '../calibration';
 import { footLowY, fppa, hipDrop, kneeFlexionFront, passes, smooth, wristsAboveShoulders } from '../geometry';
 import { bestReps, medianRep } from '../reps';
 import {
-  confidenceOf, metric, poseHz, scorable, sideResult, weightedScore, worseSide,
+  repClip, confidenceOf, metric, poseHz, scorable, sideResult, weightedScore, worseSide,
   type FrozenRep, type JumpRead, type MetricResult, type T5Extra, type TestResult,
 } from '../scoring';
 import { bandOf, isProvisional, th, type ThresholdId } from '../thresholds';
@@ -238,7 +238,7 @@ export function gradeT5(raw: readonly PoseFrame[], ctx: GradeContext & { cameraF
   const ok = frames.map((f) => f.present && passes(f.image, SCORING_POINTS, 'front', vis));
   const flights = detectFlights(raw, front);
   const wLanding = th('t5.landingWindowMs');
-  const jumps: (JumpRead & { landFrame: number })[] = [];
+  const jumps: (JumpRead & { landFrame: number; takeFrame: number })[] = [];
   for (const fl of flights) {
     const flightMs = fl.landT - fl.takeoffT;
     if (flightMs < th('t5.flightMinMs')) continue;                       // a hop, not an attempt
@@ -273,7 +273,7 @@ export function gradeT5(raw: readonly PoseFrame[], ctx: GradeContext & { cameraF
       landingValgus: { left: valg('left'), right: valg('right') },
       landingSymMs: !fpsLow && dl !== null && dr !== null ? Math.round(Math.abs(dl - dr)) : null,
       dipKneeFlex: dip === null ? null : Math.round(dip),
-      landFrame,
+      landFrame, takeFrame: fl.takeoffIdx,
     });
   }
 
@@ -300,7 +300,13 @@ export function gradeT5(raw: readonly PoseFrame[], ctx: GradeContext & { cameraF
     if (m.fault) {
       const worst = per.reduce((a, b) => ((b.metrics.find((x) => x.id === tmpl.id)!.score ?? 101) < (a.metrics.find((x) => x.id === tmpl.id)!.score ?? 101) ? b : a));
       const jf = jumps.find((x) => x.index === worst.j.index)!;
-      frozen.push({ metric: tmpl.id, ...(tmpl.side ? { side: tmpl.side } : {}), rep: worst.j.index, image: frames[jf.landFrame].image.map((l) => ({ ...l })), aspect });
+      const top = per.reduce((a, b) => ((b.metrics.find((x) => x.id === tmpl.id)!.score ?? -1) > (a.metrics.find((x) => x.id === tmpl.id)!.score ?? -1) ? b : a));
+      const jt = jumps.find((x) => x.index === top.j.index)!;
+      frozen.push({
+        metric: tmpl.id, ...(tmpl.side ? { side: tmpl.side } : {}), rep: worst.j.index, image: frames[jf.landFrame].image.map((l) => ({ ...l })), aspect,
+        worstClip: repClip(frames, jf.index, jf.takeFrame, jf.landFrame),
+        ...(top !== worst ? { bestClip: repClip(frames, jt.index, jt.takeFrame, jt.landFrame) } : {}),
+      });
     }
     return m;
   }) : [];
@@ -310,7 +316,7 @@ export function gradeT5(raw: readonly PoseFrame[], ctx: GradeContext & { cameraF
   const mean = heights.length ? heights.reduce((a, b) => a + b, 0) / heights.length : 0;
   const cvPct = heights.length >= 2 ? Math.round((Math.sqrt(heights.reduce((a, h) => a + (h - mean) ** 2, 0) / heights.length) / mean) * 1000) / 10 : null;
   const extra: T5Extra = {
-    jumps: jumps.map(({ landFrame: _lf, ...j }) => { void _lf; return j; }),
+    jumps: jumps.map(({ landFrame: _lf, takeFrame: _tf, ...j }) => { void _lf; void _tf; return j; }),
     bestHeightCm: bestJ ? bestJ.heightCm : null,
     bestFlightMs: bestJ ? bestJ.flightMs : null,
     bestJump: bestJ ? bestJ.index : null,

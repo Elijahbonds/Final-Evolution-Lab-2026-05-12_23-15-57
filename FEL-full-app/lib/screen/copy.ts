@@ -209,3 +209,10 @@ export const PRIVACY_CONTACT = `Questions? Final Evolution LLC, ${SCREEN_CONTACT
  */
 export const REPLAY_TITLE = 'Your worst rep, as a stick figure';
 export const REPLAY_NOTE = 'The ringed joints and the dashed line show what this check looks at. Drawn from this screen only, never saved, gone when you leave.';
+
+/** MIRROR replay follow-up: the replay's controls and the two sides' labels. */
+export const REPLAY_PLAY = 'Play';
+export const REPLAY_PAUSE = 'Pause';
+export const REPLAY_SCRUB = 'Move through the rep';
+export const REPLAY_WORST = 'Worst rep';
+export const REPLAY_BEST = 'Best rep';

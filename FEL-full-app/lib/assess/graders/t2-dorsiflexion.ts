@@ -16,7 +16,7 @@ import { facingSign, passes, smooth, tibiaAngle } from '../geometry';
 import { aroundPeak, bestReps, medianRep, segmentRocks } from '../reps';
 import {
   asymmetry, confidenceOf, isFault, metric, poseHz, scorable, sideResult, worseSide,
-  type FrozenRep, type SideResult, type TestResult,
+  repClip, type FrozenRep, type SideResult, type TestResult,
 } from '../scoring';
 import { bandOf, isProvisional, th, type ThresholdId } from '../thresholds';
 import type { GradeContext } from './t1-overhead-squat';
@@ -63,7 +63,14 @@ function gradeSide(raw: readonly PoseFrame[], s: Side, ctx: GradeContext): T2Sid
   const frozen: FrozenRep[] = [];
   if (m.fault && valid.length) {
     const worst = valid.reduce((a, c) => (c.value < a.value ? c : a));
-    frozen.push({ metric: 'tibia', side: s, rep: worst.rep, image: frames[worst.frame].image.map((l) => ({ ...l })), aspect });
+    const top = valid.reduce((a, c) => (c.value > a.value ? c : a));
+    const range = (n: number) => reps.find((r) => r.index === n);
+    const wr = range(worst.rep), br = range(top.rep);
+    frozen.push({
+      metric: 'tibia', side: s, rep: worst.rep, image: frames[worst.frame].image.map((l) => ({ ...l })), aspect,
+      ...(wr ? { worstClip: repClip(frames, wr.index, wr.start, wr.end) } : {}),
+      ...(br && top !== worst ? { bestClip: repClip(frames, br.index, br.start, br.end) } : {}),
+    });
   }
   return {
     result: sideResult([m], { repsValid: valid.length, repsTotal: reps.length }),
