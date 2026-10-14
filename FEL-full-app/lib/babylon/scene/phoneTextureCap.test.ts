@@ -4,7 +4,8 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import {
-  PHONE_MODEL_TEXTURE_MAX, cappedUploadSize, installPhoneTextureCap, isModelImageUrl, textureBytes,
+  PHONE_KIT_OTHER_MAX, PHONE_KIT_SKIN_MAX, PHONE_MODEL_TEXTURE_MAX, cappedUploadSize, installPhoneTextureCap, isModelImageUrl,
+  phoneCapFor, textureBytes,
 } from './phoneTextureCap';
 
 /** A stand-in engine whose prepare records the cap it saw — the one value Babylon's prepare sizes the upload from. */
@@ -13,7 +14,7 @@ function fakeEngine(max = 16384) {
   const seen: Array<{ url: string; cap: number }> = [];
   const e = {
     getCaps: () => caps,
-    _prepareWebGLTexture(texture: { url?: string }) { seen.push({ url: texture.url ?? '', cap: caps.maxTextureSize }); return 'r'; },
+    _prepareWebGLTexture(texture: { url?: string }, ..._rest: unknown[]) { seen.push({ url: texture.url ?? '', cap: caps.maxTextureSize }); return 'r'; },
   };
   return { e, caps, seen };
 }
@@ -42,6 +43,25 @@ describe('phoneTextureCap', () => {
     expect(e._prepareWebGLTexture({ url: 'data:/models/props/meshy/dojo.glb#image1' })).toBe('r');
     expect(seen[0].cap).toBe(1024);
     expect(caps.maxTextureSize).toBe(16384);
+  });
+
+  it("the guest's kit body takes the phone split every body ships with: skin (its one 2048² map) at 1024², the rest at 512²", () => {
+    expect([PHONE_KIT_SKIN_MAX, PHONE_KIT_OTHER_MAX]).toEqual([1024, 512]);
+    const kit = 'data:/models/candidates/fel-kit-male.glb#image7';
+    expect(phoneCapFor(kit, 2048, 2048)).toBe(1024);
+    expect(phoneCapFor('data:/models/candidates/fel-kit-female.glb#image3', 1024, 1024)).toBe(512);
+    expect(phoneCapFor('data:/models/candidates/fel-kit-male.glb#image0', 256, 256)).toBe(512);   // never an upscale: Babylon only clamps
+    expect(phoneCapFor('data:/models/athletes/m22-2ef63bb6.glb#image0', 1024, 1024)).toBe(1024);   // a rival keeps its own file's split
+    expect(phoneCapFor('data:/models/candidates/fel-hero-mpfb.glb#image0', 2048, 2048)).toBe(1024);
+    expect(phoneCapFor('/backdrops/baked/beach.jpg', 2048, 1024)).toBe(Infinity);
+    // through the engine: the image's size (Babylon's 4th argument) picks the split
+    const { e, seen } = fakeEngine();
+    installPhoneTextureCap(e, 'mobile');
+    e._prepareWebGLTexture({ url: kit }, '.webp', null, { width: 2048, height: 2048 });
+    e._prepareWebGLTexture({ url: 'data:/models/candidates/fel-kit-male.glb#image1' }, '.webp', null, { width: 1024, height: 1024 });
+    expect(seen.map((x) => x.cap)).toEqual([1024, 512]);
+    // 95.8 MB measured → 24 MB: one 1024² skin and fourteen 512² maps
+    expect(Math.round((textureBytes(1024, 1024) + 14 * textureBytes(512, 512)) / 1048576)).toBe(24);
   });
 
   it('a plain image (a sky dome, a backdrop) and a render target keep the GPU limit on a phone', () => {

@@ -11,8 +11,8 @@
 // HOW. Babylon decides a texture's upload size in `ThinEngine._prepareWebGLTexture` from `getCaps().maxTextureSize`: an
 // image larger than the cap is drawn through its working canvas at the cap and uploaded at that size (the same path a
 // GPU with a small limit takes). On the MOBILE tier only, this wraps that method on the one engine: while a glTF/GLB
-// image (a texture URL ending `.glb#image<n>` / `.gltf#image<n>`) is being prepared the cap reads PHONE_MODEL_TEXTURE_MAX,
-// and it is restored before the call returns. Everything else is untouched: render targets, post-process buffers (they
+// image (a texture URL ending `.glb#image<n>` / `.gltf#image<n>`) is being prepared the cap reads PHONE_MODEL_TEXTURE_MAX
+// (the player's kit body: 1024 skin / 512 the rest, below), and it is restored before the call returns. Everything else is untouched: render targets, post-process buffers (they
 // also read the cap, and are never inside this window), dynamic textures, sky domes and photo backdrops (plain image
 // URLs: their texel density across a 360° dome is what a phone sees). Desktop and high never install it.
 //
@@ -21,12 +21,31 @@
 
 /** The largest edge a glTF model's texture is uploaded at on the phone tier. */
 export const PHONE_MODEL_TEXTURE_MAX = 1024;
+/** The guest player's kit body on a phone: its skin (the file's one 2048² map) at 1024², every other map at 512². */
+export const PHONE_KIT_SKIN_MAX = 1024, PHONE_KIT_OTHER_MAX = 512;
+
+/**
+ * THE KIT BODY (phone-perf, 2026-10-14). The guest player plays `candidates/fel-kit-male.glb` (or -female): one body with
+ * EVERY wardrobe option in it — six hair styles, two tops, two pairs of shoes, shorts, eyes — fifteen maps, uploaded
+ * whether worn or not. Measured on the phone tier: 95.8 MB, a third of the 256 MB phone ceiling, in every mode a guest
+ * plays (who_scene_it's whole texture list was 225 MB). The phone split the owner already ships for bodies is the rule
+ * here: the scanned hero's phone file (CharacterLibrary MOBILE_HERO_URL) and every rival (roster-from-kit) carry the skin
+ * at 1024² and everything else at 512². The kit file's skin is its only 2048² map, so the split reads off the size.
+ */
+const PLAYER_KIT_IMAGE = /\/models\/candidates\/fel-kit-(male|female)\.glb#image\d+$/;
 
 /** A glTF-embedded image, as Babylon's glTF loader names it (`<file>.glb#image7`, also behind a `data:` prefix). */
 const MODEL_IMAGE = /\.(glb|gltf)#image\d+$/i;
 
 export function isModelImageUrl(url: string | null | undefined): boolean {
   return typeof url === 'string' && MODEL_IMAGE.test(url);
+}
+
+/** Pure: the edge cap a phone uploads this image under, or Infinity for none (not a model image). */
+export function phoneCapFor(url: string | null | undefined, w: number, h: number): number {
+  if (!isModelImageUrl(url)) return Infinity;
+  if (PLAYER_KIT_IMAGE.test(url as string)) return Math.max(w, h) >= 2048 ? PHONE_KIT_SKIN_MAX : PHONE_KIT_OTHER_MAX;
+  return PHONE_MODEL_TEXTURE_MAX;
 }
 
 /** Pure: the size an image of w×h uploads at under a cap (each edge clamped, as Babylon clamps it). */
@@ -55,10 +74,14 @@ export function installPhoneTextureCap(engine: unknown, tier: string, cap = PHON
   const prev = e._prepareWebGLTexture;
   const original = prev.bind(e);
   e._prepareWebGLTexture = function capped(texture, ...rest) {
-    if (!isModelImageUrl(texture?.url)) return original(texture, ...rest);
+    // Babylon's signature: (texture, extension, scene, img, ...) — the image's own size picks the kit body's split
+    const img = rest[2] as { width?: number; height?: number } | undefined;
+    const rule = phoneCapFor(texture?.url, img?.width ?? 0, img?.height ?? 0);
+    if (!Number.isFinite(rule)) return original(texture, ...rest);
+    const want = Math.min(cap, rule);
     const caps = e.getCaps();
     const was = caps.maxTextureSize;
-    caps.maxTextureSize = Math.min(was, cap);
+    caps.maxTextureSize = Math.min(was, want);
     try { return original(texture, ...rest); } finally { caps.maxTextureSize = was; }
   };
   e.__felTexCap = true;
