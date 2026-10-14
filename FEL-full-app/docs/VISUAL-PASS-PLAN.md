@@ -779,8 +779,9 @@ dribble, shot timing, meter, release window, difficulty, score, judging, pay or 
   from the commit that only lifts the hold (no set piece yet), because the shadow cache then re-bakes (reason 'settled') with the
   venue's palms, tent, pier and lamp posts as per-frame casters (117 moving instead of 69). Dunk and duel do not show it. It is a
   foundation behaviour behind the lifted wave-2 look (one of decals / detail maps / sweat / air), found late, not chased to its
-  cause; 220 measured + 48 would pass the table's 264 only by 4 draws, so it needs the foundation owner's eyes before this merges
-  to a phone build (routed).
+  cause; the table's threepoint row is 220 measured / 264 budget, so 220 + 48 + 7 would be over it by 11 draws: it needs the foundation
+  owner's eyes before this merges to a phone build (routed). A re-measure with `scripts/probes/_perf-sweep.mts` (the table's own probe,
+  4x CPU throttle, a pad playing) is the owner's, on a machine that runs it.
 - **Deferred to wave 3 / needs art or an owner call.** A "Flight Night" lighting option (a night mood with floodlights: the dunk's
   goldenHour is the owner's tuned look, so a mood change is theirs); sun shafts (the foundation did not build them); instanced
   and vertex-animated crowds and a crowd chant (the dunk's crowd is one baked strip, 3-Point's venue has no crowd, and phone flashes
