@@ -1,8 +1,8 @@
 // PARTY-CHAT (2026-10-13): who the party server is told is an adult. The app decides it from User.dobYear IN THE
 // DATABASE by the STRICT rule, signs it, and netd verifies it — so these tests are the age gate's first half.
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { buildTicket } from '@/lib/party/social/ticketServer';
-import { partyIceServers } from '@/lib/party/social/iceServers';
+import { partyIceServers, TURN_CREDENTIAL_TTL_S } from '@/lib/party/social/iceServers';
 import { verifyTicket } from '@/server/netd/src/ticket';
 import { createHmac } from 'node:crypto';
 
@@ -49,7 +49,12 @@ vi.mock('@/lib/auth', () => ({ authOptions: {} }));
 vi.mock('@/lib/db', () => ({ prisma: { user: { findUnique: async () => { h.reads++; return { dobYear: h.dobYear }; } } } }));
 
 describe('GET /api/party/ticket', () => {
-  beforeEach(() => { h.session = null; h.dobYear = null; h.reads = 0; process.env.PARTY_TICKET_SECRET = 'route-secret'; process.env.PARTY_TURN_URLS = 'turn:t.example:3478'; process.env.PARTY_TURN_SECRET = 'turn-secret'; });
+  beforeEach(() => { h.session = null; h.dobYear = null; h.reads = 0; process.env.PARTY_TICKET_SECRET = 'route-secret'; process.env.PARTY_TURN_URLS = 'turn:t.example:3478'; process.env.PARTY_TURN_SECRET = 'turn-secret';
+    // the clock is frozen (QA final re-check): the TURN username is then ONE exact string, and the response is the same every run
+    vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(FROZEN);
+  });
+  afterEach(() => { vi.useRealTimers(); delete process.env.PARTY_TURN_URLS; delete process.env.PARTY_TURN_SECRET; });
+  const FROZEN = new Date('2026-10-14T18:00:00Z').getTime();
   const call = async (q = '?name=ana') => {
     const { GET } = await import('@/app/api/party/ticket/route');
     return (await GET(new Request(`http://x/api/party/ticket${q}`))).json();
@@ -71,14 +76,14 @@ describe('GET /api/party/ticket', () => {
     // …and the original SUBSTRING bar, kept: a birth year or user id embedded in a longer string ('born 1980', 'hi u9') is a
     // leak too. Only the random fields are taken out first (the signed ticket, checked above and below, and the TURN
     // username / credential pair, an expiry + HMAC base64), so the check cannot flake on them and still sees everything else.
-    // The TURN pair is not skipped: it is pinned EXACTLY first (QA 2026-10-14) — username "<expiry>:fel", credential the
+    // The TURN pair is not skipped: it is pinned EXACTLY first (QA 2026-10-14) — username the frozen clock's "<expiry>:fel", credential the
     // HMAC-SHA1 of that username under the test's TURN secret (iceServers.ts:21-22) — so it can carry nothing else, and
     // only then is it left out of the substring scan (its digits / base64 are the only random text in the response).
     const ice = rest.iceServers as Array<Record<string, unknown>>;
     const turn = ice.filter((s) => s.username !== undefined || s.credential !== undefined);
     expect(turn).toHaveLength(1);
     expect(turn[0].urls).toEqual(['turn:t.example:3478']);
-    expect(turn[0].username).toMatch(/^\d+:fel$/);
+    expect(turn[0].username).toBe(`${Math.floor(FROZEN / 1000) + TURN_CREDENTIAL_TTL_S}:fel`);   // iceServers.ts:14, :21 — exactly, not a shape
     expect(turn[0].credential).toBe(createHmac('sha1', 'turn-secret').update(String(turn[0].username)).digest('base64'));
     const redacted = { ...rest, iceServers: ice.map(({ username: _u, credential: _c, ...rest2 }) => rest2) };
     expect(JSON.stringify(redacted)).not.toContain('1980');
@@ -92,6 +97,18 @@ describe('GET /api/party/ticket', () => {
     expect(JSON.stringify(fixedClaims)).not.toContain('1980');
     expect(Object.keys(claims).filter((k) => /dob|birth|year/i.test(k))).toEqual([]);
     expect(verifyTicket(ticket, 'route-secret', Date.now())).toMatchObject({ uid: 'u9', adult: true });
+  });
+  it('with no TURN relay configured: no username or credential anywhere, and the WHOLE response is scanned, nothing skipped', async () => {
+    delete process.env.PARTY_TURN_URLS; delete process.env.PARTY_TURN_SECRET;
+    h.session = { user: { id: 'u9' } }; h.dobYear = 1980;
+    const j = await call('?name=ana&adult=true&dobYear=1950');
+    expect(j.adult).toBe(true);
+    expect(j.iceServers).toEqual([{ urls: ['stun:stun.l.google.com:19302'] }]);
+    const all = JSON.stringify(j);
+    expect(all).not.toContain('username');
+    expect(all).not.toContain('credential');
+    expect(all).not.toContain('1980');
+    expect(all).not.toContain('u9');
   });
   it('a teen gets no ICE servers (no voice is ever offered)', async () => {
     h.session = { user: { id: 'u9' } }; h.dobYear = new Date().getFullYear() - 14;
