@@ -35,6 +35,7 @@ import { COURT_LAYOUTS, COURT_LAYOUT_MODES, readCourtLayout, writeCourtLayout, t
 import { SET_LENGTH_MODES, setLengthsFor, setLengthLabel, readSetLength, writeSetLength, setLengthLocked, type SetLengthId } from '@/lib/babylon/nexus/setLength';   // IMPROVE (2026-10-06): volleyball's short set, tennis's quick match
 import { looksFor, readPlaceLook, writePlaceLook } from '@/lib/babylon/nexus/placeLooks';
 import { tierList, readTier, writeTier, profileFor, type Tier } from '@/lib/babylon/core/Difficulty';
+import { headToHeadRun } from '@/lib/babylon/modes/onevoneRules';
 import { OneVOneWinBy2 } from './onevone-win-by-2';   // owner 2026-10-06: the 1v1's win-by-2 pick
 import { ThreePointOptions } from './three-point-options';   // IMPROVE (2026-10-06): 3PT #5 #6 #8
 import { PartyInvite } from '@/components/party/party-invite';   // MULTIPLAYER: the start screen's door to the party room
@@ -308,7 +309,10 @@ export function SplashCard(props: BootSplashProps) {
 
   // DIFFICULTY (2026-09-13). Phase 0 measured four modes with no tiering at all and four more each inventing
   // their own; this is the one picker, reading the one shared ladder.
-  const hasTiers = TIER_MODES.has(props.modeId);
+  // QA #259: no OPPONENT pick on a staked / head-to-head link (?arena= / ?mp= / ?c=) — those runs play PRO
+  const [headToHead, setHeadToHead] = useState(false);
+  useEffect(() => { setHeadToHead(headToHeadRun(window.location.search)); }, []);
+  const hasTiers = TIER_MODES.has(props.modeId) && !headToHead;
   const [tier, setTier] = useState<Tier>('pro');
   useEffect(() => { if (hasTiers) setTier(readTier()); }, [hasTiers]);
   const pickTier = (t: Tier) => { if (t === tier) return; writeTier(t); setTier(t); };
