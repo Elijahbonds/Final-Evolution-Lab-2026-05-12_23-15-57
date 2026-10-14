@@ -904,6 +904,14 @@ export const OneVOneMode: ModeDefinition = (() => {
 
   /** A possession-changing timer: only fires if the possession it was scheduled in is still the live one. IMPROVE (2026-10-06) #6
    *  #13: on the mode's clock (after) — it waits out a pause, and dispose ends it (ended, the token bumped, the queue emptied). */
+  /** #2 #3 / NB-1: the OPPONENT pick and the win rule as they stand now — read at load AND again at TAP TO START (onPlay). */
+  function readRules(): { knobs: typeof knobs; winCond: WinRule } {
+    return {
+      knobs: ONEVONE_TIER[readTier()] ?? ONEVONE_TIER.pro,
+      winCond: winRule(TARGET_SCORE, typeof window !== 'undefined' && winBy2Requested(window.location.search, { picked: readWinBy2Pick(), dev: process.env.NODE_ENV === 'development' })),
+    };
+  }
+
   function later(ms: number, fn: () => void): void {
     const tok = possessionToken;
     after(ms / 1000, () => { if (!ended && possessionToken === tok) fn(); });
@@ -915,6 +923,17 @@ export const OneVOneMode: ModeDefinition = (() => {
     // HOOPS BODY (2026-10-07): the body plays 1v1 through the hero's ControlSource; its claimed events land here
     body: COURT_BODY,
     onBody: (_ctx: ModeContext, ev: BodyEvent, view: BodyView): boolean => bodyCtl?.see(ev, view) ?? false,
+    // NB-1 (HONEST-START): load() ran at page load, before the start screen's OPPONENT / WIN BY 2 picks — this run plays the pick
+    onPlay(ctx: ModeContext) {
+      if (myScore !== 0 || foeScore !== 0) return;   // only before the first bucket
+      const r = readRules();
+      if (r.knobs === knobs && r.winCond.winBy2 === winCond.winBy2) return;
+      knobs = r.knobs; winCond = r.winCond;
+      foeBrain?.setAggression(knobs.defenderAggression);
+      nerveTheAttacker();
+      putHud(ctx, { winBy2: winCond.winBy2 });
+      console.info(`[1V1-RULES] at start: opponent ${readTier()} (poke ${knobs.defenderAggression}, drive ×${knobs.attackerAggression}) · ${winCond.winBy2 ? `win by 2, cap ${winCond.cap}` : `first to ${winCond.target}`}`);
+    },
 
     async load(ctx: ModeContext) {
       // ONE BUS PER MOUNT, OWNED BY THE HARNESS. This mode built its own, which worked and was
