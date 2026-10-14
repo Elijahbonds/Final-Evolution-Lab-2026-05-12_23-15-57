@@ -55,7 +55,7 @@ export function fireLevel(streak: number, fireAt: number): FireLevel {
 
 /** Pure: flame particles a second for a level on a tier (a phone gets half; none at level 0). */
 export function flameRate(level: FireLevel, tier: string | undefined): number {
-  const per = level === 2 ? 46 : level === 1 ? 10 : 0;
+  const per = level === 2 ? 70 : level === 1 ? 14 : 0;
   return tier === 'mobile' ? Math.round(per / 2) : per;
 }
 

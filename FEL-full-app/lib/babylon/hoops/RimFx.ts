@@ -23,7 +23,7 @@ import { MAKE_LOOK, easeToward, fireLevel, flameRate, type FireLevel, type MakeT
 /** The iron's radius (m) — HoopJuice's torus is 0.9 across. */
 export const RIM_R = 0.45;
 /** Flame particles the system can hold (the rate is what a tier and a level change). */
-export const FLAME_CAP = 70;
+export const FLAME_CAP = 110;
 
 export interface RimFxHandle {
   /** A make, at its tier: the ring, the sparks, the net's flare. */
@@ -76,9 +76,9 @@ export function mountRimFx(scene: Scene, rim: Vector3, tier: string | undefined)
     ps.emitter = new Vector3(rim.x, rim.y + 0.02, rim.z);
     ps.createCylinderEmitter(RIM_R * 0.92, 0.02, 0, 0);
     ps.minEmitPower = 0.1; ps.maxEmitPower = 0.35;
-    ps.minSize = 0.16; ps.maxSize = 0.34;
+    ps.minSize = 0.24; ps.maxSize = 0.5;
     ps.minLifeTime = 0.35; ps.maxLifeTime = 0.7;
-    ps.color1 = new Color4(1, 0.78, 0.3, 0.9); ps.color2 = new Color4(1, 0.4, 0.12, 0.8); ps.colorDead = new Color4(0.6, 0.1, 0.02, 0);
+    ps.color1 = new Color4(1, 0.82, 0.35, 1); ps.color2 = new Color4(1, 0.45, 0.14, 0.95); ps.colorDead = new Color4(0.6, 0.1, 0.02, 0);
     ps.gravity = new Vector3(0, 2.4, 0);
     ps.emitRate = 0;
     ps.updateSpeed = 0.016;
