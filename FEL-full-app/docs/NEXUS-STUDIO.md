@@ -249,8 +249,15 @@ existing `builder` role, JSON mode) for **edits in a closed vocabulary** — `ve
   read, and every placed object through `doc.ts sanitizeObject` / every setting through `sanitizeVenue` — the import
   path's own sanitisers. Ids are minted by the Studio. Nothing is evaluated; the model's text is never returned.
 - **The route** (`app/api/cell/venue/route.ts`): the ABACUS kill switch first (503 coming soon before the session, the body
-  or the database), signed in, a rate limit per account, **adults only** (DB `dobYear`, strict rule), a capped body. The
-  prompt carries the venue's settings and placements — never the account, a character or a look. No new env or secret.
+  or the database), signed in, a rate limit per account (6 a minute, 120 a day), **teens (13–17) and adults** (DB `dobYear`;
+  owner 2026-10-14, "Teens too" — was adults only), a capped body. The prompt carries the venue's settings and placements —
+  never the account, a character, a look, an age or any health number. No new env or secret.
+- **Who (`lib/nexus-studio/aiAccess.ts`).** The lines are the account screen's own (`lib/privacy/ageScreen.ts`
+  `ageScreenOutcome`): 'teen' and 'adult' are answered; 'blocked' (a year gap of 13 or less: may still be 12) and an unknown
+  age (no year, a bad year) get a neutral 403 `ai_builder_unavailable`. Under 13 stays blocked because nothing in the repo
+  lets an under-13 use an AI feature, guardian consent or not: the age screen keeps an under-13 from having an account at all,
+  and guardian consent (`lib/consent/guardianGate.ts`) gates health data, never an under-13's access. No guardian step is
+  added for a teen (assumption: the builder sends no account or health data, so the health-data gate does not apply).
 - **The panel** asks `useAiStatus('studio')` and sends nothing unless the server says the AI is available.
 
 ### 10.2 Track 3: characters — a Closet share code, worn through playerIdentity
@@ -295,5 +302,5 @@ drag nodes, drag from a port to connect (illegal or looping wires refused), Dele
   opened from a character ("Edit in the Closet").
 - Track 4: more events as modes expose them as data (a rally length, a replay ending), per-venue scope for a script, a
   minimap of the graph; a second play-test mode (Football Rush replays: the replay shot becomes live).
-- Owner calls: minors and the AI builder (adults only today); whether a cast may carry its height/build (no, today).
+- Owner calls: the AI builder is open to teens 13–17 (answered 2026-10-14, §10.1); whether a cast may carry its height/build (no, today).
 

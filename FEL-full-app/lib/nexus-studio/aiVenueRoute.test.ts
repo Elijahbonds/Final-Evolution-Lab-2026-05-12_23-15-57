@@ -1,9 +1,9 @@
 // Track 2's server half: POST /api/cell/venue, run for real with the session, the database and the model as stand-ins.
-// The switch first (nothing read, nothing sent); then signed in, a rate limit, adults only, a capped body; the model's answer
+// The switch first (nothing read, nothing sent); then signed in, a rate limit, teens (13–17) and adults only, a capped body; the model's answer
 // (stubbed: good, hostile, prose) comes back sanitised, never as text.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const m = vi.hoisted(() => ({ session: { user: { id: 'adult-1' } } as unknown, dobYear: 1980 as number | null }));
+const m = vi.hoisted(() => ({ session: { user: { id: 'adult-1' } } as unknown, dobYear: 1980 as number | null | undefined }));
 const getServerSession = vi.hoisted(() => ({ spy: vi.fn(async () => m.session) }));
 const prisma = vi.hoisted(() => ({ models: { user: { findUnique: vi.fn(async () => (m.dobYear === undefined ? null : { dobYear: m.dobYear })) } } }));
 
@@ -97,18 +97,62 @@ describe('ABACUS_ENABLED=true', () => {
     expect(await (await POST(req({ prompt: 'x', venue: venue() }))).json()).toEqual({ edits: [], dropped: 0 });
   });
 
-  it('signed out 401; a minor or an unknown age 403 before the body is read or anything is sent', async () => {
+  // test changed: (owner, 2026-10-14, "Teens too") this test asserted a 15-year-old was refused ('adults_only'). The rule is now
+  // teens 13–17 and adults (lib/nexus-studio/aiAccess.ts); the teen half moved to 'who may ask' below, where it is allowed.
+  it('signed out 401; an under-13 or an unknown age 403 before the body is read or anything is sent', async () => {
     m.session = null;
     expect((await POST(req({ prompt: 'x', venue: venue() }))).status).toBe(401);
-    for (const year of [new Date().getFullYear() - 15, null]) {
-      m.session = { user: { id: `teen-${++users}` } };
-      m.dobYear = year;
+    expect(prisma.models.user.findUnique).not.toHaveBeenCalled();
+    const y = new Date().getFullYear();
+    for (const year of [y - 13, y - 10, y - 1, y, y + 1, null, undefined, 1899, 2000.5]) {
+      m.session = { user: { id: `kid-${++users}` } };
+      m.dobYear = year as number | null;
       const res = await POST(req({ prompt: 'x', venue: venue() }));
-      expect(res.status).toBe(403);
-      expect(await res.json()).toEqual({ error: 'adults_only' });
+      expect(res.status, `dobYear ${year}`).toBe(403);
+      expect(await res.json()).toEqual({ error: 'ai_builder_unavailable' });
     }
     expect(bodyReads).toBe(0);
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  describe('who may ask (owner 2026-10-14: teens too)', () => {
+    const y = new Date().getFullYear();
+    it('an adult and a teen (13–17) are both answered; the model hears the venue, never the account or the age', async () => {
+      for (const [who, year] of [['adult', 1980], ['adult', y - 19], ['teen', y - 15], ['teen', y - 14], ['teen', y - 18]] as const) {
+        fetchSpy.mockClear();
+        m.session = { user: { id: `${who}-${++users}` } };
+        m.dobYear = year;
+        const res = await POST(req({ prompt: NIGHT_BEACH_PROMPT, venue: venue() }));
+        expect(res.status, `${who} ${year}`).toBe(200);
+        expect((await res.json()).edits.length).toBeGreaterThan(0);
+        expect(fetchSpy).toHaveBeenCalledTimes(1);
+        const words = JSON.stringify(JSON.parse(((fetchSpy.mock.calls[0] as unknown[])[1] as { body: string }).body).messages);
+        expect(words).toContain(NIGHT_BEACH_PROMPT);
+        expect(words).not.toContain((m.session as { user: { id: string } }).user.id);
+        expect(words).not.toMatch(new RegExp(`\\b${year}\\b`));
+        expect(words).not.toMatch(/dobYear|birth|teen|adult|minor|email/i);
+      }
+    });
+    it('a teen keeps the same limits: the per-account rate limit and the capped body', async () => {
+      m.session = { user: { id: `teen-${++users}` } };
+      m.dobYear = y - 15;
+      expect((await POST(req(null, 'x'.repeat(400_001)))).status).toBe(413);
+      let last = 200;
+      for (let i = 0; i < 7; i++) last = (await POST(req({ prompt: 'x', venue: venue() }))).status;
+      expect(last).toBe(429);
+    });
+    it('the kill switch still comes first, for every age: 503 before the session, the database or the body', async () => {
+      delete process.env.ABACUS_ENABLED;
+      for (const year of [1980, y - 15, y - 10, null]) {
+        m.session = { user: { id: `any-${++users}` } };
+        m.dobYear = year;
+        expect((await POST(req({ prompt: NIGHT_BEACH_PROMPT, venue: venue() }))).status).toBe(503);
+      }
+      expect(getServerSession.spy).not.toHaveBeenCalled();
+      expect(prisma.models.user.findUnique).not.toHaveBeenCalled();
+      expect(bodyReads).toBe(0);
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
   });
 
   it('a bad body is refused without a model call: no prompt, too long, no venue, not JSON, too big', async () => {
