@@ -31,12 +31,14 @@ import type { DanceClip, DanceStep, Judgement } from './DanceCore';
 import type { CueZone, Limb, MoveKind } from './bodyTargets';
 import { readExportedTrack } from '../music/DanceExport';
 import { DANCE_LIBRARY, isBodyStep, stepLimb } from './DanceCore';
+import { danceMove } from '../dance/moves';
 import { CATEGORY_STEM } from '../audio/StemBand';
 import { FEL_SONGS, sectionAtBar, type FelSong, type FelSongSection, type FelStem } from '../dance/felSongs';
 // PIPELINES (2026-10-06): approved community songs and routines, and the player's equipped routine (dance/communityDance.ts).
 import { communityCreditLine, communityDanceTracks, communityStepsFor } from '../dance/communityDance';
 // MUSIC-SUITE P9 re-land (2026-10-13): the six songs' authored charts (dance/chart.ts).
-import { chartStepsFor, chartStyleBeatsFor } from '../dance/chart';
+import { chartStepsFor, chartStyleBeatsFor, chartFreeSpansFor } from '../dance/chart';
+import type { FreeSpan } from '../dance/freestyle';
 
 export interface DanceTrack {
   id: string;
@@ -161,6 +163,18 @@ export function styleBeatsFor(t: DanceTrack): number[] | null {
   if (mine && mine.track.id === t.id) return null;
   if (communityStepsFor(t)) return null;
   return t.song ? chartStyleBeatsFor(t.song) : null;
+}
+
+/**
+ * lane/dance-extras (2026-10-14): the track's FREESTYLE SECTIONS (dance/freestyle.ts) — song beats, where the buttons pick the move and
+ * MATCH is not asked. Only an authored chart marks them; every other track (the export, a community song, a fallback) has none and
+ * plays exactly as before. They hold no scored step, so what a run scores is the same with or without them.
+ */
+export function freeSpansFor(t: DanceTrack): FreeSpan[] {
+  const mine = readExportedTrack();
+  if (mine && mine.track.id === t.id) return [];
+  if (communityStepsFor(t)) return [];
+  return t.song ? chartFreeSpansFor(t.song) ?? [] : [];
 }
 
 // ── MUSIC-SUITE P7: press steps authored from a song's own section map ──────────────────────────────────────────
@@ -407,7 +421,7 @@ export function cueLane(
       });
       continue;
     }
-    const clip = DANCE_LIBRARY.find((c) => c.id === u.step.clipId);
+    const clip = danceMove(u.step.clipId);   // lane/dance-extras: the room's whole vocabulary — DANCE_LIBRARY's own row first (a plain press cue is drawn exactly as before), then a captured move, named and coloured by its family
     const family = clip?.category ?? 'transition';
     out.push({
       in: Math.round(dt * 1000) / 1000,
