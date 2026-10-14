@@ -38,6 +38,14 @@
 //     this tree; CHART_MOVES maps each of those names to the DANCE_LIBRARY clip of its family, so the instrument a move
 //     earns is the one the chart was written for.
 //
+// FREESTYLE SECTIONS (lane/dance-extras, 2026-10-14; owner 2026-10-13: "freestyle where the button picks the move, without fighting
+// MATCH"). A free phrase marked `"freestyle": true` is a FREESTYLE SECTION: its slots are the same STYLE taps as any free phrase's
+// (the same beats, the same density, the same pay), but the room treats the stretch differently (dance/freestyle.ts): every face
+// button dances a move of its MATCH family, MATCH is not asked, and a press can neither miss nor cost. The chart's side of that
+// promise is held HERE: a section holds no scored move (a free phrase has no notes), the move before it ends before it (a freeze's
+// hold a clear gap before), it is at least two bars, and no scored move comes within the judge's reach of its last slot. A free
+// phrase with no flag is exactly what it was. dance/freestyle.ts has the rest; freestyle.test.ts holds a whole chart both ways.
+//
 // WHERE THE CHARTS LIVE: lib/babylon/dance/charts/<song>.json, imported statically here. Not public/audio/songs/<id>/,
 // which is an AUDIO provenance root (lib/babylon/music/provenance.test.ts wants a PROVENANCE.json entry for every file
 // there); a chart is FEL-authored data, and it must be in the bundle synchronously (no fetch to race the count-in), like
@@ -64,6 +72,7 @@
 // returns null, and danceTracks.stepsFor falls back to stepsForSong so the room stays playable.
 
 import { MISS_AFTER, type DanceClip, type DanceStep } from '../core/DanceCore';
+import type { FreeSpan } from './freestyle';
 import { MOVE_BY_ID } from './moves';
 import { GROOVE_WINDOW_SEC } from './chartPlay';
 import { CATEGORY_STEM } from '../audio/StemBand';
@@ -93,8 +102,9 @@ export interface ChartPhrase {
   bars: number;
   /** A called phrase. */
   notes?: ChartNote[];
-  /** A freestyle phrase: a STYLE tap every `every` beats from its first beat. */
-  free?: { every: number; move?: string };
+  /** A freestyle phrase: a STYLE tap every `every` beats from its first beat. `freestyle: true` marks it a FREESTYLE SECTION
+   *  (dance/freestyle.ts): the same slots, but the buttons pick the move and MATCH is not asked while it plays. */
+  free?: { every: number; move?: string; freestyle?: boolean };
 }
 
 export interface ChartSection {
@@ -216,6 +226,8 @@ export interface ChartPress {
 
 export interface ExpandedChart {
   presses: ChartPress[];
+  /** The FREESTYLE SECTIONS (flagged free phrases), in song beats, adjacent ones merged. */
+  freeSpans: FreeSpan[];
   /** What the expansion itself could not make sense of (validateChart reports these first). */
   problems: string[];
 }
@@ -235,6 +247,7 @@ export function swingBeat(beat: number, swing: number): number {
 export function expandChart(chart: DanceChart, song: FelSong): ExpandedChart {
   const problems: string[] = [];
   const presses: ChartPress[] = [];
+  const freeSpans: FreeSpan[] = [];
   let running: { clipId: string; mirrored: boolean } | null = null;
   chart.sections.forEach((sec, si) => {
     let bar = sec.bar;
@@ -243,6 +256,10 @@ export function expandChart(chart: DanceChart, song: FelSong): ExpandedChart {
       if (!ph) { problems.push(`section ${si} (${sec.name}) plays unknown phrase "${pid}"`); continue; }
       const start = (bar - 1) * 4;
       if (ph.free) {
+        if (ph.free.freestyle === true) {
+          const end = start + ph.bars * 4, last = freeSpans[freeSpans.length - 1];
+          if (last && last.end === start) last.end = end; else freeSpans.push({ start, end });   // two flagged phrases in a row are one section
+        }
         const every = ph.free.every;
         if (!(every > 0)) problems.push(`phrase "${pid}": free.every ${every} is not a positive number of beats`);
         else {
@@ -282,7 +299,7 @@ export function expandChart(chart: DanceChart, song: FelSong): ExpandedChart {
     }
   });
   presses.sort((a, b) => a.beat - b.beat);
-  return { presses, problems };
+  return { presses, freeSpans, problems };
 }
 
 /** The SCORED moves as the press steps DancePerformance plays: plain steps, exactly the shape stepsForSong makes. */
@@ -319,6 +336,8 @@ export interface ChartPlan {
   style: ChartPress[];
   /** The authored moves the cap demoted (a subset of `style`). */
   demoted: ChartPress[];
+  /** The FREESTYLE SECTIONS (expandChart): song beats, sorted. No scored step is inside one (validateChart). */
+  freeSpans: FreeSpan[];
   /** The cap could not be met safely (validateChart reports these). */
   problems: string[];
 }
@@ -396,12 +415,12 @@ export function selectScored(presses: readonly ChartPress[], song: FelSong, cap:
 
 /** Split an expanded chart into its scored steps and its STYLE taps, under the song's scored-step cap. */
 export function planChart(chart: DanceChart, song: FelSong): ChartPlan {
-  const { presses, problems } = expandChart(chart, song);
+  const { presses, freeSpans, problems } = expandChart(chart, song);
   const cap = SCORED_STEP_CAP[song.id];
   const sel = cap === undefined ? { demoted: new Set<ChartPress>(), problems: [] as string[] } : selectScored(presses, song, cap);
   const scored = presses.filter((p) => p.kind === 'move' && !sel.demoted.has(p));
   const style = presses.filter((p) => p.kind !== 'move' || sel.demoted.has(p));
-  return { presses, scored, style, demoted: presses.filter((p) => sel.demoted.has(p)), problems: [...problems, ...sel.problems] };
+  return { presses, scored, style, demoted: presses.filter((p) => sel.demoted.has(p)), freeSpans, problems: [...problems, ...sel.problems] };
 }
 
 // ── stats + validation ──────────────────────────────────────────────────────────────────────────────────────────
@@ -523,6 +542,26 @@ export function validateChart(chart: DanceChart, song: FelSong): string[] {
     if (room < HOLD_GAP_BEATS - EPS) fail(`bar ${m.bar}: the freeze at beat ${m.beat} ends at ${m.beat + clip.beats}, less than ${HOLD_GAP_BEATS} beat before the next move (${next.beat}, swung ${next.swungBeat})`);
   });
 
+  // FREESTYLE SECTIONS: the chart's half of the promise dance/freestyle.ts makes — MATCH is never asked inside one, so no scored
+  // move may be inside it, a freeze's hold must be over before it, and it must be long enough to read (two bars).
+  const { freeSpans } = expandChart(chart, song);
+  for (const [pid, ph] of Object.entries(chart.phrases)) {
+    if (ph.free?.freestyle !== undefined && ph.free.freestyle !== true) fail(`phrase "${pid}": freestyle is true or absent`);
+    if (ph.free?.freestyle === true && ph.notes) fail(`phrase "${pid}": a freestyle section is a free phrase, not a called one`);
+  }
+  for (const f of freeSpans) {
+    if (f.end - f.start < 8) fail(`a freestyle section at beat ${f.start} is ${(f.end - f.start) / 4} bar(s): it needs at least two to read (the banner, then the moves)`);
+    for (const m of moves) {
+      // (belt and braces: phrases are laid end to end, so a section's own bars cannot hold another phrase's move — this can only fire if
+      // that ever changes; the mutation check on this rule found it an equivalent mutant, so no test can reach it)
+      if (m.beat >= f.start - EPS && m.beat < f.end - EPS) fail(`bar ${m.bar}: a scored move at beat ${m.beat} is inside the freestyle section ${f.start}–${f.end}, where MATCH is never asked`);
+      const clip = CLIP_BY_ID.get(m.clipId);
+      if (clip?.category === 'freeze' && m.beat < f.start && m.beat + clip.beats > f.start - HOLD_GAP_BEATS + EPS) {
+        fail(`bar ${m.bar}: the freeze at beat ${m.beat} is held until ${m.beat + clip.beats}, less than ${HOLD_GAP_BEATS} beat before the freestyle section at ${f.start}`);
+      }
+    }
+  }
+
   // a STYLE tap just BEFORE a move must be out of the move's judge window: a press at the tap (up to GROOVE_WINDOW_SEC
   // late) that is still within MISS_AFTER of the move would be judged as an early press OF THE MOVE, and the press the
   // player then makes on the move would be a wild tap. (After a move the head is normally hit and gone.)
@@ -595,7 +634,7 @@ const RAW: Readonly<Record<string, DanceChart>> = {
 export const chartFor = (songId: string | null | undefined): DanceChart | undefined => (songId ? RAW[songId] : undefined);
 export const CHART_SONG_IDS: readonly string[] = Object.keys(RAW);
 
-interface Played { steps: DanceStep[]; styleBeats: number[] }
+interface Played { steps: DanceStep[]; styleBeats: number[]; freeSpans: FreeSpan[] }
 const played = new Map<string, Played | null>();
 
 function load(song: FelSong): Played | null {
@@ -609,7 +648,7 @@ function load(song: FelSong): Played | null {
       console.error(`[FEL-DANCE] chart "${song.id}" is INVALID (${problems.length}) — playing the generated steps instead:\n  ${problems.join('\n  ')}`);
     } else {
       const plan = planChart(chart, song);
-      out = { steps: stepsFromPresses(plan.scored), styleBeats: styleBeatsFromPresses(plan.style) };
+      out = { steps: stepsFromPresses(plan.scored), styleBeats: styleBeatsFromPresses(plan.style), freeSpans: plan.freeSpans.map((f) => ({ ...f })) };
     }
   }
   played.set(song.id, out);
@@ -630,4 +669,12 @@ export function chartStyleBeatsFor(song: FelSong | string | null | undefined): n
   const s = typeof song === 'string' ? songFor(song) : song;
   const got = s ? load(s) : null;
   return got ? [...got.styleBeats] : null;
+}
+
+/** The authored chart's FREESTYLE SECTIONS for a song (song beats, a fresh copy), or null when the song has no playable chart. An empty
+ *  list = a chart with no section: the room plays exactly as it did. lane/dance-extras (2026-10-14). */
+export function chartFreeSpansFor(song: FelSong | string | null | undefined): FreeSpan[] | null {
+  const s = typeof song === 'string' ? songFor(song) : song;
+  const got = s ? load(s) : null;
+  return got ? got.freeSpans.map((f) => ({ ...f })) : null;
 }

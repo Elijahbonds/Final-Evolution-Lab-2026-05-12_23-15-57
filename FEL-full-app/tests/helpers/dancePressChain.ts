@@ -13,6 +13,7 @@ import { DancePerformance, beatDuration, type DanceStep, type Judgement } from '
 import { danceTap, type TriggerLatch } from '../../lib/babylon/audio/SongClock';
 import { buttonForStep, matchPress, pressTarget, styleTapAt, GROOVE_STYLE, GROOVE_WINDOW_SEC } from '../../lib/babylon/dance/chartPlay';
 import { STOOP_LOOKAHEAD } from '../../lib/babylon/dance/stoopWindows';
+import { FreestyleDeck, freeSpanAt, freeStyleFor, routeFreestyle, type FreeSpan } from '../../lib/babylon/dance/freestyle';
 
 export interface TimedInput { at: number; ev: FelInput }
 export interface ChainResult {
@@ -28,6 +29,10 @@ export interface ChainResult {
   wrongButton: number;
   /** Presses the chain ignored (not a tap at all). */
   ignored: number;
+  /** Presses a FREESTYLE section took (lane/dance-extras): a move danced, never the judge. */
+  freestyle: number;
+  /** The moves those presses danced, in order (clip ids). */
+  moves: string[];
 }
 
 export function runChain(o: {
@@ -37,6 +42,8 @@ export function runChain(o: {
   inputs: TimedInput[];
   /** The chart's STYLE beats (song beats), as the room reads them; none = no STYLE taps. */
   styleBeats?: number[];
+  /** The chart's FREESTYLE sections (song beats): inside one every face button picks the move (DanceMode.freestylePress). */
+  freeSpans?: FreeSpan[];
   /** Run to this heard second after the last input (so unanswered steps expire as MISS). */
   endAt?: number;
 }): ChainResult {
@@ -50,13 +57,29 @@ export function runChain(o: {
   const taken = new Set<number>();
   const grooves = o.styleBeats ?? [];
   const bd = beatDuration(o.bpm);
-  let style = 0, wrongButton = 0, ignored = 0;
+  let style = 0, wrongButton = 0, ignored = 0, freestyle = 0;
+  const moves: string[] = [];
+  const deck = new FreestyleDeck();
+  let freeCur: FreeSpan | null = null;
 
   for (const { at, ev } of [...o.inputs].sort((a, b) => a.at - b.at)) {
     perf.update(at);
     const t = danceTap(latch, ev);
     latch = t.latch;
     const btn = o.match ? matchPress(ev, t.tap) : null;
+    // ── DanceMode.update's trackFreestyle, then onInput's freestylePress (before the tap guard) ──
+    const span = o.freeSpans?.length ? freeSpanAt(o.freeSpans, at / bd) : null;
+    if (span !== freeCur) { freeCur = span; if (span) deck.reset(); }
+    if (freeCur) {
+      const route = routeFreestyle({ e: ev, tap: t.tap, upcoming: perf.upcoming(at, STOOP_LOOKAHEAD), heardNow: at, beatPos: at / bd, beatSec: bd, styleBeats: grooves, taken });
+      if (route) {
+        moves.push(deck.press(route.slot).clipId);
+        if (route.slotBeat !== null) taken.add(route.slotBeat);
+        style += freeStyleFor(route);
+        freestyle++;
+        continue;
+      }
+    }
     if (!t.tap && !btn) { ignored++; continue; }
     // ── DanceMode.pressAt ──
     const near = grooves.length || o.match ? perf.upcoming(at, STOOP_LOOKAHEAD) : null;
@@ -75,7 +98,7 @@ export function runChain(o: {
   }
   perf.update(o.endAt ?? (o.inputs.length ? Math.max(...o.inputs.map((i) => i.at)) + 2 : 2));
   const r = perf.result();
-  return { labels, score: r.score, combo: perf.combo, maxCombo: r.maxCombo, counts: r.counts, style, wrongButton, ignored };
+  return { labels, score: r.score, combo: perf.combo, maxCombo: r.maxCombo, counts: r.counts, style, wrongButton, ignored, freestyle, moves };
 }
 
 /** A hand-made routine: the families the MATCH buttons carry, one step a bar at 120 BPM (a beat is 0.5 s). */

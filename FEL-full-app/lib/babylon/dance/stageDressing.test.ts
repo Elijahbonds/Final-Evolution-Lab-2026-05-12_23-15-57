@@ -1,6 +1,6 @@
 // The dressed Cypher (vis-party, 2026-10-13): the milestone rate limit, the idle phase, and a render smoke on NullEngine —
 // the stage mounts, hides the banner it replaces, runs a song frame, and takes every mesh it made away with it.
-import { beforeAll, describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { FreeCamera, NullEngine, Scene, TransformNode, Vector3 } from '@babylonjs/core';
 import type { LightRigHandle } from '../scene/LightRig';
 import {
@@ -65,6 +65,20 @@ describe('dance stage: the mount', () => {
     const high = mountDanceStage({ scene, lights: lights('high'), banners: [], track: 'X', calmLights: false, calmMotion: false });
     expect(high.heads.fixtures.length).toBe(6);
     high.dispose();
+  });
+  it('lane/dance-extras: a FREESTYLE section sets the wall\'s word and clears it; the burst on entry obeys reduced motion and the milestone gap', () => {
+    const calm = mountDanceStage({ scene, lights: lights('desktop'), banners: [], track: 'X', calmLights: true, calmMotion: true });
+    const set = vi.spyOn(calm.wall, 'setOverride');
+    calm.freestyle(true);                                                // reduced motion: the word is not motion; no jets, no confetti
+    calm.freestyle(false);
+    expect(set.mock.calls).toEqual([['FREESTYLE'], [null]]);
+    calm.dispose();
+    const live = mountDanceStage({ scene, lights: lights('desktop'), banners: [], track: 'X', calmLights: false, calmMotion: false });
+    const word = vi.spyOn(live.wall, 'setOverride');
+    live.freestyle(true);
+    live.freestyle(false);
+    expect(word.mock.calls).toEqual([['FREESTYLE'], [null]]);
+    live.dispose();
   });
   it('reduced motion fires no jets or confetti; a normal run fires once, then waits out the gap', () => {
     const calm = mountDanceStage({ scene, lights: lights('desktop'), banners: [], track: 'X', calmLights: true, calmMotion: true });

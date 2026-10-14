@@ -60,8 +60,12 @@ export const parseLevel = (v: unknown): DanceLevel => (v === 'easy' || v === 'ha
  * break's horn hit). HARD fills each gap of HARD_FILL_MIN_BEATS or more with the shortest clip of the previous step's
  * family that fits, so the band the steps earn is the band the section already plays. Never overlaps two steps, and
  * never denser than one step per shortest clip — the bound lib/arena-score-integrity.ts's danceCeiling assumes.
+ *
+ * `keepClear` (lane/dance-extras, 2026-10-14): song-beat ranges that must hold no step — the chart's FREESTYLE SECTIONS (dance/freestyle.ts),
+ * where MATCH is never asked. HARD's fill stops at the start of one (a fill that would run into it is not placed, and the rest of that gap
+ * stays as authored), so a section stays empty whatever the level. Empty (the default) = exactly the chart as before; EASY only ever removes steps.
  */
-export function chartForLevel(steps: readonly DanceStep[], level: DanceLevel): DanceStep[] {
+export function chartForLevel(steps: readonly DanceStep[], level: DanceLevel, keepClear: readonly { start: number; end: number }[] = []): DanceStep[] {
   const sorted = [...steps].sort((a, b) => a.beat - b.beat);
   if (level === 'normal' || sorted.length === 0) return sorted;
   if (level === 'easy') {
@@ -91,6 +95,8 @@ export function chartForLevel(steps: readonly DanceStep[], level: DanceLevel): D
       if (room < HARD_FILL_MIN_BEATS) break;
       const clip = fits.find((c) => c.beats <= room);
       if (!clip) break;
+      // a fill may not start, or run, inside a FREESTYLE SECTION (none: the unchanged path)
+      if (keepClear.some((f) => cursor < f.end && cursor + clip.beats > f.start)) break;
       mirrored = !mirrored;
       out.push({ clipId: clip.id, beat: cursor, holdBeats: clip.beats, mirrored });
       cursor += clip.beats;

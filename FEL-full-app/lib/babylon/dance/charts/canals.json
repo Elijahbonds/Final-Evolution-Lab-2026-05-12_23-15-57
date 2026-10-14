@@ -4,7 +4,7 @@
   "bpm": 118,
   "bars": 52,
   "author": "FEL (MUSIC-SUITE P9, 2026-09-29)",
-  "about": "Difficulty 5. Four on the floor, so the accents sit on the off-beat eighths and the keys hook (0.75, 1.5, 2.5) against the kick; eighth doubles on the claps, sixteenth doubles only where the drums play sixteenths (3.5 / 3.75 in the second verse, 3 / 3.25 in the last hook); a build of quarters into straight eighths; freezes on both break bars; free-tap bars every beat after each called pair. Captured-move short names (moonwalk, headstand, kickstep, sidefreeze) still play their family's library clip, as they always did; the last verse opts in to the CAPTURED MOONWALK by naming its id (kvDc: dance_pop_moonwalk — the same family, beat and accents as kvD, so the steps, the cap and the pay are the same). Accents, doubles and free taps are STYLE taps; only the moves are scored steps.",
+  "about": "Difficulty 5. Four on the floor, so the accents sit on the off-beat eighths and the keys hook (0.75, 1.5, 2.5) against the kick; eighth doubles on the claps, sixteenth doubles only where the drums play sixteenths (3.5 / 3.75 in the second verse, 3 / 3.25 in the last hook); a build of quarters into straight eighths; freezes on both break bars; free-tap bars every beat after each called pair. Captured-move short names (moonwalk, headstand, kickstep, sidefreeze) still play their family's library clip, as they always did; the last verse opts in to the CAPTURED MOONWALK by naming its id (kvDc: dance_pop_moonwalk — the same family, beat and accents as kvD, so the steps, the cap and the pay are the same). The last hook ends in a FREESTYLE section (kfreeFS: the same free taps, marked): the buttons pick the move, MATCH is not asked, and it pays STYLE only. Accents, doubles and free taps are STYLE taps; only the moves are scored steps.",
   "phrases": {
     "kin": { "bars": 2, "notes": [ { "b": 0, "m": "toprock" }, { "b": 2 }, { "b": 4, "m": "wave" }, { "b": 6, "m": "spin" } ] },
     "kin2": { "bars": 2, "notes": [ { "b": 0, "m": "toprock", "mir": 1 }, { "b": 2 }, { "b": 4, "m": "wave", "mir": 1 }, { "b": 6, "m": "spin" } ] },
@@ -18,6 +18,7 @@
     "khA": { "bars": 2, "notes": [ { "b": 0, "m": "windmill" }, { "b": 0.75 }, { "b": 1.5 }, { "b": 2.5, "x2": 0.5 }, { "b": 4, "m": "wave" }, { "b": 5.5 } ] },
     "khB": { "bars": 2, "notes": [ { "b": 0, "m": "kickstep" }, { "b": 0.75 }, { "b": 1.5 }, { "b": 3, "x2": 0.25 }, { "b": 4, "m": "windmill" }, { "b": 4.75 }, { "b": 5.5 }, { "b": 6.5, "x2": 0.5 } ] },
     "kfree": { "bars": 2, "free": { "every": 1 } },
+    "kfreeFS": { "bars": 2, "free": { "every": 1, "freestyle": true } },
     "kbrk": { "bars": 2, "notes": [ { "b": 0, "m": "babyfreeze" }, { "b": 4, "m": "spin" }, { "b": 6 } ] },
     "kbrk2": { "bars": 2, "notes": [ { "b": 0, "m": "sidefreeze", "mir": 1 }, { "b": 4, "m": "spin" }, { "b": 6 } ] },
     "kout1": { "bars": 2, "notes": [ { "b": 0, "m": "twostep" }, { "b": 1 }, { "b": 3 }, { "b": 4, "m": "toprock" }, { "b": 5.5 } ] },
@@ -30,7 +31,7 @@
     { "name": "hook", "bar": 21, "bars": 8, "play": ["khA", "kfree", "khA", "kfree"] },
     { "name": "break", "bar": 29, "bars": 4, "play": ["kbrk", "kbrk2"] },
     { "name": "verse", "bar": 33, "bars": 8, "play": ["kvA", "kvC", "kfree", "kvDc"] },
-    { "name": "hook", "bar": 41, "bars": 8, "play": ["khB", "kfree", "khA", "kfree"] },
+    { "name": "hook", "bar": 41, "bars": 8, "play": ["khB", "kfree", "khA", "kfreeFS"] },
     { "name": "outro", "bar": 49, "bars": 4, "play": ["kout1", "kout2"] }
   ]
 }
