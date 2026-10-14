@@ -36,6 +36,7 @@ import { allCarnivalEvents, type CarnivalEvent } from './carnivalEvents';
 import {
   pickNight, rollRival, rivalMakeRate, rivalProgress, freshTally, bankEvent, nightChampion, nightBoard, type NightTally, EVENTS_PER_NIGHT,
 } from '../core/CarnivalNight';
+import { mountCarnivalFx, type CarnivalFx } from '../court/mount/carnivalFx';   // vis-hoops-court (2026-10-14): the fair, its marquee, the intro's camera and the celebrations
 import { ModeMic } from '../audio/mic/ModeMic';   // THE MIC (2026-09-24): the MC calls Game Night, the stands react
 
 type Phase = 'pick' | 'reveal' | 'playing' | 'handoff' | 'eventOver' | 'finale';
@@ -62,6 +63,7 @@ const PICK_OPTS: readonly PickOpt[] = ['solo', 'duo', 'practice'];
  *  geometry on two venues in a row; the spec's camera is the one that was authored to see the floor. */
 const HUB_VENUE = 'court_carnival';
 const HUB_SPOTS: [BABYLON.Vector3, BABYLON.Vector3] = [new BABYLON.Vector3(-1.5, 0, 5), new BABYLON.Vector3(1.5, 0, 2)];   // = VENUE_SPECS.court_carnival.actors
+const HUB_MID = HUB_SPOTS[0].add(HUB_SPOTS[1]).scale(0.5); HUB_MID.y = 1.2;   // the hub camera's objective (showHub's own `mid`); the broadcast intro steps the director toward it
 
 /** One line per event for the reveal card — the verb, not the rules. */
 const BLURB: Record<string, string> = {
@@ -134,6 +136,8 @@ interface St {
   hostBio: StagePostureInput;
   guestBio: StagePostureInput;
   anchor: BABYLON.TransformNode | null;
+  /** vis-hoops-court: the fair round the hub, its marquee and the celebrations (court/carnivalFx) */
+  fx: CarnivalFx | null;
   /** A+ P0 juice latches: one event-win punch per event (reset when the next event starts), one champion punch per night. */
   eventLatch: boolean;
   champLatch: boolean;
@@ -207,6 +211,7 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
     }
     S.host?.root.setEnabled(on);
     S.guest?.root.setEnabled(on);
+    S.fx?.showSet(on);   // vis-hoops-court: the fair stands with the hub (an event paints its own floor)
     wakeHub(ctx, S, on);
   }
 
@@ -307,6 +312,7 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
     const blurb = BLURB[S.current.id] ?? '';
     hud(ctx, S, { banner: `${S.practice ? 'PRACTICE' : 'NEXT UP'}: ${S.current.title}`, blurb: first ? `${blurb}  ·  GO when ready` : blurb, board: null, boardTitle: '', hint: '' });
     SoundKit.play('powerUp');
+    S.fx?.reveal(); S.fx?.board({ title: S.current.title, rows: nightBoard(S.tally, names(S)), footer: `EVENT ${Math.min(S.idx + 1, S.events.length)} OF ${S.events.length}` });   // vis-hoops-court: a confetti volley as the card turns; the sign says the event and the standings
     // SCORECARD FEEL: the night is four events, and the turn of one is the biggest beat the hub has (3 juice beats a minute)
     ctx.juice.flash('#ffd75e', 110);
     ctx.juice.callout(S.current.title, '#ffd75e', 900);
@@ -323,6 +329,7 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
   async function runAttempt(ctx: ModeContext, S: St): Promise<void> {
     if (!S.current || S.building || S.phase === 'playing' || S.ended) return;
     const ev = S.current;
+    S.fx?.endIntro();                                // vis-hoops-court: the crane hands the frame back BEFORE the event builds and sets its own camera
     showHub(ctx, S, false);                          // the event paints its own floor and spawns its own player
     ctx.setHud({ banner: '', blurb: '' });
     // HOOPS MOTION phase 3c (review): the bodies this event spawns are built for IT — the hoops smoothing and the overhead pole rule reach
@@ -417,6 +424,7 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
     else if (w === 0 || S.players > 1) S.mic?.say({ moment: 'carnival.eventwin', priority: 2, crowd: { moment: 'crowd.cheer', n: 2 } });
     else S.mic?.say({ moment: 'carnival.eventloss', priority: 2, crowd: { moment: 'crowd.groan', n: 1 } });
     const [n1, n2] = names(S);
+    S.fx?.eventResult(w); S.fx?.board({ title: 'STANDINGS', rows: nightBoard(S.tally, names(S)), footer: w === -1 ? 'TIE' : `${names(S)[w]} TAKES ${S.current.title}` });   // vis-hoops-court: a volley (and, in the dark, fireworks) when the player takes it; the sign shows the board
     hud(ctx, S, {
       banner: `${S.current.title}: ${n1} ${a} · ${n2} ${b}`,
       blurb: w === -1 ? 'TIE — nobody takes it' : `${names(S)[w]} TAKES IT`,
@@ -449,6 +457,7 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
     champBody?.beat(SPORT_CLIP.scoreCelebrate, { fadeSec: 0.12 });
     runnerUpBody?.beat(SPORT_CLIP.karateHitReact, { fadeSec: 0.08 });
     setResult(S, champ === 0 ? 0 : 1);
+    S.fx?.finale(won); S.fx?.board({ title: won ? 'CHAMPION' : 'FINAL', rows: nightBoard(S.tally, names(S)), footer: S.practice ? 'PRACTICE' : 'GAME NIGHT' });   // vis-hoops-court
     const [n1, n2] = names(S);
     hud(ctx, S, {
       banner: S.practice ? (won ? 'PRACTICE: YOU TOOK IT' : 'PRACTICE: THE RIVAL TOOK IT')
@@ -500,6 +509,7 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
 
   return {
     modeId: 'carnival', mood: 'goldenHour', camPreset: 'court',
+    intro: 'establish',   // vis-hoops-court: a crane over the fair when the night opens (skipped by the first press; the director is stepped by fx.stepIntro)
 
     async load(ctx: ModeContext) {
       const qs = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
@@ -519,7 +529,7 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
         // harness's own start-of-play step and the first event rendered sky (measured on /play/carnival?players=1).
         autoBegin: !!q, starting: false, current: null,
         players, turn: 0, turnPoints: [0, 0], tally: freshTally(), rivalTarget: 0,
-        ended: false, hub: null, host: null, guest: null, hostBody: null, guestBody: null, anchor: null, eventLatch: false, champLatch: false,
+        ended: false, hub: null, host: null, guest: null, hostBody: null, guestBody: null, anchor: null, fx: null, eventLatch: false, champLatch: false,
         hostPP: null, guestPP: null, hostBio: { ...STAGE_INPUT_IDLE, watching: true }, guestBio: { ...STAGE_INPUT_IDLE, watching: true },
         mic: null, micOpening: true, micOpened: false, micQuiet: '', micClock: false,
       };
@@ -546,6 +556,8 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
         };
       }
       if (S.scene.isDisposed) return;
+      S.fx = mountCarnivalFx(ctx);   // vis-hoops-court: before the first showHub, which raises the fair with the hub
+      S.fx.board({ title: 'GAME NIGHT', rows: [], footer: `${S.events.length} EVENTS` });
       showHub(ctx, S, true);
       if (!S.autoBegin) showPick(ctx, S);
     },
@@ -595,6 +607,8 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
       const S = st(ctx); if (!S || S.ended) return;
       S.phaseSec += dt;
       micTick(ctx, S);
+      S.fx?.update(dt);   // vis-hoops-court: the marquee's chasers run on the mode's clock (they stop with a pause)
+      if (S.anchor) S.fx?.stepIntro(S.anchor.position, HUB_MID, S.phase === 'pick' || S.phase === 'reveal');   // …and the broadcast intro's camera (the hub never stepped the director)
 
       if (S.phase === 'pick') {
         if (S.pickTouched) S.pickSec += dt;
@@ -646,7 +660,7 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
       // things to do by hand are the instance whose scene is GOING away — found on the next tick by `isDisposed` —
       // and the ambient bed, which stays up while another instance is still live (strict-mode phantom stop).
       setTimeout(() => {
-        for (const S of live) if (S.scene.isDisposed) { S.ended = true; S.current = null; S.hostPP?.dispose(); S.hostPP = null; S.guestPP?.dispose(); S.guestPP = null; S.mic?.dispose(); S.mic = null; live.delete(S); }   // THE MIC stops with its night
+        for (const S of live) if (S.scene.isDisposed) { S.ended = true; S.current = null; S.hostPP?.dispose(); S.hostPP = null; S.guestPP?.dispose(); S.guestPP = null; S.mic?.dispose(); S.mic = null; try { S.fx?.dispose(); } catch { /* the scene took its meshes */ } S.fx = null; live.delete(S); }   // THE MIC stops with its night
         if (live.size === 0) SoundKit.stopAmbient();
       }, 0);
     },

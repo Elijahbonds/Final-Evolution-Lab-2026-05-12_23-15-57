@@ -12,9 +12,9 @@
 // motion the player did not ask for. Pure targets in `duskTarget`; the mount only eases the lights toward them.
 
 import { Color3 } from '@babylonjs/core';
-import type { ModeContext } from '../core/ModeHarness';
-import { MOODS } from '../scene/moods';
-import { motionPolicy } from '../../a11y/reducedMotion';
+import type { ModeContext } from '../../core/ModeHarness';
+import { MOODS } from '../../scene/moods';
+import { motionPolicy } from '../../../a11y/reducedMotion';
 
 /** The game is dusk by the time it is this far gone: nothing happens before the first fifth, it is complete at the end. */
 export const DUSK_START = 0.2;

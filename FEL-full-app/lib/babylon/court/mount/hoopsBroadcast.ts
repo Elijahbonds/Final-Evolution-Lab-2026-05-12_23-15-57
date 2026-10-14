@@ -18,9 +18,9 @@
 // state: whether a basket counts, who wins and what a block is worth are the modes' own.
 
 import { Vector3 } from '@babylonjs/core';
-import type { ModeContext } from '../core/ModeHarness';
-import { motionPolicy } from '../../a11y/reducedMotion';
-import { HoopsReplayPlanner, momentOfReport } from './hoopsMoments';
+import type { ModeContext } from '../../core/ModeHarness';
+import { motionPolicy } from '../../../a11y/reducedMotion';
+import { HoopsReplayPlanner, momentOfReport, type HoopsMomentKind } from '../hoopsMoments';
 
 export interface HoopsBroadcastOpts {
   /** What the replay's cameras look toward (the rim). */
@@ -35,6 +35,8 @@ export interface HoopsBroadcast {
   /** At a dead ball, before the mode resets: true = a replay took the call and `next` runs when it ends (the caller returns);
    *  false = nothing to show, the caller carries on and `next` is NOT called. */
   deadBall(next: () => void): boolean;
+  /** Note a moment by hand (probes and tests; the modes' own reach the planner through the momentum bus). */
+  note(kind: HoopsMomentKind): void;
   /** A new run on the same closure. */
   reset(): void;
   readonly replays: number;
@@ -47,7 +49,7 @@ export function mountHoopsBroadcast(ctx: ModeContext, opts: HoopsBroadcastOpts):
   const planner = new HoopsReplayPlanner();
   const clock = (): number => performance.now() / 1000;   // the recorder's clock (ReplayDirector records on it)
   const stop = ctx.momentum.onReport((e) => { const k = momentOfReport(e); if (k) planner.log.note(k, clock()); });
-  let replaying = false, gone = false;
+  let replaying = false, gone = false, bypass = false;   // bypass: `next` is the mode's own reset coming back through its dead-ball hook
   return {
     holdIntro(subject, objective) {
       if (!ctx.camDirector.inIntro) return false;
@@ -56,15 +58,17 @@ export function mountHoopsBroadcast(ctx: ModeContext, opts: HoopsBroadcastOpts):
     },
     deadBall(next) {
       if (replaying) return false;
+      if (bypass) { bypass = false; return false; }
       const plan = planner.atDeadBall(clock(), { final: opts.final(), reduced: !motionPolicy().travel });
       if (!plan || !ctx.highlight) return false;
       replaying = true;
       console.info(`[HOOPS-REPLAY] ${plan.kind}: the last ${plan.lastSeconds.toFixed(1)} s`);
       void ctx.highlight({ lastSeconds: plan.lastSeconds, endAt: plan.endAt, objective: opts.rim })
         .catch(() => { /* a replay that failed is a replay not shown */ })
-        .then(() => { replaying = false; if (!gone) next(); });   // a mode torn down during its replay is not reset
+        .then(() => { replaying = false; if (gone) return; bypass = true; try { next(); } finally { bypass = false; } });   // a mode torn down during its replay is not reset
       return true;
     },
+    note(kind) { planner.log.note(kind, clock()); },
     reset() { planner.reset(); replaying = false; },
     get replays() { return planner.count; },
     dispose() { gone = true; stop(); },

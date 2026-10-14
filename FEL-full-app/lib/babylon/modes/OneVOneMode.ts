@@ -197,6 +197,7 @@ import { readPlayerIcon } from '../visual/playerIcon';
 import { netExitVelocity, netExitKindOf, netExitMph, type NetExitKind } from '../core/NetExit';   // NET EXIT (2026-09-17)
 import { SHOWTIME_FLUSH_K, SHOWTIME_GOOD_K, showtimeAsked, pickShowtime, judgeShowtime, showtimeMeterT, posterRide, SHOWTIME_FLIGHT_MS, SHOWTIME_HANG_FROM, SHOWTIME_HANG_TO, SHOWTIME_HANG_SCALE, SHOWTIME_DEADLINE_K, SHOWTIME_PCT } from '../core/ShowtimeDunk';   // SHOWTIME (2026-09-17)
 import type { ParticleSystem } from '@babylonjs/core';   // suite pass: the hot hand's shot trails (the dunk contest's ball trail, on the game)
+import { mountHoopsCourt, type HoopsCourt } from '../court/mount/hoopsCourt';   // vis-hoops-court (2026-10-14): the broadcast, the scuffs and the dusk
 import { HoopJuice } from '../visual/HoopJuice';   // A+ P0: the hoop answers the make (shared with Dunk; Meshy never scaled)
 import { mountShotMeter3D, type ShotMeter3DHandle } from '../visual/ShotMeter3D';   // THE SHOT METER (owner, 2026-09-18): the 2K bar beside the shooter's head
 import { assertSpawned } from '../core/FrameGuard';
@@ -485,6 +486,7 @@ export const OneVOneMode: ModeDefinition = (() => {
   };
   const meterRelease = (): ReturnType<ShotMeter['release']> => { const q = shotMeter.release(); meter3d?.end(q); return q; };
   let dummyFoe = false;   // DEV ?dummy=1 — see the defend block
+  let hoopsFx: HoopsCourt | null = null;         // vis-hoops-court: the intro hold, the dead-ball replay, the court's scuffs and its dusk (court/hoopsCourt)
   let hoopJuice: HoopJuice | null = null;        // A+ P0 CONTACT-lite: rim spring / net squash / hoop flash on a make
   let contactLatch = false;                      // A+ P0: the dunk's ONE punch per attempt — never re-fired by the banner or the stun
   let hud: ModeContext['setHud'] = () => {};
@@ -724,6 +726,7 @@ export const OneVOneMode: ModeDefinition = (() => {
 
   /** MY possession: I take it back to the top. (Also the reset after my make: make-it-take-it.) */
   function resetPositions(): void {
+    if (hoopsFx?.deadBall(() => resetPositions())) return;   // vis-hoops-court: a replay of the possession's best moment first
     possessionToken++;
     possession = 'mine'; carrying = true; shooting = false; dunking = false; defPhase = 'over';
     currentShot = null; myJumpAge = Infinity; meStunSec = 0; reachCooldown = 0; goaltendCalled = false; paintSec = 0;
@@ -908,6 +911,7 @@ export const OneVOneMode: ModeDefinition = (() => {
 
   return {
     modeId: 'onevone', mood: 'goldenHour', camPreset: 'hoops',
+    intro: 'walkIn', replay: true, replayCast: () => ({ bodies: [me.root, foe.root], loose: [ball] }),   // vis-hoops-court: the broadcast opens and replays the possession's best moment
     // HOOPS BODY (2026-10-07): the body plays 1v1 through the hero's ControlSource; its claimed events land here
     body: COURT_BODY,
     onBody: (_ctx: ModeContext, ev: BodyEvent, view: BodyView): boolean => bodyCtl?.see(ev, view) ?? false,
@@ -947,6 +951,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       ambient?.dispose(); ambient = EffectsKit.ambient(ctx.scene, 'venice');   // IMPROVE (2026-10-06) #12: kept, so dispose can take it
       // IMPROVE (2026-10-06) #7: the second, untracked ballTrail is gone — it emitted 'soft' forever, so the ball streaked on every
       // possession and the hot hand's trail (momentum ≥ 70) meant nothing; it was never disposed either (#12)
+      hoopsFx?.dispose(); hoopsFx = mountHoopsCourt(ctx, { kind: 'onevone', rim: RIM, bodies: () => [me?.root, foe?.root], final: () => ended, progress: () => Math.max(myScore, foeScore) / TARGET_SCORE });
       hoopJuice?.dispose(); hoopJuice = new HoopJuice(ctx.scene, RIM);   // A+ P0: juice-only ring + net, material clones — no meshy_hoop_* transform is touched
       meter3d?.dispose(); meter3d = mountShotMeter3D(ctx.scene);
       // THE MIC: the court's MC (by ctx.location) and the rival in a court regular's voice; the banks load in the background
@@ -1145,6 +1150,7 @@ export const OneVOneMode: ModeDefinition = (() => {
         meFlightTick?.(stepMs); foeFlightTick?.(stepMs); }
       if (ended) return;
       micTick(ctx);
+      if (hoopsFx?.holdIntro(me.root.position, RIM)) return;   // vis-hoops-court: the broadcast intro holds the first possession
       // the harness cools the shared meter on real time now -- a second update() here decayed it twice as fast
       // this exact curve is now MomentumFx.crowdLevel, applied by the harness for every mode --
       // it was extracted FROM here because this is the mode people have actually played
@@ -2232,6 +2238,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       me?.dispose(); foe?.dispose(); ball?.dispose();
       meSlot?.dispose(); foeSlot?.dispose();
       SoundKit.stopAmbient();
+      hoopsFx?.dispose(); hoopsFx = null;
       hoopJuice?.dispose(); hoopJuice = null;        // A+ P0: restores any hoop material the punch swapped
       meter3d?.dispose(); meter3d = null;
       mic?.dispose(); mic = null;   // THE MIC stops with the mode
@@ -2268,6 +2275,7 @@ export const OneVOneMode: ModeDefinition = (() => {
   /** THEIR possession: the check. The rival checks up beyond the arc, I set inside him, the drive starts after
    *  CHECK_HOLD_SEC. No timer decides the release — the AttackerBrain reads my body. */
   function startDefense(ctx: ModeContext, banner: string): void {
+    if (hoopsFx?.deadBall(() => startDefense(ctx, banner))) return;   // vis-hoops-court: a replay of the possession's best moment first
     possessionToken++;
     possession = 'defense'; carrying = false; shooting = false; dunking = false; currentShot = null;
     defPhase = 'check'; attacker.reset(); nerveTheAttacker(); gatherShown = false; stepbackShown = false; goaltendCalled = false; paintSec = 0;
