@@ -49,7 +49,7 @@ describe('mountModeCrowd on a scene', () => {
 
   it('hears reports and the end of the match, and never reports anything itself', async () => {
     const { scene, momentum, ctx, end } = rig();
-    const crowd = mountModeCrowd(ctx, 'football')!;
+    const crowd = mountModeCrowd(ctx, 'football', { deferFrames: 0 })!;
     expect(crowd).not.toBeNull();
     expect(crowd.fans).toBe(0);                 // a phone: cards only
     expect(crowd.cards).toBeGreaterThan(40);
@@ -76,7 +76,7 @@ describe('mountModeCrowd on a scene', () => {
 
   it('a phone crowd idles in a handful of draws and moves cards between pose meshes as it cheers', async () => {
     const { scene, ctx } = rig();
-    const crowd = mountModeCrowd(ctx, 'football')!;
+    const crowd = mountModeCrowd(ctx, 'football', { deferFrames: 0 })!;
     await crowd.ready;
     scene.render();
     const on = () => crowd.meshes().filter((m) => m.isEnabled() && /^crowd_card_/.test(m.name)).length;
@@ -89,5 +89,21 @@ describe('mountModeCrowd on a scene', () => {
     expect(on()).toBeGreaterThan(0);
     crowd.dispose();
     scene.dispose();
+  });
+});
+
+describe('the crowd waits for play', () => {
+  it('builds nothing until the scene has drawn its first frames after the mode\'s load', async () => {
+    const engine = new NullEngine();
+    const scene = new Scene(engine);
+    new FreeCamera('c', new Vector3(0, 4, -18), scene);
+    (scene.metadata ??= {}).felTier = 'mobile';
+    const crowd = mountModeCrowd({ scene, momentum: new MomentumBus(), phase: () => 'playing' as ModePhase }, 'football')!;
+    await Promise.resolve();
+    expect(crowd.meshes()).toHaveLength(0);
+    for (let i = 0; i < 25; i++) scene.render();
+    await crowd.ready;
+    expect(crowd.meshes().length).toBeGreaterThan(0);
+    crowd.dispose(); scene.dispose();
   });
 });

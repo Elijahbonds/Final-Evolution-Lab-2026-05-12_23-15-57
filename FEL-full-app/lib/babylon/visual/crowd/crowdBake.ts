@@ -85,6 +85,10 @@ async function buildBake(scene: Scene): Promise<CrowdBake | null> {
   let material: PBRMaterial | null = null;
   const bodies: CrowdBody[] = [];
   for (const c of containers) {
+    // one body a frame: the bake is a few thousand skeleton evaluations, spread so no single frame carries it
+    // eslint-disable-next-line no-await-in-loop
+    if (bodies.length) await new Promise<void>((r) => { const o = scene.onAfterRenderObservable.addOnce(() => r()); scene.onDisposeObservable.addOnce(() => { scene.onAfterRenderObservable.remove(o); r(); }); });
+    if (scene.isDisposed) break;
     c.addAllToScene();
     const mesh = c.meshes.find((m) => !!m.skeleton) as Mesh | undefined;
     const sk = c.skeletons[0];

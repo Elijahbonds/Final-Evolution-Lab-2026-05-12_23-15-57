@@ -36,6 +36,20 @@ export interface CrowdOptions {
   scale?: number;
   /** Read at each reaction: reduced motion keeps reactions small (motionPolicy().reduced). */
   reduced?: () => boolean;
+  /** Frames the scene draws before the crowd starts building (DEFER_FRAMES). 0 builds at once (tests). */
+  deferFrames?: number;
+}
+
+/** The crowd starts building this many rendered frames after it is mounted (well after the mode's load has returned). */
+export const DEFER_FRAMES = 20;
+
+/** Resolves after the scene has rendered `n` more frames (or the scene is disposed). */
+export function afterFrames(scene: Scene, n: number): Promise<void> {
+  return new Promise((resolve) => {
+    let left = n;
+    const obs = scene.onAfterRenderObservable.add(() => { if (--left <= 0) { scene.onAfterRenderObservable.remove(obs); resolve(); } });
+    scene.onDisposeObservable.addOnce(() => { scene.onAfterRenderObservable.remove(obs); resolve(); });
+  });
 }
 
 export interface CrowdHandle {
@@ -315,6 +329,10 @@ export function mountCrowd(scene: Scene, venue: CrowdVenue, opts: CrowdOptions =
     if (changes.length || animatingCards.size) refreshCardMeshes();
   };
   const ready = (async (): Promise<boolean> => {
+    // NOT DURING THE MODE'S LOAD: the harness gives load() a watchdog, and five GLBs, the bake and the card snapshot are
+    // the crowd's business, not the venue's — they start once the scene has drawn `deferFrames` frames of play
+    if ((opts.deferFrames ?? DEFER_FRAMES) > 0) await afterFrames(scene, opts.deferFrames ?? DEFER_FRAMES);
+    if (disposed) return false;
     buildBenches();
     if (tier !== 'mobile' && fans.length + cards.length > 0) {
       bake = await crowdBake(scene);
