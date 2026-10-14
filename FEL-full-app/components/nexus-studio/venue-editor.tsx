@@ -16,7 +16,7 @@ import { targetOf, PLAYTEST_TARGETS, DEFAULT_TARGET } from '@/lib/nexus-studio/t
 import type { BudgetSample } from '@/lib/nexus-studio/budget';
 import type { CameraMode, Tool } from '@/lib/nexus-studio/viewport';
 import type { StudioTransform, V3 } from '@/lib/nexus-studio/doc';
-import type { StudioApi } from './use-studio';
+import { useResolvedCast, type StudioApi } from './use-studio';
 import { AssetBrowser } from './asset-browser';
 import { SceneTree } from './scene-tree';
 import { Inspector } from './inspector';
@@ -46,6 +46,7 @@ export function VenueEditor({ studio }: { studio: StudioApi }) {
   const [note, setNote] = useState<string | null>(null);
 
   const object = venue?.objects.find((o) => o.id === selected) ?? null;
+  const cast = useResolvedCast(doc, venue);   // track 3: the cast, decoded, stood on the hero's spot
 
   const place = useCallback((item: CatalogItem, at?: V3) => {
     if (!venue) return;
@@ -137,7 +138,7 @@ export function VenueEditor({ studio }: { studio: StudioApi }) {
           </select>
           {note && <span className="ml-2 text-[11px]" style={{ color: C.gold }}>{note}</span>}
         </div>
-        <ViewportPanel ref={vp} venue={venue} selected={selected} tool={tool} camera={camera} snap={snap} grid={grid} phone={phone}
+        <ViewportPanel ref={vp} venue={venue} cast={cast} selected={selected} tool={tool} camera={camera} snap={snap} grid={grid} phone={phone}
           onSelect={setSelected} onTransform={onTransform} onStats={setStats} onPreviewEnd={() => setNote(null)}
           onDropItem={(id, at) => { const item = catalogItem(id); if (item) place(item, at); }} />
         <div className="border-t" style={{ borderColor: C.line, background: C.surface }}>
@@ -146,7 +147,7 @@ export function VenueEditor({ studio }: { studio: StudioApi }) {
       </section>
 
       <aside className="flex min-h-0 flex-col border-l" style={{ borderColor: C.line, background: C.surface }} aria-label="Inspector">
-        <Inspector venue={venue} object={object} run={run} seal={seal} onDelete={del} onDuplicate={dup}
+        <Inspector venue={venue} project={doc} object={object} run={run} seal={seal} onDelete={del} onDuplicate={dup}
           onPreviewIntro={(k) => { const ok = vp.current?.previewIntro(k); setNote(ok ? 'Previewing the intro — Esc to stop' : 'Reduced motion is on: the intro is skipped, as in the mode'); }}
           onPreviewReplay={(a) => { vp.current?.previewReplay(a); setNote(`Looking through the ${a} angle — Esc or a camera button to leave`); }} />
       </aside>

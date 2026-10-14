@@ -3,8 +3,10 @@
 
 import type { Command, ObjectPatch } from './commands';
 import {
-  duplicateObject, newVenue, type StudioObject, type StudioProject, type StudioTransform, type StudioVenue, type VenueSettings,
+  LIMITS, duplicateObject, newId, newVenue,
+  type StudioCharacter, type StudioObject, type StudioProject, type StudioTransform, type StudioVenue, type VenueSettings,
 } from './doc';
+import type { CastSlot } from './cast';
 import { instantiate, type CatalogItem } from './catalog';
 import type { PlaytestTarget } from './targets';
 
@@ -56,3 +58,38 @@ export function switchVenue(id: string): Command { return { label: 'Switch venue
 export function importProject(project: StudioProject): Command { return { label: `Import ${project.name}`, ops: [{ op: 'replaceProject', project }] }; }
 
 export function renameProject(name: string): Command { return { label: 'Rename project', group: 'project:name', ops: [{ op: 'setName', name }] }; }
+
+// ── track 3: characters (Closet share codes) and the venue's cast ───────────────────────────────────────────────────
+
+/** Add a character; with `cast`, also cast it in venue `v` — one undo step either way. */
+export function addCharacter(p: StudioProject, c: { name: string; lookCode: string }, cast?: { venue: StudioVenue; slot: CastSlot }): { cmd: Command; id: string } {
+  const character: StudioCharacter = { id: newId('char'), name: c.name.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, LIMITS.name) || `Character ${p.characters.length + 1}`, lookCode: c.lookCode };
+  const ops: Command['ops'] = [{ op: 'addCharacter', character }];
+  if (cast) ops.push({ op: 'patchVenue', venueId: cast.venue.id, patch: { cast: { ...cast.venue.cast, [cast.slot]: character.id } } });
+  return { id: character.id, cmd: { label: cast ? `Cast ${character.name}` : `Add ${character.name}`, ops } };
+}
+
+/** Remove a character, and take it out of every venue that casts it (in the same step, so Undo puts both back). */
+export function removeCharacter(p: StudioProject, id: string): Command | null {
+  const c = p.characters.find((x) => x.id === id);
+  if (!c) return null;
+  const ops: Command['ops'] = [];
+  for (const v of p.venues) {
+    if (v.cast?.player !== id) continue;
+    const { player: _gone, ...rest } = v.cast; void _gone;
+    ops.push({ op: 'patchVenue', venueId: v.id, patch: { cast: Object.keys(rest).length ? rest : undefined } });
+  }
+  ops.push({ op: 'removeCharacter', id });
+  return { label: `Delete ${c.name}`, ops };
+}
+
+export function renameCharacter(id: string, name: string): Command {
+  return { label: 'Rename character', group: `char:${id}:name`, ops: [{ op: 'patchCharacter', id, patch: { name: name.replace(/[\u0000-\u001f\u007f]/g, '').slice(0, LIMITS.name) || 'Character' } }] };
+}
+
+/** Fill (or empty, with null) a venue's cast slot. */
+export function castCharacter(v: StudioVenue, slot: CastSlot, id: string | null): Command {
+  const cast = { ...v.cast };
+  if (id) cast[slot] = id; else delete cast[slot];
+  return { label: id ? 'Cast character' : 'Uncast character', ops: [{ op: 'patchVenue', venueId: v.id, patch: { cast: Object.keys(cast).length ? cast : undefined } }] };
+}

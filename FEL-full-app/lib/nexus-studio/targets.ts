@@ -15,6 +15,8 @@ export interface PlaytestTarget {
   spec: string;
   /** Where the mode's hero stands (the intro and replay previews frame it) and who it plays toward. */
   subject: V3;
+  /** The hero's facing on that spot (radians; the cast preview stands it so). */
+  subjectYaw: number;
   objective: V3;
   /** CameraDirector preset the mode plays on. */
   camPreset: 'court';
@@ -34,6 +36,7 @@ export const PLAYTEST_TARGETS: Record<string, PlaytestTarget> = {
     label: 'Tiebreak',
     spec: 'tennis',
     subject: [0, 0, 10],     // core/TiebreakFlight NEAR_Z
+    subjectYaw: Math.PI,     // TiebreakMode PLAYER_YAW
     objective: [0.4, 0, -10], // FAR_Z, the rival's spot
     camPreset: 'court',
     weatherFamily: 'court',

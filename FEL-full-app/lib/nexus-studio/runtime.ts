@@ -31,6 +31,8 @@ import type { IntroKind } from '../babylon/scene/broadcastShots';
 import type { ExportCrowd, ExportDecal, ExportFixture, ExportMeshyProp, StudioVenueExport } from './exportVenue';
 import { browserKV, decodeInline, readPlaytest, type KV } from './storage';
 import { targetOf } from './targets';
+import { castIdentity } from './cast';
+import { invalidateIdentity, primeIdentity } from '../babylon/core/playerIdentity';
 
 // ── the mode's side: is there a Studio venue for this mode? ─────────────────────────────────────────────────────────
 
@@ -269,10 +271,21 @@ export function mountStudioExtras(ctx: StudioModeCtx, exp: StudioVenueExport, op
   };
 }
 
-/** A mode's one-line hook: the extras for the Studio venue this page carries for `modeKey`, or null. */
+/**
+ * A mode's one-line hook: the extras for the Studio venue this page carries for `modeKey`, or null. A venue that casts a
+ * player (track 3) seats that look as the session's identity HERE — before the mode's load() spawns its hero — so the
+ * mode's own spawn (CharacterLibrary.spawn → resolveIdentity → the body file → applyIdentity) dresses the hero in it.
+ * Dispose forgets it, so the next mount resolves the player's own look again.
+ */
 export function mountStudioFor(modeKey: string, ctx: StudioModeCtx): StudioExtras | null {
   const exp = studioVenueFor(modeKey);
   if (!exp) return null;
-  console.info(`[NEXUS-STUDIO] ${modeKey}: "${exp.name}" — ${exp.kit.length} kit props, ${exp.meshy.length} scans, ${exp.fixtures.length} fixtures, ${exp.crowd?.stands.length ?? 0} stands, ${exp.decals.length} decals`);
-  return mountStudioExtras(ctx, exp, { stepIntro: true });
+  console.info(`[NEXUS-STUDIO] ${modeKey}: "${exp.name}" — ${exp.kit.length} kit props, ${exp.meshy.length} scans, ${exp.fixtures.length} fixtures, ${exp.crowd?.stands.length ?? 0} stands, ${exp.decals.length} decals${exp.cast?.player ? `, cast: ${exp.cast.player.name}` : ''}`);
+  const cast = exp.cast?.player ?? null;
+  if (cast) primeIdentity(castIdentity(cast));
+  const extras = mountStudioExtras(ctx, exp, { stepIntro: true });
+  return {
+    layers: extras.layers,
+    dispose() { extras.dispose(); if (cast) invalidateIdentity(); },
+  };
 }

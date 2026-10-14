@@ -12,6 +12,7 @@ import {
 import { activeVenue, newProject, newVenue, type StudioProject, type StudioVenue } from '@/lib/nexus-studio/doc';
 import { AUTOSAVE_MS, browserKV, loadProject, saveProject } from '@/lib/nexus-studio/storage';
 import { DEFAULT_TARGET, PLAYTEST_TARGETS } from '@/lib/nexus-studio/targets';
+import { resolveCast, type ExportCast } from '@/lib/nexus-studio/cast';
 
 type Action =
   | { type: 'exec'; cmd: Command }
@@ -101,3 +102,17 @@ export function useStudio() {
 }
 
 export type StudioApi = ReturnType<typeof useStudio>;
+
+/** Track 3: the active venue's cast, decoded (share codes decode asynchronously; a code that will not decode casts nothing). */
+export function useResolvedCast(doc: StudioProject, venue: StudioVenue | null): ExportCast | null {
+  const [cast, setCast] = useState<ExportCast | null>(null);
+  const key = venue?.cast?.player ? `${venue.cast.player}|${doc.characters.find((c) => c.id === venue.cast!.player)?.lookCode ?? ''}|${doc.characters.find((c) => c.id === venue.cast!.player)?.name ?? ''}` : '';
+  useEffect(() => {
+    let live = true;
+    if (!key || !venue) { setCast(null); return; }
+    void resolveCast(doc, venue).then((c) => { if (live) setCast(c); });
+    return () => { live = false; };
+    // the key names everything the cast reads
+  }, [key]);
+  return cast;
+}

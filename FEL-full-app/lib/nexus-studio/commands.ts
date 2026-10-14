@@ -13,7 +13,7 @@
 
 import {
   findObject, venueSettings,
-  type StudioObject, type StudioProject, type StudioVenue, type VenueSettings,
+  type StudioCharacter, type StudioObject, type StudioProject, type StudioScript, type StudioVenue, type VenueSettings,
 } from './doc';
 
 export type ObjectPatch = { [K in keyof StudioObject]?: StudioObject[K] } & Record<string, unknown>;
@@ -27,6 +27,14 @@ export type Op =
   | { op: 'removeVenue'; id: string }
   | { op: 'setActiveVenue'; id: string }
   | { op: 'setName'; name: string }
+  // track 3: the project's characters (Closet share codes)
+  | { op: 'addCharacter'; character: StudioCharacter; index?: number }
+  | { op: 'removeCharacter'; id: string }
+  | { op: 'patchCharacter'; id: string; patch: Partial<Omit<StudioCharacter, 'id'>> }
+  // track 4: the project's scripts (event → condition → action graphs)
+  | { op: 'addScript'; script: StudioScript; index?: number }
+  | { op: 'removeScript'; id: string }
+  | { op: 'patchScript'; id: string; patch: Partial<Omit<StudioScript, 'id'>> }
   | { op: 'replaceProject'; project: StudioProject };
 
 export interface Command { label: string; ops: Op[]; group?: string }
@@ -142,6 +150,41 @@ export function applyOp(doc: StudioProject, op: Op): { doc: StudioProject; inver
     }
     case 'setName':
       return { doc: { ...doc, name: op.name }, inverse: { op: 'setName', name: doc.name } };
+    case 'addCharacter': case 'addScript': {
+      const key = op.op === 'addCharacter' ? 'characters' : 'scripts';
+      const item = op.op === 'addCharacter' ? op.character : op.script;
+      const list = (doc[key] as Array<{ id: string }>).slice();
+      if (list.some((x) => x.id === item.id)) throw new CommandError(`${item.id} already exists`);
+      list.splice(op.index === undefined ? list.length : Math.max(0, Math.min(list.length, op.index)), 0, clone(item));
+      const inverse: Op = op.op === 'addCharacter' ? { op: 'removeCharacter', id: item.id } : { op: 'removeScript', id: item.id };
+      return { doc: { ...doc, [key]: list }, inverse };
+    }
+    case 'removeCharacter': case 'removeScript': {
+      const key = op.op === 'removeCharacter' ? 'characters' : 'scripts';
+      const list = doc[key] as Array<{ id: string }>;
+      const index = list.findIndex((x) => x.id === op.id);
+      if (index < 0) throw new CommandError(`no ${key === 'characters' ? 'character' : 'script'} ${op.id}`);
+      const inverse: Op = op.op === 'removeCharacter'
+        ? { op: 'addCharacter', character: doc.characters[index], index }
+        : { op: 'addScript', script: doc.scripts[index], index };
+      return { doc: { ...doc, [key]: list.filter((x) => x.id !== op.id) }, inverse };
+    }
+    case 'patchCharacter': case 'patchScript': {
+      const key = op.op === 'patchCharacter' ? 'characters' : 'scripts';
+      const list = doc[key] as unknown as Array<Record<string, unknown>>;
+      const i = list.findIndex((x) => x.id === op.id);
+      if (i < 0) throw new CommandError(`no ${key === 'characters' ? 'character' : 'script'} ${op.id}`);
+      const before: Record<string, unknown> = {};
+      const merged: Record<string, unknown> = { ...list[i] };
+      for (const [k, val] of Object.entries(op.patch)) {
+        if (k === 'id') throw new CommandError('an id cannot change');
+        before[k] = k in list[i] ? clone(list[i][k]) : undefined;
+        if (val === undefined) delete merged[k]; else merged[k] = clone(val);
+      }
+      const next = list.slice(); next[i] = merged;
+      const inverse = { op: op.op, id: op.id, patch: before } as Op;
+      return { doc: { ...doc, [key]: next }, inverse };
+    }
     case 'replaceProject':
       return { doc: clone(op.project), inverse: { op: 'replaceProject', project: doc } };
   }

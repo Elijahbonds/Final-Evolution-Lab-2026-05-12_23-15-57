@@ -23,9 +23,10 @@ import { targetOf } from './targets';
 import {
   studioLook, mountMeshyLayer, mountFixtureLayer, mountDecalLayer, mountCrowdLayer, mountWeatherLayer, type Layer,
 } from './runtime';
+import { mountCastLayer, type CastLayer } from './castLayer';
 
-export type StageLayer = 'venue' | 'meshy' | 'fixtures' | 'decals' | 'crowd' | 'weather';
-export const STAGE_LAYERS: readonly StageLayer[] = ['venue', 'meshy', 'fixtures', 'decals', 'crowd', 'weather'];
+export type StageLayer = 'venue' | 'meshy' | 'fixtures' | 'decals' | 'crowd' | 'weather' | 'cast';
+export const STAGE_LAYERS: readonly StageLayer[] = ['venue', 'meshy', 'fixtures', 'decals', 'crowd', 'weather', 'cast'];
 
 export interface StageOpts {
   canvas: HTMLCanvasElement | null;
@@ -88,7 +89,7 @@ export async function mountStage(opts: StageOpts): Promise<Stage> {
   // 7: load() — the venue the mode mounts, with the Studio look, then the Studio's layers (runtime.ts: the mode's calls)
   const ctx = { scene, canvas: canvas ?? undefined, camDirector };
   let venue: VenueHandle | null = null;
-  const layers: Partial<Record<Exclude<StageLayer, 'venue'>, Layer>> = {};
+  const layers: Partial<Record<Exclude<StageLayer, 'venue' | 'cast'>, Layer>> & { cast?: CastLayer } = {};
   const subject = (): Vector3 => Vector3.FromArray(exp.subject ?? target?.subject ?? [0, 0, 0]);
   const objective = (): Vector3 => Vector3.FromArray(target?.objective ?? [0, 0, -10]);
   const mountLayer = (name: StageLayer): void => {
@@ -105,6 +106,8 @@ export async function mountStage(opts: StageOpts): Promise<Stage> {
       case 'fixtures': layers.fixtures?.dispose(); layers.fixtures = mountFixtureLayer(scene, null, exp.fixtures); return;
       case 'decals': layers.decals?.dispose(); layers.decals = mountDecalLayer(scene, tier, exp.decals); return;
       case 'crowd': layers.crowd?.dispose(); layers.crowd = mountCrowdLayer({ scene }, exp.crowd); return;
+      // track 3: the cast character on the mode's own hero spot, on the real rig (castLayer.ts) — RIG-ADJACENT
+      case 'cast': layers.cast?.dispose(); layers.cast = mountCastLayer(scene, exp.cast?.player, target?.subject ?? [0, 0, 0], target?.subjectYaw ?? 0); return;
       case 'weather': layers.weather?.dispose(); layers.weather = mountWeatherLayer(scene, lights, exp.weather, target?.weatherFamily ?? 'court', { tier, keepSky: !!exp.look.sky }); return;
     }
   };

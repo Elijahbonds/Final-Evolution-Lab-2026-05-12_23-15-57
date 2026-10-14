@@ -13,8 +13,9 @@ import { browserKV, encodeInline, exportFile, writePlaytest } from '@/lib/nexus-
 import { importProject, renameProject } from '@/lib/nexus-studio/edits';
 import { targetOf } from '@/lib/nexus-studio/targets';
 import { studioLoadAllowed } from '@/lib/nexus-studio/runtime';
-import { useStudio, type SaveState } from './use-studio';
+import { useResolvedCast, useStudio, type SaveState } from './use-studio';
 import { VenueEditor } from './venue-editor';
+import { CharactersTrack } from './characters';
 import { AiVenuePanel } from './ai-venue-panel';
 import { C, ToolButton } from './ui';
 
@@ -35,6 +36,7 @@ export function NexusStudioApp() {
   const [message, setMessage] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const { doc, venue } = studio;
+  const cast = useResolvedCast(doc, venue);
 
   const doExport = () => {
     const f = exportFile(doc);
@@ -54,7 +56,7 @@ export function NexusStudioApp() {
     const t = targetOf(venue.base.target);
     if (!t) { setMessage('This venue has no mode to play it in yet.'); return; }
     if (!studioLoadAllowed()) { setMessage('Play-test runs in a development build only (the mode’s ?venue= load path is dev-only).'); return; }
-    const exp = exportVenue(venue);
+    const exp = exportVenue(venue, cast);   // track 3: the cast rides the export, decoded (synchronously here: a popup must open in the click)
     const w = writePlaytest(browserKV(), exp);
     const param = w.ok ? exp.venueId : encodeInline(exp);
     if (!param) { setMessage(`Could not hand the venue over: ${w.ok ? '' : w.error}`); return; }
@@ -116,11 +118,7 @@ export function NexusStudioApp() {
           <div className="relative min-h-0 overflow-hidden"><StudioShell /></div>
         </div>
       )}
-      {track === 'characters' && <PlannedTrack title="Characters (track 3)" lines={[
-        'A Studio character is a Closet look: the Closet Studio (lib/creator/look, the stage rig, the on-model handles) is the editor, and its share code is what a project keeps.',
-        'Next: cast a venue — who stands where (the target mode’s rival, the crowd’s body variety), applied through playerIdentity as the Closet already does.',
-        'The athlete Creator (components/creator/editor) keeps the stats and traits.',
-      ]} />}
+      {track === 'characters' && <CharactersTrack studio={studio} onPreview={() => setTrack('venue')} />}
       {track === 'scripts' && <PlannedTrack title="Scripts (track 4)" lines={[
         'Event → condition → action graphs over the seams a mode already exposes as data: the momentum meter, the crowd’s react(), the juice and the HUD banner, the broadcast camera, the replay.',
         'Venue triggers first (a zone fires a cheer, a fixture flash, a banner), gameplay rules last. A project already carries an empty scripts list, so nothing migrates when it lands.',

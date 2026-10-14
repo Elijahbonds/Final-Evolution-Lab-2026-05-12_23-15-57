@@ -7,13 +7,14 @@
 import { Copy, Film, Trash2, Clapperboard } from 'lucide-react';
 import {
   BACKDROPS, DECAL_KINDS, FIXTURE_ROLES, GROUND_KINDS, INTROS, LIMITS, MOODS, REPLAY_ANGLES,
-  type StudioIntro, type StudioMood, type StudioObject, type StudioReplayAngle, type StudioSky, type StudioVenue, type StudioWeather,
+  type StudioIntro, type StudioMood, type StudioObject, type StudioProject, type StudioReplayAngle, type StudioSky, type StudioVenue, type StudioWeather,
 } from '@/lib/nexus-studio/doc';
 import { editObject, editVenue } from '@/lib/nexus-studio/edits';
 import type { Command, ObjectPatch } from '@/lib/nexus-studio/commands';
 import { catalogIdOf, catalogItem } from '@/lib/nexus-studio/catalog';
 import { targetOf } from '@/lib/nexus-studio/targets';
 import { readyWeathers } from '@/lib/babylon/nexus/weather';
+import { CastSlotField } from './characters';
 import { C, ColorField, NumberField, PanelTitle, Row, Select, TextField, Toggle, ToolButton } from './ui';
 
 const MOOD_LABEL: Record<StudioMood, string> = {
@@ -32,6 +33,8 @@ export interface InspectorProps {
   onDuplicate(id: string): void;
   onPreviewIntro(kind: 'establish' | 'walkIn'): void;
   onPreviewReplay(angle: StudioReplayAngle): void;
+  /** Track 3: the project, for the venue's character slot (its characters). */
+  project?: StudioProject;
 }
 
 export function Inspector(p: InspectorProps) {
@@ -124,7 +127,7 @@ function ObjectFields({ venue, object: o, run, seal, onDelete, onDuplicate }: In
   );
 }
 
-function VenueFields({ venue: v, run, seal, onPreviewIntro, onPreviewReplay }: InspectorProps) {
+function VenueFields({ venue: v, run, seal, onPreviewIntro, onPreviewReplay, project }: InspectorProps) {
   const set = (patch: Parameters<typeof editVenue>[1], field: string) => run(editVenue(v, patch, field));
   const target = targetOf(v.base.target);
   const sky = v.sky;
@@ -135,6 +138,8 @@ function VenueFields({ venue: v, run, seal, onPreviewIntro, onPreviewReplay }: I
       <PanelTitle>Venue</PanelTitle>
       <Row label="Name"><TextField label="Venue name" value={v.name} onChange={(n) => set({ name: n.slice(0, LIMITS.name) }, 'name')} onDone={seal} /></Row>
       <Row label="Plays in" hint="The mode that loads this venue, and the court it is laid over"><span className="text-[12px]" style={{ color: C.text }}>{target?.label ?? v.base.target} <span style={{ color: C.dim }}>· {v.base.spec} court</span></span></Row>
+
+      {project && (<><PanelTitle>Cast</PanelTitle><CastSlotField project={project} venue={v} run={run} /></>)}
 
       <PanelTitle>Light &amp; sky</PanelTitle>
       <Row label="Mood" hint="LightRig: the sun, the fill, the grade, the sky dome's glow"><Select label="Mood" value={v.mood} options={MOODS.map((m) => ({ value: m, label: MOOD_LABEL[m] }))} onChange={(m) => set({ mood: m }, 'mood')} /></Row>
@@ -167,7 +172,7 @@ function VenueFields({ venue: v, run, seal, onPreviewIntro, onPreviewReplay }: I
         </span>
       </Row>
       <Row label="Court dressing" hint="The court's own CC0 set (VenueProps)"><Select label="Court dressing" value={v.baseDressing} options={[{ value: 'keep', label: 'Keep' }, { value: 'none', label: 'Bare' }]} onChange={(d) => set({ baseDressing: d }, 'dressing')} /></Row>
-      <Row label="Glossy floor" hint="GlossyFloor: a varnished mirror on a wooden court (desktop/TV). Needs a routed one-line change to reach the mode — docs/NEXUS-STUDIO.md §8">
+      <Row label="Glossy floor" hint="GlossyFloor: a varnished mirror on a wooden court (desktop/TV), in the viewport and in the mode">
         <Toggle label="Glossy floor" on={v.glossyFloor} onChange={(on) => set({ glossyFloor: on, ...(on && !v.ground?.kind ? { ground: { ...v.ground, kind: 'court' } } : {}) }, 'glossy floor')} />
       </Row>
 

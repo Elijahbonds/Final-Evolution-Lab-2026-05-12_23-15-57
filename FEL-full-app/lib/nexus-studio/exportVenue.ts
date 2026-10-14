@@ -14,6 +14,7 @@ import {
   type StudioVenue, type StudioWeather, type V3,
 } from './doc';
 import { targetOf } from './targets';
+import { sanitizeCast, type ExportCast } from './cast';
 
 export const EXPORT_KIND = 'nexus-studio-venue' as const;
 export const EXPORT_VERSION = 1 as const;
@@ -49,13 +50,16 @@ export interface StudioVenueExport {
   glossyFloor: boolean;
   /** Where the play happens (the previews' subject); null = the target's own. */
   subject: V3 | null;
+  /** Track 3: the decoded looks the venue casts (cast.ts). Absent = the player's own look. */
+  cast?: ExportCast;
 }
 
 const r3 = (n: number): number => Math.round(n * 1000) / 1000;
 const v3 = (p: V3): V3 => [r3(p[0]), r3(p[1]), r3(p[2])];
 
-/** A Studio venue → what a mode loads. Hidden objects are left out; locked ones are in (locked is an editor state). */
-export function exportVenue(v: StudioVenue): StudioVenueExport {
+/** A Studio venue → what a mode loads. Hidden objects are left out; locked ones are in (locked is an editor state). `cast` is
+ *  the venue's cast already decoded (cast.ts resolveCast: share codes decode asynchronously). */
+export function exportVenue(v: StudioVenue, cast?: ExportCast | null): StudioVenueExport {
   const live = v.objects.filter((o) => !o.hidden);
   const props: ExportSpecProp[] = [], kit: ExportKitProp[] = [], meshy: ExportMeshyProp[] = [];
   const fixtures: ExportFixture[] = [], stands: ExportStand[] = [], decals: ExportDecal[] = [];
@@ -90,6 +94,7 @@ export function exportVenue(v: StudioVenue): StudioVenueExport {
     },
     baseDressing: v.baseDressing, kit, meshy, fixtures, crowd, decals,
     weather: v.weather, glossyFloor: v.glossyFloor, subject,
+    ...(cast ? { cast } : {}),
   };
 }
 
@@ -143,6 +148,7 @@ export function sanitizeVenueExport(raw: unknown): StudioVenueExport | null {
       posture: oneOf(s.posture, POSTURES) ?? 'seated', benches: s.benches !== false, gaps: clampNum(s.gaps, 0, 0.9, 0.12),
     };
   }) : [];
+  const cast = sanitizeCast(raw.cast);
   const angles: StudioReplayAngle[] = [];
   for (const a of Array.isArray(raw.replayAngles) ? raw.replayAngles : []) { const v = oneOf(a, REPLAY_ANGLES); if (v && !angles.includes(v) && angles.length < LIMITS.replayAngles) angles.push(v); }
   return {
@@ -182,6 +188,7 @@ export function sanitizeVenueExport(raw: unknown): StudioVenueExport | null {
     weather: oneOf(raw.weather, WEATHER_PICKS) ?? 'natural',
     glossyFloor: raw.glossyFloor === true,
     subject: Array.isArray(raw.subject) ? pos(raw.subject) : null,
+    ...(cast ? { cast } : {}),
   };
 }
 
