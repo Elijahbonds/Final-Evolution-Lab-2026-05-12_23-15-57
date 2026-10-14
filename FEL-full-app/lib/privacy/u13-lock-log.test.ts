@@ -48,6 +48,38 @@ const UA = 'AgeScreenTest/1.0';
 // statement; pending SQL only, no column or index added) at 521c52c1.
 const PARENT = '521c52c1466eef149872a469b631e31572b318f2';
 
+/**
+ * PRISMA-PUBLIC step 1 (PR A, PM guard condition, 2026-10-13): the ONE schema change this ban lets through without a
+ * PARENT bump is exactly one ADDED generator block whose output is "../lib/generated/prisma" — the parallel client.
+ * Everything else still trips it: any model / enum / datasource / view / type change, any change to an existing
+ * generator, a second added generator, or any other file under prisma/. Comments and blank lines are ignored (they
+ * cannot change the client). Returns null when allowed, else the reason.
+ */
+type PrismaBlock = { kind: string; name: string; body: string };
+function prismaBlocks(src: string): PrismaBlock[] {
+  const clean = src.split('\n').map((l) => l.replace(/\/\/.*$/, '').trim()).filter(Boolean).join('\n');
+  const out: PrismaBlock[] = [];
+  const re = /^(generator|model|enum|datasource|view|type)\s+(\w+)\s*\{([\s\S]*?)^\}/gm;
+  for (let m = re.exec(clean); m; m = re.exec(clean)) out.push({ kind: m[1], name: m[2], body: m[3].replace(/\s+/g, ' ').trim() });
+  return out;
+}
+export function prismaChangeVerdict(before: string, after: string): string | null {
+  const a = prismaBlocks(before), b = prismaBlocks(after);
+  const key = (x: PrismaBlock) => `${x.kind} ${x.name} {${x.body}}`;
+  const aKeys = new Set(a.map(key));
+  const added = b.filter((x) => !aKeys.has(key(x)));
+  const bKeys = new Set(b.map(key));
+  const removed = a.filter((x) => !bKeys.has(key(x)));
+  if (removed.length) return `changed or removed: ${removed.map((x) => `${x.kind} ${x.name}`).join(', ')}`;
+  if (added.length === 0) return null;
+  if (added.length > 1) return `more than one block added: ${added.map((x) => `${x.kind} ${x.name}`).join(', ')}`;
+  const g = added[0];
+  if (g.kind !== 'generator') return `added ${g.kind} ${g.name}`;
+  if (a.some((x) => x.kind === 'generator' && x.name === g.name)) return `generator ${g.name} already existed`;
+  if (!/(^| )output = "\.\.\/lib\/generated\/prisma"( |$)/.test(g.body)) return `generator ${g.name} does not output to ../lib/generated/prisma`;
+  return null;
+}
+
 /** Resolve a diff base for the schema-ban check when CI's checkout is shallow. */
 function resolvePrismaDiffBase(): string {
   const tryCat = (sha: string) => {
@@ -184,7 +216,42 @@ describe('MUST (3) one PII-free line per under-13 lock', () => {
     const coppa = execSync("git grep -n '\\[COPPA-U13-LOCK\\]' -- app components lib || true", { encoding: 'utf8' });
     expect(coppa.trim()).toBe('');
     const base = resolvePrismaDiffBase();
-    const schema = execSync(`git diff --name-only ${base} -- prisma/`, { encoding: 'utf8' });
-    expect(schema.trim()).toBe('');
+    const changed = execSync(`git diff --relative --name-only ${base} -- prisma/`, { encoding: 'utf8' }).trim();
+    if (changed === '') return;
+    // the PM's one exception (see prismaChangeVerdict): the schema file alone, with only the parallel generator added
+    expect(changed.split('\n')).toEqual(['prisma/schema.prisma']);
+    const before = execSync(`git show ${base}:./prisma/schema.prisma`, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+    const after = execSync('cat prisma/schema.prisma', { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+    expect(prismaChangeVerdict(before, after)).toBeNull();
+  });
+});
+
+describe('the prisma/ guard condition still trips on everything else (PRISMA-PUBLIC step 1)', () => {
+  const BASE = [
+    'datasource db {', '  provider = "postgresql"', '  url = env("DATABASE_URL")', '}',
+    'generator client {', '  provider = "prisma-client-js"', '  output   = "../public/_prisma/client"', '}',
+    'model User {', '  id String @id', '  email String @unique', '}',
+    'enum Role {', '  ADULT', '  TEEN', '}',
+  ].join('\n');
+  const LIB = ['// the parallel client', 'generator clientLib {', '  provider      = "prisma-client-js"', '  output        = "../lib/generated/prisma"', '}'].join('\n');
+  it('allows: no change, comments only, and exactly the one parallel generator', () => {
+    expect(prismaChangeVerdict(BASE, BASE)).toBeNull();
+    expect(prismaChangeVerdict(BASE, `// a note\n${BASE}\n`)).toBeNull();
+    expect(prismaChangeVerdict(BASE, `${BASE}\n\n${LIB}`)).toBeNull();
+  });
+  it('a MODEL edit still trips it, even alongside the allowed generator', () => {
+    const edited = BASE.replace('  email String @unique', '  email String @unique\n  birthYear Int?');
+    expect(prismaChangeVerdict(BASE, edited)).toMatch(/model User/);
+    expect(prismaChangeVerdict(BASE, `${edited}\n${LIB}`)).toMatch(/model User/);
+    expect(prismaChangeVerdict(BASE, `${BASE}\nmodel Extra {\n  id String @id\n}`)).toMatch(/added model Extra/);
+  });
+  it('an enum, datasource or existing-generator change trips it', () => {
+    expect(prismaChangeVerdict(BASE, BASE.replace('  TEEN', '  TEEN\n  CHILD'))).toMatch(/enum Role/);
+    expect(prismaChangeVerdict(BASE, BASE.replace('postgresql', 'mysql'))).toMatch(/datasource db/);
+    expect(prismaChangeVerdict(BASE, BASE.replace('../public/_prisma/client', '../lib/generated/prisma'))).toMatch(/generator client/);
+  });
+  it('a second added generator, or one pointed anywhere else, trips it', () => {
+    expect(prismaChangeVerdict(BASE, `${BASE}\n${LIB}\n${LIB.replace('clientLib', 'clientTwo')}`)).toMatch(/more than one/);
+    expect(prismaChangeVerdict(BASE, `${BASE}\n${LIB.replace('../lib/generated/prisma', '../public/other')}`)).toMatch(/does not output/);
   });
 });
