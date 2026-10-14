@@ -87,9 +87,9 @@ describe('wired in, and presentation only', () => {
     expect(w).toContain('w.m.environmentIntensity = wetGloss(w.gloss.dryEnv, w.gloss.env, wet);');
     expect(w).toContain('w.m.environmentIntensity = w.gloss.dryEnv; w.m.specularIntensity = w.gloss.drySpec;');
   });
-  it('the kart reads the weather for its LOOKS only: rain, storm, fog from the URL, and none of the gameplay modifiers', () => {
+  it('the kart reads the weather for its LOOKS only: rain, storm, fog from the URL or the Rain chip, and none of the gameplay modifiers', () => {
     const k = read('../modes/VelocityKartMode.ts');
-    expect(k).toMatch(/readWeatherUrl\(\)/);
+    expect(k).toMatch(/readKartWeather\(\)/);   // test changed (w3-followups): was readWeatherUrl(); the mode now reads the URL then the start screen's saved Rain chip, through readKartWeather()
     expect(k).toMatch(/mountWeatherFx\(ctx\.scene, ctx\.lights, weather, \{ tier: ctx\.lights\.tier, keepSky: true, fogHex: hazeColor\(course\.mood\) \}\)/);   // the air is the course's haze, not its dark clear colour
     for (const m of ['gripMult', 'boardDragMult', 'ballWindAccel', 'flightWind', 'gustWind', 'airDensityMult', 'wet01']) expect(k, m).not.toContain(`weather.${m}`);
     expect(k).toMatch(/weatherFx\?\.dispose\(\); weatherFx = null; weather = null;/);

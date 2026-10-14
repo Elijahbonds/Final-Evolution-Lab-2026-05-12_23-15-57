@@ -923,11 +923,11 @@ The deferred atmosphere and surface items from waves 1 and 2. Everything below i
 - **Kart.** `racing/roadSurface.ts`: the asphalt grain (relief and roughness) over the road's paint (desktop/high: a phone's texture row is
   frozen over the ceiling); rumble ribs on the kerbs (a normal map);
   the road named into the weather's wet pass with a wet reflection level (environment and specular lift to 1.0 as it soaks, and come back).
-  The kart has no weather chip, so it honours `?weather=rain|storm|fog` from the URL only (never the saved pick of the other modes) for its
+  The kart honours `?weather=rain|storm|fog` from the URL, and (w3-followups, owner 2026-10-14) a RAIN on/off chip on its start screen, saved per device as `fel-kart-rain` (never the saved pick of the other modes) for its
   looks, and reads none of the weather's gameplay modifiers. The night courses' edge strip is a fixture now (`FixtureLights` strips): a pool
   of 8 clustered lights that follows the kart along the strip, each pinned to one of the nearest lamps.
 - **Aero.** `racing/aeroAtmos.ts`: cloud banks to fly through (soft upright sprites at the line's height that fade out as the camera enters
-  while the fog thickens to 4x and takes the cloud's colour); skim spray off the plane's track over water (sparks over lava); the caldera's
+  while the fog thickens to 2.5x (was 4x; owner 2026-10-14 "Soften it") and takes 0.3 of the cloud's colour); skim spray off the plane's track over water (sparks over lava); the caldera's
   lava glow (the world's underlight 0.8 to ~1.7, a glow on the lava, the haze) and a ring of light round the plane at every checkpoint.
   A phone keeps only the ring and the lava glow (`mobileBudget.json` holds aeroaces at 0 live particles: no sprites, no spray).
 - **Findings worth the next lane's time.** (1) An upright or camera-facing sprite that dips into a depth plane (the sea, the ground) is cut
